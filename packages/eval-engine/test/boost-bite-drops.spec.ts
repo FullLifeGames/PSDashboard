@@ -236,7 +236,8 @@ describe.each(MODES.filter(mode => !mode.doubles))('a drop behind a front that b
     // The front Jolteon at full HP wins on the move order whatever the drop does; the bench Jolteon would be the flip.
     const battle = behind(JOLTEON);
     expect(evalFeatures(battle).boosts).toBeLessThan(0);
-    expect(evalFeatures(battle).boostsBiting).toBe(0);
+    // T248 (round 73): the front Jolteon is bitten itself, as it wins and the drop makes the win safer in the fresh race (half the foes); the bench Jolteon behind it would add the other half.
+    expect(evalFeatures(battle).boostsBiting).toBeCloseTo(stageValue(battle.sides[0].active[0]!, 'atk', -2) / 2, 12);
   });
 
   test('a front foe that never swings back but outlasts the horizon closes the bench as well (T225; before: the drop counted)', () => {

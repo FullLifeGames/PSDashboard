@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import type { Battle } from '@pkmn/sim';
 import { loadSimMods } from '../src/forward/sim-mods';
 import {
-  RELATIONS, TOLERANCE, idleActiveBodies, pickByStride, readManifest, realEvaluator, rootSubject, swapSides, sweepLeaves, reviveBattle,
+  JUMP_LIMIT, RELATIONS, TOLERANCE, idleActiveBodies, pickByStride, readManifest, realEvaluator, rootSubject, swapSides, sweepLeaves, reviveBattle,
   type Evaluator, type RelationGroup, type RelationName, type RelationSubject, type Violation,
 } from './relation-checks';
 
@@ -18,41 +18,40 @@ import {
  * Each group (singles, doubles OU, VGC, Champions) reads its own positions. The detectors are proved by planted
  * faults in an evaluator, on a constant stub and on the real one.
  *
- * Known breaks. A break the group has today is named below by relation, group and position (the fixture file) with
- * its TODO, and it is checked by a `test.fails`: the day the TODO makes the position pass, that test turns red and
- * the entry goes. Every other position of the group must pass as a plain test, so the marker never hides an unnamed
- * fault. The causes, read at one HP point (out/break-diag.json of lane C): the 1v1 race of boostsBiting flips at one
- * HP (up to 0.15 in singles, 0.06 in VGC, 0.01 in Champions) and the matchup term falls faster than the bodies term
- * rises over a range of HP (up to 1e-3).
+ * Known breaks (T248, design gate 2a of round 73: every break above 1e-3 goes, a smaller slope stays with its reason). The
+ * size of a break is the largest wrong-way change of the score at ONE HP point: a break found on the grid of 10 % steps
+ * is scanned point by point (`jump` of the violation). A position in the list is checked by a `test.fails`: the day it
+ * passes, that test turns red and the entry goes. Two kinds. A slope is a smooth change that stays at or under 1e-3 per HP
+ * point (the matchup term falls a little faster than the bodies term rises over a range of HP); it stays with its
+ * reason and must pass the 1e-3 test. A pending break is above 1e-3 and waits for its cause: the matchup term at one HP
+ * (573756 turn 73, Toxapex; the slope of 2629703929-t13) and the priced hits of a recoil move (two single points). Every
+ * other position of the group passes at 1e-9 as a plain test, so the list never hides an unnamed fault. The race flips of
+ * boostsBiting that stood here (nine positions) went with the fresh-race reading of `stageBites` (score/boost-race.ts).
  */
-
-/**
- * The TODO of every break below. pairFocus weighs 0 in every table since aafd8c5 (round 69, gate 6b), so no break runs
- * through it (T199 stays the ramp that would let pairFocus carry a weight again); the causes are the two read above.
- */
-const HP_MONOTONY = 'T248';
 
 interface KnownBreak {
   relation: 'ownHpDown' | 'foeHpDown';
   group: RelationGroup;
   position: string;
-  todo: string;
+  kind: 'slope' | 'pending';
+  /** The cause, for the title. */
+  reason: string;
 }
 
-const known = (todo: string, relation: KnownBreak['relation'], group: RelationGroup, ...positions: string[]): KnownBreak[] =>
-  positions.map(position => ({ relation, group, position, todo }));
+const SLOPE = 'slope, T248, D2';
+const slope = (relation: KnownBreak['relation'], group: RelationGroup, ...positions: string[]): KnownBreak[] =>
+  positions.map(position => ({ relation, group, position, kind: 'slope', reason: SLOPE }));
+const pending = (reason: string, relation: KnownBreak['relation'], group: RelationGroup, ...positions: string[]): KnownBreak[] =>
+  positions.map(position => ({ relation, group, position, kind: 'pending', reason }));
 
 const KNOWN_BREAKS: KnownBreak[] = [
-  ...known(HP_MONOTONY, 'foeHpDown', 'vgc',
-    'gen9vgc2026regi-2629703929-t13', 'gen9vgc2026regi-2629703929-t8', 'gen9vgc2026regi-2629731825-t2',
-    'gen9vgc2026regi-2629760324-t6', 'gen9vgc2026regi-2630461565-t2'),
-  ...known(HP_MONOTONY, 'ownHpDown', 'vgc',
-    'gen9vgc2026regi-2629703929-t13', 'gen9vgc2026regi-2630685175-t4', 'gen9vgc2026regi-2630685175-t7',
-    'gen9vgc2026regi-2630685175-t7-played', 'gen9vgc2026regi-2630685175-t8'),
-  ...known(HP_MONOTONY, 'ownHpDown', 'singles', 'smogtours-gen8ou-573756-t73', 'gen9ou-2658663776-t2'),
-  ...known(HP_MONOTONY, 'foeHpDown', 'singles', 'gen9ou-2658675932-t2', 'smogtours-gen9ou-749351-t10', 'smogtours-gen9ou-751466-t2'),
-  ...known(HP_MONOTONY, 'ownHpDown', 'champions', 'gen9championsvgc2026regmbbo3-2634199230-t5'),
-  ...known(HP_MONOTONY, 'foeHpDown', 'champions', 'gen9championsvgc2026regmbbo3-2634199230-t5'),
+  ...slope('foeHpDown', 'vgc', 'gen9vgc2026regi-2629703929-t13', 'gen9vgc2026regi-2629703929-t8'),
+  ...slope('ownHpDown', 'vgc', 'gen9vgc2026regi-2630685175-t8'),
+  ...slope('foeHpDown', 'singles', 'smogtours-gen9ou-749351-t10'),
+  ...pending('T248 matchup slope above 1e-3', 'ownHpDown', 'vgc', 'gen9vgc2026regi-2629703929-t13'),
+  ...pending('T248 priced hit', 'ownHpDown', 'vgc', 'gen9vgc2026regi-2630685175-t4'),
+  ...pending('T248 matchup jump (the 573756 turn 73 pin)', 'ownHpDown', 'singles', 'smogtours-gen8ou-573756-t73'),
+  ...pending('T248 priced hit', 'ownHpDown', 'champions', 'gen9championsvgc2026regmbbo3-2634199230-t5'),
 ];
 
 await loadSimMods('gen9championscustomgame');
@@ -132,17 +131,23 @@ for (const { group, name } of GROUPS) {
     for (const relation of ['ownHpDown', 'foeHpDown'] as const) {
       const knownHere = KNOWN_BREAKS.filter(entry => entry.group === group && entry.relation === relation);
       const named = new Set(knownHere.map(entry => entry.position));
+      const waiting = new Set(knownHere.filter(entry => entry.kind === 'pending').map(entry => entry.position));
+      const above = (list: RelationSubject[]) => violationsOf(relation, list, realEvaluator).filter(violation => (violation.jump ?? violation.size) > JUMP_LIMIT);
 
-      test(`${name}: ${STATEMENT[relation]}, outside the positions a TODO names`, () => {
+      test(`${name}: ${STATEMENT[relation]}, outside the positions the list names`, () => {
         const rest = mine.filter(subject => !named.has(subject.position));
         expect(scene(violationsOf(relation, rest, realEvaluator))).toEqual([]);
       });
 
+      test(`${name}: ${STATEMENT[relation]} by more than ${JUMP_LIMIT} at one HP point, outside the pending positions`, () => {
+        expect(scene(above(mine.filter(subject => !waiting.has(subject.position))))).toEqual([]);
+      });
+
       for (const entry of knownHere) {
-        // Expected failure: red today, so the day the TODO makes this position pass, this test fails and the entry goes.
-        test.fails(`${entry.todo} ${name}: ${STATEMENT[relation]} (${entry.position})`, () => {
+        // Expected failure: red today, so the day the position passes, this test fails and the entry goes.
+        test.fails(`${entry.reason} ${name}: ${STATEMENT[relation]}${entry.kind === 'pending' ? ` by more than ${JUMP_LIMIT}` : ''} (${entry.position})`, () => {
           const board = mine.filter(subject => subject.position === entry.position);
-          expect(scene(violationsOf(relation, board, realEvaluator))).toEqual([]);
+          expect(scene(entry.kind === 'pending' ? above(board) : violationsOf(relation, board, realEvaluator))).toEqual([]);
         });
       }
     }

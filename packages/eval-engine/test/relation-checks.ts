@@ -40,14 +40,19 @@ export interface Violation {
   relation: 'ownHpDown' | 'foeHpDown' | 'idleStage' | 'idleStageActive' | 'swapNegates';
   subject: string;
   detail: string;
-  /** The size of the break in score units. */
+  /** The size of the break in score units (an HP series: the break over the step of 10 % of the maximum HP). */
   size: number;
+  /** An HP series: the largest wrong-way change of the score at one HP point inside the broken step (T248, design gate 2a). */
+  jump?: number;
   /** The body that changed: its side, its index in side.pokemon and the HP before and after (HP series only). */
   body?: { side: 0 | 1; index: number; fromHp: number; toHp: number };
 }
 
 /** The tolerance of every relation: the residuals are floating-point noise (largest measured on the roots: 1.7e-16). */
 export const TOLERANCE = 1e-9;
+
+/** T248, design gate 2a: a wrong-way change of the score at one HP point above this is a break that goes; a smaller slope stays as an expected failure with its reason. */
+export const JUMP_LIMIT = 1e-3;
 
 /** The static evaluation the engine ships, with a fresh matchup cache per call. */
 export const realEvaluator: Evaluator = (battle, ruleset) => evaluatePosition(battle, createMatchupCache(ruleset));
@@ -135,6 +140,25 @@ const HP_STEPS = [0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1] as const;
 const standing = (battle: Battle, side: 0 | 1) => battle.sides[side].pokemon.filter(mon => mon.hp > 0);
 
 /**
+ * The largest wrong-way change of the score at one HP point when the body goes down from `fromHp` to `toHp` one point at
+ * a time (the score of p1 rises as p1's body loses HP, or falls as p2's body loses HP). The body ends at `toHp`.
+ */
+function largestJump(
+  battle: Battle, mon: Pokemon, subject: RelationSubject, evaluate: Evaluator, side: 0 | 1, fromHp: number, toHp: number,
+): number {
+  mon.hp = fromHp;
+  let previous = evaluate(battle, subject.ruleset);
+  let largest = 0;
+  for (let hp = fromHp - 1; hp >= toHp; hp--) {
+    mon.hp = hp;
+    const score = evaluate(battle, subject.ruleset);
+    largest = Math.max(largest, side === 0 ? score - previous : previous - score);
+    previous = score;
+  }
+  return largest;
+}
+
+/**
  * HP of one side goes down body by body (the active ones and the bench): 90 down to 10 % of the maximum in steps of 10, the
  * steps below the body's current HP only. `worse` names the direction a step must not break.
  */
@@ -157,8 +181,9 @@ function hpSeriesViolations(
         // Own HP down must not raise the score; foe HP down must not lower it (p1's view).
         const delta = side === 0 ? score - previous : previous - score;
         if (delta > TOLERANCE) {
+          const jump = largestJump(battle, mon, subject, evaluate, side, previousHp, hp);
           violations.push({
-            relation, subject: subject.label, size: delta, body: { side, index, fromHp: previousHp, toHp: hp },
+            relation, subject: subject.label, size: delta, jump, body: { side, index, fromHp: previousHp, toHp: hp },
             detail: `${side === 0 ? 'p1' : 'p2'} body ${index} (${mon.species.name}) ${previousHp}/${mon.maxhp} to ${hp}/${mon.maxhp}: ${previous.toFixed(6)} to ${score.toFixed(6)}`,
           });
         }

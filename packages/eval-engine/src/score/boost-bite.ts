@@ -112,7 +112,7 @@ function statBites(pair: PairRace, stat: keyof BoostsTable, drop: boolean): bool
   const { stages } = pair;
   if (!stages.mineHitting[stat] && !stages.mineDefending[stat]) return false;
   if (stat === 'accuracy' || stat === 'evasion') return true;
-  return stageBites(pair.held, pair.without(stat), drop);
+  return stageBites(pair.held, pair.without(stat), drop, pair.full);
 }
 
 /** What the foes on the field leave of a holder's stages: boosts at all, and any stage for the foes off the field. */

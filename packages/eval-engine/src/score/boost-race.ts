@@ -204,10 +204,19 @@ export function setRaceCut(on: boolean): void {
   raceCut = on;
 }
 
-/** One pair's races: the race on all the stages standing, and the race without one stat's stage. */
+/**
+ * One pair's races. `held` is the race on all the stages standing, at the HP the bodies have (it gates: who wins, who acts,
+ * who closes the bench). `full` is the same race with both bodies at full HP, and `without` the race at full HP without
+ * one stat's stage: the pair of them says whether the stage decides a fresh race (T248, round 73). Read at the HP the
+ * bodies have, "the stage made the difference" started and stopped at single HP points (a defensive stage only decides
+ * the race inside a range of HP, a clock only differs above the HP where both need one hit), so a hit you take could raise
+ * your grade and a hit you land could lower it; at full HP it is a property of the pair and the HP enters only through
+ * the gates, which are monotone.
+ */
 export interface PairRace {
   stages: PairStages;
   held: Race;
+  full: Race;
   without: (stat: keyof BoostsTable) => Race;
 }
 
@@ -233,11 +242,13 @@ export function pairRace(
   };
   const heldInputs = inputsOn(mine, foe, mineThreat, foeThreat, battle, stages);
   const held = raceOf(heldInputs, mineBody, foeBody, costOf(heldInputs));
+  const [mineFull, foeFull] = [{ ...mineBody, hp: 1 }, { ...foeBody, hp: 1 }];
+  const full = mineBody.hp === 1 && foeBody.hp === 1 ? held : raceOf(heldInputs, mineFull, foeFull, costOf(heldInputs));
   return {
-    stages, held,
+    stages, held, full,
     without: stat => {
       const inputs = inputsOn(mine, foe, mineThreat, foeThreat, battle, withoutStat(stages, stat));
-      return raceCut && sameInputs(inputs, heldInputs) ? held : raceOf(inputs, mineBody, foeBody, costOf(inputs));
+      return raceCut && sameInputs(inputs, heldInputs) ? full : raceOf(inputs, mineFull, foeFull, costOf(inputs));
     },
   };
 }
@@ -305,10 +316,20 @@ export function idleHolders(battle: Battle, threat: ThreatOf): ReadonlySet<Pokem
  * Whether the stage moves the race in favour of the side it helps (the holder for a boost, the foe for a drop): that
  * side wins the race with the stage, within the race horizon, and gets to act in it; and it did not win without the
  * stage, or won more slowly. A boost that hurts (Speed under Trick Room) is not read: it stays uncounted.
+ *
+ * T248 (round 73): `held` is the race at the HP the bodies have and gates (the side wins, acts, and wins within the
+ * horizon at the HP it has). Whether the stage `made the difference` is read between `full` and `without`, both at full
+ * HP (default: `held`, for the rule on a table of races), and it asks whether the stage improves the race for the side it
+ * helps at all: a shorter clock of its own, a longer one for the other side, or the first move. Read at the HP the bodies
+ * have, the question flipped at single HP points (a defensive stage decides the race only inside a range of the holder's
+ * HP, a clock differs only above the foe's HP where both need one hit), so a hit you take could raise your grade and a
+ * hit you land could lower it, by up to 0.15 in singles. A stage that improves the fresh race is worth having wherever the
+ * HP puts the pair, and only the gate, which is monotone in both HPs, decides whether the pair is won.
  */
-export function stageBites(held: Race, without: Race, drop: boolean): boolean {
+export function stageBites(held: Race, without: Race, drop: boolean, full: Race = held): boolean {
   const helped = drop ? 'foe' : 'mine';
-  const [now, before] = [frameOf(held, helped), frameOf(without, helped)];
+  const now = frameOf(held, helped);
   if (!wins(now) || !now.acts || now.own > BITE_TURNS) return false;
-  return !wins(before) || now.own < before.own;
+  const [fresh, before] = [frameOf(full, helped), frameOf(without, helped)];
+  return fresh.own < before.own || fresh.other > before.other || (fresh.first && !before.first);
 }

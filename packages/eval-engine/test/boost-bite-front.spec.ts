@@ -108,7 +108,8 @@ describe('the foes in front gate the stage (T218)', () => {
     const battle = behind(splash('Snorlax'), splash('Clefable'));
     battle.sides[1].active[0]!.sethp(1);
     benchBitten(battle);
-    expect(sideValue(battle)).toBeCloseTo(stageValue(battle.sides[0].active[0]!, 'atk', 2) / 2, 12);
+    // T248 (round 73): the stage is judged on the fresh race, so the front foe at 1 HP is bitten as well as the bench foe.
+    expect(sideValue(battle)).toBeCloseTo(stageValue(battle.sides[0].active[0]!, 'atk', 2), 12);
   });
 
   /**
@@ -147,7 +148,8 @@ describe('the foes in front gate the stage (T218)', () => {
     const control = behind(set('Clefable', ['splash']), splash('Clefable'));
     control.sides[1].active[0]!.sethp(1);
     benchBitten(control);
-    expect(sideValue(control)).toBeCloseTo(stageValue(control.sides[0].active[0]!, 'atk', 2) / 2, 12);
+    // T248 (round 73): the stage is judged on the fresh race, so the front foe at 1 HP is bitten as well as the bench foe.
+    expect(sideValue(control)).toBeCloseTo(stageValue(control.sides[0].active[0]!, 'atk', 2), 12);
   });
 
   test('a front Haze foe that is only on the bench does not close the gate: it just does not count', () => {
@@ -255,7 +257,8 @@ describe('the doubles gate: the foes in front are the foes on the field', () => 
 
   test('the same board with a harmless first foe: the stage counts for the foe it bites', () => {
     const { battle, mine } = board(splash('Snorlax'));
-    expect(sideValue(battle)).toBeCloseTo(stageValue(mine, 'atk', 2) / 2, 12);
+    // T248 (round 73): the stage is judged on the fresh race, so the front foe at 1 HP is bitten as well as the bench foe.
+    expect(sideValue(battle)).toBeCloseTo(stageValue(mine, 'atk', 2), 12);
   });
 });
 

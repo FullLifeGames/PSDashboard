@@ -84,7 +84,8 @@ describe.each([SINGLES, CHAMPIONS])('singles on %s: the bench credit needs the h
 
   test('the same board with a front foe the holder takes within three turns keeps the bench credit', () => {
     const battle = singlesBoard(format, splash('Snorlax'), foe => foe.sethp(1));
-    expect(sideValue(battle)).toBeCloseTo(stageValue(battle.sides[0].active[0]!, 'atk', 2) / 2, 12);
+    // T248 (round 73): the front foe at 1 HP is bitten as well as the bench foe (the stage is judged on the fresh race).
+    expect(sideValue(battle)).toBeCloseTo(stageValue(battle.sides[0].active[0]!, 'atk', 2), 12);
   });
 });
 
@@ -106,11 +107,14 @@ describe('doubles: the holder has to get past every foe on the field', () => {
   });
 
   test('one front foe the holder cannot get past closes the bench for the other foes too', () => {
-    expect(sideValue(board(wall(), walled))).toBe(0);
+    // The front foe at 1 HP is bitten itself (a third of the foes); the Clefable on the bench would add another third if the bench were open.
+    const battle = board(wall(), walled);
+    expect(sideValue(battle)).toBeCloseTo(stageValue(battle.sides[0].active[0]!, 'atk', 2) / 3, 12);
   });
 
   test('both front foes within the horizon: the bench foe the stage bites counts', () => {
     const battle = board(splash('Snorlax'), foe => foe.sethp(1));
-    expect(sideValue(battle)).toBeCloseTo(stageValue(battle.sides[0].active[0]!, 'atk', 2) / 3, 12);
+    // All three foes are bitten: the two at 1 HP in front and the Clefable on the bench.
+    expect(sideValue(battle)).toBeCloseTo(stageValue(battle.sides[0].active[0]!, 'atk', 2), 12);
   });
 });
