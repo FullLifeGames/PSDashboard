@@ -138,6 +138,7 @@ function PickerRegion({ app, replayData }: WorkspaceProps) {
       onExecuteTurn={liveTip ? app.handleExecuteTurn : handleExecuteDraft}
       played={playedAtView}
       positionKey={`${replayData.id}:${evalViewKey}`}
+      getBattle={liveTip ? app.ctx.branch.getBattle : undefined}
     />
   );
 }
