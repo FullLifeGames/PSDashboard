@@ -10,7 +10,7 @@ import type { CandidateRung, SpreadCandidate } from './ladder.ts';
 import type { ItemDecision, SpeedKnowledgeMap } from './scarf.ts';
 import type { ObservedMaxHp } from './max-hp.ts';
 import { raceSpeed } from './race-speed.ts';
-import { defenderSideOf, fieldOf, hitSideOf, moveOf, readObservation, type HitSide, type ReadObservation } from './observation-read.ts';
+import { defenderSideOf, fieldOf, forcedSpread, hitSideOf, moveOf, readObservation, type HitSide, type ReadObservation } from './observation-read.ts';
 import { abilityAtHit } from './ability-at-hit.ts';
 import { formeAbility } from './battle-forme.ts';
 import { withItemAtHit } from './item-at-hit.ts';
@@ -221,6 +221,8 @@ export function rollRange(ctx: SolveContext, obs: ReadObservation, attackerSprea
   // The calculator keys a few moves on the name (Weather Ball, Terrain Pulse); the typed Hidden Power is its own id.
   const moveName = calcMoveId === obs.moveId ? obs.moveName ?? calcMoveId : calcMoveId;
   const result = calculate(gen, attacker, defender, moveOf(gen, moveName, obs), fieldOf(obs));
+  // A spread the calculator forces on a hit that had one target in the game is no reading (T202).
+  if (forcedSpread(obs, result.move.target)) return null;
   const rolls = (Array.isArray(result.damage) ? (result.damage as number[]).flat() : [Number(result.damage)]).map(Number);
   if (rolls.length === 0) return null;
   const maxHp = defender.maxHP();

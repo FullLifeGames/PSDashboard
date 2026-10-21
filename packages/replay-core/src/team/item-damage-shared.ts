@@ -8,6 +8,7 @@ import { abilitiesAreFree } from './dex-legal.ts';
 import type { EvBudget } from '../spreads/ev-budget.ts';
 import { onBudgetScale } from '../spreads/ev-budget.ts';
 import { natureOf } from '../spreads/ladder.ts';
+import { forcedSpread, SPREAD_TARGETS } from '../spreads/observation-read.ts';
 import { toId } from '../ids.ts';
 import { screenFlags } from '../dex-facts/index.ts';
 
@@ -26,8 +27,6 @@ export const OBSERVATION_SLACK = 0.02;
  * from the guessed spread of the defender as built (round 67, ruling R12).
  */
 export const MISS_MARGIN = 1.1;
-/** The calculator's spread targets: its spread factor applies to them in doubles. */
-const SPREAD_TARGETS = new Set(['allAdjacent', 'allAdjacentFoes']);
 /** Handlers by which an ability changes another Pokémon's damage (Friend Guard, Power Spot, the auras, Ruin). */
 const FIELD_DAMAGE_HOOK = /^on(Ally|Any|Foe)(BasePower|ModifyAtk|ModifyDef|ModifySpA|ModifySpD|ModifyDamage)$/;
 /** Move handlers that set power, damage or type from state the record does not carry. */
@@ -132,6 +131,8 @@ export function rolls(gen: CalcGeneration, hit: LoggedHit, attacker: CalcOptions
       : named;
     const target = calcPokemon(gen, hit.defender, defender);
     const result = calculate(gen, calcPokemon(gen, hit.attacker, attacker), target, move, field);
+    // A spread the calculator forces on a hit that had one target in the game is no reading (T202).
+    if (forcedSpread(hit, result.move.target)) return null;
     const damage = (Array.isArray(result.damage) ? (result.damage as number[]).flat() : [Number(result.damage)]).map(Number);
     const maxHp = target.maxHP();
     return damage.length === 0 || maxHp <= 0 ? null : { min: Math.min(...damage) / maxHp, max: Math.max(...damage) / maxHp };

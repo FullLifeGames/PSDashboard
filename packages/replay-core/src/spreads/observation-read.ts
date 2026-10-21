@@ -45,6 +45,19 @@ export function fieldOf(obs: DamageObservation): Field {
   });
 }
 
+/** The calculator's spread targets: its spread factor applies to them in doubles. */
+export const SPREAD_TARGETS = new Set(['allAdjacent', 'allAdjacentFoes']);
+
+/**
+ * A doubles hit the log shows on one target (no `[spread]` mark) whose calculator result still names a spread target (round 73,
+ * T202). The calculator forces the spread target for a few moves (Expanding Force in Psychic Terrain, Tera Starstorm of
+ * Terapagos-Stellar), and its Doubles field then cuts a hit that the simulator played on one target; behind a screen no field
+ * prices it. The hit gives no damage reading. The detection reads the calculator's result, never a move name. Remove when the
+ * calculator stops forcing the target against a lone foe.
+ */
+export const forcedSpread = (obs: { doubles?: boolean; spread?: boolean }, resultTarget: string): boolean =>
+  !!obs.doubles && !obs.spread && SPREAD_TARGETS.has(resultTarget);
+
 /**
  * The move of an observation as the calculator builds it, by its name (Weather Ball, Terrain Pulse, Techno Blast and Multi-Attack
  * key on the name, not on the id). The calculator cuts a move aimed at all adjacent targets to 0.75 on a
