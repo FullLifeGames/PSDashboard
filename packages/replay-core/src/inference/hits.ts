@@ -46,6 +46,8 @@ interface PendingMove {
   spread: boolean;
   crits: Set<string>;
   targets: Map<string, TargetHit>;
+  /** The item a Pokémon held just before an `-enditem` inside this move (a weakening berry, a gem): the item the hit counted. */
+  itemsBefore: Map<string, { held: string; changed: boolean }>;
 }
 
 export interface HitWalk {
@@ -73,12 +75,12 @@ function boostedStatOf(mon: ClientPokemon): string {
   return typeof stat === 'string' ? stat : '';
 }
 
-function party(mon: ClientPokemon): HitParty {
+function party(mon: ClientPokemon, counted?: { held: string; changed: boolean }): HitParty {
   return {
     species: mon.speciesForme, level: mon.level, tera: mon.terastallized || undefined,
     boosts: { ...mon.boosts } as Record<string, number>, status: mon.status ?? '',
     hp: mon.maxhp > 0 ? mon.hp / mon.maxhp : 1, ability: mon.ability ?? '',
-    held: mon.item ?? '', itemChanged: !!mon.lastItem || ACQUIRED.has(mon.itemEffect),
+    held: counted?.held ?? mon.item ?? '', itemChanged: counted?.changed ?? (!!mon.lastItem || ACQUIRED.has(mon.itemEffect)),
     gender: mon.gender === 'M' || mon.gender === 'F' ? mon.gender : '',
     alliesFainted: mon.side.team.filter(member => member.fainted).length,
     flashFire: !!mon.volatiles.flashfire, slowStart: !!mon.volatiles.slowstart, boostedStat: boostedStatOf(mon),
@@ -107,8 +109,8 @@ function recordHit(walk: HitWalk, pending: PendingMove, attacker: ClientPokemon,
     .filter((mon): mon is ClientPokemon => !!mon && mon !== attacker && mon !== defender && !mon.fainted)
     .map(mon => ({ species: mon.speciesForme, ability: mon.ability ?? '' }));
   return {
-    move: pending.move, attacker: party(attacker),
-    defender: { ...party(defender), side: defender.side.n === 0 ? 'p1' : 'p2' },
+    move: pending.move, attacker: party(attacker, pending.itemsBefore.get(pending.attacker)),
+    defender: { ...party(defender, pending.itemsBefore.get(defender.ident)), side: defender.side.n === 0 ? 'p1' : 'p2' },
     observed: 0, lowerBound: false,
     weather: battle.field.weather ?? '', terrain: battle.field.terrain ?? '',
     screens: standingScreens(defender.side),
@@ -157,6 +159,23 @@ function closeMove(walk: HitWalk) {
   }
 }
 
+/**
+ * The first `-enditem` of a Pokémon inside the resolving move, before its own damage line: the item ended while the damage was
+ * resolved (a weakening berry, a gem), so the hit counted it. The client is read before the line applies, with the item the line
+ * names when the log had not shown it (the idiom of protocol/item-reading.ts, round 73, T210 group 5). An item that ends after its
+ * holder's damage line is gone only for the next hit.
+ */
+function noteItemEnd(walk: HitWalk, line: LogLine) {
+  const pending = walk.pending;
+  const ident = arg(line, 1);
+  if (!pending || pending.itemsBefore.has(ident) || pending.targets.has(ident)) return;
+  // The attacker's item (a gem) counts for every target of the move: it is the first line the move resolves.
+  if (ident === pending.attacker && pending.targets.size > 0) return;
+  const mon = walk.battle.getPokemon(ident as ClientIdent);
+  if (!mon) return;
+  pending.itemsBefore.set(ident, { held: mon.item || toId(arg(line, 2)), changed: !!mon.lastItem || ACQUIRED.has(mon.itemEffect) });
+}
+
 /** Stat swaps the calculator cannot see stay with both Pokémon until they leave the field. */
 function noteSwaps(walk: HitWalk, line: LogLine) {
   if (line.cmd === 'switch' || line.cmd === 'drag') walk.swapped.delete(keyOf(arg(line, 1)));
@@ -174,7 +193,7 @@ function noteSwaps(walk: HitWalk, line: LogLine) {
 /** A line of the resolving move: an opponent's move opens it, a crit marks its target, a plain damage line opens a hit. */
 function noteMoveLine(walk: HitWalk, state: InferrerState, line: LogLine) {
   if (line.cmd === 'move' && identOf(arg(line, 1))?.side === state.opponentSide) {
-    walk.pending = { attacker: arg(line, 1), move: toId(arg(line, 2)), spread: hasKw(line, 'spread'), crits: new Set(), targets: new Map() };
+    walk.pending = { attacker: arg(line, 1), move: toId(arg(line, 2)), spread: hasKw(line, 'spread'), crits: new Set(), targets: new Map(), itemsBefore: new Map() };
   } else if (line.cmd === '-crit' && walk.pending) {
     walk.pending.crits.add(arg(line, 1));
   } else if (line.cmd === '-damage' && !hasKw(line, 'from')) {
@@ -186,6 +205,7 @@ export function collectHits(state: InferrerState, line: LogLine) {
   const walk = (state.hitWalk ??= newWalk(state));
   if (ACTION_ENDS.has(line.cmd)) closeMove(walk);
   noteMoveLine(walk, state, line);
+  if (line.cmd === '-enditem') noteItemEnd(walk, line);
   noteSwaps(walk, line);
   if (namesEffect(line, 'Neutralizing Gas')) walk.neutralized = true;
   try {
