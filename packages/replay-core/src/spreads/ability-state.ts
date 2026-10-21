@@ -31,12 +31,12 @@ const RULES: Record<string, StateRule> = {
 };
 
 /** Abilities that work while an ally has one of these (Plus and Minus read `allies()` and `hasAbility` of the partner). */
-/* eslint-disable names/no-new-dex-name -- ability-state-census.spec.ts holds these ids and the abilities they name to the Dex handlers */
 const ALLY_RULES: Record<string, readonly string[]> = {
+  // eslint-disable-next-line names/no-new-dex-name -- ability-state-census.spec.ts holds these ids and the abilities they name to the Dex handlers
   plus: ['minus', 'plus'],
+  // eslint-disable-next-line names/no-new-dex-name -- the same pair from the other side, held by the same census
   minus: ['minus', 'plus'],
 };
-/* eslint-enable names/no-new-dex-name */
 
 export const abilityStateIds = (): string[] => Object.keys(RULES);
 export const allyStateIds = (): string[] => Object.keys(ALLY_RULES);
