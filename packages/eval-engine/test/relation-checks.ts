@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
-import type { Battle } from '@pkmn/sim';
+import type { Battle, Pokemon } from '@pkmn/sim';
 import { advancePosition, createRootPosition, legalChoices, positionBattle } from '../src/forward-model';
 import { createMatchupCache, evaluatePosition, type StaticRuleset } from '../src/eval-function';
+import { copyOf, FixedDice } from '../src/sim-ask/index';
 
 /**
  * Round 72 (T240): the relation checks on search-made leaves. A relation is a
@@ -36,7 +37,7 @@ export interface RelationSubject extends ManifestEntry {
 export type Evaluator = (battle: Battle, ruleset: StaticRuleset) => number;
 
 export interface Violation {
-  relation: 'ownHpDown' | 'foeHpDown' | 'idleStage' | 'swapNegates';
+  relation: 'ownHpDown' | 'foeHpDown' | 'idleStage' | 'idleStageActive' | 'swapNegates';
   subject: string;
   detail: string;
   /** The size of the break in score units. */
@@ -208,6 +209,101 @@ export function idleStage(subject: RelationSubject, evaluate: Evaluator): Violat
   return violations;
 }
 
+/** The stats the relation raises by 4 on an active body that every foe in front KOs before it acts (speed untouched), where the body stands on no stage: a stage it holds already is not overwritten. */
+const IDLE_ACTIVE_STATS = ['atk', 'spa'] as const;
+
+/** The share of the maximum HP the body is left with: low enough that one hit of a foe in front decides. */
+const IDLE_HP_SHARE = 0.05;
+
+/** The quantile of the damage roll that is the lowest roll of the simulator (random(16) answers 15), and no critical hit. */
+const LOW_ROLL = { quantile: 0.99, chance: false } as const;
+
+/**
+ * T249 (round 73): whether the foe moves before the body and one hit of a move it can click takes the body's HP, asked
+ * of the simulator on a copy of the battle. The order is the simulator's: the best priority of a damaging move of each
+ * (the Dex), then the action speed (Trick Room is in it). The hit is the simulator's damage step at the lowest roll
+ * without a critical hit, for a move that always hits one target; a Choice lock leaves the locked move, and a move
+ * without PP is not clicked.
+ */
+function koesFirst(battle: Battle, foe: Pokemon, body: Pokemon): boolean {
+  const copy = copyOf(battle);
+  (copy as unknown as { debugMode: boolean }).debugMode = false;
+  copy.prng = new FixedDice(LOW_ROLL);
+  const attacker = copy.sides[foe.side.n].pokemon[foe.side.pokemon.indexOf(foe)];
+  const target = copy.sides[body.side.n].pokemon[body.side.pokemon.indexOf(body)];
+  const damaging = (mon: Pokemon) => mon.moveSlots
+    .map(slot => copy.dex.moves.getByID(slot.id as never))
+    .filter(move => move.category !== 'Status' && (move.basePower > 0 || move.damage || move.damageCallback));
+  const locked = (attacker.volatiles['choicelock'] as { move?: string } | undefined)?.move;
+  const moves = damaging(attacker).filter(move => !locked || move.id === locked);
+  const priority = (mon: Pokemon) => Math.max(0, ...damaging(mon).map(move => move.priority));
+  const first = priority(attacker) > priority(target) ||
+    (priority(attacker) === priority(target) && attacker.getActionSpeed() > target.getActionSpeed());
+  if (!first) return false;
+  return moves.some(move => {
+    if (move.accuracy !== true && move.accuracy < 100) return false;
+    if (move.target === 'allAdjacentFoes' || move.target === 'allAdjacent') return false;
+    if ((attacker.moveSlots.find(entry => entry.id === move.id)?.pp ?? 1) <= 0) return false;
+    const active = copy.dex.getActiveMove(move.id);
+    copy.activeMove = active;
+    copy.activePokemon = attacker;
+    copy.activeTarget = target;
+    return (copy.actions.getDamage(attacker, target, active, true) || 0) >= target.hp;
+  });
+}
+
+/** The active bodies of a side that every foe in front KOs first at the HP the relation gives them: the subjects of R3b. */
+export function idleActiveBodies(battle: Battle, side: 0 | 1): Pokemon[] {
+  const foes = battle.sides[1 - side].active.filter((mon): mon is Pokemon => !!mon && mon.hp > 0);
+  if (foes.length === 0) return [];
+  const bodies: Pokemon[] = [];
+  for (const mon of battle.sides[side].active) {
+    if (!mon || mon.hp <= 0) continue;
+    const saved = mon.hp;
+    mon.hp = Math.max(1, Math.round(mon.maxhp * IDLE_HP_SHARE));
+    try {
+      if (foes.every(foe => koesFirst(battle, foe, mon))) bodies.push(mon);
+    } finally {
+      mon.hp = saved;
+    }
+  }
+  return bodies;
+}
+
+/**
+ * R3b: a stage on an active body that every foe in front KOs before it acts adds nothing. The body is set to 5 % HP
+ * and the simulator is asked whether each foe in front moves first and KOs it; then +4 attack and special attack go on
+ * it (on the stats that stand at 0) and the score must stay where it was (in doubles every foe on the field must KO it
+ * first, so a body that only one of two foes KOs is not read).
+ */
+export function idleStageActive(subject: RelationSubject, evaluate: Evaluator): Violation[] {
+  const battle = reviveBattle(subject.serialized, subject.ruleset);
+  const violations: Violation[] = [];
+  for (const side of [0, 1] as const) {
+    for (const mon of idleActiveBodies(battle, side)) {
+      const stats = IDLE_ACTIVE_STATS.filter(stat => mon.boosts[stat] === 0);
+      if (stats.length === 0) continue;
+      const saved = { hp: mon.hp, boosts: { ...mon.boosts } };
+      try {
+        mon.hp = Math.max(1, Math.round(mon.maxhp * IDLE_HP_SHARE));
+        const base = evaluate(battle, subject.ruleset);
+        for (const stat of stats) mon.boosts[stat] = 4;
+        const score = evaluate(battle, subject.ruleset);
+        if (Math.abs(score - base) > TOLERANCE) {
+          violations.push({
+            relation: 'idleStageActive', subject: subject.label, size: Math.abs(score - base),
+            detail: `${side === 0 ? 'p1' : 'p2'} active ${mon.species.name} at ${mon.hp}/${mon.maxhp} with +4 atk, spa: ${base.toFixed(6)} to ${score.toFixed(6)}`,
+          });
+        }
+      } finally {
+        mon.hp = saved.hp;
+        Object.assign(mon.boosts, saved.boosts);
+      }
+    }
+  }
+  return violations;
+}
+
 /** R4: the same board with the sides exchanged scores the negative. */
 export function swapNegates(subject: RelationSubject, evaluate: Evaluator): Violation[] {
   const original = evaluate(reviveBattle(subject.serialized, subject.ruleset), subject.ruleset);
@@ -218,7 +314,7 @@ export function swapNegates(subject: RelationSubject, evaluate: Evaluator): Viol
     : [];
 }
 
-export const RELATIONS = { ownHpDown, foeHpDown, idleStage, swapNegates } as const;
+export const RELATIONS = { ownHpDown, foeHpDown, idleStage, idleStageActive, swapNegates } as const;
 export type RelationName = keyof typeof RELATIONS;
 
 /** Counts the standing bodies of a side (the manifest guard reads it). */

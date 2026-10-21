@@ -3,6 +3,7 @@ import { effectiveSpeed } from '../speed.ts';
 import { EVAL_WEIGHTS, type EvalFeatures } from './weights.ts';
 import { hazardCost, hazardRemovalEquity, strandedMons } from './hazards.ts';
 import { liveTypes, livingOf, threatGetter, type MatchupCache } from './threat.ts';
+import { holderActsInFront, idleHolders, type ThreatOf } from './boost-race.ts';
 import { matchupTerms, sweepCells } from './matchup.ts';
 import { fieldPairCells } from './field-pair.ts';
 import { boostBiteValue, removalFormat, stageValue } from './boost-bite.ts';
@@ -80,13 +81,19 @@ function choiceMismatchOf(pokemon: Pokemon, battle: Battle): number {
   return statusMoves / pokemon.moveSlots.length;
 }
 
-/** Standing boost stages on the side's actives, weighted and status-discounted. */
-function activeBoostValue(side: Side): number {
+/**
+ * Standing boost stages on the side's actives, weighted and status-discounted. A body that never acts, because a foe on
+ * the field moves first and KOs it (score/boost-race.ts, holderActsInFront), carries no value for its boosts (T249,
+ * round 73); its drops stay, as in boostsBiting, so that a body losing HP never gains a point by losing the drop.
+ */
+function activeBoostValue(side: Side, battle: Battle, threat: ThreatOf): number {
   let boosts = 0;
+  const front = side.foe.active.filter((foe): foe is Pokemon => !!foe && !foe.fainted);
   for (const active of side.active) {
     if (!active || active.fainted) continue;
+    const idle = Object.values(active.boosts).some(stage => stage > 0) && !holderActsInFront(active, front, battle, threat);
     for (const [stat, stage] of Object.entries(active.boosts)) {
-      if (stage) boosts += stageValue(active, stat, stage);
+      if (stage && !(idle && stage > 0)) boosts += stageValue(active, stat, stage);
     }
   }
   return boosts;
@@ -96,7 +103,7 @@ function screenCount(side: Side): number {
   return standingScreens(side).length;
 }
 
-function sideFeatureValues(side: Side, battle: Battle, twin: string | null) {
+function sideFeatureValues(side: Side, battle: Battle, twin: string | null, threat: ThreatOf) {
   const stranded = strandedMons(side, battle);
   let bodies = 0;
   let choiceMismatch = 0;
@@ -107,7 +114,7 @@ function sideFeatureValues(side: Side, battle: Battle, twin: string | null) {
     choiceMismatch += choiceMismatchOf(pokemon, battle);
     if (twin) statusFix += statusFixOf(pokemon, stranded, twin);
   }
-  const boosts = activeBoostValue(side);
+  const boosts = activeBoostValue(side, battle, threat);
   const screens = screenCount(side);
   return {
     bodies,
@@ -148,14 +155,15 @@ export function faintedFractionOf(battle: Battle): number {
 export function evalFeatures(battle: Battle, cache?: MatchupCache, weights?: Readonly<Record<keyof EvalFeatures, number>>): EvalFeatures {
   const wants = (key: keyof EvalFeatures): boolean => !weights || weights[key] !== 0;
   const twin = wants('statusFix') ? removalFormat(battle) : null;
-  const p1 = sideFeatureValues(battle.sides[0], battle, twin);
-  const p2 = sideFeatureValues(battle.sides[1], battle, twin);
+  const threat = threatGetter(battle, cache);
+  const p1 = sideFeatureValues(battle.sides[0], battle, twin, threat);
+  const p2 = sideFeatureValues(battle.sides[1], battle, twin, threat);
   let trickRoom = 0;
   if (battle.field.pseudoWeather['trickroom']) {
     trickRoom = averageSpeed(battle.sides[0], battle) <= averageSpeed(battle.sides[1], battle) ? 1 : -1;
   }
-  const terms = matchupTerms(battle, cache);
-  const threat = threatGetter(battle, cache);
+  const idle = idleHolders(battle, threat);
+  const terms = matchupTerms(battle, cache, idle);
   // The end of the turn is played (once, when a race asks for it) only for a board with a standing stage (score/residuals.ts).
   const residuals = residualReader(battle);
   // The hits of the pairs are played (once per pair of the process, score/contact.ts) only where a race asks for one.
@@ -163,8 +171,8 @@ export function evalFeatures(battle: Battle, cache?: MatchupCache, weights?: Rea
   const faintedFraction = faintedFractionOf(battle);
   const damp = EVAL_WEIGHTS.matchupEarlyDamp;
   const matchupPhase = damp + (1 - damp) * Math.min(1, faintedFraction * 3);
-  const p1Cells = sweepCells(0, battle, threat);
-  const p2Cells = sweepCells(1, battle, threat);
+  const p1Cells = sweepCells(0, battle, threat, idle);
+  const p2Cells = sweepCells(1, battle, threat, idle);
   const pairs = wants('pairFocus') || wants('pairRedirect');
   const p1Pair = pairs ? fieldPairCells(0, battle, threat) : NO_PAIR;
   const p2Pair = pairs ? fieldPairCells(1, battle, threat) : NO_PAIR;
@@ -185,7 +193,7 @@ export function evalFeatures(battle: Battle, cache?: MatchupCache, weights?: Rea
     pairFocus: p1Pair.focus - p2Pair.focus,
     pairRedirect: p1Pair.redirect - p2Pair.redirect,
     boostsBiting: wants('boostsBiting')
-      ? boostBiteValue(battle.sides[0], 0, battle, threat, residuals, hits) - boostBiteValue(battle.sides[1], 1, battle, threat, residuals, hits)
+      ? boostBiteValue(battle.sides[0], 0, battle, threat, residuals, hits, idle) - boostBiteValue(battle.sides[1], 1, battle, threat, residuals, hits, idle)
       : 0,
     statusFix: p1.statusFix - p2.statusFix,
   };

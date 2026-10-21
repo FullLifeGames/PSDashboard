@@ -2,17 +2,19 @@ import { describe, expect, test } from 'vitest';
 import type { Battle } from '@pkmn/sim';
 import { loadSimMods } from '../src/forward/sim-mods';
 import {
-  RELATIONS, TOLERANCE, pickByStride, readManifest, realEvaluator, rootSubject, swapSides, sweepLeaves, reviveBattle,
+  RELATIONS, TOLERANCE, idleActiveBodies, pickByStride, readManifest, realEvaluator, rootSubject, swapSides, sweepLeaves, reviveBattle,
   type Evaluator, type RelationGroup, type RelationName, type RelationSubject, type Violation,
 } from './relation-checks';
 
 /**
  * Round 72 (T240): relation checks on search-made leaves. The static is fitted on real positions, and the search
- * builds boards the fit never saw (a +4 Cobalion at 5 % HP priced above a healthy body, gen9draft-2058494320). Four
+ * builds boards the fit never saw (a +4 Cobalion at 5 % HP priced above a healthy body, gen9draft-2058494320). Five
  * statements must hold on any board, so they run on the 34 roots of the fixture manifest and on the leaves of a
  * one-ply sweep (three choices per side by stride, every pair advanced under the seed 1,2,3,4):
  *   own HP down never raises the score; foe HP down never lowers it (p1's view, steps of 10 points from 90 to 10 %);
- *   a stage on a fainted body adds nothing; swapped sides negate.
+ *   a stage on a fainted body adds nothing; a stage on an active body that every foe in front KOs before it acts adds
+ *   nothing (T249, round 73: 5 % HP, +4 attack and special attack, the simulator decides who moves first and who KOs);
+ *   swapped sides negate.
  * Each group (singles, doubles OU, VGC, Champions) reads its own positions. The detectors are proved by planted
  * faults in an evaluator, on a constant stub and on the real one.
  *
@@ -72,6 +74,7 @@ const STATEMENT: Record<RelationName, string> = {
   ownHpDown: 'own HP down never raises the score',
   foeHpDown: 'foe HP down never lowers the score',
   idleStage: 'a stage on a fainted body adds nothing',
+  idleStageActive: 'a stage on an active body that every foe in front KOs first adds nothing',
   swapNegates: 'swapped sides negate the score',
 };
 
@@ -148,6 +151,10 @@ for (const { group, name } of GROUPS) {
       expect(scene(violationsOf('idleStage', mine, realEvaluator))).toEqual([]);
     });
 
+    test(`${name}: ${STATEMENT.idleStageActive}`, () => {
+      expect(scene(violationsOf('idleStageActive', mine, realEvaluator))).toEqual([]);
+    });
+
     test(`${name}: ${STATEMENT.swapNegates}`, () => {
       expect(scene(violationsOf('swapNegates', mine, realEvaluator))).toEqual([]);
     });
@@ -173,6 +180,9 @@ describe('relation checks: planted faults', () => {
     idleStage: base => (battle, ruleset) => base(battle, ruleset) + 0.05 * battle.sides[0].pokemon
       .filter(mon => mon.hp <= 0)
       .reduce((sum, mon) => sum + mon.boosts.atk + mon.boosts.spa + mon.boosts.spe, 0),
+    // Stages on an active body count in full: p1's actives gain 0.05 per stage of attack and special attack, p2's lose it.
+    idleStageActive: base => (battle, ruleset) => base(battle, ruleset) + 0.05 * [0, 1].reduce((sum, side) => (side === 0 ? 1 : -1) * battle.sides[side].active
+      .reduce((stages, mon) => stages + (mon ? mon.boosts.atk + mon.boosts.spa : 0), 0) + sum, 0),
     // An additive bias for p1: the swapped board gets the same bias and the two scores no longer cancel.
     swapNegates: base => (battle, ruleset) => base(battle, ruleset) + 0.05,
   };
@@ -181,13 +191,18 @@ describe('relation checks: planted faults', () => {
   const withFainted = (gameType: 'singles' | 'doubles') =>
     roots.find(root => root.gameType === gameType && /\d+ fainted/.test(root.reason))!;
   const boards: [string, RelationSubject][] = [['singles', withFainted('singles')], ['doubles', withFainted('doubles')]];
+  // The fault of the stage relation needs an active body that every foe in front KOs first: the first position of the game type that has one.
+  const withIdle = (gameType: 'singles' | 'doubles') => subjects.find(subject => subject.gameType === gameType && subject.kind === 'root' &&
+    ([0, 1] as const).some(side => idleActiveBodies(reviveBattle(subject.serialized, subject.ruleset), side).length > 0))!;
+  const idleBoards: [string, RelationSubject][] = [['singles', withIdle('singles')], ['doubles', withIdle('doubles')]];
 
   for (const [baseName, base] of bases) {
     for (const [gameType, board] of boards) {
       for (const relation of Object.keys(RELATIONS) as RelationName[]) {
-        test(`${STATEMENT[relation]}: a planted fault is found on ${gameType} (${board.position}) with ${baseName}`, () => {
-          const found = RELATIONS[relation](board, plants[relation](base));
-          expect(found.length, `the fault went unseen on ${board.label}`).toBeGreaterThan(0);
+        const seen = relation === 'idleStageActive' ? idleBoards.find(([name]) => name === gameType)![1] : board;
+        test(`${STATEMENT[relation]}: a planted fault is found on ${gameType} (${seen.position}) with ${baseName}`, () => {
+          const found = RELATIONS[relation](seen, plants[relation](base));
+          expect(found.length, `the fault went unseen on ${seen.label}`).toBeGreaterThan(0);
           expect(found.every(violation => violation.relation === relation && violation.size > TOLERANCE)).toBe(true);
         });
       }

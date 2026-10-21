@@ -265,7 +265,8 @@ describe.each(MODES)('a positive stage that moves the race, as before, $name', m
     mine.boosts.spe = 2;
     expect(mine.getActionSpeed()).toBeLessThan(foe.getActionSpeed());
     const features = evalFeatures(battle);
-    expect(features.boosts).toBeGreaterThan(0);
+    // T249 (round 73): the slowed holder at 1 HP never acts (the foe moves first and KOs it), so `boosts` reads its stage as 0 too (before: it read the stage in full).
+    expect(features.boosts).toBe(0);
     expect(features.boostsBiting).toBe(0);
   });
 });

@@ -3,6 +3,7 @@ import { movesFirst } from '../speed.ts';
 import { EVAL_WEIGHTS } from './weights.ts';
 import { hazardEntryFraction } from './hazards.ts';
 import { boostedFraction, livingMons, threatGetter, type MatchupCache, type PairThreat } from './threat.ts';
+import { idleHolders, withoutRaises } from './boost-race.ts';
 import { healProfile, ppBudget, raceClocks, raceSide, statusResidual, type RaceClocks, type RaceSide } from './races.ts';
 
 /**
@@ -49,6 +50,7 @@ export function sweepCells(
   sideIndex: 0 | 1,
   battle: Battle,
   threat: (attacker: Pokemon, defender: Pokemon) => PairThreat,
+  idle: ReadonlySet<Pokemon>,
 ): SweepCells {
   const mine = livingMons(battle, sideIndex);
   const theirs = livingMons(battle, 1 - sideIndex);
@@ -56,6 +58,7 @@ export function sweepCells(
   if (theirs.length === 0) return cells;
   for (const a of mine) {
     if ((a.boosts.atk ?? 0) <= 0 && (a.boosts.spa ?? 0) <= 0) continue;
+    if (idle.has(a)) continue;
     for (const b of theirs) {
       const threatA = threat(a, b);
       const threatB = threat(b, a);
@@ -172,12 +175,19 @@ function coverageFrom(
  * other side has NO favorable trade against contributes its answer deficit ×
  * its HP fraction (p1-positive). Exported for direct testing.
  */
-export function matchupTerms(battle: Battle, cache?: MatchupCache): { matchup: number; coverage: number } {
+export function matchupTerms(
+  battle: Battle,
+  cache?: MatchupCache,
+  idle: ReadonlySet<Pokemon> | undefined = undefined,
+): { matchup: number; coverage: number } {
   const p1Living = livingMons(battle, 0);
   const p2Living = livingMons(battle, 1);
   if (p1Living.length === 0 || p2Living.length === 0) return { matchup: 0, coverage: 0 };
 
   const threat = threatGetter(battle, cache);
+  const idleBodies = idle ?? idleHolders(battle, threat);
+  // A body that never acts hits with its drops only.
+  const offence = (mon: Pokemon): Pokemon => (idleBodies.has(mon) ? withoutRaises(mon) : mon);
   const inputs = raceInputs(battle);
   let sum = 0;
   let totalWeight = 0;
@@ -189,8 +199,8 @@ export function matchupTerms(battle: Battle, cache?: MatchupCache): { matchup: n
       const threatA = threat(a, b);
       const threatB = threat(b, a);
       const clocks = raceClocks(
-        inputs.raceSideOf(a, boostedFraction(threatA, a, b)),
-        inputs.raceSideOf(b, boostedFraction(threatB, b, a)),
+        inputs.raceSideOf(a, boostedFraction(threatA, offence(a), b)),
+        inputs.raceSideOf(b, boostedFraction(threatB, offence(b), a)),
       );
       // Answer margins read the race's effective offense: an attacker held
       // by a (now finite) wall keeps its partial answer, a pinned healer
