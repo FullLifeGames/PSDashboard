@@ -308,7 +308,12 @@ export interface StoredEval {
 //      rebuilt turn; the speed tie comes from the simulator's queue; Dex reads replace hand lists (Tidy Up clears
 //      both sides, Defog before Generation 6, Normalize and Hidden Power, Generation 1 screens, Symbiosis and
 //      Pickup). Positions of every format read new values.
-const EVAL_ENGINE_CACHE_VERSION = 68;
+// v69 (round 73, wave 5): the static counts a stage only where its holder acts and wins its front race, a
+//      matchup pair weighs the HP share of its winner, paralysis and sleep are priced from the played hit; the
+//      rebuild leaves a slot empty where the log does, plays the log's -start lines and keeps a Sitrus Berry the
+//      game kept; the spread solver reads history powers, partner abilities and the field of the hit, and drops
+//      Z, Max and cut spread hits. Positions of every format read new values.
+const EVAL_ENGINE_CACHE_VERSION = 69;
 
 /** Round 61: a search-budget form stores under its own tag; the default keeps today's keys. */
 const versionTag = (): string => {
