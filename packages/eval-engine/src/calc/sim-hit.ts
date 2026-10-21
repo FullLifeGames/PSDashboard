@@ -39,7 +39,7 @@ const LOWEST_ROLL = 0.999;
 /** Clicks the Terastallization on a body of the copy, as the turn's first action does it. */
 function clickTera(copy: Battle, body: Pokemon): void {
   const actions = copy.actions as { terastallize?: (pokemon: Pokemon) => void };
-  if (!body.terastallized && typeof actions.terastallize === 'function') actions.terastallize.call(copy.actions, body);
+  if (!body.terastallized && typeof actions.terastallize === 'function') actions.terastallize(body);
 }
 
 /** One played use: the damage the simulator's damage step returned for the defender, or null when the move never reached it. */
