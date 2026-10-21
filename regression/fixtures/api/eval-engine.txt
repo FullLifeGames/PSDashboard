@@ -2,6 +2,7 @@ type AdoptParams
 type AlignmentScore
 type AlignmentSummary
 type AnalyzeTurnParams
+type BattleSlot
 type BranchChoiceActive
 type BranchChoiceErrorLog
 type BranchChoices
@@ -53,6 +54,7 @@ type KoOddsMismatch
 type LeadAnalysis
 type LeadEvalData
 type LeadSideAnalysis
+type LiveHit
 type MatchupCache
 type MctsCallbacks
 type MctsTreeStats
@@ -86,6 +88,7 @@ type SimFastCounters
 type SimFastLever
 type SimFastReport
 type SimFastStatus
+type SimHitRange
 type SimPokemonInfo
 type SnapshotMoveType
 type SnapshotTypeBody
@@ -212,6 +215,7 @@ value shownAttribution
 value sightedHp
 value sightedHpAt
 value simFastStatus
+value simHitRange
 value snapshotMoveTypes
 value snapshotSimFacts
 value solveEndgame

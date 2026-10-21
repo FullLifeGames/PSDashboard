@@ -7,6 +7,7 @@ import { hitDraws } from './calc/hit-draws.ts';
 import { calcMove, protectBlocks } from './calc/move.ts';
 import { strengthMix, strongerPower } from './calc/fickle.ts';
 import { stellarFirstUse } from './calc/stellar.ts';
+import { simHitRange, type LiveHit } from './calc/sim-hit.ts';
 import { teraClicked } from './calc/tera-click.ts';
 
 type CalcMoveOptions = NonNullable<ConstructorParameters<typeof Move>[2]>;
@@ -47,7 +48,15 @@ export interface DamageCalcContext {
   attackerPartnerAlive?: boolean;
   /** The move id the defender's partner picked this turn, when the preview knows it (T124). */
   defenderPartnerMove?: string;
+  /**
+   * The live battle of the branch with the two bodies of the hit (round 73, T202): the hits the calc cannot price are played on a
+   * copy of it. Left out where the position has no live battle.
+   */
+  liveHit?: LiveHit;
 }
+
+/** The calc has no field that prices this hit: the simulator does (T202). */
+class UnpricedByCalc extends Error {}
 
 function toConditionId(value: string | undefined): string {
   return toId(value ?? '');
@@ -211,6 +220,8 @@ export function hitCounts(gen: number, attacker: GearHolder, moveName: string): 
   return sharesOf(drawn);
 }
 
+const defenderBehindScreen = (context: DamageCalcContext): boolean => (context.defenderSideConditions ?? []).map(toConditionId).some(isScreen);
+
 /** The calc gives exact KO odds up to four hits; past that it only estimates, and the picker stays quiet. */
 const MAX_KO_HITS = 4;
 
@@ -258,10 +269,19 @@ function strengthPriced(priceAt: (hits?: number, firstUse?: boolean, power?: { b
   return [{ chance: 1 - mix.chance, result: weak }, { chance: mix.chance, result: priceAt(undefined, firstUse, strongerPower(weak.move.bp, mix.factor)) }];
 }
 
-/** A Doubles hit on a foe that stands alone, with the foes-only spread target left on the move (moveLanding sets one foe for the moves whose Dex target spreads) and no screen to price at the doubles factor. */
+/** A Doubles hit on a foe that stands alone, with the foes-only spread target left on the move (moveLanding sets one foe for the moves whose Dex target spreads). */
 function aloneSpread(context: DamageCalcContext, result: CalcResult): boolean {
-  const screens = [...(context.defenderSideConditions ?? [])].map(toConditionId).some(isScreen);
-  return context.gameType === 'Doubles' && context.defenderPartner === null && !screens && result.move.target === 'allAdjacentFoes';
+  return context.gameType === 'Doubles' && context.defenderPartner === null && result.move.target === 'allAdjacentFoes';
+}
+
+/** The simulator's price of the hit on a copy of the live battle, as a result; the empty result where the position has no live battle. */
+function priceOnCopy(context: DamageCalcContext, moveName: string): DamageResult {
+  const range = context.liveHit ? simHitRange(context.liveHit, moveName) : null;
+  if (!range) return emptyDamageResult(moveName);
+  const minPct = percentOfMaxHp(range.min, range.maxhp);
+  const maxPct = percentOfMaxHp(range.max, range.maxhp);
+  const koChance = range.min >= range.hp ? 'guaranteed OHKO' : range.max >= range.hp ? 'possible OHKO' : '';
+  return { moveName, minPercent: minPct, maxPercent: maxPct, range: `${minPct}% - ${maxPct}%`, koChance };
 }
 
 export function calcSingleDamageRange(
@@ -286,8 +306,10 @@ export function calcSingleDamageRange(
         ...(hits ? { hits } : {}),
       });
       const result = calculate(gen, atkPoke, defPoke, calcMoveFor(), calcField(context));
-      // The calc forces a spread on a few moves (Tera Starstorm of Terapagos-Stellar, Expanding Force on Psychic Terrain): against a lone foe the simulator plays one target, which the Singles game type prices (T152).
-      return aloneSpread(context, result) ? calculate(gen, atkPoke, defPoke, calcMoveFor(), calcField({ ...context, gameType: 'Singles' })) : result;
+      // The calc forces a spread on a few moves (Tera Starstorm of Terapagos-Stellar, Expanding Force on Psychic Terrain): against a lone foe the simulator plays one target, which the Singles game type prices (T152). Behind a screen no game type does (T202): the simulator prices the hit.
+      if (!aloneSpread(context, result)) return result;
+      if (defenderBehindScreen(context)) throw new UnpricedByCalc();
+      return calculate(gen, atkPoke, defPoke, calcMoveFor(), calcField({ ...context, gameType: 'Singles' }));
     };
     const firstUse = stellarFirstUse(atkBody, () => priceAt().move.type);
     // A multi-hit move deals the sum of its hits; the calc sums them itself (T96). A drawn hit
@@ -308,8 +330,8 @@ export function calcSingleDamageRange(
       koChance: koChanceOf(priced, maxDamage),
       ...(counts && counts.length > 1 ? { hitShares: hitSharesOf(counts, priced, maxhp) } : {}),
     };
-  } catch {
-    return emptyDamageResult(moveOption.name);
+  } catch (error) {
+    return error instanceof UnpricedByCalc ? priceOnCopy(context, moveOption.name) : emptyDamageResult(moveOption.name);
   }
 }
 
