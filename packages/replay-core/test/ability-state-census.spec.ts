@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { Dex } from '@pkmn/sim';
 import * as championsMod from '@pkmn/mods/champions';
-import { abilityStateAtHit, abilityStateIds } from '../src/spreads/ability-state';
+import { abilityStateAtHit, abilityStateIds, allyStateIds } from '../src/spreads/ability-state';
 
 /**
  * Round 73 (T210, group 3): the table of abilities whose damage reads the turn's order (`spreads/ability-state.ts`) against the Dex.
@@ -39,5 +39,31 @@ describe('the ability-state table is the Dex\'s abilities that read the turn', (
       expect(abilityStateAtHit(id, { defenderNewlyIn: true, lastToMove: true }), `${id} with the fact`).toEqual({ on: true });
     }
     expect(abilityStateAtHit('intimidate', { defenderNewlyIn: true, lastToMove: true })).toEqual({});
+  });
+});
+
+/** The abilities with a damage handler that asks the user's allies about their abilities, with the abilities the handler names. */
+function allyReaders(dex: ReturnType<typeof Dex.forGen>): Map<string, string[]> {
+  const found = new Map<string, string[]>();
+  for (const ability of dex.abilities.all()) {
+    for (const [key, value] of Object.entries(ability as unknown as Record<string, unknown>)) {
+      if (!DAMAGE_HANDLER.test(key) || typeof value !== 'function' || !/\.allies\(\)/.test(String(value))) continue;
+      const named = /hasAbility\(\[([^\]]*)\]\)/.exec(String(value))?.[1].match(/'([^']+)'/g)?.map(name => name.replace(/'/g, '')) ?? [];
+      found.set(ability.id, named.sort());
+    }
+  }
+  return found;
+}
+
+describe('the ally table is the abilities of the Dex that ask the allies (Plus and Minus)', () => {
+  test.each(dexes)('%s: the same ids, each with the abilities its handler names', (_name, dex) => {
+    const found = allyReaders(dex);
+    expect([...found.keys()].sort()).toEqual([...allyStateIds()].sort());
+    for (const [id, named] of found) {
+      expect(named.length, id).toBeGreaterThan(0);
+      for (const ally of named) expect(abilityStateAtHit(id, { allyAbility: ally }), `${id} beside ${ally}`).toEqual({ on: true });
+      expect(abilityStateAtHit(id, { allyAbility: 'intimidate' }), `${id} beside another ability`).toEqual({});
+      expect(abilityStateAtHit(id, {}), `${id} alone`).toEqual({});
+    }
   });
 });

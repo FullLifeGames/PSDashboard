@@ -14,6 +14,8 @@ export interface TurnFacts {
   defenderNewlyIn?: boolean;
   /** Every other active Pokémon had moved when the hit landed. */
   lastToMove?: boolean;
+  /** The ability id of the attacker's living partner: shown, the Dex's for a species with one ability, else its set's (T203). */
+  allyAbility?: string;
 }
 
 interface StateRule {
@@ -28,14 +30,29 @@ const RULES: Record<string, StateRule> = {
   analytic: { fact: 'lastToMove', calcDefault: 'speed' },
 };
 
+/** Abilities that work while an ally has one of these (Plus and Minus read `allies()` and `hasAbility` of the partner). */
+/* eslint-disable names/no-new-dex-name -- ability-state-census.spec.ts holds these ids and the abilities they name to the Dex handlers */
+const ALLY_RULES: Record<string, readonly string[]> = {
+  plus: ['minus', 'plus'],
+  minus: ['minus', 'plus'],
+};
+/* eslint-enable names/no-new-dex-name */
+
 export const abilityStateIds = (): string[] => Object.keys(RULES);
+export const allyStateIds = (): string[] => Object.keys(ALLY_RULES);
+
+/** Whether an ally with this ability switches any ability on (only those abilities are worth carrying on the observation). */
+export const allyAbilityMatters = (ability: string): boolean => Object.values(ALLY_RULES).some(named => named.includes(toId(ability)));
 
 /**
  * What the facts of the hit do to an attacker's ability: `on` switches it on for the calculator, `drop` removes it for the hit
  * (the user of Analytic did not move last, and the calculator's speed comparison would lift the hit anyway).
  */
 export function abilityStateAtHit(ability: string | undefined, facts: TurnFacts): { on?: true; drop?: true } {
-  const rule = RULES[toId(ability ?? '')];
+  const id = toId(ability ?? '');
+  const allies = ALLY_RULES[id];
+  if (allies) return allies.includes(toId(facts.allyAbility ?? '')) ? { on: true } : {};
+  const rule = RULES[id];
   if (!rule) return {};
   if (facts[rule.fact]) return { on: true };
   return rule.calcDefault === 'speed' ? { drop: true } : {};
