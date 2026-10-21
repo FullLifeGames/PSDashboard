@@ -3,6 +3,7 @@ import { movesFirst } from '../speed.ts';
 import { EVAL_WEIGHTS } from './weights.ts';
 import { hazardEntryFraction } from './hazards.ts';
 import { boostedFraction, livingMons, threatGetter, type MatchupCache, type PairThreat } from './threat.ts';
+import { idleHolders, withoutRaises } from './boost-race.ts';
 import { healProfile, ppBudget, raceClocks, raceSide, statusResidual, type RaceClocks, type RaceSide } from './races.ts';
 
 /**
@@ -49,6 +50,7 @@ export function sweepCells(
   sideIndex: 0 | 1,
   battle: Battle,
   threat: (attacker: Pokemon, defender: Pokemon) => PairThreat,
+  idle: ReadonlySet<Pokemon>,
 ): SweepCells {
   const mine = livingMons(battle, sideIndex);
   const theirs = livingMons(battle, 1 - sideIndex);
@@ -56,6 +58,7 @@ export function sweepCells(
   if (theirs.length === 0) return cells;
   for (const a of mine) {
     if ((a.boosts.atk ?? 0) <= 0 && (a.boosts.spa ?? 0) <= 0) continue;
+    if (idle.has(a)) continue;
     for (const b of theirs) {
       const threatA = threat(a, b);
       const threatB = threat(b, a);
@@ -147,6 +150,30 @@ function pairSign(
   return 0;
 }
 
+/**
+ * T248 (round 73): a side the foe moves ahead of and takes down with its best hit never gets to heal, so its heal PP
+ * are no wall. One HP point above that hit the race priced the heals as a wall, one point below as a lost race, and a
+ * hit taken raised the grade (573756 turn 73, Toxapex 282 to 281 of 303). `foeFrac` is the foe's best hit as a share
+ * of the maximum; the side keeps its attack, so the clocks read the pair as the plain race it is.
+ */
+function unhealedIfBeaten(side: RaceSide, foeFrac: number, foeFirst: () => boolean): RaceSide {
+  if (side.healRate <= 0 && side.healAbsorb <= 0) return side;
+  if (foeFrac < side.hp || !foeFirst()) return side;
+  return { ...side, healRate: 0, healAbsorb: 0 };
+}
+
+/**
+ * The value of one pair for p1 (round 73, T248): the HP share of the side that wins it, signed for the winner. The pair
+ * used to weigh both bodies' shares, so a lost pair counted less the lower the loser's HP and a hit p1 took raised the
+ * matchup (and a hit p1 landed on the loser of a won pair lowered it); in a small board the bodies term could not
+ * cancel that (gen9vgc-2629703929 turn 13: a 1v1 lost at 88 of 176 HP). The winner's share keeps every step the
+ * right way: more HP for the winner, or less for the loser, never moves the pair against the side it helps. A body
+ * whose entry hazards would kill it has no HP share and loses its pairs at the foe's share.
+ */
+function pairValue(sign: number, hpA: number, hpB: number): number {
+  return sign > 0 ? hpA : sign < 0 ? -hpB : 0;
+}
+
 /** Coverage: each enemy no remaining teammate trades favorably against, its answer deficit × HP (p1-positive). */
 function coverageFrom(
   bestAnswerToP2: Map<Pokemon, number>,
@@ -172,12 +199,19 @@ function coverageFrom(
  * other side has NO favorable trade against contributes its answer deficit ×
  * its HP fraction (p1-positive). Exported for direct testing.
  */
-export function matchupTerms(battle: Battle, cache?: MatchupCache): { matchup: number; coverage: number } {
+export function matchupTerms(
+  battle: Battle,
+  cache?: MatchupCache,
+  idle: ReadonlySet<Pokemon> | undefined = undefined,
+): { matchup: number; coverage: number } {
   const p1Living = livingMons(battle, 0);
   const p2Living = livingMons(battle, 1);
   if (p1Living.length === 0 || p2Living.length === 0) return { matchup: 0, coverage: 0 };
 
   const threat = threatGetter(battle, cache);
+  const idleBodies = idle ?? idleHolders(battle, threat);
+  // A body that never acts hits with its drops only.
+  const offence = (mon: Pokemon): Pokemon => (idleBodies.has(mon) ? withoutRaises(mon) : mon);
   const inputs = raceInputs(battle);
   let sum = 0;
   let totalWeight = 0;
@@ -188,9 +222,11 @@ export function matchupTerms(battle: Battle, cache?: MatchupCache): { matchup: n
     for (const b of p2Living) {
       const threatA = threat(a, b);
       const threatB = threat(b, a);
+      const fracA = boostedFraction(threatA, offence(a), b);
+      const fracB = boostedFraction(threatB, offence(b), a);
       const clocks = raceClocks(
-        inputs.raceSideOf(a, boostedFraction(threatA, a, b)),
-        inputs.raceSideOf(b, boostedFraction(threatB, b, a)),
+        unhealedIfBeaten(inputs.raceSideOf(a, fracA), fracB, () => movesFirst(b, a, threatB, threatA, battle)),
+        unhealedIfBeaten(inputs.raceSideOf(b, fracB), fracA, () => movesFirst(a, b, threatA, threatB, battle)),
       );
       // Answer margins read the race's effective offense: an attacker held
       // by a (now finite) wall keeps its partial answer, a pinned healer
@@ -199,7 +235,7 @@ export function matchupTerms(battle: Battle, cache?: MatchupCache): { matchup: n
       bestAnswerToP1.set(a, Math.max(bestAnswerToP1.get(a) ?? -Infinity, clocks.effFracB - clocks.effFracA));
       const sign = pairSign(a, b, threatA, threatB, clocks, battle);
       const weight = a.isActive && b.isActive ? EVAL_WEIGHTS.activePair : 1;
-      sum += weight * sign * inputs.effHp(a) * inputs.effHp(b);
+      sum += weight * pairValue(sign, inputs.effHp(a), inputs.effHp(b));
       totalWeight += weight;
     }
   }

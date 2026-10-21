@@ -236,11 +236,17 @@ describe.each(MODES.filter(mode => !mode.doubles))('a drop behind a front that b
     // The front Jolteon at full HP wins on the move order whatever the drop does; the bench Jolteon would be the flip.
     const battle = behind(JOLTEON);
     expect(evalFeatures(battle).boosts).toBeLessThan(0);
-    expect(evalFeatures(battle).boostsBiting).toBe(0);
+    // T248 (round 73): the front Jolteon is bitten itself, as it wins and the drop makes the win safer in the fresh race (half the foes); the bench Jolteon behind it would add the other half.
+    expect(evalFeatures(battle).boostsBiting).toBeCloseTo(stageValue(battle.sides[0].active[0]!, 'atk', -2) / 2, 12);
   });
 
-  test('a front foe that never swings back leaves the gate open: the drop counts against the bench Jolteon', () => {
+  test('a front foe that never swings back but outlasts the horizon closes the bench as well (T225; before: the drop counted)', () => {
+    expect(evalFeatures(behind(['Clefable', ['splash']])).boostsBiting).toBe(0);
+  });
+
+  test('a front foe that never swings back and falls to the holder at once leaves the gate open: the drop counts against the bench Jolteon', () => {
     const battle = behind(['Clefable', ['splash']]);
+    battle.sides[1].active[0]!.sethp(1);
     const features = evalFeatures(battle);
     expect(features.boostsBiting).toBeCloseTo(stageValue(battle.sides[0].active[0]!, 'atk', -2) / 2, 12);
     expect(features.boostsBiting).toBeLessThan(0);
@@ -260,7 +266,8 @@ describe.each(MODES)('a positive stage that moves the race, as before, $name', m
     mine.boosts.spe = 2;
     expect(mine.getActionSpeed()).toBeLessThan(foe.getActionSpeed());
     const features = evalFeatures(battle);
-    expect(features.boosts).toBeGreaterThan(0);
+    // T249 (round 73): the slowed holder at 1 HP never acts (the foe moves first and KOs it), so `boosts` reads its stage as 0 too (before: it read the stage in full).
+    expect(features.boosts).toBe(0);
     expect(features.boostsBiting).toBe(0);
   });
 });

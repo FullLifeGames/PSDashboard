@@ -4,7 +4,7 @@ import { twinBattle } from '../sim-ask/index.ts';
 import { EVAL_WEIGHTS } from './weights.ts';
 import { livingMons, livingOf, usableSlots } from './threat.ts';
 import {
-  BITE_TURNS, foeWins, holderActs, pairRace, raceBodies, stageBites, type Bodies, type PairRace, type ThreatOf,
+  BITE_TURNS, foeWins, holderActs, holderWins, idleHolders, pairRace, raceBodies, stageBites, type Bodies, type PairRace, type ThreatOf,
 } from './boost-race.ts';
 import { residualReader, type Residuals } from './residuals.ts';
 import { hitReader, type HitReader } from './contact.ts';
@@ -26,7 +26,9 @@ import { hitReader, type HitReader } from './contact.ts';
  * away or KOs the holder before it acts, no foe counts for a boost; while a
  * foe on the field wins the race within the horizon, no foe off the field
  * counts for any stage (the bench is credited only behind a front the holder
- * survives; T218).
+ * survives; T218) and, T225, while the holder does not win the race against a
+ * foe on the field within the horizon (a wall it needs six turns for keeps the
+ * bench shut, though it cannot KO the holder either).
  */
 
 /** The value of one standing stage: sign, stat weight, schedule and status discount of the boosts term. */
@@ -110,7 +112,7 @@ function statBites(pair: PairRace, stat: keyof BoostsTable, drop: boolean): bool
   const { stages } = pair;
   if (!stages.mineHitting[stat] && !stages.mineDefending[stat]) return false;
   if (stat === 'accuracy' || stat === 'evasion') return true;
-  return stageBites(pair.held, pair.without(stat), drop);
+  return stageBites(pair.held, pair.without(stat), drop, pair.full);
 }
 
 /** What the foes on the field leave of a holder's stages: boosts at all, and any stage for the foes off the field. */
@@ -121,21 +123,22 @@ function frontGate(front: Pokemon[], removers: ReadonlySet<Pokemon>, raceWith: (
   for (const foe of front) {
     const { held } = raceWith(foe);
     if (removers.has(foe) || !holderActs(held)) gate.boosts = false;
-    if (foeWins(held) && held.turnsFoe <= BITE_TURNS) gate.bench = false;
+    if (!holderWins(held) || (foeWins(held) && held.turnsFoe <= BITE_TURNS)) gate.bench = false;
   }
   return gate;
 }
 
 /** The value of one holder's stages, summed over the foes each of them bites. */
 function holderBites(
-  mine: Pokemon, foes: Pokemon[], removers: ReadonlySet<Pokemon>, battle: Battle, threat: ThreatOf, bodies: Bodies, hits: HitReader,
+  mine: Pokemon, foes: Pokemon[], removers: ReadonlySet<Pokemon>, idle: ReadonlySet<Pokemon>, battle: Battle, threat: ThreatOf,
+  bodies: Bodies, hits: HitReader,
 ): number {
   const stats = stagedStats(mine);
   const races = new Map<Pokemon, PairRace>();
   const raceWith = (foe: Pokemon): PairRace => {
     let race = races.get(foe);
     if (!race) {
-      race = pairRace(mine, foe, battle, threat, bodies, hits);
+      race = pairRace(mine, foe, battle, threat, bodies, hits, idle.has(foe));
       races.set(foe, race);
     }
     return race;
@@ -154,10 +157,13 @@ function holderBites(
   return value;
 }
 
-/** One side's standing stages, each valued as `boosts` values it and counted for the share of living foes it bites. */
+/**
+ * One side's standing stages, each valued as `boosts` values it and counted for the share of living foes it bites. `idle`
+ * names the bodies that never act (score/boost-race.ts, idleHolders): a foe among them hits with no raised attack.
+ */
 export function boostBiteValue(
   side: Side, sideIndex: 0 | 1, battle: Battle, threat: ThreatOf, residuals: Residuals = residualReader(battle),
-  hits: HitReader = hitReader(battle),
+  hits: HitReader = hitReader(battle), idle: ReadonlySet<Pokemon> = idleHolders(battle, threat),
 ): number {
   const actives = side.active.filter((mon): mon is Pokemon => !!mon && !mon.fainted && Object.values(mon.boosts).some(Boolean));
   if (actives.length === 0) return 0;
@@ -168,6 +174,6 @@ export function boostBiteValue(
   const removers = new Set(foes.filter(foe => usableSlots(foe).some(slot => removesStages(twin, slot.id, benched))));
   const bodies = raceBodies(battle, residuals);
   let value = 0;
-  for (const mine of actives) value += holderBites(mine, foes, removers, battle, threat, bodies, hits);
+  for (const mine of actives) value += holderBites(mine, foes, removers, idle, battle, threat, bodies, hits);
   return value / foes.length;
 }

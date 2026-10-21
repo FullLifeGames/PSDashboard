@@ -21,7 +21,8 @@ describe('a boost counts when the holder wins the race with it and the stage mad
       race({ turnsMine: 1, turnsFoe: 1, foeFirst: true, mineSurvives: false }), race({ turnsMine: 2, turnsFoe: 1, foeFirst: true, mineSurvives: false }), false],
     ['a later KO of me in a race I still lose', race({ turnsMine: 5, turnsFoe: 4 }), race({ turnsMine: 5, turnsFoe: 2 }), false],
     ['a race won either way at the same speed: the stage changed nothing', race({ turnsMine: 2 }), race({ turnsMine: 2 }), false],
-    ['a win either way, only safer: the foe\'s clock is longer, mine is not', race({ turnsMine: 2, turnsFoe: 4 }), race({ turnsMine: 2, turnsFoe: 3 }), false],
+    // T248 (round 73): a stage that only makes a won race safer decides the race at a lower HP, so it counts (the HP enters through the gate only).
+    ['a win either way, only safer: the foe\'s clock is longer, mine is not', race({ turnsMine: 2, turnsFoe: 4 }), race({ turnsMine: 2, turnsFoe: 3 }), true],
     ['a win beyond the horizon is a stall war', race({ turnsMine: BITE_TURNS + 1 }), race({ turnsMine: BITE_TURNS + 3 }), false],
     ['nobody wins with the stage', race({}), race({}), false],
     ['equal clocks, the foe moves first: the foe wins the tie', race({ turnsMine: 2, turnsFoe: 2, foeFirst: true }), race({ turnsMine: 3, turnsFoe: 2, foeFirst: true }), false],
@@ -38,6 +39,28 @@ describe('a boost counts when the holder wins the race with it and the stage mad
     expect(stageBites(held, without, false)).toBe(false);
     expect(stageBites({ ...held, first: true }, without, false)).toBe(true);
     expect(stageBites({ ...held, mineSurvives: true }, without, false)).toBe(true);
+  });
+});
+
+describe('the difference a stage makes is read on the fresh race (T248, round 73)', () => {
+  test('the same stage counts at every HP the gate lets through: the HP of the held race does not decide whether the stage helps', () => {
+    // The stage improves the race at full HP (two hits against four): a held race that wins counts whether or not the held race alone would show a difference.
+    const full = race({ turnsMine: 2, turnsFoe: 3 });
+    const without = race({ turnsMine: 4, turnsFoe: 3 });
+    for (const heldHere of [race({ turnsMine: 2, turnsFoe: 3 }), race({ turnsMine: 1, turnsFoe: 3 }), race({ turnsMine: 2, turnsFoe: 9 })]) {
+      expect(stageBites(heldHere, without, false, full)).toBe(true);
+    }
+  });
+
+  test('a stage that changes nothing at full HP counts nowhere, though the held race shows a difference at its low HP', () => {
+    // The held race at a low HP of the foe differs from the race without the stage (one hit against five); the fresh races of both are the same.
+    const same = race({ turnsMine: 4, turnsFoe: 3 });
+    expect(stageBites(race({ turnsMine: 1, turnsFoe: 3 }), same, false, same)).toBe(false);
+  });
+
+  test('the gate still reads the held race: a held race the side loses counts nothing, whatever the fresh race says', () => {
+    const lost = race({ turnsMine: 3, turnsFoe: 2 });
+    expect(stageBites(lost, race({ turnsMine: 5, turnsFoe: 2 }), false, race({ turnsMine: 2, turnsFoe: 3 }))).toBe(false);
   });
 });
 

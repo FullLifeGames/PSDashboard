@@ -108,7 +108,8 @@ describe('the foes in front gate the stage (T218)', () => {
     const battle = behind(splash('Snorlax'), splash('Clefable'));
     battle.sides[1].active[0]!.sethp(1);
     benchBitten(battle);
-    expect(sideValue(battle)).toBeCloseTo(stageValue(battle.sides[0].active[0]!, 'atk', 2) / 2, 12);
+    // T248 (round 73): the stage is judged on the fresh race, so the front foe at 1 HP is bitten as well as the bench foe.
+    expect(sideValue(battle)).toBeCloseTo(stageValue(battle.sides[0].active[0]!, 'atk', 2), 12);
   });
 
   /**
@@ -147,7 +148,8 @@ describe('the foes in front gate the stage (T218)', () => {
     const control = behind(set('Clefable', ['splash']), splash('Clefable'));
     control.sides[1].active[0]!.sethp(1);
     benchBitten(control);
-    expect(sideValue(control)).toBeCloseTo(stageValue(control.sides[0].active[0]!, 'atk', 2) / 2, 12);
+    // T248 (round 73): the stage is judged on the fresh race, so the front foe at 1 HP is bitten as well as the bench foe.
+    expect(sideValue(control)).toBeCloseTo(stageValue(control.sides[0].active[0]!, 'atk', 2), 12);
   });
 
   test('a front Haze foe that is only on the bench does not close the gate: it just does not count', () => {
@@ -184,9 +186,14 @@ describe('the report on gen9draft-2058494320: a 5% Cobalion at +4 into a full-HP
     expect(sideValue(scene(PALOSSAND()))).toBe(0);
   });
 
-  test('the same board in front of a Palossand without its attack: the healer cannot swing and the bench foe counts', () => {
-    const battle = scene(set('Palossand', ['shoreup', 'splash']));
-    expect(sideValue(battle)).toBeCloseTo(stageValue(battle.sides[0].active[0]!, 'atk', 4) / 2, 12);
+  test('the same board in front of a Palossand without its attack: the healer cannot swing, but the race does not give the holder the win past Shore Up within the horizon and the bench stays shut (T225; before: the bench foe counted)', () => {
+    expect(sideValue(scene(set('Palossand', ['shoreup', 'splash'])))).toBe(0);
+  });
+
+  test('the same Palossand with no heal move: the holder gets past it within the horizon and the bench foe counts', () => {
+    const battle = scene(set('Palossand', ['splash']));
+    // Both foes bite now: the Palossand in front and the Clefable behind it.
+    expect(sideValue(battle)).toBeCloseTo(stageValue(battle.sides[0].active[0]!, 'atk', 4), 12);
   });
 });
 
@@ -250,7 +257,8 @@ describe('the doubles gate: the foes in front are the foes on the field', () => 
 
   test('the same board with a harmless first foe: the stage counts for the foe it bites', () => {
     const { battle, mine } = board(splash('Snorlax'));
-    expect(sideValue(battle)).toBeCloseTo(stageValue(mine, 'atk', 2) / 2, 12);
+    // T248 (round 73): the stage is judged on the fresh race, so the front foe at 1 HP is bitten as well as the bench foe.
+    expect(sideValue(battle)).toBeCloseTo(stageValue(mine, 'atk', 2), 12);
   });
 });
 

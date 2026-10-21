@@ -58,6 +58,10 @@ export const pairStages = (battle: Battle, mine: Pokemon, foe: Pokemon): PairSta
   mineDefending: stagesSeen(battle, mine, foe, mine),
 });
 
+/** The pair's stages with the foe's raised attack and special attack taken off (T249: a foe that never acts hits with nothing it raised). */
+const withoutFoeRaises = (stages: PairStages): PairStages =>
+  ({ ...stages, foeHitting: { ...stages.foeHitting, atk: Math.min(stages.foeHitting.atk, 0), spa: Math.min(stages.foeHitting.spa, 0) } });
+
 export const withoutStat = (stages: PairStages, stat: keyof BoostsTable): PairStages => ({
   mineHitting: { ...stages.mineHitting, [stat]: 0 },
   foeDefending: stages.foeDefending,
@@ -110,11 +114,21 @@ export interface Race {
  */
 interface Inputs { mineFrac: number; foeFrac: number; first: boolean; foeFirst: boolean; mineMove: string | null; foeMove: string | null }
 
+/** Whether a side lives through the other's best hit: that hit leaves some of its HP (a share of the maximum). */
+const livesThrough = (hitFraction: number, hp: number): boolean => hitFraction < hp;
+
+/** The stages of a pair as each attack of the race sees the two bodies. */
+function viewsOn(mine: Pokemon, foe: Pokemon, stages: PairStages) {
+  return {
+    mineHitting: viewOf(mine, stages.mineHitting),
+    foeHitting: viewOf(foe, stages.foeHitting),
+    foeDefending: viewOf(foe, stages.foeDefending),
+    mineDefending: viewOf(mine, stages.mineDefending),
+  };
+}
+
 function inputsOn(mine: Pokemon, foe: Pokemon, mineThreat: PairThreat, foeThreat: PairThreat, battle: Battle, stages: PairStages): Inputs {
-  const mineHitting = viewOf(mine, stages.mineHitting);
-  const foeHitting = viewOf(foe, stages.foeHitting);
-  const foeDefending = viewOf(foe, stages.foeDefending);
-  const mineDefending = viewOf(mine, stages.mineDefending);
+  const { mineHitting, foeHitting, foeDefending, mineDefending } = viewsOn(mine, foe, stages);
   return {
     mineFrac: boostedFraction(mineThreat, mineHitting, foeDefending),
     foeFrac: boostedFraction(foeThreat, foeHitting, mineDefending),
@@ -162,7 +176,7 @@ function raceOf(inputs: Inputs, mine: Body, foe: Body, cost: PairCost): Race {
   const clocks = pricedClocks(inputs, mine, foe, cost);
   return {
     turnsMine: clocks.turnsA, turnsFoe: clocks.turnsB, first: inputs.first, foeFirst: inputs.foeFirst,
-    mineSurvives: inputs.foeFrac < mine.hp, foeSurvives: inputs.mineFrac < foe.hp,
+    mineSurvives: livesThrough(inputs.foeFrac, mine.hp), foeSurvives: livesThrough(inputs.mineFrac, foe.hp),
   };
 }
 
@@ -190,10 +204,19 @@ export function setRaceCut(on: boolean): void {
   raceCut = on;
 }
 
-/** One pair's races: the race on all the stages standing, and the race without one stat's stage. */
+/**
+ * One pair's races. `held` is the race on all the stages standing, at the HP the bodies have (it gates: who wins, who acts,
+ * who closes the bench). `full` is the same race with both bodies at full HP, and `without` the race at full HP without
+ * one stat's stage: the pair of them says whether the stage decides a fresh race (T248, round 73). Read at the HP the
+ * bodies have, "the stage made the difference" started and stopped at single HP points (a defensive stage only decides
+ * the race inside a range of HP, a clock only differs above the HP where both need one hit), so a hit you take could raise
+ * your grade and a hit you land could lower it; at full HP it is a property of the pair and the HP enters only through
+ * the gates, which are monotone.
+ */
 export interface PairRace {
   stages: PairStages;
   held: Race;
+  full: Race;
   without: (stat: keyof BoostsTable) => Race;
 }
 
@@ -202,8 +225,10 @@ export interface PairRace {
  * only where taking the stat off changes what the race reads: the damage of a side or the move order. A stat that
  * no move reads (Attack on a special attacker) leaves the inputs as they were and shares the race on all stages.
  */
-export function pairRace(mine: Pokemon, foe: Pokemon, battle: Battle, threat: ThreatOf, bodies: Bodies, hits: HitReader): PairRace {
-  const stages = pairStages(battle, mine, foe);
+export function pairRace(
+  mine: Pokemon, foe: Pokemon, battle: Battle, threat: ThreatOf, bodies: Bodies, hits: HitReader, idleFoe = false,
+): PairRace {
+  const stages = idleFoe ? withoutFoeRaises(pairStages(battle, mine, foe)) : pairStages(battle, mine, foe);
   const mineThreat = threat(mine, foe);
   const foeThreat = threat(foe, mine);
   const [mineBody, foeBody] = [bodies(mine), bodies(foe)];
@@ -217,11 +242,13 @@ export function pairRace(mine: Pokemon, foe: Pokemon, battle: Battle, threat: Th
   };
   const heldInputs = inputsOn(mine, foe, mineThreat, foeThreat, battle, stages);
   const held = raceOf(heldInputs, mineBody, foeBody, costOf(heldInputs));
+  const [mineFull, foeFull] = [{ ...mineBody, hp: 1 }, { ...foeBody, hp: 1 }];
+  const full = mineBody.hp === 1 && foeBody.hp === 1 ? held : raceOf(heldInputs, mineFull, foeFull, costOf(heldInputs));
   return {
-    stages, held,
+    stages, held, full,
     without: stat => {
       const inputs = inputsOn(mine, foe, mineThreat, foeThreat, battle, withoutStat(stages, stat));
-      return raceCut && sameInputs(inputs, heldInputs) ? held : raceOf(inputs, mineBody, foeBody, costOf(inputs));
+      return raceCut && sameInputs(inputs, heldInputs) ? full : raceOf(inputs, mineFull, foeFull, costOf(inputs));
     },
   };
 }
@@ -241,16 +268,68 @@ const wins = (frame: Frame): boolean =>
 export const foeWins = (race: Race): boolean => wins(frameOf(race, 'foe'));
 
 /** Whether the holder gets to act in the race: it moves first, or it survives the foe's hit. */
-export const holderActs = (race: Race): boolean => frameOf(race, 'mine').acts;
+export const holderActs = (race: Pick<Race, 'first' | 'mineSurvives'>): boolean => race.first || race.mineSurvives;
+
+/**
+ * T249 (round 73): whether the holder gets to act against every foe in front, read from the same pieces as the race
+ * (the stages each attack sees, the move order, the foe's best hit against the holder's HP) and without its clocks or
+ * a played hit. False when one foe on the field moves first and takes the holder's HP with its best hit: the holder
+ * never acts, and what its stages would do is moot (the rule of the front gate of boostsBiting, here for every reader
+ * of a stage). A holder without a foe in front acts.
+ */
+export function holderActsInFront(mine: Pokemon, front: readonly Pokemon[], battle: Battle, threat: ThreatOf): boolean {
+  return front.every(foe => {
+    const { mineHitting, foeHitting, mineDefending } = viewsOn(mine, foe, pairStages(battle, mine, foe));
+    const [mineThreat, foeThreat] = [threat(mine, foe), threat(foe, mine)];
+    return holderActs({
+      first: movesFirst(mineHitting, foeHitting, mineThreat, foeThreat, battle),
+      mineSurvives: livesThrough(boostedFraction(foeThreat, foeHitting, mineDefending), mine.hp / mine.maxhp),
+    });
+  });
+}
+
+/** Whether the holder wins the race within the race horizon (for the bench credit behind the foes in front). */
+export const holderWins = (race: Race): boolean => wins(frameOf(race, 'mine')) && race.turnsMine <= BITE_TURNS;
+
+/** The mon with its raised stages taken off and its drops kept: a view, as `unboosted`. */
+export const withoutRaises = (pokemon: Pokemon): Pokemon =>
+  Object.create(pokemon, { boosts: { value: Object.fromEntries(Object.entries(pokemon.boosts).map(([stat, stage]) => [stat, Math.min(stage, 0)])) } }) as Pokemon;
+
+/**
+ * T249 (round 73): the active bodies that carry a raised stage and never act, because a foe on the field moves first
+ * and KOs them (score/boost-race.ts, holderActsInFront). What their raises would do to a pair is moot: the pair terms
+ * read such a body on its drops only. Empty on a board without a raised stage.
+ */
+export function idleHolders(battle: Battle, threat: ThreatOf): ReadonlySet<Pokemon> {
+  const idle = new Set<Pokemon>();
+  for (const side of battle.sides) {
+    const front = side.foe.active.filter((foe): foe is Pokemon => !!foe && !foe.fainted);
+    for (const mon of side.active) {
+      if (!mon || mon.fainted || !Object.values(mon.boosts).some(stage => stage > 0)) continue;
+      if (!holderActsInFront(mon, front, battle, threat)) idle.add(mon);
+    }
+  }
+  return idle;
+}
 
 /**
  * Whether the stage moves the race in favour of the side it helps (the holder for a boost, the foe for a drop): that
  * side wins the race with the stage, within the race horizon, and gets to act in it; and it did not win without the
  * stage, or won more slowly. A boost that hurts (Speed under Trick Room) is not read: it stays uncounted.
+ *
+ * T248 (round 73): `held` is the race at the HP the bodies have and gates (the side wins, acts, and wins within the
+ * horizon at the HP it has). Whether the stage `made the difference` is read between `full` and `without`, both at full
+ * HP (default: `held`, for the rule on a table of races), and it asks whether the stage improves the race for the side it
+ * helps at all: a shorter clock of its own, a longer one for the other side, or the first move. Read at the HP the bodies
+ * have, the question flipped at single HP points (a defensive stage decides the race only inside a range of the holder's
+ * HP, a clock differs only above the foe's HP where both need one hit), so a hit you take could raise your grade and a
+ * hit you land could lower it, by up to 0.15 in singles. A stage that improves the fresh race is worth having wherever the
+ * HP puts the pair, and only the gate, which is monotone in both HPs, decides whether the pair is won.
  */
-export function stageBites(held: Race, without: Race, drop: boolean): boolean {
+export function stageBites(held: Race, without: Race, drop: boolean, full: Race = held): boolean {
   const helped = drop ? 'foe' : 'mine';
-  const [now, before] = [frameOf(held, helped), frameOf(without, helped)];
+  const now = frameOf(held, helped);
   if (!wins(now) || !now.acts || now.own > BITE_TURNS) return false;
-  return !wins(before) || now.own < before.own;
+  const [fresh, before] = [frameOf(full, helped), frameOf(without, helped)];
+  return fresh.own < before.own || fresh.other > before.other || (fresh.first && !before.first);
 }
