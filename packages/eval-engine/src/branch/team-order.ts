@@ -95,11 +95,22 @@ export function reorderForLeads(team: PokemonSet[], leads: PokemonIdent[]): Poke
  * Round 73 (T250): what the protocol says about a side's bench. `shown`: the ids (name and base species) of every body its
  * switch, drag, replace and detailschange lines name; a body outside the set never stood on the field. `fainted`: the slots
  * the block's own lines faint. The game left a slot empty only where its body fainted, so a slot the simulator wants filled
- * without a faint line in the block is the simulator's divergence, not the bring list.
+ * without a faint line in the block is the simulator's divergence, not the bring list. `goesOn`: the log plays on past the block.
+ * At the log's last block (a forfeit, a win or a tie follows) an empty slot proves nothing about the bench: a player who forfeits
+ * with bodies left leaves the same slot empty.
  */
 export interface ProtocolBench {
   shown: ReadonlySet<string>;
   fainted: ReadonlySet<number>;
+  goesOn: boolean;
+}
+
+/** Whether the log has a turn line after the given turn: the game played on with the slot empty. */
+export function logGoesOn(replayLog: string, turn: number): boolean {
+  return normalizeLineEndings(replayLog).split('\n').some(line => {
+    const match = line.match(/^\|turn\|(\d+)/);
+    return !!match && Number(match[1]) > turn;
+  });
 }
 
 export function shownBodyIds(replayLog: string, sideId: 'p1' | 'p2'): Set<string> {
@@ -138,7 +149,8 @@ export const mayDisguise = (body: SimPokemon) =>
  * list) or a body that may disguise itself as another. True when bodies left.
  */
 export function retireUnshownBench(battle: SimBattle, sideIdx: number, bench: ProtocolBench, answers: number, emptySlots: number[]): boolean {
-  const { shown, fainted } = bench;
+  const { shown, fainted, goesOn } = bench;
+  if (!goesOn) return false;
   const side = battle.sides[sideIdx];
   const living = side.pokemon.filter(body => !body.isActive && !body.fainted);
   const phantoms = living.filter(body => !wasShown(body, shown));

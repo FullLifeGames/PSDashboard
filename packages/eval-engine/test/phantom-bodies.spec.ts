@@ -7,7 +7,7 @@ import {
 import { buildChoiceLockContext } from '../src/choice-lock';
 import { reconstructBranchRuntime } from '../src/branch-engine';
 import { buildForcedSwitchChoice } from '../src/branch/corrections';
-import { faintedSlots, mayDisguise, shownBodyIds, type ProtocolBench } from '../src/branch/team-order';
+import { faintedSlots, logGoesOn, mayDisguise, shownBodyIds, type ProtocolBench } from '../src/branch/team-order';
 import { loadSimMods } from '../src/forward/sim-mods';
 
 /**
@@ -86,6 +86,19 @@ describe('the scene: the other side and the bring rule stay as they were', () =>
     expect(battle.ended).toBe(true);
   });
 
+  test('the forfeit scene gen9doublesou-2694811367 turn 6: both p2 actives faint and the player forfeits; the bench he never sent stays alive (Cresselia)', { timeout: 240000 }, async () => {
+    const forfeit = fixture('gen9doublesou-2694811367.json');
+    const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(forfeit.log);
+    const { p1Team, p2Team } = buildTeamsFromReplay(forfeit.log, { observations, speedOrders });
+    const runtime = await reconstructBranchRuntime({
+      format: getBranchSimulatorFormat(forfeit), p1Team, p2Team, replayLog: forfeit.log, targetTurn: 7,
+      snapshot: snapshots[snapshots.length - 1] ?? null,
+    });
+    const side = runtime.battleStream.battle!.sides[1];
+    expect(side.pokemon.find(entry => entry.species.name === 'Cresselia')?.fainted).toBe(false);
+    expect(side.pokemonLeft).toBe(1);
+  });
+
   test('the shown bodies of a side: the names and base species of its switch, drag, replace and detailschange lines (CRLF too)', () => {
     const shown = shownBodyIds(replay.log.replace(/\n/g, '\r\n'), 'p2');
     for (const id of ['powerpolice', 'meowstic', 'breezy', 'scrafty', 'grayman', 'aerodactyl', 'liberation', 'floette']) expect(shown.has(id), id).toBe(true);
@@ -110,8 +123,8 @@ function board(format: string, p1: PokemonSet[], p2: PokemonSet[], choices: [str
 }
 
 /** What the protocol says about the side: these bodies shown, and by default a faint on both slots in the block. */
-const benchOf = (species: string[], fainted = [0, 1]): ProtocolBench => ({
-  shown: new Set(species.map(name => name.toLowerCase().replace(/[^a-z0-9]/g, ''))), fainted: new Set(fainted),
+const benchOf = (species: string[], fainted = [0, 1], goesOn = true): ProtocolBench => ({
+  shown: new Set(species.map(name => name.toLowerCase().replace(/[^a-z0-9]/g, ''))), fainted: new Set(fainted), goesOn,
 });
 const livingNames = (battle: LiveBattle, side: 0 | 1) => battle.sides[side].pokemon.filter(entry => !entry.fainted).map(entry => entry.name);
 
@@ -186,6 +199,29 @@ describe('retiring the bench the protocol never shows, against the simulator (si
     expect(buildForcedSwitchChoice(battle as never, 1, [], { current: 0 }, benchOf(['Voltorb'], []))).toBe('switch 2');
     expect(livingNames(battle, 1)).toEqual(['Magikarp']);
     expect(battle.ended).toBe(false);
+  });
+
+  test('controls: the log ends with this block (a forfeit, a win or a tie follows): the bench stays and the old answer stands, in singles and doubles', () => {
+    const singles = board('gen9customgame', SINGLES_P1,
+      [memento('Voltorb'), splash('Magikarp', 'Swift Swim'), splash('Ditto', 'Limber')], ['move 1', 'move 1']);
+    expect(buildForcedSwitchChoice(singles as never, 1, [], { current: 0 }, benchOf(['Voltorb', 'Pikachu'], [0, 1], false))).toBe('switch 2');
+    expect(singles.ended).toBe(false);
+    expect(livingNames(singles, 1)).toEqual(['Magikarp', 'Ditto']);
+    const doubles = board('gen9doublescustomgame', DOUBLES_P1,
+      [memento('Voltorb'), splash('Ditto', 'Limber'), splash('Magikarp', 'Swift Swim'), splash('Feebas', 'Swift Swim')],
+      ['move 1, move 1', 'move 1 1, move 1']);
+    expect(buildForcedSwitchChoice(doubles as never, 1, [], { current: 0 }, benchOf(['Voltorb', 'Ditto'], [0, 1], false))).toBe('switch 3, pass');
+    expect(livingNames(doubles, 1)).toEqual(['Ditto', 'Magikarp', 'Feebas']);
+  });
+
+  test('the block goes on past the turn when a later turn line exists (the forfeit scene has none, the 2687970740 scene does)', () => {
+    const forfeit = fixture('gen9doublesou-2694811367.json');
+    expect(logGoesOn(forfeit.log, 6)).toBe(false);
+    expect(logGoesOn(forfeit.log.replace(/\n/g, '\r\n'), 6)).toBe(false);
+    expect(logGoesOn(forfeit.log, 5)).toBe(true);
+    const scene = fixture('gen9championsvgc2026regmbbo3-2687970740.json');
+    expect(logGoesOn(scene.log, 6)).toBe(true);
+    expect(logGoesOn(scene.log.replace(/\n/g, '\r\n'), 6)).toBe(true);
   });
 
   test('the faint slots of a block: the slot letters of its faint lines for one side (CRLF too)', () => {

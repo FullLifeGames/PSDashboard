@@ -2,7 +2,7 @@ import { extractProtocolEvents, scoreAlignment } from '../hax-alignment.ts';
 import { normalizeLineEndings } from '../line-endings.ts';
 import type { BranchRuntime, SimBattle, TurnBlock } from './types.ts';
 import { getMainChoice, parseTurnBlocks } from './protocol-choices.ts';
-import { faintedSlots, shownBodyIds, type ProtocolBench } from './team-order.ts';
+import { faintedSlots, logGoesOn, shownBodyIds, type ProtocolBench } from './team-order.ts';
 import { alignArrivalDice, alignBlockSeed, type AlignedBlock } from './arrival-dice.ts';
 import {
   buildForcedSwitchChoice, correctActivesFromProtocol, correctBattleFromSnapshot, hasForceSwitch,
@@ -83,7 +83,10 @@ async function resolveForcedSwitches(
   // What the protocol says about each side's bench (T250): read once, and only when a forced switch needs it.
   const benchCache: Partial<Record<'p1' | 'p2', ProtocolBench>> = {};
   const protocolBench = (side: 'p1' | 'p2') =>
-    (benchCache[side] ??= { shown: shownBodyIds(session.params.replayLog, side), fainted: faintedSlots(blockLines, side) });
+    (benchCache[side] ??= {
+      shown: shownBodyIds(session.params.replayLog, side), fainted: faintedSlots(blockLines, side),
+      goesOn: logGoesOn(session.params.replayLog, turnBeforeChoice),
+    });
 
   let maxIterations = 10;
   while (maxIterations-- > 0) {
