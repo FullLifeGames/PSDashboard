@@ -1,6 +1,6 @@
 # Backlog
 
-This file holds the details of every open TODO, one section per TODO under its fixed T-number. The sections are grouped by the packages of `NextSteps.md`, and a package is one round. The next free T-number is T258.
+This file holds the details of every open TODO, one section per TODO under its fixed T-number. The sections follow the finish line of `NextSteps.md` (user 21.10.2026): wave 5, T163 and T160, the last wave, the release; every other TODO is parked with a trigger. The next free T-number is T258.
 
 Evidence paths that start with `r69/` are under `docs/perf/probes/2026-10-12-r69/`, those that start with `r72/` under `docs/perf/probes/2026-10-19-r72/`.
 
@@ -12,203 +12,9 @@ Source of the new TODOs of round 72 (T248 to T255): the lane notes of wave 4, th
 
 ## Next rounds
 
-User gate 21.10.2026, "3b": wave 5 runs next, with four lanes that share no file: F static evaluation (T224, T248, T249, then T243), G the feedback corpus in CI (T247), H rebuild fidelity (T250 with package D: T212, T213, T214, T232, T245) and I spread solver and hits (package C); the small fixes T251, T252 and T255 go into G or H. Its own gate over the open decisions of its design comes first, and it measures in CI (`node scripts/bank-ci.mjs`, AGENTS.md). T163 follows right after, since it fits K on the search's root values, which lane F changes; then T160 (user 13.10.2026, "1a"; the trigger of T160 is met). The TODOs of rounds 70 to 72 are in the packages below.
+Triage of 21.10.2026 (user gate "1a 2a 3b"): 21 TODOs stay on the way to the release, each with a scene a user sees; 28 are parked with a trigger, and 3 closed (`docs/completed/triage.md`). Wave 5 runs three lanes, F, H and I (the booking gate of round 72 chose four with "3b"; the triage kept three with "2a"), and measures in CI (`node scripts/bank-ci.mjs`, AGENTS.md); its own gate over the open decisions of its design comes first. Then T163 (it fits K on the search's root values, which lane F changes), T160, the last wave and the release.
 
-### T163 · Leaf K per family, fitted on search values
-
-*Re-fit · round · medium · score-touching D3 · absorbs T164 · needs T144 and T102*
-
-**Problem.** One doubles K for all doubles families did not hold. T52 fitted it on the bank and won there (fixed K −36 bp); the doubles OU holdout read it worse (own K +15 [+5, +24]); the VGC holdout read it better only late (−17 [−31, −3]). Bank doubles OU and holdout contradicted each other. Champions OU shows the same: the fitted K (1.64 + 4.41 × share of fainted Pokémon) read better early and late and worse in the middle (fixed K +35 [+7, +65], own K +26 [+3, +47]); the fit ran on static values, while the holdout searches. Untested is a K per family, fitted on the corpus with root values of the search. `winprobK` already takes a ruleset (`winprob.ts:79-82`), and Champions VGC has had its K since T138. Before any Champions doubles re-fit a new capture is needed: F3 ran under the old doubles K, and `regression/fit-families.ts:179` throws as long as `EVAL_FIT_FAMILIES` does not exclude Champions doubles.
-
-**Benefit.** Engine: doubles OU, VGC and Champions OU each get a K that reads their own games.
-
-**Success.** Fit per family on root values of a capture with search; bank plus holdout (D26) with a resolved better doubles row, no pooled harm and no warning in both tables; Champions OU holdout without a warning and better than the base.
-
-**Status (round 69).** Moved behind the wave (user 13.10.2026, "1a"); the tools of lane B stay in the code (family filter of the capture, `rootScaleReports` in `regression/fit-families.ts`, 426e466).
-
-**Evidence.** Numbers from lane F of round 67 (measurements f5 and f6), proofs in `todo-verification.md`.
-
-**Steps.**
-- [ ] New capture of the corpus in the app build with root values of the search, Champions doubles included (F3 ran under the old doubles K; `regression/fit-families.ts:179`).
-- [ ] Fit per family (doubles OU, VGC, Champions OU) with the tools from T138; rules set in advance.
-- [ ] Bank plus holdout (D26) with fixed and own K; Champions OU holdout.
-- [ ] Adopt only with a resolved better doubles row, no pooled harm and no warning.
-
-### T160 · Champions rules from the battle's dex
-
-*Champions · round · medium · score-touching D3 · parked until after wave 3*
-
-**Problem.** 82 places in eval-engine (27) and replay-core (55) read rules from the global dex instead of the battle's dex (count of 12.10. on r67); 20 of them read species or natures that the mod does not change. The mod deviates in 155 moves: 55 only in PP, 45 only in availability, 40 in mechanics (power 23, accuracy 5, flags 7, secondary effects 4, type 2, plus typed Hidden Power); also 7 abilities, 1 item, paralysis, sleep and freeze. Examples with a wrong rule in Champions: `damage-calc.ts:184` (onModifyMove from Scarlet/Violet), `pokemon-info.ts:29` (the old type of Snap Trap), `trigger-evidence.ts:78` (White Herb from Scarlet/Violet). The replay-core half has the same blocker as T159: at inference time there is no battle and no mod. Data: `docs/perf/probes/2026-10-10-r67/lanes/F/out/global-dex-census.json`, `mod-diff.json`.
-
-**Benefit.** Champions: every rule that reads a position is the rule of the game.
-
-**Success.** Each of the 62 open places reads the battle's dex or is proven format-free; Champions holdouts without pooled harm.
-
-**Trigger.** Met, wave 3 is booked (13.10.). The places lie in the files of all lanes, so this gets its own round. T186 took part of the calculator places ahead.
-
-**Evidence.** The count of 12.10. ran with the census script of lane F on r67 (82 places in 34 files); the data of round 67 is in `lanes/F/out/global-dex-census.json` and `mod-diff.json`.
-
-**Steps.**
-- [ ] Recount on the state after wave 3; prove the 20 format-free places (species, natures).
-- [ ] eval-engine: every place reads the battle's dex (`battle.dex`).
-- [ ] replay-core: the same solution as T159 (one dex or move reader that the host passes in).
-- [ ] Champions holdouts without pooled harm; bank paired.
-
-## Package A · Doubles search and verify rows
-
-### T194 · Why the answer round overrates Protect plus Tera Starstorm
-
-*Doubles search · mini round · small · score-touching D3 · round 69*
-
-**Problem.** The doubles expert pin gen9vgc2026regi-2630685175 t8 (Taunt is the error) flips on almost every doubles change, because the answer round sits on a tie of 0.003: p1's answer Protect plus Tera Starstorm gets too high a value. The pin stays (user 13.10., 1a); this TODO looks for the cause in the answer round (`search/answers.ts`), not in the pin. The diagnosis predates T149: first re-read the pin on the merged state.
-
-**Benefit.** Engine: a doubles verdict no longer hangs on a chance tie.
-
-**Success.** Checker on the scene against a Monte Carlo reference; the pin holds across the doubles changes of the next round.
-
-**Evidence.** `r69/lanes/A/diagnosis-pin-2630685175.md` (tie 0.003, price of the column; diagnosis predates T149), `r69/progress-ledger.md:88` and `r69/lanes/B/ledger.md:41` (the pin flips on almost every doubles change), user answer 1a in `r69/lanes/A/ledger.md:155`, `search/answers.ts`, reference format `r69/lanes/D/out/mc-pins-w.json`.
-
-**Steps.**
-- [ ] Re-read pin gen9vgc2026regi-2630685175 t8 on the merged state: which rows lie 0.003 apart, how the column Protect plus Tera Starstorm is priced today (T149 prices near rows deeper since 5477eda; the diagnosis does not know this).
-- [ ] Red checker on the scene against a Monte Carlo reference (pattern `mc-pins-w.json`, tolerance 0.02 between engine and MC regret); doubles only, singles have no answer round.
-- [ ] Fix the cause in `search/answers.ts`, not in the pin; the pin holds across the doubles changes of the next round; bank plus holdout doubles paired.
-
-### T195 · One column, one price in the answer round
-
-*Doubles search · round · medium · score-touching D3 · rest of T149 · round 69*
-
-**Problem.** Since T149 a found answer gets three different prices in the same column: confirmed cells get the full depth-1 sub-search, two deep rows the light sub-search, further rows a plain move (`tree-orchestrator.ts:158`, `search/answers.ts:212`). Nearly equal rows further down probably get the more pessimistic value this way (not measured). In addition, the order spec of the answer round and the scene readings of lane D run under the standard ruleset, while the app plays VGC under 'vgc': on 2629703929 t4 both rulesets have 7 near rows for p1 and 3 are checked (`ANSWER_NEAR_ROWS`), and for p2 the round finds 0 refutations under 'vgc' against 4 under 'standard'.
-
-**Benefit.** Engine: rows in one column are compared at equal depth; the specs check the app's path.
-
-**Success.** Answer round specs under 'vgc' and 'standard'; bank plus holdout doubles (D26); tree time within the timing window.
-
-**Evidence.** `r69/review/lens-BD.md` (findings 3 and 5, probe on 2629703929 t4: 7 near rows in both rulesets, 3 checked), `r69/review/todos-check.md` (T195), `tree-orchestrator.ts:154-158` (sideExtension), `search/answers.ts:52`, `:57`, `:212`, `test/doubles-answers-t149.spec.ts:200-218`, scene readings in `r69/lanes/D/ledger.md` (ruleset 'standard').
-
-**Steps.**
-- [ ] Red specs of the answer round under 'vgc' and 'standard': the order spec and the scene readings run with the app's ruleset (`settings.ruleset`); on 2629703929 t4 the same number of near rows and the same refutations for p2 in both.
-- [ ] Measure the three prices (full depth-1 sub-search, light sub-search, plain move) against the Monte Carlo count from `verify-cover-doubles` before anything changes; otherwise the hypothesis about the pessimistic value below place three stays unmeasured.
-- [ ] Price the rows of a column at equal depth (tie ANSWER_NEAR_ROWS to the size of the tie, or price the tail rows against the same sibling probes); bank plus holdout doubles (D26), tree time within the timing window.
-
-### T219 · The same verify rows in every run
-
-*Search · mini round · small · score-touching D3 · round 69*
-
-**Problem.** The expert pin smogtours-gen6ou-653785 t19 (3d sacrifices Weavile into Stealth Rock) has flipped since T102: p1 reads an inaccuracy (0.025 on 0.142), and the sentence about the sacrifice is missing. No single static term explains it; the regret swings with the search budget between 0.034 and 0.259 (base 0.010 to 0.046), because the verify round recalculates different rows in each run: the base checks only the cells of Pain Split, not those of Hex, and with Hex checked even the base reads 0.109. Proposal: check the same set of rows in every run (played row, best row, rows up to 0.1 behind the best), then re-read the pin. Replaces the watch item in section C ("Pin 653785 turn 19 ... hangs on shaky numbers"): the pin has flipped.
-
-**Benefit.** Engine: a verdict does not depend on which rows the verify round happens to catch.
-
-**Success.** Regret of 653785 t19 stable across search budgets, pin re-read; tree time within the timing window.
-
-**Evidence.** `r69/lanes/B/diagnosis-pins.md` (pin 2, regret 0.034 to 0.259 per search budget, base 0.010 to 0.046, Hex checked 0.109), `r69/lanes/B/pins/tree-...-keephex.json`, `search/verify-select.ts:101-118` (supportMass), `e2e-feedback/corpus.ts:177-179`, the NextSteps watch item in section C (pin 653785 turn 19), `r69/review/todos-check-2.md` (T219).
-
-**Steps.**
-- [ ] Red test: the regret of 653785 t19 across search budgets of 500, 600 and 700 iterations; today 0.034, 0.142, 0.244 (singles).
-- [ ] The verify round takes the same row set in every run: played row, best row and rows up to 0.1 behind the best (instead of equilibrium support plus the played row); then re-read the pin.
-- [ ] Regret stable across search budgets, tree time within the timing window; the watch item in section C is struck.
-
-### T198 · Fickle Beam in the scripted chance
-
-*Search · mini round · small · rest of T154 · round 69*
-
-**Problem.** For a kill class that only the doubled power of Fickle Beam reaches, `search/outcome-children.ts:131-136` writes the roll -1 (101%); `forward/scripted-prng.ts` does not know the doubling. No wrong value reaches the tree (the roll drops out), but the class stays unreached. Affects the singles path (scriptFor); doubles draw the power in `pair/prng.ts`.
-
-**Benefit.** Engine: the rare kill class is drawn instead of estimated.
-
-**Success.** Checker against the simulator (Fickle Beam doubled, kill only that way), singles.
-
-**Evidence.** `search/outcome-children.ts:131-136` (scriptFor, roll -1), `:197-203` (forceMissing), `ko-odds.ts:180-184`, `forward/scripted-prng.ts` (no doubling), `calc/fickle.ts` (strengthMix), `pair/prng.ts` (strengthDraw, doubles path), `r69/lanes/D/ledger.md:73` (point 1), `r69/review/lens-BD.md` (finding 7).
-
-**Steps.**
-- [ ] Red checker against the simulator: a kill class that only the doubled power of Fickle Beam reaches; the tree draws it instead of leaving it unreached (singles; doubles draw the power in `pair/prng.ts` and are not affected).
-- [ ] Script the power through `ScriptedPRNG`; its factor comes from the dex handler, as with `strengthMix`, not from a list.
-- [ ] Bank paired.
-
-### T227 · The trend probe at lower cost and by class
-
-*Search · mini round · small · score-touching D3 · round 70*
-
-**Problem.** Since round 70 the trend probe reads every base draw of a decisive cell (`search/trend-probe.ts`, `search/position.ts`, `orchestrator.ts`), and early singles matrix searches at three draws cost about 41% more CPU (34 saved positions, 14.5 s to 20.4 s; the pool runs the probes in parallel). A class-weighted probe over the cell's outcome classes would be exact at one sub-search per class; duplicate boards among draws (25 of 223 jobs) could share one probe; blend cells take the unweighted mean of their base draws; `search/deepening.ts:34` books the depth-2 trend with the old first-seed formula.
-
-**Benefit.** Tempo and engine: the same trend reading for less time.
-
-**Success.** The rankings of the 34 positions as with the round-70 probe, or each change explained; CPU within 10% of v1.
-
-**Evidence.** `docs/perf/probes/2026-10-13-search-fixes/` (timing, `out/identity-*.json`).
-
-**Steps.**
-- [ ] Probe per outcome class with its weight; one probe per distinct board.
-- [ ] The depth-2 trend with the per-draw formula.
-- [ ] Timing interleaved with v1 on a quiet machine.
-
-### T242 · The Protect tempo softens a VGC verdict the reference keeps
-
-*Doubles search · mini round · small · score-touching D3 · round 70 (gate 17.10., 1a)*
-
-**Problem.** Since the Protect tempo (7b4b73f, user gate 13.10., 3a) a Protect earns the damage it denies in the doubles hints. In gen9vgc2026regi-2629703929 turn 8 the engine now grades p1's played Heat Wave + Protect an inaccuracy (0.1736) where the Monte-Carlo reference on the same rows grades a mistake (0.326 and 0.299 on 24 draws, 0.280 on 96), and p2's Protect + Encore→Koraidon an inaccuracy (0.1936; the reference none on 24 draws, 0.147 on 96); before the tempo both graded p1 a mistake and p2 no tier. A bisection over the batch commits moves the scene at 7b4b73f only. The rows change: Protect + Flare Blitz→Jumpluff enters, the played Heat Wave + Protect moves from an appended thirteenth row into the twelve, and Heat Wave + Flare Blitz→Groudon (the round-69 reference's best) and Tera Blast→Groudon + Flare Blitz→Jumpluff leave. The reference's best row on the new list (Dark Pulse→Groudon + Flare Blitz→Jumpluff) stays listed, so the distance lies in cell values: Heat Wave + Protect × Rock Slide + Sleep Powder→Chi-Yu reads −0.307 against the reference's −0.437 ± 0.076, and Tera Blast→Jumpluff + Collision Course→Jumpluff × Protect + Encore→Koraidon 0.210 against 0.008 ± 0.033 (96 draws). The quarter-tier VGC holdout of the batch check shows harm on the hq table's luck-adjusted row (+37 [+0, +74]); no run separates 7b4b73f from the rest of the batch.
-
-**Benefit.** Engine: Protect stays in the doubles search without softening the verdicts the reference keeps.
-
-**Success.** The scene grades p1 a mistake again, as the reference does, with the two cells within 2.5 standard errors of the reference; the VGC and Doubles OU holdouts paired in full without harm, with and without the Protect tempo.
-
-**Evidence.** `docs/perf/probes/2026-10-17-vgc-bisect/out/` (verdicts and row lists per commit snapshot), `docs/perf/probes/2026-10-15-mc/out/` (references; `mc-pins/big-gen9vgc2026regi-2629703929-t8-C.json` with 96 draws per cell), `docs/perf/probes/2026-10-15-r70-check/paired-r70-hold-vgc-q-vs-r69-w2-hold-vgc-hq.txt`.
-
-**Steps.**
-- [ ] Price the two cells as the verify step does, with and without the tempo, and find what moves them.
-- [ ] Full VGC and Doubles OU holdouts with and without the tempo.
-- [ ] Fix test-first; the scene pin moves at its gate.
-
-### T253 · Move order by Quick Claw, Quick Draw and Custap Berry in the search
-
-*Search · feature · score-touching D3 · rest of T196 · round 72*
-
-**Problem.** A Quick Claw holder moves before a faster foe in 20% of turns (`randomChance(1, 5)`, `@pkmn/sim` `data/items.js:5057`), a Quick Draw holder in 30% (`data/abilities.js:3903`), and a Custap Berry holder at a quarter of its HP or less (a half with Gluttony) moves first for certain once the berry triggers. `speedTie` (`search/leaf.ts:84-90`) scripts true ties in singles only, and the queue's answer (`sim-ask/action-order.ts`) calls two different action speeds no tie whatever either body holds, so a claw against a faster foe reaches the tree through the seed alone. In doubles no tie is scripted; the pair plan hands a claw or Quick Draw mover to the simulator's own dice (`pair/guards.ts:46`, fallback `quick`). T196's checker named singles and doubles; round 72 delivered the singles tie.
-
-**Benefit.** Engine: a turn a Quick Claw can steal counts at its chance instead of at the seed's draw.
-
-**Success.** In singles the claw and Quick Draw chances are priced like a tie (Custap Berry as the certain order it gives), with a checker against the simulator; the doubles path measured on its own.
-
-**Evidence.** `packages/eval-engine/src/search/leaf.ts:84-90`, `packages/eval-engine/src/sim-ask/action-order.ts` (doc comment), `packages/eval-engine/src/pair/guards.ts:46`.
-
-**Steps.**
-- [ ] A checker against the simulator: a claw holder against a faster foe, singles and doubles, Gen 9 and Champions, and the claw's chance in older generations.
-- [ ] The chance in the singles leaf; the doubles path through the pair plan measured.
-
-## Package B · Static evaluation repairs
-
-### T199 · pairFocus as a ramp instead of a switch
-
-*Static weights · mini round · small · score-touching D3 · rest of T42 · round 69*
-
-**Problem.** pairFocus prices a pair that can KO a foe only together, as a 0/1 gate: "alone neither makes it, together both do" (`score/field-pair.ts:43`). At its fitted weight of -188 the VGC grade dropped in 24 of 103 runs when a foe took more damage (round 69, `r69/lanes/B/vgc-monotone.vt.ts`), so the user gate of 13.10. (6b) set it to 0 in every table (aafd8c5, `score/weights.ts:230, 269, 332, 391, 440`). Since then the doubles static has no term for a KO the pair makes together. The monotony breaks that remain run through other terms (T248).
-
-**Benefit.** Engine: a doubles position where only both attackers together KO a foe gets credit again, and more damage on that foe never lowers the grade.
-
-**Success.** A continuous ramp over the KO window earns a nonzero weight in a re-fit; the relation specs of round 72 (`test/relation-checks.spec.ts`) show no HP-monotony break through it; bank plus holdout (D26) without harm, R1 to R3 in VGC.
-
-**Evidence.** `score/field-pair.ts:43` (gate `best < foeHp && total >= foeHp`), `score/weights.ts:230, 269, 332, 391, 440` (pairFocus 0 in every table since aafd8c5; -188 in VGC before), `r69/lanes/B/vgc-monotone.vt.ts` and `r69/lanes/B/out/vgc-monotone-all.json`, `r69/review/todos-check-2.md` (T199: 24 of 103 on the merged state, 16 before S17), `r69/review/lens-BD.md` (finding 2), gate question in `r69/progress-ledger.md:138`.
-
-**Steps.**
-- [ ] pairFocus as a continuous ramp over the KO window instead of a 0/1 gate.
-- [ ] Re-fit; the relation specs show no break through pairFocus.
-- [ ] Bank plus holdout (D26), R1 to R3 in VGC.
-
-### T201 · The static capture knows its form
-
-*Fit tool · mini round · small · rest of T102 · round 69*
-
-**Problem.** Since T102 the statics in standard singles compute with the phase form (EVAL_STATIC_FORM, on by default). A new capture stores the grade with the form, the fit rebuilds it from the table; the identity check holds only if you name the form columns and the weights of the capture by hand (`regression/fit-families.ts`, B ledger line 122). The capture should write form and weights itself.
-
-**Benefit.** Measurement: a re-fit starts without manual work and without false alarms.
-
-**Success.** Capture plus fit without extra variables, identity 0.
-
-**Evidence.** `score/phase-form.ts:34-35`, `:52-55` (staticFormOn), `eval-function.ts:46`, `regression/fit-families.ts:234-235`, `:244-252` (identity check), `regression/eval-calibration.spec.ts:5531`, `:5819-5823` (leafValue as capture grade), `regression/eval-fit.spec.ts:175-176`, `:246-250` (EVAL_FIT_FORMS, EVAL_FIT_CAPTURED), `r69/lanes/B/ledger.md:122`, `r69/review/lens-BD.md` (finding 4).
-
-**Steps.**
-- [ ] Red test: a new capture of the standard singles statics, then `familyReports`; today the identity check throws `identity: N of M captured scores differ`.
-- [ ] The capture writes the form (EVAL_STATIC_FORM) and the weights of the capture itself; the fit reads them from there, not from environment variables set by hand.
-- [ ] Capture plus fit without extra variables, identity 0 (standard singles; the other families carry no form).
+## Wave 5 · Lane F: static evaluation
 
 ### T224 · Re-fit boostsBiting on the round-70 definition
 
@@ -243,39 +49,6 @@ User gate 21.10.2026, "3b": wave 5 runs next, with four lanes that share no file
 - [ ] The bench credit needs the holder to win its front race within the horizon.
 - [ ] Paralysis and sleep priced from the played hit; a third body's Neutralizing Gas in the key.
 - [ ] Bank paired.
-
-### T226 · Residuals and drain heal outside the boost races
-
-*Static · mini round · small · score-touching D3 · round 70*
-
-**Problem.** The played end of turn (`score/residuals.ts`: Leech Seed with its heal, items, weather, terrain, statuses) feeds only the boostsBiting races, for the holder and the foes on the field. Benched bodies, the matchup term, the last pair and the unanswered profile keep the status table (`races.ts` `statusResidual`: burn, poison, toxic). No race counts the drain heal inside an attack (half the damage dealt).
-
-**Benefit.** Engine: every race reads the residuals the game plays.
-
-**Success.** Matchup and last-pair races read the played residual; checker against the simulator (Leech Seed, Leftovers, a drain attacker); bank paired.
-
-**Evidence.** `docs/perf/probes/2026-10-13-boost-bite/findings.md` (open points 3 and 4).
-
-**Steps.**
-- [ ] Red checker: a seeded body in the matchup race; a Giga Drain user's race.
-- [ ] The played residual for every race side; the drain heal as negative chip on attacking turns.
-- [ ] Bank paired; static time within noise.
-
-### T243 · The draft t56 play-out loses for p2 in 2 of 16 dice
-
-*Engine · larger bug · score-touching D3 · round 70 · after T224*
-
-**Problem.** The e2e pin "the draft t56 play-out wins for p2 without crawling (round 42)" (`e2e/branch.spec.ts`, `test.fixme` since the gate of 17.10., 2a) plays draft turn 56 out with the engine on both sides. Under the log's dice the pin turns red with the round-70 static: at 0da5ec7 (stage races) p2 still wins at turn 68 but with 8 switches, and from 57d1539 (contact costs) on p2 sends Heatran into Mienshao's Knock Off at turn 61, the round-19 error, and p1 wins at turn 67. Over 16 arrival dice in Node, v1 against itself wins 16 for p2 and passes the pin 14 times; round 70 against itself wins 14 and passes 12, and one of its losses shuffles Muk-Alola and Slowking for 12 switches against Palossand's Shore Up (turn 76). Head to head over the same dice (`h2h.vt.ts`): round 70 as p2 wins 16 of 16 against v1 as p1 (pin 10, mean 5.8 switches); round 70 as p1 takes one of 16 from v1 as p2 (pin 11, mean 6.3); v1 as p1 wins none of 32. Under the log's dice p2 loses only when both sides play round 70.
-
-**Benefit.** App: the play-out keeps the round-42 intent (p2 wins without crawling).
-
-**Success.** The Node probe over the 16 dice, the new engine against itself: p2 wins 16 and passes the pin at least 14 times (v1's numbers), the two mixed pairings reported beside it; the e2e pin back from `test.fixme`. Or a gate decides that the six-switch cap no longer measures a crawl against the stronger p1.
-
-**Evidence.** `docs/perf/probes/2026-10-15-playout/` (`playout.vt.ts`, `h2h.vt.ts`, `variants/`, `out/`, `table.mjs`).
-
-**Steps.**
-- [ ] The 16-dice probe after T224's re-fit, all four pairings.
-- [ ] If still short: the first turn where the round-70 p2 leaves v1's line, priced by the Monte-Carlo reference.
 
 ### T248 · HP monotony of the static
 
@@ -312,7 +85,91 @@ User gate 21.10.2026, "3b": wave 5 runs next, with four lanes that share no file
 - [ ] The red relation spec with a foe that KOs first.
 - [ ] The fix in every family table, with T224 where the race decides and T225 where the front gate's bench credit reads along.
 
-## Package C · Spread solver, hits and the Choice check
+### T243 · The draft t56 play-out loses for p2 in 2 of 16 dice
+
+*Engine · larger bug · score-touching D3 · round 70 · after T224*
+
+**Problem.** The e2e pin "the draft t56 play-out wins for p2 without crawling (round 42)" (`e2e/branch.spec.ts`, `test.fixme` since the gate of 17.10., 2a) plays draft turn 56 out with the engine on both sides. Under the log's dice the pin turns red with the round-70 static: at 0da5ec7 (stage races) p2 still wins at turn 68 but with 8 switches, and from 57d1539 (contact costs) on p2 sends Heatran into Mienshao's Knock Off at turn 61, the round-19 error, and p1 wins at turn 67. Over 16 arrival dice in Node, v1 against itself wins 16 for p2 and passes the pin 14 times; round 70 against itself wins 14 and passes 12, and one of its losses shuffles Muk-Alola and Slowking for 12 switches against Palossand's Shore Up (turn 76). Head to head over the same dice (`h2h.vt.ts`): round 70 as p2 wins 16 of 16 against v1 as p1 (pin 10, mean 5.8 switches); round 70 as p1 takes one of 16 from v1 as p2 (pin 11, mean 6.3); v1 as p1 wins none of 32. Under the log's dice p2 loses only when both sides play round 70.
+
+**Benefit.** App: the play-out keeps the round-42 intent (p2 wins without crawling).
+
+**Success.** The Node probe over the 16 dice, the new engine against itself: p2 wins 16 and passes the pin at least 14 times (v1's numbers), the two mixed pairings reported beside it; the e2e pin back from `test.fixme`. Or a gate decides that the six-switch cap no longer measures a crawl against the stronger p1.
+
+**Evidence.** `docs/perf/probes/2026-10-15-playout/` (`playout.vt.ts`, `h2h.vt.ts`, `variants/`, `out/`, `table.mjs`).
+
+**Steps.**
+- [ ] The 16-dice probe after T224's re-fit, all four pairings.
+- [ ] If still short: the first turn where the round-70 p2 leaves v1's line, priced by the Monte-Carlo reference.
+
+## Wave 5 · Lane H: rebuild fidelity
+
+### T250 · The bring restriction in short VGC games
+
+*Rebuild · larger bug · score-touching D3 · replaces the parked bring bullet of the watch list · round 72*
+
+**Problem.** In gen9championsvgc2026regmbbo3-2687970740 p2 shows its four brought Pokémon (Meowstic, Scrafty, Aerodactyl, Floette) and p1 shows 3 of 4, whose fourth species stands in no log line (`|teampreview|4` gives the number, not the name). `replayBringOnly` (`replay-core/src/replay-format.ts:281-290`) trims both sides or neither (`:275-280`: a pinned four against an unpinned six flipped game 452654), so it answers null and p2 keeps all six bodies. Two phantoms stand in the game: Swampert replaces Floette at the end of turn 6 and takes Earthquake on turn 7, and Rotom-Heat fills the empty slot, healthy, though p2 brought neither. Round 72's better alignment (T238) lets Swampert enter a turn earlier, which moved the Champions VGC row of turn 8 from 0.7999 to 0.8149; the exchange of Swampert's HP and Earthquake PP alone produces the move (`r72/review/cvgc-2687970740.md`, measured at 60743ec).
+
+**Benefit.** Engine and app: a short VGC game evaluates with the bodies each side brought.
+
+**Success.** No phantom body in that game; the bank and holdout rows of every game where a side shows fewer species than its bring count, counted before and after; VGC and Champions VGC on their own.
+
+**Evidence.** `r72/review/cvgc-2687970740.md`, `packages/replay-core/src/replay-format.ts:275-290`.
+
+**Steps.**
+- [ ] Count the games where a side shows fewer species than its bring count (bank, holdouts, fit corpus), and those where a team sheet names the missing species.
+- [ ] Answer `pass` for a forced replacement the protocol never shows, or trim the complete side where a sheet completes the other; then the symmetric rule of `:275-280` against the A.3c game 452654.
+
+### T212 · Start volatiles that the protocol shows
+
+*Rebuild · mini round · small · rest of T172 · round 69*
+
+**Problem.** The board does not know every `-start` that the log shows (Salt Cure in 752733, boostedStat lines). Rebuild them through the simulator's `addVolatile`.
+
+**Benefit.** Engine: the rebuild carries the effects that the game carries.
+
+**Success.** Count in the corpus before and after, checker against the simulator.
+
+**Evidence.** `r69/lanes/E/ledger.md:13` (Salt Cure, 752733 turns 15 to 17), `:58` (point 1: boostedStat lines, 107 of 38,897 bank bodies deviate), `r69/lanes/E/out-c4-split.txt`.
+
+**Steps.**
+- [ ] Count in the corpus before: `-start` lines of the log that the board does not carry (Salt Cure, boostedStat), singles and doubles separately.
+- [ ] Red checker against the simulator: Salt Cure in 752733 turns 15 to 17 takes effect in the rebuild; the line is played through the simulator's `addVolatile`, without a list of effects.
+- [ ] Count after; the 107 deviating bodies drop.
+
+### T214 · A Sitrus witness from the HP
+
+*Rebuild · mini round · small · rest of T172 · round 69*
+
+**Problem.** In 939635 the simulator eats Sinistcha's Sitrus Berry, while in the game she stays at 52 to 55% and keeps the berry. Lane E restores items only for bodies that the protocol never showed. The count finds 16 Sitrus lines of switched-in bodies: 8 of Tyranitar (2660826377), which the game already refutes (it falls to 25% without eating), 4 of Sinistcha in 939635, 4 of Ogerpon and Indeedee. A witness from HP and threshold decides the 8 open ones and confirms the 8 of Tyranitar.
+
+**Benefit.** Engine: the board carries the berry that the game still has.
+
+**Success.** Count of the 16 lines before and after, checker against the simulator.
+
+**Evidence.** `r69/lanes/E/ledger.md:14` (count, 16 lines), `:18` (names 15; the raw output `r69/lanes/E/out-c4-split.txt` lines 3-4 and 17-34 gives 16), `r69/review/todos-check-2.md` (T214), games 939635, 2660826377, 2660802611, 913990, 938638.
+
+**Steps.**
+- [ ] Count of the 16 Sitrus lines before: 8 of Tyranitar (2660826377, already refuted by the game), 4 of Sinistcha (939635), 1 each of Ogerpon (2660802611) and Indeedee (913990), 2 of Indeedee (938638).
+- [ ] Red checker against the simulator: Sinistcha stays at 52 to 55% and keeps the berry; a witness from HP and threshold (singles and doubles, the threshold from the dex) decides the 8 open lines and confirms the 8 of Tyranitar.
+- [ ] The rebuild restores the berry only after this witness; count of the 16 lines after.
+
+### T232 · Dice per action in the first branch turn
+
+*Rebuild · mini round · small · lossless for the search · round 70*
+
+**Problem.** Since round 70 a branch opens on the seed its turn has in the log (`branch/arrival-dice.ts`), so every action before the first changed one draws the logged dice; actions after it draw later numbers of the same stream, deterministic but not the logged roll (GPL DzBQ5azlO5l turn 13: when the faster side's move changes, the slower side's logged roll is lost).
+
+**Benefit.** App: a rebuilt turn keeps every logged roll the change does not touch.
+
+**Success.** In the first branch turn every unchanged action shows its logged roll, in singles, doubles and Champions.
+
+**Evidence.** `docs/perf/probes/2026-10-13-gpl-flinch/findings.md` (part 2).
+
+**Steps.**
+- [ ] Red test: change the faster side's move; the slower side's logged damage roll and secondary effect stay.
+- [ ] Scripts from the log in a ScriptedPRNG that also answers secondary rolls, keyed by side, slot and move, for the first branch turn only.
+
+## Wave 5 · Lane I: spread solver and hits
 
 ### T202 · Expanding Force and Tera Starstorm without [spread]
 
@@ -365,57 +222,6 @@ User gate 21.10.2026, "3b": wave 5 runs next, with four lanes that share no file
 - [ ] `explainsWith` computes with the item at the hit, Tera, Paradox value, weather and screens of the observation (T86, T167, T191) instead of an empty field and the built item.
 - [ ] Bank paired.
 
-### T207 · Hidden Power in doubles
-
-*Spread solver · mini round · small · round 69*
-
-**Problem.** Since T31 the parser reads doubles hits, but the Hidden Power hints remain in singles only. Doubles formats with Hidden Power (older generations) lose the type hint this way.
-
-**Benefit.** Sets: Hidden Power is read in doubles as in singles.
-
-**Success.** Checker against the simulator, doubles of a generation with Hidden Power.
-
-**Evidence.** `protocol/handlers.ts:233-235` (recordHiddenPowerHit: `!state.singles`), `:196` (recordImmuneHiddenPower), `r69/lanes/A/ledger.md:14` (the exception as a decision, "a small TODO of its own").
-
-**Steps.**
-- [ ] Red checker against the simulator: a doubles format of a generation with Hidden Power; the hit yields the type hint as in singles.
-- [ ] The singles lock in `recordHiddenPowerHit` goes.
-- [ ] Holdout doubles paired; singles stay byte-identical.
-
-### T208 · Transformed Mew and Ditto
-
-*Spread solver · mini round · small · round 69*
-
-**Problem.** Hits of a transformed Mew or a Ditto drop out: 26 doubles hits of the bank (bank-doubles 2, doublesou 14, vgc 10). The simulator knows the copied values.
-
-**Benefit.** Sets: more observations in games with Transform.
-
-**Success.** Count per family, checker against the simulator.
-
-**Evidence.** `r69/lanes/A/ledger.md:40-41` (26 hits in three families, all Transform; the parser does not hold the Transform state), count bank-doubles 2, doublesou 14, vgc 10.
-
-**Steps.**
-- [ ] Count per family before (26 discarded doubles hits) and a red checker against the simulator: a hit of a transformed Mew or a Ditto carries the copied values of the target.
-- [ ] The parser tracks the Transform state; the observation computes with the copied values, not those of the species. The count covers doubles; the same count shows whether singles have the same gap.
-- [ ] Count after, set diff (D8) on the holdouts.
-
-### T209 · The prior names its source
-
-*Sets · mini round · small · score-touching D3 · rest of T132 · round 69*
-
-**Problem.** Without a published set the solver starts from a default per species. Lane A proposes naming the source of the prior (published set, usage data, default per species), so that the T132 rule treats a guessed speed value differently from a published one.
-
-**Benefit.** Sets: the speed rule knows how much a starting value weighs.
-
-**Success.** Set diff (D8), fit error per family, bank paired.
-
-**Evidence.** `r69/lanes/A/ledger.md:105` (point 1: name the source of the prior; example GPL Uxie 0/252/0/0/4/252), `r69/review/todos-check.md` (old T208: the goal is the gate of the T132 rule, not a ranking of the sources), `replay-core/src/spreads/ev-budget.ts:22-23`, `:45`.
-
-**Steps.**
-- [ ] Red test: two solver runs with the same starting value, one from a published set, one from the default per species; the T132 rule treats the guessed speed value differently from the published one (singles and doubles).
-- [ ] The prior carries its source (published set, usage data, default per species) up to the rule.
-- [ ] Set diff (D8), fit error per family, bank paired.
-
 ### T210 · Move powers from the battle history in the spread solver
 
 *Spread solver · round · medium · rest of T86 · round 69*
@@ -432,23 +238,6 @@ User gate 21.10.2026, "3b": wave 5 runs next, with four lanes that share no file
 - [ ] Red checkers against the simulator per group, singles and doubles: Last Respects and Rage Fist (power from the history), Hex and Venoshock (defender's status), Stakeout, Analytic, Plus and Minus; plus a hit with a changed item (consumed resist berry).
 - [ ] The observation carries the number of fainted Pokémon, the defender's status and the partner's ability (Plus and Minus through the way from T203); the item judge no longer skips hits with a changed item.
 - [ ] Count of valid and wrongly priced observations before and after; set diff.
-
-### T228 · Gen 2 Special stats apart in the solver
-
-*Spread solver · mini round · small · score-touching D3 · round 70 · rest of T222*
-
-**Problem.** `topUp` in `spread-inference.ts` hands out EV room one stat at a time and leaves Special Attack and Special Defense apart in 10 of 1,077 Gen 2 fit-corpus sets (all Raikou, e.g. smogtours-gen2ou-684843 at 184/252/252/0/252/216). The calculator couples them (`coupleSpecial`, `spreads/ev-budget.ts`); the simulator plays them apart in custom games. A probe fix moves 11 builds, because the second solve pass reads the first's answers.
-
-**Benefit.** Sets: every Gen 1 and 2 body plays one Special value, as the game does.
-
-**Success.** Every Gen 1 and 2 build carries one Special value; set diff over the fit corpus explained.
-
-**Evidence.** `docs/perf/probes/2026-10-13-replay-core/findings.md` (open point 2), `docs/perf/probes/2026-10-13-replay-core/out/setdiff-report.txt`.
-
-**Steps.**
-- [ ] Red test on 684843 p14.
-- [ ] `topUp` keeps the pair equal where the budget has one Special.
-- [ ] Set diff (D8).
 
 ### T229 · Z-move and Max-move hits in the spread solver
 
@@ -484,141 +273,49 @@ User gate 21.10.2026, "3b": wave 5 runs next, with four lanes that share no file
 - [ ] The lookup follows replace lines; the CRLF door on `correctActivesFromProtocol`.
 - [ ] Set diff (D8).
 
-### T231 · Crit and accuracy: conditions, evasion, the pair plan
+## After wave 5
 
-*KO odds · mini round · small · score-touching D3 · round 70 · rest of N1*
+### T163 · Leaf K per family, fitted on search values
 
-**Problem.** Since round 70 a closed census decides the crit and accuracy guard for items and abilities (`ko-odds.ts`); among volatiles and field conditions the guard checks only Focus Energy by hand, while Dragon Cheer, G-Max Chi Strike, Laser Focus, Lock-On, Telekinesis, Glaive Rush, Minimize, Gravity, Lucky Chant and Toxic (Gen 7 and earlier) carry such handlers. Keen Eye, Mind's Eye, Illuminate (`ignoreEvasion`) and Unaware change the accuracy reading without an accuracy handler. `pair/pattern.ts:94` (`missedCrit`) ignores crit-stage items and abilities; `pair/snapshot.ts:79` keeps a hand list of crit blockers. `parsePlayedActions` reads the newest Dex because its signature carries no generation.
+*Re-fit · round · medium · score-touching D3 · absorbs T164 · needs T144 and T102*
 
-**Benefit.** Engine: one census decides every crit and accuracy effect, in singles and in the pair plan.
+**Problem.** One doubles K for all doubles families did not hold. T52 fitted it on the bank and won there (fixed K −36 bp); the doubles OU holdout read it worse (own K +15 [+5, +24]); the VGC holdout read it better only late (−17 [−31, −3]). Bank doubles OU and holdout contradicted each other. Champions OU shows the same: the fitted K (1.64 + 4.41 × share of fainted Pokémon) read better early and late and worse in the middle (fixed K +35 [+7, +65], own K +26 [+3, +47]); the fit ran on static values, while the holdout searches. Untested is a K per family, fitted on the corpus with root values of the search. `winprobK` already takes a ruleset (`winprob.ts:79-82`), and Champions VGC has had its K since T138. Before any Champions doubles re-fit a new capture is needed: F3 ran under the old doubles K, and `regression/fit-families.ts:179` throws as long as `EVAL_FIT_FAMILIES` does not exclude Champions doubles.
 
-**Success.** One census over items, abilities and conditions; the pair plan reads it; bank paired.
+**Benefit.** Engine: doubles OU, VGC and Champions OU each get a K that reads their own games.
 
-**Evidence.** `docs/perf/probes/2026-10-15-n1/out/crit-acc-handlers.txt`, `docs/perf/probes/2026-10-15-n1/crit-acc-conditions.mjs`.
+**Success.** Fit per family on root values of a capture with search; bank plus holdout (D26) with a resolved better doubles row, no pooled harm and no warning in both tables; Champions OU holdout without a warning and better than the base.
 
-**Steps.**
-- [ ] Extend the census to conditions and evasion-ignoring effects.
-- [ ] The pair plan reads the census; the hand list goes.
-- [ ] Decide whether `parsePlayedActions` takes a generation (package API).
+**Status (round 69).** Moved behind the wave (user 13.10.2026, "1a"); the tools of lane B stay in the code (family filter of the capture, `rootScaleReports` in `regression/fit-families.ts`, 426e466).
 
-## Package D · Rebuild fidelity
-
-### T212 · Start volatiles that the protocol shows
-
-*Rebuild · mini round · small · rest of T172 · round 69*
-
-**Problem.** The board does not know every `-start` that the log shows (Salt Cure in 752733, boostedStat lines). Rebuild them through the simulator's `addVolatile`.
-
-**Benefit.** Engine: the rebuild carries the effects that the game carries.
-
-**Success.** Count in the corpus before and after, checker against the simulator.
-
-**Evidence.** `r69/lanes/E/ledger.md:13` (Salt Cure, 752733 turns 15 to 17), `:58` (point 1: boostedStat lines, 107 of 38,897 bank bodies deviate), `r69/lanes/E/out-c4-split.txt`.
+**Evidence.** Numbers from lane F of round 67 (measurements f5 and f6), proofs in `todo-verification.md`.
 
 **Steps.**
-- [ ] Count in the corpus before: `-start` lines of the log that the board does not carry (Salt Cure, boostedStat), singles and doubles separately.
-- [ ] Red checker against the simulator: Salt Cure in 752733 turns 15 to 17 takes effect in the rebuild; the line is played through the simulator's `addVolatile`, without a list of effects.
-- [ ] Count after; the 107 deviating bodies drop.
+- [ ] New capture of the corpus in the app build with root values of the search, Champions doubles included (F3 ran under the old doubles K; `regression/fit-families.ts:179`).
+- [ ] Fit per family (doubles OU, VGC, Champions OU) with the tools from T138; rules set in advance.
+- [ ] Bank plus holdout (D26) with fixed and own K; Champions OU holdout.
+- [ ] Adopt only with a resolved better doubles row, no pooled harm and no warning.
 
-### T213 · Outrage lock in the opposite direction
+### T160 · Champions rules from the battle's dex
 
-*Rebuild · mini round · small · rest of T187 · round 69*
+*Champions · round · medium · score-touching D3 · parked until after wave 3*
 
-**Problem.** Lane E found the reverse case: the game holds the lock, the simulator ends it (2663114473 t12, Dragonite). Counted, not built.
+**Problem.** 82 places in eval-engine (27) and replay-core (55) read rules from the global dex instead of the battle's dex (count of 12.10. on r67); 20 of them read species or natures that the mod does not change. The mod deviates in 155 moves: 55 only in PP, 45 only in availability, 40 in mechanics (power 23, accuracy 5, flags 7, secondary effects 4, type 2, plus typed Hidden Power); also 7 abilities, 1 item, paralysis, sleep and freeze. Examples with a wrong rule in Champions: `damage-calc.ts:184` (onModifyMove from Scarlet/Violet), `pokemon-info.ts:29` (the old type of Snap Trap), `trigger-evidence.ts:78` (White Herb from Scarlet/Violet). The replay-core half has the same blocker as T159: at inference time there is no battle and no mod. Data: `docs/perf/probes/2026-10-10-r67/lanes/F/out/global-dex-census.json`, `mod-diff.json`.
 
-**Benefit.** Engine: locks end in the rebuild as in the game.
+**Benefit.** Champions: every rule that reads a position is the rule of the game.
 
-**Success.** Count, checker.
+**Success.** Each of the 62 open places reads the battle's dex or is proven format-free; Champions holdouts without pooled harm.
 
-**Evidence.** `r69/lanes/E/ledger.md:36`, `:40` (2663114473 turn 12, p2 Dragonite: the game holds the lock, the board has lost it and is confused), `:58` (point 2), T187 (751466 turn 7, the other direction).
+**Trigger.** Met, wave 3 is booked (13.10.). The places lie in the files of all lanes, so this gets its own round. T186 took part of the calculator places ahead.
 
-**Steps.**
-- [ ] Count in the corpus: games in which the simulator ends a lock that the game holds (Outrage and other random lengths), singles and doubles.
-- [ ] Red checker against the simulator on 2663114473 turn 12: the rebuild keeps the lock.
-- [ ] Count after.
-
-### T214 · A Sitrus witness from the HP
-
-*Rebuild · mini round · small · rest of T172 · round 69*
-
-**Problem.** In 939635 the simulator eats Sinistcha's Sitrus Berry, while in the game she stays at 52 to 55% and keeps the berry. Lane E restores items only for bodies that the protocol never showed. The count finds 16 Sitrus lines of switched-in bodies: 8 of Tyranitar (2660826377), which the game already refutes (it falls to 25% without eating), 4 of Sinistcha in 939635, 4 of Ogerpon and Indeedee. A witness from HP and threshold decides the 8 open ones and confirms the 8 of Tyranitar.
-
-**Benefit.** Engine: the board carries the berry that the game still has.
-
-**Success.** Count of the 16 lines before and after, checker against the simulator.
-
-**Evidence.** `r69/lanes/E/ledger.md:14` (count, 16 lines), `:18` (names 15; the raw output `r69/lanes/E/out-c4-split.txt` lines 3-4 and 17-34 gives 16), `r69/review/todos-check-2.md` (T214), games 939635, 2660826377, 2660802611, 913990, 938638.
+**Evidence.** The count of 12.10. ran with the census script of lane F on r67 (82 places in 34 files); the data of round 67 is in `lanes/F/out/global-dex-census.json` and `mod-diff.json`.
 
 **Steps.**
-- [ ] Count of the 16 Sitrus lines before: 8 of Tyranitar (2660826377, already refuted by the game), 4 of Sinistcha (939635), 1 each of Ogerpon (2660802611) and Indeedee (913990), 2 of Indeedee (938638).
-- [ ] Red checker against the simulator: Sinistcha stays at 52 to 55% and keeps the berry; a witness from HP and threshold (singles and doubles, the threshold from the dex) decides the 8 open lines and confirms the 8 of Tyranitar.
-- [ ] The rebuild restores the berry only after this witness; count of the 16 lines after.
+- [ ] Recount on the state after wave 3; prove the 20 format-free places (species, natures).
+- [ ] eval-engine: every place reads the battle's dex (`battle.dex`).
+- [ ] replay-core: the same solution as T159 (one dex or move reader that the host passes in).
+- [ ] Champions holdouts without pooled harm; bank paired.
 
-### T232 · Dice per action in the first branch turn
-
-*Rebuild · mini round · small · lossless for the search · round 70*
-
-**Problem.** Since round 70 a branch opens on the seed its turn has in the log (`branch/arrival-dice.ts`), so every action before the first changed one draws the logged dice; actions after it draw later numbers of the same stream, deterministic but not the logged roll (GPL DzBQ5azlO5l turn 13: when the faster side's move changes, the slower side's logged roll is lost).
-
-**Benefit.** App: a rebuilt turn keeps every logged roll the change does not touch.
-
-**Success.** In the first branch turn every unchanged action shows its logged roll, in singles, doubles and Champions.
-
-**Evidence.** `docs/perf/probes/2026-10-13-gpl-flinch/findings.md` (part 2).
-
-**Steps.**
-- [ ] Red test: change the faster side's move; the slower side's logged damage roll and secondary effect stay.
-- [ ] Scripts from the log in a ScriptedPRNG that also answers secondary rolls, keyed by side, slot and move, for the first branch turn only.
-
-### T245 · The saved-replay checkpoint reads 93 % where the snapshot says 94 %
-
-*Rebuild · larger bug (cause open) · lossless D4*
-
-**Problem.** `packages/eval-engine/test/reconstruction.spec.ts` ("reconstructs stable checkpoints from a real saved replay") fails on round 70: p1's active Pokémon reads 93 % HP where the replay's snapshot says 94 % (the assertion at `:93`). The test runs only where the gitignored saved replay HTML exists, so CI never sees it; it passed on 24.09.2026 (round 59) and failed in the logs of 13.10.2026.
-
-**Benefit.** Tests: the local suite runs green.
-
-**Success.** The checkpoint test green; the cause named (turn, body, rounding) with a test that fails without the fix.
-
-**Evidence.** `docs/perf/probes/2026-10-17-vgc-bisect/red/reconstruction.log`.
-
-**Steps.**
-- [ ] Find the first failing commit between 24.09. and 13.10., then the turn and the body.
-- [ ] Fix test-first.
-
-### T250 · The bring restriction in short VGC games
-
-*Rebuild · larger bug · score-touching D3 · replaces the parked bring bullet of the watch list · round 72*
-
-**Problem.** In gen9championsvgc2026regmbbo3-2687970740 p2 shows its four brought Pokémon (Meowstic, Scrafty, Aerodactyl, Floette) and p1 shows 3 of 4, whose fourth species stands in no log line (`|teampreview|4` gives the number, not the name). `replayBringOnly` (`replay-core/src/replay-format.ts:281-290`) trims both sides or neither (`:275-280`: a pinned four against an unpinned six flipped game 452654), so it answers null and p2 keeps all six bodies. Two phantoms stand in the game: Swampert replaces Floette at the end of turn 6 and takes Earthquake on turn 7, and Rotom-Heat fills the empty slot, healthy, though p2 brought neither. Round 72's better alignment (T238) lets Swampert enter a turn earlier, which moved the Champions VGC row of turn 8 from 0.7999 to 0.8149; the exchange of Swampert's HP and Earthquake PP alone produces the move (`r72/review/cvgc-2687970740.md`, measured at 60743ec).
-
-**Benefit.** Engine and app: a short VGC game evaluates with the bodies each side brought.
-
-**Success.** No phantom body in that game; the bank and holdout rows of every game where a side shows fewer species than its bring count, counted before and after; VGC and Champions VGC on their own.
-
-**Evidence.** `r72/review/cvgc-2687970740.md`, `packages/replay-core/src/replay-format.ts:275-290`.
-
-**Steps.**
-- [ ] Count the games where a side shows fewer species than its bring count (bank, holdouts, fit corpus), and those where a team sheet names the missing species.
-- [ ] Answer `pass` for a forced replacement the protocol never shows, or trim the complete side where a sheet completes the other; then the symmetric rule of `:275-280` against the A.3c game 452654.
-
-### T251 · The shiny flag of Champions team previews
-
-*Rebuild · small fix · cosmetic · rest of T238 · after T250 · round 72*
-
-**Problem.** A shiny body that never switches in loses its shine in a Champions branch. Champions previews write `, shiny` on their `|poke|` lines (940 fit-corpus games, all Champions formats: 205 `gen9championsou`, 735 Champions VGC), and the build reads the flag only from switch, drag and replace lines (`noteLogIdentities`, `replay-core/src/team-identity.ts:48-59`); the comment above it (`:42-47`) says the preview strips the flag, which holds for Scarlet/Violet only.
-
-**Benefit.** App: the branch shows a Champions body as the replay does.
-
-**Success.** A body that never switches in keeps its preview's flag in Champions; Scarlet/Violet unchanged. If T250 trims the bodies a side never brought, the fix matters most where all six bodies stay (the 205 Champions OU games); decide T250 first.
-
-**Evidence.** `packages/replay-core/src/team-identity.ts:42-59`; the count from the TODO review of round 72 (`r72/booking/todos-review.md`, item 4).
-
-**Steps.**
-- [ ] A red spec with a Champions preview line that carries `, shiny` for a body that never switches in.
-- [ ] Read the flag from the preview in Champions formats; fix the comment.
-
-## Package E · App and report
+## The last wave
 
 ### T233 · Cards: tied punishers, quiet turns, stopped hits
 
@@ -670,164 +367,7 @@ User gate 21.10.2026, "3b": wave 5 runs next, with four lanes that share no file
 - [ ] Bisect the regret over the batch commits (engine snapshots as in `docs/perf/probes/2026-10-17-vgc-bisect/`); a probe with the scene and its numbers.
 - [ ] Red test on the turn, fix test-first; feedback run.
 
-### T252 · Generation 1 screens in the damage preview
-
-*App · small fix · round 72*
-
-**Problem.** A Gen 1 branch under Reflect or Light Screen would show the hit in the damage preview as if no screen stood: `src/lib/picker-state.ts:372-373` hands the side conditions to `src/lib/branch-damage.ts:131-132`, while Generation 1 builds both screens as volatiles of the user (`@pkmn/mods` gen1 `reflect`: `volatileStatus`, no `sideCondition`). The engine's readers add them through `standingScreens` (`replay-core/src/dex-facts/screens.ts:34-35`). The scene is read from the code: the bank, the fit corpus and the fixtures hold no Gen 1 game.
-
-**Benefit.** App: a Gen 1 branch prices a hit under a screen as the game does.
-
-**Success.** The preview prices a hit under a Gen 1 screen the way the simulator plays it, held by a spec against the simulator.
-
-**Evidence.** `src/lib/picker-state.ts:372-373`, `src/lib/branch-damage.ts:131-132`, `packages/replay-core/src/dex-facts/screens.ts:34-35`, `r72/lanes/C/out/corpus-coverage.txt` (Gen 1: 0 games).
-
-**Steps.**
-- [ ] A red spec: a Gen 1 board with Reflect on the defender's side, the preview against the simulator's damage.
-- [ ] The preview reads the screens through `standingScreens`.
-
-## Package F · Cleanup and tooling
-
-### T197 · One target at use, one redirect rule
-
-*Cleanup · mini round · small · round 69*
-
-**Problem.** "Target at use" exists twice with different reach (`search/hints.ts:199-203` without Expanding Force, `pair/odds.ts:34-49` with it), `redirectsFoes` twice with the same body (`search/hints.ts:61`, `score/field-pair.ts:25`). One place per rule stops the drift.
-
-**Benefit.** Engine: the hints and the odds read the same rule.
-
-**Success.** Specs of both places green, bank byte-identical.
-
-**Evidence.** `search/hints.ts:199-203` (RULE_MOVES, `move-use.ts:66`, `move-use-rules.ts:100-113`), `pair/odds.ts:34-49` (targetAtUse, exported since c7a78b4), `search/hints.ts:61` and `score/field-pair.ts:25` (redirectsFoes), `r69/review/lens-BD.md` (findings 6 and 10).
-
-**Steps.**
-- [ ] Red test: doubles, grounded user in Psychic Terrain with Expanding Force; the hint (combinedOptionHints) and the odds read the same target (today a single target against both opponents).
-- [ ] Merge `targetAtUse` into one place (the handler reading from `pair/odds.ts`) and `redirectsFoes` into one place; the second place imports.
-- [ ] Specs of both places green, bank byte-identical; singles are not affected (the rules apply only with several targets).
-
-### T200 · Bank rows from games that end in a forfeit
-
-*Measurement · mini round · small · round 69*
-
-**Problem.** The T39 sighting found that 68 of 193 early singles rows of the bank come from games that end in a forfeit. An early state of a forfeited game measures the statics against an outcome that no move decided.
-
-**Benefit.** Measurement: the bank verdict weighs rows by how much they say.
-
-**Success.** Count per family, verdict with and without these rows; decision at the gate.
-
-**Evidence.** `r69/lanes/B/ledger.md:125`, `:139` (68 of 193 early singles rows, 26 of 92 both-wrong rows, 9 of 28 sure ones), `r69/lanes/B/sight-t39.vt.ts` with readers `out/sight-read.mjs`, `out/sight-sum.mjs`, `r69/progress-ledger.md:105`.
-
-**Steps.**
-- [ ] Count per family (singles, doubles, VGC, Champions): rows from games that end in a forfeit, and their share of the rows of the verdict.
-- [ ] Compute the bank verdict with and without these rows (error bars as in round 48), singles and doubles separately.
-- [ ] Decision at the gate: exclude the rows, weigh them less or keep them.
-
-### T211 · One forme origin
-
-*Cleanup · mini round · small · round 69*
-
-**Problem.** Three functions answer "which species does this forme come from": `spreads/battle-forme.ts:45`, `choice-lock-defender.ts:15`, `team/item-damage-shared.ts` (defenderOf). They differ at the edges: Zygarde-Mega, Necrozma-Ultra, Floette-Mega and the Tera formes of Ogerpon. Also: `format-generations.ts` exports a scope 'legal' that nobody calls, while `src/lib/pokemon-options.ts:10` and `src/lib/smogon-sets.ts:33` build their own generations; `DEFENDER_ITEMS` in `team/item-damage-defender.ts:25` is a typed list where dex hooks could answer.
-
-**Benefit.** Engine: one answer per question.
-
-**Success.** Specs of the three places green, bank byte-identical.
-
-**Evidence.** `replay-core/src/spreads/battle-forme.ts:45` (formeOrigin), `eval-engine/src/choice-lock-defender.ts:15` (formeOrigins), `team/item-damage-shared.ts:76` (defenderOf), `format-generations.ts:46` (scope 'legal'), `src/lib/pokemon-options.ts:10`, `src/lib/smogon-sets.ts:33`, `team/item-damage-defender.ts:25` (DEFENDER_ITEMS, use at `:171`), `r69/review/lens-AFE.md` (findings 8, 9, 11), `r69/review/todos-check.md` (old T210: probe p3, six deviating formes).
-
-**Steps.**
-- [ ] Red test over every dex species: the three functions answer the same; today Zygarde-Mega, Necrozma-Ultra, Floette-Mega and the Tera formes of Ogerpon deviate.
-- [ ] One exported helper in replay-core for the forme origin; the two other places call it. `pokemon-options.ts` and `smogon-sets.ts` call `generationsFor` with scope 'legal'; `DEFENDER_ITEMS` from the dex hooks (`onModifyDef`, `onModifySpD`) instead of a typed list.
-- [ ] Specs of the three places green, bank byte-identical; singles and doubles share the functions.
-
-### T247 · The feedback corpus in CI
-
-*Tooling · round (feature, like round 71) · small to medium · no score touch · rest of round 71 (user gate 13.10.2026, "4a")*
-
-**Problem.** Since round 71 the bank and the holdouts run in GitHub Actions; the feedback corpus (`e2e-feedback/`, 12 replays with the expert pins) still runs on this machine: `npm run test:feedback` starts a Vite dev server on port 5176 and Chromium, one run took 393 s in round 70, and a lossless change needs three byte-identical runs. Its anchor is the browser build: a Chromium change shifts the last floating-point place (watch list), so a CI run has to reproduce the local dumps byte for byte before it replaces them.
-
-**Benefit.** Measurement: the feedback runs of a gate run side by side in CI, and the machine stays free.
-
-**Success.** Two CI runs and one local run of one commit give byte-identical dumps (`FEEDBACK_DUMP=1`) and the same drift report (`feedback-drift.json` beside the dumps); three CI runs side by side finish in less wall time than one run here (393 s).
-
-**Evidence.** `docs/perf/probes/2026-10-15-r70-check/check.log` (393 s), `docs/superpowers/specs/2026-10-13-round-71-bank-in-ci-design.md` (gate question 4), `.github/workflows/bank.yml` (the security rules to copy).
-
-**Steps.**
-- [ ] A workflow for the feedback corpus with the rules of `bank.yml`, Chromium pinned to the local version.
-- [ ] Dumps compared CI against local and two CI runs against each other.
-- [ ] AGENTS.md: the feedback runs of a gate in CI.
-
-### T235 · Rules from the Dex in one module
-
-*Rule fidelity · round · medium · lossless D4 · see T160*
-
-**Problem.** A replay where Wide Guard decides a turn showed it: the stall guard and the planner each kept their own list of protecting moves, with different entries. About 22 name lists and 440 name literals sit in 71 files; list groups repeat in two to five files (choice items, random-call moves, screens); the Protect family has five Dex predicates in four files (`damage-calc.ts`, `pair/guards.ts`, `search/hints.ts`, `cell-blend.ts`; `calc/protect.ts` is a sixth reader); 2 of 18 list names appear in any spec. T160 moves the same reads onto the battle's Dex.
-
-**Benefit.** Engine: one answer per rule, held to the Dex by one closed census.
-
-**Success.** Each list derived from the Dex through one facts table per Dex object (the shape of `score/contact-filter.ts` `factsOf`) or held by an `oracle:` spec; bank digit-identical; static time within noise.
-
-**Evidence.** `docs/perf/probes/2026-10-15-lessons/out/name-census.txt`, `out/dex-lists.txt`, `out/dex-unpriceable.txt`.
-
-**Status (round 72).** Steps 1 and 2 and the setup moves of step 3 delivered in wave 4 (`dex-facts/` in both packages: the Protect family as one predicate, 7 lists derived from the Dex, 12 held by `oracle:` specs, 9 readings that differed from the simulator fixed; `dex-facts/setup.ts` with `test/setup-moves-oracle.spec.ts`). Open: the 21 unpriceable candidates of `test/unpriceable-oracle.spec.ts:33-41`, of which five have a pricing rule of their own (superfang, naturesmadness and ruination in `HALVING_MOVES`, `score/threat.ts:126`; Psywave in `fixedDamage`, `:259`; Endeavor in `score/move-facts.ts:119`) and Guardian of Alola has none a grep finds, so each adoption is its own D3 measurement; oracle specs for `SWAP_PAIR_MOVES` and `MOLD_BREAKER_ABILITIES` (`replay-core/src/inference/handlers.ts:28`, `:30`); the three screen literals of `pair/kill-table.ts:73-75` onto `SCREENS`; the weather id table `CLIENT_WEATHER_IDS` of `branch/field-ids.ts:17`.
-
-**Steps.**
-- [x] Facts table and the Protect family in one predicate.
-- [x] Choice items, random-call moves, screens, hazards.
-- [x] Setup moves (round 72).
-- [ ] The unpriceable list of `ko-odds.ts`: the 21 candidates, one D3 measurement each.
-- [ ] Oracle specs for `SWAP_PAIR_MOVES` and `MOLD_BREAKER_ABILITIES`; the screen literals of `pair/kill-table.ts` onto `SCREENS`; `CLIENT_WEATHER_IDS` from the Dex.
-
-
-### T241 · One door for log lines (epic)
-
-*Epic · in steps · lossless D4 per step · see T170*
-
-**Problem.** A Windows log made the parser read 0 of 15 hits (T206); round 70 put twenty `split('\n')` sites behind doors, but about 30 files still read raw commands by prefix, and a replay load walks the log three times with `@pkmn/client`. Since round 72 the header facts come from the client and the bring count reads the rule table, then `|teampreview|N`, then the format id (`replay-format.ts:207-238`).
-
-**Benefit.** Engine and app: one reading of each log line, from the library's parser.
-
-**Success.** Per step: identical results on the fixtures and the corpus.
-
-**Evidence.** `docs/perf/probes/2026-10-15-lessons/findings.md` (library items 5, 6 and 9).
-
-**Steps.**
-- [x] Header facts (game type, generation, bring count) from the client in `replay-format.ts` (24 of 24 fixtures agree); `Teams` or `@pkmn/sets` for team text; `gen.stats.calc` for max HP (round 72).
-- [ ] `LogLine` and `readLine` into the barrel (API snapshot change); `observedMaxHp` (`replay-core/src/spreads/max-hp.ts:20`, which still reads the log string) onto `LogLine`.
-- [ ] Engine readers one family per round; one client walk feeding parser, hit reader and item reader.
-
-
-### T254 · The rests of T239
-
-*Refactor · larger bug · lossless D4 with a quiet timing window · round 72*
-
-**Problem.** In round 70 a hand-built stand-in wrote five shields' contact penalties into the live battle (7b4b73f). Round 72 moved the engine's stand-ins onto `sim-ask/`, and some places still build their own: `Object.create` views of live bodies in `score/boost-race.ts:68`, `score/matchup.ts:45`, `score/move-facts.ts:287` and `:362`, and `calc/body.ts:108`; eleven files call a Dex handler on a hand-built `this` (`test/sim-ask-callers.spec.ts:66-69`: seven in eval-engine, four in replay-core); `score/status-factor.ts:75` builds a plain `new PRNG('1,2,3,4')`; `twinFormat` returns a plain string.
-
-**Benefit.** Engine: no question to the simulator can write the live battle.
-
-**Success.** The census spec without rests; D4: the bank byte-identical, three byte-identical feedback runs, regression, e2e, lint and `tsc -b`; tree time within +5 % of the base in a quiet window.
-
-**Evidence.** `packages/eval-engine/test/sim-ask-callers.spec.ts:61-70`, `r72/lanes/B/ledger.md`.
-
-**Steps.**
-- [ ] The five views onto `isolated()` or a copy, with the module's fingerprint check.
-- [ ] The eleven handler callers onto `callHandler`, the PRNG onto `FixedDice`, `twinFormat` typed.
-
-### T255 · The lexical `gen.num` guard
-
-*Tests · small fix · round 72*
-
-**Problem.** A calculator generation read as the simulator's generation slips past the guard when it is destructured: `test/calc-generation.spec.ts:64-65` matches the text `gen.num` line by line, so `const { num } = calcGen` passes it, and `replay-core/src/replay-format.ts:79` destructures the client's standard `Generation` (`const { num: generation } = battle.gen`) to stay outside it.
-
-**Benefit.** Contributors: the guard catches the calculator's generation by its type, not by its spelling.
-
-**Success.** The guard tells the calculator's generation from the simulator's by type; `replay-format.ts` reads `gen.num` plainly.
-
-**Evidence.** `packages/eval-engine/test/calc-generation.spec.ts:61-68`, `packages/replay-core/src/replay-format.ts:79`.
-
-**Steps.**
-- [ ] A type-aware check (the TypeScript checker or a branded type for the calculator's generation), red on a destructured `calcGen`.
-
-## Off-cycle and parked
+## The release
 
 ### T43 · Release check before every package release
 
@@ -883,9 +423,510 @@ User gate 21.10.2026, "3b": wave 5 runs next, with four lanes that share no file
 - [ ] **6.** Record the production chunk map again as a probe and file it under docs/perf/probes/; the old script lived in the session scratchpad and is gone.
 - [ ] **7.** Run lint, tsc -b and the regression, and record the plan of the dry run in the release note.
 
+## Parked
+
+The triage of 21.10.2026 parked these TODOs; each section names its trigger, and a trigger that fires brings its TODO to a gate.
+
+### T194 · Why the answer round overrates Protect plus Tera Starstorm
+
+*Doubles search · mini round · small · score-touching D3 · round 69*
+
+**Parked (triage 21.10.2026).** Trigger: the pin gen9vgc2026regi-2630685175 turn 8 flips at a gate.
+
+**Problem.** The doubles expert pin gen9vgc2026regi-2630685175 t8 (Taunt is the error) flips on almost every doubles change, because the answer round sits on a tie of 0.003: p1's answer Protect plus Tera Starstorm gets too high a value. The pin stays (user 13.10., 1a); this TODO looks for the cause in the answer round (`search/answers.ts`), not in the pin. The diagnosis predates T149: first re-read the pin on the merged state.
+
+**Benefit.** Engine: a doubles verdict no longer hangs on a chance tie.
+
+**Success.** Checker on the scene against a Monte Carlo reference; the pin holds across the doubles changes of the next round.
+
+**Evidence.** `r69/lanes/A/diagnosis-pin-2630685175.md` (tie 0.003, price of the column; diagnosis predates T149), `r69/progress-ledger.md:88` and `r69/lanes/B/ledger.md:41` (the pin flips on almost every doubles change), user answer 1a in `r69/lanes/A/ledger.md:155`, `search/answers.ts`, reference format `r69/lanes/D/out/mc-pins-w.json`.
+
+**Steps.**
+- [ ] Re-read pin gen9vgc2026regi-2630685175 t8 on the merged state: which rows lie 0.003 apart, how the column Protect plus Tera Starstorm is priced today (T149 prices near rows deeper since 5477eda; the diagnosis does not know this).
+- [ ] Red checker on the scene against a Monte Carlo reference (pattern `mc-pins-w.json`, tolerance 0.02 between engine and MC regret); doubles only, singles have no answer round.
+- [ ] Fix the cause in `search/answers.ts`, not in the pin; the pin holds across the doubles changes of the next round; bank plus holdout doubles paired.
+
+### T195 · One column, one price in the answer round
+
+*Doubles search · round · medium · score-touching D3 · rest of T149 · round 69*
+
+**Parked (triage 21.10.2026).** Trigger: a doubles verdict at a gate hangs on a row priced at a lighter depth.
+
+**Problem.** Since T149 a found answer gets three different prices in the same column: confirmed cells get the full depth-1 sub-search, two deep rows the light sub-search, further rows a plain move (`tree-orchestrator.ts:158`, `search/answers.ts:212`). Nearly equal rows further down probably get the more pessimistic value this way (not measured). In addition, the order spec of the answer round and the scene readings of lane D run under the standard ruleset, while the app plays VGC under 'vgc': on 2629703929 t4 both rulesets have 7 near rows for p1 and 3 are checked (`ANSWER_NEAR_ROWS`), and for p2 the round finds 0 refutations under 'vgc' against 4 under 'standard'.
+
+**Benefit.** Engine: rows in one column are compared at equal depth; the specs check the app's path.
+
+**Success.** Answer round specs under 'vgc' and 'standard'; bank plus holdout doubles (D26); tree time within the timing window.
+
+**Evidence.** `r69/review/lens-BD.md` (findings 3 and 5, probe on 2629703929 t4: 7 near rows in both rulesets, 3 checked), `r69/review/todos-check.md` (T195), `tree-orchestrator.ts:154-158` (sideExtension), `search/answers.ts:52`, `:57`, `:212`, `test/doubles-answers-t149.spec.ts:200-218`, scene readings in `r69/lanes/D/ledger.md` (ruleset 'standard').
+
+**Steps.**
+- [ ] Red specs of the answer round under 'vgc' and 'standard': the order spec and the scene readings run with the app's ruleset (`settings.ruleset`); on 2629703929 t4 the same number of near rows and the same refutations for p2 in both.
+- [ ] Measure the three prices (full depth-1 sub-search, light sub-search, plain move) against the Monte Carlo count from `verify-cover-doubles` before anything changes; otherwise the hypothesis about the pessimistic value below place three stays unmeasured.
+- [ ] Price the rows of a column at equal depth (tie ANSWER_NEAR_ROWS to the size of the tie, or price the tail rows against the same sibling probes); bank plus holdout doubles (D26), tree time within the timing window.
+
+### T219 · The same verify rows in every run
+
+*Search · mini round · small · score-touching D3 · round 69*
+
+**Parked (triage 21.10.2026).** Trigger: the pin smogtours-gen6ou-653785 turn 19 turns red again, or a verdict at a gate swings with the search budget.
+
+**Problem.** The expert pin smogtours-gen6ou-653785 t19 (3d sacrifices Weavile into Stealth Rock) has flipped since T102: p1 reads an inaccuracy (0.025 on 0.142), and the sentence about the sacrifice is missing. No single static term explains it; the regret swings with the search budget between 0.034 and 0.259 (base 0.010 to 0.046), because the verify round recalculates different rows in each run: the base checks only the cells of Pain Split, not those of Hex, and with Hex checked even the base reads 0.109. Proposal: check the same set of rows in every run (played row, best row, rows up to 0.1 behind the best), then re-read the pin. Replaces the watch item in section C ("Pin 653785 turn 19 ... hangs on shaky numbers"): the pin has flipped.
+
+**Benefit.** Engine: a verdict does not depend on which rows the verify round happens to catch.
+
+**Success.** Regret of 653785 t19 stable across search budgets, pin re-read; tree time within the timing window.
+
+**Evidence.** `r69/lanes/B/diagnosis-pins.md` (pin 2, regret 0.034 to 0.259 per search budget, base 0.010 to 0.046, Hex checked 0.109), `r69/lanes/B/pins/tree-...-keephex.json`, `search/verify-select.ts:101-118` (supportMass), `e2e-feedback/corpus.ts:177-179`, the NextSteps watch item in section C (pin 653785 turn 19), `r69/review/todos-check-2.md` (T219).
+
+**Steps.**
+- [ ] Red test: the regret of 653785 t19 across search budgets of 500, 600 and 700 iterations; today 0.034, 0.142, 0.244 (singles).
+- [ ] The verify round takes the same row set in every run: played row, best row and rows up to 0.1 behind the best (instead of equilibrium support plus the played row); then re-read the pin.
+- [ ] Regret stable across search budgets, tree time within the timing window; the watch item in section C is struck.
+
+### T198 · Fickle Beam in the scripted chance
+
+*Search · mini round · small · rest of T154 · round 69*
+
+**Parked (triage 21.10.2026).** Trigger: a KO in a measurement hangs on the doubled power of Fickle Beam.
+
+**Problem.** For a kill class that only the doubled power of Fickle Beam reaches, `search/outcome-children.ts:131-136` writes the roll -1 (101%); `forward/scripted-prng.ts` does not know the doubling. No wrong value reaches the tree (the roll drops out), but the class stays unreached. Affects the singles path (scriptFor); doubles draw the power in `pair/prng.ts`.
+
+**Benefit.** Engine: the rare kill class is drawn instead of estimated.
+
+**Success.** Checker against the simulator (Fickle Beam doubled, kill only that way), singles.
+
+**Evidence.** `search/outcome-children.ts:131-136` (scriptFor, roll -1), `:197-203` (forceMissing), `ko-odds.ts:180-184`, `forward/scripted-prng.ts` (no doubling), `calc/fickle.ts` (strengthMix), `pair/prng.ts` (strengthDraw, doubles path), `r69/lanes/D/ledger.md:73` (point 1), `r69/review/lens-BD.md` (finding 7).
+
+**Steps.**
+- [ ] Red checker against the simulator: a kill class that only the doubled power of Fickle Beam reaches; the tree draws it instead of leaving it unreached (singles; doubles draw the power in `pair/prng.ts` and are not affected).
+- [ ] Script the power through `ScriptedPRNG`; its factor comes from the dex handler, as with `strengthMix`, not from a list.
+- [ ] Bank paired.
+
+### T227 · The trend probe at lower cost and by class
+
+*Search · mini round · small · score-touching D3 · round 70*
+
+**Parked (triage 21.10.2026).** Trigger: a user finds the analysis slow.
+
+**Problem.** Since round 70 the trend probe reads every base draw of a decisive cell (`search/trend-probe.ts`, `search/position.ts`, `orchestrator.ts`), and early singles matrix searches at three draws cost about 41% more CPU (34 saved positions, 14.5 s to 20.4 s; the pool runs the probes in parallel). A class-weighted probe over the cell's outcome classes would be exact at one sub-search per class; duplicate boards among draws (25 of 223 jobs) could share one probe; blend cells take the unweighted mean of their base draws; `search/deepening.ts:34` books the depth-2 trend with the old first-seed formula.
+
+**Benefit.** Tempo and engine: the same trend reading for less time.
+
+**Success.** The rankings of the 34 positions as with the round-70 probe, or each change explained; CPU within 10% of v1.
+
+**Evidence.** `docs/perf/probes/2026-10-13-search-fixes/` (timing, `out/identity-*.json`).
+
+**Steps.**
+- [ ] Probe per outcome class with its weight; one probe per distinct board.
+- [ ] The depth-2 trend with the per-draw formula.
+- [ ] Timing interleaved with v1 on a quiet machine.
+
+### T242 · The Protect tempo softens a VGC verdict the reference keeps
+
+*Doubles search · mini round · small · score-touching D3 · round 70 (gate 17.10., 1a)*
+
+**Parked (triage 21.10.2026).** Trigger: a second scene where the Protect tempo softens a verdict the reference keeps, or a user report.
+
+**Problem.** Since the Protect tempo (7b4b73f, user gate 13.10., 3a) a Protect earns the damage it denies in the doubles hints. In gen9vgc2026regi-2629703929 turn 8 the engine now grades p1's played Heat Wave + Protect an inaccuracy (0.1736) where the Monte-Carlo reference on the same rows grades a mistake (0.326 and 0.299 on 24 draws, 0.280 on 96), and p2's Protect + Encore→Koraidon an inaccuracy (0.1936; the reference none on 24 draws, 0.147 on 96); before the tempo both graded p1 a mistake and p2 no tier. A bisection over the batch commits moves the scene at 7b4b73f only. The rows change: Protect + Flare Blitz→Jumpluff enters, the played Heat Wave + Protect moves from an appended thirteenth row into the twelve, and Heat Wave + Flare Blitz→Groudon (the round-69 reference's best) and Tera Blast→Groudon + Flare Blitz→Jumpluff leave. The reference's best row on the new list (Dark Pulse→Groudon + Flare Blitz→Jumpluff) stays listed, so the distance lies in cell values: Heat Wave + Protect × Rock Slide + Sleep Powder→Chi-Yu reads −0.307 against the reference's −0.437 ± 0.076, and Tera Blast→Jumpluff + Collision Course→Jumpluff × Protect + Encore→Koraidon 0.210 against 0.008 ± 0.033 (96 draws). The quarter-tier VGC holdout of the batch check shows harm on the hq table's luck-adjusted row (+37 [+0, +74]); no run separates 7b4b73f from the rest of the batch.
+
+**Benefit.** Engine: Protect stays in the doubles search without softening the verdicts the reference keeps.
+
+**Success.** The scene grades p1 a mistake again, as the reference does, with the two cells within 2.5 standard errors of the reference; the VGC and Doubles OU holdouts paired in full without harm, with and without the Protect tempo.
+
+**Evidence.** `docs/perf/probes/2026-10-17-vgc-bisect/out/` (verdicts and row lists per commit snapshot), `docs/perf/probes/2026-10-15-mc/out/` (references; `mc-pins/big-gen9vgc2026regi-2629703929-t8-C.json` with 96 draws per cell), `docs/perf/probes/2026-10-15-r70-check/paired-r70-hold-vgc-q-vs-r69-w2-hold-vgc-hq.txt`.
+
+**Steps.**
+- [ ] Price the two cells as the verify step does, with and without the tempo, and find what moves them.
+- [ ] Full VGC and Doubles OU holdouts with and without the tempo.
+- [ ] Fix test-first; the scene pin moves at its gate.
+
+### T253 · Move order by Quick Claw, Quick Draw and Custap Berry in the search
+
+*Search · feature · score-touching D3 · rest of T196 · round 72*
+
+**Parked (triage 21.10.2026).** Trigger: an activation of Quick Claw, Quick Draw or Custap Berry decides a verdict in a measurement or a user report.
+
+**Problem.** A Quick Claw holder moves before a faster foe in 20% of turns (`randomChance(1, 5)`, `@pkmn/sim` `data/items.js:5057`), a Quick Draw holder in 30% (`data/abilities.js:3903`), and a Custap Berry holder at a quarter of its HP or less (a half with Gluttony) moves first for certain once the berry triggers. `speedTie` (`search/leaf.ts:84-90`) scripts true ties in singles only, and the queue's answer (`sim-ask/action-order.ts`) calls two different action speeds no tie whatever either body holds, so a claw against a faster foe reaches the tree through the seed alone. In doubles no tie is scripted; the pair plan hands a claw or Quick Draw mover to the simulator's own dice (`pair/guards.ts:46`, fallback `quick`). T196's checker named singles and doubles; round 72 delivered the singles tie.
+
+**Benefit.** Engine: a turn a Quick Claw can steal counts at its chance instead of at the seed's draw.
+
+**Success.** In singles the claw and Quick Draw chances are priced like a tie (Custap Berry as the certain order it gives), with a checker against the simulator; the doubles path measured on its own.
+
+**Evidence.** `packages/eval-engine/src/search/leaf.ts:84-90`, `packages/eval-engine/src/sim-ask/action-order.ts` (doc comment), `packages/eval-engine/src/pair/guards.ts:46`.
+
+**Steps.**
+- [ ] A checker against the simulator: a claw holder against a faster foe, singles and doubles, Gen 9 and Champions, and the claw's chance in older generations.
+- [ ] The chance in the singles leaf; the doubles path through the pair plan measured.
+
+### T199 · pairFocus as a ramp instead of a switch
+
+*Static weights · mini round · small · score-touching D3 · rest of T42 · round 69*
+
+**Parked (triage 21.10.2026).** Trigger: a doubles verdict misses a KO that only the pair makes.
+
+**Problem.** pairFocus prices a pair that can KO a foe only together, as a 0/1 gate: "alone neither makes it, together both do" (`score/field-pair.ts:43`). At its fitted weight of -188 the VGC grade dropped in 24 of 103 runs when a foe took more damage (round 69, `r69/lanes/B/vgc-monotone.vt.ts`), so the user gate of 13.10. (6b) set it to 0 in every table (aafd8c5, `score/weights.ts:230, 269, 332, 391, 440`). Since then the doubles static has no term for a KO the pair makes together. The monotony breaks that remain run through other terms (T248).
+
+**Benefit.** Engine: a doubles position where only both attackers together KO a foe gets credit again, and more damage on that foe never lowers the grade.
+
+**Success.** A continuous ramp over the KO window earns a nonzero weight in a re-fit; the relation specs of round 72 (`test/relation-checks.spec.ts`) show no HP-monotony break through it; bank plus holdout (D26) without harm, R1 to R3 in VGC.
+
+**Evidence.** `score/field-pair.ts:43` (gate `best < foeHp && total >= foeHp`), `score/weights.ts:230, 269, 332, 391, 440` (pairFocus 0 in every table since aafd8c5; -188 in VGC before), `r69/lanes/B/vgc-monotone.vt.ts` and `r69/lanes/B/out/vgc-monotone-all.json`, `r69/review/todos-check-2.md` (T199: 24 of 103 on the merged state, 16 before S17), `r69/review/lens-BD.md` (finding 2), gate question in `r69/progress-ledger.md:138`.
+
+**Steps.**
+- [ ] pairFocus as a continuous ramp over the KO window instead of a 0/1 gate.
+- [ ] Re-fit; the relation specs show no break through pairFocus.
+- [ ] Bank plus holdout (D26), R1 to R3 in VGC.
+
+### T201 · The static capture knows its form
+
+*Fit tool · mini round · small · rest of T102 · round 69*
+
+**Parked (triage 21.10.2026).** Trigger: a re-fit errs at the static form.
+
+**Problem.** Since T102 the statics in standard singles compute with the phase form (EVAL_STATIC_FORM, on by default). A new capture stores the grade with the form, the fit rebuilds it from the table; the identity check holds only if you name the form columns and the weights of the capture by hand (`regression/fit-families.ts`, B ledger line 122). The capture should write form and weights itself.
+
+**Benefit.** Measurement: a re-fit starts without manual work and without false alarms.
+
+**Success.** Capture plus fit without extra variables, identity 0.
+
+**Evidence.** `score/phase-form.ts:34-35`, `:52-55` (staticFormOn), `eval-function.ts:46`, `regression/fit-families.ts:234-235`, `:244-252` (identity check), `regression/eval-calibration.spec.ts:5531`, `:5819-5823` (leafValue as capture grade), `regression/eval-fit.spec.ts:175-176`, `:246-250` (EVAL_FIT_FORMS, EVAL_FIT_CAPTURED), `r69/lanes/B/ledger.md:122`, `r69/review/lens-BD.md` (finding 4).
+
+**Steps.**
+- [ ] Red test: a new capture of the standard singles statics, then `familyReports`; today the identity check throws `identity: N of M captured scores differ`.
+- [ ] The capture writes the form (EVAL_STATIC_FORM) and the weights of the capture itself; the fit reads them from there, not from environment variables set by hand.
+- [ ] Capture plus fit without extra variables, identity 0 (standard singles; the other families carry no form).
+
+### T226 · Residuals and drain heal outside the boost races
+
+*Static · mini round · small · score-touching D3 · round 70*
+
+**Parked (triage 21.10.2026).** Trigger: a scene where a race misjudges Leftovers, Leech Seed or a drain move.
+
+**Problem.** The played end of turn (`score/residuals.ts`: Leech Seed with its heal, items, weather, terrain, statuses) feeds only the boostsBiting races, for the holder and the foes on the field. Benched bodies, the matchup term, the last pair and the unanswered profile keep the status table (`races.ts` `statusResidual`: burn, poison, toxic). No race counts the drain heal inside an attack (half the damage dealt).
+
+**Benefit.** Engine: every race reads the residuals the game plays.
+
+**Success.** Matchup and last-pair races read the played residual; checker against the simulator (Leech Seed, Leftovers, a drain attacker); bank paired.
+
+**Evidence.** `docs/perf/probes/2026-10-13-boost-bite/findings.md` (open points 3 and 4).
+
+**Steps.**
+- [ ] Red checker: a seeded body in the matchup race; a Giga Drain user's race.
+- [ ] The played residual for every race side; the drain heal as negative chip on attacking turns.
+- [ ] Bank paired; static time within noise.
+
+### T207 · Hidden Power in doubles
+
+*Spread solver · mini round · small · round 69*
+
+**Parked (triage 21.10.2026).** Trigger: a doubles replay from Generations 2 to 7 in a user report or a measurement.
+
+**Problem.** Since T31 the parser reads doubles hits, but the Hidden Power hints remain in singles only. Doubles formats with Hidden Power (older generations) lose the type hint this way.
+
+**Benefit.** Sets: Hidden Power is read in doubles as in singles.
+
+**Success.** Checker against the simulator, doubles of a generation with Hidden Power.
+
+**Evidence.** `protocol/handlers.ts:233-235` (recordHiddenPowerHit: `!state.singles`), `:196` (recordImmuneHiddenPower), `r69/lanes/A/ledger.md:14` (the exception as a decision, "a small TODO of its own").
+
+**Steps.**
+- [ ] Red checker against the simulator: a doubles format of a generation with Hidden Power; the hit yields the type hint as in singles.
+- [ ] The singles lock in `recordHiddenPowerHit` goes.
+- [ ] Holdout doubles paired; singles stay byte-identical.
+
+### T208 · Transformed Mew and Ditto
+
+*Spread solver · mini round · small · round 69*
+
+**Parked (triage 21.10.2026).** Trigger: a user report on a Ditto or Mew set.
+
+**Problem.** Hits of a transformed Mew or a Ditto drop out: 26 doubles hits of the bank (bank-doubles 2, doublesou 14, vgc 10). The simulator knows the copied values.
+
+**Benefit.** Sets: more observations in games with Transform.
+
+**Success.** Count per family, checker against the simulator.
+
+**Evidence.** `r69/lanes/A/ledger.md:40-41` (26 hits in three families, all Transform; the parser does not hold the Transform state), count bank-doubles 2, doublesou 14, vgc 10.
+
+**Steps.**
+- [ ] Count per family before (26 discarded doubles hits) and a red checker against the simulator: a hit of a transformed Mew or a Ditto carries the copied values of the target.
+- [ ] The parser tracks the Transform state; the observation computes with the copied values, not those of the species. The count covers doubles; the same count shows whether singles have the same gap.
+- [ ] Count after, set diff (D8) on the holdouts.
+
+### T209 · The prior names its source
+
+*Sets · mini round · small · score-touching D3 · rest of T132 · round 69*
+
+**Parked (triage 21.10.2026).** Trigger: a guessed speed value beats a published one in a set diff or a user report.
+
+**Problem.** Without a published set the solver starts from a default per species. Lane A proposes naming the source of the prior (published set, usage data, default per species), so that the T132 rule treats a guessed speed value differently from a published one.
+
+**Benefit.** Sets: the speed rule knows how much a starting value weighs.
+
+**Success.** Set diff (D8), fit error per family, bank paired.
+
+**Evidence.** `r69/lanes/A/ledger.md:105` (point 1: name the source of the prior; example GPL Uxie 0/252/0/0/4/252), `r69/review/todos-check.md` (old T208: the goal is the gate of the T132 rule, not a ranking of the sources), `replay-core/src/spreads/ev-budget.ts:22-23`, `:45`.
+
+**Steps.**
+- [ ] Red test: two solver runs with the same starting value, one from a published set, one from the default per species; the T132 rule treats the guessed speed value differently from the published one (singles and doubles).
+- [ ] The prior carries its source (published set, usage data, default per species) up to the rule.
+- [ ] Set diff (D8), fit error per family, bank paired.
+
+### T228 · Gen 2 Special stats apart in the solver
+
+*Spread solver · mini round · small · score-touching D3 · round 70 · rest of T222*
+
+**Parked (triage 21.10.2026).** Trigger: a Gen 2 user report.
+
+**Problem.** `topUp` in `spread-inference.ts` hands out EV room one stat at a time and leaves Special Attack and Special Defense apart in 10 of 1,077 Gen 2 fit-corpus sets (all Raikou, e.g. smogtours-gen2ou-684843 at 184/252/252/0/252/216). The calculator couples them (`coupleSpecial`, `spreads/ev-budget.ts`); the simulator plays them apart in custom games. A probe fix moves 11 builds, because the second solve pass reads the first's answers.
+
+**Benefit.** Sets: every Gen 1 and 2 body plays one Special value, as the game does.
+
+**Success.** Every Gen 1 and 2 build carries one Special value; set diff over the fit corpus explained.
+
+**Evidence.** `docs/perf/probes/2026-10-13-replay-core/findings.md` (open point 2), `docs/perf/probes/2026-10-13-replay-core/out/setdiff-report.txt`.
+
+**Steps.**
+- [ ] Red test on 684843 p14.
+- [ ] `topUp` keeps the pair equal where the budget has one Special.
+- [ ] Set diff (D8).
+
+### T231 · Crit and accuracy: conditions, evasion, the pair plan
+
+*KO odds · mini round · small · score-touching D3 · round 70 · rest of N1*
+
+**Parked (triage 21.10.2026).** Trigger: a verdict hangs on one of these conditions.
+
+**Problem.** Since round 70 a closed census decides the crit and accuracy guard for items and abilities (`ko-odds.ts`); among volatiles and field conditions the guard checks only Focus Energy by hand, while Dragon Cheer, G-Max Chi Strike, Laser Focus, Lock-On, Telekinesis, Glaive Rush, Minimize, Gravity, Lucky Chant and Toxic (Gen 7 and earlier) carry such handlers. Keen Eye, Mind's Eye, Illuminate (`ignoreEvasion`) and Unaware change the accuracy reading without an accuracy handler. `pair/pattern.ts:94` (`missedCrit`) ignores crit-stage items and abilities; `pair/snapshot.ts:79` keeps a hand list of crit blockers. `parsePlayedActions` reads the newest Dex because its signature carries no generation.
+
+**Benefit.** Engine: one census decides every crit and accuracy effect, in singles and in the pair plan.
+
+**Success.** One census over items, abilities and conditions; the pair plan reads it; bank paired.
+
+**Evidence.** `docs/perf/probes/2026-10-15-n1/out/crit-acc-handlers.txt`, `docs/perf/probes/2026-10-15-n1/crit-acc-conditions.mjs`.
+
+**Steps.**
+- [ ] Extend the census to conditions and evasion-ignoring effects.
+- [ ] The pair plan reads the census; the hand list goes.
+- [ ] Decide whether `parsePlayedActions` takes a generation (package API).
+
+### T213 · Outrage lock in the opposite direction
+
+*Rebuild · mini round · small · rest of T187 · round 69*
+
+**Parked (triage 21.10.2026).** Trigger: a second scene.
+
+**Problem.** Lane E found the reverse case: the game holds the lock, the simulator ends it (2663114473 t12, Dragonite). Counted, not built.
+
+**Benefit.** Engine: locks end in the rebuild as in the game.
+
+**Success.** Count, checker.
+
+**Evidence.** `r69/lanes/E/ledger.md:36`, `:40` (2663114473 turn 12, p2 Dragonite: the game holds the lock, the board has lost it and is confused), `:58` (point 2), T187 (751466 turn 7, the other direction).
+
+**Steps.**
+- [ ] Count in the corpus: games in which the simulator ends a lock that the game holds (Outrage and other random lengths), singles and doubles.
+- [ ] Red checker against the simulator on 2663114473 turn 12: the rebuild keeps the lock.
+- [ ] Count after.
+
+### T245 · The saved-replay checkpoint reads 93 % where the snapshot says 94 %
+
+*Rebuild · larger bug (cause open) · lossless D4*
+
+**Parked (triage 21.10.2026).** Trigger: a user sees an HP display that differs from the replay.
+
+**Problem.** `packages/eval-engine/test/reconstruction.spec.ts` ("reconstructs stable checkpoints from a real saved replay") fails on round 70: p1's active Pokémon reads 93 % HP where the replay's snapshot says 94 % (the assertion at `:93`). The test runs only where the gitignored saved replay HTML exists, so CI never sees it; it passed on 24.09.2026 (round 59) and failed in the logs of 13.10.2026.
+
+**Benefit.** Tests: the local suite runs green.
+
+**Success.** The checkpoint test green; the cause named (turn, body, rounding) with a test that fails without the fix.
+
+**Evidence.** `docs/perf/probes/2026-10-17-vgc-bisect/red/reconstruction.log`.
+
+**Steps.**
+- [ ] Find the first failing commit between 24.09. and 13.10., then the turn and the body.
+- [ ] Fix test-first.
+
+### T251 · The shiny flag of Champions team previews
+
+*Rebuild · small fix · cosmetic · rest of T238 · after T250 · round 72*
+
+**Parked (triage 21.10.2026).** Trigger: a user report.
+
+**Problem.** A shiny body that never switches in loses its shine in a Champions branch. Champions previews write `, shiny` on their `|poke|` lines (940 fit-corpus games, all Champions formats: 205 `gen9championsou`, 735 Champions VGC), and the build reads the flag only from switch, drag and replace lines (`noteLogIdentities`, `replay-core/src/team-identity.ts:48-59`); the comment above it (`:42-47`) says the preview strips the flag, which holds for Scarlet/Violet only.
+
+**Benefit.** App: the branch shows a Champions body as the replay does.
+
+**Success.** A body that never switches in keeps its preview's flag in Champions; Scarlet/Violet unchanged. If T250 trims the bodies a side never brought, the fix matters most where all six bodies stay (the 205 Champions OU games); decide T250 first.
+
+**Evidence.** `packages/replay-core/src/team-identity.ts:42-59`; the count from the TODO review of round 72 (`r72/booking/todos-review.md`, item 4).
+
+**Steps.**
+- [ ] A red spec with a Champions preview line that carries `, shiny` for a body that never switches in.
+- [ ] Read the flag from the preview in Champions formats; fix the comment.
+
+### T252 · Generation 1 screens in the damage preview
+
+*App · small fix · round 72*
+
+**Parked (triage 21.10.2026).** Trigger: a Gen 1 replay in a user report or a measurement.
+
+**Problem.** A Gen 1 branch under Reflect or Light Screen would show the hit in the damage preview as if no screen stood: `src/lib/picker-state.ts:372-373` hands the side conditions to `src/lib/branch-damage.ts:131-132`, while Generation 1 builds both screens as volatiles of the user (`@pkmn/mods` gen1 `reflect`: `volatileStatus`, no `sideCondition`). The engine's readers add them through `standingScreens` (`replay-core/src/dex-facts/screens.ts:34-35`). The scene is read from the code: the bank, the fit corpus and the fixtures hold no Gen 1 game.
+
+**Benefit.** App: a Gen 1 branch prices a hit under a screen as the game does.
+
+**Success.** The preview prices a hit under a Gen 1 screen the way the simulator plays it, held by a spec against the simulator.
+
+**Evidence.** `src/lib/picker-state.ts:372-373`, `src/lib/branch-damage.ts:131-132`, `packages/replay-core/src/dex-facts/screens.ts:34-35`, `r72/lanes/C/out/corpus-coverage.txt` (Gen 1: 0 games).
+
+**Steps.**
+- [ ] A red spec: a Gen 1 board with Reflect on the defender's side, the preview against the simulator's damage.
+- [ ] The preview reads the screens through `standingScreens`.
+
+### T197 · One target at use, one redirect rule
+
+*Cleanup · mini round · small · round 69*
+
+**Parked (triage 21.10.2026).** Trigger: a doubles verdict hangs on a hint for Expanding Force or on a redirect.
+
+**Problem.** "Target at use" exists twice with different reach (`search/hints.ts:199-203` without Expanding Force, `pair/odds.ts:34-49` with it), `redirectsFoes` twice with the same body (`search/hints.ts:61`, `score/field-pair.ts:25`). One place per rule stops the drift.
+
+**Benefit.** Engine: the hints and the odds read the same rule.
+
+**Success.** Specs of both places green, bank byte-identical.
+
+**Evidence.** `search/hints.ts:199-203` (RULE_MOVES, `move-use.ts:66`, `move-use-rules.ts:100-113`), `pair/odds.ts:34-49` (targetAtUse, exported since c7a78b4), `search/hints.ts:61` and `score/field-pair.ts:25` (redirectsFoes), `r69/review/lens-BD.md` (findings 6 and 10).
+
+**Steps.**
+- [ ] Red test: doubles, grounded user in Psychic Terrain with Expanding Force; the hint (combinedOptionHints) and the odds read the same target (today a single target against both opponents).
+- [ ] Merge `targetAtUse` into one place (the handler reading from `pair/odds.ts`) and `redirectsFoes` into one place; the second place imports.
+- [ ] Specs of both places green, bank byte-identical; singles are not affected (the rules apply only with several targets).
+
+### T211 · One forme origin
+
+*Cleanup · mini round · small · round 69*
+
+**Parked (triage 21.10.2026).** Trigger: a set or Choice reading of Ogerpon, Zygarde or Necrozma goes wrong.
+
+**Problem.** Three functions answer "which species does this forme come from": `spreads/battle-forme.ts:45`, `choice-lock-defender.ts:15`, `team/item-damage-shared.ts` (defenderOf). They differ at the edges: Zygarde-Mega, Necrozma-Ultra, Floette-Mega and the Tera formes of Ogerpon. Also: `format-generations.ts` exports a scope 'legal' that nobody calls, while `src/lib/pokemon-options.ts:10` and `src/lib/smogon-sets.ts:33` build their own generations; `DEFENDER_ITEMS` in `team/item-damage-defender.ts:25` is a typed list where dex hooks could answer.
+
+**Benefit.** Engine: one answer per question.
+
+**Success.** Specs of the three places green, bank byte-identical.
+
+**Evidence.** `replay-core/src/spreads/battle-forme.ts:45` (formeOrigin), `eval-engine/src/choice-lock-defender.ts:15` (formeOrigins), `team/item-damage-shared.ts:76` (defenderOf), `format-generations.ts:46` (scope 'legal'), `src/lib/pokemon-options.ts:10`, `src/lib/smogon-sets.ts:33`, `team/item-damage-defender.ts:25` (DEFENDER_ITEMS, use at `:171`), `r69/review/lens-AFE.md` (findings 8, 9, 11), `r69/review/todos-check.md` (old T210: probe p3, six deviating formes).
+
+**Steps.**
+- [ ] Red test over every dex species: the three functions answer the same; today Zygarde-Mega, Necrozma-Ultra, Floette-Mega and the Tera formes of Ogerpon deviate.
+- [ ] One exported helper in replay-core for the forme origin; the two other places call it. `pokemon-options.ts` and `smogon-sets.ts` call `generationsFor` with scope 'legal'; `DEFENDER_ITEMS` from the dex hooks (`onModifyDef`, `onModifySpD`) instead of a typed list.
+- [ ] Specs of the three places green, bank byte-identical; singles and doubles share the functions.
+
+### T247 · The feedback corpus in CI
+
+*Tooling · round (feature, like round 71) · small to medium · no score touch · rest of round 71 (user gate 13.10.2026, "4a")*
+
+**Parked (triage 21.10.2026).** Trigger: after the release, bug-report rounds wait on local feedback runs.
+
+**Problem.** Since round 71 the bank and the holdouts run in GitHub Actions; the feedback corpus (`e2e-feedback/`, 12 replays with the expert pins) still runs on this machine: `npm run test:feedback` starts a Vite dev server on port 5176 and Chromium, one run took 393 s in round 70, and a lossless change needs three byte-identical runs. Its anchor is the browser build: a Chromium change shifts the last floating-point place (watch list), so a CI run has to reproduce the local dumps byte for byte before it replaces them.
+
+**Benefit.** Measurement: the feedback runs of a gate run side by side in CI, and the machine stays free.
+
+**Success.** Two CI runs and one local run of one commit give byte-identical dumps (`FEEDBACK_DUMP=1`) and the same drift report (`feedback-drift.json` beside the dumps); three CI runs side by side finish in less wall time than one run here (393 s).
+
+**Evidence.** `docs/perf/probes/2026-10-15-r70-check/check.log` (393 s), `docs/superpowers/specs/2026-10-13-round-71-bank-in-ci-design.md` (gate question 4), `.github/workflows/bank.yml` (the security rules to copy).
+
+**Steps.**
+- [ ] A workflow for the feedback corpus with the rules of `bank.yml`, Chromium pinned to the local version.
+- [ ] Dumps compared CI against local and two CI runs against each other.
+- [ ] AGENTS.md: the feedback runs of a gate in CI.
+
+### T235 · Rules from the Dex in one module
+
+*Rule fidelity · round · medium · lossless D4 · see T160*
+
+**Parked (triage 21.10.2026).** Trigger: a rule fault traced to one of these lists.
+
+**Problem.** A replay where Wide Guard decides a turn showed it: the stall guard and the planner each kept their own list of protecting moves, with different entries. About 22 name lists and 440 name literals sit in 71 files; list groups repeat in two to five files (choice items, random-call moves, screens); the Protect family has five Dex predicates in four files (`damage-calc.ts`, `pair/guards.ts`, `search/hints.ts`, `cell-blend.ts`; `calc/protect.ts` is a sixth reader); 2 of 18 list names appear in any spec. T160 moves the same reads onto the battle's Dex.
+
+**Benefit.** Engine: one answer per rule, held to the Dex by one closed census.
+
+**Success.** Each list derived from the Dex through one facts table per Dex object (the shape of `score/contact-filter.ts` `factsOf`) or held by an `oracle:` spec; bank digit-identical; static time within noise.
+
+**Evidence.** `docs/perf/probes/2026-10-15-lessons/out/name-census.txt`, `out/dex-lists.txt`, `out/dex-unpriceable.txt`.
+
+**Status (round 72).** Steps 1 and 2 and the setup moves of step 3 delivered in wave 4 (`dex-facts/` in both packages: the Protect family as one predicate, 7 lists derived from the Dex, 12 held by `oracle:` specs, 9 readings that differed from the simulator fixed; `dex-facts/setup.ts` with `test/setup-moves-oracle.spec.ts`). Open: the 21 unpriceable candidates of `test/unpriceable-oracle.spec.ts:33-41`, of which five have a pricing rule of their own (superfang, naturesmadness and ruination in `HALVING_MOVES`, `score/threat.ts:126`; Psywave in `fixedDamage`, `:259`; Endeavor in `score/move-facts.ts:119`) and Guardian of Alola has none a grep finds, so each adoption is its own D3 measurement; oracle specs for `SWAP_PAIR_MOVES` and `MOLD_BREAKER_ABILITIES` (`replay-core/src/inference/handlers.ts:28`, `:30`); the three screen literals of `pair/kill-table.ts:73-75` onto `SCREENS`; the weather id table `CLIENT_WEATHER_IDS` of `branch/field-ids.ts:17`.
+
+**Steps.**
+- [x] Facts table and the Protect family in one predicate.
+- [x] Choice items, random-call moves, screens, hazards.
+- [x] Setup moves (round 72).
+- [ ] The unpriceable list of `ko-odds.ts`: the 21 candidates, one D3 measurement each.
+- [ ] Oracle specs for `SWAP_PAIR_MOVES` and `MOLD_BREAKER_ABILITIES`; the screen literals of `pair/kill-table.ts` onto `SCREENS`; `CLIENT_WEATHER_IDS` from the Dex.
+
+### T241 · One door for log lines (epic)
+
+*Epic · in steps · lossless D4 per step · see T170*
+
+**Parked (triage 21.10.2026).** Trigger: a parser fault traced to a reader with a raw prefix.
+
+**Problem.** A Windows log made the parser read 0 of 15 hits (T206); round 70 put twenty `split('\n')` sites behind doors, but about 30 files still read raw commands by prefix, and a replay load walks the log three times with `@pkmn/client`. Since round 72 the header facts come from the client and the bring count reads the rule table, then `|teampreview|N`, then the format id (`replay-format.ts:207-238`).
+
+**Benefit.** Engine and app: one reading of each log line, from the library's parser.
+
+**Success.** Per step: identical results on the fixtures and the corpus.
+
+**Evidence.** `docs/perf/probes/2026-10-15-lessons/findings.md` (library items 5, 6 and 9).
+
+**Steps.**
+- [x] Header facts (game type, generation, bring count) from the client in `replay-format.ts` (24 of 24 fixtures agree); `Teams` or `@pkmn/sets` for team text; `gen.stats.calc` for max HP (round 72).
+- [ ] `LogLine` and `readLine` into the barrel (API snapshot change); `observedMaxHp` (`replay-core/src/spreads/max-hp.ts:20`, which still reads the log string) onto `LogLine`.
+- [ ] Engine readers one family per round; one client walk feeding parser, hit reader and item reader.
+
+### T254 · The rests of T239
+
+*Refactor · larger bug · lossless D4 with a quiet timing window · round 72*
+
+**Parked (triage 21.10.2026).** Trigger: a test or a report shows a question that changed the live battle.
+
+**Problem.** In round 70 a hand-built stand-in wrote five shields' contact penalties into the live battle (7b4b73f). Round 72 moved the engine's stand-ins onto `sim-ask/`, and some places still build their own: `Object.create` views of live bodies in `score/boost-race.ts:68`, `score/matchup.ts:45`, `score/move-facts.ts:287` and `:362`, and `calc/body.ts:108`; eleven files call a Dex handler on a hand-built `this` (`test/sim-ask-callers.spec.ts:66-69`: seven in eval-engine, four in replay-core); `score/status-factor.ts:75` builds a plain `new PRNG('1,2,3,4')`; `twinFormat` returns a plain string.
+
+**Benefit.** Engine: no question to the simulator can write the live battle.
+
+**Success.** The census spec without rests; D4: the bank byte-identical, three byte-identical feedback runs, regression, e2e, lint and `tsc -b`; tree time within +5 % of the base in a quiet window.
+
+**Evidence.** `packages/eval-engine/test/sim-ask-callers.spec.ts:61-70`, `r72/lanes/B/ledger.md`.
+
+**Steps.**
+- [ ] The five views onto `isolated()` or a copy, with the module's fingerprint check.
+- [ ] The eleven handler callers onto `callHandler`, the PRNG onto `FixedDice`, `twinFormat` typed.
+
+### T189 · Luck: the played cell against the next root (T22 stage b)
+
+*Report and search · round · medium · score-touching D3 · parked until T146*
+
+**Parked (triage 21.10.2026).** Trigger: a user report finds the chance attribution of a turn wrong.
+
+**Problem.** Stage b of T22: the report prices the played cell against the next root and so separates what the move itself cost from what the search read anew afterwards. The draft scene t48 and 573756 turn 70 from section B wait for it: the read payoff fizzles, and the setup payoff comes one evaluation too late. T146 removes a known source of re-reading (653785 turn 24), so measure after it.
+
+**Benefit.** App: report and cards separate dice, re-reading and move value.
+
+**Success.** The two gap scenes book their luck correctly; bank paired; the chance pins hold.
+
+**Trigger.** T146 is booked.
+
+**Evidence.** From the old section T22 (restated in round 62): stage b reconciles the cell price against the follow-up root and belongs to the family T16 (verify merge). Scenes of that time: draft gen9draft-2058494320 turn 48 (−0.472 chance on the U-turn read move, state 05.09.), 573756 turn 70 (reads quiet with chanceDelta −0.145, state round 45; the turn 70 matrix read +0.31 for SOULWIND, after mixing +0.19, the turn 71 root −0.05).
+
+**Steps.**
+- [ ] Re-read the two scenes on the app path after T146.
+- [ ] The reconciliation of cell price against follow-up root; pre-registered verdict rule on the hq tranche, paired bank bench with a fresh base on the same day, feedback 3×.
+- [ ] Re-pins only at the user gate; the chance pins 573756 t73 and 649664 t23 hold.
+
 ### T103 · Harden the speed layer before the simulator changes
 
 *Tool · parked · small to medium · lossless D4*
+
+**Parked (triage 21.10.2026).** Trigger: the next simulator upgrade (unchanged).
 
 **Problem.** The speed layer of round 59 (`packages/eval-engine/src/forward/sim-fast/`) passed all gates of the round on `@pkmn/sim` 0.10.11 (bank in Gen 9 and Gen 3, census over Gen 1 to 9); on this version none of the points below leads to a deviation. The hash gate and the guard spec do not cover everything the layer builds on, though; there a new simulator can change something without a test turning red. Open from the reviews of the round (ledger `.superpowers/sdd/2026-09-24-round-59-plan/progress.md`, "minor (deferred)"):
 - The hash gate does not check the source text of the classes that the copy mimics, and a deviation always switches off the whole layer, not only the affected lever; the skeptic of the final review downgraded this to minor, because there is no path for it in 0.10.11.
@@ -927,6 +968,8 @@ User gate 21.10.2026, "3b": wave 5 runs next, with four lanes that share no file
 
 *Tool · round · medium · score-touching D3 · parked*
 
+**Parked (triage 21.10.2026).** Trigger: `@pkmn/client` tracks the five facts (unchanged).
+
 **Problem.** Gate of round 67 ("6a"): since round 67, 4 of 11 fact handlers read the client. The other five stay own code (`inference/handlers.ts:150, 165, 226, 269, 284`: addFromPreview, addFromSwitch, recordItem, recordTera, recordAbilityAttribution), because `@pkmn/client` does not track these facts (decision R8 of lane C): it deletes the Tera type on faint (139 team members), shows the item of now instead of the set item before a swap (17), has no flag for the item marker of the preview (15) and misses two ability attributions (Natural Cure, Grassy Surge). A replacement would therefore change the output; it cannot be lossless.
 
 **Benefit.** Less own protocol code, once the client tracks the facts.
@@ -940,41 +983,6 @@ User gate 21.10.2026, "3b": wave 5 runs next, with four lanes that share no file
 **Steps.**
 - [ ] On a new `@pkmn/client` version, repeat lane C's count of client against inference.
 - [ ] Replace the handlers whose facts the client then tracks; explain the set diff; bank paired.
-
-### T185 · A deeper analysis, clearly defined
-
-*Surface and search · programme · parked*
-
-**Problem.** Gate of round 67 of 10.10. ("5b"): "Think deeper" is dropped. A deeper analysis returns when it is settled what it computes beyond Auto, how long a click waits (click at move 2 in the worker pool since round 67: doubles warm 2.5 s, cold 8.9 s) and how the panel shows its result. The C line on 573756 turns 134 to 136 measures against it.
-
-**Benefit.** App: whoever wants to give more compute time gets a level with a known gain.
-
-**Success.** A definition with budget, wait time and display, measured on the bank.
-
-**Trigger.** The user asks for a deeper level, or a gate needs one.
-
-**Steps.**
-- [ ] Definition: budget against Auto, wait time of a click (measurement as in T111 point 11), display in the panel.
-- [ ] Bank run with the budget; then brainstorming and spec.
-
-### T189 · Luck: the played cell against the next root (T22 stage b)
-
-*Report and search · round · medium · score-touching D3 · parked until T146*
-
-**Problem.** Stage b of T22: the report prices the played cell against the next root and so separates what the move itself cost from what the search read anew afterwards. The draft scene t48 and 573756 turn 70 from section B wait for it: the read payoff fizzles, and the setup payoff comes one evaluation too late. T146 removes a known source of re-reading (653785 turn 24), so measure after it.
-
-**Benefit.** App: report and cards separate dice, re-reading and move value.
-
-**Success.** The two gap scenes book their luck correctly; bank paired; the chance pins hold.
-
-**Trigger.** T146 is booked.
-
-**Evidence.** From the old section T22 (restated in round 62): stage b reconciles the cell price against the follow-up root and belongs to the family T16 (verify merge). Scenes of that time: draft gen9draft-2058494320 turn 48 (−0.472 chance on the U-turn read move, state 05.09.), 573756 turn 70 (reads quiet with chanceDelta −0.145, state round 45; the turn 70 matrix read +0.31 for SOULWIND, after mixing +0.19, the turn 71 root −0.05).
-
-**Steps.**
-- [ ] Re-read the two scenes on the app path after T146.
-- [ ] The reconciliation of cell price against follow-up root; pre-registered verdict rule on the hq tranche, paired bank bench with a fresh base on the same day, feedback 3×.
-- [ ] Re-pins only at the user gate; the chance pins 573756 t73 and 649664 t23 hold.
 
 ### Parked without a T-number
 
@@ -1018,7 +1026,7 @@ Each bullet reads "signal → when to act".
 - [ ] The set fallback for doubles and VGC is hard-wired to Gen 9 (`src/lib/smogon/format-fallback.ts`): a doubles replay before Gen 9 would get Gen 9 sets. Today every doubles replay in bank, fit corpus and feedback run is Gen 9 → act before an older doubles game enters a measurement.
 - [ ] A new live access in `pairThreat` or `singleMoveFraction` needs its key term in `pairKey` (round 49: HP, types and base values were missing, doubles cells differed from run to run) → with every change to `score/threat.ts`, extend the test `threat-memo.spec.ts` by the new access (since round 64, T125, the key also carries the values that a move reads outside its axis: Body Press, Foul Play). Since round 54 the key carries the Tera type next to the raw types, for attacker and defender (be95961); a leaf that reads the living types is thus covered, the case is in `threat-memo.spec.ts`.
 - [ ] The opponent model reads a doubles pair row only at the first slot (`isSwitchChoice` in `opponent-model.ts`); in doubles it therefore rarely becomes sure (favorite from 0.6 on 10 of 496 pages) → act when the read is needed in doubles (T42).
-- [ ] 573756 turns 134 to 136: the decided detection has named the right side since turn 92, the bar stands at 0.33 to 0.60, because the search does not compute the Struggle plan over twelve plies. Since round 50 the sentence is silent there until turn 137 → measure with T185 (T109 removed "Think deeper" in round 67; T33 was closed in round 62): if the bar stands at 0.7 from turn 134, the sentence speaks earlier by itself.
+- [ ] 573756 turns 134 to 136: the decided detection has named the right side since turn 92, the bar stands at 0.33 to 0.60, because the search does not compute the Struggle plan over twelve plies. Since round 50 the sentence is silent there until turn 137 → act on a user report about a late bar in a Struggle endgame (T185, the deeper analysis this waited for, closed at the triage of 21.10.2026; T109 removed "Think deeper" in round 67; T33 was closed in round 62): if the bar stands at 0.7 from turn 134, the sentence speaks earlier by itself.
 - [ ] 2663093831 turn 10: p2's inaccuracy disappears with T81 (round 63, lane B), although its regret rises from 0.152 to 0.276; the cause is unread → read it when T127 re-fits the static weights.
 - [ ] Gen 2 logs show Leftovers holders under full HP without healing (684843 turn 34; 72 moves in 30 Gen 2 games; round 63, lane D) → act before a Gen 2 game enters a measurement whose verdict hangs on a Leftovers exclusion.
 - [ ] Doubles with a hidden slot: the played combination is chosen before the verification, so the grade can land on another combination (`tree-orchestrator.ts:104`, review of round 63) → act when a doubles grade is wrong on a partly seen move; T148 reads along.
@@ -1074,9 +1082,9 @@ Each bullet reads "signal → when to act".
 - Cleaned up on 12.10. after round 67 (user okay): the round branch `r67` and the merge branch `r67-merge` (both in `v1`), the lane branches `w2-a` to `w2-g` (every commit in `v1`; three of them with the same changed lines under a new hash) and the measurement branch `r67-f` (4c0d50d, never merged: lane F's measurement helper let the eval worker wait for the Champions mod before it revived a Champions position) are deleted. Hashes in `docs/perf/probes/2026-10-10-r67/gate/deleted-branches.txt`; as long as Git holds the objects, `git branch <name> <hash>` brings one back.
 - `r41-wide` (163efcc): wide reading of the speed release, reference for T26. The bank folder is deleted, the numbers are in `docs/perf/probes/2026-09-11-r41/paired-wide-*.txt`.
 
-## After stabilization: Showdown Companion
+## After the release: Showdown Companion (own project)
 
-*Programme, only after stabilization.*
+*Programme, its own project after the release (user gate 21.10.2026, "3b"); the finish line of `NextSteps.md` comes first.*
 
 Precondition (user ordering 04.09. 11:08): first finish the small rounds from the list above, until the dashboard is round as a product (the rounds of choice, a clean release; the app test suite and the package remainders have been done since round 39, `docs/completed/test-infrastructure.md`; the first npm publish has been done since 06.09., both packages are on npm in 0.7.0 and 0.7.1, `docs/completed/architecture-refactor.md`). Then the programme starts; none of it runs next to an engine round, because step 0 moves every path in the repo and the feedback gates are calibrated against today's paths.
 
@@ -1096,3 +1104,4 @@ Decisions of 04.09. (user): audience tournament players, opponent scouting first
 Order and gates (spec §2): 0 monorepo → 1 scouting core and companion → 2a `eval-runtime` → 2b grades and profiles / 4a bot without model (any order) → 3 opponent model → 4b bot with model → 6 team pipeline → 5 live assistant. Every step has brainstorming polish, a spec section, a plan phase and a gate (lint, knip, package suites, e2e of both apps, API snapshot; three byte-identical feedback runs as soon as a shared package or the pipeline is touched; calibration paired as soon as scores are touched). Phase 0 of the plan is ready at step level (eight tasks: baseline capture, `git mv`, suites with file-relative fixtures, zones and ratchet path rewrite, companion scaffold with redirect, `assemble-site.mjs` with two release lines and `ci.yml`, docs, gate); phases 1 to 6 are written out at step level at the start of each.
 
 First move when it starts: plan task 0.1 (branch `monorepo`, secure the feedback baseline with `FEEDBACK_DUMP=1`), execution at choice subagent-driven or inline.
+

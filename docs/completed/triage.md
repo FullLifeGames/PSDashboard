@@ -2258,3 +2258,79 @@ Am Gate der Runde 67 (11.10.) bekamen die Funde der Spuren die Nummern T146 bis 
 - T176 · Reihenfolge-Zählung mit Trick Room (verworfen, falsche Prämisse: der Parser verwirft Reihenfolgen unter Trick Room, keine der 193 lag unter Trick Room; der Befund zu Mega-Fähigkeiten steht in T188)
 - T181 · Toxic Spikes als gewürfelter Status (zusammengelegt in T177)
 - T183 · Ungetestete Wege der Runde 67 (zusammengelegt in T184)
+
+## Nachtrag Triage vor dem Release (21.10.2026)
+
+Vor dem Release sortierte die Triage alle 52 offenen TODOs nach einer Frage: Sieht ein Nutzer den Fehler in echten Spielen, oder braucht das Release ihn? 21 bleiben auf dem Weg zum Release (Welle 5 mit den Spuren F, H und I, T163, T160, die letzte Welle, T43), 28 parken mit einem Trigger im Abschnitt „Parked“ von `docs/backlog.md`, drei sind hier stillgelegt. Ein TODO, das eine falsche Spielregel nennt, parkt nur. Gate 21.10.2026 „1a 2a 3b“ (3b: der Showdown Companion bleibt als eigenes Projekt nach dem Release geparkt). Tabelle: `docs/perf/probes/2026-10-19-r72/triage/gate-triage.md`.
+
+### T255 · Der lexikalische gen.num-Check
+
+- Urteil: verwerfen
+- Grund: ein schwacher Test, keine falsche Spielregel; der Check fängt die ausgeschriebene Form, und keine Nutzer-Szene hängt an der destrukturierten.
+- Spielart: beide
+
+**Alter Text in docs/backlog.md:**
+
+> ### T255 · The lexical `gen.num` guard
+>
+> *Tests · small fix · round 72*
+>
+> **Problem.** A calculator generation read as the simulator's generation slips past the guard when it is destructured: `test/calc-generation.spec.ts:64-65` matches the text `gen.num` line by line, so `const { num } = calcGen` passes it, and `replay-core/src/replay-format.ts:79` destructures the client's standard `Generation` (`const { num: generation } = battle.gen`) to stay outside it.
+>
+> **Benefit.** Contributors: the guard catches the calculator's generation by its type, not by its spelling.
+>
+> **Success.** The guard tells the calculator's generation from the simulator's by type; `replay-format.ts` reads `gen.num` plainly.
+>
+> **Evidence.** `packages/eval-engine/test/calc-generation.spec.ts:61-68`, `packages/replay-core/src/replay-format.ts:79`.
+>
+> **Steps.**
+> - [ ] A type-aware check (the TypeScript checker or a branded type for the calculator's generation), red on a destructured `calcGen`.
+
+### T200 · Bank-Zeilen aus aufgegebenen Spielen
+
+- Urteil: verwerfen
+- Grund: nur Messmethode; kein Nutzer sieht die Gewichtung der Bank-Zeilen, und bis zum Release entscheidet keine Bank-Frage daran.
+- Spielart: beide
+
+**Alter Text in docs/backlog.md:**
+
+> ### T200 · Bank rows from games that end in a forfeit
+>
+> *Measurement · mini round · small · round 69*
+>
+> **Problem.** The T39 sighting found that 68 of 193 early singles rows of the bank come from games that end in a forfeit. An early state of a forfeited game measures the statics against an outcome that no move decided.
+>
+> **Benefit.** Measurement: the bank verdict weighs rows by how much they say.
+>
+> **Success.** Count per family, verdict with and without these rows; decision at the gate.
+>
+> **Evidence.** `r69/lanes/B/ledger.md:125`, `:139` (68 of 193 early singles rows, 26 of 92 both-wrong rows, 9 of 28 sure ones), `r69/lanes/B/sight-t39.vt.ts` with readers `out/sight-read.mjs`, `out/sight-sum.mjs`, `r69/progress-ledger.md:105`.
+>
+> **Steps.**
+> - [ ] Count per family (singles, doubles, VGC, Champions): rows from games that end in a forfeit, and their share of the rows of the verdict.
+> - [ ] Compute the bank verdict with and without these rows (error bars as in round 48), singles and doubles separately.
+> - [ ] Decision at the gate: exclude the rows, weigh them less or keep them.
+
+### T185 · Eine tiefere Analyse, klar definiert
+
+- Urteil: verwerfen
+- Grund: eine Feature-Idee; nach der Ziellinie vom 21.10.2026 kommen nach dem Release nur Bugreports aus echter Nutzung dazu. Die Watch-Zeile zu 573756 Zug 134 bis 136 wartet seitdem auf einen Nutzerbericht.
+- Spielart: beide
+
+**Alter Text in docs/backlog.md:**
+
+> ### T185 · A deeper analysis, clearly defined
+>
+> *Surface and search · programme · parked*
+>
+> **Problem.** Gate of round 67 of 10.10. ("5b"): "Think deeper" is dropped. A deeper analysis returns when it is settled what it computes beyond Auto, how long a click waits (click at move 2 in the worker pool since round 67: doubles warm 2.5 s, cold 8.9 s) and how the panel shows its result. The C line on 573756 turns 134 to 136 measures against it.
+>
+> **Benefit.** App: whoever wants to give more compute time gets a level with a known gain.
+>
+> **Success.** A definition with budget, wait time and display, measured on the bank.
+>
+> **Trigger.** The user asks for a deeper level, or a gate needs one.
+>
+> **Steps.**
+> - [ ] Definition: budget against Auto, wait time of a click (measurement as in T111 point 11), display in the panel.
+> - [ ] Bank run with the budget; then brainstorming and spec.

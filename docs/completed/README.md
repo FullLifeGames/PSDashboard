@@ -9,7 +9,7 @@ Hier steht jede abgeschlossene Runde, sortiert nach Gebiet. `NextSteps.md` hält
 | `performance.md` | Performance | Runde 16 (Time-Performance), die Perf-Evaluation vom 01.09.2026, Runde 31 (verlustfreie Perf-Basis), die Sichtung der Runde 32 |
 | `architecture-refactor.md` | Architektur-Refactor | Runden 22 bis 30 (Workspace-Split, Publish-Readiness, Paket-Testsuiten, CSS), der erste npm-Publish und Trusted Publishing |
 | `test-infrastructure.md` | Test-Infrastruktur | Runde 39 (Vitest, App-Testsuite unter jsdom, e2e in Themen-Dateien, Test-Workflow in CI), Runde 71 (Bank in GitHub Actions) |
-| `triage.md` | Triage | stillgelegte TODOs mit Urteil, Beleg und altem Text (Runde 62, Nachträge der Runden 67 und 69) |
+| `triage.md` | Triage | stillgelegte TODOs mit Urteil, Beleg und altem Text (Runde 62, Nachträge der Runden 67 und 69, die Triage vor dem Release vom 21.10.2026) |
 | `qa-campaign-2026-07.md` | QA-Kampagne 07/2026 | der Fix-Plan der 45 Befunde und die Nachtest-Runden (vor der Rundenzählung) |
 
 Ein neues Gebiet bekommt eine eigene Datei mit demselben Kopf und eine Zeile in dieser Tabelle.
