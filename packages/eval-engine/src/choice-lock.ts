@@ -6,10 +6,10 @@
  * because nothing here reads sim history.
  */
 
-import { calculate, Field, Move, type Pokemon } from '@smogon/calc';
+import { calculate, Move, type Pokemon } from '@smogon/calc';
 import { Dex, type PokemonSet } from '@pkmn/sim';
-import { type DamageObservation, type OpponentTeamInfo, typedHiddenPowerId, inferOpponentTeam, itemSetValue, replayRuleset, toId, calcGenerationFor, simGenNum, type CalcGeneration } from '@fulllifegames/replay-core';
-import { attackerAtUse, calcPokemon, type CalcBody } from './calc/body.ts';
+import { type DamageObservation, type OpponentTeamInfo, typedHiddenPowerId, inferOpponentTeam, itemSetValue, replayRuleset, toId, calcGenerationFor, simGenNum, type CalcGeneration, abilityStateAtHit, fieldOf, historyPower, poweredMove } from '@fulllifegames/replay-core';
+import { attackerAtUse, calcPokemon, simDexOf, type CalcBody } from './calc/body.ts';
 import { defenderAbilities, defenderItems, formeAbility, isBodyOf, pricedSpecies, type DefenderRead } from './choice-lock-defender.ts';
 import { calcMove } from './calc/move.ts';
 import { CHOICE_ITEMS } from './sensitivity.ts';
@@ -268,31 +268,40 @@ const TYPE_BOOST_ITEMS: Record<string, string> = {
  */
 type CalcGen = CalcGeneration;
 
-const stagesOf = (boosts: Record<string, number>): CalcBody['boosts'] =>
-  ({ atk: boosts.atk ?? 0, def: boosts.def ?? 0, spa: boosts.spa ?? 0, spd: boosts.spd ?? 0, spe: boosts.spe ?? 0 });
+const stagesOf = (boosts: Record<string, number>): CalcBody['boosts'] => ({ atk: boosts.atk ?? 0, def: boosts.def ?? 0, spa: boosts.spa ?? 0, spd: boosts.spd ?? 0, spe: boosts.spe ?? 0 });
+
+/** The calculator's current HP for a fraction of the maximum: below the maximum whenever the fraction is (Multiscale reads full HP exactly). */
+const atHp = (body: Pokemon, fraction = 1): Pokemon => Object.assign(body, fraction < 1 ? { originalCurHP: Math.max(1, Math.min(body.maxHP() - 1, Math.round(fraction * body.maxHP()))) } : {});
 
 /**
- * Both bodies of an observation stood on the field: their stages hold every
- * entry boost; the attacker hits in the forme its ability takes for the move
- * (calc/body.ts). A Champions game's sets hold Stat Points, which the one
- * builder hands to the calc's Champions generation as they are (round 68, T186).
+ * Both bodies of an observation stood on the field: their stages hold every entry boost; the attacker hits in the forme its ability
+ * takes for the move (calc/body.ts). A Champions game's sets hold Stat Points, which the one builder hands to the calc's Champions
+ * generation as they are (round 68, T186). Round 73 (T204): each body also wears what the observation shows at the hit, as the
+ * spread solver reads it: the Tera type, the stat a Paradox ability raised, the HP, the fallen of Supreme Overlord and Last
+ * Respects, and the state Stakeout and Analytic take from the turn's order. The item stays the hypothesis under test.
  */
 function calcAttacker(gen: CalcGen, attackerSet: PokemonSet, obs: DamageObservation, withItem: string, moveId: string, mod?: string): Pokemon {
   const species = pricedSpecies(attackerSet, obs.attackerSpecies);
-  return calcPokemon(gen, attackerAtUse(simGenNum(gen), {
-    species, level: attackerSet.level || 100, ability: formeAbility(gen, species, attackerSet.ability || ''), item: withItem,
-    nature: attackerSet.nature, evs: attackerSet.evs, ivs: attackerSet.ivs, gender: attackerSet.gender,
-    boosts: stagesOf(obs.attackerBoosts), status: obs.attackerStatus, tera: null, onField: true, mod,
-  }, moveId));
+  const ability = formeAbility(gen, species, attackerSet.ability || '');
+  return atHp(calcPokemon(gen, attackerAtUse(simGenNum(gen), {
+    species, level: attackerSet.level || 100, ability, item: withItem, nature: attackerSet.nature, evs: attackerSet.evs, ivs: attackerSet.ivs, gender: attackerSet.gender,
+    boosts: stagesOf(obs.attackerBoosts), status: obs.attackerStatus, tera: obs.attackerTera ?? null, onField: true, mod,
+    boostedStat: obs.attackerParadox?.stat, alliesFainted: obs.attackerFallen, totalFainted: obs.attackerFainted,
+    abilityOn: abilityStateAtHit(ability, { defenderNewlyIn: obs.defenderNewlyIn, lastToMove: obs.lastToMove }).on,
+  }, moveId)), obs.attackerHp);
 }
 
 function calcDefender(gen: CalcGen, defenderSet: PokemonSet | undefined, obs: DamageObservation, ability: string, item: string, mod?: string): Pokemon {
-  return calcPokemon(gen, {
-    species: pricedSpecies(defenderSet, obs.defenderSpecies), level: defenderSet?.level || 100, ability, item,
-    nature: defenderSet?.nature ?? '', evs: defenderSet?.evs ?? {}, ivs: defenderSet?.ivs ?? {}, gender: defenderSet?.gender,
-    boosts: stagesOf(obs.defenderBoosts), tera: null, onField: true, mod,
-  });
+  return atHp(calcPokemon(gen, {
+    species: pricedSpecies(defenderSet, obs.defenderSpecies), level: defenderSet?.level || 100, ability, item, nature: defenderSet?.nature ?? '',
+    evs: defenderSet?.evs ?? {}, ivs: defenderSet?.ivs ?? {}, gender: defenderSet?.gender, boosts: stagesOf(obs.defenderBoosts), tera: obs.defenderTera ?? null,
+    onField: true, mod, boostedStat: obs.defenderParadox?.stat, status: obs.defenderStatus,
+  }), obs.defenderHp);
 }
+
+/** The defender's items the check ranges: the one the client shows at the hit when it shows one (or shows it gone), else the build's range. */
+const itemsAtHit = (gen: CalcGen, items: string[], obs: DamageObservation): string[] =>
+  (obs.defenderItem || obs.defenderItemChanged ? [obs.defenderItem ? simDexOf(gen).items.get(obs.defenderItem).name : ''] : items);
 
 /**
  * Whether the roll range (± slack) under `withItem` contains the observed fraction for some ability and item the
@@ -316,7 +325,9 @@ function explainsWith(
     const attacker = calcAttacker(gen, attackerSet, obs, withItem, calcMoveId, mod);
     const defender = buildDefender();
     // The move as the calc must read it: a Champions game's moves at the mod's power and type (calc/move.ts).
-    const result = calculate(gen, attacker, defender, calcMove(gen, calcMoveId, { mod } as CalcBody), new Field({}));
+    // Rage Fist and Last Respects take their power from the battle's history (T210 group 1).
+    const basePower = historyPower(simDexOf(gen), calcMoveId, { fainted: obs.attackerFainted ?? 0, timesAttacked: obs.attackerTimesAttacked ?? 0 });
+    const result = calculate(gen, attacker, defender, calcMove(gen, calcMoveId, { mod, totalFainted: obs.attackerFainted } as CalcBody, basePower === null ? {} : { overrides: { basePower } }), fieldOf(obs));
     const rolls = (Array.isArray(result.damage) ? (result.damage as number[]).flat() : [Number(result.damage)]).map(Number);
     const maxHp = defender.maxHP();
     if (rolls.length === 0 || maxHp <= 0) return null;
@@ -346,9 +357,7 @@ function judgeObservation(
 ): 'contradicted' | 'choice-only' | 'skip' {
   // Typeless "hiddenpower" calcs as the set's resolved variant (same seam
   // as spread-inference — the IV-default type would judge with wrong rolls).
-  const calcMoveId = obs.moveId === 'hiddenpower'
-    ? typedHiddenPowerId(attackerSet.moves) ?? obs.moveId
-    : obs.moveId;
+  const calcMoveId = obs.moveId === 'hiddenpower' ? typedHiddenPowerId(attackerSet.moves) ?? obs.moveId : obs.moveId;
   const explains = (withItem: string) => explainsObservation(gen, attackerSet, defender, obs, calcMoveId, withItem, mod);
   const rivals = rivalItemsFor(gen, calcMoveId);
   const choiceFits = explains(item);
@@ -383,11 +392,12 @@ export function corroborateChoiceItem(
     if (obs.attackerSide !== side || !isBodyOf(gen, obs.attackerSpecies, species)) continue;
     // Doubles hits (round 69, T31) carry a spread cut, screens at x2732/4096 and partner targets this check prices on a
     // singles field: they stay out of the verdict until it reads the doubles field.
-    if (obs.doubles) continue;
+    // A Z-move or a Max move prices from the Dex's placeholder power (T229): it proves nothing about the item.
+    if (obs.doubles || poweredMove(simDexOf(gen), obs.moveId)) continue;
     const defenderTeam = side === 'p1' ? teams.p2Team : teams.p1Team;
     const defenderSet = defenderTeam.find(candidate => isBodyOf(gen, obs.defenderSpecies, candidate.species));
     const info = defenders?.[side === 'p1' ? 'p2' : 'p1'];
-    const defender = { set: defenderSet, abilities: defenderAbilities(gen, defenderSet, obs, info), items: defenderItems(defenderSet, obs, info) };
+    const defender = { set: defenderSet, abilities: defenderAbilities(gen, defenderSet, obs, info), items: itemsAtHit(gen, defenderItems(defenderSet, obs, info), obs) };
     const verdict = judgeObservation(gen, attackerSet, defender, obs, item, mod);
     if (verdict === 'contradicted') return 'contradicted';
     if (verdict === 'choice-only') sawChoiceOnly = true;

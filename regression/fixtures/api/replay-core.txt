@@ -59,6 +59,7 @@ value RULED_OUT_ITEM_DETAIL
 value SCREENS
 value TERRAIN_BY_ID
 value WEATHER_BY_ID
+value abilityStateAtHit
 value alternativeItems
 value applyInferredSpreads
 value applyPastedTeam
@@ -81,6 +82,7 @@ value enrichTeamInfo
 value enrichTeamInfos
 value evBudget
 value extractTeamSheets
+value fieldOf
 value fillUsageMoves
 value finalPlayedTurn
 value formatEnforcesSleepClause
@@ -95,6 +97,7 @@ value getSpeciesUsageSet
 value getSpeciesUsageStats
 value guessedFieldFromUsage
 value hazardConditions
+value historyPower
 value inferOpponentTeam
 value inferReplayFormatId
 value isScreen
@@ -107,6 +110,7 @@ value parsePastedTeam
 value parseReplayLog
 value parseReplayLogWithObservations
 value parseTeamText
+value poweredMove
 value protectKind
 value replayBringOnly
 value replayRuleset

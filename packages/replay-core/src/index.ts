@@ -46,6 +46,10 @@ export type { TwinOptions, TwinSide } from './sim-ask/twin.ts';
 export type { SpeedKnowledge, SpeedKnowledgeMap, SpreadCandidate } from './spread-inference.ts';
 export type { SpreadOrigin } from './spreads/ladder.ts';
 export { calcEvs, calcIvs, evBudget } from './spreads/ev-budget.ts';
+export { fieldOf } from './spreads/observation-read.ts';
+export { poweredMove } from './spreads/powered-move.ts';
+export { historyPower } from './spreads/hit-power.ts';
+export { abilityStateAtHit } from './spreads/ability-state.ts';
 export type { EvBudget } from './spreads/ev-budget.ts';
 export { buildTeamsFromReplay, solveReplaySpreads, extractTeamSheets } from './team-builder.ts';
 export {
