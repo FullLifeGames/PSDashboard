@@ -2,7 +2,7 @@ import type { Battle, ID, Pokemon } from '@pkmn/sim';
 import { copyOf, FixedDice } from '../sim-ask/index.ts';
 import { playResiduals, slotsOf } from './residuals.ts';
 import { damageOf } from './status-factor.ts';
-import { NO_COST, type HitCost, type StatusCost } from './contact-cost.ts';
+import { MAX_PRICED_HITS, NO_COST, type HitCost, type StatusCost } from './contact-cost.ts';
 
 /**
  * Plays one hit of a move on copies of the board and reads what it costs the attacker (13.10.2026, the Swords
@@ -32,6 +32,8 @@ const GRID = 20;
 const PROBES = [1, 18];
 const MIDDLE = 9;
 const quantileOf = (index: number): number => (index + 0.5) / GRID;
+
+const mean = (values: readonly number[]): number => values.reduce((sum, value) => sum + value, 0) / values.length;
 
 /** A board with the pair ready for a hit: both on the field of a copy, both at full HP. */
 interface Setup { copy: Battle; attacker: Pokemon; defender: Pokemon }
@@ -139,12 +141,41 @@ function endOfTurn({ copy, attacker }: Setup): number {
   return playResiduals(copy, bodies)[bodies.indexOf(attacker)] ?? 0;
 }
 
+/** Whether the attacker moves on each of its next turns with the status the hit left on it, played on a copy with every draw answering `quantile`. */
+function turnsActed(run: Run, moveId: string, quantile: number): boolean[] {
+  const copy = copyOf(run.setup.copy);
+  (copy as unknown as { debugMode: boolean }).debugMode = false;
+  const attacker = counterpart(run.setup.copy, copy, run.setup.attacker);
+  const defender = counterpart(run.setup.copy, copy, run.setup.defender);
+  copy.prng = new FixedDice({ quantile });
+  // The status is put on again under the dice of this play: the hit's own draws decided that it lands, and a sleep's length or a paralysis's turn would answer the same low quantile every time.
+  attacker.clearStatus();
+  attacker.setStatus(run.label, defender);
+  const move = copy.dex.getActiveMove(moveId);
+  return Array.from({ length: MAX_PRICED_HITS }, () => !!copy.runEvent('BeforeMove', attacker, defender, move));
+}
+
+/**
+ * T225: the share of its next turns the attacker moves on with the status the hit left (BeforeMove of the simulator, the
+ * grid of quantiles), turn by turn; undefined where the status never stops a move at the two probes (a burn, a poison).
+ */
+function actsOf(run: Run, moveId: string): number[] | undefined {
+  try {
+    const probes = PROBES.map(point => turnsActed(run, moveId, quantileOf(point)));
+    if (probes.every(turns => turns.every(Boolean))) return undefined;
+    const grid = Array.from({ length: GRID }, (_, point) => (PROBES.includes(point) ? probes[PROBES.indexOf(point)] : turnsActed(run, moveId, quantileOf(point))));
+    return Array.from({ length: MAX_PRICED_HITS }, (_, turn) => mean(grid.map(turns => (turns[turn] ? 1 : 0))));
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * What a status (or an item taken over) the hit left costs the attacker: the loss per turn it adds at the end of the
- * turn, played on the copy of the hit against a copy of the board before it, and the share of its damage the same
- * move still deals, from the simulator's damage with and without the status.
+ * turn, played on the copy of the hit against a copy of the board before it, the share of its damage the same
+ * move still deals, from the simulator's damage with and without the status, and the turns the status takes.
  */
-function costOfLabel(run: Run, moveId: string, baseline: () => number): { chip: number; output: number } {
+function costOfLabel(run: Run, moveId: string, baseline: () => number): { chip: number; output: number; acts?: number[] } {
   const { copy, attacker, defender } = run.setup;
   let output = 1;
   if (attacker.status && run.label === attacker.status) {
@@ -155,10 +186,9 @@ function costOfLabel(run: Run, moveId: string, baseline: () => number): { chip: 
     attacker.status = status;
     if (plain > 0) output = statused / plain;
   }
-  return { chip: endOfTurn(run.setup) - baseline(), output };
+  const acts = attacker.status && run.label === attacker.status ? actsOf(run, moveId) : undefined;
+  return { chip: endOfTurn(run.setup) - baseline(), output, ...(acts ? { acts } : {}) };
 }
-
-const mean = (values: readonly number[]): number => values.reduce((sum, value) => sum + value, 0) / values.length;
 
 /**
  * Whether the move costs its user HP by itself, played once on a pair stripped of items, abilities and typing (the

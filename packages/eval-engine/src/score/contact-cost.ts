@@ -14,7 +14,16 @@ export interface StatusCost {
   chip: number;
   /** The share of its damage the attacker's move still deals while it carries it (a burn halves a physical move: 0.5). */
   output: number;
+  /**
+   * T225: the share of its turns the attacker still moves on, turn by turn after the hit landed it (`acts[0]` is the
+   * next turn), for a status that takes turns and not HP (paralysis, sleep, freeze). Absent when every turn is a move.
+   * It has MAX_PRICED_HITS entries.
+   */
+  acts?: readonly number[];
 }
+
+/** The longest race priced, in hits and in turns: the profile of `acts` runs over as many turns. */
+export const MAX_PRICED_HITS = 8;
 
 /** What one hit costs the attacker. */
 export interface HitCost {

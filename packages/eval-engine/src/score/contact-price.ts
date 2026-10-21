@@ -1,4 +1,4 @@
-import type { HitCost } from './contact-cost.ts';
+import { MAX_PRICED_HITS, type HitCost } from './contact-cost.ts';
 
 /**
  * How the cost of one hit (score/contact.ts) enters a race of boostsBiting (13.10.2026, the Swords Dance report on
@@ -22,8 +22,9 @@ import type { HitCost } from './contact-cost.ts';
  * the turns j to the turn before the other side's last hit, and the hits after j deal its share of the damage: a burn
  * halves a physical hit, a Guts body deals more, a Poison Heal body gains HP. Hit j itself is dealt before the status it
  * may leave. The expected chip is spread over the turns of the race, the expected damage over the hits the side lands.
- * Paralysis, sleep and freeze take turns instead of HP and damage, and are not priced here (the reader tells their
- * chance; the races have no turn to give).
+ * Paralysis, sleep and freeze take turns instead of HP and damage (T225, round 73): the reader hands the share of turns
+ * the body still moves on, turn by turn after the status landed (`acts`), and the k-th hit after the landing one deals
+ * that share of its damage (the halved Speed of a paralysis is not priced: the move order of the race stays as it was).
  */
 
 /** What a hit's cost adds to a side of a race. */
@@ -36,8 +37,8 @@ export interface HitPrice {
   buffer: number;
 }
 
-/** The longest race priced: a race that never ends, or runs longer, is priced over this many hits. */
-export const MAX_PRICED_HITS = 8;
+/** The longest race priced: a race that never ends, or runs longer, is priced over this many hits (the constant lives with the shape, score/contact-cost.ts). */
+export { MAX_PRICED_HITS };
 
 const FREE: HitPrice = { residual: 0, output: 1, buffer: 0 };
 
@@ -58,7 +59,7 @@ export function priceHit(cost: HitCost, own: number, other: number, ownFirst: bo
   for (const entry of cost.statuses) {
     for (let at = 1; at <= MAX_PRICED_HITS; at++) {
       const probability = (1 - chance) ** (at - 1) * entry.chance;
-      output += probability * (entry.output - 1) * Math.max(0, landing - at);
+      for (let after = 1; after <= landing - at; after++) output += probability * (entry.output * (entry.acts?.[after - 1] ?? 1) - 1);
       chips += probability * entry.chip * Math.max(0, turns - at);
     }
   }
