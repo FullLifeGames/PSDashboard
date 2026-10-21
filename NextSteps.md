@@ -2,6 +2,10 @@
 
 Open work only, as packages. A package is one round; its TODOs carry fixed T-numbers, and their scenes, numbers and steps are in `docs/backlog.md`. Rules for agents: `AGENTS.md`. Finished rounds: `docs/completed/`. Next free T-number: T258.
 
+## Finish line
+
+The goal is a release: v1 onto master and the GitHub Pages site built from it (user 21.10.2026). The way there, in this order: wave 5, T163, T160, one last wave with the rest a user sees, then the release. After the release only bug reports from real use add work. master moves at the release only, and only with the user's okay.
+
 ## Next rounds
 
 1. **Wave 5 · The static, the feedback corpus in CI, the rebuild and the solver** (user gate 21.10.2026, "3b"). Four lanes that share no file; its own gate over the open decisions of its design comes first, and it measures in CI (`node scripts/bank-ci.mjs`).
@@ -14,6 +18,8 @@ Open work only, as packages. A package is one round; its TODOs carry fixed T-num
    Success: each TODO's own line; bank plus holdout (D26) without harm, with Doubles OU, VGC and the Champions families counted on their own.
 2. **Leaf K per family (T163)**, right after wave 5, since it fits K on the search's root values, which lane F changes. Doubles OU, VGC and Champions OU each get a K fitted on the search's own root values instead of one doubles K. Success: bank plus holdout reads the doubles row better, with no warning.
 3. **Champions rules from the battle's Dex (T160).** 62 code paths still read rules from the global Dex, and in Champions some of them read the Scarlet/Violet rule. Success: every path reads the battle's Dex or is shown to be format-free.
+4. **The last wave:** the rest a user sees, as the triage keeps it.
+5. **The release:** v1 onto master and the Pages site, after the user's okay.
 
 ## Packages
 
