@@ -25,8 +25,8 @@ import type { BodySnapshot, HitSnapshot } from './snapshot.ts';
  * its Doubles field then takes the 0.75 spread factor off a hit that the
  * simulator did not spread because only one foe stood. That hit is priced with
  * the Singles game type, which enters the calc in the spread factor and the
- * screen factor only (a defender with a screen stays on the Doubles field,
- * the one hit the calc cannot price exactly).
+ * screen factor only. Round 73 (T202): a defender behind a screen is the one hit neither field prices (a screen is 2732/4096 in
+ * Doubles and 2048/4096 in Singles), so its table is null and the pair plan samples the simulator's own draws.
  */
 
 /** A hit's snapshot with the strength factor the move drew (Fickle Beam's 2, T154); absent for the move's own power. */
@@ -93,10 +93,14 @@ function hitMove(gen: CalcGen, snap: PricedHit, isCrit: boolean, isStellarFirstU
   return calcMove(gen, snap.moveName, snap.attacker, { isCrit, isStellarFirstUse, overrides: { ...strength, target: 'normal' } });
 }
 
-/** The hit's 16 values: the calc's Doubles field, or the Singles one where the calc forces a spread the simulator did not play. */
+/**
+ * The hit's 16 values: the calc's Doubles field, the Singles one where the calc forces a spread the simulator did not play, or null
+ * where it forces that spread on a defender behind a screen (no field of the calc prices that hit).
+ */
 function hitRolls(gen: CalcGen, snap: PricedHit, attacker: CalcPokemon, defender: CalcPokemon, isCrit: boolean, firstUse: boolean): number[] | null {
   const result = calculate(gen, attacker, defender, hitMove(gen, snap, isCrit, firstUse), calcField(snap));
-  const forced = !snap.spreadHit && SPREAD_TARGETS.has(result.move.target) && snap.screens.length === 0;
+  const forced = !snap.spreadHit && SPREAD_TARGETS.has(result.move.target);
+  if (forced && snap.screens.length > 0) return null;
   return rollsOf(forced ? calculate(gen, attacker, defender, hitMove(gen, snap, isCrit, firstUse), calcField(snap, 'Singles')).damage : result.damage);
 }
 
