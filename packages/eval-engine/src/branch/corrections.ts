@@ -12,6 +12,7 @@ import { restoreTeraFromSnapshot } from './tera-restore.ts';
 import { bodiesOffTheField, restoreAfterProtocolEntry, restoreExitVolatiles } from './exit-volatiles.ts';
 import { endLocksTheGameEnded, settleSleepCounter } from './sleep-counter.ts';
 import { hpOfSighting } from './pokemon-info.ts';
+import { normalizeLines } from '../line-endings.ts';
 
 function repointActiveSlot(side: SimSide, activeSlot: number, target: SimPokemon): boolean {
   if (side.active[activeSlot] === target) return false;
@@ -55,9 +56,11 @@ function repointActiveSlot(side: SimSide, activeSlot: number, target: SimPokemon
 
 export function correctActivesFromProtocol(
   battle: SimBattle,
-  events: string[],
+  rawEvents: string[],
   locks?: { context: ChoiceLockContext; turn: number },
 ) {
+  // The door for lines (round 73, T230 on T206): a block cut from a CRLF log ends its lines in a carriage return; the readers below see LF only.
+  const events = normalizeLines(rawEvents);
   const before = battle.sides.map(side => [...side.active]);
   let repointed = false;
   for (const line of events) {
