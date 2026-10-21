@@ -7,6 +7,7 @@ import { screenFlags } from '../dex-facts/index.ts';
 import type { DamageObservation } from '../types.ts';
 import { originIn, type FormeDex } from './battle-forme.ts';
 import { partnerAbility } from './partner-ability.ts';
+import type { TurnFacts } from './ability-state.ts';
 
 /** Client condition ids the shared calc map doesn't spell out. */
 const WEATHER_ALIASES: Record<string, string> = {
@@ -122,6 +123,8 @@ export interface HitSide {
   ability?: string;
   suppressed?: boolean;
   abilityOn?: boolean;
+  /** The turn's facts of the hit, read by the abilities of `ability-state.ts` (attacker side only). */
+  turn?: TurnFacts;
 }
 
 /** One side of a hit as the log shows it at the damage line. The defender's ability is never "on". */
@@ -135,5 +138,6 @@ export function hitSideOf(obs: ReadObservation, role: 'attacker' | 'defender'): 
   return {
     boosts: obs.attackerBoosts, status: obs.attackerStatus, forme: obs.attackerForme, boostedStat: obs.attackerParadox?.stat, tera: obs.attackerTera,
     hp: obs.attackerHp, fallen: obs.attackerFallen, ability: obs.attackerAbility, suppressed: obs.attackerSuppressed, abilityOn: obs.attackerAbilityOn,
+    turn: { defenderNewlyIn: obs.defenderNewlyIn, lastToMove: obs.lastToMove },
   };
 }

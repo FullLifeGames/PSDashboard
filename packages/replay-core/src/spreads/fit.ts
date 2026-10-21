@@ -16,6 +16,7 @@ import { formeAbility } from './battle-forme.ts';
 import { withItemAtHit } from './item-at-hit.ts';
 import { genNumOf, toId } from '../ids.ts';
 import { poweredMove } from './powered-move.ts';
+import { abilityStateAtHit } from './ability-state.ts';
 import { historyPower } from './hit-power.ts';
 
 /**
@@ -175,6 +176,16 @@ const hpAt = (maxHp: number, fraction: number) => Math.max(1, Math.min(maxHp - 1
 type CalcOptions = NonNullable<ConstructorParameters<typeof Pokemon>[2]>;
 
 /**
+ * The ability a body fought with at the hit and whether it is on: the shown or built one (abilityAtHit), and for an ability that
+ * reads the turn's order (Stakeout, Analytic) the state the facts of the hit give it (round 73, T210 group 3).
+ */
+function abilityOfHit(dex: ReturnType<typeof Dex.forGen>, setAbility: string | undefined, hit: HitSide): { ability: string | undefined; abilityOn: boolean | undefined } {
+  const built = abilityAtHit(dex, formeAbility(dex, hit.forme, setAbility), hit.ability, hit.suppressed);
+  const turn = abilityStateAtHit(built, hit.turn ?? {});
+  return { ability: turn.drop ? abilityAtHit(dex, built, undefined, true) : built, abilityOn: hit.abilityOn || turn.on };
+}
+
+/**
  * A body as the calculator reads it: the spread itself, Stat Points in evs for Champions' generation 0, which ignores IVs (round 68,
  * T186), and what the log shows of the side at the hit (`hit`, round 69, T86): stages, status, forme, Terastallization, HP, the
  * fallen of Supreme Overlord, the ability it fought with.
@@ -182,10 +193,11 @@ type CalcOptions = NonNullable<ConstructorParameters<typeof Pokemon>[2]>;
 export function calcPokemon(ctx: SolveContext, side: 'p1' | 'p2', species: string, spread: SpreadCandidate, hit: HitSide = {}) {
   const set = setOf(ctx, side, species);
   const dex = Dex.forGen(simGenNum(ctx.gen));
+  const { ability, abilityOn } = abilityOfHit(dex, set?.ability, hit);
   const body = buildCalcPokemon(ctx.gen, hit.forme ?? set?.species ?? species, {
     level: set?.level || 100,
-    ability: abilityAtHit(dex, formeAbility(dex, hit.forme, set?.ability), hit.ability, hit.suppressed),
-    abilityOn: hit.abilityOn,
+    ability,
+    abilityOn,
     item: (spread.item ?? set?.item) || undefined,
     nature: spread.nature,
     evs: coupleSpecial(spread.evs, ctx.budget),

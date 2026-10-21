@@ -130,7 +130,7 @@ describe('singles logs give the observations they gave before (T31)', () => {
     'doubles', 'spread', 'defenderSide', 'attackerItem', 'defenderItem', 'attackerItemChanged', 'defenderItemChanged',
     'attackerParadox', 'defenderParadox', 'moveName', 'terrain', 'attackerHp', 'defenderHp', 'attackerAbility', 'defenderAbility',
     'attackerTera', 'defenderTera', 'attackerFallen', 'attackerSuppressed', 'defenderSuppressed', 'attackerAbilityOn', 'fieldFacts',
-    'attackerAlly', 'defenderAlly', 'attackerFainted', 'attackerTimesAttacked', 'defenderStatus',
+    'attackerAlly', 'defenderAlly', 'attackerFainted', 'attackerTimesAttacked', 'defenderStatus', 'defenderNewlyIn', 'lastToMove',
   ] as const;
 
   for (const name of ['singles-1', 'singles-2']) {

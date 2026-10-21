@@ -173,6 +173,12 @@ export interface DamageObservation {
   attackerTimesAttacked?: number;
   /** The defender's status before the hit (round 73, T210 group 2): Hex and Venoshock double against it, Marvel Scale lifts Defense under it. */
   defenderStatus?: string;
+  /**
+   * The turn's order of events at the hit (round 73, T210 group 3), only when true: the defender switched in this turn (Stakeout), and
+   * every other active Pokémon had moved (Analytic).
+   */
+  defenderNewlyIn?: boolean;
+  lastToMove?: boolean;
 }
 
 export interface AllyReading {

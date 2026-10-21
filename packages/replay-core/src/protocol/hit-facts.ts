@@ -86,6 +86,19 @@ function historyFactsOf(attacker: Pokemon, defender: Pokemon): Partial<DamageObs
   };
 }
 
+/** The slot key of an active Pokémon in the idents the parser keeps ('p2a'). */
+const slotKeyOf = (mon: Pokemon) => `p${mon.side.n + 1}${String.fromCharCode(97 + mon.side.active.indexOf(mon))}`;
+
+/** The turn's order of events at the hit (T210 group 3): the defender came in this turn, and every other living active has moved or switched. */
+function turnFactsOf(state: ParserState, attacker: Pokemon, defender: Pokemon): Partial<DamageObservation> {
+  const acted = new Set([...state.actedThisTurn].map(ident => ident.slice(0, 3)));
+  const others = state.battle.getAllActive().filter(mon => mon !== attacker && !mon.fainted);
+  return {
+    ...(defender.newlySwitched ? { defenderNewlyIn: true } : {}),
+    ...(others.every(mon => acted.has(slotKeyOf(mon))) ? { lastToMove: true } : {}),
+  };
+}
+
 /**
  * What the client battle shows at the damage line besides the stages, the item and the weather (round 69, T86): the move's name,
  * the terrain, the Terastallized types, both HP fractions, the fallen of Supreme Overlord, the abilities and the field facts. The
@@ -110,5 +123,6 @@ export function hitFactsOf(state: ParserState, move: PendingMove, attacker: Poke
     ...(facts.length > 0 ? { fieldFacts: facts } : {}),
     ...partnerFactsOf(attacker, defender),
     ...historyFactsOf(attacker, defender),
+    ...turnFactsOf(state, attacker, defender),
   };
 }
