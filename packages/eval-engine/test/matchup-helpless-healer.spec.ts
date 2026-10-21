@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import type { Battle, Pokemon, PokemonSet } from '@pkmn/sim';
+import type { Battle, Pokemon } from '@pkmn/sim';
 import { createMatchupCache, evaluatePosition, type StaticRuleset } from '../src/eval-function';
 import { loadSimMods } from '../src/forward/sim-mods';
 import { set } from './move-oracle';
