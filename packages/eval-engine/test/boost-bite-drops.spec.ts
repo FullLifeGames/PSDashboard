@@ -239,8 +239,13 @@ describe.each(MODES.filter(mode => !mode.doubles))('a drop behind a front that b
     expect(evalFeatures(battle).boostsBiting).toBe(0);
   });
 
-  test('a front foe that never swings back leaves the gate open: the drop counts against the bench Jolteon', () => {
+  test('a front foe that never swings back but outlasts the horizon closes the bench as well (T225; before: the drop counted)', () => {
+    expect(evalFeatures(behind(['Clefable', ['splash']])).boostsBiting).toBe(0);
+  });
+
+  test('a front foe that never swings back and falls to the holder at once leaves the gate open: the drop counts against the bench Jolteon', () => {
     const battle = behind(['Clefable', ['splash']]);
+    battle.sides[1].active[0]!.sethp(1);
     const features = evalFeatures(battle);
     expect(features.boostsBiting).toBeCloseTo(stageValue(battle.sides[0].active[0]!, 'atk', -2) / 2, 12);
     expect(features.boostsBiting).toBeLessThan(0);

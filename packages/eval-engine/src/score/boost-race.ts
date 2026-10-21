@@ -243,6 +243,9 @@ export const foeWins = (race: Race): boolean => wins(frameOf(race, 'foe'));
 /** Whether the holder gets to act in the race: it moves first, or it survives the foe's hit. */
 export const holderActs = (race: Race): boolean => frameOf(race, 'mine').acts;
 
+/** Whether the holder wins the race within the race horizon (for the bench credit behind the foes in front). */
+export const holderWins = (race: Race): boolean => wins(frameOf(race, 'mine')) && race.turnsMine <= BITE_TURNS;
+
 /**
  * Whether the stage moves the race in favour of the side it helps (the holder for a boost, the foe for a drop): that
  * side wins the race with the stage, within the race horizon, and gets to act in it; and it did not win without the

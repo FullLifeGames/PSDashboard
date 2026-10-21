@@ -184,9 +184,14 @@ describe('the report on gen9draft-2058494320: a 5% Cobalion at +4 into a full-HP
     expect(sideValue(scene(PALOSSAND()))).toBe(0);
   });
 
-  test('the same board in front of a Palossand without its attack: the healer cannot swing and the bench foe counts', () => {
-    const battle = scene(set('Palossand', ['shoreup', 'splash']));
-    expect(sideValue(battle)).toBeCloseTo(stageValue(battle.sides[0].active[0]!, 'atk', 4) / 2, 12);
+  test('the same board in front of a Palossand without its attack: the healer cannot swing, but the race does not give the holder the win past Shore Up within the horizon and the bench stays shut (T225; before: the bench foe counted)', () => {
+    expect(sideValue(scene(set('Palossand', ['shoreup', 'splash'])))).toBe(0);
+  });
+
+  test('the same Palossand with no heal move: the holder gets past it within the horizon and the bench foe counts', () => {
+    const battle = scene(set('Palossand', ['splash']));
+    // Both foes bite now: the Palossand in front and the Clefable behind it.
+    expect(sideValue(battle)).toBeCloseTo(stageValue(battle.sides[0].active[0]!, 'atk', 4), 12);
   });
 });
 
