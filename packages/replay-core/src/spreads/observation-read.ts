@@ -63,10 +63,12 @@ export const forcedSpread = (obs: { doubles?: boolean; spread?: boolean }, resul
  * The move of an observation as the calculator builds it, by its name (Weather Ball, Terrain Pulse, Techno Blast and Multi-Attack
  * key on the name, not on the id). The calculator cuts a move aimed at all adjacent targets to 0.75 on a
  * Doubles field; the simulator cuts exactly when the move line names `[spread]` (two targets at the start, even if one protects).
- * A doubles hit without the mark had one target and takes the full damage, so the move reads as a single-target move.
+ * A doubles hit without the mark had one target and takes the full damage, so the move reads as a single-target move. A move whose
+ * power reads the battle's history takes its power from the Dex callback (`basePower`, round 73, T210).
  */
-export function moveOf(gen: CalcGeneration, moveName: string, obs: DamageObservation): Move {
-  return obs.doubles && !obs.spread ? new Move(gen, moveName, { overrides: { target: 'normal' } }) : new Move(gen, moveName);
+export function moveOf(gen: CalcGeneration, moveName: string, obs: DamageObservation, basePower?: number): Move {
+  const overrides = { ...(obs.doubles && !obs.spread ? { target: 'normal' as const } : {}), ...(basePower === undefined ? {} : { basePower }) };
+  return Object.keys(overrides).length > 0 ? new Move(gen, moveName, { overrides }) : new Move(gen, moveName);
 }
 
 /**

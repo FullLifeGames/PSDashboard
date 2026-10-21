@@ -2,7 +2,7 @@ import { Pokemon, calculate } from '@smogon/calc';
 import { buildCalcPokemon, calcBaseStats, calcKnowsMove } from '../calc-build.ts';
 import { calcGenerationFor, calcModOf, simGenNum, type CalcGeneration } from '../calc-gen.ts';
 import { Dex } from '@pkmn/dex';
-import type { PokemonSet } from '@pkmn/sim';
+import { Dex as SimDex, type PokemonSet } from '@pkmn/sim';
 import type { DamageObservation, PokemonEvs, SpeedOrderObservation } from '../types.ts';
 import { typedHiddenPowerId } from '../hidden-power.ts';
 import { calcIvs, coupleSpecial, evBudget, evsOfSet, onBudgetScale, statPointsOfEv, ZERO_EVS, type EvBudget } from './ev-budget.ts';
@@ -16,6 +16,7 @@ import { formeAbility } from './battle-forme.ts';
 import { withItemAtHit } from './item-at-hit.ts';
 import { genNumOf, toId } from '../ids.ts';
 import { poweredMove } from './powered-move.ts';
+import { historyPower } from './hit-power.ts';
 
 /**
  * A violated move-order constraint outweighs any damage-fit error: the log
@@ -200,6 +201,11 @@ export function calcPokemon(ctx: SolveContext, side: 'p1' | 'p2', species: strin
   return body;
 }
 
+/** The base power a move takes from the battle's history, from the Dex callback; the handlers live in the simulator's Dex, not in @pkmn/dex's data. */
+function historyPowerOf(gen: CalcGeneration, moveId: string, obs: ReadObservation): number | undefined {
+  return historyPower(SimDex.forGen(simGenNum(gen)), moveId, { fainted: obs.attackerFainted ?? 0, timesAttacked: obs.attackerTimesAttacked ?? 0 }) ?? undefined;
+}
+
 /** The calc's roll range for one observation under the candidate spread, as HP fractions. */
 export function rollRange(ctx: SolveContext, obs: ReadObservation, attackerSpread: SpreadCandidate, defenderSpread: SpreadCandidate): { min: number; max: number } | null {
   const { gen } = ctx;
@@ -220,7 +226,7 @@ export function rollRange(ctx: SolveContext, obs: ReadObservation, attackerSprea
   if (!calcKnowsMove(gen, calcMoveId)) return null;
   // The calculator keys a few moves on the name (Weather Ball, Terrain Pulse); the typed Hidden Power is its own id.
   const moveName = calcMoveId === obs.moveId ? obs.moveName ?? calcMoveId : calcMoveId;
-  const result = calculate(gen, attacker, defender, moveOf(gen, moveName, obs), fieldOf(obs));
+  const result = calculate(gen, attacker, defender, moveOf(gen, moveName, obs, historyPowerOf(gen, calcMoveId, obs)), fieldOf(obs));
   // A spread the calculator forces on a hit that had one target in the game is no reading (T202).
   if (forcedSpread(obs, result.move.target)) return null;
   const rolls = (Array.isArray(result.damage) ? (result.damage as number[]).flat() : [Number(result.damage)]).map(Number);

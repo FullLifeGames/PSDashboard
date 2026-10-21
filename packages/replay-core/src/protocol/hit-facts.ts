@@ -69,6 +69,22 @@ function allyReading(mon: Pokemon): AllyReading | undefined {
   return { species: ally.speciesForme, ...(ability ? { ability } : {}), ...(!(ally.ability || ally.baseAbility) ? { unrevealed: true } : {}) };
 }
 
+/** The living partners of the hit (T203). */
+function partnerFactsOf(attacker: Pokemon, defender: Pokemon): Partial<DamageObservation> {
+  const attackerAlly = allyReading(attacker);
+  const defenderAlly = allyReading(defender);
+  return { ...(attackerAlly ? { attackerAlly } : {}), ...(defenderAlly ? { defenderAlly } : {}) };
+}
+
+/** The history a move's power can read (T210 group 1): the fallen of the attacker's side and the hits it took, only above zero. */
+function historyFactsOf(attacker: Pokemon): Partial<DamageObservation> {
+  const attackerFainted = attacker.side.team.filter(mon => mon.fainted).length;
+  return {
+    ...(attackerFainted > 0 ? { attackerFainted } : {}),
+    ...(attacker.timesAttacked > 0 ? { attackerTimesAttacked: attacker.timesAttacked } : {}),
+  };
+}
+
 /**
  * What the client battle shows at the damage line besides the stages, the item and the weather (round 69, T86): the move's name,
  * the terrain, the Terastallized types, both HP fractions, the fallen of Supreme Overlord, the abilities and the field facts. The
@@ -77,8 +93,6 @@ function allyReading(mon: Pokemon): AllyReading | undefined {
 export function hitFactsOf(state: ParserState, move: PendingMove, attacker: Pokemon, defender: Pokemon): Partial<DamageObservation> {
   const fallen = Object.keys(attacker.volatiles).map(volatile => FALLEN.exec(volatile)?.[1]).find(count => count !== undefined);
   const facts = fieldFactsOf(state, attacker, defender);
-  const attackerAlly = allyReading(attacker);
-  const defenderAlly = allyReading(defender);
   return {
     moveName: move.moveName,
     terrain: state.battle.field.terrain || '',
@@ -93,7 +107,7 @@ export function hitFactsOf(state: ParserState, move: PendingMove, attacker: Poke
     ...(suppressed(state, defender) ? { defenderSuppressed: true } : {}),
     ...(attacker.ability && attacker.volatiles[attacker.ability] ? { attackerAbilityOn: true } : {}),
     ...(facts.length > 0 ? { fieldFacts: facts } : {}),
-    ...(attackerAlly ? { attackerAlly } : {}),
-    ...(defenderAlly ? { defenderAlly } : {}),
+    ...partnerFactsOf(attacker, defender),
+    ...historyFactsOf(attacker),
   };
 }

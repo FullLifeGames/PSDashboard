@@ -165,6 +165,12 @@ export interface DamageObservation {
    */
   attackerAlly?: AllyReading;
   defenderAlly?: AllyReading;
+  /**
+   * The history a move's power can read (round 73, T210 group 1), only when above zero: the fainted members of the attacker's
+   * side (Last Respects) and the hits the attacker took (Rage Fist), as the client battle holds them at the damage line.
+   */
+  attackerFainted?: number;
+  attackerTimesAttacked?: number;
 }
 
 export interface AllyReading {
