@@ -910,6 +910,93 @@ import { takeSimFastReport } from '../packages/eval-engine/src/forward/sim-fast/
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * WAVE 4 2026-10-19..21 (improvement round 72, package G "library instead of
+ * hand work": lanes A to D in worktrees w4-a to w4-d from ed25505 (= v1),
+ * follow-up steps on w4-b6, w4-b7, w4-d7 and w4-d8; the merge in its own
+ * clone on r72-merge: 200e81c (C), 5c3e7a6 (D), 3a9751d (B), 39f012d (A),
+ * 2cd40a1 and e5d68f5 (D's nickname fixes), fa53f73 (B's step 6, taken out
+ * again in 45af626), aa52996 (the 2b labels), 65a1181 (B's step 6 with its
+ * fixes); cache v68 5c9f9bf; spec
+ * docs/superpowers/specs/2026-10-19-round-72-wave-4-design.md, probes
+ * docs/perf/probes/2026-10-19-r72/). Gates: 19.10. ("1a (vll kann man das
+ * sogar optimieren) 2a 3a 4a": the speed tie from the simulator's queue and
+ * made cheap, one cache bump with share links at format version 1, T246 first
+ * in lane A, four lanes in parallel), 20.10. ("1c 2b": lane B's step 6
+ * repaired and measured with the wave before the booking; the branch panel's
+ * switch buttons and picker name a body as the history does, "Nickname
+ * (Species)").
+ * DELIVERED: lane A: T246 (a commanding Tatsugiri passes in the search's
+ * choices and in the rebuild; a move Disable locks stays out of the choices);
+ * T235 steps 1 and 2 (dex-facts/ in both packages: the Protect family as one
+ * predicate, 7 lists derived from the Dex, 12 held by oracle: specs, 9
+ * readings that differed from the simulator fixed, among them Tidy Up, Defog
+ * before Gen 6 and the Gen 1 screens). Lane B: T239 (sim-ask/: twinBattle per
+ * format, copyOf with FixedDice, callHandler on copy-on-write views, the
+ * development fingerprint; every stand-in of T239's list asks through it,
+ * replay-core's race speed through its own twin); T196 (the speed tie from
+ * queue.resolveAction and comparePriority on a copy, behind two exact
+ * prefilters: the action speeds and the simulator's handler discovery). Lane
+ * C: T236 (the ESLint rule names/no-new-dex-name with a baseline that only
+ * shrinks, 421 pairs in 69 files; scripts/twin-lists.mjs in npm run lint, 7
+ * groups; an equality spec for the two line-endings.ts copies); T237
+ * (scripts/corpus-coverage.mjs; ExhaustiveRunner games in 16 formats through
+ * the inference); T240 (relation specs on 34 roots and 293 leaves, 17
+ * expected failures filed under T248). Lane D: T238 (nickname, shiny flag and
+ * the genderless flag in the built set; both name translators gone;
+ * exact-name lookups and JSON.stringify for the >player line, so 1 of 8,449
+ * nicknamed bodies drops its nickname); T241 step 1 (header data from
+ * @pkmn/client, team text through Teams, max HP through gen.stats.calc).
+ * Found and fixed in the wave: T257 (the contact cost memo of round 70 keyed
+ * a hit without its bystanders, so a partner's Sword of Ruin, Tablets of
+ * Ruin, Power Spot or Friend Guard reached a cost priced for another board,
+ * and turn 1 of gen9vgc2026regi-2630685175 varied from run to run since round
+ * 70; 88b9b5a); T256 (a view handed out a species or the format as a new
+ * proxy, which entered the speed layer's handler table for good: the feedback
+ * renderer died of out-of-memory, which Playwright showed as a hang;
+ * 81a33ff); the Protect family's answers shared per Dex where no HitProtect
+ * handler reaches the hit (24cf1bd). The integrator: the name census reads
+ * the rule's own exceptions, the twin prefilter reads strings whole,
+ * bank-ci.mjs waits for the run's own status, bank.yml pins Node 24.21.0, the
+ * data download tries four times.
+ * MEASUREMENT: CI r72-m6 (65a1181) against the bases on ed25505: bank 9 rows
+ * moved, Doubles OU byte-identical, VGC 28 moved and 104 regained, Champions
+ * OU 2 moved, Champions VGC 10 moved and 1 regained; paired (bank, D26,
+ * Champions OU, Champions VGC; full and hq, fixed K and own K per phase): no
+ * harm, no warning. The steps behind it: the wave without step 6 (r72-m5,
+ * 01cd9c6): bank 6 moved (Tidy Up), Doubles OU identical, VGC 1,121 to 1,225
+ * rows (104 regained, 6 moved, Commander), Champions OU 1 moved (a corrected
+ * faint count), Champions VGC 1 regained and 1 moved (a phantom, T250), no
+ * search error in any family; T257 (r72-b4 against r72-m5): bank 3, VGC 27,
+ * Champions OU 1, Champions VGC 9 moved, no gain, no harm, no warning; step 6
+ * lossless twice (r72-b3 against r72-m1, r72-b5 against r72-b4), 7d lossless
+ * (r72-m6 against r72-b5, all five families byte-identical). Timing (lane B's
+ * tree probe, quiet windows, medians of five): the wave without step 6 +0.4 %
+ * singles and doubles; T257 +1.5 % and +0.4 %; step 6 before 7d +3.1 % and
+ * +19.6 %; the final head doubles +2.6 % (main checkout against the merge
+ * clone), singles +2.0 % in one worktree that checks out both sides in turn
+ * (the same pairing across two checkouts read +5.6 %; v1 itself reads 2.1 %
+ * apart in two checkouts); npm run lint 14.8 to 15.8 s. The full suite 6,141
+ * tests green; e2e 78 of 78 after a warm-up; three feedback runs with 12 of
+ * 12 replays byte-identical; no pin moved; one moved turn in the tier census
+ * against round 70 (2630685175 turn 1, mistake to inaccuracy: T257's turn).
+ * FOUND ON THE WAY: the runner image's move to Ubuntu 26 gave one run two
+ * Node versions, so the job fingerprints differed (0be7274); HTTP 504 in gh
+ * run watch (57b8360) and on the data release (01cd9c6); a fresh Windows
+ * clone checks the workflow out with CRLF (27517ed); toId turns Chinese and
+ * Japanese nicknames into "" and a nickname ending in a backslash broke the
+ * >player JSON (e5d68f5); Champions previews carry the shiny flag (T251); the
+ * phantom bodies of gen9championsvgc2026regmbbo3-2687970740 (T250); the
+ * timeline e2e test fails on a cold Vite cache, on v1 too; round 70's batch
+ * check ran feedback once and could not see T257; @smogon/calc 0.12 has no
+ * flag for Mud Sport, Water Sport or Ion Deluge (upstream list).
+ * USER GATES 2026-10-20 11:30 ("1c 2b": step 6 repaired and measured with the
+ * wave before the booking; the switch buttons and the picker as the history)
+ * and 2026-10-21 10:04 ("1a 2a 3b 4a": r72 is booked and pushed to v1 and the
+ * wave's worktrees and branches go; a timing window checks out both sides in
+ * one worktree; wave 5 runs next with lanes F (static), G (feedback in CI), H
+ * (rebuild) and I (package C), T163 right after it; the batch check runs
+ * feedback twice, byte for byte). New TODOs T248 to T255, next free T258.
+ *
  * BANK IN CI 2026-10-17..19 (improvement round 71, a tooling round without a
  * score touch; branch r71 from 421c6ed (= v1), commits 0c22a04 to 4694469;
  * spec docs/superpowers/specs/2026-10-13-round-71-bank-in-ci-design.md, plan

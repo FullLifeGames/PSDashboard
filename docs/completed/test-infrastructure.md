@@ -6,6 +6,7 @@ Inhalt:
 
 - Runde 39 · Test-Infrastruktur (Vitest-Umzug, Paket-Testsuiten-Rest, App-Testsuite, e2e-Split, CI)
 - Runde 46 · Nachtrag: die Feedback-Suite startet über den e2e-Starter (18.09., 99b00f2)
+- Runde 71 · Bank in GitHub Actions (17. bis 19.10., übernommen am User-Gate 19.10.)
 
 ## Runde 39 · Test-Infrastruktur, 05./06.09.2026 (Commits 8d35f62, 67b822f, 5549315, f9a0b32, 625e2d2, 909ef00, 3c7ee8a, f2a79e5, bee42c3, 0e65d2c, 45b8502, 1267981, c7c977a, 34afc82; 220 ahead origin/master, nichts gepusht)
 

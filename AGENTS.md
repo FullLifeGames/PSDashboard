@@ -53,7 +53,7 @@ PS Dashboard analyzes Pokémon Showdown replays: it replays a game turn by turn,
 - Order for tree and verify changes: the play-out pin first (`e2e/branch.spec.ts`, draft t56), then the golden replay 655336, then the bank.
 - Set and solver changes: set diffs on every build path before the bank (the bank builds like the app, through `buildAppTeams`).
 - Monte-Carlo references of scene pins price their leaves with the engine's static evaluation: recompute them after every weight change before calling a pin wrong.
-- Wall-clock timing only interleaved with the base on a quiet machine; no tests, probes or agents meanwhile.
+- Wall-clock timing only interleaved with the base on a quiet machine, both sides in one worktree that checks them out in turn (round 72: two checkouts of one commit read up to 2 % apart); no tests, probes or agents meanwhile.
 - Feedback dumps (`feedback-full-*.json`) exist only with `FEEDBACK_DUMP=1`; check their mtime before reading them.
 
 ## Tools and pitfalls
@@ -82,7 +82,7 @@ Every change gets a class before work starts: the integrator proposes it, the us
 | Feature | New behaviour for the user in the app, the engine or the package API | A round: brainstorming, spec with success criteria, plan, build with tests, measurement, user gate, booking | D3 or D4, as the change touches scores |
 | Epic | A programme of several features (the Showdown Companion in `docs/backlog.md`) | Its own spec and plan with ordered steps; each step runs as a feature round with its own gate | Per step |
 
-- Small fixes collect in a batch on one branch, score-touching ones included. The batch ends with one check: the checks before push, the cache version bumped once, one feedback run with the tier census, the paired bank only when the user asks for it. Every pin the batch moves waits for one gate at the end; each fix gets its own commit.
+- Small fixes collect in a batch on one branch, score-touching ones included. The batch ends with one check: the checks before push, the cache version bumped once, two feedback runs compared byte for byte with the tier census (round 70 ran one and missed a turn that varied from run to run), the paired bank only when the user asks for it. Every pin the batch moves waits for one gate at the end; each fix gets its own commit.
 - A small fix that grows (a second cause, a re-fit, more than a few files) becomes a larger bug and gets its TODO.
 - A bank or feedback run costs an hour of machine time, so it runs once per batch or round, never per fix.
 
