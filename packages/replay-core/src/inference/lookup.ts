@@ -80,7 +80,7 @@ export function findPokemonByNickname(
   side: string,
 ): RevealedPokemonInfo | undefined {
   for (const line of lines) {
-    if (line.cmd !== 'switch' && line.cmd !== 'drag') continue;
+    if (line.cmd !== 'switch' && line.cmd !== 'drag' && line.cmd !== 'replace') continue;
     const ident = identOf(arg(line, 1));
     if (ident?.side !== side || ident.name !== nickname) continue;
     const parsed = detailsOf(arg(line, 2));
