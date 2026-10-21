@@ -35,8 +35,20 @@ export const FIELD_FLAG_BY_ID: Record<string, string> = {
 };
 export const ATTACKER_SIDE_FLAG_BY_ID: Record<string, string> = {
   helpinghand: 'isHelpingHand', charge: 'isCharge', battery: 'isBattery', powerspot: 'isPowerSpot', steelyspirit: 'isSteelySpirit',
+  flowergift: 'isFlowerGift',
 };
-export const DEFENDER_SIDE_FLAG_BY_ID: Record<string, string> = { friendguard: 'isFriendGuard' };
+export const DEFENDER_SIDE_FLAG_BY_ID: Record<string, string> = { friendguard: 'isFriendGuard', defenderflowergift: 'isFlowerGift' };
+
+/**
+ * The fact an ally's ability books for one side of a hit, or null when the calculator reads nothing of it (round 73, T203). Flower
+ * Gift weighs on both sides (the attacker's Attack, the defender's Special Defense), so the defender side books it under its own id.
+ */
+export function allyFactOf(role: 'attacker' | 'defender', ability: string): string | null {
+  if (role === 'attacker') return ability in ATTACKER_SIDE_FLAG_BY_ID ? ability : null;
+  // eslint-disable-next-line names/no-new-dex-name -- the one ability both sides read; field-ability-census.spec.ts holds it to the Dex
+  const fact = ability === 'flowergift' ? 'defenderflowergift' : ability;
+  return fact in DEFENDER_SIDE_FLAG_BY_ID ? fact : null;
+}
 
 export const TERRAIN_BY_ID: Record<string, NonNullable<CalcTerrain>> = {
   electricterrain: 'Electric',

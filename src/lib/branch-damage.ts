@@ -1,4 +1,4 @@
-import type { BranchMoveOption, BranchSimState, BranchSlotChoice, SimPokemonInfo, DamageResult } from '@fulllifegames/eval-engine';
+import type { BranchMoveOption, BranchSimState, BranchSlotChoice, SimPokemonInfo, DamageResult, LiveHit } from '@fulllifegames/eval-engine';
 
 export interface SpreadTargetDamage {
   label: string;
@@ -37,6 +37,11 @@ export interface DamagePreviewInputs {
    * back onto the defender (T124).
    */
   choices?: { p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] };
+  /**
+   * The live battle of the branch when the viewed position is its tip (round 73, T202): a hit the calc cannot price (a lone foe
+   * behind a screen under a forced spread) is played on a copy of it. Left out, that hit shows no range.
+   */
+  battle?: LiveHit['battle'] | null;
 }
 
 type LivingEnemy = { active: SimPokemonInfo; index: number };
@@ -44,6 +49,7 @@ type SlotsBySide = { p1: (SimPokemonInfo | null)[]; p2: (SimPokemonInfo | null)[
 type ChoicesBySide = NonNullable<DamagePreviewInputs['choices']>;
 
 const NO_CHOICES: ChoicesBySide = { p1: [], p2: [] };
+const NO_TERA = { p1: [], p2: [] };
 
 const isLiving = (info: SimPokemonInfo | null | undefined): info is SimPokemonInfo =>
   !!info && !info.fainted && info.hp > 0;
@@ -75,13 +81,26 @@ function slotDamage(args: {
   choices: ChoicesBySide;
   context: DamageContext;
   calc: CalcSingleDamageRange;
+  battle?: LiveHit['battle'] | null;
+  /** The Tera type each slot has armed, by side. */
+  armed: { p1: (string | null)[]; p2: (string | null)[] };
 }) {
-  const { active, moves, enemySide, enemyActives, slots, choices, context, calc } = args;
+  const { active, moves, enemySide, enemyActives, slots, choices, context, calc, battle, armed } = args;
   const defaults: DamageResult[] = [];
   const spread: Record<number, SpreadTargetDamage[]> = {};
   const targetEntries: [string, DamageResult][] = [];
+  const attackerSide = slots.p1.includes(active) ? 'p1' : 'p2';
+  const attackerSlot = slots[attackerSide].indexOf(active);
+  const liveHit = (side: 'p1' | 'p2', slot: number): { liveHit?: LiveHit } => (battle ? {
+    liveHit: {
+      battle,
+      attacker: { side: attackerSide === 'p1' ? 0 : 1, slot: attackerSlot },
+      defender: { side: side === 'p1' ? 0 : 1, slot },
+      armed: { attacker: !!armed[attackerSide][attackerSlot], defender: !!armed[side][slot] },
+    },
+  } : {});
   const contextInto = (side: 'p1' | 'p2', slot: number): DamageContext =>
-    (context?.gameType === 'Doubles' ? { ...context, ...fieldFacts(slots, choices, active, side, slot) } : context);
+    (context?.gameType === 'Doubles' ? { ...context, ...fieldFacts(slots, choices, active, side, slot), ...liveHit(side, slot) } : context);
   moves.forEach((move, moveIndex) => {
     for (const target of move.targetOptions) {
       const defender = slots[target.side][target.activeSlot];
@@ -153,7 +172,7 @@ export function computePreviewDamage(inputs: DamagePreviewInputs, calc: CalcSing
       spread[activeSlot] = {};
       targets[activeSlot] = {};
       if (!active || moves.length === 0) return;
-      const slot = slotDamage({ active, moves, enemySide, enemyActives, slots, choices, context, calc });
+      const slot = slotDamage({ active, moves, enemySide, enemyActives, slots, choices, context, calc, battle: inputs.battle, armed: inputs.teraBySlot ?? NO_TERA });
       defaults[activeSlot] = slot.defaults;
       spread[activeSlot] = slot.spread;
       targets[activeSlot] = slot.targets;

@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import type { BranchSimState, BranchMoveOption, BranchSwitchOption, SimPokemonInfo } from '../hooks/useBranch';
 import {
   type BranchSlotModifiers, branchSideChoicesReady, requiredChoicesForActiveSlots, switchChoiceKey,
-  type BranchSlotChoice,
+  type BranchSlotChoice, type LiveHit,
 } from '@fulllifegames/eval-engine';
 import type { PickerSource } from '../lib/picker-state';
 import { computePreviewDamage, EMPTY_SIDE_DAMAGE, type DamagePreviewInputs, type SideDamage } from '../lib/branch-damage';
@@ -38,7 +38,14 @@ interface Props {
   played?: { p1: PlayedPick | null; p2: PlayedPick | null } | null;
   /** Names the viewed position: armed gimmick toggles belong to it and fall back on a new one (T124). */
   positionKey?: string;
+  /**
+   * The live battle of the branch, handed over only while the viewed position is its tip (round 73, T202): the preview prices a hit
+   * the calc cannot price on a copy of it. Absent for a stored or reconstructed position, which has no live battle.
+   */
+  getBattle?: () => LiveBattle | null;
 }
+
+type LiveBattle = LiveHit['battle'];
 
 const EMPTY_MOVES: BranchMoveOption[] = [];
 const EMPTY_SWITCHES: BranchSwitchOption[] = [];
@@ -104,7 +111,7 @@ function useSlots(simState: BranchSimState | null) {
 }
 
 /** The damage preview per side, recomputed whenever the actives, moves, field, gen, armed Tera toggles, or picks change. */
-function usePreviewDamage(inputs: DamagePreviewInputs) {
+function usePreviewDamage(inputs: DamagePreviewInputs, getBattle: Props['getBattle']) {
   const { p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, fieldState, gen, teraBySlot, choices } = inputs;
   const [damageBySide, setDamageBySide] = useState<{ p1: SideDamage; p2: SideDamage }>({
     p1: EMPTY_SIDE_DAMAGE,
@@ -118,7 +125,7 @@ function usePreviewDamage(inputs: DamagePreviewInputs) {
       if (cancelled) return;
       if (!cancelled) {
         setDamageBySide(computePreviewDamage(
-          { p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, fieldState, gen, teraBySlot, choices },
+          { p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, fieldState, gen, teraBySlot, choices, battle: getBattle?.() ?? null },
           calcSingleDamageRange,
         ));
       }
@@ -128,7 +135,7 @@ function usePreviewDamage(inputs: DamagePreviewInputs) {
     return () => {
       cancelled = true;
     };
-  }, [p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, fieldState, gen, teraBySlot, choices]);
+  }, [p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, fieldState, gen, teraBySlot, choices, getBattle]);
   return damageBySide;
 }
 
@@ -225,7 +232,7 @@ function SideColumn(props: SideColumnProps) {
  * The slot views, the gimmick toggles and the damage preview of a position.
  * The toggles live here, not per slot: the preview reads both sides' Tera (T20).
  */
-function usePanelPreview(simState: BranchSimState | null, gen: number, positionKey: string | undefined) {
+function usePanelPreview(simState: BranchSimState | null, gen: number, positionKey: string | undefined, getBattle: Props['getBattle']) {
   const slots = useSlots(simState);
   // Both sides' chosen actions: a gimmick in one slot's pick is the side's for this turn (T124).
   const choices = useMemo(() => ({ p1: simState?.p1Choices ?? EMPTY_CHOICES, p2: simState?.p2Choices ?? EMPTY_CHOICES }), [simState]);
@@ -237,14 +244,14 @@ function usePanelPreview(simState: BranchSimState | null, gen: number, positionK
   );
   const { p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot } = slots;
   const fieldState = simState?.field ?? null;
-  const damageBySide = usePreviewDamage({ p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, fieldState, gen, teraBySlot, choices });
+  const damageBySide = usePreviewDamage({ p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, fieldState, gen, teraBySlot, choices }, getBattle);
   return { slots, gimmickFor, damageBySide };
 }
 
 /* ── Main BranchPanel (controls only, no iframe) ── */
-export function BranchPanel({ simState, source, acquiringExact, executeError, executing, gen, onSetChoice, onHypotheticalMove, onExecuteTurn, played, positionKey }: Props) {
+export function BranchPanel({ simState, source, acquiringExact, executeError, executing, gen, onSetChoice, onHypotheticalMove, onExecuteTurn, played, positionKey, getBattle }: Props) {
   const { advanced, toggleAdvanced } = useAdvancedToggle();
-  const { slots, gimmickFor, damageBySide } = usePanelPreview(simState, gen, positionKey);
+  const { slots, gimmickFor, damageBySide } = usePanelPreview(simState, gen, positionKey, getBattle);
   const { p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, p1SwitchesBySlot, p2SwitchesBySlot } = slots;
 
   if (!simState) return null;

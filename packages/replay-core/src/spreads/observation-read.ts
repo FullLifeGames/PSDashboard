@@ -1,11 +1,13 @@
 import { Field, Move } from '@smogon/calc';
 import type { PokemonSet } from '@pkmn/sim';
 import type { CalcGeneration } from '../calc-gen.ts';
-import { ATTACKER_SIDE_FLAG_BY_ID, DEFENDER_SIDE_FLAG_BY_ID, FIELD_FLAG_BY_ID, TERRAIN_BY_ID, WEATHER_BY_ID } from '../calc-field.ts';
+import { ATTACKER_SIDE_FLAG_BY_ID, DEFENDER_SIDE_FLAG_BY_ID, FIELD_FLAG_BY_ID, TERRAIN_BY_ID, WEATHER_BY_ID, allyFactOf } from '../calc-field.ts';
 import { toId } from '../ids.ts';
 import { screenFlags } from '../dex-facts/index.ts';
-import type { DamageObservation } from '../types.ts';
+import type { AllyReading, DamageObservation } from '../types.ts';
 import { originIn, type FormeDex } from './battle-forme.ts';
+import { partnerAbility } from './partner-ability.ts';
+import { allyAbilityMatters, type TurnFacts } from './ability-state.ts';
 
 /** Client condition ids the shared calc map doesn't spell out. */
 const WEATHER_ALIASES: Record<string, string> = {
@@ -45,14 +47,29 @@ export function fieldOf(obs: DamageObservation): Field {
   });
 }
 
+/** The calculator's spread targets: its spread factor applies to them in doubles. */
+export const SPREAD_TARGETS = new Set(['allAdjacent', 'allAdjacentFoes']);
+
+/**
+ * A doubles hit the log shows on one target (no `[spread]` mark) whose calculator result still names a spread target (round 73,
+ * T202). The calculator forces the spread target for a few moves (Expanding Force in Psychic Terrain, Tera Starstorm of
+ * Terapagos-Stellar), and its Doubles field then cuts a hit that the simulator played on one target; behind a screen no field
+ * prices it. The hit gives no damage reading. The detection reads the calculator's result, never a move name. Remove when the
+ * calculator stops forcing the target against a lone foe.
+ */
+export const forcedSpread = (obs: { doubles?: boolean; spread?: boolean }, resultTarget: string): boolean =>
+  !!obs.doubles && !obs.spread && SPREAD_TARGETS.has(resultTarget);
+
 /**
  * The move of an observation as the calculator builds it, by its name (Weather Ball, Terrain Pulse, Techno Blast and Multi-Attack
  * key on the name, not on the id). The calculator cuts a move aimed at all adjacent targets to 0.75 on a
  * Doubles field; the simulator cuts exactly when the move line names `[spread]` (two targets at the start, even if one protects).
- * A doubles hit without the mark had one target and takes the full damage, so the move reads as a single-target move.
+ * A doubles hit without the mark had one target and takes the full damage, so the move reads as a single-target move. A move whose
+ * power reads the battle's history takes its power from the Dex callback (`basePower`, round 73, T210).
  */
-export function moveOf(gen: CalcGeneration, moveName: string, obs: DamageObservation): Move {
-  return obs.doubles && !obs.spread ? new Move(gen, moveName, { overrides: { target: 'normal' } }) : new Move(gen, moveName);
+export function moveOf(gen: CalcGeneration, moveName: string, obs: DamageObservation, basePower?: number): Move {
+  const overrides = { ...(obs.doubles && !obs.spread ? { target: 'normal' as const } : {}), ...(basePower === undefined ? {} : { basePower }) };
+  return Object.keys(overrides).length > 0 ? new Move(gen, moveName, { overrides }) : new Move(gen, moveName);
 }
 
 /**
@@ -62,15 +79,45 @@ export function moveOf(gen: CalcGeneration, moveName: string, obs: DamageObserva
 export interface ReadObservation extends DamageObservation {
   attackerForme?: string;
   defenderForme?: string;
+  /** The ability id of the attacker's living partner as the solver reads it (shown, the Dex's, or its set's); absent without one (T210 group 4). */
+  attackerAllyAbility?: string;
 }
 
-/** The observation with a forme named as the set of the species it came from; unchanged when a set carries the species or no set carries its origin. */
+/** The ability of a living partner: the one the client shows, else the Dex's for a species with one ability, else the set's (round 73, T203). */
+function allyAbilityOf(dex: FormeDex, sets: readonly PokemonSet[], ally: AllyReading | undefined): string {
+  if (!ally) return '';
+  const ability = toId(ally.ability || (ally.unrevealed ? partnerAbility(dex, sets, ally.species) : ''));
+  return allyAbilityMatters(ability) ? ability : '';
+}
+
+/**
+ * The partner readings of a hit (round 73, T203, T210 group 4): the field facts plus the ones a partner's hidden ability books, and
+ * the attacker's partner ability. The facts keep the sorted, unique order of the parser's list.
+ */
+function partnerReading(dex: FormeDex, sets: { p1: readonly PokemonSet[]; p2: readonly PokemonSet[] }, obs: DamageObservation): { fieldFacts: string[] | undefined; attackerAllyAbility: string } {
+  const roles = [['attacker', obs.attackerAlly, obs.attackerSide], ['defender', obs.defenderAlly, defenderSideOf(obs)]] as const;
+  const facts = new Set(obs.fieldFacts ?? []);
+  for (const [role, ally, side] of roles) {
+    if (!ally?.unrevealed) continue;
+    const fact = allyFactOf(role, partnerAbility(dex, sets[side], ally.species));
+    if (fact) facts.add(fact);
+  }
+  return {
+    fieldFacts: facts.size > (obs.fieldFacts?.length ?? 0) ? [...facts].sort() : obs.fieldFacts,
+    attackerAllyAbility: allyAbilityOf(dex, sets[obs.attackerSide], obs.attackerAlly),
+  };
+}
+
+/** The observation with a forme named as the set of the species it came from and the partner readings added; unchanged when none applies. */
 export function readObservation(dex: FormeDex, sets: { p1: readonly PokemonSet[]; p2: readonly PokemonSet[] }, obs: DamageObservation): ReadObservation {
   const attacker = originIn(dex, sets[obs.attackerSide], obs.attackerSpecies);
   const defender = originIn(dex, sets[defenderSideOf(obs)], obs.defenderSpecies);
-  if (!attacker && !defender) return obs;
+  const { fieldFacts, attackerAllyAbility } = partnerReading(dex, sets, obs);
+  if (!attacker && !defender && !attackerAllyAbility && fieldFacts === obs.fieldFacts) return obs;
   return {
     ...obs,
+    ...(fieldFacts ? { fieldFacts } : {}),
+    ...(attackerAllyAbility ? { attackerAllyAbility } : {}),
     ...(attacker ? { attackerSpecies: attacker, attackerForme: obs.attackerSpecies } : {}),
     ...(defender ? { defenderSpecies: defender, defenderForme: obs.defenderSpecies } : {}),
   };
@@ -89,18 +136,21 @@ export interface HitSide {
   ability?: string;
   suppressed?: boolean;
   abilityOn?: boolean;
+  /** The turn's facts of the hit, read by the abilities of `ability-state.ts` (attacker side only). */
+  turn?: TurnFacts;
 }
 
-/** One side of a hit as the log shows it at the damage line. The defender's status is not read, and its ability is never "on". */
+/** One side of a hit as the log shows it at the damage line. The defender's ability is never "on". */
 export function hitSideOf(obs: ReadObservation, role: 'attacker' | 'defender'): HitSide {
   if (role === 'defender') {
     return {
       boosts: obs.defenderBoosts, forme: obs.defenderForme, boostedStat: obs.defenderParadox?.stat, tera: obs.defenderTera, hp: obs.defenderHp,
-      ability: obs.defenderAbility, suppressed: obs.defenderSuppressed,
+      ability: obs.defenderAbility, suppressed: obs.defenderSuppressed, status: obs.defenderStatus,
     };
   }
   return {
     boosts: obs.attackerBoosts, status: obs.attackerStatus, forme: obs.attackerForme, boostedStat: obs.attackerParadox?.stat, tera: obs.attackerTera,
     hp: obs.attackerHp, fallen: obs.attackerFallen, ability: obs.attackerAbility, suppressed: obs.attackerSuppressed, abilityOn: obs.attackerAbilityOn,
+    turn: { defenderNewlyIn: obs.defenderNewlyIn, lastToMove: obs.lastToMove, allyAbility: obs.attackerAllyAbility },
   };
 }

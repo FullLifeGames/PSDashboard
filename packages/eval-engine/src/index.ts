@@ -38,6 +38,8 @@ export { buildChoiceLockContext } from './choice-lock.ts';
 export type { ChoiceLockTrails, ChoiceLockContext } from './choice-lock.ts';
 export { calcSingleDamageRange } from './damage-calc.ts';
 export type { DamageResult, DamageCalcContext } from './damage-calc.ts';
+export { simHitRange } from './calc/sim-hit.ts';
+export type { BattleSlot, LiveHit, SimHitRange } from './calc/sim-hit.ts';
 export { deserializeBattleExact } from './forward-model.ts';
 export { loadSimMods, loadSimModsFor } from './forward/sim-mods.ts';
 export { ENDGAME_CAPS, endgameScope, solveEndgame } from './endgame/solver.ts';

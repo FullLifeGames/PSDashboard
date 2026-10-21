@@ -2,6 +2,7 @@ import { Dex } from '@pkmn/sim';
 import type { OpenMove, RevealedPokemonInfo } from '../types.ts';
 import { sameOpenMove } from '../team/open-moves.ts';
 import { toId } from '../ids.ts';
+import { poweredMove } from '../spreads/powered-move.ts';
 import { findPokemon, type InferrerState } from './inferrer-state.ts';
 import { arg, identOf, kwText, type LogLine } from './log-line.ts';
 
@@ -41,8 +42,8 @@ function statusZReading(dex: GenDex, line: LogLine): PowerMove | null {
 /** The reading of a `move` line, or null for a move that is its own base. */
 export function readPowerMove(dex: GenDex, line: LogLine): PowerMove | null {
   const move = dex.moves.get(arg(line, 2));
-  if (move.exists && move.isZ) return zMoveReading(dex, move);
-  if (!move.exists || !move.isMax) return statusZReading(dex, line);
+  if (!poweredMove(dex, move.id)) return statusZReading(dex, line);
+  if (move.isZ) return zMoveReading(dex, move);
   const gigantamax = typeof move.isMax === 'string';
   return { open: move.category === 'Status' ? { kind: 'status' } : { kind: 'attack', type: move.type }, gigantamax };
 }

@@ -1,6 +1,6 @@
 import type { Pokemon } from '@pkmn/client';
-import { ATTACKER_SIDE_FLAG_BY_ID, DEFENDER_SIDE_FLAG_BY_ID, FIELD_FLAG_BY_ID } from '../calc-field.ts';
-import type { DamageObservation } from '../types.ts';
+import { ATTACKER_SIDE_FLAG_BY_ID, FIELD_FLAG_BY_ID, allyFactOf } from '../calc-field.ts';
+import type { AllyReading, DamageObservation } from '../types.ts';
 import { noteParadoxStart } from './paradox-reading.ts';
 import { noteSurvivalMarker } from './survival-marker.ts';
 import type { ClientIdent, ParserState, PendingMove } from './parser-state.ts';
@@ -54,11 +54,49 @@ function fieldFactsOf(state: ParserState, attacker: Pokemon, defender: Pokemon):
   }
   for (const condition of Object.keys(battle.field.pseudoWeather)) if (condition in FIELD_FLAG_BY_ID) found.add(condition);
   for (const volatile of Object.keys(attacker.volatiles)) if (volatile in ATTACKER_SIDE_FLAG_BY_ID) found.add(volatile);
-  const attackerAlly = allyOf(attacker)?.effectiveAbility();
-  if (attackerAlly && attackerAlly in ATTACKER_SIDE_FLAG_BY_ID) found.add(attackerAlly);
-  const defenderAlly = allyOf(defender)?.effectiveAbility();
-  if (defenderAlly && defenderAlly in DEFENDER_SIDE_FLAG_BY_ID) found.add(defenderAlly);
+  const attackerFact = allyFactOf('attacker', allyOf(attacker)?.effectiveAbility() ?? '');
+  if (attackerFact) found.add(attackerFact);
+  const defenderFact = allyFactOf('defender', allyOf(defender)?.effectiveAbility() ?? '');
+  if (defenderFact) found.add(defenderFact);
   return [...found].sort();
+}
+
+/** The living partner of `mon` as the solver reads it (T203); undefined in singles and when the partner has fainted. */
+function allyReading(mon: Pokemon): AllyReading | undefined {
+  const ally = allyOf(mon);
+  if (!ally) return undefined;
+  const ability = ally.effectiveAbility();
+  return { species: ally.speciesForme, ...(ability ? { ability } : {}), ...(!(ally.ability || ally.baseAbility) ? { unrevealed: true } : {}) };
+}
+
+/** The living partners of the hit (T203). */
+function partnerFactsOf(attacker: Pokemon, defender: Pokemon): Partial<DamageObservation> {
+  const attackerAlly = allyReading(attacker);
+  const defenderAlly = allyReading(defender);
+  return { ...(attackerAlly ? { attackerAlly } : {}), ...(defenderAlly ? { defenderAlly } : {}) };
+}
+
+/** The history a move's power can read (T210): the fallen of the attacker's side and the hits it took (group 1), the defender's status (group 2). */
+function historyFactsOf(attacker: Pokemon, defender: Pokemon): Partial<DamageObservation> {
+  const attackerFainted = attacker.side.team.filter(mon => mon.fainted).length;
+  return {
+    ...(attackerFainted > 0 ? { attackerFainted } : {}),
+    ...(attacker.timesAttacked > 0 ? { attackerTimesAttacked: attacker.timesAttacked } : {}),
+    ...(defender.status ? { defenderStatus: defender.status } : {}),
+  };
+}
+
+/** The slot key of an active Pokémon in the idents the parser keeps ('p2a'). */
+const slotKeyOf = (mon: Pokemon) => `p${mon.side.n + 1}${String.fromCharCode(97 + mon.side.active.indexOf(mon))}`;
+
+/** The turn's order of events at the hit (T210 group 3): the defender came in this turn, and every other living active has moved or switched. */
+function turnFactsOf(state: ParserState, attacker: Pokemon, defender: Pokemon): Partial<DamageObservation> {
+  const acted = new Set([...state.actedThisTurn].map(ident => ident.slice(0, 3)));
+  const others = state.battle.getAllActive().filter(mon => mon !== attacker && !mon.fainted);
+  return {
+    ...(defender.newlySwitched ? { defenderNewlyIn: true } : {}),
+    ...(others.every(mon => acted.has(slotKeyOf(mon))) ? { lastToMove: true } : {}),
+  };
 }
 
 /**
@@ -83,5 +121,8 @@ export function hitFactsOf(state: ParserState, move: PendingMove, attacker: Poke
     ...(suppressed(state, defender) ? { defenderSuppressed: true } : {}),
     ...(attacker.ability && attacker.volatiles[attacker.ability] ? { attackerAbilityOn: true } : {}),
     ...(facts.length > 0 ? { fieldFacts: facts } : {}),
+    ...partnerFactsOf(attacker, defender),
+    ...historyFactsOf(attacker, defender),
+    ...turnFactsOf(state, attacker, defender),
   };
 }

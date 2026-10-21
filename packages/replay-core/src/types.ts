@@ -158,6 +158,33 @@ export interface DamageObservation {
    * ability on the field, Gravity, Magic Room, Wonder Room. Absent at none.
    */
   fieldFacts?: string[];
+  /**
+   * The living partner of each side at the hit, doubles only (round 73, T203): its species forme, the ability the client shows it
+   * with (`ability`, empty when the ability is suppressed), and `unrevealed` when the log never showed the ability. The solver reads
+   * the field abilities of a partner whose ability the log hid from the Dex (a species with one ability) or from its built set.
+   */
+  attackerAlly?: AllyReading;
+  defenderAlly?: AllyReading;
+  /**
+   * The history a move's power can read (round 73, T210 group 1), only when above zero: the fainted members of the attacker's
+   * side (Last Respects) and the hits the attacker took (Rage Fist), as the client battle holds them at the damage line.
+   */
+  attackerFainted?: number;
+  attackerTimesAttacked?: number;
+  /** The defender's status before the hit (round 73, T210 group 2): Hex and Venoshock double against it, Marvel Scale lifts Defense under it. */
+  defenderStatus?: string;
+  /**
+   * The turn's order of events at the hit (round 73, T210 group 3), only when true: the defender switched in this turn (Stakeout), and
+   * every other active Pokémon had moved (Analytic).
+   */
+  defenderNewlyIn?: boolean;
+  lastToMove?: boolean;
+}
+
+export interface AllyReading {
+  species: string;
+  ability?: string;
+  unrevealed?: boolean;
 }
 
 /** What the log shows of an active Protosynthesis or Quark Drive: the stat the client names and the stages the simulator read it at. */
