@@ -1,6 +1,7 @@
 import type { PokemonSet } from '@pkmn/sim';
 import { speciesBaseId, toId } from '@fulllifegames/replay-core';
-import type { PokemonIdent } from './types.ts';
+import { normalizeLineEndings } from '../line-endings.ts';
+import type { PokemonIdent, SimBattle, SimPokemon } from './types.ts';
 
 /**
  * Fields only the brought species (VGC's 4 of 6, BSS's 3 of 6). Resolution
@@ -88,4 +89,68 @@ export function reorderForLeads(team: PokemonSet[], leads: PokemonIdent[]): Poke
   }
 
   return [...orderedLeads, ...remaining];
+}
+
+/**
+ * Round 73 (T250): what the protocol says about a side's bench. `shown`: the ids (name and base species) of every body its
+ * switch, drag, replace and detailschange lines name; a body outside the set never stood on the field. `fainted`: the slots
+ * the block's own lines faint. The game left a slot empty only where its body fainted, so a slot the simulator wants filled
+ * without a faint line in the block is the simulator's divergence, not the bring list.
+ */
+export interface ProtocolBench {
+  shown: ReadonlySet<string>;
+  fainted: ReadonlySet<number>;
+}
+
+export function shownBodyIds(replayLog: string, sideId: 'p1' | 'p2'): Set<string> {
+  const shown = new Set<string>();
+  for (const line of normalizeLineEndings(replayLog).split('\n')) {
+    const match = line.match(/^\|(?:switch|drag|replace|detailschange)\|(p[12])[a-d]?: ?([^|]*)\|([^,|]+)/);
+    if (match?.[1] !== sideId) continue;
+    for (const name of [match[2], match[3]]) shown.add(toId(name)).add(speciesBaseId(name));
+  }
+  return shown;
+}
+
+/** The slots of a side that a block's lines faint. */
+export function faintedSlots(blockLines: readonly string[], sideId: 'p1' | 'p2'): Set<number> {
+  const slots = new Set<number>();
+  for (const line of blockLines) {
+    const match = normalizeLineEndings(line).match(/^\|faint\|(p[12])([a-d]):/);
+    if (match?.[1] === sideId) slots.add(match[2].charCodeAt(0) - 97);
+  }
+  return slots;
+}
+
+const wasShown = (body: SimPokemon, shown: ReadonlySet<string>) =>
+  [body.name, body.species.name, body.baseSpecies.name].some(name => shown.has(toId(name)) || shown.has(speciesBaseId(name)));
+
+/** Whether a body's species or set can carry an ability that changes how it shows on entry (the Dex's BeforeSwitchIn handler: Illusion). */
+export const mayDisguise = (body: SimPokemon) =>
+  [body.ability, body.baseAbility, ...Object.values(body.species.abilities)].some(name =>
+    typeof (body.battle.dex.abilities.get(name) as { onBeforeSwitchIn?: unknown }).onBeforeSwitchIn === 'function');
+
+/**
+ * The game left a forced slot empty (its body fainted in the block and no switch followed): the living bench bodies the protocol never shows were not brought (a player with a
+ * body to send sends it), so they leave the game as the simulator takes a fainted body out (no faint line, no fallen-ally
+ * count) and the slot takes `pass`, which the simulator accepts once no living body waits. Nothing happens, and the old
+ * answer stands, when the bench holds a shown body the log's answers leave over (the simulator diverged, not the bring
+ * list) or a body that may disguise itself as another. True when bodies left.
+ */
+export function retireUnshownBench(battle: SimBattle, sideIdx: number, bench: ProtocolBench, answers: number, emptySlots: number[]): boolean {
+  const { shown, fainted } = bench;
+  const side = battle.sides[sideIdx];
+  const living = side.pokemon.filter(body => !body.isActive && !body.fainted);
+  const phantoms = living.filter(body => !wasShown(body, shown));
+  if (!emptySlots.every(slot => fainted.has(slot))) return false;
+  if (phantoms.length === 0 || living.length - phantoms.length > answers || phantoms.some(mayDisguise)) return false;
+  for (const body of phantoms) {
+    body.hp = 0;
+    body.fainted = true;
+    body.faintQueued = true;
+    if (side.pokemonLeft > 0) side.pokemonLeft--;
+  }
+  side.clearChoice();
+  if (side.pokemonLeft === 0) battle.checkWin();
+  return true;
 }
