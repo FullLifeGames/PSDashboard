@@ -1,17 +1,10 @@
 import { test, expect, describe } from 'vitest';
-import { readFileSync } from 'fs';
 import { PRNG } from '@pkmn/sim';
-import {
-  buildTeamsFromReplay, getBranchSimulatorFormat, parseReplayLogWithObservations, type ReplayData,
-} from '@fulllifegames/replay-core';
-import { adoptSerializedRuntime, executeBranchChoices, reconstructBranchRuntime, type BranchRuntime } from '../src/branch-engine';
-import { buildChoiceLockContext } from '../src/choice-lock';
+import { adoptSerializedRuntime } from '../src/branch-engine';
 import { serializeLiveBattle } from '../src/serialize';
-import { extractProtocolEvents, scoreAlignment } from '../src/hax-alignment';
-import { buildForcedSwitchChoice, hasForceSwitch } from '../src/branch/corrections';
-import { collectForcedSwitchSpecies, getMainChoice, parseTurnBlocks } from '../src/branch/protocol-choices';
 import { alignArrivalDice } from '../src/branch/arrival-dice';
 import { deserializeBattleExact } from '../src/forward-model';
+import { playTurn, prngOf, reconstruct } from './arrival-turn';
 
 /**
  * Round 70: a branch opens with the dice its own turn has in the log. GPL DzBQ5azlO5l turn 13 (Air Slash against Heavy Slam,
@@ -21,73 +14,11 @@ import { deserializeBattleExact } from '../src/forward-model';
  * alignment); the arrival now plays its own turn under that seed too, in singles and in doubles.
  */
 
-const loadReplay = (name: string) =>
-  JSON.parse(readFileSync(new URL(`./fixtures/${name}.json`, import.meta.url), 'utf-8')) as ReplayData;
-
 /** The scenes: turns the replay plays under another seed than 1,2,3,4 (the aligned seed is pinned), and one it plays under 1,2,3,4. */
 const SINGLES = { label: 'singles (GPL DzBQ5azlO5l)', fixture: 'gpl-replay', turn: 13, seed: '5,9,13,17' };
 const DOUBLES = { label: 'doubles (Doubles OU 912884)', fixture: 'smogtours-gen9doublesou-912884', turn: 10, seed: '5,9,13,17' };
 const VGC = { label: 'VGC doubles (Regulation I 2630181744)', fixture: 'gen9vgc2026regi-2630181744', turn: 3, seed: '3,1,4,1' };
 const QUIET = { fixture: 'gpl-replay', turn: 12 };
-
-/** The app's reconstruction: healed, locked, boundaries captured. */
-async function reconstruct(fixture: string, targetTurn: number) {
-  const replay = loadReplay(fixture);
-  const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
-  const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });
-  const snapshotAt = (turn: number) => snapshots[Math.min(turn - 1, snapshots.length - 1)] ?? null;
-  const captured = new Map<number, string>();
-  const runtime = await reconstructBranchRuntime({
-    format: getBranchSimulatorFormat(replay),
-    p1Team, p2Team,
-    replayLog: replay.log,
-    targetTurn,
-    snapshot: snapshotAt(targetTurn),
-    playerNames: [replay.players[0], replay.players[1]],
-    choiceLocks: buildChoiceLockContext(replay.log, { p1Team, p2Team }, observations),
-    capturePositions: {
-      snapshotFor: snapshotAt,
-      onPosition: (turn, battle) => captured.set(turn, serializeLiveBattle(battle)),
-    },
-  });
-  return { replay, runtime, captured, snapshotAt };
-}
-
-const prngOf = (runtime: BranchRuntime) => runtime.battleStream.battle!.prng.getSeed();
-
-/**
- * The logged turn through the branch's own execution path: the commands the replay would send (or `p2` instead of the logged
- * click), written to the live battle, the forced replacements answered from the log as the replay answers them. Scored the
- * way the replay scores its own blocks: the discrete events (faints, misses, crits, secondaries, cants, move order).
- */
-async function playTurn(runtime: BranchRuntime, replayLog: string, turn: number, p2?: string) {
-  const block = parseTurnBlocks(replayLog).turns.find(entry => entry.turn === turn)!;
-  const battle = runtime.battleStream.battle!;
-  const send = (commands: { side: 'p1' | 'p2'; command: string }[]) =>
-    executeBranchChoices({ streams: runtime.streams, log: runtime.log, choiceErrors: runtime.choiceErrors, commands });
-  const logStart = battle.log.length;
-  const first = await send([
-    { side: 'p1', command: getMainChoice(block.preUpkeep, 'p1', battle) },
-    { side: 'p2', command: p2 ?? getMainChoice(block.preUpkeep, 'p2', battle) },
-  ]);
-  expect(first.ok).toBe(true);
-  const forced = {
-    p1: collectForcedSwitchSpecies(block.preUpkeep, block.postUpkeep, 'p1'),
-    p2: collectForcedSwitchSpecies(block.preUpkeep, block.postUpkeep, 'p2'),
-  };
-  const cursors = { p1: { current: 0 }, p2: { current: 0 } };
-  for (let guard = 0; guard < 6; guard++) {
-    const commands = (['p1', 'p2'] as const).flatMap((side, index) => {
-      const choice = hasForceSwitch(battle, index) ? buildForcedSwitchChoice(battle, index, forced[side], cursors[side]) : null;
-      return choice ? [{ side, command: choice }] : [];
-    });
-    if (commands.length === 0) break;
-    await send(commands);
-  }
-  const lines = battle.log.slice(logStart);
-  const expected = extractProtocolEvents([...block.preUpkeep, ...block.postUpkeep]);
-  return { lines, score: scoreAlignment(expected, extractProtocolEvents(lines)) };
-}
 
 const PERFECT = { endedMismatch: false, faintMismatches: 0, softMismatches: 0 };
 
