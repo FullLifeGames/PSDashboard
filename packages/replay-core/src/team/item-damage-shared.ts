@@ -28,7 +28,7 @@ export const OBSERVATION_SLACK = 0.02;
  */
 export const MISS_MARGIN = 1.1;
 /** Handlers by which an ability changes another Pokémon's damage (Friend Guard, Power Spot, the auras, Ruin). */
-const FIELD_DAMAGE_HOOK = /^on(Ally|Any|Foe)(BasePower|ModifyAtk|ModifyDef|ModifySpA|ModifySpD|ModifyDamage)$/;
+export const FIELD_DAMAGE_HOOK = /^on(Ally|Any|Foe)(BasePower|ModifyAtk|ModifyDef|ModifySpA|ModifySpD|ModifyDamage)$/;
 /** Move handlers that set power, damage or type from state the record does not carry. */
 const UNREADABLE_MOVE = ['basePowerCallback', 'damageCallback', 'damage', 'ohko', 'multihit', 'isZ', 'isMax', 'onModifyType', 'onModifyMove'];
 

@@ -158,6 +158,19 @@ export interface DamageObservation {
    * ability on the field, Gravity, Magic Room, Wonder Room. Absent at none.
    */
   fieldFacts?: string[];
+  /**
+   * The living partner of each side at the hit, doubles only (round 73, T203): its species forme, the ability the client shows it
+   * with (`ability`, empty when the ability is suppressed), and `unrevealed` when the log never showed the ability. The solver reads
+   * the field abilities of a partner whose ability the log hid from the Dex (a species with one ability) or from its built set.
+   */
+  attackerAlly?: AllyReading;
+  defenderAlly?: AllyReading;
+}
+
+export interface AllyReading {
+  species: string;
+  ability?: string;
+  unrevealed?: boolean;
 }
 
 /** What the log shows of an active Protosynthesis or Quark Drive: the stat the client names and the stages the simulator read it at. */

@@ -1,6 +1,6 @@
 import type { Pokemon } from '@pkmn/client';
-import { ATTACKER_SIDE_FLAG_BY_ID, DEFENDER_SIDE_FLAG_BY_ID, FIELD_FLAG_BY_ID } from '../calc-field.ts';
-import type { DamageObservation } from '../types.ts';
+import { ATTACKER_SIDE_FLAG_BY_ID, FIELD_FLAG_BY_ID, allyFactOf } from '../calc-field.ts';
+import type { AllyReading, DamageObservation } from '../types.ts';
 import { noteParadoxStart } from './paradox-reading.ts';
 import { noteSurvivalMarker } from './survival-marker.ts';
 import type { ClientIdent, ParserState, PendingMove } from './parser-state.ts';
@@ -54,11 +54,19 @@ function fieldFactsOf(state: ParserState, attacker: Pokemon, defender: Pokemon):
   }
   for (const condition of Object.keys(battle.field.pseudoWeather)) if (condition in FIELD_FLAG_BY_ID) found.add(condition);
   for (const volatile of Object.keys(attacker.volatiles)) if (volatile in ATTACKER_SIDE_FLAG_BY_ID) found.add(volatile);
-  const attackerAlly = allyOf(attacker)?.effectiveAbility();
-  if (attackerAlly && attackerAlly in ATTACKER_SIDE_FLAG_BY_ID) found.add(attackerAlly);
-  const defenderAlly = allyOf(defender)?.effectiveAbility();
-  if (defenderAlly && defenderAlly in DEFENDER_SIDE_FLAG_BY_ID) found.add(defenderAlly);
+  const attackerFact = allyFactOf('attacker', allyOf(attacker)?.effectiveAbility() ?? '');
+  if (attackerFact) found.add(attackerFact);
+  const defenderFact = allyFactOf('defender', allyOf(defender)?.effectiveAbility() ?? '');
+  if (defenderFact) found.add(defenderFact);
   return [...found].sort();
+}
+
+/** The living partner of `mon` as the solver reads it (T203); undefined in singles and when the partner has fainted. */
+function allyReading(mon: Pokemon): AllyReading | undefined {
+  const ally = allyOf(mon);
+  if (!ally) return undefined;
+  const ability = ally.effectiveAbility();
+  return { species: ally.speciesForme, ...(ability ? { ability } : {}), ...(!(ally.ability || ally.baseAbility) ? { unrevealed: true } : {}) };
 }
 
 /**
@@ -69,6 +77,8 @@ function fieldFactsOf(state: ParserState, attacker: Pokemon, defender: Pokemon):
 export function hitFactsOf(state: ParserState, move: PendingMove, attacker: Pokemon, defender: Pokemon): Partial<DamageObservation> {
   const fallen = Object.keys(attacker.volatiles).map(volatile => FALLEN.exec(volatile)?.[1]).find(count => count !== undefined);
   const facts = fieldFactsOf(state, attacker, defender);
+  const attackerAlly = allyReading(attacker);
+  const defenderAlly = allyReading(defender);
   return {
     moveName: move.moveName,
     terrain: state.battle.field.terrain || '',
@@ -83,5 +93,7 @@ export function hitFactsOf(state: ParserState, move: PendingMove, attacker: Poke
     ...(suppressed(state, defender) ? { defenderSuppressed: true } : {}),
     ...(attacker.ability && attacker.volatiles[attacker.ability] ? { attackerAbilityOn: true } : {}),
     ...(facts.length > 0 ? { fieldFacts: facts } : {}),
+    ...(attackerAlly ? { attackerAlly } : {}),
+    ...(defenderAlly ? { defenderAlly } : {}),
   };
 }

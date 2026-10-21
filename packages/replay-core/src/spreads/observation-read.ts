@@ -1,11 +1,12 @@
 import { Field, Move } from '@smogon/calc';
 import type { PokemonSet } from '@pkmn/sim';
 import type { CalcGeneration } from '../calc-gen.ts';
-import { ATTACKER_SIDE_FLAG_BY_ID, DEFENDER_SIDE_FLAG_BY_ID, FIELD_FLAG_BY_ID, TERRAIN_BY_ID, WEATHER_BY_ID } from '../calc-field.ts';
+import { ATTACKER_SIDE_FLAG_BY_ID, DEFENDER_SIDE_FLAG_BY_ID, FIELD_FLAG_BY_ID, TERRAIN_BY_ID, WEATHER_BY_ID, allyFactOf } from '../calc-field.ts';
 import { toId } from '../ids.ts';
 import { screenFlags } from '../dex-facts/index.ts';
 import type { DamageObservation } from '../types.ts';
 import { originIn, type FormeDex } from './battle-forme.ts';
+import { partnerAbility } from './partner-ability.ts';
 
 /** Client condition ids the shared calc map doesn't spell out. */
 const WEATHER_ALIASES: Record<string, string> = {
@@ -77,13 +78,30 @@ export interface ReadObservation extends DamageObservation {
   defenderForme?: string;
 }
 
-/** The observation with a forme named as the set of the species it came from; unchanged when a set carries the species or no set carries its origin. */
+/**
+ * The field facts of a hit plus the ones a partner's hidden ability books (round 73, T203): the ability the log showed, else the
+ * Dex's for a species with one ability, else the built set's. The result keeps the sorted, unique order of the parser's list.
+ */
+function withPartnerFacts(dex: FormeDex, sets: { p1: readonly PokemonSet[]; p2: readonly PokemonSet[] }, obs: DamageObservation): string[] | undefined {
+  const roles = [['attacker', obs.attackerAlly, obs.attackerSide], ['defender', obs.defenderAlly, defenderSideOf(obs)]] as const;
+  const facts = new Set(obs.fieldFacts ?? []);
+  for (const [role, ally, side] of roles) {
+    if (!ally?.unrevealed) continue;
+    const fact = allyFactOf(role, partnerAbility(dex, sets[side], ally.species));
+    if (fact) facts.add(fact);
+  }
+  return facts.size > (obs.fieldFacts?.length ?? 0) ? [...facts].sort() : obs.fieldFacts;
+}
+
+/** The observation with a forme named as the set of the species it came from and a partner's hidden field ability booked; unchanged when neither applies. */
 export function readObservation(dex: FormeDex, sets: { p1: readonly PokemonSet[]; p2: readonly PokemonSet[] }, obs: DamageObservation): ReadObservation {
   const attacker = originIn(dex, sets[obs.attackerSide], obs.attackerSpecies);
   const defender = originIn(dex, sets[defenderSideOf(obs)], obs.defenderSpecies);
-  if (!attacker && !defender) return obs;
+  const fieldFacts = withPartnerFacts(dex, sets, obs);
+  if (!attacker && !defender && fieldFacts === obs.fieldFacts) return obs;
   return {
     ...obs,
+    ...(fieldFacts ? { fieldFacts } : {}),
     ...(attacker ? { attackerSpecies: attacker, attackerForme: obs.attackerSpecies } : {}),
     ...(defender ? { defenderSpecies: defender, defenderForme: obs.defenderSpecies } : {}),
   };
