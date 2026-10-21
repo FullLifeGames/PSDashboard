@@ -76,12 +76,13 @@ function partnerFactsOf(attacker: Pokemon, defender: Pokemon): Partial<DamageObs
   return { ...(attackerAlly ? { attackerAlly } : {}), ...(defenderAlly ? { defenderAlly } : {}) };
 }
 
-/** The history a move's power can read (T210 group 1): the fallen of the attacker's side and the hits it took, only above zero. */
-function historyFactsOf(attacker: Pokemon): Partial<DamageObservation> {
+/** The history a move's power can read (T210): the fallen of the attacker's side and the hits it took (group 1), the defender's status (group 2). */
+function historyFactsOf(attacker: Pokemon, defender: Pokemon): Partial<DamageObservation> {
   const attackerFainted = attacker.side.team.filter(mon => mon.fainted).length;
   return {
     ...(attackerFainted > 0 ? { attackerFainted } : {}),
     ...(attacker.timesAttacked > 0 ? { attackerTimesAttacked: attacker.timesAttacked } : {}),
+    ...(defender.status ? { defenderStatus: defender.status } : {}),
   };
 }
 
@@ -108,6 +109,6 @@ export function hitFactsOf(state: ParserState, move: PendingMove, attacker: Poke
     ...(attacker.ability && attacker.volatiles[attacker.ability] ? { attackerAbilityOn: true } : {}),
     ...(facts.length > 0 ? { fieldFacts: facts } : {}),
     ...partnerFactsOf(attacker, defender),
-    ...historyFactsOf(attacker),
+    ...historyFactsOf(attacker, defender),
   };
 }

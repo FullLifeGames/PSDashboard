@@ -124,12 +124,12 @@ export interface HitSide {
   abilityOn?: boolean;
 }
 
-/** One side of a hit as the log shows it at the damage line. The defender's status is not read, and its ability is never "on". */
+/** One side of a hit as the log shows it at the damage line. The defender's ability is never "on". */
 export function hitSideOf(obs: ReadObservation, role: 'attacker' | 'defender'): HitSide {
   if (role === 'defender') {
     return {
       boosts: obs.defenderBoosts, forme: obs.defenderForme, boostedStat: obs.defenderParadox?.stat, tera: obs.defenderTera, hp: obs.defenderHp,
-      ability: obs.defenderAbility, suppressed: obs.defenderSuppressed,
+      ability: obs.defenderAbility, suppressed: obs.defenderSuppressed, status: obs.defenderStatus,
     };
   }
   return {

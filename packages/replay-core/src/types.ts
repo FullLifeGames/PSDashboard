@@ -171,6 +171,8 @@ export interface DamageObservation {
    */
   attackerFainted?: number;
   attackerTimesAttacked?: number;
+  /** The defender's status before the hit (round 73, T210 group 2): Hex and Venoshock double against it, Marvel Scale lifts Defense under it. */
+  defenderStatus?: string;
 }
 
 export interface AllyReading {
