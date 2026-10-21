@@ -98,6 +98,7 @@ value hazardConditions
 value inferOpponentTeam
 value inferReplayFormatId
 value isScreen
+value isSitrusBerry
 value itemSetValue
 value judgeItemsByDamage
 value manualEvs
@@ -114,6 +115,7 @@ value resolveHiddenPowerType
 value screenFlags
 value sideIndex
 value simGenNum
+value sitrusKeptAt
 value solveReplaySpreads
 value sourceDetail
 value speciesBaseId

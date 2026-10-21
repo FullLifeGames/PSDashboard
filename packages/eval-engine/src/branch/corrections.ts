@@ -3,15 +3,16 @@ import { protocolChoiceLock, type ChoiceLockContext } from '../choice-lock.ts';
 import { CHOICE_ITEMS } from '../sensitivity.ts';
 import { restoreSideInvariants } from '../forward-model.ts';
 import type { SimBattle, SimPokemon, SimSide } from './types.ts';
-import { normalizeBattleOnlyFormeId, sameBodyName } from './team-order.ts';
+import { normalizeBattleOnlyFormeId, retireUnshownBench, sameBodyName, type ProtocolBench } from './team-order.ts';
 import { findFirstAvailableSwitchSlot, findPokemonOnSide, findSlotBySpecies } from './protocol-choices.ts';
 import { correctFieldFromSnapshot } from './field-correction.ts';
 import { applyProtocolHeldItems } from './held-items.ts';
-import { playProtocolEntries } from './entry-effects.ts';
+import { playProtocolEntries, playProtocolStarts } from './entry-effects.ts';
 import { restoreTeraFromSnapshot } from './tera-restore.ts';
 import { bodiesOffTheField, restoreAfterProtocolEntry, restoreExitVolatiles } from './exit-volatiles.ts';
 import { endLocksTheGameEnded, settleSleepCounter } from './sleep-counter.ts';
 import { hpOfSighting } from './pokemon-info.ts';
+import { normalizeLines } from '../line-endings.ts';
 
 function repointActiveSlot(side: SimSide, activeSlot: number, target: SimPokemon): boolean {
   if (side.active[activeSlot] === target) return false;
@@ -55,9 +56,12 @@ function repointActiveSlot(side: SimSide, activeSlot: number, target: SimPokemon
 
 export function correctActivesFromProtocol(
   battle: SimBattle,
-  events: string[],
+  rawEvents: string[],
   locks?: { context: ChoiceLockContext; turn: number },
+  residualAt?: number,
 ) {
+  // The door for lines (round 73, T230 on T206): a block cut from a CRLF log ends its lines in a carriage return; the readers below see LF only.
+  const events = normalizeLines(rawEvents);
   const before = battle.sides.map(side => [...side.active]);
   let repointed = false;
   for (const line of events) {
@@ -78,11 +82,13 @@ export function correctActivesFromProtocol(
   // A body the repoints put on the field plays its switch-in with the item it
   // held, before the held items take the protocol's state (round 67, T133).
   if (repointed) playProtocolEntries(battle, before, events);
+  // A start the block shows and the board lacks (round 73, T212); residualAt: where the block's residual round came.
+  const started = playProtocolStarts(battle, events, residualAt);
   // After the repoints, so a lock lands on the body the protocol has active.
-  const handedOver = locks ? applyProtocolHeldItems(battle, locks.context, locks.turn) : false;
+  const handedOver = locks ? applyProtocolHeldItems(battle, locks.context, locks.turn, events) : false;
   // The cached requests were built from the PRE-correction actives — refresh
   // the disable flags and the request view from the corrected board.
-  if (repointed || handedOver) {
+  if (repointed || handedOver || started) {
     restoreSideInvariants(battle);
     // Protocol-proven locks go back on BEFORE the request refresh, so the
     // disable pass bakes them into the corrected request (spec ③ 1b).
@@ -124,20 +130,31 @@ export function hasForceSwitch(battle: SimBattle, sideIdx: number): boolean {
   return forceSwitches(battle, sideIdx).some(Boolean);
 }
 
+/**
+ * `bench`: what the protocol says about the side (ProtocolBench). With it, a forced slot the log leaves empty after its body
+ * fainted takes `pass` once the bench bodies the protocol never shows are out of the game (round 73, T250); without it the
+ * slot takes the first living body, as before.
+ */
 export function buildForcedSwitchChoice(
   battle: SimBattle,
   sideIdx: number,
   forcedSpecies: string[],
   cursor: { current: number },
+  bench?: ProtocolBench,
 ): string | null {
   const needs = forceSwitches(battle, sideIdx);
   if (!needs.some(Boolean)) return null;
 
+  const forced = needs.filter(Boolean).length;
+  const answers = Math.min(forced, Math.max(0, forcedSpecies.length - cursor.current));
+  const empty = !!bench && answers < forced &&
+    retireUnshownBench(battle, sideIdx, bench, answers, needs.flatMap((need, slot) => (need ? [slot] : [])));
+  if (battle.ended) return null;
   const choices = needs.map(need => {
     if (!need) return 'pass';
     const species = forcedSpecies[cursor.current++];
     if (species) return `switch ${findSlotBySpecies(battle, sideIdx, species)}`;
-    return `switch ${findFirstAvailableSwitchSlot(battle, sideIdx)}`;
+    return empty ? 'pass' : `switch ${findFirstAvailableSwitchSlot(battle, sideIdx)}`;
   });
 
   return choices.join(', ');

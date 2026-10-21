@@ -125,6 +125,9 @@ function eats(handler: ItemHandler | undefined, holder: object): boolean {
   return ate;
 }
 
+/** Whether the item id is the Sitrus Berry, the berry sitrusEatsAt judges (round 73, T214: the rebuild asks it for the build's item). */
+export const isSitrusBerry = (itemId: string): boolean => itemId === ('sitrusberry' satisfies Rule);
+
 /**
  * Whether Sitrus Berry would have been eaten at the HP the log shows. The
  * display rounds (a percentage up, the Champions mod down, pixels down), and
@@ -137,6 +140,20 @@ export function sitrusEatsAt(gen: number, shown: string): boolean {
   if (!health || health.fainted || !health.hp) return false;
   const item = Dex.forGen(gen).items.get('sitrusberry') as unknown as { exists: boolean; gen: number; onUpdate?: ItemHandler };
   return item.exists && item.gen <= gen && eats(item.onUpdate, { hp: health.hp + 1, maxhp: health.maxhp });
+}
+
+/**
+ * The reverse question (round 73, T214): whether the Sitrus Berry certainly stays uneaten at the HP the log shows. The display
+ * hides up to one unit, so the berry is judged at the lowest ratio the shown text allows (a shown 51/100 is above half, a shown
+ * 50/100 may be exactly half). An exact text (the player's own side, neither 100 nor 48 as the maximum) is read as it stands.
+ */
+export function sitrusKeptAt(gen: number, shown: string): boolean {
+  const health = Protocol.parseHealth(shown as Protocol.PokemonHPStatus);
+  if (!health || health.fainted || !health.hp) return false;
+  const item = Dex.forGen(gen).items.get('sitrusberry') as unknown as { exists: boolean; gen: number; onUpdate?: ItemHandler };
+  const lowest = health.maxhp === 100 || health.maxhp === 48 ? health.hp - 1 + 1e-6 : health.hp;
+  // A generation whose Update handler eats at no HP (the Dex moves the berry to another event) says nothing about the threshold.
+  return item.exists && item.gen <= gen && eats(item.onUpdate, { hp: 1, maxhp: health.maxhp }) && !eats(item.onUpdate, { hp: lowest, maxhp: health.maxhp });
 }
 
 const sideOf = (key: string) => key.slice(0, 2);

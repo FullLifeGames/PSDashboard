@@ -4,6 +4,7 @@ import {
   ALIGNMENT_SEEDS, chooseAlignedSeed, extractProtocolEvents, type SeedChoice,
 } from '../hax-alignment.ts';
 import { hasForceSwitch } from './corrections.ts';
+import { LoggedRollPRNG, recordLoggedRolls } from './logged-rolls.ts';
 import { collectForcedSwitchSpecies, getMainChoice, parseTurnBlocks } from './protocol-choices.ts';
 import type { SimBattle, TurnBlock } from './types.ts';
 
@@ -94,12 +95,19 @@ export function alignArrivalDice(
   const block = parseTurnBlocks(replayLog).turns.find(entry => entry.turn === targetTurn);
   if (!block) return null;
   try {
-    const aligned = alignBlockSeed(
-      battle, block, getMainChoice(block.preUpkeep, 'p1', battle), getMainChoice(block.preUpkeep, 'p2', battle),
-      shouldStop,
-    );
+    const p1Choice = getMainChoice(block.preUpkeep, 'p1', battle);
+    const p2Choice = getMainChoice(block.preUpkeep, 'p2', battle);
+    const aligned = alignBlockSeed(battle, block, p1Choice, p2Choice, shouldStop);
     if (aligned.seedChoice.trialScore === null) return null;
-    battle.prng = new PRNG(aligned.seedChoice.seed);
+    const { seed } = aligned.seedChoice;
+    const logged = recordLoggedRolls(battle, seed, p1Choice, p2Choice, aligned.alignForced);
+    if (logged) {
+      const prng = new LoggedRollPRNG(seed, logged, targetTurn);
+      prng.attach(battle);
+      battle.prng = prng;
+    } else {
+      battle.prng = new PRNG(seed);
+    }
     return aligned.seedChoice;
   } catch {
     return null;

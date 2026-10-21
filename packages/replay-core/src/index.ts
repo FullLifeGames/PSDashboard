@@ -20,6 +20,7 @@ export type { FactsDex, ProtectKind, ScreenHolder, ScreenId } from './dex-facts/
 export { resolveHiddenPowerType, typedHiddenPowerId, withHiddenPowerType, HP_TYPES } from './hidden-power.ts';
 export { toId, sideIndex } from './ids.ts';
 export type { SideId } from './ids.ts';
+export { isSitrusBerry, sitrusKeptAt } from './inference/item-triggers.ts';
 export { inferOpponentTeam } from './opponent-inferrer.ts';
 export { parseReplayLog, parseReplayLogWithObservations } from './protocol-parser.ts';
 export {

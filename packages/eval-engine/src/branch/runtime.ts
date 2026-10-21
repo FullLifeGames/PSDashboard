@@ -2,6 +2,7 @@ import { extractProtocolEvents, scoreAlignment } from '../hax-alignment.ts';
 import { normalizeLineEndings } from '../line-endings.ts';
 import type { BranchRuntime, SimBattle, TurnBlock } from './types.ts';
 import { getMainChoice, parseTurnBlocks } from './protocol-choices.ts';
+import { faintedSlots, logGoesOn, shownBodyIds, type ProtocolBench } from './team-order.ts';
 import { alignArrivalDice, alignBlockSeed, type AlignedBlock } from './arrival-dice.ts';
 import {
   buildForcedSwitchChoice, correctActivesFromProtocol, correctBattleFromSnapshot, hasForceSwitch,
@@ -71,12 +72,21 @@ async function commitMainChoices(session: ReconstructionSession, turnBeforeChoic
 }
 
 /** Answers the sim's forced replacements with the protocol's switch-ins, in order. */
-async function resolveForcedSwitches(session: ReconstructionSession, turnBeforeChoice: number, alignForced: AlignedBlock['alignForced']) {
+async function resolveForcedSwitches(
+  session: ReconstructionSession, turnBeforeChoice: number, alignForced: AlignedBlock['alignForced'], blockLines: readonly string[],
+) {
   const { battleStream, choiceErrors } = session;
   const p1Forced = alignForced.p1;
   const p2Forced = alignForced.p2;
   const p1ForceIndex = { current: 0 };
   const p2ForceIndex = { current: 0 };
+  // What the protocol says about each side's bench (T250): read once, and only when a forced switch needs it.
+  const benchCache: Partial<Record<'p1' | 'p2', ProtocolBench>> = {};
+  const protocolBench = (side: 'p1' | 'p2') =>
+    (benchCache[side] ??= {
+      shown: shownBodyIds(session.params.replayLog, side), fainted: faintedSlots(blockLines, side),
+      goesOn: logGoesOn(session.params.replayLog, turnBeforeChoice),
+    });
 
   let maxIterations = 10;
   while (maxIterations-- > 0) {
@@ -88,8 +98,8 @@ async function resolveForcedSwitches(session: ReconstructionSession, turnBeforeC
     if (!p1Needs && !p2Needs) break;
 
     const commands: string[] = [];
-    const p1ForcedChoice = buildForcedSwitchChoice(currentBattle, 0, p1Forced, p1ForceIndex);
-    const p2ForcedChoice = buildForcedSwitchChoice(currentBattle, 1, p2Forced, p2ForceIndex);
+    const p1ForcedChoice = buildForcedSwitchChoice(currentBattle, 0, p1Forced, p1ForceIndex, protocolBench('p1'));
+    const p2ForcedChoice = buildForcedSwitchChoice(currentBattle, 1, p2Forced, p2ForceIndex, protocolBench('p2'));
     if (p1ForcedChoice) commands.push(`>p1 ${p1ForcedChoice}`);
     if (p2ForcedChoice) commands.push(`>p2 ${p2ForcedChoice}`);
 
@@ -122,7 +132,7 @@ function scoreBlock(session: ReconstructionSession, turnBlock: TurnBlock, aligne
   correctActivesFromProtocol(latestBattle, [
     ...turnBlock.preUpkeep,
     ...turnBlock.postUpkeep,
-  ], choiceLocks ? { context: choiceLocks, turn: turnBlock.turn + 1 } : undefined);
+  ], choiceLocks ? { context: choiceLocks, turn: turnBlock.turn + 1 } : undefined, turnBlock.preUpkeep.length);
   session.haxAlignment.push({
     turn: turnBlock.turn,
     seed: aligned.seedChoice.seed,
@@ -178,7 +188,7 @@ async function replayBlock(session: ReconstructionSession, turnBlock: TurnBlock)
   const simLogStart = battle.log.length;
 
   await commitMainChoices(session, turnBeforeChoice, p1Choice, p2Choice);
-  await resolveForcedSwitches(session, turnBeforeChoice, aligned.alignForced);
+  await resolveForcedSwitches(session, turnBeforeChoice, aligned.alignForced, [...turnBlock.preUpkeep, ...turnBlock.postUpkeep]);
   scoreBlock(session, turnBlock, aligned, simLogStart);
   return 'continue';
 }

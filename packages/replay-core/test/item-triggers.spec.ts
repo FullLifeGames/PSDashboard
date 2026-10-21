@@ -3,7 +3,7 @@ import { Battle, Dex, Teams, toID, type PokemonSet } from '@pkmn/sim';
 import { Protocol } from '@pkmn/protocol';
 import * as championsMod from '@pkmn/mods/champions';
 import { inferOpponentTeam } from '../src/opponent-inferrer';
-import { sitrusEatsAt } from '../src/inference/item-triggers';
+import { isSitrusBerry, sitrusEatsAt, sitrusKeptAt } from '../src/inference/item-triggers';
 
 /**
  * Round 69, T168 (decision 34): four items whose trigger the protocol shows without the item's line are ruled out, as
@@ -211,6 +211,37 @@ describe('the shown HP bounds the real HP, so Sitrus Berry is judged only where 
     expect(judged).toBeGreaterThan(0);
     expect(Protocol.parseHealth('0 fnt').fainted).toBe(true);
     expect(sitrusEatsAt(gen, '0 fnt')).toBe(false);
+  });
+});
+
+describe('the shown HP bounds the real HP, so the kept Sitrus Berry is judged only where rounding cannot hide an eating (T214)', () => {
+  /** Every HP of a 400 HP Pokémon, shown the way the simulator shows it: a berry judged kept stays uneaten at every real HP that shows it. */
+  test.each(['gen9ou', 'gen6ou', 'gen5ou', 'gen9championsou'])('%s: a berry judged kept is uneaten at every real HP that shows the text', formatid => {
+    const battle = new Battle({ formatid: toID(formatid), seed: '1,2,3,4', p1: { name: 'A', team: Teams.pack([set('Blissey', 'Sitrus Berry', 'Natural Cure', ['Splash'])]) }, p2: { name: 'B', team: Teams.pack([set('Chansey', 'Leftovers', 'Natural Cure', ['Splash'])]) } });
+    if (battle.requestState === 'teampreview') { battle.choose('p1', 'team 1'); battle.choose('p2', 'team 1'); }
+    const mon = battle.p1.active[0];
+    let judged = 0;
+    for (let hp = 1; hp <= mon.maxhp; hp++) {
+      mon.hp = hp;
+      if (sitrusKeptAt(battle.gen, mon.getHealth().shared)) {
+        judged++;
+        expect(hp > mon.maxhp / 2, `${formatid} hp ${hp}/${mon.maxhp}`).toBe(true);
+      }
+    }
+    expect(judged).toBeGreaterThan(0);
+  });
+
+  test('the rows: above half is kept, at half or under is not, an exact text reads as it stands, a faint and a generation before the berry are not', () => {
+    expect(sitrusKeptAt(9, '55/100')).toBe(true);
+    expect(sitrusKeptAt(9, '51/100')).toBe(true);
+    expect(sitrusKeptAt(9, '50/100')).toBe(false);
+    expect(sitrusKeptAt(9, '49/100')).toBe(false);
+    expect(sitrusKeptAt(9, '174/346')).toBe(true);
+    expect(sitrusKeptAt(9, '173/346')).toBe(false);
+    expect(sitrusKeptAt(9, '0 fnt')).toBe(false);
+    expect(sitrusKeptAt(2, '90/100')).toBe(false);
+    expect(isSitrusBerry('sitrusberry')).toBe(true);
+    expect(isSitrusBerry('lumberry')).toBe(false);
   });
 });
 
