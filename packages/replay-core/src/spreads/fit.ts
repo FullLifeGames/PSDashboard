@@ -15,6 +15,7 @@ import { abilityAtHit } from './ability-at-hit.ts';
 import { formeAbility } from './battle-forme.ts';
 import { withItemAtHit } from './item-at-hit.ts';
 import { genNumOf, toId } from '../ids.ts';
+import { poweredMove } from './powered-move.ts';
 
 /**
  * A violated move-order constraint outweighs any damage-fit error: the log
@@ -133,6 +134,8 @@ export function buildSolveContext(
 
   const dex = Dex.forGen(simGenNum(ctx.gen));
   for (const raw of observations) {
+    // A Z-move or a Max move prices from the Dex's placeholder power, not from the base move's (round 73, T229): no reading.
+    if (poweredMove(dex, raw.moveId)) continue;
     const obs = readObservation(dex, ctx.sets, raw);
     const defenderSide = defenderSideOf(obs);
     if (setOf(ctx, obs.attackerSide, obs.attackerSpecies) && setOf(ctx, defenderSide, obs.defenderSpecies)) {
