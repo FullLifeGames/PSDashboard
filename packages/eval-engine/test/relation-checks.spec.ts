@@ -40,7 +40,6 @@ const pending = (reason: string, relation: KnownBreak['relation'], group: Relati
   positions.map(position => ({ relation, group, position, reason }));
 
 const KNOWN_BREAKS: KnownBreak[] = [
-  ...pending('T248 matchup jump (the 573756 turn 73 pin)', 'ownHpDown', 'singles', 'smogtours-gen8ou-573756-t73'),
   ...pending('T248 priced hit', 'ownHpDown', 'champions', 'gen9championsvgc2026regmbbo3-2634199230-t5'),
 ];
 

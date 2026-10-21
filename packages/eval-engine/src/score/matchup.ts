@@ -151,6 +151,18 @@ function pairSign(
 }
 
 /**
+ * T248 (round 73): a side the foe moves ahead of and takes down with its best hit never gets to heal, so its heal PP
+ * are no wall. One HP point above that hit the race priced the heals as a wall, one point below as a lost race, and a
+ * hit taken raised the grade (573756 turn 73, Toxapex 282 to 281 of 303). `foeFrac` is the foe's best hit as a share
+ * of the maximum; the side keeps its attack, so the clocks read the pair as the plain race it is.
+ */
+function unhealedIfBeaten(side: RaceSide, foeFrac: number, foeFirst: () => boolean): RaceSide {
+  if (side.healRate <= 0 && side.healAbsorb <= 0) return side;
+  if (foeFrac < side.hp || !foeFirst()) return side;
+  return { ...side, healRate: 0, healAbsorb: 0 };
+}
+
+/**
  * The value of one pair for p1 (round 73, T248): the HP share of the side that wins it, signed for the winner. The pair
  * used to weigh both bodies' shares, so a lost pair counted less the lower the loser's HP and a hit p1 took raised the
  * matchup (and a hit p1 landed on the loser of a won pair lowered it); in a small board the bodies term could not
@@ -210,9 +222,11 @@ export function matchupTerms(
     for (const b of p2Living) {
       const threatA = threat(a, b);
       const threatB = threat(b, a);
+      const fracA = boostedFraction(threatA, offence(a), b);
+      const fracB = boostedFraction(threatB, offence(b), a);
       const clocks = raceClocks(
-        inputs.raceSideOf(a, boostedFraction(threatA, offence(a), b)),
-        inputs.raceSideOf(b, boostedFraction(threatB, offence(b), a)),
+        unhealedIfBeaten(inputs.raceSideOf(a, fracA), fracB, () => movesFirst(b, a, threatB, threatA, battle)),
+        unhealedIfBeaten(inputs.raceSideOf(b, fracB), fracA, () => movesFirst(a, b, threatA, threatB, battle)),
       );
       // Answer margins read the race's effective offense: an attacker held
       // by a (now finite) wall keeps its partial answer, a pinned healer
