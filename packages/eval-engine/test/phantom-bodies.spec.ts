@@ -201,6 +201,17 @@ describe('retiring the bench the protocol never shows, against the simulator (si
     expect(battle.ended).toBe(false);
   });
 
+  test('controls: the simulator asks for a slot the block does not faint (a divergence, gen9doublesou-2694811367 turn 5): the log answers one slot, the other is no proof of an empty bench', () => {
+    const battle = board('gen9doublescustomgame', DOUBLES_P1,
+      [memento('Voltorb'), memento('Electrode'), splash('Ditto', 'Limber'), splash('Magikarp', 'Swift Swim'), splash('Feebas', 'Swift Swim')],
+      ['move 1, move 1', 'move 1 1, move 1 2']);
+    expect(battle.sides[1].activeRequest).toMatchObject({ forceSwitch: [true, true] });
+    const choice = buildForcedSwitchChoice(battle as never, 1, ['Ditto'], { current: 0 }, benchOf(['Voltorb', 'Electrode', 'Ditto'], [1]));
+    expect(choice).toBe(buildForcedSwitchChoice(battle as never, 1, ['Ditto'], { current: 0 }));
+    expect(choice).not.toContain('pass');
+    expect(livingNames(battle, 1)).toEqual(['Ditto', 'Magikarp', 'Feebas']);
+  });
+
   test('controls: the log ends with this block (a forfeit, a win or a tie follows): the bench stays and the old answer stands, in singles and doubles', () => {
     const singles = board('gen9customgame', SINGLES_P1,
       [memento('Voltorb'), splash('Magikarp', 'Swift Swim'), splash('Ditto', 'Limber')], ['move 1', 'move 1']);

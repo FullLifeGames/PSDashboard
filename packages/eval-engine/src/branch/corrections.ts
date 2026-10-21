@@ -145,7 +145,7 @@ export function buildForcedSwitchChoice(
   const forced = needs.filter(Boolean).length;
   const answers = Math.min(forced, Math.max(0, forcedSpecies.length - cursor.current));
   const empty = !!bench && answers < forced &&
-    retireUnshownBench(battle, sideIdx, bench, answers, needs.flatMap((need, slot) => (need ? [slot] : [])).slice(answers));
+    retireUnshownBench(battle, sideIdx, bench, answers, needs.flatMap((need, slot) => (need ? [slot] : [])));
   if (battle.ended) return null;
   const choices = needs.map(need => {
     if (!need) return 'pass';

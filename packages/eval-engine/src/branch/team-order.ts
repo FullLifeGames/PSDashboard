@@ -142,19 +142,19 @@ export const mayDisguise = (body: SimPokemon) =>
     typeof (body.battle.dex.abilities.get(name) as { onBeforeSwitchIn?: unknown }).onBeforeSwitchIn === 'function');
 
 /**
- * The game left a forced slot empty (its body fainted in the block and no switch followed): the living bench bodies the protocol never shows were not brought (a player with a
+ * The game left a forced slot empty (every forced slot is one the block faints, and no switch followed for at least one): the living bench bodies the protocol never shows were not brought (a player with a
  * body to send sends it), so they leave the game as the simulator takes a fainted body out (no faint line, no fallen-ally
  * count) and the slot takes `pass`, which the simulator accepts once no living body waits. Nothing happens, and the old
  * answer stands, when the bench holds a shown body the log's answers leave over (the simulator diverged, not the bring
  * list) or a body that may disguise itself as another. True when bodies left.
  */
-export function retireUnshownBench(battle: SimBattle, sideIdx: number, bench: ProtocolBench, answers: number, emptySlots: number[]): boolean {
+export function retireUnshownBench(battle: SimBattle, sideIdx: number, bench: ProtocolBench, answers: number, forcedSlots: number[]): boolean {
   const { shown, fainted, goesOn } = bench;
   if (!goesOn) return false;
   const side = battle.sides[sideIdx];
   const living = side.pokemon.filter(body => !body.isActive && !body.fainted);
   const phantoms = living.filter(body => !wasShown(body, shown));
-  if (!emptySlots.every(slot => fainted.has(slot))) return false;
+  if (!forcedSlots.every(slot => fainted.has(slot))) return false;
   if (phantoms.length === 0 || living.length - phantoms.length > answers || phantoms.some(mayDisguise)) return false;
   for (const body of phantoms) {
     body.hp = 0;
