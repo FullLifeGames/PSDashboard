@@ -150,6 +150,18 @@ function pairSign(
   return 0;
 }
 
+/**
+ * The value of one pair for p1 (round 73, T248): the HP share of the side that wins it, signed for the winner. The pair
+ * used to weigh both bodies' shares, so a lost pair counted less the lower the loser's HP and a hit p1 took raised the
+ * matchup (and a hit p1 landed on the loser of a won pair lowered it); in a small board the bodies term could not
+ * cancel that (gen9vgc-2629703929 turn 13: a 1v1 lost at 88 of 176 HP). The winner's share keeps every step the
+ * right way: more HP for the winner, or less for the loser, never moves the pair against the side it helps. A body
+ * whose entry hazards would kill it has no HP share and loses its pairs at the foe's share.
+ */
+function pairValue(sign: number, hpA: number, hpB: number): number {
+  return sign > 0 ? hpA : sign < 0 ? -hpB : 0;
+}
+
 /** Coverage: each enemy no remaining teammate trades favorably against, its answer deficit × HP (p1-positive). */
 function coverageFrom(
   bestAnswerToP2: Map<Pokemon, number>,
@@ -209,7 +221,7 @@ export function matchupTerms(
       bestAnswerToP1.set(a, Math.max(bestAnswerToP1.get(a) ?? -Infinity, clocks.effFracB - clocks.effFracA));
       const sign = pairSign(a, b, threatA, threatB, clocks, battle);
       const weight = a.isActive && b.isActive ? EVAL_WEIGHTS.activePair : 1;
-      sum += weight * sign * inputs.effHp(a) * inputs.effHp(b);
+      sum += weight * pairValue(sign, inputs.effHp(a), inputs.effHp(b));
       totalWeight += weight;
     }
   }

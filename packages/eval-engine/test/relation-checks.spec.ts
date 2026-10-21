@@ -20,36 +20,26 @@ import {
  *
  * Known breaks (T248, design gate 2a of round 73: every break above 1e-3 goes, a smaller slope stays with its reason). The
  * size of a break is the largest wrong-way change of the score at ONE HP point: a break found on the grid of 10 % steps
- * is scanned point by point (`jump` of the violation). A position in the list is checked by a `test.fails`: the day it
- * passes, that test turns red and the entry goes. Two kinds. A slope is a smooth change that stays at or under 1e-3 per HP
- * point (the matchup term falls a little faster than the bodies term rises over a range of HP); it stays with its
- * reason and must pass the 1e-3 test. A pending break is above 1e-3 and waits for its cause: the matchup term at one HP
- * (573756 turn 73, Toxapex; the slope of 2629703929-t13) and the priced hits of a recoil move (two single points). Every
- * other position of the group passes at 1e-9 as a plain test, so the list never hides an unnamed fault. The race flips of
- * boostsBiting that stood here (nine positions) went with the fresh-race reading of `stageBites` (score/boost-race.ts).
+ * is scanned point by point (`jump` of the violation). A pending break is above 1e-3 and waits for its cause; it is
+ * checked by a `test.fails`: the day it passes, that test turns red and the entry goes. Every other position of the
+ * group passes at 1e-9 as a plain test, so the list never hides an unnamed fault. The race flips of boostsBiting that
+ * stood here (nine positions) went with the fresh-race reading of `stageBites` (score/boost-race.ts); the slopes of the
+ * matchup term (five positions, 1e-5 to 1.3e-3 per HP point) went with the pair value of the winner's HP share
+ * (score/matchup.ts, `pairValue`); no smooth slope is left, so the list holds no slope entry.
  */
 
 interface KnownBreak {
   relation: 'ownHpDown' | 'foeHpDown';
   group: RelationGroup;
   position: string;
-  kind: 'slope' | 'pending';
   /** The cause, for the title. */
   reason: string;
 }
 
-const SLOPE = 'slope, T248, D2';
-const slope = (relation: KnownBreak['relation'], group: RelationGroup, ...positions: string[]): KnownBreak[] =>
-  positions.map(position => ({ relation, group, position, kind: 'slope', reason: SLOPE }));
 const pending = (reason: string, relation: KnownBreak['relation'], group: RelationGroup, ...positions: string[]): KnownBreak[] =>
-  positions.map(position => ({ relation, group, position, kind: 'pending', reason }));
+  positions.map(position => ({ relation, group, position, reason }));
 
 const KNOWN_BREAKS: KnownBreak[] = [
-  ...slope('foeHpDown', 'vgc', 'gen9vgc2026regi-2629703929-t13', 'gen9vgc2026regi-2629703929-t8'),
-  ...slope('ownHpDown', 'vgc', 'gen9vgc2026regi-2630685175-t8'),
-  ...slope('foeHpDown', 'singles', 'smogtours-gen9ou-749351-t10'),
-  ...pending('T248 matchup slope above 1e-3', 'ownHpDown', 'vgc', 'gen9vgc2026regi-2629703929-t13'),
-  ...pending('T248 priced hit', 'ownHpDown', 'vgc', 'gen9vgc2026regi-2630685175-t4'),
   ...pending('T248 matchup jump (the 573756 turn 73 pin)', 'ownHpDown', 'singles', 'smogtours-gen8ou-573756-t73'),
   ...pending('T248 priced hit', 'ownHpDown', 'champions', 'gen9championsvgc2026regmbbo3-2634199230-t5'),
 ];
@@ -131,7 +121,7 @@ for (const { group, name } of GROUPS) {
     for (const relation of ['ownHpDown', 'foeHpDown'] as const) {
       const knownHere = KNOWN_BREAKS.filter(entry => entry.group === group && entry.relation === relation);
       const named = new Set(knownHere.map(entry => entry.position));
-      const waiting = new Set(knownHere.filter(entry => entry.kind === 'pending').map(entry => entry.position));
+      const waiting = new Set(knownHere.map(entry => entry.position));
       const above = (list: RelationSubject[]) => violationsOf(relation, list, realEvaluator).filter(violation => (violation.jump ?? violation.size) > JUMP_LIMIT);
 
       test(`${name}: ${STATEMENT[relation]}, outside the positions the list names`, () => {
@@ -145,9 +135,9 @@ for (const { group, name } of GROUPS) {
 
       for (const entry of knownHere) {
         // Expected failure: red today, so the day the position passes, this test fails and the entry goes.
-        test.fails(`${entry.reason} ${name}: ${STATEMENT[relation]}${entry.kind === 'pending' ? ` by more than ${JUMP_LIMIT}` : ''} (${entry.position})`, () => {
+        test.fails(`${entry.reason} ${name}: ${STATEMENT[relation]} by more than ${JUMP_LIMIT} (${entry.position})`, () => {
           const board = mine.filter(subject => subject.position === entry.position);
-          expect(scene(entry.kind === 'pending' ? above(board) : violationsOf(relation, board, realEvaluator))).toEqual([]);
+          expect(scene(above(board))).toEqual([]);
         });
       }
     }
