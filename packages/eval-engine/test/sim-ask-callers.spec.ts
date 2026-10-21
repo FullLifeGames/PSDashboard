@@ -53,7 +53,9 @@ describe('the callers of the simulator', () => {
   });
 
   test('the dice of a question come from FixedDice; the other PRNG classes are the search\'s scripts', () => {
+    // Round 73 (T232): branch/logged-rolls.ts serves a branch's first turn the draws its log made, a script like the search's.
     expect(filesWith(/\bextends (?:PRNG|BattlePRNG)\b/)).toEqual([
+      'eval-engine:branch/logged-rolls.ts',
       'eval-engine:forward/scripted-prng.ts',
       'eval-engine:pair/prng.ts',
     ]);
@@ -67,6 +69,9 @@ describe('the callers of the simulator', () => {
       'eval-engine:calc/typeless.ts', 'eval-engine:damage-calc.ts', 'eval-engine:score/move-facts.ts',
       'replay-core:inference/item-evidence.ts', 'replay-core:inference/item-triggers.ts', 'replay-core:inference/rocks-tell.ts',
       'replay-core:inference/trigger-evidence.ts',
+      // Round 73 (T210): a recording stand-in with no battle behind it, so nothing can be written; held to the simulator by
+      // replay-core's hit-power-census.spec.ts (every Dex, Generations 1 to 9 and Champions) and hit-power-played.spec.ts.
+      'replay-core:spreads/hit-power.ts',
     ];
     expect(called).toEqual([...rests].sort());
   });
