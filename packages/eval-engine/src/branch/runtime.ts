@@ -132,7 +132,7 @@ function scoreBlock(session: ReconstructionSession, turnBlock: TurnBlock, aligne
   correctActivesFromProtocol(latestBattle, [
     ...turnBlock.preUpkeep,
     ...turnBlock.postUpkeep,
-  ], choiceLocks ? { context: choiceLocks, turn: turnBlock.turn + 1 } : undefined);
+  ], choiceLocks ? { context: choiceLocks, turn: turnBlock.turn + 1 } : undefined, turnBlock.preUpkeep.length);
   session.haxAlignment.push({
     turn: turnBlock.turn,
     seed: aligned.seedChoice.seed,

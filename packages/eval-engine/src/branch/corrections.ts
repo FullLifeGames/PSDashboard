@@ -7,7 +7,7 @@ import { normalizeBattleOnlyFormeId, retireUnshownBench, sameBodyName, type Prot
 import { findFirstAvailableSwitchSlot, findPokemonOnSide, findSlotBySpecies } from './protocol-choices.ts';
 import { correctFieldFromSnapshot } from './field-correction.ts';
 import { applyProtocolHeldItems } from './held-items.ts';
-import { playProtocolEntries } from './entry-effects.ts';
+import { playProtocolEntries, playProtocolStarts } from './entry-effects.ts';
 import { restoreTeraFromSnapshot } from './tera-restore.ts';
 import { bodiesOffTheField, restoreAfterProtocolEntry, restoreExitVolatiles } from './exit-volatiles.ts';
 import { endLocksTheGameEnded, settleSleepCounter } from './sleep-counter.ts';
@@ -58,6 +58,7 @@ export function correctActivesFromProtocol(
   battle: SimBattle,
   rawEvents: string[],
   locks?: { context: ChoiceLockContext; turn: number },
+  residualAt?: number,
 ) {
   // The door for lines (round 73, T230 on T206): a block cut from a CRLF log ends its lines in a carriage return; the readers below see LF only.
   const events = normalizeLines(rawEvents);
@@ -81,11 +82,13 @@ export function correctActivesFromProtocol(
   // A body the repoints put on the field plays its switch-in with the item it
   // held, before the held items take the protocol's state (round 67, T133).
   if (repointed) playProtocolEntries(battle, before, events);
+  // A start the block shows and the board lacks (round 73, T212); residualAt: where the block's residual round came.
+  const started = playProtocolStarts(battle, events, residualAt);
   // After the repoints, so a lock lands on the body the protocol has active.
   const handedOver = locks ? applyProtocolHeldItems(battle, locks.context, locks.turn) : false;
   // The cached requests were built from the PRE-correction actives — refresh
   // the disable flags and the request view from the corrected board.
-  if (repointed || handedOver) {
+  if (repointed || handedOver || started) {
     restoreSideInvariants(battle);
     // Protocol-proven locks go back on BEFORE the request refresh, so the
     // disable pass bakes them into the corrected request (spec ③ 1b).

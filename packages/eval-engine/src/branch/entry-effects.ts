@@ -155,3 +155,105 @@ export function playProtocolEntries(battle: SimBattle, before: (SimPokemon | nul
   for (const entry of entries) closeTheTurn(entry.body);
   return true;
 }
+
+/**
+ * Round 73 (T212): a `|-start|` the block shows and the board lacks. The simulator's own block misses a start when it diverges
+ * (752733 turn 14: the game's Garganacl lives and starts Salt Cure, the simulator K.O.s it first), and its Protosynthesis or
+ * Quark Drive may boost another stat than the one the protocol names. The line's effect is read as a Dex condition (the text
+ * after `move:`, `ability:` or `item:`; the stat suffix of `protosynthesisatk` split off when the rest is a condition) and the
+ * volatile starts through the simulator's own `addVolatile`, without a list of effects. A token no condition names (a
+ * count such as perish3, a type change) starts nothing.
+ */
+interface ProtocolStart {
+  sideIdx: number;
+  slot: number;
+  id: string;
+  stat?: string;
+  source?: string;
+  index: number;
+}
+
+const STAT_SUFFIX = /(atk|def|spa|spd|spe)$/;
+
+function conditionOf(battle: SimBattle, effect: string): { id: string; stat?: string } | null {
+  const token = toId(effect.replace(/^(move|ability|item): /i, ''));
+  const condition = (id: string) => {
+    const found = battle.dex.conditions.get(id);
+    return found.exists && found.effectType === 'Condition' ? found.id : null;
+  };
+  const whole = condition(token);
+  if (whole) return { id: whole };
+  const stat = token.match(STAT_SUFFIX)?.[1];
+  const stripped = stat ? condition(token.slice(0, -stat.length)) : null;
+  return stripped && stat ? { id: stripped, stat } : null;
+}
+
+/** The starts that still stand at the block's end: not ended by an `-end`, and the body still on its slot (no switch, drag or faint after). */
+function liveStarts(battle: SimBattle, events: readonly string[]): ProtocolStart[] {
+  const live = new Map<string, ProtocolStart>();
+  events.forEach((line, index) => {
+    const [, tag, ident, effect] = line.split('|');
+    const slotKey = ident?.match(/^p([12])([a-d])/);
+    if (!slotKey) return;
+    const [key, sideIdx, slot] = [slotKey[0], Number(slotKey[1]) - 1, slotKey[2].charCodeAt(0) - 97];
+    if (tag === 'switch' || tag === 'drag' || tag === 'faint') {
+      for (const entry of live.keys()) if (entry.startsWith(`${key}:`)) live.delete(entry);
+      return;
+    }
+    if ((tag !== '-start' && tag !== '-end') || !effect) return;
+    const condition = conditionOf(battle, effect);
+    if (!condition) return;
+    if (tag === '-end') live.delete(`${key}:${condition.id}`);
+    else live.set(`${key}:${condition.id}`, { sideIdx, slot, ...condition, source: line.match(/\|\[of\] (p[12][a-d])/)?.[1], index });
+  });
+  return [...live.values()];
+}
+
+/** Starts one volatile on the body as the simulator does, then takes back what a start must not change here: the body's hp, the log, the dice and the turn flags. */
+function startVolatile(battle: SimBattle, body: SimPokemon, start: ProtocolStart, ticked: boolean): boolean {
+  const source = start.source ? battle.sides[Number(start.source[1]) - 1].active[start.source.charCodeAt(2) - 97] : null;
+  const [hp, maxhp, logLength, seed, activeMove] = [body.hp, body.maxhp, battle.log.length, battle.prng.getSeed(), battle.activeMove];
+  const flags = turnFlags(battle);
+  battle.activeMove = null;
+  let added: boolean;
+  try {
+    added = !!body.addVolatile(start.id, source ?? null) && !!body.volatiles[start.id];
+  } catch {
+    added = false;
+  }
+  if (!added) delete body.volatiles[start.id];
+  battle.activeMove = activeMove;
+  [body.hp, body.maxhp] = [hp, maxhp];
+  battle.log.length = logLength;
+  battle.prng.setSeed(seed);
+  for (const { pokemon, flags: kept } of flags) Object.assign(pokemon, kept);
+  const state = body.volatiles[start.id];
+  // The block's residual round ticked the counter of every volatile the simulator itself had started before it.
+  if (added && ticked && typeof state?.duration === 'number' && --state.duration <= 0) {
+    delete body.volatiles[start.id];
+    return false;
+  }
+  return added;
+}
+
+/**
+ * Plays the `-start` lines of the block that the board lacks, on the body standing on the line's slot at the block's end.
+ * `residualAt`: the index in `events` where the block's residual round came (the lines before it count one tick on a
+ * duration). A volatile the board has keeps its state, but a protosynthesis-style stat takes the protocol's. True when the
+ * board changed.
+ */
+export function playProtocolStarts(battle: SimBattle, events: readonly string[], residualAt = 0): boolean {
+  if (battle.ended || battle.queue.list.length > 0 || !events.some(line => line.startsWith('|-start|'))) return false;
+  let changed = false;
+  for (const start of liveStarts(battle, events)) {
+    const body = battle.sides[start.sideIdx].active[start.slot];
+    if (!body || body.fainted || body.hp <= 0) continue;
+    if (!body.volatiles[start.id]) changed = startVolatile(battle, body, start, start.index < residualAt) || changed;
+    const state = body.volatiles[start.id];
+    if (start.stat && state && state['bestStat'] !== start.stat) {
+      state['bestStat'] = start.stat;
+      changed = true;
+    }
+  }
+  return changed;
+}
