@@ -22,6 +22,8 @@ import doublesTeams from './fixtures/doubles-identity-fixture';
  * positions with real history: a singles 6v6 three turns in and a doubles
  * 2v2 two turns in. Children are pinned as a hash of their serialized state
  * without the history keys plus readable facts and the advance's log delta.
+ * Re-recorded in round 73 (user gate 22.10.2026, 2a): the bench credit (T225), the stage relation (T249) and the
+ * matchup pair value (T248) move the children's prng, hp and fainted facts and the search picks other children.
  */
 
 const RECORD = process.env.PERF_IDENTITY_RECORD === '1';
