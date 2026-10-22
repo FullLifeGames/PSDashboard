@@ -1,8 +1,8 @@
 # Backlog
 
-This file holds the details of every open TODO, one section per TODO under its fixed T-number. The sections follow the finish line of `NextSteps.md` (user 21.10.2026): wave 5, T163 and T160, the last wave, the release; every other TODO is parked with a trigger. The next free T-number is T264.
+This file holds the details of every open TODO, one section per TODO under its fixed T-number. The sections follow the finish line of `NextSteps.md` (user 21.10.2026): wave 5, T163 and T160, the last wave, the release; every other TODO is parked with a trigger. The next free T-number is T266.
 
-Evidence paths that start with `r69/` are under `docs/perf/probes/2026-10-12-r69/`, those that start with `r72/` under `docs/perf/probes/2026-10-19-r72/`, those that start with `r73/` under `docs/perf/probes/2026-10-21-r73/`.
+Evidence paths that start with `r69/` are under `docs/perf/probes/2026-10-12-r69/`, those that start with `r72/` under `docs/perf/probes/2026-10-19-r72/`, those that start with `r73/` under `docs/perf/probes/2026-10-21-r73/`, those that start with `r74/` under `docs/perf/probes/2026-10-22-r74/`.
 
 Source of the new TODOs of round 69: the lane notes, the three review lenses after the merge, the pin diagnosis of lane B and the timing windows of round 69; each claim was checked by a reviewer against the code of the merge state (`r69/review/todos-check.md`, `todos-check-2.md`). Line numbers refer to the state after round 69.
 
@@ -12,9 +12,11 @@ Source of the new TODOs of round 72 (T248 to T255): the lane notes of wave 4, th
 
 Source of the new TODOs of round 73 (T258 to T263): the lane notes of wave 5 and its gate of 22.10.2026 ("5a", "4a"); a reviewer checked each claim against the code of the merge state (`r73/booking/backlog-review.md`). Their line numbers refer to the state after round 73.
 
+Source of T264 and T265: the two proposals of round 73 that the design gate of round 74 approved (22.10.2026, "5a", "6a"); a reviewer checked both scenes against the code before the gate (`r74/review/gate-design-facts.md`, claims 10 and 11).
+
 ## Next rounds
 
-Wave 5 (round 73) is booked (user gate 22.10.2026, "6a"). Next: T163 with T263 (both fit on one new capture with search), then T160, the last wave (T233, T234, T244, T243 with T258, T259, T260, T261, T262), and the release with T43. Every other TODO is parked with a trigger.
+Wave 5 (round 73) is booked (user gate 22.10.2026, "6a"). Round 74 runs T163 with T263 (design gate 22.10.2026, "1a 2a 3a 4a": the capture with search in CI on the full fit corpus, all five families, the leaf K first, then the matchup weight, then the display scale). Then T160, the last wave (T233 with T264, T234, T244, T243 with T258, T259, T260, T261, T262, T265), and the release with T43. Every other TODO is parked with a trigger.
 
 ## The next two rounds: T163 and T160
 
@@ -222,6 +224,40 @@ Wave 5 (round 73) is booked (user gate 22.10.2026, "6a"). Next: T163 with T263 (
 **Steps.**
 - [ ] Timing by commit in one worktree (lanes F, H and I apart).
 - [ ] The fix, lossless.
+
+### T264 · A dice turn against the winner joins the key moments
+
+*Report · small fix · prose (corpus pins at the gate) · round 73 (lane D) · with T233*
+
+**Problem.** The game report shows at most four key moments (`keyMomentsFor` in `report.ts`, ranked by `momentScore`). In smogtours-gen8ou-573756 turn 73, Garchomp (+4) misses a 95 % Fire Fang on Corviknight at 15 % HP, and Body Press knocks Garchomp out. Since round 73 the turn ranks eighth of eight: the healer rule of T248 lowers its chance share from 0.286 to 0.267 (the 3 % Corviknight after the miss falls before its Roost), and T225a with the pair value of T248 lifts turns 70 and 78 into the list and turns 116 and 124 above it (`r73/lanes/D/diagnosis.md`). A user who reads the report does not see the luck that turned the game.
+
+**Benefit.** Report: a roll that went against the winner shows among the key moments.
+
+**Success.** The list keeps its top four and adds every dice turn that qualifies (`momentScore` at least 0.25, not quiet, not a resolution turn) and whose chance went against the winner, in turn order. In 573756 only turn 73 joins (the dice turns 5, 26, 27, 44, 46, 65, 79, 84 and 130 are not in the pool). Red test on synthetic lists of analyses in singles and doubles; one feedback run for the moved lists of the other eleven replays; the gap pin of 573756 t73 closes at the gate.
+
+**Evidence.** `r73/lanes/D/diagnosis.md` (sections 2, 3 and 6), `r74/review/gate-design-facts.md` (claim 10).
+
+**Steps.**
+- [ ] Red test: a dice turn at rank 8 enters, a non-dice turn at rank 8 does not, a dice turn whose chance went toward the winner does not; singles and doubles.
+- [ ] The rule in `keyMomentsFor`.
+- [ ] One feedback run; the moved pins wait for the gate.
+
+### T265 · Rage Fist after hits taken
+
+*Rule · small fix · score-touching D3 · round 73 (lane I)*
+
+**Problem.** Rage Fist's power is 50 plus 50 per hit taken, at most 350 (the simulator's `basePowerCallback` reads `pokemon.timesAttacked`). After two hits the game plays it at 150, and two of our paths price it at 50. The doubles kill table and the KO odds on the cards go through `calcMove`, where `CALC_LACKS_POWER` holds Last Respects alone (`calc/move.ts:31`) and `@smogon/calc` 0.12 counts no hits. The static evaluation reads the simulator's handler only for the ids of `POWER_MOVES` (`score/move-facts.ts:113`), on a rebuilt battle that does not pin hits taken (`power-handlers-census.spec.ts:30`, `ragefist: 'unpinned'`). The spread solver already reads the hits from the history (`historyPower` in `replay-core/src/spreads/hit-power.ts`, T210).
+
+**Benefit.** Engine and app: an Annihilape that took hits threatens on the board what it threatens in the game.
+
+**Success.** A red sweep over every move with a `basePowerCallback` that reads the history, against the calculator and the static on the same facts (hits taken, faints so far), in every generation and mod the corpus plays; Rage Fist reads its hits from the history the way `historyPower` does, one rule in one module; the batch check of the last wave.
+
+**Evidence.** `r74/review/gate-design-facts.md` (claim 11), `r74/todo-proposals-r73.md`.
+
+**Steps.**
+- [ ] The red sweep.
+- [ ] The hits taken from the history for the calc path and the static.
+- [ ] The upstream note for `@smogon/calc` in the user's list.
 
 ## The release
 
@@ -848,7 +884,6 @@ The triage of 21.10.2026 parked these TODOs; each section names its trigger, and
 - [ ] Round 73: The halved Speed of a paralysis after the hit lands, in the race's move order. Trigger: a scene where a paralyzed body's race order misreads.
 - [ ] Round 73: `sweepCells` and `beatsPair` read the pair on raw HP without the heal strip of T248. Trigger: a relation spec or a scene reaches it.
 - [ ] Round 73: Per-target dice in a branch's first turn (VGC 2630181744 turn 3: a changed move lets Astral Barrage hit both foes where the log rolled once). Trigger: a scene where the targets change order.
-- [ ] Round 73: `CALC_LACKS_POWER` in `calc/move.ts` holds Last Respects alone, while the history class of T210 holds Rage Fist too, which `@smogon/calc` 0.12 prices at its base power. Trigger: met at booking (Rage Fist after hits taken); it goes to the next gate as a proposal.
 - [ ] Round 73: Payback, Bolt Beak and Fishious Rend take the move order from speeds, not from the log. Trigger: a measured hit misreads.
 - [ ] Round 73: Stakeout after a forced replacement reads without the boost (the client clears `newlySwitched` at `|turn|`). Trigger: a measured hit misreads.
 - [ ] Round 73: Two same-species team members without nicknames count as one fainted for Last Respects (two Shedinja in a draft league). Trigger: a user report.
@@ -861,7 +896,7 @@ Every gap has its TODO. The pins themselves are in `e2e-feedback/corpus.ts`; re-
 
 | Gap | State 19.09. | Handled in |
 | --- | --- | --- |
-| 573756 t73 (since round 32) | Chance and key moment have been pinned since round 40 (dbffb5f). State 17.10. (round 70): the miss is a key moment again and books as chance (+0.286), but the sentence "one 95% roll from clearing the rest" no longer renders (observed re-pinned without it, gate 17.10., "4a"); Body Press reads no tier (regret 0.0995 against Defog; Monte Carlo 0.085 and 0.095). | Round 73: the key moment lost to two game-correct changes (T225a lifts t70, the healer rule of T248 lowers t73's chance share 0.286 to 0.267; `r73/lanes/D/diagnosis.md`); a key-moment rule waits for the user |
+| 573756 t73 (since round 32) | Chance and key moment have been pinned since round 40 (dbffb5f). State 17.10. (round 70): the miss is a key moment again and books as chance (+0.286), but the sentence "one 95% roll from clearing the rest" no longer renders (observed re-pinned without it, gate 17.10., "4a"); Body Press reads no tier (regret 0.0995 against Defog; Monte Carlo 0.085 and 0.095). | Round 73: the key moment lost to two game-correct changes (T225a lifts t70, the healer rule of T248 lowers t73's chance share 0.286 to 0.267; `r73/lanes/D/diagnosis.md`); T264 (last wave, design gate of round 74, "5a") adds a dice turn against the winner to the list |
 | 649664 t23 | observed has been on shift since round 70 (gate 17.10., "4a"): a turn reads chance only where the chance part outweighs the decision part (7ecaac4), here 0.354 against 1.304; from round 42 to round 69 it was on chance. The bar reads 0.79 instead of 0.92, because the proof leaves the next 80% Hydro Pump open, no crit (round 62). Since round 63 the card for turn 24 names the open 80% Hydro Pump (T19) and says in turn 23 that the verdict hangs on Keldeo's item (Choice Scarf: fine, Mystic Water: blunder). Since round 64 (T121 point 1) Keldeo's guessed Choice item gets the damage check that refutes it; the gap stayed open in the wave run, nobody has read it yet. | Re-pin question at the gate |
 | Draft game t48, 573756 t70 | Chance booking without dice: the read payoff fizzles (t48), the setup payoff comes one evaluation too late (t70, reads quiet today with −0.145). | T189 |
 | GPL DzBQ5azlO5l t13 | State 17.10. (round 70): the rebuild plays turn 13 under the log's seed (0ec3352), so Air Slash no longer flinches there, and the trend probe reads each base draw against its own leaf (8d5642b); with Stone Edge set by the editor it ranks first or second, where round 69's matrix path had it third (`docs/perf/probes/2026-10-13-gpl-flinch/findings.md`). Before: Heavy Slam reads without an error band. Stone Edge is missing from the set (gen9ou 0.35%, a limit of the reconstruction); with Stone Edge added by hand, the cell Air Slash against Stone Edge has read −0.336 against the MC reference −0.328 ± 0.033 since round 64 (T119); Stone Edge stands first for p2, Heavy Slam has a regret of about 0.007, there is no grade. The gap thus hangs on the missing Stone Edge in the set (limit of the reconstruction), not on the verification. t15 reads right in Auto (Vileplume regret 0 to 0.018 in three seed sets, round 62) and is done. Fixture `e2e/fixtures/gpl-replay-DzBQ5azlO5l.html`. | Gate question (reconstruction) |
