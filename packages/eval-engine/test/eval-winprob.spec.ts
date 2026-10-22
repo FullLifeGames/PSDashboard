@@ -1,5 +1,5 @@
 import { test, expect, describe } from 'vitest';
-import { CHAMPIONS_WINPROB_K, DISPLAY_K, VGC_WINPROB_K, winPercent, winProbability, WINPROB_K, winprobK, wpUnits } from '../src/winprob';
+import { CHAMPIONS_WINPROB_K, DISPLAY_K, VGC_WINPROB_K, winPercent, winProbability, WINPROB_K, WINPROB_K_OF, winprobK, wpUnits } from '../src/winprob';
 import type { StaticRuleset } from '../src/score/weights';
 
 describe('win probability mapping', () => {
@@ -27,34 +27,32 @@ describe('win probability mapping', () => {
     expect(WINPROB_K.doubles.k0).toBeGreaterThan(1);
   });
 
-  // Round 67 (T138): Pokémon Champions doubles prices its own scale, fitted on its corpus games in the app's build on
-  // the Champions mod (1.86 + 4.17 × the fainted share). Champions singles keeps the singles K: its fit (1.64 + 4.41)
-  // read the mid game of the Champions OU holdout worse in both tables. Every other rule set keeps the K of its game
-  // type.
-  test('round 67 (T138): Champions doubles prices its own phase K; Champions singles, standard and VGC keep their game type\'s', () => {
-    expect(CHAMPIONS_WINPROB_K.doubles).toEqual({ k0: 1.86, k1: 4.17 });
-    expect(CHAMPIONS_WINPROB_K.singles).toEqual(WINPROB_K.singles);
+  // Round 67 (T138), reshaped in round 74 (T163): a rule set prices its own scale. Champions doubles did so since
+  // round 67 (1.86 + 4.17 × the fainted share, fitted on its corpus games in the Champions mod); since round 74 every
+  // family has an entry of its own. The default rule set is the standard one.
+  test('round 67 (T138): every rule set resolves its own phase K through winProbability and wpUnits', () => {
     const p = (k: { k0: number; k1: number }) => 1 / (1 + Math.exp(-(k.k0 + k.k1 * 0.5) * 0.4));
     expect(winProbability(0.4, true, 0.5, 'champions')).toBeCloseTo(p(CHAMPIONS_WINPROB_K.doubles), 12);
     expect(wpUnits(0.4, true, 0.5, 'champions')).toBeCloseTo(2 * p(CHAMPIONS_WINPROB_K.doubles) - 1, 12);
     for (const doubles of [false, true]) {
-      const gameType = doubles ? WINPROB_K.doubles : WINPROB_K.singles;
-      const rulesets = doubles ? (['standard', 'vgc'] as const) : (['champions', 'standard', 'vgc'] as const);
-      for (const ruleset of rulesets) expect(winProbability(0.4, doubles, 0.5, ruleset)).toBeCloseTo(p(gameType), 12);
-      expect(winProbability(0.4, doubles, 0.5)).toBeCloseTo(p(gameType), 12);
+      const gameType = doubles ? 'doubles' : 'singles';
+      for (const ruleset of ['standard', 'vgc', 'champions'] as const) {
+        expect(winProbability(0.4, doubles, 0.5, ruleset), `${ruleset} ${gameType}`).toBeCloseTo(p(WINPROB_K_OF[ruleset][gameType]), 12);
+      }
+      expect(winProbability(0.4, doubles, 0.5)).toBeCloseTo(p(WINPROB_K[gameType]), 12);
     }
   });
 
   // Round 74 (T163): every family resolves its own K entry, so a fit moves one family and no other. The five values
-  // are today's (lossless): VGC doubles equals standard doubles, Champions singles equals standard singles, and none
-  // of them shares an object with another.
-  test('round 74 (T163): the five families hold today\'s K, each in its own entry', () => {
+  // are the candidates of the fit on the search's own root values (a weight pin, not a verdict: the bank and the
+  // holdouts decide by D4), and none of them shares an object with another.
+  test('round 74 (T163): the five families hold their candidate K, each in its own entry', () => {
     const today = {
-      'standard-singles': { k0: 2.28, k1: 1.49 },
-      'standard-doubles': { k0: 2.98, k1: 0.88 },
-      'vgc-doubles': { k0: 2.98, k1: 0.88 },
-      'champions-singles': { k0: 2.28, k1: 1.49 },
-      'champions-doubles': { k0: 1.86, k1: 4.17 },
+      'standard-singles': { k0: 2.81, k1: 0.8 },
+      'standard-doubles': { k0: 2.95, k1: 1.11 },
+      'vgc-doubles': { k0: 2.09, k1: 1.13 },
+      'champions-singles': { k0: 2.05, k1: 3.22 },
+      'champions-doubles': { k0: 1.8, k1: 3.07 },
     } as const;
     const entries = new Map<string, object>();
     for (const [family, k] of Object.entries(today)) {
@@ -64,7 +62,7 @@ describe('win probability mapping', () => {
       entries.set(family, resolved);
     }
     expect(new Set(entries.values()).size).toBe(5);
-    expect(VGC_WINPROB_K.doubles).toEqual({ k0: 2.98, k1: 0.88 });
+    expect(VGC_WINPROB_K.doubles).toEqual({ k0: 2.09, k1: 1.13 });
     expect(winprobK(true, 'vgc')).toBe(VGC_WINPROB_K.doubles);
     expect(winprobK(false, 'vgc')).toBe(VGC_WINPROB_K.singles);
     expect(winprobK(false, 'champions')).toBe(CHAMPIONS_WINPROB_K.singles);

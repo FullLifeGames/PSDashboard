@@ -21,12 +21,12 @@ describe('scripts/k-stamp.mjs writes the K table the leaf resolves', () => {
     }
   });
 
-  test('the stamp holds today\'s five family values', () => {
+  test('the stamp holds the five candidate family values', () => {
     const stamp = JSON.parse(run().stdout);
     expect(stamp).toEqual({
-      standard: { singles: { k0: 2.28, k1: 1.49 }, doubles: { k0: 2.98, k1: 0.88 } },
-      vgc: { singles: { k0: 2.28, k1: 1.49 }, doubles: { k0: 2.98, k1: 0.88 } },
-      champions: { singles: { k0: 2.28, k1: 1.49 }, doubles: { k0: 1.86, k1: 4.17 } },
+      standard: { singles: { k0: 2.81, k1: 0.8 }, doubles: { k0: 2.95, k1: 1.11 } },
+      vgc: { singles: { k0: 2.28, k1: 1.49 }, doubles: { k0: 2.09, k1: 1.13 } },
+      champions: { singles: { k0: 2.05, k1: 3.22 }, doubles: { k0: 1.8, k1: 3.07 } },
     });
   });
 });
