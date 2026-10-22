@@ -10,9 +10,12 @@
 //                                                   release, check its sha256, unpack it into the checkout and
 //                                                   check that both folders hash as the fixture says
 //
-// The tarball holds what a CI run reads from disk: every file of .smogon-cache and, of .fit-corpus, the replays of the
-// holdout sets (regression/fixtures/fit-holdout-manifest.json, read by regression/bank-universe.ts). CI fits no
-// weights, so the rest of the fit corpus stays here; the bank fetches its own replays from the network, here as in CI.
+// The tarball holds what a CI run reads from disk: every file of .smogon-cache and, of .fit-corpus, every replay the
+// fit source reads (round 74, T163: CI captures the fit corpus with search): the manifest's replays
+// (regression/fixtures/fit-corpus-manifest.json, FIT_MANIFEST in regression/bank-universe.ts) and the holdout sets'
+// replays (regression/fixtures/fit-holdout-manifest.json, read by the holdout source there). The sample caches of
+// the weight fits (samples-cache*.json) stay here, and so does what no manifest names; the bank fetches its own
+// replays from the network, here as in CI.
 // The fixture is tracked, so a commit names exactly the data its CI runs read (scripts/bank-data.mjs).
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -26,6 +29,8 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const FIXTURE = 'regression/fixtures/bank-data.json';
 /** The holdout sets regression/bank-universe.ts reads (HOLDOUT_MANIFEST there). */
 const HOLDOUT_MANIFEST = 'regression/fixtures/fit-holdout-manifest.json';
+/** The fit corpus regression/bank-universe.ts reads for EVAL_CALIBRATION_SOURCE=fit (FIT_MANIFEST there). */
+const FIT_MANIFEST = 'regression/fixtures/fit-corpus-manifest.json';
 const PACK_DIR = '.calibration/bank-data';
 const FORMAT = 1;
 
@@ -56,12 +61,21 @@ const readFixture = () => {
 const sha256 = data => createHash('sha256').update(data).digest('hex');
 const megabytes = bytes => `${(bytes / 1e6).toFixed(1)} MB`;
 
-/** The files to pack: all of .smogon-cache, and of .fit-corpus the holdout replays (every one must be there). */
+/**
+ * The files to pack: all of .smogon-cache, and of .fit-corpus every replay the fit source reads, the manifest's and
+ * the holdout's. A holdout replay must be there; a manifest replay the cache lacks is skipped by a run on the fit
+ * source too (round 74: five of 5,627 on the build machine), so the pack reports them and goes on.
+ */
 function selection() {
-  const ids = [...new Set(JSON.parse(readFileSync(join(ROOT, HOLDOUT_MANIFEST), 'utf8')).sets.flatMap(set => set.ids))];
-  const missing = ids.filter(id => !existsSync(join(ROOT, '.fit-corpus', `${id}.json`)));
+  const holdout = [...new Set(JSON.parse(readFileSync(join(ROOT, HOLDOUT_MANIFEST), 'utf8')).sets.flatMap(set => set.ids))];
+  const missing = holdout.filter(id => !existsSync(join(ROOT, '.fit-corpus', `${id}.json`)));
   if (missing.length > 0) fail(`${missing.length} holdout replay(s) missing from .fit-corpus (first: ${missing[0]}); run scripts/build-fit-corpus.mjs first`);
-  return { '.smogon-cache': null, '.fit-corpus': ids.map(id => `${id}.json`) };
+  const manifest = JSON.parse(readFileSync(join(ROOT, FIT_MANIFEST), 'utf8')).replays.map(entry => entry.id);
+  const ids = [...new Set([...manifest, ...holdout])];
+  const absent = ids.filter(id => !existsSync(join(ROOT, '.fit-corpus', `${id}.json`)));
+  if (absent.length > 0) console.log(`${absent.length} manifest replay(s) not in .fit-corpus, left out (first: ${absent[0]})`);
+  const present = new Set(absent);
+  return { '.smogon-cache': null, '.fit-corpus': ids.filter(id => !present.has(id)).map(id => `${id}.json`) };
 }
 
 function pack() {

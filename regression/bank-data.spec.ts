@@ -120,12 +120,16 @@ describe('bank-data-pack.mjs packs here and fetches in CI', () => {
   /** The holdout sets of the temp checkout: the tarball takes these replays of .fit-corpus. */
   const holdout = (root: string, ids: string[]) =>
     put(root, 'regression/fixtures/fit-holdout-manifest.json', JSON.stringify({ sets: [{ key: 'doublesou|a|b', family: 'doublesou', ids }] }));
+  /** The fit corpus manifest of the temp checkout (regression/fixtures/fit-corpus-manifest.json, read by regression/bank-universe.ts). */
+  const fitManifest = (root: string, ids: string[]) =>
+    put(root, 'regression/fixtures/fit-corpus-manifest.json', JSON.stringify({ replays: ids.map(id => ({ id, format: id.split('-')[0], source: 'tournament' })) }));
   const run = (root: string, ...args: string[]) =>
     spawnSync(process.execPath, [join(root, 'scripts', 'bank-data-pack.mjs'), ...args], { cwd: root, encoding: 'utf8' });
 
   test('the pack writes the asset and the fixture; a checkout without data fetches it from the file and checks both folders', () => {
     const source = withScripts(dataRoot());
     holdout(source, ['gen9ou-1']);
+    fitManifest(source, ['gen9ou-1']);
     const packed = run(source);
     expect(packed.status, packed.stderr).toBe(0);
     const fixture = JSON.parse(readFileSync(join(source, 'regression', 'fixtures', 'bank-data.json'), 'utf8'));
@@ -139,13 +143,43 @@ describe('bank-data-pack.mjs packs here and fetches in CI', () => {
     expect(fetched.status, fetched.stderr).toBe(0);
     expect(hashDirectory(join(ci, '.fit-corpus'))).toEqual(fixture.dirs['.fit-corpus']);
     expect(hashDirectory(join(ci, '.smogon-cache'))).toEqual(fixture.dirs['.smogon-cache']);
-    // CI fits no weights: the replays outside the holdout stay here.
+    // A replay that neither the fit manifest nor the holdout names stays here.
     expect(existsSync(join(ci, '.fit-corpus', 'gen9vgc2025regg-2.json'))).toBe(false);
+  });
+
+  test('the pack holds every replay the fit source reads (round 74, T163: CI captures the fit corpus with search) and nothing else', () => {
+    const source = withScripts(dataRoot());
+    put(source, '.fit-corpus/samples-cache.json', '{"samples":[]}\n');
+    holdout(source, ['gen9ou-1']);
+    fitManifest(source, ['gen9ou-1', 'gen9vgc2025regg-2', 'gen9ou-not-cached']);
+    const packed = run(source);
+    expect(packed.status, packed.stderr).toBe(0);
+    const fixture = JSON.parse(readFileSync(join(source, 'regression', 'fixtures', 'bank-data.json'), 'utf8'));
+    // Two smogon-cache files and the two manifest replays that the cache holds; the sample cache is no replay.
+    expect(fixture.files).toBe(4);
+    expect(fixture.dirs['.fit-corpus'].files).toBe(2);
+    expect(packed.stdout).toMatch(/1 manifest replay\(s\) not in \.fit-corpus/);
+    const ci = withScripts(folder('ci'));
+    put(ci, 'regression/fixtures/bank-data.json', JSON.stringify(fixture));
+    const fetched = run(ci, '--fetch', '--file', join(source, '.calibration', 'bank-data', fixture.asset));
+    expect(fetched.status, fetched.stderr).toBe(0);
+    expect(existsSync(join(ci, '.fit-corpus', 'gen9vgc2025regg-2.json'))).toBe(true);
+    expect(existsSync(join(ci, '.fit-corpus', 'samples-cache.json'))).toBe(false);
+  });
+
+  test('a holdout replay outside the fit manifest still joins the pack', () => {
+    const source = withScripts(dataRoot());
+    holdout(source, ['gen9ou-1']);
+    fitManifest(source, ['gen9vgc2025regg-2']);
+    const packed = run(source);
+    expect(packed.status, packed.stderr).toBe(0);
+    expect(JSON.parse(readFileSync(join(source, 'regression', 'fixtures', 'bank-data.json'), 'utf8')).dirs['.fit-corpus'].files).toBe(2);
   });
 
   test('a holdout replay missing from .fit-corpus stops the pack', () => {
     const source = withScripts(dataRoot());
     holdout(source, ['gen9ou-1', 'gen9ou-404']);
+    fitManifest(source, ['gen9ou-1', 'gen9ou-404']);
     const packed = run(source);
     expect(packed.status).toBe(2);
     expect(packed.stderr).toMatch(/1 holdout replay\(s\) missing.*gen9ou-404/);
@@ -155,6 +189,7 @@ describe('bank-data-pack.mjs packs here and fetches in CI', () => {
   test('a fetched file whose sha256 differs from the fixture unpacks nothing', () => {
     const source = withScripts(dataRoot());
     holdout(source, ['gen9ou-1']);
+    fitManifest(source, ['gen9ou-1']);
     expect(run(source).status).toBe(0);
     const fixture = JSON.parse(readFileSync(join(source, 'regression', 'fixtures', 'bank-data.json'), 'utf8'));
     const tampered = join(folder('tampered'), fixture.asset);
