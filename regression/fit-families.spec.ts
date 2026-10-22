@@ -112,6 +112,56 @@ describe('fit families', () => {
       { seeds: 2, folds: 5, draws: 4, minGames: 20 }, leaf)).toThrow(/identity/);
   });
 
+  // Round 74 (T163, T263): a capture with search holds the root value in `score`, which no start table gives back. The
+  // dump says it came from a search by the root fields only a search writes (gameValue, the decided sweep, the proven
+  // forced win); the weight fit then needs the features, the outcome and the start tables, and skips the identity.
+  describe('round 74 (T163, T263): a weight fit on a dump from a search', () => {
+    const row = (id: string, extra: Record<string, unknown>, g = [1, 2]) => JSON.stringify({
+      id, turn: 2, tranche: 'fit-ladder', phase: 'early', gameType: 'singles', score: 0.1, faintedFraction: 0, p1Won: true, lastPair: false, g, ...extra,
+    });
+    const dumpOf = (...lines: string[]) => {
+      const dump = join(mkdtempSync(join(tmpdir(), 'fit-families-')), 'merged.jsonl');
+      writeFileSync(dump, `${lines.join('\n')}\n`);
+      return dump;
+    };
+
+    test('a dump with any root field of a search marks all its samples; a static dump marks none', () => {
+      const staticRow = (id: string) => row(id, { gameValue: null, decided: null, decidedHeld: null, forcedWinMass: null });
+      const searched = dumpSamples([dumpOf(staticRow('gen9ou-1'), row('gen9ou-2', { gameValue: 0.2 }))], () => ['a', 'b']);
+      expect(searched.map(sample => sample.search)).toEqual([true, true]);
+      for (const field of [{ decided: 'p1' }, { decidedHeld: 'p2' }, { forcedWinMass: 0.5 }]) {
+        expect(dumpSamples([dumpOf(row('gen9ou-3', field))], () => ['a', 'b'])[0].search, JSON.stringify(field)).toBe(true);
+      }
+      expect(dumpSamples([dumpOf(staticRow('gen9ou-4'), staticRow('gen9ou-5'))], () => ['a', 'b']).map(sample => sample.search)).toEqual([false, false]);
+      // A dump written before round 67 has no root fields at all: static.
+      expect(dumpSamples([dumpOf(row('gen9ou-6', {}))], () => ['a', 'b'])[0].search).toBe(false);
+      // The flag is per dump file: a static file next to a search file keeps its identity check.
+      const mixed = dumpSamples([dumpOf(staticRow('gen9ou-7')), dumpOf(row('gen9ou-8', { gameValue: -0.1 }))], () => ['a', 'b']);
+      expect(mixed.map(sample => sample.search)).toEqual([false, true]);
+    });
+
+    const names = ['bodies', 'matchup'];
+    const families = [{ name: 'standard-singles', singles: [2, 2], doubles: [2, 2] }];
+    const options = { seeds: 2, folds: 5, draws: 4, minGames: 20 };
+
+    test('the identity is skipped for samples of a search dump, and the fit runs on their features and outcomes', () => {
+      // The roots a search returns: no start table gives them back.
+      const samples = synthetic('gen9ou', 'singles', [3, 1], 220, 1).map(sample => ({ ...sample, score: 0.37, search: true }));
+      expect(() => familyReports(samples.map(sample => ({ ...sample, search: false })), names, families, () => K, options, leaf)).toThrow(/identity/);
+      const reports = familyReports(samples, names, families, () => K, options, leaf);
+      expect(reports.identity).toEqual({ samples: 0, off: 0, skipped: samples.length });
+      const entry = reports.families['standard-singles'];
+      if (!('weights' in entry)) throw new Error('no report');
+      expect(entry.games).toBe(220);
+    });
+
+    test('a static sample next to a search sample is still checked', () => {
+      const samples = synthetic('gen9ou', 'singles', [3, 1], 220, 1).map(sample => ({ ...sample, search: true }));
+      samples[0] = { ...samples[0], search: false, score: 0.9 };
+      expect(() => familyReports(samples, names, families, () => K, options, leaf)).toThrow(/identity: 1 of 1 /);
+    });
+  });
+
   // Rule R2 of round 65: a weight the first pass flags (a flipped sign, a band wider than twice its value) is held, and the family refits once.
   test('a flagged weight is held in a second pass, which the report gives beside the first', () => {
     // The truth runs the second feature against its start sign: the first pass flips it and flags it.

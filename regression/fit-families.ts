@@ -34,6 +34,11 @@ export interface FamilySample {
   wp?: boolean;
   /** The bank prices the last pair by its race, not by the static: no identity check there. */
   lastPair?: boolean;
+  /**
+   * Round 74 (T163, T263): the dump came from a search, so `score` is the root value of the search and no start table
+   * gives it back: no identity check there. A weight fit on such a dump needs only `g`, the outcome and the start tables.
+   */
+  search?: boolean;
   source?: 'tournament' | 'ladder';
   /** The replay's ladder rating (null or 0 for tournament games and unrated games). */
   rating?: number | null;
@@ -76,7 +81,16 @@ interface BankRow {
   lastPair?: boolean;
   g?: number[];
   rating?: number | null;
+  /** The root fields only a search writes (regression/eval-calibration.spec.ts rootReading): null or missing under EVAL_CALIBRATION_STATIC=1. */
+  gameValue?: number | null;
+  decided?: string | null;
+  decidedHeld?: string | null;
+  forcedWinMass?: number | null;
 }
+
+/** A row that carries a root field of a search. A static capture writes all of them as null, a dump from before round 67 none. */
+const fromSearch = (row: BankRow): boolean =>
+  row.gameValue != null || row.decided != null || row.decidedHeld != null || row.forcedWinMass != null;
 
 /**
  * Samples from calibration-bank dumps (one JSON line per position, with g).
@@ -93,17 +107,19 @@ export function dumpSamples(paths: string[], playersOf: (id: string) => string[]
     }
     return `${family}|${key}`;
   };
-  return paths
-    .flatMap(path => readFileSync(path, 'utf-8').split('\n').filter(line => line.trim()).map(line => JSON.parse(line) as BankRow))
-    .filter(row => Array.isArray(row.g))
-    .map(row => {
+  // Round 74: a dump is a search's when any of its rows carries a root field of a search (a tree turn alone leaves them null).
+  return paths.flatMap(path => {
+    const rows = readFileSync(path, 'utf-8').split('\n').filter(line => line.trim()).map(line => JSON.parse(line) as BankRow);
+    const search = rows.some(fromSearch);
+    return rows.filter(row => Array.isArray(row.g)).map(row => {
       const ruleset = rulesetOfId(row.id);
       return {
         game: row.id, set: setOf(row, familyOf({ ruleset, gameType: row.gameType })), gameType: row.gameType, ruleset,
         g: row.g!, p1Won: row.p1Won, faintedFraction: row.faintedFraction, score: row.score, wp: true,
-        lastPair: row.lastPair ?? false, source: row.tranche === 'fit-tournament' ? 'tournament' : 'ladder', rating: row.rating ?? null,
+        lastPair: row.lastPair ?? false, search, source: row.tranche === 'fit-tournament' ? 'tournament' : 'ladder', rating: row.rating ?? null,
       };
     });
+  });
 }
 
 /** The samples outside the holdout (scripts/build-fit-holdout.mjs), and how many it took. */
@@ -219,15 +235,17 @@ function refitWithSecondPass(
  * (the pre-registered holds among them). First the identity: the start
  * tables must give back every captured score (`leaf` turns the static's tanh
  * into the leaf value for wp samples, under the K of the sample's rule set),
- * or the capture and the tables disagree and the report stops. Each family
+ * or the capture and the tables disagree and the report stops. A sample of a dump from a search (round 74) holds
+ * the search's root value, which no table gives back: it is left out of the check and counted in `skipped`. Each family
  * refits at the K of its rule set (`kOf`, round 67: Champions has its own).
  */
 export function familyReports(
   samples: FamilySample[], names: string[], families: FamilyTables[], kOf: KOf, options: AtKReportOptions,
   leaf: (tanh: number, doubles: boolean, faintedFraction: number, ruleset: Ruleset) => number,
-): { identity: { samples: number; off: number }; families: Record<string, FamilyReport> } {
+): { identity: { samples: number; off: number; skipped?: number }; families: Record<string, FamilyReport> } {
   let off = 0;
   let checked = 0;
+  let skipped = 0;
   const reports: Record<string, FamilyReport> = {};
   for (const family of families) {
     const subset = samples.filter(sample => familyOf(sample) === family.name);
@@ -239,6 +257,10 @@ export function familyReports(
     }));
     subset.forEach((sample, i) => {
       if (sample.lastPair) return;
+      if (sample.search) {
+        skipped++;
+        return;
+      }
       checked++;
       const tanh = atKScore(atK[i], start, layout);
       const expected = sample.wp ? leaf(tanh, atK[i].doubles, sample.faintedFraction, sample.ruleset) : tanh;
@@ -250,7 +272,7 @@ export function familyReports(
       : refitWithSecondPass(atK, names, family, kOf(rulesetOfFamily(family.name)), options);
   }
   if (off > 0) throw new Error(`identity: ${off} of ${checked} captured scores differ from the start tables`);
-  return { identity: { samples: checked, off }, families: reports };
+  return { identity: { samples: checked, off, ...(skipped > 0 ? { skipped } : {}) }, families: reports };
 }
 
 type Bucket = 'early' | 'mid' | 'late';

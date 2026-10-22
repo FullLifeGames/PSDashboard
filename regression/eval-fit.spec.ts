@@ -191,6 +191,7 @@ const kOf = (ruleset: Ruleset) => WINPROB_K_OF[ruleset];
 const familySamplesOf = (samples: FitSample[]): FamilySample[] => samples.map(sample => ({
   game: sample.game, set: sample.set ?? sample.game, gameType: sample.gameType, ruleset: sample.ruleset ?? rulesetOfId(sample.game),
   g: sample.g, p1Won: sample.p1Won, faintedFraction: sample.faintedFraction, score: sample.score, wp: sample.wp, lastPair: sample.lastPair,
+  search: sample.search,
 }));
 
 /**
@@ -252,6 +253,7 @@ function writeRefitReport(samples: FitSample[]) {
   const report = familyReports(formed.samples, formed.names, formed.families, kOf, options, wpUnits);
   const out = process.env.EVAL_FIT_OUT ?? join(SAMPLES_DIR ?? CACHE_DIR, 'fit-report.json');
   writeFileSync(out, JSON.stringify(report, null, 1));
+  console.log(`identity: ${report.identity.samples} checked, ${report.identity.skipped ?? 0} from a search left out`);
   for (const [name, entry] of Object.entries(report.families)) {
     console.log('verdict' in entry
       ? `refit ${name}: adopt=${entry.verdict.adopt} wins=${entry.summary.pooled.logLossWins}/20 sets=${entry.games}`
@@ -267,6 +269,9 @@ function writeRefitReport(samples: FitSample[]) {
  * reconstruction) instead of this spec's own capture, whose naked teams
  * leave a Doubles OU mon 1.9 moves. Sets are keyed by the corpus cache's
  * players.
+ * Round 74 (T163, T263): a dump from a capture with search (no EVAL_CALIBRATION_STATIC) feeds the same fit; its score
+ * is the search's root value, so the identity check leaves its samples out (fit-families.ts dumpSamples reads the root
+ * fields of a search) and the fit runs on the features, the outcome and the start tables.
  */
 function samplesOf(manifest: Manifest): FitSample[] {
   if (!process.env.EVAL_FIT_DUMP) return cachedSamples(manifest);
@@ -314,6 +319,8 @@ interface FitSample {
   ruleset?: Ruleset;
   wp?: boolean;
   lastPair?: boolean;
+  /** Round 74: the dump came from a search; the score is its root value (no identity check, fit-families.ts). */
+  search?: boolean;
 }
 
 /** One manifest replay's sampled positions, captured in a single reconstruction pass. */
