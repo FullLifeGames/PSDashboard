@@ -54,19 +54,9 @@ import type { StaticRuleset } from './score/weights.ts';
 /** The leaf's K at a fainted share f: k0 + k1·f. */
 export interface PhaseK { readonly k0: number; readonly k1: number }
 
-/**
- * Round 74 (T163): the table of the standard rule set (standard singles and Doubles OU) is a CANDIDATE until the bank
- * and the holdouts decide (D4). Fitted on the search's own root values (the full fit corpus, captured with search in
- * CI at d6e9259; regression/fit-families.ts rootScaleReports): the scale c0 + c1·ff of the old K, K' = K·c.
- * Singles: 4,309 positions of 1,363 sets, c = 1.23 − 0.33·ff, K at 0, a third and two thirds fainted 2.80 [2.37, 3.31],
- * 3.10 [2.87, 3.39], 3.29 [2.63, 4.16] against today's 2.28 + 1.49·ff (2.28, 2.78, 3.27); the band of c0 (1.04 to
- * 1.45) leaves 1. Doubles: 2,131 positions of 651 sets, c = 0.99 + 0.07·ff, K at the same shares 2.96 [2.48, 3.51],
- * 3.32 [3.02, 3.67], 3.70 [2.97, 4.52] against 2.98, 3.27, 3.57; the band of c includes 1 (c0 0.83 to 1.18).
- * The values before: singles 2.28 + 1.49·ff, doubles 2.98 + 0.88·ff (the 1,100-game fit of 2026-08-09).
- */
 export const WINPROB_K = {
-  singles: { k0: 2.81, k1: 0.8 },
-  doubles: { k0: 2.95, k1: 1.11 },
+  singles: { k0: 2.28, k1: 1.49 },
+  doubles: { k0: 2.98, k1: 0.88 },
 } as const;
 
 /**
@@ -83,32 +73,21 @@ export const WINPROB_K = {
  * tables (+35 [+7, +65], own K +26 [+3, +47]). The thresholds in wp-units
  * stay where they are (wave 2, decision 33).
  */
-/**
- * Round 74 (T163), candidates until the bank and the holdouts decide (D4), fitted on the search's own root values of
- * the Champions corpus (rootScaleReports). Champions singles (Champions OU): 900 positions of 285 sets, c = 0.91 +
- * 0.59·ff, K at 0, a third and two thirds fainted 2.08 [1.22, 3.10], 3.08 [2.47, 3.85], 4.28 [3.21, 5.71]; the band of
- * c includes 1 (c0 0.54 to 1.36). Champions doubles (Champions VGC): 1,486 positions of 386 sets, c = 0.95 − 0.22·ff,
- * K 1.77 [1.43, 2.19], 2.86 [2.54, 3.26], 3.75 [2.67, 4.94]; the band of c includes 1 (c0 0.77 to 1.18). The values
- * before: singles 2.28 + 1.49·ff (the standard singles K), doubles 1.86 + 4.17·ff (round 67).
- */
 export const CHAMPIONS_WINPROB_K = {
-  singles: { k0: 2.05, k1: 3.22 },
-  doubles: { k0: 1.8, k1: 3.07 },
+  singles: { k0: 2.28, k1: 1.49 },
+  doubles: { k0: 1.86, k1: 4.17 },
 } as const;
 
 /**
- * Round 74 (T163): VGC doubles resolves its own entry, so a fit sets it without touching Doubles OU (until now both
- * shared 2.98 + 0.88·ff). Champions singles likewise has an entry of its own (it referenced the standard singles
- * before), so each of the five families (standard and Champions singles, Doubles OU, VGC, Champions VGC) is fitted
- * and pinned on its own. VGC doubles is a CANDIDATE until the bank and the holdouts decide (D4): fitted on the
- * search's own root values (rootScaleReports), 2,234 positions of 711 sets, c = 0.70 + 0.15·ff, K at 0, a third and
- * two thirds fainted 2.10 [1.67, 2.45], 2.46 [2.21, 2.81], 2.86 [2.28, 3.66]; the band of c0 (0.56 to 0.82) leaves 1,
- * the one family whose search reads clearly too confident. VGC has no singles game: its singles entry stays the
- * standard one of before (2.28 + 1.49·ff) and no game reads it.
+ * Round 74 (T163): VGC doubles resolves its own entry. It holds the values of Doubles OU (2.98 + 0.88·ff, the one
+ * table both families shared until now), so nothing moves; a fit on the search's own root values sets it without
+ * touching Doubles OU. VGC has no singles game, its singles entry is the standard one. Champions singles likewise
+ * holds the standard singles values in an entry of its own (it referenced them before), so each of the five
+ * families (standard and Champions singles, Doubles OU, VGC, Champions VGC) is fitted and pinned on its own.
  */
 export const VGC_WINPROB_K = {
   singles: { k0: 2.28, k1: 1.49 },
-  doubles: { k0: 2.09, k1: 1.13 },
+  doubles: { k0: 2.98, k1: 0.88 },
 } as const;
 
 /** One K table per rule set (regression/fit-families.ts reads them by rule set, scripts/k-stamp.mjs stamps them). */
