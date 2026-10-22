@@ -910,6 +910,77 @@ import { takeSimFastReport } from '../packages/eval-engine/src/forward/sim-fast/
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * WAVE 5 2026-10-21..22 (improvement round 73, the first step of the finish
+ * line: lanes F (static), H (rebuild) and I (spread solver and hits) in
+ * worktrees w5-f, w5-h and w5-i from 078cf6a (= v1); the merge in its own
+ * clone on r73-merge: 74c72cf (H), ef78abd (I), 1bf0b53 (F's structural
+ * part), 5ac933a (cache v69), 17396d4 (I's census fix), 0aa780c (the census
+ * names the new readers), 387cfe7 (Plus and Minus line by line), 3af7060 (the
+ * re-pins: 2e4ce39 and 10bbc76); spec
+ * docs/superpowers/specs/2026-10-21-round-73-wave-5-design.md, probes
+ * docs/perf/probes/2026-10-21-r73/). Gates: 21.10. ("1a 2a 3b 4a" of round
+ * 72: wave 5 with four lanes), the triage of 21.10. ("1a 2a 3b": three lanes,
+ * 15 TODOs), the design gate of 21.10. ("1a 2a 3a, 4b": T224's re-fit after
+ * the merge of H and I, breaks above 1e-3 go, the cut spread hits priced by
+ * the simulator, T210 with every group).
+ * DELIVERED: lane F: T225 (the bench credit only where the holder wins its
+ * front race within three turns; paralysis and sleep priced from the played
+ * hit), T249 (a raised stage on a body every foe in front KOs first adds
+ * nothing, in every family), T248 (the race flip read on the race at full HP,
+ * a matchup pair weighing the HP share of its winner, a healer the faster foe
+ * takes down in one hit loses its heal in the pair's clocks; one-point
+ * wrong-way jumps over the relation positions 2,460 to 1); T224 measured on a
+ * new capture (28,899 samples) and not adopted: only Doubles OU's
+ * cross-validated fit moved (boostsBiting 0 to 41), and its pair warned in
+ * D26's late cells, so by the pre-registered rule every weight stayed
+ * (e087a48, reverted in 802565f). Lane H: T250 (a forced slot the log leaves
+ * empty stays empty where the game went on and the block's own faint lines
+ * cover it; the protocol's never-shown bench leaves the game), T212
+ * (playProtocolStarts plays a -start line through addVolatile), T214 (the
+ * Sitrus witness sitrusKeptAt), T232 (the first branch turn serves every
+ * unchanged action its logged draws), the CRLF door of T230. Lane I: T229
+ * (powered Z and Max hits leave the solver), T230 (the lookup follows replace
+ * lines), T202 (a single-target Expanding Force or Tera Starstorm that calc
+ * 0.12 cuts leaves the solver and the kill table; the doubles preview prices
+ * it on a copy of the branch's live battle, simHitRange), T203 (a partner's
+ * field ability), T210 (history powers, the defender's status, Stakeout,
+ * Analytic, Plus and Minus, a changed item), T204 (the Choice check reads the
+ * field of the hit).
+ * MEASUREMENT: CI r73-m1 (5ac933a) and r73-m2 (0aa780c, byte-identical to m1)
+ * against the bases on 078cf6a: D26 all -11 [-26, +4], singles -37 [-79, +3],
+ * doubles -5 [-22, +11]; Doubles OU -2, VGC -16, Champions VGC -8, Champions
+ * OU +5; unresolved, no harm, no warning in the full and hq tables (the
+ * bank's own hq doubles rows +99 on 135 rows). Lane by lane: H (r73-h2)
+ * doubles -8 and Champions VGC -17 resolved better, T232 byte-identical
+ * (r73-h3); I (r73-i1) singles -5 full and -8 hq resolved better, set diff
+ * 350 of about 3,400 builds moved, no feedback replay; F's split: T225a costs
+ * singles (+7, +11), T249 hq doubles (+11), T248's race flip gives most of it
+ * back. Timing in one worktree against v1: singles +0.1 %, Doubles OU +2.1 %,
+ * VGC +9.1 % (T262), Champions VGC +1.7 %. Feedback three times
+ * byte-identical in 12 of 12 replays; e2e 78 passed; the tier census 87 moved
+ * turns against round 72. T243 missed: p2 wins the draft t56 play-out 13 of
+ * 16 dice (v1 16).
+ * FOUND ON THE WAY: the simulator refuses pass while a living body waits on
+ * the bench, so T250 retires the bench the protocol never shows; the first
+ * retire also fired at a forfeit (gen9doublesou-2694811367 turn 6, a living
+ * Cresselia) and after a simulator divergence, both fixed in the lane; a lost
+ * Champions VGC row where the simulator KOs a body the game kept at 7 %
+ * (T260); the name census reads no block exception; CI ran 24 runs side by
+ * side for an hour, so a local capture waited for the queue (D23).
+ * USER GATE 2026-10-22 12:12 ("1: 562428 okay, 573756 turn 73 must be
+ * clarified; 2a, watching 573756; 3a 4a 5a 6a"): 562428 t12 becomes known
+ * drift, the six scene pins follow fresh references (the tiers of 2629703929
+ * t8 expect the reference, T242), the play-out pin stays fixme with T243 and
+ * T258 in the last wave, T262 for the VGC tree time, the TODO proposals as
+ * recommended, booked and pushed. The diagnosis of 573756 t73
+ * (lanes/D/diagnosis.md): two game-correct changes push the turn from the top
+ * four. The healer rule (bc9167b) lowers its chance share 0.286 to 0.267,
+ * because the 3 % Corviknight falls before its Roost, and T225a with the pair
+ * value of T248 lifts turns 70 and 78 into the list and turns 116 and 124
+ * above it; in round 72 the turn held fourth place by 0.003. No static fix
+ * holds it; a key-moment rule waits for the next gate. New TODOs T258 to
+ * T263, next free T264.
+ *
  * WAVE 4 2026-10-19..21 (improvement round 72, package G "library instead of
  * hand work": lanes A to D in worktrees w4-a to w4-d from ed25505 (= v1),
  * follow-up steps on w4-b6, w4-b7, w4-d7 and w4-d8; the merge in its own

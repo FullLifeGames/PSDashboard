@@ -1,8 +1,8 @@
 # Backlog
 
-This file holds the details of every open TODO, one section per TODO under its fixed T-number. The sections follow the finish line of `NextSteps.md` (user 21.10.2026): wave 5, T163 and T160, the last wave, the release; every other TODO is parked with a trigger. The next free T-number is T258.
+This file holds the details of every open TODO, one section per TODO under its fixed T-number. The sections follow the finish line of `NextSteps.md` (user 21.10.2026): wave 5, T163 and T160, the last wave, the release; every other TODO is parked with a trigger. The next free T-number is T264.
 
-Evidence paths that start with `r69/` are under `docs/perf/probes/2026-10-12-r69/`, those that start with `r72/` under `docs/perf/probes/2026-10-19-r72/`.
+Evidence paths that start with `r69/` are under `docs/perf/probes/2026-10-12-r69/`, those that start with `r72/` under `docs/perf/probes/2026-10-19-r72/`, those that start with `r73/` under `docs/perf/probes/2026-10-21-r73/`.
 
 Source of the new TODOs of round 69: the lane notes, the three review lenses after the merge, the pin diagnosis of lane B and the timing windows of round 69; each claim was checked by a reviewer against the code of the merge state (`r69/review/todos-check.md`, `todos-check-2.md`). Line numbers refer to the state after round 69.
 
@@ -10,270 +10,13 @@ Source of the new TODOs of round 70 (T224 to T246): the findings of the batch (`
 
 Source of the new TODOs of round 72 (T248 to T255): the lane notes of wave 4, the merge and its timing windows; a reviewer checked each claim against the code of the merge state twice (`r72/booking/todos-review.md`, `r72/booking/backlog-review.md`). Their line numbers refer to the state after round 72. T256 and T257 were found and fixed inside round 72 and have no section.
 
+Source of the new TODOs of round 73 (T258 to T263): the lane notes of wave 5 and its gate of 22.10.2026 ("5a", "4a"); a reviewer checked each claim against the code of the merge state (`r73/booking/backlog-review.md`). Their line numbers refer to the state after round 73.
+
 ## Next rounds
 
-Triage of 21.10.2026 (user gate "1a 2a 3b"): 21 TODOs stay on the way to the release, each with a scene a user sees; 28 are parked with a trigger, and 3 closed (`docs/completed/triage.md`). Wave 5 runs three lanes, F, H and I (the booking gate of round 72 chose four with "3b"; the triage kept three with "2a"), and measures in CI (`node scripts/bank-ci.mjs`, AGENTS.md); its own gate over the open decisions of its design comes first. Then T163 (it fits K on the search's root values, which lane F changes), T160, the last wave and the release.
+Wave 5 (round 73) is booked (user gate 22.10.2026, "6a"). Next: T163 with T263 (both fit on one new capture with search), then T160, the last wave (T233, T234, T244, T243 with T258, T259, T260, T261, T262), and the release with T43. Every other TODO is parked with a trigger.
 
-## Wave 5 · Lane F: static evaluation
-
-### T224 · Re-fit boostsBiting on the round-70 definition
-
-*Re-fit · mini round · small · score-touching D3 · round 70 · rest of T223*
-
-**Problem.** Round 70 (T223) changed what a standing stage is worth: it counts only on a flip or a faster win the holder gets to act in, the races play residuals and contact costs in the simulator, and healers attack where that wins. The weights (standard singles 95, Champions singles 102, Champions doubles 61, VGC 16) come from fits on the old definition, and the feature now reads fewer bites (gen9draft-2058494320, rebuild of turn 19: 95 to 63 points in the Swords Dance cells). Before the contact costs, Swords Dance led that scene down to a weight of about 70.
-
-**Benefit.** Engine: the stage weight matches the feature it multiplies.
-
-**Success.** REPLACEMENT re-fit per family on a new capture (rules set in advance); bank plus holdouts (D26) without harm; the draft scenes keep their order.
-
-**Evidence.** `docs/perf/probes/2026-10-13-boost-bite/findings.md` (weight sweep), `docs/perf/probes/2026-10-15-contact/findings.md` (sweep with contact: Swords Dance 0.001, 0.004, 0.009 at 50, 70, 95).
-
-**Steps.**
-- [ ] New capture of the fit corpus with the round-70 features (the capture writes its own form, T201).
-- [ ] Fit per family; adopt by the pre-registered rule.
-- [ ] Bank plus holdouts paired; the draft scenes as pins.
-
-### T225 · The front gate's bench credit and the open contact costs
-
-*Static · mini round · small · score-touching D3 · round 70 · rest of T223*
-
-**Problem.** The front gate (`frontGate` in `score/boost-bite.ts:121-130`) keeps the bench credit open when the foe in front cannot KO the holder, even when the holder needs six turns to get past that foe (gen9draft-2058494320, rebuild of turn 19: Swords Dance into a Talonflame switch still reads +0.165 through Tentacruel and Comfey on the bench). The contact reader reads paralysis and sleep but prices neither; its memo key (`score/contact.ts`) leaves out a third body's Neutralizing Gas; the race charges the healer chip every turn, not only on attacking turns (scaling it moves 4 of 585 r61 positions).
-
-**Benefit.** Engine: a stage counts against the bench only where the holder gets past the foe in front.
-
-**Success.** Red tests against the simulator per case; the Swords Dance / Talonflame cell of the scene drops; bank paired.
-
-**Evidence.** `docs/perf/probes/2026-10-15-contact/findings.md` (open points 3 to 5).
-
-**Steps.**
-- [ ] The bench credit needs the holder to win its front race within the horizon.
-- [ ] Paralysis and sleep priced from the played hit; a third body's Neutralizing Gas in the key.
-- [ ] Bank paired.
-
-### T248 · HP monotony of the static
-
-*Static weights · larger bug · score-touching D3 · with T224 · round 72*
-
-**Problem.** In gen8ou-573756 turn 73, Kyurem falls from 322 to 321 of 405 HP and p1's score rises by 0.129. The relation specs of round 72 (`packages/eval-engine/test/relation-checks.spec.ts:44-53`, `HP_MONOTONY`) hold 17 such breaks as expected failures: own HP down raises the score in VGC (5), singles (2) and Champions VGC (1); foe HP down lowers it in VGC (5), singles (3) and Champions VGC (1); Doubles OU shows none. Read at one HP point (`r72/lanes/C/out/break-diag.json`), three causes show. The one-on-one race of boostsBiting flips at one HP (up to 0.15 in singles, 0.06 in VGC, 0.017 in Champions). The matchup term jumps at one HP: in the same turn 73, Toxapex 282 to 281 of 303 HP moves matchup by 6.26 and the score by +0.017 at the root, up to +0.028 in the leaves. Over a range of HP the matchup term falls faster than the bodies term rises (up to 1e-3). The five VGC foe-HP breaks stood under T199 until the merge; pairFocus weighs 0 in every table since aafd8c5, so none of them runs through it. Turn 73 of 573756 is a feedback pin ("re-read after T224"), so a fix moves it at the gate.
-
-**Benefit.** Engine: a hit you land never lowers your grade, and a hit you take never raises it.
-
-**Success.** No break above a size the round sets and gives its reason for (1e-9 may be out of reach for smooth slopes); each entry that passes leaves the expected-failure list; singles, Doubles OU, VGC and Champions counted on their own; bank plus holdout (D26) without harm.
-
-**Evidence.** `r72/lanes/C/out/break-diag.json`, `r72/lanes/C/ledger.md` (the matchup cliff at the root), `packages/eval-engine/test/relation-checks.spec.ts:44-53`, `score/boost-race.ts:244` and `:251` (the race gates `holderActs` and `stageBites`, read by `score/boost-bite.ts`).
-
-**Steps.**
-- [ ] Per family, which cause carries each break: the race flip, the matchup jump or the slope; whether T224's re-fit removes the race flip.
-- [ ] The matchup jump at one HP (573756 turn 73, Toxapex).
-- [ ] The slope where the matchup term outruns the bodies term.
-- [ ] The relation spec without expected failures above the round's size; the 573756 pin at the gate.
-
-### T249 · A stage on a body that cannot act first
-
-*Static weights · larger bug · score-touching D3 · T240's open clause · with T224 and T225 · round 72*
-
-**Problem.** In gen9draft-2058494320 the static priced a +4 Cobalion at 5% HP above a healthy body. The relation probe of round 72 compares the same body at 5% HP with and without +4 Attack and +4 Special Attack, against a faster foe with a damaging move (`r72/lanes/C/out/cobalion2.json`): the stages raise the score on 44 of 66 root bodies (25 positions) and on 326 of 529 leaves (26 positions) by more than 1e-9, and by more than 0.05 on 23 roots (11 positions) and 174 leaves (14 positions). The largest gains are Doubles OU bodies (Mew +0.517, Okidogi +0.464), whose table weighs `boosts` 27 and boostsBiting 0 (`score/weights.ts:257`, `:271`), and `activeBoostValue` (`score/features.ts:84-93`) skips only fainted bodies; a singles Dragonite (+0.427, gen9ou-2658675932 turn 2) stands among the top five as well, though singles weighs boostsBiting 95 and gates it by `holderActs`. Which feature carries each gain is not measured, and the probe tests a faster foe, not a foe that KOs first (no immunity, Protect, Focus Sash or accuracy check). The merged relation `idleStage` covers a fainted body only (`relation-checks.spec.ts:74`).
-
-**Benefit.** Engine: a setup move on a body the foe KOs first reads as the lost turn it is.
-
-**Success.** A relation spec "a stage on a body that every foe in front KOs before it acts adds nothing" (in doubles: each foe that can target it), red today, green per family (singles, Doubles OU, VGC, Champions); bank plus holdout (D26) without harm.
-
-**Evidence.** `r72/lanes/C/out/cobalion2.json` (keys `t1e9` and `t05`), `r72/lanes/C/cobalion2.vt.ts`, `docs/perf/probes/2026-10-13-draft-sd/findings.md`, `score/features.ts:84-93`, `score/weights.ts:257`, `:271`.
-
-**Steps.**
-- [ ] Per family, the feature that carries the gain (a feature tally on the probe's bodies), and the counts per family.
-- [ ] The red relation spec with a foe that KOs first.
-- [ ] The fix in every family table, with T224 where the race decides and T225 where the front gate's bench credit reads along.
-
-### T243 · The draft t56 play-out loses for p2 in 2 of 16 dice
-
-*Engine · larger bug · score-touching D3 · round 70 · after T224*
-
-**Problem.** The e2e pin "the draft t56 play-out wins for p2 without crawling (round 42)" (`e2e/branch.spec.ts`, `test.fixme` since the gate of 17.10., 2a) plays draft turn 56 out with the engine on both sides. Under the log's dice the pin turns red with the round-70 static: at 0da5ec7 (stage races) p2 still wins at turn 68 but with 8 switches, and from 57d1539 (contact costs) on p2 sends Heatran into Mienshao's Knock Off at turn 61, the round-19 error, and p1 wins at turn 67. Over 16 arrival dice in Node, v1 against itself wins 16 for p2 and passes the pin 14 times; round 70 against itself wins 14 and passes 12, and one of its losses shuffles Muk-Alola and Slowking for 12 switches against Palossand's Shore Up (turn 76). Head to head over the same dice (`h2h.vt.ts`): round 70 as p2 wins 16 of 16 against v1 as p1 (pin 10, mean 5.8 switches); round 70 as p1 takes one of 16 from v1 as p2 (pin 11, mean 6.3); v1 as p1 wins none of 32. Under the log's dice p2 loses only when both sides play round 70.
-
-**Benefit.** App: the play-out keeps the round-42 intent (p2 wins without crawling).
-
-**Success.** The Node probe over the 16 dice, the new engine against itself: p2 wins 16 and passes the pin at least 14 times (v1's numbers), the two mixed pairings reported beside it; the e2e pin back from `test.fixme`. Or a gate decides that the six-switch cap no longer measures a crawl against the stronger p1.
-
-**Evidence.** `docs/perf/probes/2026-10-15-playout/` (`playout.vt.ts`, `h2h.vt.ts`, `variants/`, `out/`, `table.mjs`).
-
-**Steps.**
-- [ ] The 16-dice probe after T224's re-fit, all four pairings.
-- [ ] If still short: the first turn where the round-70 p2 leaves v1's line, priced by the Monte-Carlo reference.
-
-## Wave 5 · Lane H: rebuild fidelity
-
-### T250 · The bring restriction in short VGC games
-
-*Rebuild · larger bug · score-touching D3 · replaces the parked bring bullet of the watch list · round 72*
-
-**Problem.** In gen9championsvgc2026regmbbo3-2687970740 p2 shows its four brought Pokémon (Meowstic, Scrafty, Aerodactyl, Floette) and p1 shows 3 of 4, whose fourth species stands in no log line (`|teampreview|4` gives the number, not the name). `replayBringOnly` (`replay-core/src/replay-format.ts:281-290`) trims both sides or neither (`:275-280`: a pinned four against an unpinned six flipped game 452654), so it answers null and p2 keeps all six bodies. Two phantoms stand in the game: Swampert replaces Floette at the end of turn 6 and takes Earthquake on turn 7, and Rotom-Heat fills the empty slot, healthy, though p2 brought neither. Round 72's better alignment (T238) lets Swampert enter a turn earlier, which moved the Champions VGC row of turn 8 from 0.7999 to 0.8149; the exchange of Swampert's HP and Earthquake PP alone produces the move (`r72/review/cvgc-2687970740.md`, measured at 60743ec).
-
-**Benefit.** Engine and app: a short VGC game evaluates with the bodies each side brought.
-
-**Success.** No phantom body in that game; the bank and holdout rows of every game where a side shows fewer species than its bring count, counted before and after; VGC and Champions VGC on their own.
-
-**Evidence.** `r72/review/cvgc-2687970740.md`, `packages/replay-core/src/replay-format.ts:275-290`.
-
-**Steps.**
-- [ ] Count the games where a side shows fewer species than its bring count (bank, holdouts, fit corpus), and those where a team sheet names the missing species.
-- [ ] Answer `pass` for a forced replacement the protocol never shows, or trim the complete side where a sheet completes the other; then the symmetric rule of `:275-280` against the A.3c game 452654.
-
-### T212 · Start volatiles that the protocol shows
-
-*Rebuild · mini round · small · rest of T172 · round 69*
-
-**Problem.** The board does not know every `-start` that the log shows (Salt Cure in 752733, boostedStat lines). Rebuild them through the simulator's `addVolatile`.
-
-**Benefit.** Engine: the rebuild carries the effects that the game carries.
-
-**Success.** Count in the corpus before and after, checker against the simulator.
-
-**Evidence.** `r69/lanes/E/ledger.md:13` (Salt Cure, 752733 turns 15 to 17), `:58` (point 1: boostedStat lines, 107 of 38,897 bank bodies deviate), `r69/lanes/E/out-c4-split.txt`.
-
-**Steps.**
-- [ ] Count in the corpus before: `-start` lines of the log that the board does not carry (Salt Cure, boostedStat), singles and doubles separately.
-- [ ] Red checker against the simulator: Salt Cure in 752733 turns 15 to 17 takes effect in the rebuild; the line is played through the simulator's `addVolatile`, without a list of effects.
-- [ ] Count after; the 107 deviating bodies drop.
-
-### T214 · A Sitrus witness from the HP
-
-*Rebuild · mini round · small · rest of T172 · round 69*
-
-**Problem.** In 939635 the simulator eats Sinistcha's Sitrus Berry, while in the game she stays at 52 to 55% and keeps the berry. Lane E restores items only for bodies that the protocol never showed. The count finds 16 Sitrus lines of switched-in bodies: 8 of Tyranitar (2660826377), which the game already refutes (it falls to 25% without eating), 4 of Sinistcha in 939635, 4 of Ogerpon and Indeedee. A witness from HP and threshold decides the 8 open ones and confirms the 8 of Tyranitar.
-
-**Benefit.** Engine: the board carries the berry that the game still has.
-
-**Success.** Count of the 16 lines before and after, checker against the simulator.
-
-**Evidence.** `r69/lanes/E/ledger.md:14` (count, 16 lines), `:18` (names 15; the raw output `r69/lanes/E/out-c4-split.txt` lines 3-4 and 17-34 gives 16), `r69/review/todos-check-2.md` (T214), games 939635, 2660826377, 2660802611, 913990, 938638.
-
-**Steps.**
-- [ ] Count of the 16 Sitrus lines before: 8 of Tyranitar (2660826377, already refuted by the game), 4 of Sinistcha (939635), 1 each of Ogerpon (2660802611) and Indeedee (913990), 2 of Indeedee (938638).
-- [ ] Red checker against the simulator: Sinistcha stays at 52 to 55% and keeps the berry; a witness from HP and threshold (singles and doubles, the threshold from the dex) decides the 8 open lines and confirms the 8 of Tyranitar.
-- [ ] The rebuild restores the berry only after this witness; count of the 16 lines after.
-
-### T232 · Dice per action in the first branch turn
-
-*Rebuild · mini round · small · lossless for the search · round 70*
-
-**Problem.** Since round 70 a branch opens on the seed its turn has in the log (`branch/arrival-dice.ts`), so every action before the first changed one draws the logged dice; actions after it draw later numbers of the same stream, deterministic but not the logged roll (GPL DzBQ5azlO5l turn 13: when the faster side's move changes, the slower side's logged roll is lost).
-
-**Benefit.** App: a rebuilt turn keeps every logged roll the change does not touch.
-
-**Success.** In the first branch turn every unchanged action shows its logged roll, in singles, doubles and Champions.
-
-**Evidence.** `docs/perf/probes/2026-10-13-gpl-flinch/findings.md` (part 2).
-
-**Steps.**
-- [ ] Red test: change the faster side's move; the slower side's logged damage roll and secondary effect stay.
-- [ ] Scripts from the log in a ScriptedPRNG that also answers secondary rolls, keyed by side, slot and move, for the first branch turn only.
-
-## Wave 5 · Lane I: spread solver and hits
-
-### T202 · Expanding Force and Tera Starstorm without [spread]
-
-*Calculator fidelity · mini round · small · library gap · round 69*
-
-**Problem.** calc 0.12 sets the spread target and the 0.75 cut itself for Expanding Force in Psychic Terrain (`gen789.js:773-774`) and for Tera Starstorm of Stellar Terapagos (`gen789.js:228-229`), even when the log shows no `[spread]`; the target override in `spreads/observation-read.ts:56-58` is thereby undone. Scene: Hatterene hits Clefable alone with Expanding Force, simulator 322 damage, calculator 237 to 279. The same gap hits the doubles preview and kill table (lane D, ledger line 73, point 2). Noted on the upstream list for the user; until the fix, such an observation drops out, recognised by the calculator's result, not by move names.
-
-**Benefit.** Sets and preview: no spread and no kill odds from a wrongly cut hit.
-
-**Success.** Checker against the simulator, doubles and VGC; after the upstream fix the removal of the workaround.
-
-**Evidence.** `@smogon/calc/dist/mechanics/gen789.js:773-774` (Expanding Force), `:228-229` (Tera Starstorm, Stellar Terapagos only), `:1224-1226` (spread factor), `spreads/observation-read.ts:56-58`, `r69/review/lens-AFE.md` (finding 1, scene Hatterene against Clefable, 322 against 237 to 279), `r69/review/todos-check.md` (old T201: own probe confirms the mechanism), `r69/lanes/D/ledger.md:73` (point 2, preview and kill table), `:74` (upstream list).
-
-**Steps.**
-- [ ] Red checker against the simulator: doubles, Psychic Terrain, Hatterene hits Clefable alone with Expanding Force; the observation holds the simulator damage (322); plus a VGC scene with Tera Starstorm of Stellar Terapagos on a single target.
-- [ ] Detection from the calculator's result (spread target set although the log shows no `[spread]`), not from move names: the observation drops out; the same detection for the preview and the kill table of doubles.
-- [ ] Remove it once calc has the fix; until then the entry stays on the upstream list for the user. Checker against the simulator, doubles and VGC.
-
-### T203 · Field abilities of the partner in the hit
-
-*Spread solver · mini round · small · rest of T86 · round 69*
-
-**Problem.** Battery, Power Spot, Steely Spirit and Friend Guard print nothing in the log; `protocol/hit-facts.ts` (fieldFactsOf) reads them only if the ability became visible another way. Flower Gift is missing from the tables (`calc-field.ts:31-39`). Review probe p7: Charjabug (Battery) next to Garchomp, Clefairy (Friend Guard) next to Blissey, all four observations without fieldFacts. Two ways: the dex for species with a single ability (Charjabug) and the ability from the built set of the partner (lane A, ledger line 90, point 4); Clefairy's hidden Friend Guard only the second covers.
-
-**Benefit.** Sets: doubles hits next to such partners are priced correctly.
-
-**Success.** Checker against the simulator (both scenes), doubles.
-
-**Evidence.** `protocol/hit-facts.ts:48-62` (fieldFactsOf), `calc-field.ts:31-39` (tables without Flower Gift; `field.d.ts:43` knows `isFlowerGift`), `r69/review/lens-AFE.md` (finding 3, probe p7), `r69/lanes/A/ledger.md:90` (point 4: ability from the built set), `r69/review/todos-check.md` (old T202: Clefairy's Friend Guard is hidden, the dex way alone is not enough).
-
-**Steps.**
-- [ ] Red checkers against the simulator: doubles, Charjabug (Battery) next to Garchomp, Clefairy (Friend Guard) next to Blissey; today all four observations have no `fieldFacts`.
-- [ ] Two ways: the dex for species with a single ability (Charjabug) and the ability from the built set of the partner (covers Clefairy's hidden ability); Flower Gift into the tables.
-- [ ] Doubles and VGC; the doc at `types.ts:156` says "when the ability was shown"; holdout doubles paired.
-
-### T204 · The Choice check reads the field of the hit
-
-*Calculator fidelity · mini round · small · score-touching D3 · rest of T193 · round 69*
-
-**Problem.** After T193 the Choice check knows the defender's item, but it computes every hit on an empty field, without Tera, without a Paradox value and with the built item (`choice-lock.ts:318`, explainsWith). Since this round the observation carries the item at the hit, Tera, Paradox value, weather and screens (T86, T167, T191). Only singles are affected; doubles bypass the check.
-
-**Benefit.** Engine: a Choice lock is not read from a Quark Drive or Tera hit.
-
-**Success.** Checker (Quark Drive Atk, Tera STAB), bank paired.
-
-**Evidence.** `eval-engine/src/choice-lock.ts:279-286` (calcAttacker: `tera: null`), `:318` (`new Field({})`, explainsWith), `:383-385` (doubles path), `replay-core/src/types.ts:98-160` (DamageObservation), `r69/review/lens-AFE.md` (finding 4).
-
-**Steps.**
-- [ ] Red tests: a guessed Choice Band on a Quark Drive attacker (Atk ×1.3) and a Tera STAB hit; today the check reads them as Band proof or contradiction for the wrong reason. Singles only; doubles bypass the check.
-- [ ] `explainsWith` computes with the item at the hit, Tera, Paradox value, weather and screens of the observation (T86, T167, T191) instead of an empty field and the built item.
-- [ ] Bank paired.
-
-### T210 · Move powers from the battle history in the spread solver
-
-*Spread solver · round · medium · rest of T86 · round 69*
-
-**Problem.** Lane A found hits that the solver prices wrongly or skips: Last Respects and Rage Fist (power from the history), Hex and Venoshock (defender's status; the solver has read Brine through the HP at the hit since T86), Stakeout, Analytic, Plus and Minus (ledger line 90, points 1 to 3; Plus and Minus need the partner's ability as in T203); in addition the item judge skips hits where the item changed, such as a resist berry (ledger line 56, point 1).
-
-**Benefit.** Sets: more valid observations, fewer wrongly priced ones.
-
-**Success.** Checker against the simulator per group, singles and doubles.
-
-**Evidence.** `r69/lanes/A/ledger.md:90` (points 1 to 3), `:56` (point 1, item judge), `r69/review/todos-check-2.md` (T210: Brine read through the HP at the hit since T86, `hit-facts.ts:76`, `observation-read.ts:100`; open are Hex and Venoshock, `gen789.js:560`, `:768`; Plus, Minus, Stakeout, Analytic through `attacker.abilityOn`, `gen789.js:866-867`, `:1019`, `:1038`), `fit.ts:200`, `team/item-damage-shared.ts:64`, `team/item-damage-defender.ts:129`.
-
-**Steps.**
-- [ ] Red checkers against the simulator per group, singles and doubles: Last Respects and Rage Fist (power from the history), Hex and Venoshock (defender's status), Stakeout, Analytic, Plus and Minus; plus a hit with a changed item (consumed resist berry).
-- [ ] The observation carries the number of fainted Pokémon, the defender's status and the partner's ability (Plus and Minus through the way from T203); the item judge no longer skips hits with a changed item.
-- [ ] Count of valid and wrongly priced observations before and after; set diff.
-
-### T229 · Z-move and Max-move hits in the spread solver
-
-*Spread solver · mini round · small · score-touching D3 · round 70 · see T210*
-
-**Problem.** Since round 70 a Z-move or Max move reveals its crystal or Dynamax and an open slot of its type, but its hits still reach the spread solver at a placeholder base power (the calculator prices Devastating Drake at 1 damage and Max Airstream at base power 10): 126 of 3,111 observations in the 100 Z and Max replays of the fit corpus. `docs/perf/probes/2026-10-13-zmoves/observation-filter.patch` drops them and moves spreads in 172 of 300 builds. T210 covers the other mispriced powers.
-
-**Benefit.** Sets: no spread rests on a hit priced at a placeholder.
-
-**Success.** No Z or Max hit priced at a placeholder; set diff over the Gen 7 and Gen 8 replays; bank unchanged (it holds none).
-
-**Evidence.** `docs/perf/probes/2026-10-15-zmoves/findings.md` (open point 1).
-
-**Steps.**
-- [ ] Red test: the solver reads no observation of a powered move at a placeholder.
-- [ ] Price the hit as the simulator does (the base move's Z or Max power) or drop it.
-- [ ] Set diff (D8).
-
-### T230 · Illusion in the nickname lookup
-
-*Inference · mini round · small · score-touching D3 · round 70*
-
-**Problem.** `lookup.ts:83` (`findPokemonByNickname`) reads switch and drag lines, not replace lines: in smogtours-gen7uu-321437 the real Zoroark's five move lines, one of them a Flying Z-move, book nothing. `correctActivesFromProtocol(battle, events)` on the barrel has no CRLF door.
-
-**Benefit.** Sets: a disguised body's moves land on the body that used them.
-
-**Success.** The Zoroark of 321437 books its moves; set diff over the corpus.
-
-**Evidence.** `docs/perf/probes/2026-10-15-zmoves/illusion-out.txt`.
-
-**Steps.**
-- [ ] Red test on 321437.
-- [ ] The lookup follows replace lines; the CRLF door on `correctActivesFromProtocol`.
-- [ ] Set diff (D8).
-
-## After wave 5
+## The next two rounds: T163 and T160
 
 ### T163 · Leaf K per family, fitted on search values
 
@@ -295,6 +38,20 @@ Triage of 21.10.2026 (user gate "1a 2a 3b"): 21 TODOs stay on the way to the rel
 - [ ] Bank plus holdout (D26) with fixed and own K; Champions OU holdout.
 - [ ] Adopt only with a resolved better doubles row, no pooled harm and no warning.
 
+### T263 · The matchup weights after the winner-share pair value
+
+*Re-fit · feature · score-touching D3 · with T163 · round 73 (F6)*
+
+**Problem.** T248 changed what a matchup pair is worth: it weighs the HP share of the side that wins the pair (68ac4cc). The matchup weights (96 to 210 per table, `score/weights.ts:384`, `:433`) come from fits on the old product form, so the bar of a damaged board reads the matchup at a weight fitted for another term.
+
+**Benefit.** Engine: the matchup weight fits the term it multiplies.
+
+**Success.** A re-fit of `matchup` per family on the capture of T163, by a rule set before the fit; bank plus holdout (D26) and the Champions holdouts without harm.
+
+**Evidence.** `r73/lanes/F/ledger.md` (step 3 proposals), `r73/gate/reading-r73-f2.md`.
+
+**Steps.**
+- [ ] The fit in the round of T163, beside the leaf K.
 ### T160 · Champions rules from the battle's dex
 
 *Champions · round · medium · score-touching D3 · parked until after wave 3*
@@ -366,6 +123,105 @@ Triage of 21.10.2026 (user gate "1a 2a 3b"): 21 TODOs stay on the way to the rel
 **Steps.**
 - [ ] Bisect the regret over the batch commits (engine snapshots as in `docs/perf/probes/2026-10-17-vgc-bisect/`); a probe with the scene and its numbers.
 - [ ] Red test on the turn, fix test-first; feedback run.
+
+### T243 · The draft t56 play-out loses for p2 in 3 of 16 dice
+
+*Engine · larger bug · score-touching D3 · round 70 · after T224*
+
+**Status (round 73).** On the wave-5 engine p2 wins 13 of 16 dice and passes the pin 12 times (v1: 16 and 14; `r73/lanes/F/playout/out/`). At the first departure of each loss the Monte-Carlo reference finds no clearly worse p2 move; at later steps v1 reads slightly better (0.06 to 0.13). The pin stays `test.fixme`; T258 (the healer race against Shore Up) reads along (user gate 22.10.2026, 3a).
+
+**Problem.** The e2e pin "the draft t56 play-out wins for p2 without crawling (round 42)" (`e2e/branch.spec.ts`, `test.fixme` since the gate of 17.10., 2a) plays draft turn 56 out with the engine on both sides. Under the log's dice the pin turns red with the round-70 static: at 0da5ec7 (stage races) p2 still wins at turn 68 but with 8 switches, and from 57d1539 (contact costs) on p2 sends Heatran into Mienshao's Knock Off at turn 61, the round-19 error, and p1 wins at turn 67. Over 16 arrival dice in Node, v1 against itself wins 16 for p2 and passes the pin 14 times; round 70 against itself wins 14 and passes 12, and one of its losses shuffles Muk-Alola and Slowking for 12 switches against Palossand's Shore Up (turn 76). Head to head over the same dice (`h2h.vt.ts`): round 70 as p2 wins 16 of 16 against v1 as p1 (pin 10, mean 5.8 switches); round 70 as p1 takes one of 16 from v1 as p2 (pin 11, mean 6.3); v1 as p1 wins none of 32. Under the log's dice p2 loses only when both sides play round 70.
+
+**Benefit.** App: the play-out keeps the round-42 intent (p2 wins without crawling).
+
+**Success.** The Node probe over the 16 dice, the new engine against itself: p2 wins 16 and passes the pin at least 14 times (v1's numbers), the two mixed pairings reported beside it; the e2e pin back from `test.fixme`. Or a gate decides that the six-switch cap no longer measures a crawl against the stronger p1.
+
+**Evidence.** `docs/perf/probes/2026-10-15-playout/` (`playout.vt.ts`, `h2h.vt.ts`, `variants/`, `out/`, `table.mjs`).
+
+**Steps.**
+- [ ] The 16-dice probe after T224's re-fit, all four pairings.
+- [ ] If still short: the first turn where the round-70 p2 leaves v1's line, priced by the Monte-Carlo reference.
+
+### T258 · The healer race against the simulator's sequence
+
+*Static · larger bug · score-touching D3 · round 73 (F3) · with T243*
+
+**Problem.** In the unit scene "Palossand without its attack" (`boost-bite-front.spec.ts`), the engine's healer race gives the holder no win within the horizon (5 turns), while the simulator's own sequence takes 3 (`r73/lanes/F/ledger.md`, step 2 ruling); no spec shows the simulator's 3 yet. Shore Up has no Dex `heal` field (its heal is an `onHit` handler: half the HP, two thirds in sand), so `healProfile` falls back to one half. Palossand is p1's Shore Up user in the draft t56 play-out, which p2 wins 13 of 16 dice on the wave-5 engine against 16 on v1 (T243); the link is not measured.
+
+**Benefit.** Engine and app: a race against a healer lasts as long as the game lets it heal, and the play-out does not crawl against Shore Up.
+
+**Success.** A red sweep over every healing move of the Dex against the simulator's heal per turn (AGENTS.md: heal fractions come live from the simulator), singles and doubles; the unit scene reads the simulator's turn count; T243's 16-dice probe run again.
+
+**Evidence.** `r73/lanes/F/ledger.md` (step 2 rulings, step 4c), `r73/lanes/F/playout/out/`.
+
+**Steps.**
+- [ ] The red sweep, with the unit scene as one row.
+- [ ] The race reads the heal the simulator plays.
+- [ ] T243's probe again.
+
+### T259 · A smoother price for a stage drop at the bench gate
+
+*Static weights · larger bug · score-touching D3 · rest of T248 · round 73 (F5)*
+
+**Problem.** One HP-monotony break above 1e-3 is left after wave 5: in gen9championsvgc2026regmbbo3-2634199230 turn 5, Incineroar falls from 81 to 80 of 174 HP and the bar jumps 0.031 (`relation-checks.spec.ts`, the pending entry). When the holder starts to win its front race, the drop starts to count against the bench behind it, and the whole step lands where a priced recoil moves an integer clock by one turn. The gate is round 69's rule and right by the game, so the spec waits for a smoother price, not for a new gate.
+
+**Benefit.** Engine: the last jump a user sees on the bar after a hit goes.
+
+**Success.** The relation spec without the pending entry (design gate of round 73: breaks above 1e-3); bank plus holdout (D26) and Champions VGC without harm.
+
+**Evidence.** `r73/lanes/F/ledger.md` (step 3), `r73/lanes/F/out/hp-causes-step3.json`, `packages/eval-engine/test/relation-checks.spec.ts:26-32`.
+
+**Steps.**
+- [ ] The drop's price ramps over the race margin where the recoil moves the clock.
+- [ ] The relation spec green; bank paired.
+
+### T260 · A kill the log does not show
+
+*Rebuild · larger bug · score-touching D3 · round 73 (H1)*
+
+**Problem.** In gen9championsvgc2026regmbbo3-2634204248 turn 11, p2's Incineroar knocks out Mawile with Flare Blitz in the simulator, where the game's Mawile, the last body p1 shows, kept 7 %. Before T250 a phantom absorbed the divergence; now the simulated game ends, the bank skips turn 12, and a user cannot open a branch from turn 12. The hax alignment already scores faints as a hard criterion; whether any roll of that Flare Blitz leaves Mawile alive is not known.
+
+**Benefit.** App and engine: a branch opens on every turn the log has.
+
+**Success.** First the cause: a roll that leaves Mawile at 7 %, or a damage input that differs from the game. Then the rebuild keeps the body the log shows alive; the lost Champions VGC row returns; VGC and Champions VGC counted on their own.
+
+**Evidence.** `r73/lanes/H/ledger.md` (step 3, the lost row), `r73/gate/reading-r73-h2.md`.
+
+**Steps.**
+- [ ] A probe: every roll of the Flare Blitz against the logged HP.
+- [ ] The fix in the alignment or in the damage inputs, red test first.
+
+### T261 · Taunt started by a `-start` line ticks once too long
+
+*Rebuild · small fix · score-touching D3 (the rebuild feeds the bank) · round 73 (H3)*
+
+**Problem.** `playProtocolStarts` (T212, `branch/entry-effects.ts:245`) plays a `-start` line through `addVolatile` while `queue.willMove` reads empty, so a Taunt started on a slower body in the same block ticks once too long: in a branch the body stays taunted one turn longer than in the game.
+
+**Benefit.** App: a branch releases a Taunt on the turn the game does.
+
+**Success.** A red test against the simulator for a Taunt on a slower body in the block, singles and doubles; the block's own turn order read for the duration handlers.
+
+**Evidence.** `r73/lanes/H/ledger.md` (step 4, TODO proposals, item 3).
+
+**Steps.**
+- [ ] Red test, singles and doubles.
+- [ ] The fix in `branch/entry-effects.ts`.
+
+### T262 · VGC tree time after wave 5
+
+*Performance · larger bug · lossless D4 · round 73 (gate 4a)*
+
+**Problem.** In one worktree against v1, the wave-5 head's tree time reads +9.1 % over the 12 VGC fixture positions, while singles read +0.1 %, Doubles OU +2.1 % and Champions VGC +1.7 % (the spec's bound is +5 %). Which change costs VGC is not measured.
+
+**Benefit.** App: a VGC analysis waits no longer than before wave 5.
+
+**Success.** The cost attributed by commit in one worktree; the expensive path cheaper with rows byte-identical; VGC within +5 % of the base.
+
+**Evidence.** `r73/gate/gate.md` (the per-family split), `r73/gate/out/tree-time-t-*.json`, `r73/gate/reading-wave.md`.
+
+**Steps.**
+- [ ] Timing by commit in one worktree (lanes F, H and I apart).
+- [ ] The fix, lossless.
 
 ## The release
 
@@ -527,6 +383,8 @@ The triage of 21.10.2026 parked these TODOs; each section names its trigger, and
 *Doubles search · mini round · small · score-touching D3 · round 70 (gate 17.10., 1a)*
 
 **Parked (triage 21.10.2026).** Trigger: a second scene where the Protect tempo softens a verdict the reference keeps, or a user report.
+
+**Status (round 73).** Under the wave-5 static the engine reads no tier for either side of 2629703929 turn 8, while the fresh reference grades p1 a mistake (0.255 and 0.298) and p2 at least an inaccuracy: the distance widened from one tier to two on p1. `verify-spread-scenes.spec.ts` expects the reference and fails until this TODO closes it (user gate 22.10.2026, 2a).
 
 **Problem.** Since the Protect tempo (7b4b73f, user gate 13.10., 3a) a Protect earns the damage it denies in the doubles hints. In gen9vgc2026regi-2629703929 turn 8 the engine now grades p1's played Heat Wave + Protect an inaccuracy (0.1736) where the Monte-Carlo reference on the same rows grades a mistake (0.326 and 0.299 on 24 draws, 0.280 on 96), and p2's Protect + Encore→Koraidon an inaccuracy (0.1936; the reference none on 24 draws, 0.147 on 96); before the tempo both graded p1 a mistake and p2 no tier. A bisection over the batch commits moves the scene at 7b4b73f only. The rows change: Protect + Flare Blitz→Jumpluff enters, the played Heat Wave + Protect moves from an appended thirteenth row into the twelve, and Heat Wave + Flare Blitz→Groudon (the round-69 reference's best) and Tera Blast→Groudon + Flare Blitz→Jumpluff leave. The reference's best row on the new list (Dark Pulse→Groudon + Flare Blitz→Jumpluff) stays listed, so the distance lies in cell values: Heat Wave + Protect × Rock Slide + Sleep Powder→Chi-Yu reads −0.307 against the reference's −0.437 ± 0.076, and Tera Blast→Jumpluff + Collision Course→Jumpluff × Protect + Encore→Koraidon 0.210 against 0.008 ± 0.033 (96 draws). The quarter-tier VGC holdout of the batch check shows harm on the hq table's luck-adjusted row (+37 [+0, +74]); no run separates 7b4b73f from the rest of the batch.
 
@@ -986,6 +844,15 @@ The triage of 21.10.2026 parked these TODOs; each section names its trigger, and
 
 ### Parked without a T-number
 
+- [ ] Round 73: The healer chip charged every turn in `races.ts` (4 of 585 positions move when scaled). Trigger: a scene where a healer's race misreads.
+- [ ] Round 73: The halved Speed of a paralysis after the hit lands, in the race's move order. Trigger: a scene where a paralyzed body's race order misreads.
+- [ ] Round 73: `sweepCells` and `beatsPair` read the pair on raw HP without the heal strip of T248. Trigger: a relation spec or a scene reaches it.
+- [ ] Round 73: Per-target dice in a branch's first turn (VGC 2630181744 turn 3: a changed move lets Astral Barrage hit both foes where the log rolled once). Trigger: a scene where the targets change order.
+- [ ] Round 73: `CALC_LACKS_POWER` in `calc/move.ts` holds Last Respects alone, while the history class of T210 holds Rage Fist too, which `@smogon/calc` 0.12 prices at its base power. Trigger: met at booking (Rage Fist after hits taken); it goes to the next gate as a proposal.
+- [ ] Round 73: Payback, Bolt Beak and Fishious Rend take the move order from speeds, not from the log. Trigger: a measured hit misreads.
+- [ ] Round 73: Stakeout after a forced replacement reads without the boost (the client clears `newlySwitched` at `|turn|`). Trigger: a measured hit misreads.
+- [ ] Round 73: Two same-species team members without nicknames count as one fainted for Last Respects (two Shedinja in a draft league). Trigger: a user report.
+- [ ] Round 73: A move used under Illusion books on the disguised species, the rest of T230 (smogtours-gen7uu-321437, not in the repo). Trigger: a corpus game or a user report.
 - 17 corpus species are in the tier list of the Champions mod 0.10.11 as banned and illegal (Rillaboom 656 sightings, Golisopod 505, Cinderace 375, Pawmot 212, Indeedee, Salamence); the validator rejects real teams ("Rillaboom does not exist in Gen 9" on Reg M-B). No code uses a legality filter today. Trigger: a Champions legality filter or a mod version with the game's list.
 
 ## Corpus gaps
@@ -994,7 +861,7 @@ Every gap has its TODO. The pins themselves are in `e2e-feedback/corpus.ts`; re-
 
 | Gap | State 19.09. | Handled in |
 | --- | --- | --- |
-| 573756 t73 (since round 32) | Chance and key moment have been pinned since round 40 (dbffb5f). State 17.10. (round 70): the miss is a key moment again and books as chance (+0.286), but the sentence "one 95% roll from clearing the rest" no longer renders (observed re-pinned without it, gate 17.10., "4a"); Body Press reads no tier (regret 0.0995 against Defog; Monte Carlo 0.085 and 0.095). | Re-read after T224 and T248 |
+| 573756 t73 (since round 32) | Chance and key moment have been pinned since round 40 (dbffb5f). State 17.10. (round 70): the miss is a key moment again and books as chance (+0.286), but the sentence "one 95% roll from clearing the rest" no longer renders (observed re-pinned without it, gate 17.10., "4a"); Body Press reads no tier (regret 0.0995 against Defog; Monte Carlo 0.085 and 0.095). | Round 73: the key moment lost to two game-correct changes (T225a lifts t70, the healer rule of T248 lowers t73's chance share 0.286 to 0.267; `r73/lanes/D/diagnosis.md`); a key-moment rule waits for the user |
 | 649664 t23 | observed has been on shift since round 70 (gate 17.10., "4a"): a turn reads chance only where the chance part outweighs the decision part (7ecaac4), here 0.354 against 1.304; from round 42 to round 69 it was on chance. The bar reads 0.79 instead of 0.92, because the proof leaves the next 80% Hydro Pump open, no crit (round 62). Since round 63 the card for turn 24 names the open 80% Hydro Pump (T19) and says in turn 23 that the verdict hangs on Keldeo's item (Choice Scarf: fine, Mystic Water: blunder). Since round 64 (T121 point 1) Keldeo's guessed Choice item gets the damage check that refutes it; the gap stayed open in the wave run, nobody has read it yet. | Re-pin question at the gate |
 | Draft game t48, 573756 t70 | Chance booking without dice: the read payoff fizzles (t48), the setup payoff comes one evaluation too late (t70, reads quiet today with −0.145). | T189 |
 | GPL DzBQ5azlO5l t13 | State 17.10. (round 70): the rebuild plays turn 13 under the log's seed (0ec3352), so Air Slash no longer flinches there, and the trend probe reads each base draw against its own leaf (8d5642b); with Stone Edge set by the editor it ranks first or second, where round 69's matrix path had it third (`docs/perf/probes/2026-10-13-gpl-flinch/findings.md`). Before: Heavy Slam reads without an error band. Stone Edge is missing from the set (gen9ou 0.35%, a limit of the reconstruction); with Stone Edge added by hand, the cell Air Slash against Stone Edge has read −0.336 against the MC reference −0.328 ± 0.033 since round 64 (T119); Stone Edge stands first for p2, Heavy Slam has a regret of about 0.007, there is no grade. The gap thus hangs on the missing Stone Edge in the set (limit of the reconstruction), not on the verification. t15 reads right in Auto (Vileplume regret 0 to 0.018 in three seed sets, round 62) and is done. Fixture `e2e/fixtures/gpl-replay-DzBQ5azlO5l.html`. | Gate question (reconstruction) |
