@@ -63,7 +63,7 @@ describe('verify scenes: hidden lengths (round 64, T119)', () => {
     const local = createLocalTreeExecutor(position.serialized);
     const rounds: EvalCellJob[][] = [];
     const executor: TreeExecutor = { ...local, evalCells: async (jobs, onDone) => { rounds.push(jobs); return local.evalCells(jobs, onDone); } };
-    const result = await searchTreesOrchestrated(executor, settingsOf(position));
+    await searchTreesOrchestrated(executor, settingsOf(position));
     const verify = rounds.find(jobs => jobs.length > 0 && jobs.every(job => job.deepen !== undefined && !job.plain))!;
     const template = verify.find(job => job.p1Choice === 'move heatwave, move flareblitz 2' && job.p2Choice === 'move rockslide, move sleeppowder 1')!;
     const [old] = await local.evalCells([{ ...template, p1Choice: 'move heatwave, move flareblitz 1' }], () => {});
@@ -75,21 +75,18 @@ describe('verify scenes: hidden lengths (round 64, T119)', () => {
     // distance stays open in T242. Under the round 69 static both graded p1 a mistake and p2 no tier.
     // Round 73 (user gate 22.10.2026, 2a): the winner-share pair value lowers both regrets, p1's Heat Wave + Protect to 0.0514
     // (best Heat Wave + Dragon Claw→Jumpluff) and p2's Protect + Encore→Koraidon to 0.0004, so neither carries a tier, with and
-    // without the answer round. The fresh reference on the same rows (probe lanes/P/mc-oracle.vt.ts, 24 draws, seed blocks
-    // 1001 and 5001, answers off) grades p1 a mistake on both (0.255 and 0.298) and p2 a mistake (0.267) and an inaccuracy
-    // (0.168): the engine's distance to it widened from one tier to two on p1, and stays open in T242.
-    const analysis = flat(position, result);
-    expect(analysis.p1.tier ?? null).toBeNull();
-    expect(analysis.p2.tier ?? null).toBeNull();
-    const saved = process.env.EVAL_DOUBLES_ANSWERS;
-    process.env.EVAL_DOUBLES_ANSWERS = 'off';
-    try {
-      const listed = flat(position, await search(position));
-      expect(listed.p1.tier ?? null).toBeNull();
-      expect(listed.p2.tier ?? null).toBeNull();
-    } finally {
-      if (saved === undefined) delete process.env.EVAL_DOUBLES_ANSWERS;
-      else process.env.EVAL_DOUBLES_ANSWERS = saved;
-    }
+    // without the answer round. The fresh reference does not carry that (next test), so the tiers are pinned to the reference.
+  });
+
+  // Round 73 (user gate 22.10.2026, 2a: a pin follows the engine only where the fresh reference carries it). The fresh reference
+  // on the same rows (probe docs/perf/probes/2026-10-21-r73/lanes/P/mc-oracle.vt.ts, 24 draws, seed blocks 1001 and 5001,
+  // answers off) grades p1 a mistake on both blocks (0.255 and 0.298) and p2 a mistake (0.267) and an inaccuracy (0.168), while
+  // the engine reads no tier for either side: the distance widened from one tier (round 70) to two on p1. The test expects the
+  // reference and fails until T242 closes the distance; the day it passes, the marker goes.
+  test.fails("2629703929 t8 (VGC): the tiers the fresh reference grades, p1 a mistake and p2 at least an inaccuracy (T242)", { timeout: 300_000 }, async () => {
+    const position = scene('gen9vgc2026regi-2629703929-t8');
+    const analysis = flat(position, await search(position));
+    expect(analysis.p1.tier).toBe('mistake');
+    expect(analysis.p2.tier ?? null).not.toBeNull();
   });
 });
