@@ -314,6 +314,11 @@ export const DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
  * [2.8, 30.7], out of fold better in 20 of 20 seeds, Brier 20 of 20, log-loss
  * -126 bp, no flagged band; before the drops counted the column was flagged
  * and missed R1). The bank and the VGC holdout decide it (R3).
+ *
+ * Round 74 (T263): matchup 169 refit to 123 [100, 149] on the root features of the search capture
+ * (r74-cap-vgc-doubles, commit d6e9259: 2,334 positions of 711 sets, rest of the table at hand, the K of
+ * the capture): out of fold better in 20 of 20 seeds, log-loss -13 bp, Brier -6 bp, no flagged band. A
+ * candidate until the bank and the holdouts decide (D4).
  */
 export const VGC_DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   bodies: 177,
@@ -322,7 +327,7 @@ export const VGC_DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   screens: 48,
   tailwind: 0,
   trickRoom: 54,
-  matchup: 169,
+  matchup: 123,
   coverage: 0,
   choiceMismatch: 40,
   sweepFastKo: 0,

@@ -40,7 +40,8 @@ describe('the SV VGC table (round 69, T144)', () => {
   test('tailwind and coverage are 0, the refit columns carry the fit, the rest stays', () => {
     const w = VGC_DOUBLES_FEATURE_WEIGHTS;
     expect([w.tailwind, w.coverage]).toEqual([0, 0]);
-    expect([w.bodies, w.screens, w.matchup, w.trickRoom]).toEqual([177, 48, 169, 54]);
+    // Round 74 (T263): the matchup weight 169 is a candidate 123 until the bank and the VGC holdout decide (D4).
+    expect([w.bodies, w.screens, w.matchup, w.trickRoom]).toEqual([177, 48, 123, 54]);
     // Held at the hand values: hazards (R2 flagged), choice mismatch (hold). The S7 pair cell is 0 since the user gate of
     // 13.10. (6b): its 0/1 gate made the VGC score fall as a foe took damage in 24 of 103 HP series (T199 builds a ramp).
     expect([w.hazards, w.choiceMismatch, w.pairFocus]).toEqual([0.75, 40, 0]);
