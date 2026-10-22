@@ -127,7 +127,7 @@ export const FEEDBACK_CORPUS: FeedbackItem[] = [
   },
   {
     replay: 'smogtours-gen8ou-562428', turn: 12, kind: 'truth', source: 'expert-2026-08',
-    essence: "LordEnz's Close Combat over the safe Mandibuzz line is graded as a read that paid off; the expert explicitly praised that framing.",
+    essence: "LordEnz's Close Combat over the safe Mandibuzz line is graded as a read that paid off; the expert explicitly praised that framing. (KNOWN DRIFT since round 73 2026-10-22, user-gated: the stage-aware T249 relation prices the gains of a stage on a body that every foe in front KOs before it acts at nothing, so the turn books an attribution shift instead of p1-read and riskPaidOff reads false. The pin STAYS: the expert is right; it is the same shape as the known drift of t10.)",
     expect: { side: 'p1', attribution: ['p1-read'], riskPaidOff: true, playedLabelIncludes: 'Close Combat', keyMoment: true },
   },
   {

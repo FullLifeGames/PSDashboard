@@ -192,9 +192,11 @@ describe('tree orchestration (round 61; read through the executor since round 64
     const merged = mergeMctsTrees(record.trees);
     const played = playedIndices(record.trees, merged, keepPlayed);
     expect(played.p1).toBeDefined();
-    // The trees' own support leaves the played row out; the played option brings it into the check and verify rounds.
+    // Round 73 (user gate 22.10.2026, 2a): the new static (T248 race flip and pair value, T249) moves the trees' visits, so
+    // their own support now holds the played row (it left it out before); the played option still brings it into the
+    // verify round. The singles scene above is the one that proves the played option adds a row the trees leave out.
     const support = rowCompletedCells(record.trees, merged, starvedSupportCells(record.trees, merged));
-    expect(support.some(job => job.i === played.p1)).toBe(false);
+    expect(support.some(job => job.i === played.p1)).toBe(true);
     expect(verifyRound(record)!.jobs.some(job => job.i === played.p1)).toBe(true);
   });
 
