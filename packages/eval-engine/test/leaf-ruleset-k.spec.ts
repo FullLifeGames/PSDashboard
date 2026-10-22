@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { Battle, type PokemonSet } from '@pkmn/sim';
 import { createMatchupCache, evaluatePosition } from '../src/eval-function';
 import { battleFaintedFraction, leafValue } from '../src/search/leaf';
-import { CHAMPIONS_WINPROB_K, WINPROB_K } from '../src/winprob';
+import { WINPROB_K_OF } from '../src/winprob';
 
 /**
  * Round 67 (T138): Pokémon Champions doubles prices its own scale at the leaf. The search hands the rule set to the
@@ -30,7 +30,7 @@ const expected = (raw: number, k: { k0: number; k1: number }, ff: number) => 2 /
 
 describe('the leaf prices a position with the K of its rule set (T138)', () => {
   for (const [kind, formatid] of [['singles', 'gen9customgame'], ['doubles', 'gen9doublescustomgame']] as const) {
-    test(`Champions doubles reads its own phase K, Champions singles, standard and VGC their game type's (${kind})`, () => {
+    test(`each rule set reads its own phase K (${kind})`, () => {
       const battle = battleOf(formatid);
       const ff = battleFaintedFraction(battle);
       expect(ff).toBeGreaterThan(0);
@@ -38,7 +38,7 @@ describe('the leaf prices a position with the K of its rule set (T138)', () => {
         const cache = createMatchupCache(ruleset);
         const raw = evaluatePosition(battle, createMatchupCache(ruleset));
         expect(raw).not.toBe(0);
-        const k = ruleset === 'champions' && kind === 'doubles' ? CHAMPIONS_WINPROB_K.doubles : WINPROB_K[kind];
+        const k = WINPROB_K_OF[ruleset][kind];
         expect(leafValue(battle, cache), ruleset).toBeCloseTo(expected(raw, k, ff), 12);
       }
     });

@@ -51,6 +51,9 @@
  */
 import type { StaticRuleset } from './score/weights.ts';
 
+/** The leaf's K at a fainted share f: k0 + k1·f. */
+export interface PhaseK { readonly k0: number; readonly k1: number }
+
 export const WINPROB_K = {
   singles: { k0: 2.28, k1: 1.49 },
   doubles: { k0: 2.98, k1: 0.88 },
@@ -71,13 +74,32 @@ export const WINPROB_K = {
  * stay where they are (wave 2, decision 33).
  */
 export const CHAMPIONS_WINPROB_K = {
-  singles: WINPROB_K.singles,
+  singles: { k0: 2.28, k1: 1.49 },
   doubles: { k0: 1.86, k1: 4.17 },
 } as const;
 
-/** The leaf's phase K of a game type under a rule set: Champions doubles its own, every other case its game type's. */
-export function winprobK(doubles: boolean, ruleset: StaticRuleset = 'standard'): { readonly k0: number; readonly k1: number } {
-  const table = ruleset === 'champions' ? CHAMPIONS_WINPROB_K : WINPROB_K;
+/**
+ * Round 74 (T163): VGC doubles resolves its own entry. It holds the values of Doubles OU (2.98 + 0.88·ff, the one
+ * table both families shared until now), so nothing moves; a fit on the search's own root values sets it without
+ * touching Doubles OU. VGC has no singles game, its singles entry is the standard one. Champions singles likewise
+ * holds the standard singles values in an entry of its own (it referenced them before), so each of the five
+ * families (standard and Champions singles, Doubles OU, VGC, Champions VGC) is fitted and pinned on its own.
+ */
+export const VGC_WINPROB_K = {
+  singles: { k0: 2.28, k1: 1.49 },
+  doubles: { k0: 2.98, k1: 0.88 },
+} as const;
+
+/** One K table per rule set (regression/fit-families.ts reads them by rule set, scripts/k-stamp.mjs stamps them). */
+export const WINPROB_K_OF: Readonly<Record<StaticRuleset, { readonly singles: PhaseK; readonly doubles: PhaseK }>> = {
+  standard: WINPROB_K,
+  vgc: VGC_WINPROB_K,
+  champions: CHAMPIONS_WINPROB_K,
+};
+
+/** The leaf's phase K of a game type under a rule set: each rule set its own table, each game type its own entry. */
+export function winprobK(doubles: boolean, ruleset: StaticRuleset = 'standard'): PhaseK {
+  const table = WINPROB_K_OF[ruleset];
   return doubles ? table.doubles : table.singles;
 }
 

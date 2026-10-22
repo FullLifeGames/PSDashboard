@@ -10,7 +10,7 @@ import {
   evaluatePosition, EVAL_WEIGHTS, FEATURE_WEIGHTS, VGC_DOUBLES_FEATURE_WEIGHTS, type EvalFeatures,
 } from '../packages/eval-engine/src/eval-function';
 import { battleFaintedFraction } from '../packages/eval-engine/src/search';
-import { CHAMPIONS_WINPROB_K, WINPROB_K, wpUnits } from '../packages/eval-engine/src/winprob';
+import { WINPROB_K_OF, wpUnits } from '../packages/eval-engine/src/winprob';
 import {
   bootstrapPhaseK, brierScore, crossValidate, fitConstantK, fitLogistic, fitPhaseK, logLossScore,
   mulberry32, phaseBucket,
@@ -185,8 +185,8 @@ const listOf = (name: string) => (process.env[name] ?? '').split(',').map(part =
  * set. First the identity: the start tables must give back every captured
  * score, or the fit refuses.
  */
-/** The leaf's phase K of a family's rule set (round 67, T138: Pokémon Champions prices its own scale). */
-const kOf = (ruleset: Ruleset) => (ruleset === 'champions' ? CHAMPIONS_WINPROB_K : WINPROB_K);
+/** The leaf's phase K of a family's rule set (round 67, T138: Pokémon Champions prices its own scale; round 74, T163: VGC too, one table per rule set). */
+const kOf = (ruleset: Ruleset) => WINPROB_K_OF[ruleset];
 
 const familySamplesOf = (samples: FitSample[]): FamilySample[] => samples.map(sample => ({
   game: sample.game, set: sample.set ?? sample.game, gameType: sample.gameType, ruleset: sample.ruleset ?? rulesetOfId(sample.game),

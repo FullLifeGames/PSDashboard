@@ -1,5 +1,6 @@
 import { test, expect, describe } from 'vitest';
-import { CHAMPIONS_WINPROB_K, DISPLAY_K, winPercent, winProbability, WINPROB_K, wpUnits } from '../src/winprob';
+import { CHAMPIONS_WINPROB_K, DISPLAY_K, VGC_WINPROB_K, winPercent, winProbability, WINPROB_K, winprobK, wpUnits } from '../src/winprob';
+import type { StaticRuleset } from '../src/score/weights';
 
 describe('win probability mapping', () => {
   test('an even score is a coin flip in both game types', () => {
@@ -42,6 +43,32 @@ describe('win probability mapping', () => {
       for (const ruleset of rulesets) expect(winProbability(0.4, doubles, 0.5, ruleset)).toBeCloseTo(p(gameType), 12);
       expect(winProbability(0.4, doubles, 0.5)).toBeCloseTo(p(gameType), 12);
     }
+  });
+
+  // Round 74 (T163): every family resolves its own K entry, so a fit moves one family and no other. The five values
+  // are today's (lossless): VGC doubles equals standard doubles, Champions singles equals standard singles, and none
+  // of them shares an object with another.
+  test('round 74 (T163): the five families hold today\'s K, each in its own entry', () => {
+    const today = {
+      'standard-singles': { k0: 2.28, k1: 1.49 },
+      'standard-doubles': { k0: 2.98, k1: 0.88 },
+      'vgc-doubles': { k0: 2.98, k1: 0.88 },
+      'champions-singles': { k0: 2.28, k1: 1.49 },
+      'champions-doubles': { k0: 1.86, k1: 4.17 },
+    } as const;
+    const entries = new Map<string, object>();
+    for (const [family, k] of Object.entries(today)) {
+      const [ruleset, gameType] = family.split('-') as [StaticRuleset, string];
+      const resolved = winprobK(gameType === 'doubles', ruleset);
+      expect(resolved, family).toEqual(k);
+      entries.set(family, resolved);
+    }
+    expect(new Set(entries.values()).size).toBe(5);
+    expect(VGC_WINPROB_K.doubles).toEqual({ k0: 2.98, k1: 0.88 });
+    expect(winprobK(true, 'vgc')).toBe(VGC_WINPROB_K.doubles);
+    expect(winprobK(false, 'vgc')).toBe(VGC_WINPROB_K.singles);
+    expect(winprobK(false, 'champions')).toBe(CHAMPIONS_WINPROB_K.singles);
+    expect(winprobK(true)).toBe(WINPROB_K.doubles);
   });
 
   test('wpUnits carries the Jensen effect: variance helps when behind, hurts ahead', () => {
