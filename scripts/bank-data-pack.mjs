@@ -74,8 +74,8 @@ function selection() {
   const ids = [...new Set([...manifest, ...holdout])];
   const absent = ids.filter(id => !existsSync(join(ROOT, '.fit-corpus', `${id}.json`)));
   if (absent.length > 0) console.log(`${absent.length} manifest replay(s) not in .fit-corpus, left out (first: ${absent[0]})`);
-  const present = new Set(absent);
-  return { '.smogon-cache': null, '.fit-corpus': ids.filter(id => !present.has(id)).map(id => `${id}.json`) };
+  const skipped = new Set(absent);
+  return { '.smogon-cache': null, '.fit-corpus': ids.filter(id => !skipped.has(id)).map(id => `${id}.json`) };
 }
 
 function pack() {
