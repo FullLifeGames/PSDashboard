@@ -10,7 +10,7 @@ import type {
 import { slotLetter, trimTeamToBring } from './team-order.ts';
 import { targetTypeForMove } from './protocol-choices.ts';
 import { forceSwitches } from './corrections.ts';
-import { extractPokemonInfo, makePokemonInfo } from './pokemon-info.ts';
+import { extractPokemonInfo, makePokemonInfo, shownPercent } from './pokemon-info.ts';
 
 
 /**
@@ -126,7 +126,7 @@ function buildTargetOptions(
         activeSlot: target.position,
         name: target.name,
         species: target.species.name,
-        hpPercent: target.maxhp > 0 ? Math.round(target.hp / target.maxhp * 100) : 0,
+        hpPercent: shownPercent(target),
       };
     })
     .filter((target): target is BranchTargetOption => !!target);
@@ -160,15 +160,18 @@ function makeSlotModifiers(battle: SimBattle, active: SimPokemon | null | undefi
 function makeSwitches(side: SimSide, activeSlot: number): BranchSwitchOption[] {
   const activeNames = new Set(side.active.filter(Boolean).map(active => active.name));
   return side.pokemon
-    .map((pokemon, index): BranchSwitchOption => ({
-      name: pokemon.name,
-      species: pokemon.species.name,
-      activeSlot,
-      slot: index + 1,
-      hp: `${pokemon.maxhp > 0 ? Math.round(pokemon.hp / pokemon.maxhp * 100) : 0}%`,
-      hpPercent: pokemon.maxhp > 0 ? Math.round(pokemon.hp / pokemon.maxhp * 100) : 0,
-      fainted: pokemon.fainted,
-    }))
+    .map((pokemon, index): BranchSwitchOption => {
+      const percent = shownPercent(pokemon);
+      return {
+        name: pokemon.name,
+        species: pokemon.species.name,
+        activeSlot,
+        slot: index + 1,
+        hp: `${percent}%`,
+        hpPercent: percent,
+        fainted: pokemon.fainted,
+      };
+    })
     .filter(pokemon => !pokemon.fainted && !activeNames.has(pokemon.name));
 }
 

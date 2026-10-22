@@ -69,7 +69,7 @@ export function makePokemonInfo(
     species: pokemon.species.name,
     hp: pokemon.hp,
     maxhp: pokemon.maxhp,
-    hpPercent: pokemon.maxhp > 0 ? Math.round(pokemon.hp / pokemon.maxhp * 100) : 0,
+    hpPercent: shownPercent(pokemon),
     status: pokemon.status || '',
     fainted: pokemon.fainted,
     isActive,
@@ -165,6 +165,29 @@ export function sightedHp(body: HpDisplayBody, shown: HpSighting): number | null
 export function hpOfSighting(body: HpDisplayBody, sighting: { hp: number; maxhp: number; hpPercent: number }): number {
   const sighted = sighting.maxhp === 100 || sighting.maxhp === 48 ? sightedHp(body, sighting) : null;
   return sighted ?? Math.round((sighting.hpPercent / 100) * body.maxhp);
+}
+
+/**
+ * The percent a player sees for a body (round 74, step R): the numerator of the simulator's own display (getHealth)
+ * on the 100 scale, which is what the replay's log shows. Gen 7 and later round it up (never 100 below full HP),
+ * Champions round it down; `Math.round(hp / maxhp * 100)` reads one point under the log for a body the rebuild
+ * sets to the middle of a run of HPs (T161). The display runs in percent mode whatever the body's battle was built
+ * with (a custom game reports exact HP, a Gen 6 battle without the rule shows pixels); 0 for a faint. The body keeps
+ * its modes.
+ */
+export function shownPercent(body: HpDisplayBody): number {
+  if (!(body.maxhp > 0) || !(body.hp > 0)) return 0;
+  const { battle } = body;
+  const saved = { percentages: battle.reportPercentages, exact: battle.reportExactHP };
+  battle.reportExactHP = false;
+  battle.reportPercentages = true;
+  try {
+    const read = /^(\d+)\/100/.exec(body.getHealth().shared);
+    return read ? Number(read[1]) : 0;
+  } finally {
+    battle.reportPercentages = saved.percentages;
+    battle.reportExactHP = saved.exact;
+  }
 }
 
 /** The probe body per generation and rule set; null remembers a generation no candidate species fits. */
