@@ -1,6 +1,6 @@
 # Backlog
 
-This file holds the details of every open TODO, one section per TODO under its fixed T-number. The sections follow the finish line of `NextSteps.md` (user 21.10.2026): wave 5, T163 and T160, the last wave, the release; every other TODO is parked with a trigger. The next free T-number is T266.
+This file holds the details of every open TODO, one section per TODO under its fixed T-number. The sections follow the finish line of `NextSteps.md` (user 21.10.2026): T160, the last wave, the release (wave 5 and T163 are booked); every other TODO is parked with a trigger. The next free T-number is T267.
 
 Evidence paths that start with `r69/` are under `docs/perf/probes/2026-10-12-r69/`, those that start with `r72/` under `docs/perf/probes/2026-10-19-r72/`, those that start with `r73/` under `docs/perf/probes/2026-10-21-r73/`, those that start with `r74/` under `docs/perf/probes/2026-10-22-r74/`.
 
@@ -14,46 +14,14 @@ Source of the new TODOs of round 73 (T258 to T263): the lane notes of wave 5 and
 
 Source of T264 and T265: the two proposals of round 73 that the design gate of round 74 approved (22.10.2026, "5a", "6a"); a reviewer checked both scenes against the code before the gate (`r74/review/gate-design-facts.md`, claims 10 and 11).
 
+Source of T266: the gate of round 74 (23.10.2026, "4a"); a reviewer checked its facts against the run logs before the gate (`r74/review/gate-end-facts.md`).
+
 ## Next rounds
 
-Wave 5 (round 73) is booked (user gate 22.10.2026, "6a"). Round 74 runs T163 with T263 (design gate 22.10.2026, "1a 2a 3a 4a": the capture with search in CI on the full fit corpus, all five families, the leaf K first, then the matchup weight, then the display scale). Then T160, the last wave (T233 with T264, T234, T244, T243 with T258, T259, T260, T261, T262, T265), and the release with T43. Every other TODO is parked with a trigger.
+Wave 5 (round 73) and T163 with T263 (round 74, user gate 23.10.2026, "1a": measured, nothing adopted) are booked. Next: T160, then the last wave (T233 with T264, T234, T244, T243 with T258, T259, T260, T261, T262, T265, T266), and the release with T43. Every other TODO is parked with a trigger.
 
-## The next two rounds: T163 and T160
+## The next round: T160
 
-### T163 · Leaf K per family, fitted on search values
-
-*Re-fit · round · medium · score-touching D3 · absorbs T164 · needs T144 and T102*
-
-**Problem.** One doubles K for all doubles families did not hold. T52 fitted it on the bank and won there (fixed K −36 bp); the doubles OU holdout read it worse (own K +15 [+5, +24]); the VGC holdout read it better only late (−17 [−31, −3]). Bank doubles OU and holdout contradicted each other. Champions OU shows the same: the fitted K (1.64 + 4.41 × share of fainted Pokémon) read better early and late and worse in the middle (fixed K +35 [+7, +65], own K +26 [+3, +47]); the fit ran on static values, while the holdout searches. Untested is a K per family, fitted on the corpus with root values of the search. `winprobK` already takes a ruleset (`winprob.ts:79-82`), and Champions VGC has had its K since T138. Before any Champions doubles re-fit a new capture is needed: F3 ran under the old doubles K, and `regression/fit-families.ts:179` throws as long as `EVAL_FIT_FAMILIES` does not exclude Champions doubles.
-
-**Benefit.** Engine: doubles OU, VGC and Champions OU each get a K that reads their own games.
-
-**Success.** Fit per family on root values of a capture with search; bank plus holdout (D26) with a resolved better doubles row, no pooled harm and no warning in both tables; Champions OU holdout without a warning and better than the base.
-
-**Status (round 69).** Moved behind the wave (user 13.10.2026, "1a"); the tools of lane B stay in the code (family filter of the capture, `rootScaleReports` in `regression/fit-families.ts`, 426e466).
-
-**Evidence.** Numbers from lane F of round 67 (measurements f5 and f6), proofs in `todo-verification.md`.
-
-**Steps.**
-- [ ] New capture of the corpus in the app build with root values of the search, Champions doubles included (F3 ran under the old doubles K; `regression/fit-families.ts:179`).
-- [ ] Fit per family (doubles OU, VGC, Champions OU) with the tools from T138; rules set in advance.
-- [ ] Bank plus holdout (D26) with fixed and own K; Champions OU holdout.
-- [ ] Adopt only with a resolved better doubles row, no pooled harm and no warning.
-
-### T263 · The matchup weights after the winner-share pair value
-
-*Re-fit · feature · score-touching D3 · with T163 · round 73 (F6)*
-
-**Problem.** T248 changed what a matchup pair is worth: it weighs the HP share of the side that wins the pair (68ac4cc). The matchup weights (96 to 210 per table, `score/weights.ts:384`, `:433`) come from fits on the old product form, so the bar of a damaged board reads the matchup at a weight fitted for another term.
-
-**Benefit.** Engine: the matchup weight fits the term it multiplies.
-
-**Success.** A re-fit of `matchup` per family on the capture of T163, by a rule set before the fit; bank plus holdout (D26) and the Champions holdouts without harm.
-
-**Evidence.** `r73/lanes/F/ledger.md` (step 3 proposals), `r73/gate/reading-r73-f2.md`.
-
-**Steps.**
-- [ ] The fit in the round of T163, beside the leaf K.
 ### T160 · Champions rules from the battle's dex
 
 *Champions · round · medium · score-touching D3 · parked until after wave 3*
@@ -258,6 +226,22 @@ Wave 5 (round 73) is booked (user gate 22.10.2026, "6a"). Round 74 runs T163 wit
 - [ ] The red sweep.
 - [ ] The hits taken from the history for the calc path and the static.
 - [ ] The upstream note for `@smogon/calc` in the user's list.
+
+### T266 · The bank in CI: a run GitHub leaves open, a watcher that ends, the runner image
+
+*Tooling · small fix · lossless D4 · round 74 (gate 4a)*
+
+**Problem.** In round 74 the Champions OU holdout run of r74-k finished its 16 jobs and its merge at 20:03 local, and GitHub kept the run "in_progress" without a conclusion for about an hour; `bank-ci.mjs` waits for the run's own status (`waitForRun`, since round 72) and waited with it. When the session ended on 22.10.2026, the local watchers of r74-m ended too: four finished runs came back by hand, and their branches were deleted by hand. `.github/workflows/bank.yml` runs on `ubuntu-latest`, which GitHub moves to Ubuntu 26 from 19.10.2026; the jobs of r74-base and r74-f still ran on Ubuntu 24.04.
+
+**Benefit.** The harm guard of the last wave: a bank run comes back without hand work, and its rows do not change with the runner image.
+
+**Success.** A finished run (every job and the merge job completed, the merged artifact present) downloads after a grace period even while GitHub holds the run open; a run whose watcher ended downloads by its name or run id and loses its branch; `bank.yml` pins `runs-on: ubuntu-24.04`; the bank and one holdout read byte-identical to r74-f after the pin. A spec holds the wait rule with stubbed `gh` answers.
+
+**Evidence.** `r74/gate/reading-r74-k.md`, `r74/gate/reading-r74-m.md`, `r74/review/gate-end-facts.md` (question 4), `r74/ledger.md` (integrator, 22.10. 21:06 and 23.10.).
+
+**Steps.**
+- [ ] The wait rule and the resume, red spec first.
+- [ ] The pinned image; one bank run and one holdout byte-identical.
 
 ## The release
 
@@ -880,6 +864,7 @@ The triage of 21.10.2026 parked these TODOs; each section names its trigger, and
 
 ### Parked without a T-number
 
+- [ ] Round 74: A target without dice and player errors for the evaluation: a fit against the deeper search, or a strength test engine against engine on fixed dice. The bank measures against game outcomes, which carry both (T52, T224 and T163 adopted nothing). Trigger: after the release, a user report of a misread that neither the bank nor the expert pins catch.
 - [ ] Round 73: The healer chip charged every turn in `races.ts` (4 of 585 positions move when scaled). Trigger: a scene where a healer's race misreads.
 - [ ] Round 73: The halved Speed of a paralysis after the hit lands, in the race's move order. Trigger: a scene where a paralyzed body's race order misreads.
 - [ ] Round 73: `sweepCells` and `beatsPair` read the pair on raw HP without the heal strip of T248. Trigger: a relation spec or a scene reaches it.

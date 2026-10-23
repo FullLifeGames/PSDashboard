@@ -910,6 +910,64 @@ import { takeSimFastReport } from '../packages/eval-engine/src/forward/sim-fast/
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * ROUND 74 2026-10-22..23 (improvement round 74, T163 with T263, the second
+ * step of the finish line; branch r74 from c72bd3c (= v1): f43701e (T264 and
+ * T265 booked), 0353e72 (the data pack holds the fit corpus), e589a88 (a leaf
+ * K entry per family), 856b9c4 (the weight fit on a search dump), d6e9259,
+ * 2d3fd6d (the candidate K, reverted in a04d2c1), 03fafa1 (the branch HP
+ * percent), 78d7cf3 (VGC matchup 123, reverted in 80b98cd), 1ae7eab (the bank
+ * guards against harm), 0806c90 (the fits as comments); spec
+ * docs/superpowers/specs/2026-10-22-round-74-design.md, probes
+ * docs/perf/probes/2026-10-22-r74/). Design gate 22.10. ("1a 2a 3a 4a 5a 6a":
+ * the capture with search in CI on the full fit corpus and the upload of its
+ * data pack, all five families, the leaf K first, then the matchup weight,
+ * then the display scale, the adoption rule per family, T264 and T265 to the
+ * last wave).
+ * DELIVERED: the capture tooling (bank-data-pack.mjs packs every replay the
+ * fit source reads, the pre-release bank-data-0c5ed6c275536da9 with 5,690
+ * files in 14.4 MB; the fit source per family in CI with three positions per
+ * game; a leaf K entry per family in winprob.ts, VGC with its own;
+ * scripts/k-stamp.mjs; the weight fit skips the identity check on a dump from
+ * a search); T163 and T263 measured and not adopted; found on the way and
+ * fixed: the branch reads its HP percent from the simulator's display
+ * (shownPercent, a sweep over every HP for maximum HPs from 50 to 700 in
+ * seven formats).
+ * MEASUREMENT: the base r74-base (d6e9259) byte-identical to r73-m2 in all
+ * five families. Capture: standard singles 4,317, Doubles OU 2,161, VGC
+ * 2,334, Champions OU 901, Champions VGC 1,559 positions. Root scale, K' =
+ * K·c: standard singles 2.81 + 0.80·ff, Doubles OU 2.95 + 1.11·ff, VGC 2.09 +
+ * 1.13·ff (c0 0.56 to 0.82), Champions OU 2.05 + 3.22·ff, Champions VGC 1.80
+ * + 3.07·ff. r74-k against r74-base: singles +12 unresolved; Doubles OU -1
+ * unresolved; VGC -1 with fixed K and harm with own K (+12 [+3, +22] full and
+ * hq, +17 luck-adjusted); Champions OU -12 unresolved with a mid warning;
+ * Champions VGC -13 [-23, -4] and hq -21 better with late and mid warnings:
+ * none adopted. The matchup refit at today's K by T127's rule: only VGC
+ * moved, 169 to 123 [100, 149] in 20 of 20 seeds; r74-m: the VGC holdout +4
+ * [-8, +16] unresolved with a luck-adjusted mid warning (+36), harm on the
+ * bank's VGC rows (luck-adjusted doubles +16, own K +21), Doubles OU and both
+ * Champions holdouts byte-identical: not adopted. The display fit dropped
+ * under the rule of 22.10. The final head r74-f (0806c90) byte-identical to
+ * r74-base in all five families; suite 6,621 passed, 2 expected fail, 22
+ * skipped; e2e 77 of 78 (the muted-audio test, "$ is not defined" in the
+ * replay iframe as on 19.09., alone 3 of 3); feedback three times
+ * byte-identical and byte-identical to round 73, no moved turn.
+ * FOUND ON THE WAY: the saved-replay test of reconstruction.spec.ts was red
+ * since fa50482 (round 69, T161): the rebuild sets the middle of the HPs the
+ * simulator shows as the logged percent, and four readers rounded to the
+ * nearest (Gastrodon 398 of 426: the log 94, the panel 93); the test skips
+ * without the gitignored HTML, so the merge clones never ran it. GitHub held
+ * a finished run "in_progress" for an hour (r74-k-hold-championsou), and the
+ * end of the session stopped the local watchers of r74-m (T266). A lower leaf
+ * K in VGC flattens the leaves and sorts the positions worse, although the
+ * root reads too confident.
+ * USER GATE 2026-10-23 13:06 ("1a 2a 3a 4a 5a 6a"): T163 and T263 closed, the
+ * HP percent fix kept, the final suite of a round runs in the main checkout
+ * and its report lists the skipped tests, T266 (the bank in CI after a hung
+ * run or an ended watcher, the pinned runner image) to the last wave, a
+ * target without player noise parked for after the release, booked and
+ * pushed; next T160. The rule of 22.10.2026 ("Passt"): the bank guards
+ * against harm and does not prove a gain. New TODO T266, next free T267.
+ *
  * WAVE 5 2026-10-21..22 (improvement round 73, the first step of the finish
  * line: lanes F (static), H (rebuild) and I (spread solver and hits) in
  * worktrees w5-f, w5-h and w5-i from 078cf6a (= v1); the merge in its own

@@ -1,6 +1,6 @@
-# Next Steps (as of 22.10.2026, round 74 under way)
+# Next Steps (as of 23.10.2026, after round 74)
 
-Open work only, along the finish line. Each step is one round; its TODOs carry fixed T-numbers, and their scenes, numbers and steps are in `docs/backlog.md`. Rules for agents: `AGENTS.md`. Finished rounds: `docs/completed/`. Next free T-number: T266.
+Open work only, along the finish line. Each step is one round; its TODOs carry fixed T-numbers, and their scenes, numbers and steps are in `docs/backlog.md`. Rules for agents: `AGENTS.md`. Finished rounds: `docs/completed/`. Next free T-number: T267.
 
 ## Finish line
 
@@ -8,11 +8,10 @@ The goal is a release: v1 onto master and the GitHub Pages site built from it (u
 
 ## Next rounds
 
-Wave 5 is booked (round 73, user gate 22.10.2026). Round 74 runs the first step below. The way on:
+Wave 5 (round 73) and T163 with T263 (round 74) are booked. Round 74 fitted a leaf K per family and the matchup weights on the search's own values, and the bank and the holdouts adopted none (user gate 23.10.2026). The way on:
 
-1. **Leaf K per family (T163) with the matchup weights (T263), round 74.** Every family (Singles OU, Doubles OU, VGC, Champions OU, Champions VGC) gets a leaf K fitted on the search's own root values, from one capture of the full fit corpus in CI (design gate 22.10.2026, "1a 2a 3a 4a"). The K goes first, then the matchup weight for the winner-share pair value of T248 on the adopted K, then the display scale of the bar. Success: per family, its holdout (Singles OU: the bank's singles rows) reads resolved better with fixed K, and no table shows harm or a warning; the matchup weight also passes the cross-validation of T127.
-2. **Champions rules from the battle's Dex (T160).** 62 code paths still read rules from the global Dex, and in Champions some of them read the Scarlet/Violet rule. Success: every path reads the battle's Dex or is shown to be format-free.
-3. **The last wave:** the rest a user sees.
+1. **Champions rules from the battle's Dex (T160).** 62 code paths still read rules from the global Dex, and in Champions some of them read the Scarlet/Violet rule. Success: every path reads the battle's Dex or is shown to be format-free.
+2. **The last wave:** the rest a user sees.
    - T233 with T264: cards that lose their read; a game report that quotes the odds of a stopped hit; a dice turn against the winner joins the key moments (573756 turn 73).
    - T234: the team editor and early exports keep the inference.
    - T244: a cheap hazard sack read as a blunder in 655336 turn 25.
@@ -22,7 +21,8 @@ Wave 5 is booked (round 73, user gate 22.10.2026). Round 74 runs the first step 
    - T261: a Taunt from a `-start` line ticks once too long.
    - T262: VGC tree time +9.1 % after wave 5.
    - T265: Rage Fist after hits taken, in the kill table, the card odds and the static.
-4. **The release:** T43 (the release check), then v1 onto master and the Pages site after the user's okay.
+   - T266: the bank in CI comes back without hand work after a hung run or an ended watcher, on a pinned runner image.
+3. **The release:** T43 (the release check), then v1 onto master and the Pages site after the user's okay.
 
 ## Parked
 
