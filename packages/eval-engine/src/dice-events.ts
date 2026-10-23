@@ -19,8 +19,11 @@ import { normalizeLines } from './line-endings.ts';
  */
 
 /** |cant| reasons that are dice: full paralysis, flinch, freeze, sleep.
- * (Rest sleep is fixed-length — a documented over-inclusion.) */
-export const CHANCE_CANT: ReadonlySet<string> = new Set(['slp', 'par', 'frz', 'flinch']);
+ * (Rest sleep is fixed-length — a documented over-inclusion.)
+ * Round 76 (T233): the infatuation too; the simulator writes it by the name of its condition, "Attract" (the census of
+ * test/pair-cant-reasons.spec.ts holds this set to the simulator's dice reasons, plus sleep). */
+// eslint-disable-next-line names/no-new-dex-name -- the simulator's |cant| reason (the infatuation's condition name), held by pair-cant-reasons.spec.ts
+export const CHANCE_CANT: ReadonlySet<string> = new Set(['slp', 'par', 'frz', 'flinch', 'Attract']);
 
 type GenDex = RulesDex;
 

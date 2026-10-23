@@ -192,9 +192,10 @@ function hindsightReadFor(
   const row = sideChoices.indexOf(played.choice);
   if (!(column >= 0 && row >= 0)) return undefined;
   const { bestRow, bestValue } = bestRowAgainst(view, matrix, sideChoices.length, column);
-  const gain = bestValue - view.ownValue(matrix, row, column);
+  const playedValue = view.ownValue(matrix, row, column);
+  const gain = bestValue - playedValue;
   if (bestRow >= 0 && bestRow !== row && gain >= TIER_THRESHOLDS.mistake) {
-    const read = { response: sideLabels[bestRow], against: oppPlayed!.label, gain };
+    const read = { response: sideLabels[bestRow], against: oppPlayed!.label, gain, playedValue };
     // The cells of the best row and of the played row against the click (cells[p1 row][p2 column]).
     const cellAt = (own: number) => matrix.cells?.[key === 'p1' ? own : column]?.[key === 'p1' ? column : own];
     return { ...read, ...likeliestClick(params, key, matrix, column), ...hindsightShown(read, [cellAt(bestRow), cellAt(row)], regret) };

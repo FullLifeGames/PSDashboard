@@ -1,3 +1,5 @@
+import { CHANCE_CANT } from '../dice-events.ts';
+
 /**
  * Round 56: the doubles pair plan reads a draw's own lines. A hit's window
  * runs from its roll to the next |move| line; the owner's HP lines carry
@@ -8,9 +10,10 @@
  * The `|cant|` reasons whose cause the simulator draws this turn (round 70, N1). It writes each reason by the name of its
  * condition, so the infatuation reads "Attract" and never "attract". test/pair-cant-reasons.spec.ts scans every reason the
  * simulator can write, plays each over 40 seeds in every doubles generation and the Champions mod, and holds this set to
- * the dice ones.
+ * the dice ones. Round 76 (T233): the report's dice markers (CHANCE_CANT) are the same set plus sleep, whose length the
+ * simulator draws when the status starts, so the plan prices no roll in a sleeping turn.
  */
-const RANDOM_CANT = new Set(['flinch', 'par', 'frz', 'Attract']);
+const RANDOM_CANT: ReadonlySet<string> = new Set([...CHANCE_CANT].filter(reason => reason !== 'slp'));
 
 /** The next |move| line at or after `from`, or the log's end. */
 function windowEnd(log: readonly string[], from: number): number {

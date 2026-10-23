@@ -277,6 +277,11 @@ export interface SideAnalysis {
   hindsightRead?: {
     response: string; against: string; gain: number;
     /**
+     * Round 76 (T233): the played row's own-perspective value against the click (the gain is the best row's value minus
+     * this one). `walkedInto` reads it to tell a click that ties the played row's punisher from one that does not.
+     */
+    playedValue?: number;
+    /**
      * Round 47: the opponent model's share of the actual click, set when
      * that click was the model's favourite (≥ LIKELIEST_CLICK_MIN) — the
      * read was findable, not just there in hindsight (562428 t10).

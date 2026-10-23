@@ -408,7 +408,8 @@ export function seedPhrase(analysis: TurnAnalysis, loser: Side): string {
   const side = analysis[loser];
   const setup = playedSetupMove(side) ? '; a setup move the engine may undervalue' : '';
   const better = displayBest(side);
-  const odds = side.played!.koOdds;
+  // Round 76 (T233): a hit the opponent's click stopped is no claim (the turn card drops it too, round 70, 4a).
+  const odds = side.hitStopped?.played ? undefined : side.played!.koOdds;
   const oddsBit = odds ? ` (${odds.label ? `${phrase(odds.label)}: ` : ''}${koPhrase(odds)})` : '';
   return `turn ${analysis.turn} (${phrase(side.played!.label)}${oddsBit}, ` +
     `${regretText(side.regret ?? 0, better.ev, side.played!.ev, side.faintedFraction)}; safer was ${phrase(better.label)}${setup})`;

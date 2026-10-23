@@ -101,11 +101,15 @@ interface Options {
   clickedOther?: boolean;
   /** scoreBefore, playedOutcome, scoreAfter. */
   scores?: [number, number, number];
+  /** Round 76 (T233): the played row's value against line [1] sits this far above its worst case (default: far above). */
+  siblingGap?: number;
 }
 
 // The turn-7 numbers: the decision part -1.342 and the chance part -0.417 (a shift), or a chance part larger than the decision part.
 const SHIFT: [number, number, number] = [0.9054284770830265, -0.4366561935931187, -0.8535168316469056];
 const CHANCE: [number, number, number] = [0.9054284770830265, 0.72, -0.8535168316469056];
+// Round 76 (T233): the score did not move and the dice had nothing to say: a quiet turn.
+const QUIET: [number, number, number] = [0.9054284770830265, 0.9, 0.9];
 
 function turnOf(make: () => Game, options: Options = {}): { analysis: TurnAnalysis; names: [string, string] } {
   const game = make();
@@ -121,7 +125,7 @@ function turnOf(make: () => Game, options: Options = {}): { analysis: TurnAnalys
   // The click column: the best response beats the played row by 1.0948 (+55%); the other column by 0.6.
   const values = game.p1.map((_, i) => game.p2.map((__, j) => {
     if (j === 0) return i === RESPONSE ? 1.0 : i === PLAYED ? -0.0948465147774409 : i === 0 ? 0.6514 : 0.5;
-    if (j === 1) return i === RESPONSE ? 0.9 : i === PLAYED ? 0.3 : 0.5;
+    if (j === 1) return i === RESPONSE ? 0.9 : i === PLAYED ? (options.siblingGap === undefined ? 0.3 : -0.0948465147774409 + options.siblingGap) : 0.5;
     return 0.5;
   }));
   const cells = game.p1.map((_, i) => game.p2.map((__, j) => {
@@ -181,6 +185,22 @@ describe.each(GAMES)('%s: the trigger', (_name, make) => {
     expect(walkedInto(edge.p1, edge.p2)).toBe(true);
   });
 
+  // Round 76 (T233): the click is a sibling of the punisher when the played row's value against it lies within one inaccuracy of its worst case.
+  test('a click that ties the punisher within an inaccuracy is a walk into it, one band further out is not (red before: only the exact label)', () => {
+    const tied = turnOf(make, { clickedOther: true, siblingGap: TIER_THRESHOLDS.inaccuracy - 0.02 }).analysis;
+    expect(tied.p1.played!.punishedBy).not.toBe(tied.p2.played!.label);
+    expect(walkedInto(tied.p1, tied.p2)).toBe(true);
+    const far = turnOf(make, { clickedOther: true, siblingGap: TIER_THRESHOLDS.inaccuracy + 0.02 }).analysis;
+    expect(walkedInto(far.p1, far.p2)).toBe(false);
+    // The opponent's side did not walk into anything.
+    expect(walkedInto(tied.p2, tied.p1)).toBe(false);
+  });
+
+  test('a tied click still needs the band the worst case trails the best line by', () => {
+    const close = turnOf(make, { clickedOther: true, siblingGap: 0.03, bestWorst: -0.0948465147774409 + TIER_THRESHOLDS.mistake - 0.01 }).analysis;
+    expect(walkedInto(close.p1, close.p2)).toBe(false);
+  });
+
   test('a side without a played line, a best line or a click is not a walk into anything', () => {
     const { analysis } = turnOf(make);
     expect(walkedInto({ ...analysis.p1, played: null }, analysis.p2)).toBe(false);
@@ -225,6 +245,16 @@ describe.each(GAMES)('%s: the card of a turn the chance part carried', (_name, m
     expect(summarizeTurn(analysis, names)).not.toContain(READ);
   });
 
+  test('a click that ties the punisher gets the read after the chance sentence (round 76, T233; red before: no read)', () => {
+    const { analysis, names } = turnOf(make, { scores: CHANCE, clickedOther: true, siblingGap: 0.05 });
+    expect(analysis.attribution).toBe('chance');
+    const text = summarizeTurn(analysis, names);
+    expect(text).toContain(`${READ} ${names[0]}: against`);
+    expect(text.indexOf(READ)).toBeGreaterThan(text.indexOf('Both sides picked reasonable options'));
+    const far = turnOf(make, { scores: CHANCE, clickedOther: true, siblingGap: 0.25 });
+    expect(summarizeTurn(far.analysis, far.names)).not.toContain(READ);
+  });
+
   test('no read sentence when the worst case trails by less than a band', () => {
     const { analysis, names } = turnOf(make, { scores: CHANCE, bestWorst: 0.0 });
     expect(walkedInto(analysis.p1, analysis.p2)).toBe(false);
@@ -243,5 +273,27 @@ describe.each(GAMES)('%s: the card of a turn the chance part carried', (_name, m
     const text = summarizeTurn(resolving, names);
     expect(text).toContain('the decided game resolving toward');
     expect(text).not.toContain(READ);
+  });
+});
+
+describe.each(GAMES)('%s: the card of a quiet turn (round 76, T233)', (_name, make) => {
+  test('the side that walked into its punisher keeps the read it showed on a chance card (red before: "A quiet turn." alone)', () => {
+    const { analysis, names } = turnOf(make, { scores: QUIET });
+    expect(analysis.attribution).toBe('quiet');
+    const text = summarizeTurn(analysis, names);
+    expect(text).toContain('A quiet turn.');
+    expect(text).toContain(`${READ} ${names[0]}: against`);
+    expect(text).toContain('was worth +55% more.');
+    expect(text.indexOf(READ)).toBeGreaterThan(text.indexOf('A quiet turn.'));
+  });
+
+  test('no read when the click was no punisher, the cell is a guess, or the worst case trails by less than a band', () => {
+    const other = turnOf(make, { scores: QUIET, clickedOther: true });
+    expect(summarizeTurn(other.analysis, other.names)).not.toContain(READ);
+    const guess = turnOf(make, { scores: QUIET, responseCell: GUESS });
+    expect(guess.analysis.p1.hindsightRead?.thin).toBe(true);
+    expect(summarizeTurn(guess.analysis, guess.names)).not.toContain(READ);
+    const near = turnOf(make, { scores: QUIET, bestWorst: 0.0 });
+    expect(summarizeTurn(near.analysis, near.names)).not.toContain(READ);
   });
 });

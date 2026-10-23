@@ -1,11 +1,11 @@
 import type { SideAnalysis, TurnAnalysis, VerdictTier } from './analysis.ts';
 import { type DeniedEnd, deniedEndFor, deniedEndSentence } from './denied-end.ts';
-import { KEY_TURN_SWING } from './graph.ts';
+import { KEY_MOMENT_SWING, keyMomentsFor } from './key-moments.ts';
 import { regretSpanFor } from './prose/phrases.ts';
 import { diceAnchorFor, luckSplit, type LuckSplit } from './turn-analysis/luck.ts';
 import { lostGround } from './turn-analysis/risk.ts';
 import {
-  LUCK_TOTAL_THRESHOLD, badTier, closeGameFallback, conversionFor, luckSentence, matchupClause, momentScore,
+  LUCK_TOTAL_THRESHOLD, badTier, closeGameFallback, conversionFor, luckSentence, matchupClause,
   seedPhrase, seedsOfTheLoss, tipClause, winPathFor, type WinConversion, type WinPath, type WinPathResult,
 } from './win-reason.ts';
 import { winPercent } from './winprob.ts';
@@ -17,14 +17,7 @@ import { sideIndex } from '@fulllifegames/replay-core';
  * the result was play vs luck. Pure — no sim imports, main-bundle safe.
  */
 
-/** A key moment needs at least this much swing in one COMPONENT (net swing
- * or the chance share alone — a roll a decision partially cancelled still
- * swung the game, 573756 t73) — the same constant that selects the sweep's
- * deepening turns (graph.ts): whatever the report names ran at the
- * configured settings. */
-export const KEY_MOMENT_SWING = KEY_TURN_SWING;
-/** How many key moments the report keeps. */
-const REPORT_KEY_MOMENTS = 4;
+export { KEY_MOMENT_SWING };
 /** How many misplays the report lists per player. */
 const REPORT_MISPLAYS_PER_SIDE = 2;
 /** How many paid-off reads the report lists per player. */
@@ -195,16 +188,6 @@ function resolutionTurns(known: TurnAnalysis[], boundary: number | null, winner:
     .filter(analysis => analysis.turn >= boundary && analysis.attribution === 'chance' &&
       analysis.chanceDelta !== null && towardWinner(analysis.chanceDelta))
     .map(analysis => analysis.turn));
-}
-
-/** Selection by the biggest component (momentScore, win-reason.ts); resolution turns stay excluded. */
-function keyMomentsFor(known: TurnAnalysis[], resolution: Set<number>): TurnAnalysis[] {
-  return known
-    .filter(analysis => analysis.attribution !== 'quiet' && analysis.swing !== null &&
-      momentScore(analysis) >= KEY_MOMENT_SWING && !resolution.has(analysis.turn))
-    .sort((a, b) => momentScore(b) - momentScore(a))
-    .slice(0, REPORT_KEY_MOMENTS)
-    .sort((a, b) => a.turn - b.turn);
 }
 
 /**
@@ -391,7 +374,7 @@ export function buildGameReport(
   const series = scoreSeries(analyses);
   const boundary = winner ? favorBoundary(series, winner) : null;
   const resolution = resolutionTurns(known, boundary, winner);
-  const keyMoments = keyMomentsFor(known, resolution);
+  const keyMoments = keyMomentsFor(known, resolution, winner, diceTurns);
   const misplays = !playedTracking ? [] : [...misplaysFor(known, 'p1'), ...misplaysFor(known, 'p2')]
     .sort((a, b) => a.turn - b.turn || a.side.localeCompare(b.side));
   const reads = !playedTracking ? [] : [...readsFor(known, 'p1'), ...readsFor(known, 'p2')]
