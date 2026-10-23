@@ -4,7 +4,7 @@ import { twinBattle } from '../sim-ask/index.ts';
 import { EVAL_WEIGHTS } from './weights.ts';
 import { livingMons, livingOf, usableSlots } from './threat.ts';
 import {
-  benchShare, holderActs, idleHolders, pairRace, raceBodies, stageBites, type Bodies, type PairRace, type ThreatOf,
+  BITE_TURNS, foeWins, holderActs, holderWins, idleHolders, pairRace, raceBodies, stageBites, type Bodies, type PairRace, type ThreatOf,
 } from './boost-race.ts';
 import { residualReader, type Residuals } from './residuals.ts';
 import { hitReader, type HitReader } from './contact.ts';
@@ -115,15 +115,15 @@ function statBites(pair: PairRace, stat: keyof BoostsTable, drop: boolean): bool
   return stageBites(pair.held, pair.without(stat), drop, pair.full);
 }
 
-/** What the foes on the field leave of a holder's stages: boosts at all, and the share of any stage that counts for the foes off the field (T259: a ramp, not a switch). */
-interface Gate { boosts: boolean; bench: number }
+/** What the foes on the field leave of a holder's stages: boosts at all, and any stage for the foes off the field. */
+interface Gate { boosts: boolean; bench: boolean }
 
 function frontGate(front: Pokemon[], removers: ReadonlySet<Pokemon>, raceWith: (foe: Pokemon) => PairRace): Gate {
-  const gate: Gate = { boosts: true, bench: 1 };
+  const gate: Gate = { boosts: true, bench: true };
   for (const foe of front) {
     const { held } = raceWith(foe);
     if (removers.has(foe) || !holderActs(held)) gate.boosts = false;
-    gate.bench = Math.min(gate.bench, benchShare(held));
+    if (!holderWins(held) || (foeWins(held) && held.turnsFoe <= BITE_TURNS)) gate.bench = false;
   }
   return gate;
 }
@@ -146,13 +146,12 @@ function holderBites(
   const gate = frontGate(foes.filter(foe => foe.isActive), removers, raceWith);
   let value = 0;
   for (const foe of foes) {
-    const credit = foe.isActive ? 1 : gate.bench;
-    if (removers.has(foe) || credit === 0) continue;
+    if (removers.has(foe) || (!foe.isActive && !gate.bench)) continue;
     const pair = raceWith(foe);
     for (const stat of stats) {
       const stage = mine.boosts[stat];
       if (stage > 0 && !gate.boosts) continue;
-      if (statBites(pair, stat, stage < 0)) value += credit * stageValue(mine, stat, stage);
+      if (statBites(pair, stat, stage < 0)) value += stageValue(mine, stat, stage);
     }
   }
   return value;

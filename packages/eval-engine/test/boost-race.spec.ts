@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { BITE_TURNS, benchShare, foeWins, holderActs, stageBites, type Race } from '../src/score/boost-race';
+import { BITE_TURNS, foeWins, holderActs, stageBites, type Race } from '../src/score/boost-race';
 
 /**
  * 13.10.2026 (the Swords Dance report on gen9draft-2058494320, cause 2): the rule that says whether a standing stage
@@ -8,8 +8,7 @@ import { BITE_TURNS, benchShare, foeWins, holderActs, stageBites, type Race } fr
  */
 
 const race = (partial: Partial<Race>): Race => ({
-  turnsMine: Infinity, turnsFoe: Infinity, first: false, foeFirst: false, mineSurvives: true, foeSurvives: true,
-  exactMine: partial.turnsMine ?? Infinity, exactFoe: partial.turnsFoe ?? Infinity, ...partial,
+  turnsMine: Infinity, turnsFoe: Infinity, first: false, foeFirst: false, mineSurvives: true, foeSurvives: true, ...partial,
 });
 
 describe('a boost counts when the holder wins the race with it and the stage made the difference', () => {
@@ -101,43 +100,5 @@ describe('the gates read the race from the foe in front', () => {
     expect(holderActs(race({ first: true, mineSurvives: false }))).toBe(true);
     expect(holderActs(race({ first: false, mineSurvives: true }))).toBe(true);
     expect(holderActs(race({ first: false, mineSurvives: false }))).toBe(false);
-  });
-});
-
-describe('T259 (round 76): the bench behind a front foe opens by a ramp over the race margin, not by a whole turn', () => {
-  const share = (partial: Partial<Race>): number => benchShare(race(partial));
-
-  test('a clear win is a whole credit, a clear loss none, the same as the whole-turn gate on both ends', () => {
-    expect(share({ turnsMine: 1, turnsFoe: 4, exactMine: 0.6, exactFoe: 3.2 })).toBe(1);
-    expect(share({ turnsMine: 2, exactMine: 1.5 })).toBe(1);
-    expect(share({ turnsMine: 4, turnsFoe: 1, exactMine: 3.2, exactFoe: 0.6 })).toBe(0);
-    expect(share({ turnsMine: Infinity, turnsFoe: 2 })).toBe(0);
-  });
-
-  test('the horizon ramps over its last turn: three turns is whole, four is none', () => {
-    expect(share({ turnsMine: BITE_TURNS, exactMine: BITE_TURNS })).toBe(1);
-    expect(share({ turnsMine: BITE_TURNS + 1, exactMine: BITE_TURNS + 0.5 })).toBeCloseTo(0.5, 12);
-    expect(share({ turnsMine: BITE_TURNS + 1, exactMine: BITE_TURNS + 1 })).toBe(0);
-  });
-
-  test('a close race is a part credit that grows with the margin; the first move tips a tie', () => {
-    const at = (exactMine: number, exactFoe: number, extra: Partial<Race> = {}) =>
-      share({ turnsMine: Math.ceil(exactMine), turnsFoe: Math.ceil(exactFoe), exactMine, exactFoe, ...extra });
-    expect(at(2, 2)).toBeCloseTo(0.5, 12);
-    expect(at(2, 2, { first: true })).toBeGreaterThan(at(2, 2));
-    expect(at(2, 2, { foeFirst: true })).toBeLessThan(at(2, 2));
-    expect(at(1.9, 2.6)).toBeGreaterThan(at(2.0, 2.6));
-  });
-
-  test('no step in the exact clocks moves the share by more than the step over the ramp: the Incineroar of Champions 2634199230 turn 5 (whole clocks 3 against 3, then 2 against 3)', () => {
-    let worst = 0;
-    let last = share({ turnsMine: 3, turnsFoe: 3, exactMine: 2.2, exactFoe: 2.9 });
-    for (let step = 1; step <= 40; step++) {
-      const exactMine = 2.2 - step * 0.01;
-      const now = share({ turnsMine: Math.ceil(exactMine), turnsFoe: 3, exactMine, exactFoe: 2.9 });
-      worst = Math.max(worst, Math.abs(now - last));
-      last = now;
-    }
-    expect(worst).toBeLessThanOrEqual(0.01 + 1e-12);
   });
 });

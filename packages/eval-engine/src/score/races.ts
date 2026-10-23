@@ -200,9 +200,6 @@ export interface RaceClocks {
   /** Turns side A needs to KO side B (Infinity = never lands). */
   turnsA: number;
   turnsB: number;
-  /** Round 76 (T259): the same clocks before they are rounded up to whole turns (Infinity where the turns are). */
-  exactA: number;
-  exactB: number;
   /** Offense after the wall's action economy (see below). */
   effFracA: number;
   effFracB: number;
@@ -247,12 +244,9 @@ export function raceClocks(a: RaceSide, b: RaceSide): RaceClocks {
   const attackB = pinned(b, incomingB) && attackWins(b, a, effFracA, incomingB, incomingA);
   if (attackA) effFracA = a.frac;
   if (attackB) effFracB = b.frac;
-  const [clockA, clockB] = [clockOf(a, effFracA, b, incomingB, !attackB), clockOf(b, effFracB, a, incomingA, !attackA)];
   return {
-    turnsA: clockA.turns,
-    turnsB: clockB.turns,
-    exactA: clockA.exact,
-    exactB: clockB.exact,
+    turnsA: clock(a, effFracA, b, incomingB, !attackB),
+    turnsB: clock(b, effFracB, a, incomingA, !attackA),
     effFracA,
     effFracB,
   };
@@ -281,18 +275,9 @@ function attackWins(side: RaceSide, other: RaceSide, otherEffFrac: number, incom
  * `heals` is whether the defender spends turns on its heal moves (a defender that attacks instead heals none).
  */
 function clock(attacker: RaceSide, effFrac: number, defender: RaceSide, incoming: number, heals: boolean): number {
-  return clockOf(attacker, effFrac, defender, incoming, heals).turns;
-}
-
-/** A clock in whole turns and before the rounding up (T259: the ramp of the bench gate reads the second). */
-interface Clock { turns: number; exact: number }
-
-const NEVER: Clock = { turns: Infinity, exact: Infinity };
-
-function clockOf(attacker: RaceSide, effFrac: number, defender: RaceSide, incoming: number, heals: boolean): Clock {
-  if (attacker.frac <= 0) return NEVER;
+  if (attacker.frac <= 0) return Infinity;
   const pressure = effFrac + defender.residual;
-  if (pressure <= 0) return NEVER;
+  if (pressure <= 0) return Infinity;
   // Held heal PP realize only at the pin efficiency (round 12): past the
   // heal rate the healer heals at a net loss and dies with PP in the
   // tank, so a bar held in PP is worth healRate/incoming of a bar on the
@@ -308,11 +293,9 @@ function clockOf(attacker: RaceSide, effFrac: number, defender: RaceSide, incomi
   }
   // The epsilon keeps float noise (0.1 − 0.45/0.5 ≠ exactly 0.02) from
   // pushing an exact division over the next whole turn.
-  const heldExact = (defender.hp + absorb) / pressure;
-  const sequenceExact = heals ? healedSequence(defender, pressure, incoming) : Infinity;
-  const exact = Math.min(heldExact, Math.max(1, sequenceExact));
-  const turns = Math.min(Math.ceil(heldExact - 1e-9), heals ? Math.ceil(sequenceExact - 1e-9) : Infinity);
-  return turns > attacker.ppBudget ? NEVER : { turns, exact };
+  const held = Math.ceil((defender.hp + absorb) / pressure - 1e-9);
+  const turns = heals ? Math.min(held, healedSequence(defender, pressure, incoming)) : held;
+  return turns > attacker.ppBudget ? Infinity : turns;
 }
 
 /**
@@ -320,13 +303,13 @@ function clockOf(attacker: RaceSide, effFrac: number, defender: RaceSide, incomi
  * take 1 + (n - 1) heals of the healer's rate, so the KO lands at the first n with n * pressure >= hp + (n - 1) * rate.
  * The held-PP price above stays the clock where the PP cannot bridge that many heals (a short tank empties first), and
  * wherever it is the shorter one: it counts the PP at the pin efficiency (round 12), so healing now still beats holding.
- * Infinity where the hits never out-run a heal. Returns the hits before the rounding up.
+ * Infinity where the hits never out-run a heal.
  */
 function healedSequence(defender: RaceSide, pressure: number, incoming: number): number {
   const rate = defender.healRate;
   if (rate <= 0 || incoming <= rate || pressure <= rate) return Infinity;
-  const exact = Math.max(1, (defender.hp - rate) / (pressure - rate));
-  return (Math.ceil(exact - 1e-9) - 1) * rate <= defender.healAbsorb + 1e-9 ? exact : Infinity;
+  const hits = Math.max(1, Math.ceil((defender.hp - rate) / (pressure - rate) - 1e-9));
+  return (hits - 1) * rate <= defender.healAbsorb + 1e-9 ? hits : Infinity;
 }
 
 /** Assembles one Pokémon's race side from live battle state. */

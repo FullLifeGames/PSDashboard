@@ -100,9 +100,6 @@ export function raceBodies(battle: Battle, residuals: Residuals): Bodies {
 export interface Race {
   turnsMine: number;
   turnsFoe: number;
-  /** T259 (round 76): the same clocks before the rounding up to whole turns, for the ramp of the bench gate (`benchShare`). */
-  exactMine: number;
-  exactFoe: number;
   first: boolean;
   foeFirst: boolean;
   /** The foe's best hit leaves me standing. */
@@ -178,8 +175,7 @@ function pricedClocks(inputs: Inputs, mine: Body, foe: Body, cost: PairCost): Ra
 function raceOf(inputs: Inputs, mine: Body, foe: Body, cost: PairCost): Race {
   const clocks = pricedClocks(inputs, mine, foe, cost);
   return {
-    turnsMine: clocks.turnsA, turnsFoe: clocks.turnsB, exactMine: clocks.exactA, exactFoe: clocks.exactB,
-    first: inputs.first, foeFirst: inputs.foeFirst,
+    turnsMine: clocks.turnsA, turnsFoe: clocks.turnsB, first: inputs.first, foeFirst: inputs.foeFirst,
     mineSurvives: livesThrough(inputs.foeFrac, mine.hp), foeSurvives: livesThrough(inputs.mineFrac, foe.hp),
   };
 }
@@ -292,24 +288,8 @@ export function holderActsInFront(mine: Pokemon, front: readonly Pokemon[], batt
   });
 }
 
-/**
- * T259 (round 76): how much of the bench credit a front foe leaves, from 0 (closed) to 1 (open). The bench gate used to ask whether the holder wins the front race within the
- * horizon in whole turns, and a hit more or less on one HP point moved a clock by a whole turn and the credit of the whole
- * bench with it (Champions 2634199230 turn 5: Incineroar 81 to 80
- * of 174 HP, 0.031 on the bar). The ramp reads the clocks before the rounding up. The win ramps over the margin of the two
- * clocks, a tie in the move order worth half a turn, from lost at one turn behind to won at one turn ahead (equal clocks
- * are half); the horizon ramps over its last turn (whole at three turns, none at four). A foe that wins the race inside
- * the horizon in whole turns (a speed tie where both move first) closes the bench as before.
- */
-export function benchShare(race: Race): number {
-  if (race.exactMine === Infinity) return 0;
-  if (foeWins(race) && race.turnsFoe <= BITE_TURNS) return 0;
-  const horizon = Math.min(1, Math.max(0, BITE_TURNS + 1 - race.exactMine));
-  if (race.exactFoe === Infinity) return horizon;
-  const order = race.first ? 0.5 : race.foeFirst ? -0.5 : 0;
-  const margin = race.exactFoe - race.exactMine + order;
-  return Math.min(1, Math.max(0, 0.5 + margin / 2)) * horizon;
-}
+/** Whether the holder wins the race within the race horizon (for the bench credit behind the foes in front). */
+export const holderWins = (race: Race): boolean => wins(frameOf(race, 'mine')) && race.turnsMine <= BITE_TURNS;
 
 /** The mon with its raised stages taken off and its drops kept: a view, as `unboosted`. */
 export const withoutRaises = (pokemon: Pokemon): Pokemon =>
