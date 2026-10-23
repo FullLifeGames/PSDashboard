@@ -198,8 +198,21 @@ export function attributionFor(
  */
 export function walkedInto(side: SideAnalysis, opponent: SideAnalysis): boolean {
   const { played, best } = side;
-  return !!played && !!best && !!opponent.played && played.punishedBy !== null && played.punishedBy === opponent.played.label
+  return !!played && !!best && !!opponent.played && played.punishedBy !== null && punisherClicked(side, opponent)
     && best.worstCase - played.worstCase >= TIER_THRESHOLDS.mistake;
+}
+
+/**
+ * Round 76 (T233): the click is the played line's punisher, or ties it: a fresh search can name a sibling of the click as the
+ * punisher (2630685175 t7: "Pollen Puff→Rillaboom + Wide Guard" for "Pollen Puff→Zamazenta-Crowned + Wide Guard"), and the
+ * floor does not tell them apart when the played line's value against the click lies within one inaccuracy of that floor.
+ */
+function punisherClicked(side: SideAnalysis, opponent: SideAnalysis): boolean {
+  const { played, hindsightRead } = side;
+  if (!played || !opponent.played) return false;
+  if (played.punishedBy === opponent.played.label) return true;
+  return hindsightRead?.playedValue !== undefined && hindsightRead.against === opponent.played.label &&
+    hindsightRead.playedValue - played.worstCase < TIER_THRESHOLDS.inaccuracy;
 }
 
 /**

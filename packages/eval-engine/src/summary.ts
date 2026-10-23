@@ -130,8 +130,13 @@ function chanceSentences(analysis: TurnAnalysis, playerNames: PlayerNames, decid
     : 'Both sides picked reasonable options; the swing came from how the turn rolled ' +
       `(${winDeltaText(delta)}).`;
   // Round 70 (gate of 13.10. 20:26, 1a): a side that walked into its punisher gets the read it missed after the luck sentence.
-  const walked = hindsightSentence(analysis, playerNames, side => walkedInto(analysis[side], analysis[side === 'p1' ? 'p2' : 'p1']));
+  const walked = walkedSentence(analysis, playerNames);
   return walked ? [sentence, walked] : [sentence];
+}
+
+/** The hindsight read of a side that walked into its played line's punisher (or a click that ties it), if its cell is solid. */
+function walkedSentence(analysis: TurnAnalysis, playerNames: PlayerNames): string | null {
+  return hindsightSentence(analysis, playerNames, side => walkedInto(analysis[side], analysis[side === 'p1' ? 'p2' : 'p1']));
 }
 
 /**
@@ -229,10 +234,14 @@ function attributionSentences(analysis: TurnAnalysis, playerNames: PlayerNames, 
       return shiftSentences(analysis, playerNames);
     case 'unclear':
       return ['The score swung, but a choice never surfaced (a Pokémon slept, flinched, or was fully paralyzed), so no blame is assigned.'];
-    default:
-      return [playedBest(analysis.p1) && playedBest(analysis.p2)
+    default: {
+      const quiet = playedBest(analysis.p1) && playedBest(analysis.p2)
         ? "A quiet turn: both sides played the engine's preferred line."
-        : 'A quiet turn.'];
+        : 'A quiet turn.';
+      // Round 76 (T233): a quiet card keeps the read a chance card shows (round 70, 1a) where the cell is solid.
+      const walked = walkedSentence(analysis, playerNames);
+      return walked ? [quiet, walked] : [quiet];
+    }
   }
 }
 
