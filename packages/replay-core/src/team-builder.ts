@@ -274,7 +274,7 @@ function buildSet(
   const usageSet = getSpeciesUsageSet(usageStats, info.species, info.ruledOut, USAGE_MOVE_POOL);
   const smogonSet = getSpeciesSetAssumption(setAssumptions, info.species);
 
-  if (userMatch) return buildSheetSet(info, userMatch, edited, usageSet, smogonSet);
+  if (userMatch) return buildSheetSet(info, userMatch, edited, usageSet, smogonSet, inferred);
 
   const curated = selectCuratedFor(dexOf(rules), info, smogonSet, usageSet);
   // A dropped Scarf ('' from the solver) resolves without it: the guessed

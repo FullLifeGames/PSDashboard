@@ -65,7 +65,7 @@ describe('the callers of the simulator', () => {
     const called = filesWith(/\.call\(/, name => name.includes('sim-fast/'));
     // Rests of T239 outside the files of its lane (the plan's finding 8 and the inference of replay-core): read-only by use.
     const rests = [
-      'eval-engine:branch/sleep-counter.ts', 'eval-engine:calc/body.ts', 'eval-engine:calc/fickle.ts', 'eval-engine:calc/move.ts',
+      'eval-engine:branch/sleep-counter.ts', 'eval-engine:calc/body.ts', 'eval-engine:calc/fickle.ts',
       'eval-engine:calc/typeless.ts', 'eval-engine:damage-calc.ts', 'eval-engine:score/move-facts.ts',
       'replay-core:inference/item-evidence.ts', 'replay-core:inference/item-triggers.ts', 'replay-core:inference/rocks-tell.ts',
       'replay-core:inference/trigger-evidence.ts',

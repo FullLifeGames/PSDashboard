@@ -89,10 +89,15 @@ function fallbackSpreadFor(usageSet: SpeciesUsageSet | null, smogonSet: SmogonSe
   return usageSet?.spread || smogonSet?.spread || null;
 }
 
+/**
+ * Round 76 (T260): a sheet that shows no EVs leaves them unknown, not zero. The solver's EVs (a spread the damage, the move
+ * order or the HP lines checked, never its prior) come before the usage fallback; the sheet's nature and IVs stay.
+ */
 function sheetSpread(
-  userMatch: PokemonSet, edited: EditedFields, fallbackSpread: FallbackSpread,
+  userMatch: PokemonSet, edited: EditedFields, fallbackSpread: FallbackSpread, inferred?: SpreadCandidate,
 ): { nature: PokemonSet['nature']; evs: PokemonSet['evs']; ivs: PokemonSet['ivs'] } {
-  const matchEvs = hasNonZeroEvs(userMatch.evs) ? userMatch.evs : fallbackSpread?.evs || userMatch.evs;
+  const solvedEvs = inferred && inferred.origin !== 'prior' ? inferred.evs : undefined;
+  const matchEvs = hasNonZeroEvs(userMatch.evs) ? userMatch.evs : solvedEvs || fallbackSpread?.evs || userMatch.evs;
   return {
     nature: (edited.editedNature || userMatch.nature || fallbackSpread?.nature || 'Hardy') as PokemonSet['nature'],
     evs: edited.editedEvs || matchEvs,
@@ -106,13 +111,14 @@ export function buildSheetSet(
   edited: EditedFields,
   usageSet: SpeciesUsageSet | null,
   smogonSet: SmogonSet,
+  inferred?: SpreadCandidate,
 ): PokemonSet {
   const hasManualMoves = info.moves.some(move => move.source === 'manual');
   const infoMoveNames = info.moves.map(move => move.name);
   const moves = hasManualMoves
     ? mergeMoveLists(userMatch.moves, infoMoveNames)
     : mergeMoveLists(infoMoveNames, userMatch.moves);
-  const spread = sheetSpread(userMatch, edited, fallbackSpreadFor(usageSet, smogonSet));
+  const spread = sheetSpread(userMatch, edited, fallbackSpreadFor(usageSet, smogonSet), inferred);
   return {
     ...userMatch,
     moves: moves.length > 0 ? moves : userMatch.moves,

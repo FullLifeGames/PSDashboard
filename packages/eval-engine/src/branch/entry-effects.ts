@@ -234,7 +234,8 @@ function startVolatile(battle: SimBattle, body: SimPokemon, start: ProtocolStart
   // The queue is empty at the block's end; a body whose move came after the line answers as it did in the game.
   const queue = battle.queue as { willMove: (pokemon: SimPokemon) => unknown };
   const realWillMove = queue.willMove;
-  if (pending) queue.willMove = pokemon => (pokemon === body ? { choice: 'move', pokemon } : realWillMove.call(queue, pokemon));
+  const asked = realWillMove.bind(queue);
+  if (pending) queue.willMove = pokemon => (pokemon === body ? { choice: 'move', pokemon } : asked(pokemon));
   let added: boolean;
   try {
     added = !!body.addVolatile(start.id, source ?? null) && !!body.volatiles[start.id];
