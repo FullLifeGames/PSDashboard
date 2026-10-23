@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import type { Battle, PokemonSet } from '@pkmn/sim';
 import { loadSimMods } from '../src/forward/sim-mods';
+import { CHANCE_CANT, diceEventTurns } from '../src/dice-events';
 import { randomDeviation } from '../src/pair/log';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
@@ -89,6 +90,18 @@ describe('the |cant| reasons of the simulator, scanned (round 70, N1)', () => {
     for (const [reason, kind] of Object.entries(REASONS)) {
       expect(`${reason} ${randomDeviation([`|cant|p1a: Snorlax|${reason}`])}`, kind.why).toBe(`${reason} ${kind.dice ? `cant:${reason}` : null}`);
     }
+  });
+
+  // Round 76 (T233): the report's dice markers read the same census: a dice reason is a dice event (sleep stays the documented
+  // over-inclusion: the sleep length is drawn at the start, but a sleeping turn has always read as a roll in the luck claims).
+  test('diceEventTurns and the sack scan (CHANCE_CANT) read every dice reason, and the pair plan reads the same set without sleep', () => {
+    for (const [reason, kind] of Object.entries(REASONS)) {
+      const marked = diceEventTurns([[], [`|cant|p1a: Snorlax|${reason}`]]).has(1);
+      expect(`${reason} ${marked}`, kind.why).toBe(`${reason} ${kind.dice || reason === 'slp'}`);
+    }
+    const census = Object.entries(REASONS).filter(([reason, kind]) => kind.dice || reason === 'slp').map(([reason]) => reason);
+    expect([...CHANCE_CANT].sort()).toEqual(census.sort());
+    expect([...CHANCE_CANT].filter(reason => reason !== 'slp').every(reason => randomDeviation([`|cant|p1a: Snorlax|${reason}`]) === `cant:${reason}`)).toBe(true);
   });
 
   test('the reported scene: Snorlax\'s Attract on Blissey, seed 2 of the probe', () => {
