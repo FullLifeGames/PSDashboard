@@ -126,11 +126,14 @@ describe('raceClocks: a pinned healer attacks when attacking wins it the race', 
 
   test('a healer the attack race would lose stays pinned: it never attacks and its held PP realize at the pin efficiency', () => {
     const body = side({ hp: 1, frac: 0.6 });
-    const clocks = raceClocks(body, healer({ healAbsorb: 4 }));
+    // Round 76 (T258): one bar of PP (two heals) cannot bridge the four heals the sequence of the simulator needs, so the held-PP clock stays.
+    const clocks = raceClocks(body, healer({ healAbsorb: 1 }));
     expect(clocks.effFracB).toBe(0);
     expect(clocks.turnsB).toBe(Infinity);
-    // Unchanged by the rule: 1 + 4 x (1/2 / 0.6) bars under 0.6 per turn.
-    expect(clocks.turnsA).toBe(Math.ceil((1 + 4 * (0.5 / 0.6)) / 0.6 - 1e-9));
+    // Unchanged by the rule: 1 + 1 x (1/2 / 0.6) bars under 0.6 per turn.
+    expect(clocks.turnsA).toBe(Math.ceil((1 + 1 * (0.5 / 0.6)) / 0.6 - 1e-9));
+    // With four bars of PP the sequence of the simulator is shorter: five hits, four heals (before: 8 turns).
+    expect(raceClocks(body, healer({ healAbsorb: 4 })).turnsA).toBe(5);
   });
 
   test('a healer whose attack cannot land stays pinned (no damaging move)', () => {
@@ -147,6 +150,22 @@ describe('raceClocks: a pinned healer attacks when attacking wins it the race', 
     expect(clocks.turnsB).toBeLessThan(Infinity);
     expect(clocks.effFracA).toBe(0.6);
     expect(clocks.effFracB).toBe(0.55);
+  });
+
+  test('T258: a pinned healer falls to the sequence of the simulator, a hit then a heal: n hits take 1 + (n - 1) heals (before: the held PP counted at rate/incoming, 8 turns)', () => {
+    const attacker = (frac: number) => side({ hp: 0.05, frac });
+    const shoreUp = (partial: Partial<RaceSide> = {}) => side({ hp: 1, frac: 0, healRate: 0.5, healAbsorb: 4, ppBudget: 16, ...partial });
+    // 80% hits: the second hit lands on 20% + 50%, so two turns (before: 5).
+    expect(raceClocks(attacker(0.795), shoreUp()).turnsA).toBe(2);
+    // 60% hits: net 10% a turn after the first heal, five hits in all, four heals of the eight PP.
+    expect(raceClocks(attacker(0.6), shoreUp()).turnsA).toBe(5);
+    // A hit that takes the healer in one: no heal comes in time.
+    expect(raceClocks(attacker(1.2), shoreUp()).turnsA).toBe(1);
+  });
+
+  test('T258: a pinned healer with too few heal PP for the sequence keeps the held-PP clock', () => {
+    // Two heals (one bar of PP) cannot bridge the four heals the 60% sequence needs: the PP-bound clock of round 12 stays.
+    expect(raceClocks(side({ hp: 0.05, frac: 0.6 }), side({ hp: 1, frac: 0, healRate: 0.5, healAbsorb: 1, ppBudget: 16 })).turnsA).toBe(4);
   });
 
   test('nobody pinned: the clocks are the old ones', () => {

@@ -293,8 +293,23 @@ function clock(attacker: RaceSide, effFrac: number, defender: RaceSide, incoming
   }
   // The epsilon keeps float noise (0.1 − 0.45/0.5 ≠ exactly 0.02) from
   // pushing an exact division over the next whole turn.
-  const turns = Math.ceil((defender.hp + absorb) / pressure - 1e-9);
+  const held = Math.ceil((defender.hp + absorb) / pressure - 1e-9);
+  const turns = heals ? Math.min(held, healedSequence(defender, pressure, incoming)) : held;
   return turns > attacker.ppBudget ? Infinity : turns;
+}
+
+/**
+ * Round 76 (T258): the clock of a healer the hits out-run, as the simulator plays it: hit, heal, hit, heal, hit. n hits
+ * take 1 + (n - 1) heals of the healer's rate, so the KO lands at the first n with n * pressure >= hp + (n - 1) * rate.
+ * The held-PP price above stays the clock where the PP cannot bridge that many heals (a short tank empties first), and
+ * wherever it is the shorter one: it counts the PP at the pin efficiency (round 12), so healing now still beats holding.
+ * Infinity where the hits never out-run a heal.
+ */
+function healedSequence(defender: RaceSide, pressure: number, incoming: number): number {
+  const rate = defender.healRate;
+  if (rate <= 0 || incoming <= rate || pressure <= rate) return Infinity;
+  const hits = Math.max(1, Math.ceil((defender.hp - rate) / (pressure - rate) - 1e-9));
+  return (hits - 1) * rate <= defender.healAbsorb + 1e-9 ? hits : Infinity;
 }
 
 /** Assembles one Pokémon's race side from live battle state. */

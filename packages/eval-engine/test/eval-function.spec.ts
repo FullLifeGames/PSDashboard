@@ -1222,8 +1222,11 @@ describe('the healer wall is a finite race (round 11)', () => {
     const attacker = side({ frac: 1.0 });
     const held = side({ frac: 0.2, healRate: 0.5, healAbsorb: 2 });
     const healed = side({ hp: 1.5, frac: 0.2, healRate: 0.5, healAbsorb: 1.5 });
-    expect(raceClocks(attacker, held).turnsA).toBe(2);
-    expect(raceClocks(attacker, healed).turnsA).toBe(3);
+    // Round 76 (T258): the sequence of the simulator (hit, heal, hit) replaces the held-PP price where the PP bridge it:
+    // a 100% hit takes the 100% body in one turn (before: 2, the held PP counted), the body that already healed in two
+    // (before: 3). The order stands: the body that healed already outlasts the one that holds.
+    expect(raceClocks(attacker, held).turnsA).toBe(1);
+    expect(raceClocks(attacker, healed).turnsA).toBe(2);
     // Below the heal rate there is no pin and the absorb realizes in full.
     const gentle = side({ frac: 0.4 });
     expect(raceClocks(gentle, held).turnsA).toBe(8);
