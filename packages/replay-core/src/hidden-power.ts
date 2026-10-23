@@ -1,9 +1,9 @@
-import { Dex } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import { getSpeciesUsageStats } from './smogon/usage-lookup.ts';
 import type { SmogonUsageStats } from './smogon/stats-types.ts';
 import type { HiddenPowerEvidence } from './types.ts';
 import { toId } from './ids.ts';
+import { rulesDex, type GameRules, type RulesDex } from './rules-dex.ts';
 
 /**
  * Typeless "Hidden Power" resolution (round 2, agenda item ⑤): the replay
@@ -20,7 +20,7 @@ export const HP_TYPES = [
 
 type Marker = HiddenPowerEvidence['marker'];
 
-function markerFor(dex: typeof Dex, type: string, defenderSpecies: string): Marker | null {
+function markerFor(dex: RulesDex, type: string, defenderSpecies: string): Marker | null {
   const species = dex.species.get(defenderSpecies);
   if (!species.exists) return null;
   const targetTypes = species.types;
@@ -33,10 +33,10 @@ export function resolveHiddenPowerType(
   evidence: HiddenPowerEvidence[],
   usageStats: SmogonUsageStats | null | undefined,
   species: string,
-  gen: number,
+  rules: GameRules,
 ): string | null {
   const stats = getSpeciesUsageStats(species, usageStats);
-  const dex = Dex.forGen(Math.min(9, Math.max(2, gen)));
+  const dex = rulesDex(Math.max(2, rules.gen), rules.mod);
   const variants = (stats?.moves ?? [])
     .filter(move => toId(move.value).startsWith('hiddenpower') && toId(move.value) !== 'hiddenpower')
     .map(move => {
@@ -55,7 +55,7 @@ export function resolveHiddenPowerType(
   const speciesId = toId(species);
   const mine = evidence.filter(entry => toId(entry.attackerSpecies) === speciesId);
   const fits = (type: string) =>
-    mine.every(entry => markerFor(dex as typeof Dex, type, entry.defenderSpecies) === entry.marker);
+    mine.every(entry => markerFor(dex, type, entry.defenderSpecies) === entry.marker);
   const surviving = variants.filter(variant => fits(variant.type));
   // Empty intersection: ability-faked markers (Levitate family) can poison
   // the filter — fall back to usage alone rather than to nothing.
@@ -82,7 +82,7 @@ export function withHiddenPowerType(
   set: PokemonSet,
   evidence: HiddenPowerEvidence[],
   usageStats: SmogonUsageStats | null | undefined,
-  gen: number,
+  rules: GameRules,
 ): PokemonSet {
   const index = set.moves.findIndex(move => toId(move) === 'hiddenpower');
   if (index < 0) return set;
@@ -90,7 +90,7 @@ export function withHiddenPowerType(
   const defaultIvs = !set.ivs || Object.values(set.ivs).every(value => value === 31);
   if (!defaultIvs) return set;
   const resolved = resolveHiddenPowerType(
-    evidence.filter(entry => toId(entry.attackerSpecies) === toId(set.species)), usageStats, set.species, gen);
+    evidence.filter(entry => toId(entry.attackerSpecies) === toId(set.species)), usageStats, set.species, rules);
   if (!resolved) return set;
   const moves = [...set.moves];
   moves[index] = resolved;

@@ -6,6 +6,7 @@ import { buildSolveContext, observationError } from '../src/spreads/fit';
 import { toId } from '../src/ids';
 import type { SpeedKnowledge } from '../src/spreads/scarf';
 import type { DamageObservation, PokemonEvs } from '../src/types';
+import './champions-mod';
 
 const gen = Generations.get(9);
 

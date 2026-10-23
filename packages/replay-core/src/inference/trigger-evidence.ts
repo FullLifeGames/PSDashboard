@@ -1,6 +1,6 @@
-import { Dex } from '@pkmn/sim';
+import { dexOf } from '../rules-dex.ts';
 import { Protocol } from '@pkmn/protocol';
-import type { InferrerState } from './inferrer-state.ts';
+import { type InferrerState } from './inferrer-state.ts';
 import { possibleAbilities, ruleOutUnknown } from './item-evidence.ts';
 import { arg, keyOf, namesEffect, ofIdent, type LogLine } from './log-line.ts';
 import { newItemTriggerWatch, teamSizeOf, watchItemTriggers, type ItemTriggerWatch } from './item-triggers.ts';
@@ -65,7 +65,7 @@ function newWatch(state: InferrerState): TriggerWatch {
 
 /** The item exists in the replay's generation. */
 function inGen(state: InferrerState, itemId: string): boolean {
-  const item = Dex.forGen(state.gen).items.get(itemId);
+  const item = dexOf(state).items.get(itemId);
   return item.exists && item.gen <= state.gen;
 }
 
@@ -92,7 +92,7 @@ function spendsWith(onUpdate: ItemHandler, ability: string, watch: TriggerWatch)
 /** Every ability the Pokémon may have makes Booster Energy spend itself at entry, so a holder shows the line. */
 function boosterSpends(state: InferrerState, ident: string, watch: TriggerWatch): boolean {
   if (watch.neutralized || watch.magicRoom || !inGen(state, 'boosterenergy')) return false;
-  const { onUpdate } = Dex.forGen(state.gen).items.get('boosterenergy') as { onUpdate?: ItemHandler };
+  const { onUpdate } = dexOf(state).items.get('boosterenergy') as { onUpdate?: ItemHandler };
   const abilities = possibleAbilities(state, ident);
   return !!onUpdate && !!abilities && abilities.size > 0 && [...abilities].every(ability => spendsWith(onUpdate, ability, watch));
 }
@@ -152,7 +152,7 @@ function onField(state: InferrerState, watch: TriggerWatch, line: LogLine) {
   if (line.cmd === '-weather') watch.weather = id === 'none' ? '' : id;
   else if (id === 'gravity') watch.gravity = on;
   else if (id === 'magicroom') watch.magicRoom = on;
-  else if (terrainConditions(Dex.forGen(state.gen)).has(id)) watch.terrain = on ? id : (watch.terrain === id ? '' : watch.terrain);
+  else if (terrainConditions(dexOf(state)).has(id)) watch.terrain = on ? id : (watch.terrain === id ? '' : watch.terrain);
   // A field change inside an entry's window: the Booster Energy reading is no longer clean.
   // A lasting weather's upkeep line changes nothing (752839 t13).
   if (fieldOf(watch) !== before) for (const entry of watch.entries.values()) entry.booster = false;

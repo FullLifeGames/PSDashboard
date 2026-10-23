@@ -1,3 +1,4 @@
+import './champions-mod';
 import { describe, expect, test } from 'vitest';
 import { Dex } from '@pkmn/sim';
 import { Move, calculate } from '@smogon/calc';
@@ -9,6 +10,7 @@ import { buildCalcPokemon } from '../src/calc-build';
 import { calcGenerationFor } from '../src/calc-gen';
 import { toId } from '../src/ids';
 import type { DamageObservation, PokemonEvs } from '../src/types';
+import { rulesDex } from '../src/rules-dex';
 
 /**
  * Round 69 (T26, spec decision 7): a guessed boost item (Choice Band, Choice Specs, Life Orb ...) the damage lines
@@ -103,10 +105,10 @@ describe('a boost item is what the Dex says it is (T26)', () => {
   const gen9 = Dex.forGen(9);
   test('the offense items of the simulator are in, the others are out', () => {
     for (const name of ['Choice Band', 'Choice Specs', 'Life Orb', 'Muscle Band', 'Expert Belt', 'Wise Glasses']) {
-      expect(isBoostItem(9, name), name).toBe(true);
+      expect(isBoostItem(rulesDex(9), name), name).toBe(true);
     }
     for (const name of ['Leftovers', 'Choice Scarf', 'Assault Vest', 'Heavy-Duty Boots', 'Rocky Helmet', 'Focus Sash', 'Eviolite', '']) {
-      expect(isBoostItem(9, name), name).toBe(false);
+      expect(isBoostItem(rulesDex(9), name), name).toBe(false);
     }
   });
 
@@ -115,9 +117,9 @@ describe('a boost item is what the Dex says it is (T26)', () => {
     for (const generation of [9, 8, 4]) {
       const dex = Dex.forGen(generation);
       const expected = dex.items.all().filter(item => hooks.some(hook => typeof (item as unknown as Record<string, unknown>)[hook] === 'function')).map(item => item.id);
-      expect([...boostItemIds(generation)].sort()).toEqual(expected.sort());
+      expect([...boostItemIds(rulesDex(generation))].sort()).toEqual(expected.sort());
     }
-    expect(isBoostItem(9, 'choiceband')).toBe(isBoostItem(9, 'Choice Band'));
+    expect(isBoostItem(rulesDex(9), 'choiceband')).toBe(isBoostItem(rulesDex(9), 'Choice Band'));
     expect(gen9.items.get('lifeorb').exists).toBe(true);
   });
 });
@@ -125,12 +127,12 @@ describe('a boost item is what the Dex says it is (T26)', () => {
 describe('an item the species needs is never a guess to drop (T26)', () => {
   test('the Dex names the species that cannot do without a boost item', () => {
     const dex = Dex.forGen(9);
-    const needing = dex.species.all().filter(entry => [entry.requiredItem, ...(entry.requiredItems ?? [])].some(name => !!name && isBoostItem(9, name)));
+    const needing = dex.species.all().filter(entry => [entry.requiredItem, ...(entry.requiredItems ?? [])].some(name => !!name && isBoostItem(rulesDex(9), name)));
     expect(needing.map(entry => entry.name)).toContain('Ogerpon-Hearthflame');
     for (const entry of needing) {
-      for (const name of [entry.requiredItem, ...(entry.requiredItems ?? [])].filter(Boolean) as string[]) expect(requiresItem(9, entry.name, name), `${entry.name} ${name}`).toBe(true);
+      for (const name of [entry.requiredItem, ...(entry.requiredItems ?? [])].filter(Boolean) as string[]) expect(requiresItem(rulesDex(9), entry.name, name), `${entry.name} ${name}`).toBe(true);
     }
-    expect(requiresItem(9, 'Garchomp', 'Choice Band')).toBe(false);
+    expect(requiresItem(rulesDex(9), 'Garchomp', 'Choice Band')).toBe(false);
   });
 
   for (const formatid of ['gen9ou', 'gen9doublesou']) {

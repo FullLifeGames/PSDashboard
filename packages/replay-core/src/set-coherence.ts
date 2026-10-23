@@ -1,7 +1,5 @@
-// Data-only Dex: this module is reachable from the app's MAIN bundle via
-// team-info's enrichment — importing @pkmn/sim here would drag the whole
-// simulator across the dynamic-import boundary (team-builder stays lazy).
-import { Dex } from '@pkmn/dex';
+// Round 75 (T160): the Dex of the game comes in with the evidence and the context (a type-only import of the resolver's Dex).
+import type { RulesDex } from './rules-dex.ts';
 import type { PokemonSetAssumption } from './smogon/sets-lookup.ts';
 import { filledSlots, slotMoveKey, slotOrderedMoves } from './team/move-slots.ts';
 import { fillsOpenMove } from './team/open-moves.ts';
@@ -37,6 +35,8 @@ export interface MoveCandidate {
 }
 
 export interface CoherenceContext {
+  /** The Dex of the game the set is assembled for (its generation and mod). */
+  dex: RulesDex;
   /** The set's item id ('' when unknown): a status fill contradicts a Choice/AV item whether it is proof or a guess. */
   itemId: string;
   /**
@@ -50,7 +50,7 @@ export interface CoherenceContext {
 /** A selected set; `itemReplaced` when its item gave way after a rule-out (then it is no longer the set's own). */
 export type CuratedSetAssumption = PokemonSetAssumption & { itemReplaced?: true };
 
-type DexMove = ReturnType<typeof Dex.moves.get>;
+type DexMove = ReturnType<RulesDex['moves']['get']>;
 
 /**
  * The offense stats a move raises for its user, from the Dex (round 64,
@@ -107,8 +107,8 @@ function ownStatsLowered(move: DexMove): string[] {
   return Object.keys(boosts).filter(stat => (boosts[stat] ?? 0) < 0);
 }
 
-function factsOf(name: string): MoveFacts | null {
-  const move = Dex.moves.get(name);
+function factsOf(dex: RulesDex, name: string): MoveFacts | null {
+  const move = dex.moves.get(name);
   if (!move.exists) return null;
   const scaling = move.category === 'Status' ? null
     : move.overrideOffensiveStat === 'def' ? 'def'
@@ -121,6 +121,8 @@ function factsOf(name: string): MoveFacts | null {
 }
 
 export interface CuratedEvidence {
+  /** The Dex of the game the set is chosen for (its generation and mod). */
+  dex: RulesDex;
   /** Move ids seen in game or user-set — the anchors a set must cover. */
   revealedMoves: string[];
   /**
@@ -165,13 +167,11 @@ interface CandidateIds {
   abilityId: string;
 }
 
-const itemId = (name: string) => Dex.items.get(name).id as string;
-
-function candidateIds(candidate: PokemonSetAssumption): CandidateIds {
+function candidateIds(dex: RulesDex, candidate: PokemonSetAssumption): CandidateIds {
   return {
-    moveIds: candidate.moves.map(move => Dex.moves.get(move.value).id as string),
-    itemIds: candidate.item ? (candidate.item.options ?? [candidate.item.value]).map(itemId) : [],
-    abilityId: candidate.ability ? (Dex.abilities.get(candidate.ability.value).id as string) : '',
+    moveIds: candidate.moves.map(move => dex.moves.get(move.value).id as string),
+    itemIds: candidate.item ? (candidate.item.options ?? [candidate.item.value]).map(name => dex.items.get(name).id as string) : [],
+    abilityId: candidate.ability ? (dex.abilities.get(candidate.ability.value).id as string) : '',
   };
 }
 
@@ -180,7 +180,7 @@ function candidateIds(candidate: PokemonSetAssumption): CandidateIds {
  * slot: T89), per revealed item, and per revealed ability the candidate carries.
  */
 function fitScore(candidate: PokemonSetAssumption, ids: CandidateIds, evidence: CuratedEvidence): number {
-  let fit = 2 * filledSlots(candidate.moves, evidence.revealedMoves.map(slotMoveKey)).size;
+  let fit = 2 * filledSlots(evidence.dex, candidate.moves, evidence.revealedMoves.map(name => slotMoveKey(evidence.dex, name))).size;
   if (evidence.revealedItem && ids.itemIds.includes(evidence.revealedItem)) fit += 2;
   if (evidence.revealedAbility && ids.abilityId === evidence.revealedAbility) fit += 2;
   return fit;
@@ -191,7 +191,7 @@ function fitScore(candidate: PokemonSetAssumption, ids: CandidateIds, evidence: 
  * that clear the floor and never lift one over it: a set that misses the revealed moves stays out.
  */
 function openFit(candidate: PokemonSetAssumption, evidence: CuratedEvidence): number {
-  const fills = (open: OpenMove) => candidate.moves.some(slot => (slot.options ?? [slot.value]).some(option => fillsOpenMove(open, option)));
+  const fills = (open: OpenMove) => candidate.moves.some(slot => (slot.options ?? [slot.value]).some(option => fillsOpenMove(evidence.dex, open, option)));
   return 2 * (evidence.openMoves ?? []).filter(fills).length;
 }
 
@@ -203,7 +203,7 @@ function bestCandidate(
   let bestFit = -Infinity;
   let bestTiebreak = -Infinity;
   for (const candidate of candidates) {
-    const ids = candidateIds(candidate);
+    const ids = candidateIds(evidence.dex, candidate);
     if (itemRuleOuts && ids.itemIds.length > 0 && ids.itemIds.every(id => evidence.ruledOutItems.includes(id))) continue;
     if (ids.abilityId && evidence.ruledOutAbilities.includes(ids.abilityId)) continue;
 
@@ -249,7 +249,7 @@ function withItemAfterRuleOut(
   set: PokemonSetAssumption, unruled: PokemonSetAssumption, evidence: CuratedEvidence,
 ): CuratedSetAssumption {
   const allowed = (item: string | undefined): item is string =>
-    !!item && !evidence.ruledOutItems.includes(Dex.items.get(item).id as string);
+    !!item && !evidence.ruledOutItems.includes(evidence.dex.items.get(item).id as string);
   const replacement = [evidence.guessedItem, evidence.usageItem].find(allowed);
   if (!replacement) return set;
   const why = replacement === evidence.guessedItem ? `${replacement} guessed from the log` : 'most used other item';
@@ -268,8 +268,9 @@ export function publishedIvs(
   return curated ? curated.ivs : !usageHasSpread ? smogonSet?.ivs : undefined;
 }
 
-export function itemFromChosenSet(curated: CuratedSetAssumption | null, item: string): boolean {
+export function itemFromChosenSet(dex: RulesDex, curated: CuratedSetAssumption | null, item: string): boolean {
   if (!curated?.item || curated.itemReplaced || !item) return false;
+  const itemId = (name: string) => dex.items.get(name).id as string;
   return (curated.item.options ?? [curated.item.value]).some(option => itemId(option) === itemId(item));
 }
 
@@ -281,6 +282,7 @@ export function itemFromChosenSet(curated: CuratedSetAssumption | null, item: st
 function withItemSlotResolved(set: PokemonSetAssumption, evidence: CuratedEvidence): PokemonSetAssumption {
   const options = set.item?.options;
   if (!set.item || !options) return set;
+  const itemId = (name: string) => evidence.dex.items.get(name).id as string;
   const played = options.find(option => itemId(option) === evidence.revealedItem)
     ?? options.find(option => !evidence.ruledOutItems.includes(itemId(option)));
   return !played || played === set.item.value ? set : { ...set, item: { ...set.item, value: played } };
@@ -288,7 +290,7 @@ function withItemSlotResolved(set: PokemonSetAssumption, evidence: CuratedEviden
 
 /** The winner's moves with its slots read against the evidence (T89, decision 11). */
 function withSlotsResolved(set: PokemonSetAssumption, evidence: CuratedEvidence): PokemonSetAssumption {
-  const moves = slotOrderedMoves(set.moves, new Set(evidence.revealedMoves.map(slotMoveKey)));
+  const moves = slotOrderedMoves(evidence.dex, set.moves, new Set(evidence.revealedMoves.map(name => slotMoveKey(evidence.dex, name))));
   return moves === set.moves ? set : { ...set, moves };
 }
 
@@ -303,9 +305,9 @@ function contradicts(a: MoveFacts, b: MoveFacts): boolean {
 }
 
 /** The damaging moves no row may veto: seen ones and the chosen set's, wherever the pool lists them. */
-function protectedDamaging(candidates: MoveCandidate[]): MoveFacts[] {
+function protectedDamaging(dex: RulesDex, candidates: MoveCandidate[]): MoveFacts[] {
   return candidates.filter(candidate => !candidate.guessed || candidate.fromSet)
-    .map(candidate => factsOf(candidate.name))
+    .map(candidate => factsOf(dex, candidate.name))
     .filter((facts): facts is MoveFacts => !!facts && facts.category !== 'Status');
 }
 
@@ -314,13 +316,13 @@ function protectedDamaging(candidates: MoveCandidate[]): MoveFacts[] {
  * ask what the kept attacks scale with — Iron Defense is only coherent
  * while a Defense-scaling attack survives.
  */
-function keepDamagingMoves(candidates: MoveCandidate[], served: Set<string>): DamagingKeeps {
+function keepDamagingMoves(dex: RulesDex, candidates: MoveCandidate[], served: Set<string>): DamagingKeeps {
   const keptDamageTypes = new Set<string>();
   const keptScalings = new Set<string>();
   const damagingKept = new Set<MoveCandidate>();
-  const keptFacts = protectedDamaging(candidates);
+  const keptFacts = protectedDamaging(dex, candidates);
   for (const candidate of candidates) {
-    const facts = factsOf(candidate.name);
+    const facts = factsOf(dex, candidate.name);
     if (!facts || facts.category === 'Status') continue;
     const keep = () => {
       damagingKept.add(candidate);
@@ -352,11 +354,11 @@ function keepDamagingMoves(candidates: MoveCandidate[], served: Set<string>): Da
 
 /** Pass 2 assembles in pool order; status rows run against the kept attacks. */
 function assembleKeptMoves(
-  candidates: MoveCandidate[], restrictiveItem: 'choice' | 'av' | null, keeps: DamagingKeeps, itemFromSet: boolean,
+  dex: RulesDex, candidates: MoveCandidate[], restrictiveItem: 'choice' | 'av' | null, keeps: DamagingKeeps, itemFromSet: boolean,
 ): MoveCandidate[] {
   const kept: MoveCandidate[] = [];
   for (const candidate of candidates) {
-    const facts = factsOf(candidate.name);
+    const facts = factsOf(dex, candidate.name);
     if (!candidate.guessed || !facts) {
       kept.push(candidate);
       continue;
@@ -368,7 +370,7 @@ function assembleKeptMoves(
       if (restrictiveItem === 'choice' && !TRICK_FAMILY.has(facts.id) && !spared) continue;
       // Row 3: a defense-boost enabler without its payoff attack (Iron
       // Defense whose Body Press was vetoed or never offered).
-      if (!candidate.fromSet && defenseBoost(Dex.moves.get(facts.id)) && !keeps.keptScalings.has('def')) continue;
+      if (!candidate.fromSet && defenseBoost(dex.moves.get(facts.id)) && !keeps.keptScalings.has('def')) continue;
       kept.push(candidate);
       continue;
     }
@@ -382,7 +384,8 @@ export function applyCoherenceVetoes(
   context: CoherenceContext,
 ): MoveCandidate[] {
   // A Choice item from the Dex (`isChoice`, round 64 decision 17).
-  const restrictiveItem = Dex.items.get(context.itemId).isChoice ? 'choice'
+  const { dex } = context;
+  const restrictiveItem = dex.items.get(context.itemId).isChoice ? 'choice'
     : context.itemId === 'assaultvest' ? 'av' : null;
   // Boost context comes from the WHOLE pool (usage order can list the attack
   // before the boost) — boost moves themselves are never vetoed by these rows.
@@ -392,11 +395,11 @@ export function applyCoherenceVetoes(
   const served = new Set<string>();
   const itemFromSet = !!context.itemFromSet;
   for (const candidate of candidates) {
-    const move = Dex.moves.get(candidate.name);
+    const move = dex.moves.get(candidate.name);
     const struck = candidate.guessed && restrictiveItem !== null && move.category === 'Status' && !(candidate.fromSet && itemFromSet);
     if (!struck && !candidate.tail) for (const stat of boostsServed(move)) served.add(stat);
   }
 
-  const keeps = keepDamagingMoves(candidates, served);
-  return assembleKeptMoves(candidates, restrictiveItem, keeps, itemFromSet);
+  const keeps = keepDamagingMoves(dex, candidates, served);
+  return assembleKeptMoves(dex, candidates, restrictiveItem, keeps, itemFromSet);
 }

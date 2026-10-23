@@ -1,4 +1,4 @@
-import { type TurnSnapshot, broughtSpeciesFor, speciesBaseId } from '@fulllifegames/replay-core';
+import { type GameRules, type TurnSnapshot, broughtSpeciesFor, speciesBaseId } from '@fulllifegames/replay-core';
 
 /** One team slot offered as a lead: identity plus what the real game did. */
 export interface LeadOption {
@@ -13,7 +13,7 @@ export interface LeadOption {
 /** T0 lead picker data: each side's team with the real leads marked (the
  *  pre-turn-1 snapshot's actives ARE the leads) and, for bring-limited
  *  formats, which Pokemon the real game brought (active in ANY snapshot). */
-export function buildLeadOptions(snapshots: TurnSnapshot[]): { p1: LeadOption[]; p2: LeadOption[] } {
+export function buildLeadOptions(snapshots: TurnSnapshot[], rules: GameRules): { p1: LeadOption[]; p2: LeadOption[] } {
   const snapshot = snapshots[0] ?? null;
   if (!snapshot) return { p1: [], p2: [] };
   // Base-species matching: the preview lists "Zamazenta-*" while the
@@ -23,10 +23,10 @@ export function buildLeadOptions(snapshots: TurnSnapshot[]): { p1: LeadOption[];
       name: pokemon.name,
       species: pokemon.speciesForme,
       wasLead: pokemon.isActive,
-      wasBrought: broughtBases.has(speciesBaseId(pokemon.speciesForme)),
+      wasBrought: broughtBases.has(speciesBaseId(pokemon.speciesForme, rules)),
     }));
   const basesOf = (sideKey: 'p1' | 'p2') =>
-    new Set(broughtSpeciesFor(snapshots, sideKey).map(name => speciesBaseId(name)));
+    new Set(broughtSpeciesFor(snapshots, sideKey, rules).map(name => speciesBaseId(name, rules)));
   return {
     p1: optionsOf(snapshot.p1, basesOf('p1')),
     p2: optionsOf(snapshot.p2, basesOf('p2')),

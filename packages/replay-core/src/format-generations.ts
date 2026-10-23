@@ -1,6 +1,6 @@
 import { Generations } from '@pkmn/data';
-import { Dex } from '@pkmn/dex';
 import { calcModOf } from './calc-gen.ts';
+import { dataDex } from './rules-dex.ts';
 
 /**
  * Round 69 (T188, decision 33): the one place that knows which Generations a format's client battle is built on.
@@ -21,7 +21,7 @@ export type LegalDex = ConstructorParameters<typeof Generations>[0];
 export type GenerationsScope = 'logged' | 'legal';
 
 /** The standard Generations: what the Dex lists as played in a generation. */
-const standardGenerations = new Generations(Dex);
+const standardGenerations = new Generations(dataDex());
 
 type Known = Parameters<NonNullable<ConstructorParameters<typeof Generations>[1]>>[0];
 
@@ -48,5 +48,5 @@ export function generationsFor(format: string, scope: GenerationsScope = 'logged
     if (!legal) legalChampions.set(mod, legal = new Generations(pinnedTo(mod), legalRow));
     return legal;
   }
-  return loggedChampions ??= new Generations(Dex, known);
+  return loggedChampions ??= new Generations(dataDex(), known);
 }

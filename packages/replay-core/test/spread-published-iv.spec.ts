@@ -10,6 +10,7 @@ import { calcGenerationFor } from '../src/calc-gen';
 import { buildCalcPokemon } from '../src/calc-build';
 import type { SpeedKnowledge } from '../src/spreads/scarf';
 import type { PokemonEvs, SpeedOrderObservation } from '../src/types';
+import './champions-mod';
 
 /**
  * Round 69 (T132 point 2, spec decision 12): a published Speed IV below 31 belongs to a Trick Room set. An order the

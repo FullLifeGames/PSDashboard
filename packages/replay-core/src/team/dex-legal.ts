@@ -1,6 +1,6 @@
 import type { PokemonSet } from '@pkmn/sim';
-import { Dex } from '@pkmn/sim';
 import { toId } from '../ids.ts';
+import { dexOf, simFormats, type GameRules, type RulesDex } from '../rules-dex.ts';
 
 /**
  * Sets the simulator can play (round 60). The rules read only the dex of the
@@ -18,10 +18,9 @@ import { toId } from '../ids.ts';
  *   the dex.
  */
 
-export type GenDex = ReturnType<typeof Dex.forGen>;
+export type GenDex = RulesDex;
 
-export interface LegalityContext {
-  gen: number;
+export interface LegalityContext extends GameRules {
   /** A format with free abilities (abilitiesAreFree): players may give any species any ability or item. */
   freeAbilities: boolean;
 }
@@ -68,14 +67,14 @@ function slotZeroAbility(dex: GenDex, species: string): string | undefined {
  */
 export function abilitiesAreFree(log: string): boolean {
   const tier = log.match(/^\|tier\|(.*)$/m)?.[1] ?? '';
-  const format = Dex.formats.get(tier);
+  const format = simFormats().get(tier);
   if (!format.exists || format.id.endsWith('customgame')) return false;
-  return !Dex.formats.getRuleTable(format).has('obtainableabilities');
+  return !simFormats().getRuleTable(format).has('obtainableabilities');
 }
 
 export function legalAbility(set: PokemonSet, context: LegalityContext): string {
   if (context.gen < 3 || !set.ability) return set.ability;
-  const dex = Dex.forGen(context.gen);
+  const dex = dexOf(context);
   if (!dex.species.get(set.species).exists) return set.ability;
   const id = toId(set.ability);
   if (ownAbilities(dex, set.species).some(name => toId(name) === id)) return set.ability;
@@ -93,7 +92,7 @@ export function legalAbility(set: PokemonSet, context: LegalityContext): string 
  */
 export function withRequiredFields(set: PokemonSet, context: LegalityContext): PokemonSet {
   if (context.freeAbilities) return set;
-  const species = Dex.forGen(context.gen).species.get(set.species);
+  const species = dexOf(context).species.get(set.species);
   if (!species.exists) return set;
   const teraType = !set.teraType && species.requiredTeraType ? species.requiredTeraType : set.teraType;
   const item = species.requiredItem && toId(set.item) !== toId(species.requiredItem) ? species.requiredItem : set.item;

@@ -7,6 +7,7 @@ import { fillsOpenMove, settleOpenMoves, unfilledOpenMoves } from '../src/team/o
 import { toId } from '../src/ids';
 import type { SmogonUsageStats } from '../src/smogon/stats-types';
 import type { PokemonSetAssumption, SmogonSetAssumptions } from '../src/smogon/sets-lookup';
+import { rulesDex } from '../src/rules-dex';
 
 /**
  * Round 70 (batch fix), the set side of Z-moves and Max moves: how the open slot of a hidden base move settles (team/open-moves.ts)
@@ -98,7 +99,7 @@ describe('a team sheet names the moves: the sheet fills the slot', () => {
     const log = `${Z_LOG}\n${sheet}`;
     const info = inferOpponentTeam(log, 'p2').pokemon.find(entry => entry.species === 'Garchomp')!;
     expect(info.moves.map(move => move.name)).toEqual(['Outrage', 'Earthquake', 'Swords Dance', 'Stealth Rock']);
-    expect(unfilledOpenMoves(info.openMoves, info.moves.map(move => move.name))).toEqual([]);
+    expect(unfilledOpenMoves(rulesDex(9), info.openMoves, info.moves.map(move => move.name))).toEqual([]);
     expect(built(log, { usageStats: usage('Garchomp', ['Toxic', 'Dragon Claw', 'Roar']) }).moves)
       .toEqual(['Outrage', 'Earthquake', 'Swords Dance', 'Stealth Rock']);
   });
@@ -121,14 +122,14 @@ describe('an open slot no guess can fill stays open', () => {
 describe('open moves against the Dex', () => {
   test('a damaging slot takes the moves of its type that deal damage, a status slot every status move', () => {
     const dragon = { kind: 'attack', type: 'Dragon' } as const;
-    expect(fillsOpenMove(dragon, 'Outrage')).toBe(true);
-    expect(fillsOpenMove(dragon, 'Draco Meteor')).toBe(true);
-    expect(fillsOpenMove(dragon, 'Dragon Dance')).toBe(false);
-    expect(fillsOpenMove(dragon, 'Earthquake')).toBe(false);
-    expect(fillsOpenMove(dragon, 'Not A Move')).toBe(false);
-    expect(fillsOpenMove({ kind: 'status' }, 'Roost')).toBe(true);
-    expect(fillsOpenMove({ kind: 'status' }, 'Dragon Dance')).toBe(true);
-    expect(fillsOpenMove({ kind: 'status' }, 'Brave Bird')).toBe(false);
+    expect(fillsOpenMove(rulesDex(9), dragon, 'Outrage')).toBe(true);
+    expect(fillsOpenMove(rulesDex(9), dragon, 'Draco Meteor')).toBe(true);
+    expect(fillsOpenMove(rulesDex(9), dragon, 'Dragon Dance')).toBe(false);
+    expect(fillsOpenMove(rulesDex(9), dragon, 'Earthquake')).toBe(false);
+    expect(fillsOpenMove(rulesDex(9), dragon, 'Not A Move')).toBe(false);
+    expect(fillsOpenMove(rulesDex(9), { kind: 'status' }, 'Roost')).toBe(true);
+    expect(fillsOpenMove(rulesDex(9), { kind: 'status' }, 'Dragon Dance')).toBe(true);
+    expect(fillsOpenMove(rulesDex(9), { kind: 'status' }, 'Brave Bird')).toBe(false);
   });
 
   test('every Dex move is filled by exactly one kind of slot of the Dex\'s own types, so no move fills two slots', () => {
@@ -136,7 +137,7 @@ describe('open moves against the Dex', () => {
     for (const move of Dex.moves.all()) {
       if (!move.exists) continue;
       const fills = [{ kind: 'status' } as const, ...types.map(type => ({ kind: 'attack', type }) as const)]
-        .filter(slot => fillsOpenMove(slot, move.name));
+        .filter(slot => fillsOpenMove(rulesDex(9), slot, move.name));
       expect(fills, move.name).toHaveLength(1);
     }
   });
@@ -150,8 +151,8 @@ describe('open moves against the Dex', () => {
   test('settling is a no-op without open moves: the assembly\'s own result comes back', () => {
     const pool = [{ name: 'Earthquake', guessed: false }, { name: 'Outrage', guessed: true }, { name: 'Toxic', guessed: true }];
     const assemble = (candidates: typeof pool) => candidates.slice(0, 2);
-    expect(settleOpenMoves(pool, undefined, assemble).map(entry => entry.name)).toEqual(['Earthquake', 'Outrage']);
-    expect(settleOpenMoves(pool, [], assemble).map(entry => entry.name)).toEqual(['Earthquake', 'Outrage']);
+    expect(settleOpenMoves(rulesDex(9), pool, undefined, assemble).map(entry => entry.name)).toEqual(['Earthquake', 'Outrage']);
+    expect(settleOpenMoves(rulesDex(9), pool, [], assemble).map(entry => entry.name)).toEqual(['Earthquake', 'Outrage']);
   });
 
   test('a pin that pushes out the move filling another slot does not leave that slot open', () => {
@@ -159,7 +160,7 @@ describe('open moves against the Dex', () => {
     const assemble = (candidates: typeof pool) => candidates.slice(0, 4);
     // The four first guesses fill the Flying slot (Brave Bird, fourth) and not the status slot, which is asked first.
     const open = [{ kind: 'status' }, { kind: 'attack', type: 'Flying' }] as const;
-    expect(settleOpenMoves(pool, open, assemble).map(entry => entry.name)).toEqual(['Roost', 'Brave Bird', 'Earthquake', 'Rock Slide']);
+    expect(settleOpenMoves(rulesDex(9), pool, open, assemble).map(entry => entry.name)).toEqual(['Roost', 'Brave Bird', 'Earthquake', 'Rock Slide']);
   });
 
   test('a slot that the proven moves leave no room for stays open', () => {
@@ -167,7 +168,7 @@ describe('open moves against the Dex', () => {
       ...['Earthquake', 'Swords Dance', 'Stealth Rock', 'Toxic'].map(name => ({ name, guessed: false })), { name: 'Outrage', guessed: true },
     ];
     const assemble = (candidates: typeof pool) => candidates.slice(0, 4);
-    expect(settleOpenMoves(pool, [{ kind: 'attack', type: 'Dragon' }], assemble).map(entry => entry.name))
+    expect(settleOpenMoves(rulesDex(9), pool, [{ kind: 'attack', type: 'Dragon' }], assemble).map(entry => entry.name))
       .toEqual(['Earthquake', 'Swords Dance', 'Stealth Rock', 'Toxic']);
   });
 
@@ -178,8 +179,8 @@ describe('open moves against the Dex', () => {
     ];
     const assemble = (candidates: typeof pool) => candidates.slice(0, 3);
     const dragon = [{ kind: 'attack', type: 'Dragon' } as const];
-    expect(settleOpenMoves(pool, dragon, assemble).map(entry => entry.name)).toEqual(['Earthquake', 'Outrage', 'Swords Dance']);
+    expect(settleOpenMoves(rulesDex(9), pool, dragon, assemble).map(entry => entry.name)).toEqual(['Earthquake', 'Outrage', 'Swords Dance']);
     const filled = [...pool.slice(0, 2), pool[3], pool[2]];
-    expect(settleOpenMoves(filled, dragon, assemble).map(entry => entry.name)).toEqual(['Earthquake', 'Swords Dance', 'Outrage']);
+    expect(settleOpenMoves(rulesDex(9), filled, dragon, assemble).map(entry => entry.name)).toEqual(['Earthquake', 'Swords Dance', 'Outrage']);
   });
 });

@@ -1,4 +1,3 @@
-import { Dex } from '@pkmn/sim';
 import { calcGenerationFor, calcModOf, type CalcGeneration } from '../calc-gen.ts';
 import type { LoggedHit, RevealedPokemonInfo } from '../types.ts';
 import type { DefenderRole } from './damage-ruleouts.ts';
@@ -7,7 +6,7 @@ import { evBudget, onBudgetScale, type EvBudget } from '../spreads/ev-budget.ts'
 import { toId } from '../ids.ts';
 import {
   abilityName, defenderOf, defenderOptions, extremes, holderOptions, itemName, judgeable, mayHave, MISS_MARGIN, missBeyond, offenseStat, rolls, shown, variantsOf,
-  type AbilityVariant, type CalcOptions, type GenDex, type HitTeams, type Spread, type Stat,
+  hitDex, type AbilityVariant, type CalcOptions, type GenDex, type HitTeams, type Spread, type Stat,
 } from './item-damage-shared.ts';
 
 /**
@@ -33,10 +32,10 @@ function defenseStat(dex: GenDex, moveId: string): Stat | null {
 }
 
 /** The softest and the hardest legal body for that defense: the format's per-stat cap in HP and the defense, and its opposite. */
-function bodyExtremes(stat: Stat, budget: EvBudget): { soft: Spread; hard: Spread } {
+function bodyExtremes(dex: GenDex, stat: Stat, budget: EvBudget): { soft: Spread; hard: Spread } {
   return {
-    hard: { evs: { hp: budget.perStat, [stat]: budget.perStat }, ivs: {}, nature: natureOf(stat, 'spe') },
-    soft: { evs: {}, ivs: budget.statPoints ? {} : { hp: 0, [stat]: 0 }, nature: natureOf('spe', stat) },
+    hard: { evs: { hp: budget.perStat, [stat]: budget.perStat }, ivs: {}, nature: natureOf(dex, stat, 'spe') },
+    soft: { evs: {}, ivs: budget.statPoints ? {} : { hp: 0, [stat]: 0 }, nature: natureOf(dex, 'spe', stat) },
   };
 }
 
@@ -49,7 +48,7 @@ interface TakenHit {
 function takenHits(holder: RevealedPokemonInfo, role: DefenderRole, teams: HitTeams): TakenHit[] {
   const dealers = teams[role.side === 'p1' ? 'p2' : 'p1'].pokemon;
   return dealers.flatMap(attacker => (attacker.hits ?? [])
-    .filter(hit => hit.defender.side === role.side && toId(defenderOf(teams[role.side], hit.defender.species)?.species ?? '') === toId(holder.species))
+    .filter(hit => hit.defender.side === role.side && toId(defenderOf(hitDex(hit), teams[role.side], hit.defender.species)?.species ?? '') === toId(holder.species))
     .map(hit => ({ attacker, hit })));
 }
 
@@ -76,11 +75,11 @@ function attackerKey(ctx: Omit<DefenderContext, 'attackers'>, attacker: CalcOpti
 }
 
 /** The attacker's offense: the spread a sheet or the user fixed, else its strongest and weakest legal spread for the stat the move reads. */
-function attackerSpreads(attacker: RevealedPokemonInfo, stat: Stat | null, budget: EvBudget): Spread[] {
+function attackerSpreads(dex: GenDex, attacker: RevealedPokemonInfo, stat: Stat | null, budget: EvBudget): Spread[] {
   if (['revealed', 'manual', 'sheet'].includes(attacker.evs.source)) {
     return [{ evs: onBudgetScale(attacker.evs.value, budget), ivs: attacker.ivs?.value ?? {}, nature: attacker.nature?.value || 'Hardy' }];
   }
-  const { strong, weak } = extremes(stat, budget);
+  const { strong, weak } = extremes(dex, stat, budget);
   return [strong, weak];
 }
 
@@ -114,7 +113,7 @@ function attackerVariants(
   const items = attackerItemRange(dex, attacker, ctx.hit, built, attackerItems);
   const abilities = attackerAbilities(dex, attacker, ctx.hit, built);
   const distinct = new Map<string, CalcOptions>();
-  for (const spread of attackerSpreads(attacker, offenseStat(dex, ctx.hit.move), budget)) {
+  for (const spread of attackerSpreads(dex, attacker, offenseStat(dex, ctx.hit.move), budget)) {
     for (const option of items.flatMap(item => abilities.map(ability => holderOptions(spread, ability, item ?? '')))) {
       const key = attackerKey(ctx, option);
       if (!distinct.has(key)) distinct.set(key, option);
@@ -124,12 +123,12 @@ function attackerVariants(
 }
 
 function contextOf({ attacker, hit }: TakenHit, holder: RevealedPokemonInfo, role: DefenderRole): DefenderContext | null {
-  const dex = Dex.forGen(hit.gen);
+  const dex = hitDex(hit);
   const stat = defenseStat(dex, hit.move);
   if (!stat || hit.defender.itemChanged || hit.defender.held) return null;
   const base = {
     hit, gen: calcGenerationFor(hit.gen, calcModOf(hit.format)), holders: holderAbilities(dex, holder, hit),
-    spreads: bodyExtremes(stat, evBudget(toId(hit.format))),
+    spreads: bodyExtremes(dex, stat, evBudget(toId(hit.format))),
   };
   return { ...base, attackers: attackerVariants(dex, attacker, base, role.attackerItems) };
 }
@@ -152,8 +151,8 @@ export function widestMisses(holder: RevealedPokemonInfo, ids: string[], teams: 
   for (const taken of takenHits(holder, role, teams)) {
     const ctx = judgeable(taken.hit) ? contextOf(taken, holder, role) : null;
     if (!ctx) continue;
-    const dex = Dex.forGen(taken.hit.gen);
-    const verdicts = ids.filter(id => modelled(ctx, id, dex)).map(id => [id, missOf(ctx, Dex.items.get(id).name)] as const);
+    const dex = hitDex(taken.hit);
+    const verdicts = ids.filter(id => modelled(ctx, id, dex)).map(id => [id, missOf(ctx, dex.items.get(id).name)] as const);
     const none = missOf(ctx, '');
     if (!verdicts.some(([, miss]) => miss === 1) && none !== 1) continue;
     counted++;
@@ -168,7 +167,11 @@ export function widestMisses(holder: RevealedPokemonInfo, ids: string[], teams: 
  * the log still allows, and no item as well, contradict each other, and none of them decides.
  */
 export function judgeDefenderItems(holder: RevealedPokemonInfo, candidates: string[], teams: HitTeams, role: DefenderRole): string[] {
-  const ids = [...new Set(candidates.map(name => toId(Dex.items.get(name).name)))].filter(id => DEFENDER_ITEMS.includes(id));
+  // Without a hit the holder took nothing is judged: no rules to read the names by, and no verdict either way.
+  const first = takenHits(holder, role, teams)[0];
+  if (!first) return [];
+  const dex = hitDex(first.hit);
+  const ids = [...new Set(candidates.map(name => toId(dex.items.get(name).name)))].filter(id => DEFENDER_ITEMS.includes(id));
   if (ids.length === 0) return [];
   const { misses, bare } = widestMisses(holder, ids, teams, role);
   const refuted = [...misses].filter(([, miss]) => miss > MISS_MARGIN).map(([id]) => id);

@@ -1,4 +1,5 @@
-import { Dex } from '@pkmn/dex';
+import type { RulesDex } from '../rules-dex.ts';
+import { dexOfCalc } from '../rules-dex.ts';
 import type { PokemonSet } from '@pkmn/sim';
 import type { PokemonEvs, SpeedOrderObservation } from '../types.ts';
 import { capToBudget, evStep, evsOfSet, onBudgetScale, ZERO_EVS } from './ev-budget.ts';
@@ -9,7 +10,6 @@ import { raceSpeed } from './race-speed.ts';
 import { originIn } from './battle-forme.ts';
 import { plausibleFor, scarfAllowed, type SpeedKnowledgeMap } from './scarf.ts';
 import { natureOf, type SpreadCandidate } from './ladder.ts';
-import { simGenNum } from '../calc-gen.ts';
 
 /**
  * T117 (round 63): an observed move order is a hard limit on the built
@@ -77,7 +77,7 @@ const restoredIvs = (racer: Racer): PokemonEvs => ({ ...MAX_IVS, ...racer.set.iv
  * Speed (a Mega after its evolution, Terapagos-Terastal) raced on its base
  * Speed with the set's spread (round 64), so the race keeps the forme.
  */
-function racedAs(dex: ReturnType<typeof Dex.forGen>, sets: PokemonSet[], species: string): { species: string; forme?: string } {
+function racedAs(dex: RulesDex, sets: PokemonSet[], species: string): { species: string; forme?: string } {
   const origin = originIn(dex, sets, species);
   if (!origin) return { species };
   const forme = dex.species.get(species);
@@ -91,7 +91,7 @@ function racedAs(dex: ReturnType<typeof Dex.forGen>, sets: PokemonSet[], species
  * whose item ran the race when that is another one.
  */
 function readMover(
-  dex: ReturnType<typeof Dex.forGen>, sets: Sets, side: Side, species: string, copied?: { side: Side; species: string },
+  dex: RulesDex, sets: Sets, side: Side, species: string, copied?: { side: Side; species: string },
 ): Omit<RaceSide, 'held'> {
   const own = racedAs(dex, sets[side], species);
   if (!copied) return { side, ...own };
@@ -99,8 +99,7 @@ function readMover(
 }
 
 /** The orders with each mover named as the set that raced, the forme when it ran on its own Speed, the holder of a copied race. */
-export function readableOrders(orders: SpeedOrderObservation[], sets: Sets, gen: number): ReadOrder[] {
-  const dex = Dex.forGen(gen);
+export function readableOrders(orders: SpeedOrderObservation[], sets: Sets, dex: RulesDex): ReadOrder[] {
   return orders.map(order => {
     const first = readMover(dex, sets, order.firstSide, order.firstSpecies, order.firstCopied);
     const second = readMover(dex, sets, order.secondSide, order.secondSpecies, order.secondCopied);
@@ -113,16 +112,16 @@ export function readableOrders(orders: SpeedOrderObservation[], sets: Sets, gen:
 }
 
 /** The prior's nature with its Speed effect lowered, kept neutral and raised; the other stat it moves stays. */
-function speedNatures(prior: string, physical: boolean): string[] {
-  const nature = Dex.natures.get(prior);
+function speedNatures(dex: RulesDex, prior: string, physical: boolean): string[] {
+  const nature = dex.natures.get(prior);
   const name = nature.exists ? nature.name : 'Hardy';
   const plus = nature.plus as StatId | undefined;
   const minus = nature.minus as StatId | undefined;
   const offense: StatId = physical ? 'atk' : 'spa';
   const other: StatId = physical ? 'spa' : 'atk';
-  const lowered = minus === 'spe' ? name : natureOf(plus && plus !== 'spe' ? plus : offense, 'spe');
-  const neutral = plus === 'spe' ? 'Hardy' : minus === 'spe' ? natureOf(plus ?? offense, other) : name;
-  const raised = plus === 'spe' ? name : natureOf('spe', minus && minus !== 'spe' ? minus : other);
+  const lowered = minus === 'spe' ? name : natureOf(dex, plus && plus !== 'spe' ? plus : offense, 'spe');
+  const neutral = plus === 'spe' ? 'Hardy' : minus === 'spe' ? natureOf(dex, plus ?? offense, other) : name;
+  const raised = plus === 'spe' ? name : natureOf(dex, 'spe', minus && minus !== 'spe' ? minus : other);
   return [...new Set([lowered, neutral, raised])];
 }
 
@@ -153,7 +152,7 @@ function legalOptions(ctx: SolveContext, racer: Racer): Option[] {
   const step = evStep(ctx.budget);
   const steps = [...new Set([...Array.from({ length: Math.floor(ctx.budget.perStat / step) + 1 }, (_, i) => i * step), ctx.budget.perStat])];
   const restored = lowSpeedIv(ctx, racer);
-  for (const nature of speedNatures(racer.prior.nature, physical)) {
+  for (const nature of speedNatures(dexOfCalc(ctx.gen), racer.prior.nature, physical)) {
     for (const spe of steps) {
       const evs = capToBudget({ ...ZERO_EVS, ...racer.prior.evs, spe }, new Set<StatId>(['spe']), ctx.budget);
       const candidate = restored
@@ -175,7 +174,7 @@ function legalOptions(ctx: SolveContext, racer: Racer): Option[] {
  */
 function slowOptions(ctx: SolveContext, racer: Racer): Option[] {
   if (ctx.budget.statPoints) return [];
-  const [lowered] = speedNatures(racer.prior.nature, physicalAttackerFor(ctx, racer.key));
+  const [lowered] = speedNatures(dexOfCalc(ctx.gen), racer.prior.nature, physicalAttackerFor(ctx, racer.key));
   const evs = capToBudget({ ...ZERO_EVS, ...racer.prior.evs, spe: 0 }, new Set<StatId>(['spe']), ctx.budget);
   const ivs = { ...MAX_IVS, ...racer.set.ivs };
   return Array.from({ length: ivs.spe }, (_, spe) => {
@@ -223,7 +222,7 @@ function readings(ctx: SolveContext, order: ReadOrder): [Reading, Reading] {
   const reading = (mover: RaceSide): Reading => {
     const scarf = racedWithScarf(ctx, mover);
     const { side, species, forme } = mover;
-    return entry => raceSpeed(simGenNum(ctx.gen), forme ? formeStat(ctx, side, species, entry, forme) : entry.stat, scarf);
+    return entry => raceSpeed(dexOfCalc(ctx.gen), forme ? formeStat(ctx, side, species, entry, forme) : entry.stat, scarf);
   };
   return [reading(firstOf(order)), reading(secondOf(order))];
 }

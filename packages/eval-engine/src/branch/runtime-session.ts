@@ -1,6 +1,6 @@
 import { BattleStreams, Teams } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
-import type { TurnSnapshot } from '@fulllifegames/replay-core';
+import { logRules, type TurnSnapshot } from '@fulllifegames/replay-core';
 import type { ChoiceLockContext } from '../choice-lock.ts';
 import type { TurnAlignmentRecord } from '../hax-alignment.ts';
 import type { BranchChoiceErrorLog, PokemonIdent, SimBattle } from './types.ts';
@@ -83,10 +83,11 @@ export interface ReconstructionSession {
 /** Leads first (the replay's or the override's), then the bring trim. */
 export function orderTeams(params: ReconstructParams): { orderedP1: PokemonSet[]; orderedP2: PokemonSet[] } {
   const { p1Leads, p2Leads } = extractLeads(params.replayLog);
+  const rules = logRules(params.replayLog);
   const leadsFor = (replayLeads: PokemonIdent[], override: string[] | null | undefined): PokemonIdent[] =>
     override && override.length > 0 ? override.map(name => ({ name, species: name })) : replayLeads;
-  const orderedP1 = trimTeamToBring(reorderForLeads(params.p1Team, leadsFor(p1Leads, params.leadOverride?.p1)), params.bringOnly?.p1);
-  const orderedP2 = trimTeamToBring(reorderForLeads(params.p2Team, leadsFor(p2Leads, params.leadOverride?.p2)), params.bringOnly?.p2);
+  const orderedP1 = trimTeamToBring(reorderForLeads(params.p1Team, leadsFor(p1Leads, params.leadOverride?.p1)), params.bringOnly?.p1, rules);
+  const orderedP2 = trimTeamToBring(reorderForLeads(params.p2Team, leadsFor(p2Leads, params.leadOverride?.p2)), params.bringOnly?.p2, rules);
   return { orderedP1, orderedP2 };
 }
 

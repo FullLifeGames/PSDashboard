@@ -1,7 +1,7 @@
 import type { PokemonSet } from '@pkmn/sim';
 import {
   buildTeamsFromReplay, enrichTeamInfos, inferOpponentTeam, judgeItemsByDamage, parseReplayLogWithObservations,
-  resolveHiddenPowerType, solveReplaySpreads,
+  logRules, resolveHiddenPowerType, solveReplaySpreads,
   type DamageObservation, type HiddenPowerEvidence, type OpponentTeamInfo, type SmogonSetAssumptions,
   type SmogonUsageStats, type SpeedOrderObservation, type SpreadCandidate,
 } from '@fulllifegames/replay-core';
@@ -58,7 +58,7 @@ export function buildAppTeams(log: string, seed: AppTeamSeed, knowledge: {
 }): AppTeams {
   const { usageStats, setAssumptions } = knowledge;
   const hpResolver = (side: 'p1' | 'p2') => (species: string) => resolveHiddenPowerType(
-    seed.hpEvidence.filter(entry => entry.attackerSide === side), usageStats, species, seed.gen);
+    seed.hpEvidence.filter(entry => entry.attackerSide === side), usageStats, species, logRules(log));
   const infos = enrichTeamInfos(seed.rawInfos, usageStats, setAssumptions, { p1: hpResolver('p1'), p2: hpResolver('p2') }, judgeItemsByDamage);
   const shared = { p1Info: infos.p1, p2Info: infos.p2, usageStats, setAssumptions };
   const inferredSpreads = solveReplaySpreads(log, seed.observations,

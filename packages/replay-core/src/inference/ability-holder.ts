@@ -1,6 +1,6 @@
-import { Dex } from '@pkmn/sim';
+import { dexOf } from '../rules-dex.ts';
 import { speciesAbilityFor } from '../team/dex-legal.ts';
-import type { InferrerState } from './inferrer-state.ts';
+import { type InferrerState } from './inferrer-state.ts';
 
 /**
  * Who owns an ability a protocol line names (round 60, T104). The sim
@@ -17,7 +17,7 @@ export function mayHold(state: InferrerState, ident: string, ability: string): b
   if (state.freeAbilities) return true;
   const species = state.identSpecies.get(ident);
   if (!species) return true;
-  const dex = Dex.forGen(state.gen);
+  const dex = dexOf(state);
   if (!dex.species.get(species).exists) return true;
   return speciesAbilityFor(dex, species, ability) !== undefined;
 }

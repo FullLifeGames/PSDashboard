@@ -7,6 +7,7 @@ import { buildCalcPokemon } from '../src/calc-build';
 import { calcGenerationFor } from '../src/calc-gen';
 import { toId } from '../src/ids';
 import type { DamageObservation, PokemonEvs } from '../src/types';
+import './champions-mod';
 
 /**
  * Round 69 (T26, spec decision 7): a satisfied move order keeps the Speed the build holds, and the ladder used to

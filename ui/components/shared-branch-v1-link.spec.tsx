@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { act, render, renderHook, screen } from '@testing-library/react';
 import { Battle } from '@pkmn/client';
-import { generationsFor, speciesBaseId } from '@fulllifegames/replay-core';
+import { formatRules, generationsFor, speciesBaseId } from '@fulllifegames/replay-core';
 import { SharedBranchView } from '../../src/components/SharedBranchView';
 import { useSharedBranch } from '../../src/hooks/useSharedBranch';
 import { decodeBranchShare, encodeBranchShare, loadSavedBranches, savedBranchKey } from '../../src/lib/branch-share';
@@ -72,7 +72,7 @@ describe('a share link built on v1', () => {
     const battle = new Battle(generationsFor(branch.format));
     for (const line of branch.finalLog.split('\n')) battle.add(line);
     for (const side of [battle.p1, battle.p2]) {
-      const bases = side.team.map(body => speciesBaseId(body.speciesForme));
+      const bases = side.team.map(body => speciesBaseId(body.speciesForme, formatRules(branch.format)));
       expect(bases.length, side.team.map(body => body.ident).join(', ')).toBe(new Set(bases).size);
     }
     expect(battle.p2.team.map(body => body.ident)).toContain('p2a: EARFQUAKE?');

@@ -4,6 +4,7 @@ import {
   type CuratedEvidence, type MoveCandidate,
 } from '../src/set-coherence';
 import type { PokemonSetAssumption } from '../src/smogon/sets-lookup';
+import { rulesDex } from '../src/rules-dex';
 
 /**
  * Pairwise coherence vetoes: guessed sets are assembled from independent
@@ -23,14 +24,14 @@ describe('set-coherence vetoes', () => {
     // does not serve it; the archetypes are disjoint.
     const kept = applyCoherenceVetoes([
       revealed('Swords Dance'), revealed('Iron Head'), guessed('Body Press'), guessed('Stone Edge'),
-    ], { itemId: '' });
+    ], { dex: rulesDex(9), itemId: '' });
     expect(names(kept)).toEqual(['Swords Dance', 'Iron Head', 'Stone Edge']);
   });
 
   test('a revealed off-stat attack always survives', () => {
     const kept = applyCoherenceVetoes([
       revealed('Swords Dance'), revealed('Body Press'), guessed('Stone Edge'),
-    ], { itemId: '' });
+    ], { dex: rulesDex(9), itemId: '' });
     expect(names(kept)).toEqual(['Swords Dance', 'Body Press', 'Stone Edge']);
   });
 
@@ -41,28 +42,28 @@ describe('set-coherence vetoes', () => {
     const kept = applyCoherenceVetoes([
       revealed('Swords Dance'), revealed('Heavy Slam'),
       guessed('Body Press'), guessed('Iron Defense'), guessed('Thunder Wave'), guessed('Stone Edge'),
-    ], { itemId: '' });
+    ], { dex: rulesDex(9), itemId: '' });
     expect(names(kept)).toEqual(['Swords Dance', 'Heavy Slam', 'Thunder Wave', 'Stone Edge']);
   });
 
   test('a defense-boost with its payoff attack survives', () => {
     const kept = applyCoherenceVetoes([
       revealed('Body Press'), guessed('Iron Defense'), guessed('Stone Edge'),
-    ], { itemId: '' });
+    ], { dex: rulesDex(9), itemId: '' });
     expect(names(kept)).toEqual(['Body Press', 'Iron Defense', 'Stone Edge']);
   });
 
   test('a revealed defense-boost is never second-guessed', () => {
     const kept = applyCoherenceVetoes([
       revealed('Iron Defense'), guessed('Stone Edge'),
-    ], { itemId: '' });
+    ], { dex: rulesDex(9), itemId: '' });
     expect(names(kept)).toEqual(['Iron Defense', 'Stone Edge']);
   });
 
   test('Nasty Plot vetoes big guessed physical attacks but spares utility and pivots', () => {
     const kept = applyCoherenceVetoes([
       guessed('Nasty Plot'), guessed('Play Rough'), guessed('Knock Off'), guessed('U-turn'), guessed('Shadow Ball'),
-    ], { itemId: '' });
+    ], { dex: rulesDex(9), itemId: '' });
     // Play Rough (90 BP physical) contradicts the special boost; Knock Off is
     // sub-70-BP utility and U-turn is a pivot — both stay.
     expect(names(kept)).toEqual(['Nasty Plot', 'Knock Off', 'U-turn', 'Shadow Ball']);
@@ -71,28 +72,28 @@ describe('set-coherence vetoes', () => {
   test('a guessed damaging move sharing a type with the set is redundant (Noivern)', () => {
     const kept = applyCoherenceVetoes([
       revealed('Hurricane'), guessed('Air Slash'), guessed('Boomburst'),
-    ], { itemId: '' });
+    ], { dex: rulesDex(9), itemId: '' });
     expect(names(kept)).toEqual(['Hurricane', 'Boomburst']);
   });
 
   test('two guessed same-type attacks keep the higher-usage first', () => {
     const kept = applyCoherenceVetoes([
       guessed('Air Slash'), guessed('Hurricane'), guessed('Draco Meteor'),
-    ], { itemId: '' });
+    ], { dex: rulesDex(9), itemId: '' });
     expect(names(kept)).toEqual(['Air Slash', 'Draco Meteor']);
   });
 
   test('typed STATUS moves never block a same-type attack', () => {
     const kept = applyCoherenceVetoes([
       revealed('Roost'), guessed('Air Slash'),
-    ], { itemId: '' });
+    ], { dex: rulesDex(9), itemId: '' });
     expect(names(kept)).toEqual(['Roost', 'Air Slash']);
   });
 
   test('a choice item vetoes guessed status moves except the Trick family', () => {
     const kept = applyCoherenceVetoes([
       guessed('Draco Meteor'), guessed('Protect'), guessed('Trick'), guessed('Roost'),
-    ], { itemId: 'choicescarf' });
+    ], { dex: rulesDex(9), itemId: 'choicescarf' });
     expect(names(kept)).toEqual(['Draco Meteor', 'Trick']);
   });
 
@@ -100,20 +101,20 @@ describe('set-coherence vetoes', () => {
     // The guessed ITEM is the weaker knowledge — proof beats fills.
     const kept = applyCoherenceVetoes([
       revealed('Protect'), guessed('Draco Meteor'),
-    ], { itemId: 'choicescarf' });
+    ], { dex: rulesDex(9), itemId: 'choicescarf' });
     expect(names(kept)).toEqual(['Protect', 'Draco Meteor']);
   });
 
   test('Assault Vest vetoes every guessed status move including Trick', () => {
     const kept = applyCoherenceVetoes([
       guessed('Knock Off'), guessed('Trick'), guessed('Substitute'),
-    ], { itemId: 'assaultvest' });
+    ], { dex: rulesDex(9), itemId: 'assaultvest' });
     expect(names(kept)).toEqual(['Knock Off']);
   });
 
   test('no boosts, no restrictive item — nothing vetoed', () => {
     const pool = [revealed('Tackle'), guessed('Protect'), guessed('Shadow Ball')];
-    expect(names(applyCoherenceVetoes(pool, { itemId: 'leftovers' }))).toEqual([
+    expect(names(applyCoherenceVetoes(pool, { dex: rulesDex(9), itemId: 'leftovers' }))).toEqual([
       'Tackle', 'Protect', 'Shadow Ball',
     ]);
   });
@@ -126,39 +127,39 @@ describe('set-coherence vetoes', () => {
   test('a guessed boost the Choice item strikes serves nothing (Kyurem with Specs, T28)', () => {
     const kept = applyCoherenceVetoes([
       guessed('Earth Power'), guessed('Draco Meteor'), guessed('Dragon Dance'), guessed('Icicle Spear'),
-    ], { itemId: 'choicespecs' });
+    ], { dex: rulesDex(9), itemId: 'choicespecs' });
     expect(names(kept)).toEqual(['Earth Power', 'Draco Meteor', 'Icicle Spear']);
   });
 
   test('a guessed boost the Vest strikes serves nothing (T28)', () => {
     const kept = applyCoherenceVetoes([
       guessed('Calm Mind'), guessed('Close Combat'), guessed('Moonblast'),
-    ], { itemId: 'assaultvest' });
+    ], { dex: rulesDex(9), itemId: 'assaultvest' });
     expect(names(kept)).toEqual(['Close Combat', 'Moonblast']);
   });
 
   test('a revealed boost still serves under a guessed Choice item (T28)', () => {
     const kept = applyCoherenceVetoes([
       revealed('Dragon Dance'), guessed('Earth Power'), guessed('Icicle Spear'),
-    ], { itemId: 'choicespecs' });
+    ], { dex: rulesDex(9), itemId: 'choicespecs' });
     expect(names(kept)).toEqual(['Dragon Dance', 'Icicle Spear']);
   });
 
   test('row 2 spares a priority move, and a priority move blocks no main attack (Weavile, T28)', () => {
     expect(names(applyCoherenceVetoes([
       revealed('Triple Axel'), guessed('Ice Shard'), guessed('Icicle Crash'),
-    ], { itemId: 'choiceband' }))).toEqual(['Triple Axel', 'Ice Shard']);
+    ], { dex: rulesDex(9), itemId: 'choiceband' }))).toEqual(['Triple Axel', 'Ice Shard']);
     expect(names(applyCoherenceVetoes([
       guessed('Ice Shard'), guessed('Icicle Crash'), guessed('Knock Off'),
-    ], { itemId: 'choiceband' }))).toEqual(['Ice Shard', 'Icicle Crash', 'Knock Off']);
+    ], { dex: rulesDex(9), itemId: 'choiceband' }))).toEqual(['Ice Shard', 'Icicle Crash', 'Knock Off']);
   });
 
   test('rows 1 and 2 spare the chosen set\'s own moves (Samurott-Hisui with the Vest, T28)', () => {
     const kept = applyCoherenceVetoes([
       revealed('Ceaseless Edge'), fromSet('Razor Shell'), fromSet('Sucker Punch'), fromSet('Knock Off'), guessed('Night Slash'),
-    ], { itemId: 'assaultvest' });
+    ], { dex: rulesDex(9), itemId: 'assaultvest' });
     expect(names(kept)).toEqual(['Ceaseless Edge', 'Razor Shell', 'Sucker Punch', 'Knock Off']);
-    expect(names(applyCoherenceVetoes([guessed('Swords Dance'), fromSet('Body Press')], { itemId: '' })))
+    expect(names(applyCoherenceVetoes([guessed('Swords Dance'), fromSet('Body Press')], { dex: rulesDex(9), itemId: '' })))
       .toEqual(['Swords Dance', 'Body Press']);
   });
 
@@ -166,10 +167,10 @@ describe('set-coherence vetoes', () => {
     // The user gate of round 63 reads the published set as published (d2): row 2 spares the chosen set's moves.
     expect(names(applyCoherenceVetoes([
       revealed('Headlong Rush'), revealed('Earthquake'), fromSet('Stomping Tantrum'),
-    ], { itemId: '' }))).toEqual(['Headlong Rush', 'Earthquake', 'Stomping Tantrum']);
+    ], { dex: rulesDex(9), itemId: '' }))).toEqual(['Headlong Rush', 'Earthquake', 'Stomping Tantrum']);
     expect(names(applyCoherenceVetoes([
       revealed('Headlong Rush'), revealed('Earthquake'), guessed('Stomping Tantrum'),
-    ], { itemId: '' }))).toEqual(['Headlong Rush', 'Earthquake']);
+    ], { dex: rulesDex(9), itemId: '' }))).toEqual(['Headlong Rush', 'Earthquake']);
   });
 
   test('a boost from the usage tail serves nothing (Kingdra with Life Orb, review of round 63)', () => {
@@ -178,12 +179,12 @@ describe('set-coherence vetoes', () => {
     const kept = applyCoherenceVetoes([
       revealed('Hydro Pump'), guessed('Draco Meteor'), guessed('Weather Ball'), guessed('Hurricane'),
       { name: 'Dragon Dance', guessed: true, tail: true },
-    ], { itemId: 'lifeorb' });
+    ], { dex: rulesDex(9), itemId: 'lifeorb' });
     expect(names(kept)).toEqual(['Hydro Pump', 'Draco Meteor', 'Weather Ball', 'Hurricane', 'Dragon Dance']);
   });
 
   test('the item rows still strike a chosen-set status move (an inferred Scarf, T28)', () => {
-    expect(names(applyCoherenceVetoes([fromSet('Volt Switch'), fromSet('Toxic')], { itemId: 'choicescarf' })))
+    expect(names(applyCoherenceVetoes([fromSet('Volt Switch'), fromSet('Toxic')], { dex: rulesDex(9), itemId: 'choicescarf' })))
       .toEqual(['Volt Switch']);
   });
 
@@ -192,7 +193,7 @@ describe('set-coherence vetoes', () => {
     // for boost context before deciding.
     const kept = applyCoherenceVetoes([
       guessed('Body Press'), revealed('Swords Dance'), guessed('Iron Head'),
-    ], { itemId: '' });
+    ], { dex: rulesDex(9), itemId: '' });
     expect(names(kept)).toEqual(['Swords Dance', 'Iron Head']);
   });
 });
@@ -204,6 +205,7 @@ describe('coherent-set selection', () => {
     ...(item ? { item: { value: item, sourceDetail: 't' } } : {}),
   });
   const evidence = (over: Partial<CuratedEvidence>): CuratedEvidence => ({
+    dex: rulesDex(9),
     revealedMoves: [], revealedItem: '', revealedAbility: '',
     ruledOutItems: [], ruledOutAbilities: [],
     usageProbability: () => 0.5,

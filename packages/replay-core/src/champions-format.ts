@@ -7,10 +7,10 @@ import { toId } from './ids.ts';
  *
  * The input is anything a host holds for a format: the Dex's id ('gen9championsou'), a replay id ('smogtours-gen9championsou-12'),
  * a branch format with custom rules ('gen9championsou@@@+sleepclausemod') or the tier name a log prints ('[Gen 9 Champions] OU',
- * '[Gen 9] Champions VGC 2026 Reg M-A (Bo3)'). The mod's formats all carry its name right after the generation
- * (champions-format.spec.ts checks the rule against every format of the mod and of the base Dex).
+ * '[Gen 9] Champions VGC 2026 Reg M-A (Bo3)', or a bare 'championsvgc2026' as a spec writes it). No format of the base Dex
+ * carries the word, and every format of the mod does (champions-format.spec.ts checks the rule against both Dexes).
  */
-const CHAMPIONS_FORMAT = /gen\d+champions/;
+const CHAMPIONS_FORMAT = /champions/;
 const MEMO_LIMIT = 512;
 const memo = new Map<string, boolean>();
 

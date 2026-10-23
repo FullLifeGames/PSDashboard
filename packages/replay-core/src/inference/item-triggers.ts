@@ -1,6 +1,6 @@
-import { Dex } from '@pkmn/sim';
+import { dexOf, type RulesDex } from '../rules-dex.ts';
 import { Protocol } from '@pkmn/protocol';
-import type { InferrerState } from './inferrer-state.ts';
+import { type InferrerState } from './inferrer-state.ts';
 import { possibleAbilities, ruleOutUnknown } from './item-evidence.ts';
 import { arg, hasKw, identOf, keyOf, namesEffect, type LogLine } from './log-line.ts';
 import { toId } from '../ids.ts';
@@ -73,21 +73,21 @@ const BOUNDARIES = new Set(['move', 'cant', 'switch', 'drag', 'turn']);
 // oracle: packages/replay-core/test/senders-oracle.spec.ts
 export const SENDERS = new Set(['ejectbutton', 'redcard', 'ejectpack']);
 
-const stoppersByGen = new Map<number, { ids: Set<string>; names: string[] }>();
+const stoppersByDex = new WeakMap<RulesDex, { ids: Set<string>; names: string[] }>();
 
 /** The abilities of the generation that stop a foe's berry: those with onFoeTryEatItem (Unnerve, As One). */
-function stoppersOf(gen: number) {
-  let found = stoppersByGen.get(gen);
+function stoppersOf(dex: RulesDex) {
+  let found = stoppersByDex.get(dex);
   if (!found) {
-    const abilities = Dex.forGen(gen).abilities.all().filter(ability => (ability as unknown as Record<string, unknown>).onFoeTryEatItem);
+    const abilities = dex.abilities.all().filter(ability => (ability as unknown as Record<string, unknown>).onFoeTryEatItem);
     found = { ids: new Set(abilities.map(ability => ability.id)), names: abilities.map(ability => ability.name) };
-    stoppersByGen.set(gen, found);
+    stoppersByDex.set(dex, found);
   }
   return found;
 }
 
 export function newItemTriggerWatch(state: InferrerState): ItemTriggerWatch {
-  const { names } = stoppersOf(state.gen);
+  const { names } = stoppersOf(dexOf(state));
   // The raw text rules out almost every line before the effect parser reads it.
   const heads = names.map(name => name.replace(/ \(.*\)$/, ''));
   return {
@@ -109,7 +109,7 @@ export function teamSizeOf(state: InferrerState, side: string): number {
 
 /** One handler of the item as the replay's generation has it (undefined when the item does not exist there yet). */
 function handlerOf(state: InferrerState, itemId: string, name: string): ItemHandler | undefined {
-  const item = Dex.forGen(state.gen).items.get(itemId) as unknown as Record<string, unknown> & { exists: boolean; gen: number };
+  const item = dexOf(state).items.get(itemId) as unknown as Record<string, unknown> & { exists: boolean; gen: number };
   return item.exists && item.gen <= state.gen ? item[name] as ItemHandler | undefined : undefined;
 }
 
@@ -135,11 +135,11 @@ export const isSitrusBerry = (itemId: string): boolean => itemId === ('sitrusber
  * so the berry is judged at that bound: a shown 49/100 eats, 50/100 does not
  * (item-triggers.spec.ts holds the bound against the simulator's displays).
  */
-export function sitrusEatsAt(gen: number, shown: string): boolean {
+export function sitrusEatsAt(dex: RulesDex, shown: string): boolean {
   const health = Protocol.parseHealth(shown as Protocol.PokemonHPStatus);
   if (!health || health.fainted || !health.hp) return false;
-  const item = Dex.forGen(gen).items.get('sitrusberry') as unknown as { exists: boolean; gen: number; onUpdate?: ItemHandler };
-  return item.exists && item.gen <= gen && eats(item.onUpdate, { hp: health.hp + 1, maxhp: health.maxhp });
+  const item = dex.items.get('sitrusberry') as unknown as { exists: boolean; gen: number; onUpdate?: ItemHandler };
+  return item.exists && item.gen <= dex.gen && eats(item.onUpdate, { hp: health.hp + 1, maxhp: health.maxhp });
 }
 
 /**
@@ -147,13 +147,13 @@ export function sitrusEatsAt(gen: number, shown: string): boolean {
  * hides up to one unit, so the berry is judged at the lowest ratio the shown text allows (a shown 51/100 is above half, a shown
  * 50/100 may be exactly half). An exact text (the player's own side, neither 100 nor 48 as the maximum) is read as it stands.
  */
-export function sitrusKeptAt(gen: number, shown: string): boolean {
+export function sitrusKeptAt(dex: RulesDex, shown: string): boolean {
   const health = Protocol.parseHealth(shown as Protocol.PokemonHPStatus);
   if (!health || health.fainted || !health.hp) return false;
-  const item = Dex.forGen(gen).items.get('sitrusberry') as unknown as { exists: boolean; gen: number; onUpdate?: ItemHandler };
+  const item = dex.items.get('sitrusberry') as unknown as { exists: boolean; gen: number; onUpdate?: ItemHandler };
   const lowest = health.maxhp === 100 || health.maxhp === 48 ? health.hp - 1 + 1e-6 : health.hp;
   // A generation whose Update handler eats at no HP (the Dex moves the berry to another event) says nothing about the threshold.
-  return item.exists && item.gen <= gen && eats(item.onUpdate, { hp: 1, maxhp: health.maxhp }) && !eats(item.onUpdate, { hp: lowest, maxhp: health.maxhp });
+  return item.exists && item.gen <= dex.gen && eats(item.onUpdate, { hp: 1, maxhp: health.maxhp }) && !eats(item.onUpdate, { hp: lowest, maxhp: health.maxhp });
 }
 
 const sideOf = (key: string) => key.slice(0, 2);
@@ -172,7 +172,7 @@ function sends(state: InferrerState, watch: ItemTriggerWatch, gates: TriggerGate
   const handler = handlerOf(state, trigger.rule, 'onAfterMoveSecondary');
   const hit = trigger.hit;
   if (!handler || !hit) return false;
-  const move = Dex.forGen(state.gen).moves.get(hit.move);
+  const move = dexOf(state).moves.get(hit.move);
   const sides = { holder: sideOf(trigger.holder), attacker: sideOf(hit.attacker) };
   let used = false;
   const target = {
@@ -197,7 +197,7 @@ function sends(state: InferrerState, watch: ItemTriggerWatch, gates: TriggerGate
 function sheerForced(state: InferrerState, trigger: Trigger): boolean {
   const hit = trigger.hit;
   if (!hit) return false;
-  const dex = Dex.forGen(state.gen);
+  const dex = dexOf(state);
   const ability = dex.abilities.get('sheerforce') as unknown as { onModifyMove?: (this: object, move: object, pokemon: object) => void };
   const abilities = possibleAbilities(state, hit.attackerIdent);
   if (abilities && !abilities.has('sheerforce')) return false;
@@ -213,7 +213,7 @@ function sheerForced(state: InferrerState, trigger: Trigger): boolean {
 /** Whether a foe of the holder may have an ability that stops its berry (a foe of unknown species may). */
 function foeStopsBerry(state: InferrerState, watch: ItemTriggerWatch, holder: string): boolean {
   if (watch.unnerveNamed) return true;
-  const stoppers = stoppersOf(state.gen).ids;
+  const stoppers = stoppersOf(dexOf(state)).ids;
   return [...watch.slots.values()].some(ident => {
     if (identOf(ident)?.side === sideOf(holder)) return false;
     const abilities = possibleAbilities(state, ident);
@@ -234,7 +234,7 @@ function wouldShow(state: InferrerState, watch: ItemTriggerWatch, gates: Trigger
   }
   if (trigger.rule === 'sitrusberry') {
     const shown = watch.hp.get(trigger.holder) ?? '';
-    return !foeStopsBerry(state, watch, trigger.holder) && !watch.healBlocked.has(trigger.holder) && sitrusEatsAt(state.gen, shown);
+    return !foeStopsBerry(state, watch, trigger.holder) && !watch.healBlocked.has(trigger.holder) && sitrusEatsAt(dexOf(state), shown);
   }
   const attacker = trigger.hit?.attacker ?? '';
   return !watch.fainted.has(attacker) && !sheerForced(state, trigger) && sends(state, watch, gates, trigger);
@@ -276,7 +276,7 @@ function noteHp(state: InferrerState, watch: ItemTriggerWatch, ident: string, ke
 function onHit(state: InferrerState, watch: ItemTriggerWatch, line: LogLine, key: string) {
   const pending = watch.move;
   if (!pending || hasKw(line, 'from') || keyOf(pending.attacker) === key) return;
-  if (!Dex.forGen(state.gen).moves.get(pending.move).exists) return;
+  if (!dexOf(state).moves.get(pending.move).exists) return;
   const hit = { attacker: keyOf(pending.attacker), attackerIdent: pending.attacker, move: pending.move };
   for (const rule of ['ejectbutton', 'redcard'] as const) open(watch, { rule, holder: key, ident: arg(line, 1), hit });
 }

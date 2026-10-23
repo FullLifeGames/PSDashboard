@@ -1,4 +1,5 @@
-import { Battle, Dex } from '@pkmn/sim';
+import { dexOf, type RulesDex } from '../rules-dex.ts';
+import { Battle } from '@pkmn/sim';
 import { Protocol } from '@pkmn/protocol';
 import { findPokemon, ruleOut, type InferrerState } from './inferrer-state.ts';
 import { arg, fromEffect, hasKw, keyOf, ofIdent, type LogLine } from './log-line.ts';
@@ -99,7 +100,7 @@ export function possibleAbilities(state: InferrerState, ident: string): Set<stri
   if (known) return new Set([known]);
   if (state.freeAbilities) return null;
   const species = info?.species ?? state.identSpecies.get(ident);
-  const entry = species ? Dex.forGen(state.gen).species.get(species) : null;
+  const entry = species ? dexOf(state).species.get(species) : null;
   if (!entry?.exists) return null;
   const ruled = info?.ruledOut?.abilities ?? [];
   return new Set(Object.values(entry.abilities ?? {}).map(name => toId(String(name))).filter(id => id && !ruled.includes(id)));
@@ -113,7 +114,7 @@ export function possibleAbilities(state: InferrerState, ident: string): Set<stri
  * format with free abilities any unknown one may be Illusion.
  */
 export function illusionPossible(state: InferrerState): boolean {
-  const dex = Dex.forGen(state.gen);
+  const dex = dexOf(state);
   return [...state.pokemonMap.values()].some(mon => {
     const known = provenAbility(mon);
     if (known) return known === 'illusion';
@@ -144,7 +145,7 @@ type ItemHandler = (this: never, ...args: never[]) => unknown;
  * onAfterMoveSecondarySelf decides, called on stubs: gens 5 and 6 skip a
  * one-hit KO move there. A handler that fails on the stubs proves nothing.
  */
-function lifeOrbRecoils(dex: ReturnType<typeof Dex.forGen>, move: ReturnType<ReturnType<typeof Dex.forGen>['moves']['get']>): boolean {
+function lifeOrbRecoils(dex: RulesDex, move: ReturnType<RulesDex['moves']['get']>): boolean {
   const lifeOrb = dex.items.get('lifeorb') as { onBasePower?: unknown; onAfterMoveSecondarySelf?: ItemHandler };
   if (lifeOrb.onBasePower) return !move.damage && !move.damageCallback && !move.ohko;
   let recoil = false;
@@ -159,7 +160,7 @@ function lifeOrbRecoils(dex: ReturnType<typeof Dex.forGen>, move: ReturnType<Ret
 
 /** Whether a Life Orb on the attacker would have shown its recoil after this hit. */
 function lifeOrbWouldShow(state: InferrerState, watch: ItemWatch, action: ActionWatch): boolean {
-  const dex = Dex.forGen(state.gen);
+  const dex = dexOf(state);
   const move = dex.moves.get(action.move);
   if (!move.exists || move.category === 'Status' || move.flags.futuremove || !lifeOrbRecoils(dex, move)) return false;
   const abilities = possibleAbilities(state, action.ident);
@@ -176,7 +177,7 @@ function lifeOrbWouldShow(state: InferrerState, watch: ItemWatch, action: Action
  * effect skips that step; Klutz, Embargo, Magic Room and Heal Block silence it.
  */
 function shellBellWouldShow(state: InferrerState, watch: ItemWatch, action: ActionWatch): boolean {
-  const dex = Dex.forGen(state.gen);
+  const dex = dexOf(state);
   const bell = dex.items.get('shellbell');
   const move = dex.moves.get(action.move);
   if (!bell.exists || bell.gen > state.gen || !move.exists || move.category === 'Status') return false;
@@ -192,8 +193,7 @@ function shellBellWouldShow(state: InferrerState, watch: ItemWatch, action: Acti
  * Glove takes contact from a punch), then `Battle#checkMoveMakesContact`
  * (Protective Pads). Any doubt reads as no contact (round 64, T120).
  */
-export function contactLands(gen: number, moveName: string, heldItem: string): boolean {
-  const dex = Dex.forGen(gen);
+export function contactLands(dex: RulesDex, moveName: string, heldItem: string): boolean {
   const holder = { hasItem: (item: string | string[]) => [item].flat().map(toId).includes(heldItem), addVolatile: () => false };
   try {
     const move = dex.getActiveMove(moveName);
@@ -213,14 +213,14 @@ export function contactLands(gen: number, moveName: string, heldItem: string): b
  * spoke later), and the simulator says whether that item lets it make contact.
  */
 function helmetWouldShow(state: InferrerState, watch: ItemWatch, action: ActionWatch): boolean {
-  const dex = Dex.forGen(state.gen);
+  const dex = dexOf(state);
   const pads = dex.items.get('protectivepads');
   const padsExist = pads.exists && pads.gen <= state.gen;
   const held = watch.items.get(action.attacker);
   if (padsExist && held === undefined) return false;
   const move = dex.moves.get(action.move);
   if (!move.exists || move.category === 'Status' || !move.flags.contact) return false;
-  if (padsExist && !contactLands(state.gen, move.name, held ?? '')) return false;
+  if (padsExist && !contactLands(dex, move.name, held ?? '')) return false;
   const abilities = possibleAbilities(state, action.ident);
   return !!abilities && !abilities.has('magicguard') && !abilities.has('longreach') && !watch.magicRoom;
 }

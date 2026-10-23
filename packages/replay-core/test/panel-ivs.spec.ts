@@ -1,3 +1,4 @@
+import './champions-mod';
 import { describe, expect, test } from 'vitest';
 import { applyInferredSpreads, enrichPokemonInfo, enrichTeamInfo } from '../src/team-info';
 import { buildTeamsFromReplay } from '../src/team-builder';

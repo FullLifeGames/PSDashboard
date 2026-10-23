@@ -1,6 +1,6 @@
 import { Pokemon as CalcPokemon } from '@smogon/calc';
-import { Dex } from '@pkmn/dex';
-import { calcGenerationFor, simGenNum, type CalcGeneration } from './calc-gen.ts';
+import { calcGenerationFor, type CalcGeneration } from './calc-gen.ts';
+import { rulesDex } from './rules-dex.ts';
 import { toId } from './ids.ts';
 
 /**
@@ -36,9 +36,9 @@ export type CalcPokemonOptions = NonNullable<ConstructorParameters<typeof CalcPo
 /** The calculator generation's own number, the key of a memo (the simulator's generation is `simGenNum`). */
 const calcGenId = (calc: CalcGeneration): number => calc.num;
 
-/** The Dex a generation's species come from when the caller names none: the game generation's own (Champions: Gen 9's, whose base stats and types it shares). */
+/** The Dex a generation's species come from when the caller names none: the game generation's own (round 75, T160: the Champions generation reads the registered Champions Dex). */
 function defaultDex(calc: CalcGeneration): SpeciesDex {
-  return Dex.forGen(simGenNum(calc)) as unknown as SpeciesDex;
+  return rulesDex(calc.num as number) as unknown as SpeciesDex;
 }
 
 /** One answer per generation, dex and name. */

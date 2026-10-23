@@ -5,6 +5,7 @@ import { inferOpponentTeam } from '../src/opponent-inferrer';
 import { judgeItemsByDamage } from '../src/team/item-damage';
 import { guessedEvs, guessedField, revealedField, unknownField } from '../src/team-info';
 import type { LoggedHit, OpponentTeamInfo, PokemonEvs, RevealedPokemonInfo } from '../src/types';
+import './champions-mod';
 
 /**
  * The damage judge (round 67, T130, decision 18): an item candidate falls

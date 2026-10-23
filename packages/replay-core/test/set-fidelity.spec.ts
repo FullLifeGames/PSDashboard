@@ -7,6 +7,7 @@ import type { OpponentTeamInfo } from '../src/types';
 import type { PokemonSetAssumption, SmogonSetAssumptions } from '../src/smogon/sets-lookup';
 import type { PokemonUsageStats, SmogonUsageStats } from '../src/smogon/stats-types';
 import { toId } from '../src/ids';
+import { rulesDex } from '../src/rules-dex';
 
 /**
  * Set fidelity of the build (round 63, T89 with T28, spec decisions 11 and
@@ -37,13 +38,13 @@ const sets = (...entries: PokemonSetAssumption[]): SmogonSetAssumptions => ({
 function build(log: string, species: string, usageStats: SmogonUsageStats, setAssumptions: SmogonSetAssumptions | null, info?: OpponentTeamInfo) {
   const p2Info = info ?? enrichTeamInfo(inferOpponentTeam(log, 'p2'), usageStats, setAssumptions);
   const team = buildTeamsFromReplay(log, { p2Info, usageStats, setAssumptions }).p2Team;
-  const keys = (moves: string[]) => moves.map(slotMoveKey).sort();
+  const keys = (moves: string[]) => moves.map(move => slotMoveKey(rulesDex(9), move)).sort();
   return {
     built: keys(team.find(set => set.species === species)!.moves),
     panel: keys(p2Info.pokemon.find(mon => mon.species === species)!.moves.map(move => move.name)),
   };
 }
-const keysOf = (...moves: string[]) => moves.map(slotMoveKey).sort();
+const keysOf = (...moves: string[]) => moves.map(move => slotMoveKey(rulesDex(9), move)).sort();
 
 const singles = (gen: number, species: string, moves: string[], extra: string[] = []) => [
   '|player|p1|Alice|', '|player|p2|Bob|', `|gen|${gen}`, '|tier|test',

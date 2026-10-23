@@ -1,6 +1,6 @@
 import { Dex } from '@pkmn/dex';
 import type { PokemonSet } from '@pkmn/sim';
-import { CHAMPIONS_MOD, buildCalcPokemon, calcGenerationFor, evBudget, speciesBaseId, toId, type PokemonSnapshot, type TurnSnapshot } from '@fulllifegames/replay-core';
+import { CHAMPIONS_MOD, type GameRules, buildCalcPokemon, calcGenerationFor, evBudget, speciesBaseId, toId, type PokemonSnapshot, type TurnSnapshot } from '@fulllifegames/replay-core';
 import {
   moveAtUse, sightedHpAt, snapshotMoveTypes, snapshotSimFacts, speciesAfterTeraClick,
   type BranchMoveOption, type BranchSimState, type BranchSlotModifiers, type BranchSwitchOption, type MoveUser, type SimPokemonInfo,
@@ -305,6 +305,7 @@ function snapshotSideOptions(
   snapshot: TurnSnapshot, side: 'p1' | 'p2', team: PokemonSet[], gen: number,
   bringOnly: { p1: string[]; p2: string[] } | null | undefined, teraAllowed: boolean, champions = false,
 ): SnapshotSideOptions {
+  const rules: GameRules = { gen, mod: champions ? CHAMPIONS_MOD : undefined };
   const pokemon = snapshot[side].pokemon;
   const actives = pokemon.filter(mon => mon.isActive && !mon.fainted);
   const setFor = (mon: PokemonSnapshot) =>
@@ -313,9 +314,9 @@ function snapshotSideOptions(
   // switch option, not a missing one.
   const benchPercent = (mon: PokemonSnapshot) =>
     (mon.maxhp === 0 && !mon.fainted ? 100 : mon.hpPercent);
-  const broughtBases = (bringOnly?.[side] ?? []).map(name => speciesBaseId(name));
+  const broughtBases = (bringOnly?.[side] ?? []).map(name => speciesBaseId(name, rules));
   const inBring = (mon: PokemonSnapshot) =>
-    broughtBases.length === 0 || broughtBases.includes(speciesBaseId(mon.speciesForme));
+    broughtBases.length === 0 || broughtBases.includes(speciesBaseId(mon.speciesForme, rules));
   const fainted = pokemon.filter(mon => mon.fainted).length;
   // One Tera per side and battle: a terastallized teammate spent it.
   const sideMayTera = teraAllowed && !pokemon.some(mon => mon.terastallized);

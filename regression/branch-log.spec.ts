@@ -2,12 +2,12 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { Battle } from '@pkmn/client';
 import {
-  buildChoiceLockContext, createBranchState, executeBranchChoices, reconstructBranchRuntime,
+  buildChoiceLockContext, loadSimMods, createBranchState, executeBranchChoices, reconstructBranchRuntime,
   requiredChoicesForActiveSlots, resolveSideChoices, type BranchRuntime, type BranchSlotChoice,
 } from '@fulllifegames/eval-engine';
 import {
   buildTeamsFromReplay, generationsFor, getBranchSimulatorFormat, parseReplayLog, parseReplayLogWithObservations,
-  replayBringOnly, speciesBaseId, toId, type ReplayData,
+  replayBringOnly, replayRules, speciesBaseId, toId, type ReplayData,
 } from '@fulllifegames/replay-core';
 import { branchFrameLog } from '../src/lib/branch-log';
 import { decodeBranchShare, encodeBranchShare, makeBranchSharePayload } from '../src/lib/branch-share';
@@ -73,6 +73,8 @@ async function playBranch(
   replay: ReplayData, branchTurn: number,
   options: { edit?: (p1Team: ReturnType<typeof buildTeamsFromReplay>['p1Team']) => void; opening?: BranchSlotChoice } = {},
 ): Promise<PlayedBranch> {
+  // Round 75 (T160): the Champions mod registers before the inference reads the Champions Dex, as the app's replay load does.
+  await loadSimMods(getBranchSimulatorFormat(replay));
   const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
   const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });
   options.edit?.(p1Team);
@@ -112,7 +114,7 @@ function embedRoster(replay: ReplayData, frameLog: string) {
   const battle = new Battle(generationsFor(replay.format));
   for (const line of frameLog.split('\n')) battle.add(line);
   return [battle.p1, battle.p2].map(side => side.team.map(body => ({
-    ident: body.ident, base: speciesBaseId(body.speciesForme), fainted: body.fainted,
+    ident: body.ident, base: speciesBaseId(body.speciesForme, replayRules(replay)), fainted: body.fainted,
   })));
 }
 
@@ -124,7 +126,7 @@ function expectRosterMatchesLine(replay: ReplayData, played: PlayedBranch) {
     const bases = roster.map(entry => entry.base);
     expect(bases.length, `${side} roster ${roster.map(entry => entry.ident).join(', ')}`).toBe(new Set(bases).size);
     for (const body of played.bodies[side]) {
-      const entry = roster.find(candidate => candidate.base === speciesBaseId(body.species));
+      const entry = roster.find(candidate => candidate.base === speciesBaseId(body.species, replayRules(replay)));
       if (entry) expect(entry.fainted, `${side} ${entry.ident} (sim: ${body.name})`).toBe(body.fainted);
     }
   });

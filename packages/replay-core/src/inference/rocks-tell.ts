@@ -1,8 +1,8 @@
-import { Dex } from '@pkmn/sim';
+import type { RulesDex } from '../rules-dex.ts';
 import type { RevealedPokemonInfo } from '../types.ts';
 import { toId } from '../ids.ts';
 
-type GenDex = ReturnType<typeof Dex.forGen>;
+type GenDex = RulesDex;
 type DamageHandler = (this: never, ...args: never[]) => unknown;
 
 /**
@@ -30,8 +30,7 @@ function keepsRocksOff(dex: GenDex, name: string): boolean {
  * no Heavy-Duty Boots (round 64 review for the build; round 67, T130, for the
  * inference's guess, so the panel never shows a guess the build refuses).
  */
-export function rocksMayMiss(info: RevealedPokemonInfo, gen: number, freeAbilities: boolean): boolean {
-  const dex = Dex.forGen(gen);
+export function rocksMayMiss(info: RevealedPokemonInfo, dex: RulesDex, freeAbilities: boolean): boolean {
   const known = info.ability.source === 'revealed' || info.ability.source === 'manual' ? info.ability.value : '';
   if (known) return keepsRocksOff(dex, known);
   if (freeAbilities) return dex.abilities.all().some(ability => keepsRocksOff(dex, ability.name));

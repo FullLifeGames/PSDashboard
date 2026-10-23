@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PokemonSet } from '@pkmn/sim';
 import {
   type DamageObservation, type HiddenPowerEvidence, type OpponentTeamInfo, type ReplayData,
-  type SpeedOrderObservation, parsePastedTeam, type PastedSet, parseTeamText, type SpreadCandidate,
+  type SpeedOrderObservation, logRules, parsePastedTeam, type PastedSet, parseTeamText, type SpreadCandidate,
 } from '@fulllifegames/replay-core';
 import type { useSmogonUsageStats } from './useSmogonUsageStats';
 import type { useSmogonSetAssumptions } from './useSmogonSetAssumptions';
@@ -74,13 +74,14 @@ export function useHpResolver(
   }, [replayData]);
 
   const replayGenNumber = parseInt(replayData?.log.match(/^\|gen\|(\d)/m)?.[1] ?? '9', 10);
+  const rules = useMemo(() => (replayData ? logRules(replayData.log) : { gen: replayGenNumber, mod: undefined }), [replayData, replayGenNumber]);
 
   const hpResolverFor = useCallback((side: 'p1' | 'p2') => {
     if (!hpModule) return undefined;
     const sideEvidence = hpEvidence.filter(entry => entry.attackerSide === side);
     return (species: string) =>
-      hpModule.resolveHiddenPowerType(sideEvidence, usageStats.stats, species, replayGenNumber);
-  }, [hpModule, hpEvidence, usageStats.stats, replayGenNumber]);
+      hpModule.resolveHiddenPowerType(sideEvidence, usageStats.stats, species, rules);
+  }, [hpModule, hpEvidence, usageStats.stats, rules]);
 
   return { hpResolverFor, replayGenNumber };
 }

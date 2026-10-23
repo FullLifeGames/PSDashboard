@@ -14,10 +14,11 @@ import {
   selectCuratedFor, USAGE_MOVE_POOL, usageMoveTail,
 } from './team/set-resolvers.ts';
 import { resolveInferredItems, speedKnowledgeFor } from './team/inferred-items.ts';
-import { abilitiesAreFree, dexLegalSet } from './team/dex-legal.ts';
+import { abilitiesAreFree, dexLegalSet, type LegalityContext } from './team/dex-legal.ts';
+import { dexOf, formatRules, logRules, type GameRules } from './rules-dex.ts';
 import { rocksMayMiss } from './inference/rocks-tell.ts';
 import type { DamageObservation, HiddenPowerEvidence, OpponentTeamInfo, RevealedPokemonInfo, SpeedOrderObservation } from './types.ts';
-import { genNumOf, toId } from './ids.ts';
+import { toId } from './ids.ts';
 import { normalizeLineEndings } from './line-endings.ts';
 import { isChampionsFormat } from './champions-format.ts';
 import { withReplayIdentity } from './team-identity.ts';
@@ -65,12 +66,12 @@ type SideInfos = { p1: OpponentTeamInfo; p2: OpponentTeamInfo };
  * Magic Guard Clefable shows the Boots tell without Boots).
  */
 function itemTells(
-  log: string, options: BuildOptions, infos: SideInfos, legality: { gen: number; freeAbilities: boolean },
+  log: string, options: BuildOptions, infos: SideInfos, legality: LegalityContext,
 ): Record<'p1' | 'p2', Map<string, string>> {
   const tells = (side: 'p1' | 'p2') => {
     const raw = options?.[`${side}Info`] ? inferOpponentTeam(log, side) : infos[side];
     return new Map(raw.pokemon
-      .filter(mon => mon.item.source === 'guessed' && mon.item.value && !rocksMayMiss(mon, legality.gen, legality.freeAbilities))
+      .filter(mon => mon.item.source === 'guessed' && mon.item.value && !rocksMayMiss(mon, dexOf(legality), legality.freeAbilities))
       .map(mon => [toId(mon.species), mon.item.value]));
   };
   return { p1: tells('p1'), p2: tells('p2') };
@@ -91,26 +92,26 @@ function knownTeamsFor(log: string, userTeamText: string | undefined): SideTeams
 function buildTeams(log: string, options: BuildOptions): { teams: BuiltTeams; inferred: Map<string, SpreadCandidate> | undefined } {
   const infos = infosFor(log, options);
   const knownTeams = knownTeamsFor(log, options?.userTeamText);
-  const { gen, formatHint } = formatHintFor(log);
+  const { formatHint } = formatHintFor(log);
   // Pokémon Champions counts Stat Points (32 per stat, 66 total) and every
   // IV is 31 (round 67, T145): a guess or fallback from an EV-scale source
   // reaches the Stat Point scale by the level-50 inverse (legalizeEvs), and
   // the sets keep every IV at 31, as the server plays them.
   const budget = evBudget(formatHint);
   const champions = budget.statPoints;
-  const legality = { gen: parseInt(gen, 10), freeAbilities: abilitiesAreFree(log) };
+  const legality = { ...logRules(log), freeAbilities: abilitiesAreFree(log) };
   const legalize = (team: PokemonSet[]): PokemonSet[] =>
     (champions ? team.map(set => ({ ...set, evs: legalizeEvs(set.evs, formatHint), ivs: { ...ALL_31_IVS } })) : team)
       .map(set => dexLegalSet(withHappinessAssumption(set), legality));
   const hpFor = (side: 'p1' | 'p2') =>
     (options?.hpEvidence ?? []).filter(entry => entry.attackerSide === side);
   const hpTyped = (side: 'p1' | 'p2'): HiddenPowerTyping =>
-    set => withHiddenPowerType(set, hpFor(side), options?.usageStats, parseInt(gen, 10));
+    set => withHiddenPowerType(set, hpFor(side), options?.usageStats, legality);
   const tells = itemTells(log, options, infos, legality);
   const sideTeam = (side: 'p1' | 'p2', inferred?: Map<string, SpreadCandidate>) =>
     legalize(infos[side].pokemon.map(pokemon => buildSet(
       pokemon, knownTeams[side], options?.usageStats, options?.setAssumptions, inferred?.get(`${side}:${toId(pokemon.species)}`),
-      { hpTyped: hpTyped(side), tellItem: tells[side].get(toId(pokemon.species)) ?? '', gen: legality.gen, budget })))
+      { hpTyped: hpTyped(side), tellItem: tells[side].get(toId(pokemon.species)) ?? '', rules: legality, budget })))
       .map(hpTyped(side))
       .map((set, index) => withReplayIdentity(set, infos[side].pokemon[index]));
   const build = (inferred?: Map<string, SpreadCandidate>) => ({ p1Team: sideTeam('p1', inferred), p2Team: sideTeam('p2', inferred) });
@@ -210,10 +211,10 @@ function resolveSolvedItems(
     const info = infos[side].pokemon.find(mon => toId(mon.species) === speciesId);
     // A species with no item left in the build's lists keeps '' (no item): the Scarf resolver below must not hand the boost item back.
     if (candidate.itemReason === 'no-boost' && info) {
-      drops.set(key, { ...candidate, item: resolveItemWithout(info, usageStats, setAssumptions, ['choicescarf', ...boostItemIds(genNumOf(formatHint))]) });
+      drops.set(key, { ...candidate, item: resolveItemWithout(dexOf(formatRules(formatHint)), info, usageStats, setAssumptions, ['choicescarf', ...boostItemIds(dexOf(formatRules(formatHint)))]) });
     }
   }
-  const rest = resolveInferredItems(new Map([...solved].filter(([key]) => !drops.has(key))), infos, usageStats, setAssumptions);
+  const rest = resolveInferredItems(dexOf(formatRules(formatHint)), new Map([...solved].filter(([key]) => !drops.has(key))), infos, usageStats, setAssumptions);
   return new Map([...solved].map(([key, candidate]) => [key, drops.get(key) ?? rest.get(key) ?? candidate]));
 }
 
@@ -256,7 +257,7 @@ type HiddenPowerTyping = (set: PokemonSet) => PokemonSet;
 interface SetContext {
   hpTyped: HiddenPowerTyping;
   tellItem: string;
-  gen: number;
+  rules: GameRules;
   budget: EvBudget;
 }
 
@@ -266,7 +267,7 @@ function buildSet(
   usageStats?: SmogonUsageStats | null,
   setAssumptions?: SmogonSetAssumptions | null,
   inferred?: SpreadCandidate,
-  { hpTyped, tellItem, gen, budget }: SetContext = { hpTyped: set => set, tellItem: '', gen: 9, budget: evBudget('') },
+  { hpTyped, tellItem, rules, budget }: SetContext = { hpTyped: set => set, tellItem: '', rules: { gen: 9, mod: undefined }, budget: evBudget('') },
 ): PokemonSet {
   const edited = editedFields(info);
   const userMatch = findUserMatch(userTeam, info.species);
@@ -275,21 +276,21 @@ function buildSet(
 
   if (userMatch) return buildSheetSet(info, userMatch, edited, usageSet, smogonSet);
 
-  const curated = selectCuratedFor(info, smogonSet, usageSet);
+  const curated = selectCuratedFor(dexOf(rules), info, smogonSet, usageSet);
   // A dropped Scarf ('' from the solver) resolves without it: the guessed
   // Scarf must not return through the usage marginal (round 37).
   const item = inferred?.item === ''
-    ? resolveItemWithout(info, usageStats, setAssumptions, inferred.itemReason === 'no-boost' ? ['choicescarf', ...boostItemIds(gen)] : 'choicescarf')
+    ? resolveItemWithout(dexOf(rules), info, usageStats, setAssumptions, inferred.itemReason === 'no-boost' ? ['choicescarf', ...boostItemIds(dexOf(rules))] : 'choicescarf')
     : resolveItem(info, curated, usageSet, smogonSet, inferred?.item ?? '', tellItem);
-  const moves = assembleMoves(info, curated, usageSet, smogonSet, item, usageMoveTail(usageStats, info.species));
+  const moves = assembleMoves(dexOf(rules), info, curated, usageSet, smogonSet, item, usageMoveTail(usageStats, info.species));
   const revealedMoves = info.moves.filter(move => move.source === 'revealed').map(move => move.name);
-  const spread = resolveSpread(info.species, edited, inferred, curated, usageSet, smogonSet, revealedMoves, budget);
+  const spread = resolveSpread(dexOf(rules), info.species, edited, inferred, curated, usageSet, smogonSet, revealedMoves, budget);
 
   const set: PokemonSet = {
     name: info.species,
     species: info.species,
     item,
-    ability: resolveAbility(info, curated, usageSet, smogonSet),
+    ability: resolveAbility(dexOf(rules), info, curated, usageSet, smogonSet),
     moves: moves.length > 0 ? moves : ['Tackle'],
     nature: spread.nature,
     evs: spread.evs,
@@ -349,6 +350,7 @@ function extractEmbeddedShowteamExports(log: string): SideTeams {
   const fromShowteam: SideTeams = { p1: null, p2: null };
   const fromChat: SideTeams = { p1: null, p2: null };
   const unassigned: PokemonSet[][] = [];
+  const dex = dexOf(logRules(log));
 
   for (const line of log.split('\n')) {
     const playerMatch = line.match(/^\|player\|(p[12])\|([^|]+)/);
@@ -362,7 +364,7 @@ function extractEmbeddedShowteamExports(log: string): SideTeams {
     if (showteamMatch) {
       const side = showteamMatch[1] as 'p1' | 'p2';
       if (!fromShowteam[side]) {
-        const unpacked = unpackSheetSets(showteamMatch[2]);
+        const unpacked = unpackSheetSets(showteamMatch[2], dex);
         if (unpacked.length > 0) fromShowteam[side] = unpacked;
       }
       continue;

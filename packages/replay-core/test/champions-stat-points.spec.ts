@@ -11,6 +11,8 @@ import { decideScarfs, type SpeedKnowledge } from '../src/spreads/scarf';
 import type { SmogonSetAssumptions } from '../src/smogon/sets-lookup';
 import type { DamageObservation, PokemonEvs, SpeedOrderObservation } from '../src/types';
 import { toId } from '../src/ids';
+import './champions-mod';
+import { rulesDex } from '../src/rules-dex';
 
 /**
  * Round 67 (T145): Pokémon Champions replaces EVs by Stat Points (0 to 32 per stat, 66 in total) and the
@@ -83,7 +85,7 @@ describe('the spread solver reads Champions Stat Points (T145)', () => {
       // Every Garchomp runs Jolly 32 SP Speed (169) and still moved before a 32-SP Timid Dragapult (213): it holds a
       // Scarf (253). The tempo camp read 32 against the EV threshold of 200 and never let a Scarf in.
       const sets = { p1: [mon('Garchomp', 'Jolly', sp(2, 32, 0, 0, 0, 32))], p2: [mon('Dragapult', 'Timid', sp(2, 0, 0, 32, 0, 32))] };
-      const orders = readableOrders([race('p1', 'Garchomp', 'p2', 'Dragapult')], sets, 9);
+      const orders = readableOrders([race('p1', 'Garchomp', 'p2', 'Dragapult')], sets, rulesDex(9, 'champions'));
       const ctx = buildSolveContext([], sets, format, orders);
       const decisions = decideScarfs(ctx, knowledge({
         'p1:garchomp': { spreads: [{ nature: 'Jolly', evs: sp(2, 32, 0, 0, 0, 32), probability: 1 }] },

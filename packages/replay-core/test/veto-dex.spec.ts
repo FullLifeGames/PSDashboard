@@ -6,6 +6,7 @@ import { buildTeamsFromReplay } from '../src/team-builder';
 import { slotMoveKey } from '../src/team/move-slots';
 import type { PokemonUsageStats, SmogonUsageStats } from '../src/smogon/stats-types';
 import { toId } from '../src/ids';
+import { rulesDex } from '../src/rules-dex';
 
 /**
  * Veto row 4 (round 64, T120, spec decision 15): a guessed move that
@@ -26,45 +27,45 @@ describe('row 4: pairs the Dex calls contradicting', () => {
   test('a guessed move that lowers the Defense a kept Body Press reads falls (Clanging Scales, Kommo-o)', () => {
     expect(names(applyCoherenceVetoes([
       revealed('Iron Defense'), guessed('Body Press'), guessed('Clanging Scales'), guessed('Protect'),
-    ], { itemId: '' }))).toEqual(['Iron Defense', 'Body Press', 'Protect']);
+    ], { dex: rulesDex(9), itemId: '' }))).toEqual(['Iron Defense', 'Body Press', 'Protect']);
   });
 
   test('of two guessed moves that contradict, the one kept first stays', () => {
     expect(names(applyCoherenceVetoes([
       guessed('Clanging Scales'), guessed('Body Press'), guessed('Protect'),
-    ], { itemId: '' }))).toEqual(['Clanging Scales', 'Protect']);
+    ], { dex: rulesDex(9), itemId: '' }))).toEqual(['Clanging Scales', 'Protect']);
   });
 
   test('a guessed Body Press falls beside a revealed Headlong Rush (Ursaluna)', () => {
     expect(names(applyCoherenceVetoes([
       revealed('Headlong Rush'), guessed('Body Press'), guessed('Facade'),
-    ], { itemId: '' }))).toEqual(['Headlong Rush', 'Facade']);
+    ], { dex: rulesDex(9), itemId: '' }))).toEqual(['Headlong Rush', 'Facade']);
   });
 
   test('a guessed Body Press falls beside a chosen-set Superpower, wherever the pool lists it', () => {
     expect(names(applyCoherenceVetoes([
       guessed('Body Press'), fromSet('Superpower'), guessed('Iron Head'),
-    ], { itemId: '' }))).toEqual(['Superpower', 'Iron Head']);
+    ], { dex: rulesDex(9), itemId: '' }))).toEqual(['Superpower', 'Iron Head']);
   });
 
   test('a seen move and a chosen-set move never fall', () => {
-    expect(names(applyCoherenceVetoes([revealed('Clanging Scales'), fromSet('Body Press')], { itemId: '' })))
+    expect(names(applyCoherenceVetoes([revealed('Clanging Scales'), fromSet('Body Press')], { dex: rulesDex(9), itemId: '' })))
       .toEqual(['Clanging Scales', 'Body Press']);
-    expect(names(applyCoherenceVetoes([fromSet('Close Combat'), fromSet('Body Press')], { itemId: '' })))
+    expect(names(applyCoherenceVetoes([fromSet('Close Combat'), fromSet('Body Press')], { dex: rulesDex(9), itemId: '' })))
       .toEqual(['Close Combat', 'Body Press']);
   });
 });
 
 describe('row 2 runs on usage fillers only (decision 16)', () => {
   test('two usage fillers Close Combat and Body Press keep the first', () => {
-    expect(names(applyCoherenceVetoes([guessed('Close Combat'), guessed('Body Press')], { itemId: '' })))
+    expect(names(applyCoherenceVetoes([guessed('Close Combat'), guessed('Body Press')], { dex: rulesDex(9), itemId: '' })))
       .toEqual(['Close Combat']);
   });
 
   test('the chosen set keeps Grassy Glide beside Wood Hammer, a usage Horn Leech falls (Rillaboom)', () => {
     expect(names(applyCoherenceVetoes([
       revealed('Fake Out'), fromSet('Wood Hammer'), fromSet('Grassy Glide'), guessed('Horn Leech'), guessed('U-turn'),
-    ], { itemId: '' }))).toEqual(['Fake Out', 'Wood Hammer', 'Grassy Glide', 'U-turn']);
+    ], { dex: rulesDex(9), itemId: '' }))).toEqual(['Fake Out', 'Wood Hammer', 'Grassy Glide', 'U-turn']);
   });
 });
 
@@ -80,13 +81,13 @@ const stats = (...entries: PokemonUsageStats[]): SmogonUsageStats => ({
 function build(log: string, species: string, usageStats: SmogonUsageStats) {
   const p2Info = enrichTeamInfo(inferOpponentTeam(log, 'p2'), usageStats, null);
   const team = buildTeamsFromReplay(log, { p2Info, usageStats, setAssumptions: null }).p2Team;
-  const keys = (moves: string[]) => moves.map(slotMoveKey).sort();
+  const keys = (moves: string[]) => moves.map(move => slotMoveKey(rulesDex(9), move)).sort();
   return {
     built: keys(team.find(set => set.species === species)!.moves),
     panel: keys(p2Info.pokemon.find(mon => mon.species === species)!.moves.map(move => move.name)),
   };
 }
-const keysOf = (...moves: string[]) => moves.map(slotMoveKey).sort();
+const keysOf = (...moves: string[]) => moves.map(move => slotMoveKey(rulesDex(9), move)).sort();
 
 const singles = (species: string, moves: string[]) => [
   '|player|p1|Alice|', '|player|p2|Bob|', '|gen|9', '|tier|test',
@@ -123,34 +124,34 @@ describe('the panel and the build drop the same contradicting guess', () => {
 describe('the veto rows read their lists from the Dex (decision 17)', () => {
   test('a Choice item is what the Dex marks isChoice', () => {
     for (const itemId of ['choiceband', 'choicespecs', 'choicescarf']) {
-      expect(names(applyCoherenceVetoes([guessed('Volt Switch'), guessed('Toxic')], { itemId }))).toEqual(['Volt Switch']);
+      expect(names(applyCoherenceVetoes([guessed('Volt Switch'), guessed('Toxic')], { dex: rulesDex(9), itemId }))).toEqual(['Volt Switch']);
     }
-    expect(names(applyCoherenceVetoes([guessed('Volt Switch'), guessed('Toxic')], { itemId: 'lifeorb' })))
+    expect(names(applyCoherenceVetoes([guessed('Volt Switch'), guessed('Toxic')], { dex: rulesDex(9), itemId: 'lifeorb' })))
       .toEqual(['Volt Switch', 'Toxic']);
   });
 
   test('a pivot is what the Dex marks selfSwitch: Nasty Plot spares U-turn and Volt Switch, not Close Combat', () => {
     expect(names(applyCoherenceVetoes([
       revealed('Nasty Plot'), guessed('U-turn'), guessed('Volt Switch'), guessed('Close Combat'),
-    ], { itemId: '' }))).toEqual(['Nasty Plot', 'U-turn', 'Volt Switch']);
+    ], { dex: rulesDex(9), itemId: '' }))).toEqual(['Nasty Plot', 'U-turn', 'Volt Switch']);
   });
 
   test('a boost serves the offense stats the Dex raises for the user: Shell Smash serves both, Torch Song spa', () => {
     expect(names(applyCoherenceVetoes([
       revealed('Shell Smash'), guessed('Icicle Spear'), guessed('Hydro Pump'), guessed('Body Press'),
-    ], { itemId: '' }))).toEqual(['Shell Smash', 'Icicle Spear', 'Hydro Pump']);
+    ], { dex: rulesDex(9), itemId: '' }))).toEqual(['Shell Smash', 'Icicle Spear', 'Hydro Pump']);
     expect(names(applyCoherenceVetoes([
       revealed('Torch Song'), guessed('Earthquake'), guessed('Shadow Ball'),
-    ], { itemId: '' }))).toEqual(['Torch Song', 'Shadow Ball']);
+    ], { dex: rulesDex(9), itemId: '' }))).toEqual(['Torch Song', 'Shadow Ball']);
   });
 
   test('a defense boost is a self status move the Dex says raises Defense and no offense: Cosmic Power falls without Body Press', () => {
     expect(names(applyCoherenceVetoes([
       revealed('Moonblast'), guessed('Cosmic Power'), guessed('Bulk Up'), guessed('Protect'),
-    ], { itemId: '' }))).toEqual(['Moonblast', 'Bulk Up', 'Protect']);
+    ], { dex: rulesDex(9), itemId: '' }))).toEqual(['Moonblast', 'Bulk Up', 'Protect']);
     expect(names(applyCoherenceVetoes([
       revealed('Body Press'), guessed('Cosmic Power'), guessed('Iron Defense'),
-    ], { itemId: '' }))).toEqual(['Body Press', 'Cosmic Power', 'Iron Defense']);
+    ], { dex: rulesDex(9), itemId: '' }))).toEqual(['Body Press', 'Cosmic Power', 'Iron Defense']);
   });
 });
 
@@ -158,9 +159,9 @@ describe('row 3 spares the chosen set as published (review of round 64)', () => 
   const storedPower = ['Cosmic Power', 'Stored Power', 'Recover', 'Taunt'];
 
   test('the chosen set keeps its Cosmic Power without a Defense-scaling attack (gen 9 Ubers Arceus-Psychic "Stored Power")', () => {
-    expect(names(applyCoherenceVetoes(storedPower.map(fromSet), { itemId: 'mindplate' }))).toEqual(storedPower);
+    expect(names(applyCoherenceVetoes(storedPower.map(fromSet), { dex: rulesDex(9), itemId: 'mindplate' }))).toEqual(storedPower);
     // A guessed Cosmic Power outside the chosen set still needs its payoff.
-    expect(names(applyCoherenceVetoes([guessed('Cosmic Power'), guessed('Stored Power')], { itemId: '' }))).toEqual(['Stored Power']);
+    expect(names(applyCoherenceVetoes([guessed('Cosmic Power'), guessed('Stored Power')], { dex: rulesDex(9), itemId: '' }))).toEqual(['Stored Power']);
   });
 
   const arceus = stats(usage('Arceus-Psychic', [['Judgment', 0.9], ['Recover', 0.8], ['Cosmic Power', 0.5], ['Stored Power', 0.5], ['Taunt', 0.4]]));
@@ -175,8 +176,8 @@ describe('row 3 spares the chosen set as published (review of round 64)', () => 
     const p2Info = enrichTeamInfo(inferOpponentTeam(log, 'p2'), arceus, published);
     const team = buildTeamsFromReplay(log, { p2Info, usageStats: arceus, setAssumptions: published }).p2Team;
     return {
-      built: team.find(set => set.species === 'Arceus-Psychic')!.moves.map(slotMoveKey).sort(),
-      panel: p2Info.pokemon.find(mon => mon.species === 'Arceus-Psychic')!.moves.map(move => slotMoveKey(move.name)).sort(),
+      built: team.find(set => set.species === 'Arceus-Psychic')!.moves.map(move => slotMoveKey(rulesDex(9), move)).sort(),
+      panel: p2Info.pokemon.find(mon => mon.species === 'Arceus-Psychic')!.moves.map(move => slotMoveKey(rulesDex(9), move.name)).sort(),
     };
   };
 

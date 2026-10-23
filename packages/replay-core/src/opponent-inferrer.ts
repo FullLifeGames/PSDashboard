@@ -1,4 +1,4 @@
-import { Dex, Teams } from '@pkmn/sim';
+import { Teams } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import type { OpponentTeamInfo, RevealedPokemonInfo } from './types.ts';
 import { guessedField, revealedField, unknownEvs, unknownField } from './team-info.ts';
@@ -16,6 +16,8 @@ import { syncClientFacts } from './inference/client-facts.ts';
 import { rocksMayMiss } from './inference/rocks-tell.ts';
 import { arg, fromEffect, identOf, readLine, type LogLine } from './inference/log-line.ts';
 import { toId } from './ids.ts';
+import { dexOf, logRules, type RulesDex } from './rules-dex.ts';
+import type { LegalityContext } from './team/dex-legal.ts';
 import { normalizeLineEndings } from './line-endings.ts';
 import { dropAmbiguousNicknames, noteLogIdentities, noteSheetIdentities, sheetMatcher } from './team-identity.ts';
 
@@ -34,10 +36,10 @@ interface SheetPokemon {
  * leaves them out. A species the sheet writes in the name field (the server's way) is left as written by the
  * unpacker, so it reads the Dex's name for it, and its own text when the Dex does not know it.
  */
-function sheetEntry(set: PokemonSet): SheetPokemon | null {
+function sheetEntry(dex: RulesDex, set: PokemonSet): SheetPokemon | null {
   const packed = set.species || set.name;
   if (!packed) return null;
-  const known = Dex.species.get(packed);
+  const known = dex.species.get(packed);
   return {
     species: known.exists ? known.name : packed,
     item: set.item,
@@ -61,15 +63,15 @@ function asWritten(raw: string | undefined, read: string, table: NameTable): str
 }
 
 /** The unpacked entry with the species, item, ability and moves its packed text names but the Dex does not know put back as written. */
-function writtenNames(set: PokemonSet, entry: string): PokemonSet {
+function writtenNames(dex: RulesDex, set: PokemonSet, entry: string): PokemonSet {
   const fields = entry.split('|');
   const moves = (fields[4] ?? '').split(',').filter(move => move);
   return {
     ...set,
-    species: asWritten(fields[1], set.species, Dex.species),
-    item: asWritten(fields[2], set.item, Dex.items),
-    ability: asWritten(fields[3], set.ability, Dex.abilities),
-    moves: set.moves.map((move, index) => (moves.length === set.moves.length ? asWritten(moves[index], move, Dex.moves) : move)),
+    species: asWritten(fields[1], set.species, dex.species),
+    item: asWritten(fields[2], set.item, dex.items),
+    ability: asWritten(fields[3], set.ability, dex.abilities),
+    moves: set.moves.map((move, index) => (moves.length === set.moves.length ? asWritten(moves[index], move, dex.moves) : move)),
   };
 }
 
@@ -80,30 +82,30 @@ function writtenNames(set: PokemonSet, entry: string): PokemonSet {
  * the next one, so each entry goes in alone, padded to the full count: a hand-edited or cut-off entry reads with its
  * missing fields empty and does not swallow the entries after it.
  */
-function unpackEntry(entry: string): PokemonSet | undefined {
+function unpackEntry(dex: RulesDex, entry: string): PokemonSet | undefined {
   const pipes = entry.split('|').length - 1;
   const set = Teams.import(entry + '|'.repeat(Math.max(0, SHEET_ENTRY_PIPES - pipes)))?.[0];
-  return set && writtenNames(set, entry);
+  return set && writtenNames(dex, set, entry);
 }
 
 /**
  * The sets of one packed sheet, the part of a `|showteam|` line after the side: the one reader of the parser below
  * and of the built sets (`extractTeamSheets`). Entries without a species are left out.
  */
-export function unpackSheetSets(packed: string): PokemonSet[] {
+export function unpackSheetSets(packed: string, dex: RulesDex): PokemonSet[] {
   const sets: PokemonSet[] = [];
   for (const entry of packed.split(']')) {
-    const set = unpackEntry(entry);
+    const set = unpackEntry(dex, entry);
     if (set && (set.species || set.name)) sets.push(set);
   }
   return sets;
 }
 
 /** The sets of the `|showteam|` line of a side (Open Team Sheets), null without one: `unpackSheetSets` of its packed part. */
-function sheetSetsOf(log: string, side: 'p1' | 'p2'): PokemonSet[] | null {
+function sheetSetsOf(log: string, side: 'p1' | 'p2', dex: RulesDex): PokemonSet[] | null {
   const prefix = `|showteam|${side}|`;
   const line = log.split('\n').find(candidate => candidate.startsWith(prefix));
-  return line ? unpackSheetSets(line.slice(prefix.length)) : null;
+  return line ? unpackSheetSets(line.slice(prefix.length), dex) : null;
 }
 
 /**
@@ -112,7 +114,8 @@ function sheetSetsOf(log: string, side: 'p1' | 'p2'): PokemonSet[] | null {
  * (sheet-text.spec.ts holds the reading to the old one).
  */
 export function parseShowteamSheet(log: string, side: 'p1' | 'p2'): SheetPokemon[] | null {
-  const pokemon = (sheetSetsOf(log, side) ?? []).map(sheetEntry).filter((mon): mon is SheetPokemon => mon !== null);
+  const dex = dexOf(logRules(log));
+  const pokemon = (sheetSetsOf(log, side, dex) ?? []).map(set => sheetEntry(dex, set)).filter((mon): mon is SheetPokemon => mon !== null);
   return pokemon.length > 0 ? pokemon : null;
 }
 
@@ -187,13 +190,14 @@ export function inferOpponentTeam(rawLog: string, opponentSide: 'p1' | 'p2' = 'p
   }
   attachHits(state);
 
-  inferBootsFromHazards(lines, opponentSide, state.pokemonMap, { gen: state.gen, freeAbilities: state.freeAbilities });
+  inferBootsFromHazards(lines, opponentSide, state.pokemonMap, { gen: state.gen, mod: state.mod, freeAbilities: state.freeAbilities });
 
+  const dex = dexOf(state);
   const sheet = parseShowteamSheet(log, opponentSide);
   if (sheet) applyTeamSheet(state.pokemonMap, sheet);
-  noteLogIdentities(lines, opponentSide, state.pokemonMap);
-  noteSheetIdentities(sheetSetsOf(log, opponentSide) ?? [], state.pokemonMap);
-  dropAmbiguousNicknames(state.pokemonMap);
+  noteLogIdentities(dex, lines, opponentSide, state.pokemonMap);
+  noteSheetIdentities(dex, sheetSetsOf(log, opponentSide, dex) ?? [], state.pokemonMap);
+  dropAmbiguousNicknames(dex, state.pokemonMap);
 
   return { pokemon: Array.from(state.pokemonMap.values()) };
 }
@@ -207,7 +211,7 @@ function inferBootsFromHazards(
   lines: readonly LogLine[],
   side: 'p1' | 'p2',
   pokemonMap: Map<string, RevealedPokemonInfo>,
-  legality: { gen: number; freeAbilities: boolean },
+  legality: LegalityContext,
 ) {
   if (legality.gen < 8) return;
 
@@ -217,7 +221,7 @@ function inferBootsFromHazards(
     const nickname = rocksUp ? entrantOf(lines[index], side) : null;
     if (!nickname || tookRockDamageOnEntry(lines, index, nickname)) continue;
 
-    const pokemon = findPokemonByNickname(pokemonMap, nickname, lines, side);
+    const pokemon = findPokemonByNickname(dexOf(legality), pokemonMap, nickname, lines, side);
     if (!pokemon || !canGuessBoots(pokemon, legality)) continue;
     pokemon.item = guessedField('Heavy-Duty Boots', undefined, 'No Stealth Rock damage on switch-in');
   }
@@ -243,11 +247,11 @@ function entrantOf(line: LogLine, side: string): string | null {
  * the simulator as the build asks it (T130: a Magic Guard Clefable showed the
  * guess in the panel while the build refused it).
  */
-function canGuessBoots(pokemon: RevealedPokemonInfo, legality: { gen: number; freeAbilities: boolean }): boolean {
+function canGuessBoots(pokemon: RevealedPokemonInfo, legality: LegalityContext): boolean {
   if (pokemon.item.value && pokemon.item.value !== '(has item)') return false;
   // A rocks chip elsewhere in the game disproves Boots outright.
   if (pokemon.ruledOut?.items.includes('heavydutyboots')) return false;
-  return !rocksMayMiss(pokemon, legality.gen, legality.freeAbilities);
+  return !rocksMayMiss(pokemon, dexOf(legality), legality.freeAbilities);
 }
 
 /** Entry-hazard damage resolves before the next action — scan until then. */

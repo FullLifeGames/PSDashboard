@@ -12,8 +12,7 @@ import { paradoxError } from './spreads/paradox.ts';
 import { hpEvsForMaxHp, type ObservedMaxHp } from './spreads/max-hp.ts';
 import { readableOrders, settledSets } from './spreads/order-limit.ts';
 import { isBoostItem, requiresItem } from './spreads/boost-items.ts';
-import { simGenNum } from './calc-gen.ts';
-import { genNumOf } from './ids.ts';
+import { dexOf, dexOfCalc, formatRules } from './rules-dex.ts';
 
 export { evBudget, legalizeEvs } from './spreads/ev-budget.ts';
 export type { SpreadCandidate } from './spreads/ladder.ts';
@@ -96,8 +95,8 @@ function guessedBoostItem(ctx: SolveContext, key: string): string | undefined {
   const [side, species] = key.split(':') as ['p1' | 'p2', string];
   const set = setOf(ctx, side, species);
   if (!set?.item || (ctx.knowledge.get(key) ?? ctx.knowledge.get(keyOf(side, set.species)))?.itemKnown) return undefined;
-  const gen = simGenNum(ctx.gen);
-  return isBoostItem(gen, set.item) && !requiresItem(gen, set.species, set.item) ? set.item : undefined;
+  const dex = dexOfCalc(ctx.gen);
+  return isBoostItem(dex, set.item) && !requiresItem(dex, set.species, set.item) ? set.item : undefined;
 }
 
 /**
@@ -243,7 +242,7 @@ function ladderFor(
 ): CandidateRung[] {
   const fixed: Partial<PokemonEvs> = evidence.fixedHp === undefined ? {} : { hp: evidence.fixedHp };
   const build = (hasSpeedObs: boolean) =>
-    candidateLadder(prior, physicalAttacker, evidence.hasOffenseEvidence, evidence.hasDefenderObs, hasSpeedObs, ctx.budget, keep, fixed);
+    candidateLadder(dexOfCalc(ctx.gen), prior, physicalAttacker, evidence.hasOffenseEvidence, evidence.hasDefenderObs, hasSpeedObs, ctx.budget, keep, fixed);
   if (!evidence.hasSpeedObs && !evidence.paradoxBound) return build(false);
   const ladder = build(true);
   if (speedMeasured(ctx, key, ladder, prior)) return ladder;
@@ -308,7 +307,7 @@ export function inferSpreads(
   knowledge: SpeedKnowledgeMap = new Map(),
   maxHp: Map<string, ObservedMaxHp> = new Map(),
 ): Map<string, SpreadCandidate> {
-  const ctx = buildSolveContext(observations, sets, formatid, readableOrders(speedOrders, sets, genNumOf(formatid)), maxHp);
+  const ctx = buildSolveContext(observations, sets, formatid, readableOrders(speedOrders, sets, dexOf(formatRules(formatid))), maxHp);
   ctx.knowledge = knowledge;
   ctx.scarf = decideScarfs(ctx, knowledge);
   // T117 (round 63): every observed order holds in the sets the ladder starts from.

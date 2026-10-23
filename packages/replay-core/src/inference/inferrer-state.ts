@@ -1,8 +1,9 @@
-import { Dex } from '@pkmn/sim';
 import type { RevealedPokemonInfo } from '../types.ts';
 import { findPokemonByNickname } from './lookup.ts';
 import { abilitiesAreFree } from '../team/dex-legal.ts';
 import { toId } from '../ids.ts';
+import { calcModOf, type CHAMPIONS_MOD } from '../calc-gen.ts';
+import { dexOf } from '../rules-dex.ts';
 import type { ItemWatch } from './item-evidence.ts';
 import type { TriggerWatch } from './trigger-evidence.ts';
 import type { HitWalk } from './hits.ts';
@@ -43,6 +44,8 @@ export interface InferrerState {
   gravityActive: boolean;
   /** The replay's generation (|gen| line): the dex that decides who may hold an ability (round 60, T104). */
   gen: number;
+  /** The replay's mod, read from its tier line ('champions' for a Pokémon Champions format; round 75, T160): the Dex of the game is `rulesDex(gen, mod)`. */
+  mod: typeof CHAMPIONS_MOD | undefined;
   /** A format that lets any species hold any ability (Balanced Hackmons; a custom game keeps the usual ones, round 67 gate): the dex decides nothing. */
   freeAbilities: boolean;
   /** Item evidence by absence (round 63, T80): the resolving move and the residual phase; item-evidence.ts creates it. */
@@ -59,6 +62,7 @@ export function createInferrerState(lines: readonly LogLine[], opponentSide: 'p1
     lines,
     opponentSide,
     gen: (genLine ? Number(arg(genLine, 1)) : 9) || 9,
+    mod: calcModOf(lines.find(line => line.cmd === 'tier')?.raw ?? ''),
     freeAbilities: abilitiesAreFree(lines.find(line => line.cmd === 'tier')?.raw ?? ''),
     pokemonMap: new Map<string, RevealedPokemonInfo>(),
     lastMoveTarget: new Map<string, string>(),
@@ -74,14 +78,14 @@ export function createInferrerState(lines: readonly LogLine[], opponentSide: 'p1
 export function canHaveDancer(state: InferrerState, ident: string): boolean {
   const species = state.identSpecies.get(ident);
   if (!species) return false;
-  return Object.values(Dex.species.get(species).abilities ?? {})
+  return Object.values(dexOf(state).species.get(species).abilities ?? {})
     .some(ability => toId(String(ability)) === 'dancer');
 }
 
 export function ruleOut(state: InferrerState, nickname: string, kind: 'abilities' | 'items', id: string) {
   const known = state.nicknameSpecies.get(nickname);
   const pokemon = (known ? state.pokemonMap.get(known) : undefined) ??
-    findPokemonByNickname(state.pokemonMap, nickname, state.lines, state.opponentSide);
+    findPokemonByNickname(dexOf(state), state.pokemonMap, nickname, state.lines, state.opponentSide);
   if (!pokemon) return;
   const ruledOut = (pokemon.ruledOut ??= { abilities: [], items: [] });
   if (!ruledOut[kind].includes(id)) ruledOut[kind].push(id);
@@ -89,5 +93,5 @@ export function ruleOut(state: InferrerState, nickname: string, kind: 'abilities
 
 /** The opponent Pokémon behind a nickname, through the log's switch lines. */
 export function findPokemon(state: InferrerState, nickname: string): RevealedPokemonInfo | undefined {
-  return findPokemonByNickname(state.pokemonMap, nickname, state.lines, state.opponentSide);
+  return findPokemonByNickname(dexOf(state), state.pokemonMap, nickname, state.lines, state.opponentSide);
 }

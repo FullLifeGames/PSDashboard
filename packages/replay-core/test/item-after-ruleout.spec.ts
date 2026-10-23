@@ -9,6 +9,7 @@ import type { PokemonUsageStats, SmogonUsageStats } from '../src/smogon/stats-ty
 import type { RevealedPokemonInfo } from '../src/types';
 import { unknownEvs } from '../src/team-info';
 import { toId } from '../src/ids';
+import { rulesDex } from '../src/rules-dex';
 
 /**
  * The item after a proven rule-out (round 64, T120, spec decision 19):
@@ -27,6 +28,7 @@ const plot = () => curated('Gholdengo', ['Protect', 'Nasty Plot', 'Make It Rain'
 const specs = () => curated('Gholdengo', ['Make It Rain', 'Shadow Ball', 'Power Gem', 'Trick'], 'Choice Specs');
 const usageOf: Record<string, number> = { makeitrain: 0.99, shadowball: 0.95, protect: 0.6, nastyplot: 0.57, trick: 0.27, powergem: 0.1 };
 const evidence = (over: Partial<CuratedEvidence>): CuratedEvidence => ({
+  dex: rulesDex(9),
   revealedMoves: ['makeitrain'], revealedItem: '', revealedAbility: '',
   ruledOutItems: [], ruledOutAbilities: [],
   usageProbability: moveId => usageOf[moveId] ?? 0,

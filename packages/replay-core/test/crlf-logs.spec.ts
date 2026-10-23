@@ -8,6 +8,7 @@ import {
 } from '../src/index';
 import { parseShowteamSheet } from '../src/opponent-inferrer';
 import { observedMaxHp } from '../src/spreads/max-hp';
+import './champions-mod';
 
 /**
  * Round 70 (T206): a log with Windows line endings reads like the same log with LF at every exported function that takes a log.

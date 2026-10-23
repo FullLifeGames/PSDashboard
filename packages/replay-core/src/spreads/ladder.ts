@@ -1,4 +1,4 @@
-import { Dex } from '@pkmn/dex';
+import type { RulesDex } from '../rules-dex.ts';
 import type { PokemonEvs } from '../types.ts';
 import { capToBudget, ZERO_EVS, type EvBudget } from './ev-budget.ts';
 import { toId } from '../ids.ts';
@@ -114,9 +114,9 @@ function rungNature(options: RungOption[], keepNature: boolean, priorNature: str
 }
 
 /** The nature raising `plus` and lowering `minus`, from the Dex; neutral when both name one stat. */
-export function natureOf(plus: keyof PokemonEvs, minus: keyof PokemonEvs): string {
+export function natureOf(dex: RulesDex, plus: keyof PokemonEvs, minus: keyof PokemonEvs): string {
   if (plus === minus) return 'Hardy';
-  return Dex.natures.all().find(nature => nature.plus === plus && nature.minus === minus)?.name ?? 'Hardy';
+  return dex.natures.all().find(nature => nature.plus === plus && nature.minus === minus)?.name ?? 'Hardy';
 }
 
 /**
@@ -126,8 +126,8 @@ export function natureOf(plus: keyof PokemonEvs, minus: keyof PokemonEvs): strin
  */
 function slowNature(nature: string | null, ctx: LadderContext): string | null {
   if (!ctx.slowKept || nature === null) return nature;
-  const plus = Dex.natures.get(nature).plus as keyof PokemonEvs | undefined;
-  return plus && nature !== ctx.priorNature ? natureOf(plus, 'spe') : ctx.prior.nature;
+  const plus = ctx.dex.natures.get(nature).plus as keyof PokemonEvs | undefined;
+  return plus && nature !== ctx.priorNature ? natureOf(ctx.dex, plus, 'spe') : ctx.prior.nature;
 }
 
 /** The stats a measurement fixed (round 40: HP from the log's maximum HP). */
@@ -160,6 +160,7 @@ function composeRung(
 
 /** What every rung of one ladder shares. */
 interface LadderContext {
+  dex: RulesDex;
   prior: SpreadCandidate;
   budget: EvBudget;
   fixed: Partial<PokemonEvs>;
@@ -268,6 +269,7 @@ function unmeasuredTempo(prior: SpreadCandidate, hasSpeedObs: boolean, keep: Rea
 }
 
 export function candidateLadder(
+  dex: RulesDex,
   prior: SpreadCandidate,
   physicalAttacker: boolean,
   hasAttackerObs: boolean,
@@ -289,9 +291,9 @@ export function candidateLadder(
   const measured = measuredStats(offenseStat, hasAttackerObs, hasDefenderObs, hasSpeedObs);
   const priorPlus = NATURE_PLUS[toId(prior.nature)];
   const ctx: LadderContext = {
-    prior, budget, fixed: fixedAll, keep: keptAll, offenseStat, priorPlus,
+    dex, prior, budget, fixed: fixedAll, keep: keptAll, offenseStat, priorPlus,
     priorNature: priorPlus && measured.has(priorPlus) ? 'Hardy' : prior.nature,
-    slowKept: keptAll.has('spe') && Dex.natures.get(prior.nature).minus === 'spe',
+    slowKept: keptAll.has('spe') && dex.natures.get(prior.nature).minus === 'spe',
   };
   const rungs = priorRungs(ctx);
   for (const o of offense) {

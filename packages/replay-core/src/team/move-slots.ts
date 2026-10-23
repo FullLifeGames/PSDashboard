@@ -1,6 +1,4 @@
-// Data-only Dex, like set-coherence.ts: this module rides into the app's
-// MAIN bundle through the team-info enrichment.
-import { Dex } from '@pkmn/dex';
+import type { RulesDex } from '../rules-dex.ts';
 import type { SetAssumption } from '../smogon/sets-lookup.ts';
 import { toId } from '../ids.ts';
 
@@ -16,13 +14,13 @@ import { toId } from '../ids.ts';
  * typeless one, because logs before gen 8 show "Hidden Power" without its
  * type (the enrichment dedups the same way).
  */
-export function slotMoveKey(name: string): string {
-  const move = Dex.moves.get(name);
+export function slotMoveKey(dex: RulesDex, name: string): string {
+  const move = dex.moves.get(name);
   const id = move.exists ? move.id as string : toId(name);
   return id.startsWith('hiddenpower') ? 'hiddenpower' : id;
 }
 
-const slotKeys = (move: SetAssumption) => new Set((move.options ?? [move.value]).map(slotMoveKey));
+const slotKeys = (dex: RulesDex, move: SetAssumption) => new Set((move.options ?? [move.value]).map(option => slotMoveKey(dex, option)));
 
 /**
  * The slots the revealed moves fill: one move per slot, as many slots as
@@ -30,8 +28,8 @@ const slotKeys = (move: SetAssumption) => new Set((move.options ?? [move.value])
  * first. Two seen options of one slot fill it once (573756: "The Pex" lists
  * Toxic and Haze as one slot, the log shows both).
  */
-export function filledSlots(moves: SetAssumption[], revealedKeys: Iterable<string>): Set<number> {
-  const keys = moves.map(slotKeys);
+export function filledSlots(dex: RulesDex, moves: SetAssumption[], revealedKeys: Iterable<string>): Set<number> {
+  const keys = moves.map(move => slotKeys(dex, move));
   const order = keys.map((_, index) => index).sort((a, b) => keys[a].size - keys[b].size);
   const holder = new Map<number, string>();
   const place = (key: string, tried: Set<number>): boolean => {
@@ -57,16 +55,16 @@ export function filledSlots(moves: SetAssumption[], revealedKeys: Iterable<strin
  * other options (the rest of the chosen set, which a short pool draws on
  * before usage, decision 12). A set without slots keeps its own array.
  */
-export function slotOrderedMoves(moves: SetAssumption[], revealedKeys: ReadonlySet<string>): SetAssumption[] {
+export function slotOrderedMoves(dex: RulesDex, moves: SetAssumption[], revealedKeys: ReadonlySet<string>): SetAssumption[] {
   if (!moves.some(move => (move.options?.length ?? 0) > 1)) return moves;
-  const filled = filledSlots(moves, revealedKeys);
+  const filled = filledSlots(dex, moves, revealedKeys);
   const fixed: SetAssumption[] = [];
   const open: SetAssumption[][] = [];
   moves.forEach((move, index) => {
     const options = move.options ?? [move.value];
     if (options.length <= 1) fixed.push(move);
     else if (!filled.has(index)) {
-      open.push(options.filter(option => !revealedKeys.has(slotMoveKey(option)))
+      open.push(options.filter(option => !revealedKeys.has(slotMoveKey(dex, option)))
         .map(value => ({ value, sourceDetail: move.sourceDetail })));
     }
   });

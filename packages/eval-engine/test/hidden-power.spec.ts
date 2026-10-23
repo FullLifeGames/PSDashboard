@@ -31,25 +31,25 @@ const ev = (defender: string, marker: HiddenPowerEvidence['marker']): HiddenPowe
 
 describe('hidden-power type resolution', () => {
   test('usage alone picks the top variant', () => {
-    expect(resolveHiddenPowerType([], usage, 'Manectric', 6)).toBe('Hidden Power Ice');
+    expect(resolveHiddenPowerType([], usage, 'Manectric', { gen: 6, mod: undefined })).toBe('Hidden Power Ice');
   });
   test('evidence filters: a NEUTRAL hit on Skarmory keeps Ice (0.5 x 2 = x1), cuts Grass (x0.25)', () => {
-    expect(resolveHiddenPowerType([ev('Skarmory', 'neutral')], usage, 'Manectric', 6)).toBe('Hidden Power Ice');
+    expect(resolveHiddenPowerType([ev('Skarmory', 'neutral')], usage, 'Manectric', { gen: 6, mod: undefined })).toBe('Hidden Power Ice');
   });
   test('evidence overrides usage rank: a RESISTED hit on Skarmory cuts Ice, survivor Grass wins', () => {
-    expect(resolveHiddenPowerType([ev('Skarmory', 'resisted')], usage, 'Manectric', 6)).toBe('Hidden Power Grass');
+    expect(resolveHiddenPowerType([ev('Skarmory', 'resisted')], usage, 'Manectric', { gen: 6, mod: undefined })).toBe('Hidden Power Grass');
   });
   test('empty intersection falls back to usage-top (SUPER on Skarmory: no usage variant fits)', () => {
     // Ice vs Steel/Flying is x1 and Grass x0.25 — neither reads "super", so
     // the filter empties and the Levitate-family fallback fires.
-    expect(resolveHiddenPowerType([ev('Skarmory', 'super')], usage, 'Manectric', 6)).toBe('Hidden Power Ice');
+    expect(resolveHiddenPowerType([ev('Skarmory', 'super')], usage, 'Manectric', { gen: 6, mod: undefined })).toBe('Hidden Power Ice');
   });
   test('contradictory evidence (super + immune) also falls back to usage-top', () => {
-    expect(resolveHiddenPowerType([ev('Skarmory', 'super'), ev('Skarmory', 'immune')], usage, 'Manectric', 6))
+    expect(resolveHiddenPowerType([ev('Skarmory', 'super'), ev('Skarmory', 'immune')], usage, 'Manectric', { gen: 6, mod: undefined }))
       .toBe('Hidden Power Ice');
   });
   test('no usage variant leaves null', () => {
-    expect(resolveHiddenPowerType([], usage, 'Skarmory', 6)).toBeNull();
+    expect(resolveHiddenPowerType([], usage, 'Skarmory', { gen: 6, mod: undefined })).toBeNull();
   });
 });
 
@@ -62,13 +62,13 @@ describe('set substitution', () => {
     level: 100, gender: '',
   };
   test('typeless HP is substituted; explicit knowledge is not', () => {
-    const substituted = withHiddenPowerType(baseSet, [], usage, 6);
+    const substituted = withHiddenPowerType(baseSet, [], usage, { gen: 6, mod: undefined });
     expect(substituted.moves).toContain('Hidden Power Ice');
     expect(substituted.moves).not.toContain('Hidden Power');
-    const explicit = withHiddenPowerType({ ...baseSet, hpType: 'Grass' }, [], usage, 6);
+    const explicit = withHiddenPowerType({ ...baseSet, hpType: 'Grass' }, [], usage, { gen: 6, mod: undefined });
     expect(explicit.moves).toContain('Hidden Power');
     const customIvs = withHiddenPowerType(
-      { ...baseSet, ivs: { ...baseSet.ivs, atk: 0, def: 30 } }, [], usage, 6);
+      { ...baseSet, ivs: { ...baseSet.ivs, atk: 0, def: 30 } }, [], usage, { gen: 6, mod: undefined });
     expect(customIvs.moves).toContain('Hidden Power');
   });
 });

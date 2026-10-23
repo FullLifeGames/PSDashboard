@@ -3,6 +3,7 @@ import { Battle } from '@pkmn/client';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { inferOpponentTeam } from '../src/opponent-inferrer';
 import { parseReplayLogWithObservations } from '../src/protocol-parser';
+import './champions-mod';
 
 /**
  * Round 69 (T188, decision 33): the protocol parser and the inference's own client walk build their client battle on the

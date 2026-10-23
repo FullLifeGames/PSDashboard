@@ -6,6 +6,7 @@ import { buildTeamsFromReplay } from '../src/team-builder';
 import type { PokemonSetAssumption, SmogonSetAssumptions } from '../src/smogon/sets-lookup';
 import type { PokemonUsageStats, SmogonUsageStats } from '../src/smogon/stats-types';
 import { toId } from '../src/ids';
+import { rulesDex } from '../src/rules-dex';
 
 /**
  * Round 69 (T166): the log rules out the one item every published set of a species lists, and the whole species gave up its
@@ -26,6 +27,7 @@ const physical = () => curated(['Swords Dance', 'Spirit Break', 'Close Combat', 
 const special = () => curated(['Calm Mind', 'Moonblast', 'Focus Blast', 'Thunderbolt'], 'Timid', { spa: 252, spe: 252, spd: 4 });
 const usageOf: Record<string, number> = { moonblast: 0.9, closecombat: 0.7, spiritbreak: 0.5, swordsdance: 0.4, shadowsneak: 0.2, calmmind: 0.3 };
 const evidence = (over: Partial<CuratedEvidence>): CuratedEvidence => ({
+  dex: rulesDex(9),
   revealedMoves: ['swordsdance', 'spiritbreak', 'shadowsneak'], revealedItem: '', revealedAbility: '',
   ruledOutItems: ['boosterenergy'], ruledOutAbilities: [], usageProbability: moveId => usageOf[moveId] ?? 0, ...over,
 });

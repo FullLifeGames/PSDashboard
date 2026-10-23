@@ -1,5 +1,5 @@
 import type { PokemonSet } from '@pkmn/sim';
-import { Dex } from '@pkmn/sim';
+import type { RulesDex } from '../rules-dex.ts';
 import type { SmogonUsageStats, SpeciesUsageSet, UsageProbability } from '../smogon/stats-types.ts';
 import { getSpeciesSetAssumption, type SmogonSetAssumptions } from '../smogon/sets-lookup.ts';
 import { getSpeciesUsageSet, getSpeciesUsageStats } from '../smogon/usage-lookup.ts';
@@ -132,12 +132,13 @@ export function buildSheetSet(
  * evidence — a winning curated set fills the unrevealed slots as one
  * internally coherent unit instead of independent marginals.
  */
-export function selectCuratedFor(info: RevealedPokemonInfo, smogonSet: SmogonSet, usageSet: SpeciesUsageSet | null): CuratedSet | null {
+export function selectCuratedFor(dex: RulesDex, info: RevealedPokemonInfo, smogonSet: SmogonSet, usageSet: SpeciesUsageSet | null): CuratedSet | null {
   const seen = info.moves.filter(move => move.source === 'revealed' || move.source === 'manual');
   return smogonSet ? selectCuratedSet([smogonSet, ...(smogonSet.alternatives ?? [])], {
+    dex,
     revealedMoves: seen.map(move => toId(move.name)),
     // The Z-moves and Max moves the revealed moves do not explain: a set with a move to fill them fits better (round 70).
-    openMoves: unfilledOpenMoves(info.openMoves, seen.map(move => move.name)),
+    openMoves: unfilledOpenMoves(dex, info.openMoves, seen.map(move => move.name)),
     // A consumed or knocked-off item is still the set's item (round 63: 751407 Dragonite's Choice Band).
     revealedItem: toId(itemSetValue(known(info.item))),
     revealedAbility: toId(known(info.ability)),
@@ -178,7 +179,7 @@ function guessedItem(info: RevealedPokemonInfo, curated: CuratedSet | null, usag
  * round 69, T26: for a dropped boost item, every boost item and the Scarf).
  */
 export function resolveItemWithout(
-  info: RevealedPokemonInfo, usageStats: SmogonUsageStats | null | undefined, setAssumptions: SmogonSetAssumptions | null | undefined,
+  dex: RulesDex, info: RevealedPokemonInfo, usageStats: SmogonUsageStats | null | undefined, setAssumptions: SmogonSetAssumptions | null | undefined,
   excludedItemIds: string | readonly string[],
 ): string {
   const ruledOut = { abilities: info.ruledOut?.abilities ?? [], items: [...(info.ruledOut?.items ?? []), ...[excludedItemIds].flat()] };
@@ -188,7 +189,7 @@ export function resolveItemWithout(
   };
   const usageSet = getSpeciesUsageSet(usageStats, info.species, ruledOut, USAGE_MOVE_POOL);
   const smogonSet = getSpeciesSetAssumption(setAssumptions, info.species);
-  return resolveItem(stripped, selectCuratedFor(stripped, smogonSet, usageSet), usageSet, smogonSet);
+  return resolveItem(stripped, selectCuratedFor(dex, stripped, smogonSet, usageSet), usageSet, smogonSet);
 }
 
 /**
@@ -201,35 +202,35 @@ export function resolveItemWithout(
  * same order (team-info.ts).
  */
 export function assembleMoves(
-  info: RevealedPokemonInfo, curated: CuratedSet | null, usageSet: SpeciesUsageSet | null, smogonSet: SmogonSet, item: string,
+  dex: RulesDex, info: RevealedPokemonInfo, curated: CuratedSet | null, usageSet: SpeciesUsageSet | null, smogonSet: SmogonSet, item: string,
   usageTail: UsageProbability[] = [],
 ): string[] {
   const pool: MoveCandidate[] = [];
   const pooled = new Set<string>();
   const offer = (name: string, candidate: Omit<MoveCandidate, 'name'>) => {
-    if (pooled.has(slotMoveKey(name))) return;
-    pooled.add(slotMoveKey(name));
+    if (pooled.has(slotMoveKey(dex, name))) return;
+    pooled.add(slotMoveKey(dex, name));
     pool.push({ name, ...candidate });
   };
   const known = info.moves.filter(move => move.source === 'revealed' || move.source === 'manual');
   for (const move of known) offer(move.name, { guessed: false });
   // A guess the enrichment took from the usage tail stays a tail move (its boost serves nothing).
-  const tailKeys = new Set(usageTail.map(fill => slotMoveKey(fill.value)));
+  const tailKeys = new Set(usageTail.map(fill => slotMoveKey(dex, fill.value)));
   for (const fill of curated?.moves ?? []) offer(fill.value, { guessed: true, fromSet: true });
-  for (const move of info.moves) offer(move.name, { guessed: true, tail: tailKeys.has(slotMoveKey(move.name)) || undefined });
+  for (const move of info.moves) offer(move.name, { guessed: true, tail: tailKeys.has(slotMoveKey(dex, move.name)) || undefined });
   const fills = [...(usageSet?.moves ?? []), ...(curated ? [] : (smogonSet?.moves ?? []))];
   for (const fill of fills) offer(fill.value, { guessed: true });
   for (const fill of usageTail) offer(fill.value, { guessed: true, tail: true });
   const assemble = (candidates: MoveCandidate[]) =>
-    applyCoherenceVetoes(candidates, { itemId: toId(item), itemFromSet: itemFromChosenSet(curated, item) }).slice(0, 4);
-  return settleOpenMoves(pool, info.openMoves, assemble).map(candidate => candidate.name);
+    applyCoherenceVetoes(candidates, { dex, itemId: toId(item), itemFromSet: itemFromChosenSet(dex, curated, item) }).slice(0, 4);
+  return settleOpenMoves(dex, pool, info.openMoves, assemble).map(candidate => candidate.name);
 }
 
-export function resolveAbility(info: RevealedPokemonInfo, curated: CuratedSet | null, usageSet: SpeciesUsageSet | null, smogonSet: SmogonSet): string {
+export function resolveAbility(dex: RulesDex, info: RevealedPokemonInfo, curated: CuratedSet | null, usageSet: SpeciesUsageSet | null, smogonSet: SmogonSet): string {
   const curatedAbility = curated ? allowed(curated.ability?.value, info.ruledOut?.abilities) : '';
   return known(info.ability) || curatedAbility || info.ability.value ||
     usageSet?.ability?.value || allowed(smogonSet?.ability?.value, info.ruledOut?.abilities) ||
-    defaultAbility(info.species, info.ruledOut?.abilities);
+    defaultAbility(dex, info.species, info.ruledOut?.abilities);
 }
 
 /** Damage-consistent spreads beat usage guesses, never edited/revealed EVs. */
@@ -243,11 +244,11 @@ function spreadNature(
 }
 
 function spreadEvs(
-  species: string, edited: EditedFields, inferred: SpreadCandidate | undefined, curated: CuratedSet | null,
+  dex: RulesDex, species: string, edited: EditedFields, inferred: SpreadCandidate | undefined, curated: CuratedSet | null,
   spread: UsageSpreadLike, setSpread: UsageSpreadLike, revealedMoves: string[], budget: EvBudget,
 ): PokemonSet['evs'] {
   return edited.editedEvs || inferred?.evs || curated?.spread?.evs || spread?.evs || setSpread?.evs ||
-    defaultEvsFor(species, revealedMoves, budget);
+    defaultEvsFor(dex, species, revealedMoves, budget);
 }
 
 /**
@@ -266,14 +267,14 @@ function spreadIvs(
 }
 
 export function resolveSpread(
-  species: string, edited: EditedFields, inferred: SolvedSpread | undefined, curated: CuratedSet | null,
+  dex: RulesDex, species: string, edited: EditedFields, inferred: SolvedSpread | undefined, curated: CuratedSet | null,
   usageSet: SpeciesUsageSet | null, smogonSet: SmogonSet, revealedMoves: string[] = [], budget: EvBudget = evBudget(''),
 ): { nature: PokemonSet['nature']; evs: PokemonSet['evs']; ivs: PokemonSet['ivs'] } {
   const spread = usageSet?.spread;
   const setSpread = smogonSet?.spread;
   return {
     nature: spreadNature(edited, inferred, curated, spread, setSpread),
-    evs: spreadEvs(species, edited, inferred, curated, spread, setSpread, revealedMoves, budget),
+    evs: spreadEvs(dex, species, edited, inferred, curated, spread, setSpread, revealedMoves, budget),
     ivs: spreadIvs(edited, inferred, curated, usageSet, smogonSet),
   };
 }
@@ -283,9 +284,9 @@ function hasNonZeroEvs(evs: PokemonSet['evs'] | undefined): boolean {
 }
 
 /** The offense side the revealed attacks agree on; null when none or both categories were shown. */
-function revealedOffense(revealedMoves: string[]): 'atk' | 'spa' | null {
+function revealedOffense(dex: RulesDex, revealedMoves: string[]): 'atk' | 'spa' | null {
   const categories = new Set(
-    revealedMoves.map(name => Dex.moves.get(name))
+    revealedMoves.map(name => dex.moves.get(name))
       .filter(move => move.exists && move.category !== 'Status')
       .map(move => move.category),
   );
@@ -303,11 +304,11 @@ function revealedOffense(revealedMoves: string[]): 'atk' | 'spa' | null {
  * without EVs a start (Gens 1 and 2: 252 in every stat, round 70, T222) that
  * start is the default, whatever the species.
  */
-function defaultEvsFor(species: string, revealedMoves: string[], budget: EvBudget): PokemonSet['evs'] {
+function defaultEvsFor(dex: RulesDex, species: string, revealedMoves: string[], budget: EvBudget): PokemonSet['evs'] {
   if (budget.start > 0) return evsOfSet(undefined, budget);
-  const data = Dex.species.get(species);
+  const data = dex.species.get(species);
   const stats = data.exists ? data.baseStats : null;
-  const offense: 'atk' | 'spa' = revealedOffense(revealedMoves) ?? (stats && stats.spa > stats.atk ? 'spa' : 'atk');
+  const offense: 'atk' | 'spa' = revealedOffense(dex, revealedMoves) ?? (stats && stats.spa > stats.atk ? 'spa' : 'atk');
   const secondary: 'spe' | 'hp' = stats && stats.spe >= 80 ? 'spe' : 'hp';
   const evs = { hp: 0, atk: 0, def: 0, spa: 0, spd: 4, spe: 0 };
   evs[offense] = 252;
@@ -342,8 +343,8 @@ function cleanItem(replayItem: string, fallback: string): string {
  * teambuilder default when nothing better is known; protocol rule-outs walk
  * to the next slot (a Bronzong that took an Earthquake is not Levitate).
  */
-function defaultAbility(species: string, ruledOut?: string[]): string {
-  const abilities = (Dex.species.get(species).abilities ?? {}) as unknown as Record<string, string | undefined>;
+function defaultAbility(dex: RulesDex, species: string, ruledOut?: string[]): string {
+  const abilities = (dex.species.get(species).abilities ?? {}) as unknown as Record<string, string | undefined>;
   for (const slot of ['0', '1', 'H'] as const) {
     const ability = abilities[slot];
     if (ability && !(ruledOut ?? []).includes(toId(ability))) return ability;

@@ -9,6 +9,7 @@ import { boostItemIds } from '../src/spreads/boost-items';
 import { toId } from '../src/ids';
 import type { SmogonUsageStats } from '../src/smogon/stats-types';
 import type { DamageObservation, PokemonEvs } from '../src/types';
+import { rulesDex } from '../src/rules-dex';
 
 /**
  * Round 69 (T26): the item that replaces a guessed boost item the damage lines refuted is the build's own next
@@ -53,7 +54,7 @@ for (const formatid of ['gen9ou', 'gen9doublesou']) {
       const gengar = solved.get('p2:gengar');
       expect(gengar?.itemReason).toBe('no-boost');
       expect(gengar?.item).toBe('Focus Sash');
-      expect(boostItemIds(9).has(toId(gengar?.item ?? ''))).toBe(false);
+      expect(boostItemIds(rulesDex(9)).has(toId(gengar?.item ?? ''))).toBe(false);
       const built = buildTeamsFromReplay(log, { usageStats: stats, inferredSpreads: solved }).p2Team.find(set => set.species === 'Gengar');
       expect(built?.item).toBe('Focus Sash');
       expect(built?.evs.spa).toBe(252);
@@ -75,7 +76,7 @@ for (const formatid of ['gen9ou', 'gen9doublesou']) {
     test('an unresolved drop never lets a boost item or the Scarf back into the set', () => {
       const raw = new Map([['p2:gengar', { evs: evs({ spa: 252, spe: 252, hp: 4 }), nature: 'Timid', item: '', itemReason: 'no-boost' as const }]]);
       const built = buildTeamsFromReplay(log, { usageStats: stats, inferredSpreads: raw }).p2Team.find(set => set.species === 'Gengar');
-      expect(boostItemIds(9).has(toId(built?.item ?? ''))).toBe(false);
+      expect(boostItemIds(rulesDex(9)).has(toId(built?.item ?? ''))).toBe(false);
       expect(built?.item).not.toBe('Choice Scarf');
     });
   });

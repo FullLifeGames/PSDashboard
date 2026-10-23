@@ -4,6 +4,7 @@ import type { SmogonSetAssumptions } from '../smogon/sets-lookup.ts';
 import { getSpeciesUsageStats } from '../smogon/usage-lookup.ts';
 import type { SpeedKnowledgeMap } from '../spreads/scarf.ts';
 import type { SpreadCandidate } from '../spreads/ladder.ts';
+import type { RulesDex } from '../rules-dex.ts';
 import { findUserMatch, resolveItemWithout } from './set-resolvers.ts';
 import type { KnowledgeSource, OpponentTeamInfo } from '../types.ts';
 import { toId } from '../ids.ts';
@@ -48,7 +49,7 @@ export function speedKnowledgeFor(
 
 /** A dropped Scarf ('' from the solver) becomes the build's next item choice, so panel and sim agree. */
 export function resolveInferredItems(
-  inferred: Map<string, SpreadCandidate>, infos: SideInfos,
+  dex: RulesDex, inferred: Map<string, SpreadCandidate>, infos: SideInfos,
   usageStats: SmogonUsageStats | null | undefined, setAssumptions: SmogonSetAssumptions | null | undefined,
 ): Map<string, SpreadCandidate> {
   const resolved = new Map(inferred);
@@ -57,7 +58,7 @@ export function resolveInferredItems(
     const [side, speciesId] = key.split(':') as ['p1' | 'p2', string];
     const info = infos[side].pokemon.find(mon => toId(mon.species) === speciesId);
     if (!info) continue;
-    resolved.set(key, { ...candidate, item: resolveItemWithout(info, usageStats, setAssumptions, 'choicescarf') });
+    resolved.set(key, { ...candidate, item: resolveItemWithout(dex, info, usageStats, setAssumptions, 'choicescarf') });
   }
   return resolved;
 }

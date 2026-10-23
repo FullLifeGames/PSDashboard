@@ -5,7 +5,7 @@
  */
 import type { PokemonFieldInfo, PokemonMoveInfo } from '../types.ts';
 import type { PokemonUsageStats, SmogonUsageStats, SpeciesUsageSet, UsageProbability } from './stats-types.ts';
-import { Dex } from '@pkmn/dex';
+import { dexOf, formatRules, type RulesDex } from '../rules-dex.ts';
 import { toId } from '../ids.ts';
 
 export function sourceDetail(format: string, month: string): string {
@@ -22,10 +22,10 @@ function ownUsageStats(species: string, usageStats: SmogonUsageStats): PokemonUs
  * base stats and abilities in the Dex (Gastrodon-East, Maushold-Four,
  * Zarude-Dada); null for a forme that battles differently (Rotom-Wash).
  */
-function battleAlikeBase(species: string): string | null {
-  const forme = Dex.species.get(species);
+function battleAlikeBase(dex: RulesDex, species: string): string | null {
+  const forme = dex.species.get(species);
   if (!forme.exists || forme.baseSpecies === forme.name) return null;
-  const base = Dex.species.get(forme.baseSpecies);
+  const base = dex.species.get(forme.baseSpecies);
   const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
   return base.exists && same(forme.types, base.types) && same(forme.baseStats, base.baseStats) &&
     same(forme.abilities, base.abilities) ? base.name : null;
@@ -43,7 +43,7 @@ export function getSpeciesUsageStats(
   if (!usageStats) return undefined;
   const own = ownUsageStats(species, usageStats);
   if (own) return own;
-  const base = battleAlikeBase(species);
+  const base = battleAlikeBase(dexOf(formatRules(usageStats.format)), species);
   return base ? ownUsageStats(base, usageStats) : undefined;
 }
 

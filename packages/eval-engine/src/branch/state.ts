@@ -8,6 +8,7 @@ import type {
   SimBattle, SimPokemon, SimSide,
 } from './types.ts';
 import { slotLetter, trimTeamToBring } from './team-order.ts';
+import { formatRules } from '@fulllifegames/replay-core';
 import { targetTypeForMove } from './protocol-choices.ts';
 import { forceSwitches } from './corrections.ts';
 import { extractPokemonInfo, makePokemonInfo, shownPercent } from './pokemon-info.ts';
@@ -340,8 +341,8 @@ export function serializePreviewPosition(
       // WITHOUT team preview — every draft replay lost its turn 0 that way.
       formatid: format as ID,
       seed: '1,2,3,4',
-      p1: { name: 'p1', team: Teams.pack(trimTeamToBring(p1Team, bringOnly?.p1)) },
-      p2: { name: 'p2', team: Teams.pack(trimTeamToBring(p2Team, bringOnly?.p2)) },
+      p1: { name: 'p1', team: Teams.pack(trimTeamToBring(p1Team, bringOnly?.p1, formatRules(format))) },
+      p2: { name: 'p2', team: Teams.pack(trimTeamToBring(p2Team, bringOnly?.p2, formatRules(format))) },
     });
     if (battle.sides[0]?.requestState !== 'teampreview') return null;
     return serializeBattleStable(battle);

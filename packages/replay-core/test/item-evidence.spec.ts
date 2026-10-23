@@ -2,6 +2,7 @@ import { test, expect, describe } from 'vitest';
 import { Battle, Dex, Teams, toID, type PokemonSet } from '@pkmn/sim';
 import { inferOpponentTeam } from '../src/opponent-inferrer';
 import { contactLands } from '../src/inference/item-evidence';
+import { rulesDex } from '../src/rules-dex';
 
 /**
  * Items the protocol rules out by a line it does NOT show (round 63, T80).
@@ -199,7 +200,7 @@ describe('Rocky Helmet from the generation of Protective Pads on (round 64, T120
     for (const item of items) {
       for (const move of ['Mach Punch', 'Tackle']) {
         const log = ou([set('Hitmonchan', item, 'Iron Fist', [move])], [holder('Rocky Helmet')], [[`move ${toID(move)}`, 'move roost']]);
-        expect(shown(log, 'Rocky Helmet'), `${item} ${move}`).toBe(contactLands(9, move, toID(item)));
+        expect(shown(log, 'Rocky Helmet'), `${item} ${move}`).toBe(contactLands(rulesDex(9), move, toID(item)));
       }
     }
   });

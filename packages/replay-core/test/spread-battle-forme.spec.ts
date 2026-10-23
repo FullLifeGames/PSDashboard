@@ -6,6 +6,7 @@ import { buildSolveContext, keyOf, observationError, rollRange } from '../src/sp
 import { formeOrigin } from '../src/spreads/battle-forme';
 import { readableOrders } from '../src/spreads/order-limit';
 import type { DamageObservation, PokemonEvs, SpeedOrderObservation } from '../src/types';
+import { rulesDex } from '../src/rules-dex';
 
 /**
  * Round 69 (T190, spec decision 8): a hit by or on a battle forme (a Mega, Aegislash-Blade, Ogerpon's Tera mask) belongs to the
@@ -269,7 +270,7 @@ describe('an order read for a Mega names the base set too (T190, the Mega-Z orde
     const cfg = CFGS[0];
     const sets = { p1: [body(cfg, 'Garchomp', 'Garchompite Z', 'Rough Skin', ['Dragon Claw'], 'Jolly', { spe: 252 })], p2: [blissey(cfg)] };
     const order: SpeedOrderObservation = { firstSide: 'p1', firstSpecies: 'Garchomp-Mega-Z', secondSide: 'p2', secondSpecies: 'Blissey', turn: 2 } as SpeedOrderObservation;
-    const [read] = readableOrders([order], sets, 9);
+    const [read] = readableOrders([order], sets, rulesDex(9));
     const dex = Dex.forGen(9);
     expect(dex.species.get('Garchomp-Mega-Z').baseStats.spe).not.toBe(dex.species.get('Garchomp').baseStats.spe);
     expect(read).toMatchObject({ firstSide: 'p1', firstSpecies: 'Garchomp', firstForme: 'Garchomp-Mega-Z' });

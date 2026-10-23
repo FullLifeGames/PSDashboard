@@ -1,7 +1,7 @@
 import { calculate, Field, Move, Pokemon } from '@smogon/calc';
 import { buildCalcPokemon, calcKnowsMove } from '../calc-build.ts';
-import type { CalcGeneration } from '../calc-gen.ts';
-import { Dex } from '@pkmn/sim';
+import { calcModOf, type CalcGeneration } from '../calc-gen.ts';
+import { rulesDex, type RulesDex } from '../rules-dex.ts';
 import type { HitParty, LoggedHit, OpponentTeamInfo, PokemonEvs, RevealedPokemonInfo } from '../types.ts';
 import { itemSetValue } from '../team-info.ts';
 import { abilitiesAreFree } from './dex-legal.ts';
@@ -32,7 +32,10 @@ export const FIELD_DAMAGE_HOOK = /^on(Ally|Any|Foe)(BasePower|ModifyAtk|ModifyDe
 /** Move handlers that set power, damage or type from state the record does not carry. */
 const UNREADABLE_MOVE = ['basePowerCallback', 'damageCallback', 'damage', 'ohko', 'multihit', 'isZ', 'isMax', 'onModifyType', 'onModifyMove'];
 
-export type GenDex = ReturnType<typeof Dex.forGen>;
+export type GenDex = RulesDex;
+
+/** The Dex of the game a logged hit was played in: its generation and the mod its format names (round 75, T160). */
+export const hitDex = (hit: Pick<LoggedHit, 'gen' | 'format'>): GenDex => rulesDex(hit.gen, calcModOf(hit.format));
 export type CalcOptions = NonNullable<ConstructorParameters<typeof Pokemon>[2]>;
 export type Stat = keyof PokemonEvs;
 export interface Spread { evs: Partial<PokemonEvs>; ivs: Partial<PokemonEvs>; nature: string }
@@ -63,7 +66,7 @@ export function readableMove(dex: GenDex, moveId: string): boolean {
 export function judgeable(hit: LoggedHit): boolean {
   if (hit.doubt || hit.attacker.itemChanged || hit.attacker.tera === 'Stellar') return false;
   if (abilitiesAreFree(`|tier|${hit.format}`)) return false;
-  const dex = Dex.forGen(hit.gen);
+  const dex = hitDex(hit);
   if (!readableMove(dex, hit.move)) return false;
   // A Charge doubles the next Electric move, which the calculator does not model.
   if (hit.attacker.charged && dex.moves.get(hit.move).type === 'Electric') return false;
@@ -73,10 +76,10 @@ export function judgeable(hit: LoggedHit): boolean {
 }
 
 /** The defender's entry on its own side: the forme as named, else the entry its base species or battle origin holds. */
-export function defenderOf(team: OpponentTeamInfo, forme: string): RevealedPokemonInfo | undefined {
+export function defenderOf(dex: GenDex, team: OpponentTeamInfo, forme: string): RevealedPokemonInfo | undefined {
   const exact = team.pokemon.find(mon => toId(mon.species) === toId(forme));
   if (exact) return exact;
-  const species = Dex.species.get(forme);
+  const species = dex.species.get(forme);
   const origins = [species.baseSpecies, ...([] as string[]).concat(species.battleOnly ?? [])].map(toId);
   return team.pokemon.find(mon => origins.includes(toId(mon.species)));
 }
@@ -192,11 +195,11 @@ export function variantsOf(abilities: string[], party: HitParty): AbilityVariant
  * The holder's strongest and weakest legal spreads for that stat: the format's per-stat cap (252 EVs, or 32 Stat Points in a
  * Champions game, which has no IVs to lower, so its weak spread keeps IV 31 as the calculator's generation 0 ignores them anyway).
  */
-export function extremes(stat: Stat | null, budget: EvBudget): { strong: Spread; weak: Spread } {
+export function extremes(dex: GenDex, stat: Stat | null, budget: EvBudget): { strong: Spread; weak: Spread } {
   if (!stat) return { strong: { evs: {}, ivs: {}, nature: 'Hardy' }, weak: { evs: {}, ivs: {}, nature: 'Hardy' } };
   const other: Stat = stat === 'atk' ? 'spa' : 'atk';
   return {
-    strong: { evs: { [stat]: budget.perStat }, ivs: {}, nature: natureOf(stat, other) },
-    weak: { evs: {}, ivs: budget.statPoints ? {} : { [stat]: 0 }, nature: natureOf(other, stat) },
+    strong: { evs: { [stat]: budget.perStat }, ivs: {}, nature: natureOf(dex, stat, other) },
+    weak: { evs: {}, ivs: budget.statPoints ? {} : { [stat]: 0 }, nature: natureOf(dex, other, stat) },
   };
 }

@@ -51,13 +51,13 @@ describe('reorderForLeads', () => {
 
 describe('trimTeamToBring', () => {
   test('names without an id: the brought names keep their own bodies', () => {
-    const kept = trimTeamToBring(japanese, ['グレンタウン', 'うみのうた', 'ワスレイヌ']);
+    const kept = trimTeamToBring(japanese, ['グレンタウン', 'うみのうた', 'ワスレイヌ'], { gen: 9, mod: undefined });
     expect(kept.map(pokemon => pokemon.name)).toEqual(['うみのうた', 'ワスレイヌ', 'グレンタウン']);
   });
 
   test('two names of one id: each brought name keeps its exact body', () => {
     const team = [set('Rias!', 'Dragapult'), set('Rias?', 'Snorlax'), set('Plain', 'Clefable')];
-    expect(trimTeamToBring(team, ['Rias?', 'Plain']).map(pokemon => pokemon.name)).toEqual(['Rias?', 'Plain']);
+    expect(trimTeamToBring(team, ['Rias?', 'Plain'], { gen: 9, mod: undefined }).map(pokemon => pokemon.name)).toEqual(['Rias?', 'Plain']);
   });
 });
 

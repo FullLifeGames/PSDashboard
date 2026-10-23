@@ -83,7 +83,7 @@ function lastShownHealth(battle: SimBattle, events: readonly string[]): Map<SimP
 function witnessedBerry(battle: SimBattle, body: SimPokemon, health: string | undefined): string | null {
   const build = toId(body.set.item);
   if (!health || body.fainted || body.item !== '' || !isSitrusBerry(build)) return null;
-  return sitrusKeptAt(battle.gen, health) ? build : null;
+  return sitrusKeptAt(battle.dex, health) ? build : null;
 }
 
 /** Puts the witnessed berry back; the game never ate it, so the sim's eating marks (Belch and Cud Chew read them) go. True when the board changed. */

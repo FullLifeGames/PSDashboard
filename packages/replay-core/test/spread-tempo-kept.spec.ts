@@ -7,6 +7,7 @@ import { buildCalcPokemon } from '../src/calc-build';
 import { calcGenerationFor } from '../src/calc-gen';
 import { toId } from '../src/ids';
 import type { DamageObservation, PokemonEvs } from '../src/types';
+import './champions-mod';
 
 /**
  * Round 69 (T132 point 1, spec decision 12): a Speed no move order measures keeps the prior. The ladder gave such a

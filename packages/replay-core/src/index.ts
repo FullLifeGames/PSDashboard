@@ -9,6 +9,8 @@
 export { WEATHER_BY_ID, TERRAIN_BY_ID } from './calc-field.ts';
 export { calcGenerationFor, calcModOf, simGenNum, CHAMPIONS_MOD } from './calc-gen.ts';
 export { isChampionsFormat } from './champions-format.ts';
+export { rulesDex, dexOf, dexOfCalc, formatRules, logRules } from './rules-dex.ts';
+export type { GameRules, RulesDex, RulesMod } from './rules-dex.ts';
 export { generationsFor } from './format-generations.ts';
 export type { GenerationsScope, LegalDex } from './format-generations.ts';
 export type { CalcGeneration } from './calc-gen.ts';
@@ -27,7 +29,7 @@ export { parseReplayLog, parseReplayLogWithObservations } from './protocol-parse
 export {
   splitReplayPassword, getReplayGameType, inferReplayFormatId, getReplayDisplayFormat, getReplayGeneration,
   getReplayBringCount, speciesBaseId, broughtSpeciesFor, replayBringOnly, formatEnforcesSleepClause, replayRuleset,
-  getBranchSimulatorFormat,
+  getBranchSimulatorFormat, replayRules,
 } from './replay-format.ts';
 export type { ReplayRuleset } from './replay-format.ts';
 export { finalPlayedTurn } from './replay-turns.ts';

@@ -1,4 +1,4 @@
-import { Dex } from '@pkmn/dex';
+import { statIds } from '../rules-dex.ts';
 import type { ParadoxReading, StatId } from '../types.ts';
 import type { SpreadCandidate } from './ladder.ts';
 import { calcPokemon, keyOf, SPEED_VIOLATION_PENALTY, type SolveContext } from './fit.ts';
@@ -8,7 +8,7 @@ import { defenderSideOf } from './observation-read.ts';
 const PARADOX_VIOLATION_PENALTY = SPEED_VIOLATION_PENALTY;
 
 /** The stats a stage and a nature can raise, in the order of the game's stat list (the order that settles a tie). */
-const BOOSTABLE = Dex.stats.ids().filter(stat => stat !== 'hp') as StatId[];
+const BOOSTABLE = statIds().filter(stat => stat !== 'hp') as StatId[];
 
 /** A stat at a stage as the simulator's `getStat` reads it: x(2 + n)/2 above zero, x2/(2 + n) below, rounded down, six stages at most. */
 function stagedStat(stat: number, stage: number): number {

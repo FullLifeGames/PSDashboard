@@ -1,5 +1,4 @@
-// Data-only Dex, like move-slots.ts: this module rides into the app's MAIN bundle through the team-info enrichment.
-import { Dex } from '@pkmn/dex';
+import type { RulesDex } from '../rules-dex.ts';
 import type { OpenMove } from '../types.ts';
 
 /**
@@ -13,15 +12,15 @@ export const sameOpenMove = (a: OpenMove, b: OpenMove): boolean =>
   a.kind === 'status' ? b.kind === 'status' : b.kind === 'attack' && a.type === b.type;
 
 /** Whether the move can be the base move the slot stands for. */
-export function fillsOpenMove(open: OpenMove, moveName: string): boolean {
-  const move = Dex.moves.get(moveName);
+export function fillsOpenMove(dex: RulesDex, open: OpenMove, moveName: string): boolean {
+  const move = dex.moves.get(moveName);
   if (!move.exists) return false;
   return open.kind === 'status' ? move.category === 'Status' : move.category !== 'Status' && move.type === open.type;
 }
 
 /** The open moves that none of the moves fills. */
-export function unfilledOpenMoves(open: readonly OpenMove[] | undefined, moves: readonly string[]): OpenMove[] {
-  return (open ?? []).filter(slot => !moves.some(name => fillsOpenMove(slot, name)));
+export function unfilledOpenMoves(dex: RulesDex, open: readonly OpenMove[] | undefined, moves: readonly string[]): OpenMove[] {
+  return (open ?? []).filter(slot => !moves.some(name => fillsOpenMove(dex, slot, name)));
 }
 
 /** A pool entry the settling reads: the move's name and whether it is a guess (a seen or user-set move is proof). */
@@ -42,18 +41,18 @@ function pinFirst<T extends OpenCandidate>(pool: readonly T[], pinned: readonly 
  * the slot is the log's evidence, so it outranks the guesses that would have used the room. A slot no guess fills stays open.
  */
 export function settleOpenMoves<T extends OpenCandidate>(
-  pool: readonly T[], open: readonly OpenMove[] | undefined, assemble: (pool: T[]) => T[],
+  dex: RulesDex, pool: readonly T[], open: readonly OpenMove[] | undefined, assemble: (pool: T[]) => T[],
 ): T[] {
   let kept = assemble([...pool]);
   const pinned: T[] = [];
   const stuck = new Set<OpenMove>();
   // A pin takes a place and can push out the move that filled another slot: the loop looks at every slot again after each pin.
   for (;;) {
-    const slot = (open ?? []).find(entry => !stuck.has(entry) && !kept.some(move => fillsOpenMove(entry, move.name)));
+    const slot = (open ?? []).find(entry => !stuck.has(entry) && !kept.some(move => fillsOpenMove(dex, entry, move.name)));
     if (!slot) return kept;
     let settled = false;
     for (const candidate of pool) {
-      if (!candidate.guessed || pinned.includes(candidate) || !fillsOpenMove(slot, candidate.name)) continue;
+      if (!candidate.guessed || pinned.includes(candidate) || !fillsOpenMove(dex, slot, candidate.name)) continue;
       const trial = assemble(pinFirst(pool, [...pinned, candidate]));
       if (![...pinned, candidate].every(entry => trial.includes(entry))) continue;
       pinned.push(candidate);

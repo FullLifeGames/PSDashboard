@@ -1,8 +1,8 @@
 import { Pokemon, calculate } from '@smogon/calc';
 import { buildCalcPokemon, calcBaseStats, calcKnowsMove } from '../calc-build.ts';
-import { calcGenerationFor, calcModOf, simGenNum, type CalcGeneration } from '../calc-gen.ts';
-import { Dex } from '@pkmn/dex';
-import { Dex as SimDex, type PokemonSet } from '@pkmn/sim';
+import { calcGenerationFor, calcModOf, type CalcGeneration } from '../calc-gen.ts';
+import type { PokemonSet } from '@pkmn/sim';
+import { dexOfCalc, type RulesDex } from '../rules-dex.ts';
 import type { DamageObservation, PokemonEvs, SpeedOrderObservation } from '../types.ts';
 import { typedHiddenPowerId } from '../hidden-power.ts';
 import { calcIvs, coupleSpecial, evBudget, evsOfSet, onBudgetScale, statPointsOfEv, ZERO_EVS, type EvBudget } from './ev-budget.ts';
@@ -134,7 +134,7 @@ export function buildSolveContext(
   };
   const { byMon, speedByMon } = ctx;
 
-  const dex = Dex.forGen(simGenNum(ctx.gen));
+  const dex = dexOfCalc(ctx.gen);
   for (const raw of observations) {
     // A Z-move or a Max move prices from the Dex's placeholder power, not from the base move's (round 73, T229): no reading.
     if (poweredMove(dex, raw.moveId)) continue;
@@ -179,7 +179,7 @@ type CalcOptions = NonNullable<ConstructorParameters<typeof Pokemon>[2]>;
  * The ability a body fought with at the hit and whether it is on: the shown or built one (abilityAtHit), and for an ability that
  * reads the turn's order (Stakeout, Analytic) the state the facts of the hit give it (round 73, T210 group 3).
  */
-function abilityOfHit(dex: ReturnType<typeof Dex.forGen>, setAbility: string | undefined, hit: HitSide): { ability: string | undefined; abilityOn: boolean | undefined } {
+function abilityOfHit(dex: RulesDex, setAbility: string | undefined, hit: HitSide): { ability: string | undefined; abilityOn: boolean | undefined } {
   const built = abilityAtHit(dex, formeAbility(dex, hit.forme, setAbility), hit.ability, hit.suppressed);
   const turn = abilityStateAtHit(built, hit.turn ?? {});
   return { ability: turn.drop ? abilityAtHit(dex, built, undefined, true) : built, abilityOn: hit.abilityOn || turn.on };
@@ -192,7 +192,7 @@ function abilityOfHit(dex: ReturnType<typeof Dex.forGen>, setAbility: string | u
  */
 export function calcPokemon(ctx: SolveContext, side: 'p1' | 'p2', species: string, spread: SpreadCandidate, hit: HitSide = {}) {
   const set = setOf(ctx, side, species);
-  const dex = Dex.forGen(simGenNum(ctx.gen));
+  const dex = dexOfCalc(ctx.gen);
   const { ability, abilityOn } = abilityOfHit(dex, set?.ability, hit);
   const body = buildCalcPokemon(ctx.gen, hit.forme ?? set?.species ?? species, {
     level: set?.level || 100,
@@ -215,7 +215,7 @@ export function calcPokemon(ctx: SolveContext, side: 'p1' | 'p2', species: strin
 
 /** The base power a move takes from the battle's history, from the Dex callback; the handlers live in the simulator's Dex, not in @pkmn/dex's data. */
 function historyPowerOf(gen: CalcGeneration, moveId: string, obs: ReadObservation): number | undefined {
-  return historyPower(SimDex.forGen(simGenNum(gen)), moveId, { fainted: obs.attackerFainted ?? 0, timesAttacked: obs.attackerTimesAttacked ?? 0 }) ?? undefined;
+  return historyPower(dexOfCalc(gen), moveId, { fainted: obs.attackerFainted ?? 0, timesAttacked: obs.attackerTimesAttacked ?? 0 }) ?? undefined;
 }
 
 /** The calc's roll range for one observation under the candidate spread, as HP fractions. */
@@ -223,7 +223,7 @@ export function rollRange(ctx: SolveContext, obs: ReadObservation, attackerSprea
   const { gen } = ctx;
   const defenderSide = defenderSideOf(obs);
   // The items the hit landed with: the client's at the line, not the set's (a popped Air Balloon, a Knock Off, a Trick).
-  const dex = Dex.forGen(simGenNum(gen));
+  const dex = dexOfCalc(gen);
   const attackerBody = withItemAtHit(dex, attackerSpread, setOf(ctx, obs.attackerSide, obs.attackerSpecies)?.item, obs.attackerItem, obs.attackerItemChanged);
   const defenderBody = withItemAtHit(dex, defenderSpread, setOf(ctx, defenderSide, obs.defenderSpecies)?.item, obs.defenderItem, obs.defenderItemChanged);
   const attacker = calcPokemon(ctx, obs.attackerSide, obs.attackerSpecies, attackerBody, hitSideOf(obs, 'attacker'));
@@ -310,7 +310,7 @@ export function racedWithScarf(ctx: SolveContext, mover: RaceSide): boolean {
 
 /** The Speed a race ran at: the stat in the forme that raced, with the Scarf as the simulator rounds it (round 64). */
 function effectiveSpeed(ctx: SolveContext, mover: RaceSide, spread: SpreadCandidate): number {
-  return raceSpeed(simGenNum(ctx.gen), speedStat(ctx, mover.side, mover.species, spread, mover.forme), racedWithScarf(ctx, mover));
+  return raceSpeed(dexOfCalc(ctx.gen), speedStat(ctx, mover.side, mover.species, spread, mover.forme), racedWithScarf(ctx, mover));
 }
 
 /**
@@ -321,7 +321,7 @@ function effectiveSpeed(ctx: SolveContext, mover: RaceSide, spread: SpreadCandid
  */
 export function weakRace(ctx: SolveContext, order: ReadOrder): boolean {
   if (!order.knockOut) return false;
-  const dex = Dex.forGen(simGenNum(ctx.gen));
+  const dex = dexOfCalc(ctx.gen);
   return (setOf(ctx, order.secondSide, order.secondSpecies)?.moves ?? []).some(move => dex.moves.get(move).priority < 0);
 }
 

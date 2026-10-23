@@ -9,6 +9,7 @@ import type { SpeedKnowledge } from '../src/spreads/scarf';
 import type { SpreadCandidate } from '../src/spreads/ladder';
 import type { PokemonEvs, SpeedOrderObservation } from '../src/types';
 import { toId } from '../src/ids';
+import { rulesDex } from '../src/rules-dex';
 
 /**
  * Round 64 (T122): the rests of the move order. A race reads the Speed the
@@ -49,12 +50,12 @@ describe('a Choice Scarf races at the Speed the simulator rounds (T122 point 3)'
           for (let spe = 0; spe <= 252; spe += 4) {
             const spread = { nature, evs: evs(0, 0, 0, 0, 0, spe) };
             const stat = new Pokemon(Generations.get(gen as 9), species, spread).stats.spe;
-            expect(scarfedSpeed(gen, stat), `${gen} ${species} ${nature} ${spe}`).toBe(calcRaceSpeed(gen, species, spread, 'Choice Scarf'));
+            expect(scarfedSpeed(rulesDex(gen), stat), `${gen} ${species} ${nature} ${spe}`).toBe(calcRaceSpeed(gen, species, spread, 'Choice Scarf'));
           }
         }
       }
     }
-    expect([scarfedSpeed(9, 201), scarfedSpeed(9, 202)]).toEqual([301, 303]);
+    expect([scarfedSpeed(rulesDex(9), 201), scarfedSpeed(rulesDex(9), 202)]).toEqual([301, 303]);
   });
 
   for (const formatid of ['gen9ou', 'gen9doublesou']) {

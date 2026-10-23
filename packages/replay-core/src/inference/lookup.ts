@@ -1,4 +1,4 @@
-import { Dex } from '@pkmn/sim';
+import type { RulesDex } from '../rules-dex.ts';
 import type { RevealedPokemonInfo } from '../types.ts';
 import { toId } from '../ids.ts';
 import { arg, detailsOf, identOf, type LogLine } from './log-line.ts';
@@ -9,8 +9,8 @@ import { arg, detailsOf, identOf, type LogLine } from './log-line.ts';
  * Necrozma-Ultra (the team decides); a Gigantamax forme changes from its
  * base. Empty for every other species.
  */
-function battleOrigins(species: string): string[] {
-  const entry = Dex.species.get(species);
+function battleOrigins(dex: RulesDex, species: string): string[] {
+  const entry = dex.species.get(species);
   if (entry.battleOnly) return ([] as string[]).concat(entry.battleOnly);
   return entry.forme === 'Gmax' && entry.changesFrom ? [entry.changesFrom] : [];
 }
@@ -24,14 +24,14 @@ function battleOrigins(species: string): string[] {
  * else the forme's first origin, as a Mega first seen evolved always was
  * (B16: battle-only formes never make a seventh card).
  */
-export function teamSpecies(pokemonMap: Map<string, RevealedPokemonInfo>, species: string): string {
+export function teamSpecies(dex: RulesDex, pokemonMap: Map<string, RevealedPokemonInfo>, species: string): string {
   // A "-*" preview marker learns the forme as the switch shows it (Zamazenta-Crowned).
-  if (pokemonMap.has(species) || unknownFormeMarkerFor(pokemonMap, species)) return species;
-  const origins = battleOrigins(species);
+  if (pokemonMap.has(species) || unknownFormeMarkerFor(dex, pokemonMap, species)) return species;
+  const origins = battleOrigins(dex, species);
   if (origins.length === 0) return species;
-  const num = Dex.species.get(species).num;
+  const num = dex.species.get(species).num;
   return origins.find(origin => pokemonMap.has(origin)) ??
-    [...pokemonMap.keys()].find(key => !key.endsWith('-*') && Dex.species.get(key).num === num) ??
+    [...pokemonMap.keys()].find(key => !key.endsWith('-*') && dex.species.get(key).num === num) ??
     origins[0];
 }
 
@@ -40,8 +40,8 @@ export function teamSpecies(pokemonMap: Map<string, RevealedPokemonInfo>, specie
  * Zamazenta-*, Greninja-*, Arceus-*): the marker entry a revealed species
  * belongs to, matched on the base species — null when the team holds none.
  */
-export function unknownFormeMarkerFor(pokemonMap: Map<string, RevealedPokemonInfo>, species: string): string | null {
-  const dexSpecies = Dex.species.get(species);
+export function unknownFormeMarkerFor(dex: RulesDex, pokemonMap: Map<string, RevealedPokemonInfo>, species: string): string | null {
+  const dexSpecies = dex.species.get(species);
   const base = toId(dexSpecies.exists ? dexSpecies.baseSpecies : species.split('-')[0]);
   for (const key of pokemonMap.keys()) {
     if (key.endsWith('-*') && toId(key.slice(0, -2)) === base) return key;
@@ -74,6 +74,7 @@ export function revealMarkerForme(
 
 /** The opponent Pokémon behind a nickname: the first switch or drag line of the side that names it. */
 export function findPokemonByNickname(
+  dex: RulesDex,
   pokemonMap: Map<string, RevealedPokemonInfo>,
   nickname: string,
   lines: readonly LogLine[],
@@ -84,7 +85,7 @@ export function findPokemonByNickname(
     const ident = identOf(arg(line, 1));
     if (ident?.side !== side || ident.name !== nickname) continue;
     const parsed = detailsOf(arg(line, 2));
-    if (parsed) return pokemonMap.get(teamSpecies(pokemonMap, parsed.species));
+    if (parsed) return pokemonMap.get(teamSpecies(dex, pokemonMap, parsed.species));
   }
   return undefined;
 }

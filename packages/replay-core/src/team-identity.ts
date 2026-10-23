@@ -1,5 +1,5 @@
 import { Protocol } from '@pkmn/protocol';
-import { Dex } from '@pkmn/sim';
+import type { RulesDex } from './rules-dex.ts';
 import type { PokemonSet } from '@pkmn/sim';
 import type { RevealedPokemonInfo } from './types.ts';
 import { toId } from './ids.ts';
@@ -45,25 +45,25 @@ function bookIdentity(info: RevealedPokemonInfo, name: string, shiny: boolean, n
  * `replace` line that ends the disguise books the Zoroark. Team preview (`|poke|`) is not read: it strips the shiny
  * flag and names no nickname.
  */
-export function noteLogIdentities(lines: readonly LogLine[], side: string, pokemonMap: Map<string, RevealedPokemonInfo>): void {
+export function noteLogIdentities(dex: RulesDex, lines: readonly LogLine[], side: string, pokemonMap: Map<string, RevealedPokemonInfo>): void {
   for (const line of lines) {
     if (!ENTRY_COMMANDS.has(line.cmd)) continue;
     const ident = identOf(arg(line, 1));
     if (!ident || ident.side !== side) continue;
     const details = Protocol.parseDetails(ident.name, arg(line, 1) as Protocol.PokemonIdent, arg(line, 2) as Protocol.PokemonDetails);
-    const info = pokemonMap.get(teamSpecies(pokemonMap, details.speciesForme.trim()));
+    const info = pokemonMap.get(teamSpecies(dex, pokemonMap, details.speciesForme.trim()));
     // A line without a gender for a species that has one (a fixed one included): the game ran the body as genderless.
-    const noGender = details.gender === undefined && Dex.species.get(details.speciesForme.trim()).gender !== 'N';
+    const noGender = details.gender === undefined && dex.species.get(details.speciesForme.trim()).gender !== 'N';
     if (info) bookIdentity(info, ident.name, details.shiny, noGender);
   }
 }
 
 /** The name and shiny flag of an Open Team Sheet for a body the log never showed (the log wins when both exist). */
-export function noteSheetIdentities(sets: readonly PokemonSet[], pokemonMap: Map<string, RevealedPokemonInfo>): void {
+export function noteSheetIdentities(dex: RulesDex, sets: readonly PokemonSet[], pokemonMap: Map<string, RevealedPokemonInfo>): void {
   const infoFor = sheetMatcher(pokemonMap);
   for (const set of sets) {
     const species = set.species || set.name;
-    const info = species ? infoFor(Dex.species.get(species).name) : undefined;
+    const info = species ? infoFor(dex.species.get(species).name) : undefined;
     // The server writes the species into the name field of a sheet; a nickname there is the sheet's own.
     if (info) bookIdentity(info, set.species ? set.name : '', !!set.shiny);
   }
@@ -80,14 +80,14 @@ export function noteSheetIdentities(sets: readonly PokemonSet[], pokemonMap: Map
  * take an empty id for no key (team-order.ts, `sameBodyName`), and the stream line that seats the players is built with
  * `JSON.stringify` (round 72, T238).
  */
-export function dropAmbiguousNicknames(pokemonMap: Map<string, RevealedPokemonInfo>): void {
+export function dropAmbiguousNicknames(dex: RulesDex, pokemonMap: Map<string, RevealedPokemonInfo>): void {
   const speciesIds = new Set<string>();
   for (const [key, info] of pokemonMap) {
     for (const name of [key, info.species]) {
       const bare = name.replace(/-\*$/, '');
-      const dex = Dex.species.get(bare);
+      const entry = dex.species.get(bare);
       speciesIds.add(toId(bare));
-      if (dex.exists) speciesIds.add(toId(dex.baseSpecies));
+      if (entry.exists) speciesIds.add(toId(entry.baseSpecies));
     }
   }
   for (const info of pokemonMap.values()) {

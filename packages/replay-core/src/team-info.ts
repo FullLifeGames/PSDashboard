@@ -9,6 +9,7 @@ import type {
   OpenMove, OpponentTeamInfo, PokemonEvs, PokemonEvsInfo, PokemonFieldInfo, PokemonMoveInfo, RevealedPokemonInfo,
 } from './types.ts';
 import { toId } from './ids.ts';
+import { dexOfSources, type RulesDex } from './rules-dex.ts';
 
 export const EMPTY_EVS: PokemonEvs = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
 
@@ -254,14 +255,14 @@ type CuratedSet = ReturnType<typeof selectCuratedSet>;
  * panel's fills and the sim's fills come from one winner (or one shared
  * marginal fallback), never from two different guessers (GPL Body Press).
  */
-function curatedSetFor(pokemon: RevealedPokemonInfo, usageSet: SpeciesUsage, smogonSet: SmogonSet): CuratedSet | null {
+function curatedSetFor(dex: RulesDex, pokemon: RevealedPokemonInfo, usageSet: SpeciesUsage, smogonSet: SmogonSet): CuratedSet | null {
   const proven = (field: PokemonFieldInfo) =>
     field.source === 'revealed' || field.source === 'manual' ? toId(field.value) : '';
   const known = pokemon.moves.filter(move => move.source === 'revealed' || move.source === 'manual');
   return smogonSet ? selectCuratedSet([smogonSet, ...(smogonSet.alternatives ?? [])], {
-    revealedMoves: known.map(move => toId(move.name)),
+    dex, revealedMoves: known.map(move => toId(move.name)),
     // The Z-moves and Max moves the revealed moves do not explain: a set with a move to fill them fits better (round 70).
-    openMoves: unfilledOpenMoves(pokemon.openMoves, known.map(move => move.name)),
+    openMoves: unfilledOpenMoves(dex, pokemon.openMoves, known.map(move => move.name)),
     // A consumed or knocked-off item is still the set's item (round 63).
     revealedItem: proven({ ...pokemon.item, value: itemSetValue(pokemon.item.value) }),
     revealedAbility: proven(pokemon.ability),
@@ -321,18 +322,18 @@ function assembleMovePool(
  * Max move's open slot is settled as the build settles it (round 70).
  */
 function vetoedMoves(
-  pool: MoveCandidate[], infoFor: Map<string, PokemonMoveInfo>, itemValue: string, curated: CuratedSet | null,
+  dex: RulesDex, pool: MoveCandidate[], infoFor: Map<string, PokemonMoveInfo>, itemValue: string, curated: CuratedSet | null,
   open: readonly OpenMove[] | undefined,
 ): PokemonMoveInfo[] {
   const item = itemSetValue(itemValue);
   const shown = (candidates: MoveCandidate[]): MoveCandidate[] => {
     const kept: MoveCandidate[] = [];
-    for (const candidate of applyCoherenceVetoes(candidates, { itemId: toId(item), itemFromSet: itemFromChosenSet(curated, item) })) {
+    for (const candidate of applyCoherenceVetoes(candidates, { dex, itemId: toId(item), itemFromSet: itemFromChosenSet(dex, curated, item) })) {
       if (infoFor.has(candidate.name) && (!candidate.guessed || kept.length < 4)) kept.push(candidate);
     }
     return kept;
   };
-  return settleOpenMoves(pool, open, shown).flatMap(candidate => infoFor.get(candidate.name) ?? []);
+  return settleOpenMoves(dex, pool, open, shown).flatMap(candidate => infoFor.get(candidate.name) ?? []);
 }
 
 /**
@@ -374,16 +375,18 @@ export function enrichPokemonInfo(
   setAssumptions?: SmogonSetAssumptions | null,
   hpTypeResolver?: (species: string) => string | null,
 ): RevealedPokemonInfo {
+  // The Dex of the game the sets and the usage were published for (round 75, T160).
+  const dex = dexOfSources(setAssumptions?.format, usageStats?.format);
   const usageSet = getSpeciesUsageSet(usageStats, pokemon.species, pokemon.ruledOut, GUESS_MOVE_POOL);
   const smogonSet = getSpeciesSetAssumption(setAssumptions, pokemon.species);
-  const curated = curatedSetFor(pokemon, usageSet, smogonSet);
+  const curated = curatedSetFor(dex, pokemon, usageSet, smogonSet);
   const fallback = setFallbacks(curated, smogonSet);
 
   // The item resolves BEFORE the moves — the Choice/AV veto rows read it.
   const item = normalizeItemField(pokemon.item, usageSet?.item, fallback.item, pokemon.ruledOut?.items, !!curated);
   const usageTail = getSpeciesUsageStats(pokemon.species, usageStats)?.moves.slice(GUESS_MOVE_POOL) ?? [];
   const { pool, infoFor } = assembleMovePool(pokemon, curated, usageSet, smogonSet, usageTail);
-  const moves = vetoedMoves(pool, infoFor, item.value, curated, pokemon.openMoves);
+  const moves = vetoedMoves(dex, pool, infoFor, item.value, curated, pokemon.openMoves);
   const ivs = ivsField(pokemon, curated, usageSet, smogonSet, setAssumptions?.format ?? '');
 
   return {

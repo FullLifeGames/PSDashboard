@@ -1,4 +1,3 @@
-import { Dex } from '@pkmn/sim';
 import type { LoggedHit, OpponentTeamInfo, RevealedPokemonInfo } from '../types.ts';
 import { calcGenerationFor, calcModOf, type CalcGeneration } from '../calc-gen.ts';
 import type { ItemDamageJudge } from './damage-ruleouts.ts';
@@ -6,7 +5,7 @@ import { evBudget, type EvBudget } from '../spreads/ev-budget.ts';
 import { toId } from '../ids.ts';
 import { judgeDefenderItems } from './item-damage-defender.ts';
 import {
-  abilityName, defenderOf, defenderOptions, extremes, holderOptions, judgeable, mayHave, MISS_MARGIN, missBeyond, offenseStat, rolls, shown, variantsOf,
+  abilityName, defenderOf, defenderOptions, extremes, hitDex, holderOptions, judgeable, mayHave, MISS_MARGIN, missBeyond, offenseStat, rolls, shown, variantsOf,
   type AbilityVariant, type CalcOptions, type GenDex, type Spread,
 } from './item-damage-shared.ts';
 
@@ -83,9 +82,9 @@ function defenderVariants(dex: GenDex, info: RevealedPokemonInfo, ctx: Omit<HitC
 }
 
 function contextOf(attacker: RevealedPokemonInfo, hit: LoggedHit, teams: { p1: OpponentTeamInfo; p2: OpponentTeamInfo }): HitContext | null {
-  const info = defenderOf(teams[hit.defender.side], hit.defender.species);
+  const dex = hitDex(hit);
+  const info = defenderOf(dex, teams[hit.defender.side], hit.defender.species);
   if (!info || info.evs.source === 'unknown') return null;
-  const dex = Dex.forGen(hit.gen);
   const known = attacker.ability.source === 'revealed' || attacker.ability.source === 'manual'
     ? attacker.ability.value : abilityName(dex, hit.attacker.ability);
   const ruled = attacker.ruledOut?.abilities ?? [];
@@ -93,7 +92,7 @@ function contextOf(attacker: RevealedPokemonInfo, hit: LoggedHit, teams: { p1: O
   const budget = evBudget(toId(hit.format));
   const base = {
     hit, gen: calcGenerationFor(hit.gen, calcModOf(hit.format)), budget,
-    abilities: variantsOf(abilities.length > 0 ? abilities : [''], hit.attacker), spreads: extremes(offenseStat(dex, hit.move), budget),
+    abilities: variantsOf(abilities.length > 0 ? abilities : [''], hit.attacker), spreads: extremes(dex, offenseStat(dex, hit.move), budget),
   };
   return { ...base, defenders: defenderVariants(dex, info, base) };
 }
@@ -107,14 +106,18 @@ function contextOf(attacker: RevealedPokemonInfo, hit: LoggedHit, teams: { p1: O
 export function itemMisses(
   attacker: RevealedPokemonInfo, candidates: string[], teams: { p1: OpponentTeamInfo; p2: OpponentTeamInfo },
 ): { misses: Map<string, number>; bare: number } {
-  const ids = [...new Set(candidates.map(name => Dex.items.get(name)).filter(item => item.exists).map(item => item.id as string))];
+  // Without a logged hit there are no rules to read the names by, and no verdict either way.
+  const first = attacker.hits?.[0];
+  if (!first) return { misses: new Map(), bare: 1 };
+  const dex = hitDex(first);
+  const ids = [...new Set(candidates.map(name => dex.items.get(name)).filter(item => item.exists).map(item => item.id as string))];
   const misses = new Map(ids.map(id => [id, 1]));
   let bare = 1;
   for (const hit of attacker.hits ?? []) {
     if (!judgeable(hit)) continue;
     const ctx = contextOf(attacker, hit, teams);
     if (!ctx) continue;
-    const verdicts = ids.map(id => [id, missOf(ctx, Dex.items.get(id).name)] as const);
+    const verdicts = ids.map(id => [id, missOf(ctx, hitDex(hit).items.get(id).name)] as const);
     const none = missOf(ctx, '');
     if (!verdicts.some(([, miss]) => miss === 1) && none !== 1) continue;
     for (const [id, miss] of verdicts) if (miss !== null && miss > misses.get(id)!) misses.set(id, miss);

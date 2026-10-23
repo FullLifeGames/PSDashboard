@@ -1,5 +1,5 @@
 import type { PokemonSet } from '@pkmn/sim';
-import { speciesBaseId, toId } from '@fulllifegames/replay-core';
+import { CHAMPIONS_MOD, logRules, speciesBaseId, toId, type GameRules } from '@fulllifegames/replay-core';
 import { normalizeLineEndings } from '../line-endings.ts';
 import type { PokemonIdent, SimBattle, SimPokemon } from './types.ts';
 
@@ -12,7 +12,7 @@ import type { PokemonIdent, SimBattle, SimPokemon } from './types.ts';
  * Any unresolved or ambiguous name fails the side open (team stays whole).
  * Filtering preserves team order, so leads stay in front.
  */
-export function trimTeamToBring(team: PokemonSet[], keep: string[] | undefined): PokemonSet[] {
+export function trimTeamToBring(team: PokemonSet[], keep: string[] | undefined, rules: GameRules): PokemonSet[] {
   if (!keep || keep.length === 0 || keep.length >= team.length) return team;
   const claimed = new Set<PokemonSet>();
   for (const name of keep) {
@@ -24,8 +24,8 @@ export function trimTeamToBring(team: PokemonSet[], keep: string[] | undefined):
       claimed.add(exact);
       continue;
     }
-    const base = speciesBaseId(name);
-    const byBase = free.filter(set => speciesBaseId(set.species) === base);
+    const base = speciesBaseId(name, rules);
+    const byBase = free.filter(set => speciesBaseId(set.species, rules) === base);
     if (byBase.length !== 1) return team;
     claimed.add(byBase[0]);
   }
@@ -115,10 +115,11 @@ export function logGoesOn(replayLog: string, turn: number): boolean {
 
 export function shownBodyIds(replayLog: string, sideId: 'p1' | 'p2'): Set<string> {
   const shown = new Set<string>();
+  const rules = logRules(normalizeLineEndings(replayLog));
   for (const line of normalizeLineEndings(replayLog).split('\n')) {
     const match = line.match(/^\|(?:switch|drag|replace|detailschange)\|(p[12])[a-d]?: ?([^|]*)\|([^,|]+)/);
     if (match?.[1] !== sideId) continue;
-    for (const name of [match[2], match[3]]) shown.add(toId(name)).add(speciesBaseId(name));
+    for (const name of [match[2], match[3]]) shown.add(toId(name)).add(speciesBaseId(name, rules));
   }
   return shown;
 }
@@ -133,8 +134,10 @@ export function faintedSlots(blockLines: readonly string[], sideId: 'p1' | 'p2')
   return slots;
 }
 
-const wasShown = (body: SimPokemon, shown: ReadonlySet<string>) =>
-  [body.name, body.species.name, body.baseSpecies.name].some(name => shown.has(toId(name)) || shown.has(speciesBaseId(name)));
+const wasShown = (body: SimPokemon, shown: ReadonlySet<string>) => {
+  const rules: GameRules = { gen: body.battle.gen, mod: body.battle.dex.currentMod === CHAMPIONS_MOD ? CHAMPIONS_MOD : undefined };
+  return [body.name, body.species.name, body.baseSpecies.name].some(name => shown.has(toId(name)) || shown.has(speciesBaseId(name, rules)));
+};
 
 /** Whether a body's species or set can carry an ability that changes how it shows on entry (the Dex's BeforeSwitchIn handler: Illusion). */
 export const mayDisguise = (body: SimPokemon) =>

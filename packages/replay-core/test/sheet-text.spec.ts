@@ -5,6 +5,7 @@ import { parseShowteamSheet } from '../src/opponent-inferrer.ts';
 import { extractTeamSheets } from '../src/team-builder.ts';
 import { toId } from '../src/ids.ts';
 import { fixtureTexts, GENERATIONS, generatedTeams, withCorners } from './team-text-sources.ts';
+import './champions-mod';
 
 /**
  * Round 72, T241 step 1b: an Open Team Sheet (`|showteam|`) goes through the library. `parseShowteamSheet` and the sets

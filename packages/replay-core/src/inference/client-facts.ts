@@ -1,4 +1,4 @@
-import { Dex } from '@pkmn/sim';
+import { dexOf } from '../rules-dex.ts';
 import type { ClientIdent } from '../protocol/parser-state.ts';
 import { revealedField } from '../team-info.ts';
 import { speciesAbilityFor } from '../team/dex-legal.ts';
@@ -73,7 +73,7 @@ export function ownMove(state: InferrerState, line: LogLine): string {
 
 /** Same Pokémon by the Dex: the client's forme belongs to the team member's species. */
 function sameSpecies(state: InferrerState, clientForme: string, species: string): boolean {
-  const dex = Dex.forGen(state.gen);
+  const dex = dexOf(state);
   const base = (name: string) => toId(dex.species.get(name.replace(/-\*$/, '')).baseSpecies || name);
   return base(clientForme) === base(species);
 }
@@ -86,7 +86,7 @@ function swapped(state: InferrerState, key: string): boolean {
 /** The ability the client booked as the Pokémon's own, where the inference has none: one its team species may hold (the Dex keeps a Mega's or a Tera forme's ability off the set). */
 function adoptAbility(state: InferrerState, info: RevealedPokemonInfo, client: ClientPokemon) {
   if (info.ability.value || !client.baseAbility) return;
-  const dex = Dex.forGen(state.gen);
+  const dex = dexOf(state);
   const name = dex.abilities.get(client.baseAbility).name;
   // The species' own spelling: the client keeps only the id, and "As One" is the id of no gen 9 ability ("As One (Spectrier)").
   const own = speciesAbilityFor(dex, info.species.replace(/-\*$/, ''), name) ?? (state.freeAbilities ? name : '');
@@ -101,7 +101,7 @@ function adoptAbility(state: InferrerState, info: RevealedPokemonInfo, client: C
 function adoptItem(state: InferrerState, info: RevealedPokemonInfo, client: ClientPokemon, key: string) {
   const itemOpen = !info.item.value || info.item.value === '(has item)';
   if (!itemOpen || swapped(state, key)) return;
-  const dex = Dex.forGen(state.gen);
+  const dex = dexOf(state);
   if (client.item) {
     if (!OWN_ITEM_EFFECTS.has(client.itemEffect ?? '') || ATTACKER_PUNISH_ITEMS.has(client.item)) return;
     const item = dex.items.get(client.item);

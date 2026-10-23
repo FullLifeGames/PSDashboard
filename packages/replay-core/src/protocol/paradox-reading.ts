@@ -1,10 +1,10 @@
 import type { Pokemon } from '@pkmn/client';
-import { Dex } from '@pkmn/dex';
+import { statIds } from '../rules-dex.ts';
 import type { DamageObservation, ParadoxReading, StatId } from '../types.ts';
 import type { ClientIdent, ParserState } from './parser-state.ts';
 
 const PARADOX_VOLATILES = ['protosynthesis', 'quarkdrive'];
-const BOOSTABLE = Dex.stats.ids().filter(stat => stat !== 'hp') as StatId[];
+const BOOSTABLE = statIds().filter(stat => stat !== 'hp') as StatId[];
 
 /**
  * The stat an active Protosynthesis or Quark Drive raises. The client keeps the activation line's suffix ('protosynthesisatk')

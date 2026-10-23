@@ -8,6 +8,7 @@ import type { PokemonUsageStats, SmogonUsageStats } from '../src/smogon/stats-ty
 import type { OpponentTeamInfo } from '../src/types';
 import type { SpreadCandidate } from '../src/spread-inference';
 import { toId } from '../src/ids';
+import { rulesDex } from '../src/rules-dex';
 
 /**
  * Published IVs in the build (round 64, T122 point 4, spec decision 21):
@@ -85,12 +86,12 @@ describe('resolveSpread takes the IVs edited, then solved, then published, then 
 
   test('a Speed IV the solver decided beats the published one; the published Attack stays', () => {
     const solved = { evs: { hp: 252, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, nature: 'Quiet', ivs: { spe: 12 } } as SpreadCandidate;
-    expect(resolveSpread('Sinistcha', editedFields(info), solved, chosen, null, undefined).ivs).toEqual({ ...all31, atk: 0, spe: 12 });
+    expect(resolveSpread(rulesDex(9), 'Sinistcha', editedFields(info), solved, chosen, null, undefined).ivs).toEqual({ ...all31, atk: 0, spe: 12 });
   });
 
   test('without a solver IV the published ones stand', () => {
     const solved = { evs: { hp: 252, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, nature: 'Quiet' } as SpreadCandidate;
-    expect(resolveSpread('Sinistcha', editedFields(info), solved, chosen, null, undefined).ivs).toEqual({ ...all31, atk: 0, spe: 0 });
+    expect(resolveSpread(rulesDex(9), 'Sinistcha', editedFields(info), solved, chosen, null, undefined).ivs).toEqual({ ...all31, atk: 0, spe: 0 });
   });
 });
 

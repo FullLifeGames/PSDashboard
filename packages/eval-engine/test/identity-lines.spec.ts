@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 import { Battle, Teams } from '@pkmn/sim';
-import { buildTeamsFromReplay, getBranchSimulatorFormat, speciesBaseId } from '@fulllifegames/replay-core';
+import { buildTeamsFromReplay, getBranchSimulatorFormat, logRules, speciesBaseId, type GameRules } from '@fulllifegames/replay-core';
 import { loadSimMods } from '../src/forward/sim-mods';
 
 /**
@@ -47,18 +47,19 @@ const STATIC_FLAG = /^(L\d+|M|F|shiny)$/;
 const ENTRY = /^\|(switch|drag|replace)\|(p[12])[a-d]?: ([^|]*)\|([^|]*)/;
 
 /** Species base id and the static flags of a details string, flags in the protocol's order. */
-function reading(details: string): { base: string; flags: string } {
+function reading(details: string, rules: GameRules): { base: string; flags: string } {
   const [species, ...flags] = details.split(', ');
-  return { base: speciesBaseId(species.trim().replace(/-\*$/, '')), flags: flags.filter(flag => STATIC_FLAG.test(flag)).join(', ') };
+  return { base: speciesBaseId(species.trim().replace(/-\*$/, ''), rules), flags: flags.filter(flag => STATIC_FLAG.test(flag)).join(', ') };
 }
 
 /** Every distinct body a replay shows: side, the name on its line, base species and static flags. */
 function shownBodies(log: string): Array<{ side: 'p1' | 'p2'; name: string; base: string; flags: string; line: string }> {
   const bodies = new Map<string, { side: 'p1' | 'p2'; name: string; base: string; flags: string; line: string }>();
+  const rules = logRules(log);
   for (const raw of log.split('\n')) {
     const entry = ENTRY.exec(raw.replace(/\r$/, ''));
     if (!entry) continue;
-    const { base, flags } = reading(entry[4]);
+    const { base, flags } = reading(entry[4], rules);
     const key = [entry[2], entry[3], base, flags].join('|');
     if (!bodies.has(key)) bodies.set(key, { side: entry[2] as 'p1' | 'p2', name: entry[3], base, flags, line: raw });
   }
@@ -88,7 +89,7 @@ describe('the built sets switch in with the lines the replay has', () => {
     const missing = shownBodies(replay.log).filter(shown => {
       const side = battle.sides[shown.side === 'p1' ? 0 : 1];
       return !side.pokemon.some(body => {
-        const mine = reading(body.details);
+        const mine = reading(body.details, logRules(replay.log));
         return body.name === shown.name && mine.base === shown.base && mine.flags === shown.flags;
       });
     }).map(shown => `${shown.side} ${shown.line.split('|').slice(2, 4).join(' | ')}`);

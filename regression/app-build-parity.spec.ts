@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { PokemonSet } from '@pkmn/sim';
 import {
-  enrichTeamInfos, judgeItemsByDamage, parseReplayLogWithObservations, resolveHiddenPowerType,
+  enrichTeamInfos, judgeItemsByDamage, parseReplayLogWithObservations, resolveHiddenPowerType, logRules,
   type ReplayData, type SpreadCandidate,
 } from '@fulllifegames/replay-core';
 import { appTeamSeed, buildAppTeams } from '../src/lib/app-team-build';
@@ -133,7 +133,7 @@ describe('the bank builds the teams the app ships', () => {
     // resolver has landed, the Smogon data is in, and the damage judge came
     // with the inference (round 67, T130).
     const hp = (side: 'p1' | 'p2') => (species: string) => resolveHiddenPowerType(
-      seed.hpEvidence.filter(entry => entry.attackerSide === side), usageStats, species, seed.gen);
+      seed.hpEvidence.filter(entry => entry.attackerSide === side), usageStats, species, logRules(replay.log));
     const { p1: effectiveP1Info, p2: effectiveP2Info } = enrichTeamInfos(seed.rawInfos, usageStats, setAssumptions,
       { p1: hp('p1'), p2: hp('p2') }, judgeItemsByDamage);
     const solved = await solveInWorker({

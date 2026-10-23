@@ -6,6 +6,7 @@ import { buildTeamsFromReplay } from '../src/team-builder';
 import type { PokemonSetAssumption, SmogonSetAssumptions } from '../src/smogon/sets-lookup';
 import type { PokemonUsageStats, SmogonUsageStats } from '../src/smogon/stats-types';
 import { toId } from '../src/ids';
+import { rulesDex } from '../src/rules-dex';
 
 /**
  * Published sets as published (round 67, T131, decision 20): the veto rule's
@@ -21,25 +22,25 @@ const names = (moves: MoveCandidate[]) => moves.map(move => move.name);
 
 describe('the item rows spare the chosen set\'s moves under its own item', () => {
   test('singles: Ditto\'s Choice Scarf set keeps Transform, Jirachi\'s keeps Healing Wish', () => {
-    expect(names(applyCoherenceVetoes([fromSet('Transform')], { itemId: 'choicescarf', itemFromSet: true }))).toEqual(['Transform']);
-    expect(names(applyCoherenceVetoes([fromSet('Iron Head'), fromSet('U-turn'), fromSet('Healing Wish'), fromSet('Trick')], { itemId: 'choicescarf', itemFromSet: true })))
+    expect(names(applyCoherenceVetoes([fromSet('Transform')], { dex: rulesDex(9), itemId: 'choicescarf', itemFromSet: true }))).toEqual(['Transform']);
+    expect(names(applyCoherenceVetoes([fromSet('Iron Head'), fromSet('U-turn'), fromSet('Healing Wish'), fromSet('Trick')], { dex: rulesDex(9), itemId: 'choicescarf', itemFromSet: true })))
       .toEqual(['Iron Head', 'U-turn', 'Healing Wish', 'Trick']);
   });
 
   test('doubles: Zapdos-Galar\'s Choice Scarf set keeps Coaching, an Assault Vest set its status move', () => {
-    expect(names(applyCoherenceVetoes([fromSet('Thunderous Kick'), fromSet('Brave Bird'), fromSet('Coaching')], { itemId: 'choicescarf', itemFromSet: true })))
+    expect(names(applyCoherenceVetoes([fromSet('Thunderous Kick'), fromSet('Brave Bird'), fromSet('Coaching')], { dex: rulesDex(9), itemId: 'choicescarf', itemFromSet: true })))
       .toEqual(['Thunderous Kick', 'Brave Bird', 'Coaching']);
-    expect(names(applyCoherenceVetoes([fromSet('Fake Out'), fromSet('Taunt')], { itemId: 'assaultvest', itemFromSet: true }))).toEqual(['Fake Out', 'Taunt']);
+    expect(names(applyCoherenceVetoes([fromSet('Fake Out'), fromSet('Taunt')], { dex: rulesDex(9), itemId: 'assaultvest', itemFromSet: true }))).toEqual(['Fake Out', 'Taunt']);
   });
 
   test('an item from elsewhere still strikes: the set\'s status move falls under an inferred Scarf', () => {
-    expect(names(applyCoherenceVetoes([fromSet('Iron Head'), fromSet('Healing Wish')], { itemId: 'choicescarf', itemFromSet: false }))).toEqual(['Iron Head']);
-    expect(names(applyCoherenceVetoes([fromSet('Iron Head'), fromSet('Healing Wish')], { itemId: 'choicescarf' }))).toEqual(['Iron Head']);
+    expect(names(applyCoherenceVetoes([fromSet('Iron Head'), fromSet('Healing Wish')], { dex: rulesDex(9), itemId: 'choicescarf', itemFromSet: false }))).toEqual(['Iron Head']);
+    expect(names(applyCoherenceVetoes([fromSet('Iron Head'), fromSet('Healing Wish')], { dex: rulesDex(9), itemId: 'choicescarf' }))).toEqual(['Iron Head']);
   });
 
   test('a guessed status move outside the set still falls under the set\'s own Choice item', () => {
     const usageFill: MoveCandidate = { name: 'Calm Mind', guessed: true };
-    expect(names(applyCoherenceVetoes([fromSet('Iron Head'), usageFill], { itemId: 'choicescarf', itemFromSet: true }))).toEqual(['Iron Head']);
+    expect(names(applyCoherenceVetoes([fromSet('Iron Head'), usageFill], { dex: rulesDex(9), itemId: 'choicescarf', itemFromSet: true }))).toEqual(['Iron Head']);
   });
 });
 

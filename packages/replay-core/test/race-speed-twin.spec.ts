@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { Battle, Dex, Teams, toID } from '@pkmn/sim';
 import { raceSpeed, scarfedSpeed } from '../src/spreads/race-speed';
+import { rulesDex } from '../src/rules-dex';
 
 /**
  * Round 72 (T239): the Scarf holder of the spread solver's race comes from the twin factory. It races at the speed the
@@ -30,9 +31,9 @@ describe('the Scarf holder of the race', () => {
     const scarf = Dex.forGen(gen).items.get('choicescarf');
     for (const stat of STATS) {
       const expected = scarf.exists && scarf.gen <= gen ? byHand(gen, stat) : stat;
-      expect(scarfedSpeed(gen, stat), `${stat}`).toBe(expected);
-      expect(raceSpeed(gen, stat, true)).toBe(expected);
-      expect(raceSpeed(gen, stat, false)).toBe(stat);
+      expect(scarfedSpeed(rulesDex(gen), stat), `${stat}`).toBe(expected);
+      expect(raceSpeed(rulesDex(gen), stat, true)).toBe(expected);
+      expect(raceSpeed(rulesDex(gen), stat, false)).toBe(stat);
     }
   });
 });

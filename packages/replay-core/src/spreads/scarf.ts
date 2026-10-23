@@ -1,3 +1,4 @@
+import { dexOfCalc } from '../rules-dex.ts';
 import type { PokemonSet } from '@pkmn/sim';
 import type { PokemonEvs } from '../types.ts';
 import { keyOf, speedStat, weakRace, type ReadOrder, type SolveContext } from './fit.ts';
@@ -5,7 +6,6 @@ import { evsOfSet, onBudgetScale, statPointsOfEv, ZERO_EVS, type EvBudget } from
 import { raceSpeed, scarfedSpeed } from './race-speed.ts';
 import type { SpreadCandidate } from './ladder.ts';
 import { toId } from '../ids.ts';
-import { simGenNum } from '../calc-gen.ts';
 
 /**
  * Choice Scarf decisions from move-order evidence (round 37). A mover that
@@ -111,7 +111,7 @@ function scarfInAllowed(m: Mover): boolean {
 
 /** Scarf-in for the first mover when allowed and the Scarf closes the gap to `ref`. */
 function scarfIn(ctx: SolveContext, first: Mover, max: number, ref: number): [string, ItemDecision] | null {
-  return scarfInAllowed(first) && scarfedSpeed(simGenNum(ctx.gen), max) >= ref ? [first.key, 'holds'] : null;
+  return scarfInAllowed(first) && scarfedSpeed(dexOfCalc(ctx.gen), max) >= ref ? [first.key, 'holds'] : null;
 }
 
 /**
@@ -120,7 +120,7 @@ function scarfIn(ctx: SolveContext, first: Mover, max: number, ref: number): [st
  * Scarf; otherwise the first mover may hold one instead.
  */
 function decideAgainstGuessedScarf(ctx: SolveContext, first: Mover, second: Mover, max: number): [string, ItemDecision] | null {
-  const scarfRef = scarfedSpeed(simGenNum(ctx.gen), investedFloor(ctx, second));
+  const scarfRef = scarfedSpeed(dexOfCalc(ctx.gen), investedFloor(ctx, second));
   if (max >= scarfRef) return null;
   if (floor(ctx, second) <= max) return [second.key, 'lacks'];
   return scarfIn(ctx, first, max, scarfRef);
@@ -137,7 +137,7 @@ function decide(ctx: SolveContext, order: ReadOrder, first: Mover, second: Mover
   if (max === 0 || order.firstScarf !== undefined || toId(first.set.item ?? '') === 'choicescarf') return null;
   const secondScarf = order.secondScarf ?? toId(second.set.item ?? '') === 'choicescarf';
   if (secondScarf && order.secondScarf === undefined && !second.know.itemKnown) return decideAgainstGuessedScarf(ctx, first, second, max);
-  const ref = raceSpeed(simGenNum(ctx.gen), floor(ctx, second), secondScarf);
+  const ref = raceSpeed(dexOfCalc(ctx.gen), floor(ctx, second), secondScarf);
   return max >= ref ? null : scarfIn(ctx, first, max, ref);
 }
 

@@ -1,10 +1,11 @@
 import { Battle } from '@pkmn/client';
 import { Protocol } from '@pkmn/protocol';
-import { Dex } from '@pkmn/sim';
 import { isChampionsFormat } from './champions-format.ts';
+import { CHAMPIONS_MOD } from './calc-gen.ts';
 import { generationsFor } from './format-generations.ts';
 import type { ReplayData, TurnSnapshot } from './types.ts';
 import { toId } from './ids.ts';
+import { dexOf, simFormats, type GameRules } from './rules-dex.ts';
 import { normalizeLineEndings } from './line-endings.ts';
 
 type ReplayFormatSource = Partial<Pick<ReplayData, 'id' | 'format' | 'formatid' | 'log'>>;
@@ -158,6 +159,11 @@ export function getReplayGeneration(source: ReplayFormatSource): number {
   return parseInt(extractGen({ ...source, formatid }), 10) || 9;
 }
 
+/** The generation and mod a replay plays by: the Dex of the game is `dexOf` of these (round 75, T160). */
+export function replayRules(source: ReplayFormatSource): GameRules {
+  return { gen: getReplayGeneration(source), mod: replayRuleset(source) === 'champions' ? CHAMPIONS_MOD : undefined };
+}
+
 /** Sides' currently-sleeping (non-Rest) victims — detects logs the clause cannot describe. */
 function logShowsSecondSleep(log: string): boolean {
   const sleepers: Record<'p1' | 'p2', Set<string>> = { p1: new Set(), p2: new Set() };
@@ -220,10 +226,10 @@ function sleepClauseSuffix(rawLog: string | undefined, base: string): string {
 export function getReplayBringCount(source: ReplayFormatSource): number | null {
   const formatid = inferReplayFormatId(source);
   if (!formatid) return null;
-  const format = Dex.formats.get(formatid);
+  const format = simFormats().get(formatid);
   if (format.exists) {
     try {
-      const size = Dex.formats.getRuleTable(format).pickedTeamSize;
+      const size = simFormats().getRuleTable(format).pickedTeamSize;
       if (typeof size === 'number' && size > 0) return size;
       return null;
     } catch {
@@ -244,8 +250,8 @@ export function getReplayBringCount(source: ReplayFormatSource): number | null {
  * Species clause keeps one base per side in bring-limited formats, so the
  * base id is a safe secondary key there.
  */
-export function speciesBaseId(name: string): string {
-  const species = Dex.species.get(name);
+export function speciesBaseId(name: string, rules: GameRules): string {
+  const species = dexOf(rules).species.get(name);
   return optionalId(species.exists ? species.baseSpecies || species.name : name);
 }
 
@@ -256,13 +262,13 @@ export function speciesBaseId(name: string): string {
  * its first-seen name instead of counting twice (the VGC-tranche sighting
  * caught exactly that).
  */
-export function broughtSpeciesFor(snapshots: TurnSnapshot[], side: 'p1' | 'p2'): string[] {
+export function broughtSpeciesFor(snapshots: TurnSnapshot[], side: 'p1' | 'p2', rules: GameRules): string[] {
   const seenBases = new Set<string>();
   const ordered: string[] = [];
   for (const turn of snapshots) {
     for (const pokemon of turn[side].pokemon) {
       if (!pokemon.isActive) continue;
-      const base = speciesBaseId(pokemon.speciesForme);
+      const base = speciesBaseId(pokemon.speciesForme, rules);
       if (seenBases.has(base)) continue;
       seenBases.add(base);
       ordered.push(pokemon.speciesForme);
@@ -285,8 +291,9 @@ export function replayBringOnly(
 ): { p1: string[]; p2: string[] } | null {
   const bringCount = getReplayBringCount(source);
   if (bringCount === null) return null;
-  const p1 = broughtSpeciesFor(snapshots, 'p1');
-  const p2 = broughtSpeciesFor(snapshots, 'p2');
+  const rules = replayRules(source);
+  const p1 = broughtSpeciesFor(snapshots, 'p1', rules);
+  const p2 = broughtSpeciesFor(snapshots, 'p2', rules);
   return p1.length === bringCount && p2.length === bringCount ? { p1, p2 } : null;
 }
 
@@ -309,9 +316,9 @@ export function replayRuleset(source: ReplayFormatSource): ReplayRuleset {
 /** The branch format carries the clause as a custom-rule suffix — is it there? */
 export function formatEnforcesSleepClause(format: string): boolean {
   if (/@@@.*sleep ?clause/i.test(format)) return true;
-  const base = Dex.formats.get(format.split('@@@')[0]);
+  const base = simFormats().get(format.split('@@@')[0]);
   try {
-    return base.exists && Dex.formats.getRuleTable(base).has('sleepclausemod');
+    return base.exists && simFormats().getRuleTable(base).has('sleepclausemod');
   } catch {
     return false;
   }
@@ -340,7 +347,7 @@ export function getBranchSimulatorFormat(source: ReplayFormatSource): string {
   // A formatid the sim doesn't know (draft leagues, video pipelines) runs as
   // a rule-less custom game anyway — name that explicitly so clause suffixes
   // have a real base to attach to.
-  const known = formatid && Dex.formats.get(formatid).exists ? formatid : '';
+  const known = formatid && simFormats().get(formatid).exists ? formatid : '';
   const base = known || (formatid ? `gen${gen}customgame` : `gen${gen}ou`);
   return `${base}${sleepClauseSuffix(source.log, base)}`;
 }

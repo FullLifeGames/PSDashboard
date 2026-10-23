@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import {
-  type DamageObservation, type ReplayData, type TurnSnapshot, getBranchSimulatorFormat,
+  type DamageObservation, type ReplayData, type TurnSnapshot, getBranchSimulatorFormat, replayRules,
 } from '@fulllifegames/replay-core';
 import type { BranchSlotChoice } from '@fulllifegames/eval-engine';
 import { classifyDeviation, keptEntries, type TimelinePosition } from '../lib/timeline';
@@ -212,7 +212,7 @@ export function useDeviation(inputs: DeviationInputs) {
     requests.requestDeviation({ p1Choices: draftChoices.p1, p2Choices: draftChoices.p2 });
   }, [requests, draftChoices]);
 
-  const { leadOptions, defaultLeadSelection } = useLeadDefaults(snapshots, bringCount, replayGameType);
+  const { leadOptions, defaultLeadSelection } = useLeadDefaults(snapshots, bringCount, replayGameType, replayData);
 
   return {
     session, branchDivergence, setBranchDivergence,
@@ -223,8 +223,8 @@ export function useDeviation(inputs: DeviationInputs) {
 }
 
 /** The lead picker's options and the real game's selection as its default. */
-function useLeadDefaults(snapshots: TurnSnapshot[], bringCount: number | null, replayGameType: string | null) {
-  const leadOptions = useMemo(() => buildLeadOptions(snapshots), [snapshots]);
+function useLeadDefaults(snapshots: TurnSnapshot[], bringCount: number | null, replayGameType: string | null, replayData: ReplayData | null) {
+  const leadOptions = useMemo(() => buildLeadOptions(snapshots, replayData ? replayRules(replayData) : { gen: 9, mod: undefined }), [snapshots, replayData]);
   const defaultLeadSelection = useCallback(
     () => defaultLeadSelectionFor(leadOptions, bringCount, replayGameType),
     [leadOptions, bringCount, replayGameType],

@@ -1,4 +1,4 @@
-import { Dex } from '@pkmn/sim';
+import { dexOf } from '../rules-dex.ts';
 import { revealedField, unknownEvs, unknownField } from '../team-info.ts';
 import { canHaveDancer, findPokemon, ruleOut, type InferrerState } from './inferrer-state.ts';
 import { revealMarkerForme, teamSpecies, unknownFormeMarkerFor } from './lookup.ts';
@@ -59,11 +59,11 @@ function recordPlainMove(state: InferrerState, ident: string, moveName: string, 
   if (!powered) used.add(toId(moveName));
   state.plainMovesSince.set(ident, used);
   if (used.size >= 2 && !canHaveDancer(state, ident)) {
-    for (const item of choiceItems(Dex.forGen(state.gen))) {
+    for (const item of choiceItems(dexOf(state))) {
       ruleOut(state, nickname, 'items', item);
     }
   }
-  if (Dex.moves.get(moveName).category === 'Status') {
+  if (dexOf(state).moves.get(moveName).category === 'Status') {
     ruleOut(state, nickname, 'items', 'assaultvest');
   }
 }
@@ -78,7 +78,7 @@ export function noteMoveOrBoundary(state: InferrerState, line: LogLine) {
     const target = identOf(arg(line, 3));
     if (target && (target.side === 'p1' || target.side === 'p2')) state.lastMoveTarget.set(attacker, arg(line, 3));
     if (identOf(attacker)?.side === state.opponentSide && !hasKw(line, 'from') && moveName) {
-      recordPlainMove(state, attacker, moveName, !!readPowerMove(Dex.forGen(state.gen), line));
+      recordPlainMove(state, attacker, moveName, !!readPowerMove(dexOf(state), line));
     }
   } else if (MOVE_BOUNDARIES.has(line.cmd) || (line.cmd === '-activate' && arg(line, 2) === 'confusion')) {
     state.pendingMove = null;
@@ -98,7 +98,7 @@ export function noteEntry(state: InferrerState, line: LogLine) {
   if (!ident) return;
   const parsed = detailsOf(arg(line, 2));
   if (parsed) {
-    const species = teamSpecies(state.pokemonMap, parsed.species);
+    const species = teamSpecies(dexOf(state), state.pokemonMap, parsed.species);
     state.identSpecies.set(ident, species);
     const nickname = sideSubject(line, state.opponentSide)?.trim();
     if (nickname) state.nicknameSpecies.set(nickname, species);
@@ -110,12 +110,12 @@ export function noteEntry(state: InferrerState, line: LogLine) {
 function ruleOutLevitate(state: InferrerState, nickname: string) {
   const { pendingMove } = state;
   if (!pendingMove) return;
-  const move = Dex.moves.get(pendingMove.moveName);
+  const move = dexOf(state).moves.get(pendingMove.moveName);
   const ignore = move.ignoreImmunity as boolean | Record<string, boolean> | undefined;
   const ignoresGround = ignore === true || (typeof ignore === 'object' && !!ignore?.Ground);
   const attackerSpecies = state.identSpecies.get(pendingMove.attacker);
   const possiblyMoldBreaker = attackerSpecies
-    ? Object.values(Dex.species.get(attackerSpecies).abilities ?? {})
+    ? Object.values(dexOf(state).species.get(attackerSpecies).abilities ?? {})
       .some(ability => MOLD_BREAKER_ABILITIES.has(toId(String(ability))))
     : false;
   if (move.type === 'Ground' && !ignoresGround && !possiblyMoldBreaker) {
@@ -181,9 +181,9 @@ export function addFromSwitch(state: InferrerState, line: LogLine) {
   if ((line.cmd !== 'switch' && line.cmd !== 'drag') || sideSubject(line, state.opponentSide) === null) return;
   const details = detailsOf(arg(line, 2));
   if (!details) return;
-  const parsed = { ...details, species: teamSpecies(state.pokemonMap, details.species) };
+  const parsed = { ...details, species: teamSpecies(dexOf(state), state.pokemonMap, details.species) };
   if (state.pokemonMap.has(parsed.species)) return;
-  const marker = unknownFormeMarkerFor(state.pokemonMap, parsed.species);
+  const marker = unknownFormeMarkerFor(dexOf(state), state.pokemonMap, parsed.species);
   if (marker) revealMarkerForme(state.pokemonMap, marker, parsed);
   else state.pokemonMap.set(parsed.species, revealedPokemon(parsed, unknownField()));
 }
@@ -210,7 +210,7 @@ export function recordMove(state: InferrerState, line: LogLine) {
   const pokemon = findPokemon(state, nickname);
   if (!pokemon) return;
   // A Z-move or Max move books its base move, or an open slot for it, never its own name (round 70).
-  const power = moveName === arg(moveLine, 2) ? readPowerMove(Dex.forGen(state.gen), moveLine) : null;
+  const power = moveName === arg(moveLine, 2) ? readPowerMove(dexOf(state), moveLine) : null;
   if (power) bookPowerMove(pokemon, power);
   else if (!pokemon.moves.some(move => move.name === moveName)) pokemon.moves.push({ name: moveName, source: 'revealed' });
 }
