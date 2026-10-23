@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { PokemonSet } from '@pkmn/sim';
 import type { ReplayData } from '@fulllifegames/replay-core';
@@ -19,7 +19,8 @@ vi.mock('../../src/hooks/useAppController', async importOriginal => {
   return { ...actual, useAppController: () => { const app = actual.useAppController(); captured.app = app; return app; } };
 });
 // The legal move pool is heavy dex data the what-if row loads lazily; a fixed pool keeps the workspace render cheap.
-vi.mock('../../src/lib/pokemon-options', () => ({ getMovePool: async () => ['Dragon Claw'] }));
+// The editor's pools read the rest of the module (prepareFormat), so the mock keeps it.
+vi.mock('../../src/lib/pokemon-options', async importOriginal => ({ ...(await importOriginal<typeof import('../../src/lib/pokemon-options')>()), getMovePool: async () => ['Dragon Claw'] }));
 
 const { default: App } = await import('../../src/App');
 
@@ -85,6 +86,17 @@ describe('the sets export and import leave the inference where it was', () => {
     ['singles', 'smogtours-gen6ou-655336'],
     ['doubles', 'gen9doublesou-2663093831'],
     ['Champions singles, Stat Points', 'gen9championsou-2628340185'],
+    // Round 76 (T234): the two sets the coherence veto swapped on a round trip (a guessed fourth move, once the solved item
+    // is a Choice item), then the rest of the feedback fixtures: 144 sets in all.
+    ['Champions VGC, Head Smash', 'gen9championsvgc2026regmc-2695803506'],
+    ['singles, Body Press', 'smogtours-gen8ou-573756'],
+    ['singles', 'smogtours-gen6ou-648453'],
+    ['singles', 'smogtours-gen6ou-649664'],
+    ['singles', 'smogtours-gen6ou-653785'],
+    ['singles', 'smogtours-gen8ou-562428'],
+    ['doubles', 'smogtours-gen9doublesou-912045'],
+    ['VGC', 'gen9vgc2026regi-2629703929'],
+    ['VGC', 'gen9vgc2026regi-2630685175'],
   ] as const)('%s (%s): export, import, and every set plays as before', async (_kind, id) => {
     const replay = JSON.parse(readFileSync(join('e2e-feedback', 'fixtures', `${id}.json`), 'utf-8')) as ReplayData;
     await mountSettled(replay);
@@ -117,5 +129,73 @@ describe('the sets export and import leave the inference where it was', () => {
     const ivLine = (side: string) => side.split(/\n\n/).find(block => block.startsWith('Sinistcha'))!.split('\n').find(line => line.startsWith('IVs:'));
     expect(ivLine(p1Side)).toBe('IVs: 0 Atk');
     expect(ivLine(p2Side)).toBe('IVs: 0 Atk / 0 Spe');
+  }, 240_000);
+});
+
+/** The replay loaded and the Smogon data in, no spread solve started: what a user sees who opens a panel at once. */
+async function mountEarly(replay: ReplayData) {
+  stubNetwork(replay);
+  render(<App />);
+  await act(async () => { await app().ctx.replay.loadReplay(replay.id); });
+  await waitFor(() => expect(app().engine.smogonPending).toBe(false), { timeout: 60_000 });
+}
+
+/** The build a settled app plays for the replay, read in a fresh mount and torn down again. */
+async function settledRows(replay: ReplayData) {
+  await mountSettled(replay);
+  const rows = rowsOf(await buildReplayTeams(replay, app().ctx.teamSources));
+  cleanup();
+  localStorage.clear();
+  return rows;
+}
+
+/**
+ * Round 76 (T234): the editor and the sets panel read the same solved values as the stats panel, and a panel opened
+ * before the first spread solve waits for it. Before, the editor took the enriched infos (the usage guesses) and a
+ * save pinned them; the early sets export wrote the guesses and the import took them as the user's own input.
+ */
+describe('the team editor and an early sets panel keep the inference', () => {
+  test.each([
+    ['singles', 'smogtours-gen6ou-655336'],
+    ['doubles', 'gen9doublesou-2663093831'],
+  ] as const)('%s (%s): saving each side in the editor without a change plays the same sets', async (_kind, id) => {
+    const replay = JSON.parse(readFileSync(join('e2e-feedback', 'fixtures', `${id}.json`), 'utf-8')) as ReplayData;
+    await mountSettled(replay);
+    const before = rowsOf(await buildReplayTeams(replay, app().ctx.teamSources));
+    for (const [button, title] of [['Edit Player', 'Edit Player Team'], ['Edit Opp', 'Edit Opponent Team']] as const) {
+      await userEvent.click(screen.getByRole('button', { name: button }));
+      await screen.findByRole('dialog', { name: title });
+      await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: title })).toBeNull());
+    }
+    expect(rowsOf(await buildReplayTeams(replay, app().ctx.teamSources))).toEqual(before);
+  }, 240_000);
+
+  test.each([
+    ['singles', 'smogtours-gen6ou-655336'],
+    ['doubles', 'gen9doublesou-2663093831'],
+  ] as const)('%s (%s): opening the editor before any solve and saving plays the same sets', async (_kind, id) => {
+    const replay = JSON.parse(readFileSync(join('e2e-feedback', 'fixtures', `${id}.json`), 'utf-8')) as ReplayData;
+    const reference = await settledRows(replay);
+    await mountEarly(replay);
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Opp' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Save' }, { timeout: 60_000 }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Edit Opponent Team' })).toBeNull());
+    expect(rowsOf(await buildReplayTeams(replay, app().ctx.teamSources))).toEqual(reference);
+  }, 240_000);
+
+  test.each([
+    ['singles', 'smogtours-gen6ou-655336'],
+    ['doubles', 'gen9doublesou-2663093831'],
+  ] as const)('%s (%s): a sets round trip before the first solve plays the same sets', async (_kind, id) => {
+    const replay = JSON.parse(readFileSync(join('e2e-feedback', 'fixtures', `${id}.json`), 'utf-8')) as ReplayData;
+    const reference = await settledRows(replay);
+    await mountEarly(replay);
+    await openSets();
+    const dialog = await screen.findByRole('dialog', { name: 'Import / Export Sets' }, { timeout: 60_000 });
+    expect((dialog.querySelector('textarea') as HTMLTextAreaElement).value).toContain('=== p1:');
+    await userEvent.click(screen.getByRole('button', { name: 'Import' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Import / Export Sets' })).toBeNull());
+    expect(rowsOf(await buildReplayTeams(replay, app().ctx.teamSources))).toEqual(reference);
   }, 240_000);
 });

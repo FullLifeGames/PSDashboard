@@ -1,8 +1,9 @@
+import type { PokemonSet } from '@pkmn/sim';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   type DamageObservation, type HiddenPowerEvidence, type ItemDamageJudge, type OpponentTeamInfo, type ReplayData,
   type SpeedOrderObservation, applyPastedTeam, countMatchingSpecies, applyInferredSpreads, enrichTeamInfos,
-  applyTeamSheetToInfo,
+  applyTeamSheetToInfo, enrichPokemonInfo,
 } from '@fulllifegames/replay-core';
 import { parseSetsImport } from '../lib/sets-io';
 import { buildSensitivityTargets } from '../lib/team-knowledge';
@@ -105,6 +106,18 @@ function useSetsIO(args: {
   return { applySetsText };
 }
 
+/**
+ * Round 76 (T234): the team editor and the sets panel start from the infos the stats panel shows, and those carry the solved
+ * spreads only once a solve has run. A panel that opens before it would show (and an export would write) the usage guesses, and
+ * the import would take them as the user's own input. The open waits for the solve (a settled one answers at once; no solve
+ * possible, as before the evidence or the Smogon data arrive, opens at once).
+ */
+function useOpenAfterSolve(getInferredSpreads: ReturnType<typeof useSpreadSolve>['getInferredSpreads']) {
+  return useCallback((open: () => void) => {
+    void getInferredSpreads().then(() => undefined, () => undefined).then(open);
+  }, [getInferredSpreads]);
+}
+
 export function useTeamKnowledge(inputs: TeamKnowledgeInputs) {
   const {
     replayData, p1Info, opponentInfo, itemJudge, observations, speedOrders, hpEvidence, usageStats, setAssumptions, onTeamsEdited,
@@ -146,8 +159,9 @@ export function useTeamKnowledge(inputs: TeamKnowledgeInputs) {
     setEditedP1Info: edits.setEditedP1Info, setEditedP2Info: edits.setEditedP2Info, onTeamsEdited,
   });
 
+  const openAfterSolve = useOpenAfterSolve(getInferredSpreads);
   const status = useTeamStatus({ paste, p1Info });
-  const stats = useTeamStats({ effectiveP1Info, effectiveP2Info, sheetTeams, solvedSpreads, usageStats });
+  const stats = useTeamStats({ effectiveP1Info, effectiveP2Info, sheetTeams, solvedSpreads, usageStats, setAssumptions, hpResolverFor });
   const saveTeam = useSaveTeam({ effectiveP1Info, effectiveP2Info, edits, onTeamsEdited });
   const setsFingerprint = useMemo(
     () => JSON.stringify([edits.editedP1Info, edits.editedP2Info, paste.teamText]),
@@ -160,10 +174,28 @@ export function useTeamKnowledge(inputs: TeamKnowledgeInputs) {
     teamText: paste.teamText, handleTeamLoad: paste.handleTeamLoad,
     editedP1Info: edits.editedP1Info, editedP2Info: edits.editedP2Info,
     setEditedP1Info: edits.setEditedP1Info, setEditedP2Info: edits.setEditedP2Info,
-    editorSide: edits.editorSide, setEditorSide: edits.setEditorSide,
-    setsPanelOpen: edits.setsPanelOpen, setSetsPanelOpen: edits.setSetsPanelOpen,
+    editorSide: edits.editorSide,
+    setEditorSide: (side: 'p1' | 'p2' | null) => (side ? openAfterSolve(() => edits.setEditorSide(side)) : edits.setEditorSide(null)),
+    setsPanelOpen: edits.setsPanelOpen,
+    setSetsPanelOpen: (open: boolean) => (open ? openAfterSolve(() => edits.setSetsPanelOpen(true)) : edits.setSetsPanelOpen(false)),
     effectiveP1Info, effectiveP2Info, solvedSpreads, getInferredSpreads, replayGenNumber,
     applySetsText, saveTeam, setsFingerprint,
+  };
+}
+
+/**
+ * Round 76 (T234): a solved item can replace the guessed one, and the coherence vetoes read the item (a Choice item drops a guessed
+ * status move). The overlay changes the item only, so the moves of such a Pokémon are settled again under the solved item, as the
+ * build settles them; the rest of the entry stays as the overlay left it.
+ */
+function settleMovesUnderSolvedItem(
+  shown: OpponentTeamInfo, before: OpponentTeamInfo,
+  enrich: (pokemon: OpponentTeamInfo['pokemon'][number]) => OpponentTeamInfo['pokemon'][number],
+): OpponentTeamInfo {
+  return {
+    ...shown,
+    pokemon: shown.pokemon.map((pokemon, index) =>
+      pokemon.item.value === before.pokemon[index]?.item.value ? pokemon : { ...pokemon, moves: enrich(pokemon).moves }),
   };
 }
 
@@ -174,20 +206,20 @@ function useTeamStats(args: {
   sheetTeams: ReturnType<typeof useSheetTeams>;
   solvedSpreads: ReturnType<typeof useSpreadSolve>['solvedSpreads'];
   usageStats: ReturnType<typeof useSmogonUsageStats>;
+  setAssumptions: ReturnType<typeof useSmogonSetAssumptions>;
+  hpResolverFor: ReturnType<typeof useHpResolver>['hpResolverFor'];
 }) {
-  const { effectiveP1Info, effectiveP2Info, sheetTeams, solvedSpreads, usageStats } = args;
-  const statsP1Info = useMemo(
-    () => (effectiveP1Info
-      ? applyInferredSpreads(applyTeamSheetToInfo(effectiveP1Info, sheetTeams.p1), 'p1', solvedSpreads)
-      : null),
-    [effectiveP1Info, sheetTeams, solvedSpreads],
-  );
-  const statsP2Info = useMemo(
-    () => (effectiveP2Info
-      ? applyInferredSpreads(applyTeamSheetToInfo(effectiveP2Info, sheetTeams.p2), 'p2', solvedSpreads)
-      : null),
-    [effectiveP2Info, sheetTeams, solvedSpreads],
-  );
+  const { effectiveP1Info, effectiveP2Info, sheetTeams, solvedSpreads, usageStats, setAssumptions, hpResolverFor } = args;
+  const statsInfoOf = useCallback((side: 'p1' | 'p2', effective: OpponentTeamInfo | null, sheet: PokemonSet[] | null) => {
+    if (!effective) return null;
+    const withSheet = applyTeamSheetToInfo(effective, sheet);
+    const shown = applyInferredSpreads(withSheet, side, solvedSpreads);
+    const hpResolver = hpResolverFor(side);
+    return settleMovesUnderSolvedItem(shown, withSheet,
+      pokemon => enrichPokemonInfo(pokemon, usageStats.stats, setAssumptions.assumptions, hpResolver));
+  }, [solvedSpreads, usageStats.stats, setAssumptions.assumptions, hpResolverFor]);
+  const statsP1Info = useMemo(() => statsInfoOf('p1', effectiveP1Info, sheetTeams.p1), [statsInfoOf, effectiveP1Info, sheetTeams]);
+  const statsP2Info = useMemo(() => statsInfoOf('p2', effectiveP2Info, sheetTeams.p2), [statsInfoOf, effectiveP2Info, sheetTeams]);
   const sensitivityTargetsFor = useCallback((side: 'p1' | 'p2'): SensitivityTarget[] => {
     const info = side === 'p1' ? statsP1Info : statsP2Info;
     return buildSensitivityTargets(info, usageStats.stats);

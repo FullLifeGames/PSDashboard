@@ -55,10 +55,11 @@ describe('useTeamKnowledge', () => {
     expect(lead.item.value).toBe('Loaded Dice');
   });
 
-  test('saving one side keeps it as the edit, closes the editor, and reports both teams', () => {
-    const wired = inputs();
+  test('saving one side keeps it as the edit, closes the editor, and reports both teams', async () => {
+    const wired = inputs({ replayWorker: fakeReplayWorkerClient(() => [{ type: 'solveSpreadsResult', entries: [] }]).client });
     const { result } = renderHook(() => useTeamKnowledge(wired));
-    act(() => result.current.setEditorSide('p1'));
+    act(() => { void result.current.setEditorSide('p1'); });
+    await waitFor(() => expect(result.current.editorSide).toBe('p1'));
     expect(result.current.editorSide).toBe('p1');
 
     const edited = { pokemon: result.current.effectiveP1Info!.pokemon.map(mon => ({ ...mon, item: { value: 'Choice Band', source: 'manual' as const } })) };
@@ -68,6 +69,30 @@ describe('useTeamKnowledge', () => {
     expect(result.current.effectiveP1Info).toBe(edited);
     expect(wired.onTeamsEdited).toHaveBeenCalledWith({ p1: edited, p2: result.current.effectiveP2Info });
     expect(result.current.setsFingerprint).not.toBe(JSON.stringify([null, null, '']));
+  });
+
+  // Round 76 (T234): a panel that opens before the first solve would show and export the usage guesses.
+  test.each(['editor', 'sets panel'] as const)('the %s opens when the first spread solve has settled, and closes at once', async kind => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const { client, requests } = fakeReplayWorkerClient(async () => {
+      await gate;
+      return [{ type: 'solveSpreadsResult', entries: [] }];
+    });
+    const { result } = renderHook(() => useTeamKnowledge(inputs({
+      replayWorker: client, usageStats: { stats: usageWith(p1Lead, ['Earthquake']), loading: false, error: null },
+    })));
+    const isOpen = () => (kind === 'editor' ? result.current.editorSide === 'p1' : result.current.setsPanelOpen);
+    const open = () => (kind === 'editor' ? result.current.setEditorSide('p1') : result.current.setSetsPanelOpen(true));
+    const close = () => (kind === 'editor' ? result.current.setEditorSide(null) : result.current.setSetsPanelOpen(false));
+
+    await act(async () => open());
+    await waitFor(() => expect(requests.filter(request => request.type === 'solveSpreads')).toHaveLength(1));
+    expect(isOpen()).toBe(false);
+    await act(async () => release());
+    await waitFor(() => expect(isOpen()).toBe(true));
+    act(() => close());
+    expect(isOpen()).toBe(false);
   });
 
   test('a new replay forgets the edits', () => {

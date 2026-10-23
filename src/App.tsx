@@ -47,7 +47,7 @@ function AppModals({ app }: { app: AppController }) {
   const { replayData } = app.ctx.replay;
   const {
     setsPanelOpen, setSetsPanelOpen, applySetsText, statsP1Info, statsP2Info,
-    editorSide, setEditorSide, effectiveP1Info, effectiveP2Info, saveTeam,
+    editorSide, setEditorSide, saveTeam,
   } = app.ctx.knowledge;
   const { replayGen } = app.ctx.meta;
   return (
@@ -71,20 +71,20 @@ function AppModals({ app }: { app: AppController }) {
           onClose={() => setSetsPanelOpen(false)}
         />
       )}
-      {editorSide === 'p1' && effectiveP1Info && (
+      {editorSide === 'p1' && statsP1Info && (
         <TeamEditor
           title="Edit Player Team"
-          teamInfo={effectiveP1Info}
+          teamInfo={statsP1Info}
           gen={replayGen}
           format={replayData ? inferReplayFormatId(replayData) : ''}
           onSave={(info) => saveTeam('p1', info)}
           onClose={() => setEditorSide(null)}
         />
       )}
-      {editorSide === 'p2' && effectiveP2Info && (
+      {editorSide === 'p2' && statsP2Info && (
         <TeamEditor
           title="Edit Opponent Team"
-          teamInfo={effectiveP2Info}
+          teamInfo={statsP2Info}
           gen={replayGen}
           format={replayData ? inferReplayFormatId(replayData) : ''}
           onSave={(info) => saveTeam('p2', info)}

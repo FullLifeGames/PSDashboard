@@ -111,6 +111,21 @@ describe('sets import/export', () => {
     });
   }
 
+  // Round 76 (T234): the library's import gives a set with a typed Hidden Power the type's own IVs (Ice: 30 Atk, 30 Def) unless the
+  // text lists IVs, while the build plays a listed Hidden Power at the IVs it has. An export of IVs that are all 31 stays explicit.
+  test.each([
+    ['singles', 'Tornadus-Therian', ['U-turn', 'Hidden Power Ice', 'Hurricane', 'Knock Off']],
+    ['doubles', 'Incineroar', ['Fake Out', 'Hidden Power Ice', 'Parting Shot', 'Knock Off']],
+  ])('%s: a set with a typed Hidden Power and IVs of 31 imports at IVs of 31', (_kind, species, moves) => {
+    const info: OpponentTeamInfo = { pokemon: [{
+      species, moves: moves.map(name => ({ name, source: 'guessed' as const })), ability: { value: '', source: 'unknown' },
+      item: { value: '', source: 'unknown' }, teraType: { value: '', source: 'unknown' },
+      evs: { value: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, source: 'unknown' }, level: 100,
+    }] };
+    const text = buildSetsExport({ p1Name: 'A', p2Name: 'B', p1Info: info, p2Info: null });
+    expect(parseSetsImport(text).p1[0].ivs).toEqual({ hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 });
+  });
+
   test('accepts a one-sided import and rejects headerless text with guidance', () => {
     const oneSided = parseSetsImport('=== p2 ===\n\nKingambit @ Leftovers\n- Sucker Punch');
     expect(oneSided.p1).toHaveLength(0);
