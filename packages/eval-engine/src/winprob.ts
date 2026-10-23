@@ -34,6 +34,16 @@
  * did not carry to the holdout, and with own K per phase the doubles row read
  * +5 [−2, +12] with harm in the luck-adjusted rows (+8 [+1, +16]); the pins
  * stay.
+ * ROUND 74 (T163): every family's K fitted on the search's own root values
+ * (the full fit corpus captured with search in CI; regression/fit-families.ts
+ * rootScaleReports, K' = K·c) and measured on the bank and the four holdouts:
+ * standard singles 2.81 + 0.80·ff (+12, unresolved), Doubles OU 2.95 + 1.11·ff
+ * (−1, unresolved), VGC 2.09 + 1.13·ff (own K +12 [+3, +22], harm: the flatter
+ * leaves sort VGC positions worse, although the root reads too confident),
+ * Champions OU 2.05 + 3.22·ff (−12, unresolved, a mid warning), Champions VGC
+ * 1.80 + 3.07·ff (−13 [−23, −4] better, but late and mid warnings). None
+ * passed the pre-registered rule, so the pins stay; the bank now guards
+ * against harm and does not chase a gain (AGENTS.md, user 22.10.2026).
  *
  * Since the win-prob-space conversion, the LEAF sigmoid applies once, at
  * the search leaf (`wpUnits`): every downstream value — cell averages, the

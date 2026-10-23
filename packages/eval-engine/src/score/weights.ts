@@ -314,6 +314,12 @@ export const DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
  * [2.8, 30.7], out of fold better in 20 of 20 seeds, Brier 20 of 20, log-loss
  * -126 bp, no flagged band; before the drops counted the column was flagged
  * and missed R1). The bank and the VGC holdout decide it (R3).
+ *
+ * Round 74 (T263): the matchup refit on the search capture of the fit corpus
+ * (2,334 positions of 711 sets, root features at today's K) gave 123 [100, 149],
+ * out of fold better in 20 of 20 seeds (log loss -13 bp). On the VGC holdout it
+ * read +4 [-8, +16] with a luck-adjusted mid warning (+36), and the bank's VGC
+ * rows read harm on the luck-adjusted doubles row (+16, own K +21): 169 stays.
  */
 export const VGC_DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   bodies: 177,
