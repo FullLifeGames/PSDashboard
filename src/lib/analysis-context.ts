@@ -1,5 +1,5 @@
 import { toID } from '@pkmn/dex';
-import type { ReplayData, TurnSnapshot } from '@fulllifegames/replay-core';
+import type { ReplayData, RulesMod, TurnSnapshot } from '@fulllifegames/replay-core';
 import {
   analyzeTurn, decidedSeenKey, diceEventTurns, forcedWinSeenKey, forcedWinSpeaks, PAYOFF_WINDOW, unansweredSeenKey, type TurnAnalysis, detectSacks,
   type PlayedTurn, type StreakHistoryEntry, buildGameReport, type GameReport, computeRead, type EvalResult, noteSpokenClaim, releaseBrokenClaims,
@@ -78,19 +78,22 @@ export type ReplayTendencies = NonNullable<Parameters<typeof analyzeTurn>[0]['te
 function protocolInputs(turn: number, context: TurnAnalysisContext, includeSacks: boolean) {
   const events = context.turnEventsIndex[turn];
   const before = context.snapshots[turn - 1] ?? null;
+  // Round 75 (T160): the turn's generation and mod read the Dex (hazards, accuracies, secondaries); no board, no snapshot, no sacks.
+  const actives = context.activesForTurn(turn);
+  const rules = actives ? { gen: actives.gen, mod: actives.mod } : undefined;
   return {
-    ...(includeSacks ? { sacks: detectSacks(events ?? [], before) } : {}),
-    ...(events ? { rolls: detectRolls(events, before, context.activesForTurn(turn)?.gen) } : {}),
+    ...(includeSacks && rules ? { sacks: detectSacks(events ?? [], before, rules) } : {}),
+    ...(events ? { rolls: detectRolls(events, before, actives?.gen, actives?.mod) } : {}),
   };
 }
 
-/** Round 69 (T177): the replay's generation, read from the first turn that has a board; undefined keeps the dice markers as the protocol shows them. */
-function replayGenerationOf(context: TurnAnalysisContext): number | undefined {
+/** Round 69 (T177): the replay's generation (round 75, T160: and mod), read from the first turn that has a board; undefined keeps the dice markers as the protocol shows them. */
+function replayRulesOf(context: TurnAnalysisContext): { gen?: number; mod?: RulesMod } {
   for (let turn = 1; turn < context.snapshots.length; turn++) {
-    const gen = context.activesForTurn(turn)?.gen;
-    if (gen !== undefined) return gen;
+    const actives = context.activesForTurn(turn);
+    if (actives) return { gen: actives.gen, mod: actives.mod };
   }
-  return undefined;
+  return {};
 }
 
 /** One argument assembly for analyzeTurn — the per-turn view and the report
@@ -243,10 +246,11 @@ export function computeGameReportData(args: {
     return analysis;
   });
   if (analyses.filter(Boolean).length < 3) return null;
+  const replayRules = replayRulesOf(args.context);
   const report = buildGameReport(
     analyses, [args.replayData.players[0], args.replayData.players[1]], args.winner, true,
     // Protocol dice anchor for the luck claims (crits, misses, rolled statuses).
-    diceEventTurns(args.context.turnEventsIndex, replayGenerationOf(args.context)),
+    diceEventTurns(args.context.turnEventsIndex, replayRules.gen, replayRules.mod),
   );
   return { report, analyses };
 }

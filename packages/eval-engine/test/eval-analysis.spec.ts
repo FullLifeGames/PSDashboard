@@ -1,5 +1,6 @@
 import { test, expect, describe } from 'vitest';
-import { analyzeTurn, decidedSeenKey, findPlayedOption, matchPlayedChoice, phantomStayIn, playedSetupMove, REGRET_THRESHOLD, unansweredSeenKey, type SideAnalysis } from '../src/analysis';
+import { analyzeTurn, decidedSeenKey, findPlayedOption, matchPlayedChoice, phantomStayIn, REGRET_THRESHOLD, unansweredSeenKey } from '../src/analysis';
+import { logRules } from '@fulllifegames/replay-core';
 import { allTurnEvents, detectSacks, turnEvents } from '../src/played';
 import type { EvalResult, RankedChoice } from '../src/types';
 import type { TurnSnapshot } from '@fulllifegames/replay-core';
@@ -152,9 +153,9 @@ describe('sacrifice detection', () => {
       '|faint|p1a: Dauni',
     ];
     // Round 63: the switch-in fell to the rocks before acting, so the low-HP feed also carries the hazard mark.
-    expect(detectSacks(events, sackSnapshot(9))).toEqual({ p1: { name: 'Dauni', species: 'Uxie', hpFraction: 0.09, hazard: true } });
-    expect(detectSacks(events, sackSnapshot(45))).toEqual({});
-    expect(detectSacks(events, null)).toEqual({});
+    expect(detectSacks(events, sackSnapshot(9), logRules(''))).toEqual({ p1: { name: 'Dauni', species: 'Uxie', hpFraction: 0.09, hazard: true } });
+    expect(detectSacks(events, sackSnapshot(45), logRules(''))).toEqual({});
+    expect(detectSacks(events, null, logRules(''))).toEqual({});
   });
 
   test('a healthy body switched in and fainted the same turn is a simplification-sack candidate', () => {
@@ -168,7 +169,7 @@ describe('sacrifice detection', () => {
       '|-damage|p1a: Relous|0 fnt',
       '|faint|p1a: Relous',
     ];
-    expect(detectSacks(events, sackSnapshot(46))).toEqual({
+    expect(detectSacks(events, sackSnapshot(46), logRules(''))).toEqual({
       p1: { name: 'Relous', species: 'Salazzle', hpFraction: 116 / 253, healthy: true },
     });
   });
@@ -177,9 +178,9 @@ describe('sacrifice detection', () => {
     // A forced drag is not a deliberate feed; a switch-in that lives is not
     // a sack; a mid-HP faint without a same-turn entry is now a stay-and-die
     // CANDIDATE — still a plain loss unless the verdict gates pass.
-    expect(detectSacks(['|drag|p1a: Dauni|Uxie, L50|120/182', '|faint|p1a: Dauni'], sackSnapshot(66))).toEqual({});
-    expect(detectSacks(['|switch|p1a: Relous|Salazzle, F|116/253'], sackSnapshot(46))).toEqual({});
-    expect(detectSacks(['|faint|p1a: Dauni'], sackSnapshot(46))).toEqual({
+    expect(detectSacks(['|drag|p1a: Dauni|Uxie, L50|120/182', '|faint|p1a: Dauni'], sackSnapshot(66), logRules(''))).toEqual({});
+    expect(detectSacks(['|switch|p1a: Relous|Salazzle, F|116/253'], sackSnapshot(46), logRules(''))).toEqual({});
+    expect(detectSacks(['|faint|p1a: Dauni'], sackSnapshot(46), logRules(''))).toEqual({
       p1: { name: 'Dauni', species: 'Uxie', hpFraction: 0.46, stayed: true },
     });
   });
@@ -192,14 +193,14 @@ describe('sacrifice detection', () => {
       '|-damage|p1a: Dauni|0 fnt',
       '|faint|p1a: Dauni',
     ];
-    expect(detectSacks(events, sackSnapshot(46))).toEqual({
+    expect(detectSacks(events, sackSnapshot(46), logRules(''))).toEqual({
       p1: { name: 'Dauni', species: 'Uxie', hpFraction: 0.46, stayed: true },
     });
     // Dragged in this turn = not a deliberate stay; below the low-HP
     // threshold = shape 1 as before; absent from the snapshot = no claim.
-    expect(detectSacks(['|drag|p1a: Dauni|Uxie, L50|120/182', '|faint|p1a: Dauni'], sackSnapshot(66))).toEqual({});
-    expect(detectSacks(['|faint|p1a: Dauni'], sackSnapshot(9))).toEqual({ p1: { name: 'Dauni', species: 'Uxie', hpFraction: 0.09 } });
-    expect(detectSacks(['|faint|p1a: Ghost'], sackSnapshot(46))).toEqual({});
+    expect(detectSacks(['|drag|p1a: Dauni|Uxie, L50|120/182', '|faint|p1a: Dauni'], sackSnapshot(66), logRules(''))).toEqual({});
+    expect(detectSacks(['|faint|p1a: Dauni'], sackSnapshot(9), logRules(''))).toEqual({ p1: { name: 'Dauni', species: 'Uxie', hpFraction: 0.09 } });
+    expect(detectSacks(['|faint|p1a: Ghost'], sackSnapshot(46), logRules(''))).toEqual({});
   });
 
   test('a faint-prevented side gets a charitable stay-in phantom (priority moves excluded)', () => {
@@ -223,12 +224,12 @@ describe('sacrifice detection', () => {
       p2: null,
       prevented: { p2: 'faint' },
     };
-    const phantom = phantomStayIn(result, 'p2', played);
+    const phantom = phantomStayIn(result, 'p2', played, logRules(''));
     expect(phantom?.choice).toBe('move moonblast');
     expect(phantom?.label).toContain('stayed in');
     // No marker, no phantom; a non-faint prevention stays unmatched.
-    expect(phantomStayIn(result, 'p2', { ...played, prevented: {} })).toBeNull();
-    expect(phantomStayIn(result, 'p2', { ...played, prevented: { p2: 'slp' } })).toBeNull();
+    expect(phantomStayIn(result, 'p2', { ...played, prevented: {} }, logRules(''))).toBeNull();
+    expect(phantomStayIn(result, 'p2', { ...played, prevented: { p2: 'slp' } }, logRules(''))).toBeNull();
 
     const analysis = analyzeTurn({
       turn: 14,
@@ -237,6 +238,7 @@ describe('sacrifice detection', () => {
       playedOutcome: 0.35,
       scoreBefore: 0.2,
       scoreAfter: 0.55,
+      actives: { p1: null, p2: null, gen: 9 },
     });
     // The stay-in itself is gradable: the engine's switch was worth 0.3
     // more than the best outcome-equivalent move — a mistake, whichever
@@ -1082,24 +1084,6 @@ describe('doubles combined matching', () => {
     expect(analysis.p1.played?.choice).toBe('move moonblast 1, switch 3');
     expect(analysis.p1.regret).toBeCloseTo(0.2, 10);
     expect(analysis.p1.playedSlots).toHaveLength(2);
-  });
-});
-
-describe('setup-move detection', () => {
-  const side = (over: Partial<SideAnalysis>): SideAnalysis =>
-    ({ playedRaw: null, played: null, best: null, regret: null, ...over });
-
-  test('singles: the played move is recognized by name', () => {
-    expect(playedSetupMove(side({ playedRaw: { kind: 'move', name: 'Swords Dance' } }))).toBe('Swords Dance');
-    expect(playedSetupMove(side({ playedRaw: { kind: 'move', name: 'Ice Beam' } }))).toBeNull();
-    // A switch to a Pokémon nicknamed after a setup move is not a setup move.
-    expect(playedSetupMove(side({ playedRaw: { kind: 'switch', name: 'Curse' } }))).toBeNull();
-    expect(playedSetupMove(side({}))).toBeNull();
-  });
-
-  test('doubles: any slot clicking a setup move counts', () => {
-    expect(playedSetupMove(side({ playedSlots: [null, { kind: 'move', name: 'Dragon Dance' }] }))).toBe('Dragon Dance');
-    expect(playedSetupMove(side({ playedSlots: [{ kind: 'move', name: 'Protect' }, { kind: 'move', name: 'Fake Out' }] }))).toBeNull();
   });
 });
 

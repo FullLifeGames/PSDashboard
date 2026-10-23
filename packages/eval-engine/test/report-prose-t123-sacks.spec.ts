@@ -1,5 +1,6 @@
 import { test, expect, describe } from 'vitest';
 import type { TurnSnapshot } from '@fulllifegames/replay-core';
+import { logRules } from '@fulllifegames/replay-core';
 import { detectSacks } from '../src/played';
 import { sackClause } from '../src/prose/clauses';
 import type { SideAnalysis } from '../src/analysis';
@@ -43,7 +44,7 @@ describe('point 10: a sack names the other bodies the side lost on the turn', ()
       [mon('Ogerpon', 'Ogerpon-Cornerstone', 9, true), mon('Rillaboom', 'Rillaboom', 78, true)],
     );
     // Round 67 (T135 point 1): the other faint's shape rides along for the verdict.
-    expect(detectSacks(events, before).p2).toEqual({
+    expect(detectSacks(events, before, logRules('')).p2).toEqual({
       name: 'Ogerpon', species: 'Ogerpon-Cornerstone', hpFraction: 0.09, alsoFell: ['Rillaboom'],
       others: [{ name: 'Rillaboom', species: 'Rillaboom', hpFraction: 0.78, stayed: true }],
     });
@@ -62,7 +63,7 @@ describe('point 10: a sack names the other bodies the side lost on the turn', ()
       [mon('Tornadus', 'Tornadus-Therian', 10, true), mon('Volcanion', 'Volcanion', 30, false)],
       [mon('Dragonite', 'Dragonite', 100, true)],
     );
-    expect(detectSacks(events, before).p1).toEqual({
+    expect(detectSacks(events, before, logRules('')).p1).toEqual({
       name: 'Tornadus', species: 'Tornadus-Therian', hpFraction: 0.1, alsoFell: ['Volcanion'],
       others: [{ name: 'Volcanion', species: 'Volcanion', hpFraction: 109 / 363, healthy: true }],
     });

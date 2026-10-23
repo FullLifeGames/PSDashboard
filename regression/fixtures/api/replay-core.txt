@@ -29,6 +29,8 @@ type ReplayRuleset
 type RevealedPokemonInfo
 type RulesDex
 type RulesMod
+type RulesModData
+type RulesModFormats
 type ScreenHolder
 type ScreenId
 type SetAssumption
@@ -82,6 +84,7 @@ value choiceItems
 value countMatchingSpecies
 value dexOf
 value dexOfCalc
+value dexOfFormat
 value enrichPokemonInfo
 value enrichTeamInfo
 value enrichTeamInfos
@@ -121,6 +124,7 @@ value parseReplayLogWithObservations
 value parseTeamText
 value poweredMove
 value protectKind
+value registerChampionsDex
 value replayBringOnly
 value replayRules
 value replayRuleset
@@ -128,6 +132,7 @@ value resolveHiddenPowerType
 value rulesDex
 value screenFlags
 value sideIndex
+value simFormats
 value simGenNum
 value sitrusKeptAt
 value solveReplaySpreads

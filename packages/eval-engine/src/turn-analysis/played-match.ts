@@ -1,10 +1,8 @@
-// Data-only Dex (move priorities for the stay-in phantom) — this module is
-// in the app's MAIN bundle; @pkmn/sim must never be imported here.
-import { Dex } from '@pkmn/dex';
+// Round 75 (T160): move priorities (the stay-in phantom) and the setup moves are read by the replay's own Dex, handed in by the caller.
 import type { EvalResult, RankedChoice } from '../types.ts';
 import type { PlayedAction, PlayedTurn } from '../played.ts';
 import type { SideAnalysis } from './types.ts';
-import { toId } from '@fulllifegames/replay-core';
+import { dexOf, toId, type GameRules, type RulesDex } from '@fulllifegames/replay-core';
 import { setupMoves } from '../dex-facts/setup.ts';
 
 /**
@@ -21,15 +19,18 @@ import { setupMoves } from '../dex-facts/setup.ts';
  * Round 72 (W2): read from the Dex's boost fields plus five handler moves
  * (dex-facts/setup.ts), held to the simulator by test/setup-moves-oracle.spec.ts.
  */
-export const SETUP_MOVES = setupMoves(Dex);
+export const setupMovesOf = (dex: RulesDex): ReadonlySet<string> => setupMoves(dex);
 
-/** The setup move this side actually clicked, if any (display name). */
-export function playedSetupMove(side: SideAnalysis): string | null {
+/** The setup move a side's played actions hold, if any (display name), by the game's Dex. */
+export function setupMoveClicked(side: Pick<SideAnalysis, 'playedSlots' | 'playedRaw'>, dex: RulesDex): string | null {
   const actions = side.playedSlots?.filter((action): action is PlayedAction => action !== null) ??
     (side.playedRaw ? [side.playedRaw] : []);
-  const setup = actions.find(action => action.kind === 'move' && SETUP_MOVES.has(toId(action.name)));
+  const setup = actions.find(action => action.kind === 'move' && setupMovesOf(dex).has(toId(action.name)));
   return setup?.name ?? null;
 }
+
+/** The setup move this side actually clicked, if any (display name): the record carries it (round 75, T160). */
+export const playedSetupMove = (side: Pick<SideAnalysis, 'setupMove'>): string | null => side.setupMove ?? null;
 
 /** "Tera + X" labels contain the slot separator — re-merge after splitting. */
 export const splitCombinedLabel = (label: string): string[] => {
@@ -223,14 +224,16 @@ export function phantomStayIn(
   result: EvalResult,
   side: 'p1' | 'p2',
   played: PlayedTurn | null | undefined,
+  rules: GameRules | undefined,
 ): RankedChoice | null {
-  if (!played || played[side] !== null) return null;
+  if (!played || played[side] !== null || !rules) return null;
+  const dex = dexOf(rules);
   if (played.p1Slots || played.p2Slots) return null;
   if (played.prevented?.[side] !== 'faint') return null;
   const option = result.perSide[side].find(candidate => {
     if (!candidate.choice.startsWith('move ')) return false;
     const id = candidate.choice.split(' ')[1] ?? '';
-    return (Dex.moves.get(id).priority ?? 0) === 0;
+    return (dex.moves.get(id).priority ?? 0) === 0;
   });
   return option ? { ...option, label: 'stayed in (KO’d before acting)' } : null;
 }

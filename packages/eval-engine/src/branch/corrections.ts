@@ -1,6 +1,5 @@
-import { type PokemonSnapshot, type TurnSnapshot, sideIndex, toId } from '@fulllifegames/replay-core';
+import { type PokemonSnapshot, type TurnSnapshot, choiceItems, sideIndex, toId } from '@fulllifegames/replay-core';
 import { protocolChoiceLock, type ChoiceLockContext } from '../choice-lock.ts';
-import { CHOICE_ITEMS } from '../sensitivity.ts';
 import { restoreSideInvariants } from '../forward-model.ts';
 import type { SimBattle, SimPokemon, SimSide } from './types.ts';
 import { normalizeBattleOnlyFormeId, retireUnshownBench, sameBodyName, type ProtocolBench } from './team-order.ts';
@@ -100,7 +99,7 @@ export function correctActivesFromProtocol(
 /** Spec 1b's stamp: protocol trail + eligibility + set sanity, never sim history. */
 function restampProtocolLocks(battle: SimBattle, context: ChoiceLockContext, turn: number) {
   for (const sideId of ['p1', 'p2'] as const) {
-    const lock = protocolChoiceLock(context.trails, sideId, turn);
+    const lock = protocolChoiceLock(context.trails, sideId, turn, battle.dex);
     if (!lock) continue;
     const side = battle.sides[sideIndex(sideId)];
     // Singles only — the trail tracker follows one active per side.
@@ -110,7 +109,7 @@ function restampProtocolLocks(battle: SimBattle, context: ChoiceLockContext, tur
     if (toId(active.species.name) !== toId(lock.species) && toId(active.name) !== toId(lock.species)) continue;
     // A handed-over Choice item is in the protocol itself; only a set guess needs the damage vetting.
     if (!lock.handedOver && !context.eligibility[sideId][toId(lock.species)]) continue;
-    if (!CHOICE_ITEMS.has(active.item)) continue;
+    if (!choiceItems(battle.dex).has(active.item)) continue;
     if (!active.moveSlots.some(slot => slot.id === lock.moveId)) continue;
     if (active.volatiles['choicelock']) continue;
     // Not addVolatile: the condition's onStart reads battle.activeMove (null

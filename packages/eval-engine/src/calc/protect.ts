@@ -1,6 +1,6 @@
-import type { CalcGeneration } from '@fulllifegames/replay-core';
+import { dexOfCalc, type CalcGeneration } from '@fulllifegames/replay-core';
 import { callHandler } from '../sim-ask/index.ts';
-import { simDexOf, type CalcBody } from './body.ts';
+import type { CalcBody } from './body.ts';
 
 /**
  * Round 68 (T186, decision 4): does Protect stop this move, as the simulator plays it? The calculator's own Protect
@@ -18,7 +18,7 @@ import { simDexOf, type CalcBody } from './body.ts';
 type ModifyMoveHandler = (this: unknown, move: unknown, pokemon: unknown, target: unknown) => void;
 
 export function protectBlocks(gen: CalcGeneration, moveName: string, attacker: CalcBody): boolean {
-  const dex = simDexOf(gen);
+  const dex = dexOfCalc(gen);
   const move = dex.getActiveMove(moveName);
   if (!move.exists) return true;
   const handler = (dex.abilities.get(attacker.ability) as { onModifyMove?: unknown }).onModifyMove;

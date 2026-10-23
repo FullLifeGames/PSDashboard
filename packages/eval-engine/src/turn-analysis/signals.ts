@@ -304,7 +304,7 @@ function bestNullFor(
   const defenderTera = key === 'p1' ? actives.p2Tera : actives.p1Tera;
   const attackerTera = key === 'p1' ? actives.p1Tera : actives.p2Tera;
   const nullFor = (choice: string) => nullMoveReason({
-    choice, gen: actives.gen, attackerSpecies, defenderSpecies, defenderTera, attackerTera,
+    choice, gen: actives.gen, mod: actives.mod, attackerSpecies, defenderSpecies, defenderTera, attackerTera,
   });
   const reason = nullFor(best.choice);
   if (!reason) return undefined;
@@ -323,7 +323,7 @@ function bestNullFor(
 /** Round 6 ②: a streak ending THIS turn, read from the render-time history (index t−1 = turn t, current included). */
 function streakFor(params: AnalyzeTurnParams, key: Side): SideAnalysis['streakOdds'] {
   if (params.playedHistory && params.actives) {
-    return detectStreakOdds(params.actives.gen, params.playedHistory[key].slice(0, params.turn)) ?? undefined;
+    return detectStreakOdds(params.actives.gen, params.playedHistory[key].slice(0, params.turn), params.actives.mod) ?? undefined;
   }
   return undefined;
 }

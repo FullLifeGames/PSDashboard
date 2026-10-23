@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { Dex } from '@pkmn/dex';
+import { logRules } from '@fulllifegames/replay-core';
 import { toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import { analyzeTurn } from '../src/analysis';
@@ -35,7 +36,7 @@ function singlesTurn(p1Move: string, p2Move: string, cell: Cell) {
     matrix: { p1Labels: [p1Move], p2Labels: [p2Move], p1Choices: [p1Id], p2Choices: [p2Id], values: [[0.05]], mixes: { p1: [1], p2: [1] }, cells: [[cell]] },
   };
   const played: PlayedTurn = { p1: { kind: 'move', name: p1Move, tera: false }, p2: { kind: 'move', name: p2Move, tera: false } };
-  return analyzeTurn({ turn: 4, result, played, playedOutcome: 0.05, scoreBefore: 0.05, scoreAfter: 0.3 });
+  return analyzeTurn({ turn: 4, result, played, playedOutcome: 0.05, scoreBefore: 0.05, scoreAfter: 0.3, actives: { p1: null, p2: null, gen: 9 } });
 }
 
 /** The doubles twin: both sides click two moves (`p1Moves`, `p2Moves`), the played cell is `cell`. */
@@ -52,7 +53,7 @@ function doublesTurn(p1Moves: [string, string], p2Moves: [string, string], cell:
   };
   const slots = (moves: [string, string]) => moves.map(name => ({ kind: 'move' as const, name, targetLoc: null }));
   const played: PlayedTurn = { p1: null, p2: null, p1Slots: slots(p1Moves), p2Slots: slots(p2Moves) };
-  return analyzeTurn({ turn: 4, result, played, playedOutcome: 0.05, scoreBefore: 0.05, scoreAfter: 0.3 });
+  return analyzeTurn({ turn: 4, result, played, playedOutcome: 0.05, scoreBefore: 0.05, scoreAfter: 0.3, actives: { p1: null, p2: null, gen: 9 } });
 }
 
 describe('singles: a plain cell with an unpriced secondary effect is "no priced roll", not "nothing rolled"', () => {
@@ -92,7 +93,7 @@ describe('singles: a plain cell with an unpriced secondary effect is "no priced 
       matrix: { p1Labels: ['→ Clefable'], p2Labels: ['Seismic Toss'], p1Choices: ['switch 2'], p2Choices: ['move seismictoss'], values: [[0.05]], mixes: { p1: [1], p2: [1] }, cells: [[NONE]] },
     };
     const played: PlayedTurn = { p1: { kind: 'switch', name: 'Clefable', species: 'Clefable' }, p2: { kind: 'move', name: 'Seismic Toss', tera: false } };
-    expect(analyzeTurn({ turn: 4, result, played, playedOutcome: 0.05, scoreBefore: 0.05, scoreAfter: 0.3 }).rolledFor).toEqual({ p1: false, p2: false });
+    expect(analyzeTurn({ turn: 4, result, played, playedOutcome: 0.05, scoreBefore: 0.05, scoreAfter: 0.3, actives: { p1: null, p2: null, gen: 9 } }).rolledFor).toEqual({ p1: false, p2: false });
   });
 });
 
@@ -109,7 +110,7 @@ describe('doubles: the same reading per slot', () => {
 });
 
 describe('the chance is read from the Dex, and the Dex agrees with the simulator', () => {
-  const unpriced = (moveId: string): boolean => rolledFromCell(NONE, [moveId]) === undefined;
+  const unpriced = (moveId: string): boolean => rolledFromCell(NONE, [moveId], logRules('')) === undefined;
 
   test('every Dex move with a secondary effect under 100% is unpriced, every move without one is not (a sweep, no names)', () => {
     const moves = Dex.moves.all().filter(move => move.exists && !move.isMax && !move.isZ && move.gen <= 9);

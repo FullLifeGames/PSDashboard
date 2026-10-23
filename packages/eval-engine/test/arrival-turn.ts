@@ -11,6 +11,7 @@ import { buildForcedSwitchChoice, hasForceSwitch } from '../src/branch/correctio
 import { actionKey } from '../src/branch/logged-rolls';
 import type { SimBattle } from '../src/branch/types';
 import { collectForcedSwitchSpecies, getMainChoice, parseTurnBlocks } from '../src/branch/protocol-choices';
+import { rulesDex } from '@fulllifegames/replay-core';
 
 /**
  * The branch's first turn as the specs play it (round 70, arrival-dice.spec.ts; round 73, logged-rolls.spec.ts): the app's
@@ -67,8 +68,8 @@ export async function playTurn(
   ]);
   expect(first.ok).toBe(true);
   const forced = {
-    p1: collectForcedSwitchSpecies(block.preUpkeep, block.postUpkeep, 'p1'),
-    p2: collectForcedSwitchSpecies(block.preUpkeep, block.postUpkeep, 'p2'),
+    p1: collectForcedSwitchSpecies(block.preUpkeep, block.postUpkeep, 'p1', rulesDex(9)),
+    p2: collectForcedSwitchSpecies(block.preUpkeep, block.postUpkeep, 'p2', rulesDex(9)),
   };
   const cursors = { p1: { current: 0 }, p2: { current: 0 } };
   for (let guard = 0; guard < 6; guard++) {

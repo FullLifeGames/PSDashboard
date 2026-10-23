@@ -1,5 +1,6 @@
 import { readFileSync } from 'fs';
 import { describe, expect, test } from 'vitest';
+import { logRules } from '@fulllifegames/replay-core';
 import type { PokemonSet } from '@pkmn/sim';
 import {
   buildTeamsFromReplay, getBranchSimulatorFormat, parseReplayLog, parseReplayLogWithObservations, replayBringOnly,
@@ -100,11 +101,11 @@ describe('the readers of a turn\'s lines tolerate the "\\r" a CRLF log leaves on
       turns.forEach((lines, turn) => {
         if (!lines) return;
         const before = snapshots.find(entry => entry.turn === turn) ?? null;
-        expect(parsePlayedActions(withCr(lines))).toEqual(parsePlayedActions(lines));
+        expect(parsePlayedActions(withCr(lines), logRules(''))).toEqual(parsePlayedActions(lines, logRules('')));
         expect(parsePlayedActionsDoubles(withCr(lines))).toEqual(parsePlayedActionsDoubles(lines));
-        expect(detectSacks(withCr(lines), before)).toEqual(detectSacks(lines, before));
+        expect(detectSacks(withCr(lines), before, logRules(''))).toEqual(detectSacks(lines, before, logRules('')));
         expect(detectRolls(withCr(lines), before)).toEqual(detectRolls(lines, before));
-        seen.sackTurns += Object.keys(detectSacks(lines, before)).length > 0 ? 1 : 0;
+        seen.sackTurns += Object.keys(detectSacks(lines, before, logRules(''))).length > 0 ? 1 : 0;
         seen.hits += detectRolls(lines, before).hits.length;
       });
       const index = turns.map(lines => (lines ? withCr(lines) : lines));
@@ -122,8 +123,8 @@ describe('the readers of a turn\'s lines tolerate the "\\r" a CRLF log leaves on
 
   test('a |cant| reason, the last field of its line, reads the same with and without the "\\r"', () => {
     const lines = ['|move|p2a: Gengar|Fake Out|p1a: Snorlax', '|cant|p1a: Snorlax|flinch'];
-    expect(parsePlayedActions(lines).prevented).toEqual({ p1: 'flinch' });
-    expect(parsePlayedActions(withCr(lines))).toEqual(parsePlayedActions(lines));
+    expect(parsePlayedActions(lines, logRules('')).prevented).toEqual({ p1: 'flinch' });
+    expect(parsePlayedActions(withCr(lines), logRules(''))).toEqual(parsePlayedActions(lines, logRules('')));
   });
 });
 

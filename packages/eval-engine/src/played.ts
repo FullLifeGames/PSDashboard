@@ -1,10 +1,9 @@
 /**
  * Parses what each side actually chose in one turn's protocol block. Pure —
- * no @pkmn/sim imports, main-bundle safe.
+ * no @pkmn/sim imports of its own (the Dex comes from replay-core's resolver), main-bundle safe.
  */
 
-import { Dex } from '@pkmn/dex';
-import { toId, type SideId, type TurnSnapshot } from '@fulllifegames/replay-core';
+import { dexOf, toId, type GameRules, type RulesDex, type SideId, type TurnSnapshot } from '@fulllifegames/replay-core';
 import { normalizeLineEndings, normalizeLines } from './line-endings.ts';
 import { isPivotMove } from './pivot-moves.ts';
 import { detectSacks as detectSacksOfLf, type SackInfo } from './turn-analysis/sacks.ts';
@@ -15,8 +14,8 @@ export type { SackInfo } from './turn-analysis/sacks.ts';
  * Round 63: the sack shapes live in turn-analysis/sacks.ts; the protocol API keeps its old address. Round 70 (T206): the address
  * is also the reader's door for line endings, because the faint pattern matches to the line end and a '\r' there hid every sack.
  */
-export function detectSacks(events: string[], snapshotBefore: TurnSnapshot | null): { p1?: SackInfo; p2?: SackInfo } {
-  return detectSacksOfLf(normalizeLines(events), snapshotBefore);
+export function detectSacks(events: string[], snapshotBefore: TurnSnapshot | null, rules: GameRules): { p1?: SackInfo; p2?: SackInfo } {
+  return detectSacksOfLf(normalizeLines(events), snapshotBefore, rules);
 }
 
 export interface PlayedAction {
@@ -72,6 +71,8 @@ const nickname = (pokemonRef: string): string => pokemonRef.replace(/^p[12][a-c]
 
 /** The singles scan: per side the settled action, the gimmick flags, and why a choice never surfaced. */
 interface PlayedScan {
+  /** Round 75 (T160): the game's own Dex (generation and mod), for the pivot moves. */
+  dex: RulesDex;
   actions: { p1: PlayedAction | null; p2: PlayedAction | null };
   settled: Record<SideId, boolean>;
   /** The side's body fainted: a switch after that is a replacement, never the follow-up of a move. */
@@ -117,10 +118,9 @@ function noteSwitch(scan: PlayedScan, side: SideId, ref: string, species: string
     // "U-turn → the wall" from "U-turn → the wincon"). Round 70 (N1): the pivots
     // are the Dex's selfSwitch moves (pivot-moves.ts), and a body that fainted
     // after its move was replaced, not pivoted: a Teleport that failed before
-    // Gen 8 records no target. The scan has no generation, so the newest Dex
-    // answers, and it holds every pivot of every generation.
+    // Gen 8 records no target. The scan reads the game's own Dex (round 75, T160).
     const action = scan.actions[side];
-    if (action && action.kind === 'move' && !scan.fainted[side] && isPivotMove(Dex, toId(action.name)) &&
+    if (action && action.kind === 'move' && !scan.fainted[side] && isPivotMove(scan.dex, toId(action.name)) &&
       action.pivotTarget === undefined) {
       action.pivotTarget = species;
     }
@@ -151,8 +151,9 @@ function notePlayedLine(scan: PlayedScan, tag: string, side: SideId, parts: stri
  * never surfaced (the side stays unknown rather than guessed). Round 70 (T206): the lines pass the door for line endings first, so
  * the reason of a `|cant|` line, its last field, reads "flinch" and never "flinch\r".
  */
-export function parsePlayedActions(lines: string[]): PlayedTurn {
+export function parsePlayedActions(lines: string[], rules: GameRules): PlayedTurn {
   const scan: PlayedScan = {
+    dex: dexOf(rules),
     actions: { p1: null, p2: null },
     settled: { p1: false, p2: false },
     fainted: { p1: false, p2: false },

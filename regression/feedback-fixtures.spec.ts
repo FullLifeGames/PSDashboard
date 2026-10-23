@@ -1,5 +1,6 @@
 import { test, expect } from 'vitest';
 import { existsSync, readFileSync } from 'fs';
+import { loadSimMods } from '@fulllifegames/eval-engine';
 import { join } from 'path';
 import { FEEDBACK_CENSUS_REPLAYS, FEEDBACK_CORPUS, FEEDBACK_REPLAYS } from '../e2e-feedback/corpus';
 import { validateCorpus } from '../e2e-feedback/claims';
@@ -118,6 +119,8 @@ test('573756: Magnezone holds the Choice Scarf the move order proves', async () 
 const SINGLES_CENSUS: readonly string[] = ['gen9championsou-2628340185'];
 
 test('census fixtures are doubles games (Champions OU singles) with every Smogon input pinned', async () => {
+  // Round 75 (T160): the census holds Champions games, whose inference reads the registered mod.
+  await loadSimMods('gen9championsou');
   expect(FEEDBACK_CENSUS_REPLAYS.filter(id => (FEEDBACK_REPLAYS as readonly string[]).includes(id))).toEqual([]);
   expect(FEEDBACK_CORPUS.filter(item => (FEEDBACK_CENSUS_REPLAYS as readonly string[]).includes(item.replay))).toEqual([]);
   for (const id of FEEDBACK_CENSUS_REPLAYS) {

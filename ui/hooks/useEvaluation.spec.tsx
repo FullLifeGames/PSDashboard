@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, onTestFinished, test, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
+import { logRules } from '@fulllifegames/replay-core';
 import { AUTO_MCTS_FAINTED_FRACTION, configureSearchBudget, parsePlayedActions, parseSearchBudget, type EvalResult, type EvalSettings, type SearchProgress } from '@fulllifegames/eval-engine';
 import { evalResult } from '../fixtures/eval-result';
 
@@ -108,7 +109,7 @@ describe('useEvaluation single position', () => {
 
   // Round 63 (final review): the single evaluation of a replay turn searches with the played action, like the sweep it shares the cache key with.
   test('a single evaluation hands its played action to the search as keepPlayed', async () => {
-    const played = parsePlayedActions(['|move|p1a: Chomp|Earthquake|p2a: Rotom', '|turn|2']);
+    const played = parsePlayedActions(['|move|p1a: Chomp|Earthquake|p2a: Rotom', '|turn|2'], logRules(''));
     const { result } = renderHook(() => useEvaluation());
     act(() => result.current.setPrefs(matrixPrefs));
     act(() => result.current.evaluate({ cacheKey: 'replay:1:fp', tera: false, sleepClause: true, acquire: async () => position(1), tag: 'main:1', keepPlayed: played }));
@@ -226,7 +227,7 @@ describe('useEvaluation single position', () => {
 
 describe('useEvaluation whole-game sweep', () => {
   const sweepParams = (acquireFor: (turn: number) => () => Promise<string>) => ({
-    turns: 3, tera: false as const, cacheKeyFor: (turn: number) => `replay:${turn}:fp`, acquireFor, playedFor: () => null,
+    turns: 3, tera: false as const, rules: logRules(''), cacheKeyFor: (turn: number) => `replay:${turn}:fp`, acquireFor, playedFor: () => null,
   });
 
   test('sweeps every turn through the pool and fills the graph in turn order', async () => {
@@ -250,7 +251,7 @@ describe('useEvaluation whole-game sweep', () => {
 
   // Round 63 (T78, lane C's merge patch): the verify step joins the played row and column, so a singles turn hands its played action on too.
   test('a singles sweep hands the played action to the search as keepPlayed; a turn without one passes nothing', async () => {
-    const played = parsePlayedActions(['|move|p1a: Chomp|Earthquake|p2a: Rotom', '|turn|2']);
+    const played = parsePlayedActions(['|move|p1a: Chomp|Earthquake|p2a: Rotom', '|turn|2'], logRules(''));
     const { result } = renderHook(() => useEvaluation());
     act(() => result.current.setPrefs(matrixPrefs));
     act(() => result.current.runGraphSweep({

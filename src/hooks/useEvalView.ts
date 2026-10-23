@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, type Dispatch, type SetStateAction } from 'react';
 import {
-  type OpponentTeamInfo, type ReplayData, type TurnSnapshot, formatEnforcesSleepClause,
-  getBranchSimulatorFormat, inferReplayFormatId, replayRuleset,
+  type GameRules, type OpponentTeamInfo, type ReplayData, type TurnSnapshot, formatEnforcesSleepClause,
+  getBranchSimulatorFormat, inferReplayFormatId, logRules, replayRuleset,
 } from '@fulllifegames/replay-core';
 import { resolveAutoTurnSettings, type TurnEvalSettings, useEvaluation } from './useEvaluation';
 import type { useEvalAcquire } from './useEvalAcquire';
@@ -17,9 +17,9 @@ type Evaluation = ReturnType<typeof useEvaluation>;
 type Acquire = ReturnType<typeof useEvalAcquire>;
 
 /** The actions played on a replay turn: snapshots[turn] carries the block ending at |turn|turn+1. */
-const playedOn = (snapshots: TurnSnapshot[], turn: number, doubles: boolean) => (doubles
+const playedOn = (snapshots: TurnSnapshot[], turn: number, doubles: boolean, rules: GameRules) => (doubles
   ? parsePlayedActionsDoubles(snapshots[turn]?.log ?? [])
-  : parsePlayedActions(snapshots[turn]?.log ?? []));
+  : parsePlayedActions(snapshots[turn]?.log ?? [], rules));
 
 export interface EvalViewInputs {
   replayData: ReplayData | null;
@@ -112,7 +112,7 @@ function useEvaluateAction(inputs: EvalViewInputs, format: EvalFormat) {
         acquire: acquire.acquireReplayPosition,
         tag: evalViewKey,
         // The sweep stores this turn under the same key: search it with the same played action.
-        keepPlayed: keptPlayed(playedOn(snapshots, viewTurn, evalIsDoubles)),
+        keepPlayed: keptPlayed(playedOn(snapshots, viewTurn, evalIsDoubles, logRules(replayData.log))),
       });
     }
   }, [replayData, snapshots, evalIsDoubles, liveTip, viewingVariation, serializedAtView, evaluation, effectiveTera, effectiveSleepClause, effectiveRuleset, acquire.acquireBranchPosition, acquire.acquireReplayPosition, viewTurn, setsFingerprint, evalViewKey]);
@@ -141,7 +141,9 @@ function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
   const { replayData, snapshots, evaluation, analyzableTurns, evalIsDoubles, acquire, sources, bringOnlyLists, setsFingerprint, sensitivityTargetsFor, smogonPending } = inputs;
   const { effectiveTera, effectiveSleepClause, effectiveRuleset, evalAvailable } = format;
 
-  const playedFor = useCallback((turn: number) => playedOn(snapshots, turn, evalIsDoubles), [evalIsDoubles, snapshots]);
+  // Round 75 (T160): the replay's generation and mod, for the Dex reads of the played-action parser and the sweep.
+  const rules = useMemo(() => logRules(replayData?.log ?? ''), [replayData]);
+  const playedFor = useCallback((turn: number) => playedOn(snapshots, turn, evalIsDoubles, rules), [evalIsDoubles, snapshots, rules]);
 
   const handleAnalyzeGame = useCallback(() => {
     if (!replayData) return;
@@ -149,6 +151,7 @@ function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
       turns: analyzableTurns,
       tera: effectiveTera,
       sleepClause: effectiveSleepClause,
+      rules,
       ruleset: effectiveRuleset,
       doubles: evalIsDoubles,
       cacheKeyFor: turn => `${replayData.id}:${turn}:${setsFingerprint}`,
@@ -163,7 +166,7 @@ function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
       playedLeads: parseLeadSpecies(replayData.log),
       sensitivityTargetsFor,
     });
-  }, [replayData, evaluation, analyzableTurns, effectiveTera, effectiveSleepClause, effectiveRuleset, evalIsDoubles, setsFingerprint, acquire, playedFor, sources, bringOnlyLists, sensitivityTargetsFor]);
+  }, [replayData, evaluation, analyzableTurns, effectiveTera, effectiveSleepClause, effectiveRuleset, evalIsDoubles, setsFingerprint, acquire, playedFor, rules, sources, bringOnlyLists, sensitivityTargetsFor]);
 
   // Explains ONE turn: a two-turn mini sweep (turn + its follow-up) so the
   // report can price the played outcome, at the panel's settings. Runs ONLY
@@ -177,6 +180,7 @@ function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
       to: Math.min(turn + 1, analyzableTurns),
       tera: effectiveTera,
       sleepClause: effectiveSleepClause,
+      rules,
       ruleset: effectiveRuleset,
       doubles: evalIsDoubles,
       cacheKeyFor: sweepTurn => `${replayData.id}:${sweepTurn}:${setsFingerprint}`,
@@ -185,7 +189,7 @@ function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
       playedFor,
       sensitivityTargetsFor,
     });
-  }, [replayData, evaluation, analyzableTurns, effectiveTera, effectiveSleepClause, effectiveRuleset, evalIsDoubles, setsFingerprint, acquire, playedFor, sensitivityTargetsFor]);
+  }, [replayData, evaluation, analyzableTurns, effectiveTera, effectiveSleepClause, effectiveRuleset, evalIsDoubles, setsFingerprint, acquire, playedFor, rules, sensitivityTargetsFor]);
 
   /**
    * "Always on": with the autoAnalyze pref set, Analyze game starts by

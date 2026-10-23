@@ -87,7 +87,7 @@ describe('SideRow', () => {
   test('a blunder reads as a blunder; a setup move softens the chip into a caveat', () => {
     const { rerender } = render(<SideRow name="Alice" side={misplayedSide('blunder')} />);
     expect(screen.getByText(`blunder · ${winDeltaText(-0.5)}`)).toBeInTheDocument();
-    rerender(<SideRow name="Alice" side={misplayedSide('mistake', { playedRaw: { kind: 'move', name: 'Swords Dance' } })} />);
+    rerender(<SideRow name="Alice" side={misplayedSide('mistake', { playedRaw: { kind: 'move', name: 'Swords Dance' }, setupMove: 'Swords Dance' })} />);
     expect(screen.getByText(`${winDeltaText(-0.25)} regret · setup caveat`)).toBeInTheDocument();
   });
 

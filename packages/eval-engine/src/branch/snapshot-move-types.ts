@@ -62,8 +62,8 @@ function remember(key: string, answer: ReadonlyMap<string, SnapshotMoveType> | n
 
 /** The weather and the terrain the snapshot shows, set on the twin; what the twin's own switch-in ability started goes. */
 function setField(battle: Battle, field: SnapshotTypeQuery['field']): void {
-  const weather = weatherIdFromSnapshot(field.weather);
-  const terrain = terrainIdFromSnapshot(field.terrain);
+  const weather = weatherIdFromSnapshot(field.weather, battle.dex);
+  const terrain = terrainIdFromSnapshot(field.terrain, battle.dex);
   if (weather && battle.dex.conditions.get(weather).exists) battle.field.setWeather(weather, 'debug');
   else battle.field.clearWeather();
   if (terrain && battle.dex.conditions.get(terrain).exists) battle.field.setTerrain(terrain, 'debug');

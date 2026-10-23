@@ -1,4 +1,4 @@
-import { Dex } from '@pkmn/sim';
+import type { RulesDex } from '@fulllifegames/replay-core';
 
 /**
  * Round 68 (T186, decision 6): Struggle in Gens 2 to 4 is typeless in the simulator (its own onModifyMove sets the type to
@@ -11,7 +11,7 @@ import { Dex } from '@pkmn/sim';
 type Handler = (this: unknown, ...args: unknown[]) => unknown;
 
 /** Whether the simulator's move, once it has run its own onModifyMove, is a typeless damaging move ('???'). */
-function typelessAtUse(dex: typeof Dex, moveName: string): boolean {
+function typelessAtUse(dex: RulesDex, moveName: string): boolean {
   const move = dex.getActiveMove(moveName);
   const modify = (move as { onModifyMove?: unknown }).onModifyMove;
   if (!move.exists || move.category === 'Status' || typeof modify !== 'function') return false;
@@ -27,7 +27,7 @@ function typelessAtUse(dex: typeof Dex, moveName: string): boolean {
 const HIT_HANDLER = /^on(BasePower|ModifyAtk|ModifySpA|ModifyDamage)$/;
 
 /** Whether one of the item's hit handlers gives a boost to a move of this type, the move otherwise as it stands. */
-function boostsType(dex: typeof Dex, itemName: string, moveName: string, type: string): boolean {
+function boostsType(dex: RulesDex, itemName: string, moveName: string, type: string): boolean {
   const item = dex.items.get(itemName) as unknown as Record<string, unknown>;
   const move = { ...dex.getActiveMove(moveName), type };
   return Object.keys(item).filter(key => HIT_HANDLER.test(key) && typeof item[key] === 'function').some(key => {
@@ -40,8 +40,7 @@ function boostsType(dex: typeof Dex, itemName: string, moveName: string, type: s
 }
 
 /** The item the calc should see on the attacker for this move: '' for a Normal-type boost item on a move the simulator plays typeless, else the item itself. */
-export function itemAtUse(gen: number, item: string, moveName: string): string {
+export function itemAtUse(dex: RulesDex, item: string, moveName: string): string {
   if (!item) return item;
-  const dex = Dex.forGen(gen);
   return typelessAtUse(dex, moveName) && boostsType(dex, item, moveName, 'Normal') && !boostsType(dex, item, moveName, '???') ? '' : item;
 }

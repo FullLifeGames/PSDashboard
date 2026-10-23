@@ -1,8 +1,7 @@
 import { Move, Field, calculate, type Pokemon } from '@smogon/calc';
-import { Dex } from '@pkmn/sim';
 import type { SimPokemonInfo, BranchMoveOption } from './branch-engine.ts';
-import { toId, TERRAIN_BY_ID, WEATHER_BY_ID, calcGenerationFor, isScreen, protectKind, screenFlags, simGenNum } from '@fulllifegames/replay-core';
-import { attackerAtUse, bodyFromInfo, calcPokemon, simDexOf, type CalcBody } from './calc/body.ts';
+import { toId, TERRAIN_BY_ID, WEATHER_BY_ID, calcGenerationFor, isScreen, protectKind, screenFlags, dexOfCalc, simGenNum, type RulesDex } from '@fulllifegames/replay-core';
+import { attackerAtUse, bodyFromInfo, calcPokemon, type CalcBody } from './calc/body.ts';
 import { hitDraws } from './calc/hit-draws.ts';
 import { calcMove, protectBlocks } from './calc/move.ts';
 import { strengthMix, strongerPower } from './calc/fickle.ts';
@@ -116,7 +115,7 @@ function landsOn(gen: CalcGen, attacker: SimPokemonInfo, target: SimPokemonInfo,
  */
 function shieldedBy(gen: CalcGen, pick: string | undefined, moveName: string, attacker: CalcBody): boolean {
   if (!pick) return false;
-  const dex = simDexOf(gen);
+  const dex = dexOfCalc(gen);
   const shield = dex.moves.get(pick);
   return protectKind(dex, shield) === 'shield' && shield.priority > dex.moves.get(moveName).priority && protectBlocks(gen, moveName, attacker);
 }
@@ -143,7 +142,7 @@ function moveLanding(
   const hit = moveOption.targetType === 'allAdjacentFoes' ? foes
     : moveOption.targetType === 'allAdjacent' ? foes + (context.attackerPartnerAlive ? 1 : 0)
     : 0;
-  const split = !!partner && !!simDexOf(gen).moves.get(moveOption.name).smartTarget &&
+  const split = !!partner && !!dexOfCalc(gen).moves.get(moveOption.name).smartTarget &&
     landsOn(gen, attacker, partner, moveOption.name, context, shieldedBy(gen, context.defenderPartnerMove, moveOption.name, bodyFor(gen, attacker)));
   const overrides: CalcMoveOverrides = {
     ...(hit === 1 ? { target: 'normal' as const } : {}),
@@ -183,14 +182,13 @@ const multihitMemo = new Map<string, number | number[] | undefined>();
  * Ash-Greninja's Water Shuriken three hits). A handler that asks the battle
  * for more than the preview holds leaves the copy as it is.
  */
-function multihitAtUse(gen: number, attacker: GearHolder, moveName: string) {
-  const key = `${gen}|${attacker.species}|${attacker.ability}|${attacker.item}|${moveName}`;
-  if (!multihitMemo.has(key)) multihitMemo.set(key, askModifyMove(gen, attacker, moveName));
+function multihitAtUse(dex: RulesDex, attacker: GearHolder, moveName: string) {
+  const key = `${dex.gen}|${dex.currentMod}|${attacker.species}|${attacker.ability}|${attacker.item}|${moveName}`;
+  if (!multihitMemo.has(key)) multihitMemo.set(key, askModifyMove(dex, attacker, moveName));
   return multihitMemo.get(key);
 }
 
-function askModifyMove(gen: number, attacker: GearHolder, moveName: string) {
-  const dex = Dex.forGen(gen);
+function askModifyMove(dex: RulesDex, attacker: GearHolder, moveName: string) {
   const move = dex.getActiveMove(moveName);
   const pokemon = { species: dex.species.get(attacker.species), transformed: false };
   for (const effect of [dex.abilities.get(attacker.ability), dex.items.get(attacker.item)]) {
@@ -212,11 +210,11 @@ function askModifyMove(gen: number, attacker: GearHolder, moveName: string) {
  * and the calc's own reading stands. A count the attacker's ability sets
  * (multihitAtUse) goes to the calc as such.
  */
-export function hitCounts(gen: number, attacker: GearHolder, moveName: string): HitCount[] | null {
-  const multihit = multihitAtUse(gen, attacker, moveName);
+export function hitCounts(dex: RulesDex, attacker: GearHolder, moveName: string): HitCount[] | null {
+  const multihit = multihitAtUse(dex, attacker, moveName);
   if (!multihit) return null;
-  const drawn = hitDraws(gen, multihit, toId(attacker.item) === 'loadeddice');
-  if (drawn.length === 1 && multihit === Dex.forGen(gen).moves.get(moveName).multihit) return null;
+  const drawn = hitDraws(dex.gen, multihit, toId(attacker.item) === 'loadeddice');
+  if (drawn.length === 1 && multihit === dex.moves.get(moveName).multihit) return null;
   return sharesOf(drawn);
 }
 
@@ -293,7 +291,7 @@ export function calcSingleDamageRange(
   try {
     const gen = calcGeneration(context, attacker.mod);
     const overrides = moveLanding(gen, attacker, moveOption, context);
-    const atkBody = attackerAtUse(simGenNum(gen), bodyFor(gen, attacker, context), moveOption.name);
+    const atkBody = attackerAtUse(dexOfCalc(gen), bodyFor(gen, attacker, context), moveOption.name);
     const priceAt = (hits?: number, isStellarFirstUse = false, power?: { basePower: number }): CalcResult => {
       const atkPoke = calcPokemon(gen, atkBody);
       const defPoke = calcPokemonFrom(gen, defender, context);
@@ -314,8 +312,8 @@ export function calcSingleDamageRange(
     const firstUse = stellarFirstUse(atkBody, () => priceAt().move.type);
     // A multi-hit move deals the sum of its hits; the calc sums them itself (T96). A drawn hit
     // count spans the fewest hits' minimum to the most hits' maximum, every count priced (T124).
-    const counts = overrides?.multihit ? null : hitCounts(simGenNum(gen), attacker, moveOption.name);
-    const priced = counts ? counts.map(({ hits, chance }) => ({ chance, result: priceAt(hits, firstUse) })) : strengthPriced(priceAt, firstUse, strengthMix(simDexOf(gen), moveOption.name));
+    const counts = overrides?.multihit ? null : hitCounts(dexOfCalc(gen), attacker, moveOption.name);
+    const priced = counts ? counts.map(({ hits, chance }) => ({ chance, result: priceAt(hits, firstUse) })) : strengthPriced(priceAt, firstUse, strengthMix(dexOfCalc(gen), moveOption.name));
     const minDamage = Math.min(...priced.map(({ result }) => result.range()[0]));
     const maxDamage = Math.max(...priced.map(({ result }) => result.range()[1]));
     const maxhp = bodyFor(gen, defender).maxhp;

@@ -7,7 +7,8 @@
  * bundle prints minified source, so there the pin and CI stand guard and the
  * host decides (state.ts).
  */
-import { Battle, Dex, Pokemon, toID } from '@pkmn/sim';
+import { Battle, Pokemon, toID } from '@pkmn/sim';
+import { simFormats } from '@fulllifegames/replay-core';
 import { breakSimFast, onNode } from './state.ts';
 
 type HashTable = Readonly<Record<string, string>>;
@@ -70,7 +71,7 @@ function check(): boolean {
   const field = new Battle({ formatid: toID('gen9customgame') }).field;
   const actual = hashSources({
     battle: Battle.prototype, pokemon: Pokemon.prototype,
-    field: Object.getPrototypeOf(field) as object, formats: Object.getPrototypeOf(Dex.formats) as object,
+    field: Object.getPrototypeOf(field) as object, formats: Object.getPrototypeOf(simFormats()) as object,
   });
   const tables = Object.values(pinned);
   const match = tables.some(table => Object.keys(table).every(key => table[key] === actual[key]));

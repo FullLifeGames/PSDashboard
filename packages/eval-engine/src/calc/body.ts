@@ -1,6 +1,6 @@
 import { Move as CalcMove, Pokemon as CalcPokemon, Field, calculate } from '@smogon/calc';
-import { Dex, toID, type Battle, type Pokemon } from '@pkmn/sim';
-import { buildCalcPokemon, calcGenerationFor, calcSpecies as sharedCalcSpecies, speciesOverrides as sharedSpeciesOverrides, simGenNum, CHAMPIONS_MOD, type CalcGeneration } from '@fulllifegames/replay-core';
+import { toID, type Battle, type Pokemon } from '@pkmn/sim';
+import { buildCalcPokemon, calcGenerationFor, calcSpecies as sharedCalcSpecies, dexOfCalc, rulesDex, speciesOverrides as sharedSpeciesOverrides, type CalcGeneration, type RulesDex } from '@fulllifegames/replay-core';
 import type { SimPokemonInfo } from '../branch/types.ts';
 import { itemAtUse } from './typeless.ts';
 
@@ -146,7 +146,7 @@ export function bodyOf(battle: Battle, mon: Pokemon): SimBody {
     species: mon.species.name,
     level: mon.level,
     // A suppressed ability reaches the calc as No Ability: Multiscale under Gastro Acid is no Multiscale (abilityId stays the simulator's).
-    ability: !mon.ability ? '' : suppressed ? NO_ABILITY : battle.dex.abilities.get(mon.ability).name,
+    ability: !mon.ability ? '' : suppressed ? noAbilityOf(battle.dex) : battle.dex.abilities.get(mon.ability).name,
     abilityId: mon.ability,
     item: mon.item ? battle.dex.items.get(mon.item).name : '',
     itemId: mon.item,
@@ -209,12 +209,14 @@ function probeStages(gen: number, ability: string, abilityOn: boolean): boolean 
   let moved = stageProbeMemo.get(key);
   if (moved === undefined) {
     moved = false;
+    // Outside the try: a Champions generation without its mod throws, and a failed read is never memoized as "no stage".
+    const noAbility = noAbilityOf(rulesDex(gen));
     try {
       const calcGen = calcGenerationFor(gen);
       const species = [...calcGen.species][0].name;
       const move = [...calcGen.moves].find(candidate => candidate.basePower > 0)!.name;
       const user = new CalcPokemon(calcGen, species, { ability: ability as never, ...(abilityOn ? { abilityOn: true } : {}) });
-      const other = new CalcPokemon(calcGen, species, { ability: NO_ABILITY as never });
+      const other = new CalcPokemon(calcGen, species, { ability: noAbility as never });
       const result = calculate(calcGen, user, other, new CalcMove(calcGen, move), new Field({}));
       const changed = (stages: Partial<Stages>) => STAT_KEYS.some(stat => (stages[stat] ?? 0) !== 0);
       // With abilityOn only the holder's own stage counts: Intimidate moves the other side's stages, which the simulator gives too.
@@ -247,24 +249,14 @@ export function calcOwnEntryStage(gen: number, ability: string): boolean {
 }
 
 /** The simulator's own name for no ability: no check of the calc names it, and it keeps the calc off the species' first ability. */
-const NO_ABILITY = Dex.abilities.get('noability').name;
-
-/**
- * The simulator's Dex behind a calculator generation: a game generation's own, and for the calculator's Champions
- * generation 0 the Champions mod's Dex where it is loaded (it loads with a Champions battle), else Gen 9's, whose
- * species data it shares (champions-vs-mod.md).
- */
-export function simDexOf(gen: CalcGen): typeof Dex {
-  const mod = (gen.num as number) === 0 ? Dex.dexes[CHAMPIONS_MOD] : undefined;
-  return (mod ?? Dex.forGen(simGenNum(gen))) as typeof Dex;
-}
+const noAbilityOf = (dex: RulesDex): string => dex.abilities.get('noability').name;
 
 /**
  * The species as the calc knows it (round 67, T72; replay-core calc-build.ts since round 68): the form the generation lists
- * with equal values, read against the simulator's Dex (the Champions mod's where it is loaded).
+ * with equal values, read against the simulator's Dex (round 75, T160: the generation's own, the Champions mod's for generation 0, which throws unregistered).
  */
 export function calcSpecies(gen: number, name: string): string {
-  return sharedCalcSpecies(gen, name, simDexOf(calcGenerationFor(gen)));
+  return sharedCalcSpecies(gen, name, dexOfCalc(calcGenerationFor(gen)));
 }
 
 /** One answer per gen, species, ability, item and move. */
@@ -280,18 +272,17 @@ type ModifyMoveHandler = (this: unknown, move: unknown, pokemon: unknown, target
  * itself leaves the body as it is. Round 68: the item as the move finds it
  * too (typeless.ts: a Normal-boost item on Struggle in Gens 2 to 4).
  */
-export function attackerAtUse<T extends CalcBody>(gen: number, body: T, moveName: string): T {
-  const key = `${gen}|${body.species}|${body.ability}|${body.item}|${moveName}`;
+export function attackerAtUse<T extends CalcBody>(dex: RulesDex, body: T, moveName: string): T {
+  const key = `${dex.gen}|${dex.currentMod}|${body.species}|${body.ability}|${body.item}|${moveName}`;
   let atUse = atUseMemo.get(key);
   if (atUse === undefined) {
-    atUse = { species: formeAtUse(gen, body, moveName), item: itemAtUse(gen, body.item, moveName) };
+    atUse = { species: formeAtUse(dex, body, moveName), item: itemAtUse(dex, body.item, moveName) };
     atUseMemo.set(key, atUse);
   }
   return atUse.species === body.species && atUse.item === body.item ? body : { ...body, ...atUse };
 }
 
-function formeAtUse(gen: number, body: CalcBody, moveName: string): string {
-  const dex = Dex.forGen(gen);
+function formeAtUse(dex: RulesDex, body: CalcBody, moveName: string): string {
   const handler = (dex.abilities.get(body.ability) as { onModifyMove?: unknown }).onModifyMove;
   if (typeof handler !== 'function' || !dex.moves.get(moveName).exists) return body.species;
   let forme = body.species;
@@ -315,7 +306,7 @@ function abilityForCalc(gen: CalcGen, body: CalcBody, species: string): string |
   const given = body.ability || undefined;
   if (!body.onField) return given;
   const effective = given ?? gen.species.get(toID(species))?.abilities?.[0];
-  return effective && calcAddsStages(gen.num, effective) ? NO_ABILITY : given;
+  return effective && calcAddsStages(gen.num, effective) ? noAbilityOf(dexOfCalc(gen)) : given;
 }
 
 /**
@@ -331,7 +322,7 @@ function entersWithStage(gen: CalcGen, body: CalcBody, ability: string | undefin
 
 /** The species as overrides, read from the simulator's Dex (replay-core calc-build.ts, decision 3). */
 export function speciesOverrides(gen: CalcGen, name: string): ReturnType<typeof sharedSpeciesOverrides> {
-  return sharedSpeciesOverrides(gen, name, simDexOf(gen));
+  return sharedSpeciesOverrides(gen, name, dexOfCalc(gen));
 }
 
 /** The one place the engine builds a calc Pokémon (the species through replay-core's shared builder). */
@@ -353,5 +344,5 @@ export function calcPokemon(gen: CalcGen, body: CalcBody): CalcPokemon {
     teraType: (body.tera ?? undefined) as never,
     boostedStat: body.boostedStat as never,
     alliesFainted: body.alliesFainted,
-  }, simDexOf(gen));
+  }, dexOfCalc(gen));
 }

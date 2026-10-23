@@ -136,7 +136,7 @@ describe('the report reads the played cell when the turn has no protocol', () =>
     played: { p1: { kind: 'move', name: 'Hydro Pump', tera: false }, p2: { kind: 'move', name: 'Seismic Toss', tera: false } },
   });
   const turn = (result: EvalResult, played: PlayedTurn) => analyzeTurn({
-    turn: 4, result, played, playedOutcome: 0.05, scoreBefore: 0.05, scoreAfter: 0.25,
+    turn: 4, result, played, playedOutcome: 0.05, scoreBefore: 0.05, scoreAfter: 0.25, actives: { p1: null, p2: null, gen: 9 },
   });
   const ROLL = { visits: 20, verified: false, plan: 'events' as const, classes: [{ key: 'hit-nokill', weight: 0.7 }, { key: 'miss', weight: 0.3 }] };
   const DETERMINISTIC = { visits: 20, verified: false, plan: 'none' as const };

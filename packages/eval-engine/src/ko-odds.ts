@@ -1,7 +1,7 @@
 import { Field, calculate } from '@smogon/calc';
-import { Dex, type Battle, type Pokemon } from '@pkmn/sim';
-import { TERRAIN_BY_ID, WEATHER_BY_ID, callingMoves, calcGenerationFor, screenFlags, standingScreens } from '@fulllifegames/replay-core';
-import { attackerAtUse, calcPokemon, simDexOf, type SimBody } from './calc/body.ts';
+import type { Battle, Pokemon } from '@pkmn/sim';
+import { TERRAIN_BY_ID, WEATHER_BY_ID, callingMoves, calcGenerationFor, dexOfCalc, screenFlags, standingScreens, type RulesDex } from '@fulllifegames/replay-core';
+import { attackerAtUse, calcPokemon, type SimBody } from './calc/body.ts';
 import { strengthMix, strongerPower } from './calc/fickle.ts';
 import { calcMove } from './calc/move.ts';
 import { stellarFirstUse } from './calc/stellar.ts';
@@ -37,7 +37,7 @@ type DexMove = ReturnType<Battle['dex']['moves']['get']>;
  * Moves that call another move, so the seed or the turn decides what actually happens (Round 72, W1: the Dex's `callsMove`,
  * seven moves over every generation; the hand list held four). test/random-call-oracle.spec.ts plays each of them.
  */
-export const RANDOM_CALL_MOVES = new Set(callingMoves(Dex));
+export const randomCallMoves = (dex: RulesDex): ReadonlySet<string> => callingMoves(dex);
 
 /** Moves whose immediate damage the one-turn model cannot price. */
 // oracle: packages/eval-engine/test/unpriceable-oracle.spec.ts
@@ -122,7 +122,7 @@ function killShare(damage: unknown, hp: number): number | null {
 /** The guards that make the one-turn model refuse a pair: unknown or unpriceable moves, crit and accuracy modifiers it cannot fold. */
 export function unpriceable(attacker: Pokemon, defender: Pokemon, move: DexMove): boolean {
   if (!move.exists) return true;
-  if (RANDOM_CALL_MOVES.has(move.id) || UNPRICEABLE_MOVE_IDS.has(move.id)) return true;
+  if (randomCallMoves(attacker.battle.dex).has(move.id) || UNPRICEABLE_MOVE_IDS.has(move.id)) return true;
   if (move.multihit) return true;
   if (move.ohko) return true;
   if ((move.critRatio ?? 1) > 2) return true;
@@ -192,7 +192,7 @@ function damageKillFraction(
     const c = critRate(genNum, move.critRatio ?? 1);
     if (weak === null || c === null) return null;
     // A move that doubles on a chance (Fickle Beam, T154) is the mix of its two strengths; the roll counts stay the weaker one's, which the scripts aim by.
-    const mix = strengthMix(simDexOf(gen), move.name);
+    const mix = strengthMix(dexOfCalc(gen), move.name);
     const strong = mix ? sharesAt(strongerPower(calcMove(gen, move.name, bodies.attacker, stellar).bp, mix.factor)) : null;
     if (mix && strong === null) return null;
     const fraction = (shares: { normal: number; crit: number }) => (1 - c) * shares.normal + c * shares.crit;
@@ -232,7 +232,7 @@ export function boundaryEvent(
   }
 
   const bodies = {
-    attacker: attackerAtUse(genNum, bodyAsClicked(battle, attacker, !!tera.attacker), move.name),
+    attacker: attackerAtUse(battle.dex, bodyAsClicked(battle, attacker, !!tera.attacker), move.name),
     defender: bodyAsClicked(battle, defender, !!tera.defender),
   };
   // A click that clears the weather (Teraform Zero) comes before every move of the turn, the accuracy roll included.

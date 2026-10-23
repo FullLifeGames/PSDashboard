@@ -1,6 +1,6 @@
 import type { Battle, Pokemon } from '@pkmn/sim';
 import { rollsStall } from '../dex-facts/protect.ts';
-import { RANDOM_CALL_MOVES } from '../ko-odds.ts';
+import { randomCallMoves } from '../ko-odds.ts';
 
 /**
  * Round 56: a doubles pair choice as slot actions, and the rules that send
@@ -48,7 +48,7 @@ function moverFallback(battle: Battle, mon: Pokemon, moveId: string, foes: numbe
   // Quick Guard and Mat Block set a side condition and roll nothing; test/pair-stall-guard.spec.ts plays every one).
   if (rollsStall(battle.dex, move) && mon.volatiles['stall']) return 'stall';
   if (move.multihit || mon.ability === 'parentalbond') return 'multi-hit';
-  if (RANDOM_CALL_MOVES.has(move.id)) return 'random-call';
+  if (randomCallMoves(battle.dex).has(move.id)) return 'random-call';
   if (move.target === 'randomNormal' && foes > 1) return 'random-target';
   return null;
 }

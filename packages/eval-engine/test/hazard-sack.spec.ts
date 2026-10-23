@@ -1,5 +1,6 @@
 import { test, expect, describe } from 'vitest';
 import type { TurnSnapshot } from '@fulllifegames/replay-core';
+import { logRules } from '@fulllifegames/replay-core';
 import { detectSacks } from '../src/played';
 
 const mon = (name: string, speciesForme: string, hpPercent: number, isActive: boolean) => ({
@@ -37,7 +38,7 @@ describe('the hazard sack', () => {
       [mon('Tornadus', 'Tornadus-Therian', 60, true), mon('Weavile', 'Weavile', 22, false)],
       [mon('Charizard', 'Charizard', 80, true)],
     );
-    expect(detectSacks(events, before)).toEqual({
+    expect(detectSacks(events, before, logRules(''))).toEqual({
       p1: { name: 'Weavile', species: 'Weavile', hpFraction: 63 / 281, healthy: true, hazard: true },
     });
   });
@@ -53,7 +54,7 @@ describe('the hazard sack', () => {
       [mon('Chi-Yu', 'Chi-Yu', 100, true)],
       [mon('Rillaboom', 'Rillaboom', 100, true), mon('Amoonguss', 'Amoonguss', 40, false)],
     );
-    expect(detectSacks(events, before).p2).toEqual({ name: 'Amoonguss', species: 'Amoonguss', hpFraction: 0.4, healthy: true, hazard: true });
+    expect(detectSacks(events, before, logRules('')).p2).toEqual({ name: 'Amoonguss', species: 'Amoonguss', hpFraction: 0.4, healthy: true, hazard: true });
   });
 
   test('a replacement after a move (a pivot or an end-of-turn switch) killed by hazards is no hazard sack', () => {
@@ -67,7 +68,7 @@ describe('the hazard sack', () => {
       [mon('Heatran', 'Heatran', 100, true)],
       [mon('Landorus', 'Landorus-Therian', 100, true), mon('Weavile', 'Weavile', 21, false)],
     );
-    expect(detectSacks(events, before).p2?.hazard).toBeUndefined();
+    expect(detectSacks(events, before, logRules('')).p2?.hazard).toBeUndefined();
   });
 
   test('a switch-in that falls to a move, not to the hazards, is no hazard sack', () => {
@@ -82,6 +83,6 @@ describe('the hazard sack', () => {
       [mon('Tornadus', 'Tornadus-Therian', 60, true), mon('Weavile', 'Weavile', 22, false)],
       [mon('Charizard', 'Charizard', 80, true)],
     );
-    expect(detectSacks(events, before).p1?.hazard).toBeUndefined();
+    expect(detectSacks(events, before, logRules('')).p1?.hazard).toBeUndefined();
   });
 });

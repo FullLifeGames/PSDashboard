@@ -7,10 +7,10 @@
  * (getRuleTable answers format.ruleTable first, dex-formats.mjs:520). Process
  * wide: the format object is shared, so reconstruction battles share it too.
  */
-import { Dex } from '@pkmn/sim';
+import { dexOfFormat, simFormats } from '@fulllifegames/replay-core';
 import { onSimFastChange, simFastCounters, simFastFlags } from './state.ts';
 
-type Format = ReturnType<typeof Dex.formats.get>;
+type Format = ReturnType<ReturnType<typeof simFormats>['get']>;
 
 /** Formats whose table this module stored; the lever going off resets them to null. */
 const ours = new Set<Format>();
@@ -21,11 +21,11 @@ export function ensureRuleTable(formatid: string): void {
     onSimFastChange(syncRuleTables);
     hooked = true;
   }
-  const format = Dex.formats.get(formatid, true);
+  const format = simFormats().get(formatid, true);
   if (!format.exists) return;
   if (!format.ruleTable) {
     // The Battle constructor's own call (battle.mjs:61): the format's mod dex builds it.
-    format.ruleTable = Dex.forFormat(format).formats.getRuleTable(format);
+    format.ruleTable = dexOfFormat(format).formats.getRuleTable(format);
     ours.add(format);
   }
   simFastCounters.ruleTables++;

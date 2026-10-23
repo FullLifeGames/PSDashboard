@@ -1,5 +1,5 @@
 import { Move as CalcMove, Pokemon as CalcPokemon, Field, calculate } from '@smogon/calc';
-import { TERRAIN_BY_ID, WEATHER_BY_ID, calcGenerationFor, simGenNum, type CalcGeneration } from '@fulllifegames/replay-core';
+import { TERRAIN_BY_ID, WEATHER_BY_ID, calcGenerationFor, dexOfCalc, type CalcGeneration } from '@fulllifegames/replay-core';
 import { attackerAtUse, calcPokemon } from '../calc/body.ts';
 import { calcMove } from '../calc/move.ts';
 import { strongerPower, type StrengthMix } from '../calc/fickle.ts';
@@ -113,7 +113,7 @@ function rollsOf(damage: unknown): number[] | null {
 export function killTable(snap: PricedHit): KillTable | null {
   try {
     const gen = calcGenerationFor(snap.gen, snap.attacker.mod);
-    const attacker = calcBody(gen, attackerAtUse(simGenNum(gen), snap.attacker, snap.moveName), chargeOffset(snap));
+    const attacker = calcBody(gen, attackerAtUse(dexOfCalc(gen), snap.attacker, snap.moveName), chargeOffset(snap));
     const defender = calcBody(gen, snap.defender, 0);
     // A Stellar body's first use of a type hits harder (T152); the type at use is the calc's own.
     const first = stellarFirstUse(snap.attacker, () => calculate(gen, attacker, defender, hitMove(gen, snap, false), calcField(snap)).move.type);

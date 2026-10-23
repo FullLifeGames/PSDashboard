@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { logRules } from '@fulllifegames/replay-core';
 import {
   configureSearchBudget, createLocalTreeExecutor, parsePlayedActionsDoubles, parseSearchBudget, searchPosition, searchTreesOrchestrated,
 } from '@fulllifegames/eval-engine';
@@ -44,16 +45,16 @@ test('rule set like the app: Champions, VGC outside Champions, every other forma
 
 test('played combo like the app sweep: the log of snapshot[turn], kept when a slot or a singles action was played', () => {
   const doublesTurn = ['|move|p1a: Pelipper|Hurricane|p2a: Wall', '|move|p2a: Wall|Protect|p2a: Wall', '|turn|3'];
-  const kept = bankKeepPlayed([undefined, undefined, doublesTurn], 2, true);
+  const kept = bankKeepPlayed([undefined, undefined, doublesTurn], 2, true, logRules(''));
   expect(kept?.p1Slots?.[0]).toMatchObject({ kind: 'move' });
   // Like sweep-core: the doubles parser always returns slot lists, so a turn without actions passes [null, null] on.
-  expect(bankKeepPlayed([undefined, undefined, ['|turn|3']], 2, true)).toEqual(parsePlayedActionsDoubles(['|turn|3']));
+  expect(bankKeepPlayed([undefined, undefined, ['|turn|3']], 2, true, logRules(''))).toEqual(parsePlayedActionsDoubles(['|turn|3']));
   // Round 63 (T78, lane C's merge patch): a singles action is kept, so the verify step joins the played row and column.
-  const singles = bankKeepPlayed([undefined, undefined, ['|move|p1a: Chomp|Earthquake|p2a: Rotom', '|turn|3']], 2, false);
+  const singles = bankKeepPlayed([undefined, undefined, ['|move|p1a: Chomp|Earthquake|p2a: Rotom', '|turn|3']], 2, false, logRules(''));
   expect(singles?.p1).toMatchObject({ kind: 'move' });
   expect(singles?.p1Slots).toBeUndefined();
-  expect(bankKeepPlayed([undefined, undefined, ['|turn|3']], 2, false)).toBeUndefined();
-  expect(bankKeepPlayed([], 5, false)).toBeUndefined();
+  expect(bankKeepPlayed([undefined, undefined, ['|turn|3']], 2, false, logRules(''))).toBeUndefined();
+  expect(bankKeepPlayed([], 5, false, logRules(''))).toBeUndefined();
 });
 
 test('auto reads the budget: early depth and the tree threshold', async () => {

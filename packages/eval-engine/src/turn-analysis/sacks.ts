@@ -6,8 +6,7 @@
  * main-bundle safe. Moved out of played.ts in round 63.
  */
 
-import { Dex } from '@pkmn/dex';
-import { type TurnSnapshot, toId, type SideId } from '@fulllifegames/replay-core';
+import { dexOf, type GameRules, type RulesDex, type TurnSnapshot, toId, type SideId } from '@fulllifegames/replay-core';
 import { CHANCE_CANT } from '../dice-events.ts';
 
 /** A Pokémon fed to the opponent while nearly dead — its loss cost almost nothing. */
@@ -120,13 +119,15 @@ function sackForFaint(
 }
 
 /** An entry hazard by the Dex: a move that lays a side condition on the foe side (Stealth Rock, Spikes). */
-const isEntryHazard = (effect: string): boolean => {
-  const move = Dex.moves.get(effect);
+const isEntryHazard = (dex: RulesDex, effect: string): boolean => {
+  const move = dex.moves.get(effect);
   return move.exists && !!move.sideCondition && move.target === 'foeSide';
 };
 
 /** What one turn's lines told the sack detector before each faint. */
 interface SackScan {
+  /** The game's own Dex (round 75, T160). */
+  dex: RulesDex;
   entered: Entered;
   /** Slots force-dragged in this turn — a drag is never a deliberate feed. */
   dragged: Set<string>;
@@ -158,7 +159,7 @@ function noteSackLine(scan: SackScan, line: string): boolean {
     return true;
   }
   const hazardMatch = line.match(/^\|-damage\|(p[12][a-d]): [^|]*\|0 fnt\|\[from\] ([^|]+)/);
-  if (hazardMatch && scan.switchPhase.has(hazardMatch[1]) && isEntryHazard(hazardMatch[2].trim())) {
+  if (hazardMatch && scan.switchPhase.has(hazardMatch[1]) && isEntryHazard(scan.dex, hazardMatch[2].trim())) {
     scan.hazardFell.add(hazardMatch[1]);
     return true;
   }
@@ -200,10 +201,12 @@ function noteSackLine(scan: SackScan, line: string): boolean {
 export function detectSacks(
   events: string[],
   snapshotBefore: TurnSnapshot | null,
+  rules: GameRules,
 ): { p1?: SackInfo; p2?: SackInfo } {
   if (!snapshotBefore) return {};
   const fallen: Record<SideId, { name: string; sack: SackInfo | null }[]> = { p1: [], p2: [] };
   const scan: SackScan = {
+    dex: dexOf(rules),
     entered: new Map(), dragged: new Set(), rolled: new Map(), moved: false, switchPhase: new Set(), hazardFell: new Set(),
   };
   for (const line of events) {

@@ -99,8 +99,8 @@ async function computeFreshPlayedOutcome(
 ): Promise<'abort' | { value: number | null }> {
   const { depth, samples, mode } = engine;
   let outcome: number | null = null;
-  const p1Choice = matchOrPhantom(result, 'p1', turnPlayed);
-  const p2Choice = matchOrPhantom(result, 'p2', turnPlayed);
+  const p1Choice = matchOrPhantom(result, 'p1', turnPlayed, env.params.rules);
+  const p2Choice = matchOrPhantom(result, 'p2', turnPlayed, env.params.rules);
   if (p1Choice && p2Choice) {
     const paired = await guardedStage(env, () => perfSpan('played-pair', () =>
       client.evalPair(serialized, p1Choice.choice, p2Choice.choice, { depth, samples, mode, tera: env.params.tera, sleepClause: env.params.sleepClause, ruleset: env.params.ruleset })));

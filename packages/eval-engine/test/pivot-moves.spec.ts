@@ -1,5 +1,6 @@
 import { Dex } from '@pkmn/dex';
 import { State } from '@pkmn/sim';
+import type { GameRules } from '@fulllifegames/replay-core';
 import type { Battle, PokemonSet } from '@pkmn/sim';
 import { describe, expect, test } from 'vitest';
 import { createRootPosition } from '../src/forward-model';
@@ -143,7 +144,7 @@ describe.each(RULES)('$name: the follow-up switch in the simulator\'s own log (r
     battle.choose('p1', 'move 1');
     battle.choose('p2', 'move 1');
     if ((battle.sides[0].activeRequest as unknown as { forceSwitch?: boolean[] } | null)?.forceSwitch?.[0]) battle.choose('p1', 'switch 2');
-    const played = parsePlayedActions(publicTurn(battle)).p1;
+    const played = parsePlayedActions(publicTurn(battle), { gen: rules.gen, mod: rules.name === 'Pokémon Champions' ? 'champions' : undefined }).p1;
     expect(played?.kind).toBe('move');
     expect(played?.pivotTarget, `${moveId}: ${publicTurn(battle).filter(line => /^\|(move|faint|switch|-fail)\|/.test(line)).join(' ')}`)
       .toBe(PIVOTS[rules.name].includes(moveId) ? 'Blissey' : undefined);
@@ -151,17 +152,21 @@ describe.each(RULES)('$name: the follow-up switch in the simulator\'s own log (r
 });
 
 describe('the played-action parser names no move the simulator never pivots with (round 70, N1)', () => {
-  const every = new Map<string, string>();
-  for (const rules of RULES) for (const move of movesOf(rules, scene(rules, 'tackle'))) every.set(move.id, move.name);
-  const targetAfter = (name: string, between: string[]) =>
-    parsePlayedActions([`|move|p1a: Snorlax|${name}|p2a: Chansey`, ...between, '|switch|p1a: Blissey|Blissey|100/100']).p1?.pivotTarget;
+  const gameOf = (rules: Rules): GameRules => ({ gen: rules.gen, mod: rules.name === 'Pokémon Champions' ? 'champions' : undefined });
+  const targetAfter = (rules: Rules, name: string, between: string[]) =>
+    parsePlayedActions([`|move|p1a: Snorlax|${name}|p2a: Chansey`, ...between, '|switch|p1a: Blissey|Blissey|100/100'], gameOf(rules)).p1?.pivotTarget;
 
-  test('the switch right after a move is its follow-up for exactly the moves some generation pivots with', () => {
-    expect(every.size).toBeGreaterThan(800);
-    expect([...every].filter(([, name]) => targetAfter(name, []) === 'Blissey').map(([id]) => id).sort()).toEqual(EVERY_PIVOT);
-  });
+  // Round 75 (T160): the parser reads the Dex of the log's generation and mod, so the census is per generation.
+  describe.each(RULES)('$name', rules => {
+    const every = movesOf(rules, scene(rules, 'tackle'));
 
-  test('the switch after the body fainted is a replacement, whatever the move was', () => {
-    expect([...every].filter(([, name]) => targetAfter(name, ['|faint|p1a: Snorlax']) !== undefined)).toEqual([]);
+    test('the switch right after a move is its follow-up for exactly the moves the generation pivots with', () => {
+      expect(every.length).toBeGreaterThan(100);
+      expect(every.filter(move => targetAfter(rules, move.name, []) === 'Blissey').map(move => move.id).sort()).toEqual([...PIVOTS[rules.name]].sort());
+    });
+
+    test('the switch after the body fainted is a replacement, whatever the move was', () => {
+      expect(every.filter(move => targetAfter(rules, move.name, ['|faint|p1a: Snorlax']) !== undefined)).toEqual([]);
+    });
   });
 });

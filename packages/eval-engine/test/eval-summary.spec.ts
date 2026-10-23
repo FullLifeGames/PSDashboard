@@ -351,6 +351,7 @@ describe('natural-language turn summaries', () => {
       playedOutcome: 0.0,
       scoreBefore: 0.1,
       scoreAfter: -0.25,
+      actives: { p1: null, p2: null, gen: 9 },
     }), names);
     expect(summary).toContain('Beta played Swords Dance');
     expect(summary).toContain('Swords Dance is a setup move');

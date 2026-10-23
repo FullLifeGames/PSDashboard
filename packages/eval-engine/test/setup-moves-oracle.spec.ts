@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
-import { playedSetupMove, type SideAnalysis } from '../src/analysis';
+import { playedSetupMove } from '../src/analysis';
 import { CODED_SETUP_MOVES, fieldStages } from '../src/dex-facts/setup';
-import { SETUP_MOVES } from '../src/turn-analysis/played-match';
+import { setupMoveClicked, setupMovesOf } from '../src/turn-analysis/played-match';
 import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-views';
 
 /**
@@ -49,23 +49,24 @@ function setupMovesIn(view: SimView): string[] {
   return here;
 }
 
-describe('SETUP_MOVES is held to the simulator (round 72)', () => {
+// Round 75 (T160): the set is the view's own Dex's (setupMovesOf), not a global one.
+describe('The setup moves are held to the simulator (round 72)', () => {
   describe.each(ALL_VIEWS)('$name', view => {
     test('every setup move the simulator shows here is in the set', () => {
-      expect(setupMovesIn(view).filter(id => !NOT_SETUP.includes(id) && !SETUP_MOVES.has(id))).toEqual([]);
+      expect(setupMovesIn(view).filter(id => !NOT_SETUP.includes(id) && !setupMovesOf(view.dex).has(id))).toEqual([]);
     });
 
     test('every id in the set that the view plays is a setup move here, or one the view builds differently', () => {
       // Generations 2 to 4 give Growth one stage and Generation 3 gives Stockpile none (the boosts come in Generation 4); the doubles
       // sweep cannot aim Curse (it needs a target in the request).
       const unlike = [...(view.dex.gen >= 2 && view.dex.gen <= 4 ? ['growth'] : []), ...(view.dex.gen === 3 ? ['stockpile'] : []), ...(view.doubles ? ['curse'] : [])];
-      expect([...SETUP_MOVES].filter(id => real(view, id) && !setupMovesIn(view).includes(id) && !unlike.includes(id))).toEqual([]);
+      expect([...setupMovesOf(view.dex)].filter(id => real(view, id) && !setupMovesIn(view).includes(id) && !unlike.includes(id))).toEqual([]);
     });
   });
 
-  test('the set is exactly the union over the views, minus the two random moves', () => {
+  test('the sets are exactly the union over the views, minus the two random moves', () => {
     const union = [...new Set(ALL_VIEWS.flatMap(setupMovesIn))].filter(id => !NOT_SETUP.includes(id)).sort();
-    expect([...SETUP_MOVES].sort()).toEqual(union);
+    expect([...new Set(ALL_VIEWS.flatMap(view => [...setupMovesOf(view.dex)]))].sort()).toEqual(union);
   });
 
   test('the handler moves are the ones no data field covers, and the list carries its oracle tag', () => {
@@ -74,14 +75,19 @@ describe('SETUP_MOVES is held to the simulator (round 72)', () => {
     for (const view of ALL_VIEWS) for (const id of CODED_SETUP_MOVES.filter(name => real(view, name))) {
       expect(fieldStages(view.dex.moves.get(id) as Parameters<typeof fieldStages>[0]), `${id} in ${view.name}`).toBeLessThan(2);
     }
-    // And every other member of the set is covered by a field in the newest Dex.
-    const byField = [...SETUP_MOVES].filter(id => !CODED_SETUP_MOVES.includes(id));
-    expect(byField.filter(id => fieldStages(ALL_VIEWS[8].dex.moves.get(id) as Parameters<typeof fieldStages>[0]) < 2)).toEqual([]);
+    // And every other member of a view's set is covered by a field in that view's Dex.
+    for (const view of ALL_VIEWS) {
+      const byField = [...setupMovesOf(view.dex)].filter(id => !CODED_SETUP_MOVES.includes(id));
+      expect(byField.filter(id => fieldStages(view.dex.moves.get(id) as Parameters<typeof fieldStages>[0]) < 2), view.name).toEqual([]);
+    }
   });
 
-  test('playedSetupMove names Shelter, Take Heart and Tidy Up, and a plain attack stays null', () => {
-    const side = (name: string) => ({ playedRaw: { kind: 'move', name } }) as unknown as SideAnalysis;
-    for (const name of ['Shelter', 'Take Heart', 'Tidy Up', 'Swords Dance']) expect(playedSetupMove(side(name))).toBe(name);
-    expect(playedSetupMove(side('Tackle'))).toBeNull();
+  test('the record names Shelter, Take Heart and Tidy Up, and a plain attack stays null', () => {
+    const side = (name: string) => ({ playedRaw: { kind: 'move', name } }) as unknown as Parameters<typeof setupMoveClicked>[0];
+    const dex = ALL_VIEWS[8].dex;
+    for (const name of ['Shelter', 'Take Heart', 'Tidy Up', 'Swords Dance']) expect(setupMoveClicked(side(name), dex)).toBe(name);
+    expect(setupMoveClicked(side('Tackle'), dex)).toBeNull();
+    expect(playedSetupMove({ setupMove: 'Swords Dance' })).toBe('Swords Dance');
+    expect(playedSetupMove({})).toBeNull();
   });
 });

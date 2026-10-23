@@ -1,5 +1,4 @@
-import { Dex } from '@pkmn/sim';
-import { isChampionsFormat } from '@fulllifegames/replay-core';
+import { isChampionsFormat, registerChampionsDex, type RulesModData } from '@fulllifegames/replay-core';
 
 /**
  * Round 67 (T145): Pokémon Champions battles run on the Champions mod of
@@ -15,7 +14,6 @@ import { isChampionsFormat } from '@fulllifegames/replay-core';
  */
 
 type ChampionsMod = typeof import('@pkmn/mods/champions');
-type ModData = NonNullable<Parameters<typeof Dex.mod>[1]>;
 
 /**
  * Whether a simulator or replay format id names a Pokémon Champions format. Round 75 (T160): replay-core's isChampionsFormat is
@@ -33,8 +31,7 @@ let loading: Promise<void> | null = null;
  */
 export function registerChampionsMod(mod: ChampionsMod): void {
   if (registered) return;
-  Dex.mod('champions', mod as unknown as ModData);
-  Dex.formats.extend(mod.Formats);
+  registerChampionsDex(mod as unknown as RulesModData, mod.Formats);
   registered = true;
 }
 

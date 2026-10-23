@@ -37,11 +37,11 @@ function mismatches(battle: Battle, snapshot: TurnSnapshot): string[] {
       if (!fits(entry.duration, value)) out.push(`t${snapshot.turn} p${index + 1} ${key} duration sim ${entry.duration} snapshot ${JSON.stringify(value)}`);
     }
   });
-  if (battle.field.weather && battle.field.weather === weatherIdFromSnapshot(snapshot.field.weather) &&
+  if (battle.field.weather && battle.field.weather === weatherIdFromSnapshot(snapshot.field.weather, battle.dex) &&
       !fits(battle.field.weatherState.duration, snapshot.field.weatherState)) {
     out.push(`t${snapshot.turn} weather ${battle.field.weather} sim ${battle.field.weatherState.duration} snapshot ${JSON.stringify(snapshot.field.weatherState)}`);
   }
-  if (battle.field.terrain && battle.field.terrain === terrainIdFromSnapshot(snapshot.field.terrain) &&
+  if (battle.field.terrain && battle.field.terrain === terrainIdFromSnapshot(snapshot.field.terrain, battle.dex) &&
       !fits(battle.field.terrainState.duration, snapshot.field.terrainState)) {
     out.push(`t${snapshot.turn} terrain ${battle.field.terrain} sim ${battle.field.terrainState.duration} snapshot ${JSON.stringify(snapshot.field.terrainState)}`);
   }

@@ -5,6 +5,7 @@ import { buildTeamsFromReplay, getBranchSimulatorFormat, parseReplayLogWithObser
 import { buildChoiceLockContext } from '../src/choice-lock';
 import { reconstructBranchRuntime } from '../src/branch-engine';
 import { collectForcedSwitchSpecies, parseTurnBlocks } from '../src/branch/protocol-choices';
+import { rulesDex } from '@fulllifegames/replay-core';
 
 /**
  * Round 64 (T121, step G4): every switch the protocol shows that answers a
@@ -25,12 +26,12 @@ const block = (replay: Replay, turn: number) => parseTurnBlocks(replay.log).turn
 describe('the forced list reads every answered request', () => {
   test('an old-protocol pivot and a gen 3 faint replacement join the forced list', () => {
     const pivot = block(fixture('smogtours-gen6ou-653785.json'), 5);
-    expect(collectForcedSwitchSpecies(pivot.preUpkeep, pivot.postUpkeep, 'p1')).toEqual(['Excadrill']);
+    expect(collectForcedSwitchSpecies(pivot.preUpkeep, pivot.postUpkeep, 'p1', rulesDex(9))).toEqual(['Excadrill']);
     const explosion = block(fixture('gen3customgame-2115579570.json'), 8);
-    expect(collectForcedSwitchSpecies(explosion.preUpkeep, explosion.postUpkeep, 'p1')).toEqual(['Charizard']);
-    expect(collectForcedSwitchSpecies(explosion.preUpkeep, explosion.postUpkeep, 'p2')).toEqual(['Electabuzz']);
+    expect(collectForcedSwitchSpecies(explosion.preUpkeep, explosion.postUpkeep, 'p1', rulesDex(9))).toEqual(['Charizard']);
+    expect(collectForcedSwitchSpecies(explosion.preUpkeep, explosion.postUpkeep, 'p2', rulesDex(9))).toEqual(['Electabuzz']);
     const knockedOut = block(fixture('gen3customgame-2115579570.json'), 4);
-    expect(collectForcedSwitchSpecies(knockedOut.preUpkeep, knockedOut.postUpkeep, 'p1')).toEqual(['Gengar']);
+    expect(collectForcedSwitchSpecies(knockedOut.preUpkeep, knockedOut.postUpkeep, 'p1', rulesDex(9))).toEqual(['Gengar']);
   });
 
   test('doubles: a pivot on one slot leaves the partner\'s chosen switch alone', () => {
@@ -40,7 +41,7 @@ describe('the forced list reads every answered request', () => {
       '|-damage|p2a: Snorlax|80/100',
       '|switch|p1b: Heatran|Heatran, M|100/100',
     ];
-    expect(collectForcedSwitchSpecies(lines, [], 'p1')).toEqual(['Heatran']);
+    expect(collectForcedSwitchSpecies(lines, [], 'p1', rulesDex(9))).toEqual(['Heatran']);
   });
 
   test('a chosen switch that Pursuit hits on the way out stays the side\'s choice', () => {
@@ -50,7 +51,7 @@ describe('the forced list reads every answered request', () => {
       '|-damage|p1a: Latias|60/100',
       '|switch|p1a: Ferrothorn|Ferrothorn, M|352/352',
     ];
-    expect(collectForcedSwitchSpecies(lines, [], 'p1')).toEqual([]);
+    expect(collectForcedSwitchSpecies(lines, [], 'p1', rulesDex(9))).toEqual([]);
   });
 });
 

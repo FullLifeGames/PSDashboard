@@ -7,12 +7,11 @@
  */
 
 import { calculate, Move, type Pokemon } from '@smogon/calc';
-import { Dex, type PokemonSet } from '@pkmn/sim';
-import { type DamageObservation, type OpponentTeamInfo, typedHiddenPowerId, inferOpponentTeam, itemSetValue, replayRuleset, toId, calcGenerationFor, simGenNum, type CalcGeneration, abilityStateAtHit, fieldOf, historyPower, poweredMove } from '@fulllifegames/replay-core';
-import { attackerAtUse, calcPokemon, simDexOf, type CalcBody } from './calc/body.ts';
+import type { PokemonSet } from '@pkmn/sim';
+import { type DamageObservation, type OpponentTeamInfo, typedHiddenPowerId, inferOpponentTeam, itemSetValue, replayRuleset, toId, calcGenerationFor, dexOf, dexOfCalc, choiceItems, type RulesDex, type CalcGeneration, abilityStateAtHit, fieldOf, historyPower, poweredMove } from '@fulllifegames/replay-core';
+import { attackerAtUse, calcPokemon, type CalcBody } from './calc/body.ts';
 import { defenderAbilities, defenderItems, formeAbility, isBodyOf, pricedSpecies, type DefenderRead } from './choice-lock-defender.ts';
 import { calcMove } from './calc/move.ts';
-import { CHOICE_ITEMS } from './sensitivity.ts';
 import { normalizeLineEndings } from './line-endings.ts';
 
 /** `handedOver`: the Choice item came by a move, so the protocol itself shows it (no set guess to vet). */
@@ -50,7 +49,7 @@ function handOverLines(lines: string[]): Set<number> {
   return handed;
 }
 
-const isChoiceItem = (itemId: string) => !!itemId && Dex.items.get(itemId).isChoice === true;
+const isChoiceItem = (dex: RulesDex, itemId: string) => !!itemId && dex.items.get(itemId).isChoice === true;
 
 /**
  * A hand-over to the trailing active (round 63, T115; abilities since round
@@ -115,12 +114,12 @@ export function buildChoiceLockTrails(replayLog: string): ChoiceLockTrails {
  * or, after a hand-over, a Choice item and one move since it arrived.
  */
 export function protocolChoiceLock(
-  trails: ChoiceLockTrails, side: 'p1' | 'p2', turn: number,
+  trails: ChoiceLockTrails, side: 'p1' | 'p2', turn: number, dex: RulesDex,
 ): ProtocolLock | null {
   const state = trails[side].get(turn);
   if (!state || state.itemDisturbed || state.moves.length !== 1) return null;
   if (state.handedItem === undefined) return { species: state.species, moveId: state.moves[0] };
-  if (!isChoiceItem(state.handedItem)) return null;
+  if (!isChoiceItem(dex, state.handedItem)) return null;
   return { species: state.species, moveId: state.moves[0], handedOver: true };
 }
 
@@ -283,7 +282,7 @@ const atHp = (body: Pokemon, fraction = 1): Pokemon => Object.assign(body, fract
 function calcAttacker(gen: CalcGen, attackerSet: PokemonSet, obs: DamageObservation, withItem: string, moveId: string, mod?: string): Pokemon {
   const species = pricedSpecies(attackerSet, obs.attackerSpecies);
   const ability = formeAbility(gen, species, attackerSet.ability || '');
-  return atHp(calcPokemon(gen, attackerAtUse(simGenNum(gen), {
+  return atHp(calcPokemon(gen, attackerAtUse(dexOfCalc(gen), {
     species, level: attackerSet.level || 100, ability, item: withItem, nature: attackerSet.nature, evs: attackerSet.evs, ivs: attackerSet.ivs, gender: attackerSet.gender,
     boosts: stagesOf(obs.attackerBoosts), status: obs.attackerStatus, tera: obs.attackerTera ?? null, onField: true, mod,
     boostedStat: obs.attackerParadox?.stat, alliesFainted: obs.attackerFallen, totalFainted: obs.attackerFainted,
@@ -301,7 +300,7 @@ function calcDefender(gen: CalcGen, defenderSet: PokemonSet | undefined, obs: Da
 
 /** The defender's items the check ranges: the one the client shows at the hit when it shows one (or shows it gone), else the build's range. */
 const itemsAtHit = (gen: CalcGen, items: string[], obs: DamageObservation): string[] =>
-  (obs.defenderItem || obs.defenderItemChanged ? [obs.defenderItem ? simDexOf(gen).items.get(obs.defenderItem).name : ''] : items);
+  (obs.defenderItem || obs.defenderItemChanged ? [obs.defenderItem ? dexOfCalc(gen).items.get(obs.defenderItem).name : ''] : items);
 
 /**
  * Whether the roll range (± slack) under `withItem` contains the observed fraction for some ability and item the
@@ -326,7 +325,7 @@ function explainsWith(
     const defender = buildDefender();
     // The move as the calc must read it: a Champions game's moves at the mod's power and type (calc/move.ts).
     // Rage Fist and Last Respects take their power from the battle's history (T210 group 1).
-    const basePower = historyPower(simDexOf(gen), calcMoveId, { fainted: obs.attackerFainted ?? 0, timesAttacked: obs.attackerTimesAttacked ?? 0 });
+    const basePower = historyPower(dexOfCalc(gen), calcMoveId, { fainted: obs.attackerFainted ?? 0, timesAttacked: obs.attackerTimesAttacked ?? 0 });
     const result = calculate(gen, attacker, defender, calcMove(gen, calcMoveId, { mod, totalFainted: obs.attackerFainted } as CalcBody, basePower === null ? {} : { overrides: { basePower } }), fieldOf(obs));
     const rolls = (Array.isArray(result.damage) ? (result.damage as number[]).flat() : [Number(result.damage)]).map(Number);
     const maxHp = defender.maxHP();
@@ -393,7 +392,7 @@ export function corroborateChoiceItem(
     // Doubles hits (round 69, T31) carry a spread cut, screens at x2732/4096 and partner targets this check prices on a
     // singles field: they stay out of the verdict until it reads the doubles field.
     // A Z-move or a Max move prices from the Dex's placeholder power (T229): it proves nothing about the item.
-    if (obs.doubles || poweredMove(simDexOf(gen), obs.moveId)) continue;
+    if (obs.doubles || poweredMove(dexOfCalc(gen), obs.moveId)) continue;
     const defenderTeam = side === 'p1' ? teams.p2Team : teams.p1Team;
     const defenderSet = defenderTeam.find(candidate => isBodyOf(gen, obs.defenderSpecies, candidate.species));
     const info = defenders?.[side === 'p1' ? 'p2' : 'p1'];
@@ -434,7 +433,7 @@ export function buildChoiceLockContext(
     const team = side === 'p1' ? teams.p1Team : teams.p2Team;
     for (const built of team) {
       const speciesId = toId(built.species);
-      if (!CHOICE_ITEMS.has(toId(built.item ?? ''))) continue;
+      if (!choiceItems(dexOf({ gen: genNum, mod })).has(toId(built.item ?? ''))) continue;
       const revealed = info.pokemon.find(mon => toId(mon.species) === speciesId);
       // The team preview's "(has item)" is revealed-source but names no item
       // (round 64, T121: 649664's guessed Keldeo Specs skipped the check).

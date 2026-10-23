@@ -1,7 +1,7 @@
 import type { PRNGSeed } from '@pkmn/sim';
 import { evaluatePosition, type MatchupCache } from '../eval-function.ts';
 import type { positionBattle } from '../forward-model.ts';
-import { RANDOM_CALL_MOVES } from '../ko-odds.ts';
+import { randomCallMoves } from '../ko-odds.ts';
 import { lastPairRace, lastPairValue } from '../score/last-pair.ts';
 import { actionsTie } from '../sim-ask/index.ts';
 import type { RollScripts } from '../forward/scripted-prng.ts';
@@ -102,7 +102,7 @@ export function rollSensitivePair(battle: ReturnType<typeof positionBattle>, p1C
   return [...choiceMoveIds(p1Choice), ...choiceMoveIds(p2Choice)].some(id => {
     const move = battle.dex.moves.get(id);
     if (!move.exists) return false;
-    if (RANDOM_CALL_MOVES.has(move.id)) return true;
+    if (randomCallMoves(battle.dex).has(move.id)) return true;
     return typeof move.accuracy === 'number' && move.accuracy < 100;
   });
 }

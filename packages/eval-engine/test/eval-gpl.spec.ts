@@ -1,7 +1,7 @@
 import { test, expect, describe } from 'vitest';
 import { readFileSync } from 'fs';
 import { State } from '@pkmn/sim';
-import { type ReplayData, formatEnforcesSleepClause, inferReplayFormatId, getBranchSimulatorFormat, parseReplayLogWithObservations, buildTeamsFromReplay } from '@fulllifegames/replay-core';
+import { type ReplayData, logRules, formatEnforcesSleepClause, inferReplayFormatId, getBranchSimulatorFormat, parseReplayLogWithObservations, buildTeamsFromReplay } from '@fulllifegames/replay-core';
 import { reconstructBranchRuntime } from '../src/branch-engine';
 import { searchPosition } from '../src/search';
 import { analyzeTurn, TIER_THRESHOLDS } from '../src/analysis';
@@ -51,14 +51,16 @@ describe('GPL replay end-to-end verdicts', () => {
       const result = searchPosition(serialized, { depth: 1, samples: 1, tera, sleepClause });
       scoreByTurn.set(turn, result.score);
       const events = turnEvents(replay.log, turn);
+      const rules = logRules(replay.log);
       return analyzeTurn({
         turn,
         result,
-        played: parsePlayedActions(events),
+        played: parsePlayedActions(events, rules),
         playedOutcome: null,
         scoreBefore: result.score,
         scoreAfter,
-        sacks: detectSacks(events, snapshots[turn - 1] ?? null),
+        sacks: detectSacks(events, snapshots[turn - 1] ?? null, rules),
+        actives: { p1: null, p2: null, gen: rules.gen, mod: rules.mod },
       });
     };
 

@@ -1,5 +1,6 @@
 import { test, expect, describe } from 'vitest';
 import { parsePlayedActions, parsePlayedActionsDoubles } from '../src/played';
+import { logRules } from '@fulllifegames/replay-core';
 
 describe('played-action parsing', () => {
   test('both sides move', () => {
@@ -10,7 +11,7 @@ describe('played-action parsing', () => {
       '|-heal|p2a: Cryogonal|62/100',
       '|upkeep',
       '|turn|5',
-    ]);
+    ], logRules(''));
     expect(played.p1).toEqual({ kind: 'move', name: 'Draco Meteor', tera: false });
     expect(played.p2).toEqual({ kind: 'move', name: 'Recover', tera: false });
   });
@@ -24,7 +25,7 @@ describe('played-action parsing', () => {
       '|faint|p2a: Dragapult',
       '|switch|p2a: Cobalion|Cobalion|100/100',
       '|turn|6',
-    ]);
+    ], logRules(''));
     expect(played.p2).toEqual({ kind: 'switch', name: 'Dragapult', species: 'Dragapult' });
     expect(played.p1).toEqual({ kind: 'move', name: 'Draco Meteor', tera: false });
   });
@@ -35,7 +36,7 @@ describe('played-action parsing', () => {
     const slept = parsePlayedActions([
       '|move|p1a: Vileplume|Sleep Powder|p2a: Rhydon',
       '|cant|p2a: Rhydon|slp',
-    ]);
+    ], logRules(''));
     expect(slept.p2).toBeNull();
     expect(slept.prevented?.p2).toBe('slp');
     expect(slept.prevented?.p1).toBeUndefined();
@@ -44,14 +45,14 @@ describe('played-action parsing', () => {
     const taunted = parsePlayedActions([
       '|cant|p1a: Uxie|move: Taunt|Stealth Rock',
       '|move|p2a: Salazzle|Flamethrower|p1a: Uxie',
-    ]);
+    ], logRules(''));
     expect(taunted.prevented?.p1).toBe('move: Taunt');
 
     // A side that acted BEFORE the cant keeps its action, no reason.
     const moved = parsePlayedActions([
       '|move|p2a: Rhydon|Avalanche|p1a: Noivern',
       '|cant|p2a: Rhydon|flinch',
-    ]);
+    ], logRules(''));
     expect(moved.p2?.name).toBe('Avalanche');
     expect(moved.prevented).toBeUndefined();
   });
@@ -63,7 +64,7 @@ describe('played-action parsing', () => {
       '|faint|p2a: Cryogonal',
       '|switch|p2a: Cobalion|Cobalion|100/100',
       '|turn|7',
-    ]);
+    ], logRules(''));
     expect(played.p1).toEqual({ kind: 'move', name: 'Draco Meteor', tera: false });
     // Cryogonal died before acting — p2's chosen action never surfaced.
     expect(played.p2).toBeNull();
@@ -77,7 +78,7 @@ describe('played-action parsing', () => {
       '|switch|p1a: Corviknight|Corviknight|100/100|[from] U-turn',
       '|move|p2a: Snorlax|Body Slam|p1a: Corviknight',
       '|turn|9',
-    ]);
+    ], logRules(''));
     expect(played.p1).toEqual({ kind: 'move', name: 'U-turn', tera: false, pivotTarget: 'Corviknight' });
     expect(played.p2).toEqual({ kind: 'move', name: 'Body Slam', tera: false });
   });
@@ -88,7 +89,7 @@ describe('played-action parsing', () => {
       '|move|p1a: Kyurem|Draco Meteor|p2a: Snorlax',
       '|move|p2a: Snorlax|Body Slam|p1a: Kyurem',
       '|turn|12',
-    ]);
+    ], logRules(''));
     expect(played.p1).toEqual({ kind: 'move', name: 'Draco Meteor', tera: true });
     expect(played.p2).toEqual({ kind: 'move', name: 'Body Slam', tera: false });
   });
@@ -99,7 +100,7 @@ describe('played-action parsing', () => {
       '|move|p1a: Skarmory|Whirlwind|p2a: Snorlax',
       '|drag|p2a: Chansey|Chansey, F|100/100',
       '|turn|15',
-    ]);
+    ], logRules(''));
     expect(played.p1).toEqual({ kind: 'move', name: 'Whirlwind', tera: false });
     expect(played.p2).toBeNull();
   });
@@ -170,7 +171,7 @@ describe('mega evolution tracking', () => {
       '|-mega|p1a: Lucario|Lucario|Lucarionite',
       '|move|p1a: Lucario|Close Combat|p2a: Snorlax',
       '|turn|3',
-    ]);
+    ], logRules(''));
     expect(played.p1?.mega).toBe(true);
   });
 });
@@ -182,7 +183,7 @@ describe('pivot pair targets', () => {
       '|-damage|p2a: Chomp|150/200',
       '|switch|p1a: Clef|Clefable, F|100/100',
       '|move|p2a: Chomp|Earthquake|p1a: Clef',
-    ]);
+    ], logRules(''));
     expect(played.p1).toEqual({ kind: 'move', name: 'U-turn', tera: false, pivotTarget: 'Clefable' });
   });
 
@@ -192,7 +193,7 @@ describe('pivot pair targets', () => {
       '|move|p2a: Chomp|Earthquake|p1a: Mien',
       '|faint|p1a: Mien',
       '|switch|p1a: Clef|Clefable, F|100/100',
-    ]);
+    ], logRules(''));
     expect(played.p1).toEqual({ kind: 'move', name: 'Close Combat', tera: false });
   });
 });

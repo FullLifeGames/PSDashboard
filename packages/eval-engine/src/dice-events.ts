@@ -1,5 +1,4 @@
-import { Dex } from '@pkmn/dex';
-import { toId, type SideId, type TurnSnapshot } from '@fulllifegames/replay-core';
+import { rulesDex, toId, type RulesDex, type RulesMod, type SideId, type TurnSnapshot } from '@fulllifegames/replay-core';
 import { normalizeLines } from './line-endings.ts';
 
 /**
@@ -23,11 +22,11 @@ import { normalizeLines } from './line-endings.ts';
  * (Rest sleep is fixed-length — a documented over-inclusion.) */
 export const CHANCE_CANT: ReadonlySet<string> = new Set(['slp', 'par', 'frz', 'flinch']);
 
-type GenDex = ReturnType<typeof Dex.forGen>;
+type GenDex = RulesDex;
 
-/** The Dex of a replay generation (a Champions battle reads Gen 9's, whose moves it shares); absent without a generation. */
-const dexOfGeneration = (generation: number | undefined): GenDex | undefined =>
-  generation === undefined ? undefined : Dex.forGen(Math.min(9, Math.max(1, generation)));
+/** Round 75 (T160): the Dex of a replay's generation and mod (the Champions mod changes accuracies and secondaries); absent without a generation. */
+const dexOfGeneration = (generation: number | undefined, mod: RulesMod): GenDex | undefined =>
+  generation === undefined ? undefined : rulesDex(generation, mod);
 
 /** The Dex and the move whose action is running at a line; null keeps the markers as the protocol alone shows them. */
 type DiceContext = { dex: GenDex; running: string | null } | null;
@@ -42,8 +41,9 @@ function moveRollsStatus(dex: GenDex, id: string): boolean {
   if (typeof move.accuracy === 'number' && move.accuracy < 100) return true;
   const effects = move.secondaries ?? (move.secondary ? [move.secondary] : []);
   // A secondary that names only its chance picks its effect in a handler (Tri Attack, Dire Claw): its status is rolled too.
+  // Round 75 (T160): the simulator's Dex keeps the handler on the secondary (onHit), the data-only Dex of before dropped it: a function is no field.
   return effects.some(effect => (effect.chance ?? 100) < 100
-    && (effect.status !== undefined || Object.keys(effect).every(key => key === 'chance')));
+    && (effect.status !== undefined || Object.entries(effect).every(([key, value]) => key === 'chance' || typeof value === 'function')));
 }
 
 /** A bare or `[from] move:` status is a roll when its source's dice can decide it; with no running move (a hazard on a switch-in, a residual) it is none. */
@@ -72,8 +72,8 @@ function diceLine(line: string, context: DiceContext): boolean {
 const ACTION_END: ReadonlySet<string> = new Set(['move', 'switch', 'drag', 'cant', 'upkeep', 'turn', '']);
 
 /** Per line of a turn: whether it is a dice marker, with the running move read for the generation's Dex. */
-function diceMarks(lines: readonly string[], generation: number | undefined): boolean[] {
-  const dex = dexOfGeneration(generation);
+function diceMarks(lines: readonly string[], generation: number | undefined, mod: RulesMod): boolean[] {
+  const dex = dexOfGeneration(generation, mod);
   let running: string | null = null;
   return lines.map(line => {
     const tag = line.split('|')[1] ?? '';
@@ -88,10 +88,10 @@ function diceMarks(lines: readonly string[], generation: number | undefined): bo
  * Round 69 (T177): with the replay generation a sure crit and a status no dice decided are no event. Round 70 (T206): every turn's
  * lines pass the door for line endings (normalizeLines) before they are read.
  */
-export function diceEventTurns(turnEventsIndex: readonly (readonly string[])[], generation?: number): Set<number> {
+export function diceEventTurns(turnEventsIndex: readonly (readonly string[])[], generation?: number, mod?: RulesMod): Set<number> {
   const turns = new Set<number>();
   turnEventsIndex.forEach((lines, turn) => {
-    if (turn >= 1 && diceMarks(normalizeLines(lines), generation).some(Boolean)) turns.add(turn);
+    if (turn >= 1 && diceMarks(normalizeLines(lines), generation, mod).some(Boolean)) turns.add(turn);
   });
   return turns;
 }
@@ -196,11 +196,11 @@ function noteEntry(entered: Entered, parts: string[]): void {
  * Round 69 (T177): with the replay generation, the markers of a sure crit and of a status no dice decided are no roll.
  * Round 70 (T206): the lines pass the door for line endings (normalizeLines) first; a '\r' at the end of a damage line hid its KO.
  */
-export function detectRolls(rawLines: readonly string[], snapshotBefore: TurnSnapshot | null, generation?: number): TurnRolls {
+export function detectRolls(rawLines: readonly string[], snapshotBefore: TurnSnapshot | null, generation?: number, mod?: RulesMod): TurnRolls {
   const lines = normalizeLines(rawLines);
   const favored = { p1: false, p2: false };
   const scan = { entered: new Map() as Entered, snapshotBefore, hits: [] as RolledHit[] };
-  const marks = diceMarks(lines, generation);
+  const marks = diceMarks(lines, generation, mod);
   let action: RunningAction | null = null;
   for (const [index, line] of lines.entries()) {
     const parts = line.split('|');

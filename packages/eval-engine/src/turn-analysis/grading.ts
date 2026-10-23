@@ -1,11 +1,12 @@
-import { Dex } from '@pkmn/dex';
+import { dexOf } from '@fulllifegames/replay-core';
 import type { RankedChoice } from '../types.ts';
 import type { PlayedAction, SackInfo } from '../played.ts';
 import {
   DECIDED_SCORE, FEED_FLOOR_EPSILON, HEALTHY_SACK_FLOOR, PAYOFF_WINDOW, REGRET_THRESHOLD, RISK_PAYOFF_MARGIN,
   TIER_THRESHOLDS, type AnalyzeTurnParams, type SensitivityProbe, type Side, type SideAnalysis, type VerdictTier,
 } from './types.ts';
-import { matchPlayedChoice, matchPlayedSlots, phantomStayIn } from './played-match.ts';
+import { matchPlayedChoice, matchPlayedSlots, phantomStayIn, setupMoveClicked } from './played-match.ts';
+import { rulesOfActives } from './rules.ts';
 
 /**
  * The grading half of one side's turn, stage by stage in analyzeTurn's
@@ -41,7 +42,7 @@ function matchPlayedForSide(
   } else if (params.played) {
     played = matchPlayedChoice(params.result, key, playedRaw);
     if (!played) {
-      const phantom = phantomStayIn(params.result, key, params.played);
+      const phantom = phantomStayIn(params.result, key, params.played, rulesOfActives(params.actives));
       if (phantom) {
         played = phantom;
         neverActed = true;
@@ -267,7 +268,8 @@ function hazardSackPayoff(params: AnalyzeTurnParams, key: Side, safe: RankedChoi
 function feedsOpposingSweep(params: AnalyzeTurnParams, key: Side, sack: SackInfo): boolean {
   const near = params.result.unanswered?.nearDecided;
   if (!near || near.side === key || !sack.species) return false;
-  const base = (species: string) => Dex.species.get(species).baseSpecies || species;
+  const rules = rulesOfActives(params.actives);
+  const base = (species: string) => (rules ? dexOf(rules).species.get(species).baseSpecies : '') || species;
   return base(near.removes) === base(sack.species);
 }
 
@@ -393,10 +395,18 @@ export function gradeSide(params: AnalyzeTurnParams, key: Side): SideGrading {
   };
 }
 
+/** The setup move the side clicked, by the replay's own Dex (round 75, T160); none without the board context. */
+function setupField(params: AnalyzeTurnParams, g: SideGrading): { setupMove?: string } {
+  const rules = rulesOfActives(params.actives);
+  const setup = rules ? setupMoveClicked({ playedRaw: g.playedRaw, playedSlots: g.playedSlots }, dexOf(rules)) : null;
+  return setup ? { setupMove: setup } : {};
+}
+
 /** The grading half of the side record, keys in the report's order. */
 export function gradingFields(params: AnalyzeTurnParams, key: Side, g: SideGrading): SideAnalysis {
   return {
     playedRaw: g.playedRaw,
+    ...setupField(params, g),
     ...(params.played?.prevented?.[key] ? { prevented: params.played.prevented[key] } : {}),
     ...(g.playedSlots ? { playedSlots: g.playedSlots } : {}),
     ...(g.neverActed ? { neverActed: g.neverActed } : {}),

@@ -1,12 +1,11 @@
 /**
  * Item-sensitivity probe plumbing: pure JSON surgery on serialized battle
- * positions (State.serializeBattle output) — no battle is built here (the Dex
- * only names the Choice items), so the main-thread sweep can prepare probe
+ * positions (State.serializeBattle output) — no battle is built here (the Dex of the position's
+ * format only names the Choice items), so the main-thread sweep can prepare probe
  * positions and hand them to the worker like any other serialized position.
  */
 
-import { Dex } from '@pkmn/sim';
-import { choiceItems, sideIndex, toId } from '@fulllifegames/replay-core';
+import { choiceItems, dexOf, formatRules, sideIndex, toId } from '@fulllifegames/replay-core';
 
 export interface SensitivityTarget {
   species: string;
@@ -23,10 +22,10 @@ interface SerializedMon {
 }
 
 interface SerializedBattleShape {
+  /** The format the position was serialized under (State.serializeBattle): its generation and mod pick the Dex. */
+  formatid?: string;
   sides?: { pokemon?: SerializedMon[] }[];
 }
-
-export const CHOICE_ITEMS: ReadonlySet<string> = choiceItems(Dex);
 
 const monSpecies = (mon: SerializedMon): string => mon.set?.species ?? '';
 
@@ -97,7 +96,7 @@ export function patchSerializedItem(
   mon.item = itemId;
   if (mon.set) mon.set.item = item;
   if (mon.itemState && typeof mon.itemState === 'object') mon.itemState.id = itemId;
-  if (!CHOICE_ITEMS.has(itemId) && mon.volatiles && 'choicelock' in mon.volatiles) {
+  if (!choiceItems(dexOf(formatRules(parsed.formatid ?? ''))).has(itemId) && mon.volatiles && 'choicelock' in mon.volatiles) {
     delete mon.volatiles['choicelock'];
   }
   return JSON.stringify(parsed);

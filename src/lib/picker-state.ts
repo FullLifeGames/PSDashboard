@@ -1,6 +1,5 @@
-import { Dex } from '@pkmn/dex';
 import type { PokemonSet } from '@pkmn/sim';
-import { CHAMPIONS_MOD, type GameRules, buildCalcPokemon, calcGenerationFor, evBudget, speciesBaseId, toId, type PokemonSnapshot, type TurnSnapshot } from '@fulllifegames/replay-core';
+import { CHAMPIONS_MOD, type GameRules, type RulesDex, buildCalcPokemon, dexOf, calcGenerationFor, evBudget, speciesBaseId, toId, type PokemonSnapshot, type TurnSnapshot } from '@fulllifegames/replay-core';
 import {
   moveAtUse, sightedHpAt, snapshotMoveTypes, snapshotSimFacts, speciesAfterTeraClick,
   type BranchMoveOption, type BranchSimState, type BranchSlotModifiers, type BranchSwitchOption, type MoveUser, type SimPokemonInfo,
@@ -16,23 +15,23 @@ import { teraBanned } from './picker-tera';
  */
 export type PickerSource = 'live' | 'stored' | 'snapshot';
 
-function dexForGen(gen: number) {
-  return Dex.forGen(Math.min(9, Math.max(1, Math.round(gen))));
-}
+/** Round 75 (T160): the Dex of the game the picker shows: its generation and, for Pokémon Champions, the mod (Snap Trap and Growth differ there). */
+const gameRules = (gen: number, champions: boolean): GameRules => ({ gen: Math.round(gen), mod: champions ? CHAMPIONS_MOD : undefined });
+const dexFor = (gen: number, champions: boolean): RulesDex => dexOf(gameRules(gen, champions));
 
 /** Move type from the dex — the snapshot knows names, not types, but the
  *  picker buttons color and label by type exactly like the live sim's. */
-function moveTypeFor(name: string, gen: number): string {
+function moveTypeFor(name: string, gen: number, champions: boolean): string {
   try {
-    return dexForGen(gen).moves.get(name)?.type || '';
+    return dexFor(gen, champions).moves.get(name)?.type || '';
   } catch {
     return '';
   }
 }
 
-function speciesTypesFor(species: string, gen: number): string[] {
+function speciesTypesFor(species: string, gen: number, champions: boolean): string[] {
   try {
-    return [...(dexForGen(gen).species.get(species)?.types ?? [])];
+    return [...(dexFor(gen, champions).species.get(species)?.types ?? [])];
   } catch {
     return [];
   }
@@ -75,7 +74,7 @@ function guessedAttacks(mon: PokemonSnapshot, set: PokemonSet | undefined, gen: 
  * stays unknown.
  */
 function snapshotMoveUser(mon: PokemonSnapshot, set: PokemonSet | undefined, gen: number, champions = false): MoveUser {
-  const dex = dexForGen(gen);
+  const dex = dexFor(gen, champions);
   const species = dex.species.get(mon.speciesForme);
   const known = species.exists ? species : null;
   const item = mon.item ? dex.items.get(mon.item) : null;
@@ -97,17 +96,17 @@ function snapshotMoveUser(mon: PokemonSnapshot, set: PokemonSet | undefined, gen
  * Power keep the catalog type, as does a move whose possible abilities
  * disagree.
  */
-function snapshotTypeAtUse(name: string, user: MoveUser, gen: number): string {
-  const move = dexForGen(gen).moves.get(name);
+function snapshotTypeAtUse(name: string, user: MoveUser, gen: number, champions: boolean): string {
+  const move = dexFor(gen, champions).moves.get(name);
   if (!move.exists) return '';
   return moveAtUse(move, user)?.type ?? move.type;
 }
 
 /** The type a move lands with after the Tera click (round 69, T158): the move table with the Tera type clicked and the species the simulator makes of the body on the click. */
-function typesUnderTera(info: SimPokemonInfo, user: MoveUser, teraType: string | null, gen: number): (name: string) => string | undefined {
+function typesUnderTera(info: SimPokemonInfo, user: MoveUser, teraType: string | null, gen: number, champions: boolean): (name: string) => string | undefined {
   if (!teraType) return () => undefined;
   const clicked: MoveUser = { ...user, terastallized: teraType, species: speciesAfterTeraClick(gen, info, teraType) };
-  return name => snapshotTypeAtUse(name, clicked, gen);
+  return name => snapshotTypeAtUse(name, clicked, gen, champions);
 }
 
 /**
@@ -130,10 +129,10 @@ function moveOptionsFor(
   const read = snapshotMoveTypes({ gen, champions, body: tera.info, abilities: user.abilities, field, clickTera: tera.type, moves: names });
   // The table's Tera label is built (it clicks a twin) only for a move the simulator did not answer.
   let tableLabels: ReturnType<typeof typesUnderTera> | null = null;
-  const underTera = (name: string) => (tableLabels ??= typesUnderTera(tera.info, user, tera.type, gen))(name);
+  const underTera = (name: string) => (tableLabels ??= typesUnderTera(tera.info, user, tera.type, gen, champions))(name);
   return names.map((name, slot): BranchMoveOption => {
     const simulated = read?.get(name);
-    const type = simulated?.type ?? snapshotTypeAtUse(name, user, gen);
+    const type = simulated?.type ?? snapshotTypeAtUse(name, user, gen, champions);
     const clicked = simulated ? simulated.typeUnderTera : underTera(name);
     return {
       name,
@@ -207,7 +206,7 @@ function pokemonInfoFromSnapshot(
     fainted: mon.fainted,
     isActive: mon.isActive,
     activeSlot,
-    moves: moveNamesFor(mon, set).map(name => ({ name, type: moveTypeFor(name, gen) })),
+    moves: moveNamesFor(mon, set).map(name => ({ name, type: moveTypeFor(name, gen, champions) })),
     ability: mon.ability || set?.ability || '',
     item: mon.item || set?.item || '',
     // Raw stats are unknown without the sim, but the damage calc derives
@@ -219,10 +218,10 @@ function pokemonInfoFromSnapshot(
     ivs: set?.ivs,
     boosts: { ...mon.boosts },
     level: mon.level || set?.level || 100,
-    types: speciesTypesFor(mon.speciesForme, gen),
+    types: speciesTypesFor(mon.speciesForme, gen, champions),
     // The damage calc reads the Tera type from here (as on the live and stored paths).
     teraType: mon.terastallized || '',
-    ...snapshotSimFacts(mon, set, gen, sideFainted),
+    ...snapshotSimFacts(mon, set, gameRules(gen, champions), sideFainted),
     ...championsMark(champions),
   };
 }
@@ -261,15 +260,15 @@ const NO_TERA_TRANSFORMED_INTO: ReadonlySet<string> = new Set(['Ogerpon', 'Terap
  * canTerastallize and canMegaEvo), or after a transformation into Ogerpon
  * or Terapagos.
  */
-function snapshotTeraType(mon: PokemonSnapshot, set: PokemonSet | undefined, gen: number, sideMayTera: boolean): string | null {
+function snapshotTeraType(mon: PokemonSnapshot, set: PokemonSet | undefined, gen: number, sideMayTera: boolean, champions: boolean): string | null {
   if (!sideMayTera || gen !== 9) return null;
-  const dex = dexForGen(gen);
+  const dex = dexFor(gen, champions);
   const species = dex.species.get(set?.species || mon.speciesForme);
   if (transformedWithoutTera(dex, mon, species) || holdsOtherGimmick(dex, set?.item || mon.item, species)) return null;
   return set?.teraType || species.types[0] || null;
 }
 
-type GenDex = ReturnType<typeof dexForGen>;
+type GenDex = RulesDex;
 type GenSpecies = ReturnType<GenDex['species']['get']>;
 
 /** The snapshot shows a body transformed into Ogerpon or Terapagos (its set names another species). */
@@ -323,7 +322,7 @@ function snapshotSideOptions(
   const activeSlots = actives.map((mon, index) => pokemonInfoFromSnapshot(mon, setFor(mon), index, gen, champions, fainted));
   const field = { weather: snapshot.field.weather || '', terrain: snapshot.field.terrain || '' };
   const movesBySlot = actives.map((mon, index) => moveOptionsFor(
-    mon, setFor(mon), index, gen, champions, { info: activeSlots[index], type: snapshotTeraType(mon, setFor(mon), gen, sideMayTera) }, field,
+    mon, setFor(mon), index, gen, champions, { info: activeSlots[index], type: snapshotTeraType(mon, setFor(mon), gen, sideMayTera, champions) }, field,
   ));
   const switchesBySlot = actives.map((_, activeSlot): BranchSwitchOption[] =>
     pokemon
@@ -340,7 +339,7 @@ function snapshotSideOptions(
   const infos = pokemon.map(mon =>
     pokemonInfoFromSnapshot(mon, setFor(mon), mon.isActive ? actives.indexOf(mon) : null, gen, champions, fainted));
   const modifiersBySlot = actives.map((mon, index) => ({
-    teraType: snapshotTeraType(mon, setFor(mon), gen, sideMayTera),
+    teraType: snapshotTeraType(mon, setFor(mon), gen, sideMayTera, champions),
     canMegaEvo: false,
     canUltraBurst: false,
     zMoves: (movesBySlot[index] ?? []).map(() => null),

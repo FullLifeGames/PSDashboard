@@ -7,6 +7,7 @@ import { applyTargetCorrections, reconstructBranchRuntime } from '../packages/ev
 import { buildChoiceLockContext } from '../packages/eval-engine/src/choice-lock';
 import { getBranchSimulatorFormat, replayBringOnly } from '../packages/replay-core/src/replay-format';
 import { parseReplayLogWithObservations } from '../packages/replay-core/src/protocol-parser';
+import { logRules } from '../packages/replay-core/src/rules-dex';
 import { battleFaintedFraction, searchPosition } from '../packages/eval-engine/src/search';
 import { leafValue } from '../packages/eval-engine/src/search/leaf';
 import { bankKeepPlayed, bankSampleCount, bankSearch, bankSettings } from './bank-search';
@@ -6363,7 +6364,7 @@ describe.skipIf(!process.env.EVAL_CALIBRATION)('eval calibration against real re
             serialized, faintedFraction, depth, samples: sampleCount, mode: process.env.EVAL_CALIBRATION_MODE,
             settings: {
               ...replaySettings,
-              keepPlayed: bankKeepPlayed(snapshots.map(snapshot => snapshot.log), turn, gameType === 'doubles'),
+              keepPlayed: bankKeepPlayed(snapshots.map(snapshot => snapshot.log), turn, gameType === 'doubles', logRules(replay.log)),
             },
           });
           const { score } = root;

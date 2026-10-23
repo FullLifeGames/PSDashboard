@@ -141,7 +141,7 @@ function turnOf(make: () => Game, options: Options = {}): { analysis: TurnAnalys
   const [scoreBefore, playedOutcome, scoreAfter] = options.scores ?? SHIFT;
   const analysis = analyzeTurn({
     turn: 7, result, played: options.clickedOther ? game.playedOther : game.played, playedOutcome, scoreBefore, scoreAfter,
-    faintedFraction: 0.375, faintedFractionAfter: 0.375,
+    faintedFraction: 0.375, faintedFractionAfter: 0.375, actives: { p1: null, p2: null, gen: 9 },
   });
   return { analysis, names: game.names };
 }

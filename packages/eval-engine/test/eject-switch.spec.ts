@@ -7,6 +7,7 @@ import {
 import { buildChoiceLockContext } from '../src/choice-lock';
 import { reconstructBranchRuntime } from '../src/branch-engine';
 import { collectForcedSwitchSpecies, getMainChoice, parseTurnBlocks } from '../src/branch/protocol-choices';
+import { rulesDex } from '@fulllifegames/replay-core';
 
 /**
  * Round 64 (T121): an Eject Pack or Eject Button switch is the protocol's
@@ -26,11 +27,11 @@ const block = (replay: Replay, turn: number) => parseTurnBlocks(replay.log).turn
 describe('the forced list reads the switch an item made', () => {
   test('an Eject Pack or Eject Button switch-in joins the forced list', () => {
     const singles = block(fixture('smogtours-gen9ou-751407.json'), 1);
-    expect(collectForcedSwitchSpecies(singles.preUpkeep, singles.postUpkeep, 'p2')).toEqual(['Dragonite']);
+    expect(collectForcedSwitchSpecies(singles.preUpkeep, singles.postUpkeep, 'p2', rulesDex(9))).toEqual(['Dragonite']);
     // Doubles: Sinistcha's own switch-in is p2's choice; its Eject Button
     // brings Ninetales-Alola, and the faint replacement after upkeep follows.
     const doubles = block(fixture('gen9vgc2026regi-2630181744.json'), 3);
-    expect(collectForcedSwitchSpecies(doubles.preUpkeep, doubles.postUpkeep, 'p2'))
+    expect(collectForcedSwitchSpecies(doubles.preUpkeep, doubles.postUpkeep, 'p2', rulesDex(9)))
       .toEqual(['Ninetales-Alola', 'Sinistcha-Masterpiece']);
   });
 
@@ -41,7 +42,7 @@ describe('the forced list reads the switch an item made', () => {
       '|-unboost|p2a: Hatterene|atk|1',
       '|switch|p2a: Ting-Lu|Ting-Lu|100/100',
     ];
-    expect(collectForcedSwitchSpecies(intimidated, [], 'p2')).toEqual([]);
+    expect(collectForcedSwitchSpecies(intimidated, [], 'p2', rulesDex(9))).toEqual([]);
     const berry = [
       '|move|p2a: Weavile|Pursuit|p1a: Latias|[from]Pursuit',
       '|-damage|p1a: Latias|40/100',
@@ -49,7 +50,7 @@ describe('the forced list reads the switch an item made', () => {
       '|-heal|p1a: Latias|65/100|[from] item: Sitrus Berry',
       '|switch|p1a: Ferrothorn|Ferrothorn|100/100',
     ];
-    expect(collectForcedSwitchSpecies(berry, [], 'p1')).toEqual([]);
+    expect(collectForcedSwitchSpecies(berry, [], 'p1', rulesDex(9))).toEqual([]);
   });
 });
 
@@ -82,7 +83,7 @@ describe('the simulator\'s own logs: ejection against a Pursuit-time balloon pop
     const lines = played.log.filter((line, index, all) => !line.startsWith('|split|') && !all[index - 1]?.startsWith('|split|'));
     const turn = parseTurnBlocks(lines.join('\n')).turns.find(entry => entry.turn === 1)!;
     return {
-      forced: collectForcedSwitchSpecies(turn.preUpkeep, turn.postUpkeep, 'p1'),
+      forced: collectForcedSwitchSpecies(turn.preUpkeep, turn.postUpkeep, 'p1', rulesDex(9)),
       main: getMainChoice(turn.preUpkeep, 'p1', make(format, p1, p2) as never),
     };
   };

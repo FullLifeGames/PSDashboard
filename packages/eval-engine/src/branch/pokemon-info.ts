@@ -1,4 +1,4 @@
-import { Dex } from '@pkmn/sim';
+import { dexOf, type GameRules } from '@fulllifegames/replay-core';
 import { bodyFromInfo, simBodyFacts } from '../calc/body.ts';
 import { teraClicked } from '../calc/tera-click.ts';
 import { twinBattle, twinFormat } from '../sim-ask/index.ts';
@@ -25,13 +25,14 @@ const DEFAULT_IVS: PokemonStatTable = { hp: 31, atk: 31, def: 31, spa: 31, spd: 
  *  display name ('Technician'), so ids ('technician') silently disable
  *  every ability/item damage modifier (B6). */
 function displayFields(pokemon: SimPokemon): Pick<SimPokemonInfo, 'ability' | 'item' | 'moves'> {
+  const { dex } = pokemon.battle;
   return {
     moves: pokemon.moveSlots.map(move => ({
       name: move.move,
-      type: Dex.moves.get(move.id || move.move)?.type || '',
+      type: dex.moves.get(move.id || move.move)?.type || '',
     })),
-    ability: pokemon.ability ? (Dex.abilities.get(pokemon.ability)?.name || pokemon.ability) : '',
-    item: pokemon.item ? (Dex.items.get(pokemon.item)?.name || pokemon.item) : '',
+    ability: pokemon.ability ? (dex.abilities.get(pokemon.ability)?.name || pokemon.ability) : '',
+    item: pokemon.item ? (dex.items.get(pokemon.item)?.name || pokemon.item) : '',
   };
 }
 
@@ -239,10 +240,12 @@ export function sightedHpAt(gen: number, champions: boolean, sighting: HpSightin
 /**
  * Hidden Power's type and power for a set, as the simulator's Pokemon constructor gives them (round 69, T158): the
  * set's own hpType, else the type of the first typed Hidden Power move in its list, else the Dex's reading of the
- * IVs (the Dex gives the power too: 60 from Gen 6 on, IV-derived before; Gen 1 and 2 read the even DVs).
+ * IVs (the Dex gives the power too: 60 from Gen 6 on, IV-derived before; Gen 1 and 2 read the even DVs). Round 75 (T160): the
+ * Dex is the game's own, by generation and mod.
  */
-export function hiddenPowerFacts(gen: number, set: { moves?: readonly string[]; ivs?: Partial<PokemonStatTable>; hpType?: string }): { hpType: string; hpPower: number } {
-  const dex = Dex.forGen(gen);
+export function hiddenPowerFacts(rules: GameRules, set: { moves?: readonly string[]; ivs?: Partial<PokemonStatTable>; hpType?: string }): { hpType: string; hpPower: number } {
+  const dex = dexOf(rules);
+  const { gen } = rules;
   const ivs = Object.fromEntries((Object.keys(DEFAULT_IVS) as (keyof PokemonStatTable)[]).map(stat => {
     const iv = Math.min(31, Math.max(0, Math.trunc(set.ivs?.[stat] ?? DEFAULT_IVS[stat])));
     return [stat, gen <= 2 ? iv & 30 : iv];
@@ -254,14 +257,14 @@ export function hiddenPowerFacts(gen: number, set: { moves?: readonly string[]; 
 
 /** What the calc reads off the simulator's body, from a snapshot (round 69, T158): the volatile facts the client kept, the side's fallen, Hidden Power of the set (or of the moves shown). */
 export function snapshotSimFacts(
-  mon: { boostedStat?: string; fallen?: number; moves?: readonly string[] }, set: { moves?: readonly string[]; ivs?: Partial<PokemonStatTable>; hpType?: string } | undefined, gen: number, sideFainted: number,
+  mon: { boostedStat?: string; fallen?: number; moves?: readonly string[] }, set: { moves?: readonly string[]; ivs?: Partial<PokemonStatTable>; hpType?: string } | undefined, rules: GameRules, sideFainted: number,
 ): Pick<SimPokemonInfo, 'boostedStat' | 'alliesFainted' | 'totalFainted' | 'hpType' | 'hpPower'> {
   return {
     ...(mon.boostedStat ? { boostedStat: mon.boostedStat } : {}),
     ...(mon.fallen ? { alliesFainted: mon.fallen } : {}),
     ...(sideFainted ? { totalFainted: sideFainted } : {}),
     // A body without a set reads as the simulator reads one without IVs of its own: 31 everywhere, the moves the log showed.
-    ...hiddenPowerFacts(gen, set ?? { moves: mon.moves }),
+    ...hiddenPowerFacts(rules, set ?? { moves: mon.moves }),
   };
 }
 

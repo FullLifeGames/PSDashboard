@@ -1,4 +1,4 @@
-import { Dex } from '@pkmn/dex';
+import { rulesDex, type RulesDex, type RulesMod } from '@fulllifegames/replay-core';
 
 /**
  * Multi-turn expectation cumulation (round 6 expectation grounding, the
@@ -33,7 +33,7 @@ export interface StreakOdds {
   event: 'freeze' | 'paralysis' | 'burn' | 'flinch' | 'crit';
 }
 
-type GenDex = ReturnType<typeof Dex.forGen>;
+type GenDex = RulesDex;
 type DexMove = ReturnType<GenDex['moves']['get']>;
 
 /** Sentences fire only at streak milestones — a 4th repeat is not news. */
@@ -118,11 +118,11 @@ function boostedAttackRun(dex: GenDex, last: StreakHistoryEntry, entries: (Strea
  * Secondary fishing is checked first; crit accumulation only speaks when
  * no secondary story exists. Returns null below gen 3 and off milestones.
  */
-export function detectStreakOdds(gen: number, entries: (StreakHistoryEntry | null)[]): StreakOdds | null {
+export function detectStreakOdds(gen: number, entries: (StreakHistoryEntry | null)[], mod?: RulesMod): StreakOdds | null {
   if (gen <= 2) return null;
   const last = entries[entries.length - 1];
   if (!last || !last.moveId) return null;
-  const dex = Dex.forGen(gen);
+  const dex = rulesDex(gen, mod);
 
   // Secondary detector: the same attacker repeating the same move into the
   // same defender fishes for the move's secondary.

@@ -17,8 +17,8 @@ async function backfillPlayedOutcome(
   let outcome: number | null | undefined = hit.playedOutcome;
   if (outcome === undefined) {
     outcome = null;
-    const p1Choice = matchOrPhantom(hit.result, 'p1', turnPlayed);
-    const p2Choice = matchOrPhantom(hit.result, 'p2', turnPlayed);
+    const p1Choice = matchOrPhantom(hit.result, 'p1', turnPlayed, env.params.rules);
+    const p2Choice = matchOrPhantom(hit.result, 'p2', turnPlayed, env.params.rules);
     if (p1Choice && p2Choice) {
       try {
         const serialized = await env.positionFor(turn);

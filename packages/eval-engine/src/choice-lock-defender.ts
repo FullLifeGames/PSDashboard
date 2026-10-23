@@ -1,11 +1,10 @@
 import type { PokemonSet } from '@pkmn/sim';
-import { itemSetValue, toId, type CalcGeneration, type DamageObservation, type OpponentTeamInfo, type RevealedPokemonInfo } from '@fulllifegames/replay-core';
-import { simDexOf } from './calc/body.ts';
+import { dexOfCalc, itemSetValue, toId, type CalcGeneration, type RulesDex, type DamageObservation, type OpponentTeamInfo, type RevealedPokemonInfo } from '@fulllifegames/replay-core';
 
 /** The defender of an observation: its built set (when the team has one), the abilities and the items it may have (round 68, T157; round 69, T193). */
 export interface DefenderRead { set: PokemonSet | undefined; abilities: string[]; items: string[] }
 
-type SimDex = ReturnType<typeof simDexOf>;
+type SimDex = RulesDex;
 
 /**
  * The species a battle forme comes from, as ids (round 69, lane A's request): the forme's battleOnly and changesFrom
@@ -23,7 +22,7 @@ function formeOrigins(dex: SimDex, name: string, depth = 0): string[] {
 
 /** Whether the species the log names is the built species, or a battle forme of it. */
 export const isBodyOf = (gen: CalcGeneration, logged: string, built: string): boolean =>
-  toId(logged) === toId(built) || formeOrigins(simDexOf(gen), logged).includes(toId(built));
+  toId(logged) === toId(built) || formeOrigins(dexOfCalc(gen), logged).includes(toId(built));
 
 /** The species a body is priced as: the built set's own name when the log names that species, else the forme the log names. */
 export const pricedSpecies = (set: PokemonSet | undefined, logged: string): string =>
@@ -31,7 +30,7 @@ export const pricedSpecies = (set: PokemonSet | undefined, logged: string): stri
 
 /** The ability the forme has: the set's own when the forme lists it (Stance Change), else the forme's first (a Mega's). */
 export function formeAbility(gen: CalcGeneration, species: string, ability: string): string {
-  const listed = Object.values(simDexOf(gen).species.get(species).abilities ?? {}).filter(Boolean);
+  const listed = Object.values(dexOfCalc(gen).species.get(species).abilities ?? {}).filter(Boolean);
   return !ability || listed.length === 0 || listed.includes(ability) ? ability : listed[0];
 }
 
@@ -56,7 +55,7 @@ const shownItem = (info: RevealedPokemonInfo | undefined): string =>
  * forme of the set's species ranges the forme's abilities (a Mega's own), not the set's.
  */
 export function defenderAbilities(gen: CalcGeneration, set: PokemonSet | undefined, obs: DamageObservation, info?: OpponentTeamInfo): string[] {
-  const dex = simDexOf(gen);
+  const dex = dexOfCalc(gen);
   const species = pricedSpecies(set, obs.defenderSpecies);
   const forme = !!set && species !== set.species;
   const revealed = entryOf(info, set, obs);

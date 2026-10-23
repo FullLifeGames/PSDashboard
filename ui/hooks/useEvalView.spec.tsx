@@ -1,5 +1,6 @@
 import { describe, expect, onTestFinished, test, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
+import { logRules } from '@fulllifegames/replay-core';
 import { configureSearchBudget, parsePlayedActions, parseSearchBudget, type EvalResult } from '@fulllifegames/eval-engine';
 import { useEvalView, type EvalViewInputs } from '../../src/hooks/useEvalView';
 import type { useEvaluation } from '../../src/hooks/useEvaluation';
@@ -98,7 +99,7 @@ describe('useEvalView', () => {
   // search the same played action (the verify step joins its row and column, T78); live and variation positions have none.
   test('Evaluate on a replay turn hands the search the played action the sweep would; live and variation evaluations none', () => {
     const { evaluation, spies } = evaluationOf();
-    const expected = parsePlayedActions(snapshots[3]?.log ?? []);
+    const expected = parsePlayedActions(snapshots[3]?.log ?? [], logRules(''));
     expect(expected.p1 ?? expected.p2).toBeTruthy();
     const { result, rerender } = renderHook((props: EvalViewInputs) => useEvalView(props), { initialProps: inputs(evaluation) });
     act(() => result.current.handleEvaluate());

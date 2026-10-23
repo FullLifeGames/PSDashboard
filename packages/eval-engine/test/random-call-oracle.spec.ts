@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
-import { RANDOM_CALL_MOVES } from '../src/ko-odds';
+import { randomCallMoves } from '../src/ko-odds';
 import { ALL_VIEWS, battleIn, mon, type SimView } from './sim-views';
 
 /**
@@ -44,16 +44,17 @@ function calls(view: SimView, id: string): boolean {
   return false;
 }
 
-describe('RANDOM_CALL_MOVES is held to the simulator (round 72)', () => {
-  test('the set is every move the Dex marks callsMove, over all views', () => {
+// Round 75 (T160): the set is the view's own Dex's (randomCallMoves), not a global one.
+describe('randomCallMoves is held to the simulator (round 72)', () => {
+  test('the sets are every move the Dex marks callsMove, over all views', () => {
     const marked = [...new Set(ALL_VIEWS.flatMap(callers))].sort();
-    expect([...RANDOM_CALL_MOVES].sort()).toEqual(marked);
+    expect([...new Set(ALL_VIEWS.flatMap(view => [...randomCallMoves(view.dex)]))].sort()).toEqual(marked);
   });
 
   describe.each(ALL_VIEWS)('$name', view => {
     test('each call move of the view is in the set', () => {
       if (view.dex.gen >= 2) expect(callers(view).length).toBeGreaterThan(0);
-      expect(callers(view).filter(id => !RANDOM_CALL_MOVES.has(id))).toEqual([]);
+      expect(callers(view).filter(id => !randomCallMoves(view.dex).has(id))).toEqual([]);
     });
 
     test('each call move of the view calls a move in the simulator', () => {
@@ -63,7 +64,7 @@ describe('RANDOM_CALL_MOVES is held to the simulator (round 72)', () => {
 
   test('pair/guards.ts reads the one set and keeps no copy', () => {
     const source = readFileSync(resolve(root, 'packages/eval-engine/src/pair/guards.ts'), 'utf8');
-    expect(/RANDOM_CALL_MOVES\s*=\s*new Set/.test(source)).toBe(false);
-    expect(/import\s*\{[^}]*RANDOM_CALL_MOVES[^}]*\}\s*from\s*'\.\.\/ko-odds\.ts'/.test(source)).toBe(true);
+    expect(/randomCallMoves\s*=\s*new Set/.test(source)).toBe(false);
+    expect(/import\s*\{[^}]*randomCallMoves[^}]*\}\s*from\s*'\.\.\/ko-odds\.ts'/.test(source)).toBe(true);
   });
 });

@@ -159,7 +159,7 @@ describe('the odds note reads the real keys of the pair plan (gate of 13.10.2026
   const tree = mctsTreeSearch(position.serialized, settings, 0);
   const result = mergeMctsTrees([tree]);
   const against = (p2Slots: NonNullable<EvalSettings['keepPlayed']>['p2Slots']) => analyzeTurn({
-    turn: 7, result, played: { p1: null, p2: null, p1Slots: position.keepPlayed.p1Slots, p2Slots }, playedOutcome: 0, scoreBefore: 0, scoreAfter: 0,
+    turn: 7, result, played: { p1: null, p2: null, p1Slots: position.keepPlayed.p1Slots, p2Slots }, playedOutcome: 0, scoreBefore: 0, scoreAfter: 0, actives: { p1: null, p2: null, gen: 9 },
   });
 
   test('the played row prices a Tera Starstorm claim at the root (the premise)', () => {
@@ -200,7 +200,7 @@ describe('a doubles turn without its protocol reads its luck from the planned ce
     // A result from before the plan reached doubles (an old cache): the same cells without their answers.
     const cells = result.matrix!.cells!.map(line => line.map(cell => (stripPlans ? { visits: cell.visits, verified: cell.verified } : cell)));
     const bare = { ...result, matrix: { ...result.matrix!, cells } };
-    const analysis = analyzeTurn({ turn: 7, result: bare, played, playedOutcome, scoreBefore: playedOutcome, scoreAfter: playedOutcome - 0.8 });
+    const analysis = analyzeTurn({ turn: 7, result: bare, played, playedOutcome, scoreBefore: playedOutcome, scoreAfter: playedOutcome - 0.8, actives: { p1: null, p2: null, gen: 9 } });
     // The attribution of this synthetic turn reads the sides' reads; the sentence under test is the chance card's.
     return { analysis, text: summarizeTurn({ ...analysis, attribution: 'chance' }, names) };
   }

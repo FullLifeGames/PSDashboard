@@ -1,10 +1,10 @@
 import type { Battle, Pokemon, PRNGSeed } from '@pkmn/sim';
-import { boundaryEvent, RANDOM_CALL_MOVES, type BoundaryEvent } from './ko-odds.ts';
+import { boundaryEvent, randomCallMoves, type BoundaryEvent } from './ko-odds.ts';
 import { pairKoOdds } from './pair/odds.ts';
 import { accuracyRollReached } from './search/event-reach.ts';
 import { stopsHits } from './dex-facts/protect.ts';
 import type { KoOddsInfo } from './types.ts';
-import { hazardConditions, sideIndex } from '@fulllifegames/replay-core';
+import { hazardConditions, sideIndex, type RulesDex } from '@fulllifegames/replay-core';
 
 /**
  * Root-cell boundary-event planning and outcome-class arithmetic (round 6
@@ -99,9 +99,9 @@ type SideEventPlan = { kind: 'fail' } | { kind: 'skip' } | { kind: 'event'; even
  * damaging move without an event has no priceable roll (occurrence
  * deviations are caught at classify time).
  */
-function unpricedMovePlan(move: DexMove): SideEventPlan {
+function unpricedMovePlan(dex: RulesDex, move: DexMove): SideEventPlan {
   const damaging = move.exists && move.category !== 'Status';
-  const rollFlagged = RANDOM_CALL_MOVES.has(move.id) ||
+  const rollFlagged = randomCallMoves(dex).has(move.id) ||
     (typeof move.accuracy === 'number' && move.accuracy < 100);
   if (damaging && rollFlagged) return { kind: 'fail' };
   return { kind: 'skip' };
@@ -123,7 +123,7 @@ function planSideEvent(battle: Battle, side: 'p1' | 'p2', choice: string, oppCho
 
   const event = boundaryEvent(battle, attacker, defender, moveId, { attacker: clicksTera(choice), defender: clicksTera(oppChoice) });
   const move = battle.dex.moves.get(moveId);
-  if (event === null) return unpricedMovePlan(move);
+  if (event === null) return unpricedMovePlan(battle.dex, move);
   // Round 69 (T146 c3): a status move stopped before its accuracy roll has no miss class.
   if (move.category === 'Status') {
     const [p1Choice, p2Choice] = side === 'p1' ? [choice, oppChoice] : [oppChoice, choice];

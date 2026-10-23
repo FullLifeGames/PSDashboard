@@ -14,6 +14,8 @@ import { pickerStateFromSnapshot } from '../../src/lib/picker-state';
  * every percent from 1 to 100, on the singles and the doubles (VGC) format of both rule sets.
  */
 const replay = JSON.parse(readFileSync(join('packages', 'eval-engine', 'test', 'fixtures', 'champions', 'gen9championsou-2693832490.json'), 'utf-8')) as { log: string };
+// Round 75 (T160): every body here is built from a Champions log (on a Scarlet/Violet format as well), and its inference reads the mod.
+await loadSimMods('gen9championsou');
 const FORMATS = [
   { label: 'singles', format: 'gen9ou' },
   { label: 'doubles and VGC', format: 'gen9doublesou' },
@@ -57,11 +59,11 @@ describe('snapshot picker, absolute HP from a percent sighting', () => {
   }
 
   test('a fainted body stays at 0 HP and a never-revealed body reads full', async () => {
+    await loadSimMods('gen9championsou');
     const snapshot = parseReplayLog(replay.log).find(entry => entry.turn === 3)!;
     const { p1Team, p2Team } = buildTeamsFromReplay(replay.log);
     const base = snapshot.p1.pokemon.find(mon => p1Team.some(set => set.species === mon.speciesForme || set.name === mon.name))!;
     const set = p1Team.find(entry => entry.species === base.speciesForme || entry.name === base.name)!;
-    await loadSimMods('gen9championsou');
     const read = (mon: PokemonSnapshot) => pickerStateFromSnapshot(
       { ...snapshot, p1: { ...snapshot.p1, pokemon: [mon] }, p2: { ...snapshot.p2, pokemon: snapshot.p2.pokemon.slice(0, 1) } } as TurnSnapshot,
       [set], p2Team, 9, null, { format: 'gen9championsou' },

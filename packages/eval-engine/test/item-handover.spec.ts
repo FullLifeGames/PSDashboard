@@ -1,5 +1,6 @@
 import { readFileSync } from 'fs';
 import { test, expect, describe } from 'vitest';
+import { rulesDex } from '@fulllifegames/replay-core';
 import type { Battle, PokemonSet } from '@pkmn/sim';
 import {
   buildTeamsFromReplay, getBranchSimulatorFormat, parseReplayLog, parseReplayLogWithObservations,
@@ -44,20 +45,20 @@ const trickTurn = (bisharpFirst: boolean, knockedAfter = false) => log([
 describe('hand-over trails', () => {
   test('a Choice item a move hands over restarts the trail: the first move after it locks', () => {
     const trails = buildChoiceLockTrails(trickTurn(false));
-    expect(protocolChoiceLock(trails, 'p1', 2)).toMatchObject({ species: 'Bisharp', moveId: 'knockoff' });
+    expect(protocolChoiceLock(trails, 'p1', 2, rulesDex(9))).toMatchObject({ species: 'Bisharp', moveId: 'knockoff' });
   });
 
   test('a move before the hand-over does not lock; a handed non-Choice item does not either', () => {
     const trails = buildChoiceLockTrails(trickTurn(true));
     // Bisharp attacked before the Scarf arrived: it picks freely next turn.
-    expect(protocolChoiceLock(trails, 'p1', 2)).toBeNull();
+    expect(protocolChoiceLock(trails, 'p1', 2, rulesDex(9))).toBeNull();
     // Latias used Trick before its Life Orb arrived; Life Orb locks nothing.
-    expect(protocolChoiceLock(trails, 'p2', 2)).toBeNull();
+    expect(protocolChoiceLock(trails, 'p2', 2, rulesDex(9))).toBeNull();
   });
 
   test('a Knock Off after the hand-over leaves no lock', () => {
     const trails = buildChoiceLockTrails(trickTurn(false, true));
-    expect(protocolChoiceLock(trails, 'p1', 2)).toBeNull();
+    expect(protocolChoiceLock(trails, 'p1', 2, rulesDex(9))).toBeNull();
   });
 });
 

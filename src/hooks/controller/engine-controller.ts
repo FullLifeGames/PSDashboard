@@ -1,3 +1,5 @@
+import { useCallback, useMemo } from 'react';
+import { logRules } from '@fulllifegames/replay-core';
 import { useEvalAcquire } from '../useEvalAcquire';
 import { usePlayedAtView, usePositionPicker } from '../usePositionPicker';
 import { useEvalView } from '../useEvalView';
@@ -49,10 +51,13 @@ function useAcquireLayer(ctx: ReplayContext, transients: Transients, board: Boar
     liveTip, viewingVariation, serializedAtView, viewTurn, variationStartTurn, startSerialized,
     getExact: acquire.getExact, exactPositionsVersion: acquire.exactPositionsVersion, draftChoices,
   });
+  // Round 75 (T160): the played-action parser reads the replay's own Dex (generation and mod).
+  const rules = useMemo(() => logRules(replayData?.log ?? ''), [replayData]);
+  const parseSingles = useCallback((lines: string[]) => parsePlayedActions(lines, rules), [rules]);
   const playedAtView = usePlayedAtView({
     viewingVariation, variationSpan: board.timeline.variationSpan, viewTurn,
     history: ctx.branch.history, snapshots, doubles: ctx.meta.evalIsDoubles,
-    parseSingles: parsePlayedActions, parseDoubles: parsePlayedActionsDoubles,
+    parseSingles, parseDoubles: parsePlayedActionsDoubles,
   });
   return { acquire, smogonPending, positionPicker, pickerSimState, playedAtView };
 }

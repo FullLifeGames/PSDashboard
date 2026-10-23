@@ -1,9 +1,9 @@
-import { Dex } from '@pkmn/dex';
-import { toId } from '@fulllifegames/replay-core';
+import { dexOf, toId, type GameRules } from '@fulllifegames/replay-core';
 import type { TurnRolls } from '../dice-events.ts';
 import type { EvalResult, MatrixCell } from '../types.ts';
 import type { PlayedAction, PlayedTurn } from '../played.ts';
 import { matchClickedColumn } from './played-match.ts';
+import { rulesOfActives } from './rules.ts';
 import type { AnalyzeTurnParams, Side, SideAnalysis, TurnAnalysis } from './types.ts';
 
 /**
@@ -28,7 +28,7 @@ export const ROLL_MIN_CHANCE = 0.1;
 const other = (side: Side): Side => (side === 'p1' ? 'p2' : 'p1');
 
 /** Formes of one species are one body (Medicham and Medicham-Mega), read from the Dex. */
-const baseSpecies = (species: string): string => Dex.species.get(species).baseSpecies || species;
+const baseSpeciesIn = (rules: GameRules | undefined) => (species: string): string => (rules ? dexOf(rules).species.get(species).baseSpecies : '') || species;
 
 const atLeastRollChance = (chance: number): boolean => Math.round(chance * 100) >= Math.round(ROLL_MIN_CHANCE * 100);
 
@@ -51,10 +51,11 @@ function pricedEvent(side: SideAnalysis, defender: string | null | undefined): {
  * real chance. Null when the event did not happen (a miss is a marker; a
  * switch-out, a Protect or an unreached body is no roll).
  */
-function oddsFavor(rolls: TurnRolls, key: Side, side: SideAnalysis, defender: string | null | undefined): Side | null {
+function oddsFavor(rolls: TurnRolls, key: Side, side: SideAnalysis, defender: string | null | undefined, rules: GameRules | undefined): Side | null {
   const event = pricedEvent(side, defender);
   const odds = side.played?.koOdds;
   if (!event || !odds) return null;
+  const baseSpecies = baseSpeciesIn(rules);
   const hit = rolls.hits.find(entry =>
     entry.side === key && entry.move === event.move && baseSpecies(entry.target) === baseSpecies(event.target));
   if (!hit) return null;
@@ -76,7 +77,7 @@ export function rolledSides(
 ): { p1: boolean; p2: boolean } {
   const rolled = { ...rolls.favored };
   for (const [key, side] of [['p1', p1], ['p2', p2]] as const) {
-    const favored = oddsFavor(rolls, key, side, actives?.[other(key)]);
+    const favored = oddsFavor(rolls, key, side, actives?.[other(key)], rulesOfActives(actives));
     if (favored) rolled[favored] = true;
   }
   return rolled;
@@ -100,16 +101,13 @@ export function playedMoveIds(played: PlayedTurn | null | undefined): string[] {
   return actions.filter((action): action is PlayedAction => action?.kind === 'move').map(action => toId(action.name));
 }
 
-/** The data-only Dex of the replay's generation (a Champions battle reads Gen 9's); the current one without a generation. */
-const dexOfGeneration = (gen: number | undefined) => (gen === undefined ? Dex : Dex.forGen(Math.min(9, Math.max(1, gen))));
-
 /**
  * Round 70 (T217): whether any of the moves carries a secondary effect that may or may not happen: a chance under 100 on a
  * status, a stat change or a flinch (Body Slam's paralysis, Scald's burn, Earth Power's drop), read from the Dex. The planner
  * prices the accuracy and the kill range of a hit and nothing else, so such an effect sits in a cell it calls plain.
  */
-function rollsUnpricedEffect(moves: readonly string[], gen: number | undefined): boolean {
-  const dex = dexOfGeneration(gen);
+function rollsUnpricedEffect(moves: readonly string[], rules: GameRules): boolean {
+  const dex = dexOf(rules);
   return moves.some(id => {
     const move = dex.moves.get(id);
     return (move.secondaries ?? (move.secondary ? [move.secondary] : [])).some(effect => (effect.chance ?? 100) < 100);
@@ -129,11 +127,12 @@ function rollsUnpricedEffect(moves: readonly string[], gen: number | undefined):
 export function rolledFromCell(
   cell: MatrixCell | null,
   moves: readonly string[] = [],
-  gen?: number,
+  rules?: GameRules,
 ): { p1: boolean; p2: boolean } | undefined {
   if (!cell || (cell.plan !== 'none' && (cell.plan !== 'events' || !cell.classes))) return undefined;
   const real = (cell.classes ?? []).filter(entry => entry.weight > 0 && entry.weight < 1).length >= 2;
-  if (!real && rollsUnpricedEffect(moves, gen)) return undefined;
+  // Round 75 (T160): without the game's generation the secondary effects cannot be read, and the question stays open.
+  if (!real && (!rules || rollsUnpricedEffect(moves, rules))) return undefined;
   return { p1: real, p2: real };
 }
 

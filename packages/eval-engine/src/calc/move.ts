@@ -1,7 +1,7 @@
 import { Move as CalcMove } from '@smogon/calc';
-import { Dex, toID } from '@pkmn/sim';
-import { CHAMPIONS_MOD, simGenNum, type CalcGeneration } from '@fulllifegames/replay-core';
-import { simDexOf, type CalcBody } from './body.ts';
+import { toID } from '@pkmn/sim';
+import { CHAMPIONS_MOD, dexOfCalc, simGenNum, type CalcGeneration } from '@fulllifegames/replay-core';
+import type { CalcBody } from './body.ts';
 
 export { protectBlocks } from './protect.ts';
 
@@ -32,7 +32,7 @@ const CALC_LACKS_POWER = new Set(['lastrespects']);
 
 /** The power the move's own callback gives on the attacker's facts, or null to leave the calc its own. */
 function powerAtUse(gen: CalcGen, name: string, attacker: CalcBody): number | null {
-  const move = simDexOf(gen).moves.get(name);
+  const move = dexOfCalc(gen).moves.get(name);
   if (!CALC_LACKS_POWER.has(move.id) || typeof move.basePowerCallback !== 'function') return null;
   try {
     const power = (move.basePowerCallback as unknown as PowerCallback).call(undefined, { side: { totalFainted: attacker.totalFainted ?? 0 } }, null, move);
@@ -54,7 +54,7 @@ function typedHiddenPower(gen: CalcGen, name: string, attacker: CalcBody): { nam
  * Read from the simulator's own move, no list.
  */
 function typelessOverride(gen: CalcGen, name: string): { type: never } | null {
-  const move = simDexOf(gen).moves.get(name);
+  const move = dexOfCalc(gen).moves.get(name);
   return move.exists && move.type === '???' && move.category !== 'Status' ? { type: '???' as never } : null;
 }
 
@@ -66,7 +66,7 @@ function typelessOverride(gen: CalcGen, name: string): { type: never } | null {
  * "greater than zero", which has no damage effect.
  */
 function modOverrides(gen: CalcGen, name: string, attacker: CalcBody, calc: CalcMove): CalcMoveOptions['overrides'] | null {
-  const move = attacker.mod === CHAMPIONS_MOD ? Dex.dexes[CHAMPIONS_MOD]?.moves.get(name) : undefined;
+  const move = attacker.mod === CHAMPIONS_MOD ? dexOfCalc(gen).moves.get(name) : undefined;
   if (!move?.exists) return null;
   if (!gen.moves.get(toID(move.name) as never)) {
     return { basePower: move.basePower, type: move.type as never, category: move.category, flags: { ...move.flags } as never, target: move.target as never };

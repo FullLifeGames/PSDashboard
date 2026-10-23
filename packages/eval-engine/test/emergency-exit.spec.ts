@@ -3,6 +3,7 @@ import { Battle as LiveBattle, Teams, type Battle, type PokemonSet } from '@pkmn
 import { parseReplayLogWithObservations } from '@fulllifegames/replay-core';
 import { reconstructBranchRuntime } from '../src/branch-engine';
 import { collectForcedSwitchSpecies, getMainChoice, parseTurnBlocks } from '../src/branch/protocol-choices';
+import { rulesDex } from '@fulllifegames/replay-core';
 
 /**
  * Round 67 (T133): an Emergency Exit or Wimp Out switch that comes before the
@@ -41,7 +42,7 @@ function readTurn(format: string, p1: PokemonSet[], p2: PokemonSet[], choices: [
   const turn = parseTurnBlocks(publicLines(played.log).join('\n')).turns.find(entry => entry.turn === 1)!;
   expect(turn.preUpkeep.some(line => line.startsWith('|-activate|p1a:') && line.includes('ability: '))).toBe(true);
   return {
-    forced: collectForcedSwitchSpecies(turn.preUpkeep, turn.postUpkeep, 'p1'),
+    forced: collectForcedSwitchSpecies(turn.preUpkeep, turn.postUpkeep, 'p1', rulesDex(9)),
     main: getMainChoice(turn.preUpkeep, 'p1', make(format, p1, p2) as never),
   };
 }
@@ -82,9 +83,9 @@ describe('the forced list reads the switch an ability asked for', () => {
       '|-activate|p1a: Cofagrigus|ability: Mummy|Pressure|[of] p2a: Weavile',
       '|switch|p1a: Ferrothorn|Ferrothorn|100/100',
     ];
-    expect(collectForcedSwitchSpecies(pursued, [], 'p1')).toEqual([]);
+    expect(collectForcedSwitchSpecies(pursued, [], 'p1', rulesDex(9))).toEqual([]);
     // Even across a request break: Mummy's Dex entry asks for no switch.
-    expect(collectForcedSwitchSpecies([...pursued.slice(0, 3), '|', pursued[3]], [], 'p1')).toEqual([]);
+    expect(collectForcedSwitchSpecies([...pursued.slice(0, 3), '|', pursued[3]], [], 'p1', rulesDex(9))).toEqual([]);
   });
 });
 

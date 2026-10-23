@@ -74,6 +74,25 @@ export function simFormats(): typeof Dex.formats {
   return Dex.formats;
 }
 
+/** The Dex of a format object's own mod, as the simulator's Battle constructor builds the rule table from (the speed layer's rule-table lever). */
+export function dexOfFormat(format: Parameters<typeof Dex.forFormat>[0]): RulesDex {
+  return Dex.forFormat(format);
+}
+
+/** Types of what registering a mod takes: the mod's data and its format list. */
+export type RulesModData = NonNullable<Parameters<typeof Dex.mod>[1]>;
+export type RulesModFormats = Parameters<typeof Dex.formats.extend>[0];
+
+/**
+ * Registers the Champions mod with the simulator: its Dex (`Dex.mod`) and its formats on the base Dex. The one place that writes
+ * the global Dex; eval-engine's registerChampionsMod (forward/sim-mods.ts) calls it once per process (a second format registration
+ * throws "duplicate ID").
+ */
+export function registerChampionsDex(data: RulesModData, formats: RulesModFormats): void {
+  Dex.mod(CHAMPIONS_MOD, data);
+  Dex.formats.extend(formats);
+}
+
 /** The stat ids in the simulator's order (hp, atk, def, spa, spd, spe): the same in every generation and mod. */
 export function statIds(): ReturnType<typeof Dex.stats.ids> {
   return Dex.stats.ids();

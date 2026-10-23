@@ -2,7 +2,7 @@ import type { EvalResult, ForcedWinCaveat, ForcedWinOpen, KoOddsInfo, RankedChoi
 import type { StreakHistoryEntry, StreakOdds } from '../streaks.ts';
 import type { PlayedAction, PlayedTurn, SackInfo } from '../played.ts';
 import type { TurnRolls } from '../dice-events.ts';
-import type { SideId } from '@fulllifegames/replay-core';
+import type { RulesMod, SideId } from '@fulllifegames/replay-core';
 import type { PlayerTendencies } from '../opponent-model.ts';
 
 /**
@@ -150,6 +150,8 @@ export interface SideAnalysis {
    */
   faintedFraction?: number;
   playedRaw: PlayedAction | null;
+  /** Round 75 (T160): the setup move the side clicked (playedSetupMove), read by the replay's own Dex when the record was made; absent for none. */
+  setupMove?: string;
   /**
    * The protocol's reason a chosen action never surfaced ('slp', 'flinch',
    * 'move: Taunt', 'faint', …) — the side DID pick something.
@@ -471,6 +473,8 @@ export interface AnalyzeTurnParams {
    */
   actives?: {
     p1: string | null; p2: string | null; gen: number;
+    /** Round 75 (T160): the replay's mod (Champions), next to its generation: the Dex the analysis reads is the game's own. */
+    mod?: RulesMod;
     p1Tera?: string | null; p2Tera?: string | null;
   } | null;
   /**

@@ -41,8 +41,8 @@ export function alignBlockSeed(
 ): AlignedBlock {
   const expectedEvents = extractProtocolEvents([...turnBlock.preUpkeep, ...turnBlock.postUpkeep]);
   const alignForced = {
-    p1: collectForcedSwitchSpecies(turnBlock.preUpkeep, turnBlock.postUpkeep, 'p1'),
-    p2: collectForcedSwitchSpecies(turnBlock.preUpkeep, turnBlock.postUpkeep, 'p2'),
+    p1: collectForcedSwitchSpecies(turnBlock.preUpkeep, turnBlock.postUpkeep, 'p1', battle.dex),
+    p2: collectForcedSwitchSpecies(turnBlock.preUpkeep, turnBlock.postUpkeep, 'p2', battle.dex),
   };
   let seedChoice: SeedChoice = {
     seed: ALIGNMENT_SEEDS[0], trialScore: null, trialPerfect: false,

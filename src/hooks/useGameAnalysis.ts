@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { ReplayData, TurnSnapshot } from '@fulllifegames/replay-core';
+import { logRules, type ReplayData, type TurnSnapshot } from '@fulllifegames/replay-core';
 import {
   allTurnEvents, parseTendencies, analyzeLeads, type GameReport, type TurnAnalysis, summarizeAlignment,
   type TurnAlignmentRecord,
@@ -22,6 +22,8 @@ function useAnalysisContext(args: {
   replayGen: number;
 }) {
   const { replayData, snapshots, graphPlayed, replayGen } = args;
+  // Round 75 (T160): the replay's mod rides with its generation, so the analysis reads the game's own Dex.
+  const mod = useMemo(() => (replayData ? logRules(replayData.log).mod : undefined), [replayData]);
   const tendencies = useMemo(() => (replayData
     ? { p1: parseTendencies(replayData.log, 'p1'), p2: parseTendencies(replayData.log, 'p2') }
     : null), [replayData]);
@@ -45,12 +47,12 @@ function useAnalysisContext(args: {
       };
       const [p1, p2] = [activeOf(snapshot.p1), activeOf(snapshot.p2)];
       return {
-        p1: p1?.speciesForme ?? null, p2: p2?.speciesForme ?? null, gen: replayGen,
+        p1: p1?.speciesForme ?? null, p2: p2?.speciesForme ?? null, gen: replayGen, mod,
         p1Tera: p1?.terastallized || null, p2Tera: p2?.terastallized || null,
       };
     },
     playedHistory: buildPlayedHistory(graphPlayed, snapshots, turnEventsIndex),
-  }), [snapshots, turnEventsIndex, graphPlayed, replayGen]);
+  }), [snapshots, turnEventsIndex, graphPlayed, replayGen, mod]);
   return { tendencies, context };
 }
 

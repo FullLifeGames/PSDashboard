@@ -3,6 +3,7 @@ import {
   type LeadEvalData, type PlayedTurn, type EvalPreferences, type EvalResult, type EvalSettings,
   type RankedChoice, type StaticRuleset, type TeraAllowance,
 } from '@fulllifegames/eval-engine';
+import type { GameRules } from '@fulllifegames/replay-core';
 import type { EvalWorkerClient } from '../../lib/eval/worker-client';
 import type { StoredEval } from '../../lib/eval-cache-store';
 import type { AppEvalSettings } from '../../lib/eval/worker-client';
@@ -13,8 +14,8 @@ import type { CachedEval } from './single-eval';
  * never got to act still prices its pair through the charitable
  * outcome-equivalent phantom (analysis.ts) — T14/T36 stop reading
  * "unclear". */
-export const matchOrPhantom = (result: EvalResult, side: 'p1' | 'p2', played: PlayedTurn | null): RankedChoice | null =>
-  matchPlayedSide(result, side, played) ?? phantomStayIn(result, side, played);
+export const matchOrPhantom = (result: EvalResult, side: 'p1' | 'p2', played: PlayedTurn | null, rules: GameRules): RankedChoice | null =>
+  matchPlayedSide(result, side, played) ?? phantomStayIn(result, side, played, rules);
 
 /**
  * Eval-layer lifecycle guard: a failure is only a gap while the turn is
@@ -42,6 +43,8 @@ export interface GraphSweepParams {
   tera: TeraAllowance;
   /** Sleep Clause enforced for this replay (resolved from the branch format). */
   sleepClause?: boolean;
+  /** Round 75 (T160): the replay's generation and mod, for the Dex reads of the sweep (the stay-in phantom's move priorities). */
+  rules: GameRules;
   /** Round 65: the rule set the replay runs under (Pokémon Champions or standard), resolved from its format. */
   ruleset: StaticRuleset;
   /** The replay's game type: auto resolves each turn per game type (round 63, T110). */

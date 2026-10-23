@@ -1,5 +1,6 @@
 import { readFileSync } from 'fs';
 import { test, expect, describe } from 'vitest';
+import { rulesDex } from '@fulllifegames/replay-core';
 import { Battle as LiveBattle, Teams, type Battle, type PokemonSet } from '@pkmn/sim';
 import {
   buildTeamsFromReplay, getBranchSimulatorFormat, parseReplayLog, parseReplayLogWithObservations, replayBringOnly,
@@ -175,7 +176,7 @@ describe('the walk knows every item line (points 3 and 4)', () => {
       '|upkeep',
       '|turn|3',
     ]));
-    expect(protocolChoiceLock(trails, 'p1', 3)).toEqual({ species: 'Weavile', moveId: 'knockoff', handedOver: true });
+    expect(protocolChoiceLock(trails, 'p1', 3, rulesDex(9))).toEqual({ species: 'Weavile', moveId: 'knockoff', handedOver: true });
   });
 
   test('a Frisk reveal keeps the holder\'s trail and leaves the frisker\'s item alone', () => {
@@ -202,7 +203,7 @@ describe('the walk knows every item line (points 3 and 4)', () => {
       { side: 'p2', species: 'Banette', item: null, firstMove: 'shadowsneak', touched: false },
       { side: 'p2', species: 'Banette', item: null, firstMove: null, touched: false },
     ]);
-    expect(protocolChoiceLock(buildChoiceLockTrails(log(lines)), 'p1', 3)).toEqual({ species: 'Gourgeist', moveId: 'poltergeist' });
+    expect(protocolChoiceLock(buildChoiceLockTrails(log(lines)), 'p1', 3, rulesDex(9))).toEqual({ species: 'Gourgeist', moveId: 'poltergeist' });
   });
 });
 

@@ -1,4 +1,4 @@
-import { Dex } from '@pkmn/sim';
+import type { RulesDex } from '@fulllifegames/replay-core';
 
 /**
  * A line the slot's choice made: a move, a switch, or a `|cant|` that names
@@ -11,10 +11,10 @@ const isOwnAction = (line: string) =>
  * An own `|-activate|` of an ability that makes its holder leave mid-turn: the
  * Dex gives it an Emergency Exit handler (Emergency Exit and Wimp Out).
  */
-function abilityAskedToLeave(line: string): boolean {
+function abilityAskedToLeave(line: string, dex: RulesDex): boolean {
   const [, tag, , effect] = line.split('|');
   if (tag !== '-activate' || !effect?.startsWith('ability: ')) return false;
-  const ability = Dex.abilities.get(effect.slice('ability: '.length));
+  const ability = dex.abilities.get(effect.slice('ability: '.length));
   return 'onEmergencyExit' in ability && typeof ability.onEmergencyExit === 'function';
 }
 
@@ -31,13 +31,13 @@ function abilityAskedToLeave(line: string): boolean {
  * that pops the Air Balloon of a body on its way out writes the chosen switch
  * right after the item line (round 64 review).
  */
-export function answersForcedRequest(events: string[], index: number, ident: string): boolean {
+export function answersForcedRequest(events: string[], index: number, ident: string, dex: RulesDex): boolean {
   if (events[index].includes('[from]')) return true;
   const own = [...events.keys()].filter(at => at < index && events[at].split('|')[2]?.startsWith(ident));
   if (own.some(at => isOwnAction(events[at]))) return true;
   const last = own[own.length - 1];
   if (last === undefined || !events.slice(last + 1, index).includes('|')) return false;
-  return /^\|(-enditem|faint)\|/.test(events[last]) || abilityAskedToLeave(events[last]);
+  return /^\|(-enditem|faint)\|/.test(events[last]) || abilityAskedToLeave(events[last], dex);
 }
 
 /** The species the block's switches bring in on forced requests, in order: before upkeep the answers above, after upkeep every switch. */
@@ -45,13 +45,14 @@ export function collectForcedSwitchSpecies(
   preUpkeep: string[],
   postUpkeep: string[],
   side: 'p1' | 'p2',
+  dex: RulesDex,
 ): string[] {
   const species: string[] = [];
   const matcher = new RegExp(`^\\|switch\\|(${side}[a-d]:)`);
 
   for (const [index, line] of preUpkeep.entries()) {
     const slot = line.match(matcher)?.[1];
-    if (slot && answersForcedRequest(preUpkeep, index, slot)) {
+    if (slot && answersForcedRequest(preUpkeep, index, slot, dex)) {
       species.push(line.split('|')[3].split(',')[0].trim());
     }
   }

@@ -1,5 +1,6 @@
 import { readFileSync } from 'fs';
 import { test, expect, describe } from 'vitest';
+import { rulesDex } from '@fulllifegames/replay-core';
 import type { PokemonSet } from '@pkmn/sim';
 import { buildChoiceLockContext, buildChoiceLockTrails, corroborateChoiceItem, protocolChoiceLock } from '../src/choice-lock';
 import { parseReplayLogWithObservations, type SmogonUsageStats, buildTeamsFromReplay, getBranchSimulatorFormat } from '@fulllifegames/replay-core';
@@ -30,13 +31,13 @@ describe('protocol choice-lock trails', () => {
       '|move|p1a: Keldeo|Secret Sword|p2a: Chansey',
       '|turn|4',
     ]));
-    expect(protocolChoiceLock(trails, 'p1', 2)).toEqual({ species: 'Keldeo', moveId: 'hydropump' });
-    expect(protocolChoiceLock(trails, 'p1', 3)).toEqual({ species: 'Keldeo', moveId: 'hydropump' });
+    expect(protocolChoiceLock(trails, 'p1', 2, rulesDex(9))).toEqual({ species: 'Keldeo', moveId: 'hydropump' });
+    expect(protocolChoiceLock(trails, 'p1', 3, rulesDex(9))).toEqual({ species: 'Keldeo', moveId: 'hydropump' });
     // Two distinct moves since entry: no choice item can explain the trail.
-    expect(protocolChoiceLock(trails, 'p1', 4)).toBeNull();
+    expect(protocolChoiceLock(trails, 'p1', 4, rulesDex(9))).toBeNull();
     // Fresh entry, no move yet: nothing to lock on.
-    expect(protocolChoiceLock(trails, 'p1', 1)).toBeNull();
-    expect(protocolChoiceLock(trails, 'p2', 3)).toBeNull();
+    expect(protocolChoiceLock(trails, 'p1', 1, rulesDex(9))).toBeNull();
+    expect(protocolChoiceLock(trails, 'p2', 3, rulesDex(9))).toBeNull();
   });
 
   test('a re-entry resets the trail', () => {
@@ -50,7 +51,7 @@ describe('protocol choice-lock trails', () => {
       '|switch|p1a: Keldeo|Keldeo|100/100',
       '|turn|4',
     ]));
-    expect(protocolChoiceLock(trails, 'p1', 4)).toBeNull();
+    expect(protocolChoiceLock(trails, 'p1', 4, rulesDex(9))).toBeNull();
   });
 
   test('a Trick-handed Choice item locks the next move; any other item event disturbs the trail', () => {
@@ -67,8 +68,8 @@ describe('protocol choice-lock trails', () => {
       '|-enditem|p1a: Plume|Choice Scarf|[from] move: Knock Off|[of] p2a: Chansey',
       '|turn|3',
     ]));
-    expect(protocolChoiceLock(trails, 'p1', 2)).toEqual({ species: 'Vileplume', moveId: 'sludgebomb', handedOver: true });
-    expect(protocolChoiceLock(trails, 'p1', 3)).toBeNull();
+    expect(protocolChoiceLock(trails, 'p1', 2, rulesDex(9))).toEqual({ species: 'Vileplume', moveId: 'sludgebomb', handedOver: true });
+    expect(protocolChoiceLock(trails, 'p1', 3, rulesDex(9))).toBeNull();
   });
 
   test('|cant| does not break the trail; |drag| counts as entry', () => {
@@ -80,7 +81,7 @@ describe('protocol choice-lock trails', () => {
       '|cant|p1a: Keldeo|par',
       '|turn|3',
     ]));
-    expect(protocolChoiceLock(trails, 'p1', 3)).toEqual({ species: 'Keldeo', moveId: 'hydropump' });
+    expect(protocolChoiceLock(trails, 'p1', 3, rulesDex(9))).toEqual({ species: 'Keldeo', moveId: 'hydropump' });
   });
 });
 

@@ -7,6 +7,7 @@ import {
 import { buildChoiceLockContext } from '../src/choice-lock';
 import { reconstructBranchRuntime } from '../src/branch-engine';
 import { collectForcedSwitchSpecies, getMainChoice, parseTurnBlocks } from '../src/branch/protocol-choices';
+import { rulesDex } from '@fulllifegames/replay-core';
 
 /**
  * Round 67 (T108 point 3): a move the rebuild reads from a `|cant|` line is
@@ -89,7 +90,7 @@ describe('a |cant| with [of] names the blocker, not the slot\'s click', () => {
 
   test('a blocker\'s |cant| line is no action of its slot: a later switch there stays the side\'s choice', () => {
     const events = ['|cant|p1a: Farigiraf|ability: Armor Tail|Fake Out|[of] p2a: Incineroar', '|switch|p1a: Corviknight|Corviknight|100/100'];
-    expect(collectForcedSwitchSpecies(events, [], 'p1')).toEqual([]);
+    expect(collectForcedSwitchSpecies(events, [], 'p1', rulesDex(9))).toEqual([]);
   });
 });
 

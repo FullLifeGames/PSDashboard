@@ -39,8 +39,8 @@ export async function verifyFlagged(
 ): Promise<TurnVerification | null> {
   const deep = verificationDeepSettings(settings);
   if (!deep) return null;
-  const p1Choice = matchOrPhantom(result, 'p1', turnPlayed);
-  const p2Choice = matchOrPhantom(result, 'p2', turnPlayed);
+  const p1Choice = matchOrPhantom(result, 'p1', turnPlayed, env.params.rules);
+  const p2Choice = matchOrPhantom(result, 'p2', turnPlayed, env.params.rules);
   if (!p1Choice || !p2Choice) return null;
   const flaggedBest = (side: 'p1' | 'p2', chosen: RankedChoice): RankedChoice | null => {
     const best = result.perSide[side][0];
@@ -140,8 +140,8 @@ export async function probeSensitivity(
   turnVerified: TurnVerification | null,
 ): Promise<TurnSensitivity | null> {
   if (!env.params.sensitivityTargetsFor) return null;
-  const p1Choice = matchOrPhantom(result, 'p1', turnPlayed);
-  const p2Choice = matchOrPhantom(result, 'p2', turnPlayed);
+  const p1Choice = matchOrPhantom(result, 'p1', turnPlayed, env.params.rules);
+  const p2Choice = matchOrPhantom(result, 'p2', turnPlayed, env.params.rules);
   if (!p1Choice || !p2Choice) return null;
   const probeSettings: AppEvalSettings = { ...settings, keepPlayed: undefined };
   const out: TurnSensitivity = {};

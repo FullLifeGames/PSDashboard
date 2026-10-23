@@ -1,10 +1,9 @@
-import { Dex } from '@pkmn/sim';
-import { toId } from '@fulllifegames/replay-core';
+import { toId, type RulesDex } from '@fulllifegames/replay-core';
 
-/** Snapshot display names of terrain and weather, translated to the sim's condition ids. */
-export function terrainIdFromSnapshot(terrain: string): string {
+/** Snapshot display names of terrain and weather, translated to the sim's condition ids (the Dex of the battle's generation and mod). */
+export function terrainIdFromSnapshot(terrain: string, dex: RulesDex): string {
   if (!terrain) return '';
-  const terrainCondition = Dex.conditions.get(`${terrain} Terrain`);
+  const terrainCondition = dex.conditions.get(`${terrain} Terrain`);
   return terrainCondition.exists ? terrainCondition.id : toId(terrain);
 }
 
@@ -25,10 +24,10 @@ const CLIENT_WEATHER_IDS: Record<string, string> = {
   strongwinds: 'deltastream',
 };
 
-export function weatherIdFromSnapshot(weather: string): string {
+export function weatherIdFromSnapshot(weather: string, dex: RulesDex): string {
   if (!weather) return '';
   const mapped = CLIENT_WEATHER_IDS[toId(weather)];
   if (mapped) return mapped;
-  const weatherCondition = Dex.conditions.get(weather);
+  const weatherCondition = dex.conditions.get(weather);
   return weatherCondition.exists ? weatherCondition.id : toId(weather);
 }

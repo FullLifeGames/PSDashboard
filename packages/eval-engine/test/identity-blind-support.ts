@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { expect } from 'vitest';
 import { Dex, State } from '@pkmn/sim';
 import {
-  buildTeamsFromReplay, formatEnforcesSleepClause, getBranchSimulatorFormat, inferOpponentTeam, parseReplayLogWithObservations,
+  buildTeamsFromReplay, formatEnforcesSleepClause, getBranchSimulatorFormat, inferOpponentTeam, logRules, parseReplayLogWithObservations,
   type ReplayData,
 } from '@fulllifegames/replay-core';
 import { reconstructBranchRuntime } from '../src/branch-engine';
@@ -88,11 +88,13 @@ export async function expectNameBlind(replay: ReplayData, shares: readonly numbe
     if (!battle || battle.ended) continue;
     const named = JSON.stringify(State.serializeBattle(battle));
     const events = turnEvents(replay.log, turn);
+    const rules = logRules(replay.log);
     const read = (serialized: string) => {
       const result = searchPosition(serialized, { depth: 1, samples: 1, tera, sleepClause });
       const analysis = analyzeTurn({
-        turn, result, played: parsePlayedActions(events), playedOutcome: null, scoreBefore: result.score, scoreAfter: null,
-        sacks: detectSacks(events, snapshots[turn - 1] ?? null),
+        turn, result, played: parsePlayedActions(events, rules), playedOutcome: null, scoreBefore: result.score, scoreAfter: null,
+        sacks: detectSacks(events, snapshots[turn - 1] ?? null, rules),
+        actives: { p1: null, p2: null, gen: rules.gen, mod: rules.mod },
       });
       return { result, analysis, summary: summarizeTurn(analysis, names) };
     };

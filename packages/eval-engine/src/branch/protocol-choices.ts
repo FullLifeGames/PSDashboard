@@ -1,9 +1,8 @@
-import { Dex } from '@pkmn/sim';
 import type { PokemonIdent, SimBattle, SimPokemon, SimSide, TurnBlock } from './types.ts';
 import { formatTargetLoc, normalizeBattleOnlyFormeId, slotLetter } from './team-order.ts';
 import { answersForcedRequest } from './forced-request.ts';
 import { nextChoosingSlot } from '../forward/request-moves.ts';
-import { sideIndex, toId } from '@fulllifegames/replay-core';
+import { sideIndex, toId, type RulesDex } from '@fulllifegames/replay-core';
 
 export function parseTurnBlocks(log: string): { preGame: string[]; turns: TurnBlock[] } {
   const lines = log.split('\n');
@@ -127,11 +126,11 @@ function protocolTargetLoc(
   return targetSideIdx === sourceSideIdx ? -(targetActiveSlot + 1) : targetActiveSlot + 1;
 }
 
-export function targetTypeForMove(active: SimPokemon | null | undefined, moveName: string): string {
-  if (!active) return Dex.moves.get(moveName).target || '';
+export function targetTypeForMove(dex: RulesDex, active: SimPokemon | null | undefined, moveName: string): string {
+  if (!active) return dex.moves.get(moveName).target || '';
   const moveId = toId(moveName);
   const request = active.getMoveRequestData();
-  return request.moves.find(move => move.id === moveId)?.target || Dex.moves.get(moveName).target || '';
+  return request.moves.find(move => move.id === moveId)?.target || dex.moves.get(moveName).target || '';
 }
 
 function shouldAppendTargetLoc(
@@ -141,7 +140,7 @@ function shouldAppendTargetLoc(
   targetLoc: number,
 ): boolean {
   if (!active || !targetLoc || active.side.active.length < 2) return false;
-  const targetType = targetTypeForMove(active, moveName);
+  const targetType = targetTypeForMove(battle.dex, active, moveName);
   return battle.actions.targetTypeChoices(targetType) && battle.validTargetLoc(targetLoc, active, targetType);
 }
 
@@ -170,7 +169,7 @@ export function targetLocSuffixForChoice(
   }
 
   if (!active || active.side.active.length < 2) return '';
-  const targetType = targetTypeForMove(active, moveName);
+  const targetType = targetTypeForMove(battle.dex, active, moveName);
   if (!battle.actions.targetTypeChoices(targetType)) return '';
 
   const fallbackTargetLoc = firstLegalTargetLoc(battle, active, targetType);
@@ -207,7 +206,7 @@ function defaultMoveChoice(battle: SimBattle, active: SimPokemon | null | undefi
   const requestEntry = requestMoves[enabledIndex];
   const targetType = requestEntry
     ? (requestEntry.target || '')
-    : targetTypeForMove(active, firstMove.id || firstMove.move);
+    : targetTypeForMove(battle.dex, active, firstMove.id || firstMove.move);
   const targetLoc = firstLegalTargetLoc(battle, active, targetType);
   return `move ${enabledIndex + 1}${targetLoc ? ` ${formatTargetLoc(targetLoc)}` : ''}`;
 }
@@ -251,7 +250,7 @@ function clickBehindEncore(
     line.startsWith(`|-start|${ident}`) && line.split('|')[3] === 'Encore');
   if (!encoredFirst) return null;
 
-  return slowestRequestMove(active, toId(shownMove));
+  return slowestRequestMove(active.battle.dex, active, toId(shownMove));
 }
 
 /** Whether the body's request or move slots carry the move. */
@@ -270,20 +269,21 @@ function knowsMove(active: SimPokemon, moveName: string): boolean {
  * the Taunt in the game); else the slowest move. Null: no enabled move.
  */
 function clickBehindBlockedMove(active: SimPokemon, shownMove: string): string | null {
-  const shown = Dex.moves.get(shownMove);
+  const dex = active.battle.dex;
+  const shown = dex.moves.get(shownMove);
   const alike = active.getMoveRequestData().moves.find(entry => {
-    const move = Dex.moves.get(entry.id);
+    const move = dex.moves.get(entry.id);
     return !entry.disabled && move.category === shown.category && move.priority === shown.priority;
   });
-  return alike?.id ?? slowestRequestMove(active);
+  return alike?.id ?? slowestRequestMove(dex, active);
 }
 
 /** The request's lowest-priority enabled move at priority 0 or below (other than `exceptId`), or null. */
-function slowestRequestMove(active: SimPokemon, exceptId = ''): string | null {
+function slowestRequestMove(dex: RulesDex, active: SimPokemon, exceptId = ''): string | null {
   let standIn: { id: string; priority: number } | null = null;
   for (const entry of active.getMoveRequestData().moves) {
     if (entry.id === exceptId || entry.disabled) continue;
-    const priority = Dex.moves.get(entry.id).priority;
+    const priority = dex.moves.get(entry.id).priority;
     if (priority > 0) continue;
     if (!standIn || priority < standIn.priority) standIn = { id: entry.id, priority };
   }
@@ -324,9 +324,9 @@ function getChoiceForSlot(
       // fainted (gen 3 replaces before upkeep). The click is unknown and the
       // sim cancels it as the body leaves; the slowest move lets the hit
       // land first, as in the game.
-      if (answersForcedRequest(events, lineIndex, ident)) {
+      if (answersForcedRequest(events, lineIndex, ident, battle.dex)) {
         const active = battle.sides[sideIdx].active[activeSlot];
-        const standIn = active ? slowestRequestMove(active) : null;
+        const standIn = active ? slowestRequestMove(battle.dex, active) : null;
         if (!standIn) break;
         const suffix = targetLocSuffixForChoice(battle, active, standIn, 0);
         return `${moveChoiceForActive(active, standIn)}${suffix}${gimmickSuffixForSlot(events, ident, active)}`;

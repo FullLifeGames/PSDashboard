@@ -59,7 +59,7 @@ function syncEffectTableFromSnapshot(battle: SimBattle, table: Record<string, Ef
 
 /** Weather the sim disagrees about takes the snapshot's id and remaining turns; matching weather keeps the rebuild's state. */
 function syncWeather(battle: SimBattle, snapshot: TurnSnapshot) {
-  const weather = weatherIdFromSnapshot(snapshot.field.weather);
+  const weather = weatherIdFromSnapshot(snapshot.field.weather, battle.dex);
   if ((battle.field.weather as string) === weather) return;
   battle.field.weather = weather as SimBattle['field']['weather'];
   battle.field.weatherState.id = weather as typeof battle.field.weatherState.id;
@@ -70,7 +70,7 @@ function syncWeather(battle: SimBattle, snapshot: TurnSnapshot) {
 
 /** Terrain the sim disagrees about: a cleared state (the sim's own helper), then the snapshot's id and remaining turns. */
 function syncTerrain(battle: SimBattle, snapshot: TurnSnapshot) {
-  const terrain = terrainIdFromSnapshot(snapshot.field.terrain);
+  const terrain = terrainIdFromSnapshot(snapshot.field.terrain, battle.dex);
   if ((battle.field.terrain as string) === terrain) return;
   battle.field.terrain = terrain as SimBattle['field']['terrain'];
   battle.clearEffectState(battle.field.terrainState);

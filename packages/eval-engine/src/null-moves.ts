@@ -1,6 +1,5 @@
-// Data-only Dex — this module is in the app's MAIN bundle; @pkmn/sim must
-// never be imported here.
-import { Dex } from '@pkmn/dex';
+// Round 75 (T160): the Dex is the game's own, by generation and mod, from replay-core's resolver.
+import { rulesDex, type RulesDex, type RulesMod } from '@fulllifegames/replay-core';
 import { moveAtUse } from './move-use.ts';
 
 /**
@@ -29,7 +28,7 @@ const STATUS_TEXT: Record<string, string> = {
   frz: 'frozen',
 };
 
-type GenDex = ReturnType<typeof Dex.forGen>;
+type GenDex = RulesDex;
 type DexMove = ReturnType<GenDex['moves']['get']>;
 
 /**
@@ -177,6 +176,8 @@ function attackerAtUse(
 export function nullMoveReason(params: {
   choice: string;
   gen: number;
+  /** The replay's mod (Champions); absent for none. */
+  mod?: RulesMod;
   attackerSpecies: string | null;
   defenderSpecies: string;
   /** The defender's Tera type when it has terastallized: it defends with that type (Stellar keeps the old ones). */
@@ -187,7 +188,7 @@ export function nullMoveReason(params: {
   const tokens = params.choice.split(' ');
   if (tokens[0] !== 'move' || !tokens[1] || params.choice.includes(',')) return null;
   const gen = Math.min(9, Math.max(1, Math.round(params.gen)));
-  const dex = Dex.forGen(gen);
+  const dex = rulesDex(gen, params.mod);
   const move = dex.moves.get(tokens[1]);
   if (!move.exists) return null;
   const defender = dex.species.get(params.defenderSpecies);

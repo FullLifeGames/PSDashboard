@@ -85,7 +85,7 @@ function makeMoves(
   if (!active || active.fainted || forceSwitch) return [];
   const underTera = typesUnderTera(battle, active);
   return active.moveSlots.map((move, index): BranchMoveOption => {
-    const targetType = targetTypeForMove(active, move.id || move.move);
+    const targetType = targetTypeForMove(battle.dex, active, move.id || move.move);
     const targetOptions = buildTargetOptions(battle, active, targetType);
     const type = typeAtUse(battle, active, move.id || move.move);
     const typeUnderTera = underTera.get(move.id || move.move);

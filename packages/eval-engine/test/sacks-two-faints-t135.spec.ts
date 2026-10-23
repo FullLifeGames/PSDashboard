@@ -1,5 +1,6 @@
 import { test, expect, describe } from 'vitest';
 import type { TurnSnapshot } from '@fulllifegames/replay-core';
+import { logRules } from '@fulllifegames/replay-core';
 import { analyzeTurn } from '../src/analysis';
 import { detectSacks, type SackInfo } from '../src/played';
 import type { EvalResult, RankedChoice } from '../src/types';
@@ -42,7 +43,7 @@ describe('T135 point 1: detection keeps the shape of every own faint', () => {
       [mon('Gholdengo', 'Gholdengo', 100, true)],
       [mon('Ogerpon', 'Ogerpon-Cornerstone', 9, true), mon('Rillaboom', 'Rillaboom', 78, true)],
     );
-    expect(detectSacks(events, before).p2?.others).toEqual([{ name: 'Rillaboom', species: 'Rillaboom', hpFraction: 0.78, stayed: true }]);
+    expect(detectSacks(events, before, logRules('')).p2?.others).toEqual([{ name: 'Rillaboom', species: 'Rillaboom', hpFraction: 0.78, stayed: true }]);
   });
 
   test('singles (653785 t26 shape): the replacement the Spikes took after the fed body keeps its healthy shape', () => {
@@ -58,13 +59,13 @@ describe('T135 point 1: detection keeps the shape of every own faint', () => {
       [mon('Tornadus', 'Tornadus-Therian', 10, true), mon('Volcanion', 'Volcanion', 30, false)],
       [mon('Dragonite', 'Dragonite', 100, true)],
     );
-    expect(detectSacks(events, before).p1?.others).toEqual([{ name: 'Volcanion', species: 'Volcanion', hpFraction: 109 / 363, healthy: true }]);
+    expect(detectSacks(events, before, logRules('')).p1?.others).toEqual([{ name: 'Volcanion', species: 'Volcanion', hpFraction: 109 / 363, healthy: true }]);
   });
 
   test('a one-body sack carries no others (573756 t68 guard)', () => {
     const events = ['|move|p2a: Corviknight|Body Press|p1a: Garchomp', '|-damage|p1a: Garchomp|0 fnt', '|faint|p1a: Garchomp'];
     const before = snapshot([mon('Garchomp', 'Garchomp', 11, true)], [mon('Corviknight', 'Corviknight', 27, true)]);
-    expect(detectSacks(events, before).p1).toEqual({ name: 'Garchomp', species: 'Garchomp', hpFraction: 0.11 });
+    expect(detectSacks(events, before, logRules('')).p1).toEqual({ name: 'Garchomp', species: 'Garchomp', hpFraction: 0.11 });
   });
 });
 
