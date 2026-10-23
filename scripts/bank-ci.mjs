@@ -2,6 +2,7 @@
 //
 //   node scripts/bank-ci.mjs --name <name> [--commit <ref>] [--jobs 16] [--slices-per-job 4] [--env KEY=VALUE ...]
 //                            [--tranche NAME] [--reuse] [--dry-run]
+//   node scripts/bank-ci.mjs --resume <name|run id>
 //
 // The script builds a run commit on top of the measured commit that adds exactly one file, .bank-run.json (git
 // commit-tree over a throwaway index, so the working tree, the index and every local branch stay as they are), pushes
@@ -10,6 +11,11 @@
 // deletes the branch with --force-with-lease, so a branch that moved is never deleted. Before the push it reads the
 // diff of the measured commit against origin/v1 and refuses files and lines that look like secrets. The user's
 // standing okay of 13.10. ("6a") covers these pushes and deletes of bank/<name> branches and nothing else.
+//
+// --resume takes up a run whose watcher ended (the session closed, the machine slept): it finds the run by its name or run
+// id, waits for it by the same rule, downloads it into .calibration/<name>/, records it and deletes its branch. A run whose
+// jobs have all completed and whose merged artifact exists counts as over after a grace period, also while GitHub still
+// calls it in_progress (round 76, T266).
 //
 // --reuse prints the folder of a downloaded CI run of the same measured commit and the same run settings and starts
 // nothing. --dry-run builds and checks the run commit and stops before the push. CI measures only commits that carry
@@ -104,7 +110,7 @@ function fail(message) {
 }
 
 function parseArgs(argv) {
-  const options = { name: null, commit: 'HEAD', jobs: 16, slicesPerJob: 4, env: {}, reuse: false, dryRun: false };
+  const options = { name: null, commit: 'HEAD', jobs: 16, slicesPerJob: 4, env: {}, reuse: false, dryRun: false, resume: null };
   for (let index = 0; index < argv.length; index++) {
     const arg = argv[index];
     const next = () => {
@@ -123,6 +129,7 @@ function parseArgs(argv) {
       if (eq <= 0) fail(`--env expects KEY=VALUE, got ${pair}`);
       options.env[pair.slice(0, eq)] = pair.slice(eq + 1);
     } else if (arg === '--reuse') options.reuse = true;
+    else if (arg === '--resume') options.resume = next();
     else if (arg === '--dry-run') options.dryRun = true;
     else fail(`unknown argument ${arg}`);
   }
@@ -138,12 +145,42 @@ export function pickRun(runs, sha) {
   return runs.find(entry => entry.headSha === sha && entry.workflowName === WORKFLOW_NAME) ?? null;
 }
 
+/** The merge job of bank.yml (`name:` of the job `merge`); a run is over only when it has completed too. */
+export const MERGE_JOB = 'Merge the jobs';
+/** How long a run whose jobs are all completed and whose merged artifact exists may stay open before it counts as over. */
+export const GRACE_MS = 5 * 60 * 1000;
+/** The longest `gh run watch` blocks before the loop looks at the jobs again (a run GitHub holds open never ends it). */
+const WATCH_MS = 3 * 60 * 1000;
+
+/**
+ * Round 76 (T266): whether the run's own jobs say it is over, whatever GitHub's status of the run says: every job of the run
+ * (the config job, the slice jobs, the merge job) has completed and the merged artifact exists.
+ */
+export function runFinished(state, artifactNames, { expectedJobs, artifactName, mergeJob = MERGE_JOB }) {
+  const jobs = state?.jobs ?? [];
+  return jobs.length >= expectedJobs
+    && jobs.every(job => job.status === 'completed')
+    && jobs.some(job => job.name === mergeJob)
+    && artifactNames.includes(artifactName);
+}
+
+/** The conclusion the jobs of a finished run add up to: skipped and neutral jobs do not count against it. */
+const jobsConclusion = jobs => (jobs.every(job => ['success', 'skipped', 'neutral'].includes(job.conclusion)) ? 'success' : 'failure');
+
 /**
  * The conclusion of a CI run once GitHub calls it completed. `gh run watch` ends with an error on a failed run and on an
  * API error alike (HTTP 504 on 19.10.2026: the script read run 39262005491 as over while it ran, found no artifact and
  * deleted its branch), so the run's own status decides, asked again until the run is completed.
+ *
+ * Round 76 (T266): GitHub also kept the run of r74-k open for about an hour after its 16 jobs and its merge had completed. With
+ * `artifacts` (the names of the run's artifacts) a run whose jobs are all completed and whose merged artifact is there counts
+ * as over once that has held for `graceMs`; a job that runs again starts the period anew, and the run's own conclusion wins
+ * when GitHub gives it first. The conclusion then is the jobs': success only when none failed.
  */
-export async function waitForRun(id, { watch, view, wait = pause, attempts = 240 }) {
+export async function waitForRun(id, {
+  watch, view, artifacts, wait = pause, now = Date.now, attempts = 240, graceMs = GRACE_MS, expectedJobs = 0, artifactName = '',
+}) {
+  let finishedSince = null;
   for (let attempt = 0; attempt < attempts; attempt++) {
     try {
       watch(id);
@@ -157,9 +194,55 @@ export async function waitForRun(id, { watch, view, wait = pause, attempts = 240
       // The status could not be read (network or API error): ask again after the pause.
     }
     if (state?.status === 'completed') return state.conclusion || 'unknown';
+    if (artifacts && state?.jobs) {
+      let names = null;
+      try {
+        names = artifacts(id);
+      } catch {
+        // The artifact list could not be read: the period keeps running as it was.
+      }
+      if (names) {
+        if (!runFinished(state, names, { expectedJobs, artifactName })) finishedSince = null;
+        else {
+          finishedSince ??= now();
+          if (now() - finishedSince >= graceMs) return jobsConclusion(state.jobs);
+        }
+      }
+    }
     await wait(30000);
   }
   return 'unknown';
+}
+
+/**
+ * Round 76 (T266): the Bank run a name or a run id stands for, through `gh` (`ghText(args)` returns its output). A name is the
+ * run's `bank/<name>` branch (the newest Bank run on it), a number is the run itself; its branch gives the name back.
+ */
+export function findRunByTarget(target, ghText) {
+  const fields = 'databaseId,headSha,url,workflowName,headBranch';
+  const byId = /^\d+$/.test(target);
+  const found = byId
+    ? JSON.parse(ghText(['run', 'view', target, '--json', fields]))
+    : JSON.parse(ghText(['run', 'list', '--branch', `bank/${target}`, '--json', fields, '--limit', '20'])).find(entry => entry.workflowName === WORKFLOW_NAME);
+  if (!found) throw new Error(`no run of the ${WORKFLOW_NAME} workflow on bank/${target}`);
+  if (found.workflowName !== WORKFLOW_NAME) throw new Error(`run ${target} belongs to the ${found.workflowName} workflow, not to ${WORKFLOW_NAME}`);
+  if (!found.headBranch?.startsWith('bank/')) throw new Error(`run ${target} ran on ${found.headBranch}, not on a bank/<name> branch`);
+  return { databaseId: found.databaseId, headSha: found.headSha, url: found.url, name: found.headBranch.slice('bank/'.length) };
+}
+
+/**
+ * The tail of every collection (a run just pushed and a run taken up again): wait for the run, download it, record it,
+ * and delete the branch, also when the wait or the download fails. Returns the conclusion.
+ */
+export async function collectRun({ wait, download, record, cleanup }) {
+  try {
+    const conclusion = await wait();
+    download();
+    record(conclusion);
+    return conclusion;
+  } finally {
+    cleanup();
+  }
 }
 
 async function runOf(sha, name) {
@@ -172,8 +255,76 @@ async function runOf(sha, name) {
   throw new Error(`no run of the ${WORKFLOW_NAME} workflow for ${sha} after five minutes`);
 }
 
+/** What waitForRun asks of GitHub: a watch that never blocks for long, the run's jobs, the run's artifact names. */
+const waitDeps = (id, config) => ({
+  watch: runId => execFileSync('gh', ['run', 'watch', String(runId), '--exit-status', '--interval', '30'], { cwd: ROOT, stdio: 'inherit', timeout: WATCH_MS }),
+  view: runId => JSON.parse(gh(['run', 'view', String(runId), '--json', 'status,conclusion,jobs'])),
+  artifacts: runId => JSON.parse(gh(['api', `repos/{owner}/{repo}/actions/runs/${runId}/artifacts?per_page=100`, '--jq', '[.artifacts[].name]'])),
+  expectedJobs: config.jobs + 2,
+  artifactName: `run-${config.name}`,
+});
+
+const downloadRun = (runId, name) => execFileSync('gh', ['run', 'download', String(runId), '--name', `run-${name}`, '--dir', join(ROOT, '.calibration', name)], { cwd: ROOT, stdio: 'inherit' });
+
+/** ci.json of a downloaded run (what --reuse reads), and the run's summary on the console. */
+function recordRun(run, config, measured, sha, conclusion) {
+  const out = join(ROOT, '.calibration', config.name);
+  writeFileSync(join(out, CI_RECORD), `${JSON.stringify({
+    measuredCommit: measured, runCommit: sha, runId: run.databaseId, runUrl: run.url, conclusion, settings: runSettings(config),
+    downloadedAt: new Date().toISOString(),
+  }, null, 2)}
+`);
+  const summary = join(out, 'summary.txt');
+  if (existsSync(summary)) console.log(readFileSync(summary, 'utf8'));
+  console.log(out);
+}
+
+/**
+ * Round 76 (T266): takes up a run whose watcher ended. The run commit still exists on origin as bank/<name> (the watcher
+ * deletes the branch last), and its .bank-run.json gives the run's settings back; a branch that is gone leaves the run
+ * commit to fetch by its sha, and a commit that cannot be fetched stops the resume with the reason.
+ */
+async function resume(target) {
+  let run;
+  try {
+    run = findRunByTarget(target, args => gh(args));
+  } catch (error) {
+    fail(error.message);
+  }
+  const out = join(ROOT, '.calibration', run.name);
+  if (existsSync(out)) fail(`refused: .calibration/${run.name} exists already`);
+  const fetched = [['--quiet', 'origin', `refs/heads/bank/${run.name}`], ['--quiet', 'origin', run.headSha]].some(args => {
+    try {
+      git(ROOT, ['fetch', ...args]);
+      return git(ROOT, ['rev-parse', '--verify', `${run.headSha}^{commit}`]).trim() === run.headSha;
+    } catch {
+      return false;
+    }
+  });
+  if (!fetched) fail(`cannot read the run commit ${run.headSha.slice(0, 12)} of bank/${run.name}: neither the branch nor the commit can be fetched`);
+  let config;
+  try {
+    config = validateRunConfig(JSON.parse(git(ROOT, ['show', `${run.headSha}:${CONFIG_FILE}`])), [...BANK_TRANCHES, ...holdoutTranches(ROOT), ...FIT_TRANCHES]);
+  } catch (error) {
+    fail(`the run commit holds no readable ${CONFIG_FILE}: ${error.message}`);
+  }
+  const measured = git(ROOT, ['rev-parse', `${run.headSha}^`]).trim();
+  console.log(`resuming ${run.url} (bank/${run.name}, measured ${measured.slice(0, 12)})`);
+  const conclusion = await collectRun({
+    wait: () => waitForRun(run.databaseId, waitDeps(run.databaseId, config)),
+    download: () => downloadRun(run.databaseId, run.name),
+    record: value => recordRun(run, config, measured, run.headSha, value),
+    cleanup: () => {
+      if (git(ROOT, ['ls-remote', '--heads', 'origin', `refs/heads/bank/${run.name}`]).trim() === '') return;
+      git(ROOT, deleteArgs(run.headSha, run.name), { stdio: 'inherit' });
+    },
+  });
+  if (conclusion !== 'success') process.exitCode = 1;
+}
+
 async function main() {
   const options = parseArgs(process.argv.slice(2));
+  if (options.resume) return resume(options.resume);
   let config;
   try {
     config = validateRunConfig(
@@ -209,26 +360,17 @@ async function main() {
     return;
   }
   git(ROOT, ['push', 'origin', pushRefspec(sha, config.name)], { stdio: 'inherit' });
-  let conclusion = 'unknown';
-  try {
-    const run = await runOf(sha, config.name);
-    console.log(`watching ${run.url}`);
-    conclusion = await waitForRun(run.databaseId, {
-      watch: id => execFileSync('gh', ['run', 'watch', String(id), '--exit-status', '--interval', '30'], { cwd: ROOT, stdio: 'inherit' }),
-      view: id => JSON.parse(gh(['run', 'view', String(id), '--json', 'status,conclusion'])),
-    });
-    const out = join(calibrationDir, config.name);
-    execFileSync('gh', ['run', 'download', String(run.databaseId), '--name', `run-${config.name}`, '--dir', out], { cwd: ROOT, stdio: 'inherit' });
-    writeFileSync(join(out, CI_RECORD), `${JSON.stringify({
-      measuredCommit: measured, runCommit: sha, runId: run.databaseId, runUrl: run.url, conclusion, settings: runSettings(config),
-      downloadedAt: new Date().toISOString(),
-    }, null, 2)}\n`);
-    const summary = join(out, 'summary.txt');
-    if (existsSync(summary)) console.log(readFileSync(summary, 'utf8'));
-    console.log(out);
-  } finally {
-    git(ROOT, deleteArgs(sha, config.name), { stdio: 'inherit' });
-  }
+  let run = null;
+  const conclusion = await collectRun({
+    wait: async () => {
+      run = await runOf(sha, config.name);
+      console.log(`watching ${run.url}`);
+      return waitForRun(run.databaseId, waitDeps(run.databaseId, config));
+    },
+    download: () => downloadRun(run.databaseId, config.name),
+    record: conclusion => recordRun(run, config, measured, sha, conclusion),
+    cleanup: () => git(ROOT, deleteArgs(sha, config.name), { stdio: 'inherit' }),
+  });
   if (conclusion !== 'success') process.exitCode = 1;
 }
 

@@ -4,7 +4,9 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildRunCommit, deleteArgs, findReuse, pickRun, pushRefspec, runSettings, secretFindings, waitForRun } from '../scripts/bank-ci.mjs';
+import {
+  buildRunCommit, collectRun, deleteArgs, findReuse, findRunByTarget, pickRun, pushRefspec, runSettings, secretFindings, waitForRun,
+} from '../scripts/bank-ci.mjs';
 import { BANK_TRANCHES, validateRunConfig } from '../scripts/bank-run-config.mjs';
 
 /**
@@ -146,5 +148,125 @@ describe('waiting for the CI run', () => {
 
   test('gives up as unknown after its attempts', async () => {
     expect(await waitForRun(1, { ...scripted([null], [{ status: 'in_progress' }]), attempts: 3 })).toBe('unknown');
+  });
+});
+
+describe('a finished run that GitHub holds open', () => {
+  // Round 76 (T266): on 22.10.2026 the Champions OU holdout run of r74-k finished its 16 jobs and its merge, and GitHub kept the
+  // run "in_progress" for about an hour. The run's jobs and its merged artifact decide, after a grace period.
+  const JOBS = 4;
+  const MERGE = 'Merge the jobs';
+  type Job = { name: string; status: string; conclusion?: string };
+  const done = (name: string, conclusion = 'success'): Job => ({ name, status: 'completed', conclusion });
+  const allJobs = (overrides: Record<string, Job> = {}): Job[] => [
+    done('Read the run'), ...Array.from({ length: JOBS }, (_, index) => done(`Job ${index}`)), done(MERGE),
+  ].map(job => overrides[job.name] ?? job);
+
+  /** A clock that only the waits move; every view and artifact list is the scripted answer at that time. */
+  function held(stateAt: (seconds: number) => { status: string; conclusion?: string; jobs?: Job[] }, artifactsAt: (seconds: number) => string[]) {
+    const clock = { ms: 0 };
+    const calls = { views: 0, waits: 0 };
+    return {
+      clock, calls,
+      watch: () => undefined,
+      view: () => { calls.views++; return stateAt(clock.ms / 1000); },
+      artifacts: () => artifactsAt(clock.ms / 1000),
+      wait: async (ms: number) => { calls.waits++; clock.ms += ms; },
+      now: () => clock.ms,
+      expectedJobs: JOBS + 2,
+      artifactName: 'run-r76-test',
+      graceMs: 300_000,
+    };
+  }
+  const merged = ['job-0', 'run-r76-test'];
+
+  test('downloads after the grace period when every job is completed and the merged artifact is there', async () => {
+    const run = held(() => ({ status: 'in_progress', jobs: allJobs() }), () => merged);
+    expect(await waitForRun(1, run)).toBe('success');
+    expect(run.clock.ms).toBeGreaterThanOrEqual(300_000);
+    expect(run.clock.ms).toBeLessThan(300_000 + 60_000);
+  });
+
+  test('a failed slice job reads as a failure, and the run still comes back for its merged rows', async () => {
+    const run = held(() => ({ status: 'in_progress', jobs: allJobs({ 'Job 2': done('Job 2', 'failure') }) }), () => merged);
+    expect(await waitForRun(1, run)).toBe('failure');
+  });
+
+  test.each([
+    ['a job still running', () => ({ status: 'in_progress', jobs: allJobs({ 'Job 1': { name: 'Job 1', status: 'in_progress' } }) }), () => merged],
+    ['the merge job queued', () => ({ status: 'in_progress', jobs: allJobs({ [MERGE]: { name: MERGE, status: 'queued' } }) }), () => merged],
+    ['the merge job missing', () => ({ status: 'in_progress', jobs: allJobs().filter(job => job.name !== MERGE) }), () => merged],
+    ['jobs missing from the matrix', () => ({ status: 'in_progress', jobs: allJobs().slice(0, 3) }), () => merged],
+    ['the merged artifact missing', () => ({ status: 'in_progress', jobs: allJobs() }), () => ['job-0']],
+  ] as const)('%s: waits on and gives up as unknown', async (_label, state, artifacts) => {
+    expect(await waitForRun(1, { ...held(state, artifacts), attempts: 40 })).toBe('unknown');
+  });
+
+  test('the grace period starts again when a job runs again, and the run\'s own conclusion wins once GitHub gives it', async () => {
+    const rerun = held(seconds => (seconds >= 120 && seconds < 240
+      ? { status: 'in_progress', jobs: allJobs({ 'Job 3': { name: 'Job 3', status: 'in_progress' } }) }
+      : { status: 'in_progress', jobs: allJobs() }), () => merged);
+    expect(await waitForRun(1, rerun)).toBe('success');
+    // Finished at 0 s, interrupted from 120 s to 240 s, finished again from 240 s: released no earlier than 540 s.
+    expect(rerun.clock.ms).toBeGreaterThanOrEqual(540_000);
+
+    const closed = held(seconds => (seconds >= 60
+      ? { status: 'completed', conclusion: 'cancelled', jobs: allJobs() }
+      : { status: 'in_progress', jobs: allJobs() }), () => merged);
+    expect(await waitForRun(1, closed)).toBe('cancelled');
+    expect(closed.clock.ms).toBeLessThan(300_000);
+  });
+
+  test('an API error on the artifacts is asked again', async () => {
+    const run = held(() => ({ status: 'in_progress', jobs: allJobs() }), () => merged);
+    let failures = 2;
+    const flaky = { ...run, artifacts: () => { if (failures-- > 0) throw new Error('HTTP 502'); return merged; } };
+    expect(await waitForRun(1, flaky)).toBe('success');
+  });
+});
+
+describe('resuming a run whose watcher ended', () => {
+  const runs = [
+    { databaseId: 11, headSha: 'a'.repeat(40), url: 'https://example.org/11', workflowName: 'Tests', headBranch: 'bank/r76-x' },
+    { databaseId: 12, headSha: 'b'.repeat(40), url: 'https://example.org/12', workflowName: 'Bank', headBranch: 'bank/r76-x' },
+  ];
+  const ghAnswering = (log: string[]) => (args: string[]) => {
+    log.push(args.join(' '));
+    if (args[0] === 'run' && args[1] === 'list') return JSON.stringify(runs);
+    if (args[0] === 'run' && args[1] === 'view') return JSON.stringify(runs.find(entry => String(entry.databaseId) === args[2]));
+    throw new Error(`unexpected gh call ${args.join(' ')}`);
+  };
+
+  test('by name: the newest run of the Bank workflow on bank/<name>', () => {
+    const log: string[] = [];
+    expect(findRunByTarget('r76-x', ghAnswering(log))).toMatchObject({ databaseId: 12, name: 'r76-x' });
+    expect(log[0]).toContain('--branch bank/r76-x');
+  });
+
+  test('by run id: the run and the name of its branch', () => {
+    expect(findRunByTarget('12', ghAnswering([]))).toMatchObject({ databaseId: 12, name: 'r76-x', headSha: 'b'.repeat(40) });
+  });
+
+  test('a run of another workflow is refused, and so is a name without a run', () => {
+    expect(() => findRunByTarget('11', ghAnswering([]))).toThrow(/Bank/);
+    expect(() => findRunByTarget('nobody', () => '[]')).toThrow(/no run/);
+  });
+
+  test('collecting: the wait, the download, the record and then the branch delete, also when the wait ends in a failure', async () => {
+    const order: string[] = [];
+    const steps = (conclusion: string) => ({
+      wait: async () => { order.push('wait'); return conclusion; },
+      download: () => order.push('download'),
+      record: (value: string) => order.push(`record ${value}`),
+      cleanup: () => order.push('delete'),
+    });
+    expect(await collectRun(steps('success'))).toBe('success');
+    expect(order).toEqual(['wait', 'download', 'record success', 'delete']);
+    order.length = 0;
+    expect(await collectRun(steps('failure'))).toBe('failure');
+    expect(order).toEqual(['wait', 'download', 'record failure', 'delete']);
+    order.length = 0;
+    await expect(collectRun({ ...steps('success'), download: () => { throw new Error('no artifact'); } })).rejects.toThrow('no artifact');
+    expect(order).toEqual(['wait', 'delete']);
   });
 });
