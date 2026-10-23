@@ -8,7 +8,7 @@ import dexPlugin from '../eslint.dex.mjs';
 /**
  * Round 75 (T160, decision D1): the rule dex/no-global-dex-read. The global Dex of @pkmn/sim (and of @pkmn/dex) is Generation 9 on
  * Scarlet/Violet, so a read of it is wrong for the type chart of Gens 1 to 5, a species' older stats and abilities, and the
- * Pokémon Champions mod. replay-core reads rules only through rules-dex.ts; the rule fails `npm run lint` on any other value
+ * Pokémon Champions mod. replay-core, eval-engine and the app read rules only through rules-dex.ts; the rule fails `npm run lint` on any other value
  * reference to an imported `Dex`. It replaces the census spec of round 67: no exceptions, and a new read is a lint error, not a number.
  * The rule reads code, not games: a singles and a doubles log reach it the same way.
  */
@@ -18,7 +18,7 @@ const linter = new Linter();
 function lint(code: string, filename = 'packages/replay-core/src/zz-scratch.ts'): Linter.LintMessage[] {
   return linter.verify(
     code,
-    [{ files: ['**/*.ts'], languageOptions: { parser: tseslint.parser }, plugins: { dex: dexPlugin }, rules: { [RULE]: 'error' } }],
+    [{ files: ['**/*.ts', '**/*.tsx'], languageOptions: { parser: tseslint.parser }, plugins: { dex: dexPlugin }, rules: { [RULE]: 'error' } }],
     { filename },
   );
 }
@@ -77,21 +77,34 @@ describe(RULE, () => {
 });
 
 describe('the rule in the repository', () => {
-  test('replay-core reads the global Dex nowhere but in rules-dex.ts', () => {
-    const root = join(__dirname, '..', 'packages', 'replay-core', 'src');
-    const files = (readdirSync(root, { recursive: true }) as string[]).filter(name => name.endsWith('.ts')).map(name => join('packages/replay-core/src', name));
-    expect(files.length).toBeGreaterThan(70);
-    const offending = files.filter(file => !file.endsWith('rules-dex.ts'))
-      .flatMap(file => lint(readFileSync(join(__dirname, '..', file), 'utf8'), file).filter(message => message.ruleId === RULE).map(message => `${file}:${message.line}`));
-    expect(offending).toEqual([]);
-    const reading = files.filter(file => file.endsWith('rules-dex.ts')).flatMap(file => lint(readFileSync(join(__dirname, '..', file), 'utf8'), file));
-    expect(reading.length).toBeGreaterThan(0);
+  /** Every source file under a folder of the repository, as repository-relative paths. */
+  const sourcesUnder = (folder: string) => (readdirSync(join(__dirname, '..', folder), { recursive: true }) as string[])
+    .filter(name => name.endsWith('.ts') || name.endsWith('.tsx')).map(name => `${folder}/${name.split('\\').join('/')}`);
+  const offendingIn = (files: string[]) => files.filter(file => !file.endsWith('replay-core/src/rules-dex.ts'))
+    .flatMap(file => lint(readFileSync(join(__dirname, '..', file), 'utf8'), file).filter(message => message.ruleId === RULE).map(message => `${file}:${message.line}`));
+
+  test.each([
+    ['replay-core', 'packages/replay-core/src', 70],
+    ['eval-engine', 'packages/eval-engine/src', 100],
+    ['the app', 'src', 100],
+  ])('%s reads the global Dex nowhere (the resolver rules-dex.ts is the one place)', (_name, folder, least) => {
+    const files = sourcesUnder(folder);
+    expect(files.length).toBeGreaterThan(least);
+    expect(offendingIn(files)).toEqual([]);
   });
 
-  test('the config makes it an error for replay-core sources and exempts the resolver', async () => {
+  test('the resolver itself reads the Dex', () => {
+    const files = sourcesUnder('packages/replay-core/src').filter(file => file.endsWith('rules-dex.ts'));
+    expect(files.flatMap(file => lint(readFileSync(join(__dirname, '..', file), 'utf8'), file)).length).toBeGreaterThan(0);
+  });
+
+  test('the config makes it an error for replay-core, eval-engine and app sources and exempts the resolver', async () => {
     const eslint = new ESLint();
     const ruleOf = async (file: string) => ((await eslint.calculateConfigForFile(file)) as { rules?: Record<string, unknown> }).rules?.[RULE];
     expect(await ruleOf('packages/replay-core/src/team-info.ts')).toEqual([2]);
+    expect(await ruleOf('packages/eval-engine/src/ko-odds.ts')).toEqual([2]);
+    expect(await ruleOf('src/lib/picker-state.ts')).toEqual([2]);
+    expect(await ruleOf('src/components/ReplayWorkspace.tsx')).toEqual([2]);
     expect(await ruleOf('packages/replay-core/src/rules-dex.ts')).toBeUndefined();
   });
 });
