@@ -7,6 +7,7 @@ import { defineConfig, globalIgnores } from 'eslint/config'
 import { ratchetBase, ratchetOverrides } from './eslint.ratchet.mjs'
 import { importZones } from './eslint.zones.mjs'
 import namesPlugin from './eslint.names.mjs'
+import dexPlugin from './eslint.dex.mjs'
 
 export default defineConfig([
   // docs/ holds Markdown and the local, gitignored probes (copies of old sources among them): CI never sees them,
@@ -36,5 +37,12 @@ export default defineConfig([
     files: ['packages/*/src/**/*.ts'],
     plugins: { names: namesPlugin },
     rules: { 'names/no-new-dex-name': 'error' },
+  },
+  // Round 75 (T160): replay-core reads rules through the resolver of generation and mod, never the global Dex (see eslint.dex.mjs).
+  {
+    files: ['packages/replay-core/src/**/*.ts'],
+    ignores: ['packages/replay-core/src/rules-dex.ts'],
+    plugins: { dex: dexPlugin },
+    rules: { 'dex/no-global-dex-read': 'error' },
   },
 ])
