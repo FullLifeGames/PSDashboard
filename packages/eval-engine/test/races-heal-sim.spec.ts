@@ -4,6 +4,8 @@ import type { PokemonSet } from '@pkmn/sim';
 import { healProfile } from '../src/score/races';
 import { fingerprint } from '../src/sim-ask';
 import { loadSimMods } from '../src/forward/sim-mods';
+import { set } from './move-oracle';
+import { battleOf } from './power-oracle';
 
 /**
  * Round 76 (T258): the heal rate of a move from the simulator. A heal move without a ratio in the Dex (Shore Up: half
@@ -114,6 +116,19 @@ describe('healProfile reads the heal the simulator plays (T258)', () => {
     expect(rows).toBeGreaterThan(1000);
     expect(mismatches).toEqual([]);
   }, 600_000);
+
+  test.each(['gen9doublescustomgame', 'gen9championsdoublescustomgame', 'gen9championsvgc2026regmbbo3'])('doubles (%s): the same rates on a board of two bodies a side, Shore Up in sand and Heal Pulse for the foe', format => {
+    const board = () => battleOf(format, [set('Palossand', ['shoreup', 'healpulse', 'junglehealing']), set('Snorlax', ['splash'])], [set('Snorlax', ['splash']), set('Snorlax', ['splash'])]);
+    const clear = board();
+    const sand = board();
+    sand.field.setWeather('sandstorm', sand.sides[1].active[0]!);
+    const [user, sandUser] = [clear.sides[0].active[0]!, sand.sides[0].active[0]!];
+    expect(healProfile(user, clear).rate).toBeCloseTo(1 / 2, 2);
+    expect(healProfile(sandUser, sand).rate).toBeCloseTo(2 / 3, 2);
+    // Jungle Healing (a quarter) and Heal Pulse (the target's HP: 0 for the user) never beat Shore Up; with only those two the rate is the quarter.
+    const weak = battleOf(format, [set('Palossand', ['healpulse', 'junglehealing']), set('Snorlax', ['splash'])], [set('Snorlax', ['splash']), set('Snorlax', ['splash'])]);
+    expect(healProfile(weak.sides[0].active[0]!, weak).rate).toBeCloseTo(1 / 4, 2);
+  });
 
   test('healProfile leaves the live battle as it found it', () => {
     const battle = withField(duel('gen9customgame', ['shoreup', 'moonlight', 'rest']), { weather: 'sandstorm', terrain: '' });
