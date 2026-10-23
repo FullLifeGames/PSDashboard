@@ -107,7 +107,7 @@ function ownStatsLowered(move: DexMove): string[] {
   return Object.keys(boosts).filter(stat => (boosts[stat] ?? 0) < 0);
 }
 
-function factsOf(dex: RulesDex, name: string): MoveFacts | null {
+export function factsOf(dex: RulesDex, name: string): MoveFacts | null {
   const move = dex.moves.get(name);
   if (!move.exists) return null;
   const scaling = move.category === 'Status' ? null
