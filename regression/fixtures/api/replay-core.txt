@@ -100,6 +100,7 @@ value hazardConditions
 value historyPower
 value inferOpponentTeam
 value inferReplayFormatId
+value isChampionsFormat
 value isScreen
 value isSitrusBerry
 value itemSetValue

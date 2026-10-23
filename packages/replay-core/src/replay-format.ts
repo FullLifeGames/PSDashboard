@@ -1,6 +1,7 @@
 import { Battle } from '@pkmn/client';
 import { Protocol } from '@pkmn/protocol';
 import { Dex } from '@pkmn/sim';
+import { isChampionsFormat } from './champions-format.ts';
 import { generationsFor } from './format-generations.ts';
 import type { ReplayData, TurnSnapshot } from './types.ts';
 import { toId } from './ids.ts';
@@ -301,7 +302,7 @@ export type ReplayRuleset = 'standard' | 'vgc' | 'champions';
  */
 export function replayRuleset(source: ReplayFormatSource): ReplayRuleset {
   const format = inferReplayFormatId(source);
-  if (/champions/.test(format)) return 'champions';
+  if (isChampionsFormat(format)) return 'champions';
   return /vgc/.test(format) ? 'vgc' : 'standard';
 }
 

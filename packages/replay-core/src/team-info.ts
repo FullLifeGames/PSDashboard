@@ -2,7 +2,7 @@ import { getSpeciesUsageSet, getSpeciesUsageStats } from './smogon/usage-lookup.
 import type { SmogonUsageStats, UsageProbability, UsageSpread } from './smogon/stats-types.ts';
 import { getSpeciesSetAssumption, type SetAssumption, type SetSpreadAssumption, type SmogonSetAssumptions } from './smogon/sets-lookup.ts';
 import { applyCoherenceVetoes, itemFromChosenSet, publishedIvs, selectCuratedSet, type MoveCandidate } from './set-coherence.ts';
-import { isChampionsFormat } from './spreads/champions-format.ts';
+import { isChampionsFormat } from './champions-format.ts';
 import type { SpreadCandidate, SpreadOrigin } from './spreads/ladder.ts';
 import { settleOpenMoves, unfilledOpenMoves } from './team/open-moves.ts';
 import type {

@@ -1,4 +1,5 @@
 import { Generations } from '@smogon/calc';
+import { isChampionsFormat } from './champions-format.ts';
 
 /**
  * Round 68 (T186, decision 1): the one place that decides which @smogon/calc
@@ -36,10 +37,11 @@ export function calcGenerationFor(gen: number, mod?: string): CalcGeneration {
 
 /**
  * The mod of a format, for a host that knows a format and not a battle ('champions' for the Pokémon Champions formats).
- * A format id ('gen9championsou') and a format name as the log's tier line prints it ('[Gen 9 Champions] OU') both count.
+ * A format id ('gen9championsou') and a format name as the log's tier line prints it ('[Gen 9 Champions] OU') both count
+ * (round 75, T160: champions-format.ts is the one rule).
  */
 export function calcModOf(formatid: string): typeof CHAMPIONS_MOD | undefined {
-  return /champions/i.test(formatid) ? CHAMPIONS_MOD : undefined;
+  return isChampionsFormat(formatid) ? CHAMPIONS_MOD : undefined;
 }
 
 /** The simulator's generation behind a calculator generation: the Champions generation 0 plays on Gen 9's rules. */

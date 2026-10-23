@@ -19,6 +19,7 @@ import { rocksMayMiss } from './inference/rocks-tell.ts';
 import type { DamageObservation, HiddenPowerEvidence, OpponentTeamInfo, RevealedPokemonInfo, SpeedOrderObservation } from './types.ts';
 import { genNumOf, toId } from './ids.ts';
 import { normalizeLineEndings } from './line-endings.ts';
+import { isChampionsFormat } from './champions-format.ts';
 import { withReplayIdentity } from './team-identity.ts';
 
 /**
@@ -128,7 +129,7 @@ function importedUserTeam(userTeamText: string | undefined): PokemonSet[] | null
 /** The generation digit and the format hint (Champions gets its own EV budget). */
 function formatHintFor(log: string): { gen: string; formatHint: string } {
   const gen = log.match(/^\|gen\|(\d)/m)?.[1] ?? '9';
-  const formatHint = /^\|tier\|.*champions/im.test(log) ? `gen${gen}champions` : `gen${gen}`;
+  const formatHint = isChampionsFormat(log.match(/^\|tier\|(.*)$/m)?.[1] ?? '') ? `gen${gen}champions` : `gen${gen}`;
   return { gen, formatHint };
 }
 

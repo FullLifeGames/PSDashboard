@@ -8,6 +8,7 @@
  */
 export { WEATHER_BY_ID, TERRAIN_BY_ID } from './calc-field.ts';
 export { calcGenerationFor, calcModOf, simGenNum, CHAMPIONS_MOD } from './calc-gen.ts';
+export { isChampionsFormat } from './champions-format.ts';
 export { generationsFor } from './format-generations.ts';
 export type { GenerationsScope, LegalDex } from './format-generations.ts';
 export type { CalcGeneration } from './calc-gen.ts';

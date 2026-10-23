@@ -1,7 +1,7 @@
 import { TeamValidator } from '@pkmn/sim';
 import type { PokemonEvs } from '../types.ts';
 import { genNumOf } from '../ids.ts';
-import { isChampionsFormat } from './champions-format.ts';
+import { isChampionsFormat } from '../champions-format.ts';
 
 export const ZERO_EVS: PokemonEvs = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
 

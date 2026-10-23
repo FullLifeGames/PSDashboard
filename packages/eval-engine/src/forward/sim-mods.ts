@@ -1,4 +1,5 @@
-import { Dex, toID } from '@pkmn/sim';
+import { Dex } from '@pkmn/sim';
+import { isChampionsFormat } from '@fulllifegames/replay-core';
 
 /**
  * Round 67 (T145): Pokémon Champions battles run on the Champions mod of
@@ -16,19 +17,11 @@ import { Dex, toID } from '@pkmn/sim';
 type ChampionsMod = typeof import('@pkmn/mods/champions');
 type ModData = NonNullable<Parameters<typeof Dex.mod>[1]>;
 
-/** The Champions mod's format ids carry its name after the generation ([Gen 9 Champions] OU is gen9championsou). */
-const CHAMPIONS_FORMAT = /^gen\d+champions/;
-const championsFormats = new Map<string, boolean>();
-
-/** Whether a simulator or replay format id names a Pokémon Champions format (memoized: deserialization asks per fork). */
-export function isChampionsSimFormat(format: string): boolean {
-  let champions = championsFormats.get(format);
-  if (champions === undefined) {
-    champions = CHAMPIONS_FORMAT.test(toID(format.split('@@@')[0]));
-    championsFormats.set(format, champions);
-  }
-  return champions;
-}
+/**
+ * Whether a simulator or replay format id names a Pokémon Champions format. Round 75 (T160): replay-core's isChampionsFormat is
+ * the one rule (a spec compares this name with it over every format of both Dexes); it memoizes, because deserialization asks per fork.
+ */
+export const isChampionsSimFormat = isChampionsFormat;
 
 let registered = false;
 let loading: Promise<void> | null = null;
