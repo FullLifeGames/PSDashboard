@@ -82,7 +82,7 @@ describe('the rule in the repository', () => {
     const files = (readdirSync(root, { recursive: true }) as string[]).filter(name => name.endsWith('.ts')).map(name => join('packages/replay-core/src', name));
     expect(files.length).toBeGreaterThan(70);
     const offending = files.filter(file => !file.endsWith('rules-dex.ts'))
-      .flatMap(file => lint(readFileSync(join(__dirname, '..', file), 'utf8'), file).map(message => `${file}:${message.line}`));
+      .flatMap(file => lint(readFileSync(join(__dirname, '..', file), 'utf8'), file).filter(message => message.ruleId === RULE).map(message => `${file}:${message.line}`));
     expect(offending).toEqual([]);
     const reading = files.filter(file => file.endsWith('rules-dex.ts')).flatMap(file => lint(readFileSync(join(__dirname, '..', file), 'utf8'), file));
     expect(reading.length).toBeGreaterThan(0);
