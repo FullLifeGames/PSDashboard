@@ -1,5 +1,5 @@
 import {
-  type OpponentTeamInfo, type PokemonEvs, type RevealedPokemonInfo, itemSetValue, parsePastedTeam,
+  type OpponentTeamInfo, type PokemonEvs, type RevealedPokemonInfo, itemSetValue, parsePastedTeam, typedHiddenPowerId,
   type PastedSet,
 } from '@fulllifegames/replay-core';
 import { EV_STATS } from './team-editor';
@@ -10,6 +10,8 @@ import { EV_STATS } from './team-editor';
  * headers — every block pastes cleanly into Showdown and the whole document
  * round-trips through parseSetsImport. Dependency-free like team-paste.
  */
+
+const ALL_31_IVS: PokemonEvs = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
 
 function statLine(prefix: 'EVs' | 'IVs', values: PokemonEvs, defaultValue: number): string | null {
   const parts = EV_STATS
@@ -40,10 +42,12 @@ function spreadLines(pokemon: RevealedPokemonInfo): string[] {
   }
   const nature = knownValue(pokemon.nature);
   if (nature) lines.push(`${nature} Nature`);
-  if (pokemon.ivs && pokemon.ivs.source !== 'unknown') {
-    const ivLine = statLine('IVs', pokemon.ivs.value, 31);
-    if (ivLine) lines.push(ivLine);
-  }
+  const known = pokemon.ivs && pokemon.ivs.source !== 'unknown' ? pokemon.ivs.value : null;
+  const ivLine = known ? statLine('IVs', known, 31) : null;
+  if (ivLine) lines.push(ivLine);
+  // Round 76 (T234): the import (the library's) gives a set with a typed Hidden Power that type's own IVs unless the text lists
+  // IVs, and the build plays the IVs it has (31 when nothing says otherwise): all 31 stay explicit then.
+  else if (typedHiddenPowerId(pokemon.moves.map(move => move.name))) lines.push(statLine('IVs', ALL_31_IVS, 0)!);
   return lines;
 }
 
