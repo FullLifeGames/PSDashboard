@@ -4,6 +4,10 @@ import type { Battle } from '@pkmn/sim';
 import { LoggedRollPRNG, type LoggedRolls } from '../src/branch/logged-rolls';
 import { getMainChoice, parseTurnBlocks } from '../src/branch/protocol-choices';
 import { drawsByAction, observeDraws, playTurn, prngOf, reconstruct, type Draw } from './arrival-turn';
+import { loadSimMods } from '../src/forward/sim-mods';
+
+// Round 75 (T160): a Champions game reads the registered Champions Dex, so the mod loads first, as the hosts do.
+await loadSimMods('gen9championsou');
 
 /**
  * Round 73, T232: the first turn of a branch keeps the logged dice of every action the user leaves as it was. Round 70 put the

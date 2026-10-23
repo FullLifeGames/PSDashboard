@@ -1,6 +1,10 @@
 import { describe, expect, test } from 'vitest';
 import { inferOpponentTeam } from '@fulllifegames/replay-core';
 import { expectNameBlind, replays } from './identity-blind-support';
+import { loadSimMods } from '../src/forward/sim-mods';
+
+// Round 75 (T160): a Champions game reads the registered Champions Dex, so the mod loads first, as the hosts do.
+await loadSimMods('gen9championsou');
 
 /**
  * Round 72, T238: a nickname or a shiny flag never reaches the engine's words or its numbers. The turn analysis of a

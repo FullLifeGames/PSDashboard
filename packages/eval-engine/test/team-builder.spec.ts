@@ -54,6 +54,10 @@ describe('species-shaped default spreads', () => {
 import { readFileSync } from 'fs';
 import { buildTeamsFromReplay, inferOpponentTeam, parseReplayLogWithObservations, enrichTeamInfo, type SmogonUsageStats, type SmogonSetAssumptions, type OpponentTeamInfo, type ReplayData } from '@fulllifegames/replay-core';
 import { createBranchState, reconstructBranchRuntime } from '../src/branch-engine';
+import { loadSimMods } from '../src/forward/sim-mods';
+
+// Round 75 (T160): a Champions game reads the registered Champions Dex, so the mod loads first, as the hosts do.
+await loadSimMods('gen9championsou');
 
 const fixtureReplay = JSON.parse(
   readFileSync(new URL('./fixtures/replay.json', import.meta.url), 'utf-8'),
