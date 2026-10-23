@@ -5,6 +5,7 @@ type DamageObservation
 type EvBudget
 type FactsDex
 type FieldSnapshot
+type GameRules
 type GenerationsScope
 type HiddenPowerEvidence
 type HitParty
@@ -26,6 +27,8 @@ type ProtectKind
 type ReplayData
 type ReplayRuleset
 type RevealedPokemonInfo
+type RulesDex
+type RulesMod
 type ScreenHolder
 type ScreenId
 type SetAssumption
@@ -77,6 +80,8 @@ value calcSpecies
 value callingMoves
 value choiceItems
 value countMatchingSpecies
+value dexOf
+value dexOfCalc
 value enrichPokemonInfo
 value enrichTeamInfo
 value enrichTeamInfos
@@ -86,6 +91,7 @@ value fieldOf
 value fillUsageMoves
 value finalPlayedTurn
 value formatEnforcesSleepClause
+value formatRules
 value generationsFor
 value getBranchSimulatorFormat
 value getReplayBringCount
@@ -105,6 +111,7 @@ value isScreen
 value isSitrusBerry
 value itemSetValue
 value judgeItemsByDamage
+value logRules
 value manualEvs
 value manualField
 value manualMove
@@ -115,8 +122,10 @@ value parseTeamText
 value poweredMove
 value protectKind
 value replayBringOnly
+value replayRules
 value replayRuleset
 value resolveHiddenPowerType
+value rulesDex
 value screenFlags
 value sideIndex
 value simGenNum
