@@ -12,6 +12,7 @@ import { leafValue } from '../packages/eval-engine/src/search/leaf';
 import { bankKeepPlayed, bankSampleCount, bankSearch, bankSettings } from './bank-search';
 import { diskCachedSmogonFetcher } from './smogon-fetch-cache';
 import { bankTeamsFor } from './bank-build';
+import { loadReplayMods } from '../src/lib/replay-mods';
 import { bankUniverse, phaseOf } from './bank-universe';
 import { createMatchupCache, evalFeatures, EVAL_WEIGHTS, FEATURE_WEIGHTS, type EvalFeatures } from '../packages/eval-engine/src/eval-function';
 import { setLastPairSweep } from '../packages/eval-engine/src/score/last-pair';
@@ -6467,6 +6468,7 @@ describe.skipIf(process.env.CALIB_POS_PROBE !== '1')('single-pass position ident
         continue;
       }
       const replay = fetched.replay;
+      await loadReplayMods(replay);
       const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
       const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });
       if (p1Team.length === 0 || p2Team.length === 0) {

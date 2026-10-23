@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { fetchReplay } from '../lib/replay-fetcher';
 import { parseExportedReplay } from '../lib/replay-file';
+import { loadReplayMods } from '../lib/replay-mods';
 import type {
   DamageObservation, HiddenPowerEvidence, ItemDamageJudge, ReplayData, SpeedOrderObservation, TurnSnapshot, OpponentTeamInfo,
 } from '@fulllifegames/replay-core';
@@ -49,6 +50,8 @@ export function useReplay() {
     setState(prev => ({ ...prev, loading: true, error: null }));
     try {
       const data = await task();
+      // The Champions mod registers before the inference reads the Champions Dex (round 75, T160).
+      await loadReplayMods(data);
       const [{ parseReplayLogWithObservations }, { inferOpponentTeam, judgeItemsByDamage }] = await Promise.all([
         import('../lib/lazy/protocol-parser'),
         import('../lib/lazy/opponent-inferrer'),

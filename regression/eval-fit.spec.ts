@@ -20,6 +20,7 @@ import {
   type FamilySample, type Ruleset,
 } from './fit-families';
 import { holdoutSets } from './bank-universe';
+import { loadReplayMods } from '../src/lib/replay-mods';
 
 /**
  * Weight-fitting harness (WP 7): fits the static eval's linear feature
@@ -341,6 +342,7 @@ async function captureEntry(entry: Manifest['replays'][number], samples: FitSamp
     const set = `${ruleset}-${gameType}|${players.map(name => name.toLowerCase().replace(/[^a-z0-9]/g, '')).sort().join('|')}`;
     const genClass: FitSample['genClass'] = /^gen9/.test(replay.formatid ?? entry.format) ? 'gen9' : 'old';
 
+    await loadReplayMods(replay);
     const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
     const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });
     if (p1Team.length === 0 || p2Team.length === 0 || snapshots.length < 4) return;

@@ -1,6 +1,7 @@
 import type { PokemonSet } from '@pkmn/sim';
 import { buildTeamsFromReplay, parseReplayLogWithObservations } from '@fulllifegames/replay-core';
 import { appTeamSeed, buildAppTeams } from '../src/lib/app-team-build';
+import { loadReplayMods } from '../src/lib/replay-mods';
 import { fetchSmogonSetAssumptions } from '../src/lib/smogon-sets';
 import { fetchSmogonUsageStats } from '../src/lib/smogon-stats';
 
@@ -32,6 +33,8 @@ const empty = (teams: Teams) => teams.p1Team.length === 0 || teams.p2Team.length
 
 export async function bankTeamsFor(args: BankBuildArgs): Promise<BankBuild> {
   const { log, parsed, fetcher } = args;
+  // A Champions game reads the Champions Dex: the mod registers first, as the app's replay load does (round 75, T160).
+  await loadReplayMods({ log, formatid: args.formatId });
   if (!fetcher) {
     const teams = buildTeamsFromReplay(log, { observations: parsed.observations, speedOrders: parsed.speedOrders });
     return empty(teams) ? { teams: null, reason: 'could not build teams' } : { teams, reason: null };
