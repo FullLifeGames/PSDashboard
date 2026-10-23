@@ -10,6 +10,10 @@ name: Bank
 # .bank-run.json is untrusted input, so scripts/bank-run-config.mjs validates it and starts the runner itself, and the
 # only expression in a shell line is the matrix's job index; the data tarball is checked against the sha256 that the
 # tracked regression/fixtures/bank-data.json names before anything is unpacked (scripts/bank-data-pack.mjs --fetch).
+#
+# Round 76 (T266): every job runs on ubuntu-24.04, the image every run of rounds 71 to 75 used; ubuntu-latest moves to
+# Ubuntu 26 from 19.10.2026, and an image that changes under a round would change no row only by luck (round 72: pin
+# exact versions).
 # regression/bank-workflow.spec.ts pins these properties.
 
 on:
@@ -26,7 +30,7 @@ concurrency:
 jobs:
   config:
     name: Read the run
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
       jobs: ${{ steps.config.outputs.jobs }}
@@ -49,7 +53,7 @@ jobs:
   slice:
     name: Job ${{ matrix.job }}
     needs: config
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 150
     strategy:
       fail-fast: false
@@ -97,7 +101,7 @@ jobs:
     name: Merge the jobs
     needs: [config, slice]
     if: ${{ always() && needs.config.result == 'success' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out the run commit
