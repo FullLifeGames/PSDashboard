@@ -1,4 +1,5 @@
 import { spriteUrl } from '../lib/sprite-url';
+import { useReplayRules } from '../lib/replay-rules';
 import { useLeadSelection } from '../hooks/useLeadSelection';
 import type { LeadOption } from '../lib/lead-options';
 
@@ -36,6 +37,7 @@ function LeadOptionButton({ option, slot, leadsPerSide, showBadges, onToggle }: 
   showBadges: boolean;
   onToggle: (species: string) => void;
 }) {
+  const rules = useReplayRules();
   return (
     <button
       type="button"
@@ -48,7 +50,7 @@ function LeadOptionButton({ option, slot, leadsPerSide, showBadges, onToggle }: 
           ? `${option.name} was brought in the real game.`
           : option.name}
     >
-      <img src={spriteUrl(option.species)} alt={option.name} />
+      <img src={spriteUrl(option.species, rules)} alt={option.name} />
       <div className="ps-switchbtn-name">
         {slot >= 0 && showBadges && (
           <span

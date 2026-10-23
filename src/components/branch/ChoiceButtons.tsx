@@ -2,6 +2,7 @@ import type { BranchMoveOption, BranchSwitchOption } from '../../hooks/useBranch
 import type { DamageResult, BranchSlotChoice } from '@fulllifegames/eval-engine';
 import type { SpreadTargetDamage } from '../../lib/branch-damage';
 import { spriteUrl } from '../../lib/sprite-url';
+import { useReplayRules } from '../../lib/replay-rules';
 import { toId } from '@fulllifegames/replay-core';
 import { typeBg } from '../../lib/type-colors';
 import { displayName } from '../../lib/branch-history';
@@ -190,6 +191,7 @@ export function SwitchBtn({ sw, selected, disabled, disabledReason, wasPlayed, c
   onClick: () => void;
 }) {
   const label = displayName(sw.name, sw.species);
+  const rules = useReplayRules();
   return (
     <button
       type="button"
@@ -199,7 +201,7 @@ export function SwitchBtn({ sw, selected, disabled, disabledReason, wasPlayed, c
       aria-disabled={disabled || sw.fainted}
       className={`ps-switchbtn ${compact ? 'ps-switchbtn-compact ' : ''}${selected ? 'ps-switchbtn-selected' : ''}`}
     >
-      <img src={spriteUrl(sw.species)} alt={label} />
+      <img src={spriteUrl(sw.species, rules)} alt={label} />
       {compact ? (
         <div className="ps-switchbtn-name">
           {label}

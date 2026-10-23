@@ -1,8 +1,9 @@
 import { describe, expect, test } from 'vitest';
 import { Dex } from '@pkmn/sim';
+import { logRules } from '@fulllifegames/replay-core';
 import { spriteUrl } from '../src/lib/sprite-url';
 
-const file = (species: string) => spriteUrl(species).replace('https://play.pokemonshowdown.com/sprites/gen5/', '');
+const file = (species: string) => spriteUrl(species, logRules('')).replace('https://play.pokemonshowdown.com/sprites/gen5/', '');
 
 describe('sprite file names', () => {
   test('a hyphen inside the forme goes, as Showdown names the file (T96 point 2)', () => {

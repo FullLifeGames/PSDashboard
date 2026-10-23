@@ -9,7 +9,9 @@ import { TimelineBar } from './TimelineBar';
 import { ConfirmBanner } from './ConfirmBanner';
 import { WorkspaceEvalColumn } from './WorkspaceEvalColumn';
 import type { AppController } from '../hooks/useAppController';
-import type { ReplayData } from '@fulllifegames/replay-core';
+import { useMemo } from 'react';
+import { logRules, type ReplayData } from '@fulllifegames/replay-core';
+import { ReplayRulesContext } from '../lib/replay-rules';
 
 interface WorkspaceProps {
   app: AppController;
@@ -226,12 +228,15 @@ function WorkspaceLeft({ app, replayData }: WorkspaceProps) {
 
 /** The loaded-replay layout: battle iframe and panels beside the evaluation column. */
 export function ReplayWorkspace({ app, replayData }: WorkspaceProps) {
+  const rules = useMemo(() => logRules(replayData.log), [replayData]);
   return (
-    <div className="ps-main-layout">
-      {/* Left column: iframe */}
-      <WorkspaceLeft app={app} replayData={replayData} />
-      {/* Right column: evaluation beside the battle (chess-style), then stats */}
-      <WorkspaceEvalColumn app={app} replayData={replayData} />
-    </div>
+    <ReplayRulesContext.Provider value={rules}>
+      <div className="ps-main-layout">
+        {/* Left column: iframe */}
+        <WorkspaceLeft app={app} replayData={replayData} />
+        {/* Right column: evaluation beside the battle (chess-style), then stats */}
+        <WorkspaceEvalColumn app={app} replayData={replayData} />
+      </div>
+    </ReplayRulesContext.Provider>
   );
 }

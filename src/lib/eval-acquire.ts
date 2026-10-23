@@ -3,6 +3,7 @@ import {
   type DamageObservation, type HiddenPowerEvidence, type OpponentTeamInfo, type ReplayData, type TurnSnapshot,
   type SpreadCandidate, getBranchSimulatorFormat,
 } from '@fulllifegames/replay-core';
+import { loadReplayMods } from './replay-mods';
 import { replayBuildOptions } from './team-build-options';
 
 type BranchEngineModule = typeof import('./lazy/branch-engine');
@@ -43,6 +44,8 @@ export async function buildReplayTeams(
   overrides?: { p1: OpponentTeamInfo | null; p2: OpponentTeamInfo | null },
   opts?: TeamBuildOptions,
 ): Promise<{ p1Team: PokemonSet[]; p2Team: PokemonSet[] }> {
+  // Round 75 (T160): the team build reads the Dex of the game; a Champions replay needs its mod registered first.
+  await loadReplayMods(replayData);
   const { buildTeamsFromReplay } = await import('./lazy/team-builder');
   return buildTeamsFromReplay(replayData.log, replayBuildOptions({
     userTeamText: sources.teamText || undefined,

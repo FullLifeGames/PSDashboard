@@ -1,13 +1,12 @@
-import { Generations, type GenerationNum } from '@pkmn/data';
-import { Dex } from '@pkmn/dex';
-import { Dex as SimDex } from '@pkmn/sim';
-import { evBudget } from '@fulllifegames/replay-core';
+import type { GenerationNum } from '@pkmn/data';
+import { CHAMPIONS_MOD, evBudget, generationsFor, rulesDex, simFormats, toId } from '@fulllifegames/replay-core';
 
 /**
  * Legal option pools for dropdowns. Heavy dex/learnset data — this module is
  * only ever loaded via dynamic import() so it stays out of the entry chunk.
  */
-const gens = new Generations(Dex);
+// Round 75 (T160): the standard Generations of replay-core (a format-less lookup); Pokémon Champions reads the mod's Dex below.
+const gens = generationsFor('');
 const movePoolCache = new Map<string, Promise<string[]>>();
 
 export const NATURES: readonly string[] = [
@@ -22,7 +21,7 @@ export const NATURES: readonly string[] = [
  * loses Aegislash), so its pools come from the mod itself.
  */
 const isChampions = (format: string | undefined): boolean => !!format && evBudget(format).statPoints;
-const championsDex = () => SimDex.mod('champions');
+const championsDex = () => rulesDex(9, CHAMPIONS_MOD);
 
 /** Loads what a format's pools read before the first pool is asked (the Champions mod, nothing else). */
 export async function prepareFormat(format: string): Promise<void> {
@@ -44,8 +43,8 @@ const CHAMPIONS_REFERENCE_FORMAT = 'gen9championsou';
  */
 export function getEvLimit(format: string): number | null {
   const table = (id: string) => {
-    const entry = SimDex.formats.get(id);
-    return entry.exists ? SimDex.formats.getRuleTable(entry) : null;
+    const entry = simFormats().get(id);
+    return entry.exists ? simFormats().getRuleTable(entry) : null;
   };
   const own = table(format.split('@@@')[0]);
   if (own) return own.evLimit;
@@ -53,7 +52,7 @@ export function getEvLimit(format: string): number | null {
   return table(CHAMPIONS_REFERENCE_FORMAT)?.evLimit ?? evBudget(format).total;
 }
 
-const toSimId = (name: string): string => SimDex.toID(name);
+const toSimId = (name: string): string => toId(name);
 
 async function getChampionsMovePool(species: string): Promise<string[]> {
   const dex = championsDex();

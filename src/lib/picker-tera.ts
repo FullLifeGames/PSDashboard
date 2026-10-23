@@ -1,4 +1,5 @@
-import { Battle as SimBattle, Dex as SimDex, type PokemonSet } from '@pkmn/sim';
+import { Battle as SimBattle, type PokemonSet } from '@pkmn/sim';
+import { simFormats } from '@fulllifegames/replay-core';
 
 /**
  * Terastal Clause in the branch format's rule table: the simulator nulls
@@ -13,9 +14,9 @@ export function teraBanned(format: string | undefined): boolean {
   if (!format) return false;
   if (/@@@.*terastal ?clause/i.test(format)) return true;
   try {
-    const base = SimDex.formats.get(format.split('@@@')[0]);
+    const base = simFormats().get(format.split('@@@')[0]);
     if (!base.exists) return false;
-    return SimDex.formats.getRuleTable(base).has('terastalclause') || simOffersTera(base.id) === false;
+    return simFormats().getRuleTable(base).has('terastalclause') || simOffersTera(base.id) === false;
   } catch {
     return false;
   }

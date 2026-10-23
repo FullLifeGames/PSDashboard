@@ -1,5 +1,5 @@
 import { test, expect, describe } from 'vitest';
-import { INFERRED_SPREAD_DETAIL, MEASURED_HP_SPREAD_DETAIL, ORDER_SPREAD_DETAIL } from '@fulllifegames/replay-core';
+import { INFERRED_SPREAD_DETAIL, MEASURED_HP_SPREAD_DETAIL, ORDER_SPREAD_DETAIL, logRules } from '@fulllifegames/replay-core';
 import { spriteUrl } from '../src/lib/sprite-url';
 import { sourceLabel } from '../src/lib/provenance-labels';
 
@@ -9,13 +9,13 @@ import { sourceLabel } from '../src/lib/provenance-labels';
 
 describe('stats panel display helpers', () => {
   test('sprite URLs drop base-name hyphens but keep forme hyphens (Ting-Lu)', () => {
-    expect(spriteUrl('Ting-Lu')).toBe('https://play.pokemonshowdown.com/sprites/gen5/tinglu.png');
-    expect(spriteUrl('Chien-Pao')).toBe('https://play.pokemonshowdown.com/sprites/gen5/chienpao.png');
-    expect(spriteUrl('Kommo-o')).toBe('https://play.pokemonshowdown.com/sprites/gen5/kommoo.png');
-    expect(spriteUrl('Rotom-Wash')).toBe('https://play.pokemonshowdown.com/sprites/gen5/rotom-wash.png');
-    expect(spriteUrl('Ninetales-Alola')).toBe('https://play.pokemonshowdown.com/sprites/gen5/ninetales-alola.png');
-    expect(spriteUrl('Greninja-*')).toBe('https://play.pokemonshowdown.com/sprites/gen5/greninja.png');
-    expect(spriteUrl('Mr. Mime')).toBe('https://play.pokemonshowdown.com/sprites/gen5/mrmime.png');
+    expect(spriteUrl('Ting-Lu', logRules(''))).toBe('https://play.pokemonshowdown.com/sprites/gen5/tinglu.png');
+    expect(spriteUrl('Chien-Pao', logRules(''))).toBe('https://play.pokemonshowdown.com/sprites/gen5/chienpao.png');
+    expect(spriteUrl('Kommo-o', logRules(''))).toBe('https://play.pokemonshowdown.com/sprites/gen5/kommoo.png');
+    expect(spriteUrl('Rotom-Wash', logRules(''))).toBe('https://play.pokemonshowdown.com/sprites/gen5/rotom-wash.png');
+    expect(spriteUrl('Ninetales-Alola', logRules(''))).toBe('https://play.pokemonshowdown.com/sprites/gen5/ninetales-alola.png');
+    expect(spriteUrl('Greninja-*', logRules(''))).toBe('https://play.pokemonshowdown.com/sprites/gen5/greninja.png');
+    expect(spriteUrl('Mr. Mime', logRules(''))).toBe('https://play.pokemonshowdown.com/sprites/gen5/mrmime.png');
   });
 });
 

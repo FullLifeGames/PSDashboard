@@ -1,9 +1,7 @@
-import { Generations } from '@pkmn/data';
-import { Dex } from '@pkmn/dex';
 import { Smogon } from '@pkmn/smogon';
 import type { ID } from '@pkmn/data';
 import {
-  toId, type PokemonSetAssumption, type SetAssumption, type SetSpreadAssumption, type SmogonSetAssumptions,
+  generationsFor, toId, type PokemonSetAssumption, type SetAssumption, type SetSpreadAssumption, type SmogonSetAssumptions,
 } from '@fulllifegames/replay-core';
 import { championsSetsFormat, ouFallbackFormat, vgcYearFormat } from './smogon/format-fallback';
 import { fetcherKey } from './smogon/fetcher-key';
@@ -30,7 +28,8 @@ type AssumptionSet = {
 type RawSet = { moves?: (string | string[])[]; item?: string | string[] };
 type RawSetsFile = Record<string, Record<string, RawSet | undefined> | undefined>;
 
-const gens = new Generations(Dex);
+// Round 75 (T160): published sets are read as published, on the standard Generations of replay-core (no mod).
+const gens = generationsFor('');
 const cache = new Map<string, Promise<SmogonSetAssumptions | null>>();
 
 /**

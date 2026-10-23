@@ -8,6 +8,7 @@ import type {
 } from '@fulllifegames/replay-core';
 import { sourceAccent, sourceLabel } from '../lib/provenance-labels';
 import { spriteUrl } from '../lib/sprite-url';
+import { useReplayRules } from '../lib/replay-rules';
 import { typeBg } from '../lib/type-colors';
 
 interface Props {
@@ -130,10 +131,11 @@ function SpreadTag({ info, text }: { info: PokemonEvsInfo; text: string }) {
 }
 
 function PokemonEntry({ poke, isRandomFormat }: { poke: RevealedPokemonInfo; isRandomFormat: boolean }) {
+  const rules = useReplayRules();
   return (
     <div className="ps-stats-pokemon">
       <img
-        src={spriteUrl(poke.species)}
+        src={spriteUrl(poke.species, rules)}
         alt={poke.species}
         className="ps-stats-sprite"
       />
