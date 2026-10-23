@@ -26,8 +26,9 @@ const EXCLUDED: Record<string, string> = {
   tripleaxel: 'per hit', triplekick: 'per hit',
   // Writes the battle, draws from the PRNG or writes the log.
   furycutter: 'writes', rollout: 'writes', iceball: 'writes', ficklebeam: 'writes', risingvoltage: 'writes',
-  // Counters the rebuilt battle does not pin (volatile layers, a field counter, hits taken, faints so far).
-  spitup: 'unpinned', echoedvoice: 'unpinned', ragefist: 'unpinned', lastrespects: 'unpinned', retaliate: 'unpinned',
+  // Counters the rebuilt battle does not pin (volatile layers, a field counter, the fallen of the last turn). Last Respects and
+  // Rage Fist left the list in round 76 (T265): the rebuild plays the hits, and totalFainted is pinned from the snapshot.
+  spitup: 'unpinned', echoedvoice: 'unpinned', retaliate: 'unpinned',
   // Priced by a rule of the static: the halving moves and the level moves (fixedDamage), Tera Blast and
   // Hidden Power (move-use.ts); the reactive moves and Final Gambit read 0 by design; Psywave rolls.
   superfang: 'own', naturesmadness: 'own', ruination: 'own', terablast: 'own', hiddenpower: 'own',
@@ -92,6 +93,8 @@ describe('power handlers of the Dex (round 63, T81)', () => {
       ['user speed stage', (_, user) => { user.boosts.spe = -2; }],
       ['Tailwind', (_, __, target) => { target.side.addSideCondition('tailwind', 'debug'); }],
       ['target weight', (_, __, target) => { target.weighthg = 1; }],
+      ['hits taken', (_, user) => { user.timesAttacked = 3; }],
+      ['fallen', (battle) => { battle.sides[0].totalFainted = 2; }],
     ];
     const stages: [string, (battle: Battle, user: Pokemon, target: Pokemon) => void][] = [
       ['user stages', (_, user) => { Object.assign(user.boosts, { atk: 2, def: 2, spa: 2, spd: 2 }); }],

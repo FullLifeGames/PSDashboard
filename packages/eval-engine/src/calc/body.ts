@@ -55,6 +55,8 @@ export interface CalcBody {
   alliesFainted?: number;
   /** The side's fallen, for Last Respects (T76). */
   totalFainted?: number;
+  /** The hits the body took (the simulator's timesAttacked), for Rage Fist (round 76, T265); absent when none or unknown. */
+  timesAttacked?: number;
   /** Hidden Power's type and power as the simulator gives them (T83). */
   hpType?: string;
   hpPower?: number;
@@ -70,7 +72,7 @@ export interface SimBody extends CalcBody {
   status: string;
 }
 
-type SimFacts = Pick<CalcBody, 'boostedStat' | 'alliesFainted' | 'totalFainted' | 'hpType' | 'hpPower' | 'stellarBoostedTypes'>;
+type SimFacts = Pick<CalcBody, 'boostedStat' | 'alliesFainted' | 'totalFainted' | 'timesAttacked' | 'hpType' | 'hpPower' | 'stellarBoostedTypes'>;
 
 /**
  * What the simulator holds and calc 0.11 cannot see on its own (round 67,
@@ -91,6 +93,7 @@ export function simBodyFacts(mon: Pokemon): SimFacts {
     ...(boostedStat ? { boostedStat } : {}),
     ...(alliesFainted ? { alliesFainted } : {}),
     ...(totalFainted ? { totalFainted } : {}),
+    ...(mon.timesAttacked ? { timesAttacked: mon.timesAttacked } : {}),
     ...(mon.teraType === 'Stellar' || mon.terastallized === 'Stellar' ? { stellarBoostedTypes: [...mon.stellarBoostedTypes] } : {}),
     hpType: mon.hpType,
     hpPower: mon.hpPower,
@@ -187,6 +190,7 @@ export function bodyFromInfo(info: SimPokemonInfo): SimBody {
     boostedStat: info.boostedStat,
     alliesFainted: info.alliesFainted,
     totalFainted: info.totalFainted,
+    timesAttacked: info.timesAttacked,
     stellarBoostedTypes: info.stellarBoostedTypes,
     hpType: info.hpType,
     hpPower: info.hpPower,

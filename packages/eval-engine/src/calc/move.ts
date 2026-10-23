@@ -1,6 +1,6 @@
 import { Move as CalcMove } from '@smogon/calc';
 import { toID } from '@pkmn/sim';
-import { CHAMPIONS_MOD, dexOfCalc, simGenNum, type CalcGeneration } from '@fulllifegames/replay-core';
+import { CHAMPIONS_MOD, dexOfCalc, historyPower, simGenNum, type CalcGeneration } from '@fulllifegames/replay-core';
 import type { CalcBody } from './body.ts';
 
 export { protectBlocks } from './protect.ts';
@@ -12,7 +12,7 @@ export { protectBlocks } from './protect.ts';
  * type the simulator gives the attacker (hpType), and before gen 6 at the
  * power it gives (hpPower), where the calc reads the bare name as a Normal
  * move of power 60, 0 before gen 6 (T83). A move whose power rule calc 0.11
- * lacks gets the power its own basePowerCallback in the Dex returns on the
+ * lacks (a history power: Last Respects, Rage Fist; round 76, T265) gets the power its own basePowerCallback in the Dex returns on the
  * attacker's facts: Last Respects by the side's fallen (T76;
  * test/calc-sim-inputs.spec.ts holds that the calc prices it at its listed
  * power whatever alliesFainted says, so the set empties once it learns it).
@@ -26,20 +26,15 @@ export { protectBlocks } from './protect.ts';
 
 type CalcGen = CalcGeneration;
 type CalcMoveOptions = NonNullable<ConstructorParameters<typeof CalcMove>[2]>;
-type PowerCallback = (this: unknown, pokemon: unknown, target: unknown, move: unknown) => unknown;
 
-const CALC_LACKS_POWER = new Set(['lastrespects']);
-
-/** The power the move's own callback gives on the attacker's facts, or null to leave the calc its own. */
+/**
+ * The power the move's own callback gives on the attacker's facts, or null to leave the calc its own. Round 76 (T265): the
+ * moves are the history powers of replay-core (`historyPower`, the one rule the spread solver reads too): Last Respects by the
+ * side's fallen, Rage Fist by the hits the body took; calc 0.12 counts neither.
+ */
 function powerAtUse(gen: CalcGen, name: string, attacker: CalcBody): number | null {
-  const move = dexOfCalc(gen).moves.get(name);
-  if (!CALC_LACKS_POWER.has(move.id) || typeof move.basePowerCallback !== 'function') return null;
-  try {
-    const power = (move.basePowerCallback as unknown as PowerCallback).call(undefined, { side: { totalFainted: attacker.totalFainted ?? 0 } }, null, move);
-    return typeof power === 'number' ? power : null;
-  } catch {
-    return null;
-  }
+  const dex = dexOfCalc(gen);
+  return historyPower(dex, dex.moves.get(name).id, { fainted: attacker.totalFainted ?? 0, timesAttacked: attacker.timesAttacked ?? 0 });
 }
 
 /** The slot "Hidden Power" with the attacker's type, and its power before gen 6; any other move as named. */
