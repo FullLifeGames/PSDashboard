@@ -209,17 +209,40 @@ function liveStarts(battle: SimBattle, events: readonly string[]): ProtocolStart
   return [...live.values()];
 }
 
+/**
+ * Round 76 (T261): whether the body still had its move to make when the start landed, which is what the simulator's
+ * `queue.willMove` answers to a duration handler (Taunt and Encore lengthen by a turn when it does not). The block's own
+ * order shows it: a move or a failed move of the body (`|cant|`) after the start line. A move the body makes inside another
+ * action (`[from]` an ability, Instruct, a called move) takes no place in the queue; a locked move does.
+ */
+function moveStillToCome(events: readonly string[], start: ProtocolStart): boolean {
+  const prefix = `p${start.sideIdx + 1}${String.fromCharCode(97 + start.slot)}:`;
+  return events.slice(start.index + 1).some(line => {
+    const [, tag, ident] = line.split('|');
+    if ((tag !== 'move' && tag !== 'cant') || !ident?.startsWith(prefix)) return false;
+    const from = line.match(/\|\[from\]([^|]*)/)?.[1];
+    return !from || from === 'lockedmove';
+  });
+}
+
 /** Starts one volatile on the body as the simulator does, then takes back what a start must not change here: the body's hp, the log, the dice and the turn flags. */
-function startVolatile(battle: SimBattle, body: SimPokemon, start: ProtocolStart, ticked: boolean): boolean {
+function startVolatile(battle: SimBattle, body: SimPokemon, start: ProtocolStart, ticked: boolean, pending: boolean): boolean {
   const source = start.source ? battle.sides[Number(start.source[1]) - 1].active[start.source.charCodeAt(2) - 97] : null;
   const [hp, maxhp, logLength, seed, activeMove] = [body.hp, body.maxhp, battle.log.length, battle.prng.getSeed(), battle.activeMove];
   const flags = turnFlags(battle);
   battle.activeMove = null;
+  // The queue is empty at the block's end; a body whose move came after the line answers as it did in the game.
+  const queue = battle.queue as { willMove: (pokemon: SimPokemon) => unknown };
+  const realWillMove = queue.willMove;
+  const asked = realWillMove.bind(queue);
+  if (pending) queue.willMove = pokemon => (pokemon === body ? { choice: 'move', pokemon } : asked(pokemon));
   let added: boolean;
   try {
     added = !!body.addVolatile(start.id, source ?? null) && !!body.volatiles[start.id];
   } catch {
     added = false;
+  } finally {
+    if (pending) queue.willMove = realWillMove;
   }
   if (!added) delete body.volatiles[start.id];
   battle.activeMove = activeMove;
@@ -248,7 +271,7 @@ export function playProtocolStarts(battle: SimBattle, events: readonly string[],
   for (const start of liveStarts(battle, events)) {
     const body = battle.sides[start.sideIdx].active[start.slot];
     if (!body || body.fainted || body.hp <= 0) continue;
-    if (!body.volatiles[start.id]) changed = startVolatile(battle, body, start, start.index < residualAt) || changed;
+    if (!body.volatiles[start.id]) changed = startVolatile(battle, body, start, start.index < residualAt, moveStillToCome(events, start)) || changed;
     const state = body.volatiles[start.id];
     if (start.stat && state && state['bestStat'] !== start.stat) {
       state['bestStat'] = start.stat;

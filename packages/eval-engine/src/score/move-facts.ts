@@ -102,7 +102,7 @@ export function fieldFacts(pokemon: Pokemon, battle: Battle): MoveField {
  * PRNG, writes the log, or reads the turn in progress), and checks each
  * class against the simulator:
  *  - memo: the answer reads only what pairKey keys (item, forme, happiness);
- *  - live: it reads HP, status, the field, speed or weight, so landedKey keys
+ *  - live: it reads HP, status, the field, speed, weight or the history (fallen, hits taken), so landedKey keys
  *    the answer itself;
  *  - stages: it reads the boost stages, which stay outside the memo key, so
  *    the memo prices it at the power of no boosts and boostedFraction asks
@@ -116,7 +116,10 @@ export const POWER_MOVES: ReadonlyMap<string, 'memo' | 'live' | 'stages'> = new 
   ...['lowkick', 'grassknot', 'heavyslam', 'heatcrash', 'flail', 'reversal', 'eruption', 'waterspout', 'dragonenergy',
     'crushgrip', 'wringout', 'hardpress', 'brine', 'gyroball', 'electroball', 'facade', 'hex', 'venoshock',
     'barbbarrage', 'infernalparade', 'wakeupslap', 'smellingsalts', 'solarbeam', 'solarblade', 'expandingforce',
-    'psyblade', 'mistyexplosion', 'gravapple', 'collisioncourse', 'electrodrift', 'endeavor']
+    'psyblade', 'mistyexplosion', 'gravapple', 'collisioncourse', 'electrodrift', 'endeavor',
+    // Round 76 (T265): the history powers, by the side's fallen and the hits taken.
+    // eslint-disable-next-line names/no-new-dex-name -- held by history-power-sweep.spec.ts: every Dex move that historyPower reads is priced by the callback
+    'lastrespects', 'ragefist']
     .map(id => [id, 'live'] as const),
   ...['storedpower', 'powertrip', 'punishment'].map(id => [id, 'stages'] as const),
 ]);

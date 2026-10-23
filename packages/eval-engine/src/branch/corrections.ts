@@ -257,7 +257,8 @@ function correctHpFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
 
     for (const snapshotPokemon of snapshotSide.pokemon) {
       const battlePokemon = simBodyOf(battleSide, snapshotPokemon);
-      if (battlePokemon && snapshotPokemon.maxhp > 0) correctBodyFromSnapshot(battlePokemon, snapshotPokemon, snapshot.log ?? []);
+      // Round 76 (T265): the hits taken are the log's count, as the side's fallen are, for the bench too.
+      if (battlePokemon && snapshotPokemon.maxhp > 0) { battlePokemon.timesAttacked = snapshotPokemon.timesAttacked ?? 0; correctBodyFromSnapshot(battlePokemon, snapshotPokemon, snapshot.log ?? []); }
     }
   }
   restoreSideInvariants(battle);

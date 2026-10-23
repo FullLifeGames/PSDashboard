@@ -42,6 +42,11 @@ export interface PokemonSnapshot {
   boostedStat?: string;
   /** Supreme Overlord's count of fallen allies, from the client's `fallenN` volatile; absent without it and before round 69 (T158). */
   fallen?: number;
+  /**
+   * The hits the body took, as @pkmn/client counts them (Rage Fist's count); absent at none and on snapshots written before
+   * round 76 (T265).
+   */
+  timesAttacked?: number;
 }
 
 export interface SideSnapshot {

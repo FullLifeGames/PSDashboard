@@ -77,6 +77,8 @@ export interface SimPokemonInfo {
   alliesFainted?: number;
   /** The side's fallen so far (side.totalFainted), the count Last Respects powers up by (T76). */
   totalFainted?: number;
+  /** The hits the body took (timesAttacked), the count Rage Fist powers up by (round 76, T265). */
+  timesAttacked?: number;
   /** Hidden Power's type and power as the simulator gives them (hpType, hpPower; round 67, T83). */
   hpType?: string;
   hpPower?: number;
