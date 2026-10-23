@@ -157,6 +157,25 @@ describe.each(['singles', 'doubles'] as const)('the start lines against the simu
     }
   });
 
+  test('Taunt on a slower body (round 76, T261): the body\'s own move after the start line is a move still to come, as the simulator reads the queue; another body\'s move, or a move before the line, is not', () => {
+    // Greninja is faster than Magikarp, so the Taunt lands while Magikarp's move waits in the queue: no extra turn.
+    const real = fresh(mon('Greninja', 'Torrent', ['Taunt', 'Splash']));
+    real.duelists.play(real.battle, 'move 1 1');
+    const realDuration = real.battle.sides[1].active[0]!.volatiles['taunt']!.duration!;
+    const cases: [string, string[], number][] = [
+      ['its move after', [startLine('move: Taunt'), '|move|p2a: Magikarp|Splash|p2a: Magikarp'], realDuration],
+      ['its failed move after', [startLine('move: Taunt'), '|cant|p2a: Magikarp|move: Taunt|Splash'], realDuration],
+      ['its move before', ['|move|p2a: Magikarp|Splash|p2a: Magikarp', startLine('move: Taunt')], realDuration + 1],
+      ['another body\'s move after', [startLine('move: Taunt'), '|move|p1a: Greninja|Splash|p1a: Greninja'], realDuration + 1],
+      ['a move it makes by an ability after', [startLine('move: Taunt'), '|move|p2a: Magikarp|Splash|p2a: Magikarp|[from]ability: Dancer'], realDuration + 1],
+    ];
+    for (const [label, lines, want] of cases) {
+      const { battle } = fresh(filler('Greninja', 'Torrent'));
+      playProtocolStarts(battle as never, lines, 2);
+      expect(battle.sides[1].active[0]!.volatiles['taunt']!.duration, label).toBe(want);
+    }
+  });
+
   test('controls: nothing starts for a start that ended in the block, for a body that left the field or fainted, for a token no Dex condition names, or for a volatile the board has', () => {
     const cases: [string, string[]][] = [
       ['ended in the block', [startLine('Salt Cure'), '|-end|p2a: Magikarp|Salt Cure']],
