@@ -313,7 +313,11 @@ export interface StoredEval {
 //      rebuild leaves a slot empty where the log does, plays the log's -start lines and keeps a Sitrus Berry the
 //      game kept; the spread solver reads history powers, partner abilities and the field of the hit, and drops
 //      Z, Max and cut spread hits. Positions of every format read new values.
-const EVAL_ENGINE_CACHE_VERSION = 69;
+// v70 (round 76, the last wave): the healer race follows the simulator's sequence of hits and heals, Rage Fist and
+//      Last Respects read the hits taken and the faints from the history, a Taunt from a -start line ticks as the
+//      simulator does, and an open team sheet without EVs takes the solved spread (the sets of open-sheet games move).
+//      Positions of every format read new values.
+const EVAL_ENGINE_CACHE_VERSION = 70;
 
 /** Round 61: a search-budget form stores under its own tag; the default keeps today's keys. */
 const versionTag = (): string => {
