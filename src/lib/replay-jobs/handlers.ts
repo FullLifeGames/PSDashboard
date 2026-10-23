@@ -3,6 +3,7 @@ import {
 } from '@fulllifegames/eval-engine';
 import { solveReplaySpreads } from '@fulllifegames/replay-core';
 import { snapshotAt } from '../eval-acquire';
+import { loadReplayMods } from '../replay-mods';
 import { replaySolveOptions } from '../team-build-options';
 import type { ReconstructJob, ReconstructOutcome, ReplayJobRequest, ReplayJobResponse } from './types';
 
@@ -18,6 +19,10 @@ const PROGRESS_INTERVAL_MS = 100;
  */
 export async function handleReplayJob(message: ReplayJobRequest, post: ReplayPost): Promise<void> {
   try {
+    // Round 75 (T160): this worker is its own realm (its own simulator), and the main thread's load of the Champions mod does not
+    // reach it. Both jobs read the game's Dex from the log's tier line (the solve builds the sets, the reconstruction builds the
+    // choice-lock context) before the branch engine would load the mod, so the job loads it first.
+    await loadReplayMods(message.type === 'solveSpreads' ? { log: message.job.log } : { format: message.job.format, log: message.job.replayLog });
     if (message.type === 'solveSpreads') {
       const { job } = message;
       const solved = solveReplaySpreads(job.log, job.observations, replaySolveOptions(job));
