@@ -186,8 +186,21 @@ describe('the report on gen9draft-2058494320: a 5% Cobalion at +4 into a full-HP
     expect(sideValue(scene(PALOSSAND()))).toBe(0);
   });
 
-  test('the same board in front of a Palossand without its attack: the healer cannot swing, but the race does not give the holder the win past Shore Up within the horizon and the bench stays shut (T225; before: the bench foe counted)', () => {
-    expect(sideValue(scene(set('Palossand', ['shoreup', 'splash'])))).toBe(0);
+  test('the simulator: against a Palossand that only clicks Shore Up, the boosted Smart Strike takes it in three turns (hit, heal, hit, heal, hit)', () => {
+    const battle = scene(set('Palossand', ['shoreup', 'splash']));
+    const front = battle.sides[1].active[0]!;
+    let turns = 0;
+    while (!front.fainted && turns < 10) {
+      battle.choose('p1', 'move 1');
+      battle.choose('p2', 'move 1');
+      turns++;
+    }
+    expect(turns).toBe(3);
+  });
+
+  test('the same board in front of a Palossand without its attack: the holder gets past Shore Up within the horizon, as the simulator does in three turns, and the bench foe counts (T258; T225 had it shut at five turns)', () => {
+    const battle = scene(set('Palossand', ['shoreup', 'splash']));
+    expect(sideValue(battle)).toBeCloseTo(stageValue(battle.sides[0].active[0]!, 'atk', 4), 12);
   });
 
   test('the same Palossand with no heal move: the holder gets past it within the horizon and the bench foe counts', () => {

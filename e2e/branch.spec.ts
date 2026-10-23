@@ -61,7 +61,10 @@ test.describe('PS Dashboard', () => {
   // for p2 and passes this pin 14 times, round 70 wins 14 and passes 12; head to head, round 70 as p2 wins 16 of 16
   // against v1 as p1, and round 70 as p1 takes one of 16 from v1 as p2. The pin stays the target: T243 measures the four
   // pairings again after the re-fit T224.
-  test.fixme('the draft t56 play-out wins for p2 without crawling (round 42)', async ({ page }) => {
+  // Round 76 (T243 with T258): the healer race follows the simulator's sequence of hits and heals, and over the 16 dice
+  // the engine against itself wins 16 for p2 and passes this pin 14 times (v1 of round 69 the same; probe
+  // docs/perf/probes/2026-10-23-r76/lanes/S/playout), so the pin is armed again.
+  test('the draft t56 play-out wins for p2 without crawling (round 42)', async ({ page }) => {
     // Round 19 finding, round 42 pin: from turn 56 (p1 Kyurem Ice Beam, p2
     // into Slowking) the play-out used to send Heatran into Mienshao's Knock
     // Off at turn 62 and lose it, then crawl 21 turns to a 5% win. With the
