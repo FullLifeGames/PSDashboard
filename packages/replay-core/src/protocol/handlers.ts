@@ -59,6 +59,7 @@ function snapshotPokemon(mon: Pokemon): PokemonSnapshot {
     ...(slot >= 0 ? { slot } : {}),
     ...(boostedStat ? { boostedStat } : {}),
     ...(fallen ? { fallen } : {}),
+    ...(mon.timesAttacked ? { timesAttacked: mon.timesAttacked } : {}),
   };
 }
 
