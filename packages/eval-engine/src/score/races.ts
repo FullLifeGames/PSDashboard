@@ -1,4 +1,6 @@
-import type { Battle, Pokemon } from '@pkmn/sim';
+import type { Battle, Pokemon, PokemonSet } from '@pkmn/sim';
+import { isChampionsSimFormat } from '../forward/sim-mods.ts';
+import { twinBattle, twinFormat } from '../sim-ask/index.ts';
 import { usableSlots } from './threat.ts';
 
 /**
@@ -13,13 +15,119 @@ export interface HealProfile {
 }
 
 /**
- * Fallback per-turn heal fraction for heal-flagged moves whose amount lives
- * in a callback instead of a dex ratio (the Moonlight family's weather
- * scaling, Rest's full-heal-but-sleep, Strength Sap's stat dependence):
- * ~50% is the grounded proxy. Moves with a direct dex ratio price exactly —
- * heal rates differ per move (Recover 1/2, Life Dew 1/4, …).
+ * Fallback per-turn heal fraction for a heal-flagged move when the simulator cannot be asked (the Champions mod is
+ * not registered yet, or the twin battle fails to build). Round 76 (T258): a move whose heal lives in a callback
+ * instead of a Dex ratio (Shore Up, the Moonlight family, Rest, Wish, Jungle Healing, Heal Pulse) is read from the
+ * simulator itself; moves with a direct Dex ratio price exactly (Recover 1/2, Life Dew 1/4, ...).
  */
 const HEAL_FRACTION_DEFAULT = 0.5;
+
+/** Turns a played heal move is clicked on the twin: a whole cycle of the slowest healer (Rest sleeps three turns after the click, a wake-up turn is lost), and of Wish (two). */
+const HEAL_CYCLE = 12;
+
+/** A foe whose heal-by-Attack differs between a weak and a strong Attack follows the foe (Strength Sap). */
+const HEAL_FOE_TOLERANCE = 0.005;
+
+/** The twin's bodies from the battle's own Dex, never by name: the sturdiest species for the healer, the weakest and the strongest Attack for the foes. */
+const twinBodies = new WeakMap<object, TwinBodies>();
+
+interface TwinBodies { healer: string; weak: string; strong: string; idle: string }
+
+/** The Dex fields through which a status move reaches beyond its own boosts. */
+const REACH_FIELDS = ['heal', 'volatileStatus', 'sideCondition', 'slotCondition', 'status', 'weather', 'terrain', 'pseudoWeather'] as const;
+
+/** A move the foe can click without touching the healer or the heal: a status move that raises its own Defense and nothing else. */
+function isIdleMove(move: ReturnType<Battle['dex']['moves']['all']>[number], gen: number): boolean {
+  if (!move.exists || move.isNonstandard || move.gen > gen || move.isMax || move.isZ) return false;
+  if (move.category !== 'Status' || move.target !== 'self' || Object.keys(move.boosts ?? {}).join() !== 'def') return false;
+  return !move.flags['heal'] && REACH_FIELDS.every(field => !move[field]);
+}
+
+function bodiesOf(dex: Battle['dex']): TwinBodies {
+  let bodies = twinBodies.get(dex);
+  if (!bodies) {
+    const all = dex.species.all().filter(species => species.exists && !species.isNonstandard && !species.forme && species.gen <= dex.gen);
+    const by = (stat: 'hp' | 'atk', sign: 1 | -1) => all.reduce((best, species) => (sign * (species.baseStats[stat] - best.baseStats[stat]) > 0 ? species : best)).name;
+    const idle = dex.moves.all().find(move => isIdleMove(move, dex.gen));
+    if (!idle) throw new Error('the twin has no idle move');
+    twinBodies.set(dex, bodies = { healer: by('hp', 1), weak: by('atk', -1), strong: by('atk', 1), idle: idle.id });
+  }
+  return bodies;
+}
+
+const twinSet = (species: string, moves: string[], item: string): PokemonSet => ({
+  name: 'Twin', species, item, ability: '', moves, nature: '', gender: '',
+  evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, level: 100,
+});
+
+/** The field a played heal runs under: the live weather and terrain, and the item of the healer (a Utility Umbrella blanks sun and rain). */
+interface HealField { format: string; weather: string; item: string; terrain: string }
+
+/**
+ * The HP share the healer's own clicks restore per turn on a twin battle: the healer back at a quarter of its HP and
+ * the foe at full HP every turn, over HEAL_CYCLE turns, the foe clicking its idle move. Only the heals of the move
+ * itself count (a Wish's heal carries the move's id); a terrain's upkeep heal does not.
+ */
+function cycleGain(dex: Battle['dex'], field: HealField, moveId: string, foeSpecies: string): number {
+  const twin = twinBattle(field.format, {
+    p1: { name: 'Twin', team: [twinSet(bodiesOf(dex).healer, [moveId], field.item)] },
+    p2: { name: 'Foe', team: [twinSet(foeSpecies, [bodiesOf(dex).idle], '')] },
+  });
+  const foe = twin.sides[1].active[0];
+  if (field.weather) {
+    twin.field.setWeather(field.weather, foe);
+    twin.field.weatherState.duration = 0;
+  }
+  if (field.terrain) {
+    twin.field.setTerrain(field.terrain, foe);
+    twin.field.terrainState.duration = 0;
+  }
+  const user = twin.sides[0].active[0];
+  for (const slot of user.moveSlots) slot.pp = slot.maxpp = 99;
+  let total = 0;
+  const heal = user.heal.bind(user);
+  user.heal = (amount, source, effect) => {
+    const healed = heal(amount, source, effect);
+    if (effect?.id === moveId && typeof healed === 'number') total += healed;
+    return healed;
+  };
+  for (let turn = 0; turn < HEAL_CYCLE && !twin.ended; turn++) {
+    user.sethp(Math.floor(user.maxhp / 4));
+    foe.sethp(foe.maxhp);
+    twin.makeChoices('move 1', 'move 1');
+  }
+  return total / (HEAL_CYCLE * user.maxhp);
+}
+
+const playedRates = new Map<string, number>();
+
+/**
+ * Round 76 (T258): the heal per turn of a move without a Dex ratio, as the simulator plays it. The click runs on a twin
+ * battle of the live battle's mode under its weather, terrain and the healer's item (a Utility Umbrella blanks sun and
+ * rain); the HP the healer's own clicks restore per turn is the rate. Moves that heal the target (Heal Pulse, Floral
+ * Healing: in singles the foe), the next body (Healing Wish) or later (Wish) and moves that sleep (Rest) read what a
+ * repeated click gives over the cycle. Asked once per format, move, weather, item and terrain; test/races-heal-sim.spec.ts plays every heal move of the Dex
+ * against it under every weather and terrain.
+ */
+function playedRate(pokemon: Pokemon, battle: Battle, moveId: string): number {
+  const format = twinFormat(battle.gen, isChampionsSimFormat(battle.format.id));
+  if (!format) return HEAL_FRACTION_DEFAULT;
+  const field: HealField = { format, weather: battle.field.effectiveWeather(), item: pokemon.item, terrain: battle.field.terrain };
+  const key = `${field.format}|${moveId}|${field.weather}|${field.item}|${field.terrain}`;
+  let rate = playedRates.get(key);
+  if (rate === undefined) {
+    try {
+      const { weak, strong } = bodiesOf(battle.dex);
+      const [low, high] = [weak, strong].map(foe => cycleGain(battle.dex, field, moveId, foe));
+      // A heal that follows the foe (Strength Sap takes the foe's Attack) is no rate of the healer alone: the proxy stays.
+      rate = Math.abs(low - high) > HEAL_FOE_TOLERANCE ? HEAL_FRACTION_DEFAULT : low;
+    } catch {
+      rate = HEAL_FRACTION_DEFAULT;
+    }
+    playedRates.set(key, rate);
+  }
+  return rate;
+}
 
 /**
  * Per-turn fraction a status burns off its holder, as the sim's conditions
@@ -54,7 +162,7 @@ export function healProfile(pokemon: Pokemon, battle: Battle): HealProfile {
     // A drain move (Horn Leech, Giga Drain, Draining Kiss) carries the heal flag too, because Heal Block stops it, but
     // it heals a share of the damage it deals as part of an attack: no turn is spent healing (T220, the Dex's `drain`).
     if (!move.flags['heal'] || move.drain) continue;
-    const fraction = move.heal ? move.heal[0] / move.heal[1] : HEAL_FRACTION_DEFAULT;
+    const fraction = move.heal ? move.heal[0] / move.heal[1] : playedRate(pokemon, battle, slot.id);
     rate = Math.max(rate, fraction);
     absorb += (slot.pp ?? 8) * fraction;
   }
