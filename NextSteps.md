@@ -1,4 +1,4 @@
-# Next Steps (as of 23.10.2026, after round 74)
+# Next Steps (as of 23.10.2026, after round 75)
 
 Open work only, along the finish line. Each step is one round; its TODOs carry fixed T-numbers, and their scenes, numbers and steps are in `docs/backlog.md`. Rules for agents: `AGENTS.md`. Finished rounds: `docs/completed/`. Next free T-number: T267.
 
@@ -8,10 +8,9 @@ The goal is a release: v1 onto master and the GitHub Pages site built from it (u
 
 ## Next rounds
 
-Wave 5 (round 73) and T163 with T263 (round 74) are booked. Round 74 fitted a leaf K per family and the matchup weights on the search's own values, and the bank and the holdouts adopted none (user gate 23.10.2026). The way on:
+Wave 5 (round 73), T163 with T263 (round 74) and T160 (round 75) are booked. Round 74 fitted a leaf K per family and the matchup weights on the search's own values, and the bank and the holdouts adopted none; round 75 reads every rule from the game's Dex (user gates 23.10.2026). The way on:
 
-1. **Champions rules from the battle's Dex (T160).** 62 code paths still read rules from the global Dex, and in Champions some of them read the Scarlet/Violet rule. Success: every path reads the battle's Dex or is shown to be format-free.
-2. **The last wave:** the rest a user sees.
+1. **The last wave:** the rest a user sees.
    - T233 with T264: cards that lose their read; a game report that quotes the odds of a stopped hit; a dice turn against the winner joins the key moments (573756 turn 73).
    - T234: the team editor and early exports keep the inference.
    - T244: a cheap hazard sack read as a blunder in 655336 turn 25.
@@ -22,7 +21,7 @@ Wave 5 (round 73) and T163 with T263 (round 74) are booked. Round 74 fitted a le
    - T262: VGC tree time +9.1 % after wave 5.
    - T265: Rage Fist after hits taken, in the kill table, the card odds and the static.
    - T266: the bank in CI comes back without hand work after a hung run or an ended watcher, on a pinned runner image.
-3. **The release:** T43 (the release check), then v1 onto master and the Pages site after the user's okay.
+2. **The release:** T43 (the release check), then v1 onto master and the Pages site after the user's okay.
 
 ## Parked
 

@@ -1,6 +1,6 @@
 # Backlog
 
-This file holds the details of every open TODO, one section per TODO under its fixed T-number. The sections follow the finish line of `NextSteps.md` (user 21.10.2026): T160, the last wave, the release (wave 5 and T163 are booked); every other TODO is parked with a trigger. The next free T-number is T267.
+This file holds the details of every open TODO, one section per TODO under its fixed T-number. The sections follow the finish line of `NextSteps.md` (user 21.10.2026): the last wave, the release (wave 5, T163 and T160 are booked); every other TODO is parked with a trigger. The next free T-number is T267.
 
 Evidence paths that start with `r69/` are under `docs/perf/probes/2026-10-12-r69/`, those that start with `r72/` under `docs/perf/probes/2026-10-19-r72/`, those that start with `r73/` under `docs/perf/probes/2026-10-21-r73/`, those that start with `r74/` under `docs/perf/probes/2026-10-22-r74/`.
 
@@ -18,29 +18,7 @@ Source of T266: the gate of round 74 (23.10.2026, "4a"); a reviewer checked its 
 
 ## Next rounds
 
-Wave 5 (round 73) and T163 with T263 (round 74, user gate 23.10.2026, "1a": measured, nothing adopted) are booked. Next: T160, then the last wave (T233 with T264, T234, T244, T243 with T258, T259, T260, T261, T262, T265, T266), and the release with T43. Every other TODO is parked with a trigger.
-
-## The next round: T160
-
-### T160 · Champions rules from the battle's dex
-
-*Champions · round · medium · score-touching D3 · parked until after wave 3*
-
-**Problem.** 82 places in eval-engine (27) and replay-core (55) read rules from the global dex instead of the battle's dex (count of 12.10. on r67); 20 of them read species or natures that the mod does not change. The mod deviates in 155 moves: 55 only in PP, 45 only in availability, 40 in mechanics (power 23, accuracy 5, flags 7, secondary effects 4, type 2, plus typed Hidden Power); also 7 abilities, 1 item, paralysis, sleep and freeze. Examples with a wrong rule in Champions: `damage-calc.ts:184` (onModifyMove from Scarlet/Violet), `pokemon-info.ts:29` (the old type of Snap Trap), `trigger-evidence.ts:78` (White Herb from Scarlet/Violet). The replay-core half has the same blocker as T159: at inference time there is no battle and no mod. Data: `docs/perf/probes/2026-10-10-r67/lanes/F/out/global-dex-census.json`, `mod-diff.json`.
-
-**Benefit.** Champions: every rule that reads a position is the rule of the game.
-
-**Success.** Each of the 62 open places reads the battle's dex or is proven format-free; Champions holdouts without pooled harm.
-
-**Trigger.** Met, wave 3 is booked (13.10.). The places lie in the files of all lanes, so this gets its own round. T186 took part of the calculator places ahead.
-
-**Evidence.** The count of 12.10. ran with the census script of lane F on r67 (82 places in 34 files); the data of round 67 is in `lanes/F/out/global-dex-census.json` and `mod-diff.json`.
-
-**Steps.**
-- [ ] Recount on the state after wave 3; prove the 20 format-free places (species, natures).
-- [ ] eval-engine: every place reads the battle's dex (`battle.dex`).
-- [ ] replay-core: the same solution as T159 (one dex or move reader that the host passes in).
-- [ ] Champions holdouts without pooled harm; bank paired.
+Wave 5 (round 73), T163 with T263 (round 74, measured, nothing adopted) and T160 (round 75, user gate 23.10.2026, "2a": every rule from the game's Dex) are booked. Next: the last wave (T233 with T264, T234, T244, T243 with T258, T259, T260, T261, T262, T265, T266), then the release with T43. Every other TODO is parked with a trigger.
 
 ## The last wave
 

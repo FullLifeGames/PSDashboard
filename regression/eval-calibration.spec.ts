@@ -912,6 +912,54 @@ import { takeSimFastReport } from '../packages/eval-engine/src/forward/sim-fast/
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * ROUND 75 2026-10-23 (improvement round 75, T160, the last step before the
+ * last wave; branch r75 from 50c8002 (= v1), one lane in the main checkout:
+ * 8b4567f (one Champions rule), 8d51899 and ccd7e04 (the resolver and every
+ * replay-core read on it), 2232980 and 4b42c5c (the lint rule for
+ * replay-core), 1b11c23 (the replay-core sweep), e963983 and e266e92 (the
+ * hosts load the mod first), 755fa91 (eval-engine), 2f9668e (the app),
+ * 9f58393 (the eval-engine and app sweeps), e400835 (the lint rule for
+ * eval-engine and the app), a2e7c2b (the replay worker loads the mod); spec
+ * docs/superpowers/specs/2026-10-23-round-75-design.md, probes
+ * docs/perf/probes/2026-10-23-r75/). Design gate 23.10. ("1a 2a 3a" with the
+ * user's notes: the type chart changes from Gen 1 to 2 and from Gen 6, a
+ * species' stats and abilities change between generations, and the global Dex
+ * is read nowhere, without exceptions).
+ * DELIVERED: one rule decides Champions for a format
+ * (replay-core/src/champions-format.ts; four modules decided it before, and
+ * the spreads copy read "[Gen 9 Champions] OU" as Scarlet/Violet, so the EV
+ * budget priced it with EVs); one resolver of generation and mod (rulesDex in
+ * replay-core/src/rules-dex.ts, on the Dex of @pkmn/sim; a Champions game
+ * without the registered mod throws); the inferrer carries the mod from the
+ * tier line; every read of replay-core, eval-engine and the app on the
+ * battle's Dex or the resolver; the lint rule dex/no-global-dex-read (142
+ * reads in 58 files before, none after); sweeps over the mod's changed
+ * entries and over the older generations (the type chart, a species' stats
+ * and abilities); the hosts load the mod before they infer
+ * (host-mod-order.spec.ts) and the app's replay worker before its jobs
+ * (replay-jobs-mod.spec.ts, replay-jobs-mod-solve.spec.ts).
+ * MEASUREMENT: r75-m (e400835) against r74-f: bank, Doubles OU, VGC,
+ * Champions OU and Champions VGC byte-identical. Final head a2e7c2b: suite
+ * 6,743 passed, 2 expected fail, 22 skipped; e2e 78 passed; feedback three
+ * times byte-identical, against round 74 equal in all 12 dumps once the new
+ * setupMove key (18 places) is removed, no moved turn; the initial load of
+ * the app 1,677 kB gzip against 1,674 at v1.
+ * FOUND ON THE WAY: the app inferred a replay before it loaded the mod; the
+ * preview built teams before the mod; the dice reader read the
+ * function-valued handler of Tri Attack in the simulator's Dex; the app's
+ * replay worker is its own realm and never loaded the mod, so with the new
+ * resolver both Champions replays of the corpus analyzed no turn in the first
+ * feedback run (fixed in a2e7c2b; before this round that realm read the sets,
+ * the choice lock and the move facts of a Champions replay on Scarlet/Violet
+ * data, while the battle ran on the mod). The package APIs change (the
+ * resolver and the Champions rule exported, five replay-core and seven
+ * eval-engine functions take a Dex, rules or a mod, the analysis carries
+ * setupMove): T43 bumps the versions.
+ * USER GATE 2026-10-23 17:41 ("1a 2a"): the rule into AGENTS.md (every rule
+ * from the game's Dex, the global Dex read only in the resolver, every realm
+ * loads the mod first), booked and pushed; next the last wave. No new TODO,
+ * next free T267.
+ *
  * ROUND 74 2026-10-22..23 (improvement round 74, T163 with T263, the second
  * step of the finish line; branch r74 from c72bd3c (= v1): f43701e (T264 and
  * T265 booked), 0353e72 (the data pack holds the fit corpus), e589a88 (a leaf
