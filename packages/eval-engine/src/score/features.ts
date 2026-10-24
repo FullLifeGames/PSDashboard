@@ -3,7 +3,7 @@ import { effectiveSpeed } from '../speed.ts';
 import { EVAL_WEIGHTS, type EvalFeatures } from './weights.ts';
 import { hazardCost, hazardRemovalEquity, strandedMons } from './hazards.ts';
 import { liveTypes, livingOf, threatGetter, type MatchupCache } from './threat.ts';
-import { holderActsInFront, idleHolders, type ThreatOf } from './boost-race.ts';
+import { idleHolders } from './boost-race.ts';
 import { matchupTerms, sweepCells } from './matchup.ts';
 import { fieldPairCells } from './field-pair.ts';
 import { boostBiteValue, removalFormat, stageValue } from './boost-bite.ts';
@@ -83,17 +83,18 @@ function choiceMismatchOf(pokemon: Pokemon, battle: Battle): number {
 
 /**
  * Standing boost stages on the side's actives, weighted and status-discounted. A body that never acts, because a foe on
- * the field moves first and KOs it (score/boost-race.ts, holderActsInFront), carries no value for its boosts (T249,
+ * the field moves first and KOs it (`idle`, score/boost-race.ts idleHolders), carries no value for its boosts (T249,
  * round 73); its drops stay, as in boostsBiting, so that a body losing HP never gains a point by losing the drop.
+ * Round 76 (T262): the idle set is read once per evaluation and shared with the pair terms; the boosts term used to
+ * ask holderActsInFront again for the same bodies and foes.
  */
-function activeBoostValue(side: Side, battle: Battle, threat: ThreatOf): number {
+function activeBoostValue(side: Side, idle: ReadonlySet<Pokemon>): number {
   let boosts = 0;
-  const front = side.foe.active.filter((foe): foe is Pokemon => !!foe && !foe.fainted);
   for (const active of side.active) {
     if (!active || active.fainted) continue;
-    const idle = Object.values(active.boosts).some(stage => stage > 0) && !holderActsInFront(active, front, battle, threat);
+    const never = idle.has(active);
     for (const [stat, stage] of Object.entries(active.boosts)) {
-      if (stage && !(idle && stage > 0)) boosts += stageValue(active, stat, stage);
+      if (stage && !(never && stage > 0)) boosts += stageValue(active, stat, stage);
     }
   }
   return boosts;
@@ -103,7 +104,7 @@ function screenCount(side: Side): number {
   return standingScreens(side).length;
 }
 
-function sideFeatureValues(side: Side, battle: Battle, twin: string | null, threat: ThreatOf) {
+function sideFeatureValues(side: Side, battle: Battle, twin: string | null, idle: ReadonlySet<Pokemon>) {
   const stranded = strandedMons(side, battle);
   let bodies = 0;
   let choiceMismatch = 0;
@@ -114,7 +115,7 @@ function sideFeatureValues(side: Side, battle: Battle, twin: string | null, thre
     choiceMismatch += choiceMismatchOf(pokemon, battle);
     if (twin) statusFix += statusFixOf(pokemon, stranded, twin);
   }
-  const boosts = activeBoostValue(side, battle, threat);
+  const boosts = activeBoostValue(side, idle);
   const screens = screenCount(side);
   return {
     bodies,
@@ -156,13 +157,13 @@ export function evalFeatures(battle: Battle, cache?: MatchupCache, weights?: Rea
   const wants = (key: keyof EvalFeatures): boolean => !weights || weights[key] !== 0;
   const twin = wants('statusFix') ? removalFormat(battle) : null;
   const threat = threatGetter(battle, cache);
-  const p1 = sideFeatureValues(battle.sides[0], battle, twin, threat);
-  const p2 = sideFeatureValues(battle.sides[1], battle, twin, threat);
+  const idle = idleHolders(battle, threat);
+  const p1 = sideFeatureValues(battle.sides[0], battle, twin, idle);
+  const p2 = sideFeatureValues(battle.sides[1], battle, twin, idle);
   let trickRoom = 0;
   if (battle.field.pseudoWeather['trickroom']) {
     trickRoom = averageSpeed(battle.sides[0], battle) <= averageSpeed(battle.sides[1], battle) ? 1 : -1;
   }
-  const idle = idleHolders(battle, threat);
   const terms = matchupTerms(battle, cache, idle);
   // The end of the turn is played (once, when a race asks for it) only for a board with a standing stage (score/residuals.ts).
   const residuals = residualReader(battle);
