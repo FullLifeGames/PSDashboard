@@ -210,7 +210,8 @@ export function matchupTerms(
 
   const threat = threatGetter(battle, cache);
   const idleBodies = idle ?? idleHolders(battle, threat);
-  // A body that never acts hits with its drops only.
+  // A body that never acts is read on its drops only, as the attacker and as the defender: a hit that reads the target's own
+  // stat (Foul Play) would otherwise price the stage of a body that is KO'd before it matters (round 76, 12a, after T258).
   const offence = (mon: Pokemon): Pokemon => (idleBodies.has(mon) ? withoutRaises(mon) : mon);
   const inputs = raceInputs(battle);
   let sum = 0;
@@ -222,8 +223,8 @@ export function matchupTerms(
     for (const b of p2Living) {
       const threatA = threat(a, b);
       const threatB = threat(b, a);
-      const fracA = boostedFraction(threatA, offence(a), b);
-      const fracB = boostedFraction(threatB, offence(b), a);
+      const fracA = boostedFraction(threatA, offence(a), offence(b));
+      const fracB = boostedFraction(threatB, offence(b), offence(a));
       const clocks = raceClocks(
         unhealedIfBeaten(inputs.raceSideOf(a, fracA), fracB, () => movesFirst(b, a, threatB, threatA, battle)),
         unhealedIfBeaten(inputs.raceSideOf(b, fracB), fracA, () => movesFirst(a, b, threatA, threatB, battle)),

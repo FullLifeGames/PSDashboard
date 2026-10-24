@@ -158,6 +158,61 @@ describe('doubles: one foe on the field that moves first and KOs the holder', ()
 });
 
 /**
+ * Round 76 (12a, after T258): a foe that hits through the holder's own Attack (Foul Play reads the target's stat, so the
+ * Dex entry names the holder as the stat's owner) hits an idle holder harder with a raised stage, and the coverage term
+ * read that hit at the holder's raised stage (gen9ou-2658675932 turn 2: the bench Umbreon's Foul Play against a Great
+ * Tusk at +4 that the active Dragonite KOs first). A body that never acts is read on its drops as the defender too: the
+ * stage is moot to every pair term, whether it stands on the attacker or the defender side of the pair. Singles,
+ * Champions singles and doubles; the control is the same board where the holder acts.
+ */
+describe('12a: the stage of an idle holder adds nothing to the hit of a foe that reads it (Foul Play)', () => {
+  const FOUL = () => set('Umbreon', ['foulplay', 'splash']);
+  // The holder hits hard enough that the Foul Play carrier is the foe's best answer to it only while the hit is small; a priority hit KOs it first.
+  const HITTER = () => set('Garchomp', ['earthquake', 'splash']);
+  const QUICK = () => set('Jolteon', ['quickattack', 'splash']);
+
+  function board(format: string, first: PokemonSet): { battle: Battle; holder: Pokemon } {
+    const doubles = format === DOUBLES;
+    // The Foul Play carrier stays on the bench in both game types; the foe in front KOs the holder first.
+    const battle = battleOf(format, doubles ? [HITTER(), splash('Snorlax')] : [HITTER(), splash('Clefable')],
+      doubles ? [first, splash('Clefable'), FOUL()] : [first, FOUL()]);
+    const holder = battle.sides[0].active[0]!;
+    holder.boosts.atk = 4;
+    holder.sethp(Math.max(1, Math.floor(holder.maxhp * 0.05)));
+    return { battle, holder };
+  }
+
+  const coverage = (battle: Battle) => evalFeatures(battle, createMatchupCache('standard')).coverage;
+  const idle = (battle: Battle, holder: Pokemon) => idleHolders(battle, threatGetter(battle, createMatchupCache('standard'))).has(holder);
+
+  test.each([['singles', SINGLES], ['Champions singles', CHAMPIONS]])('%s: the coverage and the score are those of the board without the stage', (_name, format) => {
+    const { battle, holder } = board(format, QUICK());
+    expect(idle(battle, holder)).toBe(true);
+    const { raised, plain } = scores(battle, holder);
+    expect(raised).toBeCloseTo(plain, 12);
+    const withStage = coverage(battle);
+    holder.boosts.atk = 0;
+    expect(withStage).toBeCloseTo(coverage(battle), 12);
+  });
+
+  test('doubles: the same', () => {
+    const { battle, holder } = board(DOUBLES, QUICK());
+    expect(idle(battle, holder)).toBe(true);
+    const { raised, plain } = scores(battle, holder);
+    expect(raised).toBeCloseTo(plain, 12);
+    const withStage = coverage(battle);
+    holder.boosts.atk = 0;
+    expect(withStage).toBeCloseTo(coverage(battle), 12);
+  });
+
+  test('the control: where the holder acts, the stage keeps its worth in the score', () => {
+    const { battle, holder } = board(SINGLES, splash('Snorlax'));
+    const { raised, plain } = scores(battle, holder);
+    expect(raised).not.toBeCloseTo(plain, 6);
+  });
+});
+
+/**
  * Round 76 (T262): one evaluation asks whether a raised body acts once per foe in front, not once for the boosts term
  * and again for the pair terms (the profile of the VGC trees: the same pair read twice per leaf). The reading is the
  * simulator's ModifyBoost event of each attack of the pair (`pairStages`), so the events fired from inside
