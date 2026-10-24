@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import type { Battle, Pokemon, PokemonSet } from '@pkmn/sim';
 import { createMatchupCache, evalFeatures, evaluatePosition } from '../src/eval-function';
 import { stageValue } from '../src/score/boost-bite';
-import { holderActsInFront } from '../src/score/boost-race';
+import { holderActsInFront, idleHolders } from '../src/score/boost-race';
 import { threatGetter } from '../src/score/threat';
 import { loadSimMods } from '../src/forward/sim-mods';
 import { set } from './move-oracle';
@@ -154,5 +154,47 @@ describe('doubles: one foe on the field that moves first and KOs the holder', ()
     const { raised, plain } = scores(battle, holder);
     expect(raised).not.toBeCloseTo(plain, 6);
     expect(boostsTerm(battle)).toBeCloseTo(stageValue(holder, 'atk', 2), 12);
+  });
+});
+
+/**
+ * Round 76 (T262): one evaluation asks whether a raised body acts once per foe in front, not once for the boosts term
+ * and again for the pair terms (the profile of the VGC trees: the same pair read twice per leaf). The reading is the
+ * simulator's ModifyBoost event of each attack of the pair (`pairStages`), so the events fired from inside
+ * `holderActsInFront` are counted: an evaluation of a board with a raised holder fires as many as one `idleHolders`
+ * pass, and the board without a raise none. The holder is idle (a faster foe KOs it) or acts (a harmless foe).
+ */
+describe('T262: the idle reading runs once per evaluation', () => {
+  function modifyBoostEvents(battle: Battle, run: () => void): number {
+    let events = 0;
+    const real = battle.runEvent.bind(battle);
+    battle.runEvent = ((eventid: string, ...rest: unknown[]) => {
+      if (eventid === 'ModifyBoost' && new Error().stack?.includes('holderActsInFront')) events++;
+      return (real as (...args: unknown[]) => unknown)(eventid, ...rest);
+    }) as typeof battle.runEvent;
+    try { run(); } finally { delete (battle as { runEvent?: unknown }).runEvent; }
+    return events;
+  }
+
+  function board(format: string, first: PokemonSet): { battle: Battle; holder: Pokemon } {
+    const doubles = format === DOUBLES;
+    const battle = battleOf(format, doubles ? [GARCHOMP(), splash('Snorlax')] : [GARCHOMP(), splash('Clefable')], doubles ? [first, splash('Clefable')] : [first, splash('Snorlax')]);
+    const holder = battle.sides[0].active[0]!;
+    holder.sethp(Math.max(1, Math.floor(holder.maxhp * 0.05)));
+    return { battle, holder };
+  }
+
+  test.each([
+    ['singles', SINGLES, KILLER()], ['doubles', DOUBLES, KILLER()], ['Champions singles', CHAMPIONS, KILLER()],
+    ['singles, the holder acts', SINGLES, splash('Snorlax')], ['doubles, the holder acts', DOUBLES, splash('Snorlax')],
+  ])('%s: the raised holder costs one pass of idleHolders', (_name, format, first) => {
+    const { battle, holder } = board(format, first);
+    const evaluate = () => { evalFeatures(battle, createMatchupCache('standard')); };
+    expect(modifyBoostEvents(battle, evaluate)).toBe(0);
+    holder.boosts.atk = 2;
+    const raised = modifyBoostEvents(battle, evaluate);
+    const pass = modifyBoostEvents(battle, () => { idleHolders(battle, threatGetter(battle, createMatchupCache('standard'))); });
+    expect(pass).toBeGreaterThan(0);
+    expect(raised).toBe(pass);
   });
 });
