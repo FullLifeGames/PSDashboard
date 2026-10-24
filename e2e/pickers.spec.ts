@@ -66,9 +66,12 @@ test.describe('PS Dashboard', () => {
     const editor = page.getByRole('dialog', { name: 'Edit Player Team' });
     await expect(editor).toBeVisible();
     await expect(editor.getByLabel('Garchomp HP EVs')).toBeVisible();
-    await editor.getByLabel('Garchomp HP EVs').fill('252');
-    await editor.getByLabel('Garchomp Atk EVs').fill('252');
+    // Round 76 (T234): the editor opens on the solved spread (the fixture's Garchomp: 252 Atk / 252 Spe / 4 SpD, 508 of the 510 EVs),
+    // and a typed value is cut to what the total leaves. The spread is therefore edited from the bottom: free the points, then spend them.
     await editor.getByLabel('Garchomp Spe EVs').fill('4');
+    await editor.getByLabel('Garchomp SpD EVs').fill('0');
+    await editor.getByLabel('Garchomp Atk EVs').fill('252');
+    await editor.getByLabel('Garchomp HP EVs').fill('252');
     const garchompCard = editor.locator('.ps-panel').filter({ hasText: 'Garchomp' }).first();
     await garchompCard.getByLabel(/Remove .* from Garchomp/).first().click();
     await garchompCard.getByPlaceholder('Add move...').fill('Dragon Claw');

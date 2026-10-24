@@ -47,6 +47,8 @@ describe('clampEv by the format limits', () => {
       expect(clampEv('252', limits, 252)).toBe(252);
       expect(clampEv('252', limits, 300)).toBe(210);
       expect(clampEv('252', limits, 510)).toBe(0);
+      // Round 76 (12a): the editor opens on the solved spread (252 Atk / 252 Spe / 4 SpD is 508 of 510), so a typed 252 HP keeps 2.
+      expect(clampEv('252', limits, 508)).toBe(2);
     });
   }
 });
