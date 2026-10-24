@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { Battle, State, Teams, toID, type PokemonSet } from '@pkmn/sim';
 import { twinBattle } from '../src/sim-ask/twin';
 import { twinBattle as exported } from '../src/index';
@@ -27,9 +27,13 @@ function byHand(format: string, p1: PokemonSet[], p2: PokemonSet[], names: [stri
   return battle;
 }
 
-const identity = (battle: Battle): string => JSON.stringify(State.serializeBattle(battle));
+/** The battle as the simulator serializes it, without the wall-clock stamp of its log (`|t:|<seconds>`). */
+const identity = (battle: Battle): string => JSON.stringify(State.serializeBattle(battle)).replace(/\|t:\|\d+/g, '|t:|');
 
 describe('twinBattle', () => {
+  beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); });
+  afterEach(() => { vi.useRealTimers(); });
+
   test('is the one export of the barrel', () => {
     expect(exported).toBe(twinBattle);
   });
@@ -38,6 +42,9 @@ describe('twinBattle', () => {
     test(`gen ${gen}: a 1v1 twin is the battle the callers built by hand`, () => {
       const format = `gen${gen}customgame`;
       const made = twinBattle(format, { p1: { name: 'Body', team: [SET] }, p2: { name: 'Foe', team: [SET] } });
+      // Round 76 (12a): the simulator stamps the log with the wall clock in seconds (`|t:|`), so two builds that straddle a
+      // second boundary differ in that one line. The second build here always lands one second later.
+      vi.setSystemTime(Date.now() + 1000);
       expect(identity(made)).toBe(identity(byHand(format, [SET], [SET], ['Body', 'Foe'])));
       expect(made.sides[0].active[0]?.species.name).toBe('Smeargle');
       expect(made.sides.some(side => side.requestState === 'teampreview')).toBe(false);
