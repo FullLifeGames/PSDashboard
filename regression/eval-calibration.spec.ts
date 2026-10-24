@@ -912,6 +912,72 @@ import { takeSimFastReport } from '../packages/eval-engine/src/forward/sim-fast/
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * ROUND 76 2026-10-23..24 (improvement round 76, the last wave: lanes R
+ * (report and analysis: T264, T233, T244), S (static: T258, T259, T243), B
+ * (rebuild and hits: T261, T265, T260) and A (app and tooling: T234, T266) in
+ * worktrees w6-r, w6-s, w6-b and w6-a from r76 (v1 7d131e2 plus c308fc3, the
+ * bank jobs pinned to ubuntu-24.04), then T262 on w6-t; merged on r76 in the
+ * main checkout: 5b6d997 (A), ff8e1bf (R), 4ddba00 (B), 9d1269e (S, T259
+ * reverted in 1459923), 8803bca (cache v70), 3785973 (T262), 372a2d6, a3b65ab
+ * and 4777df5 (the wave run's rests), d92c7ff (the re-pins); spec
+ * docs/superpowers/specs/2026-10-23-round-76-last-wave-design.md, probes
+ * docs/perf/probes/2026-10-23-r76/). Design gate 23.10. ("1a 2a": four lanes,
+ * T262 after the merge; the play-out pin is not bent).
+ * DELIVERED: T264 (a dice turn against the winner joins the key moments,
+ * keyMomentsFor in key-moments.ts; 573756 t73 back in the list), T233 (a tied
+ * punisher within the inaccuracy band, the walked-into read on quiet cards,
+ * CHANCE_CANT with Attract held to the simulator, seedPhrase drops the odds
+ * of a stopped hit), T244 (healed by round 73's T225 and T248, regret 0.056
+ * and no tier; a spec holds it), T258 (a move without a Dex heal ratio heals
+ * at the simulator's rate, swept over every heal move of Gen 1 to 9 and the
+ * Champions mod; the pinned healer's clock follows the simulator's sequence
+ * of hits and heals), T243 (p2 wins the draft t56 play-out in 16 of 16 dice
+ * and passes the pin 14 times; the pin is armed again in 5808205), T261 (a
+ * Taunt from a -start line reads the block's own order, 2 turns on a slower
+ * body as in the simulator), T265 (Rage Fist and Last Respects read their
+ * history like historyPower; PokemonSnapshot.timesAttacked from
+ * @pkmn/client's count, pinned in the rebuild), T260 (an open team sheet
+ * without EVs takes the solver's EVs: Mawile 151 instead of 125 HP, the lost
+ * Champions VGC row returns; 2,043 sets move on the app path), T234 (the
+ * editor and the sets panel open on the solved sets; the round trip changes 0
+ * of 144 sets, 4 before), T266 (bank-ci downloads a run GitHub holds open
+ * after 5 minutes and resumes a run whose watcher ended), T262
+ * (holderActsInFront ran twice per leaf; once now, answers byte-identical;
+ * VGC +3.4 % against v1 before wave 5, +9.8 % before). The wave run found a
+ * stage on an idle holder priced through a foe's Foul Play (a3b65ab:
+ * matchupTerms reads an idle holder without raises as the defender too), a
+ * twin spec that straddled a second of the wall clock (372a2d6) and an e2e
+ * spec that typed into a full spread (4777df5).
+ * MEASUREMENT: r76-g (4777df5) against r75-m in CI: D26 without harm
+ * (warnings early and mid), Doubles OU and VGC without harm (warnings:
+ * Doubles OU mid +31, luck-adjusted +52), Champions OU and Champions VGC
+ * clean (T260's row back, 1,448 rows); the bank's own doubles rows read harm
+ * with fixed K (+7, luck-adjusted +11, hq luck-adjusted +12) and none with
+ * own K. T258 alone (r76-s1): no harm, bank doubles +5; with T259 (r76-s)
+ * Champions VGC luck-adjusted +7 and bank doubles +9, so T259 went back. Lane
+ * A (r76-a-bank, r76-a-cou through --resume after a killed watcher):
+ * byte-identical. Wave run on 4777df5 in the main checkout: suite 6,873
+ * passed, 2 expected fail, 22 skipped (listed), the four pins of the gate
+ * red; e2e 79 of 79 with the play-out pin; feedback three times
+ * byte-identical with every expert pin holding; against round 75, 17 verdicts
+ * in 25 turns change their tier (9 stricter, 8 milder).
+ * FOUND ON THE WAY: T244's regret had jumped at 0da5ec7 (round 70) and was
+ * healed by 68c88f4 to 68ac4cc (round 73). T260's cause was the team build,
+ * not the dice: no roll of the Flare Blitz leaves a 125-HP Mawile alive. The
+ * rebuild's timesAttacked drifts from the client's count (Annihilape 4
+ * against 1). Champions OU 2628340185 t16 reads a blunder since T258 (regret
+ * 0.509) where the fresh reference reads a mistake (0.20 to 0.25): the trend
+ * probe read a cell with two outcomes from three draws (T227). GitHub held a
+ * finished run open for an hour in round 74; the round's own measurements ran
+ * without hand work after T266.
+ * USER GATE 2026-10-24 13:36 ("1a 2a 3a 4a 5a"): the re-pins where the fresh
+ * reference carries the engine (573756 t73 and 912045 t8 without a tier, the
+ * search identity recorded anew, 648453 t13 the required singles scene of the
+ * matrix test), no re-fit of the doubles weights, T259 parked with a trigger,
+ * five proposals parked without a T-number and one as a status of T227,
+ * booked and pushed; next the release with T43. No new T-number, next free
+ * T267.
+ *
  * ROUND 75 2026-10-23 (improvement round 75, T160, the last step before the
  * last wave; branch r75 from 50c8002 (= v1), one lane in the main checkout:
  * 8b4567f (one Champions rule), 8d51899 and ccd7e04 (the resolver and every
