@@ -55,7 +55,7 @@ describe('verify scenes: every class one ply deeper (round 63, T16)', () => {
     expect(Math.abs(analysis.p1.regret! - 0.154)).toBeLessThan(0.02);
   });
 
-  test('573756 t73: Body Press grades an inaccuracy (MC 0.1122 and 0.1200 on two seed blocks under the round 73 static, user gate 22.10.2026, 2a; no tier, 0.0774 and 0.0877 under the round 69 static)', { timeout: 300_000 }, async () => {
+  test('573756 t73: Body Press carries no tier (MC 0.1208 and 0.1278 on two seed blocks under the round 76 static, user gate 24.10.2026, 1a; an inaccuracy, 0.1122 and 0.1200 under the round 73 static)', { timeout: 300_000 }, async () => {
     // Fresh reference, 40 draws per cell on seed blocks 1001 and 5001 (round 73, lanes/F/pins-mc.vt.ts): best row Roost,
     // regret 0.1122 and 0.1200, an inaccuracy on both blocks; the engine reads 0.1299 (best Toxapex). The matchup part
     // of T248 (hit-first healer, winner-share pair value) moved the engine and the reference together. Watched at the
@@ -63,11 +63,18 @@ describe('verify scenes: every class one ply deeper (round 63, T16)', () => {
     const position = scene('smogtours-gen8ou-573756-t73');
     const analysis = flat(position, await search(position));
     expect(analysis.p1.played?.label).toBe('Body Press');
-    expect(analysis.p1.tier).toBe('inaccuracy');
-    expect(Math.abs(analysis.p1.regret! - 0.116)).toBeLessThan(0.02);
+    // Round 76 (T258, user gate 24.10.2026, 1a): the simulator's heal rate moves the engine to score -0.7042 (was
+    // -0.6975), best row Defog, regret 0.1272, and the tier to none. The raw regret is still an inaccuracy (at least
+    // 0.1); the decided-position leniency (DECIDED_SCORE 0.7, own perspective) now demotes it because the root score
+    // sits 0.0042 beyond the line. The fresh reference (24 draws, seed blocks 1001 and 5001, answers off) shares the
+    // root score and reads the same: best row Defog, regret 0.1208 and 0.1278, flat tier none on both blocks. The pin is
+    // a 0.004 margin on the 0.7 line by construction; the feedback pin of this scene is watched at the gate. Band:
+    // 0.124 ± 0.02, the blocks' mean and the pin's tolerance.
+    expect(analysis.p1.tier).toBeUndefined();
+    expect(Math.abs(analysis.p1.regret! - 0.124)).toBeLessThan(0.02);
   });
 
-  test("912045 t8 (doubles): p1's flat verdict agrees with the Monte-Carlo reference (mistake, 0.3166 and 0.2067 on two seed blocks under the round 73 static, user gate 22.10.2026, 2a; none, 0.0084 and 0.0236 under the round 70 static)", { timeout: 300_000 }, async () => {
+  test("912045 t8 (doubles): p1's flat verdict agrees with the Monte-Carlo reference (none, 0.0601 and 0.0679 on two seed blocks under the round 76 static, user gate 24.10.2026, 1a; a mistake, 0.3166 and 0.2067 under the round 73 static)", { timeout: 300_000 }, async () => {
     // Before round 63, the fallback cell Earth Power + Matcha Gotcha × Earth Power + Tera + Drain Punch read −0.9
     // through its first draw and p1's played Blood Moon line graded a blunder (0.4778). Doubles verify
     // cells go deeper through their heaviest outcome (the doubles time bound). Fresh reference on round 70 (24 draws
@@ -78,8 +85,12 @@ describe('verify scenes: every class one ply deeper (round 63, T16)', () => {
     // Gotcha); the engine reads a mistake at 0.2327. Band: 0.262 ± 0.04, the blocks' mean and the pin's tolerance.
     const position = scene('smogtours-gen9doublesou-912045-t8');
     const analysis = flat(position, await search(position));
-    expect(analysis.p1.tier).toBe('mistake');
-    expect(Math.abs(analysis.p1.regret! - 0.262)).toBeLessThan(0.04);
+    // Round 76 (T258, user gate 24.10.2026, 1a): the simulator's heal rate moves the engine to none at 0.0516 (best Hyper
+    // Voice + Matcha Gotcha). Fresh reference (same draws and blocks, answers off): none on both, regret 0.0601 (best
+    // Hyper Voice + Matcha Gotcha) and 0.0679 (best Earth Power→Okidogi + Rage Powder; block B swaps the top two rows,
+    // 0.7125 against 0.7099 ev). Band: 0.064 ± 0.04, the blocks' mean and the pin's tolerance.
+    expect(analysis.p1.tier).toBeUndefined();
+    expect(Math.abs(analysis.p1.regret! - 0.064)).toBeLessThan(0.04);
   });
 });
 

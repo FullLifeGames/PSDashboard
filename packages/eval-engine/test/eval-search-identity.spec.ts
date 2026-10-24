@@ -24,6 +24,8 @@ import doublesTeams from './fixtures/doubles-identity-fixture';
  * without the history keys plus readable facts and the advance's log delta.
  * Re-recorded in round 73 (user gate 22.10.2026, 2a): the bench credit (T225), the stage relation (T249) and the
  * matchup pair value (T248) move the children's prng, hp and fainted facts and the search picks other children.
+ * Re-recorded in round 76 (user gate 24.10.2026, 1a): T258 (the simulator's heal rate and its sequence of hits and heals
+ * for a pinned healer) moved the static again, so the search picks other children (PERF_IDENTITY_RECORD=1).
  */
 
 const RECORD = process.env.PERF_IDENTITY_RECORD === '1';

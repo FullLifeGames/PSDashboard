@@ -220,7 +220,14 @@ describe('tree orchestration (round 61; read through the executor since round 64
       applyForcedWin(verified, record.proofs[0].outcome);
       expect(result, name).toEqual(verified);
     }
-    expect(shifted, 'the verified ranking reaches the prover (singles)').toContain('smogtours-gen6ou-649664-t14-g1');
+    // Round 76 (user gate 24.10.2026, 1a): T258 (the simulator's heal rate of a pinned healer) moved the static, and the
+    // verified ranking of 649664 t14 g1 (Excadrill over Scald, unverified Scald over Excadrill) now feeds the prover the
+    // same root order as the unverified one, so that scene stays in the loop as a contract-only row and 648453 t13 is the
+    // required singles shift (it shifts at every commit measured, c308fc3 to a3b65ab). The fresh Monte-Carlo reference
+    // (24 draws, seed blocks 1001 and 5001, answers off) carries the 648453 t13 and 2663093831 t12 shifts on both
+    // blocks; on g1 it still shifts the prover input by one swap in the tail of p2's bench switches (switch 2 before
+    // switch 3), which the engine no longer shows. Nothing in the engine is wrong that the reference proves.
+    expect(shifted, 'the verified ranking reaches the prover (singles)').toContain('smogtours-gen6ou-648453-t13');
     expect(shifted, 'the verified ranking reaches the prover (doubles)').toContain('gen9doublesou-2663093831-t12');
   });
 
