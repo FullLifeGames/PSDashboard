@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
 import { REPLAY_FRAME_HEIGHT, generateReplayHtml } from '../../src/lib/replay-html';
+import { EMBED_SCRIPT_ORDER_SCRIPT } from '../../src/lib/replay-compat';
 
 const log = '|start\n|turn|1\n|turn|2';
 
@@ -91,6 +92,27 @@ describe('Replay iframe HTML', () => {
     // Every other resource the document names is absolute, so the base moves nothing else.
     const relative = [...html.matchAll(/\b(?:src|href)="(?!https:\/\/)([^"]+)"/g)].map(match => match[1]);
     expect(relative).toEqual([]);
+  });
+
+  test('the embed\'s scripts run in the order the embed appends them (round 77)', () => {
+    // Branching swarm 28.10.2026: a cold first load left the frame empty with "$ is not defined". replay-embed.js
+    // appends its dependencies as dynamic scripts, those run in the order they arrive, and graphics.js stops halfway
+    // when jQuery comes after it. test/e2e/replay-sprites.spec.ts plays that order in a browser.
+    const html = generateReplayHtml({ log });
+    expect(html.indexOf(EMBED_SCRIPT_ORDER_SCRIPT)).toBeGreaterThan(-1);
+    expect(html.indexOf(EMBED_SCRIPT_ORDER_SCRIPT)).toBeLessThan(html.indexOf('replay-embed.js'));
+    type Node = { tagName: string; src?: string; async?: boolean };
+    const appended: Node[] = [];
+    const head = { appendChild: (node: Node) => { appended.push({ ...node }); return node; } };
+    const sandbox: Record<string, unknown> = { document: { head } };
+    sandbox.window = sandbox;
+    runInNewContext(EMBED_SCRIPT_ORDER_SCRIPT.replace(/<\/?script>/g, ''), sandbox);
+    head.appendChild({ tagName: 'SCRIPT', src: 'https://play.pokemonshowdown.com/js/lib/jquery-1.11.0.min.js', async: true });
+    head.appendChild({ tagName: 'LINK', async: true });
+    expect(appended).toEqual([
+      { tagName: 'SCRIPT', src: 'https://play.pokemonshowdown.com/js/lib/jquery-1.11.0.min.js', async: false },
+      { tagName: 'LINK', async: true },
+    ]);
   });
 
   test('the battle starts at the frame\'s top edge, and no title shows under the controls (round 77)', () => {

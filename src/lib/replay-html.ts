@@ -4,7 +4,7 @@
  * which handles all rendering, animations, and playback controls.
  */
 
-import { fontAwesomeOverrideStyle, POINTER_SOURCE_SHIM_SCRIPT } from './replay-compat';
+import { EMBED_SCRIPT_ORDER_SCRIPT, fontAwesomeOverrideStyle, POINTER_SOURCE_SHIM_SCRIPT } from './replay-compat';
 
 const REPLAY_STYLES = `<style>
 html,body {font-family:Verdana, sans-serif;font-size:10pt;margin:0;padding:0;}
@@ -286,6 +286,7 @@ ${POINTER_SOURCE_SHIM_SCRIPT}
 ${escapedLog}
 </script>
 </div>
+${EMBED_SCRIPT_ORDER_SCRIPT}
 ${EMBED_LOADER_SCRIPT}
 ${fontAwesomeWoff2Url ? `${fontAwesomeOverrideStyle(fontAwesomeWoff2Url)}\n` : ''}${replayBridgeScript(seekTurn, autoPlay, viewpoint)}${reportTurn ? TURN_TRACKER_SCRIPT : ''}`;
 }

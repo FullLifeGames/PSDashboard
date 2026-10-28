@@ -33,6 +33,28 @@ export function localFontAwesomeUrl(): string | undefined {
 }
 
 /**
+ * replay-embed.js appends its sixteen dependencies to <head> as dynamic
+ * scripts, and a dynamic script runs as soon as it arrives. graphics.js
+ * extends $.easing at load time: when jQuery arrives later, graphics.js
+ * stops halfway, BattleBackdrops stays undefined, and the battle never
+ * builds (round 77, an empty frame on a cold first load). A dynamic script
+ * with async = false runs in the order it was appended, the order the embed
+ * lists them; the downloads still run in parallel. Must run before the
+ * embed loader; left alone where no document head exists.
+ */
+export const EMBED_SCRIPT_ORDER_SCRIPT = `<script>
+(function () {
+  var head = window.document && document.head;
+  if (!head) return;
+  var append = head.appendChild;
+  head.appendChild = function (node) {
+    if (node && node.tagName === 'SCRIPT' && node.src) node.async = false;
+    return append.call(head, node);
+  };
+})();
+</script>`;
+
+/**
  * battle-tooltips.ts reads MouseEvent.mozInputSource on every hover (its
  * guard against Firefox firing mouseover for a stray tap), and Firefox
  * logs a deprecation for each page that touches the native accessor.
