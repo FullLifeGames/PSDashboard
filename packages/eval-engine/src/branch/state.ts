@@ -10,6 +10,7 @@ import type {
 import { slotLetter, trimTeamToBring } from './team-order.ts';
 import { formatRules, toId } from '@fulllifegames/replay-core';
 import { targetTypeForMove } from './protocol-choices.ts';
+import { isLockedEntry } from '../forward/request-moves.ts';
 import { forceSwitches } from './corrections.ts';
 import { extractPokemonInfo, makePokemonInfo, shownPercent } from './pokemon-info.ts';
 
@@ -83,7 +84,9 @@ export function typesUnderTera(
  * reads the request and does not keep a list of reasons. A move the slot itself flags (a hidden disable
  * the singles request keeps from the player) stays disabled too. A request that offers a move the body
  * does not carry (Struggle when every move is empty) adds that button, and a move the request leaves out
- * (a locked turn lists only the locked move) cannot be clicked.
+ * (a locked turn lists only the locked move) cannot be clicked. A locked entry the Dex does not know
+ * (Recharge after Hyper Beam) is the turn's one choice: it shows by the request's own name, without a
+ * target or a type (round 77; before, a recharge turn offered no button at all).
  */
 function makeMoves(
   active: SimPokemon | null | undefined,
@@ -95,16 +98,20 @@ function makeMoves(
   const underTera = typesUnderTera(battle, active);
   const requestMoves = active.getMoveRequestData().moves;
   const ownIds = new Set(active.moveSlots.map(move => move.id || toId(move.move)));
+  const known = (id: string) => battle.dex.moves.get(id).exists;
   const entries = [
-    ...active.moveSlots.map(move => ({ name: move.move, id: move.id || toId(move.move), pp: move.pp, maxpp: move.maxpp, slotDisabled: !!move.disabled })),
+    ...active.moveSlots.map(move => ({ name: move.move, id: move.id || toId(move.move), pp: move.pp, maxpp: move.maxpp, slotDisabled: !!move.disabled, dex: true })),
     ...requestMoves
-      .filter(move => !ownIds.has(move.id) && battle.dex.moves.get(move.id).exists)
-      .map(move => ({ name: battle.dex.moves.get(move.id).name, id: move.id, pp: move.pp ?? 0, maxpp: move.maxpp ?? 0, slotDisabled: false })),
+      .filter(move => !ownIds.has(move.id) && (known(move.id) || isLockedEntry(move)))
+      .map(move => ({
+        name: known(move.id) ? battle.dex.moves.get(move.id).name : move.move, id: move.id,
+        pp: move.pp ?? 0, maxpp: move.maxpp ?? 0, slotDisabled: false, dex: known(move.id),
+      })),
   ];
   return entries.map((move, index): BranchMoveOption => {
-    const targetType = targetTypeForMove(battle.dex, active, move.id);
+    const targetType = move.dex ? targetTypeForMove(battle.dex, active, move.id) : '';
     const targetOptions = buildTargetOptions(battle, active, targetType);
-    const type = typeAtUse(battle, active, move.id);
+    const type = move.dex ? typeAtUse(battle, active, move.id) : '';
     const typeUnderTera = underTera.get(move.id);
     const requested = requestMoves.find(entry => entry.id === move.id);
     return {
