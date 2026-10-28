@@ -16,7 +16,7 @@ import { evBudget } from '../src/spreads/ev-budget';
  */
 Dex.mod('champions', championsMod as unknown as NonNullable<Parameters<typeof Dex.mod>[1]>);
 
-const manifest = (name: string) => JSON.parse(readFileSync(new URL(`../../../regression/fixtures/${name}`, import.meta.url), 'utf8')) as Record<string, unknown>;
+const manifest = (name: string) => JSON.parse(readFileSync(new URL(`../../../test/regression/fixtures/${name}`, import.meta.url), 'utf8')) as Record<string, unknown>;
 
 /** Every spelling of one format the hosts hand over: the Dex's id, its name, a replay id, a branch format with rules. */
 function spellings(format: { id: string; name: string }): string[] {

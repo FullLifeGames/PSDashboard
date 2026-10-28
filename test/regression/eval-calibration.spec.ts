@@ -1,0 +1,6702 @@
+import { afterAll, test, expect, describe } from 'vitest';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { State } from '@pkmn/sim';
+import type { Battle } from '@pkmn/sim';
+import { buildTeamsFromReplay } from '../../packages/replay-core/src/team-builder';
+import { applyTargetCorrections, reconstructBranchRuntime } from '../../packages/eval-engine/src/branch-engine';
+import { buildChoiceLockContext } from '../../packages/eval-engine/src/choice-lock';
+import { getBranchSimulatorFormat, replayBringOnly } from '../../packages/replay-core/src/replay-format';
+import { parseReplayLogWithObservations } from '../../packages/replay-core/src/protocol-parser';
+import { logRules } from '../../packages/replay-core/src/rules-dex';
+import { battleFaintedFraction, searchPosition } from '../../packages/eval-engine/src/search';
+import { leafValue } from '../../packages/eval-engine/src/search/leaf';
+import { bankKeepPlayed, bankSampleCount, bankSearch, bankSettings } from './bank-search';
+import { diskCachedSmogonFetcher } from './smogon-fetch-cache';
+import { bankTeamsFor } from './bank-build';
+import { loadReplayMods } from '../../src/lib/replay-mods';
+import { bankUniverse, phaseOf } from './bank-universe';
+import { createMatchupCache, evalFeatures, EVAL_WEIGHTS, FEATURE_WEIGHTS, type EvalFeatures } from '../../packages/eval-engine/src/eval-function';
+import { setLastPairSweep } from '../../packages/eval-engine/src/score/last-pair';
+import { livingMons } from '../../packages/eval-engine/src/score/threat';
+import { heldDecided } from '../../packages/eval-engine/src/turn-analysis/decided-held';
+import { deserializeBattleExact } from '../../packages/eval-engine/src/forward-model';
+import { hasLuckAgainst, luckAgainstFavored } from './luck-events';
+import { summaryLines } from './calibration-summary';
+import { fetchBankReplay } from './bank-fetch';
+import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fast/state';
+
+/**
+ * Informational calibration run against real finished replays: does the
+ * score's sign predict the actual winner, and how does confidence grow over
+ * the game? Not a CI gate — network + ~3 minutes of reconstruction.
+ * Run: node scripts/run-calibration.mjs --slices 4 --out .calibration/<name> (or
+ * EVAL_CALIBRATION=1 npx vitest run --project app test/regression/eval-calibration.spec.ts)
+ * Levers: EVAL_CALIBRATION_DEPTH=2 · EVAL_CALIBRATION_MODE=mcts ·
+ * EVAL_CALIBRATION_SAMPLES=3 (seeds per cell, default 1 — the app default
+ * line is d2s3, so the harness must be able to measure it) ·
+ * EVAL_CALIBRATION_SLICE=a/b (only replays with index % b === a — long
+ * engine configs split into slices whose JSONL dumps concatenate cleanly;
+ * node scripts/run-calibration.mjs runs the slices in parallel and merges
+ * the dumps into one summary) ·
+ * EVAL_CALIBRATION_TRANCHE=<name> (one corpus stratum only; slices then
+ * index the filtered list) ·
+ * EVAL_CALIBRATION_DUMP=<path> (per-position JSONL for paired analysis;
+ * since round 32 every line also carries `decided`, the root's
+ * decided-sweep side or null) ·
+ * EVAL_CALIBRATION_SOURCE=fit (swap the universe to the weight-fitting
+ * corpus' disk cache for FIT-SIDE dumps — mapping fits train there and
+ * grade here; refuses to run without a dump path) ·
+ * EVAL_CALIBRATION_SMOGON=1 (build teams WITH the Smogon usage/set fills
+ * the app line waits for, disk-pinned in .smogon-cache/ so paired runs
+ * see identical data — the information-gap experiment) ·
+ * EVAL_CALIBRATION_RAWBUILD=1 (with the fills, build the teams the way the
+ * bank did until round 52: raw infos and one solve. The default builds the
+ * app's chain instead — enriched infos, the two-stage solve, the
+ * hidden-power evidence — so the bank grades the teams a user sees. Every
+ * number recorded before round 52 was measured on the raw build; this
+ * switch brings it back, the way EVAL_CALIBRATION_RAW=1 keeps the
+ * reconstruction of round 46) ·
+ * EVAL_CALIBRATION_STATIC=1 (round 65: score each sampled position with
+ * the static's leaf value and run no search; with
+ * EVAL_CALIBRATION_FEATURES=1 it reads on the bank's positions and builds
+ * what the fit corpus fits, a measurement switch, never a record)
+ *
+ * Baseline 2026-08-04 (post ev-grading, pre boost-schedule; depth 1, samples 1):
+ *   early 55% |0.23| · mid 62% |0.34| · late 81% |0.43|
+ *   singles 63% (n=169) · doubles 80% (n=44)
+ *   buckets 0.0–0.2: 58% · 0.2–0.4: 73% · 0.4–0.7: 67% · 0.7–1.0: 76%
+ *
+ * Boost-schedule comparison 2026-08-04 (same set, deterministic):
+ *   offensive 12 / defensive 6: early 55 · mid 64 · late 78 · singles 63 · doubles 80
+ *   offensive 6 / defensive 3:  early 55 · mid 65 · late 73 · singles 61 · doubles 77
+ * Kept 12/6: net wash vs baseline (mid +2, late −3 ≈ 2 samples), halving was
+ * strictly worse (falsifying "schedule too strong"), and the schedule's real
+ * purpose — pricing setup turns honestly — is not measured by sign accuracy.
+ * RESOLVED 2026-08-05 by a PAIRED re-test (both weight sets on identical
+ * positions): 56/73 late-game correct under BOTH — zero sign flips in either
+ * direction, though 35/73 positions had boosts on the field. The "late −3"
+ * was sample-composition noise between runs (fetches/reconstructions vary),
+ * not an effect of the schedule. Cross-run comparisons here need pairing.
+ *
+ * Active-pair emphasis 2026-08-05 (turn-0 lead evaluation groundwork):
+ *   activePair 2:   early 56 · mid 64 · late 71(−7!) · singles 60 · doubles 77
+ *   activePair 1.5: early 56 · mid 64 · late 76      · singles 62 · doubles 82
+ * Kept 1.5 — late-game benches decide endgames, so the emphasis must stay
+ * modest; lead ORDERING at turn 0 only needs a nonzero active delta.
+ *
+ * Long-term-structure terms 2026-08-08 (baseline for comparison: 56/64/76/62/82):
+ *   hazards-by-victim only:              early 58 · mid 61 · late 81 · singles 62 · doubles 84
+ *   + coverage + items + choice-mismatch: early 56 · mid 63 · late 80 · singles 63 · doubles 82
+ *   + lock-aware threat + boost discount: early 56 · mid 64 · late 80 · singles 63 · doubles 82
+ * The first run's "mid −3" recovered on the second sample (−1) — composition
+ * noise again, per the paired-test precedent above. Late-game +4 across all
+ * runs: victim-aware hazards genuinely help endgame sign accuracy. Full
+ * WP 2–4 package: every bucket at or above baseline. GATE PASSED.
+ *
+ * Damage-consistent spread inference 2026-08-08 (observations → solver → overlay):
+ *   early 58 · mid 67 · late 83 · singles 66 · doubles 84
+ * Every bucket up vs the 56/64/76/62/82 baseline (mid +3, late +7, singles +4):
+ * pair-consistent spreads make reconstructed positions genuinely more
+ * predictive of outcomes. GATE PASSED.
+ *
+ * Win-prob-unit conversion 2026-08-08 (wpUnits at the search leaf): sign
+ * accuracy is INVARIANT under the monotone sigmoid, so these buckets carry
+ * over unchanged; mean|score| values are no longer comparable across the
+ * conversion (wp-units compress). Verdict thresholds re-derived as 0.1/0.2/0.4
+ * wp-units (5/10/20% win-prob loss — half-Lichess; the score-space bands
+ * flagged 3–5% losses, the source of the T22/T26/T29 over-flagging).
+ *
+ * Corpus weight fit 2026-08-08 (eval-fit, 534 games / 3565 positions):
+ *   ADOPTED: WINPROB_K singles 0.9→2.7, doubles 2.8→2.3 (leaf-level fit,
+ *     n=3393/172) — gate with K only: 58/67/83/66/82, all at/above baseline.
+ *   REJECTED: boosts 12→40 + coverage 40→80 (implied 47±12 / 224±98) —
+ *     gate read 56/68/79/66/75: doubles −9, late −4. The fit is dominated
+ *     by singles tournament games; those weights are singles-tuned at
+ *     doubles' expense. Screens/trickRoom implied values are confounded
+ *     (setup correlates with already winning); tailwind/matchup/choiceMismatch
+ *     had no signal (SE ≥ estimate). Hand values stay.
+ *
+ * Attribution/solver fixes 2026-08-08 (action-window attribution, spread
+ * rungs inherit priors, tendencies/MCTS-matrix): 58/65/82/65/84 — within
+ * gate of the 58/67/83/66/82 record (mid −2 = the usual composition noise);
+ * doubles +2. This run is the record for the per-gametype adoption below.
+ *
+ * PER-GAMETYPE weights 2026-08-08 (eval-fit on the EXPANDED corpus: 1100
+ * games / 5976 positions, doubles now 590 games / 2436 positions via NPA 15
+ * + OSDT + doubles ladder — the old doubles fit rested on 49 games):
+ *   ADOPTED (DOUBLES_FEATURE_WEIGHTS): boosts 27 (fit 27±7), tailwind 68
+ *     (68±25), trickRoom 87 (87±27) + WINPROB_K doubles 2.3→3.1 (n=2436;
+ *     sign accuracy cannot see K — it is justified by the leaf-level fit
+ *     alone). Gate: 58/65/80/64/82, all within 2 of the record. The
+ *     direction matches doubles domain knowledge: speed control decides
+ *     VGC games.
+ *   REJECTED: screens 103 (103±40) — gate read 56/62/79/64/73, doubles
+ *     −11: the screens fit is confounded exactly like the singles one.
+ *   REJECTED (again): singles boosts 12→37 (fit 37±11, third consistent
+ *     fit) — gate read 58/67/79/65/80, late −3 on a DETERMINISTIC re-test
+ *     (identical numbers twice). The boost fit keeps promising and keeps
+ *     failing the gate; whatever it measures correlates with winning in the
+ *     corpus but does not improve position-level sign accuracy.
+ *
+ * Instrumented fit 2026-08-09 (eval-fit schema 2, 5,985 positions): phase-K
+ * fitted at singles {k0 2.28, k1 1.49}, doubles {k0 2.98, k1 0.88} — beats
+ * constant K on early Brier in both gametypes (0.2470→0.2451 / 0.2264→
+ * 0.2259) with no bucket regressing.
+ *
+ * PHASE-AWARE WINPROB 2026-08-09 (K = k0 + k1·faintedFraction at the leaf,
+ * cache v11): gate 58/67/80/66/80 vs record 58/65/80/64/82 — mid +2,
+ * singles +2, doubles −2 (at the limit, within gate). GATE PASSED, ADOPTED.
+ * Early mean|score| 0.33→0.30: the early game now claims less confidence,
+ * which is the round's target. First Brier baseline (pooled constant K on
+ * the sweep's own samples): early 0.2572 · mid 0.2268 · late 0.1791 —
+ * cross-run Brier comparisons start here.
+ *
+ * matchupEarlyDamp grid 2026-08-09 (candidate phase multiplier on the
+ * matchup feature; adoption required early sign or Brier to beat the
+ * phase-K run above):
+ *   1.0 (off): 58/67/80/66/80 · early brier 0.2572
+ *   0.75:      58/63/81/64/82 · early brier 0.2592
+ *   0.5:       58/64/84/66/80 · early brier 0.2617
+ * Early Brier degrades MONOTONICALLY with damping and early sign never
+ * moves — KEPT 1.0: the phase-aware K already prices early uncertainty at
+ * the mapping layer; damping the matchup value on top double-counts it.
+ * (The late-bucket wiggle is composition noise, per the pairing precedent.)
+ *
+ * Quiescence extension 2026-08-09 — REVERTED (negative result). Design:
+ * depth-1 cells whose sampled advance contained a faint got a depth-1
+ * sub-search of the child (cap 8, most faints first, sync/orchestrator
+ * parity via a shared pure selector). Two gates rejected it:
+ * 1. Bench (hard ≤1.5×): d1s1 0.3s→1.2s (4.0×), d1s3 0.3s→1.3s (4.3×);
+ *    at the minimum cap 4 still 0.6s (2.0×) — each extension costs a full
+ *    sub-search, so the budget is unreachable at any allowed cap.
+ * 2. GPL T26 pin: the extension hits only VIOLENT rows (sacks, trades)
+ *    while quiet rows keep static depth — sack lines eat one extra ply of
+ *    punishment their alternatives never receive. The redundant-Jugulis
+ *    sack's regret rose 0.19→0.25 (inaccuracy→mistake), breaking the pin.
+ * Lesson: matrix-game quiescence needs depth SYMMETRY across rows to keep
+ * relative option values honest — selective extension distorts exactly the
+ * sack/trade comparisons it was meant to sharpen. A future attempt should
+ * extend whole rows (or price tempo statically) rather than single cells.
+ *
+ * Sim-grounded hazard pricing 2026-08-09 (isGrounded + dex psn immunity,
+ * bench-Levitate correction): 58/64/83/66/80, mid −3 vs the phase-K run —
+ * re-test read 58/65/83/65/82 (mid −2, late +3, doubles +2) with slightly
+ * different fetch composition both times: the mid dip is composition noise
+ * (pairing precedent), every bucket within gate. GATE PASSED.
+ *
+ * Sweep feature fit 2026-08-09 (win-condition coverage-gained term,
+ * captured at weight 0; eval-fit on the recaptured corpus, 5,983 positions)
+ * — NEGATIVE RESULT, the FOURTH failed boost-term attempt:
+ *   with the flat boosts term:  sweep implied −39±105 (noise); boosts keeps
+ *     its usual 32±7.
+ *   with boosts zeroed (ALL-NO-BOOSTS): sweep 169±114 — it absorbs part of
+ *     the boost signal but at 1.5 SE never clears the 2-SE bar, and
+ *     coverage inflates to 214±63 alongside (the columns are collinear).
+ *   per-tranche sweep: singles −67±171 · doubles −58±141 · gen9 −7±142.
+ * KEPT: FEATURE_WEIGHTS.sweep = 0 (feature stays captured for future fits),
+ * boosts unchanged. Whatever boost value the corpus can see, the flat
+ * stage term remains its best-measured carrier; "coverage gained" as
+ * specified does not separate from the existing matchup/coverage terms.
+ *
+ * HAZARD-REMOVAL OPTION VALUE 2026-08-09 (user finding, draft T14: the
+ * switch into Defog Talonflame read as an inaccuracy because standing
+ * hazards were priced as if paid forever — the removal capacity was
+ * invisible, and the payoff sits past the expansion horizon). Modeled as
+ * an OPTION on the net board state (hazardRemovalEquity): own-side movers
+ * (Rapid Spin/Mortal Spin/Tidy Up) net full relief; both-sides movers
+ * (Defog/Court Change) net relief MINUS the side's own hazards' worth on
+ * the opponent's board; a net-negative option is never exercised (counts
+ * 0); the exercised option is tempo-discounted ×0.5. T14: regret
+ * 0.165 (inaccuracy) → 0.020 (clean), the Defog switch ranks 2nd.
+ * Gate 58/67/85/67/82 vs record 58/65/83/65/82 — mid +2, late +2,
+ * singles +2, doubles level: the best run on record. GATE PASSED, ADOPTED
+ * (cache v12). A flat remover-exists discount was tried first and gated
+ * fine (58/64/82/65/80) but mispriced double-edged Defogs — superseded.
+ *
+ * ENTRY-COST-WEIGHTED MATCHUP 2026-08-09 (user follow-up: hazards can
+ * disable a benched wincon, an interaction the additive model never saw).
+ * matchupTerms weighs every BENCHED mon by the HP it would actually arrive
+ * with: effHp = max(0, hp − hazardEntryFraction), applied to pair weights,
+ * KO races, and coverage weights; actives pay nothing; Boots/Magic Guard/
+ * airborne exempt via the shared hazardEntryFraction (extracted from
+ * hazardCost). Gate 58/68/82/67/80, re-test 59/68/82/67/82 vs record
+ * 58/65/83/65/82 — early 59, mid 68, singles 67 are the BEST values in
+ * the history; late stable at 82 (−1; the prior run's 85 was composition
+ * generosity). GATE PASSED, ADOPTED (cache v13).
+ *
+ * Post-re-specification refit 2026-08-09 (samples recaptured, 12,636
+ * positions): the entry-cost matchup carries MORE outcome signal (implied
+ * 189.6±40.9 vs 166±40 before; still 1.7 SE from hand 120 — recorded, not
+ * adopted). REJECTED: hazardEntries 0.75→1.0 (fitted 1.0±0.1, 2.5 SE) —
+ * gate 58/67/80/66/80, re-test 59/68/79/66/80: late −3/−4 consistently,
+ * the familiar in-corpus-significant / held-out-late-harm signature
+ * (late-game boards are hazard-heavy; overweighting them drowns bodies).
+ * Hand 0.75 stays.
+ *
+ * NO-OP CANDIDATE FILTER 2026-08-09 (user finding, GPL T25: Stealth Rock
+ * ranked with rocks already up — a guaranteed |-fail| click whose cell is
+ * a pass with a real-looking label). searchOptions drops field moves that
+ * fail deterministically against standing conditions (hazards at max,
+ * standing screens/Tailwind/Safeguard/Mist; singles lists). Gate
+ * 59/67/79/65/82 then re-test 59/68/81/67/80 — the late 79 was composition
+ * noise (n varies run-to-run), re-test within gate everywhere. ADOPTED
+ * (cache v14). Known remaining: pending Future Sight clicks are also
+ * passes, but reconstructed battles store the pending marker
+ * inconsistently — left unfiltered.
+ *
+ * EV LEGALIZATION 2026-08-09 (user findings: inferred spreads could stack
+ * to 756+ EVs — the ladder inherited prior investment past the 508 budget
+ * and the sim PLAYED those monsters in custom formats — or stop at 252
+ * total; Champions formats use 32/stat 66 total). Rungs are legalized
+ * before scoring (per-stat clamp + ordered shave, Speed last), winners are
+ * topped up in unmeasured non-Speed stats, and Champions replays build
+ * with their own budget end to end. Gate 59/67/79/66/80, re-test
+ * 59/68/79/66/80 — late stable at 79 (−2 vs the preceding state, at the
+ * limit). ADOPTED as a CORRECTNESS fix (the sim must field legal spreads;
+ * precedent: the attribution/spread-solver adoptions). CAVEAT recorded:
+ * today's per-step gates each passed at the limit while late drifted
+ * 83→79 cumulatively (early/mid/singles +1/+3/+2) — the next round should
+ * re-baseline with a paired comparison instead of chaining limit-passes.
+ *
+ * ROUND CLOSE 2026-08-09 (calibration/honesty round, cache v11). The
+ * sim-grounded-hazards re-test above IS the closing run — no eval-changing
+ * task landed after it: 58/65/83/65/82, brier 0.2585/0.2267/0.1740.
+ * Adopted: phase-aware winprob (the early game claims less per point),
+ * choice/AV rule-outs, sensitivity probes (acquit-only hinge softening),
+ * choice-id read matching, sim-grounded hazards. Rejected with evidence:
+ * matchup damping (double-counts phase-K), quiescence extension (bench +
+ * depth asymmetry), sweep feature (fourth boost negative).
+ *
+ * GEN9-SINGLES CORPUS EXPANSION 2026-08-09 (follow-up round; manifest
+ * 1,108→2,127 replays: SV OU official archive thread 3718664 + UWC thread
+ * 3779021 + gen9ru cap raise — the smogtours- room prefix needed a scraper
+ * regex fix; gen9 singles ~105→~840 games; fit now 12,615 positions /
+ * 2,111 games, singles tranche 1,441 games and gen9-dominated):
+ * - HYPOTHESIS RESOLVED: the "matchup is gen9-only signal" gap dissolved
+ *   with power — oldgen implied 124 vs gen9 170±47 (previously 37 vs 146
+ *   on the starved tranche = small-sample noise). Matchup reads 166±40
+ *   pooled vs hand 120 everywhere: persistent but ~1.1 SE — below the
+ *   2-SE adoption bar. Evidence recorded, no change.
+ * - Phase-K CONFIRMED on the doubled corpus: singles k0 2.22 k1 1.37,
+ *   doubles k0 2.91 k1 0.89 — within noise of the adopted 2.28/1.49 and
+ *   2.98/0.88; pins stay.
+ * - Sweep still dead beside boosts (−57±65); coverage sub-2-SE everywhere.
+ * - REJECTED (FIFTH and final boost attempt): singles boosts 12→41
+ *   (fitted 41.3±7.5, 3.9 SE — the strongest boost fit yet). Gate run
+ *   58/67/81/66/80 (passed at the limit), CONFIRMING re-test 58/65/78/64/80
+ *   — late −5. Same failure mode as attempts 2–4: the boost term is
+ *   significant in-corpus but reliably damages late-bucket sign accuracy
+ *   on held-out replays. CONCLUSION: the correlation is reverse-causal
+ *   (winning positions produce standing boosts); the flat weight stays 12
+ *   and the boost question is CLOSED absent a causal/interventional
+ *   design. Doubles keeps its gated 27.
+ *
+ * SEEDED RE-BASELINE 2026-08-10 (the paired baseline every gate in this
+ * round compares against; measured at 24490c6, cache v20 — fulfills the
+ * substrate-change and chained-limit-pass obligations recorded last round):
+ * - DETERMINISM: two pre-fix d1 sweeps were BIT-IDENTICAL (58/65/79/64/81,
+ *   briers to 4 digits, all n equal) — seeded reconstruction (af2b276) made
+ *   the sweep fully deterministic given full fetch success. Paired gates
+ *   are now exact: any delta with matching n IS the change's effect. Check
+ *   the n line before reading buckets — a fetch hiccup shows up as a
+ *   composition shift (one intermediate run lost 4 singles positions to
+ *   the network, nothing else).
+ * - ROBUSTNESS FIXES first (c472c10, 24490c6): the Imprison-Transform Mew
+ *   replay (gen9doublesou-2660802611) cost 5 positions via three defects —
+ *   stale post-correction requests offering benched mons' moves, Imprison's
+ *   concealed disables entering candidates (the sim's ONLY hidden disable;
+ *   the Taunt/Encore/choice-lock family is visible and was never affected —
+ *   pinned), and transform-shortened moveSlots crashing the sim's
+ *   deserializer. Corrections now rerun the disable pass and rebuild
+ *   requests; every eval deserialize boundary pad-repairs the round-trip.
+ * - BASELINE d1 (depth 1, samples 1): 59/66/79/64/83
+ *   n: early 66 · mid 80 · late 68 · singles 166 · doubles 48 (214 total)
+ *   brier 0.2553/0.2187/0.1752
+ * - BASELINE d2 (EVAL_CALIBRATION_DEPTH=2): 58/64/76/62/82
+ *   n: 64/77/68 · singles 164 · doubles 45 (209) · brier 0.2570/0.2203/0.1762
+ *   Depth 2 reads WORSE than depth 1 on mid/late sign accuracy (also true
+ *   pre-fix: 58/63/76 vs 58/65/79) — deeper fixed-horizon search leans
+ *   harder on leaf noise on this corpus. 2b gates against the d2 baseline
+ *   (trends barely exist at d1).
+ * - KNOWN REMAINING error positions: gen9ou-2658675391 t38 (game over
+ *   mid-sample), gen9ou-2658670791 t104/t121 (deep-game divergence,
+ *   unverified since the invariant repair). The Phantom Force t6/t8
+ *   entries are RESOLVED (MID-CHARGE RELEASES below); the fainted-actives
+ *   choice-shape family (gen9ou-2658664943 t32, gen9ou-2658661545 t20,
+ *   gen9ou-2658659909 t37) is RESOLVED (SIDE-INVARIANT REPAIR below).
+ *   d2 loses more to child-state mismatches: parent choices reapplied to
+ *   transformed/changed children (Toxapex t70/t87, Mew t2/t4); the Meteor
+ *   Beam mid-charge targeting (vgc t4) shares the fixed builder path —
+ *   expected resolved, unverified until the next d2 sweep.
+ *
+ * SIDE-INVARIANT REPAIR 2026-08-10 (cache v26): snapshot corrections set
+ * hp/fainted per mon and repoints moved actives without maintaining the
+ * side-level state the sim runs on — pokemonLeft (the WIN-CHECK counter)
+ * read high, so a KO of the last body left a wiped side playing on behind
+ * a stale move request ("more choices than unfainted"; GPL T38's
+ * sub-search), and isActive read false on the active, so bench enumeration
+ * offered "switch 1" onto the field (GPL T39's root matrix) — the GPL
+ * graph ended at T37 (user report). Both invariants now recompute from
+ * ground truth after every correction pass AND in deserializeRepaired
+ * (the choke point all eval deserialize sites share). Gate vs
+ * 61/67/80/65/84 n216: TWO singles positions recovered (n 218, late
+ * 71→73), late 80→81, late brier 0.1585→0.1550, mid unchanged, no bucket
+ * down (early brier +0.0003 = K refit). NEW STANDING RECORD d1:
+ * 61/67/81/65/84, brier 0.2516/0.2139/0.1550, n 218.
+ *
+ * T35 PROBE RESOLVED 2026-08-10 (during re-baseline, d1s1 on the fixture):
+ * the winner's deliberate Salazzle sack dives the estimate because of the
+ * BODIES term (HP-weighted body worth ~−177 raw-weighted), NOT the
+ * coverage/matchup story the open finding guessed — matchup actually moves
+ * TOWARD the winner across the sack (−7.1 → +4.8) and the hazard liability
+ * shrinks (−56 → −19, entry costs died with the body). Two eval-quality
+ * gaps recorded, deliberately NOT attempted this round: (a) the bodies term
+ * prices a sacked body at full weight regardless of endgame redundancy —
+ * any "redundant body in a decided endgame" discount is boost-saga-shaped
+ * (in-corpus plausible, held-out poison) and needs its own causal design;
+ * (b) detectSacks recognizes low-HP feeds (T29 Uxie at 9%) but not
+ * healthy-body simplification sacks, so the sacrifice framing never
+ * attaches — a played.ts detection item for a future round.
+ *
+ * HORIZON-TREND EXTRAPOLATION (2b) 2026-08-10, ADOPTED AS 2b-LITE (λ=0.5,
+ * shift noise floor 0.005, cache v21). Two variants measured at T50, the
+ * motivating position, against the d2 by-value criterion:
+ * - REJECTED: fold trends into the tied rows' values and RE-SOLVE. The
+ *   equilibrium absorbs the correction — boosting a row re-weights the
+ *   opponent toward its punishers (Earth Power itself trends +0.018) —
+ *   and the criterion failed at EVERY λ, non-monotonically: gap(Heatran −
+ *   Recover) = −0.004 raw, −0.0065 @λ.25, −0.001 @λ.5, −0.013 @λ1.0.
+ *   Forecast-then-re-solve double-counts the opponent's reaction; the
+ *   trend already embeds the continuation's play.
+ * - ADOPTED: the same row-uniform corrections under the STANDING
+ *   equilibrium (no re-solve). T50 separates by value at d1 AND d2 (pins);
+ *   the depth-symmetry invariance is EXACT (fixed mixes ⇒ row-uniform
+ *   shifts add a constant to the opponent's EVs); score/mixes/gameValue
+ *   never move — calibration-neutral BY CONSTRUCTION, proven by a
+ *   bit-identical post-wiring d1 sweep (59/66/79/64/83, briers equal, all
+ *   n equal — the determinism dividend's first use). λ has no
+ *   calibration-visible axis under lite; it is a display/grading strength
+ *   pinned by the T50 tests. GPL T22/T26/T29 canaries green. The noise
+ *   floor keeps decided positions' structural ties (near-zero trends) out
+ *   of the values the pruned sub-search path must mirror.
+ *
+ * SET COHERENCE + SPEED-ORDER EVIDENCE 2026-08-10 (no cache bump — teams
+ * flow through the setsFingerprint cache key):
+ * - Coherence layers (pairwise vetoes + curated-set selection, f189745)
+ *   left the sweep BIT-IDENTICAL: corpus games build without usage/set
+ *   data, so their gate is the unit/builder pins plus the app-level e2e.
+ * - SPEED-ORDER CONSTRAINTS (parser move-pair evidence → hard solver
+ *   constraints over the built configuration): 61/68/79/65/83 vs baseline
+ *   59/66/79/64/83 — early +2, mid +2, singles +1, late/doubles level, and
+ *   Brier improves in EVERY phase (0.2520/0.2181/0.1718 vs
+ *   0.2553/0.2187/0.1752). Deterministic substrate: the deltas ARE the
+ *   effect — order-consistent spreads make reconstructed positions more
+ *   predictive. The best d1 run on record. GATE PASSED. (One mid/singles
+ *   sample moved — changed spreads shift a reconstruction path; n 66/79/68,
+ *   singles 165, doubles 48.)
+ *
+ * PIVOT PAIRS 2026-08-10, ADOPTED (cache v22). The U-turn family enumerates
+ * as move-plus-switch pairs at the ROOT ("U-turn → Clefable", grammar
+ * `move uturn > switch N`); the advance answers the pivot's forced-switch
+ * request with the declared follow-up (greedy fallback when it never comes
+ * or the target died mid-turn — an Earthquake KO'ing the incoming Heatran
+ * in the fixture was the first thing the tests caught); played parsing
+ * records the actual pivot target and matching prefers the exact pair.
+ * Sub-searches/MCTS/doubles keep the greedy resolution — restriction paths
+ * never see pairs by construction. Gate: 61/68/79/65/83, bucket-identical
+ * to the speed-order record, n equal, briers to 4 digits (late 0.1718→
+ * 0.1717 — pair rows re-price a few pivot roots without moving any sign).
+ * Bench: non-pivot roots identical (A/B 0.9s d1s1 both ways); pivot roots
+ * grow ≤ +4 rows/side by construction; d2 stays expansion-budget-bound
+ * (1.0→1.1s). The "round-cumulative d1s1 bench drift 0.3→0.9s" noted here
+ * did not survive profiling — see BENCH-DRIFT PROFILE below (flat 1.0s at
+ * every commit of the round; the observation was sweep wallclock noise).
+ *
+ * SPEED-EVIDENCE FOLLOW-UPS 2026-08-10 (user findings on the GPL spreads —
+ * all-zero Vileplume, 252-HP-only Clefable, bulky Noivern):
+ * - GOODNESS-OF-FIT FORFEIT (fbc49c2): solves whose best rung still
+ *   misfits >0.01 mean squared fraction per observation forfeit to the
+ *   full-budget prior (video HP bars had Vileplume at 0.05/obs — every
+ *   rung garbage, the least-bad was a paper spread); solves repairing
+ *   speed violations always stand. Gate 61/67/79/65/83, Brier better in
+ *   EVERY phase (0.2512/0.2149/0.1678) — real corpora carry unreliable
+ *   fits too. Cascade effect: Noivern's "good" bulk fit collapsed once
+ *   its garbage-fit partners forfeited — unreliable evidence quarantines
+ *   itself.
+ * - KO-BEFORE-ACTING EVIDENCE (user, T36: Noivern KO'd Iron Valiant before
+ *   it ever moved): a KO'd mon with no action line chose a move (a chosen
+ *   switch would have resolved first) and lost the race — the attacker is
+ *   faster. Two-move-line extraction was blind to the class. Guards:
+ *   attacker priority-0 + clean, victim unacted + clean at faint time,
+ *   faint attributed via the pending-move context. Cleanliness now also
+ *   excludes PARADOX BOOSTERS (Quark Drive/Protosynthesis are volatiles,
+ *   not stages — the stage check never saw them). Known limitation: a
+ *   victim holding a negative-priority choice reads slower than it is.
+ *   GPL: +4 constraints incl. t36. Gate 61/67/80/65/83 — late +1, TWO
+ *   late positions recovered (n 67→69), brier better in every phase
+ *   (0.2509/0.2145/0.1617). The speed-evidence arc in one line:
+ *   59/66/79/64/83 → 61/67/80/65/83, late brier 0.1752 → 0.1617.
+ *
+ * OPEN FINDINGS FOR THE NEXT ROUNDS (2026-08-10):
+ * - Endgame-sack PRICING (eval side): the bodies term still prices a
+ *   redundant body at full weight — see the T35 RESOLUTION below for why
+ *   the discount was deliberately NOT built this round.
+ *
+ * FIRST MCTS CALIBRATION 2026-08-10 (EVAL_CALIBRATION_MODE=mcts — the
+ * DUCT tree had shipped for months without corpus numbers): 56/68/82/66/80,
+ * brier 0.2524/0.2147/0.1370, n 216 (two mid positions error out), vs the
+ * matrix d1 record 61/67/81/65/84 / 0.2516/0.2139/0.1550 n 218. Reading:
+ * MCTS is the best LATE-GAME engine on record (brier 0.1370; the 0.7–1.0
+ * confidence bucket hits 85% at n 39 vs 79% at n 34) — adaptive depth pays
+ * in narrow decided positions — but EARLY it wanders (56, five under the
+ * matrix) and DOUBLES starves (80, the combined choice space eats the 600
+ * iterations). Verdict: not default material (and it still lacks
+ * verification, sensitivity, pivot pairs, and trend folding); its real
+ * niche is a late-game/endgame lens. OPEN FINDING: phase-hybrid sweep
+ * (matrix early/mid, MCTS late) or MCTS as the late-turn think-deeper
+ * escalation. NOTE the accidental determinism proof: the first attempt
+ * dispatched searchPosition (which ignores `mode`) and reproduced the
+ * matrix record BIT-IDENTICAL a third time.
+ *
+ * PER-POSITION DUMPS 2026-08-11 (EVAL_CALIBRATION_DUMP=<path>): every sample
+ * writes {id, turn, phase, gameType, score, faintedFraction, p1Won} as JSONL
+ * at sweep end — purely observational (d1 AND mcts reproduced their records
+ * bit-identically with the lever active; 4th/5th determinism proofs).
+ * Offline paired joins on id#turn: node scripts/paired-calibration.mjs
+ * <a.jsonl> <b.jsonl>. FINDINGS 2026-08-11 (paired, joined n 214–216):
+ * - HYBRID COUNTERFACTUAL d1 + mcts@faintedFraction≥0.40: 61/66/84/66/84,
+ *   late brier 0.1383 — beats BOTH parents and the turn-fraction oracles
+ *   (bodies-down switches exactly when the DUCT tree's depth pays; the rule
+ *   is observable pre-search, so a sweep can implement it verbatim). Blends
+ *   all worse than switching.
+ * - MCTS early −5 is NOISE AT ZERO: 3 exclusive flips, all |s|≤0.06, mean|s|
+ *   identical 0.27; both-wrong dominates early (23+3 of 26+3) — routing buys
+ *   nothing early; that error mass is information-level (set beliefs).
+ * - d2s1 PAIRED vs d1s1 (56/64/79/63/81 vs 61/66/81/65/83 joined): d2 loses
+ *   6:1 exclusive flips spread thin over ALL phases at identical confidence
+ *   — equilibrium-of-equilibria amplifies opponent-model error (each child's
+ *   restricted-Nash solve selects over noisy single-seed values). d2+mcts
+ *   hybrid only 56/64/82/64/81. d2s3 (the app default!) unmeasured until the
+ *   samples lever.
+ * - Winprob K by band: below ff 0.4 the engines are calibration-identical
+ *   (K≈1.97, brier 0.211 both); above it mcts supports a steeper K (2.22,
+ *   brier 0.1506 vs matrix 1.85/0.1805) — per-mode late K is real but waits
+ *   for a bigger corpus (n 40 in the band).
+ * - RECONSTRUCTION NONDETERMINISM: gen9ou-2658670791 dropped 3/5/5 positions
+ *   across three same-day runs at the SAME turns with DIFFERENT errors;
+ *   gen9doublesou-2660802611 t2/t4 Transform-Mew drops appeared in one run.
+ *   PROBED 2026-08-11: team build and cold reconstruction are SEMANTICALLY
+ *   deterministic (3 attempts × 5 deep turns, projected-state hashes
+ *   identical; raw serialization differs only in log timestamps/PRNG
+ *   residue). The cross-run drop variance is load/timing-sensitive
+ *   choice-replay retry behavior at deep turns (the driver's retry logic
+ *   reads live stream state) — registered, not fixed; the replay is
+ *   quarantined from the corpus instead.
+ *
+ * FIRST d2s3/d1s3 NUMBERS 2026-08-11 (EVAL_CALIBRATION_SAMPLES lever; d2s3
+ * split via EVAL_CALIBRATION_SLICE=a/3, dumps concatenated):
+ *   d1s1: 61/67/81/65/84 · 0.2516/0.2139/0.1550 · n 218 (the record)
+ *   d1s3: 61/67/81/65/84 · 0.2514/0.2145/0.1553 · n 218 — ZERO exclusive
+ *     sign flips vs d1s1 on all 218 positions: at depth 1, seed-averaging
+ *     is pure cost. The record keeps s1 as the fast-scan spec.
+ *   d2s1: 56/64/79/63/81 · 0.2536/0.2216/0.1558 · n 214
+ *   d2s3: 56/66/81/63/85 · 0.2532/0.2186/0.1535 · n 214 — s3 recovers the
+ *     depth-2 deficit mid/late/doubles (doubles 85 = best ever measured)
+ *     but NOT early (56, structural −5 vs d1). DISCRIMINATOR VERDICT: the
+ *     d2s1 collapse was mostly single-seed selection noise (the child
+ *     equilibria select over noisy values; averaging 3 seeds washes it
+ *     out); the early remainder is depth-structural (restricted-Nash
+ *     opponent model in open positions) and no sample count fixes it.
+ *   AUTO CANDIDATES on the identical triple join (n 214):
+ *     2-way d1 + mcts@ff≥0.40:            59/66/84/66/83 · late 0.1386
+ *     3-way + d2s3 doubles below ff 0.40: 59/68/84/66/85 · late 0.1397
+ *   The 3-way weakly dominates (mid +2, doubles +2, nothing down) but its
+ *   doubles edge rides on 1–2 positions — the expanded corpus decides
+ *   between them before the auto mode is built. App default stays d2s3
+ *   until the user rules on these numbers.
+ *
+ * CORPUS TRANCHE 3 + EXPANDED-BED RECORDS 2026-08-11 (65 replays: marathon
+ * quarantined, +32 sampled at ≥1500 OU / ≥1400 VGC / ≥1480 DOU, ≥7 turns,
+ * finished; n 417, ZERO reconstruction drops on d1/mcts — the corpus
+ * reconstructs cleanly at last). FORFEIT AUDIT: 33/65 replays end by
+ * forfeit — forfeits are KEPT (conceding a lost position is the ladder's
+ * resignation; the label is correct by rule, and the old record was built
+ * on ~50% forfeits too). gen9doublesou-2663100395 registered as a
+ * reconstruction-integrity suspect (engine reads ENDED +1.00 for the side
+ * that then forfeited — fantasy board or rage-quit; probe candidate).
+ * NEW RECORDS on the expanded bed (full sets):
+ *   d1s1: 55/58/77/62/69 · brier 0.2549/0.2418/0.1801 · n 417
+ *   mcts: 55/60/77/64/66 · brier 0.2547/0.2404/0.1678 · n 417 — now BEATS
+ *     d1 on mid (+2) and singles (+2) out-of-sample; doubles −3 keeps the
+ *     starvation diagnosis; late brier −0.012 stays the headline.
+ *   d2s3: 54/59/77/62/69 · brier 0.2560/0.2419/0.1766 · n 415 (the two
+ *     Transform-Mew drops) — statistically indistinguishable from d1s1 on
+ *     sign; late-doubles 88% niche persists.
+ *   AUTO (2-way d1 + mcts@ff≥0.40) counterfactual: 55/58/79/62/69 · late
+ *     brier 0.1696 — late +2 over d1, doubles preserved, brier within
+ *     0.002 of pure mcts: GATE PASSED. The 3-way (d2s3 doubles early)
+ *     REJECTED out-of-sample: its old-bed edge (mid +2, doubles +2)
+ *     collapsed to mixed noise — bed-luck caught by the expanded corpus.
+ *   Per-band K (ff≥0.4, n 94): matrix 1.57/brier 0.1963 vs mcts
+ *     1.73/0.1812 — per-mode late K re-confirmed, waits for a fit round.
+ * OUT-OF-SAMPLE HONESTY: the old-tranche positions still read 69% overall
+ * while the fresh tranche reads 57% — the standing records were partly
+ * bed-tuned by months of gated adoption against a fixed 218-position set.
+ * Pooled K fell 1.92→1.42: the app's winprob mapping is overconfident on
+ * fresh games (registered for the next eval-fit round). Cross-corpus
+ * comparisons of old records to these lines are invalid; the expanded bed
+ * is the baseline from here on.
+ *
+ * MCTS HINT-ORDERED EXPANSION + PROGRESSIVE WIDENING 2026-08-11: pick()
+ * no longer forces every unvisited option through a real visit first (the
+ * doubles 16×16 root ate its 600 iterations in that sweep). Nodes order
+ * options by the restriction's own static hints (optionHints — the same
+ * machinery, zero sim advances) and only the top wideningWindow(count,
+ * visits) = min(count, 4 + visits/8) unvisited options may open, best
+ * hint first — the window reaches every option asymptotically, so
+ * converged trees lose nothing. PAIRED GATE vs the pre-widening dump
+ * (n 417, full join): 54/61/79/63/69 vs 55/60/77/64/66 · brier
+ * 0.2555/0.2378/0.1646 vs 0.2547/0.2404/0.1678 — DOUBLES +3 (the
+ * starvation gap to the matrix closed), late +2, mid +1, mid AND late
+ * brier better; early/singles −1 inside the gate. The deep singles reads
+ * held (2658671254 t20 0.756→0.761, 2658668443 t22 still right); the
+ * 2660826377 t8 probe cell stayed ~0 — the doubles gain is broad, not one
+ * position. AUTO with the widened tree (recomputed counterfactual —
+ * bit-exact equivalence makes it the app line): 55/58/81/63/69 · late
+ * brier 0.1686, late +2 / singles +1 over the shipped auto record with
+ * nothing down. NEW AUTO RECORD.
+ *
+ * TOURNAMENT STRATUM + STRATIFIED RECORDS 2026-08-11 (tranche 4: 32
+ * smogtours games — SV OU officials SPL/OST/WCoP + OSDT doubles — every id
+ * EXCLUDED from fit-corpus-manifest.json so the fitted weights never grade
+ * their own training data; REPLAY_TRANCHES structure + the
+ * EVAL_CALIBRATION_TRANCHE lever; dumps carry the tranche tag and
+ * scripts/paired-calibration.mjs reports stratified):
+ *   ladder+draft (n 415): d1 54/58/77/62/68 · mcts 53/61/79/63/69 (late
+ *     brier 0.1648) · AUTO 54/58/81/63/69 (late brier 0.1689) — auto keeps
+ *     the best late-sign line on the stratum app users actually load.
+ *   tournament (n 208):   d1 51/58/68/60/56 (K 0.87!) · d2s3 52/58/69/60/58
+ *     · mcts 54/62/69/60/64 — the DUCT tree beats the matrix EVERYWHERE
+ *     against experts (doubles +8) and auto's matrix-early premise
+ *     inverts. Winner labels validated 32/32 — no name-mismatch artifact.
+ *   full bed (n 623):     mcts 53/61/76/62/67 · auto 53/58/77/62/64 — pure
+ *     MCTS ties-or-beats auto once expert games enter the bed.
+ * READING: the label-noise hypothesis was WRONG in direction. Tournament
+ * labels are CLEAN but the games are HARDER: equal-skill experts flatten
+ * the advantage→win mapping (pooled K 1.42→0.87 across strata — the losing
+ * expert finds the defensive resource), so static-eval advantages convert
+ * less. The fresh-ladder 57% vs old-ladder 69% split mixes overfit decay
+ * AND game-difficulty composition — not label corruption. MCTS's edge
+ * GROWS with opponent quality (experts play closer to the forced lines the
+ * tree assumes — the Foul Play architecture bet, confirmed by stratum).
+ * The 3-way hybrid stays dead on clean labels (tournament doubles: d2s3 58
+ * vs mcts 64). DEFAULT-LINE QUESTION now has three data-backed candidates:
+ * d2s3 (status quo — weakest on every stratum measured), auto (best
+ * ladder late-sign), pure MCTS (best tournament + full-bed mid/doubles/
+ * brier) — user decision, still deferred.
+ *
+ * TOURNAMENT TRANCHE 4b 2026-08-11 (+32 games, same sources deeper —
+ * merged tournament stratum 64 games / 409 positions; d1 + mcts measured,
+ * d2s3 skipped as dominated):
+ *   tournament-0811  d1 51/58/68/60/56 K 0.87 · mcts 54/62/69/60/64
+ *   tournament-0811b d1 58/72/82/71/70 K 2.46 · mcts 62/69/82/70/74
+ *   MERGED (n 409):  d1 54/65/75/65/63 K 1.47 · mcts 58/65/76/65/69
+ *   GRAND BED (826): d1 54/61/76/63/66 · mcts 56/63/78/64/69 ·
+ *     brier mcts 0.2497/0.2305/0.1787 — best line measured; auto
+ *     54/62/78/64/67 · 0.2514/0.2339/0.1803.
+ * TWO LESSONS. (1) SUB-TRANCHE VARIANCE: the same tournament population
+ * swings ±5–10 points per bucket between 32-game samples (4a read "expert
+ * games are harder", 4b reads EASIER than ladder; merged K 1.47 ≈ ladder's
+ * 1.42) — the 4a-only "experts flatten the mapping" claim is SOFTENED to
+ * composition-sensitive; stratum-level claims need n ≥ ~400. (2) What
+ * survives in BOTH sub-tranches and the merge: the widened DUCT tree beats
+ * d1 on tournament early (+3/+4) and doubles (+8/+4), and on the grand bed
+ * pure MCTS beats d1 in EVERY bucket and beats auto on early/mid/doubles
+ * and all Briers, tying late — the user's "MCTS is winning" reading holds
+ * with tight numbers. Auto's remaining niche: ladder-stratum late sign
+ * (81 vs 79). FEATURE TRADE for the default decision: verification,
+ * sensitivity probes, and the think-deeper depth ladder are MATRIX-side
+ * features — a pure-MCTS line forgoes them everywhere, auto keeps them on
+ * early turns. Default still d2s3, decision with the user.
+ *
+ * AUTO THRESHOLD RETUNE + DEFAULT FLIP 2026-08-11: offline grid over the
+ * grand-bed dumps (14 thresholds × 4 strata, plus a gametype split):
+ *   t=0.00 (pure mcts) 65.6% · brier 0.2192 · t=0.20/0.25 65.6 · 0.2197/
+ *   0.2200 · t=1/3 65.3 · t=0.40 (old) 64.9 · 0.2215 · t=1.01 (pure d1)
+ *   64.0 · 0.2231. Thresholds quantize to faint counts — for 12 bodies
+ *   0.25 = "from the 3rd faint", 0.40 = "from the 5th".
+ * ADOPTED 0.25: on the 0.00–0.25 plateau (grand +0.7 sign / −0.0015 brier
+ * vs 0.40), ladder-robust (65.7 vs 64.7; mid +3.3, doubles +2.5, late
+ * 80.9→80.1 = one position), and it keeps the matrix side — verification,
+ * sensitivity, depth ladder — through the opening, which pure MCTS (t=0)
+ * would surrender for 0.0008 brier. Gametype-split thresholds REJECTED
+ * (+0.1 for another fitted conditional — the 3-way lesson). Live
+ * confirmation at 0.25 (ladder-dou-0804 tranche): 50/50 positions
+ * bit-exact vs the ff-selected parents, 24 mcts-routed.
+ * DEFAULT LINE = AUTO (DEFAULT_PREFS.mode; stored user prefs win): d2s3 is
+ * dominated on every stratum measured, pure MCTS forgoes the matrix-side
+ * features everywhere; auto at 0.25 is the measured line 54/62/78/64/68-
+ * grade on the grand bed with the feature set intact through the opening.
+ * Registered follow-up: verification for MCTS lines (lift verifyFlagged's
+ * matrix guard — flags re-evaluate as matrix pairs regardless of line
+ * engine), then revisit pure-MCTS-as-default.
+ *
+ * VERIFICATION FOR MCTS LINES 2026-08-11 (the follow-up's first leg —
+ * app-side only, no line change): flag adjudication and the think-deeper
+ * ladder are now ENGINE-INDEPENDENT.
+ * - verifyFlagged's matrix guard is gone (verificationDeepSettings): an
+ *   MCTS-line flag re-adjudicates as matrix pairs at depth 2 — the same
+ *   tier the d1 matrix line gets. Sound because the verdict statistic
+ *   (bestDeep − playedDeep vs the threshold) is internal to the deep pass,
+ *   and pair valuation under mcts settings already runs as matrix
+ *   subsearches (playedOutcomeSettings). Sensitivity probes lift the same
+ *   guard — the acquit statistic compares probe EVs only with each other.
+ * - Think-deeper on an MCTS turn crosses into the matrix ladder at depth 2
+ *   (samples ride the prefs → d2s3 by default), then depth 3 via the
+ *   existing rungs. New ESCALATION-KEEP rule in supersedesStored /
+ *   needsSettingsUpgrade: a matrix result of depth ≥ 2 outranks the
+ *   d1s1-grade mcts tier and survives later sweeps (auto or explicit mcts
+ *   target) — without it the next sweep would trample the button's product.
+ * - Stored mcts entries carry verified: null from the guard era and do not
+ *   retro-verify (backfill triggers on undefined only) — accepted, no
+ *   cache-version bump; a re-run through the button or a cleared store
+ *   verifies fresh.
+ * - Feature asymmetry is now down to root pivot pairs (matrix-only).
+ *   Registered follow-up: revisit pure-MCTS-as-default with the user —
+ *   the feature argument for auto has thinned to pivot pairs + early
+ *   compute cost vs grand-bed mcts 56/63/78/64/69 over auto 54/62/78/64/67.
+ *
+ * DISPLAY-K REFIT 2026-08-11 (the registered "per-mode late K" fit round —
+ * EVAL_CALIBRATION_SOURCE=fit): TRAIN on a 1/20 manifest slice of the fit
+ * corpus (107 games; 668 d1 / 629 mcts positions — the mcts chunks lost 39
+ * to load-sensitive reconstruction retries, the marathon family, so fits
+ * use the 629 joined pairs), GRADE out-of-sample on the standing grand-bed
+ * dumps (n 826/827).
+ * FITTED (search root scores, wp-units): d1 constant K=1.75 (phase k0=1.85
+ * k1=−0.32) · mcts K=1.81 (k0=1.94 k1=−0.41) · routed composite (t=0.25)
+ * K=1.87 · per gametype singles ≈1.4 / doubles ≈3 on BOTH engines.
+ * GRADED (brier on the calibration bed): linear display 0.2275 → shared
+ * constant-K 0.2207 (late 0.2180→0.1972) · per-mode adds 0.0002 · the
+ * phase term adds nothing (k1 fits negative, no OOS gain) · the GAMETYPE
+ * SPLIT LOSES (doubles 0.2167 vs pooled 0.2068 — fit-corpus doubles K≈3
+ * is composition-specific and does not transfer; the 3-way lesson again).
+ * VERDICT: per-mode-late-K is ANSWERED — real but worth 0.0002, not a
+ * second mapping. The finding that matters: the LINEAR display is
+ * overconfident out-of-sample everywhere (worst late); one shared constant
+ * display-K ≈ 1.85 is the honest map, robust across engines and strata,
+ * and every fancier variant ties or loses. Adoption decision with the
+ * user (semantics: winPercent becomes sigmoid(K·s), exact ±1 ended evals
+ * keep 100/0, deltas stay wp-unit-linear).
+ * Fresh-evidence engine check on the same fit pairs (a THIRD corpus,
+ * never used for engine comparisons): d1 54/61/79 · mcts 55/64/79 · auto
+ * 54/62/79 by phase; ALL 65/66/65 — mcts ties-or-beats d1 in every bucket
+ * here too.
+ *
+ * DISPLAY-K ADOPTED + PURE-MCTS REVISIT SETTLED 2026-08-11 (user):
+ * - winPercent = sigmoid(DISPLAY_K·s), DISPLAY_K = 1.85 (winprob.ts).
+ *   Exact ±1 — an ENDED evaluation, nothing else reaches it — stays a
+ *   literal 100/0; winDeltaText, regret, and the verdict bands stay
+ *   wp-unit-linear. One function covers panel, graph, matrix view,
+ *   report, and summary; report accuracy loss is now priced in the same
+ *   honest probability space the user sees. NO cache bump (scores are
+ *   unchanged — display-only). Two summary pins updated to the calibrated
+ *   strings; the winPercent pin now states the two-stage contract (leaf
+ *   sigmoid calibrates leaves, display sigmoid calibrates the aggregate).
+ * - DEFAULT LINE STAYS AUTO @ 0.25 (the registered revisit, user
+ *   decision): three corpora agree mcts ties-or-beats d1 everywhere, but
+ *   auto sits within ~1 sign point at lower compute and keeps root pivot
+ *   pairs exactly in the pivot-heavy opening. REGISTERED revisit trigger:
+ *   pivot pairs for MCTS roots (expandPivotPairs exists, not applied to
+ *   the tree's root enumeration yet).
+ *
+ * SET-BELIEF ROUND 2026-08-11 (the early both-wrong mass):
+ * Candidate isolation on the grand bed (joined n=826): both engines wrong
+ * on 261 (31.6%), early 104/259 (40.2%); 47 early CONFIDENT both-wrong
+ * (min |s| ≥ 0.25), clustering within games (2658664071 t2/7/12) — the
+ * persistent-team-misread signature.
+ * DISCOVERY: the harness built teams WITHOUT the Smogon usage/set fills
+ * the app always waits for (buildTeamsFromReplay got observations +
+ * speedOrders only) — every standing record priced less-informed teams
+ * than the app line actually sees.
+ * EXPERIMENT A (EVAL_CALIBRATION_SMOGON=1; fills disk-pinned in
+ * .smogon-cache/ via smogon-fetch-cache.ts so paired runs see identical
+ * data): full-universe d1 paired run (joined n=821) —
+ *   early 54.2→54.6 (35 flips, 18 toward / 17 away — coin-flip) ·
+ *   mid 61.4→62.8 · late 76.8 flat · singles 63.4→62.2 (noise-level) ·
+ *   DOUBLES 66.0→71.0 (+5.0, mean|Δs| 0.179 — spreads/items genuinely
+ *   price the doubles matchup grid) · ALL 64.2→64.8.
+ *   SUSPECTS: 1/47 fixed. Information does NOT own the early mass.
+ * B-LITE (movement of the survivors under full information): mean |Δs|
+ * 0.090 against ≥0.25 confidence, mean movement toward zero +0.019 (not
+ * digging out), 28/47 move <0.08 — the suspects are SET-INSENSITIVE.
+ * CONCLUSIONS: (1) belief averaging over plausible sets cannot flip what
+ * full information does not move — the full perturbation harness is NOT
+ * justified; the early both-wrong mass belongs to the static eval's
+ * matchup pricing (or to genuine upsets), and the next lever there is a
+ * feature/weight round, not an information round. (2) The mcts side of A
+ * skipped: the suspects are both-engine-wrong positions sharing the same
+ * leaves — the readout is engine-independent. (3) STANDING RECORDS
+ * UNDERRATE THE APP LINE ON DOUBLES by ~5 sign points; adopting SMOGON=1
+ * as the standard corpus rig (records re-baseline) is REGISTERED as an
+ * open decision, not taken.
+ *
+ * ESCALATION-LANDING HOTFIX 2026-08-11 (user report: "Think deeper about
+ * this position doesn't work"): the escalation-keep rule protected a
+ * stored matrix-d2 result from MCTS-target sweeps but never let it LAND —
+ * supersedesStored rejected the think-deeper click's own d2s3 pass on a
+ * stored-mcts turn (matrix is not the late turn's configured engine →
+ * sweep skipped the turn → the button silently did nothing). The rule is
+ * now bidirectional: incoming matrix depth ≥ 2 supersedes a stored mcts
+ * result unconditionally. The unit matrix pins both directions, and the
+ * auto e2e now CLICKS the button and requires the 'depth 2 · 3 samples'
+ * badge — the presence-only assertion is what let this ship.
+ *
+ * EARLY-MASS FEATURE DIAGNOSIS 2026-08-11 (R1 of the "go ahead" round):
+ * - Phase-restricted implied-weight fits from the fit samples cache
+ *   (12,636 positions, offline): the matchup term's outcome signal GROWS
+ *   with ff (singles implied 123 early → 305 late vs hand 120; doubles
+ *   108 → 200) — the hand weight is early-correct and late-light. Rare
+ *   features (tailwind singles, sweep) swing wildly per phase = SE noise.
+ * - EVAL_CALIBRATION_FEATURES=1 (g-vector in dump rows, fit-spec
+ *   construction) + suspect-vs-control diagnosis (35 early-singles
+ *   confident both-wrong vs 52 confident-correct): the profiles are
+ *   IDENTICAL — bodies dominates 34/35 suspects AND 48/52 controls
+ *   (~0.37 toward the pick in both), matchup contributes ±0.04 noise in
+ *   both. Confident-wrong looks exactly like confident-right: the early
+ *   mass is MATERIAL LEADS THAT DIDN'T CONVERT — no feature signature.
+ * - VERDICT: no weight change pursued. A phase-scaled matchup weight
+ *   cannot touch a bodies-driven error mass, and set information already
+ *   proved inert (T3). The early both-wrong mass is structural beyond the
+ *   current feature basis; registered directions: win-condition/structure
+ *   representation, or accepting early irreducibility (the two-stage K
+ *   already prices the confidence honestly). Late-side matchup scaling
+ *   (the real signal growth) is REGISTERED as a future fit-round
+ *   experiment via an interaction term (matchup × ff) with bootstrap SEs.
+ * - Side product: feat-d1.jsonl (n 783, ended-skip active) is the first
+ *   artifact-free d1 bed; the 11 remaining exact-±1 rows are genuine
+ *   all-lines-end endgames (the ~44 skipped were the artifact family).
+ *
+ * PREMATURE-END ARTIFACTS 2026-08-11 (user report follow-through — "weird
+ * losing position" while branching the draft game at t57): the per-target
+ * reconstruction path (branch entry + THIS harness) replays raw protocol
+ * and can cascade into a fake wipe when the choice replay diverges: at
+ * gen9draft-2058494320 t56+ the sim KO'd p1's active where the real game
+ * did not, the real protocol had no forced-switch answer, and the greedy
+ * fallback fed five bench mons into the kill zone → |win| → the harness
+ * scored the ENDED battle ±1.00 with the real winner's sign. 55/827
+ * grand-bed d1 rows (46 mcts, 42 fills-d1) are exact ±1 — an upper bound
+ * on the family (some may be genuine all-lines-end endgames);
+ * DETERMINISTIC per target turn (2× reproduced), NOT the timing-flaky
+ * drop family. The capture path (app sweeps, eval-fit) heals per turn via
+ * snapshot corrections and already skips ended captures — only this
+ * harness scored them. FIX: a sampled turn is always before the real end,
+ * so ended ⇒ artifact ⇒ SKIP (loud log; specimen verified: t56/t65
+ * skipped, rest samples). Standing records carry the inflation in their
+ * late buckets — the fills re-baseline will supersede them on the clean
+ * rig. App-side the branch entry already shows the divergence notice for
+ * this state (README behavior confirmed by the ended check at branch
+ * open); an e2e pin on a real-replay fixture is a registered follow-up.
+ *
+ * MCTS EQUILIBRIUM RANKING, HYBRID SCORE 2026-08-11 (R2 — the t58
+ * specimen's fix): rankings now come from the SAME equilibrium solve the
+ * matrix mode runs, over TREE-INFORMED cells — a cell's value is the mean
+ * of every leaf backed through it (a child's marginals sum to its
+ * pass-through reward; its creation-time static covers the expansion
+ * pass) blended with ONE static-prior visit; unexpanded cells fall back
+ * to the root static; the four-tree merge pools per-cell reward totals.
+ * Visit counts allocate search effort — they are no longer the verdict:
+ * under hint-ordered widening a hint-anchored move could stay
+ * most-visited while the tree's own values refuted it (draft t58: Knock
+ * Off ranked first into a Rest loop with the punisher misnamed → now
+ * tied with → Kyurem, punisher = Rest). Every root option is ranked
+ * (visit starvation no longer hides rows); punishers come from the
+ * matrix column; ev semantics are engine-independent.
+ * FULL SCORE DELEGATION MEASURED AND REJECTED: paired a-slice (n 389,
+ * every stratum) 65.3→64.3 sign (flips 2 toward / 6 away), brier flat
+ * 0.2120/0.2122 — the equilibrium dilutes the tree's concentrated visit
+ * information across thin static cells. HYBRID adopted: the SCORE keeps
+ * the visit-mean formulation — BIT-PARITY 20/20 vs the standing dump on
+ * the draft tranche, so the standing mcts records remain the line's
+ * record — while the rankings carry the solve. New pins: ev ≡ matrix-mix
+ * ev identity, merge cell pooling, hybrid score formula (single tree +
+ * merged), alongside the standing determinism pin. Harness timeout
+ * 40→60 min (a half-corpus mcts slice with per-result solves crossed 40
+ * by minutes; the b-slice retry under afternoon machine load crossed 60
+ * — the a-slice decided the gate, recorded honestly).
+ *
+ * RE-BASELINE ON THE CLEAN FILLS RIG 2026-08-11 (R3 — NEW STANDING
+ * RECORDS; SMOGON=1 + ended-skip is the corpus standard from here): full
+ * universe, final engine (R2 hybrid — mcts scores bit-identical to the
+ * visit-mean line), d1 halves + mcts quarters, auto derived on the 794
+ * joined pairs at t=0.25.
+ *   d1   n799: 54.6/63.8/79.4 · singles 62.9 · doubles 72.0 · ALL 65.7 ·
+ *     K 1.88 · brier(ff) 0.2435/0.2024/0.1620
+ *   mcts n794: 53.5/62.0/79.1 · singles 62.0 · doubles 70.5 · ALL 64.6 ·
+ *     K 1.84 · brier(ff) 0.2392/0.2025/0.1759
+ *   auto n794: 55.0/63.1/79.5 · singles 62.9 · doubles 71.8 · ALL 65.6 ·
+ *     K 1.80 · brier(ff) 0.2424/0.2010/0.1761
+ *   strata (d1): draft 35 (n20 — tiny, nickname-heavy) · ladder-0811
+ *     55.4 · ladder-dou 76.0 · ladder-ou-0802 66.4 · tournament-0811
+ *     65.5 · tournament-0811b 75.6
+ * STORY CORRECTION: on the honest rig the "mcts beats d1 everywhere"
+ * reading DOES NOT SURVIVE — d1 ties-or-beats mcts overall (65.7 vs
+ * 64.6) and on doubles (72.0 vs 70.5). The old edge was measured without
+ * the fills (which feed the static cells d1 leans on) and with ±1
+ * artifacts padding the late buckets of both engines. AUTO stays the
+ * default on fresh grounds: best-or-tied early (55.0) and late (79.5),
+ * ties d1 overall, keeps the full matrix feature set early. Pooled K
+ * 1.80–1.88 brackets the adopted DISPLAY_K 1.85 — the display
+ * calibration re-validates on clean data. NEW-RIG records are NOT
+ * comparable to the pre-fills bed (the rig change is the point); the old
+ * numbers above stand as history.
+ *
+ * MATCHUP×FF INTERACTION FIT 2026-08-11 (the registered follow-up to the
+ * implied-weight growth 123→305 singles / 108→200 doubles): joint fit on
+ * the fit bed (12,636 samples, cluster bootstrap by game B=200) with ff
+ * main effect + matchup·ffc + bodies·ffc (bodies interaction = the
+ * uniform-sharpening control). BOTH slopes are positive and individually
+ * significant (singles matchup×ff CI [1075, 2645], bodies×ff [717,
+ * 1113]) — the game sharpens as bodies fall, which the adopted phase-K
+ * k0+k1·ff already models on the probability side. The matchup-SPECIFIC
+ * tilt is NOT established: slopeM·baseB − slopeB·baseM CI [−80k, +696k]
+ * singles / [−478k, +920k] doubles, both straddling 0 (the late/early
+ * implied-ratio CI is division-unstable and also includes 1). HONEST
+ * NEGATIVE — no ff-dependent matchup weight; the raw growth decomposes
+ * into K-territory plus a tilt below the bootstrap's resolution.
+ *
+ * STARVED-SUPPORT VERIFICATION 2026-08-11 (user report: branching the
+ * draft game after t55 with Draco Meteor made the auto-opponent switch
+ * Mienshao INTO the nuke and keep sacking — "like it's actually
+ * searching for the worst move"; auto-reply = merged perSide[0]): a root
+ * cell fixes ONE chance outcome per tree at creation, so pooled visit
+ * counts measure subtree exploration, not independent transition samples
+ * (at most four, ever). At the healed t56 the same cell's per-tree means
+ * ran −0.38/+0.37/−0.34/−0.37 ([Ice Beam × Draco Meteor] — one tree
+ * rode a missed 90% Draco Meteor through its whole subtree); the merged
+ * equilibrium chased the phantom: p2 Draco ev 0.445 vs matrix 0.208, the
+ * healthy-Mienshao sack second by 0.003, matrix's clear best (Talonflame
+ * −0.425, gap 0.11) ranked last-but-one. The OLD visit-order ranking had
+ * the sack FIRST outright (542 visits) — not an R2 regression; R2 only
+ * changed which artifact surfaces. FIX (worker-client final merge only):
+ * support cells (mix ≥ 5%, top-3 rows/cols, punisher cells) that are
+ * starved (<8 pooled visits), thin (<3 expanding trees), or in per-tree
+ * DISAGREEMENT (mean spread > 0.15) are re-priced by the matrix-grade
+ * multi-seed cell sampler (≤12 cells × 3 seeds, one worker round,
+ * degrade-to-unverified on failure) and REPLACE the pooled value before
+ * the solve. Scores stay summed-marginal visit means — records
+ * untouched. Specimen verified: sack drops to LAST with Draco Meteor
+ * named as punisher, Shadow Ball back over Draco for p2 (0.551/0.322,
+ * matrix 0.535/0.208); t57 sane. Residual honest gap: verified cells are
+ * static-sampler means, so matrix's depth-2 Talonflame read (−0.425) is
+ * not recovered — the top pack is flat but sack-free. Single-tree
+ * results (harness path) stay unverified: score-only grading. Pins:
+ * eval-search "starved support cells" (mechanism ×4) +
+ * eval-mcts-verification (end-to-end t56).
+ *
+ * WIN-CONDITION STRUCTURE DIAGNOSIS 2026-08-11 (T2 of the registered
+ * round — the early confident both-wrong mass): sweep is IDENTICALLY
+ * ZERO and coverage ≈0.01 abs on all 87 early singles positions (35
+ * suspects + 52 confident-correct controls) — the existing structural
+ * terms have no early support at all. Probe-computed candidates the
+ * basis lacks (engine 1v1 semantics): answer THINNESS (opp mons with ≤1
+ * favorable answer — coverage fires only at zero), unbreakable WALLS
+ * (healer no answer 2HKOs — the Rest-loop archetype), SPEED structure
+ * (mons faster than the whole picked side), own/opp/asymmetry variants —
+ * 11 statistics, permutation-tested: ALL NULL (|d| ≤ 0.38, p ≥ 0.099,
+ * most ≥ 0.24; the largest effect points the WRONG way — suspects'
+ * opponents hold marginally FEWER answers, "material leads that didn't
+ * convert" restated). With the R1 feature diagnosis and the set-belief
+ * negative, the early mass now has NO signature in any static structure
+ * examined — the residual is dynamics (sequencing, tempo, which body
+ * actually gets traded), not eval-basis. CONSEQUENCE: stop mining the
+ * static basis for this mass; the next lever, if any, is search/
+ * planning-side.
+ *
+ * ROUND 76 2026-10-23..24 (improvement round 76, the last wave: lanes R
+ * (report and analysis: T264, T233, T244), S (static: T258, T259, T243), B
+ * (rebuild and hits: T261, T265, T260) and A (app and tooling: T234, T266) in
+ * worktrees w6-r, w6-s, w6-b and w6-a from r76 (v1 7d131e2 plus c308fc3, the
+ * bank jobs pinned to ubuntu-24.04), then T262 on w6-t; merged on r76 in the
+ * main checkout: 5b6d997 (A), ff8e1bf (R), 4ddba00 (B), 9d1269e (S, T259
+ * reverted in 1459923), 8803bca (cache v70), 3785973 (T262), 372a2d6, a3b65ab
+ * and 4777df5 (the wave run's rests), d92c7ff (the re-pins); spec
+ * docs/superpowers/specs/2026-10-23-round-76-last-wave-design.md, probes
+ * docs/perf/probes/2026-10-23-r76/). Design gate 23.10. ("1a 2a": four lanes,
+ * T262 after the merge; the play-out pin is not bent).
+ * DELIVERED: T264 (a dice turn against the winner joins the key moments,
+ * keyMomentsFor in key-moments.ts; 573756 t73 back in the list), T233 (a tied
+ * punisher within the inaccuracy band, the walked-into read on quiet cards,
+ * CHANCE_CANT with Attract held to the simulator, seedPhrase drops the odds
+ * of a stopped hit), T244 (healed by round 73's T225 and T248, regret 0.056
+ * and no tier; a spec holds it), T258 (a move without a Dex heal ratio heals
+ * at the simulator's rate, swept over every heal move of Gen 1 to 9 and the
+ * Champions mod; the pinned healer's clock follows the simulator's sequence
+ * of hits and heals), T243 (p2 wins the draft t56 play-out in 16 of 16 dice
+ * and passes the pin 14 times; the pin is armed again in 5808205), T261 (a
+ * Taunt from a -start line reads the block's own order, 2 turns on a slower
+ * body as in the simulator), T265 (Rage Fist and Last Respects read their
+ * history like historyPower; PokemonSnapshot.timesAttacked from
+ * @pkmn/client's count, pinned in the rebuild), T260 (an open team sheet
+ * without EVs takes the solver's EVs: Mawile 151 instead of 125 HP, the lost
+ * Champions VGC row returns; 2,043 sets move on the app path), T234 (the
+ * editor and the sets panel open on the solved sets; the round trip changes 0
+ * of 144 sets, 4 before), T266 (bank-ci downloads a run GitHub holds open
+ * after 5 minutes and resumes a run whose watcher ended), T262
+ * (holderActsInFront ran twice per leaf; once now, answers byte-identical;
+ * VGC +3.4 % against v1 before wave 5, +9.8 % before). The wave run found a
+ * stage on an idle holder priced through a foe's Foul Play (a3b65ab:
+ * matchupTerms reads an idle holder without raises as the defender too), a
+ * twin spec that straddled a second of the wall clock (372a2d6) and an e2e
+ * spec that typed into a full spread (4777df5).
+ * MEASUREMENT: r76-g (4777df5) against r75-m in CI: D26 without harm
+ * (warnings early and mid), Doubles OU and VGC without harm (warnings:
+ * Doubles OU mid +31, luck-adjusted +52), Champions OU and Champions VGC
+ * clean (T260's row back, 1,448 rows); the bank's own doubles rows read harm
+ * with fixed K (+7, luck-adjusted +11, hq luck-adjusted +12) and none with
+ * own K. T258 alone (r76-s1): no harm, bank doubles +5; with T259 (r76-s)
+ * Champions VGC luck-adjusted +7 and bank doubles +9, so T259 went back. Lane
+ * A (r76-a-bank, r76-a-cou through --resume after a killed watcher):
+ * byte-identical. Wave run on 4777df5 in the main checkout: suite 6,873
+ * passed, 2 expected fail, 22 skipped (listed), the four pins of the gate
+ * red; e2e 79 of 79 with the play-out pin; feedback three times
+ * byte-identical with every expert pin holding; against round 75, 17 verdicts
+ * in 25 turns change their tier (9 stricter, 8 milder).
+ * FOUND ON THE WAY: T244's regret had jumped at 0da5ec7 (round 70) and was
+ * healed by 68c88f4 to 68ac4cc (round 73). T260's cause was the team build,
+ * not the dice: no roll of the Flare Blitz leaves a 125-HP Mawile alive. The
+ * rebuild's timesAttacked drifts from the client's count (Annihilape 4
+ * against 1). Champions OU 2628340185 t16 reads a blunder since T258 (regret
+ * 0.509) where the fresh reference reads a mistake (0.20 to 0.25): the trend
+ * probe read a cell with two outcomes from three draws (T227). GitHub held a
+ * finished run open for an hour in round 74; the round's own measurements ran
+ * without hand work after T266.
+ * USER GATE 2026-10-24 13:36 ("1a 2a 3a 4a 5a"): the re-pins where the fresh
+ * reference carries the engine (573756 t73 and 912045 t8 without a tier, the
+ * search identity recorded anew, 648453 t13 the required singles scene of the
+ * matrix test), no re-fit of the doubles weights, T259 parked with a trigger,
+ * five proposals parked without a T-number and one as a status of T227,
+ * booked and pushed; next the release with T43. No new T-number, next free
+ * T267.
+ *
+ * ROUND 75 2026-10-23 (improvement round 75, T160, the last step before the
+ * last wave; branch r75 from 50c8002 (= v1), one lane in the main checkout:
+ * 8b4567f (one Champions rule), 8d51899 and ccd7e04 (the resolver and every
+ * replay-core read on it), 2232980 and 4b42c5c (the lint rule for
+ * replay-core), 1b11c23 (the replay-core sweep), e963983 and e266e92 (the
+ * hosts load the mod first), 755fa91 (eval-engine), 2f9668e (the app),
+ * 9f58393 (the eval-engine and app sweeps), e400835 (the lint rule for
+ * eval-engine and the app), a2e7c2b (the replay worker loads the mod); spec
+ * docs/superpowers/specs/2026-10-23-round-75-design.md, probes
+ * docs/perf/probes/2026-10-23-r75/). Design gate 23.10. ("1a 2a 3a" with the
+ * user's notes: the type chart changes from Gen 1 to 2 and from Gen 6, a
+ * species' stats and abilities change between generations, and the global Dex
+ * is read nowhere, without exceptions).
+ * DELIVERED: one rule decides Champions for a format
+ * (replay-core/src/champions-format.ts; four modules decided it before, and
+ * the spreads copy read "[Gen 9 Champions] OU" as Scarlet/Violet, so the EV
+ * budget priced it with EVs); one resolver of generation and mod (rulesDex in
+ * replay-core/src/rules-dex.ts, on the Dex of @pkmn/sim; a Champions game
+ * without the registered mod throws); the inferrer carries the mod from the
+ * tier line; every read of replay-core, eval-engine and the app on the
+ * battle's Dex or the resolver; the lint rule dex/no-global-dex-read (142
+ * reads in 58 files before, none after); sweeps over the mod's changed
+ * entries and over the older generations (the type chart, a species' stats
+ * and abilities); the hosts load the mod before they infer
+ * (host-mod-order.spec.ts) and the app's replay worker before its jobs
+ * (replay-jobs-mod.spec.ts, replay-jobs-mod-solve.spec.ts).
+ * MEASUREMENT: r75-m (e400835) against r74-f: bank, Doubles OU, VGC,
+ * Champions OU and Champions VGC byte-identical. Final head a2e7c2b: suite
+ * 6,743 passed, 2 expected fail, 22 skipped; e2e 78 passed; feedback three
+ * times byte-identical, against round 74 equal in all 12 dumps once the new
+ * setupMove key (18 places) is removed, no moved turn; the initial load of
+ * the app 1,677 kB gzip against 1,674 at v1.
+ * FOUND ON THE WAY: the app inferred a replay before it loaded the mod; the
+ * preview built teams before the mod; the dice reader read the
+ * function-valued handler of Tri Attack in the simulator's Dex; the app's
+ * replay worker is its own realm and never loaded the mod, so with the new
+ * resolver both Champions replays of the corpus analyzed no turn in the first
+ * feedback run (fixed in a2e7c2b; before this round that realm read the sets,
+ * the choice lock and the move facts of a Champions replay on Scarlet/Violet
+ * data, while the battle ran on the mod). The package APIs change (the
+ * resolver and the Champions rule exported, five replay-core and seven
+ * eval-engine functions take a Dex, rules or a mod, the analysis carries
+ * setupMove): T43 bumps the versions.
+ * USER GATE 2026-10-23 17:41 ("1a 2a"): the rule into AGENTS.md (every rule
+ * from the game's Dex, the global Dex read only in the resolver, every realm
+ * loads the mod first), booked and pushed; next the last wave. No new TODO,
+ * next free T267.
+ *
+ * ROUND 74 2026-10-22..23 (improvement round 74, T163 with T263, the second
+ * step of the finish line; branch r74 from c72bd3c (= v1): f43701e (T264 and
+ * T265 booked), 0353e72 (the data pack holds the fit corpus), e589a88 (a leaf
+ * K entry per family), 856b9c4 (the weight fit on a search dump), d6e9259,
+ * 2d3fd6d (the candidate K, reverted in a04d2c1), 03fafa1 (the branch HP
+ * percent), 78d7cf3 (VGC matchup 123, reverted in 80b98cd), 1ae7eab (the bank
+ * guards against harm), 0806c90 (the fits as comments); spec
+ * docs/superpowers/specs/2026-10-22-round-74-design.md, probes
+ * docs/perf/probes/2026-10-22-r74/). Design gate 22.10. ("1a 2a 3a 4a 5a 6a":
+ * the capture with search in CI on the full fit corpus and the upload of its
+ * data pack, all five families, the leaf K first, then the matchup weight,
+ * then the display scale, the adoption rule per family, T264 and T265 to the
+ * last wave).
+ * DELIVERED: the capture tooling (bank-data-pack.mjs packs every replay the
+ * fit source reads, the pre-release bank-data-0c5ed6c275536da9 with 5,690
+ * files in 14.4 MB; the fit source per family in CI with three positions per
+ * game; a leaf K entry per family in winprob.ts, VGC with its own;
+ * scripts/k-stamp.mjs; the weight fit skips the identity check on a dump from
+ * a search); T163 and T263 measured and not adopted; found on the way and
+ * fixed: the branch reads its HP percent from the simulator's display
+ * (shownPercent, a sweep over every HP for maximum HPs from 50 to 700 in
+ * seven formats).
+ * MEASUREMENT: the base r74-base (d6e9259) byte-identical to r73-m2 in all
+ * five families. Capture: standard singles 4,317, Doubles OU 2,161, VGC
+ * 2,334, Champions OU 901, Champions VGC 1,559 positions. Root scale, K' =
+ * K·c: standard singles 2.81 + 0.80·ff, Doubles OU 2.95 + 1.11·ff, VGC 2.09 +
+ * 1.13·ff (c0 0.56 to 0.82), Champions OU 2.05 + 3.22·ff, Champions VGC 1.80
+ * + 3.07·ff. r74-k against r74-base: singles +12 unresolved; Doubles OU -1
+ * unresolved; VGC -1 with fixed K and harm with own K (+12 [+3, +22] full and
+ * hq, +17 luck-adjusted); Champions OU -12 unresolved with a mid warning;
+ * Champions VGC -13 [-23, -4] and hq -21 better with late and mid warnings:
+ * none adopted. The matchup refit at today's K by T127's rule: only VGC
+ * moved, 169 to 123 [100, 149] in 20 of 20 seeds; r74-m: the VGC holdout +4
+ * [-8, +16] unresolved with a luck-adjusted mid warning (+36), harm on the
+ * bank's VGC rows (luck-adjusted doubles +16, own K +21), Doubles OU and both
+ * Champions holdouts byte-identical: not adopted. The display fit dropped
+ * under the rule of 22.10. The final head r74-f (0806c90) byte-identical to
+ * r74-base in all five families; suite 6,621 passed, 2 expected fail, 22
+ * skipped; e2e 77 of 78 (the muted-audio test, "$ is not defined" in the
+ * replay iframe as on 19.09., alone 3 of 3); feedback three times
+ * byte-identical and byte-identical to round 73, no moved turn.
+ * FOUND ON THE WAY: the saved-replay test of reconstruction.spec.ts was red
+ * since fa50482 (round 69, T161): the rebuild sets the middle of the HPs the
+ * simulator shows as the logged percent, and four readers rounded to the
+ * nearest (Gastrodon 398 of 426: the log 94, the panel 93); the test skips
+ * without the gitignored HTML, so the merge clones never ran it. GitHub held
+ * a finished run "in_progress" for an hour (r74-k-hold-championsou), and the
+ * end of the session stopped the local watchers of r74-m (T266). A lower leaf
+ * K in VGC flattens the leaves and sorts the positions worse, although the
+ * root reads too confident.
+ * USER GATE 2026-10-23 13:06 ("1a 2a 3a 4a 5a 6a"): T163 and T263 closed, the
+ * HP percent fix kept, the final suite of a round runs in the main checkout
+ * and its report lists the skipped tests, T266 (the bank in CI after a hung
+ * run or an ended watcher, the pinned runner image) to the last wave, a
+ * target without player noise parked for after the release, booked and
+ * pushed; next T160. The rule of 22.10.2026 ("Passt"): the bank guards
+ * against harm and does not prove a gain. New TODO T266, next free T267.
+ *
+ * WAVE 5 2026-10-21..22 (improvement round 73, the first step of the finish
+ * line: lanes F (static), H (rebuild) and I (spread solver and hits) in
+ * worktrees w5-f, w5-h and w5-i from 078cf6a (= v1); the merge in its own
+ * clone on r73-merge: 74c72cf (H), ef78abd (I), 1bf0b53 (F's structural
+ * part), 5ac933a (cache v69), 17396d4 (I's census fix), 0aa780c (the census
+ * names the new readers), 387cfe7 (Plus and Minus line by line), 3af7060 (the
+ * re-pins: 2e4ce39 and 10bbc76); spec
+ * docs/superpowers/specs/2026-10-21-round-73-wave-5-design.md, probes
+ * docs/perf/probes/2026-10-21-r73/). Gates: 21.10. ("1a 2a 3b 4a" of round
+ * 72: wave 5 with four lanes), the triage of 21.10. ("1a 2a 3b": three lanes,
+ * 15 TODOs), the design gate of 21.10. ("1a 2a 3a, 4b": T224's re-fit after
+ * the merge of H and I, breaks above 1e-3 go, the cut spread hits priced by
+ * the simulator, T210 with every group).
+ * DELIVERED: lane F: T225 (the bench credit only where the holder wins its
+ * front race within three turns; paralysis and sleep priced from the played
+ * hit), T249 (a raised stage on a body every foe in front KOs first adds
+ * nothing, in every family), T248 (the race flip read on the race at full HP,
+ * a matchup pair weighing the HP share of its winner, a healer the faster foe
+ * takes down in one hit loses its heal in the pair's clocks; one-point
+ * wrong-way jumps over the relation positions 2,460 to 1); T224 measured on a
+ * new capture (28,899 samples) and not adopted: only Doubles OU's
+ * cross-validated fit moved (boostsBiting 0 to 41), and its pair warned in
+ * D26's late cells, so by the pre-registered rule every weight stayed
+ * (e087a48, reverted in 802565f). Lane H: T250 (a forced slot the log leaves
+ * empty stays empty where the game went on and the block's own faint lines
+ * cover it; the protocol's never-shown bench leaves the game), T212
+ * (playProtocolStarts plays a -start line through addVolatile), T214 (the
+ * Sitrus witness sitrusKeptAt), T232 (the first branch turn serves every
+ * unchanged action its logged draws), the CRLF door of T230. Lane I: T229
+ * (powered Z and Max hits leave the solver), T230 (the lookup follows replace
+ * lines), T202 (a single-target Expanding Force or Tera Starstorm that calc
+ * 0.12 cuts leaves the solver and the kill table; the doubles preview prices
+ * it on a copy of the branch's live battle, simHitRange), T203 (a partner's
+ * field ability), T210 (history powers, the defender's status, Stakeout,
+ * Analytic, Plus and Minus, a changed item), T204 (the Choice check reads the
+ * field of the hit).
+ * MEASUREMENT: CI r73-m1 (5ac933a) and r73-m2 (0aa780c, byte-identical to m1)
+ * against the bases on 078cf6a: D26 all -11 [-26, +4], singles -37 [-79, +3],
+ * doubles -5 [-22, +11]; Doubles OU -2, VGC -16, Champions VGC -8, Champions
+ * OU +5; unresolved, no harm, no warning in the full and hq tables (the
+ * bank's own hq doubles rows +99 on 135 rows). Lane by lane: H (r73-h2)
+ * doubles -8 and Champions VGC -17 resolved better, T232 byte-identical
+ * (r73-h3); I (r73-i1) singles -5 full and -8 hq resolved better, set diff
+ * 350 of about 3,400 builds moved, no feedback replay; F's split: T225a costs
+ * singles (+7, +11), T249 hq doubles (+11), T248's race flip gives most of it
+ * back. Timing in one worktree against v1: singles +0.1 %, Doubles OU +2.1 %,
+ * VGC +9.1 % (T262), Champions VGC +1.7 %. Feedback three times
+ * byte-identical in 12 of 12 replays; e2e 78 passed; the tier census 87 moved
+ * turns against round 72. T243 missed: p2 wins the draft t56 play-out 13 of
+ * 16 dice (v1 16).
+ * FOUND ON THE WAY: the simulator refuses pass while a living body waits on
+ * the bench, so T250 retires the bench the protocol never shows; the first
+ * retire also fired at a forfeit (gen9doublesou-2694811367 turn 6, a living
+ * Cresselia) and after a simulator divergence, both fixed in the lane; a lost
+ * Champions VGC row where the simulator KOs a body the game kept at 7 %
+ * (T260); the name census reads no block exception; CI ran 24 runs side by
+ * side for an hour, so a local capture waited for the queue (D23).
+ * USER GATE 2026-10-22 12:12 ("1: 562428 okay, 573756 turn 73 must be
+ * clarified; 2a, watching 573756; 3a 4a 5a 6a"): 562428 t12 becomes known
+ * drift, the six scene pins follow fresh references (the tiers of 2629703929
+ * t8 expect the reference, T242), the play-out pin stays fixme with T243 and
+ * T258 in the last wave, T262 for the VGC tree time, the TODO proposals as
+ * recommended, booked and pushed. The diagnosis of 573756 t73
+ * (lanes/D/diagnosis.md): two game-correct changes push the turn from the top
+ * four. The healer rule (bc9167b) lowers its chance share 0.286 to 0.267,
+ * because the 3 % Corviknight falls before its Roost, and T225a with the pair
+ * value of T248 lifts turns 70 and 78 into the list and turns 116 and 124
+ * above it; in round 72 the turn held fourth place by 0.003. No static fix
+ * holds it; a key-moment rule waits for the next gate. New TODOs T258 to
+ * T263, next free T264.
+ *
+ * WAVE 4 2026-10-19..21 (improvement round 72, package G "library instead of
+ * hand work": lanes A to D in worktrees w4-a to w4-d from ed25505 (= v1),
+ * follow-up steps on w4-b6, w4-b7, w4-d7 and w4-d8; the merge in its own
+ * clone on r72-merge: 200e81c (C), 5c3e7a6 (D), 3a9751d (B), 39f012d (A),
+ * 2cd40a1 and e5d68f5 (D's nickname fixes), fa53f73 (B's step 6, taken out
+ * again in 45af626), aa52996 (the 2b labels), 65a1181 (B's step 6 with its
+ * fixes); cache v68 5c9f9bf; spec
+ * docs/superpowers/specs/2026-10-19-round-72-wave-4-design.md, probes
+ * docs/perf/probes/2026-10-19-r72/). Gates: 19.10. ("1a (vll kann man das
+ * sogar optimieren) 2a 3a 4a": the speed tie from the simulator's queue and
+ * made cheap, one cache bump with share links at format version 1, T246 first
+ * in lane A, four lanes in parallel), 20.10. ("1c 2b": lane B's step 6
+ * repaired and measured with the wave before the booking; the branch panel's
+ * switch buttons and picker name a body as the history does, "Nickname
+ * (Species)").
+ * DELIVERED: lane A: T246 (a commanding Tatsugiri passes in the search's
+ * choices and in the rebuild; a move Disable locks stays out of the choices);
+ * T235 steps 1 and 2 (dex-facts/ in both packages: the Protect family as one
+ * predicate, 7 lists derived from the Dex, 12 held by oracle: specs, 9
+ * readings that differed from the simulator fixed, among them Tidy Up, Defog
+ * before Gen 6 and the Gen 1 screens). Lane B: T239 (sim-ask/: twinBattle per
+ * format, copyOf with FixedDice, callHandler on copy-on-write views, the
+ * development fingerprint; every stand-in of T239's list asks through it,
+ * replay-core's race speed through its own twin); T196 (the speed tie from
+ * queue.resolveAction and comparePriority on a copy, behind two exact
+ * prefilters: the action speeds and the simulator's handler discovery). Lane
+ * C: T236 (the ESLint rule names/no-new-dex-name with a baseline that only
+ * shrinks, 421 pairs in 69 files; scripts/twin-lists.mjs in npm run lint, 7
+ * groups; an equality spec for the two line-endings.ts copies); T237
+ * (scripts/corpus-coverage.mjs; ExhaustiveRunner games in 16 formats through
+ * the inference); T240 (relation specs on 34 roots and 293 leaves, 17
+ * expected failures filed under T248). Lane D: T238 (nickname, shiny flag and
+ * the genderless flag in the built set; both name translators gone;
+ * exact-name lookups and JSON.stringify for the >player line, so 1 of 8,449
+ * nicknamed bodies drops its nickname); T241 step 1 (header data from
+ * @pkmn/client, team text through Teams, max HP through gen.stats.calc).
+ * Found and fixed in the wave: T257 (the contact cost memo of round 70 keyed
+ * a hit without its bystanders, so a partner's Sword of Ruin, Tablets of
+ * Ruin, Power Spot or Friend Guard reached a cost priced for another board,
+ * and turn 1 of gen9vgc2026regi-2630685175 varied from run to run since round
+ * 70; 88b9b5a); T256 (a view handed out a species or the format as a new
+ * proxy, which entered the speed layer's handler table for good: the feedback
+ * renderer died of out-of-memory, which Playwright showed as a hang;
+ * 81a33ff); the Protect family's answers shared per Dex where no HitProtect
+ * handler reaches the hit (24cf1bd). The integrator: the name census reads
+ * the rule's own exceptions, the twin prefilter reads strings whole,
+ * bank-ci.mjs waits for the run's own status, bank.yml pins Node 24.21.0, the
+ * data download tries four times.
+ * MEASUREMENT: CI r72-m6 (65a1181) against the bases on ed25505: bank 9 rows
+ * moved, Doubles OU byte-identical, VGC 28 moved and 104 regained, Champions
+ * OU 2 moved, Champions VGC 10 moved and 1 regained; paired (bank, D26,
+ * Champions OU, Champions VGC; full and hq, fixed K and own K per phase): no
+ * harm, no warning. The steps behind it: the wave without step 6 (r72-m5,
+ * 01cd9c6): bank 6 moved (Tidy Up), Doubles OU identical, VGC 1,121 to 1,225
+ * rows (104 regained, 6 moved, Commander), Champions OU 1 moved (a corrected
+ * faint count), Champions VGC 1 regained and 1 moved (a phantom, T250), no
+ * search error in any family; T257 (r72-b4 against r72-m5): bank 3, VGC 27,
+ * Champions OU 1, Champions VGC 9 moved, no gain, no harm, no warning; step 6
+ * lossless twice (r72-b3 against r72-m1, r72-b5 against r72-b4), 7d lossless
+ * (r72-m6 against r72-b5, all five families byte-identical). Timing (lane B's
+ * tree probe, quiet windows, medians of five): the wave without step 6 +0.4 %
+ * singles and doubles; T257 +1.5 % and +0.4 %; step 6 before 7d +3.1 % and
+ * +19.6 %; the final head doubles +2.6 % (main checkout against the merge
+ * clone), singles +2.0 % in one worktree that checks out both sides in turn
+ * (the same pairing across two checkouts read +5.6 %; v1 itself reads 2.1 %
+ * apart in two checkouts); npm run lint 14.8 to 15.8 s. The full suite 6,141
+ * tests green; e2e 78 of 78 after a warm-up; three feedback runs with 12 of
+ * 12 replays byte-identical; no pin moved; one moved turn in the tier census
+ * against round 70 (2630685175 turn 1, mistake to inaccuracy: T257's turn).
+ * FOUND ON THE WAY: the runner image's move to Ubuntu 26 gave one run two
+ * Node versions, so the job fingerprints differed (0be7274); HTTP 504 in gh
+ * run watch (57b8360) and on the data release (01cd9c6); a fresh Windows
+ * clone checks the workflow out with CRLF (27517ed); toId turns Chinese and
+ * Japanese nicknames into "" and a nickname ending in a backslash broke the
+ * >player JSON (e5d68f5); Champions previews carry the shiny flag (T251); the
+ * phantom bodies of gen9championsvgc2026regmbbo3-2687970740 (T250); the
+ * timeline e2e test fails on a cold Vite cache, on v1 too; round 70's batch
+ * check ran feedback once and could not see T257; @smogon/calc 0.12 has no
+ * flag for Mud Sport, Water Sport or Ion Deluge (upstream list).
+ * USER GATES 2026-10-20 11:30 ("1c 2b": step 6 repaired and measured with the
+ * wave before the booking; the switch buttons and the picker as the history)
+ * and 2026-10-21 10:04 ("1a 2a 3b 4a": r72 is booked and pushed to v1 and the
+ * wave's worktrees and branches go; a timing window checks out both sides in
+ * one worktree; wave 5 runs next with lanes F (static), G (feedback in CI), H
+ * (rebuild) and I (package C), T163 right after it; the batch check runs
+ * feedback twice, byte for byte). New TODOs T248 to T255, next free T258.
+ *
+ * BANK IN CI 2026-10-17..19 (improvement round 71, a tooling round without a
+ * score touch; branch r71 from 421c6ed (= v1), commits 0c22a04 to 4694469;
+ * spec docs/superpowers/specs/2026-10-13-round-71-bank-in-ci-design.md, plan
+ * docs/superpowers/plans/2026-10-17-round-71-bank-in-ci-plan.md, probes
+ * docs/perf/probes/2026-10-19-r71/). Gates: 13.10. ("1a 2a 3a 4a": a release
+ * asset for the data, 16 jobs of 4 slices, CI bases reused, the feedback
+ * corpus stays local; "5a 6a": a push of bank/<name> starts a run, a standing
+ * okay for pushing and deleting those branches), 17.10. ("1a": CI measures
+ * only commits with the tooling), 19.10. ("1b 2a": the 133 password replays of
+ * the holdouts go into the tarball, the links in the repository stay; "1a":
+ * the upload and the identity check).
+ * DELIVERED: run-calibration.mjs --slice-range and --merge
+ * (calibration-jobs.mjs); the data tarball (bank-data.mjs, bank-data-pack.mjs:
+ * .smogon-cache and the 1,424 holdout replays, 8.6 MB, release
+ * bank-data-242dbf6b9548d96d, a pre-release that is never Latest;
+ * regression/fixtures/bank-data.json names its hashes, and unpacking refuses
+ * everything but regular files under the two folders); .github/workflows/
+ * bank.yml (a push to bank/** only, a read-only token, no secret, actions
+ * pinned to commits, no credentials kept, the job index the only expression
+ * in a shell line); bank-run-config.mjs (the allowlist of .bank-run.json);
+ * bank-ci.mjs (the run commit by commit-tree over a throwaway index, the
+ * secret check against origin/v1, one branch by an explicit refspec, the
+ * delete with --force-with-lease, --reuse); retries for the bank's replay
+ * fetch (bank-fetch.ts); pages.yml skips bank data releases.
+ * MEASUREMENT: two CI runs of eeb2ec1 byte-identical (837 rows, sha256
+ * d1506a4e...), equal to the first CI run of 5ac816a0 and to the local bank
+ * r70-b (8683fa9, 4 slices, Windows, Node 24.0.2), though CI ran 64 slices on
+ * Linux with Node 24.21.0; the VGC holdout from the tarball byte-identical to
+ * the local r70-hold-vgc (1,121 rows); the Doubles OU, Champions OU and
+ * Champions VGC holdouts match every row of their local quarter runs (269,
+ * 111 and 360). paired-calibration.mjs reads CI runs unchanged (r71-identity-3
+ * against r70-b: joined 837, no harm, no warning; the CI VGC holdout against
+ * r69-w2-hold-vgc reads the verdict of the local r70-hold-vgc). Wall time: a
+ * bank run about 5 minutes alone, 6.5 and 9 minutes when two bank runs
+ * shared the runners; the four holdouts 25 minutes side by side (1,090,
+ * 1,121, 445 and 1,445 rows, all complete); bank and holdouts were not run
+ * in one batch (one after the other 30 to 34 minutes), against about 2.5
+ * hours here at four slices. Regression 4,910 green, the local checkpoint
+ * test red as before (T245).
+ * FOUND ON THE WAY: gh run list --workflow resolves bank.yml on the default
+ * branch only (HTTP 404; 8ac1068 finds the run by branch, commit and workflow
+ * name); a read ECONNRESET cost a slice its 14 rows (eeb2ec1: four attempts);
+ * the data release started pages.yml, whose deploy the github-pages
+ * environment refused for a tag (6ae01d6, 4694469); ubuntu-latest moves to
+ * Ubuntu 26 from 19.10.
+ * USER GATE 2026-10-19 09:37 ("1a 2a 3a"): CI is the default for bank and
+ * holdouts (AGENTS.md); r71 is booked and pushed to v1; wave 4 runs next
+ * after its own gate, with T246 in the fitting lane; new TODO T247 (the
+ * feedback corpus in CI), next free T248.
+ *
+ * BATCH 2026-10-13..17 (improvement round 70, the first batch of small
+ * fixes under the change classes of AGENTS.md: the user's reports of 13.10.
+ * and the small open v1 TODOs, one commit a fix; branch r70 from e0fdd99 (=
+ * v1), commits 0ec3352 to 670bf5f; cache v66 to v67; findings under
+ * docs/perf/probes/2026-10-13-* and 2026-10-15-*, the check under
+ * docs/perf/probes/2026-10-15-r70-check/). Gates during the round: 13.10.
+ * (round 71's bank in CI, 1a to 6a; the Wide Guard cards and the Protect
+ * tempo, 1a to 5a), 15.10. (the lessons as rules, N1 in the batch, N2 to N9
+ * as wave 4; the check as full bank plus quarter holdouts, the simulator
+ * pinned exactly with an upgrade command, contact costs on both sides).
+ * STATIC (T223 with T218, T220, T221; 0da5ec7, 57d1539): a standing stage
+ * counts against a foe only on a flip or a faster win within three turns
+ * that its holder gets to act in; no foe counts while a foe on the field
+ * removes the stage or KOs the holder first (T218); the races play each
+ * body's end of turn in the simulator (Leech Seed with its heal, items,
+ * weather, statuses) and the contact costs of one hit (Rocky Helmet, Rough
+ * Skin, Iron Barbs, recoil, Life Orb, Flame Body, Static); healers attack
+ * where that wins; drain stops counting as heal (T220); one race per pair
+ * (T221, the feature 17 to 20 % faster). gen9draft-2058494320: Swords Dance
+ * falls from first (0.246) to seventh in the branch 13 to 14, the Muk
+ * switch leads the real turn 13, and Swords Dance falls from first (0.178)
+ * to third (0.009) in the rebuild 19 to 20. The weight stays 95 until the
+ * re-fit T224.
+ * REBUILD (0ec3352): a branch plays its first turn under the seed its own
+ * block has in the log; GPL DzBQ5azlO5l t13 flinched before and ranks
+ * Stone Edge first or second now.
+ * SEARCH: side protectors (Wide Guard, Quick Guard, Mat Block, Crafty
+ * Shield) and, by the 3a of 13.10., Protect earn the damage they deny in the
+ * doubles hints, asked through the simulator's handlers on stand-ins
+ * without the contact flag (five shields wrote their contact penalties into
+ * the live battle); the stall guard and the singles planner's protecting
+ * moves come from the Dex (8681e91, 7b4b73f, 0c3c078); the trend probe reads
+ * each base draw of a cell against its own leaf (8d5642b, +41 % CPU on
+ * early singles matrices).
+ * CARDS (7ecaac4, T217): the card names the click a played row walked into;
+ * a turn reads chance only where the chance part outweighs the decision
+ * part; the KO-odds clause leaves out a hit the opponent's pair stops;
+ * doubles plans the played row and column.
+ * APP AND PACKAGES: fainted branch Pokémon grey in the sidebar (f8b8fbe),
+ * T216 (e929bd9), T205 with team-sheet IVs (652442b), T215 (35f95ac,
+ * snapshotMoveTypes in the barrel), T206 and T222 (19be358), Z-moves and
+ * Max moves as proof of their crystal or Dynamax (73d7cad), CRLF logs in
+ * eval-engine (997f4cb), the simulator pinned exactly with npm run
+ * upgrade:pkmn (642b940, 5ae498f).
+ * N1 OF THE LESSONS (8788609, 4e791d5, 8683fa9): Attract as the simulator
+ * writes it, Teleport a pivot only from Gen 8, the KO odds' crit and
+ * accuracy guard by a census of every item and ability.
+ * TOOLS AND RULES: base reuse and the quick tier of the calibration runner
+ * (911bc36), change classes (c9c8b44), prose inside a batch (47025be), the
+ * lessons as rules (e654d46), lint without docs/ (9e7b165).
+ * CHECK on 8683fa9: bank against r69-w2 no harm, no gain (all +16 [-10,
+ * +43], singles +12, doubles +27 [-5, +58]; warnings hq doubles early +76
+ * and luck-adjusted doubles early +95; own K doubles +20, warning
+ * luck-adjusted doubles early +98); holdouts at fraction 0.25 against the
+ * full round-69 bases, a screen: the full tables without harm (Doubles OU
+ * -40 [-82, +3] with early -74 resolved better, VGC +14 [-20, +47] with a
+ * warning luck-adjusted late +32, Champions OU -108 [-199, -16] resolved
+ * better, Champions VGC +14), the hq tables with harm on the luck-adjusted
+ * rows of VGC (+37 [+0, +74], own K +36 [+1, +72], 156 pairs of 70 games)
+ * and Doubles OU (+11 on 9 pairs of 2 games);
+ * feedback once, 88 turns moved, singles tiers 45/3/0 to 31/3/1, doubles
+ * 15/5/1 to 15/6/0, 11 of 15 pins green (653785 t19 healed), drift 562428
+ * t10 and golden 655336 (10 to 11 channels), gaps 649664 t23 and 573756 t73
+ * moved; e2e 78 of 79 (the play-out pin); nine red specs, re-pinned below;
+ * reconstruction.spec red on v1 already (T245).
+ * DIAGNOSIS: 2629703929 t8 moves at 7b4b73f alone (bisected over the batch
+ * commits): Protect + Flare Blitz→Jumpluff and Heat Wave + Protect enter
+ * p1's twelve rows, Heat Wave + Flare Blitz→Groudon (the round-69
+ * reference's best) leaves; p1 reads an inaccuracy (0.1736) where the
+ * reference on the listed rows reads a mistake (0.326 and 0.299 on 24
+ * draws, 0.280 on 96), p2 an inaccuracy (0.1936; the reference none on 24
+ * draws, 0.147 on 96). The play-out from draft t56 in Node over 16 arrival
+ * dice: v1 p2 wins 16 and passes the pin 14 times, round 70 wins 14 and
+ * passes 12; under the log's dice the result turns at 0da5ec7 and 57d1539;
+ * head to head, round 70 as p2 wins 16 of 16 against v1 as p1 (pin 10), and
+ * round 70 as p1 takes one of 16 from v1 as p2 (pin 11).
+ * USER GATE 2026-10-17 11:09 ("1a 2a 3a 4a 5a"): the Protect tempo stays and
+ * 2629703929 t8 takes the engine's verdicts with the reference in the
+ * comment (T242); the play-out pin is test.fixme until T243; 648453 t13
+ * (0.187), 912045 t8 (0.016), 2630685175 t7 and t8 (the Taunt stays the
+ * mistake, best row 0.7529), the prover at t7, GPL T35, the orchestrator's
+ * round count and the search identity re-pinned (774135b, 283a2fe); the
+ * corpus keeps the golden 655336 as known drift of 11 channels (T244) and
+ * the 562428 t10 pin, the two gaps take their observed state (670bf5f);
+ * new TODOs T224 to T245, next free T246; r70 to v1 after the booking.
+ * AFTER THE GATE: the review of the new TODOs found the harm in the hq
+ * tables of the two quarter-tier holdouts, which the gate text had called
+ * free of harm, and that the reference grades 2629703929 t8 a mistake on the
+ * new rows too (the distance lies in cell values, T242). User 17.10. 11:37
+ * ("1a"): the full VGC holdout runs before the push, and without the Protect
+ * tempo as well if the harm holds. FULL VGC HOLDOUT on cea908e against
+ * r69-w2-hold-vgc (1,121 of 1,123 positions): no harm, no gain (all +2
+ * [-15, +18]; hq luck-adjusted +17 [+0, +33] and own K +16 [+0, +32],
+ * unresolved; warnings hq mid +47 and own K +41, luck-adjusted hq mid +55);
+ * the screen's harm does not hold, so the run without the tempo is not
+ * needed. The two missing positions (2318328981 and 2401571301, turn 2) fail
+ * in the search: a commanding Tatsugiri gets a move in the doubles choices
+ * (T246); v1 has the fault at other turns, the batch's search lines reach it
+ * at turn 2 (from 7b4b73f on).
+ *
+ * WAVE 3 2026-10-12..13 (improvement round 69, the third wave of lanes:
+ * seven lanes A to G with 42 TODOs in their own worktrees from 006b33c (=
+ * v1), measured one at a time against r69-base-1012 and, from 00:06 on
+ * 13.10., the byte-identical r69-base-1013; merged in a separate clone on
+ * r69-merge by cherry-pick in the order F, A, E, D, B, C, G (88 commits,
+ * three conflicts, all in lane A's files: choice-lock.ts,
+ * protocol/handlers.ts and parser-state.ts imports); cache v65 to v66;
+ * spec, ledger, lane folders, readings and probes under
+ * docs/perf/probes/2026-10-12-r69/; builders, readers and reviewers on
+ * Sonnet 5.5 and Haiku 5.5, one fresh agent a step). User answers of 13.10.
+ * 06:27 to 06:33: only the end state of a lane is measured (bank plus
+ * feedback twice, no lane holdouts), the four holdouts run once in the wave
+ * run, T163 moves behind the wave, the Schluss-Fit runs after the merge,
+ * T148 and T149 stay in full without a time limit, pin 2630685175 t8 stays
+ * (Taunt is the error), 649664 t23 is re-pinned to p1-read only if the wave
+ * run confirms it (it does not: the merged state reads chance), the wording
+ * of T69, T136 and T180 is accepted.
+ * A SETS AND SPREADS (T31, T26, T190, T191, T167, T86, T132 points 1 and 2,
+ * T166, T69, T136, T192; T132 points 3 and 4 counted and explained): the
+ * parser records doubles hits per target (doubles, spread, defenderSide)
+ * and the spread solver prices them like the simulator; a guessed boost
+ * item leaves when the damage lines refute it, never an item the species
+ * needs; battle formes take their species' set; each hit is priced with the
+ * item it landed with, the field it landed on and the Paradox stat the log
+ * names; a published set stays when the log rules out all its items; a
+ * Speed no move order measures stays at the prior, and a published Speed IV
+ * an order refutes goes back to 31 (2663093831 p1 Sinistcha moved before
+ * Incineroar without Trick Room); Gen 1 and 2 start at the server's EVs; a
+ * hit held back by Focus Sash, Sturdy, Endure or Focus Band is a lower
+ * bound; the stats panel names where a spread comes from and shows the IVs
+ * the build plays; the one-stage chain keeps the orders-only solve at a
+ * forfeit (B13, build parity 5 of 5). a1 (T31) no harm, doubles verdict
+ * with three holdouts passes (D26); a2 (T26) clear gain, hq all -26, hq
+ * doubles -62 resolved; a6 (end state) no harm against base (singles +6,
+ * doubles -13), warnings singles late (own K +53, hq +63); the step a3 to
+ * a6 reads singles +23, half of it one replay (gen9ou-2658671254) where a3
+ * found late wins neither base nor a6 see.
+ * B STATIC WEIGHTS (T42, T155, T49, T102 in standard singles, T144; T39
+ * closed by its sighting, 3 of 10; T163 moved behind the wave with its
+ * tools kept): doubles hints see the active pair; field-pair features
+ * pairFocus and pairRedirect; boostsBiting (a standing stage valued only
+ * where it moves the 1v1 race of a pair, read through the simulator's
+ * ModifyBoost) replaces boosts in standard singles (95), Champions singles
+ * (102), Champions doubles (61 after the Schluss-Fit) and VGC doubles (16,
+ * boosts 27 to 0); the review after the merge found that it counted no drop
+ * that bites (fixed, S15); T102 ties statusFix to bodies and gives bodies
+ * and matchup a phase form in standard singles (EVAL_STATIC_FORM=0 switches
+ * the form off); the Scarlet/Violet VGC table drops Tailwind and Coverage
+ * (bodies 177, screens 48, trickRoom 54, matchup 169). Schluss-Fit on the
+ * merged capture m1 (32 088 positions, identity off 0): every value inside
+ * its lane band except Champions doubles boostsBiting (61 [42, 81] against
+ * 87 [64, 120]), taken as spec decision 3 writes; VGC boostsBiting as
+ * REPLACEMENT passed R1 (20 of 20 seeds, out-of-fold log-loss -126 bp) once
+ * drops counted. b1, b2, b3 (T49, singles -18) and b6 (T102 and T144;
+ * warnings doubles early +57 at fixed K and the step's hq own K singles
+ * late +54) have no harm. pairFocus (fitted -188 in VGC) is 0 since the
+ * gate: its 0/1 gate made the VGC score fall as a foe took damage in 24 of
+ * 103 HP series.
+ * C PERCENTS AND REPORT (T51, T64, T177, T179, T178): every percent reads
+ * the fainted share (display K 1.85 + 5 x clamp(share - 0.25, 0, 0.25)), on
+ * the graph in every engine mode too; hindsight reads only on solid cells,
+ * in doubles matched exactly; a dice marker only where the move rolled (a
+ * status picked in a move's handler counts); doubles replies and clicked
+ * pairs per slot in the prose; plan and classes per matrix cell. c1 to c3
+ * leave every engine number byte-identical; 297 percent texts and 15 cards
+ * move, no pin.
+ * D CELL PLAN AND CALCULATOR PATHS (T146 c1 to c6, T148, T149, T152, T154):
+ * kill window, missing weight, immunity and speed ties in the cell sampler,
+ * the tree and the verify cell; small doubles outcomes priced by a light
+ * sub-search (5 options, weight floor 0.05); the doubles answer round reads
+ * up to three near rows; Stellar first use and Teraform Zero priced; Fickle
+ * Beam as the mix of its two strengths. d1 and d3 no harm (the bank's
+ * doubles rows do not move; the verify and answer rounds move verdicts:
+ * doubles tiers 17/5/0 to 14/5/0); census cd3 39 of 215 cells outside 2.5
+ * SE (base 47), |error| 0.0495 (0.0628).
+ * E REBUILD AND SNAPSHOT (T172, T187, T151, T161, T158): the simulator's
+ * Faint and SwitchOut recorded per write, an exit record restored only when
+ * no other body entered the slot (the e1 finding at 562428 t13, t14); sleep
+ * counter from the Dex's sleep rules; pair slot swap; sightedHp from the
+ * simulator's getHealth; snapshot fields boostedStat, fallen,
+ * alliesFainted. e1 no harm; e4 (end state) a resolved gain (all -9 [-14,
+ * -3], singles -8, hq doubles -21).
+ * F OPPONENT INFERENCE (T188, T168, T169, T175, T193): generationsFor per
+ * format; Lum, Sitrus, Eject Button and Red Card ruled out by their missing
+ * triggers (0 of about 64 000 rule-outs later shown held); a cant line that
+ * names a move is booked; Assault Vest and Eviolite judged from the hits a
+ * body takes; the Choice check ranges the defender's item and battle
+ * formes. f1 to f4 no harm, f4 byte-identical to f3, feedback identical to
+ * base.
+ * G APP (T184, T182, T162, T180): the sweep replaces a stored result after
+ * depth 2 by the configured engine; the Tera toggle labels the type a move
+ * lands with; the team editor reads EV and Stat Point limits from the
+ * simulator's rule table and Champions pools from the mod (an unlisted
+ * Champions id keeps the 66 total, review fix); no dashes in the app's
+ * text.
+ * MERGE: replay-core's two .log fixtures kept on LF by .gitattributes (the
+ * parser reads no damage observation from a CRLF log; 006b33c the same;
+ * T206); three review lenses found boostsBiting counting no drop (fixed),
+ * graph tooltips reading the share only in auto mode (fixed), an unlisted
+ * Champions id losing the 66 cap (fixed), Tri Attack's handler status
+ * missing as a dice roll and a doubles pair of two moves reading wrong in
+ * the card (fixed); two test scenes swapped (tree-orchestrator keepPlayed
+ * to VGC 2630685175 t7, the verify-to-prover check on one singles and one
+ * doubles scene); the picker's stale intersection type dropped; search
+ * identity re-recorded.
+ * WAVE RUN on bc43963 (pairFocus -188) against r69-base-1013, base-1013-1
+ * and the r68-m2 holdouts: play-out pin green; bank no harm in all four
+ * tables (all -34 [-72, +4], singles -39, doubles -22, mid -72 [-141, -6]
+ * resolved better); holdouts no harm and no warning (VGC -50 [-87, -12]
+ * resolved better, Champions OU own K -46 resolved, Doubles OU and
+ * Champions VGC no finding); bank plus doubles holdouts (D26) doubles -31
+ * fixed K and -23 own K resolved better, no warning (the bank's lone
+ * warning, hq own K doubles late +156, sits on a K at the cap 50 in a cell
+ * of 45 rows); feedback three times byte-identical, singles tiers 46/1/0 to
+ * 45/3/0, doubles 17/5/0 to 13/4/2; pins: 2630685175 t8 and 648453 t13
+ * hold, 562428 t10 and 653785 t19 drift (B's singles weights, below),
+ * golden 655336 nine to ten channels (truths of t13, t23, t24 hold); e2e 79
+ * of 79; quiet window (three interleaved runs against 006b33c): doubles
+ * tree +19.5 % (answer round 23 to 43 s, verify deepening +24 %, tree +5
+ * %), singles tree +16.6 %, split as B alone +14.3 % and D alone +1.3 %
+ * (decision 4 allowed B +5 %: T221).
+ * MONTE-CARLO PINS: the four verify-scene references (648453 t13, 573756
+ * t73, 912045 t8, 2629703929 t8) were priced under the old static and the
+ * oracle prices its leaves with the same static as the engine; recomputed
+ * on the end state (two seed blocks each) the engine meets the tier in all
+ * four (648453 t13 engine 0.157 against MC 0.155 and 0.157; 573756 t73 none
+ * against none; 912045 t8 none against none, the old bound below 0.05 fails
+ * for MC too; 2629703929 t8 mistake against mistake).
+ * EXPERT DRIFTS (diagnosis of lane B): 562428 t10 since T49, boostsBiting
+ * values Tapu Bulu's +2 Attack against benched foes while Heatran stands in
+ * front (p2 Pain Split 0.029 to 0.285); 653785 t19 since T102, the verify
+ * round re-prices different rows per run (0.034 to 0.259 across search
+ * budgets).
+ * GATE STATE aafd8c5 (pairFocus 0, user answer 6b), measured as w2 against
+ * the same bases: bank no harm in all four tables (all -36 [-75, +2],
+ * doubles -30), the step from w better on the bank's doubles rows (-7 [-13,
+ * -3] resolved); VGC holdout -49 [-85, -11] resolved better (own K -32
+ * resolved), the step from w on that holdout +1 [-9, +11] with early phase
+ * warnings (+21 full, +27 hq); bank plus the Doubles OU and VGC holdouts
+ * doubles -32 [-55, -8] resolved better, own K -25, no warning; feedback
+ * twice byte-identical, 9 turns moved against w, all in the two VGC
+ * replays, doubles tiers 13/4/2 to 15/5/1, the pins as in w (2630685175 t8
+ * holds). After the gate the documentation was restructured on the user's
+ * request (294cd10): AGENTS.md, NextSteps.md as packages, docs/backlog.md,
+ * docs/completed/ and .claude/agents/ tracked, README, ARCHITECTURE and
+ * EVALUATION rewritten, MoreSimulation.md removed.
+ * USER GATE 2026-10-13 16:28 ("1a 2a 3a 4a 5a 6b 7a 8a 9a"): the four
+ * Monte-Carlo pins take the fresh references; T49 and T102 stay and the two
+ * expert pins stand as known drift (T218, T219; the expert is right);
+ * published-ivs follows T132 point 2 (p1 Sinistcha Speed 31, Attack 0; p2
+ * keeps Speed 0); T132 point 1 stays without the carve-out; lane C's texts
+ * stay as built; pairFocus is 0 in the VGC table until T199 builds a ramp
+ * (aafd8c5); new TODOs T194 to T222, next free T223; the timing is accepted
+ * and T221 (one race per pair in boostsBiting) is the next round; r69 to
+ * the end state plus the booking, v1 fast-forwarded and pushed.
+ *
+ * CALC 0.12 2026-10-12 (improvement round 68, T186 with T156, T157 and
+ * T159 as a round of its own after wave 2; branch r68 from f018c57 (= v1),
+ * cache v64 to v65; spec, ledger, measurements and probes under
+ * docs/perf/probes/2026-10-12-r68/; the first round on the agent setup of
+ * 12.10.: builders and reviewers on Sonnet 5.5, one fresh builder a step).
+ * @smogon/calc 0.12 models Pokemon Champions as its generation 0 (level 50,
+ * Stat Points in evs, no IVs, its own move table): over every Champions
+ * species, nature, stat and Stat Point it gives the stats of the round-67
+ * bridge (EV = 8 x SP - 4, IV 31), and its legal damaging moves agree with
+ * the Champions mod on power, type, category and flags (Pound missing). One
+ * function picks the calc generation from gen and mod (replay-core
+ * calc-gen.ts); 14 gen.num reads take the simulator's generation. One
+ * shared builder (replay-core calc-build.ts) serves the engine, the spread
+ * solver, the item judge and the picker: a species the calc lacks (35 in
+ * Champions, Aegislash among them) builds through its equal-valued form or
+ * Dex overrides, a move it lacks reads as unreadable. Where 0.12 disagrees
+ * with the simulator the simulator wins: Protect is asked from the
+ * simulator's own hooks (0.12 prices Unseen Fist through Protect at a
+ * quarter, the base mods' simulator at full; calc/protect.ts), Struggle in
+ * gens 3 and 4 takes no item boost, and the entry stages of Intrepid Sword
+ * and Dauntless Shield go through abilityOn where 0.12 no longer adds them.
+ * T156: a suppressed ability goes to the calc as No Ability, the entry
+ * stage only when the simulator would give it now; T157: choice-lock ranges
+ * the defender's abilities; T159: replay-core prices Champions on
+ * generation 0, the damage judge is on for Champions again (R10), Champions
+ * is read from the tier name too.
+ * DIAGNOSES: the bank moved 85 singles rows in 15 gen9ou replays, all with
+ * Zamazenta: calc 0.11 added Dauntless Shield's stage on top of the logged
+ * one in the spread solver and the judge, 0.12 counts it once as the
+ * simulator does (old code with only that rule rebuilds all 129 bank teams
+ * byte for byte as the new state). Champions OU holdout: 34 of 149 replays
+ * build differently, from four rules: the solver reads Aegislash (it used
+ * to throw; 21 replays, +13.6 bp), Shadow Claw slices (+2.6), Double Shock
+ * punches (-0.9; the server applies Iron Fist, @pkmn/mods 0.10.11 is
+ * stale), Infernal Parade has power 65 (-0.1); old code plus the four rules
+ * makes the same 84 072 calc calls.
+ * MEASUREMENTS against r68-base-1012 (f018c57; byte-identical to round 67's
+ * r67-noiv, holdouts equal to r67-wave and r67-wavec): M1 (T186, 9cf608d)
+ * bank 85 of 837 moved, no harm, hq warning luck-adjusted singles mid +16
+ * (own K +14); Champions VGC 2 of 1442, no finding; Champions OU 80 of 445,
+ * harm +14 [+0, +30]. M2 (827b971) bank byte-identical to M1, feedback
+ * three times byte-identical and equal to M1; holdouts against the base:
+ * Doubles OU 0 of 1089, VGC 4 of 1118, Champions VGC 21 of 1442, no
+ * finding; Champions OU 103 of 445, harm +17 [+3, +34] (own K +13 [+0,
+ * +28]), M1 to M2 +3 under 5 bp; bank plus doubles holdouts (D26) no
+ * finding. One feedback turn moved: gen9championsou-2628340185 t21, p1 now
+ * an inaccuracy (regret 0.060 -> 0.124), right by the rules (Draining Kiss
+ * is a sure KO, Trailblaze 34 %), caused by the Aegislash read; no pin
+ * there. Full regression 2734 green, e2e 75/75, lint, tsc -b, build,
+ * pack:smoke green after cbd0e45. New TODOs T190 to T193 (forme
+ * observations in the spread solver, the item at the hit, gen 1 and 2
+ * spreads, the defender's item in choice-lock), next free T194. Base of the
+ * code state: .calibration/r68-m2 (Brier 0.2536/0.2307/0.1120, hq
+ * 0.2454/0.2038/0.1069, K 2.41).
+ * USER GATE 2026-10-12 18:19 ("1a 2a 3 4"): all of round 68 stays (the
+ * Champions OU holdout harm comes from rules that are right by the game);
+ * T190 stays third in wave 3 lane A; v1 fast-forwarded and pushed, r68 and
+ * the measurement worktree deleted. On Unseen Fist (user): a mode change,
+ * both readings are right (Champions a quarter through Protect,
+ * Scarlet/Violet full damage) and the battle's mode decides;
+ * calc/protect.ts reads the mode from the simulator.
+ *
+ * WAVE 2 2026-10-10..11 (improvement round 67, the second wave of lanes:
+ * seven lanes A to G in their own worktrees from d5855a0, measured one at a
+ * time against r67-base-1010 (reproduced byte for byte as r67-base-1011 on
+ * the morning of 11.10.), merged on r67-merge by cherry-pick in the order
+ * F, C, A, B, G, E, D and fast-forwarded onto r67 at 8e7dc0b; cache v63 to
+ * v64; ledger, lane reports, chains and probes under
+ * docs/perf/probes/2026-10-10-r67/). Gate of 10.10. 09:53 ("1a 2 3a 4a 5b
+ * 6a 7a"): the lanes share no file; Champions runs on the Champions mod of
+ * @pkmn/mods (Stat Points in the sets' evs, the server's statModify, no
+ * Tera); Champions refits in lane F; one Champions VGC and one Champions OU
+ * census game in the feedback run; Think deeper goes; T128 lists every legal
+ * answer if the doubles tree time allows it; the report changes stay
+ * display-only. Intermediate feedback ran twice from 11.10. (user decision),
+ * the wave run three times.
+ * A CALC INPUTS (T100, T72, T76, T83, T84, T136.1): one builder, calc/body.ts,
+ * for every calc Pokemon (entry boosts once: 14 / 40+83 / 105 double counts
+ * -> 0); Aegislash attacks as Blade; Paradox stat, Supreme Overlord and Last
+ * Respects from the simulator's body (simulator-check misses 579 -> 322);
+ * typed Hidden Power; a Tera option's kill odds on the clicked body (Brier
+ * per hit against 48 simulator seeds 0.434 -> 0.165). Bank: a5 moves 124
+ * singles rows, +3 [+0, +7] unresolved, no harm.
+ * B SEARCH (T129, T113, T128, T139, T134, T114, T111.3): one canonical bench
+ * order (538 bank rows and 17 feedback verdicts depended on it; 14 of 26
+ * fixture rankings -> 0); partner targets at the root; the answer round
+ * grades a doubles root against legal answers the tree did not list, and
+ * adds an answer only when it still refutes the best row one ply deeper
+ * (d56cd37, after the one-ply price moved the user's truth pin 2630685175
+ * t8); the rule set on every path; the prover's near-tie order by label;
+ * the tree score's form behind EVAL_TREE_SCORE (default visits). Holdout
+ * through T128: bank plus holdouts luck-adjusted all -7 [-14, -1], doubles
+ * -9 [-17, -2], no harm.
+ * C INFERENCE (T130, T131, T108): a damage judge rules out guessed items a
+ * logged hit refutes (played items refuted 21/9/1 -> 0; R18 ranges the
+ * defender's unproven item and ability); published status moves stay under
+ * the set's own Choice item or Assault Vest (161 -> 0); every log line read
+ * once through @pkmn/protocol, facts the inference missed taken from its own
+ * @pkmn/client walk (4 of 11 handlers replaced). c1 doubles mid warning (the
+ * log moves two Gholdengo builds to Choice Specs) stays: the rule is right
+ * (the score moves toward the side with the stronger Gholdengo, which lost
+ * both games).
+ * D REPORT (T22 stage a, T59, T135): rolls per turn and side, "the engine
+ * re-read the position" as the second luck class, praise silent on lost
+ * ground, sack rule A, doubles slot phrasing, frames without em dashes;
+ * display-only (461 whitelisted changes, 0 forbidden).
+ * E APP (T140, T139, T109, T111, T85, T136.2): Think deeper retired, the gap
+ * turn keeps "Analyze this position"; every worker message names its rule
+ * set; move buttons show the type at use (145 wrong buttons -> 0 of 8571);
+ * the fast picker offers Tera where the stored one does.
+ * F CHAMPIONS (T145, T143, T52, T138): Champions battles on the mod
+ * (statModify checked over 1388 species x 25 natures); Champions OU reads
+ * championsou; the Champions refits lose out of fold in 20 of 20 seeds (no
+ * weight changes); T52's doubles K wins the bank (-36) but harms bank plus
+ * holdout (own K luck-adjusted +8 [+1, +16]), reverted; T138 keeps a
+ * Champions doubles K (1.86 + 4.17 x fainted share; Champions VGC holdout
+ * -16 [-27, -5]) and leaves Champions OU on the singles K (its fit warned
+ * mid +35 [+7, +65]).
+ * G REBUILD (T133, T108.3, G4): a corrected body's switch-in plays through
+ * runSwitch; Emergency Exit and Wimp Out read as forced; a move from a |cant|
+ * line plays as the protocol shows it; the hax alignment reads the
+ * simulator's names (perfect alignments bank singles 1750 -> 2623 of 2798,
+ * doubles 220 -> 347 of 516).
+ * MERGE (integrator, each with a red test): the Champions mod loads in the
+ * evaluation worker and the stored picker (4bb1b02); decision 30: a
+ * Champions body goes to calc 0.11 as EV = 8 x SP - 4 with every IV 31 in
+ * every engine path (cf12e07) and at the mod's move power and type
+ * (2068a24: the mod changes 20 powers and two types); lane C's R10 (the
+ * damage judge on for Champions) reverted in c81ef04 because replay-core
+ * cannot read the mod's moves reliably; the fast picker asks a throwaway
+ * battle whether a format offers Tera (1c02c53). Three fresh reviewers: no
+ * critical finding; the Champions move gap was the important one.
+ * TIMING (quiet window 11.10. 15:10-16:19, three interleaved runs against
+ * d5855a0, medians): doubles tree time (20 bank positions) lane B with the
+ * answer round off +3.4 %, protect +20.2 % (+17.8 % over off), full +107 %;
+ * the whole wave +26.3 %; build path 64.0 -> 94.3 ms per replay; click wait
+ * at turn 2 doubles cold 7.6 -> 8.9 s, warm 2.0 -> 2.5 s, singles flat.
+ * WAVE RUN on 8e7dc0b against r67-base-1010 (bank 870 s): 648 of 837
+ * positions moved (462 singles, 186 doubles); pooled all -8 [-33, +14],
+ * own K -14; doubles -15, own K -35; late -27, own K -40; no gain resolved,
+ * no harm; warning luck-adjusted doubles mid +67 [+15, +126] (own K +78),
+ * carried by lane C's Gholdengo Choice Specs builds (+45 of +66.5 in the
+ * cell, G +4.5, B -0.7, interplay +17.7 mostly 938644 t6). Holdouts:
+ * Doubles OU no finding; VGC no harm, warning mid +35 (luck-adjusted +43),
+ * carried by C +17.0 and G +17.6 (B +4.9, A 0.0) in lane-alone holdouts
+ * (one board now hits the log, Quark Drive; one is a legal sample instead of
+ * an impossible sleep counter, T187); bank plus holdouts (D26) no harm,
+ * doubles late resolved better -34 [-60, -11] (hq -77), warning doubles mid
+ * +22 [+6, +41] (luck-adjusted +26). Champions VGC no finding; Champions OU
+ * no harm, warning luck-adjusted early +94 [+1, +191], two thirds of it
+ * already in lane F's T145/T143 measurement. Feedback three times
+ * byte-identical, every pin holds; tier census singles 45/1/0 -> 45/1/0,
+ * doubles 11/2/2 -> 17/5/0 (the answer round finds more regret; both
+ * blunders gone). e2e 74/75 (the play-out pin); full regression 2637
+ * green, 1 red (eval-gpl t35: a custom game counted as a format with free
+ * abilities, so Noivern could hold Magic Guard and the boots guess fell);
+ * lint, tsc -b, build, pack:smoke green after 54dc49b.
+ * USER GATE 2026-10-11 20:43 ("Recs", that is 1a 2a 3a 4a 5b 6a 7a 8a 9a
+ * 12a; to 5: "Noivern kann niemals Magic Guard haben"; 10 explained, the
+ * library reports wait for an okay; no wave 4): the answer round keeps
+ * Protect, the tree score stays the visit mean, sack rule A, Champions OU
+ * keeps the singles K (T164 refits with search), T108 step 2 stays at 4 of
+ * 11 handlers (the rest parked as T170), doubles verify cover stays (T148),
+ * T184 removes the think-deeper rest, T186 (@smogon/calc 0.12) runs as round
+ * 68. Gate fixes: 0b38b62 keeps each species to its own abilities in a
+ * custom game (abilitiesAreFree answers yes only where the rule table drops
+ * obtainable abilities; the flag custom becomes freeAbilities; eval-gpl t35
+ * holds again; bank 0 of 837 moved and feedback twice byte-identical against
+ * the wave run, so the base of 10.10. reproduces on 12.10.); 71f7ee8 pins the
+ * play-out's core (p2 wins by turn 75 with at most six switches). On
+ * 71f7ee8: e2e 75/75, full regression 2641 green, lint, tsc -b, build,
+ * pack:smoke green. Four fresh reviewers checked T146 to T187 against the
+ * code on 12.10.: T171 and T174 were already fixed, T176 rested on a wrong
+ * premise (no order breaks under Trick Room), T151's Overheat is Chi-Yu's
+ * (a slot swap in the rebuild), the parked "missing Megas" item was wrong,
+ * the Champions parser warning is a real bug (T188), and the gate text read
+ * the doubles mid warning backwards (the static does not punish the better
+ * build); the new TODOs go into wave 3 (new lanes D to G) and the sections
+ * outside the waves, next free T190. v1 pushed. Base of the code state:
+ * .calibration/r67-wave (Brier 0.2535/0.2300/0.1117, hq
+ * 0.2453/0.2023/0.1063, K 2.42).
+ *
+ * VGC DATA AND WEIGHTS 2026-10-09 (improvement round 66, T137 run as a
+ * round of its own before wave 2, with T141 and T142 from its sighting;
+ * branch r66 from 0fb3110 (= v1), cache v61 to v63; ledger, chains and
+ * probes under docs/perf/probes/2026-10-09-r66/).
+ * DATA: the corpus held 50 Scarlet/Violet VGC games, all uploaded the day
+ * after their format left the ladder (rating median 1298), and 600 of its
+ * 923 Champions VGC games were unrated challenges played after the M-B
+ * ladder ended. scripts/expand-fit-corpus.mjs --sort rating (fb80a81) pages
+ * the replay search by rating and keeps bank and feedback replays out;
+ * 8d1c0af adds 1,150 rated Scarlet/Violet VGC games of seven regulations
+ * (2024 G and H, 2025 G, H and I, 2026 F and I; rating 1563 to 1876) and
+ * 500 rated Champions VGC games (M-A, M-B, M-C; 1601 to 1959): corpus 5,627
+ * replays, holdout by the same hash 1,424 games (all 869 old ones stay;
+ * Scarlet/Violet VGC 415 of 1,200, Champions VGC 491 of 1,423).
+ * holdoutTurns takes each turn inside its own third, and a short game drops
+ * the thirds it cannot reach. PRE-REGISTERED (479ceb8, before any fit):
+ * unrated ladder games stay out of the fit; round 65's rules R1 to R4 per
+ * VGC family.
+ * TEAM BUILD (the sighting): Champions VGC read the Scarlet/Violet usage
+ * file, and every VGC format took the Doubles OU analyses as its set
+ * assumptions. T141 (8f5d2d3, v61) reads gen9championsvgc2026; T142
+ * (603788f, v62) reads the set file of the format's year (gen9vgc2025,
+ * gen9vgc2024, Champions championsvgc2026), never Doubles OU; b685866 reads
+ * a 404 sets file as an empty one (Safari threw "Smogon sets unavailable").
+ * Against open team sheets taken out of the log, items and moves guessed
+ * right: Champions VGC (849 games) 42.5/63.8 -> 61.2/75.1 %, 2025 H
+ * 48.2/72.9 -> 66.4/82.0, 2026 I 67.7/78.1 -> 76.9/79.4, 2026 F 59.8/77.1
+ * -> 62.5/72.8 (moves worse; no set file for 2026). Bank: T142 moves 46
+ * positions in the 10 VGC games, doubles -14 bp resolved better, no harm.
+ * Holdout with search: Scarlet/Violet VGC -6 [-59, +47]; Champions VGC T141
+ * +18 with an early warning (+73, own K +23), T142 -4, both together +14
+ * [-37, +69] without a warning. Feedback: only the two VGC dumps move,
+ * every pin holds (2630685175 t7 mistake -> inaccuracy, the forced win of
+ * T118).
+ * FIT (.calibration/r66-corpus-app-t142, 32,070 positions, identity 22,294
+ * of 22,294): Champions VGC 20 of 20 seeds (log-loss -25.3 bp, Brier -10.8
+ * bp; screens 83, bodies 196, matchup 96; coverage, hazards, tailwind and
+ * Trick Room held), 18 of 20 with the unrated games. Scarlet/Violet VGC 14
+ * of 20 after R2 held hazards, coverage (fitted -27) and tailwind (fitted
+ * 3); the first pass won 18 of 20, but neither pass reads better on the
+ * holdout. The candidate 05ae0fa on the holdout's 491 Champions VGC games
+ * with search: -16 [-35, +3] (early -45 [-86, -7], M-C -50 [-92, -13]; own
+ * K -6), no harm, no warning; bank and feedback byte-identical, e2e 75/75.
+ * USER GATE 2026-10-09 19:40 ("1a 2a 3a 4b 5a"): T141 and T142 stay;
+ * Champions doubles take the fit (8e629a4, v63); Scarlet/Violet VGC keeps
+ * the hand doubles table, and T144 (tailwind and coverage in VGC first)
+ * goes to wave 3 lane B; T145 (the reconstruction feeds Champions stat
+ * points to the simulator as EVs, so a fully invested Adamant Garchomp
+ * attacks with 169 instead of 200) and T143 (Champions OU reads its own set
+ * file) go to wave 2 lane F; v1 pushed. Base of the code state:
+ * .calibration/r66-t142 (Brier 0.2520/0.2305/0.1147, hq
+ * 0.2395/0.2031/0.1177, K 2.40).
+ *
+ * DOUBLES FIT 2026-10-09 (improvement round 65, T127 run as a round of its
+ * own before wave 2; branch r65 from 5408d84 (= v1), cache v59 and v60;
+ * ledger, chains and probes under docs/perf/probes/2026-10-09-r65/). The
+ * booked plan, a refit with the bank as its target, gave way after the
+ * diagnosis: no calculation is broken (search, team build and
+ * reconstruction each excluded), but (1) round 64's corpus fit learned on
+ * teams built naked from the protocol (a Doubles OU mon carried 1.9 moves),
+ * and on the app's build variant E's gains mostly vanish; (2) the bank's 46
+ * doubles games are a skewed sample on screens: in its 17 games with
+ * screens up the screens side lost 12, in the holdout it won 49 of 84
+ * (binomial P 0.015), so every table that prices screens higher reads worse
+ * on the bank. A fit against the bank would learn those games by heart.
+ * BUILT: a static-only bank (ced14e3, 92b8646; EVAL_CALIBRATION_STATIC=1,
+ * with EVAL_CALIBRATION_FEATURES=1 the feature vector in the dump); a
+ * weight table per rule set and game type (9419f80; the host names the rule
+ * set from the replay's format, EvalSettings.ruleset carries it into every
+ * search, executors are bound to one rule set; 4dfbe9d carries it through
+ * every forked battle and the greedy replacement after a knock-out); the
+ * corpus grown to 3,977 replays (e19d6c2: 450 Champions OU; afc530a: 800
+ * Doubles OU rated 1400 to 1765, 600 Champions VGC Bo3) with a holdout of
+ * one set in three per doubles and Champions family (f636b7b; FNV-1a of
+ * family and players, a Bo3 never splits; 869 games: Doubles OU 369,
+ * Champions VGC 329, Champions OU 149, SV VGC 22; EVAL_CALIBRATION_SOURCE=
+ * holdout, three positions per game); the refit per family on bank dumps
+ * of the corpus, the app's build (7fd63cf; EVAL_FIT_DUMP, folds and
+ * bootstrap clustered by set, pre-registered holds, a second pass for
+ * flagged weights).
+ * PRE-REGISTERED (08:31): R1 the refit wins the pooled out-of-fold log-loss
+ * in all 20 seeds with mean Brier not worse; R2 a flagged weight (sign
+ * flipped against the hand weight, band wider than twice its value) is held
+ * and the family refits once; R3 no pooled harm with search on the
+ * family's test bank in both tables (standard doubles: bank doubles plus
+ * holdout Doubles OU and SV VGC; Champions: its holdout); R4 feedback three
+ * times byte-identical with the tier census, re-pins only at the gate.
+ * RESULTS (r65-corpus-app3, 23,776 positions, identity 18,903 of 18,903):
+ * Champions OU 20 of 20 seeds (log-loss -102 bp, Brier -50), holdout
+ * static -85 [-164, -5], search -23 [-97, +49] (early -83 resolved better,
+ * late +87 a warning; own K -8, no warning): adopted, 8fb437b. Standard
+ * doubles 17 of 20 (-14.5 / -7 bp): holdout Doubles OU search -36 [-62,
+ * -10] (own K -28 [-51, -6]), bank Doubles OU +144 [+24, +279], SV VGC
+ * (bank and holdout, 31 games) +85 [-10, +181]; one weight at a time the
+ * screens weight alone carries the holdout gain and the bank harm.
+ * Standard singles 17 of 20 and Champions VGC 7 of 20 keep their hand
+ * weights.
+ * USER GATE 2026-10-09 11:38 ("1a / 2b (wir sollten auf jeden Fall mehr
+ * VGC Spiele haben, das wird eine große Audience des Tools) / 3a / 4a"):
+ * (1) Champions OU keeps its fit; (2) Doubles OU takes its fit and VGC
+ * outside Champions becomes a rule set of its own with the hand doubles
+ * table (359769a, cache v60; replayRuleset in replay-core), more VGC games
+ * first (T137 as round 66); (3) doubles verdicts read the bank's doubles
+ * rows together with the holdout's (paired-calibration takes a comma list
+ * per side), the bank alone warns (NextSteps D26); (4) v1 pushed after the
+ * booking.
+ * GATE STATE 359769a: holdout Doubles OU row for row the candidate's, SV
+ * VGC row for row the base's; bank against r65-base-1009 (92b8646, in its
+ * values r64-wave1) 198 positions moved, every one Doubles OU; the bank
+ * alone reads doubles +96 (own K +74), a warning under D26; bank plus
+ * holdout -10 [-34, +15] (own K -4 [-25, +18]), no harm, no warning.
+ * Feedback three times byte-identical; against the base only the two
+ * Doubles OU census games differ, 8 turns moved, doubles tiers 11/4/0 ->
+ * 10/3/1 (2663093831 t7 mistake -> blunder at the same best move), the
+ * golden and the VGC pin unmoved. e2e 75/75, regression 2309 green, lint
+ * and tsc -b clean. Base of the code state: .calibration/r65-gate (Brier
+ * 0.2519/0.2311/0.1154, hq 0.2394/0.2031/0.1180, K 2.38). New TODOs T137
+ * to T140 (NextSteps).
+ *
+ * WAVE 1.5 2026-10-08 (improvement round 64, the rest of wave 1 run as a
+ * wave of its own before wave 2; spec docs/superpowers/specs/2026-10-06-
+ * round-64-wave-1-5-design.md, plan docs/superpowers/plans/2026-10-06-
+ * round-64-wave-1-5-plan.md; branch r64 from 5360833 (= v1), cache v58;
+ * probes, queue and lane ledgers under docs/perf/probes/2026-10-06-r64/).
+ * Eight sub-agents in their own worktrees, one lane each, sharing no file
+ * (design gate 06.10. 12:46 "1a 2a 3a 4a 5a 6a"): A T118 (the doubles
+ * prover's AND node takes every legal reply from the simulator; 2630685175
+ * t7 checks 36 of 36 and 2660809089 #8 42 of 42, both false forced wins
+ * gone; doubles proofs bank 3 -> 2, dumps 2 -> 1; singles unchanged),
+ * B T125 points 1 to 3 and T126 (the threat memo key carries the stats a
+ * move reads off its axis, Body Press and Foul Play; setup equity counts
+ * own boosts and every stage a move of the holder reads; bank b1
+ * byte-identical) and T127 (refit of the static weights with STAB by the
+ * rules on the fit corpus: capture tool 0cbbdb3, 12 826 positions from
+ * 2 111 games, fixed K per phase, 20 seeds), C T119 and T126 (the verify
+ * step splits a chance class by the states its draws leave: singles by
+ * every state, doubles by the simulator's counters from a pool of 8
+ * draws; MC census singles cells outside 2.5 SE 9 -> 2 of 177, doubles
+ * 51 -> 35 of 218, singles verdicts 72 -> 73 of 75; bank byte-identical),
+ * D T120, T125 point 4 and T122 point 4 (a Dex veto row for a move that
+ * reads a stat its partner lowers, Body Press beside Close Combat; the
+ * type-doubling veto only for usage fillers; Dex-derived hand lists; item
+ * slots read like move slots; an item after a proven rule-out from
+ * evidence or the usage majority; Rocky Helmet and Shell Bell from the
+ * simulator; the Boots hint as evidence; published IVs read, 344 of 1548
+ * bank sets), E T123 (the ten report points of round 63, each with a scene
+ * and a red test; a regret above 1 keeps its number without breaking the
+ * scale; engine numbers of the dumps byte-identical), F T124 and T126
+ * (damage preview: Tera once per side from the simulator, armed toggles
+ * reset on navigation, multi-hit and Loaded Dice spreads from the calc,
+ * Protect on the partner, the Stellar first boost; feedback byte-identical
+ * to the base, e2e 75/75), G T121 (the board follows every item line of
+ * the protocol, abilities and Eject Pack included: board item against
+ * protocol 128 -> 0 on the bank and 5 -> 0 in the feedback, Eject 3 -> 15
+ * of 15, old pivots without [from] 4 -> 19 of 19, gen 3 replacements
+ * 3 -> 9 of 9), H T122 (speed solver: rounding, forme Speed and Transform
+ * from simulator and Dex, a Speed IV below 31 only when an observed order
+ * needs it, empty budgets filled toward the prior EVs (h2); empty budgets
+ * 66 -> 1 of 1548, unseen forme orders 11 -> 0, broken orders stay 0).
+ * Each lane measured alone through one queue against the same base
+ * (r63-wave3 / base-1006-1; the new day took r64-base-1008, byte-identical
+ * to it); timing window against 5360833: prover +2 %, doubles tree +5 %
+ * (gate at most +10 %), build +17 % (no gate; the budget fill, about 12 ms
+ * per replay).
+ * T127 NOT ADOPTED: variant E (bodies 199, hazards 0.78, screens 88,
+ * matchup 220, coverage 88, doubles tailwind 38, doubles trickRoom 29; the
+ * two sign-unsure weights and the boost weights held) beat the hand
+ * weights out of fold in 20 of 20 seeds, doubles included, yet the bank
+ * read doubles +116 bp [+43, +190] worse with fixed K (own K +88; mid
+ * +176, late +69) and 72 feedback tiers moved (golden 655336 t23 and t24
+ * blunders): the corpus scores the static on teams from the protocol, the
+ * bank scores the search on the app's sets, and in doubles they disagree.
+ * The fit stays on branch w15-b (043baf1); the merge took lane B up to
+ * 0cbbdb3.
+ * Merge: cherry-picks A to H without conflict (44 commits), cache v58 with
+ * the lint ratchet (9c72364), a SideRow.spec typing fix (836ed9a), three
+ * build pins re-pinned with their intent kept (29e2072: app-build parity
+ * list; Toxapex not Bold 252 Def; curated Toxapex HP 248, SpD above Def).
+ * Final review by three fresh reviewers, 13 fixes, each with a red test
+ * first: E 1 (a forced-win sentence below 0.7 no longer repeats every
+ * turn), F 3 (Battle Bond Water Shuriken, the Stellar first boost on the
+ * snapshot path, an armed toggle no longer blocks a partner that
+ * switches), G 3 (Frisk read as a hand-over, a disguised Zoroark's item
+ * lines, Pursuit into an Air Balloon holder), D 3 (the Boots hint only
+ * without a possible Magic Guard, veto row 3 spares the chosen set, Life
+ * Orb after a one-hit KO in gens 4 to 6), H 3 (Ally Switch in the forme
+ * reader, the gen 8 forme timing of a race, Ultra Burst like a Mega).
+ * WAVE RUN on 7a64967 against r64-base-1008 (567 of 837 positions moved,
+ * 464 singles and 103 doubles): no harm in a pooled row in both tables;
+ * fixed K all -9 [-39, +21], singles -14 [-42, +16], doubles +4 [-66,
+ * +80]; all early -38 [-72, -6] and singles early -39 [-69, -11] resolved
+ * better (hq singles early -50); warning doubles late +94 [+4, +264] (own
+ * K +130), about 90 % of it from 938644 #12 and #14, where p2's Gholdengo
+ * plays Metal Coat from the published item slot although the log rules it
+ * out (Tera-Fairy Dazzling Gleam took 66 % of Moltres-Galar, Metal Coat
+ * reaches 47 to 56 %), the rest protocol-right boards of lane G (938276,
+ * 941638) -> T130. Feedback three runs byte-identical; tiers singles
+ * 39/2/0 -> 40/1/0, doubles 12/3/0 -> 11/4/0, 41 turns moved. The lane
+ * counts hold on the merged state (broken orders 0, board item against
+ * protocol 0, doubles proofs 3; D's IVs break no order). Regression 2282
+ * green, lint and tsc -b clean.
+ * USER GATE 2026-10-08 20:38 ("1b will den Stab behalten / 2a 3a 4a 5a
+ * 6a"): (1) STAB by the rules stays and T127 runs at once as round 65,
+ * with the bank as its fit target, before wave 2; (2) the round-42
+ * play-out pin keeps its intent: p2 (Bene) wins the turn-56 play-out by
+ * turn 70 (the old switch order held only through near ties of 0.001 to
+ * 0.005 that the Monte-Carlo reference decides the other way; the wave
+ * wins at turn 66); (3) 573756 t75 pinned on its firm core: p1 plays the
+ * Kyurem switch and neither side earns a tier (the rebuild brings Clefable
+ * on the turn-30 U-turn as the game did, and the switch leads Knock Off by
+ * 0.001); (4) the prior-ward fill h2 stays (h1 read singles 3 to 5 bp
+ * better); (5) the new TODOs T128 to T136 go to the wave-2 lanes, T129 and
+ * T130 first in theirs; (6) push v1 after the booking. Re-pins 4bbd119:
+ * one feedback run byte-identical to the wave run, every turn truth pin
+ * ok, golden 655336 nine channels of known drift, gaps 573756 t73 and
+ * 649664 t23 open; e2e 75/75. Base of the code state:
+ * .calibration/r64-wave1 (Brier 0.2508/0.2258/0.1134, K 2.45). New TODOs
+ * T128 to T136 (NextSteps, wave 2).
+ *
+ * WAVE 1 2026-10-06 (improvement round 63, the first wave of lanes after
+ * the round-62 triage; spec docs/superpowers/specs/2026-10-05-round-63-
+ * wave-1-design.md, plan docs/superpowers/plans/2026-10-05-round-63-wave-1-
+ * plan.md; branch r63 from 888cd12, cache v57; probes, queue and lane
+ * ledgers under docs/perf/probes/2026-10-05-r63/). Eight sub-agents in
+ * their own worktrees, one lane each, sharing no file: A T110 (early
+ * singles turns on the matrix again, three draws), B T81 and T112 (the
+ * static asks the simulator for power, hits and the stats a move reads;
+ * STAB by the game's rules after a Tera click; a memo for the search
+ * hints), C T16 and T78 (the verify step prices every chance class one ply
+ * deeper, played row and doubles boundary cells included), D T89, T28,
+ * T80, T101 (Smogon slots with two options, every set from its chosen set
+ * first, items the protocol rules out, Revival Blessing, battle formes by
+ * the Dex), E T19, T18, T17, T116 (report sentences, sacrifice and hazard
+ * sack credit, read credit, no doubles lead verdicts), F T20, T96, T68
+ * (damage preview: Tera, every hit, sprites, editor, stats retry), G T115
+ * (the board follows the items the protocol shows after a move), H T117
+ * (every observed move order settled before the ladder). Each lane measured
+ * alone through one queue in a measurement worktree (bank paired with both
+ * tables, feedback 3x, e2e) against the same base; a new day took a new
+ * base (r63-base-1006, byte-identical to the 05.10. base). Before the
+ * wave: the second bank table with own K per game type and phase, refit
+ * in every draw (888cd12), and PROBE_ROOT probe configs.
+ * Merge: cherry-picks in lane order without conflict; integrator patch
+ * bfc60cf (singles hands the played action to the verify step), cache v57,
+ * fork identity re-recorded (moves only through lane B's static), two
+ * lane tests pinned to the merged read (verify scenes 648453 t13 and
+ * 912045 t8; app-build parity three rows); final review by three fresh
+ * reviewers: Evaluate on a replay turn now searches with the played action
+ * (b2960fe, it shared the sweep's cache key), six fixes (D usage tail out
+ * of veto row 1, no absence rule-outs with a possible Illusion user; F KO
+ * text from the calc against current HP; E no sacrifice praise for a body
+ * the opposing near sweep removes, read credit "before the rolls" plus
+ * luck, forced-win key in the walk). Round-42 play-out pin kept on its
+ * intent (508ffc6: Heatran never before Muk-Alola; with T16 the play-out
+ * follows the Monte-Carlo ranking and wins at turn 62 sending neither).
+ * T45: VGC 2630685175 turn 8 is the first doubles truth pin (p2's Taunt
+ * into Calyrex-Ice instead of Astral Barrage, regret 1.697); the four user
+ * verdicts of 05.10.: 2630685175 t8 engine right (pinned), 2663108091 t26
+ * player right (became T117, fixed: no false p1 win), 2663114316 t18
+ * engine right but a Tera-Ghost 50/50, 752058 t32 open (reads -0.495
+ * after the wave instead of -0.932, toward the winner p1).
+ * USER GATE 2026-10-06 11:29/11:33: (1) the chosen Smogon sets are read as
+ * published (d2; E1 reverted in ac39c56), the veto rule was meant for
+ * contradicting pairs such as Close Combat beside Body Press and T120
+ * narrows it; (2) STAB by the rules stays in (park reverted in af9b037,
+ * identity 7db8a8c): the weights are wrong, not the rule, so T127 refits
+ * them in wave 1.5 and T102 may refit the model form again in wave 3;
+ * (3) play-out pin on its intent; (4) 573756 t75 re-pinned to "the Kyurem
+ * switch is the best move"; (5) the Trick at golden 655336 t5 is not
+ * necessarily a mistake (a possible Sucker Punch or Pursuit Bisharp), so
+ * misplay 5:p2 leaves the golden and the other channels are known drift;
+ * (6) the gap pins 573756 t68, 648453 t13 and 653785 t19 become truth with
+ * their new sentences; (7) the new TODOs T118 to T127 run as wave 1.5
+ * before wave 2; (8) push v1 after the booking.
+ * WAVE RUN on the gate state 7db8a8c against r63-base-1006 (bank 945 s,
+ * 805 of 837 positions moved): no harm and no warning in both tables;
+ * fixed K all +1 [-41, +40], singles -20 [-66, +23], doubles +51
+ * [-25, +124]; own K all -5 [-39, +28], singles -25 [-64, +15], doubles
+ * +41 [-14, +102]; singles late resolved better (-73 fixed, -87 own K).
+ * Against the state before the two gate decisions (508ffc6, E1 without
+ * STAB) d2 and STAB together cost own K all +17 [+1, +33] (doubles late
+ * +117) and fixed K hq singles +13 [+1, +24], the price T120 and T127 are
+ * to win back. Feedback three runs byte-identical (265/255/255 s);
+ * tiers against the day base singles 22/3/0 -> 39/2/0 (the early matrix
+ * is back) and doubles 9/4/0 -> 12/3/0, 87 turns moved; against wave run
+ * 2, 23 turns moved, nearly all doubles (2663093831 t7 blunder ->
+ * mistake). Pins after the gate re-pins (c2e088d, one browser run
+ * byte-identical to the wave run): every turn truth pin ok, golden 655336
+ * ten channels of known drift, gaps 573756 t73 and 649664 t23 open. e2e
+ * 74 of 75 in the full run: the timeline slider test waited 30 s for the
+ * replay iframe and passed 4 of 4 alone (watch line in NextSteps C).
+ * Regression 2049 green on 7db8a8c, lint and tsc -b clean. Base of the
+ * code state: .calibration/r63-wave3. New TODOs T118 to T127 as wave 1.5
+ * (NextSteps, round 64).
+ *
+ * TRIAGE 2026-10-04 (improvement round 62, iteration S3 of the program
+ * "more simulation", T99; no engine code, cache stays v56, bank base
+ * stays .calibration/r61-t98b): every open TODO (75), the three round-61
+ * signals and every watch line of section C judged against the state after
+ * the rebuild by twelve examiners and twelve counter-examiners (one per
+ * group) and one critic, disagreements ruled by hand (38 rulings).
+ * Verdicts: obsolete 3, discarded 28, merged into another TODO 5
+ * (36 closed); smaller 21, more important 4, less important 2,
+ * unchanged 12 (39 kept, each with a benefit line);
+ * new TODOs T112 to T116. No bank run: no run request would have flipped a
+ * keep or a close. Closed TODOs with evidence and old text in
+ * docs/completed/triage.md; table, reports and probes under
+ * docs/perf/probes/2026-10-04-r62/. Gate 2026-10-05 09:41 "1a", on the
+ * order "run the next steps with several sub-agents in parallel" (the list
+ * now runs as three waves of lanes that share no file, NextSteps D25),
+ * "3a" (fast-forward r59 into v1 and push v1; master stays).
+ *
+ * SEARCH BUDGET 2026-10-02 (improvement round 61, iteration S2 of the
+ * program "more simulation", T97 and T98; spec
+ * docs/superpowers/specs/2026-10-02-round-61-design.md, plan
+ * docs/superpowers/plans/2026-10-02-round-61-plan.md; branch r59; probes
+ * under docs/perf/probes/2026-10-02-r61/). PRE-REGISTERED before the first
+ * measuring run. Instrument first: the bank prices late positions with the
+ * app's tree search (four trees, verify, prover, one engine function),
+ * passes the app's Tera allowance and the played combo; .calibration/
+ * r61-app is the base of every measurement. Forms, each its own bank run
+ * paired against r61-app: late trees 8 and 16, late iterations per tree
+ * 1200 and 2400, early matrix depth 2 and 3, early draws per cell 3 and 5,
+ * early tree instead of matrix (tree from fainted fraction 0). Cost: bank
+ * wall against r61-app; app time = sum of the three analysis passes in a
+ * feedback run, one run per form interleaved with base runs, as a ratio to
+ * the neighbouring base. Time window: three feedback runs of 85eb5ad
+ * interleaved with three of r61-app; a form fits when the r61-app median
+ * times its ratio stays at or under the 85eb5ad median. RECOMMENDATION
+ * RULE for T98 (the user gate decides): a form WINS when a pooled row of
+ * scripts/paired-calibration.mjs has its band wholly on the good side and
+ * no pooled row in full, hq or luck-adjusted shows harm (band wholly bad
+ * and at least 5 bp); among forms that win and fit, the largest gain on
+ * the full all row; within 3 bp the cheaper one; one early and one late
+ * form may combine when both win alone and their extra cost together fits;
+ * one form for singles and doubles, a game type with pooled harm keeps
+ * today's budget; no form: T98 is dropped with the evidence of T97; the
+ * fourfold steps measure the ceiling and are adopted only if they fit.
+ * PLAY-OUT PROBE (no candidate): at every bank position both sides play
+ * to the end eight times, each move drawn from the mix of a sketch search
+ * (matrix, depth 1, one draw), dice per play-out from a fixed seed, the
+ * estimate after 60 turns; a pilot on 50 positions sets the scale (full
+ * run over 3 h on four processes -> four play-outs, still over -> late
+ * positions only); static score, win share and both through a logistic
+ * curve, 5-fold CV by game, 20 seeds, per-game paired Brier, game-cluster
+ * bootstrap, 90 % band; >= 20 bp resolved: play-outs pay (a T99
+ * candidate with a cost estimate); < 10 bp or 0 in the band: they do not;
+ * between: user gate. CHEAP STATIC PROBE (no candidate): the own kernel
+ * with the mean roll, burn halving physical damage (not with Guts, not
+ * Facade from gen 6), Guts x1.5 on Atk under status, Facade doubled under
+ * status other than sleep; fit corpus captured once with own, calc, sim
+ * and mean on the code of 33c93c5; closing at least half of the sim gain
+ * of the same capture with a band that excludes 0: the accuracy axis has
+ * a cheap route; 0 in the band: it has none; between: the number goes to
+ * T99.
+ *
+ * MEASURED (03.10. and 04.10., readings in docs/perf/probes/2026-10-02-r61/
+ * ledger.md). Instrument: trees via searchTreesOrchestrated (r61-trees,
+ * 358 tree rows moved, no gain or harm resolved, bank 197 s -> 382 s), the
+ * app's Tera allowance (r61-tera, 117 of 129 games carry a click, 493 rows
+ * moved; luck-adjusted doubles +103 [+4, +242], one VGC game
+ * 2629760324 carries most of it), the played doubles combo (r61-app, 185
+ * doubles rows); the sum against r60-review resolves nothing (full all -5
+ * [-40, +30]). Time window: pass sums 218.3 s (85eb5ad, median of three)
+ * against 132.0 s (r61-app), headroom 1.65x. Forms against r61-app, full
+ * all with band, app cost against the neighbouring base: late trees 8 +2
+ * (singles HARM +6 [+2, +11], 1.16x); trees 16 +1 (doubles -12 [-25, -1],
+ * 1.35x); iterations 1200 -10 [-20, -2] (doubles -28, 1.21x); iterations
+ * 2400 -15 [-28, -2] (1.97x, does not fit); early depth 2 -12 [-26, +1]
+ * (luck-adjusted all -14 resolved, 1.13x); depth 3 -7 [-28, +12] (2.06x,
+ * does not fit); draws 3 -3 (doubles -5, 1.03x); draws 5 -2 (doubles -6,
+ * 1.04x); tree from the first turn -23 [-45, -2] (doubles -70 [-131, -12],
+ * early doubles -200, 1.33x). Every form moved only its own rows; the gain
+ * sits in doubles and spreads over many games (largest single game about
+ * 4 bp). Play-out probe (837 positions, four play-outs each): play-out
+ * alone +111 [-52, +267]; static plus play-out -52 [-117, +8] pooled,
+ * singles -120 [-231, -11] resolved, doubles +24 [+1, +48]; about 30 s per
+ * position on one core. Cheap static probe (2103 games, 12771 samples, the
+ * capture of round 58 reproduced at sim +16.4 [+7.6, +25.3]): mean mode
+ * +3.0 [-1.3, +7.3] (18 % of the sim gain), singles +5.1 [+1.3, +8.7].
+ *
+ * VERDICT. Gate 1 (03.10. 23:30, "1a, 2a, 3a"): T98 takes trees from the
+ * first turn plus 1200 iterations, fallback trees from the first turn
+ * alone; no game-type exception; both probes noted (play-outs do not pay
+ * pooled; the singles number goes to T99; the accuracy axis has no cheap
+ * route). The pair (r61-t98, cache v55) won -33 [-58, -10] but missed the
+ * time gate: pass sums 222.4 s against 197.7 s for 85eb5ad (doubled
+ * iterations also lengthen the new early trees). The fallback became the
+ * default (3d94f71, cache v56): bank r61-t98b byte-identical to the T97 run
+ * of the form, time gate green at 158.8 s against 184.4 s; feedback three
+ * times byte-identical; singles tiers 41/1/0 -> 22/3/0, doubles 9/4/0
+ * unchanged. Gate 2 (04.10. 12:46, "1a 2a 3a 4a"): T98 adopted; the
+ * think-deeper ladder leaves auto (a tree turn offers no rung), a deeper
+ * tree rung only if markedly deeper (T109); 649664 t8 accepts chance
+ * (Fire Blast's 12 % kill under the published set, 53 % under the older
+ * one); 562428 t10 stays pinned as a known drift (the tree reads that
+ * early turn narrower than the matrix, T110). Final review: the
+ * team-preview lead stays on the early matrix under auto (d97e119), and
+ * at the user's request (04.10. 17:35, rule fixed before measuring: the
+ * tree unless a pooled row shows harm) turn 0 was measured on the 128
+ * bank games with a team preview: full all +25 [-26, +81], singles -9,
+ * hq doubles +267 [+20, +534] HARM, so the matrix stays by evidence
+ * (f806a41); matrix and tree name different top leads on 119 of 164
+ * singles and 76 of 92 doubles sides. Base of every later bank
+ * comparison: .calibration/r61-t98b.
+ *
+ * RULE FIXES 2026-10-02 (improvement round 60, iteration S1a of the program
+ * "more simulation", T92 to T95 plus T79 and T104; spec
+ * docs/superpowers/specs/2026-10-02-round-60-design.md, plan
+ * docs/superpowers/plans/2026-10-02-round-60-plan.md; branch r59 from
+ * e4121d9, executed inline; cache v54; not pushed; probes, censuses and
+ * readings under docs/perf/probes/2026-10-02-r60/). Principle set at the
+ * spec gate: rules come from the simulator and the dex, provers instead of
+ * maintenance, library bugs upstream. Each fix measured on its own against
+ * the state right before it (D3); bank base r60-base = r59-on byte-identical
+ * (833 rows), feedback base unmoved against round 59.
+ * T94 (25d9fac): a doubles slot locked in a move (rampage, Uproar, Bide,
+ *   charge release, recharge) is one option without a target and goes to
+ *   the sim by request index (forward/request-moves.ts); by name the sim
+ *   assumed target type 'normal' and rejected it. Census 17 positions in 8
+ *   doubles games; identity vs round 59: level-1 errors 50 -> 0, level-2
+ *   224 -> 0, no unexpected digest; bank 834 rows (913996#6 back), 3 moved,
+ *   bands +0; feedback 2663093831 t10/t11 by 0.0014.
+ * T92 (4cc3988): snapshot corrections write Spikes/Toxic Spikes layers (dex
+ *   onSideRestart decides stacking) and the remaining turns of weather and
+ *   terrain (FieldSnapshot.weatherState/terrainState from @pkmn/client);
+ *   prover field-correction-oracle.spec.ts. Census 52 to 57 bank games (app
+ *   build and plan build), 5 feedback; bank 13 rows moved, pooled -3 [-8,+0]
+ *   (B better), hq -5 [-15,+0]; feedback 649664 t8 and 562428 t13.
+ * T93 (597d1b0): built sets carry an ability the dex knows (dex-legal.ts):
+ *   an unknown name becomes the species' ability it abbreviates ("As One"),
+ *   a battle-only forme's ability falls back outside free-ability formats;
+ *   prover dex-legal-builds.spec.ts (sim TeamValidator). Bank 837 rows
+ *   (2630685175 t6/t8/t10 no longer end prematurely), 26 moved, pooled -6
+ *   [-19,+1] unresolved, doubles mid -48 [-155,+8]; feedback 2630685175
+ *   follows the winner (t4 -0.736 -> +0.569).
+ * T79 (1e8f778): fixed Tera type and item from the dex (requiredTeraType,
+ *   requiredItem); a Tera forme switching back in maps through dex
+ *   battleOnly (749895 built a second, phantom Ogerpon). Census tera 70 ->
+ *   0; R54 Tera count 0 0 0 0 0; bank 8 rows, all 749895, all away from the
+ *   winner: pooled +13 [+0,+39], hq +23 [+0,+68] (the phantom gave p1
+ *   material it never had); feedback 912045 t1.
+ * T104 (be23b7f): an ability from a protocol line goes to the Pokemon
+ *   whose species can have it (ability-holder.ts): Water Absorb heals and
+ *   Pickpocket credited the attacker, Trace credited the traced ability;
+ *   no upstream bug: @pkmn/protocol already clears [of] for the four
+ *   absorbing abilities, our inference read raw lines. Bank 5 rows, +0;
+ *   feedback unmoved.
+ * T95 residual (5bb832c): burn 1/8 in gens 2-6, poison 1/16 in gen 1;
+ *   prover races-residual.spec.ts (gens 1-9). Bank 2 rows (5th digit);
+ *   feedback the four gen-6 games, at most 0.02.
+ * T95 speed: getStat in the static (18675cb, memo 2be6336) missed the time
+ *   gate (+22 %, +15.5 %; gate 5 %), reverted (46edcb2); fallback per spec
+ *   decision 6: the hand list stays, matches getStat on every bank body
+ *   (Protosynthesis/Quark Drive, Unburden with the sim's volatile,
+ *   ignoringAbility/ignoringItem, effectiveWeather, stages floored, Slush
+ *   Rush in snowscape; a73f58a, lazy queries 2e69351), prover
+ *   speed-oracle.spec.ts; static +2.5 %, feedback walls equal (215-216 s);
+ *   bank 129 rows moved, pooled +0 [-1,+1], doubles early +3 [+0,+6] warns.
+ * REVIEW (fresh reviewer, read-only): no critical; fixed in 3fb772d:
+ *   free-ability formats from the sim's rule table instead of the tier
+ *   name (Balanced Hackmons dropped real reveals), gen-correct fallback
+ *   ability, the benched-speed guard test; bank and feedback
+ *   byte-identical after it.
+ * END GATES: lint, tsc -b, test:regression (1726), test:e2e (75/75),
+ *   pack:smoke green, again on 3fb772d (1730 tests); feedback end-1..3
+ *   byte-identical, no pin moved in any run of the round; identity speed
+ *   layer on vs off OK (834/834/834 rows, 48 searches, 0 errors).
+ * VERDICT: adopted at the user gate 02.10. 17:51 (all seven fixes; T105
+ *   to T107 stay as iteration 7e; not pushed, the program stays on r59).
+ *   The planned @pkmn/client PR proposal was dropped after the check: the
+ *   library is right, the misattribution was ours alone.
+ *
+ * SPEED LAYER 2026-10-01 (improvement round 59, iteration S1, T91, stage 1
+ * of the program "more simulation"; spec
+ * docs/superpowers/specs/2026-09-24-round-59-design.md, plan
+ * docs/superpowers/plans/2026-09-24-round-59-plan.md; branch r59 from
+ * master 94c88d9 (code state 85eb5ad) = 8fb5795, 790e262, b297690,
+ * 8aa8194, 16d91fb, bddfdd7, e4a5a61, ace8159, eb05424, the first
+ * key-order fix 8b640a9, the default flip 78a1fdb and the final review's
+ * fix 4aaad44; lossless D4, no cache bump, not pushed; gate chain, verdict
+ * and debug probes under docs/perf/probes/2026-09-24-r59/).
+ * CHANGE: packages/eval-engine/src/forward/sim-fast/ hooks three levers
+ * into the battles the search makes (forward/parsed-state.ts, position.ts,
+ * switches.ts), without touching node_modules.
+ * (1) rules: the rule table once per format (the sim never stores it for
+ * gen9ou and gen4ou and rebuilt it on every fork). (2) clone: a Battle
+ * copy instead of the JSON round trip, for forks (a template per position:
+ * a root's unrepaired deserialization, a child's battle at its first fork)
+ * and for the mid-turn forced-switch trials (one snapshot copied per
+ * advance); generated shells and fillers, a positive list of shared dex
+ * classes (anything else throws), Pokemon closures rebuilt from the sim's
+ * source and self-tested on first use. (3) dispatch: a per-battle
+ * pre-check that answers runEvent when no effect listens and steps aside
+ * to the original whenever one might. A hash gate over the sim functions
+ * the layer relies on (ESM and CJS pins; a mismatch turns the layer off
+ * with status hash-mismatch, forced it throws); a guard spec in CI (pins,
+ * shared classes, per-instance closures, mods, runtime handler writes,
+ * since 4aaad44 a dynamic census over gens 1-9); the switch EVAL_SIM_FAST
+ * (Node) and the localStorage override 'ps-replay-interceptor:sim-fast'
+ * (app, no UI switch, stamped on every worker message); status and
+ * counters in the perf trace and in a proof line of every suite run.
+ * GATES (chain run 3 on 4aaad44, 26 Sep 16:40 to 20:31; timing from the
+ * rerun of the timing stage, run 4, 26 Sep 20:38 to 22:08, because run 3
+ * measured on a loaded machine and did not confirm off against the base:
+ * 1.199 / 1.126 / 0.949; base 85eb5ad):
+ *   identity level 1: 834 positions, 40776 turns; off vs on, vs rules
+ *     only and vs the base 0 different;
+ *   identity level 2: 318424 turns; off vs on and vs rules 0 different;
+ *   identity mid-turn: 111316 turns, 0 different, 0 errors;
+ *   identity of searches: 24 MCTS trees and 24 matrix searches (d1, d2,
+ *     singles, doubles; the prover runs in the matrix searches), 0
+ *     different;
+ *   all gens: dynamic census over gens 1-9 and gen-9 doubles in the guard
+ *     spec (own-key lists and child.serialized of a copy against today's
+ *     fork); the review's gen-2 playouts 0 of 200 differing;
+ *   lever 1 alone: identity off vs rules 0 in all four parts; suite with
+ *     EVAL_SIM_FAST=rules 904 passed, 9 skipped, proof active, ruleTables
+ *     3, 0 copies;
+ *   engine suite in default, forced on and rules only: 904 passed, 9
+ *     skipped each; by hand with EVAL_SIM_FAST=0 the same;
+ *   D4: lint 0, tsc -b 0, regression 1659 passed, e2e 75/75; pack smoke
+ *     green on 4aaad44;
+ *   feedback: 3 runs on and 3 off, each RUNS BYTE-IDENTICAL TO BASE, 10 of
+ *     10 dumps unmoved, results identical;
+ *   calibration: on, and off through the kill switch, 833 positions each,
+ *     merged-vs-r59-base=byte-identical;
+ *   production bundle: build smoke 2/2; with the layer every worker is
+ *     active, workers with cells show copies and pre-checks above 0, the
+ *     analysis is byte-equal to off;
+ *   counter-probes: a pre-check blind to abilities breaks the fixture
+ *     identity and the Huge Power turn; a foreign class throws or falls
+ *     back; a forged hash gives hash-mismatch per lever, forced it throws;
+ *   activity: the pre-check answers 92.5 % of the runEvent calls in the
+ *     feedback run (90145505 of 97453762; gate 90 %);
+ *   tempo (4 reps per variant, median; off confirmed against the base at
+ *     1.008 / 1.010 / 1.017; result digests equal across every variant and
+ *     the base): tree singles 2.35x (gate 2.0), tree doubles 1.81x (1.6),
+ *     matrix 2.39x (1.8); copy only singles 1.62x; pre-check only singles
+ *     1.22x, doubles 1.33x; rules only singles 1.15x. Two runs (copy only
+ *     and rules only, rep 0 each) started after 15 minutes of waiting for
+ *     quiet and carry the mark INVALID (not quiet); they sit inside their
+ *     variants' spread, and the adopted layer's gates rest on quiet runs
+ *     only;
+ *   end to end (feedback pass times): pass 3 1.90x (79.4 s -> 41.7 s),
+ *     pass 1 1.14x, pass 2 1.93x, no pass slower, total 1.45x (226.8 s ->
+ *     156.4 s); wall clock on 230 s against base 361 s (reported only,
+ *     one base run);
+ *   memory: maxRSS at most +6.2 % (pre-check only 1039 MB against off
+ *     978 MB; all levers 900 MB; gate 10 %).
+ * TWO DIVERGENCES, BOTH FIXED: chain run 1 (25 Sep, eb05424) found 70 of
+ * 318424 level-2 turns in three bank positions (gen9doublesou-2660809089
+ * t8, gen9doublesou-2660822493 t8, gen9ou-2663108091 t22), copy lever
+ * only, whose child.serialized differed in key order alone (values, logs
+ * and requests equal): eatItem and takeItem leave an own
+ * Pokemon.pendingStaleness slot holding undefined; today's JSON round trip
+ * drops it, the copy keeps it, and setItem refills it one ply later
+ * (Harvest, Trick back). The run then died with the machine restart at
+ * 22:02 (feedback stage); the resumable chain and the flushes kept every
+ * finished stage. A debug workflow (three localizers, an analyst, two
+ * skeptics) found the cause; the spec's request-state remedy, measured on
+ * the three positions and 48 more, left all 70 divergences. Fix 8b640a9:
+ * the copy drops the emptied key, and a guard census pins the sim's
+ * undefined writes to non-constructor keys; run 2 (8b640a9) green. The
+ * final whole-branch review (four lenses, a skeptic per Critical or
+ * Important finding) found
+ * the same class in gen 2: moveUsed without a target leaves
+ * lastMoveTargetLoc undefined, Rollout through Mirror Move or Metronome
+ * refills it, 26 of 200 gen-2 playouts differed (no bank position is gen
+ * 2), and the text census had missed it. Fix 4aaad44: a generic rule
+ * (drop every own key holding undefined that the object's constructor
+ * does not create, key sets cached per prototype and format), the dynamic
+ * census, a gen-2 regression test, and the two test gaps of the default
+ * flip (the Review-Focus-5 test, a forced-on CI step). Run 3 green except
+ * timing, run 4 timing green. KEY ORDER IS NOT COSMETIC: the endgame
+ * solver's and prover's memo key follows own-key order (endgame/key.ts),
+ * so a slot that moves a key reaches results.
+ * PRE-EXISTING, NOT ROUND 59: in smogtours-gen9doublesou-913996 turns 4, 6
+ * and 8 every level-1 and level-2 turn that plays one particular option
+ * throws (50 of 40776 level-1 turns, all at t6; 224 of 318424 level-2
+ * turns, at t4 and t8), identical on the base code at level 1 (base
+ * 85eb5ad: the same 50 errors) and with the layer off at level 2 (level 2
+ * was not run on the base); at t6 the Task-7 smoke saw the simulator
+ * reject "move outrage" without a target; at t4 and t8 the cause is not
+ * yet read (T94 sees the same message in the tree at t4) -> T94, which
+ * now also covers t6 and t8.
+ * VERDICT (decision rule 2 of the plan: all gates green): all three
+ * levers adopted. SIM_FAST_DEFAULT is ['rules', 'clone', 'dispatch'] since
+ * 78a1fdb (adopted at the gate on 26 Sep); EVAL_SIM_FAST=0 (Node) and '0'
+ * in localStorage stay the kill switch; CI runs the engine suite by
+ * default, forced off and forced on. Lever 1 would also hold alone (rule
+ * 1); no partial re-run.
+ * UPKEEP: exact pin "@pkmn/sim": "0.10.11" in the root package.json (the
+ * packages keep the peer range ^0.10.11); the hash gate under Node (the
+ * minified app bundle cannot be hashed, there pin and CI carry it); the
+ * guard spec with the dynamic census in CI; an upgrade of @pkmn/sim is a
+ * PR of its own with every identity gate of this round (chain
+ * docs/perf/probes/2026-09-24-r59/gate/), the guard spec with the census
+ * over all gens and the grep for runtime handlers, with T103 done first
+ * (NextSteps D24); a weekly version check of @pkmn/sim (NextSteps C).
+ * REMAINS: T103 (harden the layer before the sim moves: the hash gate does
+ * not cover what the copy mirrors, unhashed pre-check helpers, undefined
+ * slots and ActiveMove data below the top-level classes, check() not
+ * exception-safe, constructor key sets assumed team-independent, the
+ * reviews' missing test pins, unknown values of the app kill switch),
+ * parked until the first upgrade; T94 extended by the 913996 choice the
+ * simulator rejects (now t4, t6 and t8) in iteration S1a.
+ *
+ * STATIC UPPER BOUND AND SIM COST 2026-09-24 (sighting round 58, out of
+ * turn, no code adopted; throwaway branch r58-oracle 33c93c5, whose commit
+ * message carries the pre-registered thresholds; probes, inventory,
+ * refuters and the patch study under docs/perf/probes/2026-09-24-r58/;
+ * program docs/superpowers/plans/2026-09-24-program-more-simulation.md).
+ * QUESTION (user): are we rebuilding a whole engine, do we need it, and
+ * could @pkmn/sim, @smogon/calc or @pkmn/dex take it over? ORACLE:
+ * score/oracle.ts answers the static's damage with @smogon/calc or an
+ * adapted @pkmn/sim getDamage (no crit, mean roll, both bodies active for
+ * the call, boosts 0, PRNG seed restored, item consumption and log vetoed).
+ * On 834 bank positions and 91681 pairs (bench included) the own kernel
+ * sits 3.8 % of max HP off the sim at the median and 8.3 % on average
+ * (18467 pairs over 10 %); calc against sim 0.1 % at the median. UPPER
+ * BOUND on the fit corpus (2103 replays, 12771 positions captured once
+ * under three kernels, logistic refit per kernel, 5-fold CV by game, 20
+ * seeds, game-cluster bootstrap): sim over own +16.4 bp [7.6, 25.3]
+ * resolved, singles +19.0, doubles +7.2 unresolved; calc +11.8, held
+ * down by 21546 failed calc calls in 99 games (all 30 gen-2 games among
+ * them) that each priced 0 damage; with the hand weights and a CV-refit
+ * phase K +8.7. A refuter re-derived +16.6 with Newton fits and new folds
+ * (without games with oracle errors sim +15.7, calc +14.5); about three
+ * quarters of the gain sits in gen-9 singles (+26.1), older singles
+ * (+9.1) and doubles (+8.0) do not resolve; a richer model on the own
+ * features gains +16.8 too (singles +20.0, doubles +5.8 unresolved), both
+ * together +32.3. COST (interleaved, memo per matchup cache): cold static
+ * 22x calc and 40x sim, root search 1.28x and 1.50x (96 % memo hits;
+ * about 1.11x and 1.25x with a pair-level key) -> by the pre-registered
+ * rule the own kernel stays in the hot path, the libraries become referee
+ * and test oracle. UNDO: a partial snapshot around getDamage with the
+ * sim's State helpers restores everything (90232 calls, no residue per
+ * call) at 180 us per call against 133 us for the call. INVENTORY: 184
+ * places (about 5090 LOC) encode game rules; 11 direct reuse, 32 with an
+ * adapter, 76 keep, 61 duplicates, 4 dead; 57 rule bugs in the appendix,
+ * four of them plus the last-pair speed tie from section 3 confirmed at
+ * runtime. PATCH STUDY: the sim's clone and handler lookup dominate a
+ * tree (copy 35-53 % of a singles tree, dispatch 24-35 % of a singles
+ * tree and 39-47 % of a doubles tree); a direct clone (683 -> 87 us per
+ * fork) and a handler pre-check (5.76 -> 1.05 us per runEvent call)
+ * together make MCTS trees 2.54x (singles) and 1.92x (doubles) and matrix
+ * searches 2.17x to 2.62x faster in 18 byte-identical searches; the
+ * pre-check with the rule table alone held 40726 turns, the clone alone
+ * 2502 turns, 746 mid-turn states and 24 trees; gen9ou and gen4ou rebuild
+ * the rule table on every fork (14-17 % of a gen9ou search). VERDICT
+ * (user gate 24 Sep 18:38, "1a 2a 3a 4a 5a"): program "more simulation",
+ * rounds 59 to 62: T91 speed layer (5a: own module forward/sim-fast.ts
+ * hooked per battle, exact pin @pkmn/sim 0.10.11, hash gate with fallback,
+ * switch EVAL_SIM_FAST; gates 0 deviations in about 40700 turns and 48
+ * searches, feedback 3x byte-identical, trees singles >= 2.0x, doubles >=
+ * 1.6x, matrix >= 1.8x, pass 3 >= 1.5x), T92-T95 the gate's rule bugs
+ * that feed the sim wrong states (Spikes layers, As One, the doubles
+ * crash, burn, Slush Rush), T97/T98 measure the search budget and spend
+ * the speed on simulation (the cheap static probe folded in, 1a), T99
+ * triage of every other open TODO (68 on 24 Sep), then iteration 4g,
+ * then iteration E "one rule, one place" (T96, T100, T101; 3a); T102
+ * model form in iteration 10a (2a). The static-accuracy axis (T71, T81,
+ * T82, T88, T90) is parked until stage 2 (S2) has measured; T99 rules on
+ * it. Until the triage the rest of the list rests (exceptions only at the
+ * user gate, plus T43 on release day).
+ *
+ * MOVES AS THEY LAND 2026-09-24 (improvement round 57, iteration 4f, T73
+ * and T81; spec docs/superpowers/specs/2026-09-23-round-57-design.md, plan
+ * docs/superpowers/plans/2026-09-23-round-57-plan.md; branch r57 =
+ * 3bf56ce, cb9454d, 9eef4d7, 74f6479, 8d43ba5 (the sentence commit,
+ * cherry-picked off 66ba26f), the timing commit be0d0dd, the final
+ * review's e8955c7, the booking 2c32033 and the close-audit corrections
+ * b933ef9; T81 built as 34f84b9 and parked on branch r57-power,
+ * the first tip with it kept as branch r57-with-power (66ba26f); cache
+ * v53; score-touching as a correction with its own evidence; the eleven
+ * understanding reports, the arbiter, the gate chain in three parts and
+ * the reading under docs/perf/probes/2026-09-23-r57/).
+ * INSTRUMENT: retype/arbiter.vt.ts prices every pair of an attacker on the
+ * field, a usable non-status move and a foe on the field over all 834
+ * rebuilt bank positions (7637 pairs, 3 s; the round-54 arbiter saw only
+ * the 226 with a Tera body and skipped every move with catalog power 0),
+ * tags each row with the family that changes
+ * the move at use and compares the static with @smogon/calc called
+ * directly (weather and terrain passed, both sides' boosts at 0, Hidden
+ * Power under its hidden type) or, for the fixed-damage family the calc
+ * answers with 0, with the simulator's damage rule. It reproduces the
+ * round-54 arbiter's 2693 rows digit for digit and leaves every position
+ * untouched (834 of 834); compare.mjs exits 3 when a row outside the named
+ * families moves. Base r57-base (master 030a95b): the T73 families carry
+ * 10 false immunities (gen-3 Hidden Power 6, the static priced every
+ * gen-3 Hidden Power at 0; Weather Ball in weather 3; the anchor, Liquid
+ * Voice Hyper Voice into a Tera-Ghost Sneasler, an unplayed option at
+ * smogtours-gen9doublesou-937926 t2) and 4 false hits (Wellspring Ivy
+ * Cudgel into Water Absorb); Ivy Cudgel is the biggest family (166 pairs,
+ * 101 positions, error 0.419); the T81 families carry 137 false
+ * immunities (Low Kick 58, Heat Crash 35, Heavy Slam 29, Grass Knot 6,
+ * Endeavor 9), 147 in all; 20 false hits outside every family (Air
+ * Balloon, Psychic Terrain, Armor Tail against priority) stay out of the
+ * round. The simulator's own ModifyType answer is exact for active
+ * bodies, but reads Normal for benched Liquid Voice, Pixilate and
+ * Judgment users (the sim switches abilities and items off on the bench),
+ * writes a debug line per bench call in custom-game formats and throws
+ * after 1000 of them, and costs 6 to 11 us against 0.1 for a rule: the
+ * static asks a rule table instead.
+ * CHANGE: move-use.ts with move-use-rules.ts (no imports) answers a move's
+ * type, category, power and power multiplier from raw facts in the
+ * simulator's order (the move's own rule, then the ability): forme (Ivy
+ * Cudgel, Raging Bull, Aura Wheel), item (Judgment, Multi-Attack, Techno
+ * Blast, Natural Gift; Klutz), the user's first type (Revelation Dance),
+ * Liquid Voice, the -ate family (x4915/4096, gen 6 x5325/4096),
+ * Normalize, Struggle, Weather Ball and Terrain Pulse (field, grounding),
+ * Tera Blast and Tera Starstorm (the Tera type, physical when Attack with
+ * its stage leads, Stellar power 100), Hidden Power (hidden type, gen 2-5
+ * hidden power, gen 2-3 category by type; a Hidden Power the build never
+ * resolved reads the simulator's IV default, Dark, where the old static
+ * read Normal). score/move-facts.ts reads the
+ * facts raw from the sim objects (ability and item ids, suppression
+ * ignored on purpose, the bench included) and lazily; landedKey appends
+ * the answer of every usable slot in CONTEXT_MOVES to pairKey, so the memo
+ * stays a function of its key. threat.ts reads the answer for the ability
+ * blank list, immunity, chart, STAB (still tera-blind, T71), Thick Fat,
+ * Choice items, Assault Vest and the physical/special bucket; Scrappy and
+ * Mind's Eye hit Ghosts; a Stellar move hits a terastallized target twice.
+ * The null-move sentence asks the same table with what it knows and stays
+ * silent where the type is undecided (unknown item, weather or hidden
+ * type, abilities that disagree, a Tera click in the same choice, an
+ * unknown attacker).
+ * GATES (pre-registered 23 Sep before the first bank run; chain part 1 on
+ * 23 Sep, the machine crashed hard at about 21:16 during the field bank;
+ * the resumed chain ran 24 Sep 07:45 to 09:23 with the bank on 4 slices,
+ * equal to 6 by construction (sorted merge) but never run on the same
+ * code at both counts, and measured the sentence and the tip with T81
+ * (r57-with-power); part 3 re-measured r57 without T81 after the park):
+ * base bank byte-identical to r56-shortcut. body: only the named families
+ * moved; Ivy Cudgel false hits 4 -> 0 and error 0.419 -> 0.200 (gate
+ * 0.30), Liquid Voice 1 -> 0 and 0.192 -> 0.164, Pixilate 0.636 -> 0.436;
+ * bank against r57-base gain on full singles (-9), no harm, warnings
+ * luck-adjusted doubles early (+59, hq +78); feedback: only 912045 moved,
+ * no verdict; the expected Lopunny-Mega (Scrappy) turns could not move,
+ * since no Ghost faces Lopunny-Mega in the four gen-6 games. field:
+ * Weather Ball 3 -> 0 and 0.242 -> 0.108 (gate 0.15). tera: three Tera
+ * Blast pairs after the click moved (family error over 66 pairs 0.071 ->
+ * 0.052; two refereed pairs fall, 0.400 -> 0.165 and 1.506 -> 0.504, the
+ * third, into Gastrodon-East, has no calc verdict); Tera Starstorm had no
+ * eligible pair (6 of 8 before the click, 2 on the wrongly built base
+ * Terapagos, which the simulator reads Normal too), error 0.058 unchanged.
+ * hp: Hidden Power 6 -> 0 and 0.341 -> 0.030 (gate 0.08); bank against
+ * the base gain on luck-adjusted singles (-9), no harm, same warnings;
+ * feedback: 648453 and 653785, 11 moved turns (8 change a tier), the
+ * pinned gap 653785 t19 moves quiet -> shift. power (T81): false
+ * immunities 128 -> 0 on the weight moves (arbiter error over 141 pairs
+ * 0.388 -> 0.048; the pre-registered 0.398 is the boost-applied census,
+ * 0.044 after), Endeavor 9 -> 0; bank HARM on luck-adjusted doubles (+45
+ * [+9, +91] against hp, +70 against the base; hq +79 and +146), singles
+ * mid -16 [-28, -5], warnings hq all late +15 against hp, luck-adjusted
+ * all early +43 and doubles early +196 against the base. The harm row
+ * (133 positions, Brier sum 0.598) sits on four games with Gouging Fire's
+ * Heat Crash: 941638 0.285 and 941650 0.064, where the Gouging Fire side
+ * lost, and gen9doublesou-2663095770 0.159 and 939635 0.078, where it won;
+ * the static prices Heat Crash like the calc (0.36 against 0.32); the
+ * cause is unmeasured -> parked under the pre-registered harm rule. With
+ * T81 eight dumps and 17 turns moved (12 change a tier), and the golden
+ * 655336 drifts in 6 details instead of 8: the t6 key moment and the
+ * turning point at 4 come back, both through Lopunny's Return, t6 only
+ * against an Iron Head row the Scarf-locked Bisharp cannot click (legal
+ * rows 0.19 and 0.21, out in both runs) and the turning point by 0.0019;
+ * 655336 then lists Lopunny-Mega as unanswered at t11 to t21. TIMING: with
+ * T81 the static cost 1.383x and the root search 1.109x against master
+ * (gates 1.15x and 1.05x; A/A 1.010x and 1.018x); without T81 the static
+ * still cost 1.263x (quick probe, one position); the timing commit (each
+ * slot resolved once, no allocation on the catalog path, lazy facts)
+ * brings it to 1.108x on the quick probe and the tip to 1.121x and 1.043x
+ * with byte-identical banks. TIP r57 (be0d0dd): play-out pin, three
+ * feedback runs byte-identical, regression, e2e, lint, tsc, pack smoke;
+ * census singles 38/2/0 -> 40/1/0, doubles 10/3/0 unchanged (with T81
+ * singles 39/1/0). READING (reader and skeptic per game): hp 3 more
+ * plausible, 4 equal, 4 less; its 648453 turns moved through the root
+ * hints (Hidden Power Ice 0.21 -> 0.85 at t23), which reorder expansion,
+ * redraw each root cell's one chance outcome and change which cells the
+ * verify step reprices (t24, t33; t31 one redrawn 70 % cell); no verdict
+ * hangs on the root price of Hidden Power Ice. Three of the four less
+ * plausible tiers (648453 t23, t24, t31) hang on a Heat Wave the build
+ * gives Tornadus-T and the log never shows (T89), t24 and t31 as much on
+ * the redrawn cells; 653785 t21 surfaced under the verify trigger. The
+ * kill odds still price Hidden Power as a bare Normal move, and a new
+ * 648453 t23 sentence prints "kills ~6% of the time" (T83). T81: 8 more,
+ * 4 equal, 7 less, 3 cannot tell. FINAL REVIEW (fresh reviewer, whole
+ * branch plus 34f84b9): ready with fixes; e8955c7 closes two false
+ * immunity claims in the sentence (a Tera click in the same choice before
+ * Tera Starstorm; an unknown attacker's Tera Blast) and comments that
+ * described T81 as shipped; after it the engine suite, regression, lint,
+ * tsc and one feedback run (byte-identical). NEW BASE
+ * .calibration/r57-timing (= r57-hp bytes): Brier 0.2543/0.2237/0.1193,
+ * hq 0.2441/0.1967/0.1227, luck-adjusted 0.2301/0.1957/0.1136, K pooled
+ * 2.30 (singles 2.24, doubles 2.42), decided 78.5 % of 107, held 94.9 %
+ * of 59; against r56-shortcut 157 singles and 108 doubles positions moved
+ * in 60 replays, singles -8 full (unresolved) and -9 luck-adjusted
+ * (resolved), doubles +18 and +24 unresolved. REMAINS: T81 (parked,
+ * re-fit candidate beside T71), T82 to T90. CLOSE AUDIT (three lenses,
+ * each finding checked by a refuter, reports in audit/): about 30 text
+ * corrections, none in code, folded into this block and NextSteps
+ * (b933ef9) and into the untracked spec, completed entry and backlog
+ * plan. VERDICT (user gate 24 Sep 12:13, "1a 2a 3a 4a"): adopted; r57
+ * goes to master by fast-forward and the master state to origin v1
+ * (origin/master stays e7f618f); T81 stays parked on r57-power as a
+ * re-fit candidate beside T71 (iteration 10a); the gap 653785 t19 is
+ * re-pinned quiet -> shift (re-checked with verdict/pin.vt.ts against the
+ * stored dumps of the three tip runs and the post-review run, byte-equal
+ * for that replay: that item alone moves, gap-moved -> gap-open, in all
+ * four; the shift sits inside the root's score/gameValue gap and leans
+ * on Tornadus-T answering Dragonite, which Weakness Policy refutes at
+ * t24); a verdict check (two lenses, each with a refuter) tightened the
+ * pin note; T82 to T90 stay where the booking placed them.
+ *
+ * DOUBLES CELL PLAN 2026-09-23 (improvement round 56, iteration 4c, T58;
+ * spec docs/superpowers/specs/2026-09-23-round-56-design.md, plan
+ * docs/superpowers/plans/2026-09-23-round-56-plan.md; fcab85c, f4ecfb2,
+ * 23ee2d2, 2ff26c0, 9404ccf, the booking bf8b11c, the final review's fixes
+ * 5996e40 and e5ab1e4 plus the close-audit corrections, cache v52,
+ * score-touching as a correction with its own evidence; probes, the
+ * census, the reading, the audit and both gate chains under
+ * docs/perf/probes/2026-09-23-r56/; adopted at the user gate of 23 Sep
+ * 17:18 ("1a 2a 3a"): r56 fast-forwards to master, branch v1 follows and
+ * is pushed, origin/master stays on e7f618f; iterations 4g (T77, T78) and
+ * 7d (T79, T80) stand where the booking placed them).
+ * INSTRUMENT: the bank's 833 positions rebuilt with the round-54 instrument
+ * (label r56-base); census.vt.ts counts the 248 doubles positions: 34 788
+ * root cells (12 x 12 options on average), 22 986 of them (66 %) with a
+ * dice event (a hit chance under 100 % or a kill only part of the damage
+ * rolls reach). Before this round a doubles root cell was the plain seed
+ * mean, because planCellEvents and koOddsForOptions bail on a comma
+ * choice, which every side with two living bodies makes (planCellEvents
+ * also fails once slot a has fallen, and master's koOddsForOptions priced
+ * a comma-free choice against the foe in slot a): one draw (seed 1,2,3,4)
+ * in the one-sample matrix of the bank and of the app's auto mode, three
+ * where that draw ended the game with a move under 100 % accuracy or a
+ * random call (21 of the 712 census cells), and up to the sample count
+ * where a body fell or such a roll was in the pair (three in the MCTS
+ * verify cells and in the app's think-deeper pass). On 712 sample cells
+ * from 62 positions, each with a 64-seed reference, master's value at one
+ * sample sat 0.062 from the reference on edge cells (median 0.022, p90
+ * 0.183, max 1.06), 0.018 on the rest. Anchor
+ * gen9championsvgc2026regmbbo3-2634199230 t5 (fixture
+ * test/fixtures/positions/…-t5.json): seed 1,2,3,4 is the 10 % miss of
+ * Mawile's Play Rough on Incineroar, so the played cell read -0.652
+ * against -0.125 over 256 seeds, and the app praised "kirans's read paid
+ * off" (+18 %) on a turn that cost kirans 24 points on the same linear
+ * scale (display 69 % to 48 %). The calc at the drawn roll (first seed;
+ * damage-check-anchor-v2.vt.ts over every legal pair of the anchor,
+ * damage-check-v2.vt.ts over every matrix cell of every third doubles
+ * position of the bank) matches the sim on all 8450 anchor rolls (6535
+ * non-lethal ones to the HP, 1915 lethal ones) and, on those 83 of the
+ * bank's 248 doubles positions, on 16 638 of 17 183 non-lethal rolls
+ * (96.8 %) and 6185 of 6186 lethal ones, once the three call details under
+ * (D) are in.
+ * CHANGE (packages/eval-engine/src/pair/, doubles only): (A) PairPRNG, a
+ * recording PRNG, writes down per hit instance (one move object and one
+ * target slot; hitStepAccuracy and getSpreadDamage set activeTarget per
+ * target) the accuracy roll with the sim's threshold, the crit roll with
+ * its denominator, the damage roll with the crit flag, and a speed tie
+ * among move actions; scripts answer one instance on demand and still draw
+ * their number, so everything before replays exactly. ScriptedPRNG and the
+ * singles solver are untouched. (B) The damage roll, and a hit roll under
+ * 100, carry a snapshot of the live bodies and field at that moment (the
+ * partner's weather, an Intimidate, a Tera click are in it). (C) A draw
+ * becomes a class: every instance gets miss, hit, hit-kill or hit-nokill
+ * with its probability (threshold/100; kill share (1-c)k/16 + c k'/16 from
+ * the calc); uncertain instances are the events, the class key their
+ * sequence in roll order, the weight their product; order, truncation,
+ * retargeting and redirection are whatever the sim did. A non-lethal roll
+ * skips the calc only when even its top roll as a crit falls short of the
+ * HP with 3 % and 2 HP of margin, and never under a modifier a crit
+ * ignores (the attacker's offensive drops, the defender's defensive
+ * raises, a screen; final review, 5996e40). (D) Kill tables from
+ * @smogon/calc on a doubles field with the partner effects it knows (ruin,
+ * auras, Helping Hand, Battery, Power Spot, Steely Spirit, Friend Guard,
+ * doubles screens), trusted where the drawn roll's damage matches to the
+ * HP; a KO roll only has to reach the HP, and a miss orders its hit
+ * alternatives by an unchecked table until the flip that draws one checks
+ * it. Three details keep the calc on the sim's number: calculate clones
+ * the move, so a spread move against one target goes in through
+ * overrides; Download, Intrepid Sword, Dauntless Shield and Embody Aspect
+ * stay out (the live boosts carry them); Meteor Beam and Electro Shot lose
+ * the charge boost the calc adds itself. (E) The heaviest untried flip
+ * (prefix mass times its probability, at least 0.01) is drawn next with
+ * the dice answering that one event the other way; stop at a coverage of
+ * 0.95, after 8 draws, or without a candidate (with one base draw every
+ * flip opens a new class; with three a flip can repeat one). (F) A cell
+ * where one of these rules fires goes to the plain mean of eight natural
+ * draws (the five search seeds and three probe seeds): before any draw
+ * paralysis, freeze, confusion, attraction, Quick Claw or Quick Draw, a
+ * Protect whose success is rolled, multi-hit moves and Parental Bond,
+ * random targets, random calls (F1); after a draw a speed tie among move
+ * actions or a random drag-in (F2), a |cant| from flinch, paralysis or
+ * freeze (the list also names attraction, but the sim writes 'Attract' and
+ * the check compares 'attract', so an attraction that starts during the
+ * turn goes unpriced, T77), a confusion check, a flinch-capable hit on a
+ * target that moves later (F3), Substitute, Focus Sash or Sturdy at full
+ * HP, Disguise, Ice Face (F4), a second roll on one target (F5), no damage
+ * line, no table, a calc that misses the drawn damage (F6), a flip that
+ * did not land (F7), a coverage outside 0.8 to 1.02 (F8). A crit that
+ * decides no kill, a chance secondary such as a burn or a stat drop and
+ * the damage roll of a hit that does not kill stay inside the drawn
+ * class. (G) The cell's value is the class means weighted by weight over
+ * coverage, in the CellBlend shape deepening and the verify merge already
+ * read; a cell where no rule of F fires and whose first draw shows no
+ * event keeps today's plain path and its value to the digit. Only root
+ * cells with blendRoot take the plan: the app's matrix, the verify cells,
+ * and on a depth-1 matrix turn the played pair and the item probes
+ * (evalPair sends them through evalCells), so MCTS turns meet it in their
+ * verify cells only; sub-searches, the MCTS tree, the solver and the
+ * prover are unchanged. (H) Doubles options carry kill odds
+ * (koOddsForOptions -> pair/odds.ts): per option the uncertain slot event
+ * with the best chance, labeled "Play Rough→Incineroar"; a foe another
+ * slot of the option kills for sure gives the other slot no headline
+ * (focus fire: Karate Chop kills Eevee, Tackle's crit into the same Eevee
+ * says nothing about whether it lives); an allAdjacent move counts the
+ * living partner for the spread modifier, as the sim does (final review,
+ * e5ab1e4). The prose names the label where it is set (phrases.ts,
+ * clauses.ts, win-reason.ts); the sack rule (grading's deniedByDice) and
+ * the denied early end (denied-end.ts) read labeled odds as none, because
+ * the headline may belong to the partner's slot (final review, e5ab1e4);
+ * singles sets no label. Odds are root odds as in singles: a Howl, a chip
+ * or a Tera click in the same turn is not in them. eval-mcts.spec.ts's
+ * round-7 pin "doubles results carry no koOdds (fail-closed)" now pins the
+ * labeled odds on the same battle.
+ * GATE (pre-registered 23 Sep before the first bank run, all met; first
+ * chain on 9404ccf, 11:54 to 12:47): base bank on master byte-identical to
+ * r55-rebuild; the pattern state (it carries the prng and table commits)
+ * byte-identical, nothing wired. Census on the 712 cells
+ * (census-after.vt.ts, identity exact against master's engine in the same
+ * process): edge-cell error 0.0212 mean, 0.0532 p90 (gates 0.030 and
+ * 0.07; master 0.0618 and 0.1829); 247 cells where no rule of F fires and
+ * the first draw shows no event identical to the digit; draws per planned
+ * or fallback cell 4.55 on average (gate 5.5; p99 10, max 15 = a spent
+ * plan budget plus the fallback's seven fresh seeds); plan 275, fallback
+ * 190 (142 of the 487 edge cells, 29 %, expected 20 to 35 %; 48 of the 225
+ * cells without an edge; 41 % of the 465 plan and fallback cells), plain
+ * 247; fallback reasons tie 68, Focus Sash 44, cant:flinch 25, stall 16,
+ * flinch-chance 8, prevented:volatile 7, no-table 4, cant:par 4, multi-hit
+ * 4, drag 4, calc-mismatch 3, cant:frz 2, low-cover 1. 57 of the 225 cells
+ * without an edge in the census still leave the plain path (tie 17, stall
+ * 13, par 3, drag 2, volatile 2: random outcomes the census did not count
+ * as edges; sash 7 and flinch 4, which the Focus Sash guard and Fake
+ * Out's certain flinch send to the fallback with no roll able to kill and
+ * no random outcome at stake; plus 9 planned); their error fell from 0.041
+ * to 0.015. The Task 4 and 9404ccf commits give the same 712 values.
+ * Anchor played cell -0.1427 against -0.125 (gate 0.05; 4 draws, classes
+ * miss 0.0917, Play Rough kill with both Matcha Gotcha hits 0.7431, with
+ * one Matcha Gotcha miss 0.0826 each). Doubles matrix time on the bank's
+ * 129 matrix positions, interleaved against master in one process: 3.72x
+ * and 3.46x in two runs (base 129.1 and 148.4 s, new 480.2 and 513.0 s;
+ * per position p50 3.1x and 2.9x, p90 6.4x and 6.6x; gate 4x), run 1 under
+ * load from other projects (CPU 27 to 77 %), run 2 while the round's own
+ * reading agents ran (13 to 38 % at its start). Bank r56-sampler against
+ * r55-rebuild: singles 585 of 585 rows byte-identical, doubles with a
+ * fainted fraction from 0.25 119 of 119 byte-identical (the bank runs
+ * those through mctsSearch, without verify), 112 of the 129 matrix
+ * positions moved; verdict "no gain resolved; no harm; warnings: hq
+ * doubles late (+15); resolved under 5 bp: hq all late (+4)" (the hint is
+ * the warning's 45 doubles positions spread over all 190 hq late
+ * positions, +4 [+0, +8]; singles are unmoved); full all +4 bp [-3, +12],
+ * doubles +13 [-10, +42], singles +0 in every cell; of the warning cell's
+ * +15 [+1, +35], 10.5 come from smogtours-gen9doublesou-912883 t10 (+0.180
+ * -> +0.081, p1 won) and 3.5 from -941650 t8; Brier 0.2547/0.2231/0.1198,
+ * hq 0.2444/0.1960/0.1234, luck-adjusted 0.2293/0.1947/0.1136, K 2.31
+ * (singles 2.22, doubles 2.46); r56-odds byte-identical. Feedback: the six
+ * singles dumps byte-identical to round 55, golden 655336 with them; the
+ * four doubles dumps move and now carry koOdds (154, 99, 56 and 171
+ * entries, 0 before); three tip runs byte-identical; doubles tiers 12/5/0
+ * -> 9/3/0 on 10 moved turns, the odds step alone moves none; singles
+ * 38/2/0. Play-out pin first (D7): green at 11:23 on the tree committed as
+ * 2ff26c0 (36 s, .superpowers/sdd/2026-09-23-round-56-plan/t4-playout.log),
+ * again inside e2e 75 of 75 at the tip; suite 193 files and 1568 tests,
+ * lint, tsc -b, pack:smoke.
+ * READ (reading/reading.md, one reader and one skeptic per game,
+ * read-only): the 10 moved turns sit in three games (2630685175 moved
+ * values, no label); of 12 rows the skeptics read 8 more plausible (two of
+ * them fragile: 2663093831 t6 turns back to chance with an itemless
+ * Dragonite, which the log allows; 912045 t1 p1 holds by 0.0017 once the
+ * eight-draw fallback's crits carry their true odds, those Fake Out and
+ * Sturdy cells falling back only through F3's Fake Out flaw and the sash
+ * guard, and by 0.0002 with the columns the option cap drops), 2 equally,
+ * 1 less, 1 cannot tell, and no misquoted number turns a verdict. More
+ * plausible: labels that stood on one seed now stand on priced classes or
+ * eight draws (2663093831 t4: the +1 Throat Chop kill on Sinistcha is a
+ * class of 0.1615 instead of seed 0's "no"; t7 and t8: Scale Shot misses
+ * in seed 0; 2629703929 t4: p2's read credit came from a Sleep Powder miss
+ * one draw priced as certain; 912045 t1: Make It Rain crits on Rillaboom
+ * in the Fake Out cells). 2629703929 t13 moved through the verify merge,
+ * not through a priced crit: the verify cell prices no crit class (its
+ * three base draws land in the no-crit class, 23/24 already covers 0.95,
+ * T77), and the merge now pools the two trees that played the cell out for
+ * a blend with one open class, where an unblended cell needed three (-0.7
+ * -> -0.968). Less plausible, 912045 t8: the verify cells now return
+ * pair-plan blends, and a blend with two or more open classes takes no
+ * tree draw (doubles trees carry no class keys) and deepens only its first
+ * draw, keeping static leaves for the rest (the T16 family); inside the
+ * played cell a non-lethal Drain Punch crit (p 0.0078) holds a third of
+ * the main class while the 0.95 coverage stop drops a lethal crit class
+ * (p 0.034); the older one-seed depth check against p2's actual Protect
+ * then clears p1. Cannot tell, 2629703929 t4 p1: the class mix raises p1's
+ * gap from 0.1494 to 0.3638 and the same depth check clears it.
+ * 2629703929 t1 loses a correct mistake tier through the item probe,
+ * whose pairs now take the pair plan as well: with Life Orb on
+ * Calyrex-Shadow, which the log rules out (no recoil after Solar Beam),
+ * the probe's gap falls from 0.4852 to 0.0454 and clears p2.
+ * SIDE EFFECT (measured, not gated; the round-51 app-path probe re-run in
+ * T11-after/ on 9404ccf): the anchor turn's card no longer praises kirans.
+ * It praises wb_vg, whose 90 % Play Rough connected ("a read that paid
+ * off, +17% over the safe Matcha Gotcha + → Incineroar", "Play
+ * Rough→Incineroar was a 90% roll to connect"), and grades the same click
+ * an inaccuracy (-9 %); the swing splits into +16 % from the choices and
+ * +12 % from the rolls instead of -17 % and +41 %. On the fixed tip e5ab1e4
+ * the card reads the same with small shifts (+16 % praise, -7 % inaccuracy,
+ * the same split). The praise gate itself stays T59.
+ * FINAL REVIEW AND AUDIT: a fresh reviewer read the branch (bf8b11c against
+ * e7f618f): no critical finding, three important ones, all fixed test
+ * first in one pass. (1) The margin rule under (C) skipped the calc for a
+ * normal roll under a modifier a crit ignores: 3362 of 33 485 skipped
+ * rolls over all 34 788 first draws hide a crit kill (median 1/24, max
+ * 1/8), in 3017 cells (8.7 %), always against the Intimidated side or
+ * into a screen; fixed in 5996e40. (2) The odds priced an allAdjacent move
+ * next to a living partner as single-target (Earthquake into a lone
+ * Snorlax: 16 of 16 rolls "kill", the sim's spread rolls kill none; on the
+ * bank smogtours-gen9doublesou-939635 t12 showed Earthquake→Roaring Moon
+ * at 0.34 for a crit-only kill); fixed in e5ab1e4. (3) The sack rule and
+ * the denied early end read the headline as the fainted body's own odds;
+ * fixed in e5ab1e4 by reading labeled odds as none, master's doubles
+ * behavior. Second chain on the fixes (5996e40 and e5ab1e4, 15:31 to 16:16):
+ * census on e5ab1e4: 41 of the 712 cells move, their error falls from 0.0299
+ * to 0.0234; edge-cell error 0.0208 mean, 0.0526 p90; the 215 cells where no
+ * rule of F fires and the first draw shows no event stay identical to
+ * master; calc-mismatch fallbacks rise from 3 to 17 (rolls the margin rule
+ * skipped now meet the calc, and some miss it, T76); 4.53 draws; anchor
+ * unchanged at -0.1427; matrix time 3.61x (base 154.7 s, new 558.2 s; per
+ * position p50 3.3x, p90 6.5x). Bank r56-shortcut against r56-odds: 42
+ * doubles matrix positions move, verdict "gain on luck-adjusted all (-1),
+ * luck-adjusted doubles (-2); no harm; no warnings"; against r55-rebuild the
+ * round's verdict stands ("no gain resolved; no harm; warnings: hq doubles
+ * late (+15); resolved under 5 bp: hq all late (+4)", full all +4 [-4, +12],
+ * doubles +12 [-11, +41]), singles 585 of 585 and doubles from a fainted
+ * fraction of 0.25 119 of 119 byte-identical, 115 of 129 matrix positions
+ * moved; Brier 0.2546/0.2231/0.1197, hq 0.2444/0.1960/0.1234, luck-adjusted
+ * 0.2290/0.1947/0.1136, K 2.31 (singles 2.22, doubles 2.46); new base
+ * .calibration/r56-shortcut (r56-fixodds byte-identical). Feedback: the
+ * margin fix moves three doubles dumps and one verdict, 912045 t1 p2 none ->
+ * inaccuracy (0.067 -> 0.120): Roaring Moon's Breaking Swipe drops Ogerpon's
+ * Attack first, and the column where Ogerpon terastallizes into Ivy Cudgel
+ * now prices the crit that ignores the drop (in the game an Ivy Cudgel crit
+ * took Roaring Moon to 9 %), but that column carries the Tera type the build
+ * gets wrong (Grass for Rock, T79): cannot tell. The odds and grading fixes
+ * move no dump; three tip runs byte-identical; doubles tiers 10/3/0, singles
+ * 38/2/0; suite 193 files and 1572 tests, e2e 75 of 75, lint, tsc -b,
+ * pack:smoke. The second chain's states file carried CRLF line ends, so a
+ * catch-up script ran the two stages it skipped. Seven minor findings are
+ * deferred (T77, T18). The close audit (numbers, process, unsupported
+ * claims, each with a refuter) found 58 points in the booking, 57 held, and
+ * every correction is in this entry, NextSteps and the spec. Found on the
+ * way: origin/master was pushed to e7f618f on 21 Sep 17:18:58, 18 s after v1
+ * (reflog), while D1 and the round-55 entry below said master stays
+ * unpushed; the user gate of round 56 settled it ("2a"): only v1 follows
+ * the master state, origin/master stays on e7f618f.
+ * REMAINS: T77 (rule E's 0.95 coverage stop drops a rare expensive class,
+ * the game-ending crit of 2629703929 t13 among them; a Fake Out flinch is
+ * certain, yet F3 counts its |cant| line, 13 of the census's 25
+ * cant:flinch fallbacks; the review's minors on Attract, paralysis dealt
+ * in the same turn, Wide Guard and Quick Guard, duplicate flips at three
+ * base draws, the sash guard and deepened fallback cells), T78 (doubles
+ * trees flag no boundary cells and carry no class keys: planCellEvents
+ * fails on doubles; 2629703929 t13 reads a last turn as decided although
+ * Flare Blitz kills Solgaleo in 58 % of its rolls and p1 wins about 56 %
+ * against the played Psychic Fangs), T79 (Ogerpon's fixed Tera type and
+ * mask: the build leaves the type empty and the sim picks Grass), T80 (the
+ * protocol rules out Life Orb without recoil and Leftovers without a heal;
+ * the build keeps them). Flinch as its own class (T24), speed ties as a
+ * coin (T15), the crit class (T23) and scripted classes at the singles
+ * root (T14) build on this plan; its F2 is the doubles half of T15, its F3
+ * that of T24 and T65. The calc gaps both formats share are T76; in
+ * doubles F6 catches them where a non-lethal roll misses its damage or a
+ * KO roll falls short of the HP. C signals from the reading: the app's row
+ * suffix (KoSuffix) shows a doubles kill chance without its label; doubles
+ * odds are root odds; the doubles option cap (RESTRICT_K_DOUBLES, 16
+ * combos) drops p2's natural lines in 912045 t1; in 2663093831 t7 the
+ * played combination is not among p1's 12 options and the partial matcher
+ * fills the hidden slot with a switch the log rules out; the Orthworm move
+ * order there is one of round 53's 15 stillBroken rows (T30). The read
+ * clause prints "X was kills ~4% of the time" for a sure-hit move (singles
+ * too since round 6, T18).
+ *
+ * REBUILD FIDELITY 2026-09-21 (improvement round 55, iteration 4e, T74 and
+ * T70, a fast round without a spec; b583b79, 2f9b0a9 plus the booking, cache
+ * v51, score-touching as a correction with its own evidence; probes, the
+ * census and the gate chain under docs/perf/probes/2026-09-21-r55/; adopted
+ * at the user gate of 21 Sep 17:18: r55 fast-forwards to master, branch v1
+ * follows and is pushed (17:18:40), and master went to origin/master as
+ * well (17:18:58, reflog; D1 said otherwise until round 56); round 56 is
+ * iteration 4c, T58).
+ * INSTRUMENT: lock-census.vt.ts makes one pass per replay with the working
+ * tree's engine (the bank's app build, corrections at every boundary) and
+ * compares, at each of 3695 turn boundaries in 149 replays (the bank's 129,
+ * the feedback fixtures, the fit corpus's doubles replays with a locked-slot
+ * turn), the move locks the PROTOCOL shows on an active slot (Encore,
+ * Disable, Taunt, Torment: a |-start| without a later |-end|, switch or
+ * faint) against the volatiles the rebuilt body carries; it also sums the
+ * rejected choices (choiceErrors keeps the count and the LAST message per
+ * replay, so message classes are a lower bound). 181 s a label. BEFORE
+ * (7c0112d): Encore on 42 boundaries by the protocol, 7 missing and 1 extra
+ * in 4 replays; Taunt on 65, 1 missing and 2 extra; Disable and Torment never
+ * occur; 42 rejected choices. CAUSE T74 (gen9vgc2026regi-2629703929 t5,
+ * -2630452654 t4, smogtours-gen9doublesou-914408 t7, every time the encored
+ * move is Protect): an Encore that lands BEFORE its target moves bends the
+ * click onto the encored move, and the protocol shows that move, not the
+ * click. The rebuild sent Protect back; at +4 it ran ahead of the Encore, and
+ * the sim counts an Encore on a target that has already moved one turn longer
+ * (conditions.encore.onStart, queue.willMove). In 2629703929 the lock stood
+ * t6 to t8 instead of t6 and t7, and the second Encore of t8 failed against
+ * the first, so t9 to t11 offered Koraidon its attacks while the game had it
+ * on Protect. CHANGE (clickBehindEncore, branch/protocol-choices.ts): when a
+ * |-start|…|Encore for the slot precedes its |move| line in the same turn,
+ * the stand-in click is the request's lowest-priority other enabled move at
+ * priority 0 or below; the Encore bends it as in the game. No such move: the
+ * line stays the choice. The snapshot carries no volatiles, so the loss is
+ * prevented at the source, not restored at the boundary. CAUSE T70: a locked
+ * request (recharge, the release turn of Fly, Dig, Phantom Force or Electro
+ * Shot, a continued rampage) carries one entry WITHOUT a target;
+ * defaultMoveChoice and targetLocSuffixForChoice read the target type from
+ * moveSlots[0] or the Dex, hung a loc on the locked slot, and the sim
+ * rejected the whole side choice, so the PARTNER played its default. CHANGE:
+ * no loc for a request entry without a target; the default resolves against
+ * the request's entries. SECOND DOOR into the same room, found when
+ * 2630452654 still missed its Encore: a slot without an action line (a
+ * flinch) defaulted to `move 1`; on a choice-locked body that entry is
+ * disabled (Miraidon locked into Snarl, `move 1` = Volt Switch), the side
+ * was rejected, and Iron Valiant played Protect instead of its Encore.
+ * CHANGE (2f9b0a9): the default is the first ENABLED entry. In singles the
+ * sim's own `default` already picked that move, so only the error goes.
+ * AFTER: Encore 1 missing, 0 extra (smogtours-gen9doublesou-937928 t4: the
+ * rebuilt Ogerpon outspeeds Ninetales, the game had it the other way round,
+ * so the Encore meets a body without a last move; a broken move order, T30);
+ * Taunt unchanged at 1 and 2 (smogtours-gen9ou-752301: the built Landorus
+ * carries no Taunt; -751543 t20 unread); rejected choices 42 to 21 in 19
+ * replays, no "can't choose a target" left and "is disabled" down from 17
+ * replays to 3 (cause unread); by last message the rest is 11 x "can only switch
+ * in once" (doubles, 10 replays), 4 x "doesn't have a move matching" (3
+ * replays), 3 x "is trapped", 3 x "is disabled" (T75). GATES: bank
+ * r55-rebuild against r54-nostab,
+ * 833 of 833 joined, 5 positions moved, all doubles, all in the three Encore
+ * replays (2629703929 t6 -0.04 to +0.09, t8 -0.78 to +0.61, t10 -0.60 to
+ * -0.95; 2630452654 t6 +0.68 to +0.51; 914408 t8 -0.78 to -0.81); every
+ * singles row unmoved to the digit; full all +8 bp [+0, +25], doubles +28
+ * [+0, +83], doubles mid +74 [+0, +219], luck-adjusted all +1 [+0, +2];
+ * verdict "no gain resolved; no harm; no warnings". The +74 is one position:
+ * 2629703929 t8 now reads p1 ahead with a FREE Koraidon next to a 13 %
+ * Groudon, p1 clicked a third Protect, was encored into it and lost; the
+ * bank counts the outcome against a read the log supports. Brier
+ * 0.2537/0.2230/0.1195, K 2.31; new base .calibration/r55-rebuild. Feedback
+ * three runs byte-identical, exit 0; against the round-54 dumps 9 of 10
+ * unmoved (all six singles), 2629703929 moved on six turns: t11 blunder
+ * (regret 0.51) and t9 inaccuracy gone, t9 to t11 offer Protect alone, t6
+ * mistake 0.23 to 0.02 (the search below it no longer carries the long
+ * lock), t8 new inaccuracy 0.17 (free, Collision Course into the 13 %
+ * Groudon was on offer, p1 clicked Protect). Doubles tiers 12/6/1 to 12/5/0.
+ * Suite 188 files and 1530 tests, tsc -b, lint, e2e 75 of 75 (a first full
+ * run right after the feedback chain lost three tests to timeouts; each
+ * passes alone, the second full run is clean).
+ *
+ * TERA IN THE STATIC EVAL 2026-09-20 (improvement round 54, T57; b7313de,
+ * 5dffd19, be95961, 735bb42, 5c22919, 55c9a5a, ef0e3f4, ffb1269, 581424a,
+ * 63c16d6, 6aedcd8, the booking 34fe304 plus the closing commits, cache v50,
+ * score-touching as a correction with its own evidence; the STAB rule d8eb0a3
+ * was built, measured and parked again by c910b91 (measured under its first
+ * hash 8a0b790, reworded since, tree 57367a6 identical), the state with the
+ * rule stays on branch r54-stab at 252ade4; spec
+ * docs/superpowers/specs/2026-09-20-round-54-design.md, preparation, probes,
+ * the gate chain, the code review, the reading and the close audit under
+ * docs/perf/probes/2026-09-20-r54/; close audit BEFORE the gate, four lenses
+ * with a refuter each: 39 findings confirmed (several raised by two lenses)
+ * and worked in, 7 refuted, every bank number re-derived and found right;
+ * adopted at the user gate of 21 Sep 16:21, "1a 2a 3b 4a": the line without
+ * the STAB rule stands and fast-forwards to master, the rule stays parked for
+ * T71; T74 with T70 moves ahead of iteration 4c as iteration 4e and becomes
+ * round 55, T73 moves right behind 4c as iteration 4f; branch v1 follows
+ * master and is pushed, master itself stays unpushed). FINDING (round 51,
+ * T54): after a Tera click @pkmn/sim keeps pokemon.types at the old types and
+ * carries the new one in terastallized; six static leaves read the old types.
+ * smogtours-gen9ou-751207 t6: Body Press into a Ceruledge that had
+ * terastallized to Fighting priced 0, as into a Ghost, where the engine's own
+ * damage calc reads a knock-out. NextSteps quoted 237 % of its HP for that
+ * hit; the calc double-counts Zamazenta's Dauntless Shield there (it
+ * re-applies the switch-in boost on top of the sim's stage), by hand it is 164
+ * to 193 %, and the false immunity stands either way. A second defect had to
+ * fall first: the reconstruction lost Tera clicks, always one body too few,
+ * never one too many. PREPARATION (two readers and a probe builder, a checker
+ * each): the instrument docs/perf/probes/2026-09-20-r54/T57/probes/ rebuilds
+ * the bank positions with the working tree's engine (833 of 833 bank scores of
+ * r53-carry reproduced bit for bit, 806 distinct values), counts Tera bodies
+ * against the protocol and measures singleMoveFraction against the Tera-aware
+ * damage calc, 167 s a label. BASE "before" (f88bab2): Tera body on the field
+ * in 226 positions by the log, 215 in the rebuild; 17 positions one body short
+ * (3 singles, 14 doubles), 0 over, 7 replays (round 51 counted 18;
+ * gen9ou-2663115494 t50 keeps its body since round 52 or 53, which of the two
+ * is unmeasured). Referee: 2529 pairs of attacker, move and defender in the
+ * 215 positions, 50 false immunities (static 0 where the calc deals damage),
+ * all from the raw type chart, all with a terastallized defender; mean |static
+ * - calc| 0.2146 over the rows with a real calc result (46 rows are empty
+ * because @smogon/calc does not know Gastrodon-East, T72). CAUSE A (13 bodies,
+ * 3 replays): a Tera turn without an action line for the slot (a flinch; 8 of
+ * 207 clicks over the 129 replays, 5 of them bodies that fell before they
+ * moved) fell through getChoiceForSlot to defaultMoveChoice, the one branch
+ * without the gimmick suffix. CAUSE B (4 bodies, 4 replays): the body faints
+ * only in the rebuild, the sim's faint block deletes terastallized, the HP
+ * correction revives the body without it. CHANGE, one commit a rule, red test
+ * first: (A) the fallback carries the suffix like the other branches (Tera,
+ * Mega, Ultra Burst), never on `pass`. (B) restoreTeraFromSnapshot
+ * (branch/tera-restore.ts) runs after the HP correction at every boundary: a
+ * living snapshot entry that carries the marker spends the side's Tera
+ * (canTerastallize null for every ally, so the search never offers a second
+ * one) and gives the marker back to its body; gen 9 only, never onto a side
+ * that already carries a marker, never onto a side with an Illusion holder
+ * (the protocol names the disguise), never for an entry matching no body or
+ * two, never for Ogerpon, Terapagos and Morpeko (the click also changes forme
+ * and ability, Terapagos 140 max HP; the marker's loss stays there). The first
+ * draft's trigger ("the side spent its Tera and nobody carries it") was
+ * refuted by the checker: that state holds in every battle before gen 9, after
+ * every real faint of a Tera body and after Revival Blessing (964 of 6896
+ * side-turns on the bank); the snapshot alone decides. (C) pairKey carries
+ * terastallized next to the raw types for both bodies: the defender's term
+ * mirrors the liveTypes read (a Stellar body keeps its old types, so the raw
+ * types stay), the attacker's term mirrors no read while STAB stays tera-blind
+ * and is kept for the parked rule. (D) liveTypes(pokemon) feeds the immunity
+ * and the type chart in threat.ts, Stealth Rock and Toxic Spikes in hazards.ts
+ * and Black Sludge in features.ts; isGrounded() saw Tera before and stays. Not
+ * getTypes() on purpose (Roost, added types): the round measures Tera alone,
+ * and the shortcut is exact at a boundary because the click clears an added
+ * type and Roost does not outlast its turn. (E) STAB by the game's rules (old
+ * type 1.5, Tera type 1.5, both 2.0, Stellar 2.0 and 1.2), checked against the
+ * sim on eight cases: built as d8eb0a3, PARKED, see below. (F)
+ * ABILITY_FLAG_IMMUNITIES: Wind Rider, Soundproof and Bulletproof blank wind,
+ * sound and ball moves (gen9doublesou-2660822493 t2, Hurricane into Shiftry).
+ * (G) render-only: nullMoveReason takes the defender's Tera type, names it in
+ * its sentence ("Garchomp (Tera Fire) cannot be burned") and stays silent on
+ * eleven moves the sim retypes on use (Tera Blast, Weather Ball, Judgment and
+ * kin; each pinned by a test); pokemonInfoFromSnapshot carries teraType, so
+ * the branch panel's fallback preview stops reading Body Press into the
+ * Fighting Ceruledge as 0 %. The guard is not singles-only as its comment
+ * said: a doubles endgame with one living active a side reaches it (in the
+ * corpus one turn, VGC 2629703929 t13, where nothing moves). CODE REVIEW
+ * before the chain (four lenses with a refuter per finding; the fifth lens,
+ * spec against code, failed on its output format): 12 of 19 findings
+ * confirmed, none a blocker; 11 are worked in and the twelfth becomes T70: the
+ * restore's carve-outs left the side's Tera armed (581424a), the "side stays
+ * spent" assertion could not go red (the side was spent before the staged
+ * faint; now a fixture with an armed side; of the review's 13 mutants of the
+ * restore 12 die, the thirteenth, the snapshot entry's !fainted filter, is
+ * equivalent on every state the pipeline reaches; the close audit found the
+ * knownType write unpinned, the fixture now starts from false), pins for the
+ * `pass` trap, the Stellar defense and the guard's side pick. One finding
+ * predates the round and becomes T70: in doubles a locked slot (recharge, a
+ * Fly release) gets a target loc, the sim rejects the whole side's choice and
+ * the partner plays the default (14 of 681 doubles replays of the fit corpus,
+ * 0 on the bank). GATE CHAIN (docs/perf/probes/2026-09-20-r54/gates-chain.sh
+ * checks every state out and measures it alone: bank paired against the
+ * previous state and against r53-carry, the instrument, one feedback run).
+ * Base: a bank run on master is byte-identical to r53-carry (209 s). clickA:
+ * 13 of 833 positions move, all doubles, in exactly the three flinch replays
+ * (gen9vgc2026regi-2629760324, smogtours-gen9doublesou-938644 and -939625),
+ * three sign flips of which two land on the winner (938644 t14 from +0.33 to
+ * -0.72 where p1 lost); no gain resolved, no harm; Tera count 17 short to 4.
+ * markB: 5 positions in three of the four cause-B replays, at most 0.033 (the
+ * static is still blind there); Tera count 0 short and 0 over, 226 against 226
+ * on the field and 334 against 334 alive: the round's first success measure.
+ * key: byte-identical to markB. def: 293 positions move (147 singles, 146
+ * doubles, 98 replays), every one of them with a living Tera body and none
+ * without (pre-registered, met); against key: full singles -7 bp [-15, +0],
+ * luck-adjusted singles -13 [-25, -2], doubles -13 [-78, +40] unresolved
+ * (round 51's depth-1 direction run had let expect +45 for doubles; it does
+ * not show); table verdict: gain, no harm, no warnings. Referee: false
+ * immunities 52 to 1 (pre-registered: at most 1), mean error 0.217 to 0.153,
+ * of 639 disagreeing pairs 540 closer to the calc and 99 farther; on the pairs
+ * with a terastallized defender alone the distance falls 0.305 to 0.113
+ * (pre-registered: falls). The one left is no Tera defect: Primarina's Liquid
+ * Voice turns Hyper Voice into a Water move, the static reads it Normal into
+ * the Tera Ghost Sneasler (T73). stab: 128 positions, all with a living Tera
+ * body; the referee sides with the rule (116 of 150 disagreeing pairs closer),
+ * the bank does not: against def, HARM on luck-adjusted doubles +10 bp [+0,
+ * +22], warnings on hq doubles late +8 and luck-adjusted doubles late +23,
+ * full doubles +14 [-3, +37] (the harm row's lower end is +0.49 bp and prints
+ * as +0; the script decides on the unrounded value), every pooled singles row
+ * unresolved, one hint under 5 bp (full singles early +0). Pre-registered for
+ * this step: the distance on the pairs with a terastallized ATTACKER must not
+ * rise (base 0.211 on the label before). It reads 0.2185: below its own
+ * predecessor def (0.2261), above the pre-registered base, which clickA and
+ * markB had lifted by bringing Tera bodies back (755 such pairs to 778); both
+ * numbers went to the gate. Why the bank reads doubles worse under the truer
+ * rule was NOT measured; the working guess is that weights and K were fitted
+ * against the blind static, so the rule waits for the re-fit rounds (T71).
+ * flags: 6 positions in 3 replays (the two Wind Rider games and
+ * gen9ou-2663110678, a singles game where a built set carries Soundproof), at
+ * most 0.034, both disagreeing referee pairs closer. review (the module split,
+ * the review fixes, the render commits): byte-identical to flags. VARIANT
+ * WITHOUT STAB (c910b91, the line this entry books): against r53-carry gain on
+ * luck-adjusted all -22 and luck-adjusted singles -13 [-26, -2], full singles
+ * -6 [-15, +0] and full doubles -46 [-113, +14] unresolved, no harm on any
+ * pooled row; against the tip with STAB luck-adjusted doubles -10 [-22, +0].
+ * ONE WARNING on both lines: hq doubles mid on 49 positions, +96 bp [+8, +198]
+ * on the booked line and +98 [+11, +196] with STAB; 58 of it come from clickA
+ * and 38 from def, and three positions carry 92 of the 96
+ * (smogtours-gen9doublesou-937928 t6 +0.18 to +0.47, -913993 t6 -0.23 to
+ * +0.05, -939625 t8 -0.11 to +0.09, p1 lost all three). A phase cell warns and
+ * does not decide (D3); it went to the gate with its size. NEW BASE
+ * .calibration/r54-nostab: n=833, the same positions: sign 54/65/85 (singles
+ * 66, doubles 73); brier 0.2540/0.2207/0.1193; K pooled 2.34 (singles 2.22,
+ * doubles 2.55); hq n=559 0.2429/0.1956/0.1226; luck-adjusted n=501
+ * 0.2272/0.1940/0.1131; decided 75.9 % of 108, held 94.6 % of 56. The tip with
+ * STAB (.calibration/r54-review) reads 0.2540/0.2213/0.1196, K 2.33. FEEDBACK:
+ * the six singles dumps (gen 6 and 8, no Tera) are byte-identical to round 53
+ * in every state, tier census singles 38/2/0 throughout. The four doubles
+ * games without pins move from def on: the census flags 16 turns, doubles
+ * 7/5/0 to 12/6/1 (with STAB 9 more turns and 14/4/1). NextSteps asked that
+ * the tier census hold: it does in singles and does NOT in doubles (five
+ * inaccuracies, a mistake and a blunder more), which is why every moved turn
+ * was read. READING of the moved doubles judgments (a reader and a skeptic per
+ * game against the replay logs,
+ * docs/perf/probes/2026-09-20-r54/reading/reading.md; where the two differ the
+ * skeptic's verdict counts, one turn of the def step and three of the STAB
+ * step): the readers covered the 16 turns the census flags for the def step
+ * plus one it does not (gen9vgc2026regi-2630685175 t2, a regret that moved
+ * without changing a label). Of these 17, 8 read more plausible than before, 4
+ * equally, 3 less, 1 looks like single-draw noise and 1 cannot be told from a
+ * dump. The type relations hold after the skeptics' corrections: three were
+ * wrong in the readers' reports and were fixed there (Fire into Grass/Flying
+ * is 2x, not 4x; Rock Slide into Fighting/Dragon goes 0.5x to 2x, not 1x to
+ * 2x; Tera Water changes nothing for Sacred Sword), and no verdict turns on
+ * one (VGC 2629703929 t7: Chi-Yu's Heat Wave leaves the Tera Dark Jumpluff at
+ * 40 %, the neutral hit the new static prices, not the 2x the blind one
+ * assumed). None of the three less plausible turns is a type error. In
+ * 2629703929 t9 and t11 the new inaccuracy and the new blunder (regret 0.00 to
+ * 0.51) grade p1 against Koraidon attacks while the log has Koraidon
+ * Encore-locked into Protect from t9 to t11; the base dumps already offer
+ * those attacks there, so the missing lock is older than this round (cause
+ * unmeasured, T74) and the right type reading only turned it into a tier
+ * (Groudon's Precipice Blades now hits the Tera Fire Koraidon twice as hard).
+ * gen9doublesou-2663093831 t9 drops from "unclear" to "quiet" because the
+ * swing of a double-flinch turn falls under the 0.2 threshold. For the STAB
+ * step the census flags 9 turns; the readers looked at 12 turn-steps there and
+ * found them murkier (3 more plausible, 2 equally, 2 less, 3 noise, 2 cannot
+ * tell): the t11 blunder that comes with def goes again with stab while
+ * another appears at t9. Doubles root cells are single draws (T58); a moved
+ * doubles judgment stays a reason to look and no proof (D21). Three runs
+ * byte-identical on the booked line (two on 20 Sep, the third on 21 Sep after
+ * a regular shutdown cut the chain) and on the tip with STAB; one feedback
+ * attempt of the def state failed on a page-load timeout (649664, the player
+ * name never rendered) and passed on the retry. On the booked line: suite 186
+ * files and 1521 tests (1524 with the close audit's pins, which touch tests
+ * and one comment only), e2e 75 of 75, lint and tsc -b clean (the tip with
+ * STAB: 1527 tests, e2e 75 of 75). NOT IN THIS ROUND: Hidden Power in the
+ * null-move guard (gens 2 to 7 carry the bare id hiddenpower with dex type
+ * Normal, so a Hidden Power into a Ghost still reads as a null; none of the
+ * four times the guard fires in the ten dumps is one; T73); Tera Blast,
+ * Adaptability, the 60 BP floor, the Pledge moves, the Stellar bookkeeping;
+ * abilities and moves that retype (Liquid Voice, the -ate family; T73);
+ * gimmickSuffixForSlot checks the slot, not the body behind the colon (built
+ * sets carry the species as the name, the protocol the nickname, so a name
+ * check does not carry; how often the rebuild holds another body there is
+ * unmeasured); a rebuild-only faint costs more than the marker (every
+ * volatile, isStarted, lastMove); a rejected choice is answered with the sim's
+ * default, which never terastallizes (the restore catches the marker at the
+ * next boundary, the turn itself stays unfaithful); parsePlayedActions carries
+ * no action on a |cant| turn, so no Tera either. The referee is blind to
+ * weather, terrain and screens (67, 40 and 29 of the 215 positions) and
+ * double-counts switch-in boosts: only the difference between two states
+ * carries, never the absolute distance.
+ *
+ * PRE-SOLVE CARRY 2026-09-20 (improvement round 53, T66; 5c6dcf6 plus the
+ * closing commit, cache v49, score-touching as a correction with its own
+ * evidence; adopted at the user gate of 20 Sep 16:22, "1a 2a 3a": the carry
+ * stands and fast-forwards to master, the t86 remainder stays a C signal
+ * without a TODO, branch v1 follows master and is pushed; spec
+ * docs/superpowers/specs/2026-09-20-round-53-design.md, sighting and probes
+ * under docs/perf/probes/2026-09-20-r53/, close audit of four lenses with a
+ * refuter each: 25 findings confirmed and worked in, 3 refuted). FINDING:
+ * round 52's count (the app build breaks 20 of 910 observed singles move
+ * orders, a single solve 10) has one cause, and it sits between the two
+ * stages, not in the ladder. The speed-only pre-solve repairs the order and
+ * builds it into the base sets; the full solve takes those as its prior. A
+ * mon whose damage lines misfit forfeits "to the prior" and leaves the
+ * solved map, and the caller's build, which no longer knows the pre-solve,
+ * reaches past it to the usage guess. carryItemDecisions returned the
+ * pre-solve's entry only with an item decision. SIGHTING
+ * (T66/stage-trace.vt.ts rebuilds the chain stage by stage and first equals
+ * solveReplaySpreads on 129 of 129 bank replays and 10 of 10 feedback
+ * games): broken singles orders of 910 by build: no evidence 70, after the
+ * pre-solve 7, app build 20, single solve 10; doubles: no evidence 31 of
+ * 267, every solved path 8. All 13 rows the pre-solve holds and the app
+ * build loses carry a forfeited mon whose Speed snaps back to the usage
+ * guess (2658663776 Volcanion 239, 176, 239 against Gliscor 226); in the
+ * one row where the full solve also overrules a spread (2658669868
+ * Gholdengo, 252 EVs into SpA) its Speed stays 219 on every stage, so no
+ * row is lost to an overruled Speed. Round 52's lead (speedMeasured,
+ * speedError against the counterpart's current spread) explains none of
+ * them: in stage two speedMeasured holds the pre-solve's Speed as designed.
+ * The parser drops an order only in the direction that could explain it
+ * (speedContaminatedAt): Trick Room and same-turn entries bilaterally, a
+ * speed raiser (Tailwind, +Spe, paradox boosters) on the first mover, a
+ * lowerer (paralysis, -Spe) on the second. What it keeps is a constraint a
+ * fortiori, so the count's plain Speed comparison needs no such arithmetic;
+ * the probe still reads a mega at its base forme's Speed. CHANGE:
+ * carryPreSolve (team-builder.ts) returns the pre-solve's entry for every
+ * forfeited mon the full solve drops from its map, with or without an
+ * item. A forfeited mon whose max HP the log pinned stays in the map as the
+ * stage-two prior (the pre-solve's build) with that HP and takes only the
+ * item along, as does a mon the full solve kept; how many mons take that
+ * middle branch was not counted. A mon a pasted team or a sheet matches
+ * never reads `inferred` in the build, so a carried entry reaches only its
+ * panel. Single-stage callers are untouched. Red test first
+ * (packages/replay-core/test/two-stage-carry.spec.ts, singles and doubles:
+ * 289 against 303 before the fix; the doubles log yields no damage
+ * observation, so it pins the same solver path under a doubles header). The
+ * control case was blind at first: the audit showed a carry that overwrites
+ * every kept entry passing it; it now demands the single-solve build and
+ * Garchomp's 0 HP EVs, and that mutation turns it red. OWN EVIDENCE on the
+ * fixed code: the checkout's own chain (probe stage `app`, added between
+ * the before and the after run; `final` stays the old carry at 20 by
+ * construction) breaks 7 of 910, the 13 rows are gone, doubles 8 of 267.
+ * The 15 rows left are broken by every build, the evidence-free one
+ * included: four sit at maximum Speed on both sides (one of them the list's
+ * only Choice Scarf), five carry no Speed EV on either side, six are mixed;
+ * T30's ground, full list in stage-trace.json under stillBroken. SET DIFF
+ * before the bank (D8), pre-registered and met: 9 of 1549 bank sets in 8
+ * replays, all singles (eight change Speed, Reuniclus gains 4 SpA from the
+ * top-up); 0 of 120 sets in the feedback harness. The solved MAP grows
+ * further than the sets: the carry adds 165 entries on the 129 bank replays
+ * (the old carry added none), 154 of them with the EVs the usage guess
+ * already showed.
+ * BANK (.calibration/r53-carry against the day's base r52-appbuild, itself
+ * run twice byte-identical on c4bbe02 with no code commit since; wall 211
+ * s): 39 of 833 positions move, all singles, in exactly those 8 replays; 3
+ * by more than 0.05, one by more than 0.2. Pooled -7 bp [-21, +0], singles
+ * -10 [-29, +0] (pre-registered: at most -5, order of -10), doubles
+ * digit-identical; luck-adjusted -11 [-34, +0] and singles -16 [-45, +0];
+ * hq no gain resolved (the stall game is rated 1630, outside hq). Table
+ * verdict: gain, no harm, no warnings. NEW BASE: n=833, the same positions:
+ * sign 54/65/84 (singles 66, doubles 73); brier 0.2566/0.2197/0.1232; K
+ * pooled 2.28 (singles 2.20, doubles 2.41); hq n=559 0.2431/0.1937/0.1275;
+ * luck-adjusted n=502 0.2330/0.1948/0.1177; decided 76.7 % of 103, held
+ * 94.7 % of 57 (the held count drops by exactly 2658663776 t86).
+ * MISSED: 2658663776 t86 moves from +0.988 to +0.069 and does not read for
+ * p2 as NextSteps asked. The order is right now (Gliscor's Substitute
+ * stands before Flamethrower). Why the position still reads almost even was
+ * not measured: from t84 Volcanion clicks Flamethrower ten turns running
+ * into Gliscor's alternating Protect and Substitute under Poison Heal, and
+ * p1 forfeits at t94 with Flamethrower's PP not spent. Whether the search
+ * horizon, the PP bookkeeping or a set carries the rest is open; booked as
+ * a C signal. The raw build read -0.251 there with a Volcanion at 0 SpA
+ * (round 52, T56/stall-2658663776.txt); whether that set produced the
+ * number is untested.
+ * AGAINST THE OLD BUILD (base-20260920): pooled +4 [+0, +7] se 2, singles
+ * +5 [+0, +10], hq +3 [+0, +6]; round 52 read +11 [+1, +28] and +15 [+1,
+ * +39]. The gap's point estimate falls by 7 bp, well inside either band
+ * (the two pairings also run on different fixed K, 2.29 and 2.24). On this
+ * pairing the script still prints "no gain resolved; HARM on full singles
+ * (+5); no warnings; resolved under 5 bp: full all (+4), hq all (+3)": a
+ * D3 harm row against the superseded instrument, round 52's line booked as
+ * the new zero, not this round's gate, which is the day's base.
+ * FEEDBACK: three runs byte-identical over ten dumps and unmoved against
+ * round 52's r52-run1 (252 to 253 s), tier census singles 38/2/0 and
+ * doubles 7/5/0 with 0 moved turns; e2e 75 of 75; vitest 182 files and 1491
+ * tests; lint and tsc -b clean. NOT IN THIS ROUND: the 15 rows every build
+ * breaks; the pre-solve's top-up that turns freed Speed EVs into HP (it
+ * does so for kept mons too); the panel's tag: a carried entry reads
+ * "fitted" ("fits observed damage") like every other speed-only solve,
+ * here on mons whose damage evidence the full solve rejected, and on 154
+ * of 165 the tag moves where no EV does (T69).
+ *
+ * BANK BUILD 2026-09-20 (improvement round 52, T56 and T61; 8e73953 and
+ * c4bbe02, harness and app plumbing only, no engine touch, no cache bump,
+ * cache stays v48; adopted at the user gate of 20 Sep 14:50, "1a 2a 3a": the
+ * instrument stands with its harm line booked as the new zero, T66 moves
+ * ahead of iteration 4b, fast-forward to master; spec
+ * docs/superpowers/specs/2026-09-20-round-52-design.md,
+ * probes under docs/perf/probes/2026-09-20-r52/). FINDING (round 51, T12):
+ * the bank built its teams from raw infos with one solve, the app enriches
+ * the infos and solves in two stages, and since round 37 the two had
+ * drifted apart (648453: Landorus-Therian and Volcanion swap the Choice
+ * Scarf). CHANGE: buildAppTeams (src/lib/app-team-build.ts) is the app's
+ * chain as one pure function, the bank loop calls it through
+ * regression/bank-build.ts, and the option blocks of the worker's solve and
+ * of buildReplayTeams live once in src/lib/team-build-options.ts.
+ * EVAL_CALIBRATION_RAWBUILD=1 restores the two raw builds; without
+ * EVAL_CALIBRATION_SMOGON=1 the naked build is unchanged. The third
+ * buildTeamsFromReplay call (CALIB_POS_PROBE) compares two reconstructions
+ * on the same teams and stays as it was. PINS:
+ * regression/app-build-parity.spec.ts (bank helper, the retired build's
+ * four rows on 648453, handleReplayJob plus buildReplayTeams against
+ * buildAppTeams, singles and doubles) and ui/hooks/appBuildParity.spec.tsx
+ * (the real hook chain with the real worker handler; a solve without speed
+ * orders turns it red on both replays). A change inside the shared option
+ * blocks moves app and bank together and is invisible to the pins.
+ * SET DIFF over the 129 bank replays, pre-registered and met
+ * (T56/build-parity.vt.ts, one data source, paired by replay, side and
+ * species): old against new 58 of 997 singles sets in 27 of 83 replays
+ * (EVs 50, nature 25, ability 10, item 0), doubles 0 of 552; new against an
+ * independent rebuild of the app chain 0 of 1549; species lists equal in
+ * 129 of 129, so the set-assumption keys hold.
+ * IDENTITY: RAWBUILD=1 on the round's final code is byte-identical to the
+ * base of the day (.calibration/r52-rawbuild against base-20260920, itself
+ * byte-identical to r50-held), which also covers T61 and the option-block
+ * refactor; two runs of the new default are byte-identical (r52-appbuild,
+ * r52-appbuild-b). Wall 291 to 299 s against 292 for the raw build: the
+ * second solve costs nothing measurable.
+ * NEW BASE: .calibration/r52-appbuild (c4bbe02, cache v48), n=833, the same
+ * 833 positions: sign 54/65/84 (singles 66, doubles 73); brier
+ * 0.2564/0.2197/0.1255; K pooled 2.24 (singles 2.15, doubles 2.41); hq
+ * n=559 0.2429/0.1941/0.1278; luck-adjusted n=502 0.2333/0.1950/0.1204;
+ * decided 76.7 % of 103, held 93.1 % of 58 (the one new held sweep is the
+ * stall position below).
+ * OLD AGAINST NEW (bank/paired-r52-appbuild-vs-base-20260920-*.txt): 132 of
+ * 833 positions move, all singles, in 25 replays; 6 by more than 0.05, one
+ * by more than 0.2. Pooled +11 bp [+1, +28], singles +15 [+1, +39], doubles
+ * unmoved; hq +4 [+0, +7] and singles +5 [+0, +9], one warning (hq singles
+ * early +6); luck-adjusted +16 [+0, +44] unresolved. ONE POSITION carries
+ * the pooled line: gen9ou-2658663776 t86 (rating 1630, outside hq), a
+ * Poison Heal Gliscor stalling Volcanion's Flamethrower with Substitute and
+ * Protect until p1 forfeits at t94; the raw build reads -0.251, the app
+ * build +0.988 with the decided sweep held for p1 (8 of its 12 sets move,
+ * all eight in EVs, six in nature). Without it the pooled shift is +2.4 bp. By D3's rule the
+ * table reads HARM; the round books it as the instrument's new zero, not as
+ * a verdict on the app's sets. CAUSE: the app build gives Volcanion 252
+ * Speed (239) over Gliscor's 226 although the log shows Gliscor moving
+ * first at t86, t88, t90 and t92; the raw build kept 176, so in the sim
+ * Volcanion now strikes before the Substitute goes up. COUNT
+ * over the bank's observed speed orders (T56/speed-order-violations.vt.ts
+ * and speed-order-levers.vt.ts; plain speed arithmetic with Scarf and Iron
+ * Ball, blind to boosts, paralysis, Tailwind and Trick Room, so the
+ * absolute count is a ceiling and the difference is the finding): of 910
+ * singles orders the raw build contradicts 10 in 8 replays, the app build
+ * 20 in 14 (13 orders in 7 replays only the new build breaks, 3 in one
+ * replay only the old one); doubles 8 of 267 on both. Lever split:
+ * enrichment alone 10, the two-stage solve alone 20. The lever is the second
+ * solve in solveReplaySpreads, and the largest moved positions sit in those
+ * replays (2658669868 t26, 752624 t14, 2663115898 t17). The close audit
+ * read all 13 new rows against their logs: clean (no Trick Room, Tailwind,
+ * paralysis, boost or priority; the parser already drops those). Its lead
+ * for the mechanism, unmeasured: speedMeasured (spread-inference.ts) treats
+ * an order the prior already satisfies as measuring nothing, and in the
+ * chain the prior is the first solve; speedError (spreads/fit.ts) scores
+ * against the counterpart's current spread, so the greedy per-body solve
+ * depends on its order. It is not round 41's designed trade: releasedRung
+ * only releases kept Speed downward, and here Volcanion gains 252 Speed
+ * while Pecharunt, Moltres and Gholdengo swap a speed nature for a bulk one.
+ * The old instrument could not see any of it. The app has solved in two
+ * stages since 8 Aug (76fc029: the inner build already solved on speed
+ * orders alone; round 37's cfc904b added the item carry); from when these
+ * spreads date is unmeasured.
+ * HAND CHECK 648453 (T56/handcheck-648453.md): t12 is the only move-order
+ * datum (t22 is a switch, which resolves first). The raw build gives
+ * Volcanion a Choice Scarf although t6 shows its Leftovers knocked off; the
+ * app build sets Leftovers and scarfs Landorus-Therian, against which no
+ * line speaks (330 v 278).
+ * T61: fetchSmogonUsageStats keys its memo by the fetcher too
+ * (src/lib/smogon/fetcher-key.ts, shared with the set assumptions). One
+ * process with two sources now reproduces 4 of 120 moved sets (before the
+ * fix 0 of 120; T61/two-sources.vt.ts); only gen6ou differs between the
+ * sources (292 v 297 species), so the doubles 0 of 48 says the data are
+ * equal. The app passes no fetcher, the bank builds one per process. The
+ * census test in feedback-fixtures.spec.ts now reads the statistics pins
+ * for its second and fourth game and stays green.
+ * FEEDBACK: three runs byte-identical over ten dumps and unmoved against
+ * round 50's held-run1 (285 to 294 s), tier census singles 38/2/0 and
+ * doubles 7/5/0 with 0 moved turns against r49 fullkey-run1; e2e 75 of 75;
+ * vitest 181 files and 1488 tests; lint and tsc -b clean.
+ * WHAT THIS MEANS: bank numbers before 20 Sep stand on the raw build and
+ * compare only inside their round, or against a RAWBUILD=1 run.
+ * EVAL_CALIBRATION_SOURCE=fit walks the same loop, so fit-side grading
+ * dumps now build like the app while regression/eval-fit.spec.ts still
+ * trains on its own naked build; older fit-side figures (44 of 49 in
+ * DECIDED V2) need RAWBUILD=1 to compare. The dump lines carry no build
+ * tag (it would break the identity check); run.json records the switch.
+ * OPEN (NextSteps): T66, the two-stage solve keeps the observed speed
+ * orders; T67, a type gate for regression/ and ui/ (no tsconfig covers
+ * them; this file carries one standing error at the searchPosition depth
+ * argument); T68, a rejected usage fetch stays in the memo
+ * (smogon-stats.ts caches the promise before it settles; the set
+ * assumptions drop theirs).
+ *
+ * FIVE SIGHTINGS 2026-09-19 (improvement round 51, T10 to T13 and T54; no
+ * engine code, no cache bump, cache stays v48; one sighter, two refuters
+ * (recount, counter-hypothesis) and one rework pass per question, reports
+ * with a "Gegenprüfung" section under
+ * docs/perf/probes/2026-09-19-r51/<T>/sighting.md). Every number names its
+ * build path: BARE (observations and move orders), BANK BUILD (raw team
+ * info plus usage fills, one solve; this file's bank loop), APP
+ * BUILD (enriched info, solveReplaySpreads with the speed pre-solve),
+ * HARNESS (the app's code on the e2e-feedback fixtures).
+ * T10, GPL DzBQ5azlO5l t13: Stone Edge is in no built Cobalion set (custom
+ * game falls back to gen9ou, Stone Edge 0.35 %, rank 19 behind the ten-move
+ * usage pool; the app builds Swords Dance, Heavy Slam, Stealth Rock, Taunt).
+ * Adding it by hand does not band Heavy Slam: regret 0.034 without, 0.028
+ * with (browser), 0.034 in node; depth 1, one seed. A band needs three
+ * things at once (the move, a rightly priced Air Slash x Stone Edge cell,
+ * grading against the clicked reply: 0.12; any two stay at or under 0.039),
+ * and against the equilibrium the regret caps at 0.052 because Noivern
+ * pivots out. ENGINE FINDING: a |cant| line on an event side makes
+ * classifyChild bail (cell-blend.ts:215) and the cell falls back to ONE
+ * draw (-0.2224 against a 400-seed mean of -0.4339, single-draw sd 0.19);
+ * on the shipped set t13 blends 22 of 22 event cells. Pivot pairs get no
+ * event plan at all (cell-blend.ts:91, 16 of 99 cells).
+ * T11, VGC 2634199230 t5: one game, not a Bo3 log (one |win|, one |turn|1);
+ * the payoff window is not involved (riskPayoffTurn unset). The praise is
+ * the played cell +0.786 minus the safe floor +0.435 = riskPayoff +0.351,
+ * attribution p2-read, while kirans drops 69 % -> 48 % in the turn. The
+ * praised cell never drew the KO on Incineroar that another row of the same
+ * matrix draws (bit-identical column signature). The praise renders in five
+ * places; 3 of 14 praised reads over eleven dumps sit on a turn the praised
+ * side loses. kirans is scored with seven bodies (a phantom "Floette" from
+ * the Mega switch line).
+ * T10 + T11, DOUBLES HAS NO CELL PLAN: planCellEvents (cell-blend.ts:142)
+ * and koOddsForOptions (:310) bail on any choice with a comma, and every
+ * doubles choice carries one: 0 of 75 565 root cells planned (six turns,
+ * two games), koOdds appears 0 times in all five doubles dumps against 36
+ * to 135 per singles dump. At one seed each doubles root cell is one draw.
+ * T12, SET STATES: bank build and app build differ on 648453 in 4 of 12
+ * sets, two of them items (Landorus-Therian and Volcanion swap the Choice
+ * Scarf; both explain the move order, 281 v 280 without, 330 v 278 with).
+ * Over the 129 bank replays 58 of 997 singles sets differ in 27 of 83
+ * replays (enrichment 15, ten of them Cinderace Blaze -> Libero; second
+ * solve 43, EVs and natures), doubles 0 of 552, and the second solve moves
+ * no item (0 of 1549). Cause of the item split: the gen6 preview's
+ * "(has item)" tick counts as a revealed item and blocks the round-37 Scarf
+ * inference on raw info (inferred-items.ts:20). Round 37 moved 648453 in 3
+ * sets on the app path and in none on the bank path; the round-41 probe
+ * measured the bank path. The "set assumptions 404 in the harness" story is
+ * false (only sets/gen9doublesubers is absent, in the cache too). Fixtures
+ * against .smogon-cache: 4 of 120 sets (gen6ou usage 292 v 297 species).
+ * TOOL TRAP: fetchSmogonUsageStats memoizes by format only
+ * (src/lib/smogon-stats.ts:58); two sources in one process read the first
+ * one twice, which produced a false "0 of 120" in the first pass (fixed in
+ * round 52, T61).
+ * T13, FITTER FAMILIES (bare path, 2122 fit-corpus replays, 25 467 sets,
+ * paired by replay, side and species): 977 sets starved against the
+ * pre-round-40 list (976 singles, 1 doubles; the old 963 and 4885
+ * reproduced). Families: held speed 200/1, sum under 300 273/0, HP up
+ * 190/0, bulk up with speed down 6/0, rest 307/0. Against the same run's
+ * prior: 4380 singles and 43 doubles (no attack line, all 43 already in the
+ * old list, so a list diff hides them). Distance to the best 252 rung:
+ * median 3.77 points of an HP bar, 131 of 869 within 0.5 (the first pass's
+ * 313 of 946 came from a ladder rebuild that matched 595 of 977 rows; the
+ * faithful one matches 960). The 1531 nature changes come from rung
+ * changes: on the bare path every prior is Hardy and ladder.ts:233 cannot
+ * fire. On the bank build over the 129 bank replays it fires 705 times,
+ * keepsNature blocks 25 times, 57 singles and 4 doubles sets starve, among
+ * them T26's Weavile (smogtours-gen9ou-750267, Jolly 0/252/0/0/4/252 ->
+ * 0/0/0/0/0/252; same sets on the app build by T12's count). Bodies under
+ * their own format's budget: singles 5984 of 17 267, doubles 13 of 4298,
+ * Champions 3890 of 3902. Doubles damage: 12 620 lines dropped, 0
+ * observations (T31). Fit corpus and bank share no replay.
+ * T54, TERA IN THE STATICS: 226 of 833 bank positions carry a terastallized
+ * Pokémon on the field (doubles 125 of 248, singles 101 of 585), 334 alive
+ * in the team. Six leaf reads take pokemon.types raw (threat.ts:165 to
+ * :168, hazards.ts:65 and :69, features.ts:26). A variant on live types
+ * moves 263 positions (mean 0.024, largest clean 0.249 at VGC 2629703929
+ * t10, 5 sign flips) and none of the 508 without Tera; the rebuild matches
+ * all 110 exported bank positions. REFEREE, the Tera-aware damage calc:
+ * the variant is closer in 605 of 711 disputed pairs, false immunities 50
+ * against 1, nearly all of it the defender's type (424 v 57; STAB 90 v 28).
+ * Direction-only paired Brier shows no gain: all +6.5 bp +-7.2, doubles
+ * +45 +-35 (depth 1, plain mapping, no verdict). SECOND DEFECT: the rebuild
+ * loses Tera clicks one way only (18 positions, 8 replays): the
+ * defaultMoveChoice branch (protocol-choices.ts:253) appends no gimmick
+ * suffix (8 of 207 clicks), and the sim clears terastallized on a faint
+ * that the HP correction then revives. pairKey carries no Tera term.
+ * BOOKED: T56 (the bank builds like the app, an instrument change with a
+ * new base) and T61 as iteration 4a, T57 (Tera statics plus the lost
+ * clicks) as 4b, T58 (the doubles cell plan) as 4c, T59 to T64 further
+ * down; D8 rewritten, D22 added. The 110-position export is the small
+ * decided endgames, not the bank.
+ *
+ * DECIDED V2 2026-09-19 (improvement round 50, T09; 36d830a and 2a79040,
+ * render-only, cache stays v48; spec
+ * docs/superpowers/specs/2026-09-19-round-50-design.md, probes under
+ * docs/perf/probes/2026-09-19-r50/). COUNT on the base of the day
+ * (.calibration/r49-fullkey): the decided sweep names a side on 103 of 833
+ * positions (67 replays) and that side wins 79 = 76.7 % (singles 78.5,
+ * doubles 73.7, hq 84.5; fit corpus 59/79 = 74.7 %). 24 losses: 6 forfeits,
+ * 1 crit, 17 lost pairs (the priority loan in movesFirst, Tera and setup,
+ * the one-on-one pair view in doubles). THE PLAN'S LEVERS, counted on a
+ * rebuild of the sweep that matches the engine on all 110 exported
+ * positions: strict pair wins + clock 4 + reserve reach 100 % on 14
+ * positions and drop 65 of 79 right calls; clock 4 alone 77.8 %; strict
+ * alone 84.1 % (doubles 95.7, singles unchanged); every reserve drops right
+ * and wrong calls in the same proportion. WHAT SEPARATES is the finished
+ * score. Named side at DECIDED_SCORE (0.7) or beyond: bank 54/57 = 94.7 %
+ * (singles 32/34, doubles 22/23, hq 39/40), fit corpus 44/49 = 89.8 %,
+ * pooled 92.5 % [88, 97] over replays; flat between floors 0.5 and 0.8.
+ * Below 0.6 the sweep is a coin flip (21/41), against the score's sign
+ * 3/15. CLAMP pre-count: a floor of 0.85 on every sweep costs late +182 bp
+ * (round 15 again); under the held rule it moves 2 bp. Held sweeps win
+ * 94.7 % where the bank K promises 88.8 %; equally high bars without a held
+ * sweep win 84.3 % against 86.6 % promised.
+ * BUILT (user gate "1a 2a 3b 4a"): heldDecided(result) is the sweep where
+ * the score backs it. The turn card, the once-per-game sentence, the
+ * chance prose on a decided board and the graph strip read it; the
+ * conversion sentence takes the first forced or held turn from which the
+ * bar holds for the winner to the last known turn. The raw sweep stays on
+ * the profile: the prover's trigger and cached results are untouched, the
+ * near stage stays outside (573756 t73 stands at 0.596). INSTRUMENT: every
+ * dump line carries decidedHeld and both summaries end on "decided: n=103
+ * named-side-wins=76.7% | held by the bar: n=57 named-side-wins=94.7%".
+ * GATES (D4): bank .calibration/r50-held digit-identical to r49-fullkey on
+ * all 833 lines apart from the new field; three feedback runs
+ * byte-identical over ten dumps and the drift report; against the base of
+ * the day only decided marks, announce flags and the conversion move, no
+ * engine number, tier census unmoved (singles 38/2/0, doubles 7/5/0, zero
+ * moved turns). Conversions: 573756 t92 -> t137, 648453 t17 -> forced t35,
+ * 653785 t23 -> forced t26 (the report no longer dates the sweep before its
+ * own tip at t24), VGC 2629703929 t10 -> t13, 912045 t8 -> t9, VGC
+ * 2630685175 loses the sentence (its bar stood at -0.74). Marks gone:
+ * 649664 t15 to t22 (Medicham-Mega against the bar), 2629703929 t3 to t8
+ * (Chi-Yu, the wrong side), 573756 t92 to t136 bar t124. Regression, e2e
+ * 75/75 on the second run, lint, tsc -b, pack:smoke. E2E NOTE: the first
+ * full run failed "branch replay play controls stay muted" on two page
+ * errors from the replay iframe ("$ is not defined"); alone the test passed
+ * 10 of 12 on the branch and 6 of 6 on the base, the iframe code is
+ * untouched: the script-order lottery of the embed, booked as a signal.
+ * LIMIT: 573756 t134 to t136, the sweep is right and the bar reads 0.33 to
+ * 0.60 (the Struggle plan runs twelve plies); the sentence waits for t137.
+ * MOVED ON: the honest first strike to T33 (probe: singles 78.5 -> 83.6 %,
+ * 5 losses and 5 right calls fewer, 749828 t23 is its red test), the clamp
+ * to T55 (parked).
+ *
+ * MATCHUP MEMO KEY 2026-09-19 (improvement round 49; 5af4dcd and 49df993,
+ * cache v48; found while wiring doubles replays into the feedback run,
+ * probes under docs/perf/probes/2026-09-19-r49/). FINDING: the memoized
+ * threat (score/threat.ts, one MatchupCache per search) was not a function
+ * of its key. Super Fang, Nature's Madness and Ruination price half the
+ * defender's CURRENT HP, and the key carried no HP: the first forked
+ * position to ask froze its value for the whole search. The bank walks its
+ * cells in a fixed order in one process, so it was reproducible ON STALE
+ * VALUES (since round 33). The app splits one matrix over a worker pool
+ * with one memo per worker and lets workers steal chunks by completion
+ * time, so a cell's value followed which worker priced it: of four doubles
+ * replays run twice each, the two whose assumed Smogon sets carry
+ * Ruination (Ting-Lu, Chien-Pao) differed run to run, in matrix turns
+ * only, same option sets, 4 to 48 cells per turn, up to 0.077. Four
+ * investigators found it independently and no skeptic could refute it; a
+ * review of the fix then found the same leak on two more live reads, the
+ * current types (Protean, Libero, Soak, Burn Up) and the stored stats
+ * (Power Trick, Power and Guard Split). FIX: pairKey carries every read of
+ * pairThreat and singleMoveFraction: types, the divided stored stats, the
+ * defender's max HP, and the defender's HP where the attacker has a usable
+ * halving move (test/threat-memo.spec.ts holds memo against no memo).
+ * BANK against the base of the day (byte-identical to r47-t46): 45 of 833
+ * positions move in 23 replays (39 singles, 6 doubles; HP alone 38 in 17),
+ * largest 0.037, no sign flips; pooled +1 bp [+0, +1], hq singles +2
+ * [+0, +3]: resolved and irrelevant, booked as notes under the new harm
+ * floor. NEW BASE of the code state: .calibration/r49-fullkey (833, Brier
+ * 0.2565/0.2196/0.1223, hq 0.2469/0.1918/0.1228). FEEDBACK: three runs
+ * byte-identical over ten dumps and the drift report, the six singles
+ * dumps byte-identical to the base of the day (no halving move, no type
+ * change in those games), tier census singles 38/2/0 unchanged.
+ * HARM FLOOR (75a784c, user gate): a pooled row is harm, and a phase cell
+ * a warning, only when its band clears zero AND its mean is at least 5 bp;
+ * smaller resolved shifts print after the verdict. A change that moves few
+ * positions resolves a single basis point.
+ *
+ * DOUBLES TIER CENSUS 2026-09-19 (improvement round 49, T53; f58d57e and
+ * d2bd105, instrument only). Four doubles replays of the bank run through
+ * the feedback drift run as census-only replays (no corpus items, nothing
+ * graded): VGC 2629703929 (Tailwind, a visible bring of four on both
+ * sides, long endgame), VGC 2630685175 (Trick Room), Doubles OU 912045
+ * (tournament, hq, both speed controls), Doubles OU 2663093831 (ladder, no
+ * speed control). Smogon inputs pinned from the bank's disk cache
+ * (record-smogon-fixtures.mjs --from-cache: five bodies and one 404
+ * marker, 7.8 MB), so census and bank read the same sets. The always-on
+ * fixture spec checks shape, ten turns, game type, the bring of four and
+ * a pin behind every Smogon URL. scripts/tier-census.mjs counts tiers per
+ * side-turn per game type with unmatched and partial sides beside them
+ * (the replay list is the union over folders) and --moved lists every turn
+ * whose attribution, tier or played-match changed between two folders.
+ * STAND: singles 38/2/0 on 558 side-turns (39 unmatched); doubles 7/5/0 on
+ * 88 side-turns of 44 turns (3 unmatched, 11 partial), attribution chance
+ * 16, quiet 13, shift 5, p2-read 4, p2-decision 3, p1-read 2, unclear 1.
+ * Doubles carries a tier on 13.6 % of its side-turns against 7.2 % in
+ * singles and five mistakes against two: the graded best comes from 16
+ * restricted pair options, a slot that never showed makes the regret a
+ * lower bound, and the four games are gen 9 with Terastallization (VGC at
+ * level 50) where the singles corpus is gen 6 and gen 8, so the split
+ * never compares the game type alone. The run takes 272 to 334 s with ten
+ * replays (262 s with six).
+ *
+ * K FIT CONVERGED 2026-09-19 (improvement round 48, T48; f5618ce; NOTHING
+ * ADOPTED at the user gate, K stays 2.28/1.49 and 2.98/0.88, cache stays
+ * v47; probes under docs/perf/probes/2026-09-19-r48/). fitPhaseK runs
+ * Newton to a standstill; the fit report prints the spread from a
+ * bootstrap over games (200 draws) on the 18 Sep capture: singles k0 1.86
+ * +-0.23 [1.46, 2.20], k1 3.73 +-0.65 [2.64, 4.76]; doubles k0 1.99 +-0.29
+ * [1.60, 2.55], k1 3.67 +-0.88 [2.06, 5.06]. Both shipped pins lie outside
+ * those bands. fitLogistic was measured converged (500 steps, 5000 steps
+ * and Newton agree on every implied weight to one decimal), fitConstantK
+ * too (round 47): only the phase fit was short.
+ * FORMS on the fit corpus (5-fold CV over games, 20 seeds, against the
+ * shipped pin): singles linear maximum -2.3 +-1.4 bp Brier, 19 of 20 seeds;
+ * singles CAPPED, K = 1.548 + 6.007*min(ff, 0.35) (rises to a third of the
+ * bodies fainted, then flat at 3.65; breakpoint profiled inside each
+ * training fold, 0.35 on 75 of 100 folds) -4.1 +-1.5 bp, 20 of 20; doubles
+ * linear maximum -7.6 +-3.2 bp, 20 of 20; a cap does not carry in doubles
+ * (breakpoint at the edge, 0 of 20 against the line).
+ * BANK with bands (base of the day byte-identical to r47-t46): singles
+ * capped pooled -6 [-28, +14], hq +5 [-12, +24], late -20 [-39, -1], no
+ * harm, no warning. Doubles maximum pooled -6 [-45, +31], early -91
+ * [-175, -7], warning late +54 [+3, +112].
+ * TIER CENSUS, singles capped (one feedback run, all seven tests green):
+ * 38/2/0 -> 32/2/1 on 558 side-turns, but 36 of 279 turns change
+ * attribution or tier. In the expert golden 655336 the t23 Landorus sack
+ * goes from "low-cost trade" to BLUNDER (regret 0.215 -> 0.430) and t18
+ * gains a mistake (0.032 -> 0.217), three new drift channels, 653785 t19
+ * moves away from quiet; early verdicts vanish (573756 t19 to t22).
+ * FINDING: the verdict tiers (0.1 / 0.2 / 0.4), HEALTHY_SACK_FLOOR and
+ * PROVER_SCORE_FLOOR are measured in wp-units, and wp-units hang on K. A
+ * new K moves every such threshold silently: milder early, stricter from
+ * the middle on. A K adoption needs the thresholds decoupled or re-set
+ * with it (NextSteps T52). The doubles census CANNOT BE READ: all six
+ * feedback replays are singles (NextSteps T53). A 4 bp gain the bank
+ * cannot see does not pay for a new blunder stamp on the expert's game.
+ *
+ * VERDICT WITH BANDS 2026-09-19 (improvement round 48, T47; instrument
+ * only, no score path). scripts/paired-calibration.mjs prints a verdict
+ * table: paired Brier deltas B minus A under the A side's pooled K, per
+ * view (full, hq, luck-adjusted), game type and phase, each with a 90 %
+ * band from a paired bootstrap over REPLAYS (2000 draws, seeded; a replay
+ * yields up to eight positions with one outcome), the share of draws with
+ * B better and the standard error. A row reads "B better" or "B worse"
+ * only when its band clears zero, else "unresolved"; a dump against itself
+ * reads "unmoved" on every row. POOLED ROWS DECIDE, PHASE CELLS WARN.
+ * VERDICT RULE (user gate 19 Sep, replaces the 10 bp lines per phase cell
+ * and the round-45 rule "K follows the clean capture"): a candidate passes
+ * when (1) its gain is shown where the measurement is sharp enough, a
+ * pooled bank row wholly in the good OR the fit corpus out of sample on
+ * every seed, (2) no pooled bank row lies wholly in the bad, and (3) the
+ * tier census of the feedback dumps holds. Phase cells wholly in the bad
+ * go to the gate as warnings with their size.
+ * RESOLUTION of the bank (smallest true effect a row sees four times out
+ * of five, 2.49 x SE; median and range over the moved rows of the seven
+ * round-47 candidates, full view): pooled all 23 bp (10 to 43), pooled
+ * singles 24 (7 to 42), pooled doubles 58 (38 to 137), a singles phase
+ * cell 33 (8 to 66), a doubles phase cell 72 (35 to 242); hq and
+ * luck-adjusted rows read a fifth to a half coarser. A K map moves every
+ * score a little and resolves finer (10 bp pooled) than a weight that
+ * moves few positions a lot.
+ * THE ROUND-47 CANDIDATES AGAIN, pooled rows (full view; all / singles /
+ * doubles, bp with band; docs/perf/probes/2026-09-19-r48/t47/):
+ * - bench HP (adopted, base-20260918-live -> r47-t46): -6 [-15, +2] / +0
+ *   [-5, +4] / -19 [-47, +3]; P(B better) 89 %; warnings luck-adjusted
+ *   late +5 [+1, +10]. No harm, no gain resolved: a correctness fix.
+ * - singles K 500 steps: +2 [-4, +9] / +3 [-5, +12] / unmoved.
+ * - both K 500 steps: +1 [-10, +13] / +3 [-5, +12] / -3 [-35, +29];
+ *   warnings doubles late +51, hq doubles mid +54, hq doubles late +71.
+ * - converged K: -2 [-18, +14] / +0 [-16, +16] / -6 [-45, +31]; warnings
+ *   doubles late +54, hq singles mid +24.
+ * - singles boosts 39 (against both-K): -15 [-30, +1] / -21 [-43, +2];
+ *   P(B better) 94 %: the pooled row stops short of the band, the gain
+ *   sat in one phase cell (singles mid -43 [-74, -12]).
+ * - singles matchup 220: +6 [-14, +26] / +8 [-20, +35]: nothing resolved
+ *   either way; the round-47 rejection stood on noise.
+ * - doubles screens 101: +36 [+10, +66] / unmoved / +123 [+35, +218]:
+ *   HARM, the one candidate of the five the bank itself rejects.
+ *
+ * SOLVER NIGHT RUN 2026-09-18/19 (improvement round 47, T08; fa8c613 and
+ * 61b8078, bench only, no score path; docs/perf/2026-09-04-endgame-truth.md
+ * section "Round 47", dumps under docs/perf/probes/2026-09-18-r47/). 110
+ * bank positions and 25 late positions of the feedback replays, caps 60
+ * turns / 200000 states / 20 min. 55 in scope, 5 exact (round 34: one), 44
+ * capped, EVERY ONE BY THE WALL CLOCK at 877 to 33204 states (median 6408,
+ * about 5 states a second; no run came near 200000), 49 unpriced. Wide
+ * caps do not buy truth: the clock and unpriced chance bound it. On the 11
+ * fully expanded rows (exact or unpriced only) d1 to MCTS and the prover
+ * read the solver's value to three decimals, the race static 9 of 11
+ * signs. Q4 REFERENCE: 9 fully expanded decided positions, 6 for the
+ * decided side and 3 against it (751443#23 and 2663112349#37 exact,
+ * 749828#23); with capped values as estimates 17 of 30 at 0.8 or beyond, 6
+ * against, all six in singles. 749828#23 CLASSIFIED: movesFirst (speed.ts)
+ * lets any usable priority move outrank speed and lends the first strike to
+ * the side's best move, and reads dex priority only: Primarina's Aqua Jet
+ * counts, Rillaboom's Grassy Glide under Grassy Terrain does not, so the
+ * static (+0.600) and the decided sweep (p1) name the wrong side where the
+ * searches, the prover and the game say p2 (NextSteps T33). 573756 t138
+ * does not solve in 20 minutes (8436 states, value -0.902); the solver
+ * follows the app's late bar (t137 -0.900, t139 -1.000). EVAL_ENDGAME_SOLVED
+ * looks solver rows up by item name: a later engine state regrades its
+ * estimators against this night in ninety seconds (done once on 41698be,
+ * solver fields identical on all 135 rows).
+ *
+ * RE-FIT VERDICT 2026-09-18 (improvement round 47, T07; NOTHING ADOPTED,
+ * K and every weight stand, cache stays v47; tables under
+ * docs/perf/probes/2026-09-18-r47/bank/). Source: the capture below. Every
+ * candidate alone, paired against a fresh base of the day (r47-t46, the
+ * state after the bench-HP rule; an identity rerun read byte-identical).
+ * Deltas in bp under one fixed K (2.29, the base's pooled K), hq tranche,
+ * early / mid / late; negative = better.
+ * - SINGLES K 2.28/1.49 -> 2.51/1.18: +4 / -3 / -7 (full +11 / +9 / -9).
+ *   Adopted at the first gate (ae9351e) and taken back the same evening:
+ *   FINDING: fitPhaseK (regression/fit-helpers.ts) stops after 500 fixed
+ *   gradient steps, short of the maximum. It reports singles 2.512/1.176
+ *   and doubles 2.582/1.150 where Newton and 20000 steps agree on
+ *   1.858/3.733 and 1.987/3.666 (the k1 column carries 11 times less
+ *   curvature than k0). On its own corpus the 500-step singles value reads
+ *   Brier 0.20817, the old pin 0.20800, the maximum 0.20754: the "re-fit"
+ *   was an intermediate state, and so is every K pin before it.
+ * - THE MAXIMA on the bank (r47-kconv, both game types; bands = 90 % of a
+ *   paired bootstrap over games, 2000 draws): all -2 [-19, +14]; early -29
+ *   [-59, -2], hq mid +22 [-1, +46], hq singles mid +24 [+1, +50], doubles
+ *   late +54 [+5, +114]. Confidence moves from the endgame into the
+ *   opening; no gain. The 500-step singles K reads all +2 [-4, +9]. The
+ *   bank cannot tell these maps apart.
+ * - DOUBLES K 2.98/0.88 -> 2.58/1.15: -30 / +54 / +71 on n=40/49/45; with
+ *   bands hq mid [+4, +107], hq late [-0, +167], all doubles -3 [-35, +27].
+ *   Stays.
+ * - SINGLES boosts 12 -> 39 (fit 39.4 ± 6.1): -4 / -27 / -5 (full -7 /
+ *   -43 / -12; full singles mid band [-74, -12], confirmed on the fit
+ *   corpus out of sample, -13 bp [-21, -4]). The bank says yes. The
+ *   feedback corpus says no: verdict tiers over the six dumps go from 38
+ *   inaccuracies and 2 mistakes to 68 and 8, and the whole rise sits in
+ *   the stall game 573756 (14/0 -> 40/7; with the new K alone 14/0): forty
+ *   turns of "switch to Landorus-Therian" and "Dragon Dance was better"
+ *   while both players stall on. A standing stage is priced without asking
+ *   whether it bites the wall in front of it. NOT adopted at the user
+ *   gate; NextSteps T49. LESSON: the bank grades the bar, not the
+ *   verdicts; a weight change needs the tier census of the feedback dumps
+ *   next to the paired Brier.
+ * - SINGLES matchup 120 -> 220: +36 / -15 / +5; the early cell's band is
+ *   [-12, +85]: rejected on noise, not on evidence. Stays for now.
+ * - DOUBLES screens 5 -> 101: +126 / +52 / +1 (full +181 / +163 / +26).
+ *   Stays. Sweep cells stay at 0 (CV: STATUS QUO HOLDS).
+ * LESSON: a point estimate per phase cell is no verdict. The 10 bp lines
+ * of the registered rules sit inside the noise of a 45-to-190-position
+ * cell; the verdict table needs bands over games (NextSteps T47) before
+ * the next adoption, and the fitter needs to converge (T48).
+ * DISPLAY K by the 11 Aug procedure (TRAIN 680 positions of 107 fit-corpus
+ * games, .calibration/r47-displayk-fit-konly, taken on the 500-step K
+ * state; GRADE on the bank): the constant fits 2.22 and reads all -7,
+ * early +38, mid +9, late -66 bp: early loses, 1.85 STAYS. A PHASE-AWARE
+ * display K (k0 1.93, k1 0.92; on 11 Aug k1 fitted negative) grades all
+ * -17, early +16, mid +2, late -68, hq -29 (hq early +9), luck-adjusted
+ * -41: the first conditional display map that wins out of sample, short
+ * of the "no phase loses 10 bp" line by the early cell. NextSteps T51.
+ * CALIBRATION ALTERNATIVES (a research workflow of the same evening, four
+ * offline measurements with an adversarial reviewer each,
+ * docs/perf/2026-09-18-calibration-alternatives.md): an own K per format
+ * loses 6.2 bp out of sample, per source 2.2 bp, per generation 1.3 bp
+ * (inside its error); partial pooling does not rescue it (+0.2 bp); an
+ * isotonic shape loses 15 bp [8, 24]. What carries is the game state, not
+ * the label: K over fainted bodies. One format-dependent candidate
+ * survives: shrunk doubles weights per format, -4.2 bp Brier on 7 of 8
+ * seeds, with the shrinkage chosen on the test data (NextSteps T50).
+ *
+ * BENCH HP 2026-09-18 (improvement round 47, T46; 518504f, cache v47).
+ * FINDING: since round 40 the snapshot correction left benched bodies to
+ * the sim, on the premise that the active was corrected at every boundary
+ * before it left. A body that is hit and leaves within one turn never
+ * meets a boundary (913994 t5: Rillaboom 100 -> 22 %, U-turn, read 100 %
+ * from then on). Probe over the bank's app path (docs/perf/probes/
+ * 2026-09-18-r47/t46/): of 2306 benched living bodies 167 sat more than 10
+ * points off the last sighting; 133 of those are Regenerator heals (129
+ * exactly at sighting + a third), 38 rows are errors (16 hit-then-left, 13
+ * left clean but the sim had rolled apart, 5 + 4 Regenerator bodies healed
+ * from a wrong departure HP). RULE: a living benched body reads the last
+ * sighting, plus trunc(maxhp/3) when it holds Regenerator; status and
+ * boosts stay with the sim. 649664 confirms it to the hit point (Tornadus
+ * 10/305 out, 111/305 in; 11/362 out, 131/362 in). After: no error row
+ * left. Paired bank against r47-t06 (byte-identical to base-20260918-live):
+ * full 0.2565/0.2205/0.1229 -> 0.2565/0.2196/0.1222, hq 0.2467/0.1930/
+ * 0.1239 -> 0.2468/0.1916/0.1227 (+1 / -14 / -12 bp), luck-adjusted
+ * 0.2325/0.1952/0.1164 -> 0.2329/0.1946/0.1166; 119 of 833 positions move,
+ * 13 by more than 0.05. Three feedback runs byte-identical, every pin
+ * holds, the golden 655336 does not move; 44 channel lines. The engine pin
+ * GPL t35 follows its rule: Rhydon stands at its true 100 % (the log's
+ * turn-36 switch line) instead of the sim's 88 %, the score after the
+ * Salazzle sack reads 0.383 under HEALTHY_SACK_FLOOR, the turn reads as an
+ * inaccuracy without the stamp and never as a mistake. No control capture
+ * of the fit (user gate): 38 of 2306 bodies. SIDE FINDING: detectSacks
+ * reads the snapshot's bench HP and does not know Regenerator (649664 t9
+ * "Tornadus 3 %", true 36 %).
+ *
+ * PREDICTIVE READ 2026-09-18 (improvement round 47, T06, roadmap Q6;
+ * 5ae949b; render-only, no cache bump). Count before the build on the six
+ * full dumps (279 turns, docs/perf/probes/2026-09-18-r47/t06/): the
+ * registered triggers (model favourite >= 0.6, the best row in its column
+ * differs from the displayed recommendation, gain >= 0.2) fire on 4 turns;
+ * 562428 t10 cannot fire (the model holds Horn Leech at 0.35, and the
+ * engine already recommends the switch: -> Landorus-Therian 0.52, ->
+ * Heatran 0.45 in the mix; Heatran gains 0.036 over Landorus against Horn
+ * Leech, the known 0.34 is the distance to staying in). USER GATE: build
+ * the sentence as registered, and let the hindsight read say "X was the
+ * likeliest click on the opponent model" when the model favoured the
+ * actual click at 0.3 or more (4 of the 11 spoken hindsight reads, t10
+ * among them). The report walk now receives reads and tendencies (no
+ * wording flips: one riskUnpunished side in the corpus, no matching read).
+ * 7 of 279 summaries read differently, 16 dump paths moved, all of them
+ * the two new fields; three feedback runs byte-identical, the bank
+ * byte-identical. Doubles: on 248 bank positions (depth-1 matrices) the
+ * model holds a favourite >= 0.6 on 10 of 496 sides and the sentence fires
+ * once; pair rows blow up the option space, the sentence stays silent
+ * there. Open: isSwitchChoice reads a pair row by its first slot only.
+ *
+ * RE-FIT CAPTURE 2026-09-18 (improvement round 46, T05; a report, nothing
+ * adopted; docs/perf/probes/2026-09-18-r46/fit-run1-report.txt). Fresh
+ * capture on 1fa4b7e, the first since the forme-marker merge of round 45,
+ * with the bring-only trim (4923967: VGC samples carried two bodies per
+ * side that never played): 2111 of 2122 logs reconstruct, 12821 samples
+ * (9 Aug: 12636 from the same 2111 games), 46 min. Path: the naked
+ * reconstruction (no usage stats, no set assumptions, no hpEvidence) with
+ * the live correction at every boundary. The 9 Aug capture is kept as
+ * .fit-corpus/samples-cache-2026-08-09.keep.json.
+ * PHASE K: singles k0 2.51 k1 1.18 (production 2.28 / 1.49), doubles k0
+ * 2.58 k1 1.15 (production 2.98 / 0.88); constant K 2.80 and 2.85 (9 Aug:
+ * 2.61 and 3.15). Phase K is at least as good as constant K in every
+ * bucket of both game types again (0 to 19 bp Brier).
+ * IMPLIED WEIGHTS with bootstrap SE over games. SINGLES-ONLY, the decision
+ * tranche: boosts 39.4 ± 6.1 (hand 12), matchup 220 ± 44 (120), coverage
+ * 48 ± 40 (40), screens 55 ± 47 (5), choiceMismatch 2 ± 41 (40), hazards
+ * 0.8 ± 0.1 (0.75); tailwind and trickRoom carry no singles signal (SE 351
+ * and 75). DOUBLES-ONLY: boosts 29.9 ± 5.4 (doubles weight 27), tailwind
+ * 55.9 ± 21.5 (68), trickRoom 53.0 ± 24.0 (87), screens 100.7 ± 33.3 (5),
+ * matchup 126 ± 45 (120), coverage 110 ± 53 (40), choiceMismatch −134 ±
+ * 125 (40). SWEEP CELLS: the CV verdict reads STATUS QUO HOLDS (M1 0/20
+ * seeds, M2 2/20, Brier not better), the cells stay at 0.
+ * DISPLAY K, orientation only (in-sample on base-20260918-live,
+ * docs/perf/probes/2026-09-18-r46/display-k.txt): 1.85 against the bank's
+ * pooled 2.27 reads Brier 0.1996 against 0.1988. By phase 1.85 is the
+ * better constant early (0.2524 / 0.2565) and mid (0.2195 / 0.2205), 2.27
+ * late (0.1301 / 0.1229); the phases' own K are 0.73 / 1.82 / 3.31. One
+ * constant cannot serve both ends; the decision procedure (train on the
+ * fit corpus, grade on the bank, as on 11 Aug) belongs to T07.
+ *
+ * BANK INSTRUMENT 2026-09-18 (improvement round 46, T04; harness only, no
+ * engine touch, no cache bump; adopted at the user gate: the bank
+ * measures like the app). FINDING: T04 chased a Zapdos-Galar locked into
+ * Close Combat at 573756 t138 on the bank path and free in the app. The
+ * lock is a sim artefact (Toxapex dies a turn early in the sim, the block's
+ * "move struggle" becomes a filler Close Combat), and the cause is wider
+ * than locks: the raw single pass of 28 Aug corrects only the CLONED sample
+ * and never the live battle, while round 40 (1e0d18a) left benched bodies
+ * to the sim on the premise that the active was corrected at every boundary
+ * before it left. Every app path meets that premise through
+ * capturePositions (the replay worker, the acquire path, the branch entry's
+ * empty capture, the fit harness); the bank did not, so its bench carried
+ * the sim's own rolls. PROBES (docs/perf/probes/2026-09-18-r46/t04, Node
+ * rebuilds of both parameter sets over the bank's sampled turns; truth =
+ * the protocol's last sighting, blind to switch-out heals): mean bench
+ * error 8.1 points singles / 7.4 doubles on the raw pass against 2.4 / 1.8
+ * with the app parameters; 293 of 574 singles positions and 76 of 247
+ * doubles positions carried a body more than 10 points off (app parameters
+ * 121 and 16); 751533 t26 Kyurem 48% in the replay, 1% in the bank.
+ * Choice-lock pictures differ at only 6 of 775 sampled turns, both ways.
+ * Items, status, PP and volatiles move with the instrument too (59, 43,
+ * 143 and 12 of 497 singles positions) and were not checked against a
+ * truth.
+ * CHANGE: passInstrument gives the pass the app's parameters (choice-lock
+ * context, capturePositions, target one turn past the last sample) and the
+ * per-sample fallback the same; EVAL_CALIBRATION_RAW=1 restores the raw
+ * pass. IDENTITY: RAW=1 is byte-identical to base-20260918 (twice, before
+ * and after the default flipped); two runs of the new default are
+ * byte-identical (r46-live, r46-live-b) and so is the base below.
+ * NEW BASE: .calibration/base-20260918-live (the code of this commit,
+ * cache v46, 219 s), n=833: premature-end skips 18 → 4, per-target
+ * fallbacks 15 → 4, 19 samples gained, 2 lost (2630685175 t6 and t8).
+ * sign 54/65/84 (singles 66, doubles 72); brier 0.2565/0.2205/0.1229; K
+ * pooled 2.27 (singles 2.22, doubles 2.36); n 260/292/281/585/248. hq
+ * (--quality hq) n=559: 54/70/82/68/74, brier 0.2467/0.1930/0.1239, K
+ * 2.86; luck-adjusted n=502 (331 excluded): 0.2325/0.1952/0.1164. The
+ * endgame export holds 110 positions and regression/endgame-truth.spec.ts
+ * reads it.
+ * OLD AGAINST NEW on the 814 joined positions (paired-live-full.txt,
+ * paired-live-hq.txt): 576 scores move, 32 by more than 0.2. brier
+ * 0.2567/0.2249/0.1256 → 0.2562/0.2209/0.1255, sign mid 61 → 65, mid
+ * singles exclusive flips 3 against 13; hq 0.2491/0.2031/0.1286 →
+ * 0.2463/0.1930/0.1296. The movement sits in the MIDDLE (−40 bp, hq −101);
+ * late is flat (hq +10 bp is inside the bed's noise) and the tranches
+ * disagree in sign (tournament-0811 mid −147 bp, ladder-ou-0802 late +74).
+ * WHAT THIS MEANS FOR ROUNDS 40 TO 45: rounds 41 to 45 paired both sides
+ * on the same skewed boards, so their verdicts stand as comparisons and
+ * their absolute lines carry this caveat; the narrow one (round 43's
+ * chance nodes, +12 to +15 bp late) is re-measured by T35 anyway. Round 40
+ * is different: 1e0d18a sat between its A and B sides, so A held the bench
+ * at the last sighting and B let it drift; the round's bank line graded
+ * the package of four fixes on a bed that one of them had just skewed, and
+ * the bank share of that fix is unknown. OPEN (NextSteps T46): the app
+ * path keeps its own residue, a body that takes damage and leaves within
+ * one turn (U-turn, a pivot after a hit) is never corrected (913994
+ * Rillaboom 22% in the replay, 100% on the app path).
+ *
+ * MEASUREMENT BASE 2026-09-18 (improvement round 46, T01; no engine
+ * touch; master 0b36c03, cache v46). The 12 Sep incident below took every
+ * bank stand and every Smogon pin. Measured on the RAW instrument and
+ * superseded the same day by the entry above; these dumps stay as the
+ * bridge to the pre-incident lines. Every A/B pairs against a fresh run of
+ * the day.
+ * BANK: two six-slice runs on the same commit, A .calibration/
+ * base-20260918 (cold Smogon cache, 338 s wall) and B .calibration/
+ * base-20260918-b (warm, 335 s), both EVAL_CALIBRATION_MODE=auto
+ * EVAL_CALIBRATION_SMOGON=1. n=816 on both sides, joined 816; merged.jsonl
+ * and summary.txt byte-identical (docs/perf/probes/2026-09-18-r46/
+ * paired-base-full.txt, paired-base-hq.txt).
+ * RECORD: sign 54/61/82 (singles 64, doubles 70); brier 0.2564/0.2242/
+ * 0.1285; K pooled 2.19 (singles 2.15, doubles 2.25); n 260/292/264/569/
+ * 247. hq (--quality hq) n=549: 54/64/80/64/72, brier 0.2491/0.2031/
+ * 0.1286, K 2.72; the summary's own hq line, under the pooled K, reads
+ * 0.2451/0.2030/0.1331. luck-adjusted n=481 (335 excluded): brier
+ * 0.2344/0.2016/0.1186.
+ * AGAINST ROUND 45: every full-set record line, full and hq, is
+ * character-identical to the adopted stand's B side in docs/perf/probes/
+ * 2026-09-12-r45/paired-ac-full.txt and paired-ac-hq.txt (the tranche
+ * lines too, except tournament-0811b, which round 45 printed on its
+ * 813-position join). The bank asked for 12 Smogon URLs (11 payloads and
+ * one cached 404, sets-gen9doublesubers) and reads the pre-incident
+ * digits from them, so the "upstream may have moved" caveat below is
+ * lifted for the bank; no 599 pin. The backlog plan's T01 background
+ * quotes 0.2562/0.2242/0.1284: that is the parked threshold stand r45-b,
+ * not master.
+ * POSITIONS: A and B each exported 95 endgame positions (last pair,
+ * decided, or at most three living bodies) under <out>/positions; the two
+ * exports differ only in the sim's |t:| timestamp lines (2915 of them).
+ * regression/endgame-truth.spec.ts now defaults to .calibration/
+ * base-20260918/positions and says so when the directory is missing. The
+ * export carries today's team build: re-export after any cache bump.
+ * REPLAYS: the 129 bank ids are back on disk under .calibration/
+ * replay-cache (the harness-path set probe) and .calibration/replays (the
+ * naked set probe), 129 of 129 served. The bank itself still fetches
+ * every replay from the replay server on every run; a refused fetch logs
+ * "skipping" and costs positions, so n=816 is the first number to read.
+ * FEEDBACK: three FEEDBACK_DUMP=1 runs on the same commit, byte-identical
+ * on all six full dumps and on the drift JSON without its meta, and
+ * byte-identical to the round-45 capture run-ac (0 of 13 channels moved);
+ * 206 to 227 s per run, no empty first graph in three runs, no listener
+ * left on port 5176 (docs/perf/probes/2026-09-18-r46/base-run1..3).
+ *
+ * SMALL-TODOS ROUND 2026-09-12 (improvement round 45; no spec — three
+ * bounded items from NextSteps A.2–A.4; branch r45 on master 5e19415:
+ * d62a656 the fast play-out option / e30e72a the unknown-forme marker
+ * merge / the bookkeeping commit; the probe-chase threshold 6d10308
+ * (cache v47) is measured on the same base and PARKED on branch
+ * r45-threshold, see (3)). Verdict at the user gate.
+ * (1) TEAM BUILDER (e30e72a): team preview hides some formes behind
+ * "-*" (Urshifu-*, Zamazenta-*, Greninja-*); the battle's first switch
+ * line reveals the forme, and the inferrer kept BOTH as team entries, so
+ * 36 sides in 32 of the bank's 129 replays fielded a phantom seventh
+ * body (round 21 sighted 110359 p2 with seven sets): a bench mon that
+ * never enters and never faints, a living body to the static eval and a
+ * seventh of every fainted fraction for the rest of the game. The marker
+ * entry now becomes the revealed forme (its preview position, its "(has
+ * item)" marker and everything booked on it kept); a team sheet naming
+ * the forme sets it on a marker that never entered. Harness-path set
+ * diff over the bank (docs/perf/probes/2026-09-12-r45/diff-teams.txt):
+ * 36 sides lose the marker (7 → 6 sets, 452654 p1 8 → 6), 37 entries
+ * dropped, none added, 7 merged Zamazenta sets re-fit (0/252/0/0/0/168
+ * → 0/252/0/0/4/252: the phantom shared the solver key `p2:zamazenta`
+ * with the real body).
+ * (2) FAST PLAY-OUT (d62a656): a session checkbox beside the launcher
+ * pins every evaluation of a run to the depth-1 matrix instead of the
+ * Auto line (an engine override on useEvaluation, set before the run's
+ * first evaluation, released with the run); no score path, never stored.
+ * BENCH for (1)+(2) (paired, n=816, joined 813; A .calibration/r45-base
+ * on master 5e19415, B .calibration/r45-ac): sign 53/62/78/61/71 →
+ * 54/61/82/64/70, brier 0.2611/0.2287/0.1536 → 0.2564/0.2242/0.1285
+ * (early −47, mid −45, LATE −251 bp); hq n=548 0.2598/0.2154/0.1622 →
+ * 0.2491/0.2031/0.1286 (late −336); luck-adjusted 0.2450/0.2087/0.1471
+ * → 0.2344/0.2016/0.1186; bucket 0.4–0.7 68 → 77 %, 0.7–1.0 87 → 88 %; K
+ * pooled 1.80 → 2.19. SPLIT by the set diff (split-marker.mjs): the 97
+ * replays without a marker (601 positions) are BYTE-IDENTICAL; the 32
+ * marker replays (215 positions, joined 212) carry the whole gain:
+ * 49/66/69/59/80 → 51/65/85/66/68, brier 0.2674/0.2242/0.1994 →
+ * 0.2592/0.2024/0.1083, K 1.25 → 2.67, late singles B-only-right 14
+ * against A-only-right 4 (751207 t14 −0.674 → 1.000 with p1 the winner,
+ * 750267 t37 0.899 → −0.148 with p2 the winner); the 25 doubles
+ * positions among them lose three exclusive flips (with a pinned bring
+ * the trimmed VGC teams change only their bench ORDER, the merged entry
+ * sits at its preview position).
+ * FEEDBACK for (1)+(2): one capture (run-ac) byte-identical to the
+ * master base on all six full dumps, no channel of 13 moved, notices,
+ * errors, alignment and KO-odds mismatch counts unchanged (the corpus
+ * holds no marker species; the option is off by default); the three
+ * identical captures under the threshold below establish the day's
+ * determinism.
+ * (3) PROBE-CHASE THRESHOLD (NextSteps A.3, plan rank 16; 6d10308 on
+ * branch r45-threshold, cache v47): a root boundary class at or under
+ * 15 % analytic weight (PROBE_CHASE_MIN_WEIGHT) is neither chased with
+ * the eleven fixed probe seeds nor reported when no draw shows it; its
+ * mass renormalizes over the drawn classes as an unfound class always
+ * did. MEASURED: draw probe (docs/perf/probes/2026-09-12-r45/draws.vt.ts,
+ * 38 harness-sampled positions of the six feedback replays, d1s1 root,
+ * nude teams) 111 boundary cells, 940 draws → 171 (−82 %), 64 mismatch
+ * diagnostics with 71 missing classes → 0 (every one a tail class). Bank
+ * (.calibration/r45-b, the threshold on top of (1)+(2)): the 601
+ * non-marker positions move by at most 1 bp (0.2555/0.2317/0.1361 →
+ * 0.2554/0.2316/0.1361, no exclusive flip) — inert on the bank.
+ * Feedback: captures 1, 2 and 4 byte-identical on all six dumps (capture
+ * 3 was a harness miss: the first test of the run opened an empty graph,
+ * zero turns, no notice, no sweep — the Vite cold-start race the e2e
+ * runner guards against and the feedback config does not); against the
+ * base no channel of 13 moved and KO-odds mismatches fell
+ * 209/58/208/126/87/53 → 1/0/3/2/5/6, but root scores move where a probe
+ * used to find a tail class (648453 t10 −0.125 → −0.069 and t1 0.118 →
+ * 0.154, max |Δ| 0.057; 573756 max 0.0014) and the six reports move in
+ * their numbers. e2e: the round-42 play-out pin (draft t56, Muk-Alola
+ * before Heatran) FAILS deterministically under the threshold — p2's
+ * replacements read Slow Shadow (Slowking), Fire Shadow (Heatran), Ghost
+ * Shadow, Slow Shadow, Ghost Shadow, Muk-Alola never enters — and passes
+ * in 30 s with the threshold's two files reverted (e2e-pin-head.log,
+ * e2e-pin-nothreshold.log in the probe folder). The threshold buys draws
+ * and a clean diagnostic list at the price that a root cell no longer
+ * prices an 85–90 % move's miss unless a base draw shows it, and the
+ * tree's verified cells move enough to reorder a pinned sack line:
+ * PARKED, not recommended; the registered successor (on-demand draws at
+ * the root blend, the round-43 A.1 candidate) would price such classes
+ * exactly and retire the threshold.
+ * GATES on r45 (d62a656 + e30e72a): tsc, lint (ratchet: PlayOutBar split
+ * into a running row and a start row), knip, Vitest all projects green,
+ * e2e 75/75 (2.1 min).
+ * VERDICT 2026-09-12 (user gate, 15:20, "Agreed"): ADOPTED — r45
+ * fast-forwarded to master (d62a656, e30e72a, 0f4c832 and this commit);
+ * r45-threshold stays parked with .calibration/r45-b as its measurement
+ * stand; no re-pin, no cache bump on master (the sets fingerprint keys
+ * the marker teams), no push.
+ * INCIDENT 2026-09-12 15:25 (after the landing): `git worktree remove
+ * --force` on the round's worktree followed its junctions and deleted
+ * their targets in the main checkout — every bank stand under
+ * .calibration (r31 to r45, the replay caches), the 63 pinned Smogon
+ * payloads under .smogon-cache, the fit corpus, packages/* and part of
+ * node_modules — until an "Invalid argument" stopped it. Tracked files
+ * came back from HEAD, node_modules from npm ci, the fit corpus from the
+ * 12 Aug copy (2123 of 2127 manifest replays). The numbers above stand in
+ * this ledger and under docs/perf/probes/2026-09-12-r45/ (paired-*.txt);
+ * the dumps themselves, r45-b included, are gone: every later A/B needs a
+ * fresh base on the same day, and the Smogon pins re-establish on the
+ * next EVAL_CALIBRATION_SMOGON run (upstream may have moved since 4 Sep,
+ * so pre-incident ledger lines compare with that caveat). Rule: remove
+ * junctions non-recursively before any worktree removal (NextSteps D).
+ * FOLLOW-UP: the fit corpus carries the same phantom bodies (every gen-9
+ * team preview with a Zamazenta or Urshifu), so the feature weights and
+ * the phase-aware K were fitted against them — a re-fit is the first
+ * candidate after this round.
+ *
+ * CHANCE NODES ROUND 2026-09-12 (improvement round 43; spec
+ * docs/superpowers/specs/2026-09-12-round-43-design.md; branch r43 on
+ * master acd88d4; a42e634 the scripted PRNG / 7bae1d3 kill-roll counts on
+ * the boundary event / a98b3dc outcome children on demand / 351a9fc the
+ * solver and the prover draw missing classes on demand / 6582922 chance
+ * nodes in the first two plies / 1b3fcc1 the merge pools per class /
+ * 6478f20 unplanned pairs grouped at the root ply only / 3e25179 cache
+ * v46). Roadmap Q2 plus the speed-tie split and the prover's open
+ * classes. FINDING: round 42 lost 18 bp late with correct reads that
+ * hedged (2663102863 t8 0.851 → 0.287) because a tree cell fixes one
+ * roll per tree; the prover left classes open that no probe seed showed,
+ * and inner cells could not probe at all. MECHANISM: a ScriptedPRNG
+ * answers the accuracy roll (randomChance(·, 100)), the crit roll
+ * (denominators 24/16/8/4/3/2), the damage roll (the first direct
+ * random(16), a delegation flag keeps the gen-3-to-5 crit denominator
+ * apart) and the speed-tie order (shuffle over the tied move actions) of
+ * one named move, so a class the base seed never showed is drawn on
+ * demand (median kill roll, median non-kill roll, a crit only when no
+ * normal roll kills, the edge roll as the retry) and confirmed on its
+ * log; outcome-children.ts serves the tree, the endgame solver and the
+ * prover (the probe seeds are gone, the draw budget caps forced draws).
+ * In the first two plies a boundary cell with a class plan is a chance
+ * node over its classes (the descent takes the class with the largest
+ * deficit weight × visits − own visits, the cell reads as the weighted
+ * blend of the class means), a doubles or guarded pair groups three
+ * fixed seeds by who fell, every tree draws the same worlds there and
+ * the merge pools per class (cells[].classes); from the third ply on the
+ * rotated seed fixes one outcome per cell as before. Matrix, verify
+ * sampler and children stay byte-identical (identity fixture: only the
+ * mcts section moved, singles −0.2929 → −0.2930, doubles 0.9198 →
+ * 0.9281).
+ * PROVER: the synthetic forced-win table is line-for-line identical in
+ * mass, turns and caveat (struggle-lock 0.997, focus-blast-range 1,
+ * thunder-70 0.7; only states 16 → 19 and 3 → 4); the truth bench's
+ * synthetic coverage moves unpriced 13 → 6 and exactly solved 13 → 19
+ * (focus-blast-range, healer-vs-band, struggle-lock, choice-locked,
+ * two-v-one-switch-loop, doubles-healer-vs-band now exact).
+ * PERF (2026-09-03 probe, PERF_PROBE_DIR lever for the bank's doubles
+ * replay): singles 573756 tree t70 1017 → 1244 ms (+22%), t120 676 → 799
+ * (+18%); doubles 2663102863 tree t6 1344 → 2713 (+102%), t7 +145%, t8
+ * 1460 → 3420 (+134%), t9 +152% — over the preregistered +40%. Ladder
+ * step 1 (grouping at the root ply only, 6478f20): t6 +18%, t7 +34%, t8
+ * +37%, t9 +46% against the morning base; interleaved on one machine
+ * state flat 1435 / 1078 against chance 2061 / 1830 ms (t8 +44%, t9
+ * +70%). Step 2 (CHANCE_MAX_DEPTH 1) cannot help doubles: every doubles
+ * pair lacks a class plan, so the whole surcharge is the three root draws
+ * plus one makeNode per class child. The doubles line stays MISSED.
+ * BENCH (paired, n=816; A .calibration/r42-b; B .calibration/r43-b on the
+ * ladder-1 stand): sign 53/62/78/61/71 → 53/61/79/61/71, brier
+ * 0.2611/0.2287/0.1536 → 0.2610/0.2293/0.1548 (mid +6, LATE +12 bp); hq
+ * n=548 0.2598/0.2154/0.1622 → 0.2600/0.2141/0.1637 (mid −13, late +15);
+ * luck-adjusted 0.2450/0.2087/0.1471 → 0.2449/0.2091/0.1482 (late +11);
+ * bucket 0.7–1.0 87% → 88% (n 127 → 120); three exclusive flips, B right
+ * 2 (2660802611 t10, 749601 t22), A right 1 (2630461565 t4, doubles mid
+ * 0.215 → −0.317). Strata: tournament-0811b late 0.1174 → 0.1240 (+66),
+ * ladder-dou-0804 mid 0.0986 → 0.1221 (+235) and late 0.0862 → 0.0856,
+ * ladder-ou-0802 late 0.1348 → 0.1337. 2663102863 t8 0.287 → 0.662: the
+ * named position's certainty is back, the late line is not — against
+ * r41-b late 0.1518 → 0.1548 and hq 0.1607 → 0.1637 (+30 bp each). The
+ * preregistered line (hq late ≥ 3 bp better and full late not worse) is
+ * MISSED.
+ * FEEDBACK: three sweeps byte-identical on all six full dumps (drift JSON
+ * and report differ only in date and wall time); against the master base
+ * of the same morning the expected channels 573756 t68/t73/t138 and
+ * 649664 t23 stand unmoved, 653785 t19 (gap) open → moved (attribution
+ * shift where quiet is expected), the golden 655336 trades its t27
+ * key-moment attribution p1-read → shift and loses the "extra read 27:p1"
+ * channel (eight → seven); KO-odds mismatches 209/58/208/126/87/53 →
+ * 212/57/202/123/86/47; wall 573756 61 → 71/71/81 s (not interleaved, the
+ * machine ran 18% slower on unchanged code by noon).
+ * PLAY-OUT: the round-42 pin (e2e/branch.spec.ts, draft t56, Muk-Alola
+ * before Heatran) fails deterministically — p2's switches read Slowking,
+ * Gengar, Heatran, Slowking, Gengar, Slowking, Gengar, Muk-Alola never
+ * enters, p2 still wins at t68 instead of t65; with CHANCE_NODES = false
+ * (the solver and the prover keep their on-demand draws) the pin is green
+ * again in 34 s instead of 1.3 min. The movement belongs to the tree part.
+ * GATES: tsc, lint (ratchet), knip, Vitest 1421 green (173 files; the new
+ * scripted-prng, outcome-children and eval-mcts-chance specs); e2e 74/75,
+ * the play-out pin being the one miss.
+ * VERDICT 2026-09-12 (user gate, 12:40): FALLBACK, as the plan
+ * preregistered — CHANCE_NODES = false (9ff493c), the solver and the
+ * prover keep their on-demand draws, the tree part stays on the branch
+ * switched off. The user took the recommendation: the bank's late loss
+ * reads as structure (the class visits halve the main line's depth over
+ * two plies; the doubles identity depth fell 8 → 7), the cost and the
+ * play-out line come on top, and a rework would be a new spec (search
+ * the heaviest class deep, price the others statically), not a screw.
+ * FALLBACK BENCH (paired, A .calibration/r42-b, B .calibration/r43-flat):
+ * identical to four digits in every line — 53/62/78/61/71, brier
+ * 0.2611/0.2287/0.1536, hq 0.2598/0.2154/0.1622, luck-adjusted
+ * 0.2450/0.2087/0.1471, bucket 0.7–1.0 87% (n 127), no exclusive flip;
+ * five late positions move by thousandths as proofs with a formerly open
+ * class close (750540 t22 −0.994 → −0.929, 2115579570 t26 0.973 →
+ * 1.000, draft t65 −0.996 → −1.000, 2658661545 t20 −0.997 → −1.000).
+ * The on-demand draws are inert on the bank; their gain is the truth
+ * bench's coverage. FALLBACK FEEDBACK: three sweeps byte-identical on
+ * all six full dumps and on the drift report but for the commit stamp;
+ * against the master base no channel and no mismatch count moves (wall
+ * 573756 61 → 51 s); two full dumps move without a claim: 573756 t138
+ * p2 proof mass 0.6406 → 0.6628 (score −0.9641 → −0.9663), 649664 t23
+ * p1 proof caveat sampled-rolls → barring-crit with the t23 root 0.92 →
+ * 0.7875 (the cell prices classes now instead of falling to the plain
+ * path after one draw outside the plan; the crit stays open). Identity:
+ * the flat tree is byte-identical to the round-42 fixture (acd88d4).
+ * GATES on the fallback: Vitest green with the six tree-level chance
+ * tests skipped behind the switch, tsc, lint, knip, the play-out pin
+ * green in 24 s. Fast-forwarded to master; no re-pin; the
+ * r42-prior/budget/maxbackup branches and their bank folders deleted as
+ * the round-42 verdict foresaw; the tree part's bank run stays in
+ * .calibration/r43-b beside .calibration/r43-flat.
+ *
+ * FORCED-SWITCH NODES ROUND 2026-09-11 (improvement round 42; spec
+ * docs/superpowers/specs/2026-09-11-round-42-design.md; branch r42 on
+ * master 0926aa9; 74f6cdd the advance can stop at the forced-switch
+ * request / 99d3bb1 doubles pass assignments / e0a1759 the replacement
+ * after a knock-out is a decision node of the MCTS tree / 2293bca cache
+ * v45 / 26e1a01 the draft t56 play-out pin). Roadmap Q1: inside the tree
+ * every knock-out was resolved greedily — each bench body forked, the
+ * board read statically after its entry, the best entry taken — so the
+ * search never valued a sacrifice order (round 19: the draft play-out fed
+ * Heatran at t62 and kept Muk-Alola), and that probe was 49% of a tree at
+ * a quarter of all bodies fainted (perf evaluation P2). NOW the advance
+ * stops at the first switch request no pivot follow-up answers
+ * (answerFollowUps: 'boundary' | 'pending' | 'mixed', a follow-up beside an
+ * open request resolves greedily as before, so no position carries a
+ * half-answered request), the mid-turn position becomes a node whose
+ * option lists legalChoices already knew (the fallen side's bench, or the
+ * doubles assignments, against the waiting side's `wait` sentinel; a
+ * double knock-out is a normal k1×k2 node), Node.boundary tells turn
+ * boundaries from mid-turn nodes and depth counts boundaries only.
+ * Doubles: two forced slots with one living body offered NOTHING before
+ * (combineSlots dropped the shared target) while the greedy resolver knew
+ * "switch 3, pass" — the assignments now live in forward/assignments.ts
+ * for both. Matrix cells, the verify sampler, the played pair, play-outs,
+ * the prover and the calibration harness keep the greedy resolution.
+ * SIGHTING (docs/perf/probes/2026-09-11-r42/): the sim issues no switch
+ * request for a forced slot without a bench (the slot stays empty), and
+ * a U-turn that knocks out asks the pivot side first and the fallen side
+ * after the pivot switch, never both at once.
+ * PERF (2026-09-03 probe, same evening): MCTS tree t70 1755 → 814 ms
+ * (−54%), t120 567 → 571 ms, matrix 192/352 → 184/349 ms. Identity
+ * fixture: children and the d1 matrix byte-identical in both formats,
+ * only the mcts section moved (singles score −0.2972 → −0.2929, depth 4,
+ * doubles unchanged).
+ * PLAY-OUT (draft t56, p1 Kyurem Ice Beam, p2 → Slowking, offline
+ * fixtures): master switches Heatran into Mienshao's Knock Off at t62,
+ * loses it at t64, gets Muk-Alola as the forced replacement and crawls 21
+ * turns to a p2 win with Dragapult at 5%; r42 sacks Muk-Alola at t58–t60,
+ * brings Heatran last at t64 and ends the game at t65 with Overheat at
+ * 59% — the round-19 line. Pinned in e2e/branch.spec.ts by the order of
+ * p2's switch targets (voluntary rows and forced rows).
+ * BENCH (paired, n=816; A .calibration/r41-b, engine unchanged since the
+ * round-41 verdict; B .calibration/r42-b): sign 53/62/79/61/72 →
+ * 53/62/78/61/71, brier 0.2612/0.2296/0.1518 → 0.2611/0.2287/0.1536 (mid
+ * −9 bp, LATE +18 bp); hq n=548 0.2600/0.2167/0.1607 →
+ * 0.2598/0.2154/0.1622 (mid −13, late +15); luck-adjusted
+ * 0.2452/0.2084/0.1458 → 0.2450/0.2087/0.1471 (late +13); bucket 0.7–1.0
+ * 88% → 87% (n 130 → 127); ten exclusive flips, A right 6, B right 4;
+ * late mean |s| 0.53 → 0.52. Strata: ladder-ou-0802 late 0.1240 → 0.1348
+ * (+108), ladder-dou-0804 late 0.0811 → 0.0862 (+51, sign 94 → 88),
+ * tournament-0811b mid 0.1934 → 0.1890 (−44) and late 0.1201 → 0.1174
+ * (−27), draft late +51, the rest flat. The preregistered line (late brier
+ * and the 0.7–1.0 bucket not worse) is MISSED; the late loss sits in a
+ * few confident late positions that lose confidence while staying right
+ * (2663102863 t8 0.851 → 0.287 alone ≈ +7 bp of the late brier).
+ * THREE MORE CUTS, each measured on the bank and parked on its own
+ * branch, none passes the line: (1) PRIOR (r42-prior, 7886d9a,
+ * .calibration/r42a-b — the mid-turn node keeps the greedy resolution's
+ * static as leaf and prior, because the matchup term weights only pairs
+ * of two actives and a board with an empty slot reads less decisive):
+ * 53/63/79/61/73, brier 0.2613/0.2279/0.1533 (mid −17, late +15), hq
+ * 0.2599/0.2145/0.1630 (mid −22, late +23), flips A 3 / B 5 — but the
+ * tree costs 1980 ms at t70 again and the draft play-out sends Heatran
+ * first at t60 and LOSES the game at t72: the greedy prior takes back
+ * the freedom that finds the Muk line. (2) FREE MID-TURN ITERATIONS
+ * (r42-budget, 8cf1787, .calibration/r42b-b — only boundary expansions
+ * charge the 600, raw cap 2×): 0.2610/0.2285/0.1541 (late +23), hq late
+ * 0.1649 (+42), bank slices +50% — more search at mid-turn nodes hurts
+ * late, the depth hypothesis is refuted. (3) MAX-BACKUP on the prior
+ * (r42-maxbackup, ea313c8, .calibration/r42c-b — a one-sided mid-turn
+ * node backs its chooser's best replacement up the tree and into the
+ * root cell instead of the visit mean over every body tried):
+ * 53/62/80/61/73, 0.2611/0.2280/0.1541 (mid −16, late +23), hq
+ * 0.2599/0.2144/0.1627 (mid −23, late +20), luck-adjusted
+ * 0.2448/0.2107/0.1489 (mid +23, late +31), flips A 5 / B 8. Every
+ * variant loses 15–23 bp late and gains 9–17 bp mid: the late loss is
+ * structural to searching the replacement, not to any one value rule.
+ * FEEDBACK: three sweeps byte-identical on all six full dumps (drift JSON
+ * and report differ only in date and wall time); against the master base
+ * of the same evening ONE channel moves, 649664 t23 (gap) attribution
+ * p1-read → chance (still a gap); 573756 moves t114–t136 by about −0.1
+ * toward LordEnz (19 scores > 0.05; t116 shift → p1-read, t124 p1-read →
+ * shift, t134 quiet → chance, t135 chance → shift), t138 unmoved; KO-odds
+ * mismatches 202/58/206/123/89/51 → 209/58/208/126/87/53; wall 573756 51
+ * → 62 s (not interleaved, load-bound). No truth or golden channel moved.
+ * GATES: tsc, lint (ratchet), knip, Vitest 1397 green (170 files; the new
+ * eval-mcts-forced-switch.spec.ts, 9 tests); e2e 75/75 green with the
+ * new pin (28 s alone).
+ * VERDICT 2026-09-11 (user gate, evening): ADOPTED as built. The user
+ * read the late loss for what the paired bed shows — confident, correct
+ * endgame reads that hedge (85% → 65%) rather than wrong ones (late sign
+ * 79 → 78, flips 6:4), against a sacrifice order the old tree never finds
+ * and half the tree cost — and took the preregistered line as a guard
+ * against misread endgames, which did not happen. Fast-forwarded to
+ * master; one re-pin: 649664 t23 (gap) observed p1-read → chance, the
+ * root before Keldeo's click now reads −0.89 (was −0.37) and the paid-off
+ * read framing dissolves into the roll; desired unchanged. The three
+ * measured cuts stay parked on their branches with their bank runs;
+ * the late hedging is booked as a watch item for round 43 (Q2).
+ *
+ * OFFENSE-VS-KEPT-SPEED ROUND 2026-09-11 (improvement round 41; spec
+ * docs/superpowers/specs/2026-09-11-round-41-design.md; branch r41 on
+ * master ba2ce5b; d72690b a kept Speed gives way to an offense claim the
+ * budget cannot express / e30c1c5 both shaving orders when a kept offense
+ * and a kept Speed exceed the budget / 07db6ac cache v44 / 889a132 the
+ * release is for the offense claim's own room). The registered defect of
+ * round 40's diff review: with the log's HP fixed and a satisfied order
+ * keeping Speed, an offense rung whose claim the budget cannot express
+ * beside them was dropped by the round-40 feasibility rule, so the ladder
+ * held only 0-offense rungs and clean damage lines that measured 252 Atk
+ * ended at 0 Atk. The sighting probe (docs/perf/probes/2026-09-11-r41/
+ * repro.vt.ts) reproduced it: prior Jolly 0/252/0/0/4/252, truth Adamant
+ * 252/252/0/0/0/4, log 420/420, one satisfied order, two clean
+ * Earthquakes → Jolly 252/0/0/0/4/252 (without the order: Adamant
+ * 252/252/0/0/0/4). The probe also found the sibling: a knock-out-only
+ * offense (kept) beside the fixed HP and the kept Speed is shaved to 4 by
+ * the kept order with nothing measuring it (Jolly 252/4/0/0/0/252).
+ * FIXES (ladder.ts only): rule 1 — when the composed offense stat falls
+ * below its claim beside the kept Speed, the ladder offers the rung again
+ * with the Speed released (its plus nature neutralized, the offense-plus
+ * rung available); the 0-offense rungs stay, bestRung decides, and a
+ * released body still pays 1000 per violated order. Rule 2 — when a kept
+ * offense and a kept Speed do not both fit beside the fixed stats, a
+ * second prior rung lets the Speed give way instead (Hardy); knock-out
+ * lower bounds and orders decide, the prior's nature wins ties. A kept
+ * offense never gives way (round 33) and a bulk claim never releases
+ * Speed, not even beside an offense claim the budget did express: the
+ * first cut released for any rung claiming offense, and the fit corpus
+ * showed that reading stripping Speed from 162 bodies with an unchanged
+ * offense (Deoxys-Speed 0/0/0/252/4/252 → 252/0/0/252/0/4), so the
+ * trigger was narrowed to the offense claim's own room. The round-40
+ * test's knock-out line moved from 60% to 30%, the reach of its own
+ * 48-Atk truth.
+ * REACH (fit corpus, 2122 replays, bare build path): the 963 starvations
+ * of round 40 reproduce exactly (0e65d2c 252 → master 0). The narrow
+ * reading restores 20 of them and moves 140 sets in 81 replays (rule 2:
+ * 4 sets, Great Tusk 252/4/0/0/0/252 → 252/252/0/0/0/4); the wide reading
+ * restores 186 and moves 640 sets in 363 replays; the other 777 belong to
+ * other families (bulk claims outweighing offense lines without a kept
+ * Speed, budgets left unfilled under measured stats — the top-up rest —
+ * and orders that really need the Speed). On the HARNESS path (usage
+ * stats + set assumptions, the bank's 129 replays, 1586 sets) the narrow
+ * reading moves NO set and the wide reading 51 sets in 23 replays (15
+ * offenses restored — Weavile 0/0/0/0/0/252 → 0/252/0/0/4/252, Ogerpon-
+ * Wellspring likewise — and 19 bodies that lose Speed to a bulk claim
+ * beside an unchanged offense). On the FEEDBACK path (usage fixtures, set
+ * assumptions for four species) the narrow reading moves one set:
+ * 573756's Kyurem, Jolly 56/0/236/0/0/216 → Hardy 56/0/0/252/0/200 — the
+ * 0-SpA body of round 40's rests gets its measured Special Attack back
+ * (fixed 405 HP + kept Speed starved the offense claim); 573756's
+ * Garchomp is unchanged on the pin path (Hardy 208/48/0/0/0/252).
+ * BENCH (paired, n=816; A .calibration/r40-b = the adopted round-40
+ * numbers, engine unchanged since dbffb5f; B .calibration/r41-b): every
+ * score identical — the narrow round is invisible to the bank by
+ * construction. The wide reading (.calibration/r41-wide-b, measurement
+ * branch r41-wide): brier 0.2612/0.2296/0.1518 → 0.2609/0.2296/0.1529
+ * (early −3 bp, late +11 bp), hq n=548 0.2600/0.2167/0.1607 →
+ * 0.2597/0.2168/0.1616 (late +9 bp), luck-adjusted 0.2452/0.2084/0.1458 →
+ * 0.2445/0.2084/0.1455; sign 53/62/79 → 53/62/79; three exclusive flips,
+ * A right 2, B right 1 — flat within noise, the preregistered line (no
+ * phase worse than 20 bp hq) holds for both readings.
+ * GATES: tsc, lint (ratchet), knip, Vitest 1388 green (169 files; the new
+ * spread-ladder-release.spec.ts, 7 tests); three feedback sweeps
+ * byte-identical on all six full dumps (drift JSON and report differ
+ * only in commit, date and wall time); against the master base of the
+ * same morning only 573756 moves: t73 keeps chance + key moment (chance
+ * +0.503 → +0.404), t76 quiet → chance (−0.23) and t77 chance → quiet,
+ * 52 of 139 scores move (max 0.19 at t77), KO-odds mismatches 200 → 202;
+ * no pin moved, no other replay moved. e2e 74/74 green (1.8 min).
+ * VERDICT 2026-09-11 (user gate, afternoon): ADOPTED as built, the narrow
+ * reading. Fast-forwarded to master (5bee071 plus this entry); no pin
+ * moved, so no re-pins. The wide reading stays a registered candidate
+ * (NextSteps A.1) with the numbers above and its own feedback gate if it
+ * is ever adopted; its measurement branch r41-wide keeps the bank run.
+ *
+ * TURN-73 ROUND 2026-09-05 (improvement round 40; round-46 note: this
+ * round's bank line was measured on the raw instrument, whose bench its
+ * own fix 1e0d18a had just set adrift, see BANK INSTRUMENT 2026-09-18; spec
+ * docs/superpowers/specs/2026-09-05-round-40-design.md; worktree r40 on
+ * 0e65d2c while the second session committed on master; 694fac7 HP EVs
+ * from the log's maximum HP + a satisfied order keeps its Speed / 8dc7908
+ * a death after the mon's own miss or dice cant is no sack / 1e0d18a the
+ * bench keeps the sim's HP / b9670dc cache v43). The user's turn: 573756
+ * t73, a +4 Garchomp at 11% one 95% Fire Fang from clearing Corviknight,
+ * the miss, Body Press taking it. The app called Body Press an inaccuracy
+ * (Defog 23% vs 18%), named Scale Shot LordEnz's best move over Fire
+ * Fang, wrote "sacked Penal Battalion — a low-cost trade", and booked the
+ * miss as −4% chance AGAINST SoulWind. The probe
+ * (docs/perf/probes/2026-09-05-t73/t73-probe.spec.ts, app team path, the
+ * sweep's four trees + verify + deepen) reproduced all of it — regret
+ * 0.166, chance −0.083, Scale Shot −0.651 vs Fire Fang −0.649 own-p2 —
+ * and found the hit child (Corviknight down, Kyurem in) priced 29% for
+ * SoulWind while the miss child priced 19%: the sim held the HIT to be
+ * the better outcome for the defender. Four causes, each with evidence:
+ * (1) the spread fitter had Garchomp at 265 Speed under Kyurem's 280 —
+ * since round 37 its prior (Jolly 252/252, 333) satisfies every observed
+ * order, which the solver counted as MEASURED Speed, so a 252-HP rung won
+ * the damage lines and the budget shaved the Speed to 4; the fit table
+ * showed every candidate from 265 to 333 at error 0 (the evidence is
+ * silent on Speed), and the log's 409/409 pins 208 HP EVs, so 208 + 48 +
+ * 252 = 508 is the real set and the 252-HP rung contradicts the log.
+ * (2) The verify step deepened the equilibrium column's cells on the
+ * first-seed child (the 10% miss vanished; three rows collapsed to
+ * −0.824) and left the Defog row unverified at −0.658 — rows compared at
+ * unequal depth, the tier an artefact (open, A.1 depth consistency).
+ * (3) detectSacks read any faint under 15% as a deliberate feed. (4)
+ * correctHpFromSnapshot wrote every body's HP from the spectator
+ * snapshot, bench included: both Toxapex sat at 70% and 81% while the
+ * real ones had regenerated to full (Regenerator is silent in the
+ * protocol). Overrides confirmed the hypothesis before any code moved:
+ * Garchomp 208/48/252 Jolly alone → hit child 7.7% (matrix d2 0.0%),
+ * regret 0.013, Fire Fang best, chance +0.19; with the likely real
+ * Kyurem (56/200/252 Timid) chance +0.31.
+ * FIXES: observedMaxHp reads every switch/drag line's exact maximum HP
+ * (percent logs skipped), hpEvsForMaxHp inverts the HP formula (exact at
+ * level 100, nearest the prior below), the solver fixes those EVs in
+ * every rung, never shaves them, keeps them when the damage fit forfeits,
+ * and under the observation minimum sets them inside the prior without a
+ * ladder. speedMeasured replaces speedRepairable: only an order that
+ * REFUTES the prior and that some rung repairs opens the Speed rungs;
+ * satisfied and unrepairable orders both keep the prior's Speed and
+ * speed nature. The prior rung legalizes around the same kept and fixed
+ * stats. SackInfo.rolled marks a faint whose slot's own action failed by
+ * dice ([miss], |-miss|, dice |cant|) and sackGate applies no shape when
+ * the played move carried a knock-out chance. Benched bodies keep the
+ * sim's HP, status and boosts; only a faint-state disagreement is
+ * resolved from the snapshot.
+ * RESULT (probe on the final r40 code, app path): Garchomp Jolly
+ * 208/44/0/0/4/252 (333), Kyurem Jolly 56/0/236/0/0/216 (308, 405 HP),
+ * Corviknight 248 HP, both Toxapex 100%; t73 Fire Fang is p2's best row
+ * and Body Press p1's (regret 0.000 both), the sack carries rolled, the
+ * miss books chance +0.503 toward SoulWind, t74 root 33.8% (was 18.7%),
+ * hit child 8.2% (matrix d2 0.0%). Still open: the pre-roll bar reads
+ * 19.5% where the played pair prices 8.7% — the root cell does not see
+ * the sweep the child search sees (t68 family, A.1). A second lesson from
+ * the fit corpus (2122 replays, bare build path, master vs r40): the first
+ * cut let bulk rungs keep their nature after the budget shaved their EV
+ * claim beside the kept Speed (1633 nature changes, "Bold Rayquaza, 0
+ * Def"); a rung the budget cannot express is now not offered at all.
+ * BENCH (paired, identical positions n=813; A .calibration/r40-a on
+ * 0e65d2c = the round-37 numbers, B .calibration/r40-b on the final
+ * code): sign 53/62/80 → 53/62/79, brier 0.2605/0.2293/0.1591 →
+ * 0.2610/0.2301/0.1529 (early +5 bp, mid +8 bp, late −62 bp); hq n=545:
+ * 53/63/77 → 53/63/75, brier 0.2569/0.2167/0.1708 → 0.2597/0.2177/0.1624
+ * (early +28 bp, mid +10 bp, late −84 bp); luck-adjusted (full)
+ * 0.2444/0.2088/0.1503 → 0.2452/0.2084/0.1458 (late −45 bp); doubles K
+ * 2.32 → 2.29. Tranches: tournament-0811 late 0.1825 → 0.1656 and early
+ * 0.2640 → 0.2696, ladder-ou-0802 late 0.1287 → 0.1240, tournament-0811b
+ * flat. 31 exclusive sign flips, A right 18, B right 13; disagreement is
+ * symmetric in every phase (mid singles A-only 8 vs B-only 6, late 3 vs
+ * 3). The preregistered line (hq paired and luck-adjusted not worse)
+ * holds late by a wide margin, is flat mid, and misses early by 28 bp hq
+ * where both sides sit at a 53% coin flip. Sets moved (fit corpus, 2122
+ * replays, bare build path without Smogon data, master vs final r40):
+ * 4885 of 25959 sets in 1168 replays — HP changed on 2933, Speed up on
+ * 1352 and down on 93, nature on 1543 (the bare path's neutralized
+ * priors, not the app's usage priors); mean EV total 409 → 406, bodies
+ * under 300 EVs 5918 → 6151, the top-up refusing measured stats (C).
+ * GATES: tsc, lint (ratchet), knip, Vitest 1297 green (149 files), e2e 74/74,
+ * three feedback sweeps byte-identical on the drift JSON and report (183 s
+ * each on a loaded machine; the app path). Against a base sweep on master
+ * 34afc82 the channels move as the round intends: 573756 t73 reads
+ * attribution chance and enters the key moments ([71, 73, 131, 136]; the
+ * pin expects quiet and no key moment — the desired side of the gap),
+ * Body Press and Fire Fang are both best rows, no sack line, the
+ * denied-early-end sentence stands; 648453 t13 moves p1-decision → quiet
+ * (toward its desired 'no mistake tier'); 649664 t8 (truth pin: Fire
+ * Blast best, attribution shift or p1-read) keeps Fire Blast as the best
+ * row (regret 0) but the pre-turn score sits at −0.105 instead of −0.185,
+ * so the +0.145 swing falls under the shift threshold and the turn reads
+ * quiet; the golden 655336 trades its known-drift channels once more (t25
+ * chance and t26 p1-read out, t27 p1-read in). No pin moved; re-pins at
+ * the user gate. Wall clock: the 573756 sweep 52 s to 1.5 min under the
+ * bank's load (no quiet-machine number this round).
+ *
+ * VERDICT 2026-09-06 (user gate 07:36): ADOPTED as built. Re-pins booked
+ * (3e6d185, dbffb5f): 573756 t73 observed becomes chance + key moment (the
+ * desired side of its gap; the open half is the pre-roll bar, A.1), 648453
+ * t13 observed becomes quiet (the no-tier half of its desired), 649664 t8
+ * accepts quiet beside shift and p1-read (Fire Blast stays the best and
+ * played row, which is the pin's substance), and the golden 655336 books
+ * its traded known-drift channels. Rebased onto master 34afc82 (no
+ * conflicts, zero file overlap with the second session's test round) and
+ * fast-forwarded; gates re-run on the rebased tree: tsc, lint, knip and
+ * Vitest 1380 green (168 files, the app suite included).
+ * KNOWN DEFECT, registered at the gate (NextSteps A.1, round-40 rests):
+ * the keep-plus-fixed interaction can starve a MEASURED offense. When an
+ * order the prior already satisfies keeps Speed AND the log pins a large
+ * HP (fixed + kept + claim > 508), every offense rung composes below its
+ * claim, the round-40 feasibility rule drops it, and only 0-offense rungs
+ * remain — so clean damage lines that measure 252 Atk end at 0 Atk and the
+ * fork no longer reproduces the observed damage (the module's pair-
+ * consistency guarantee). Reproduced independently three times: Garchomp
+ * prior Jolly 0/252/0/0/4/252, truth Adamant 252/252/0/0/0/4, log 420/420,
+ * one satisfied order, two clean Earthquakes → r40 solves Jolly
+ * 252/0/0/0/4/252 (sim Earthquake 75% of the observed hit) where 0e65d2c
+ * solved 252/252/0/0/0/4. Blast radius over the fit corpus (bare build
+ * path, master vs this round): 963 of 25959 sets lose a 252+ offense to 0.
+ * The bank above MEASURED this behavior, so the adopted numbers already
+ * carry its cost; the fix (let a kept, unmeasured stat yield to a measured
+ * claim instead of dropping the rung) is the first candidate of round 41
+ * and should move the bank further.
+ *
+ * CHOICE SCARF INFERENCE ROUND 2026-09-05 (improvement round 37 of the
+ * perf-and-quality plan; spec
+ * docs/superpowers/specs/2026-09-05-round-37-design.md; worktree r37 on
+ * d8a2cb7, rebased onto master after round 38 and again after the second
+ * session's Vitest move; a9c3295 doubles orders + copied actions / 0a23625
+ * cleanliness rules / d783aeb solver decisions / cfc904b builder, panel,
+ * cache v42 / d8843b0 Pursuit-on-U-turn + Sleep Talk after |cant| / 7419394,
+ * b4afcf8, 14f9f36 a Scarf that changed hands / ef4b5ad pre-solve decisions
+ * carried through a forfeited full solve / e43e0f8 EVALUATION.md; the
+ * measurements below ran on the same trees before the second rebase, which
+ * touched no engine source). The parser reads every opposite-side pair of a
+ * turn's movers as a race (doubles turns included), drops copied actions
+ * (Dancer, Instruct, bounced or snatched status moves), a Pursuit fired at a
+ * switch as first mover, a slot After You or Quash rearranged, and every
+ * order that something other than Speed explains: Prankster status moves,
+ * Gale Wings at full HP, Triage heals, Grassy Glide on its terrain, a Quick
+ * Claw, Quick Draw, or Custap Berry that fired, a weather or terrain ability
+ * the species can carry unless the protocol revealed another, Unburden after
+ * a lost item, Stall and Mycelium Might moving last, and the races a mon
+ * lost while its Choice Scarf differed from the set's (Knock Off, Trick).
+ * The spread solver reads an order the first mover cannot reach at full
+ * Speed against every plausible spread of the second (usage spreads with >=
+ * 5% share, thinned to the tempo camp at 80%, or the known spread) as a
+ * Choice Scarf on the first mover when the Scarf closes the gap and the
+ * species runs Speed-invested spreads, and drops a guessed Scarf whose
+ * holder would then be faster than an observed order allows; known items,
+ * sheet sets, and ruled-out Choice items are never touched. The builder
+ * carries the decision into the set (a dropped Scarf resolves to the next
+ * usage item), the panel shows "inferred" (detail "moved first, Choice Scarf
+ * inferred") or the guess with "moved second, Choice Scarf ruled out", and
+ * the sensitivity probes skip an inferred Scarf.
+ * EVIDENCE (fit corpus, 2128 replays, base against r37): singles orders
+ * 20233 -> 19606 (792 dropped: weather ability 205, Prankster 102, Unburden
+ * 71, Gale Wings 43, Grassy Glide 39, Triage 25, Custap 19, Pursuit
+ * knock-outs on a switching target 13, Stall/Mycelium 6, Surge Surfer 4,
+ * Quick Claw 2, Magic Bounce copies 2, a traced Chlorophyll 1, races lost
+ * after a Scarf change 260; 165 Sleep-Talk-first pairs gained), doubles 0 ->
+ * 3794 in 626 replays. The design probe's false-order counter fell 178 ->
+ * 10, and those ten are the probe's own coarseness (no HP check for Gale
+ * Wings, no item-loss check for Unburden, a traced Adaptability the client
+ * knows).
+ * BANK (auto, 816 against 814, paired against r37-a = d8a2cb7): full late
+ * brier 0.1562 -> 0.1585; hq (paired, n=546) sign 54/64/77 -> 53/63/77,
+ * brier 0.2561/0.2164/0.1674 -> 0.2570/0.2166/0.1699 (late +25 bp against
+ * the preregistered +10 bp: FAILED); luck-adjusted late 0.1487 -> 0.1503
+ * (+16 bp, failed); sign late 80 = 80 full and 77 = 77 hq; 148 positions in
+ * 33 replays moved (singles 100, doubles 48), 3 sign flips. Attribution
+ * (fixed K 1.76): one game, smogtours-gen9ou-750540, carries +0.238 of the
+ * +0.364 late-hq sum (t18 0.11 -> 0.58 toward the loser); its inferred Scarf
+ * on Darkrai is right (t13 knock-out on Deoxys-Speed before it acted,
+ * unreachable without a Scarf; the real Darkrai used one move per stay) and
+ * the engine prices the Choice-locked cleaner worse than the wrong Life Orb
+ * set. Without it +0.126 over small items (749601 +0.052, 938644 +0.035,
+ * 752755 +0.027 with Grimmsnarl at 252 -> 0 Spe under the Prankster rule,
+ * 914633 +0.020, 750953 +0.018, against 751543 -0.036); the large gains sit
+ * in std doubles (2663100395 -0.088, 2660818097 -0.079).
+ * DECISIONS (bank universe, 133 replays with evidence): 10 item decisions in
+ * the 33 moved replays (8 Scarf-in: 750540 Darkrai, 750953 Typhlosion-Hisui,
+ * 2658665571 Kyurem, four Gholdengo, 751244 Glimmora; 2 Scarf-out: 914633
+ * Landorus-Therian -> Choice Band, 912047 Chi-Yu -> Choice Specs), 45
+ * changed sets in 31 replays (the rest are Speed spreads under new doubles
+ * evidence or dropped singles orders); the app path (solveReplaySpreads)
+ * agrees with the harness build since ef4b5ad.
+ * HAND CHECK: 8 of 9 Scarf-ins plausible against the log (573756 Magnezone;
+ * Kyurem before Zamazenta; Gholdengo before Darkrai, Iron Moth, and
+ * Ogerpon-Wellspring; Glimmora knocking out Dragapult before it acted;
+ * Typhlosion-Hisui before Ogerpon-Wellspring), one wrong (939635 Landorus:
+ * Zapdos-Galar had lost its Scarf to Knock Off the same turn), which became
+ * the changed-hands rule; both Scarf-outs right (Chi-Yu behind Sneasler and
+ * Kyurem, Landorus-Therian behind Landorus-Incarnate, doubles); 2663107495
+ * Gholdengo keeps a Scarf on contradictory evidence (t1 before, t10 behind
+ * Ogerpon-Wellspring) at its Hardy 60 Spe prior.
+ * COST (573756 alone, master e2f7fac and r37 e08abf9 interleaved on a quiet
+ * machine, 22:17): 51 s and 51 s, twice each (the first four interleaved
+ * runs at 20:16 and 20:44 had run under the second session's vitest load and
+ * read 90 to 152 s either way; no cost from the round). Four feedback runs
+ * on the final tree: regression 1044 passed on Vitest, feedback run 7
+ * byte-identical to round 2 including the sensitivity data, e2e 73 of 74
+ * with the known viewer-seeking flake (green alone).
+ * FEEDBACK: four runs (three on 14f9f36, one on ef4b5ad) identical on every
+ * drift channel and every dump except the sensitivity probe's species label
+ * (648453 t13 in one pair, 655336 in another; identical values, a labeling
+ * race the base run shows too); no pinned channel moved. Against the base
+ * three dumps move: 573756 (turns 1-73, the Scarf Magnezone counts from turn
+ * 1; t72 Flash Cannon regret 0.14 -> 0; but Garchomp falls to 252 HP/252
+ * Atk/4 Spe once the t72 order is explained, the t73 hit child prices -0.46
+ * instead of near -1 and the denied-early-end sentence drops; the log's 409
+ * HP put the real Garchomp near 208 HP EVs, so at most 48 Spe EVs, 277
+ * Jolly, under Kyurem), 648453 (all 35 turns, report fields, cause open),
+ * and 655336 (golden: Latias tricks its Scarf onto Bisharp, the
+ * changed-hands rule drops t5, Latias becomes Timid 248 HP and Bisharp
+ * Adamant; the eight booked golden channels change shape: t26 key moment
+ * attributed p1-read instead of p2-decision, t27 shift gone, extra read
+ * 26:p1).
+ * VERDICT: ADOPTED (user gate 2026-09-05 21:58). The preregistered bank line
+ * is failed by one game whose inferred set is right; the sets are
+ * demonstrably truer (Magnezone, Darkrai, Typhlosion-Hisui, Chi-Yu,
+ * Landorus-Therian) and no pinned channel moved. Registered follow-ups
+ * (NextSteps A.1, round-37 items): the engine's price of a Choice-locked
+ * cleaner, the Speed prior the ladder gives up once an order is explained,
+ * an item that changes hands as a per-span set state, and the cost
+ * measurement on a quiet machine. The branch was rebased onto master twice
+ * (round 38, then the Vitest migration); the hashes above are the final
+ * ones.
+ *
+ * FORCED-WIN PROVER ROUND 2026-09-04/05 (improvement round 35 of the perf-
+ * and-quality plan; spec docs/superpowers/specs/2026-09-04-round-35-design.md;
+ * ac3c708 class shares / 2dbf677 prover / a1e7022 trigger and bar /
+ * c6b3ccb wiring + cache v41 / da47b69 prose / 66836bd fixtures + truth
+ * column / 2d470f8 bank fields / 6e95ae8 cells budget / 295be63 coin-flip
+ * rule). An AND/OR proof search runs after every root search where the
+ * board is small (at most three living bodies or the last pair) or the
+ * decided sweep names a side: the favored side's ranking candidates against
+ * every reply, per outcome class, down to a won battle; the proven MASS
+ * (share of the classes proven along every reply) bars the score
+ * (mass toward the side, the rest at the open branches' static) when it
+ * exceeds one half, and the turn card speaks it from 0.9 ("X wins in N
+ * against every reply", "if the 95% Fire Fang lands", "barring a crit",
+ * "on the sampled rolls"). Budget: 30 matrix cells per position shared
+ * between the top three root candidates, six draws per class cell (a class
+ * the draws never show stays open), states 200, depth 12, no wall clock;
+ * the sweep's sketch pass skips it, the main thread skips the worker round
+ * trip where the trigger cannot fire.
+ * BANK (auto, 816, paired against r34-after): late brier 0.1564 -> 0.1563,
+ * hq late 0.1664 -> 0.1663 (preregistered: not worse), luck-adjusted late
+ * 0.1490 -> 0.1488, sign hits identical 54/63/80 (hq 54/64/77); 22 samples
+ * carry a proof (19 at mass 1, 21 right; the one loss, gen9ou-2663114316
+ * t22, is a guessed Rocky Helmet on Hatterene whose recoil kills the 3-HP
+ * Kingambit in the sim while the real Hatterene held none, and the engine
+ * read -0.97 there before the prover); decided-loss dossier unchanged at 23.
+ * COST (573756 alone, base and prover interleaved on one machine): 65 s and
+ * 65 s; the first, states-only budget had cost 2 s per failing position on
+ * the bank and up to 20 s per position at nine replies.
+ * FEEDBACK: three runs byte-identical, no pinned channel moved, no re-pins;
+ * proofs at 573756 t139 (p2 in 1, barring a crit, 98.8% -> 100%), 653785
+ * t26 (p2 in 2), 655336 t28 (p1 in 1), 562428 t23 (p1 in 1), 649664 t24
+ * (p1 0.8 in 3). 573756 t138 stays unproven (Close Combat cell unpriced)
+ * and t73 too.
+ * TRUTH BENCH (r35-truth2/3 dumps, 116 items, solver caps as round 34): the
+ * prover column equals d1 since the bar sits inside every root search; d1's
+ * brier against the 14 exactly solved positions falls 0.0632 -> 0.0243; the
+ * seven bank positions the searches missed by a full sign in round 34
+ * (749828#23, 2663112349#37, 2658663604#20, 752301#30, 751170#26,
+ * 752324#65, 752733#32) all prove, six at mass 1 and 2658663604#20 at
+ * 0.958; the synthetic heal wars healer-burned (0.93 in 4), struggle-lock
+ * (0.997 in 5), choice-locked (0.97 in 3) prove for p2 as the solver said,
+ * focus-blast-range (a ten-turn miss chain) and healer-vs-band fall at the
+ * cells budget.
+ * USER GATE 2026-09-05: adopt, with the coin-flip rule (a proof at exactly
+ * one half stays on the result but moves no score; toss-race-even read -0.8
+ * under the bar against an exact 0). GATES: eval-engine specs (prover 9,
+ * apply 8, summary 7), regression/forced-win.spec.ts 26, parity, identity
+ * fixture, API snapshot, 945 regression, e2e 73 (the p2 replay-link test
+ * passes alone), tsc -b, lint, knip. LESSONS: the feedback suite's full
+ * dumps exist only with FEEDBACK_DUMP=1 (a stale dump read as "no proofs
+ * in the app"); wall-time gates need base and candidate interleaved; four
+ * Playwright slices started at once in a fresh worktree race on the
+ * transform cache.
+ * FOLLOW-UP 2026-09-05 (a61b0f9 display, e019a73 replay iframe, deb8e96
+ * prover): winPercent reads a value within a billionth of +-1 as the
+ * finished game (an ended row weighted by the equilibrium mix kept a
+ * one-bit remnant and showed 86% next to a 100% bar); the replay iframe
+ * predefines Showdown's route table (client 0.11.2 reads Config.routes
+ * while battledata.js loads, and dynamic scripts run in any order). The
+ * prover gained a GREEDY PROBE (one line per root candidate against the
+ * reply that leaves the opponent the most HP, at most 16 cells and five
+ * turns per side; only a line that ends in a win starts the full search,
+ * now 100 cells with the probe's cells reused), DOMINANCE INHERITANCE (a
+ * class no draw showed takes the proof of the drawn class that is at least
+ * as bad for the side: the opponent's miss from their hit, the side's
+ * knock-out from its survived hit; a 90% Toxic had left 10% of certain wins
+ * open), inner cells at the base draws only, and a SCORE FLOOR of 0.6 for
+ * decided boards above three bodies (no bank proof ever stood below it;
+ * 42 of 573756's 51 decided turns did). BANK (r35-after4 vs r34-after):
+ * late brier 0.1564 -> 0.1562, hq late 0.1664 -> 0.1665, luck-adjusted late 0.1490 -> 0.1487,
+ * sign hits identical 54/63/80 (hq 54/64/77); 33 of 816 samples carry a proof (27 at mass 1,
+ * 30 (the three losses were wrong before the prover: gen9ou-2663114316 t18 and t22, smogtours-gen9ou-751443 t23) right). 573756: t139 p2 in 1 at mass 1 as before, and t138 p2 in 4
+ * at mass 0.88 (the bar reads about 97%, below the spoken 0.9; Toxapex's
+ * Recover-first defense leaves an open branch the class model does not
+ * price). Prover time inside the sweep 13 s over 140 calls (25 s at the
+ * first probe build); wall on 573756 about +10 s with the machine drifting
+ * 10 s between runs. FEEDBACK: three runs byte-identical (runs 2, 3, and 8 of a series in which runs 1 and 4 to 7 fell to stale dev servers and a browser crash), no pinned channel moved. Synthetic fixtures: 27 of
+ * 90 bank positions prove (22 before), healer-burned and choice-locked at
+ * mass 1, focus-blast-range 0.9999 in 12; healer-vs-band (six turns) lies
+ * beyond the probe. User gate: adopt.
+ *
+ * ENDGAME SOLVER ROUND 2026-09-04 (improvement round 34 of the perf-and-
+ * quality plan; spec docs/superpowers/specs/2026-09-04-round-34-design.md;
+ * Block 0 983ed57 luck events / ca2289d bank fields, export, summary
+ * helper; Block 1 6925507 memo key / cfa8b35 cell children / a6828ad
+ * solver; Block 2 5a039a1 fixtures / 28980a4 truth bench). No score path
+ * touched, cache stays v40, no feedback gate applies.
+ * BLOCK 0 (bank): every sample carries rating, quality ('hq' = smogtours or
+ *   ladder rating >= 1700, the pre-registration tranche from round 35),
+ *   and luckAgainstFavored (a crit taken, an own miss, or a par/frz/flinch
+ *   skip against the score's favored side from the sample turn on,
+ *   regression/luck-events.ts). The printed aggregate lives in
+ *   regression/calibration-summary.ts, digit for digit the old block plus
+ *   two lines under the pooled K; calibration-lib.mjs summarize() prints
+ *   the same characters (slice-0 log and merged summary compared line for
+ *   line). DETERMINISM GATE PASSED: r33-block2 -> r34-after, 816 joined,
+ *   max |score diff| 0, zero sign flips, records identical
+ *   (54/63/80/62/74, brier 0.2600/0.2294/0.1564, K 1.76). New lines:
+ *   hq n=547 (410 smogtours + 137 ladder; 384 rated samples, 1403..1831)
+ *   sign 65% brier 0.2540/0.2168/0.1684; luck-adjusted n=482 excluded=334
+ *   brier 0.2434/0.2084/0.1490 (early -166 bp, mid -210 bp, late -74 bp
+ *   against the full bank: luck against the favored side costs the bank
+ *   more than a third of its positions and a sizable slice of its Brier).
+ *   EVAL_CALIBRATION_POSITIONS exported 90 positions (6 last pair, 84
+ *   decided; 25 of them with at most three living bodies).
+ * BLOCK 1 (solver, packages/eval-engine/src/endgame/): exact value of a
+ *   position with at most three living bodies under best play, singles
+ *   and doubles: turn-boundary states, the choice-pair matrix's
+ *   equilibrium over the children's values, recursion to the end, memo on
+ *   the serialized board minus log, requests, PRNG, turn, and effect order
+ *   (the last move stays: Choice lock, Encore, Torment read it). Chance
+ *   per cell as outcome classes with analytic weights (the root blend's
+ *   planner and fold), one representative child per class (nearest the
+ *   class mean), a singles speed tie as two order classes of one half,
+ *   the plain median of three draws where no plan exists (all doubles
+ *   cells), `unpriced` when the draws disagree on a knock-out. Caps 30
+ *   turns / 20000 states / 120 s, `capped` with the leaf as stand-in;
+ *   `loop` on re-entry; exact only with no flag. Unit values: toss race
+ *   250 vs 200 HP = 1, mutual OHKO tie = 0, Thunder 70 % = 0.4, level gap
+ *   = 1 where the race static stops at 0.9, doubles 1v1 race = 1.
+ * BLOCK 2 (truth bench, docs/perf/2026-09-04-endgame-truth.md): 116
+ *   items (90 bank, 26 synthetic), 51 in scope, 14 exact (13 synthetic +
+ *   1 bank), 23 capped, 36 unpriced, 0 loop; every three-body bank
+ *   position hit the 120 s cap (200..5500 states, depth up to 29), two of
+ *   the six last pairs ran past 30 turns; solver wall 3013 s. Estimators
+ *   on the 14 exact rows, brier / sign hits: static 0.0947 12/14, staticB
+ *   0.0947 12/14, d1 0.0632 13/14, d2 0.0714 13/14, d3 0.0714 13/14, mcts
+ *   0.0664 14/14; doubles (n=6) d2/d3 0.0000, static 0.1218. Three exact
+ *   singles rows are speed ties (value 0) where every search reads +1
+ *   (a fixed seed orders the tie) and the race static -0.6 (no tie
+ *   value). Named: thunder-70 exact 0.4 = d1..d3 (class blend), mcts 1.0;
+ *   fixed-vs-ghost exact -1, static and d1..d3 0.0 (horizon), mcts
+ *   -0.955; level-gap exact 1 vs static cap 0.9; struggle-lock exact -1
+ *   vs static +0.36 and d1..d3 +0.2 (PP blind), mcts -0.996;
+ *   two-v-one-switch-loop exact -1 vs static +0.64 and d1..d3 +0.69
+ *   (bodies without an attack), mcts -0.04; healer walls exact -1, static
+ *   -0.9 (cap). Bank last pair 749828#23: value -1 (unpriced, 7 states),
+ *   static +0.6 and the decided sweep on the wrong side, d1 -1. Variant B
+ *   differs on three bank rows: right once, wrong twice, none exact.
+ *   Q4 reference VOID: one decided position exact (1.0 for its side);
+ *   over all 19 decided in scope, capped values counted, 9 at or beyond
+ *   0.8 for the decided side, 4 against. CONSEQUENCE for round 35: no
+ *   score change from these numbers; candidates are speed ties as chance
+ *   (searches and static both wrong on a coin flip), a tie value and a PP
+ *   horizon for the race static, the tie split in doubles, crits as a
+ *   class, and a larger-cap solver run on the 25 bank positions before
+ *   any verdict on the last-pair static or Q4.
+ * GATES: eval-engine 547 (+13), regression specs luck-events 4, summary 2,
+ *   fixtures 1, truth dry run; tsc -b, lint (ratchet tightened: the
+ *   calibration spec's complexity pin 62 -> 55), knip, pack:smoke, API
+ *   snapshot +6 lines.
+ *
+ * PUBLISHED-SET AND ENDGAME ROUND 2026-09-04 (improvement round 33 of the
+ * perf-and-quality plan; spec docs/superpowers/specs/2026-09-04-round-33-
+ * design.md; Block 0 a4f1a69 hosts / 2fccf7f bound fetch / 2557567 top bar
+ * / 43529ae harness fixtures; Block 1 a792d74 + 6d43377 keep-the-prior fit
+ * / e3ae604 Ubers fallback / 72e175f revealed-attack default / dd12462
+ * fitted label / 92c60ba re-pins; Block 2 31434e6 choice-lock lower bound
+ * / 628595a weighted disagreement / ef72c0a class pools / 73625dd depth-2
+ * verify + row completion / 12ad69a last-pair race + fixed damage /
+ * 1689c24 cache v40 / 4b013eb dossier / f0191ce re-pins).
+ * FINDING (Block 0 sighting): the app's set assumptions had NEVER loaded in
+ *   a browser. @pkmn/smogon calls this.fetch(url); window.fetch throws
+ *   "Illegal invocation" on a foreign this, and the per-species catch
+ *   swallowed it. Round 32's attribution of the user's 252-Def Toxapex to
+ *   the data.pkmn.cc 301 was wrong: the harness had never requested a set
+ *   file either (no smogonMisses, only stats). Node's fetch does not check
+ *   this, so this bench (EVAL_CALIBRATION_SMOGON=1) always had the sets.
+ *   Fix: a bound fetcher, per-species error collection (a total failure
+ *   rejects and is not cached), the top-bar notice, a host fallback
+ *   (data.pkmn.cc, then the GitHub Pages mirror; 404 is an answer), the
+ *   harness serving both hosts from one fixture name, and the gen6/gen8
+ *   OU + Ubers set files pinned. The corpus now measures the app's team
+ *   path: six items moved (t73, 648453 t20/t13, 649664 t8/t23, the
+ *   golden's channels), re-pinned after Block 1 at the user gate.
+ * BLOCK 1 (sets and builder): the fit keeps a prior's offense when the
+ *   attacker was seen only in knock-outs (lower bounds cannot measure
+ *   it) and its Speed when no rung repairs an observed order; kept stats
+ *   shave last, a kept plus nature stays. 573756 p2 Garchomp, fitted to
+ *   252 HP / 252 SpD / 0 Atk off a Choice Specs Magnezone guess, is the
+ *   curated Jolly 252 Atk / 252 Spe again and outspeeds Kyurem; the
+ *   round-15 near-decided sentence renders at t73 once more. The Ubers
+ *   file supplies a banned species' set (Kyurem, gen8ubers), revealed
+ *   attacks pick the default spread's offense side, the stats panel says
+ *   "fitted". Bench (r32-after -> r33-block1, 816 joined): sign 53/62/79
+ *   -> 54/62/79, brier 0.2614/0.2298/0.1561 -> 0.2604/0.2294/0.1561,
+ *   four exclusive flips all for the new side, doubles unchanged.
+ * BLOCK 2 (engine, cache v40): knock-out hits corroborate Choice items as
+ *   lower bounds; tree disagreement is the visit-weighted mean absolute
+ *   deviation (VERIFY_DISAGREEMENT 0.075; a 54-visit outlier beside 600
+ *   agreeing visits no longer hands 573756 t137 to the one-ply static);
+ *   root cells record their drawn outcome class and the verify merge
+ *   pools depth per class (a rich hit class keeps its depth while the
+ *   thin miss class keeps the sampler); verified cells get a depth-1
+ *   sub-search on the first-seed child and their rows complete under the
+ *   same cap (655336 t24's depth mismatch); the last pair is priced by
+ *   its race clocks (0.6 + 0.1 per turn of margin, cap 0.9, in win-prob
+ *   units; 573756's bar reads -0.92 from t136 instead of -0.77 at t137,
+ *   t138 stays quiet), and the threat proxy prices fixed-damage moves
+ *   (a Seismic Toss user had raced as a wall and lost to a level-30
+ *   Eevee). Bench A (r33-block1 -> r33-block2): sign 54/62/79/61/73 ->
+ *   54/63/80/62/74, brier 0.2604/0.2294/0.1561 -> 0.2600/0.2294/0.1564
+ *   (late +3 bp, exactly the pre-registered limit), bucket 0.7-1.0 88 ->
+ *   87% (one of 129), five exclusive flips all for A. The pre-registered
+ *   lastPair subset is VOID: the bench holds six one-body-per-side
+ *   positions, all already decided (brier 0.0000 both sides) -- the
+ *   static fires where it should in the corpus but the bench cannot
+ *   judge it; the round-34 solver is the instrument. Variant B (sweep
+ *   flag, measured, not adopted): brier 0.2603/0.2303/0.1545, on the 85
+ *   lastPair|decided positions late 0.1204 -> 0.1085, flips 1 for / 2
+ *   against. User gate: A accepted as built, VERIFY_CELL_CAP stays 12
+ *   (573756 pass-3 wall 55 -> 67 s, +22%; the small games +10 s).
+ * DOSSIER (round-15 sighting, docs/perf/2026-09-04-decided-losses.md):
+ *   84 decided positions in the block-1 dump, the decided side won 62
+ *   (73.8%); of the 22 losses 17 are pairs the clocks called won (tera
+ *   immunity, setup plus tera, unseen coverage on the standing enemy),
+ *   5 forfeits, 0 rolls. Decided needs tera and setup awareness before a
+ *   clamp can lean on it (Q4); the solver measures exactly these pairs.
+ * FEEDBACK: three byte-identical runs per block; Block 2 moved 649664
+ *   t23 to p1-read (Hydro Pump as the paid-off read) and lifted the t16
+ *   odds-prose carrier out of its band -- no corpus turn renders the
+ *   clause after this round (eval-summary.spec keeps it); the golden
+ *   655336 stays with eight channels booked. 573756 t68 stays a gap:
+ *   the floor gate misses by 0.056 (realized -0.287 against the priced
+ *   floor -0.343) where the pre-registered rule allowed an epsilon only
+ *   under 0.05; the payoff half holds (0.529 over the safe floor).
+ * GATES: regression 871, replay-core 43, eval-engine 537, e2e 74 (one
+ *   viewer-seeking flake, green alone and on the rerun), build, test:
+ *   build, lint, tsc -b, knip.
+ *
+ * ENDGAME TRUTH ROUND 2026-09-03 (improvement round 32 of the perf-and-
+ * quality plan; spec docs/superpowers/specs/2026-09-03-round-32-p4-q3-
+ * design.md; commits 50b4247 lethal fit, ce035c7 / cda99c2 / f710cdb
+ * verify depth in three cuts, 9784fc4 ladder, 070b9b9 cache v39 + decided
+ * field, cc8dceb re-pins). The plan's two items were SIGHTED with a
+ * throwaway probe before any build and both came out negative; the round
+ * then followed the user's question "why does a clearly decided endgame
+ * (573756 t138) not look decided?" down to four layers and fixed three.
+ * SIGHTING P4 (alpha-beta column order in subSearchDepth1): on the 144
+ *   child positions of 573756 t10/t30 the index order already evaluates
+ *   53 to 56% of the sub-search cells; every one of ten orderings (hints,
+ *   previous-row killer, best-row killer, adaptive column minima, their
+ *   combinations) evaluates MORE (t10: 2355 today against 2468 to 2932),
+ *   the oracle with the true values only 39 to 42% (1890 / 1753). Outputs
+ *   identical under every ordering (the plan's tie rules were right); the
+ *   gain is not there because searchOptions lists moves before switches
+ *   and the first row already sets a good bound. Sub-search 83 ms mean,
+ *   2.4 to 2.5 ms per cell. No build.
+ * SIGHTING Q3 (iteration budget by position class): 69 MCTS turns of
+ *   573756 cost 1.8 to 2.7 ms per iteration per tree in the 4x4 endgame
+ *   (62 turns sit in the 10-to-25-cell class), 2.6 to 4.2 ms above 25
+ *   cells; the plan's classes (x2 at <= 25 cells, x4 at <= 9) double the
+ *   tree CPU (1.98x against +25% allowed). Horizon t130 to t137 with four
+ *   trees: own-p2 moves at most +0.05 from 600 to 4800 iterations (t135
+ *   -0.07), depth 5-6 to 7-9 plies, trees agree to +-0.01. H_b: the
+ *   budget does not move the motif case; no class budget built.
+ * DIAGNOSIS t138 (four layers, reproduced in a node probe with the app's
+ *   Smogon fills; the bare reconstruction without fills is NOT app-
+ *   faithful, and the feedback harness (usage stats, no set assumptions)
+ *   is a third team path of its own):
+ *   1. Spread fitter: a knock-out line records the REMAINING HP as the
+ *      damage fraction, and observationError read it as an exact reading,
+ *      so every knock-out punished the rungs whose weakest roll exceeds
+ *      the remainder and pulled the solve toward a bulkier defender and a
+ *      weaker attacker (7 to 43% of the corpus' direct damage lines are
+ *      knock-outs). 573756's p1 Toxapex: the Smogon prior was specially
+ *      defensive, the fit made it Bold 252 Def (rung error 0.0355, of
+ *      which 0.0300 from the lethal t139 Tantrum; the specially defensive
+ *      rungs 0.091 with 0.089 from that one line); the sim's Stomping
+ *      Tantrum did 136 (45%) where the real hit did 180 (59%).
+ *   2. Chance fixation per tree (Q2's territory): under the bulky set the
+ *      tree finds a REAL p1 win (Knock Off removes the Choice Band, three
+ *      Recovers, Toxic, Knock Off; Zapdos dies to the second poison tick),
+ *      trees 0/3 win it, 1/2 lose it (-0.37/0.92/0.91/-0.35 at 600
+ *      iterations, -0.81/0.97/0.97/-0.80 at 2400); merged own-p2 0.199 =
+ *      the app's 0.195 to the digit. The +0.2 bar was a coin flip inside
+ *      the sim, not a horizon problem. With the corrected set the four
+ *      trees agree at 0.95.
+ *   3. Verify step (round 7): starvedSupportCells flags boundary cells
+ *      regardless of visit stats and pooledMatrix REPLACED their tree value
+ *      with the three-seed one-ply sampler value; with the corrected set
+ *      the four trees read (Knock Off x Tantrum) at -0.96 each with 185 to
+ *      209 visits per tree while the sampler statics read +0.03 / -0.06,
+ *      so the verified ranking showed the losing side's rows at 54% under
+ *      a 98% bar.
+ *   4. Think-deeper ladder: from an MCTS turn the button offered a matrix
+ *      pass at depth 2 then 3 (three plies where the tree saw seven), and
+ *      needsSettingsUpgrade kept that product over the tree ("settled, not
+ *      stale"); the depth-3 matrix read the decided endgame at 51% and
+ *      ranked Recover and Toxic over Knock Off; "Let it play out" took its
+ *      moves from that ranking (it plays each side's top actionable row).
+ * FIXES:
+ *   - replay-core (50b4247): DamageObservation.lethal (parser: the line
+ *     ends at 0 HP); observationError scores a lethal line only against
+ *     the rung's best roll (rungs that cannot reach the remainder are
+ *     refuted, overkill rungs are consistent). 573756 with fills: p1
+ *     Toxapex solves to 252 HP / 252 SpD / 0 Def (rung errors after: SpD
+ *     rungs 0.0001, Bold 0.0077); without fills Def 252 -> 0 and Melmetal
+ *     Atk 0 -> 252 (the attacker side of the same bias). On the harness
+ *     team path the rule re-fits 24 sets across the six corpus replays,
+ *     mostly knock-out scorers from "defensive" back to "offensive":
+ *     573756 p2 Garchomp Bold 252 HP/252 Def -> 252 Atk, Weavile Bold
+ *     252/252 -> Jolly 252 Atk/252 Spe, Melmetal 252 SpD -> 252 Atk,
+ *     Zapdos-Galar Jolly -> Adamant; 562428 Victini 252 HP -> 252 Atk;
+ *     655336 Bisharp, Dragonite, Heatran likewise; 649664 unchanged.
+ *     Pins: parser lethal line, fitter lower bound (an uninvested truth
+ *     under a lethal 5% line that the old reading forfeited), 573756 both
+ *     sides.
+ *   - eval-engine (ce035c7, cda99c2, f710cdb): verifiedValue in mcts-merge
+ *     decides what a verified cell contributes. Final rule: every starved,
+ *     thin, or disagreeing pool and every continuation below
+ *     VERIFY_DEPTH_FLOOR (0.9) takes the sampler's value, exactly round 7;
+ *     only a rich, agreeing pool that has played the cell out to |0.9| or
+ *     beyond keeps its depth (without a blend the pooled value; with a
+ *     blend whose classes leave exactly one open, the ended classes' exact
+ *     leaves against the pool's continuation). Cell selection unchanged;
+ *     CellBlendClass carries `ended`. The first cut (rich = keep depth
+ *     everywhere) was measured on the golden 655336 and withdrawn twice:
+ *     with two open classes (hit / miss) the pool's continuation replaced
+ *     the class the trees never drew (t23's 90% High Jump Kick); and a
+ *     middlegame mean is not a verdict (t24: 528 visits agreed at +0.52
+ *     for Dragon Claw x Return while the static read +0.08, regrading a
+ *     fine Dragon Dance as a blunder; t26: disagreeing plain cells kept
+ *     the pool and lost the Protect misplay the expert named). Probe on
+ *     the harness team path: 655336 t13/t23/t24/t26 every verified cell
+ *     back to the sampler; 573756 t138's three Tantrum cells (-0.94 to
+ *     -0.99 over 490 to 760 visits, statics near zero) re-blend and the
+ *     SoulWind rows read 3/2/1/1% under a 95% bar. Merge pins moved to
+ *     eval-mcts-merge.spec.ts (eval-search.spec.ts sat at its 900-line
+ *     ratchet pin, now 760) with five new ones; the draft t56 end-to-end
+ *     pin holds throughout.
+ *   - app (9784fc4): the ladder ends at the tree (no rung from an MCTS
+ *     turn; stored escalations keep their precedence); the GPL e2e pins
+ *     "no button, badge MCTS" at turn 38.
+ *   - harness (070b9b9): every dump line carries `decided` (the root's
+ *     decided-sweep side or null) so round 15's 17 flip positions can be
+ *     re-derived from any run (Q4 enabler). Cache v38 -> v39 (sets change
+ *     wherever a knock-out was observed).
+ * BENCH (this harness, EVAL_CALIBRATION_MODE=auto + SMOGON=1, six slices;
+ *   A = adf3777 in .calibration/r31-after, B = 070b9b9 in r32-after, 377 s
+ *   wall; the verify and ladder changes do not reach this bench, which
+ *   runs single trees without a merge): full records A 52/63/79 (singles
+ *   62, doubles 73), Brier 0.2613/0.2289/0.1560, K 1.79, n 822 -> B
+ *   53/62/79 (61, 73), Brier 0.2614/0.2298/0.1561, K 1.76, n 816; bucket
+ *   0.7-1.0 88% (n 128) -> 87% (n 127). Pre-registered rule (late Brier
+ *   <= A + 10 bp, bucket >= A - 2 points, sign >= A - 1 point): +1 bp,
+ *   -1 point, +1/-1/0 -> the fit is ADOPTED. Joined n 814 (identical
+ *   positions): late Brier 0.1581 -> 0.1572 (9 bp better), 17 exclusive
+ *   flips (A right 10, B right 7, most within +-0.1 of zero; the two large
+ *   late flips go one each way: 751443 t23 A 0.975 / B -0.976 with p1
+ *   winning, 752733 t32 A 0.847 / B -0.977 with p2 winning). Doubles
+ *   byte-identical (the parser records no doubles observations, so no
+ *   doubles set moved). Join gap: 8 A-only samples in three replays whose
+ *   reconstruction now ends before the sampled turn (the known premature-
+ *   end class; the new sets shift which turns survive), 2 B-only gained.
+ *   `decided` in B: 83 of 816 samples (p1 30, p2 53), the decided side
+ *   won 72.3% (round 15 measured 79.8% / singles 72.5%: the sweep stays
+ *   narrative, no >= 90% floor).
+ * FEEDBACK (three runs on f710cdb byte-identical in all six full dumps
+ *   and the drift file; 573756 wall 66/66/67 s): four claims move against
+ *   the adf3777 dumps, all four from the fitter. A worktree run of 50b4247
+ *   alone shows the same four, and the final verify rule changes exactly
+ *   one thing over the fitter alone: 573756 t138's rows, 55/55/55/14% ->
+ *   3/2/1/1%. The four: 573756 t138 gap MOVED, the card reads quiet (no
+ *   chance booking), own-p2 0.947 (0.195 before), t137 0.81, t136 0.20,
+ *   t135 0.47, so the pre-registered expectation (>= 0.9, rows <= 10%, no
+ *   chance swing, t137 >= 0.75) holds; 573756 t68 truth -> DRIFT, p2's
+ *   Knock Off grades inaccuracy (regret 0.115) because the stayed-
+ *   sacrifice detection no longer fires under the re-fitted sets (Weavile
+ *   Jolly 252 Atk / 252 Spe instead of Bold 252 HP / 252 Def); 573756 t73
+ *   truth -> DRIFT, attribution shift and no near-decided sentence: after
+ *   the Fire Fang miss the bank reads own-p2 0.76 (LordEnz wins in the sim
+ *   with or without the roll), so the roll is no longer decisive to the
+ *   engine; golden 655336 drifts in new channels, the t26 Protect misplay
+ *   the expert named IS recognized now (regret 0.041 -> 0.330) while t13's
+ *   p2 switch grades mistake (0.297) and t5 leaves the two-per-side
+ *   misplay list (still a mistake by tier), t23/t24 as in the baseline.
+ *   653785 t19, 649664, 562428, 648453: no claim change. Side effect in
+ *   the 573756 report: the resolution now books at t136/t137 (chanceTotal
+ *   -1.93 -> -3.64, resolutionTotal -1.24 -> -3.00), key moments
+ *   [71, 73, 135, 137] -> [71, 73, 74, 77]. Re-pins are at the USER GATE
+ *   (spec 7.3); until then the corpus stays as pinned and the drift report
+ *   shows the moves.
+ *   RE-PINS at the user gate (2026-09-03 20:33): t138 gap -> TRUTH
+ *   (attribution quiet, no key moment; the desired text is fulfilled),
+ *   t68 and t73 truth -> GAP (observed inaccuracy / shift, desired
+ *   restated), golden 655336 stays with its three moved channels booked
+ *   as known drift in the essence. Fourth run: t138 ok, t68/t73 gap-
+ *   open, the golden's three channels, everything else as pinned, all
+ *   six full dumps byte-identical to the third run. The user's read of
+ *   the golden: t5's Trick was defensible against Sucker Punch and
+ *   Pursuit, t13's paid-off read stands, Dragon Dance at t24 is a fine
+ *   move and the t23 sack deserved respect. The depth probe
+ *   (docs/perf/probes/2026-09-03-r32/depth-check.spec.ts) settled the
+ *   verify question: evaluated at ONE depth the t24 children agree
+ *   (d3s3 Dragon Dance 0.39 against Dragon Claw 0.33, four trees 0.54
+ *   against 0.66), so the broad rule's blunder came from mixing a deep
+ *   cell with starved, near-static siblings, not from a misclassified
+ *   golden; the t23 sack reads below Dragon Claw at every depth (d3s3
+ *   0.04 against 0.60, trees 0.53 against 0.74), the variance-value
+ *   limit. A second probe (t73-check.spec.ts) traced the t73 under-read
+ *   to the fit: it satisfied t72's Magnezone-before-Garchomp order by
+ *   giving Garchomp 0 Spe (240, below Kyurem's 289) instead of inferring
+ *   Magnezone's Choice Scarf, so the hit child prices 0.53 to 0.68 with
+ *   Kyurem outspeeding the surviving Garchomp. Scarf inference from
+ *   impossible move orders is the registered next candidate.
+ * LESSONS: bit-identical is not right, and deeper is not truer: the motif
+ *   case was 30% a set error whose cause was a lower bound scored as a
+ *   reading; a verification that replaces a deep value with a one-ply
+ *   snapshot can set the panel against its own bar, but a tree's mean
+ *   over a middlegame is not a verdict either, so root corrections keep
+ *   the tree's continuation only where the tree has played the cell out;
+ *   an escalation ladder must never lead into a shorter horizon; the
+ *   sighting probe (a day's worth of measurement) saved two builds; a
+ *   "rich" pool by the round-7 floor (8 visits) is not depth; the golden
+ *   is the cheapest oracle for a verify change, so run it before the
+ *   corpus; and there are three team paths (production with fills,
+ *   harness with usage stats only, bare reconstruction), so a probe must
+ *   say which one it stands on. The choice-lock corroboration still reads
+ *   every fraction as an exact reading; that consumer is left for its own
+ *   round.
+ *
+ * LOSSLESS PERF BASE ROUND 2026-09-03 (improvement round 31, the first
+ * round of docs/superpowers/plans/2026-09-02-perf-and-quality-plan.md;
+ * commits 9ec06fa pool, 41c5e05 store prefetch, 3f0d9a4 slice runner,
+ * ebf18aa identity pins, 043512c parsed-state fork, d48a117 README).
+ * No engine number moved; the sweep and this bench got faster.
+ * - Worker pool by physical cores (src/lib/eval/pool-size.ts): never
+ *   below min(cores-2, 6), about cores/2, cap 12, memory brake 0.6 GB per
+ *   worker, sweep lanes = half the pool (min 3). Pool-invariant results
+ *   by construction (2026-09-02: seven runs hash-identical).
+ * - One IndexedDB range read per sweep (loadStoredEvalsByPrefix) instead
+ *   of one read per turn; the whole-game e2e pins cache-load at one read.
+ * - This bench in parallel slices (scripts/run-calibration.mjs +
+ *   calibration-lib.mjs): the harness sorts samples by (id, turn) before
+ *   aggregating, so one process and N slices print the same digits
+ *   (tournament-0811: 208 samples byte-identical, 567 s against 100 s).
+ *   The shared Smogon disk cache now publishes entries atomically: under
+ *   seven concurrent cold-cache processes two replays had read half-
+ *   written payloads and evaluated with different fills.
+ * - Forks start from a parsed, history-free state (forward/parsed-state.ts:
+ *   parsed once per position, log/inputLog/messageLog stripped, a fresh
+ *   log per battle; the forced-switch mid-turn snapshot parsed once per
+ *   iteration). Identity: the recorded fixture (children as hash + facts +
+ *   log delta, the d1 matrix, one MCTS tree, two positions with history)
+ *   holds on the new path; 510 engine specs unchanged. Probe on 573756:
+ *   fork t120 1.94 to 1.45 ms, one MCTS tree 1360 to 1004 ms (t70 2794 to
+ *   2114 ms), a child's serialized state 99 KB to 40 KB.
+ * GATES: this bench A/B with six slices, pre-change (3f0d9a4) against
+ *   post-change (043512c): sign 52/63/79 (singles 62, doubles 73), Brier 0.2613/0.2289/0.1560, K 1.79, n 822, every printed digit equal;
+ *   wall 462 s and 473 s against
+ *   12.5 min single-process in round 16. Feedback corpus: three runs
+ *   byte-identical in all six full dumps and the drift file against the
+ *   pre-round dumps at 883e33b; 573756 wall 67/66/66 s (96 s at
+ *   883e33b, plan target 65 s). e2e 73/73, regression 825 bestanden, 6 übersprungen in
+ *   three projects, pack smoke green.
+ *
+ * THE DECIDED SWEEP, THE NEAR-DECIDED ROLL, AND THE CLAMP ITS OWN BENCH
+ * REFUSED 2026-08-25 (improvement round 15 — NextSteps A.1, "decided
+ * detection on the bar"; commits 3986107 (feature) + 8dc3721 (t73 truth)
+ * + this record; NO cache bump — phase 2's v38 was built and reverted the
+ * same day, see below):
+ * (A) THE DECIDED SWEEP (display + prose only): pairwise unanswered
+ *    (round 13) is a threat; DECIDED is stronger — one mon WINS every
+ *    living enemy pair (the beatsEntry verdict sans entry toll:
+ *    replacements arrive on a KO, not a switch), clears the whole team
+ *    within DECIDED_MAX_TURNS=6 expected turns, and survives the
+ *    accumulated expected return fire, each pair's return fire priced at
+ *    the defender's spare-turn rate (raceClocks' action economy). Both
+ *    sides sweeping, or neither: not decided. BOTH GUARDS ARE
+ *    LOAD-BEARING: the first cut (action economy alone) read 573756 as
+ *    decided from TURN 1 of a 139-turn game — the whole enemy team priced
+ *    as pinned healers across a 32-turn paper grind. The measured anchors
+ *    split cleanly: real clean-ups run 1–5 expected turns, the false
+ *    positives 23–39.
+ * (B) THE NEAR-DECIDED ROLL (user-gated "display 95%-to-win as such"): no
+ *    sweep stands, but one boundary event ≥ NEAR_DECIDED_ODDS=0.9 against
+ *    the standing enemy active removes it and the REST clears — 573756
+ *    t73 renders "Garchomp is one 95% roll from clearing the rest —
+ *    removing Corviknight leaves no answer behind" and is PINNED TRUTH:
+ *    the probe showed a decided bar there would have LIED (Garchomp
+ *    itself at 10.9% HP, the real sweep collapsed on the miss), so the
+ *    bar half of the t73 gap resolves as the conditional stage, with the
+ *    calibrated 0.6 bar standing as the honest read of a still-open board.
+ * (C) REGIME: announcements once per side+species+stage in the game
+ *    report (decidedSeenKey, the round-14 walk regime), the per-turn card
+ *    on every turn; on decided turns a chance swing TOWARD the decided
+ *    side re-read as "the decided game resolving" (the round-12 report
+ *    booking, on the turn card); graph edge strips + node-label note.
+ *    Corpus map after the guards: 573756 near-t73 + decided t120–139
+ *    (the t138 endgame), 648453 the t23+ clean-up (four successive
+ *    carriers), 655336 the t23-Slowbro → t25-Charizard-near →
+ *    t28-Charizard sequence around the expert's t26 protect mistake,
+ *    562428 only the final turn. Watch: 649664's t3 near (Mega-Medicham
+ *    is that scary on paper) and the 648453 carrier chatter.
+ * PHASE-1 MEASUREMENT: 757 regression tests (+12), three full feedback
+ *    runs bit-identical in every machine channel, all pins hold, golden
+ *    keeps its known 2-channel t26 distance to the digit.
+ * PHASE 2 — THE REAL SCORE CLAMP: NEGATIVE by its preregistered bench,
+ *    reverted to the digit. User-gated design: root score clamped to
+ *    ±DECIDED_FLOOR=0.85 on decided boards (all three attach sites) plus
+ *    the played EXPECTATION in the turn-card deltas (analysis), cache
+ *    v38. The bench refused it (n 806, composition identical): late
+ *    brier 0.1500→0.1547 (+47bp), the 0.7–1.0 bucket 90%→85% favored
+ *    wins; sign rows unchanged (early brier even −21bp). The
+ *    per-position dump names the honest number: of 84 clamped positions
+ *    the decided side won 79.8% — SINGLES ONLY 72.5% (37/51), doubles
+ *    90.9% — against the clamp's implied ~93%. VERDICT: the decided
+ *    sweep is a strong NARRATIVE signal (it found the real clean-up
+ *    phases in five of six corpus games) but not a 93%-truth oracle over
+ *    the broad singles bed — expected-rate pair verdicts on endgames
+ *    leave a real ~20% flip mass that adversarial elements (status
+ *    tricks, crits across six turns, priority reversals) carry. The
+ *    honest t138 consequence, user-gated: the gap stays OPEN — its +0.2
+ *    bar is currently BETTER calibrated than the desired decided jump.
+ *    Registered follow-up candidate "decided sweep v2": tighten the
+ *    check against the 17 dumped flip positions (14 singles; ids in
+ *    NextSteps) before any second clamp attempt.
+ *
+ * SWITCH-IN STAGE, EXPECTED-RATE RACES, ONCE-PER-MON SENTENCES 2026-08-25
+ * (improvement round 14 — the t13 Lopunny remainder plus the round-13
+ * repetition watch item; commit e65232e + the corpus re-pin + this record,
+ * NO cache bump and NO calibration bench — the score path never reads the
+ * new fields, and three full feedback runs were bit-identical in every
+ * channel including the alignment/koMismatch meta):
+ * (A) COIN-FLIP CHECK (user-gated "Satz + Münzwurf-Check"): the unanswered
+ *    profile's races run on EXPECTED rates — pairThreat carries the
+ *    category-max move's accuracy in new optional fields (physicalAcc/
+ *    specialAcc) the score never reads, beatsEntry weighs both fracs and
+ *    the entry toll by them, and a usable first-turn flinch move (Fake
+ *    Out) chips the standing answer for free before the race starts.
+ *    DIAGNOSIS behind it (browser probe, temporary debug payload on the
+ *    profile through FEEDBACK_DUMP): at 648453 t13 every benched p1 answer
+ *    died on arrival (hazards + one free hit — Weavile −522% via the 4x
+ *    High Jump Kick, Volcanion and Excadrill to 0, Diancie to 1.4% losing
+ *    the speed tie) and the ONLY "answer" was the standing Tornadus-T on
+ *    a full-hit 70% Hurricane clock, while the real game pulled Tornadus
+ *    and sacrificed Weavile into Lopunny — the expert's literal "no
+ *    remaining switch-ins". Under expected rates the pair flips outright
+ *    (two expected Hurricanes against two Returns from the chipped bar;
+ *    the faster Lopunny takes the 2-2 tie): t13 renders the FULL
+ *    no-live-answer sentence for BKC's ACTUALLY PLAYED switch, and the
+ *    gap converts to a TRUTH (user-gated; the pinned fragment names the
+ *    species, 'Lopunny-Mega has no live answer on the other side').
+ * (B) SWITCH-IN STAGE: a mon every benched enemy loses the entry race to
+ *    while a standing active still wins the pair is carried per side as
+ *    EntryUnanswered {species, heldBy} (optional p1Entry/p2Entry lists —
+ *    absent when empty, so round-13 caches and pins read unchanged; a 1v1
+ *    endgame never enters, the stage being trivially true there), and the
+ *    summary names the state: "no switch-in left on the other side — only
+ *    the standing X holds it, and from the bench the opponent can only
+ *    sacrifice into it." Fires across the corpus (562428 t19 Victini held
+ *    by Heatran, 649664 t21, 653785 t2/t25, 655336 t11, 573756 t75);
+ *    watch: the species-mirror reading ("Toxapex ... only the standing
+ *    Toxapex holds it").
+ * (C) ONCE PER MON AND STAGE (user-gated "nur erstes Mal"): the game
+ *    report's walk feeds its spoken keys back into analyzeTurn
+ *    (unansweredSeen / unansweredSeenKey), so each mon's entry sentence
+ *    appears on its first entry only — 573756 drops from ten identical
+ *    Zapdos-Galar sentences (t35–t136) to one; a stronger stage is a new
+ *    statement and speaks again (562428 Victini open t15 → held t19). The
+ *    per-turn card passes no set and keeps every sentence.
+ * MEASUREMENT: 745 regression tests (+7), build clean; three full feedback
+ * runs bit-identical in all 13 channels (meta-only diffs), the golden
+ * carrying only its two permanent t26 channels; confirmation run 7/7 with
+ * the t13 truth pin (after two known cold-start flakes, retried per
+ * protocol). Lesson recorded: graph.results rows carry no turn field —
+ * index i is turn i+1; an early anatomy read with a find-by-turn fallback
+ * misattributed the t14 hold to t13 until the run-B dump corrected it.
+ *
+ * COMPONENT KEY MOMENTS, HINDSIGHT READS, UNANSWERED ENTRIES 2026-08-25
+ * (improvement round 13 — the backlog trio t73/t13/t10 plus the registered
+ * race-margin candidate; commits 9de681d/4a33516/47febd9 + this record, NO
+ * cache bump — nothing in the round touches scores or grading):
+ * (A) RACE MARGIN IN THE PAIR WEIGHT: NEGATIVE BY DIRECT PROBE, then t26
+ *    CLOSED AS A STRUCTURAL STATIC LIMIT (user-gated). The pure margin
+ *    (upper bound of the effect) DROPS the t26 regret 0.0413 → 0.0296 —
+ *    the margin dilutes the whole sum term faster than the round-12
+ *    discount credits the heal — and reopens collateral: t23/t24
+ *    p1-inaccuracies 0.236/0.198, the t68 feed shifts (regret 0.129 →
+ *    0.095, sacrifice object gone), turning point 71 → 76, plus a NaN
+ *    path (effHp-0 pairs clock −0 turns; the tie branch divides 0.5/−0;
+ *    the binary sign code swallows that case). The matrix anatomy closes
+ *    the case: the engine already crowns Slack Off best against the known
+ *    DD (p1 mix 1.00) — [DD×Protect] 0.307 vs [DD×SlackOff] 0.266 own-p1
+ *    IS the flat HP feature; the pinned race moves no turn count on ±50%
+ *    Slowbro HP, while a synthetic probe prices heal spans at 0.45 where
+ *    race edges ARE reachable and the body threshold one half-move deeper
+ *    at ~0.12 — under the 0.2 the misplay channel needs. The heal's true
+ *    worth here is an option/variance value (burn fishing over Scald,
+ *    time for opponent error) a deterministic static cannot see; a
+ *    variance-value feature is the registered future agenda item. Fourth
+ *    pair-term attempt, closed on evidence; the golden stays (the expert
+ *    is right), drift 2 channels unchanged.
+ * (B) COMPONENT-KEYED KEY MOMENTS (9de681d, report-side): a turn
+ *    qualifies and ranks by max(|net swing|, |chance share|) against the
+ *    same 0.25 bar — the game's biggest roll surfaces even when the
+ *    decision delta partially cancelled it. 573756 t73 (chance +0.43,
+ *    net +0.18) enters and ranks by the roll: keyMoments [71,73,135,137]
+ *    (t72 displaced by the top-4 cap), 562428 gains t11, 649664 trades
+ *    t5 for t20, the 655336 golden list is untouched. t73 re-pinned gap
+ *    with keyMoment true (user-gated); the bar half (pre-turn ~0.6
+ *    own-p2, sweep past the static horizon) stays the open remainder.
+ * (C) HINDSIGHT READ (4a33516, render-time from the cached matrix, so it
+ *    reaches previously cached results): against the opponent's ACTUAL
+ *    click the matrix names the best own row when it beats the played
+ *    line in that column by ≥ the mistake band; rendered on shift turns
+ *    as "The read was there for X — against the Horn Leech actually
+ *    clicked, switching to Heatran was worth +17% more" (562428 t10: the
+ *    expert's own switch, −0.09 vs −0.44 all stay rows, gain 0.34;
+ *    equilibrium leaned → Heatran 46% all along). Renders on 4 turns
+ *    across the 6 games (shift-only); pinned into the t10 baseline —
+ *    the remaining desired is a PREDICTIVE read (opponent-model), not
+ *    hindsight.
+ * (D) UNANSWERED-MON ENTRY (4a33516 + 47febd9, root-level narrative): the
+ *    search root computes the mons the other side has no live race
+ *    answer to — beats EVERY living enemy, a wall that holds the pair
+ *    counts as an answer, and a benched answer pays the switch-in entry
+ *    toll (hazard-adjusted arrival minus one free hit from the standing
+ *    mon; the first landing measured standing pair races and 648453 t13
+ *    saw full-HP Weavile as an answer — t14's actual Weavile sacrifice
+ *    is the expert's proof of the entry economy, toll user-gated).
+ *    Carried on EvalResult (both search paths, merge takes trees[0]'s),
+ *    spoken when the played or recommended line brings such a mon in.
+ *    t13 now names the principle for the engine's own "→ Bisharp"
+ *    recommendation; the Lopunny half (BKC's actual click) stays open —
+ *    the race model still finds a toll-surviving answer to Lopunny there
+ *    (653785 t14/t15 names Lopunny-Mega itself). Scatter: 2–10 signals
+ *    per game, sentences only on entry turns.
+ * MEASUREMENT: no calibration bench by construction (round-5 precedent —
+ *    scores and grading untouched; the probe patch was reverted). 738
+ *    regression tests. Three full feedback runs on the landed state are
+ *    bit-identical in all 13 channels (meta commit/wallTimes aside);
+ *    7/7 against the re-pinned baselines. Cold-start flake hit 5× this
+ *    round (retried per protocol, never diagnosed); one run was lost to
+ *    editing src while the feedback web server ran — do not overlap.
+ *
+ * FLOOR GATE, RESOLUTION BOOKING, PIN DISCOUNT 2026-08-25 (improvement
+ * round 12 — the three follow-ups round 11 left open; commits
+ * 98b8003/135fc23/e9d9616 + this record, cache v37):
+ * (A) FLOOR-REALIZATION GATE (98b8003, render-time): the stayed-feed
+ *    pathway's certainty gate (ev − floor ≤ 0.02) was broken by design by
+ *    round 11's race-priced cells (t68 spread 0.171). Replaced: the feed
+ *    credits when the REALIZED outcome landed on the played line's priced
+ *    worst case — the turn's own rolls contributed nothing positive, so
+ *    the windowed payoff credits the plan, not the luck; an outcome above
+ *    the floor earns nothing. Certainty-priced feeds still qualify (every
+ *    branch ≈ floor). t68 RE-VERIFIES: realized −0.378 = floor, payoff
+ *    0.359 ≥ regret 0.129 + 0.1 → tier cleared, verified sacrifice named;
+ *    gap re-pinned truth (user-gated), desired state reached.
+ * (B) PIN-EFFICIENCY DISCOUNT (e9d9616, cache v37): past the heal rate a
+ *    race defender's held heal PP realize only at healRate/incoming (a
+ *    pinned healer heals at a net loss and dies with PP in the tank), so
+ *    healing NOW beats holding — round 11's model conserved hp + absorb
+ *    across a heal click. MEASURED INERT for the 655336 t26 target:
+ *    regret bit-identical 0.0413, because the pair term consumes clocks
+ *    only as a binary verdict and its weight sign × effHp(a) × effHp(b)
+ *    even penalizes healing in a lost pair (the +0.041 is the flat HP
+ *    feature alone). KEPT at the gate (user): conceptually right,
+ *    calibration-neutral, and the identified carrier — a continuous race
+ *    margin in the pair weight, e.g. (turnsB − turnsA)/(turnsA + turnsB)
+ *    — is the registered round-13 candidate that reads exactly these
+ *    discounted clocks. 655336's KNOWN DRIFT stays (2 channels, t26).
+ * (C) RESOLUTION BOOKING (135fc23, report-side): past the favor boundary
+ *    (the earliest turn from which every known score favors the winner —
+ *    the turning point's own walk, extracted as favorBoundary) a
+ *    chance-attributed turn whose delta points TOWARD the winner is the
+ *    decided game resolving — the static bar's horizon gap on a locked
+ *    endgame, not luck. Such turns leave the key moments and chanceTotal
+ *    and sum separately as resolutionTotal; chance AGAINST the winner
+ *    stays luck everywhere, pre-boundary chance toward the winner too.
+ *    573756: t138 (−1.02) leaves the key moments (71/72/135 remain),
+ *    chanceTotal −3.18 → −1.93 (the round-11 watch item shrinks),
+ *    resolutionTotal −1.24 (t76 −0.22 + t138 −1.02). WATCH ITEM: the
+ *    boundary is sign-only — 655336 (weakly favored throughout from t5)
+ *    books its whole endgame stretch t22–27 (+2.05) as resolution; no
+ *    pinned channel breaks, but magnitude-blind favor may over-collect in
+ *    wire-to-wire games.
+ * CALIBRATION (n 806, composition 260/289/257 identical): phases 54/63/82
+ *    (identical to round 11), briers 0.2600/0.2294/0.1499 →
+ *    0.2600/0.2293/0.1500 (−1/+1 bp — neutral on the digit), buckets
+ *    59/59/70/90, singles 64%, doubles 73%, wall 18.6m. Three feedback
+ *    runs bit-identical in all 13 channels. t138 stays gap-open on the
+ *    per-turn residual only: the bar reads +0.2 (not decided), the turn
+ *    card still shows chanceDelta −1.02, Tantrum prices −0.068.
+ *
+ * RACE-GROUNDED HEALER WALLS 2026-08-24 (improvement round 11 — the 573756
+ * t138 endgame gap; commits c9f0eb5/9351f37 + this record, cache v36):
+ * ROOT CAUSE: the static eval ignored PP entirely and its healer rule
+ *    ("≤50% per turn vs a healer ⇒ fraction 0") declared walls infinite
+ *    while letting them heal and chip in the same turn. 573756's endgame:
+ *    p2's Toxapex Struggle-locked from t134 (the sim's PP bookkeeping knew)
+ *    yet priced as a full wall while it recoiled itself out, and p1's lone
+ *    burned Toxapex holding 3 Recover PP read unkillable against a
+ *    sub-50%-proxy Stomping Tantrum (real: 59% a hit, ×2 vs Poison) — so
+ *    the bar walked toward the loser (own-p2 +0.44 → −0.09 across
+ *    t135–t138), the winning Tantrum priced −0.107 "punished by Toxic",
+ *    the resolution booked as chanceDelta −1.07 (the docstring admits:
+ *    model error), and t138 became the turning point.
+ * THE FIX, two commits: (1) PP truth — pair threats, heal status, and the
+ *    removal-option terms filter to live slot PP (never dex pools; per the
+ *    user, PP counts differ across rule sets — Pokémon Champions), with
+ *    the usable-slot signature keyed into the matchup memo. (2) raceClocks
+ *    — heal PP absorb as survival at each move's OWN heal rate (dex
+ *    ratios exact, callback healers ~50%), a pressured healer attacks only
+ *    on spare turns (pinned once pressure ≥ its best heal rate; status
+ *    residuals brn 1/16, psn/tox 1/8 count toward pressure, Magic
+ *    Guard/Poison Heal exempt), and every clock caps at the attacker's
+ *    usable PP budget. Coverage margins read the effective offenses.
+ * CALIBRATION (n 806, composition 260/289/257 identical): phases
+ *    55/63/82 → 54/63/82 (early −1pp), briers 0.2589/0.2288/0.1473 →
+ *    0.2600/0.2294/0.1499 (+0.0011/+0.0006/+0.0026 — round 9 Phase A was
+ *    accepted at mid +0.0036), buckets 59/59/70/90, singles 64%, doubles
+ *    72→73%, wall 18.9m (−3.8m). USER-ACCEPTED at the gate.
+ * FEEDBACK DRIFT (three runs, all 13 channels bit-identical): 573756's
+ *    turning point moved 138 → 71 (the Garchomp sweep — the t138 pin's
+ *    core ask), the endgame bar stays on the winner's side (own-p2
+ *    +0.20…+0.34 across t133–t138), t68's raw regret HALVED toward the
+ *    expert (0.266 → 0.129). TWO CHANNEL COSTS, both user-gated: the t68
+ *    verified-feed truth REOPENED as a gap (the race-grounded cells price
+ *    the feed turn with real spread — certainty gap 0.171 vs the ≤0.02
+ *    round-3 gate, which holds by design; verification without priced
+ *    certainty is round-12 agenda), and golden 655336 carries a KNOWN
+ *    DRIFT (t26's free-DD Protect loses its misplay: the race pins the
+ *    paralyzed Slowbro so hard Slack Off prices 0.041 over Protect — the
+ *    golden stays, the expert is right; heal-turn delay value is the
+ *    candidate fix). The t138 pin itself stays gap-open by its coarse
+ *    observed channels: the bar reads +0.2, not decided, so the
+ *    resolution still books as chance (−1.02) and remains a key moment —
+ *    the residual half of the desired. 573756's whole-game chanceTotal
+ *    grew −1.27 → −3.18 (more static/search disagreement routed through
+ *    the chance residual) — watch item.
+ *
+ * VERIFIED-FEED ROUND 2026-08-24 (improvement round 10 — the win-condition
+ * horizon gap 573756 t68, closed at the analysis layer; commits
+ * ee1736c/506b448 + this record): the round-3 stayed-feed pathway demoted
+ * a certainty-priced feed one band when its windowed payoff cleared the
+ * safe guarantee by the read margin — t68 (the Weavile feed that funnels
+ * Garchomp in for two free Swords Dances, the expert's "game-winning
+ * play") stayed an inaccuracy although its window peak ends 0.4415 over
+ * the safe floor. THE BAR: under the certainty gate, payoff − regret ≈
+ * windowed peak − best.ev, so payoff ≥ regret + RISK_PAYOFF_MARGIN says
+ * the line reached what the engine's best promised — such a feed VERIFIES:
+ * the verdict clears entirely (SackInfo.verified, named in the summary),
+ * margin-only feeds keep the one-band demotion, the blunder bound stays.
+ * MEASURED: t68 payoff 0.4415 ≥ regret 0.2661 + 0.1 → tier none (the
+ * depth-3 verification had CONFIRMED the flag — the sweep lies past its
+ * horizon; the future-outcome chain is the instrument that sees it).
+ * Analysis-layer only: no cache bump, calibration bench untouched (scores
+ * identical by construction). Feedback drift: three bit-identical runs,
+ * the ONLY moving channel is t68 gap-open → gap-moved ("p2.tier is
+ * 'none', expected 'inaccuracy'"), all truths ok, machine channels
+ * identical, golden 655336 exact. USER-GATED re-pin: the t68 gap converts
+ * to a truth pin (tier none + the verified-sacrifice summary fragment).
+ * NOT extended to non-feed setup turns (t70's second Swords Dance stays
+ * inaccuracy 0.1246 by design: crediting later turns on uncertain lines
+ * would launder outcome luck into grades — the round-3 certainty boundary
+ * holds).
+ *
+ * SWEEP V2 + EFFECTIVE SPEED ROUND 2026-08-24 (improvement round 9 — the
+ * registered round-8 follow-up "sharpen the sweep definition"; design doc
+ * 2026-08-17, commits 22d02c7/02e29e4/b226ca7/cf73e84 + this record):
+ * METHOD, two phases. PHASE A (runtime, cache v35): a new effective-speed
+ *    model (speed.ts — stages, paralysis gen-dependent with Quick Feet,
+ *    Tailwind, Choice Scarf, Iron Ball, Unburden as ability+empty-slot,
+ *    weather/terrain doublers) plus movesFirst (priority rule, then
+ *    effective speed, inverted under Trick Room, exact tie never "first")
+ *    becomes the STANDARD speed source at all three eval speed sites: the
+ *    matchup pair tie-break, the beatsPair/sweep tie-break, and the Trick
+ *    Room sign (averageSpeed without the TR inversion — it measures
+ *    structural slowness). PHASE B (fit-only): the v1 sweep feature
+ *    splits into four exclusive cells per flipped pair — acts-first ×
+ *    in-boosted-KO-range (fastKo/fastChip/slowKo/slowChip, sum = v1
+ *    value, all weight 0) — so each CV training fold prices the speed and
+ *    cleanup context itself instead of hand-guessed factors.
+ *    PRE-REGISTERED hierarchy on the round-8 CV harness (game-clustered
+ *    5-fold, 20 seeds, singles decides, criterion per branch: mean OOF
+ *    logloss Δ < 0 AND wins ≥ 16/20 AND mean OOF brier ≤ base):
+ *    1. REPLACEMENT M1 cells-only beats M0 boosts-only, 2. else ADDITIVE
+ *    M2 beats M0, 3. else status quo.
+ * PHASE A MEASURED (calibration vs the round-7 record, n 806 identical,
+ *    composition 260/289/257): phases 54/65/82 → 55/63/82 (early +1pp,
+ *    mid −2pp ≈ 6 positions, late =), briers 0.2592/0.2252/0.1448 →
+ *    0.2589/0.2288/0.1473 (early −0.0003, mid +0.0036, late +0.0025 —
+ *    outside the ±0.0007 band recorded for score-INVARIANT rounds; this
+ *    round moves real scores), buckets 60/58/71/90 → 59/60/70/90,
+ *    doubles 72% =, wall 22.7m. Feedback drift ZERO across three
+ *    bit-identical runs — every truth pin ok, every gap pin unchanged,
+ *    golden 655336 exact (27/27), no re-pins. USER-ACCEPTED at the gate:
+ *    the eval is mechanically truer (a Scarfer wins the tie-break it
+ *    wins on the field, an Iron Ball flips the TR mirror — both pinned
+ *    as regression tests), the mid cost is ~6 positions on a 9-game
+ *    bench. Kept.
+ * PHASE B RESULT — STATUS QUO HOLDS, the v2 answer equals the v1 answer:
+ *    recapture identical (12,828 samples / 2,111 games), M1 cells-only
+ *    loses EVERY seed in EVERY tranche (singles meanΔ +0.004094, 0/20,
+ *    brier worse; ALL +0.005060, DOUBLES +0.010641, GEN9 +0.006121 — all
+ *    0/20), M2 additive sits on M0 (singles +0.000383, 2/20, brier
+ *    worse). Cell betas are collinearity noise (singles implied: fastKo
+ *    −204.5±145.2, fastChip +83.8±153.8, slowKo +31.8±176.0, slowChip
+ *    −387.8±208.8 — the pure speed-sweep cell prices NEGATIVE); boosts
+ *    stays rock-stable at 39.2±7.3. Eighth boost-family attempt, second
+ *    held-out design, same answer: flat boosts is the better outcome
+ *    carrier. Cells stay weight 0 (captured for future fits), no cache
+ *    bump beyond v35, no adoption gates. CONSEQUENCE: the sweep-feature
+ *    question is CLOSED — v1 and v2 both carry nothing beyond flat
+ *    boosts; any future re-ask needs a genuinely different information
+ *    source (temporal/sequence signal, not another recombination of the
+ *    flip mass).
+ *
+ * BOOSTS↔SWEEP CV ROUND 2026-08-17 (improvement round 8 — the registered
+ * round-3 agenda item "boosts↔sweep disentanglement, the fit itself"):
+ * METHOD: round 3 left the question stuck on coefficient SEs — the
+ *    additive fit prices sweep NEGATIVE (collinearity correction,
+ *    −111.5±64.0) and the no-boosts basis reads +97.8±67.2, ~1.5 SE.
+ *    Under collinearity coefficient SEs structurally cannot decide which
+ *    regressor carries the outcome signal, and the fifth boost attempt
+ *    showed in-corpus significance failing held-out. So the round asked
+ *    the model-comparison question instead: game-clustered 5-fold CV,
+ *    20 fold seeds, three bases via column masks (M0 boosts-only/sweep
+ *    masked, M1 sweep-only/boosts masked, M2 additive record-only),
+ *    out-of-fold logloss decides, decision tranche SINGLES-ONLY.
+ *    PRE-REGISTERED criterion: adopt M1 only if singles mean OOF
+ *    logloss(M1) < M0 AND M1 < M0 in ≥16/20 seeds AND mean OOF
+ *    brier(M1) ≤ M0. Ties to status quo.
+ * CORPUS: manifest-pinned recapture (2,122/2,127 replays — 5 upstream
+ *    404s), 12,828 samples / 2,111 games (R3: 12,798/2,111). Fresh full
+ *    fits replicate round 3: ALL sweep −88.9 (bootstrap −99.6±61.8),
+ *    ALL-NO-BOOSTS sweep +109.8 (+103.6±65.4, coverage inflating to
+ *    ~262 alongside), SINGLES boosts 39.1±7.3.
+ * RESULT — STATUS QUO HOLDS, and not narrowly: M1 loses EVERY seed in
+ *    EVERY tranche. Singles: M0 logloss 0.61088/brier 0.21224 vs M1
+ *    0.61469/0.21391, meanΔ(M1−M0) +0.003801, wins 0/20, brierOk false
+ *    (ALL +0.004909, DOUBLES +0.008698, GEN9 +0.005723 — all 0/20).
+ *    M2 additive sits on M0 everywhere (singles 0.61097): sweep carries
+ *    NOTHING out-of-sample that flat boosts don't already carry, neither
+ *    as replacement nor on top. Seventh boost-family attempt, first with
+ *    a held-out design — the flat boost term is not a collinearity
+ *    artifact; it is the better outcome carrier. sweep stays weight 0
+ *    (runtime-inert), no cache bump, no calibration/feedback gates
+ *    needed (zero runtime change). FOLLOW-UP (not this round): sharpen
+ *    the sweep DEFINITION (v2 — e.g. speed-order and cleanup-context
+ *    aware) before ever re-asking; the current definition is answered.
+ *
+ * MCTS ROOT BLEND ROUND 2026-08-17 (improvement round 7 — the registered
+ * round-6 follow-up; commits 2caf79c/df7efbd/f04464a + this record):
+ * DESIGN (cache v34): the round-6 odds grounding reaches MCTS-mode
+ *    results on all three channels. NARRATIVE: runMcts computes
+ *    koOddsForOptions once at the live root and toResult stamps ranked
+ *    rows by choice string (rows are ranked — index alignment is gone);
+ *    trees ship the arrays on MctsTreeStats.koOdds so mergeMctsTrees
+ *    attaches them sim-free (merge purity kept — same duplication
+ *    rationale as orchestrator.ts). VALUE: each tree scans the root grid
+ *    with planCellEvents (analytic only, no sim advances) and ships
+ *    boundaryCells; starvedSupportCells treats a boundary cell as
+ *    chance-suspect regardless of visit statistics — K fixed per-tree
+ *    outcomes cannot represent an accuracy×killFraction split, so four
+ *    trees that all drew the hit side of an 80% kill range look rich,
+ *    unanimous, converged, and wrong — and boundary cells bypass the
+ *    endedCells exclusion (a game-ending kill range is ended in its
+ *    drawn class precisely because the pool cannot see the other one);
+ *    the blending verify sampler (blendRoot since round 6) re-prices
+ *    them analytically. INVENTORY: verified-cell KoOddsMismatch
+ *    diagnostics survive the merge as koDiagnostics, sorted (i, j) —
+ *    the pooled executor returns chunks in completion order. Blend
+ *    payloads stay dropped: MCTS has no deepening, reblendValue has no
+ *    call site. Score/interval remain hybrid-invariant; the sync
+ *    mctsSearch path skips the scan (no verify round to feed).
+ * MEASURED (runs ×3, all result channels bit-identical; wall ~11m):
+ *    non-MCTS turns byte-identical to the round-6 baseline (alignment,
+ *    notices, eval-gap channels, both round6-gate t8 pins). GOLDEN
+ *    655336 HEALED: the three user-rejected artifacts (extra misplay
+ *    t23/t24 + read t24, KNOWN DRIFT since 2026-08-15) vanish — the
+ *    report matches the golden exactly again; healed by the boundary
+ *    verify at MCTS roots, not by boosts↔sweep. 649664 t23 attribution
+ *    p1-read → chance: the re-priced root dissolves the read framing
+ *    (regret ~0.0003, both sides reasonable) — closer to the expert,
+ *    who rejected the gamble framing outright ("the only winning play,
+ *    not a gamble"); rows carry the arithmetic he asked for (Scald
+ *    kf 47.3% vs Hydro Pump acc 80%). Odds PROSE fires only in read/
+ *    mistake bands — t23 is bandless, the sentence has no seat there.
+ *    koMismatchByReplay 47–206 (was 36–141): MCTS turns now report;
+ *    the probe-chase weight threshold note stands.
+ * CALIBRATION GATE PASSED (mode=auto vs the round-6 record): n 806
+ *    identical, phases 54/65/82, briers 0.2592/0.2252/0.1448 and
+ *    buckets 60/58/71/90 identical to the digit (the score line is
+ *    hybrid-invariant by design — the round moves rankings, attribution
+ *    and narrative, never scores), doubles 72%, wall 26.7m vs 26.3m —
+ *    the boundary scan is free at bench scale.
+ * RE-PIN (user-approved): 649664 t23 observed none/p1-read →
+ *    none/chance (essence records the mechanism); 655336 essence gains
+ *    the HEALED note — the golden file itself is untouched (the diff
+ *    closed to zero, nothing to refresh).
+ *
+ * EXPECTATION-GROUNDING ROUND 2026-08-16 (improvement round 6 — the
+ * Erwartungs-Grundierung item spun out of round 4's agenda rename; commits
+ * d9372f4/399f6aa/f0125d8/d77e289/316ce76/7a26c93/1323a3b + this record):
+ * DESIGN (cache v33): binary boundary events (KO-range rolls, accuracy)
+ *    price at ANALYTIC probabilities instead of seed frequencies at root
+ *    matrix cells — singles, matrix mode only; sub-searches, MCTS, and
+ *    doubles byte-identical. ko-odds.ts computes one-turn odds via a
+ *    sim-exact @smogon/calc bridge fed the battle's own reconstructed
+ *    stats: killFraction = crit-weighted share of the 16 damage rolls
+ *    ≥ current HP, × accuracy after stage/weather modifiers; status moves
+ *    with imperfect accuracy yield accuracy-only events; everything
+ *    unpriceable (multi-hit, charge, counter/sucker families, self-KO,
+ *    accuracy items/abilities, gen ≤ 2) fails closed to the seed average.
+ *    cell-blend.ts plans a cell's events (guards: protect family,
+ *    action-prevention statuses, sash/Sturdy/Disguise, hazard/pivot
+ *    defenders), classifies each seed child's outcome from its advance
+ *    log (any deviation from the kill-truncation occurrence model —
+ *    flinch, |cant|, ambiguous faints — falls back to the plain seed
+ *    average), folds class weights in observed actor order (the first
+ *    mover's kill truncates the second event), and prices the cell as
+ *    analytically weighted class means. Missing classes are chased with
+ *    11 fixed probe seeds under a 16-draw budget; a class never found
+ *    renormalizes the found weights and surfaces as a koDiagnostics
+ *    entry — values are never invented. Deepening re-blends through the
+ *    first-seed child's class (reblendValue — one deepened branch cannot
+ *    erase the mixture); both engine paths share the semantics (the
+ *    local executor blends evalCells, the orchestrator re-blends with
+ *    the same pure helper). Ranked root options carry koOdds (accuracy ×
+ *    killFraction vs the standing opposing active), cache-borne; the
+ *    narrative quotes them ("kills ~43% of the time", "an 80% roll to
+ *    connect", "a 90% roll into a ~43% kill range") in the mistake/
+ *    inaccuracy/read clauses, the report's seeds sentence, and a panel
+ *    suffix. streaks.ts adds the NARRATIVE half: milestone-throttled
+ *    multi-turn cumulation (secondary fishing with Serene Grace/Shield
+ *    Dust/Covert Cloak priced in, flinch gated on outspeeding; crit
+ *    accumulation vs boosted walls) — render-time only, grading never
+ *    sees it. The contract in one line: the search prices what the next
+ *    roll is worth; the report narrates what many rolls mean.
+ * MEASURED (runs ×3 bit-identical incl. a DUMP run, ~12m): ZERO item
+ *    drift vs the round-5 baseline — truths, gaps, notices, alignment,
+ *    eval-gap channels all identical; wall +4–8% (probe draws). Odds
+ *    language fires where matrix mode runs: 649664 t8 "an 85% roll into
+ *    a ~53% kill range" (pinned), 648453 t14/t15, 562428 t11, 655336
+ *    t13; streaks fire in the 573756 stall (t8/t118 "burn fishing
+ *    compounds to ~83%", t8 pinned). 649664 t23 itself flips to MCTS at
+ *    t13 under auto mode — the anchor keeps its round-4 none/p1-read
+ *    verdict but the odds sentence waits on an MCTS-root blend (NEW
+ *    AGENDA). koMismatchByReplay 36–141 — NOT single digits: the dump
+ *    audit shows (a) tail classes ≤ 0.15 weight the fixed probes
+ *    structurally miss (first-roll bias — seeds 21..64 nearly always
+ *    hit), and (b) chip-death cells (burn/poison kills in-window) where
+ *    every child classifies hit-kill and the missing hit-nokill mass is
+ *    large — renormalization equals the OBSERVED truth in both shapes;
+ *    no calc-vs-sim bridge failures. A probe-chase weight threshold is
+ *    noted as a future refinement, deliberately not built mid-round.
+ * CALIBRATION GATE PASSED (mode=auto vs the round-4 record): n 806
+ *    identical, phases 54/65/82 (early −1pp ≈ 1–3 positions), briers
+ *    0.2592/0.2252/0.1448 (max +0.0004, inside the recorded ±0.0007
+ *    noise band; late identical to the 4th decimal), buckets 60/58/71/90,
+ *    doubles 72%, wall 26.3m vs 26.7m — the probe draws are free at
+ *    bench scale.
+ * RE-PIN (user-approved): TWO new round6-gate truth items — 649664 t8
+ *    summaryIncludes ['an 85% roll into a ~53% kill range'] and 573756
+ *    t8 ['burn fishing compounds to ~83%'] (both verbatim-stable across
+ *    the three runs); the 649664 t23 essence notes the matrix-only
+ *    scope. One regression re-pin during implementation: draft T50's
+ *    top label coarsened to either wall (crit-tail cells around the
+ *    Slowking column re-priced a ~0.001 tie; the Heatran column carries
+ *    no boundary event). Golden 655336 untouched.
+ *
+ * NARRATIVE ROUND 2026-08-16 (improvement round 5 — agenda item ⑥;
+ * commits cd5ffa5/5f75a08/6c36965/c2140f9/4aa639a/a8f64d9 + this record):
+ * DESIGN (render-time only — NO cache bump, grading/tiers/attribution
+ *    untouched): four signals computed in analyzeTurn over the cached
+ *    results and spoken by summary.ts/report.ts, all failing closed on
+ *    missing data. (1) BREADTH: viableCount = options within an
+ *    inaccuracy of best; a shift turn with ≥4 viable options per side
+ *    reads "a genuinely open turn rather than a drift … hinged on
+ *    out-predicting the opponent" (562428 t10 renders the expert's own
+ *    numbers, 9 of 9 / 11 of 13). (2) CONDITIONAL: when the side's own
+ *    equilibrium mix leans a DIFFERENT choice than the argmax-EV pick
+ *    (weight ≥ 0.5), the recommendation carries its condition — the
+ *    opponent replies with the largest own-value split in the solved
+ *    matrix ("B only if you expect X; Z covers Y"). (3) NULL-MOVE GUARD
+ *    (null-moves.ts, type-chart-driven and conservative — status
+ *    immunities as a gen-aware table since the dex damageTaken chart
+ *    carries no status keys; Thunder Wave's missing ignoreImmunity;
+ *    attacker abilities SUPPRESS verdicts): a mechanically null best
+ *    swaps its display to a co-optimal alternative within TIE_EPSILON
+ *    or carries the enabling-condition caveat; fires in the corpus on
+ *    573756 Toxic→Toxapex and 562428 Toxic/Earthquake→Corviknight
+ *    (where "pays against the rest of the team" is exactly right — the
+ *    value lies on the expected switch-in). (4) FORCED MIX: a ≥0.85
+ *    equilibrium SWITCH is said in prose ("all but commits X to
+ *    switching to Y (92%) — which is what happened / came instead"),
+ *    deduped when the conditional already names it. Harness: TurnClaim
+ *    gains summaryIncludes narrative pins (rendered via summarizeTurn
+ *    with the replay's player names; missing names mismatch loudly).
+ * MEASURED (runs ×3 bit-identical, 9.8m): ZERO drift in every machine
+ *    channel vs the round-4 baseline — results, notices, evalErrors,
+ *    alignment all identical — as designed for a narrative-only round.
+ *    NO calibration gate: nothing the calibration bed prices changed,
+ *    and the zero-drift runs prove it. Signal inventory over the dumps:
+ *    open-turn ×3 (562428 t10, 653785 t15, 655336 t6), conditional ×7,
+ *    bestNull ×6 (rendered only where a recommendation speaks — tier-
+ *    less turns keep it silent by design), forcedMix ~50 (~30 in the
+ *    573756 regenerator stall loop; per-turn display keeps it honest).
+ * RE-PIN (user-approved): 562428 t10 observed gains the narrative pin
+ *    summaryIncludes ['open turn'] — the breadth half of the desired is
+ *    delivered; the remaining half is an actual read RECOMMENDATION
+ *    (opponent-model territory). 653785 t19 essence notes the general
+ *    guard landed (the Will-O-Wisp half of its desired is delivered).
+ *    Golden 655336 untouched.
+ *
+ * HAX-ALIGNMENT ROUND 2026-08-15 (improvement round 4 — agenda item
+ * Hax-Alignment; commits 5824b5b/428f44b/63951ea/3b0d0e6/f524611 + this
+ * record):
+ * DESIGN (per-turn seed search, cache v32): at every turn boundary the
+ *    reconstruction serializes a checkpoint, trials the block's protocol
+ *    choices under a pinned 16-seed list (trialAdvanceLog fork; forced
+ *    switches answered from protocol species), scores emitted events
+ *    against the block (ended > faint-set > soft counts over misses/
+ *    crits/secondaries/hitcounts/cants/confusion/move-counts + 0/1
+ *    order), and battle.resetRNG's the argmin candidate (ties keep the
+ *    earlier seed; candidate-0 fast path; reseed EVERY turn so turns'
+ *    RNG consumption decouples). Scripted PRNG rejected (fragile @pkmn
+ *    internals coupling); backstop deliberately NOT built — measure
+ *    first (user decision).
+ * MEASURED (runs ×3 bit-identical; stable results, alignment summaries,
+ *    notices): 653785 REGAINED its 2 endgame turns (the round-2 phantom
+ *    seed-crit heals; perfect 20/25). Premature-end residual: 1 block of
+ *    270 (648453 keeps "35 of 39", ended-mismatch 1 — no candidate seed
+ *    avoids it; WATCH, no backstop agenda at this rate). Quotas
+ *    (actual-scored): gen6 80/110 perfect turns (655336 27/27, 649664
+ *    21/23, 653785 20/25, 648453 12/35), gen8 14/160 (573756 9/138 soft
+ *    275, 562428 5/22 — long stall games carry nearly all soft
+ *    residual; faint residuals single-digit everywhere). Trial-vs-
+ *    actual gap 1 turn of 270 — the fork faithfully predicts the live
+ *    battle. Feedback wall time 17.3m → 10.2m despite the search.
+ * CALIBRATION GATE PASSED (paired worktree vs c1c794a, mode=auto,
+ *    junctioned caches): n 783 → 806 (late 238 → 257 — exactly the
+ *    positions premature ends used to cut), phases 54/66/82 → 55/65/82,
+ *    briers 0.2566/0.2258/0.1513 → 0.2588/0.2251/0.1447 (late −0.0066;
+ *    early +0.0022 under the +23-position composition shift), buckets
+ *    61/58/69/89 → 61/58/71/90, doubles 70% → 72%. Calibration wall
+ *    +5.5m (the search's cost lives here).
+ * RE-PIN (user-approved): 649664 t23 gap observed mistake/p1-decision →
+ *    none/p1-read — the aligned seeds sample the t23 root differently
+ *    and the round-3-diagnosed false mistake (KO-roll sampling
+ *    confidence) dissolves; the gap stays open on the desired side.
+ *    Golden 655336 untouched (27/27 perfect). AGENDA RENAME: "analytic
+ *    KO grounding" (C. below) generalizes to ERWARTUNGS-GRUNDIERUNG —
+ *    probability-weighted analytic folding for future-turn expectation
+ *    (freeze fishing, Serene-Grace chains, crits vs boosted walls);
+ *    value vs narrative as separate consumers; own round.
+ *
+ * HORIZON-FAMILY ROUND 2026-08-15 (improvement round 3 over the corpus —
+ * agenda item ④; commits 06de5e8/4b1c489/6791ca9 + this record):
+ * A. FEED PATHWAY (06de5e8): a third sack shape in detectSacks — a mon
+ *    active since turn start (neither switched nor dragged in) fainting
+ *    above the low-HP threshold is a stay-and-die CANDIDATE (`stayed`).
+ *    The verdict layer honors it only when the played line's outcome was
+ *    priced certain (ev − floor ≤ FEED_CERTAINTY_EPSILON 0.02) AND the
+ *    best own expectation inside the payoff window clears the safe
+ *    guarantee by the read margin. markRisk's sacrifice short-circuit is
+ *    what dissolves the structural block (a deliberate feed IS "getting
+ *    punished"); blunder-band regrets are never excused. 573756 t68
+ *    re-pinned (USER-APPROVED): mistake/p2-decision → inaccuracy/quiet
+ *    with the feed named in the summary — toward the expert.
+ * B1. STRANDED-BENCH PRICING (4b1c489, cache v31): a living BENCHED mon
+ *    whose hp fraction ≤ its own side's hazardEntryFraction, on a side
+ *    with no living removal carrier, prices at alive × strandedAlive
+ *    (0.5) with no hp share and leaves the hazard victim term (no double
+ *    charge); Boots/Magic Guard/bench-Levitate/typed immunities inherit
+ *    from the shared entry-fraction term (all pinned); actives never
+ *    touched. CALIBRATION GATE PASSED: 54/62/79 (n 260/285/238), buckets
+ *    57/56/71/87, briers 0.2559/0.2304/0.1586 — no phase down beyond
+ *    noise vs the recorded pre-round numbers, buckets monotone within
+ *    noise. 653785 t19 re-pinned (USER-APPROVED): inaccuracy → none (the
+ *    stranded-Charizard position reprices; the engine's pick is now Hex,
+ *    not the mechanically-null Will-O-Wisp). Side effect: 573756 t137
+ *    (unpinned) mistake → none.
+ * B2. SWEEP WEIGHT — NOT ADOPTED (sixth boost-family attempt, recaptured
+ *    fit under v31 features, 12,798 samples / 2,111 games): implied
+ *    −101.4, cluster bootstrap −111.5 ± 64.0 — SIGNIFICANT BUT NEGATIVE;
+ *    the ALL-NO-BOOSTS variant reads +103.1 (97.8 ± 67.2). The sweep and
+ *    boosts columns are collinear (both measure standing boosts); with
+ *    both present the fit uses sweep as a negative correction. sweep
+ *    stays 0. NEW AGENDA: boosts↔sweep disentanglement — fit the
+ *    boost-flipped wincon as a REPLACEMENT for flat stages, gated as
+ *    usual.
+ * T20 KNIFE-EDGE (6791ca9): B1's repricing moved 648453 t20's safe floor
+ *    by +0.0033 and flipped the pinned paid-off read (payoff 0.1006 →
+ *    0.0972 vs margin 0.1). RISK_PAYOFF_EPSILON 0.02: a payoff within
+ *    the epsilon under the margin keeps the paid-off credit — asymmetric
+ *    by design (the feed gate and the clearly-failed exit stay strict;
+ *    the tolerance widens praise, never excuses). Truth pin green again.
+ * MEASUREMENT (runs 1+2 bit-identical at 4b1c489; re-run after 6791ca9;
+ *    confirmation run on the re-pinned corpus): all four truths OK
+ *    (655336 keeps its accepted KNOWN-DRIFT lines), eval gaps 0
+ *    everywhere. 655336: ④ SOFTENED the curve (post-DD t24 0.289 →
+ *    0.376, toward the expert) but the t23/t24 verdict artifacts persist
+ *    — stranded pricing does not fire there and sweep was not adoptable;
+ *    golden deliberately NOT refreshed (the artifact lines stay
+ *    user-rejected).
+ * C. 649664 t23 DIAGNOSED (probe, deleted): KO-ROLL SAMPLING CONFIDENCE.
+ *    At the t23 root (Keldeo 191/323 vs Medicham 245/261) Scald's
+ *    sampled damage rolls kill on 5/5 SEARCH_SEEDS (true odds ~43%) so
+ *    the engine prices Scald as a certain kill (ev = floor ≈ 0.99),
+ *    while Hydro Pump misses on 2/5 seeds (true 20%) and a miss dies to
+ *    High Jump Kick — so the actually-winning play (80% × ~100% kill,
+ *    and the real click OHKO'd) grades as a 0.82-regret mistake. Binary
+ *    events (KO rolls, accuracy) price at sampled frequencies, not true
+ *    probabilities. NEW AGENDA: analytic KO grounding at the root
+ *    (damage-range fraction × accuracy folded into cell values/floors
+ *    where the immediate question is a KO); overlaps hax alignment but
+ *    targets pricing, not reconstruction.
+ * D. GLOBAL BEFORE/AFTER vs 712de0e (last push; paired worktree runs,
+ *    junctioned caches, equal n 783): the whole 21-commit line is
+ *    CALIBRATION-NEUTRAL on the 24-game corpus (54/62/79 both sides;
+ *    briers within 0.0007; buckets within one position). Fit-corpus
+ *    hand-weight briers improve slightly everywhere, most late-game
+ *    (singles 0.1753→0.1730, doubles 0.1645→0.1602, const-K; sample sets
+ *    12,636→12,798 — directional, not paired). The line's gains are
+ *    verdict-level, which 712de0e has no harness to measure.
+ *
+ * LOCK-AND-HP-TYPING ROUND 2026-08-15 (improvement round 2 over the
+ * corpus; commits 626a4d4/c63d681 + this record): ③ corrected actives
+ * regain PROTOCOL-PROVEN choice locks — the correction's choicelock
+ * deletion stays (tricked-scarf defense) but a re-stamp from the replay
+ * text follows, BEFORE the request refresh so the disable pass bakes it
+ * in: exactly one distinct committed move since last real entry, choice
+ * item, item undisturbed, move in the set; a GUESSED choice item further
+ * needs the damage record not to contradict it (x1.5 vs x1.2 type-boost
+ * bluff vs unboosted bands, 0.02 HP-bar slack; ambiguity never blocks).
+ * Cache v29. Pinned on the real 649664: Keldeo @ Specs at the t24
+ * boundary offers exactly `move hydropump`. ⑤ typeless Hidden Power
+ * resolves via effectiveness evidence (super/resisted/immune/neutral
+ * markers per typeless hit) filtered against the defender typing, then
+ * usage ranking — 648453/653785 ran IV-default HP Dark for real HP Ice
+ * (653785 t15 super on Landorus REFUTES Dark outright). Display shows
+ * the resolved variant; the sim keeps request id `hiddenpower` for typed
+ * sets (pinned — protocol choices and played matching depend on it); the
+ * damage fitters (spread inference, corroboration) calc typeless
+ * observations AS the resolved variant (Dark-fitted spreads made the sim
+ * overkill 653785's Dragonite). Cache v30. MEASUREMENT (2 runs,
+ * bit-identical): all truths OK, eval gaps stay 0, 655336 KNOWN DRIFT
+ * unchanged; 649664 t23 verdict unchanged (the lock lands on the t24
+ * follow-up; the t23 grading needs horizon pricing — ④); 653785 t19
+ * re-pinned none → inaccuracy (USER-APPROVED — corrected Ice rolls
+ * reprice t20-23) and its endgame loses 2 reconstructed turns to a
+ * seeded sim CRIT the real game did not have. NEW AGENDA (user): hax
+ * alignment for reconstructions — per-turn seed search or scripted PRNG
+ * so sim crits/rolls/misses reproduce the protocol's outcomes; a sim-side
+ * kill the real game disproves ends the replay early and no boundary
+ * correction can resurrect it.
+ *
+ * SILENT-EVAL-GAPS ROUND 2026-08-15 (improvement round 1 over the corpus
+ * below; commits a370c61/a1daacd/e231df8/45d1ff4 + this record): all 53
+ * silent turn-eval losses are gone. ① Choice tokens now come from the
+ * request move id ("Return 102" display built `return102`, the sim
+ * rejected it — 48 turns across the four gen6 games) and guessed
+ * Frustration sets assume 0 happiness (sim default 255 priced BP 1);
+ * cache v27. ② Eval-layer failures are recorded per turn (evalErrors),
+ * the ⚠ notice appends count + first reason, turn view/tooltip name it,
+ * harness + drift report carry it — a gap now explains itself. ⑦ The five
+ * gen8-573756 gaps were CONCEALED TRAPPING: the sim marks a Magnet-Pull-
+ * trapped Steel `trapped: 'hidden'` and deliberately keeps the request
+ * silent while the switch validation rejects; legalChoices offered the
+ * bench anyway — both option paths now consult the live trapped field
+ * (liveDisabled's sibling rule); cache v28; 573756 evaluates 139/139.
+ * MEASUREMENT (bit-repeatable, 9.8m): t13-648453 mistake and t19-653785
+ * blunder verdicts EVAPORATED once their silently lost neighbor turns
+ * evaluate — both toward the expert (user re-pinned observed to
+ * quiet/none). 655336 gained misplay t23/t24 + read t24 on previously
+ * silent Lopunny turns — USER-REJECTED as engine artifacts and kept as
+ * KNOWN DRIFT against the old golden: t23 is a 25-HP Lando sac that
+ * Helmet-chips Mega-Lopunny to 38/271 behind SR+Spikes (it died ON
+ * re-entry at t25 — the real game proves the sac), t24 DD is the sweep
+ * play (engine: DD ev 0.004 vs Claw 0.503; score 0.512 -> 0.289 after the
+ * FREE DD, then 0.957 as the sweep plays out — the boost is only priced
+ * once it happens). Mechanics ACQUITTED by pins (eval-mechanics.spec.ts):
+ * Intimidate/DD/Regenerator/Helmet all correct through the searched
+ * advance; benched-below-entry effHp-0 works (+0.44). The two real causes
+ * feed agenda item ④: (a) ACTIVE mons carry no re-entry death — effHp 0
+ * exists only for the bench, so a 38/271 active behind hazards reads as a
+ * working piece; (b) the sweep feature (boost-flipped 1v1s) sits at
+ * weight 0, leaving 12 points/stage against a whole body's worth of
+ * kill-now. The t24 +0.52 "read payoff" was the same artifact (engine
+ * priced the played (DD, Slowbro) pair at -0.016).
+ *
+ * EXPERT-FEEDBACK CORPUS ROUND 2026-08-14: an experienced player reviewed
+ * the analysis on 0.5.1 across six public smogtours replays (gen8ou/
+ * gen6ou); the distilled essence is a versioned corpus (e2e-feedback/
+ * corpus.ts — 4 truths, 5 gaps) graded by `npm run test:feedback`: the
+ * REAL app swept per replay in a browser, hermetic (replay + data.pkmn.cc
+ * pins), bit-identical across runs, WARN-ONLY (drift = report material in
+ * docs/reports/, reds = harness breakage only). Pinned state: 4x OK, 5x
+ * GAP open. Gate-1 correction: the praised SoulWind game-breaking play is
+ * the t75 double switch into Kyurem (expert counted t76; the read banks on
+ * 75 — user-confirmed). Dossiers (user-approved, local docs/superpowers/
+ * feedback-round/): t68 Weavile sac = grading machinery (punished-exit
+ * blocks the payoff window for exactly the deliberate feed it should
+ * excuse; floor==ev==-0.42 is the feed signature; payoff +0.44 in-window);
+ * t10 = narrative (breadth 9/9 and 11/13 near-best is IN the matrix,
+ * 'shift' hides it; expert's Heatran-flips claim NOT confirmed, priced
+ * co-optimal); t13 = data (typeless Hidden Power runs as HP Dark, real
+ * read was HP Ice) + narrative (no-switch-ins-left never surfaced); t23 =
+ * data (Specs guessed right but the reconstruction LOSES the choice-lock
+ * volatile — choiceCount 4 instead of 1; with the lock the verdict
+ * evaporates, exactly the expert's point); t19 = HORIZON (Charizard
+ * 71/297 behind double rocks megas ON 19 — un-Mega'd re-entry costs ~148,
+ * it can never return, yet the equilibrium expects the switch 91.6%; and
+ * Mega Flare Blitz takes Cofagrigus 40%->7%, so the played Weavile feed
+ * is coherent piece preservation the depth-2 verdict cannot price —
+ * blunder CONTESTED) + data (one-move Chari) + narrative (WoW named
+ * "better" by argmax-ev while the engine's own mix plays Hex 89%; the
+ * switch-conditional is never stated). Mega bookkeeping verified clean.
+ * CROSS-CUTTING: the registered Return bug below is fully diagnosed —
+ * forward-model builds choice tokens from the request's DISPLAY NAME
+ * ("Return 102" -> return102) instead of its id, silently killing ~48
+ * turn evals across the four gen6 games (every one fields a Return
+ * Lopunny) and breaking old-gen branching; Frustration same family. And
+ * eval-layer failures have NO notice (coverageNotice counts acquisition
+ * only — 653785 lost 16/26 turns silently). Improvement agenda (approved,
+ * by leverage): return102 choice-id fix · eval-gap notice · choice-lock
+ * preservation · horizon family (deliberate-feed + hazard re-entry
+ * pricing, t68+t19) · Hidden-Power typing · narrative pack (breadth,
+ * conditionals, equilibrium-aware naming) · gen8 gap probe (573756 has 5
+ * unexplained). The 35-min record-run wedge did not reproduce
+ * hermetically (2x bit-identical clean runs); the stall detector bounds
+ * any recurrence at 6 minutes with ERROR rows.
+ *
+ * REGISTERED BUG — OLD-GEN RETURN BRANCHING FAILURE 2026-08-14, RESOLVED
+ * 2026-08-15 (a370c61): branching on smogtours-gen6ou-653785 turn 19
+ * failed with `p1 "move return102": Can't move: Your Lopunny doesn't
+ * have a move matching return102`. Actual cause was subtler than the
+ * suspected wrong-generation canonicalization: the REQUEST displays
+ * happiness moves with their computed base power ("Return 102") while
+ * the entry's id stays `return`, and forward-model built choice tokens
+ * from the display name. Fixed by using the request move id at both
+ * option paths (Frustration same family, plus the 0-happiness set
+ * assumption); pinned in eval-forward-model.spec.ts ("happiness-move
+ * choice tokens").
+ *
+ * THINK-DEEPER UNHIDDEN — HEALED SINGLE-TURN ACQUIRE 2026-08-13: the
+ * registered fix is in. makeReplayAcquire now reconstructs with the same
+ * per-turn capturePositions snapshot corrections the sweep uses (arrival
+ * snapshot unchanged), so the cascade zone arrives LIVE — pinned on the
+ * draft fixture at t56 in sweep-acquire-guard ("the HEALED single-turn
+ * acquire arrives live..."), the exact turn the unhealed run dies on.
+ * reconstructionReached stays as the loud-failure backstop for replays
+ * healing cannot save (it now throws the divergence message instead of
+ * evaluating an ended battle as ±1). Button restored to both faces
+ * (think-deeper on analyzed turns, first-analysis on gaps), both e2e
+ * click-throughs restored (d1→d2 escalation + monotone merge; the
+ * MCTS→matrix depth-2 LAND on the GPL auto line), the hide-pins removed.
+ * The two REGISTERED BUG entries below are CLOSED by this change.
+ *
+ * EMPTY GAME GRAPH ON THE BUILD — MINIFIED CLASS NAMES 2026-08-12 (the
+ * user's actual report, isolated by "works on dev but not on build"):
+ * @pkmn/sim's state serializer encodes every object reference as
+ * `[${obj.constructor.name}:id]` (sim/state.mjs:348) and rebuilds classes
+ * from those names on deserialize. Minification renames Pokemon → "t", so
+ * a serialized position round-tripped into objects that were no longer
+ * Pokemon/Side instances and the first method call threw — inside the
+ * eval workers, 20× `e?.getMoveRequestData is not a function` per sweep,
+ * each swallowed by the per-turn catch as a silent gap. EVERY turn failed,
+ * so the graph came out empty while dev (unminified) looked perfect. The
+ * engine, the harness, and all 522 regression tests run unminified and
+ * could never see it; the e2e suite drove the dev server for the same
+ * reason. FIX: keepNames on BOTH bundles (build + worker are configured
+ * separately, and the two must agree on class names because the main
+ * thread serializes what the worker deserializes). GUARD: npm run
+ * test:build — a production-build Playwright suite that drives the
+ * minified bundle and fails if any typed worker error appears or the graph
+ * stays empty (verified by flipping keepNames off: the suite fails).
+ * LESSON: dev-only e2e cannot certify a bundle-sensitive engine.
+ *
+ * EMPTY GAME GRAPH — PHANTOM FINAL TURN 2026-08-12 (user report: "the
+ * Game Graph is empty when clicking on Analyze Game"): the same
+ * premature-end family, one layer further out. makeSweepAcquireAll
+ * stored the reconstruction's FINAL battle as positions[turns-1] with no
+ * check that the replay ever reached that turn, and
+ * validateBranchRuntime deliberately returns null for an ended battle
+ * (branching into a finished line is legal and explained). So a diverged
+ * run that cascaded into an early end was stored as the last turn,
+ * evaluated as a decided ±1.00, and drew EXACTLY ONE point at the
+ * bottom-right corner — every other turn a silent gap, with the panel
+ * showing "Re-analyze" as if the line were real (hasGraph = "some score
+ * is non-null"). EvalGraph only strokes runs of ≥2 points, so one point
+ * renders as an empty box with a dot: the reported screenshot.
+ * DIAGNOSIS PATH: clean-state browser runs of BOTH the 68-turn draft
+ * (fast scan filled all 68) and the 10-turn VGC replay (full line,
+ * report, accuracies) were healthy, so the defect is not in the sweep
+ * loop — the shape (one isolated final point at ±1) is what identified
+ * the acquisition. FIX: reconstructionReached(runtime, turn) — live
+ * battle standing at or past the turn, not timed out, not ended (a
+ * sampled turn always lies BEFORE the real end; the harness applies the
+ * same invariant) — gates the store, and the single-turn acquire gets it
+ * too. That closes the mechanism behind the hidden think-deeper button:
+ * an unhealed single-shot arrival at a diverged endgame turn IS an ended
+ * battle, which is why the position read 100%. The sweep now records how
+ * much of the game the reconstruction covered and the panel states it,
+ * so a short line explains itself instead of reading as a broken app.
+ * Pins: sweep-acquire-guard.spec (predicate table + the real unhealed
+ * draft run, where validate passes and the guard rejects).
+ *
+ * REGISTERED BUG — THINK-DEEPER ON UNHEALED ACQUIRE 2026-08-11 (user
+ * report: "Think deeper breaks the turn and reduces the percentage to
+ * 100%", draft replay t56): the whole-game sweep acquires positions via
+ * capturePositions with per-turn snapshot healing (makeSweepAcquireAll),
+ * but the SINGLE-turn acquire (makeReplayAcquire — used by think-deeper's
+ * analyzeTurnNow, single-turn Evaluate, and gap-turn "Analyze this
+ * position") reconstructs single-shot WITHOUT healing. In the diverging
+ * endgame zone that is exactly the premature-end cascade: the unhealed
+ * battle arrives ENDED, evaluates ±1, the bar snaps to a literal 100%,
+ * and perSide empties — "breaks the turn". MITIGATION (this change): the
+ * think-deeper face of the button is HIDDEN on analyzed turns (EvalPanel;
+ * e2e pins the hide in both former click tests); gap-turn first analysis
+ * stays available and shares the risk in the same zone. FIX ON RECORD:
+ * route the single-turn acquire through the healed capturePositions path
+ * (or a shared healed-reconstruction helper) and add the app-side
+ * ended-skip guard (a sampled turn is always before the real end — an
+ * ended arrival is always an artifact: surface, don't evaluate). The
+ * escalation machinery (thinkDeeperTarget ladder, supersedesStored,
+ * verificationDeepSettings) is UNCHANGED and stays pinned in eval-graph;
+ * un-hide once the acquire is healed, restoring the click-through e2e
+ * assertions this change relaxed.
+ *
+ * DIVERGENCE-NOTICE E2E RESOLUTION 2026-08-11 (T3): scouting the draft
+ * replay under the APP path (fill-less like the e2e env, per-turn
+ * snapshot healing) shows arrivals t56–67 ALL LIVE and only t68 (the
+ * real end) ended — where Branch Here is already DISABLED ("The battle
+ * is already over at the end position"). The premature-end family is
+ * fully defused app-side: healing silences the cascade zone the
+ * unhealed harness replay died in, the end-guard blocks the ended
+ * arrival, so the ended/wedged notice is defense-in-depth, not a
+ * reachable state on this fixture. E2E pin (app.spec "branch
+ * divergence"): t56 branches with NO notice on the REAL draft replay
+ * (per-test route — the suite's shared fixture is a 4-turn synthetic)
+ * and t68 shows the disabled guard with its title. The notice variants
+ * keep their code path for replays healing cannot save.
+ *
+ * AUTO MODE SHIPPED 2026-08-11 (EVAL_CALIBRATION_MODE=auto; app mode
+ * 'auto'): per-position dispatch on faintedFraction ≥ AUTO_MCTS_FAINTED_
+ * FRACTION (0.4; the constant lives in types.ts so the UI shares it
+ * without importing the sim). BIT-EXACT GATE PASSED: all 417 auto
+ * positions equal their ff-selected parent's score exactly and the
+ * aggregate equals the offline counterfactual — 55/58/79/62/69 · late
+ * brier 0.1696. The app line and the measured counterfactual are the same
+ * object. Auto is a COMPLETE engine spec (d1s1 matrix below the threshold
+ * — the measured-best line; depth/samples prefs configure the explicit
+ * matrix modes only). Stored results always carry the concrete engine;
+ * supersedes/upgrade resolve auto per turn via the recorded fainted
+ * fraction and fail closed across modes when it is unknown.
+ *
+ * DIRECTIONAL SPEED EXCLUSIONS 2026-08-10: observations now drop only when
+ * the modifier could EXPLAIN the observed order — a speed-raising factor
+ * (Tailwind, +spe stages, paradox boosters) on the FIRST mover, or a
+ * speed-lowering factor (paralysis, −spe stages) on the SECOND. The kept
+ * directions are IMPLIED constraints (outrunning a Tailwind-doubled foe
+ * outruns its base speed a fortiori; a paralyzed mon moving first won at a
+ * quarter speed). Priority stays bilateral (cross-bracket order is not a
+ * race); Trick Room and same-turn entries stay bilateral. Gate vs the v24
+ * record: buckets IDENTICAL 61/67/80/65/84 (n identical), brier mid
+ * 0.2145→0.2139 and late 0.1586→0.1585, early flat — sharper spreads,
+ * no sign moved. STANDING RECORD d1: 61/67/80/65/84, brier
+ * 0.2513/0.2139/0.1585, n 216.
+ *
+ * MID-CHARGE RELEASES 2026-08-10 (cache v24): a locked request entry
+ * (mid-charge Phantom Force, rampages) carries no target data; the LIVE
+ * sim auto-targets a bare release, but State.serializeBattle drops
+ * activeRequest entirely and the ROUND-TRIPPED sim demands a target again
+ * ("Phantom Force needs a target") — and every eval advance runs on a
+ * round-trip, so those candidate cells were guaranteed rejects. The
+ * builder now falls back to the DEX target type for target-less request
+ * entries: foe-targeting releases enumerate live foe slots, random-target
+ * rampages (Outrage) stay bare. Gate vs 61/67/80/65/83 n214: t6/t8 sample
+ * cleanly, late n 69→71, doubles 83→84, late brier 0.1617→0.1586, no
+ * bucket down (early brier +0.0004 = K refit over the larger n). NEW
+ * STANDING RECORD d1: 61/67/80/65/84, brier 0.2513/0.2145/0.1586, n 216.
+ *
+ * T35 RESOLUTION 2026-08-10 (healthy-body sack framing, analysis side):
+ * The redundancy probe answered the design gate. T35 = the WINNER switches
+ * a 46%-HP Salazzle into Knock Off: score 0.6623 (83%) before, 0.4131
+ * (71%) after; with the body DELETED from the T35 state p1 still scores
+ * 0.4436 (72%) — the body was surplus headroom, the sack does not endanger
+ * the verdict, yet the played row lost 0.23 (tier "mistake"). The dip
+ * itself is REAL by the eval's own after-measurement (0.66 → 0.41), so an
+ * eval-side bodies discount would have to deny a value difference the
+ * engine consistently measures — the boost-saga shape the earlier T35
+ * probe warned about. ADOPTED instead: detectSacks recognizes the healthy
+ * switched-in-and-fainted feed (entry HP from the switch line, drags
+ * excluded) and analyzeTurn honors it ONLY while the sacker's engine score
+ * stays ≥ HEALTHY_SACK_FLOOR (0.4 — the |score| 0.4–0.7 bucket wins 77%)
+ * both BEFORE and AFTER, failing closed without an after-score.
+ * Expectation-based on both gates, zero eval change, sweep untouched
+ * (calibration never runs analyzeTurn — no gate needed). GPL T35 pins the
+ * framing end-to-end.
+ *
+ * BENCH-DRIFT PROFILE 2026-08-10 (closing the registered 0.3→0.9s item):
+ * EVAL_BENCH across the round's commits — 53ff967 (round start), c472c10
+ * (robustness), c9c7c64 (2b-lite), effd2f5 (pivots), HEAD — shows d1s1
+ * FLAT at 1.0s everywhere, forks/sec 527–606 (run noise), deserialize
+ * 1.0–1.1 ms (deserializeRepaired's pad walk is free next to the parse).
+ * The d2 line wobbles 1.1–1.8s between runs of the SAME commit —
+ * expansion-budget noise, not drift. The registered 0.3→0.9 was a sweep
+ * WALLCLOCK observation: two identical calibration runs today took 4.2
+ * and 4.9 minutes (±17% machine noise on bit-identical work), and the
+ * sweep's per-position quotient also absorbs fetch, reconstruction, and
+ * the round's build-side additions (speed solver, coherence). No search
+ * regression exists to fix; re-open only with a per-stage profile that
+ * isolates a ≥25% single cause.
+ */
+/**
+ * Corpus strata: outcome-label quality differs by source (a tournament
+ * player resigns lost positions and plays won ones out; a mid-ladder
+ * player can throw either), so records report stratified. The tranche tag
+ * rides in the dump for offline grouping.
+ */
+interface ReplayTranche { tranche: string; ids: string[] }
+
+const REPLAY_TRANCHES: ReplayTranche[] = [
+  {
+    tranche: 'draft',
+    ids: [
+      'gen9draft-2058494320',
+      'gen9draft-2298735122',
+      'gen3customgame-2115579570',
+    ],
+  },
+  {
+    // High-ladder gen9ou games (≥1500 Elo, sampled 2026-08-02) — stronger play
+    // gives a cleaner sign-accuracy signal than random-ladder blunder-fests.
+    tranche: 'ladder-ou-0802',
+    ids: [
+      'gen9ou-2658678742',
+  'gen9ou-2658675391',
+  'gen9ou-2658676184',
+  'gen9ou-2658675932',
+  // QUARANTINED 2026-08-11: 'gen9ou-2658670791' — 120+-turn marathon whose
+  // choice-replay reconstruction drops a load/timing-dependent subset of
+  // positions (3/5/5 across same-day runs, same turns, different errors;
+  // semantic determinism of cold reconstruction proven by probe). The
+  // varying drop set makes the n line wobble between runs — exactly what
+  // paired gates must not absorb.
+  'gen9ou-2658671385',
+  'gen9ou-2658663776',
+  'gen9ou-2658672151',
+  'gen9ou-2658671254',
+  'gen9ou-2658669868',
+  'gen9ou-2658668443',
+  'gen9ou-2658665571',
+  'gen9ou-2658664943',
+  'gen9ou-2658663604',
+  'gen9ou-2658664071',
+  'gen9ou-2658660641',
+  'gen9ou-2658661171',
+  'gen9ou-2658662321',
+  'gen9ou-2658661545',
+  'gen9ou-2658659909',
+  'gen9ou-2658658993',
+    ],
+  },
+  {
+    // Doubles/VGC (sampled 2026-08-04, rating ≥1400 VGC / ≥1480 DOU, ≥7 turns) —
+    // the doubles scoring path was previously uncalibrated entirely.
+    tranche: 'ladder-dou-0804',
+    ids: [
+  'gen9vgc2026regi-2630677822',
+  'gen9vgc2026regi-2630452654',
+  'gen9vgc2026regi-2630461565',
+  'gen9vgc2026regi-2630685175',
+  'gen9doublesou-2660818097',
+  'gen9doublesou-2660809089',
+  'gen9doublesou-2660826377',
+  'gen9doublesou-2660813469',
+  'gen9doublesou-2660802611',
+  'gen9doublesou-2660822493',
+    ],
+  },
+  {
+    // Tranche 3 (sampled 2026-08-11 via search.json, rating ≥1500 OU / ≥1400
+    // VGC / ≥1480 DOU, verified finished with ≥7 turns) — doubles the corpus
+    // so paired gates can see <2% effects. RECENCY sample: whatever high-rated
+    // players uploaded that morning — the "what app users actually load"
+    // stratum, with the label noise that implies.
+    tranche: 'ladder-0811',
+    ids: [
+  'gen9ou-2663115898',
+  'gen9ou-2663115494',
+  'gen9ou-2663114473',
+  'gen9ou-2663113106',
+  'gen9ou-2663114316',
+  'gen9ou-2663113816',
+  'gen9ou-2663113568',
+  'gen9ou-2663113084',
+  'gen9ou-2663112821',
+  'gen9ou-2663110678',
+  'gen9ou-2663110373',
+  'gen9ou-2663112349',
+  'gen9ou-2663108645',
+  'gen9ou-2663110845',
+  'gen9ou-2663110408',
+  'gen9ou-2663110121',
+  'gen9ou-2663109511',
+  'gen9ou-2663108252',
+  'gen9ou-2663108091',
+  'gen9ou-2663107495',
+  'gen9vgc2026regi-2630181744',
+  'gen9vgc2026regi-2630110359',
+  'gen9vgc2026regi-2629783504',
+  'gen9vgc2026regi-2629760324',
+  'gen9vgc2026regi-2629731825',
+  'gen9vgc2026regi-2629703929',
+  'gen9doublesou-2663102863',
+  'gen9doublesou-2663102669',
+  'gen9doublesou-2663100569',
+  'gen9doublesou-2663100395',
+  'gen9doublesou-2663095770',
+  'gen9doublesou-2663093831',
+    ],
+  },
+  {
+    // Tranche 4 (sampled 2026-08-11): Smogon TOURNAMENT games — SV OU
+    // officials (SPL/OST/WCoP, thread 3718664) and OSDT gen9doublesou
+    // (3778554), newest pages first. Cleanest outcome labels on the board:
+    // tournament players resign lost positions and convert won ones. Every
+    // id is EXCLUDED from fit-corpus-manifest.json — those games trained
+    // the winprob K and feature weights, so they may never grade the
+    // calibration (train/test separation).
+    tranche: 'tournament-0811',
+    ids: [
+      'smogtours-gen9ou-749601',
+      'smogtours-gen9ou-749351',
+      'smogtours-gen9ou-750267',
+      'smogtours-gen9ou-749895',
+      'smogtours-gen9ou-749739',
+      'smogtours-gen9ou-749754',
+      'smogtours-gen9ou-749828',
+      'smogtours-gen9ou-751451',
+      'smogtours-gen9ou-751543',
+      'smogtours-gen9ou-751340',
+      'smogtours-gen9ou-751436',
+      'smogtours-gen9ou-751283',
+      'smogtours-gen9ou-751505',
+      'smogtours-gen9ou-751382',
+      'smogtours-gen9ou-751443',
+      'smogtours-gen9ou-751476',
+      'smogtours-gen9ou-751341',
+      'smogtours-gen9ou-751244',
+      'smogtours-gen9ou-751512',
+      'smogtours-gen9ou-750953',
+      'smogtours-gen9doublesou-938276',
+      'smogtours-gen9doublesou-938281',
+      'smogtours-gen9doublesou-937926',
+      'smogtours-gen9doublesou-937928',
+      'smogtours-gen9doublesou-937931',
+      'smogtours-gen9doublesou-938638',
+      'smogtours-gen9doublesou-938640',
+      'smogtours-gen9doublesou-938644',
+      'smogtours-gen9doublesou-939625',
+      'smogtours-gen9doublesou-939635',
+      'smogtours-gen9doublesou-941638',
+      'smogtours-gen9doublesou-941650',
+    ],
+  },
+  {
+    // Tranche 4b (sampled 2026-08-11, same sources deeper — SV OU officials
+    // + OSDT; winner labels validated at sampling time): grows the
+    // tournament stratum to ~64 games so its per-bucket numbers tighten.
+    // Manifest-excluded like 4a. Separate tag so the tranche lever can run
+    // it alone; analyses merge every tournament-* tag into one stratum.
+    tranche: 'tournament-0811b',
+    ids: [
+      'smogtours-gen9ou-751207',
+      'smogtours-gen9ou-750540',
+      'smogtours-gen9ou-751536',
+      'smogtours-gen9ou-751533',
+      'smogtours-gen9ou-751407',
+      'smogtours-gen9ou-751170',
+      'smogtours-gen9ou-751466',
+      'smogtours-gen9ou-752324',
+      'smogtours-gen9ou-752839',
+      'smogtours-gen9ou-752549',
+      'smogtours-gen9ou-752005',
+      'smogtours-gen9ou-752624',
+      'smogtours-gen9ou-752755',
+      'smogtours-gen9ou-752781',
+      'smogtours-gen9ou-752301',
+      'smogtours-gen9ou-751881',
+      'smogtours-gen9ou-752058',
+      'smogtours-gen9ou-752068',
+      'smogtours-gen9ou-752733',
+      'smogtours-gen9ou-752702',
+      'smogtours-gen9doublesou-912045',
+      'smogtours-gen9doublesou-912047',
+      'smogtours-gen9doublesou-912883',
+      'smogtours-gen9doublesou-912884',
+      'smogtours-gen9doublesou-913990',
+      'smogtours-gen9doublesou-913993',
+      'smogtours-gen9doublesou-914406',
+      'smogtours-gen9doublesou-914408',
+      'smogtours-gen9doublesou-913994',
+      'smogtours-gen9doublesou-913996',
+      'smogtours-gen9doublesou-914621',
+      'smogtours-gen9doublesou-914633',
+    ],
+  },
+];
+
+const REPLAY_IDS = REPLAY_TRANCHES.flatMap(group => group.ids);
+const TRANCHE_OF = new Map(REPLAY_TRANCHES.flatMap(group =>
+  group.ids.map(id => [id, group.tranche] as const)));
+
+interface Sample {
+  /** Replay id + sampled turn — the pairing key across engine runs. */
+  id: string;
+  turn: number;
+  /** Corpus stratum (label-quality tier) — rides into the dump. */
+  tranche: string;
+  phase: 'early' | 'mid' | 'late';
+  gameType: 'singles' | 'doubles';
+  score: number;
+  /**
+   * Round 67 (T114): the root's solved matrix value next to the score (tree
+   * turns score the visit mean), null without a full matrix or under
+   * EVAL_CALIBRATION_STATIC=1. Observational: paired-calibration reads it with --b-field gameValue.
+   */
+  gameValue: number | null;
+  /** Fainted bodies / total bodies at the sampled position. */
+  faintedFraction: number;
+  p1Won: boolean;
+  /** The root's decided-sweep side (round 15 profile), null when no sweep stands. Round 32. */
+  decided: 'p1' | 'p2' | null;
+  /** Round 50: the sweep's side where the finished score holds it (heldDecided), the side a reader hears named. */
+  decidedHeld: 'p1' | 'p2' | null;
+  /** Round 33: one living body per side at the sample — the last-pair static's subset. */
+  lastPair: boolean;
+  /** Round 34: the replay's ladder rating (null for tournament replays and unrated games). */
+  rating: number | null;
+  /** Round 34: 'hq' for smogtours replays or rating >= HQ_RATING, the pre-registration tranche from round 35. */
+  quality: 'hq' | 'std';
+  /** Round 34: a crit taken, a miss, or a par/frz/flinch skip against the score's favored side after the sample. */
+  luckAgainstFavored: boolean;
+  /** Round 35: the proven forced-win mass at the sample (null without a proof at or above MIN_FORCED_MASS). */
+  forcedWinMass: number | null;
+  /** Round 35: the proof's deepest proven line in own moves. */
+  forcedWinTurns: number | null;
+  /**
+   * EVAL_CALIBRATION_FEATURES=1: the static eval's scaled feature vector
+   * (fit-spec g construction, FEATURE_WEIGHTS key order) — for offline
+   * suspect-vs-control feature diagnosis. Observational only.
+   */
+  g?: number[];
+}
+
+/** The root's decided-sweep side for the dump line (round 32), null when no sweep stands. */
+/** Round 35: the proven forced win behind a sample's score, when the bar stands. */
+const forcedWinFields = (result: ReturnType<typeof searchPosition>): Pick<Sample, 'forcedWinMass' | 'forcedWinTurns'> => ({
+  forcedWinMass: result.forcedWin?.mass ?? null,
+  forcedWinTurns: result.forcedWin?.turns ?? null,
+});
+
+const decidedSideOf = (result: ReturnType<typeof searchPosition>): Sample['decided'] =>
+  result.unanswered?.decided?.side ?? null;
+
+/** Round 50: the sweep's side where the finished score holds it. */
+const heldSideOf = (result: ReturnType<typeof searchPosition>): Sample['decidedHeld'] =>
+  heldDecided(result)?.side ?? null;
+
+type RootReading = Pick<Sample, 'score' | 'gameValue' | 'decided' | 'decidedHeld' | 'forcedWinMass' | 'forcedWinTurns'>;
+
+/**
+ * The root's reading of a sampled position: the bank's search, or with
+ * EVAL_CALIBRATION_STATIC=1 (round 65) the static alone, the search's leaf
+ * value at the root (leafValue: wp-units, the last-pair race included) with
+ * no search. The switch reads what the fit corpus fits on the bank's own
+ * positions and builds; a measurement switch, never a record.
+ */
+async function rootReading(battle: Battle, args: Parameters<typeof bankSearch>[0]): Promise<RootReading> {
+  if (process.env.EVAL_CALIBRATION_STATIC === '1') {
+    const score = leafValue(battle, createMatchupCache(args.settings.ruleset));
+    return { score, gameValue: null, decided: null, decidedHeld: null, forcedWinMass: null, forcedWinTurns: null };
+  }
+  const result = await bankSearch(args);
+  return {
+    score: result.score, gameValue: result.gameValue ?? null,
+    decided: decidedSideOf(result), decidedHeld: heldSideOf(result), ...forcedWinFields(result),
+  };
+}
+
+/**
+ * Engine levers the bench reads from the environment (round 33):
+ * EVAL_LAST_PAIR_SWEEP=1 turns on the last-pair static's sweep variant
+ * (variant B, measured, adopted nowhere).
+ */
+function applyCalibrationLevers(): void {
+  if (process.env.EVAL_LAST_PAIR_SWEEP === '1') setLastPairSweep(true);
+}
+
+/** One living body per side at the sample: the last-pair static's subset (round 33). */
+const lastPairAt = (battle: Battle): boolean => livingMons(battle, 0).length === 1 && livingMons(battle, 1).length === 1;
+
+/** Round 34: the pre-registration tranche threshold for ladder replays. */
+const HQ_RATING = 1700;
+
+/** smogtours replays and high-rated ladder games form the hq tranche (round 34). */
+const qualityOf = (id: string, rating: number | null): Sample['quality'] =>
+  id.startsWith('smogtours') || (rating ?? 0) >= HQ_RATING ? 'hq' : 'std';
+
+/** Luck against the side the score favors, from the sample turn to the end; a zero score favors nobody. */
+const luckFlag = (log: string, turn: number, score: number): boolean =>
+  score !== 0 && hasLuckAgainst(luckAgainstFavored(log, turn, score > 0 ? 'p1' : 'p2'));
+
+/** Bodies alive on both sides at the sample, the solver's scope test without importing the solver. */
+const livingTotal = (battle: Battle): number => livingMons(battle, 0).length + livingMons(battle, 1).length;
+
+/**
+ * The reconstruction instrument (round 46, T04). The pass runs with the
+ * APP's parameters: the choice-lock context plus capturePositions, which
+ * snapshot-corrects the LIVE battle at every boundary.
+ * EVAL_CALIBRATION_RAW=1 brings back the raw single pass of 28 Aug, which
+ * corrects only the cloned sample. Since round 40 the snapshot correction
+ * leaves benched bodies to the sim on the premise that the active was
+ * corrected at every boundary before it left; without the live correction
+ * the bench drifts with the sim's own rolls (mean 8 points off the last
+ * sighting against the app's 2, docs/perf/probes/2026-09-18-r46/t04).
+ */
+function passInstrument(
+  replayLog: string,
+  teams: Parameters<typeof buildChoiceLockContext>[1],
+  observations: Parameters<typeof buildChoiceLockContext>[2],
+  snapshots: ReturnType<typeof parseReplayLogWithObservations>['snapshots'],
+) {
+  const snapshotFor = (turn: number) => snapshots[Math.min(turn - 1, snapshots.length - 1)] ?? null;
+  if (process.env.EVAL_CALIBRATION_RAW === '1') {
+    return {
+      perTarget: {},
+      singlePass: (sampleTurns: number[], rawAt: Map<number, string>) => {
+        const pendingTurns = [...sampleTurns];
+        return {
+          targetTurn: pendingTurns[pendingTurns.length - 1],
+          snapshot: null,
+          onRawBoundary: (blockTurn: number, battle: Battle) => {
+            if (pendingTurns.length === 0 || blockTurn < pendingTurns[0]) return;
+            const rawSerialized = JSON.stringify(State.serializeBattle(battle));
+            while (pendingTurns.length > 0 && pendingTurns[0] <= blockTurn) {
+              rawAt.set(pendingTurns[0], rawSerialized);
+              pendingTurns.shift();
+            }
+          },
+        };
+      },
+    };
+  }
+  const choiceLocks = buildChoiceLockContext(replayLog, teams, observations);
+  return {
+    // The branch entry's trick: an empty capture turns on the live
+    // correction at every boundary of a per-target pass too.
+    perTarget: { choiceLocks, capturePositions: { snapshotFor, onPosition: () => {} } },
+    singlePass: (sampleTurns: number[], rawAt: Map<number, string>) => {
+      // The capture path hands out boundaries BEFORE the target turn, so
+      // the live pass aims one turn past the last sample.
+      const targetTurn = sampleTurns[sampleTurns.length - 1] + 1;
+      return {
+        targetTurn,
+        snapshot: snapshotFor(targetTurn),
+        choiceLocks,
+        capturePositions: {
+          snapshotFor,
+          onPosition: (boundaryTurn: number, battle: Battle) => {
+            if (!sampleTurns.includes(boundaryTurn) || rawAt.has(boundaryTurn)) return;
+            rawAt.set(boundaryTurn, JSON.stringify(State.serializeBattle(battle)));
+          },
+        },
+      };
+    },
+  };
+}
+
+/**
+ * EVAL_CALIBRATION_POSITIONS=<dir>: the serialized position of every
+ * sample the round-34 endgame bench can use (last pair, decided sweep, or
+ * at most three living bodies), one JSON file per id#turn.
+ */
+async function exportPosition(
+  dir: string | undefined, sample: Sample, serialized: string, living: number,
+  settings: { tera: unknown; sleepClause: boolean; ruleset: unknown },
+): Promise<void> {
+  // Round 61: EVAL_CALIBRATION_EXPORT_ALL=1 exports every position (the play-out probe), with the search's Tera and Sleep Clause.
+  // Round 67 (T139): and the replay's rule set, so a consumer (the endgame truth bench) computes with the position's own tables.
+  const all = process.env.EVAL_CALIBRATION_EXPORT_ALL === '1';
+  if (!dir || !(all || sample.lastPair || sample.decided !== null || living <= 3)) return;
+  const fs = await import('node:fs');
+  fs.mkdirSync(dir, { recursive: true });
+  const { id, turn, gameType, tranche, quality, p1Won, score, decided, lastPair, faintedFraction } = sample;
+  fs.writeFileSync(`${dir}/${id}#${turn}.json`, JSON.stringify({
+    id, turn, serialized, gameType, tranche, quality, p1Won, score, decided, lastPair, faintedFraction,
+    tera: settings.tera, sleepClause: settings.sleepClause, ruleset: settings.ruleset,
+  }));
+}
+
+describe.skipIf(!process.env.EVAL_CALIBRATION)('eval calibration against real replays', () => {
+
+  test('score sign tracks the actual winner', { timeout: 3600000 }, async () => {
+    // 60 min: a half-corpus mcts slice with per-result equilibrium solves
+    // crossed the old 40-min budget by minutes (2026-08-11).
+    applyCalibrationLevers();
+    const samples: Sample[] = [];
+    const sampleCount = bankSampleCount(process.env.EVAL_CALIBRATION_SAMPLES);
+    // The replay universe (bankUniverse above): the bank, the fit corpus, or (round 65) its holdout.
+    const universe = bankUniverse({ ids: REPLAY_IDS, trancheOf: TRANCHE_OF });
+    const { ids: universeIds, trancheOf } = universe;
+    // Tranche filter first, then the slice indexes over the filtered list —
+    // a new stratum runs alone and its dump concatenates with the standing
+    // full-corpus dumps (determinism keeps the old positions valid).
+    const trancheFilter = process.env.EVAL_CALIBRATION_TRANCHE;
+    const trancheIds = trancheFilter
+      ? universeIds.filter(id => trancheOf.get(id) === trancheFilter)
+      : universeIds;
+    const slice = process.env.EVAL_CALIBRATION_SLICE?.match(/^(\d+)\/(\d+)$/);
+    const replayIds = slice
+      ? trancheIds.filter((_, index) => index % parseInt(slice[2], 10) === parseInt(slice[1], 10))
+      : trancheIds;
+
+    // EVAL_CALIBRATION_SMOGON=1: the standing corpus numbers price teams
+    // built from protocol + inference alone, while the APP always waits
+    // for the Smogon usage/set fills before evaluating. This lever closes
+    // that information gap so the delta can be measured (T3 experiment A).
+    const smogonFills = process.env.EVAL_CALIBRATION_SMOGON === '1';
+    const smogonFetcher = smogonFills ? diskCachedSmogonFetcher() : undefined;
+    type ReplayJson = { id: string; log: string; players: string[]; formatid?: string; rating?: number };
+    for (const id of replayIds) {
+      let replay: ReplayJson;
+      if (universe.cached) {
+        // Disk-cached fit replay (node scripts/build-fit-corpus.mjs).
+        const cachePath = `.fit-corpus/${id}.json`;
+        if (!existsSync(cachePath)) {
+          console.log(`skipping ${id}: no fit cache`);
+          continue;
+        }
+        replay = JSON.parse(readFileSync(cachePath, 'utf-8')) as ReplayJson;
+      } else {
+        // Round 71: further attempts after a network error, a server error or a rate limit (test/regression/bank-fetch.ts).
+        const fetched = await fetchBankReplay<ReplayJson>(id);
+        if (!('replay' in fetched)) {
+          console.log(`skipping ${id}: HTTP ${fetched.status}`);
+          continue;
+        }
+        replay = fetched.replay;
+      }
+      const winnerName = replay.log.match(/^\|win\|(.+)$/m)?.[1]?.trim();
+      if (!winnerName) {
+        console.log(`skipping ${id}: no winner line`);
+        continue;
+      }
+      const p1Won = winnerName === replay.players[0];
+      const gameType: Sample['gameType'] = /\|gametype\|doubles/.test(replay.log) ? 'doubles' : 'singles';
+      // Observations drive spread inference — same path the app takes.
+      const parsed = parseReplayLogWithObservations(replay.log);
+      const { snapshots, observations } = parsed;
+      const replaySettings = bankSettings(replay);
+      // With the fills the build is the app's own chain (round 52): enriched
+      // infos, the two-stage solve, the hidden-power evidence — the teams a
+      // user sees, so the bank grades what the app ships. The switches:
+      //   default                        the app's chain
+      //   EVAL_CALIBRATION_RAWBUILD=1    raw infos and one solve, the build
+      //                                  every record before round 52 stands on
+      //   no EVAL_CALIBRATION_SMOGON=1   the naked build, unchanged
+      const built = await bankTeamsFor({ log: replay.log, formatId: replay.formatid ?? id, parsed, fetcher: smogonFetcher });
+      if (!built.teams) {
+        console.log(`skipping ${id}: ${built.reason}`);
+        continue;
+      }
+      const { p1Team, p2Team } = built.teams;
+      const maxTurn = snapshots.length;
+      const sampleTurns = universe.sampleTurns(maxTurn);
+
+      // A.3c: bring-limited replays (the VGC tranche) reconstruct with only
+      // the brought species per side — the same trim the app's sweep and
+      // single-turn acquire apply. Per-side fail-open, null for bring-all.
+      const bringOnly = replayBringOnly(replay, snapshots) ?? undefined;
+
+      // SINGLE-PASS RECONSTRUCTION (time-performance round, 2026-08-28):
+      // ONE pass per replay hands out the boundary state at every sampled
+      // turn, and each sample is cloned and target-corrected with exactly
+      // the per-target tail chain (applyTargetCorrections) — the old path
+      // replayed the whole game once per sampled turn (~4.5 full replays
+      // per replay). Since round 46 the pass carries the app's parameters
+      // (passInstrument above: live correction at every boundary plus the
+      // choice-lock context). The switches:
+      //   default                     one pass, app parameters
+      //   EVAL_CALIBRATION_RAW=1      the measurement base before round 46:
+      //                               the raw pass of 28 Aug (onRawBoundary,
+      //                               only the clone is corrected)
+      //   EVAL_CALIBRATION_LEGACY=1   one reconstruction per sampled turn,
+      //                               with TODAY's parameters
+      //   both                        the pure per-target path of 28 Aug
+      // The CALIB_POS_PROBE test below proved the 28 Aug swap (per-target
+      // against the RAW pass) and says nothing about the default; the
+      // default's evidence is the paired runs and the bench-HP probe under
+      // docs/perf/probes/2026-09-18-r46/t04.
+      const legacy = process.env.EVAL_CALIBRATION_LEGACY === '1';
+      const instrument = passInstrument(replay.log, { p1Team, p2Team }, observations, snapshots);
+      const rawAt = new Map<number, string>();
+      if (!legacy && sampleTurns.length > 0) {
+        try {
+          await reconstructBranchRuntime({
+            format: getBranchSimulatorFormat(replay),
+            p1Team, p2Team,
+            replayLog: replay.log,
+            bringOnly,
+            // The one pass carries the whole per-target family's work, so
+            // it gets the family's total deadline, not a single run's 60s.
+            deadlineMs: 60_000 * Math.max(1, sampleTurns.length),
+            ...instrument.singlePass(sampleTurns, rawAt),
+          });
+        } catch (error) {
+          console.log(`${id}: single-pass reconstruction failed — ${error instanceof Error ? error.message : error}`);
+        }
+      }
+
+      for (const turn of sampleTurns) {
+        try {
+          let battle: Battle;
+          const raw = legacy ? undefined : rawAt.get(turn);
+          if (raw) {
+            battle = deserializeBattleExact(raw);
+            applyTargetCorrections(battle, snapshots[Math.min(turn - 1, snapshots.length - 1)]);
+          } else {
+            // One reconstruction for this sample — either forced
+            // (EVAL_CALIBRATION_LEGACY=1) or as the per-sample fallback
+            // for a boundary the single pass never handed out (a wedged
+            // or prematurely ended pass, or the rare replay whose async
+            // stream timing shifts under the pass). It carries the same
+            // instrument parameters as the pass on purpose, so the few
+            // fallback samples (4 per bank run, 15 on the raw pass) sit
+            // on the same board as the rest.
+            if (!legacy) console.log(`${id} turn ${turn}: single-pass boundary missing — per-target fallback`);
+            const runtime = await reconstructBranchRuntime({
+              format: getBranchSimulatorFormat(replay),
+              p1Team, p2Team,
+              replayLog: replay.log,
+              targetTurn: turn,
+              snapshot: snapshots[Math.min(turn - 1, snapshots.length - 1)],
+              bringOnly,
+              ...instrument.perTarget,
+            });
+            const live = runtime.battleStream.battle;
+            if (!live) continue;
+            battle = live;
+          }
+          if (battle.ended) {
+            // A sampled turn is always BEFORE the real game's end (the loop
+            // stops short of maxTurn), so an ended reconstruction is always
+            // a divergence artifact: the choice replay cascaded a side into
+            // a wipe the real game never had (gen9draft-2058494320 t56+ —
+            // five greedy forced switches fed into a kill zone). Scoring it
+            // would hand the record a free ±1.00 with the real winner's
+            // sign; 55/827 grand-bed d1 rows carried exactly that.
+            console.log(`${id} turn ${turn}: reconstruction ended prematurely — skipped`);
+            continue;
+          }
+          // EVAL_CALIBRATION_FEATURES=1: capture the static eval's scaled
+          // feature vector (identical construction to eval-fit's g) so the
+          // offline suspect diagnosis can compare feature profiles.
+          let g: number[] | undefined;
+          if (process.env.EVAL_CALIBRATION_FEATURES === '1') {
+            const featureCache = createMatchupCache(replaySettings.ruleset);
+            const features = evalFeatures(battle, featureCache);
+            const teamSize = Math.max(battle.sides[0].pokemon.length, battle.sides[1].pokemon.length, 1);
+            const scaleOverNorm = EVAL_WEIGHTS.scale / (teamSize * (EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp));
+            g = (Object.keys(FEATURE_WEIGHTS) as (keyof EvalFeatures)[]).map(key => features[key] * scaleOverNorm);
+          }
+          const serialized = JSON.stringify(State.serializeBattle(battle));
+          // EVAL_CALIBRATION_DEPTH separates the two levers: does more
+          // search fix a phase, or is the static eval itself miscalibrated?
+          // EVAL_CALIBRATION_MODE=mcts runs the DUCT tree instead — the
+          // matrix path is gated every round; MCTS earns numbers here too.
+          // (Round 61: tree turns run the app's searchTreesOrchestrated, bank-search.ts.)
+          const depth = process.env.EVAL_CALIBRATION_DEPTH === '2' ? 2 : 1;
+          const faintedFraction = battleFaintedFraction(battle);
+          // EVAL_CALIBRATION_MODE=auto mirrors the app's sweep dispatch
+          // exactly: matrix below the threshold, the DUCT tree at or above.
+          // Round 61: the app's dispatch and the app's tree search (bank-search.ts).
+          // Round 65: rootReading runs the search, or the static alone under EVAL_CALIBRATION_STATIC=1.
+          const root = await rootReading(battle, {
+            serialized, faintedFraction, depth, samples: sampleCount, mode: process.env.EVAL_CALIBRATION_MODE,
+            settings: {
+              ...replaySettings,
+              keepPlayed: bankKeepPlayed(snapshots.map(snapshot => snapshot.log), turn, gameType === 'doubles', logRules(replay.log)),
+            },
+          });
+          const { score } = root;
+          if (Number.isNaN(score)) {
+            // A NaN would silently poison every aggregate — surface it loudly.
+            console.log(`NaN score: ${id} turn ${turn}`);
+            continue;
+          }
+          const rating = replay.rating ?? null;
+          const sample: Sample = {
+            id,
+            turn,
+            tranche: trancheOf.get(id) ?? 'unknown',
+            phase: phaseOf(turn, maxTurn),
+            gameType,
+            score,
+            gameValue: root.gameValue,
+            faintedFraction,
+            p1Won,
+            // Round 32 enabler for Q4: the root's decided-sweep side, so the
+            // clamp and flip positions of round 15 can be re-derived (their
+            // 17 ids are no longer on record anywhere).
+            decided: root.decided,
+            decidedHeld: root.decidedHeld,
+            lastPair: lastPairAt(battle),
+            rating,
+            quality: qualityOf(id, rating),
+            luckAgainstFavored: luckFlag(replay.log, turn, score),
+            forcedWinMass: root.forcedWinMass,
+            forcedWinTurns: root.forcedWinTurns,
+            ...(g ? { g } : {}),
+          };
+          samples.push(sample);
+          await exportPosition(process.env.EVAL_CALIBRATION_POSITIONS, sample, serialized, livingTotal(battle), replaySettings);
+        } catch (error) {
+          console.log(`${id} turn ${turn}: ${error instanceof Error ? error.message : error}`);
+        }
+      }
+      console.log(`${id}: sampled (winner: ${winnerName})`);
+    }
+
+    // Aggregate in (id, turn) order, compared in code units: the slice
+    // runner's merge (scripts/calibration-lib.mjs) sums in the same order,
+    // so a merged run and a single-process run print the same digits.
+    samples.sort((a, b) => (a.id !== b.id ? (a.id < b.id ? -1 : 1) : a.turn - b.turn));
+
+    // The aggregate lines live in test/regression/calibration-summary.ts (round
+    // 34), digit for digit the block that stood here through round 33 and
+    // the same characters scripts/calibration-lib.mjs summarize() prints.
+    for (const line of summaryLines(samples)) console.log(line);
+    // Per-position dump for offline paired analysis (engine-vs-engine joins,
+    // hybrid counterfactuals). Purely observational — never changes the run.
+    if (process.env.EVAL_CALIBRATION_DUMP) {
+      const { writeFileSync } = await import('node:fs');
+      writeFileSync(
+        process.env.EVAL_CALIBRATION_DUMP,
+        samples.map(sample => JSON.stringify(sample)).join('\n') + '\n',
+      );
+      console.log(`dumped ${samples.length} samples to ${process.env.EVAL_CALIBRATION_DUMP}`);
+    }
+    expect(samples.length).toBeGreaterThan(0);
+  });
+});
+
+describe.skipIf(process.env.CALIB_POS_PROBE !== '1')('single-pass position identity probe (time-performance phase 3)', () => {
+
+  /**
+   * Preregistered proof for the calibration harness's single-pass switch:
+   * for every replay and every sampled turn, the position that today's
+   * per-target reconstruction returns must equal — byte for byte, log
+   * lines aside — the raw boundary state of ONE full pass after clone +
+   * applyTargetCorrections. Log lines are excluded because the sim stamps
+   * wall-clock |t:| lines into them and no search ever reads the log; the
+   * whole mechanical state (sides, requests, RNG seed, inputLog) stays in
+   * the comparison. CALIB_POS_PROBE_TRANCHE narrows to one stratum.
+   */
+  test('raw-capture + clone-correct equals per-target reconstruction', { timeout: 3600000 }, async () => {
+    // Normal form = one exact round-trip before comparing: the searches
+    // only ever consume serialized strings through the deserializer, so
+    // "equal after a round-trip" is precisely the equivalence class the
+    // instrument cares about — and it irons out shape-only artifacts (a
+    // fresh deserialize adds a redundant formatid key the live battle's
+    // serialization omits). Log lines stay excluded (wall-clock |t:|).
+    const canon = (battle: Battle): string => {
+      const roundTripped = deserializeBattleExact(JSON.stringify(State.serializeBattle(battle)));
+      const state = State.serializeBattle(roundTripped) as Record<string, unknown>;
+      return JSON.stringify({ ...state, log: null });
+    };
+    const trancheFilter = process.env.CALIB_POS_PROBE_TRANCHE;
+    const ids = trancheFilter ? REPLAY_IDS.filter(id => TRANCHE_OF.get(id) === trancheFilter) : REPLAY_IDS;
+    type ReplayJson = { id: string; log: string; players: string[]; formatid?: string };
+    let replays = 0;
+    let comparedSamples = 0;
+    let mismatches = 0;
+    let unstable = 0;
+    let fallbackServed = 0;
+    const details: string[] = [];
+    for (const id of ids) {
+      const fetched = await fetchBankReplay<ReplayJson>(id);
+      if (!('replay' in fetched)) {
+        console.log(`skipping ${id}: HTTP ${fetched.status}`);
+        continue;
+      }
+      const replay = fetched.replay;
+      await loadReplayMods(replay);
+      const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
+      const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });
+      if (p1Team.length === 0 || p2Team.length === 0) {
+        console.log(`skipping ${id}: could not build teams`);
+        continue;
+      }
+      const maxTurn = snapshots.length;
+      const step = Math.max(1, Math.ceil(maxTurn / 8));
+      const sampleTurns: number[] = [];
+      for (let turn = 2; turn < maxTurn; turn += step) sampleTurns.push(turn);
+      if (sampleTurns.length === 0) continue;
+      const format = getBranchSimulatorFormat(replay);
+      const snapshotAt = (turn: number) => snapshots[Math.min(turn - 1, snapshots.length - 1)];
+      // Same bring trim as the calibration instrument (A.3c) — both paths.
+      const bringOnly = replayBringOnly(replay, snapshots) ?? undefined;
+
+      // Path A — the instrument before 28 Aug: one reconstruction per
+      // sampled turn, without the app parameters (the RAW family; the
+      // bank's default since round 46 is not what this probe compares).
+      const canonA = new Map<number, string>();
+      for (const turn of sampleTurns) {
+        const runtime = await reconstructBranchRuntime({
+          format, p1Team, p2Team, replayLog: replay.log, targetTurn: turn, snapshot: snapshotAt(turn), bringOnly,
+        });
+        const battle = runtime.battleStream.battle;
+        canonA.set(turn, !battle ? 'NONE' : battle.ended ? 'ENDED' : canon(battle));
+      }
+
+      // Path B — ONE pass; raw boundaries; clone + target corrections.
+      const rawAt = new Map<number, string>();
+      const pending = [...sampleTurns].sort((a, b) => a - b);
+      const targetTurn = pending[pending.length - 1];
+      await reconstructBranchRuntime({
+        format, p1Team, p2Team, replayLog: replay.log, targetTurn, snapshot: null, bringOnly,
+        // One pass carries the whole per-target family's work, so it gets
+        // the family's total deadline budget, not a single run's 60s.
+        deadlineMs: 60_000 * Math.max(1, sampleTurns.length),
+        onRawBoundary: (blockTurn, battle) => {
+          if (pending.length === 0 || blockTurn < pending[0]) return;
+          const serialized = JSON.stringify(State.serializeBattle(battle));
+          while (pending.length > 0 && pending[0] <= blockTurn) {
+            rawAt.set(pending[0], serialized);
+            pending.shift();
+          }
+        },
+      });
+      for (const turn of sampleTurns) {
+        comparedSamples += 1;
+        const raw = rawAt.get(turn);
+        let canonB: string | null = null;
+        if (raw) {
+          const clone = deserializeBattleExact(raw);
+          applyTargetCorrections(clone, snapshotAt(turn));
+          if (!clone.ended) canonB = canon(clone);
+        }
+        const a = canonA.get(turn) ?? 'NONE';
+        const aExists = a !== 'NONE' && a !== 'ENDED';
+        const bExists = canonB !== null;
+        // Both sides skip the sample (ended/none/past-the-end) — the
+        // instrument records nothing either way: equivalent.
+        if (!aExists && !bExists) continue;
+        if (aExists && bExists && a === canonB) continue;
+        // Discrepancy. Is the OLD instrument even stable here? A per-target
+        // run that hits its 60s deadline truncates at a timing-dependent
+        // block and then snapshot-corrects — such samples have no stable
+        // old value to reproduce. Rerun path A once: if it disagrees with
+        // itself (or flags the deadline), the sample is excluded as
+        // old-instrument-unstable; a REPRODUCIBLE old value that path B
+        // misses is a hard failure.
+        const rerun = await reconstructBranchRuntime({
+          format, p1Team, p2Team, replayLog: replay.log, targetTurn: turn, snapshot: snapshotAt(turn), bringOnly,
+        });
+        const rerunBattle = rerun.battleStream.battle;
+        const a2 = !rerunBattle ? 'NONE' : rerunBattle.ended ? 'ENDED' : canon(rerunBattle);
+        if (a2 !== a || rerun.timedOut) {
+          unstable += 1;
+          console.log(`${id} t${turn}: old-instrument unstable (timedOut=${rerun.timedOut}) — excluded`);
+          continue;
+        }
+        if (!bExists) {
+          // The single pass never handed this boundary out — the switched
+          // instrument serves it through the verbatim per-target fallback,
+          // so the sample stays exactly the old instrument's. Bounded, not
+          // a value risk.
+          fallbackServed += 1;
+          console.log(`${id} t${turn}: boundary missing from the pass — served by the per-target fallback`);
+          continue;
+        }
+        mismatches += 1;
+        if (details.length < 20) {
+          const b = canonB ?? (raw ? 'ENDED' : 'MISSING');
+          let at = 0;
+          while (at < Math.min(a.length, b.length) && a[at] === b[at]) at++;
+          details.push(`${id} t${turn}: first divergence at char ${at}: A …${a.slice(Math.max(0, at - 40), at + 80)}… B …${b.slice(Math.max(0, at - 40), at + 80)}…`);
+        }
+      }
+      replays += 1;
+      console.log(`${id}: ${sampleTurns.length} samples compared`);
+    }
+    console.log(`probe: ${replays} replays, ${comparedSamples} samples, ${mismatches} value mismatches, ${fallbackServed} fallback-served, ${unstable} old-instrument-unstable (excluded)`);
+    for (const line of details) console.log(line);
+    expect(mismatches).toBe(0);
+    // Both escape buckets must stay rounding errors, never loopholes.
+    expect(fallbackServed).toBeLessThanOrEqual(Math.ceil(comparedSamples / 100));
+    expect(unstable).toBeLessThanOrEqual(Math.ceil(comparedSamples / 100));
+  });
+});
+
+// Round 59: the speed layer's status and counters of this slice, next to its dump (the gate's proof the layer ran).
+afterAll(() => {
+  const dump = process.env.EVAL_CALIBRATION_DUMP;
+  if (!dump) return;
+  // Never onto the dump itself: a path without .jsonl gets the suffix appended.
+  const proof = dump.endsWith('.jsonl') ? `${dump.slice(0, -'.jsonl'.length)}.sim-fast.json` : `${dump}.sim-fast.json`;
+  writeFileSync(proof, JSON.stringify(takeSimFastReport()));
+});

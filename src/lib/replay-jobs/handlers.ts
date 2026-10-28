@@ -15,7 +15,7 @@ const PROGRESS_INTERVAL_MS = 100;
 /**
  * The worker side of the replay jobs. Pure functions of their message: the
  * same code the main thread ran, so a reconstruction here yields the same
- * positions byte for byte (pinned by regression/replay-jobs.spec.ts).
+ * positions byte for byte (pinned by test/regression/replay-jobs.spec.ts).
  */
 export async function handleReplayJob(message: ReplayJobRequest, post: ReplayPost): Promise<void> {
   try {

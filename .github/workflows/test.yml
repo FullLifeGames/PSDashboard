@@ -31,7 +31,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # The four Vitest projects: the root specs, each package's suite, and the app suite under ui/.
+      # The four Vitest projects: the root specs, each package's suite, and the app suite under test/ui/.
       - name: Run the Node suites
         run: npm run test:regression
 

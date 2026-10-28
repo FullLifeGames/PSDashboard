@@ -26,7 +26,7 @@ Wave 5 (round 73), T163 with T263 (round 74, measured, nothing adopted), T160 (r
 
 *Tool · mini round · mini · no score touch*
 
-**Problem.** Both packages are on npm, 0.7.0 and 0.7.1. The next release picks its packages by what has changed since the previous release tag. The local checkout does not know v0.7.1, because CI sets the tag on its own copy. A local dry run therefore compares against v0.7.0 and would publish a package that has not moved since 0.7.1. The barrel pins (`regression/fixtures/api/`), `pack:smoke` and a new chunk map belong to the check (the old script lived in the scratchpad and is gone). The exact simulator pin is done since round 70 (642b940, 5ae498f): every manifest pins @pkmn/sim and @pkmn/mods to one version, `npm run upgrade:pkmn` moves the release train and prints the checks a new simulator needs, and `regression/pkmn-pins.spec.ts` holds the pin, because the speed layer is bound to exactly this version and checks no hash in the browser. (Round 62 restated this; the old checkboxes in the source plan were background, and the round's spec rewrites the steps.)
+**Problem.** Both packages are on npm, 0.7.0 and 0.7.1. The next release picks its packages by what has changed since the previous release tag. The local checkout does not know v0.7.1, because CI sets the tag on its own copy. A local dry run therefore compares against v0.7.0 and would publish a package that has not moved since 0.7.1. The barrel pins (`test/regression/fixtures/api/`), `pack:smoke` and a new chunk map belong to the check (the old script lived in the scratchpad and is gone). The exact simulator pin is done since round 70 (642b940, 5ae498f): every manifest pins @pkmn/sim and @pkmn/mods to one version, `npm run upgrade:pkmn` moves the release train and prints the checks a new simulator needs, and `test/regression/pkmn-pins.spec.ts` holds the pin, because the speed layer is bound to exactly this version and checks no hash in the browser. (Round 62 restated this; the old checkboxes in the source plan were background, and the round's spec rewrites the steps.)
 
 **Idea.** Before every release, fetch the tags first, then read the plan of the dry run. The plan must name the same previous tag that CI sees, otherwise you measure against an old state.
 
@@ -61,7 +61,7 @@ Wave 5 (round 73), T163 with T263 (round 74, measured, nothing adopted), T160 (r
 - scripts/publish-packages.mjs:103-121, buildPlan joins registry state and tag diff into the selection
 - .github/workflows/release.yml:112-117, the publish job checks out with fetch-depth 0 so the previous tag is right
 - README.md:97, describes the dry run as a local plan print
-- regression/package-api.spec.ts:98-118, pins the barrel surface of both packages
+- test/regression/package-api.spec.ts:98-118, pins the barrel surface of both packages
 - package.json, root version 0.7.1 with the tag v0.7.1 missing locally
 
 **Steps.**
@@ -72,7 +72,7 @@ Wave 5 (round 73), T163 with T263 (round 74, measured, nothing adopted), T160 (r
 - [ ] **4.** Decide whether previousReleaseTag reports a missing remote tag itself and aborts, instead of silently diffing against an older tag.
   - Files: `scripts/publish-packages.mjs`
 - [ ] **5.** Run pack:smoke and check the fixture diff of the barrel pins before a barrel change goes into a release.
-  - Files: `scripts/pack-smoke.mjs`, `regression/package-api.spec.ts`, `regression/fixtures/api/`
+  - Files: `scripts/pack-smoke.mjs`, `test/regression/package-api.spec.ts`, `test/regression/fixtures/api/`
 - [ ] **6.** Record the production chunk map again as a probe and file it under docs/perf/probes/; the old script lived in the session scratchpad and is gone.
 - [ ] **7.** Run lint, tsc -b and the regression, and record the plan of the dry run in the release note.
 
@@ -148,7 +148,7 @@ The triage of 21.10.2026 parked these TODOs; each section names its trigger, and
 
 **Success.** Regret of 653785 t19 stable across search budgets, pin re-read; tree time within the timing window.
 
-**Evidence.** `r69/lanes/B/diagnosis-pins.md` (pin 2, regret 0.034 to 0.259 per search budget, base 0.010 to 0.046, Hex checked 0.109), `r69/lanes/B/pins/tree-...-keephex.json`, `search/verify-select.ts:101-118` (supportMass), `e2e-feedback/corpus.ts:177-179`, the NextSteps watch item in section C (pin 653785 turn 19), `r69/review/todos-check-2.md` (T219).
+**Evidence.** `r69/lanes/B/diagnosis-pins.md` (pin 2, regret 0.034 to 0.259 per search budget, base 0.010 to 0.046, Hex checked 0.109), `r69/lanes/B/pins/tree-...-keephex.json`, `search/verify-select.ts:101-118` (supportMass), `test/e2e-feedback/corpus.ts:177-179`, the NextSteps watch item in section C (pin 653785 turn 19), `r69/review/todos-check-2.md` (T219).
 
 **Steps.**
 - [ ] Red test: the regret of 653785 t19 across search budgets of 500, 600 and 700 iterations; today 0.034, 0.142, 0.244 (singles).
@@ -259,13 +259,13 @@ The triage of 21.10.2026 parked these TODOs; each section names its trigger, and
 
 **Parked (triage 21.10.2026).** Trigger: a re-fit errs at the static form.
 
-**Problem.** Since T102 the statics in standard singles compute with the phase form (EVAL_STATIC_FORM, on by default). A new capture stores the grade with the form, the fit rebuilds it from the table; the identity check holds only if you name the form columns and the weights of the capture by hand (`regression/fit-families.ts`, B ledger line 122). The capture should write form and weights itself.
+**Problem.** Since T102 the statics in standard singles compute with the phase form (EVAL_STATIC_FORM, on by default). A new capture stores the grade with the form, the fit rebuilds it from the table; the identity check holds only if you name the form columns and the weights of the capture by hand (`test/regression/fit-families.ts`, B ledger line 122). The capture should write form and weights itself.
 
 **Benefit.** Measurement: a re-fit starts without manual work and without false alarms.
 
 **Success.** Capture plus fit without extra variables, identity 0.
 
-**Evidence.** `score/phase-form.ts:34-35`, `:52-55` (staticFormOn), `eval-function.ts:46`, `regression/fit-families.ts:234-235`, `:244-252` (identity check), `regression/eval-calibration.spec.ts:5531`, `:5819-5823` (leafValue as capture grade), `regression/eval-fit.spec.ts:175-176`, `:246-250` (EVAL_FIT_FORMS, EVAL_FIT_CAPTURED), `r69/lanes/B/ledger.md:122`, `r69/review/lens-BD.md` (finding 4).
+**Evidence.** `score/phase-form.ts:34-35`, `:52-55` (staticFormOn), `eval-function.ts:46`, `test/regression/fit-families.ts:234-235`, `:244-252` (identity check), `test/regression/eval-calibration.spec.ts:5531`, `:5819-5823` (leafValue as capture grade), `test/regression/eval-fit.spec.ts:175-176`, `:246-250` (EVAL_FIT_FORMS, EVAL_FIT_CAPTURED), `r69/lanes/B/ledger.md:122`, `r69/review/lens-BD.md` (finding 4).
 
 **Steps.**
 - [ ] Red test: a new capture of the standard singles statics, then `familyReports`; today the identity check throws `identity: N of M captured scores differ`.
@@ -503,7 +503,7 @@ The triage of 21.10.2026 parked these TODOs; each section names its trigger, and
 
 **Parked (triage 21.10.2026).** Trigger: after the release, bug-report rounds wait on local feedback runs.
 
-**Problem.** Since round 71 the bank and the holdouts run in GitHub Actions; the feedback corpus (`e2e-feedback/`, 12 replays with the expert pins) still runs on this machine: `npm run test:feedback` starts a Vite dev server on port 5176 and Chromium, one run took 393 s in round 70, and a lossless change needs three byte-identical runs. Its anchor is the browser build: a Chromium change shifts the last floating-point place (watch list), so a CI run has to reproduce the local dumps byte for byte before it replaces them.
+**Problem.** Since round 71 the bank and the holdouts run in GitHub Actions; the feedback corpus (`test/e2e-feedback/`, 12 replays with the expert pins) still runs on this machine: `npm run test:feedback` starts a Vite dev server on port 5176 and Chromium, one run took 393 s in round 70, and a lossless change needs three byte-identical runs. Its anchor is the browser build: a Chromium change shifts the last floating-point place (watch list), so a CI run has to reproduce the local dumps byte for byte before it replaces them.
 
 **Benefit.** Measurement: the feedback runs of a gate run side by side in CI, and the machine stays free.
 
@@ -636,7 +636,7 @@ The triage of 21.10.2026 parked these TODOs; each section names its trigger, and
 - [ ] **2.** Robustness: make `check()` exception-safe (a throw in the probe battle yields `hash-mismatch` in the default mode, forced it throws); check the keys of the constructors per team; take empty keys and data below the top classes into the dynamic census over Gen 1 to 9.
   - Files: `packages/eval-engine/src/forward/sim-fast/guard.ts`, `clone.ts`, `clone-plan.ts`, `packages/eval-engine/test/sim-fast-guard.spec.ts`
 - [ ] **3.** Test pins: default `['rules', 'clone', 'dispatch']`, caching of the templates, doubles matrix with frozen templates, snapshot mid-turn through `adoptTemplate`, build smoke with every answer (report exactly at the last), stamp of `runTree`; the app kill switch after decision (1). Every new test shown red without its fix.
-  - Files: `packages/eval-engine/test/sim-fast-state.spec.ts`, `sim-fast-fork.spec.ts`, `e2e-build/build-smoke.spec.ts`, `src/lib/eval/sim-fast-setting.ts`, `regression/eval-sim-fast-setting.spec.ts`
+  - Files: `packages/eval-engine/test/sim-fast-state.spec.ts`, `sim-fast-fork.spec.ts`, `test/e2e-build/build-smoke.spec.ts`, `src/lib/eval/sim-fast-setting.ts`, `test/regression/eval-sim-fast-setting.spec.ts`
 - [ ] **4.** Gate D4, plus the identity chain of round 59 (`docs/perf/probes/2026-09-24-r59/gate/`) with 0 deviations and the engine suite in the default, forced on and with `EVAL_SIM_FAST=0`.
 
 ### T170 · Rest of T108 step 2: five fact handlers
@@ -679,14 +679,14 @@ The triage of 21.10.2026 parked these TODOs; each section names its trigger, and
 
 ## Corpus gaps
 
-Every gap has its TODO. The pins themselves are in `e2e-feedback/corpus.ts`; re-pins only at the user gate.
+Every gap has its TODO. The pins themselves are in `test/e2e-feedback/corpus.ts`; re-pins only at the user gate.
 
 | Gap | State 19.09. | Handled in |
 | --- | --- | --- |
 | 573756 t73 (since round 32) | Chance and key moment have been pinned since round 40 (dbffb5f). State 17.10. (round 70): the miss is a key moment again and books as chance (+0.286), but the sentence "one 95% roll from clearing the rest" no longer renders (observed re-pinned without it, gate 17.10., "4a"); Body Press reads no tier (regret 0.0995 against Defog; Monte Carlo 0.085 and 0.095). | Round 73: the key moment lost to two game-correct changes (T225a lifts t70, the healer rule of T248 lowers t73's chance share 0.286 to 0.267; `r73/lanes/D/diagnosis.md`); round 76: T264 adds a dice turn against the winner to the list, and the gap reads open again |
 | 649664 t23 | observed has been on shift since round 70 (gate 17.10., "4a"): a turn reads chance only where the chance part outweighs the decision part (7ecaac4), here 0.354 against 1.304; from round 42 to round 69 it was on chance. The bar reads 0.79 instead of 0.92, because the proof leaves the next 80% Hydro Pump open, no crit (round 62). Since round 63 the card for turn 24 names the open 80% Hydro Pump (T19) and says in turn 23 that the verdict hangs on Keldeo's item (Choice Scarf: fine, Mystic Water: blunder). Since round 64 (T121 point 1) Keldeo's guessed Choice item gets the damage check that refutes it; the gap stayed open in the wave run, nobody has read it yet. | Re-pin question at the gate |
 | Draft game t48, 573756 t70 | Chance booking without dice: the read payoff fizzles (t48), the setup payoff comes one evaluation too late (t70, reads quiet today with −0.145). | T189 |
-| GPL DzBQ5azlO5l t13 | State 17.10. (round 70): the rebuild plays turn 13 under the log's seed (0ec3352), so Air Slash no longer flinches there, and the trend probe reads each base draw against its own leaf (8d5642b); with Stone Edge set by the editor it ranks first or second, where round 69's matrix path had it third (`docs/perf/probes/2026-10-13-gpl-flinch/findings.md`). Before: Heavy Slam reads without an error band. Stone Edge is missing from the set (gen9ou 0.35%, a limit of the reconstruction); with Stone Edge added by hand, the cell Air Slash against Stone Edge has read −0.336 against the MC reference −0.328 ± 0.033 since round 64 (T119); Stone Edge stands first for p2, Heavy Slam has a regret of about 0.007, there is no grade. The gap thus hangs on the missing Stone Edge in the set (limit of the reconstruction), not on the verification. t15 reads right in Auto (Vileplume regret 0 to 0.018 in three seed sets, round 62) and is done. Fixture `e2e/fixtures/gpl-replay-DzBQ5azlO5l.html`. | Gate question (reconstruction) |
+| GPL DzBQ5azlO5l t13 | State 17.10. (round 70): the rebuild plays turn 13 under the log's seed (0ec3352), so Air Slash no longer flinches there, and the trend probe reads each base draw against its own leaf (8d5642b); with Stone Edge set by the editor it ranks first or second, where round 69's matrix path had it third (`docs/perf/probes/2026-10-13-gpl-flinch/findings.md`). Before: Heavy Slam reads without an error band. Stone Edge is missing from the set (gen9ou 0.35%, a limit of the reconstruction); with Stone Edge added by hand, the cell Air Slash against Stone Edge has read −0.336 against the MC reference −0.328 ± 0.033 since round 64 (T119); Stone Edge stands first for p2, Heavy Slam has a regret of about 0.007, there is no grade. The gap thus hangs on the missing Stone Edge in the set (limit of the reconstruction), not on the verification. t15 reads right in Auto (Vileplume regret 0 to 0.018 in three seed sets, round 62) and is done. Fixture `test/e2e/fixtures/gpl-replay-DzBQ5azlO5l.html`. | Gate question (reconstruction) |
 | smogtours-gen9ou-750267 Weavile | Stands with Jolly 0/0/0/0/0/252 at 41 damage observations and 11 move orders: the fulfilled order holds the speed, the budget pays for it out of the attack. Bank build and app build equal. | T26 |
 | smogtours-gen9ou-751207 t6, VGC 2629703929 t10 | Tera in the statics: Ceruledge (Tera Fighting) counted as immune to Body Press; Koraidon (Tera Fire) read −0.645 instead of −0.396. The carrier T57 has been done since round 54, T81 (statics ask the simulator, STAB by the game rules) since round 63; nobody has re-read the scenes. | T127 |
 
@@ -740,7 +740,7 @@ Each bullet reads "signal → when to act".
 - [ ] Partner targets everywhere (T113 stage 2, decision 12 of round 67): since round 67 the root knows the played choice with partner target; partner targets at every node enlarge the raw combination count by a factor of 1.55 → act when a doubles verdict hangs on an unled partner move away from the root and the tree time has room.
 - [ ] Blockers behind a `|cant|` (check of T175, 12.10.): the rebuild's substitute move follows Taunt's rule (same category and priority, `branch/protocol-choices.ts:257-264`). Imprison (a move that the opponent knows), Heal Block (heal flag) and Gravity (gravity flag) block by other properties, Throat Chop names no move (`moves.js:19758`); Disable hits only the last move, which is already in the set. No wrong substitute in the corpus (16 Taunt rows, one Heal Block row) → act when T175 fails to bring a move into the set or a substitute under another blocker carries a verdict.
 - [ ] An unknown format takes over only Sleep Clause (round 67, lane E): `getBranchSimulatorFormat` makes a Custom Game with Sleep Clause out of it (`replay-format.ts:259-273`, `:130-141`); a draft league with Terastal Clause loses the lock in the branch picker (`picker-tera.ts:18`) and in the branch battle, while the search already turns Tera off in "auto" if the log shows none (`tera.ts:72`) → act as soon as a replay with a declared Terastal Clause appears.
-- [ ] 2630685175 turn 1: worker pool and local execution have differed by 0.0002 since T129 (−0.43798 against −0.43780, same tier, cause open). The bank computes locally (`regression/bank-search.ts:37`), the app in the pool. Round 72 (T257) fixed a memo key that let the order of a worker's jobs change this turn → read the difference again, and act when a pin, a tier or a bank row hangs on a pool-against-local difference.
+- [ ] 2630685175 turn 1: worker pool and local execution have differed by 0.0002 since T129 (−0.43798 against −0.43780, same tier, cause open). The bank computes locally (`test/regression/bank-search.ts:37`), the app in the pool. Round 72 (T257) fixed a memo key that let the order of a worker's jobs change this turn → read the difference again, and act when a pin, a tier or a bank row hangs on a pool-against-local difference.
 - [ ] Monte Carlo references hang on the statics (round 69): the oracle values its leaves with the same statics as the engine; after the weights of lane B, four scene pins seemed off, freshly computed the engine hit all four. The doubles census (reference b67) has not been comparable since (cw: other job sets on 23 of 23 moves) → before the next census and after every weight change, recompute the references with MC_N > 0.
 - [ ] Own K per phase sticks to the upper limit 50 in small cells (round 69: hq doubles late, 45 rows, warning +156 in the bank alone, without weight in the verdict from bank plus holdouts; likewise in a6 and e4) → act when such a cell carries a verdict; lever: limit the K fit of small cells or pool it with the neighbouring phase.
 
@@ -750,7 +750,7 @@ Each bullet reads "signal → when to act".
 **Environment**
 
 - [ ] e2e "branch replay play controls stay muted without audio errors" saw two page errors from the replay iframe in round 50 (`$ is not defined`, then `reading 'length'`): 1 of 2 full runs red, alone 10 of 12 green on the branch and 6 of 6 on the base. A Showdown script runs before jQuery is loaded (same family as the config routes fix e019a73) → act if the test tips a gate a second time; lever: load order of the dynamic scripts in the embed, or the test waits for `window.$` in the iframe before it counts errors.
-- [ ] e2e "a long forward slider jump lands the scene instead of hanging on "seeking..."" (`e2e/timeline.spec.ts:49`) waited 30 s in vain for `Replays.battle` in the replay iframe in wave run 3 of round 63 (1 of 75 tests in a full run; alone 4 of 4 green, green in wave runs 1 and 2) → act if the test tips a gate a second time; probably the same family as the load order in the embed. Round 72: it failed on a cold Vite dependency cache, on v1 as on the merge, and passed warm; every checkout shares one Vite cache through the `node_modules` junction, so the first run after a checkout switch re-optimizes the dependencies. A warm-up run before a counted e2e run avoids it.
+- [ ] e2e "a long forward slider jump lands the scene instead of hanging on "seeking..."" (`test/e2e/timeline.spec.ts:49`) waited 30 s in vain for `Replays.battle` in the replay iframe in wave run 3 of round 63 (1 of 75 tests in a full run; alone 4 of 4 green, green in wave runs 1 and 2) → act if the test tips a gate a second time; probably the same family as the load order in the embed. Round 72: it failed on a cold Vite dependency cache, on v1 as on the merge, and passed warm; every checkout shares one Vite cache through the `node_modules` junction, so the first run after a checkout switch re-optimizes the dependencies. A warm-up run before a counted e2e run avoids it.
 - [ ] The browser build is part of the feedback anchor: a Chromium change shifts the last floating-point place (573756 t81 verify selection) → every Playwright upgrade is a re-anchoring with `FEEDBACK_DUMP=1`; state `@playwright/test ^1.62.1`.
 - [ ] TypeScript stays on 6.x until typescript-eslint parses the native compiler; `@types/node` follows the CI Node major (24) → watch the peer range.
 - [ ] `ubuntu-latest` moves to Ubuntu 26 from 19.10.2026 (an annotation on the bank runs of round 71). The identity runs of round 71 ran on the ubuntu-24.04 image, where CI rows matched local Windows rows → once the runs report Ubuntu 26, run the identity pair again (two CI runs and a local run of one commit, `docs/perf/probes/2026-10-19-r71/compare.mjs`) before a verdict pairs a new CI run with an older base. Round 72: on 20.10. the jobs of one run got Node 24.21.0 and 24.22.0 and their fingerprints differed, so `bank.yml` pins 24.21.0 (0be7274); r72-base (19.10.) and r72-m6 (20.10.) agree on every row the code did not change (Doubles OU byte-identical), and the identity pair against a local run still waits for its trigger.

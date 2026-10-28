@@ -23,9 +23,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 export const TIERS = ['inaccuracy', 'mistake', 'blunder'];
 const DUMP_PREFIX = 'feedback-full-';
-const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), '..', 'e2e-feedback', 'fixtures');
+const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), '..', 'test', 'e2e-feedback', 'fixtures');
 
-/** getReplayGameType of @fulllifegames/replay-core, to the letter (regression/tier-census.spec.ts holds the two equal). */
+/** getReplayGameType of @fulllifegames/replay-core, to the letter (test/regression/tier-census.spec.ts holds the two equal). */
 export function gameTypeOfLog(log) {
   const raw = log?.match(/^\|gametype\|([^|\n]+)/m)?.[1];
   return raw ? raw.toLowerCase().replace(/[^a-z0-9]+/g, '') : null;

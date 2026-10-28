@@ -104,7 +104,7 @@ type StateHandle = { capture: () => Promise<SupportState>; restore: (state: unkn
 /**
  * Round 77 (user gate 28.10.2026, "1a 2a 3a 4a 5a"): the support side of the app. "Report issue" opens the
  * filled issue form and downloads the state file; `window.__psState` captures and restores a state for the
- * reproduction script (e2e/repro-state.spec.ts).
+ * reproduction script (test/e2e/repro-state.spec.ts).
  */
 export function useSupport(app: SupportApp) {
   const latest = useRef(app);

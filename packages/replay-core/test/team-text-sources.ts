@@ -8,10 +8,10 @@ import { ExhaustiveRunner } from '@pkmn/sim/tools';
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const FIXTURE_DIRS = [
   'packages/replay-core/test/fixtures',
-  'regression/fixtures',
+  'test/regression/fixtures',
   'packages/eval-engine/test/fixtures',
   'packages/eval-engine/test/fixtures/champions',
-  'e2e/fixtures',
+  'test/e2e/fixtures',
 ];
 
 const decodeEntities = (text: string) => text

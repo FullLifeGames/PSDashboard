@@ -246,7 +246,7 @@ export function teraUsedSides(snapshots: readonly TurnSnapshot[]): { p1: boolean
 /**
  * A body transformed into one of these keeps no Tera (sim pokemon.js
  * transformInto names them; the Dex carries no flag). The snapshot has no
- * battle to ask, so regression/picker-state.spec.ts holds this mirror
+ * battle to ask, so test/regression/picker-state.spec.ts holds this mirror
  * against a live battle.
  */
 const NO_TERA_TRANSFORMED_INTO: ReadonlySet<string> = new Set(['Ogerpon', 'Terapagos']);

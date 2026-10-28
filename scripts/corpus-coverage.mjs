@@ -21,10 +21,10 @@ export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 export const FIXTURE_FOLDERS = [
   'packages/replay-core/test/fixtures',
   'packages/eval-engine/test/fixtures',
-  'regression/fixtures',
-  'e2e/fixtures',
-  'e2e-feedback/fixtures',
-  'e2e-feedback/golden',
+  'test/regression/fixtures',
+  'test/e2e/fixtures',
+  'test/e2e-feedback/fixtures',
+  'test/e2e-feedback/golden',
 ];
 
 const GENERATIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9];

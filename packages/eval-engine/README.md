@@ -88,7 +88,7 @@ for (const [side, name] of [['p1', p1Name], ['p2', p2Name]]) {
 }
 ```
 
-The repository's fixture replay (`e2e/fixtures/replay.json`) at turn 2 prints:
+The repository's fixture replay (`test/e2e/fixtures/replay.json`) at turn 2 prints:
 
 ```
 Turn 2: TestPlayer1 wins 62% of the time
@@ -115,7 +115,7 @@ The fixture is a synthetic four-turn game, so its unrevealed move slots fall bac
 - Pokémon Champions: battles in Champions formats run on the Champions mod of `@pkmn/mods`, which loads on demand the first time a Champions position is built, and the search scores them with Champions' own weight tables.
 - Speed layer: under Node the engine runs the simulator through a faster battle copy and event dispatch by default. Set `EVAL_SIM_FAST=0` to switch the layer off, or `EVAL_SIM_FAST=rules,clone,dispatch` (any subset) to pick levers. A browser host leaves it off until it configures it.
 
-The barrel is the API: it lists what the app, its worker, and the examples use, plus every type those signatures mention. `regression/fixtures/api/eval-engine.txt` in the repository pins that list, so widening the surface is a one-line edit to `src/index.ts` plus a snapshot refresh.
+The barrel is the API: it lists what the app, its worker, and the examples use, plus every type those signatures mention. `test/regression/fixtures/api/eval-engine.txt` in the repository pins that list, so widening the surface is a one-line edit to `src/index.ts` plus a snapshot refresh.
 
 ## Tests
 

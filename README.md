@@ -56,8 +56,8 @@ The app posts `ps-embed-ready` once it accepts replays and answers every `ps-loa
 - `src/`: the React app (Vite, TypeScript): components, controller hooks, `lib/`, and the worker that runs searches and replay jobs off the main thread.
 - [packages/replay-core](./packages/replay-core/): `@fulllifegames/replay-core`, replay logs to snapshots, revealed teams, simulator sets, and fitted spreads. No network, no DOM.
 - [packages/eval-engine](./packages/eval-engine/): `@fulllifegames/eval-engine`, position reconstruction, search, grading, and the game report.
-- `regression/`: Vitest specs for the app code and the measurement harnesses; `ui/`: component and hook specs under jsdom.
-- `e2e/`: Playwright browser flows, one file per theme; `e2e-build/`: a smoke test of the minified bundle; `e2e-feedback/`: the expert-feedback drift suite.
+- `test/regression/`: Vitest specs for the app code and the measurement harnesses; `test/ui/`: component and hook specs under jsdom.
+- `test/e2e/`: Playwright browser flows, one file per theme; `test/e2e-build/`: a smoke test of the minified bundle; `test/e2e-feedback/`: the expert-feedback drift suite.
 - `scripts/`: release, pack, lint-ratchet, and calibration tooling; `examples/`: the embed host page; `public/`: static assets.
 - [NextSteps.md](./NextSteps.md) lists the open work, [docs/backlog.md](./docs/backlog.md) the detail behind each item, and [docs/completed/](./docs/completed/) the finished rounds. [AGENTS.md](./AGENTS.md) holds the working rules for agents and contributors.
 
@@ -92,8 +92,8 @@ CI ([test.yml](./.github/workflows/test.yml)) runs three jobs: the Node suites, 
 - New files stay under the lint ceilings of 300 lines per file, 60 per function, and complexity 15. Older files sit on shrink-only pins in `eslint.ratchet.mjs`; `node scripts/update-lint-ratchet.mjs` re-measures them and refuses to raise a pin.
 - `eslint.zones.mjs` makes the layering a lint error: a package never reaches `src/`, replay-core never imports the engine, the app imports the packages by name (dynamic imports go through `src/lib/lazy/`), and nothing under `src/lib` imports the UI.
 - Keep the knip report empty; internal helpers stay unexported.
-- Package barrels (`packages/*/src/index.ts`) are the public API. After widening one, run `UPDATE_API_SNAPSHOT=1 npm run test:regression -- regression/package-api.spec.ts`.
-- A package behavior gets its spec under `packages/<name>/test/`. A spec that needs app code goes under `regression/`, a component or hook spec under `ui/`, and a browser flow into the matching theme file under `e2e/`.
+- Package barrels (`packages/*/src/index.ts`) are the public API. After widening one, run `UPDATE_API_SNAPSHOT=1 npm run test:regression -- test/regression/package-api.spec.ts`.
+- A package behavior gets its spec under `packages/<name>/test/`. A spec that needs app code goes under `test/regression/`, a component or hook spec under `test/ui/`, and a browser flow into the matching theme file under `test/e2e/`.
 
 ## Releases and hosting
 

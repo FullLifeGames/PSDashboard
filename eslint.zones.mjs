@@ -35,12 +35,12 @@ export const importZones = [
   // (feature weights, leaf values, sweep setters) and stay white-box, and the
   // speed-layer setting spec reads each lever of the worker's switch (simFastOn).
   {
-    ...zone(['regression/**/*.ts'], '^(\\.\\./)+packages/',
+    ...zone(['test/regression/**/*.ts'], '^(\\.\\./)+packages/',
       'Root specs import the packages by name (@fulllifegames/replay-core, @fulllifegames/eval-engine); only the measurement chains read package internals.'),
-    ignores: ['regression/eval-calibration.spec.ts', 'regression/eval-fit.spec.ts', 'regression/endgame-truth.spec.ts',
-      'regression/eval-sim-fast-setting.spec.ts'],
+    ignores: ['test/regression/eval-calibration.spec.ts', 'test/regression/eval-fit.spec.ts', 'test/regression/endgame-truth.spec.ts',
+      'test/regression/eval-sim-fast-setting.spec.ts'],
   },
-  zone(['ui/**/*.{ts,tsx}'], '^(\\.\\./)+packages/',
+  zone(['test/ui/**/*.{ts,tsx}'], '^(\\.\\./)+packages/',
     'The app suite imports components, hooks, and src/lib directly and the packages by name, never their files.'),
   zone(['src/lib/**/*.{ts,tsx}'], UI_LAYER,
     'Library code must not import the UI layer (hooks, components, App, workers).'),

@@ -2,7 +2,7 @@
 // rated first, without touching the tranches scripts/build-fit-corpus.mjs scrapes. The search endpoint
 // returns 51 replays a page, newest first; this pages back with `before`, keeps the highest-rated games
 // at or above --min-rating, downloads each into .fit-corpus/ and keeps it only when the log has a winner
-// and at least --min-turns turns. New entries append to regression/fixtures/fit-corpus-manifest.json
+// and at least --min-turns turns. New entries append to test/regression/fixtures/fit-corpus-manifest.json
 // (append-only, like the builder's --expand): existing entries stay pinned.
 //
 // Round 66: --sort rating pages the search by rating instead (`sort=rating&page=N`), so a format that
@@ -10,16 +10,16 @@
 // played after. Replays of the calibration bank and the feedback corpus never enter (the corpus and the
 // bank share no replay), and every new entry carries its rating. On a Bo3 ladder only the deciding game of a set
 // carries the rating (games 1 and 2 read 0), so --sort rating there finds the deciding games only, and the fit's
-// rule against unrated ladder games (regression/fit-families.ts) would drop the rest of the set.
+// rule against unrated ladder games (test/regression/fit-families.ts) would drop the rest of the set.
 //
 // Run: node scripts/expand-fit-corpus.mjs --format gen9championsou --pages 80 --games 450 --min-rating 1300
 //      node scripts/expand-fit-corpus.mjs --format gen9vgc2026regi --sort rating --pages 10 --games 150 --min-turns 6
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const MANIFEST_PATH = 'regression/fixtures/fit-corpus-manifest.json';
+const MANIFEST_PATH = 'test/regression/fixtures/fit-corpus-manifest.json';
 /** Files whose quoted replay ids stay out of the corpus: the bank's tranches and the feedback corpus. */
-const EXCLUDED_FROM = ['regression/eval-calibration.spec.ts', 'e2e-feedback/corpus.ts'];
+const EXCLUDED_FROM = ['test/regression/eval-calibration.spec.ts', 'test/e2e-feedback/corpus.ts'];
 const CACHE_DIR = '.fit-corpus';
 const DELAY_MS = 300;
 

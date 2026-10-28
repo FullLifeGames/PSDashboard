@@ -12,7 +12,7 @@ import { defineConfig } from '@playwright/test';
  * refuses a port somebody else holds.
  */
 export default defineConfig({
-  testDir: './e2e-feedback',
+  testDir: './test/e2e-feedback',
   timeout: 2_400_000,
   retries: 0,
   workers: 1,

@@ -14,10 +14,10 @@ import { generationsFor, getReplayBringCount, getReplayGameType, getReplayGenera
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const FIXTURE_DIRS = [
   'packages/replay-core/test/fixtures',
-  'regression/fixtures',
+  'test/regression/fixtures',
   'packages/eval-engine/test/fixtures',
   'packages/eval-engine/test/fixtures/champions',
-  'e2e/fixtures',
+  'test/e2e/fixtures',
 ];
 
 interface Fixture { tag: string; source: { id?: string; format?: string; formatid?: string; log: string } }
@@ -125,7 +125,7 @@ describe('the same facts from a Windows log and from odd lines', () => {
     expect(getReplayGeneration({ format: '[Gen 5] OU', log: '|start' })).toBe(5);
   });
 
-  test('odd |gametype| lines (the cases of regression/tier-census.spec.ts)', () => {
+  test('odd |gametype| lines (the cases of test/regression/tier-census.spec.ts)', () => {
     expect(getReplayGameType(undefined)).toBeNull();
     expect(getReplayGameType('')).toBeNull();
     expect(getReplayGameType('|gametype|Doubles')).toBe('doubles');

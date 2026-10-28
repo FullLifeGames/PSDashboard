@@ -4,7 +4,7 @@
 //                                    [--env KEY=VALUE ...] [--tranche NAME]
 //                                    [--reuse] [--dry-run]
 //
-// Each slice is one Playwright process over regression/eval-calibration.spec.ts
+// Each slice is one Playwright process over test/regression/eval-calibration.spec.ts
 // with EVAL_CALIBRATION=1, EVAL_CALIBRATION_SLICE=i/N, and its own dump
 // (<out>/slice-i.jsonl; console in <out>/slice-i.log). The measurement line
 // is EVAL_CALIBRATION_MODE=auto EVAL_CALIBRATION_SMOGON=1; --env overrides or
@@ -19,7 +19,7 @@
 // Base reuse (round 70). run.json also keeps the run's fingerprint, its
 // fraction (quick tier, below), the sha256 of merged.jsonl, the count of
 // replays lost to HTTP errors and a `complete` flag. The fingerprint covers the
-// git tree ids of the tracked inputs at HEAD (packages, src, regression,
+// git tree ids of the tracked inputs at HEAD (packages, src, test/regression,
 // scripts, package-lock.json and the config files), a content hash of
 // .smogon-cache and .fit-corpus, the lever env (the run's own and the ambient
 // EVAL_* variables) and the Node version; scripts/calibration-fingerprint.mjs
@@ -35,7 +35,7 @@
 // exists and 3 when a run would start; without --reuse it exits 0.
 //
 // Quick tier (round 70). --env EVAL_CALIBRATION_FRACTION=0.25 keeps a quarter
-// of the universe (regression/bank-universe.ts: the same replays every time,
+// of the universe (test/regression/bank-universe.ts: the same replays every time,
 // each tranche and family in proportion). run.json records the fraction, the
 // fingerprint covers it, and scripts/paired-calibration.mjs pairs a quick run
 // against a full base on the rows both hold.
@@ -61,7 +61,7 @@ import { checkJobs, jobRecord, mergedRunRecord, parseSliceRange, sliceIndices } 
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const DEFAULT_ENV = { EVAL_CALIBRATION_MODE: 'auto', EVAL_CALIBRATION_SMOGON: '1' };
-const SPEC = 'regression/eval-calibration.spec.ts';
+const SPEC = 'test/regression/eval-calibration.spec.ts';
 const CALIBRATION_DIR = '.calibration';
 
 function usage() {

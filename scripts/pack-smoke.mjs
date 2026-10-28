@@ -79,7 +79,7 @@ try {
   if (manifest.dependencies['@fulllifegames/replay-core'] === '*') throw new Error('the tarball still carries the workspace "*" reference');
   console.log(`[${elapsed()}] installed ${manifest.name}@${manifest.version} (replay-core ${manifest.dependencies['@fulllifegames/replay-core']})`);
 
-  const fixture = resolve(root, 'e2e/fixtures/replay.json');
+  const fixture = resolve(root, 'test/e2e/fixtures/replay.json');
   for (const example of EXAMPLES) {
     copyFileSync(resolve(root, 'packages', example.pkg, 'examples', example.file), join(consumer, example.file));
     const output = run('node', [example.file, fixture, ...example.args], { cwd: consumer });

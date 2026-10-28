@@ -4,7 +4,7 @@
  * readers behind the door see LF only and keep no '\r' handling of their own. An LF text comes back as the same string.
  *
  * This is a copy of packages/replay-core/src/line-endings.ts: that helper is no part of replay-core's barrel (the package API is
- * pinned by regression/fixtures/api/), and this package reaches replay-core by its barrel only.
+ * pinned by test/regression/fixtures/api/), and this package reaches replay-core by its barrel only.
  */
 export function normalizeLineEndings(text: string): string {
   return text.includes('\r') ? text.replace(/\r\n?/g, '\n') : text;

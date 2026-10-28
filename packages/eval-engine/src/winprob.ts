@@ -1,7 +1,7 @@
 /**
  * Score → win-probability mapping fitted to real replay outcomes (the
- * logistic fit lives in regression/eval-calibration.spec.ts and the larger
- * corpus refit in regression/eval-fit.spec.ts; pin the printed K here when
+ * logistic fit lives in test/regression/eval-calibration.spec.ts and the larger
+ * corpus refit in test/regression/eval-fit.spec.ts; pin the printed K here when
  * adopting a new fit).
  *
  * PHASE-AWARE since 2026-08-09: K = k0 + k1·faintedFraction (fainted bodies
@@ -35,7 +35,7 @@
  * +5 [−2, +12] with harm in the luck-adjusted rows (+8 [+1, +16]); the pins
  * stay.
  * ROUND 74 (T163): every family's K fitted on the search's own root values
- * (the full fit corpus captured with search in CI; regression/fit-families.ts
+ * (the full fit corpus captured with search in CI; test/regression/fit-families.ts
  * rootScaleReports, K' = K·c) and measured on the bank and the four holdouts:
  * standard singles 2.81 + 0.80·ff (+12, unresolved), Doubles OU 2.95 + 1.11·ff
  * (−1, unresolved), VGC 2.09 + 1.13·ff (own K +12 [+3, +22], harm: the flatter
@@ -72,7 +72,7 @@ export const WINPROB_K = {
 /**
  * Round 67 (T138): Pokémon Champions doubles prices its own scale. Fitted on
  * its own corpus games in the app's build on the Champions mod with the
- * round-67 tables, the holdout and unrated ladder games left out (regression/
+ * round-67 tables, the holdout and unrated ladder games left out (test/regression/
  * fit-families.ts phaseKReports): 1.86 + 4.17·ff (2,510 positions of 386
  * sets; K at a third fainted 3.25 [2.83, 3.65]). On the Champions VGC holdout
  * with search it reads −16 bp [−27, −5] with the base's K (early −40) and
@@ -100,7 +100,7 @@ export const VGC_WINPROB_K = {
   doubles: { k0: 2.98, k1: 0.88 },
 } as const;
 
-/** One K table per rule set (regression/fit-families.ts reads them by rule set, scripts/k-stamp.mjs stamps them). */
+/** One K table per rule set (test/regression/fit-families.ts reads them by rule set, scripts/k-stamp.mjs stamps them). */
 export const WINPROB_K_OF: Readonly<Record<StaticRuleset, { readonly singles: PhaseK; readonly doubles: PhaseK }>> = {
   standard: WINPROB_K,
   vgc: VGC_WINPROB_K,

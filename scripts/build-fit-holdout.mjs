@@ -2,20 +2,20 @@
 // play against each other in one format family, so a Bo3 never splits) in every family the calibration bank
 // cannot judge on its own (Doubles OU, Scarlet/Violet VGC, Champions VGC, Champions OU) leaves the fit for
 // good and becomes a test bank: the calibration harness reads it with EVAL_CALIBRATION_SOURCE=holdout and the
-// fit (regression/eval-fit.spec.ts) drops every holdout id. The bank's own doubles tranche holds 36 Doubles OU
+// fit (test/regression/eval-fit.spec.ts) drops every holdout id. The bank's own doubles tranche holds 36 Doubles OU
 // and 10 VGC games and no Champions game; round 65 showed that its 15 games with Screens or Trick Room decide
 // every doubles verdict on those weights and run against the 308-game corpus (docs/perf/probes/2026-10-09-r65).
 //
 // The selection is a pure function of the committed corpus manifest and the cached replays' player names:
 // FNV-1a of "<family>|<sorted player ids>", modulo 3, equal to 0. Writes
-// regression/fixtures/fit-holdout-manifest.json (COMMITTED, like the corpus manifest).
+// test/regression/fixtures/fit-holdout-manifest.json (COMMITTED, like the corpus manifest).
 //
 // Run: node scripts/build-fit-holdout.mjs
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const CORPUS = 'regression/fixtures/fit-corpus-manifest.json';
-const OUT = 'regression/fixtures/fit-holdout-manifest.json';
+const CORPUS = 'test/regression/fixtures/fit-corpus-manifest.json';
+const OUT = 'test/regression/fixtures/fit-holdout-manifest.json';
 const CACHE_DIR = '.fit-corpus';
 /** The formats held out: every doubles format and every Pokémon Champions format (singles included). */
 const HOLDOUT_FORMAT = /doubles|vgc|champions/;

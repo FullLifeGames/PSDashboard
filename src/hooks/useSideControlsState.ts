@@ -69,7 +69,7 @@ const NO_PENDING: PendingChoices = { p1: [], p2: [] };
  * Terastallize once per battle", the same for Mega Evolution, Ultra Burst and
  * Z-Moves) while the request offers it to every slot, so the panel holds the
  * kind for the other slots, as Showdown's own client does (T124;
- * ui/hooks/gimmickOncePerSide.spec.tsx checks it against the simulator).
+ * test/ui/hooks/gimmickOncePerSide.spec.tsx checks it against the simulator).
  */
 function heldByPartners(side: Side, slot: number, armed: ArmedGimmicks, pending: PendingChoices): HeldGimmicks {
   const held: HeldGimmicks = {};

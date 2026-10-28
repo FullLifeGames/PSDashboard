@@ -15,7 +15,7 @@ import './champions-mod';
 const read = (path: string): string => (JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8')) as { log: string }).log;
 const LOGS = {
   'singles (Meganium-Mega, Absol-Mega-Z)': read('../../eval-engine/test/fixtures/champions/gen9championsou-2693832490.json'),
-  'singles (Mega formes)': read('../../../e2e-feedback/fixtures/gen9championsou-2628340185.json'),
+  'singles (Mega formes)': read('../../../test/e2e-feedback/fixtures/gen9championsou-2628340185.json'),
   'doubles (VGC Reg M-B, no Mega on the field)': read('../../eval-engine/test/fixtures/champions/gen9championsvgc2026regmbbo3-2679053861.json'),
   'doubles (VGC Reg M-B, Scovillain-Mega and Meganium-Mega)': read('./fixtures/champions-vgc-2679899667.json'),
 } as const;

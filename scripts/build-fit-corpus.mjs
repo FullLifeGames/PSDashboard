@@ -1,9 +1,9 @@
 // Builds the manifest-pinned fitting corpus for the eval weight fit
-// (regression/eval-fit.spec.ts). Two tranches:
+// (test/regression/eval-fit.spec.ts). Two tranches:
 //  - tournament: Smogon tournament replays via the ReplayScouter static data
 //    (fulllifegames.com/Tools/TournamentTeams) — cleanest outcome labels.
 //  - ladder: top-rated replays from the replay search API.
-// Writes regression/fixtures/fit-corpus-manifest.json (COMMITTED — pins the
+// Writes test/regression/fixtures/fit-corpus-manifest.json (COMMITTED — pins the
 // corpus so fits are reproducible; run-to-run corpus drift poisons
 // comparisons) and caches replay JSONs in .fit-corpus/ (gitignored).
 //
@@ -52,7 +52,7 @@ const DOUBLES_PER_FORMAT_CAP = 150;
 // Gen9 singles: the app's home turf — power the tranche properly.
 const GEN9_SINGLES_PER_FORMAT_CAP = 300;
 const LADDER_PER_FORMAT = 25;
-const MANIFEST_PATH = 'regression/fixtures/fit-corpus-manifest.json';
+const MANIFEST_PATH = 'test/regression/fixtures/fit-corpus-manifest.json';
 const CACHE_DIR = '.fit-corpus';
 const DELAY_MS = 300;
 

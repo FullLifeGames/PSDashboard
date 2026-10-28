@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* The app's own styles, one file per domain (each file says which components
-   it serves). regression/css-audit.spec.ts fails on a class no source uses. */
+   it serves). test/regression/css-audit.spec.ts fails on a class no source uses. */
 @import "./styles/base.css";
 @import "./styles/layout.css";
 @import "./styles/loader.css";

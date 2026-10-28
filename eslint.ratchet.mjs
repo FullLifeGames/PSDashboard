@@ -38,11 +38,11 @@ export const ratchetBase = [
   },
   {
     "files": [
-      "regression/**/*.ts",
-      "e2e/**/*.ts",
-      "e2e-feedback/**/*.ts",
+      "test/regression/**/*.ts",
+      "test/e2e/**/*.ts",
+      "test/e2e-feedback/**/*.ts",
       "packages/*/test/**/*.ts",
-      "ui/**/*.{ts,tsx}"
+      "test/ui/**/*.{ts,tsx}"
     ],
     "rules": {
       "max-lines": [
@@ -71,17 +71,6 @@ export const ratchetBase = [
 ];
 
 export const ratchetOverrides = [
-  {
-    "files": [
-      "e2e-feedback/claims.ts"
-    ],
-    "rules": {
-      "complexity": [
-        "error",
-        30
-      ]
-    }
-  },
   {
     "files": [
       "packages/eval-engine/test/doubles-branch.spec.ts"
@@ -234,7 +223,18 @@ export const ratchetOverrides = [
   },
   {
     "files": [
-      "regression/eval-calibration.spec.ts"
+      "test/e2e-feedback/claims.ts"
+    ],
+    "rules": {
+      "complexity": [
+        "error",
+        30
+      ]
+    }
+  },
+  {
+    "files": [
+      "test/regression/eval-calibration.spec.ts"
     ],
     "rules": {
       "complexity": [

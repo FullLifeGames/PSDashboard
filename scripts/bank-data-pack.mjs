@@ -2,7 +2,7 @@
 //
 //   node scripts/bank-data-pack.mjs                 pack .fit-corpus and .smogon-cache into
 //                                                   .calibration/bank-data/<asset> and write
-//                                                   regression/fixtures/bank-data.json (asset, hashes, folders)
+//                                                   test/regression/fixtures/bank-data.json (asset, hashes, folders)
 //   node scripts/bank-data-pack.mjs --upload        upload the packed asset as the GitHub release the fixture
 //                                                   names (gh CLI); only after the user's okay, never by a script
 //   node scripts/bank-data-pack.mjs --fetch [--file <path>]
@@ -12,8 +12,8 @@
 //
 // The tarball holds what a CI run reads from disk: every file of .smogon-cache and, of .fit-corpus, every replay the
 // fit source reads (round 74, T163: CI captures the fit corpus with search): the manifest's replays
-// (regression/fixtures/fit-corpus-manifest.json, FIT_MANIFEST in regression/bank-universe.ts) and the holdout sets'
-// replays (regression/fixtures/fit-holdout-manifest.json, read by the holdout source there). The sample caches of
+// (test/regression/fixtures/fit-corpus-manifest.json, FIT_MANIFEST in test/regression/bank-universe.ts) and the holdout sets'
+// replays (test/regression/fixtures/fit-holdout-manifest.json, read by the holdout source there). The sample caches of
 // the weight fits (samples-cache*.json) stay here, and so does what no manifest names; the bank fetches its own
 // replays from the network, here as in CI.
 // The fixture is tracked, so a commit names exactly the data its CI runs read (scripts/bank-data.mjs).
@@ -26,11 +26,11 @@ import { canonicalJson, CACHE_DIRS, hashDirectory } from './calibration-fingerpr
 import { downloadWithRetry, packData, unpackData } from './bank-data.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
-const FIXTURE = 'regression/fixtures/bank-data.json';
-/** The holdout sets regression/bank-universe.ts reads (HOLDOUT_MANIFEST there). */
-const HOLDOUT_MANIFEST = 'regression/fixtures/fit-holdout-manifest.json';
-/** The fit corpus regression/bank-universe.ts reads for EVAL_CALIBRATION_SOURCE=fit (FIT_MANIFEST there). */
-const FIT_MANIFEST = 'regression/fixtures/fit-corpus-manifest.json';
+const FIXTURE = 'test/regression/fixtures/bank-data.json';
+/** The holdout sets test/regression/bank-universe.ts reads (HOLDOUT_MANIFEST there). */
+const HOLDOUT_MANIFEST = 'test/regression/fixtures/fit-holdout-manifest.json';
+/** The fit corpus test/regression/bank-universe.ts reads for EVAL_CALIBRATION_SOURCE=fit (FIT_MANIFEST there). */
+const FIT_MANIFEST = 'test/regression/fixtures/fit-corpus-manifest.json';
 const PACK_DIR = '.calibration/bank-data';
 const FORMAT = 1;
 

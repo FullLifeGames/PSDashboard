@@ -20,11 +20,11 @@ import { parseFraction } from './calibration-fingerprint.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 export const CONFIG_FILE = '.bank-run.json';
-const HOLDOUT_MANIFEST = 'regression/fixtures/fit-holdout-manifest.json';
+const HOLDOUT_MANIFEST = 'test/regression/fixtures/fit-holdout-manifest.json';
 
-/** The bank's own tranches (REPLAY_TRANCHES in regression/eval-calibration.spec.ts; regression/bank-run-config.spec.ts compares the two). */
+/** The bank's own tranches (REPLAY_TRANCHES in test/regression/eval-calibration.spec.ts; test/regression/bank-run-config.spec.ts compares the two). */
 export const BANK_TRANCHES = ['draft', 'ladder-0811', 'ladder-dou-0804', 'ladder-ou-0802', 'tournament-0811', 'tournament-0811b'];
-/** The fit corpus's tranches (regression/bank-universe.ts, fit-<source>). */
+/** The fit corpus's tranches (test/regression/bank-universe.ts, fit-<source>). */
 export const FIT_TRANCHES = ['fit-ladder', 'fit-tournament'];
 
 const NAME = /^[a-z0-9-]{1,40}$/;

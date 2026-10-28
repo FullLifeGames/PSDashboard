@@ -2,7 +2,7 @@
  * Public surface of @fulllifegames/eval-engine. Curated: the names the app, the worker, the
  * sibling package, the worked example, and the root suite reach, plus every
  * type their signatures mention. Widen it by adding a line here and refreshing
- * regression/fixtures/api/eval-engine.txt (UPDATE_API_SNAPSHOT=1). The
+ * test/regression/fixtures/api/eval-engine.txt (UPDATE_API_SNAPSHOT=1). The
  * package's own tests import the sources directly; the root suite imports by
  * name, so it consumes this list like any other user.
  */

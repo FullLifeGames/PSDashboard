@@ -5,7 +5,7 @@
 // score holds the sweep). Three consumers: the harness itself prints the
 // same aggregate lines, scripts/run-calibration.mjs merges slice dumps and
 // summarizes them, scripts/paired-calibration.mjs joins two dumps. The math
-// replicates regression/fit-helpers.ts exactly (pooled constant-K logistic
+// replicates test/regression/fit-helpers.ts exactly (pooled constant-K logistic
 // fit via 500-iteration gradient descent from 1.5, Brier under that K), and
 // compareSamples is the summation order the harness sorts into before it
 // aggregates, so a merged summary matches the single-process printout
@@ -94,7 +94,7 @@ export function record(samples, label) {
 
 /**
  * The harness's printed aggregate, line for line (the block after the replay
- * loop in regression/eval-calibration.spec.ts): sign accuracy and mean
+ * loop in test/regression/eval-calibration.spec.ts): sign accuracy and mean
  * |score| per phase, sign accuracy per gametype, the fitted K per pool,
  * Brier per phase under the pooled K, and the confidence buckets.
  */
@@ -163,7 +163,7 @@ export function summarize(samples) {
   return lines;
 }
 
-/** The PRNG of regression/fit-helpers.ts, so a band reproduces from its seed. */
+/** The PRNG of test/regression/fit-helpers.ts, so a band reproduces from its seed. */
 export function mulberry32(seed) {
   let a = seed;
   return () => {
@@ -232,7 +232,7 @@ function bandOf(mean, means, { n, games, moved, level, zero }) {
 
 /**
  * One K by Newton on the weighted log-likelihood, run to a standstill:
- * fitPhaseK of regression/fit-helpers.ts with k1 = 0. The 500 gradient steps
+ * fitPhaseK of test/regression/fit-helpers.ts with k1 = 0. The 500 gradient steps
  * of fitConstantK stop short on a small cell; here each side gets the K that
  * fits it best, so neither keeps an unfinished fit. A step that raises the
  * loss is halved. K stays in [0, 50]: a cell where every sign is right has

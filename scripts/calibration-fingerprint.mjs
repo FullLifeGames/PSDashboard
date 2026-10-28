@@ -23,7 +23,7 @@
 // produced its rows. A change of any other input during the run marks it unstable. A run that lost replays to
 // HTTP errors is incomplete. Runs from before this recipe carry no fingerprint and never match.
 //
-// Everything under regression/ is an input, so a ledger block booked into regression/eval-calibration.spec.ts
+// Everything under test/regression/ is an input, so a ledger block booked into test/regression/eval-calibration.spec.ts
 // changes the value although it changes no behavior. Commits that touch only docs, NextSteps.md or AGENTS.md keep it.
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -31,11 +31,11 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 /** The version of the recipe; bump it when the inputs below change. */
-export const FINGERPRINT_FORMAT = 1;
+export const FINGERPRINT_FORMAT = 2;
 
 /** The tracked inputs read at HEAD: what the bank imports and runs, and the files that decide how it resolves. */
 export const FINGERPRINT_PATHS = [
-  'packages', 'src', 'regression', 'scripts',
+  'packages', 'src', 'test/regression', 'scripts',
   'package.json', 'package-lock.json',
   'vitest.config.ts', 'vite.config.ts', 'tsconfig.json', 'tsconfig.app.json', 'tsconfig.node.json',
 ];
@@ -75,7 +75,7 @@ export function leverEnv(ambient, explicit) {
 
 /**
  * The relative names of the files a folder holds for the bank, in code unit order, with `/` between parts. A `.tmp`
- * file is a sibling process's half-written entry (regression/smogon-fetch-cache.ts) that no reader opens, so it
+ * file is a sibling process's half-written entry (test/regression/smogon-fetch-cache.ts) that no reader opens, so it
  * stays out. scripts/bank-data.mjs packs exactly these files.
  */
 export function dataFileNames(dir) {
@@ -247,7 +247,7 @@ export function fingerprintRecord(start, end) {
 }
 
 /**
- * The quick tier's share (EVAL_CALIBRATION_FRACTION, regression/bank-universe.ts reads it the same way):
+ * The quick tier's share (EVAL_CALIBRATION_FRACTION, test/regression/bank-universe.ts reads it the same way):
  * unset or empty is the whole universe, anything else must be a number above 0 and at most 1.
  */
 export function parseFraction(raw) {

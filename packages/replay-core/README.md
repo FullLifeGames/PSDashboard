@@ -112,7 +112,7 @@ The fixture is a synthetic four-turn game with nothing to guess from, so unrevea
 
 - Pokémon Champions: `evBudget(formatId)` returns the EV scale of a format, and for Champions formats that scale is Stat Points (32 per stat, 66 in total) instead of 252 and 508 EVs; `calcEvs` and `calcIvs` put a spread on it.
 
-The barrel is the API: it lists what the app, the evaluation engine, and the example use, plus every type those signatures mention. `regression/fixtures/api/replay-core.txt` in the repository pins that list, so widening the surface is a one-line edit to `src/index.ts` plus a snapshot refresh.
+The barrel is the API: it lists what the app, the evaluation engine, and the example use, plus every type those signatures mention. `test/regression/fixtures/api/replay-core.txt` in the repository pins that list, so widening the surface is a one-line edit to `src/index.ts` plus a snapshot refresh.
 
 ## Tests
 
