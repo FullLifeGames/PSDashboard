@@ -72,6 +72,15 @@ describe('WorkspaceEvalColumn', () => {
     expect(screen.queryByRole('img', { name: /Evaluation over/ })).toBeNull();
   }, 60_000);
 
+  test('at turn 0 the play-out hint names the picked leads, not a turn (round 77, C2)', async () => {
+    // Lane C of the branching swarm: at T0 the hint read "from turn 3" while the run starts from the lead decision.
+    const app = await mountLoaded();
+    act(() => app().board.timeline.handleGraphSelectLine(0));
+    await waitFor(() => expect(app().board.timeline.viewT0).toBe(true));
+    expect(screen.getByText('engine plays the game from turn 0 with the leads picked above')).toBeInTheDocument();
+    expect(screen.queryByText(/engine finishes the game from turn/)).toBeNull();
+  }, 60_000);
+
   test('a sweep fills the graph and the report; the selected turn shows its analysis, T0 the leads; a variation hands the panel to the live view', async () => {
     const app = await mountLoaded();
     await act(async () => { app().engine.evalView.handleAnalyzeGame(); });
