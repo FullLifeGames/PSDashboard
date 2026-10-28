@@ -5,7 +5,7 @@ import type { PickerSource } from '../lib/picker-state';
 import { buildReplayTeams, type TeamBuildSources } from '../lib/eval-acquire';
 import type { VariationSpan } from '../lib/timeline';
 import type { BranchHistoryEntry, BranchSimState } from './useBranch';
-import type { PlayedPick } from '../components/BranchPanel';
+import type { PlayedAtPosition, PlayedPick } from '../components/BranchPanel';
 
 /**
  * Picker state for the viewed position when the live sim is elsewhere
@@ -156,7 +156,8 @@ async function resolvePickerState(args: {
  * What the viewed line actually played at this position — the answer to
  * "which move did they press here?". Main line: the replay protocol's
  * action for this turn. Variation (behind the tip): the recorded entry's
- * choices. The tip itself has no played move yet.
+ * choices. The tip itself has no played move yet. Doubles carry one pick
+ * per slot (round 77, B3): the doubles parser fills only the slot lists.
  */
 export function usePlayedAtView(args: {
   viewingVariation: boolean;
@@ -165,41 +166,59 @@ export function usePlayedAtView(args: {
   history: BranchHistoryEntry[];
   snapshots: TurnSnapshot[];
   doubles: boolean;
-  parseSingles: (lines: string[]) => { p1: PlayedAction | null; p2: PlayedAction | null };
-  parseDoubles: (lines: string[]) => { p1: PlayedAction | null; p2: PlayedAction | null };
+  parseSingles: (lines: string[]) => PlayedActions;
+  parseDoubles: (lines: string[]) => PlayedActions;
 }) {
   const { viewingVariation, variationSpan, viewTurn, history, snapshots, doubles, parseSingles, parseDoubles } = args;
-  return useMemo<{ p1: PlayedPick | null; p2: PlayedPick | null } | null>(() => {
+  return useMemo<PlayedAtPosition | null>(() => {
     if (viewingVariation && variationSpan) {
       return playedFromHistory(history, viewTurn - variationSpan.startTurn);
     }
     const lines = snapshots[viewTurn]?.log;
     if (!lines || lines.length === 0) return null;
     const turn = doubles ? parseDoubles(lines) : parseSingles(lines);
-    if (!turn.p1 && !turn.p2) return null;
-    return { p1: fromAction(turn.p1), p2: fromAction(turn.p2) };
+    if (!doubles) return turn.p1 || turn.p2 ? { p1: fromAction(turn.p1), p2: fromAction(turn.p2) } : null;
+    const p1Slots = (turn.p1Slots ?? []).map(fromAction);
+    const p2Slots = (turn.p2Slots ?? []).map(fromAction);
+    if (![...p1Slots, ...p2Slots].some(Boolean)) return null;
+    return withSlots(p1Slots, p2Slots);
   }, [viewingVariation, variationSpan, viewTurn, history, snapshots, doubles, parseSingles, parseDoubles]);
 }
 
 type PlayedAction = { kind: 'move' | 'switch'; name: string; species?: string };
+type PlayedActions = {
+  p1: PlayedAction | null;
+  p2: PlayedAction | null;
+  p1Slots?: (PlayedAction | null)[];
+  p2Slots?: (PlayedAction | null)[];
+};
 
 function fromAction(action: PlayedAction | null): PlayedPick | null {
   return action ? { kind: action.kind, name: action.name, ...(action.species ? { species: action.species } : {}) } : null;
 }
 
-function playedFromHistory(history: BranchHistoryEntry[], index: number): { p1: PlayedPick | null; p2: PlayedPick | null } | null {
+/** A doubles record: the slot lists, and each side's first pick for the readers of `p1`/`p2`. */
+function withSlots(p1Slots: (PlayedPick | null)[], p2Slots: (PlayedPick | null)[]): PlayedAtPosition {
+  return { p1: p1Slots.find(Boolean) ?? null, p2: p2Slots.find(Boolean) ?? null, p1Slots, p2Slots };
+}
+
+function fromChoice(choice: BranchSlotChoice | null): PlayedPick | null {
+  if (!choice) return null;
+  return choice.kind === 'move'
+    ? { kind: 'move', name: choice.moveName }
+    : { kind: 'switch', name: choice.pokemonName, species: choice.speciesId };
+}
+
+function playedFromHistory(history: BranchHistoryEntry[], index: number): PlayedAtPosition | null {
   let count = 0;
   for (const entry of history) {
     if (entry.kind === 'forced') continue;
     if (count === index) {
-      const fromSlots = (slots: (BranchSlotChoice | null)[] | undefined): PlayedPick | null => {
-        const first = (slots ?? []).find(Boolean) ?? null;
-        if (!first) return null;
-        return first.kind === 'move'
-          ? { kind: 'move', name: first.moveName }
-          : { kind: 'switch', name: first.pokemonName, species: first.speciesId };
-      };
-      return { p1: fromSlots(entry.p1SlotChoices), p2: fromSlots(entry.p2SlotChoices) };
+      const p1Slots = (entry.p1SlotChoices ?? []).map(fromChoice);
+      const p2Slots = (entry.p2SlotChoices ?? []).map(fromChoice);
+      // Singles record one choice a side: the side pick alone, as before.
+      if (p1Slots.length <= 1 && p2Slots.length <= 1) return { p1: p1Slots[0] ?? null, p2: p2Slots[0] ?? null };
+      return withSlots(p1Slots, p2Slots);
     }
     count += 1;
   }
