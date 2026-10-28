@@ -2,7 +2,8 @@
 
 /* ----- Evaluation panel ----- */
 .ps-eval-panel {
-  margin-top: 8px;
+  /* Round 77 (user request 28.10.2026): the panel's top edge lines up with the top bar's. */
+  margin-top: 0;
   /* Combined doubles labels and PV lines must wrap inside the column —
      never widen the panel past its grid track. */
   overflow-wrap: anywhere;

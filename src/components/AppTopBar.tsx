@@ -1,4 +1,5 @@
 import type { BranchSimState } from '../hooks/useBranch';
+import { SetupMenu } from './SetupMenu';
 import { SupportLinks } from './SupportLinks';
 
 interface AppTopBarProps {
@@ -44,11 +45,8 @@ function TopBarMatchInfo({ replayData, usageStats, setAssumptions }: Pick<AppTop
 }
 
 function TopBarBranchStatus({
-  branchPreparing, branchProgress, showBranch, simState,
-  animateBranchTurns, branchDivergence, onCancelPreparation, onAnimateChange,
-}: Pick<AppTopBarProps,
-  'branchPreparing' | 'branchProgress' | 'showBranch' | 'simState'
-  | 'animateBranchTurns' | 'branchDivergence' | 'onCancelPreparation' | 'onAnimateChange'>) {
+  branchPreparing, branchProgress, showBranch, simState, branchDivergence, onCancelPreparation,
+}: Pick<AppTopBarProps, 'branchPreparing' | 'branchProgress' | 'showBranch' | 'simState' | 'branchDivergence' | 'onCancelPreparation'>) {
   return (
     <>
       {branchPreparing && (
@@ -69,27 +67,11 @@ function TopBarBranchStatus({
       )}
       {showBranch && !branchPreparing && (
         <>
-          <span style={{ fontSize: 11, fontWeight: 'bold', color: '#8cf' }}>
+          <span style={{ fontSize: 11, fontWeight: 'bold', color: '#8cf', whiteSpace: 'nowrap' }}>
             Branching · Turn {simState?.turnNumber ?? '…'}
           </span>
-          {simState?.ended && (
-            <span className="ps-ended-tag">
-              {simState.winner ? `${simState.winner} wins!` : 'Ended'}
-            </span>
-          )}
-          <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#aabbcc' }}>
-            <input
-              type="checkbox"
-              checked={animateBranchTurns}
-              onChange={event => onAnimateChange(event.target.checked)}
-            />
-            Animate branch turns
-          </label>
           {branchDivergence && (
-            <span
-              style={{ fontSize: 10, color: '#e6b36a', maxWidth: 520 }}
-              title={branchDivergence}
-            >
+            <span className="ps-topbar-divergence" title={branchDivergence}>
               ⚠ {branchDivergence}
             </span>
           )}
@@ -99,47 +81,30 @@ function TopBarBranchStatus({
   );
 }
 
-/** Match info + branch status collapsed into one bar above the iframe. */
+/**
+ * Match info, branch status, the Setup menu and the support links in one row above the iframe (round 77,
+ * user request 28.10.2026: the winner moved to the branch panel, the toggle and the team actions into Setup).
+ */
 export function AppTopBar(props: AppTopBarProps) {
-  const { replayData, usageStats, setAssumptions, onEditSide, onOpenSets } = props;
+  const { replayData, usageStats, setAssumptions } = props;
   return (
     <div className="ps-topbar">
       <TopBarMatchInfo replayData={replayData} usageStats={usageStats} setAssumptions={setAssumptions} />
-      <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+      <div className="ps-topbar-actions">
         <TopBarBranchStatus
           branchPreparing={props.branchPreparing}
           branchProgress={props.branchProgress}
           showBranch={props.showBranch}
           simState={props.simState}
-          animateBranchTurns={props.animateBranchTurns}
           branchDivergence={props.branchDivergence}
           onCancelPreparation={props.onCancelPreparation}
-          onAnimateChange={props.onAnimateChange}
         />
-        <button
-          type="button"
-          onClick={() => onEditSide('p1')}
-          className="ps-btn"
-          style={{ padding: '2px 8px', fontSize: 10 }}
-        >
-          Edit Player
-        </button>
-        <button
-          type="button"
-          onClick={() => onEditSide('p2')}
-          className="ps-btn"
-          style={{ padding: '2px 8px', fontSize: 10 }}
-        >
-          Edit Opp
-        </button>
-        <button
-          type="button"
-          onClick={() => onOpenSets()}
-          className="ps-btn"
-          style={{ padding: '2px 8px', fontSize: 10 }}
-        >
-          Import/Export Sets
-        </button>
+        <SetupMenu
+          animateBranchTurns={props.animateBranchTurns}
+          onAnimateChange={props.onAnimateChange}
+          onEditSide={props.onEditSide}
+          onOpenSets={props.onOpenSets}
+        />
       </div>
       <SupportLinks embed={props.embed} withName onReportIssue={props.onReportIssue} />
     </div>

@@ -95,6 +95,12 @@ export async function startVariationAt(page: Page, turn: number, options?: { p1M
   }
 }
 
+/** Opens the top bar's Setup menu and clicks one of its entries (round 77: the team actions moved there). */
+export async function fromSetup(page: Page, entry: string) {
+  await page.getByRole('button', { name: 'Setup', exact: true }).click();
+  await page.locator('.ps-setup-panel').getByRole('button', { name: entry, exact: true }).click();
+}
+
 /** Waits for the dwell upgrade: after ~1s on a main-line turn the app
  *  reconstructs the exact position in the background and the snapshot
  *  approximation upgrades in place (no button — the unified timeline's

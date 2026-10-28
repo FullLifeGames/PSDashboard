@@ -1,5 +1,6 @@
 import { PSReplayFrame } from './PSReplayFrame';
 import type { BranchSharePayload } from '../lib/branch-share';
+import { REPLAY_FRAME_HEIGHT } from '../lib/replay-html';
 
 function SharedBranchTopbar({
   branch,
@@ -83,7 +84,7 @@ export function SharedBranchView({
             p1={branch.players[0]}
             p2={branch.players[1]}
             title="Shared Branch Replay"
-            height={480}
+            height={REPLAY_FRAME_HEIGHT}
             seekTurn={branch.branchTurn}
             autoPlay={false}
             reloadKey={`shared:${branch.replayId}:${branch.createdAt}`}

@@ -125,7 +125,7 @@ test.describe('PS Dashboard', () => {
     await page.locator('button', { hasText: 'Load' }).click();
     const iframe = page.locator('iframe[title="PS Replay"]');
     await expect(iframe).toBeVisible({ timeout: 10000 });
-    await expect(iframe).toHaveCSS('height', '480px');
+    await expect(iframe).toHaveCSS('height', '456px');
     await expect(iframe).toHaveCSS('margin-top', '0px');
   });
 
@@ -135,7 +135,7 @@ test.describe('PS Dashboard', () => {
 
     const branchIframe = page.locator('iframe[title="Branch Simulation"]');
     await expect(branchIframe).toBeVisible({ timeout: 10000 });
-    await expect(branchIframe).toHaveCSS('height', '480px');
+    await expect(branchIframe).toHaveCSS('height', '456px');
     await expect(branchIframe).toHaveCSS('margin-top', '0px');
     await expect(page.locator('iframe')).toHaveCount(1);
   });

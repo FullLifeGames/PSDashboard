@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { installReplayEmbedCache, routeOfflineFixtures, startVariationAt, waitForExactPickers } from './helpers';
+import { fromSetup, installReplayEmbedCache, routeOfflineFixtures, startVariationAt, waitForExactPickers } from './helpers';
 
 test.beforeAll(installReplayEmbedCache);
 
@@ -62,7 +62,7 @@ test.describe('PS Dashboard', () => {
     await page.locator('button', { hasText: 'Load' }).click();
     await expect(page.locator('.ps-movebtn').first()).toBeVisible({ timeout: 15000 });
 
-    await page.locator('button', { hasText: 'Edit Player' }).click();
+    await fromSetup(page, 'Edit Player');
     const editor = page.getByRole('dialog', { name: 'Edit Player Team' });
     await expect(editor).toBeVisible();
     await expect(editor.getByLabel('Garchomp HP EVs')).toBeVisible();
@@ -81,7 +81,7 @@ test.describe('PS Dashboard', () => {
     await expect(page.locator('.ps-branch-side-column').first()).toContainText('Dragon Claw', { timeout: 15000 });
     await expect(page.locator('.ps-main-right')).toContainText('252 HP / 252 Atk / 4 Spe EVs');
 
-    await page.locator('button', { hasText: 'Edit Player' }).click();
+    await fromSetup(page, 'Edit Player');
     const reopenedEditor = page.getByRole('dialog', { name: 'Edit Player Team' });
     await expect(reopenedEditor.getByLabel('Garchomp HP EVs')).toHaveValue('252');
   });
@@ -98,7 +98,7 @@ test.describe('PS Dashboard', () => {
     // Pending chips show the move identity instead of the grid slot (B1).
     await expect(p2Controls.locator('.ps-pending-choice')).toBeVisible();
 
-    await page.locator('button', { hasText: 'Edit Player' }).click();
+    await fromSetup(page, 'Edit Player');
     const editor = page.getByRole('dialog', { name: 'Edit Player Team' });
     const garchompCard = editor.locator('.ps-panel').filter({ hasText: 'Garchomp' }).first();
     await garchompCard.getByLabel('Remove Earthquake from Garchomp').click();

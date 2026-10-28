@@ -78,13 +78,64 @@
   white-space: nowrap;
 }
 
-.ps-ended-tag {
+/* Round 77 (user request 28.10.2026): one row. The branch status and the Setup menu sit between the match and the support
+   links; a long divergence notice shortens with an ellipsis and keeps its full text in the title. */
+.ps-topbar-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+.ps-topbar-divergence {
   font-size: 10px;
-  padding: 2px 6px;
-  border-radius: 3px;
-  background: #1b5e20;
+  color: #e6b36a;
+  max-width: 360px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ps-setup-menu {
+  position: relative;
+}
+.ps-btn.ps-setup-toggle {
+  padding: 2px 8px;
+  font-size: 10px;
+}
+.ps-setup-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 190px;
+  padding: 8px;
+  background: #22324f;
+  border: 1px solid var(--ps-border);
+  border-radius: 6px;
+  box-shadow: var(--ps-shadow);
+}
+.ps-setup-panel .ps-btn {
+  font-size: 11px;
+  text-align: left;
+}
+.ps-setup-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #aabbcc;
+}
+
+/* The winner of an ended variation, where the pickers were. */
+.ps-branch-ended {
+  margin-top: 6px;
+  padding: 6px 10px;
+  border-radius: 5px;
+  background: rgba(27,94,32,0.55);
   color: #a5d6a7;
-  font-weight: bold;
+  font-size: 12px;
 }
 
 .ps-iframe-wrap {
@@ -97,7 +148,8 @@
 }
 .ps-iframe-wrap iframe {
   display: block;
-  min-height: 480px;
+  /* REPLAY_FRAME_HEIGHT in src/lib/replay-html.ts */
+  min-height: 456px;
 }
 
 .ps-branch-bar input[type="range"] {

@@ -8,7 +8,7 @@ import { fontAwesomeOverrideStyle, POINTER_SOURCE_SHIM_SCRIPT } from './replay-c
 
 const REPLAY_STYLES = `<style>
 html,body {font-family:Verdana, sans-serif;font-size:10pt;margin:0;padding:0;}
-body{padding:12px 0;background:#344b6c;}
+body{padding:0 0 12px;background:#344b6c;}
 .battle-log {font-family:Verdana, sans-serif;font-size:10pt;}
 .battle-log-inline {border:1px solid #AAAAAA;background:#EEF2F5;color:black;max-width:640px;margin:0 auto 80px;padding-bottom:5px;}
 .battle-log .inner {padding:4px 8px 0px 8px;}
@@ -21,6 +21,7 @@ body{padding:12px 0;background:#344b6c;}
 .spacer {margin-top:0.5em;}
 .subtle {color:#3A4A66;}
 .wrapper {max-width:1180px;margin:0 auto;}
+.wrapper.replay-wrapper{margin-top:-9px;}
 </style>`;
 
 /**
@@ -237,6 +238,14 @@ const TURN_TRACKER_SCRIPT = `
 })();
 </script>`;
 
+/**
+ * The replay frame's height: the embed's battle, its two control rows and the body's bottom padding (445 px)
+ * with a few pixels to spare for font rendering, so the document never scrolls (round 77, user request 28.10.2026:
+ * the title under the controls went, and the frame shrank to its content). layout.css repeats it as the frame's
+ * min-height; test/regression/replay-html.spec.ts holds the two equal.
+ */
+export const REPLAY_FRAME_HEIGHT = 456;
+
 export function generateReplayHtml(opts: {
   log: string;
   format?: string;
@@ -262,6 +271,7 @@ export function generateReplayHtml(opts: {
   // Round 77 (user report 28.10.2026): graphics.js prefixes the effect sprites (Stealth Rock, Spikes, the move
   // animations) with Dex.fxPrefix only when Dex already exists, and the embed runs its scripts in any order.
   // A sprite left as "rock1.png" has no base in a blob document: the base names the folder the prefix names.
+  // The title lives in <title> only (user request 28.10.2026): shown under the controls it scrolled the frame.
   return `<!DOCTYPE html>
 <meta charset="utf-8" />
 <base href="https://play.pokemonshowdown.com/fx/">
@@ -272,7 +282,6 @@ ${POINTER_SOURCE_SHIM_SCRIPT}
 <div class="wrapper replay-wrapper">
 <input type="hidden" name="replayid" value="branch-sim" />
 <div class="battle"></div><div class="battle-log"></div><div class="replay-controls"></div><div class="replay-controls-2"></div>
-<h1 style="font-weight:normal;text-align:center"><strong>${displayTitle}</strong></h1>
 <script type="text/plain" class="battle-log-data">
 ${escapedLog}
 </script>

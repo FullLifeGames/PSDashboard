@@ -122,7 +122,7 @@ test.describe('PS Dashboard', () => {
     });
     const lastTurn = Number(/Branching · Turn (\d+)/.exec(await page.getByText(/Branching · Turn \d+/).innerText())?.[1]);
     const line = `ended at turn ${lastTurn}, p2 switches: ${p2Switches.join(', ')}`;
-    await expect(page.locator('.ps-ended-tag'), line).toHaveText('Bene wins!');
+    await expect(page.locator('.ps-branch-ended'), line).toContainText('Bene wins this variation.');
     expect(lastTurn, line).toBeLessThanOrEqual(75);
     expect(p2Switches.length, line).toBeLessThanOrEqual(6);
   });
@@ -265,9 +265,11 @@ test.describe('PS Dashboard', () => {
     await page.locator('button', { hasText: 'Load' }).click();
     await startVariationAt(page, 2);
 
+    await page.getByRole('button', { name: 'Setup', exact: true }).click();
     const animateToggle = page.getByLabel('Animate branch turns');
     await expect(animateToggle).toBeVisible();
     await expect(animateToggle).toBeChecked();
+    await page.keyboard.press('Escape');
 
     const iframeHandle = await page.locator('iframe[title="Branch Simulation"]').elementHandle({ timeout: 10000 });
     const frame = await iframeHandle?.contentFrame();
@@ -342,7 +344,7 @@ test.describe('PS Dashboard', () => {
 
     const finalBox = await branchIframe.boundingBox();
     expect(finalBox?.height).toBe(initialBox?.height);
-    await expect(branchIframe).toHaveCSS('height', '480px');
+    await expect(branchIframe).toHaveCSS('height', '456px');
   });
 
   test('desktop branch controls keep both sides and Execute Turn in the first viewport', async ({ page }) => {

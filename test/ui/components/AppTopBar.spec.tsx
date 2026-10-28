@@ -30,19 +30,41 @@ describe('AppTopBar', () => {
     expect(screen.queryByRole('link', { name: 'by Bene (FullLifeGames)' })).toBeNull();
   });
 
-  test('names the match and routes the edit and sets buttons', async () => {
+  test('names the match; the Setup menu holds the edit and sets buttons and closes after a pick', async () => {
+    // Round 77 (user request 28.10.2026): one row; the animate toggle, Edit Player, Edit Opp and Import/Export Sets
+    // moved into one menu.
     const wired = props();
     render(<AppTopBar {...wired} />);
     expect(screen.getByText('[Gen 9] OU')).toBeInTheDocument();
     expect(screen.getByText('Alice')).toBeInTheDocument();
     expect(screen.getByText('Bob')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit Player' })).toBeNull();
+    const setup = screen.getByRole('button', { name: 'Setup' });
+    expect(setup).toHaveAttribute('aria-expanded', 'false');
+
+    await userEvent.click(setup);
+    expect(setup).toHaveAttribute('aria-expanded', 'true');
     await userEvent.click(screen.getByRole('button', { name: 'Edit Player' }));
     expect(wired.onEditSide).toHaveBeenCalledWith('p1');
+    expect(screen.queryByRole('button', { name: 'Edit Opp' })).toBeNull();
+    await userEvent.click(setup);
     await userEvent.click(screen.getByRole('button', { name: 'Edit Opp' }));
     expect(wired.onEditSide).toHaveBeenCalledWith('p2');
+    await userEvent.click(setup);
     await userEvent.click(screen.getByRole('button', { name: 'Import/Export Sets' }));
     expect(wired.onOpenSets).toHaveBeenCalledTimes(1);
     expect(screen.queryByText(/Smogon/)).toBeNull();
+  });
+
+  test('the Setup menu closes on Escape and on a click outside it', async () => {
+    render(<AppTopBar {...props()} />);
+    const setup = screen.getByRole('button', { name: 'Setup' });
+    await userEvent.click(setup);
+    await userEvent.keyboard('{Escape}');
+    expect(setup).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.click(setup);
+    await userEvent.click(screen.getByText('Alice'));
+    expect(setup).toHaveAttribute('aria-expanded', 'false');
   });
 
   test('the Smogon states read as loading or unavailable', () => {
@@ -59,15 +81,19 @@ describe('AppTopBar', () => {
     expect(wired.onCancelPreparation).toHaveBeenCalledTimes(1);
   });
 
-  test('a live branch shows its turn, the animate toggle, the end tag, and the divergence notice', async () => {
+  test('a live branch shows its turn and the divergence notice; the animate toggle sits in the Setup menu', async () => {
     const wired = props({ showBranch: true, simState: simState('singles', { turnNumber: 7, ended: true, winner: 'Alice' }), branchDivergence: 'The simulated replay diverged' });
     render(<AppTopBar {...wired} />);
     expect(screen.getByText('Branching · Turn 7')).toBeInTheDocument();
-    expect(screen.getByText('Alice wins!')).toBeInTheDocument();
+    // The winner shows in the branch panel, where the pickers were (round 77).
+    expect(screen.queryByText(/Alice wins/)).toBeNull();
     expect(screen.getByTitle('The simulated replay diverged')).toHaveTextContent('⚠ The simulated replay diverged');
+    await userEvent.click(screen.getByRole('button', { name: 'Setup' }));
     const toggle = screen.getByRole('checkbox', { name: 'Animate branch turns' });
     expect(toggle).toBeChecked();
     await userEvent.click(toggle);
     expect(wired.onAnimateChange).toHaveBeenCalledWith(false);
+    // A toggle keeps the menu open: the user sees the new state.
+    expect(screen.getByRole('button', { name: 'Setup' })).toHaveAttribute('aria-expanded', 'true');
   });
 });

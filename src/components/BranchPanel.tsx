@@ -250,6 +250,15 @@ function usePanelPreview(simState: BranchSimState | null, gen: number, positionK
   return { slots, gimmickFor, damageBySide };
 }
 
+/** Round 77 (user request 28.10.2026): the winner left the top bar for the place of the pickers. */
+function EndedNotice({ winner }: { winner: string | null }) {
+  return (
+    <div className="ps-branch-ended" role="status">
+      {winner ? `${winner} wins this variation.` : 'The variation ended without a winner.'} Go back a turn to play it another way.
+    </div>
+  );
+}
+
 /* ── Main BranchPanel (controls only, no iframe) ── */
 export function BranchPanel({ simState, stale, source, acquiringExact, executeError, executing, gen, onSetChoice, onHypotheticalMove, onExecuteTurn, played, positionKey, getBattle }: Props) {
   const { advanced, toggleAdvanced } = useAdvancedToggle();
@@ -270,6 +279,7 @@ export function BranchPanel({ simState, stale, source, acquiringExact, executeEr
   return (
     <div inert={stale} aria-busy={stale || undefined}>
       <PickerSourceLine source={source} acquiringExact={acquiringExact} advanced={advanced} onToggleAdvanced={toggleAdvanced} />
+      {simState.ended && <EndedNotice winner={simState.winner} />}
       {/* Controls — stacked vertically for P1 + P2 selection */}
       {!simState.ended && (
         <div className="ps-branch-controls-shell">

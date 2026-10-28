@@ -1,6 +1,8 @@
 import { test, expect, describe } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
-import { generateReplayHtml } from '../../src/lib/replay-html';
+import { REPLAY_FRAME_HEIGHT, generateReplayHtml } from '../../src/lib/replay-html';
 
 const log = '|start\n|turn|1\n|turn|2';
 
@@ -89,6 +91,25 @@ describe('Replay iframe HTML', () => {
     // Every other resource the document names is absolute, so the base moves nothing else.
     const relative = [...html.matchAll(/\b(?:src|href)="(?!https:\/\/)([^"]+)"/g)].map(match => match[1]);
     expect(relative).toEqual([]);
+  });
+
+  test('the battle starts at the frame\'s top edge, and no title shows under the controls (round 77)', () => {
+    // User request 28.10.2026: a band of 21 px stood above the battle (the body's 12 px plus the 9 px the embed
+    // puts above it), and the title under the controls ("Branch Simulation", or the players) pushed the page past
+    // the frame's 480 px, so it scrolled for nothing.
+    const html = generateReplayHtml({ log, title: 'Branch Simulation', format: 'gen9ou', p1: 'Alice', p2: 'Bob' });
+    const styles = html.slice(html.indexOf('<style>'), html.indexOf('</style>'));
+    expect(styles).toContain('body{padding:0 0 12px;background:#344b6c;}');
+    expect(styles).toContain('.wrapper.replay-wrapper{margin-top:-9px;}');
+    expect(html).not.toContain('<h1');
+    expect(html.match(/Branch Simulation/g)).toEqual(['Branch Simulation']);
+    expect(html).toContain('<title>Branch Simulation</title>');
+  });
+
+  test('the frame height in layout.css is REPLAY_FRAME_HEIGHT (round 77)', () => {
+    const css = readFileSync(fileURLToPath(new URL('../../src/styles/layout.css', import.meta.url)), 'utf8');
+    const rule = /\.ps-iframe-wrap iframe \{[^}]*min-height: (\d+)px;/.exec(css);
+    expect(Number(rule?.[1])).toBe(REPLAY_FRAME_HEIGHT);
   });
 
   test('disables Showdown replay sound before embed code loads', () => {

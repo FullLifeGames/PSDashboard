@@ -1,6 +1,6 @@
 import { test, expect, type Route } from '@playwright/test';
 import { routeSmogon } from './smogon-routes';
-import { fixturePath, fixtureReplay, installReplayEmbedCache, routeOfflineFixtures } from './helpers';
+import { fixturePath, fixtureReplay, fromSetup, installReplayEmbedCache, routeOfflineFixtures } from './helpers';
 
 test.beforeAll(installReplayEmbedCache);
 
@@ -82,7 +82,7 @@ test.describe('PS Dashboard', () => {
     await page.locator('button', { hasText: 'Load' }).click();
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
 
-    await page.locator('button', { hasText: 'Import/Export Sets' }).click();
+    await fromSetup(page, 'Import/Export Sets');
     const dialog = page.getByRole('dialog', { name: 'Import / Export Sets' });
     await expect(dialog).toBeVisible();
 
@@ -100,7 +100,7 @@ test.describe('PS Dashboard', () => {
 
   test('imported sets persist per replay across reloads', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
-    await page.locator('button', { hasText: 'Import/Export Sets' }).click();
+    await fromSetup(page, 'Import/Export Sets');
     const dialog = page.getByRole('dialog', { name: 'Import / Export Sets' });
     await dialog.locator('textarea')
       .fill('=== p1 ===\n\nGarchomp @ Choice Band\n- Earthquake');
@@ -115,7 +115,7 @@ test.describe('PS Dashboard', () => {
   test('team editor offers legal dropdown pools and validates moves', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
-    await page.locator('button', { hasText: 'Edit Player' }).click();
+    await fromSetup(page, 'Edit Player');
     const editor = page.getByRole('dialog', { name: 'Edit Player Team' });
     const garchompCard = editor.locator('.ps-panel').filter({ hasText: 'Garchomp' }).first();
 
@@ -146,7 +146,7 @@ test.describe('PS Dashboard', () => {
 
   test('rejects an import without side headers', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
-    await page.locator('button', { hasText: 'Import/Export Sets' }).click();
+    await fromSetup(page, 'Import/Export Sets');
     const dialog = page.getByRole('dialog', { name: 'Import / Export Sets' });
     await dialog.locator('textarea').fill('Garchomp @ Choice Band\n- Earthquake');
     await dialog.locator('button', { hasText: 'Import' }).click();
@@ -189,9 +189,10 @@ test.describe('PS Dashboard', () => {
     await expect(page.locator('button', { hasText: 'Save Team' })).toBeVisible();
   });
 
-  test('Edit Opp button appears after loading replay', async ({ page }) => {
+  test('the Setup menu offers Edit Opp after loading a replay', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
-    await expect(page.locator('button', { hasText: 'Edit Opp' })).toBeVisible({ timeout: 10000 });
+    await page.getByRole('button', { name: 'Setup', exact: true }).click({ timeout: 10000 });
+    await expect(page.locator('.ps-setup-panel').getByRole('button', { name: 'Edit Opp' })).toBeVisible();
   });
 
   test('Battle Statistics panel appears after loading replay', async ({ page }) => {

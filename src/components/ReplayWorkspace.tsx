@@ -12,6 +12,7 @@ import type { AppController } from '../hooks/useAppController';
 import { useMemo } from 'react';
 import { logRules, type ReplayData } from '@fulllifegames/replay-core';
 import { ReplayRulesContext } from '../lib/replay-rules';
+import { REPLAY_FRAME_HEIGHT } from '../lib/replay-html';
 
 interface WorkspaceProps {
   app: AppController;
@@ -59,7 +60,7 @@ function BattleFrame({ app, replayData }: WorkspaceProps) {
           p1={replayData.players[0]}
           p2={replayData.players[1]}
           title="Branch Simulation"
-          height={480}
+          height={REPLAY_FRAME_HEIGHT}
           seekTurn={viewTurn}
           autoPlay={false}
           viewpoint={replayData.viewpoint}
@@ -77,7 +78,7 @@ function BattleFrame({ app, replayData }: WorkspaceProps) {
           format={replayData.format}
           p1={replayData.players[0]}
           p2={replayData.players[1]}
-          height={480}
+          height={REPLAY_FRAME_HEIGHT}
           seekTurn={viewT0 ? 0 : viewTurn}
           autoPlay={false}
           viewpoint={replayData.viewpoint}

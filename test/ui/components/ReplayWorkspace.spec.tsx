@@ -51,7 +51,7 @@ const sideLabels = () => [...document.querySelectorAll('.ps-side-label')].map(la
 describe('ReplayWorkspace', () => {
   test('a loaded singles replay shows the top bar, the battle frame, the timeline, the loader, the pickers, and the evaluation column', async () => {
     const { app, replay } = await mountLoaded('singles');
-    expect(screen.getByRole('button', { name: 'Edit Opp' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Setup' })).toBeInTheDocument();
     expect(screen.getByTitle('PS Replay')).toHaveAttribute('src', expect.stringMatching(/^blob:/));
     expect(screen.getByRole('slider', { name: 'Timeline turn selector' })).toBeInTheDocument();
     expect((screen.getByRole('textbox', { name: 'Replay URL or ID' }) as HTMLInputElement).value).toContain(replay.id);

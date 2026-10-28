@@ -79,7 +79,12 @@ async function mountSettled(replay: ReplayData) {
   await waitFor(() => expect(app().ctx.knowledge.solvedSpreads).not.toBeNull(), { timeout: 60_000 });
 }
 
-const openSets = () => userEvent.click(screen.getByRole('button', { name: 'Import/Export Sets' }));
+/** The team actions sit in the top bar's Setup menu (round 77, user request 28.10.2026). */
+const fromSetup = async (name: string) => {
+  await userEvent.click(screen.getByRole('button', { name: 'Setup' }));
+  await userEvent.click(screen.getByRole('button', { name }));
+};
+const openSets = () => fromSetup('Import/Export Sets');
 
 describe('the sets export and import leave the inference where it was', () => {
   test.each([
@@ -163,7 +168,7 @@ describe('the team editor and an early sets panel keep the inference', () => {
     await mountSettled(replay);
     const before = rowsOf(await buildReplayTeams(replay, app().ctx.teamSources));
     for (const [button, title] of [['Edit Player', 'Edit Player Team'], ['Edit Opp', 'Edit Opponent Team']] as const) {
-      await userEvent.click(screen.getByRole('button', { name: button }));
+      await fromSetup(button);
       await screen.findByRole('dialog', { name: title });
       await userEvent.click(screen.getByRole('button', { name: 'Save' }));
       await waitFor(() => expect(screen.queryByRole('dialog', { name: title })).toBeNull());
@@ -178,7 +183,7 @@ describe('the team editor and an early sets panel keep the inference', () => {
     const replay = JSON.parse(readFileSync(join('test', 'e2e-feedback', 'fixtures', `${id}.json`), 'utf-8')) as ReplayData;
     const reference = await settledRows(replay);
     await mountEarly(replay);
-    await userEvent.click(screen.getByRole('button', { name: 'Edit Opp' }));
+    await fromSetup('Edit Opp');
     await userEvent.click(await screen.findByRole('button', { name: 'Save' }, { timeout: 60_000 }));
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Edit Opponent Team' })).toBeNull());
     expect(rowsOf(await buildReplayTeams(replay, app().ctx.teamSources))).toEqual(reference);

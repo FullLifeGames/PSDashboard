@@ -30,13 +30,17 @@ const slot = (label: string) => {
 };
 
 describe('BranchPanel', () => {
-  test('nothing renders without a position; an ended position keeps only the log toggle', () => {
+  test('nothing renders without a position; an ended position names the winner where the pickers were', () => {
     const { rerender, container } = render(<BranchPanel {...props({ simState: null })} />);
     expect(container).toBeEmptyDOMElement();
-    rerender(<BranchPanel {...props({ simState: simState('singles', { ended: true, winner: 'p1' }) })} />);
+    rerender(<BranchPanel {...props({ simState: simState('singles', { ended: true, winner: 'Bene' }) })} />);
     expect(screen.queryByRole('button', { name: /Earthquake/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Select|Execute/ })).toBeNull();
     expect(screen.getByRole('button', { name: 'Show Raw Protocol Log' })).toBeInTheDocument();
+    // Round 77 (user request 28.10.2026): the winner left the top bar for this spot.
+    expect(screen.getByRole('status')).toHaveTextContent('Bene wins this variation.');
+    rerender(<BranchPanel {...props({ simState: simState('singles', { ended: true, winner: null }) })} />);
+    expect(screen.getByRole('status')).toHaveTextContent('The variation ended without a winner.');
   });
 
   test('a stale panel (the last position, shown while the viewed one resolves) takes no input', () => {
