@@ -114,15 +114,14 @@ function usePlayLayer(
   const { evaluation } = ctx;
   const {
     playOut, setPlayOut, setPlayOutNotice, playOutProcessedRef, playOutRef, stopPlayOutRef,
-    pendingConfirm, fastPlayOut,
+    pendingConfirm, fastPlayOut, leadPicksRef,
   } = transients;
   const {
-    liveTip, viewingVariation, atEndPosition, viewT0, viewTurn, variationSpan, tipTurn,
-    navigateTo, setNavSeek, setVariationScores, evalViewKey,
+    liveTip, viewingVariation, atEndPosition, viewT0, viewTurn, tipTurn,
+    holdTipFollow, navigateTo, setNavSeek, evalViewKey,
   } = board.timeline;
   const {
-    branchPreparing, handleSetChoice, requestDeviation, setBranchDivergence,
-    rebuildAt, startLeadVariation, defaultLeadSelection,
+    branchPreparing, handleSetChoice, requestDeviation, setBranchDivergence, startLeadVariation, setVariationNotice,
   } = board.deviation;
   const { handleEvaluate } = evalView;
 
@@ -139,9 +138,9 @@ function usePlayLayer(
   const playOutControls = usePlayOut({
     playOut, setPlayOut, setPlayOutNotice, playOutProcessedRef, playOutRef, stopPlayOutRef,
     evaluation, fastPlayOut, evalViewKey, liveEvalStatus: board.liveEvalStatus, liveTip, viewingVariation, atEndPosition, viewT0,
-    viewTurn, variationSpan, tipTurn, navigateTo, setNavSeek, setVariationScores,
+    viewTurn, tipTurn, holdTipFollow, navigateTo, setNavSeek,
     executing, branchPreparing, getBattle, executeTurn, handleEvaluate, applyEvalChoice: walk.applyEvalChoice,
-    rebuildAt, requestDeviation, startLeadVariation, defaultLeadSelection,
+    requestDeviation, startLeadVariation, leadPicksRef, setVariationNotice,
   });
   return { walk, playOutControls };
 }

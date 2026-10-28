@@ -41,6 +41,14 @@ export function nextPlayOutStep(result: EvalResult, battleEnded: boolean, execut
   return { kind: 'done', reason: 'no-choices' };
 }
 
+/**
+ * The preferences a run gives back: the run switched Auto on for its evaluations, so the user's own setting returns
+ * when it ends, by Stop, by finish or by Discard (round 77, C4). Null when nothing needs to change.
+ */
+export function prefsAfterRun<T extends { auto: boolean }>(prefs: T, run: { prevAuto: boolean }): T | null {
+  return run.prevAuto ? null : { ...prefs, auto: false };
+}
+
 /** Human sentence for why a play-out ended (shown in the panel notice). */
 export function playOutDoneText(reason: 'ended' | 'cap' | 'no-choices', executed: number): string {
   const turns = `${executed} turn${executed === 1 ? '' : 's'}`;

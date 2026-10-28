@@ -8,6 +8,8 @@ interface PlayOutBarProps {
   /** The viewed position is an ended game: nothing is left to play out (round 77, A-6). */
   ended?: boolean;
   viewTurn: number;
+  /** The turn 0 view is open: the run starts from the leads the picker shows (round 77, C2). */
+  atTurnZero?: boolean;
   startDisabled: boolean;
   /** The session option: depth-1 matrix on every turn of the run. */
   fastPlayOut: boolean;
@@ -46,8 +48,8 @@ function RunningRow({ fastPlayOut, onStopPlayOut }: Pick<PlayOutBarProps, 'fastP
 }
 
 /** The launcher with its hint and the fast option. */
-function StartRow({ viewTurn, startDisabled, fastPlayOut, onStartPlayOut, onFastPlayOutChange }: Pick<PlayOutBarProps,
-  'viewTurn' | 'startDisabled' | 'fastPlayOut' | 'onStartPlayOut' | 'onFastPlayOutChange'>) {
+function StartRow({ viewTurn, atTurnZero, startDisabled, fastPlayOut, onStartPlayOut, onFastPlayOutChange }: Pick<PlayOutBarProps,
+  'viewTurn' | 'atTurnZero' | 'startDisabled' | 'fastPlayOut' | 'onStartPlayOut' | 'onFastPlayOutChange'>) {
   return (
     <>
       <button
@@ -61,7 +63,9 @@ function StartRow({ viewTurn, startDisabled, fastPlayOut, onStartPlayOut, onFast
         &#9658; Let it play out
       </button>
       <span style={{ fontSize: 10, color: '#8fa3bd' }}>
-        engine finishes the game from turn {viewTurn}; watch the result from here afterwards
+        {atTurnZero
+          ? 'engine plays the game from turn 0 with the leads picked above'
+          : `engine finishes the game from turn ${viewTurn}; watch the result from here afterwards`}
       </span>
       <label title={fastTitle(readSearchBudget())} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#aabbcc' }}>
         <input
@@ -78,7 +82,7 @@ function StartRow({ viewTurn, startDisabled, fastPlayOut, onStartPlayOut, onFast
 
 /** "Let it play out" launcher, the fast option, the running notice, and the finished-line watch entry. */
 export function PlayOutBar({
-  playOut, playOutNotice, hasVariation, ended = false, viewTurn, startDisabled, fastPlayOut,
+  playOut, playOutNotice, hasVariation, ended = false, viewTurn, atTurnZero = false, startDisabled, fastPlayOut,
   onStartPlayOut, onStopPlayOut, onWatchFrom, onFastPlayOutChange,
 }: PlayOutBarProps) {
   return (
@@ -89,7 +93,7 @@ export function PlayOutBar({
         ? <span style={{ fontSize: 11, color: '#8fa3bd' }}>The game ended at this position: nothing left to play out.</span>
         : (
           <StartRow
-            viewTurn={viewTurn} startDisabled={startDisabled} fastPlayOut={fastPlayOut}
+            viewTurn={viewTurn} atTurnZero={atTurnZero} startDisabled={startDisabled} fastPlayOut={fastPlayOut}
             onStartPlayOut={onStartPlayOut} onFastPlayOutChange={onFastPlayOutChange}
           />
         )}

@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import { spriteUrl } from '../lib/sprite-url';
+import { displayName } from '../lib/branch-history';
 import { useReplayRules } from '../lib/replay-rules';
 import { useLeadSelection } from '../hooks/useLeadSelection';
 import type { LeadOption } from '../lib/lead-options';
@@ -18,6 +20,8 @@ interface Props {
   /** True while the sim rebuilds or executes — blocks the start button. */
   executing: boolean;
   onStart: (leads: { p1: string[]; p2: string[] }) => void;
+  /** The complete selection on screen, null while it is unfinished or the panel leaves (the play-out starts from it). */
+  onPicksChange?: (leads: { p1: string[]; p2: string[] } | null) => void;
 }
 
 const SLOT_LABELS = ['a', 'b', 'c'];
@@ -38,6 +42,8 @@ function LeadOptionButton({ option, slot, leadsPerSide, showBadges, onToggle }: 
   onToggle: (species: string) => void;
 }) {
   const rules = useReplayRules();
+  // The switch chips of the turn pickers read this same label (round 77, C10).
+  const label = displayName(option.name, option.species);
   return (
     <button
       type="button"
@@ -45,12 +51,12 @@ function LeadOptionButton({ option, slot, leadsPerSide, showBadges, onToggle }: 
       className={`ps-switchbtn ps-switchbtn-compact ${slot >= 0 ? 'ps-switchbtn-selected' : ''}`}
       aria-pressed={slot >= 0}
       title={option.wasLead
-        ? `${option.name} led the real game.`
+        ? `${label} led the real game.`
         : option.wasBrought
-          ? `${option.name} was brought in the real game.`
-          : option.name}
+          ? `${label} was brought in the real game.`
+          : label}
     >
-      <img src={spriteUrl(option.species, rules)} alt={option.name} />
+      <img src={spriteUrl(option.species, rules)} alt={label} />
       <div className="ps-switchbtn-name">
         {slot >= 0 && showBadges && (
           <span
@@ -60,7 +66,7 @@ function LeadOptionButton({ option, slot, leadsPerSide, showBadges, onToggle }: 
             {slot < leadsPerSide ? SLOT_LABELS[slot] : slot + 1}
           </span>
         )}
-        {option.name}
+        {label}
         {option.wasLead && <span className="ps-played-badge" title="This Pokémon led the real game.">played</span>}
       </div>
     </button>
@@ -111,9 +117,14 @@ function panelIntro(bringCount: number | null, leadsPerSide: number): string {
  * slots in doubles) and, in bring-limited formats, the whole brought
  * selection; then play the game from the start as a variation.
  */
-export function LeadPanel({ playerNames, p1Options, p2Options, leadsPerSide, bringCount, pickedLeads, executing, onStart }: Props) {
+export function LeadPanel({ playerNames, p1Options, p2Options, leadsPerSide, bringCount, pickedLeads, executing, onStart, onPicksChange }: Props) {
   const maxPicks = bringCount ?? leadsPerSide;
   const { p1Leads, p2Leads, toggleP1, toggleP2 } = useLeadSelection({ p1Options, p2Options, pickedLeads, maxPicks });
+  const ready = p1Leads.length === maxPicks && p2Leads.length === maxPicks;
+  useEffect(() => {
+    onPicksChange?.(ready ? { p1: [...p1Leads], p2: [...p2Leads] } : null);
+    return () => onPicksChange?.(null);
+  }, [ready, p1Leads, p2Leads, onPicksChange]);
 
   if (p1Options.length === 0 || p2Options.length === 0) {
     return (
@@ -123,7 +134,6 @@ export function LeadPanel({ playerNames, p1Options, p2Options, leadsPerSide, bri
     );
   }
 
-  const ready = p1Leads.length === maxPicks && p2Leads.length === maxPicks;
   return (
     <div>
       <div style={{ fontSize: 10, color: '#9fb2cc', margin: '4px 0 2px' }}>

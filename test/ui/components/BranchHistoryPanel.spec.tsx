@@ -46,6 +46,15 @@ describe('BranchHistoryPanel', () => {
     expect(onNavigate).toHaveBeenCalledWith({ turn: 4, line: 'variation' });
   });
 
+  // Round 77 (C7): the panel does not know singles from doubles; an ended tip offers no play on.
+  test('an ended tip says the game ends there and no longer invites to continue', async () => {
+    const onNavigate = vi.fn();
+    render(<BranchHistoryPanel branchStartTurn={2} history={[entry(2), entry(3)]} snapshots={snapshots} onNavigate={onNavigate} ended />);
+    expect(screen.queryByRole('button', { name: /continue playing here/ })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'End of the variation: the game is over here' }));
+    expect(onNavigate).toHaveBeenCalledWith({ turn: 4, line: 'variation' });
+  });
+
   test('a forced replacement is its own row and consumes no turn', () => {
     const forced = entry(3, { kind: 'forced', forcedSide: 'p2', p1Choice: '—', p2Choice: 'switch 3' });
     render(<BranchHistoryPanel branchStartTurn={2} history={[entry(2), forced, entry(3)]} snapshots={snapshots} onNavigate={vi.fn()} />);

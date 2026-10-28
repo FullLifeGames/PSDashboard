@@ -81,6 +81,24 @@ describe('useTimelineController', () => {
     expect(result.current.ctx.branchWindowOpenRef.current).toBe(false);
   }, 90_000);
 
+  // Round 77 (C4): discarding the variation during a run ends the run and gives the user's Auto setting back.
+  test('discarding the variation during a play-out ends the run and restores the Auto setting', () => {
+    const { result } = renderHook(() => useBoardHarness());
+    act(() => result.current.ctx.evaluation.setPrefs({ ...result.current.ctx.evaluation.prefs, auto: false }));
+    act(() => result.current.ctx.evaluation.setPrefs({ ...result.current.ctx.evaluation.prefs, auto: true }));
+    expect(result.current.ctx.evaluation.prefs.auto).toBe(true);
+    act(() => result.current.transients.setPlayOut({ active: true, executed: 0, turns: 2, startTurn: 3, prevAuto: false }));
+    act(() => result.current.board.discardVariation());
+    expect(result.current.transients.playOut).toBeNull();
+    expect(result.current.ctx.evaluation.prefs.auto).toBe(false);
+
+    // A run that began with Auto on leaves it on.
+    act(() => result.current.ctx.evaluation.setPrefs({ ...result.current.ctx.evaluation.prefs, auto: true }));
+    act(() => result.current.transients.setPlayOut({ active: true, executed: 0, turns: 0, startTurn: 3, prevAuto: true }));
+    act(() => result.current.board.discardVariation());
+    expect(result.current.ctx.evaluation.prefs.auto).toBe(true);
+  });
+
   test('a stale evaluation result reads as stale until the pointer returns to its position', async () => {
     const replay = singlesReplay();
     const { result } = renderHook(() => useBoardHarness());

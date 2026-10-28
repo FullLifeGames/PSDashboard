@@ -1,7 +1,6 @@
 import { useCallback, useEffect, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import type { EvalResult, RankedChoice } from '@fulllifegames/eval-engine';
-import { FAST_PLAY_OUT_SETTINGS, nextPlayOutStep, playOutDoneText } from '../lib/play-out';
-import type { VariationSpan } from '../lib/timeline';
+import { FAST_PLAY_OUT_SETTINGS, nextPlayOutStep, playOutDoneText, prefsAfterRun } from '../lib/play-out';
 import type { useBranch } from './useBranch';
 import type { useEvaluation } from './useEvaluation';
 import type { LeadSelection } from './useDeviation';
@@ -35,30 +34,34 @@ export interface PlayOutInputs {
   atEndPosition: boolean;
   viewT0: boolean;
   viewTurn: number;
-  variationSpan: VariationSpan | null;
   tipTurn: number | null;
+  /** Keeps the pointer where the run leaves it when a turn still in flight lands (the timeline's tip-follow). */
+  holdTipFollow: () => void;
   navigateTo: (position: { turn: number; line: 'main' | 'variation' }, opts?: { seek?: boolean; internal?: boolean }) => void;
   setNavSeek: Dispatch<SetStateAction<{ turn: number; seq: number; play?: boolean } | null>>;
-  setVariationScores: Dispatch<SetStateAction<(number | null)[]>>;
   executing: boolean;
   branchPreparing: boolean;
   getBattle: Branch['getBattle'];
   executeTurn: Branch['executeTurn'];
   handleEvaluate: () => void;
   applyEvalChoice: (side: 'p1' | 'p2', ranked: RankedChoice) => boolean;
-  rebuildAt: (position: { turn: number; line: 'main' | 'variation' }, prefill: null) => Promise<void>;
-  requestDeviation: (prefill: null) => void;
+  requestDeviation: (prefill: null, opts?: { onStart?: () => void }) => void;
   startLeadVariation: (leads: LeadSelection, opts?: { onStart?: () => void }) => void;
-  defaultLeadSelection: () => LeadSelection;
+  /** The lead picker's complete selection while the turn 0 view shows it, else null (set by LeadPanel). */
+  leadPicksRef: MutableRefObject<LeadSelection | null>;
+  /** The note under the timeline for a start the app refused. */
+  setVariationNotice: (notice: string | null) => void;
 }
 
 /** Finish/stop plumbing plus the watch-from-turn seek. */
 function usePlayOutFinish(args: PlayOutInputs) {
-  const { evaluation, setPlayOut, setPlayOutNotice, playOutRef, navigateTo, setNavSeek, tipTurn, playOut } = args;
+  const { evaluation, setPlayOut, setPlayOutNotice, playOutRef, navigateTo, setNavSeek, tipTurn, playOut, holdTipFollow } = args;
   const finishPlayOut = useCallback((current: PlayOutState, text: string, opts?: { returnToStart?: boolean }) => {
-    if (!current.prevAuto) evaluation.setPrefs({ ...evaluation.prefs, auto: false });
+    const restored = prefsAfterRun(evaluation.prefs, current);
+    if (restored) evaluation.setPrefs(restored);
     evaluation.setEngineOverride(null);
     playOutRef.current = null;
+    holdTipFollow();
     setPlayOut(null);
     setPlayOutNotice({ text, watchTurn: current.startTurn });
     // The engine's play dragged the pointer along to the tip; hand the view
@@ -67,7 +70,7 @@ function usePlayOutFinish(args: PlayOutInputs) {
     if ((opts?.returnToStart ?? true) && current.turns > 0) {
       navigateTo({ turn: current.startTurn, line: 'variation' }, { seek: true, internal: true });
     }
-  }, [evaluation, setPlayOut, setPlayOutNotice, playOutRef, navigateTo]);
+  }, [evaluation, setPlayOut, setPlayOutNotice, playOutRef, navigateTo, holdTipFollow]);
 
   const stopPlayOut = useCallback((opts?: { returnToStart?: boolean }) => {
     if (playOut) {
@@ -90,39 +93,34 @@ function usePlayOutFinish(args: PlayOutInputs) {
 /** Arms the loop from whatever position the pointer holds (T0 included). */
 function useStartPlayOut(args: PlayOutInputs) {
   const {
-    evaluation, fastPlayOut, setPlayOut, setPlayOutNotice, playOutProcessedRef, setVariationScores,
-    viewT0, variationSpan, rebuildAt, startLeadVariation, defaultLeadSelection,
+    evaluation, fastPlayOut, setPlayOut, setPlayOutNotice, playOutProcessedRef,
+    viewT0, startLeadVariation, leadPicksRef, setVariationNotice,
     liveTip, viewingVariation, atEndPosition, requestDeviation, handleEvaluate, viewTurn,
   } = args;
   return useCallback(() => {
     // The fast option pins the engine BEFORE the first evaluation is asked
     // for; the finish (or a replay change) releases it.
     const pinEngine = () => evaluation.setEngineOverride(fastPlayOut ? FAST_PLAY_OUT_SETTINGS : null);
-    // Turn 0: the run INCLUDES the lead decision. Branching at the shared
-    // turn-1 prefix instead produced a variation without its turn 0 — the
-    // moves list started at turn 1 and viewing turn 1 fell back to the main
-    // line (coverage begins one turn after the branch point).
+    // The loop advances on completed evals: Auto keeps them coming after forced interludes, and the user's own
+    // setting returns at the end (prefsAfterRun).
+    const armRun = (startTurn: number) => {
+      const prevAuto = evaluation.prefs.auto;
+      if (!prevAuto) evaluation.setPrefs({ ...evaluation.prefs, auto: true });
+      pinEngine();
+      playOutProcessedRef.current = null;
+      setPlayOutNotice(null);
+      setPlayOut({ active: true, executed: 0, turns: 0, startTurn, prevAuto });
+    };
+    // Turn 0: the run INCLUDES the lead decision and plays from the leads the picker shows, through the road of
+    // "Play from turn 0" (its replace confirm guards a standing variation, hand-played turns included). Branching
+    // at the shared turn-1 prefix produced a variation without its turn 0 (round 77, C2).
     if (viewT0) {
-      const arm = () => {
-        const prevAuto = evaluation.prefs.auto;
-        if (!prevAuto) evaluation.setPrefs({ ...evaluation.prefs, auto: true });
-        pinEngine();
-        playOutProcessedRef.current = null;
-        setPlayOutNotice(null);
-        setPlayOut({ active: true, executed: 0, turns: 0, startTurn: 1, prevAuto });
-      };
-      if (variationSpan?.startTurn === 0) {
-        // A lead variation stands: keep its turn-0 decision, cut the tail
-        // (the chess truncate), and let the engine play the game again.
-        arm();
-        setVariationScores(previous => previous.map((value, index) => (index + 1 > 1 ? null : value)));
-        void rebuildAt({ turn: 1, line: 'variation' }, null);
+      const picks = leadPicksRef.current;
+      if (!picks) {
+        setVariationNotice('Finish the lead picks above before the engine plays from turn 0.');
         return;
       }
-      // No lead variation yet: seed one with the picker's default (the real
-      // game's leads and bring). The replace-confirm still guards an
-      // existing variation — arming waits for the user's yes.
-      startLeadVariation(defaultLeadSelection(), { onStart: arm });
+      startLeadVariation(picks, { onStart: () => armRun(1) });
       return;
     }
     // The post-battle sentinel has nothing to play — surface the existing
@@ -131,22 +129,21 @@ function useStartPlayOut(args: PlayOutInputs) {
       requestDeviation(null);
       return;
     }
+    const startTurn = viewTurn;
+    const arm = () => armRun(startTurn);
     // Same gates as any deviation: rebuild to here first when the live sim
-    // stands elsewhere (incl. the replace confirm on the main line).
-    if (!liveTip) requestDeviation(null);
-    const prevAuto = evaluation.prefs.auto;
-    // The loop advances on completed evals — auto keeps them coming after
-    // forced interludes; the user's own setting is restored at the end.
-    if (!prevAuto) evaluation.setPrefs({ ...evaluation.prefs, auto: true });
-    pinEngine();
-    playOutProcessedRef.current = null;
-    setPlayOutNotice(null);
-    setPlayOut({ active: true, executed: 0, turns: 0, startTurn: viewTurn, prevAuto });
-    if (liveTip) handleEvaluate();
+    // stands elsewhere. The run arms when the deviation starts, after the
+    // replace confirm's yes: Cancel leaves everything as it was (round 77, C4).
+    if (!liveTip) {
+      requestDeviation(null, { onStart: arm });
+      return;
+    }
+    arm();
+    handleEvaluate();
   }, [
-    viewT0, variationSpan, rebuildAt, startLeadVariation, defaultLeadSelection, liveTip,
+    viewT0, startLeadVariation, leadPicksRef, setVariationNotice, liveTip,
     viewingVariation, atEndPosition, requestDeviation, evaluation, fastPlayOut, handleEvaluate, viewTurn,
-    setPlayOut, setPlayOutNotice, playOutProcessedRef, setVariationScores,
+    setPlayOut, setPlayOutNotice, playOutProcessedRef,
   ]);
 }
 
@@ -166,9 +163,12 @@ function usePlayOutLoop(args: PlayOutInputs, finishPlayOut: ReturnType<typeof us
    */
   useEffect(() => {
     if (!playOut?.active || !liveTip || executing || branchPreparing) return;
-    if (liveEvalStatus !== 'idle' && liveEvalStatus !== 'stale') return;
+    // A stale position is the Auto pref's to evaluate (the run switched it on): asking here too sent two
+    // evaluations per position. Only a user who turned Auto off mid-run leaves the kick to us.
+    const autoCovers = liveEvalStatus === 'stale' && evaluation.prefs.auto;
+    if ((liveEvalStatus !== 'idle' && liveEvalStatus !== 'stale') || autoCovers) return;
     handleEvaluate();
-  }, [playOut?.active, liveTip, executing, branchPreparing, liveEvalStatus, handleEvaluate]);
+  }, [playOut?.active, liveTip, executing, branchPreparing, liveEvalStatus, evaluation.prefs.auto, handleEvaluate]);
 
   useEffect(() => {
     if (!playOut?.active || !liveTip || executing || branchPreparing) return;
@@ -179,8 +179,8 @@ function usePlayOutLoop(args: PlayOutInputs, finishPlayOut: ReturnType<typeof us
     if (playOutProcessedRef.current === evaluation.result) return;
     playOutProcessedRef.current = evaluation.result;
     const step = nextPlayOutStep(evaluation.result, getBattle()?.ended ?? false, playOut.executed);
-    applyLoopStep({ step, playOut, finishPlayOut, applyEvalChoice, setPlayOut, executeTurn, handleEvaluate });
-  }, [playOut, liveTip, executing, branchPreparing, evaluation.status, evaluation.result, evaluation.resultTag, evalViewKey, getBattle, applyEvalChoice, executeTurn, handleEvaluate, finishPlayOut, playOutProcessedRef, setPlayOut]);
+    applyLoopStep({ step, playOut, finishPlayOut, applyEvalChoice, setPlayOut, executeTurn });
+  }, [playOut, liveTip, executing, branchPreparing, evaluation.status, evaluation.result, evaluation.resultTag, evalViewKey, getBattle, applyEvalChoice, executeTurn, finishPlayOut, playOutProcessedRef, setPlayOut]);
 
   /**
    * The loop advances on COMPLETED evaluations — an evaluation that fails
@@ -202,9 +202,8 @@ function applyLoopStep(args: {
   applyEvalChoice: PlayOutInputs['applyEvalChoice'];
   setPlayOut: PlayOutInputs['setPlayOut'];
   executeTurn: PlayOutInputs['executeTurn'];
-  handleEvaluate: PlayOutInputs['handleEvaluate'];
 }) {
-  const { step, playOut, finishPlayOut, applyEvalChoice, setPlayOut, executeTurn, handleEvaluate } = args;
+  const { step, playOut, finishPlayOut, applyEvalChoice, setPlayOut, executeTurn } = args;
   const turnWord = playOut.turns === 1 ? '' : 's';
   if (step.kind === 'done') {
     finishPlayOut(playOut, playOutDoneText(step.reason, playOut.turns));
@@ -216,7 +215,12 @@ function applyLoopStep(args: {
       return;
     }
     setPlayOut({ ...playOut, executed: playOut.executed + 1, turns: playOut.turns + 1 });
-    void executeTurn().then(() => handleEvaluate());
+    // The next position is evaluated once the turn landed: by the Auto pref (stale position, set on by the run) or,
+    // with Auto off, by the kick effect. A call here used the closure of the turn before, tagged the result with the
+    // old position and cancelled the evaluation of the right one.
+    void executeTurn().then(error => {
+      if (error) finishPlayOut(playOut, `Play-out stopped after ${playOut.turns} turn${playOut.turns === 1 ? '' : 's'}: the turn could not be played (${error}).`);
+    });
     return;
   }
   // Single (forced) side: setChoice auto-executes forced replacements and

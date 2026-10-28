@@ -96,6 +96,9 @@ function LeadRegion({ app, replayData }: WorkspaceProps) {
   const { executing, history } = app.ctx.branch;
   const { branchPreparing, leadOptions, startLeadVariation } = app.board.deviation;
   const { replayGameType, bringCount } = app.ctx.meta;
+  const { setLeadPicks } = app.transients;
+  // One reading of the picks for both buttons: a bring-limited format carries its back line along.
+  const withBring = (leads: { p1: string[]; p2: string[] }) => (bringCount !== null ? { ...leads, bring: true } : leads);
   return (
     <LeadPanel
       key={`${replayData.id}:${leadOptions.p1.length}`}
@@ -106,7 +109,8 @@ function LeadRegion({ app, replayData }: WorkspaceProps) {
       bringCount={bringCount}
       pickedLeads={variationSpan?.startTurn === 0 ? history[0]?.leadChoices ?? null : null}
       executing={executing || branchPreparing}
-      onStart={leads => startLeadVariation(bringCount !== null ? { ...leads, bring: true } : leads)}
+      onStart={leads => startLeadVariation(withBring(leads))}
+      onPicksChange={picks => setLeadPicks(picks && withBring(picks))}
     />
   );
 }
@@ -166,6 +170,7 @@ function BranchSidePanels({ app, replayData }: WorkspaceProps) {
         snapshots={snapshots}
         currentPosition={{ turn: viewTurn, line: viewingVariation ? 'variation' : 'main' }}
         onNavigate={navigateTo}
+        ended={app.ctx.branch.simState?.ended ?? false}
       />
       <BranchSaveSharePanel
         replayData={replayData}
@@ -187,7 +192,7 @@ function WorkspaceAlert({ text }: { text: string }) {
 
 function WorkspaceLeft({ app, replayData }: WorkspaceProps) {
   const { branchDivergence, variationNotice } = app.board.deviation;
-  const { pendingConfirm, setPendingConfirm, setPlayOut } = app.transients;
+  const { pendingConfirm, setPendingConfirm } = app.transients;
   const { variationSpan } = app.board.timeline;
   const { branching } = app.ctx.branch;
   const { loading, error, embed, loadReplay, loadReplayFile, loadedReplayUrl } = app.ctx.replay;
@@ -220,7 +225,7 @@ function WorkspaceLeft({ app, replayData }: WorkspaceProps) {
         <ConfirmBanner
           message={pendingConfirm.message}
           onProceed={pendingConfirm.proceed}
-          onCancel={() => { setPendingConfirm(null); app.engine.walk.clearPendingPick(); setPlayOut(null); }}
+          onCancel={() => { setPendingConfirm(null); app.engine.walk.clearPendingPick(); }}
         />
       )}
       <PickerRegion app={app} replayData={replayData} />

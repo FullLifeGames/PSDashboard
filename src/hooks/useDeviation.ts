@@ -14,6 +14,9 @@ import { useVariationNotice } from './useVariationNotice';
 
 type Branch = ReturnType<typeof useBranch>;
 
+/** The choices a deviation executes once its rebuild landed. */
+type DeviationPrefill = { p1Choices: (BranchSlotChoice | null)[]; p2Choices: (BranchSlotChoice | null)[] };
+
 export interface LeadSelection { p1: string[]; p2: string[]; bring?: boolean }
 
 export type DeviationTimeline = Pick<Timeline,
@@ -37,6 +40,8 @@ export interface DeviationInputs {
   setPendingConfirm: (confirm: { message: string; proceed: () => void } | null) => void;
   draftChoices: { p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] };
   setDraftChoices: (draft: { p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] }) => void;
+  /** A rebuild really starts (after any replace confirm): the notice of a finished play-out ends here (round 77, C7). */
+  onDeviate?: () => void;
 }
 
 /** One shared preparation session for rebuilds and refreshes: the progress
@@ -155,7 +160,7 @@ function replaceVariationMessage(leadIn: string, span: { startTurn: number; leng
 export function useDeviation(inputs: DeviationInputs) {
   const {
     replayData, snapshots, observations, sources, bringOnlyLists, bringCount, replayGameType,
-    timeline, branch, acquireRuntime, branchWindowOpenRef, setPendingConfirm, draftChoices, setDraftChoices,
+    timeline, branch, acquireRuntime, branchWindowOpenRef, setPendingConfirm, draftChoices, setDraftChoices, onDeviate,
   } = inputs;
   const { branchPreparing, branchProgress, branchSession, handles: session } = useBranchSession();
   const [branchDivergence, setBranchDivergence] = useState<string | null>(null);
@@ -183,6 +188,7 @@ export function useDeviation(inputs: DeviationInputs) {
     // Turn-0 variation: startBranch needs leads — the caller's (fresh lead
     // branch) or the recorded lead entry's (truncation/refresh rebuild).
     if (startTurn === 0 && !leadOverride && !replayHistory[0]?.leadChoices) return;
+    onDeviate?.();
     await executeRebuild({
       replayData, snapshots, observations, sources,
       // Bring-limited replays (VGC 4 of 6): the interactive branch fields
@@ -198,12 +204,11 @@ export function useDeviation(inputs: DeviationInputs) {
     }, startTurn, replayHistory, prefill, leadOverride);
   }, [
     replayData, session, variationSpan, branch, acquireRuntime, snapshots, observations, sources, bringOnlyLists,
-    branchWindowOpenRef, timeline, reportVariationEnded,
+    branchWindowOpenRef, timeline, reportVariationEnded, onDeviate,
   ]);
 
   const requests = useDeviationRequests({
-    timeline, rebuildAt, branch, setPendingConfirm, setBranchDivergence, setVariationNotice,
-    branchWindowOpenRef,
+    timeline, rebuildAt, branch, setPendingConfirm, setBranchDivergence, setVariationNotice, branchWindowOpenRef,
   });
 
   const handleSetChoice = useCallback((side: 'p1' | 'p2', choice: BranchSlotChoice, activeSlot?: number) => {
@@ -224,7 +229,7 @@ export function useDeviation(inputs: DeviationInputs) {
   const { leadOptions, defaultLeadSelection } = useLeadDefaults(snapshots, bringCount, replayGameType, replayData);
 
   return {
-    session, branchDivergence, setBranchDivergence, variationNotice, reportVariationEnded,
+    session, branchDivergence, setBranchDivergence, variationNotice, setVariationNotice, reportVariationEnded,
     branchPreparing, branchProgress, branchSession,
     cancelPreparation: session.cancelPreparation,
     rebuildAt, ...requests, handleSetChoice, handleExecuteDraft, leadOptions, defaultLeadSelection,
@@ -292,9 +297,7 @@ function useDeviationRequests(args: {
 
   const undoRefusedDeviation = useUndoRefusedDeviation({ ...args, variationSpan });
 
-  const requestDeviation = useCallback((
-    prefill: { p1Choices: (BranchSlotChoice | null)[]; p2Choices: (BranchSlotChoice | null)[] } | null,
-  ) => {
+  const requestDeviation = useCallback((prefill: DeviationPrefill | null, opts?: { onStart?: () => void }) => {
     // The ref, not the closure: see viewTurnRef (slider→click race).
     const position: TimelinePosition = { turn: timeline.viewTurnRef.current, line: timeline.viewLine };
     // The end snapshot is the post-battle sentinel, not a playable turn.
@@ -304,8 +307,8 @@ function useDeviationRequests(args: {
     }
     const kind = classifyDeviation(variationSpan, position);
     const run = () => {
-      // The overlay dies with the entries it belonged to. A deviation that executes a turn waits for the turn to
-      // run: a refused turn restores the old variation with its overlay.
+      opts?.onStart?.();
+      // The overlay dies with its entries; a deviation that executes a turn drops it after the turn ran (a refusal keeps it).
       const dropOverlay = () => dropVariationOverlay(timeline, kind, position.turn);
       if (!prefill) dropOverlay();
       void rebuildAt(position, prefill).then(async () => {

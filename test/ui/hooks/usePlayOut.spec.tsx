@@ -34,13 +34,13 @@ type Wiring = Omit<PlayOutInputs, 'playOut' | 'setPlayOut' | 'setPlayOutNotice' 
 function wiring(overrides: Partial<Wiring> = {}): Wiring {
   return {
     evalViewKey: 'variation:3', liveEvalStatus: 'idle', liveTip: true, viewingVariation: true, atEndPosition: false,
-    viewT0: false, viewTurn: 3, variationSpan: null, tipTurn: 3, fastPlayOut: false,
-    navigateTo: vi.fn(), setNavSeek: vi.fn(), setVariationScores: vi.fn(), executing: false, branchPreparing: false,
+    viewT0: false, viewTurn: 3, tipTurn: 3, fastPlayOut: false,
+    navigateTo: vi.fn(), holdTipFollow: vi.fn(), setNavSeek: vi.fn(), executing: false, branchPreparing: false,
     getBattle: vi.fn(() => ({ ended: false }) as unknown as ReturnType<PlayOutInputs['getBattle']>),
     executeTurn: vi.fn(async () => {}), handleEvaluate: vi.fn(), applyEvalChoice: vi.fn(() => true),
-    rebuildAt: vi.fn(async () => {}), requestDeviation: vi.fn(),
+    requestDeviation: vi.fn(),
     startLeadVariation: vi.fn((_leads, opts) => opts?.onStart?.()),
-    defaultLeadSelection: vi.fn(() => ({ p1: ['Garchomp'], p2: ['Ferrothorn'] })),
+    leadPicksRef: { current: null }, setVariationNotice: vi.fn(),
     ...overrides,
   };
 }
@@ -79,13 +79,22 @@ describe('usePlayOut', () => {
     expect(result.current.transients.playOutRef.current).toEqual(expect.objectContaining({ active: true }));
   });
 
-  test('starting off the live tip goes through the deviation flow first; the end sentinel only asks', () => {
-    const { evaluation } = evaluationOf({ auto: true });
+  // Round 77 (C4): the run arms after the deviation started (after the replace confirm's yes), not before.
+  test('starting off the live tip goes through the deviation flow first and arms only when it starts; the end sentinel only asks', () => {
+    const { evaluation, setPrefs } = evaluationOf({});
     const wired = wiring({ liveTip: false, viewingVariation: false });
     const { result } = setup(evaluation, wired);
     act(() => result.current.playOut.startPlayOut());
-    expect(wired.requestDeviation).toHaveBeenCalledWith(null);
-    expect(result.current.transients.playOut?.active).toBe(true);
+    expect(wired.requestDeviation).toHaveBeenCalledWith(null, { onStart: expect.any(Function) });
+    // Waiting on the confirm: nothing runs, nothing is changed.
+    expect(result.current.transients.playOut).toBeNull();
+    expect(setPrefs).not.toHaveBeenCalled();
+    expect(wired.handleEvaluate).not.toHaveBeenCalled();
+
+    const onStart = (wired.requestDeviation as ReturnType<typeof vi.fn>).mock.calls[0][1].onStart as () => void;
+    act(() => onStart());
+    expect(result.current.transients.playOut).toEqual({ active: true, executed: 0, turns: 0, startTurn: 3, prevAuto: false });
+    expect(setPrefs).toHaveBeenCalledWith(expect.objectContaining({ auto: true }));
     expect(wired.handleEvaluate).not.toHaveBeenCalled();
 
     const atEnd = wiring({ liveTip: false, viewingVariation: false, atEndPosition: true });
@@ -95,7 +104,7 @@ describe('usePlayOut', () => {
     expect(ended.result.current.transients.playOut).toBeNull();
   });
 
-  test('a finished evaluation on the tip plays both top choices and re-evaluates after the turn', async () => {
+  test('a finished evaluation on the tip plays both top choices; the next evaluation is left to the Auto pref', async () => {
     const { evaluation } = evaluationOf({ auto: true });
     const { result, rerender, wired } = setup(evaluation);
     act(() => result.current.playOut.startPlayOut());
@@ -106,13 +115,26 @@ describe('usePlayOut', () => {
     expect(wired.applyEvalChoice).toHaveBeenCalledWith('p2', done.perSide.p2[0]);
     expect(result.current.transients.playOut).toMatchObject({ executed: 1, turns: 1 });
     expect(wired.executeTurn).toHaveBeenCalledTimes(1);
-    // Two evaluations at the start (the arm and the idle kick), one more after the executed turn.
+    // Two calls at the start (the arm, and the kick of this mock whose status stays idle); none after the executed turn
+    // (usePlayOut.evaluations.spec counts the real chain).
     await act(async () => {});
-    expect(wired.handleEvaluate).toHaveBeenCalledTimes(3);
+    expect(wired.handleEvaluate).toHaveBeenCalledTimes(2);
 
     // The same result again is not played twice.
     rerender({ evaluation: evaluationOf({ auto: true, status: 'done', result: done, resultTag: 'variation:3' }).evaluation, wiring: wired });
     expect(wired.executeTurn).toHaveBeenCalledTimes(1);
+  });
+
+  // The loop no longer re-evaluates after a turn by itself; a turn the simulator refuses must end the run, not stall it.
+  test('a refused turn ends the run with the refusal instead of waiting for an evaluation that never comes', async () => {
+    const { evaluation } = evaluationOf({ auto: true });
+    const wired = wiring({ executeTurn: vi.fn(async () => 'Earthquake is disabled for Garchomp right now.') });
+    const { result, rerender } = setup(evaluation, wired);
+    act(() => result.current.playOut.startPlayOut());
+    rerender({ evaluation: evaluationOf({ auto: true, status: 'done', result: evalResult(), resultTag: 'variation:3' }).evaluation, wiring: wired });
+    await act(async () => {});
+    expect(result.current.transients.playOut).toBeNull();
+    expect(result.current.transients.playOutNotice?.text).toBe('Play-out stopped after 0 turns: the turn could not be played (Earthquake is disabled for Garchomp right now.).');
   });
 
   test('a result tagged for another position is left alone', () => {
@@ -183,6 +205,20 @@ describe('usePlayOut', () => {
     expect(updater(null)).toEqual({ turn: 2, seq: 1, play: true });
   });
 
+  // Round 77 (C5): a turn in flight lands after the stop; the timeline must not follow it to the tip.
+  test('stopping hands the view back and holds the tip-follow of the timeline for the turn in flight, user stop and navigation alike', () => {
+    const { evaluation } = evaluationOf({ auto: true });
+    const { result, wired } = setup(evaluation);
+    act(() => result.current.playOut.startPlayOut());
+    act(() => result.current.transients.stopPlayOutRef.current?.());
+    expect(wired.holdTipFollow).toHaveBeenCalledTimes(1);
+
+    const again = setup(evaluation);
+    act(() => again.result.current.playOut.startPlayOut());
+    act(() => again.result.current.transients.stopPlayOutRef.current?.({ returnToStart: false }));
+    expect(again.wired.holdTipFollow).toHaveBeenCalledTimes(1);
+  });
+
   test('the fast option pins the run to the depth-1 matrix before its first evaluation and releases the engine when the run ends', () => {
     const { evaluation, setPrefs, setEngineOverride } = evaluationOf({});
     const wired = wiring({ fastPlayOut: true });
@@ -205,19 +241,38 @@ describe('usePlayOut', () => {
     expect(setEngineOverride.mock.calls.every(([override]) => override === null)).toBe(true);
   });
 
-  test('from turn 0 the run includes the lead decision: a default lead variation is seeded first', () => {
-    const { evaluation } = evaluationOf({ auto: true });
-    const wired = wiring({ viewT0: true, liveTip: false, viewingVariation: false });
-    const { result } = setup(evaluation, wired);
-    act(() => result.current.playOut.startPlayOut());
-    expect(wired.startLeadVariation).toHaveBeenCalledWith({ p1: ['Garchomp'], p2: ['Ferrothorn'] }, expect.objectContaining({ onStart: expect.any(Function) }));
-    expect(result.current.transients.playOut).toMatchObject({ active: true, startTurn: 1 });
+  // Round 77 (C2): the T0 run plays from the leads the picker shows, through the same road as "Play from turn 0".
+  describe('from turn 0', () => {
+    const singlesPicks = { p1: ['Talonflame'], p2: ['Weavile'] };
+    const vgcPicks = { p1: ['Incineroar', 'Amoonguss', 'Urshifu', 'Rillaboom'], p2: ['Tornadus', 'Kingambit', 'Chi-Yu', 'Pelipper'], bring: true };
 
-    // A standing lead variation is kept from its turn 0 and rebuilt at turn 1.
-    const standing = wiring({ viewT0: true, liveTip: false, viewingVariation: false, variationSpan: { startTurn: 0, length: 2 } });
-    const again = setup(evaluation, standing);
-    act(() => again.result.current.playOut.startPlayOut());
-    expect(standing.rebuildAt).toHaveBeenCalledWith({ turn: 1, line: 'variation' }, null);
-    expect(standing.startLeadVariation).not.toHaveBeenCalled();
+    test.each([
+      ['singles', singlesPicks],
+      ['doubles with a bring of four', vgcPicks],
+    ])('%s: the picker selection starts a lead variation and the run arms after the start', (_name, picks) => {
+      const { evaluation } = evaluationOf({ auto: true });
+      const wired = wiring({
+        viewT0: true, liveTip: false, viewingVariation: false, leadPicksRef: { current: picks },
+        startLeadVariation: vi.fn(),
+      });
+      const { result } = setup(evaluation, wired);
+      act(() => result.current.playOut.startPlayOut());
+      expect(wired.startLeadVariation).toHaveBeenCalledWith(picks, { onStart: expect.any(Function) });
+      expect(result.current.transients.playOut).toBeNull();
+      const onStart = (wired.startLeadVariation as ReturnType<typeof vi.fn>).mock.calls[0][1].onStart as () => void;
+      act(() => onStart());
+      expect(result.current.transients.playOut).toMatchObject({ active: true, startTurn: 1 });
+    });
+
+    test('an unfinished picker starts nothing and says why', () => {
+      const { evaluation, setPrefs } = evaluationOf({});
+      const wired = wiring({ viewT0: true, liveTip: false, viewingVariation: false, leadPicksRef: { current: null } });
+      const { result } = setup(evaluation, wired);
+      act(() => result.current.playOut.startPlayOut());
+      expect(wired.startLeadVariation).not.toHaveBeenCalled();
+      expect(wired.setVariationNotice).toHaveBeenCalledWith('Finish the lead picks above before the engine plays from turn 0.');
+      expect(result.current.transients.playOut).toBeNull();
+      expect(setPrefs).not.toHaveBeenCalled();
+    });
   });
 });

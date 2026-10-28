@@ -6,6 +6,7 @@ import { useBranchRefresh } from '../useBranchRefresh';
 import { useRestoreVariation } from '../useRestoreVariation';
 import type { ReplayContext } from './replay-context';
 import type { Transients } from './transients';
+import { prefsAfterRun } from '../../lib/play-out';
 
 /**
  * Honest divergence notice: guessed sets can make the branch replay
@@ -20,7 +21,8 @@ function useDeviationLayer(ctx: ReplayContext, transients: Transients, timeline:
   const { startBranch, getBattle, executeTurn, setChoice, history, branching, variationStartTurn, stopBranch } = ctx.branch;
   const { branchWindowOpenRef, teamSources } = ctx;
   const { bringOnlyLists, bringCount, replayGameType } = ctx.meta;
-  const { draftChoices, setDraftChoices, setPendingConfirm } = transients;
+  const { draftChoices, setDraftChoices, setPendingConfirm, setPlayOutNotice } = transients;
+  const clearPlayOutNotice = useCallback(() => setPlayOutNotice(null), [setPlayOutNotice]);
   const {
     viewTurnRef, viewLine, endSnapshotTurn, variationSpan, setVariationScores,
     setViewTurn, setViewLine, liveTip, viewTurn, restorePointer,
@@ -41,6 +43,7 @@ function useDeviationLayer(ctx: ReplayContext, transients: Transients, timeline:
     replayData, snapshots, observations, sources: teamSources, bringOnlyLists, bringCount,
     replayGameType, timeline: deviationTimeline, branch: deviationBranch, acquireRuntime,
     branchWindowOpenRef, setPendingConfirm, draftChoices, setDraftChoices,
+    onDeviate: clearPlayOutNotice,
   });
   useBranchRefresh({
     replayData, snapshots, observations, sources: teamSources, bringOnlyLists,
@@ -64,12 +67,13 @@ export function useTimelineController(ctx: ReplayContext, transients: Transients
   const { replayData, snapshots } = ctx.replay;
   const { branching, variationStartTurn, history, stopBranch } = ctx.branch;
   const { evaluation, branchWindowOpenRef } = ctx;
-  const { interruptPlayOut, clearDraftChoices, setPendingConfirm, setPlayOut, setPlayOutNotice, setDraftChoices } = transients;
+  const { interruptPlayOut, clearDraftChoices, setPendingConfirm, playOut, setPlayOut, setPlayOutNotice, setDraftChoices } = transients;
 
   // ── Unified timeline: one pointer over main line + at most one variation ──
   const timeline = useTimeline({
     replayId: replayData?.id, snapshots, branching, variationStartTurn, history,
     interruptPlayOut, onNavigate: clearDraftChoices, variationEnded: branching && (ctx.branch.simState?.ended ?? false),
+    executing: ctx.branch.executing,
   });
   const evalResultMatchesView = evaluation.resultTag === null || evaluation.resultTag === timeline.evalViewKey;
   const liveEvalStatus: typeof evaluation.status =
@@ -84,13 +88,16 @@ export function useTimelineController(ctx: ReplayContext, transients: Transients
     stopBranch();
     setBranchDivergence(null);
     setPendingConfirm(null);
+    // A run that ends with its variation gives the user's Auto setting back (round 77, C4).
+    const restored = playOut ? prefsAfterRun(evaluation.prefs, playOut) : null;
+    if (restored) evaluation.setPrefs(restored);
     setPlayOut(null);
     setPlayOutNotice(null);
     setDraftChoices({ p1: [], p2: [] });
     setVariationScores([]);
     setViewLine('main');
     setViewTurn(current => Math.min(current, maxTurn));
-  }, [stopBranch, maxTurn, setViewTurn, setViewLine, setVariationScores, setBranchDivergence,
+  }, [stopBranch, maxTurn, setViewTurn, setViewLine, setVariationScores, setBranchDivergence, evaluation, playOut,
     branchWindowOpenRef, setPendingConfirm, setPlayOut, setPlayOutNotice, setDraftChoices]);
 
   // A freshly loaded replay must start clean: slider at turn 1 (B11), no live

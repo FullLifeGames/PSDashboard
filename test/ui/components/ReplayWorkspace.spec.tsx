@@ -128,6 +128,22 @@ describe('ReplayWorkspace', () => {
     expect(tera()).toHaveAttribute('aria-pressed', 'false');
   }, 90_000);
 
+  // Round 77 (C2): the turn 0 picker hands its selection to the play-out, for singles and doubles.
+  test.each([['singles', 1], ['doubles', 2]] as const)('%s: the lead picker publishes its selection while the turn 0 view is open', async (kind, leads) => {
+    const { app } = await mountLoaded(kind);
+    expect(app().transients.leadPicksRef.current).toBeNull();
+    act(() => app().board.timeline.handleGraphSelect(0));
+    const published = () => app().transients.leadPicksRef.current;
+    await waitFor(() => expect(published()).not.toBeNull());
+    expect(published()!.p1).toHaveLength(leads);
+    const before = published()!.p1;
+    const benched = [...document.querySelectorAll<HTMLButtonElement>('.ps-switchgrid-compact button[aria-pressed="false"]')][0];
+    await userEvent.click(benched);
+    await waitFor(() => expect(published()!.p1).not.toEqual(before));
+    act(() => app().board.timeline.navigateTo({ turn: 2, line: 'main' }));
+    await waitFor(() => expect(published()).toBeNull());
+  }, 90_000);
+
   test('a doubles replay renders two slot columns per side', async () => {
     const { app } = await mountLoaded('doubles');
     act(() => app().board.timeline.navigateTo({ turn: 2, line: 'main' }));
