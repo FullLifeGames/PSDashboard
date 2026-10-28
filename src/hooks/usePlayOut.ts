@@ -1,6 +1,6 @@
 import { useCallback, useEffect, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import type { EvalResult, RankedChoice } from '@fulllifegames/eval-engine';
-import { FAST_PLAY_OUT_SETTINGS, nextPlayOutStep, playOutDoneText } from '../lib/play-out';
+import { FAST_PLAY_OUT_SETTINGS, nextPlayOutStep, playOutDoneText, prefsAfterRun } from '../lib/play-out';
 import type { VariationSpan } from '../lib/timeline';
 import type { useBranch } from './useBranch';
 import type { useEvaluation } from './useEvaluation';
@@ -47,7 +47,7 @@ export interface PlayOutInputs {
   handleEvaluate: () => void;
   applyEvalChoice: (side: 'p1' | 'p2', ranked: RankedChoice) => boolean;
   rebuildAt: (position: { turn: number; line: 'main' | 'variation' }, prefill: null) => Promise<void>;
-  requestDeviation: (prefill: null) => void;
+  requestDeviation: (prefill: null, opts?: { onStart?: () => void }) => void;
   startLeadVariation: (leads: LeadSelection, opts?: { onStart?: () => void }) => void;
   defaultLeadSelection: () => LeadSelection;
 }
@@ -56,7 +56,8 @@ export interface PlayOutInputs {
 function usePlayOutFinish(args: PlayOutInputs) {
   const { evaluation, setPlayOut, setPlayOutNotice, playOutRef, navigateTo, setNavSeek, tipTurn, playOut } = args;
   const finishPlayOut = useCallback((current: PlayOutState, text: string, opts?: { returnToStart?: boolean }) => {
-    if (!current.prevAuto) evaluation.setPrefs({ ...evaluation.prefs, auto: false });
+    const restored = prefsAfterRun(evaluation.prefs, current);
+    if (restored) evaluation.setPrefs(restored);
     evaluation.setEngineOverride(null);
     playOutRef.current = null;
     setPlayOut(null);
@@ -98,19 +99,22 @@ function useStartPlayOut(args: PlayOutInputs) {
     // The fast option pins the engine BEFORE the first evaluation is asked
     // for; the finish (or a replay change) releases it.
     const pinEngine = () => evaluation.setEngineOverride(fastPlayOut ? FAST_PLAY_OUT_SETTINGS : null);
+    // The loop advances on completed evals: Auto keeps them coming after forced interludes, and the user's own
+    // setting returns at the end (prefsAfterRun).
+    const armRun = (startTurn: number) => {
+      const prevAuto = evaluation.prefs.auto;
+      if (!prevAuto) evaluation.setPrefs({ ...evaluation.prefs, auto: true });
+      pinEngine();
+      playOutProcessedRef.current = null;
+      setPlayOutNotice(null);
+      setPlayOut({ active: true, executed: 0, turns: 0, startTurn, prevAuto });
+    };
     // Turn 0: the run INCLUDES the lead decision. Branching at the shared
     // turn-1 prefix instead produced a variation without its turn 0 — the
     // moves list started at turn 1 and viewing turn 1 fell back to the main
     // line (coverage begins one turn after the branch point).
     if (viewT0) {
-      const arm = () => {
-        const prevAuto = evaluation.prefs.auto;
-        if (!prevAuto) evaluation.setPrefs({ ...evaluation.prefs, auto: true });
-        pinEngine();
-        playOutProcessedRef.current = null;
-        setPlayOutNotice(null);
-        setPlayOut({ active: true, executed: 0, turns: 0, startTurn: 1, prevAuto });
-      };
+      const arm = () => armRun(1);
       if (variationSpan?.startTurn === 0) {
         // A lead variation stands: keep its turn-0 decision, cut the tail
         // (the chess truncate), and let the engine play the game again.
@@ -131,18 +135,17 @@ function useStartPlayOut(args: PlayOutInputs) {
       requestDeviation(null);
       return;
     }
+    const startTurn = viewTurn;
+    const arm = () => armRun(startTurn);
     // Same gates as any deviation: rebuild to here first when the live sim
-    // stands elsewhere (incl. the replace confirm on the main line).
-    if (!liveTip) requestDeviation(null);
-    const prevAuto = evaluation.prefs.auto;
-    // The loop advances on completed evals — auto keeps them coming after
-    // forced interludes; the user's own setting is restored at the end.
-    if (!prevAuto) evaluation.setPrefs({ ...evaluation.prefs, auto: true });
-    pinEngine();
-    playOutProcessedRef.current = null;
-    setPlayOutNotice(null);
-    setPlayOut({ active: true, executed: 0, turns: 0, startTurn: viewTurn, prevAuto });
-    if (liveTip) handleEvaluate();
+    // stands elsewhere. The run arms when the deviation starts, after the
+    // replace confirm's yes: Cancel leaves everything as it was (round 77, C4).
+    if (!liveTip) {
+      requestDeviation(null, { onStart: arm });
+      return;
+    }
+    arm();
+    handleEvaluate();
   }, [
     viewT0, variationSpan, rebuildAt, startLeadVariation, defaultLeadSelection, liveTip,
     viewingVariation, atEndPosition, requestDeviation, evaluation, fastPlayOut, handleEvaluate, viewTurn,

@@ -177,6 +177,36 @@ describe('useDeviation', () => {
     expect(startCalls(wired)[0][4]).toBe(3);
   }, 60_000);
 
+  // Round 77 (C4): a caller that arms a run (the play-out) learns when the deviation really starts.
+  test('onStart fires when the deviation runs: at once without a variation, after the yes next to one, never on cancel', async () => {
+    const wired = inputs();
+    const free = renderHook(() => useDeviation(wired));
+    const onStart = vi.fn();
+    act(() => free.result.current.requestDeviation(null, { onStart }));
+    expect(onStart).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(startCalls(wired)).toHaveLength(1), { timeout: 30_000 });
+
+    const standing = inputs({ timeline: timelineAt(3, { variationSpan: { startTurn: 2, length: 2 } }) });
+    const asks = renderHook(() => useDeviation(standing));
+    const armed = vi.fn();
+    act(() => asks.result.current.requestDeviation(null, { onStart: armed }));
+    expect(armed).not.toHaveBeenCalled();
+    const confirm = (standing.setPendingConfirm as ReturnType<typeof vi.fn>).mock.calls[0][0] as { proceed: () => void };
+    // Cancel is the banner dropping the confirm: the proceed callback never runs.
+    expect(armed).not.toHaveBeenCalled();
+    act(() => confirm.proceed());
+    expect(armed).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(startCalls(standing)).toHaveLength(1), { timeout: 30_000 });
+  }, 60_000);
+
+  test('onStart stays silent when the end position refuses the deviation', () => {
+    const wired = inputs({ timeline: timelineAt(5, { endSnapshotTurn: 5 }) });
+    const { result } = renderHook(() => useDeviation(wired));
+    const onStart = vi.fn();
+    act(() => result.current.requestDeviation(null, { onStart }));
+    expect(onStart).not.toHaveBeenCalled();
+  });
+
   test('inside the variation a move truncates the tail: the rebuild replays the kept entries from the branch start', async () => {
     const history = [entry(2), entry(2, 'forced'), entry(3), entry(4)];
     const wired = inputs({

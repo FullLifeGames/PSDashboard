@@ -79,13 +79,22 @@ describe('usePlayOut', () => {
     expect(result.current.transients.playOutRef.current).toEqual(expect.objectContaining({ active: true }));
   });
 
-  test('starting off the live tip goes through the deviation flow first; the end sentinel only asks', () => {
-    const { evaluation } = evaluationOf({ auto: true });
+  // Round 77 (C4): the run arms after the deviation started (after the replace confirm's yes), not before.
+  test('starting off the live tip goes through the deviation flow first and arms only when it starts; the end sentinel only asks', () => {
+    const { evaluation, setPrefs } = evaluationOf({});
     const wired = wiring({ liveTip: false, viewingVariation: false });
     const { result } = setup(evaluation, wired);
     act(() => result.current.playOut.startPlayOut());
-    expect(wired.requestDeviation).toHaveBeenCalledWith(null);
-    expect(result.current.transients.playOut?.active).toBe(true);
+    expect(wired.requestDeviation).toHaveBeenCalledWith(null, { onStart: expect.any(Function) });
+    // Waiting on the confirm: nothing runs, nothing is changed.
+    expect(result.current.transients.playOut).toBeNull();
+    expect(setPrefs).not.toHaveBeenCalled();
+    expect(wired.handleEvaluate).not.toHaveBeenCalled();
+
+    const onStart = (wired.requestDeviation as ReturnType<typeof vi.fn>).mock.calls[0][1].onStart as () => void;
+    act(() => onStart());
+    expect(result.current.transients.playOut).toEqual({ active: true, executed: 0, turns: 0, startTurn: 3, prevAuto: false });
+    expect(setPrefs).toHaveBeenCalledWith(expect.objectContaining({ auto: true }));
     expect(wired.handleEvaluate).not.toHaveBeenCalled();
 
     const atEnd = wiring({ liveTip: false, viewingVariation: false, atEndPosition: true });

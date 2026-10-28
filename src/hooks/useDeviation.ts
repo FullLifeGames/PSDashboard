@@ -14,6 +14,9 @@ import { useVariationNotice } from './useVariationNotice';
 
 type Branch = ReturnType<typeof useBranch>;
 
+/** The choices a deviation executes once its rebuild landed. */
+type DeviationPrefill = { p1Choices: (BranchSlotChoice | null)[]; p2Choices: (BranchSlotChoice | null)[] };
+
 export interface LeadSelection { p1: string[]; p2: string[]; bring?: boolean }
 
 export type DeviationTimeline = Pick<Timeline,
@@ -292,9 +295,7 @@ function useDeviationRequests(args: {
 
   const undoRefusedDeviation = useUndoRefusedDeviation({ ...args, variationSpan });
 
-  const requestDeviation = useCallback((
-    prefill: { p1Choices: (BranchSlotChoice | null)[]; p2Choices: (BranchSlotChoice | null)[] } | null,
-  ) => {
+  const requestDeviation = useCallback((prefill: DeviationPrefill | null, opts?: { onStart?: () => void }) => {
     // The ref, not the closure: see viewTurnRef (slider→click race).
     const position: TimelinePosition = { turn: timeline.viewTurnRef.current, line: timeline.viewLine };
     // The end snapshot is the post-battle sentinel, not a playable turn.
@@ -304,8 +305,8 @@ function useDeviationRequests(args: {
     }
     const kind = classifyDeviation(variationSpan, position);
     const run = () => {
-      // The overlay dies with the entries it belonged to. A deviation that executes a turn waits for the turn to
-      // run: a refused turn restores the old variation with its overlay.
+      opts?.onStart?.();
+      // The overlay dies with its entries; a deviation that executes a turn drops it after the turn ran (a refusal keeps it).
       const dropOverlay = () => dropVariationOverlay(timeline, kind, position.turn);
       if (!prefill) dropOverlay();
       void rebuildAt(position, prefill).then(async () => {

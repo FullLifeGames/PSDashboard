@@ -187,7 +187,7 @@ function WorkspaceAlert({ text }: { text: string }) {
 
 function WorkspaceLeft({ app, replayData }: WorkspaceProps) {
   const { branchDivergence, variationNotice } = app.board.deviation;
-  const { pendingConfirm, setPendingConfirm, setPlayOut } = app.transients;
+  const { pendingConfirm, setPendingConfirm } = app.transients;
   const { variationSpan } = app.board.timeline;
   const { branching } = app.ctx.branch;
   const { loading, error, embed, loadReplay, loadReplayFile, loadedReplayUrl } = app.ctx.replay;
@@ -220,7 +220,7 @@ function WorkspaceLeft({ app, replayData }: WorkspaceProps) {
         <ConfirmBanner
           message={pendingConfirm.message}
           onProceed={pendingConfirm.proceed}
-          onCancel={() => { setPendingConfirm(null); app.engine.walk.clearPendingPick(); setPlayOut(null); }}
+          onCancel={() => { setPendingConfirm(null); app.engine.walk.clearPendingPick(); }}
         />
       )}
       <PickerRegion app={app} replayData={replayData} />
