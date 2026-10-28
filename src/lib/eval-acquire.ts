@@ -12,8 +12,16 @@ export type CaptureBattle = Parameters<NonNullable<ReconstructOptions['capturePo
 
 type BuildOptions = NonNullable<Parameters<typeof import('./lazy/team-builder')['buildTeamsFromReplay']>[1]>;
 
+/** Teams a reported session built, pinned for its reproduction (round 77, src/hooks/usePinnedTeams.ts). */
+export interface PinnedTeams {
+  p1Team: PokemonSet[];
+  p2Team: PokemonSet[];
+}
+
 /** Everything a replay team build needs, assembled once per render. */
 export interface TeamBuildSources {
+  /** Set: every build without an edit override returns these teams. */
+  pinnedTeams?: PinnedTeams | null;
   teamText: string;
   effectiveP1Info: OpponentTeamInfo | null;
   effectiveP2Info: OpponentTeamInfo | null;
@@ -44,6 +52,8 @@ export async function buildReplayTeams(
   overrides?: { p1: OpponentTeamInfo | null; p2: OpponentTeamInfo | null },
   opts?: TeamBuildOptions,
 ): Promise<{ p1Team: PokemonSet[]; p2Team: PokemonSet[] }> {
+  // Round 77 (user gate 28.10.2026, 3a): a reproduction plays the reported sets; an edit made since still builds.
+  if (sources.pinnedTeams && !overrides) return structuredClone(sources.pinnedTeams);
   // Round 75 (T160): the team build reads the Dex of the game; a Champions replay needs its mod registered first.
   await loadReplayMods(replayData);
   const { buildTeamsFromReplay } = await import('./lazy/team-builder');

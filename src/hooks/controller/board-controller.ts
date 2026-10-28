@@ -3,6 +3,7 @@ import { useTimeline } from '../useTimeline';
 import type { Timeline } from '../useTimeline';
 import { useDeviation } from '../useDeviation';
 import { useBranchRefresh } from '../useBranchRefresh';
+import { useRestoreVariation } from '../useRestoreVariation';
 import type { ReplayContext } from './replay-context';
 import type { Transients } from './transients';
 
@@ -45,7 +46,12 @@ function useDeviationLayer(ctx: ReplayContext, transients: Transients, timeline:
     branching, variationStartTurn, startBranch, acquireRuntime, viewTurn, session: deviation.session, branchWindowOpenRef,
     request: ctx.refreshQueue.pendingBranchRefresh, clearRequest: ctx.refreshQueue.clearRefreshRequest,
   });
-  return deviation;
+  const restoreVariation = useRestoreVariation({
+    replayData, snapshots, observations, sources: teamSources, bringOnlyLists, session: deviation.session,
+    branch: deviationBranch, acquireRuntime, branchWindowOpenRef, setBranchDivergence: deviation.setBranchDivergence,
+    setViewTurn, setViewLine,
+  });
+  return { ...deviation, restoreVariation };
 }
 
 /**

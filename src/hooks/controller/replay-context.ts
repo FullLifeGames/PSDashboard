@@ -9,6 +9,7 @@ import { useSmogonSetAssumptions } from '../useSmogonSetAssumptions';
 import { useSharedBranch } from '../useSharedBranch';
 import { useTeamKnowledge } from '../useTeamKnowledge';
 import type { TeamKnowledge } from '../useTeamKnowledge';
+import { usePinnedTeams } from '../usePinnedTeams';
 import { useReplayWorker } from '../useReplayWorker';
 import { usePositionSource } from '../usePositionSource';
 import {
@@ -100,20 +101,35 @@ function useFormatMeta(replayData: ReplayData | null, snapshots: TurnSnapshot[])
 /** One team-source bundle for every acquisition path; deps are the inner
  *  stable values (the Smogon hook objects are fresh per render). */
 function useTeamSources(
-  knowledge: TeamKnowledge,
+  knowledge: PinnedKnowledge,
   smogon: ReturnType<typeof useSmogonBundle>,
   hpEvidence: ReturnType<typeof useReplay>['hpEvidence'],
 ) {
-  const { teamText, effectiveP1Info, effectiveP2Info, getInferredSpreads } = knowledge;
+  const { teamText, effectiveP1Info, effectiveP2Info, getInferredSpreads, pinnedTeams } = knowledge;
   const { stats } = smogon.usageStats;
   const { assumptions } = smogon.setAssumptions;
   return useMemo(() => ({
     teamText, effectiveP1Info, effectiveP2Info,
     usageStats: { stats },
     setAssumptions: { assumptions },
-    hpEvidence, getInferredSpreads,
-  }), [teamText, effectiveP1Info, effectiveP2Info, stats, assumptions, hpEvidence, getInferredSpreads]);
+    hpEvidence, getInferredSpreads, pinnedTeams,
+  }), [teamText, effectiveP1Info, effectiveP2Info, stats, assumptions, hpEvidence, getInferredSpreads, pinnedTeams]);
 }
+
+/**
+ * The team knowledge with the reproduction's pin (round 77): the pinned teams for the build, and the pin's
+ * marker in the sets fingerprint every store and cache keys on.
+ */
+function withPinnedTeams(knowledge: TeamKnowledge, pins: ReturnType<typeof usePinnedTeams>) {
+  return {
+    ...knowledge,
+    setsFingerprint: pins.marker ? `${knowledge.setsFingerprint}|pin:${pins.marker}` : knowledge.setsFingerprint,
+    pinnedTeams: pins.teams,
+    setPinnedTeams: pins.setTeams,
+  };
+}
+
+type PinnedKnowledge = ReturnType<typeof withPinnedTeams>;
 
 /**
  * Foundation layer: the loaded replay, the branch simulator, the evaluation
@@ -130,12 +146,13 @@ export function useReplayContext() {
   const [animateBranchTurns, setAnimateBranchTurns] = useState(true);
   const { sharedBranch, sharedBranchError, clearSharedBranch } = useSharedBranch();
   const refreshQueue = useTeamRefreshQueue(branch.history, branch.simState, branchWindowOpenRef);
-  const knowledge = useTeamKnowledge({
+  const pins = usePinnedTeams(replay.replayData?.id ?? null);
+  const knowledge = withPinnedTeams(useTeamKnowledge({
     replayData: replay.replayData, p1Info: replay.p1Info, opponentInfo: replay.opponentInfo, itemJudge: replay.itemJudge,
     observations: replay.observations, speedOrders: replay.speedOrders, hpEvidence: replay.hpEvidence,
     usageStats: smogon.usageStats, setAssumptions: smogon.setAssumptions,
     onTeamsEdited: refreshQueue.handleTeamsEdited, replayWorker,
-  });
+  }), pins);
   const meta = useFormatMeta(replay.replayData, replay.snapshots);
   const teamSources = useTeamSources(knowledge, smogon, replay.hpEvidence);
   // Every exact position (Evaluate, the sweep, the dwell, a branch start)

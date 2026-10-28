@@ -79,7 +79,7 @@ function useBranchSession() {
 
 export type BranchSession = ReturnType<typeof useBranchSession>['handles'];
 
-interface RebuildContext {
+export interface RebuildContext {
   replayData: ReplayData;
   snapshots: TurnSnapshot[];
   observations: DamageObservation[];
@@ -96,7 +96,7 @@ interface RebuildContext {
 /** The async heart of rebuildAt, once the plan (start turn, kept history)
  *  is fixed: build teams + locks, start the branch, surface divergence,
  *  land the pointer for an entry-less start. */
-async function executeRebuild(
+export async function executeRebuild(
   ctx: RebuildContext,
   startTurn: number,
   replayHistory: BranchHistoryEntry[],
