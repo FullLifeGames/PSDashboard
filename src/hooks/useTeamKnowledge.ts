@@ -3,9 +3,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   type DamageObservation, type HiddenPowerEvidence, type ItemDamageJudge, type OpponentTeamInfo, type ReplayData,
   type SpeedOrderObservation, applyPastedTeam, countMatchingSpecies, applyInferredSpreads, enrichTeamInfos,
-  applyTeamSheetToInfo, enrichPokemonInfo,
+  applyTeamSheetToInfo, enrichPokemonInfo, inferReplayFormatId,
 } from '@fulllifegames/replay-core';
-import { parseSetsImport } from '../lib/sets-io';
+import { loadImportPools, parseSetsImport, validateSetsImport } from '../lib/sets-io';
+import type { EditorPools } from '../lib/team-editor';
 import { buildSensitivityTargets } from '../lib/team-knowledge';
 import type { ReplayWorkerClient } from '../lib/replay-jobs/client';
 import type { SensitivityTarget } from '@fulllifegames/eval-engine';
@@ -59,12 +60,15 @@ function useSetsIO(args: {
   opponentInfo: OpponentTeamInfo | null;
   effectiveP1Info: OpponentTeamInfo | null;
   effectiveP2Info: OpponentTeamInfo | null;
+  replayGenNumber: number;
   setEditedP1Info: (info: OpponentTeamInfo | null) => void;
   setEditedP2Info: (info: OpponentTeamInfo | null) => void;
   onTeamsEdited: TeamKnowledgeInputs['onTeamsEdited'];
 }) {
-  const { replayData, p1Info, opponentInfo, effectiveP1Info, effectiveP2Info, setEditedP1Info, setEditedP2Info, onTeamsEdited } = args;
+  const { replayData, p1Info, opponentInfo, effectiveP1Info, effectiveP2Info, replayGenNumber, setEditedP1Info, setEditedP2Info, onTeamsEdited } = args;
   const pendingStoredSetsRef = useRef<string | null>(null);
+  /** The editor's legal pools of this replay's species (round 77, D5), read by the import's checks once loaded. */
+  const poolsRef = useRef<{ replayId: string; pools: EditorPools } | null>(null);
   useEffect(() => {
     // Sets imported for this replay earlier are re-applied once the fresh
     // inference is available (see the effect below).
@@ -73,7 +77,19 @@ function useSetsIO(args: {
       : null;
   }, [replayData?.id]);
 
-  /** Applies a sets-import text to both sides; returns an error message or null. */
+  /** Loads the legal pools the import checks against; a failed load leaves the import with the checks that need no pools. */
+  const loadPools = useCallback(async () => {
+    if (!replayData || !effectiveP1Info || !effectiveP2Info) return;
+    const species = [...effectiveP1Info.pokemon, ...effectiveP2Info.pokemon].map(pokemon => pokemon.species);
+    try {
+      const pools = await loadImportPools(species, replayGenNumber, inferReplayFormatId(replayData));
+      poolsRef.current = { replayId: replayData.id, pools };
+    } catch {
+      poolsRef.current = null;
+    }
+  }, [replayData, effectiveP1Info, effectiveP2Info, replayGenNumber]);
+
+  /** Applies a sets-import text to both sides, or to none while a value is invalid; returns the error message or null. */
   const applySetsText = useCallback((text: string): string | null => {
     if (!replayData || !effectiveP1Info || !effectiveP2Info) return 'Load a replay first.';
     let parsed: ReturnType<typeof parseSetsImport>;
@@ -82,6 +98,9 @@ function useSetsIO(args: {
     } catch (err) {
       return err instanceof Error ? err.message : 'Could not parse the sets text.';
     }
+    const pools = poolsRef.current?.replayId === replayData.id ? poolsRef.current.pools : null;
+    const invalid = validateSetsImport(parsed, { p1: effectiveP1Info, p2: effectiveP2Info }, { gen: replayGenNumber, pools });
+    if (invalid.length > 0) return `Nothing was imported. ${invalid.join(' ')}`;
     const nextP1 = parsed.p1.length > 0 ? applyPastedTeam(effectiveP1Info, parsed.p1).info : effectiveP1Info;
     const nextP2 = parsed.p2.length > 0 ? applyPastedTeam(effectiveP2Info, parsed.p2).info : effectiveP2Info;
     setEditedP1Info(nextP1);
@@ -93,7 +112,7 @@ function useSetsIO(args: {
     }
     onTeamsEdited({ p1: nextP1, p2: nextP2 });
     return null;
-  }, [replayData, effectiveP1Info, effectiveP2Info, setEditedP1Info, setEditedP2Info, onTeamsEdited]);
+  }, [replayData, effectiveP1Info, effectiveP2Info, replayGenNumber, setEditedP1Info, setEditedP2Info, onTeamsEdited]);
 
   // Re-apply this replay's stored sets once the fresh inference exists.
   useEffect(() => {
@@ -103,7 +122,7 @@ function useSetsIO(args: {
     applySetsText(stored);
   }, [p1Info, opponentInfo, applySetsText]);
 
-  return { applySetsText };
+  return { applySetsText, loadPools };
 }
 
 /**
@@ -154,8 +173,8 @@ export function useTeamKnowledge(inputs: TeamKnowledgeInputs) {
     effectiveP1Info, effectiveP2Info, usageStats, setAssumptions, replayWorker,
   });
 
-  const { applySetsText } = useSetsIO({
-    replayData, p1Info, opponentInfo, effectiveP1Info, effectiveP2Info,
+  const { applySetsText, loadPools } = useSetsIO({
+    replayData, p1Info, opponentInfo, effectiveP1Info, effectiveP2Info, replayGenNumber,
     setEditedP1Info: edits.setEditedP1Info, setEditedP2Info: edits.setEditedP2Info, onTeamsEdited,
   });
 
@@ -177,7 +196,10 @@ export function useTeamKnowledge(inputs: TeamKnowledgeInputs) {
     editorSide: edits.editorSide,
     setEditorSide: (side: 'p1' | 'p2' | null) => (side ? openAfterSolve(() => edits.setEditorSide(side)) : edits.setEditorSide(null)),
     setsPanelOpen: edits.setsPanelOpen,
-    setSetsPanelOpen: (open: boolean) => (open ? openAfterSolve(() => edits.setSetsPanelOpen(true)) : edits.setSetsPanelOpen(false)),
+    // The import checks against the editor's pools: they load before the panel opens (a failed load opens it anyway).
+    setSetsPanelOpen: (open: boolean) => (open
+      ? openAfterSolve(() => void loadPools().then(() => edits.setSetsPanelOpen(true)))
+      : edits.setSetsPanelOpen(false)),
     effectiveP1Info, effectiveP2Info, solvedSpreads, getInferredSpreads, replayGenNumber,
     applySetsText, saveTeam, setsFingerprint,
   };

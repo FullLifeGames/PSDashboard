@@ -54,6 +54,58 @@ describe('BranchHistoryPanel', () => {
     expect(screen.getAllByRole('button', { name: /Variation result/ })).toHaveLength(2);
   });
 
+  describe('the variation cell names the Pokemon that stands at the row\'s position (A-5)', () => {
+    const live = (species: string, slot = 0) => pokemon(species, { isActive: true, activeSlot: slot });
+    const variationCell = (index: number) => screen.getAllByRole('button', { name: /Variation result/ })[index];
+
+    test('singles: a pivot turn followed by the forced replacement shows the replacement', () => {
+      const pivot = entry(8, {
+        p1Choice: 'move uturn', p2Choice: 'move recover',
+        p1Active: live('Talonflame'), p1ActiveSlots: [live('Talonflame')],
+      });
+      const replacement = entry(8, {
+        kind: 'forced', forcedSide: 'p1', p1Choice: 'switch 3', p2Choice: '—',
+        p1Active: live('Tentacruel'), p1ActiveSlots: [live('Tentacruel')],
+      });
+      render(<BranchHistoryPanel branchStartTurn={7} history={[pivot, replacement]} snapshots={snapshots} />);
+      expect(variationCell(0)).toHaveTextContent('P1: Tentacruel');
+      expect(variationCell(0)).not.toHaveTextContent('Talonflame');
+    });
+
+    test('singles: a knock-out followed by two chained forced entries shows the last state', () => {
+      const knockOut = entry(8, { p1Active: live('Palossand'), p1ActiveSlots: [live('Palossand')] });
+      const first = entry(8, { kind: 'forced', forcedSide: 'p1', p1Active: live('Kyurem'), p1ActiveSlots: [live('Kyurem')] });
+      const second = entry(8, { kind: 'forced', forcedSide: 'p2', p1Active: live('Kyurem'), p1ActiveSlots: [live('Kyurem')], p2Active: live('Rotom-Wash'), p2ActiveSlots: [live('Rotom-Wash')] });
+      render(<BranchHistoryPanel branchStartTurn={7} history={[knockOut, first, second]} snapshots={snapshots} />);
+      expect(variationCell(0)).toHaveTextContent('P1: Kyurem');
+      expect(variationCell(0)).toHaveTextContent('P2: Rotom-Wash');
+    });
+
+    test('doubles: only the replaced slot changes in the cell', () => {
+      const turn = entry(8, {
+        p1ActiveSlots: [live('Talonflame', 0), live('Garchomp', 1)],
+        p2ActiveSlots: [live('Rotom-Wash', 0), live('Kyurem', 1)],
+      });
+      const replacement = entry(8, {
+        kind: 'forced', forcedSide: 'p1',
+        p1ActiveSlots: [live('Tentacruel', 0), live('Garchomp', 1)],
+        p2ActiveSlots: [live('Rotom-Wash', 0), live('Kyurem', 1)],
+      });
+      render(<BranchHistoryPanel branchStartTurn={7} history={[turn, replacement]} snapshots={snapshots} />);
+      expect(variationCell(0)).toHaveTextContent(/P1: Tentacruel \d+% \/ Garchomp/);
+      expect(variationCell(0)).not.toHaveTextContent('Talonflame');
+    });
+
+    test('a forced entry in the middle only changes the row it follows', () => {
+      const first = entry(8, { p1Active: live('Talonflame'), p1ActiveSlots: [live('Talonflame')] });
+      const replacement = entry(8, { kind: 'forced', forcedSide: 'p1', p1Active: live('Tentacruel'), p1ActiveSlots: [live('Tentacruel')] });
+      const second = entry(9, { p1Active: live('Tentacruel'), p1ActiveSlots: [live('Tentacruel')] });
+      render(<BranchHistoryPanel branchStartTurn={7} history={[first, replacement, second]} snapshots={snapshots} />);
+      expect(variationCell(0)).toHaveTextContent('P1: Tentacruel');
+      expect(variationCell(1)).toHaveTextContent('P1: Tentacruel');
+    });
+  });
+
   test('without a navigation handler the cells are inert', () => {
     render(<BranchHistoryPanel branchStartTurn={2} history={[entry(2)]} snapshots={snapshots} />);
     expect(screen.queryByText(/click a cell to jump/)).toBeNull();

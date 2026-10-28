@@ -1,8 +1,8 @@
 import {
   type OpponentTeamInfo, type PokemonEvs, type RevealedPokemonInfo, itemSetValue, parsePastedTeam, typedHiddenPowerId,
-  type PastedSet,
+  type PastedSet, applyPastedTeam, countMatchingSpecies, toId,
 } from '@fulllifegames/replay-core';
-import { EV_STATS } from './team-editor';
+import { EV_STATS, canonicalMove, type EditorPools } from './team-editor';
 
 /**
  * Text import/export for both players' sets (perfect-information analysis).
@@ -122,4 +122,108 @@ export function parseSetsImport(text: string): { p1: PastedSet[]; p2: PastedSet[
     );
   }
   return result;
+}
+
+/** What the validator needs of a game: its generation and the editor's legal pools (`null` until they load). */
+export interface ImportGame { gen: number; pools: EditorPools | null }
+
+/**
+ * The editor's pools for the species of a game, loaded lazily (the move pools read learnsets). The same pools the team editor
+ * offers (`useEditorPools` in useTeamDraft.ts), so the import and the editor accept the same values.
+ */
+export async function loadImportPools(speciesList: string[], gen: number, format: string): Promise<EditorPools> {
+  const options = await import('./pokemon-options');
+  await options.prepareFormat(format);
+  const movesBySpecies: Record<string, string[]> = {};
+  const abilitiesBySpecies: Record<string, string[]> = {};
+  await Promise.all([...new Set(speciesList)].map(async species => {
+    movesBySpecies[species] = await options.getMovePool(species, gen, format);
+    abilitiesBySpecies[species] = options.getAbilityPool(species, gen, format);
+  }));
+  return {
+    items: options.getItemPool(gen, format),
+    teraTypes: options.getTeraTypePool(gen, format),
+    natures: options.NATURES,
+    movesBySpecies,
+    abilitiesBySpecies,
+    evLimit: options.getEvLimit(format),
+  };
+}
+
+type SideId = 'p1' | 'p2';
+
+/**
+ * What an import cannot apply, one message per value (empty: the text is fine). The import is all or nothing: the caller applies
+ * nothing while this list is not empty, as the team editor refuses a move outside the species' pool. Only values that differ
+ * from what the panel already holds are checked, so the export of the panel itself always imports (a swapped ability, a move
+ * copied by Transform, an item of a custom game stay as they are). The pool checks wait until the pools load (`pools: null`),
+ * as the editor stays free text until then.
+ */
+export function validateSetsImport(
+  parsed: { p1: PastedSet[]; p2: PastedSet[] },
+  current: { p1: OpponentTeamInfo; p2: OpponentTeamInfo },
+  game: ImportGame,
+): string[] {
+  const errors: string[] = [];
+  for (const side of ['p1', 'p2'] as SideId[]) {
+    const label = side.toUpperCase();
+    const info = current[side];
+    for (const set of parsed[side]) {
+      if (countMatchingSpecies(info, [set]) === 0) errors.push(`${label} ${set.species}: not on ${label}'s team, so its set cannot apply.`);
+    }
+    if (parsed[side].length === 0) continue;
+    const applied = applyPastedTeam(info, parsed[side]).info;
+    applied.pokemon.forEach((after, index) => {
+      const before = info.pokemon[index];
+      if (after === before) return;
+      errors.push(...changedValueErrors(`${label} ${after.species}`, before, after, game));
+    });
+  }
+  return errors;
+}
+
+const changed = (before: string, after: string) => !!after && toId(before) !== toId(after);
+const listed = (pool: readonly string[], value: string) => pool.some(name => toId(name) === toId(value));
+
+type ValueCheck = (who: string, before: RevealedPokemonInfo, after: RevealedPokemonInfo, game: ImportGame & { pools: EditorPools }) => string[];
+
+const moveErrors: ValueCheck = (who, before, after, { pools }) => {
+  const held = new Set(before.moves.map(move => toId(move.name)));
+  return after.moves
+    .filter(move => !held.has(toId(move.name)) && 'illegal' in canonicalMove(pools.movesBySpecies[after.species], move.name))
+    .map(move => `${who}: ${move.name} is not in ${after.species}'s legal moves for this generation.`);
+};
+
+const abilityErrors: ValueCheck = (who, before, after, { gen, pools }) => {
+  const value = after.ability.value;
+  if (!changed(before.ability.value, value)) return [];
+  if (gen < 3) return [`${who}: generation ${gen} has no abilities, so ${value} cannot apply.`];
+  const pool = pools.abilitiesBySpecies[after.species] ?? [];
+  return pool.length > 0 && !listed(pool, value) ? [`${who}: ${value} is not an ability of ${after.species}.`] : [];
+};
+
+const itemErrors: ValueCheck = (who, before, after, { gen, pools }) => {
+  const value = after.item.value;
+  if (!changed(itemSetValue(before.item.value), value)) return [];
+  if (gen < 2) return [`${who}: generation ${gen} has no held items, so ${value} cannot apply.`];
+  return pools.items.length > 0 && !listed(pools.items, value) ? [`${who}: "${value}" is not a known item.`] : [];
+};
+
+const natureErrors: ValueCheck = (who, before, after, { pools }) => {
+  const value = after.nature?.value ?? '';
+  return changed(before.nature?.value ?? '', value) && !listed(pools.natures, value) ? [`${who}: ${value} is not a nature.`] : [];
+};
+
+const teraErrors: ValueCheck = (who, before, after, { pools }) => {
+  const value = after.teraType.value;
+  if (!changed(before.teraType.value, value)) return [];
+  if (pools.teraTypes.length === 0) return [`${who}: this game has no Tera types, so ${value} cannot apply.`];
+  return listed(pools.teraTypes, value) ? [] : [`${who}: ${value} is not a Tera type.`];
+};
+
+/** The value checks of one Pokémon, over the values the import changed. */
+function changedValueErrors(who: string, before: RevealedPokemonInfo, after: RevealedPokemonInfo, game: ImportGame): string[] {
+  const { pools } = game;
+  if (!pools) return [];
+  return [moveErrors, abilityErrors, itemErrors, natureErrors, teraErrors].flatMap(check => check(who, before, after, { ...game, pools }));
 }
