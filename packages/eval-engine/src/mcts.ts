@@ -344,6 +344,8 @@ function treeSearchOn(
     ? planRootCells(root, settings)
     : { boundaryCells: [], plannedCells: undefined };
   const legal = seedOffset === 0 && doubles ? rootLegal(root, settings.tera ?? true) : {};
+  const sides = positionBattle(root.position).sides;
+  const living = { p1: sides[0].pokemon.filter(mon => !mon.fainted).length, p2: sides[1].pokemon.filter(mon => !mon.fainted).length };
   const cells = [...root.children.entries()].map(([key, child]) => cellStats(key, child, rootClassKeys.get(key)));
   // Round 69 (T64): a single tree is never merged (mergeMctsTrees returns this result), so it writes its own cell visits.
   if (result.matrix) {
@@ -360,6 +362,7 @@ function treeSearchOn(
     visits: root.visits,
     depth: maxDepth,
     rootValue: root.value,
+    living,
     koOdds,
     ...(doubles ? {} : { boundaryCells }),
     ...(plannedCells ? { plannedCells } : {}),

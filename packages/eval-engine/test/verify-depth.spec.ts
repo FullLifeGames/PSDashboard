@@ -111,6 +111,46 @@ describe('the merge mixes per-class depth (round 63, T16)', () => {
     // The hit class keeps the trees' −0.96; the thin miss class takes its deepened 0.3.
     expect(merged.matrix!.values[0][0]).toBeCloseTo(0.8 * -0.96 + 0.2 * 0.3, 1);
   });
+
+  test('in an endgame a rich, agreeing pool keeps its depth below the floor (round 77, T267)', () => {
+    // User report 28.10.2026: draft 2058494320, variation turn 63, Mienshao (Scarf, locked into Close Combat) and Kyurem
+    // against Dragapult and Muk-Alola. The trees played Kyurem's switch into a Specs attack out to about −0.7 over 400
+    // to 650 visits; the one-ply sampler read +0.75, the 0.9 floor gave the sampler the cells, and the ranking advised
+    // U-turn beside a score that saw the other side winning. With at most two Pokémon left on each side the trees reach
+    // the end of the game; their verdict stands below the floor, because chance (Rest, Sleep Talk) keeps it off ±1.
+    const pooled = (visits: number, mean: number, classKey: string) => ({
+      key: cellKey(0, 0), visits, total: mean * (visits + 1) - (-0.1), value: -0.1, ended: false, classKey,
+    });
+    const cells = [pooled(160, -0.7, 'hit-kill'), pooled(150, -0.72, 'hit-kill'), pooled(170, -0.69, 'hit-kill'), pooled(20, 0.3, 'miss')];
+    const value: EvalCellValue = {
+      i: 0, j: 0, value: 0.7, ended: false,
+      blend: { firstLeaf: 0.75, classes: [
+        { key: 'hit-kill', weight: 0.9, leafSum: 2.2, count: 3, hasFirst: true, ended: false, deepened: 0.75 },
+        { key: 'miss', weight: 0.1, leafSum: 1.5, count: 3, hasFirst: false, ended: false, deepened: 0.5 },
+      ] },
+    };
+    const atLiving = (p1: number, p2: number) => mergeMctsTrees(
+      cells.map(cell => ({ ...mk(), cells: [cell], living: { p1, p2 } })), new Map([[cellKey(0, 0), value]]),
+    ).matrix!.values[0][0];
+    // Two against two: the hit class keeps the trees' −0.70; the thin miss class takes its deepened 0.5.
+    expect(atLiving(2, 2)).toBeCloseTo(0.9 * -0.703 + 0.1 * 0.5, 2);
+    // A side with three left is no endgame: the sampler keeps the cell, as before.
+    expect(atLiving(3, 2)).toBeCloseTo(0.9 * 0.75 + 0.1 * 0.5, 12);
+    // Without the count (a cached tree from before), nothing changes either.
+    expect(mergeMctsTrees(cells.map(cell => ({ ...mk(), cells: [cell] })), new Map([[cellKey(0, 0), value]])).matrix!.values[0][0])
+      .toBeCloseTo(0.9 * 0.75 + 0.1 * 0.5, 12);
+  });
+
+  test('in an endgame a rich, agreeing plain cell keeps its depth below the floor too (round 77, T267)', () => {
+    const plain = (visits: number, mean: number) => ({ key: cellKey(0, 0), visits, total: mean * (visits + 1) - 0.4, value: 0.4, ended: false });
+    const value: EvalCellValue = { i: 0, j: 0, value: 0.6, ended: false, deepened: 0.62 };
+    const atLiving = (p1: number, p2: number) => mergeMctsTrees(
+      [plain(200, -0.6), plain(210, -0.62), plain(190, -0.61)].map(cell => ({ ...mk(), cells: [cell], living: { p1, p2 } })),
+      new Map([[cellKey(0, 0), value]]),
+    ).matrix!.values[0][0];
+    expect(atLiving(1, 2)).toBeCloseTo(-0.61, 1);
+    expect(atLiving(2, 4)).toBeCloseTo(0.62, 12);
+  });
 });
 
 describe('the deepening rule (round 63, T16)', () => {

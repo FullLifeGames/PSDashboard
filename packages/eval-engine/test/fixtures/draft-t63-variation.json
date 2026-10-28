@@ -1,0 +1,537 @@
+{
+  "about": "Round 77 (T267, user report 28.10.2026): the variation from turn 54 of draft-replay.json up to turn 63, with the teams both players posted (!showteam). A forced replacement names one side only.",
+  "startTurn": 54,
+  "p1Team": [
+    {
+      "name": "PBA S 2 3 & 5",
+      "species": "Kyurem",
+      "gender": "",
+      "item": "Heavy-Duty Boots",
+      "ability": "Pressure",
+      "teraType": "Dragon",
+      "evs": {
+        "hp": 64,
+        "atk": 0,
+        "def": 0,
+        "spa": 252,
+        "spd": 0,
+        "spe": 192
+      },
+      "ivs": {
+        "hp": 31,
+        "atk": 31,
+        "def": 31,
+        "spa": 31,
+        "spd": 31,
+        "spe": 31
+      },
+      "nature": "Timid",
+      "moves": [
+        "Ice Beam",
+        "Freeze-Dry",
+        "Earth Power",
+        "Iron Head"
+      ],
+      "level": 100
+    },
+    {
+      "name": "Knock Off SML",
+      "species": "Tentacruel",
+      "gender": "M",
+      "item": "Black Sludge",
+      "ability": "Clear Body",
+      "teraType": "Water",
+      "evs": {
+        "hp": 248,
+        "atk": 8,
+        "def": 0,
+        "spa": 0,
+        "spd": 252,
+        "spe": 0
+      },
+      "ivs": {
+        "hp": 31,
+        "atk": 31,
+        "def": 31,
+        "spa": 31,
+        "spd": 31,
+        "spe": 31
+      },
+      "nature": "Careful",
+      "moves": [
+        "Gunk Shot",
+        "Liquidation",
+        "Flip Turn",
+        "Knock Off"
+      ],
+      "level": 100
+    },
+    {
+      "name": "NPBL S 5-7",
+      "species": "Talonflame",
+      "gender": "F",
+      "item": "Heavy-Duty Boots",
+      "ability": "Flame Body",
+      "teraType": "Fire",
+      "evs": {
+        "hp": 248,
+        "atk": 0,
+        "def": 116,
+        "spa": 0,
+        "spd": 48,
+        "spe": 96
+      },
+      "ivs": {
+        "hp": 31,
+        "atk": 31,
+        "def": 31,
+        "spa": 31,
+        "spd": 31,
+        "spe": 31
+      },
+      "nature": "Jolly",
+      "moves": [
+        "Roost",
+        "Defog",
+        "Brave Bird",
+        "U-turn"
+      ],
+      "level": 100
+    },
+    {
+      "name": "GPL S 4 5 8 & 9",
+      "species": "Palossand",
+      "gender": "F",
+      "item": "Rocky Helmet",
+      "ability": "Water Compaction",
+      "teraType": "Ghost",
+      "evs": {
+        "hp": 248,
+        "atk": 0,
+        "def": 164,
+        "spa": 0,
+        "spd": 96,
+        "spe": 0
+      },
+      "ivs": {
+        "hp": 31,
+        "atk": 0,
+        "def": 31,
+        "spa": 31,
+        "spd": 31,
+        "spe": 31
+      },
+      "nature": "Calm",
+      "moves": [
+        "Earth Power",
+        "Shadow Ball",
+        "Shore Up",
+        "Stealth Rock"
+      ],
+      "level": 100
+    },
+    {
+      "name": "GBB",
+      "species": "Mienshao",
+      "gender": "F",
+      "item": "Choice Scarf",
+      "ability": "Regenerator",
+      "teraType": "Fighting",
+      "evs": {
+        "hp": 24,
+        "atk": 252,
+        "def": 0,
+        "spa": 0,
+        "spd": 0,
+        "spe": 232
+      },
+      "ivs": {
+        "hp": 31,
+        "atk": 31,
+        "def": 31,
+        "spa": 31,
+        "spd": 31,
+        "spe": 31
+      },
+      "nature": "Jolly",
+      "moves": [
+        "U-turn",
+        "Close Combat",
+        "Triple Axel",
+        "Knock Off"
+      ],
+      "level": 100
+    },
+    {
+      "name": "NPL S 5-7",
+      "species": "Comfey",
+      "gender": "F",
+      "item": "Babiri Berry",
+      "ability": "Triage",
+      "teraType": "Fairy",
+      "evs": {
+        "hp": 248,
+        "atk": 0,
+        "def": 0,
+        "spa": 8,
+        "spd": 252,
+        "spe": 0
+      },
+      "ivs": {
+        "hp": 31,
+        "atk": 0,
+        "def": 31,
+        "spa": 31,
+        "spd": 31,
+        "spe": 31
+      },
+      "nature": "Calm",
+      "moves": [
+        "Draining Kiss",
+        "Leech Seed",
+        "Synthesis",
+        "Taunt"
+      ],
+      "level": 100
+    }
+  ],
+  "p2Team": [
+    {
+      "name": "Steel Shadow",
+      "species": "Cobalion",
+      "gender": "",
+      "item": "Leftovers",
+      "ability": "Justified",
+      "teraType": "Steel",
+      "evs": {
+        "hp": 252,
+        "atk": 24,
+        "def": 0,
+        "spa": 0,
+        "spd": 0,
+        "spe": 232
+      },
+      "ivs": {
+        "hp": 31,
+        "atk": 31,
+        "def": 31,
+        "spa": 31,
+        "spd": 31,
+        "spe": 31
+      },
+      "nature": "Jolly",
+      "moves": [
+        "Close Combat",
+        "Iron Head",
+        "Stealth Rock",
+        "Swords Dance"
+      ],
+      "level": 100
+    },
+    {
+      "name": "Ghost Shadow",
+      "species": "Dragapult",
+      "gender": "M",
+      "item": "Choice Specs",
+      "ability": "Infiltrator",
+      "teraType": "Dragon",
+      "evs": {
+        "hp": 128,
+        "atk": 0,
+        "def": 0,
+        "spa": 252,
+        "spd": 0,
+        "spe": 128
+      },
+      "ivs": {
+        "hp": 31,
+        "atk": 31,
+        "def": 31,
+        "spa": 31,
+        "spd": 31,
+        "spe": 31
+      },
+      "nature": "Modest",
+      "moves": [
+        "Draco Meteor",
+        "Shadow Ball",
+        "Fire Blast",
+        "U-turn"
+      ],
+      "level": 100
+    },
+    {
+      "name": "Slow Shadow",
+      "species": "Slowking",
+      "gender": "F",
+      "item": "Colbur Berry",
+      "ability": "Regenerator",
+      "teraType": "Water",
+      "evs": {
+        "hp": 252,
+        "atk": 0,
+        "def": 200,
+        "spa": 0,
+        "spd": 56,
+        "spe": 0
+      },
+      "ivs": {
+        "hp": 31,
+        "atk": 0,
+        "def": 31,
+        "spa": 31,
+        "spd": 31,
+        "spe": 31
+      },
+      "nature": "Calm",
+      "moves": [
+        "Chilly Reception",
+        "Scald",
+        "Grass Knot",
+        "Psyshock"
+      ],
+      "level": 100
+    },
+    {
+      "name": "Ice Shadow",
+      "species": "Cryogonal",
+      "gender": "",
+      "item": "Leftovers",
+      "ability": "Levitate",
+      "teraType": "Ice",
+      "evs": {
+        "hp": 248,
+        "atk": 0,
+        "def": 0,
+        "spa": 44,
+        "spd": 0,
+        "spe": 216
+      },
+      "ivs": {
+        "hp": 31,
+        "atk": 31,
+        "def": 31,
+        "spa": 31,
+        "spd": 31,
+        "spe": 31
+      },
+      "nature": "Timid",
+      "moves": [
+        "Freeze-Dry",
+        "Flash Cannon",
+        "Rapid Spin",
+        "Recover"
+      ],
+      "level": 100
+    },
+    {
+      "name": "Fire Shadow",
+      "species": "Heatran",
+      "gender": "M",
+      "item": "Choice Scarf",
+      "ability": "Flash Fire",
+      "teraType": "Fire",
+      "evs": {
+        "hp": 80,
+        "atk": 0,
+        "def": 0,
+        "spa": 252,
+        "spd": 0,
+        "spe": 176
+      },
+      "ivs": {
+        "hp": 31,
+        "atk": 0,
+        "def": 31,
+        "spa": 31,
+        "spd": 31,
+        "spe": 31
+      },
+      "nature": "Modest",
+      "moves": [
+        "Power Gem",
+        "Overheat",
+        "Flamethrower",
+        "Steel Beam"
+      ],
+      "level": 100
+    },
+    {
+      "name": "Sludge Shadow",
+      "species": "Muk-Alola",
+      "gender": "F",
+      "item": "Black Sludge",
+      "ability": "Poison Touch",
+      "teraType": "Poison",
+      "evs": {
+        "hp": 252,
+        "atk": 0,
+        "def": 4,
+        "spa": 0,
+        "spd": 252,
+        "spe": 0
+      },
+      "ivs": {
+        "hp": 31,
+        "atk": 31,
+        "def": 31,
+        "spa": 31,
+        "spd": 31,
+        "spe": 31
+      },
+      "nature": "Careful",
+      "moves": [
+        "Knock Off",
+        "Poison Jab",
+        "Rest",
+        "Sleep Talk"
+      ],
+      "level": 100
+    }
+  ],
+  "history": [
+    {
+      "p1": {
+        "kind": "move",
+        "moveId": "freezedry",
+        "moveName": "freezedry"
+      },
+      "p2": {
+        "kind": "move",
+        "moveId": "psyshock",
+        "moveName": "psyshock"
+      }
+    },
+    {
+      "p2": {
+        "kind": "switch",
+        "speciesId": "heatran",
+        "pokemonName": "heatran"
+      }
+    },
+    {
+      "p1": {
+        "kind": "switch",
+        "speciesId": "talonflame",
+        "pokemonName": "talonflame"
+      },
+      "p2": {
+        "kind": "move",
+        "moveId": "steelbeam",
+        "moveName": "steelbeam"
+      }
+    },
+    {
+      "p1": {
+        "kind": "switch",
+        "speciesId": "mienshao",
+        "pokemonName": "mienshao"
+      }
+    },
+    {
+      "p1": {
+        "kind": "move",
+        "moveId": "closecombat",
+        "moveName": "closecombat"
+      },
+      "p2": {
+        "kind": "move",
+        "moveId": "steelbeam",
+        "moveName": "steelbeam"
+      }
+    },
+    {
+      "p2": {
+        "kind": "switch",
+        "speciesId": "dragapult",
+        "pokemonName": "dragapult"
+      }
+    },
+    {
+      "p1": {
+        "kind": "switch",
+        "speciesId": "palossand",
+        "pokemonName": "palossand"
+      },
+      "p2": {
+        "kind": "switch",
+        "speciesId": "cryogonal",
+        "pokemonName": "cryogonal"
+      }
+    },
+    {
+      "p1": {
+        "kind": "move",
+        "moveId": "shoreup",
+        "moveName": "shoreup"
+      },
+      "p2": {
+        "kind": "move",
+        "moveId": "recover",
+        "moveName": "recover"
+      }
+    },
+    {
+      "p1": {
+        "kind": "move",
+        "moveId": "shoreup",
+        "moveName": "shoreup"
+      },
+      "p2": {
+        "kind": "move",
+        "moveId": "freezedry",
+        "moveName": "freezedry"
+      }
+    },
+    {
+      "p1": {
+        "kind": "move",
+        "moveId": "shadowball",
+        "moveName": "shadowball"
+      },
+      "p2": {
+        "kind": "move",
+        "moveId": "freezedry",
+        "moveName": "freezedry"
+      }
+    },
+    {
+      "p1": {
+        "kind": "move",
+        "moveId": "shoreup",
+        "moveName": "shoreup"
+      },
+      "p2": {
+        "kind": "move",
+        "moveId": "freezedry",
+        "moveName": "freezedry"
+      }
+    },
+    {
+      "p1": {
+        "kind": "switch",
+        "speciesId": "mienshao",
+        "pokemonName": "mienshao"
+      }
+    },
+    {
+      "p1": {
+        "kind": "move",
+        "moveId": "closecombat",
+        "moveName": "closecombat"
+      },
+      "p2": {
+        "kind": "move",
+        "moveId": "recover",
+        "moveName": "recover"
+      }
+    },
+    {
+      "p2": {
+        "kind": "switch",
+        "speciesId": "dragapult",
+        "pokemonName": "dragapult"
+      }
+    }
+  ]
+}

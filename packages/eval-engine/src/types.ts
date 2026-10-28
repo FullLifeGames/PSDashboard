@@ -553,6 +553,12 @@ export interface MctsTreeStats {
   /** Root static (p1 perspective) — the unexpanded-cell fallback. */
   rootValue: number;
   /**
+   * Round 77 (T267): the living Pokémon of each side at the root. With at most VERIFY_ENDGAME_LIVING left on each side
+   * the trees play the game to its end, and a rich, agreeing pool keeps its depth below VERIFY_DEPTH_FLOOR
+   * (mcts-merge.ts). Absent on trees from before, which keep the floor.
+   */
+  living?: { p1: number; p2: number };
+  /**
    * Per-option kill odds at the root (index-aligned with the option lists;
    * absent for dead roots). Round 7: the merge attaches these to ranked
    * rows — mcts-merge stays sim-free, so the worker ships the facts.

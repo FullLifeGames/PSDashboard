@@ -22,6 +22,20 @@ Wave 5 (round 73), T163 with T263 (round 74, measured, nothing adopted), T160 (r
 
 ## The release
 
+### T267 · An endgame keeps the trees' verdict in the verify round
+
+*Engine · round 77 · small · rankings and verdicts move, the score does not*
+
+**Problem.** Draft 2058494320, a variation from turn 54, turn 63: Mienshao (Choice Scarf, locked into Close Combat) and Kyurem at 48 % face Dragapult at 45 % (Choice Specs) and Muk-Alola. The panel read "puffelmaedchen 15 % · Bene 85 %" above lines that advised U-turn for Bene at 16 % and Kyurem's switch for puffelmaedchen at 84 %. The score is the trees' visit mean; the lines come from the pooled matrix after the verify round. The trees played Kyurem's switch into each of Dragapult's attacks out to 11 to 17 % for puffelmaedchen over 400 to 650 visits, the one-ply sampler of the verify round read 84 to 93 %, and `VERIFY_DEPTH_FLOOR` (0.9) lets the trees' depth stand only near ±1, so the sampler priced the cells and turned the ranking around (probe `docs/perf/probes/2026-10-24-r77/t63/`).
+
+**Idea.** With at most two living Pokémon on each side the trees play the game to its end, so a rich, agreeing pool is a verdict at any magnitude; damage rolls, critical hits and misses keep the mean of a played-out endgame off ±1. The middlegame keeps the floor (655336 t24).
+
+**Benefit.** In an endgame the advice and the score tell the same story; Bene's lines lead with the attacks that win.
+
+**Success.** `packages/eval-engine/test/endgame-verify-t63.spec.ts` (the scene) and the two endgame rows of `verify-depth.spec.ts`; the score paths stay byte-identical (bank rows unchanged), the feedback corpus moves only endgame turns, and the gate reads them.
+
+**Gate.** The engine suite moves one pin: 912045 t8 (doubles, two against two), regret 0.0516 to 0.0198, tier none before and after, outside its band (0.064 ± 0.04, a Monte-Carlo reference with one-ply leaves).
+
 ### T43 · Release check before every package release
 
 *Tool · mini round · mini · no score touch*

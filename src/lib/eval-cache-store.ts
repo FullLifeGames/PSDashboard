@@ -317,7 +317,9 @@ export interface StoredEval {
 //      Last Respects read the hits taken and the faints from the history, a Taunt from a -start line ticks as the
 //      simulator does, and an open team sheet without EVs takes the solved spread (the sets of open-sheet games move).
 //      Positions of every format read new values.
-const EVAL_ENGINE_CACHE_VERSION = 70;
+// v71 (round 77, T267): in an endgame (at most two living Pokémon on each side) the verify round keeps a rich,
+//      agreeing tree pool below the depth floor, so the rankings and verdicts of endgame turns move; the score stays.
+const EVAL_ENGINE_CACHE_VERSION = 71;
 
 /** Round 61: a search-budget form stores under its own tag; the default keeps today's keys. */
 const versionTag = (): string => {

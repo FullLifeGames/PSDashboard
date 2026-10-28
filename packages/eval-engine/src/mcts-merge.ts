@@ -32,6 +32,20 @@ export {
  */
 const VERIFY_DEPTH_FLOOR = 0.9;
 
+/**
+ * Round 77 (T267): with at most this many living Pokémon on each side the trees play the game to its end, so a rich,
+ * agreeing pool is a verdict at any magnitude: damage rolls, critical hits and misses keep the mean of a played-out
+ * endgame off ±1. Draft 2058494320, variation turn 63: the pools of Kyurem's switch into Dragapult's attacks read 11 to
+ * 17 % for P1 over 400 to 650 visits, the one-ply sampler 84 to 93 %, and the floor gave the sampler the cells, so the
+ * ranking advised U-turn beside a score that saw the other side winning. The middlegame keeps the floor (655336 t24).
+ */
+const VERIFY_ENDGAME_LIVING = 2;
+
+const endgameOf = (trees: MctsTreeStats[]): boolean => {
+  const living = trees[0]?.living;
+  return !!living && living.p1 <= VERIFY_ENDGAME_LIVING && living.p2 <= VERIFY_ENDGAME_LIVING;
+};
+
 interface PooledCell {
   visits: number;
   total: number;
@@ -93,10 +107,10 @@ function poolContinuation(
 /** A class pool rich enough to carry depth: VERIFY_MIN_VISITS visits over at least two trees (four trees split across classes). */
 const VERIFY_MIN_CLASS_TREES = 2;
 
-/** A pool that has played its cell out and agrees: its depth outranks the one-ply sampler. */
-function deepPool(pool: ReturnType<typeof poolContinuation>, minTrees: number): boolean {
+/** A pool that has played its cell out and agrees: its depth outranks the one-ply sampler (in an endgame at any magnitude). */
+function deepPool(pool: ReturnType<typeof poolContinuation>, minTrees: number, endgame: boolean): boolean {
   return pool.visits >= VERIFY_MIN_VISITS && pool.trees >= minTrees &&
-    pool.disagreement <= VERIFY_DISAGREEMENT && Math.abs(pool.value) >= VERIFY_DEPTH_FLOOR;
+    pool.disagreement <= VERIFY_DISAGREEMENT && (endgame || Math.abs(pool.value) >= VERIFY_DEPTH_FLOOR);
 }
 
 /**
@@ -118,10 +132,11 @@ function deepPool(pool: ReturnType<typeof poolContinuation>, minTrees: number): 
  * (cell.deepened), so no verified cell mixes depths.
  */
 function verifiedValue(trees: MctsTreeStats[], key: number, cell: EvalCellValue, pooledValue: number): number {
+  const endgame = endgameOf(trees);
   if (!cell.blend) {
     const pool = poolContinuation(trees, key);
     // The sampler's value, one ply deeper where the verify step deepened it (round 33).
-    return deepPool(pool, Math.min(VERIFY_MIN_TREES, trees.length)) ? pooledValue : cell.deepened ?? cell.value;
+    return deepPool(pool, Math.min(VERIFY_MIN_TREES, trees.length), endgame) ? pooledValue : cell.deepened ?? cell.value;
   }
   const { blend } = cell;
   // A class one ply deeper (round 63); otherwise a deepened first-seed child
@@ -140,7 +155,7 @@ function verifiedValue(trees: MctsTreeStats[], key: number, cell: EvalCellValue,
       continue;
     }
     const pool = poolContinuation(trees, key, cls.key, open.length === 1);
-    value += cls.weight * (deepPool(pool, VERIFY_MIN_CLASS_TREES) ? pool.value : classMean(cls));
+    value += cls.weight * (deepPool(pool, VERIFY_MIN_CLASS_TREES, endgame) ? pool.value : classMean(cls));
   }
   return value;
 }
