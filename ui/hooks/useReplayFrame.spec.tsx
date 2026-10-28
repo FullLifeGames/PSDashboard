@@ -129,15 +129,50 @@ describe('useSeekRequests', () => {
   });
 });
 
+/** The frame's bridge reports ready, as the replay document does once its battle exists. */
+function reportReady(iframeRef: FrameRef) {
+  const event = new MessageEvent('message', { data: { type: 'ps-replay-ready' } });
+  Object.defineProperty(event, 'source', { value: iframeRef.current?.contentWindow });
+  act(() => { window.dispatchEvent(event); });
+}
+
 describe('useLiveAppend', () => {
   type AppendArgs = Parameters<typeof useLiveAppend>[0];
   const base: Omit<AppendArgs, 'iframeRef' | 'log'> = {
     liveUpdates: true, reloadKey: 'session-1', blobUrl: 'blob:test/1', seekTurn: 2, liveAppendMode: 'follow-end', liveAppendTurn: null,
   };
 
+  test('lines appended before the frame reports ready wait for it and then go out as one append', () => {
+    // Round 77 (user report 28.10.2026): after one turn back and a new choice the frame reloaded for the rebuilt line, and the
+    // new turn's lines went out while the embed script still loaded. Nothing listened yet, so the frame never showed the turn.
+    const { iframeRef, postMessage } = frame();
+    const { rerender } = renderHook((props: Parameters<typeof useLiveAppend>[0]) => useLiveAppend(props), { initialProps: { ...base, iframeRef, log: LOG } });
+    rerender({ ...base, iframeRef, log: `${LOG}\n|move|p2a: Ferrothorn|Leech Seed|p1a: Garchomp`, liveAppendMode: 'play', liveAppendTurn: 2 });
+    rerender({ ...base, iframeRef, log: `${LOG}\n|move|p2a: Ferrothorn|Leech Seed|p1a: Garchomp\n|turn|3`, liveAppendMode: 'play', liveAppendTurn: 2 });
+    expect(postMessage).not.toHaveBeenCalled();
+
+    // Another frame's ready message changes nothing; this frame's sends every waiting line at once.
+    const other = new MessageEvent('message', { data: { type: 'ps-replay-ready' } });
+    act(() => { window.dispatchEvent(other); });
+    expect(postMessage).not.toHaveBeenCalled();
+    reportReady(iframeRef);
+    expect(postMessage).toHaveBeenCalledTimes(1);
+    expect(postMessage).toHaveBeenCalledWith({
+      type: 'ps-append-log', lines: ['|move|p2a: Ferrothorn|Leech Seed|p1a: Garchomp', '|turn|3'], seekTurn: 2, followEnd: false, playFromTurn: 2,
+    }, '*');
+
+    // A new document waits for its own ready message.
+    rerender({ ...base, iframeRef, log: `${LOG}\n|turn|3`, blobUrl: 'blob:test/2' });
+    rerender({ ...base, iframeRef, log: `${LOG}\n|turn|3\n|turn|4`, blobUrl: 'blob:test/2' });
+    expect(postMessage).toHaveBeenCalledTimes(1);
+    reportReady(iframeRef);
+    expect(postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ lines: ['|turn|4'] }), '*');
+  });
+
   test('appended lines stream into the frame; the first pass only records the baseline', () => {
     const { iframeRef, postMessage } = frame();
     const { rerender } = renderHook((props: Parameters<typeof useLiveAppend>[0]) => useLiveAppend(props), { initialProps: { ...base, iframeRef, log: LOG } });
+    reportReady(iframeRef);
     expect(postMessage).not.toHaveBeenCalled();
 
     rerender({ ...base, iframeRef, log: `${LOG}\n|move|p2a: Ferrothorn|Leech Seed|p1a: Garchomp\n|turn|3` });
@@ -149,6 +184,7 @@ describe('useLiveAppend', () => {
   test('play mode animates from the executed turn, hold mode neither seeks nor follows', () => {
     const { iframeRef, postMessage } = frame();
     const { rerender } = renderHook((props: Parameters<typeof useLiveAppend>[0]) => useLiveAppend(props), { initialProps: { ...base, iframeRef, log: LOG } });
+    reportReady(iframeRef);
     rerender({ ...base, iframeRef, log: `${LOG}\n|turn|3`, liveAppendMode: 'play', liveAppendTurn: 2 });
     expect(postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ followEnd: false, playFromTurn: 2 }), '*');
 
@@ -159,6 +195,7 @@ describe('useLiveAppend', () => {
   test('a diverging log, a new session, or a non-live frame posts nothing', () => {
     const { iframeRef, postMessage } = frame();
     const { rerender } = renderHook((props: Parameters<typeof useLiveAppend>[0]) => useLiveAppend(props), { initialProps: { ...base, iframeRef, log: LOG } });
+    reportReady(iframeRef);
     rerender({ ...base, iframeRef, log: LOG.replace('Earthquake', 'Stone Edge') });
     rerender({ ...base, iframeRef, log: `${LOG}\n|turn|3`, reloadKey: 'session-2' });
     rerender({ ...base, iframeRef, log: `${LOG}\n|turn|3\n|turn|4`, liveUpdates: false });

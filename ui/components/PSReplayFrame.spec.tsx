@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { PSReplayFrame } from '../../src/components/PSReplayFrame';
 
 const LOG = '|player|p1|Alice|\n|player|p2|Bob|\n|turn|1\n|move|p1a: Garchomp|Earthquake|p2a: Ferrothorn\n|turn|2';
@@ -60,7 +60,11 @@ describe('PSReplayFrame', () => {
     expect(await rebuilt.text()).not.toContain('|turn|3');
 
     const postMessage = vi.fn();
-    Object.defineProperty(frame, 'contentWindow', { configurable: true, value: { postMessage } });
+    const contentWindow = { postMessage };
+    Object.defineProperty(frame, 'contentWindow', { configurable: true, value: contentWindow });
+    const ready = new MessageEvent('message', { data: { type: 'ps-replay-ready' } });
+    Object.defineProperty(ready, 'source', { value: contentWindow });
+    act(() => { window.dispatchEvent(ready); });
     rerender(<PSReplayFrame log={`${LOG}\n${newTurn.join('\n')}`} liveUpdates reloadKey="session" title="Branch" />);
     expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'ps-append-log', lines: newTurn }), '*');
     expect(URL.createObjectURL).toHaveBeenCalledTimes(2);

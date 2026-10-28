@@ -146,8 +146,7 @@ export function extendsLines(previous: string[], next: string[]): boolean {
   return previous.length <= next.length && previous.every((line, index) => line === next[index]);
 }
 
-/** Streams appended log lines into a live frame instead of rebuilding it. */
-export function useLiveAppend(args: {
+interface LiveAppendArgs {
   iframeRef: FrameRef;
   liveUpdates: boolean;
   reloadKey: string;
@@ -156,31 +155,67 @@ export function useLiveAppend(args: {
   seekTurn: number | undefined;
   liveAppendMode: 'play' | 'follow-end' | 'hold';
   liveAppendTurn: number | null;
-}) {
+}
+
+type SentLog = { key: string; blobUrl: string; lines: string[] };
+
+/**
+ * Streams appended log lines into a live frame instead of rebuilding it.
+ * The frame's bridge listens only once its document has loaded, and the
+ * embed script comes from the network: lines posted before that were lost.
+ * After one turn back and a new choice the frame reloaded for the rebuilt
+ * line, and it never showed the new turn (round 77, user report
+ * 28.10.2026). New lines wait for the frame's ready message and then go out
+ * as one append.
+ */
+export function useLiveAppend(args: LiveAppendArgs) {
   const { iframeRef, liveUpdates, reloadKey, blobUrl, log, seekTurn, liveAppendMode, liveAppendTurn } = args;
-  const sentLogRef = useRef<{ key: string; blobUrl: string; lines: string[] } | null>(null);
+  /** The lines the frame holds, or holds once its bridge reports ready. */
+  const sentLogRef = useRef<SentLog | null>(null);
+  /** The document whose bridge reported ready. */
+  const readyRef = useRef<string | null>(null);
+  const latestRef = useRef<LiveAppendArgs | null>(null);
   useEffect(() => {
     if (!liveUpdates || !blobUrl) return;
-
-    const lines = frameLines(log);
-    const previous = sentLogRef.current;
-    if (!previous || previous.key !== reloadKey || previous.blobUrl !== blobUrl) {
-      sentLogRef.current = { key: reloadKey, blobUrl, lines };
-      return;
-    }
-
-    const canAppend = extendsLines(previous.lines, lines);
-    if (canAppend && lines.length > previous.lines.length) {
-      const shouldPlayAppend = liveAppendMode === 'play' && typeof liveAppendTurn === 'number';
-      const holdAppend = liveAppendMode === 'hold';
-      iframeRef.current?.contentWindow?.postMessage({
-        type: 'ps-append-log',
-        lines: lines.slice(previous.lines.length),
-        seekTurn: holdAppend ? undefined : seekTurn,
-        followEnd: !shouldPlayAppend && !holdAppend,
-        playFromTurn: shouldPlayAppend ? liveAppendTurn : undefined,
-      }, '*');
-    }
-    sentLogRef.current = { key: reloadKey, blobUrl, lines };
+    const current = { iframeRef, liveUpdates, reloadKey, blobUrl, log, seekTurn, liveAppendMode, liveAppendTurn };
+    latestRef.current = current;
+    appendNewLines(current, sentLogRef, readyRef.current === blobUrl);
   }, [liveUpdates, reloadKey, blobUrl, log, seekTurn, liveAppendMode, liveAppendTurn, iframeRef]);
+  useEffect(() => {
+    if (!liveUpdates || !blobUrl) return;
+    const onReady = (event: MessageEvent) => {
+      if (event.data?.type !== 'ps-replay-ready' || event.source !== iframeRef.current?.contentWindow) return;
+      readyRef.current = blobUrl;
+      if (latestRef.current?.blobUrl === blobUrl) appendNewLines(latestRef.current, sentLogRef, true);
+    };
+    window.addEventListener('message', onReady);
+    return () => window.removeEventListener('message', onReady);
+  }, [liveUpdates, blobUrl, iframeRef]);
+}
+
+/** Posts the lines the frame lacks; a new document records its own lines, and a frame not ready yet keeps them waiting. */
+function appendNewLines(args: LiveAppendArgs, sentLogRef: React.RefObject<SentLog | null>, ready: boolean): void {
+  const { iframeRef, reloadKey, blobUrl, log, seekTurn, liveAppendMode, liveAppendTurn } = args;
+  if (!blobUrl) return;
+  const lines = frameLines(log);
+  const previous = sentLogRef.current;
+  if (!previous || previous.key !== reloadKey || previous.blobUrl !== blobUrl) {
+    sentLogRef.current = { key: reloadKey, blobUrl, lines };
+    return;
+  }
+  if (!ready) return;
+
+  const canAppend = extendsLines(previous.lines, lines);
+  if (canAppend && lines.length > previous.lines.length) {
+    const shouldPlayAppend = liveAppendMode === 'play' && typeof liveAppendTurn === 'number';
+    const holdAppend = liveAppendMode === 'hold';
+    iframeRef.current?.contentWindow?.postMessage({
+      type: 'ps-append-log',
+      lines: lines.slice(previous.lines.length),
+      seekTurn: holdAppend ? undefined : seekTurn,
+      followEnd: !shouldPlayAppend && !holdAppend,
+      playFromTurn: shouldPlayAppend ? liveAppendTurn : undefined,
+    }, '*');
+  }
+  sentLogRef.current = { key: reloadKey, blobUrl, lines };
 }

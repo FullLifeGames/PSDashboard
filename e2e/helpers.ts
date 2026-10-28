@@ -122,6 +122,21 @@ export async function installReplayEmbedCache(): Promise<void> {
   }
 }
 
+/**
+ * Serves the cached embed script late, as a browser gets it from the network: a frame still loads while the app already
+ * posts to it (round 77, the appended turn the user never saw). Registered after the offline routes, so it wins.
+ */
+export async function routeSlowReplayEmbed(page: Page, delayMs: number): Promise<void> {
+  await page.route('**/play.pokemonshowdown.com/js/replay-embed.js*', async (route) => {
+    await new Promise(resolve => setTimeout(resolve, delayMs));
+    if (replayEmbedCache) {
+      await route.fulfill({ status: 200, contentType: 'application/javascript', body: replayEmbedCache });
+      return;
+    }
+    await route.continue().catch(() => {});
+  });
+}
+
 /** The offline routes every dashboard test starts from: cached replay embed, fixture replays, empty Smogon data. */
 export async function routeOfflineFixtures(page: Page): Promise<void> {
   await page.route('**/play.pokemonshowdown.com/js/replay-embed.js*', async (route) => {

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'fs';
-import { expectReplayTurnAtLeast, fixturePath, installReplayEmbedCache, routeOfflineFixtures, startVariationAt, type ReplayWindow } from './helpers';
+import { expectReplayTurnAtLeast, fixturePath, installReplayEmbedCache, routeOfflineFixtures, routeSlowReplayEmbed, startVariationAt, type ReplayWindow } from './helpers';
 
 test.beforeAll(installReplayEmbedCache);
 
@@ -142,8 +142,11 @@ test.describe('PS Dashboard', () => {
   test('one turn back in a turn-0 variation and a new choice: the branch frame plays the new turn alone (round 77)', async ({ page }) => {
     // User report 28.10.2026: in the draft replay, a few turns from turn 0, one turn back and a new choice. The rebuild kept
     // the variation right, but the frame kept the old line and the new turn appended after its tail: the frame played the
-    // old attack and then the new one. Here turn 2 is Ice Beam first and Freeze-Dry after the step back.
+    // old attack and then the new one. With that fixed, the frame reloaded for the rebuilt line and the new turn went out
+    // while the embed script still loaded, so the frame never showed it. The embed comes a second late here, as from the
+    // network. Turn 2 is Ice Beam first and Freeze-Dry after the step back.
     test.setTimeout(180_000);
+    await routeSlowReplayEmbed(page, 1000);
     const draftReplay = JSON.parse(readFileSync(fixturePath('draft-replay.json'), 'utf-8'));
     await page.route('**/replay.pokemonshowdown.com/**', route => route.fulfill({
       status: 200,
@@ -191,6 +194,8 @@ test.describe('PS Dashboard', () => {
       ((window as ReplayWindow & { Replays?: { battle?: { stepQueue?: string[] } } }).Replays?.battle?.stepQueue ?? [])
         .filter(line => line.startsWith('|move|'))
     ), { timeout: 30_000 }).toEqual(simMoves);
+    // And it shows the new turn: the frame plays through turn 2 to the variation's tip.
+    await expectReplayTurnAtLeast(frame!, 3);
   });
 
   test('an executed move replaces the replay iframe with the branch sim', async ({ page }) => {
