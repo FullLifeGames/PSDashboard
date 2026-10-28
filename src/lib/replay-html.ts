@@ -259,8 +259,12 @@ export function generateReplayHtml(opts: {
   // Escape forward slashes for the script tag content (PS format)
   const escapedLog = log.replace(/<\//g, '<\\/');
 
+  // Round 77 (user report 28.10.2026): graphics.js prefixes the effect sprites (Stealth Rock, Spikes, the move
+  // animations) with Dex.fxPrefix only when Dex already exists, and the embed runs its scripts in any order.
+  // A sprite left as "rock1.png" has no base in a blob document: the base names the folder the prefix names.
   return `<!DOCTYPE html>
 <meta charset="utf-8" />
+<base href="https://play.pokemonshowdown.com/fx/">
 <title>${displayTitle}</title>
 ${REPLAY_STYLES}
 ${SILENT_AUDIO_SCRIPT}

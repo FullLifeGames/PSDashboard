@@ -76,6 +76,21 @@ describe('Replay iframe HTML', () => {
     expect(configured.sound).toBe(false);
   });
 
+  test('relative effect sprites resolve against Showdown\'s fx folder (round 77)', () => {
+    // User report 28.10.2026: the Stealth Rock around both Pokémon of 562428 turn 12 showed as empty boxes.
+    // graphics.js prefixes BattleEffects with Dex.fxPrefix only when Dex already exists; the embed loads
+    // its scripts in any order, and when graphics.js runs first the sprites stay "rock1.png". A blob
+    // document has no base to resolve that against, so the base names the folder the prefix would have.
+    const html = generateReplayHtml({ log });
+    const head = html.slice(0, html.indexOf('<div class="wrapper replay-wrapper">'));
+    expect(head).toContain('<base href="https://play.pokemonshowdown.com/fx/">');
+    const resolved = new URL('rock1.png', 'https://play.pokemonshowdown.com/fx/').href;
+    expect(resolved).toBe('https://play.pokemonshowdown.com/fx/rock1.png');
+    // Every other resource the document names is absolute, so the base moves nothing else.
+    const relative = [...html.matchAll(/\b(?:src|href)="(?!https:\/\/)([^"]+)"/g)].map(match => match[1]);
+    expect(relative).toEqual([]);
+  });
+
   test('disables Showdown replay sound before embed code loads', () => {
     const html = generateReplayHtml({ log });
 
