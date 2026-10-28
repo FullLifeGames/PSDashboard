@@ -27,6 +27,12 @@ export interface EngineWalkInputs {
   setBranchDivergence: (updater: (previous: string | null) => string | null) => void;
 }
 
+/** The walk's two shared refs: armed for the interlude, and the last result it has read. */
+interface WalkRefs {
+  walkInterludeRef: MutableRefObject<boolean>;
+  walkProcessedRef: MutableRefObject<EvalResult | null>;
+}
+
 /** Maps an engine choice string onto the live pickers, slot-aligned. */
 function useApplyEvalChoice(simState: BranchSimState | null, handleSetChoice: EngineWalkInputs['handleSetChoice']) {
   return useCallback((side: 'p1' | 'p2', ranked: RankedChoice): boolean => {
@@ -57,12 +63,11 @@ function useApplyEvalChoice(simState: BranchSimState | null, handleSetChoice: En
 /** Chess-style walk: clicking an engine line PLAYS THE TURN OUT — the
  *  clicked side commits its line, the other side answers with the engine's
  *  top reply, the turn executes, and the result re-evaluates. */
-function usePlayTurnOut(args: EngineWalkInputs & {
+function usePlayTurnOut(args: EngineWalkInputs & WalkRefs & {
   applyEvalChoice: ReturnType<typeof useApplyEvalChoice>;
-  walkInterludeRef: MutableRefObject<boolean>;
 }) {
   const {
-    evaluation, applyEvalChoice, walkInterludeRef, getBattle, setBranchDivergence, executeTurn, handleEvaluate,
+    evaluation, applyEvalChoice, walkInterludeRef, walkProcessedRef, getBattle, setBranchDivergence, executeTurn, handleEvaluate,
   } = args;
   return useCallback((side: 'p1' | 'p2', ranked: RankedChoice, reply: RankedChoice | null) => {
     // A diverged/finished branch sim cannot accept choices — refuse with the
@@ -86,6 +91,10 @@ function usePlayTurnOut(args: EngineWalkInputs & {
         // Mid-turn KOs pause the sim on a forced replacement — the walk
         // finishes those interludes with the engine's answer (effect below).
         walkInterludeRef.current = true;
+        // Round 77 (C3): the result that stands now is the position this click left; it is not the replacement
+        // position. A pick played from the queue arms the walk inside an effect pass, and the interlude effect of
+        // the same pass would read that result as the answer and disarm the walk.
+        walkProcessedRef.current = evaluation.result;
         void executeTurn().then(() => handleEvaluate());
         return;
       }
@@ -93,12 +102,11 @@ function usePlayTurnOut(args: EngineWalkInputs & {
     // No engine reply to commit (forced-switch positions execute through
     // setChoice on their own) — show the engine's view of what stands.
     handleEvaluate();
-  }, [applyEvalChoice, walkInterludeRef, evaluation.result, getBattle, executeTurn, handleEvaluate, setBranchDivergence]);
+  }, [applyEvalChoice, walkInterludeRef, walkProcessedRef, evaluation.result, getBattle, executeTurn, handleEvaluate, setBranchDivergence]);
 }
 
-function useChessWalk(args: EngineWalkInputs & {
+function useChessWalk(args: EngineWalkInputs & WalkRefs & {
   applyEvalChoice: ReturnType<typeof useApplyEvalChoice>;
-  walkInterludeRef: MutableRefObject<boolean>;
 }) {
   const { evaluation, liveTip, simState, requestDeviation, branching, branchPreparing, confirmOpen } = args;
   const playOutEvalChoice = usePlayTurnOut(args);
@@ -170,15 +178,13 @@ function interludeStep(result: EvalResult): { side: 'p1' | 'p2'; choice: RankedC
   return 'disarm';
 }
 
-function useWalkInterlude(args: EngineWalkInputs & {
+function useWalkInterlude(args: EngineWalkInputs & WalkRefs & {
   applyEvalChoice: ReturnType<typeof useApplyEvalChoice>;
-  walkInterludeRef: MutableRefObject<boolean>;
 }) {
   const {
-    evaluation, applyEvalChoice, walkInterludeRef, playOutActive, liveTip, executing,
+    evaluation, applyEvalChoice, walkInterludeRef, walkProcessedRef, playOutActive, liveTip, executing,
     branchPreparing, evalViewKey, getBattle,
   } = args;
-  const walkProcessedRef = useRef<EvalResult | null>(null);
   useEffect(() => {
     if (!walkInterludeRef.current || playOutActive) return;
     if (!liveTip || executing || branchPreparing) return;
@@ -198,7 +204,7 @@ function useWalkInterlude(args: EngineWalkInputs & {
     }
     // setChoice auto-executes forced replacements; the auto pref re-evaluates
     // once the entry lands, which re-enters this effect until two-sided.
-  }, [playOutActive, liveTip, executing, branchPreparing, evaluation.status, evaluation.result, evaluation.resultTag, evalViewKey, getBattle, applyEvalChoice, walkInterludeRef]);
+  }, [playOutActive, liveTip, executing, branchPreparing, evaluation.status, evaluation.result, evaluation.resultTag, evalViewKey, getBattle, applyEvalChoice, walkInterludeRef, walkProcessedRef]);
 }
 
 export function useEngineWalk(inputs: EngineWalkInputs) {
@@ -206,7 +212,9 @@ export function useEngineWalk(inputs: EngineWalkInputs) {
   // Armed by a clicked engine line whose turn executed — see the interlude
   // completion effect.
   const walkInterludeRef = useRef(false);
-  const walk = useChessWalk({ ...inputs, applyEvalChoice, walkInterludeRef });
-  useWalkInterlude({ ...inputs, applyEvalChoice, walkInterludeRef });
+  // The result the walk has already read (or that stood when it armed); the interlude acts on newer results only.
+  const walkProcessedRef = useRef<EvalResult | null>(null);
+  const walk = useChessWalk({ ...inputs, applyEvalChoice, walkInterludeRef, walkProcessedRef });
+  useWalkInterlude({ ...inputs, applyEvalChoice, walkInterludeRef, walkProcessedRef });
   return { applyEvalChoice, ...walk };
 }
