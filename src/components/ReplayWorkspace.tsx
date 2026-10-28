@@ -96,6 +96,9 @@ function LeadRegion({ app, replayData }: WorkspaceProps) {
   const { executing, history } = app.ctx.branch;
   const { branchPreparing, leadOptions, startLeadVariation } = app.board.deviation;
   const { replayGameType, bringCount } = app.ctx.meta;
+  const { setLeadPicks } = app.transients;
+  // One reading of the picks for both buttons: a bring-limited format carries its back line along.
+  const withBring = (leads: { p1: string[]; p2: string[] }) => (bringCount !== null ? { ...leads, bring: true } : leads);
   return (
     <LeadPanel
       key={`${replayData.id}:${leadOptions.p1.length}`}
@@ -106,7 +109,8 @@ function LeadRegion({ app, replayData }: WorkspaceProps) {
       bringCount={bringCount}
       pickedLeads={variationSpan?.startTurn === 0 ? history[0]?.leadChoices ?? null : null}
       executing={executing || branchPreparing}
-      onStart={leads => startLeadVariation(bringCount !== null ? { ...leads, bring: true } : leads)}
+      onStart={leads => startLeadVariation(withBring(leads))}
+      onPicksChange={picks => setLeadPicks(picks && withBring(picks))}
     />
   );
 }

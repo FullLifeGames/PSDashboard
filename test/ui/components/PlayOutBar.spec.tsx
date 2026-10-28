@@ -24,6 +24,13 @@ describe('PlayOutBar', () => {
     expect(screen.getByRole('button', { name: /Let it play out/ })).toBeDisabled();
   });
 
+  // Round 77 (C2): at turn 0 the hint names the start the run really takes.
+  test('in the turn 0 view the hint names turn 0 and the picked leads, not the turn the pointer left behind', () => {
+    render(<PlayOutBar {...props({ viewTurn: 3, atTurnZero: true })} />);
+    expect(screen.getByText('engine plays the game from turn 0 with the leads picked above')).toBeInTheDocument();
+    expect(screen.queryByText(/from turn 3/)).toBeNull();
+  });
+
   // Round 77 (swarm A-6): at an ended position the engine has nothing to play.
   test('at an ended position no play-out is offered', () => {
     render(<PlayOutBar {...props({ ended: true })} />);

@@ -227,7 +227,7 @@ export function useDeviation(inputs: DeviationInputs) {
   const { leadOptions, defaultLeadSelection } = useLeadDefaults(snapshots, bringCount, replayGameType, replayData);
 
   return {
-    session, branchDivergence, setBranchDivergence, variationNotice, reportVariationEnded,
+    session, branchDivergence, setBranchDivergence, variationNotice, setVariationNotice, reportVariationEnded,
     branchPreparing, branchProgress, branchSession,
     cancelPreparation: session.cancelPreparation,
     rebuildAt, ...requests, handleSetChoice, handleExecuteDraft, leadOptions, defaultLeadSelection,

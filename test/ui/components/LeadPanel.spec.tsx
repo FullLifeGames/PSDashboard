@@ -77,4 +77,25 @@ describe('LeadPanel', () => {
     render(<LeadPanel {...props({ p1Options: [] })} />);
     expect(screen.getByText(/The teams are still loading/)).toBeInTheDocument();
   });
+
+  // Round 77 (C2): the play-out button outside the panel reads the picks the panel shows.
+  test('reports the picks while they are complete and clears them when the panel leaves', async () => {
+    const onPicksChange = vi.fn();
+    const { unmount } = render(<LeadPanel {...props({ ...doubles, leadsPerSide: 2, onPicksChange })} />);
+    expect(onPicksChange).toHaveBeenLastCalledWith({ p1: ['Incineroar', 'Amoonguss'], p2: ['Tornadus', 'Kingambit'] });
+    await userEvent.click(screen.getByRole('button', { name: /^Incineroar/ }));
+    expect(onPicksChange).toHaveBeenLastCalledWith(null);
+    await userEvent.click(screen.getByRole('button', { name: /^Urshifu/ }));
+    expect(onPicksChange).toHaveBeenLastCalledWith({ p1: ['Amoonguss', 'Urshifu'], p2: ['Tornadus', 'Kingambit'] });
+    unmount();
+    expect(onPicksChange).toHaveBeenLastCalledWith(null);
+  });
+
+  test('singles report the picked lead the same way', async () => {
+    const onPicksChange = vi.fn();
+    render(<LeadPanel {...props({ onPicksChange })} />);
+    expect(onPicksChange).toHaveBeenLastCalledWith({ p1: ['Garchomp'], p2: ['Weavile'] });
+    await userEvent.click(screen.getByRole('button', { name: /^Latias/ }));
+    expect(onPicksChange).toHaveBeenLastCalledWith({ p1: ['Latias'], p2: ['Weavile'] });
+  });
 });

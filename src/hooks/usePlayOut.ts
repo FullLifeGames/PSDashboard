@@ -1,7 +1,6 @@
 import { useCallback, useEffect, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import type { EvalResult, RankedChoice } from '@fulllifegames/eval-engine';
 import { FAST_PLAY_OUT_SETTINGS, nextPlayOutStep, playOutDoneText, prefsAfterRun } from '../lib/play-out';
-import type { VariationSpan } from '../lib/timeline';
 import type { useBranch } from './useBranch';
 import type { useEvaluation } from './useEvaluation';
 import type { LeadSelection } from './useDeviation';
@@ -35,21 +34,21 @@ export interface PlayOutInputs {
   atEndPosition: boolean;
   viewT0: boolean;
   viewTurn: number;
-  variationSpan: VariationSpan | null;
   tipTurn: number | null;
   navigateTo: (position: { turn: number; line: 'main' | 'variation' }, opts?: { seek?: boolean; internal?: boolean }) => void;
   setNavSeek: Dispatch<SetStateAction<{ turn: number; seq: number; play?: boolean } | null>>;
-  setVariationScores: Dispatch<SetStateAction<(number | null)[]>>;
   executing: boolean;
   branchPreparing: boolean;
   getBattle: Branch['getBattle'];
   executeTurn: Branch['executeTurn'];
   handleEvaluate: () => void;
   applyEvalChoice: (side: 'p1' | 'p2', ranked: RankedChoice) => boolean;
-  rebuildAt: (position: { turn: number; line: 'main' | 'variation' }, prefill: null) => Promise<void>;
   requestDeviation: (prefill: null, opts?: { onStart?: () => void }) => void;
   startLeadVariation: (leads: LeadSelection, opts?: { onStart?: () => void }) => void;
-  defaultLeadSelection: () => LeadSelection;
+  /** The lead picker's complete selection while the turn 0 view shows it, else null (set by LeadPanel). */
+  leadPicksRef: MutableRefObject<LeadSelection | null>;
+  /** The note under the timeline for a start the app refused. */
+  setVariationNotice: (notice: string | null) => void;
 }
 
 /** Finish/stop plumbing plus the watch-from-turn seek. */
@@ -91,8 +90,8 @@ function usePlayOutFinish(args: PlayOutInputs) {
 /** Arms the loop from whatever position the pointer holds (T0 included). */
 function useStartPlayOut(args: PlayOutInputs) {
   const {
-    evaluation, fastPlayOut, setPlayOut, setPlayOutNotice, playOutProcessedRef, setVariationScores,
-    viewT0, variationSpan, rebuildAt, startLeadVariation, defaultLeadSelection,
+    evaluation, fastPlayOut, setPlayOut, setPlayOutNotice, playOutProcessedRef,
+    viewT0, startLeadVariation, leadPicksRef, setVariationNotice,
     liveTip, viewingVariation, atEndPosition, requestDeviation, handleEvaluate, viewTurn,
   } = args;
   return useCallback(() => {
@@ -109,24 +108,16 @@ function useStartPlayOut(args: PlayOutInputs) {
       setPlayOutNotice(null);
       setPlayOut({ active: true, executed: 0, turns: 0, startTurn, prevAuto });
     };
-    // Turn 0: the run INCLUDES the lead decision. Branching at the shared
-    // turn-1 prefix instead produced a variation without its turn 0 — the
-    // moves list started at turn 1 and viewing turn 1 fell back to the main
-    // line (coverage begins one turn after the branch point).
+    // Turn 0: the run INCLUDES the lead decision and plays from the leads the picker shows, through the road of
+    // "Play from turn 0" (its replace confirm guards a standing variation, hand-played turns included). Branching
+    // at the shared turn-1 prefix produced a variation without its turn 0 (round 77, C2).
     if (viewT0) {
-      const arm = () => armRun(1);
-      if (variationSpan?.startTurn === 0) {
-        // A lead variation stands: keep its turn-0 decision, cut the tail
-        // (the chess truncate), and let the engine play the game again.
-        arm();
-        setVariationScores(previous => previous.map((value, index) => (index + 1 > 1 ? null : value)));
-        void rebuildAt({ turn: 1, line: 'variation' }, null);
+      const picks = leadPicksRef.current;
+      if (!picks) {
+        setVariationNotice('Finish the lead picks above before the engine plays from turn 0.');
         return;
       }
-      // No lead variation yet: seed one with the picker's default (the real
-      // game's leads and bring). The replace-confirm still guards an
-      // existing variation — arming waits for the user's yes.
-      startLeadVariation(defaultLeadSelection(), { onStart: arm });
+      startLeadVariation(picks, { onStart: () => armRun(1) });
       return;
     }
     // The post-battle sentinel has nothing to play — surface the existing
@@ -147,9 +138,9 @@ function useStartPlayOut(args: PlayOutInputs) {
     arm();
     handleEvaluate();
   }, [
-    viewT0, variationSpan, rebuildAt, startLeadVariation, defaultLeadSelection, liveTip,
+    viewT0, startLeadVariation, leadPicksRef, setVariationNotice, liveTip,
     viewingVariation, atEndPosition, requestDeviation, evaluation, fastPlayOut, handleEvaluate, viewTurn,
-    setPlayOut, setPlayOutNotice, playOutProcessedRef, setVariationScores,
+    setPlayOut, setPlayOutNotice, playOutProcessedRef,
   ]);
 }
 

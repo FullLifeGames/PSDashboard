@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import type { BranchSlotChoice, EvalResult } from '@fulllifegames/eval-engine';
+import type { LeadSelection } from '../useDeviation';
 
 export interface PlayOutState {
   active: boolean;
@@ -36,6 +37,12 @@ export function useTransients(replayId: string | undefined) {
   /** Why the last play-out ended + where watching it starts (panel notice). */
   const [playOutNotice, setPlayOutNotice] = useState<{ text: string; watchTurn: number } | null>(null);
   const playOutProcessedRef = useRef<EvalResult | null>(null);
+  /**
+   * The lead picker's complete selection while the turn 0 view shows it (null otherwise): "Let it play out" starts
+   * from the leads on screen (round 77, C2).
+   */
+  const leadPicksRef = useRef<LeadSelection | null>(null);
+  const setLeadPicks = useCallback((picks: LeadSelection | null) => { leadPicksRef.current = picks; }, []);
   /**
    * "Fast play-out": every evaluation of a run uses the depth-1 matrix
    * instead of the Auto line. A session option the user ticks on purpose —
@@ -76,7 +83,7 @@ export function useTransients(replayId: string | undefined) {
 
   return {
     playOutRef, stopPlayOutRef, playOut, setPlayOut, playOutNotice, setPlayOutNotice,
-    playOutProcessedRef, fastPlayOut, setFastPlayOut, draftChoices, setDraftChoices, pendingConfirm, setPendingConfirm,
+    playOutProcessedRef, leadPicksRef, setLeadPicks, fastPlayOut, setFastPlayOut, draftChoices, setDraftChoices, pendingConfirm, setPendingConfirm,
     interruptPlayOut, clearDraftChoices,
   };
 }

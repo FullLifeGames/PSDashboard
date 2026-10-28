@@ -34,13 +34,13 @@ type Wiring = Omit<PlayOutInputs, 'playOut' | 'setPlayOut' | 'setPlayOutNotice' 
 function wiring(overrides: Partial<Wiring> = {}): Wiring {
   return {
     evalViewKey: 'variation:3', liveEvalStatus: 'idle', liveTip: true, viewingVariation: true, atEndPosition: false,
-    viewT0: false, viewTurn: 3, variationSpan: null, tipTurn: 3, fastPlayOut: false,
-    navigateTo: vi.fn(), setNavSeek: vi.fn(), setVariationScores: vi.fn(), executing: false, branchPreparing: false,
+    viewT0: false, viewTurn: 3, tipTurn: 3, fastPlayOut: false,
+    navigateTo: vi.fn(), setNavSeek: vi.fn(), executing: false, branchPreparing: false,
     getBattle: vi.fn(() => ({ ended: false }) as unknown as ReturnType<PlayOutInputs['getBattle']>),
     executeTurn: vi.fn(async () => {}), handleEvaluate: vi.fn(), applyEvalChoice: vi.fn(() => true),
-    rebuildAt: vi.fn(async () => {}), requestDeviation: vi.fn(),
+    requestDeviation: vi.fn(),
     startLeadVariation: vi.fn((_leads, opts) => opts?.onStart?.()),
-    defaultLeadSelection: vi.fn(() => ({ p1: ['Garchomp'], p2: ['Ferrothorn'] })),
+    leadPicksRef: { current: null }, setVariationNotice: vi.fn(),
     ...overrides,
   };
 }
@@ -214,19 +214,38 @@ describe('usePlayOut', () => {
     expect(setEngineOverride.mock.calls.every(([override]) => override === null)).toBe(true);
   });
 
-  test('from turn 0 the run includes the lead decision: a default lead variation is seeded first', () => {
-    const { evaluation } = evaluationOf({ auto: true });
-    const wired = wiring({ viewT0: true, liveTip: false, viewingVariation: false });
-    const { result } = setup(evaluation, wired);
-    act(() => result.current.playOut.startPlayOut());
-    expect(wired.startLeadVariation).toHaveBeenCalledWith({ p1: ['Garchomp'], p2: ['Ferrothorn'] }, expect.objectContaining({ onStart: expect.any(Function) }));
-    expect(result.current.transients.playOut).toMatchObject({ active: true, startTurn: 1 });
+  // Round 77 (C2): the T0 run plays from the leads the picker shows, through the same road as "Play from turn 0".
+  describe('from turn 0', () => {
+    const singlesPicks = { p1: ['Talonflame'], p2: ['Weavile'] };
+    const vgcPicks = { p1: ['Incineroar', 'Amoonguss', 'Urshifu', 'Rillaboom'], p2: ['Tornadus', 'Kingambit', 'Chi-Yu', 'Pelipper'], bring: true };
 
-    // A standing lead variation is kept from its turn 0 and rebuilt at turn 1.
-    const standing = wiring({ viewT0: true, liveTip: false, viewingVariation: false, variationSpan: { startTurn: 0, length: 2 } });
-    const again = setup(evaluation, standing);
-    act(() => again.result.current.playOut.startPlayOut());
-    expect(standing.rebuildAt).toHaveBeenCalledWith({ turn: 1, line: 'variation' }, null);
-    expect(standing.startLeadVariation).not.toHaveBeenCalled();
+    test.each([
+      ['singles', singlesPicks],
+      ['doubles with a bring of four', vgcPicks],
+    ])('%s: the picker selection starts a lead variation and the run arms after the start', (_name, picks) => {
+      const { evaluation } = evaluationOf({ auto: true });
+      const wired = wiring({
+        viewT0: true, liveTip: false, viewingVariation: false, leadPicksRef: { current: picks },
+        startLeadVariation: vi.fn(),
+      });
+      const { result } = setup(evaluation, wired);
+      act(() => result.current.playOut.startPlayOut());
+      expect(wired.startLeadVariation).toHaveBeenCalledWith(picks, { onStart: expect.any(Function) });
+      expect(result.current.transients.playOut).toBeNull();
+      const onStart = (wired.startLeadVariation as ReturnType<typeof vi.fn>).mock.calls[0][1].onStart as () => void;
+      act(() => onStart());
+      expect(result.current.transients.playOut).toMatchObject({ active: true, startTurn: 1 });
+    });
+
+    test('an unfinished picker starts nothing and says why', () => {
+      const { evaluation, setPrefs } = evaluationOf({});
+      const wired = wiring({ viewT0: true, liveTip: false, viewingVariation: false, leadPicksRef: { current: null } });
+      const { result } = setup(evaluation, wired);
+      act(() => result.current.playOut.startPlayOut());
+      expect(wired.startLeadVariation).not.toHaveBeenCalled();
+      expect(wired.setVariationNotice).toHaveBeenCalledWith('Finish the lead picks above before the engine plays from turn 0.');
+      expect(result.current.transients.playOut).toBeNull();
+      expect(setPrefs).not.toHaveBeenCalled();
+    });
   });
 });
