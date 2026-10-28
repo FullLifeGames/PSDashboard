@@ -46,7 +46,8 @@ export function requiredChoices(battle: LiveBattle, side: SideId): boolean[] {
   const sideState = battle.sides[sideIndex(side)];
   const forced = forceSwitches(battle, side);
   // The bench caps the replacements as the simulator does (round 77, B1): the same count as `canSwitchIn` in side.js.
-  const revival = sideState.active.some(active => active?.switchFlag === 'revivalblessing');
+  const party = (sideState.activeRequest as { side?: { pokemon?: { active?: boolean; reviving?: boolean }[] } } | null)?.side?.pokemon;
+  const revival = !!party?.some(entry => entry.active && entry.reviving);
   const switchIns = revival ? undefined : sideState.pokemon.slice(sideState.active.length).filter(pokemon => pokemon && !pokemon.fainted).length;
   return requiredChoicesForActiveSlots(sideState.active, forced, switchIns);
 }
