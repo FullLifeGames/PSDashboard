@@ -56,6 +56,27 @@ describe('branch save/share payloads', () => {
     expect(decoded.finalLog).toContain('|move|p1a: Test|Tackle|p2a: Test');
   });
 
+  // Round 77 (D6): the shared view reads move and Pokemon names, not the simulator commands.
+  test.each([
+    ['singles', [{ kind: 'move' as const, moveId: 'earthquake', moveName: 'Earthquake' }], [{ kind: 'switch' as const, speciesId: 'rotomwash', pokemonName: 'Rotom-Wash' }], 'Earthquake', '→ Rotom-Wash'],
+    ['doubles', [{ kind: 'move' as const, moveId: 'closecombat', moveName: 'Close Combat', targetLoc: 1 }, { kind: 'move' as const, moveId: 'protect', moveName: 'Protect' }], [{ kind: 'switch' as const, speciesId: 'rotomwash', pokemonName: 'Rotom-Wash' }, null], 'Close Combat +1 + Protect', '→ Rotom-Wash'],
+  ])('%s: a payload carries the names the history shows beside the commands', (_kind, p1Slots, p2Slots, p1Label, p2Label) => {
+    const named: BranchHistoryEntry = { ...history[0], p1Choice: 'move 1', p2Choice: 'switch 3', p1SlotChoices: p1Slots, p2SlotChoices: p2Slots };
+    const forced: BranchHistoryEntry = { ...history[0], kind: 'forced', forcedSide: 'p2', p1Choice: '—', p2Choice: 'switch 2', p2SlotChoices: p2Slots.slice(0, 1) };
+    const payload = makeBranchSharePayload({ replay, branchTurn: 3, history: [named, forced], finalLog: '|turn|3' });
+    expect(payload.choices[0]).toMatchObject({ p1Choice: 'move 1', p2Choice: 'switch 3', p1Label, p2Label });
+    expect(payload.choices[1]).toMatchObject({ forcedSide: 'p2', p2Label });
+    const decoded = decodeBranchShare(encodeBranchShare(payload));
+    expect(decoded.choices).toEqual(payload.choices);
+    expect(decoded.version).toBe(1);
+  });
+
+  test('an entry without slot choices keeps the raw command as its label', () => {
+    const payload = makeBranchSharePayload({ replay, branchTurn: 3, history, finalLog: '|turn|3' });
+    expect(payload.choices[0].p1Label).toBe('move 1');
+    expect(payload.choices[0].p2Label).toBe('switch 2');
+  });
+
   test('uses a stable localStorage key', () => {
     expect(savedBranchKey('gen9ou-123')).toBe('ps-replay-interceptor:branches:gen9ou-123');
   });

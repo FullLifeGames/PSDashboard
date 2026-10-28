@@ -37,6 +37,21 @@ describe('SharedBranchView', () => {
     expect(onClear).toHaveBeenCalledTimes(1);
   });
 
+  // Round 77 (D6): a link built from the history lists names; a link from before the labels keeps listing the commands.
+  test.each([
+    ['singles', 'Earthquake', '→ Rotom-Wash'],
+    ['doubles', 'Close Combat +1 + Protect', '→ Rotom-Wash + Fake Out'],
+  ])('%s: lists the move and Pokemon names, and the forced replacement as its own line', (_kind, p1Label, p2Label) => {
+    const named = { ...branch, choices: [
+      { turnNumber: 3, p1Choice: 'move 2', p2Choice: 'switch 3', p1Label, p2Label },
+      { turnNumber: 4, p1Choice: '—', p2Choice: 'switch 2', p2Label: '→ Kyurem', forcedSide: 'p2' as const },
+    ] };
+    render(<SharedBranchView branch={named} onLoadOriginal={vi.fn()} onClear={vi.fn()} />);
+    expect(screen.getByText(`Turn 3: P1 ${p1Label} / P2 ${p2Label}`)).toBeInTheDocument();
+    expect(screen.getByText('Turn 4, forced replacement (P2): → Kyurem')).toBeInTheDocument();
+    expect(screen.queryByText(/move 2|switch 3/)).toBeNull();
+  });
+
   test('a branch without stored choices says so', () => {
     render(<SharedBranchView branch={{ ...branch, choices: [] }} onLoadOriginal={vi.fn()} onClear={vi.fn()} />);
     expect(screen.getByText('No executed branch choices were stored.')).toBeInTheDocument();

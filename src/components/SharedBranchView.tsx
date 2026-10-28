@@ -44,6 +44,18 @@ function SharedBranchTopbar({
   );
 }
 
+type SharedChoice = BranchSharePayload['choices'][number];
+
+/** One line of the choice list: names where the link carries them, the simulator commands for an older link. */
+function choiceLine(choice: SharedChoice): string {
+  const p1 = choice.p1Label ?? choice.p1Choice;
+  const p2 = choice.p2Label ?? choice.p2Choice;
+  if (choice.forcedSide) {
+    return `Turn ${choice.turnNumber}, forced replacement (${choice.forcedSide.toUpperCase()}): ${choice.forcedSide === 'p1' ? p1 : p2}`;
+  }
+  return `Turn ${choice.turnNumber}: P1 ${p1} / P2 ${p2}`;
+}
+
 function SharedBranchChoices({ branch }: { branch: BranchSharePayload }) {
   return (
     <div className="ps-panel ps-shared-branch-panel">
@@ -52,9 +64,9 @@ function SharedBranchChoices({ branch }: { branch: BranchSharePayload }) {
         Branch started from turn {branch.branchTurn}. This read-only view replays the shared alternate line.
       </div>
       <div className="ps-shared-choice-list">
-        {branch.choices.length > 0 ? branch.choices.map(choice => (
-          <div key={`${choice.turnNumber}-${choice.p1Choice}-${choice.p2Choice}`} className="ps-shared-choice-row">
-            Turn {choice.turnNumber}: P1 {choice.p1Choice} / P2 {choice.p2Choice}
+        {branch.choices.length > 0 ? branch.choices.map((choice, index) => (
+          <div key={`${index}-${choice.turnNumber}`} className="ps-shared-choice-row">
+            {choiceLine(choice)}
           </div>
         )) : (
           <div className="ps-shared-choice-row">No executed branch choices were stored.</div>
