@@ -85,7 +85,7 @@ function EvalSection({ app, replayData }: WorkspaceColumnProps) {
 export function WorkspaceEvalColumn({ app, replayData }: WorkspaceColumnProps) {
   const { evalAvailable } = app.engine.evalView;
   const { playOut, playOutNotice, fastPlayOut, setFastPlayOut } = app.transients;
-  const { viewTurn, variationSpan } = app.board.timeline;
+  const { viewTurn, variationSpan, viewingVariation, atEndPosition, atVariationEnd } = app.board.timeline;
   const { branchPreparing } = app.board.deviation;
   const { usageStats, setAssumptions } = app.ctx.smogon;
   const { startPlayOut, stopPlayOut, watchFrom } = app.engine.playOutControls;
@@ -98,6 +98,7 @@ export function WorkspaceEvalColumn({ app, replayData }: WorkspaceColumnProps) {
           playOut={playOut}
           playOutNotice={playOutNotice}
           hasVariation={variationSpan !== null}
+          ended={viewingVariation ? atVariationEnd : atEndPosition}
           viewTurn={viewTurn}
           startDisabled={branchPreparing || usageStats.loading || setAssumptions.loading}
           fastPlayOut={fastPlayOut}

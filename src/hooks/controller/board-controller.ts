@@ -69,7 +69,7 @@ export function useTimelineController(ctx: ReplayContext, transients: Transients
   // ── Unified timeline: one pointer over main line + at most one variation ──
   const timeline = useTimeline({
     replayId: replayData?.id, snapshots, branching, variationStartTurn, history,
-    interruptPlayOut, onNavigate: clearDraftChoices,
+    interruptPlayOut, onNavigate: clearDraftChoices, variationEnded: branching && (ctx.branch.simState?.ended ?? false),
   });
   const evalResultMatchesView = evaluation.resultTag === null || evaluation.resultTag === timeline.evalViewKey;
   const liveEvalStatus: typeof evaluation.status =

@@ -208,6 +208,7 @@ function WorkspaceLeft({ app, replayData }: WorkspaceProps) {
         endSnapshotTurn={app.board.timeline.endSnapshotTurn}
         atEndPosition={app.board.timeline.atEndPosition}
         viewingVariation={app.board.timeline.viewingVariation}
+        variationEnded={app.ctx.branch.simState?.ended ?? false}
         branching={branching}
         onNavigate={app.board.timeline.navigateTo}
         onGraphSelectLine={app.board.timeline.handleGraphSelectLine}

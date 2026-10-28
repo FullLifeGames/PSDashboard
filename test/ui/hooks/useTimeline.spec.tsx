@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { useTimeline, type TimelineInputs } from '../../../src/hooks/useTimeline';
 import type { BranchHistoryEntry } from '../../../src/hooks/useBranch';
@@ -223,6 +223,32 @@ describe('useTimeline', () => {
       expect(result.current.viewTurn).toBe(3);
       act(() => result.current.handleReplayTurn(1));
       expect(result.current).toMatchObject({ viewTurn: 1, viewingVariation: false });
+    });
+  });
+
+  // Round 77 (swarm A-6): the variation's ended tip is an end position like the main line's.
+  describe('an ended variation', () => {
+    afterEach(() => { vi.useRealTimers(); });
+
+    test('the pointer knows it sits at the end, and the frame\'s last turn does not knock it back', () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      const { result, rerender, base } = setup();
+      rerender({ ...base, branching: true, variationStartTurn: 2, history: [entry(2), entry(3)], variationEnded: true });
+      expect(result.current).toMatchObject({ viewTurn: 4, viewingVariation: true, atVariationEnd: true });
+
+      // The echo guard of the executed turn lapsed; the frame stays on the last played turn.
+      vi.setSystemTime(Date.now() + 10_000);
+      act(() => result.current.handleReplayTurn(3));
+      expect(result.current.viewTurn).toBe(4);
+
+      // Going back with the frame's own button is the user's: turn 2 is before the end.
+      act(() => result.current.handleReplayTurn(2));
+      expect(result.current).toMatchObject({ viewTurn: 2, atVariationEnd: false });
+    });
+
+    test('a variation that has not ended has no end position', () => {
+      const { result } = setup({ branching: true, variationStartTurn: 2, history: [entry(2)] });
+      expect(result.current.atVariationEnd).toBe(false);
     });
   });
 

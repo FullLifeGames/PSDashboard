@@ -24,6 +24,14 @@ describe('PlayOutBar', () => {
     expect(screen.getByRole('button', { name: /Let it play out/ })).toBeDisabled();
   });
 
+  // Round 77 (swarm A-6): at an ended position the engine has nothing to play.
+  test('at an ended position no play-out is offered', () => {
+    render(<PlayOutBar {...props({ ended: true })} />);
+    expect(screen.queryByRole('button', { name: /Let it play out/ })).toBeNull();
+    expect(screen.queryByText(/engine finishes the game/)).toBeNull();
+    expect(screen.getByText('The game ended at this position: nothing left to play out.')).toBeInTheDocument();
+  });
+
   test('while the engine plays, the bar shows the running state and a stop button', async () => {
     const wired = props({ playOut: { active: true } });
     render(<PlayOutBar {...wired} />);

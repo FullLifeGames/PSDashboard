@@ -53,6 +53,23 @@ describe('TimelineBar', () => {
     expect(screen.getByText('End')).toBeInTheDocument();
   });
 
+  // Round 77 (swarm A-6): the variation's ended tip reads as the main line's end does.
+  test('the ended tip of a variation reads End and the total counts played turns', () => {
+    const ended = props({
+      viewTurn: 7, maxTurn: 5, variationSpan: { startTurn: 4, length: 3 }, viewingVariation: true, viewLine: 'variation',
+      branching: true, variationEnded: true,
+    });
+    const { rerender } = render(<TimelineBar {...ended} />);
+    expect(positionLabel()).toBe('End');
+    expect(screen.getByRole('slider')).toHaveAttribute('max', '7');
+
+    rerender(<TimelineBar {...ended} viewTurn={6} />);
+    expect(positionLabel()).toBe('T6/6');
+    // A variation that has not ended keeps counting its tip.
+    rerender(<TimelineBar {...ended} viewTurn={7} variationEnded={false} />);
+    expect(positionLabel()).toBe('T7/7');
+  });
+
   test('a variation adds the gold stripe, the line chips, and the discard button', async () => {
     const wired = props({ viewTurn: 5, variationSpan: { startTurn: 4, length: 3 }, viewingVariation: true, viewLine: 'variation', branching: true });
     render(<TimelineBar {...wired} />);
