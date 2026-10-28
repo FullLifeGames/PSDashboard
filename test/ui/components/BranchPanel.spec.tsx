@@ -168,6 +168,20 @@ describe('BranchPanel', () => {
     });
   });
 
+  // Round 77, B3: the hint named slot A only; B had played too.
+  test('doubles: every slot shows what that slot played; singles keep the side-level hint (B3)', () => {
+    const played = {
+      p1: null, p2: null,
+      p1Slots: [{ kind: 'move' as const, name: 'Fake Out' }, { kind: 'move' as const, name: 'Spore' }],
+      p2Slots: [{ kind: 'switch' as const, name: 'Kingambit', species: 'Kingambit' }, null],
+    };
+    render(<BranchPanel {...props({ simState: simState('doubles'), played })} />);
+    expect(slot('P1A').getByText('played:')).toHaveTextContent('played: Fake Out');
+    expect(slot('P1B').getByText('played:')).toHaveTextContent('played: Spore');
+    expect(slot('P2A').getByText('played:')).toHaveTextContent('played: → Kingambit');
+    expect(slot('P2B').queryByText('played:')).toBeNull();
+  });
+
   test('the source line, the execute error, and the played badges render from their props', () => {
     const played = { p1: { kind: 'move' as const, name: 'Earthquake' }, p2: { kind: 'switch' as const, name: 'Rotom-Wash', species: 'Rotom-Wash' } };
     render(<BranchPanel {...props({ source: 'snapshot', acquiringExact: true, executeError: 'Invalid choice: Garchomp is trapped', played })} />);

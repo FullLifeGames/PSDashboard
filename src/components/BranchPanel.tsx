@@ -37,7 +37,7 @@ interface Props {
   onHypotheticalMove: (side: 'p1' | 'p2', activeSlot: number, params: { species: string; move: string; replace: string | null }) => void;
   onExecuteTurn: () => void;
   /** The action each side actually took at this position on the viewed line. */
-  played?: { p1: PlayedPick | null; p2: PlayedPick | null } | null;
+  played?: PlayedAtPosition | null;
   /** Names the viewed position: armed gimmick toggles belong to it and fall back on a new one (T124). */
   positionKey?: string;
   /**
@@ -48,6 +48,23 @@ interface Props {
 }
 
 type LiveBattle = LiveHit['battle'];
+
+/**
+ * What each side played at a position. Doubles carry one pick per slot (`p1Slots`, index 0 = slot A);
+ * singles carry the side's pick alone.
+ */
+export interface PlayedAtPosition {
+  p1: PlayedPick | null;
+  p2: PlayedPick | null;
+  p1Slots?: (PlayedPick | null)[];
+  p2Slots?: (PlayedPick | null)[];
+}
+
+/** The pick one slot shows: its own entry in a doubles record, else the side's pick on slot A. */
+function playedOfSlot(slots: (PlayedPick | null)[] | undefined, side: PlayedPick | null | undefined, slot: number): PlayedPick | null {
+  if (slots) return slots[slot] ?? null;
+  return slot === 0 ? side ?? null : null;
+}
 
 const EMPTY_MOVES: BranchMoveOption[] = [];
 const EMPTY_SWITCHES: BranchSwitchOption[] = [];
@@ -174,6 +191,7 @@ interface SideColumnProps {
   gen: number;
   advanced: boolean;
   played: PlayedPick | null | undefined;
+  playedSlots: (PlayedPick | null)[] | undefined;
   /** The other side has to replace a Pokémon and this side has nothing to choose until it has (round 77, B5). */
   waitingFor: 'P1' | 'P2' | null;
   gimmickFor: (side: 'p1' | 'p2', slot: number) => Gimmick;
@@ -213,7 +231,7 @@ function slotChoiceProps(props: SideColumnProps, slot: number) {
 }
 
 function SideColumn(props: SideColumnProps) {
-  const { side, activeSlots, gen, advanced, played, waitingFor, onSetChoice, onHypotheticalMove } = props;
+  const { side, activeSlots, gen, advanced, played, playedSlots, waitingFor, onSetChoice, onHypotheticalMove } = props;
   return (
     <div className="ps-branch-side-column" inert={waitingFor !== null} style={waitingFor ? { opacity: 0.6 } : undefined}>
       {waitingFor && <div className="ps-force-switch-note">Waiting for {waitingFor} to choose a replacement.</div>}
@@ -224,7 +242,7 @@ function SideColumn(props: SideColumnProps) {
           {...slotChoiceProps(props, slot)}
           gen={gen}
           advanced={advanced}
-          played={slot === 0 ? played ?? null : null}
+          played={playedOfSlot(playedSlots, played, slot)}
           onChoice={(choice) => onSetChoice(side, choice, slot)}
           onHypotheticalMove={(params) => onHypotheticalMove(side, slot, params)}
         />
@@ -306,6 +324,7 @@ export function BranchPanel({ simState, stale, source, acquiringExact, executeEr
               requiredChoices={p1RequiredChoices}
               damage={damageBySide.p1}
               played={played?.p1}
+              playedSlots={played?.p1Slots}
               waitingFor={p1Waits ? 'P2' : null}
               {...columnProps}
             />
@@ -318,6 +337,7 @@ export function BranchPanel({ simState, stale, source, acquiringExact, executeEr
               requiredChoices={p2RequiredChoices}
               damage={damageBySide.p2}
               played={played?.p2}
+              playedSlots={played?.p2Slots}
               waitingFor={p2Waits ? 'P1' : null}
               {...columnProps}
             />
