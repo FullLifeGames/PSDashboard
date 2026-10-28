@@ -65,23 +65,34 @@ export interface HistoryRowAlignment {
   entry: BranchHistoryEntry;
   originalTurn: number | null;
   variationTurn: number | null;
+  /** The entry that holds the board at `variationTurn`: the row's own entry,
+   *  or the last forced replacement that follows it (a pivot or a knock-out
+   *  settles after the turn). */
+  settled: BranchHistoryEntry;
 }
 
 /**
  * Forced-switch interludes are recorded as their own entries (B15) but must
  * not shift the turn-by-turn alignment with the original replay.
  * `variationTurn` is the position AFTER the row's move — where clicking the
- * branch column navigates (the notation reads "this move led here").
+ * branch column navigates (the notation reads "this move led here"). That
+ * position includes the forced replacements that follow the turn, so the
+ * row's cell reads the board from `settled`.
  */
 export function alignHistoryRows(history: BranchHistoryEntry[], branchStartTurn: number): HistoryRowAlignment[] {
   let turnIndex = 0;
-  return history.map(entry => {
+  return history.map((entry, index) => {
     const isForced = entry.kind === 'forced';
     if (!isForced) turnIndex += 1;
+    let settled = entry;
+    if (!isForced) {
+      for (let next = index + 1; next < history.length && history[next].kind === 'forced'; next += 1) settled = history[next];
+    }
     return {
       entry,
       originalTurn: isForced ? null : branchStartTurn + turnIndex,
       variationTurn: isForced ? null : branchStartTurn + turnIndex,
+      settled,
     };
   });
 }

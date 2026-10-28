@@ -70,14 +70,16 @@ function LineCell({ heading, summary, highlighted, color, onClick }: {
   );
 }
 
-function HistoryRow({ entry, originalTurn, variationTurn, snapshots, currentPosition, onNavigate }: Pick<Props, 'snapshots' | 'currentPosition' | 'onNavigate'> & {
+function HistoryRow({ entry, settled, originalTurn, variationTurn, snapshots, currentPosition, onNavigate }: Pick<Props, 'snapshots' | 'currentPosition' | 'onNavigate'> & {
   entry: BranchHistoryEntry;
+  /** Holds the board after the turn's forced replacements (A-5). */
+  settled: BranchHistoryEntry;
   originalTurn: number;
   variationTurn: number;
 }) {
   const originalSnapshot = snapshots.find(snapshot => snapshot.turn === originalTurn) || null;
   const original = activeSummary(originalSnapshot);
-  const branch = branchSummary(entry);
+  const branch = branchSummary(settled);
   const onMainCell = currentPosition?.line === 'main' && currentPosition.turn === originalTurn;
   const onVariationCell = currentPosition?.line === 'variation' && currentPosition.turn === variationTurn;
 
@@ -138,13 +140,14 @@ export function BranchHistoryPanel({ branchStartTurn, history, snapshots, curren
         </div>
       )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {rows.map(({ entry, originalTurn, variationTurn }, index) => (
+        {rows.map(({ entry, settled, originalTurn, variationTurn }, index) => (
           entry.kind === 'forced' || originalTurn === null || variationTurn === null
             ? <ForcedRow key={`forced-${entry.turnNumber}-${index}`} entry={entry} />
             : (
               <HistoryRow
                 key={`${entry.turnNumber}-${index}`}
                 entry={entry}
+                settled={settled}
                 originalTurn={originalTurn}
                 variationTurn={variationTurn}
                 snapshots={snapshots}
