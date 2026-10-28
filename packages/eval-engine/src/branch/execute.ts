@@ -49,7 +49,9 @@ function resolveMoveSlotChoice(
   if (requestIndex < 0) {
     return { ok: false, error: `${describePokemon(active)} no longer knows ${choice.moveName}.` };
   }
-  if (requestMoves[requestIndex].disabled) {
+  // The slot's own flag counts too: a hidden disable stays out of a singles request (the player cannot know it), the simulator refuses it all the same.
+  const ownSlot = active.moveSlots.find(slot => slot.id === requestMoves[requestIndex].id);
+  if (requestMoves[requestIndex].disabled || ownSlot?.disabled) {
     return { ok: false, error: `${choice.moveName} is disabled for ${describePokemon(active)} right now.` };
   }
 
@@ -58,13 +60,23 @@ function resolveMoveSlotChoice(
   return { ok: true, command: `move ${requestIndex + 1}${suffix}${modifier}` };
 }
 
+/** The slot's body when the simulator holds it: a held body cannot switch out in a move request (side.js chooseSwitch); a forced replacement is no switch out. */
+function heldBody(battle: SimBattle, sideIdx: number, activeSlot: number): SimPokemon | null {
+  const side = battle.sides[sideIdx];
+  const body = side.active[activeSlot];
+  return side.requestState === 'move' && body && !body.fainted && body.trapped ? body : null;
+}
+
 function resolveSwitchSlotChoice(
   battle: SimBattle,
   side: 'p1' | 'p2',
+  activeSlot: number,
   choice: Extract<BranchSlotChoice, { kind: 'switch' }>,
 ): ResolvedSideCommand {
   const sideIdx = sideIndex(side);
   const bench = battle.sides[sideIdx].pokemon;
+  const held = heldBody(battle, sideIdx, activeSlot);
+  if (held) return { ok: false, error: `${describePokemon(held)} is trapped and cannot switch out right now.` };
 
   // The bench bodies of the clicked species: the exact name decides, then an equal id (an empty id is no key), then the first.
   const candidates: number[] = [];
@@ -133,7 +145,7 @@ export function resolveSideChoices(
     }
     const resolved = choice.kind === 'move'
       ? resolveMoveSlotChoice(battle, side, slot, choice)
-      : resolveSwitchSlotChoice(battle, side, choice);
+      : resolveSwitchSlotChoice(battle, side, slot, choice);
     if (!resolved.ok) return resolved;
     fragments.push(resolved.command);
   }

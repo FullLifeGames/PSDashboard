@@ -136,7 +136,7 @@ function ChoicePicker({ label, moves, switches, blockedSwitchKeys, onPick }: Pic
             <option
               key={`s-${sw.slot}`}
               value={`switch:${sw.slot}`}
-              disabled={blockedSwitchKeys.has(switchOptionKey(sw))}
+              disabled={!!sw.trapped || blockedSwitchKeys.has(switchOptionKey(sw))}
             >
               Switch: {displayName(sw.name, sw.species)} ({sw.hpPercent}% HP)
             </option>

@@ -44,8 +44,10 @@ export interface SideControlsProps {
   onHypotheticalMove: (params: { species: string; move: string; replace: string | null }) => void;
 }
 
-function SideHeader({ label, activeName, activeFainted, forceSwitch, pending, played }: Pick<SideControlsProps,
-  'label' | 'activeName' | 'activeFainted' | 'forceSwitch' | 'pending' | 'played'>) {
+/** A fainted active nobody replaces (round 77, B2): the bench is empty, so the slot has no choice to make. */
+function SideHeader({ label, activeName, activeFainted, forceSwitch, pending, played, switches }: Pick<SideControlsProps,
+  'label' | 'activeName' | 'activeFainted' | 'forceSwitch' | 'pending' | 'played' | 'switches'>) {
+  const nobodyLeft = activeFainted && !forceSwitch && switches.length === 0;
   const playedText = played
     ? (played.kind === 'move' ? played.name : `→ ${played.name}`)
     : null;
@@ -55,6 +57,8 @@ function SideHeader({ label, activeName, activeFainted, forceSwitch, pending, pl
       {' '}
       {forceSwitch ? (
         <>Choose a replacement{activeFainted ? <> for <strong>{activeName}</strong></> : null}</>
+      ) : nobodyLeft ? (
+        <><strong>{activeName}</strong> fainted. No Pokémon is left to send in.</>
       ) : (
         <>What will <strong>{activeName}</strong> do?</>
       )}
@@ -96,8 +100,8 @@ function TabRow({ tab, setTab }: { tab: 'fight' | 'switch'; setTab: (tab: 'fight
   );
 }
 
-function SwitchGrid({ switches, advanced, forceSwitch, pending, blockedSwitchKeys, played, onChoice }: Pick<SideControlsProps,
-  'switches' | 'advanced' | 'forceSwitch' | 'pending' | 'blockedSwitchKeys' | 'played' | 'onChoice'>) {
+function SwitchGrid({ activeName, switches, advanced, forceSwitch, pending, blockedSwitchKeys, played, onChoice }: Pick<SideControlsProps,
+  'activeName' | 'switches' | 'advanced' | 'forceSwitch' | 'pending' | 'blockedSwitchKeys' | 'played' | 'onChoice'>) {
   const playedSwitchKey = played?.kind === 'switch' ? toId(played.species || played.name) : null;
   return (
     <div className={`ps-switchgrid${!advanced && !forceSwitch ? ' ps-switchgrid-compact' : ''}`}>
@@ -108,8 +112,10 @@ function SwitchGrid({ switches, advanced, forceSwitch, pending, blockedSwitchKey
             key={sw.slot}
             sw={sw}
             selected={selected}
-            disabled={blockedSwitchKeys.has(switchOptionKey(sw)) && !selected}
-            disabledReason={`${displayName(sw.name, sw.species)} is already chosen as the switch-in for your other slot.`}
+            disabled={!!sw.trapped || (blockedSwitchKeys.has(switchOptionKey(sw)) && !selected)}
+            disabledReason={sw.trapped
+              ? `${activeName} is trapped and cannot switch out this turn.`
+              : `${displayName(sw.name, sw.species)} is already chosen as the switch-in for your other slot.`}
             wasPlayed={playedSwitchKey !== null && (toId(sw.species) === playedSwitchKey || toId(sw.name) === playedSwitchKey)}
             compact={!advanced && !forceSwitch}
             onClick={() => onChoice({ kind: 'switch', speciesId: toId(sw.species), pokemonName: sw.name })}
@@ -131,7 +137,10 @@ export function SideControls(props: SideControlsProps) {
 
   return (
     <div className="ps-controls ps-side-controls">
-      <SideHeader label={label} activeName={activeName} activeFainted={activeFainted} forceSwitch={forceSwitch} pending={pending} played={played} />
+      <SideHeader
+        label={label} activeName={activeName} activeFainted={activeFainted} forceSwitch={forceSwitch} pending={pending} played={played}
+        switches={switches}
+      />
 
       {forceSwitch && (
         <div className="ps-force-switch-note">
@@ -151,6 +160,7 @@ export function SideControls(props: SideControlsProps) {
 
       {(forceSwitch || !advanced || tab === 'switch') && switches.length > 0 && (
         <SwitchGrid
+          activeName={activeName}
           switches={switches}
           advanced={advanced}
           forceSwitch={forceSwitch}

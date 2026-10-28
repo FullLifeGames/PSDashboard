@@ -136,6 +136,52 @@ describe('BranchPanel', () => {
     expect(screen.queryByRole('button', { name: /Select|Execute/ })).toBeNull();
   });
 
+  // Round 77, B5: P1 clicked Tailwind while P2 had to replace a Chien-Pao, and the pick rode into the next turn.
+  describe('the side that does not replace takes no input (B5)', () => {
+    const columnOf = (label: string) => [...document.querySelectorAll('.ps-side-label')].find(candidate => candidate.textContent === label)!.closest('.ps-branch-side-column') as HTMLElement;
+
+    test('singles: P2 replaces, so the P1 column is inert and says whom it waits for', () => {
+      render(<BranchPanel {...props({ simState: simState('singles', { p2ForceSwitch: true, p2ForceSwitches: [true] }) })} />);
+      expect(columnOf('P1')).toHaveAttribute('inert');
+      expect(columnOf('P1')).toHaveTextContent('Waiting for P2 to choose a replacement.');
+      expect(slot('P2').getByRole('button', { name: /Rotom-Wash/ }).closest('.ps-branch-side-column')).not.toHaveAttribute('inert');
+    });
+
+    test('doubles: one side replaces, the other waits; both replacing leaves both live', () => {
+      const down = (side: 'p1' | 'p2') => ({ [`${side}ForceSwitch`]: true, [`${side}ForceSwitches`]: [true, false] });
+      const { rerender } = render(<BranchPanel {...props({ simState: simState('doubles', down('p2')) })} />);
+      expect(columnOf('P1A')).toHaveAttribute('inert');
+      expect(columnOf('P1A')).toHaveTextContent('Waiting for P2 to choose a replacement.');
+      rerender(<BranchPanel {...props({ simState: simState('doubles', down('p1')) })} />);
+      expect(columnOf('P2A')).toHaveAttribute('inert');
+      expect(columnOf('P2A')).toHaveTextContent('Waiting for P1 to choose a replacement.');
+      rerender(<BranchPanel {...props({ simState: simState('doubles', { ...down('p1'), ...down('p2') }) })} />);
+      expect(slot('P1A').getByRole('button', { name: /Flutter Mane/ }).closest('.ps-branch-side-column')).not.toHaveAttribute('inert');
+      expect(slot('P2A').getByRole('button', { name: /Kingambit/ }).closest('.ps-branch-side-column')).not.toHaveAttribute('inert');
+      expect(screen.queryByText(/Waiting for/)).toBeNull();
+    });
+
+    test('a normal turn leaves both sides live', () => {
+      render(<BranchPanel {...props()} />);
+      expect(columnOf('P1')).not.toHaveAttribute('inert');
+      expect(columnOf('P2')).not.toHaveAttribute('inert');
+    });
+  });
+
+  // Round 77, B3: the hint named slot A only; B had played too.
+  test('doubles: every slot shows what that slot played; singles keep the side-level hint (B3)', () => {
+    const played = {
+      p1: null, p2: null,
+      p1Slots: [{ kind: 'move' as const, name: 'Fake Out' }, { kind: 'move' as const, name: 'Spore' }],
+      p2Slots: [{ kind: 'switch' as const, name: 'Kingambit', species: 'Kingambit' }, null],
+    };
+    render(<BranchPanel {...props({ simState: simState('doubles'), played })} />);
+    expect(slot('P1A').getByText('played:')).toHaveTextContent('played: Fake Out');
+    expect(slot('P1B').getByText('played:')).toHaveTextContent('played: Spore');
+    expect(slot('P2A').getByText('played:')).toHaveTextContent('played: → Kingambit');
+    expect(slot('P2B').queryByText('played:')).toBeNull();
+  });
+
   test('the source line, the execute error, and the played badges render from their props', () => {
     const played = { p1: { kind: 'move' as const, name: 'Earthquake' }, p2: { kind: 'switch' as const, name: 'Rotom-Wash', species: 'Rotom-Wash' } };
     render(<BranchPanel {...props({ source: 'snapshot', acquiringExact: true, executeError: 'Invalid choice: Garchomp is trapped', played })} />);

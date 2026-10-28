@@ -48,6 +48,8 @@ export interface BranchSwitchOption {
   hp: string;
   hpPercent: number;
   fainted: boolean;
+  /** The slot's Pokémon is held: the simulator refuses any switch from it this turn (round 77, A-3). Absent on a forced replacement. */
+  trapped?: boolean;
 }
 
 export interface SimPokemonInfo {

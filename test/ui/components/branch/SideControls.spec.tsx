@@ -95,4 +95,26 @@ describe('SideControls', () => {
     expect(screen.getByRole('button', { name: /Latias/ })).toHaveClass('ps-switchbtn-selected');
     expect(screen.getByText('[→ Latias]')).toBeInTheDocument();
   });
+  // One slot's controls serve singles and every doubles slot alike: the flag comes per slot from the state.
+  test('a trapped Pokémon has its switch chips and picker options disabled; its moves stay live (A-3)', () => {
+    const trapped = singles.p1SwitchesBySlot[0].map(sw => ({ ...sw, trapped: true }));
+    const { rerender } = render(<SideControls {...props({ switches: trapped })} />);
+    for (const sw of trapped) {
+      const chip = screen.getByRole('button', { name: new RegExp(sw.species) });
+      expect(chip).toBeDisabled();
+      expect(chip).toHaveAttribute('title', 'Garchomp is trapped and cannot switch out this turn.');
+    }
+    expect(screen.getByRole('button', { name: /Earthquake/ })).toBeEnabled();
+
+    rerender(<SideControls {...props({ switches: trapped, advanced: true })} />);
+    const picker = screen.getByRole('combobox', { name: 'Choice picker for P1' });
+    for (const option of picker.querySelectorAll('optgroup[label="Switch to"] option')) expect(option).toBeDisabled();
+  });
+  // Singles cannot reach this state: the game ends when a side's last Pokémon faints. A doubles slot can stand empty beside a living partner.
+  test('a fainted slot with nobody left to send in says so instead of asking what it will do (B2)', () => {
+    render(<SideControls {...props({ label: 'P1A', activeName: 'Ting-Lu', activeFainted: true, moves: [], switches: [] })} />);
+    expect(screen.queryByText(/What will/)).toBeNull();
+    expect(screen.getByText(/fainted/)).toHaveTextContent('P1A Ting-Lu fainted. No Pokémon is left to send in.');
+    expect(screen.queryByRole('button')).toBeNull();
+  });
 });

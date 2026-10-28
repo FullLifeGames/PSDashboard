@@ -12,6 +12,9 @@ import { bodiesOffTheField, restoreAfterProtocolEntry, restoreExitVolatiles } fr
 import { endLocksTheGameEnded, settleSleepCounter } from './sleep-counter.ts';
 import { hpOfSighting } from './pokemon-info.ts';
 import { normalizeLines } from '../line-endings.ts';
+import { forceSwitches, hasForceSwitch } from './forced-slots.ts';
+
+export { forceSwitches, hasForceSwitch };
 
 function repointActiveSlot(side: SimSide, activeSlot: number, target: SimPokemon): boolean {
   if (side.active[activeSlot] === target) return false;
@@ -117,16 +120,6 @@ function restampProtocolLocks(battle: SimBattle, context: ChoiceLockContext, tur
     // the direct volatile carries everything the sim needs.
     active.volatiles['choicelock'] = { id: 'choicelock', move: lock.moveId } as never;
   }
-}
-
-export function forceSwitches(battle: SimBattle, sideIdx: number): boolean[] {
-  const requests = battle.sides[sideIdx].activeRequest?.forceSwitch;
-  const activeCount = battle.sides[sideIdx].active.length;
-  return Array.from({ length: activeCount }, (_, index) => requests?.[index] ?? false);
-}
-
-export function hasForceSwitch(battle: SimBattle, sideIdx: number): boolean {
-  return forceSwitches(battle, sideIdx).some(Boolean);
 }
 
 /**
