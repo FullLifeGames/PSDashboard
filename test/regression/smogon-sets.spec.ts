@@ -145,6 +145,30 @@ describe('Smogon set assumptions', () => {
     expect(assumptions?.pokemon.kyurem?.sourceDetail).toBe('Smogon sets gen9doublesubers');
   });
 
+  // Round 77 (branching swarm, 28.10.2026): every load of a VGC 2026 replay logged twelve 404s for
+  // sets/gen9vgc2026.json, one per species of both teams. @pkmn/smogon keeps a sets file only once its response
+  // arrived, and the species ask at the same time. The species of one request now share one fetch per file, the
+  // Doubles Ubers fallback of Doubles OU included.
+  test('round 77: the species of one request share one fetch per sets file', async () => {
+    const asked: string[] = [];
+    const counting = (files: Record<string, unknown>) => {
+      const answer = byUrl(files);
+      return async (url: string) => { asked.push(url); return answer(url); };
+    };
+    const team = ['Kyurem', 'Toxapex', 'Corviknight', 'Great Tusk', 'Gholdengo', 'Dragonite'];
+    const fetchesOf = (file: string) => asked.filter(url => url.endsWith(`/sets/${file}.json`)).length;
+    await expect(fetchSmogonSetAssumptions({ formatId: 'gen9vgc2026regi', species: team, fetcher: counting({}) as never })).resolves.toBeNull();
+    expect(fetchesOf('gen9vgc2026')).toBe(1);
+    asked.length = 0;
+    const doubles = await fetchSmogonSetAssumptions({
+      formatId: 'gen9doublesou', species: team, fetcher: counting({ gen9doublesou: toxapexSet, gen9doublesubers: kyuremSet }) as never,
+    });
+    expect(fetchesOf('gen9doublesou')).toBe(1);
+    expect(fetchesOf('gen9doublesubers')).toBe(1);
+    expect(doubles?.pokemon.toxapex?.sourceDetail).toBe('Smogon sets gen9doublesou');
+    expect(doubles?.pokemon.kyurem?.sourceDetail).toBe('Smogon sets gen9doublesubers');
+  });
+
   // Round 66 review: WebKit fails json() on a 404 page with "The string did not match the expected pattern.", a message
   // the error filter does not know, so a format whose set file is missing for every species (Scarlet/Violet VGC 2026)
   // threw "Smogon sets unavailable" in Safari. A 404 sets file now reads as an empty file before json() runs.

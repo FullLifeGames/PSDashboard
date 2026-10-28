@@ -94,22 +94,35 @@ async function setsFrom(smogon: Smogon, gen: ReturnType<typeof gens.get>, name: 
  * A missing sets file (404) reads as an empty one before json() runs: the
  * browsers word the parse error of a 404 page differently, and WebKit's
  * "The string did not match the expected pattern." passed no error filter
- * (round 66 review).
+ * (round 66 review). Round 77: the species of one request share one fetch
+ * and one parse per file. @pkmn/smogon keeps a file only once its response
+ * arrived, and the species ask at the same time: a VGC 2026 team asked
+ * twelve times for its missing file. A failed fetch is not kept.
  */
 function keepingSetsFiles(fetcher: SmogonFetch, files: RawSetsFile[]): SmogonFetch {
-  return async (input, init) => {
+  const shared = new Map<string, Promise<Response>>();
+  const read = async (input: string, init?: RequestInit): Promise<Response> => {
     const response = await fetcher(input, init);
-    if (!/\/sets\/[^/]+\.json$/.test(input)) return response;
     if (response.status === 404) return { ok: false, status: 404, json: async () => ({}) } as Response;
+    let file: Promise<RawSetsFile> | null = null;
     return {
       ok: response.ok,
       status: response.status,
-      json: async () => {
-        const file = await response.json() as RawSetsFile;
-        files.push(file);
-        return file;
-      },
+      json: () => (file ??= (response.json() as Promise<RawSetsFile>).then(parsed => {
+        files.push(parsed);
+        return parsed;
+      })),
     } as Response;
+  };
+  return (input, init) => {
+    if (!/\/sets\/[^/]+\.json$/.test(input)) return fetcher(input, init);
+    let response = shared.get(input);
+    if (!response) {
+      response = read(input, init);
+      shared.set(input, response);
+      response.catch(() => shared.delete(input));
+    }
+    return response;
   };
 }
 
