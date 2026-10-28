@@ -12,6 +12,7 @@ import { bodiesOffTheField, restoreAfterProtocolEntry, restoreExitVolatiles } fr
 import { endLocksTheGameEnded, settleSleepCounter } from './sleep-counter.ts';
 import { hpOfSighting } from './pokemon-info.ts';
 import { normalizeLines } from '../line-endings.ts';
+import { fillableForcedSlots } from '../branch-choices.ts';
 
 function repointActiveSlot(side: SimSide, activeSlot: number, target: SimPokemon): boolean {
   if (side.active[activeSlot] === target) return false;
@@ -119,10 +120,24 @@ function restampProtocolLocks(battle: SimBattle, context: ChoiceLockContext, tur
   }
 }
 
+/**
+ * The Pokémon a side can still send in: the living ones behind the actives, as the simulator counts them
+ * (`canSwitchIn` in side.js). Null while a Revival Blessing prompt is open: its target is a fainted body.
+ */
+export function switchInsOf(side: SimSide): number | null {
+  if (side.active.some(active => active?.switchFlag === 'revivalblessing')) return null;
+  return side.pokemon.slice(side.active.length).filter(pokemon => pokemon && !pokemon.fainted).length;
+}
+
+/**
+ * The slots whose replacement the user chooses: the request's forced slots, capped by the bench (round 77,
+ * B1). A forced slot the bench cannot fill passes, so it reads like a fainted active without a request.
+ */
 export function forceSwitches(battle: SimBattle, sideIdx: number): boolean[] {
-  const requests = battle.sides[sideIdx].activeRequest?.forceSwitch;
-  const activeCount = battle.sides[sideIdx].active.length;
-  return Array.from({ length: activeCount }, (_, index) => requests?.[index] ?? false);
+  const side = battle.sides[sideIdx];
+  const requests = side.activeRequest?.forceSwitch;
+  const asked = Array.from({ length: side.active.length }, (_, index) => requests?.[index] ?? false);
+  return fillableForcedSlots(asked, switchInsOf(side) ?? undefined);
 }
 
 export function hasForceSwitch(battle: SimBattle, sideIdx: number): boolean {

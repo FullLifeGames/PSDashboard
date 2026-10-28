@@ -69,12 +69,27 @@ export function switchOptionKey(option: Pick<BranchSwitchOption, 'species' | 'na
   return `${toId(option.species)}|${toId(option.name)}`;
 }
 
+/**
+ * The forced slots a bench can fill (round 77, B1). The simulator asks every slot with a switch flag for
+ * a replacement, even when fewer Pokémon wait in the back: it then takes one switch per Pokémon and a
+ * pass for the rest (side.js `forcedPasses = canSwitchOut - min(canSwitchOut, canSwitchIn)`). The first
+ * slots take the replacements, the later ones pass. `switchIns` is the count of living Pokémon in the
+ * back; undefined, or zero (the simulator asks nothing then), leaves the request as it is.
+ */
+export function fillableForcedSlots(forced: boolean[], switchIns?: number): boolean[] {
+  if (switchIns === undefined || switchIns <= 0) return forced;
+  let left = switchIns;
+  return forced.map(slot => (slot && left > 0 ? (left--, true) : false));
+}
+
 export function requiredChoicesForActiveSlots(
   activeSlots: (BranchChoiceActive | null)[],
   forceSwitches: boolean[],
+  switchIns?: number,
 ): boolean[] {
   if (forceSwitches.some(Boolean)) {
-    return activeSlots.map((_, index) => forceSwitches[index] ?? false);
+    const fillable = fillableForcedSlots(forceSwitches, switchIns);
+    return activeSlots.map((_, index) => fillable[index] ?? false);
   }
   return activeSlots.map(active => !!active && !active.fainted);
 }
