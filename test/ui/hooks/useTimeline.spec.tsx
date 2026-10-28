@@ -74,6 +74,25 @@ describe('useTimeline', () => {
     expect(result.current).toMatchObject({ viewTurn: 2, viewLine: 'variation', viewingVariation: false, evalViewKey: 'main:2' });
   });
 
+  test('the pointer knows whether it followed an executed turn or the user moved it', () => {
+    // Round 77 (user report 28.10.2026): the branch frame plays a turn in only when the pointer followed that turn.
+    const { result, rerender, base } = setup();
+    act(() => result.current.navigateTo({ turn: 2, line: 'main' }));
+    expect(result.current.followedPlay).toBe(false);
+    rerender({ ...base, branching: true, variationStartTurn: 2, history: [entry(2)] });
+    expect(result.current).toMatchObject({ viewTurn: 3, viewingVariation: true, followedPlay: true });
+
+    act(() => result.current.navigateTo({ turn: 2, line: 'main' }));
+    expect(result.current.followedPlay).toBe(false);
+    act(() => result.current.navigateTo({ turn: 3, line: 'variation' }));
+    expect(result.current).toMatchObject({ viewTurn: 3, viewingVariation: true, followedPlay: false });
+
+    rerender({ ...base, branching: true, variationStartTurn: 2, history: [entry(2), entry(3)] });
+    expect(result.current).toMatchObject({ viewTurn: 4, followedPlay: true });
+    act(() => result.current.handleGraphSelect(2));
+    expect(result.current.followedPlay).toBe(false);
+  });
+
   test('the variation span needs an executed turn: a forced interlude alone opens nothing', () => {
     const { result } = setup({ branching: true, variationStartTurn: 2, history: [entry(2, { kind: 'forced' })] });
     expect(result.current.variationSpan).toBeNull();

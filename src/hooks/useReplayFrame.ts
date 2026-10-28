@@ -97,7 +97,10 @@ export function useSeekTurn(args: {
     const stopRetry = window.setTimeout(() => window.clearInterval(retry), 1200);
 
     const handler = (event: MessageEvent) => {
-      if (event.data?.type === 'ps-replay-ready') sendSeek();
+      if (event.data?.type !== 'ps-replay-ready') return;
+      sendSeek();
+      // A ready live frame has its opening seek; a retry after it would cut short a turn its appends play.
+      if (liveUpdates && event.source === iframeRef.current?.contentWindow) window.clearInterval(retry);
     };
     window.addEventListener('message', handler);
     return () => {
@@ -151,6 +154,8 @@ interface LiveAppendArgs {
   liveUpdates: boolean;
   reloadKey: string;
   blobUrl: string | null;
+  /** The log the document opened with, when it opened on less than `log`: the lines after it reach the frame as appends. */
+  documentLog?: string;
   log: string;
   seekTurn: number | undefined;
   liveAppendMode: 'play' | 'follow-end' | 'hold';
@@ -169,7 +174,7 @@ type SentLog = { key: string; blobUrl: string; lines: string[] };
  * as one append.
  */
 export function useLiveAppend(args: LiveAppendArgs) {
-  const { iframeRef, liveUpdates, reloadKey, blobUrl, log, seekTurn, liveAppendMode, liveAppendTurn } = args;
+  const { iframeRef, liveUpdates, reloadKey, blobUrl, documentLog, log, seekTurn, liveAppendMode, liveAppendTurn } = args;
   /** The lines the frame holds, or holds once its bridge reports ready. */
   const sentLogRef = useRef<SentLog | null>(null);
   /** The document whose bridge reported ready. */
@@ -177,10 +182,10 @@ export function useLiveAppend(args: LiveAppendArgs) {
   const latestRef = useRef<LiveAppendArgs | null>(null);
   useEffect(() => {
     if (!liveUpdates || !blobUrl) return;
-    const current = { iframeRef, liveUpdates, reloadKey, blobUrl, log, seekTurn, liveAppendMode, liveAppendTurn };
+    const current = { iframeRef, liveUpdates, reloadKey, blobUrl, documentLog, log, seekTurn, liveAppendMode, liveAppendTurn };
     latestRef.current = current;
     appendNewLines(current, sentLogRef, readyRef.current === blobUrl);
-  }, [liveUpdates, reloadKey, blobUrl, log, seekTurn, liveAppendMode, liveAppendTurn, iframeRef]);
+  }, [liveUpdates, reloadKey, blobUrl, documentLog, log, seekTurn, liveAppendMode, liveAppendTurn, iframeRef]);
   useEffect(() => {
     if (!liveUpdates || !blobUrl) return;
     const onReady = (event: MessageEvent) => {
@@ -193,29 +198,34 @@ export function useLiveAppend(args: LiveAppendArgs) {
   }, [liveUpdates, blobUrl, iframeRef]);
 }
 
-/** Posts the lines the frame lacks; a new document records its own lines, and a frame not ready yet keeps them waiting. */
+/** Posts the lines the frame lacks; a new document records the lines it opened with, and a frame not ready yet keeps them waiting. */
 function appendNewLines(args: LiveAppendArgs, sentLogRef: React.RefObject<SentLog | null>, ready: boolean): void {
-  const { iframeRef, reloadKey, blobUrl, log, seekTurn, liveAppendMode, liveAppendTurn } = args;
+  const { reloadKey, blobUrl, documentLog, log } = args;
   if (!blobUrl) return;
-  const lines = frameLines(log);
   const previous = sentLogRef.current;
-  if (!previous || previous.key !== reloadKey || previous.blobUrl !== blobUrl) {
-    sentLogRef.current = { key: reloadKey, blobUrl, lines };
+  const sent = previous && previous.key === reloadKey && previous.blobUrl === blobUrl
+    ? previous
+    : { key: reloadKey, blobUrl, lines: frameLines(documentLog ?? log) };
+  if (!ready) {
+    sentLogRef.current = sent;
     return;
   }
-  if (!ready) return;
+  postAppend(args, sent);
+  sentLogRef.current = { key: reloadKey, blobUrl, lines: frameLines(log) };
+}
 
-  const canAppend = extendsLines(previous.lines, lines);
-  if (canAppend && lines.length > previous.lines.length) {
-    const shouldPlayAppend = liveAppendMode === 'play' && typeof liveAppendTurn === 'number';
-    const holdAppend = liveAppendMode === 'hold';
-    iframeRef.current?.contentWindow?.postMessage({
-      type: 'ps-append-log',
-      lines: lines.slice(previous.lines.length),
-      seekTurn: holdAppend ? undefined : seekTurn,
-      followEnd: !shouldPlayAppend && !holdAppend,
-      playFromTurn: shouldPlayAppend ? liveAppendTurn : undefined,
-    }, '*');
-  }
-  sentLogRef.current = { key: reloadKey, blobUrl, lines };
+/** One append message with the lines after the ones the frame holds, when the log still extends them. */
+function postAppend(args: LiveAppendArgs, sent: SentLog): void {
+  const { iframeRef, log, seekTurn, liveAppendMode, liveAppendTurn } = args;
+  const lines = frameLines(log);
+  if (!extendsLines(sent.lines, lines) || lines.length <= sent.lines.length) return;
+  const shouldPlayAppend = liveAppendMode === 'play' && typeof liveAppendTurn === 'number';
+  const holdAppend = liveAppendMode === 'hold';
+  iframeRef.current?.contentWindow?.postMessage({
+    type: 'ps-append-log',
+    lines: lines.slice(sent.lines.length),
+    seekTurn: holdAppend ? undefined : seekTurn,
+    followEnd: !shouldPlayAppend && !holdAppend,
+    playFromTurn: shouldPlayAppend ? liveAppendTurn : undefined,
+  }, '*');
 }

@@ -46,6 +46,11 @@ function usePointerState() {
    */
   const [navSeek, setNavSeek] = useState<{ turn: number; seq: number; play?: boolean } | null>(null);
   /**
+   * The pointer stands where it followed an executed turn, not where the user moved it: a branch frame
+   * that opens there plays that turn in (round 77, user report 28.10.2026).
+   */
+  const [followedPlay, setFollowedPlay] = useState(false);
+  /**
    * Variation evals for the graph overlay: variationScores[turn − 1] = score
    * of the variation position before that turn. Session-scoped.
    */
@@ -56,11 +61,12 @@ function usePointerState() {
     setViewLine('main');
     setViewT0(false);
     setNavSeek(null);
+    setFollowedPlay(false);
     setVariationScores([]);
   }, [setViewTurn]);
   return {
     viewTurn, viewTurnRef, setViewTurn, viewLine, setViewLine, viewT0, setViewT0,
-    navSeek, setNavSeek, variationScores, setVariationScores, resetPointer,
+    navSeek, setNavSeek, followedPlay, setFollowedPlay, variationScores, setVariationScores, resetPointer,
   };
 }
 
@@ -150,14 +156,15 @@ type SeekIntentRef = { current: { turn: number; until: number } | null };
 /** The single pointer move plus the tip-follow after executed turns. */
 function useNavigateTo(args: NavArgs, seekIntentRef: SeekIntentRef) {
   const { pointer, derived, branching, interruptPlayOut, onNavigate } = args;
-  const { setViewTurn, setViewLine, setViewT0, setNavSeek } = pointer;
+  const { setViewTurn, setViewLine, setViewT0, setNavSeek, setFollowedPlay } = pointer;
   const { maxTurn, variationSpan, tipTurn } = derived;
 
-  const navigateTo = useCallback((position: TimelinePosition, opts?: { seek?: boolean; internal?: boolean }) => {
+  const navigateTo = useCallback((position: TimelinePosition, opts?: { seek?: boolean; internal?: boolean; followPlay?: boolean }) => {
     if (!opts?.internal) interruptPlayOut();
     const next = normalizePosition(position, maxTurn, variationSpan);
     setViewT0(false);
     setViewTurn(next.turn);
+    setFollowedPlay(!!opts?.followPlay);
     // The stored line is the user's INTENT, sticky across uncovered turns:
     // only an explicit 'main' request (chip, notation, graph) leaves the
     // variation.
@@ -171,13 +178,13 @@ function useNavigateTo(args: NavArgs, seekIntentRef: SeekIntentRef) {
       setNavSeek(prev => ({ turn: next.turn, seq: (prev?.seq ?? 0) + 1 }));
       seekIntentRef.current = { turn: next.turn, until: Date.now() + 4000 };
     }
-  }, [maxTurn, variationSpan, setViewTurn, setViewLine, setViewT0, setNavSeek, interruptPlayOut, onNavigate, seekIntentRef]);
+  }, [maxTurn, variationSpan, setViewTurn, setViewLine, setViewT0, setNavSeek, setFollowedPlay, interruptPlayOut, onNavigate, seekIntentRef]);
 
   // Executed turns move the pointer WITH the play — the tip is where the
   // next choice happens (chess: the board follows the line you play).
   useEffect(() => {
     if (!branching || tipTurn === null) return;
-    navigateTo({ turn: tipTurn, line: 'variation' }, { seek: false, internal: true });
+    navigateTo({ turn: tipTurn, line: 'variation' }, { seek: false, internal: true, followPlay: true });
   }, [branching, tipTurn, navigateTo]);
 
   return navigateTo;
@@ -186,7 +193,7 @@ function useNavigateTo(args: NavArgs, seekIntentRef: SeekIntentRef) {
 /** Embed echo guard and the graph's explicit line-addressed selections. */
 function useTimelineNav(args: NavArgs) {
   const { pointer, derived, interruptPlayOut, setAnalysisTurn } = args;
-  const { setViewTurn, setViewLine, setViewT0 } = pointer;
+  const { setViewTurn, setViewLine, setViewT0, setFollowedPlay } = pointer;
   const { endSnapshotTurn } = derived;
   // Programmatic seeks race the embed's turn echoes: while the iframe is
   // still seeking it keeps reporting the OLD turn, which would knock the
@@ -216,6 +223,7 @@ function useTimelineNav(args: NavArgs) {
     // Selecting a turn is user navigation — it bypasses navigateTo, so the
     // same "navigation stops the engine's run" rule applies here.
     interruptPlayOut();
+    setFollowedPlay(false);
     if (turn >= 1) {
       setViewT0(false);
       seekIntentRef.current = { turn, until: Date.now() + 4000 };
@@ -230,7 +238,7 @@ function useTimelineNav(args: NavArgs) {
       setViewT0(true);
     }
     setAnalysisTurn(turn);
-  }, [setViewTurn, setViewT0, setAnalysisTurn, interruptPlayOut]);
+  }, [setViewTurn, setViewT0, setFollowedPlay, setAnalysisTurn, interruptPlayOut]);
 
   /** Graph clicks name their line explicitly — gold points navigate the
    *  variation, blue points the main line. */

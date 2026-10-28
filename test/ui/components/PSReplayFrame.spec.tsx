@@ -69,4 +69,37 @@ describe('PSReplayFrame', () => {
     expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'ps-append-log', lines: newTurn }), '*');
     expect(URL.createObjectURL).toHaveBeenCalledTimes(2);
   });
+
+  test('a new live document for a turn just played opens at the start of that turn and plays it in', async () => {
+    // Round 77 (user report 28.10.2026): the first turn of a new variation (Iron Head into Recover) showed its end at
+    // once, while every later turn played out. The frame mounts after the turn ran, with the turn already in its log.
+    const played = ['|move|p1a: Garchomp|Earthquake|p2a: Ferrothorn', '|-damage|p2a: Ferrothorn|40/100', '|turn|2'];
+    const log = `|player|p1|Alice|\n|player|p2|Bob|\n|turn|1\n${played.join('\n')}`;
+    const props = { log, liveUpdates: true, reloadKey: 'session', title: 'Branch', seekTurn: 2, liveAppendMode: 'play' as const, liveAppendTurn: 1 };
+    const { rerender } = render(<PSReplayFrame {...props} openAtTurn={1} />);
+    const html = await (vi.mocked(URL.createObjectURL).mock.calls[0][0] as Blob).text();
+    expect(html).toContain('|turn|1');
+    expect(html).not.toContain('|turn|2');
+    expect(html).toContain('{ turn: 1, autoPlay: false }');
+
+    const frame = screen.getByTitle('Branch') as HTMLIFrameElement;
+    const postMessage = vi.fn();
+    const contentWindow = { postMessage };
+    Object.defineProperty(frame, 'contentWindow', { configurable: true, value: contentWindow });
+    const ready = new MessageEvent('message', { data: { type: 'ps-replay-ready' } });
+    Object.defineProperty(ready, 'source', { value: contentWindow });
+    act(() => { window.dispatchEvent(ready); });
+    expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'ps-append-log', lines: played, playFromTurn: 1 }), '*');
+
+    // The pointer moving on keeps the document; only a new document reads the opening turn.
+    rerender(<PSReplayFrame {...props} openAtTurn={null} />);
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
+  });
+
+  test('a live document opened by navigation shows the position, with the whole line in its log', async () => {
+    render(<PSReplayFrame log={`${LOG}\n|move|p1a: Garchomp|Earthquake|p2a: Ferrothorn\n|turn|3`} liveUpdates reloadKey="session" seekTurn={3} liveAppendMode="play" liveAppendTurn={2} />);
+    const html = await (vi.mocked(URL.createObjectURL).mock.calls[0][0] as Blob).text();
+    expect(html).toContain('|turn|3');
+    expect(html).toContain('{ turn: 3, autoPlay: false }');
+  });
 });

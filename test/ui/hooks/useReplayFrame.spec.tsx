@@ -107,6 +107,20 @@ describe('useSeekTurn', () => {
     act(() => vi.advanceTimersByTime(1500));
     expect(postMessage).toHaveBeenCalledTimes(afterFirst);
   });
+
+  test('a live frame that reports ready stops its retries: a late retry would cut short a turn its appends play', () => {
+    // Round 77 (user report 28.10.2026): a new variation's first turn plays in from an append right after ready.
+    vi.useFakeTimers();
+    const { iframeRef, postMessage } = frame();
+    const lastReportedTurnRef = { current: null as number | null };
+    renderHook(() => useSeekTurn({ iframeRef, seekTurn: 4, autoPlay: false, blobUrl: 'blob:test/1', liveUpdates: true, lastReportedTurnRef }));
+    act(() => vi.advanceTimersByTime(200));
+    expect(postMessage).toHaveBeenCalledTimes(2);
+    reportReady(iframeRef);
+    expect(postMessage).toHaveBeenCalledTimes(3);
+    act(() => vi.advanceTimersByTime(1000));
+    expect(postMessage).toHaveBeenCalledTimes(3);
+  });
 });
 
 describe('useSeekRequests', () => {

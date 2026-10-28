@@ -17,6 +17,11 @@ interface Props {
    *  play-out streams turns in; the finish notice's watch seek moves it. */
   liveAppendMode?: 'play' | 'follow-end' | 'hold';
   liveAppendTurn?: number | null;
+  /**
+   * A live document that opens now opens at the start of this turn and plays the turn in: the pointer
+   * followed a turn that just ran, and the frame mounted after it (the first turn of a new variation).
+   */
+  openAtTurn?: number | null;
   reloadKey?: string;
   /** Viewer perspective — 'p2' renders from player 2's side (the ?p2 replay-URL flag). */
   viewpoint?: 'p1' | 'p2';
@@ -41,6 +46,8 @@ interface Props {
  */
 interface DocumentProps extends Props {
   documentLog: string;
+  /** The turn a new document opens on: the opening turn's start, or the pointer's turn. */
+  documentSeekTurn?: number;
 }
 
 export function PSReplayFrame(props: Props) {
@@ -48,7 +55,28 @@ export function PSReplayFrame(props: Props) {
   const key = props.liveUpdates
     ? `live:${props.reloadKey ?? 'default'}:${generation}`
     : `static:${props.reloadKey ?? props.log.length}`;
-  return <PSReplayFrameDocument key={key} {...props} documentLog={props.log} />;
+  const opening = props.liveUpdates ? openingAt(props.log, props.openAtTurn) : null;
+  return (
+    <PSReplayFrameDocument
+      key={key}
+      {...props}
+      documentLog={opening?.log ?? props.log}
+      documentSeekTurn={opening ? opening.turn : props.seekTurn}
+    />
+  );
+}
+
+/**
+ * The log up to the line that starts `turn`, when lines follow it: a document on that prefix shows the
+ * position before the turn, and the append that brings the rest plays the turn (round 77, user report
+ * 28.10.2026: the first turn of a new variation opened on its end).
+ */
+function openingAt(log: string, turn: number | null | undefined): { log: string; turn: number } | null {
+  if (turn == null || turn < 1) return null;
+  const lines = log.split('\n');
+  const start = lines.indexOf(`|turn|${turn}`);
+  if (start < 0 || !lines.slice(start + 1).some(Boolean)) return null;
+  return { log: lines.slice(0, start + 1).join('\n'), turn };
 }
 
 /**
@@ -85,6 +113,7 @@ function EmptyFrame({ height }: { height: number }) {
 function PSReplayFrameDocument({
   log,
   documentLog: initialDocumentLog,
+  documentSeekTurn,
   format,
   p1,
   p2,
@@ -103,13 +132,16 @@ function PSReplayFrameDocument({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const reportTurn = !!onTurnChange;
   const [documentLog] = useState(initialDocumentLog);
-  const [initialSeek] = useState(() => ({ seekTurn, autoPlay }));
+  const [initialSeek] = useState(() => ({ seekTurn: documentSeekTurn, autoPlay }));
+  // A live document seeks once, to where it opened; navigation reaches it through seekRequest and new
+  // lines through appends, so a later seekTurn never moves it (a late load event would end a turn playing in).
+  const frameSeekTurn = liveUpdates ? initialSeek.seekTurn : seekTurn;
 
   const blobUrl = useReplayBlobUrl({ documentLog, format, p1, p2, title, initialSeek, reportTurn, viewpoint });
   const lastReportedTurnRef = useTurnReports(onTurnChange, blobUrl);
-  useSeekTurn({ iframeRef, seekTurn, autoPlay, blobUrl, liveUpdates, lastReportedTurnRef });
+  useSeekTurn({ iframeRef, seekTurn: frameSeekTurn, autoPlay, blobUrl, liveUpdates, lastReportedTurnRef });
   useSeekRequests(iframeRef, seekRequest);
-  useLiveAppend({ iframeRef, liveUpdates, reloadKey, blobUrl, log, seekTurn, liveAppendMode, liveAppendTurn });
+  useLiveAppend({ iframeRef, liveUpdates, reloadKey, blobUrl, documentLog, log, seekTurn, liveAppendMode, liveAppendTurn });
 
   if (!blobUrl) {
     return <EmptyFrame height={height} />;
@@ -123,10 +155,10 @@ function PSReplayFrameDocument({
       ref={iframeRef}
       src={blobUrl}
       onLoad={() => {
-        if (seekTurn == null) return;
+        if (frameSeekTurn == null) return;
         iframeRef.current?.contentWindow?.postMessage({
           type: 'ps-seek-turn',
-          turn: seekTurn,
+          turn: frameSeekTurn,
           autoPlay: !!autoPlay,
         }, '*');
       }}

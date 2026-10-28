@@ -402,3 +402,35 @@ test.describe('PS Dashboard', () => {
     await expect(page.locator('.ps-branch-bar input[type="range"]')).toBeVisible();
   });
 });
+
+test.describe('the branch frame plays executed turns', () => {
+  test.beforeEach(async ({ page }) => {
+    await routeOfflineFixtures(page);
+    await page.goto('/');
+  });
+
+  test('the first turn of a new variation plays in from its start (round 77)', async ({ page }) => {
+    // User report 28.10.2026: Iron Head into Recover opened a variation, and the frame showed the end of that turn at
+    // once, while every later turn played out. The branch frame mounts after the turn ran; it opens on the turn's start.
+    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('.ps-branch-bar input[type="range"]').fill('2');
+    await expect(page.getByText('T2/')).toBeVisible();
+    await page.locator('.ps-branch-side-column').first().locator('.ps-movebtn', { hasText: 'Swords Dance' }).click();
+    await page.locator('.ps-branch-side-column').nth(1).locator('.ps-movebtn:enabled').first().click();
+    await page.locator('.ps-execute-btn').click();
+
+    type Sample = { turn: number; paused: boolean; seeking: number | null };
+    const samples: Sample[] = [];
+    await expect.poll(async () => {
+      const handle = await page.locator('iframe[title="Branch Simulation"]').elementHandle({ timeout: 100 }).catch(() => null);
+      const frame = await handle?.contentFrame();
+      const sample = await frame?.evaluate(() => {
+        const battle = (window as ReplayWindow).Replays?.battle;
+        return battle ? { turn: battle.turn ?? -1, paused: !!battle.paused, seeking: battle.seeking ?? null } : null;
+      }).catch(() => null);
+      if (sample) samples.push(sample as Sample);
+      return sample?.turn ?? -1;
+    }, { timeout: 60_000, intervals: [100] }).toBeGreaterThanOrEqual(3);
+    expect(samples.some(sample => sample.turn === 2 && !sample.paused && sample.seeking === null)).toBe(true);
+  });
+});

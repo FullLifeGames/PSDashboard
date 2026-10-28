@@ -44,8 +44,11 @@ function WorkspaceTopBar({ app, replayData }: WorkspaceProps) {
 
 function BattleFrame({ app, replayData }: WorkspaceProps) {
   const { showBranch, simLog, latestBranchHistoryEntry, branchReloadKey } = app.analysis;
-  const { viewingVariation, viewTurn, viewT0, navSeek, handleReplayTurn } = app.board.timeline;
+  const { viewingVariation, viewTurn, viewT0, navSeek, handleReplayTurn, followedPlay, tipTurn } = app.board.timeline;
   const { playOut } = app.transients;
+  const appendMode = playOut?.active ? 'hold' : app.ctx.animateBranchTurns ? 'play' : 'follow-end';
+  // The pointer followed a turn that just ran: a branch frame that opens now plays that turn in.
+  const openAtTurn = appendMode === 'play' && followedPlay && tipTurn !== null && viewTurn === tipTurn ? tipTurn - 1 : null;
   return (
     <div className="ps-iframe-wrap">
       {showBranch && viewingVariation ? (
@@ -61,8 +64,9 @@ function BattleFrame({ app, replayData }: WorkspaceProps) {
           autoPlay={false}
           viewpoint={replayData.viewpoint}
           liveUpdates
-          liveAppendMode={playOut?.active ? 'hold' : app.ctx.animateBranchTurns ? 'play' : 'follow-end'}
+          liveAppendMode={appendMode}
           liveAppendTurn={latestBranchHistoryEntry?.turnNumber ?? null}
+          openAtTurn={openAtTurn}
           reloadKey={branchReloadKey}
           seekRequest={navSeek}
         />
