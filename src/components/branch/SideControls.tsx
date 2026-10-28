@@ -44,8 +44,9 @@ export interface SideControlsProps {
   onHypotheticalMove: (params: { species: string; move: string; replace: string | null }) => void;
 }
 
-function SideHeader({ label, activeName, activeFainted, forceSwitch, pending, played }: Pick<SideControlsProps,
-  'label' | 'activeName' | 'activeFainted' | 'forceSwitch' | 'pending' | 'played'>) {
+/** A fainted active nobody replaces (round 77, B2): the bench is empty, so the slot has no choice to make. */
+function SideHeader({ label, activeName, activeFainted, forceSwitch, pending, played, nobodyLeft }: Pick<SideControlsProps,
+  'label' | 'activeName' | 'activeFainted' | 'forceSwitch' | 'pending' | 'played'> & { nobodyLeft: boolean }) {
   const playedText = played
     ? (played.kind === 'move' ? played.name : `→ ${played.name}`)
     : null;
@@ -55,6 +56,8 @@ function SideHeader({ label, activeName, activeFainted, forceSwitch, pending, pl
       {' '}
       {forceSwitch ? (
         <>Choose a replacement{activeFainted ? <> for <strong>{activeName}</strong></> : null}</>
+      ) : nobodyLeft ? (
+        <><strong>{activeName}</strong> fainted. No Pokémon is left to send in.</>
       ) : (
         <>What will <strong>{activeName}</strong> do?</>
       )}
@@ -133,7 +136,10 @@ export function SideControls(props: SideControlsProps) {
 
   return (
     <div className="ps-controls ps-side-controls">
-      <SideHeader label={label} activeName={activeName} activeFainted={activeFainted} forceSwitch={forceSwitch} pending={pending} played={played} />
+      <SideHeader
+        label={label} activeName={activeName} activeFainted={activeFainted} forceSwitch={forceSwitch} pending={pending} played={played}
+        nobodyLeft={activeFainted && !forceSwitch && switches.length === 0}
+      />
 
       {forceSwitch && (
         <div className="ps-force-switch-note">

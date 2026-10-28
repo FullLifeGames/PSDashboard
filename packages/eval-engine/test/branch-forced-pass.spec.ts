@@ -82,6 +82,9 @@ describe('B1 doubles: the bench decides how many replacements are chosen', () =>
             return;
           }
           expect(required.filter(Boolean).length).toBe(fillable);
+          // A slot that passes offers no switch-in: its header says nobody is left, and no chip can reserve a Pokémon there.
+          const switches = leaverIndex === 0 ? state.p1SwitchesBySlot : state.p2SwitchesBySlot;
+          battle.sides[leaverIndex].active.forEach((active, slot) => { if (active.fainted && !forced[slot]) expect(switches[slot]).toEqual([]); });
           // Only slots the simulator asked about can be required.
           required.forEach((needed, slot) => { if (needed) expect(asked[slot]).toBe(true); });
           const choices = pickReplacements(battle, leaverIndex, required);

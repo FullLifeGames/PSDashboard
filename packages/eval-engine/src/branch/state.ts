@@ -185,7 +185,9 @@ function makeSlotModifiers(battle: SimBattle, active: SimPokemon | null | undefi
 function makeSwitches(side: SimSide, activeSlot: number, forced: boolean): BranchSwitchOption[] {
   const activeNames = new Set(side.active.filter(Boolean).map(active => active.name));
   const held = side.active[activeSlot];
-  const trapped = !forced && !!held && !held.fainted && !!held.trapped;
+  // A fainted active nobody replaces (the bench cannot fill every forced slot, round 77 B1) has no switch to make.
+  if (!forced && (!held || held.fainted)) return [];
+  const trapped = !forced && !!held.trapped;
   return side.pokemon
     .map((pokemon, index): BranchSwitchOption => {
       const percent = shownPercent(pokemon);

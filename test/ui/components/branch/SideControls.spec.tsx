@@ -110,4 +110,11 @@ describe('SideControls', () => {
     const picker = screen.getByRole('combobox', { name: 'Choice picker for P1' });
     for (const option of picker.querySelectorAll('optgroup[label="Switch to"] option')) expect(option).toBeDisabled();
   });
+  // Singles cannot reach this state: the game ends when a side's last Pokémon faints. A doubles slot can stand empty beside a living partner.
+  test('a fainted slot with nobody left to send in says so instead of asking what it will do (B2)', () => {
+    render(<SideControls {...props({ label: 'P1A', activeName: 'Ting-Lu', activeFainted: true, moves: [], switches: [] })} />);
+    expect(screen.queryByText(/What will/)).toBeNull();
+    expect(screen.getByText(/fainted/)).toHaveTextContent('P1A Ting-Lu fainted. No Pokémon is left to send in.');
+    expect(screen.queryByRole('button')).toBeNull();
+  });
 });
