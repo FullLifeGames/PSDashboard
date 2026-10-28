@@ -199,6 +199,25 @@ describe('useDeviation', () => {
     await waitFor(() => expect(startCalls(standing)).toHaveLength(1), { timeout: 30_000 });
   }, 60_000);
 
+  // Round 77 (C7): the notice of a finished run belongs to the line it ran on; a deviation ends it.
+  test('onDeviate fires when a deviation or a lead variation really starts, and not while the replace confirm waits', async () => {
+    const onDeviate = vi.fn();
+    const standing = inputs({ timeline: timelineAt(3, { variationSpan: { startTurn: 2, length: 2 } }), onDeviate });
+    const { result } = renderHook(() => useDeviation(standing));
+    act(() => result.current.requestDeviation(null));
+    expect(onDeviate).not.toHaveBeenCalled();
+    const confirm = (standing.setPendingConfirm as ReturnType<typeof vi.fn>).mock.calls[0][0] as { proceed: () => void };
+    act(() => confirm.proceed());
+    expect(onDeviate).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(startCalls(standing)).toHaveLength(1), { timeout: 30_000 });
+
+    const free = inputs({ onDeviate });
+    const lead = renderHook(() => useDeviation(free));
+    act(() => lead.result.current.startLeadVariation({ p1: ['Garchomp'], p2: ['Great Tusk'] }));
+    expect(onDeviate).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(startCalls(free)).toHaveLength(1), { timeout: 30_000 });
+  }, 60_000);
+
   test('onStart stays silent when the end position refuses the deviation', () => {
     const wired = inputs({ timeline: timelineAt(5, { endSnapshotTurn: 5 }) });
     const { result } = renderHook(() => useDeviation(wired));

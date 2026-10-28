@@ -40,6 +40,8 @@ export interface DeviationInputs {
   setPendingConfirm: (confirm: { message: string; proceed: () => void } | null) => void;
   draftChoices: { p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] };
   setDraftChoices: (draft: { p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] }) => void;
+  /** A rebuild really starts (after any replace confirm): the notice of a finished play-out ends here (round 77, C7). */
+  onDeviate?: () => void;
 }
 
 /** One shared preparation session for rebuilds and refreshes: the progress
@@ -158,7 +160,7 @@ function replaceVariationMessage(leadIn: string, span: { startTurn: number; leng
 export function useDeviation(inputs: DeviationInputs) {
   const {
     replayData, snapshots, observations, sources, bringOnlyLists, bringCount, replayGameType,
-    timeline, branch, acquireRuntime, branchWindowOpenRef, setPendingConfirm, draftChoices, setDraftChoices,
+    timeline, branch, acquireRuntime, branchWindowOpenRef, setPendingConfirm, draftChoices, setDraftChoices, onDeviate,
   } = inputs;
   const { branchPreparing, branchProgress, branchSession, handles: session } = useBranchSession();
   const [branchDivergence, setBranchDivergence] = useState<string | null>(null);
@@ -186,6 +188,7 @@ export function useDeviation(inputs: DeviationInputs) {
     // Turn-0 variation: startBranch needs leads — the caller's (fresh lead
     // branch) or the recorded lead entry's (truncation/refresh rebuild).
     if (startTurn === 0 && !leadOverride && !replayHistory[0]?.leadChoices) return;
+    onDeviate?.();
     await executeRebuild({
       replayData, snapshots, observations, sources,
       // Bring-limited replays (VGC 4 of 6): the interactive branch fields
@@ -201,12 +204,11 @@ export function useDeviation(inputs: DeviationInputs) {
     }, startTurn, replayHistory, prefill, leadOverride);
   }, [
     replayData, session, variationSpan, branch, acquireRuntime, snapshots, observations, sources, bringOnlyLists,
-    branchWindowOpenRef, timeline, reportVariationEnded,
+    branchWindowOpenRef, timeline, reportVariationEnded, onDeviate,
   ]);
 
   const requests = useDeviationRequests({
-    timeline, rebuildAt, branch, setPendingConfirm, setBranchDivergence, setVariationNotice,
-    branchWindowOpenRef,
+    timeline, rebuildAt, branch, setPendingConfirm, setBranchDivergence, setVariationNotice, branchWindowOpenRef,
   });
 
   const handleSetChoice = useCallback((side: 'p1' | 'p2', choice: BranchSlotChoice, activeSlot?: number) => {

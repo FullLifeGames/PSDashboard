@@ -12,6 +12,8 @@ interface Props {
   currentPosition?: TimelinePosition;
   /** Clicking a cell navigates there, naming its line explicitly. */
   onNavigate?: (position: TimelinePosition) => void;
+  /** The live sim has a winner: the tip is an end, not a place to play on (round 77, C7). */
+  ended?: boolean;
 }
 
 const cellReset = {
@@ -120,7 +122,7 @@ function HistoryRow({ entry, settled, originalTurn, variationTurn, snapshots, cu
   );
 }
 
-export function BranchHistoryPanel({ branchStartTurn, history, snapshots, currentPosition, onNavigate }: Props) {
+export function BranchHistoryPanel({ branchStartTurn, history, snapshots, currentPosition, onNavigate, ended = false }: Props) {
   const rows = alignHistoryRows(history, branchStartTurn);
   const turnEntries = history.filter(entry => entry.kind !== 'forced').length;
   const tipTurn = branchStartTurn + turnEntries;
@@ -170,7 +172,7 @@ export function BranchHistoryPanel({ branchStartTurn, history, snapshots, curren
               background: 'rgba(240,199,107,0.06)',
             }}
           >
-            Tip of the variation: continue playing here
+            {ended ? 'End of the variation: the game is over here' : 'Tip of the variation: continue playing here'}
           </button>
         )}
       </div>

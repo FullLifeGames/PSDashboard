@@ -170,6 +170,7 @@ function BranchSidePanels({ app, replayData }: WorkspaceProps) {
         snapshots={snapshots}
         currentPosition={{ turn: viewTurn, line: viewingVariation ? 'variation' : 'main' }}
         onNavigate={navigateTo}
+        ended={app.ctx.branch.simState?.ended ?? false}
       />
       <BranchSaveSharePanel
         replayData={replayData}

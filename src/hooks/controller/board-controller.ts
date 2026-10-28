@@ -21,7 +21,8 @@ function useDeviationLayer(ctx: ReplayContext, transients: Transients, timeline:
   const { startBranch, getBattle, executeTurn, setChoice, history, branching, variationStartTurn, stopBranch } = ctx.branch;
   const { branchWindowOpenRef, teamSources } = ctx;
   const { bringOnlyLists, bringCount, replayGameType } = ctx.meta;
-  const { draftChoices, setDraftChoices, setPendingConfirm } = transients;
+  const { draftChoices, setDraftChoices, setPendingConfirm, setPlayOutNotice } = transients;
+  const clearPlayOutNotice = useCallback(() => setPlayOutNotice(null), [setPlayOutNotice]);
   const {
     viewTurnRef, viewLine, endSnapshotTurn, variationSpan, setVariationScores,
     setViewTurn, setViewLine, liveTip, viewTurn, restorePointer,
@@ -42,6 +43,7 @@ function useDeviationLayer(ctx: ReplayContext, transients: Transients, timeline:
     replayData, snapshots, observations, sources: teamSources, bringOnlyLists, bringCount,
     replayGameType, timeline: deviationTimeline, branch: deviationBranch, acquireRuntime,
     branchWindowOpenRef, setPendingConfirm, draftChoices, setDraftChoices,
+    onDeviate: clearPlayOutNotice,
   });
   useBranchRefresh({
     replayData, snapshots, observations, sources: teamSources, bringOnlyLists,
