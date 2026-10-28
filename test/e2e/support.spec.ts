@@ -38,24 +38,34 @@ test.describe('support', () => {
     await expect(links.getByRole('link', { name: 'by Bene (FullLifeGames)' })).toBeVisible();
   });
 
-  test('Report issue opens the filled issue form and downloads the state file', async ({ page, context }) => {
+  test('Report issue opens a dialog that offers the state file and the filled issue form', async ({ page, context }) => {
+    // User request 28.10.2026: a dialog with a download button and a link replaces the tab and the download that the
+    // click started by itself.
     await context.route('https://github.com/**', route => route.fulfill({ status: 200, contentType: 'text/html', body: '<p>issue form</p>' }));
     await page.locator('button', { hasText: 'Load' }).click();
     await startVariationAt(page, 1);
 
-    const tab = context.waitForEvent('page');
-    const download = page.waitForEvent('download');
+    let opened = 0;
+    context.on('page', () => { opened += 1; });
     await page.locator('.ps-topbar').getByRole('button', { name: 'Report issue' }).click();
-    const issuePage = await tab;
-    await issuePage.waitForLoadState();
-    const issue = new URL(issuePage.url());
+    const dialog = page.getByRole('dialog', { name: 'Report an issue' });
+    await expect(dialog).toBeVisible();
+    expect(opened).toBe(0);
+
+    const link = dialog.getByRole('link', { name: 'Open the issue on GitHub' });
+    await expect(link).toHaveAttribute('target', '_blank');
+    const issue = new URL((await link.getAttribute('href'))!);
     expect(`${issue.origin}${issue.pathname}`).toBe('https://github.com/FullLifeGames/PSDashboard/issues/new');
     expect(issue.searchParams.get('template')).toBe('bug_report.yml');
     expect(issue.searchParams.get('replay')).toBe('https://replay.pokemonshowdown.com/gen9ou-test-123');
-    expect(issue.searchParams.get('position')).toMatch(/^T2, variation \(variation from turn 1, 1 turn\)$/);
+    expect(issue.searchParams.get('position')).toBe('T2 in the variation from turn 1 (1 turn)');
     expect(issue.searchParams.get('version')).toMatch(new RegExp(`^${packageVersion.replace(/\./g, '\\.')} \\([0-9a-f]{7,}\\)$`));
+    expect(issue.searchParams.get('body')).toContain('T2 in the variation from turn 1 (1 turn)');
 
+    const download = page.waitForEvent('download');
+    await dialog.getByRole('button', { name: 'Download state file' }).click();
     const file = await download;
+    await expect(dialog.getByRole('status')).toHaveText(`Downloaded ${file.suggestedFilename()}`);
     expect(file.suggestedFilename()).toMatch(/^ps-dashboard-state-gen9ou-test-123-.+\.json$/);
     const state = JSON.parse(readFileSync(await file.path(), 'utf-8')) as Captured;
     expect(state.kind).toBe('ps-dashboard-state');

@@ -40,29 +40,38 @@ describe('the support state file (round 77, user gate 28.10.2026)', () => {
     expect(JSON.stringify(state)).not.toContain('a huge');
   });
 
-  test('the position reads as the timeline bar names it, and the first message on screen leads', () => {
+  test('the position names the line once, and the first message on screen leads', () => {
     const state = buildSupportState(inputs());
-    expect(positionLabel(state)).toBe('T28, main line (variation from turn 5, 1 turn)');
+    expect(positionLabel(state)).toBe('T28 on the main line (variation from turn 5, 1 turn)');
+    // Round 77 (user report 28.10.2026): the title read "T52, variation (variation from turn 50, 2 turns)".
+    const inVariation = buildSupportState(inputs({ view: { turn: 7, line: 'variation', t0: false, viewingVariation: true, liveTip: true } }));
+    expect(positionLabel(inVariation)).toBe('T7 in the variation from turn 5 (1 turn)');
     expect(positionLabel(buildSupportState(inputs({ view: { turn: 1, line: 'main', t0: true, viewingVariation: false, liveTip: false } }))))
-      .toBe('T0 (team preview) (variation from turn 5, 1 turn)');
+      .toBe('T0, the team preview (variation from turn 5, 1 turn)');
     expect(positionLabel(buildSupportState(inputs({ variation: { startTurn: null, branching: false, history: [] } }))))
-      .toBe('T28, main line');
+      .toBe('T28 on the main line');
     expect(screenMessage(state)).toBe('PBA S 2 3 & 5 (Kyurem) no longer knows Brave Bird.');
     expect(screenMessage(buildSupportState(inputs({ messages: { executeError: null, branchDivergence: '  ' } })))).toBeNull();
     expect(supportFileName(state)).toBe('ps-dashboard-state-gen9draft-2058494320-2026-10-28T12-34-56Z.json');
   });
 
-  test('the issue link fills the form fields by their ids and clips long text', () => {
+  test('the issue link fills the form fields by their ids, carries the same facts as a description, and clips long text', () => {
     const state = buildSupportState(inputs());
     const url = new URL(issueUrl(state, 'state.json'));
     expect(`${url.origin}${url.pathname}`).toBe(NEW_ISSUE_URL);
     expect(url.searchParams.get('template')).toBe('bug_report.yml');
     expect(url.searchParams.get('version')).toBe('0.7.1 (abc1234)');
     expect(url.searchParams.get('replay')).toBe('https://replay.pokemonshowdown.com/gen9draft-2058494320');
-    expect(url.searchParams.get('position')).toBe('T28, main line (variation from turn 5, 1 turn)');
+    expect(url.searchParams.get('position')).toBe('T28 on the main line (variation from turn 5, 1 turn)');
     expect(url.searchParams.get('message')).toBe('PBA S 2 3 & 5 (Kyurem) no longer knows Brave Bird.');
     expect(url.searchParams.get('title')).toBe('gen9draft-2058494320: PBA S 2 3 & 5 (Kyurem) no longer knows Brave Bird.');
     expect(url.searchParams.get('state-file')).toContain('state.json');
+    // Round 77 (user report 28.10.2026): GitHub reads issue forms from the default branch only; without the form the link
+    // opened a blank issue with the title alone. The description carries the facts for that case.
+    const body = url.searchParams.get('body') ?? '';
+    for (const fact of ['0.7.1 (abc1234)', 'https://replay.pokemonshowdown.com/gen9draft-2058494320', 'T28 on the main line', 'no longer knows Brave Bird', 'state.json']) {
+      expect(body).toContain(fact);
+    }
 
     const long = buildSupportState(inputs({ messages: { executeError: 'x'.repeat(5000) } }));
     const clipped = new URL(issueUrl(long, 'state.json')).searchParams.get('message') ?? '';

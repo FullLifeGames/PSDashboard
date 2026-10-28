@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { APP_COMMIT, APP_VERSION } from '../lib/app-version';
 import { buildReplayTeams } from '../lib/eval-acquire';
 import {
-  buildSupportState, isSupportState, issueUrl, supportFileName, type SupportState, type SupportStateInputs,
+  buildSupportState, isSupportState, issueUrl, supportFileName,
+  type IssueReport, type SupportState, type SupportStateInputs,
 } from '../lib/support-state';
 import type { ReplayContext } from './controller/replay-context';
 import type { Transients } from './controller/transients';
@@ -102,22 +103,36 @@ async function restoreState(latest: React.RefObject<SupportApp>, state: unknown)
 type StateHandle = { capture: () => Promise<SupportState>; restore: (state: unknown) => Promise<void> };
 
 /**
- * Round 77 (user gate 28.10.2026, "1a 2a 3a 4a 5a"): the support side of the app. "Report issue" opens the
- * filled issue form and downloads the state file; `window.__psState` captures and restores a state for the
- * reproduction script (test/e2e/repro-state.spec.ts).
+ * Round 77 (user gate 28.10.2026, "1a 2a 3a 4a 5a"): the support side of the app. "Report issue" opens a
+ * dialog (user request 28.10.2026) that offers the state file and the filled issue form, each one click
+ * away; `window.__psState` captures and restores a state for the reproduction script
+ * (test/e2e/repro-state.spec.ts).
  */
 export function useSupport(app: SupportApp) {
   const latest = useRef(app);
   useEffect(() => {
     latest.current = app;
   });
+  const [report, setReport] = useState<IssueReport | null>(null);
+  /** The file as the app stood when the user clicked "Report issue"; the download waits for it. */
+  const captureRef = useRef<Promise<SupportState> | null>(null);
   const reportIssue = useCallback(() => {
     const createdAt = new Date().toISOString();
     const quick = buildSupportState({ ...gatherInputs(latest.current, createdAt), builtSets: null });
     const fileName = supportFileName(quick);
-    // Inside the click, before any await: a tab opened later is a popup the browser may block.
-    window.open(issueUrl(quick, fileName), '_blank', 'noopener');
-    void captureState(latest.current, createdAt).then(state => downloadJson(state, fileName));
+    captureRef.current = captureState(latest.current, createdAt);
+    setReport({ fileName, issueUrl: issueUrl(quick, fileName), downloaded: false });
+  }, []);
+  const downloadState = useCallback(async () => {
+    const capture = captureRef.current;
+    if (!capture) return;
+    const state = await capture;
+    downloadJson(state, supportFileName(state));
+    setReport(current => current && { ...current, downloaded: true });
+  }, []);
+  const closeReport = useCallback(() => {
+    captureRef.current = null;
+    setReport(null);
   }, []);
   useEffect(() => {
     const handle: StateHandle = {
@@ -129,5 +144,5 @@ export function useSupport(app: SupportApp) {
       delete (window as Window & { __psState?: StateHandle }).__psState;
     };
   }, []);
-  return { reportIssue };
+  return { reportIssue, report, downloadState, closeReport };
 }

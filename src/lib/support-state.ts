@@ -37,6 +37,13 @@ export interface SupportState {
   engine: { prefs: EvalPreferences; fastPlayOut: boolean; animateBranchTurns: boolean; playOutActive: boolean };
 }
 
+/** An open "Report issue" dialog: the file it offers, the filled issue link, and whether the file went out. */
+export interface IssueReport {
+  fileName: string;
+  issueUrl: string;
+  downloaded: boolean;
+}
+
 export type SupportStateInputs = Omit<SupportState, 'kind' | 'version' | 'variation'> & {
   variation: { startTurn: number | null; branching: boolean; history: BranchHistoryEntry[] };
 };
@@ -65,13 +72,15 @@ export function isSupportState(value: unknown): value is SupportState {
     && (value as { version?: unknown }).version === SUPPORT_STATE_VERSION;
 }
 
-/** "T28, main line (variation from turn 5, 1 turn)" — the position as the timeline bar names it. */
+/** "T7 in the variation from turn 5 (2 turns)", "T28 on the main line (variation from turn 5, 2 turns)": the line once. */
 export function positionLabel(state: Pick<SupportState, 'view' | 'variation'>): string {
   const { view, variation } = state;
-  const where = view.t0 ? 'T0 (team preview)' : `T${view.turn}, ${view.viewingVariation ? 'variation' : 'main line'}`;
   const turns = variation.history.filter(entry => entry.kind !== 'forced').length;
-  if (variation.startTurn === null || turns === 0) return where;
-  return `${where} (variation from turn ${variation.startTurn}, ${turns} ${turns === 1 ? 'turn' : 'turns'})`;
+  const length = `${turns} ${turns === 1 ? 'turn' : 'turns'}`;
+  const hasVariation = variation.startTurn !== null && turns > 0;
+  if (!view.t0 && view.viewingVariation && hasVariation) return `T${view.turn} in the variation from turn ${variation.startTurn} (${length})`;
+  const where = view.t0 ? 'T0, the team preview' : `T${view.turn} on the main line`;
+  return hasVariation ? `${where} (variation from turn ${variation.startTurn}, ${length})` : where;
 }
 
 /** The first message on screen, in the order a reader looks for it. */
@@ -91,19 +100,31 @@ const clip = (text: string) => (text.length > FIELD_MAX ? `${text.slice(0, FIELD
 
 /**
  * The new-issue link with the issue form's fields filled (`.github/ISSUE_TEMPLATE/bug_report.yml`):
- * GitHub fills a form's text fields from query parameters named by their ids.
+ * GitHub fills a form's text fields from query parameters named by their ids. GitHub reads forms from the
+ * default branch only, and without the form it opens a blank issue: the description then carries the same
+ * facts (round 77, user report 28.10.2026: the issue held the title alone).
  */
 export function issueUrl(state: SupportState, fileName: string): string {
   const message = screenMessage(state);
   const replay = state.replay ? `https://replay.pokemonshowdown.com/${state.replay.id}` : 'none loaded';
+  const version = `${state.app.version} (${state.app.commit})`;
+  const position = positionLabel(state);
+  const stateFile = `Drag ${fileName} (downloaded by "Report issue") into this box.`;
+  const body = [
+    '### What happened?', '', 'The steps that led there, what you saw, and what you expected instead.', '',
+    '### State file', '', stateFile, '',
+    `**App version:** ${version}`, `**Replay:** ${replay}`, `**Position:** ${position}`,
+    ...(message ? [`**Message on screen:** ${clip(message)}`] : []),
+  ].join('\n');
   const params = new URLSearchParams({
     template: 'bug_report.yml',
-    title: clip(`${state.replay?.id ?? 'PS Dashboard'}: ${message ?? positionLabel(state)}`),
-    version: `${state.app.version} (${state.app.commit})`,
+    title: clip(`${state.replay?.id ?? 'PS Dashboard'}: ${message ?? position}`),
+    version,
     replay,
-    position: positionLabel(state),
+    position,
     message: clip(message ?? ''),
-    'state-file': `Drag ${fileName} (downloaded by "Report issue") into this box.`,
+    'state-file': stateFile,
+    body,
   });
   return `${NEW_ISSUE_URL}?${params.toString()}`;
 }

@@ -5,6 +5,7 @@ import { SetsImportExportPanel } from './components/SetsImportExportPanel';
 import { SharedBranchView } from './components/SharedBranchView';
 import { ReplayWorkspace } from './components/ReplayWorkspace';
 import { BetaMark, SupportLinks } from './components/SupportLinks';
+import { ReportIssueDialog } from './components/ReportIssueDialog';
 import { buildSetsExport } from './lib/sets-io';
 import { useAppController } from './hooks/useAppController';
 import type { AppController } from './hooks/useAppController';
@@ -91,6 +92,9 @@ function AppModals({ app }: { app: AppController }) {
           onSave={(info) => saveTeam('p2', info)}
           onClose={() => setEditorSide(null)}
         />
+      )}
+      {app.support.report && (
+        <ReportIssueDialog report={app.support.report} onDownload={() => void app.support.downloadState()} onClose={app.support.closeReport} />
       )}
     </>
   );
