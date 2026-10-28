@@ -14,6 +14,8 @@ export type { PlayedPick } from './branch/SideControls';
 
 interface Props {
   simState: BranchSimState | null;
+  /** The state shown is the last resolved position's while the viewed one resolves: the panel keeps its height and takes no input. */
+  stale?: boolean;
   /**
    * Where this position's choices come from (unified timeline, variant B):
    * 'live' = the branch sim stands here; 'stored' = rebuilt from a recorded
@@ -249,7 +251,7 @@ function usePanelPreview(simState: BranchSimState | null, gen: number, positionK
 }
 
 /* ── Main BranchPanel (controls only, no iframe) ── */
-export function BranchPanel({ simState, source, acquiringExact, executeError, executing, gen, onSetChoice, onHypotheticalMove, onExecuteTurn, played, positionKey, getBattle }: Props) {
+export function BranchPanel({ simState, stale, source, acquiringExact, executeError, executing, gen, onSetChoice, onHypotheticalMove, onExecuteTurn, played, positionKey, getBattle }: Props) {
   const { advanced, toggleAdvanced } = useAdvancedToggle();
   const { slots, gimmickFor, damageBySide } = usePanelPreview(simState, gen, positionKey, getBattle);
   const { p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, p1SwitchesBySlot, p2SwitchesBySlot } = slots;
@@ -266,7 +268,7 @@ export function BranchPanel({ simState, source, acquiringExact, executeError, ex
   const columnProps = { simState, gen, advanced, gimmickFor, onSetChoice, onHypotheticalMove };
 
   return (
-    <div>
+    <div inert={stale} aria-busy={stale || undefined}>
       <PickerSourceLine source={source} acquiringExact={acquiringExact} advanced={advanced} onToggleAdvanced={toggleAdvanced} />
       {/* Controls — stacked vertically for P1 + P2 selection */}
       {!simState.ended && (

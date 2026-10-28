@@ -112,7 +112,7 @@ function PickerRegion({ app, replayData }: WorkspaceProps) {
   const { simState, executing, executeError } = app.ctx.branch;
   const { branchPreparing, handleSetChoice, handleExecuteDraft } = app.board.deviation;
   const { replayGen } = app.ctx.meta;
-  const { positionPicker, pickerSimState, playedAtView } = app.engine;
+  const { positionPicker, pickerSimState, pickerStale, playedAtView } = app.engine;
   if (playOut?.active) {
     /* A steady stand-in while the engine plays: the per-turn picker
        churn was the "everything keeps switching" complaint, and a
@@ -130,6 +130,7 @@ function PickerRegion({ app, replayData }: WorkspaceProps) {
   return (
     <BranchPanel
       simState={liveTip ? simState : pickerSimState}
+      stale={!liveTip && pickerStale}
       source={liveTip ? 'live' : positionPicker?.source}
       acquiringExact={!liveTip && app.engine.acquire.exactAcquiringTurn === viewTurn}
       executeError={executeError}

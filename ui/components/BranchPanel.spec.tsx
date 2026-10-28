@@ -39,6 +39,19 @@ describe('BranchPanel', () => {
     expect(screen.getByRole('button', { name: 'Show Raw Protocol Log' })).toBeInTheDocument();
   });
 
+  test('a stale panel (the last position, shown while the viewed one resolves) takes no input', () => {
+    // Round 77 (user report 28.10.2026): a click on the stand-in chose a move of a Pokémon that was not on the field.
+    const { container, rerender } = render(<BranchPanel {...props({ stale: true })} />);
+    const root = container.firstElementChild as HTMLElement;
+    expect(root).toHaveAttribute('inert');
+    expect(root).toHaveAttribute('aria-busy', 'true');
+    expect(slot('P1').getByRole('button', { name: /Earthquake/, hidden: true })).toBeInTheDocument();
+
+    rerender(<BranchPanel {...props()} />);
+    expect(root).not.toHaveAttribute('inert');
+    expect(root).not.toHaveAttribute('aria-busy');
+  });
+
   test('compact: both sides get move and switch chips; Execute waits for both choices and names the missing side', async () => {
     const wired = props();
     const { rerender } = render(<BranchPanel {...wired} />);

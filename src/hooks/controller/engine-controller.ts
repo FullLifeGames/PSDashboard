@@ -46,10 +46,11 @@ function useAcquireLayer(ctx: ReplayContext, transients: Transients, board: Boar
     playOut, evaluation, usageStats: ctx.smogon.usageStats, setAssumptions: ctx.smogon.setAssumptions,
   });
   const acquire = useEvalAcquire({ replayData, source: positions, getBattle, viewTurn, dwellEnabled, smogonPending });
-  const { positionPicker, pickerSimState } = usePositionPicker({
+  const { positionPicker, pickerSimState, pickerStale } = usePositionPicker({
     replayData, snapshots, sources: teamSources, bringOnlyLists, replayGenNumber,
     liveTip, viewingVariation, serializedAtView, viewTurn, variationStartTurn, startSerialized,
     getExact: acquire.getExact, exactPositionsVersion: acquire.exactPositionsVersion, draftChoices,
+    liveSimState: ctx.branch.simState,
   });
   // Round 75 (T160): the played-action parser reads the replay's own Dex (generation and mod).
   const rules = useMemo(() => logRules(replayData?.log ?? ''), [replayData]);
@@ -59,7 +60,7 @@ function useAcquireLayer(ctx: ReplayContext, transients: Transients, board: Boar
     history: ctx.branch.history, snapshots, doubles: ctx.meta.evalIsDoubles,
     parseSingles, parseDoubles: parsePlayedActionsDoubles,
   });
-  return { acquire, smogonPending, positionPicker, pickerSimState, playedAtView };
+  return { acquire, smogonPending, positionPicker, pickerSimState, pickerStale, playedAtView };
 }
 
 function useEvalViewLayer(
