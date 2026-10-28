@@ -40,6 +40,26 @@ describe('EvalPanel', () => {
     expect(wired.onPrefsChange).toHaveBeenCalledWith({ ...prefs, mode: 'matrix', depth: 2 });
   });
 
+  // Round 77 (C7): Evaluate at a finished variation showed a 100 % bar and an empty line list. The panel says who won,
+  // as the branch panel does; the end of a game reads the same in singles and doubles.
+  test('at a finished variation the panel names the winner instead of a bar and empty lines, and offers no Evaluate', () => {
+    const stale = evalResult('singles', { score: 1, perSide: { p1: [], p2: [] } });
+    const { rerender } = render(<EvalPanel {...props({ status: 'done', result: stale, onEvaluate: vi.fn(), showAuto: true, positionLabel: 'Turn 21 · variation', ended: { winner: 'Alice' } })} />);
+    expect(screen.getByRole('status')).toHaveTextContent('Alice wins this variation.');
+    expect(screen.queryByRole('img', { name: /Advantage estimate/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /valuate/ })).toBeNull();
+    expect(screen.queryByText('Position changed; re-evaluate.')).toBeNull();
+
+    rerender(<EvalPanel {...props({ status: 'stale', result: stale, onEvaluate: vi.fn(), showAuto: true, ended: { winner: null } })} />);
+    expect(screen.getByRole('status')).toHaveTextContent('The variation ended without a winner.');
+    expect(screen.queryByText('Position changed; re-evaluate.')).toBeNull();
+
+    rerender(<EvalPanel {...props({ status: 'done', result: evalResult(), onEvaluate: vi.fn(), showAuto: true, ended: null })} />);
+    expect(screen.getByRole('img', { name: /Advantage estimate/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Re-evaluate' })).toBeInTheDocument();
+    expect(screen.queryByText(/wins this variation/)).toBeNull();
+  });
+
   test('searching shows the progress, an error the alert; stale results lose their click handlers', () => {
     const { rerender } = render(<EvalPanel {...props({ status: 'searching', progress: { done: 10, total: 40, depth: 1 } })} />);
     expect(screen.getByText('Searching… depth 1')).toBeInTheDocument();

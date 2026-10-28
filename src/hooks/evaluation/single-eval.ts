@@ -72,6 +72,8 @@ interface SingleEvalIO {
   setError: (value: string | null) => void;
   setProgress: (value: SearchProgress | null) => void;
   setReconstructProgress: (value: { turn: number; target: number } | null) => void;
+  /** Stops the sweep's painting; `superseded` keeps where it stopped for its status line (round 77, C1). */
+  stopGraphPaint: (superseded?: boolean) => void;
 }
 
 /**
@@ -193,7 +195,7 @@ function useEvaluateAction(
   engineOverrideRef: React.RefObject<TurnEvalSettings | null>,
   setResultTag: (value: string | null) => void,
 ) {
-  const { runRef, cacheRef, setResult, setStatus, setError, setProgress, setReconstructProgress } = io;
+  const { runRef, cacheRef, setResult, setStatus, setError, setProgress, setReconstructProgress, stopGraphPaint } = io;
   return useCallback((params: EvaluateParams) => {
     // A pinned engine (the fast play-out) beats the panel preferences for
     // single evaluations; the sweep never reads it.
@@ -202,6 +204,8 @@ function useEvaluateAction(
       const hit = cacheRef.current.get(params.cacheKey);
       if (hit && hit.depth === depth && hit.samples === samples && hit.mode === mode && teraKey(hit.tera) === teraKey(params.tera)) {
         runRef.current += 1;
+        // Bumping the run counter kills a running sweep: its status must say so (round 77, C1).
+        stopGraphPaint(true);
         setResult(hit.result);
         setResultTag(params.tag ?? null);
         setStatus('done');
@@ -213,6 +217,7 @@ function useEvaluateAction(
     }
 
     const runId = ++runRef.current;
+    stopGraphPaint(true);
     setStatus('reconstructing');
     setError(null);
     setResult(null);
@@ -221,7 +226,7 @@ function useEvaluateAction(
     setReconstructProgress(null);
 
     void runSingleEvaluation(io, params, runId, { depth, samples, mode });
-  }, [io, prefsRef, engineOverrideRef, setResultTag, runRef, cacheRef, setResult, setStatus, setError, setProgress, setReconstructProgress]);
+  }, [io, prefsRef, engineOverrideRef, setResultTag, runRef, cacheRef, setResult, setStatus, setError, setProgress, setReconstructProgress, stopGraphPaint]);
 }
 
 /**
@@ -236,7 +241,7 @@ export function useSingleEval(env: {
   /** A concrete engine pinned for the single path (null = the prefs decide). */
   engineOverrideRef: React.RefObject<TurnEvalSettings | null>;
   /** cancel also stops the sweep's painting (the run counter kills its work). */
-  stopGraphPaint: () => void;
+  stopGraphPaint: (superseded?: boolean) => void;
 }) {
   const { runRef, clientRef, cacheRef, prefsRef, engineOverrideRef, stopGraphPaint } = env;
   const [status, setStatus] = useState<EvalStatus>('idle');
@@ -265,8 +270,8 @@ export function useSingleEval(env: {
   }, [runRef, clientRef, stopGraphPaint]);
 
   const io = useMemo<SingleEvalIO>(() => ({
-    runRef, clientRef, cacheRef, setStatus, setResult, setError, setProgress, setReconstructProgress,
-  }), [runRef, clientRef, cacheRef, setResult]);
+    runRef, clientRef, cacheRef, setStatus, setResult, setError, setProgress, setReconstructProgress, stopGraphPaint,
+  }), [runRef, clientRef, cacheRef, setResult, stopGraphPaint]);
   const evaluate = useEvaluateAction(io, prefsRef, engineOverrideRef, setResultTag);
 
   const markStale = useCallback(() => {

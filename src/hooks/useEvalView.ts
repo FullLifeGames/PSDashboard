@@ -218,12 +218,14 @@ function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
 
 /** Invalidations and the auto re-evaluations of live positions. */
 function useEvalHousekeeping(inputs: EvalViewInputs, format: EvalFormat, handleEvaluate: () => void) {
-  const { evaluation, viewTurn, viewLine, historyLength, editedP1Info, editedP2Info, replayData, branching, liveEvalView, liveEvalStatus, executing, branchPreparing, playOutActive } = inputs;
-  // Any position change invalidates a displayed result.
+  const { evaluation, historyLength, editedP1Info, editedP2Info, replayData, branching, liveEvalView, liveEvalStatus, executing, branchPreparing, playOutActive } = inputs;
+  // A change of the position itself (a turn executed, a set edited) invalidates a displayed result. Moving the
+  // pointer does not (round 77, C6): the result's position tag decides whether it fits the screen, so the result
+  // is current again when the pointer returns to the position it was computed for.
   const { markStale: markEvalStale, reset: resetEval, clearGraph } = evaluation;
   useEffect(() => {
     markEvalStale();
-  }, [viewTurn, viewLine, historyLength, editedP1Info, editedP2Info, markEvalStale]);
+  }, [historyLength, editedP1Info, editedP2Info, markEvalStale]);
   // A different replay or entering/leaving branch mode is a new position context.
   useEffect(() => {
     resetEval();
@@ -239,10 +241,11 @@ function useEvalHousekeeping(inputs: EvalViewInputs, format: EvalFormat, handleE
   // main-line turn (the end sentinel included) fired a stray single-turn
   // reconstruction — the "diverged before turn 68" error on a 67-turn game.
   useEffect(() => {
-    if (branching && evaluation.prefs.auto && liveEvalView && liveEvalStatus === 'stale' && !executing) {
+    // Round 77 (C1): not while the game sweep runs; a single evaluation would stop it. The effect fires again when it ends.
+    if (branching && evaluation.prefs.auto && liveEvalView && liveEvalStatus === 'stale' && !executing && !evaluation.graph.running) {
       handleEvaluate();
     }
-  }, [branching, evaluation.prefs.auto, liveEvalView, liveEvalStatus, executing, handleEvaluate]);
+  }, [branching, evaluation.prefs.auto, liveEvalView, liveEvalStatus, executing, evaluation.graph.running, handleEvaluate]);
   // "Always on" also covers the live sim: a freshly opened variation (or a
   // navigation back to its tip) evaluates without the Evaluate button. Never
   // while the game sweep runs — a single evaluation supersedes the run id

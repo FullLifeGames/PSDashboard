@@ -53,6 +53,22 @@ describe('GameGraphSection', () => {
     expect(screen.getByText(/^line:/)).toHaveTextContent('then MCTS everywhere');
   });
 
+  // Round 77 (C1): a single evaluation that took over a running sweep leaves a status line instead of a silent stop.
+  test('a sweep that a single evaluation stopped says where it stopped and offers Analyze again', () => {
+    const stopped = evalGraph('singles', { running: false, stopped: { done: 1, total: 2 } });
+    render(<GameGraphSection {...props({ graph: stopped })} />);
+    expect(screen.getByText('Analysis stopped at turn 1 of 2.')).toHaveTextContent('Analysis stopped at turn 1 of 2.');
+    expect(screen.queryByRole('button', { name: 'Cancel' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Re-analyze' })).toBeEnabled();
+  });
+
+  test('no stopped note while nothing was stopped or the sweep runs again', () => {
+    const { rerender } = render(<GameGraphSection {...props({ graph: evalGraph('singles', { stopped: null }) })} />);
+    expect(screen.queryByText(/Analysis stopped/)).toBeNull();
+    rerender(<GameGraphSection {...props({ graph: evalGraph('singles', { running: true, progress: { done: 0, total: 2 }, stopped: { done: 1, total: 2 } }) })} />);
+    expect(screen.queryByText(/Analysis stopped/)).toBeNull();
+  });
+
   test('the auto line hint follows the game type (round 63, T110)', () => {
     configureSearchBudget(parseSearchBudget('singles-tree-from=0.25'));
     onTestFinished(() => configureSearchBudget(null));

@@ -114,6 +114,26 @@ describe('useEngineWalk', () => {
     expect(wired.executeTurn).toHaveBeenCalledTimes(1);
   });
 
+  // Round 77 (C3): a pick played from the queue arms the walk in the same effect pass in which the walk's own effect
+  // still sees the result that stood before the click. That result is not the replacement position and must not
+  // disarm the walk: the forced replacement that comes next still auto-plays. The arming does not read the game
+  // type, so doubles (a combined choice per side, the same refs) take the same path; the singles case stands for both.
+  test('off the tip the queued pick keeps the walk armed until the replacement position arrives', async () => {
+    const before = evalResult('singles');
+    const doneBefore = evaluationOf({ status: 'done', result: before, resultTag: 'variation:3' }).evaluation;
+    const wired = inputs({ liveTip: false, evaluation: doneBefore });
+    const { result, rerender } = renderHook((props: EngineWalkInputs) => useEngineWalk(props), { initialProps: wired });
+    act(() => result.current.handleExploreChoice('p1', rankedChoice('move earthquake', 'Earthquake', 0.3), rankedChoice('move leechseed', 'Leech Seed', -0.3)));
+    rerender({ ...wired, liveTip: true, branchPreparing: false });
+    await flush();
+    expect(wired.executeTurn).toHaveBeenCalledTimes(1);
+    (wired.handleSetChoice as ReturnType<typeof vi.fn>).mockClear();
+
+    const forced = evalResult('singles', { perSide: { p1: [rankedChoice('switch heatran', '→ Heatran', 0.1)], p2: [rankedChoice('wait', 'wait', 0)] } });
+    rerender({ ...wired, liveTip: true, evaluation: evaluationOf({ status: 'done', result: forced, resultTag: 'variation:3' }).evaluation });
+    expect(wired.handleSetChoice).toHaveBeenCalledWith('p1', { kind: 'switch', speciesId: 'heatran', pokemonName: 'Heatran' }, 0);
+  });
+
   test('a cancelled branch entry drops the queued pick', () => {
     const wired = inputs({ liveTip: false, branching: true });
     const { result, rerender } = renderHook((props: EngineWalkInputs) => useEngineWalk(props), { initialProps: wired });

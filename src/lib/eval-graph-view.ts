@@ -97,6 +97,36 @@ export function variationOverlay(
   return { points, path, end };
 }
 
+export interface HitBand { y: number; height: number }
+
+/**
+ * Round 77 (C8): on a turn where both lines have a point, the two hit areas share the whole column and split it at
+ * the middle between the points, so the nearer point wins at any width. Equal heights give the main line the upper
+ * band, as the gold area is drawn after it.
+ */
+export function splitHitColumn(mainY: number, goldY: number): { main: HitBand; gold: HitBand } {
+  const boundary = Math.min(GRAPH_HEIGHT, Math.max(0, (mainY + goldY) / 2));
+  const upper: HitBand = { y: 0, height: boundary };
+  const lower: HitBand = { y: boundary, height: GRAPH_HEIGHT - boundary };
+  return mainY <= goldY ? { main: upper, gold: lower } : { main: lower, gold: upper };
+}
+
+/** The split bands of every turn where the main line and the variation both have a point, by turn. */
+export function sharedHitBands(
+  points: VariationPoint[], scores: (number | null)[], y: GraphScales['y'],
+): { main: Map<number, HitBand>; gold: Map<number, HitBand> } {
+  const main = new Map<number, HitBand>();
+  const gold = new Map<number, HitBand>();
+  for (const point of points) {
+    const mainScore = scores[point.turn - 1];
+    if (mainScore === null || mainScore === undefined) continue;
+    const split = splitHitColumn(y(mainScore), point.py);
+    main.set(point.turn, split.main);
+    gold.set(point.turn, split.gold);
+  }
+  return { main, gold };
+}
+
 export type DecidedSignal = { side: 'p1' | 'p2'; species: string } | null;
 export interface DecidedSpan { x1: number; x2: number; side: 'p1' | 'p2'; species: string }
 
