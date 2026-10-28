@@ -7,6 +7,7 @@ import type { BoardController } from './controller/board-controller';
 import { useEngineController } from './controller/engine-controller';
 import type { EngineController } from './controller/engine-controller';
 import { useGameAnalysis } from './useGameAnalysis';
+import { useSupport } from './useSupport';
 import { branchFrameLog } from '../lib/branch-log';
 import { manualMove, toId } from '@fulllifegames/replay-core';
 import type { BranchSlotChoice } from '@fulllifegames/eval-engine';
@@ -128,7 +129,8 @@ export function useAppController() {
     await executeTurn();
   }, [executeTurn]);
   const analysis = useAnalysisSurface(ctx, board, engine);
-  return { ctx, transients, board, engine, handleHypotheticalMove, handleExecuteTurn, analysis };
+  const support = useSupport({ ctx, transients, board });
+  return { ctx, transients, board, engine, handleHypotheticalMove, handleExecuteTurn, analysis, support };
 }
 
 export type AppController = ReturnType<typeof useAppController>;

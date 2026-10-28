@@ -1,0 +1,36 @@
+name: Bug report
+description: Something in PS Dashboard behaves wrong. "Report issue" in the app fills most of this form.
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: The steps that led there, what you saw, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: state-file
+    attributes:
+      label: State file
+      description: >-
+        "Report issue" downloads a ps-dashboard-state-….json file with the replay, the sets, the variation and the
+        position on screen. Drag it into this box; it lets the bug be replayed exactly. It contains a pasted team if you
+        pasted one.
+  - type: input
+    id: version
+    attributes:
+      label: App version
+  - type: input
+    id: replay
+    attributes:
+      label: Replay
+  - type: input
+    id: position
+    attributes:
+      label: Position
+  - type: textarea
+    id: message
+    attributes:
+      label: Message on screen
+      render: text

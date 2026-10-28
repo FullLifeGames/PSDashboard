@@ -4,6 +4,7 @@ import { TeamEditor } from './components/TeamEditor';
 import { SetsImportExportPanel } from './components/SetsImportExportPanel';
 import { SharedBranchView } from './components/SharedBranchView';
 import { ReplayWorkspace } from './components/ReplayWorkspace';
+import { BetaMark, SupportLinks } from './components/SupportLinks';
 import { buildSetsExport } from './lib/sets-io';
 import { useAppController } from './hooks/useAppController';
 import type { AppController } from './hooks/useAppController';
@@ -107,9 +108,11 @@ function App() {
       {!embed && !replayData && (
         <div className="ps-app-header" style={{ borderRadius: '0 0 5px 5px' }}>
           <h1>PS Dashboard</h1>
+          <BetaMark />
           <span style={{ fontSize: 10, color: '#aabbcc' }}>
             Load a replay · branch off with different moves
           </span>
+          <SupportLinks embed={false} onReportIssue={app.support.reportIssue} />
         </div>
       )}
 

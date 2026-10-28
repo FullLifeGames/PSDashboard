@@ -12,11 +12,24 @@ function props(overrides: Partial<Props> = {}): Props {
     usageStats: { loading: false, error: null }, setAssumptions: { loading: false, error: null },
     branchPreparing: false, branchProgress: null, showBranch: false, simState: null, animateBranchTurns: true,
     branchDivergence: null, onCancelPreparation: vi.fn(), onAnimateChange: vi.fn(), onEditSide: vi.fn(), onOpenSets: vi.fn(),
+    embed: false, onReportIssue: vi.fn(),
     ...overrides,
   };
 }
 
 describe('AppTopBar', () => {
+  test('with a replay loaded the bar ends with the name, Beta, Report issue and the creator link (round 77)', async () => {
+    const wired = props();
+    const { rerender } = render(<AppTopBar {...wired} />);
+    const links = document.querySelector('.ps-topbar > .ps-support-links') as HTMLElement;
+    expect(links).toHaveTextContent('PS Dashboard Beta');
+    await userEvent.click(screen.getByRole('button', { name: 'Report issue' }));
+    expect(wired.onReportIssue).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('link', { name: 'by Bene (FullLifeGames)' })).toBeInTheDocument();
+    rerender(<AppTopBar {...wired} embed />);
+    expect(screen.queryByRole('link', { name: 'by Bene (FullLifeGames)' })).toBeNull();
+  });
+
   test('names the match and routes the edit and sets buttons', async () => {
     const wired = props();
     render(<AppTopBar {...wired} />);

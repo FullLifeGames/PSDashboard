@@ -1,4 +1,5 @@
 import type { BranchSimState } from '../hooks/useBranch';
+import { SupportLinks } from './SupportLinks';
 
 interface AppTopBarProps {
   replayData: { format: string; players: string[] };
@@ -14,11 +15,14 @@ interface AppTopBarProps {
   onAnimateChange: (value: boolean) => void;
   onEditSide: (side: 'p1' | 'p2') => void;
   onOpenSets: () => void;
+  /** A host site frames the app (round 77: the creator link is left out). */
+  embed: boolean;
+  onReportIssue: () => void;
 }
 
 function TopBarMatchInfo({ replayData, usageStats, setAssumptions }: Pick<AppTopBarProps, 'replayData' | 'usageStats' | 'setAssumptions'>) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+    <div className="ps-topbar-match" style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '1 1 auto', minWidth: 0 }}>
       <span className="ps-format-tag">{replayData.format}</span>
       <span style={{ fontSize: 11, color: '#8ac' }}>{replayData.players[0]}</span>
       <span style={{ fontSize: 10, color: '#556' }}>vs</span>
@@ -137,6 +141,7 @@ export function AppTopBar(props: AppTopBarProps) {
           Import/Export Sets
         </button>
       </div>
+      <SupportLinks embed={props.embed} withName onReportIssue={props.onReportIssue} />
     </div>
   );
 }

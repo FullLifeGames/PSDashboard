@@ -36,6 +36,8 @@ function WorkspaceTopBar({ app, replayData }: WorkspaceProps) {
       onAnimateChange={app.ctx.setAnimateBranchTurns}
       onEditSide={setEditorSide}
       onOpenSets={() => setSetsPanelOpen(true)}
+      embed={app.ctx.replay.embed}
+      onReportIssue={app.support.reportIssue}
     />
   );
 }

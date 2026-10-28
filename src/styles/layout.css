@@ -51,7 +51,22 @@
   border: 1px solid var(--ps-border);
   border-radius: 7px 7px 0 0;
   padding: 4px 10px;
-  gap: 8px;
+  gap: 4px 8px;
+  /* Round 77: where the support links do not fit beside a live branch's status, they take a line of their own. */
+  flex-wrap: wrap;
+}
+/* The match info keeps its own width for the line break and shortens long names instead of running under its neighbours. */
+.ps-topbar-match {
+  overflow: hidden;
+}
+.ps-topbar-match > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.ps-topbar-match > .ps-format-tag {
+  flex-shrink: 0;
 }
 
 .ps-format-tag {

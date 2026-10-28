@@ -51,6 +51,49 @@ body {
   margin: 0;
 }
 
+/* Round 77: the Beta mark, Report issue and the creator link. */
+.ps-beta-mark {
+  font-size: 9px;
+  font-weight: bold;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #1a2a4c;
+  background: #f0c96a;
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+.ps-support-links {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 10px;
+  white-space: nowrap;
+}
+.ps-app-header .ps-support-links,
+.ps-topbar > .ps-support-links {
+  margin-left: auto;
+}
+.ps-support-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: bold;
+  color: #dbe6f5;
+}
+.ps-support-link {
+  font: inherit;
+  color: #9cc4f0;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.ps-support-link:hover {
+  color: #c9e0fa;
+}
+
 .ps-panel {
   flex-shrink: 0;
   background:
@@ -70,5 +113,13 @@ body {
   }
   .ps-app-header h1 {
     font-size: 15px;
+  }
+  /* Round 77 (mobile a): the links form their own row in the stacked header and top bar. */
+  .ps-app-header .ps-support-links {
+    margin-left: 0;
+  }
+  .ps-support-links {
+    flex-wrap: wrap;
+    white-space: normal;
   }
 }
