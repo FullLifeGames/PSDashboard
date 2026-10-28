@@ -60,12 +60,17 @@ export function normalizePosition(
  * - extend: at the tip — normal play.
  * - truncate: inside the variation — the tail is silently cut.
  * - replace: on the main line while a variation exists — needs the confirm.
+ * The line is the user's intent and stays sticky across turns the variation
+ * does not cover; those turns show the main line, so a move there replaces.
+ * Round 77 (user report 28.10.2026): a one-turn variation at turn 5, ▶ to
+ * turn 28, and the move there extended the variation instead, running at its
+ * tip against another Pokémon.
  */
 export type DeviationKind = 'open' | 'extend' | 'truncate' | 'replace';
 
 export function classifyDeviation(span: VariationSpan | null, position: TimelinePosition): DeviationKind {
   if (!span || span.length === 0) return 'open';
-  if (position.line === 'variation') {
+  if (position.line === 'variation' && variationCovers(span, position.turn)) {
     return position.turn >= variationTip(span) ? 'extend' : 'truncate';
   }
   return 'replace';

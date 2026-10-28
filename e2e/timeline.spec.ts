@@ -177,6 +177,32 @@ test.describe('PS Dashboard', () => {
       await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 2', { timeout: 60_000 });
     });
 
+    test('a move past the variation\'s tip plays on the main line there, after the replace confirm (round 77)', async ({ page }) => {
+      // User report 28.10.2026: a one-turn variation at turn 5, then ▶ to turn 28 and Brave Bird there. The line stayed
+      // "variation" across the uncovered turns, the move extended the variation instead, ran at its tip against Kyurem
+      // ("no longer knows Brave Bird") and pulled the pointer back. Here: a one-turn variation at turn 1, ▶ to turn 3.
+      test.setTimeout(120_000);
+      await page.locator('button', { hasText: 'Load' }).click();
+      await startVariationAt(page, 1, { p1Move: 'Swords Dance' });
+      const history = page.locator('.ps-panel', { hasText: 'Variation moves' });
+      await expect(history).not.toContainText('Turn 2');
+      await page.locator('.ps-branch-bar button', { hasText: '▶' }).click();
+      await expect(page.getByText('T3/')).toBeVisible();
+      await expect(page.locator('.ps-line-chip button.on-main')).toBeVisible();
+
+      const p1 = page.locator('.ps-branch-side-column').first();
+      const p2 = page.locator('.ps-branch-side-column').nth(1);
+      await p1.locator('.ps-movebtn:enabled').first().click();
+      await p2.locator('.ps-movebtn:enabled').first().click();
+      await page.locator('.ps-execute-btn').click();
+      const confirm = page.locator('[role="alertdialog"]');
+      await expect(confirm).toContainText('You are on the main line (turn 3): replace the existing variation from turn 1');
+      await confirm.locator('button', { hasText: 'Replace' }).click();
+      await expect(history).toContainText('Turn 3', { timeout: 60_000 });
+      await expect(history).not.toContainText('Turn 1');
+      await expect(page.locator('.ps-execute-error')).toHaveCount(0);
+    });
+
     test('main line stays one click away and replacing from it asks first', async ({ page }) => {
       test.setTimeout(120_000);
       await page.locator('button', { hasText: 'Load' }).click();

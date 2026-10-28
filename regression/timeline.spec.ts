@@ -47,6 +47,21 @@ test('classifyDeviation implements the chess rules', () => {
   expect(classifyDeviation(span, at(16, 'main'))).toBe('replace');
 });
 
+test('a variation-line position the variation does not cover is the main line: a move there replaces (round 77)', () => {
+  // User report 28.10.2026: a one-turn variation at turn 5, then ▶ to turn 28. The line stayed 'variation' (the intent is
+  // sticky across uncovered turns), the screen showed the main line, and the move there extended the variation instead: its
+  // Brave Bird ran at the variation's tip against Kyurem ("PBA S 2 3 & 5 (Kyurem) no longer knows Brave Bird."). Before the
+  // start the same slip played the move at the variation's start turn.
+  const at = (turn: number): TimelinePosition => ({ turn, line: 'variation' });
+  expect(classifyDeviation(span, at(19))).toBe('replace');
+  expect(classifyDeviation(span, at(28))).toBe('replace');
+  expect(classifyDeviation(span, at(10))).toBe('replace');
+  // The branch point is the shared prefix: a move there replaces the whole variation, so it asks too.
+  expect(classifyDeviation(span, at(15))).toBe('replace');
+  expect(classifyDeviation(span, at(18))).toBe('extend');
+  expect(classifyDeviation(span, at(17))).toBe('truncate');
+});
+
 test('keptEntries counts the entries that survive a truncating deviation', () => {
   expect(keptEntries(span, { turn: 16, line: 'variation' })).toBe(1); // keep the turn-15 entry
   expect(keptEntries(span, { turn: 18, line: 'variation' })).toBe(3); // extend keeps all
