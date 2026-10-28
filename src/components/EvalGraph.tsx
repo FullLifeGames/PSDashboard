@@ -2,8 +2,8 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import type { LeadAnalysis } from '@fulllifegames/eval-engine';
 import {
   decidedSpans, graphBlunders, graphScales, GRAPH_HEIGHT as HEIGHT, GRAPH_PAD_X as PAD_X, highlightEdge, hitTitle,
-  lastVariationTurnOf, leadTooltip, mainLinePaths, ringScore, variationHitTitle, variationOverlay,
-  type DecidedSignal, type DecidedSpan, type GapLink, type GraphScales, type VariationPoint, type VariationSeries,
+  lastVariationTurnOf, leadTooltip, mainLinePaths, ringScore, sharedHitBands, variationHitTitle, variationOverlay,
+  type DecidedSignal, type DecidedSpan, type GapLink, type GraphScales, type HitBand, type VariationPoint, type VariationSeries,
 } from '../lib/eval-graph-view';
 
 interface EvalGraphProps {
@@ -204,8 +204,10 @@ function MainPoints({ scores, blunders, scales: { x, y } }: { scores: (number | 
   );
 }
 
-function MainHits({ scores, hitWidth, x, onSelectTurn, titleArgs }: {
+function MainHits({ scores, hitWidth, x, bands, onSelectTurn, titleArgs }: {
   scores: (number | null)[]; hitWidth: number; x: GraphScales['x']; onSelectTurn: SelectTurn;
+  /** Turns where a variation point shares the column: the band of the column the main point owns. */
+  bands: Map<number, HitBand>;
   titleArgs: {
     evalErrors: (string | null)[] | undefined; blunders: Set<number>; first: number; decided: DecidedSignal[] | undefined;
     playerNames: [string, string]; faintedFractions: (number | null)[] | undefined;
@@ -218,9 +220,9 @@ function MainHits({ scores, hitWidth, x, onSelectTurn, titleArgs }: {
           key={`h${index}`}
           data-turn={index + 1}
           x={x(index + 1) - hitWidth / 2}
-          y={0}
+          y={bands.get(index + 1)?.y ?? 0}
           width={hitWidth}
-          height={HEIGHT}
+          height={bands.get(index + 1)?.height ?? HEIGHT}
           fill="transparent"
           style={onSelectTurn ? { cursor: 'pointer' } : undefined}
           onClick={onSelectTurn ? () => onSelectTurn(index + 1, 'main') : undefined}
@@ -232,11 +234,12 @@ function MainHits({ scores, hitWidth, x, onSelectTurn, titleArgs }: {
   );
 }
 
-/* Variation hits render AFTER the main hits so they win the overlap;
-   narrower than a full column — the main line stays clickable around
-   each gold point. */
-function VariationHits({ points, hitWidth, playerNames, onSelectTurn }: {
-  points: VariationPoint[]; hitWidth: number; playerNames: [string, string]; onSelectTurn: SelectTurn;
+/* Variation hits render AFTER the main hits so they win the overlap. On a turn
+   where the main line has a point too, the column is split by height (see
+   splitHitColumn); on a turn without one the gold area is the middle half of
+   the column, and the main column (a gap turn's analysis) stays around it. */
+function VariationHits({ points, hitWidth, playerNames, bands, onSelectTurn }: {
+  points: VariationPoint[]; hitWidth: number; playerNames: [string, string]; bands: Map<number, HitBand>; onSelectTurn: SelectTurn;
 }) {
   return (
     <>
@@ -245,10 +248,10 @@ function VariationHits({ points, hitWidth, playerNames, onSelectTurn }: {
           key={`vh${point.turn}`}
           data-turn={point.turn}
           data-line="variation"
-          x={point.px - hitWidth / 4}
-          y={0}
-          width={hitWidth / 2}
-          height={HEIGHT}
+          x={bands.has(point.turn) ? point.px - hitWidth / 2 : point.px - hitWidth / 4}
+          y={bands.get(point.turn)?.y ?? 0}
+          width={bands.has(point.turn) ? hitWidth : hitWidth / 2}
+          height={bands.get(point.turn)?.height ?? HEIGHT}
           fill="transparent"
           style={onSelectTurn ? { cursor: 'pointer' } : undefined}
           onClick={onSelectTurn ? () => onSelectTurn(point.turn, 'variation') : undefined}
@@ -282,6 +285,8 @@ export function EvalGraph({ scores, playerNames, currentTurn, currentLine, onSel
   const hitWidth = (width - 2 * PAD_X) / Math.max(lastTurn - first, 1);
   const overlay = variationOverlay(variation, scores, scales);
   const spans = decidedSpans(decided, scores, x);
+  // Where both lines have a point on a turn, the column splits between them (round 77, C8).
+  const bands = sharedHitBands(overlay.points, scores, y);
   const highlight = highlightEdge({ currentTurn, scores, hasLead, leadScore, first, scales });
   const ring = ringScore({ currentLine, variation, scores, currentTurn, hasLead, leadScore, first });
   const titleArgs = { evalErrors, blunders, first, decided, playerNames, faintedFractions };
@@ -312,8 +317,8 @@ export function EvalGraph({ scores, playerNames, currentTurn, currentLine, onSel
         <LeadPoint scores={scores} leadScore={leadScore} leadDetail={leadDetail} playerNames={playerNames} hitWidth={hitWidth} scales={scales} onSelectTurn={onSelectTurn} />
       )}
       <MainPoints scores={scores} blunders={blunders} scales={scales} />
-      <MainHits scores={scores} hitWidth={hitWidth} x={x} onSelectTurn={onSelectTurn} titleArgs={titleArgs} />
-      <VariationHits points={overlay.points} hitWidth={hitWidth} playerNames={playerNames} onSelectTurn={onSelectTurn} />
+      <MainHits scores={scores} hitWidth={hitWidth} x={x} bands={bands.main} onSelectTurn={onSelectTurn} titleArgs={titleArgs} />
+      <VariationHits points={overlay.points} hitWidth={hitWidth} playerNames={playerNames} bands={bands.gold} onSelectTurn={onSelectTurn} />
       {/* Ring marker: the pointer's position on ITS line. */}
       {ring !== null && (
         <circle

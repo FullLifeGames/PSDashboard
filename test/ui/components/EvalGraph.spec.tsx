@@ -81,6 +81,46 @@ describe('EvalGraph', () => {
     expect(svg.querySelector('circle[r="4.5"]')).toBeNull();
   });
 
+  // Round 77 (C8): on a turn where both lines have a point, the two hit areas share the whole column and split it at
+  // the middle between the two points, so the nearer point wins at any width. Before, the gold area took the middle half
+  // of a column about 5 px wide and the blue point under it could not be hit.
+  describe('a turn where the variation and the main line both have a point', () => {
+    const rect = (turn: number, line?: 'variation') => {
+      const element = hit(turn, line);
+      return { y: Number(element.getAttribute('y')), height: Number(element.getAttribute('height')), x: Number(element.getAttribute('x')), width: Number(element.getAttribute('width')) };
+    };
+    const cases = [
+      { name: 'the gold point above the blue one', main: 0.1, gold: 0.4 },
+      { name: 'the gold point below the blue one', main: 0.4, gold: 0.1 },
+    ];
+    test.each(cases)('$name: the two areas split the column at the middle and cover it whole', ({ main, gold }) => {
+      render(<EvalGraph scores={[0.1, 0.2, main]} playerNames={names} currentTurn={3} variation={{ startTurn: 2, scores: [null, null, gold] }} maxTurn={3} onSelectTurn={vi.fn()} />);
+      const blue = rect(3);
+      const yellow = rect(3, 'variation');
+      expect(yellow.x).toBe(blue.x);
+      expect(yellow.width).toBe(blue.width);
+      // The higher score draws higher on the graph and owns the upper area.
+      const top = main > gold ? blue : yellow;
+      const bottom = main > gold ? yellow : blue;
+      expect(top.y).toBe(0);
+      expect(top.y + top.height).toBeCloseTo(bottom.y, 5);
+      expect(bottom.y + bottom.height).toBeCloseTo(GRAPH_HEIGHT, 5);
+      // Each point lies inside its own area.
+      const graphY = (score: number) => GRAPH_HEIGHT / 2 - score * (GRAPH_HEIGHT / 2 - 7);
+      expect(graphY(Math.max(main, gold))).toBeLessThan(top.y + top.height);
+      expect(graphY(Math.min(main, gold))).toBeGreaterThan(top.y + top.height);
+    });
+
+    test('a variation point on a turn with no main point keeps the middle half; the main column stays around it', () => {
+      render(<EvalGraph scores={[0.1, null, null]} playerNames={names} currentTurn={3} variation={{ startTurn: 2, scores: [null, null, 0.4] }} maxTurn={3} onSelectTurn={vi.fn()} />);
+      const column = rect(3);
+      const yellow = rect(3, 'variation');
+      expect(yellow.width).toBeCloseTo(column.width / 2, 5);
+      expect(yellow.y).toBe(0);
+      expect(yellow.height).toBe(GRAPH_HEIGHT);
+    });
+  });
+
   test('decided sweeps draw a strip along the decided side\'s edge and the node label carries the note', () => {
     const kingambit = { side: 'p1' as const, species: 'Kingambit' };
     const decided = [null, kingambit, kingambit, { side: 'p2' as const, species: 'Dragapult' }];
