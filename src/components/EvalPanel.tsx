@@ -70,6 +70,8 @@ interface EvalPanelProps {
   doubles?: boolean;
   /** Which position the shown single result belongs to (e.g. "Turn 5 · variation"). */
   positionLabel?: string | null;
+  /** Round 77 (C7): the pointer sits on the finished end of a variation: there is nothing to evaluate, the panel says who won. */
+  ended?: { winner: string | null } | null;
   /** "Let it play out" is running: one steady progress block replaces the
    *  per-turn result churn (the graph keeps growing underneath). */
   playOutProgress?: PlayOutProgress | null;
@@ -106,6 +108,16 @@ function useReportView(report: GameReport | null | undefined, analysisTurn: numb
   return { view, setView };
 }
 
+/** Round 77 (C7): the finished end of a variation has no lines to rank; it names the winner as the branch panel does. */
+function EndedResultNotice({ winner, positionLabel }: { winner: string | null; positionLabel?: string | null }) {
+  return (
+    <div role="status" style={{ fontSize: 11, color: '#cde', marginTop: 4 }}>
+      {positionLabel && <div style={{ fontSize: 10, color: '#8fa3bd', marginBottom: 2 }}>{positionLabel}</div>}
+      {winner ? `${winner} wins this variation.` : 'The variation ended without a winner.'} Go back a turn to evaluate a position.
+    </div>
+  );
+}
+
 /** The header row and the run-state block, both fed straight from the panel props. */
 function PanelHeader({ running, ...props }: EvalPanelProps & { running: boolean }) {
   return (
@@ -116,7 +128,7 @@ function PanelHeader({ running, ...props }: EvalPanelProps & { running: boolean 
         running={running}
         showAuto={props.showAuto}
         showTera={props.showTera}
-        onEvaluate={props.onEvaluate}
+        onEvaluate={props.ended ? undefined : props.onEvaluate}
         onCancel={props.onCancel}
         result={props.result}
         status={props.status}
@@ -124,7 +136,7 @@ function PanelHeader({ running, ...props }: EvalPanelProps & { running: boolean 
       />
       <EvalStatusBlock
         playOutProgress={props.playOutProgress}
-        status={props.status}
+        status={props.ended ? 'idle' : props.status}
         reconstructProgress={props.reconstructProgress}
         progress={props.progress}
         error={props.error}
@@ -151,11 +163,31 @@ function shownShare({ result, graph, analysis, analysisTurn, faintedShares, vari
   return currentLine === 'variation' ? variation?.shares?.[currentTurn - 1] ?? null : mainLineShare(currentTurn);
 }
 
+/** The live or analyzed single result, or at a finished variation the winner (round 77, C7). */
+function SingleResult(props: EvalPanelProps) {
+  const { playerNames, status, result, onPickChoice, onPickPair, resultSettings, positionLabel, doubles, ended } = props;
+  if (ended) return <EndedResultNotice winner={ended.winner} positionLabel={positionLabel} />;
+  if (!result) return null;
+  return (
+    <EvalResultBlock
+      result={result}
+      status={status}
+      playerNames={playerNames}
+      positionLabel={positionLabel}
+      resultSettings={resultSettings}
+      onPickChoice={onPickChoice}
+      onPickPair={onPickPair}
+      doubles={doubles}
+      faintedFraction={shownShare(props)}
+    />
+  );
+}
+
 export function EvalPanel(props: EvalPanelProps) {
   const {
-    playerNames, status, result, onPickChoice, onPickPair,
-    graph, variation, onAnalyzeGame, onSelectTurn, resultSettings, onAnalyzeTurn, analyzeTarget, smogonPending,
-    positionLabel, analysisTurn, playOutProgress, report, doubles,
+    status,
+    graph, variation, onAnalyzeGame, onSelectTurn, onAnalyzeTurn, analyzeTarget, smogonPending,
+    analysisTurn, playOutProgress, report,
   } = props;
   const running = status === 'searching' || status === 'reconstructing';
   const hasGraph = graph.scores.some(score => score !== null);
@@ -193,19 +225,7 @@ export function EvalPanel(props: EvalPanelProps) {
         />
       )}
 
-      {result && !showReportView && !playOutProgress && (
-        <EvalResultBlock
-          result={result}
-          status={status}
-          playerNames={playerNames}
-          positionLabel={positionLabel}
-          resultSettings={resultSettings}
-          onPickChoice={onPickChoice}
-          onPickPair={onPickPair}
-          doubles={doubles}
-          faintedFraction={shownShare(props)}
-        />
-      )}
+      {!showReportView && !playOutProgress && <SingleResult {...props} />}
     </div>
   );
 }

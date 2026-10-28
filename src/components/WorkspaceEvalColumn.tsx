@@ -24,13 +24,23 @@ function analysisPropsFor(liveEvalView: boolean, analysisTurn: number | null, an
   };
 }
 
+/**
+ * A live result that still streams in for a position the pointer left maps its choices onto the wrong position: the
+ * lines stay readable and stop being buttons until the position on screen has its own result.
+ */
+const linesClickable = (liveEvalView: boolean, evalResultMatchesView: boolean) => !liveEvalView || evalResultMatchesView;
+
+/** Round 77 (C7): the finished end of a variation, with the winner the branch panel names. */
+const endedFor = (atVariationEnd: boolean, simState: AppController['ctx']['branch']['simState']) =>
+  (atVariationEnd ? { winner: simState?.winner ?? null } : null);
+
 function EvalSection({ app, replayData }: WorkspaceColumnProps) {
   const { evaluation } = app.ctx;
   const { replayGen, replayGameType } = app.ctx.meta;
   const { liveEvalStatus, evalResultMatchesView } = app.board;
   const {
     viewTurn, viewingVariation, liveEvalView, liveSimTurn, analyzableTurns, analysisTurn,
-    handleGraphSelectLine, variationSpan, variationScores,
+    handleGraphSelectLine, variationSpan, variationScores, atVariationEnd,
   } = app.board.timeline;
   const {
     handleEvaluate, handleAnalyzeGame, analyzedResult, analyzedSettings,
@@ -38,9 +48,7 @@ function EvalSection({ app, replayData }: WorkspaceColumnProps) {
   } = app.engine.evalView;
   const { handleExploreChoice, handlePickPair } = app.engine.walk;
   const { playOut, fastPlayOut } = app.transients;
-  // A live result that still streams in for a position the pointer left maps its choices onto the wrong position: the
-  // lines stay readable and stop being buttons until the position on screen has its own result.
-  const clickable = !liveEvalView || evalResultMatchesView;
+  const clickable = linesClickable(liveEvalView, evalResultMatchesView);
   // Round 70 (T216): the gold points and the panel's bar print at the share of the variation's own board, read from the
   // rosters the branch recorded after each executed turn; the main line's share of the same turn number is another board.
   const { history } = app.ctx.branch;
@@ -71,6 +79,7 @@ function EvalSection({ app, replayData }: WorkspaceColumnProps) {
       showTera={replayGen === 9}
       graph={evaluation.graph}
       onAnalyzeGame={handleAnalyzeGame}
+      ended={endedFor(atVariationEnd, app.ctx.branch.simState)}
       positionLabel={liveEvalView ? resultPositionLabel(evaluation.resultTag, { viewTurn, viewingVariation }) : null}
       playOutProgress={playOut?.active ? { startTurn: playOut.startTurn, turns: playOut.turns, atTurn: liveSimTurn, fast: fastPlayOut } : null}
       graphMaxTurn={analyzableTurns}
