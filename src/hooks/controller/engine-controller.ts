@@ -118,7 +118,7 @@ function usePlayLayer(
   } = transients;
   const {
     liveTip, viewingVariation, atEndPosition, viewT0, viewTurn, tipTurn,
-    navigateTo, setNavSeek, evalViewKey,
+    holdTipFollow, navigateTo, setNavSeek, evalViewKey,
   } = board.timeline;
   const {
     branchPreparing, handleSetChoice, requestDeviation, setBranchDivergence, startLeadVariation, setVariationNotice,
@@ -138,7 +138,7 @@ function usePlayLayer(
   const playOutControls = usePlayOut({
     playOut, setPlayOut, setPlayOutNotice, playOutProcessedRef, playOutRef, stopPlayOutRef,
     evaluation, fastPlayOut, evalViewKey, liveEvalStatus: board.liveEvalStatus, liveTip, viewingVariation, atEndPosition, viewT0,
-    viewTurn, tipTurn, navigateTo, setNavSeek,
+    viewTurn, tipTurn, holdTipFollow, navigateTo, setNavSeek,
     executing, branchPreparing, getBattle, executeTurn, handleEvaluate, applyEvalChoice: walk.applyEvalChoice,
     requestDeviation, startLeadVariation, leadPicksRef, setVariationNotice,
   });

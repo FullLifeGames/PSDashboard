@@ -18,6 +18,8 @@ export interface TimelineInputs {
   onNavigate: () => void;
   /** The live sim of the variation has a winner: its tip is an end position (round 77, A-6). */
   variationEnded?: boolean;
+  /** A turn of the live sim is running; the turn lands with the history entry (round 77, C5). */
+  executing?: boolean;
 }
 
 /** The pointer's own state: view turn (with its synchronous ref), line,
@@ -151,6 +153,7 @@ interface NavArgs {
   branching: boolean;
   interruptPlayOut: () => void;
   onNavigate: () => void;
+  executing: boolean;
   setAnalysisTurn: (turn: number) => void;
 }
 
@@ -158,7 +161,7 @@ type SeekIntentRef = { current: { turn: number; until: number } | null };
 
 /** The single pointer move plus the tip-follow after executed turns. */
 function useNavigateTo(args: NavArgs, seekIntentRef: SeekIntentRef) {
-  const { pointer, derived, branching, interruptPlayOut, onNavigate } = args;
+  const { pointer, derived, branching, interruptPlayOut, onNavigate, executing } = args;
   const { setViewTurn, setViewLine, setViewT0, setNavSeek, setFollowedPlay } = pointer;
   const { maxTurn, variationSpan, tipTurn } = derived;
 
@@ -189,6 +192,8 @@ function useNavigateTo(args: NavArgs, seekIntentRef: SeekIntentRef) {
   // turn: the pointer stays where the user looks (round 77, D3). The key names the span, so a variation
   // that ended and a new one with the same tip follows again.
   const followedKeyRef = useRef<string | null>(null);
+  const executingRef = useRef(false);
+  const holdFollowRef = useRef(false);
   /**
    * Puts the pointer back after a rebuild the user did not ask to follow (a failed execute restored the old
    * variation, round 77): the span that comes back counts as followed already, so the tip-follow stays put.
@@ -209,13 +214,28 @@ function useNavigateTo(args: NavArgs, seekIntentRef: SeekIntentRef) {
     const key = `${variationSpan.startTurn}:${tipTurn}`;
     if (followedKeyRef.current === key) return;
     followedKeyRef.current = key;
+    // The view was handed back while this turn was in flight (Stop, or the user's own click): the turn lands
+    // where the user is not looking, so the pointer stays (round 77, C5).
+    if (holdFollowRef.current) {
+      holdFollowRef.current = false;
+      return;
+    }
     // The frame plays the turn in from the one before the tip: its reports until it lands on the tip are the
     // app's own, not the user's (round 77, A-4).
     seekIntentRef.current = { turn: tipTurn, until: Date.now() + 4000 };
     navigateTo({ turn: tipTurn, line: 'variation' }, { seek: false, internal: true, followPlay: true });
   }, [branching, tipTurn, variationSpan, navigateTo, seekIntentRef]);
+  // Declared after the follow effect: a landing turn is seen by it before this one clears the hold.
+  useEffect(() => {
+    executingRef.current = executing;
+    if (!executing) holdFollowRef.current = false;
+  }, [executing]);
+  /** Keeps the pointer where it is when the turn in flight lands; void when no turn is in flight. */
+  const holdTipFollow = useCallback(() => {
+    if (executingRef.current) holdFollowRef.current = true;
+  }, []);
 
-  return { navigateTo, restorePointer };
+  return { navigateTo, restorePointer, holdTipFollow };
 }
 
 /** Embed echo guard and the graph's explicit line-addressed selections. */
@@ -228,7 +248,7 @@ function useTimelineNav(args: NavArgs) {
   // fresh selection straight back. Stale echoes are ignored until the embed
   // confirms the seek or the window lapses.
   const seekIntentRef = useRef<{ turn: number; until: number } | null>(null);
-  const { navigateTo, restorePointer } = useNavigateTo(args, seekIntentRef);
+  const { navigateTo, restorePointer, holdTipFollow } = useNavigateTo(args, seekIntentRef);
 
   const handleReplayTurn = useCallback((turn: number) => {
     if (turn < 1) return;
@@ -289,11 +309,11 @@ function useTimelineNav(args: NavArgs) {
     handleGraphSelect(turn);
   }, [navigateTo, handleGraphSelect, setViewLine]);
 
-  return { navigateTo, restorePointer, handleReplayTurn, handleGraphSelect, handleGraphSelectLine };
+  return { navigateTo, restorePointer, holdTipFollow, handleReplayTurn, handleGraphSelect, handleGraphSelectLine };
 }
 
 export function useTimeline(inputs: TimelineInputs) {
-  const { replayId, snapshots, branching, variationStartTurn, history, interruptPlayOut, onNavigate, variationEnded = false } = inputs;
+  const { replayId, snapshots, branching, variationStartTurn, history, interruptPlayOut, onNavigate, variationEnded = false, executing = false } = inputs;
   void replayId; // reset runs through resetPointer from the app's load effect
   const pointer = usePointerState();
   const derived = useTimelineDerived({ pointer, snapshots, branching, variationStartTurn, history });
@@ -315,7 +335,7 @@ export function useTimeline(inputs: TimelineInputs) {
     }
   }
 
-  const nav = useTimelineNav({ pointer, derived, atVariationEnd, branching, interruptPlayOut, onNavigate, setAnalysisTurn });
+  const nav = useTimelineNav({ pointer, derived, atVariationEnd, branching, interruptPlayOut, onNavigate, executing, setAnalysisTurn });
   return { ...pointer, ...derived, ...nav, analysisTurn, atVariationEnd };
 }
 

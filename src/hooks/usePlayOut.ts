@@ -35,6 +35,8 @@ export interface PlayOutInputs {
   viewT0: boolean;
   viewTurn: number;
   tipTurn: number | null;
+  /** Keeps the pointer where the run leaves it when a turn still in flight lands (the timeline's tip-follow). */
+  holdTipFollow: () => void;
   navigateTo: (position: { turn: number; line: 'main' | 'variation' }, opts?: { seek?: boolean; internal?: boolean }) => void;
   setNavSeek: Dispatch<SetStateAction<{ turn: number; seq: number; play?: boolean } | null>>;
   executing: boolean;
@@ -53,12 +55,13 @@ export interface PlayOutInputs {
 
 /** Finish/stop plumbing plus the watch-from-turn seek. */
 function usePlayOutFinish(args: PlayOutInputs) {
-  const { evaluation, setPlayOut, setPlayOutNotice, playOutRef, navigateTo, setNavSeek, tipTurn, playOut } = args;
+  const { evaluation, setPlayOut, setPlayOutNotice, playOutRef, navigateTo, setNavSeek, tipTurn, playOut, holdTipFollow } = args;
   const finishPlayOut = useCallback((current: PlayOutState, text: string, opts?: { returnToStart?: boolean }) => {
     const restored = prefsAfterRun(evaluation.prefs, current);
     if (restored) evaluation.setPrefs(restored);
     evaluation.setEngineOverride(null);
     playOutRef.current = null;
+    holdTipFollow();
     setPlayOut(null);
     setPlayOutNotice({ text, watchTurn: current.startTurn });
     // The engine's play dragged the pointer along to the tip; hand the view
@@ -67,7 +70,7 @@ function usePlayOutFinish(args: PlayOutInputs) {
     if ((opts?.returnToStart ?? true) && current.turns > 0) {
       navigateTo({ turn: current.startTurn, line: 'variation' }, { seek: true, internal: true });
     }
-  }, [evaluation, setPlayOut, setPlayOutNotice, playOutRef, navigateTo]);
+  }, [evaluation, setPlayOut, setPlayOutNotice, playOutRef, navigateTo, holdTipFollow]);
 
   const stopPlayOut = useCallback((opts?: { returnToStart?: boolean }) => {
     if (playOut) {

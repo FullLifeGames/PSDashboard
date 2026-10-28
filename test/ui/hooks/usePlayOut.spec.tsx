@@ -35,7 +35,7 @@ function wiring(overrides: Partial<Wiring> = {}): Wiring {
   return {
     evalViewKey: 'variation:3', liveEvalStatus: 'idle', liveTip: true, viewingVariation: true, atEndPosition: false,
     viewT0: false, viewTurn: 3, tipTurn: 3, fastPlayOut: false,
-    navigateTo: vi.fn(), setNavSeek: vi.fn(), executing: false, branchPreparing: false,
+    navigateTo: vi.fn(), holdTipFollow: vi.fn(), setNavSeek: vi.fn(), executing: false, branchPreparing: false,
     getBattle: vi.fn(() => ({ ended: false }) as unknown as ReturnType<PlayOutInputs['getBattle']>),
     executeTurn: vi.fn(async () => {}), handleEvaluate: vi.fn(), applyEvalChoice: vi.fn(() => true),
     requestDeviation: vi.fn(),
@@ -190,6 +190,20 @@ describe('usePlayOut', () => {
     act(() => vi.advanceTimersByTime(250));
     const updater = (wired.setNavSeek as ReturnType<typeof vi.fn>).mock.calls[0][0] as (prev: null) => unknown;
     expect(updater(null)).toEqual({ turn: 2, seq: 1, play: true });
+  });
+
+  // Round 77 (C5): a turn in flight lands after the stop; the timeline must not follow it to the tip.
+  test('stopping hands the view back and holds the tip-follow of the timeline for the turn in flight, user stop and navigation alike', () => {
+    const { evaluation } = evaluationOf({ auto: true });
+    const { result, wired } = setup(evaluation);
+    act(() => result.current.playOut.startPlayOut());
+    act(() => result.current.transients.stopPlayOutRef.current?.());
+    expect(wired.holdTipFollow).toHaveBeenCalledTimes(1);
+
+    const again = setup(evaluation);
+    act(() => again.result.current.playOut.startPlayOut());
+    act(() => again.result.current.transients.stopPlayOutRef.current?.({ returnToStart: false }));
+    expect(again.wired.holdTipFollow).toHaveBeenCalledTimes(1);
   });
 
   test('the fast option pins the run to the depth-1 matrix before its first evaluation and releases the engine when the run ends', () => {

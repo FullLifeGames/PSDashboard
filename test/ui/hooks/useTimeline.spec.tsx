@@ -119,6 +119,47 @@ describe('useTimeline', () => {
     expect(result.current).toMatchObject({ viewTurn: 5, viewLine: 'variation', followedPlay: true });
   });
 
+  // Round 77 (C5): Stop hands the view back; the turn still in flight lands after it and must not drag the pointer to the tip.
+  describe('a turn that lands after the view was handed back', () => {
+    const running = (history: BranchHistoryEntry[], executing: boolean, base: TimelineInputs): TimelineInputs =>
+      ({ ...base, branching: true, variationStartTurn: 2, history, executing });
+
+    test('stays out of the pointer once, then a turn played by hand follows again', () => {
+      const { result, rerender, base } = setup();
+      rerender(running([entry(2), entry(3)], true, base));
+      expect(result.current.viewTurn).toBe(4);
+      // The play-out stops with a third turn in flight and returns the pointer to its start turn.
+      act(() => {
+        result.current.holdTipFollow();
+        result.current.navigateTo({ turn: 3, line: 'variation' }, { seek: true, internal: true });
+      });
+      rerender(running([entry(2), entry(3), entry(4)], false, base));
+      expect(result.current).toMatchObject({ viewTurn: 3, viewLine: 'variation', followedPlay: false, tipTurn: 5 });
+
+      rerender(running([entry(2), entry(3), entry(4), entry(5)], false, base));
+      expect(result.current).toMatchObject({ viewTurn: 6, viewLine: 'variation', followedPlay: true });
+    });
+
+    test('with nothing in flight the hold is void: the next played turn follows', () => {
+      const { result, rerender, base } = setup();
+      rerender(running([entry(2)], false, base));
+      act(() => result.current.holdTipFollow());
+      rerender(running([entry(2)], true, base));
+      rerender(running([entry(2), entry(3)], false, base));
+      expect(result.current).toMatchObject({ viewTurn: 4, followedPlay: true });
+    });
+
+    test('a turn that fails after the hold clears it', () => {
+      const { result, rerender, base } = setup();
+      rerender(running([entry(2)], true, base));
+      act(() => result.current.holdTipFollow());
+      rerender(running([entry(2)], false, base));
+      rerender(running([entry(2)], true, base));
+      rerender(running([entry(2), entry(3)], false, base));
+      expect(result.current).toMatchObject({ viewTurn: 4, followedPlay: true });
+    });
+  });
+
   test('restorePointer puts the pointer back and the span that returns is not followed (round 77, A-2)', () => {
     const { result, rerender, base } = setup();
     const history = [entry(2), entry(3)];
