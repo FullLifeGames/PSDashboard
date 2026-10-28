@@ -45,8 +45,9 @@ export interface SideControlsProps {
 }
 
 /** A fainted active nobody replaces (round 77, B2): the bench is empty, so the slot has no choice to make. */
-function SideHeader({ label, activeName, activeFainted, forceSwitch, pending, played, nobodyLeft }: Pick<SideControlsProps,
-  'label' | 'activeName' | 'activeFainted' | 'forceSwitch' | 'pending' | 'played'> & { nobodyLeft: boolean }) {
+function SideHeader({ label, activeName, activeFainted, forceSwitch, pending, played, switches }: Pick<SideControlsProps,
+  'label' | 'activeName' | 'activeFainted' | 'forceSwitch' | 'pending' | 'played' | 'switches'>) {
+  const nobodyLeft = activeFainted && !forceSwitch && switches.length === 0;
   const playedText = played
     ? (played.kind === 'move' ? played.name : `→ ${played.name}`)
     : null;
@@ -138,7 +139,7 @@ export function SideControls(props: SideControlsProps) {
     <div className="ps-controls ps-side-controls">
       <SideHeader
         label={label} activeName={activeName} activeFainted={activeFainted} forceSwitch={forceSwitch} pending={pending} played={played}
-        nobodyLeft={activeFainted && !forceSwitch && switches.length === 0}
+        switches={switches}
       />
 
       {forceSwitch && (
