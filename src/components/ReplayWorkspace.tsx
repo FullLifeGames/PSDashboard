@@ -140,7 +140,7 @@ function PickerRegion({ app, replayData }: WorkspaceProps) {
       stale={!liveTip && pickerStale}
       source={liveTip ? 'live' : positionPicker?.source}
       acquiringExact={!liveTip && app.engine.acquire.exactAcquiringTurn === viewTurn}
-      executeError={executeError}
+      executeError={liveTip ? executeError : null}
       executing={executing || branchPreparing}
       gen={replayGen}
       onSetChoice={handleSetChoice}

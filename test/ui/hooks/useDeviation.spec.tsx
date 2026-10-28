@@ -136,6 +136,24 @@ describe('useDeviation', () => {
     }, 60_000);
   });
 
+  // Round 77 (swarm D1): a rebuild that keeps no turn leaves no variation and no phantom message.
+  test('a rebuild that keeps no turn ends the variation: the notice names it and the pointer stays on the main line', async () => {
+    const notice = 'The variation from turn 2 (2 turns) ended: Swampert no longer knows Earthquake.';
+    const history = [entry(2), entry(3)];
+    const wired = inputs({
+      timeline: timelineAt(4, { viewLine: 'variation', variationSpan: { startTurn: 2, length: 2 } }),
+      branch: branchSurface({ history, startBranch: vi.fn(async () => ({ endedNotice: notice })) }),
+    });
+    const { result } = renderHook(() => useDeviation(wired));
+    act(() => result.current.requestDeviation(null));
+    await waitFor(() => expect(result.current.variationNotice).toBe(notice), { timeout: 30_000 });
+    expect(wired.timeline.setViewLine).toHaveBeenCalledWith('main');
+    expect(wired.timeline.setVariationScores).toHaveBeenCalledWith([]);
+    expect(wired.branchWindowOpenRef.current).toBe(false);
+    expect(wired.timeline.setViewTurn).not.toHaveBeenCalledWith(2);
+    expect(result.current.branchDivergence).toBeNull();
+  }, 60_000);
+
   test('the end position refuses with a notice instead of rebuilding', () => {
     const wired = inputs({ timeline: timelineAt(5, { endSnapshotTurn: 5 }) });
     const { result } = renderHook(() => useDeviation(wired));

@@ -10,6 +10,7 @@ import { buildLeadOptions, defaultLeadSelectionFor } from '../lib/lead-options';
 import type { BranchHistoryEntry, useBranch } from './useBranch';
 import type { AcquireRuntime } from './branch/session';
 import type { Timeline } from './useTimeline';
+import { useVariationNotice } from './useVariationNotice';
 
 type Branch = ReturnType<typeof useBranch>;
 
@@ -91,6 +92,8 @@ export interface RebuildContext {
   branchWindowOpenRef: MutableRefObject<boolean>;
   setBranchDivergence: (notice: string | null) => void;
   landPointer: (startTurn: number) => void;
+  /** The rebuild kept no turn (round 77, D1); without it the notice goes to the divergence line. */
+  reportEnded?: (notice: string) => void;
 }
 
 /** The async heart of rebuildAt, once the plan (start turn, kept history)
@@ -110,7 +113,7 @@ export async function executeRebuild(
     if (inputs) {
       ctx.session.bumpSession();
       const selectedSnapshot = snapshotAt(ctx.snapshots, startTurn);
-      await ctx.branch.startBranch(getBranchSimulatorFormat(ctx.replayData), inputs.p1Team, inputs.p2Team, ctx.replayData.log, startTurn, selectedSnapshot, {
+      const outcome = await ctx.branch.startBranch(getBranchSimulatorFormat(ctx.replayData), inputs.p1Team, inputs.p2Team, ctx.replayData.log, startTurn, selectedSnapshot, {
         replayHistory,
         p1Choices: prefill?.p1Choices ?? [],
         p2Choices: prefill?.p2Choices ?? [],
@@ -123,7 +126,10 @@ export async function executeRebuild(
         bringOnly: ctx.bringOnly,
         acquireRuntime: ctx.acquireRuntime,
       });
-      if (!abortController.signal.aborted) {
+      if (outcome?.endedNotice) {
+        ctx.branchWindowOpenRef.current = false;
+        (ctx.reportEnded ?? ctx.setBranchDivergence)(outcome.endedNotice);
+      } else if (!abortController.signal.aborted) {
         ctx.branchWindowOpenRef.current = true;
         ctx.setBranchDivergence(divergenceNoticeFor(ctx.branch.getBattle(), startTurn));
         // The pointer lands where the sim now stands; the tip-follow effect
@@ -154,7 +160,7 @@ export function useDeviation(inputs: DeviationInputs) {
   const { branchPreparing, branchProgress, branchSession, handles: session } = useBranchSession();
   const [branchDivergence, setBranchDivergence] = useState<string | null>(null);
   const { variationSpan } = timeline;
-  const { variationNotice, setVariationNotice } = useVariationNotice(timeline, branch.history.length);
+  const { variationNotice, setVariationNotice, reportVariationEnded } = useVariationNotice(timeline, branch.history.length, snapshots.length);
 
   /**
    * Rebuilds the live sim at `position` and prefills the pickers: the proven
@@ -184,6 +190,7 @@ export function useDeviation(inputs: DeviationInputs) {
       // selection; per-side fail-open when the protocol does not pin a side.
       bringOnly: startTurn > 0 ? bringOnlyLists ?? undefined : undefined,
       session, branch, acquireRuntime, branchWindowOpenRef, setBranchDivergence,
+      reportEnded: reportVariationEnded,
       landPointer: (turn) => {
         timeline.setViewTurn(turn);
         timeline.setViewLine('main');
@@ -191,7 +198,7 @@ export function useDeviation(inputs: DeviationInputs) {
     }, startTurn, replayHistory, prefill, leadOverride);
   }, [
     replayData, session, variationSpan, branch, acquireRuntime, snapshots, observations, sources, bringOnlyLists,
-    branchWindowOpenRef, timeline,
+    branchWindowOpenRef, timeline, reportVariationEnded,
   ]);
 
   const requests = useDeviationRequests({
@@ -217,28 +224,11 @@ export function useDeviation(inputs: DeviationInputs) {
   const { leadOptions, defaultLeadSelection } = useLeadDefaults(snapshots, bringCount, replayGameType, replayData);
 
   return {
-    session, branchDivergence, setBranchDivergence, variationNotice,
+    session, branchDivergence, setBranchDivergence, variationNotice, reportVariationEnded,
     branchPreparing, branchProgress, branchSession,
     cancelPreparation: session.cancelPreparation,
     rebuildAt, ...requests, handleSetChoice, handleExecuteDraft, leadOptions, defaultLeadSelection,
   };
-}
-
-/**
- * A notice about the variation that went away or came back (round 77): a failed execute that restored the old
- * variation or left none behind. It belongs to the position where it appeared and leaves once the pointer moves
- * on or a turn is played. The position is read on the first render after the notice; a render-phase
- * reconciliation, no effect.
- */
-function useVariationNotice(timeline: DeviationTimeline, historyLength: number) {
-  const [notice, setNotice] = useState<{ text: string; key: string | null } | null>(null);
-  const positionKey = `${timeline.viewTurn}:${timeline.viewLine}:${historyLength}`;
-  if (notice) {
-    if (notice.key === null) setNotice({ ...notice, key: positionKey });
-    else if (notice.key !== positionKey) setNotice(null);
-  }
-  const setVariationNotice = useCallback((text: string | null) => setNotice(text === null ? null : { text, key: null }), []);
-  return { variationNotice: notice?.text ?? null, setVariationNotice };
 }
 
 /** The lead picker's options and the real game's selection as its default. */

@@ -13,6 +13,27 @@ function fixture(kind: ReplayKind) {
   return { replayData, snapshots, p1Team, p2Team };
 }
 
+/** A recorded entry whose move the rebuilt team no longer knows (a set edit removed it). */
+const brokenEntry = (turnNumber: number, slots = 1) => ({
+  turnNumber, kind: 'turn' as const, p1Choice: 'move 1', p2Choice: 'move 1', p1Active: null, p1ActiveSlots: [], p2Active: null,
+  p2ActiveSlots: [], p1Pokemon: [], p2Pokemon: [],
+  p1SlotChoices: Array.from({ length: slots }, () => ({ kind: 'move' as const, moveId: 'nosuchmove', moveName: 'Nosuch Move' })),
+  p2SlotChoices: Array.from({ length: slots }, () => ({ kind: 'move' as const, moveId: 'nosuchmove', moveName: 'Nosuch Move' })),
+});
+
+async function startWith(result: { current: ReturnType<typeof useBranch> }, data: ReturnType<typeof fixture>, turn: number, replayHistory: ReturnType<typeof brokenEntry>[]) {
+  const { replayData, snapshots, p1Team, p2Team } = data;
+  let outcome: Awaited<ReturnType<ReturnType<typeof useBranch>['startBranch']>>;
+  await act(async () => {
+    outcome = await result.current.startBranch(getBranchSimulatorFormat(replayData), p1Team, p2Team, replayData.log, turn, snapshots[turn - 1] ?? null, {
+      playerNames: [replayData.players[0], replayData.players[1]],
+      snapshotFor: (boundary: number) => snapshots[boundary - 1] ?? null,
+      replayHistory,
+    });
+  });
+  return outcome!;
+}
+
 async function startAt(result: { current: ReturnType<typeof useBranch> }, data: ReturnType<typeof fixture>, turn: number) {
   const { replayData, snapshots, p1Team, p2Team } = data;
   await act(async () => {
@@ -90,6 +111,45 @@ describe('useBranch', () => {
     act(() => result.current.stopBranch());
     expect(result.current).toMatchObject({ branching: false, simState: null, history: [], variationStartTurn: null, startSerialized: null });
     expect(result.current.getBattle()).toBeNull();
+  }, 60_000);
+
+  // Round 77 (swarm D1): an edit that makes the first variation move illegal used to leave an empty variation behind.
+  test('a rebuild that keeps no turn ends the branch and names what was lost', async () => {
+    const data = fixture('singles');
+    const { result } = renderHook(() => useBranch());
+    const outcome = await startWith(result, data, 2, [brokenEntry(2), brokenEntry(3), brokenEntry(4)]);
+    expect(outcome).toEqual({ endedNotice: expect.stringMatching(/^The variation from turn 2 \(3 turns\) ended: .*Nosuch Move/) });
+    expect(result.current).toMatchObject({ branching: false, simState: null, history: [], variationStartTurn: null, startSerialized: null, executeError: null });
+    expect(result.current.getBattle()).toBeNull();
+  }, 60_000);
+
+  test('a rebuild that keeps a turn stays a shorter variation with the stop message', async () => {
+    const data = fixture('singles');
+    const { result } = renderHook(() => useBranch());
+    await startAt(result, data, 2);
+    const state = result.current.simState!;
+    act(() => {
+      result.current.setChoice('p1', firstMove(state, 'p1'));
+      result.current.setChoice('p2', firstMove(state, 'p2'));
+    });
+    await act(async () => { await result.current.executeTurn(); });
+    const kept = result.current.history;
+    expect(kept).toHaveLength(1);
+    act(() => result.current.stopBranch());
+
+    const outcome = await startWith(result, data, 2, [kept[0] as never, brokenEntry(3)]);
+    expect(outcome?.endedNotice ?? null).toBeNull();
+    expect(result.current.branching).toBe(true);
+    expect(result.current.history).toHaveLength(1);
+    expect(result.current.executeError).toMatch(/^Rebuild stopped before branch turn 3: /);
+  }, 60_000);
+
+  test('doubles: a rebuild that keeps no turn ends the branch too', async () => {
+    const data = fixture('doubles');
+    const { result } = renderHook(() => useBranch());
+    const outcome = await startWith(result, data, 1, [brokenEntry(1, 2)]);
+    expect(outcome).toEqual({ endedNotice: expect.stringMatching(/^The variation from turn 1 \(1 turn\) ended: /) });
+    expect(result.current).toMatchObject({ branching: false, history: [], variationStartTurn: null });
   }, 60_000);
 
   test('doubles: two active slots per side; a switch named twice in one turn never executes, distinct choices do', async () => {
