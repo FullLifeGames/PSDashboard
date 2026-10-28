@@ -46,4 +46,23 @@ describe('PSReplayFrame', () => {
     live.rerender(<PSReplayFrame log={`${LOG}\n|turn|3`} liveUpdates reloadKey="session" />);
     expect(URL.createObjectURL).toHaveBeenCalledTimes(3);
   });
+
+  test('a live log that stops extending the shown one starts a new document, and the next turn appends to that', async () => {
+    // Round 77 (user report 28.10.2026): one turn back in a variation and a new choice rebuilt the branch. The frame kept the old
+    // line and the new turn appended after its tail, so the frame played the old attack and then the new one.
+    const oldLine = `${LOG}\n|move|p1a: Garchomp|Earthquake|p2a: Ferrothorn\n|turn|3`;
+    const newTurn = ['|move|p1a: Garchomp|Stone Edge|p2a: Ferrothorn', '|turn|3'];
+    const { rerender } = render(<PSReplayFrame log={oldLine} liveUpdates reloadKey="session" title="Branch" />);
+    rerender(<PSReplayFrame log={LOG} liveUpdates reloadKey="session" title="Branch" />);
+    const frame = screen.getByTitle('Branch') as HTMLIFrameElement;
+    expect(frame).toHaveAttribute('src', 'blob:test/2');
+    const rebuilt = vi.mocked(URL.createObjectURL).mock.calls[1][0] as Blob;
+    expect(await rebuilt.text()).not.toContain('|turn|3');
+
+    const postMessage = vi.fn();
+    Object.defineProperty(frame, 'contentWindow', { configurable: true, value: { postMessage } });
+    rerender(<PSReplayFrame log={`${LOG}\n${newTurn.join('\n')}`} liveUpdates reloadKey="session" title="Branch" />);
+    expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'ps-append-log', lines: newTurn }), '*');
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(2);
+  });
 });

@@ -136,6 +136,16 @@ export function useSeekRequests(iframeRef: FrameRef, seekRequest: SeekRequest | 
   }, [seekRequest, iframeRef]);
 }
 
+/** The lines of a log a frame holds (the embed skips blank lines). */
+export function frameLines(log: string): string[] {
+  return log.split('\n').filter(Boolean);
+}
+
+/** True when `next` keeps every line of `previous` in order and adds lines only after them: a frame showing `previous` can append. */
+export function extendsLines(previous: string[], next: string[]): boolean {
+  return previous.length <= next.length && previous.every((line, index) => line === next[index]);
+}
+
 /** Streams appended log lines into a live frame instead of rebuilding it. */
 export function useLiveAppend(args: {
   iframeRef: FrameRef;
@@ -152,15 +162,14 @@ export function useLiveAppend(args: {
   useEffect(() => {
     if (!liveUpdates || !blobUrl) return;
 
-    const lines = log.split('\n').filter(Boolean);
+    const lines = frameLines(log);
     const previous = sentLogRef.current;
     if (!previous || previous.key !== reloadKey || previous.blobUrl !== blobUrl) {
       sentLogRef.current = { key: reloadKey, blobUrl, lines };
       return;
     }
 
-    const canAppend = previous.lines.length <= lines.length &&
-      previous.lines.every((line, index) => line === lines[index]);
+    const canAppend = extendsLines(previous.lines, lines);
     if (canAppend && lines.length > previous.lines.length) {
       const shouldPlayAppend = liveAppendMode === 'play' && typeof liveAppendTurn === 'number';
       const holdAppend = liveAppendMode === 'hold';

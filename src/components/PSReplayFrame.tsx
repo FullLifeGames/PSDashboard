@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import {
-  useLiveAppend, useReplayBlobUrl, useSeekRequests, useSeekTurn, useTurnReports, type SeekRequest,
+  extendsLines, frameLines, useLiveAppend, useReplayBlobUrl, useSeekRequests, useSeekTurn, useTurnReports, type SeekRequest,
 } from '../hooks/useReplayFrame';
 
 interface Props {
@@ -44,10 +44,26 @@ interface DocumentProps extends Props {
 }
 
 export function PSReplayFrame(props: Props) {
+  const generation = useLiveDocumentGeneration(props.log, !!props.liveUpdates);
   const key = props.liveUpdates
-    ? `live:${props.reloadKey ?? 'default'}`
+    ? `live:${props.reloadKey ?? 'default'}:${generation}`
     : `static:${props.reloadKey ?? props.log.length}`;
   return <PSReplayFrameDocument key={key} {...props} documentLog={props.log} />;
+}
+
+/**
+ * A live frame keeps its document and streams appended lines into it. A log that no longer extends the last one (the
+ * branch rebuilt for a new choice behind its tip, or for a team edit) starts a new document: appended to the old one, the
+ * new turn played after the old tail, and the frame showed the old attack and then the new one (round 77, user report
+ * 28.10.2026). Reconciled during render, as state that follows a prop is.
+ */
+function useLiveDocumentGeneration(log: string, liveUpdates: boolean): number {
+  const [seen, setSeen] = useState({ log, generation: 0 });
+  if (liveUpdates && log !== seen.log) {
+    const appends = extendsLines(frameLines(seen.log), frameLines(log));
+    setSeen({ log, generation: appends ? seen.generation : seen.generation + 1 });
+  }
+  return seen.generation;
 }
 
 function EmptyFrame({ height }: { height: number }) {

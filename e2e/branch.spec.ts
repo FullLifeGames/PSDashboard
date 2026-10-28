@@ -139,6 +139,60 @@ test.describe('PS Dashboard', () => {
     await expectReplayTurnAtLeast(frame!, 2);
   });
 
+  test('one turn back in a turn-0 variation and a new choice: the branch frame plays the new turn alone (round 77)', async ({ page }) => {
+    // User report 28.10.2026: in the draft replay, a few turns from turn 0, one turn back and a new choice. The rebuild kept
+    // the variation right, but the frame kept the old line and the new turn appended after its tail: the frame played the
+    // old attack and then the new one. Here turn 2 is Ice Beam first and Freeze-Dry after the step back.
+    test.setTimeout(180_000);
+    const draftReplay = JSON.parse(readFileSync(fixturePath('draft-replay.json'), 'utf-8'));
+    await page.route('**/replay.pokemonshowdown.com/**', route => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(draftReplay),
+    }));
+    await page.locator('button', { hasText: 'Load' }).click();
+    await expect(page.getByText('puffelmaedchen', { exact: true }).first()).toBeVisible({ timeout: 15_000 });
+    await page.locator('.ps-branch-bar button[title^="Turn 0"]').click();
+    await page.locator('.ps-execute-btn', { hasText: 'Play from turn 0' }).click();
+    await expect(page.getByText(/Branching · Turn 1/)).toBeVisible({ timeout: 60_000 });
+
+    const p1 = page.locator('.ps-branch-side-column').first();
+    const p2 = page.locator('.ps-branch-side-column').nth(1);
+    const history = page.locator('.ps-panel', { hasText: 'Variation moves' });
+    // Turn 1: U-turn and Chilly Reception, each side then sends its first switch-in.
+    await p1.locator('.ps-movebtn', { hasText: 'U-turn' }).click();
+    await p2.locator('.ps-movebtn', { hasText: 'Chilly Reception' }).click();
+    await page.locator('.ps-execute-btn').click();
+    for (const side of ['P1', 'P2']) {
+      const forced = page.locator('.ps-side-controls', { has: page.locator('.ps-force-switch-note') }).first();
+      await forced.locator('.ps-switchbtn:enabled').first().click();
+      await expect(history).toContainText(`forced replacement (${side})`, { timeout: 30_000 });
+    }
+    // Turn 2 as played first, then one turn back and Freeze-Dry instead.
+    await p1.locator('.ps-movebtn', { hasText: 'Ice Beam' }).click();
+    await p2.locator('.ps-movebtn', { hasText: 'Close Combat' }).click();
+    await page.locator('.ps-execute-btn').click();
+    await expect(history).toContainText('Ice Beam | Close Combat', { timeout: 60_000 });
+    await page.locator('.ps-branch-bar button', { hasText: '◀' }).click();
+    await expect(page.getByText('T2/')).toBeVisible();
+    await p1.locator('.ps-movebtn', { hasText: 'Freeze-Dry' }).click();
+    await p2.locator('.ps-movebtn', { hasText: 'Close Combat' }).click();
+    await page.locator('.ps-execute-btn').click();
+    await expect(history).toContainText('Freeze-Dry | Close Combat', { timeout: 60_000 });
+    await expect(history).not.toContainText('Ice Beam | Close Combat');
+
+    // The frame holds the variation's moves, each once: the old turn 2 is gone.
+    await page.locator('.ps-log-toggle').click();
+    const simMoves = (await page.locator('.ps-log').innerText()).split('\n').filter(line => line.startsWith('|move|'));
+    expect(simMoves.some(line => line.includes('|Freeze-Dry|'))).toBe(true);
+    const frame = await (await page.locator('iframe[title="Branch Simulation"]').elementHandle({ timeout: 10_000 }))?.contentFrame();
+    expect(frame).toBeTruthy();
+    await expect.poll(async () => frame!.evaluate(() =>
+      ((window as ReplayWindow & { Replays?: { battle?: { stepQueue?: string[] } } }).Replays?.battle?.stepQueue ?? [])
+        .filter(line => line.startsWith('|move|'))
+    ), { timeout: 30_000 }).toEqual(simMoves);
+  });
+
   test('an executed move replaces the replay iframe with the branch sim', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
     await startVariationAt(page, 1);
