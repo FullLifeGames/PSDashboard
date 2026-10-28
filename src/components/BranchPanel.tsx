@@ -174,6 +174,8 @@ interface SideColumnProps {
   gen: number;
   advanced: boolean;
   played: PlayedPick | null | undefined;
+  /** The other side has to replace a Pokémon and this side has nothing to choose until it has (round 77, B5). */
+  waitingFor: 'P1' | 'P2' | null;
   gimmickFor: (side: 'p1' | 'p2', slot: number) => Gimmick;
   onSetChoice: Props['onSetChoice'];
   onHypotheticalMove: Props['onHypotheticalMove'];
@@ -211,9 +213,10 @@ function slotChoiceProps(props: SideColumnProps, slot: number) {
 }
 
 function SideColumn(props: SideColumnProps) {
-  const { side, activeSlots, gen, advanced, played, onSetChoice, onHypotheticalMove } = props;
+  const { side, activeSlots, gen, advanced, played, waitingFor, onSetChoice, onHypotheticalMove } = props;
   return (
-    <div className="ps-branch-side-column">
+    <div className="ps-branch-side-column" inert={waitingFor !== null} style={waitingFor ? { opacity: 0.6 } : undefined}>
+      {waitingFor && <div className="ps-force-switch-note">Waiting for {waitingFor} to choose a replacement.</div>}
       {activeSlots.map((active, slot) => (
         <SideControls
           key={`${side}-${slot}`}
@@ -259,6 +262,23 @@ function EndedNotice({ winner }: { winner: string | null }) {
   );
 }
 
+/** What the position asks of each side: the required slots, whether Execute is ready, and which side waits for the other's replacement. */
+function panelFlags(simState: BranchSimState, p1ActiveSlots: (SimPokemonInfo | null)[], p2ActiveSlots: (SimPokemonInfo | null)[]) {
+  const p1RequiredChoices = requiredChoicesForActiveSlots(p1ActiveSlots, simState.p1ForceSwitches);
+  const p2RequiredChoices = requiredChoicesForActiveSlots(p2ActiveSlots, simState.p2ForceSwitches);
+  const bothChosen = branchSideChoicesReady(simState.p1Choices, p1RequiredChoices) &&
+    branchSideChoicesReady(simState.p2Choices, p2RequiredChoices);
+  const isMultiActive = p1ActiveSlots.length > 1 || p2ActiveSlots.length > 1;
+  return {
+    isForceSwitch: simState.p1ForceSwitch || simState.p2ForceSwitch,
+    p1RequiredChoices, p2RequiredChoices, bothChosen,
+    pendingLabel: pendingLabelFor(simState, bothChosen, isMultiActive),
+    // One side replaces while the other has nothing to choose: its pickers take no input, so no stale pick reaches the next turn (B5).
+    p1Waits: simState.p2ForceSwitch && !simState.p1ForceSwitch,
+    p2Waits: simState.p1ForceSwitch && !simState.p2ForceSwitch,
+  };
+}
+
 /* ── Main BranchPanel (controls only, no iframe) ── */
 export function BranchPanel({ simState, stale, source, acquiringExact, executeError, executing, gen, onSetChoice, onHypotheticalMove, onExecuteTurn, played, positionKey, getBattle }: Props) {
   const { advanced, toggleAdvanced } = useAdvancedToggle();
@@ -267,13 +287,7 @@ export function BranchPanel({ simState, stale, source, acquiringExact, executeEr
 
   if (!simState) return null;
 
-  const isForceSwitch = simState.p1ForceSwitch || simState.p2ForceSwitch;
-  const isMultiActive = p1ActiveSlots.length > 1 || p2ActiveSlots.length > 1;
-  const p1RequiredChoices = requiredChoicesForActiveSlots(p1ActiveSlots, simState.p1ForceSwitches);
-  const p2RequiredChoices = requiredChoicesForActiveSlots(p2ActiveSlots, simState.p2ForceSwitches);
-  const bothChosen = branchSideChoicesReady(simState.p1Choices, p1RequiredChoices) &&
-    branchSideChoicesReady(simState.p2Choices, p2RequiredChoices);
-  const pendingLabel = pendingLabelFor(simState, bothChosen, isMultiActive);
+  const { isForceSwitch, p1RequiredChoices, p2RequiredChoices, bothChosen, pendingLabel, p1Waits, p2Waits } = panelFlags(simState, p1ActiveSlots, p2ActiveSlots);
   const columnProps = { simState, gen, advanced, gimmickFor, onSetChoice, onHypotheticalMove };
 
   return (
@@ -292,6 +306,7 @@ export function BranchPanel({ simState, stale, source, acquiringExact, executeEr
               requiredChoices={p1RequiredChoices}
               damage={damageBySide.p1}
               played={played?.p1}
+              waitingFor={p1Waits ? 'P2' : null}
               {...columnProps}
             />
             <div className="ps-side-divider" />
@@ -303,6 +318,7 @@ export function BranchPanel({ simState, stale, source, acquiringExact, executeEr
               requiredChoices={p2RequiredChoices}
               damage={damageBySide.p2}
               played={played?.p2}
+              waitingFor={p2Waits ? 'P1' : null}
               {...columnProps}
             />
           </div>
