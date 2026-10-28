@@ -47,6 +47,15 @@ describe('TimelineBar', () => {
     expect(wired.onNavigate).toHaveBeenLastCalledWith({ turn: 1, line: 'main' });
   });
 
+  // Round 77 (swarm B6): after viewing turn 9, T0 left the thumb on turn 9 while the label read T0.
+  test('turn 0 puts the slider thumb at the start of the range', () => {
+    const { rerender } = render(<TimelineBar {...props({ viewTurn: 9 })} />);
+    expect(screen.getByRole('slider')).toHaveValue('9');
+    rerender(<TimelineBar {...props({ viewTurn: 9, viewT0: true })} />);
+    expect(positionLabel()).toBe('T0');
+    expect(screen.getByRole('slider')).toHaveValue('1');
+  });
+
   test('the forward arrow stops at the end of the range; the end sentinel reads End', () => {
     render(<TimelineBar {...props({ viewTurn: 10, endSnapshotTurn: 10, atEndPosition: true })} />);
     expect(screen.getByRole('button', { name: '▶' })).toBeDisabled();

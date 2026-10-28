@@ -79,8 +79,8 @@ function TimelineLineChip({ viewTurn, variationSpan, maxTurn, viewingVariation, 
   );
 }
 
-function TimelineTrack({ viewTurn, viewLine, variationSpan, maxTurn, onNavigate }: Pick<TimelineBarProps,
-  'viewTurn' | 'viewLine' | 'variationSpan' | 'maxTurn' | 'onNavigate'>) {
+function TimelineTrack({ viewT0, viewTurn, viewLine, variationSpan, maxTurn, onNavigate }: Pick<TimelineBarProps,
+  'viewT0' | 'viewTurn' | 'viewLine' | 'variationSpan' | 'maxTurn' | 'onNavigate'>) {
   return (
     <span className="ps-timeline-track">
       {variationSpan && <VariationStripe variationSpan={variationSpan} maxTurn={maxTurn} />}
@@ -88,7 +88,7 @@ function TimelineTrack({ viewTurn, viewLine, variationSpan, maxTurn, onNavigate 
         type="range"
         min={1}
         max={sliderMax(maxTurn, variationSpan)}
-        value={viewTurn}
+        value={viewT0 ? 1 : viewTurn}
         onChange={e => onNavigate({ turn: parseInt(e.target.value, 10), line: viewLine })}
         aria-label="Timeline turn selector"
       />
@@ -131,7 +131,7 @@ export function TimelineBar(props: TimelineBarProps) {
     <div className="ps-branch-bar">
       <span style={{ fontSize: 11, fontWeight: 'bold', whiteSpace: 'nowrap', color: '#cde' }}>Timeline</span>
       <TimelineBackControls viewT0={viewT0} viewTurn={viewTurn} viewLine={viewLine} onNavigate={onNavigate} onGraphSelectLine={onGraphSelectLine} />
-      <TimelineTrack viewTurn={viewTurn} viewLine={viewLine} variationSpan={variationSpan} maxTurn={maxTurn} onNavigate={onNavigate} />
+      <TimelineTrack viewT0={viewT0} viewTurn={viewTurn} viewLine={viewLine} variationSpan={variationSpan} maxTurn={maxTurn} onNavigate={onNavigate} />
       <button
         type="button"
         onClick={() => onNavigate({ turn: viewT0 ? 1 : viewTurn + 1, line: viewLine })}
