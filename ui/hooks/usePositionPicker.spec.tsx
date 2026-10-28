@@ -31,9 +31,9 @@ async function land(serialized: string, state: BranchSimState) {
 
 describe('usePositionPicker', () => {
   test('while the viewed position resolves, the panel keeps what it showed last, as stale', async () => {
-    // Round 77 (user report 28.10.2026): one turn back from the tip of a turn-0 variation showed the picker of the main line's
-    // turn 1 (Mienshao's moves) for the 40 to 80 ms until turn 3 (Kyurem) resolved, and a click there chose a move of a
-    // Pokémon that was not on the field. Without a stand-in the history below jumped about 380 px for two frames.
+    // Round 77 (user report 28.10.2026): one turn back from the tip of a turn-0 variation showed another position's picker
+    // (Mienshao's moves) for about 40 ms until turn 3 (Kyurem) resolved, and a click there would choose a move of a Pokémon
+    // that was not on the field. Without a stand-in the history below jumped by the panel's height (585 px) for two frames.
     const shown = (current: { pickerSimState: BranchSimState | null }) => current.pickerSimState?.p1Active?.name;
     const { result, rerender } = renderHook((props: Args) => usePositionPicker(props), {
       initialProps: args({ viewingVariation: false, viewTurn: 1 }),
@@ -62,5 +62,15 @@ describe('usePositionPicker', () => {
     await land('turn-2 again', stateFor('Mienshao at turn 2'));
     await waitFor(() => expect(shown(result.current)).toBe('Mienshao at turn 2'));
     expect(result.current.pickerStale).toBe(false);
+  });
+
+  test('a viewed position that cannot be shown ends the stand-in: the panel goes empty, not stale for good', async () => {
+    // Review of round 77: a variation position without a capture resolves to no picker, and the stand-in stayed on screen,
+    // inert, for as long as the pointer stood there.
+    const { result, rerender } = renderHook((props: Args) => usePositionPicker(props), { initialProps: args({ viewTurn: 4, liveTip: true }) });
+    rerender(args({ viewTurn: 3, serializedAtView: null }));
+    await waitFor(() => expect(result.current.pickerStale).toBe(false));
+    expect(result.current.pickerSimState).toBeNull();
+    expect(result.current.positionPicker).toBeNull();
   });
 });

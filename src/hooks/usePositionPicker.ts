@@ -36,14 +36,17 @@ export function usePositionPicker(args: {
     serializedAtView, viewTurn, variationStartTurn, startSerialized, getExact, exactPositionsVersion,
     draftChoices, liveSimState,
   } = args;
-  const [resolvedPicker, setPositionPicker] = useState<ResolvedPicker | null>(null);
+  // The last resolution, with the position it belongs to (a position that
+  // cannot be shown resolves to no picker).
+  const [resolution, setResolution] = useState<{ viewKey: string; picker: ResolvedPicker | null } | null>(null);
   // Live-tip positions render the sim's own state, and a picker resolved
   // for another position never stands for the viewed one: both by
   // derivation (a synchronous clear here would be a setState in an effect,
   // which the react-hooks gate forbids).
   const viewKey = `${viewingVariation ? 'variation' : 'main'}:${viewTurn}`;
-  const positionPicker = !liveTip && resolvedPicker?.viewKey === viewKey ? resolvedPicker : null;
-  const standIn = useStandIn(liveTip, positionPicker, resolvedPicker, liveSimState);
+  const landed = !liveTip && resolution?.viewKey === viewKey;
+  const positionPicker = landed ? resolution!.picker : null;
+  const standIn = useStandIn(liveTip, landed, resolution?.picker ?? null, liveSimState);
   const shownState = positionPicker?.simState ?? standIn;
   useEffect(() => {
     let cancelled = false;
@@ -55,7 +58,7 @@ export function usePositionPicker(args: {
     void resolvePickerState({
       stored, viewingVariation, viewTurn, snapshots, replayData, sources, replayGenNumber, bringOnlyLists,
     }).then(resolved => {
-      if (!cancelled) setPositionPicker(resolved ? { ...resolved, viewKey } : null);
+      if (!cancelled) setResolution({ viewKey, picker: resolved });
     });
     return () => {
       cancelled = true;
@@ -79,24 +82,26 @@ export function usePositionPicker(args: {
   return { positionPicker, pickerSimState, pickerStale: standIn !== null };
 }
 
-type ResolvedPicker = { simState: BranchSimState; source: PickerSource; viewKey: string };
+type ResolvedPicker = { simState: BranchSimState; source: PickerSource };
 
 /**
  * Round 77 (user report 28.10.2026): one turn back from the tip showed the
  * last resolved position's picker (another turn, another Pokémon) until the
- * viewed one resolved, and a click there chose a move of a Pokémon that was
- * not on the field. While the viewed position resolves, the panel keeps what
- * it showed last, the live tip or the last resolved position, so it keeps
- * its height; the stand-in is stale and the panel takes no input.
+ * viewed one resolved, and a click there would choose a move of a Pokémon
+ * that was not on the field. While the viewed position resolves, the panel
+ * keeps what it showed last, the live tip or the last resolved position, so
+ * it keeps its height; the stand-in is stale and the panel takes no input.
+ * Once the viewed position lands, with a picker or without one, the
+ * stand-in ends.
  */
 function useStandIn(
-  liveTip: boolean, positionPicker: ResolvedPicker | null, resolvedPicker: ResolvedPicker | null, liveSimState: BranchSimState | null,
+  liveTip: boolean, landed: boolean, lastPicker: ResolvedPicker | null, liveSimState: BranchSimState | null,
 ): BranchSimState | null {
-  const shownNow = liveTip ? 'live' : positionPicker ? 'resolved' : null;
+  const shownNow = liveTip ? 'live' : landed ? 'resolved' : null;
   const [shownLast, setShownLast] = useState<'live' | 'resolved'>(shownNow ?? 'resolved');
   if (shownNow !== null && shownNow !== shownLast) setShownLast(shownNow);
   if (shownNow !== null) return null;
-  return shownLast === 'live' ? liveSimState : resolvedPicker?.simState ?? null;
+  return shownLast === 'live' ? liveSimState : lastPicker?.simState ?? null;
 }
 
 /** Exact recording first, then the snapshot approximation; null when the
