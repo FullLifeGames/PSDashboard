@@ -7,6 +7,7 @@ import { executeBranchChoices, resolveSideChoices } from '../src/branch/execute'
 import { reconstructBranchRuntime } from '../src/branch/runtime';
 import { serializeLiveBattle } from '../src/serialize';
 import { createLocalTreeExecutor, searchTreesOrchestrated } from '../src/tree-orchestrator';
+import { loadSimModsFor } from '../src/forward/sim-mods';
 
 const replay = JSON.parse(readFileSync(new URL('./fixtures/draft-replay.json', import.meta.url), 'utf8')) as ReplayData;
 const variation = JSON.parse(readFileSync(new URL('./fixtures/draft-t63-variation.json', import.meta.url), 'utf8')) as {
@@ -53,5 +54,22 @@ describe('an endgame keeps the trees\' verdict (round 77, T267)', () => {
     expect(Math.sign(result.perSide.p1[0].ev)).toBe(Math.sign(result.score));
     expect(['Draco Meteor', 'Shadow Ball', 'Fire Blast']).toContain(p2[0].label);
     expect(p2.find(choice => choice.label === 'U-turn')!.ev).toBeLessThan(0);
+  });
+
+  test('Champions VGC 2628166702 turn 7: a thin pool leaves the cell to the sampler, and the prover proves the win', { timeout: 300_000 }, async () => {
+    // The CI holdout of round 77: the last pair, p1 won the game. The four trees visited Dark Pulse into Protect 24
+    // times (8, 6, 5, 5) and read about 0.1; one ply deeper the sampler reads the win (Protect holds once, the next
+    // Dark Pulse lands), and the prover proves it in two turns against every reply. Waiving the floor for that thin
+    // pool ranked Dark Pulse third (0.14), and the prover, which tries the ranked moves in order, found no proof.
+    const position = JSON.parse(readFileSync(new URL('./fixtures/championsvgc-2628166702-t7.json', import.meta.url), 'utf8')) as {
+      serialized: string; tera: false; sleepClause: boolean; ruleset: 'champions';
+    };
+    await loadSimModsFor(position.serialized);
+    const result = await searchTreesOrchestrated(createLocalTreeExecutor(position.serialized, position.ruleset), {
+      depth: 1, samples: 1, mode: 'mcts', tera: position.tera, sleepClause: position.sleepClause, ruleset: position.ruleset,
+    });
+    expect(result.perSide.p1[0].label).toBe('Dark Pulse');
+    expect(result.forcedWin).toMatchObject({ side: 'p1', mass: 1 });
+    expect(result.score).toBe(1);
   });
 });

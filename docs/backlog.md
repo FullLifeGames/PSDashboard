@@ -1,6 +1,6 @@
 # Backlog
 
-This file holds the details of every open TODO, one section per TODO under its fixed T-number. The sections follow the finish line of `NextSteps.md` (user 21.10.2026): the release (wave 5, T163, T160 and the last wave are booked); every other TODO is parked with a trigger. The next free T-number is T267.
+This file holds the details of every open TODO, one section per TODO under its fixed T-number. The sections follow the finish line of `NextSteps.md` (user 21.10.2026): the release (wave 5, T163, T160 and the last wave are booked); every other TODO is parked with a trigger. The next free T-number is T272.
 
 Evidence paths that start with `r69/` are under `docs/perf/probes/2026-10-12-r69/`, those that start with `r72/` under `docs/perf/probes/2026-10-19-r72/`, those that start with `r73/` under `docs/perf/probes/2026-10-21-r73/`, those that start with `r74/` under `docs/perf/probes/2026-10-22-r74/`, those that start with `r76/` under `docs/perf/probes/2026-10-23-r76/`.
 
@@ -28,13 +28,11 @@ Wave 5 (round 73), T163 with T263 (round 74, measured, nothing adopted), T160 (r
 
 **Problem.** Draft 2058494320, a variation from turn 54, turn 63: Mienshao (Choice Scarf, locked into Close Combat) and Kyurem at 48 % face Dragapult at 45 % (Choice Specs) and Muk-Alola. The panel read "puffelmaedchen 15 % · Bene 85 %" above lines that advised U-turn for Bene at 16 % and Kyurem's switch for puffelmaedchen at 84 %. The score is the trees' visit mean; the lines come from the pooled matrix after the verify round. The trees played Kyurem's switch into each of Dragapult's attacks out to 11 to 17 % for puffelmaedchen over 400 to 650 visits, the one-ply sampler of the verify round read 84 to 93 %, and `VERIFY_DEPTH_FLOOR` (0.9) lets the trees' depth stand only near ±1, so the sampler priced the cells and turned the ranking around (probe `docs/perf/probes/2026-10-24-r77/t63/`).
 
-**Idea.** With at most two living Pokémon on each side the trees play the game to its end, so a rich, agreeing pool is a verdict at any magnitude; damage rolls, critical hits and misses keep the mean of a played-out endgame off ±1. The middlegame keeps the floor (655336 t24).
+**Idea.** With at most two living Pokémon on each side the trees play the game to its end, so an agreeing pool that played its cell out is a verdict at any magnitude; damage rolls, critical hits and misses keep the mean of a played-out endgame off ±1. "Played out" means 100 visits: the first fix took any pool of 8 visits, and the CI holdout found the counter-scene, Champions VGC 2628166702 turn 7 (the last pair, p1 won). There the trees visited Dark Pulse into Protect 24 times and read about 0.1, the sampler one ply deeper read the win (Protect holds once), Dark Pulse fell to third at 0.14, and the prover, which tries the ranked moves in order, lost its proof (score 1 to 0.954; probe `docs/perf/probes/2026-10-24-r77/t267/`). The middlegame keeps the floor (655336 t24).
 
-**Benefit.** In an endgame the advice and the score tell the same story; Bene's lines lead with the attacks that win.
+**Benefit.** In an endgame the advice and the score tell the same story; Bene's lines lead with the attacks that win, and a short winning line the trees visited too little keeps the sampler's read.
 
-**Success.** `packages/eval-engine/test/endgame-verify-t63.spec.ts` (the scene) and the two endgame rows of `verify-depth.spec.ts`; the score paths stay byte-identical (bank rows unchanged), the feedback corpus moves only endgame turns, and the gate reads them.
-
-**Gate.** The engine suite moves one pin: 912045 t8 (doubles, two against two), regret 0.0516 to 0.0198, tier none before and after, outside its band (0.064 ± 0.04, a Monte-Carlo reference with one-ply leaves).
+**Success.** `packages/eval-engine/test/endgame-verify-t63.spec.ts` (both scenes) and the three endgame rows of `verify-depth.spec.ts`; the score of the trees stays, so the bank and the holdouts move only where a proof moves, and the feedback corpus moves only endgame turns; the gate reads them. The engine suite stays green (the first fix moved the pin 912045 t8; the visit bar keeps it).
 
 ### T43 · Release check before every package release
 
@@ -93,6 +91,77 @@ Wave 5 (round 73), T163 with T263 (round 74, measured, nothing adopted), T160 (r
 ## Parked
 
 The triage of 21.10.2026 parked these TODOs; each section names its trigger, and a trigger that fires brings its TODO to a gate.
+
+### T268 · The set editor shows the moves the branch plays
+
+*Teams · round 77 · small · confusing · swarm finding D4*
+
+**Parked (user gate 28.10.2026, "4b").** Trigger: a user report, or the first round after the release.
+
+**Problem.** smogtours-gen8ou-562428, Edit Opp, Corviknight: remove the guessed Roost and add Body Press. Editor and stats panel then read Brave Bird, U-turn, Defog (guessed) and Body Press (manual); the picker and the built set read Brave Bird, U-turn, Body Press and Roost, and a variation with Defog fails with "no longer knows Defog" while the panel still lists it. Scizor's Roost replaced by U-turn keeps Roost in the picker and drops Knock Off; Earthquake removed without a replacement changes nothing, because a guess fills the slot again; on the draft's open sheet a removed revealed Freeze-Dry comes back as SHEET (4 of 4). The set resolver puts the revealed and manual moves first and fills the rest from the guesses (`packages/replay-core/src/team/set-resolvers.ts:142`, `:221`), and `statsInfoOf` (`src/hooks/useTeamKnowledge.ts:235`) shows the guesses of before the edit.
+
+**Benefit.** App: the editor and the stats panel show the four moves the branch plays, and a removed move stays removed.
+
+**Success.** After an edit, the editor, the stats panel and the picker list the same four moves in singles and doubles; a removed guessed or revealed move does not come back; a spec per scene.
+
+**Evidence.** Lane D of the branching swarm (`docs/perf/probes/2026-10-24-r77/swarm/findings.md`, D4), its scripts `s1b-edit-cases.mjs` and `s1h-panel-vs-picker.mjs`.
+
+**Steps.**
+- [ ] Red specs for scenes A to D (removed guess, replaced guess, removed move without a replacement, removed revealed move on an open sheet).
+- [ ] Decide with the user whether a removed revealed move may leave the set at all (the replay showed it).
+- [ ] One source for the editor, the stats panel and the built set.
+
+### T269 · Say what a reload keeps
+
+*App · round 77 · small · confusing · swarm finding D8*
+
+**Parked (user gate 28.10.2026, "4b").** Trigger: a user report, or the first round after the release.
+
+**Problem.** A reload loses the open variation, the pointer and the drafts without a warning (no `beforeunload` guard). Sets from `Edit Player` and `Edit Opp` are lost on reload, while an import persists per replay (`ps-replay-interceptor:sets:<id>`, `src/hooks/useTeamKnowledge.ts:76`, `:109`) with no way to clear it. A saved branch opens only as a read-only view, so its Save does not mean resume.
+
+**Benefit.** App: a user knows before a reload what stays, edits and imports behave alike, and an import can be taken back.
+
+**Success.** A reload with an open variation asks first; edits and imports persist the same way and the Setup menu clears them; a saved branch says it opens read-only, or opens as a variation.
+
+**Evidence.** Lane D of the branching swarm (D8), its scripts `s4-reload-same.mjs` and `s4c-persist-newreplay.mjs`.
+
+**Steps.**
+- [ ] Decide with the user which of the three is wanted: the reload guard, edits that persist like imports, a saved branch that resumes.
+- [ ] Red specs, then the fixes.
+
+### T270 · Leaving a replay with a variation open
+
+*App · round 77 · small · cosmetic · swarm findings D9 and D10*
+
+**Parked (user gate 28.10.2026, "4b").** Trigger: a user report, or the first round after the release.
+
+**Problem.** In the shared-branch view, "New Replay" returns to the replay that was loaded before, with its variation, instead of the loader (D9). Loading another replay drops an open variation without a confirm; loading the same id does nothing (D10).
+
+**Benefit.** App: "New Replay" does what it says, and a played variation does not vanish with one click.
+
+**Success.** "New Replay" in the shared view opens the loader; loading another replay with a variation open asks first, as the replace confirm does.
+
+**Evidence.** Lane D of the branching swarm (D9, D10), its script `s4-reload-same.mjs`.
+
+**Steps.**
+- [ ] Red specs for both scenes, then the fixes.
+
+### T271 · Doubles slots of the approximated position follow the protocol
+
+*App · round 77 · small · confusing · swarm finding B4*
+
+**Parked (user gate 28.10.2026, "4b").** Trigger: a user report, or the first round after the release.
+
+**Problem.** gen9doublesou-2663093831, main line: until the exact position is rebuilt, the picker shows the approximation from the turn snapshot and the guessed teams (`pickerStateFromSnapshot`, `src/lib/picker-state.ts:391`). At T5 it reads "P2A kanye | P2B the aids missle", the exact position "P2A the aids missle | P2B kanye", and the protocol puts Glimmora in `p2a`; T12 is reversed the same way; at T15 the approximation shows one slot a side, the exact position four (3 of 3). No wrong execution from a click in that window was shown.
+
+**Benefit.** App: the slots a doubles player sees while the position loads are the slots the move goes to.
+
+**Success.** The approximation orders each side's actives as the protocol does, and a two-slot side keeps two slots; a doubles and a VGC row in a spec.
+
+**Evidence.** Lane B of the branching swarm (`docs/perf/probes/2026-10-24-r77/swarm/findings.md`, B4).
+
+**Steps.**
+- [ ] A red spec from the three turns, then the fix in the snapshot picker.
 
 ### T259 · A smoother price for a stage drop at the bench gate
 

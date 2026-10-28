@@ -151,6 +151,19 @@ describe('the merge mixes per-class depth (round 63, T16)', () => {
     expect(atLiving(1, 2)).toBeCloseTo(-0.61, 1);
     expect(atLiving(2, 4)).toBeCloseTo(0.62, 12);
   });
+
+  test('in an endgame a thin pool below the floor leaves the cell to the sampler (round 77, T267)', () => {
+    // Champions VGC 2628166702 turn 7, the last pair: the trees visited Dark Pulse into Protect 24 times (8, 6, 5, 5)
+    // and read about 0.1, the sampler one ply deeper read the win the prover proves. A value short of a decided game
+    // needs a pool that played the cell out (T63: 400 to 650 visits); 24 visits stay with the sampler.
+    const plain = (visits: number, mean: number) => ({ key: cellKey(0, 0), visits, total: mean * (visits + 1) - 0.4, value: 0.4, ended: false });
+    const value: EvalCellValue = { i: 0, j: 0, value: 0.9, ended: false, deepened: 1 };
+    const merged = mergeMctsTrees(
+      [plain(8, 0.19), plain(6, -0.02), plain(5, 0.1), plain(5, 0.1)].map(cell => ({ ...mk(), cells: [cell], living: { p1: 1, p2: 1 } })),
+      new Map([[cellKey(0, 0), value]]),
+    );
+    expect(merged.matrix!.values[0][0]).toBe(1);
+  });
 });
 
 describe('the deepening rule (round 63, T16)', () => {

@@ -41,6 +41,13 @@ const VERIFY_DEPTH_FLOOR = 0.9;
  */
 const VERIFY_ENDGAME_LIVING = 2;
 
+/**
+ * A value short of a decided game needs a pool that played the cell out, more than the VERIFY_MIN_VISITS a decided
+ * pool needs. Champions VGC 2628166702 turn 7 (the last pair) pooled 24 visits of Dark Pulse into Protect at about
+ * 0.1, while the sampler one ply deeper read the win the prover proves in two turns (T63's pools held 400 to 650).
+ */
+const VERIFY_ENDGAME_MIN_VISITS = 100;
+
 const endgameOf = (trees: MctsTreeStats[]): boolean => {
   const living = trees[0]?.living;
   return !!living && living.p1 <= VERIFY_ENDGAME_LIVING && living.p2 <= VERIFY_ENDGAME_LIVING;
@@ -107,10 +114,10 @@ function poolContinuation(
 /** A class pool rich enough to carry depth: VERIFY_MIN_VISITS visits over at least two trees (four trees split across classes). */
 const VERIFY_MIN_CLASS_TREES = 2;
 
-/** A pool that has played its cell out and agrees: its depth outranks the one-ply sampler (in an endgame at any magnitude). */
+/** A pool that has played its cell out and agrees: its depth outranks the one-ply sampler (in an endgame below the floor too, given the visits). */
 function deepPool(pool: ReturnType<typeof poolContinuation>, minTrees: number, endgame: boolean): boolean {
-  return pool.visits >= VERIFY_MIN_VISITS && pool.trees >= minTrees &&
-    pool.disagreement <= VERIFY_DISAGREEMENT && (endgame || Math.abs(pool.value) >= VERIFY_DEPTH_FLOOR);
+  if (pool.visits < VERIFY_MIN_VISITS || pool.trees < minTrees || pool.disagreement > VERIFY_DISAGREEMENT) return false;
+  return Math.abs(pool.value) >= VERIFY_DEPTH_FLOOR || (endgame && pool.visits >= VERIFY_ENDGAME_MIN_VISITS);
 }
 
 /**
