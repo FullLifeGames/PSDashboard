@@ -35,6 +35,8 @@ const setsText = (p1Species: string) => [
   `=== p2: ${replayData.players[1]} ===`, '',
 ].join('\n');
 
+const NL = '\n';
+
 describe('useTeamKnowledge', () => {
   test('the effective teams start as the enriched inferred teams and carry a fingerprint of the edits', () => {
     const { result } = renderHook(() => useTeamKnowledge(inputs()));
@@ -129,6 +131,44 @@ describe('useTeamKnowledge', () => {
     const empty = renderHook(() => useTeamKnowledge(inputs({ replayData: null, p1Info: null, opponentInfo: null })));
     act(() => { outcome = empty.result.current.applySetsText(setsText(p1Lead)); });
     expect(outcome).toBe('Load a replay first.');
+  });
+
+  // Round 77 (D5): the import names what the game cannot use and applies nothing until the text is fixed.
+  describe.each(['singles', 'doubles'] as const)('a sets import with values the game does not have (%s)', kind => {
+    test('is refused with every value named, and nothing is applied or stored', async () => {
+      const fixture = replayFixture(kind);
+      const team1 = inferOpponentTeam(fixture.replayData.log, 'p1');
+      const team2 = inferOpponentTeam(fixture.replayData.log, 'p2');
+      const lead = team1.pokemon[0].species;
+      const wired = inputs({
+        replayData: fixture.replayData, p1Info: team1, opponentInfo: team2, observations: fixture.observations,
+        speedOrders: fixture.speedOrders, hpEvidence: fixture.hpEvidence,
+        replayWorker: fakeReplayWorkerClient(() => [{ type: 'solveSpreadsResult', entries: [] }]).client,
+      });
+      const { result } = renderHook(() => useTeamKnowledge(wired));
+      await act(async () => result.current.setSetsPanelOpen(true));
+      await waitFor(() => expect(result.current.setsPanelOpen).toBe(true));
+
+      const bad = [
+        `=== p1: A ===`, '', `${lead} @ Choice Band`, 'Ability: Foo Bar', '- Moon Landing', '- Hydro Cannon', '',
+        'Foo Mon', '- Splash', '', `=== p2: B ===`, '',
+      ].join(NL);
+      let outcome: string | null = null;
+      act(() => { outcome = result.current.applySetsText(bad); });
+      expect(outcome).toMatch(/Foo Bar/);
+      expect(outcome).toMatch(/Moon Landing/);
+      expect(outcome).toMatch(/Hydro Cannon/);
+      expect(outcome).toMatch(/foomon/i);
+      expect(result.current.editedP1Info).toBeNull();
+      expect(wired.onTeamsEdited).not.toHaveBeenCalled();
+      expect(localStorage.getItem(`ps-replay-interceptor:sets:${fixture.replayData.id}`)).toBeNull();
+
+      const legalMove = (await (await import('../../../src/lib/pokemon-options')).getMovePool(lead, 9))[0];
+      const good = ['=== p1: A ===', '', `${lead} @ Choice Band`, `- ${legalMove}`, '', '=== p2: B ===', ''].join(NL);
+      act(() => { outcome = result.current.applySetsText(good); });
+      expect(outcome).toBeNull();
+      expect(wired.onTeamsEdited).toHaveBeenCalledTimes(1);
+    });
   });
 
   test('a pasted team reports its match with the replay and applies to the effective team', () => {
