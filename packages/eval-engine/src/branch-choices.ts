@@ -186,6 +186,9 @@ function resolveCustomSwitch(
       return { ok: false, error: `"${nameOrSlot}" is not available to switch in.` };
     }
   }
+  if (target.trapped) {
+    return { ok: false, error: `${target.name} cannot be sent in: the active Pokémon is trapped and cannot switch out.` };
+  }
   return {
     ok: true,
     choice: { kind: 'switch', speciesId: toId(target.species), pokemonName: target.name },

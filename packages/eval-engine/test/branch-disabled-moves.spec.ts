@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { resolveSideChoices } from '../src/branch/execute';
 import { createBranchStateFromBattle } from '../src/branch/state';
 import type { SimBattle } from '../src/branch/types';
-import { setOf, startBattle } from './branch-rule-battles';
+import { FORMATS, moveCommand, setOf, sideId, startBattle } from './branch-rule-battles';
 
 /**
  * Round 77, A-1: the picker offered a move at 0 PP, and Execute failed with "Toxic Spikes is disabled
@@ -15,11 +15,6 @@ import { setOf, startBattle } from './branch-rule-battles';
  * or empties a move's PP, then compares every move button with the request the simulator sends. The
  * rows run with the victim on either side, in singles and in doubles.
  */
-
-const FORMATS = [
-  { name: 'singles', id: 'gen9customgame', doubles: false },
-  { name: 'doubles', id: 'gen9doublescustomgame', doubles: true },
-];
 
 interface Row {
   name: string;
@@ -64,22 +59,14 @@ const ROWS: Row[] = [
     } },
 ];
 
-const sideId = (index: number) => (index === 0 ? 'p1' : 'p2') as 'p1' | 'p2';
-
-/** One side's turn: the clicked move with a foe target where the Dex target type asks for one (doubles), the partner on Splash. */
-function command(battle: SimBattle, move: string, doubles: boolean): string {
-  const targeted = doubles && battle.actions.targetTypeChoices(battle.dex.moves.get(move).target);
-  return `move ${move}${targeted ? ' 1' : ''}${doubles ? ', move Splash' : ''}`;
-}
-
 function build(row: Row, format: typeof FORMATS[number], victimSide: number): SimBattle {
   const victim = [setOf('Pikachu', row.victim.moves, { item: row.victim.item ?? '', evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 252 } }),
     ...(format.doubles ? [setOf('Eevee', ['Splash'])] : []), setOf('Meowth', ['Splash'])];
   const source = [setOf('Snorlax', row.source.moves),
     ...(format.doubles ? [setOf('Corviknight', ['Splash'])] : []), setOf('Gliscor', ['Splash'])];
   const battle = startBattle(format.id, victimSide === 0 ? victim : source, victimSide === 0 ? source : victim);
-  expect(battle.choose(sideId(victimSide), command(battle, row.turn1.victim, format.doubles)), 'victim turn 1').toBe(true);
-  expect(battle.choose(sideId(1 - victimSide), command(battle, row.turn1.source, format.doubles)), 'source turn 1').toBe(true);
+  expect(battle.choose(sideId(victimSide), moveCommand(battle, row.turn1.victim, format.doubles)), 'victim turn 1').toBe(true);
+  expect(battle.choose(sideId(1 - victimSide), moveCommand(battle, row.turn1.source, format.doubles)), 'source turn 1').toBe(true);
   row.after?.(battle, victimSide);
   return battle;
 }

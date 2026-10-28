@@ -96,8 +96,8 @@ function TabRow({ tab, setTab }: { tab: 'fight' | 'switch'; setTab: (tab: 'fight
   );
 }
 
-function SwitchGrid({ switches, advanced, forceSwitch, pending, blockedSwitchKeys, played, onChoice }: Pick<SideControlsProps,
-  'switches' | 'advanced' | 'forceSwitch' | 'pending' | 'blockedSwitchKeys' | 'played' | 'onChoice'>) {
+function SwitchGrid({ activeName, switches, advanced, forceSwitch, pending, blockedSwitchKeys, played, onChoice }: Pick<SideControlsProps,
+  'activeName' | 'switches' | 'advanced' | 'forceSwitch' | 'pending' | 'blockedSwitchKeys' | 'played' | 'onChoice'>) {
   const playedSwitchKey = played?.kind === 'switch' ? toId(played.species || played.name) : null;
   return (
     <div className={`ps-switchgrid${!advanced && !forceSwitch ? ' ps-switchgrid-compact' : ''}`}>
@@ -108,8 +108,10 @@ function SwitchGrid({ switches, advanced, forceSwitch, pending, blockedSwitchKey
             key={sw.slot}
             sw={sw}
             selected={selected}
-            disabled={blockedSwitchKeys.has(switchOptionKey(sw)) && !selected}
-            disabledReason={`${displayName(sw.name, sw.species)} is already chosen as the switch-in for your other slot.`}
+            disabled={!!sw.trapped || (blockedSwitchKeys.has(switchOptionKey(sw)) && !selected)}
+            disabledReason={sw.trapped
+              ? `${activeName} is trapped and cannot switch out this turn.`
+              : `${displayName(sw.name, sw.species)} is already chosen as the switch-in for your other slot.`}
             wasPlayed={playedSwitchKey !== null && (toId(sw.species) === playedSwitchKey || toId(sw.name) === playedSwitchKey)}
             compact={!advanced && !forceSwitch}
             onClick={() => onChoice({ kind: 'switch', speciesId: toId(sw.species), pokemonName: sw.name })}
@@ -151,6 +153,7 @@ export function SideControls(props: SideControlsProps) {
 
       {(forceSwitch || !advanced || tab === 'switch') && switches.length > 0 && (
         <SwitchGrid
+          activeName={activeName}
           switches={switches}
           advanced={advanced}
           forceSwitch={forceSwitch}

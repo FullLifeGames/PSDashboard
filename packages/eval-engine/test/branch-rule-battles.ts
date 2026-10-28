@@ -22,3 +22,16 @@ export function startBattle(format: string, p1: PokemonSet[], p2: PokemonSet[]):
   }
   return battle as unknown as SimBattle;
 }
+
+export const FORMATS = [
+  { name: 'singles', id: 'gen9customgame', doubles: false },
+  { name: 'doubles', id: 'gen9doublescustomgame', doubles: true },
+];
+
+export const sideId = (index: number) => (index === 0 ? 'p1' : 'p2') as 'p1' | 'p2';
+
+/** One side's turn: the clicked move with a foe target where the Dex target type asks for one (doubles), the partner on Splash. */
+export function moveCommand(battle: SimBattle, move: string, doubles: boolean): string {
+  const targeted = doubles && battle.actions.targetTypeChoices(battle.dex.moves.get(move).target);
+  return `move ${move}${targeted ? ' 1' : ''}${doubles ? ', move Splash' : ''}`;
+}

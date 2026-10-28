@@ -177,8 +177,15 @@ function makeSlotModifiers(battle: SimBattle, active: SimPokemon | null | undefi
   return { teraType, canMegaEvo, canUltraBurst, zMoves };
 }
 
-function makeSwitches(side: SimSide, activeSlot: number): BranchSwitchOption[] {
+/**
+ * The switch chips of one slot. A Pokémon the simulator holds (`trapped` in a move request: a trapping
+ * ability or move, a locked move) cannot switch out, and side.js chooseSwitch refuses the choice, so the
+ * chips carry the flag (round 77, A-3). A forced replacement is no switch out of a held body: no flag.
+ */
+function makeSwitches(side: SimSide, activeSlot: number, forced: boolean): BranchSwitchOption[] {
   const activeNames = new Set(side.active.filter(Boolean).map(active => active.name));
+  const held = side.active[activeSlot];
+  const trapped = !forced && !!held && !held.fainted && !!held.trapped;
   return side.pokemon
     .map((pokemon, index): BranchSwitchOption => {
       const percent = shownPercent(pokemon);
@@ -190,6 +197,7 @@ function makeSwitches(side: SimSide, activeSlot: number): BranchSwitchOption[] {
         hp: `${percent}%`,
         hpPercent: percent,
         fainted: pokemon.fainted,
+        ...(trapped ? { trapped } : {}),
       };
     })
     .filter(pokemon => !pokemon.fainted && !activeNames.has(pokemon.name));
@@ -259,7 +267,8 @@ function sideSlots(battle: SimBattle, sideIndex: 0 | 1) {
     forced,
     activeSlots: side.active.map((active, index) => active ? makePokemonInfo(active, true, index) : null),
     movesBySlot: side.active.map((active, index) => makeMoves(active, index, forced[index] ?? false, battle)),
-    switchesBySlot: side.active.map((_, index) => makeSwitches(side, index)),
+    // After the moves: a locked move marks its body trapped when the sim writes the request data (pokemon.js getMoveRequestData).
+    switchesBySlot: side.active.map((_, index) => makeSwitches(side, index, forced[index] ?? false)),
     modifiersBySlot: side.active.map(active => makeSlotModifiers(battle, active)),
   };
 }
