@@ -158,8 +158,9 @@ export function BranchSaveSharePanel({ replayData, branchTurn, history, finalLog
 
       {saved.length > 0 && (
         <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 180, overflowY: 'auto' }}>
-          {saved.map(entry => (
-            <SavedBranchRow key={`${entry.createdAt}-${entry.branchTurn}`} entry={entry} onOpen={openSaved} onRemove={removeSaved} />
+          {saved.map((entry, index) => (
+            // The index joins the key: rows saved before the stamps were unique may share createdAt and branchTurn.
+            <SavedBranchRow key={`${entry.createdAt}-${entry.branchTurn}-${index}`} entry={entry} onOpen={openSaved} onRemove={removeSaved} />
           ))}
         </div>
       )}

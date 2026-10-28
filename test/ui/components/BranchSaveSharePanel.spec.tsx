@@ -49,6 +49,18 @@ describe('BranchSaveSharePanel', () => {
     expect(JSON.parse(localStorage.getItem(savedBranchKey(replayData.id)) ?? '[]')).toHaveLength(0);
   });
 
+  test('saving twice lists two rows, and one Delete removes one of them', async () => {
+    render(<BranchSaveSharePanel replayData={replayData} branchTurn={2} history={history} finalLog="|turn|3" />);
+    await userEvent.click(screen.getByRole('button', { name: 'Save Branch' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save Branch' }));
+    expect(screen.getAllByText(/Turn 2 branch, 1 choices/)).toHaveLength(2);
+    expect(JSON.parse(localStorage.getItem(savedBranchKey(replayData.id))!)).toHaveLength(2);
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Delete saved branch from turn 2' })[0]);
+    expect(screen.getAllByText(/Turn 2 branch, 1 choices/)).toHaveLength(1);
+    expect(JSON.parse(localStorage.getItem(savedBranchKey(replayData.id))!)).toHaveLength(1);
+  });
+
   test('saved branches of the replay show up on mount', () => {
     localStorage.setItem(savedBranchKey(replayData.id), JSON.stringify([{
       version: 1, replayId: replayData.id, format: replayData.format, formatid: replayData.formatid, players: replayData.players,

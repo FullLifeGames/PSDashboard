@@ -77,6 +77,37 @@ describe('branch save/share payloads', () => {
     expect(payload.choices[0].p2Label).toBe('switch 2');
   });
 
+  // Round 77 (D7): two saves of one branch are two rows, and a delete removes one of them.
+  describe('saving the same branch twice', () => {
+    const withStore = (run: () => void) => {
+      const store = new Map<string, string>();
+      (globalThis as { localStorage?: unknown }).localStorage = {
+        getItem: (key: string) => store.get(key) ?? null,
+        setItem: (key: string, value: string) => store.set(key, value),
+        removeItem: (key: string) => store.delete(key),
+      };
+      try { run(); } finally { delete (globalThis as { localStorage?: unknown }).localStorage; }
+    };
+
+    test('each save is its own row with its own key, and a delete removes only that row', () => withStore(() => {
+      const payload = makeBranchSharePayload({ replay, branchTurn: 3, history, finalLog: '|turn|3' });
+      saveBranchPayload(payload);
+      const rows = saveBranchPayload(payload);
+      expect(rows).toHaveLength(2);
+      expect(new Set(rows.map(row => row.createdAt)).size).toBe(2);
+      expect(rows[0].finalLog).toBe(rows[1].finalLog);
+      expect(deleteSavedBranch(rows[0])).toHaveLength(1);
+      expect(loadSavedBranches(replay.id)[0].createdAt).toBe(rows[1].createdAt);
+    }));
+
+    test('a store that already holds two rows with one key loses one row per delete', () => withStore(() => {
+      const payload = makeBranchSharePayload({ replay, branchTurn: 3, history, finalLog: '|turn|3' });
+      localStorage.setItem(savedBranchKey(replay.id), JSON.stringify([payload, payload]));
+      expect(deleteSavedBranch(payload)).toHaveLength(1);
+      expect(deleteSavedBranch(payload)).toHaveLength(0);
+    }));
+  });
+
   test('uses a stable localStorage key', () => {
     expect(savedBranchKey('gen9ou-123')).toBe('ps-replay-interceptor:branches:gen9ou-123');
   });
@@ -91,9 +122,9 @@ describe('branch save/share payloads', () => {
 
     try {
       const payload = makeBranchSharePayload({ replay, branchTurn: 3, history, finalLog: '|turn|3' });
-      expect(saveBranchPayload(payload)).toHaveLength(1);
+      const [row] = saveBranchPayload(payload);
       expect(loadSavedBranches(replay.id)).toHaveLength(1);
-      expect(deleteSavedBranch(payload)).toHaveLength(0);
+      expect(deleteSavedBranch(row)).toHaveLength(0);
       expect(loadSavedBranches(replay.id)).toHaveLength(0);
     } finally {
       delete (globalThis as { localStorage?: unknown }).localStorage;
