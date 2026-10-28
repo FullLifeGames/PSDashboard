@@ -93,6 +93,32 @@ describe('useTimeline', () => {
     expect(result.current.followedPlay).toBe(false);
   });
 
+  test('a rebuild that keeps the tip leaves the pointer where the user looks (round 77, D3)', () => {
+    const { result, rerender, base } = setup();
+    rerender({ ...base, branching: true, variationStartTurn: 2, history: [entry(2), entry(3)] });
+    expect(result.current).toMatchObject({ viewTurn: 4, followedPlay: true });
+
+    // Inside the variation: a set edit rebuilds the same history into new objects.
+    act(() => result.current.navigateTo({ turn: 3, line: 'variation' }));
+    rerender({ ...base, branching: true, variationStartTurn: 2, history: [entry(2), entry(3)] });
+    expect(result.current).toMatchObject({ viewTurn: 3, viewLine: 'variation', followedPlay: false });
+
+    // On the main line: the same rebuild leaves the pointer on its main turn.
+    act(() => result.current.navigateTo({ turn: 2, line: 'main' }));
+    rerender({ ...base, branching: true, variationStartTurn: 2, history: [entry(2), entry(3)] });
+    expect(result.current).toMatchObject({ viewTurn: 2, viewLine: 'main', followedPlay: false });
+
+    // An executed turn still follows to the new tip.
+    rerender({ ...base, branching: true, variationStartTurn: 2, history: [entry(2), entry(3), entry(4)] });
+    expect(result.current).toMatchObject({ viewTurn: 5, viewLine: 'variation', followedPlay: true });
+
+    // A variation that ends and a new one with the same span follows again.
+    act(() => result.current.navigateTo({ turn: 2, line: 'main' }));
+    rerender({ ...base, branching: false, variationStartTurn: null, history: [] });
+    rerender({ ...base, branching: true, variationStartTurn: 2, history: [entry(2), entry(3), entry(4)] });
+    expect(result.current).toMatchObject({ viewTurn: 5, viewLine: 'variation', followedPlay: true });
+  });
+
   test('the variation span needs an executed turn: a forced interlude alone opens nothing', () => {
     const { result } = setup({ branching: true, variationStartTurn: 2, history: [entry(2, { kind: 'forced' })] });
     expect(result.current.variationSpan).toBeNull();

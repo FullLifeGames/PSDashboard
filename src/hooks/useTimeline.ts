@@ -182,10 +182,20 @@ function useNavigateTo(args: NavArgs, seekIntentRef: SeekIntentRef) {
 
   // Executed turns move the pointer WITH the play — the tip is where the
   // next choice happens (chess: the board follows the line you play).
+  // A rebuild that keeps the span (a set edit replays the same turns into new objects) is no executed
+  // turn: the pointer stays where the user looks (round 77, D3). The key names the span, so a variation
+  // that ended and a new one with the same tip follows again.
+  const followedKeyRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!branching || tipTurn === null) return;
+    if (!branching || tipTurn === null || variationSpan === null) {
+      followedKeyRef.current = null;
+      return;
+    }
+    const key = `${variationSpan.startTurn}:${tipTurn}`;
+    if (followedKeyRef.current === key) return;
+    followedKeyRef.current = key;
     navigateTo({ turn: tipTurn, line: 'variation' }, { seek: false, internal: true, followPlay: true });
-  }, [branching, tipTurn, navigateTo]);
+  }, [branching, tipTurn, variationSpan, navigateTo]);
 
   return navigateTo;
 }
