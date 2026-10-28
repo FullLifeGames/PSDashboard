@@ -64,6 +64,6 @@ export interface EngineResponse {
    * punishers, the equilibrium and reads. Without it the analysis shows values and verdict tiers.
    */
   matrix?: { p1: string[]; p2: string[]; values: number[][] };
-  /** Optional: who answered, shown beside the result. */
+  /** Optional: the build that answered; the dashboard records the version with the result (EvalResult.engine). */
   engine?: { name?: string; version?: string };
 }

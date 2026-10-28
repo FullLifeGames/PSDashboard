@@ -49,7 +49,7 @@ A move order the mover cannot reach at full Speed reads as a Choice Scarf. The s
 
 ### Editing and importing sets
 
-Edits for either player rebuild the branch and replay its history. The editor offers legal pools: learnset-based moves, generation-legal items, the species' abilities, Tera types and natures. `Import/Export Sets` round-trips both teams as Showdown text (natures, IVs, levels included); imports persist per replay as manual knowledge. Hypothetical moves ("What if it had …") load into the set.
+Edits for either player (`Edit Player` and `Edit Opp` in the top bar's `Setup` menu) rebuild the branch and replay its history. The editor offers legal pools: learnset-based moves, generation-legal items, the species' abilities, Tera types and natures. `Import/Export Sets` round-trips both teams as Showdown text (natures, IVs, levels included); imports persist per replay as manual knowledge. An import that names a move, ability, item, nature or Tera type the editor would not offer, or a species that is not on the team, imports nothing and lists what to fix. Hypothetical moves ("What if it had …") load into the set.
 
 ## 2. The evaluation
 
@@ -58,7 +58,7 @@ Edits for either player rebuild the branch and replay its history. The editor of
 A sim-backed search plays every legal choice pair on forked battles and solves the choice matrix as a zero-sum game by regret matching. Sampling is deterministic with fixed seeds and KO-boundary roll grouping, and the work fans out over a worker pool sized by the machine's cores, so pool size moves only wall-clock. The engine selector offers four modes:
 
 - depth 1 and depth 2: the full joint matrix, with deeper cells valued by a shallower sub-search,
-- MCTS: a DUCT tree search (four trees of 600 iterations). A forced switch after a knock-out is a decision node inside the tree; the root matrix, verify sampler, play-outs and prover resolve replacements by the static pick. Chance-suspect root cells are re-verified by the matrix sampler, so a lucky miss in one tree cannot masquerade as a good line,
+- MCTS: a DUCT tree search (four trees of 600 iterations). A forced switch after a knock-out is a decision node inside the tree; the root matrix, verify sampler, play-outs and prover resolve replacements by the static pick. Chance-suspect root cells are re-verified by the matrix sampler, so a lucky miss in one tree cannot masquerade as a good line. A cell the trees played out over enough visits, with the trees in agreement, keeps the trees' value when it reads a decided game (±0.9), and in an endgame of at most two living Pokémon a side at any value: there the trees play the game to its end, and the sampler's single ply turned the ranked lines against the score,
 - Auto, the default: singles run a depth-1 matrix with three samples while boards are full and the tree once a quarter of all Pokémon have fainted; doubles run the tree from the first turn. The team-preview lead stays on a depth-1 matrix in both game types.
 
 Pivot moves (U-turn, Volt Switch, Flip Turn, Parting Shot, Baton Pass and the like) are move-plus-incoming pairs over the live bench, so the engine can say which Pokémon makes a pivot safe. Guaranteed-failing clicks are dropped from the candidates.
@@ -91,6 +91,10 @@ Each rule set and game type reads its own static weight table, named from the re
 - VGC doubles (Scarlet/Violet VGC): fitted on its own games; Tailwind 0, because the matchup term already reads the doubled speed, Trick Room 54, screens 48, matchup 169.
 - Champions singles: a body counts 121 against 200 in standard singles, and a matchup 210 against 120.
 - Champions doubles and Champions VGC: fitted on rated Champions games; screens 83, matchup 96, Trick Room 87.
+
+### Other engines
+
+The Evaluation panel can hand positions to another engine instead of the search ([ENGINES.md](./ENGINES.md)). The dashboard sends it the options the search would rank and checks the shape of every answer. An answer with the value of every pair goes through the same equilibrium solve as the search's matrix; an answer with one value per option stands as the engine gave it, so floors and punishers stay empty. Verdicts, the graph and the report read those values with the same bands. The bank, the holdouts and the expert pins measure the dashboard's own search, so another engine's percentages carry that engine's calibration; the panel says "estimate from" and the engine's name, and depth and samples hide while another engine evaluates.
 
 ## 3. Game analysis
 
