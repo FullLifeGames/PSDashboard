@@ -223,8 +223,15 @@ describe('useEvalView', () => {
     const counts = () => ({ stale: spies.markStale.mock.calls.length, reset: spies.reset.mock.calls.length, clear: spies.clearGraph.mock.calls.length });
     const before = counts();
 
+    // Round 77 (C6): moving the pointer alone does not age the result; its position tag decides whether it fits the screen.
     rerender(inputs(evaluation, { viewTurn: 4 }));
+    rerender(inputs(evaluation, { viewTurn: 4, viewLine: 'variation' }));
+    expect(counts().stale).toBe(before.stale);
+    // The position itself changing (a turn executed, a set edited) does.
+    rerender(inputs(evaluation, { viewTurn: 4, historyLength: 1 }));
     expect(counts().stale).toBe(before.stale + 1);
+    rerender(inputs(evaluation, { viewTurn: 4, historyLength: 1, editedP1Info: { name: 'edited' } as never }));
+    expect(counts().stale).toBe(before.stale + 2);
     rerender(inputs(evaluation, { viewTurn: 4, replayData: { ...replayData, id: 'other' } }));
     expect(counts().reset).toBe(before.reset + 1);
     rerender(inputs(evaluation, { viewTurn: 4, replayData: { ...replayData, id: 'other' }, setsFingerprint: 'fp2' }));

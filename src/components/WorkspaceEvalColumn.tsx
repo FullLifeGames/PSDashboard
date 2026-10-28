@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { EvalPanel } from './EvalPanel';
 import { PlayOutBar } from './PlayOutBar';
+import { resultPositionLabel } from './eval/turn-copy';
 import { BattleStatsPanel } from './BattleStatsPanel';
 import type { AppController } from '../hooks/useAppController';
 import { variationBoardShares } from '../lib/variation-shares';
@@ -67,7 +68,7 @@ function EvalSection({ app, replayData }: WorkspaceColumnProps) {
       showTera={replayGen === 9}
       graph={evaluation.graph}
       onAnalyzeGame={handleAnalyzeGame}
-      positionLabel={liveEvalView ? `Turn ${viewTurn} · ${viewingVariation ? 'variation' : 'main line'}` : null}
+      positionLabel={liveEvalView ? resultPositionLabel(evaluation.resultTag, { viewTurn, viewingVariation }) : null}
       playOutProgress={playOut?.active ? { startTurn: playOut.startTurn, turns: playOut.turns, atTurn: liveSimTurn, fast: fastPlayOut } : null}
       graphMaxTurn={analyzableTurns}
       analysisTurn={analysisTurn}

@@ -75,3 +75,17 @@ export function comparisonTarget(side: SideAnalysis, best: RankedChoice) {
   const value = asSafe ? target.worstCase : swapped?.ev ?? target.ev;
   return { asSafe, target, swapped, value };
 }
+
+/**
+ * The heading over the live evaluation (round 77, C6): it names the position the shown result was computed for,
+ * read from the run's position tag (`main:10`, `variation:10`), never the position the pointer holds now. A result
+ * without a tag falls back to the position on screen.
+ */
+export function resultPositionLabel(
+  resultTag: string | null, screen: { viewTurn: number; viewingVariation: boolean },
+): string {
+  const match = resultTag === null ? null : /^(main|variation):(\d+)$/.exec(resultTag);
+  const turn = match ? Number(match[2]) : screen.viewTurn;
+  const variation = match ? match[1] === 'variation' : screen.viewingVariation;
+  return `Turn ${turn} · ${variation ? 'variation' : 'main line'}`;
+}
