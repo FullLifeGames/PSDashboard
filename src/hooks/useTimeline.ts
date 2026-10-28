@@ -16,6 +16,8 @@ export interface TimelineInputs {
   interruptPlayOut: () => void;
   /** Every pointer move clears position-bound drafts. */
   onNavigate: () => void;
+  /** The live sim of the variation has a winner: its tip is an end position (round 77, A-6). */
+  variationEnded?: boolean;
 }
 
 /** The pointer's own state: view turn (with its synchronous ref), line,
@@ -145,6 +147,7 @@ type TimelineDerived = ReturnType<typeof useTimelineDerived>;
 interface NavArgs {
   pointer: PointerState;
   derived: TimelineDerived;
+  atVariationEnd: boolean;
   branching: boolean;
   interruptPlayOut: () => void;
   onNavigate: () => void;
@@ -182,32 +185,67 @@ function useNavigateTo(args: NavArgs, seekIntentRef: SeekIntentRef) {
 
   // Executed turns move the pointer WITH the play — the tip is where the
   // next choice happens (chess: the board follows the line you play).
+  // A rebuild that keeps the span (a set edit replays the same turns into new objects) is no executed
+  // turn: the pointer stays where the user looks (round 77, D3). The key names the span, so a variation
+  // that ended and a new one with the same tip follows again.
+  const followedKeyRef = useRef<string | null>(null);
+  /**
+   * Puts the pointer back after a rebuild the user did not ask to follow (a failed execute restored the old
+   * variation, round 77): the span that comes back counts as followed already, so the tip-follow stays put.
+   */
+  const restorePointer = useCallback((position: TimelinePosition, span: VariationSpan | null) => {
+    followedKeyRef.current = span ? `${span.startTurn}:${variationTip(span)}` : null;
+    setViewT0(false);
+    setViewTurn(position.turn);
+    setViewLine(position.line);
+    setFollowedPlay(false);
+    setNavSeek(prev => ({ turn: position.turn, seq: (prev?.seq ?? 0) + 1 }));
+  }, [setViewT0, setViewTurn, setViewLine, setFollowedPlay, setNavSeek]);
   useEffect(() => {
-    if (!branching || tipTurn === null) return;
+    if (!branching || tipTurn === null || variationSpan === null) {
+      followedKeyRef.current = null;
+      return;
+    }
+    const key = `${variationSpan.startTurn}:${tipTurn}`;
+    if (followedKeyRef.current === key) return;
+    followedKeyRef.current = key;
+    // The frame plays the turn in from the one before the tip: its reports until it lands on the tip are the
+    // app's own, not the user's (round 77, A-4).
+    seekIntentRef.current = { turn: tipTurn, until: Date.now() + 4000 };
     navigateTo({ turn: tipTurn, line: 'variation' }, { seek: false, internal: true, followPlay: true });
-  }, [branching, tipTurn, navigateTo]);
+  }, [branching, tipTurn, variationSpan, navigateTo, seekIntentRef]);
 
-  return navigateTo;
+  return { navigateTo, restorePointer };
 }
 
 /** Embed echo guard and the graph's explicit line-addressed selections. */
 function useTimelineNav(args: NavArgs) {
-  const { pointer, derived, interruptPlayOut, setAnalysisTurn } = args;
-  const { setViewTurn, setViewLine, setViewT0, setFollowedPlay } = pointer;
+  const { pointer, derived, atVariationEnd, interruptPlayOut, setAnalysisTurn } = args;
+  const { setViewTurn, setViewLine, setViewT0, setFollowedPlay, viewTurnRef } = pointer;
   const { endSnapshotTurn } = derived;
   // Programmatic seeks race the embed's turn echoes: while the iframe is
   // still seeking it keeps reporting the OLD turn, which would knock the
   // fresh selection straight back. Stale echoes are ignored until the embed
   // confirms the seek or the window lapses.
   const seekIntentRef = useRef<{ turn: number; until: number } | null>(null);
-  const navigateTo = useNavigateTo(args, seekIntentRef);
+  const { navigateTo, restorePointer } = useNavigateTo(args, seekIntentRef);
 
   const handleReplayTurn = useCallback((turn: number) => {
-    if (derived.viewingVariation || turn < 1) return;
+    if (turn < 1) return;
     const intent = seekIntentRef.current;
     if (intent && Date.now() < intent.until) {
       if (turn !== intent.turn) return;
       seekIntentRef.current = null;
+    }
+    if (derived.viewingVariation) {
+      // The branch frame's own Last turn / Next turn. A turn the variation does not cover is the shared prefix: the
+      // pointer leaves for the main line there, and the main frame that opens gets the same echo guard.
+      // Like the main line's end (B12): the frame stays on the last played turn when the pointer sits on the end.
+      if (atVariationEnd && derived.tipTurn !== null && turn >= derived.tipTurn - 1) return;
+      if (!variationCovers(derived.variationSpan, turn)) seekIntentRef.current = { turn, until: Date.now() + 4000 };
+      if (turn !== viewTurnRef.current) setFollowedPlay(false);
+      setViewTurn(turn);
+      return;
     }
     setViewTurn(current => {
       // The embed can only report real turns; when the end position is
@@ -217,7 +255,7 @@ function useTimelineNav(args: NavArgs) {
       }
       return turn;
     });
-  }, [derived.viewingVariation, endSnapshotTurn, setViewTurn]);
+  }, [derived.viewingVariation, derived.variationSpan, atVariationEnd, derived.tipTurn, endSnapshotTurn, setViewTurn, setFollowedPlay, viewTurnRef]);
 
   const handleGraphSelect = useCallback((turn: number) => {
     // Selecting a turn is user navigation — it bypasses navigateTo, so the
@@ -251,14 +289,16 @@ function useTimelineNav(args: NavArgs) {
     handleGraphSelect(turn);
   }, [navigateTo, handleGraphSelect, setViewLine]);
 
-  return { navigateTo, handleReplayTurn, handleGraphSelect, handleGraphSelectLine };
+  return { navigateTo, restorePointer, handleReplayTurn, handleGraphSelect, handleGraphSelectLine };
 }
 
 export function useTimeline(inputs: TimelineInputs) {
-  const { replayId, snapshots, branching, variationStartTurn, history, interruptPlayOut, onNavigate } = inputs;
+  const { replayId, snapshots, branching, variationStartTurn, history, interruptPlayOut, onNavigate, variationEnded = false } = inputs;
   void replayId; // reset runs through resetPointer from the app's load effect
   const pointer = usePointerState();
   const derived = useTimelineDerived({ pointer, snapshots, branching, variationStartTurn, history });
+  /** The pointer sits on the ended tip of the variation (the main line's End has its own flag). */
+  const atVariationEnd = variationEnded && derived.viewingVariation && derived.tipTurn !== null && pointer.viewTurn >= derived.tipTurn;
 
   // The analysis follows the replay position — selecting a turn IS the
   // analysis request; a lead selection (turn 0, set by handleGraphSelect)
@@ -275,8 +315,8 @@ export function useTimeline(inputs: TimelineInputs) {
     }
   }
 
-  const nav = useTimelineNav({ pointer, derived, branching, interruptPlayOut, onNavigate, setAnalysisTurn });
-  return { ...pointer, ...derived, ...nav, analysisTurn };
+  const nav = useTimelineNav({ pointer, derived, atVariationEnd, branching, interruptPlayOut, onNavigate, setAnalysisTurn });
+  return { ...pointer, ...derived, ...nav, analysisTurn, atVariationEnd };
 }
 
 export type Timeline = ReturnType<typeof useTimeline>;

@@ -5,6 +5,8 @@ interface PlayOutBarProps {
   playOut: { active: boolean } | null;
   playOutNotice: { text: string; watchTurn: number } | null;
   hasVariation: boolean;
+  /** The viewed position is an ended game: nothing is left to play out (round 77, A-6). */
+  ended?: boolean;
   viewTurn: number;
   startDisabled: boolean;
   /** The session option: depth-1 matrix on every turn of the run. */
@@ -76,13 +78,15 @@ function StartRow({ viewTurn, startDisabled, fastPlayOut, onStartPlayOut, onFast
 
 /** "Let it play out" launcher, the fast option, the running notice, and the finished-line watch entry. */
 export function PlayOutBar({
-  playOut, playOutNotice, hasVariation, viewTurn, startDisabled, fastPlayOut,
+  playOut, playOutNotice, hasVariation, ended = false, viewTurn, startDisabled, fastPlayOut,
   onStartPlayOut, onStopPlayOut, onWatchFrom, onFastPlayOutChange,
 }: PlayOutBarProps) {
   return (
     <div className="ps-panel" style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
       {playOut?.active
         ? <RunningRow fastPlayOut={fastPlayOut} onStopPlayOut={onStopPlayOut} />
+        : ended
+        ? <span style={{ fontSize: 11, color: '#8fa3bd' }}>The game ended at this position: nothing left to play out.</span>
         : (
           <StartRow
             viewTurn={viewTurn} startDisabled={startDisabled} fastPlayOut={fastPlayOut}

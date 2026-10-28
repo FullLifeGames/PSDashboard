@@ -252,15 +252,52 @@ function leadHistoryEntry(
 async function replayKeptHistory(
   runtime: BranchRuntime, branchEngine: BranchEngineModule, historyToReplay: BranchHistoryEntry[],
   replayedHistory: BranchHistoryEntry[],
-): Promise<string | null> {
+): Promise<{ turnNumber: number; error: string } | null> {
   for (const entry of historyToReplay) {
     const outcome = await replayHistoryEntry(runtime, branchEngine, entry);
-    if (!outcome.ok) {
-      return `Rebuild stopped before branch turn ${entry.turnNumber}: ${outcome.error}`;
-    }
+    if (!outcome.ok) return { turnNumber: entry.turnNumber, error: outcome.error };
     replayedHistory.push(outcome.entry);
   }
   return null;
+}
+
+/** What a rebuild reports: `endedNotice` names the variation that was lost when the rebuild kept no turn. */
+export interface StartOutcome { endedNotice: string | null }
+
+const turnCount = (entries: BranchHistoryEntry[]) => entries.filter(entry => entry.kind !== 'forced').length;
+
+/**
+ * The text for a variation that a rebuild could not keep at all (round 77, D1): the first recorded move no longer
+ * applies, so no turn survives and no variation stays behind.
+ */
+function endedNoticeFor(startTurn: number, recorded: BranchHistoryEntry[], reason: string): string {
+  const turns = turnCount(recorded);
+  return `The variation from turn ${startTurn} (${turns} ${turns === 1 ? 'turn' : 'turns'}) ended: ${reason}`;
+}
+
+/**
+ * The history a start puts on the rebuilt runtime: the lead entry of a turn-0 variation, then the kept entries.
+ * A start whose recorded turns all fail to apply reports `endedNotice` instead of an empty variation (round 77, D1).
+ */
+async function replayStartHistory(
+  runtime: BranchRuntime, branchEngine: BranchEngineModule, plan: StartPlan, startPosition: string | null, targetTurn: number,
+): Promise<{ replayedHistory: BranchHistoryEntry[]; branchError: string | null; endedNotice: string | null }> {
+  const { isT0, leadOverride, historyToReplay } = plan;
+  const replayedHistory: BranchHistoryEntry[] = [];
+  const invalid = branchEngine.validateBranchRuntime(runtime);
+  if (invalid) return { replayedHistory, branchError: invalid, endedNotice: null };
+  if (isT0 && leadOverride) {
+    replayedHistory.push(leadHistoryEntry(branchEngine, runtime, leadOverride, startPosition));
+  }
+  const failure = await replayKeptHistory(runtime, branchEngine, historyToReplay, replayedHistory);
+  if (!failure) return { replayedHistory, branchError: null, endedNotice: null };
+  if (turnCount(replayedHistory) === 0 && turnCount(historyToReplay) > 0) {
+    return { replayedHistory, branchError: null, endedNotice: endedNoticeFor(targetTurn, historyToReplay, failure.error) };
+  }
+  return {
+    replayedHistory, endedNotice: null,
+    branchError: `Rebuild stopped before branch turn ${failure.turnNumber}: ${failure.error}`,
+  };
 }
 
 interface SessionSetters extends BranchSetters {
@@ -272,6 +309,7 @@ interface SessionSetters extends BranchSetters {
 function useStartBranch(
   refs: BranchRefs, setters: SessionSetters, clearChoices: () => void,
   loadBranchEngine: () => Promise<BranchEngineModule>, updateState: (battleStream: BattleStream | null) => void,
+  stopBranch: () => void,
 ) {
   const { logRef, battleStreamRef, streamsRef, choiceErrorsRef, p1ChoicesRef, p2ChoicesRef } = refs;
   const { setExecuteError, setBranching, setHistory, setVariationStartTurn, setStartSerialized } = setters;
@@ -283,14 +321,13 @@ function useStartBranch(
     targetTurn: number,
     snapshot?: TurnSnapshot | null,
     options?: StartBranchOptions,
-  ) => {
+  ): Promise<StartOutcome | void> => {
     logRef.current = [];
     clearChoices();
     setExecuteError(null);
 
     const branchEngine = await loadBranchEngine();
     const plan = resolveStartPlan(targetTurn, options);
-    const { isT0, leadOverride, historyToReplay } = plan;
     const runtime = await reconstructOrAbort(branchEngine, { format, p1Team, p2Team, replayLog, targetTurn, snapshot, options }, plan);
     if (!runtime) return;
 
@@ -302,14 +339,10 @@ function useStartBranch(
     // tip, and the start position is the one every truncation returns to.
     const startPosition = branchEngine.captureSerializedPosition(runtime.battleStream.battle);
 
-    let branchError = branchEngine.validateBranchRuntime(runtime);
-
-    const replayedHistory: BranchHistoryEntry[] = [];
-    if (isT0 && leadOverride && !branchError) {
-      replayedHistory.push(leadHistoryEntry(branchEngine, runtime, leadOverride, startPosition));
-    }
-    if (!branchError) {
-      branchError = await replayKeptHistory(runtime, branchEngine, historyToReplay, replayedHistory);
+    const { replayedHistory, branchError, endedNotice } = await replayStartHistory(runtime, branchEngine, plan, startPosition, targetTurn);
+    if (endedNotice) {
+      stopBranch();
+      return { endedNotice };
     }
 
     p1ChoicesRef.current = branchError ? [] : [...(options?.p1Choices ?? [])];
@@ -320,7 +353,8 @@ function useStartBranch(
     setStartSerialized(startPosition);
     setExecuteError(branchError);
     updateState(runtime.battleStream);
-  }, [clearChoices, loadBranchEngine, updateState, logRef, battleStreamRef, streamsRef, choiceErrorsRef,
+    return { endedNotice: null };
+  }, [clearChoices, loadBranchEngine, updateState, stopBranch, logRef, battleStreamRef, streamsRef, choiceErrorsRef,
     p1ChoicesRef, p2ChoicesRef, setExecuteError, setBranching, setHistory, setVariationStartTurn, setStartSerialized]);
 }
 
@@ -337,11 +371,6 @@ export function useBranchSession(
     return branchEngineRef.current;
   }, [branchEngineRef]);
 
-  const startBranch = useStartBranch(refs, setters, clearChoices, loadBranchEngine, updateState);
-
-  /** Live sim battle of the current branch (null outside an active branch). */
-  const getBattle = useCallback(() => battleStreamRef.current?.battle ?? null, [battleStreamRef]);
-
   const stopBranch = useCallback(() => {
     setBranching(false);
     setSimState(null);
@@ -356,6 +385,11 @@ export function useBranchSession(
     clearChoices();
   }, [clearChoices, setBranching, setSimState, setHistory, setVariationStartTurn, setStartSerialized, setExecuteError,
     streamsRef, battleStreamRef, logRef, choiceErrorsRef]);
+
+  const startBranch = useStartBranch(refs, setters, clearChoices, loadBranchEngine, updateState, stopBranch);
+
+  /** Live sim battle of the current branch (null outside an active branch). */
+  const getBattle = useCallback(() => battleStreamRef.current?.battle ?? null, [battleStreamRef]);
 
   return { startBranch, getBattle, stopBranch };
 }

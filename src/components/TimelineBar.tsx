@@ -10,6 +10,8 @@ interface TimelineBarProps {
   endSnapshotTurn: number | null;
   atEndPosition: boolean;
   viewingVariation: boolean;
+  /** The variation's live sim has a winner: its tip reads End and the total counts played turns (round 77, A-6). */
+  variationEnded?: boolean;
   branching: boolean;
   onNavigate: (position: TimelinePosition) => void;
   onGraphSelectLine: (turn: number) => void;
@@ -33,19 +35,23 @@ function VariationStripe({ variationSpan, maxTurn }: { variationSpan: VariationS
   );
 }
 
-function TimelinePositionLabel({ viewT0, viewTurn, variationSpan, maxTurn, endSnapshotTurn, atEndPosition, viewingVariation }: Pick<TimelineBarProps,
-  'viewT0' | 'viewTurn' | 'variationSpan' | 'maxTurn' | 'endSnapshotTurn' | 'atEndPosition' | 'viewingVariation'>) {
+function TimelinePositionLabel({ viewT0, viewTurn, variationSpan, maxTurn, endSnapshotTurn, atEndPosition, viewingVariation, variationEnded }: Pick<TimelineBarProps,
+  'viewT0' | 'viewTurn' | 'variationSpan' | 'maxTurn' | 'endSnapshotTurn' | 'atEndPosition' | 'viewingVariation' | 'variationEnded'>) {
+  const playedMain = endSnapshotTurn !== null ? endSnapshotTurn - 1 : maxTurn;
+  // An ended variation's tip is its end sentinel, not one more played turn.
+  const atVariationEnd = !!variationEnded && viewingVariation && variationSpan !== null && viewTurn >= variationTip(variationSpan);
+  const total = variationEnded && variationSpan ? Math.max(playedMain, variationTip(variationSpan) - 1) : sliderMax(playedMain, variationSpan);
   return (
     <span style={{ fontSize: 11, color: '#aab', minWidth: 60, textAlign: 'center' }}>
       {viewT0 ? (
         <strong style={{ color: '#fff' }}>T0</strong>
-      ) : atEndPosition && !viewingVariation ? (
+      ) : (atEndPosition && !viewingVariation) || atVariationEnd ? (
         <strong style={{ color: '#fff' }}>End</strong>
       ) : (
         <>
           {/* The total counts PLAYED turns — the end snapshot is the
               "End" sentinel, not a 68th turn of a 67-turn game. */}
-          T<strong style={{ color: '#fff' }}>{viewTurn}</strong>/{sliderMax(endSnapshotTurn !== null ? endSnapshotTurn - 1 : maxTurn, variationSpan)}
+          T<strong style={{ color: '#fff' }}>{viewTurn}</strong>/{total}
         </>
       )}
     </span>
@@ -73,8 +79,8 @@ function TimelineLineChip({ viewTurn, variationSpan, maxTurn, viewingVariation, 
   );
 }
 
-function TimelineTrack({ viewTurn, viewLine, variationSpan, maxTurn, onNavigate }: Pick<TimelineBarProps,
-  'viewTurn' | 'viewLine' | 'variationSpan' | 'maxTurn' | 'onNavigate'>) {
+function TimelineTrack({ viewT0, viewTurn, viewLine, variationSpan, maxTurn, onNavigate }: Pick<TimelineBarProps,
+  'viewT0' | 'viewTurn' | 'viewLine' | 'variationSpan' | 'maxTurn' | 'onNavigate'>) {
   return (
     <span className="ps-timeline-track">
       {variationSpan && <VariationStripe variationSpan={variationSpan} maxTurn={maxTurn} />}
@@ -82,7 +88,7 @@ function TimelineTrack({ viewTurn, viewLine, variationSpan, maxTurn, onNavigate 
         type="range"
         min={1}
         max={sliderMax(maxTurn, variationSpan)}
-        value={viewTurn}
+        value={viewT0 ? 1 : viewTurn}
         onChange={e => onNavigate({ turn: parseInt(e.target.value, 10), line: viewLine })}
         aria-label="Timeline turn selector"
       />
@@ -125,7 +131,7 @@ export function TimelineBar(props: TimelineBarProps) {
     <div className="ps-branch-bar">
       <span style={{ fontSize: 11, fontWeight: 'bold', whiteSpace: 'nowrap', color: '#cde' }}>Timeline</span>
       <TimelineBackControls viewT0={viewT0} viewTurn={viewTurn} viewLine={viewLine} onNavigate={onNavigate} onGraphSelectLine={onGraphSelectLine} />
-      <TimelineTrack viewTurn={viewTurn} viewLine={viewLine} variationSpan={variationSpan} maxTurn={maxTurn} onNavigate={onNavigate} />
+      <TimelineTrack viewT0={viewT0} viewTurn={viewTurn} viewLine={viewLine} variationSpan={variationSpan} maxTurn={maxTurn} onNavigate={onNavigate} />
       <button
         type="button"
         onClick={() => onNavigate({ turn: viewT0 ? 1 : viewTurn + 1, line: viewLine })}
@@ -141,6 +147,7 @@ export function TimelineBar(props: TimelineBarProps) {
         endSnapshotTurn={props.endSnapshotTurn}
         atEndPosition={props.atEndPosition}
         viewingVariation={props.viewingVariation}
+        variationEnded={props.variationEnded}
       />
       {/* The chip stays put while a variation exists — flickering away
           outside the covered turns made the whole bar jump around. */}

@@ -40,6 +40,19 @@ async function loaded() {
 }
 
 describe('useEngineController', () => {
+  // Round 77 (swarm D2): a pending pick that the position no longer offers is dropped once the picker lands.
+  test('a draft pick the viewed position does not offer is dropped, a pick it offers stays', async () => {
+    const { result } = await loaded();
+    act(() => result.current.board.timeline.navigateTo({ turn: 2, line: 'main' }));
+    await waitFor(() => expect(result.current.engine.positionPicker?.source).toBe('snapshot'), { timeout: 30_000 });
+    const offered = result.current.engine.positionPicker!.simState.p2MovesBySlot[0].find(option => !option.disabled)!;
+    const kept = { kind: 'move' as const, moveId: offered.name.toLowerCase().replace(/[^a-z0-9]/g, ''), moveName: offered.name };
+    const gone = { kind: 'move' as const, moveId: 'nosuchmove', moveName: 'Nosuch Move' };
+
+    act(() => result.current.transients.setDraftChoices({ p1: [gone], p2: [kept] }));
+    await waitFor(() => expect(result.current.transients.draftChoices).toEqual({ p1: [null], p2: [kept] }));
+  }, 60_000);
+
   test('exposes the four surfaces in their idle state before a replay', () => {
     const { result } = renderHook(() => useEngineHarness());
     const { engine } = result.current;

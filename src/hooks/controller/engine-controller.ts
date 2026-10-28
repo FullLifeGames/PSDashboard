@@ -10,6 +10,7 @@ import { parsePlayedActions, parsePlayedActionsDoubles } from '@fulllifegames/ev
 import type { ReplayContext } from './replay-context';
 import type { Transients } from './transients';
 import type { BoardController } from './board-controller';
+import { dropStaleDraft } from './draft-guard';
 
 /** View-side gates for the acquisition hook: whether the dwell rebuild may
  *  arm (main-line position, nothing busy) and whether Smogon data is due. */
@@ -52,6 +53,13 @@ function useAcquireLayer(ctx: ReplayContext, transients: Transients, board: Boar
     getExact: acquire.getExact, exactPositionsVersion: acquire.exactPositionsVersion, draftChoices,
     liveSimState: ctx.branch.simState,
   });
+  // Round 77 (D2): a draft pick that the rebuilt position no longer offers goes, instead of failing on Execute. The
+  // reconciliation runs in render: the draft state lives in this same component.
+  const resolvedForView = !liveTip ? positionPicker?.simState ?? null : null;
+  if (resolvedForView) {
+    const kept = dropStaleDraft(draftChoices, resolvedForView);
+    if (kept !== draftChoices) transients.setDraftChoices(kept);
+  }
   // Round 75 (T160): the played-action parser reads the replay's own Dex (generation and mod).
   const rules = useMemo(() => logRules(replayData?.log ?? ''), [replayData]);
   const parseSingles = useCallback((lines: string[]) => parsePlayedActions(lines, rules), [rules]);

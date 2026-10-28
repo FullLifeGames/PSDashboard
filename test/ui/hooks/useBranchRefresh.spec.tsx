@@ -34,7 +34,7 @@ function args(overrides: Partial<Args> = {}): Args {
   return {
     replayData, snapshots, observations, sources, bringOnlyLists: null, branching: false, variationStartTurn: null,
     startBranch: vi.fn(async () => {}), acquireRuntime: vi.fn(), viewTurn: 3, session: fakeSession(),
-    branchWindowOpenRef: { current: false }, request: null, clearRequest: vi.fn(),
+    branchWindowOpenRef: { current: false }, request: null, clearRequest: vi.fn(), reportEnded: vi.fn(),
     ...overrides,
   };
 }
@@ -87,6 +87,20 @@ describe('useBranchRefresh', () => {
     expect(turn).toBe(2);
     expect(options.replayHistory).toBe(history);
     expect(options.bringOnly).toEqual({ p1: ['Garchomp'], p2: ['Great Tusk'] });
+  }, 60_000);
+
+  // Round 77 (swarm D1): a rebuild that keeps no turn ends the variation and says so.
+  test('a refresh that keeps no turn reports the ended variation and opens no branch window', async () => {
+    const history = [{ turnNumber: 2, p1Choice: 'move earthquake', p2Choice: 'move leechseed', p1Active: null, p1ActiveSlots: [], p2Active: null, p2ActiveSlots: [], p1Pokemon: [], p2Pokemon: [] }];
+    const wired = args({
+      request: { ...request(), history }, branching: true, variationStartTurn: 2,
+      startBranch: vi.fn(async () => ({ endedNotice: 'The variation from turn 2 (1 turn) ended: Swampert no longer knows Earthquake.' })),
+    });
+    renderHook(() => useBranchRefresh(wired));
+    await waitFor(() => expect(wired.reportEnded).toHaveBeenCalledTimes(1), { timeout: 30_000 });
+    expect(wired.reportEnded).toHaveBeenCalledWith('The variation from turn 2 (1 turn) ended: Swampert no longer knows Earthquake.');
+    expect(wired.branchWindowOpenRef.current).toBe(false);
+    await waitFor(() => expect(wired.clearRequest).toHaveBeenCalledTimes(1));
   }, 60_000);
 
   test('a request that arrives while the inputs change is cancelled before it lands', async () => {

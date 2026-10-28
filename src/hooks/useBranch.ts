@@ -58,7 +58,23 @@ export function useBranch() {
     p2ChoicesRef.current = [];
   }, []);
 
-  const { executeTurn, setChoice } = useBranchExecute(refs, setters, clearChoices);
+  // executeTurn hands its failure to the caller: a deviation that replaced a variation needs it to roll back
+  // (round 77, A-2). The tracked setter records what the executor reported last.
+  const lastExecuteErrorRef = useRef<string | null>(null);
+  const trackedSetters = useMemo(() => ({
+    ...setters,
+    setExecuteError: (value: React.SetStateAction<string | null>) => {
+      if (typeof value !== 'function') lastExecuteErrorRef.current = value;
+      setters.setExecuteError(value);
+    },
+  }), [setters]);
+  const { executeTurn: runTurn, setChoice } = useBranchExecute(refs, trackedSetters, clearChoices);
+  /** Runs the pending choices; resolves to the executor's error text, or null when the turn ran or nothing was due. */
+  const executeTurn = useCallback(async (): Promise<string | null> => {
+    lastExecuteErrorRef.current = null;
+    await runTurn();
+    return lastExecuteErrorRef.current;
+  }, [runTurn]);
   const { startBranch, getBattle, stopBranch } = useBranchSession(refs, setters, clearChoices, updateState);
 
   return {

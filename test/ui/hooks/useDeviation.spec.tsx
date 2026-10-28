@@ -23,15 +23,16 @@ type BranchSurface = DeviationInputs['branch'];
 
 function timelineAt(turn: number, overrides: Partial<Timeline> = {}): Timeline {
   return {
-    viewTurnRef: { current: turn }, viewLine: 'main', endSnapshotTurn: null, variationSpan: null,
-    setVariationScores: vi.fn(), setViewTurn: vi.fn(), setViewLine: vi.fn(), liveTip: false, ...overrides,
+    viewTurnRef: { current: turn }, viewTurn: turn, viewLine: 'main', endSnapshotTurn: null, variationSpan: null,
+    setVariationScores: vi.fn(), setViewTurn: vi.fn(), setViewLine: vi.fn(), liveTip: false, restorePointer: vi.fn(),
+    ...overrides,
   };
 }
 
 function branchSurface(overrides: Partial<BranchSurface> = {}): BranchSurface {
   return {
-    startBranch: vi.fn(async () => {}), getBattle: vi.fn(() => null), executeTurn: vi.fn(async () => {}), setChoice: vi.fn(),
-    history: [], ...overrides,
+    startBranch: vi.fn(async () => {}), getBattle: vi.fn(() => null), executeTurn: vi.fn(async () => null), setChoice: vi.fn(),
+    history: [], stopBranch: vi.fn(), ...overrides,
   };
 }
 
@@ -81,6 +82,76 @@ describe('useDeviation', () => {
     act(() => result.current.requestDeviation(prefill));
     await waitFor(() => expect(wired.branch.executeTurn).toHaveBeenCalledTimes(1), { timeout: 30_000 });
     expect(startCalls(wired)[0][6]).toMatchObject({ p1Choices: prefill.p1Choices });
+  }, 60_000);
+
+  // Round 77 (swarm A-2): the executor refuses the picked turn after the rebuild replaced the variation.
+  describe('a refused execute after the rebuild', () => {
+    const prefill = { p1Choices: [{ kind: 'move' as const, moveId: 'toxicspikes', moveName: 'Toxic Spikes' }], p2Choices: [] };
+
+    test('next to a standing variation it restores that variation and the pointer, and says why', async () => {
+      const history = [entry(2), entry(3)];
+      const wired = inputs({
+        timeline: timelineAt(3, { variationSpan: { startTurn: 2, length: 2 } }),
+        branch: branchSurface({ history, executeTurn: vi.fn(async () => 'Toxic Spikes is disabled for Toxapex right now.') }),
+      });
+      const { result } = renderHook(() => useDeviation(wired));
+      act(() => result.current.requestDeviation(prefill));
+      const confirm = (wired.setPendingConfirm as ReturnType<typeof vi.fn>).mock.calls[0][0] as { proceed: () => void };
+      act(() => confirm.proceed());
+      await waitFor(() => expect(startCalls(wired)).toHaveLength(2), { timeout: 30_000 });
+
+      // The first start replaced the variation at the viewed turn; the second brings the old one back whole.
+      expect(startCalls(wired)[0][4]).toBe(3);
+      expect(startCalls(wired)[0][6].replayHistory).toEqual([]);
+      expect(startCalls(wired)[1][4]).toBe(2);
+      expect(startCalls(wired)[1][6].replayHistory).toEqual(history);
+      await waitFor(() => expect(result.current.variationNotice).toBe('Toxic Spikes is disabled for Toxapex right now.'));
+      expect(wired.timeline.restorePointer).toHaveBeenCalledWith({ turn: 3, line: 'main' }, { startTurn: 2, length: 2 });
+      expect(wired.branch.stopBranch).not.toHaveBeenCalled();
+      expect(wired.timeline.setVariationScores).not.toHaveBeenCalled();
+    }, 60_000);
+
+    test('without a variation it ends the empty one the rebuild opened', async () => {
+      const wired = inputs({
+        branch: branchSurface({ executeTurn: vi.fn(async () => 'Swampert no longer knows Earthquake.') }),
+      });
+      const { result } = renderHook(() => useDeviation(wired));
+      act(() => result.current.requestDeviation(prefill));
+      await waitFor(() => expect(result.current.variationNotice).toBe('Swampert no longer knows Earthquake.'), { timeout: 30_000 });
+      expect(startCalls(wired)).toHaveLength(1);
+      expect(wired.branch.stopBranch).toHaveBeenCalledTimes(1);
+      expect(wired.branchWindowOpenRef.current).toBe(false);
+      expect(wired.timeline.restorePointer).not.toHaveBeenCalled();
+    }, 60_000);
+
+    test('an executed turn keeps the new variation and drops the old overlay', async () => {
+      const wired = inputs({ timeline: timelineAt(3, { variationSpan: { startTurn: 2, length: 2 } }), branch: branchSurface({ history: [entry(2), entry(3)] }) });
+      const { result } = renderHook(() => useDeviation(wired));
+      act(() => result.current.requestDeviation(prefill));
+      act(() => ((wired.setPendingConfirm as ReturnType<typeof vi.fn>).mock.calls[0][0] as { proceed: () => void }).proceed());
+      await waitFor(() => expect(wired.timeline.setVariationScores).toHaveBeenCalledWith([]), { timeout: 30_000 });
+      expect(startCalls(wired)).toHaveLength(1);
+      expect(result.current.variationNotice).toBeNull();
+      expect(wired.timeline.restorePointer).not.toHaveBeenCalled();
+    }, 60_000);
+  });
+
+  // Round 77 (swarm D1): a rebuild that keeps no turn leaves no variation and no phantom message.
+  test('a rebuild that keeps no turn ends the variation: the notice names it and the pointer stays on the main line', async () => {
+    const notice = 'The variation from turn 2 (2 turns) ended: Swampert no longer knows Earthquake.';
+    const history = [entry(2), entry(3)];
+    const wired = inputs({
+      timeline: timelineAt(4, { viewLine: 'variation', variationSpan: { startTurn: 2, length: 2 } }),
+      branch: branchSurface({ history, startBranch: vi.fn(async () => ({ endedNotice: notice })) }),
+    });
+    const { result } = renderHook(() => useDeviation(wired));
+    act(() => result.current.requestDeviation(null));
+    await waitFor(() => expect(result.current.variationNotice).toBe(notice), { timeout: 30_000 });
+    expect(wired.timeline.setViewLine).toHaveBeenCalledWith('main');
+    expect(wired.timeline.setVariationScores).toHaveBeenCalledWith([]);
+    expect(wired.branchWindowOpenRef.current).toBe(false);
+    expect(wired.timeline.setViewTurn).not.toHaveBeenCalledWith(2);
+    expect(result.current.branchDivergence).toBeNull();
   }, 60_000);
 
   test('the end position refuses with a notice instead of rebuilding', () => {

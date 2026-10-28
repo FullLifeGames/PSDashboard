@@ -32,6 +32,8 @@ interface RefreshContext {
   branchWindowOpenRef: MutableRefObject<boolean>;
   isCancelled: () => boolean;
   clearRequest: () => void;
+  /** The rebuild kept no turn: the variation is gone (round 77, D1). */
+  reportEnded: (notice: string) => void;
 }
 
 /** The refresh run: rebuild the variation with the edited team knowledge,
@@ -45,7 +47,7 @@ async function runRefresh(ctx: RefreshContext, request: BranchRefreshRequest) {
     });
     if (!ctx.isCancelled() && inputs) {
       ctx.session.bumpSession();
-      await ctx.startBranch(getBranchSimulatorFormat(ctx.replayData), inputs.p1Team, inputs.p2Team, ctx.replayData.log, ctx.refreshTurn, snapshotAt(ctx.snapshots, ctx.refreshTurn), {
+      const outcome = await ctx.startBranch(getBranchSimulatorFormat(ctx.replayData), inputs.p1Team, inputs.p2Team, ctx.replayData.log, ctx.refreshTurn, snapshotAt(ctx.snapshots, ctx.refreshTurn), {
         replayHistory: request.history,
         p1Choices: request.p1Choices,
         p2Choices: request.p2Choices,
@@ -57,7 +59,10 @@ async function runRefresh(ctx: RefreshContext, request: BranchRefreshRequest) {
         bringOnly: ctx.bringOnly,
         acquireRuntime: ctx.acquireRuntime,
       });
-      if (!abortController.signal.aborted) {
+      if (outcome?.endedNotice) {
+        ctx.branchWindowOpenRef.current = false;
+        ctx.reportEnded(outcome.endedNotice);
+      } else if (!abortController.signal.aborted) {
         ctx.branchWindowOpenRef.current = true;
       }
     }
@@ -89,10 +94,11 @@ export function useBranchRefresh(args: {
   branchWindowOpenRef: MutableRefObject<boolean>;
   request: BranchRefreshRequest | null;
   clearRequest: () => void;
+  reportEnded: (notice: string) => void;
 }) {
   const {
     replayData, snapshots, observations, sources, bringOnlyLists, branching, variationStartTurn,
-    startBranch, acquireRuntime, viewTurn, session, branchWindowOpenRef, request, clearRequest,
+    startBranch, acquireRuntime, viewTurn, session, branchWindowOpenRef, request, clearRequest, reportEnded,
   } = args;
   useEffect(() => {
     if (!request || !replayData) return;
@@ -105,13 +111,13 @@ export function useBranchRefresh(args: {
       bringOnly: refreshTurn > 0 ? bringOnlyLists ?? undefined : undefined,
       session, startBranch, acquireRuntime, branchWindowOpenRef,
       isCancelled: () => cancelled,
-      clearRequest,
+      clearRequest, reportEnded,
     }, request);
     return () => {
       cancelled = true;
     };
   }, [
     request, replayData, snapshots, observations, sources, bringOnlyLists, branching,
-    variationStartTurn, startBranch, acquireRuntime, viewTurn, session, branchWindowOpenRef, clearRequest,
+    variationStartTurn, startBranch, acquireRuntime, viewTurn, session, branchWindowOpenRef, clearRequest, reportEnded,
   ]);
 }

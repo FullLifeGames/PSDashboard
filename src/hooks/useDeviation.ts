@@ -3,22 +3,23 @@ import {
   type DamageObservation, type ReplayData, type TurnSnapshot, getBranchSimulatorFormat, replayRules,
 } from '@fulllifegames/replay-core';
 import type { BranchSlotChoice } from '@fulllifegames/eval-engine';
-import { classifyDeviation, keptEntries, type TimelinePosition } from '../lib/timeline';
+import { classifyDeviation, keptEntries, variationTip, type TimelinePosition } from '../lib/timeline';
 import { snapshotAt, type TeamBuildSources } from '../lib/eval-acquire';
 import { divergenceNoticeFor, keptHistorySlice, prepareBranchInputs } from '../lib/branch-build';
 import { buildLeadOptions, defaultLeadSelectionFor } from '../lib/lead-options';
 import type { BranchHistoryEntry, useBranch } from './useBranch';
 import type { AcquireRuntime } from './branch/session';
 import type { Timeline } from './useTimeline';
+import { useVariationNotice } from './useVariationNotice';
 
 type Branch = ReturnType<typeof useBranch>;
 
 export interface LeadSelection { p1: string[]; p2: string[]; bring?: boolean }
 
 export type DeviationTimeline = Pick<Timeline,
-  'viewTurnRef' | 'viewLine' | 'endSnapshotTurn' | 'variationSpan' | 'setVariationScores'
-  | 'setViewTurn' | 'setViewLine' | 'liveTip'>;
-type DeviationBranch = Pick<Branch, 'startBranch' | 'getBattle' | 'executeTurn' | 'setChoice' | 'history'>;
+  'viewTurnRef' | 'viewTurn' | 'viewLine' | 'endSnapshotTurn' | 'variationSpan' | 'setVariationScores'
+  | 'setViewTurn' | 'setViewLine' | 'liveTip' | 'restorePointer'>;
+type DeviationBranch = Pick<Branch, 'startBranch' | 'getBattle' | 'executeTurn' | 'setChoice' | 'history' | 'stopBranch'>;
 
 export interface DeviationInputs {
   replayData: ReplayData | null;
@@ -91,6 +92,8 @@ export interface RebuildContext {
   branchWindowOpenRef: MutableRefObject<boolean>;
   setBranchDivergence: (notice: string | null) => void;
   landPointer: (startTurn: number) => void;
+  /** The rebuild kept no turn (round 77, D1); without it the notice goes to the divergence line. */
+  reportEnded?: (notice: string) => void;
 }
 
 /** The async heart of rebuildAt, once the plan (start turn, kept history)
@@ -110,7 +113,7 @@ export async function executeRebuild(
     if (inputs) {
       ctx.session.bumpSession();
       const selectedSnapshot = snapshotAt(ctx.snapshots, startTurn);
-      await ctx.branch.startBranch(getBranchSimulatorFormat(ctx.replayData), inputs.p1Team, inputs.p2Team, ctx.replayData.log, startTurn, selectedSnapshot, {
+      const outcome = await ctx.branch.startBranch(getBranchSimulatorFormat(ctx.replayData), inputs.p1Team, inputs.p2Team, ctx.replayData.log, startTurn, selectedSnapshot, {
         replayHistory,
         p1Choices: prefill?.p1Choices ?? [],
         p2Choices: prefill?.p2Choices ?? [],
@@ -123,7 +126,10 @@ export async function executeRebuild(
         bringOnly: ctx.bringOnly,
         acquireRuntime: ctx.acquireRuntime,
       });
-      if (!abortController.signal.aborted) {
+      if (outcome?.endedNotice) {
+        ctx.branchWindowOpenRef.current = false;
+        (ctx.reportEnded ?? ctx.setBranchDivergence)(outcome.endedNotice);
+      } else if (!abortController.signal.aborted) {
         ctx.branchWindowOpenRef.current = true;
         ctx.setBranchDivergence(divergenceNoticeFor(ctx.branch.getBattle(), startTurn));
         // The pointer lands where the sim now stands; the tip-follow effect
@@ -154,6 +160,7 @@ export function useDeviation(inputs: DeviationInputs) {
   const { branchPreparing, branchProgress, branchSession, handles: session } = useBranchSession();
   const [branchDivergence, setBranchDivergence] = useState<string | null>(null);
   const { variationSpan } = timeline;
+  const { variationNotice, setVariationNotice, reportVariationEnded } = useVariationNotice(timeline, branch.history.length, snapshots.length);
 
   /**
    * Rebuilds the live sim at `position` and prefills the pickers: the proven
@@ -183,6 +190,7 @@ export function useDeviation(inputs: DeviationInputs) {
       // selection; per-side fail-open when the protocol does not pin a side.
       bringOnly: startTurn > 0 ? bringOnlyLists ?? undefined : undefined,
       session, branch, acquireRuntime, branchWindowOpenRef, setBranchDivergence,
+      reportEnded: reportVariationEnded,
       landPointer: (turn) => {
         timeline.setViewTurn(turn);
         timeline.setViewLine('main');
@@ -190,11 +198,12 @@ export function useDeviation(inputs: DeviationInputs) {
     }, startTurn, replayHistory, prefill, leadOverride);
   }, [
     replayData, session, variationSpan, branch, acquireRuntime, snapshots, observations, sources, bringOnlyLists,
-    branchWindowOpenRef, timeline,
+    branchWindowOpenRef, timeline, reportVariationEnded,
   ]);
 
   const requests = useDeviationRequests({
-    timeline, rebuildAt, executeTurn: branch.executeTurn, setPendingConfirm, setBranchDivergence,
+    timeline, rebuildAt, branch, setPendingConfirm, setBranchDivergence, setVariationNotice,
+    branchWindowOpenRef,
   });
 
   const handleSetChoice = useCallback((side: 'p1' | 'p2', choice: BranchSlotChoice, activeSlot?: number) => {
@@ -215,7 +224,7 @@ export function useDeviation(inputs: DeviationInputs) {
   const { leadOptions, defaultLeadSelection } = useLeadDefaults(snapshots, bringCount, replayGameType, replayData);
 
   return {
-    session, branchDivergence, setBranchDivergence,
+    session, branchDivergence, setBranchDivergence, variationNotice, reportVariationEnded,
     branchPreparing, branchProgress, branchSession,
     cancelPreparation: session.cancelPreparation,
     rebuildAt, ...requests, handleSetChoice, handleExecuteDraft, leadOptions, defaultLeadSelection,
@@ -232,18 +241,56 @@ function useLeadDefaults(snapshots: TurnSnapshot[], bringCount: number | null, r
   return { leadOptions, defaultLeadSelection };
 }
 
+/** The score overlay dies with the variation entries it belonged to. */
+function dropVariationOverlay(timeline: DeviationTimeline, kind: ReturnType<typeof classifyDeviation>, turn: number) {
+  if (kind === 'replace' || kind === 'open') {
+    timeline.setVariationScores([]);
+  } else if (kind === 'truncate') {
+    timeline.setVariationScores(previous => previous.map((value, index) => (index + 1 > turn ? null : value)));
+  }
+}
+
+/**
+ * The executor refused the picked turn. The rebuild already replaced the variation, so put it back
+ * (round 77, A-2): the old one when there was one, no variation at all otherwise.
+ */
+function useUndoRefusedDeviation(args: {
+  timeline: DeviationTimeline;
+  variationSpan: DeviationTimeline['variationSpan'];
+  rebuildAt: (position: TimelinePosition, prefill: null) => Promise<void>;
+  branch: Pick<DeviationBranch, 'stopBranch'>;
+  setVariationNotice: (notice: string | null) => void;
+  branchWindowOpenRef: MutableRefObject<boolean>;
+}) {
+  const { timeline, variationSpan, rebuildAt, branch, setVariationNotice, branchWindowOpenRef } = args;
+  return useCallback(async (position: TimelinePosition, error: string) => {
+    if (variationSpan) {
+      await rebuildAt({ turn: variationTip(variationSpan), line: 'variation' }, null);
+      timeline.restorePointer(position, variationSpan);
+    } else {
+      branchWindowOpenRef.current = false;
+      branch.stopBranch();
+    }
+    setVariationNotice(error);
+  }, [timeline, variationSpan, rebuildAt, branch, setVariationNotice, branchWindowOpenRef]);
+}
+
 /** The chess rules of leaving the line: an explicit deviation request from
  *  the viewed position, and the turn-0 lead variation, both guarded by the
  *  replace confirm. */
 function useDeviationRequests(args: {
   timeline: DeviationTimeline;
   rebuildAt: (position: TimelinePosition, prefill: { p1Choices: (BranchSlotChoice | null)[]; p2Choices: (BranchSlotChoice | null)[] } | null, leadOverride?: LeadSelection) => Promise<void>;
-  executeTurn: Branch['executeTurn'];
+  branch: Pick<DeviationBranch, 'executeTurn' | 'stopBranch'>;
   setPendingConfirm: DeviationInputs['setPendingConfirm'];
   setBranchDivergence: (notice: string | null) => void;
+  setVariationNotice: (notice: string | null) => void;
+  branchWindowOpenRef: MutableRefObject<boolean>;
 }) {
-  const { timeline, rebuildAt, executeTurn, setPendingConfirm, setBranchDivergence } = args;
+  const { timeline, rebuildAt, branch, setPendingConfirm, setBranchDivergence } = args;
   const { variationSpan } = timeline;
+
+  const undoRefusedDeviation = useUndoRefusedDeviation({ ...args, variationSpan });
 
   const requestDeviation = useCallback((
     prefill: { p1Choices: (BranchSlotChoice | null)[]; p2Choices: (BranchSlotChoice | null)[] } | null,
@@ -257,14 +304,17 @@ function useDeviationRequests(args: {
     }
     const kind = classifyDeviation(variationSpan, position);
     const run = () => {
-      // The overlay dies with the entries it belonged to.
-      if (kind === 'replace' || kind === 'open') {
-        timeline.setVariationScores([]);
-      } else if (kind === 'truncate') {
-        timeline.setVariationScores(previous => previous.map((value, index) => (index + 1 > position.turn ? null : value)));
-      }
-      void rebuildAt(position, prefill).then(() => {
-        if (prefill) void executeTurn();
+      // The overlay dies with the entries it belonged to. A deviation that executes a turn waits for the turn to
+      // run: a refused turn restores the old variation with its overlay.
+      const dropOverlay = () => dropVariationOverlay(timeline, kind, position.turn);
+      if (!prefill) dropOverlay();
+      void rebuildAt(position, prefill).then(async () => {
+        const error = prefill ? await branch.executeTurn() : null;
+        if (error === null) {
+          if (prefill) dropOverlay();
+          return;
+        }
+        await undoRefusedDeviation(position, error);
       });
     };
     if (kind === 'replace' && variationSpan) {
@@ -275,7 +325,7 @@ function useDeviationRequests(args: {
       return;
     }
     run();
-  }, [timeline, variationSpan, rebuildAt, executeTurn, setPendingConfirm, setBranchDivergence]);
+  }, [timeline, variationSpan, rebuildAt, branch, setPendingConfirm, setBranchDivergence, undoRefusedDeviation]);
 
   /**
    * Turn-0 branching: replace the game's leads and play from team preview.
