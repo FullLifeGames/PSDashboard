@@ -8,7 +8,7 @@ import type {
   SimBattle, SimPokemon, SimSide,
 } from './types.ts';
 import { slotLetter, trimTeamToBring } from './team-order.ts';
-import { formatRules } from '@fulllifegames/replay-core';
+import { formatRules, toId } from '@fulllifegames/replay-core';
 import { targetTypeForMove } from './protocol-choices.ts';
 import { forceSwitches } from './corrections.ts';
 import { extractPokemonInfo, makePokemonInfo, shownPercent } from './pokemon-info.ts';
@@ -76,6 +76,15 @@ export function typesUnderTera(
   return labels;
 }
 
+/**
+ * The moves a body can click, with the flags of the simulator's own request (round 77, A-1): getMoves
+ * disables a move at 0 PP and for every reason the Dex gives (Disable, Taunt, Encore, Torment, Imprison,
+ * Heal Block, Gravity, Throat Chop, Choice and Assault Vest, a move that cannot repeat), so the picker
+ * reads the request and does not keep a list of reasons. A move the slot itself flags (a hidden disable
+ * the singles request keeps from the player) stays disabled too. A request that offers a move the body
+ * does not carry (Struggle when every move is empty) adds that button, and a move the request leaves out
+ * (a locked turn lists only the locked move) cannot be clicked.
+ */
 function makeMoves(
   active: SimPokemon | null | undefined,
   activeSlot: number,
@@ -84,18 +93,28 @@ function makeMoves(
 ): BranchMoveOption[] {
   if (!active || active.fainted || forceSwitch) return [];
   const underTera = typesUnderTera(battle, active);
-  return active.moveSlots.map((move, index): BranchMoveOption => {
-    const targetType = targetTypeForMove(battle.dex, active, move.id || move.move);
+  const requestMoves = active.getMoveRequestData().moves;
+  const ownIds = new Set(active.moveSlots.map(move => move.id || toId(move.move)));
+  const entries = [
+    ...active.moveSlots.map(move => ({ name: move.move, id: move.id || toId(move.move), pp: move.pp, maxpp: move.maxpp, slotDisabled: !!move.disabled })),
+    ...requestMoves
+      .filter(move => !ownIds.has(move.id) && battle.dex.moves.get(move.id).exists)
+      .map(move => ({ name: battle.dex.moves.get(move.id).name, id: move.id, pp: move.pp ?? 0, maxpp: move.maxpp ?? 0, slotDisabled: false })),
+  ];
+  return entries.map((move, index): BranchMoveOption => {
+    const targetType = targetTypeForMove(battle.dex, active, move.id);
     const targetOptions = buildTargetOptions(battle, active, targetType);
-    const type = typeAtUse(battle, active, move.id || move.move);
-    const typeUnderTera = underTera.get(move.id || move.move);
+    const type = typeAtUse(battle, active, move.id);
+    const typeUnderTera = underTera.get(move.id);
+    const requested = requestMoves.find(entry => entry.id === move.id);
     return {
-      name: move.move,
+      name: move.name,
       activeSlot,
       slot: index + 1,
       pp: move.pp,
       maxpp: move.maxpp,
-      disabled: !!move.disabled,
+      // A request that lists other moves only (Struggle, a locked turn) leaves this one out: it cannot be clicked.
+      disabled: move.slotDisabled || (requested ? !!requested.disabled : requestMoves.length > 0),
       type,
       ...(typeUnderTera && typeUnderTera !== type ? { typeUnderTera } : {}),
       targetType,

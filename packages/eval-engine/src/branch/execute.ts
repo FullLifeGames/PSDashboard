@@ -49,7 +49,9 @@ function resolveMoveSlotChoice(
   if (requestIndex < 0) {
     return { ok: false, error: `${describePokemon(active)} no longer knows ${choice.moveName}.` };
   }
-  if (requestMoves[requestIndex].disabled) {
+  // The slot's own flag counts too: a hidden disable stays out of a singles request (the player cannot know it), the simulator refuses it all the same.
+  const ownSlot = active.moveSlots.find(slot => slot.id === requestMoves[requestIndex].id);
+  if (requestMoves[requestIndex].disabled || ownSlot?.disabled) {
     return { ok: false, error: `${choice.moveName} is disabled for ${describePokemon(active)} right now.` };
   }
 
