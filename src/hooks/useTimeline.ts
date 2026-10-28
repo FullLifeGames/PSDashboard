@@ -186,6 +186,18 @@ function useNavigateTo(args: NavArgs, seekIntentRef: SeekIntentRef) {
   // turn: the pointer stays where the user looks (round 77, D3). The key names the span, so a variation
   // that ended and a new one with the same tip follows again.
   const followedKeyRef = useRef<string | null>(null);
+  /**
+   * Puts the pointer back after a rebuild the user did not ask to follow (a failed execute restored the old
+   * variation, round 77): the span that comes back counts as followed already, so the tip-follow stays put.
+   */
+  const restorePointer = useCallback((position: TimelinePosition, span: VariationSpan | null) => {
+    followedKeyRef.current = span ? `${span.startTurn}:${variationTip(span)}` : null;
+    setViewT0(false);
+    setViewTurn(position.turn);
+    setViewLine(position.line);
+    setFollowedPlay(false);
+    setNavSeek(prev => ({ turn: position.turn, seq: (prev?.seq ?? 0) + 1 }));
+  }, [setViewT0, setViewTurn, setViewLine, setFollowedPlay, setNavSeek]);
   useEffect(() => {
     if (!branching || tipTurn === null || variationSpan === null) {
       followedKeyRef.current = null;
@@ -197,7 +209,7 @@ function useNavigateTo(args: NavArgs, seekIntentRef: SeekIntentRef) {
     navigateTo({ turn: tipTurn, line: 'variation' }, { seek: false, internal: true, followPlay: true });
   }, [branching, tipTurn, variationSpan, navigateTo]);
 
-  return navigateTo;
+  return { navigateTo, restorePointer };
 }
 
 /** Embed echo guard and the graph's explicit line-addressed selections. */
@@ -210,7 +222,7 @@ function useTimelineNav(args: NavArgs) {
   // fresh selection straight back. Stale echoes are ignored until the embed
   // confirms the seek or the window lapses.
   const seekIntentRef = useRef<{ turn: number; until: number } | null>(null);
-  const navigateTo = useNavigateTo(args, seekIntentRef);
+  const { navigateTo, restorePointer } = useNavigateTo(args, seekIntentRef);
 
   const handleReplayTurn = useCallback((turn: number) => {
     if (derived.viewingVariation || turn < 1) return;
@@ -261,7 +273,7 @@ function useTimelineNav(args: NavArgs) {
     handleGraphSelect(turn);
   }, [navigateTo, handleGraphSelect, setViewLine]);
 
-  return { navigateTo, handleReplayTurn, handleGraphSelect, handleGraphSelectLine };
+  return { navigateTo, restorePointer, handleReplayTurn, handleGraphSelect, handleGraphSelectLine };
 }
 
 export function useTimeline(inputs: TimelineInputs) {

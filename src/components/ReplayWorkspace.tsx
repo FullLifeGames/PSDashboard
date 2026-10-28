@@ -176,8 +176,16 @@ function BranchSidePanels({ app, replayData }: WorkspaceProps) {
   );
 }
 
+function WorkspaceAlert({ text }: { text: string }) {
+  return (
+    <div className="ps-panel" role="alert" style={{ marginTop: 6, padding: '6px 10px', fontSize: 11, color: '#e6b36a' }}>
+      {text}
+    </div>
+  );
+}
+
 function WorkspaceLeft({ app, replayData }: WorkspaceProps) {
-  const { branchDivergence } = app.board.deviation;
+  const { branchDivergence, variationNotice } = app.board.deviation;
   const { pendingConfirm, setPendingConfirm, setPlayOut } = app.transients;
   const { variationSpan } = app.board.timeline;
   const { branching } = app.ctx.branch;
@@ -204,11 +212,8 @@ function WorkspaceLeft({ app, replayData }: WorkspaceProps) {
         onGraphSelectLine={app.board.timeline.handleGraphSelectLine}
         onDiscard={app.board.discardVariation}
       />
-      {branchDivergence && !app.analysis.showBranch && (
-        <div className="ps-panel" role="alert" style={{ marginTop: 6, padding: '6px 10px', fontSize: 11, color: '#e6b36a' }}>
-          ⚠ {branchDivergence}
-        </div>
-      )}
+      {branchDivergence && !app.analysis.showBranch && <WorkspaceAlert text={`⚠ ${branchDivergence}`} />}
+      {variationNotice && <WorkspaceAlert text={variationNotice} />}
       {pendingConfirm && (
         <ConfirmBanner
           message={pendingConfirm.message}

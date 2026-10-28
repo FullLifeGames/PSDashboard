@@ -119,6 +119,21 @@ describe('useTimeline', () => {
     expect(result.current).toMatchObject({ viewTurn: 5, viewLine: 'variation', followedPlay: true });
   });
 
+  test('restorePointer puts the pointer back and the span that returns is not followed (round 77, A-2)', () => {
+    const { result, rerender, base } = setup();
+    const history = [entry(2), entry(3)];
+    rerender({ ...base, branching: true, variationStartTurn: 2, history });
+    act(() => result.current.navigateTo({ turn: 2, line: 'main' }));
+
+    // A refused execute: the rebuild emptied the variation, then the old one came back.
+    rerender({ ...base, branching: true, variationStartTurn: 2, history: [] });
+    act(() => {
+      result.current.restorePointer({ turn: 2, line: 'main' }, { startTurn: 2, length: 2 });
+    });
+    rerender({ ...base, branching: true, variationStartTurn: 2, history: [entry(2), entry(3)] });
+    expect(result.current).toMatchObject({ viewTurn: 2, viewLine: 'main', followedPlay: false });
+  });
+
   test('the variation span needs an executed turn: a forced interlude alone opens nothing', () => {
     const { result } = setup({ branching: true, variationStartTurn: 2, history: [entry(2, { kind: 'forced' })] });
     expect(result.current.variationSpan).toBeNull();

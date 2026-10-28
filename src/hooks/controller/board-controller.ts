@@ -17,24 +17,25 @@ import type { Transients } from './transients';
  */
 function useDeviationLayer(ctx: ReplayContext, transients: Transients, timeline: Timeline) {
   const { replayData, snapshots, observations } = ctx.replay;
-  const { startBranch, getBattle, executeTurn, setChoice, history, branching, variationStartTurn } = ctx.branch;
+  const { startBranch, getBattle, executeTurn, setChoice, history, branching, variationStartTurn, stopBranch } = ctx.branch;
   const { branchWindowOpenRef, teamSources } = ctx;
   const { bringOnlyLists, bringCount, replayGameType } = ctx.meta;
   const { draftChoices, setDraftChoices, setPendingConfirm } = transients;
   const {
     viewTurnRef, viewLine, endSnapshotTurn, variationSpan, setVariationScores,
-    setViewTurn, setViewLine, liveTip, viewTurn,
+    setViewTurn, setViewLine, liveTip, viewTurn, restorePointer,
   } = timeline;
 
   // Deviation machinery: the rebuild road, the chess-rule requests, the
   // shared preparation session, and the picker draft plumbing.
   const deviationTimeline = useMemo(() => ({
-    viewTurnRef, viewLine, endSnapshotTurn, variationSpan, setVariationScores,
-    setViewTurn, setViewLine, liveTip,
-  }), [viewTurnRef, viewLine, endSnapshotTurn, variationSpan, setVariationScores, setViewTurn, setViewLine, liveTip]);
+    viewTurnRef, viewTurn, viewLine, endSnapshotTurn, variationSpan, setVariationScores,
+    setViewTurn, setViewLine, liveTip, restorePointer,
+  }), [viewTurnRef, viewTurn, viewLine, endSnapshotTurn, variationSpan, setVariationScores, setViewTurn, setViewLine, liveTip,
+    restorePointer]);
   const deviationBranch = useMemo(() => ({
-    startBranch, getBattle, executeTurn, setChoice, history,
-  }), [startBranch, getBattle, executeTurn, setChoice, history]);
+    startBranch, getBattle, executeTurn, setChoice, history, stopBranch,
+  }), [startBranch, getBattle, executeTurn, setChoice, history, stopBranch]);
   const { acquireRuntime } = ctx.positions;
   const deviation = useDeviation({
     replayData, snapshots, observations, sources: teamSources, bringOnlyLists, bringCount,
