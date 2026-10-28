@@ -7,6 +7,7 @@ import { resolveAutoTurnSettings, type TurnEvalSettings, useEvaluation } from '.
 import type { useEvalAcquire } from './useEvalAcquire';
 import { makePreviewAcquire, type TeamBuildSources } from '../lib/eval-acquire';
 import { evalStorePrefix } from '../lib/eval-cache-store';
+import { engineCacheTag } from '../lib/eval/engine-setting';
 import { keptPlayed } from './evaluation/sweep-core';
 import {
   resolveTeraPreference, parseLeadSpecies, parsePlayedActions, parsePlayedActionsDoubles,
@@ -105,7 +106,7 @@ function useEvaluateAction(inputs: EvalViewInputs, format: EvalFormat) {
       evaluation.evaluate({ cacheKey: null, tera: effectiveTera, sleepClause: effectiveSleepClause, ruleset: effectiveRuleset, acquire: async () => stored, tag: evalViewKey });
     } else {
       evaluation.evaluate({
-        cacheKey: `${replayData.id}:${viewTurn}:${setsFingerprint}`,
+        cacheKey: `${replayData.id}:${viewTurn}:${setsFingerprint}${engineCacheTag()}`,
         tera: effectiveTera,
         sleepClause: effectiveSleepClause,
         ruleset: effectiveRuleset,
@@ -154,7 +155,7 @@ function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
       rules,
       ruleset: effectiveRuleset,
       doubles: evalIsDoubles,
-      cacheKeyFor: turn => `${replayData.id}:${turn}:${setsFingerprint}`,
+      cacheKeyFor: turn => `${replayData.id}:${turn}:${setsFingerprint}${engineCacheTag()}`,
       storePrefix: evalStorePrefix(replayData.id),
       acquireFor: acquire.makeReplayAcquire,
       acquireAll: acquire.makeSweepAcquireAll(analyzableTurns),
@@ -183,7 +184,7 @@ function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
       rules,
       ruleset: effectiveRuleset,
       doubles: evalIsDoubles,
-      cacheKeyFor: sweepTurn => `${replayData.id}:${sweepTurn}:${setsFingerprint}`,
+      cacheKeyFor: sweepTurn => `${replayData.id}:${sweepTurn}:${setsFingerprint}${engineCacheTag()}`,
       storePrefix: evalStorePrefix(replayData.id),
       acquireFor: acquire.makeReplayAcquire,
       playedFor,

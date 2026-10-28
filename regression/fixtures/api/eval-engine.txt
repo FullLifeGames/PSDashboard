@@ -27,6 +27,11 @@ type DeniedEnd
 type EndgameCaps
 type EndgameFlag
 type EndgameResult
+type EngineCheck
+type EngineCheckReport
+type EngineOption
+type EngineRequest
+type EngineResponse
 type EntryUnanswered
 type EvalCellJob
 type EvalCellValue
@@ -111,8 +116,10 @@ type WinConversion
 type WinPath
 value AUTO_MCTS_FAINTED_FRACTION
 value BLUNDER_SWING
+value DASHBOARD_ORIGINS
 value ENDGAME_CAPS
 value ENDGAME_MAX_BODIES
+value ENGINE_PROTOCOL
 value KEY_MOMENT_SWING
 value KEY_TURN_SWING
 value MIN_FORCED_MASS
@@ -134,11 +141,13 @@ value applyTargetCorrections
 value autoTurnSettings
 value branchSideChoicesReady
 value buildChoiceLockContext
+value buildEngineRequest
 value buildGameReport
 value calcSingleDamageRange
 value captureSerializedPosition
 value cellKey
 value chanceRolled
+value checkEngine
 value computeBlunders
 value computeRead
 value configureSearchBudget
@@ -155,6 +164,9 @@ value detectSacks
 value diceEventTurns
 value diffChoices
 value endgameScope
+value engineOptions
+value engineRequestFor
+value engineResponseToResult
 value evalChoiceToSlotChoices
 value executeBranchChoices
 value forcedWinFor
@@ -229,6 +241,7 @@ value takeSimFastReport
 value teraKey
 value unansweredSeenKey
 value validateBranchRuntime
+value validateEngineResponse
 value winDeltaText
 value winPctText
 value winPercent

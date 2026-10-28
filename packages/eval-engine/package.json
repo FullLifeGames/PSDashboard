@@ -28,6 +28,9 @@
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "eval-engine": "./bin/eval-engine.mjs"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -36,6 +39,8 @@
   },
   "files": [
     "dist",
+    "bin",
+    "samples",
     "README.md"
   ],
   "scripts": {

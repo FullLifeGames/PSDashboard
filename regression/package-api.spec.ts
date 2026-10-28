@@ -73,7 +73,13 @@ describe('Package hygiene', () => {
       expect(manifest.publishConfig?.access).toBe('public');
       // The types condition has to come first: consumers resolve conditions in order.
       expect(Object.keys(manifest.exports['.'])).toEqual(['types', 'default']);
-      expect(manifest.files).toEqual(['dist', 'README.md']);
+      // Round 77 (user gate 28.10.2026, 6a): the engine package ships the check-engine command and its sample positions.
+      if (name === 'eval-engine') {
+        expect(manifest.files).toEqual(['dist', 'bin', 'samples', 'README.md']);
+        expect((manifest as Manifest & { bin?: Record<string, string> }).bin).toEqual({ 'eval-engine': './bin/eval-engine.mjs' });
+      } else {
+        expect(manifest.files).toEqual(['dist', 'README.md']);
+      }
       // Workspace references stay "*" in the tree; the publish script writes the caret range.
       for (const [dep, range] of Object.entries(manifest.dependencies ?? {})) {
         expect(dep.startsWith('@fulllifegames/'), `${dep} is not a workspace package`).toBe(true);

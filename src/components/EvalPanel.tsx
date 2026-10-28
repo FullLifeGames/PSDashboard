@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { EngineChoice } from '../hooks/useEngineChoice';
 import type {
   EvalPreferences, EvalResult, RankedChoice, ReadRecommendation, SearchProgress, TurnAnalysis, GameReport,
   LeadAnalysis,
@@ -40,6 +41,8 @@ interface EvalPanelProps {
   showAuto: boolean;
   /** Gen 9 only — other gens have no Tera to gate. */
   showTera: boolean;
+  /** Round 77: the engines on offer and the chosen one. */
+  engines?: EngineChoice;
   graph: EvalGraphState;
   /** Variation overlay for the game graph (unified timeline): the gold
    *  curve's scores, indexed like the main scores (scores[turn − 1]), and the
@@ -117,6 +120,7 @@ function PanelHeader({ running, ...props }: EvalPanelProps & { running: boolean 
         onCancel={props.onCancel}
         result={props.result}
         status={props.status}
+        engines={props.engines}
       />
       <EvalStatusBlock
         playOutProgress={props.playOutProgress}

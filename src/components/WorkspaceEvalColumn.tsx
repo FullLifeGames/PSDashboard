@@ -57,6 +57,7 @@ function EvalSection({ app, replayData }: WorkspaceColumnProps) {
       reconstructProgress={evaluation.reconstructProgress}
       error={evaluation.error}
       prefs={evaluation.prefs}
+      engines={app.ctx.engines}
       onPrefsChange={evaluation.setPrefs}
       onEvaluate={liveEvalView ? handleEvaluate : undefined}
       onCancel={evaluation.cancel}

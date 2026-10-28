@@ -4,6 +4,8 @@ import {
   type EvalWorkerResponse, type MctsTreeStats, type SearchProgress, type StaticRuleset,
 } from '@fulllifegames/eval-engine';
 import { evalPoolSize } from './pool-size';
+import { evalPairWithEngine, evaluateWithEngine } from './engine-evaluate';
+import { selectedEngine } from './engine-setting';
 import { searchBudgetStamp } from './search-budget-setting';
 import { recordSimFastReport, simFastLevers } from './sim-fast-setting';
 
@@ -204,6 +206,9 @@ export class EvalWorkerClient {
       },
       shouldStop: () => !live(),
     };
+    // Round 77: another engine answers over HTTP; the pool still lists the options it ranks.
+    const engine = selectedEngine();
+    if (engine) return evaluateWithEngine(engine, serializedBattle, this.createPooledExecutor(serializedBattle, ruleset), settings, live);
     // Round 61: the tree search's orchestration lives in the engine; the
     // pool is its executor, the bank runs the same function in-process.
     if (settings.mode === 'mcts') {
@@ -262,6 +267,11 @@ export class EvalWorkerClient {
   async evalPair(serializedBattle: string, p1Choice: string, p2Choice: string, settings: AppEvalSettings): Promise<number> {
     const ruleset = settings.ruleset;
     if (!ruleset) throw new Error(MISSING_RULESET);
+    const engine = selectedEngine();
+    if (engine) {
+      const generation = this.generation;
+      return evalPairWithEngine(engine, serializedBattle, p1Choice, p2Choice, () => generation === this.generation);
+    }
     const handle = this.pickWorker();
     const subSettings = playedOutcomeSettings(settings);
     if (subSettings) {

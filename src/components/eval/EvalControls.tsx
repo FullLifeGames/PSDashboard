@@ -1,6 +1,8 @@
 import type { EvalPreferences, EvalResult, SearchBudget } from '@fulllifegames/eval-engine';
 import type { EvalStatus } from '../../hooks/useEvaluation';
 import { readSearchBudget, treeThresholdText } from '../../lib/eval/search-budget-setting';
+import type { EngineChoice } from '../../hooks/useEngineChoice';
+import { EngineControls } from './EngineControls';
 
 interface PrefsProps {
   prefs: EvalPreferences;
@@ -107,21 +109,25 @@ function EvaluateButton({ running, onEvaluate, onCancel, result, status }: {
 }
 
 /** The panel header: title, the engine preferences, and the Evaluate/Cancel entry. */
-export function EvalControls({ prefs, onPrefsChange, running, showAuto, showTera, onEvaluate, onCancel, result, status }: PrefsProps & {
+export function EvalControls({ prefs, onPrefsChange, running, showAuto, showTera, onEvaluate, onCancel, result, status, engines }: PrefsProps & {
   showAuto: boolean;
+  /** Round 77: the engines on offer; another engine than the own search decides its own depth. */
+  engines?: EngineChoice;
   showTera: boolean;
   onEvaluate?: () => void;
   onCancel: () => void;
   result: EvalResult | null;
   status: EvalStatus;
 }) {
+  const external = !!engines && engines.selected.source !== 'builtin';
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
       <span style={{ fontSize: 13, fontWeight: 'bold' }}>Evaluation</span>
-      <span style={{ fontSize: 10, color: '#778' }}>estimate from a sim search, no oracle</span>
+      <span style={{ fontSize: 10, color: '#778' }}>{external ? `estimate from ${engines.selected.name}` : 'estimate from a sim search, no oracle'}</span>
       <span style={{ flex: 1 }} />
-      <DepthSelect prefs={prefs} onPrefsChange={onPrefsChange} running={running} />
-      {prefs.mode === 'matrix' && <SamplesSelect prefs={prefs} onPrefsChange={onPrefsChange} running={running} />}
+      {engines && <EngineControls engines={engines.engines} selected={engines.selected} running={running} onSelect={engines.select} onAdd={engines.add} onRemove={engines.remove} />}
+      {!external && <DepthSelect prefs={prefs} onPrefsChange={onPrefsChange} running={running} />}
+      {!external && prefs.mode === 'matrix' && <SamplesSelect prefs={prefs} onPrefsChange={onPrefsChange} running={running} />}
       {showTera && <TeraSelect prefs={prefs} onPrefsChange={onPrefsChange} running={running} />}
       {showAuto && (
         <label style={LABEL_STYLE}>

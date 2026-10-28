@@ -63,6 +63,12 @@ export { parseTendencies, computeRead } from './opponent-model.ts';
 export type { PlayerTendencies } from './opponent-model.ts';
 export { searchOrchestrated } from './orchestrator.ts';
 export type { SearchExecutor, OrchestratorCallbacks } from './orchestrator.ts';
+// Round 77 (user gate 28.10.2026): the protocol other engines answer (docs: ENGINES.md).
+export {
+  DASHBOARD_ORIGINS, ENGINE_PROTOCOL, buildEngineRequest, checkEngine, engineOptions, engineRequestFor, engineResponseToResult,
+  validateEngineResponse,
+} from './engine-api/index.ts';
+export type { EngineCheck, EngineCheckReport, EngineOption, EngineRequest, EngineResponse } from './engine-api/index.ts';
 export { createLocalTreeExecutor, searchTreesOrchestrated } from './tree-orchestrator.ts';
 export {
   autoTurnSettings, configureSearchBudget, parseSearchBudget, searchBudget, searchBudgetTag, SEARCH_BUDGET_DEFAULT,

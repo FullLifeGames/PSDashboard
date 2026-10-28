@@ -250,6 +250,8 @@ export interface EvalResult {
   unanswered?: UnansweredProfile;
   /** Round 35: the forced win proven from this root, when one stands at or above MIN_FORCED_MASS; the score already carries its bar. */
   forcedWin?: ForcedWin;
+  /** Round 77: the engine that answered, when another one than this package's own search (the engine protocol, ENGINES.md). */
+  engine?: { id: string; name: string; version?: string };
   /**
    * Round 70: the answer of a trend probe (EvalSubSearchJob.draw): this result's
    * score minus the leaf of the draw's own child. Absent on every other search.

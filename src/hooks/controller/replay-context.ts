@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useReplay } from '../useReplay';
 import { useEmbedHost } from '../useEmbedHost';
 import { useBranch } from '../useBranch';
@@ -10,6 +10,8 @@ import { useSharedBranch } from '../useSharedBranch';
 import { useTeamKnowledge } from '../useTeamKnowledge';
 import type { TeamKnowledge } from '../useTeamKnowledge';
 import { usePinnedTeams } from '../usePinnedTeams';
+import { useEngineChoice } from '../useEngineChoice';
+import { setEngineGameFormat } from '../../lib/eval/engine-setting';
 import { useReplayWorker } from '../useReplayWorker';
 import { usePositionSource } from '../usePositionSource';
 import {
@@ -141,6 +143,16 @@ export function useReplayContext() {
   const replay = useReplaySurface();
   const branch = useBranch();
   const evaluation = useEvaluation();
+  // Round 77: another engine's results never mix with the own engine's on screen.
+  const engines = useEngineChoice(() => {
+    evaluation.cancel();
+    evaluation.reset();
+    evaluation.clearGraph();
+  });
+  const replayFormat = replay.replayData?.formatid ?? null;
+  useEffect(() => {
+    setEngineGameFormat(replayFormat);
+  }, [replayFormat]);
   const branchWindowOpenRef = useRef(false);
   const smogon = useSmogonBundle(replay.replayData, replay.p1Info, replay.opponentInfo);
   const [animateBranchTurns, setAnimateBranchTurns] = useState(true);
@@ -168,7 +180,7 @@ export function useReplayContext() {
     void loadReplay(replayId);
   }, [clearSharedBranch, loadReplay]);
   return {
-    replay, branch, evaluation, branchWindowOpenRef, smogon,
+    replay, branch, evaluation, engines, branchWindowOpenRef, smogon,
     animateBranchTurns, setAnimateBranchTurns,
     shared: { sharedBranch, sharedBranchError, clearSharedBranch, handleLoadSharedOriginal },
     refreshQueue, knowledge, meta, teamSources, positions,
