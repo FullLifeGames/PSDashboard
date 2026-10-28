@@ -156,7 +156,7 @@ describe('useTimeline', () => {
     expect(result.current).toMatchObject({ viewTurn: 3, viewLine: 'variation', viewingVariation: true, viewT0: false });
   });
 
-  test('replay echoes move the pointer, except stale echoes during a seek and inside a variation', () => {
+  test('replay echoes move the pointer, except stale echoes during a seek', () => {
     const { result, rerender, base } = setup();
     act(() => result.current.handleReplayTurn(2));
     expect(result.current.viewTurn).toBe(2);
@@ -174,6 +174,56 @@ describe('useTimeline', () => {
     expect(result.current.viewingVariation).toBe(true);
     act(() => result.current.handleReplayTurn(1));
     expect(result.current.viewTurn).toBe(3);
+  });
+
+  // Round 77 (swarm A-4): inside a variation the frame's own Last turn / Next turn move the pointer as on the main line.
+  describe('the branch frame\'s own navigation', () => {
+    const variation = (length: number, base: TimelineInputs) => ({
+      ...base, branching: true, variationStartTurn: 2, history: Array.from({ length }, (_, index) => entry(2 + index)),
+    });
+
+    test('Last turn and Next turn inside the variation move the pointer once the frame landed on the tip', () => {
+      const { result, rerender, base } = setup();
+      rerender(variation(3, base));
+      expect(result.current).toMatchObject({ viewTurn: 5, viewingVariation: true });
+
+      // The frame opens at the turn before the tip and plays it in: that report is the app's own doing.
+      act(() => result.current.handleReplayTurn(4));
+      expect(result.current.viewTurn).toBe(5);
+      act(() => result.current.handleReplayTurn(5));
+      expect(result.current.viewTurn).toBe(5);
+
+      // Now a report is the user's: Last turn, Last turn, Next turn.
+      act(() => result.current.handleReplayTurn(4));
+      expect(result.current).toMatchObject({ viewTurn: 4, viewLine: 'variation', viewingVariation: true, followedPlay: false });
+      act(() => result.current.handleReplayTurn(3));
+      expect(result.current.viewTurn).toBe(3);
+      act(() => result.current.handleReplayTurn(4));
+      expect(result.current.viewTurn).toBe(4);
+    });
+
+    test('a seek the app sent is not knocked back by the old turn the frame still reports', () => {
+      const { result, rerender, base } = setup();
+      rerender(variation(3, base));
+      act(() => result.current.handleReplayTurn(5));
+      act(() => result.current.navigateTo({ turn: 3, line: 'variation' }));
+      act(() => result.current.handleReplayTurn(5));
+      expect(result.current.viewTurn).toBe(3);
+      act(() => result.current.handleReplayTurn(3));
+      act(() => result.current.handleReplayTurn(2));
+      expect(result.current).toMatchObject({ viewTurn: 2, viewingVariation: false });
+    });
+
+    test('Reset reports turn 0, which the pointer ignores as on the main line; a turn before the start leaves the variation', () => {
+      const { result, rerender, base } = setup();
+      rerender(variation(2, base));
+      act(() => result.current.handleReplayTurn(4));
+      act(() => result.current.handleReplayTurn(3));
+      act(() => result.current.handleReplayTurn(0));
+      expect(result.current.viewTurn).toBe(3);
+      act(() => result.current.handleReplayTurn(1));
+      expect(result.current).toMatchObject({ viewTurn: 1, viewingVariation: false });
+    });
   });
 
   test('resetPointer returns to turn 1 on the main line and drops the overlay', () => {

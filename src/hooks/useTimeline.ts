@@ -206,8 +206,11 @@ function useNavigateTo(args: NavArgs, seekIntentRef: SeekIntentRef) {
     const key = `${variationSpan.startTurn}:${tipTurn}`;
     if (followedKeyRef.current === key) return;
     followedKeyRef.current = key;
+    // The frame plays the turn in from the one before the tip: its reports until it lands on the tip are the
+    // app's own, not the user's (round 77, A-4).
+    seekIntentRef.current = { turn: tipTurn, until: Date.now() + 4000 };
     navigateTo({ turn: tipTurn, line: 'variation' }, { seek: false, internal: true, followPlay: true });
-  }, [branching, tipTurn, variationSpan, navigateTo]);
+  }, [branching, tipTurn, variationSpan, navigateTo, seekIntentRef]);
 
   return { navigateTo, restorePointer };
 }
@@ -215,7 +218,7 @@ function useNavigateTo(args: NavArgs, seekIntentRef: SeekIntentRef) {
 /** Embed echo guard and the graph's explicit line-addressed selections. */
 function useTimelineNav(args: NavArgs) {
   const { pointer, derived, interruptPlayOut, setAnalysisTurn } = args;
-  const { setViewTurn, setViewLine, setViewT0, setFollowedPlay } = pointer;
+  const { setViewTurn, setViewLine, setViewT0, setFollowedPlay, viewTurnRef } = pointer;
   const { endSnapshotTurn } = derived;
   // Programmatic seeks race the embed's turn echoes: while the iframe is
   // still seeking it keeps reporting the OLD turn, which would knock the
@@ -225,11 +228,19 @@ function useTimelineNav(args: NavArgs) {
   const { navigateTo, restorePointer } = useNavigateTo(args, seekIntentRef);
 
   const handleReplayTurn = useCallback((turn: number) => {
-    if (derived.viewingVariation || turn < 1) return;
+    if (turn < 1) return;
     const intent = seekIntentRef.current;
     if (intent && Date.now() < intent.until) {
       if (turn !== intent.turn) return;
       seekIntentRef.current = null;
+    }
+    if (derived.viewingVariation) {
+      // The branch frame's own Last turn / Next turn. A turn the variation does not cover is the shared prefix: the
+      // pointer leaves for the main line there, and the main frame that opens gets the same echo guard.
+      if (!variationCovers(derived.variationSpan, turn)) seekIntentRef.current = { turn, until: Date.now() + 4000 };
+      if (turn !== viewTurnRef.current) setFollowedPlay(false);
+      setViewTurn(turn);
+      return;
     }
     setViewTurn(current => {
       // The embed can only report real turns; when the end position is
@@ -239,7 +250,7 @@ function useTimelineNav(args: NavArgs) {
       }
       return turn;
     });
-  }, [derived.viewingVariation, endSnapshotTurn, setViewTurn]);
+  }, [derived.viewingVariation, derived.variationSpan, endSnapshotTurn, setViewTurn, setFollowedPlay, viewTurnRef]);
 
   const handleGraphSelect = useCallback((turn: number) => {
     // Selecting a turn is user navigation — it bypasses navigateTo, so the

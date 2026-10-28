@@ -70,6 +70,7 @@ function BattleFrame({ app, replayData }: WorkspaceProps) {
           openAtTurn={openAtTurn}
           reloadKey={branchReloadKey}
           seekRequest={navSeek}
+          onTurnChange={handleReplayTurn}
         />
       ) : (
         <PSReplayFrame
