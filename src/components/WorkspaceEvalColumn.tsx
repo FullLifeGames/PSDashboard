@@ -27,7 +27,7 @@ function analysisPropsFor(liveEvalView: boolean, analysisTurn: number | null, an
 function EvalSection({ app, replayData }: WorkspaceColumnProps) {
   const { evaluation } = app.ctx;
   const { replayGen, replayGameType } = app.ctx.meta;
-  const { liveEvalStatus } = app.board;
+  const { liveEvalStatus, evalResultMatchesView } = app.board;
   const {
     viewTurn, viewingVariation, liveEvalView, liveSimTurn, analyzableTurns, analysisTurn,
     handleGraphSelectLine, variationSpan, variationScores,
@@ -38,6 +38,9 @@ function EvalSection({ app, replayData }: WorkspaceColumnProps) {
   } = app.engine.evalView;
   const { handleExploreChoice, handlePickPair } = app.engine.walk;
   const { playOut, fastPlayOut } = app.transients;
+  // A live result that still streams in for a position the pointer left maps its choices onto the wrong position: the
+  // lines stay readable and stop being buttons until the position on screen has its own result.
+  const clickable = !liveEvalView || evalResultMatchesView;
   // Round 70 (T216): the gold points and the panel's bar print at the share of the variation's own board, read from the
   // rosters the branch recorded after each executed turn; the main line's share of the same turn number is another board.
   const { history } = app.ctx.branch;
@@ -62,8 +65,8 @@ function EvalSection({ app, replayData }: WorkspaceColumnProps) {
       onPrefsChange={evaluation.setPrefs}
       onEvaluate={liveEvalView ? handleEvaluate : undefined}
       onCancel={evaluation.cancel}
-      onPickChoice={handleExploreChoice}
-      onPickPair={handlePickPair}
+      onPickChoice={clickable ? handleExploreChoice : undefined}
+      onPickPair={clickable ? handlePickPair : undefined}
       showAuto={liveEvalView}
       showTera={replayGen === 9}
       graph={evaluation.graph}
