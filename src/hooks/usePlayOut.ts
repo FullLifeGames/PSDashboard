@@ -163,9 +163,12 @@ function usePlayOutLoop(args: PlayOutInputs, finishPlayOut: ReturnType<typeof us
    */
   useEffect(() => {
     if (!playOut?.active || !liveTip || executing || branchPreparing) return;
-    if (liveEvalStatus !== 'idle' && liveEvalStatus !== 'stale') return;
+    // A stale position is the Auto pref's to evaluate (the run switched it on): asking here too sent two
+    // evaluations per position. Only a user who turned Auto off mid-run leaves the kick to us.
+    const autoCovers = liveEvalStatus === 'stale' && evaluation.prefs.auto;
+    if ((liveEvalStatus !== 'idle' && liveEvalStatus !== 'stale') || autoCovers) return;
     handleEvaluate();
-  }, [playOut?.active, liveTip, executing, branchPreparing, liveEvalStatus, handleEvaluate]);
+  }, [playOut?.active, liveTip, executing, branchPreparing, liveEvalStatus, evaluation.prefs.auto, handleEvaluate]);
 
   useEffect(() => {
     if (!playOut?.active || !liveTip || executing || branchPreparing) return;
@@ -176,8 +179,8 @@ function usePlayOutLoop(args: PlayOutInputs, finishPlayOut: ReturnType<typeof us
     if (playOutProcessedRef.current === evaluation.result) return;
     playOutProcessedRef.current = evaluation.result;
     const step = nextPlayOutStep(evaluation.result, getBattle()?.ended ?? false, playOut.executed);
-    applyLoopStep({ step, playOut, finishPlayOut, applyEvalChoice, setPlayOut, executeTurn, handleEvaluate });
-  }, [playOut, liveTip, executing, branchPreparing, evaluation.status, evaluation.result, evaluation.resultTag, evalViewKey, getBattle, applyEvalChoice, executeTurn, handleEvaluate, finishPlayOut, playOutProcessedRef, setPlayOut]);
+    applyLoopStep({ step, playOut, finishPlayOut, applyEvalChoice, setPlayOut, executeTurn });
+  }, [playOut, liveTip, executing, branchPreparing, evaluation.status, evaluation.result, evaluation.resultTag, evalViewKey, getBattle, applyEvalChoice, executeTurn, finishPlayOut, playOutProcessedRef, setPlayOut]);
 
   /**
    * The loop advances on COMPLETED evaluations — an evaluation that fails
@@ -199,9 +202,8 @@ function applyLoopStep(args: {
   applyEvalChoice: PlayOutInputs['applyEvalChoice'];
   setPlayOut: PlayOutInputs['setPlayOut'];
   executeTurn: PlayOutInputs['executeTurn'];
-  handleEvaluate: PlayOutInputs['handleEvaluate'];
 }) {
-  const { step, playOut, finishPlayOut, applyEvalChoice, setPlayOut, executeTurn, handleEvaluate } = args;
+  const { step, playOut, finishPlayOut, applyEvalChoice, setPlayOut, executeTurn } = args;
   const turnWord = playOut.turns === 1 ? '' : 's';
   if (step.kind === 'done') {
     finishPlayOut(playOut, playOutDoneText(step.reason, playOut.turns));
@@ -213,7 +215,12 @@ function applyLoopStep(args: {
       return;
     }
     setPlayOut({ ...playOut, executed: playOut.executed + 1, turns: playOut.turns + 1 });
-    void executeTurn().then(() => handleEvaluate());
+    // The next position is evaluated once the turn landed: by the Auto pref (stale position, set on by the run) or,
+    // with Auto off, by the kick effect. A call here used the closure of the turn before, tagged the result with the
+    // old position and cancelled the evaluation of the right one.
+    void executeTurn().then(error => {
+      if (error) finishPlayOut(playOut, `Play-out stopped after ${playOut.turns} turn${playOut.turns === 1 ? '' : 's'}: the turn could not be played (${error}).`);
+    });
     return;
   }
   // Single (forced) side: setChoice auto-executes forced replacements and

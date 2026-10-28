@@ -104,7 +104,7 @@ describe('usePlayOut', () => {
     expect(ended.result.current.transients.playOut).toBeNull();
   });
 
-  test('a finished evaluation on the tip plays both top choices and re-evaluates after the turn', async () => {
+  test('a finished evaluation on the tip plays both top choices; the next evaluation is left to the Auto pref', async () => {
     const { evaluation } = evaluationOf({ auto: true });
     const { result, rerender, wired } = setup(evaluation);
     act(() => result.current.playOut.startPlayOut());
@@ -115,13 +115,26 @@ describe('usePlayOut', () => {
     expect(wired.applyEvalChoice).toHaveBeenCalledWith('p2', done.perSide.p2[0]);
     expect(result.current.transients.playOut).toMatchObject({ executed: 1, turns: 1 });
     expect(wired.executeTurn).toHaveBeenCalledTimes(1);
-    // Two evaluations at the start (the arm and the idle kick), one more after the executed turn.
+    // Two calls at the start (the arm, and the kick of this mock whose status stays idle); none after the executed turn
+    // (usePlayOut.evaluations.spec counts the real chain).
     await act(async () => {});
-    expect(wired.handleEvaluate).toHaveBeenCalledTimes(3);
+    expect(wired.handleEvaluate).toHaveBeenCalledTimes(2);
 
     // The same result again is not played twice.
     rerender({ evaluation: evaluationOf({ auto: true, status: 'done', result: done, resultTag: 'variation:3' }).evaluation, wiring: wired });
     expect(wired.executeTurn).toHaveBeenCalledTimes(1);
+  });
+
+  // The loop no longer re-evaluates after a turn by itself; a turn the simulator refuses must end the run, not stall it.
+  test('a refused turn ends the run with the refusal instead of waiting for an evaluation that never comes', async () => {
+    const { evaluation } = evaluationOf({ auto: true });
+    const wired = wiring({ executeTurn: vi.fn(async () => 'Earthquake is disabled for Garchomp right now.') });
+    const { result, rerender } = setup(evaluation, wired);
+    act(() => result.current.playOut.startPlayOut());
+    rerender({ evaluation: evaluationOf({ auto: true, status: 'done', result: evalResult(), resultTag: 'variation:3' }).evaluation, wiring: wired });
+    await act(async () => {});
+    expect(result.current.transients.playOut).toBeNull();
+    expect(result.current.transients.playOutNotice?.text).toBe('Play-out stopped after 0 turns: the turn could not be played (Earthquake is disabled for Garchomp right now.).');
   });
 
   test('a result tagged for another position is left alone', () => {
