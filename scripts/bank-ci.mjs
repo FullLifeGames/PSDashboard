@@ -67,7 +67,14 @@ export const deleteArgs = (sha, name) => ['push', `--force-with-lease=refs/heads
 /** The run settings that decide a CI run's rows: everything of the validated run but its name. */
 export const runSettings = config => ({ jobs: config.jobs, slicesPerJob: config.slicesPerJob, env: config.env });
 
-const git = (root, args, options = {}) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], ...options });
+/**
+ * A git command's output. The secret check reads the whole diff against v1, which outgrew Node's default output
+ * limit of 1 MB in round 77 ("spawnSync git ENOBUFS"), so the limit is 256 MB.
+ */
+export const gitText = (root, args, options = {}) => execFileSync('git', args, {
+  cwd: root, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], maxBuffer: 256 * 1024 * 1024, ...options,
+});
+const git = gitText;
 
 /**
  * The run commit: the measured commit's tree plus .bank-run.json, its parent the measured commit. Built in a

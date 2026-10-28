@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  buildRunCommit, collectRun, deleteArgs, findReuse, findRunByTarget, pickRun, pushRefspec, runSettings, secretFindings, waitForRun,
+  buildRunCommit, collectRun, deleteArgs, findReuse, findRunByTarget, gitText, pickRun, pushRefspec, runSettings, secretFindings,
+  waitForRun,
 } from '../../scripts/bank-ci.mjs';
 import { BANK_TRANCHES, validateRunConfig } from '../../scripts/bank-run-config.mjs';
 
@@ -78,6 +79,14 @@ describe('finding the run of a pushed commit', () => {
 });
 
 describe('the secret check before a push', () => {
+  // Round 77: the diff of the round against v1 grew past 1 MB, Node's default output limit of execFileSync, and the
+  // check died with "spawnSync git ENOBUFS" before any push.
+  test('reads a git output larger than 1 MB', () => {
+    const root = fileURLToPath(new URL('../..', import.meta.url));
+    const text = gitText(root, ['show', 'HEAD:test/e2e-feedback/fixtures/smogon/_stats_gen9ou.json.json']);
+    expect(text.length).toBeGreaterThan(1024 * 1024);
+  });
+
   test.each([
     ['A\t.env', ''],
     ['A\tconfig/.env.production', ''],
