@@ -45,6 +45,12 @@ function GraphHeader({ onAnalyzeGame, graph, onCancel, running, smogonPending, h
           >
             {hasGraph ? 'Re-analyze' : 'Analyze game'}
           </button>
+          {/* Round 77 (C1): a single evaluation took the sweep over; the status names where it stopped. */}
+          {graph.stopped && (
+            <span role="status" style={{ color: '#e6b36a' }}>
+              Analysis stopped at turn {graph.stopped.done} of {graph.stopped.total}.
+            </span>
+          )}
         </>
       ))}
     </div>

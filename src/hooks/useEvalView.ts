@@ -239,10 +239,11 @@ function useEvalHousekeeping(inputs: EvalViewInputs, format: EvalFormat, handleE
   // main-line turn (the end sentinel included) fired a stray single-turn
   // reconstruction — the "diverged before turn 68" error on a 67-turn game.
   useEffect(() => {
-    if (branching && evaluation.prefs.auto && liveEvalView && liveEvalStatus === 'stale' && !executing) {
+    // Round 77 (C1): not while the game sweep runs; a single evaluation would stop it. The effect fires again when it ends.
+    if (branching && evaluation.prefs.auto && liveEvalView && liveEvalStatus === 'stale' && !executing && !evaluation.graph.running) {
       handleEvaluate();
     }
-  }, [branching, evaluation.prefs.auto, liveEvalView, liveEvalStatus, executing, handleEvaluate]);
+  }, [branching, evaluation.prefs.auto, liveEvalView, liveEvalStatus, executing, evaluation.graph.running, handleEvaluate]);
   // "Always on" also covers the live sim: a freshly opened variation (or a
   // navigation back to its tip) evaluates without the Evaluate button. Never
   // while the game sweep runs — a single evaluation supersedes the run id

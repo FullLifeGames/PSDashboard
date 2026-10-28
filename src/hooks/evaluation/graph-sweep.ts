@@ -81,6 +81,11 @@ export interface EvalGraphState {
   notice: string | null;
   running: boolean;
   progress: { done: number; total: number } | null;
+  /**
+   * Round 77 (C1): set when a single evaluation took over while the sweep was running; the sweep's status names
+   * where it stopped. Any new sweep or a clear resets it. Absent or null = nothing was stopped.
+   */
+  stopped?: { done: number; total: number } | null;
 }
 
 /** The persisted-between-sweeps slice of the graph state (range sweeps merge into it). */
@@ -318,9 +323,16 @@ export function useGraphState() {
   const [graph, setGraph] = useState<EvalGraphState>(emptyGraphState());
   /** Latest graph arrays, so partial (range) sweeps merge instead of wiping. */
   const graphDataRef = useRef<GraphData | null>(null);
-  /** cancel clears the sweep's running flag; the bumped run counter stops its work. */
-  const stopGraphPaint = useCallback(() => {
-    setGraph(prev => (prev.running ? { ...prev, running: false, progress: null } : prev));
+  /**
+   * cancel clears the sweep's running flag; the bumped run counter stops its work. A single evaluation that takes
+   * over passes `superseded`, and the graph keeps where the sweep stopped (round 77, C1).
+   */
+  const stopGraphPaint = useCallback((superseded = false) => {
+    setGraph(prev => {
+      if (!prev.running) return prev;
+      const stopped = superseded ? { done: prev.progress?.done ?? 0, total: prev.progress?.total ?? 0 } : null;
+      return { ...prev, running: false, progress: null, stopped };
+    });
   }, []);
   const clearGraph = useCallback(() => {
     graphDataRef.current = null;
@@ -365,7 +377,7 @@ export function useGraphSweepRunner(env: {
       return out;
     };
     const total = Math.max(0, to - from + 1);
-    setGraph({ ...snapshot(), running: true, progress: { done: 0, total } });
+    setGraph({ ...snapshot(), running: true, progress: { done: 0, total }, stopped: null });
     // Painting (snapshot + setGraph) is presentation only — the sweep's
     // own logic reads the local arrays, and every result also lands in the
     // caches. Per-turn painting made a long sweep pay a fresh copy of ten
@@ -380,7 +392,7 @@ export function useGraphSweepRunner(env: {
       const at = Date.now();
       if (!force && at - lastPaintAt < 200) return;
       lastPaintAt = at;
-      setGraph({ ...snapshot(), running: true, progress });
+      setGraph({ ...snapshot(), running: true, progress, stopped: null });
     };
     const paintFinal = (running: boolean) => setGraph({ ...snapshot(), running, progress: null });
     const sweepEnv: SweepEnv = {
