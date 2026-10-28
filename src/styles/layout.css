@@ -96,6 +96,9 @@
 }
 .ps-setup-menu {
   position: relative;
+  /* A flex box, so the button sits in the middle of the row instead of on a text baseline. */
+  display: flex;
+  align-items: center;
 }
 .ps-btn.ps-setup-toggle {
   padding: 2px 8px;
