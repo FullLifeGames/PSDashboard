@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { spriteUrl } from '../lib/sprite-url';
+import { displayName } from '../lib/branch-history';
 import { useReplayRules } from '../lib/replay-rules';
 import { useLeadSelection } from '../hooks/useLeadSelection';
 import type { LeadOption } from '../lib/lead-options';
@@ -41,6 +42,8 @@ function LeadOptionButton({ option, slot, leadsPerSide, showBadges, onToggle }: 
   onToggle: (species: string) => void;
 }) {
   const rules = useReplayRules();
+  // The switch chips of the turn pickers read this same label (round 77, C10).
+  const label = displayName(option.name, option.species);
   return (
     <button
       type="button"
@@ -48,12 +51,12 @@ function LeadOptionButton({ option, slot, leadsPerSide, showBadges, onToggle }: 
       className={`ps-switchbtn ps-switchbtn-compact ${slot >= 0 ? 'ps-switchbtn-selected' : ''}`}
       aria-pressed={slot >= 0}
       title={option.wasLead
-        ? `${option.name} led the real game.`
+        ? `${label} led the real game.`
         : option.wasBrought
-          ? `${option.name} was brought in the real game.`
-          : option.name}
+          ? `${label} was brought in the real game.`
+          : label}
     >
-      <img src={spriteUrl(option.species, rules)} alt={option.name} />
+      <img src={spriteUrl(option.species, rules)} alt={label} />
       <div className="ps-switchbtn-name">
         {slot >= 0 && showBadges && (
           <span
@@ -63,7 +66,7 @@ function LeadOptionButton({ option, slot, leadsPerSide, showBadges, onToggle }: 
             {slot < leadsPerSide ? SLOT_LABELS[slot] : slot + 1}
           </span>
         )}
-        {option.name}
+        {label}
         {option.wasLead && <span className="ps-played-badge" title="This Pokémon led the real game.">played</span>}
       </div>
     </button>
