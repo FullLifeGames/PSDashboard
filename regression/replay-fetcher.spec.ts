@@ -57,6 +57,16 @@ describe('replay fetcher', () => {
     expect(parseReplayUrl('not a replay!')).toBeNull();
   });
 
+  test('parseReplayUrl accepts the psim.us short links (round 77)', () => {
+    // User request 28.10.2026: Showdown shares replays as https://psim.us/r/<id>, which redirects to the replay server.
+    expect(parseReplayUrl('https://psim.us/r/smogtours-gen8ou-562428')).toBe('smogtours-gen8ou-562428');
+    expect(parseReplayUrl('psim.us/r/gen9ou-123?p2')).toBe('gen9ou-123');
+    expect(parseReplayViewpoint('https://psim.us/r/gen9ou-123?p2')).toBe('p2');
+    expect(parseReplayUrl(`https://psim.us/r/${privateId}`)).toBe(privateId);
+    // Other psim.us paths are no replay links.
+    expect(parseReplayUrl('https://psim.us/t/gen9ou')).toBeNull();
+  });
+
   test('parseReplayViewpoint reads the ?p2 perspective flag off a replay link', () => {
     expect(parseReplayViewpoint('https://replay.pokemonshowdown.com/gen9ou-123?p2')).toBe('p2');
     expect(parseReplayViewpoint('https://replay.pokemonshowdown.com/gen9ou-123?turn=5&p2')).toBe('p2');

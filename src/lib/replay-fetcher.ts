@@ -18,7 +18,8 @@ const REPLAY_HOST = 'https://replay.pokemonshowdown.com';
  */
 export function parseReplayUrl(input: string): string | null {
   const trimmed = input.trim();
-  const match = trimmed.match(/replay\.pokemonshowdown\.com\/([a-z0-9-]+)/i);
+  // Round 77 (user request 28.10.2026): Showdown's short link psim.us/r/<id> names the same replay.
+  const match = trimmed.match(/replay\.pokemonshowdown\.com\/([a-z0-9-]+)/i) ?? trimmed.match(/psim\.us\/r\/([a-z0-9-]+)/i);
   if (match) return match[1].toLowerCase();
 
   // A bare id tolerates the Showdown query flags riding along (…?p2).
@@ -100,7 +101,7 @@ export async function fetchReplay(urlOrId: string): Promise<ReplayData> {
   const id = parseReplayUrl(urlOrId);
   if (!id) {
     throw new Error(
-      'That does not look like a replay link or id. Paste a replay.pokemonshowdown.com URL or a plain id like "gen9ou-123456789".',
+      'That does not look like a replay link or id. Paste a replay.pokemonshowdown.com or psim.us/r link, or a plain id like "gen9ou-123456789".',
     );
   }
 
