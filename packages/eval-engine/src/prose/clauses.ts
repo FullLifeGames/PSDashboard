@@ -132,9 +132,12 @@ export function readCreditClause(name: string, side: SideAnalysis, ownLuck: numb
     `${partialNote(side, 'credited')}${luck}`;
 }
 
-/** Sub-verdict note: a light imprecision worth naming, not blaming. */
+/**
+ * Sub-verdict note: a light imprecision worth naming, not blaming. Round 77 (562428 t12): a read that paid off speaks for the
+ * inaccuracy, as the read clause does for a misplay.
+ */
 export function inaccuracyClause(name: string, side: SideAnalysis): string | null {
-  if (side.tier !== 'inaccuracy' || !side.played || !side.best) return null;
+  if (side.tier !== 'inaccuracy' || side.riskPaidOff || !side.played || !side.best) return null;
   const shown = displayBest(side);
   return `${name}'s ${phrase(side.played.label)} was an inaccuracy; ` +
     `${phrase(shown.label)} was slightly better (${winPctText(shown.ev, side.faintedFraction)} vs ${winPctText(side.played.ev, side.faintedFraction)}).` +

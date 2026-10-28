@@ -33,6 +33,21 @@ function isGamble(params: AnalyzeTurnParams, key: Side, side: SideAnalysis, tier
 }
 
 /**
+ * Round 77 (user report 28.10.2026, the expert pin 562428 t12): an inaccuracy that gave up floor against the safe line, from
+ * a not-yet-lost position, can earn the paid-off credit as a gamble does, on the immediate outcome. Between the mistake band,
+ * which books its risk, and the gamble's bound of a mistake-sized floor it fell through every rule: LordEnz's Close Combat
+ * into the Weavile switch paid 0.448 over the safe Mandibuzz line and read as a plain shift.
+ */
+function isInaccuracyRisk(params: AnalyzeTurnParams, key: Side, side: SideAnalysis): boolean {
+  const ownBefore = key === 'p1' ? params.scoreBefore : -params.scoreBefore;
+  return side.tier === 'inaccuracy' && side.played !== null && side.safe !== null
+    && side.played.choice !== side.safe.choice
+    && side.played.worstCase < side.safe.worstCase
+    && ownBefore > -DECIDED_SCORE
+    && params.playedOutcome !== null;
+}
+
+/**
  * Books the windowed payoff over the safe guarantee on the side record —
  * the BEST expected outcome within the window (tiered turns look
  * PAYOFF_WINDOW turns ahead, gambles at the immediate outcome only). True
@@ -110,7 +125,7 @@ export function markRisk(params: AnalyzeTurnParams, key: Side, side: SideAnalysi
   // A phantom stay-in has no real floor to price a read against.
   if (side.sacrifice || side.neverActed) return;
   const tiered = side.tier === 'mistake' || side.tier === 'blunder';
-  const gamble = isGamble(params, key, side, tiered);
+  const gamble = isGamble(params, key, side, tiered) || isInaccuracyRisk(params, key, side);
   if (!tiered && !gamble) {
     // Round 63 (T17): no band and no gamble — a quiet read can still earn its sentence.
     markQuietRead(params, key, side);
