@@ -85,7 +85,7 @@ function useTimelineDerived(args: {
   history: BranchHistoryEntry[];
 }) {
   const { pointer, snapshots, branching, variationStartTurn, history } = args;
-  const { viewTurn, viewLine } = pointer;
+  const { viewTurn, viewLine, viewT0 } = pointer;
   const maxTurn = snapshots.length > 0 ? snapshots.length : 1;
   // The last snapshot is the post-battle end state when it holds the final
   // turn's residue instead of starting a new |turn| — it is labelled "End",
@@ -103,7 +103,9 @@ function useTimelineDerived(args: {
     const turnEntries = history.filter(entry => entry.kind !== 'forced').length;
     return turnEntries > 0 ? { startTurn: variationStartTurn, length: turnEntries } : null;
   }, [variationStartTurn, history]);
-  const viewingVariation = viewLine === 'variation' && variationCovers(variationSpan, viewTurn);
+  // The T0 view is a side trip: the line stays as the user left it (the step forward returns there), but nothing of
+  // the variation is on screen (round 77, C9).
+  const viewingVariation = viewLine === 'variation' && !viewT0 && variationCovers(variationSpan, viewTurn);
   /** Where the live sim stands (the tip of what has been replayed/executed). */
   const liveSimTurn = branching && variationStartTurn !== null
     ? variationStartTurn + (variationSpan?.length ?? 0)
@@ -301,6 +303,10 @@ function useTimelineNav(args: NavArgs) {
   /** Graph clicks name their line explicitly — gold points navigate the
    *  variation, blue points the main line. */
   const handleGraphSelectLine = useCallback((turn: number, line?: 'main' | 'variation') => {
+    if (turn === 0 && line === undefined) {
+      handleGraphSelect(0);
+      return;
+    }
     if (line === 'variation') {
       navigateTo({ turn, line: 'variation' });
       return;

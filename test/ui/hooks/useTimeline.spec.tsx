@@ -160,6 +160,40 @@ describe('useTimeline', () => {
     });
   });
 
+  // Round 77 (C9): T0 is a side trip. The arrow forward returns to the line the user came from.
+  describe('turn 0 as a side trip', () => {
+    const leadVariation = (base: TimelineInputs): TimelineInputs =>
+      ({ ...base, branching: true, variationStartTurn: 0, history: [entry(0), entry(1), entry(2)] });
+
+    test('from variation turn 1 the T0 view keeps the line, shows no variation, and the step forward lands on variation turn 1', () => {
+      const { result, rerender, base } = setup();
+      rerender(leadVariation(base));
+      act(() => result.current.navigateTo({ turn: 1, line: 'variation' }));
+      expect(result.current).toMatchObject({ viewTurn: 1, viewLine: 'variation', viewingVariation: true });
+
+      act(() => result.current.handleGraphSelectLine(0));
+      expect(result.current).toMatchObject({ viewT0: true, viewLine: 'variation', viewingVariation: false, liveTip: false, evalViewKey: 'main:1' });
+
+      // The bar's forward arrow at T0 asks for turn 1 on the stored line.
+      act(() => result.current.navigateTo({ turn: 1, line: result.current.viewLine }));
+      expect(result.current).toMatchObject({ viewT0: false, viewTurn: 1, viewLine: 'variation', viewingVariation: true });
+    });
+
+    test('from the main line the step forward returns to the main line; an explicit main selection still sets it', () => {
+      const { result, rerender, base } = setup();
+      rerender(leadVariation(base));
+      act(() => result.current.navigateTo({ turn: 1, line: 'main' }));
+      act(() => result.current.handleGraphSelectLine(0));
+      expect(result.current).toMatchObject({ viewT0: true, viewLine: 'main' });
+      act(() => result.current.navigateTo({ turn: 1, line: result.current.viewLine }));
+      expect(result.current).toMatchObject({ viewTurn: 1, viewLine: 'main', viewingVariation: false });
+
+      act(() => result.current.navigateTo({ turn: 2, line: 'variation' }));
+      act(() => result.current.handleGraphSelectLine(1, 'main'));
+      expect(result.current).toMatchObject({ viewTurn: 1, viewLine: 'main' });
+    });
+  });
+
   test('restorePointer puts the pointer back and the span that returns is not followed (round 77, A-2)', () => {
     const { result, rerender, base } = setup();
     const history = [entry(2), entry(3)];
