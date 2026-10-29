@@ -73,16 +73,38 @@ function knownForm(calc: CalcGeneration, name: string, dex: SpeciesDex): string 
   return (forms.find(form => form.name === species.baseSpecies) ?? forms[0])?.name ?? name;
 }
 
+const STAT_IDS = ['hp', 'atk', 'def', 'spa', 'spd', 'spe'] as const;
+
+/** One answer per generation, dex and name: null for a species that needs none. */
+const overridesMemo = new Map<string, CalcPokemonOptions['overrides'] | null>();
+
 /**
  * The species as overrides, read from the Dex: a species the calculator's generation does not list and no equal-valued form
  * stands in for (Meloetta-Pirouette, Minior-Meteor, the Ogerpon Tera formes, Terapagos-Terastal in Champions' generation 0)
  * goes to the calc as the data the Dex holds, on its own name; the calc builds the stats, types and weight from it.
- * Undefined when the calc lists the name or the Dex does not know it either (the calc refuses as before).
+ * A species the calc lists with other base stats or types than the Dex takes the Dex's (round 78: Obliteryx 2.0 of
+ * @pkmn 0.10.12 has a Special Defense of 78, @smogon/calc 0.12 lists 90).
+ * Undefined when the calc lists the name with the Dex's values, or the Dex does not know it either (the calc refuses as before).
  */
 export function speciesOverrides(gen: CalcGeneration, name: string, dex?: SpeciesDex): CalcPokemonOptions['overrides'] | undefined {
-  if (gen.species.get(toId(name) as never)) return undefined;
-  const species = (dex ?? defaultDex(gen)).species.get(name);
+  const source = dex ?? defaultDex(gen);
+  const key = `${calcGenId(gen)}|${source.currentMod ?? ''}|${name}`;
+  let overrides = overridesMemo.get(key);
+  if (overrides === undefined) {
+    overrides = dexOverrides(gen, name, source) ?? null;
+    overridesMemo.set(key, overrides);
+  }
+  return overrides ?? undefined;
+}
+
+function dexOverrides(gen: CalcGeneration, name: string, dex: SpeciesDex): CalcPokemonOptions['overrides'] | undefined {
+  const species = dex.species.get(name);
   if (!species.exists) return undefined;
+  const listed = gen.species.get(toId(name) as never);
+  if (listed) {
+    const same = STAT_IDS.every(stat => listed.baseStats[stat] === species.baseStats[stat]) && listed.types.join('/') === species.types.join('/');
+    return same ? undefined : { types: species.types as never, baseStats: species.baseStats };
+  }
   return {
     name: species.name as never,
     types: species.types as never,
@@ -104,10 +126,10 @@ export function buildCalcPokemon(gen: CalcGeneration, species: string, options: 
   return new CalcPokemon(gen, known, overrides ? { ...options, overrides: { ...overrides, ...options.overrides } } : options);
 }
 
-/** The species' base stats as the calculator will build them (a listed form's, else the Dex's through the overrides); undefined for a species neither knows. */
+/** The species' base stats as the calculator will build them (the Dex's through the overrides, else the listed form's); undefined for a species neither knows. */
 export function calcBaseStats(gen: CalcGeneration, species: string, dex?: SpeciesDex): SpeciesRow['baseStats'] | undefined {
   const known = calcSpecies(calcGenId(gen), species, dex);
-  return gen.species.get(toId(known) as never)?.baseStats ?? speciesOverrides(gen, known, dex)?.baseStats;
+  return speciesOverrides(gen, known, dex)?.baseStats ?? gen.species.get(toId(known) as never)?.baseStats;
 }
 
 /**

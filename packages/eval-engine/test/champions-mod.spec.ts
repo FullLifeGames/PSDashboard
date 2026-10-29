@@ -4,7 +4,8 @@ import { Battle, Dex, type PokemonSet } from '@pkmn/sim';
 import { Generations, Pokemon as CalcPokemon } from '@smogon/calc';
 import { Scripts } from '@pkmn/mods/champions';
 import {
-  buildTeamsFromReplay, calcEvs, calcIvs, evBudget, getBranchSimulatorFormat, parseReplayLogWithObservations, replayBringOnly,
+  buildCalcPokemon, buildTeamsFromReplay, calcEvs, calcIvs, evBudget, getBranchSimulatorFormat, parseReplayLogWithObservations,
+  replayBringOnly,
 } from '@fulllifegames/replay-core';
 import { reconstructBranchRuntime } from '../src/branch-engine';
 import { loadSimMods } from '../src/forward/sim-mods';
@@ -91,7 +92,9 @@ describe('Champions battles run on the Champions mod (T145)', () => {
     sets().forEach((set, i) => {
       let calc: CalcPokemon;
       try {
-        calc = new CalcPokemon(gen, set.species, { level: 50, nature: set.nature, evs: calcEvs(set.evs, budget), ivs: calcIvs({ ...ALL_31, spe: 0 }, budget) });
+        // Round 78: the app's one builder (calc-build.ts), whose bodies take the Dex values where the calculator's differ
+        // (Obliteryx 2.0 of @pkmn 0.10.12: Special Defense 78, @smogon/calc 0.12 lists 90).
+        calc = buildCalcPokemon(gen, set.species, { level: 50, nature: set.nature, evs: calcEvs(set.evs, budget), ivs: calcIvs({ ...ALL_31, spe: 0 }, budget) }, championsDex() as never);
       } catch {
         unknown.add(set.species);
         return;
