@@ -26,7 +26,7 @@ function loneFoe(attacker: PokemonSet, psychicTerrain: boolean, screens: string[
   battle.choose('p1', 'team 12');
   battle.choose('p2', 'team 12');
   battle.sides[1].active[1]!.faint();
-  battle.faintMessages();
+  battle.resolveFaints();
   if (psychicTerrain) battle.field.setTerrain('psychicterrain', 'debug');
   for (const screen of screens) battle.sides[1].addSideCondition(screen, battle.sides[1].active[0]!);
   return battle;

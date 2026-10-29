@@ -81,11 +81,14 @@ describe('the partner path follows the Dex species (singles has no partner)', ()
     expect(singles + several).toBeGreaterThan(0);
   });
 
-  test('the Champions roster holds two families of these species, both with Friend Guard: Vivillon (the Champions scene plays it) and Maushold', () => {
+  // Round 78 (@pkmn 0.10.12): Regulation M-C brings Perrserker, whose Steely Spirit lifts its partner's Steel moves.
+  test('the Champions roster holds three families of these species: Vivillon (the Champions scene plays it) and Maushold with Friend Guard, Perrserker with Steely Spirit', () => {
     const dex = Dex.mod('champions');
-    const named = dex.species.all().filter(species => !species.isNonstandard
-      && Object.values(species.abilities).some(name => partnerAbilities.includes(dex.abilities.get(name).id)));
-    expect([...new Set(named.map(species => species.baseSpecies))]).toEqual(['Vivillon', 'Maushold']);
-    expect(named.every(species => Object.values(species.abilities).some(name => dex.abilities.get(name).id === 'friendguard'))).toBe(true);
+    const partnerOf = (species: { abilities: Record<string, string> }) =>
+      Object.values(species.abilities).map(name => dex.abilities.get(name).id).filter(id => partnerAbilities.includes(id)).join(',');
+    const named = dex.species.all().filter(species => !species.isNonstandard && partnerOf(species) !== '');
+    expect([...new Set(named.map(species => species.baseSpecies))]).toEqual(['Vivillon', 'Perrserker', 'Maushold']);
+    expect(Object.fromEntries(named.map(species => [species.baseSpecies, partnerOf(species)])))
+      .toEqual({ Vivillon: 'friendguard', Perrserker: 'steelyspirit', Maushold: 'friendguard' });
   });
 });

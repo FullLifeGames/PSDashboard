@@ -53,9 +53,9 @@
     "@fulllifegames/replay-core": "*"
   },
   "peerDependencies": {
-    "@pkmn/dex": "^0.10.11",
-    "@pkmn/mods": "0.10.11",
-    "@pkmn/sim": "0.10.11",
+    "@pkmn/dex": "^0.10.12",
+    "@pkmn/mods": "0.10.12",
+    "@pkmn/sim": "0.10.12",
     "@smogon/calc": "^0.12.0"
   }
 }

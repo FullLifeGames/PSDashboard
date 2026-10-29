@@ -245,7 +245,7 @@ describe('the memo keys the power at use (round 63, T81)', () => {
     const split = cached(pult, lax);
     expect(split).toEqual(pairThreat(pult, lax, battle));
     battle.sides[1].active[1].faint();
-    battle.faintMessages();
+    battle.resolveFaints();
     expect(cached(pult, lax)).toEqual(pairThreat(pult, lax, battle));
     expect(cached(pult, lax)).not.toEqual(split);
   });

@@ -130,7 +130,7 @@ describe('last-pair race static (round 33)', () => {
     );
     expect(battle.gameType).toBe('doubles');
     for (const side of battle.sides) side.active[1]!.faint();
-    battle.faintMessages();
+    battle.resolveFaints();
     battle.sides[0].active[0]!.setStatus('brn');
     expect(lastPairRace(battle, createMatchupCache())).toEqual({ winner: 1, margin: 3 });
     expect(leafValue(battle, createMatchupCache())).toBeCloseTo(-LAST_PAIR_CAP, 10);

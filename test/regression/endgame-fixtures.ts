@@ -60,7 +60,7 @@ const filler = (name: string): PokemonSet => makeSet(name, 'Pikachu', ['Tackle']
 /** Faints the second slot of the named sides so the doubles board holds the living bodies the fixture names. */
 function faintPartners(battle: Battle, sides: number[]): Battle {
   for (const index of sides) battle.sides[index].active[1]!.faint();
-  battle.faintMessages();
+  battle.resolveFaints();
   return battle;
 }
 

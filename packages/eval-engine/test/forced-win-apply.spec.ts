@@ -107,7 +107,7 @@ describe('forced-win trigger and bar (round 35)', () => {
       [makeSet('D', 'Machamp', ['Seismic Toss']), makeSet('E', 'Chansey', ['Soft-Boiled'])],
     );
     twoVsOne.sides[1].pokemon[1].faint();
-    twoVsOne.faintMessages();
+    twoVsOne.resolveFaints();
     expect(forcedWinPossible(JSON.stringify(State.serializeBattle(twoVsOne)), noProfile)).toBe(true);
     expect(forcedWinPossible('not json', noProfile)).toBe(true);
   });
@@ -161,7 +161,7 @@ describe('forced-win trigger and bar (round 35)', () => {
       'gen9doublescustomgame',
     );
     battle.sides[1].active[1]!.faint();
-    battle.faintMessages();
+    battle.resolveFaints();
     const serialized = serializeAt(battle, { p2: [1] });
     const result = resultWith(0.1, [], []);
     const outcome = forcedWinFor(createRootPosition(serialized), forcedWinInput(result, { depth: 1, samples: 1, tera: false }));

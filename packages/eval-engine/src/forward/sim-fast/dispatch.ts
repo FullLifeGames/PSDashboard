@@ -94,9 +94,10 @@ function directBits(effect: Bag, event: string): number {
   if (effect[`onFoe${event}`] !== undefined) bits |= FOE;
   if (effect[`onAny${event}`] !== undefined) bits |= ANY;
   if (effect[`onSource${event}`] !== undefined) bits |= SOURCE;
-  // getCallback's SwitchIn -> onStart fallback (battle.mjs:854), counted wide. In 0.10.11
-  // no SwitchIn reaches runEvent from gen 5 on (fieldEvent), so this guards future versions.
-  if (event === 'SwitchIn' && effect.onStart !== undefined) bits |= ALL;
+  // getCallback's SwitchIn fallbacks, counted wide: onStart in every generation since 0.10.12 (gen 5 on before), and
+  // a gen 3 weather ability's onAfterEntryHazard on turn 0 (battle.mjs getCallback). No SwitchIn reaches runEvent in
+  // 0.10.12 (fieldEvent runs it in every generation), so this guards future versions.
+  if (event === 'SwitchIn' && (effect.onStart !== undefined || effect.onAfterEntryHazard !== undefined)) bits |= ALL;
   return bits;
 }
 

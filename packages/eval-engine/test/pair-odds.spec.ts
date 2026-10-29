@@ -36,7 +36,7 @@ describe('kill odds for doubles options (round 56)', () => {
       [pairSet('Lax', 'Snorlax', ['Rest', 'Protect']), pairSet('Gone', 'Pikachu', ['Protect'])],
       battle => {
         battle.sides[1].active[1]!.faint();
-        battle.faintMessages();
+        battle.resolveFaints();
         battle.sides[1].active[0]!.sethp(114);
       },
     );

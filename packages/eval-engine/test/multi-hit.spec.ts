@@ -101,7 +101,7 @@ describe('multi-hit and sure crits in the static (round 63, T81)', () => {
     // The partner fainted with nobody left to replace it: one foe on the field.
     const lone = battleOf('gen9doublescustomgame', [set('Dragapult', ['dragondarts']), splash('Pikachu')], [splash('Snorlax'), splash('Garchomp')]);
     lone.sides[1].active[1].faint();
-    lone.faintMessages();
+    lone.resolveFaints();
     expect(ours(lone, 'dragondarts', 0).landing).toBe(2);
     expect(powerInTurn(lone, { p1: 'move 1 1, move 1', p2: 'move 1, pass' }, 'dragondarts').length).toBe(2);
   });

@@ -115,7 +115,7 @@ describe('the damage judge on a Champions game (T159, R10)', () => {
 });
 
 describe('the spread solver reads the same Champions hit on Stat Points (T159, decision 7)', () => {
-  const SOLVER_FORMAT: Record<Kind, string> = { singles: 'gen9championsou', doubles: 'gen9championsvgc2026regmbbo3' };
+  const SOLVER_FORMAT: Record<Kind, string> = { singles: 'gen9championsou', doubles: 'gen9championsvgc2026regmcbo3' };
   for (const kind of ['singles', 'doubles'] as const) {
     test(`${kind}: the spread the simulator played fits the hit at the mod's power, a weaker one does not`, () => {
       const { attacker } = sceneOf(kind, '');

@@ -117,7 +117,7 @@ describe('healProfile reads the heal the simulator plays (T258)', () => {
     expect(mismatches).toEqual([]);
   }, 600_000);
 
-  test.each(['gen9doublescustomgame', 'gen9championsdoublescustomgame', 'gen9championsvgc2026regmbbo3'])('doubles (%s): the same rates on a board of two bodies a side, Shore Up in sand and Heal Pulse for the foe', format => {
+  test.each(['gen9doublescustomgame', 'gen9championsdoublescustomgame', 'gen9championsvgc2026regmcbo3'])('doubles (%s): the same rates on a board of two bodies a side, Shore Up in sand and Heal Pulse for the foe', format => {
     const board = () => battleOf(format, [set('Palossand', ['shoreup', 'healpulse', 'junglehealing']), set('Snorlax', ['splash'])], [set('Snorlax', ['splash']), set('Snorlax', ['splash'])]);
     const clear = board();
     const sand = board();

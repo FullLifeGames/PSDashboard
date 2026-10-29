@@ -75,7 +75,7 @@ describe('tied singles cell in the verify pass (T146 c6)', () => {
     const mon = () => pairSet('Machamp', 'Machamp', ['Close Combat'], { level: 100 });
     const root = doublesRoot([mon(), pairSet('Pika', 'Pikachu', ['Tackle'], { level: 5 })], [mon(), pairSet('Chu', 'Pikachu', ['Tackle'], { level: 5 })], battle => {
       for (const side of battle.sides) side.active[1]!.faint();
-      battle.faintMessages();
+      battle.resolveFaints();
       for (const side of battle.sides) side.active[0]!.sethp(1);
     });
     const choice = (side: 'p1' | 'p2') => legalChoices(root, side).map(option => option.choice).filter(c => c.includes('closecombat'))[0];

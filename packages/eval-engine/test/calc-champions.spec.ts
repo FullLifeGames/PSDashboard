@@ -35,7 +35,7 @@ function checkerSets(): PokemonSet[] {
 
 describe('the engine prices a Champions body as the simulator plays it (decision 30)', () => {
   // The doubles run: the VGC format loads the same mod and the same Stat Points body (stats do not depend on the game type).
-  for (const formatid of ['gen9championsou', 'gen9championsvgc2026regmbbo3']) test(`calcPokemon on bodyOf gives the simulator's stats on every Champions body (${formatid})`, () => {
+  for (const formatid of ['gen9championsou', 'gen9championsvgc2026regmcbo3']) test(`calcPokemon on bodyOf gives the simulator's stats on every Champions body (${formatid})`, () => {
     const gen = calcGenerationFor(9, 'champions');
     const sets = checkerSets();
     const wrong: string[] = [];

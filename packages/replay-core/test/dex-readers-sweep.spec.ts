@@ -71,16 +71,22 @@ const conditions = changed('conditions', []);
 describe('the sweep sees what the mod changes', () => {
   test('the changed entries are the ones the round-67 diff and the fact check counted', () => {
     // By id, not by row: the mod's 16 typed Hidden Power rows share one id (the fact check's 18 types and 23 flags count rows).
+    // Round 78 (@pkmn 0.10.12, Regulation M-C): two more powers and two more PP counts, Double Shock's punch flag, Curse's
+    // own target rule, Emergency Exit, Run Away and Wimp Out changed and Disguise back to the game's, Eject Button for
+    // White Herb.
     expect(moves.type?.map(row => row.id).sort()).toEqual(['growth', 'snaptrap']);
-    expect(moves.basePower?.length).toBe(23);
+    expect(moves.basePower?.length).toBe(25);
     expect(moves.accuracy?.length).toBe(5);
-    expect(moves.flags?.length).toBe(7);
+    expect(moves.flags?.length).toBe(8);
+    expect(moves.flags?.map(row => row.id)).toContain('doubleshock');
     expect(moves.onDisableMove?.length).toBe(4);
     expect(moves.secondaries?.length).toBe(4);
-    expect(moves.pp?.length).toBe(103);
+    expect(moves.pp?.length).toBe(105);
+    expect(moves.onModifyMove?.map(row => row.id)).toEqual(['curse']);
     expect(Object.keys(moves).filter(field => ['category', 'priority'].includes(field))).toEqual([]);
-    expect([...new Set(Object.values(abilities).flat().map(row => row.id))].sort()).toEqual(['angershell', 'berserk', 'disguise', 'healer', 'naturalcure', 'regenerator', 'unseenfist']);
-    expect([...new Set(Object.values(items).flat().map(row => row.id))]).toEqual(['whiteherb']);
+    expect([...new Set(Object.values(abilities).flat().map(row => row.id))].sort())
+      .toEqual(['angershell', 'berserk', 'emergencyexit', 'healer', 'naturalcure', 'regenerator', 'runaway', 'unseenfist', 'wimpout']);
+    expect([...new Set(Object.values(items).flat().map(row => row.id))]).toEqual(['ejectbutton']);
     expect([...new Set(Object.values(conditions).flat().map(row => row.id))].sort()).toEqual(expect.arrayContaining(['frz', 'par', 'slp']));
   });
 });

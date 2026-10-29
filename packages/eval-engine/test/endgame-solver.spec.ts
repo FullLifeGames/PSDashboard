@@ -114,7 +114,7 @@ describe('endgame children (round 34)', () => {
       'gen9doublescustomgame',
     );
     for (const side of battle.sides) side.active[1]!.faint();
-    battle.faintMessages();
+    battle.resolveFaints();
     const root = createRootPosition(serialize(battle));
     // The first legal option of each side: the solver uses searchOptions, the test only needs one valid pair.
     const p1Choice = searchOptions(root, 'p1', { tera: false })[0].choice;
@@ -143,7 +143,7 @@ describe('endgame children (round 34)', () => {
       'gen9doublescustomgame',
     );
     for (const side of battle.sides) side.active[1]!.faint();
-    battle.faintMessages();
+    battle.resolveFaints();
     const root = createRootPosition(serialize(battle));
     const p1Choice = searchOptions(root, 'p1', { tera: false })[0].choice;
     const p2Choice = searchOptions(root, 'p2', { tera: false })[0].choice;
@@ -161,7 +161,7 @@ describe('endgame children (round 34)', () => {
       'gen9doublescustomgame',
     );
     for (const side of battle.sides) side.active[1]!.faint();
-    battle.faintMessages();
+    battle.resolveFaints();
     const root = createRootPosition(serialize(battle));
     const p1Choice = searchOptions(root, 'p1', { tera: false })[0].choice;
     const p2Choice = searchOptions(root, 'p2', { tera: false })[0].choice;
@@ -228,7 +228,7 @@ describe('endgame solver (round 34)', () => {
       'gen9doublescustomgame',
     );
     for (const side of battle.sides) side.active[1]!.faint();
-    battle.faintMessages();
+    battle.resolveFaints();
     battle.sides[0].active[0]!.sethp(250);
     battle.sides[1].active[0]!.sethp(200);
     const result = solveEndgame(serialize(battle), SMALL);

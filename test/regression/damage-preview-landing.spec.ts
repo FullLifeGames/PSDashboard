@@ -93,7 +93,7 @@ function wall(species: string): PokemonSet {
 /** Faints one active so its side fights on with a single Pokémon (no bench left to send in). */
 function faint(current: Battle, side: 0 | 1, slot: number) {
   current.sides[side].active[slot].faint();
-  current.faintMessages();
+  current.resolveFaints();
 }
 
 /** The roll is the only luck the range covers: a crit or a miss voids the check. */

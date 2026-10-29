@@ -274,7 +274,7 @@ describe('sim forward model', () => {
     const eevee = battle.sides[1].active[1]!;
     eevee.hp = 0;
     eevee.faint();
-    battle.faintMessages();
+    battle.resolveFaints();
     const root = createRootPosition(serialize(battle));
     const p1Choices = legalChoices(root, 'p1').map(option => option.choice);
     expect(p1Choices).toContain('move karatechop 1, move tackle 1');

@@ -44,11 +44,11 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@pkmn/client": "^0.7.3",
-    "@pkmn/data": "^0.10.11",
-    "@pkmn/dex": "^0.10.11",
-    "@pkmn/protocol": "^0.7.3",
-    "@pkmn/sim": "0.10.11",
+    "@pkmn/client": "^0.7.4",
+    "@pkmn/data": "^0.10.12",
+    "@pkmn/dex": "^0.10.12",
+    "@pkmn/protocol": "^0.7.4",
+    "@pkmn/sim": "0.10.12",
     "@smogon/calc": "^0.12.0"
   }
 }

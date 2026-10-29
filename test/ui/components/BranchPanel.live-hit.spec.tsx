@@ -28,7 +28,7 @@ function loneFoeBehind(screen: string | null): Battle {
   battle.choose('p1', 'team 12');
   battle.choose('p2', 'team 12');
   battle.sides[1].active[1]!.faint();
-  battle.faintMessages();
+  battle.resolveFaints();
   battle.field.setTerrain('psychicterrain', 'debug');
   if (screen) battle.sides[1].addSideCondition(screen, battle.sides[1].active[0]!);
   return battle;

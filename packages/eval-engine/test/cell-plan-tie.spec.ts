@@ -56,7 +56,7 @@ function doublesOhkoTie(): SimPosition {
   const mon = () => pairSet('Machamp', 'Machamp', ['Close Combat'], { level: 100 });
   return doublesRoot([mon(), pairSet('Pika', 'Pikachu', ['Tackle'], { level: 5 })], [mon(), pairSet('Chu', 'Pikachu', ['Tackle'], { level: 5 })], battle => {
     for (const side of battle.sides) side.active[1]!.faint();
-    battle.faintMessages();
+    battle.resolveFaints();
     for (const side of battle.sides) side.active[0]!.sethp(1);
   });
 }

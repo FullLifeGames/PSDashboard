@@ -64,7 +64,7 @@ function faintInTheRebuild(battle: Awaited<ReturnType<typeof rebuilt>>['battle']
   const body = battle.sides[0].pokemon.find(pokemon => pokemon.species.name === species)!;
   body.hp = 0;
   battle.faint(body);
-  battle.faintMessages(false, false, false);
+  battle.resolveFaints({ checkWin: false });
   expect(body.terastallized ?? null).toBe(null);
   return body;
 }

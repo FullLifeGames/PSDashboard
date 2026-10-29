@@ -265,7 +265,7 @@ describe('the twin battle runs in the mode of the battle it answers for (user 12
   test('removalFormat: a base battle plays its twin on the base custom game, a Champions battle on the Champions custom game, singles or doubles', () => {
     const base = [SINGLES, DOUBLES].map(format => removalFormat(battleOf(format, [splash('Garchomp'), splash('Snorlax')], [splash('Clefable'), splash('Snorlax')])));
     expect(base).toEqual([SINGLES, SINGLES]);
-    const champions = [CHAMPIONS, CHAMPIONS_DOUBLES, 'gen9championsou', 'gen9championsvgc2026regmbbo3']
+    const champions = [CHAMPIONS, CHAMPIONS_DOUBLES, 'gen9championsou', 'gen9championsvgc2026regmcbo3']
       .map(format => removalFormat(battleOf(format, [splash('Garchomp'), splash('Snorlax')], [splash('Clefable'), splash('Snorlax')])));
     expect(champions).toEqual([CHAMPIONS, CHAMPIONS, CHAMPIONS, CHAMPIONS]);
   });

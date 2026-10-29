@@ -37,7 +37,7 @@ const knowledge = (entries: Record<string, Partial<SpeedKnowledge>>): Map<string
 /** The calculator's own view of a Champions body, for building observations the replay would show. */
 const calcEvs = (spread: PokemonEvs) => Object.fromEntries(Object.entries(spread).map(([stat, value]) => [stat, value >= 1 ? 8 * value - 4 : 0]));
 
-const CHAMPIONS = { singles: 'gen9championsou', doubles: 'gen9championsvgc2026regmbbo3' } as const;
+const CHAMPIONS = { singles: 'gen9championsou', doubles: 'gen9championsvgc2026regmcbo3' } as const;
 
 describe('the spread solver reads Champions Stat Points (T145)', () => {
   for (const [kind, format] of Object.entries(CHAMPIONS)) {

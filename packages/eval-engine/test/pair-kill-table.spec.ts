@@ -61,7 +61,7 @@ describe('kill tables from the calc, checked at the drawn roll (round 56)', () =
     const wall = pairSet('Wall', 'Blissey', ['Soft-Boiled', 'Protect']);
     const root = doublesRoot([gleam, wall], [pairSet('Target', 'Snorlax', ['Protect', 'Rest']), pairSet('Gone', 'Pikachu', ['Protect'])], battle => {
       battle.sides[1].active[1]!.faint();
-      battle.faintMessages();
+      battle.resolveFaints();
     });
     const p2 = legalChoices(root, 'p2', { tera: false }).find(option => option.choice.startsWith('move rest'))!.choice;
     const drawn = draw(root, 'move dazzlinggleam, move softboiled', p2);

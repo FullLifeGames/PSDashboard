@@ -9,8 +9,12 @@ import { isChampionsFormat, registerChampionsDex, type RulesModData } from '@ful
  * sleep and freeze turns). The simulator builds every battle from its format
  * id on the base Dex (BattleStream's start, State.deserializeBattle), so the
  * mod's formats are registered there as well; their `mod` routes each battle
- * to the Champions dex. The mod bundles a private copy of the simulator's
- * data (about 10 MB), so it loads on demand, for a Champions format only.
+ * to the Champions dex. The mod loads on demand, for a Champions format only;
+ * up to @pkmn/mods 0.10.11 it bundled a private copy of the simulator's data
+ * (about 10 MB), since 0.10.12 it holds the mod's own data (about 0.5 MB).
+ * Since 0.10.12 the mod plays Regulation M-C and lists only its formats; a
+ * replay of an earlier regulation branches on the mod's OU or Doubles Custom
+ * Game like every Champions replay (getBranchSimulatorFormat in replay-core).
  */
 
 type ChampionsMod = typeof import('@pkmn/mods/champions');

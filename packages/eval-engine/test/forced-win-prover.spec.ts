@@ -180,7 +180,7 @@ describe('forced-win prover (round 35)', () => {
       'gen9doublescustomgame',
     );
     battle.sides[1].active[1]!.faint();
-    battle.faintMessages();
+    battle.resolveFaints();
     const serialized = serializeAt(battle, { p2: [1] });
     const proof = proveForcedWin(serialized, { side: 'p1', rootOrder: [], tera: false });
     expect(proof.mass).toBe(1);

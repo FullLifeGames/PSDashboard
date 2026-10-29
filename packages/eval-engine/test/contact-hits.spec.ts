@@ -74,6 +74,17 @@ function meanLoss(build: (seed: string) => Battle, count: number, click: Click):
   return total / count;
 }
 
+/** The same mean over the seeds whose turn shows no crit. */
+function meanLossWithoutCrit(build: (seed: string) => Battle, count: number, click: Click): number {
+  const losses: number[] = [];
+  for (let index = 1; index <= count; index++) {
+    const battle = build(seedOf(index));
+    const loss = realLoss(battle, click);
+    if (!battle.log.some(line => line.startsWith('|-crit|'))) losses.push(loss);
+  }
+  return losses.reduce((sum, loss) => sum + loss, 0) / losses.length;
+}
+
 const statusOf = (cost: HitCost, name: string) => cost.statuses.find(entry => entry.status === name);
 
 beforeEach(() => resetHitMemo());
@@ -384,7 +395,10 @@ describe('the Champions mod and every generation', () => {
     expect(read(skin(), 'bodyslam').chip).toBeCloseTo(realLoss(skin(), SINGLES_CLICK), 9);
     expect(read(skin(), 'bodyslam').chip).toBeGreaterThan(0);
     const recoil = (seed: string) => battleOf(format, [attackerOf('Snorlax', ['doubleedge'])], [foe('Snorlax')], seed);
-    expect(Math.abs(read(recoil('1,2,3,4'), 'doubleedge').chip / meanLoss(recoil, 60, SINGLES_CLICK) - 1)).toBeLessThan(0.06);
+    // Round 78 (@pkmn 0.10.12): the reader's two probes (u = 0.075 and 0.925) never meet a crit (1 in 16 up to gen 5,
+    // 1 in 24 later), so a recoil it reads deterministic is the cost of a hit without a crit, and the simulator's turns
+    // are held to that: their mean over every seed ran 6.8 % above it in gen 3 once the new simulator drew other dice.
+    expect(Math.abs(read(recoil('1,2,3,4'), 'doubleedge').chip / meanLossWithoutCrit(recoil, 60, SINGLES_CLICK) - 1)).toBeLessThan(0.06);
   });
 
   test.each([1, 2])('generation %s has no abilities and no items to read; the reader answers without failing', gen => {

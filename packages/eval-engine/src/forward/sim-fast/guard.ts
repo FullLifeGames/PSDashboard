@@ -22,21 +22,26 @@ const FUNCTIONS: readonly [keyof SimProtos, string, readonly string[]][] = [
   ['formats', 'DexFormats', ['getRuleTable']],
 ];
 
-/** @pkmn/sim 0.10.11; the ESM and CJS builds print three of these functions differently. */
+/**
+ * @pkmn/sim 0.10.12; the ESM and CJS builds print three of these functions differently. Round 78 re-pinned three of
+ * them after a review against 0.10.11: runEvent changed only its syntax (`sourceEffect?.effectType`), getCallback's
+ * SwitchIn fallback now holds in every generation (dispatch.ts counts it wide), and getRuleTable rewrote the tag rules,
+ * which the layer does not read.
+ */
 export const PINNED_SIM_HASHES: Readonly<Record<'esm' | 'cjs', HashTable>> = {
   esm: {
-    'Battle.runEvent': '46869e91', 'Battle.findEventHandlers': 'a7e357a8', 'Battle.findPokemonEventHandlers': 'e6d2de11',
+    'Battle.runEvent': '95ef43d6', 'Battle.findEventHandlers': 'a7e357a8', 'Battle.findPokemonEventHandlers': 'e6d2de11',
     'Battle.findSideEventHandlers': 'a46b9cf0', 'Battle.findFieldEventHandlers': 'a8542bd1',
-    'Battle.findBattleEventHandlers': '12e97530', 'Battle.getCallback': '33f2c687', 'Battle.modify': 'db4b25ab',
+    'Battle.findBattleEventHandlers': '12e97530', 'Battle.getCallback': '0c352070', 'Battle.modify': 'db4b25ab',
     'Pokemon.getStatus': '63d4338d', 'Pokemon.getAbility': '48320f6f', 'Pokemon.getItem': '969bd06d',
-    'Field.getWeather': '6cdee693', 'Field.getTerrain': '7c6d1d5d', 'DexFormats.getRuleTable': '5e3c222d',
+    'Field.getWeather': '6cdee693', 'Field.getTerrain': '7c6d1d5d', 'DexFormats.getRuleTable': '111039e5',
   },
   cjs: {
-    'Battle.runEvent': 'c72b7ce6', 'Battle.findEventHandlers': '791d0893', 'Battle.findPokemonEventHandlers': 'e6d2de11',
+    'Battle.runEvent': '0a7cfc07', 'Battle.findEventHandlers': '791d0893', 'Battle.findPokemonEventHandlers': 'e6d2de11',
     'Battle.findSideEventHandlers': 'a46b9cf0', 'Battle.findFieldEventHandlers': 'a8542bd1',
-    'Battle.findBattleEventHandlers': '12e97530', 'Battle.getCallback': '6012f4ce', 'Battle.modify': 'db4b25ab',
+    'Battle.findBattleEventHandlers': '12e97530', 'Battle.getCallback': '0c21f4d7', 'Battle.modify': 'db4b25ab',
     'Pokemon.getStatus': '63d4338d', 'Pokemon.getAbility': '48320f6f', 'Pokemon.getItem': '969bd06d',
-    'Field.getWeather': '6cdee693', 'Field.getTerrain': '7c6d1d5d', 'DexFormats.getRuleTable': '5e3c222d',
+    'Field.getWeather': '6cdee693', 'Field.getTerrain': '7c6d1d5d', 'DexFormats.getRuleTable': '111039e5',
   },
 };
 

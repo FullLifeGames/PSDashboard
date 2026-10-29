@@ -34,7 +34,7 @@ const doubles = (p1: PokemonSet[], foes: PokemonSet[], setup?: (battle: Battle) 
   rootOf('gen9doublescustomgame', p1, foes, battle => {
     if (alone) {
       battle.sides[1].active[1]!.faint();
-      battle.faintMessages();
+      battle.resolveFaints();
     }
     setup?.(battle);
   });

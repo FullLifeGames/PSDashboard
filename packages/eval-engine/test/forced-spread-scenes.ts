@@ -39,7 +39,7 @@ export function doubles(scene: Scene, screen: string | null, alone: boolean): Si
   return rootOf('gen9doublescustomgame', [scene.attacker(), wall('Snorlax')], [wall(), wall('Chansey')], battle => {
     if (alone) {
       battle.sides[1].active[1]!.faint();
-      battle.faintMessages();
+      battle.resolveFaints();
     }
     scene.field(battle);
     if (screen) battle.sides[1].addSideCondition(screen, battle.sides[1].active[0]!);

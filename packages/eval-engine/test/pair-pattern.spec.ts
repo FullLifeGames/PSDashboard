@@ -122,7 +122,7 @@ describe('pair choices and the rules before the dice (round 56)', () => {
       [pairSet('A', 'Snorlax', ['Rest', 'Protect']), pairSet('B', 'Snorlax', ['Rest', 'Protect'])],
       battle => {
         battle.sides[0].active[0]!.faint();
-        battle.faintMessages();
+        battle.resolveFaints();
       },
     );
     const battle = positionBattle(root);

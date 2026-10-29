@@ -18,7 +18,7 @@ import type { DamageObservation } from '../src/types';
  */
 Dex.mod('champions', championsMod as unknown as NonNullable<Parameters<typeof Dex.mod>[1]>);
 const dex = Dex.dexes.champions;
-const FORMATS = { singles: 'gen9championsou', doubles: 'gen9championsvgc2026regmbbo3' } as const;
+const FORMATS = { singles: 'gen9championsou', doubles: 'gen9championsvgc2026regmcbo3' } as const;
 const legal = dex.species.all().filter(species => !species.isNonstandard);
 const ZERO = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
 const ALL_31 = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };

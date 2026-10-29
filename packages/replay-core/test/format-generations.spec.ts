@@ -6,7 +6,8 @@ import { generationsFor } from '../src/format-generations';
 
 /**
  * Round 69 (T188, decision 33): the Generations a format's client battle is built on. A Champions battle's log names
- * species the mod calls non-standard (Absol-Mega-Z is `Past` in the mod and `Future` in the base Dex), so the parser reads
+ * species the mod calls non-standard (Absol-Mega-Z was `Past` in the mod and `Future` in the base Dex until Regulation M-C
+ * of @pkmn 0.10.12 made it legal; Heatran-Mega stands in, `Future` in both), so the parser reads
  * the 'logged' scope (every species the Dex knows, with the base Dex's data) and the team editor's pools read the 'legal'
  * scope (exactly what the registered mod allows). Every other format keeps the one shared standard Generations.
  * The checker is the mod: Dex.mod('champions', @pkmn/mods/champions), as the engine registers it.
@@ -21,6 +22,7 @@ describe('formats outside Champions keep the standard Generations', () => {
     for (const format of ['gen9doublesou', 'gen9vgc2026regi', 'gen8ou', '[Gen 9] OU', '']) expect(generationsFor(format), format).toBe(standard);
     expect(generationsFor('gen9ou', 'legal', mod as never)).toBe(standard);
     expect(standard.get(9).species.get('Absol-Mega-Z')).toBeUndefined();
+    expect(standard.get(9).species.get('Heatran-Mega')).toBeUndefined();
   });
 });
 
@@ -38,10 +40,12 @@ describe('the logged scope of a Champions format', () => {
     });
   }
 
-  test('Absol-Mega-Z, which the mod flags non-standard and a Champions log names, is a species of it', () => {
-    expect(mod.species.get('Absol-Mega-Z').isNonstandard).toBeTruthy();
+  test('a species the mod flags non-standard is a species of it: Heatran-Mega, and Absol-Mega-Z, legal since M-C', () => {
+    expect(mod.species.get('Heatran-Mega').isNonstandard).toBeTruthy();
+    expect(generationsFor(FORMATS.singles).get(9).species.get('Heatran-Mega')?.name).toBe('Heatran-Mega');
+    expect(BaseDex.species.get('Heatran-Mega').exists).toBe(true);
+    expect(mod.species.get('Absol-Mega-Z').isNonstandard).toBeFalsy();
     expect(generationsFor(FORMATS.singles).get(9).species.get('Absol-Mega-Z')?.name).toBe('Absol-Mega-Z');
-    expect(BaseDex.species.get('Absol-Mega-Z').exists).toBe(true);
   });
 
   test('items, moves and abilities of the mod resolve too, and one object serves the format id and the tier name', () => {
@@ -69,7 +73,8 @@ describe('the legal scope of a Champions format with the registered mod', () => 
     check('move', mod.moves.all(), name => gen.moves.get(name));
     check('ability', mod.abilities.all(), name => gen.abilities.get(name));
     expect(wrong).toEqual([]);
-    expect(gen.species.get('Absol-Mega-Z')).toBeUndefined();
+    expect(gen.species.get('Heatran-Mega')).toBeUndefined();
+    expect(gen.species.get('Absol-Mega-Z')).toBeDefined();
     expect(gen.species.get('Meloetta-Pirouette')).toBeDefined();
   });
 

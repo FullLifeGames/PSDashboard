@@ -81,7 +81,9 @@ describe('the |cant| reasons of the simulator, scanned (round 70, N1)', () => {
   const found = scan();
 
   test('every write has a plain reason, and the census names exactly the reasons the simulator writes', () => {
-    expect(found.writes).toBeGreaterThan(80);
+    // Round 78 (@pkmn 0.10.12): the Champions mod no longer carries a copy of the simulator, so the scan finds 50 writes
+    // where it found 93, with the same 21 reasons.
+    expect(found.writes).toBeGreaterThan(40);
     expect(found.plain).toBe(found.writes);
     expect(found.reasons).toEqual(Object.keys(REASONS).sort());
   });

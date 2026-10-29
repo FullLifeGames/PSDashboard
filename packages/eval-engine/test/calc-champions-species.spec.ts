@@ -25,7 +25,7 @@ function neutralSet(species: string): PokemonSet {
 }
 
 describe('every species of the Champions mod builds in the calculator (decision 3)', () => {
-  for (const formatid of ['gen9championsou', 'gen9championsvgc2026regmbbo3']) {
+  for (const formatid of ['gen9championsou', 'gen9championsvgc2026regmcbo3']) {
     test(`${formatid}: no throw, the simulator's stats, types and weight`, () => {
       const gen = calcGenerationFor(9, 'champions');
       const names = legalSpecies();
