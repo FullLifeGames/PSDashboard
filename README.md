@@ -96,7 +96,7 @@ npm run dev              # local Vite server
 | `npm run pack:smoke` | packs both packages and runs their README examples from the tarballs |
 | `npx @fulllifegames/eval-engine check-engine <url>` | an engine endpoint against the engine protocol ([ENGINES.md](./ENGINES.md)) |
 
-CI ([test.yml](./.github/workflows/test.yml)) runs on every push to master and dev and on pull requests, in three jobs: the Node suites, the browser flows, and a smoke test of the production build. The Node job also runs the eval-engine project twice more with the simulator speed layer forced off and on (`EVAL_SIM_FAST=0` and `1`), and the pages workflow lints before it deploys.
+CI ([test.yml](./.github/workflows/test.yml)) runs on every push to master and dev and on pull requests, in five jobs: the Node suites, the eval-engine project twice more with the simulator speed layer forced off and on (`EVAL_SIM_FAST=0` and `1`), the browser flows, and a smoke test of the production build. The pages workflow lints before it deploys.
 
 ### Contributing
 

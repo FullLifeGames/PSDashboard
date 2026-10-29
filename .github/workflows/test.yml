@@ -17,7 +17,7 @@ jobs:
   node:
     name: Node suites
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -35,17 +35,38 @@ jobs:
       - name: Run the Node suites
         run: npm run test:regression
 
-      # Round 59: the default run above covers the adopted speed layer; one more run forces it
-      # off (the kill switch) and one forces it on (a break throws instead of falling back).
-      - name: Run the engine suite with the speed layer forced off
-        run: npx vitest run --project eval-engine
-        env:
-          EVAL_SIM_FAST: '0'
+  # Round 59: the Node suites cover the adopted speed layer; one more run forces it off (the kill
+  # switch) and one forces it on (a break throws instead of falling back). Release 1.0.0: both ran
+  # after the Node suites in one job, which outgrew its 20 minutes, so each runs as its own job.
+  engine-speed-layer:
+    name: Engine suite, speed layer ${{ matrix.speed-layer }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - speed-layer: forced off
+            sim-fast: '0'
+          - speed-layer: forced on
+            sim-fast: '1'
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
 
-      - name: Run the engine suite with the speed layer forced on
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run the engine suite
         run: npx vitest run --project eval-engine
         env:
-          EVAL_SIM_FAST: '1'
+          EVAL_SIM_FAST: ${{ matrix.sim-fast }}
 
   browser:
     name: Browser flows
