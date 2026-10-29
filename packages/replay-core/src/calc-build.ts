@@ -73,8 +73,6 @@ function knownForm(calc: CalcGeneration, name: string, dex: SpeciesDex): string 
   return (forms.find(form => form.name === species.baseSpecies) ?? forms[0])?.name ?? name;
 }
 
-const STAT_IDS = ['hp', 'atk', 'def', 'spa', 'spd', 'spe'] as const;
-
 /** One answer per generation, dex and name: null for a species that needs none. */
 const overridesMemo = new Map<string, CalcPokemonOptions['overrides'] | null>();
 
@@ -102,7 +100,8 @@ function dexOverrides(gen: CalcGeneration, name: string, dex: SpeciesDex): CalcP
   if (!species.exists) return undefined;
   const listed = gen.species.get(toId(name) as never);
   if (listed) {
-    const same = STAT_IDS.every(stat => listed.baseStats[stat] === species.baseStats[stat]) && listed.types.join('/') === species.types.join('/');
+    const stats = Object.keys(species.baseStats) as (keyof SpeciesRow['baseStats'])[];
+    const same = stats.every(stat => listed.baseStats[stat] === species.baseStats[stat]) && listed.types.join('/') === species.types.join('/');
     return same ? undefined : { types: species.types as never, baseStats: species.baseStats };
   }
   return {
