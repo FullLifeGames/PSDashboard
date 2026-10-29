@@ -103,6 +103,9 @@ describe('fit universe of one family', () => {
   /** What a fit does not read: the holdout and the ladder games without a rating (withoutHoldout, withoutUnratedLadder). */
   const leavesTheFit = (entry: Entry, holdout: ReadonlySet<string>) =>
     holdout.has(entry.id) || (entry.source === 'ladder' && (cachedRating(entry.id) ?? 0) <= 0 && cachedRating(entry.id) !== undefined);
+  // Release 1.0.0: the Tests workflow on master runs without the bank's data (.fit-corpus reaches only the bank jobs),
+  // so the tests that read the corpus's replay files skip there, like every spec of local data.
+  const corpusHere = existsSync('.fit-corpus');
 
   test('without a family or a turn rule the fit universe is the whole corpus at the bank turns', () => {
     delete process.env.EVAL_CALIBRATION_TURNS;
@@ -113,7 +116,7 @@ describe('fit universe of one family', () => {
     expect(universe.sampleTurns(30)).toEqual(bankTurns(30));
   });
 
-  test('a corpus format belongs to the family its replays play (the log says gametype)', () => {
+  test.skipIf(!corpusHere)('a corpus format belongs to the family its replays play (the log says gametype)', () => {
     const seen = new Map<string, number>();
     for (const entry of corpus()) {
       const taken = seen.get(entry.format) ?? 0;
@@ -144,9 +147,12 @@ describe('fit universe of one family', () => {
     const all = lists.flatMap(({ universe }) => universe.ids);
     expect(new Set(all).size).toBe(all.length);
     expect(all.length).toBe(fitted.length);
-    // The unrated ladder games of the corpus (Champions VGC Bo3) are what the filter drops beside the holdout.
-    expect(entries.filter(entry => entry.source === 'ladder' && !holdout.has(entry.id) && leavesTheFit(entry, holdout)).length).toBeGreaterThan(0);
   }, 240_000);
+
+  test.skipIf(!corpusHere)('the unrated ladder games of the corpus (Champions VGC Bo3) leave the fit beside the holdout', () => {
+    const holdout = held();
+    expect(corpus().filter(entry => entry.source === 'ladder' && !holdout.has(entry.id) && leavesTheFit(entry, holdout)).length).toBeGreaterThan(0);
+  });
 
   test('a family names one of the five and needs the fit corpus', () => {
     expect(() => fitRun('doublesou')).toThrow(/unknown EVAL_CALIBRATION_FAMILY/);
