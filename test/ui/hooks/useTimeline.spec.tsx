@@ -333,6 +333,30 @@ describe('useTimeline', () => {
       expect(result.current).toMatchObject({ viewTurn: 2, atVariationEnd: false });
     });
 
+    test('the frame landing on the last played turn ends the guard: Last turn right after the end moves the pointer', () => {
+      // Round 77 (lane L2's open point, made worse by the 20-second play-in guard): an ended tip never reports its own
+      // turn, so the guard waiting for the tip held every report until it lapsed, and the user's first Last turn after
+      // the game ended did nothing. At an ended variation the frame lands on the last played turn: that ends the guard.
+      const { result, rerender, base } = setup();
+      rerender({ ...base, branching: true, variationStartTurn: 2, history: [entry(2), entry(3)], variationEnded: true });
+      expect(result.current).toMatchObject({ viewTurn: 4, atVariationEnd: true });
+      act(() => result.current.handleReplayTurn(3));
+      expect(result.current.viewTurn).toBe(4);
+      act(() => result.current.handleReplayTurn(2));
+      expect(result.current).toMatchObject({ viewTurn: 2, atVariationEnd: false });
+    });
+
+    test('a win that lands a render after its turn retargets the guard to the last played turn', () => {
+      const { result, rerender, base } = setup();
+      const played = { ...base, branching: true, variationStartTurn: 2, history: [entry(2), entry(3)] };
+      rerender(played);
+      rerender({ ...played, variationEnded: true });
+      expect(result.current).toMatchObject({ viewTurn: 4, atVariationEnd: true });
+      act(() => result.current.handleReplayTurn(3));
+      act(() => result.current.handleReplayTurn(2));
+      expect(result.current.viewTurn).toBe(2);
+    });
+
     test('a variation that has not ended has no end position', () => {
       const { result } = setup({ branching: true, variationStartTurn: 2, history: [entry(2)] });
       expect(result.current.atVariationEnd).toBe(false);

@@ -156,6 +156,8 @@ interface NavArgs {
   interruptPlayOut: () => void;
   onNavigate: () => void;
   executing: boolean;
+  /** The live sim of the variation has a winner (round 77, A-6). */
+  variationEnded: boolean;
   setAnalysisTurn: (turn: number) => void;
 }
 
@@ -170,7 +172,7 @@ const PLAY_IN_GUARD_MS = 20_000;
 
 /** The single pointer move plus the tip-follow after executed turns. */
 function useNavigateTo(args: NavArgs, seekIntentRef: SeekIntentRef) {
-  const { pointer, derived, branching, interruptPlayOut, onNavigate, executing } = args;
+  const { pointer, derived, branching, interruptPlayOut, onNavigate, executing, variationEnded } = args;
   const { setViewTurn, setViewLine, setViewT0, setNavSeek, setFollowedPlay } = pointer;
   const { maxTurn, variationSpan, tipTurn } = derived;
 
@@ -221,7 +223,12 @@ function useNavigateTo(args: NavArgs, seekIntentRef: SeekIntentRef) {
       return;
     }
     const key = `${variationSpan.startTurn}:${tipTurn}`;
-    if (followedKeyRef.current === key) return;
+    if (followedKeyRef.current === key) {
+      // The win can land a render after its turn: the guard then waits for the last played turn.
+      const intent = seekIntentRef.current;
+      if (variationEnded && intent?.turn === tipTurn) seekIntentRef.current = { ...intent, turn: tipTurn - 1 };
+      return;
+    }
     followedKeyRef.current = key;
     // The view was handed back while this turn was in flight (Stop, or the user's own click): the turn lands
     // where the user is not looking, so the pointer stays (round 77, C5).
@@ -230,10 +237,11 @@ function useNavigateTo(args: NavArgs, seekIntentRef: SeekIntentRef) {
       return;
     }
     // The frame plays the turn in from the one before the tip: its reports until it lands on the tip are the
-    // app's own, not the user's (round 77, A-4).
-    seekIntentRef.current = { turn: tipTurn, until: Date.now() + PLAY_IN_GUARD_MS };
+    // app's own, not the user's (round 77, A-4). An ended tip has no turn of its own: the frame lands on the last
+    // played turn, and that landing ends the guard.
+    seekIntentRef.current = { turn: variationEnded ? tipTurn - 1 : tipTurn, until: Date.now() + PLAY_IN_GUARD_MS };
     navigateTo({ turn: tipTurn, line: 'variation' }, { seek: false, internal: true, followPlay: true });
-  }, [branching, tipTurn, variationSpan, navigateTo, seekIntentRef]);
+  }, [branching, tipTurn, variationSpan, variationEnded, navigateTo, seekIntentRef]);
   // Declared after the follow effect: a landing turn is seen by it before this one clears the hold.
   useEffect(() => {
     executingRef.current = executing;
@@ -351,7 +359,7 @@ export function useTimeline(inputs: TimelineInputs) {
     }
   }
 
-  const nav = useTimelineNav({ pointer, derived, atVariationEnd, branching, interruptPlayOut, onNavigate, executing, setAnalysisTurn });
+  const nav = useTimelineNav({ pointer, derived, atVariationEnd, branching, interruptPlayOut, onNavigate, executing, variationEnded, setAnalysisTurn });
   return { ...pointer, ...derived, ...nav, analysisTurn, atVariationEnd };
 }
 
