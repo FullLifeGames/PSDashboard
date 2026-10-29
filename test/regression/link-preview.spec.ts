@@ -33,4 +33,14 @@ describe('link preview', () => {
     expect(existsSync(join(root, 'public', file))).toBe(true);
     expect(readme).toContain(`](./public/${file})`);
   });
+
+  // Release 1.0.1: the picture lost its empty margins. A crawler lays out the card from the declared size before it
+  // fetches the file, so the size follows the PNG's own header.
+  test('the declared size is the picture\'s own', () => {
+    const file = meta('property', 'og:image')!.slice(PAGES.length);
+    const png = readFileSync(join(root, 'public', file));
+    expect(png.toString('latin1', 12, 16)).toBe('IHDR');
+    expect(meta('property', 'og:image:width')).toBe(String(png.readUInt32BE(16)));
+    expect(meta('property', 'og:image:height')).toBe(String(png.readUInt32BE(20)));
+  });
 });
