@@ -47,11 +47,10 @@ test.describe('PS Dashboard', () => {
     await page.locator('button', { hasText: 'Discard variation' }).click();
     await expect(slider).toBeVisible({ timeout: 10_000 });
     await slider.fill('68');
-    // The end snapshot is the post-battle sentinel — playing from it (the
-    // play-out button included) is refused with the explanation, and no
-    // play-out arms.
-    await page.locator('button', { hasText: 'Let it play out' }).click();
-    await expect(page.getByText(/already over at the end position/)).toBeVisible();
+    // The end snapshot is the post-battle sentinel: no play-out is offered there (round 77, A-6: the bar says the game
+    // ended), and none arms.
+    await expect(page.locator('button', { hasText: 'Let it play out' })).toHaveCount(0);
+    await expect(page.getByText('The game ended at this position: nothing left to play out.')).toBeVisible();
     await expect(page.getByText(/Engine is playing both sides/)).toHaveCount(0);
     await expect(page.getByText(/Branching · Turn/)).toHaveCount(0);
   });
@@ -122,6 +121,9 @@ test.describe('PS Dashboard', () => {
     });
     const lastTurn = Number(/Branching · Turn (\d+)/.exec(await page.getByText(/Branching · Turn \d+/).innerText())?.[1]);
     const line = `ended at turn ${lastTurn}, p2 switches: ${p2Switches.join(', ')}`;
+    // The finished run hands the view back to its start turn (round 77, C5: the last turn no longer drags the pointer
+    // to the tip); the tip names the winner.
+    await page.getByRole('button', { name: 'End of the variation: the game is over here' }).click();
     await expect(page.locator('.ps-branch-ended'), line).toContainText('Bene wins this variation.');
     expect(lastTurn, line).toBeLessThanOrEqual(75);
     expect(p2Switches.length, line).toBeLessThanOrEqual(6);
