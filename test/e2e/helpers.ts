@@ -23,6 +23,7 @@ export type ReplayWindow = Window & {
       currentStep?: number;
       paused?: boolean;
       seeking?: number | null;
+      atQueueEnd?: boolean;
       viewpointSwitched?: boolean;
     };
   };
@@ -54,6 +55,18 @@ export async function expectReplayTurnAtLeast(frame: Frame, turn: number) {
   await expect.poll(async () => frame.evaluate(() =>
     (window as ReplayWindow).Replays?.battle?.turn ?? -1
   ), { timeout: 30_000 }).toBeGreaterThanOrEqual(turn);
+}
+
+/**
+ * Waits until the frame has played everything it holds: no seek running and the battle at the end of its steps (T280,
+ * T281). Until then the frame plays its turn in, and the app repeats a seek for 1.2 s (`useReplayFrame`), so a reading
+ * or a click before that races the frame, and a slow runner loses the race.
+ */
+export async function expectReplaySettled(frame: Frame) {
+  await expect.poll(() => frame.evaluate(() => {
+    const battle = (window as ReplayWindow).Replays?.battle;
+    return !!battle && battle.seeking === null && battle.atQueueEnd === true;
+  }), { timeout: 60_000 }).toBe(true);
 }
 
 /**

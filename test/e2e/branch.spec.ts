@@ -1,11 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'fs';
-import { expectReplayTurnAtLeast, fixturePath, installReplayEmbedCache, routeOfflineFixtures, routeSlowReplayEmbed, startVariationAt, type ReplayWindow } from './helpers';
+import { expectReplaySettled, expectReplayTurnAtLeast, fixturePath, installReplayEmbedCache, routeOfflineFixtures, routeSlowReplayEmbed, startVariationAt, type ReplayWindow } from './helpers';
 
 test.beforeAll(installReplayEmbedCache);
-
-/** T280: the embed's battle also says whether it has played every step it holds. */
-type SettlingWindow = ReplayWindow & { Replays?: { battle?: { atQueueEnd?: boolean } } };
 
 test.describe('PS Dashboard', () => {
   test.beforeEach(async ({ page }) => {
@@ -248,10 +245,7 @@ test.describe('PS Dashboard', () => {
     // appended growth came from turn 2 itself, and Last turn's return to the start of turn 2 landed above that reading
     // on a slow runner (the Tests runs on dev, 29.10.2026).
     const settledLogLength = async () => {
-      await expect.poll(() => frame!.evaluate(() => {
-        const battle = (window as SettlingWindow).Replays?.battle;
-        return !!battle && battle.seeking === null && battle.atQueueEnd === true;
-      }), { timeout: 60_000 }).toBe(true);
+      await expectReplaySettled(frame!);
       return logLength();
     };
     const beforeLength = await settledLogLength();
@@ -320,6 +314,8 @@ test.describe('PS Dashboard', () => {
   });
 
   test('branch replay play controls stay muted without audio errors', async ({ page }) => {
+    // T281: the frame plays the variation's turn to its end first, about 10 s at normal speed.
+    test.setTimeout(150_000);
     const pageErrors: string[] = [];
     page.on('pageerror', error => pageErrors.push(error.message));
 
@@ -332,10 +328,12 @@ test.describe('PS Dashboard', () => {
     expect(frame).toBeTruthy();
     await expectReplayTurnAtLeast(frame!, 2);
 
-    // The appended turn auto-plays (animate default) — pause first so the
-    // explicit Play click below exists in either player state.
-    const pauseButton = frame!.locator('button', { hasText: 'Pause' });
-    if (await pauseButton.isVisible().catch(() => false)) await pauseButton.click();
+    // T281: the frame plays the variation's turn in on its own (animate default), and the app repeats its seek for
+    // 1.2 s. A seek that lands after a pause plays again, and the Play button never shows (the Tests runs of e93499a,
+    // 29.10.2026). Once the frame has played everything, it rests unpaused at the end of its log: pause, then play.
+    await expectReplaySettled(frame!);
+    await frame!.locator('button', { hasText: 'Pause' }).click();
+    await expect.poll(() => frame!.evaluate(() => (window as ReplayWindow).Replays?.battle?.paused)).toBe(true);
     await frame!.locator('button', { hasText: 'Play' }).click();
     await expect.poll(async () =>
       frame!.evaluate(() => Boolean((window as ReplayWindow).Replays?.battle && !(window as ReplayWindow).Replays?.battle?.paused))
