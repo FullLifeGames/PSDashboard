@@ -277,6 +277,18 @@ describe('useTimeline', () => {
       expect(result.current.viewTurn).toBe(4);
     });
 
+    test('the frame landing on the tip spends the play, so a rebuild after it plays nothing in again (round 77)', () => {
+      // The acceptance e2e: a set edit at the tip rebuilt the variation, the new frame document opened at the turn before
+      // the tip to play it in again (followedPlay still held from the executed turn), and its landing there moved the
+      // pointer off the tip onto the main line. The play is spent once the frame lands on the tip it followed.
+      const { result, rerender, base } = setup();
+      rerender(variation(3, base));
+      expect(result.current).toMatchObject({ viewTurn: 5, followedPlay: true });
+      act(() => result.current.handleReplayTurn(4));
+      act(() => result.current.handleReplayTurn(5));
+      expect(result.current).toMatchObject({ viewTurn: 5, viewingVariation: true, followedPlay: false });
+    });
+
     test('a seek the app sent is not knocked back by the old turn the frame still reports', () => {
       const { result, rerender, base } = setup();
       rerender(variation(3, base));
@@ -311,8 +323,8 @@ describe('useTimeline', () => {
       rerender({ ...base, branching: true, variationStartTurn: 2, history: [entry(2), entry(3)], variationEnded: true });
       expect(result.current).toMatchObject({ viewTurn: 4, viewingVariation: true, atVariationEnd: true });
 
-      // The echo guard of the executed turn lapsed; the frame stays on the last played turn.
-      vi.setSystemTime(Date.now() + 10_000);
+      // The echo guard of the executed turn lapsed (20 s since round 77); the frame stays on the last played turn.
+      vi.setSystemTime(Date.now() + 30_000);
       act(() => result.current.handleReplayTurn(3));
       expect(result.current.viewTurn).toBe(4);
 

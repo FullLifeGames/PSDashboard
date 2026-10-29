@@ -161,6 +161,13 @@ interface NavArgs {
 
 type SeekIntentRef = { current: { turn: number; until: number } | null };
 
+/**
+ * How long the frame's reports count as the app's own while it plays a followed turn in. The guard ends when the frame
+ * lands on the tip; the bound covers a new document's load, which took more than four seconds under the full e2e suite
+ * after a set edit, and its landing on the turn before the tip moved the pointer off the variation (round 77).
+ */
+const PLAY_IN_GUARD_MS = 20_000;
+
 /** The single pointer move plus the tip-follow after executed turns. */
 function useNavigateTo(args: NavArgs, seekIntentRef: SeekIntentRef) {
   const { pointer, derived, branching, interruptPlayOut, onNavigate, executing } = args;
@@ -224,7 +231,7 @@ function useNavigateTo(args: NavArgs, seekIntentRef: SeekIntentRef) {
     }
     // The frame plays the turn in from the one before the tip: its reports until it lands on the tip are the
     // app's own, not the user's (round 77, A-4).
-    seekIntentRef.current = { turn: tipTurn, until: Date.now() + 4000 };
+    seekIntentRef.current = { turn: tipTurn, until: Date.now() + PLAY_IN_GUARD_MS };
     navigateTo({ turn: tipTurn, line: 'variation' }, { seek: false, internal: true, followPlay: true });
   }, [branching, tipTurn, variationSpan, navigateTo, seekIntentRef]);
   // Declared after the follow effect: a landing turn is seen by it before this one clears the hold.
@@ -243,7 +250,7 @@ function useNavigateTo(args: NavArgs, seekIntentRef: SeekIntentRef) {
 /** Embed echo guard and the graph's explicit line-addressed selections. */
 function useTimelineNav(args: NavArgs) {
   const { pointer, derived, atVariationEnd, interruptPlayOut, setAnalysisTurn } = args;
-  const { setViewTurn, setViewLine, setViewT0, setFollowedPlay, viewTurnRef } = pointer;
+  const { setViewTurn, setViewLine, setViewT0, setFollowedPlay } = pointer;
   const { endSnapshotTurn } = derived;
   // Programmatic seeks race the embed's turn echoes: while the iframe is
   // still seeking it keeps reporting the OLD turn, which would knock the
@@ -265,7 +272,10 @@ function useTimelineNav(args: NavArgs) {
       // Like the main line's end (B12): the frame stays on the last played turn when the pointer sits on the end.
       if (atVariationEnd && derived.tipTurn !== null && turn >= derived.tipTurn - 1) return;
       if (!variationCovers(derived.variationSpan, turn)) seekIntentRef.current = { turn, until: Date.now() + 4000 };
-      if (turn !== viewTurnRef.current) setFollowedPlay(false);
+      // A landed report spends the play: the user's own step, or the frame on the tip after playing the turn in. A
+      // rebuild afterwards (a set edit) opens its document on the tip and plays nothing in again; that replay's landing
+      // on the turn before the tip moved the pointer off the variation (round 77).
+      setFollowedPlay(false);
       setViewTurn(turn);
       return;
     }
@@ -277,7 +287,7 @@ function useTimelineNav(args: NavArgs) {
       }
       return turn;
     });
-  }, [derived.viewingVariation, derived.variationSpan, atVariationEnd, derived.tipTurn, endSnapshotTurn, setViewTurn, setFollowedPlay, viewTurnRef]);
+  }, [derived.viewingVariation, derived.variationSpan, atVariationEnd, derived.tipTurn, endSnapshotTurn, setViewTurn, setFollowedPlay]);
 
   const handleGraphSelect = useCallback((turn: number) => {
     // Selecting a turn is user navigation — it bypasses navigateTo, so the
