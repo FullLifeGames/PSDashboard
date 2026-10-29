@@ -912,6 +912,65 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * ROUND 78 2026-10-29 (improvement round 78, the dependencies for 1.0.1:
+ * the user's "Die @pkmn Dependencies scheinen updated worden zu sein" after
+ * the release of 1.0.0; branch r78 from dev, which v1 became; probes
+ * docs/perf/probes/2026-10-29-r78/). Gates 12:25 ("1a 2a": 1.0.1 brings the
+ * dependencies and the @pkmn train, T103 only as far as the upgrade needs
+ * it) and 15:15 ("1a 2a 3b 4a").
+ * DELIVERED: part A (ff9352a: react 19.3.1, vite 8.3.5, vitest 5.0.5, eslint
+ * 10.13.0, typescript-eslint 8.72.1, @playwright/test 1.64.1 and the rest of
+ * npm outdated; npm audit fix for the dev-only brace-expansion and undici;
+ * TypeScript stays 6.0.3, @types/node on 24). The @pkmn train (cff57e3):
+ * sim, mods, dex and data 0.10.12 (Showdown b354a81f, 326 commits after
+ * 755f4665), client and protocol 0.7.4, smogon 0.6.1; three of the speed
+ * layer's fourteen hashes moved and a review against 0.10.11 found no code
+ * the layer needs (runEvent's syntax, getCallback's SwitchIn fallback in
+ * every generation, getRuleTable's tag rules), so six pins move;
+ * resolveFaints for faintMessages in 19 spec files; the specs that built a
+ * battle on a Champions M-B format play M-C, since the mod lists no M-A or
+ * M-B format any more. A corrected Gen 1 to 4 entry plays switchIn's own
+ * steps (1bb29cc, 9f3858d; the gen 4 mod's runSwitch is gone):
+ * entry-sweep.spec.ts, 26 rows after a faint and at the boundary, 34 red
+ * before. The calculator body takes the Dex values where the calculator
+ * lists a species differently (8002900, ffa5ea8: Obliteryx 2.0, Special
+ * Defense 78 against @smogon/calc's 90). The search identity reference
+ * re-recorded (fcf28a1: a fainted body that left the field carries the
+ * status '' where 0.10.11 kept 'fnt'). Cache v72 (a102a84), the bin path
+ * without ./ (d834e4a), the app and UI specs on M-C and the generator floors
+ * of Gens 2 and 3 (cec3d98), a test timeout (3711088), the Pages build of a
+ * release started by release.yml (c064b5a, gate "3b"). Before the round the
+ * Tests workflow learned to run on dev (c34eea6, 3b30440) and the two
+ * fit-corpus specs to skip without the corpus (b418a75).
+ * MEASUREMENT: part A lossless: r77-fix2 (the 1.0.0 engine) against
+ * r78-base (ff9352a), 5,045 of 5,045 rows identical in every field. CI
+ * candidate a102a84 against base ff9352a, the same day: scores moved in 4
+ * of 837 bank rows, 1 of 1,090 Doubles OU, 1 of 1,225 VGC, 180 of 445
+ * Champions OU and 122 of 1,448 Champions VGC rows, and one row more
+ * (2695194009 t7 rebuilds now; the base skipped it). Verdicts: bank +0,
+ * D26 doubles +0, Champions VGC -4 [-12, +3]; Champions OU full +13 [-11,
+ * +40], luck-adjusted under the base's K +31 [+2, +68] HARM (late +63
+ * warning), own K per phase no harm. Cause: 116 of 149 Champions OU games
+ * hold a species the 0.10.11 mod did not allow (35 legal now and not then);
+ * there 49 % of the rows moved, elsewhere 10 %, and every large flip holds
+ * Golisopod: the old mod lagged the game. Feedback twice byte-identical, 13
+ * of 13, drift only on the known 562428 t10 and 655336; census singles
+ * 39/6/2, doubles 12/5/0, no turn moved against round 77. Suite on 3711088
+ * 7,227 passed, 2 expected fails, 22 skipped (the 22 of rounds 76 and 77);
+ * the engine suite green in all three speed-layer modes (one timeout under
+ * the full EVAL_SIM_FAST=0 load, 3711088); e2e 88 passed, 1 skipped (one
+ * load flake in the first full run, 16 of 16 alone); build smoke 3 of 3;
+ * pack smoke green; start load 1,646 kB gzip (1,627 for 1.0.0, the same
+ * method); the Champions chunk 46 kB gzip in one file (992 kB twice before).
+ * USER GATE 2026-10-29 15:15 ("1a 2a 3b 4a"): the upgrade adopted (the
+ * Champions OU harm game-correct, T277 for the refit), the moved specs and
+ * the identity reference taken as listed, T277 to T279 parked, the Pages
+ * dispatch built before 1.0.1, and 1.0.1 prepared: r78 into dev, the
+ * version, the dry run; master and production wait for their own okay.
+ * T103 stays parked, trigger: the next simulator upgrade. Next free T280.
+ * RESTS: T277 (the Champions OU K on the 0.10.12 rebuild), T278 (an M-B
+ * replay on the M-B overlay), T279 (the recoil chip with the crit share).
+ *
  * ROUND 77 2026-10-24..29 (improvement round 77, before the release: the
  * user's reports A to J, the report dialog, the engine protocol, the test
  * move, a branching review swarm and its two fix waves, T267; branch r77
