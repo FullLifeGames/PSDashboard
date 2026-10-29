@@ -16,6 +16,8 @@ Source of T264 and T265: the two proposals of round 73 that the design gate of r
 
 Source of T266: the gate of round 74 (23.10.2026, "4a"); a reviewer checked its facts against the run logs before the gate (`r74/review/gate-end-facts.md`).
 
+Source of T267 to T271: the user's report of 28.10.2026 (draft 2058494320, variation turn 63) and the branching swarm of that day (`docs/perf/probes/2026-10-24-r77/swarm/findings.md`), with the user's gates of 28.10. ("1a 2d 3a 4b + A-5 5b", recorded in `docs/perf/probes/2026-10-24-r77/wave-fix/BRIEF.md`); a reviewer checked T268 to T271 against the code of 29.10. (`docs/perf/probes/2026-10-24-r77/review/findings.md`). Their line numbers refer to the state after round 77.
+
 ## Next rounds
 
 Wave 5 (round 73), T163 with T263 (round 74, measured, nothing adopted), T160 (round 75) and the last wave (round 76, user gate 24.10.2026, "1a 2a 3a 4a 5a"; T259 reverted and parked) are booked. Next: the release with T43. Every other TODO is parked with a trigger.
@@ -90,21 +92,21 @@ Wave 5 (round 73), T163 with T263 (round 74, measured, nothing adopted), T160 (r
 
 ## Parked
 
-The triage of 21.10.2026 parked these TODOs; each section names its trigger, and a trigger that fires brings its TODO to a gate.
+The triage of 21.10.2026 and the user gates after it parked these TODOs; each section names its trigger, and a trigger that fires brings its TODO to a gate.
 
 ### T268 · The set editor shows the moves the branch plays
 
-*Teams · round 77 · small · confusing · swarm finding D4*
+*Teams · round 77 · larger bug · confusing · score-touching (the sets the engine plays move: set diffs on every build path before the bank) · swarm finding D4*
 
 **Parked (user gate 28.10.2026, "4b").** Trigger: a user report, or the first round after the release.
 
-**Problem.** smogtours-gen8ou-562428, Edit Opp, Corviknight: remove the guessed Roost and add Body Press. Editor and stats panel then read Brave Bird, U-turn, Defog (guessed) and Body Press (manual); the picker and the built set read Brave Bird, U-turn, Body Press and Roost, and a variation with Defog fails with "no longer knows Defog" while the panel still lists it. Scizor's Roost replaced by U-turn keeps Roost in the picker and drops Knock Off; Earthquake removed without a replacement changes nothing, because a guess fills the slot again; on the draft's open sheet a removed revealed Freeze-Dry comes back as SHEET (4 of 4). The set resolver puts the revealed and manual moves first and fills the rest from the guesses (`packages/replay-core/src/team/set-resolvers.ts:142`, `:221`), and `statsInfoOf` (`src/hooks/useTeamKnowledge.ts:235`) shows the guesses of before the edit.
+**Problem.** smogtours-gen8ou-562428, Edit Opp, Corviknight: remove the guessed Roost and add Body Press. Editor and stats panel then read Brave Bird, U-turn, Defog (guessed) and Body Press (manual); the picker and the built set read Brave Bird, U-turn, Body Press and Roost, and a variation with Defog fails with "no longer knows Defog" while the panel still lists it. Scizor's Roost replaced by U-turn keeps Roost in the picker and drops Knock Off; Earthquake removed without a replacement changes nothing, because a guess fills the slot again; on the draft's open sheet a removed revealed Freeze-Dry comes back as SHEET (4 of 4). The set resolver puts the revealed and manual moves first and fills the rest from the guesses (`packages/replay-core/src/team/set-resolvers.ts:142`, `:221`), and `statsInfoOf` (`src/hooks/useTeamKnowledge.ts:252`) shows the guesses of before the edit.
 
 **Benefit.** App: the editor and the stats panel show the four moves the branch plays, and a removed move stays removed.
 
 **Success.** After an edit, the editor, the stats panel and the picker list the same four moves in singles and doubles; a removed guessed or revealed move does not come back; a spec per scene.
 
-**Evidence.** Lane D of the branching swarm (`docs/perf/probes/2026-10-24-r77/swarm/findings.md`, D4), its scripts `s1b-edit-cases.mjs` and `s1h-panel-vs-picker.mjs`.
+**Evidence.** Lane D of the branching swarm (`docs/perf/probes/2026-10-24-r77/swarm/findings.md`, D4; report `swarm/reports/lane-D-report.txt`), its scripts `swarm/D-scripts/s1b-edit-cases.mjs` and `s1h-panel-vs-picker.mjs`.
 
 **Steps.**
 - [ ] Red specs for scenes A to D (removed guess, replaced guess, removed move without a replacement, removed revealed move on an open sheet).
@@ -117,13 +119,13 @@ The triage of 21.10.2026 parked these TODOs; each section names its trigger, and
 
 **Parked (user gate 28.10.2026, "4b").** Trigger: a user report, or the first round after the release.
 
-**Problem.** A reload loses the open variation, the pointer and the drafts without a warning (no `beforeunload` guard). Sets from `Edit Player` and `Edit Opp` are lost on reload, while an import persists per replay (`ps-replay-interceptor:sets:<id>`, `src/hooks/useTeamKnowledge.ts:76`, `:109`) with no way to clear it. A saved branch opens only as a read-only view, so its Save does not mean resume.
+**Problem.** A reload loses the open variation, the pointer and the drafts without a warning (no `beforeunload` guard). Sets from `Edit Player` and `Edit Opp` are lost on reload, while an import persists per replay (`ps-replay-interceptor:sets:<id>`, `src/hooks/useTeamKnowledge.ts:97`, `:125`) with no way to clear it. A saved branch opens only as a read-only view, so its Save does not mean resume.
 
 **Benefit.** App: a user knows before a reload what stays, edits and imports behave alike, and an import can be taken back.
 
 **Success.** A reload with an open variation asks first; edits and imports persist the same way and the Setup menu clears them; a saved branch says it opens read-only, or opens as a variation.
 
-**Evidence.** Lane D of the branching swarm (D8), its scripts `s4-reload-same.mjs` and `s4c-persist-newreplay.mjs`.
+**Evidence.** Lane D of the branching swarm (D8; `swarm/reports/lane-D-report.txt`), its scripts `swarm/D-scripts/s4-reload-same.mjs` and `s4c-persist-newreplay.mjs`.
 
 **Steps.**
 - [ ] Decide with the user which of the three is wanted: the reload guard, edits that persist like imports, a saved branch that resumes.
@@ -141,7 +143,7 @@ The triage of 21.10.2026 parked these TODOs; each section names its trigger, and
 
 **Success.** "New Replay" in the shared view opens the loader; loading another replay with a variation open asks first, as the replace confirm does.
 
-**Evidence.** Lane D of the branching swarm (D9, D10), its script `s4-reload-same.mjs`.
+**Evidence.** Lane D of the branching swarm (D9, D10; `swarm/reports/lane-D-report.txt`), its script `swarm/D-scripts/s4-reload-same.mjs`.
 
 **Steps.**
 - [ ] Red specs for both scenes, then the fixes.
@@ -158,7 +160,7 @@ The triage of 21.10.2026 parked these TODOs; each section names its trigger, and
 
 **Success.** The approximation orders each side's actives as the protocol does, and a two-slot side keeps two slots; a doubles and a VGC row in a spec.
 
-**Evidence.** Lane B of the branching swarm (`docs/perf/probes/2026-10-24-r77/swarm/findings.md`, B4).
+**Evidence.** Lane B of the branching swarm (`docs/perf/probes/2026-10-24-r77/swarm/findings.md`, B4; report `swarm/reports/lane-B-report.txt`).
 
 **Steps.**
 - [ ] A red spec from the three turns, then the fix in the snapshot picker.
