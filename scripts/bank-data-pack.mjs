@@ -110,10 +110,10 @@ function upload() {
   }
   if (exists) fail(`the release ${fixture.release} exists already; nothing uploaded`);
   // A pre-release that is never "Latest": the site's Pages build lists releases and serves the newest one with a build
-  // zip; this one carries none, and the repository's latest release stays the app's. Its tag points at v1: a release
-  // event runs pages.yml from the tagged commit, and v1's pages.yml skips bank data releases (master's may not yet).
+  // zip; this one carries none, and the repository's latest release stays the app's. Its tag points at dev: a release
+  // event runs pages.yml from the tagged commit, and that pages.yml skips bank data releases (round 71).
   execFileSync('gh', [
-    'release', 'create', fixture.release, assetPath, '--prerelease', '--latest=false', '--target', 'v1',
+    'release', 'create', fixture.release, assetPath, '--prerelease', '--latest=false', '--target', 'dev',
     '--title', `Bank data ${fixture.release.slice('bank-data-'.length)}`,
     '--notes', `Replays and Smogon data the calibration bank reads in CI (${fixture.files} files). sha256 ${fixture.sha256}.`,
   ], { cwd: ROOT, stdio: 'inherit' });

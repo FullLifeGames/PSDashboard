@@ -9,7 +9,7 @@
 // it as the one branch bank/<name> with an explicit refspec (never a tag, never --force, refused when the branch
 // exists), waits for the workflow .github/workflows/bank.yml, downloads the merged run into .calibration/<name>/ and
 // deletes the branch with --force-with-lease, so a branch that moved is never deleted. Before the push it reads the
-// diff of the measured commit against origin/v1 and refuses files and lines that look like secrets. The user's
+// diff of the measured commit against origin/dev and refuses files and lines that look like secrets. The user's
 // standing okay of 13.10. ("6a") covers these pushes and deletes of bank/<name> branches and nothing else.
 //
 // --resume takes up a run whose watcher ended (the session closed, the machine slept): it finds the run by its name or run
@@ -31,7 +31,7 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 /** The workflow's display name (`name:` of .github/workflows/bank.yml). GitHub resolves a workflow file name only on
  * the default branch, where bank.yml need not exist, so the run is found by branch, commit and this name. */
 const WORKFLOW_NAME = 'Bank';
-const PUBLIC_BASE = 'origin/v1';
+const PUBLIC_BASE = 'origin/dev';
 const CI_RECORD = 'ci.json';
 
 /** Added files whose names look like keys or credentials. */
@@ -68,7 +68,7 @@ export const deleteArgs = (sha, name) => ['push', `--force-with-lease=refs/heads
 export const runSettings = config => ({ jobs: config.jobs, slicesPerJob: config.slicesPerJob, env: config.env });
 
 /**
- * A git command's output. The secret check reads the whole diff against v1, which outgrew Node's default output
+ * A git command's output. The secret check reads the whole diff against dev, which outgrew Node's default output
  * limit of 1 MB in round 77 ("spawnSync git ENOBUFS"), so the limit is 256 MB.
  */
 export const gitText = (root, args, options = {}) => execFileSync('git', args, {
@@ -353,7 +353,7 @@ async function main() {
     console.log(`reuse: no downloaded CI run of ${measured.slice(0, 7)} with these settings`);
   }
   if (existsSync(join(calibrationDir, config.name))) fail(`refused: .calibration/${config.name} exists already; pick another name`);
-  git(ROOT, ['fetch', '--quiet', 'origin', 'v1']);
+  git(ROOT, ['fetch', '--quiet', 'origin', 'dev']);
   const base = git(ROOT, ['merge-base', PUBLIC_BASE, measured]).trim();
   const findings = secretFindings(git(ROOT, ['diff', '--name-status', base, measured]), git(ROOT, ['diff', base, measured]));
   if (findings.length > 0) fail(`refused: the diff against ${PUBLIC_BASE} holds what looks like a secret: ${findings.join('; ')}`);
