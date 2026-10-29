@@ -76,7 +76,9 @@ describe('Package hygiene', () => {
       // Round 77 (user gate 28.10.2026, 6a): the engine package ships the check-engine command and its sample positions.
       if (name === 'eval-engine') {
         expect(manifest.files).toEqual(['dist', 'bin', 'samples', 'README.md']);
-        expect((manifest as Manifest & { bin?: Record<string, string> }).bin).toEqual({ 'eval-engine': './bin/eval-engine.mjs' });
+        // Round 78: the path as npm writes it (npm 12 dropped the leading ./ at the 1.0.0 publish and warned
+        // '"bin[eval-engine]" script name bin/eval-engine.mjs was invalid and removed', though it kept the entry).
+        expect((manifest as Manifest & { bin?: Record<string, string> }).bin).toEqual({ 'eval-engine': 'bin/eval-engine.mjs' });
       } else {
         expect(manifest.files).toEqual(['dist', 'README.md']);
       }

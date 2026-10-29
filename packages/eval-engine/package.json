@@ -29,7 +29,7 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "eval-engine": "./bin/eval-engine.mjs"
+    "eval-engine": "bin/eval-engine.mjs"
   },
   "exports": {
     ".": {
