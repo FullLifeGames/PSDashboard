@@ -84,7 +84,9 @@ test.describe('PS Dashboard', () => {
 
     await fromSetup(page, 'Import/Export Sets');
     const dialog = page.getByRole('dialog', { name: 'Import / Export Sets' });
-    await expect(dialog).toBeVisible();
+    // The panel opens after the spread solve (T234) and the editor's pools (round 77, D5): under the full suite the
+    // unbundled dev server needs more than the default five seconds for both.
+    await expect(dialog).toBeVisible({ timeout: 30_000 });
 
     const textarea = dialog.locator('textarea');
     const exported = await textarea.inputValue();

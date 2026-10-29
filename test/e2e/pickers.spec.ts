@@ -64,7 +64,8 @@ test.describe('PS Dashboard', () => {
 
     await fromSetup(page, 'Edit Player');
     const editor = page.getByRole('dialog', { name: 'Edit Player Team' });
-    await expect(editor).toBeVisible();
+    // The editor opens after the spread solve (T234), more than five seconds under the full suite (round 77).
+    await expect(editor).toBeVisible({ timeout: 30_000 });
     await expect(editor.getByLabel('Garchomp HP EVs')).toBeVisible();
     // Round 76 (T234): the editor opens on the solved spread (the fixture's Garchomp: 252 Atk / 252 Spe / 4 SpD, 508 of the 510 EVs),
     // and a typed value is cut to what the total leaves. The spread is therefore edited from the bottom: free the points, then spend them.
@@ -112,8 +113,11 @@ test.describe('PS Dashboard', () => {
     await expect(p1Controls).not.toContainText('Earthquake');
     await expect(p2Controls.locator('.ps-pending-choice')).toBeVisible();
 
-    await p1Controls.locator('.ps-movebtn', { hasText: 'Stone Edge' }).click();
-    await expect(page.locator('button', { hasText: 'Execute Turn' })).toBeEnabled();
+    // While the rebuilt position lands the pickers stand in for it and take no input (round 77): click until the pick holds.
+    await expect(async () => {
+      await p1Controls.locator('.ps-movebtn', { hasText: 'Stone Edge' }).click();
+      await expect(page.locator('button', { hasText: 'Execute Turn' })).toBeEnabled({ timeout: 2_000 });
+    }).toPass({ timeout: 30_000 });
   });
 
   test('snapshot pickers upgrade to the exact position on dwell — no button', async ({ page }) => {
