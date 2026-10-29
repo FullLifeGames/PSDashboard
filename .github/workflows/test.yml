@@ -38,10 +38,12 @@ jobs:
   # Round 59: the Node suites cover the adopted speed layer; one more run forces it off (the kill
   # switch) and one forces it on (a break throws instead of falling back). Release 1.0.0: both ran
   # after the Node suites in one job, which outgrew its 20 minutes, so each runs as its own job.
+  # Round 78: on simulator 0.10.12 the forced-off pass ran past 20 minutes (12 on 0.10.11), the
+  # forced-on pass still takes 12.
   engine-speed-layer:
     name: Engine suite, speed layer ${{ matrix.speed-layer }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
