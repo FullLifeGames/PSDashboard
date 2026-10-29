@@ -152,10 +152,7 @@ describe('a body the correction puts in plays the entry the simulator plays (rou
   const ANNOUNCING = ['gen 3 Air Lock in rain', 'gen 3 Cloud Nine in rain'];
 
   test('the rows are not empty: in every other row of Gens 1 to 4 the simulator\'s entry changes the body, its side or the field', () => {
-    const bodyState = (battle: Battle) => {
-      const { pp, ...state } = entryState(battle);
-      return state;
-    };
+    const bodyState = (battle: Battle) => ({ ...entryState(battle), pp: undefined });
     const quiet = ROWS.filter(row => row.gen <= 4 && !ANNOUNCING.includes(row.label)).flatMap(row => [true, false]
       .filter(afterFaint => {
         const before = make(row);

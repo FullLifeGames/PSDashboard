@@ -1,5 +1,5 @@
 import { toId } from '@fulllifegames/replay-core';
-import type { SimBattle, SimPokemon, SimSide } from './types.ts';
+import type { SimBattle, SimPokemon } from './types.ts';
 import { normalizeBattleOnlyFormeId } from './team-order.ts';
 
 /**
@@ -97,43 +97,47 @@ function faintThePredecessor(battle: SimBattle, entry: FreshEntry, before: (SimP
   return true;
 }
 
+interface EntryWay { afterFaint: boolean; drag: boolean }
+
+/**
+ * Gens 1 to 4, before the ability and the item start: a body Knock Off robbed drops a regained item, Gens 1 and 2 forget
+ * the active Pokémon's last moves, Gen 1 resets the side's last move slot. switchIn's Gen 1 branch that re-records a
+ * partial trap's Metronome for the trapping foe is left out: it names a move, and no entry the sweep plays reaches it.
+ */
+function enterOlderGeneration(battle: SimBattle, body: SimPokemon) {
+  if (body.itemKnockedOff && body.item) body.item = '';
+  if (battle.gen <= 2) for (const active of battle.getAllActive()) active.lastMove = null;
+  if (battle.gen === 1) body.side.lastSelectedMoveSlot = 0;
+}
+
+/**
+ * Gens 1 to 4, after BeforeSwitchIn: EntryHazard (hazards, Healing Wish, Lunar Dance), in Gens 1 and 2 AfterSwitchInSelf
+ * unless the body replaces a fainted one or is dragged in, in Gen 3 after turn 0 AfterEntryHazard (the weather
+ * abilities). False when the hazards K.O. the body: it then runs no runSwitch.
+ */
+function settleOlderGeneration(battle: SimBattle, body: SimPokemon, way: EntryWay): boolean {
+  battle.runEvent('EntryHazard', body);
+  if (battle.gen <= 2 && !way.afterFaint && !way.drag) battle.runEvent('AfterSwitchInSelf', body);
+  if (!body.hp) return false;
+  if (battle.gen === 3 && battle.turn > 0) battle.runEvent('AfterEntryHazard', body);
+  return true;
+}
+
 /**
  * BattleActions#switchIn's steps for the incoming body, then its runSwitch: the entry as the sim plays it. Round 78
- * (@pkmn 0.10.12): Gens 1 to 4 play their entry inside switchIn, where the gen 4 mod's runSwitch used to. A body Knock
- * Off robbed drops a regained item; Gens 1 and 2 forget the active Pokémon's last moves (Gen 1 resets the side's last
- * move slot and keeps a partial trap's Metronome); EntryHazard runs (hazards, Healing Wish, Lunar Dance), then in Gens
- * 1 and 2 AfterSwitchInSelf unless the body replaces a fainted one or is dragged in, and in Gen 3 after turn 0
- * AfterEntryHazard (the weather abilities). A body the hazards K.O. runs no runSwitch. The board stands at a turn's
- * start with an empty queue, so the move a partial trap would change is the side's record alone.
- * test/entry-sweep.spec.ts holds every entry these events reach to switchIn.
+ * (@pkmn 0.10.12): Gens 1 to 4 play their entry inside switchIn, where the gen 4 mod's runSwitch used to.
+ * test/entry-sweep.spec.ts holds every entry these steps reach to switchIn.
  */
-function playEntry(battle: SimBattle, body: SimPokemon, entry: { afterFaint: boolean; drag: boolean }) {
+function playEntry(battle: SimBattle, body: SimPokemon, way: EntryWay) {
   body.activeTurns = 0;
   body.activeMoveActions = 0;
   for (const moveSlot of body.moveSlots) moveSlot.used = false;
-  if (battle.gen <= 4) {
-    if (body.itemKnockedOff && body.item) body.item = '';
-    if (battle.gen <= 2) for (const active of battle.getAllActive()) active.lastMove = null;
-    if (battle.gen === 1) {
-      body.side.lastSelectedMoveSlot = 0;
-      for (const foe of body.foes()) {
-        if (foe.volatiles['partialtrappinglock'] && foe.moveSlots[foe.side.lastSelectedMoveSlot]?.id === 'metronome') {
-          foe.side.lastSelectedMove = 'metronome' as SimSide['lastSelectedMove'];
-          foe.side.lastEnemySelectedMove = 'metronome' as SimSide['lastEnemySelectedMove'];
-        }
-      }
-    }
-  }
+  if (battle.gen <= 4) enterOlderGeneration(battle, body);
   body.abilityState = battle.initEffectState({ id: body.ability, target: body });
   body.itemState = battle.initEffectState({ id: body.item, target: body });
   battle.runEvent('BeforeSwitchIn', body);
   body.previouslySwitchedIn++;
-  if (battle.gen <= 4) {
-    battle.runEvent('EntryHazard', body);
-    if (battle.gen <= 2 && !entry.afterFaint && !entry.drag) battle.runEvent('AfterSwitchInSelf', body);
-    if (!body.hp) return;
-    if (battle.gen === 3 && battle.turn > 0) battle.runEvent('AfterEntryHazard', body);
-  }
+  if (battle.gen <= 4 && !settleOlderGeneration(battle, body, way)) return;
   battle.actions.runSwitch(body);
 }
 
