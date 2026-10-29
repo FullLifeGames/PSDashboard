@@ -1,5 +1,5 @@
 import { toId } from '@fulllifegames/replay-core';
-import type { SimBattle, SimPokemon } from './types.ts';
+import type { SimBattle, SimPokemon, SimSide } from './types.ts';
 import { normalizeBattleOnlyFormeId } from './team-order.ts';
 
 /**
@@ -18,6 +18,8 @@ interface FreshEntry {
   slot: number;
   /** Index of the protocol line that brought the body in. */
   line: number;
+  /** The protocol dragged it in (Roar, Whirlwind, Dragon Tail): the simulator's entry of a drag. */
+  drag: boolean;
 }
 
 const SWITCH_IN = /^\|(switch|drag|replace)\|(p[12])([a-d]):[^|]*\|([^,|]+)/;
@@ -56,7 +58,7 @@ function freshEntries(battle: SimBattle, before: (SimPokemon | null)[][], events
     if (simSwitchedIn(simLines, body.side.id, (_, name) => name === body.name)) return;
     const known = entries.findIndex(entry => entry.body === body);
     if (known >= 0) entries.splice(known, 1);
-    entries.push({ body, sideIdx, slot, line: index });
+    entries.push({ body, sideIdx, slot, line: index, drag: match[1] === 'drag' });
   });
   return entries;
 }
@@ -66,23 +68,25 @@ function freshEntries(battle: SimBattle, before: (SimPokemon | null)[][], events
  * sim's body there still stands: the sim's own faint bookkeeping, so the side
  * counts it before the entry reads it (Supreme Overlord). The body is the one
  * the protocol lost when the protocol switched that species in earlier in the
- * block, or when neither side switched the slot during the block.
+ * block, or when neither side switched the slot during the block. True when the protocol shows the slot's faint before
+ * the entry: the body then replaces a fainted one, as the simulator's replacement after a faint does.
  */
-function faintThePredecessor(battle: SimBattle, entry: FreshEntry, before: (SimPokemon | null)[][], events: string[], simLines: string[]) {
+function faintThePredecessor(battle: SimBattle, entry: FreshEntry, before: (SimPokemon | null)[][], events: string[], simLines: string[]): boolean {
   const sideId = battle.sides[entry.sideIdx].id;
   const ident = `${sideId}${String.fromCharCode('a'.charCodeAt(0) + entry.slot)}:`;
   let faintAt = -1;
   for (let index = entry.line - 1; index >= 0 && faintAt < 0; index--) {
     const line = events[index];
-    if (SWITCH_IN.test(line) && line.split('|')[2].startsWith(ident)) return;
+    if (SWITCH_IN.test(line) && line.split('|')[2].startsWith(ident)) return false;
     if (line.startsWith(`|faint|${ident}`)) faintAt = index;
   }
+  if (faintAt < 0) return false;
   const predecessor = before[entry.sideIdx][entry.slot];
-  if (faintAt < 0 || !predecessor || predecessor.fainted || predecessor.hp <= 0) return;
+  if (!predecessor || predecessor.fainted || predecessor.hp <= 0) return true;
   const earlier = events.slice(0, faintAt).reverse()
     .find(line => SWITCH_IN.test(line) && line.split('|')[2].startsWith(ident))?.match(SWITCH_IN)?.[4].trim();
   const letter = ident[2];
-  if (earlier ? !sameSpecies(predecessor, earlier) : simSwitchedIn(simLines, sideId, slotLetter => slotLetter === letter)) return;
+  if (earlier ? !sameSpecies(predecessor, earlier) : simSwitchedIn(simLines, sideId, slotLetter => slotLetter === letter)) return true;
   predecessor.hp = 0;
   predecessor.fainted = true;
   predecessor.faintQueued = true;
@@ -90,17 +94,46 @@ function faintThePredecessor(battle: SimBattle, entry: FreshEntry, before: (SimP
   predecessor.clearVolatile(false);
   predecessor.isStarted = false;
   if (predecessor.side.totalFainted < 100) predecessor.side.totalFainted++;
+  return true;
 }
 
-/** BattleActions#switchIn's steps for the incoming body, then its runSwitch: the entry as the sim plays it. */
-function playEntry(battle: SimBattle, body: SimPokemon) {
+/**
+ * BattleActions#switchIn's steps for the incoming body, then its runSwitch: the entry as the sim plays it. Round 78
+ * (@pkmn 0.10.12): Gens 1 to 4 play their entry inside switchIn, where the gen 4 mod's runSwitch used to. A body Knock
+ * Off robbed drops a regained item; Gens 1 and 2 forget the active Pokémon's last moves (Gen 1 resets the side's last
+ * move slot and keeps a partial trap's Metronome); EntryHazard runs (hazards, Healing Wish, Lunar Dance), then in Gens
+ * 1 and 2 AfterSwitchInSelf unless the body replaces a fainted one or is dragged in, and in Gen 3 after turn 0
+ * AfterEntryHazard (the weather abilities). A body the hazards K.O. runs no runSwitch. The board stands at a turn's
+ * start with an empty queue, so the move a partial trap would change is the side's record alone.
+ * test/entry-sweep.spec.ts holds every entry these events reach to switchIn.
+ */
+function playEntry(battle: SimBattle, body: SimPokemon, entry: { afterFaint: boolean; drag: boolean }) {
   body.activeTurns = 0;
   body.activeMoveActions = 0;
   for (const moveSlot of body.moveSlots) moveSlot.used = false;
+  if (battle.gen <= 4) {
+    if (body.itemKnockedOff && body.item) body.item = '';
+    if (battle.gen <= 2) for (const active of battle.getAllActive()) active.lastMove = null;
+    if (battle.gen === 1) {
+      body.side.lastSelectedMoveSlot = 0;
+      for (const foe of body.foes()) {
+        if (foe.volatiles['partialtrappinglock'] && foe.moveSlots[foe.side.lastSelectedMoveSlot]?.id === 'metronome') {
+          foe.side.lastSelectedMove = 'metronome' as SimSide['lastSelectedMove'];
+          foe.side.lastEnemySelectedMove = 'metronome' as SimSide['lastEnemySelectedMove'];
+        }
+      }
+    }
+  }
   body.abilityState = battle.initEffectState({ id: body.ability, target: body });
   body.itemState = battle.initEffectState({ id: body.item, target: body });
   battle.runEvent('BeforeSwitchIn', body);
   body.previouslySwitchedIn++;
+  if (battle.gen <= 4) {
+    battle.runEvent('EntryHazard', body);
+    if (battle.gen <= 2 && !entry.afterFaint && !entry.drag) battle.runEvent('AfterSwitchInSelf', body);
+    if (!body.hp) return;
+    if (battle.gen === 3 && battle.turn > 0) battle.runEvent('AfterEntryHazard', body);
+  }
   battle.actions.runSwitch(body);
 }
 
@@ -146,10 +179,10 @@ export function playProtocolEntries(battle: SimBattle, before: (SimPokemon | nul
   const simLines = simBlockLines(battle);
   const entries = freshEntries(battle, before, events, simLines);
   if (entries.length === 0) return false;
-  for (const entry of entries) faintThePredecessor(battle, entry, before, events, simLines);
+  const afterFaint = entries.map(entry => faintThePredecessor(battle, entry, before, events, simLines));
   const logLength = battle.log.length;
   const flags = turnFlags(battle);
-  for (const entry of entries) playEntry(battle, entry.body);
+  entries.forEach((entry, index) => playEntry(battle, entry.body, { afterFaint: afterFaint[index], drag: entry.drag }));
   battle.log.length = logLength;
   for (const { pokemon, flags: kept } of flags) Object.assign(pokemon, kept);
   for (const entry of entries) closeTheTurn(entry.body);
