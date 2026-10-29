@@ -4,6 +4,9 @@ import { expectReplayTurnAtLeast, fixturePath, installReplayEmbedCache, routeOff
 
 test.beforeAll(installReplayEmbedCache);
 
+/** T280: the embed's battle also says whether it has played every step it holds. */
+type SettlingWindow = ReplayWindow & { Replays?: { battle?: { atQueueEnd?: boolean } } };
+
 test.describe('PS Dashboard', () => {
   test.beforeEach(async ({ page }) => {
     await routeOfflineFixtures(page);
@@ -228,6 +231,8 @@ test.describe('PS Dashboard', () => {
   });
 
   test('branch replay follows appended branch events and keeps iframe turn controls usable', async ({ page }) => {
+    // T280: the frame plays turn 2 and the appended turn to their ends at normal speed, about 16 s more than before.
+    test.setTimeout(150_000);
     await page.locator('button', { hasText: 'Load' }).click();
     await expect(page.locator('iframe[title="PS Replay"]')).toBeVisible({ timeout: 10000 });
     await startVariationAt(page, 2);
@@ -239,7 +244,17 @@ test.describe('PS Dashboard', () => {
 
     const logLength = () =>
       frame!.evaluate(() => (document.querySelector('.battle-log')?.textContent ?? '').length);
-    const beforeLength = await logLength();
+    // T280: both lengths count once the frame has played everything it holds. Read while it still played turn 2, the
+    // appended growth came from turn 2 itself, and Last turn's return to the start of turn 2 landed above that reading
+    // on a slow runner (the Tests runs on dev, 29.10.2026).
+    const settledLogLength = async () => {
+      await expect.poll(() => frame!.evaluate(() => {
+        const battle = (window as SettlingWindow).Replays?.battle;
+        return !!battle && battle.seeking === null && battle.atQueueEnd === true;
+      }), { timeout: 60_000 }).toBe(true);
+      return logLength();
+    };
+    const beforeLength = await settledLogLength();
 
     const p1Side = page.locator('.ps-branch-side-column').first();
     const p2Side = page.locator('.ps-branch-side-column').nth(1);
@@ -250,7 +265,7 @@ test.describe('PS Dashboard', () => {
     // The appended turn grows the visible log — a marker that does not
     // depend on damage rolls, KOs, or the inferred spreads.
     await expect.poll(logLength).toBeGreaterThan(beforeLength + 20);
-    const afterLength = await logLength();
+    const afterLength = await settledLogLength();
     await expect.poll(async () =>
       frame!.evaluate(() => (document.querySelector('.battle-log')?.textContent ?? '').match(/Battle started/g)?.length ?? 0)
     ).toBe(1);
