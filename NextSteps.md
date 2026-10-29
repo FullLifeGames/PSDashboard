@@ -1,16 +1,16 @@
-# Next Steps (as of 24.10.2026, after round 76)
+# Next Steps (as of 29.10.2026, after round 77)
 
-Open work only, along the finish line. Each step is one round; its TODOs carry fixed T-numbers, and their scenes, numbers and steps are in `docs/backlog.md`. Rules for agents: `AGENTS.md`. Finished rounds: `docs/completed/`. Next free T-number: T272.
+Open work only, along the finish line. Each step is one round; its TODOs carry fixed T-numbers, and their scenes, numbers and steps are in `docs/backlog.md`. Rules for agents: `AGENTS.md`. Finished rounds: `docs/completed/`. Next free T-number: T277.
 
 ## Finish line
 
-The goal is a release: v1 onto master and the GitHub Pages site built from it (user 21.10.2026). The way there, in this order: wave 5, T163, T160, one last wave with the rest a user sees, then the release. After the release only bug reports from real use add work. master moves at the release only, and only with the user's okay.
+The goal is a release: v1 onto master and the GitHub Pages site built from it (user 21.10.2026). The way there, in this order: wave 5, T163, T160, one last wave with the rest a user sees, round 77 with the branching swarm, then the release. After the release only bug reports from real use add work. master moves at the release only, and only with the user's okay.
 
 ## Next rounds
 
-Wave 5 (round 73), T163 with T263 (round 74), T160 (round 75) and the last wave (round 76) are booked. The last wave closed T233, T234, T243, T244, T258, T260, T261, T262, T264, T265 and T266; T259 went back and waits parked (user gate 24.10.2026). The way on:
+Wave 5 (round 73), T163 with T263 (round 74), T160 (round 75) and the last wave (round 76) are booked. The last wave closed T233, T234, T243, T244, T258, T260, T261, T262, T264, T265 and T266; T259 went back and waits parked (user gate 24.10.2026). Round 77 is booked (release gate 29.10.2026, "1a 2a 3a 4a 5a 6a 7a 8b"): the user's reports A to J, the report dialog, the engine protocol, the branching swarm with its two fix waves, and T267; T268 to T276 wait parked. The way on:
 
-1. **The release:** T43 (the release check, the package versions and a note on the changed APIs), then v1 onto master and the Pages site after the user's okay.
+1. **The release:** T43 passed its check on 29.10. (version 1.0.0 on v1, the dry run names v0.7.1, `pack:smoke` green). master and the Pages site move after the user's okay ("8b"), then a note for package users on the changed APIs and the exact simulator pins.
 
 ## Parked
 

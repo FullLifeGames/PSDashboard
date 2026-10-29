@@ -912,6 +912,77 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * ROUND 77 2026-10-24..29 (improvement round 77, before the release: the
+ * user's reports A to J, the report dialog, the engine protocol, the test
+ * move, a branching review swarm and its two fix waves, T267; branch r77
+ * from v1, lanes L1 to L5 in worktrees r77-L1..5, merged in the main
+ * checkout: 1b55346 (L1), 0e18b11 (L2), 6350915 (L3), 5ec993f (L4), fb63aba
+ * (L5); probes docs/perf/probes/2026-10-24-r77/). Swarm gates 28.10. ("1a 2d
+ * 3a 4b + A-5 5b", "1a 2a 3a 4a 5a 6a").
+ * DELIVERED: A to C (a20919f, e416be5, f42b4fe, 81194df: the frame shows the
+ * turn a variation played, the picker takes input only for the position it
+ * shows), D (44913ee: a move where the variation does not reach is a main
+ * line move), E (81cbb37: an inaccuracy earns the paid-off read credit; 562428
+ * t12 reads Close Combat as a read, eight attributions of the corpus move), F
+ * (c820e36, 76b1580, 8450303: Report issue with the app's state, from 8450303
+ * a dialog with the download and a prefilled GitHub issue), psim.us links
+ * (325ee1a), G (9bdf96c: ps-dashboard-engine/1, check-engine, the engine
+ * dropdown), H (the README image), I (27c059e: the suites under test/, bank
+ * and VGC holdout byte-identical across the move), J (2c3d60c: the fx base of
+ * the frame's effect sprites), the first turn of a new variation plays in
+ * (54b60a8), the one-row top bar with the Setup menu and the trimmed frame
+ * (2f9a5cb, 45287be). Swarm wave 1: B1 (a forced slot the bench cannot fill
+ * passes), A-1 (the picker disables what the request disables), A-3 (no
+ * switch chips for a trapped body), B2, B5, B3, D3, A-2 (a failed Execute
+ * after Replace keeps the old variation), D1 (an edit that makes the first
+ * move illegal ends the variation with a notice), D2, A-4, A-6, B6, A-5, D5
+ * (the import refuses values the game does not have), D6, D7. Wave 2: C4, C2
+ * (the turn-0 play-out starts from the picked leads, after the replace
+ * confirm), C5, C9, C7, one evaluation per play-out position, C10, C1 (a
+ * single evaluation stops a running sweep and says so), C6, C3, C8, the lines
+ * of a position the pointer left are no buttons. Integrator: B3's producer
+ * (95b0f65), the turn-0 hint (eabc408), 5b (2bf5118: the embed's scripts run
+ * in the order it appends them, the cold-load empty frame; de886c7: one fetch
+ * per sets file and team load, twelve 404s before), the recharge turn as a
+ * button (fbd3318, swept over every recharge move), bank-ci past 1 MB of git
+ * output (5cad170). T267 (ecd9c07, 8d2d75b, cache v71): in an endgame (at most
+ * two living a side) the verify round keeps an agreeing tree pool of 100
+ * visits below the 0.9 floor; draft 2058494320 t63 (the user's report) leads
+ * with the attacks that win. The first form took any pool of 8 visits and
+ * lost two proofs in CI (bank 750540 t22, Champions VGC 2628166702 t7: Dark
+ * Pulse into Protect pooled 24 visits at 0.1, the sampler read the win).
+ * MEASUREMENT: CI on 8d2d75b against the same day's base r77-move (27c059e)
+ * and r76-g's holdouts (r76-g equals 45287be row for row, checked on
+ * Champions VGC): no score moves in 837 bank and 4,208 holdout rows, every
+ * verdict unmoved (bank, the four holdouts, D26), 40 game values of endgame
+ * rows move. The first T267 form (ecd9c07, measured on 5cad170) lost two
+ * proofs, bank 750540 t22 and Champions VGC 2628166702 t7. Main checkout:
+ * suite on 5e7b3db 7,159 passed, 2 expected fails, 22 skipped (the 22 of
+ * round 76); e2e on 5e7b3db 88 passed with the draft t56 play-out pin, 1
+ * skipped (repro-state); build smoke 3 of 3 on 52a20ed; feedback on 5ceffe8
+ * twice byte-identical, 13 of 13, drift only on
+ * the known 562428 t10 and 655336; census singles 39/6/2, doubles 12/5/0, no
+ * tier moved, 9 attributions moved (8 by E, 649664 t23 by T267). Release
+ * check: dry run as 1.0.0 (previous v0.7.1, both packages), pack smoke green,
+ * start load 1,688 kB gzip in 5 files (v1: 1,675 in 4). The acceptance found
+ * five faults no lane saw: the first T267 form, the recharge turn (fbd3318),
+ * the import of the panel's own export (0c685b1), the start load (bd70952)
+ * and the pointer after a set edit (5ceffe8).
+ * USER GATE 2026-10-29 07:38 ("1a 2a 3a 4a 5a 6a 7a 8b"): T267 with the visit
+ * bar adopted, the nine moved attributions taken as listed (no pinned verdict
+ * moved), the rests parked as T272 to T276 with the trigger "a user report"
+ * (the three internal points as one, T276; the review merged the ended tip
+ * and the ended play-out, one cause, into T274), the engine version stays out
+ * of the panel, version 1.0.0, the publish script stops on a missing release
+ * tag (7905bf8), the chunk map stays a probe, and the release waits: v1
+ * pushed, master only after the user's next okay. Before the booking 5e7b3db
+ * closed a further rest: the play-in guard of an ended tip waits for the last
+ * played turn. Next free T277.
+ * RESTS: T268 to T271 parked (D4, D8, D9 and D10, B4); T272 to T276 parked
+ * (old share links, the slot of a lone replacement, no evaluation at an
+ * ended position, an unknown species in the import message, the editor's
+ * pools); T43 closes with the release.
+ *
  * ROUND 76 2026-10-23..24 (improvement round 76, the last wave: lanes R
  * (report and analysis: T264, T233, T244), S (static: T258, T259, T243), B
  * (rebuild and hits: T261, T265, T260) and A (app and tooling: T234, T266) in

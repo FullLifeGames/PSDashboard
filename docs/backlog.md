@@ -1,8 +1,8 @@
 # Backlog
 
-This file holds the details of every open TODO, one section per TODO under its fixed T-number. The sections follow the finish line of `NextSteps.md` (user 21.10.2026): the release (wave 5, T163, T160 and the last wave are booked); every other TODO is parked with a trigger. The next free T-number is T272.
+This file holds the details of every open TODO, one section per TODO under its fixed T-number. The sections follow the finish line of `NextSteps.md` (user 21.10.2026): the release (wave 5, T163, T160, the last wave and round 77 are booked); every other TODO is parked with a trigger. The next free T-number is T277.
 
-Evidence paths that start with `r69/` are under `docs/perf/probes/2026-10-12-r69/`, those that start with `r72/` under `docs/perf/probes/2026-10-19-r72/`, those that start with `r73/` under `docs/perf/probes/2026-10-21-r73/`, those that start with `r74/` under `docs/perf/probes/2026-10-22-r74/`, those that start with `r76/` under `docs/perf/probes/2026-10-23-r76/`.
+Evidence paths that start with `r77/` are under `docs/perf/probes/2026-10-24-r77/`; those that start with `r69/` are under `docs/perf/probes/2026-10-12-r69/`, those that start with `r72/` under `docs/perf/probes/2026-10-19-r72/`, those that start with `r73/` under `docs/perf/probes/2026-10-21-r73/`, those that start with `r74/` under `docs/perf/probes/2026-10-22-r74/`, those that start with `r76/` under `docs/perf/probes/2026-10-23-r76/`.
 
 Source of the new TODOs of round 69: the lane notes, the three review lenses after the merge, the pin diagnosis of lane B and the timing windows of round 69; each claim was checked by a reviewer against the code of the merge state (`r69/review/todos-check.md`, `todos-check-2.md`). Line numbers refer to the state after round 69.
 
@@ -16,25 +16,13 @@ Source of T264 and T265: the two proposals of round 73 that the design gate of r
 
 Source of T266: the gate of round 74 (23.10.2026, "4a"); a reviewer checked its facts against the run logs before the gate (`r74/review/gate-end-facts.md`).
 
-Source of T267 to T271: the user's report of 28.10.2026 (draft 2058494320, variation turn 63) and the branching swarm of that day (`docs/perf/probes/2026-10-24-r77/swarm/findings.md`), with the user's gates of 28.10. ("1a 2d 3a 4b + A-5 5b", recorded in `docs/perf/probes/2026-10-24-r77/wave-fix/BRIEF.md`); a reviewer checked T268 to T271 against the code of 29.10. (`docs/perf/probes/2026-10-24-r77/review/findings.md`). Their line numbers refer to the state after round 77.
+Source of T268 to T276: the branching swarm of 28.10.2026 (`r77/swarm/findings.md`) with the user's gates of that day ("1a 2d 3a 4b + A-5 5b", recorded in `r77/wave-fix/BRIEF.md`) for T268 to T271, and the rests of its two fix waves with the release gate of 29.10. ("3a") for T272 to T276. Two reviewers checked them against the code of 29.10. (`r77/review/findings.md`, `r77/review/todos-review.md`); the second merged two rests with one cause into T274. T267 was found and fixed inside round 77 and has no section. Their line numbers refer to the state after round 77.
 
 ## Next rounds
 
-Wave 5 (round 73), T163 with T263 (round 74, measured, nothing adopted), T160 (round 75) and the last wave (round 76, user gate 24.10.2026, "1a 2a 3a 4a 5a"; T259 reverted and parked) are booked. Next: the release with T43. Every other TODO is parked with a trigger.
+Wave 5 (round 73), T163 with T263 (round 74, measured, nothing adopted), T160 (round 75), the last wave (round 76, user gate 24.10.2026, "1a 2a 3a 4a 5a"; T259 reverted and parked) and round 77 (release gate 29.10.2026, "1a 2a 3a 4a 5a 6a 7a 8b") are booked. Next: the release with T43, version 1.0.0; master moves after the user's okay. Every other TODO is parked with a trigger.
 
 ## The release
-
-### T267 · An endgame keeps the trees' verdict in the verify round
-
-*Engine · round 77 · small · rankings and verdicts move, the score does not*
-
-**Problem.** Draft 2058494320, a variation from turn 54, turn 63: Mienshao (Choice Scarf, locked into Close Combat) and Kyurem at 48 % face Dragapult at 45 % (Choice Specs) and Muk-Alola. The panel read "puffelmaedchen 15 % · Bene 85 %" above lines that advised U-turn for Bene at 16 % and Kyurem's switch for puffelmaedchen at 84 %. The score is the trees' visit mean; the lines come from the pooled matrix after the verify round. The trees played Kyurem's switch into each of Dragapult's attacks out to 11 to 17 % for puffelmaedchen over 400 to 650 visits, the one-ply sampler of the verify round read 84 to 93 %, and `VERIFY_DEPTH_FLOOR` (0.9) lets the trees' depth stand only near ±1, so the sampler priced the cells and turned the ranking around (probe `docs/perf/probes/2026-10-24-r77/t63/`).
-
-**Idea.** With at most two living Pokémon on each side the trees play the game to its end, so an agreeing pool that played its cell out is a verdict at any magnitude; damage rolls, critical hits and misses keep the mean of a played-out endgame off ±1. "Played out" means 100 visits: the first fix took any pool of 8 visits and lost two proofs in CI, bank smogtours-gen9ou-750540 turn 22 (score −0.929 to −0.864) and Champions VGC 2628166702 turn 7 (the last pair, p1 won; score 1 to 0.954). In the second the trees visited Dark Pulse into Protect 24 times and read about 0.1, the sampler one ply deeper read the win (Protect holds once), Dark Pulse fell to third at 0.14, and the prover, which tries the ranked moves in order, found no proof (probe `docs/perf/probes/2026-10-24-r77/t267/`). With the bar both proofs return. The middlegame keeps the floor (655336 t24).
-
-**Benefit.** In an endgame the advice and the score tell the same story; Bene's lines lead with the attacks that win, and a short winning line the trees visited too little keeps the sampler's read.
-
-**Success.** `packages/eval-engine/test/endgame-verify-t63.spec.ts` (both scenes) and the three endgame rows of `verify-depth.spec.ts`; the score of the trees stays, so the bank and the holdouts move only where a proof moves, and the feedback corpus moves only endgame turns; the gate reads them. The engine suite stays green (the first fix moved the pin 912045 t8; the visit bar keeps it).
 
 ### T43 · Release check before every package release
 
@@ -54,9 +42,11 @@ Wave 5 (round 73), T163 with T263 (round 74, measured, nothing adopted), T160 (r
 
 **Singles and doubles.** Touches no game logic. The published packages carry both game types; the package suites under packages/*/test already cover singles and doubles and run in the regression gate.
 
-**Open decisions (at the user gate before the build).**
-- Does the script abort on a missing remote tag, or is a warning line in the plan enough?
-- Does the chunk map stay a probe under docs/, or does it move to scripts/ as a script?
+**Decisions (release gate 29.10.2026, "6a 7a").**
+- The script stops when the local tags lack a release tag of origin below the version (7905bf8, `scripts/release-tags.mjs`, `test/regression/release-tags.spec.ts`).
+- The chunk map stays a probe (`r77/measure/chunk-map.mjs`); the build smoke holds the start load free of simulator code (bd70952).
+
+**Status (29.10.2026).** The check passed: the dry run as 1.0.0 names v0.7.1 and publishes both packages, `pack:smoke` is green, the pins stand at 0.10.11, and the start load reads 1,688 kB gzip in 5 files. T43 closes when the release lands on master.
 
 **Background.**
 - The first real publish has happened: origin/master is at ba2ce5b "Release 0.7.1: the first release that publishes itself", refs/tags/v0.7.0 and v0.7.1 are on origin, v0.7.1 is missing locally.
@@ -164,6 +154,92 @@ The triage of 21.10.2026 and the user gates after it parked these TODOs; each se
 
 **Steps.**
 - [ ] A red spec from the three turns, then the fix in the snapshot picker.
+
+### T272 · Old share links name their moves
+
+*App · round 77 · small · cosmetic · rest of D6*
+
+**Parked (release gate 29.10.2026, "3a").** Trigger: a user report.
+
+**Problem.** Since 4cc36e0 a shared branch link carries the names of its choices (`p1Label`, `p2Label`, `forcedSide` in `src/lib/branch-share.ts:14-17`), and the shared view prints them. A link made before round 77 holds the simulator commands alone, and `choiceLine` (`src/components/SharedBranchView.tsx:50`) prints those: "Turn 2: P1 move 1 / P2 move 2" (`test/e2e/embed.spec.ts:69` holds that fallback).
+
+**Benefit.** App: an old link reads like a new one.
+
+**Success.** A link without names shows the move and Pokémon names; a spec with an old payload in singles and doubles.
+
+**Evidence.** Lane L3 (`docs/perf/probes/2026-10-24-r77/wave-fix/L3/ledger.md`, D6).
+
+**Steps.**
+- [ ] Find out whether the names can come from the link's `finalLog`: old payloads hold no slot choices and mark no forced replacement, so each entry has to be matched to its log turn, its doubles slots and its forced switches.
+- [ ] A red spec with a payload of format 1 without names, then the names.
+
+### T273 · The player picks the slot of a lone replacement
+
+*Branch · round 77 · small · rest of B1*
+
+**Parked (release gate 29.10.2026, "3a").** Trigger: a user report.
+
+**Problem.** After a double knock-out with one Pokémon in the back (gen9vgc2026regi-2629703929 turn 8: Groudon and Solgaleo faint, Jumpluff is left), the simulator asks both slots for a replacement and takes one switch and one pass in either order (`forcedPasses` in side.js `clearChoice`; `choosePass` counts the passes and checks no slot). Since a0500bb the app sends the Pokémon to slot A and passes slot B (`fillableForcedSlots`, `packages/eval-engine/src/branch-choices.ts:79`), so a user cannot fill slot B.
+
+**Benefit.** App: the replacement lands in the slot the player chooses, where Future Sight, Wish or an ally's move targets a slot.
+
+**Success.** The picker offers the lone replacement in both slots, and the other slot passes; doubles and VGC rows against the simulator.
+
+**Evidence.** Lane L1 (`docs/perf/probes/2026-10-24-r77/wave-fix/L1/ledger.md`, B1).
+
+**Steps.**
+- [ ] A red spec that fills slot B. The slot rule lives in `requiredChoicesForActiveSlots` (`packages/eval-engine/src/branch-choices.ts:85`), `forceSwitches` (`packages/eval-engine/src/branch/forced-slots.ts`) and `src/hooks/branch/shared.ts`, and every hook reads it without the pending picks: the choice of slot has to reach them, `src/hooks/branch/execute.ts` included.
+
+### T274 · No evaluation at an ended position
+
+*Eval · round 77 · small · rest of C7 and of the play-out fix*
+
+**Parked (release gate 29.10.2026, "3a"; the review of 29.10. found that the ended tip and the ended play-out share the cause).** Trigger: a user report.
+
+**Problem.** At a variation's ended tip the panel says who won and offers no Evaluate (05956c0), but two effects of `src/hooks/useEvalView.ts` have no `ended` input: Auto (`:245`) and "Always on" (`:253-262`) can still start an evaluation behind the notice. The same Auto effect evaluates the ended position once after the last turn of a play-out; the loop of `src/hooks/usePlayOut.ts` reads the end only from that result (`:175`, `:181`). Whether such a result writes a point into the variation graph (`useEvalView.ts:125-134`) and what it costs (the tree returns early at an ended root, `packages/eval-engine/src/mcts.ts:74`) is unchecked.
+
+**Benefit.** App: no search runs for a game that is over, and the variation graph holds no point for it.
+
+**Success.** No evaluation starts at an ended position, with Auto or "Always on", and a play-out that ends the game asks for none after its last turn; a spec over the controller in singles and doubles, and a row in `test/ui/hooks/usePlayOut.evaluations.spec.tsx`.
+
+**Evidence.** Lanes L5 (`docs/perf/probes/2026-10-24-r77/wave-fix/L5/ledger.md`, item 6) and L4 (`wave-fix/L4/ledger.md`, item 6); the review of the TODOs (`docs/perf/probes/2026-10-24-r77/review/todos-review.md`).
+
+**Steps.**
+- [ ] Red specs, then an `ended` input from `src/hooks/controller/engine-controller.ts` (`:91-96`) to both effects; the play-out loop reads the end from the battle.
+
+### T275 · An unknown species keeps its name in the import's message
+
+*App · round 77 · small · cosmetic · rest of D5*
+
+**Parked (release gate 29.10.2026, "3a").** Trigger: a user report.
+
+**Problem.** An import that names a species the Dex does not know is refused with the name turned into its id ("P1 foomon: not on P1's team, so its set cannot apply.", `src/lib/sets-io.ts:174`): `Teams.import` reads "Foo Mon" as the species `foomon`, because the Dex names an unknown species by its id. A species the Dex knows keeps its name ("MissingNo.").
+
+**Benefit.** App: the message names the species as the user typed it.
+
+**Success.** The refusal quotes the typed name; the specs of `test/regression/sets-import-validation.spec.ts` (`:52`, `:85`, today case-blind) match "Foo Mon" exactly.
+
+**Evidence.** Lane L3 (`docs/perf/probes/2026-10-24-r77/wave-fix/L3/ledger.md`, D5).
+
+**Steps.**
+- [ ] A red spec, then the typed name carried out of `parsePastedTeam` (`packages/replay-core/src/team-paste.ts:49`) or `parseSetsImport` (`src/lib/sets-io.ts:96`) to the message.
+
+### T276 · One loader for the editor's pools, and real pools in the UI specs
+
+*Test and code health · round 77 · small · rest of D5*
+
+**Parked (release gate 29.10.2026, "3a", the three internal points as one).** Trigger: the next change to the set editor or the sets import.
+
+**Problem.** (1) `loadImportPools` (`src/lib/sets-io.ts:134`) repeats the pool loading of `useEditorPools` (`src/hooks/useTeamDraft.ts:9`). (2) In the jsdom round trip of `test/ui/components/sets-roundtrip-t205.spec.tsx` every move pool of the import held one move per species, Body Press not among them (`docs/perf/probes/2026-10-24-r77/measure/poolprobe-jsdom.log`, from a log line the integrator added to the hook for one run); in Node, Magnezone's Gen 8 pool holds 50 moves. (3) The import validation spec has no Champions row (`test/regression/sets-import-validation.spec.ts:24-27`).
+
+**Benefit.** Packages and app: one place loads the pools, and the UI specs test the editor and the import against the pools a user meets.
+
+**Success.** One `loadEditorPools` in `src/lib/team-editor.ts` serves both; a UI spec reads a full pool under jsdom; a Champions row in the import validation spec.
+
+**Evidence.** Lane L3 (`docs/perf/probes/2026-10-24-r77/wave-fix/L3/ledger.md`), the night's acceptance (`docs/perf/probes/2026-10-24-r77/swarm/findings.md`, "Found in the acceptance").
+
+**Steps.**
+- [ ] Find why the pools hold one move in the jsdom run, then the shared loader and the Champions row.
 
 ### T259 · A smoother price for a stage drop at the bench gate
 

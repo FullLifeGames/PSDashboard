@@ -1,10 +1,10 @@
 # Erledigte Runden (Archiv nach Gebiet)
 
-Hier steht jede abgeschlossene Runde, sortiert nach Gebiet. `NextSteps.md` hält nur Offenes, `docs/backlog.md` die Einzelheiten offener TODOs, diese Dateien nur Erledigtes. Seit dem 13.10.2026 liegt das Archiv im Repository; Mess-Ausgaben, Sonden und Specs bleiben lokal unter `docs/`. Maschinen-Quellen sind der Ledger in `regression/eval-calibration.spec.ts` und die Pins in `e2e-feedback/corpus.ts`; die Arbeitsregeln stehen in `AGENTS.md`.
+Hier steht jede abgeschlossene Runde, sortiert nach Gebiet. `NextSteps.md` hält nur Offenes, `docs/backlog.md` die Einzelheiten offener TODOs, diese Dateien nur Erledigtes. Seit dem 13.10.2026 liegt das Archiv im Repository; Mess-Ausgaben, Sonden und Specs bleiben lokal unter `docs/`. Maschinen-Quellen sind der Ledger in `test/regression/eval-calibration.spec.ts` und die Pins in `test/e2e-feedback/corpus.ts`; die Arbeitsregeln stehen in `AGENTS.md`.
 
 | Datei | Gebiet | Enthält |
 | --- | --- | --- |
-| `eval-quality.md` | Eval-Qualität | Verbesserungsrunden 4 bis 15 und 32 bis 72 (ohne 38, 39, 59 und 71), der Expert-Feedback-Korpus, geschlossene Korpus-Gaps |
+| `eval-quality.md` | Eval-Qualität | Verbesserungsrunden 4 bis 15 und 32 bis 77 (ohne 38, 39, 59 und 71), der Expert-Feedback-Korpus, geschlossene Korpus-Gaps |
 | `timeline-ux.md` | Timeline und UX | Runden 17 bis 21 (Unified Timeline, T0-Branching, Play-out, Bring-Limit), Runde 38 (flüssige Oberfläche), Spur F der Wellen 1 und 1.5 (Schadensvorschau) |
 | `performance.md` | Performance | Runde 16 (Time-Performance), die Perf-Evaluation vom 01.09.2026, Runde 31 (verlustfreie Perf-Basis), die Sichtung der Runde 32 |
 | `architecture-refactor.md` | Architektur-Refactor | Runden 22 bis 30 (Workspace-Split, Publish-Readiness, Paket-Testsuiten, CSS), der erste npm-Publish und Trusted Publishing |
