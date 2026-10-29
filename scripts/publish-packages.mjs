@@ -23,6 +23,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { lower, missingReleaseTags, parseVersion, remoteTagNames } from './release-tags.mjs';
 
 /** Dependency order: a package comes after the packages it depends on. */
 const PACKAGES = ['replay-core', 'eval-engine'];
@@ -60,21 +61,22 @@ const git = (...gitArgs) => {
   return result.stdout.trim();
 };
 
-const parseVersion = text => {
-  const match = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(text);
-  return match ? match.slice(1, 4).map(Number) : null;
-};
-const lower = (a, b) => {
-  for (let i = 0; i < 3; i += 1) if (a[i] !== b[i]) return a[i] < b[i];
-  return false;
-};
-
-/** The newest v* tag whose version is below the one being released, or null. */
+/**
+ * The newest v* tag whose version is below the one being released, or null. A plan that selects by change needs every
+ * release tag of origin: it stops when the local tags lack one (round 77, "6a"); --all selects without a tag.
+ */
 function previousReleaseTag(version) {
   const current = parseVersion(version);
   if (!current) throw new Error(`root version ${version} is not major.minor.patch`);
+  const localTags = git('tag', '--list', 'v*').split(/\r?\n/).filter(Boolean);
+  if (!all) {
+    const missing = missingReleaseTags(version, localTags, remoteTagNames(git('ls-remote', '--tags', 'origin')));
+    if (missing.length > 0) {
+      throw new Error(`origin has the release tag(s) ${missing.join(', ')}, which the local tags lack: run git fetch --tags first`);
+    }
+  }
   let best = null;
-  for (const tag of git('tag', '--list', 'v*').split('\n').filter(Boolean)) {
+  for (const tag of localTags) {
     const parsed = parseVersion(tag);
     if (parsed && lower(parsed, current) && (!best || lower(best.parsed, parsed))) best = { tag, parsed };
   }
