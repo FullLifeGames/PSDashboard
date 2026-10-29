@@ -1,12 +1,12 @@
 {
   "singles": {
-    "root": "cd8961fff977b4dbbea82efb9801d073dcdb97186bb0cb2f52b8e4dae6d30881",
+    "root": "8546e3799279bc9169e885d594f8abad4a552f1ecdc3948c2041699fc3eabd6c",
     "children": [
       {
         "p1": "move dragondarts",
         "p2": "move powerwhip",
         "seed": "1,2,3,4",
-        "state": "54adae9ad2019fed16f08a5d77b26eff4bbeca327906e5f7b45682f1ad09b3d9",
+        "state": "e3efb62527061290c050149cd2e09c849636ecd0e98fca432218a35f8359d70c",
         "facts": {
           "turn": 5,
           "ended": false,
@@ -100,7 +100,7 @@
         "p1": "move dragondarts",
         "p2": "move powerwhip",
         "seed": "5,6,7,8",
-        "state": "daf637b65441ec2ff777c7238319e278381700f7761fb97b7dd8ec84686a0cde",
+        "state": "352ddc7b2bcda86a9f224fb3a909fef79cd35a5d412d3b7dea86db2329197517",
         "facts": {
           "turn": 5,
           "ended": false,
@@ -194,7 +194,7 @@
         "p1": "move dragondarts",
         "p2": "move powerwhip terastallize",
         "seed": "1,2,3,4",
-        "state": "5c2fd095b43dc9ca50c51c748d7aadf88e402f25bef46df4435450a06a3f81fd",
+        "state": "999adfa8ee3989850dced0be5c6abd2a3732ab6ab53876048ed87c76361924bd",
         "facts": {
           "turn": 5,
           "ended": false,
@@ -287,7 +287,7 @@
         "p1": "move dragondarts",
         "p2": "move powerwhip terastallize",
         "seed": "5,6,7,8",
-        "state": "dfe113989f040c9206f1b4968c313cf36b68401e80ff4cd3da4def7692d265b7",
+        "state": "188280d67165c0e748852aad2475f0d42261538f8a8c483f569fb8fdf98c487e",
         "facts": {
           "turn": 5,
           "ended": false,
@@ -380,7 +380,7 @@
         "p1": "move dragondarts terastallize",
         "p2": "move powerwhip",
         "seed": "1,2,3,4",
-        "state": "6b282b804dd900fadb867cd010932d9e18c2b8a82b6f8d7f5212e19e8d3d42d2",
+        "state": "929d0f50a4cf6aceeaf16197d9b8119337826a63385901193b1ad1aade3c6b7f",
         "facts": {
           "turn": 5,
           "ended": false,
@@ -475,7 +475,7 @@
         "p1": "move dragondarts terastallize",
         "p2": "move powerwhip",
         "seed": "5,6,7,8",
-        "state": "e6e667ab7b378fd26061bbc1018fca5137a77fe77b2083c1476edfe3e45663ee",
+        "state": "614a8b2d0a4930bbef225f0ce4e030f22b61100d6be33d9e40d1e05c73b9b9fd",
         "facts": {
           "turn": 5,
           "ended": false,
@@ -570,7 +570,7 @@
         "p1": "move dragondarts terastallize",
         "p2": "move powerwhip terastallize",
         "seed": "1,2,3,4",
-        "state": "1e1340b0f4246bb2fd871d293d3bac5d09240d3bc196032e084ea7b8cde959ce",
+        "state": "7f40134867d7f97ee3811477181c1369354850336386f49613e9d740ce9d6edb",
         "facts": {
           "turn": 5,
           "ended": false,
@@ -664,7 +664,7 @@
         "p1": "move dragondarts terastallize",
         "p2": "move powerwhip terastallize",
         "seed": "5,6,7,8",
-        "state": "dfaf1bdee146f10fb4e435dcc5d1db87fcd2f33c823d36f26ea01362ac9ea94a",
+        "state": "093d35312be5c9f234aa2cbddb58f4ff2a5ca38b5904b9d5baff905e79a8f319",
         "facts": {
           "turn": 5,
           "ended": false,
@@ -758,7 +758,7 @@
         "p1": "move uturn",
         "p2": "move powerwhip",
         "seed": "1,2,3,4",
-        "state": "119e4803144782bd8eec89479b2baee1a2888f425e37f6ff15893339f92404fe",
+        "state": "bce7e939d39f7f74413e98f8cde6ff4aa0f8b2a420898a6ced14c537e024f308",
         "facts": {
           "turn": 5,
           "ended": false,
@@ -850,7 +850,7 @@
         "p1": "move uturn",
         "p2": "move powerwhip",
         "seed": "5,6,7,8",
-        "state": "eefcd5be5f56cac1e0c774f41fe649828f8443d5430cd9ee4d1d1ad145a3042a",
+        "state": "3458fdc691a0591374b7e5a7ec5f1828573960867892df402b91134168a8058b",
         "facts": {
           "turn": 5,
           "ended": false,
@@ -942,7 +942,7 @@
         "p1": "move uturn",
         "p2": "move powerwhip terastallize",
         "seed": "1,2,3,4",
-        "state": "b84afcbee4d973bc838adf4285ef77d89300e487cabdf2b56bc6af136a691de5",
+        "state": "c8478df1363eb0b4eef6b59b7a3186c26b1595deb2b608f373c5855144a90c4b",
         "facts": {
           "turn": 5,
           "ended": false,
@@ -1036,7 +1036,7 @@
         "p1": "move uturn",
         "p2": "move powerwhip terastallize",
         "seed": "5,6,7,8",
-        "state": "027b0fac88f616579d66f93edde4ecab7626e7ad37146f1f66108ab27cc344f6",
+        "state": "6be4611e378accd6fc382345b5a7c42b13e05491409c13cf4a9e1c9c4134354d",
         "facts": {
           "turn": 5,
           "ended": false,
@@ -1760,13 +1760,13 @@
     }
   },
   "doubles": {
-    "root": "182bae5936fd1d1c07ba32f9adb58edeb0d270720403fcb646894eab1c905d1e",
+    "root": "af94af401e8fde98566779d5c00494d75d12c66d205727141ef0bb86f7a4c524",
     "children": [
       {
         "p1": "move tackle 2",
         "p2": "move ember 2",
         "seed": "1,2,3,4",
-        "state": "cff384017ba7634592c85eb64528284cce4de5c5e3f7ea754ca435f0eaec2694",
+        "state": "22bf4861f15338ea1f40d91859e316031e9820954672028402c739e5bafd28fc",
         "facts": {
           "turn": 4,
           "ended": false,
@@ -1787,7 +1787,7 @@
                 false
               ],
               "status": [
-                "fnt",
+                "",
                 ""
               ]
             },
@@ -1806,7 +1806,7 @@
                 false
               ],
               "status": [
-                "fnt",
+                "",
                 ""
               ]
             }
@@ -1831,7 +1831,7 @@
         "p1": "move tackle 2",
         "p2": "move ember 2",
         "seed": "5,6,7,8",
-        "state": "64ab3c7c316772fd87943c117cfdfa115fabfec8d2f2dc933ee15d48f852fff9",
+        "state": "319fbaa906a317180182bc53a23879fc11f8fe6963352253b06c039985aff417",
         "facts": {
           "turn": 4,
           "ended": false,
@@ -1852,7 +1852,7 @@
                 false
               ],
               "status": [
-                "fnt",
+                "",
                 ""
               ]
             },
@@ -1871,7 +1871,7 @@
                 false
               ],
               "status": [
-                "fnt",
+                "",
                 ""
               ]
             }
@@ -1896,7 +1896,7 @@
         "p1": "move tackle 2",
         "p2": "move ember 2 terastallize",
         "seed": "1,2,3,4",
-        "state": "e6c1a1e874991bba0eab656cdd6b416c85be75283aa271aa9560b05994fb0ad7",
+        "state": "4d30a14c5836c695437cddf467c7b50b7dbb5d18ea4469965c2ff489498499db",
         "facts": {
           "turn": 4,
           "ended": false,
@@ -1917,7 +1917,7 @@
                 false
               ],
               "status": [
-                "fnt",
+                "",
                 ""
               ]
             },
@@ -1936,7 +1936,7 @@
                 false
               ],
               "status": [
-                "fnt",
+                "",
                 ""
               ]
             }
@@ -1962,7 +1962,7 @@
         "p1": "move tackle 2",
         "p2": "move ember 2 terastallize",
         "seed": "5,6,7,8",
-        "state": "36c29409d076d4211679278e6c0deb793202c991a1531f150cff7b105f3daaa1",
+        "state": "25330b6d042575c7be84e47d31a9ad760e0b4309859c614317f0888934be7857",
         "facts": {
           "turn": 4,
           "ended": false,
@@ -1983,7 +1983,7 @@
                 false
               ],
               "status": [
-                "fnt",
+                "",
                 ""
               ]
             },
@@ -2002,7 +2002,7 @@
                 false
               ],
               "status": [
-                "fnt",
+                "",
                 ""
               ]
             }
@@ -2028,7 +2028,7 @@
         "p1": "move tackle 2 terastallize",
         "p2": "move ember 2",
         "seed": "1,2,3,4",
-        "state": "c5e55c68972c1d45dcd8dda07df83cf3ccb0a4c190ac8716fc13a3cdffb11bc3",
+        "state": "133f92059e20547f8843628d550afedb14bdf979312caf80be77369e94d7a421",
         "facts": {
           "turn": 4,
           "ended": false,
@@ -2049,7 +2049,7 @@
                 false
               ],
               "status": [
-                "fnt",
+                "",
                 ""
               ]
             },
@@ -2068,7 +2068,7 @@
                 false
               ],
               "status": [
-                "fnt",
+                "",
                 ""
               ]
             }
@@ -2094,7 +2094,7 @@
         "p1": "move tackle 2 terastallize",
         "p2": "move ember 2",
         "seed": "5,6,7,8",
-        "state": "355e8230d94b8ea050a8be9384cc9223c88c2474ef7998d091db2f3cc1e2472c",
+        "state": "6f417e7503851160e24b7db969d35fd0c50524943642ec46c4d7534c325999bf",
         "facts": {
           "turn": 4,
           "ended": false,
@@ -2115,7 +2115,7 @@
                 false
               ],
               "status": [
-                "fnt",
+                "",
                 ""
               ]
             },
@@ -2134,7 +2134,7 @@
                 false
               ],
               "status": [
-                "fnt",
+                "",
                 ""
               ]
             }
@@ -2160,7 +2160,7 @@
         "p1": "move tackle 2 terastallize",
         "p2": "move ember 2 terastallize",
         "seed": "1,2,3,4",
-        "state": "f0c1b744ce85b6819327b3f94b01e96ec4697db8afcabc088e11a50cf64c3a81",
+        "state": "53fb54a066763fff8fa5e52499739d47336a658b71c5d9423e7a05d0b2bfa83c",
         "facts": {
           "turn": 4,
           "ended": false,
@@ -2181,7 +2181,7 @@
                 false
               ],
               "status": [
-                "fnt",
+                "",
                 ""
               ]
             },
@@ -2200,7 +2200,7 @@
                 false
               ],
               "status": [
-                "fnt",
+                "",
                 ""
               ]
             }
@@ -2227,7 +2227,7 @@
         "p1": "move tackle 2 terastallize",
         "p2": "move ember 2 terastallize",
         "seed": "5,6,7,8",
-        "state": "fe818685f904d2a457d3b962a7f5ad570c99043fdf700fd2eeda0d0cabc5bfad",
+        "state": "cdbc7d32b8a04f924ad7fb3a8bceca5245a03685a3cb30e3ab8af716f6953717",
         "facts": {
           "turn": 4,
           "ended": false,
@@ -2248,7 +2248,7 @@
                 false
               ],
               "status": [
-                "fnt",
+                "",
                 ""
               ]
             },
@@ -2267,7 +2267,7 @@
                 false
               ],
               "status": [
-                "fnt",
+                "",
                 ""
               ]
             }
@@ -2294,7 +2294,7 @@
         "p1": "move protect",
         "p2": "move ember 2",
         "seed": "1,2,3,4",
-        "state": "8677c812e70777c76c64c5a6981b8b7f85d3d8a3e09adb1b122c159764c4dfb6",
+        "state": "5aacbd1fe3453b919c13f6592b76875ac54840c4bb21818a6e7d7899b1b3764a",
         "facts": {
           "turn": 4,
           "ended": false,
@@ -2315,7 +2315,7 @@
                 false
               ],
               "status": [
-                "fnt",
+                "",
                 ""
               ]
             },
@@ -2334,7 +2334,7 @@
                 false
               ],
               "status": [
-                "fnt",
+                "",
                 ""
               ]
             }
@@ -2355,7 +2355,7 @@
         "p1": "move protect",
         "p2": "move ember 2",
         "seed": "5,6,7,8",
-        "state": "fe8219dc38e9e580beab3d0966ee1b373c49f4efea9238f87e3fe1a57b1c0727",
+        "state": "877e1c4458fe416bb07d6e6ce8279bb5146b5bc64f7e317d11a22d3b93bd9af1",
         "facts": {
           "turn": 4,
           "ended": false,
@@ -2376,7 +2376,7 @@
                 false
               ],
               "status": [
-                "fnt",
+                "",
                 ""
               ]
             },
@@ -2395,7 +2395,7 @@
                 false
               ],
               "status": [
-                "fnt",
+                "",
                 ""
               ]
             }
@@ -2416,7 +2416,7 @@
         "p1": "move protect",
         "p2": "move ember 2 terastallize",
         "seed": "1,2,3,4",
-        "state": "91cbc1f0a29c4fd06d380dcc18037249e75a8023fe870c2383e643e2eb0a2b72",
+        "state": "0e3f226df21c6eb286c7f70ebb604f11eb691481fb702abccda2cba1446d0c45",
         "facts": {
           "turn": 4,
           "ended": false,
@@ -2437,7 +2437,7 @@
                 false
               ],
               "status": [
-                "fnt",
+                "",
                 ""
               ]
             },
@@ -2456,7 +2456,7 @@
                 false
               ],
               "status": [
-                "fnt",
+                "",
                 ""
               ]
             }
@@ -2478,7 +2478,7 @@
         "p1": "move protect",
         "p2": "move ember 2 terastallize",
         "seed": "5,6,7,8",
-        "state": "d1d5326a261e0249776ecbd7754afe7f43e810fccedcc174ed907c436477e796",
+        "state": "51c7cd19acd382566f43a73375ec60c82177b30bf4404ea0708ce46c975dec59",
         "facts": {
           "turn": 4,
           "ended": false,
@@ -2499,7 +2499,7 @@
                 false
               ],
               "status": [
-                "fnt",
+                "",
                 ""
               ]
             },
@@ -2518,7 +2518,7 @@
                 false
               ],
               "status": [
-                "fnt",
+                "",
                 ""
               ]
             }
