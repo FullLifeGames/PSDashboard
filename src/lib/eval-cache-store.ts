@@ -320,7 +320,10 @@ export interface StoredEval {
 // v71 (round 77, T267): in an endgame (at most two living Pokémon on each side) the verify round keeps an agreeing
 //      tree pool of 100 visits below the depth floor, so the rankings and verdicts of endgame turns move, and with
 //      them a prover's proof; the score of the trees stays.
-const EVAL_ENGINE_CACHE_VERSION = 71;
+// v72 (round 78, @pkmn 0.10.12): the simulator of Showdown b354a81f (Pursuit, recoil, Emergency Exit, the Gen 3 and 4
+//      entry, the faint order, Champions Regulation M-C), a corrected Gen 1 to 4 entry plays it, and a calculator body
+//      takes the Dex values where the calculator's differ. Positions of every format may read new values.
+const EVAL_ENGINE_CACHE_VERSION = 72;
 
 /** Round 61: a search-budget form stores under its own tag; the default keeps today's keys. */
 const versionTag = (): string => {
