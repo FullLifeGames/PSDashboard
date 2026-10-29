@@ -4,7 +4,7 @@
 
 Chess-style analysis for Pokémon Showdown replays. Load a replay, scrub to any turn, read the engine's evaluation, and play out your own line from there.
 
-![PS Dashboard at turn 12 of a Gen 8 OU tournament game: the replay on the left, the evaluation and the turn's analysis on the right](./.github/images/ps-dashboard.png)
+![PS Dashboard at turn 12 of a Gen 8 OU tournament game: the replay on the left, the evaluation and the turn's analysis on the right](./public/ps-dashboard.png)
 
 - **Use it:** [release](https://fulllifegames.com/Tools/PSDashboard/) · [nightly](https://fulllifegames.github.io/PSDashboard/) · [all hosted builds](https://fulllifegames.github.io/PSDashboard/versions/)
 - **Read more:** [ARCHITECTURE.md](./ARCHITECTURE.md) for how the code works · [EVALUATION.md](./EVALUATION.md) for what the engine computes and how far to trust it · [ENGINES.md](./ENGINES.md) for plugging in an engine of your own
