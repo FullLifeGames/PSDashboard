@@ -23,6 +23,23 @@ const fixtureReplay = JSON.parse(
  * round-trip through the built worker and come back as a ranked search
  * result, class identity survived minification.
  */
+/**
+ * Round 77 (the release check): the start load grew from 1,675 to 1,765 kB gzip when the engine protocol's request
+ * builder reached the main thread through a static import, and with it the simulator's Pokemon class. The main thread
+ * builds positions in workers and through the lazy facades of src/lib/lazy/; no file of the start load holds the
+ * simulator. `getFullDetails` is a method name of @pkmn/sim's Pokemon that minification keeps.
+ */
+test('the start load holds no simulator code', async ({ request }) => {
+  const html = await (await request.get('/')).text();
+  const initial = [...html.matchAll(/(?:src|href)="\.?\/?(assets\/[^"]+\.js)"/g)].map(match => match[1]);
+  expect(initial.length).toBeGreaterThan(0);
+  const carriers: string[] = [];
+  for (const file of initial) {
+    if ((await (await request.get(`/${file}`)).text()).includes('getFullDetails')) carriers.push(file);
+  }
+  expect(carriers).toEqual([]);
+});
+
 test.describe.serial('production build', () => {
   test.beforeEach(async ({ page }) => {
     await page.route('**/play.pokemonshowdown.com/js/replay-embed.js*', route =>

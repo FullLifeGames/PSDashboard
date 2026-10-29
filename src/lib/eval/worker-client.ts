@@ -4,10 +4,15 @@ import {
   type EvalWorkerResponse, type MctsTreeStats, type SearchProgress, type StaticRuleset,
 } from '@fulllifegames/eval-engine';
 import { evalPoolSize } from './pool-size';
-import { evalPairWithEngine, evaluateWithEngine } from './engine-evaluate';
 import { selectedEngine } from './engine-setting';
 import { searchBudgetStamp } from './search-budget-setting';
 import { recordSimFastReport, simFastLevers } from './sim-fast-setting';
+
+/**
+ * The engine protocol builds its request on the simulator, so it loads with the first evaluation another engine answers
+ * (round 77: a static import put the simulator's Pokemon class into the start load, 1,675 to 1,773 kB gzip).
+ */
+const engineEvaluate = () => import('./engine-evaluate');
 
 export interface EvalRunHandlers {
   onProgress?(progress: SearchProgress): void;
@@ -208,7 +213,10 @@ export class EvalWorkerClient {
     };
     // Round 77: another engine answers over HTTP; the pool still lists the options it ranks.
     const engine = selectedEngine();
-    if (engine) return evaluateWithEngine(engine, serializedBattle, this.createPooledExecutor(serializedBattle, ruleset), settings, live);
+    if (engine) {
+      return engineEvaluate().then(({ evaluateWithEngine }) =>
+        evaluateWithEngine(engine, serializedBattle, this.createPooledExecutor(serializedBattle, ruleset), settings, live));
+    }
     // Round 61: the tree search's orchestration lives in the engine; the
     // pool is its executor, the bank runs the same function in-process.
     if (settings.mode === 'mcts') {
@@ -270,6 +278,7 @@ export class EvalWorkerClient {
     const engine = selectedEngine();
     if (engine) {
       const generation = this.generation;
+      const { evalPairWithEngine } = await engineEvaluate();
       return evalPairWithEngine(engine, serializedBattle, p1Choice, p2Choice, () => generation === this.generation);
     }
     const handle = this.pickWorker();
