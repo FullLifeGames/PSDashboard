@@ -45,6 +45,7 @@ function compilerSurface(name: string): string[] {
 
 interface Manifest {
   name: string;
+  version: string;
   license: string;
   type: string;
   sideEffects: boolean;
@@ -59,6 +60,7 @@ const readJson = <T>(path: string): T => JSON.parse(readFileSync(path, 'utf8')) 
 
 describe('Package hygiene', () => {
   const rootLicense = readFileSync(resolve(repoRoot, 'LICENSE'), 'utf8');
+  const rootVersion = readJson<{ version: string }>(resolve(repoRoot, 'package.json')).version;
   const examples: Record<string, string> = { 'replay-core': 'parse-replay.mjs', 'eval-engine': 'evaluate-turn.mjs' };
 
   for (const { name } of PACKAGES) {
@@ -67,6 +69,9 @@ describe('Package hygiene', () => {
     test(`${name}: the manifest is ready to publish`, () => {
       const manifest = readJson<Manifest>(resolve(dir, 'package.json'));
       expect(manifest.name).toBe(`@fulllifegames/${name}`);
+      // Release 1.0.1 (user 29.10.2026): the manifest names the version the release publishes, the root's.
+      expect(manifest.version, 'move all three: npm version <bump> --workspaces --include-workspace-root --no-git-tag-version')
+        .toBe(rootVersion);
       expect(manifest.license).toBe('MIT');
       expect(manifest.type).toBe('module');
       expect(manifest.sideEffects).toBe(false);

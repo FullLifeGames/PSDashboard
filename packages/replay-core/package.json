@@ -1,6 +1,6 @@
 {
   "name": "@fulllifegames/replay-core",
-  "version": "0.1.0",
+  "version": "1.0.1",
   "description": "Pokémon Showdown replay parsing: protocol logs in, turn snapshots, revealed teams, and simulator sets out.",
   "keywords": [
     "pokemon",

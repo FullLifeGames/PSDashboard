@@ -108,9 +108,9 @@ CI ([test.yml](./.github/workflows/test.yml)) runs on every push to master and d
 
 ## Releases and hosting
 
-Bumping `version` in `package.json` on `master` cuts a release (`npm version patch --no-git-tag-version`, commit, push). The [release workflow](./.github/workflows/release.yml) builds the app, tags `v<version>`, and publishes a GitHub Release with `ps-dashboard-<version>.zip`.
+Bumping the version on `master` cuts a release (`npm version patch --workspaces --include-workspace-root --no-git-tag-version` moves the app and both packages, then commit and push). The [release workflow](./.github/workflows/release.yml) builds the app, tags `v<version>`, and publishes a GitHub Release with `ps-dashboard-<version>.zip`.
 
-The same release publishes the library packages whose files changed since the previous tag ([scripts/publish-packages.mjs](./scripts/publish-packages.mjs), `--dry-run` prints the plan). Each package names this repository and `release.yml` as its npm trusted publisher, so there is no npm secret and every published version carries a provenance attestation.
+The same release publishes both library packages at that version ([scripts/publish-packages.mjs](./scripts/publish-packages.mjs), `--dry-run` prints the plan). Each package names this repository and `release.yml` as its npm trusted publisher, so there is no npm secret and every published version carries a provenance attestation.
 
 The [pages workflow](./.github/workflows/pages.yml) deploys on every push to `master` and on every release:
 

@@ -1,11 +1,13 @@
 /**
  * Publishes the workspace packages (packages/*) as part of the release flow.
  *
- * One global version: the root package.json version is written into every
- * package manifest while this script runs. Changed-only: a package is
- * selected when its files changed since the previous release tag (the newest
- * v* tag below the current version), when no earlier tag exists, or when the
- * registry has no version of it yet. The workspace reference "*" on the
+ * One global version: every package manifest carries the root package.json
+ * version (release 1.0.1, test/regression/package-api.spec.ts), and this
+ * script writes it again while it runs. Changed-only: a package is selected
+ * when its files changed since the previous release tag (the newest v* tag
+ * below the current version), when no earlier tag exists, or when the
+ * registry has no version of it yet; the release bump moves every manifest,
+ * so a release selects every package. The workspace reference "*" on the
  * sibling package becomes a caret range on the version being published, or
  * on the latest published version when the sibling is skipped this round.
  * The manifests are restored afterwards, whatever happens in between.
