@@ -1,6 +1,6 @@
 # Backlog
 
-This file holds the details of every open TODO, one section per TODO under its fixed T-number. The sections follow the finish line of `NextSteps.md` (user 21.10.2026): the release (wave 5, T163, T160, the last wave and round 77 are booked); every other TODO is parked with a trigger. The next free T-number is T277.
+This file holds the details of every open TODO, one section per TODO under its fixed T-number. The release of 1.0.0 is out (29.10.2026, the finish line of `NextSteps.md`, user 21.10.2026), and every TODO is parked with a trigger; a trigger that fires brings its TODO to a gate. The next free T-number is T277.
 
 Evidence paths that start with `r77/` are under `docs/perf/probes/2026-10-24-r77/`; those that start with `r69/` are under `docs/perf/probes/2026-10-12-r69/`, those that start with `r72/` under `docs/perf/probes/2026-10-19-r72/`, those that start with `r73/` under `docs/perf/probes/2026-10-21-r73/`, those that start with `r74/` under `docs/perf/probes/2026-10-22-r74/`, those that start with `r76/` under `docs/perf/probes/2026-10-23-r76/`.
 
@@ -20,65 +20,7 @@ Source of T268 to T276: the branching swarm of 28.10.2026 (`r77/swarm/findings.m
 
 ## Next rounds
 
-Wave 5 (round 73), T163 with T263 (round 74, measured, nothing adopted), T160 (round 75), the last wave (round 76, user gate 24.10.2026, "1a 2a 3a 4a 5a"; T259 reverted and parked) and round 77 (release gate 29.10.2026, "1a 2a 3a 4a 5a 6a 7a 8b") are booked. Next: the release with T43, version 1.0.0; master moves after the user's okay. Every other TODO is parked with a trigger.
-
-## The release
-
-### T43 · Release check before every package release
-
-*Tool · mini round · mini · no score touch*
-
-**Problem.** Both packages are on npm, 0.7.0 and 0.7.1. The next release picks its packages by what has changed since the previous release tag. The local checkout does not know v0.7.1, because CI sets the tag on its own copy. A local dry run therefore compares against v0.7.0 and would publish a package that has not moved since 0.7.1. The barrel pins (`test/regression/fixtures/api/`), `pack:smoke` and a new chunk map belong to the check (the old script lived in the scratchpad and is gone). The exact simulator pin is done since round 70 (642b940, 5ae498f): every manifest pins @pkmn/sim and @pkmn/mods to one version, `npm run upgrade:pkmn` moves the release train and prints the checks a new simulator needs, and `test/regression/pkmn-pins.spec.ts` holds the pin, because the speed layer is bound to exactly this version and checks no hash in the browser. (Round 62 restated this; the old checkboxes in the source plan were background, and the round's spec rewrites the steps.)
-
-**Idea.** Before every release, fetch the tags first, then read the plan of the dry run. The plan must name the same previous tag that CI sees, otherwise you measure against an old state.
-
-**Benefit.** App and package users: a release pulls no unchecked simulator version on which the speed layer could silently compute wrongly.
-
-**Success.** The local dry run names the same previous tag as CI, the published column matches `npm view`, the barrel pins show no unintended diff. npm view shows the exact simulator version as a dependency.
-
-**Trigger.** Due on the next release day, independent of the waves.
-
-**Gate.** No score path, no feedback runs, no bank. Gates are lint, tsc -b, regression and pack:smoke.
-
-**Singles and doubles.** Touches no game logic. The published packages carry both game types; the package suites under packages/*/test already cover singles and doubles and run in the regression gate.
-
-**Decisions (release gate 29.10.2026, "6a 7a").**
-- The script stops when the local tags lack a release tag of origin below the version (7905bf8, `scripts/release-tags.mjs`, `test/regression/release-tags.spec.ts`).
-- The chunk map stays a probe (`r77/measure/chunk-map.mjs`); the build smoke holds the start load free of simulator code (bd70952).
-
-**Status (29.10.2026).** The check passed: the dry run as 1.0.0 names v0.7.1 and publishes both packages, `pack:smoke` is green, the pins stand at 0.10.11, and the start load reads 1,688 kB gzip in 5 files. T43 closes when the release lands on master.
-
-**Background.**
-- The first real publish has happened: origin/master is at ba2ce5b "Release 0.7.1: the first release that publishes itself", refs/tags/v0.7.0 and v0.7.1 are on origin, v0.7.1 is missing locally.
-- npm holds @fulllifegames/replay-core and @fulllifegames/eval-engine, each with 0.7.0 and 0.7.1.
-- The publish runs through npm trusted publishing from release.yml, without an npm secret, with provenance; the CI checkout uses fetch-depth 0 so the previous tag is right.
-- A sibling skip with a never-published replay-core aborts on purpose.
-- README line 97 describes the flow and names the dry run.
-- The chunk map used to run through scratchpad/phase6/chunk-map.cjs on npx vite build --sourcemap against the base scratchpad/phase6/chunks-6-3b.txt; the signal was a growing entry chunk or a vanished lazy chunk, the inventory was INEFFECTIVE_DYNAMIC_IMPORT for smogon-stats.ts.
-- Round 34 extended the barrel by the solver (types and three values only, no app import).
-
-**Origin.** Old NextSteps.md (dcf9526): line 181; line 180; line 178; line 43 (rest). Merged because all four hang on the same trigger, a package, barrel or release change, and are checked in one pass. Line 43 names the first npm publish as a precondition of the big step; that is done, the recurring check stays open.
-
-**Evidence.** Code state dcf9526:
-- scripts/publish-packages.mjs:72-81, previousReleaseTag reads only the local tag list
-- scripts/publish-packages.mjs:91-101, publishedVersion asks the registry through npm view
-- scripts/publish-packages.mjs:103-121, buildPlan joins registry state and tag diff into the selection
-- .github/workflows/release.yml:112-117, the publish job checks out with fetch-depth 0 so the previous tag is right
-- README.md:97, describes the dry run as a local plan print
-- test/regression/package-api.spec.ts:98-118, pins the barrel surface of both packages
-- package.json, root version 0.7.1 with the tag v0.7.1 missing locally
-
-**Steps.**
-- [ ] **1.** Fetch the tags and compare the local tag list against the remote list; today v0.7.1 is missing locally.
-- [ ] **2.** Run the dry run of the publish script and read per package the line with published, changed since and reason.
-  - Files: `scripts/publish-packages.mjs`
-- [ ] **3.** Match the published column against the registry, with npm view per package name and version.
-- [ ] **4.** Decide whether previousReleaseTag reports a missing remote tag itself and aborts, instead of silently diffing against an older tag.
-  - Files: `scripts/publish-packages.mjs`
-- [ ] **5.** Run pack:smoke and check the fixture diff of the barrel pins before a barrel change goes into a release.
-  - Files: `scripts/pack-smoke.mjs`, `test/regression/package-api.spec.ts`, `test/regression/fixtures/api/`
-- [ ] **6.** Record the production chunk map again as a probe and file it under docs/perf/probes/; the old script lived in the session scratchpad and is gone.
-- [ ] **7.** Run lint, tsc -b and the regression, and record the plan of the dry run in the release note.
+Wave 5 (round 73), T163 with T263 (round 74, measured, nothing adopted), T160 (round 75), the last wave (round 76, user gate 24.10.2026, "1a 2a 3a 4a 5a"; T259 reverted and parked) and round 77 (release gate 29.10.2026, "1a 2a 3a 4a 5a 6a 7a 8b") are booked, and the release of 1.0.0 closed T43 on 29.10.2026. Next: round 78, the dependencies the user asked for on 29.10.2026; @pkmn/sim 0.10.12 fires the trigger of T103. Every other TODO is parked with a trigger.
 
 ## Parked
 
