@@ -62,6 +62,22 @@ describe.each([
     expect(await check(format, 9, team(held), team(), text)).toEqual([]);
   });
 
+  test('a value the panel shows from its solved sets passes, though the knowledge does not hold it', async () => {
+    // Round 77 (the suite of the acceptance): the export reads the stats view (the solved sets, round 70 T205), the check
+    // read the knowledge. Champions VGC 2695803506: Basculegion's guessed Head Smash stands in the export, not in the
+    // knowledge, and the editor's pool lacks it, so the panel's own export imported nothing. Moon Landing stands in here.
+    const shown = entry('Corviknight', { moves: [{ name: 'Moon Landing', source: 'guessed' }], ability: { value: 'Mummy', source: 'guessed' } });
+    const text = textOf('Corviknight\nAbility: Mummy\n- Moon Landing\n- Roost');
+    const pools = await loadImportPools(['Corviknight'], 9, format);
+    const parsed = parseSetsImport(text);
+    expect(validateSetsImport(parsed, { p1: team(entry('Corviknight')), p2: team() }, { gen: 9, pools }, { p1: team(shown), p2: team() })).toEqual([]);
+    // Without the shown sets the same text is refused, and a value neither view holds is refused with them.
+    expect(validateSetsImport(parsed, { p1: team(entry('Corviknight')), p2: team() }, { gen: 9, pools }).join('\n')).toMatch(/Moon Landing/);
+    const other = parseSetsImport(textOf('Corviknight\n- Hydro Cannon'));
+    expect(validateSetsImport(other, { p1: team(entry('Corviknight')), p2: team() }, { gen: 9, pools }, { p1: team(shown), p2: team() }).join('\n'))
+      .toMatch(/Hydro Cannon/);
+  });
+
   test('before the pools load, the species check still runs and the pool checks wait', async () => {
     const parsed = parseSetsImport(textOf('Foo Mon\n- Roost\n\nCorviknight\nAbility: Foo Bar\n- Moon Landing'));
     const errors = validateSetsImport(parsed, { p1: team(entry('Corviknight')), p2: team() }, { gen: 9, pools: null });

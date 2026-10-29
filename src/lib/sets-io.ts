@@ -157,12 +157,14 @@ type SideId = 'p1' | 'p2';
  * nothing while this list is not empty, as the team editor refuses a move outside the species' pool. Only values that differ
  * from what the panel already holds are checked, so the export of the panel itself always imports (a swapped ability, a move
  * copied by Transform, an item of a custom game stay as they are). The pool checks wait until the pools load (`pools: null`),
- * as the editor stays free text until then.
+ * as the editor stays free text until then. `shown` is the view the export reads (the stats panel's solved sets, round 70
+ * T205): a value it holds counts as held too (round 77: a guessed Head Smash of Champions VGC 2695803506).
  */
 export function validateSetsImport(
   parsed: { p1: PastedSet[]; p2: PastedSet[] },
   current: { p1: OpponentTeamInfo; p2: OpponentTeamInfo },
   game: ImportGame,
+  shown?: { p1: OpponentTeamInfo | null; p2: OpponentTeamInfo | null },
 ): string[] {
   const errors: string[] = [];
   for (const side of ['p1', 'p2'] as SideId[]) {
@@ -176,7 +178,8 @@ export function validateSetsImport(
     applied.pokemon.forEach((after, index) => {
       const before = info.pokemon[index];
       if (after === before) return;
-      errors.push(...changedValueErrors(`${label} ${after.species}`, before, after, game));
+      const shownBefore = shown?.[side]?.pokemon.find(pokemon => toId(pokemon.species) === toId(before.species));
+      errors.push(...changedValueErrors(`${label} ${after.species}`, shownBefore ? [before, shownBefore] : [before], after, game));
     });
   }
   return errors;
@@ -221,9 +224,11 @@ const teraErrors: ValueCheck = (who, before, after, { pools }) => {
   return listed(pools.teraTypes, value) ? [] : [`${who}: ${value} is not a Tera type.`];
 };
 
-/** The value checks of one Pokémon, over the values the import changed. */
-function changedValueErrors(who: string, before: RevealedPokemonInfo, after: RevealedPokemonInfo, game: ImportGame): string[] {
+/** The value checks of one Pokémon, over the values the import changed against every view the panel holds of it. */
+function changedValueErrors(who: string, befores: RevealedPokemonInfo[], after: RevealedPokemonInfo, game: ImportGame): string[] {
   const { pools } = game;
   if (!pools) return [];
-  return [moveErrors, abilityErrors, itemErrors, natureErrors, teraErrors].flatMap(check => check(who, before, after, { ...game, pools }));
+  const against = (before: RevealedPokemonInfo) =>
+    [moveErrors, abilityErrors, itemErrors, natureErrors, teraErrors].flatMap(check => check(who, before, after, { ...game, pools }));
+  return befores.map(against).reduce((kept, next) => kept.filter(message => next.includes(message)));
 }
