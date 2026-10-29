@@ -22,7 +22,7 @@ const replay = JSON.parse(readFileSync(join('packages', 'eval-engine', 'test', '
 const mod = Dex.dexes.champions;
 const standard = Dex.forGen(9);
 const FORMATS = {
-  'Champions singles': 'gen9championsou', 'Champions doubles': 'gen9championsvgc2026regmbbo3',
+  'Champions singles': 'gen9championsou', 'Champions doubles': 'gen9championsvgc2026regmcbo3',
   'Scarlet/Violet singles': 'gen9ou', 'Scarlet/Violet doubles': 'gen9doublesou',
 } as const;
 const championsOf = (format: string) => /champions/.test(format);

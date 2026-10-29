@@ -27,7 +27,7 @@ function Row({ format, evLimit }: { format: string; evLimit?: number | null }) {
 const spin = (label: string) => screen.getByRole('spinbutton', { name: `Garchomp ${label} EVs` });
 
 describe('EV inputs by format', () => {
-  for (const [kind, format] of [['singles', 'gen9championsou'], ['doubles (VGC)', 'gen9championsvgc2026regmbbo3']] as const) {
+  for (const [kind, format] of [['singles', 'gen9championsou'], ['doubles (VGC)', 'gen9championsvgc2026regmcbo3']] as const) {
     test(`Champions ${kind}: max 32, step 1, the Stat Points line, no Tera field`, () => {
       render(<Row format={format} />);
       expect(spin('HP')).toHaveAttribute('max', '32');

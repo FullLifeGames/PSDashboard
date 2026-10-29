@@ -47,9 +47,12 @@ const FLOORS: Record<string, { sides: number; revealed: number }> = {
   gen6customgame: { sides: 58, revealed: 269 }, gen6doublescustomgame: { sides: 57, revealed: 375 },
   gen5customgame: { sides: 60, revealed: 336 }, gen5doublescustomgame: { sides: 60, revealed: 339 },
   gen4customgame: { sides: 64, revealed: 365 }, gen4doublescustomgame: { sides: 63, revealed: 390 },
-  gen3customgame: { sides: 64, revealed: 448 }, gen3doublescustomgame: { sides: 64, revealed: 543 },
-  gen2customgame: { sides: 64, revealed: 426 }, gen1customgame: { sides: 40, revealed: 217 },
+  gen3customgame: { sides: 64, revealed: 392 }, gen3doublescustomgame: { sides: 64, revealed: 451 },
+  gen2customgame: { sides: 64, revealed: 416 }, gen1customgame: { sides: 40, revealed: 217 },
 };
+// Round 78 (@pkmn 0.10.12): the generator plays other Gen 2 and 3 games on the new simulator, which show fewer distinct
+// moves (Gen 3 448 to 392, Gen 3 doubles 543 to 451, Gen 2 426 to 416); the parser reads every one of them (its reveals
+// equal the distinct moves of the logs' own move lines) and none is impossible.
 const floorOf = (format: string) => FLOORS[format] ?? { sides: 1, revealed: 1 };
 
 type Teams2 = { p1: PokemonSet[]; p2: PokemonSet[] };

@@ -16,7 +16,7 @@ const pools = (evLimit?: number | null): EditorPools => ({
 });
 
 describe('useTeamDraft.updateEv by format', () => {
-  for (const [kind, format] of [['singles', 'gen9championsou'], ['doubles (VGC)', 'gen9championsvgc2026regmbbo3']] as const) {
+  for (const [kind, format] of [['singles', 'gen9championsou'], ['doubles (VGC)', 'gen9championsvgc2026regmcbo3']] as const) {
     test(`Champions ${kind}: typing 32, 32, 32 gives 32, 32, 2 and a stat never passes 32`, () => {
       const { result } = renderHook(() => useTeamDraft(blank(), null, format));
       act(() => result.current.updateEv(0, 'hp', '32'));

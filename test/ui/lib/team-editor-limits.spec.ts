@@ -11,7 +11,7 @@ import { getEvLimit } from '../../../src/lib/pokemon-options';
  * simulator's own team validator, so it cannot drift from the format.
  */
 const SINGLES_CHAMPIONS = 'gen9championsou';
-const DOUBLES_CHAMPIONS = 'gen9championsvgc2026regmbbo3';
+const DOUBLES_CHAMPIONS = 'gen9championsvgc2026regmcbo3';
 const SINGLES_SV = 'gen9ou';
 const DOUBLES_SV = 'gen9doublesou';
 const FORMATS = [SINGLES_CHAMPIONS, DOUBLES_CHAMPIONS, SINGLES_SV, DOUBLES_SV];

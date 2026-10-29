@@ -20,7 +20,7 @@ const FORMATS = [
   { label: 'singles', format: 'gen9ou' },
   { label: 'doubles and VGC', format: 'gen9doublesou' },
   { label: 'Champions singles', format: 'gen9championsou' },
-  { label: 'Champions doubles and VGC', format: 'gen9championsvgc2026regmbbo3' },
+  { label: 'Champions doubles and VGC', format: 'gen9championsvgc2026regmcbo3' },
 ] as const;
 
 /** The simulator's body for the set, in the replay's display mode (percent). */

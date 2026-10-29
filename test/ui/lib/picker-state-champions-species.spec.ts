@@ -14,7 +14,7 @@ import { pickerStateFromSnapshot } from '../../../src/lib/picker-state';
  * legal species, on the singles format and on the doubles (VGC) format alike.
  */
 const replay = JSON.parse(readFileSync(join('packages', 'eval-engine', 'test', 'fixtures', 'champions', 'gen9championsou-2693832490.json'), 'utf-8')) as { formatid: string; log: string };
-const FORMATS = { singles: 'gen9championsou', doubles: 'gen9championsvgc2026regmbbo3' } as const;
+const FORMATS = { singles: 'gen9championsou', doubles: 'gen9championsvgc2026regmcbo3' } as const;
 
 function simulatedMaxHp(format: string, set: PokemonSet): number {
   const battle = new Battle({ formatid: format as never, seed: '1,2,3,4', p1: { name: 'A', team: [set] }, p2: { name: 'B', team: [set] } });

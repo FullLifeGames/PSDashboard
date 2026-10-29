@@ -27,7 +27,7 @@ describe('TeamEditor', () => {
   }, 60_000);
 
   test('a Champions game reads the mod: its abilities and Stat Point caps, and no Tera field (singles and VGC)', async () => {
-    for (const format of ['gen9championsou', 'gen9championsvgc2026regmbbo3']) {
+    for (const format of ['gen9championsou', 'gen9championsvgc2026regmcbo3']) {
       const { unmount } = render(<TeamEditor title="Edit Player" teamInfo={teamInfo('singles', 'p1')} gen={9} format={format} onSave={vi.fn()} onClose={vi.fn()} />);
       const ability = await screen.findByRole('combobox', { name: 'Garchomp ability' }, { timeout: 30_000 });
       await waitFor(() => expect(ability.tagName).toBe('SELECT'), { timeout: 30_000 });
