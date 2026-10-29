@@ -6,7 +6,9 @@ on:
       - master
       - main
   # A published release has to redeploy the site, otherwise its frozen copy
-  # would not appear until the next unrelated push.
+  # would not appear until the next unrelated push. This trigger serves a
+  # release made by hand; a release that release.yml makes with its token
+  # starts no workflow, so release.yml dispatches this one (round 78).
   release:
     types:
       - published

@@ -45,6 +45,9 @@ jobs:
     needs: check
     if: needs.check.outputs.should_release == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -80,13 +83,22 @@ jobs:
           site="https://$(echo "$owner" | tr '[:upper:]' '[:lower:]').github.io/$repo"
           # gh prepends --notes to the generated changelog, so these links head
           # the release body. The frozen copy appears once the Pages run that
-          # this release triggers finishes.
+          # the next step starts finishes.
           gh release create "v$VERSION" \
             --title "v$VERSION" \
             --target "$GITHUB_SHA" \
             --notes "**[Open this build]($site/v$VERSION/)** · [Production](https://fulllifegames.com/Tools/PSDashboard/) · [All hosted versions]($site/versions/) · [Nightly]($site/)" \
             --generate-notes \
             "ps-dashboard-$VERSION.zip"
+
+      # Round 78: a release this job makes with its token starts no other
+      # workflow, so pages.yml's release trigger never ran for it; the frozen
+      # copy appeared only when the push's own Pages run listed the release in
+      # time. A workflow_dispatch is the one event the token may start.
+      - name: Build the Pages site with the new release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --ref "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY"
 
   # The library packages ride the same release: scripts/publish-packages.mjs
   # publishes the ones whose files changed since the previous release tag, at
