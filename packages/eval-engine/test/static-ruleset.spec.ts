@@ -106,7 +106,9 @@ describe('static rule set', () => {
         expect(matrix('standard')).toBe(matrixStandard);
       });
     }
-  });
+    // Round 78: three matrix searches and two trees per game type take 25 s with the speed layer forced off on a quiet
+    // machine (11 s with it on) and ran past the default 60 s in the full EVAL_SIM_FAST=0 suite.
+  }, 180_000);
 
   test('a local executor serves its cells under the rule set it is bound to', async () => {
     const serialized = position(DOUBLES);
