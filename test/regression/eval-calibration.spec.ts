@@ -970,6 +970,16 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * T103 stays parked, trigger: the next simulator upgrade. Next free T280.
  * RESTS: T277 (the Champions OU K on the 0.10.12 rebuild), T278 (an M-B
  * replay on the M-B overlay), T279 (the recoil chip with the crit share).
+ * RELEASE 1.0.1 2026-10-29 (user 17:29 "1a 2a 3a", 17:58 "1a 2a 3a", 18:40
+ * "1a"): the README picture cropped to the app (fd692d8), the package
+ * manifests on the release version instead of 0.1.0 (e32f720), and T280
+ * (84bef28): the branch replay's browser flow read the log while the frame
+ * still played turn 2 and failed three Tests runs on dev in a row; it now
+ * reads both lengths once the frame has played everything it holds (20 of
+ * 20 with the CPU throttled fourfold). master by fast-forward from 4895108
+ * to 84bef28; release.yml tagged v1.0.1, published both packages as 1.0.1
+ * with provenance and started the Pages build; deploy.ps1 moved production;
+ * the Tests run on master green at the first attempt. Next free T281.
  *
  * ROUND 77 2026-10-24..29 (improvement round 77, before the release: the
  * user's reports A to J, the report dialog, the engine protocol, the test

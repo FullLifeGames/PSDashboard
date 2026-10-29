@@ -1,6 +1,6 @@
 # Backlog
 
-This file holds the details of every open TODO, one section per TODO under its fixed T-number. The release of 1.0.0 is out (29.10.2026, the finish line of `NextSteps.md`, user 21.10.2026), and every TODO is parked with a trigger; a trigger that fires brings its TODO to a gate. The next free T-number is T280.
+This file holds the details of every open TODO, one section per TODO under its fixed T-number. The releases of 1.0.0 and 1.0.1 are out (29.10.2026; 1.0.0 was the finish line of `NextSteps.md`, user 21.10.2026), and every TODO is parked with a trigger; a trigger that fires brings its TODO to a gate. The next free T-number is T281.
 
 Evidence paths that start with `r78/` are under `docs/perf/probes/2026-10-29-r78/`, those that start with `r77/` under `docs/perf/probes/2026-10-24-r77/`; those that start with `r69/` are under `docs/perf/probes/2026-10-12-r69/`, those that start with `r72/` under `docs/perf/probes/2026-10-19-r72/`, those that start with `r73/` under `docs/perf/probes/2026-10-21-r73/`, those that start with `r74/` under `docs/perf/probes/2026-10-22-r74/`, those that start with `r76/` under `docs/perf/probes/2026-10-23-r76/`.
 
@@ -22,7 +22,7 @@ Source of T277 to T279: round 78, the dependencies for 1.0.1, with its gate of 2
 
 ## Next rounds
 
-Wave 5 (round 73), T163 with T263 (round 74, measured, nothing adopted), T160 (round 75), the last wave (round 76, user gate 24.10.2026, "1a 2a 3a 4a 5a"; T259 reverted and parked) and round 77 (release gate 29.10.2026, "1a 2a 3a 4a 5a 6a 7a 8b") are booked, and the release of 1.0.0 closed T43 on 29.10.2026. Round 78, the dependencies (user gate 29.10.2026, 15:15, "1a 2a 3b 4a"), is booked: @pkmn/sim 0.10.12 fired the trigger of T103, which stays parked after the upgrade, and T277 to T279 wait parked. Next: the release of 1.0.1. Every other TODO is parked with a trigger.
+Wave 5 (round 73), T163 with T263 (round 74, measured, nothing adopted), T160 (round 75), the last wave (round 76, user gate 24.10.2026, "1a 2a 3a 4a 5a"; T259 reverted and parked) and round 77 (release gate 29.10.2026, "1a 2a 3a 4a 5a 6a 7a 8b") are booked, and the release of 1.0.0 closed T43 on 29.10.2026. Round 78, the dependencies (user gate 29.10.2026, 15:15, "1a 2a 3b 4a"), is booked: @pkmn/sim 0.10.12 fired the trigger of T103, which stays parked after the upgrade, and T277 to T279 wait parked. The release of 1.0.1 followed the same evening and built T280 inside it: the branch replay's browser flow reads the log once the frame has played to its end (`docs/completed/eval-quality.md`, round 78). Every other TODO is parked with a trigger.
 
 ## Parked
 

@@ -1,16 +1,14 @@
-# Next Steps (as of 29.10.2026, after round 78)
+# Next Steps (as of 29.10.2026, after the release of 1.0.1)
 
-Open work only, along the finish line. Each step is one round; its TODOs carry fixed T-numbers, and their scenes, numbers and steps are in `docs/backlog.md`. Rules for agents: `AGENTS.md`. Finished rounds: `docs/completed/`. Next free T-number: T280.
+Open work only, along the finish line. Each step is one round; its TODOs carry fixed T-numbers, and their scenes, numbers and steps are in `docs/backlog.md`. Rules for agents: `AGENTS.md`. Finished rounds: `docs/completed/`. Next free T-number: T281.
 
 ## Finish line
 
-The release is out: v1.0.0 since 29.10.2026, on master with the Pages site and its frozen copy `/v1.0.0/`, both packages on npm, and the production copy on fulllifegames.com. The way there ran through wave 5, T163, T160, one last wave and round 77 (user 21.10.2026). From here only bug reports from real use add work, plus the dependency upkeep of AGENTS.md. master moves only with the user's okay.
+The release is out: v1.0.1 since 29.10.2026, after v1.0.0 the same morning, on master with the Pages site and the frozen copies `/v1.0.0/` and `/v1.0.1/`, both packages on npm, and the production copy on fulllifegames.com. The way there ran through wave 5, T163, T160, one last wave and round 77 (user 21.10.2026). From here only bug reports from real use add work, plus the dependency upkeep of AGENTS.md. master moves only with the user's okay.
 
 ## Next rounds
 
-Wave 5 (round 73), T163 with T263 (round 74), T160 (round 75) and the last wave (round 76) are booked. The last wave closed T233, T234, T243, T244, T258, T260, T261, T262, T264, T265 and T266; T259 went back and waits parked (user gate 24.10.2026). Round 77 is booked (release gate 29.10.2026, "1a 2a 3a 4a 5a 6a 7a 8b"): the user's reports A to J, the report dialog, the engine protocol, the branching swarm with its two fix waves, and T267; T268 to T276 wait parked. The release of 1.0.0 followed on 29.10. (T43 closed): master by fast-forward with the link preview, the tag and both packages through `release.yml`, then `deploy.ps1` for production. Round 78 is booked (user gate 29.10.2026, 15:15, "1a 2a 3b 4a"): the @pkmn train 0.10.12 (Showdown b354a81f) with client and protocol 0.7.4 and smogon 0.6.1, the rest of `npm outdated`, the corrected Gen 1 to 4 entry, the Dex values in the calculator body and the Pages build started by `release.yml`; T103 stays parked, T277 to T279 wait parked. The way on:
-
-1. **Release 1.0.1:** dev carries the version (user gate "4a"); master, and with it the tag, npm and Pages, and the production copy through `deploy.ps1` each wait for the user's own okay.
+Wave 5 (round 73), T163 with T263 (round 74), T160 (round 75) and the last wave (round 76) are booked. The last wave closed T233, T234, T243, T244, T258, T260, T261, T262, T264, T265 and T266; T259 went back and waits parked (user gate 24.10.2026). Round 77 is booked (release gate 29.10.2026, "1a 2a 3a 4a 5a 6a 7a 8b"): the user's reports A to J, the report dialog, the engine protocol, the branching swarm with its two fix waves, and T267; T268 to T276 wait parked. The release of 1.0.0 followed on 29.10. (T43 closed): master by fast-forward with the link preview, the tag and both packages through `release.yml`, then `deploy.ps1` for production. Round 78 is booked (user gate 29.10.2026, 15:15, "1a 2a 3b 4a"): the @pkmn train 0.10.12 (Showdown b354a81f) with client and protocol 0.7.4 and smogon 0.6.1, the rest of `npm outdated`, the corrected Gen 1 to 4 entry, the Dex values in the calculator body and the Pages build started by `release.yml`; T103 stays parked, T277 to T279 wait parked. The release of 1.0.1 followed the same evening (user gates 17:29 to 18:40): the README picture cropped to the app, the package manifests on the release version, and T280, the branch replay's browser flow, which now reads the log once the frame has played to its end. master moved by fast-forward to 84bef28, `release.yml` set the tag, published both packages and started the Pages build, and `deploy.ps1` moved production. No round is open.
 
 ## Parked
 
