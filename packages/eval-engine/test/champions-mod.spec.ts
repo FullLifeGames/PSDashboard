@@ -27,9 +27,9 @@ await loadSimMods('gen9championsou');
 
 const championsDex = () => Dex.dexes.champions;
 /**
- * Every out-of-battle forme of the Champions dex, legal or not: the Champions games of the corpus field species the
- * mod's FormatsData of 0.10.11 still marks illegal (regulation M-C's Rillaboom, Cinderace, Golisopod), and the
- * formula does not depend on legality. Shedinja's fixed HP stays out.
+ * Every out-of-battle forme of the Champions dex, legal or not: the Champions games of the corpus fielded species the
+ * mod's FormatsData of 0.10.11 marked illegal (regulation M-C's Rillaboom, Cinderace, Golisopod; legal since 0.10.12),
+ * and the formula does not depend on legality. Shedinja's fixed HP stays out.
  */
 const championsSpecies = () => championsDex().species.all()
   .filter(species => species.exists && !species.battleOnly && !species.maxHP)

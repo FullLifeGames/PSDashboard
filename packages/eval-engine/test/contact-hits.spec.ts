@@ -395,8 +395,8 @@ describe('the Champions mod and every generation', () => {
     expect(read(skin(), 'bodyslam').chip).toBeCloseTo(realLoss(skin(), SINGLES_CLICK), 9);
     expect(read(skin(), 'bodyslam').chip).toBeGreaterThan(0);
     const recoil = (seed: string) => battleOf(format, [attackerOf('Snorlax', ['doubleedge'])], [foe('Snorlax')], seed);
-    // Round 78 (@pkmn 0.10.12): the reader's two probes (u = 0.075 and 0.925) never meet a crit (1 in 16 up to gen 5,
-    // 1 in 24 later), so a recoil it reads deterministic is the cost of a hit without a crit, and the simulator's turns
+    // Round 78 (@pkmn 0.10.12): the reader's two probes (u = 0.075 and 0.925) meet no crit at the ordinary stage (1 in 16
+    // up to gen 6, 1 in 24 later; T279), so a recoil it reads deterministic is the cost of a hit without a crit, and the simulator's turns
     // are held to that: their mean over every seed ran 6.8 % above it in gen 3 once the new simulator drew other dice.
     expect(Math.abs(read(recoil('1,2,3,4'), 'doubleedge').chip / meanLossWithoutCrit(recoil, 60, SINGLES_CLICK) - 1)).toBeLessThan(0.06);
   });

@@ -7,7 +7,8 @@ const CHAMPIONS_LOAD_FORMAT = 'gen9championsou';
 
 /**
  * Round 75 (T160): the one load order of every host. The inference, the team build and the item judge read the Dex of the game
- * (replay-core's rulesDex), and a Pokémon Champions game reads the registered Champions mod, which loads on demand (about 10 MB).
+ * (replay-core's rulesDex), and a Pokémon Champions game reads the registered Champions mod, which loads on demand (about 0.5 MB
+ * since @pkmn/mods 0.10.12, 10 MB before).
  * A host awaits this before it parses, infers or builds a replay: the app's replay load, the bank's team build and the
  * calibration and fit harnesses. A replay of any other format returns at once and loads nothing.
  */
