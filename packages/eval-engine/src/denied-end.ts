@@ -48,7 +48,7 @@ export function sureKillRoll(analysis: TurnAnalysis, side: Side): { label: strin
 
 /**
  * The played move is named only when its analytic odds ARE the near-decided
- * roll — a full kill behind a sub-certain accuracy. Anything else (a
+ * roll â€” a full kill behind a sub-certain accuracy. Anything else (a
  * switch, a different move, a damage-roll gate) keeps the generic verb, so
  * "X missed" is never said about a roll X did not take.
  */
