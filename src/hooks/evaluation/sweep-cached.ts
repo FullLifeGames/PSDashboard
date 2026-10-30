@@ -3,6 +3,7 @@ import { EvalWorkerClient } from '../../lib/eval/worker-client';
 import { saveStoredEval } from '../../lib/eval-cache-store';
 import { aborted, guardedStage, isCancelled, matchOrPhantom, type SweepEnv, type TurnStageArgs } from './sweep-types';
 import { probeSensitivity, verifyFlagged } from './sweep-verify';
+import { playedCellValue } from './played-cell';
 
 /**
  * Entries written by single evaluations never computed the
@@ -19,7 +20,11 @@ async function backfillPlayedOutcome(
     outcome = null;
     const p1Choice = matchOrPhantom(hit.result, 'p1', turnPlayed, env.params.rules);
     const p2Choice = matchOrPhantom(hit.result, 'p2', turnPlayed, env.params.rules);
-    if (p1Choice && p2Choice) {
+    // Round 79 (T287): a tree turn prices the pair with the root's own cell (no position needed); the sub-search stays where the pair is no cell.
+    const cell = p1Choice && p2Choice && mode === 'mcts' ? playedCellValue(hit.result, p1Choice.choice, p2Choice.choice) : null;
+    if (cell !== null) {
+      outcome = cell;
+    } else if (p1Choice && p2Choice) {
       try {
         const serialized = await env.positionFor(turn);
         if (aborted(env)) return 'abort';

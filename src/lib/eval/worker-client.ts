@@ -54,7 +54,10 @@ export type AppEvalSettings = EvalSettings & { ruleset: StaticRuleset };
  * sweep's own cells get: depth-1 matrix cells are static evals already
  * (null = use the plain cell path); deeper searches deepen their cells with
  * a depth-(d−1) sub-search, so the played pair gets exactly that. MCTS has
- * no fixed-depth equivalent — a depth-1 sub-search is the approximation.
+ * no fixed-depth equivalent — a depth-1 sub-search is the approximation. Round 79
+ * (T287): the sweep asks it of a tree turn only where the root's merged matrix
+ * holds no priced cell of the played pair (hooks/evaluation/played-cell.ts);
+ * the roots are deep searches and the cell is their own number.
  * Round 67 (T140): the Sleep Clause rides along, because serialization strips
  * a custom game's clause from the rule table the sub-search would fall back on.
  */
