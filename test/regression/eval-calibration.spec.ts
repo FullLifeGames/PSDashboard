@@ -912,6 +912,48 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * ROUND 79 2026-10-30 (improvement round 79, wave 7: the user's three reports
+ * of 30.10.2026 on the game report of smogtours-gen8ou-573756, setup in the
+ * GPL replay and the replacements after a knockout; lanes w7-a to w7-d from
+ * r79 (dev a5491bf), merged on r79-merge; probes
+ * docs/perf/probes/2026-10-30-r79/). Gates: design 08:50 ("1a 2a 3c 4a 5a 6a
+ * 7a 8a"), final 15:05 ("1a 2a 3a 4a 5a 6a 7a 8a").
+ * DELIVERED: lane A T282 (the near-decided click weighed by the chance its
+ * user still acts), T283 (a finite race tie to the first mover only by its
+ * own hit), T284 (the biggest roll against the winner, named only where the
+ * log proves the event, gate "2a"; the chip prints the roll and the net), T285
+ * (no shifts or reads from a standoff of 10 turns without a faint or a
+ * switch), T286 (plain words for the residual without a roll), and the
+ * hazard-sack gate reads the dice; lane B T288 (a Def or SpD stage that takes
+ * away the foe's win bites with a slow holder; the GPL t27 pin); lane C T290
+ * (the replacement note on the next turn's card); lane D T287 (a tree turn
+ * prices its played pair with the root's cell). Integrator: the note's own
+ * class, the cache key spec on v73, denied-end.ts back to UTF-8 with
+ * source-encoding.spec.ts, the 649664 t23 gap re-pinned to chance. Cache v73.
+ * MEASUREMENT: CI against r79-base (a5491bf, the same day): lane D bank
+ * byte-identical; lane B no harm, no warnings (bank 37 rows, VGC 39, Doubles
+ * OU identical); lane A 6 rows, no warnings; the merge no harm, one warning in
+ * the late singles hq cells (+9 [+0, +26] fixed K, +11 own K) carried by
+ * favored sides that lost to luck (gen9ou-2663110408 t47), luck-adjusted +0.
+ * Feedback three times byte-identical on the merge and twice on the final
+ * state; no truth pin moved; 24 attributions moved (all T287); census singles
+ * 39/6/2, doubles 12/5/0 -> 10/5/0. 573756 reads key moments 68, 71, 73, the
+ * biggest roll at t73 and the standoff sentence; no report says "re-read" (6
+ * before). GPL t27 Cosmic Power 0.172 -> 0.255, regret 0.108 -> 0.043; the
+ * play-out clicks it 5 times instead of once. Suite 7,454 passed, 2 expected
+ * fails, 24 skipped; e2e 90 passed, 1 skipped; build smoke, pack smoke and the
+ * dev CI on 5aa439c green. T290's interleaved timing did not resolve (10 s
+ * steps, drift); per root: singles tree +11 %, Doubles OU +15 %, VGC +6 %.
+ * USER GATE 2026-10-30 15:05 ("1a 2a 3a 4a 5a 6a 7a 8a"): the wave adopted
+ * with its moves; the biggest roll only with a proven event; the standoff
+ * sentence kept; the late warning watched, no refit; T291 and T293 parked,
+ * T292 next; dev on 5aa439c. T294 and T295 approved the same afternoon for
+ * the next batch. Next free T296.
+ * RESTS: T291 (a sacrifice credit reads the turns that followed), T292 (the
+ * near stage's open gaps), T293 (the first-mover tie on the score path), T294
+ * (the turn card's explanation folds away), T295 (doubles move selection
+ * without jumps).
+ *
  * ROUND 78 2026-10-29 (improvement round 78, the dependencies for 1.0.1:
  * the user's "Die @pkmn Dependencies scheinen updated worden zu sein" after
  * the release of 1.0.0; branch r78 from dev, which v1 became; probes

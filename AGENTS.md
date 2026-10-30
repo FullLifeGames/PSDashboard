@@ -57,7 +57,7 @@ PS Dashboard analyzes Pokémon Showdown replays: it replays a game turn by turn,
 - Order for tree and verify changes: the play-out pin first (`test/e2e/branch.spec.ts`, draft t56), then the golden replay 655336, then the bank.
 - Set and solver changes: set diffs on every build path before the bank (the bank builds like the app, through `buildAppTeams`).
 - Monte-Carlo references of scene pins price their leaves with the engine's static evaluation: recompute them after every weight change before calling a pin wrong.
-- Wall-clock timing only interleaved with the base on a quiet machine, both sides in one worktree that checks them out in turn (round 72: two checkouts of one commit read up to 2 % apart); no tests, probes or agents meanwhile.
+- Wall-clock timing only interleaved with the base on a quiet machine, both sides in one worktree that checks them out in turn (round 72: two checkouts of one commit read up to 2 % apart); no tests, probes or agents meanwhile. The feedback harness reads a test's duration in steps of about ten seconds (round 79), so the cost of a sweep needs a Node probe.
 - Feedback dumps (`feedback-full-*.json`) exist only with `FEEDBACK_DUMP=1`; check their mtime before reading them.
 
 ## Tools and pitfalls
@@ -69,6 +69,7 @@ PS Dashboard analyzes Pokémon Showdown replays: it replays a game turn by turn,
 - Bank data in CI: the tarball holds `.smogon-cache` and every replay of `.fit-corpus` that the fit source and the holdouts read (`scripts/bank-data-pack.mjs`; since round 74 CI captures the fit corpus with search: `--env EVAL_CALIBRATION_SOURCE=fit --env EVAL_CALIBRATION_FAMILY=<family> --env EVAL_CALIBRATION_TURNS=thirds --env EVAL_CALIBRATION_FEATURES=1`); the tracked `test/regression/fixtures/bank-data.json` names its sha256 and folder hashes, and a CI job unpacks it only after both checks. When the data changes, pack again; the upload (`--upload`, a pre-release that is never Latest) waits for the user's okay.
 - Crash protection (D23): commit before every heavy run and force freshly written files to disk; do not write to `.git` while the run is going. The repair recipe for zeroed `.git` files is in `docs/completed/` (incident of 20.09.2026).
 - Worktrees: remove the junctions (`node_modules`, `.calibration`, `.smogon-cache`, `.fit-corpus`) one by one with `[System.IO.Directory]::Delete('<path>')` and check with a reparse-point scan before `git worktree remove`; otherwise git follows the junctions and deletes their targets (incident of 12.09.2026).
+- File encoding: a PowerShell write without `-Encoding utf8` uses the ANSI code page (round 79: an em dash became the byte 0x97, and only the production build refused it); `test/regression/source-encoding.spec.ts` holds every source file to UTF-8.
 - Line endings: the repository checks out with `core.autocrlf`. Scripts match `\r?\n`; count conflict markers before `git add`. Test logs stay LF through `.gitattributes`.
 - Probes never go under `test/regression/` (the suite collects them); they are `.vt.ts` files under `docs/perf/probes/<date>/` with their own Vitest config and `PROBE_ROOT`.
 - The replay iframe's own `Config` stub (`PS_CONFIG_DEFAULTS` in `src/lib/replay-html.ts`) must carry Showdown's routes: the client reads `Config.routes` while it loads, and its scripts load in no fixed order.
@@ -88,7 +89,7 @@ Every change gets a class before work starts: the integrator proposes it, the us
 
 - Small fixes collect in a batch on one branch, score-touching ones included. The batch ends with one check: the checks before push, the cache version bumped once, two feedback runs compared byte for byte with the tier census (round 70 ran one and missed a turn that varied from run to run), the paired bank only when the user asks for it. Every pin the batch moves waits for one gate at the end; each fix gets its own commit.
 - A small fix that grows (a second cause, a re-fit, more than a few files) becomes a larger bug and gets its TODO.
-- A bank or feedback run costs an hour of machine time, so it runs once per batch or round, never per fix.
+- A feedback run takes about ten minutes and a bank run in CI about five (round 79), so a run per lane fits a wave and separates the lanes' effects; never one per fix.
 
 ## Working in rounds
 

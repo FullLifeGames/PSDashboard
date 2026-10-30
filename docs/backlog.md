@@ -1,6 +1,6 @@
 # Backlog
 
-This file holds the details of every open TODO, one section per TODO under its fixed T-number. The releases of 1.0.0 and 1.0.1 are out (29.10.2026; 1.0.0 was the finish line of `NextSteps.md`, user 21.10.2026), round 79 builds T282 to T288 and T290, and every other TODO is parked with a trigger; a trigger that fires brings its TODO to a gate. The next free T-number is T291.
+This file holds the details of every open TODO, one section per TODO under its fixed T-number. The releases of 1.0.0 and 1.0.1 are out (29.10.2026; 1.0.0 was the finish line of `NextSteps.md`, user 21.10.2026), round 80 builds T292, T294 and T295, and every other TODO is parked with a trigger; a trigger that fires brings its TODO to a gate. The next free T-number is T296.
 
 Evidence paths that start with `r79/` are under `docs/perf/probes/2026-10-30-r79/`, those that start with `r78/` are under `docs/perf/probes/2026-10-29-r78/`, those that start with `r77/` under `docs/perf/probes/2026-10-24-r77/`; those that start with `r69/` are under `docs/perf/probes/2026-10-12-r69/`, those that start with `r72/` under `docs/perf/probes/2026-10-19-r72/`, those that start with `r73/` under `docs/perf/probes/2026-10-21-r73/`, those that start with `r74/` under `docs/perf/probes/2026-10-22-r74/`, those that start with `r76/` under `docs/perf/probes/2026-10-23-r76/`.
 
@@ -22,143 +22,63 @@ Source of T277 to T279: round 78, the dependencies for 1.0.1, with its gate of 2
 
 Source of T282 to T290: round 79 (wave 7), the user's three reports of 30.10.2026 (the game report of smogtours-gen8ou-573756, setup in the GPL replay, the replacements after a knockout), the diagnosis step of its four lanes (`r79/lanes/<X>/plan.md`) and the design gate of 30.10.2026 08:50 ("1a 2a 3c 4a 5a 6a 7a 8a", `r79/gate-design.md`). A reviewer checked the gate and the TODOs against the code of a5491bf (`r79/review/gate-design-facts.md`, `r79/review/todos-check.md`). Their line numbers refer to a5491bf.
 
+Source of T291 to T295: the final gate of round 79 (30.10.2026 15:05, "1a 2a 3a 4a 5a 6a 7a 8a", `r79/gate-final.md`) for T291 to T293, and the user's two requests of the same afternoon for T294 and T295. A reviewer checked them against r79 at 7287b48 (`r79/review/todos-rests-check.md`). Their line numbers refer to that state.
+
 ## Next rounds
 
-Wave 5 (round 73), T163 with T263 (round 74, measured, nothing adopted), T160 (round 75), the last wave (round 76, user gate 24.10.2026, "1a 2a 3a 4a 5a"; T259 reverted and parked) and round 77 (release gate 29.10.2026, "1a 2a 3a 4a 5a 6a 7a 8b") are booked, and the release of 1.0.0 closed T43 on 29.10.2026. Round 78, the dependencies (user gate 29.10.2026, 15:15, "1a 2a 3b 4a"), is booked: @pkmn/sim 0.10.12 fired the trigger of T103, which stays parked after the upgrade, and T277 to T279 wait parked. The release of 1.0.1 followed the same evening and built T280 inside it: the branch replay's browser flow reads the log once the frame has played to its end (`docs/completed/eval-quality.md`, round 78). After the release T281 did the same for the play controls flow. Round 79 (wave 7, design gate 30.10.2026 08:50) builds T282 to T288 and T290 in four lanes; T289 waits parked. Every other TODO is parked with a trigger.
+Wave 5 (round 73), T163 with T263 (round 74, measured, nothing adopted), T160 (round 75), the last wave (round 76, user gate 24.10.2026, "1a 2a 3a 4a 5a"; T259 reverted and parked) and round 77 (release gate 29.10.2026, "1a 2a 3a 4a 5a 6a 7a 8b") are booked, and the release of 1.0.0 closed T43 on 29.10.2026. Round 78, the dependencies (user gate 29.10.2026, 15:15, "1a 2a 3b 4a"), is booked: @pkmn/sim 0.10.12 fired the trigger of T103, which stays parked after the upgrade, and T277 to T279 wait parked. The release of 1.0.1 followed the same evening and built T280 inside it: the branch replay's browser flow reads the log once the frame has played to its end (`docs/completed/eval-quality.md`, round 78). After the release T281 did the same for the play controls flow. Round 79 (wave 7, design gate 30.10.2026 08:50, final gate 15:05) is booked: T282 to T288 and T290 delivered (`docs/completed/eval-quality.md`, round 79); T289, T291 and T293 wait parked. Next: round 80, a small batch with T292, T294 and T295. Every other TODO is parked with a trigger.
 
-## Round 79 · wave 7
+## Round 80 · the next small batch
 
-The design gate of 30.10.2026 approved these TODOs for round 79; each leaves this file with the round's booking.
+The final gate of round 79 and the user's requests of 30.10.2026 approved these TODOs for round 80; each leaves this file with that round's booking.
 
-### T282 · The near-decided stage asks whether the click lands
+### T292 · The open gaps of the near-decided stage
 
-*Engine · round 79 · small · rule with a score side effect (the prover's start)*
+*Engine · round 79 · small · rule*
 
-**In round 79 (user gate 30.10.2026, "1a").**
+**Approved for round 80 (final gate 30.10.2026 15:05, "6a"): the next small batch, starting with a probe of gen9championsvgc2026regmc-2695803506 turn 2.**
 
-**Problem.** In smogtours-gen8ou-573756 turn 71 SOULWIND's burned Clefable (377/393) stays in against a +4 Garchomp (155/409) that moves first. `nearDecidedFor` (`packages/eval-engine/src/score/unanswered.ts`) prices Clefable's Moonblast against Garchomp at odds 1 without asking whether Clefable acts: Garchomp's Earthquake knocks it out first at 0.82, so the click lands at most 0.18 of the time. The game report says "Magnezone stood one sure KO from clearing the rest, but the KO never came". The near stage stands on 14 turns of the round-78 corpus dumps (11 singles, 3 doubles and VGC; 9 of them announced, 2 rendered as the sentence), and the click test drops about half of them (648453 t29, 649664 t17, 653785 t20, 655336 t13 and t15 among them).
+**Problem.** After T282 and T283 one "one roll from clearing the rest" sentence stays in the corpus reports, in the Champions VGC census game 2695803506: "Turn 2 nearly ended it the other way: Kingambit stood one 94% roll from clearing the rest, but the roll failed, and juacox300 went on to lose." Lane A could not probe it (the probe realm lacked the Champions mod). Three gaps stay: the click test reads a move's priority from the Dex move only, so a priority set by an ability or a terrain (Prankster, Gale Wings, Triage, Grassy Glide) and a fractional one (Quick Claw, Custap Berry, Stall) go unread; doubles read slot 0 only (`nearDecidedFor`, `packages/eval-engine/src/score/unanswered.ts`); and a sweeper that holds a Choice item but is not locked yet (a benched Choice Scarf Magnezone) may pick its best move against each foe in the clean-up, though in the game it will be locked after its first one.
 
-**Idea.** Weigh the click by the chance its user still acts: 1 when the click goes first (its own priority, else effective speed), else 1 minus the foe's best kill chance from `boundaryEvent`.
+**Idea.** First the probe of turn 2 with the Champions mod loaded, its sentence checked against the simulator's play of the line. Then each gap with its sweep: the priority the simulator gives a move (its priority events, never a list of abilities or items), both slots in doubles, and a Choice holder that plays one move through the clean-up.
 
-**Benefit.** App: the "nearly ended it" sentence and its chip appear only where the click can land.
+**Benefit.** App: the "nearly ended it" sentence stands only where the game bears it out.
 
-**Success.** A sweep (`near-decided-acts.spec.ts`) over every Dex move with a priority other than 0 in every generation the near stage reads (gens 3 to 9: `boundaryEvent` reads no gen 1 or 2) and the Champions mod, the simulator judging who acts first; 573756 t71 loses its denied end; the batch check lists the reports that move (573756, 648453, 649664, 653785, 655336) for the gate.
+**Success.** The turn-2 sentence holds against the simulator's play of the line, or it goes; the three sweeps; the batch check.
 
-**Evidence.** `r79/lanes/A/plan.md` (A1), `r79/lanes/A/out/near.txt`.
+**Singles and doubles.** Both; the slot question is the doubles half.
 
-**Singles and doubles.** Both; doubles read slot 0 as the stage does today, and whether both slots should count stays an open point.
+### T294 · The turn card's explanation folds away
 
-### T283 · A tie in the clean-up goes to the first mover only by its own hit
+*App · round 79 · small · lossless*
 
-*Engine · round 79 · small · rule with a score side effect (the decided sweep starts the prover)*
+**Approved for round 80 (user 30.10.2026: "Can the white text be hidden ... and only be displayed under a description like spoiler (maybe clickable with an arrow that shows the text)?").**
 
-**In round 79 (user gate 30.10.2026, "1a").**
+**Problem.** The turn card of the Evaluation panel opens with a long paragraph (`.ps-eval-analysis-summary` in `src/components/EvalTurnAnalysis.tsx`), from "The estimate moved from 32% to 30% for ..." to "... not graded as a misplay." in the user's screenshot of 2695803506 turn 1; it pushes the parts line and the two side rows far down. The game report's summary shares the class (`src/components/EvalGameReport.tsx`).
 
-**Problem.** In the same position of 573756 turn 71 the sweep profile has Magnezone (Choice Scarf) beat Landorus-Therian. Magnezone's Flash Cannon does 0.345 of Lando's HP against 0.404 left after Stealth Rock; `raceClocks` (`score/races.ts`) adds Lando's Toxic tick (0.125) to the hit and calls the knockout turn 1, Lando's Earthquake (4x) also kills in turn 1, and `beatsEntry` and `sweepClocks` (`score/unanswered.ts`) give the tie to the faster Magnezone. Magnezone moves first, but the tick comes at the end of the turn, after Lando's Earthquake, so Lando still acts and wins the pair.
+**Idea.** On the turn card the paragraph sits closed under a one-line toggle with an arrow, a button that carries `aria-expanded`; a click or the keyboard opens it. The card's header, the parts line and the side rows stay as they are. Whether the game report's summary folds as well is a question for the round's gate.
 
-**Idea.** The first mover takes a finite tie only when its own expected hit finishes the foe; a knockout that needs the foe's end-of-turn damage leaves the foe its action.
+**Benefit.** App: the card shows the verdict and both sides at a glance, the reasoning one click away.
 
-**Benefit.** App: no "clears the rest" claim rests on end-of-turn damage.
+**Success.** A ui spec on the toggle (closed by default, `aria-expanded` follows a click); the e2e specs that read the paragraph open it first; nothing else on the card moves.
 
-**Success.** A sweep (`race-tie-residual.spec.ts`) over every residual status in every generation, the simulator as the judge; the t71 pair is one row; the batch check lists the reports that move. The same tie in `score/last-pair.ts` and `score/matchup.ts` (the score path) stays for a measured follow-up.
+**Singles and doubles.** Both (one card).
 
-**Singles and doubles.** Both (the profile serves both).
+### T295 · Doubles move selection without jumps
 
-### T284 · The biggest roll of a game, and its number on the chip
+*App · round 79 · small · lossless*
 
-*App and engine prose · round 79 · small · lossless for scores*
+**Approved for round 80 (user 30.10.2026: "selecting a move lets the moves jump which is not very intuitive (I think the Targeting text can be just removed probably as the target is selected anyway)").**
 
-**In round 79 (user gate 30.10.2026, "2a").**
+**Problem.** In the doubles picker the selected move's chip gains "Targeting P1A Delphox" (`src/components/branch/ChoiceButtons.tsx`), so the chip widens in the compact view and the row wraps: selecting Last Respects pushed Aqua Jet and Head Smash to the next row, selecting Wave Crash pushed Last Respects, Aqua Jet and Head Smash (the user's screenshots, Basculegion). The selection frame is an outline (`src/styles/pickers.css`) and takes no space.
 
-**Problem.** In 573756 turn 73 Garchomp's 95% Fire Fang missed against a 27% Corviknight: chance +0.269 for SOULWIND (+13%), the largest rolled chance of the game (the next +0.154). The key-moment chip prints the net swing (+0.103, "+5%", `src/components/EvalGameReport.tsx`) because Body Press read below the root in the same turn, and the report's denied-end sentence goes to turn 71.
+**Idea.** Drop the "Targeting ..." text; the chosen target's tile is highlighted already.
 
-**Idea.** The chip of a chance key moment prints both parts ("+13% from the roll (net +5%)"); the report names the largest rolled chance against the eventual winner (floor `CHANCE_THRESHOLD`, 0.2), with the move only where the log proves it: "The game's biggest roll came on turn 73: Fire Fang (95%) missed, worth +13% to SOULWIND." (the sentence approved at the gate).
+**Benefit.** App: the moves stay where they are while the user picks.
 
-**Benefit.** App: the game's decisive roll reads at its size.
+**Success.** An e2e spec reads the bounding boxes of the move chips before and after a selection and finds them unchanged; the two specs that read the text (`test/e2e/pickers.spec.ts`, `test/ui/components/branch/ChoiceButtons.spec.tsx`) follow the change.
 
-**Success.** 573756 names turn 73; the other corpus reports gain the sentence where such a roll exists (the design gate's fact check counts 7 more of the 12 round-78 dumps); no score, tier or key-moment selection changes.
-
-**Singles and doubles.** Both.
-
-### T285 · No highlights from a standoff
-
-*Engine report · round 79 · small · lossless for scores*
-
-**In round 79, after T287 (user gate 30.10.2026, "3c").**
-
-**Problem.** From turn 79 to 137 of 573756 nothing faints and nobody switches; p1's burned Toxapex cycles between 53% and 94% HP (161 to 285 of 303), p2's PP run out, and the report lifts turns 116 and 124 as "advantage shifted" and turn 131 as "read paid off".
-
-**Idea.** A run of at least 10 analyzed turns with a constant fainted share and no switch is a standoff; inside it shifts, chance and reads stay out of the key moments and the reads, mistakes stay, and one sentence names the standoff in game terms.
-
-**Benefit.** App: a long stall reads as one stall, not as a string of highlights.
-
-**Success.** Measured on the numbers after T287: no shift or read inside a standoff reaches the key moments or the reads (on the round-78 numbers 573756 would read key moments 68, 71 and 73), and the reports of games without a standoff stay byte-identical.
-
-**Singles and doubles.** Both; the doubles and VGC games of the corpus hold no 10-turn run without a faint, and `playedTracking` is on in every dump; the switch test reads the slot lists, since a doubles label can carry a switch after another action ("Protect + → X").
-
-### T286 · Plain words for "engine re-read"
-
-*App and engine prose · round 79 · small · lossless for scores*
-
-**In round 79 (user gate 30.10.2026, "4a").**
-
-**Problem.** The chip "engine re-read (no roll behind it)", the card row "from the engine's re-read" and the summary "the engine re-read the position for +113%" name a residual the engine cannot explain: the chance part of a swing with no roll in its direction (`turn-analysis/luck.ts`), which holds estimator gaps (T287), unpriced outcomes and replacements (T290), and the drift toward the winner. The report's total adds per-turn residuals past 100 points.
-
-**Idea.** Every chip, card row and prose line that carries the wording (eight source lines) says what the number is: "estimate moved (no roll behind it)", "−19% not explained by a roll", "the estimate moved −19% with no roll behind it"; the report's luck line names only what the rolls gave.
-
-**Benefit.** App: the words say what the number is.
-
-**Success.** No "re-read" in the UI or the prose; the 13 specs that quote the old words follow at the round's gate.
-
-**Singles and doubles.** Both.
-
-### T287 · The played pair priced like the roots
-
-*App · round 79 · medium · score-touching for the report (D3)*
-
-**In round 79 (user gate 30.10.2026, "3c").**
-
-**Problem.** From turn 69 of 573756 the sweep runs the tree and prices the played pair with a depth-1 sub-search (`src/lib/eval/worker-client.ts`, `playedOutcomeSettings`), while the roots before and after search depth 4 to 7. The gap lands in each turn's decision and chance parts: over the Toxapex stall (turns 94 to 136) decision +2.86 and chance −3.04 against a net −0.14; the mean absolute difference to the root's cell is 0.061 over 51 tree turns of 573756 (lane A's probe; other games differ more).
-
-**Idea.** Read the root's own cell of the played pair where it is a cell of the merged matrix; keep the sub-search only where the pair is missing.
-
-**Benefit.** App: decision and chance parts measure the same thing on tree turns as on matrix turns; fewer swings in long games read as chance.
-
-**Success.** The difference to the cell is 0 on tree turns as on matrix turns, except where the cell is unvisited; three byte-identical feedback runs; the tier census with `--moved` read at the gate; root scores and the bank unchanged (the bank does not read `playedOutcome`); the cache version moves once (v72 now), since stored tree turns hold the old value.
-
-**Singles and doubles.** Both.
-
-### T288 · A stage that takes away the foe's win counts
-
-*Engine · round 79 · medium · score-touching (D3)*
-
-**In round 79 (user gate 30.10.2026, "5a").**
-
-**Problem.** In the GPL replay (`test/e2e/fixtures/gpl-replay-DzBQ5azlO5l.html`) turn 27 Clefable at 71% faces a sleeping Rhydon (Rest, Sleep Talk with Earthquake and Avalanche). With +1 Def and +1 SpD Rhydon's clock goes from 2 turns to never, yet the static scores the stage at 0: a defensive stage bites only when the holder also wins within `BITE_TURNS` (3), and Clefable needs 14 (`holderWins` and `stageBites` in `score/boost-race.ts`; `frontGate` in `score/boost-bite.ts` then shuts the bench). Cosmic Power sits below Moonblast and Moonlight in all seven columns of the root (0.172 against 0.280 and 0.276), Bene's own click reads an inaccuracy (regret 0.108), and the engine's play-out clicks Cosmic Power once in 56 Clefable decisions and Moonlight 19 times, at up to 71% HP.
-
-**Idea.** A standing positive stage on a stat the foe's hits read also bites when without it the foe wins within the horizon, with it the foe's clock passes the horizon, and the holder acts with a finite clock of its own; the bench gate opens behind a front foe that cannot beat the holder with the stage standing. No weight changes.
-
-**Benefit.** Engine and app: defensive setup ranks with attacks and heals where the foe's threat disappears; the play-out sets up where the game does.
-
-**Success.** The pin of the user gate: at GPL turn 27 Cosmic Power reads no inaccuracy and ranks in the top two rows or within 0.05 of the best (at least +0.058 on its row of 0.172; lane B estimates +0.05 to +0.10); a sweep over every Dex move that raises Def or SpD against the simulator; golden 655336 unchanged; bank and holdouts without harm.
-
-**Singles and doubles.** Singles, VGC and Champions read `boostsBiting`; standard Doubles OU weighs it 0 and stays unchanged by construction.
-
-### T290 · The replacement after a knockout on the next card
-
-*App and engine API · round 79 · medium · feature, lossless (D4)*
-
-**In round 79 (user gate 30.10.2026, "7a").**
-
-**Problem.** In 573756 SOULWIND's Clefable falls at turn 71 and Magnezone comes in; the card of turn 72 shows the new board and says nothing about the pick. The tree prices a replacement as a decision node (`FORCED_SWITCH_NODES`, `mcts.ts`), the matrix and the pair path pick it greedily by the entry's static value (`forward/switches.ts`), no turn analysis carries it, the timeline has no step between turns, and the difference between the engine's greedy replacement and the played one lands in the previous turn's chance part.
-
-**Idea.** Like the lead card at turn 0: a root at the moment of the request, the played pick found in its list, a note on the card of the next turn ("Before turn 72: SOULWIND sent in Magnezone (x%). The engine would have sent Y (z%)."), in replay stepping and in the turn analysis, each replaced slot in doubles; nothing graded.
-
-**Benefit.** App: every replacement shows with the engine's pick, while stepping through a replay too.
-
-**Success.** Every replacement point of the fixture replays with a choice appears once with the played pick found in the engine's list, and every skipped point (a single candidate, a protocol mismatch) is counted; feedback byte-identical on the existing fields; the full sweep time, measured interleaved, reported at the gate. Replacement points per game: singles 7.3, Champions OU 6.7, Doubles OU 5.0, VGC 2.9; in tree mode a replacement root costs 70 to 76% of a turn root in singles and 29 to 39% in doubles (about +11% root time in singles, +15% in Doubles OU and +6% in VGC by those figures), in matrix mode 0.7 to 9%.
-
-**Singles and doubles.** Both, VGC and Champions.
+**Singles and doubles.** Doubles and VGC; singles has no target.
 
 ## Parked
 
@@ -386,6 +306,40 @@ The triage of 21.10.2026 and the user gates after it parked these TODOs; each se
 **Success.** A sweep over every Dex item with a residual, damage or stat effect against the simulator; a Knock Off scene pin; bank without harm.
 
 **Evidence.** `r79/lanes/B/plan.md` (B3).
+
+**Singles and doubles.** Both.
+
+### T291 · A sacrifice credit reads the turns that followed
+
+*Engine · round 79 · small to medium · rule, moves tiers*
+
+**Parked (final gate 30.10.2026 15:05, "5a").** Trigger: a sacrifice credit in a pinned replay that the game refutes.
+
+**Problem.** In smogtours-gen9doublesou-912045 turn 1 both of p2's leads attack at full HP and fall to Gholdengo's Make It Rain, and since T287 the census credits p2 with a sacrifice (the inaccuracy of 0.174 drops, marked [sacrifice]). The payoff window of the stayed feed (`stayedFeedPayoff`, `packages/eval-engine/src/turn-analysis/sack-gates.ts`) counts turn 2 at its expected pair value (the root's cell, 0.156 for p1; the window's `futureOutcomes` come from `graph.playedOutcome`, `src/lib/analysis-context.ts`) although the search read turn 2's result at 0.784 for p1. The user's screenshot of gen9championsvgc2026regmc-2695803506 turn 1 shows a similar credit ("learningthegame234 fed Sneasler (100% HP) ... verified as a win-condition sacrifice"); whether it has the same cause is open.
+
+**Idea.** The window that repays a sacrifice reads each following turn at the score the search found after it (`scoreAfter`), not at the cell of its played pair.
+
+**Benefit.** App: a lead that simply fell is not called a sacrifice.
+
+**Success.** A red test on the 912045 t1 shape (no credit); the credits of 653785 t19 (hazard sack), 573756 t68 (stayed feed) and 2663093831 t11 stay; two feedback runs byte-identical and the tier census read at the gate.
+
+**Evidence.** `r79/lanes/D/ledger.md` (step 3).
+
+**Singles and doubles.** Both; the scenes are doubles.
+
+### T293 · The first-mover tie on the score path
+
+*Engine · round 79 · small · score-touching (D3)*
+
+**Parked (final gate 30.10.2026 15:05, "7a").** Trigger: the next round that touches races or weights.
+
+**Problem.** T283 gave a finite race tie to the first mover only when its own hit finishes the foe, in the near-decided profile (`packages/eval-engine/src/score/unanswered.ts`). The same bare tie stands in the score path: `score/last-pair.ts` and `score/matchup.ts` (two places).
+
+**Idea.** The same rule there, in one module that all three readers import (AGENTS.md: one rule, one module).
+
+**Benefit.** Engine: the last-pair and matchup terms do not count end-of-turn damage as the winning blow.
+
+**Success.** A sweep spec that drives the last-pair and matchup readers over every residual status in every generation, the simulator as the judge; the bank and the holdouts without harm.
 
 **Singles and doubles.** Both.
 
