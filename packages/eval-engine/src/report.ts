@@ -3,6 +3,7 @@ import { type BiggestRoll, biggestRollFor, biggestRollSentence } from './biggest
 import { type DeniedEnd, deniedEndFor, deniedEndSentence } from './denied-end.ts';
 import { KEY_MOMENT_SWING, keyMomentsFor } from './key-moments.ts';
 import { regretSpanFor } from './prose/phrases.ts';
+import { inStandoff, type Standoff, standoffSentence, standoffsOf } from './standoff.ts';
 import { diceAnchorFor, luckSplit, type LuckSplit } from './turn-analysis/luck.ts';
 import { lostGround } from './turn-analysis/risk.ts';
 import {
@@ -216,10 +217,14 @@ function misplaysFor(known: TurnAnalysis[], side: Side): GameMisplay[] {
     .slice(0, REPORT_MISPLAYS_PER_SIDE);
 }
 
-/** Round 67 (T59): a read whose side lost ground on the turn stays off the list (its regret stays out of the totals). */
-function readsFor(known: TurnAnalysis[], side: Side): GameRead[] {
+/**
+ * Round 67 (T59): a read whose side lost ground on the turn stays off the list (its regret stays out of the totals).
+ * Round 79 (T285): so does a read inside a standoff, where the payoff is the HP and PP cycle of one position.
+ */
+function readsFor(known: TurnAnalysis[], side: Side, standoffs: readonly Standoff[]): GameRead[] {
   return known
-    .filter(analysis => analysis[side].riskPaidOff && analysis[side].played && !lostGround(analysis, side))
+    .filter(analysis => analysis[side].riskPaidOff && analysis[side].played && !lostGround(analysis, side) &&
+      !inStandoff(standoffs, analysis.turn))
     .map(analysis => ({
       turn: analysis.turn,
       side,
@@ -340,6 +345,7 @@ function reportSummary(
   luck: { chanceTotal: number; diceAnchor: number | null; split: LuckSplit | null },
   story: WinStory | null,
   series: (number | undefined)[],
+  standoffs: readonly Standoff[],
 ): string {
   const { chanceTotal, diceAnchor, split } = luck;
   const sentences: string[] = [];
@@ -348,6 +354,8 @@ function reportSummary(
   } else if (known.length > 0) {
     sentences.push('No winner recorded; the game may be unfinished.');
   }
+  // Round 79 (T285): the stretch the key moments and the reads skip is named once, in game terms.
+  if (standoffs.length > 0) sentences.push(standoffSentence(standoffs));
 
   if (!story?.path?.foldLuck && Math.abs(chanceTotal) >= LUCK_TOTAL_THRESHOLD) {
     sentences.push(luckSentence(chanceTotal, diceAnchor, playerNames, split));
@@ -380,10 +388,11 @@ export function buildGameReport(
   const series = scoreSeries(analyses);
   const boundary = winner ? favorBoundary(series, winner) : null;
   const resolution = resolutionTurns(known, boundary, winner);
-  const keyMoments = keyMomentsFor(known, resolution, winner, diceTurns);
+  const standoffs = standoffsOf(known);
+  const keyMoments = keyMomentsFor(known, resolution, winner, diceTurns, standoffs);
   const misplays = !playedTracking ? [] : [...misplaysFor(known, 'p1'), ...misplaysFor(known, 'p2')]
     .sort((a, b) => a.turn - b.turn || a.side.localeCompare(b.side));
-  const reads = !playedTracking ? [] : [...readsFor(known, 'p1'), ...readsFor(known, 'p2')]
+  const reads = !playedTracking ? [] : [...readsFor(known, 'p1', standoffs), ...readsFor(known, 'p2', standoffs)]
     .sort((a, b) => a.turn - b.turn || a.side.localeCompare(b.side));
   const { decisionTotals, chanceTotal, resolutionTotal } = gameTotals(known, resolution);
 
@@ -401,7 +410,7 @@ export function buildGameReport(
     known, series, boundary, playerNames, winner, turningPoint, playedTracking, chanceTotal, diceAnchor, chanceSplit, diceTurns,
   });
   const summary = reportSummary(known, playerNames, winner, turningPoint, playedTracking, decisionTotals,
-    { chanceTotal, diceAnchor, split: chanceSplit }, story, series);
+    { chanceTotal, diceAnchor, split: chanceSplit }, story, series, standoffs);
 
   return {
     winner, turningPoint, keyMoments, misplays, reads, tracked: playedTracking,
