@@ -107,6 +107,9 @@ export function removesStages(format: string, moveId: string, benched: boolean):
 const stagedStats = (mine: Pokemon): (keyof BoostsTable)[] =>
   (Object.keys(mine.boosts) as (keyof BoostsTable)[]).filter(stat => mine.boosts[stat]);
 
+/** The stats the foe's hits read of the holder (round 79, T288): a shield is a Defense or Special Defense stage, whose damage reduction the race prices. */
+const shieldStat = (stat: keyof BoostsTable): boolean => stat === 'def' || stat === 'spd';
+
 /**
  * Whether the stage of one stat bites the foe of this pair: the foe leaves it standing and it moves the race (accuracy
  * and evasion bite by the stage the foe leaves them). Round 79 (T288): a positive stage also bites when it takes the foe's
@@ -117,7 +120,7 @@ function statBites(pair: PairRace, stat: keyof BoostsTable, drop: boolean): bool
   if (!stages.mineHitting[stat] && !stages.mineDefending[stat]) return false;
   if (stat === 'accuracy' || stat === 'evasion') return true;
   const without = pair.without(stat);
-  return stageBites(pair.held, without, drop, pair.full) || stageShields(pair.held, without, drop, pair.full);
+  return stageBites(pair.held, without, drop, pair.full) || (shieldStat(stat) && stageShields(pair.held, without, drop, pair.full));
 }
 
 /** What the foes on the field leave of a holder's stages: boosts at all, and any stage for the foes off the field. */
@@ -155,7 +158,7 @@ function holderBites(
     }
     return race;
   };
-  const shielded = (pair: PairRace) => stats.some(stat => mine.boosts[stat] > 0 && stageShields(pair.held, pair.without(stat), false, pair.full));
+  const shielded = (pair: PairRace) => stats.some(stat => shieldStat(stat) && mine.boosts[stat] > 0 && stageShields(pair.held, pair.without(stat), false, pair.full));
   const gate = frontGate(foes.filter(foe => foe.isActive), removers, raceWith, shielded);
   let value = 0;
   for (const foe of foes) {
