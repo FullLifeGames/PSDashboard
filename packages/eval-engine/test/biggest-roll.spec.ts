@@ -9,6 +9,8 @@ import type { KoOddsInfo, RankedChoice } from '../src/types';
  * net +5 %. The roll is the largest |chanceDelta| on a turn whose roll went in the chance's direction, toward the loser,
  * at least CHANCE_THRESHOLD (0.2). The move is named only when the winner's played move provably carried the roll: a sure
  * kill behind an accuracy under 1. Singles and doubles read the same turns; a doubles pair names no move.
+ * User gate 30.10.2026 ("2a"): the sentence speaks only where the log names the event; a biggest roll whose move is not
+ * proven says nothing, since "the game's biggest roll" with no event behind it told the reader nothing.
  */
 
 const names: [string, string] = ['Alpha', 'Beta'];
@@ -42,23 +44,29 @@ describe('the game\'s biggest roll against the winner (T284)', () => {
     expect(report.summary).toContain("The game's biggest roll came on turn 3: Fire Fang (95%) missed, worth +14% to Alpha.");
   });
 
-  test('a roll whose move is not proven keeps the plain sentence', () => {
+  test('a roll whose move is not proven says nothing', () => {
     const report = buildGameReport(game({ chanceDelta: 0.27, rolledFor: forP1 }), names, 'p2', true, new Set([3]));
-    expect(report.summary).toContain("The game's biggest roll came on turn 3, worth +14% to Alpha.");
-    expect(report.summary).not.toContain('missed');
+    expect(report.summary).not.toContain('biggest roll');
   });
 
-  test('doubles: a pair of clicks names no move', () => {
+  test('doubles: a pair of clicks names no move, so the report says nothing', () => {
     const pair = sideOf({ played: choice('Fire Fang→Rillaboom + Protect', { accuracy: 0.95, killFraction: 1, label: 'Fire Fang→Rillaboom' }) });
     const report = buildGameReport(game({ chanceDelta: 0.27, rolledFor: forP1, p2: pair }), names, 'p2', false, new Set([3]));
-    expect(report.summary).toContain("The game's biggest roll came on turn 3, worth +14% to Alpha.");
+    expect(report.summary).not.toContain('biggest roll');
   });
 
   test('the largest roll wins among several', () => {
-    const report = buildGameReport(game({ chanceDelta: 0.3, rolledFor: forP1 }, [
-      mk(5, -0.8, -1, { chanceDelta: 0.22, rolledFor: forP1 }),
+    const report = buildGameReport(game({ chanceDelta: 0.3, rolledFor: forP1, p2: fireFang }, [
+      mk(5, -0.8, -1, { chanceDelta: 0.22, rolledFor: forP1, p2: fireFang }),
     ]), names, 'p2', true, new Set([3, 5]));
-    expect(report.summary).toContain("biggest roll came on turn 3, worth +15% to Alpha");
+    expect(report.summary).toContain("biggest roll came on turn 3: Fire Fang (95%) missed, worth +15% to Alpha");
+  });
+
+  test('a proven smaller roll does not stand in for an unproven biggest one', () => {
+    const report = buildGameReport(game({ chanceDelta: 0.3, rolledFor: forP1 }, [
+      mk(5, -0.8, -1, { chanceDelta: 0.22, rolledFor: forP1, p2: fireFang }),
+    ]), names, 'p2', true, new Set([3, 5]));
+    expect(report.summary).not.toContain('biggest roll');
   });
 
   test('no sentence under the mistake floor, without a roll behind the chance, toward the winner, or without the turns\' rolls', () => {
