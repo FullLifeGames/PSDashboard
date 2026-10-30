@@ -327,7 +327,9 @@ export interface StoredEval {
 //      takes away the foe's win counts (T288), the near-decided stage and the clean-up read who acts (T282, T283), and
 //      the sweep prices the replacements after a knockout (T290). Stored decision and chance parts, tiers and the
 //      positions with a Defense or Special Defense stage read new values.
-const EVAL_ENGINE_CACHE_VERSION = 73;
+// v74 (round 80, small batch): the near-decided stage names the clicker, who clears the rest itself, and records its
+//      click (T292); stored near stages, the forced-win starts they name and the denied ends read new values.
+const EVAL_ENGINE_CACHE_VERSION = 74;
 
 /** Round 61: a search-budget form stores under its own tag; the default keeps today's keys. */
 const versionTag = (): string => {
