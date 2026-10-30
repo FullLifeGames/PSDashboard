@@ -1,3 +1,4 @@
+import type { ReplacementPoint } from '@fulllifegames/eval-engine';
 import type { SpreadCandidate } from '@fulllifegames/replay-core';
 import { recordSimFastReport, simFastLevers } from '../eval/sim-fast-setting';
 import type {
@@ -15,6 +16,8 @@ export interface WorkerLike {
 export interface ReconstructHandlers {
   onProgress?(turn: number, target: number): void;
   onPosition?(turn: number, serialized: string): void;
+  /** Round 79 (T290): an open replacement request of a knockout, serialized as the player faced it. */
+  onReplacement?(point: ReplacementPoint, serialized: string): void;
 }
 
 interface Pending {
@@ -120,6 +123,8 @@ export class ReplayWorkerClient {
       active.handlers.onProgress?.(response.turn, response.target);
     } else if (response.type === 'replayPosition') {
       active.handlers.onPosition?.(response.turn, response.serialized);
+    } else if (response.type === 'replayReplacement') {
+      active.handlers.onReplacement?.(response.point, response.serialized);
     } else if (response.type === 'replayError') {
       this.settle(pending => pending.reject(new Error(response.message)));
     } else {
