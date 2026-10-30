@@ -51,15 +51,15 @@ test.describe('the replacement note', () => {
     const slider = page.locator('input[type="range"]');
 
     await slider.fill('6');
-    await expect(panel.locator('.ps-eval-analysis').first()).toContainText('Turn 6', { timeout: 15_000 });
+    await expect(panel.locator('.ps-eval-analysis')).toContainText('Turn 6', { timeout: 15_000 });
     await expect(panel.getByText(/^Before turn \d+$/)).toHaveCount(0);
 
     await slider.fill('7');
-    const note = panel.locator('.ps-eval-analysis', { hasText: 'Before turn 7' });
+    const note = panel.locator('.ps-eval-replacement', { hasText: 'Before turn 7' });
     await expect(note).toBeVisible({ timeout: 15_000 });
     await expect(note).toContainText(/(sent in Toxapex \(\d+%\)\.|had only Toxapex left\.)/);
-    // The note sits above the turn card, and the card keeps its own header. Nothing is graded.
-    await expect(panel.locator('.ps-eval-analysis').nth(1)).toContainText('Turn 7');
+    // The note sits above the turn card under its own class, and the card keeps its header. Nothing is graded.
+    await expect(panel.locator('.ps-eval-analysis')).toContainText('Turn 7');
     await expect(note).not.toContainText(/blunder|mistake|inaccuracy/i);
 
     // A reload serves the note from the stored sweep.
@@ -69,7 +69,7 @@ test.describe('the replacement note', () => {
     await expect(page.getByText(fixture('gen9ou-2658662321').players[0], { exact: true }).first()).toBeVisible({ timeout: 15_000 });
     await analyzeGame(page, 90_000);
     await page.locator('input[type="range"]').fill('7');
-    await expect(page.locator('.ps-main-right .ps-eval-panel .ps-eval-analysis', { hasText: 'Before turn 7' })).toContainText('Toxapex', { timeout: 15_000 });
+    await expect(page.locator('.ps-main-right .ps-eval-panel .ps-eval-replacement', { hasText: 'Before turn 7' })).toContainText('Toxapex', { timeout: 15_000 });
   });
 
   test('doubles: two replaced slots of one side read as one sentence with both Pokémon', async ({ page }) => {
@@ -77,7 +77,7 @@ test.describe('the replacement note', () => {
     await loadReplay(page, fixture('gen9doublesou-2694811367'));
     const panel = await analyzeGame(page);
     await page.locator('input[type="range"]').fill('3');
-    const note = panel.locator('.ps-eval-analysis', { hasText: 'Before turn 3' });
+    const note = panel.locator('.ps-eval-replacement', { hasText: 'Before turn 3' });
     await expect(note).toBeVisible({ timeout: 15_000 });
     await expect(note).toContainText(/Flamigo and Sylveon|Sylveon and Flamigo/);
     await expect(note).not.toContainText(/blunder|mistake|inaccuracy/i);

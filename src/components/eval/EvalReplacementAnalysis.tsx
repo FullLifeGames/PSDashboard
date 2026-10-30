@@ -42,7 +42,8 @@ export function EvalReplacementAnalysis({ turn, records, playerNames, faintedFra
   });
   if (lines.length === 0) return null;
   return (
-    <div className="ps-eval-analysis">
+    // Its own root class: `.ps-eval-analysis` names the turn's card, and a second match broke the panel's locators.
+    <div className="ps-eval-replacement">
       <div className="ps-eval-analysis-row">
         <span style={{ fontWeight: 'bold', fontSize: 11, color: '#cde' }}>Before turn {turn}</span>
         <span style={{ color: '#778' }}>the replacement after a knockout</span>

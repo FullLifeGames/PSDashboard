@@ -107,6 +107,7 @@ button.ps-eval-choice:hover,
   border-radius: 3px;
 }
 .ps-eval-analysis,
+.ps-eval-replacement,
 .ps-eval-report {
   margin-top: 6px;
   padding: 6px;
@@ -115,7 +116,8 @@ button.ps-eval-choice:hover,
   display: flex;
   flex-direction: column;
 }
-.ps-eval-analysis {
+.ps-eval-analysis,
+.ps-eval-replacement {
   gap: 3px;
   font-size: 11px;
 }
