@@ -8,7 +8,7 @@ import {
   expectedFraction, livingMons, singleMoveFraction, threatGetter, usableSlots,
   type MatchupCache, type PairThreat, type ThreatGetter,
 } from './threat.ts';
-import { healProfile, ppBudget, raceClocks, statusResidual, type HealProfile, type RaceSide } from './races.ts';
+import { healProfile, ppBudget, raceClocks, statusResidual, type HealProfile, type RaceClocks, type RaceSide } from './races.ts';
 
 /**
  * The root's unanswered-mon profile: mons no living enemy answers, the
@@ -67,6 +67,22 @@ function flinchChip(ctx: ProfileContext, standing: Pokemon, enemy: Pokemon): num
 }
 
 /**
+ * Round 79 (T283): does the first mover take a finite tie (both clocks equal)? Only when its own hit finishes the last
+ * turn. A KO that needs the foe's end-of-turn damage (burn, poison, Toxic) leaves the slower foe its action first: the tick
+ * comes after both moves. The foe's residual counts for the turns before the last, the first mover's own expected hit for
+ * the last. race-tie-residual.spec.ts plays each status against the simulator. A foe without a residual ties as before.
+ * The same tie in score/last-pair.ts and score/matchup.ts is not changed here (the score path).
+ */
+function firstTakesTie(sideA: RaceSide, sideB: RaceSide, clocks: RaceClocks, first: boolean): boolean {
+  if (!first || clocks.turnsA === Infinity) return false;
+  if (sideB.residual <= 0) return true;
+  const incoming = sideA.frac + sideB.residual;
+  const absorb = sideB.healRate > 0 && incoming > sideB.healRate ? sideB.healAbsorb * (sideB.healRate / incoming) : sideB.healAbsorb;
+  const earlier = (clocks.turnsA - 1) * (clocks.effFracA + sideB.residual);
+  return earlier + clocks.effFracA >= sideB.hp + absorb - 1e-9;
+}
+
+/**
  * Does the standing mon beat this enemy? Race verdict as the matchup term
  * weighs it; a benched enemy eats one free hit on the way in, a standing
  * one loses its first turn to the entry's flinch move.
@@ -78,10 +94,10 @@ function beatsEntry(ctx: ProfileContext, standing: Pokemon, enemy: Pokemon): boo
   const sideE = profileSide(ctx, enemy, threatE, standing);
   if (!enemy.isActive) sideE.hp = Math.max(0, sideE.hp - expectedRate(threatS, standing, enemy));
   else sideE.hp = Math.max(0, sideE.hp - flinchChip(ctx, standing, enemy));
-  const { turnsA, turnsB } = raceClocks(sideS, sideE);
-  if (turnsA < turnsB) return true;
-  if (turnsB < turnsA) return false;
-  return turnsA !== Infinity && movesFirst(standing, enemy, threatS, threatE, ctx.battle);
+  const clocks = raceClocks(sideS, sideE);
+  if (clocks.turnsA < clocks.turnsB) return true;
+  if (clocks.turnsB < clocks.turnsA) return false;
+  return firstTakesTie(sideS, sideE, clocks, movesFirst(standing, enemy, threatS, threatE, ctx.battle));
 }
 
 /** The side's open (no live answer) list and its switch-in-stage rows. */
@@ -113,13 +129,15 @@ function sweepClocks(ctx: ProfileContext, mon: Pokemon, theirs: Pokemon[]): { tu
     const threatS = ctx.threat(mon, enemy);
     const threatE = ctx.threat(enemy, mon);
     const first = movesFirst(mon, enemy, threatS, threatE, ctx.battle);
-    const clocks = raceClocks(profileSide(ctx, mon, threatS, enemy), profileSide(ctx, enemy, threatE, mon));
+    const sideS = profileSide(ctx, mon, threatS, enemy);
+    const sideE = profileSide(ctx, enemy, threatE, mon);
+    const clocks = raceClocks(sideS, sideE);
     // The sweeper must WIN every pair outright (the beatsEntry verdict,
     // sans entry toll — replacements arrive on a KO, not a switch): a
     // "survivor" that loses pairs but outlasts them on paper is an
     // artifact of the spare-turn economy, not a clean-up.
     const wins = clocks.turnsA < clocks.turnsB ||
-      (clocks.turnsA === clocks.turnsB && clocks.turnsA !== Infinity && first);
+      (clocks.turnsA === clocks.turnsB && firstTakesTie(sideS, sideE, clocks, first));
     if (!wins) return { turns, chip, blocked: true };
     const hits = Math.max(0, clocks.turnsA - (first ? 1 : 0));
     turns += clocks.turnsA;
