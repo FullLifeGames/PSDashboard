@@ -1,4 +1,4 @@
-import type { Battle, Pokemon } from '@pkmn/sim';
+import type { Battle, ID, Pokemon } from '@pkmn/sim';
 import { boundaryEvent } from '../ko-odds.ts';
 import { movesFirst } from '../speed.ts';
 import { stageMultiplier } from '../stat-stages.ts';
@@ -162,6 +162,21 @@ function sweepSurvivor(ctx: ProfileContext, mine: Pokemon[], theirs: Pokemon[]):
 }
 
 /**
+ * Round 79 (T282): does the foe's move act before mine? The move's priority decides first, then the effective speed
+ * (inverted under Trick Room); an exact speed tie is a coin flip in the simulator, so the foe may act first (the near
+ * stage fails closed). Dex priorities only: a priority a handler moves (Prankster, Gale Wings, Triage, Grassy Glide in
+ * Grassy Terrain) is not read. near-decided-acts.spec.ts plays every priority move against the simulator's queue.
+ */
+export function foeActsBefore(battle: Battle, foe: Pokemon, foeMoveId: string, mine: Pokemon, myMoveId: string): boolean {
+  const foePriority = battle.dex.moves.getByID(foeMoveId as ID).priority;
+  const myPriority = battle.dex.moves.getByID(myMoveId as ID).priority;
+  if (foePriority !== myPriority) return foePriority > myPriority;
+  // movesFirst owns the speed order (Trick Room inverts it) and calls an exact tie first for neither side.
+  const equalPriority = { priority: false };
+  return movesFirst(foe, mine, equalPriority, equalPriority, battle) || !movesFirst(mine, foe, equalPriority, equalPriority, battle);
+}
+
+/**
  * The near stage: no decided sweep stands, but one high-odds click
  * removes the standing active and the REST clears — the 573756 t73 shape
  * (a 95% Fire Fang from the sweep). Own active, own click — a teammate's
@@ -171,10 +186,15 @@ function nearDecidedFor(ctx: ProfileContext, key: 'p1' | 'p2', mine: Pokemon[], 
   const attacker = mine.find(mon => mon.isActive);
   const target = theirs.find(mon => mon.isActive);
   if (!attacker || !target) return undefined;
+  // Round 79 (T282): a click lands only if its user still acts. The foe's moves that act before the click can kill the
+  // attacker first; the click's odds are its kill chance times the chance the foe's best earlier kill does not come.
+  const foeKills = usableSlots(target).map(slot => ({ id: slot.id, pKill: boundaryEvent(ctx.battle, target, attacker, slot.id)?.pKill ?? 0 }));
   let odds = 0;
   for (const slot of usableSlots(attacker)) {
     const event = boundaryEvent(ctx.battle, attacker, target, slot.id);
-    if (event && event.pKill > odds) odds = event.pKill;
+    if (!event) continue;
+    const earlier = Math.max(0, ...foeKills.filter(kill => foeActsBefore(ctx.battle, target, kill.id, attacker, slot.id)).map(kill => kill.pKill));
+    odds = Math.max(odds, event.pKill * (1 - earlier));
   }
   if (odds < NEAR_DECIDED_ODDS) return undefined;
   const rest = theirs.filter(enemy => enemy !== target);
