@@ -11,7 +11,7 @@ PS Dashboard analyzes Pokémon Showdown replays: it replays a game turn by turn,
 - `packages/eval-engine` (`@fulllifegames/eval-engine`): static evaluation, MCTS trees, verify round, prover, report.
 - `test/regression/`: Node tests of the app and the calibration bank (`eval-calibration.spec.ts`, which also holds the ledger of every round); `test/ui/`: component and hook specs under jsdom; `test/e2e/` and `test/e2e-build/`: Playwright; `test/e2e-feedback/`: the feedback corpus with the expert pins (`corpus.ts`). Each package keeps its specs in its own `test/`.
 - Keep the three layers apart: ingestion and inference, deterministic reconstruction with `@pkmn/sim`, user interface.
-- Branches: work happens on `dev` (pushed to origin; it was `v1` until the release of 1.0.0, user 29.10.2026). Each round runs on its own branch from `dev`, deleted after the push. `master` moves only with the user's okay; it carries the release v1.0.1 (tag `v1.0.1`, 29.10.2026), and GitHub Pages builds from it. The production copy on fulllifegames.com, which the README calls the release, changes only through the local `deploy.ps1` (the releases of 1.0.0 and 1.0.1 ran it after the master push).
+- Branches: work happens on `dev` (pushed to origin; it was `v1` until the release of 1.0.0, user 29.10.2026). Each round runs on its own branch from `dev`, deleted after the push. `master` moves only with the user's okay; it carries the release v1.0.2 (tag `v1.0.2`, 30.10.2026), and GitHub Pages builds from it. The production copy on fulllifegames.com, which the README calls the release, changes only through the local `deploy.ps1` (the releases of 1.0.0 to 1.0.2 ran it after the master push).
 
 ## Working with the user
 
