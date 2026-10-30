@@ -142,13 +142,6 @@
 .ps-movebtn-pp { font-size: 9px; opacity: 0.75; }
 .ps-movebtn-dmg { font-size: 9px; margin-top: 2px; opacity: 0.9; }
 .ps-movebtn-ko { font-weight: bold; color: #ffe066; text-shadow: 0 0 4px rgba(255,200,0,0.5); }
-.ps-movebtn-target {
-  margin-top: 4px;
-  font-size: 10px;
-  font-weight: bold;
-  line-height: 1.2;
-  color: #fff7c7;
-}
 
 /* Basic view: small action chips instead of the 2x2 detail grid. */
 .ps-movegrid-compact {

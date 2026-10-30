@@ -60,7 +60,8 @@ describe('MoveBtn', () => {
     rerender(<MoveBtn move={move} targetDamage={{}} pendingChoice={{ kind: 'move', moveId: 'flareblitz', moveName: 'Flare Blitz', targetLoc: 2 }} onClick={onClick} />);
     expect(screen.getByTitle('Flare Blitz into Tornadus (100%)')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByTitle('Flare Blitz into Rillaboom (100%)')).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.getByText('Targeting P2B Tornadus')).toBeInTheDocument();
+    // The pressed tile names the target; the move button keeps its size (T295).
+    expect(screen.getByRole('button', { name: /^Flare Blitz/ })).not.toHaveTextContent('Tornadus');
   });
 
   test('disabled moves and targeted moves without a target cannot be clicked', () => {

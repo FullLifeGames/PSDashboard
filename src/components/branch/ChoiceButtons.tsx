@@ -57,7 +57,8 @@ function MoveDamage({ dmg, spreadDamage }: { dmg?: DamageResult; spreadDamage?: 
   );
 }
 
-function MoveBtnBody({ move, type, dmg, spreadDamage, zMoveName, wasPlayed, compact, selectedTarget }: {
+/** The button names no target: the pressed target tile does, so a pick never resizes the button (T295). */
+function MoveBtnBody({ move, type, dmg, spreadDamage, zMoveName, wasPlayed, compact }: {
   move: BranchMoveOption;
   type: string;
   dmg?: DamageResult;
@@ -65,7 +66,6 @@ function MoveBtnBody({ move, type, dmg, spreadDamage, zMoveName, wasPlayed, comp
   zMoveName?: string | null;
   wasPlayed?: boolean;
   compact?: boolean;
-  selectedTarget: BranchMoveOption['targetOptions'][number] | null | undefined;
 }) {
   const ppText = ppTextFor(move);
   return (
@@ -85,11 +85,6 @@ function MoveBtnBody({ move, type, dmg, spreadDamage, zMoveName, wasPlayed, comp
         </div>
       )}
       {!compact && <MoveDamage dmg={dmg} spreadDamage={spreadDamage} />}
-      {selectedTarget && (
-        <div className="ps-movebtn-target">
-          Targeting {selectedTarget.label} {selectedTarget.name}
-        </div>
-      )}
     </>
   );
 }
@@ -152,9 +147,6 @@ export function MoveBtn({ move, dmg, spreadDamage, zMoveName, targetDamage, pend
   const bg = typeBg(type);
   const pendingMove = pendingChoice?.kind === 'move' ? pendingChoice : null;
   const selected = pendingMove?.moveId === toId(move.name);
-  const selectedTarget = selected
-    ? move.targetOptions.find(target => target.targetLoc === pendingMove?.targetLoc)
-    : null;
   return (
     <div>
       <button
@@ -173,7 +165,6 @@ export function MoveBtn({ move, dmg, spreadDamage, zMoveName, targetDamage, pend
           zMoveName={zMoveName}
           wasPlayed={wasPlayed}
           compact={compact}
-          selectedTarget={selectedTarget}
         />
       </button>
       {move.targetOptions.length > 0 && (

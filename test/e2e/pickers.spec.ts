@@ -249,7 +249,46 @@ test.describe('PS Dashboard', () => {
 
     await charmanderTarget.click();
     await expect(charmanderTarget).toHaveClass(/ps-target-btn-selected/);
-    await expect(pikachuControls).toContainText('Targeting P2B Charmander');
     await expect(bulbasaurTarget).not.toHaveClass(/ps-target-btn-selected/);
+  });
+
+  test('picking a doubles move or target leaves every move button in place', async ({ page }) => {
+    await page.locator('input[type="text"]').fill('gen9doubles-test');
+    await page.locator('button', { hasText: 'Load' }).click();
+    await expect(page.getByText('Alice', { exact: true }).first()).toBeVisible({ timeout: 10000 });
+    await waitForExactPickers(page);
+
+    const pikachuControls = page.locator('.ps-side-controls').first();
+    const moves = pikachuControls.locator('.ps-movebtn');
+    // Measured from the side's own box: a click scrolls the page to its button.
+    const boxes = () => pikachuControls.evaluate(side => {
+      const origin = side.getBoundingClientRect();
+      return [...side.querySelectorAll('.ps-movebtn')].map(button => {
+        const { x, y, width, height } = button.getBoundingClientRect();
+        return { name: button.querySelector('.ps-movebtn-name')?.textContent, x: x - origin.x, y: y - origin.y, width, height };
+      });
+    });
+    // The hover lift moves a button by a pixel: measure with the mouse away.
+    const settledBoxes = async () => {
+      await page.mouse.move(0, 0);
+      return boxes();
+    };
+
+    for (const view of ['Basic', 'Advanced']) {
+      if (view === 'Advanced') await page.locator('button', { hasText: 'Advanced' }).click();
+      await expect(pikachuControls.locator('.ps-target-btn').first()).toBeVisible({ timeout: 5000 });
+      const before = await settledBoxes();
+      expect(before.length, `${view}: Pikachu's moves`).toBeGreaterThan(1);
+
+      // The user's scene: a click on the move itself, then on a target tile.
+      await moves.first().click();
+      await expect(moves.first()).toHaveClass(/ps-movebtn-selected/);
+      await expect.poll(settledBoxes, { message: `${view}: after the move click`, timeout: 5000 }).toEqual(before);
+      const lastTarget = pikachuControls.locator('.ps-target-btn').last();
+      await lastTarget.click();
+      await expect(lastTarget).toHaveClass(/ps-target-btn-selected/);
+      await expect.poll(settledBoxes, { message: `${view}: after the target click`, timeout: 5000 }).toEqual(before);
+    }
+    await expect(pikachuControls).not.toContainText('Targeting');
   });
 });
