@@ -323,7 +323,11 @@ export interface StoredEval {
 // v72 (round 78, @pkmn 0.10.12): the simulator of Showdown b354a81f (Pursuit, recoil, Emergency Exit, the Gen 3 and 4
 //      entry, the faint order, Champions Regulation M-C), a corrected Gen 1 to 4 entry plays it, and a calculator body
 //      takes the Dex values where the calculator's differ. Positions of every format may read new values.
-const EVAL_ENGINE_CACHE_VERSION = 72;
+// v73 (round 79, wave 7): a tree turn prices its played pair with the root's own cell (T287), a defensive stage that
+//      takes away the foe's win counts (T288), the near-decided stage and the clean-up read who acts (T282, T283), and
+//      the sweep prices the replacements after a knockout (T290). Stored decision and chance parts, tiers and the
+//      positions with a Defense or Special Defense stage read new values.
+const EVAL_ENGINE_CACHE_VERSION = 73;
 
 /** Round 61: a search-budget form stores under its own tag; the default keeps today's keys. */
 const versionTag = (): string => {
