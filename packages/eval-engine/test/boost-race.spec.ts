@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { BITE_TURNS, foeWins, holderActs, stageBites, type Race } from '../src/score/boost-race';
+import { BITE_TURNS, foeWins, holderActs, holderHolds, stageBites, stageShields, type Race } from '../src/score/boost-race';
 
 /**
  * 13.10.2026 (the Swords Dance report on gen9draft-2058494320, cause 2): the rule that says whether a standing stage
@@ -100,5 +100,39 @@ describe('the gates read the race from the foe in front', () => {
     expect(holderActs(race({ first: true, mineSurvives: false }))).toBe(true);
     expect(holderActs(race({ first: false, mineSurvives: true }))).toBe(true);
     expect(holderActs(race({ first: false, mineSurvives: false }))).toBe(false);
+  });
+});
+
+describe('a stage that takes away the foe\'s win counts although the holder wins nothing itself (T288, round 79)', () => {
+  // Clefable behind +1/+1 against a Rhydon: the foe's clock goes from two turns to never, the holder needs fourteen.
+  const without = race({ turnsMine: 3, turnsFoe: 2, first: true });
+  const held = race({ turnsMine: 14, turnsFoe: Infinity, first: true });
+  const full = race({ turnsMine: 16, turnsFoe: Infinity, first: true });
+
+  test.each([
+    ['the foe\'s clock goes from 2 turns to never, the holder\'s own is 14', held, without, full, true],
+    ['the foe\'s clock goes from 2 turns to 20 and the holder needs 14: the holder wins the long race', race({ turnsMine: 14, turnsFoe: 20, first: true }), without, race({ turnsMine: 14, turnsFoe: 20, first: true }), true],
+    ['the foe\'s clock goes from 2 turns to 5, the holder needs 14: the foe still wins the stall war', race({ turnsMine: 14, turnsFoe: 5, first: true }), without, race({ turnsMine: 14, turnsFoe: 5, first: true }), false],
+    ['the foe\'s clock goes from 2 to 3: still inside the horizon', race({ turnsMine: 14, turnsFoe: 3, first: true }), without, race({ turnsMine: 14, turnsFoe: 3, first: true }), false],
+    ['the holder\'s own clock is Infinity (no hit that lands, no PP): nothing to act with', race({ turnsFoe: Infinity, first: true }), without, race({ turnsFoe: Infinity, first: true }), false],
+    ['the foe did not win the race without the stage (a clock of 6): the stage took nothing away', held, race({ turnsMine: 3, turnsFoe: 6, first: true }), full, false],
+    ['the foe never won the fresh race (an Infinity clock without the stage as well)', held, race({ turnsMine: 3, turnsFoe: Infinity, first: true }), full, false],
+    ['the holder won the fresh race without the stage anyway (one hit)', held, race({ turnsMine: 1, turnsFoe: 2, first: true }), full, false],
+    ['an offensive stage: the foe\'s clock is the same with and without it', race({ turnsMine: 14, turnsFoe: 2, first: true }), without, race({ turnsMine: 14, turnsFoe: 2, first: true }), false],
+    ['the holder never acts: the foe moves first and KOs it', race({ turnsMine: 14, turnsFoe: Infinity, mineSurvives: false }), without, full, false],
+  ])('%s', (_name, heldRace, withoutRace, fullRace, expected) => {
+    expect(stageShields(heldRace, withoutRace, false, fullRace)).toBe(expected);
+  });
+
+  test('a drop is the foe\'s stage: it shields nobody', () => {
+    expect(stageShields(held, without, true, full)).toBe(false);
+  });
+
+  test('the holder holds the front when it acts, has a clock of its own and the foe cannot win within the horizon or at all', () => {
+    expect(holderHolds(held)).toBe(true);
+    expect(holderHolds(race({ turnsMine: 14, turnsFoe: 5 }))).toBe(false);
+    expect(holderHolds(race({ turnsMine: 14, turnsFoe: 20, first: true }))).toBe(true);
+    expect(holderHolds(race({ turnsFoe: Infinity }))).toBe(false);
+    expect(holderHolds(race({ turnsMine: 14, turnsFoe: Infinity, mineSurvives: false }))).toBe(false);
   });
 });

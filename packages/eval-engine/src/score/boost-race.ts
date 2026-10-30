@@ -333,3 +333,26 @@ export function stageBites(held: Race, without: Race, drop: boolean, full: Race 
   const [fresh, before] = [frameOf(full, helped), frameOf(without, helped)];
   return fresh.own < before.own || fresh.other > before.other || (fresh.first && !before.first);
 }
+
+/**
+ * Round 79 (T288): whether the holder holds the front against the foe on the stages standing: it gets to act, it has a
+ * finite clock of its own (the PP budget and the foe's heals are in it), and the foe wins neither within the race horizon
+ * nor the long race. The holder need not win within BITE_TURNS: a wall that out-heals the foe's hits holds the front
+ * whatever its own clock (Clefable behind +1/+1 needs fourteen turns against a resting Rhydon and is never KOed).
+ */
+export const holderHolds = (race: Race): boolean =>
+  holderActs(race) && race.turnsMine < Infinity && race.turnsFoe > BITE_TURNS && !foeWins(race);
+
+/**
+ * Round 79 (T288), besides `stageBites`: whether a standing positive stage takes away the foe's win. Without the stage
+ * the foe wins the fresh race within the horizon (`without`, at full HP); with it the foe's clock passes the horizon and
+ * the foe does not win the long race either (`full`, at full HP); and the holder holds the front at the HP it has (`held`,
+ * which gates: it acts and has a clock of its own). The offensive horizon stays: a stage that leaves the foe's clock
+ * alone (an attacking stage) never shields. A drop is the foe's stage and shields nobody.
+ */
+export function stageShields(held: Race, without: Race, drop: boolean, full: Race = held): boolean {
+  if (drop || !holderHolds(held)) return false;
+  const before = frameOf(without, 'foe');
+  const fresh = frameOf(full, 'foe');
+  return wins(before) && before.own <= BITE_TURNS && fresh.own > BITE_TURNS && !wins(fresh);
+}

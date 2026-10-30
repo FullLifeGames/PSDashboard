@@ -4,7 +4,7 @@ import { twinBattle } from '../sim-ask/index.ts';
 import { EVAL_WEIGHTS } from './weights.ts';
 import { livingMons, livingOf, usableSlots } from './threat.ts';
 import {
-  BITE_TURNS, foeWins, holderActs, holderWins, idleHolders, pairRace, raceBodies, stageBites, type Bodies, type PairRace, type ThreatOf,
+  BITE_TURNS, foeWins, holderActs, holderWins, idleHolders, pairRace, raceBodies, stageBites, stageShields, type Bodies, type PairRace, type ThreatOf,
 } from './boost-race.ts';
 import { residualReader, type Residuals } from './residuals.ts';
 import { hitReader, type HitReader } from './contact.ts';
@@ -107,23 +107,35 @@ export function removesStages(format: string, moveId: string, benched: boolean):
 const stagedStats = (mine: Pokemon): (keyof BoostsTable)[] =>
   (Object.keys(mine.boosts) as (keyof BoostsTable)[]).filter(stat => mine.boosts[stat]);
 
-/** Whether the stage of one stat bites the foe of this pair: the foe leaves it standing and it moves the race (accuracy and evasion bite by the stage the foe leaves them). */
+/**
+ * Whether the stage of one stat bites the foe of this pair: the foe leaves it standing and it moves the race (accuracy
+ * and evasion bite by the stage the foe leaves them). Round 79 (T288): a positive stage also bites when it takes the foe's
+ * win away, whatever the holder's own clock (stageShields, score/boost-race.ts).
+ */
 function statBites(pair: PairRace, stat: keyof BoostsTable, drop: boolean): boolean {
   const { stages } = pair;
   if (!stages.mineHitting[stat] && !stages.mineDefending[stat]) return false;
   if (stat === 'accuracy' || stat === 'evasion') return true;
-  return stageBites(pair.held, pair.without(stat), drop, pair.full);
+  const without = pair.without(stat);
+  return stageBites(pair.held, without, drop, pair.full) || stageShields(pair.held, without, drop, pair.full);
 }
 
 /** What the foes on the field leave of a holder's stages: boosts at all, and any stage for the foes off the field. */
 interface Gate { boosts: boolean; bench: boolean }
 
-function frontGate(front: Pokemon[], removers: ReadonlySet<Pokemon>, raceWith: (foe: Pokemon) => PairRace): Gate {
+/**
+ * Round 79 (T288): the bench opens behind a front foe the holder wins within the horizon, and behind one that a standing
+ * stage of the holder takes the win from (`shielded`: the holder holds the front with the stage standing, the foe wins
+ * the race without it).
+ */
+function frontGate(front: Pokemon[], removers: ReadonlySet<Pokemon>, raceWith: (foe: Pokemon) => PairRace, shielded: (pair: PairRace) => boolean): Gate {
   const gate: Gate = { boosts: true, bench: true };
   for (const foe of front) {
-    const { held } = raceWith(foe);
+    const pair = raceWith(foe);
+    const { held } = pair;
     if (removers.has(foe) || !holderActs(held)) gate.boosts = false;
-    if (!holderWins(held) || (foeWins(held) && held.turnsFoe <= BITE_TURNS)) gate.bench = false;
+    const won = holderWins(held) && !(foeWins(held) && held.turnsFoe <= BITE_TURNS);
+    if (!won && !shielded(pair)) gate.bench = false;
   }
   return gate;
 }
@@ -143,7 +155,8 @@ function holderBites(
     }
     return race;
   };
-  const gate = frontGate(foes.filter(foe => foe.isActive), removers, raceWith);
+  const shielded = (pair: PairRace) => stats.some(stat => mine.boosts[stat] > 0 && stageShields(pair.held, pair.without(stat), false, pair.full));
+  const gate = frontGate(foes.filter(foe => foe.isActive), removers, raceWith, shielded);
   let value = 0;
   for (const foe of foes) {
     if (removers.has(foe) || (!foe.isActive && !gate.bench)) continue;
