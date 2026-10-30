@@ -1,7 +1,7 @@
 import { describe, expect, onTestFinished, test, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { logRules } from '@fulllifegames/replay-core';
-import { configureSearchBudget, parsePlayedActions, parseSearchBudget, type EvalResult } from '@fulllifegames/eval-engine';
+import { configureSearchBudget, parsePlayedActions, parseSearchBudget, replacementRounds, type EvalResult } from '@fulllifegames/eval-engine';
 import { useEvalView, type EvalViewInputs } from '../../../src/hooks/useEvalView';
 import type { useEvaluation } from '../../../src/hooks/useEvaluation';
 import type { TeamBuildSources } from '../../../src/lib/eval-acquire';
@@ -130,9 +130,14 @@ describe('useEvalView', () => {
     expect(sweep.turns).toBe(6);
     expect(sweep.from).toBeUndefined();
     expect(sweep.cacheKeyFor(3)).toBe(`${replayData.id}:3:fp1`);
+    // Round 79 (T290): the full sweep carries the protocol's replacement rounds and their own cache keys; a single turn's analysis does not.
+    const withRounds = sweep as typeof sweep & { replacementRounds: unknown; replacementKeyFor: (turn: number, ordinal: number) => string };
+    expect(withRounds.replacementRounds).toEqual(replacementRounds(replayData.log));
+    expect(withRounds.replacementKeyFor(3, 1)).toBe(`${replayData.id}:3r1:fp1`);
 
     act(() => result.current.analyzeTurnNow(5));
     expect(spies.runGraphSweep.mock.calls[1][0]).toMatchObject({ from: 5, to: 6 });
+    expect(spies.runGraphSweep.mock.calls[1][0]).not.toHaveProperty('replacementRounds');
     act(() => result.current.analyzeTurnNow(6));
     expect(spies.runGraphSweep.mock.calls[2][0]).toMatchObject({ from: 6, to: 6 });
   });

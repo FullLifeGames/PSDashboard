@@ -27,7 +27,7 @@ export {
 export type {
   BranchChoiceErrorLog, BranchExecuteResult, BranchFieldState, BranchMoveOption, BranchRuntime, BranchSimState,
   BranchSlotModifiers, BranchSwitchOption, BranchTargetOption, PokemonStatTable, SimPokemonInfo,
-  ResolvedSideCommand, ReconstructParams, AdoptParams,
+  ResolvedSideCommand, ReconstructParams, ReplacementPoint, AdoptParams,
 } from './branch-engine.ts';
 export type { BranchChoices } from './branch/types.ts';
 export { hiddenPowerFacts, sightedHp, sightedHpAt, snapshotSimFacts, speciesAfterTeraClick } from './branch/pokemon-info.ts';
@@ -54,6 +54,10 @@ export { summarizeAlignment } from './hax-alignment.ts';
 export type { AlignmentScore, TurnAlignmentRecord, AlignmentSummary } from './hax-alignment.ts';
 export { analyzeLeads } from './leads.ts';
 export type { LeadSideAnalysis, LeadAnalysis, LeadEvalData } from './leads.ts';
+export { replacementRounds } from './replacement-rounds.ts';
+export type { ReplacementRound } from './replacement-rounds.ts';
+export { analyzeReplacements, matchReplacementOption, replacementSpeciesOf } from './replacements.ts';
+export type { ReplacementEvalData, ReplacementAnalysis, ReplacementSideAnalysis } from './replacements.ts';
 export { mergeMctsTrees, rowCompletedCells, starvedSupportCells } from './mcts-merge.ts';
 export { mctsSearch, mctsTreeSearch } from './mcts.ts';
 export type { MctsCallbacks } from './mcts.ts';

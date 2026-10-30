@@ -7,6 +7,7 @@ import type { EvalGraphState } from '../../hooks/useEvaluation';
 import { EvalGameReport } from '../EvalGameReport';
 import { EvalGraph } from '../EvalGraph';
 import { EvalLeadAnalysis, EvalTurnAnalysis } from '../EvalTurnAnalysis';
+import { EvalReplacementAnalysis } from './EvalReplacementAnalysis';
 import type { VariationSeries } from '../../lib/eval-graph-view';
 
 type SelectTurn = ((turn: number, line?: 'main' | 'variation') => void) | undefined;
@@ -73,6 +74,13 @@ function LineHint({ prefs, doubles }: { prefs: EvalPreferences; doubles?: boolea
   );
 }
 
+/** The replacement note of the card's turn: the points of the knockout block before it, when the sweep priced any. */
+function ReplacementNote({ analysis, graph, playerNames }: { analysis: TurnAnalysis; graph: EvalGraphState; playerNames: [string, string] }) {
+  const records = graph.replacements?.[analysis.turn - 1];
+  if (!records?.length) return null;
+  return <EvalReplacementAnalysis turn={analysis.turn} records={records} playerNames={playerNames} faintedFraction={analysis.faintedFraction} />;
+}
+
 interface TurnViewProps {
   report?: GameReport | null;
   onBackToReport: () => void;
@@ -116,6 +124,8 @@ function TurnView({ report, onBackToReport, result, currentTurn, graph, analyzeT
         <div style={{ marginTop: 4 }}>{analyzeTurn}</div>
       )}
       {leadAnalysis && <EvalLeadAnalysis leads={leadAnalysis} playerNames={playerNames} />}
+      {/* Round 79 (T290): the replacement after a knockout sits above the card of the turn that follows it. */}
+      {!leadAnalysis && analysis && <ReplacementNote analysis={analysis} graph={graph} playerNames={playerNames} />}
       {!leadAnalysis && analysis && <EvalTurnAnalysis analysis={analysis} playerNames={playerNames} reads={reads} onExplore={onPickChoice} />}
     </>
   );

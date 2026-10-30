@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import {
-  type TurnSensitivity, type TurnVerification, type LeadEvalData, type PlayedTurn, perfReport, perfReset,
+  type TurnSensitivity, type TurnVerification, type LeadEvalData, type ReplacementEvalData, type PlayedTurn, perfReport, perfReset,
   perfSpan, selectKeyTurns, type EvalPreferences, type EvalResult, type EvalSettings, teraKey,
 } from '@fulllifegames/eval-engine';
 import { EvalWorkerClient, type AppEvalSettings } from '../../lib/eval/worker-client';
@@ -9,31 +9,11 @@ import { resolveAutoLeadSettings, type TurnEvalSettings } from './prefs';
 import type { CachedEval } from './single-eval';
 import type { GraphSweepParams, SweepData, SweepEnv, SweepSettings } from './sweep-types';
 import { sweepTurns } from './sweep-core';
+import { evaluateReplacements } from './sweep-replacements';
+import { coverageNotice, makePositionSource } from './sweep-positions';
 
 export type { GraphSweepParams } from './sweep-types';
-
-/**
- * Why the game line is short, worded by shape. The counts describe the
- * RECONSTRUCTION pass — one fast replay of the game that hands out every
- * turn's position — which settles seconds after "Analyze game" while the
- * per-turn evaluations are still streaming, so the wording must not claim
- * analysis that has not happened yet. A missing FINAL turn alone is the
- * cascade's mildest form (the simulated line reaches the game's end one
- * turn early — the draft replay does this) and gets a calm story without
- * set-correction advice; anything else is genuine divergence.
- */
-export function coverageNotice(positions: (string | null)[]): string | null {
-  const total = positions.length;
-  const covered = positions.filter(Boolean).length;
-  if (total === 0 || covered === total) return null;
-  if (covered === 0) {
-    return 'The replay could not be reconstructed from the guessed sets: no turn has a live position to analyze. Correcting items/moves via Edit Player/Opp is the common fix.';
-  }
-  if (covered === total - 1 && positions[total - 1] === null) {
-    return "The simulated replay reached the game's end one turn early, so the real game's final turn has no live position to analyze; the rest of the line is unaffected.";
-  }
-  return `The reconstruction diverged from the real game: ${covered} of ${total} turns could be reconstructed for analysis. Correcting items/moves via Edit Player/Opp is the common fix.`;
-}
+export { coverageNotice };
 
 /**
  * The ⚠ line's second half: acquisition gaps keep coverageNotice's wording,
@@ -74,6 +54,11 @@ export interface EvalGraphState {
   /** Turn 0 (team preview) evaluation — null when unavailable or not swept. */
   lead: LeadEvalData | null;
   /**
+   * Round 79 (T290): the replacement points after a knockout, under the card of the turn that follows it (replacements[t - 1]
+   * holds what happened between turn t - 1 and turn t, in request order). Null = none or not priced; absent = no sweep ran.
+   */
+  replacements?: (ReplacementEvalData[] | null)[];
+  /**
    * Why the line is short, when it is: the single-pass acquisition only
    * reached part of the game (a diverging reconstruction). Silence here
    * used to leave the panel showing an unexplained empty graph.
@@ -89,10 +74,10 @@ export interface EvalGraphState {
 }
 
 /** The persisted-between-sweeps slice of the graph state (range sweeps merge into it). */
-export type GraphData = Pick<EvalGraphState, 'scores' | 'results' | 'settings' | 'faintedFractions' | 'played' | 'playedOutcome' | 'verified' | 'sensitivity' | 'evalErrors' | 'lead'>;
+export type GraphData = Pick<EvalGraphState, 'scores' | 'results' | 'settings' | 'faintedFractions' | 'played' | 'playedOutcome' | 'verified' | 'sensitivity' | 'evalErrors' | 'lead' | 'replacements'>;
 
 const emptyGraphState = (): EvalGraphState => ({
-  scores: [], results: [], settings: [], faintedFractions: [], played: [], playedOutcome: [], verified: [], sensitivity: [], evalErrors: [], lead: null,
+  scores: [], results: [], settings: [], faintedFractions: [], played: [], playedOutcome: [], verified: [], sensitivity: [], evalErrors: [], lead: null, replacements: [],
   notice: null, running: false, progress: null,
 });
 
@@ -118,74 +103,9 @@ function buildSweepData(params: GraphSweepParams, previous: GraphData | null): S
     sensitivity: carriedArray(keptSized(previous?.sensitivity), params.turns),
     evalErrors: carriedArray(keptSized(previous?.evalErrors), params.turns),
     lead: keepPrevious ? previous.lead : null,
+    replacements: carriedArray(keptSized(previous?.replacements), params.turns),
     notice: null,
   };
-}
-
-/**
- * Lazily-run single-pass acquisition, pipelined: positions stream out of
- * the ongoing reconstruction, so the first search starts after the first
- * captured turn instead of after the whole replay pass. Started at most
- * once; a failure fails every waiting turn instead of retrying.
- */
-function makePositionSource(params: GraphSweepParams, data: SweepData): (turn: number) => Promise<string> {
-  const arrived = new Map<number, string>();
-  const waiters = new Map<number, { resolve(serialized: string): void; reject(error: unknown): void }[]>();
-  let acquireStarted = false;
-  let acquireSettled = false;
-  let acquireError: unknown = null;
-  const settleWaiters = () => {
-    for (const [turn, list] of waiters) {
-      for (const waiter of list) {
-        const found = arrived.get(turn);
-        if (found) waiter.resolve(found);
-        else waiter.reject(acquireError ?? new Error(`No position captured for turn ${turn}.`));
-      }
-    }
-    waiters.clear();
-  };
-  const acquireDiagnostics: string[] = [];
-  const startAcquisition = () => {
-    if (acquireStarted) return;
-    acquireStarted = true;
-    params.acquireAll!(() => {}, (turn, serialized) => {
-      arrived.set(turn, serialized);
-      for (const waiter of waiters.get(turn) ?? []) waiter.resolve(serialized);
-      waiters.delete(turn);
-    }, message => acquireDiagnostics.push(message)).then(positions => {
-      positions.forEach((serialized, index) => {
-        if (serialized) arrived.set(index + 1, serialized);
-      });
-      // An unexplained short line is the worst outcome: the sweep leaves
-      // gaps for every turn the reconstruction never produced, and the
-      // panel used to show that as a blank graph with no reason given.
-      data.notice = coverageNotice(positions);
-      if (acquireDiagnostics.length > 0) {
-        const extra = acquireDiagnostics.join(' ');
-        data.notice = data.notice ? `${data.notice} ${extra}` : extra;
-      }
-    }).catch(error => {
-      acquireError = error;
-      data.notice = `The replay could not be reconstructed: ${error instanceof Error ? error.message : String(error)}`;
-    }).finally(() => {
-      acquireSettled = true;
-      settleWaiters();
-    });
-  };
-  return (turn: number): Promise<string> => perfSpan('position-wait', () => {
-    if (!params.acquireAll) return params.acquireFor(turn)(() => {});
-    const found = arrived.get(turn);
-    if (found) return Promise.resolve(found);
-    if (acquireSettled) {
-      return Promise.reject(acquireError ?? new Error(`No position captured for turn ${turn}.`));
-    }
-    startAcquisition();
-    return new Promise((resolve, reject) => {
-      const list = waiters.get(turn) ?? [];
-      list.push({ resolve, reject });
-      waiters.set(turn, list);
-    });
-  });
 }
 
 /** The lead evaluation's cache layers (memory, then the persisted store). */
@@ -262,6 +182,15 @@ async function evaluateLead(
   return true;
 }
 
+/** The stages after the turn passes: the lead, then the replacement points. false = aborted. */
+async function evaluateEnd(
+  env: SweepEnv,
+  sweep: { depth: EvalSettings['depth']; samples: EvalSettings['samples']; mode: EvalPreferences['mode'] },
+  paintFinal: (running: boolean) => void,
+): Promise<boolean> {
+  return (await evaluateLead(env, sweep, paintFinal)) && (await evaluateReplacements(env, paintFinal));
+}
+
 /**
  * One store read for the whole run: every persisted eval of this replay
  * (all turns, engines, fingerprints) instead of one read per turn. false
@@ -308,7 +237,7 @@ async function runSweep(env: SweepEnv, opts: {
     return;
   }
 
-  if (!(await evaluateLead(env, { depth, samples, mode }, paintFinal))) return;
+  if (!(await evaluateEnd(env, { depth, samples, mode }, paintFinal))) return;
 
   if (env.runRef.current === env.runId) {
     // The summary ⚠ line settles once, when the line is final.
@@ -370,7 +299,7 @@ export function useGraphSweepRunner(env: {
         scores: [...data.scores], results: [...data.results], settings: [...data.turnSettings],
         faintedFractions: [...data.faintedFractions], played: [...data.played],
         playedOutcome: [...data.playedOutcome], verified: [...data.verified], sensitivity: [...data.sensitivity],
-        evalErrors: [...data.evalErrors], lead: data.lead,
+        evalErrors: [...data.evalErrors], lead: data.lead, replacements: [...data.replacements],
         notice: data.notice,
       };
       graphDataRef.current = out;
@@ -397,7 +326,7 @@ export function useGraphSweepRunner(env: {
     const paintFinal = (running: boolean) => setGraph({ ...snapshot(), running, progress: null });
     const sweepEnv: SweepEnv = {
       params, runId, runRef, clientRef, cacheRef, configuredMode, data, paint,
-      positionFor: makePositionSource(params, data),
+      ...makePositionSource(params, data),
       prefetched: null,
     };
     void runSweep(sweepEnv, { from, to, depth, samples, mode, paintFinal });

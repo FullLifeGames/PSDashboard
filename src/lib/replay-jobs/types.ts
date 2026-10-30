@@ -3,7 +3,7 @@ import type {
   DamageObservation, OpponentTeamInfo, SmogonSetAssumptions, SmogonUsageStats, SpeedOrderObservation, SpreadCandidate,
   TurnSnapshot,
 } from '@fulllifegames/replay-core';
-import type { SimFastLever, SimFastReport, TurnAlignmentRecord } from '@fulllifegames/eval-engine';
+import type { ReplacementPoint, SimFastLever, SimFastReport, TurnAlignmentRecord } from '@fulllifegames/eval-engine';
 
 /**
  * The replay-side jobs the app hands to a worker (round 38): the spread
@@ -44,6 +44,8 @@ export interface ReconstructJob {
   mode: 'replay' | 'lead';
   leadOverride?: { p1: string[] | null; p2: string[] | null };
   deadlineMs?: number;
+  /** Round 79 (T290): hand out the open replacement requests of the knockouts too (the sweep asks; other jobs skip the cost). */
+  replacements?: boolean;
 }
 
 export interface ReconstructOutcome {
@@ -69,6 +71,7 @@ export type ReplayJobRequest = (
 export type ReplayJobResponse = (
   | { type: 'replayProgress'; id: number; turn: number; target: number }
   | { type: 'replayPosition'; id: number; turn: number; serialized: string }
+  | { type: 'replayReplacement'; id: number; point: ReplacementPoint; serialized: string }
   | { type: 'reconstructResult'; id: number; outcome: ReconstructOutcome }
   | { type: 'solveSpreadsResult'; id: number; entries: [string, SpreadCandidate][] }
   | { type: 'replayError'; id: number; message: string }

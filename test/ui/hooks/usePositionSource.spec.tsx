@@ -112,6 +112,26 @@ describe('usePositionSource', () => {
     expect(onDiagnostic).toHaveBeenCalledWith(expect.stringMatching(/ended at turn 2 although the real game continued/));
   }, 30_000);
 
+  // Round 79 (T290): only a sweep that asks gets the replacement requests, and they reach its callback with the point intact.
+  test('acquireAll asks the worker for the replacement requests only when it has a consumer, and hands them on', async () => {
+    const point = { turn: 1, ordinal: 0, forced: { p1: [0], p2: [] }, played: { p1: ['Toxapex'], p2: [] } };
+    const { client, requests } = fakeReplayWorkerClient((request): ReplayJobResponse[] => (request.type === 'reconstruct'
+      ? [
+        { type: 'replayPosition', id: request.id, turn: 1, serialized: 'pos-1' },
+        { type: 'replayReplacement', id: request.id, point, serialized: 'request-1' },
+        { type: 'reconstructResult', id: request.id, outcome: outcome({ serialized: 'pos-2', turn: 2 }) },
+      ]
+      : []));
+    const { result } = renderHook(() => usePositionSource(inputs(client)));
+    const asked: [unknown, string][] = [];
+    await result.current.acquireAll(2, vi.fn(), undefined, undefined, (received, serialized) => asked.push([received, serialized]));
+    expect(asked).toEqual([[point, 'request-1']]);
+    expect((requests.at(-1) as { job: { replacements?: boolean } }).job.replacements).toBe(true);
+
+    await result.current.acquireAll(2, vi.fn());
+    expect((requests.at(-1) as { job: { replacements?: boolean } }).job.replacements).toBeUndefined();
+  }, 30_000);
+
   test('acquireRuntime adopts a stored position as a live branch and stores a fresh worker result', async () => {
     const { p1Team, p2Team } = buildTeamsFromReplay(replayData.log, { observations });
     const format = getBranchSimulatorFormat(replayData);

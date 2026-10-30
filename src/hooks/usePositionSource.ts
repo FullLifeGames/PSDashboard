@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PokemonSet } from '@pkmn/sim';
 import { type DamageObservation, type ReplayData, type TurnSnapshot, getBranchSimulatorFormat } from '@fulllifegames/replay-core';
-import type { BranchRuntime, ReconstructParams, TurnAlignmentRecord } from '@fulllifegames/eval-engine';
+import type { BranchRuntime, ReconstructParams, ReplacementPoint, TurnAlignmentRecord } from '@fulllifegames/eval-engine';
 import { buildReplayTeams, type TeamBuildSources } from '../lib/eval-acquire';
 import { throttleLatest } from '../lib/eval/throttle-latest';
 import type { ReplayWorkerClient } from '../lib/replay-jobs/client';
@@ -92,6 +92,8 @@ interface ReconstructArgs {
   leadOverride?: ReconstructJob['leadOverride'];
   onProgress?: Report;
   onPosition?: (turn: number, serialized: string) => void;
+  /** Round 79 (T290): asks the worker for the open replacement requests of the knockouts too. */
+  onReplacement?: (point: ReplacementPoint, serialized: string) => void;
   signal?: AbortSignal;
 }
 
@@ -119,6 +121,7 @@ function useWorkerReconstruct(args: {
       bringOnly: run.bringOnly ?? null,
       leadOverride: run.leadOverride,
       mode: run.mode,
+      ...(run.onReplacement ? { replacements: true } : {}),
     };
     return replayWorker.reconstruct(job, {
       onProgress: run.onProgress,
@@ -126,6 +129,7 @@ function useWorkerReconstruct(args: {
         if (run.mode === 'replay') exact.storeExactPosition(turn, serialized);
         run.onPosition?.(turn, serialized);
       },
+      onReplacement: run.onReplacement,
     }, run.signal);
   }, [replayData, snapshots, observations, replayWorker, exact]);
 
@@ -185,6 +189,7 @@ function useMainLineAcquire(args: {
     report: Report,
     onPosition?: (turn: number, serialized: string) => void,
     onDiagnostic?: (message: string) => void,
+    onReplacement?: (point: ReplacementPoint, serialized: string) => void,
   ): Promise<(string | null)[]> => {
     setSweepAlignment(null);
     const teams = await buildTeams();
@@ -196,6 +201,7 @@ function useMainLineAcquire(args: {
         positions[turn - 1] = serialized;
         onPosition?.(turn, serialized);
       },
+      onReplacement,
     });
     setSweepAlignment(outcome.haxAlignment);
     const diagnostic = sweepDiagnostic(outcome, turns);

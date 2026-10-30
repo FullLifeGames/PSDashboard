@@ -44,6 +44,10 @@ describe('useEvalAcquire', () => {
     const onPosition = vi.fn();
     await result.current.makeSweepAcquireAll(6)(report, onPosition);
     expect(source.acquireAll).toHaveBeenCalledWith(6, report, onPosition, undefined);
+    // Round 79 (T290): the replacement callback rides along as the fifth argument, only when the sweep has one.
+    const onReplacement = vi.fn();
+    await result.current.makeSweepAcquireAll(6)(report, onPosition, undefined, onReplacement);
+    expect(source.acquireAll).toHaveBeenLastCalledWith(6, report, onPosition, undefined, onReplacement);
     expect(result.current.exactKeyFor(2)).toBe(`${replayData.id}:2:fp`);
   });
 

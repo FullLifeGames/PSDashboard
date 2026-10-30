@@ -79,6 +79,11 @@ type ProverBudget
 type RankedChoice
 type ReadRecommendation
 type ReconstructParams
+type ReplacementAnalysis
+type ReplacementEvalData
+type ReplacementPoint
+type ReplacementRound
+type ReplacementSideAnalysis
 type ResolvedSideCommand
 type RolledHit
 type SackInfo
@@ -134,6 +139,7 @@ value TIER_THRESHOLDS
 value adoptSerializedRuntime
 value allTurnEvents
 value analyzeLeads
+value analyzeReplacements
 value analyzeTurn
 value annotateNicknames
 value applyForcedWin
@@ -182,6 +188,7 @@ value loadSimMods
 value loadSimModsFor
 value lostGround
 value matchPlayedSide
+value matchReplacementOption
 value mctsSearch
 value mctsTreeSearch
 value mergeMctsTrees
@@ -209,6 +216,8 @@ value reconstructBranchRuntime
 value reconstructionReached
 value regretText
 value releaseBrokenClaims
+value replacementRounds
+value replacementSpeciesOf
 value requiredChoicesForActiveSlots
 value resolveSideChoices
 value resolveTeraPreference

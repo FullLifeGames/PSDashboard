@@ -1,7 +1,8 @@
 import {
   buildChoiceLockContext, reconstructBranchRuntime, reconstructionReached, serializeLiveBattle, validateBranchRuntime,
+  type ReconstructParams,
 } from '@fulllifegames/eval-engine';
-import { solveReplaySpreads } from '@fulllifegames/replay-core';
+import { solveReplaySpreads, type TurnSnapshot } from '@fulllifegames/replay-core';
 import { snapshotAt } from '../eval-acquire';
 import { loadReplayMods } from '../replay-mods';
 import { replaySolveOptions } from '../team-build-options';
@@ -35,6 +36,31 @@ export async function handleReplayJob(message: ReplayJobRequest, post: ReplayPos
   }
 }
 
+/** The boundaries (and, when the job asks, the open replacement requests) the replay hands out as messages. A broken one is a gap for the caller, never a failed job. */
+function capturePositionsFor(
+  job: ReconstructJob, id: number, post: ReplayPost, snapshotFor: (turn: number) => TurnSnapshot | null,
+): NonNullable<ReconstructParams['capturePositions']> {
+  return {
+    snapshotFor,
+    onPosition: (turn, battle) => {
+      try {
+        post({ type: 'replayPosition', id, turn, serialized: serializeLiveBattle(battle) });
+      } catch {
+        // A gap for the caller.
+      }
+    },
+    ...(job.replacements ? {
+      onReplacement: (point, battle) => {
+        try {
+          post({ type: 'replayReplacement', id, point, serialized: serializeLiveBattle(battle) });
+        } catch {
+          // A gap for the caller.
+        }
+      },
+    } : {}),
+  };
+}
+
 /** One reconstruction: the protocol replay (healed, locked, captured) or the fresh lead game. */
 async function reconstruct(job: ReconstructJob, id: number, post: ReplayPost): Promise<ReconstructOutcome> {
   const lead = job.mode === 'lead';
@@ -60,18 +86,7 @@ async function reconstruct(job: ReconstructJob, id: number, post: ReplayPost): P
     bringOnly: job.bringOnly ?? undefined,
     leadOverride: job.leadOverride,
     deadlineMs: job.deadlineMs,
-    ...(lead ? {} : {
-      capturePositions: {
-        snapshotFor,
-        onPosition: (turn, battle) => {
-          try {
-            post({ type: 'replayPosition', id, turn, serialized: serializeLiveBattle(battle) });
-          } catch {
-            // A broken boundary is a gap for the caller, never a failed job.
-          }
-        },
-      },
-    }),
+    ...(lead ? {} : { capturePositions: capturePositionsFor(job, id, post, snapshotFor) }),
   });
   const battle = runtime.battleStream.battle;
   let serialized: string | null = null;

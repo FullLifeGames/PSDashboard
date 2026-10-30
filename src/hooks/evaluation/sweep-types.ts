@@ -1,6 +1,6 @@
 import {
   matchPlayedSide, phantomStayIn, type TurnSensitivity, type TurnVerification, type SensitivityTarget,
-  type LeadEvalData, type PlayedTurn, type EvalPreferences, type EvalResult, type EvalSettings,
+  type LeadEvalData, type ReplacementEvalData, type ReplacementPoint, type ReplacementRound, type PlayedTurn, type EvalPreferences, type EvalResult, type EvalSettings,
   type RankedChoice, type StaticRuleset, type TeraAllowance,
 } from '@fulllifegames/eval-engine';
 import type { GameRules } from '@fulllifegames/replay-core';
@@ -62,6 +62,8 @@ export interface GraphSweepParams {
     report: (turn: number, target: number) => void,
     onPosition?: (turn: number, serialized: string) => void,
     onDiagnostic?: (message: string) => void,
+    /** Round 79 (T290): an open replacement request of a knockout, serialized as the player faced it. */
+    onReplacement?: (point: ReplacementPoint, serialized: string) => void,
   ): Promise<(string | null)[]>;
   /** What was actually played on this turn (parsed from the replay log). */
   playedFor(turn: number): PlayedTurn | null;
@@ -84,6 +86,12 @@ export interface GraphSweepParams {
    * store read per turn. Absent = single reads.
    */
   storePrefix?: string;
+  /**
+   * Round 79 (T290): the protocol's replacement request rounds (full-game sweeps only). The last stage prices each one at the
+   * position the capture hands out, under the key of replacementKeyFor.
+   */
+  replacementRounds?: ReplacementRound[];
+  replacementKeyFor?(turn: number, ordinal: number): string;
 }
 
 /** The sweep's working arrays plus the lead/notice slots — mutated in place, painted via snapshots. */
@@ -98,6 +106,8 @@ export interface SweepData {
   sensitivity: (TurnSensitivity | null)[];
   evalErrors: (string | null)[];
   lead: LeadEvalData | null;
+  /** Round 79 (T290): the replacement points of the knockout turn t at index t (the card of turn t + 1 reads index (t + 1) - 1). */
+  replacements: (ReplacementEvalData[] | null)[];
   notice: string | null;
 }
 
@@ -114,6 +124,8 @@ export interface SweepEnv {
   data: SweepData;
   paint(progress: { done: number; total: number } | null, force?: boolean): void;
   positionFor(turn: number): Promise<string>;
+  /** Round 79 (T290): the serialized open request of a replacement round, or null where the capture never reached it. */
+  replacementPositionFor?(turn: number, ordinal: number): Promise<string | null>;
   /** The store's evals for this replay, read once at run start (null = read unavailable, single reads instead). */
   prefetched: Map<string, StoredEval> | null;
 }

@@ -5,17 +5,17 @@ import { getMainChoice, parseTurnBlocks } from './protocol-choices.ts';
 import { faintedSlots, logGoesOn, shownBodyIds, type ProtocolBench } from './team-order.ts';
 import { alignArrivalDice, alignBlockSeed, type AlignedBlock } from './arrival-dice.ts';
 import {
-  buildForcedSwitchChoice, correctActivesFromProtocol, correctBattleFromSnapshot, hasForceSwitch,
+  buildForcedSwitchChoice, correctActivesFromProtocol, correctBattleFromSnapshot, forceSwitches, hasForceSwitch,
   refreshRequestsFromLiveState, repairStaleForcedSwitchRequest,
 } from './corrections.ts';
 import { replaceLogWithReplayPrefix, syncLogActivesFromBattle } from './log-sync.ts';
 import {
   advanceSimToTurn, commitRejectedChoicesWithDefaults, openSession, orderTeams, startBattle, stopRequested,
   waitForBattle, waitForLog, waitForLogIdle,
-  type ReconstructionSession, type ReconstructParams,
+  type ReconstructionSession, type ReconstructParams, type ReplacementPoint,
 } from './runtime-session.ts';
 
-export type { ReconstructParams } from './runtime-session.ts';
+export type { ReconstructParams, ReplacementPoint } from './runtime-session.ts';
 
 /**
  * Boundary capture: the battle sits at the start of turnBlock.turn —
@@ -71,6 +71,54 @@ async function commitMainChoices(session: ReconstructionSession, turnBeforeChoic
   }
 }
 
+/**
+ * Round 79 (T290): the open request as a replacement point. Null where it is no knockout (a pivot's or an ejected body's request
+ * is its own half-turn: it neither counts nor fires); 'gap' where it is one and the protocol does not agree with the simulator:
+ * a forced slot whose body fainted outside this block, or that the log sends no one into. A gap counts as a request (the ordinal
+ * stays the protocol's) and fires nothing, never a guessed point.
+ */
+function replacementPoint(
+  battle: SimBattle, turn: number, ordinal: number, blockLines: readonly string[],
+  forced: Record<'p1' | 'p2', string[]>, cursors: Record<'p1' | 'p2', number>,
+): ReplacementPoint | 'gap' | null {
+  const slots: ReplacementPoint['forced'] = { p1: [], p2: [] };
+  const played: ReplacementPoint['played'] = { p1: [], p2: [] };
+  let knockout = false;
+  let agrees = true;
+  for (const [index, side] of (['p1', 'p2'] as const).entries()) {
+    const fainted = faintedSlots(blockLines, side);
+    for (const [slot, needed] of forceSwitches(battle, index).entries()) {
+      if (!needed) continue;
+      const isKnockout = !!battle.sides[index].active[slot]?.fainted && fainted.has(slot);
+      knockout ||= isKnockout;
+      const species = forced[side][cursors[side] + slots[side].length];
+      if (!isKnockout || !species) agrees = false;
+      slots[side].push(slot);
+      played[side].push(species ?? '');
+    }
+  }
+  if (!knockout) return null;
+  return agrees ? { turn, ordinal, forced: slots, played } : 'gap';
+}
+
+/** Hands an open knockout request to the capture hook; true where the request counts as a point of the block (a gap counts too). */
+function offerReplacement(
+  session: ReconstructionSession, battle: SimBattle, turn: number, ordinal: number, blockLines: readonly string[],
+  forced: Record<'p1' | 'p2', string[]>, cursors: Record<'p1' | 'p2', number>,
+): boolean {
+  const onReplacement = session.params.capturePositions?.onReplacement;
+  if (!onReplacement) return false;
+  const point = replacementPoint(battle, turn, ordinal, blockLines, forced, cursors);
+  if (point && point !== 'gap') {
+    try {
+      onReplacement(point, battle);
+    } catch {
+      // A failing consumer leaves a gap, never a failed replay.
+    }
+  }
+  return !!point;
+}
+
 /** Answers the sim's forced replacements with the protocol's switch-ins, in order. */
 async function resolveForcedSwitches(
   session: ReconstructionSession, turnBeforeChoice: number, alignForced: AlignedBlock['alignForced'], blockLines: readonly string[],
@@ -89,6 +137,7 @@ async function resolveForcedSwitches(
     });
 
   let maxIterations = 10;
+  let ordinal = 0;
   while (maxIterations-- > 0) {
     const currentBattle = battleStream.battle;
     if (!currentBattle || currentBattle.ended) break;
@@ -96,6 +145,11 @@ async function resolveForcedSwitches(
     const p1Needs = hasForceSwitch(currentBattle, 0);
     const p2Needs = hasForceSwitch(currentBattle, 1);
     if (!p1Needs && !p2Needs) break;
+
+    // The request is open and nothing answered it yet: the capture reads the battle as the player faced it.
+    const forcedAnswers = { p1: p1Forced, p2: p2Forced };
+    const cursors = { p1: p1ForceIndex.current, p2: p2ForceIndex.current };
+    if (offerReplacement(session, currentBattle, turnBeforeChoice, ordinal, blockLines, forcedAnswers, cursors)) ordinal++;
 
     const commands: string[] = [];
     const p1ForcedChoice = buildForcedSwitchChoice(currentBattle, 0, p1Forced, p1ForceIndex, protocolBench('p1'));

@@ -10,7 +10,7 @@ import { evalStorePrefix } from '../lib/eval-cache-store';
 import { engineCacheTag } from '../lib/eval/engine-setting';
 import { keptPlayed } from './evaluation/sweep-core';
 import {
-  resolveTeraPreference, parseLeadSpecies, parsePlayedActions, parsePlayedActionsDoubles,
+  resolveTeraPreference, parseLeadSpecies, parsePlayedActions, parsePlayedActionsDoubles, replacementRounds,
   type SensitivityTarget, type StaticRuleset,
 } from '@fulllifegames/eval-engine';
 
@@ -156,6 +156,9 @@ function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
       ruleset: effectiveRuleset,
       doubles: evalIsDoubles,
       cacheKeyFor: turn => `${replayData.id}:${turn}:${setsFingerprint}${engineCacheTag()}`,
+      // Round 79 (T290): the replacement points of the knockouts, each under its own key beside the turn keys.
+      replacementRounds: replacementRounds(replayData.log),
+      replacementKeyFor: (turn, ordinal) => `${replayData.id}:${turn}r${ordinal}:${setsFingerprint}${engineCacheTag()}`,
       storePrefix: evalStorePrefix(replayData.id),
       acquireFor: acquire.makeReplayAcquire,
       acquireAll: acquire.makeSweepAcquireAll(analyzableTurns),

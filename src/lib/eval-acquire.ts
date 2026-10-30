@@ -6,6 +6,8 @@ import {
 import { loadReplayMods } from './replay-mods';
 import { replayBuildOptions } from './team-build-options';
 
+import type { ReplacementPoint } from '@fulllifegames/eval-engine';
+
 type BranchEngineModule = typeof import('./lazy/branch-engine');
 type ReconstructOptions = Parameters<BranchEngineModule['reconstructBranchRuntime']>[0];
 export type CaptureBattle = Parameters<NonNullable<ReconstructOptions['capturePositions']>['onPosition']>[1];
@@ -99,6 +101,8 @@ export async function reconstructReplayRuntime(args: {
   bringOnly?: { p1: string[]; p2: string[] };
   onProgress: (turn: number, target: number) => void;
   onPosition?: (turn: number, battle: CaptureBattle) => void;
+  /** Round 79 (T290): the open replacement requests of the knockouts (the main-thread twin of the worker's hand-out). */
+  onReplacement?: (point: ReplacementPoint, battle: CaptureBattle) => void;
 }) {
   const branchEngine = await import('./lazy/branch-engine');
   const { buildChoiceLockContext } = await import('./lazy/choice-lock');
@@ -117,6 +121,7 @@ export async function reconstructReplayRuntime(args: {
     capturePositions: {
       snapshotFor: boundary => snapshotAt(args.snapshots, boundary),
       onPosition: args.onPosition ?? (() => {}),
+      ...(args.onReplacement ? { onReplacement: args.onReplacement } : {}),
     },
   });
   return { runtime, branchEngine };

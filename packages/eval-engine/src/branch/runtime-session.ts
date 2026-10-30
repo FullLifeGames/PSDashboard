@@ -11,6 +11,19 @@ import { recordVolatilesAtExit } from './exit-volatiles.ts';
 import { safeStreamWrite, sleep } from './execute.ts';
 import { loadSimMods, simModsReady } from '../forward/sim-mods.ts';
 
+/**
+ * Round 79 (T290): one open replacement request of a knockout. `turn` is the block's turn (the knockout turn; the replacement
+ * stands on the board of the next one), `ordinal` counts the block's open requests from 0 (a replacement that falls to an entry
+ * hazard opens a second one). `forced` lists the slots to fill per side (a side without any waits); `played` the species the
+ * replay sent into them, in the same order.
+ */
+export interface ReplacementPoint {
+  turn: number;
+  ordinal: number;
+  forced: { p1: number[]; p2: number[] };
+  played: { p1: string[]; p2: string[] };
+}
+
 export interface ReconstructParams {
   format: string;
   p1Team: PokemonSet[];
@@ -35,6 +48,12 @@ export interface ReconstructParams {
   capturePositions?: {
     snapshotFor(turn: number): TurnSnapshot | null;
     onPosition(turn: number, battle: SimBattle): void;
+    /**
+     * Round 79 (T290): the replacement points. Fired for every open forced request after a knockout of the block, before the
+     * replay answers it, with the live battle (read it, never write it). A request the protocol does not match (a slot the
+     * block does not faint, a slot the log sends no one into) is a gap, never a point.
+     */
+    onReplacement?(point: ReplacementPoint, battle: SimBattle): void;
   };
   /**
    * Raw boundary hand-out (the calibration harness's single-pass path):

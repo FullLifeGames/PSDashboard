@@ -13,7 +13,7 @@ export {
 export { annotateNicknames, executeBranchChoices, resolveSideChoices } from './branch/execute.ts';
 export type { ResolvedSideCommand } from './branch/execute.ts';
 export { reconstructBranchRuntime } from './branch/runtime.ts';
-export type { ReconstructParams } from './branch/runtime.ts';
+export type { ReconstructParams, ReplacementPoint } from './branch/runtime.ts';
 export { adoptSerializedRuntime } from './branch/adopt.ts';
 export type { AdoptParams } from './branch/adopt.ts';
 

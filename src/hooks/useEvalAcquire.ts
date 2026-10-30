@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ReplacementPoint } from '@fulllifegames/eval-engine';
 import type { ReplayData } from '@fulllifegames/replay-core';
 import type { useBranch } from './useBranch';
 import type { PositionSource } from './usePositionSource';
@@ -86,7 +87,10 @@ export function useEvalAcquire(inputs: {
       report: Report,
       onPosition?: (turn: number, serialized: string) => void,
       onDiagnostic?: (message: string) => void,
-    ) => acquireAll(turns, report, onPosition, onDiagnostic), [acquireAll]);
+      onReplacement?: (point: ReplacementPoint, serialized: string) => void,
+    ) => (onReplacement
+      ? acquireAll(turns, report, onPosition, onDiagnostic, onReplacement)
+      : acquireAll(turns, report, onPosition, onDiagnostic)), [acquireAll]);
 
   const exactAcquiringTurn = useDwellReconstruction({ replayData, dwellEnabled, smogonPending, viewTurn, source });
   return {
