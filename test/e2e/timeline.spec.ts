@@ -353,5 +353,28 @@ test.describe('PS Dashboard', () => {
       await expect(page.locator('.ps-side-controls')).toHaveCount(4);
       await expect(page.locator('.ps-side-controls').first().locator('.ps-switchbtn')).toHaveCount(2);
     });
+
+    test('VGC T0 starts again over a standing turn-0 variation once the replace is confirmed', async ({ page }) => {
+      test.setTimeout(180_000);
+      await page.locator('input[type="text"]').fill('gen9vgc-test');
+      await page.locator('button', { hasText: 'Load' }).click();
+      await expect(page.getByText('Alice', { exact: true }).first()).toBeVisible({ timeout: 10000 });
+      await page.locator('.ps-branch-bar button[title^="Turn 0"]').click();
+      await expect(page.getByText('pick the 4 each side brings')).toBeVisible();
+      await page.locator('.ps-execute-btn', { hasText: 'Play from turn 0' }).click();
+      await expect(page.getByText(/Branching · Turn 1/)).toBeVisible({ timeout: 60_000 });
+
+      // The user's report of 30.10.2026 (Champions VGC 2646618972): back on T0, the same picks started again hung at
+      // "Branching"; discarding the variation first worked.
+      await page.locator('.ps-branch-bar button[title^="Turn 0"]').click();
+      await expect(page.getByText('pick the 4 each side brings')).toBeVisible();
+      await page.locator('.ps-execute-btn', { hasText: 'Play from turn 0' }).click();
+      const confirm = page.locator('[role="alertdialog"]');
+      await expect(confirm).toContainText('Start a new game from turn 0: replace the existing variation from turn 0');
+      await confirm.locator('button', { hasText: 'Replace' }).click();
+      await expect(page.getByText(/Branching · Turn 1/)).toBeVisible({ timeout: 60_000 });
+      await expect(page.locator('.ps-side-controls')).toHaveCount(4);
+      await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 0');
+    });
   });
 });

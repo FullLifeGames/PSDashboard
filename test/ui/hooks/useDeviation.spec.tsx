@@ -25,7 +25,7 @@ function timelineAt(turn: number, overrides: Partial<Timeline> = {}): Timeline {
   return {
     viewTurnRef: { current: turn }, viewTurn: turn, viewLine: 'main', endSnapshotTurn: null, variationSpan: null,
     setVariationScores: vi.fn(), setViewTurn: vi.fn(), setViewLine: vi.fn(), liveTip: false, restorePointer: vi.fn(),
-    ...overrides,
+    followNextTip: vi.fn(), ...overrides,
   };
 }
 
@@ -55,6 +55,7 @@ describe('useDeviation', () => {
 
     act(() => result.current.requestDeviation(null));
     expect(wired.timeline.setVariationScores).toHaveBeenCalledWith([]);
+    expect(wired.timeline.followNextTip).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(result.current.branchPreparing).toBe(true));
     await waitFor(() => expect(startCalls(wired)).toHaveLength(1), { timeout: 30_000 });
 
@@ -278,6 +279,8 @@ describe('useDeviation', () => {
     act(() => result.current.startLeadVariation({ p1: ['Garchomp'], p2: ['Great Tusk'] }, { onStart }));
     expect(onStart).toHaveBeenCalledTimes(1);
     expect(wired.timeline.setVariationScores).toHaveBeenCalledWith([]);
+    // Round 80: the new game's tip is followed even when its span matches the one it replaces.
+    expect(wired.timeline.followNextTip).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(startCalls(wired)).toHaveLength(1), { timeout: 30_000 });
     const [, , , , turn, , options] = startCalls(wired)[0];
     expect(turn).toBe(0);

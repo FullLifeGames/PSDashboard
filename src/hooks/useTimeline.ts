@@ -217,6 +217,13 @@ function useNavigateTo(args: NavArgs, seekIntentRef: SeekIntentRef) {
     setFollowedPlay(false);
     setNavSeek(prev => ({ turn: position.turn, seq: (prev?.seq ?? 0) + 1 }));
   }, [setViewT0, setViewTurn, setViewLine, setFollowedPlay, setNavSeek]);
+  /**
+   * The user starts a new variation (round 80): its tip is followed even when its span matches the one it replaces.
+   * A second start from turn 0 kept the key "0:1" and left the pointer on the lead picker (Champions VGC 2646618972).
+   */
+  const followNextTip = useCallback(() => {
+    followedKeyRef.current = null;
+  }, []);
   useEffect(() => {
     if (!branching || tipTurn === null || variationSpan === null) {
       followedKeyRef.current = null;
@@ -252,7 +259,7 @@ function useNavigateTo(args: NavArgs, seekIntentRef: SeekIntentRef) {
     if (executingRef.current) holdFollowRef.current = true;
   }, []);
 
-  return { navigateTo, restorePointer, holdTipFollow };
+  return { navigateTo, restorePointer, holdTipFollow, followNextTip };
 }
 
 /** Embed echo guard and the graph's explicit line-addressed selections. */
@@ -265,7 +272,7 @@ function useTimelineNav(args: NavArgs) {
   // fresh selection straight back. Stale echoes are ignored until the embed
   // confirms the seek or the window lapses.
   const seekIntentRef = useRef<{ turn: number; until: number } | null>(null);
-  const { navigateTo, restorePointer, holdTipFollow } = useNavigateTo(args, seekIntentRef);
+  const { navigateTo, restorePointer, holdTipFollow, followNextTip } = useNavigateTo(args, seekIntentRef);
 
   const handleReplayTurn = useCallback((turn: number) => {
     if (turn < 1) return;
@@ -333,7 +340,7 @@ function useTimelineNav(args: NavArgs) {
     handleGraphSelect(turn);
   }, [navigateTo, handleGraphSelect, setViewLine]);
 
-  return { navigateTo, restorePointer, holdTipFollow, handleReplayTurn, handleGraphSelect, handleGraphSelectLine };
+  return { navigateTo, restorePointer, holdTipFollow, followNextTip, handleReplayTurn, handleGraphSelect, handleGraphSelectLine };
 }
 
 export function useTimeline(inputs: TimelineInputs) {

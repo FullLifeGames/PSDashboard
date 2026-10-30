@@ -165,6 +165,22 @@ describe('useTimeline', () => {
     const leadVariation = (base: TimelineInputs): TimelineInputs =>
       ({ ...base, branching: true, variationStartTurn: 0, history: [entry(0), entry(1), entry(2)] });
 
+    test('a new game from T0 with the same span follows its tip once the start asks for it; a rebuild of the span stays on T0 (round 80)', () => {
+      // The user's report of 30.10.2026 (Champions VGC 2646618972): back on T0, the same picks played again kept the
+      // key "0:1", so the pointer stayed on the lead picker while the new game stood at turn 1.
+      const { result, rerender, base } = setup();
+      const leadGame = (): TimelineInputs => ({ ...base, branching: true, variationStartTurn: 0, history: [entry(0)] });
+      rerender(leadGame());
+      expect(result.current).toMatchObject({ viewTurn: 1, viewLine: 'variation', followedPlay: true });
+      act(() => result.current.handleGraphSelectLine(0));
+      expect(result.current.viewT0).toBe(true);
+      rerender(leadGame());
+      expect(result.current.viewT0).toBe(true);
+      act(() => result.current.followNextTip());
+      rerender(leadGame());
+      expect(result.current).toMatchObject({ viewT0: false, viewTurn: 1, viewLine: 'variation', followedPlay: true });
+    });
+
     test('from variation turn 1 the T0 view keeps the line, shows no variation, and the step forward lands on variation turn 1', () => {
       const { result, rerender, base } = setup();
       rerender(leadVariation(base));

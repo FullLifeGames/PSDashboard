@@ -21,7 +21,7 @@ export interface LeadSelection { p1: string[]; p2: string[]; bring?: boolean }
 
 export type DeviationTimeline = Pick<Timeline,
   'viewTurnRef' | 'viewTurn' | 'viewLine' | 'endSnapshotTurn' | 'variationSpan' | 'setVariationScores'
-  | 'setViewTurn' | 'setViewLine' | 'liveTip' | 'restorePointer'>;
+  | 'setViewTurn' | 'setViewLine' | 'liveTip' | 'restorePointer' | 'followNextTip'>;
 type DeviationBranch = Pick<Branch, 'startBranch' | 'getBattle' | 'executeTurn' | 'setChoice' | 'history' | 'stopBranch'>;
 
 export interface DeviationInputs {
@@ -311,6 +311,7 @@ function useDeviationRequests(args: {
       // The overlay dies with its entries; a deviation that executes a turn drops it after the turn ran (a refusal keeps it).
       const dropOverlay = () => dropVariationOverlay(timeline, kind, position.turn);
       if (!prefill) dropOverlay();
+      timeline.followNextTip();
       void rebuildAt(position, prefill).then(async () => {
         const error = prefill ? await branch.executeTurn() : null;
         if (error === null) {
@@ -339,6 +340,7 @@ function useDeviationRequests(args: {
     const run = () => {
       opts?.onStart?.();
       timeline.setVariationScores([]);
+      timeline.followNextTip();
       void rebuildAt({ turn: 0, line: 'main' }, null, leads);
     };
     if (variationSpan) {

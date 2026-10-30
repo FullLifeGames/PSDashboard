@@ -25,16 +25,16 @@ function useDeviationLayer(ctx: ReplayContext, transients: Transients, timeline:
   const clearPlayOutNotice = useCallback(() => setPlayOutNotice(null), [setPlayOutNotice]);
   const {
     viewTurnRef, viewLine, endSnapshotTurn, variationSpan, setVariationScores,
-    setViewTurn, setViewLine, liveTip, viewTurn, restorePointer,
+    setViewTurn, setViewLine, liveTip, viewTurn, restorePointer, followNextTip,
   } = timeline;
 
   // Deviation machinery: the rebuild road, the chess-rule requests, the
   // shared preparation session, and the picker draft plumbing.
   const deviationTimeline = useMemo(() => ({
     viewTurnRef, viewTurn, viewLine, endSnapshotTurn, variationSpan, setVariationScores,
-    setViewTurn, setViewLine, liveTip, restorePointer,
+    setViewTurn, setViewLine, liveTip, restorePointer, followNextTip,
   }), [viewTurnRef, viewTurn, viewLine, endSnapshotTurn, variationSpan, setVariationScores, setViewTurn, setViewLine, liveTip,
-    restorePointer]);
+    restorePointer, followNextTip]);
   const deviationBranch = useMemo(() => ({
     startBranch, getBattle, executeTurn, setChoice, history, stopBranch,
   }), [startBranch, getBattle, executeTurn, setChoice, history, stopBranch]);
