@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { Battle, PokemonSet } from '@pkmn/sim';
-import { createMatchupCache } from '../src/eval-function';
+import { createMatchupCache, evalFeatures, featureWeights } from '../src/eval-function';
 import { boostBiteValue, stageValue } from '../src/score/boost-bite';
 import { threatGetter } from '../src/score/threat';
 import { loadSimMods } from '../src/forward/sim-mods';
@@ -91,5 +91,56 @@ describe('the stage bites a foe it takes the win from (T288)', () => {
 
   test('a stage on a stat the foe\'s hits do not read (Attack against a physical Rhydon): 0', () => {
     expect(sideValue(shielded(BRUISER(), 0.7, { atk: 2 }))).toBe(0);
+  });
+});
+
+describe('doubles and the other families (T288)', () => {
+  const DOUBLES = 'gen9doublescustomgame';
+  const CHAMPIONS = 'gen9championscustomgame';
+  // Stat points of the mode: a bulky Rhydon whose Earthquake the holder needs three turns to answer, so the foe wins the fresh race.
+  const SP = { hp: 32, atk: 8, def: 0, spa: 0, spd: 32, spe: 0 };
+  const splash = (species: string) => set(species, ['splash']);
+
+  /** The shielded Clefable at 70% with a Splashing Snorlax beside it, against the Rhydon and a Splashing Snorlax beside it. */
+  function doublesBoard(): Battle {
+    const battle = battleOf(DOUBLES, [WALL(), splash('Snorlax')], [BRUISER(), splash('Snorlax')]);
+    const mine = battle.sides[0].active[0]!;
+    mine.boosts.def = 1;
+    mine.boosts.spd = 1;
+    mine.sethp(Math.floor(mine.maxhp * 0.7));
+    return battle;
+  }
+
+  test('standard Doubles OU weighs boostsBiting 0: the column is not read, the board scores as it did', () => {
+    const battle = doublesBoard();
+    const weights = featureWeights(true, 'standard');
+    expect(weights.boostsBiting).toBe(0);
+    expect(weights.boosts).toBeGreaterThan(0);
+    // The column is computed only where its weight is not 0 (boost-bite.spec.ts): the rule adds nothing to this family's score.
+    expect(evalFeatures(battle, createMatchupCache('standard'), weights).boostsBiting).toBe(0);
+  });
+
+  test('a VGC board (weight 16): the shielded Clefable bites the Rhydon of the pair, and the score prices it', () => {
+    const battle = doublesBoard();
+    expect(featureWeights(true, 'vgc').boostsBiting).toBe(16);
+    const cache = createMatchupCache('vgc');
+    expect(evalFeatures(battle, cache).boostsBiting).toBeGreaterThan(0);
+    // The same board without the stages reads 0.
+    const plain = doublesBoard();
+    plain.sides[0].active[0]!.boosts.def = 0;
+    plain.sides[0].active[0]!.boosts.spd = 0;
+    expect(evalFeatures(plain, createMatchupCache('vgc')).boostsBiting).toBe(0);
+  });
+
+  test('a Champions singles board (weight 102): the shielded Clefable bites the Rhydon, the stat points of the mode', () => {
+    const wall = set('Clefable', ['cosmicpower', 'moonlight', 'moonblast'], { evs: { hp: 32, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, level: 50 });
+    const foe = set('Rhydon', ['earthquake', 'rest', 'sleeptalk'], { evs: SP, level: 50 });
+    const battle = battleOf(CHAMPIONS, [wall], [foe, set('Landorus-Therian', ['earthquake', 'uturn'], { evs: SP, level: 50 })]);
+    const mine = battle.sides[0].active[0]!;
+    mine.boosts.def = 1;
+    mine.boosts.spd = 1;
+    mine.sethp(Math.floor(mine.maxhp * 0.7));
+    expect(featureWeights(false, 'champions').boostsBiting).toBe(102);
+    expect(evalFeatures(battle, createMatchupCache('champions')).boostsBiting).toBeGreaterThan(0);
   });
 });
