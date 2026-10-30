@@ -82,6 +82,7 @@ type ReconstructParams
 type ReplacementAnalysis
 type ReplacementEvalData
 type ReplacementPoint
+type ReplacementRound
 type ReplacementSideAnalysis
 type ResolvedSideCommand
 type RolledHit
@@ -215,6 +216,7 @@ value reconstructBranchRuntime
 value reconstructionReached
 value regretText
 value releaseBrokenClaims
+value replacementRounds
 value replacementSpeciesOf
 value requiredChoicesForActiveSlots
 value resolveSideChoices

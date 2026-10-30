@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
-import { logRounds, reconstructWithPoints } from './replacement-points';
+import { replacementRounds } from '../src/replacement-rounds';
+import { reconstructWithPoints } from './replacement-points';
 
 /**
  * Round 79 (T290), the sweep of the capture: over the fixture replays (singles of generations 3, 7 and 9, Doubles OU, Scarlet/
@@ -31,7 +32,7 @@ const byKind: Record<string, { rounds: number; skipped: number }> = {};
 describe('the capture hook meets every request round of the protocol', () => {
   test.each(FIXTURES)('$kind $name', { timeout: 480000 }, async ({ name, kind }) => {
     const run = await reconstructWithPoints(name);
-    const rounds = logRounds(run.replay.log);
+    const rounds = replacementRounds(run.replay.log);
     expect(rounds.length).toBeGreaterThan(0);
     const points = new Map(run.points.map(({ point }) => [`${point.turn}.${point.ordinal}`, point]));
     expect(points.size).toBe(run.points.length);

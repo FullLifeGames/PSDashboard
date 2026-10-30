@@ -54,6 +54,8 @@ export { summarizeAlignment } from './hax-alignment.ts';
 export type { AlignmentScore, TurnAlignmentRecord, AlignmentSummary } from './hax-alignment.ts';
 export { analyzeLeads } from './leads.ts';
 export type { LeadSideAnalysis, LeadAnalysis, LeadEvalData } from './leads.ts';
+export { replacementRounds } from './replacement-rounds.ts';
+export type { ReplacementRound } from './replacement-rounds.ts';
 export { analyzeReplacements, matchReplacementOption, replacementSpeciesOf } from './replacements.ts';
 export type { ReplacementEvalData, ReplacementAnalysis, ReplacementSideAnalysis } from './replacements.ts';
 export { mergeMctsTrees, rowCompletedCells, starvedSupportCells } from './mcts-merge.ts';

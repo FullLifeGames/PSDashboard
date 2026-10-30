@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { createRootPosition, legalChoices } from '../src/forward-model';
-import { logRounds, reconstructWithPoints } from './replacement-points';
+import { replacementRounds } from '../src/replacement-rounds';
+import { reconstructWithPoints } from './replacement-points';
 
 /**
  * Round 79 (T290): the capture hook of the replacement points. The reconstruction hands out the battle at every open forced
@@ -11,7 +12,7 @@ import { logRounds, reconstructWithPoints } from './replacement-points';
 describe('onReplacement: the hook at the open request', () => {
   test('doubles: every point is an open request, read twice with the same bytes', { timeout: 240000 }, async () => {
     const run = await reconstructWithPoints('gen9doublesou-2694811367');
-    const rounds = logRounds(run.replay.log);
+    const rounds = replacementRounds(run.replay.log);
     expect(rounds.length).toBeGreaterThan(0);
     expect(run.points.length).toBeGreaterThan(0);
     for (const { point, serialized, serializedAgain } of run.points) {
@@ -29,7 +30,7 @@ describe('onReplacement: the hook at the open request', () => {
 
   test('singles: the point names the knockout turn, the slot and the species the replay sent in', { timeout: 240000 }, async () => {
     const run = await reconstructWithPoints('gen9ou-2658662321');
-    const rounds = logRounds(run.replay.log);
+    const rounds = replacementRounds(run.replay.log);
     expect(rounds.length).toBeGreaterThan(0);
     const first = run.points[0].point;
     expect(first.turn).toBe(rounds[0].turn);
