@@ -27,7 +27,7 @@ const forP1 = { p1: true, p2: false };
 const forP2 = { p1: false, p2: true };
 
 describe('T22 report: the luck ledger in two parts', () => {
-  test('649664 shape: the rolls hold under half of the ledger, so no "The rolls decided it" and the luck line names the re-read', () => {
+  test('649664 shape: the rolls hold under half of the ledger, so no "The rolls decided it" and the luck line names only what the rolls gave', () => {
     // The big swing sits before the favor boundary (turn 4), so it stays in the ledger.
     const report = buildGameReport([
       mk(1, -0.3, -0.1, { chanceDelta: 0.3, rolledFor: forP1 }),
@@ -40,7 +40,7 @@ describe('T22 report: the luck ledger in two parts', () => {
     expect(report.winPath?.factor).not.toBe('variance');
     expect(report.chanceSplit?.rolled).toBeCloseTo(0.3);
     expect(report.chanceSplit?.reRead).toBeCloseTo(0.5);
-    expect(report.summary).toContain('Chance swings favored Alpha overall (+40%): the rolls gave Alpha +15%, and the engine re-read the position for +25%.');
+    expect(report.summary).toContain('The rolls gave Alpha +15%.');
   });
 
   test('the rolls carry at least half the ledger the same way: the rolls decided it', () => {
@@ -53,7 +53,7 @@ describe('T22 report: the luck ledger in two parts', () => {
     expect(report.winPath?.factor).toBe('variance');
   });
 
-  test('573756 shape: the rolls went the other way, the luck line says what they cost', () => {
+  test('573756 shape: the rolls went the other way, the luck line says what they gave the other side', () => {
     const report = buildGameReport([
       mk(1, 0.1, 0.3, { chanceDelta: 0.24, rolledFor: forP1 }),
       mk(2, 0.3, -0.4, { attribution: 'chance', chanceDelta: -0.7, rolledFor: forP1 }),
@@ -61,10 +61,10 @@ describe('T22 report: the luck ledger in two parts', () => {
       mk(4, -0.8, -0.9, { rolledFor: none }),
     ], names, 'p2');
     expect(report.summary).not.toContain('The rolls decided it');
-    expect(report.summary).toContain('Chance swings favored Beta overall (+53%): the rolls cost Beta 12%, and the engine re-read the position for +65%.');
+    expect(report.summary).toContain('The rolls gave Alpha +12%.');
   });
 
-  test('doubles (2663093831 shape): luck toward the loser, under half rolled, names the re-read', () => {
+  test('doubles (2663093831 shape): luck toward the loser, under half rolled, names only the rolls', () => {
     const pair = sideOf({ playedSlots: [{ kind: 'move', name: 'Heat Wave', targetLoc: null }, { kind: 'move', name: 'Protect', targetLoc: null }] });
     const report = buildGameReport([
       mk(1, 0, 0.3, { p1: pair, p2: pair, chanceDelta: 0.35, rolledFor: none }),
@@ -72,7 +72,7 @@ describe('T22 report: the luck ledger in two parts', () => {
       mk(3, 0.2, -0.6, { p1: pair, p2: pair, rolledFor: none }),
       mk(4, -0.6, -0.9, { p1: pair, p2: pair, rolledFor: none }),
     ], names, 'p2');
-    expect(report.summary).toContain('Chance swings favored Alpha overall (+25%): the rolls gave Alpha +8%, and the engine re-read the position for +18%.');
+    expect(report.summary).toContain('The rolls gave Alpha +8%.');
     expect(report.summary).not.toContain('Luck ran');
   });
 
@@ -81,7 +81,7 @@ describe('T22 report: the luck ledger in two parts', () => {
       mk(1, 0, 0.4, { chanceDelta: 0.4, rolledFor: none }),
       mk(2, 0.4, 0.8, { rolledFor: none }),
     ], names, 'p1');
-    expect(report.summary).toContain('Chance swings favored Alpha overall (+20%): the rolls gave Alpha nothing, and the engine re-read the position for +20%.');
+    expect(report.summary).toContain('The rolls favored neither side.');
   });
 
   test('without rolledFor the report keeps its anchor gates and writes no split', () => {

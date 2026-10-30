@@ -20,11 +20,11 @@ describe('EvalTurnAnalysis', () => {
     expect(screen.getByText(`mistake · ${winDeltaText(-0.25)}`)).toBeInTheDocument();
   });
 
-  test('a residual without a roll in its direction reads as the re-read in the badge and the split line (T22, 649664 t12 shape)', () => {
+  test('a residual without a roll in its direction reads as an estimate that moved with no roll behind it, in the badge and the split line (T22, 649664 t12 shape)', () => {
     const reRead = turnAnalysis(12, { attribution: 'chance', swing: 0.24, decisionDelta: 0, chanceDelta: 0.24, rolledFor: { p1: false, p2: true } });
     const { unmount } = render(<EvalTurnAnalysis analysis={reRead} playerNames={names} />);
-    expect(screen.getByText('engine re-read (no roll behind it)')).toBeInTheDocument();
-    expect(screen.getByText(/expected from the choices/)).toHaveTextContent(`${winDeltaText(0)} expected from the choices · ${winDeltaText(0.24)} from the engine's re-read`);
+    expect(screen.getByText('estimate moved (no roll behind it)')).toBeInTheDocument();
+    expect(screen.getByText(/expected from the choices/)).toHaveTextContent(`${winDeltaText(0)} expected from the choices · ${winDeltaText(0.24)} not explained by a roll`);
     unmount();
     render(<EvalTurnAnalysis analysis={{ ...reRead, rolledFor: { p1: true, p2: false } }} playerNames={names} />);
     expect(screen.getByText('chance swing (rolls, crits, reveals)')).toBeInTheDocument();

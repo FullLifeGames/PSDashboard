@@ -84,7 +84,7 @@ export interface GameReport {
   diceAnchorTotal?: number;
   /**
    * Round 67 (T22): chanceTotal in two parts (p1 perspective): the turns with a roll in their residual's
-   * direction and the rest, the engine re-reading the position. Absent without the turns' rolls.
+   * direction and the rest (an estimate that moved with no roll behind it). Absent without the turns' rolls.
    */
   chanceSplit?: LuckSplit;
   /** How the winner sealed it: the first proven forced win or decided sweep. Absent without a signal. */
@@ -392,7 +392,7 @@ export function buildGameReport(
     : { p1: null, p2: null };
 
   const diceAnchor = diceAnchorFor(known, diceTurns, resolution);
-  // Round 67 (T22): the ledger in rolled and re-read parts, when every turn carries its rolls.
+  // Round 67 (T22): the ledger in the rolled part and the rest, when every turn carries its rolls.
   const chanceSplit = luckSplit(known, resolution);
 
   // The play that produced the boundary score happened on the turn before.

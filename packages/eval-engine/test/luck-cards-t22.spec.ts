@@ -26,10 +26,10 @@ const turnWith = (over: Partial<TurnAnalysis>): TurnAnalysis => ({
 
 const names: [string, string] = ['BKC', 'devin'];
 
-describe('T22 cards: a swing without a roll in its direction is the engine re-reading the position', () => {
+describe('T22 cards: a swing without a roll in its direction is an estimate that moved with no roll behind it', () => {
   test('singles chance card (649664 t12 shape): no roll toward BKC, so no "how the turn rolled"', () => {
     const reRead = summarizeTurn(turnWith({ rolledFor: { p1: false, p2: false } }), names);
-    expect(reRead).toContain('the engine re-read the position after the turn (+12%)');
+    expect(reRead).toContain('the estimate moved +12% with no roll behind it');
     expect(reRead).not.toContain('how the turn rolled');
     expect(summarizeTurn(turnWith({ rolledFor: { p1: true, p2: false } }), names)).toContain('how the turn rolled (+12%)');
     // A roll the other way does not explain a swing toward BKC.
@@ -41,17 +41,17 @@ describe('T22 cards: a swing without a roll in its direction is the engine re-re
   test('doubles chance card (2663093831 t2 shape): the same rule', () => {
     const pair = playing(ranked('move heatwave, move protect', 'Heat Wave + Protect', 0.1));
     const reRead = summarizeTurn(turnWith({ p1: pair, p2: pair, chanceDelta: -0.4, swing: -0.4, scoreAfter: -0.4, rolledFor: { p1: true, p2: false } }), names);
-    expect(reRead).toContain('the engine re-read the position after the turn (−20%)');
+    expect(reRead).toContain('the estimate moved −20% with no roll behind it');
     expect(reRead).not.toContain('how the turn rolled');
   });
 
-  test('a decision turn\'s luck rider names the re-read when no roll went that way', () => {
+  test('a decision turn\'s luck rider names the unrolled move when no roll went that way', () => {
     const mistake: SideAnalysis = {
       ...playing(ranked('move bulkup', 'Bulk Up', -0.1)), best: ranked('move drainpunch', 'Drain Punch', 0.25), regret: 0.35, tier: 'mistake',
     };
     const turn = (rolledFor: { p1: boolean; p2: boolean }) =>
       turnWith({ attribution: 'p1-decision', p1: mistake, chanceDelta: -0.3, swing: -0.4, scoreAfter: -0.4, rolledFor });
-    expect(summarizeTurn(turn({ p1: false, p2: false }), names)).toContain('On top of that, the engine re-read the position after the turn (−15%).');
+    expect(summarizeTurn(turn({ p1: false, p2: false }), names)).toContain('On top of that, the estimate moved −15% with no roll behind it.');
     expect(summarizeTurn(turn({ p1: false, p2: false }), names)).not.toContain('luck contributed');
     expect(summarizeTurn(turn({ p1: false, p2: true }), names)).toContain('On top of that, luck contributed −15%.');
   });
@@ -64,16 +64,16 @@ describe('T22 cards: a swing without a roll in its direction is the engine re-re
     // The side holds its ground (−0.05): a credit on a lost turn stays silent (T59).
     const turn = (rolledFor: { p1: boolean; p2: boolean }) =>
       turnWith({ attribution: 'quiet', p1: credit, chanceDelta: -0.15, swing: -0.05, scoreAfter: -0.05, rolledFor });
-    expect(summarizeTurn(turn({ p1: false, p2: false }), names)).toContain('On top of that, the engine re-read the position after the turn (−8% for BKC).');
+    expect(summarizeTurn(turn({ p1: false, p2: false }), names)).toContain('On top of that, the estimate moved −8% for BKC with no roll behind it.');
     expect(summarizeTurn(turn({ p1: false, p2: true }), names)).toContain('On top of that, luck contributed −8% for BKC.');
   });
 
-  test('a shift names the re-read in its split', () => {
+  test('a shift names the unrolled part in its split', () => {
     const shift = (rolledFor: { p1: boolean; p2: boolean }) => turnWith({
       attribution: 'shift', p1: playing(ranked('move uturn', 'U-turn', 0.1)), p2: playing(ranked('move pursuit', 'Pursuit', -0.1)),
       decisionDelta: 0.23, chanceDelta: 0.12, swing: 0.35, scoreAfter: 0.35, rolledFor,
     });
-    expect(summarizeTurn(shift({ p1: false, p2: false }), names)).toContain('(+12% expected, +6% as the engine re-read the position)');
+    expect(summarizeTurn(shift({ p1: false, p2: false }), names)).toContain('(+12% expected, +6% with no roll behind it)');
     expect(summarizeTurn(shift({ p1: true, p2: false }), names)).toContain('(+12% expected, +6% from the rolls)');
   });
 });

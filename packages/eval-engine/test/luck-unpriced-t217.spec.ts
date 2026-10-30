@@ -65,13 +65,13 @@ describe('singles: a plain cell with an unpriced secondary effect is "no priced 
     }
   });
 
-  test('the card keeps its ungated wording there, and names the engine\'s re-read where the pair holds no such effect', () => {
+  test('the card keeps its ungated wording there, and names the engine\'s unrolled move where the pair holds no such effect', () => {
     const undecided = summarizeTurn(singlesTurn('Body Slam', 'Seismic Toss', NONE), names);
     expect(undecided).toContain('how the turn rolled');
-    expect(undecided).not.toContain('the engine re-read the position');
+    expect(undecided).not.toContain('with no roll behind it');
     const plain = singlesTurn('Hydro Pump', 'Seismic Toss', NONE);
     expect(plain.rolledFor).toEqual({ p1: false, p2: false });
-    expect(summarizeTurn(plain, names)).toContain('the engine re-read the position');
+    expect(summarizeTurn(plain, names)).toContain('with no roll behind it');
   });
 
   test('a secondary at 100% is no roll (Power-Up Punch, Flame Charge): the plain cell still rolled nothing', () => {

@@ -89,19 +89,13 @@ const rollsBehind = (chanceTotal: number, diceAnchor: number | null, split: Luck
   split ? rollsCarry(chanceTotal, split) : !diceContradict(chanceTotal, diceAnchor);
 
 /**
- * Round 67 (T22): a ledger the rolls do not carry, in its two parts from the
- * beneficiary's side: what the rolls gave or cost, and what the engine
- * re-read (649664 on the base: +58% overall, +22% of it rolled).
+ * Round 67 (T22): a ledger the rolls do not carry. Round 79 (T286): the line says only what the rolls gave, to the side
+ * they favored; the part no roll explains is an estimate that moved, and no total of it is a probability (573756 read
+ * "+117%"). Under 1% the rolls favored neither side.
  */
-function reReadLuckSentence(chanceTotal: number, split: LuckSplit, playerNames: PlayerNames): string {
-  const sign = chanceTotal > 0 ? 1 : -1;
-  const beneficiary = playerNames[chanceTotal > 0 ? 0 : 1];
-  const rolled = sign * split.rolled;
-  const amount = winDeltaText(Math.abs(rolled)).slice(1);
-  const rolls = amount === '0%' ? `the rolls gave ${beneficiary} nothing`
-    : rolled > 0 ? `the rolls gave ${beneficiary} ${winDeltaText(rolled)}` : `the rolls cost ${beneficiary} ${amount}`;
-  return `Chance swings favored ${beneficiary} overall (${winDeltaText(Math.abs(chanceTotal))}): ${rolls}, ` +
-    `and the engine re-read the position for ${winDeltaText(sign * split.reRead)}.`;
+function rollsOnlyLuckSentence(split: LuckSplit, playerNames: PlayerNames): string {
+  if (Math.abs(split.rolled) * 50 < 1) return 'The rolls favored neither side.';
+  return `The rolls gave ${playerNames[split.rolled > 0 ? 0 : 1]} ${winDeltaText(Math.abs(split.rolled))}.`;
 }
 
 /**
@@ -110,7 +104,7 @@ function reReadLuckSentence(chanceTotal: number, split: LuckSplit, playerNames: 
  * residual — and names where the dice actually went (the draft game: two
  * crits and two Flame Body burns into the winner under a net toward them).
  * Round 67 (T22): with the ledger split, "luck" only when the rolls carry
- * it; otherwise the line names the rolls and the re-read apart.
+ * it; otherwise the line names only what the rolls gave.
  */
 export function luckSentence(
   chanceTotal: number,
@@ -118,14 +112,14 @@ export function luckSentence(
   playerNames: PlayerNames,
   split: LuckSplit | null = null,
 ): string {
-  if (split && !rollsCarry(chanceTotal, split)) return reReadLuckSentence(chanceTotal, split, playerNames);
+  if (split && !rollsCarry(chanceTotal, split)) return rollsOnlyLuckSentence(split, playerNames);
   if (!split && diceContradict(chanceTotal, diceAnchor)) {
     const beneficiary = playerNames[chanceTotal > 0 ? 0 : 1];
     const diceName = playerNames[(diceAnchor ?? 0) > 0 ? 0 : 1];
     return `Chance swings favored ${beneficiary} overall (${winDeltaText(Math.abs(chanceTotal))}), ` +
       `while the visible dice favored ${diceName}.`;
   }
-  // Round 69 (T177): with the split the rolls carry the ledger, so the line quotes what they gave, not the re-read part with it.
+  // Round 69 (T177): with the split the rolls carry the ledger, so the line quotes what they gave.
   if (split) return `Luck ran ${chanceTotal > 0 ? 'for' : 'against'} ${playerNames[0]} (${winDeltaText(split.rolled)} from the rolls).`;
   return `Luck ran ${chanceTotal > 0 ? 'for' : 'against'} ${playerNames[0]} overall (${winDeltaText(chanceTotal)}).`;
 }
@@ -308,7 +302,7 @@ export interface WinPathArgs {
   chanceTotal: number;
   /** Chance summed over the protocol's dice-event turns (p1 perspective), null without dice info. */
   diceAnchor: number | null;
-  /** Round 67 (T22): the ledger split into rolled and re-read (turn-analysis/luck.ts), null without the turns' rolls. */
+  /** Round 67 (T22): the ledger split into the rolled part and the rest (turn-analysis/luck.ts), null without the turns' rolls. */
   chanceSplit: LuckSplit | null;
   playedTracking: boolean;
   /** The seeds sentence already tells the decisions story — don't tell it twice. */

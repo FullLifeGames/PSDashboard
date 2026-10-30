@@ -100,9 +100,9 @@ function decisionSentences(analysis: TurnAnalysis, playerNames: PlayerNames): st
   if (p1Clause) sentences.push(p1Clause);
   if (p2Clause) sentences.push(p2Clause);
   if (analysis.chanceDelta !== null && Math.abs(analysis.chanceDelta) >= CHANCE_THRESHOLD) {
-    // Round 67 (T22): luck only with a roll in the residual's direction; the rest is the engine re-reading the position.
+    // Round 67 (T22): luck only with a roll in the residual's direction; the rest is an estimate that moved with no roll behind it (Round 79, T286).
     sentences.push(chanceRolled(analysis) === false
-      ? `On top of that, the engine re-read the position after the turn (${winDeltaText(analysis.chanceDelta)}).`
+      ? `On top of that, the estimate moved ${winDeltaText(analysis.chanceDelta)} with no roll behind it.`
       : `On top of that, luck contributed ${winDeltaText(analysis.chanceDelta)}.`);
   }
   return sentences;
@@ -113,8 +113,8 @@ function decisionSentences(analysis: TurnAnalysis, playerNames: PlayerNames): st
  * the game resolving, not luck — the same booking the game report has made
  * since round 12, now visible on the turn itself. Chance against the
  * decided side stays genuine luck. Round 67 (T22): a swing without a roll
- * in its direction is the engine re-reading the position (649664 t12: the
- * only roll went the other way), so the card says so. Round 70 (gate of
+ * in its direction is an estimate that moved with no roll behind it (649664 t12:
+ * the only roll went the other way), so the card says so. Round 70 (gate of
  * 13.10. 20:26, 1a): the sentence of a side that walked into its punisher
  * follows, the hindsight read it missed.
  */
@@ -126,7 +126,7 @@ function chanceSentences(analysis: TurnAnalysis, playerNames: PlayerNames, decid
       `toward ${decided.key === 'p1' ? playerNames[0] : playerNames[1]} (${winDeltaText(delta)}).`];
   }
   const sentence = chanceRolled(analysis) === false
-    ? `Both sides picked reasonable options; the engine re-read the position after the turn (${winDeltaText(delta)}).`
+    ? `Both sides picked reasonable options; the estimate moved ${winDeltaText(delta)} with no roll behind it.`
     : 'Both sides picked reasonable options; the swing came from how the turn rolled ' +
       `(${winDeltaText(delta)}).`;
   // Round 70 (gate of 13.10. 20:26, 1a): a side that walked into its punisher gets the read it missed after the luck sentence.
@@ -190,11 +190,11 @@ function predictiveSentence(analysis: TurnAnalysis, playerNames: PlayerNames): s
  */
 function shiftSentences(analysis: TurnAnalysis, playerNames: PlayerNames): string[] {
   const sentences: string[] = [];
-  // Round 67 (T22): the chance part names the re-read when no roll went its way.
-  const reRead = chanceRolled(analysis) === false;
+  // Round 67 (T22): the chance part says no roll is behind it when no roll went its way.
+  const unrolled = chanceRolled(analysis) === false;
   const decomposition = analysis.decisionDelta !== null && analysis.chanceDelta !== null
     ? ` (${winDeltaText(analysis.decisionDelta)} expected, ${winDeltaText(analysis.chanceDelta)} ` +
-      `${reRead ? 'as the engine re-read the position' : 'from the rolls'})`
+      `${unrolled ? 'with no roll behind it' : 'from the rolls'})`
     : '';
   const open = (analysis.p1.viableCount ?? 0) >= BREADTH_MIN_OPTIONS &&
     (analysis.p2.viableCount ?? 0) >= BREADTH_MIN_OPTIONS;
@@ -208,7 +208,7 @@ function shiftSentences(analysis: TurnAnalysis, playerNames: PlayerNames): strin
       `${analysis.p2.choiceCount} for ${playerNames[1]} sat within an inaccuracy of best, so the ` +
       `turn hinged on out-predicting the opponent${decomposition}.`
     : decomposition
-      ? `No single mistake stands out; the choices and ${reRead ? "the engine's re-read" : 'the rolls'} ${parts}${decomposition}.`
+      ? `No single mistake stands out; the choices and ${unrolled ? 'the part no roll explains' : 'the rolls'} ${parts}${decomposition}.`
       : 'No single mistake stands out; the swing built up without a clear culprit.');
   const hindsight = hindsightSentence(analysis, playerNames);
   if (hindsight) sentences.push(hindsight);
@@ -257,7 +257,7 @@ function attributionSentences(analysis: TurnAnalysis, playerNames: PlayerNames, 
  */
 function rideAlongSentences(analysis: TurnAnalysis, playerNames: PlayerNames): string[] {
   const sentences: string[] = [];
-  // Round 67 (T22): the credit's luck rider names the re-read when no roll went the residual's way;
+  // Round 67 (T22): the credit's luck rider says no roll is behind it when none went the residual's way;
   // (T59) a side that lost ground gets no credit sentence.
   const rolled = chanceRolled(analysis) !== false;
   const kinds: ((name: string, side: SideAnalysis, ownLuck: number | null, praised: boolean) => string | null)[] = [

@@ -161,7 +161,7 @@ describe('the turn-7 card (doubles): the shift sentences name what the played ro
     expect(summarizeTurn(analysis, names)).toBe(
       'The estimate moved from 90% to 11% for pixelfrost. ' +
       'A genuinely open turn rather than a drift: 9 of 13 options for pixelfrost and 13 of 13 for Mstr_Hawk sat within an inaccuracy of best, ' +
-      'so the turn hinged on out-predicting the opponent (−67% expected, −21% as the engine re-read the position). ' +
+      'so the turn hinged on out-predicting the opponent (−67% expected, −21% with no roll behind it). ' +
       'The read was there for pixelfrost: against what was actually clicked (Pollen Puff→Zamazenta-Crowned + Wide Guard), ' +
       'Wood Hammer→Calyrex-Shadow + Earth Power→Zamazenta-Crowned was worth +55% more.');
   });
@@ -234,7 +234,8 @@ describe.each(GAMES)('%s: the card of a turn the chance part carried', (_name, m
     const { analysis, names } = turnOf(make, { scores: CHANCE });
     expect(analysis.attribution).toBe('chance');
     const text = summarizeTurn(analysis, names);
-    expect(text).toContain('Both sides picked reasonable options; the engine re-read the position after the turn');
+    expect(text).toContain('Both sides picked reasonable options; the estimate moved');
+    expect(text).toContain('with no roll behind it');
     expect(text).toContain(`${READ} ${names[0]}: against`);
     expect(text.indexOf(READ)).toBeGreaterThan(text.indexOf('Both sides picked reasonable options'));
   });
