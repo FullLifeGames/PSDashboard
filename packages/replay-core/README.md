@@ -8,7 +8,7 @@ Pokémon Showdown replay parsing: protocol logs in, turn snapshots, revealed tea
 npm install @fulllifegames/replay-core @pkmn/sim @pkmn/dex @pkmn/data @pkmn/client @pkmn/protocol @smogon/calc
 ```
 
-The sim family is a peer dependency: you pick the simulator version, and one copy serves every package that uses it. The package is tested with `@pkmn/sim` 0.10.11 and ships ES modules for Node 20 or newer and for bundlers.
+The sim family is a peer dependency, so one copy serves every package that uses it. The package is tested with `@pkmn/sim` 0.10.12 and pins that exact version, as eval-engine does. It ships ES modules for Node 20 or newer and for bundlers.
 
 ## Parse a replay
 

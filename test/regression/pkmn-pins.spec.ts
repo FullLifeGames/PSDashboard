@@ -27,6 +27,16 @@ describe('the simulator pin', () => {
     expect(versions.size).toBe(1);
   });
 
+  test('the package READMEs name the version the manifests pin (round 80: both still said 0.10.11 a release after 0.10.12)', () => {
+    const pinned = read('packages/eval-engine/package.json').peerDependencies?.['@pkmn/sim'];
+    for (const readme of ['packages/eval-engine/README.md', 'packages/replay-core/README.md']) {
+      const named = [...readFileSync(new URL(`../../${readme}`, import.meta.url), 'utf8').matchAll(/`@pkmn\/sim` (\d+\.\d+\.\d+)/g)]
+        .map(match => match[1]);
+      expect(named.length, readme).toBeGreaterThan(0);
+      expect(new Set(named), readme).toEqual(new Set([pinned]));
+    }
+  });
+
   test('the upgrade moves the train: sim and mods exact, dex and data from the same release, nothing else', () => {
     const manifest = {
       dependencies: { '@pkmn/sim': '0.10.11', '@pkmn/dex': '^0.10.11', '@pkmn/client': '^0.7.3' },

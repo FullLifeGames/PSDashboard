@@ -8,7 +8,7 @@ Position evaluation for Pokémon Showdown replays: rebuild the battle at any tur
 npm install @fulllifegames/eval-engine @fulllifegames/replay-core @pkmn/sim @pkmn/dex @pkmn/mods @smogon/calc
 ```
 
-`@pkmn/sim`, `@pkmn/dex`, `@pkmn/mods`, and `@smogon/calc` are peer dependencies: you pick the simulator version, and one copy serves both packages. The package is tested with `@pkmn/sim` 0.10.11 and ships ES modules for Node 20 or newer and for bundlers.
+`@pkmn/sim`, `@pkmn/dex`, `@pkmn/mods`, and `@smogon/calc` are peer dependencies, so one copy serves both packages. The package is tested with `@pkmn/sim` 0.10.12 and pins it and `@pkmn/mods` to that exact version, because its speed layer copies the simulator's classes. It ships ES modules for Node 20 or newer and for bundlers.
 
 ## Evaluate a replay turn
 
