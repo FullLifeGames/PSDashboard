@@ -170,13 +170,15 @@ type SeekIntentRef = { current: { turn: number; until: number } | null };
  */
 const PLAY_IN_GUARD_MS = 20_000;
 
+type Navigate = (position: TimelinePosition, opts?: { seek?: boolean; internal?: boolean; followPlay?: boolean }) => void;
+
 /** The single pointer move plus the tip-follow after executed turns. */
 function useNavigateTo(args: NavArgs, seekIntentRef: SeekIntentRef) {
-  const { pointer, derived, branching, interruptPlayOut, onNavigate, executing, variationEnded } = args;
+  const { pointer, derived, interruptPlayOut, onNavigate } = args;
   const { setViewTurn, setViewLine, setViewT0, setNavSeek, setFollowedPlay } = pointer;
-  const { maxTurn, variationSpan, tipTurn } = derived;
+  const { maxTurn, variationSpan } = derived;
 
-  const navigateTo = useCallback((position: TimelinePosition, opts?: { seek?: boolean; internal?: boolean; followPlay?: boolean }) => {
+  const navigateTo = useCallback<Navigate>((position, opts) => {
     if (!opts?.internal) interruptPlayOut();
     const next = normalizePosition(position, maxTurn, variationSpan);
     setViewT0(false);
@@ -197,11 +199,20 @@ function useNavigateTo(args: NavArgs, seekIntentRef: SeekIntentRef) {
     }
   }, [maxTurn, variationSpan, setViewTurn, setViewLine, setViewT0, setNavSeek, setFollowedPlay, interruptPlayOut, onNavigate, seekIntentRef]);
 
-  // Executed turns move the pointer WITH the play — the tip is where the
-  // next choice happens (chess: the board follows the line you play).
-  // A rebuild that keeps the span (a set edit replays the same turns into new objects) is no executed
-  // turn: the pointer stays where the user looks (round 77, D3). The key names the span, so a variation
-  // that ended and a new one with the same tip follows again.
+  return { navigateTo, ...useTipFollow(args, seekIntentRef, navigateTo) };
+}
+
+/**
+ * Executed turns move the pointer WITH the play — the tip is where the
+ * next choice happens (chess: the board follows the line you play).
+ * A rebuild that keeps the span (a set edit replays the same turns into new objects) is no executed
+ * turn: the pointer stays where the user looks (round 77, D3). The key names the span, so a variation
+ * that ended and a new one with the same tip follows again.
+ */
+function useTipFollow(args: NavArgs, seekIntentRef: SeekIntentRef, navigateTo: Navigate) {
+  const { pointer, derived, branching, executing, variationEnded } = args;
+  const { setViewTurn, setViewLine, setViewT0, setNavSeek, setFollowedPlay } = pointer;
+  const { variationSpan, tipTurn } = derived;
   const followedKeyRef = useRef<string | null>(null);
   const executingRef = useRef(false);
   const holdFollowRef = useRef(false);
@@ -259,7 +270,7 @@ function useNavigateTo(args: NavArgs, seekIntentRef: SeekIntentRef) {
     if (executingRef.current) holdFollowRef.current = true;
   }, []);
 
-  return { navigateTo, restorePointer, holdTipFollow, followNextTip };
+  return { restorePointer, holdTipFollow, followNextTip };
 }
 
 /** Embed echo guard and the graph's explicit line-addressed selections. */
