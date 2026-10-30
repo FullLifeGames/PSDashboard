@@ -912,6 +912,47 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * ROUND 80 2026-10-30 (improvement round 80, a small batch on r80 from dev
+ * 54e5d3b: T292 of the round 79 gate, T294 and T295 from the user's requests
+ * of the same afternoon, T296 from the user's report of the evening and T297
+ * from the round's own gate; probes docs/perf/probes/2026-10-30-r80/).
+ * Gate: final 22:05 ("1a 2a 3a 4b").
+ * DELIVERED: T295 (the doubles move button names no target, so a pick never
+ * resizes it), T294 (the turn card's summary folds under an Explanation
+ * toggle, closed on every turn), T292 as a quick fix (the near stage names
+ * the clicker, who clears the rest itself, the stage's own rule since round
+ * 15, and records its click; the denied end speaks only when the played
+ * choice made that click; 2695803506 t2 named the doubles partner, as 573756
+ * t71 named a benched Magnezone until T282 of round 79), T296 (a start the
+ * user asks for follows the new variation's tip when its span matches the one
+ * it replaces: a second start from turn 0 stayed on the lead picker,
+ * Champions VGC 2646618972), T297 (the first pickers test waits for the
+ * pickers, not the statistics panel's "P1"), the README picture in the
+ * round's UI (1412 x 1056), and the package READMEs on the simulator pin
+ * 0.10.12 (they still said 0.10.11; pkmn-pins.spec.ts holds them now). Cache
+ * v74.
+ * MEASUREMENT: feedback twice on 6131b82, byte-identical (12 of 12); census
+ * singles 39/6/2, doubles 10/5/0, both as round 79; 0 moved turns; no pin
+ * moved. Only near stages move: 6 of the 10 on turn cards go (2695803506 t2
+ * and t7, 2629703929 t2, 648453 t15 and t21, 562428 t21), each named a
+ * Pokemon other than the clicker; a seventh goes from the replacement root
+ * after the knockouts of turn 3 of 912045; the denied end of 2695803506 goes
+ * with them; no score moves. Suite 7,462 passed, with the 2 expected fails
+ * and 24 skipped of round 79. e2e: the main checkout read 91 passed and 1
+ * failed twice (pickers.spec.ts:12 under load), then 92 passed; a worktree
+ * bisect read 54e5d3b 90, 4754c58 91, afde053 92 and b8541e7 92 passed (1
+ * skipped each); after T297 the pickers file passed 14 of 14, and the full
+ * e2e suite on 2148e95 read 92 passed, 1 skipped.
+ * USER GATE 2026-10-30 22:05 ("1a 2a 3a 4b"): the batch adopted as measured;
+ * the three remaining gaps of T292 parked with a trigger; T297 approved and
+ * built in the batch; dev goes to the booking commit, and release 1.0.2 is
+ * prepared next. At 22:20 the user gave the go for the release, the push to
+ * master and the deployment to production, once the reviewers and a check of
+ * the docs leave nothing open. Next free T298.
+ * RESTS: T292 (parked: priority from abilities, terrain and items; both
+ * doubles slots; a Choice lock not yet set, Gorilla Tactics included); T289,
+ * T291 and T293 stay parked.
+ *
  * ROUND 79 2026-10-30 (improvement round 79, wave 7: the user's three reports
  * of 30.10.2026 on the game report of smogtours-gen8ou-573756, setup in the
  * GPL replay and the replacements after a knockout; lanes w7-a to w7-d from

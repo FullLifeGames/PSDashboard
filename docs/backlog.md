@@ -1,8 +1,8 @@
 # Backlog
 
-This file holds the details of every open TODO, one section per TODO under its fixed T-number. The releases of 1.0.0 and 1.0.1 are out (29.10.2026; 1.0.0 was the finish line of `NextSteps.md`, user 21.10.2026), round 80 builds T292, T294 and T295, and every other TODO is parked with a trigger; a trigger that fires brings its TODO to a gate. The next free T-number is T296.
+This file holds the details of every open TODO, one section per TODO under its fixed T-number. The releases of 1.0.0 and 1.0.1 are out (29.10.2026; 1.0.0 was the finish line of `NextSteps.md`, user 21.10.2026), round 80 is booked, and every TODO is parked with a trigger; a trigger that fires brings its TODO to a gate. The next free T-number is T298.
 
-Evidence paths that start with `r79/` are under `docs/perf/probes/2026-10-30-r79/`, those that start with `r78/` are under `docs/perf/probes/2026-10-29-r78/`, those that start with `r77/` under `docs/perf/probes/2026-10-24-r77/`; those that start with `r69/` are under `docs/perf/probes/2026-10-12-r69/`, those that start with `r72/` under `docs/perf/probes/2026-10-19-r72/`, those that start with `r73/` under `docs/perf/probes/2026-10-21-r73/`, those that start with `r74/` under `docs/perf/probes/2026-10-22-r74/`, those that start with `r76/` under `docs/perf/probes/2026-10-23-r76/`.
+Evidence paths that start with `r80/` are under `docs/perf/probes/2026-10-30-r80/`, those that start with `r79/` under `docs/perf/probes/2026-10-30-r79/`, those that start with `r78/` are under `docs/perf/probes/2026-10-29-r78/`, those that start with `r77/` under `docs/perf/probes/2026-10-24-r77/`; those that start with `r69/` are under `docs/perf/probes/2026-10-12-r69/`, those that start with `r72/` under `docs/perf/probes/2026-10-19-r72/`, those that start with `r73/` under `docs/perf/probes/2026-10-21-r73/`, those that start with `r74/` under `docs/perf/probes/2026-10-22-r74/`, those that start with `r76/` under `docs/perf/probes/2026-10-23-r76/`.
 
 Source of the new TODOs of round 69: the lane notes, the three review lenses after the merge, the pin diagnosis of lane B and the timing windows of round 69; each claim was checked by a reviewer against the code of the merge state (`r69/review/todos-check.md`, `todos-check-2.md`). Line numbers refer to the state after round 69.
 
@@ -24,61 +24,11 @@ Source of T282 to T290: round 79 (wave 7), the user's three reports of 30.10.202
 
 Source of T291 to T295: the final gate of round 79 (30.10.2026 15:05, "1a 2a 3a 4a 5a 6a 7a 8a", `r79/gate-final.md`) for T291 to T293, and the user's two requests of the same afternoon for T294 and T295. A reviewer checked them against r79 at 7287b48 (`r79/review/todos-rests-check.md`). Their line numbers refer to that state.
 
+Source of T296 and T297: round 80, the user's report of 30.10.2026 evening (T296, Champions VGC 2646618972) and the round's final gate (22:05, "3a", T297); both were built inside round 80 and have no section. T292 stays parked after the round's quick fix; four review passes checked its new text and the round's booking against r80 at 48758db and 2148e95 (`r80/review/t292-parked-check.md`, `booking-check.md`, `booking-check-3.md`, `booking-check-4.md`).
+
 ## Next rounds
 
-Wave 5 (round 73), T163 with T263 (round 74, measured, nothing adopted), T160 (round 75), the last wave (round 76, user gate 24.10.2026, "1a 2a 3a 4a 5a"; T259 reverted and parked) and round 77 (release gate 29.10.2026, "1a 2a 3a 4a 5a 6a 7a 8b") are booked, and the release of 1.0.0 closed T43 on 29.10.2026. Round 78, the dependencies (user gate 29.10.2026, 15:15, "1a 2a 3b 4a"), is booked: @pkmn/sim 0.10.12 fired the trigger of T103, which stays parked after the upgrade, and T277 to T279 wait parked. The release of 1.0.1 followed the same evening and built T280 inside it: the branch replay's browser flow reads the log once the frame has played to its end (`docs/completed/eval-quality.md`, round 78). After the release T281 did the same for the play controls flow. Round 79 (wave 7, design gate 30.10.2026 08:50, final gate 15:05) is booked: T282 to T288 and T290 delivered (`docs/completed/eval-quality.md`, round 79); T289, T291 and T293 wait parked. Next: round 80, a small batch with T292, T294 and T295. Every other TODO is parked with a trigger.
-
-## Round 80 · the next small batch
-
-The final gate of round 79 and the user's requests of 30.10.2026 approved these TODOs for round 80; each leaves this file with that round's booking.
-
-### T292 · The open gaps of the near-decided stage
-
-*Engine · round 79 · small · rule*
-
-**Approved for round 80 (final gate 30.10.2026 15:05, "6a"): the next small batch, starting with a probe of gen9championsvgc2026regmc-2695803506 turn 2.**
-
-**Problem.** After T282 and T283 one "one roll from clearing the rest" sentence stays in the corpus reports, in the Champions VGC census game 2695803506: "Turn 2 nearly ended it the other way: Kingambit stood one 94% roll from clearing the rest, but the roll failed, and juacox300 went on to lose." Lane A could not probe it (the probe realm lacked the Champions mod). Three gaps stay: the click test reads a move's priority from the Dex move only, so a priority set by an ability or a terrain (Prankster, Gale Wings, Triage, Grassy Glide) and a fractional one (Quick Claw, Custap Berry, Stall) go unread; doubles read slot 0 only (`nearDecidedFor`, `packages/eval-engine/src/score/unanswered.ts`); and a sweeper that holds a Choice item but is not locked yet (a benched Choice Scarf Magnezone) may pick its best move against each foe in the clean-up, though in the game it will be locked after its first one.
-
-**Idea.** First the probe of turn 2 with the Champions mod loaded, its sentence checked against the simulator's play of the line. Then each gap with its sweep: the priority the simulator gives a move (its priority events, never a list of abilities or items), both slots in doubles, and a Choice holder that plays one move through the clean-up.
-
-**Benefit.** App: the "nearly ended it" sentence stands only where the game bears it out.
-
-**Success.** The turn-2 sentence holds against the simulator's play of the line, or it goes; the three sweeps; the batch check.
-
-**Singles and doubles.** Both; the slot question is the doubles half.
-
-### T294 · The turn card's explanation folds away
-
-*App · round 79 · small · lossless*
-
-**Approved for round 80 (user 30.10.2026: "Can the white text be hidden ... and only be displayed under a description like spoiler (maybe clickable with an arrow that shows the text)?").**
-
-**Problem.** The turn card of the Evaluation panel opens with a long paragraph (`.ps-eval-analysis-summary` in `src/components/EvalTurnAnalysis.tsx`), from "The estimate moved from 32% to 30% for ..." to "... not graded as a misplay." in the user's screenshot of 2695803506 turn 1; it pushes the parts line and the two side rows far down. The game report's summary shares the class (`src/components/EvalGameReport.tsx`).
-
-**Idea.** On the turn card the paragraph sits closed under a one-line toggle with an arrow, a button that carries `aria-expanded`; a click or the keyboard opens it. The card's header, the parts line and the side rows stay as they are. Whether the game report's summary folds as well is a question for the round's gate.
-
-**Benefit.** App: the card shows the verdict and both sides at a glance, the reasoning one click away.
-
-**Success.** A ui spec on the toggle (closed by default, `aria-expanded` follows a click); the e2e specs that read the paragraph open it first; nothing else on the card moves.
-
-**Singles and doubles.** Both (one card).
-
-### T295 · Doubles move selection without jumps
-
-*App · round 79 · small · lossless*
-
-**Approved for round 80 (user 30.10.2026: "selecting a move lets the moves jump which is not very intuitive (I think the Targeting text can be just removed probably as the target is selected anyway)").**
-
-**Problem.** In the doubles picker the selected move's chip gains "Targeting P1A Delphox" (`src/components/branch/ChoiceButtons.tsx`), so the chip widens in the compact view and the row wraps: selecting Last Respects pushed Aqua Jet and Head Smash to the next row, selecting Wave Crash pushed Last Respects, Aqua Jet and Head Smash (the user's screenshots, Basculegion). The selection frame is an outline (`src/styles/pickers.css`) and takes no space.
-
-**Idea.** Drop the "Targeting ..." text; the chosen target's tile is highlighted already.
-
-**Benefit.** App: the moves stay where they are while the user picks.
-
-**Success.** An e2e spec reads the bounding boxes of the move chips before and after a selection and finds them unchanged; the two specs that read the text (`test/e2e/pickers.spec.ts`, `test/ui/components/branch/ChoiceButtons.spec.tsx`) follow the change.
-
-**Singles and doubles.** Doubles and VGC; singles has no target.
+Wave 5 (round 73), T163 with T263 (round 74, measured, nothing adopted), T160 (round 75), the last wave (round 76, user gate 24.10.2026, "1a 2a 3a 4a 5a"; T259 reverted and parked) and round 77 (release gate 29.10.2026, "1a 2a 3a 4a 5a 6a 7a 8b") are booked, and the release of 1.0.0 closed T43 on 29.10.2026. Round 78, the dependencies (user gate 29.10.2026, 15:15, "1a 2a 3b 4a"), is booked: @pkmn/sim 0.10.12 fired the trigger of T103, which stays parked after the upgrade, and T277 to T279 wait parked. The release of 1.0.1 followed the same evening and built T280 inside it: the branch replay's browser flow reads the log once the frame has played to its end (`docs/completed/eval-quality.md`, round 78). After the release T281 did the same for the play controls flow. Round 79 (wave 7, design gate 30.10.2026 08:50, final gate 15:05) is booked: T282 to T288 and T290 delivered (`docs/completed/eval-quality.md`, round 79); T289, T291 and T293 wait parked. Round 80 (small batch, final gate 30.10.2026 22:05, "1a 2a 3a 4b") is booked: T294 to T297 and the quick fix of T292 delivered (`docs/completed/eval-quality.md`, round 80); the rest of T292 waits parked. Next: the release of 1.0.2. Every TODO is parked with a trigger.
 
 ## Parked
 
@@ -326,6 +276,24 @@ The triage of 21.10.2026 and the user gates after it parked these TODOs; each se
 **Evidence.** `r79/lanes/D/ledger.md` (step 3).
 
 **Singles and doubles.** Both; the scenes are doubles.
+
+### T292 · The open gaps of the near-decided stage
+
+*Engine · round 79 · small · rule · score-touching (the prover and the sack gate read the stage)*
+
+**Parked (final gate of round 80, 30.10.2026 22:05, "2a"). Trigger: a near-decided sentence in the corpus or in a report of the user that one of the three gaps below makes wrong.**
+
+**Delivered in round 80 (quick fix, 4754c58).** The near stage names the clicker, who clears the rest itself, and records its click (`click`: the move id and, in doubles, the target's location). The stage's own comment has said "Own active, own click" since round 15, but `nearDecidedFor` returned `sweepSurvivor(ctx, mine, rest)`, any teammate. The denied end speaks only when the played choice made that click (`clickPlayed` in `packages/eval-engine/src/denied-end.ts`, which reads the first action of the played choice). The scene of 2695803506 turn 2 is gone: Basculegion's 94 % Wave Crash stood against Incineroar, the sentence named Kingambit, Basculegion switched out, and the only rolls the log marks on that turn were Matcha Gotcha's burns. Six of the ten near stages on the corpus's turn cards went with it; each named a Pokémon other than the clicker, twice the doubles partner (Kingambit in 2695803506 turns 2 and 7) and four times a benched Pokémon. A seventh went from the replacement root after the knockouts of turn 3 of 912045.
+
+**Problem.** Three gaps stay. First, the stage reads a move's priority from the Dex move only, in the click test (`foeActsBefore`, `packages/eval-engine/src/score/unanswered.ts`) and in the clean-up order (`threat.priority` in `score/threat.ts`, read by `movesFirst` in `sweepClocks` and in `beatsEntry`), so a priority that an ability or a terrain sets (Prankster, Gale Wings, Triage, Grassy Glide) and an item's fractional priority (Quick Claw, Custap Berry) go unread. Second, doubles read the first active of each side only: the partner's click and the partner's kill chance on the clicker are both outside the model. Third, the clean-up lets a holder of a Choice item that is not locked yet pick its best move against each foe (`pairThreat` locks only on the live `choicelock` volatile), though in the game it is locked after its first move; Gorilla Tactics keeps its lock in the ability's state, not in that volatile. The four near stages that stay in the corpus (655336 t25 and t27, 573756 t77, 2695803506 t13) name their own clicker; only 655336 played its click, so no denied end can speak at the other two. Nobody has played them out against the simulator.
+
+**Idea.** Each gap with its sweep. The order comes from the simulator: `packages/eval-engine/src/sim-ask/action-order.ts` (round 72, `actionsTie`) already asks `queue.resolveAction` on a copy with fixed dice and reads Prankster, Gale Wings, Triage, Grassy Glide, Stall, Quick Claw and Custap Berry for the tie question, and it gains an "acts before" answer that the click test and the clean-up order both read (one rule in one module, never a list of abilities or items). Both slots in doubles. A Choice lock read from what the simulator applies, item or ability, so the holder plays one move through the clean-up.
+
+**Benefit.** App: the "one roll from clearing the rest" sentence stands only where the game bears it out.
+
+**Success.** The three sweeps against the simulator; each remaining stage played out on a copy (the click forced, both sides on their best moves, a fixed set of seeds), and its sentence kept only where the clicker clears the rest in most seeds; the batch check (two feedback runs byte-identical, the tier census with `--moved`) and the count of turns where the prover names a side, before and after.
+
+**Singles and doubles.** Both: the slot question is the doubles half, and the priority and Choice gaps show in singles too (655336 and 573756 are singles stages that stay).
 
 ### T293 · The first-mover tie on the score path
 
