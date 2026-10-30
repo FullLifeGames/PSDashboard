@@ -211,7 +211,12 @@ test.describe('PS Dashboard', () => {
     // so the honest copy says the choice never surfaced while the engine's
     // combined lines still render.
     await expect(panel.locator('.ps-eval-analysis')).toBeVisible({ timeout: 120_000 });
-    await expect(panel.locator('.ps-eval-analysis-summary')).toContainText('%');
+    // The summary sits closed under its toggle (T294).
+    const summary = panel.locator('.ps-eval-analysis .ps-eval-analysis-summary');
+    await expect(summary).toBeHidden();
+    await panel.locator('.ps-eval-analysis-toggle').click();
+    await expect(summary).toBeVisible();
+    await expect(summary).toContainText('%');
     await expect(panel.locator('.ps-eval-analysis')).toContainText('engine:');
 
     // Long combined labels must wrap inside the panel, never widen it.

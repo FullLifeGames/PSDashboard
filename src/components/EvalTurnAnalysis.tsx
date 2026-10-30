@@ -1,3 +1,4 @@
+import { useId, useState } from 'react';
 import {
   type TurnAnalysis, type LeadAnalysis, type LeadSideAnalysis, type RankedChoice, type ReadRecommendation,
   chanceRolled, formatRead, lostGround, summarizeTurn, winDeltaText, winPctText,
@@ -61,6 +62,23 @@ function SplitRow({ analysis, name }: { analysis: TurnAnalysis; name: string }) 
   );
 }
 
+/**
+ * Round 80 (T294): the turn's summary sits closed under a one-line toggle, so the card opens on the verdict and both
+ * sides. Every turn starts closed (the card keys it by turn), and the app remembers nothing.
+ */
+function TurnSummary({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const id = useId();
+  return (
+    <>
+      <button type="button" className="ps-eval-analysis-toggle" aria-expanded={open} aria-controls={id} onClick={() => setOpen(!open)}>
+        {open ? '▾' : '▸'} Explanation
+      </button>
+      <div id={id} className="ps-eval-analysis-summary" hidden={!open}>{text}</div>
+    </>
+  );
+}
+
 /** Chess-style explanation of one analyzed turn: played vs best, and why the score moved. */
 export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore }: EvalTurnAnalysisProps) {
   const badge = attributionBadge(analysis, playerNames);
@@ -76,7 +94,7 @@ export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore }: Ev
         )}
         <span style={{ color: badge.color }}>{badge.text}</span>
       </div>
-      <div className="ps-eval-analysis-summary">{summarizeTurn(analysis, playerNames)}</div>
+      <TurnSummary key={analysis.turn} text={summarizeTurn(analysis, playerNames)} />
       {analysis.decisionDelta !== null && analysis.chanceDelta !== null && <SplitRow analysis={analysis} name={playerNames[0]} />}
       {analysis.playedTracking === false ? (
         <>

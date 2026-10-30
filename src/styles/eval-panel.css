@@ -126,6 +126,20 @@ button.ps-eval-choice:hover,
   line-height: 1.45;
   color: #bcd;
 }
+/* Round 80 (T294): the turn card's summary opens from this line. */
+.ps-eval-analysis-toggle {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: #9fb2cc;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11px;
+  padding: 0;
+}
+.ps-eval-analysis-toggle:hover {
+  color: #cde;
+}
 .ps-eval-report {
   gap: 4px;
 }

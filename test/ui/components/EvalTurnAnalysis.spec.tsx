@@ -20,6 +20,34 @@ describe('EvalTurnAnalysis', () => {
     expect(screen.getByText(`mistake · ${winDeltaText(-0.25)}`)).toBeInTheDocument();
   });
 
+  test('the summary sits closed under its toggle; a click or the keyboard opens it, and every turn starts closed (T294)', async () => {
+    const analysis = turnAnalysis(4, { attribution: 'p1-decision', p1: misplayedSide(), swing: -0.2, decisionDelta: -0.15, chanceDelta: -0.05 });
+    const { rerender } = render(<EvalTurnAnalysis analysis={analysis} playerNames={names} />);
+    const toggle = screen.getByRole('button', { name: /Explanation/ });
+    const summary = screen.getByText(summarizeTurn(analysis, names));
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveAttribute('aria-controls', summary.id);
+    expect(summary).not.toBeVisible();
+    // The header, the split line and the side rows show while it is closed.
+    expect(screen.getByText('Alice misplayed')).toBeVisible();
+    expect(screen.getByText(/expected from the choices/)).toBeVisible();
+    expect(screen.getByText(`mistake · ${winDeltaText(-0.25)}`)).toBeVisible();
+
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(summary).toBeVisible();
+    await userEvent.keyboard('{Enter}');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(summary).not.toBeVisible();
+    await userEvent.keyboard(' ');
+    expect(summary).toBeVisible();
+
+    const next = turnAnalysis(5, { attribution: 'p1-decision', p1: misplayedSide(), swing: -0.1, decisionDelta: -0.1, chanceDelta: 0 });
+    rerender(<EvalTurnAnalysis analysis={next} playerNames={names} />);
+    expect(screen.getByRole('button', { name: /Explanation/ })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByText(summarizeTurn(next, names))).not.toBeVisible();
+  });
+
   test('a residual without a roll in its direction reads as an estimate that moved with no roll behind it, in the badge and the split line (T22, 649664 t12 shape)', () => {
     const reRead = turnAnalysis(12, { attribution: 'chance', swing: 0.24, decisionDelta: 0, chanceDelta: 0.24, rolledFor: { p1: false, p2: true } });
     const { unmount } = render(<EvalTurnAnalysis analysis={reRead} playerNames={names} />);
