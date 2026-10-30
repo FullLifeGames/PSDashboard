@@ -15,6 +15,7 @@ import {
 } from './sweep-types';
 import { probeSensitivity, verifyFlagged } from './sweep-verify';
 import { installCachedTurn } from './sweep-cached';
+import { playedCellValue } from './played-cell';
 
 /**
  * Turns the graph sweep evaluates concurrently. One turn's search already
@@ -101,6 +102,9 @@ async function computeFreshPlayedOutcome(
   let outcome: number | null = null;
   const p1Choice = matchOrPhantom(result, 'p1', turnPlayed, env.params.rules);
   const p2Choice = matchOrPhantom(result, 'p2', turnPlayed, env.params.rules);
+  // Round 79 (T287): a tree turn prices the pair with the root's own cell; the sub-search stays where the pair is no cell.
+  const cell = p1Choice && p2Choice && mode === 'mcts' ? playedCellValue(result, p1Choice.choice, p2Choice.choice) : null;
+  if (cell !== null) return { value: cell };
   if (p1Choice && p2Choice) {
     const paired = await guardedStage(env, () => perfSpan('played-pair', () =>
       client.evalPair(serialized, p1Choice.choice, p2Choice.choice, { depth, samples, mode, tera: env.params.tera, sleepClause: env.params.sleepClause, ruleset: env.params.ruleset })));
