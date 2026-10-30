@@ -979,7 +979,12 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * 20 with the CPU throttled fourfold). master by fast-forward from 4895108
  * to 84bef28; release.yml tagged v1.0.1, published both packages as 1.0.1
  * with provenance and started the Pages build; deploy.ps1 moved production;
- * the Tests run on master green at the first attempt. Next free T281.
+ * the Tests run on master green at the first attempt. After the release
+ * (user 20:35 "1a"): T281 (e5ecdb5), the branch replay's play controls flow
+ * paused while the frame still played its turn in and the app repeated its
+ * seek; it now waits for the same settled frame (expectReplaySettled in
+ * test/e2e/helpers.ts), and the Tests run on dev went green at the first
+ * attempt. Next free T282.
  *
  * ROUND 77 2026-10-24..29 (improvement round 77, before the release: the
  * user's reports A to J, the report dialog, the engine protocol, the test
