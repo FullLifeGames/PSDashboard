@@ -33,20 +33,29 @@ const RULES = [
 ];
 
 describe('the near stage weighs the click by the chance its user acts (T282)', () => {
-  // A sure Double-Edge kill on the foe's lead; the foe's Focus Blast (70 %) kills a 1-HP attacker when it lands, so the
-  // foe has no near stage of its own (below the 0.9 floor) and the p1 stage is the only one to read. A second Tauros waits.
   const attackerSet = (): PokemonSet => set('Tauros', ['doubleedge'], { level: 50, item: 'choiceband' });
+  // Round 80 (T292): the clicker clears the rest itself, so no second sweeper waits. A 95 % Crush Claw kills the 1-HP
+  // Alakazam, whose Psychic kills the attacker when it acts first; behind Alakazam a 1-HP Machamp only bulks up. The
+  // poisoned attacker at 20 % survives the one turn the rest takes, not the two the whole board takes, so the board reads
+  // near-decided rather than decided. The attacker's partner is immune to the foe's move, so the foe never reads decided
+  // and the click's order alone decides.
   const foeSets = (): PokemonSet[] => [
-    set('Alakazam', ['focusblast'], { level: 50 }),
-    set('Machamp', ['dynamicpunch'], { level: 50 }),
+    set('Alakazam', ['psychic'], { level: 50 }),
+    set('Machamp', ['bulkup'], { level: 50 }),
   ];
 
-  function singlesScene(speed: -6 | 6): Battle {
-    const battle = battleOf('gen9customgame', [attackerSet(), attackerSet()], foeSets());
-    battle.sides[0].active[0]!.sethp(1);
-    battle.sides[0].active[0]!.boosts.spe = speed;
+  function clickScene(format: string, attacker: PokemonSet, partner: PokemonSet, foes: PokemonSet[], speed: -6 | 6): Battle {
+    const battle = battleOf(format, [attacker, partner], foes);
+    const mine = battle.sides[0].pokemon[0];
+    mine.sethp(Math.floor(mine.maxhp / 5));
+    mine.setStatus('psn');
+    mine.boosts.spe = speed;
+    for (const foe of battle.sides[1].pokemon) foe.sethp(1);
     return battle;
   }
+
+  const singlesScene = (speed: -6 | 6): Battle => clickScene('gen9customgame', set('Tauros', ['crushclaw'], { level: 50 }),
+    set('Umbreon', ['splash'], { level: 50 }), foeSets(), speed);
 
   test('singles: a slower click that the foe kills first is no near-decided; the same click going first is', () => {
     const slow = unansweredMons(singlesScene(-6));
@@ -59,14 +68,9 @@ describe('the near stage weighs the click by the chance its user acts (T282)', (
   });
 
   test('singles: a click with priority acts before a faster foe, the same click without it does not', () => {
-    const scene = (move: string): Battle => {
-      const battle = battleOf('gen9customgame',
-        [set('Mamoswine', [move], { level: 50, item: 'choiceband' }), attackerSet()],
-        [set('Landorus-Therian', ['focusblast'], { level: 50 }), set('Machamp', ['dynamicpunch'], { level: 50 })]);
-      battle.sides[0].active[0]!.sethp(1);
-      battle.sides[0].active[0]!.boosts.spe = -6;
-      return battle;
-    };
+    const scene = (move: string): Battle => clickScene('gen9customgame', set('Mamoswine', [move], { level: 50 }),
+      set('Skarmory', ['splash'], { level: 50 }),
+      [set('Landorus-Therian', ['earthpower'], { level: 50 }), set('Machamp', ['bulkup'], { level: 50 })], -6);
     const iceShard = unansweredMons(scene('iceshard')).nearDecided;
     expect(iceShard?.side).toBe('p1');
     expect(iceShard?.removes).toBe('Landorus-Therian');
@@ -83,13 +87,8 @@ describe('the near stage weighs the click by the chance its user acts (T282)', (
   });
 
   test('doubles: the stage reads slot 0 as the code does, and the same order decides', () => {
-    const scene = (speed: -6 | 6): Battle => {
-      const battle = battleOf('gen9doublescustomgame',
-        [attackerSet(), attackerSet()], foeSets());
-      battle.sides[0].active[0]!.sethp(1);
-      battle.sides[0].active[0]!.boosts.spe = speed;
-      return battle;
-    };
+    const scene = (speed: -6 | 6): Battle => clickScene('gen9doublescustomgame', set('Tauros', ['crushclaw'], { level: 50 }),
+      set('Umbreon', ['splash'], { level: 50 }), foeSets(), speed);
     expect(unansweredMons(scene(-6)).nearDecided).toBeUndefined();
     expect(unansweredMons(scene(6)).nearDecided?.side).toBe('p1');
   });

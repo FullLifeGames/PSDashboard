@@ -108,9 +108,10 @@ describe('T22 report: the tip and the denied end read the same rolls', () => {
   });
 
   test('573756 t73 shape: the denied end needs a roll against the near-decided side', () => {
-    const near = { species: 'Garchomp', odds: 0.95, removes: 'Corviknight', announce: true };
+    const near = { species: 'Garchomp', odds: 0.95, removes: 'Corviknight', click: { move: 'firefang' }, announce: true };
+    const played = { choice: 'move firefang', label: 'Fire Fang', worstCase: 0, expected: 0, ev: 0, punishedBy: null };
     const turns = (rolledFor: { p1: boolean; p2: boolean }) => [
-      mk(1, -0.5, 0.1, { attribution: 'chance', chanceDelta: 0.4, p2: sideOf({ nearDecided: near }), rolledFor }),
+      mk(1, -0.5, 0.1, { attribution: 'chance', chanceDelta: 0.4, p2: sideOf({ played, nearDecided: near }), rolledFor }),
       ...Array.from({ length: 9 }, (_, index) => mk(index + 2, 0.1, -0.2 - index * 0.08, { rolledFor: none })),
     ];
     expect(buildGameReport(turns(forP1), names, 'p2', true, new Set([1])).deniedEnd?.turn).toBe(1);

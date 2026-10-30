@@ -303,6 +303,8 @@ export interface NearDecidedSweep {
   odds: number;
   /** Species of the standing enemy active the click removes. */
   removes: string;
+  /** Round 80 (T292): the click's move id and, in doubles, the target's location, as a played choice writes them. */
+  click?: { move: string; target?: number };
 }
 
 export type ForcedWinCaveat = 'none' | 'barring-crit' | 'sampled-rolls';

@@ -345,8 +345,10 @@ export interface SideAnalysis {
    * Round 15: one high-odds click from decided — `odds` (accuracy × kill
    * share, round 6) on the click that removes `removes`, after which
    * `species` clears the rest (573756 t73: a 95% Fire Fang from the sweep).
+   * Round 80 (T292): `species` is the clicker, and `click` the move as the
+   * played choice writes it.
    */
-  nearDecided?: { species: string; odds: number; removes: string; announce: boolean };
+  nearDecided?: { species: string; odds: number; removes: string; click?: { move: string; target?: number }; announce: boolean };
   /**
    * Round 35: a forced win proven from this root FOR this side (the sim
    * played every reply out): `turns` the deepest proven line, `mass` the

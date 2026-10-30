@@ -199,6 +199,9 @@ export function foeActsBefore(battle: Battle, foe: Pokemon, foeMoveId: string, m
  * removes the standing active and the REST clears — the 573756 t73 shape
  * (a 95% Fire Fang from the sweep). Own active, own click — a teammate's
  * kill unlocking someone else's sweep stays out (narrower is honest).
+ * Round 80 (T292): the clicker itself clears the rest. Since round 15 any
+ * teammate could: 573756 t71 named Magnezone behind Clefable's Moonblast,
+ * 2695803506 t2 Kingambit behind Basculegion's Wave Crash.
  */
 function nearDecidedFor(ctx: ProfileContext, key: 'p1' | 'p2', mine: Pokemon[], theirs: Pokemon[]): NearDecidedSweep | undefined {
   const attacker = mine.find(mon => mon.isActive);
@@ -208,17 +211,20 @@ function nearDecidedFor(ctx: ProfileContext, key: 'p1' | 'p2', mine: Pokemon[], 
   // attacker first; the click's odds are its kill chance times the chance the foe's best earlier kill does not come.
   const foeKills = usableSlots(target).map(slot => ({ id: slot.id, pKill: boundaryEvent(ctx.battle, target, attacker, slot.id)?.pKill ?? 0 }));
   let odds = 0;
+  let move = '';
   for (const slot of usableSlots(attacker)) {
     const event = boundaryEvent(ctx.battle, attacker, target, slot.id);
     if (!event) continue;
     const earlier = Math.max(0, ...foeKills.filter(kill => foeActsBefore(ctx.battle, target, kill.id, attacker, slot.id)).map(kill => kill.pKill));
-    odds = Math.max(odds, event.pKill * (1 - earlier));
+    const slotOdds = event.pKill * (1 - earlier);
+    if (slotOdds > odds) [odds, move] = [slotOdds, slot.id];
   }
   if (odds < NEAR_DECIDED_ODDS) return undefined;
   const rest = theirs.filter(enemy => enemy !== target);
-  const survivor = rest.length === 0 ? attacker.species.name : sweepSurvivor(ctx, mine, rest);
-  if (!survivor) return undefined;
-  return { side: key, species: survivor, odds, removes: target.species.name };
+  if (rest.length > 0 && !sweepSurvivor(ctx, [attacker], rest)) return undefined;
+  // The click as the played choice writes it: a doubles move names the target's location (round 80, T292).
+  const click = ctx.battle.gameType === 'doubles' ? { move, target: target.position + 1 } : { move };
+  return { side: key, species: attacker.species.name, odds, removes: target.species.name, click };
 }
 
 /** The near stage only while no decided sweep stands; both sides one roll away fails closed. */

@@ -80,9 +80,10 @@ describe('the game\'s biggest roll against the winner (T284)', () => {
   });
 
   test('the denied end of the same turn is not said twice', () => {
-    const near = { species: 'Garchomp', odds: 0.95, removes: 'Corviknight', announce: true };
+    const near = { species: 'Garchomp', odds: 0.95, removes: 'Corviknight', click: { move: 'firefang' }, announce: true };
+    const played = { ...choice('Fire Fang'), choice: 'move firefang' };
     const turns = [
-      mk(1, -0.5, 0.1, { attribution: 'chance', chanceDelta: 0.4, p2: sideOf({ nearDecided: near }), rolledFor: forP1 }),
+      mk(1, -0.5, 0.1, { attribution: 'chance', chanceDelta: 0.4, p2: sideOf({ played, nearDecided: near }), rolledFor: forP1 }),
       ...Array.from({ length: 9 }, (_, index) => mk(index + 2, 0.1, -0.2 - index * 0.08, { rolledFor: none })),
     ];
     const report = buildGameReport(turns, names, 'p2', true, new Set([1]));

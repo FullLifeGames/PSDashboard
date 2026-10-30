@@ -429,7 +429,7 @@ describe('denied early end', () => {
     best: null,
     safe: null,
     regret: 0,
-    nearDecided: { species: 'Garchomp', odds: 0.95, removes: 'Corviknight', announce: true },
+    nearDecided: { species: 'Garchomp', odds: 0.95, removes: 'Corviknight', click: { move: 'firefang' }, announce: true },
   });
 
   const deniedAnalyses = (lastTurn: number, t3over: Partial<TurnAnalysis> = {}) => [
@@ -457,8 +457,8 @@ describe('denied early end', () => {
       mk(3, 0.5, 0.45, {
         chanceDelta: -0.19,
         p1: {
-          playedRaw: null, played: null, best: null, safe: null, regret: 0,
-          nearDecided: { species: 'Machamp', odds: 0.9, removes: 'Chansey', announce: true },
+          playedRaw: null, played: ranked('move dynamicpunch', 'Dynamic Punch', 0.45), best: null, safe: null, regret: 0,
+          nearDecided: { species: 'Machamp', odds: 0.9, removes: 'Chansey', click: { move: 'dynamicpunch' }, announce: true },
         },
       }),
       mk(4, 0.45, 0.2),
@@ -503,10 +503,34 @@ describe('denied early end', () => {
       names, 'p2', true, new Set([3]));
     expect(otherOdds.summary).toContain('but the roll failed, and the win waited another 9 turns.');
     expect(otherOdds.deniedEnd?.move).toBeUndefined();
+    // Round 80 (T292): without a played choice no click is proven, so the claim stays unmade.
     const noPlayed = buildGameReport(
       deniedAnalyses(12, { p2: nearSide(null) }),
       names, 'p2', true, new Set([3]));
-    expect(noPlayed.summary).toContain('but the roll failed');
+    expect(noPlayed.summary).not.toContain('nearly ended it');
+    expect(noPlayed.deniedEnd).toBeUndefined();
+  });
+
+  test('the claim needs the near stage\'s click in the played choice (T292, 2695803506 t2)', () => {
+    // Champions VGC 2695803506 t2: Basculegion's 94 % Wave Crash stood against Incineroar, Basculegion switched out, and
+    // the turn's only rolls were Matcha Gotcha's burns. The near stage reads the first active: the played choice's lead part.
+    const doublesSide = (choice: string, click: { move: string; target?: number } = { move: 'wavecrash', target: 1 }) => ({
+      ...nearSide(), played: ranked(choice, 'Basculegion and Kingambit', -0.5),
+      nearDecided: { species: 'Basculegion', odds: 0.94, removes: 'Incineroar', click, announce: false },
+    });
+    const denied = (side: TurnAnalysis['p2']) =>
+      buildGameReport(deniedAnalyses(12, { p2: side }), names, 'p2', true, new Set([3])).deniedEnd;
+    expect(denied(doublesSide('switch 3, move kowtowcleave 2'))).toBeUndefined();
+    expect(denied(doublesSide('move wavecrash 2, move kowtowcleave 1'))).toBeUndefined();
+    expect(denied(doublesSide('move protect, move wavecrash 1'))).toBeUndefined();
+    expect(denied(doublesSide('move wavecrash 1, move kowtowcleave 2'))?.species).toBe('Basculegion');
+    expect(denied(doublesSide('move wavecrash 1 mega, move protect'))?.turn).toBe(3);
+    // A spread move writes no target and reaches the one it would remove.
+    expect(denied(doublesSide('move heatwave, move protect', { move: 'heatwave', target: 1 }))?.turn).toBe(3);
+    // Singles: the click is the played move, a switch or another move is none.
+    expect(denied(nearSide({ choice: 'switch 2' }))).toBeUndefined();
+    expect(denied(nearSide({ choice: 'move bodypress' }))).toBeUndefined();
+    expect(denied(nearSide())?.move).toBe('Fire Fang');
   });
 
   test('labeled doubles odds never name the move (final review, finding 3)', () => {

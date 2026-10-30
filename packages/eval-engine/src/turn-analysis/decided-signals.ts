@@ -60,7 +60,7 @@ function nearStage(params: AnalyzeTurnParams, key: Side): SideAnalysis['nearDeci
   const ownNear = params.result.unanswered?.nearDecided;
   if (!ownNear || ownNear.side !== key) return undefined;
   return {
-    species: ownNear.species, odds: ownNear.odds, removes: ownNear.removes,
+    species: ownNear.species, odds: ownNear.odds, removes: ownNear.removes, ...(ownNear.click ? { click: ownNear.click } : {}),
     announce: nearInPhase(params) && !params.decidedSeen?.has(
       decidedSeenKey(key, { species: ownNear.species, removes: ownNear.removes })),
   };
