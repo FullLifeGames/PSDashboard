@@ -33,7 +33,7 @@ const baseSpeciesIn = (rules: GameRules | undefined) => (species: string): strin
 const atLeastRollChance = (chance: number): boolean => Math.round(chance * 100) >= Math.round(ROLL_MIN_CHANCE * 100);
 
 /** The event a played line's KO odds price: its move and the body (singles: the opposing pre-turn active; doubles: the labeled slot's target). */
-function pricedEvent(side: SideAnalysis, defender: string | null | undefined): { move: string; target: string } | null {
+function pricedEvent(side: Pick<SideAnalysis, 'played'>, defender: string | null | undefined): { move: string; target: string } | null {
   const odds = side.played?.koOdds;
   if (!side.played || !odds) return null;
   if (odds.label) {
@@ -51,7 +51,7 @@ function pricedEvent(side: SideAnalysis, defender: string | null | undefined): {
  * real chance. Null when the event did not happen (a miss is a marker; a
  * switch-out, a Protect or an unreached body is no roll).
  */
-function oddsFavor(rolls: TurnRolls, key: Side, side: SideAnalysis, defender: string | null | undefined, rules: GameRules | undefined): Side | null {
+function oddsFavor(rolls: TurnRolls, key: Side, side: Pick<SideAnalysis, 'played'>, defender: string | null | undefined, rules: GameRules | undefined): Side | null {
   const event = pricedEvent(side, defender);
   const odds = side.played?.koOdds;
   if (!event || !odds) return null;
@@ -71,8 +71,8 @@ function oddsFavor(rolls: TurnRolls, key: Side, side: SideAnalysis, defender: st
  */
 export function rolledSides(
   rolls: TurnRolls,
-  p1: SideAnalysis,
-  p2: SideAnalysis,
+  p1: Pick<SideAnalysis, 'played'>,
+  p2: Pick<SideAnalysis, 'played'>,
   actives: AnalyzeTurnParams['actives'],
 ): { p1: boolean; p2: boolean } {
   const rolled = { ...rolls.favored };
@@ -134,6 +134,21 @@ export function rolledFromCell(
   // Round 75 (T160): without the game's generation the secondary effects cannot be read, and the question stays open.
   if (!real && (!rules || rollsUnpricedEffect(moves, rules))) return undefined;
   return { p1: real, p2: real };
+}
+
+/**
+ * The sides the turn's rolls favored: the protocol's markers and the played odds when the turn has its log, else the classes
+ * of the played cell. Undefined where neither answers. The sides enter as their matched played lines, so the sack gates can
+ * ask before the side records exist (round 79, hazard sack).
+ */
+export function turnRolledFor(
+  params: AnalyzeTurnParams,
+  p1: Pick<SideAnalysis, 'played'>,
+  p2: Pick<SideAnalysis, 'played'>,
+): { p1: boolean; p2: boolean } | undefined {
+  return params.rolls
+    ? rolledSides(params.rolls, p1, p2, params.actives)
+    : rolledFromCell(playedCellOf(params.result, params.played), playedMoveIds(params.played), rulesOfActives(params.actives));
 }
 
 /** The turn's residual has a roll behind it in its own direction; null without the turn's dice or a residual. */
