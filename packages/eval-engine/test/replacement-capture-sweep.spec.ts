@@ -10,6 +10,8 @@ import { reconstructWithPoints } from './replacement-points';
  */
 
 const FIXTURES: { name: string; kind: 'singles' | 'doubles' | 'vgc' }[] = [
+  // The app's e2e replay (test/e2e/replacement-note.spec.ts reads its turn 4 card).
+  { name: 'replay', kind: 'singles' },
   { name: 'gen9ou-2658662321', kind: 'singles' },
   { name: 'gen3customgame-2115579570', kind: 'singles' },
   { name: 'smogtours-gen7ou-450650', kind: 'singles' },

@@ -40,6 +40,22 @@ describe('onReplacement: the hook at the open request', () => {
     expect(first.played[side]).toEqual(rounds[0].species[side]);
   });
 
+  // The scenes test/e2e/replacement-note.spec.ts reads on the cards of the turns after them.
+  test('the e2e scenes: Toxapex on turn 6 of the OU game, Flamigo and Sylveon together on turn 2 of the doubles game', { timeout: 480000 }, async () => {
+    const singles = await reconstructWithPoints('gen9ou-2658662321');
+    const species = singles.points.map(({ point }) => [point.turn, point.ordinal, ...point.played.p1, ...point.played.p2]);
+    expect(species).toEqual([[6, 0, 'Toxapex'], [11, 0, 'Walking Wake']]);
+    const doubles = await reconstructWithPoints('gen9doublesou-2694811367');
+    const first = doubles.points[0].point;
+    expect([first.turn, first.forced.p2, first.played.p2]).toEqual([2, [0, 1], ['Flamigo', 'Sylveon']]);
+  });
+
+  test('a knockout the simulator does not reproduce is a gap with its cause in the alignment: the default e2e replay', { timeout: 240000 }, async () => {
+    const run = await reconstructWithPoints('replay');
+    expect(run.points).toEqual([]);
+    expect(run.runtime.haxAlignment.find(entry => entry.turn === 3)?.actual.faintMismatches).toBeGreaterThan(0);
+  });
+
   test.each(['gen9doublesou-2694811367', 'gen9ou-2658662321'])('%s: the hook changes no position', { timeout: 480000 }, async fixture => {
     const withHook = await reconstructWithPoints(fixture);
     const without = await reconstructWithPoints(fixture, { hook: false });
