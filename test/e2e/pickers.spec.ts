@@ -12,11 +12,14 @@ test.describe('PS Dashboard', () => {
   test('the loaded replay shows P1 and P2 move controls without any mode switch', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
 
-    await expect(page.getByText('P1', { exact: true }).first()).toBeVisible({ timeout: 15000 });
-    await expect(page.getByText('P2', { exact: true }).first()).toBeVisible();
+    // Round 80 (T297): the pickers themselves carry the load wait. The Battle Statistics panel shows its "P1" first, and
+    // under the full suite the pickers came more than five seconds after it.
+    const columns = page.locator('.ps-branch-side-column');
+    await expect(columns.first().locator('.ps-movebtn').first()).toBeVisible({ timeout: 15000 });
+    await expect(columns.first()).toContainText('P1');
+    await expect(columns.nth(1)).toContainText('P2');
     // The basic view lists moves AND switches as compact chips — no tabs.
-    await expect(page.locator('.ps-branch-side-column').first().locator('.ps-movebtn').first()).toBeVisible();
-    await expect(page.locator('.ps-branch-side-column').first().locator('.ps-switchbtn').first()).toBeVisible();
+    await expect(columns.first().locator('.ps-switchbtn').first()).toBeVisible();
   });
 
   test('always-on pickers show move buttons with type info', async ({ page }) => {
