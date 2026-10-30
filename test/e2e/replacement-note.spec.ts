@@ -1,5 +1,6 @@
 import { readFileSync } from 'fs';
-import { join } from 'path';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
 import { test, expect, type Page } from '@playwright/test';
 import type { ReplayData } from '@fulllifegames/replay-core';
 import { installReplayEmbedCache, routeOfflineFixtures } from './helpers';
@@ -11,8 +12,10 @@ import { installReplayEmbedCache, routeOfflineFixtures } from './helpers';
  * note from the stored sweep. The default e2e replay has a knockout the simulator does not reproduce, so it shows no note.
  */
 
+// The e2e specs load as ES modules, which have no __dirname (helpers.ts derives it the same way).
+const here = dirname(fileURLToPath(import.meta.url));
 const fixture = (name: string) =>
-  JSON.parse(readFileSync(join(__dirname, '../../packages/eval-engine/test/fixtures', `${name}.json`), 'utf-8')) as ReplayData;
+  JSON.parse(readFileSync(join(here, '../../packages/eval-engine/test/fixtures', `${name}.json`), 'utf-8')) as ReplayData;
 
 test.beforeAll(installReplayEmbedCache);
 
