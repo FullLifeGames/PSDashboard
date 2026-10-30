@@ -20,8 +20,13 @@ await loadSimMods('gen9championsou');
 const SLOW = { nature: 'Brave', evs: { hp: 252, atk: 252, def: 0, spa: 0, spd: 4, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 0 } };
 const FAST = { nature: 'Jolly', evs: { hp: 4, atk: 252, def: 0, spa: 0, spd: 0, spe: 252 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 } };
 
+// Round 79 (T282 sweep): every generation the near stage reads (boundaryEvent returns nothing for generations 1 and 2) and the Champions mod.
 const RULES = [
+  { name: 'Generation 3', singles: 'gen3customgame', doubles: 'gen3doublescustomgame' },
+  { name: 'Generation 4', singles: 'gen4customgame', doubles: 'gen4doublescustomgame' },
+  { name: 'Generation 5', singles: 'gen5customgame', doubles: 'gen5doublescustomgame' },
   { name: 'Generation 6', singles: 'gen6customgame', doubles: 'gen6doublescustomgame' },
+  { name: 'Generation 7', singles: 'gen7customgame', doubles: 'gen7doublescustomgame' },
   { name: 'Generation 8', singles: 'gen8customgame', doubles: 'gen8doublescustomgame' },
   { name: 'Scarlet/Violet', singles: 'gen9customgame', doubles: 'gen9doublescustomgame' },
   { name: 'Pokémon Champions', singles: 'gen9championscustomgame', doubles: 'gen9championsdoublescustomgame' },
@@ -91,7 +96,7 @@ describe('the near stage weighs the click by the chance its user acts (T282)', (
 });
 
 describe.each(RULES)('$name: who acts first, the reading against the simulator (T282)', rules => {
-  const mon = (moves: string[], extra: Partial<PokemonSet>): PokemonSet => set('Garchomp', moves, { level: 100, ...extra });
+  const mon = (moves: string[], extra: Partial<PokemonSet>): PokemonSet => set('Snorlax', moves, { level: 100, ...extra });
 
   /** The simulator's queue: can the foe's action come before mine (a tie counts as possible)? */
   function simFoeFirst(battle: Battle, foeMove: string, myMove: string): boolean {
@@ -107,7 +112,7 @@ describe.each(RULES)('$name: who acts first, the reading against the simulator (
     move.id !== 'struggle' && move.priority !== 0);
 
   test('the sweep covers the priority moves of the rule set', () => {
-    expect(priorityMoves.length).toBeGreaterThan(20);
+    expect(priorityMoves.length).toBeGreaterThan(15);
     // The moves with a priority handler of their own are not read from the Dex priority: they stay named, so a new one shows.
     const handlers = dex.moves.all().filter(move => move.exists && move.gen <= dex.gen && typeof (move as { onModifyPriority?: unknown }).onModifyPriority === 'function')
       .map(move => move.id).sort();
@@ -119,7 +124,8 @@ describe.each(RULES)('$name: who acts first, the reading against the simulator (
     ['doubles', rules.doubles],
   ])('%s: every priority move in both seats, at both speeds, at a speed tie and under Trick Room', (_label, format) => {
     const rows: string[] = [];
-    for (const trickRoom of [false, true]) {
+    // Trick Room exists from generation 4 on.
+    for (const trickRoom of dex.gen >= 4 ? [false, true] : [false]) {
       for (const [mineSet, foeSet] of [[SLOW, FAST], [FAST, SLOW], [SLOW, SLOW]] as const) {
         for (const move of priorityMoves) {
           for (const seat of ['mine', 'foe'] as const) {

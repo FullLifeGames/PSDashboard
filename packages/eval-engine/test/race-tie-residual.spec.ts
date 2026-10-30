@@ -15,8 +15,13 @@ import { battleOf } from './power-oracle';
 
 await loadSimMods('gen9championsou');
 
+// Round 79 (T283 sweep): every generation the profile reads (boundaryEvent returns nothing for generations 1 and 2) and the Champions mod.
 const RULES = [
+  { name: 'Generation 3', format: 'gen3customgame' },
+  { name: 'Generation 4', format: 'gen4customgame' },
+  { name: 'Generation 5', format: 'gen5customgame' },
   { name: 'Generation 6', format: 'gen6customgame' },
+  { name: 'Generation 7', format: 'gen7customgame' },
   { name: 'Generation 8', format: 'gen8customgame' },
   { name: 'Scarlet/Violet', format: 'gen9customgame' },
   { name: 'Pokémon Champions', format: 'gen9championscustomgame' },
@@ -28,7 +33,7 @@ describe.each(RULES)('$name: a finite tie by a status tick (T283)', rules => {
   const board = (status: (typeof STATUSES)[number], foeHp: number, bench: PokemonSet[] = []): Battle => {
     const battle = battleOf(rules.format,
       [set('Jolteon', ['seismictoss'], { level: 100 }), ...bench],
-      [set('Landorus-Therian', ['earthquake'], { level: 100 })]);
+      [set('Swampert', ['earthquake'], { level: 100 })]);
     const attacker = battle.sides[0].active[0]!;
     const foe = battle.sides[1].active[0]!;
     attacker.sethp(1);
@@ -42,6 +47,8 @@ describe.each(RULES)('$name: a finite tie by a status tick (T283)', rules => {
     const battle = board(status, 110, [set('Blissey', ['splash'], { level: 100 })]);
     battle.choose('p1', 'move 1');
     battle.choose('p2', 'move 1');
+    // Generation 3 asks for the replacement before the end of the turn: answer it, the tick comes after.
+    if (!battle.log.some(line => line.startsWith('|faint|p2a'))) battle.choose('p1', 'switch 2');
     const log = battle.log;
     const foeMoved = log.findIndex(line => line.startsWith('|move|p2a'));
     const foeFell = log.findIndex(line => line.startsWith('|faint|p2a'));
