@@ -27,7 +27,7 @@ export {
 export type {
   BranchChoiceErrorLog, BranchExecuteResult, BranchFieldState, BranchMoveOption, BranchRuntime, BranchSimState,
   BranchSlotModifiers, BranchSwitchOption, BranchTargetOption, PokemonStatTable, SimPokemonInfo,
-  ResolvedSideCommand, ReconstructParams, AdoptParams,
+  ResolvedSideCommand, ReconstructParams, ReplacementPoint, AdoptParams,
 } from './branch-engine.ts';
 export type { BranchChoices } from './branch/types.ts';
 export { hiddenPowerFacts, sightedHp, sightedHpAt, snapshotSimFacts, speciesAfterTeraClick } from './branch/pokemon-info.ts';
