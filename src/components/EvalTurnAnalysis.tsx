@@ -44,19 +44,19 @@ function ReadRows({ reads, playerNames, faintedFraction }: Pick<EvalTurnAnalysis
 
 /**
  * The estimate change split in two: what the chosen pair was expected to move and the rest. Round 67 (T22):
- * the rest is "how it rolled" only with a roll in its direction, else the engine's re-read of the position.
+ * the rest is "how it rolled" only with a roll in its direction, else the part no roll explains (Round 79, T286).
  */
 function SplitRow({ analysis, name }: { analysis: TurnAnalysis; name: string }) {
-  const reRead = chanceRolled(analysis) === false;
+  const unrolled = chanceRolled(analysis) === false;
   return (
     <div
       className="ps-eval-analysis-row"
       style={{ color: '#778' }}
-      title={reRead
-        ? `${name}'s estimate change split in two: what the chosen pair was expected to move, and how the engine re-read the position after the turn. No roll on this turn went that way.`
+      title={unrolled
+        ? `${name}'s estimate change split in two: what the chosen pair was expected to move, and the rest of the move, which no roll explains. No roll on this turn went that way.`
         : `${name}'s estimate change split in two: what the chosen pair was expected to move, and what the actual rolls added on top.`}
     >
-      {winDeltaText(analysis.decisionDelta ?? 0)} expected from the choices · {winDeltaText(analysis.chanceDelta ?? 0)} {reRead ? "from the engine's re-read" : 'from how it rolled'}
+      {winDeltaText(analysis.decisionDelta ?? 0)} expected from the choices · {winDeltaText(analysis.chanceDelta ?? 0)} {unrolled ? 'not explained by a roll' : 'from how it rolled'}
     </div>
   );
 }

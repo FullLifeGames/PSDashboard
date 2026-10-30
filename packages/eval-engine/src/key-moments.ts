@@ -1,5 +1,6 @@
 import type { TurnAnalysis } from './analysis.ts';
 import { KEY_TURN_SWING } from './graph.ts';
+import { inStandoff, type Standoff } from './standoff.ts';
 import { chanceRolled } from './turn-analysis/luck.ts';
 import { momentScore } from './win-reason.ts';
 
@@ -20,13 +21,16 @@ type Winner = 'p1' | 'p2' | null;
  * chance went against the winner joins them (573756 t73: a missed 95 % Fire Fang ranked eighth).
  * A dice turn is a turn whose own rolls ran in its residual's direction (chanceRolled) or, without
  * the turn's rolls, one that carries a protocol-visible dice event. Without a winner or dice info
- * no turn joins.
+ * no turn joins. Round 79 (T285): the selection runs over the whole game, then a turn inside a standoff drops out unless it
+ * is a graded decision (a decision attribution): its shift, roll or read is the HP and PP cycle of one position. The slot
+ * of a dropped turn stays empty (573756 reads 68, 71 and 73, not a marginal turn 78 pulled up from the fifth rank).
  */
 export function keyMomentsFor(
   known: TurnAnalysis[],
   resolution: Set<number>,
   winner: Winner,
   diceTurns: ReadonlySet<number> | null,
+  standoffs: readonly Standoff[] = [],
 ): TurnAnalysis[] {
   const ranked = known
     .filter(analysis => analysis.attribution !== 'quiet' && analysis.swing !== null &&
@@ -38,5 +42,7 @@ export function keyMomentsFor(
     return wentAgainst && (chanceRolled(analysis) ?? diceTurns?.has(analysis.turn) ?? false);
   };
   const kept = new Set([...ranked.slice(0, REPORT_KEY_MOMENTS), ...ranked.slice(REPORT_KEY_MOMENTS).filter(againstWinner)]);
-  return [...kept].sort((a, b) => a.turn - b.turn);
+  const speaks = (analysis: TurnAnalysis): boolean =>
+    !inStandoff(standoffs, analysis.turn) || analysis.attribution.endsWith('-decision');
+  return [...kept].filter(speaks).sort((a, b) => a.turn - b.turn);
 }

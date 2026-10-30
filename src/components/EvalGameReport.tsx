@@ -1,4 +1,6 @@
-import { type GameReport, type LeadAnalysis, regretText, rollText, winDeltaText } from '@fulllifegames/eval-engine';
+import {
+  chanceRolled, type GameReport, type LeadAnalysis, regretText, rollText, shownAttribution, type TurnAnalysis, winDeltaText,
+} from '@fulllifegames/eval-engine';
 import type { TurnEvalSettings } from '../hooks/useEvaluation';
 import { attributionBadge, leadTier } from './eval-badges';
 import { sideIndex } from '@fulllifegames/replay-core';
@@ -181,6 +183,16 @@ function DeniedEndChip({ report, playerNames, onSelectTurn, settingsFor }: EvalG
   );
 }
 
+/**
+ * Round 79 (T284): a chance chip prints the chance part and the net ("+13% from the roll (net +5%)", 573756 t73: the
+ * biggest roll of the game netted +5% because the decision part pulled the other way); the badge beside it is about
+ * the chance part. Every other attribution keeps the net swing.
+ */
+function momentDelta(moment: TurnAnalysis, swing: number): string {
+  if (shownAttribution(moment) !== 'chance' || moment.chanceDelta === null) return winDeltaText(swing);
+  return `${winDeltaText(moment.chanceDelta)}${chanceRolled(moment) ? ' from the roll' : ''} (net ${winDeltaText(swing)})`;
+}
+
 function KeyMomentChips({ report, playerNames, onSelectTurn, settingsFor }: EvalGameReportProps) {
   if (report.keyMoments.length === 0) return null;
   return (
@@ -198,7 +210,7 @@ function KeyMomentChips({ report, playerNames, onSelectTurn, settingsFor }: Eval
             <span style={{ color: '#cde' }}>T{moment.turn}</span>
             <SettingsBadge turn={moment.turn} settingsFor={settingsFor} />
             <span style={{ color: badge.color }}>{badge.text}</span>
-            {moment.swing !== null && <span style={{ color: '#aab' }}>{winDeltaText(moment.swing)}</span>}
+            {moment.swing !== null && <span style={{ color: '#aab' }}>{momentDelta(moment, moment.swing)}</span>}
           </button>
         );
       })}

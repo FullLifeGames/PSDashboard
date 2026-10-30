@@ -32,7 +32,7 @@ describe('EvalGameReport', () => {
       ],
       reads: [{ turn: 8, side: 'p2', played: 'Body Press', payoff: 0.14 }],
       deniedEnd: { turn: 9, side: 'p2', species: 'Kingambit', move: 'Knock Off', odds: 0.9, removes: 'Garchomp', turnsRemaining: 3 },
-      keyMoments: [turnAnalysis(7, { attribution: 'chance', swing: -0.35 })],
+      keyMoments: [turnAnalysis(7, { attribution: 'chance', swing: -0.35, chanceDelta: -0.4 })],
     });
     const settings: Record<number, TurnEvalSettings> = { 3: { depth: 2, samples: 3, mode: 'matrix' }, 5: { depth: 1, samples: 1, mode: 'mcts' } };
     render(<EvalGameReport report={report} playerNames={names} onSelectTurn={onSelectTurn} settingsFor={turn => settings[turn] ?? null} />);
@@ -54,7 +54,7 @@ describe('EvalGameReport', () => {
     expect(within(chip(9)).getByText('one 90% roll from ending it, missed')).toBeInTheDocument();
     expect(within(chip(9)).getByText('Knock Off')).toBeInTheDocument();
     expect(within(chip(7)).getByText('chance swing (rolls, crits, reveals)')).toBeInTheDocument();
-    expect(within(chip(7)).getByText(winDeltaText(-0.35))).toBeInTheDocument();
+    expect(within(chip(7)).getByText(`${winDeltaText(-0.4)} (net ${winDeltaText(-0.35)})`)).toBeInTheDocument();
     await userEvent.click(chip(7));
     expect(onSelectTurn).toHaveBeenLastCalledWith(7);
   });
@@ -107,6 +107,16 @@ describe('EvalGameReport', () => {
     render(<EvalGameReport report={gameReport({ keyMoments: [moment] })} playerNames={names} />);
     expect(within(chip(9)).queryByText("Alice's read paid off")).toBeNull();
     expect(within(chip(9)).getByText('chance swing (rolls, crits, reveals)')).toBeInTheDocument();
+  });
+
+  test('a chance chip prints the chance part and the net, 573756 t73: +13% from the roll (net +5%) (T284)', () => {
+    const rolled = turnAnalysis(73, { attribution: 'chance', swing: 0.103, chanceDelta: 0.269, rolledFor: { p1: true, p2: false } });
+    const reread = turnAnalysis(74, { attribution: 'chance', swing: -0.2, chanceDelta: -0.35, rolledFor: { p1: false, p2: false } });
+    const plain = turnAnalysis(75, { attribution: 'shift', swing: 0.4, chanceDelta: 0.1 });
+    render(<EvalGameReport report={gameReport({ keyMoments: [rolled, reread, plain] })} playerNames={names} />);
+    expect(within(chip(73)).getByText('+13% from the roll (net +5%)')).toBeInTheDocument();
+    expect(within(chip(74)).getByText('−18% (net −10%)')).toBeInTheDocument();
+    expect(within(chip(75)).getByText(winDeltaText(0.4))).toBeInTheDocument();
   });
 
   test('a denied end at odds 1 reads as a sure KO that never came, never as a 100% roll or a failed one (T123 point 3, T135 point 4)', () => {

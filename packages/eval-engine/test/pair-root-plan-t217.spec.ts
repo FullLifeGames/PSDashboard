@@ -205,10 +205,11 @@ describe('a doubles turn without its protocol reads its luck from the planned ce
     return { analysis, text: summarizeTurn({ ...analysis, attribution: 'chance' }, names) };
   }
 
-  test('the played cell is plain and holds no unpriced effect: nothing rolled, so the card names the re-read (red before: no answer, the ungated wording)', () => {
+  test('the played cell is plain and holds no unpriced effect: nothing rolled, so the card says no roll is behind it (red before: no answer, the ungated wording)', () => {
     const planned = cardOf(false);
     expect(planned.analysis.rolledFor).toEqual({ p1: false, p2: false });
-    expect(planned.text).toContain('the engine re-read the position after the turn');
+    expect(planned.text).toContain('the estimate moved');
+    expect(planned.text).toContain('with no roll behind it');
     expect(planned.text).not.toContain('how the turn rolled');
   });
 

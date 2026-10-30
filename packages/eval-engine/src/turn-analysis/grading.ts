@@ -2,11 +2,13 @@ import { dexOf } from '@fulllifegames/replay-core';
 import type { RankedChoice } from '../types.ts';
 import type { PlayedAction, SackInfo } from '../played.ts';
 import {
-  DECIDED_SCORE, FEED_FLOOR_EPSILON, HEALTHY_SACK_FLOOR, PAYOFF_WINDOW, REGRET_THRESHOLD, RISK_PAYOFF_MARGIN,
+  DECIDED_SCORE, REGRET_THRESHOLD, RISK_PAYOFF_MARGIN,
   TIER_THRESHOLDS, type AnalyzeTurnParams, type SensitivityProbe, type Side, type SideAnalysis, type VerdictTier,
 } from './types.ts';
 import { matchPlayedChoice, matchPlayedSlots, phantomStayIn, setupMoveClicked } from './played-match.ts';
 import { rulesOfActives } from './rules.ts';
+import { turnRolledFor } from './luck.ts';
+import { praisedSack, sackGate, type SackGate, type SackGrade } from './sack-gates.ts';
 
 /**
  * The grading half of one side's turn, stage by stage in analyzeTurn's
@@ -97,126 +99,6 @@ function baseTier(regret: number | null, key: Side, scoreBefore: number): Verdic
   return tier;
 }
 
-/** The best own-perspective outcome over a floor inside a chain, and the chain index where it peaked. */
-export interface WindowPayoff {
-  payoff: number | null;
-  /** Index of the first peak (0 = the turn itself). */
-  payoffTurn: number;
-}
-
-/**
- * The payoff loop both the stayed-feed gate and the risk booking run: the
- * BEST expected outcome within the window over a guarantee (null entries
- * skipped) — a setup turn's value arrives on the turns after it.
- */
-export function bestWindowPayoff(chain: (number | null | undefined)[], key: Side, floor: number): WindowPayoff {
-  let payoff: number | null = null;
-  let payoffTurn = 0;
-  chain.forEach((outcome, index) => {
-    if (outcome === null || outcome === undefined) return;
-    const own = key === 'p1' ? outcome : -outcome;
-    const value = own - floor;
-    if (payoff === null || value > payoff) {
-      payoff = value;
-      payoffTurn = index;
-    }
-  });
-  return { payoff, payoffTurn };
-}
-
-/**
- * A stayed feed's windowed payoff over the safe guarantee — only when the
- * realized outcome landed on the played line's priced floor (the player
- * accepted the known worst case and got it — the turn's own rolls
- * contributed nothing positive; 573756 t68). Null when the floor gate
- * fails or no safe line exists.
- */
-function stayedFeedPayoff(
-  params: AnalyzeTurnParams,
-  key: Side,
-  played: RankedChoice | null,
-  safe: RankedChoice | null,
-): number | null {
-  const ownOutcome = params.playedOutcome === null ? null
-    : key === 'p1' ? params.playedOutcome : -params.playedOutcome;
-  const atFloor = played !== null && ownOutcome !== null &&
-    ownOutcome - played.worstCase <= FEED_FLOOR_EPSILON;
-  if (!(atFloor && safe && params.playedOutcome !== null)) return null;
-  const chain = [params.playedOutcome, ...(params.futureOutcomes ?? [])]
-    .slice(0, PAYOFF_WINDOW + 1);
-  return bestWindowPayoff(chain, key, safe.worstCase).payoff;
-}
-
-/**
- * The body's own action failed by dice while its move carried a knock-out:
- * a hit would have kept it alive, so nobody fed it (573756 t73, round 40).
- * Without knock-out odds on the played line the feed reading stands. A
- * doubles option's odds (round 56) carry a label and may be the partner
- * slot's: they count as none until the odds name their attacker.
- */
-function deniedByDice(sack: SackInfo, played: RankedChoice | null): boolean {
-  const odds = played?.koOdds;
-  return sack.rolled !== undefined && !!odds && !odds.label && odds.killFraction > 0;
-}
-
-/** What the sack gates decided: whether the leniency applies and, for a stayed feed, its windowed payoff. */
-interface SackGate {
-  sackApplies: boolean;
-  feedPayoff: number | null;
-}
-
-/**
- * Shape gates: low-HP applies unconditionally; healthy only while
- * decisively ahead on both sides of the sack (trading surplus material
- * for certainty, GPL T35 Salazzle — expectation-based, not results-based:
- * both gates read engine scores, and no after-score means no excuse, so
- * game ends and gap turns fail closed); a stayed feed only when the
- * realized outcome landed on the played line's priced floor AND the
- * windowed payoff over the safe guarantee clears the read margin (573756
- * t68). Fails closed. Before any shape: a body whose own action the dice
- * failed while its move carried a knock-out was not fed — a hit would have
- * kept it alive (573756 t73, round 40) — so no shape applies. Round 67
- * (T135, rule A): every own faint of the turn passes its own gate, so a
- * plain loss (no shape) or a body behind a stricter gate that fails blocks
- * the leniency (a low-HP feed is cheap, a partner lost next to it is not).
- */
-function sackGate(
-  params: AnalyzeTurnParams,
-  key: Side,
-  sack: SackInfo | undefined,
-  played: RankedChoice | null,
-  safe: RankedChoice | null,
-): SackGate {
-  if (!sack) return { sackApplies: false, feedPayoff: null };
-  const gates = turnFaints(sack).map(shape => (shape && !deniedByDice(shape, played) ? shapeGate(params, key, shape, played, safe) : null));
-  if (gates.some(gate => gate === null || !gate.sackApplies)) return { sackApplies: false, feedPayoff: null };
-  return { sackApplies: true, feedPayoff: gates.find(gate => gate!.feedPayoff !== null)?.feedPayoff ?? null };
-}
-
-/** Round 67 (T135, rule A): every own faint of the turn, the side's sack first; null = a plain loss with no sack shape. */
-const turnFaints = (sack: SackInfo): (SackInfo | null)[] => [sack, ...(sack.others ?? [])];
-
-/** One fallen body's shape gate (sackGate above), with a stayed feed's windowed payoff. */
-function shapeGate(
-  params: AnalyzeTurnParams,
-  key: Side,
-  shape: SackInfo,
-  played: RankedChoice | null,
-  safe: RankedChoice | null,
-): SackGate {
-  if (shape.stayed) {
-    const payoff = stayedFeedPayoff(params, key, played, safe);
-    const sackApplies = payoff !== null && payoff >= RISK_PAYOFF_MARGIN;
-    return { sackApplies, feedPayoff: sackApplies ? payoff : null };
-  }
-  if (shape.healthy) {
-    const ownBefore = key === 'p1' ? params.scoreBefore : -params.scoreBefore;
-    const ownAfter = params.scoreAfter === null ? null : (key === 'p1' ? params.scoreAfter : -params.scoreAfter);
-    return { sackApplies: ownBefore >= HEALTHY_SACK_FLOOR && ownAfter !== null && ownAfter >= HEALTHY_SACK_FLOOR, feedPayoff: null };
-  }
-  return { sackApplies: true, feedPayoff: null };
-}
-
 /** The sack verdict on the tier: demoted one band, cleared for a verified feed, never excusing a blunder. */
 interface SackVerdict {
   sacrificed: boolean;
@@ -242,77 +124,11 @@ function sackVerdict(tier: VerdictTier | undefined, regret: number | null, gate:
   return { sacrificed, feedVerified, tier: sacrificed ? (feedVerified ? undefined : demoteTier(tier)) : tier };
 }
 
-/**
- * Round 63 (T17): a hazard sack's windowed payoff over the safe guarantee —
- * only when the rolls after the pair added nothing (own after-score at most
- * FEED_FLOOR_EPSILON over the pair's value). The switch-in's death already
- * sits in the pair's cell (the attack aimed at it hits nothing), so the
- * floor gate of a stayed feed cannot apply; what must not count is luck
- * after the pair (653785 t19: −0.05). Null when the gate fails.
- */
-function hazardSackPayoff(params: AnalyzeTurnParams, key: Side, safe: RankedChoice | null): number | null {
-  if (params.playedOutcome === null || params.scoreAfter === null || !safe) return null;
-  const luckAfter = key === 'p1' ? params.scoreAfter - params.playedOutcome : params.playedOutcome - params.scoreAfter;
-  if (luckAfter > FEED_FLOOR_EPSILON) return null;
-  const chain = [params.playedOutcome, ...(params.futureOutcomes ?? [])].slice(0, PAYOFF_WINDOW + 1);
-  return bestWindowPayoff(chain, key, safe.worstCase).payoff;
-}
-
-/**
- * Round 63 fix: the fed body is the one the opponent's near-decided click
- * removes — the opponent's way into its sweep, so letting it fall is no
- * win-condition sacrifice (649664 t20: Medicham-Mega one sure KO from
- * clearing the rest by removing Lopunny-Mega, the body BKC fed). Formes of
- * one species are one body (Lopunny and Lopunny-Mega), read from the Dex.
- */
-function feedsOpposingSweep(params: AnalyzeTurnParams, key: Side, sack: SackInfo): boolean {
-  const near = params.result.unanswered?.nearDecided;
-  if (!near || near.side === key || !sack.species) return false;
-  const rules = rulesOfActives(params.actives);
-  const base = (species: string) => (rules ? dexOf(rules).species.get(species).baseSpecies : '') || species;
-  return base(near.removes) === base(sack.species);
-}
-
-/**
- * Round 63 (T17): praise without a band. An UNTIERED side earns the
- * sacrifice stamp only in the two verified forms — a stayed feed through
- * the priced-floor gate (573756 t68) or a hazard sack through the
- * luck-after-the-pair gate (653785 t19) — and only when the window repaid
- * the regret with the read margin on top. Low-HP and healthy faints stay
- * leniencies for tiered turns; a phantom stay-in has no choice to praise,
- * and an already-lost position earns no praise (the gamble credit's bound).
- * Round 67 (T135, rule A): every own faint of the turn must earn it.
- */
-function praisedSack(
-  params: AnalyzeTurnParams,
-  key: Side,
-  g: { sack: SackInfo | undefined; played: RankedChoice | null; safe: RankedChoice | null; regret: number | null; neverActed: boolean },
-): boolean {
-  if (!g.sack || g.regret === null || g.neverActed) return false;
-  if ((key === 'p1' ? params.scoreBefore : -params.scoreBefore) <= -DECIDED_SCORE) return false;
-  return turnFaints(g.sack).every(shape => praisedFaint(params, key, shape, g.played, g.safe, g.regret!));
-}
-
-/** One fallen body's praise form: a stayed feed through the floor gate or a hazard sack, repaying the regret with the margin. */
-function praisedFaint(
-  params: AnalyzeTurnParams,
-  key: Side,
-  shape: SackInfo | null,
-  played: RankedChoice | null,
-  safe: RankedChoice | null,
-  regret: number,
-): boolean {
-  if (!shape || deniedByDice(shape, played) || feedsOpposingSweep(params, key, shape)) return false;
-  const payoff = shape.stayed ? stayedFeedPayoff(params, key, played, safe)
-    : shape.hazard ? hazardSackPayoff(params, key, safe) : null;
-  return payoff !== null && payoff >= regret + RISK_PAYOFF_MARGIN;
-}
-
 /** The verdict before sensitivity: a tiered side through the sack leniency, an untiered one through the praise forms. */
 function sideVerdict(
   params: AnalyzeTurnParams,
   key: Side,
-  g: { sack: SackInfo | undefined; played: RankedChoice | null; safe: RankedChoice | null; regret: number | null; neverActed: boolean },
+  g: SackGrade,
 ): SackVerdict {
   const tier = baseTier(g.regret, key, params.scoreBefore);
   if (tier) return sackVerdict(tier, g.regret, sackGate(params, key, g.sack, g.played, g.safe));
@@ -374,6 +190,19 @@ export interface SideGrading {
   sensitivity: SideAnalysis['sensitivity'];
 }
 
+/**
+ * Round 79: the turn's dice for the sack gates, read before the side records exist: both sides' matched played lines go to
+ * the one rule that builds `rolledFor` (luck.ts). Only a side with a sack asks.
+ */
+function rolledForTurn(params: AnalyzeTurnParams, key: Side, played: RankedChoice | null): { p1: boolean; p2: boolean } | undefined {
+  if (!params.sacks?.[key]) return undefined;
+  const foe: Side = key === 'p1' ? 'p2' : 'p1';
+  const foePlayed = matchPlayedForSide(params, foe, foe === 'p1' ? params.played?.p1Slots : params.played?.p2Slots, params.played?.[foe] ?? null).played;
+  const own = { played };
+  const other = { played: foePlayed };
+  return turnRolledFor(params, key === 'p1' ? own : other, key === 'p1' ? other : own);
+}
+
 /** Runs the grading stages for one side: match, references, regret, band, sack, sensitivity. */
 export function gradeSide(params: AnalyzeTurnParams, key: Side): SideGrading {
   const playedRaw = params.played?.[key] ?? null;
@@ -386,7 +215,7 @@ export function gradeSide(params: AnalyzeTurnParams, key: Side): SideGrading {
     : null;
   const { regret, verifiedAtDepth } = verifiedRegret(params, key, played, best);
   const sack = params.sacks?.[key];
-  const verdict = sideVerdict(params, key, { sack, played, safe, regret, neverActed });
+  const verdict = sideVerdict(params, key, { sack, played, safe, regret, neverActed, rolledFor: rolledForTurn(params, key, played) });
   const acquittal = sensitivityAcquittal(verdict.tier, params.sensitivity?.[key]);
   return {
     playedRaw, playedSlots, played, playedPartial, neverActed, options, best, safe, regret, verifiedAtDepth,

@@ -2,8 +2,7 @@ import { gradeSide, gradingFields } from './turn-analysis/grading.ts';
 import { signalFields, signalSide } from './turn-analysis/signals.ts';
 import { hitStoppedFor } from './turn-analysis/odds-stopped.ts';
 import { attributionFor, markRisk } from './turn-analysis/risk.ts';
-import { rulesOfActives } from './turn-analysis/rules.ts';
-import { playedCellOf, playedMoveIds, rolledFromCell, rolledSides } from './turn-analysis/luck.ts';
+import { turnRolledFor } from './turn-analysis/luck.ts';
 import type { AnalyzeTurnParams, Side, SideAnalysis, TurnAnalysis } from './turn-analysis/types.ts';
 
 /**
@@ -53,9 +52,7 @@ const shareField = (share: number | null | undefined): { faintedFraction?: numbe
  * reading holds there, and the moves of the pair say whether an unpriced secondary effect could have rolled.
  */
 function rolledForFields(params: AnalyzeTurnParams, p1: SideAnalysis, p2: SideAnalysis): Pick<TurnAnalysis, 'rolledFor'> {
-  const rolledFor = params.rolls
-    ? rolledSides(params.rolls, p1, p2, params.actives)
-    : rolledFromCell(playedCellOf(params.result, params.played), playedMoveIds(params.played), rulesOfActives(params.actives));
+  const rolledFor = turnRolledFor(params, p1, p2);
   return rolledFor ? { rolledFor } : {};
 }
 

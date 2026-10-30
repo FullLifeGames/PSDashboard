@@ -1,4 +1,4 @@
-import type { Battle, Pokemon } from '@pkmn/sim';
+import type { Battle, ID, Pokemon } from '@pkmn/sim';
 import { boundaryEvent } from '../ko-odds.ts';
 import { movesFirst } from '../speed.ts';
 import { stageMultiplier } from '../stat-stages.ts';
@@ -8,7 +8,7 @@ import {
   expectedFraction, livingMons, singleMoveFraction, threatGetter, usableSlots,
   type MatchupCache, type PairThreat, type ThreatGetter,
 } from './threat.ts';
-import { healProfile, ppBudget, raceClocks, statusResidual, type HealProfile, type RaceSide } from './races.ts';
+import { healProfile, ppBudget, raceClocks, statusResidual, type HealProfile, type RaceClocks, type RaceSide } from './races.ts';
 
 /**
  * The root's unanswered-mon profile: mons no living enemy answers, the
@@ -67,6 +67,22 @@ function flinchChip(ctx: ProfileContext, standing: Pokemon, enemy: Pokemon): num
 }
 
 /**
+ * Round 79 (T283): does the first mover take a finite tie (both clocks equal)? Only when its own hit finishes the last
+ * turn. A KO that needs the foe's end-of-turn damage (burn, poison, Toxic) leaves the slower foe its action first: the tick
+ * comes after both moves. The foe's residual counts for the turns before the last, the first mover's own expected hit for
+ * the last. race-tie-residual.spec.ts plays each status against the simulator. A foe without a residual ties as before.
+ * The same tie in score/last-pair.ts and score/matchup.ts is not changed here (the score path).
+ */
+function firstTakesTie(sideA: RaceSide, sideB: RaceSide, clocks: RaceClocks, first: boolean): boolean {
+  if (!first || clocks.turnsA === Infinity) return false;
+  if (sideB.residual <= 0) return true;
+  const incoming = sideA.frac + sideB.residual;
+  const absorb = sideB.healRate > 0 && incoming > sideB.healRate ? sideB.healAbsorb * (sideB.healRate / incoming) : sideB.healAbsorb;
+  const earlier = (clocks.turnsA - 1) * (clocks.effFracA + sideB.residual);
+  return earlier + clocks.effFracA >= sideB.hp + absorb - 1e-9;
+}
+
+/**
  * Does the standing mon beat this enemy? Race verdict as the matchup term
  * weighs it; a benched enemy eats one free hit on the way in, a standing
  * one loses its first turn to the entry's flinch move.
@@ -78,10 +94,10 @@ function beatsEntry(ctx: ProfileContext, standing: Pokemon, enemy: Pokemon): boo
   const sideE = profileSide(ctx, enemy, threatE, standing);
   if (!enemy.isActive) sideE.hp = Math.max(0, sideE.hp - expectedRate(threatS, standing, enemy));
   else sideE.hp = Math.max(0, sideE.hp - flinchChip(ctx, standing, enemy));
-  const { turnsA, turnsB } = raceClocks(sideS, sideE);
-  if (turnsA < turnsB) return true;
-  if (turnsB < turnsA) return false;
-  return turnsA !== Infinity && movesFirst(standing, enemy, threatS, threatE, ctx.battle);
+  const clocks = raceClocks(sideS, sideE);
+  if (clocks.turnsA < clocks.turnsB) return true;
+  if (clocks.turnsB < clocks.turnsA) return false;
+  return firstTakesTie(sideS, sideE, clocks, movesFirst(standing, enemy, threatS, threatE, ctx.battle));
 }
 
 /** The side's open (no live answer) list and its switch-in-stage rows. */
@@ -113,13 +129,15 @@ function sweepClocks(ctx: ProfileContext, mon: Pokemon, theirs: Pokemon[]): { tu
     const threatS = ctx.threat(mon, enemy);
     const threatE = ctx.threat(enemy, mon);
     const first = movesFirst(mon, enemy, threatS, threatE, ctx.battle);
-    const clocks = raceClocks(profileSide(ctx, mon, threatS, enemy), profileSide(ctx, enemy, threatE, mon));
+    const sideS = profileSide(ctx, mon, threatS, enemy);
+    const sideE = profileSide(ctx, enemy, threatE, mon);
+    const clocks = raceClocks(sideS, sideE);
     // The sweeper must WIN every pair outright (the beatsEntry verdict,
     // sans entry toll — replacements arrive on a KO, not a switch): a
     // "survivor" that loses pairs but outlasts them on paper is an
     // artifact of the spare-turn economy, not a clean-up.
     const wins = clocks.turnsA < clocks.turnsB ||
-      (clocks.turnsA === clocks.turnsB && clocks.turnsA !== Infinity && first);
+      (clocks.turnsA === clocks.turnsB && firstTakesTie(sideS, sideE, clocks, first));
     if (!wins) return { turns, chip, blocked: true };
     const hits = Math.max(0, clocks.turnsA - (first ? 1 : 0));
     turns += clocks.turnsA;
@@ -162,6 +180,21 @@ function sweepSurvivor(ctx: ProfileContext, mine: Pokemon[], theirs: Pokemon[]):
 }
 
 /**
+ * Round 79 (T282): does the foe's move act before mine? The move's priority decides first, then the effective speed
+ * (inverted under Trick Room); an exact speed tie is a coin flip in the simulator, so the foe may act first (the near
+ * stage fails closed). Dex priorities only: a priority a handler moves (Prankster, Gale Wings, Triage, Grassy Glide in
+ * Grassy Terrain) is not read. near-decided-acts.spec.ts plays every priority move against the simulator's queue.
+ */
+export function foeActsBefore(battle: Battle, foe: Pokemon, foeMoveId: string, mine: Pokemon, myMoveId: string): boolean {
+  const foePriority = battle.dex.moves.getByID(foeMoveId as ID).priority;
+  const myPriority = battle.dex.moves.getByID(myMoveId as ID).priority;
+  if (foePriority !== myPriority) return foePriority > myPriority;
+  // movesFirst owns the speed order (Trick Room inverts it) and calls an exact tie first for neither side.
+  const equalPriority = { priority: false };
+  return movesFirst(foe, mine, equalPriority, equalPriority, battle) || !movesFirst(mine, foe, equalPriority, equalPriority, battle);
+}
+
+/**
  * The near stage: no decided sweep stands, but one high-odds click
  * removes the standing active and the REST clears — the 573756 t73 shape
  * (a 95% Fire Fang from the sweep). Own active, own click — a teammate's
@@ -171,10 +204,15 @@ function nearDecidedFor(ctx: ProfileContext, key: 'p1' | 'p2', mine: Pokemon[], 
   const attacker = mine.find(mon => mon.isActive);
   const target = theirs.find(mon => mon.isActive);
   if (!attacker || !target) return undefined;
+  // Round 79 (T282): a click lands only if its user still acts. The foe's moves that act before the click can kill the
+  // attacker first; the click's odds are its kill chance times the chance the foe's best earlier kill does not come.
+  const foeKills = usableSlots(target).map(slot => ({ id: slot.id, pKill: boundaryEvent(ctx.battle, target, attacker, slot.id)?.pKill ?? 0 }));
   let odds = 0;
   for (const slot of usableSlots(attacker)) {
     const event = boundaryEvent(ctx.battle, attacker, target, slot.id);
-    if (event && event.pKill > odds) odds = event.pKill;
+    if (!event) continue;
+    const earlier = Math.max(0, ...foeKills.filter(kill => foeActsBefore(ctx.battle, target, kill.id, attacker, slot.id)).map(kill => kill.pKill));
+    odds = Math.max(odds, event.pKill * (1 - earlier));
   }
   if (odds < NEAR_DECIDED_ODDS) return undefined;
   const rest = theirs.filter(enemy => enemy !== target);

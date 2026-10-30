@@ -11,7 +11,7 @@ import ts from 'typescript';
  * later cannot bring the dash back. Comments stay out (they are no text).
  */
 
-const PROSE = ['prose/clauses.ts', 'prose/phrases.ts', 'prose/line.ts', 'summary.ts', 'report.ts', 'win-reason.ts', 'denied-end.ts'];
+const PROSE = ['prose/clauses.ts', 'prose/phrases.ts', 'prose/line.ts', 'summary.ts', 'report.ts', 'win-reason.ts', 'denied-end.ts', 'biggest-roll.ts', 'standoff.ts'];
 
 /** Every string literal and template piece of one source file that holds an em or en dash, as "file:line". */
 function dashedStrings(file: string): string[] {

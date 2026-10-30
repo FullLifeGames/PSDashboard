@@ -3,7 +3,7 @@ import {
   CHANCE_THRESHOLD, DECIDED_SCORE, PAYOFF_WINDOW, RISK_PAYOFF_EPSILON, RISK_PAYOFF_MARGIN, TIER_THRESHOLDS,
   type AnalyzeTurnParams, type Side, type SideAnalysis, type TurnAnalysis, type TurnAttribution,
 } from './types.ts';
-import { bestWindowPayoff } from './grading.ts';
+import { bestWindowPayoff } from './sack-gates.ts';
 
 /**
  * A flagged risk whose punishing reply was never clicked reads differently

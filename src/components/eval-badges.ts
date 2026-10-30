@@ -43,9 +43,9 @@ export function attributionBadge(analysis: TurnAnalysis, playerNames: [string, s
     case 'p1-read': return { text: `${playerNames[0]}'s read paid off`, color: '#8c8' };
     case 'p2-read': return { text: `${playerNames[1]}'s read paid off`, color: '#8c8' };
     case 'both-read': return { text: 'both sides\' reads paid off', color: '#8c8' };
-    // Round 67 (T22): without a roll in the swing's direction the engine re-read the position.
+    // Round 67 (T22): without a roll in the swing's direction the estimate moved on its own. Round 79 (T286): plain words.
     case 'chance': return chanceRolled(analysis) === false
-      ? { text: 'engine re-read (no roll behind it)', color: '#b6a46a' }
+      ? { text: 'estimate moved (no roll behind it)', color: '#b6a46a' }
       : { text: 'chance swing (rolls, crits, reveals)', color: '#b6a46a' };
     case 'shift':
       return analysis.playedTracking === false

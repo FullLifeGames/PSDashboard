@@ -141,7 +141,7 @@ describe('the report reads the played cell when the turn has no protocol', () =>
   const ROLL = { visits: 20, verified: false, plan: 'events' as const, classes: [{ key: 'hit-nokill', weight: 0.7 }, { key: 'miss', weight: 0.3 }] };
   const DETERMINISTIC = { visits: 20, verified: false, plan: 'none' as const };
 
-  test('singles: a cell with a priced roll says the turn rolled, a deterministic cell says the engine re-read', () => {
+  test('singles: a cell with a priced roll says the turn rolled, a deterministic cell says the estimate moved with no roll behind it', () => {
     const rolled = single(ROLL);
     const reRead = single(DETERMINISTIC);
     const rolledCard = turn(rolled.result, rolled.played);
@@ -149,7 +149,7 @@ describe('the report reads the played cell when the turn has no protocol', () =>
     expect(rolledCard.rolledFor).toEqual({ p1: true, p2: true });
     expect(reReadCard.rolledFor).toEqual({ p1: false, p2: false });
     expect(summarizeTurn(rolledCard, names)).toContain('how the turn rolled');
-    expect(summarizeTurn(reReadCard, names)).toContain('the engine re-read the position');
+    expect(summarizeTurn(reReadCard, names)).toContain('with no roll behind it');
     expect(summarizeTurn(reReadCard, names)).not.toContain('how the turn rolled');
   });
 
