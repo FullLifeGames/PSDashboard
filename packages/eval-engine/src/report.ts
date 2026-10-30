@@ -1,4 +1,5 @@
 import type { SideAnalysis, TurnAnalysis, VerdictTier } from './analysis.ts';
+import { type BiggestRoll, biggestRollFor, biggestRollSentence } from './biggest-roll.ts';
 import { type DeniedEnd, deniedEndFor, deniedEndSentence } from './denied-end.ts';
 import { KEY_MOMENT_SWING, keyMomentsFor } from './key-moments.ts';
 import { regretSpanFor } from './prose/phrases.ts';
@@ -253,6 +254,8 @@ interface WinStory {
   seeds: TurnAnalysis[];
   conversion: ReturnType<typeof conversionFor>;
   denied: DeniedEnd | null;
+  /** Round 79 (T284): the largest roll against the winner, absent where the denied end already speaks that turn. */
+  roll: BiggestRoll | null;
   /** The tip turn's mechanism clause ('' when it has none the report may name). */
   tip: string;
   path: WinPathResult | null;
@@ -276,6 +279,8 @@ function winStoryFor(args: {
   const seeds = !playedTracking ? [] : seedsOfTheLoss(known, loser, turningPoint);
   const conversion = conversionFor(known, winner, args.playerNames);
   const denied = deniedEndFor(known, args.diceTurns);
+  const rolled = biggestRollFor(known, winner);
+  const roll = rolled && rolled.turn !== denied?.turn ? rolled : null;
   const tip = tipClause(known, winner, args.playerNames[sideIndex(winner)], turningPoint, args.diceTurns);
   const path = winPathFor({
     known, series: args.series, boundary: args.boundary, winner, playerNames: args.playerNames, chanceTotal: args.chanceTotal,
@@ -283,9 +288,9 @@ function winStoryFor(args: {
   });
   // Nothing else explained a tipped game: say so instead of saying nothing.
   if (!path && !conversion && seeds.length === 0 && turningPoint !== null) {
-    return { seeds, conversion, denied, tip, path: closeGameFallback(args.playerNames[sideIndex(winner)]) };
+    return { seeds, conversion, denied, roll, tip, path: closeGameFallback(args.playerNames[sideIndex(winner)]) };
   }
-  return { seeds, conversion, denied, tip, path };
+  return { seeds, conversion, denied, roll, tip, path };
 }
 
 /** The winner's story: who won, when and how it tipped, the conversion, the seeds (or clean play), and the winning edge. */
@@ -309,6 +314,7 @@ function winnerSentences(
   const loser = winner === 'p1' ? 'p2' : 'p1';
   const loserName = playerNames[sideIndex(loser)];
   if (story.denied) sentences.push(deniedEndSentence(story.denied, winner, loserName));
+  if (story.roll) sentences.push(biggestRollSentence(story.roll, loserName));
   if (story.seeds.length > 0) {
     const parts = story.seeds.map(analysis => seedPhrase(analysis, loser));
     sentences.push(`The seeds of the loss: ${parts.join(' and ')}.`);

@@ -37,16 +37,24 @@ const DENIED_MIN_REMAINDER = 8;
 const toward = (side: Side, delta: number): number => (side === 'p1' ? delta : -delta);
 
 /**
+ * Round 79 (T284): a played move that provably carried a roll: a full kill behind a sub-certain accuracy. Doubles odds
+ * (round 56) may be the partner slot's roll: no name from them (the odds then carry a label).
+ */
+export function sureKillRoll(analysis: TurnAnalysis, side: Side): { label: string; accuracy: number } | undefined {
+  const ko = analysis[side].played?.koOdds;
+  if (!ko || ko.label || ko.killFraction < 1 || ko.accuracy >= 1) return undefined;
+  return { label: analysis[side].played!.label, accuracy: ko.accuracy };
+}
+
+/**
  * The played move is named only when its analytic odds ARE the near-decided
- * roll â€” a full kill behind a sub-certain accuracy. Anything else (a
+ * roll — a full kill behind a sub-certain accuracy. Anything else (a
  * switch, a different move, a damage-roll gate) keeps the generic verb, so
  * "X missed" is never said about a roll X did not take.
  */
 function carriedMove(analysis: TurnAnalysis, side: Side, odds: number): string | undefined {
-  const ko = analysis[side].played?.koOdds;
-  // Doubles odds (round 56) may be the partner slot's roll: no name from them.
-  if (!ko || ko.label || ko.killFraction < 1 || ko.accuracy >= 1) return undefined;
-  return Math.abs(ko.accuracy - odds) < 1e-6 ? analysis[side].played!.label : undefined;
+  const roll = sureKillRoll(analysis, side);
+  return roll && Math.abs(roll.accuracy - odds) < 1e-6 ? roll.label : undefined;
 }
 
 /**
