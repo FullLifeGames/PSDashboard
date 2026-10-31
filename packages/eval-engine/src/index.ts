@@ -25,10 +25,21 @@ export {
   annotateNicknames, executeBranchChoices, resolveSideChoices, reconstructBranchRuntime, adoptSerializedRuntime,
 } from './branch-engine.ts';
 export type {
-  BranchChoiceErrorLog, BranchExecuteResult, BranchFieldState, BranchMoveOption, BranchRuntime, BranchSimState,
+  BranchChoiceErrorLog, BranchDiceTurn, BranchExecuteResult, BranchFieldState, BranchMoveOption, BranchRuntime, BranchSimState,
   BranchSlotModifiers, BranchSwitchOption, BranchTargetOption, PokemonStatTable, SimPokemonInfo,
   ResolvedSideCommand, ReconstructParams, ReplacementPoint, AdoptParams,
 } from './branch-engine.ts';
+// Round 82 (forced dice): what the app needs of the dice module. The words, the log reader and the label are free of simulator
+// imports; the offers read the simulator and load with the branch engine (src/lib/lazy/branch-engine.ts).
+export { DIE_KINDS, dieKey, tieName } from './dice/types.ts';
+export type { DiceReport, DieKind, DieName, DieReport, DieResult, DieTook, ForcedDie } from './dice/types.ts';
+export { dieLabel } from './dice/die-label.ts';
+export type { DieWords } from './dice/die-label.ts';
+export { loggedDice, mergeLoggedDice } from './dice/logged-results.ts';
+export type { LoggedOptions } from './dice/logged-results.ts';
+export { offeredDice, offeredEndDice, offeredOrderDice } from './dice/offer.ts';
+export type { DieOffer } from './dice/offer.ts';
+export { secondariesIn } from './dice/secondaries.ts';
 export type { BranchChoices } from './branch/types.ts';
 export { hiddenPowerFacts, sightedHp, sightedHpAt, snapshotSimFacts, speciesAfterTeraClick } from './branch/pokemon-info.ts';
 export type { HpDisplayBody, HpSighting } from './branch/pokemon-info.ts';
