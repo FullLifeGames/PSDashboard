@@ -1,8 +1,9 @@
 import type { Battle, PRNG } from '@pkmn/sim';
 import { LoggedRollPRNG } from '../branch/logged-rolls.ts';
 import { copyOf } from '../sim-ask/copy.ts';
-import { ForcedDicePRNG, RecordingPRNG, type DieNote } from './prng.ts';
-import { dieKey, type DiceReport, type DieReport, type ForcedDie, type NaturalRecord } from './types.ts';
+import { ForcedDicePRNG, RecordingPRNG } from './prng.ts';
+import { reportOf } from './report.ts';
+import { dieKey, type DiceReport, type ForcedDie, type NaturalRecord } from './types.ts';
 import { watchBattle } from './watch.ts';
 
 /**
@@ -49,17 +50,6 @@ function naturalTurn(live: Battle, play: (battle: Battle) => void): { record: Na
   return { record: recording.record, endSeed: String(stream.getSeed()) };
 }
 
-/**
- * The first report: what the real turn's PRNG saw of each forced die. `applied` here means the draw ran and took the answer
- * the draw allows; the protocol's witnesses (blocked, no effect) come with the full report (A2b).
- */
-function reportOf(die: ForcedDie, note: DieNote | undefined): DieReport {
-  if (!note) return { die, took: 'no-draw', reason: 'the simulator never drew this die in the turn' };
-  const seen = { ...(note.chance === undefined ? {} : { chance: note.chance }), ...(note.logIndex === undefined ? {} : { logIndex: note.logIndex }) };
-  if (note.noChance) return { die, took: 'no-chance', ...seen, reason: 'the draw has no way to give this answer' };
-  return { die, took: 'applied', ...seen };
-}
-
 export function playForcedTurn({ live, forced, play }: ForcedTurnInput): DiceReport {
   if (forced.length === 0) {
     play(live);
@@ -68,6 +58,7 @@ export function playForcedTurn({ live, forced, play }: ForcedTurnInput): DiceRep
   const natural = naturalTurn(live, play);
   const inner = live.prng;
   const watch = watchBattle(live);
+  const start = live.log.length;
   const prng = new ForcedDicePRNG({ inner, watch, forced, record: natural.record });
   live.prng = prng;
   try {
@@ -78,7 +69,7 @@ export function playForcedTurn({ live, forced, play }: ForcedTurnInput): DiceRep
   }
   inner.setSeed(natural.endSeed as Parameters<PRNG['setSeed']>[0]);
   return {
-    forced: forced.map(die => reportOf(die, prng.notes.get(dieKey(die.name)))),
+    forced: forced.map(die => reportOf({ die, note: prng.notes.get(dieKey(die.name)), battle: live, start })),
     naturalEndSeed: natural.endSeed,
   };
 }

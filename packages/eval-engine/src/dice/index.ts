@@ -6,6 +6,7 @@ export { answerDie, type Answered } from './answer.ts';
 export { playForcedTurn, type ForcedTurnInput } from './play.ts';
 export { ForcedDicePRNG, RecordingPRNG, type DieNote } from './prng.ts';
 export { genShape, recognize } from './recognize.ts';
+export { reportOf, type ReportInput } from './report.ts';
 export {
   dieKey,
   type Answer, type DiceReport, type DieKind, type DieName, type DieReport, type DieResult, type DieTook, type Draw,

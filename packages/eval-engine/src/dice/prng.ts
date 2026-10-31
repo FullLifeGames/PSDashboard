@@ -96,6 +96,8 @@ export interface DieNote {
   draws: number;
   /** A draw gave no way to produce the forced answer (a 100 percent accuracy forced to miss). */
   noChance: boolean;
+  /** The answer does not fit the die (a step the roll lacks, a result of another kind): nothing was forced. */
+  unfit?: boolean;
   /** The chance of the first draw, numerator over denominator, when the draw was a chance. */
   chance?: number;
   /** `battle.log.length` at the first draw. */
@@ -136,7 +138,10 @@ export class ForcedDicePRNG extends WatchedPRNG {
     if (note.draws === 1) note.logIndex = this.watch.battle.log.length;
     if (answer && 'chance' in answer && answer.chance !== undefined && note.chance === undefined) note.chance = answer.chance;
     this.notes.set(key, note);
-    if (!answer) return natural;
+    if (!answer) {
+      note.unfit = true;
+      return natural;
+    }
     if ('noChance' in answer) {
       note.noChance = true;
       return natural;
