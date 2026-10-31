@@ -3,6 +3,7 @@ import type { BranchHistoryEntry } from '../hooks/useBranch';
 import { notationSideLabel } from '@fulllifegames/eval-engine';
 import type { TimelinePosition } from '../lib/timeline';
 import { activeSummary, alignHistoryRows, branchSummary, type SideSummary } from '../lib/branch-history';
+import { markText, turnDiceMarks, type DiceMarks } from '../lib/branch-dice-marks';
 
 interface Props {
   branchStartTurn: number;
@@ -44,6 +45,24 @@ function ForcedRow({ entry }: { entry: BranchHistoryEntry }) {
   );
 }
 
+/**
+ * Round 82 (forced dice), step A7c, decision 6a: the dice the user forced in the row's turn, each with its side, and "(no effect)"
+ * on a die the simulator did not use (the reason sits in the title).
+ */
+function DiceMarksLine({ marks }: { marks: DiceMarks }) {
+  const sides = (['p1', 'p2'] as const).flatMap(side => marks[side].map((mark, index) => ({ side, mark, key: `${side}-${index}` })));
+  return (
+    <div role="group" aria-label="Forced dice" style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 8px', fontSize: 10, color: '#cddcf2', marginBottom: 6 }}>
+      <span style={{ color: '#8899aa' }}>Forced dice</span>
+      {sides.map(({ side, mark, key }) => (
+        <span key={key} title={mark.noEffect || undefined} style={mark.noEffect === undefined ? undefined : { color: '#e0a8a8' }}>
+          {`${side.toUpperCase()} ${markText(mark)}`}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 /** One line's cell of a history row: the heading and both sides' actives; clickable when navigation exists. */
 function LineCell({ heading, summary, highlighted, color, onClick }: {
   heading: string;
@@ -72,8 +91,10 @@ function LineCell({ heading, summary, highlighted, color, onClick }: {
   );
 }
 
-function HistoryRow({ entry, settled, originalTurn, variationTurn, snapshots, currentPosition, onNavigate }: Pick<Props, 'snapshots' | 'currentPosition' | 'onNavigate'> & {
+function HistoryRow({ entry, settled, marks, originalTurn, variationTurn, snapshots, currentPosition, onNavigate }: Pick<Props, 'snapshots' | 'currentPosition' | 'onNavigate'> & {
   entry: BranchHistoryEntry;
+  /** The dice of the whole turn: a turn that paused for a switch reads the joined report of its last forced entry. */
+  marks: DiceMarks | undefined;
   /** Holds the board after the turn's forced replacements (A-5). */
   settled: BranchHistoryEntry;
   originalTurn: number;
@@ -102,6 +123,7 @@ function HistoryRow({ entry, settled, originalTurn, variationTurn, snapshots, cu
           {notationSideLabel(entry.p2SlotChoices, entry.p2Choice)}
         </span>
       </div>
+      {marks && <DiceMarksLine marks={marks} />}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
         <LineCell
           heading={`Main line (turn ${originalTurn})`}
@@ -150,6 +172,7 @@ export function BranchHistoryPanel({ branchStartTurn, history, snapshots, curren
                 key={`${entry.turnNumber}-${index}`}
                 entry={entry}
                 settled={settled}
+                marks={turnDiceMarks(history, index)}
                 originalTurn={originalTurn}
                 variationTurn={variationTurn}
                 snapshots={snapshots}

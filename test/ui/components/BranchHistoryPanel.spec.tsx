@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BranchHistoryPanel } from '../../../src/components/BranchHistoryPanel';
 import type { BranchHistoryEntry } from '../../../src/hooks/useBranch';
@@ -119,5 +119,43 @@ describe('BranchHistoryPanel', () => {
     render(<BranchHistoryPanel branchStartTurn={2} history={[entry(2)]} snapshots={snapshots} />);
     expect(screen.queryByText(/click a cell to jump/)).toBeNull();
     expect(screen.queryByRole('button', { name: /Tip of the variation/ })).toBeNull();
+  });
+});
+
+// Round 82 (forced dice), step A7c, decision 6a: a row lists the dice the user forced in its turn and says which took no effect.
+describe('the dice of a turn in its row', () => {
+  const marks = (p1: { label: string; noEffect?: string }[], p2: { label: string; noEffect?: string }[] = []) => ({ p1, p2 });
+  const diceLine = () => screen.getByRole('group', { name: 'Forced dice' });
+
+  test.each([
+    ['singles', [{ label: 'Air Slash: Flinch' }], [], ['P1 Air Slash: Flinch']],
+    ['doubles', [{ label: 'Air Slash: Flinch' }, { label: 'Rock Slide: Hits' }], [{ label: 'Scald: Burn' }], ['P1 Air Slash: Flinch', 'P1 Rock Slide: Hits', 'P2 Scald: Burn']],
+  ])('%s: the row names each forced die with its side', (_kind, p1, p2, texts) => {
+    render(<BranchHistoryPanel branchStartTurn={2} history={[entry(2, { diceMarks: marks(p1, p2) })]} snapshots={snapshots} />);
+    const line = diceLine();
+    expect(line).toHaveTextContent('Forced dice');
+    texts.forEach(text => expect(within(line).getByText(text)).toBeInTheDocument());
+  });
+
+  test('a die that took no effect says so, and the reason sits in its title', () => {
+    render(<BranchHistoryPanel branchStartTurn={2} history={[entry(2, { diceMarks: marks([{ label: 'Air Slash: Flinch', noEffect: 'Air Slash did not run' }, { label: 'Air Slash: Hits' }]) })]} snapshots={snapshots} />);
+    const void_ = within(diceLine()).getByText('P1 Air Slash: Flinch (no effect)');
+    expect(void_).toHaveAttribute('title', 'Air Slash did not run');
+    expect(within(diceLine()).getByText('P1 Air Slash: Hits')).not.toHaveAttribute('title');
+  });
+
+  test('a turn without a forced die has no dice line', () => {
+    render(<BranchHistoryPanel branchStartTurn={2} history={[entry(2)]} snapshots={snapshots} />);
+    expect(screen.queryByRole('group', { name: 'Forced dice' })).toBeNull();
+  });
+
+  test('a turn that paused for a switch shows the joined report once, on the turn row and not on the replacement row', () => {
+    const turn = entry(8, { diceMarks: marks([], [{ label: 'Scald: Burn', noEffect: 'not reached' }]) });
+    const replacement = entry(8, { kind: 'forced', forcedSide: 'p1', p1Choice: 'switch 3', p2Choice: '—', diceMarks: marks([{ label: 'Volt Switch: Hits' }], [{ label: 'Scald: Burn' }]) });
+    render(<BranchHistoryPanel branchStartTurn={7} history={[turn, replacement]} snapshots={snapshots} />);
+    expect(screen.getAllByRole('group', { name: 'Forced dice' })).toHaveLength(1);
+    expect(within(diceLine()).getByText('P2 Scald: Burn')).toBeInTheDocument();
+    expect(within(diceLine()).getByText('P1 Volt Switch: Hits')).toBeInTheDocument();
+    expect(screen.queryByText(/no effect/)).toBeNull();
   });
 });
