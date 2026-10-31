@@ -65,6 +65,7 @@ describe('the dice a log shows, action by action', () => {
     expect(show(loggedDice(GPL13))).toEqual([
       'p1a:airslash:p2a:accuracy {"happens":true}', 'p1a:airslash:p2a:crit {"happens":false}',
       'p2a:heavyslam:p1a:accuracy {"happens":true}', 'p2a:heavyslam:p1a:crit {"happens":false}',
+      'p1a::p2a:speed-tie {"first":"p1a"}',
     ]);
     const withFlinch = loggedDice(GPL13, { secondariesOf: move => (move === 'airslash' ? ['flinch'] : []) });
     expect(show(withFlinch)).toContain('p1a:airslash:p2a:secondary:flinch {"happens":false}');
@@ -74,6 +75,7 @@ describe('the dice a log shows, action by action', () => {
     expect(show(loggedDice(FIRE_FANG, { secondariesOf: move => (move === 'firefang' ? ['brn', 'flinch'] : []) }))).toEqual([
       'p2a:firefang:p1a:accuracy {"happens":false}',
       'p1a:bodypress:p2a:accuracy {"happens":true}', 'p1a:bodypress:p2a:crit {"happens":false}',
+      'p1a::p2a:speed-tie {"first":"p2a"}',
     ]);
   });
 
@@ -188,6 +190,19 @@ describe('the dice a log shows, action by action', () => {
     expect(show(loggedDice(through, options)).filter(entry => entry.includes('status-check'))).toEqual(['p1a:tackle::status-check:confusion {"happens":true}']);
   });
 
+  test('the order of the moves is a die for every two bodies; a copy of a move and a repeat by one body are none', () => {
+    const turn = lines(`
+|move|p1a: A|Tackle|p2a: C
+|move|p2b: D|Tackle|p1b: B
+|move|p2a: C|Swords Dance|p2a: C|[from] ability: Dancer
+|move|p1b: B|Tackle|p2b: D
+`);
+    const ties = show(loggedDice(turn)).filter(entry => entry.includes('speed-tie'));
+    expect(ties).toEqual([
+      'p1a::p2b:speed-tie {"first":"p1a"}', 'p1a::p1b:speed-tie {"first":"p1a"}', 'p1b::p2b:speed-tie {"first":"p2b"}',
+    ]);
+  });
+
   test('the split lines of a simulator log read as the public lines do', () => {
     const turn = lines(`
 |move|p1a: A|Tackle|p2a: B
@@ -214,16 +229,18 @@ describe('the logged dice join the forced dice of a turn (19a)', () => {
     expect(show(merged)).toEqual([
       'p2a:firefang:p1a:accuracy {"happens":true}',
       'p1a:bodypress:p2a:accuracy {"happens":true}', 'p1a:bodypress:p2a:crit {"happens":false}',
+      'p1a::p2a:speed-tie {"first":"p2a"}',
     ]);
   });
 
-  test('an action the user changed loses its logged dice; the body it switched out loses the dice aimed at it', () => {
+  test('an action the user changed loses its logged dice, and the order it was part of; the body it switched out loses the dice aimed at it', () => {
     const forced = [accuracyOf('p1a', 'tackle', 'p2a', false)];
     expect(show(mergeLoggedDice({ logged, forced, changed: new Set(['p1a']) })).filter(entry => entry.startsWith('p1a:bodypress'))).toEqual([]);
     const switched = mergeLoggedDice({ logged, forced, changed: new Set(['p1a']), switched: new Set(['p1a']) });
     expect(show(switched).filter(entry => entry.includes('firefang'))).toEqual([]);
     const moved = mergeLoggedDice({ logged, forced, changed: new Set(['p1a']) });
     expect(show(moved).filter(entry => entry.includes('firefang'))).toEqual(['p2a:firefang:p1a:accuracy {"happens":false}']);
+    expect(show(moved).filter(entry => entry.includes('speed-tie'))).toEqual([]);
   });
 });
 

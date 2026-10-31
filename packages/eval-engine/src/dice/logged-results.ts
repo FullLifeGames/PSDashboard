@@ -1,5 +1,5 @@
 import { toId } from '@fulllifegames/replay-core';
-import { dieKey, type ForcedDie } from './types.ts';
+import { dieKey, tieName, type ForcedDie } from './types.ts';
 
 /**
  * Round 82 (forced dice), step A5, gate answer 19a: the dice a log shows, read per action. On the first turn of a branch the
@@ -31,6 +31,8 @@ export interface LoggedOptions {
 /** One stretch of the log: a body's `|move|` or `|cant|` line and the lines up to the next action, or the lines between actions. */
 export interface LoggedAction {
   type: 'move' | 'cant' | 'other';
+  /** A move the queue ran (no `[from]` line: a Dancer copy or a called move is no queue action). */
+  queued: boolean;
   slot: string;
   ident: string;
   moveId: string;
@@ -67,7 +69,7 @@ const BREAKS = new Set(['move', 'cant', 'switch', 'drag', 'replace', 'upkeep', '
 
 function blank(type: LoggedAction['type'], ident = '', moveId = '', reason = ''): LoggedAction {
   return {
-    type, slot: slotOf(ident), ident, moveId, reason, idents: ident ? { [slotOf(ident)]: ident } : {}, targets: [], missed: [], misses: 0,
+    type, queued: false, slot: slotOf(ident), ident, moveId, reason, idents: ident ? { [slotOf(ident)]: ident } : {}, targets: [], missed: [], misses: 0,
     damaged: {}, crits: {}, hitCounts: {}, selfHits: {}, selfHitBy: {}, effects: {}, boosts: {},
   };
 }
@@ -145,6 +147,7 @@ export function loggedActions(turnLines: readonly string[]): LoggedAction[] {
       if (tag === 'move') {
         const action = blank('move', field(parts, 2), toId(field(parts, 3)));
         action.targets = aimOf(parts);
+        action.queued = !line.includes('[from]') || line.includes('[from]lockedmove');
         const aimed = slotOf(field(parts, 4));
         if (aimed) action.idents[aimed] = field(parts, 4);
         if (line.includes('[miss]')) {
@@ -281,7 +284,7 @@ export function loggedDice(turnLines: readonly string[], options: LoggedOptions 
   actions.forEach((action, index) => {
     if (action.type === 'move') dice.push(...moveDice(actions, index, flinched.get(index) ?? new Set(), options));
   });
-  dice.push(...checkDice(actions, options));
+  dice.push(...checkDice(actions, options), ...orderDice(actions));
   const seen = new Set<string>();
   return dice.filter(die => {
     const key = dieKey(die.name);
@@ -289,6 +292,22 @@ export function loggedDice(turnLines: readonly string[], options: LoggedOptions 
     seen.add(key);
     return true;
   });
+}
+
+/**
+ * The order the log shows: for every two bodies whose moves the queue ran, the one that moved first goes first. Two bodies that
+ * did not tie in speed and priority have no such die (the report says `no-draw`), so the dice only hold where the simulator
+ * shuffled the two.
+ */
+function orderDice(actions: readonly LoggedAction[]): ForcedDie[] {
+  const moves = actions.filter(action => action.type === 'move' && action.queued);
+  const dice: ForcedDie[] = [];
+  moves.forEach((earlier, index) => {
+    for (const later of moves.slice(index + 1)) {
+      if (earlier.slot !== later.slot) dice.push({ name: tieName(earlier.slot, later.slot), result: { first: earlier.slot } });
+    }
+  });
+  return dice;
 }
 
 export interface MergeInput {
@@ -309,7 +328,9 @@ export interface MergeInput {
 export function mergeLoggedDice({ logged, forced, changed, switched }: MergeInput): ForcedDie[] {
   if (forced.length === 0) return [];
   const taken = new Set(forced.map(die => dieKey(die.name)));
+  // a tie belongs to two bodies: when either one changed its action the order of the log no longer holds
   const kept = logged.filter(die => !taken.has(dieKey(die.name)) && !changed.has(die.name.slot)
+    && !(die.name.kind === 'speed-tie' && die.name.targetSlot !== undefined && changed.has(die.name.targetSlot))
     && !(die.name.targetSlot !== undefined && switched?.has(die.name.targetSlot)));
   return [...forced, ...kept];
 }
