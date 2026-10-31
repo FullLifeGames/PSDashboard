@@ -36,7 +36,7 @@ function answerChance(happens: boolean, draw: Draw): Answered {
 }
 
 /** The dice that are one chance: forced to happen or not to. */
-const CHANCE_KINDS: ReadonlySet<DieKind> = new Set(['accuracy', 'crit', 'secondary', 'self-effect', 'stalling', 'power', 'status-check', 'move-first']);
+const CHANCE_KINDS: ReadonlySet<DieKind> = new Set(['accuracy', 'crit', 'secondary', 'self-effect', 'stalling', 'power', 'status-check', 'move-first', 'ability-proc', 'item-proc', 'end-of-turn']);
 
 /**
  * The hit count: a `sample` over the counts (the first item that equals it), or `random(from, to)` over the counts. A
@@ -52,8 +52,20 @@ function answerHits(hits: number, draw: Draw): Answered | null {
   return null;
 }
 
+/**
+ * A die with several results (Effect Spore's status). A `sample` over the words names its result by the item that equals it; a
+ * `random(100)` that the script compares against thresholds holds a result the draw alone does not name: the learner (learn.ts)
+ * plays it out on copies.
+ */
+function answerOption(option: string, draw: Draw): Answered | null {
+  if (draw.call !== 'sample') return null;
+  const index = draw.items?.indexOf(option) ?? -1;
+  return index < 0 ? { noChance: true } : { value: index };
+}
+
 export function answerDie(kind: DieKind, result: DieResult, draw: Draw, gen: number): Answered | null {
   if (CHANCE_KINDS.has(kind) && 'happens' in result) return answerChance(result.happens, draw);
+  if (kind === 'ability-proc' && 'option' in result) return answerOption(result.option, draw);
   if (kind === 'hit-count' && 'hits' in result) return answerHits(result.hits, draw);
   if (kind === 'damage-roll' && 'step' in result) {
     const shape = genShape(gen).roll;

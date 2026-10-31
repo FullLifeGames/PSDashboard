@@ -13,7 +13,7 @@ export {
   type ForcedDie, type NaturalRecord,
 } from './types.ts';
 export { watchBattle, type ArmedHook, type BattleWatch } from './watch.ts';
-export { learnHitCount, type LearnInput } from './learn.ts';
+export { learnHitCount, learnOption, type LearnInput, type LearnOptionInput } from './learn.ts';
 export { offeredDice, offeredOrderDice, type DieOffer } from './offer.ts';
 export { probeCheck, type CheckProbe } from './status-probe.ts';
 export { readsStartRoll } from './start-roll.ts';

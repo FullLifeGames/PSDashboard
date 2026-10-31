@@ -24,6 +24,9 @@ abstract class WatchedPRNG extends PRNG {
     this.watch = watch;
   }
 
+  /** A draw is about to be answered; `name` is its die, or null when nothing names it. */
+  protected saw?(name: DieName | null): void;
+
   /** What to return for a recognized draw; `natural` is the value the stream gave. */
   protected abstract decide(name: DieName, draw: Draw, natural: number): number;
 
@@ -46,6 +49,7 @@ abstract class WatchedPRNG extends PRNG {
     const draw: Draw = this.shape ?? { call: 'random', from, to };
     const name = recognize(draw, this.watch, this.watch.battle.gen);
     this.watch.settle();
+    this.saw?.(name);
     return name ? this.decide(name, draw, natural) : natural;
   }
 
@@ -145,6 +149,8 @@ export interface DieNote {
   chance?: number;
   /** `battle.log.length` at the first draw. */
   logIndex?: number;
+  /** `battle.log.length` at the next draw of any die after the first: the lines up to here are this die's own (a proc, an end-of-turn die). */
+  until?: number;
   /** The shape of every draw of the die (a copy of the call's `Draw`), in order: the learner reads the next draw's shape from it. */
   shapes: Draw[];
 }
@@ -161,6 +167,8 @@ export class ForcedDicePRNG extends WatchedPRNG {
   private readonly ties = new Map<string, ForcedDie>();
   private readonly record: NaturalRecord;
   private readonly cursors = new Map<string, number>();
+  /** The die whose first draw was the last forced one: the next draw of any kind closes its window. */
+  private open: { note: DieNote; name: DieName } | null = null;
 
   /** Raw answers per die key, one per draw, learned on copies (learn.ts); null means no draw sequence gives the answer. */
   private readonly scripts: ReadonlyMap<string, readonly number[] | null>;
@@ -209,6 +217,19 @@ export class ForcedDicePRNG extends WatchedPRNG {
     for (const [index, slot] of respecting(slots, pairs).entries()) items[start + positions[index]] = bySlot.get(slot);
   }
 
+  /**
+   * The next draw ends the window of the die forced last unless it belongs to the same effect (Gens 3 and 4 draw Effect Spore's
+   * chance and then its pick: the status line follows the second draw).
+   */
+  protected override saw(name: DieName | null): void {
+    const open = this.open;
+    if (!open) return;
+    const effectOf = (die: DieName): string => (die.effectId ?? '').split(':')[0];
+    if (name && name.kind === open.name.kind && name.slot === open.name.slot && effectOf(name) === effectOf(open.name)) return;
+    open.note.until ??= this.watch.battle.log.length;
+    this.open = null;
+  }
+
   private noteOf(key: string): DieNote {
     let note = this.notes.get(key);
     if (!note) this.notes.set(key, note = { draws: 0, noChance: false, shapes: [] });
@@ -230,7 +251,10 @@ export class ForcedDicePRNG extends WatchedPRNG {
     const answer = this.answerFor(key, die, draw, natural, note.draws);
     note.draws++;
     note.shapes.push({ ...draw });
-    if (note.draws === 1) note.logIndex = this.watch.battle.log.length;
+    if (note.draws === 1) {
+      note.logIndex = this.watch.battle.log.length;
+      this.open = { note, name: die.name };
+    }
     if (answer && 'chance' in answer && answer.chance !== undefined && note.chance === undefined) note.chance = answer.chance;
     this.notes.set(key, note);
     if (!answer) {

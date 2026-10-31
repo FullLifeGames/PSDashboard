@@ -175,6 +175,37 @@ function handlerDie(draw: Draw, battle: Battle, base: Base): DieName | null {
   return null;
 }
 
+/**
+ * Round 82, step A4: a proc of the move's hit. An ability's handler draws a chance (a contact ability, Cursed Body, Poison Touch,
+ * Toxic Chain) or a number from 0 to 99 (Effect Spore) when its holder was hit or hit; an item's handler draws a chance under
+ * `Damage` (the Focus Band). The die names the user of the move, the body that was hit (the event's target) and the holder's
+ * ability or item. The Gens 3 and 4 Effect Spore then picks its status with a `sample` under the same event: that pick is its own
+ * die, told apart by `:option`.
+ */
+function procDie(draw: Draw, battle: Battle, base: Base): DieName | null {
+  const event = battle.event as { id?: string; target?: { getSlot?: () => string } } | undefined;
+  const effect = battle.effect as { id?: string; effectType?: string } | undefined;
+  const targetSlot = event?.target?.getSlot?.();
+  if (!effect?.id || !targetSlot) return null;
+  const named = { ...base, targetSlot };
+  if (effect.effectType === 'Ability') return abilityProc(draw, event?.id, effect.id, named);
+  return effect.effectType === 'Item' && draw.call === 'chance' && event?.id === 'Damage' ? { ...named, kind: 'item-proc', effectId: effect.id } : null;
+}
+
+function abilityProc(draw: Draw, event: string | undefined, id: string, named: Base & { targetSlot: string }): DieName | null {
+  if (draw.call === 'sample') return event === 'DamagingHit' ? { ...named, kind: 'ability-proc', effectId: `${id}:option` } : null;
+  return draw.call === 'chance' || isPercent(draw) ? { ...named, kind: 'ability-proc', effectId: id } : null;
+}
+
+/**
+ * The count is drawn for a move with a `multihit` before the first hit starts (`move.hit` is still 0), with no handler in
+ * flight; a duration or a pick is no count.
+ */
+function hitCountDraw(draw: Draw, battle: Battle, scope: string | null, gen: number, quiet: boolean): boolean {
+  const counted = battle.activeMove as unknown as { hit?: number; multihit?: unknown };
+  return scope === hitCountScope(gen) && (draw.call === 'sample' || draw.call === 'random') && quiet && !counted.hit && !!counted.multihit;
+}
+
 /** The dice of a move that are not accuracy, crit or roll (A3a): secondaries, self effects, hit counts, stalling, power. */
 function recognizeMoveDraw(draw: Draw, watch: BattleWatch, gen: number, base: Base): DieName | null {
   const { battle } = watch;
@@ -187,11 +218,8 @@ function recognizeMoveDraw(draw: Draw, watch: BattleWatch, gen: number, base: Ba
     draw.chance = chanceOfEntry((battle.activeMove as unknown as ActiveMoveLike).self?.chance);
     return { ...base, kind: 'self-effect' };
   }
-  // the count is drawn for a move with a `multihit` before the first hit starts (`move.hit` is still 0); a duration or a pick is no count
-  const counted = battle.activeMove as unknown as { hit?: number; multihit?: unknown };
-  const beforeHits = !counted.hit && !!counted.multihit;
-  if (scope === hitCountScope(gen) && (draw.call === 'sample' || draw.call === 'random') && quiet && beforeHits) return { ...base, kind: 'hit-count' };
-  return handlerDie(draw, battle, base);
+  if (hitCountDraw(draw, battle, scope, gen, quiet)) return { ...base, kind: 'hit-count' };
+  return handlerDie(draw, battle, base) ?? procDie(draw, battle, base);
 }
 
 /** Events whose handler lets its holder act first: Gen 4 draws in the item's `BeforeTurn`, Gens 5 on in `FractionalPriority`. */

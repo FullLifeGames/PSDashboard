@@ -4,6 +4,7 @@ import type { DieReport, ForcedDie } from './types.ts';
 import type { MoveSight } from './watch.ts';
 import { about, applied, otherwise, parts, shows, slotOfIdent, type Witness } from './report-lines.ts';
 import { moveNoDraw, moveWitness } from './report-moves.ts';
+import { endNoDraw, procReport, SPAN_KINDS } from './report-procs.ts';
 import { moveFirstReport, orderNoDraw, startRollReport, statusNoDraw, statusReport, tieReport } from './report-turn.ts';
 
 /**
@@ -95,6 +96,7 @@ const QUIET = new Set(['debug', '-nothing', '']);
 function noDraw(input: ReportInput): DieReport {
   const early = orderNoDraw(input);
   if (early) return early;
+  if (input.die.name.kind === 'end-of-turn') return endNoDraw(input);
   const { die, battle, start } = input;
   const { moveId, slot } = die.name;
   const move = battle.dex.moves.get(moveId);
@@ -171,6 +173,8 @@ export function reportOf(input: ReportInput): DieReport {
   }
   const { targetSlot, moveId } = die.name;
   const action = windowOf(battle.log, note.logIndex ?? battle.log.length);
+  // a proc or an end-of-turn die owns the lines up to the next draw of any die: two holders' lines share one action
+  if (SPAN_KINDS.has(die.name.kind) && note.until !== undefined) action.length = Math.min(action.length, note.until - (note.logIndex ?? 0));
   const witness: Witness = {
     die, seen, note, action, targetSlot, target: action.filter(line => about(line, targetSlot)), name: battle.dex.moves.get(moveId).name || moveId,
   };
@@ -187,5 +191,6 @@ function witnessOf(witness: Witness, battle: Battle, start: number): DieReport {
   if (kind === 'status-check' && 'happens' in result) return statusReport(witness, result.happens, battle.log);
   if (kind === 'speed-tie') return tieReport(witness, battle.log, start);
   if (kind === 'move-first' && 'happens' in result) return moveFirstReport(witness, result.happens, battle.log);
+  if (SPAN_KINDS.has(kind)) return procReport(witness, battle);
   return moveWitness(witness, battle) ?? applied(witness);
 }

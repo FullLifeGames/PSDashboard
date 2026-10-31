@@ -1,7 +1,7 @@
 import type { Battle, PRNG } from '@pkmn/sim';
 import { LoggedRollPRNG } from '../branch/logged-rolls.ts';
 import { copyOf } from '../sim-ask/copy.ts';
-import { learnHitCount } from './learn.ts';
+import { learnHitCount, learnOption, type LearnInput, type LearnOptionInput } from './learn.ts';
 import { ForcedDicePRNG, RecordingPRNG } from './prng.ts';
 import { rollsAtTurnStart } from './recognize.ts';
 import { reportOf } from './report.ts';
@@ -77,13 +77,17 @@ export function naturalTurn(live: Battle, play: (battle: Battle) => void): Natur
 
 /**
  * The raw answers of the dice that learn theirs on copies (decision D6): a hit count whose draws the module cannot name by
- * the draw alone (Loaded Dice adds a second draw, Population Bomb draws `random(7)`). `null` marks a count no draws reach.
+ * the draw alone (Loaded Dice adds a second draw, Population Bomb draws `random(7)`), and a status word (Effect Spore compares
+ * one number with thresholds). `null` marks a result no draws reach.
  */
-function learnedScripts(input: Omit<Parameters<typeof learnHitCount>[0], 'fork' | 'die'>): Map<string, readonly number[] | null> {
+function learnedScripts(input: Omit<LearnInput, 'fork' | 'die'>): Map<string, readonly number[] | null> {
   const scripts = new Map<string, readonly number[] | null>();
   for (const die of input.forced) {
     if (die.name.kind === 'hit-count' && 'hits' in die.result) {
-      scripts.set(dieKey(die.name), learnHitCount({ ...input, fork: forkPrng, die: die as Parameters<typeof learnHitCount>[0]['die'] }));
+      scripts.set(dieKey(die.name), learnHitCount({ ...input, fork: forkPrng, die: die as LearnInput['die'] }));
+    }
+    if (die.name.kind === 'ability-proc' && 'option' in die.result) {
+      scripts.set(dieKey(die.name), learnOption({ ...input, fork: forkPrng, die: die as LearnOptionInput['die'] }));
     }
   }
   return scripts;
