@@ -4,15 +4,22 @@
  * forces it (docs/adr/0001). The types are JSON-clean on purpose: a forced die rides on the slot choice of a branch.
  */
 
-export type DieKind = 'accuracy' | 'crit' | 'damage-roll' | 'secondary' | 'self-effect' | 'hit-count' | 'status-check'
-  // eslint-disable-next-line names/no-new-dex-name -- the kind of the Protect-like draws (the simulator's `StallMove` event), not an ability id
-  | 'stall' | 'fickle-beam' | 'speed-tie' | 'ability-proc' | 'item-proc' | 'quick-claw' | 'end-of-turn';
+/**
+ * What a die decides, never a Dex entry (AGENTS.md): `stalling` is a stalling move that succeeds again, `power` a chance that
+ * changes a move's power, `move-first` a die that lets its holder act first in its priority bracket. A text that names the
+ * move or the item reads it from the Dex at run time.
+ */
+export const DIE_KINDS = [
+  'accuracy', 'crit', 'damage-roll', 'secondary', 'self-effect', 'hit-count', 'status-check', 'stalling', 'power',
+  'speed-tie', 'ability-proc', 'item-proc', 'move-first', 'end-of-turn',
+] as const;
+export type DieKind = typeof DIE_KINDS[number];
 
 /** `slot` is the body that holds the draw (the user of the move; the holder for end-of-turn dice), `moveId` is empty outside a move. */
 export interface DieName { slot: string; moveId: string; targetSlot?: string; kind: DieKind; effectId?: string }
 
 export type DieResult =
-  | { happens: boolean }        // a chance: accuracy, crit, secondary, status check, procs, stall, end of turn
+  | { happens: boolean }        // a chance: accuracy, crit, secondary, status check, procs, stalling, end of turn
   | { step: number }            // the damage roll, 0 is the lowest damage
   | { hits: number }            // the hit count
   | { option: string }          // a die with several results (Effect Spore's status), by its protocol word
