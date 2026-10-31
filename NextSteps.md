@@ -1,4 +1,4 @@
-# Next Steps (as of 31.10.2026, after round 81)
+# Next Steps (as of 31.10.2026, round 82 open)
 
 Open work only. Each step is one round; its TODOs carry fixed T-numbers, and their details are in `docs/backlog.md`. Rules for agents: `AGENTS.md`. Finished rounds: `docs/completed/`. Next free T-number: T300.
 
@@ -8,7 +8,9 @@ Release v1.0.2 (30.10.2026) is on master, on GitHub Pages with the frozen copies
 
 ## Next rounds
 
-No round is open. Bug reports from real use and the dependency upkeep of AGENTS.md bring the next one, and a parked TODO whose trigger fires comes to a gate.
+Round 82 · Forced dice in branches (feature, lossless D4), on branch `r82`. In the branch panel's Advanced mode the user sets single dice of a turn (hit or miss, crit, the damage roll, a secondary effect, a status check, the dice of abilities and items) and every other die falls as it would have. Spec `docs/superpowers/specs/2026-10-31-forced-dice-design.md`, plan `docs/superpowers/plans/2026-10-31-forced-dice-plan.md`, words in `GLOSSARY.md`, decisions in `docs/adr/`. Next: step A1, the probe of the simulator's hooks and the lane plan.
+
+After round 82, bug reports from real use and the dependency upkeep of AGENTS.md bring the next round, and a parked TODO whose trigger fires comes to a gate.
 
 ## Parked
 
