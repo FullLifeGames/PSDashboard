@@ -99,10 +99,11 @@ function useAnalysisSurface(ctx: ReplayContext, board: BoardController, engine: 
   });
 
   const simLines = simState?.log;
+  // Round 82 (forced dice), step A7b: the display lines of the forced dice join the frame's log, never the battle's own.
   const simLog = useMemo(() => {
     if (!simLines || simLines.length === 0) return '';
-    return branchFrameLog(simLines);
-  }, [simLines]);
+    return branchFrameLog(simLines, history.flatMap(entry => entry.dieLines ?? []));
+  }, [simLines, history]);
   const latestBranchHistoryEntry = history.length > 0 ? history[history.length - 1] : null;
 
   const showBranch = branching && simLog.length > 0;

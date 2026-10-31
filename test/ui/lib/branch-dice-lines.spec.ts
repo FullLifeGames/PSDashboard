@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import type { DiceReport, DieReport, DieName, DieResult } from '@fulllifegames/eval-engine';
 import { branchFrameLog } from '../../../src/lib/branch-log';
-import { DIE_LINE, dieLines, dieText, withDieLines, type TurnWindow } from '../../../src/lib/branch-dice-lines';
+import { DIE_LINE, dieLines, dieText, entryDice, withDieLines, type TurnWindow } from '../../../src/lib/branch-dice-lines';
 import { wordsOf } from '../../../src/lib/branch-dice';
 import { diceBattle, setOf } from '../fixtures/dice-battle';
 
@@ -94,6 +94,34 @@ describe('the lines of a turn', () => {
 
   test('a turn without a forced die has no line', () => {
     expect(dieLines(turnReport(), WINDOW, words)).toEqual([]);
+  });
+});
+
+describe('the dice part of a history entry', () => {
+  const never = report('secondary', { happens: true }, { took: 'no-draw', reason: 'Air Slash drew no secondary this turn' }, { effectId: 'brn' });
+  const start = { battleStart: 2, shownStart: 2, words };
+  const battle = { log: BATTLE_LOG } as never;
+
+  test('a turn with no forced die leaves the entry as it was', () => {
+    expect(entryDice(undefined, start, battle, SHOWN_LOG, false)).toEqual({});
+    expect(entryDice(turnReport(), start, battle, SHOWN_LOG, false)).toEqual({ diceReport: turnReport() });
+  });
+
+  test('a turn that waits for a replacement after its actions ended is complete: the end-of-turn faint comes after the last action', () => {
+    expect(entryDice(turnReport(never), start, battle, SHOWN_LOG, true)).toEqual({
+      diceReport: turnReport(never),
+      dieLines: [{ at: 6, text: 'Forced burn had no effect: Air Slash drew no secondary this turn' }],
+    });
+  });
+
+  test('a turn that paused for a switch in the middle has more to play: a die not drawn yet stays quiet', () => {
+    const midTurn = SHOWN_LOG.slice(0, 5);
+    expect(entryDice(turnReport(never), start, battle, midTurn, true)).toEqual({ diceReport: turnReport(never) });
+    // once the rest of the turn is played the same die gets its line
+    expect(entryDice(turnReport(never), start, battle, SHOWN_LOG, false)).toEqual({
+      diceReport: turnReport(never),
+      dieLines: [{ at: 6, text: 'Forced burn had no effect: Air Slash drew no secondary this turn' }],
+    });
   });
 });
 

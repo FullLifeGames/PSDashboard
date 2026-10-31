@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import type { BranchSlotChoice } from '@fulllifegames/eval-engine';
+import { entryDice, turnStart } from '../../lib/branch-dice-lines';
 import {
   forceSwitches, hasAllChoices, makeHistoryEntry, requiredChoices,
   type BranchEngineModule, type BranchRefs, type BranchSetters, type LiveBattle, type SideId,
@@ -42,6 +43,7 @@ function useExecuteTurn(refs: BranchRefs, setters: BranchSetters, clearChoices: 
         return;
       }
 
+      const start = turnStart(battle, logRef.current);
       const result = await branchEngine.executeBranchChoices({
         streams,
         log: logRef.current,
@@ -68,7 +70,7 @@ function useExecuteTurn(refs: BranchRefs, setters: BranchSetters, clearChoices: 
         kind: 'turn' as const,
         p1SlotChoices,
         p2SlotChoices,
-        ...(result.dice ? { diceReport: result.dice } : {}),
+        ...entryDice(result.dice, start, battle, logRef.current, nextState.p1ForceSwitch || nextState.p2ForceSwitch),
         serializedPosition: branchEngine.captureSerializedPosition(battleStream.battle),
       }]);
       setSimState(nextState);
@@ -101,6 +103,7 @@ function useExecuteForcedSide(refs: BranchRefs, setters: BranchSetters) {
     try {
       const turnNumber = battleStream.battle?.turn ?? 0;
       const battle = battleStream.battle;
+      const start = battle ? turnStart(battle, logRef.current) : null;
       // the turn's dice wait on the battle when the turn paused for this switch: the replacement plays the rest of the turn with them
       const result = await branchEngine.executeBranchChoices({
         streams,
@@ -127,7 +130,7 @@ function useExecuteForcedSide(refs: BranchRefs, setters: BranchSetters) {
         kind: 'forced' as const,
         forcedSide: side,
         ...(side === 'p1' ? { p1SlotChoices: slotChoices } : { p2SlotChoices: slotChoices }),
-        ...(result.dice ? { diceReport: result.dice } : {}),
+        ...(battle && start ? entryDice(result.dice, start, battle, logRef.current, nextState.p1ForceSwitch || nextState.p2ForceSwitch) : {}),
         serializedPosition: branchEngine.captureSerializedPosition(battleStream.battle),
       }]);
       setSimState(nextState);

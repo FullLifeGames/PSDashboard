@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import type { PokemonSet } from '@pkmn/sim';
 import type { TurnSnapshot } from '@fulllifegames/replay-core';
 import type { ChoiceLockContext, BranchRuntime, BranchSlotChoice, ReconstructParams } from '@fulllifegames/eval-engine';
+import { entryDice, turnStart } from '../../lib/branch-dice-lines';
 import {
   makeHistoryEntry, requiredChoices,
   type BranchEngineModule, type BranchHistoryEntry, type BranchRefs, type BranchSetters, type BattleStream, type SideId,
@@ -114,6 +115,7 @@ async function replayHistoryEntry(
   const resolved = resolveEntryCommands(branchEngine, battle, entry);
   if (!resolved.ok) return resolved;
 
+  const start = turnStart(battle, runtime.log);
   const result = await branchEngine.executeBranchChoices({
     streams: runtime.streams,
     log: runtime.log,
@@ -140,7 +142,7 @@ async function replayHistoryEntry(
       ...(entry.forcedSide ? { forcedSide: entry.forcedSide } : {}),
       ...(entry.p1SlotChoices ? { p1SlotChoices: entry.p1SlotChoices } : {}),
       ...(entry.p2SlotChoices ? { p2SlotChoices: entry.p2SlotChoices } : {}),
-      ...(result.dice ? { diceReport: result.dice } : {}),
+      ...entryDice(result.dice, start, battle, runtime.log, nextState.p1ForceSwitch || nextState.p2ForceSwitch),
     },
   };
 }
