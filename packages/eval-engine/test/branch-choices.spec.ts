@@ -206,6 +206,13 @@ describe('notation of forced dice', () => {
     expect(notationDice(undefined)).toEqual([]);
   });
 
+  // Round 82, step A7d: the app calls `notationDice` and no code outside the package calls `notationSlotDice`
+  test('the package barrel exports notationDice and keeps notationSlotDice inside the package', async () => {
+    const barrel = await import('../src/index');
+    expect(typeof barrel.notationDice).toBe('function');
+    expect('notationSlotDice' in barrel).toBe(false);
+  });
+
   test('the notation of the choice itself stays as it was', () => {
     expect(notationSlotChoice({ ...moveBy('Air Slash'), dice: [flinch] })).toBe('Air Slash');
     expect(notationSideLabel([{ ...moveBy('Air Slash'), dice: [flinch] }], 'move 1')).toBe('Air Slash');

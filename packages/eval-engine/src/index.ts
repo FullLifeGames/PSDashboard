@@ -15,7 +15,7 @@ export type {
   TurnVerification, VerdictTier,
 } from './analysis.ts';
 export {
-  notationSlotChoice, notationSideLabel, notationDice, notationSlotDice, switchChoiceKey, switchOptionKey, requiredChoicesForActiveSlots,
+  notationSlotChoice, notationSideLabel, notationDice, switchChoiceKey, switchOptionKey, requiredChoicesForActiveSlots,
   branchSideChoicesReady, evalChoiceToSlotChoices,
 } from './branch-choices.ts';
 export type { BranchChoiceActive, BranchMoveModifier, BranchSlotChoice } from './branch-choices.ts';
