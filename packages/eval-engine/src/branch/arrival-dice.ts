@@ -102,7 +102,9 @@ export function alignArrivalDice(
     const { seed } = aligned.seedChoice;
     const logged = recordLoggedRolls(battle, seed, p1Choice, p2Choice, aligned.alignForced);
     if (logged) {
-      const prng = new LoggedRollPRNG(seed, logged, targetTurn);
+      const prng = new LoggedRollPRNG(seed, logged, targetTurn, {
+        lines: [...block.preUpkeep, ...block.postUpkeep], choices: { p1: p1Choice, p2: p2Choice },
+      });
       prng.attach(battle);
       battle.prng = prng;
     } else {

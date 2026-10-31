@@ -1,5 +1,7 @@
 import type { BranchSlotChoice } from '../branch-choices.ts';
 import type { BranchChoiceErrorLog, BranchExecuteResult, BranchRuntime, SimBattle, SimPokemon } from './types.ts';
+import type { PendingTurn } from '../dice/turn.ts';
+import type { DiceReport } from '../dice/types.ts';
 import { findByName, normalizeBattleOnlyFormeId, sameBodyName, slotLetter } from './team-order.ts';
 import { targetLocSuffixForChoice } from './protocol-choices.ts';
 import { sideIndex, toId } from '@fulllifegames/replay-core';
@@ -153,12 +155,78 @@ export function resolveSideChoices(
   return { ok: true, command: fragments.join(', ') };
 }
 
+/** The commands on a copy of the battle, as the stream writes them to the live one; a refused choice ends the play. */
+function chooseOnCopy(battle: SimBattle, commands: { side: 'p1' | 'p2'; command: string }[]): void {
+  for (const { side, command } of commands) {
+    if (battle.choose(side, command)) continue;
+    throw new Error(battle.sides[sideIndex(side)].choice.error || 'The simulator rejected this choice.');
+  }
+}
+
+async function playWithDice(
+  dice: BranchDiceTurn, pending: PendingTurn | undefined, commands: { side: 'p1' | 'p2'; command: string }[],
+  play: (battle: SimBattle) => void,
+): Promise<{ ok: true; report: DiceReport | undefined; pending: PendingTurn | null } | { ok: false; error: string }> {
+  const { playBranchTurn } = await import('../dice/turn.ts');
+  try {
+    const played = playBranchTurn({ battle: dice.battle, commands, p1Choices: dice.p1Choices, p2Choices: dice.p2Choices, pending, play });
+    return { ok: true, report: played.report, pending: played.pending };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/**
+ * Round 82 (forced dice): the turns that paused for a switch in the middle, by battle. The forced dice of the turn wait here for
+ * the call that goes on (the forced replacement), which plays the rest of the turn.
+ */
+const pendingTurns = new WeakMap<object, PendingTurn>();
+
+/** What a call needs to play a turn with forced dice: the live battle and the slot choices the dice ride on. */
+export interface BranchDiceTurn {
+  battle: SimBattle;
+  p1Choices: (BranchSlotChoice | null)[];
+  p2Choices: (BranchSlotChoice | null)[];
+}
+
+const carriesDice = (turn: BranchDiceTurn): boolean => [...turn.p1Choices, ...turn.p2Choices].some(choice => (choice?.dice?.length ?? 0) > 0);
+
+/**
+ * Writes the turn's commands to the sim: through the stream as always, or, for a turn with forced dice (the slot choices carry
+ * one, or dice are pending from a turn that paused for a switch), through the dice module, which plays the turn on a copy of the
+ * battle first and then on the live one.
+ */
+async function dispatchTurn(
+  params: Parameters<typeof executeBranchChoices>[0], record: (error: unknown) => void,
+): Promise<{ ok: true; report?: DiceReport } | { ok: false; error: string }> {
+  const { streams, commands, dice } = params;
+  const payload = commands.map(({ side, command }) => `>${side} ${command}`).join('\n');
+  const pending = dice ? pendingTurns.get(dice.battle) : undefined;
+  if (!dice || (!pending && !carriesDice(dice))) {
+    if (dice) pendingTurns.delete(dice.battle);
+    safeStreamWrite(streams.omniscient, payload, record);
+    return { ok: true };
+  }
+  const outcome = await playWithDice(dice, pending, commands, battle => {
+    if (battle === dice.battle) safeStreamWrite(streams.omniscient, payload, record);
+    else chooseOnCopy(battle, commands);
+  });
+  if (!outcome.ok) return outcome;
+  if (outcome.pending) pendingTurns.set(dice.battle, outcome.pending);
+  else pendingTurns.delete(dice.battle);
+  return { ok: true, report: outcome.report };
+}
+
 /**
  * Writes side commands to the sim and waits for the outcome. Succeeds when the
  * omniscient log grows (the sim committed and simulated); fails when the sim
  * rejects a choice (`|error|` sideupdate) or never responds within the timeout,
  * so callers can keep the user's choices and surface the message instead of
  * failing silently.
+ *
+ * `dice` (round 82, forced dice) names the live battle and the slot choices of both sides. A turn whose choices carry a forced
+ * die, or that goes on after a pause for a switch with dice pending, plays through the dice module (a dynamic import: a turn
+ * without a forced die runs the code below as it always did). The result then carries the report of the user's dice.
  */
 export async function executeBranchChoices(params: {
   streams: BranchRuntime['streams'];
@@ -166,20 +234,20 @@ export async function executeBranchChoices(params: {
   choiceErrors: BranchChoiceErrorLog;
   commands: { side: 'p1' | 'p2'; command: string }[];
   timeoutMs?: number;
+  dice?: BranchDiceTurn;
 }): Promise<BranchExecuteResult> {
-  const { streams, log, choiceErrors, commands, timeoutMs = 1500 } = params;
+  const { log, choiceErrors, timeoutMs = 1500 } = params;
   const previousLogLength = log.length;
   const previousErrorCount = choiceErrors.count;
 
   // Surface sim crashes as choice errors instead of unhandled rejections.
-  safeStreamWrite(
-    streams.omniscient,
-    commands.map(({ side, command }) => `>${side} ${command}`).join('\n'),
-    (error: unknown) => {
-      choiceErrors.count += 1;
-      choiceErrors.last = error instanceof Error ? error.message : String(error);
-    },
-  );
+  const record = (error: unknown) => {
+    choiceErrors.count += 1;
+    choiceErrors.last = error instanceof Error ? error.message : String(error);
+  };
+  const dispatched = await dispatchTurn(params, record);
+  if (!dispatched.ok) return dispatched;
+  const report = dispatched.report;
 
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -198,7 +266,7 @@ export async function executeBranchChoices(params: {
           stableSince = Date.now();
         }
       }
-      return { ok: true };
+      return report ? { ok: true, dice: report } : { ok: true };
     }
     await sleep(25);
   }

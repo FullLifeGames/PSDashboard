@@ -53,6 +53,17 @@ class RollRecorder extends PRNG {
 }
 
 /**
+ * Round 82 (forced dice): the logged turn a branch opens on, as the first turn of the branch has to read it: the block's lines
+ * (the log's own results) and the commands the log's players sent. The dice module joins the log's results to the dice the user
+ * forces (gate answer 19a) and finds the actions the user changed by comparing the commands.
+ */
+export interface LoggedTurn {
+  turn: number;
+  lines: readonly string[];
+  choices: { p1: string; p2: string };
+}
+
+/**
  * The branch's dice for its first turn: the plain seed stream, except that an action the log has plays its logged draws.
  * `turn` is the turn the position stands at; from the next turn on this is the plain PRNG again.
  */
@@ -62,10 +73,14 @@ export class LoggedRollPRNG extends PRNG {
   private readonly turn: number;
   private readonly cursors = new Map<string, number>();
 
-  constructor(seed: PRNGSeed, logged: LoggedRolls, turn: number) {
+  /** The logged turn the position stands at (round 82); null for a stream built without it. */
+  readonly loggedTurn: LoggedTurn | null;
+
+  constructor(seed: PRNGSeed, logged: LoggedRolls, turn: number, loggedTurn?: Omit<LoggedTurn, 'turn'>) {
     super(seed);
     this.logged = logged;
     this.turn = turn;
+    this.loggedTurn = loggedTurn ? { turn, ...loggedTurn } : null;
   }
 
   attach(battle: Battle): void {
@@ -78,7 +93,7 @@ export class LoggedRollPRNG extends PRNG {
    * attaches it to the battle it plays on.
    */
   fork(): LoggedRollPRNG {
-    const copy = new LoggedRollPRNG(this.getSeed(), this.logged, this.turn);
+    const copy = new LoggedRollPRNG(this.getSeed(), this.logged, this.turn, this.loggedTurn ?? undefined);
     for (const [key, cursor] of this.cursors) copy.cursors.set(key, cursor);
     return copy;
   }

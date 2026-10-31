@@ -1,6 +1,7 @@
 import type { BranchMoveOption, BranchSwitchOption } from './branch-engine.ts';
 import { splitCombinedLabel } from './analysis.ts';
 import { toId } from '@fulllifegames/replay-core';
+import type { ForcedDie } from './dice/types.ts';
 
 export interface BranchChoiceActive {
   fainted: boolean;
@@ -14,10 +15,14 @@ export type BranchMoveModifier = 'terastallize' | 'mega' | 'zmove' | 'ultra';
  * produced at the sim boundary, resolved against the live request
  * (`resolveSideChoices` in branch-engine.ts). `modifier` carries
  * Tera/Mega/Z-Move/Ultra Burst intents (G7).
+ *
+ * Round 82 (forced dice, ADR 0001): `dice` carries the dice the user forces in the turn this choice belongs to, each named by
+ * the body that holds it (`name.slot`). The field is optional and JSON-clean, so every hand-off that copies the choice (draft,
+ * prefill, history, support state) carries it, and a choice without it reads as before.
  */
 export type BranchSlotChoice =
-  | { kind: 'move'; moveId: string; moveName: string; targetLoc?: number; modifier?: BranchMoveModifier }
-  | { kind: 'switch'; speciesId: string; pokemonName: string };
+  | { kind: 'move'; moveId: string; moveName: string; targetLoc?: number; modifier?: BranchMoveModifier; dice?: ForcedDie[] }
+  | { kind: 'switch'; speciesId: string; pokemonName: string; dice?: ForcedDie[] };
 
 const MODIFIER_LABELS: Record<BranchMoveModifier, string> = {
   terastallize: 'Tera',

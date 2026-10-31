@@ -1,6 +1,7 @@
 import type { BattleStreams } from '@pkmn/sim';
 import type { BranchSlotChoice } from '../branch-choices.ts';
 import type { TurnAlignmentRecord } from '../hax-alignment.ts';
+import type { DiceReport } from '../dice/types.ts';
 
 export type SimBattle = NonNullable<BattleStreams.BattleStream['battle']>;
 export type SimSide = SimBattle['sides'][number];
@@ -160,8 +161,12 @@ export interface BranchChoiceErrorLog {
   last: string | null;
 }
 
+/**
+ * `dice` (round 82, forced dice): what the simulator did with the dice the user forced in this turn, only for a turn that carried
+ * one. A turn that pauses for a switch (U-turn) reports the dice it has drawn so far; the last call of the turn holds all of them.
+ */
 export type BranchExecuteResult =
-  | { ok: true }
+  | { ok: true; dice?: DiceReport }
   | { ok: false; error: string };
 
 export interface BranchChoices {
