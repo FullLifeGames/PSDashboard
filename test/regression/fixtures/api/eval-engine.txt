@@ -211,6 +211,7 @@ value mctsTreeSearch
 value mergeLoggedDice
 value mergeMctsTrees
 value moveAtUse
+value notationDice
 value notationSideLabel
 value notationSlotChoice
 value noteSpokenClaim
