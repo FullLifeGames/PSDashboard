@@ -5,9 +5,10 @@ import { learnHitCount } from './learn.ts';
 import { ForcedDicePRNG, RecordingPRNG } from './prng.ts';
 import { rollsAtTurnStart } from './recognize.ts';
 import { reportOf } from './report.ts';
+import { actionOrder } from './report-turn.ts';
 import { readsStartRoll } from './start-roll.ts';
 import { probeCheck } from './status-probe.ts';
-import { dieKey, type DiceReport, type ForcedDie, type NaturalRecord } from './types.ts';
+import { dieKey, type DiceReport, type DieName, type ForcedDie, type NaturalRecord } from './types.ts';
 import { watchBattle } from './watch.ts';
 
 /**
@@ -42,9 +43,21 @@ function forkPrng(prng: PRNG, battle: Battle): PRNG {
 /** The die of Gens 2 and 3 that lets a Quick Claw holder act first, kept on the battle (the simulator reads it in the action speed). */
 type StartRoll = { quickClawRoll?: boolean };
 
-interface NaturalTurn { record: NaturalRecord; endSeed: string; startRoll: boolean | undefined }
+/** What the natural turn on a copy showed: the dice it drew (names, chances, answers), the speed ties, who acted, where the stream ended. */
+export interface NaturalTurn {
+  record: NaturalRecord;
+  endSeed: string;
+  startRoll: boolean | undefined;
+  names: ReadonlyMap<string, DieName>;
+  chances: ReadonlyMap<string, number>;
+  /** The slots of the move actions of every shuffle that held two or more of them. */
+  ties: readonly (readonly string[])[];
+  /** The slots of the bodies that acted, in order. */
+  acted: readonly string[];
+}
 
-function naturalTurn(live: Battle, play: (battle: Battle) => void): NaturalTurn {
+/** The natural turn: `play` runs on a copy of the battle with a stream at the live PRNG's place, under watch. The live battle is read and never written. */
+export function naturalTurn(live: Battle, play: (battle: Battle) => void): NaturalTurn {
   const copy = copyOf(live);
   (copy as unknown as { debugMode: boolean }).debugMode = false;
   const stream = forkPrng(live.prng, copy);
@@ -56,7 +69,10 @@ function naturalTurn(live: Battle, play: (battle: Battle) => void): NaturalTurn 
   } finally {
     watch.uninstall();
   }
-  return { record: recording.record, endSeed: String(stream.getSeed()), startRoll: (copy as unknown as StartRoll).quickClawRoll };
+  return {
+    record: recording.record, endSeed: String(stream.getSeed()), startRoll: (copy as unknown as StartRoll).quickClawRoll,
+    names: recording.names, chances: recording.chances, ties: recording.ties, acted: actionOrder(copy.log),
+  };
 }
 
 /**

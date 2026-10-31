@@ -66,7 +66,7 @@ export function statusNoDraw(input: ReportInput, moveName: string, turn: readonl
 const startsMove = (line: string): boolean => !line.includes('|[from]') || line.includes('|[from] item:');
 
 /** The slots of the bodies that acted in the lines, in the order of their first action (a `|move|` that starts an action, or a `|cant|`). */
-function actionOrder(lines: readonly string[]): string[] {
+export function actionOrder(lines: readonly string[]): string[] {
   const order: string[] = [];
   for (const line of lines) {
     const fields = parts(line);

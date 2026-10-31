@@ -8,11 +8,13 @@ export { ForcedDicePRNG, RecordingPRNG, type DieNote } from './prng.ts';
 export { genShape, recognize } from './recognize.ts';
 export { reportOf, type ReportInput } from './report.ts';
 export {
-  dieKey,
+  dieKey, tieName,
   type Answer, type DiceReport, type DieKind, type DieName, type DieReport, type DieResult, type DieTook, type Draw,
   type ForcedDie, type NaturalRecord,
 } from './types.ts';
 export { watchBattle, type ArmedHook, type BattleWatch } from './watch.ts';
 export { learnHitCount, type LearnInput } from './learn.ts';
-export { offeredDice, type DieOffer } from './offer.ts';
+export { offeredDice, offeredOrderDice, type DieOffer } from './offer.ts';
+export { probeCheck, type CheckProbe } from './status-probe.ts';
+export { readsStartRoll } from './start-roll.ts';
 export { secondaryEffectId } from './recognize.ts';

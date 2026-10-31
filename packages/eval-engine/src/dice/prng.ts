@@ -109,6 +109,8 @@ export class RecordingPRNG extends WatchedPRNG {
   readonly ties: string[][] = [];
   /** The chance of every chance die drawn, per die key (numerator over denominator of the first draw). */
   readonly chances = new Map<string, number>();
+  /** The name of every die drawn, per die key. */
+  readonly names = new Map<string, DieName>();
 
   get record(): NaturalRecord {
     return this.answers;
@@ -121,6 +123,7 @@ export class RecordingPRNG extends WatchedPRNG {
 
   protected override decide(name: DieName, draw: Draw, natural: number): number {
     const key = dieKey(name);
+    this.names.set(key, name);
     if (draw.call === 'chance' && !this.chances.has(key)) this.chances.set(key, (draw.numerator ?? 0) / (draw.from ?? 1));
     const answer: Answer = { from: draw.from, to: draw.to, value: natural };
     const list = this.answers.get(key);

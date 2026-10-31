@@ -2,8 +2,11 @@ import type { Battle, Pokemon } from '@pkmn/sim';
 import type { BranchSlotChoice } from '../branch-choices.ts';
 import { strengthMix } from '../calc/fickle.ts';
 import { copyOf } from '../sim-ask/copy.ts';
-import { chanceOfEntry, genShape, secondaryEffectId } from './recognize.ts';
-import type { DieName, DieResult, SecondaryEntry } from './types.ts';
+import { naturalTurn } from './play.ts';
+import { chanceOfEntry, genShape, rollsAtTurnStart, secondaryEffectId } from './recognize.ts';
+import { readsStartRoll } from './start-roll.ts';
+import { probeCheck } from './status-probe.ts';
+import { dieKey, tieName, type DieName, type DieResult, type SecondaryEntry } from './types.ts';
 
 /**
  * Round 82 (forced dice), step A3a: which dice the panel offers for a slot's move choice. What the move's Dex entry and the
@@ -121,6 +124,21 @@ function moveOffers(copy: Battle, user: Pokemon, move: ActiveMove, targets: Poke
 }
 
 /**
+ * The status checks the body carries: a condition (its status or a volatile) whose own `BeforeMove` handler draws a chance for
+ * this move. The chance offered is the chance of the answer "the body goes on".
+ */
+function checkOffers(battle: Battle, slot: string, moveId: string): DieOffer[] {
+  const body = battle.sides[slot[1] === '1' ? 0 : 1].active[slot[2] === 'a' ? 0 : 1];
+  if (!body || body.fainted) return [];
+  const ids = [body.status, ...Object.keys(body.volatiles)].filter(id => id !== '');
+  return ids.flatMap((id): DieOffer[] => {
+    const probe = probeCheck(battle, slot, id, moveId);
+    if (!probe) return [];
+    return [{ name: { slot, moveId, kind: 'status-check', effectId: id }, results: YES_NO, chance: probe.actsOnTrue ? probe.chance : 1 - probe.chance }];
+  });
+}
+
+/**
  * The dice the panel offers for `choice` of the body in `slot`. A switch offers none. A move the simulator cannot run this turn
  * (charging, landing two turns later) offers none; the offer says what the move will draw if it runs.
  */
@@ -132,11 +150,54 @@ export function offeredDice(battle: Battle, slot: string, choice: BranchSlotChoi
   if (!user || user.fainted) return [];
   const aimed = choice.targetLoc === undefined ? user.foes()[0] : user.getAtLoc(choice.targetLoc);
   const move = activeMoveOn(copy, user, aimed, choice.moveId);
-  if (move.flags.futuremove || !charged(user, move)) return [];
+  // the checks before a move draw whatever the move does next, also on the turn a charge move charges
+  const checks = checkOffers(battle, slot, move.id);
+  if (move.flags.futuremove || !charged(user, move)) return checks;
   const offers = FOE_REACHING.has(move.target) ? moveOffers(copy, user, move, targetsOf(user, move, choice)) : [];
+  offers.push(...checks);
   // a self effect belongs to the move whatever it aims at (a status move that raises the user's stats draws it too)
   if (move.self?.boosts) offers.push({ name: { slot, moveId: move.id, kind: 'self-effect' }, results: YES_NO });
   const stall = move.stallingMove ? stallCondition(user, copy) : undefined;
   if (stall) offers.push({ name: { slot, moveId: move.id, kind: 'stalling', effectId: stall }, results: YES_NO });
+  return offers;
+}
+
+/**
+ * The dice of the turn's order the panel offers (round 82, step A3b). They belong to the turn and not to one slot's choice, so
+ * the offer plays the turn on a copy, the way `playForcedTurn` plays its natural turn, and reads what the simulator drew:
+ *
+ * - a speed tie for every pair of bodies whose move actions the simulator shuffled together (the name is the sorted pair, the
+ *   results are the two orders);
+ * - a first mover for every holder whose die the simulator drew (Quick Claw for any move, since the handler tests the relayed
+ *   priority of 0 and not the move's; Quick Draw only for a damaging move), with the chance of the draw;
+ * - Gens 2 and 3 draw that die at the start of the turn and keep it on the battle: it is offered for every body that acted
+ *   this turn and whose action speed moves with the roll (no chance: no draw of the turn carries one).
+ *
+ * The live battle is read and never written.
+ */
+export function offeredOrderDice(battle: Battle, play: (battle: Battle) => void): DieOffer[] {
+  const natural = naturalTurn(battle, play);
+  const offers: DieOffer[] = [];
+  const seen = new Set<string>();
+  for (const slots of natural.ties) {
+    for (const [index, a] of slots.entries()) {
+      for (const b of slots.slice(index + 1)) {
+        const name = tieName(a, b);
+        if (seen.has(dieKey(name))) continue;
+        seen.add(dieKey(name));
+        offers.push({ name, results: [{ first: name.slot }, { first: name.targetSlot! }] });
+      }
+    }
+  }
+  for (const [key, name] of natural.names) {
+    const chance = natural.chances.get(key);
+    if (name.kind === 'move-first') offers.push({ name, results: YES_NO, ...(chance === undefined ? {} : { chance }) });
+  }
+  if (rollsAtTurnStart(battle.gen)) {
+    for (const slot of natural.acted.filter(acted => readsStartRoll(battle, acted))) {
+      const body = battle.sides[slot[1] === '1' ? 0 : 1].active[slot[2] === 'a' ? 0 : 1];
+      offers.push({ name: { slot, moveId: '', kind: 'move-first', effectId: body.item }, results: YES_NO });
+    }
+  }
   return offers;
 }
