@@ -4,6 +4,7 @@ import { loadSimMods } from '../src/forward/sim-mods';
 import { DIE_KINDS } from '../src/dice/types';
 import { CLASSES, DRAW, scan } from './dice-census-support';
 import { RULES } from './dice-fixtures';
+import { FIRST_MOVERS } from './dice-order-support';
 import { CHECKS } from './dice-status-support';
 import { dexOfRules } from './dice-sweep-support';
 
@@ -52,6 +53,11 @@ describe('the draws of abilities, items and conditions, scanned (round 82, A4)',
   test('the BeforeMove draws of conditions are the checks of the status sweep', () => {
     const ids = BEFORE_MOVE.map(key => key.split('/')[1]).sort();
     expect(ids).toEqual(CHECKS.map(entry => entry.id).sort());
+  });
+
+  test('the first movers the census finds are the ones the order sweep plays', () => {
+    const ids = [...new Set(Object.entries(CLASSES).filter(([, entry]) => entry.kind === 'move-first').map(([key]) => key.split('/')[1]))];
+    expect(ids.sort()).toEqual(FIRST_MOVERS.map(mover => mover.id).sort());
   });
 
   describe.each(RULES)('the status checks in $name', rules => {

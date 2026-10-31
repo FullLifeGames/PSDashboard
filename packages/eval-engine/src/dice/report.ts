@@ -29,6 +29,8 @@ import { moveFirstReport, orderNoDraw, startRollReport, statusNoDraw, statusRepo
  * - status check: yes shows as the body's own `|move|` after the draw, no as a stop (report-turn.ts).
  * - speed tie: the order of the two bodies' first actions in the turn's lines.
  * - first mover: the activation line of the item or the ability after the draw; the start-of-turn roll of Gens 2 and 3 by the holder's place in the turn's order.
+ * - proc, end of turn (report-procs.ts): a line between the die's draw and the next draw that shows the effect (the ability's or the item's
+ *   label, a status line, a thaw), none for a no.
  */
 
 export interface ReportInput {
