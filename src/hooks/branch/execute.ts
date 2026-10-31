@@ -46,10 +46,8 @@ function useExecuteTurn(refs: BranchRefs, setters: BranchSetters, clearChoices: 
         streams,
         log: logRef.current,
         choiceErrors,
-        commands: [
-          { side: 'p1', command: resolved.p1 },
-          { side: 'p2', command: resolved.p2 },
-        ],
+        commands: [{ side: 'p1', command: resolved.p1 }, { side: 'p2', command: resolved.p2 }],
+        dice: { battle, p1Choices: p1ChoicesRef.current, p2Choices: p2ChoicesRef.current },
       });
 
       if (!result.ok) {
@@ -70,6 +68,7 @@ function useExecuteTurn(refs: BranchRefs, setters: BranchSetters, clearChoices: 
         kind: 'turn' as const,
         p1SlotChoices,
         p2SlotChoices,
+        ...(result.dice ? { diceReport: result.dice } : {}),
         serializedPosition: branchEngine.captureSerializedPosition(battleStream.battle),
       }]);
       setSimState(nextState);
@@ -101,11 +100,14 @@ function useExecuteForcedSide(refs: BranchRefs, setters: BranchSetters) {
     setExecuting(true);
     try {
       const turnNumber = battleStream.battle?.turn ?? 0;
+      const battle = battleStream.battle;
+      // the turn's dice wait on the battle when the turn paused for this switch: the replacement plays the rest of the turn with them
       const result = await branchEngine.executeBranchChoices({
         streams,
         log: logRef.current,
         choiceErrors,
         commands: [{ side, command }],
+        ...(battle ? { dice: { battle, p1Choices: side === 'p1' ? slotChoices : [], p2Choices: side === 'p2' ? slotChoices : [] } } : {}),
       });
 
       if (!result.ok) {
@@ -125,6 +127,7 @@ function useExecuteForcedSide(refs: BranchRefs, setters: BranchSetters) {
         kind: 'forced' as const,
         forcedSide: side,
         ...(side === 'p1' ? { p1SlotChoices: slotChoices } : { p2SlotChoices: slotChoices }),
+        ...(result.dice ? { diceReport: result.dice } : {}),
         serializedPosition: branchEngine.captureSerializedPosition(battleStream.battle),
       }]);
       setSimState(nextState);

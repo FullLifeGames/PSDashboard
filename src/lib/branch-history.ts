@@ -1,5 +1,5 @@
 import type { TurnSnapshot, SideId } from '@fulllifegames/replay-core';
-import type { BranchSlotChoice, SimPokemonInfo } from '@fulllifegames/eval-engine';
+import type { BranchSlotChoice, DiceReport, SimPokemonInfo } from '@fulllifegames/eval-engine';
 
 export interface BranchHistoryEntry {
   turnNumber: number;
@@ -12,6 +12,12 @@ export interface BranchHistoryEntry {
   /** Identity-based choices used to replay this entry after a team edit (B1). */
   p1SlotChoices?: (BranchSlotChoice | null)[];
   p2SlotChoices?: (BranchSlotChoice | null)[];
+  /**
+   * Round 82 (forced dice): what the simulator did with the dice the user forced in this turn (the dice ride on the slot
+   * choices above). A turn that paused for a switch holds its dice in two entries: the forced replacement that finishes the
+   * turn carries the report that joins both parts. Absent for a turn without a forced die.
+   */
+  diceReport?: DiceReport;
   /** The resolved commands actually sent to the sim (display/share only). */
   p1Choice: string;
   p2Choice: string;

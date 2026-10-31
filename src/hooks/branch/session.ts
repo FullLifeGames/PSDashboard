@@ -119,6 +119,8 @@ async function replayHistoryEntry(
     log: runtime.log,
     choiceErrors: runtime.choiceErrors,
     commands: resolved.commands,
+    // the entry's slot choices carry the forced dice; a forced entry after a pause plays the rest of that turn with them (round 82)
+    dice: { battle, p1Choices: entry.p1SlotChoices ?? [], p2Choices: entry.p2SlotChoices ?? [] },
   });
   if (!result.ok) return result;
 
@@ -138,6 +140,7 @@ async function replayHistoryEntry(
       ...(entry.forcedSide ? { forcedSide: entry.forcedSide } : {}),
       ...(entry.p1SlotChoices ? { p1SlotChoices: entry.p1SlotChoices } : {}),
       ...(entry.p2SlotChoices ? { p2SlotChoices: entry.p2SlotChoices } : {}),
+      ...(result.dice ? { diceReport: result.dice } : {}),
     },
   };
 }
