@@ -72,6 +72,17 @@ export class LoggedRollPRNG extends PRNG {
     this.battle = battle;
   }
 
+  /**
+   * Round 82 (forced dice): a second stream at this one's place, with the same logged dice and the cursors where they stand.
+   * The copy of a battle plays the natural turn on it while the original stays where it is. It is not attached: the caller
+   * attaches it to the battle it plays on.
+   */
+  fork(): LoggedRollPRNG {
+    const copy = new LoggedRollPRNG(this.getSeed(), this.logged, this.turn);
+    for (const [key, cursor] of this.cursors) copy.cursors.set(key, cursor);
+    return copy;
+  }
+
   override random(from?: number, to?: number): number {
     const natural = super.random(from, to);
     const battle = this.battle;
