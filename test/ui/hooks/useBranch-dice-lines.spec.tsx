@@ -86,6 +86,8 @@ describe.each(CASES)('the display lines of a forced die, $kind', ({ kind, turn }
     const lines = result.current.history[0].dieLines!;
     expect(lines).toHaveLength(1);
     expect(lines[0].text).toMatch(/^Forced zzz had no effect: /);
+    // Round 82, step A7c: the history row and the share link read the marks of the same report
+    expect(result.current.history[0].diceMarks).toEqual({ p1: [{ label: expect.stringContaining('zzz'), noEffect: expect.any(String) }], p2: [] });
     const log = result.current.simState!.log;
     // before the end of the turn: the next shown line closes it
     expect(['upkeep', 'turn', 'win', 'tie']).toContain(log[lines[0].at]?.split('|')[1]);

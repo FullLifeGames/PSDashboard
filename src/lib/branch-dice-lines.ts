@@ -1,5 +1,6 @@
 import { dieLabel, type DiceReport, type DieReport, type DieWords, type LiveHit } from '@fulllifegames/eval-engine';
 import { resultWord, wordsOf } from './branch-dice';
+import { diceMarksOf, type DiceMarks } from './branch-dice-marks';
 
 /**
  * Round 82 (forced dice), step A7b, decision 6a: the lines the frame shows for the dice the user forced. A line before the event a
@@ -123,16 +124,18 @@ export const turnStart = (battle: Battle, shown: readonly string[]): TurnStart =
   ({ battleStart: battle.log.length, shownStart: shown.length, words: wordsOf(battle) });
 
 /**
- * The part of a history entry that holds the dice of the turn just played, the report and its display lines: empty for a turn
+ * The part of a history entry that holds the dice of the turn just played, the report, its display lines and its marks for the
+ * history row and the share link (step A7c): empty for a turn
  * without a forced die, so the entry keeps today's shape. `waiting` is true while a forced replacement is pending; the turn is still complete when its actions
  * are over (the `|upkeep` line shows it): a body that fainted at the end of the turn asks for a replacement after the last
  * action drew its dice. A switch in the middle of the turn (a pivot move) leaves the rest of the actions to play.
  */
 export function entryDice(
   report: DiceReport | undefined, start: TurnStart, battle: Battle, shown: readonly string[], waiting: boolean,
-): { diceReport?: DiceReport; dieLines?: DieLine[] } {
+): { diceReport?: DiceReport; dieLines?: DieLine[]; diceMarks?: DiceMarks } {
   if (!report) return {};
   const complete = !waiting || shown.some((line, index) => index >= start.shownStart && line.startsWith('|upkeep'));
   const lines = dieLines(report, { battleLog: battle.log, battleStart: start.battleStart, shownLog: shown, shownStart: start.shownStart, complete }, start.words);
-  return lines.length > 0 ? { diceReport: report, dieLines: lines } : { diceReport: report };
+  const marks = diceMarksOf(report, start.words);
+  return { diceReport: report, ...(lines.length > 0 ? { dieLines: lines } : {}), ...(marks ? { diceMarks: marks } : {}) };
 }

@@ -1,6 +1,7 @@
 import type { TurnSnapshot, SideId } from '@fulllifegames/replay-core';
 import type { BranchSlotChoice, DiceReport, SimPokemonInfo } from '@fulllifegames/eval-engine';
 import type { DieLine } from './branch-dice-lines';
+import type { DiceMarks } from './branch-dice-marks';
 
 export interface BranchHistoryEntry {
   turnNumber: number;
@@ -24,6 +25,11 @@ export interface BranchHistoryEntry {
    * log puts them in; the battle's own log never holds them. A rebuild writes them again with the report.
    */
   dieLines?: DieLine[];
+  /**
+   * Round 82 (forced dice), step A7c: the labels of the report's dice by side, for the history row and the share link, named with the
+   * battle's words when the turn played (the entry has no battle later). A rebuild writes them again with the report.
+   */
+  diceMarks?: DiceMarks;
   /** The resolved commands actually sent to the sim (display/share only). */
   p1Choice: string;
   p2Choice: string;

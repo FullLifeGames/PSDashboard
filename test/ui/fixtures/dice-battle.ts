@@ -26,3 +26,12 @@ export function diceBattle({ p1, p2, format = 'gen9customgame', seed = '1,2,3,4'
   }
   return battle;
 }
+
+/**
+ * Round 82 (forced dice), step A7c: the public log of a fresh game past team preview, the replay log a branch at turn 1 starts from
+ * (the hook specs hand it to `startBranch` with the teams), without the clock lines and the secret halves of split lines.
+ */
+export function freshLog({ p1, p2, format }: DiceBoard & { format: string }): string {
+  const battle = diceBattle({ p1, p2, format });
+  return battle.log.filter((line, index, all) => !line.startsWith('|split|') && !all[index - 1]?.startsWith('|split|') && !line.startsWith('|t:|')).join('\n');
+}
