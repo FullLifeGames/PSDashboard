@@ -16,6 +16,7 @@ Work:
 - Singles and doubles both: every fix and test covers both game types or says why one is not affected.
 - Commit only through the brief's commit script, one small step per commit; English release-style messages without attribution lines.
 - Never start a bank, holdout, feedback, e2e or full-regression run, never push, never edit a file outside your lane's list.
+- End only the processes you started, by their PID, after you checked the command line: other sessions and the user's own tools run node too.
 
 Keep your context small, because every call re-reads it:
 - Send long command output to a file in your lane folder and read only what you need (`tail -n 40`, `grep`). Never print a whole test log, dump or result table.
