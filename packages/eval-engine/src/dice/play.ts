@@ -1,6 +1,7 @@
 import type { Battle, PRNG } from '@pkmn/sim';
 import { LoggedRollPRNG } from '../branch/logged-rolls.ts';
 import { copyOf } from '../sim-ask/copy.ts';
+import { learnHitCount } from './learn.ts';
 import { ForcedDicePRNG, RecordingPRNG } from './prng.ts';
 import { reportOf } from './report.ts';
 import { dieKey, type DiceReport, type ForcedDie, type NaturalRecord } from './types.ts';
@@ -50,6 +51,20 @@ function naturalTurn(live: Battle, play: (battle: Battle) => void): { record: Na
   return { record: recording.record, endSeed: String(stream.getSeed()) };
 }
 
+/**
+ * The raw answers of the dice that learn theirs on copies (decision D6): a hit count whose draws the module cannot name by
+ * the draw alone (Loaded Dice adds a second draw, Population Bomb draws `random(7)`). `null` marks a count no draws reach.
+ */
+function learnedScripts(input: Omit<Parameters<typeof learnHitCount>[0], 'fork' | 'die'>): Map<string, readonly number[] | null> {
+  const scripts = new Map<string, readonly number[] | null>();
+  for (const die of input.forced) {
+    if (die.name.kind === 'hit-count' && 'hits' in die.result) {
+      scripts.set(dieKey(die.name), learnHitCount({ ...input, fork: forkPrng, die: die as Parameters<typeof learnHitCount>[0]['die'] }));
+    }
+  }
+  return scripts;
+}
+
 export function playForcedTurn({ live, forced, play }: ForcedTurnInput): DiceReport {
   if (forced.length === 0) {
     play(live);
@@ -59,7 +74,8 @@ export function playForcedTurn({ live, forced, play }: ForcedTurnInput): DiceRep
   const inner = live.prng;
   const watch = watchBattle(live);
   const start = live.log.length;
-  const prng = new ForcedDicePRNG({ inner, watch, forced, record: natural.record });
+  const scripts = learnedScripts({ live, forced, record: natural.record, play });
+  const prng = new ForcedDicePRNG({ inner, watch, forced, record: natural.record, scripts });
   live.prng = prng;
   try {
     play(live);

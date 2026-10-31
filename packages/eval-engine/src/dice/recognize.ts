@@ -160,9 +160,10 @@ function handlerDie(draw: Draw, battle: Battle, base: Base): DieName | null {
 
 /** The dice of a move that are not accuracy, crit or roll (A3a): secondaries, self effects, hit counts, stalling, power. */
 function recognizeMoveDraw(draw: Draw, watch: BattleWatch, gen: number, base: Base): DieName | null {
-  const { battle, armed } = watch;
+  const { battle } = watch;
   const scope = watch.scope();
-  const quiet = !armed && !(battle.event as { id?: string } | undefined)?.id;
+  // no handler in flight; a hook left armed without a draw (Gen 2 skips the accuracy draw of a sure move) does not matter here
+  const quiet = !(battle.event as { id?: string } | undefined)?.id;
   const secondary = secondaryDie(draw, watch, gen, base);
   if (secondary) return secondary;
   if (isPercent(draw) && quiet && (scope === 'selfDrops' || (gen === 2 && scope === 'tryMoveHit'))) {

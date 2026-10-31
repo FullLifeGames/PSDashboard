@@ -70,6 +70,26 @@ describe('a chance draw answers yes or no', () => {
     expect(answerDie('crit', { happens: false }, draw, 2)).toEqual({ value: 255 });
   });
 
+  test('a random(100) the script compares answers by the chance the simulator named', () => {
+    const draw = (chanceOf: number): Draw => ({ call: 'random', from: 100, chance: chanceOf });
+    expect(answerDie('secondary', { happens: true }, draw(0.3), 9)).toEqual({ value: 0, chance: 0.3 });
+    expect(answerDie('secondary', { happens: false }, draw(0.3), 9)).toEqual({ value: 99, chance: 0.3 });
+    expect(answerDie('secondary', { happens: false }, draw(1), 9)).toEqual({ noChance: true, chance: 1 });
+    expect(answerDie('self-effect', { happens: true }, draw(0), 9)).toEqual({ noChance: true, chance: 0 });
+  });
+
+  test('a hit count is the index of the count in the sample, the count itself in a range, and no answer outside', () => {
+    const sample: Draw = { call: 'sample', from: 8, items: [2, 2, 2, 3, 3, 3, 4, 5] };
+    expect(answerDie('hit-count', { hits: 2 }, sample, 5)).toEqual({ value: 0 });
+    expect(answerDie('hit-count', { hits: 4 }, sample, 5)).toEqual({ value: 6 });
+    expect(answerDie('hit-count', { hits: 6 }, sample, 5)).toEqual({ noChance: true });
+    const range: Draw = { call: 'random', from: 1, to: 4 };
+    expect(answerDie('hit-count', { hits: 3 }, range, 2)).toEqual({ value: 3 });
+    expect(answerDie('hit-count', { hits: 4 }, range, 2)).toEqual({ noChance: true });
+    // a random(m) with no upper end holds a count the draw alone does not name: the learner answers it
+    expect(answerDie('hit-count', { hits: 5 }, { call: 'random', from: 7 }, 9)).toBeNull();
+  });
+
   test('a result that does not fit the kind is no answer', () => {
     expect(answerDie('accuracy', { step: 3 }, chance(75, 100), 9)).toBeNull();
     expect(answerDie('damage-roll', { happens: true }, { call: 'random', from: 16 }, 9)).toBeNull();

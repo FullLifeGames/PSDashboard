@@ -1,5 +1,5 @@
 import { PRNG, type PRNGSeed } from '@pkmn/sim';
-import { answerDie } from './answer.ts';
+import { answerDie, type Answered } from './answer.ts';
 import { recognize } from './recognize.ts';
 import { dieKey, type Answer, type DieName, type Draw, type ForcedDie, type NaturalRecord } from './types.ts';
 import type { BattleWatch } from './watch.ts';
@@ -102,6 +102,8 @@ export interface DieNote {
   chance?: number;
   /** `battle.log.length` at the first draw. */
   logIndex?: number;
+  /** The shape of every draw of the die (a copy of the call's `Draw`), in order: the learner reads the next draw's shape from it. */
+  shapes: Draw[];
 }
 
 /**
@@ -115,10 +117,16 @@ export class ForcedDicePRNG extends WatchedPRNG {
   private readonly record: NaturalRecord;
   private readonly cursors = new Map<string, number>();
 
-  constructor(input: { inner: PRNG; watch: BattleWatch; forced: readonly ForcedDie[]; record: NaturalRecord }) {
+  /** Raw answers per die key, one per draw, learned on copies (learn.ts); null means no draw sequence gives the answer. */
+  private readonly scripts: ReadonlyMap<string, readonly number[] | null>;
+
+  constructor(input: {
+    inner: PRNG; watch: BattleWatch; forced: readonly ForcedDie[]; record: NaturalRecord; scripts?: ReadonlyMap<string, readonly number[] | null>;
+  }) {
     super(input.inner, input.watch);
     for (const die of input.forced) this.forced.set(dieKey(die.name), die);
     this.record = input.record;
+    this.scripts = input.scripts ?? new Map();
   }
 
   protected override decide(name: DieName, draw: Draw, natural: number): number {
@@ -132,9 +140,11 @@ export class ForcedDicePRNG extends WatchedPRNG {
   }
 
   private force(key: string, die: ForcedDie, draw: Draw, natural: number): number {
-    const answer = answerDie(die.name.kind, die.result, draw, this.watch.battle.gen);
-    const note = this.notes.get(key) ?? { draws: 0, noChance: false };
+    const note = this.notes.get(key) ?? { draws: 0, noChance: false, shapes: [] };
+    const script = this.scripts.get(key);
+    const answer = script === undefined ? answerDie(die.name.kind, die.result, draw, this.watch.battle.gen) : this.scripted(script, note.draws, natural);
     note.draws++;
+    note.shapes.push({ ...draw });
     if (note.draws === 1) note.logIndex = this.watch.battle.log.length;
     if (answer && 'chance' in answer && answer.chance !== undefined && note.chance === undefined) note.chance = answer.chance;
     this.notes.set(key, note);
@@ -147,5 +157,11 @@ export class ForcedDicePRNG extends WatchedPRNG {
       return natural;
     }
     return answer.value;
+  }
+
+  /** The learned raw answer of a die's draw, the stream's own after the script ends, or the word that no sequence reaches the answer. */
+  private scripted(script: readonly number[] | null, draw: number, natural: number): Answered {
+    if (script === null) return { noChance: true };
+    return { value: draw < script.length ? script[draw] : natural };
   }
 }
