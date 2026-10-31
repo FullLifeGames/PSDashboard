@@ -1,6 +1,9 @@
 import { toID, type Battle } from '@pkmn/sim';
 import type { DieNote } from './prng.ts';
 import type { DieReport, ForcedDie } from './types.ts';
+import type { MoveSight } from './watch.ts';
+import { about, applied, otherwise, parts, shows, slotOfIdent, type Witness } from './report-lines.ts';
+import { moveNoDraw, moveWitness } from './report-moves.ts';
 
 /**
  * Round 82 (forced dice), decision D9: what became of a forced die. The real turn's PRNG notes whether the simulator drew the
@@ -15,6 +18,12 @@ import type { DieReport, ForcedDie } from './types.ts';
  * - crit: yes needs the `|-crit|` line, no needs none. The Gen 2 crit compares a number to a threshold the draw does not
  *   show, so the module answers 0 or 255 and the protocol decides.
  * - damage roll: the draw ran, so a damage line for the target (or the Substitute's `[damage]` activation) has to follow.
+ * - secondary: the effect line of the entry (a `|-status|`, a `|cant|` flinch, a `|-start|`, a `|-boost|` or `|-unboost|`) after
+ *   the draw, for the target (for the user when the entry is a self effect).
+ * - self effect: a `|-boost|` or `|-unboost|` of the move's own stats on the user.
+ * - hit count: the `|-hitcount|` line equals the count; a count no draw gives is `no-chance` (the learner found none).
+ * - stalling: no `|-fail|` for the user in the action means it succeeded.
+ * - power: the handler's own `|-activate|` line for its move means the stronger draw.
  */
 
 export interface ReportInput {
@@ -24,6 +33,8 @@ export interface ReportInput {
   battle: Battle;
   /** `battle.log.length` before the real turn. */
   start: number;
+  /** What the watch saw of the moves of the turn (the reasons of a die that was never drawn). */
+  saw?: ReadonlyMap<string, MoveSight>;
 }
 
 /** Lines that open a new action: the next body's move, a switch, the end of the turn. A move another move calls (`[from]`) belongs to the action. */
@@ -43,12 +54,6 @@ function windowOf(log: readonly string[], from: number): string[] {
   }
   return lines;
 }
-
-const parts = (line: string): string[] => line.split('|');
-const slotOfIdent = (ident: string | undefined): string | undefined => ident?.split(':')[0].trim();
-
-/** The line is about the body in `slot` (its first argument), or about any body when the die names none. */
-const about = (line: string, slot: string | undefined): boolean => slot === undefined || slotOfIdent(parts(line)[2]) === slot;
 
 /** Lines that say what a hit was like, not that it did something. */
 const MARKERS = new Set(['-miss', '-crit', '-supereffective', '-resisted', '-hitcount', '-immune', '-fail', '-notarget', '-block', '-anim', '-prepare', '-singleturn', '-hint', '-nothing', 'move']);
@@ -79,7 +84,6 @@ function isBlocker(line: string, targetSlot: string | undefined): boolean {
 /** Lines a move that did nothing leaves behind. */
 const QUIET = new Set(['debug', '-nothing', '']);
 
-const shows = (line: string): string => `the protocol shows "${line}"`;
 
 /** Why the simulator never drew the die, read from the protocol of the turn. */
 function noDraw(input: ReportInput): DieReport {
@@ -110,23 +114,11 @@ function noDraw(input: ReportInput): DieReport {
   if (kind === 'crit' && move.willCrit && action.some(line => about(line, targetSlot) && isEffect(line))) {
     return { die, took: 'no-draw', reason: `${move.name} always crits: the simulator draws no crit` };
   }
+  const extra = moveNoDraw(input, move.name, action);
+  if (extra) return extra;
   if (action.every(line => QUIET.has(parts(line)[1]))) return { die, took: 'no-draw', reason: `${move.name} did nothing this turn: no line follows it` };
   return { die, took: 'no-draw', reason: `the simulator drew no ${kind} for ${move.name} this turn` };
 }
-
-/** What every witness reads: the die, the notes of its draw and the lines of the action that holds it. */
-interface Witness {
-  die: ForcedDie;
-  seen: Pick<DieReport, 'chance' | 'logIndex'>;
-  note: DieNote;
-  action: string[];
-  target: string[];
-  targetSlot: string | undefined;
-  name: string;
-}
-
-const applied = (w: Witness): DieReport => ({ die: w.die, took: 'applied', ...w.seen });
-const otherwise = (w: Witness, took: DieReport['took'], reason: string): DieReport => ({ die: w.die, took, ...w.seen, reason });
 
 function accuracyReport(w: Witness, happens: boolean): DieReport {
   const missed = w.action.some(line => missFor(line, w.targetSlot));
@@ -171,5 +163,5 @@ export function reportOf(input: ReportInput): DieReport {
   if (kind === 'accuracy' && 'happens' in result) return accuracyReport(witness, result.happens);
   if (kind === 'crit' && 'happens' in result) return critReport(witness, result.happens);
   if (kind === 'damage-roll') return rollReport(witness);
-  return applied(witness);
+  return moveWitness(witness, battle) ?? applied(witness);
 }

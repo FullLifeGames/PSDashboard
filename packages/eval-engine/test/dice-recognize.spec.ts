@@ -116,7 +116,8 @@ describe.each(RULES)('a Substitute in front changes no name: $name singles', (ru
         const played = named(rules, scene, 'singles', seed);
         if (!played) break;
         const miss = played.log.some(line => line.startsWith('|-miss|'));
-        const expected = miss ? ['accuracy'] : ['accuracy', 'crit', 'damage-roll'];
+        // Air Slash draws its flinch (Round 82, A3a) behind a Substitute too: the hit went into the Substitute, the entry is still drawn
+        const expected = miss ? ['accuracy'] : ['accuracy', 'crit', 'damage-roll', ...(move === 'airslash' ? ['secondary'] : [])];
         expect(played.names.map(entry => entry.name.kind), `${move} ${seed}`).toEqual(expected);
         expect(played.names.every(entry => entry.name.targetSlot === 'p2a' && entry.name.moveId === move && entry.name.slot === 'p1a')).toBe(true);
       }
@@ -127,7 +128,7 @@ describe.each(RULES)('a Substitute in front changes no name: $name singles', (ru
 describe.each(RULES_WITH_DOUBLES)('Rock Slide in doubles: $name', (rules: Rules) => {
   const ROCK_SLIDE: Scene = { id: 'rock slide', a: SNORLAX(['rockslide']), t: PIKACHU(['splash']), spread: true };
 
-  test('the accuracy of each target comes first in the order of the targets, then crit and damage roll of each target that was hit', () => {
+  test('the accuracy of each target comes first in the order of the targets, then crit, damage roll and flinch of each target that was hit', () => {
     let both = 0;
     let oneMissed = 0;
     for (const seed of SEEDS) {
@@ -138,10 +139,14 @@ describe.each(RULES_WITH_DOUBLES)('Rock Slide in doubles: $name', (rules: Rules)
       const expected: DieName[] = [];
       // Gen 3 plays a spread move target by target (tryMoveHit); Gens 4 and up draw every accuracy first (hitStepAccuracy).
       if (rules.generation !== 3) expected.push(...targets.map(target => name('p1a', 'rockslide', target, 'accuracy')));
+      const flinch = (target: string): DieName => ({ ...name('p1a', 'rockslide', target, 'secondary'), effectId: 'flinch' });
       for (const target of targets) {
         if (rules.generation === 3) expected.push(name('p1a', 'rockslide', target, 'accuracy'));
         if (hit.includes(target)) expected.push(name('p1a', 'rockslide', target, 'crit'), name('p1a', 'rockslide', target, 'damage-roll'));
+        // Gen 3 draws the flinch of a target right after its roll, Gens 4 and up after the rolls of every target
+        if (rules.generation === 3 && hit.includes(target)) expected.push(flinch(target));
       }
+      if (rules.generation !== 3) expected.push(...hit.map(flinch));
       expect(played.names.map(entry => dieKey(entry.name)), `seed ${seed}`).toEqual(expected.map(dieKey));
       if (missedTargets.length === 0) both++;
       else oneMissed++;

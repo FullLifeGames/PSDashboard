@@ -69,7 +69,7 @@ export function playForcedTurn({ live, forced, play }: ForcedTurnInput): DiceRep
   }
   inner.setSeed(natural.endSeed as Parameters<PRNG['setSeed']>[0]);
   return {
-    forced: forced.map(die => reportOf({ die, note: prng.notes.get(dieKey(die.name)), battle: live, start })),
+    forced: forced.map(die => reportOf({ die, note: prng.notes.get(dieKey(die.name)), battle: live, start, saw: watch.moves })),
     naturalEndSeed: natural.endSeed,
   };
 }

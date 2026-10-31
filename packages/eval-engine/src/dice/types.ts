@@ -49,6 +49,22 @@ export interface Draw {
   to?: number;
   /** The numerator of a chance. */
   numerator?: number;
+  /** The items of a `sample`: a hit count is found among them. */
+  items?: readonly unknown[];
+  /**
+   * The chance behind a `random(100)` that the script compares (a secondary entry, a self effect), 0 to 1. `recognize` fills it
+   * when the simulator's state names it, so the answer knows whether the draw can go the other way.
+   */
+  chance?: number;
+}
+
+/** One entry of the secondaries a move carries, as the simulator hands it to `ModifySecondaries` (the fields the module reads). */
+export interface SecondaryEntry {
+  chance?: number;
+  status?: string;
+  volatileStatus?: string;
+  boosts?: Record<string, number>;
+  self?: { boosts?: Record<string, number>; volatileStatus?: string };
 }
 
 /** What the simulator drew for one occurrence of a die: the raw call (`random(from, to)`) and its value. */

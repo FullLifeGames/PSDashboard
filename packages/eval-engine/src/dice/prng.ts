@@ -54,7 +54,7 @@ abstract class WatchedPRNG extends PRNG {
   }
 
   override sample<T>(items: readonly T[]): T {
-    return this.within({ call: 'sample', from: items.length }, () => super.sample(items));
+    return this.within({ call: 'sample', from: items.length, items }, () => super.sample(items));
   }
 
   override shuffle<T>(items: T[], start = 0, end = items.length): void {
