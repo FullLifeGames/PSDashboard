@@ -115,6 +115,10 @@ export class RecordingPRNG extends WatchedPRNG {
   readonly chances = new Map<string, number>();
   /** The name of every die drawn, per die key. */
   readonly names = new Map<string, DieName>();
+  /** The shape of the first draw of every die, per die key (a sample's items tell the results of the die). */
+  readonly shapes = new Map<string, Draw>();
+  /** The offer's probe lets every proc chance come true, so the dice that follow a proc (Effect Spore's pick) are drawn and can be listed. */
+  procsYes = false;
 
   get record(): NaturalRecord {
     return this.answers;
@@ -128,12 +132,13 @@ export class RecordingPRNG extends WatchedPRNG {
   protected override decide(name: DieName, draw: Draw, natural: number): number {
     const key = dieKey(name);
     this.names.set(key, name);
+    if (!this.shapes.has(key)) this.shapes.set(key, { ...draw });
     if (draw.call === 'chance' && !this.chances.has(key)) this.chances.set(key, (draw.numerator ?? 0) / (draw.from ?? 1));
     const answer: Answer = { from: draw.from, to: draw.to, value: natural };
     const list = this.answers.get(key);
     if (list) list.push(answer);
     else this.answers.set(key, [answer]);
-    return natural;
+    return this.procsYes && draw.call === 'chance' && (name.kind === 'ability-proc' || name.kind === 'item-proc') ? 0 : natural;
   }
 }
 

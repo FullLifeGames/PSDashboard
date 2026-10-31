@@ -153,3 +153,34 @@ export function learnOption(input: LearnOptionInput): number[] | null {
   const answer = find(0, top, at(0), at(top));
   return answer === null ? null : [answer];
 }
+
+/**
+ * Every status the die's one draw can lead to, read from the protocol: the offer lists them as the results of the die. A `sample`
+ * over words names them by its items; a `random(m)` is bisected like `learnOption` does, collecting the status at every probe.
+ */
+export function reachableOptions(input: Omit<LearnInput, 'die'> & { name: ForcedDie['name'] }): string[] {
+  const key = dieKey(input.name);
+  const forced = [...input.forced, { name: input.name, result: { happens: true } }];
+  const first = trialOf({ ...input, forced }, key, []);
+  const shape = first.note?.shapes[0];
+  if (!shape) return [];
+  if (shape.call === 'sample') return [...new Set((shape.items ?? []).map(String))];
+  if (shape.call !== 'random' || shape.to !== undefined || shape.from === undefined) return [];
+  const seen = new Set<string>();
+  const at = (value: number): string | null => {
+    const { note, log } = trialOf({ ...input, forced }, key, [value]);
+    const word = note?.logIndex === undefined ? null : statusAfter(log, note.logIndex);
+    if (word) seen.add(word);
+    return word;
+  };
+  const walk = (low: number, high: number, atLow: string | null, atHigh: string | null): void => {
+    if (high - low <= 1 || atLow === atHigh) return;
+    const middle = Math.floor((low + high) / 2);
+    const atMiddle = at(middle);
+    walk(low, middle, atLow, atMiddle);
+    walk(middle, high, atMiddle, atHigh);
+  };
+  const top = shape.from - 1;
+  walk(0, top, at(0), at(top));
+  return [...seen];
+}

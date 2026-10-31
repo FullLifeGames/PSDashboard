@@ -2,11 +2,14 @@ import type { Battle, Pokemon } from '@pkmn/sim';
 import type { BranchSlotChoice } from '../branch-choices.ts';
 import { strengthMix } from '../calc/fickle.ts';
 import { copyOf } from '../sim-ask/copy.ts';
+import { reachableOptions } from './learn.ts';
 import { naturalTurn } from './play.ts';
+import { RecordingPRNG } from './prng.ts';
 import { chanceOfEntry, genShape, rollsAtTurnStart, secondaryEffectId } from './recognize.ts';
 import { readsStartRoll } from './start-roll.ts';
 import { probeCheck } from './status-probe.ts';
 import { dieKey, tieName, type DieName, type DieResult, type SecondaryEntry } from './types.ts';
+import { watchBattle } from './watch.ts';
 
 /**
  * Round 82 (forced dice), step A3a: which dice the panel offers for a slot's move choice. What the move's Dex entry and the
@@ -123,6 +126,59 @@ function moveOffers(copy: Battle, user: Pokemon, move: ActiveMove, targets: Poke
   return offers;
 }
 
+const bodyAt = (battle: Battle, slot: string): Pokemon | undefined => battle.sides[slot[1] === '1' ? 0 : 1].active[slot[2] === 'a' ? 0 : 1];
+
+/** The events of a hit that holders' abilities and items answer: the target was hit, then it took damage. Runs on a copy. */
+function hitEvents(copy: Battle, userSlot: string, targetSlot: string, moveId: string): void {
+  const user = bodyAt(copy, userSlot);
+  const target = bodyAt(copy, targetSlot);
+  if (!user || !target) return;
+  const move = copy.dex.getActiveMove(moveId);
+  const events = copy as unknown as { setActiveMove(move: unknown, pokemon: Pokemon, target?: Pokemon): void; runEvent(...args: unknown[]): unknown };
+  events.setActiveMove(move, user, target);
+  events.runEvent('DamagingHit', target, user, move, 1);
+  events.runEvent('Damage', target, user, move, 1);
+}
+
+/**
+ * Round 82, step A4: the procs of a hit. The offer runs the hit's events on a copy under the module's own recognition and lists
+ * the proc dice it names, with the chance the draw carried; a die that picks (Effect Spore's status) lists its results: the
+ * items of a `sample`, or the statuses a `random(100)` can reach, read from the protocol on copies (learn.ts). No ability or item
+ * is named: a holder whose handler draws nothing for this hit (no contact, a rule of the user) offers nothing.
+ */
+function procOffers(battle: Battle, user: Pokemon, move: ActiveMove, targets: Pokemon[]): DieOffer[] {
+  if (move.category === 'Status') return [];
+  const offers: DieOffer[] = [];
+  for (const target of targets) {
+    const play = (copy: Battle): void => hitEvents(copy, user.getSlot(), target.getSlot(), move.id);
+    const copy = copyOf(battle);
+    copy.prng ??= battle.prng.clone();
+    const watch = watchBattle(copy);
+    const recording = new RecordingPRNG(copy.prng, watch);
+    recording.procsYes = true;
+    copy.prng = recording;
+    try {
+      play(copy);
+    } finally {
+      watch.uninstall();
+    }
+    for (const [key, name] of recording.names) {
+      if (name.kind !== 'ability-proc' && name.kind !== 'item-proc') continue;
+      const shape = recording.shapes.get(key);
+      const chance = recording.chances.get(key);
+      if (shape?.call === 'sample') {
+        offers.push({ name, results: [...new Set(shape.items ?? [])].map((item): DieResult => ({ option: String(item) })) });
+      } else if (shape?.call === 'random' && shape.to === undefined) {
+        const options = reachableOptions({ live: battle, forced: [], record: new Map(), play, fork: prng => prng.clone(), name });
+        offers.push({ name, results: [{ happens: false }, ...options.map((option): DieResult => ({ option }))] });
+      } else {
+        offers.push({ name, results: YES_NO, ...(chance === undefined ? {} : { chance }) });
+      }
+    }
+  }
+  return offers;
+}
+
 /**
  * The status checks the body carries: a condition (its status or a volatile) whose own `BeforeMove` handler draws a chance for
  * this move. The chance offered is the chance of the answer "the body goes on".
@@ -153,8 +209,17 @@ export function offeredDice(battle: Battle, slot: string, choice: BranchSlotChoi
   // the checks before a move draw whatever the move does next, also on the turn a charge move charges
   const checks = checkOffers(battle, slot, move.id);
   if (move.flags.futuremove || !charged(user, move)) return checks;
-  const offers = FOE_REACHING.has(move.target) ? moveOffers(copy, user, move, targetsOf(user, move, choice)) : [];
+  const targets = FOE_REACHING.has(move.target) ? targetsOf(user, move, choice) : [];
+  const offers = targets.length > 0 ? moveOffers(copy, user, move, targets) : [];
+  offers.push(...procOffers(copy, user, move, targets));
   offers.push(...checks);
+  return [...offers, ...userOffers(copy, user, move)];
+}
+
+/** The dice of the move that belong to the user whatever the move aims at: a self effect, the chance of a stalling move to succeed again. */
+function userOffers(copy: Battle, user: Pokemon, move: ActiveMove): DieOffer[] {
+  const slot = user.getSlot();
+  const offers: DieOffer[] = [];
   // a self effect belongs to the move whatever it aims at (a status move that raises the user's stats draws it too)
   if (move.self?.boosts) offers.push({ name: { slot, moveId: move.id, kind: 'self-effect' }, results: YES_NO });
   const stall = move.stallingMove ? stallCondition(user, copy) : undefined;
@@ -198,6 +263,28 @@ export function offeredOrderDice(battle: Battle, play: (battle: Battle) => void)
       const body = battle.sides[slot[1] === '1' ? 0 : 1].active[slot[2] === 'a' ? 0 : 1];
       offers.push({ name: { slot, moveId: '', kind: 'move-first', effectId: body.item }, results: YES_NO });
     }
+  }
+  return offers;
+}
+
+/**
+ * The dice of the end of the turn the panel offers (round 82, step A4). They belong to the turn, so the offer plays the turn on a
+ * copy, as `offeredOrderDice` does, and lists what the simulator drew at the Residual event of every body (Shed Skin, Harvest,
+ * Healer, the Gen 2 thaw), with the chance of the draw. A future move that lands this turn draws its accuracy, crit and damage
+ * roll in the end-of-turn handling: those dice are listed too, as far as the natural landing drew them (a landing that misses
+ * draws no crit and no roll). The live battle is read and never written.
+ */
+export function offeredEndDice(battle: Battle, play: (battle: Battle) => void): DieOffer[] {
+  const natural = naturalTurn(battle, play);
+  const offers: DieOffer[] = [];
+  const steps = Array.from({ length: genShape(battle.gen).roll.steps }, (_, step): DieResult => ({ step }));
+  for (const [key, name] of natural.names) {
+    const chance = natural.chances.get(key);
+    const withChance = chance === undefined ? {} : { chance };
+    const future = !!name.moveId && !!battle.dex.moves.get(name.moveId).flags.futuremove;
+    if (name.kind === 'end-of-turn') offers.push({ name, results: YES_NO, ...withChance });
+    else if (future && (name.kind === 'accuracy' || name.kind === 'crit')) offers.push({ name, results: YES_NO, ...withChance });
+    else if (future && name.kind === 'damage-roll') offers.push({ name, results: steps });
   }
   return offers;
 }
