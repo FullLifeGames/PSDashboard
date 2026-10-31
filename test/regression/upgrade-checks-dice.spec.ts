@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { upgradeChecks } from '../../../scripts/upgrade-pkmn.mjs';
+import { upgradeChecks } from '../../scripts/upgrade-pkmn.mjs';
 
 /**
  * Round 82 (forced dice), step A7d (gate answer 1b): a plain run plays a sample of the dice sweeps, so the checks a new
