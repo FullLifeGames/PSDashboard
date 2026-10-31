@@ -6,7 +6,7 @@ import { attachDispatch } from '../src/forward/sim-fast/dispatch';
 import { configureSimFast, SIM_FAST_DEFAULT } from '../src/forward/sim-fast/state';
 import { copyOf } from '../src/sim-ask/copy';
 import { watchBattle } from '../src/dice/watch';
-import { boardOf, clicksOf, PIKACHU, playClicks, RULES, SNORLAX, stableLog, seedOf, type Mode, type Rules, type Scene } from './dice-fixtures';
+import { boardOf, clicksOf, GRID_SCENES, playClicks, RULES, seedOf, stableLog, type Mode, type Rules } from './dice-fixtures';
 import { fingerprint } from './power-oracle';
 
 // Round 82 (forced dice), decision D1. The watch is a set of own-property wrappers on one battle for one forced turn. It
@@ -15,16 +15,7 @@ import { fingerprint } from './power-oracle';
 await loadSimMods('gen9championsou');
 configureSimFast(SIM_FAST_DEFAULT);
 
-const SCENES: Scene[] = [
-  { id: 'tackle', a: SNORLAX(['tackle']), t: PIKACHU(['splash']) },
-  { id: 'rockslide', a: SNORLAX(['rockslide']), t: PIKACHU(['splash']), spread: true },
-  { id: 'airslash', a: SNORLAX(['airslash']), t: PIKACHU(['splash']) },
-  { id: 'furyattack', a: SNORLAX(['furyattack']), t: PIKACHU(['splash']) },
-  { id: 'tackle from a paralysed body', a: SNORLAX(['tackle']), t: PIKACHU(['splash']), setup: battle => void battle.sides[0].active[0]!.setStatus('par') },
-  { id: 'tackle from a confused body', a: SNORLAX(['tackle']), t: PIKACHU(['splash']), setup: battle => void battle.sides[0].active[0]!.addVolatile('confusion') },
-  { id: 'tackle into a Substitute', a: SNORLAX(['tackle']), t: PIKACHU(['splash']), setup: battle => void battle.sides[1].active[0]!.addVolatile('substitute') },
-  { id: 'both sides attack', a: SNORLAX(['tackle']), t: PIKACHU(['tackle']), tMove: true },
-];
+const SCENES = GRID_SCENES;
 
 const SEEDS = [0, 1, 2, 3].map(seedOf);
 const keysOf = (battle: Battle): string =>

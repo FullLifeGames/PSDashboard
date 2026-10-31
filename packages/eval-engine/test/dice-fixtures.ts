@@ -82,3 +82,15 @@ export const stableLog = (battle: Battle): string => battle.log.filter(line => !
 export function playClicks(battle: Battle, clicks: { p1: string; p2: string }): void {
   if (!battle.choose('p1', clicks.p1) || !battle.choose('p2', clicks.p2)) throw new Error(`choice refused "${clicks.p1}" / "${clicks.p2}"`);
 }
+
+/** The scenes the identity grids play: a plain hit, a spread move, a multi-hit move, three bodies that draw before they move, a Substitute, two attackers. */
+export const GRID_SCENES: Scene[] = [
+  { id: 'tackle', a: SNORLAX(['tackle']), t: PIKACHU(['splash']) },
+  { id: 'rockslide', a: SNORLAX(['rockslide']), t: PIKACHU(['splash']), spread: true },
+  { id: 'airslash', a: SNORLAX(['airslash']), t: PIKACHU(['splash']) },
+  { id: 'furyattack', a: SNORLAX(['furyattack']), t: PIKACHU(['splash']) },
+  { id: 'tackle from a paralysed body', a: SNORLAX(['tackle']), t: PIKACHU(['splash']), setup: battle => void battle.sides[0].active[0]!.setStatus('par') },
+  { id: 'tackle from a confused body', a: SNORLAX(['tackle']), t: PIKACHU(['splash']), setup: battle => void battle.sides[0].active[0]!.addVolatile('confusion') },
+  { id: 'tackle into a Substitute', a: SNORLAX(['tackle']), t: PIKACHU(['splash']), setup: battle => void battle.sides[1].active[0]!.addVolatile('substitute') },
+  { id: 'both sides attack', a: SNORLAX(['tackle']), t: PIKACHU(['tackle']), tMove: true },
+];
