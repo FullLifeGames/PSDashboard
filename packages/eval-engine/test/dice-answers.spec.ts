@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { PRNG, type Battle } from '@pkmn/sim';
+import type { Battle } from '@pkmn/sim';
 import { loadSimMods } from '../src/forward/sim-mods';
 import { answerDie } from '../src/dice/answer';
 import { ForcedDicePRNG } from '../src/dice/prng';
@@ -10,6 +10,7 @@ import { watchBattle } from '../src/dice/watch';
 import {
   boardOf, clicksOf, GRID_SCENES, PIKACHU, playClicks, RULES, seedOf, SNORLAX, stableLog, type Mode, type Rules, type Scene,
 } from './dice-fixtures';
+import { damageAtRaw as oracleDamage } from './dice-sweep-support';
 
 // Round 82 (forced dice), decision D4: how a die answers. A chance answers yes or no; a die with no way to give an answer
 // keeps the natural result and says so; the damage roll's step runs from the lowest damage up in every generation; and a
@@ -125,34 +126,8 @@ describe.each(cases)('the damage roll runs from the lowest damage up: $rules.nam
   const STRENGTH: Scene = { id: 'strength into Chansey', a: SNORLAX(['strength']), t: { species: 'Chansey', moves: ['splash'] } };
   const shape = genShape(rules.generation).roll;
 
-  /**
-   * The damage the target loses when the simulator draws this raw value for the roll: the turn plays with a PRNG that answers
-   * the draws inside `battle.randomizer` (Gens 3 and up; a crit chance of 1 in 16 draws `random(16)` too) or the
-   * `random(217, 256)` of Gens 1 and 2 with the raw value, and the stream for everything else.
-   */
-  const damageAtRaw = (seed: string, raw: number): number => {
-    const battle = boardOf(rules, STRENGTH, mode, seed)!;
-    const natural = battle.prng;
-    let inRandomizer = false;
-    const original = (battle as unknown as { randomizer(...args: unknown[]): unknown }).randomizer;
-    (battle as unknown as { randomizer: unknown }).randomizer = function (this: unknown, ...args: unknown[]) {
-      inRandomizer = true;
-      try {
-        return original.apply(this, args);
-      } finally {
-        inRandomizer = false;
-      }
-    };
-    battle.prng = new (class extends PRNG {
-      override random(from?: number, to?: number): number {
-        const value = natural.random(from, to);
-        const isRoll = shape.scope === 'randomizer' ? inRandomizer : from === shape.from && to === shape.to;
-        return isRoll ? raw : value;
-      }
-    })(seed);
-    playClicks(battle, clicksOf(STRENGTH, mode));
-    return battle.sides[1].active[0].maxhp - battle.sides[1].active[0].hp;
-  };
+  /** The damage the target loses when the simulator draws this raw value for the roll (the oracle shared with the roll sweep). */
+  const damageAtRaw = (seed: string, raw: number): number => oracleDamage(boardOf(rules, STRENGTH, mode, seed)!, clicksOf(STRENGTH, mode), 'p2a', raw);
 
   test('step 0 deals the least damage of the raw values, the top step the most, and no step deals less than the one before', () => {
     // a seed whose turn hits without a crit: the roll is the only die that then moves the damage
