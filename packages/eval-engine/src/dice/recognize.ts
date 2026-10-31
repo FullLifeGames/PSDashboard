@@ -73,7 +73,7 @@ export function secondaryEffectId(entry: SecondaryEntry): string {
 }
 
 /** The chance of an entry (or of a move's self effect) as a number from 0 to 1; no chance is a sure effect. */
-const chanceOfEntry = (chance: number | undefined): number => (chance === undefined ? 1 : Math.min(1, chance / 100));
+export const chanceOfEntry = (chance: number | undefined): number => (chance === undefined ? 1 : Math.min(1, chance / 100));
 
 const HANDLERS = new Set(['Condition', 'Status', 'Item', 'Ability']);
 /** A draw inside a condition's, an item's or an ability's handler belongs to it, not to the script that called it. */
@@ -170,7 +170,10 @@ function recognizeMoveDraw(draw: Draw, watch: BattleWatch, gen: number, base: Ba
     draw.chance = chanceOfEntry((battle.activeMove as unknown as ActiveMoveLike).self?.chance);
     return { ...base, kind: 'self-effect' };
   }
-  if (scope === hitCountScope(gen) && (draw.call === 'sample' || draw.call === 'random') && quiet) return { ...base, kind: 'hit-count' };
+  // the count is drawn for a move with a `multihit` before the first hit starts (`move.hit` is still 0); a duration or a pick is no count
+  const counted = battle.activeMove as unknown as { hit?: number; multihit?: unknown };
+  const beforeHits = !counted.hit && !!counted.multihit;
+  if (scope === hitCountScope(gen) && (draw.call === 'sample' || draw.call === 'random') && quiet && beforeHits) return { ...base, kind: 'hit-count' };
   return handlerDie(draw, battle, base);
 }
 

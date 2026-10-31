@@ -13,3 +13,6 @@ export {
   type ForcedDie, type NaturalRecord,
 } from './types.ts';
 export { watchBattle, type ArmedHook, type BattleWatch } from './watch.ts';
+export { learnHitCount, type LearnInput } from './learn.ts';
+export { offeredDice, type DieOffer } from './offer.ts';
+export { secondaryEffectId } from './recognize.ts';
