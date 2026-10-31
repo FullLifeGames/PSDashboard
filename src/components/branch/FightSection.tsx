@@ -7,6 +7,7 @@ import type { Gimmick } from '../../hooks/useSideControlsState';
 import { ComboBox } from '../ComboBox';
 import { MoveBtn } from './ChoiceButtons';
 import { SlotDice, type SlotDiceProps } from './DiceChips';
+import { rollsFor } from '../../lib/branch-rolls';
 import { moveChoiceFor, pickedChoice, type ChoiceContext } from './choice-context';
 import type { PlayedPick } from './SideControls';
 import { toId } from '@fulllifegames/replay-core';
@@ -219,7 +220,12 @@ export function FightSection(props: FightSectionProps) {
         ctx={ctx}
         onChoice={onChoice}
       />
-      {advanced && props.dice && <SlotDice {...props.dice} label={label} />}
+      {advanced && props.dice && (
+        <SlotDice
+          {...props.dice} label={label}
+          rollsOf={name => rollsFor(name, { moves, dmgResults: props.dmgResults, spreadDamageResults: props.spreadDamageResults, targetDamageResults: props.targetDamageResults })}
+        />
+      )}
       {advanced && (
       <div className="ps-custom-choice">
         <ChoicePicker label={label} moves={moves} switches={switches} blockedSwitchKeys={blockedSwitchKeys} onPick={onPickChoice} />

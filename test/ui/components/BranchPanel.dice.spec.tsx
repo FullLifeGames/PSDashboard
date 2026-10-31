@@ -3,7 +3,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useMemo, useState } from 'react';
 import type { Battle } from '@pkmn/sim';
-import { createBranchStateFromBattle, type BranchSlotChoice, type ForcedDie } from '@fulllifegames/eval-engine';
+import { calcSingleDamageRange, createBranchStateFromBattle, type BranchSlotChoice, type ForcedDie } from '@fulllifegames/eval-engine';
 import { BranchPanel } from '../../../src/components/BranchPanel';
 import { diceBattle, setOf } from '../fixtures/dice-battle';
 
@@ -272,5 +272,73 @@ describe('BranchPanel Quick Claw die', () => {
     renderPanel(quickClaw('gen9customgame'), { first: { p1: [tackle], p2: [tackle] } });
     await screen.findByRole('group', { name: 'Quick Claw on Alpha Mon' });
     expect(screen.queryByText(/for every holder on the field/)).toBeNull();
+  });
+});
+
+describe('BranchPanel damage roll select', () => {
+  const airSlash: BranchSlotChoice = { kind: 'move', moveId: 'airslash', moveName: 'Air Slash' };
+  const percent = (option: HTMLElement) => Number(/(\d+(?:\.\d)?)%/.exec(option.textContent ?? '')![1]);
+
+  /** The damage of each step as the calculator prices it, read the way the panel reads it. */
+  function stepsOf(battle: Battle, crit = false): number[] {
+    const state = createBranchStateFromBattle(battle as never, [], {});
+    const result = calcSingleDamageRange(state.p1ActiveSlots![0]!, state.p2ActiveSlots![0]!, state.p1MovesBySlot![0][0], { gen: 9, rolls: true, ...(crit ? { isCrit: true } : {}) });
+    return result.rolls!.damage;
+  }
+
+  test('every step lists its damage from the calculator, lowest first, and min and max set the ends', async () => {
+    const battle = singles();
+    const latest = renderPanel(battle, { first: { p1: [airSlash], p2: [] } });
+    const select = await screen.findByRole('combobox', { name: 'Damage roll' });
+    const options = within(select).getAllByRole('option');
+    expect(options.map(option => option.textContent)[0]).toBe('As rolled');
+    const steps = options.slice(1);
+    expect(steps).toHaveLength(16);
+    expect(steps[0].textContent).toMatch(/^Damage roll 1 · \d+(\.\d)?%$/);
+    const maxhp = battle.sides[1].active[0]!.maxhp;
+    expect(steps.map(percent)).toEqual(stepsOf(battle).map(damage => Math.round(damage / maxhp * 1000) / 10));
+    const roll = screen.getByRole('group', { name: 'Damage roll' });
+    await userEvent.click(within(roll).getByRole('button', { name: 'Max' }));
+    expect(kinds(diceOf(latest.picks, 'p1'))).toContainEqual(['damage-roll', { step: 15 }]);
+    await userEvent.click(within(screen.getByRole('group', { name: 'Damage roll' })).getByRole('button', { name: 'Min' }));
+    expect(kinds(diceOf(latest.picks, 'p1'))).toContainEqual(['damage-roll', { step: 0 }]);
+    expect(within(screen.getByRole('group', { name: 'Damage roll' })).queryByRole('button', { name: 'Lowest KO roll' })).toBeNull();
+  });
+
+  test('the lowest KO roll is the first step that takes the foe down, and the steps from it read KO', async () => {
+    const battle = singles();
+    const damage = stepsOf(battle);
+    battle.sides[1].active[0]!.hp = damage[8];
+    const latest = renderPanel(battle, { first: { p1: [airSlash], p2: [] } });
+    const select = await screen.findByRole('combobox', { name: 'Damage roll' });
+    const texts = within(select).getAllByRole('option').slice(1).map(option => option.textContent ?? '');
+    expect(texts.map(text => text.endsWith(' · KO'))).toEqual(damage.map(value => value >= damage[8]));
+    const first = damage.findIndex(value => value >= damage[8]);
+    await userEvent.click(within(screen.getByRole('group', { name: 'Damage roll' })).getByRole('button', { name: 'Lowest KO roll' }));
+    expect(kinds(diceOf(latest.picks, 'p1'))).toContainEqual(['damage-roll', { step: first }]);
+  });
+
+  test('a forced crit switches the numbers to the crit damage and says so', async () => {
+    const battle = singles();
+    renderPanel(battle, { first: { p1: [airSlash], p2: [] } });
+    await userEvent.click(within(await screen.findByRole('group', { name: 'Crit' })).getByRole('button', { name: 'Crit' }));
+    const maxhp = battle.sides[1].active[0]!.maxhp;
+    await waitFor(() => {
+      const steps = within(screen.getByRole('combobox', { name: 'Damage roll' })).getAllByRole('option').slice(1);
+      expect(steps.map(percent)).toEqual(stepsOf(battle, true).map(damage => Math.round(damage / maxhp * 1000) / 10));
+    });
+    expect(screen.getByText('The damages show a crit.')).toBeInTheDocument();
+  });
+
+  test('a spread move has one select per target, each with its own damage', async () => {
+    const battle = doubles();
+    renderPanel(battle);
+    await userEvent.click(await side('P1A').findByRole('button', { name: /Rock Slide/ }));
+    const first = await screen.findByRole('combobox', { name: 'Damage roll against Snorlax' });
+    const second = screen.getByRole('combobox', { name: 'Damage roll against Chansey' });
+    expect(within(first).getAllByRole('option')).toHaveLength(17);
+    const top = (select: HTMLElement) => percent(within(select).getAllByRole('option').at(-1)!);
+    expect(top(first)).toBeGreaterThan(0);
+    expect(top(second)).not.toBe(top(first));
   });
 });

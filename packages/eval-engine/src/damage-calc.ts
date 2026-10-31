@@ -26,6 +26,20 @@ export interface DamageResult {
    * for one hit or a fixed count.
    */
   hitShares?: { hits: number; chance: number; minPercent: number; maxPercent: number }[];
+  /** Round 82 (forced dice): the damage of each step of the roll, asked for with `DamageCalcContext.rolls`. */
+  rolls?: DamageRolls;
+}
+
+/**
+ * The damage roll's steps as the panel's select lists them: the calculator's damage for each step, lowest first (16 steps, 39 in
+ * Gens 1 and 2). A multi-hit move gives the sum of its hits, every hit taking the step (decision 15a), for `hits` hits.
+ */
+export interface DamageRolls {
+  damage: number[];
+  /** The defender's HP now and at most, to read a step as a knock out. */
+  hp: number;
+  maxhp: number;
+  hits: number;
 }
 
 export interface DamageCalcContext {
@@ -52,6 +66,12 @@ export interface DamageCalcContext {
    * copy of it. Left out where the position has no live battle.
    */
   liveHit?: LiveHit;
+  /** Round 82 (forced dice): the hit is a crit (the user forced one); the calculator prices it as a crit. */
+  isCrit?: boolean;
+  /** Round 82: also list the damage of each step of the roll (`DamageResult.rolls`). */
+  rolls?: boolean;
+  /** Round 82: the hit count the user forced; a move with a drawn count lists its rolls for that count (else for the fewest hits). */
+  hits?: number;
 }
 
 /** The calc has no field that prices this hit: the simulator does (T202). */
@@ -302,6 +322,7 @@ export function calcSingleDamageRange(
         overrides: power ? { ...overrides, ...power } : overrides,
         isStellarFirstUse,
         ...(hits ? { hits } : {}),
+        ...(context.isCrit ? { isCrit: true } : {}),
       });
       const result = calculate(gen, atkPoke, defPoke, calcMoveFor(), calcField(context));
       // The calc forces a spread on a few moves (Tera Starstorm of Terapagos-Stellar, Expanding Force on Psychic Terrain): against a lone foe the simulator plays one target, which the Singles game type prices (T152). Behind a screen no game type does (T202): the simulator prices the hit.
@@ -327,10 +348,23 @@ export function calcSingleDamageRange(
       range: `${minPct}% - ${maxPct}%`,
       koChance: koChanceOf(priced, maxDamage),
       ...(counts && counts.length > 1 ? { hitShares: hitSharesOf(counts, priced, maxhp) } : {}),
+      ...(context.rolls ? rollsOf(priced, counts, context.hits, { hp: defender.hp, maxhp }) : {}),
     };
   } catch (error) {
     return error instanceof UnpricedByCalc ? priceOnCopy(context, moveOption.name) : emptyDamageResult(moveOption.name);
   }
+}
+
+/** The steps of the roll for the count the user forced, else for the fewest hits: the hits' damages added step by step. Absent where the calculator gives no list of steps (a fixed damage). */
+function rollsOf(priced: PricedCount[], counts: HitCount[] | null, hits: number | undefined, defender: { hp: number; maxhp: number }): { rolls: DamageRolls } | Record<string, never> {
+  const index = Math.max(0, counts?.findIndex(count => count.hits === hits) ?? 0);
+  const damage = priced[index]?.result.damage;
+  if (!Array.isArray(damage) || damage.length === 0) return {};
+  const perHit: number[][] = typeof damage[0] === 'number' ? [damage as number[]] : (damage as number[][]);
+  const steps = perHit[0].length;
+  if (steps !== 16 && steps !== 39) return {};
+  const total = Array.from({ length: steps }, (_, step) => perHit.reduce((sum, hit) => sum + hit[step], 0));
+  return { rolls: { damage: total, hp: defender.hp, maxhp: defender.maxhp, hits: counts ? counts[index].hits : perHit.length } };
 }
 
 /** Each drawn hit count with its chance and its own range (round 67, T136 point 1). */

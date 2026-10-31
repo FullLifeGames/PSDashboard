@@ -1,4 +1,5 @@
 import type { BranchMoveOption, BranchSimState, BranchSlotChoice, SimPokemonInfo, DamageResult, LiveHit } from '@fulllifegames/eval-engine';
+import { toId } from '@fulllifegames/replay-core';
 
 export interface SpreadTargetDamage {
   label: string;
@@ -71,6 +72,19 @@ function fieldFacts(slots: SlotsBySide, choices: ChoicesBySide, attacker: SimPok
   };
 }
 
+/**
+ * Round 82 (forced dice): what the slot's chosen move adds to the calc's context. The move lists the damage of each step of its
+ * roll; a crit forced on this target prices it as a crit; a forced hit count prices a multi-hit move for that count. Other
+ * moves, and the chosen move on a target without a forced crit, keep the plain preview.
+ */
+function forcedContext(chosen: Extract<BranchSlotChoice, { kind: 'move' }> | null, move: BranchMoveOption, target: string): Partial<NonNullable<DamageContext>> {
+  if (!chosen || chosen.moveId !== toId(move.name)) return {};
+  const dice = chosen.dice ?? [];
+  const crit = dice.some(die => die.name.kind === 'crit' && die.name.targetSlot === target && 'happens' in die.result && die.result.happens);
+  const count = dice.map(die => die.result).find((result): result is { hits: number } => 'hits' in result);
+  return { rolls: true, ...(crit ? { isCrit: true } : {}), ...(count ? { hits: count.hits } : {}) };
+}
+
 /** Per-move damage of one active slot: targeted entries, the best untargeted range, and spread breakdowns. */
 function slotDamage(args: {
   active: SimPokemonInfo;
@@ -99,13 +113,17 @@ function slotDamage(args: {
       armed: { attacker: !!armed[attackerSide][attackerSlot], defender: !!armed[side][slot] },
     },
   } : {});
-  const contextInto = (side: 'p1' | 'p2', slot: number): DamageContext =>
-    (context?.gameType === 'Doubles' ? { ...context, ...fieldFacts(slots, choices, active, side, slot), ...liveHit(side, slot) } : context);
+  const pick = choices[attackerSide][attackerSlot];
+  const chosen = pick?.kind === 'move' ? pick : null;
+  const contextInto = (side: 'p1' | 'p2', slot: number, move: BranchMoveOption): DamageContext => ({
+    ...(context?.gameType === 'Doubles' ? { ...context, ...fieldFacts(slots, choices, active, side, slot), ...liveHit(side, slot) } : context),
+    ...forcedContext(chosen, move, `${side}${String.fromCharCode(97 + slot)}`),
+  });
   moves.forEach((move, moveIndex) => {
     for (const target of move.targetOptions) {
       const defender = slots[target.side][target.activeSlot];
       if (defender) {
-        targetEntries.push([`${move.slot}:${target.targetLoc}`, calc(active, defender, move, contextInto(target.side, target.activeSlot))]);
+        targetEntries.push([`${move.slot}:${target.targetLoc}`, calc(active, defender, move, contextInto(target.side, target.activeSlot, move))]);
       }
     }
 
@@ -113,7 +131,7 @@ function slotDamage(args: {
     // Untargeted moves (spread/self/singles): one range per living enemy (G6).
     const perTarget = enemyActives.map(enemy => ({
       label: `${enemySide.toUpperCase()}${String.fromCharCode(65 + enemy.index)}`,
-      result: calc(active, enemy.active, move, contextInto(enemySide, enemy.index)),
+      result: calc(active, enemy.active, move, contextInto(enemySide, enemy.index, move)),
     }));
     const best = perTarget.reduce((currentBest, candidate) =>
       candidate.result.maxPercent > currentBest.result.maxPercent ? candidate : currentBest,
