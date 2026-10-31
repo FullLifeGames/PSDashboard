@@ -1,4 +1,5 @@
 import { expect } from 'vitest';
+import type { Battle } from '@pkmn/sim';
 import { readFileSync } from 'fs';
 import {
   buildTeamsFromReplay, getBranchSimulatorFormat, parseReplayLogWithObservations, replayBringOnly, type ReplayData,
@@ -21,9 +22,12 @@ import { rulesDex } from '@fulllifegames/replay-core';
 export const loadReplay = (name: string) =>
   JSON.parse(readFileSync(new URL(`./fixtures/${name}.json`, import.meta.url), 'utf-8')) as ReplayData;
 
-/** The app's reconstruction: healed, locked, boundaries captured. Champions replays bring what the app brings. */
-export async function reconstruct(fixture: string, targetTurn: number) {
-  const replay = loadReplay(fixture);
+/**
+ * The app's reconstruction: healed, locked, boundaries captured. Champions replays bring what the app brings. `source` is a
+ * replay that does not live in this folder's fixtures (the feedback corpus); `fixture` still names its game type.
+ */
+export async function reconstruct(fixture: string, targetTurn: number, source?: ReplayData) {
+  const replay = source ?? loadReplay(fixture);
   const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
   const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });
   const snapshotAt = (turn: number) => snapshots[Math.min(turn - 1, snapshots.length - 1)] ?? null;
@@ -108,4 +112,32 @@ export function drawsByAction(draws: Draw[]): Map<string, Draw[]> {
     byAction.set(draw.key, [...(byAction.get(draw.key) ?? []), draw]);
   }
   return byAction;
+}
+
+/**
+ * Round 82 (forced dice), step A5: the `play` of the dice module for the logged turn. It writes the commands the replay would
+ * send to the battle it gets (the live battle and its copy alike) and answers the forced replacements from the log, so the
+ * module plays the turn twice the way `playTurn` plays it once.
+ */
+export function loggedClicks(replayLog: string, turn: number, choices: { p1?: string; p2?: string } = {}): (battle: Battle) => void {
+  const block = parseTurnBlocks(replayLog).turns.find(entry => entry.turn === turn)!;
+  return battle => {
+    const sim = battle as SimBattle;
+    for (const side of ['p1', 'p2'] as const) {
+      if (!sim.choose(side, choices[side] ?? getMainChoice(block.preUpkeep, side, sim))) throw new Error(`choice refused for ${side}`);
+    }
+    const forced = {
+      p1: collectForcedSwitchSpecies(block.preUpkeep, block.postUpkeep, 'p1', sim.dex),
+      p2: collectForcedSwitchSpecies(block.preUpkeep, block.postUpkeep, 'p2', sim.dex),
+    };
+    const cursors = { p1: { current: 0 }, p2: { current: 0 } };
+    for (let guard = 0; guard < 6 && !sim.ended; guard++) {
+      const answers = (['p1', 'p2'] as const).flatMap((side, index) => {
+        const choice = hasForceSwitch(sim, index) ? buildForcedSwitchChoice(sim, index, forced[side], cursors[side]) : null;
+        return choice ? [{ side, choice }] : [];
+      });
+      if (answers.length === 0) break;
+      for (const { side, choice } of answers) sim.choose(side, choice);
+    }
+  };
 }

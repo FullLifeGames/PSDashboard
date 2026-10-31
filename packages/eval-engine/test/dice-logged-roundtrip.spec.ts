@@ -4,12 +4,11 @@ import { compareAlignment, extractProtocolEvents, scoreAlignment, type Alignment
 import { loadSimMods } from '../src/forward/sim-mods';
 import { loggedActions, loggedDice, mergeLoggedDice, type LoggedOptions } from '../src/dice/logged-results';
 import { playForcedTurn } from '../src/dice/play';
-import { secondaryEffectId } from '../src/dice/recognize';
 import type { ForcedDie } from '../src/dice/types';
 import {
   boardOf, clicksOf, PIKACHU, playClicks, RULES, seedOf, SNORLAX, type Mode, type Mon, type Rules, type Scene,
 } from './dice-fixtures';
-import { dexOfRules } from './dice-sweep-support';
+import { dexOfRules, secondariesIn } from './dice-sweep-support';
 
 /**
  * Round 82 (forced dice), step A5: the simulator is the oracle of the log reader. A turn played on one seed writes a log;
@@ -41,20 +40,10 @@ const SCENES: RoundScene[] = [
   { id: 'a confused attacker', a: SNORLAX(['tackle']), t: CHANSEY(['splash']), setup: confuse, checks: ['confusion'] },
 ];
 
-/** The entries of a move's secondaries that carry a chance, as the module names them. */
-function secondariesOf(rules: Rules): (moveId: string) => string[] {
-  const dex = dexOfRules(rules);
-  return moveId => {
-    const move = dex.moves.get(moveId) as { secondaries?: { chance?: number }[] | null; secondary?: { chance?: number } | null; self?: { chance?: number } };
-    const entries = move.secondaries ?? (move.secondary ? [move.secondary] : []);
-    return entries.filter(entry => entry.chance !== undefined && entry.chance < 100).map(entry => secondaryEffectId(entry));
-  };
-}
-
 function optionsOf(rules: Rules, scene: RoundScene, mode: Mode): LoggedOptions {
   const clicked = new Map([['p1a', scene.a.moves[0]], ['p2a', scene.tMove ? scene.t.moves[0] : 'splash']]);
   if (mode === 'doubles') for (const slot of ['p1b', 'p2b']) clicked.set(slot, 'splash');
-  return { clicked, checks: scene.checks ? new Map([['p1a', scene.checks]]) : undefined, secondariesOf: secondariesOf(rules) };
+  return { clicked, checks: scene.checks ? new Map([['p1a', scene.checks]]) : undefined, secondariesOf: secondariesIn(dexOfRules(rules)) };
 }
 
 const SEEDS = 6;

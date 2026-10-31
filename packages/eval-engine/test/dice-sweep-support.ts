@@ -1,7 +1,7 @@
 import { Battle as SimBattle, PRNG, Teams, toID, type Battle, type Pokemon } from '@pkmn/sim';
 import { rulesDex } from '@fulllifegames/replay-core';
 import { playForcedTurn } from '../src/dice/play';
-import { genShape } from '../src/dice/recognize';
+import { genShape, secondaryEffectId } from '../src/dice/recognize';
 import type { DiceReport, DieName, ForcedDie } from '../src/dice/types';
 import { copyOf } from '../src/sim-ask/copy';
 import { CHAMPIONS, mon, playClicks, RULES, sweepSelection, type Mode, type Rules } from './dice-fixtures';
@@ -218,4 +218,16 @@ export function outfitBoard(
   return battleOf(
     rules.doubles!, [attacker, mon(rules, { species: 'Blissey', moves: ['splash'] })], [foe, mon(rules, { species: 'Chansey', moves: ['splash'] })],
   );
+}
+
+/**
+ * Round 82 (forced dice), step A5: what `loggedDice` takes from the Dex. The effect ids (the words of `secondaryEffectId`) of
+ * the entries of a move's secondaries that carry a chance below 100, from the dex of the game's own rule set.
+ */
+export function secondariesIn(dex: { moves: { get(id: string): unknown } }): (moveId: string) => string[] {
+  return moveId => {
+    const move = dex.moves.get(moveId) as { secondaries?: SecondaryEntry[] | null; secondary?: SecondaryEntry | null };
+    const entries = move.secondaries ?? (move.secondary ? [move.secondary] : []);
+    return entries.filter(entry => entry.chance !== undefined && entry.chance < 100).map(entry => secondaryEffectId(entry));
+  };
 }
