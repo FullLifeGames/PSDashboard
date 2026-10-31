@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Rules for agents working on PS Dashboard. Claude Code reads this file through `CLAUDE.md`. What comes next is in `NextSteps.md`; the details of every open TODO are in `docs/backlog.md`; finished rounds are in `docs/completed/`.
+Rules for agents working on PS Dashboard. Claude Code reads this file through `CLAUDE.md`. What comes next is in `NextSteps.md`; the details of every open TODO are in `docs/backlog.md`; finished rounds are in `docs/completed/`. Name the project's concepts with the words of `GLOSSARY.md`; before you change a decision that `docs/adr/` records, read its ADR.
 
 ## The project
 
@@ -74,7 +74,7 @@ PS Dashboard analyzes Pokémon Showdown replays: it replays a game turn by turn,
 - Probes never go under `test/regression/` (the suite collects them); they are `.vt.ts` files under `docs/perf/probes/<date>/` with their own Vitest config and `PROBE_ROOT`.
 - The replay iframe's own `Config` stub (`PS_CONFIG_DEFAULTS` in `src/lib/replay-html.ts`) must carry Showdown's routes: the client reads `Config.routes` while it loads, and its scripts load in no fixed order.
 - Feedback runs use port 5176; an orphaned dev server there makes every run fail at once. Do not edit root Markdown files during feedback, e2e or bank runs (Vite reloads).
-- `docs/` is local (gitignored) except `docs/completed/` and `docs/backlog.md`; `.claude/` is local except `.claude/agents/`. `deploy.ps1` and `FeedbackEval.xlsx` stay untracked.
+- `docs/` is local (gitignored) except `docs/completed/`, `docs/adr/` and `docs/backlog.md`; `.claude/` is local except `.claude/agents/`. `deploy.ps1` and `FeedbackEval.xlsx` stay untracked.
 
 ## Change classes
 

@@ -33,9 +33,10 @@ Gen9Draft-*
 test-results
 .playwright-mcp
 FIXPLAN.md
-# docs/ stays local except the archive of finished rounds and the backlog
+# docs/ stays local except the archive of finished rounds, the decision records and the backlog
 /docs/*
 !/docs/completed/
+!/docs/adr/
 !/docs/backlog.md
 
 # Fitting corpus cache (manifest is committed; logs are re-downloadable)
