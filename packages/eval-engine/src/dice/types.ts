@@ -19,7 +19,7 @@ export type DieKind = typeof DIE_KINDS[number];
 export interface DieName { slot: string; moveId: string; targetSlot?: string; kind: DieKind; effectId?: string }
 
 export type DieResult =
-  | { happens: boolean }        // a chance: accuracy, crit, secondary, status check, procs, stalling, end of turn
+  | { happens: boolean }        // a chance: accuracy, crit, secondary, procs, stalling, end of turn; a status check: the body goes on; a first mover: it acts first
   | { step: number }            // the damage roll, 0 is the lowest damage
   | { hits: number }            // the hit count
   | { option: string }          // a die with several results (Effect Spore's status), by its protocol word
