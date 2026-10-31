@@ -26,6 +26,8 @@ export class FixedDice extends PRNG {
   private readonly quantile: number;
   private readonly chance: boolean | undefined;
   private draws = 0;
+  /** The first chance a handler asked since the last `clearChance`, numerator over denominator; null until one is asked. */
+  firstChance: number | null = null;
 
   constructor({ quantile = 0.5, chance }: DiceSpec) {
     super('1,2,3,4');
@@ -42,7 +44,13 @@ export class FixedDice extends PRNG {
     return Math.floor(this.quantile * (to - from)) + from;
   }
 
+  /** Forgets the chance noted so far (what putting a condition on the copy drew does not count). */
+  clearChance(): void {
+    this.firstChance = null;
+  }
+
   override randomChance(numerator: number, denominator: number): boolean {
+    this.firstChance ??= numerator / denominator;
     if (this.chance === undefined) return super.randomChance(numerator, denominator);
     if (++this.draws > MAX_DRAWS) throw new Error('the dice of a played question ran out');
     return this.chance;

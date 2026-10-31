@@ -157,6 +157,20 @@ describe('playOnCopy', () => {
     expect([yes.randomChance(1, 1000), no.randomChance(999, 1000)]).toEqual([true, false]);
     expect(copyOf).toBeTypeOf('function');
   });
+
+  test('FixedDice note the first chance a handler asks and answer a quantile of zero with the low end', () => {
+    // Round 82 (forced dice): the status probe asks which chance a handler draws, and plays on these dice.
+    const dice = new FixedDice({ quantile: 0, chance: true });
+    expect(dice.firstChance).toBeNull();
+    expect([dice.randomChance(3, 4), dice.randomChance(1, 2)]).toEqual([true, true]);
+    expect(dice.firstChance).toBe(0.75);
+    expect([dice.random(), dice.random(4), dice.random(10, 20)]).toEqual([0, 0, 10]);
+    const seeded = new FixedDice({});
+    seeded.randomChance(1, 4);
+    expect(seeded.firstChance).toBe(0.25);
+    seeded.clearChance();
+    expect(seeded.firstChance).toBeNull();
+  });
 });
 
 describe('callHandler', () => {
