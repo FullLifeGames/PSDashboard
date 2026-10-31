@@ -192,8 +192,18 @@ export interface BranchDiceTurn {
 const carriesDice = (turn: BranchDiceTurn): boolean => [...turn.p1Choices, ...turn.p2Choices].some(choice => (choice?.dice?.length ?? 0) > 0);
 
 /**
+ * Round 82 (forced dice), gate answer 2a: a branch's first turn always joins the log's visible results. The first turn is the
+ * move request of the turn the live PRNG (a `LoggedRollPRNG`) knows the logged lines of; the dice module reads the rest from it.
+ * Read by shape: this file keeps type-only imports of the dice module and of the PRNG classes.
+ */
+function joinsLog(battle: SimBattle): boolean {
+  const logged = (battle.prng as { loggedTurn?: { turn: number } | null }).loggedTurn;
+  return battle.requestState === 'move' && !!logged && logged.turn === battle.turn;
+}
+
+/**
  * Writes the turn's commands to the sim: through the stream as always, or, for a turn with forced dice (the slot choices carry
- * one, or dice are pending from a turn that paused for a switch), through the dice module, which plays the turn on a copy of the
+ * one, dice are pending from a turn that paused for a switch, or it is the branch's first turn and joins the log), through the dice module, which plays the turn on a copy of the
  * battle first and then on the live one.
  */
 async function dispatchTurn(
@@ -202,7 +212,7 @@ async function dispatchTurn(
   const { streams, commands, dice } = params;
   const payload = commands.map(({ side, command }) => `>${side} ${command}`).join('\n');
   const pending = dice ? pendingTurns.get(dice.battle) : undefined;
-  if (!dice || (!pending && !carriesDice(dice))) {
+  if (!dice || (!pending && !carriesDice(dice) && !joinsLog(dice.battle))) {
     if (dice) pendingTurns.delete(dice.battle);
     safeStreamWrite(streams.omniscient, payload, record);
     return { ok: true };
@@ -225,8 +235,9 @@ async function dispatchTurn(
  * failing silently.
  *
  * `dice` (round 82, forced dice) names the live battle and the slot choices of both sides. A turn whose choices carry a forced
- * die, or that goes on after a pause for a switch with dice pending, plays through the dice module (a dynamic import: a turn
- * without a forced die runs the code below as it always did). The result then carries the report of the user's dice.
+ * die, that goes on after a pause for a switch with dice pending, or that is the branch's first turn (it joins the log's results,
+ * gate answer 2a), plays through the dice module (a dynamic import: a later turn without a forced die runs the code below as
+ * it always did). The result then carries the report of the user's dice.
  */
 export async function executeBranchChoices(params: {
   streams: BranchRuntime['streams'];

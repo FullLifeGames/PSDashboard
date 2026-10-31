@@ -16,15 +16,19 @@ import { dieKey, type DiceReport, type DieReport, type DieTook, type ForcedDie }
  *
  * - The user's dice come from the slot choices of both sides (`BranchSlotChoice.dice`, ADR 0001).
  * - On the first turn of a branch (the live PRNG is a `LoggedRollPRNG` that knows the logged turn) the dice the log shows for the
- *   actions the user leaves as logged join the user's dice (gate answer 19a), once the user forces a die in that turn. One place
- *   holds this choice: `FIRST_TURN_JOINS_LOG`.
+ *   actions the user leaves as logged join the user's dice, with or without a die of the user's (gate answers 19a and 2a). The
+ *   turn after the first plays as without the module when the user forces nothing. One place holds this choice:
+ *   `FIRST_TURN_JOINS_LOG`.
  * - A turn can pause for a switch in the middle (U-turn, Volt Switch, Flip Turn, Parting Shot, Eject Button, Eject Pack, Emergency
  *   Exit, Wimp Out) and go on in a later `choose`. The forced dice span the whole turn: the pause leaves a `PendingTurn` that the
  *   next call picks up. Each call plays its part through `playForcedTurn`, so the natural copy plays the same switch choice, and
  *   each part ends the stream on the natural turn's seed at that place (decision D8): the parts chain into the whole turn.
  */
 
-/** Gate answer 19a: the log's results join the user's dice on the first turn. The user may move this to "always" (open question). */
+/**
+ * Gates 19a and 2a: the log's results join the user's dice on the first turn, always (before 2a: once the user forced a die). The
+ * first turn of a branch that has no logged turn (a position without one) has nothing to join.
+ */
 export const FIRST_TURN_JOINS_LOG = true;
 
 /** What a turn that paused for a switch hands to the next call. */
@@ -193,7 +197,7 @@ export function playBranchTurn(input: BranchTurnInput): BranchTurnResult {
   const taken = new Set(fresh.map(die => dieKey(die.name)));
   const later = <T extends ForcedDie>(dice: readonly T[]): T[] => dice.filter(die => !taken.has(dieKey(die.name)));
   const mine = carried ? [...fresh, ...later(carried.mine)] : fresh;
-  const forced = carried ? [...fresh, ...later(carried.forced)] : fresh.length > 0 ? firstTurnDice(input, fresh) : [];
+  const forced = carried ? [...fresh, ...later(carried.forced)] : fresh.length > 0 || battle.requestState === 'move' ? firstTurnDice(input, fresh) : [];
   if (forced.length === 0) {
     input.play(battle);
     return { report: undefined, pending: null };
@@ -202,7 +206,8 @@ export function playBranchTurn(input: BranchTurnInput): BranchTurnResult {
   const own = new Set(mine.map(die => dieKey(die.name)));
   const reports = bestReports(carried?.reports ?? [], played.forced.filter(entry => own.has(dieKey(entry.die.name))));
   return {
-    report: { forced: reports, naturalEndSeed: played.naturalEndSeed },
+    // a first turn that joins the log with no die of the user's lists no die
+    report: mine.length > 0 ? { forced: reports, naturalEndSeed: played.naturalEndSeed } : undefined,
     pending: pausedMidTurn(battle) ? { turn: battle.turn, forced, mine, reports } : null,
   };
 }

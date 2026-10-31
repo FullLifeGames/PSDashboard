@@ -323,10 +323,10 @@ export interface MergeInput {
 
 /**
  * The forced dice of the first turn (19a): the user's dice, and the logged dice of the actions left as logged. The user's die
- * wins where both name the same die. A turn with nothing forced stays a turn with nothing forced: it plays as today.
+ * wins where both name the same die. With none of the user's the log's dice stand alone (gate answer 2a): the first turn always
+ * plays the log's visible results.
  */
 export function mergeLoggedDice({ logged, forced, changed, switched }: MergeInput): ForcedDie[] {
-  if (forced.length === 0) return [];
   const taken = new Set(forced.map(die => dieKey(die.name)));
   // a tie belongs to two bodies: when either one changed its action the order of the log no longer holds
   const kept = logged.filter(die => !taken.has(dieKey(die.name)) && !changed.has(die.name.slot)

@@ -219,8 +219,9 @@ describe('the logged dice join the forced dice of a turn (19a)', () => {
   const accuracyOf = (slot: string, moveId: string, targetSlot: string, happens: boolean): ForcedDie =>
     ({ name: { slot, moveId, targetSlot, kind: 'accuracy' }, result: { happens } });
 
-  test('a turn with no forced die stays a turn with none', () => {
-    expect(mergeLoggedDice({ logged, forced: [], changed: new Set() })).toEqual([]);
+  test('a turn with no forced die still joins the log (gate answer 2a); a changed slot leaves it', () => {
+    expect(mergeLoggedDice({ logged, forced: [], changed: new Set() })).toEqual(logged);
+    expect(mergeLoggedDice({ logged, forced: [], changed: new Set(['p1a']) }).some(die => die.name.slot === 'p1a')).toBe(false);
   });
 
   test('the user\'s die wins where both name the same die, and the other logged results follow', () => {

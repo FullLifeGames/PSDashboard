@@ -6,6 +6,7 @@ import { LoggedRollPRNG } from '../src/branch/logged-rolls';
 import { loggedTurnDice, turnChanges, userDice } from '../src/dice/turn';
 import { dieKey, type DieReport } from '../src/dice/types';
 import { branchOf, clickWith, mon } from './branch-dice-support';
+import { executeBranchChoices } from '../src/branch-engine';
 import { playTurn, reconstruct } from './arrival-turn';
 
 /**
@@ -110,13 +111,54 @@ describe('the first turn through executeBranchChoices joins the log\'s dice to t
     expect(has(played.lines, '|-status|p2b: tea pot|brn')).toBe(false);
   });
 
-  test('a turn whose choices carry no die plays as the app plays it today', { timeout: 300000 }, async () => {
+  // Round 82 (A7d, gate answer 2a): the first turn joins the log with or without a die of the user's.
+  test('singles (t73): a first turn with no forced die shows the Fire Fang miss and lists no die', { timeout: 300000 }, async () => {
+    const { replay, runtime } = await reconstruct(FIRE_FANG.fixture, FIRE_FANG.turn, FIRE_FANG.source);
+    const played = await playTurn(runtime, replay.log, FIRE_FANG.turn, undefined, { p1: [clickWith('bodypress')], p2: [] });
+    expect(has(played.lines, '|move|p2a: Penal Battalion|Fire Fang|p1a: Corviknight|[miss]')).toBe(true);
+    expect(played.report).toBeUndefined();
+  });
+
+  test('doubles (t8): a first turn with no forced die plays the logged results and lists no die', { timeout: 300000 }, async () => {
+    const { replay, runtime } = await reconstruct(DOUBLES.fixture, DOUBLES.turn, DOUBLES.source);
+    const played = await playTurn(runtime, replay.log, DOUBLES.turn, undefined, { p1: [clickWith('matchagotcha'), null], p2: [] });
+    expect(played.report).toBeUndefined();
+    // the turn plays the logged crits and hit counts (the damage rolls stay with the seed, so the faint can still differ): the unjoined turn crits Kanye
+    expect(has(played.lines, '|-crit|p2')).toBe(false);
+    expect(played.score.softMismatches).toBeLessThan(4);
+  });
+
+  test('a first turn with no forced die on a position without a logged turn plays as the app plays it today', { timeout: 120000 }, async () => {
+    const asked = await branchOf('gen9customgame', [mon('Pikachu', ['tackle'])], [mon('Snorlax', ['tackle'])], '1,2,3,4');
+    const plain = await branchOf('gen9customgame', [mon('Pikachu', ['tackle'])], [mon('Snorlax', ['tackle'])], '1,2,3,4');
+    const send = (runtime: typeof asked, dice: boolean) => executeBranchChoices({
+      streams: runtime.streams, log: runtime.log, choiceErrors: runtime.choiceErrors,
+      commands: [{ side: 'p1', command: 'move 1' }, { side: 'p2', command: 'move 1' }],
+      ...(dice ? { dice: { battle: runtime.battleStream.battle!, p1Choices: [clickWith('tackle')], p2Choices: [clickWith('tackle')] } } : {}),
+    });
+    expect((await send(asked, true)).ok).toBe(true);
+    expect((await send(plain, false)).ok).toBe(true);
+    expect(asked.battleStream.battle!.log.filter(line => !line.startsWith('|t:|'))).toEqual(plain.battleStream.battle!.log.filter(line => !line.startsWith('|t:|')));
+    expect(String(asked.battleStream.battle!.prng.getSeed())).toBe(String(plain.battleStream.battle!.prng.getSeed()));
+  });
+
+  test('criterion 3: the turn after the first plays byte for byte as without the dice argument', { timeout: 300000 }, async () => {
     const asked = await reconstruct(FIRE_FANG.fixture, FIRE_FANG.turn, FIRE_FANG.source);
     const plain = await reconstruct(FIRE_FANG.fixture, FIRE_FANG.turn, FIRE_FANG.source);
-    const withArg = await playTurn(asked.runtime, asked.replay.log, FIRE_FANG.turn, undefined, { p1: [clickWith('bodypress')], p2: [] });
-    const without = await playTurn(plain.runtime, plain.replay.log, FIRE_FANG.turn);
-    expect(withArg.lines.filter(line => !line.startsWith('|t:|'))).toEqual(without.lines.filter(line => !line.startsWith('|t:|')));
-    expect(withArg.report).toBeUndefined();
+    await playTurn(asked.runtime, asked.replay.log, FIRE_FANG.turn, undefined, { p1: [clickWith('bodypress')], p2: [] });
+    await playTurn(plain.runtime, plain.replay.log, FIRE_FANG.turn, undefined, { p1: [clickWith('bodypress')], p2: [] });
+    const second = (runtime: typeof asked.runtime, dice: boolean) => executeBranchChoices({
+      streams: runtime.streams, log: runtime.log, choiceErrors: runtime.choiceErrors,
+      commands: [{ side: 'p1', command: 'move 1' }, { side: 'p2', command: 'move 1' }],
+      ...(dice ? { dice: { battle: runtime.battleStream.battle!, p1Choices: [clickWith('bodypress')], p2Choices: [] } } : {}),
+    });
+    const withArg = await second(asked.runtime, true);
+    const without = await second(plain.runtime, false);
+    expect(withArg.ok).toBe(true);
+    expect(without.ok).toBe(true);
+    expect(withArg.ok && withArg.dice).toBeFalsy();
+    const lines = (runtime: typeof asked.runtime) => runtime.battleStream.battle!.log.filter(line => !line.startsWith('|t:|'));
+    expect(lines(asked.runtime)).toEqual(lines(plain.runtime));
     expect(String(asked.runtime.battleStream.battle!.prng.getSeed())).toBe(String(plain.runtime.battleStream.battle!.prng.getSeed()));
   });
 });
