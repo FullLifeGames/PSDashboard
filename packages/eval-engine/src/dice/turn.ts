@@ -1,7 +1,9 @@
 import type { Battle } from '@pkmn/sim';
 import type { BranchSlotChoice } from '../branch-choices.ts';
 import { LoggedRollPRNG } from '../branch/logged-rolls.ts';
+import { getMainChoice, parseTurnBlocks } from '../branch/protocol-choices.ts';
 import { slotLetter } from '../branch/team-order.ts';
+import type { SimBattle } from '../branch/types.ts';
 import { loggedDice, mergeLoggedDice, type LoggedOptions } from './logged-results.ts';
 import { offeredDice } from './offer.ts';
 import { playForcedTurn } from './play.ts';
@@ -141,6 +143,25 @@ function firstTurnDice(input: BranchTurnInput, mine: readonly ForcedDie[]): Forc
 export function loggedTurnDice(battle: Battle): ForcedDie[] {
   const logged = battleLoggedTurn(battle);
   return logged ? loggedDice(logged.lines, loggedOptions(battle, logged.choices)) : [];
+}
+
+/**
+ * Round 82 (forced dice), step A7b: the same reading for a battle that has no `LoggedRollPRNG`, the stored exact position of a
+ * replay turn the user views before a branch starts there. The lines and the clicks come from the replay's own block of that turn
+ * (no seed search, nothing played); the options come from the battle as `loggedTurnDice` takes them. A battle that does not stand
+ * at a move request of a turn the replay has gives none.
+ */
+export function loggedDiceAt(battle: Battle, replayLog: string): ForcedDie[] {
+  if (battle.ended || battle.requestState !== 'move') return [];
+  const block = parseTurnBlocks(replayLog).turns.find(entry => entry.turn === battle.turn);
+  if (!block) return [];
+  try {
+    const sim = battle as SimBattle;
+    const choices = { p1: getMainChoice(block.preUpkeep, 'p1', sim), p2: getMainChoice(block.preUpkeep, 'p2', sim) };
+    return loggedDice([...block.preUpkeep, ...block.postUpkeep], loggedOptions(battle, choices));
+  } catch {
+    return [];
+  }
 }
 
 /** The logged turn of the live PRNG when the battle still stands in that turn. */
