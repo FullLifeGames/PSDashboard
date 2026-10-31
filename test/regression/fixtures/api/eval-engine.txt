@@ -201,6 +201,7 @@ value hiddenPowerFacts
 value loadSimMods
 value loadSimModsFor
 value loggedDice
+value loggedDiceAt
 value loggedTurnDice
 value lostGround
 value matchPlayedSide
