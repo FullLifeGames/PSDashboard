@@ -129,3 +129,83 @@ export function chipGroups(offers: readonly DieOffer[]): ChipGroup[] {
   const rest = offers.filter(offer => offer.name.targetSlot === undefined);
   return rest.length > 0 ? [...groups, { key: 'move', offers: rest }] : groups;
 }
+
+/**
+ * Dice that only happen when the move hits: the crit and the damage roll are drawn for a hit, a secondary effect, the hit count,
+ * the self effect and the procs of the target's ability and item follow one (decision 5a).
+ */
+const NEEDS_HIT: ReadonlySet<DieName['kind']> = new Set(['crit', 'damage-roll', 'secondary', 'hit-count', 'self-effect', 'ability-proc', 'item-proc']);
+
+const sameMove = (a: DieName, b: DieName): boolean => a.slot === b.slot && a.moveId === b.moveId;
+/** A die that names a target needs the hit on that target; one that names none needs the hit on every target. */
+const needsHitOn = (die: DieName, accuracy: DieName): boolean => NEEDS_HIT.has(die.kind) && sameMove(die, accuracy) && (die.targetSlot === undefined || die.targetSlot === accuracy.targetSlot);
+
+const isSet = (dice: readonly ForcedDie[], die: ForcedDie): boolean => dice.some(entry => dieKey(entry.name) === dieKey(die.name) && sameResult(entry, die));
+
+/** Gives the dice their results, in the place of the die with the same key when there is one. */
+function setAll(dice: readonly ForcedDie[], pulled: readonly ForcedDie[]): ForcedDie[] {
+  return pulled.reduce<ForcedDie[]>((held, die) => {
+    const key = dieKey(die.name);
+    return held.some(entry => dieKey(entry.name) === key) ? held.map(entry => (dieKey(entry.name) === key ? die : entry)) : [...held, die];
+  }, [...dice]);
+}
+
+/** The dice of the move's own offers that its forced die needs: the hit on its target and the attacker's status checks (it has to act). */
+function pulledFor(die: ForcedDie, offers: readonly DieOffer[]): ForcedDie[] {
+  return offers
+    .filter(offer => sameMove(offer.name, die.name)
+      && ((offer.name.kind === 'accuracy' && (die.name.targetSlot === undefined || offer.name.targetSlot === die.name.targetSlot)) || offer.name.kind === 'status-check'))
+    .map(offer => ({ name: offer.name, result: { happens: true } }));
+}
+
+/** A miss or a body that cannot act: the dice that need the hit have nothing to decide. */
+const stopsTheMove = (die: ForcedDie): boolean =>
+  (die.name.kind === 'accuracy' || die.name.kind === 'status-check') && 'happens' in die.result && !die.result.happens;
+
+/**
+ * A click on a chip of a slot's move. It toggles the die as `toggleDie` does and then settles the dice around it: a die that needs
+ * the hit sets the hit on its target and passes the attacker's status checks (a result that contradicts them gives way); a miss
+ * or a stopped body takes back the dice that need the hit.
+ */
+export function applyDie(dice: readonly ForcedDie[], die: ForcedDie, offers: readonly DieOffer[]): ForcedDie[] {
+  const next = toggleDie(dice, die);
+  if (!isSet(next, die)) return next;
+  if (NEEDS_HIT.has(die.name.kind)) return setAll(next, pulledFor(die, offers));
+  if (!stopsTheMove(die)) return next;
+  const stopped = die.name.kind === 'status-check';
+  return next.filter(entry => !(NEEDS_HIT.has(entry.name.kind) && sameMove(entry.name, die.name) && (stopped || needsHitOn(entry.name, die.name))));
+}
+
+/** What a die that needs the hit is called in a sentence. */
+function needOf(die: ForcedDie, words: DieWords): string {
+  switch (die.name.kind) {
+    case 'crit': return 'the crit';
+    case 'damage-roll': return 'the damage roll';
+    case 'hit-count': return 'the hit count';
+    case 'self-effect': return 'the stat change';
+    case 'secondary': return `the ${words.effect((die.name.effectId ?? '').split(':option')[0]).toLowerCase()}`;
+    default: return words.effect((die.name.effectId ?? '').split(':option')[0]);
+  }
+}
+
+/**
+ * The reasons a hit or a passed check stands set: one sentence per set die of the move that another die needs. The chips show
+ * the dice as set; the sentences say why (decision 5a).
+ */
+export function pullNotes(dice: readonly ForcedDie[], offers: readonly DieOffer[], words: DieWords): string[] {
+  const offered = new Set(offers.map(offer => dieKey(offer.name)));
+  const notes: string[] = [];
+  for (const held of dice) {
+    const yes = 'happens' in held.result && held.result.happens;
+    if (!yes || !offered.has(dieKey(held.name))) continue;
+    const needing = dice.find(entry => NEEDS_HIT.has(entry.name.kind) && sameMove(entry.name, held.name)
+      && (held.name.kind === 'status-check' || needsHitOn(entry.name, held.name)));
+    if (!needing) continue;
+    if (held.name.kind === 'accuracy') {
+      notes.push(`${words.move(held.name.moveId)} hits ${words.slot(held.name.targetSlot ?? '')} because ${needOf(needing, words)} needs a hit.`);
+    } else if (held.name.kind === 'status-check') {
+      notes.push(`${words.slot(held.name.slot)} passes the ${words.effect(held.name.effectId ?? '')} check because ${needOf(needing, words)} needs it to move.`);
+    }
+  }
+  return notes;
+}

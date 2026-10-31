@@ -14,6 +14,13 @@ import { diceBattle, setOf } from '../fixtures/dice-battle';
  */
 vi.mock('../../../src/lib/pokemon-options', () => ({ getMovePool: async () => [] }));
 
+/** What the log shows for the first turn: a spec sets it. The engine reads it from the battle's logged PRNG (arrival-dice.ts), which a battle built in this file does not have. */
+const shown = vi.hoisted(() => ({ logged: [] as unknown[] }));
+vi.mock('../../../src/lib/lazy/branch-engine', async importOriginal => ({
+  ...(await importOriginal<typeof import('../../../src/lib/lazy/branch-engine')>()),
+  loggedTurnDice: () => shown.logged,
+}));
+
 type Picks = { p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] };
 
 /** The panel over a live battle with its own picks, as the app keeps them. `latest` shows what the app would hold. */
@@ -81,13 +88,17 @@ describe('BranchPanel dice chips', () => {
     await userEvent.click(within(within(dice).getByRole('group', { name: 'Flinch' })).getByRole('button', { name: 'Flinch' }));
     expect(diceOf(latest.picks, 'p1')).toEqual([
       { name: { slot: 'p1a', moveId: 'airslash', targetSlot: 'p2a', kind: 'secondary', effectId: 'flinch' }, result: { happens: true } },
+      { name: { slot: 'p1a', moveId: 'airslash', targetSlot: 'p2a', kind: 'accuracy' }, result: { happens: true } },
     ]);
     const chip = () => within(screen.getByRole('group', { name: 'Flinch' })).getByRole('button', { name: 'Flinch' });
     await waitFor(() => expect(chip()).toHaveAttribute('aria-pressed', 'true'));
 
+    // a second click gives the flinch back to the seed; the hit it pulled in stays set and shows, one click from clear
     await userEvent.click(chip());
-    expect('dice' in latest.picks.p1[0]!).toBe(false);
+    expect(kinds(diceOf(latest.picks, 'p1'))).toEqual([['accuracy', { happens: true }]]);
     await waitFor(() => expect(chip()).toHaveAttribute('aria-pressed', 'false'));
+    await userEvent.click(within(screen.getByRole('group', { name: 'Hit' })).getByRole('button', { name: 'Hits' }));
+    expect('dice' in latest.picks.p1[0]!).toBe(false);
   });
 
   test('the other result of a die replaces the first, and the damage roll is a select', async () => {
@@ -96,16 +107,16 @@ describe('BranchPanel dice chips', () => {
     const crit = () => screen.getByRole('group', { name: 'Crit' });
     await userEvent.click(await within(await screen.findByRole('group', { name: 'Crit' })).findByRole('button', { name: 'Crit' }));
     await userEvent.click(within(crit()).getByRole('button', { name: 'No crit' }));
-    expect(kinds(diceOf(latest.picks, 'p1'))).toEqual([['crit', { happens: false }]]);
+    expect(kinds(diceOf(latest.picks, 'p1'))).toEqual([['crit', { happens: false }], ['accuracy', { happens: true }]]);
     await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Damage roll' }), '15');
-    expect(kinds(diceOf(latest.picks, 'p1'))).toEqual([['crit', { happens: false }], ['damage-roll', { step: 15 }]]);
+    expect(kinds(diceOf(latest.picks, 'p1'))).toEqual([['crit', { happens: false }], ['accuracy', { happens: true }], ['damage-roll', { step: 15 }]]);
   });
 
   test('a new move for the slot gives its dice back to the seed', async () => {
     const latest = renderPanel(singles());
     await userEvent.click(await side('P1').findByRole('button', { name: /Air Slash/ }));
     await userEvent.click(within(await screen.findByRole('group', { name: 'Flinch' })).getByRole('button', { name: 'Flinch' }));
-    expect(diceOf(latest.picks, 'p1')).toHaveLength(1);
+    expect(diceOf(latest.picks, 'p1')).toHaveLength(2);
     await userEvent.click(side('P1').getByRole('button', { name: /Splash/ }));
     expect('dice' in latest.picks.p1[0]!).toBe(false);
     await waitFor(() => expect(screen.queryByRole('group', { name: 'Flinch' })).toBeNull());
@@ -137,7 +148,7 @@ describe('BranchPanel dice chips in doubles', () => {
       expect(within(dice).getByRole('group', { name: `Flinch against ${name}` })).toBeInTheDocument();
     }
     await userEvent.click(within(within(dice).getByRole('group', { name: 'Flinch against Chansey' })).getByRole('button', { name: 'Flinch' }));
-    expect(diceOf(latest.picks, 'p1')?.map(die => [die.name.targetSlot, die.name.kind, die.result])).toEqual([['p2b', 'secondary', { happens: true }]]);
+    expect(diceOf(latest.picks, 'p1')?.map(die => [die.name.targetSlot, die.name.kind, die.result])).toEqual([['p2b', 'secondary', { happens: true }], ['p2b', 'accuracy', { happens: true }]]);
   });
 });
 
@@ -172,5 +183,94 @@ describe('BranchPanel dice of the turn', () => {
     renderPanel(tied(), { first: { p1: [tackle], p2: [] } });
     await settle();
     expect(screen.queryByRole('group', { name: 'Dice of the turn' })).toBeNull();
+  });
+});
+
+describe('BranchPanel dice a forced die needs (decision 5a)', () => {
+  const airSlash: BranchSlotChoice = { kind: 'move', moveId: 'airslash', moveName: 'Air Slash' };
+
+  test('forcing a crit sets the hit and says why, and a miss takes the crit back', async () => {
+    const latest = renderPanel(singles());
+    await userEvent.click(await side('P1').findByRole('button', { name: /Air Slash/ }));
+    await userEvent.click(within(await screen.findByRole('group', { name: 'Crit' })).getByRole('button', { name: 'Crit' }));
+    expect(kinds(diceOf(latest.picks, 'p1'))).toEqual([['crit', { happens: true }], ['accuracy', { happens: true }]]);
+    await waitFor(() => expect(within(screen.getByRole('group', { name: 'Hit' })).getByRole('button', { name: 'Hits' })).toHaveAttribute('aria-pressed', 'true'));
+    expect(screen.getByText('Air Slash hits Snorlax because the crit needs a hit.')).toBeInTheDocument();
+
+    await userEvent.click(within(screen.getByRole('group', { name: 'Hit' })).getByRole('button', { name: 'Misses' }));
+    expect(kinds(diceOf(latest.picks, 'p1'))).toEqual([['accuracy', { happens: false }]]);
+    await waitFor(() => expect(screen.queryByText(/because the crit needs a hit/)).toBeNull());
+  });
+
+  test('a paralysed attacker has a status check chip that says what the body does, and a forced secondary passes it', async () => {
+    const battle = singles();
+    battle.sides[0].active[0]!.setStatus('par');
+    const latest = renderPanel(battle, { first: { p1: [airSlash], p2: [] } });
+    const check = await screen.findByRole('group', { name: 'Paralysis check' });
+    expect(within(check).getAllByRole('button').map(chip => chip.textContent)).toEqual(['Paralysis lets it move', 'Paralysis stops it']);
+    await userEvent.click(within(screen.getByRole('group', { name: 'Flinch' })).getByRole('button', { name: 'Flinch' }));
+    expect(kinds(diceOf(latest.picks, 'p1'))).toEqual([
+      ['secondary', { happens: true }], ['accuracy', { happens: true }], ['status-check', { happens: true }],
+    ]);
+    expect(await screen.findByText('Noivern passes the Paralysis check because the flinch needs it to move.')).toBeInTheDocument();
+  });
+
+  test('a spread move sets the hit on the target of the forced die only', async () => {
+    const latest = renderPanel(doubles());
+    await userEvent.click(await side('P1A').findByRole('button', { name: /Rock Slide/ }));
+    await userEvent.click(within(await screen.findByRole('group', { name: 'Crit against Chansey' })).getByRole('button', { name: 'Crit' }));
+    expect(diceOf(latest.picks, 'p1')?.map(die => [die.name.kind, die.name.targetSlot])).toEqual([['crit', 'p2b'], ['accuracy', 'p2b']]);
+  });
+});
+
+describe('BranchPanel chips on the first turn of a branch', () => {
+  const airSlash: BranchSlotChoice = { kind: 'move', moveId: 'airslash', moveName: 'Air Slash' };
+  const loggedCrit = { name: { slot: 'p1a', moveId: 'airslash', targetSlot: 'p2a', kind: 'crit' }, result: { happens: true } };
+
+  test('the log result of an action left as logged reads "log", and a click forces the other result', async () => {
+    shown.logged = [loggedCrit];
+    try {
+      const latest = renderPanel(singles(), { first: { p1: [airSlash], p2: [] } });
+      const crit = await screen.findByRole('group', { name: 'Crit' });
+      expect(within(crit).getAllByRole('button').map(chip => chip.textContent)).toEqual(['Crit · log', 'No crit']);
+      expect(within(crit).getByRole('button', { name: 'Crit · log' })).toHaveAttribute('aria-pressed', 'false');
+      await userEvent.click(within(crit).getByRole('button', { name: 'No crit' }));
+      expect(kinds(diceOf(latest.picks, 'p1'))).toEqual([['crit', { happens: false }], ['accuracy', { happens: true }]]);
+      await waitFor(() => expect(within(screen.getByRole('group', { name: 'Crit' })).getByRole('button', { name: 'Crit · log' })).toBeInTheDocument());
+    } finally {
+      shown.logged = [];
+    }
+  });
+
+  test('another move shows no log result: the logged die belongs to the logged action', async () => {
+    shown.logged = [loggedCrit];
+    try {
+      renderPanel(singles(), { first: { p1: [{ kind: 'move', moveId: 'splash', moveName: 'Splash' }], p2: [] } });
+      await settle();
+      expect(screen.queryByRole('button', { name: /· log/ })).toBeNull();
+    } finally {
+      shown.logged = [];
+    }
+  });
+});
+
+describe('BranchPanel Quick Claw die', () => {
+  const quickClaw = (format: string) => diceBattle({
+    format,
+    p1: [setOf('Snorlax', ['tackle'], { name: 'Alpha Mon', item: 'Quick Claw' })], p2: [setOf('Snorlax', ['tackle'], { name: 'Beta Mon' })],
+  });
+  const tackle: BranchSlotChoice = { kind: 'move', moveId: 'tackle', moveName: 'Tackle' };
+
+  test('Gen 3 draws it once per turn for every holder on the field, and the chip says so', async () => {
+    renderPanel(quickClaw('gen3customgame'), { first: { p1: [tackle], p2: [tackle] } });
+    const row = await screen.findByRole('group', { name: 'Quick Claw on Alpha Mon' });
+    expect(within(row).getAllByRole('button').map(chip => chip.textContent)).toEqual(['Acts first', 'Does not act first']);
+    expect(screen.getByText('The game draws this die once per turn for every holder on the field, so a chip here applies to all of them.')).toBeInTheDocument();
+  });
+
+  test('Gen 9 draws it per holder: no such note', async () => {
+    renderPanel(quickClaw('gen9customgame'), { first: { p1: [tackle], p2: [tackle] } });
+    await screen.findByRole('group', { name: 'Quick Claw on Alpha Mon' });
+    expect(screen.queryByText(/for every holder on the field/)).toBeNull();
   });
 });

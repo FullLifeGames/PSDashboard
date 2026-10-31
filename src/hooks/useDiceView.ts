@@ -1,8 +1,8 @@
 import { useCallback, useMemo } from 'react';
-import { dieKey, type BranchSlotChoice, type ForcedDie, type LiveHit } from '@fulllifegames/eval-engine';
+import { dieKey, type BranchSlotChoice, type DieOffer, type ForcedDie, type LiveHit } from '@fulllifegames/eval-engine';
 import type { BranchSimState } from './useBranch';
 import { useDiceOffers } from './useDiceOffers';
-import { TURN_KINDS, toggleDie, withDice } from '../lib/branch-dice';
+import { TURN_KINDS, applyDie, toggleDie, withDice } from '../lib/branch-dice';
 import type { SlotDiceProps, TurnDiceProps } from '../components/branch/DiceChips';
 
 /**
@@ -35,11 +35,14 @@ export function useDiceViews(args: {
   const view = useDiceOffers({ enabled: advanced && !stale, simState, getBattle });
   const choiceAt = useCallback((side: Side, index: number): BranchSlotChoice | null =>
     (side === 'p1' ? simState?.p1Choices : simState?.p2Choices)?.[index] ?? null, [simState]);
-  const toggleOn = useCallback((slot: string, die: ForcedDie) => {
+  /** A move's die settles the dice around it (the hit it needs); a die of the turn is a plain toggle. */
+  const toggleOn = useCallback((slot: string, die: ForcedDie, offers: readonly DieOffer[] | null) => {
     const side = sideOf(slot);
     const index = indexOf(slot);
     const choice = choiceAt(side, index);
-    if (choice) onSetChoice(side, withDice(choice, toggleDie(choice.dice ?? [], die)), index);
+    if (!choice) return;
+    const held = choice.dice ?? [];
+    onSetChoice(side, withDice(choice, offers ? applyDie(held, die, offers) : toggleDie(held, die)), index);
   }, [choiceAt, onSetChoice]);
   return useMemo(() => {
     if (!view) return { slot: () => undefined, turn: null };
@@ -53,12 +56,12 @@ export function useDiceViews(args: {
         if (choice?.kind !== 'move' || !view.bySlot[slot]) return undefined;
         return {
           offers: view.bySlot[slot], dice: (choice.dice ?? []).filter(die => !isTurnDie(die)), logged: view.logged,
-          words: view.words, onToggle: die => toggleOn(slot, die),
+          words: view.words, onToggle: die => toggleOn(slot, die, view.bySlot[slot]),
         };
       },
       turn: {
         offers: view.turn, dice: allDice.filter(isTurnDie), logged: view.logged, words: view.words,
-        onToggle: die => toggleOn(die.name.slot, die),
+        onToggle: die => toggleOn(die.name.slot, die, null),
       },
     };
   }, [view, simState, choiceAt, toggleOn]);

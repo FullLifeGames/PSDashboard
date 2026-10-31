@@ -1,5 +1,5 @@
 import { dieKey, dieLabel, type DieOffer, type DieWords, type ForcedDie } from '@fulllifegames/eval-engine';
-import { TURN_KINDS, captionOf, chipGroups, resultWord } from '../../lib/branch-dice';
+import { TURN_KINDS, captionOf, chipGroups, pullNotes, resultWord } from '../../lib/branch-dice';
 
 /**
  * Round 82 (forced dice), step A7a: the chips of Advanced. A chip is one result of one die; a click forces it, a second click
@@ -78,7 +78,7 @@ function DieRow({ offer, dice, logged, words, target, withMove, onToggle }: DieR
             key={JSON.stringify(result)}
             die={die}
             set={!!held && sameResult(held.result, result)}
-            logMark={!held && !!seen && sameResult(seen.result, result)}
+            logMark={!!seen && sameResult(seen.result, result)}
             words={words}
             onToggle={onToggle}
           />
@@ -126,6 +126,7 @@ export function SlotDice({ offers, dice, logged, words, label, onToggle }: SlotD
           ))}
         </div>
       ))}
+      {pullNotes(dice, offers, words).map(note => <div key={note} className="ps-dice-note">{note}</div>)}
       <StrayDice dice={stray} words={words} onToggle={onToggle} />
     </div>
   );
@@ -143,6 +144,8 @@ export interface TurnDiceProps {
 
 const END = 'end-of-turn';
 
+const SHARED_ROLL_NOTE = 'The game draws this die once per turn for every holder on the field, so a chip here applies to all of them.';
+
 /** The dice of the turn: the order of the actions, then one "End of turn" row per Pokémon. */
 export function TurnDice({ offers, dice, logged, words, onToggle }: TurnDiceProps) {
   const order = offers.filter(offer => offer.name.kind === 'speed-tie' || offer.name.kind === 'move-first');
@@ -151,12 +154,15 @@ export function TurnDice({ offers, dice, logged, words, onToggle }: TurnDiceProp
   const stray = dice.filter(die => !offered.has(dieKey(die.name)));
   if (offers.length === 0 && stray.length === 0) return null;
   const holders = [...new Set(end.map(offer => offer.name.slot))];
+  // a first mover with no chance of its own is the die the game draws once per turn for every holder (Gens 2 and 3)
+  const sharedRoll = order.some(offer => offer.name.kind === 'move-first' && offer.chance === undefined);
   return (
     <div className="ps-dice ps-dice-turn" role="group" aria-label="Dice of the turn">
       {order.length > 0 && (
         <div className="ps-dice-set" role="group" aria-label="Move order">
           <div className="ps-dice-heading">Move order</div>
           {order.map(offer => <DieRow key={dieKey(offer.name)} offer={offer} dice={dice} logged={logged} words={words} onToggle={onToggle} />)}
+          {sharedRoll && <div className="ps-dice-note">{SHARED_ROLL_NOTE}</div>}
         </div>
       )}
       {holders.map(holder => (

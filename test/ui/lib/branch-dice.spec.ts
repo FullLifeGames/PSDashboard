@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { Dex } from '@pkmn/sim';
 import type { BranchSlotChoice, DieOffer, ForcedDie } from '@fulllifegames/eval-engine';
-import { STATUS_WORDS, captionOf, chipGroups, resultWord, toggleDie, wordsOf, withDice } from '../../../src/lib/branch-dice';
+import { STATUS_WORDS, applyDie, captionOf, chipGroups, pullNotes, resultWord, toggleDie, wordsOf, withDice } from '../../../src/lib/branch-dice';
 import { diceBattle, setOf } from '../fixtures/dice-battle';
 
 /**
@@ -95,5 +95,60 @@ describe('the groups the chips show', () => {
       ['p2a', ['accuracy', 'crit']], ['p2b', ['accuracy', 'crit']], [undefined, ['hit-count']],
     ]);
     expect(chipGroups(offers.slice(0, 2)).map(group => group.target)).toEqual([undefined]);
+  });
+});
+
+describe('the dice a forced die needs (decision 5a)', () => {
+  const offer = (kind: ForcedDie['name']['kind'], extra: Partial<ForcedDie['name']> = {}): DieOffer => ({
+    name: { slot: 'p1a', moveId: 'airslash', targetSlot: 'p2a', kind, ...extra }, results: [{ happens: true }, { happens: false }],
+  });
+  const offers = [
+    offer('accuracy'), offer('crit'), offer('secondary', { effectId: 'flinch' }),
+    offer('accuracy', { moveId: 'splash', targetSlot: 'p2b' }),
+    offer('status-check', { targetSlot: undefined, effectId: 'par' }),
+    offer('hit-count', { targetSlot: undefined }),
+  ];
+  const yes = (kind: ForcedDie['name']['kind'], extra: Partial<ForcedDie['name']> = {}): ForcedDie => die(kind, { happens: true }, extra);
+  const no = (kind: ForcedDie['name']['kind'], extra: Partial<ForcedDie['name']> = {}): ForcedDie => die(kind, { happens: false }, extra);
+  const kinds = (dice: ForcedDie[]) => dice.map(entry => `${entry.name.kind}:${JSON.stringify(entry.result)}`);
+
+  test('a crit, a roll, a secondary effect or a hit count sets the hit and passes the attacker status checks', () => {
+    const checked = (kind: ForcedDie['name']['kind'], extra: Partial<ForcedDie['name']> = {}) => kinds(applyDie([], die(kind, { happens: false }, extra), offers));
+    expect(checked('crit')).toEqual(['crit:{"happens":false}', 'accuracy:{"happens":true}', 'status-check:{"happens":true}']);
+    expect(kinds(applyDie([], die('damage-roll', { step: 4 }), offers))).toEqual(['damage-roll:{"step":4}', 'accuracy:{"happens":true}', 'status-check:{"happens":true}']);
+    expect(checked('secondary', { effectId: 'flinch' })[1]).toBe('accuracy:{"happens":true}');
+    expect(kinds(applyDie([], die('hit-count', { hits: 3 }, { targetSlot: undefined }), offers))).toContain('accuracy:{"happens":true}');
+  });
+
+  test('the pulled dice replace a result that contradicts them and leave other moves alone', () => {
+    const held = [no('accuracy'), no('status-check', { targetSlot: undefined, effectId: 'par' }), no('accuracy', { moveId: 'splash', targetSlot: 'p2b' })];
+    const next = applyDie(held, yes('crit'), offers);
+    expect(kinds(next)).toEqual(['accuracy:{"happens":true}', 'status-check:{"happens":true}', 'accuracy:{"happens":false}', 'crit:{"happens":true}']);
+  });
+
+  test('a die with no offered hit pulls nothing', () => {
+    expect(kinds(applyDie([], yes('crit'), offers.filter(entry => entry.name.kind !== 'accuracy' && entry.name.kind !== 'status-check')))).toEqual(['crit:{"happens":true}']);
+  });
+
+  test('a miss or a stopped body takes the dice that need the hit back', () => {
+    const crit = yes('crit');
+    const flinch = yes('secondary', { effectId: 'flinch' });
+    const count = die('hit-count', { hits: 2 }, { targetSlot: undefined });
+    expect(kinds(applyDie([crit, flinch], no('accuracy'), offers))).toEqual(['accuracy:{"happens":false}']);
+    expect(kinds(applyDie([crit, count], no('status-check', { targetSlot: undefined, effectId: 'par' }), offers))).toEqual(['status-check:{"happens":false}']);
+  });
+
+  test('clearing a die changes no other die', () => {
+    const pulled = applyDie([], yes('crit'), offers);
+    expect(kinds(applyDie(pulled, yes('crit'), offers))).toEqual(['accuracy:{"happens":true}', 'status-check:{"happens":true}']);
+  });
+
+  test('the notes say which die needs the hit and the passed check, with the names of the battle', () => {
+    expect(pullNotes(applyDie([], yes('crit'), offers), offers, words)).toEqual([
+      'Air Slash hits Snorlax because the crit needs a hit.',
+      'Nova passes the Paralysis check because the crit needs it to move.',
+    ]);
+    expect(pullNotes(applyDie([], yes('secondary', { effectId: 'brn' }), offers), offers, words)[0]).toBe('Air Slash hits Snorlax because the burn needs a hit.');
+    expect(pullNotes([yes('accuracy')], offers, words)).toEqual([]);
   });
 });
