@@ -40,6 +40,35 @@ test('the start load holds no simulator code', async ({ request }) => {
   expect(carriers).toEqual([]);
 });
 
+/**
+ * Round 81 (T298): a lazy chunk that a deploy removed. The first request for the replay parser's chunk answers 404, as
+ * production did for a page built before the deploy of 1.0.2; the minified preload helper raises vite:preloadError,
+ * the page reloads once, and the next load of the replay finds the chunk.
+ */
+test('a lazy chunk missing after a deploy reloads the page once, and the next load works', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.route('**/play.pokemonshowdown.com/js/replay-embed.js*', route =>
+    route.fulfill({ status: 200, contentType: 'application/javascript', body: '' }));
+  await page.route('**/replay.pokemonshowdown.com/**', route => route.fulfill({
+    status: 200, contentType: 'application/json', body: JSON.stringify(fixtureReplay),
+  }));
+  await routeSmogon(page, emptySmogon);
+  let refused = 0;
+  await page.route('**/assets/opponent-inferrer-*.js', route => {
+    if (refused > 0) return route.continue();
+    refused += 1;
+    return route.fulfill({ status: 404, body: '' });
+  });
+  await page.goto('/');
+  const reloaded = page.waitForEvent('load');
+  await page.locator('button', { hasText: 'Load' }).click();
+  await reloaded;
+  expect(refused).toBe(1);
+  expect(await page.evaluate(() => sessionStorage.getItem('ps-replay-interceptor:stale-chunk-reload'))).not.toBeNull();
+  await page.locator('button', { hasText: 'Load' }).click();
+  await expect(page.locator('.ps-branch-bar input[type="range"]')).toBeVisible({ timeout: 60_000 });
+});
+
 test.describe.serial('production build', () => {
   test.beforeEach(async ({ page }) => {
     await page.route('**/play.pokemonshowdown.com/js/replay-embed.js*', route =>
