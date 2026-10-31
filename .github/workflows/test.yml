@@ -70,6 +70,30 @@ jobs:
         env:
           EVAL_SIM_FAST: ${{ matrix.sim-fast }}
 
+  # Round 82 (forced dice): the dice sweeps play every move of the Dex only with DICE_SWEEPS=full; the jobs above play a
+  # fixed sample of them. One full run per push, beside the other jobs (user gate 31.10.2026, "1b").
+  dice-sweeps:
+    name: Dice sweeps, every move
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run the dice sweeps
+        run: npx vitest run --project eval-engine packages/eval-engine/test/dice-
+        env:
+          DICE_SWEEPS: full
+
   browser:
     name: Browser flows
     runs-on: ubuntu-latest

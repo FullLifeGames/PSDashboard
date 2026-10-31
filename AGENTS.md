@@ -42,7 +42,7 @@ PS Dashboard analyzes Pokémon Showdown replays: it replays a game turn by turn,
 ## Checks before commit and push
 
 - `npx tsc -b` (`tsc --noEmit` checks nothing in this solution setup) and `npm run lint` before every push; the Pages workflow has its own lint gate. The lint ratchet (`eslint.ratchet.mjs`) only shrinks: split a file instead of raising its limit, and run `node scripts/update-lint-ratchet.mjs` after a refactor.
-- Tests: `npx vitest run --project <eval-engine|replay-core|ui|app>` or single files; the full suite with `npx vitest run`; e2e with `npm run test:e2e` (a separate port via `PS_DEV_PORT`).
+- Tests: `npx vitest run --project <eval-engine|replay-core|ui|app>` or single files; the full suite with `npx vitest run`; e2e with `npm run test:e2e` (a separate port via `PS_DEV_PORT`). The dice sweeps play every move only with `DICE_SWEEPS=full` (their own CI job); a plain run plays a fixed sample of them, and the final suite of a round sets the variable.
 - The final suite of a round runs in the main checkout, where the local test data lives (the saved replay HTML of `reconstruction.spec.ts`); a clone or a worktree skips those tests. The report lists the skipped tests (`--reporter verbose` marks them). Round 74: a test that skipped in the merge clones stayed red for ten days (user 23.10.2026).
 - Package exports: a barrel change shows as a diff under `test/regression/fixtures/api/` (`UPDATE_API_SNAPSHOT=1` only on purpose), then `npm run pack:smoke`.
 - Test first: a red test that fails for the right reason, then the code.
