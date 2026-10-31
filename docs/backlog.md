@@ -1,6 +1,6 @@
 # Backlog
 
-This file holds the details of every open TODO, one section per TODO under its fixed T-number. Release v1.0.2 is out (30.10.2026), no round is open, and every TODO is parked with a trigger; a trigger that fires brings its TODO to a gate. The next free T-number is T299.
+This file holds the details of every open TODO, one section per TODO under its fixed T-number. Release v1.0.2 is out (30.10.2026), no round is open, and every TODO is parked with a trigger; a trigger that fires brings its TODO to a gate. The next free T-number is T300.
 
 Evidence paths of the form `r<NN>/…` point to that round's probe folder, `docs/perf/probes/<date>-r<NN>/`; `docs/` is local, so they exist only on the maintainer's machine. Each round's entry in `docs/completed/` names its folder and the gate that approved its TODOs. Line numbers in a section refer to the state when the TODO was written.
 
@@ -284,6 +284,30 @@ The triage of 21.10.2026 and the user gates after it parked these TODOs; each se
 **Success.** A sweep spec that drives the last-pair and matchup readers over every residual status in every generation, the simulator as the judge; the bank and the holdouts without harm.
 
 **Singles and doubles.** Both.
+
+### T299 · A scripted die decides the attacker's status check
+
+*Engine · round 82 · small · score-touching*
+
+**Parked (user gate 31.10.2026, planning of round 82, "11a").** Trigger: the engine moves its scripted dice onto the forced-dice module of round 82, or the next batch of small fixes.
+
+**Problem.** The tree's scripted dice tell a draw by the numbers in the call, and the simulator draws the attacker's status checks inside the same action: `runMove` sets the active move before `BeforeMove` (`@pkmn/sim` 0.10.12, `battle-actions.js:292` and `:301`).
+
+`ScriptedPRNG` (singles, `packages/eval-engine/src/forward/scripted-prng.ts:80-86`) takes the first `randomChance(x, 100)` of a scripted move as its accuracy roll and any `randomChance(1, d)` with a crit denominator as its crit roll. A script therefore decides full paralysis (1 in 4, 1 in 8 in Champions), the infatuation (1 in 2), the Champions thaw (1 in 4) and the confusion check. From Gen 7 the check draws 33 in 100, and `{ hit: true }` makes a confused Snorlax hit itself on every seed, where the plain seeds show a self-hit on a third of them; in Gens 2 to 6 it draws 1 in 2, true means no self-hit, and `{ crit: false }` forces the self-hit. A check read as the accuracy roll also spends the action's accuracy flag, so the move's real accuracy roll goes unscripted (`:80-81`). The self-hit's damage roll takes the script's roll, because the script answers the first `random(16)` of the action (`:91-100`).
+
+`PairPRNG` (doubles, `pair/prng.ts:107-119`) guards the crit with `inDamage()`. From Gen 7 it books the confusion check as an accuracy record of 33, lets a script decide it, and leaves the move's real accuracy roll unrecorded (`:107-108`). It books every `random(16)` of the action as a roll of the move (`:131-146`), the self-hit's too: on the attacker from Gen 7, and on the move's own target in Gens 3 to 6, a hit that never happened. The guard `randomDeviation` (`pair/log.ts:40-48`, read at `pair/pattern.ts:227`) sends every draw with a confusion check to the plain mean, so these records do not reach the pattern today; the fix makes them true for the code after the guard and keeps the scripts off the check.
+
+In Gens 1 and 2 accuracy and crit draw in 256ths and the damage roll is `random(217, 256)`, so `ScriptedPRNG` reaches none of them. The singles tree checks each forced draw against its log (`search/outcome-children.ts:201-202`), so a misread draw there tends to leave a class empty rather than fill a wrong one; nobody has measured the grades it moves.
+
+**Idea.** Tell a draw by the simulator's own hook where one runs once, right before it: in Gens 3 to 9 the `Accuracy` event, `ModifyCritRatio` and `battle.randomizer`, and in every generation the `BeforeMove` handler that draws a status check. Where an old script runs none, tell the draw by that script's own call: Gen 1 draws the crit from base Speed without `ModifyCritRatio` (`data/mods/gen1/scripts.js:796-825`); Gen 2 runs the hook but draws the crit as `random(256)` (`gen2/scripts.js:541-547`) and runs `Accuracy` three times before one draw (`:203`, `:232`, `:241`, the draw at `:243`); both draw the damage roll as `random(217, 256)` (`gen1/scripts.js:937`, `gen2/scripts.js:687`). Round 82 builds this recognition for forced dice; the scripted dice move onto it.
+
+**Benefit.** Engine: the tree's outcome classes and the pair plan's records describe the move, also for a confused, paralyzed or infatuated attacker and in Gens 1 and 2.
+
+**Success.** The 88 `test.fails` rows of `packages/eval-engine/test/scripted-dice-status.spec.ts` become plain tests. Before the fix, a probe counts the tree and pair cells of the bank whose attacker carries one of these checks, the reach of the fix. The recognition watches the simulator's hooks; where it calls a Dex handler, the `fingerprint` sweep of AGENTS.md proves the live battle unchanged. Then the batch check: two feedback runs byte-identical, the tier census with `--moved`.
+
+**Singles and doubles.** Both: `ScriptedPRNG` serves the singles tree, `PairPRNG` the doubles pair plan; the sweep plays each in every generation and mod the corpus plays.
+
+**Evidence.** `packages/eval-engine/test/scripted-dice-status.spec.ts`; the simulator's draws in `@pkmn/sim` 0.10.12 `data/conditions.js:47` (paralysis) and `:201` (confusion from Gen 7), `data/mods/gen2/conditions.js:146`, `gen4/conditions.js:77` and `gen6/conditions.js:31` (confusion up to Gen 6), `data/moves.js:758` (infatuation), and `@pkmn/mods` `build/champions/index.js:122` (paralysis, 1 in 8) and `:162` (thaw, 1 in 4).
 
 ### T259 · A smoother price for a stage drop at the bench gate
 
