@@ -14,6 +14,7 @@ interface Engine {
   offeredOrderDice(battle: Battle, play: (battle: Battle) => void): DieOffer[];
   offeredEndDice(battle: Battle, play: (battle: Battle) => void): DieOffer[];
   loggedTurnDice(battle: Battle): ForcedDie[];
+  loggedDiceAt(battle: Battle, replayLog: string): ForcedDie[];
   resolveSideChoices(battle: Battle, side: 'p1' | 'p2', choices: (BranchSlotChoice | null)[], required: boolean[]): ResolvedSideCommand;
 }
 
@@ -24,6 +25,11 @@ export interface DiceAsk {
   required: { p1: boolean[]; p2: boolean[] };
   /** Both sides have chosen every required slot: the turn's own dice (order, end of turn) can be read. */
   turnReady: boolean;
+  /**
+   * The replay's log, for a stored position the user views before a branch starts there (round 82, step A7b): the log's dice come from
+   * its lines. Without it the battle's own first-turn PRNG names them (a branch's live battle).
+   */
+  replayLog?: string;
 }
 
 export interface DiceOffers {
@@ -75,7 +81,7 @@ export function askDice(engine: Engine, ask: DiceAsk): DiceOffers {
   let logged: ForcedDie[] = [];
   try {
     bySlot = slotOffers(engine, ask);
-    logged = engine.loggedTurnDice(ask.battle);
+    logged = ask.replayLog ? engine.loggedDiceAt(ask.battle, ask.replayLog) : engine.loggedTurnDice(ask.battle);
     const play = ask.turnReady ? turnPlay(engine, ask) : null;
     if (play) turn = [...engine.offeredOrderDice(ask.battle, play), ...engine.offeredEndDice(ask.battle, play)];
   } catch {

@@ -24,8 +24,12 @@ function askKey(simState: BranchSimState): string {
 /** The offers with the reader of names the chips use. */
 export interface DiceView extends DiceOffers { words: DieWords }
 
-export function useDiceOffers(args: { enabled: boolean; simState: BranchSimState | null; getBattle: (() => Battle | null) | undefined }): DiceView | null {
-  const { enabled, simState, getBattle } = args;
+export function useDiceOffers(args: {
+  enabled: boolean; simState: BranchSimState | null; getBattle: (() => Battle | null) | undefined;
+  /** The replay's log at a stored position of the main line (step A7b): the log's dice are read from its lines. */
+  replayLog?: string;
+}): DiceView | null {
+  const { enabled, simState, getBattle, replayLog } = args;
   const [answer, setAnswer] = useState<{ key: string; view: DiceView } | null>(null);
   const key = enabled && simState && getBattle ? askKey(simState) : null;
   useEffect(() => {
@@ -45,12 +49,12 @@ export function useDiceOffers(args: { enabled: boolean; simState: BranchSimState
       const choices = { p1: simState.p1Choices, p2: simState.p2Choices };
       const turnReady = !simState.ended && !simState.p1ForceSwitch && !simState.p2ForceSwitch
         && branchSideChoicesReady(choices.p1, required.p1) && branchSideChoicesReady(choices.p2, required.p2);
-      setAnswer({ key: forKey, view: { ...askDice(engine, { battle, choices, required, turnReady }), words: wordsOf(battle) } });
+      setAnswer({ key: forKey, view: { ...askDice(engine, { battle, choices, required, turnReady, ...(replayLog ? { replayLog } : {}) }), words: wordsOf(battle) } });
     }
     void ask();
     return () => {
       cancelled = true;
     };
-  }, [key, simState, getBattle]);
+  }, [key, simState, getBattle, replayLog]);
   return key !== null && answer?.key === key ? answer.view : null;
 }

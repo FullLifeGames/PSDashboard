@@ -37,15 +37,7 @@ function speciesTypesFor(species: string, gen: number, champions: boolean): stri
   }
 }
 
-/** Exact pickers from a recorded position — no live stream needed. */
-export async function pickerStateFromSerialized(serialized: string): Promise<BranchSimState> {
-  const { deserializeBattleExact } = await import('./lazy/forward-model');
-  const { createBranchStateFromBattle, loadSimModsFor } = await import('./lazy/branch-engine');
-  // Round 67 (T145): a Champions position revives on the Champions mod, which nothing before this lazy module loads.
-  await loadSimModsFor(serialized);
-  const battle = deserializeBattleExact(serialized);
-  return createBranchStateFromBattle(battle, battle.log ?? [], { p1Choices: [], p2Choices: [] });
-}
+export { pickerFromSerialized, pickerStateFromSerialized, type PickerBattle } from './picker-stored';
 
 function moveNamesFor(mon: PokemonSnapshot, set: PokemonSet | undefined): string[] {
   return set?.moves && set.moves.length > 0 ? set.moves : mon.moves;

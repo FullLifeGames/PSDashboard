@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getBranchSimulatorFormat, type ReplayData, type TurnSnapshot } from '@fulllifegames/replay-core';
 import type { BranchSlotChoice } from '@fulllifegames/eval-engine';
-import type { PickerSource } from '../lib/picker-state';
+import type { PickerBattle, PickerSource } from '../lib/picker-state';
 import { buildReplayTeams, type TeamBuildSources } from '../lib/eval-acquire';
 import type { VariationSpan } from '../lib/timeline';
 import type { BranchHistoryEntry, BranchSimState } from './useBranch';
@@ -79,10 +79,18 @@ export function usePositionPicker(args: {
     p2Choices: draftChoices.p2,
   } : null), [shownState, draftChoices]);
 
-  return { positionPicker, pickerSimState, pickerStale: standIn !== null };
+  // Round 82 (forced dice), step A7b: the battle of a stored position, for the dice chips' offers. One function per battle, so the
+  // panel's effect asks again only when the position changes.
+  const pickerBattle = positionPicker?.battle ?? null;
+  const getPickerBattle = useCallback(() => pickerBattle, [pickerBattle]);
+  // The main line shows the replay's own turn at a stored position: the log's dice are read from the replay's lines. A variation's
+  // position is no turn of the replay.
+  const pickerReplayLog = pickerBattle && !viewingVariation ? replayData?.log : undefined;
+  return { positionPicker, pickerSimState, pickerStale: standIn !== null, getPickerBattle: pickerBattle ? getPickerBattle : undefined, pickerReplayLog };
 }
 
-type ResolvedPicker = { simState: BranchSimState; source: PickerSource };
+/** The picker of a viewed position; `battle` is the revived battle of a stored position (none for the snapshot's approximation). */
+type ResolvedPicker = { simState: BranchSimState; source: PickerSource; battle?: PickerBattle };
 
 /**
  * Round 77 (user report 28.10.2026): one turn back from the tip showed the
@@ -115,13 +123,13 @@ async function resolvePickerState(args: {
   sources: TeamBuildSources;
   replayGenNumber: number;
   bringOnlyLists: { p1: string[]; p2: string[] } | null;
-}): Promise<{ simState: BranchSimState; source: PickerSource } | null> {
+}): Promise<ResolvedPicker | null> {
   const { stored, viewingVariation, viewTurn, snapshots, replayData, sources, replayGenNumber, bringOnlyLists } = args;
   if (stored) {
-    const { pickerStateFromSerialized } = await import('../lib/picker-state');
+    const { pickerFromSerialized } = await import('../lib/picker-state');
     try {
-      const state = await pickerStateFromSerialized(stored);
-      return { simState: state, source: 'stored' };
+      const { state, battle } = await pickerFromSerialized(stored);
+      return { simState: state, source: 'stored', battle };
     } catch {
       // Fall through to the snapshot approximation.
     }

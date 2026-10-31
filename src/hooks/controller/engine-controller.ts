@@ -47,7 +47,7 @@ function useAcquireLayer(ctx: ReplayContext, transients: Transients, board: Boar
     playOut, evaluation, usageStats: ctx.smogon.usageStats, setAssumptions: ctx.smogon.setAssumptions,
   });
   const acquire = useEvalAcquire({ replayData, source: positions, getBattle, viewTurn, dwellEnabled, smogonPending });
-  const { positionPicker, pickerSimState, pickerStale } = usePositionPicker({
+  const { positionPicker, pickerSimState, pickerStale, getPickerBattle, pickerReplayLog } = usePositionPicker({
     replayData, snapshots, sources: teamSources, bringOnlyLists, replayGenNumber,
     liveTip, viewingVariation, serializedAtView, viewTurn, variationStartTurn, startSerialized,
     getExact: acquire.getExact, exactPositionsVersion: acquire.exactPositionsVersion, draftChoices,
@@ -68,7 +68,7 @@ function useAcquireLayer(ctx: ReplayContext, transients: Transients, board: Boar
     history: ctx.branch.history, snapshots, doubles: ctx.meta.evalIsDoubles,
     parseSingles, parseDoubles: parsePlayedActionsDoubles,
   });
-  return { acquire, smogonPending, positionPicker, pickerSimState, pickerStale, playedAtView };
+  return { acquire, smogonPending, positionPicker, pickerSimState, pickerStale, getPickerBattle, pickerReplayLog, playedAtView };
 }
 
 function useEvalViewLayer(

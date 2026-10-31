@@ -4,10 +4,10 @@ import type { BranchSimState } from '@fulllifegames/eval-engine';
 import { usePositionPicker } from '../../../src/hooks/usePositionPicker';
 import type { TeamBuildSources } from '../../../src/lib/eval-acquire';
 
-/** The recorded positions resolve when the test says so: each serialized string names its picker state. */
-const pending = new Map<string, (state: BranchSimState) => void>();
+/** The recorded positions resolve when the test says so: each serialized string names its picker state and the battle it was read from. */
+const pending = new Map<string, (state: BranchSimState, battle?: unknown) => void>();
 vi.mock('../../../src/lib/picker-state', () => ({
-  pickerStateFromSerialized: (serialized: string) => new Promise<BranchSimState>(resolve => pending.set(serialized, resolve)),
+  pickerFromSerialized: (serialized: string) => new Promise(resolve => pending.set(serialized, (state, battle = { turn: 0 }) => resolve({ state, battle }))),
 }));
 
 type Args = Parameters<typeof usePositionPicker>[0];
@@ -24,9 +24,9 @@ function args(overrides: Partial<Args>): Args {
   };
 }
 
-async function land(serialized: string, state: BranchSimState) {
+async function land(serialized: string, state: BranchSimState, battle?: unknown) {
   await waitFor(() => expect(pending.has(serialized)).toBe(true));
-  act(() => pending.get(serialized)!(state));
+  act(() => pending.get(serialized)!(state, battle));
 }
 
 describe('usePositionPicker', () => {
@@ -62,6 +62,43 @@ describe('usePositionPicker', () => {
     await land('turn-2 again', stateFor('Mienshao at turn 2'));
     await waitFor(() => expect(shown(result.current)).toBe('Mienshao at turn 2'));
     expect(result.current.pickerStale).toBe(false);
+  });
+
+  test('a stored position hands the panel the battle it was read from, for the dice offers (round 82, A7b)', async () => {
+    // The chips ask the simulator which dice a move draws, so a viewed replay position needs its battle. Only a position that
+    // resolved from a recorded capture has one; the live tip has the branch's own, and a stand-in has none that belongs here.
+    const stored = { turn: 12 };
+    const { result, rerender } = renderHook((props: Args) => usePositionPicker(props), { initialProps: args({ viewTurn: 4, liveTip: true }) });
+    expect(result.current.getPickerBattle).toBeUndefined();
+    rerender(args({ viewTurn: 3, viewingVariation: false, serializedAtView: 'viewed-3', getExact: () => 'viewed-3' }));
+    expect(result.current.getPickerBattle).toBeUndefined();
+    await land('viewed-3', stateFor('Kyurem at turn 3'), stored);
+    await waitFor(() => expect(result.current.getPickerBattle).toBeDefined());
+    expect(result.current.getPickerBattle!()).toBe(stored);
+    // the hook hands out one function per battle, so the panel's effect does not ask again on every render
+    const first = result.current.getPickerBattle;
+    rerender(args({ viewTurn: 3, viewingVariation: false, serializedAtView: 'viewed-3', getExact: () => 'viewed-3' }));
+    expect(result.current.getPickerBattle).toBe(first);
+    // another viewed position that has not landed has no battle: the stand-in shows the last picker, stale
+    rerender(args({ viewTurn: 2, viewingVariation: false, serializedAtView: 'viewed-2', getExact: () => 'viewed-2' }));
+    expect(result.current.pickerStale).toBe(true);
+    expect(result.current.getPickerBattle).toBeUndefined();
+  });
+
+  test('the replay\'s log goes with the battle of a main line position, and with no other (round 82, A7b)', async () => {
+    // The turn a main line position stands at is the turn the replay shows, so the chips read the log's dice from its lines. A
+    // position inside a variation is no turn of the replay, and an unresolved position has no battle to read them for.
+    const replayData = { log: 'the replay log' } as unknown as Args['replayData'];
+    const { result, rerender } = renderHook((props: Args) => usePositionPicker(props), { initialProps: args({ viewTurn: 4, liveTip: true, replayData }) });
+    expect(result.current.pickerReplayLog).toBeUndefined();
+    rerender(args({ viewTurn: 5, viewingVariation: false, serializedAtView: 'main-5', getExact: () => 'main-5', replayData }));
+    expect(result.current.pickerReplayLog).toBeUndefined();
+    await land('main-5', stateFor('Kyurem at turn 5'));
+    await waitFor(() => expect(result.current.pickerReplayLog).toBe('the replay log'));
+    rerender(args({ viewTurn: 6, viewingVariation: true, serializedAtView: 'variation-6', replayData }));
+    await land('variation-6', stateFor('Kyurem at turn 6'));
+    await waitFor(() => expect(result.current.getPickerBattle).toBeDefined());
+    expect(result.current.pickerReplayLog).toBeUndefined();
   });
 
   test('a viewed position that cannot be shown ends the stand-in: the panel goes empty, not stale for good', async () => {

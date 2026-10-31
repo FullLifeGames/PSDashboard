@@ -9,7 +9,7 @@ import { computePreviewDamage, EMPTY_SIDE_DAMAGE, type DamagePreviewInputs, type
 import { SideControls, type PlayedPick } from './branch/SideControls';
 import { useGimmickToggles, type Gimmick } from '../hooks/useSideControlsState';
 import { ExecuteRow, PickerSourceLine, RawLogToggle } from './branch/PanelStatus';
-import { TurnDice } from './branch/DiceChips';
+import { DICE_WAIT_NOTE, TurnDice } from './branch/DiceChips';
 import { useDiceViews, type DiceViews } from '../hooks/useDiceView';
 
 export type { PlayedPick } from './branch/SideControls';
@@ -47,6 +47,11 @@ interface Props {
    * the calc cannot price on a copy of it. Absent for a stored or reconstructed position, which has no live battle.
    */
   getBattle?: () => LiveBattle | null;
+  /**
+   * Round 82 (forced dice), step A7b: the replay's log, handed over with the battle of a stored position on the main line. The turn the
+   * user views is the turn the log shows, so the chips read the log's dice from its lines.
+   */
+  replayLog?: string;
 }
 
 type LiveBattle = LiveHit['battle'];
@@ -302,10 +307,10 @@ function panelFlags(simState: BranchSimState, p1ActiveSlots: (SimPokemonInfo | n
 }
 
 /* ── Main BranchPanel (controls only, no iframe) ── */
-export function BranchPanel({ simState, stale, source, acquiringExact, executeError, executing, gen, onSetChoice, onHypotheticalMove, onExecuteTurn, played, positionKey, getBattle }: Props) {
+export function BranchPanel({ simState, stale, source, acquiringExact, executeError, executing, gen, onSetChoice, onHypotheticalMove, onExecuteTurn, played, positionKey, getBattle, replayLog }: Props) {
   const { advanced, toggleAdvanced } = useAdvancedToggle();
   const { slots, gimmickFor, damageBySide } = usePanelPreview(simState, gen, positionKey, getBattle);
-  const diceViews = useDiceViews({ advanced, stale, simState, getBattle, onSetChoice });
+  const diceViews = useDiceViews({ advanced, stale, simState, getBattle, replayLog, onSetChoice });
   const { p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, p1SwitchesBySlot, p2SwitchesBySlot } = slots;
 
   if (!simState) return null;
@@ -316,6 +321,7 @@ export function BranchPanel({ simState, stale, source, acquiringExact, executeEr
   return (
     <div inert={stale} aria-busy={stale || undefined}>
       <PickerSourceLine source={source} acquiringExact={acquiringExact} advanced={advanced} onToggleAdvanced={toggleAdvanced} />
+      {advanced && source === 'snapshot' && <div className="ps-dice-note" role="note">{DICE_WAIT_NOTE}</div>}
       {simState.ended && <EndedNotice winner={simState.winner} />}
       {/* Controls — stacked vertically for P1 + P2 selection */}
       {!simState.ended && (

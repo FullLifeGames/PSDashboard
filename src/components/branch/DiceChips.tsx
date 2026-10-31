@@ -132,6 +132,9 @@ export interface TurnDiceProps {
 
 const END = 'end-of-turn';
 
+/** Shown in Advanced where the position is only approximated: the offers need the simulator's battle, which the exact position brings (round 82, step A7b). */
+export const DICE_WAIT_NOTE = 'Dice need the exact position. They appear once it is ready.';
+
 const SHARED_ROLL_NOTE = 'The game draws this die once per turn for every holder on the field, so a chip here applies to all of them.';
 
 /** The dice of the turn: the order of the actions, then one "End of turn" row per Pokémon. */

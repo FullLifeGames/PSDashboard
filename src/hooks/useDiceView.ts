@@ -29,10 +29,11 @@ export function useDiceViews(args: {
   stale: boolean | undefined;
   simState: BranchSimState | null;
   getBattle: (() => LiveHit['battle'] | null) | undefined;
+  replayLog?: string;
   onSetChoice: (side: Side, choice: BranchSlotChoice, activeSlot?: number) => void;
 }): DiceViews {
-  const { advanced, stale, simState, getBattle, onSetChoice } = args;
-  const view = useDiceOffers({ enabled: advanced && !stale, simState, getBattle });
+  const { advanced, stale, simState, getBattle, replayLog, onSetChoice } = args;
+  const view = useDiceOffers({ enabled: advanced && !stale, simState, getBattle, replayLog });
   const choiceAt = useCallback((side: Side, index: number): BranchSlotChoice | null =>
     (side === 'p1' ? simState?.p1Choices : simState?.p2Choices)?.[index] ?? null, [simState]);
   /** A move's die settles the dice around it (the hit it needs); a die of the turn is a plain toggle. */

@@ -8,15 +8,16 @@ import { realReplayWorkerClient } from '../fixtures/worker';
 
 /**
  * Round 73 (T202, design gate 3a): the picker's preview prices a forced spread on a lone foe behind a screen on a copy of the
- * branch's live battle. The workspace hands that battle to the picker at the live tip only; a stored or reconstructed position has
- * no matching battle. The panel is a spy here, so the test reads the prop the workspace gives it.
+ * branch's live battle. The workspace hands that battle to the picker at the live tip. Round 82 (step A7b): a stored exact position
+ * brings its own revived battle, which the workspace hands over with the replay's log (the dice chips read the log's dice from its
+ * lines); an approximated position has no battle. The panel is a spy here, so the test reads the props the workspace gives it.
  */
 const worker = vi.hoisted(() => ({ current: null as null | ReturnType<typeof import('../fixtures/worker').realReplayWorkerClient> }));
-const panel = vi.hoisted(() => ({ props: [] as Array<{ source?: string; getBattle?: () => unknown }> }));
+const panel = vi.hoisted(() => ({ props: [] as Array<{ source?: string; getBattle?: () => unknown; replayLog?: string }> }));
 vi.mock('../../../src/hooks/useReplayWorker', () => ({ useReplayWorker: () => worker.current!.client }));
 vi.mock('../../../src/lib/pokemon-options', () => ({ getMovePool: async () => ['Dragon Claw'] }));
 vi.mock('../../../src/components/BranchPanel', () => ({
-  BranchPanel: (props: { source?: string; getBattle?: () => unknown }) => {
+  BranchPanel: (props: { source?: string; getBattle?: () => unknown; replayLog?: string }) => {
     panel.props.push(props);
     return <div data-testid="branch-panel-spy" />;
   },
@@ -56,9 +57,9 @@ async function mountLoaded(kind: ReplayKind) {
 
 const lastProps = () => panel.props[panel.props.length - 1];
 
-describe('ReplayWorkspace hands the live battle to the picker (T202)', () => {
+describe('ReplayWorkspace hands the battle to the picker (T202, round 82)', () => {
   for (const kind of ['singles', 'doubles'] as const) {
-    test(`${kind}: the live tip gets the branch's getBattle, a stored position gets none`, async () => {
+    test(`${kind}: the live tip gets the branch's getBattle, a stored position its own battle and the replay's log`, async () => {
       const app = await mountLoaded(kind);
       await waitFor(() => expect(screen.getByTestId('branch-panel-spy')).toBeInTheDocument());
       // A loaded replay is not at a live tip: its pickers read the stored position.
@@ -71,11 +72,18 @@ describe('ReplayWorkspace hands the live battle to the picker (T202)', () => {
       await waitFor(() => expect(app().board.timeline.liveTip).toBe(true), { timeout: 60_000 });
       await waitFor(() => expect(lastProps().getBattle).toBe(app().ctx.branch.getBattle));
 
-      // Stepping back to an earlier turn leaves the tip: that position has no matching battle. The doubles fixture has one turn.
+      // The live tip reads the log's dice from the branch's own first-turn PRNG: no replay log goes with it.
+      expect(lastProps().replayLog).toBeUndefined();
+
+      // Stepping back to an earlier turn leaves the tip: that stored position brings its own battle, standing at the viewed turn, with
+      // the replay's log. The doubles fixture has one turn.
       if (kind === 'singles') {
         act(() => app().board.timeline.navigateTo({ turn: 1, line: 'main' }));
         await waitFor(() => expect(app().board.timeline.liveTip).toBe(false));
-        await waitFor(() => expect(lastProps().getBattle).toBeUndefined());
+        await waitFor(() => expect(lastProps().source).toBe('stored'));
+        expect(lastProps().getBattle).not.toBe(app().ctx.branch.getBattle);
+        expect((lastProps().getBattle!() as { turn: number }).turn).toBe(1);
+        expect(lastProps().replayLog).toBe(app().ctx.replay.replayData!.log);
       }
     }, 90_000);
   }
