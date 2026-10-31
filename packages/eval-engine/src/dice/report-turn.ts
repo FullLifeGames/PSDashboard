@@ -57,3 +57,38 @@ export function statusNoDraw(input: ReportInput, moveName: string, turn: readonl
   if (cured) return { die, took: 'no-draw', reason: `${moveName} thaws its user without a draw: the protocol shows "${cured}"` };
   return { die, took: 'no-draw', reason: `${slot} had no ${effectId} check to draw this turn` };
 }
+
+/** The slots of the bodies that acted in the lines, in the order of their first action (a `|move|` that no other move called, or a `|cant|`). */
+function actionOrder(lines: readonly string[]): string[] {
+  const order: string[] = [];
+  for (const line of lines) {
+    const fields = parts(line);
+    const acts = (fields[1] === 'move' && !line.includes('|[from]')) || fields[1] === 'cant';
+    const slot = acts ? slotOfIdent(fields[2]) : undefined;
+    if (slot !== undefined && !order.includes(slot)) order.push(slot);
+  }
+  return order;
+}
+
+/**
+ * Speed tie: the die names a pair of bodies and says which of them goes first. The order of their first actions in the turn's
+ * lines shows it. A body that never acted leaves no order to read: that is blocked, with the body named.
+ */
+export function tieReport(w: Witness, log: readonly string[], start: number): DieReport {
+  const { slot, targetSlot } = w.die.name;
+  const first = 'first' in w.die.result ? w.die.result.first : undefined;
+  const order = actionOrder(log.slice(start));
+  const [a, b] = [order.indexOf(slot), order.indexOf(targetSlot ?? '')];
+  const idle = a < 0 ? slot : b < 0 ? targetSlot : undefined;
+  if (idle !== undefined) return otherwise(w, 'blocked', `${idle} did not act this turn, so the order of the two cannot show`);
+  const went = a < b ? slot : targetSlot;
+  return went === first ? applied(w) : otherwise(w, 'blocked', `${first} was forced first but ${went} acted first`);
+}
+
+/** Why a die of the turn's order was never drawn. Null for the kinds that belong to a move. */
+export function orderNoDraw(input: ReportInput): DieReport | null {
+  const { die } = input;
+  const { slot, targetSlot, kind } = die.name;
+  if (kind === 'speed-tie') return { die, took: 'no-draw', reason: `${slot} and ${targetSlot} did not tie in speed and priority this turn` };
+  return null;
+}

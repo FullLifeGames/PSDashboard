@@ -4,7 +4,7 @@ import type { DieReport, ForcedDie } from './types.ts';
 import type { MoveSight } from './watch.ts';
 import { about, applied, otherwise, parts, shows, slotOfIdent, type Witness } from './report-lines.ts';
 import { moveNoDraw, moveWitness } from './report-moves.ts';
-import { statusNoDraw, statusReport } from './report-turn.ts';
+import { orderNoDraw, statusNoDraw, statusReport, tieReport } from './report-turn.ts';
 
 /**
  * Round 82 (forced dice), decision D9: what became of a forced die. The real turn's PRNG notes whether the simulator drew the
@@ -25,7 +25,8 @@ import { statusNoDraw, statusReport } from './report-turn.ts';
  * - hit count: the `|-hitcount|` line equals the count; a count no draw gives is `no-chance` (the learner found none).
  * - stalling: no `|-fail|` for the user in the action means it succeeded.
  * - power: the handler's own `|-activate|` line for its move means the stronger draw.
- * - status check: a yes shows as a line that names the condition after the draw; a no has no line of its own (report-turn.ts).
+ * - status check: yes shows as the body's own `|move|` after the draw, no as a stop (report-turn.ts).
+ * - speed tie: the order of the two bodies' first actions in the turn's lines.
  */
 
 export interface ReportInput {
@@ -89,6 +90,8 @@ const QUIET = new Set(['debug', '-nothing', '']);
 
 /** Why the simulator never drew the die, read from the protocol of the turn. */
 function noDraw(input: ReportInput): DieReport {
+  const early = orderNoDraw(input);
+  if (early) return early;
   const { die, battle, start } = input;
   const { moveId, slot } = die.name;
   const move = battle.dex.moves.get(moveId);
@@ -167,16 +170,17 @@ export function reportOf(input: ReportInput): DieReport {
   const witness: Witness = {
     die, seen, note, action, targetSlot, target: action.filter(line => about(line, targetSlot)), name: battle.dex.moves.get(moveId).name || moveId,
   };
-  return witnessOf(witness, battle);
+  return witnessOf(witness, battle, input.start);
 }
 
 /** The witness of the die's kind. */
-function witnessOf(witness: Witness, battle: Battle): DieReport {
+function witnessOf(witness: Witness, battle: Battle, start: number): DieReport {
   const { kind } = witness.die.name;
   const { result } = witness.die;
   if (kind === 'accuracy' && 'happens' in result) return accuracyReport(witness, result.happens);
   if (kind === 'crit' && 'happens' in result) return critReport(witness, result.happens);
   if (kind === 'damage-roll') return rollReport(witness);
   if (kind === 'status-check' && 'happens' in result) return statusReport(witness, result.happens, battle.log);
+  if (kind === 'speed-tie') return tieReport(witness, battle.log, start);
   return moveWitness(witness, battle) ?? applied(witness);
 }

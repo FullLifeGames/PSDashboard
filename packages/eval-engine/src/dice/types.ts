@@ -42,6 +42,15 @@ export function dieKey(name: DieName): string {
   return [name.slot, name.moveId, name.targetSlot ?? '', name.kind, ...(name.effectId ? [name.effectId] : [])].join(':');
 }
 
+/**
+ * The name of the die that decides which of two bodies acts first when their move actions tie in speed and priority: the
+ * two slots in sorted order (the die belongs to the pair, whichever body the user names first). Its result is `{ first: slot }`.
+ */
+export function tieName(a: string, b: string): DieName {
+  const [slot, targetSlot] = a < b ? [a, b] : [b, a];
+  return { slot, moveId: '', targetSlot, kind: 'speed-tie' };
+}
+
 /** One call of the simulator to its PRNG, as the module reads it. A chance carries its denominator in `from`, a sample its length. */
 export interface Draw {
   call: 'chance' | 'random' | 'sample' | 'shuffle';

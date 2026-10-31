@@ -1,7 +1,7 @@
 import { PRNG, type PRNGSeed } from '@pkmn/sim';
 import { answerDie, type Answered } from './answer.ts';
 import { recognize } from './recognize.ts';
-import { dieKey, type Answer, type DieName, type DieResult, type Draw, type ForcedDie, type NaturalRecord } from './types.ts';
+import { dieKey, tieName, type Answer, type DieName, type DieResult, type Draw, type ForcedDie, type NaturalRecord } from './types.ts';
 import type { BattleWatch } from './watch.ts';
 
 /**
@@ -59,7 +59,11 @@ abstract class WatchedPRNG extends PRNG {
 
   override shuffle<T>(items: T[], start = 0, end = items.length): void {
     this.within({ call: 'shuffle', from: start, to: end }, () => super.shuffle(items, start, end));
+    this.shuffled?.(items, start, end);
   }
+
+  /** The segment of `items` between `start` and `end` was just shuffled. A speed tie among move actions ends here. */
+  protected shuffled?(items: unknown[], start: number, end: number): void;
 
   private within<T>(draw: Draw, run: () => T): T {
     if (this.shape) return run();
@@ -72,16 +76,52 @@ abstract class WatchedPRNG extends PRNG {
   }
 }
 
+interface MoveAction { choice: 'move'; pokemon: { getSlot(): string } }
+
+/** A queue action of a body's move: the items a speed tie shuffles when two moves tie (the other shuffles hold handlers). */
+const isMoveAction = (item: unknown): item is MoveAction =>
+  typeof item === 'object' && item !== null && (item as { choice?: unknown }).choice === 'move'
+  && typeof (item as { pokemon?: { getSlot?: unknown } }).pokemon?.getSlot === 'function';
+
+/** The slots of the move actions in a segment of a shuffled list, in their order. */
+const moveSlots = (items: readonly unknown[], start: number, end: number): string[] =>
+  items.slice(start, end).filter(isMoveAction).map(item => item.pokemon.getSlot());
+
+/**
+ * The order of `slots` that keeps their current order as far as the pairs allow and puts the first of each pair ahead of the
+ * second: the next slot is the earliest one that no pair still holds back.
+ */
+function respecting(slots: readonly string[], pairs: readonly (readonly [string, string])[]): string[] {
+  const left = [...slots];
+  const order: string[] = [];
+  while (left.length > 0) {
+    const next = left.find(slot => !pairs.some(([first, second]) => second === slot && left.includes(first))) ?? left[0];
+    order.push(next);
+    left.splice(left.indexOf(next), 1);
+  }
+  return order;
+}
+
 /** Writes down what the simulator draws for every die of the natural turn, in order, per die key. */
 export class RecordingPRNG extends WatchedPRNG {
   private readonly answers = new Map<string, Answer[]>();
+  /** The slots of the move actions of every shuffle that held two or more of them (a speed tie), in order. */
+  readonly ties: string[][] = [];
+  /** The chance of every chance die drawn, per die key (numerator over denominator of the first draw). */
+  readonly chances = new Map<string, number>();
 
   get record(): NaturalRecord {
     return this.answers;
   }
 
+  protected override shuffled(items: unknown[], start: number, end: number): void {
+    const slots = moveSlots(items, start, end);
+    if (slots.length >= 2) this.ties.push(slots);
+  }
+
   protected override decide(name: DieName, draw: Draw, natural: number): number {
     const key = dieKey(name);
+    if (draw.call === 'chance' && !this.chances.has(key)) this.chances.set(key, (draw.numerator ?? 0) / (draw.from ?? 1));
     const answer: Answer = { from: draw.from, to: draw.to, value: natural };
     const list = this.answers.get(key);
     if (list) list.push(answer);
@@ -114,6 +154,8 @@ export interface DieNote {
 export class ForcedDicePRNG extends WatchedPRNG {
   readonly notes = new Map<string, DieNote>();
   private readonly forced = new Map<string, ForcedDie>();
+  /** The forced speed ties, by pair key. */
+  private readonly ties = new Map<string, ForcedDie>();
   private readonly record: NaturalRecord;
   private readonly cursors = new Map<string, number>();
 
@@ -130,10 +172,44 @@ export class ForcedDicePRNG extends WatchedPRNG {
     scripts?: ReadonlyMap<string, readonly number[] | null>; actsOnTrue?: ReadonlyMap<string, boolean>;
   }) {
     super(input.inner, input.watch);
-    for (const die of input.forced) this.forced.set(dieKey(die.name), die);
+    for (const die of input.forced) (die.name.kind === 'speed-tie' ? this.ties : this.forced).set(dieKey(die.name), die);
     this.record = input.record;
     this.scripts = input.scripts ?? new Map();
     this.actsOnTrue = input.actsOnTrue ?? new Map();
+  }
+
+  /**
+   * A shuffle that holds move actions is a speed tie: the stream shuffled it as it would without the module, and the forced
+   * pairs now put their first body ahead of the second wherever both stand in the segment (Gens 8 and 9 shuffle a pair more
+   * than once in a turn, so every shuffle that holds both is held to the order).
+   */
+  protected override shuffled(items: unknown[], start: number, end: number): void {
+    const slots = moveSlots(items, start, end);
+    if (slots.length < 2 || this.ties.size === 0) return;
+    const pairs: [string, string][] = [];
+    for (const [index, a] of slots.entries()) {
+      for (const b of slots.slice(index + 1)) {
+        const name = tieName(a, b);
+        const die = this.ties.get(dieKey(name));
+        if (!die) continue;
+        const first = 'first' in die.result ? die.result.first : undefined;
+        const note = this.noteOf(dieKey(name));
+        note.shapes.push({ call: 'shuffle', from: start, to: end });
+        if (note.draws++ === 0) note.logIndex = this.watch.battle.log.length;
+        if (first === a || first === b) pairs.push([first, first === a ? b : a]);
+        else note.unfit = true;
+      }
+    }
+    if (pairs.length === 0) return;
+    const positions = items.slice(start, end).flatMap((item, offset) => (isMoveAction(item) ? [offset] : []));
+    const bySlot = new Map(positions.map(offset => [(items[start + offset] as MoveAction).pokemon.getSlot(), items[start + offset]]));
+    for (const [index, slot] of respecting(slots, pairs).entries()) items[start + positions[index]] = bySlot.get(slot);
+  }
+
+  private noteOf(key: string): DieNote {
+    let note = this.notes.get(key);
+    if (!note) this.notes.set(key, note = { draws: 0, noChance: false, shapes: [] });
+    return note;
   }
 
   protected override decide(name: DieName, draw: Draw, natural: number): number {
