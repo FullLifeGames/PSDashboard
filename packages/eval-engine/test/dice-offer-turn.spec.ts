@@ -4,8 +4,9 @@ import { loadSimMods } from '../src/forward/sim-mods';
 import { offeredDice, offeredEndDice, type DieOffer } from '../src/dice/offer';
 import { dieKey, type ForcedDie } from '../src/dice/types';
 import { chanceOfEffect, EFFECT_SPORE, END_ROWS, endBoard, hitDie, PROCS, present, procBoard, type Proc } from './dice-ability-support';
-import { playClicks, standing, type Mode } from './dice-fixtures';
+import { mon, PIKACHU, playClicks, SNORLAX, standing, type Mode } from './dice-fixtures';
 import { forcedOn, outfitBoard, SWEEP_CASES, sweepBoard, sweepClicks, sweepMoves } from './dice-sweep-support';
+import { battleOf } from './power-oracle';
 import { copyOf } from '../src/sim-ask/copy';
 
 // Round 82 (forced dice), lane A4: the dice the panel offers for the procs of abilities and items and for the end of the turn,
@@ -116,5 +117,30 @@ describe.each(SWEEP_CASES.filter(({ rules }) => rules.generation >= 2))('the off
     // exactly one of the next two turns holds the landing, and its die is offered both ways
     const offered = [landing, accuracy(later)].filter(keys => keys.length > 0);
     expect(offered.length, 'the landing turn offers the accuracy').toBe(1);
+  });
+});
+
+// A condition that starts in the middle of the turn (a faster foe's Thunder Wave or Confuse Ray lands before the body's own check)
+// is no state of the board when the choice is made: the offer lists no status check for it. A die forced for it anyway is held to
+// the check the simulator then draws: the status probe adds the condition on a copy and reads its polarity, and the report
+// says applied for both answers.
+describe.each(SWEEP_CASES.filter(({ rules }) => rules.generation >= 3))('a status check that starts in the turn: $name', ({ rules, mode }) => {
+  const foe = (moveId: string) => mon(rules, PIKACHU([moveId]));
+  const board = (moveId: string) => mode === 'singles'
+    ? battleOf(rules.singles, [mon(rules, SNORLAX(['tackle']))], [foe(moveId)], SEED)
+    : battleOf(rules.doubles!, [mon(rules, SNORLAX(['tackle'])), mon(rules, { species: 'Blissey', moves: ['splash'] })], [foe(moveId), mon(rules, { species: 'Chansey', moves: ['splash'] })], SEED);
+  const clicks = (moveId: string) => (mode === 'singles' ? { p1: 'move 1', p2: 'move 1' } : { p1: 'move 1 1, move 1', p2: `move 1${moveId === 'tackle' ? '' : ' 1'}, move 1` });
+
+  test.each([['thunderwave', 'par'], ['confuseray', 'confusion']] as const)('%s: not offered, forced yes and no are applied', (moveId, id) => {
+    const start = board(moveId);
+    expect(keysOf(offeredDice(start, 'p1a', choiceOf('tackle', 'normal', mode)), 'status-check'), 'not offered before it starts').toEqual([]);
+    for (const happens of [true, false]) {
+      const die: ForcedDie = { name: { slot: 'p1a', moveId: 'tackle', kind: 'status-check', effectId: id }, result: { happens } };
+      const { report, battle, start: from } = forcedOn(board(moveId), clicks(moveId), [die]);
+      expect(report.forced[0].took, `${rules.name} ${mode} ${id} ${happens}: ${report.forced[0].reason}`).toBe('applied');
+      // the answer shows: the body goes on with its own move, or it is stopped (a full-paralysis line, the confusion self-hit)
+      const moved = battle.log.slice(from).some(line => line.startsWith('|move|p1a: ') && line.includes('Tackle'));
+      expect(moved).toBe(happens);
+    }
   });
 });
