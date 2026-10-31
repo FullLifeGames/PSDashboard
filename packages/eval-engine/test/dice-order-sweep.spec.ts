@@ -2,11 +2,13 @@ import { writeFileSync } from 'node:fs';
 import { afterAll, describe, expect, test } from 'vitest';
 import type { Battle } from '@pkmn/sim';
 import { loadSimMods } from '../src/forward/sim-mods';
-import type { DieReport, ForcedDie } from '../src/dice/types';
+import type { DieReport } from '../src/dice/types';
 import { copyOf } from '../src/sim-ask/copy';
 import { mon, playClicks, PIKACHU, RULES, sweepSelection, type Mode, type Rules } from './dice-fixtures';
-import { dexOfRules, forcedOn, outfitBoard, SWEEP_CASES } from './dice-sweep-support';
-import { set } from './move-oracle';
+import {
+  moveOrder, moverBoard, moverClicks, moverDie, moversOf, PAIRS, SLOTS, tieBoard, tieClicks, tieDie, type FirstMover,
+} from './dice-order-support';
+import { forcedOn, SWEEP_CASES } from './dice-sweep-support';
 import { battleOf } from './power-oracle';
 
 // Round 82 (forced dice), lane A3b: the order of the turn. Two dice decide who moves first inside one priority bracket: the
@@ -31,33 +33,7 @@ afterAll(() => {
 });
 
 const why = (report: DieReport): string => `${report.took}: ${report.reason ?? 'no reason'}`;
-const slotOfIdent = (ident: string): string => ident.split(':')[0].trim();
-
-/**
- * The slots of the bodies that used a move, in the order of the `|move|` lines (a move another move calls is no action; Gen 4
- * writes the move of a Quick Claw holder with `[from] item:`, which is the holder's own action).
- */
-function moveOrder(battle: Battle, start: number): string[] {
-  return battle.log.slice(start).map(line => line.split('|')).filter(row => row[1] === 'move' && !row.some(field => field.startsWith('[from]') && !field.startsWith('[from] item:'))).map(row => slotOfIdent(row[2]));
-}
-
 const SEEDS = Array.from({ length: 6 }, (_, index) => [1, 2, 3, 4].map(offset => (index + 1) * 11 + offset).join(','));
-
-/** Bodies of equal speed: the same species and set on every place, all of them tackle. */
-function tieBoard(rules: Rules, mode: Mode, seed: string): Battle {
-  const body = () => mon(rules, PIKACHU(['tackle']));
-  return mode === 'singles'
-    ? battleOf(rules.singles, [body()], [body()], seed)
-    : battleOf(rules.doubles!, [body(), body()], [body(), body()], seed);
-}
-
-const tieClicks = (mode: Mode): { p1: string; p2: string } =>
-  mode === 'singles' ? { p1: 'move 1', p2: 'move 1' } : { p1: 'move 1 1, move 1 2', p2: 'move 1 1, move 1 2' };
-
-const tieDie = (a: string, b: string, first: string): ForcedDie => {
-  const [low, high] = [a, b].sort();
-  return { name: { slot: low, moveId: '', targetSlot: high, kind: 'speed-tie' }, result: { first } };
-};
 
 /** The order a plain turn gives on this board. */
 function naturalOrder(board: Battle, clicks: { p1: string; p2: string }): string[] {
@@ -69,9 +45,6 @@ function naturalOrder(board: Battle, clicks: { p1: string; p2: string }): string
 }
 
 const before = (order: string[], first: string, second: string): boolean => order.indexOf(first) < order.indexOf(second);
-
-const SLOTS: Record<Mode, string[]> = { singles: ['p1a', 'p2a'], doubles: ['p1a', 'p1b', 'p2a', 'p2b'] };
-const PAIRS = (slots: string[]): [string, string][] => slots.flatMap((a, index) => slots.slice(index + 1).map((b): [string, string] => [a, b]));
 
 describe.each(SWEEP_CASES)('the speed tie: $name', ({ rules, mode, name }) => {
   let flipped = 0;
@@ -152,34 +125,6 @@ describe.each(SWEEP_CASES)('the speed tie: $name', ({ rules, mode, name }) => {
 
 // The first-mover die ---------------------------------------------------------------------------------------------------
 
-interface FirstMover { id: string; label: string; kind: 'items' | 'abilities'; outfit: { item?: string; ability?: string }; activate: RegExp }
-
-const FIRST_MOVERS: FirstMover[] = [
-  { id: 'quickclaw', label: 'Quick Claw', kind: 'items', outfit: { item: 'Quick Claw' }, activate: /^\|-activate\|p1a: [^|]*\|item: Quick Claw/ },
-  { id: 'quickdraw', label: 'Quick Draw', kind: 'abilities', outfit: { ability: 'Quick Draw' }, activate: /^\|-activate\|p1a: [^|]*\|ability: Quick Draw/ },
-];
-
-const exists = (rules: Rules, mover: FirstMover): boolean => {
-  const entry = dexOfRules(rules)[mover.kind].get(mover.id);
-  return entry.exists && entry.gen <= dexOfRules(rules).gen && !entry.isNonstandard;
-};
-
-const moverDie = (mover: FirstMover, happens: boolean): ForcedDie => ({ name: { slot: 'p1a', moveId: '', kind: 'move-first', effectId: mover.id }, result: { happens } });
-
-/** A slow holder (Snorlax) facing a fast body (Pikachu): both use a move of priority 0, the holder goes second unless its die lets it go first. */
-function moverBoard(rules: Rules, mode: Mode, mover: FirstMover, seed: string): Battle {
-  const outfit = { level: rules.level, ...(rules.evs ? { evs: rules.evs } : {}), item: mover.outfit.item ?? '', ability: mover.outfit.ability ?? 'No Ability' };
-  const holder = set('Snorlax', ['tackle'], { ...outfit, gender: 'M' });
-  const fast = mon(rules, PIKACHU(['tackle']));
-  if (mode === 'singles') return battleOf(rules.singles, [holder], [fast], seed);
-  return battleOf(
-    rules.doubles!, [holder, mon(rules, { species: 'Blissey', moves: ['splash'] })], [fast, mon(rules, { species: 'Chansey', moves: ['splash'] })], seed,
-  );
-}
-
-const moverClicks = (mode: Mode): { p1: string; p2: string } =>
-  mode === 'singles' ? { p1: 'move 1', p2: 'move 1' } : { p1: 'move 1 1, move 1', p2: 'move 1 1, move 1' };
-
 /** Whether the plain turn on this seed lets the holder go first by its die. */
 function naturalActivates(board: Battle, mover: FirstMover, rules: Rules): boolean {
   const battle = copyOf(board);
@@ -203,7 +148,7 @@ function seedsWhere(rules: Rules, mode: Mode, mover: FirstMover, activates: bool
 }
 
 describe.each(SWEEP_CASES)('the first-mover die: $name', ({ rules, mode, name }) => {
-  const movers = FIRST_MOVERS.filter(mover => exists(rules, mover) && (mover.kind === 'items' || rules.generation >= 8));
+  const movers = moversOf(rules);
   const played: string[] = [];
 
   describe.each(movers.map(mover => [mover.label, mover] as const))('%s', (_label, mover) => {
@@ -231,10 +176,7 @@ describe.each(SWEEP_CASES)('the first-mover die: $name', ({ rules, mode, name })
     }
 
     test('a body without the holder\'s outfit has no die: no-draw', () => {
-      const board = outfitBoard(rules, mode, { species: 'Snorlax', moves: ['tackle'] }, { species: 'Pikachu' });
-      // the foe of this board splashes: it takes no target
-      const clicks = mode === 'singles' ? { p1: 'move 1', p2: 'move 1' } : { p1: 'move 1 1, move 1', p2: 'move 1, move 1' };
-      const { report } = forcedOn(board, clicks, [moverDie(mover, true)]);
+      const { report } = forcedOn(moverBoard(rules, mode, null, SEED_POOL[0]), moverClicks(mode), [moverDie(mover, true)]);
       expect(report.forced[0].took, why(report.forced[0])).toBe('no-draw');
     });
   });

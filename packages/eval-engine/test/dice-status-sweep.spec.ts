@@ -5,6 +5,7 @@ import { loadSimMods } from '../src/forward/sim-mods';
 import type { DieReport, ForcedDie } from '../src/dice/types';
 import { copyOf } from '../src/sim-ask/copy';
 import { playClicks, sweepSelection, type Mode, type Rules } from './dice-fixtures';
+import { attacker, CHECK_MOVES, CHECKS, started, type Check } from './dice-status-support';
 import { dexOfRules, forcedOn, monOf, newTally, SWEEP_CASES, sweepBoard, sweepClicks, type Tally } from './dice-sweep-support';
 
 // Round 82 (forced dice), lane A3b: the status checks of the attacker. The simulator draws them inside the attacker's own
@@ -26,38 +27,6 @@ const summaries: string[] = [];
 afterAll(() => {
   if (logPath) writeFileSync(logPath, summaries.join('\n') + '\n', 'utf8');
 });
-
-/** A move of each kind the check precedes: physical, spread, a status move, a move that thaws its user (read from the Dex flag). */
-const MOVES = ['tackle', 'rockslide', 'splash', 'flamewheel'];
-
-interface Check {
-  /** The condition's id, as the die names it. */
-  id: string;
-  /** The first generation whose simulator draws this check in the turn. */
-  from: number;
-  start(battle: Battle): void;
-  /** The protocol line of the body going on (yes) or being stopped (no). */
-  yes: RegExp;
-  no: RegExp;
-}
-
-const attacker = (battle: Battle) => monOf(battle, 'p1a');
-const started = (ok: boolean, what: string): void => {
-  if (!ok) throw new Error(`${what} did not start`);
-};
-
-const CHECKS: Check[] = [
-  { id: 'par', from: 1, start: b => started(attacker(b).setStatus('par'), 'paralysis'), yes: /^\|move\|p1a: /, no: /^\|cant\|p1a: [^|]*\|par/ },
-  { id: 'frz', from: 3, start: b => started(attacker(b).setStatus('frz'), 'freeze'), yes: /^\|-curestatus\|p1a: [^|]*\|frz/, no: /^\|cant\|p1a: [^|]*\|frz/ },
-  {
-    id: 'attract', from: 2, start: b => started(attacker(b).addVolatile('attract', monOf(b, 'p2a')), 'infatuation'),
-    yes: /^\|move\|p1a: /, no: /^\|cant\|p1a: [^|]*\|Attract/,
-  },
-  {
-    id: 'confusion', from: 1, start: b => started(attacker(b).addVolatile('confusion'), 'confusion'),
-    yes: /^\|move\|p1a: /, no: /^\|-damage\|p1a: [^|]*\|[^|]*\|\[from\] confusion/,
-  },
-];
 
 const shows = (battle: Battle, start: number, pattern: RegExp): boolean => battle.log.slice(start).some(line => pattern.test(line));
 
@@ -152,7 +121,7 @@ function judge({ label, shown, happens, defrosts, oracle, check, battle, start }
 describe.each(SWEEP_CASES)('the status check sweep: $name', ({ rules, mode, name }) => {
   const tally: Tally = newTally();
   const checks = CHECKS.filter(check => rules.generation >= check.from);
-  const moves = sweepSelection(MOVES, 'moves');
+  const moves = sweepSelection(CHECK_MOVES, 'moves');
 
   describe.each(checks.map(check => [check.id, check] as const))('%s', (_id, check) => {
     test.each(moves)('%s', moveId => {
