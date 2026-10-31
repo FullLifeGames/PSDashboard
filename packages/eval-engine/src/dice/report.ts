@@ -142,7 +142,10 @@ function accuracyReport(w: Witness, happens: boolean): DieReport {
   const missed = w.action.some(line => missFor(line, w.targetSlot));
   if (!happens) return missed ? applied(w) : otherwise(w, 'no-chance', `${w.name} hit although the die gave a miss`);
   if (missed) return otherwise(w, 'blocked', `${w.name} missed although the die gave a hit`);
-  const blocker = w.action.find(line => isBlocker(line, w.targetSlot));
+  // A line after the hit's first effect on the target is not a block: an ability or item that answers the damage (Emergency Exit,
+  // Eject Button) writes an `-activate` there, after the damage line (round 82, A6: the pause specs found it).
+  const effect = w.action.findIndex(line => about(line, w.targetSlot) && isEffect(line));
+  const blocker = w.action.slice(0, effect < 0 ? undefined : effect).find(line => isBlocker(line, w.targetSlot));
   if (blocker) return otherwise(w, 'blocked', `${w.name} hit and did nothing: ${shows(blocker)}`);
   if (!w.target.some(isEffect)) return otherwise(w, 'blocked', `${w.name} hit and left no effect line for ${w.targetSlot ?? 'the target'}`);
   return applied(w);
