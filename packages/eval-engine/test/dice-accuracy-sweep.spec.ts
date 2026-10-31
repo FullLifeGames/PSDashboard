@@ -81,8 +81,9 @@ function conclude(name: string, moves: DexMove[], skipped: number, tally: Tally)
   summaries.push(`${name}: ${moves.length} moves (${skipped} skipped: no foe as target) ${JSON.stringify({ ...tally, bad: undefined, unexercised: tally.unexercised.join(',') })}`);
   expect(tally.unexercised.length, `clicks refused: ${tally.unexercised}`).toBeLessThan(moves.length * 0.02);
   expect(tally.cases).toBeGreaterThan(moves.length);
-  // most moves in a plain scene draw their accuracy (or cannot miss) and show the answer
-  expect(tally.applied + tally.blocked + tally.noChance).toBeGreaterThan(tally.cases * 0.8);
+  // most moves in a plain scene draw their accuracy (or cannot miss: a no-draw with that reason, each held by its case) and show the answer
+  expect(tally.applied + tally.blocked + tally.noChance + tally.noDraw).toBeGreaterThan(tally.cases * 0.8);
+  expect(tally.applied).toBeGreaterThan(tally.cases * 0.3);
 }
 
 describe.each(SWEEP_CASES)('the accuracy sweep: $name', ({ rules, mode, name }) => {
@@ -99,7 +100,7 @@ describe.each(SWEEP_CASES)('the accuracy sweep: $name', ({ rules, mode, name }) 
 describe.each(SWEEP_CASES)('the accuracy rows with no chance: $name', ({ rules, mode, name }) => {
   const { moves } = sweepMoves(rules, move => move.accuracy === true && move.category !== 'Status');
 
-  test('a damaging move that cannot miss draws no accuracy: both answers are no chance and the hit shows', () => {
+  test('a damaging move that cannot miss draws no accuracy: both answers are no draw and the hit shows', () => {
     let noChance = 0;
     for (const move of moves) {
       const board = sweepBoard(rules, move.id, mode);
@@ -115,11 +116,11 @@ describe.each(SWEEP_CASES)('the accuracy rows with no chance: $name', ({ rules, 
           expect(missesOf(battle, start, slot), `${move.id} ${slot} ${happens}`).toBe(0);
           return report.forced[0];
         });
-        const sure = (report: DieReport): boolean => report.took === 'no-chance' || (report.took === 'no-draw' && explained(report.reason));
+        const sure = (report: DieReport): boolean => report.took === 'no-draw' && explained(report.reason);
         // a move that picks one target draws for that one only
-        const fine = picksOne(move.target) ? shown.some(report => report.took === 'no-chance') : shown.every(sure);
+        const fine = picksOne(move.target) ? shown.some(sure) : shown.every(sure);
         expect(fine, `${move.id} ${happens}: ${shown.map(report => `${report.took} ${report.reason}`).join(' | ')}`).toBe(true);
-        noChance += shown.filter(report => report.took === 'no-chance').length;
+        noChance += shown.filter(sure).length;
       }
     }
     expect(noChance, `${name} ${moves.length} moves`).toBeGreaterThan(moves.length * 0.5);

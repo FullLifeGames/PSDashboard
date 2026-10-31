@@ -4,7 +4,7 @@ import { playForcedTurn } from '../src/dice/play';
 import { genShape } from '../src/dice/recognize';
 import type { DiceReport, DieName, ForcedDie } from '../src/dice/types';
 import { copyOf } from '../src/sim-ask/copy';
-import { CHAMPIONS, mon, playClicks, RULES, type Mode, type Rules } from './dice-fixtures';
+import { CHAMPIONS, mon, playClicks, RULES, sweepSelection, type Mode, type Rules } from './dice-fixtures';
 import { battleOf } from './power-oracle';
 
 /**
@@ -31,8 +31,8 @@ export function sweepMoves(rules: Rules, keep: (move: DexMove) => boolean): { mo
   const dex = dexOfRules(rules);
   const all = dex.moves.all().filter(move => move.exists && !move.isZ && !move.isMax && move.gen <= dex.gen
     && (move.isNonstandard === null || move.isNonstandard === undefined || move.isNonstandard === 'Past') && keep(move));
-  const moves = all.filter(move => FOE_REACHING.has(move.target));
-  return { moves, skipped: all.length - moves.length };
+  const reaching = all.filter(move => FOE_REACHING.has(move.target));
+  return { moves: sweepSelection(reaching, 'moves'), skipped: all.length - reaching.length };
 }
 
 /** The rule sets VGC plays (Scarlet/Violet and Champions doubles): a team of six per side. */

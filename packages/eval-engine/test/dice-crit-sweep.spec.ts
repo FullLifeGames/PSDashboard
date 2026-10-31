@@ -111,7 +111,7 @@ describe.each(VGC_RULES.map(rules => ({ rules, name: `${rules.name} VGC` })))('t
 describe.each(SWEEP_CASES)('the crit rows with no chance: $name', ({ rules, mode }) => {
   const dexMoves = (keep: (move: DexMove) => boolean): DexMove[] => sweepMoves(rules, move => move.category !== 'Status' && keep(move)).moves;
 
-  test('a move that always crits draws no crit: both answers are no chance and the crit shows', () => {
+  test('a move that always crits draws no crit: both answers are no draw and the crit shows', () => {
     for (const move of dexMoves(candidate => !!candidate.willCrit)) {
       const board = sweepBoard(rules, move.id, mode);
       const clicks = sweepClicks(mode, move.target);
@@ -120,7 +120,8 @@ describe.each(SWEEP_CASES)('the crit rows with no chance: $name', ({ rules, mode
         const slot = sweepTargets(mode, move.target)[0];
         const { report, battle, start } = forcedOn(board, clicks, [hit(move.id, slot), { name: dieOf(move.id, slot, 'crit'), result: { happens } }]);
         if (missesOf(battle, start, slot) > 0) continue;
-        expect(report.forced[1].took, `${move.id} ${happens}`).toBe('no-chance');
+        expect(report.forced[1].took, `${move.id} ${happens}`).toBe('no-draw');
+        expect(report.forced[1].reason, move.id).toMatch(/always crits/);
         expect(critsOf(battle, start, slot), move.id).toBeGreaterThan(0);
       }
     }

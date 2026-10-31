@@ -94,3 +94,11 @@ export const GRID_SCENES: Scene[] = [
   { id: 'tackle into a Substitute', a: SNORLAX(['tackle']), t: PIKACHU(['splash']), setup: battle => void battle.sides[1].active[0]!.addVolatile('substitute') },
   { id: 'both sides attack', a: SNORLAX(['tackle']), t: PIKACHU(['tackle']), tMove: true },
 ];
+
+/**
+ * The choice of moves (or cases) a sweep plays. Today every one; the cost of the sweeps in CI is open with the user, and the
+ * integrator wires the answer into this one function: every sweep file takes its list through it (`sweepMoves` calls it).
+ */
+export function sweepSelection<T>(items: readonly T[], sweep?: string): T[] {
+  return sweep === undefined ? [...items] : [...items];
+}

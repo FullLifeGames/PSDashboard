@@ -5,8 +5,8 @@ import type { DieReport, ForcedDie } from './types.ts';
 /**
  * Round 82 (forced dice), decision D9: what became of a forced die. The real turn's PRNG notes whether the simulator drew the
  * die and whether the draw could give the answer; this module reads the protocol's own lines after the draw and says
- * `applied` (the protocol shows the answer), `no-draw` (the simulator never drew it), `no-chance` (the draw has no way to
- * give the answer) or `blocked` (the draw ran and the answer was given, but the effect did not land). The reason is the
+ * `applied` (the protocol shows the answer), `no-draw` (the simulator never drew it, for both answers: a move that hits
+ * without an accuracy draw, a move that always crits), `no-chance` (a draw ran and has no way to give the answer) or `blocked` (the draw ran and the answer was given, but the effect did not land). The reason is the
  * protocol line that shows why, or a short sentence.
  *
  * The witness per kind (the user's answer against the lines of the action, from the log index of the first draw to the next
@@ -105,9 +105,10 @@ function noDraw(input: ReportInput): DieReport {
   // A future move draws in the end-of-turn residual two turns later, when no move is in flight.
   if (move.flags.futuremove) return { die, took: 'no-draw', reason: `${move.name} lands two turns later: its draws fall in the end-of-turn residual` };
   const happened = action.some(line => (about(line, targetSlot) && isEffect(line)) || parts(line)[1] === '-activate');
-  if (kind === 'accuracy' && happened) return { die, took: 'no-chance', reason: `${move.name} hit without an accuracy draw: it cannot miss here` };
+  // A die the simulator never drew is `no-draw` for both answers; `no-chance` stays for a draw that ran and cannot give the answer.
+  if (kind === 'accuracy' && happened) return { die, took: 'no-draw', reason: `${move.name} hit without an accuracy draw: it cannot miss here` };
   if (kind === 'crit' && move.willCrit && action.some(line => about(line, targetSlot) && isEffect(line))) {
-    return { die, took: 'no-chance', reason: `${move.name} always crits: the simulator draws no crit` };
+    return { die, took: 'no-draw', reason: `${move.name} always crits: the simulator draws no crit` };
   }
   if (action.every(line => QUIET.has(parts(line)[1]))) return { die, took: 'no-draw', reason: `${move.name} did nothing this turn: no line follows it` };
   return { die, took: 'no-draw', reason: `the simulator drew no ${kind} for ${move.name} this turn` };

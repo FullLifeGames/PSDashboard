@@ -46,11 +46,13 @@ describe.each(cases)('the report of a forced accuracy: $rules.name $mode', ({ ru
     }
   });
 
-  test('a forced miss on a move that cannot miss is no chance exactly when the turn still hits', () => {
+  test('a forced miss on a move that cannot miss is no chance exactly when the turn still hits, no draw where the generation draws nothing', () => {
     for (const seed of SEEDS) {
       const { report, battle } = forcedReport(boardOf(rules, TACKLE, mode, seed)!, TACKLE, mode, [{ name: name('tackle', 'accuracy'), result: { happens: false } }]);
       const hit = lines(battle, '|-miss|').length === 0;
-      expect(report.took === 'no-chance', `${rules.name} ${seed} ${report.took}`).toBe(hit);
+      // Gen 2 draws no accuracy for a 100 percent move (accuracy 255): the die never ran, whatever the answer
+      const sure = rules.generation === 2 ? 'no-draw' : 'no-chance';
+      expect(report.took === sure, `${rules.name} ${seed} ${report.took}`).toBe(hit);
       if (hit) expect(report.reason).toBeTruthy();
     }
   });
@@ -118,7 +120,7 @@ describe.each(fromGen3)('a forced crit on a body that blocks it: $rules.name', (
 
 describe('a move that always crits draws no crit', () => {
   const FROST: Scene = { id: 'frost breath', a: SNORLAX(['frostbreath']), t: PIKACHU(['splash']) };
-  test.each(RULES.filter(rules => rules.generation >= 5).map(rules => ({ rules })))('$rules.name: both answers are no chance, the crit shows', ({ rules }: { rules: Rules }) => {
+  test.each(RULES.filter(rules => rules.generation >= 5).map(rules => ({ rules })))('$rules.name: both answers are no draw, the crit shows', ({ rules }: { rules: Rules }) => {
     let played = 0;
     for (const seed of SEEDS.slice(0, 4)) {
       for (const happens of [true, false]) {
@@ -127,7 +129,8 @@ describe('a move that always crits draws no crit', () => {
         const { report, battle } = forcedReport(board, FROST, 'singles', [{ name: name('frostbreath', 'crit'), result: { happens } }]);
         if (lines(battle, '|-miss|').length) continue;
         expect(lines(battle, '|-crit|').length).toBe(1);
-        expect(report.took).toBe('no-chance');
+        expect(report.took).toBe('no-draw');
+        expect(report.reason).toMatch(/always crits/);
         played++;
       }
     }
