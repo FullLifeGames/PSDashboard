@@ -9,8 +9,8 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 
 async function fixtures(mode: string | undefined) {
   vi.resetModules();
-  if (mode === undefined) vi.unstubAllEnvs();
-  else vi.stubEnv('DICE_SWEEPS', mode);
+  // no variable is an empty one: a run that sets DICE_SWEEPS=full for the whole process leaves these rows as they are
+  vi.stubEnv('DICE_SWEEPS', mode ?? '');
   return import('./dice-fixtures');
 }
 
