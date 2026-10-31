@@ -38,7 +38,7 @@ function startsAction(line: string): boolean {
 function windowOf(log: readonly string[], from: number): string[] {
   const lines: string[] = [];
   for (let index = from; index < log.length; index++) {
-    if (index > from && startsAction(log[index])) break;
+    if (startsAction(log[index])) break;
     lines.push(log[index]);
   }
   return lines;
@@ -76,6 +76,9 @@ function isBlocker(line: string, targetSlot: string | undefined): boolean {
   return type === '-activate' && !line.includes('[damage]') && about(line, targetSlot);
 }
 
+/** Lines a move that did nothing leaves behind. */
+const QUIET = new Set(['debug', '-nothing', '']);
+
 const shows = (line: string): string => `the protocol shows "${line}"`;
 
 /** Why the simulator never drew the die, read from the protocol of the turn. */
@@ -92,12 +95,21 @@ function noDraw(input: ReportInput): DieReport {
     const cant = turn.find(line => parts(line)[1] === 'cant' && slotOfIdent(parts(line)[2]) === slot);
     return { die, took: 'no-draw', reason: `${slot} did not use ${move.name} this turn${cant ? ` (${shows(cant)})` : ''}` };
   }
-  const action = windowOf(turn, moveLine + 1).filter(line => parts(line)[1] !== 'move');
+  const next = turn[moveLine + 1];
+  if (next !== undefined && parts(next)[1] === 'cant' && slotOfIdent(parts(next)[2]) === slot) {
+    return { die, took: 'no-draw', reason: `${move.name} did not run: ${shows(next)}` };
+  }
+  const action = windowOf(turn, moveLine + 1);
   const blocker = action.find(line => isBlocker(line, targetSlot));
-  const landed = !blocker && action.some(line => about(line, targetSlot) && isEffect(line));
-  if (kind === 'accuracy' && landed) return { die, took: 'no-chance', reason: `${move.name} hit without an accuracy draw: it cannot miss here` };
-  if (kind === 'crit' && landed && move.willCrit) return { die, took: 'no-chance', reason: `${move.name} always crits: the simulator draws no crit` };
   if (blocker) return { die, took: 'no-draw', reason: `${move.name} drew no ${kind}: ${shows(blocker)}` };
+  // A future move draws in the end-of-turn residual two turns later, when no move is in flight.
+  if (move.flags.futuremove) return { die, took: 'no-draw', reason: `${move.name} lands two turns later: its draws fall in the end-of-turn residual` };
+  const happened = action.some(line => (about(line, targetSlot) && isEffect(line)) || parts(line)[1] === '-activate');
+  if (kind === 'accuracy' && happened) return { die, took: 'no-chance', reason: `${move.name} hit without an accuracy draw: it cannot miss here` };
+  if (kind === 'crit' && move.willCrit && action.some(line => about(line, targetSlot) && isEffect(line))) {
+    return { die, took: 'no-chance', reason: `${move.name} always crits: the simulator draws no crit` };
+  }
+  if (action.every(line => QUIET.has(parts(line)[1]))) return { die, took: 'no-draw', reason: `${move.name} did nothing this turn: no line follows it` };
   return { die, took: 'no-draw', reason: `the simulator drew no ${kind} for ${move.name} this turn` };
 }
 
