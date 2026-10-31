@@ -56,6 +56,21 @@ function choiceLine(choice: SharedChoice): string {
   return `Turn ${choice.turnNumber}: P1 ${p1} / P2 ${p2}`;
 }
 
+/** The dice the user forced in a turn, by side: the texts the history row shows. Nothing for a link from before the dice. */
+function ChoiceDice({ choice }: { choice: SharedChoice }) {
+  const dice = [
+    ...(choice.p1DiceLabels ?? []).map(text => `P1 ${text}`),
+    ...(choice.p2DiceLabels ?? []).map(text => `P2 ${text}`),
+  ];
+  if (dice.length === 0) return null;
+  return (
+    <div role="group" aria-label={`Forced dice, turn ${choice.turnNumber}`} style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 8px', fontSize: 10, color: '#aebdd0' }}>
+      <span style={{ color: '#8899aa' }}>Forced dice</span>
+      {dice.map((text, index) => <span key={index}>{text}</span>)}
+    </div>
+  );
+}
+
 function SharedBranchChoices({ branch }: { branch: BranchSharePayload }) {
   return (
     <div className="ps-panel ps-shared-branch-panel">
@@ -67,6 +82,7 @@ function SharedBranchChoices({ branch }: { branch: BranchSharePayload }) {
         {branch.choices.length > 0 ? branch.choices.map((choice, index) => (
           <div key={`${index}-${choice.turnNumber}`} className="ps-shared-choice-row">
             {choiceLine(choice)}
+            <ChoiceDice choice={choice} />
           </div>
         )) : (
           <div className="ps-shared-choice-row">No executed branch choices were stored.</div>

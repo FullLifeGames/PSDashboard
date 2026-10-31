@@ -1,8 +1,10 @@
-import { describe, expect, test } from 'vitest';
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { describe, expect, test, vi } from 'vitest';
+import { act, render, renderHook, screen, waitFor } from '@testing-library/react';
 import type { ForcedDie } from '@fulllifegames/eval-engine';
 import { useBranch } from '../../../src/hooks/useBranch';
 import { branchFrameLog } from '../../../src/lib/branch-log';
+import { decodeBranchShare, encodeBranchShare, makeBranchSharePayload } from '../../../src/lib/branch-share';
+import { SharedBranchView } from '../../../src/components/SharedBranchView';
 import { turnDiceMarks, sideMarkTexts } from '../../../src/lib/branch-dice-marks';
 import { freshLog, setOf } from '../fixtures/dice-battle';
 
@@ -93,5 +95,29 @@ describe.each(SCENES)('a turn that pauses for a switch, $kind', scene => {
     expect(again.executeError).toBeNull();
     expect(again.history.map(entry => entry.diceMarks)).toEqual(recorded.map(entry => entry.diceMarks));
     expect(forcedLines(again)).toEqual(lines);
+  }, 180_000);
+
+  // Round 82, step A7c, criterion 4: a link written from this branch shows the marks. The viewer plays `finalLog` without a
+  // simulator, so the display lines must be in it, and the turn's choice carries the labels of both dice once.
+  test('a share link carries the display lines in its log and the labels of both dice on the turn, and the viewer shows them', async () => {
+    const current = await play();
+    const finalLog = branchFrameLog(current.simState!.log, current.history.flatMap(entry => entry.dieLines ?? []));
+    const replay = { id: 'gen9test-1', format: scene.format, formatid: scene.format, players: ['A', 'B'], log: '', uploadtime: 0, views: 0 };
+    const payload = decodeBranchShare(encodeBranchShare(makeBranchSharePayload({ replay, branchTurn: 1, history: current.history, finalLog })));
+    expect(payload.version).toBe(1);
+    expect(payload.finalLog.split('\n').filter(line => line.startsWith('|-message|Forced'))).toHaveLength(2);
+    expect(payload.choices.map(choice => [choice.p1DiceLabels, choice.p2DiceLabels])).toEqual([[['Volt Switch: hits'], ['Scald: Burn']], [undefined, undefined]]);
+
+    const blobs: Blob[] = [];
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: vi.fn((blob: Blob) => { blobs.push(blob); return 'blob:test/dice'; }), revokeObjectURL: vi.fn() }));
+    try {
+      render(<SharedBranchView branch={payload} onLoadOriginal={vi.fn()} onClear={vi.fn()} />);
+      const html = await blobs[0].text();
+      expect(html).toContain('|-message|Forced: Volt Switch hits');
+      expect(html).toContain('|-message|Forced: Scald burn');
+      expect(screen.getByRole('group', { name: 'Forced dice, turn 1' })).toHaveTextContent('P1 Volt Switch: hitsP2 Scald: Burn');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   }, 180_000);
 });

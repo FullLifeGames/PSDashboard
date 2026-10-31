@@ -71,6 +71,37 @@ describe('branch save/share payloads', () => {
     expect(decoded.version).toBe(1);
   });
 
+  // Round 82 (forced dice), step A7c: each turn of a link names its forced dice, the turn's row reads the joined report of a
+  // turn that paused for a switch, and a turn without a forced die writes no key (an old reader meets today's shape).
+  describe('forced dice in a link', () => {
+    const turn: BranchHistoryEntry = { ...history[0], p1Choice: 'move 1', p2Choice: 'move 1', diceMarks: { p1: [{ label: 'Air Slash: Flinch', noEffect: 'Air Slash did not run' }], p2: [{ label: 'Scald: Burn' }] } };
+    const make = (entries: BranchHistoryEntry[]) => makeBranchSharePayload({ replay, branchTurn: 3, history: entries, finalLog: '|turn|3' });
+
+    test('a turn carries the labels of its dice by side, with the dice that took no effect marked', () => {
+      const payload = make([turn]);
+      expect(payload.choices[0]).toMatchObject({ p1DiceLabels: ['Air Slash: Flinch (no effect)'], p2DiceLabels: ['Scald: Burn'] });
+      const decoded = decodeBranchShare(encodeBranchShare(payload));
+      expect(decoded.choices).toEqual(payload.choices);
+      expect(decoded.version).toBe(1);
+    });
+
+    test('a side without a die writes no key, and a turn without dice writes none at all', () => {
+      const oneSided = make([{ ...turn, diceMarks: { p1: [], p2: [{ label: 'Scald: Burn' }] } }]).choices[0];
+      expect('p1DiceLabels' in oneSided).toBe(false);
+      expect(oneSided.p2DiceLabels).toEqual(['Scald: Burn']);
+      const plain = make(history).choices[0];
+      expect(Object.keys(plain).sort()).toEqual(['p1Choice', 'p1Label', 'p2Choice', 'p2Label', 'turnNumber']);
+    });
+
+    test('a turn that paused for a switch gets the joined report on the turn, and the forced line none', () => {
+      const partial: BranchHistoryEntry = { ...turn, diceMarks: { p1: [], p2: [{ label: 'Scald: Burn', noEffect: 'not reached' }] } };
+      const forced: BranchHistoryEntry = { ...history[0], kind: 'forced', forcedSide: 'p1', p1Choice: 'switch 2', p2Choice: '—', diceMarks: { p1: [{ label: 'Volt Switch: Hits' }], p2: [{ label: 'Scald: Burn' }] } };
+      const payload = make([partial, forced]);
+      expect(payload.choices[0]).toMatchObject({ p1DiceLabels: ['Volt Switch: Hits'], p2DiceLabels: ['Scald: Burn'] });
+      expect('p1DiceLabels' in payload.choices[1] || 'p2DiceLabels' in payload.choices[1]).toBe(false);
+    });
+  });
+
   test('an entry without slot choices keeps the raw command as its label', () => {
     const payload = makeBranchSharePayload({ replay, branchTurn: 3, history, finalLog: '|turn|3' });
     expect(payload.choices[0].p1Label).toBe('move 1');

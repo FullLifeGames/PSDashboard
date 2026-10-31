@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SharedBranchView } from '../../../src/components/SharedBranchView';
 import type { BranchSharePayload } from '../../../src/lib/branch-share';
@@ -50,6 +50,27 @@ describe('SharedBranchView', () => {
     expect(screen.getByText(`Turn 3: P1 ${p1Label} / P2 ${p2Label}`)).toBeInTheDocument();
     expect(screen.getByText('Turn 4, forced replacement (P2): → Kyurem')).toBeInTheDocument();
     expect(screen.queryByText(/move 2|switch 3/)).toBeNull();
+  });
+
+  // Round 82 (forced dice), step A7c: a link made after the dice lists them under the turn; an older link shows no such line.
+  test('a turn with forced dice lists them by side under its line', () => {
+    const withDice = { ...branch, choices: [
+      { turnNumber: 3, p1Choice: 'move 2', p2Choice: 'move 1', p1Label: 'Air Slash', p2Label: 'Scald', p1DiceLabels: ['Air Slash: Flinch (no effect)', 'Air Slash: Hits'], p2DiceLabels: ['Scald: Burn'] },
+      { turnNumber: 4, p1Choice: 'move 2', p2Choice: 'move 1' },
+    ] };
+    render(<SharedBranchView branch={withDice} onLoadOriginal={vi.fn()} onClear={vi.fn()} />);
+    expect(screen.getByText('Turn 3: P1 Air Slash / P2 Scald')).toBeInTheDocument();
+    const dice = screen.getByRole('group', { name: 'Forced dice, turn 3' });
+    expect(dice).toHaveTextContent('Forced dice');
+    expect(within(dice).getByText('P1 Air Slash: Flinch (no effect)')).toBeInTheDocument();
+    expect(within(dice).getByText('P1 Air Slash: Hits')).toBeInTheDocument();
+    expect(within(dice).getByText('P2 Scald: Burn')).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Forced dice, turn 4' })).toBeNull();
+  });
+
+  test('a link from before the dice has no dice line', () => {
+    render(<SharedBranchView branch={branch} onLoadOriginal={vi.fn()} onClear={vi.fn()} />);
+    expect(screen.queryByRole('group', { name: /Forced dice/ })).toBeNull();
   });
 
   test('a branch without stored choices says so', () => {

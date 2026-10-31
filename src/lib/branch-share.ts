@@ -1,11 +1,14 @@
 import type { BranchHistoryEntry } from './branch-history';
 import type { ReplayData, SideId } from '@fulllifegames/replay-core';
 import { notationSideLabel } from '@fulllifegames/eval-engine';
+import { sideMarkTexts, turnDiceMarks } from './branch-dice-marks';
 
 /**
  * One executed entry of the branch. `p1Choice` and `p2Choice` are the simulator commands; the labels (round 77, D6) are the
  * move and Pokemon names the history panel shows, so the shared view reads names. A link built before the labels carries
- * the commands alone and the view lists those (format version 1 stays: the fields are optional).
+ * the commands alone and the view lists those (format version 1 stays: the fields are optional). Round 82 (forced dice, step A7c):
+ * `p1DiceLabels` and `p2DiceLabels` name the dice the user forced in the turn, one text per die as the history row writes it, a
+ * die that took no effect marked; a turn without a forced die on a side has no key for it, and the viewer shows a link without them.
  */
 interface BranchShareChoice {
   turnNumber: number;
@@ -13,6 +16,8 @@ interface BranchShareChoice {
   p2Choice: string;
   p1Label?: string;
   p2Label?: string;
+  p1DiceLabels?: string[];
+  p2DiceLabels?: string[];
   /** Set on a forced replacement of one side, which is its own line and consumes no turn. */
   forcedSide?: SideId;
 }
@@ -48,14 +53,21 @@ export function makeBranchSharePayload(params: {
     players: replay.players,
     branchTurn,
     createdAt: new Date().toISOString(),
-    choices: history.map(entry => ({
-      turnNumber: entry.turnNumber,
-      p1Choice: entry.p1Choice,
-      p2Choice: entry.p2Choice,
-      p1Label: notationSideLabel(entry.p1SlotChoices, entry.p1Choice),
-      p2Label: notationSideLabel(entry.p2SlotChoices, entry.p2Choice),
-      ...(entry.kind === 'forced' && entry.forcedSide ? { forcedSide: entry.forcedSide } : {}),
-    })),
+    choices: history.map((entry, index) => {
+      const marks = turnDiceMarks(history, index);
+      const p1Dice = sideMarkTexts(marks, 'p1');
+      const p2Dice = sideMarkTexts(marks, 'p2');
+      return {
+        turnNumber: entry.turnNumber,
+        p1Choice: entry.p1Choice,
+        p2Choice: entry.p2Choice,
+        p1Label: notationSideLabel(entry.p1SlotChoices, entry.p1Choice),
+        p2Label: notationSideLabel(entry.p2SlotChoices, entry.p2Choice),
+        ...(p1Dice.length > 0 ? { p1DiceLabels: p1Dice } : {}),
+        ...(p2Dice.length > 0 ? { p2DiceLabels: p2Dice } : {}),
+        ...(entry.kind === 'forced' && entry.forcedSide ? { forcedSide: entry.forcedSide } : {}),
+      };
+    }),
     finalLog,
   };
 }
