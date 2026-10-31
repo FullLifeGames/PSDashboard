@@ -4,8 +4,10 @@ import {
   conflictingSwitchTargets,
   describeSlotChoice,
   evalChoiceToSlotChoices,
+  notationDice,
   notationSideLabel,
   notationSlotChoice,
+  notationSlotDice,
   requiredChoicesForActiveSlots,
   switchChoiceKey,
   switchOptionKey,
@@ -13,6 +15,8 @@ import {
 } from '../src/branch-choices';
 import type { BranchMoveOption, BranchSwitchOption, BranchTargetOption } from '../src/branch-engine';
 import { toId } from '@fulllifegames/replay-core';
+import { dieLabel, type DieWords } from '../src/dice/die-label';
+import type { ForcedDie } from '../src/dice/types';
 
 function switchTo(species: string, name = species): BranchSlotChoice {
   return { kind: 'switch', speciesId: toId(species), pokemonName: name };
@@ -178,5 +182,32 @@ describe('engine choice → branch slot choices', () => {
     // The move exists but the named switch target does not — no partial prefill.
     expect(evalChoiceToSlotChoices('move protect, switch 5', [[move('Protect', 0, 1)], []], [[], [bench('Amoonguss', 3)]]))
       .toBeNull();
+  });
+});
+
+// Round 82 (forced dice), step A7c: the labels of a slot's forced dice come from `dieLabel`, so a history row, a share link
+// and a frame line say the same thing about a die.
+describe('notation of forced dice', () => {
+  const words: DieWords = { move: id => `Move ${id}`, effect: id => `Effect ${id}`, slot: slot => `Body ${slot}` };
+  const flinch: ForcedDie = { name: { slot: 'p1a', moveId: 'airslash', targetSlot: 'p2a', kind: 'secondary', effectId: 'flinch' }, result: { happens: true } };
+  const miss: ForcedDie = { name: { slot: 'p1a', moveId: 'airslash', targetSlot: 'p2a', kind: 'accuracy' }, result: { happens: false } };
+
+  test('a choice names each of its dice by the label the chips and the frame lines use', () => {
+    const choice: BranchSlotChoice = { ...moveBy('Air Slash'), dice: [miss, flinch] };
+    expect(notationSlotDice(choice, words)).toEqual([dieLabel(miss, words), dieLabel(flinch, words)]);
+    expect(notationSlotDice(choice, words)).toEqual(['Move airslash: misses', 'Move airslash: Effect flinch']);
+    expect(notationDice([flinch])).toEqual([dieLabel(flinch)]);
+  });
+
+  test('a choice without dice, a pass and a switch name none', () => {
+    expect(notationSlotDice(moveBy('Ice Beam'), words)).toEqual([]);
+    expect(notationSlotDice(null, words)).toEqual([]);
+    expect(notationSlotDice({ ...switchTo('Kyurem'), dice: [flinch] }, words)).toEqual(['Move airslash: Effect flinch']);
+    expect(notationDice(undefined)).toEqual([]);
+  });
+
+  test('the notation of the choice itself stays as it was', () => {
+    expect(notationSlotChoice({ ...moveBy('Air Slash'), dice: [flinch] })).toBe('Air Slash');
+    expect(notationSideLabel([{ ...moveBy('Air Slash'), dice: [flinch] }], 'move 1')).toBe('Air Slash');
   });
 });

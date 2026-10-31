@@ -1,6 +1,7 @@
 import type { BranchMoveOption, BranchSwitchOption } from './branch-engine.ts';
 import { splitCombinedLabel } from './analysis.ts';
 import { toId } from '@fulllifegames/replay-core';
+import { dieLabel, type DieWords } from './dice/die-label.ts';
 import type { ForcedDie } from './dice/types.ts';
 
 export interface BranchChoiceActive {
@@ -54,6 +55,20 @@ export function notationSlotChoice(choice: BranchSlotChoice | null | undefined):
   const target = choice.targetLoc !== undefined ? ` ${formatTargetLoc(choice.targetLoc)}` : '';
   const modifier = choice.modifier ? ` (${MODIFIER_LABELS[choice.modifier]})` : '';
   return `${choice.moveName}${target}${modifier}`;
+}
+
+/**
+ * Round 82 (forced dice), step A7c: the labels of forced dice, one text per die from `dieLabel`, so the history rows, the
+ * share links and the frame lines say the same thing. `words` is the reader of names of the game's rule set (`wordsOf`
+ * in the app); without it the ids stand in.
+ */
+export function notationDice(dice: readonly ForcedDie[] | undefined, words?: DieWords): string[] {
+  return (dice ?? []).map(die => dieLabel(die, words));
+}
+
+/** The labels of the dice one slot's choice carries; none for a pass and for a choice without dice. */
+export function notationSlotDice(choice: BranchSlotChoice | null | undefined, words?: DieWords): string[] {
+  return notationDice(choice?.dice, words);
 }
 
 /** One side's notation for a history entry — slots joined, raw fallback. */
