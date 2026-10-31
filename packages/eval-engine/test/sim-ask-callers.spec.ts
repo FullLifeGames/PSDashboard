@@ -54,8 +54,12 @@ describe('the callers of the simulator', () => {
 
   test('the dice of a question come from FixedDice; the other PRNG classes are the search\'s scripts', () => {
     // Round 73 (T232): branch/logged-rolls.ts serves a branch's first turn the draws its log made, a script like the search's.
+    // Round 82 (forced dice): dice/prng.ts answers a turn's dice the way logged-rolls.ts does, a script that stands over the
+    // battle's own stream and asks the simulator nothing (it is a script; the learners replay a turn on a copy through it).
+    // The one question the module puts to a Dex handler, status-probe.ts, plays on a copy with FixedDice.
     expect(filesWith(/\bextends (?:PRNG|BattlePRNG)\b/)).toEqual([
       'eval-engine:branch/logged-rolls.ts',
+      'eval-engine:dice/prng.ts',
       'eval-engine:forward/scripted-prng.ts',
       'eval-engine:pair/prng.ts',
     ]);
