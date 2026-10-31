@@ -11,7 +11,7 @@ One random draw of the simulator: an accuracy check, a critical hit, a damage ro
 _Avoid_: roll (outside "damage roll"), RNG call
 
 **Damage roll**:
-The die that sets a hit's damage to one of 16 steps between 85 and 100 percent.
+The die that sets a hit's damage to one step between 85 and 100 percent: 16 steps from Gen 3 on, 39 in Gens 1 and 2.
 _Avoid_: roll
 
 **Logged dice**:
