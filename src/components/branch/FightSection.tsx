@@ -6,6 +6,7 @@ import type { SpreadTargetDamage } from '../../lib/branch-damage';
 import type { Gimmick } from '../../hooks/useSideControlsState';
 import { ComboBox } from '../ComboBox';
 import { MoveBtn } from './ChoiceButtons';
+import { SlotDice, type SlotDiceProps } from './DiceChips';
 import { moveChoiceFor, pickedChoice, type ChoiceContext } from './choice-context';
 import type { PlayedPick } from './SideControls';
 import { toId } from '@fulllifegames/replay-core';
@@ -31,6 +32,8 @@ export interface FightSectionProps {
   targetDamageResults: Record<string, DamageResult | undefined>;
   advanced: boolean;
   played?: PlayedPick | null;
+  /** The chips of the slot's chosen move (Advanced, round 82); absent where the panel has no battle to ask. */
+  dice?: Omit<SlotDiceProps, 'label'>;
   gimmick: Gimmick;
   movePool: string[];
   whatIf: WhatIfState;
@@ -216,6 +219,7 @@ export function FightSection(props: FightSectionProps) {
         ctx={ctx}
         onChoice={onChoice}
       />
+      {advanced && props.dice && <SlotDice {...props.dice} label={label} />}
       {advanced && (
       <div className="ps-custom-choice">
         <ChoicePicker label={label} moves={moves} switches={switches} blockedSwitchKeys={blockedSwitchKeys} onPick={onPickChoice} />

@@ -9,6 +9,8 @@ import { computePreviewDamage, EMPTY_SIDE_DAMAGE, type DamagePreviewInputs, type
 import { SideControls, type PlayedPick } from './branch/SideControls';
 import { useGimmickToggles, type Gimmick } from '../hooks/useSideControlsState';
 import { ExecuteRow, PickerSourceLine, RawLogToggle } from './branch/PanelStatus';
+import { TurnDice } from './branch/DiceChips';
+import { useDiceViews, type DiceViews } from '../hooks/useDiceView';
 
 export type { PlayedPick } from './branch/SideControls';
 
@@ -195,6 +197,7 @@ interface SideColumnProps {
   /** The other side has to replace a Pokémon and this side has nothing to choose until it has (round 77, B5). */
   waitingFor: 'P1' | 'P2' | null;
   gimmickFor: (side: 'p1' | 'p2', slot: number) => Gimmick;
+  diceViews: DiceViews;
   onSetChoice: Props['onSetChoice'];
   onHypotheticalMove: Props['onHypotheticalMove'];
 }
@@ -212,7 +215,7 @@ function slotIdentity(side: 'p1' | 'p2', slot: number, activeSlots: (SimPokemonI
 
 /** The choice part of one slot's controls: options, pending state, gimmicks, damage. */
 function slotChoiceProps(props: SideColumnProps, slot: number) {
-  const { side, simState, movesBySlot, switchesBySlot, requiredChoices, damage, gimmickFor } = props;
+  const { side, simState, movesBySlot, switchesBySlot, requiredChoices, damage, gimmickFor, diceViews } = props;
   const forceSwitches = side === 'p1' ? simState.p1ForceSwitches : simState.p2ForceSwitches;
   const choices = side === 'p1' ? simState.p1Choices : simState.p2Choices;
   const modifiersBySlot = side === 'p1' ? simState.p1ModifiersBySlot : simState.p2ModifiersBySlot;
@@ -227,6 +230,7 @@ function slotChoiceProps(props: SideColumnProps, slot: number) {
     dmgResults: damage.default[slot] ?? [],
     spreadDamageResults: damage.spread[slot] ?? {},
     targetDamageResults: damage.targets[slot] ?? {},
+    dice: diceViews.slot(side, slot),
   };
 }
 
@@ -301,12 +305,13 @@ function panelFlags(simState: BranchSimState, p1ActiveSlots: (SimPokemonInfo | n
 export function BranchPanel({ simState, stale, source, acquiringExact, executeError, executing, gen, onSetChoice, onHypotheticalMove, onExecuteTurn, played, positionKey, getBattle }: Props) {
   const { advanced, toggleAdvanced } = useAdvancedToggle();
   const { slots, gimmickFor, damageBySide } = usePanelPreview(simState, gen, positionKey, getBattle);
+  const diceViews = useDiceViews({ advanced, stale, simState, getBattle, onSetChoice });
   const { p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, p1SwitchesBySlot, p2SwitchesBySlot } = slots;
 
   if (!simState) return null;
 
   const { isForceSwitch, p1RequiredChoices, p2RequiredChoices, bothChosen, pendingLabel, p1Waits, p2Waits } = panelFlags(simState, p1ActiveSlots, p2ActiveSlots);
-  const columnProps = { simState, gen, advanced, gimmickFor, onSetChoice, onHypotheticalMove };
+  const columnProps = { simState, gen, advanced, gimmickFor, diceViews, onSetChoice, onHypotheticalMove };
 
   return (
     <div inert={stale} aria-busy={stale || undefined}>
@@ -342,6 +347,7 @@ export function BranchPanel({ simState, stale, source, acquiringExact, executeEr
               {...columnProps}
             />
           </div>
+          {advanced && diceViews.turn && <TurnDice {...diceViews.turn} />}
           <ExecuteRow
             executeError={executeError}
             isForceSwitch={isForceSwitch}

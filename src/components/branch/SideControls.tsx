@@ -8,7 +8,7 @@ import type { SpreadTargetDamage } from '../../lib/branch-damage';
 import { useMovePool, type Gimmick } from '../../hooks/useSideControlsState';
 import { SwitchBtn } from './ChoiceButtons';
 import { displayName } from '../../lib/branch-history';
-import { FightSection, type WhatIfState } from './FightSection';
+import { FightSection, type FightSectionProps, type WhatIfState } from './FightSection';
 import { toId } from '@fulllifegames/replay-core';
 
 /** What the viewed line actually played at this position (badge on the
@@ -40,6 +40,8 @@ export interface SideControlsProps {
   /** Shows the power tools (free choice dropdown, "What if it had…"). */
   advanced: boolean;
   played?: PlayedPick | null;
+  /** The chips of the chosen move (round 82, forced dice). */
+  dice?: FightSectionProps['dice'];
   onChoice: (choice: BranchSlotChoice) => void;
   onHypotheticalMove: (params: { species: string; move: string; replace: string | null }) => void;
 }
