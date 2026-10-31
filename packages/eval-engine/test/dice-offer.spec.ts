@@ -6,7 +6,7 @@ import { RecordingPRNG } from '../src/dice/prng';
 import { dieKey, type DieResult, type ForcedDie } from '../src/dice/types';
 import { watchBattle } from '../src/dice/watch';
 import { copyOf } from '../src/sim-ask/copy';
-import { playClicks, type Mode, type Rules } from './dice-fixtures';
+import { playClicks, standing, type Mode, type Rules } from './dice-fixtures';
 import {
   clicksAccepted, dexOfRules, forcedOn, isCharge, newTally, outfitBoard, picksOne, SWEEP_CASES, sweepBoard, sweepClicks, sweepMoves, type DexMove, type Tally,
 } from './dice-sweep-support';
@@ -61,7 +61,9 @@ function exercise(rules: Rules, mode: Mode, move: DexMove, tally: Tally): string
     clicks = sweepClicks(mode, move.target, true);
   }
   if (!clicksAccepted(board, clicks) || move.flags.futuremove) return [];
+  const before = standing(board);
   const offers = offeredDice(board, 'p1a', choiceOf(move, mode));
+  expect(standing(board), `${move.id} offer leaves the battle as it was`).toBe(before);
   tally.cases++;
   const problems: string[] = [];
   // every die the natural turn draws is offered

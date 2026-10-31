@@ -1,6 +1,6 @@
 import type { Battle, PokemonSet } from '@pkmn/sim';
 import { set } from './move-oracle';
-import { battleOf } from './power-oracle';
+import { battleOf, fingerprint } from './power-oracle';
 
 /**
  * Round 82 (forced dice): the boards the dice specs share. One scene is a small turn in every rule set the corpus plays
@@ -101,4 +101,14 @@ export const GRID_SCENES: Scene[] = [
  */
 export function sweepSelection<T>(items: readonly T[], sweep?: string): T[] {
   return sweep === undefined ? [...items] : [...items];
+}
+
+/**
+ * Round 82 (forced dice), step A4: everything a question to the simulator could leave behind on the battle it reads (AGENTS.md:
+ * a stand-in that calls a Dex handler proves the live battle unchanged). `fingerprint` of `power-oracle.ts` over every body
+ * of both sides, plus the turn, the start-of-turn roll, the queue and the move in flight.
+ */
+export function standing(battle: Battle): string {
+  const state = battle as unknown as { turn: number; quickClawRoll?: boolean; queue: { list: unknown[] }; activeMove: { id: string } | null };
+  return `${fingerprint(battle, battle.sides.flatMap(side => side.pokemon), 'tackle')}|${state.turn}|${state.quickClawRoll}|${state.queue.list.length}|${state.activeMove?.id ?? ''}`;
 }
