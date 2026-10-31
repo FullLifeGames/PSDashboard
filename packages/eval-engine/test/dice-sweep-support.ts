@@ -28,11 +28,11 @@ const FOE_REACHING = new Set(['normal', 'any', 'adjacentFoe', 'allAdjacentFoes',
 const NEEDS_AIM = new Set(['normal', 'any', 'adjacentFoe']);
 
 /** Every move a rule set plays (the probe's filter: no Z or Max moves, past moves stay) that the sweep's predicate keeps and a foe can be the target of. */
-export function sweepMoves(rules: Rules, keep: (move: DexMove) => boolean): { moves: DexMove[]; skipped: number } {
+export function sweepMoves(rules: Rules, keep: (move: DexMove) => boolean, foesOnly = true): { moves: DexMove[]; skipped: number } {
   const dex = dexOfRules(rules);
   const all = dex.moves.all().filter(move => move.exists && !move.isZ && !move.isMax && move.gen <= dex.gen
     && (move.isNonstandard === null || move.isNonstandard === undefined || move.isNonstandard === 'Past') && keep(move));
-  const reaching = all.filter(move => FOE_REACHING.has(move.target));
+  const reaching = foesOnly ? all.filter(move => FOE_REACHING.has(move.target)) : all;
   return { moves: sweepSelection(reaching, 'moves'), skipped: all.length - reaching.length };
 }
 
