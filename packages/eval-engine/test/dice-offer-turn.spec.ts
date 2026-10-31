@@ -4,7 +4,7 @@ import { loadSimMods } from '../src/forward/sim-mods';
 import { offeredDice, offeredEndDice, type DieOffer } from '../src/dice/offer';
 import { dieKey, type ForcedDie } from '../src/dice/types';
 import { chanceOfEffect, EFFECT_SPORE, END_ROWS, endBoard, hitDie, PROCS, present, procBoard, type Proc } from './dice-ability-support';
-import { mon, PIKACHU, playClicks, SNORLAX, standing, type Mode } from './dice-fixtures';
+import { mon, PIKACHU, playClicks, SNORLAX, standing, sweepSelection, type Mode } from './dice-fixtures';
 import { forcedOn, outfitBoard, SWEEP_CASES, sweepBoard, sweepClicks, sweepMoves } from './dice-sweep-support';
 import { battleOf } from './power-oracle';
 import { copyOf } from '../src/sim-ask/copy';
@@ -23,7 +23,7 @@ const choiceOf = (moveId: string, target: string, mode: Mode) => ({
 const keysOf = (offers: DieOffer[], ...kinds: string[]): string[] => offers.filter(offer => kinds.includes(offer.name.kind)).map(offer => dieKey(offer.name)).sort();
 
 describe.each(SWEEP_CASES)('the offered procs: $name', ({ rules, mode }) => {
-  const procs: Proc[] = [...PROCS, EFFECT_SPORE].filter(proc => present(rules, proc.kind, proc.id));
+  const procs: Proc[] = sweepSelection([...PROCS, EFFECT_SPORE].filter(proc => present(rules, proc.kind, proc.id)), 'rows');
 
   test.each(procs.map(proc => [proc.id, proc] as const))('%s is offered with the simulator\'s chance, and each answer is drawn', (_id, proc) => {
     const board = procBoard(rules, mode, proc);
@@ -57,7 +57,7 @@ describe.each(SWEEP_CASES)('the offered procs: $name', ({ rules, mode }) => {
   test('a board with no proc offers none, and a move that makes no contact reaches no contact handler', () => {
     const bare = sweepBoard(rules, 'tackle', mode);
     expect(keysOf(offeredDice(bare, 'p1a', choiceOf('tackle', 'normal', mode)), 'ability-proc', 'item-proc')).toEqual([]);
-    const contact = PROCS.filter(proc => proc.id !== 'cursedbody' && proc.id !== 'toxicchain' && proc.id !== 'focusband' && present(rules, proc.kind, proc.id));
+    const contact = sweepSelection(PROCS.filter(proc => proc.id !== 'cursedbody' && proc.id !== 'toxicchain' && proc.id !== 'focusband' && present(rules, proc.kind, proc.id)), 'rows');
     for (const proc of contact) {
       const holder = proc.holder === 'user' ? { ability: procBoard(rules, mode, proc).sides[0].active[0]!.ability } : {};
       const foe = proc.holder === 'target' ? { ability: procBoard(rules, mode, proc).sides[1].active[0]!.ability } : {};
@@ -68,7 +68,7 @@ describe.each(SWEEP_CASES)('the offered procs: $name', ({ rules, mode }) => {
 });
 
 describe.each(SWEEP_CASES)('the offered end-of-turn dice: $name', ({ rules, mode }) => {
-  const rows = END_ROWS.filter(row => (row.kind === 'condition' || present(rules, 'abilities', row.id)) && (!row.doubles || mode === 'doubles') && (!row.only || row.only(rules)));
+  const rows = sweepSelection(END_ROWS.filter(row => (row.kind === 'condition' || present(rules, 'abilities', row.id)) && (!row.doubles || mode === 'doubles') && (!row.only || row.only(rules))), 'rows');
   const clicks = sweepClicks(mode, 'self');
   const play = (battle: Parameters<typeof playClicks>[0]) => playClicks(battle, clicks);
 

@@ -72,7 +72,7 @@ describe.each(SWEEP_CASES)('the speed tie: $name', ({ rules, mode, name }) => {
     const slots = SLOTS[mode];
     const wanted = [...slots].reverse();
     const dice = PAIRS(slots).map(([a, b]) => tieDie(a, b, wanted.indexOf(a) < wanted.indexOf(b) ? a : b));
-    for (const seed of SEEDS) {
+    for (const seed of sweepSelection(SEEDS, 'seeds')) {
       const { report, battle, start } = forcedOn(tieBoard(rules, mode, seed), tieClicks(mode), dice);
       expect(moveOrder(battle, start), seed).toEqual(wanted);
       expect(report.forced.map(shown => shown.took), `${seed}: ${report.forced.map(why).join(' / ')}`).toEqual(dice.map(() => 'applied'));
@@ -86,7 +86,7 @@ describe.each(SWEEP_CASES)('the speed tie: $name', ({ rules, mode, name }) => {
       const body = battle.sides[slot[1] === '1' ? 0 : 1].active[slot[2] === 'a' ? 0 : 1];
       return body.maxhp - body.hp;
     };
-    for (const seed of SEEDS) {
+    for (const seed of sweepSelection(SEEDS, 'seeds')) {
       const board = tieBoard(rules, mode, seed);
       const clicks = tieClicks(mode);
       const plain = copyOf(board);
@@ -194,7 +194,7 @@ describe.each(RULES.filter(rules => rules.generation === 2 || rules.generation =
     const attacker = mon(rules, { species: 'Snorlax', moves: ['megakick'], gender: 'M' });
     const foe = mon(rules, PIKACHU(['splash']));
     let compared = 0;
-    for (const seed of SEED_POOL) {
+    for (const seed of sweepSelection(SEED_POOL, 'pool')) {
       const board = mode === 'singles'
         ? battleOf(rules.singles, [attacker], [foe], seed)
         : battleOf(rules.doubles!, [attacker, mon(rules, { species: 'Blissey', moves: ['splash'] })], [foe, mon(rules, { species: 'Chansey', moves: ['splash'] })], seed);

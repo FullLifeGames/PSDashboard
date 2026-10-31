@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import type { Battle } from '@pkmn/sim';
 import { loadSimMods } from '../src/forward/sim-mods';
 import { genShape } from '../src/dice/recognize';
-import { seedOf, type Mode, type Rules } from './dice-fixtures';
+import { seedOf, sweepSelection, type Mode, type Rules } from './dice-fixtures';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 import {
@@ -51,13 +51,13 @@ function checkRoll(rules: Rules, mode: Mode, scene: { move: string; target: stri
 }
 
 describe.each(SWEEP_CASES)('the roll sweep: $name', ({ rules, mode }) => {
-  test.each(SCENES.flatMap(scene => sweepTargets(mode, scene.target).map(slot => ({ ...scene, slot, label: `${scene.id} on ${slot}` }))))('$label', ({ move, target, slot }) => {
+  test.each(sweepSelection(SCENES.flatMap(scene => sweepTargets(mode, scene.target).map(slot => ({ ...scene, slot, label: `${scene.id} on ${slot}` }))), 'rows'))('$label', ({ move, target, slot }) => {
     checkRoll(rules, mode, { move, target }, slot, false);
   });
 });
 
 describe.each(VGC_RULES.map(rules => ({ rules, name: `${rules.name} VGC` })))('the roll sweep, a team of six: $name', ({ rules }) => {
-  test.each(SCENES.flatMap(scene => sweepTargets('doubles', scene.target).map(slot => ({ ...scene, slot, label: `${scene.id} on ${slot}` }))))('$label', ({ move, target, slot }) => {
+  test.each(sweepSelection(SCENES.flatMap(scene => sweepTargets('doubles', scene.target).map(slot => ({ ...scene, slot, label: `${scene.id} on ${slot}` }))), 'rows'))('$label', ({ move, target, slot }) => {
     checkRoll(rules, 'doubles', { move, target }, slot, true);
   });
 });
@@ -104,7 +104,7 @@ describe.each(SWEEP_CASES.filter(entry => entry.rules.generation >= 3))('the con
 describe.each(SWEEP_CASES.filter(entry => entry.rules.generation <= 2))('no confusion roll before Gen 3: $name', ({ rules }) => {
   test('the self-hit of Gens 1 and 2 draws no damage roll: a forced die of it is no draw', () => {
     const outfit = { level: rules.level, gender: rules.generation >= 2 ? 'M' as const : '' as const };
-    for (const seed of SEEDS) {
+    for (const seed of sweepSelection(SEEDS, 'seeds')) {
       const board = battleOf(rules.singles, [set('Snorlax', ['tackle'], outfit)], [set('Vaporeon', ['splash'], outfit)], seed);
       board.sides[0].active[0].addVolatile('confusion');
       const name = { slot: 'p1a', moveId: 'tackle', targetSlot: 'p1a', kind: 'damage-roll' as const, effectId: 'confusion' };

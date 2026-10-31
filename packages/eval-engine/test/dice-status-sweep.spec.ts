@@ -77,7 +77,7 @@ function exercise(rules: Rules, mode: Mode, check: Check, moveId: string, tally:
   if (!move.exists || move.gen > dex.gen) return [];
   const problems: string[] = [];
   const clicks = sweepClicks(mode, move.target);
-  for (const seed of SEEDS) {
+  for (const seed of sweepSelection(SEEDS, 'seeds')) {
     const board = sweepBoard(rules, moveId, mode, seed);
     check.start(board);
     const defrosts = check.id === 'frz' && !!move.flags.defrost;

@@ -7,7 +7,7 @@ import { genShape } from '../src/dice/recognize';
 import { copyOf } from '../src/sim-ask/copy';
 import { CLASSES } from './dice-census-support';
 import { END_IDS, END_ROWS, endBoard, present } from './dice-ability-support';
-import { playClicks } from './dice-fixtures';
+import { playClicks, sweepSelection } from './dice-fixtures';
 import { critsOf, dexOfRules, forcedOn, missesOf, monOf, newTally, SWEEP_CASES, sweepBoard, sweepClicks, sweepMoves, turnLines } from './dice-sweep-support';
 
 // Round 82 (forced dice), lane A4: the dice of the end of the turn. The simulator runs the Residual event of every body after
@@ -32,11 +32,12 @@ const dieOf = (id: string, happens: boolean, targetSlot?: string): ForcedDie => 
 
 describe.each(SWEEP_CASES)('the end of the turn: $name', ({ rules, mode, name }) => {
   const tally = newTally();
-  const rows = END_ROWS.filter(row => (row.kind === 'condition' || present(rules, 'abilities', row.id)) && (!row.doubles || mode === 'doubles') && (!row.only || row.only(rules)));
+  const rows = sweepSelection(END_ROWS.filter(row => (row.kind === 'condition' || present(rules, 'abilities', row.id)) && (!row.doubles || mode === 'doubles') && (!row.only || row.only(rules))), 'rows');
+  const seeds = sweepSelection(SEEDS, 'seeds');
   const clicks = sweepClicks(mode, 'self');
 
   describe.each(rows.map(row => [row.id, row] as const))('%s', (_id, row) => {
-    test.each(SEEDS.flatMap(seed => [true, false].map(happens => [seed, happens] as const)))('seed %s, forced %s', (seed, happens) => {
+    test.each(seeds.flatMap(seed => [true, false].map(happens => [seed, happens] as const)))('seed %s, forced %s', (seed, happens) => {
       const board = endBoard(rules, mode, row);
       board.prng.setSeed(seed as PRNGSeed);
       const { report, battle, start } = forcedOn(board, clicks, [dieOf(row.id, happens, row.targetSlot)]);
@@ -64,7 +65,7 @@ describe.each(SWEEP_CASES)('the end of the turn: $name', ({ rules, mode, name })
 
   test('the sweep was exercised', () => {
     summaries.push(`${name}: ${rows.length} rows ${JSON.stringify({ ...tally, bad: undefined, unexercised: undefined })}`);
-    expect(tally.cases).toBe(rows.length * SEEDS.length * 2);
+    expect(tally.cases).toBe(rows.length * seeds.length * 2);
   });
 });
 
@@ -99,7 +100,7 @@ describe.each(SWEEP_CASES)('the future moves: $name', ({ rules, mode, name }) =>
     test('the turn it lands: accuracy, crit and the damage roll are dice of that turn', () => {
       const turn = landing();
       expect(turn, 'a future move lands after its use').toBeGreaterThan(1);
-      for (const seed of SEEDS) {
+      for (const seed of sweepSelection(SEEDS, 'seeds')) {
         for (const happens of [true, false]) {
           const board = sweepBoard(rules, move.id, mode);
           board.prng.setSeed(seed as PRNGSeed);

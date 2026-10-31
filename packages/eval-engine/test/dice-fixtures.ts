@@ -96,11 +96,24 @@ export const GRID_SCENES: Scene[] = [
 ];
 
 /**
- * The choice of moves (or cases) a sweep plays. Today every one; the cost of the sweeps in CI is open with the user, and the
- * integrator wires the answer into this one function: every sweep file takes its list through it (`sweepMoves` calls it).
+ * Round 82 (gate answer 1b): the full sweeps (every move, every row, every seed) run only with `DICE_SWEEPS=full`, which the
+ * final suite of a round and the upgrade check of the simulator set. Any other run plays the same small sample of each list.
+ */
+export const SWEEPS_FULL = process.env.DICE_SWEEPS === 'full';
+
+/** How many of a list each sweep plays without `DICE_SWEEPS=full`: a handful of moves, a few rows, two seeds, and 40 of a pool of seeds that a spec searches. */
+const SAMPLE_SIZE: Record<string, number> = { moves: 6, rows: 4, seeds: 2, pool: 40 };
+
+/**
+ * The choice of moves (or rows, or seeds) a sweep plays: every sweep file takes its list through this one function (`sweepMoves`
+ * calls it for the moves). A `sweep` name picks the sample size; a call without one gives the whole list (the census checks
+ * read the lists whole). The sample is spread evenly over the list in its own order, so it is the same on every run and in
+ * every CI job, and a list that is short already stays whole.
  */
 export function sweepSelection<T>(items: readonly T[], sweep?: string): T[] {
-  return sweep === undefined ? [...items] : [...items];
+  const size = SAMPLE_SIZE[sweep ?? ''];
+  if (SWEEPS_FULL || size === undefined || items.length <= size) return [...items];
+  return Array.from({ length: size }, (_, index) => items[Math.floor(((index + 0.5) * items.length) / size)]);
 }
 
 /**

@@ -32,13 +32,14 @@ const kindOf = (proc: Proc): 'ability-proc' | 'item-proc' => (proc.kind === 'abi
 
 describe.each(SWEEP_CASES)('the procs: $name', ({ rules, mode, name }) => {
   const tally = newTally();
-  const procs = PROCS.filter(proc => present(rules, proc.kind, proc.id));
+  const procs = sweepSelection(PROCS.filter(proc => present(rules, proc.kind, proc.id)), 'rows');
+  const seeds = sweepSelection(SEEDS, 'seeds');
 
   describe.each(procs.map(proc => [proc.id, proc] as const))('%s', (_id, proc) => {
     const label = labelOf(rules, proc.kind, proc.id);
     const clicks = sweepClicks(mode, 'normal');
 
-    test.each(SEEDS.flatMap(seed => [true, false].map(happens => [seed, happens] as const)))('seed %s, forced %s', (seed, happens) => {
+    test.each(seeds.flatMap(seed => [true, false].map(happens => [seed, happens] as const)))('seed %s, forced %s', (seed, happens) => {
       const board = procBoard(rules, mode, proc);
       board.prng.setSeed(seed as PRNGSeed);
       const { report, battle, start } = forcedOn(board, clicks, [hitDie(proc.move), procDie(proc, kindOf(proc), happens)]);
@@ -77,7 +78,7 @@ describe.each(SWEEP_CASES)('the procs: $name', ({ rules, mode, name }) => {
 
   test('the sweep was exercised', () => {
     summaries.push(`${name}: ${procs.length} procs ${JSON.stringify({ ...tally, bad: undefined, unexercised: undefined })}`);
-    expect(tally.cases).toBe(procs.length * SEEDS.length * 2);
+    expect(tally.cases).toBe(procs.length * seeds.length * 2);
   });
 });
 
