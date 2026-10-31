@@ -1,6 +1,6 @@
 import type { Battle } from '@pkmn/sim';
 import type { DieName, Draw, SecondaryEntry } from './types.ts';
-import type { BattleWatch } from './watch.ts';
+import type { AllyList, BattleWatch } from './watch.ts';
 
 /**
  * Round 82 (forced dice), decision D3: which draw is which die. `recognize` maps one draw of the simulator's PRNG to the name
@@ -111,7 +111,7 @@ function isCritDraw(draw: Draw, shape: GenShape, watch: BattleWatch): boolean {
  */
 export function recognize(draw: Draw, watch: BattleWatch, gen: number): DieName | null {
   const { battle, armed } = watch;
-  const first = firstMoverDie(draw, battle);
+  const first = firstMoverDie(draw, battle) ?? endOfTurnDie(draw, watch);
   if (first) return first;
   const move = battle.activeMove;
   const user = battle.activePokemon;
@@ -237,6 +237,33 @@ function firstMoverDie(draw: Draw, battle: Battle): DieName | null {
   const slot = event.target?.getSlot?.();
   return slot === undefined ? null : { slot, moveId: '', kind: 'move-first', effectId: effect.id };
 }
+
+/**
+ * Round 82, step A4: a chance a handler draws under `Residual`, the end of the turn (Shed Skin, Harvest, Healer, the Gen 2 thaw).
+ * No move is in flight; the holder is the event's target. A handler that asked for the holder's allies (Healer) draws once for
+ * each ally that has a status, and the die names that ally: the watch gives the allies in order.
+ */
+function endOfTurnDie(draw: Draw, watch: BattleWatch): DieName | null {
+  const { battle } = watch;
+  const event = battle.event as { id?: string; target?: { getSlot?: () => string } } | undefined;
+  const effect = battle.effect as { id?: string; effectType?: string } | undefined;
+  const slot = event?.target?.getSlot?.();
+  if (draw.call !== 'chance' || event?.id !== 'Residual' || !effect?.id || !slot) return null;
+  if (!RESIDUAL_EFFECTS.has(effect.effectType ?? '')) return null;
+  const name: DieName = { slot, moveId: '', kind: 'end-of-turn', effectId: effect.id };
+  const ally = nextAlly(watch.allies, event.target, effect.id);
+  return ally ? { ...name, targetSlot: ally.getSlot() } : name;
+}
+
+/** The next ally with a status that a handler looping over its holder's allies is drawing for. */
+function nextAlly(allies: AllyList | null, holder: unknown, effectId: string): { getSlot(): string } | undefined {
+  if (!allies || allies.holder !== holder || allies.effectId !== effectId) return undefined;
+  allies.pending ??= allies.allies.filter(ally => ally.status);
+  return allies.pending[allies.used++];
+}
+
+/** The kinds of effect that hold a Residual handler of a body. */
+const RESIDUAL_EFFECTS = new Set(['Ability', 'Item', 'Condition', 'Status']);
 
 /**
  * A draw inside a condition's `BeforeMove` handler (the confusion self-hit rolls its own damage) belongs to the condition,

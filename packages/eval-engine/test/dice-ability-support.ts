@@ -89,3 +89,60 @@ export function chanceOfEffect(board: Battle, clicks: { p1: string; p2: string }
   play(battle, clicks);
   return seen;
 }
+
+/**
+ * One die of the end of the turn: a holder (and, for Healer, the ally it cures) whose handler draws at the Residual event.
+ * `setup` puts the position the handler needs (a status to shed, a berry to harvest); `witness` is the protocol line that shows
+ * the effect, read from the Dex's own name or the status word, never from the module.
+ */
+export interface EndRow {
+  id: string;
+  kind: 'abilities' | 'condition';
+  /** The slot the die names after the holder; an ally's slot for Healer. */
+  targetSlot?: string;
+  /** Needs a partner on the field. */
+  doubles?: boolean;
+  /** Applies to the rule sets whose generation passes this test, beyond the Dex's own entry. */
+  only?: (rules: Rules) => boolean;
+  setup(board: Battle): void;
+  /** The line that shows the effect in the turn's lines. */
+  witness(rules: Rules): RegExp;
+}
+
+const escape = (text: string): string => text.replace(/\W/g, character => `\\${character}`);
+
+export const END_ROWS: EndRow[] = [
+  {
+    id: 'shedskin', kind: 'abilities', setup: board => void monOf(board, 'p1a').setStatus('brn'),
+    witness: rules => new RegExp(`^\\|-activate\\|p1a: [^|]*\\|${escape(labelOf(rules, 'abilities', 'shedskin'))}`),
+  },
+  {
+    id: 'harvest', kind: 'abilities',
+    setup: board => {
+      const body = monOf(board, 'p1a');
+      body.item = '';
+      body.lastItem = 'oranberry';
+    },
+    witness: rules => new RegExp(`^\\|-item\\|p1a: [^|]*\\|[^|]*\\|\\[from\\] ${escape(labelOf(rules, 'abilities', 'harvest'))}`),
+  },
+  {
+    id: 'healer', kind: 'abilities', targetSlot: 'p1b', doubles: true, setup: board => void monOf(board, 'p1b').setStatus('par'),
+    witness: rules => new RegExp(`^\\|-activate\\|p1a: [^|]*\\|${escape(labelOf(rules, 'abilities', 'healer'))}`),
+  },
+  // Gen 2 thaws a frozen body at the end of the turn (a draw of the condition); later generations draw it before the body moves
+  {
+    id: 'frz', kind: 'condition', only: rules => rules.generation === 2, setup: board => void monOf(board, 'p1a').setStatus('frz'),
+    witness: () => /^\|-curestatus\|p1a: [^|]*\|frz/,
+  },
+];
+
+/** Snorlax splashes; its outfit and the position come from the row. */
+export function endBoard(rules: Rules, mode: Mode, row: EndRow): Battle {
+  const outfit = row.kind === 'abilities' ? { ability: nameOf(rules, 'abilities', row.id) } : {};
+  const board = outfitBoard(rules, mode, { species: 'Snorlax', moves: ['splash'], ...outfit }, { species: 'Vaporeon' });
+  row.setup(board);
+  return board;
+}
+
+/** The ids of the dice of the end of the turn the rows play: the census holds this list to the simulator's handlers. */
+export const END_IDS: string[] = END_ROWS.map(row => row.id);

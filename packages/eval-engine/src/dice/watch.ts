@@ -42,8 +42,24 @@ export interface MoveSight {
   removedFor: string[];
 }
 
+/**
+ * The allies a handler asked for with `adjacentAllies()` under the effect that was running (Healer loops over them and draws once
+ * for each one that has a status). The end-of-turn die of such a handler is named by the ally it is about: the first draw takes the
+ * first ally with a status, the next draw the next one.
+ */
+export interface AllyList {
+  holder: unknown;
+  effectId: string | undefined;
+  allies: readonly { getSlot(): string; status: string }[];
+  /** The allies with a status when the first draw came, in order. */
+  pending: readonly { getSlot(): string }[] | null;
+  used: number;
+}
+
 export interface BattleWatch {
   readonly battle: Battle;
+  /** The allies of the last `adjacentAllies()` call, or null. */
+  allies: AllyList | null;
   /** One entry per move id that dealt damage or met the secondary hook in the watched turn. */
   readonly moves: Map<string, MoveSight>;
   /** The secondary entries still to be drawn for the target of the last `ModifySecondaries`, or null. */
@@ -94,6 +110,7 @@ export function watchBattle(battle: Battle): BattleWatch {
     battle,
     moves: new Map<string, MoveSight>(),
     secondaries: null,
+    allies: null,
     taken: new WeakSet<object>(),
     armed: null,
     scopes,
@@ -146,5 +163,17 @@ export function watchBattle(battle: Battle): BattleWatch {
   wrap(battle, 'randomizer', scoped('randomizer'));
   const actions = (battle as unknown as { actions: object }).actions;
   for (const name of ACTION_SCOPES) wrap(actions, name, scoped(name));
+  watchAllies(watch, wrap);
   return watch;
+}
+
+/** A handler that looks at the holder's allies (Healer) draws once for each: the watch remembers what it was given and under which effect. */
+function watchAllies(watch: BattleWatch, wrap: (owner: object, name: string, make: (original: AnyFn) => AnyFn) => void): void {
+  for (const body of watch.battle.sides.flatMap(side => side.pokemon)) {
+    wrap(body, 'adjacentAllies', original => function (this: unknown, ...args: unknown[]) {
+      const allies = original.apply(this, args) as AllyList['allies'];
+      watch.allies = { holder: this, effectId: (watch.battle.effect as { id?: string } | undefined)?.id, allies, pending: null, used: 0 };
+      return allies;
+    });
+  }
 }
