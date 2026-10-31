@@ -17,6 +17,18 @@ export const PKMN_EXACT = ['@pkmn/sim', '@pkmn/mods'];
 export const PKMN_TRAIN = ['@pkmn/dex', '@pkmn/data'];
 const SECTIONS = ['dependencies', 'devDependencies', 'peerDependencies'];
 
+/** The checks a new simulator needs before it ships, as the script prints them after the upgrade. */
+export function upgradeChecks(version) {
+  return [
+    '',
+    `The @pkmn train stands at ${version}. Before a new simulator ships:`,
+    '- T103 (docs/backlog.md): harden the speed layer for it (hash gate, census over Gen 1 to 9).',
+    '- npx vitest run --project eval-engine, also with EVAL_SIM_FAST=0 and EVAL_SIM_FAST=1 (the CI modes).',
+    '- the full dice sweeps (a plain run plays a sample of them): DICE_SWEEPS=full npx vitest run --project eval-engine packages/eval-engine/test/dice-',
+    '- the batch check of AGENTS.md: a new simulator can move every score, so a feedback run and the paired bank.',
+  ].join('\n');
+}
+
 /** The manifest with the train moved to `version`; the input stays as it is. */
 export function planPkmnUpgrade(manifest, version) {
   if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error(`upgrade-pkmn: ${version} is no plain release (x.y.z)`);
@@ -63,13 +75,7 @@ function main(argv) {
       return;
     }
   }
-  console.log([
-    '',
-    `The @pkmn train stands at ${version}. Before a new simulator ships:`,
-    '- T103 (docs/backlog.md): harden the speed layer for it (hash gate, census over Gen 1 to 9).',
-    '- npx vitest run --project eval-engine, also with EVAL_SIM_FAST=0 and EVAL_SIM_FAST=1 (the CI modes).',
-    '- the batch check of AGENTS.md: a new simulator can move every score, so a feedback run and the paired bank.',
-  ].join('\n'));
+  console.log(upgradeChecks(version));
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main(process.argv.slice(2));
