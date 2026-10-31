@@ -58,13 +58,17 @@ function MoveDamage({ dmg, spreadDamage }: { dmg?: DamageResult; spreadDamage?: 
 }
 
 /** The button names no target: the pressed target tile does, so a pick never resizes the button (T295). */
-function MoveBtnBody({ move, type, dmg, spreadDamage, zMoveName, wasPlayed, compact }: {
+const FORCED_TITLE = 'This move carries forced dice. Open Advanced to see them.';
+
+function MoveBtnBody({ move, type, dmg, spreadDamage, zMoveName, wasPlayed, forced, compact }: {
   move: BranchMoveOption;
   type: string;
   dmg?: DamageResult;
   spreadDamage?: SpreadTargetDamage[];
   zMoveName?: string | null;
   wasPlayed?: boolean;
+  /** The move is the slot's pick and carries forced dice (round 82). */
+  forced?: boolean;
   compact?: boolean;
 }) {
   const ppText = ppTextFor(move);
@@ -73,6 +77,8 @@ function MoveBtnBody({ move, type, dmg, spreadDamage, zMoveName, wasPlayed, comp
       <div className="ps-movebtn-name">{move.name}</div>
       {/* Advanced already names the played action in the header line. */}
       {compact && wasPlayed && <span className="ps-played-badge" title={PLAYED_TITLE}>played</span>}
+      {/* Advanced shows the dice as chips; Basic keeps them and says so. */}
+      {compact && forced && <span className="ps-forced-badge" title={FORCED_TITLE}>forced</span>}
       {zMoveName && (
         <div className="ps-movebtn-zmove">→ {zMoveName}</div>
       )}
@@ -164,6 +170,7 @@ export function MoveBtn({ move, dmg, spreadDamage, zMoveName, targetDamage, pend
           spreadDamage={spreadDamage}
           zMoveName={zMoveName}
           wasPlayed={wasPlayed}
+          forced={selected && (pendingMove?.dice?.length ?? 0) > 0}
           compact={compact}
         />
       </button>

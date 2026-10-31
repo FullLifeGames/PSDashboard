@@ -342,3 +342,22 @@ describe('BranchPanel damage roll select', () => {
     expect(top(second)).not.toBe(top(first));
   });
 });
+
+describe('BranchPanel Basic badge', () => {
+  const forcedCrit: ForcedDie = { name: { slot: 'p1a', moveId: 'airslash', targetSlot: 'p2a', kind: 'crit' }, result: { happens: true } };
+
+  test('Basic keeps the forced dice of a pick and marks that move "forced", Advanced shows chips instead', async () => {
+    const pick: BranchSlotChoice = { kind: 'move', moveId: 'airslash', moveName: 'Air Slash', dice: [forcedCrit] };
+    renderPanel(singles(), { advanced: false, first: { p1: [pick], p2: [] } });
+    const airSlash = await side('P1').findByRole('button', { name: /Air Slash/ });
+    expect(within(airSlash).getByText('forced')).toBeInTheDocument();
+    expect(within(side('P1').getByRole('button', { name: /Splash/ })).queryByText('forced')).toBeNull();
+  });
+
+  test('in doubles each slot marks its own move', async () => {
+    const pick: BranchSlotChoice = { kind: 'move', moveId: 'rockslide', moveName: 'Rock Slide', dice: [{ ...forcedCrit, name: { ...forcedCrit.name, moveId: 'rockslide', targetSlot: 'p2b' } }] };
+    renderPanel(doubles(), { advanced: false, first: { p1: [pick, { kind: 'move', moveId: 'splash', moveName: 'Splash' }], p2: [] } });
+    expect(within(await side('P1A').findByRole('button', { name: /Rock Slide/ })).getByText('forced')).toBeInTheDocument();
+    expect(within(side('P1B').getByRole('button', { name: /Splash/ })).queryByText('forced')).toBeNull();
+  });
+});

@@ -22,6 +22,22 @@ describe('MoveBtn', () => {
     expect(onClick).toHaveBeenCalledWith(undefined);
   });
 
+  test('the compact chip of a move that carries forced dice says "forced", the full button needs no badge', () => {
+    const move = moveOption('Air Slash', { type: 'Flying' });
+    const dice = [{ name: { slot: 'p1a', moveId: 'airslash', targetSlot: 'p2a', kind: 'crit' as const }, result: { happens: true } }];
+    const forced = { kind: 'move' as const, moveId: 'airslash', moveName: 'Air Slash', dice };
+    const { rerender } = render(<MoveBtn move={move} targetDamage={{}} pendingChoice={forced} compact onClick={vi.fn()} />);
+    expect(screen.getByText('forced')).toHaveAttribute('title', 'This move carries forced dice. Open Advanced to see them.');
+    rerender(<MoveBtn move={move} targetDamage={{}} pendingChoice={{ ...forced, dice: [] }} compact onClick={vi.fn()} />);
+    expect(screen.queryByText('forced')).toBeNull();
+    rerender(<MoveBtn move={move} targetDamage={{}} pendingChoice={{ kind: 'move', moveId: 'airslash', moveName: 'Air Slash' }} compact onClick={vi.fn()} />);
+    expect(screen.queryByText('forced')).toBeNull();
+    rerender(<MoveBtn move={moveOption('Splash')} targetDamage={{}} pendingChoice={forced} compact onClick={vi.fn()} />);
+    expect(screen.queryByText('forced')).toBeNull();
+    rerender(<MoveBtn move={move} targetDamage={{}} pendingChoice={forced} onClick={vi.fn()} />);
+    expect(screen.queryByText('forced')).toBeNull();
+  });
+
   test('the full button spells out type and damage, marks the pending move, and names its Z-Move', () => {
     const move = moveOption('Earthquake', { type: 'Ground' });
     const { rerender } = render(<MoveBtn move={move} dmg={damage('Earthquake', 30, 35, '25% chance to 3HKO')} targetDamage={{}} pendingChoice={null} onClick={vi.fn()} />);
