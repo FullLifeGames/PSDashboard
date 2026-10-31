@@ -4,8 +4,9 @@ import type { Battle } from '@pkmn/sim';
 import { loadSimMods } from '../src/forward/sim-mods';
 import type { DieReport, ForcedDie } from '../src/dice/types';
 import { copyOf } from '../src/sim-ask/copy';
-import { mon, playClicks, PIKACHU, sweepSelection, type Mode, type Rules } from './dice-fixtures';
-import { forcedOn, SWEEP_CASES } from './dice-sweep-support';
+import { mon, playClicks, PIKACHU, RULES, sweepSelection, type Mode, type Rules } from './dice-fixtures';
+import { dexOfRules, forcedOn, outfitBoard, SWEEP_CASES } from './dice-sweep-support';
+import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
 // Round 82 (forced dice), lane A3b: the order of the turn. Two dice decide who moves first inside one priority bracket: the
@@ -32,9 +33,12 @@ afterAll(() => {
 const why = (report: DieReport): string => `${report.took}: ${report.reason ?? 'no reason'}`;
 const slotOfIdent = (ident: string): string => ident.split(':')[0].trim();
 
-/** The slots of the bodies that used a move, in the order of the `|move|` lines (a move another move calls is no action). */
+/**
+ * The slots of the bodies that used a move, in the order of the `|move|` lines (a move another move calls is no action; Gen 4
+ * writes the move of a Quick Claw holder with `[from] item:`, which is the holder's own action).
+ */
 function moveOrder(battle: Battle, start: number): string[] {
-  return battle.log.slice(start).map(line => line.split('|')).filter(row => row[1] === 'move' && !row.some(field => field.startsWith('[from]'))).map(row => slotOfIdent(row[2]));
+  return battle.log.slice(start).map(line => line.split('|')).filter(row => row[1] === 'move' && !row.some(field => field.startsWith('[from]') && !field.startsWith('[from] item:'))).map(row => slotOfIdent(row[2]));
 }
 
 const SEEDS = Array.from({ length: 6 }, (_, index) => [1, 2, 3, 4].map(offset => (index + 1) * 11 + offset).join(','));
@@ -143,5 +147,127 @@ describe.each(SWEEP_CASES)('the speed tie: $name', ({ rules, mode, name }) => {
     summaries.push(`${name}: ${cases} forced ties, ${flipped} against the natural order`);
     expect(cases).toBeGreaterThan(0);
     expect(flipped).toBeGreaterThan(0);
+  });
+});
+
+// The first-mover die ---------------------------------------------------------------------------------------------------
+
+interface FirstMover { id: string; label: string; kind: 'items' | 'abilities'; outfit: { item?: string; ability?: string }; activate: RegExp }
+
+const FIRST_MOVERS: FirstMover[] = [
+  { id: 'quickclaw', label: 'Quick Claw', kind: 'items', outfit: { item: 'Quick Claw' }, activate: /^\|-activate\|p1a: [^|]*\|item: Quick Claw/ },
+  { id: 'quickdraw', label: 'Quick Draw', kind: 'abilities', outfit: { ability: 'Quick Draw' }, activate: /^\|-activate\|p1a: [^|]*\|ability: Quick Draw/ },
+];
+
+const exists = (rules: Rules, mover: FirstMover): boolean => {
+  const entry = dexOfRules(rules)[mover.kind].get(mover.id);
+  return entry.exists && entry.gen <= dexOfRules(rules).gen && !entry.isNonstandard;
+};
+
+const moverDie = (mover: FirstMover, happens: boolean): ForcedDie => ({ name: { slot: 'p1a', moveId: '', kind: 'move-first', effectId: mover.id }, result: { happens } });
+
+/** A slow holder (Snorlax) facing a fast body (Pikachu): both use a move of priority 0, the holder goes second unless its die lets it go first. */
+function moverBoard(rules: Rules, mode: Mode, mover: FirstMover, seed: string): Battle {
+  const outfit = { level: rules.level, ...(rules.evs ? { evs: rules.evs } : {}), item: mover.outfit.item ?? '', ability: mover.outfit.ability ?? 'No Ability' };
+  const holder = set('Snorlax', ['tackle'], { ...outfit, gender: 'M' });
+  const fast = mon(rules, PIKACHU(['tackle']));
+  if (mode === 'singles') return battleOf(rules.singles, [holder], [fast], seed);
+  return battleOf(
+    rules.doubles!, [holder, mon(rules, { species: 'Blissey', moves: ['splash'] })], [fast, mon(rules, { species: 'Chansey', moves: ['splash'] })], seed,
+  );
+}
+
+const moverClicks = (mode: Mode): { p1: string; p2: string } =>
+  mode === 'singles' ? { p1: 'move 1', p2: 'move 1' } : { p1: 'move 1 1, move 1', p2: 'move 1 1, move 1' };
+
+/** Whether the plain turn on this seed lets the holder go first by its die. */
+function naturalActivates(board: Battle, mover: FirstMover, rules: Rules): boolean {
+  const battle = copyOf(board);
+  battle.prng ??= board.prng.clone();
+  if (rules.generation <= 3) return !!(battle as unknown as { quickClawRoll: boolean }).quickClawRoll;
+  const start = battle.log.length;
+  playClicks(battle, moverClicks(battle.gameType === 'doubles' ? 'doubles' : 'singles'));
+  return battle.log.slice(start).some(line => mover.activate.test(line));
+}
+
+const SEED_POOL = Array.from({ length: 160 }, (_, index) => [1, 2, 3, 4].map(offset => (index + 1) * 7 + offset).join(','));
+
+/** Up to `want` seeds where the natural draw does (or does not) let the holder go first. */
+function seedsWhere(rules: Rules, mode: Mode, mover: FirstMover, activates: boolean, want: number): string[] {
+  const found: string[] = [];
+  for (const seed of SEED_POOL) {
+    if (found.length === want) break;
+    if (naturalActivates(moverBoard(rules, mode, mover, seed), mover, rules) === activates) found.push(seed);
+  }
+  return found;
+}
+
+describe.each(SWEEP_CASES)('the first-mover die: $name', ({ rules, mode, name }) => {
+  const movers = FIRST_MOVERS.filter(mover => exists(rules, mover) && (mover.kind === 'items' || rules.generation >= 8));
+  const played: string[] = [];
+
+  describe.each(movers.map(mover => [mover.label, mover] as const))('%s', (_label, mover) => {
+    for (const natural of [true, false]) {
+      test(`on a seed where the natural draw ${natural ? 'lets the holder go first' : 'does not'}, forced to happen and not to`, () => {
+        const seeds = seedsWhere(rules, mode, mover, natural, 3);
+        expect(seeds.length, 'seeds found').toBeGreaterThan(0);
+        for (const seed of seeds) {
+          const board = moverBoard(rules, mode, mover, seed);
+          const clicks = moverClicks(mode);
+          for (const happens of [true, false]) {
+            const { report, battle, start } = forcedOn(board, clicks, [moverDie(mover, happens)]);
+            const order = moveOrder(battle, start);
+            const shown = report.forced[0];
+            expect(shown.took, `${seed} ${happens ? 'yes' : 'no'}: ${why(shown)}`).toBe('applied');
+            expect(order[0] === 'p1a', `${seed} ${happens ? 'yes' : 'no'}: order ${order.join(' ')}`).toBe(happens);
+            expect(String(battle.prng.getSeed()), `${seed}: the stream after the turn is the natural one`).toBe(report.naturalEndSeed);
+            if (rules.generation >= 4) {
+              expect(battle.log.slice(start).some(line => mover.activate.test(line)), `${seed}: the activation line`).toBe(happens);
+            }
+            played.push(`${seed}${happens}`);
+          }
+        }
+      });
+    }
+
+    test('a body without the holder\'s outfit has no die: no-draw', () => {
+      const board = outfitBoard(rules, mode, { species: 'Snorlax', moves: ['tackle'] }, { species: 'Pikachu' });
+      // the foe of this board splashes: it takes no target
+      const clicks = mode === 'singles' ? { p1: 'move 1', p2: 'move 1' } : { p1: 'move 1 1, move 1', p2: 'move 1, move 1' };
+      const { report } = forcedOn(board, clicks, [moverDie(mover, true)]);
+      expect(report.forced[0].took, why(report.forced[0])).toBe('no-draw');
+    });
+  });
+
+  test('the sweep played the die', () => {
+    summaries.push(`${name}: ${movers.map(mover => mover.id).join(',') || 'no first-mover item or ability'}, ${played.length} forced turns`);
+    if (movers.length > 0) expect(played.length).toBeGreaterThan(0);
+  });
+});
+
+describe.each(RULES.filter(rules => rules.generation === 2 || rules.generation === 3))('the roll of Gens 2 and 3 is read from the battle: $name', rules => {
+  test.each(['singles', 'doubles'] as const)('%s: a forced die that adds draws leaves the next turn\'s roll as the natural turn gave it', mode => {
+    if (mode === 'doubles' && !rules.doubles) return;
+    // Mega Kick misses a quarter of the time: forced to hit on a natural miss it draws a crit and a damage roll more
+    const attacker = mon(rules, { species: 'Snorlax', moves: ['megakick'], gender: 'M' });
+    const foe = mon(rules, PIKACHU(['splash']));
+    let compared = 0;
+    for (const seed of SEED_POOL) {
+      const board = mode === 'singles'
+        ? battleOf(rules.singles, [attacker], [foe], seed)
+        : battleOf(rules.doubles!, [attacker, mon(rules, { species: 'Blissey', moves: ['splash'] })], [foe, mon(rules, { species: 'Chansey', moves: ['splash'] })], seed);
+      const clicks = mode === 'singles' ? { p1: 'move 1', p2: 'move 1' } : { p1: 'move 1 1, move 1', p2: 'move 1, move 1' };
+      const plain = copyOf(board);
+      plain.prng ??= board.prng.clone();
+      const start = plain.log.length;
+      playClicks(plain, clicks);
+      if (!plain.log.slice(start).some(line => line.startsWith('|-miss|'))) continue;
+      const hit: ForcedDie = { name: { slot: 'p1a', moveId: 'megakick', targetSlot: 'p2a', kind: 'accuracy' }, result: { happens: true } };
+      const { battle } = forcedOn(board, clicks, [hit]);
+      const roll = (target: Battle): boolean => !!(target as unknown as { quickClawRoll: boolean }).quickClawRoll;
+      expect(roll(battle), `${seed}: the roll of the next turn`).toBe(roll(plain));
+      compared++;
+    }
+    expect(compared).toBeGreaterThan(5);
   });
 });

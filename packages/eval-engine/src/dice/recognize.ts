@@ -17,7 +17,10 @@ import type { BattleWatch } from './watch.ts';
  * `StallMove` is a stalling move that succeeds again, `BasePower` a chance that changes a move's power.
  *
  * Round 82, step A3b: a chance a condition draws in its `BeforeMove` handler is a status check of the body about to move
- * (full paralysis, the thaw, the infatuation, the confusion check).
+ * (full paralysis, the thaw, the infatuation, the confusion check); the chance of an item's or an ability's `FractionalPriority`
+ * handler (Gen 4: the item's `BeforeTurn`) is a die that lets its holder act first. The second kind runs when the queue is
+ * built, with no move in flight: the holder is the event's target. Gens 2 and 3 draw that die once at the start of the turn,
+ * outside any action, and read it from `battle.quickClawRoll`: no draw of the turn is named for it (`rollsAtTurnStart`).
  *
  * The numbers of both rules live in this one table (hook probe, lanes/A/p1-hooks.md, exceptions 1 to 3); the sweeps hold it to
  * the simulator for every generation and the Champions mod.
@@ -82,6 +85,9 @@ const HANDLERS = new Set(['Condition', 'Status', 'Item', 'Ability']);
 /** A draw inside a condition's, an item's or an ability's handler belongs to it, not to the script that called it. */
 const inHandler = (battle: Battle): boolean => HANDLERS.has((battle.effect as { effectType?: string } | undefined)?.effectType ?? '');
 
+/** Gens 2 and 3 draw the die that lets a holder act first at the start of every turn and keep it in `battle.quickClawRoll`. */
+export const rollsAtTurnStart = (gen: number): boolean => gen === 2 || gen === 3;
+
 export function genShape(gen: number): GenShape {
   if (gen === 1) return { critHook: false, critCall: 'chance', roll: ROLL_RANGE };
   if (gen === 2) return { critHook: true, critCall: 'random', roll: ROLL_RANGE };
@@ -105,6 +111,8 @@ function isCritDraw(draw: Draw, shape: GenShape, watch: BattleWatch): boolean {
  */
 export function recognize(draw: Draw, watch: BattleWatch, gen: number): DieName | null {
   const { battle, armed } = watch;
+  const first = firstMoverDie(draw, battle);
+  if (first) return first;
   const move = battle.activeMove;
   const user = battle.activePokemon;
   if (!move || !user) return null;
@@ -184,6 +192,22 @@ function recognizeMoveDraw(draw: Draw, watch: BattleWatch, gen: number, base: Ba
   const beforeHits = !counted.hit && !!counted.multihit;
   if (scope === hitCountScope(gen) && (draw.call === 'sample' || draw.call === 'random') && quiet && beforeHits) return { ...base, kind: 'hit-count' };
   return handlerDie(draw, battle, base);
+}
+
+/** Events whose handler lets its holder act first: Gen 4 draws in the item's `BeforeTurn`, Gens 5 on in `FractionalPriority`. */
+const FIRST_MOVER_EVENTS = new Set(['FractionalPriority', 'BeforeTurn']);
+
+/**
+ * The die that lets the holder of an item or an ability act first in its priority bracket. The handler runs while the queue is
+ * built (or before the turn's first action), so no move is in flight and the holder is the event's target.
+ */
+function firstMoverDie(draw: Draw, battle: Battle): DieName | null {
+  const event = battle.event as { id?: string; target?: { getSlot?: () => string } } | undefined;
+  const effect = battle.effect as { id?: string; effectType?: string } | undefined;
+  if (draw.call !== 'chance' || !event?.id || !FIRST_MOVER_EVENTS.has(event.id) || !effect?.id) return null;
+  if (effect.effectType !== 'Item' && effect.effectType !== 'Ability') return null;
+  const slot = event.target?.getSlot?.();
+  return slot === undefined ? null : { slot, moveId: '', kind: 'move-first', effectId: effect.id };
 }
 
 /**

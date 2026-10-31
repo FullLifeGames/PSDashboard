@@ -1,7 +1,8 @@
 import { toID } from '@pkmn/sim';
+import { rollsAtTurnStart } from './recognize.ts';
 import { applied, otherwise, parts, slotOfIdent, type Witness } from './report-lines.ts';
 import type { ReportInput } from './report.ts';
-import type { DieReport } from './types.ts';
+import type { DieReport, ForcedDie } from './types.ts';
 
 /**
  * Round 82 (forced dice), step A3b: the witnesses of the dice that belong to the body's turn and not to its move: the status
@@ -18,7 +19,7 @@ function mentions(line: string, id: string): boolean {
 /** Lines that start the next action, the end of the turn, or a switch: a status check's own lines come before them. */
 function opensNext(line: string): boolean {
   const type = parts(line)[1];
-  if (type === 'move') return !line.includes('|[from]');
+  if (type === 'move') return startsMove(line);
   return type === 'switch' || type === 'drag' || type === 'upkeep' || type === 'turn' || type === 'win' || type === 'tie' || line === '|';
 }
 
@@ -58,12 +59,18 @@ export function statusNoDraw(input: ReportInput, moveName: string, turn: readonl
   return { die, took: 'no-draw', reason: `${slot} had no ${effectId} check to draw this turn` };
 }
 
-/** The slots of the bodies that acted in the lines, in the order of their first action (a `|move|` that no other move called, or a `|cant|`). */
+/**
+ * A `|move|` line that starts a body's action: no other move called it, or an item let the holder go first (Gen 4 writes the Quick
+ * Claw holder's move with `[from] item:`).
+ */
+const startsMove = (line: string): boolean => !line.includes('|[from]') || line.includes('|[from] item:');
+
+/** The slots of the bodies that acted in the lines, in the order of their first action (a `|move|` that starts an action, or a `|cant|`). */
 function actionOrder(lines: readonly string[]): string[] {
   const order: string[] = [];
   for (const line of lines) {
     const fields = parts(line);
-    const acts = (fields[1] === 'move' && !line.includes('|[from]')) || fields[1] === 'cant';
+    const acts = (fields[1] === 'move' && startsMove(line)) || fields[1] === 'cant';
     const slot = acts ? slotOfIdent(fields[2]) : undefined;
     if (slot !== undefined && !order.includes(slot)) order.push(slot);
   }
@@ -90,5 +97,46 @@ export function orderNoDraw(input: ReportInput): DieReport | null {
   const { die } = input;
   const { slot, targetSlot, kind } = die.name;
   if (kind === 'speed-tie') return { die, took: 'no-draw', reason: `${slot} and ${targetSlot} did not tie in speed and priority this turn` };
+  if (kind === 'move-first' && rollsAtTurnStart(input.battle.gen)) {
+    return { die, took: 'no-draw', reason: `${slot} holds nothing that reads the roll of the start of the turn` };
+  }
+  if (kind === 'move-first') {
+    const acted = actionOrder(input.battle.log.slice(input.start)).includes(slot);
+    const why = acted ? 'its move is in a priority bracket that draws none' : 'it did not act';
+    return { die, took: 'no-draw', reason: `the simulator drew no ${die.name.effectId ?? 'first-mover'} die for ${slot} this turn: ${why}` };
+  }
   return null;
+}
+
+/**
+ * The die that lets a holder act first (Gen 4 on): a yes shows as the item's or the ability's own `|-activate|` line after the
+ * draw, a no shows none.
+ */
+export function moveFirstReport(w: Witness, happens: boolean, log: readonly string[]): DieReport {
+  const id = w.die.name.effectId ?? '';
+  const window = statusWindow(log, w.seen.logIndex ?? log.length);
+  const activated = window.some(line => parts(line)[1] === '-activate' && mentions(line, id));
+  if (activated === happens) return applied(w);
+  return happens
+    ? otherwise(w, 'blocked', `the draw said yes but no activation line of ${id} followed for ${w.die.name.slot}`)
+    : otherwise(w, 'blocked', `${id} activated for ${w.die.name.slot} although the die said no`);
+}
+
+/**
+ * The start-of-turn roll of Gens 2 and 3 is written on the battle, so no draw of the turn carries it. A yes shows as the
+ * holder acting before every other body that acted; a holder in a lower priority bracket, or one that did not act, is blocked.
+ * A no needs no witness: the roll was written false.
+ */
+export function startRollReport(die: ForcedDie, log: readonly string[], start: number): DieReport {
+  const happens = 'happens' in die.result && die.result.happens;
+  if (!happens) return { die, took: 'applied' };
+  const order = actionOrder(log.slice(start));
+  if (order[0] === die.name.slot) return { die, took: 'applied' };
+  const where = order.indexOf(die.name.slot);
+  return {
+    die, took: 'blocked',
+    reason: where < 0
+      ? `${die.name.slot} did not act this turn`
+      : `${die.name.slot} acted after ${order.slice(0, where).join(' and ')} although the roll gave it the first move`,
+  };
 }

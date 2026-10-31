@@ -3,7 +3,9 @@ import { LoggedRollPRNG } from '../branch/logged-rolls.ts';
 import { copyOf } from '../sim-ask/copy.ts';
 import { learnHitCount } from './learn.ts';
 import { ForcedDicePRNG, RecordingPRNG } from './prng.ts';
+import { rollsAtTurnStart } from './recognize.ts';
 import { reportOf } from './report.ts';
+import { readsStartRoll } from './start-roll.ts';
 import { probeCheck } from './status-probe.ts';
 import { dieKey, type DiceReport, type ForcedDie, type NaturalRecord } from './types.ts';
 import { watchBattle } from './watch.ts';
@@ -37,7 +39,12 @@ function forkPrng(prng: PRNG, battle: Battle): PRNG {
   return fork;
 }
 
-function naturalTurn(live: Battle, play: (battle: Battle) => void): { record: NaturalRecord; endSeed: string } {
+/** The die of Gens 2 and 3 that lets a Quick Claw holder act first, kept on the battle (the simulator reads it in the action speed). */
+type StartRoll = { quickClawRoll?: boolean };
+
+interface NaturalTurn { record: NaturalRecord; endSeed: string; startRoll: boolean | undefined }
+
+function naturalTurn(live: Battle, play: (battle: Battle) => void): NaturalTurn {
   const copy = copyOf(live);
   (copy as unknown as { debugMode: boolean }).debugMode = false;
   const stream = forkPrng(live.prng, copy);
@@ -49,7 +56,7 @@ function naturalTurn(live: Battle, play: (battle: Battle) => void): { record: Na
   } finally {
     watch.uninstall();
   }
-  return { record: recording.record, endSeed: String(stream.getSeed()) };
+  return { record: recording.record, endSeed: String(stream.getSeed()), startRoll: (copy as unknown as StartRoll).quickClawRoll };
 }
 
 /**
@@ -64,6 +71,25 @@ function learnedScripts(input: Omit<Parameters<typeof learnHitCount>[0], 'fork' 
     }
   }
   return scripts;
+}
+
+/**
+ * Gens 2 and 3 draw the die that lets a holder act first at the start of the turn, outside any action, and keep it on the
+ * battle: the real turn reads the forced answer from there (one roll for every holder on the field: any forced yes wins). The
+ * natural turn on the copy keeps the value the battle drew. A body whose action speed does not read the roll has no die. Returns
+ * the keys of the dice written this way.
+ */
+function writeStartRoll(live: Battle, forced: readonly ForcedDie[]): Set<string> {
+  const written = new Set<string>();
+  if (!rollsAtTurnStart(live.gen)) return written;
+  let roll: boolean | undefined;
+  for (const die of forced) {
+    if (die.name.kind !== 'move-first' || !('happens' in die.result) || !readsStartRoll(live, die.name.slot)) continue;
+    written.add(dieKey(die.name));
+    roll = (roll ?? false) || die.result.happens;
+  }
+  if (roll !== undefined) (live as unknown as StartRoll).quickClawRoll = roll;
+  return written;
 }
 
 /** Which way each forced status check goes: whether the body acts when the draw comes true, read from the condition's own handler. */
@@ -84,6 +110,7 @@ export function playForcedTurn({ live, forced, play }: ForcedTurnInput): DiceRep
   }
   const natural = naturalTurn(live, play);
   const inner = live.prng;
+  const written = writeStartRoll(live, forced);
   const watch = watchBattle(live);
   const start = live.log.length;
   const scripts = learnedScripts({ live, forced, record: natural.record, play });
@@ -97,8 +124,12 @@ export function playForcedTurn({ live, forced, play }: ForcedTurnInput): DiceRep
     live.prng = inner;
   }
   inner.setSeed(natural.endSeed as Parameters<PRNG['setSeed']>[0]);
+  // the roll of the next turn was drawn at the end of the real turn from a stream the forced die may have moved: the natural one stands
+  if (natural.startRoll !== undefined) (live as unknown as StartRoll).quickClawRoll = natural.startRoll;
   return {
-    forced: forced.map(die => reportOf({ die, note: prng.notes.get(dieKey(die.name)), battle: live, start, saw: watch.moves })),
+    forced: forced.map(die => reportOf({
+      die, note: prng.notes.get(dieKey(die.name)), battle: live, start, saw: watch.moves, startRoll: written.has(dieKey(die.name)),
+    })),
     naturalEndSeed: natural.endSeed,
   };
 }

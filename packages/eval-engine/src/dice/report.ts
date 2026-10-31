@@ -4,7 +4,7 @@ import type { DieReport, ForcedDie } from './types.ts';
 import type { MoveSight } from './watch.ts';
 import { about, applied, otherwise, parts, shows, slotOfIdent, type Witness } from './report-lines.ts';
 import { moveNoDraw, moveWitness } from './report-moves.ts';
-import { orderNoDraw, statusNoDraw, statusReport, tieReport } from './report-turn.ts';
+import { moveFirstReport, orderNoDraw, startRollReport, statusNoDraw, statusReport, tieReport } from './report-turn.ts';
 
 /**
  * Round 82 (forced dice), decision D9: what became of a forced die. The real turn's PRNG notes whether the simulator drew the
@@ -27,6 +27,7 @@ import { orderNoDraw, statusNoDraw, statusReport, tieReport } from './report-tur
  * - power: the handler's own `|-activate|` line for its move means the stronger draw.
  * - status check: yes shows as the body's own `|move|` after the draw, no as a stop (report-turn.ts).
  * - speed tie: the order of the two bodies' first actions in the turn's lines.
+ * - first mover: the activation line of the item or the ability after the draw; the start-of-turn roll of Gens 2 and 3 by the holder's place in the turn's order.
  */
 
 export interface ReportInput {
@@ -38,6 +39,8 @@ export interface ReportInput {
   start: number;
   /** What the watch saw of the moves of the turn (the reasons of a die that was never drawn). */
   saw?: ReadonlyMap<string, MoveSight>;
+  /** The die is the start-of-turn roll of Gens 2 and 3, written on the battle before the turn: no draw of the turn belongs to it. */
+  startRoll?: boolean;
 }
 
 /** Lines that open a new action: the next body's move, a switch, the end of the turn. A move another move calls (`[from]`) belongs to the action. */
@@ -158,6 +161,7 @@ function rollReport(w: Witness): DieReport {
 
 export function reportOf(input: ReportInput): DieReport {
   const { die, note, battle } = input;
+  if (input.startRoll) return startRollReport(die, battle.log, input.start);
   if (!note) return noDraw(input);
   const seen = { ...(note.chance === undefined ? {} : { chance: note.chance }), ...(note.logIndex === undefined ? {} : { logIndex: note.logIndex }) };
   if (note.unfit) return { die, took: 'no-chance', ...seen, reason: 'the answer does not fit this die: no such step or result' };
@@ -182,5 +186,6 @@ function witnessOf(witness: Witness, battle: Battle, start: number): DieReport {
   if (kind === 'damage-roll') return rollReport(witness);
   if (kind === 'status-check' && 'happens' in result) return statusReport(witness, result.happens, battle.log);
   if (kind === 'speed-tie') return tieReport(witness, battle.log, start);
+  if (kind === 'move-first' && 'happens' in result) return moveFirstReport(witness, result.happens, battle.log);
   return moveWitness(witness, battle) ?? applied(witness);
 }

@@ -36,7 +36,7 @@ function answerChance(happens: boolean, draw: Draw): Answered {
 }
 
 /** The dice that are one chance: forced to happen or not to. */
-const CHANCE_KINDS: ReadonlySet<DieKind> = new Set(['accuracy', 'crit', 'secondary', 'self-effect', 'stalling', 'power', 'status-check']);
+const CHANCE_KINDS: ReadonlySet<DieKind> = new Set(['accuracy', 'crit', 'secondary', 'self-effect', 'stalling', 'power', 'status-check', 'move-first']);
 
 /**
  * The hit count: a `sample` over the counts (the first item that equals it), or `random(from, to)` over the counts. A
