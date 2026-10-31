@@ -109,13 +109,17 @@ describe.each(SWEEP_CASES)('the accuracy rows with no chance: $name', ({ rules, 
         clicks = sweepClicks(mode, move.target, true);
       }
       if (!clicksAccepted(board, clicks)) continue;
-      const slot = sweepTargets(mode, move.target)[0];
       for (const happens of [true, false]) {
-        const { report, battle, start } = forcedOn(board, clicks, [{ name: dieOf(move.id, slot, 'accuracy'), result: { happens } }]);
-        const shown = report.forced[0];
-        expect(missesOf(battle, start, slot), `${move.id} ${happens}`).toBe(0);
-        expect(shown.took === 'no-chance' || (shown.took === 'no-draw' && explained(shown.reason)), `${move.id} ${happens}: ${shown.took} ${shown.reason}`).toBe(true);
-        if (shown.took === 'no-chance') noChance++;
+        const shown = sweepTargets(mode, move.target).map(slot => {
+          const { report, battle, start } = forcedOn(board, clicks, [{ name: dieOf(move.id, slot, 'accuracy'), result: { happens } }]);
+          expect(missesOf(battle, start, slot), `${move.id} ${slot} ${happens}`).toBe(0);
+          return report.forced[0];
+        });
+        const sure = (report: DieReport): boolean => report.took === 'no-chance' || (report.took === 'no-draw' && explained(report.reason));
+        // a move that picks one target draws for that one only
+        const fine = picksOne(move.target) ? shown.some(report => report.took === 'no-chance') : shown.every(sure);
+        expect(fine, `${move.id} ${happens}: ${shown.map(report => `${report.took} ${report.reason}`).join(' | ')}`).toBe(true);
+        noChance += shown.filter(report => report.took === 'no-chance').length;
       }
     }
     expect(noChance, `${name} ${moves.length} moves`).toBeGreaterThan(moves.length * 0.5);
