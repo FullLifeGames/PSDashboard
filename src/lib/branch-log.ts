@@ -1,3 +1,5 @@
+import { withDieLines, type DieLine } from './branch-dice-lines';
+
 /**
  * The protocol log the replay iframe plays for a branch: the simulator's lines
  * without what the embed must not show.
@@ -15,9 +17,13 @@
 /** Lines the embed must not show: spectator splits, chat, and the simulator's debug output (G13). */
 const HIDDEN_FROM_FRAME = ['|split|', '|c|', '|debug|'];
 
-/** The log string the iframe plays: the branch's lines without what the embed must not show. */
-export function branchFrameLog(simLog: readonly string[]): string {
-  return simLog
+/**
+ * The log string the iframe plays: the branch's lines without what the embed must not show. Round 82 (forced dice), step A7b: the
+ * display lines of the forced dice (`dieLines`) go in first, at the indexes of the shown log, so the frame prints them where the die
+ * decided; the battle's own log never holds them.
+ */
+export function branchFrameLog(simLog: readonly string[], dieLines: readonly DieLine[] = []): string {
+  return withDieLines(simLog, dieLines)
     .filter(line => line && !HIDDEN_FROM_FRAME.some(prefix => line.startsWith(prefix)))
     .join('\n');
 }
