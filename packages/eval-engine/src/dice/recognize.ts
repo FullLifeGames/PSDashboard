@@ -16,6 +16,9 @@ import type { BattleWatch } from './watch.ts';
  * `sample` or `random` with no event in flight inside the hit loop), and the draws inside a handler that name their event:
  * `StallMove` is a stalling move that succeeds again, `BasePower` a chance that changes a move's power.
  *
+ * Round 82, step A3b: a chance a condition draws in its `BeforeMove` handler is a status check of the body about to move
+ * (full paralysis, the thaw, the infatuation, the confusion check).
+ *
  * The numbers of both rules live in this one table (hook probe, lanes/A/p1-hooks.md, exceptions 1 to 3); the sweeps hold it to
  * the simulator for every generation and the Champions mod.
  */
@@ -148,13 +151,19 @@ function secondaryDie(draw: Draw, watch: BattleWatch, gen: number, base: Base): 
   return scope === 'tryMoveHit' ? scriptedSecondary(draw, watch, gen, base) : null;
 }
 
-/** A chance a handler draws under its own event: a stalling move that succeeds again, a chance that changes a move's power. */
+/**
+ * A chance a handler draws under its own event: a stalling move that succeeds again, a chance that changes a move's power, and
+ * the status check of a condition on the body about to move (`BeforeMove`).
+ */
 function handlerDie(draw: Draw, battle: Battle, base: Base): DieName | null {
   const event = (battle.event as { id?: string } | undefined)?.id;
-  const effectId = (battle.effect as { id?: string } | undefined)?.id;
+  const effect = battle.effect as { id?: string; effectType?: string } | undefined;
   if (draw.call !== 'chance') return null;
-  if (event === 'StallMove') return { ...base, kind: 'stalling', effectId };
-  if (event === 'BasePower') return { ...base, kind: 'power', effectId };
+  if (event === 'StallMove') return { ...base, kind: 'stalling', effectId: effect?.id };
+  if (event === 'BasePower') return { ...base, kind: 'power', effectId: effect?.id };
+  if (event === 'BeforeMove' && effect?.id && (effect.effectType === 'Condition' || effect.effectType === 'Status')) {
+    return { ...base, kind: 'status-check', effectId: effect.id };
+  }
   return null;
 }
 

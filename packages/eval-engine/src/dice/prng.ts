@@ -1,7 +1,7 @@
 import { PRNG, type PRNGSeed } from '@pkmn/sim';
 import { answerDie, type Answered } from './answer.ts';
 import { recognize } from './recognize.ts';
-import { dieKey, type Answer, type DieName, type Draw, type ForcedDie, type NaturalRecord } from './types.ts';
+import { dieKey, type Answer, type DieName, type DieResult, type Draw, type ForcedDie, type NaturalRecord } from './types.ts';
 import type { BattleWatch } from './watch.ts';
 
 /**
@@ -119,14 +119,21 @@ export class ForcedDicePRNG extends WatchedPRNG {
 
   /** Raw answers per die key, one per draw, learned on copies (learn.ts); null means no draw sequence gives the answer. */
   private readonly scripts: ReadonlyMap<string, readonly number[] | null>;
+  /**
+   * Per status-check die: whether the body acts when the draw comes true (status-probe.ts). The user's answer says what the
+   * body does, so a check whose true stops the body (or one the probe could not read) answers with the draw turned round.
+   */
+  private readonly actsOnTrue: ReadonlyMap<string, boolean>;
 
   constructor(input: {
-    inner: PRNG; watch: BattleWatch; forced: readonly ForcedDie[]; record: NaturalRecord; scripts?: ReadonlyMap<string, readonly number[] | null>;
+    inner: PRNG; watch: BattleWatch; forced: readonly ForcedDie[]; record: NaturalRecord;
+    scripts?: ReadonlyMap<string, readonly number[] | null>; actsOnTrue?: ReadonlyMap<string, boolean>;
   }) {
     super(input.inner, input.watch);
     for (const die of input.forced) this.forced.set(dieKey(die.name), die);
     this.record = input.record;
     this.scripts = input.scripts ?? new Map();
+    this.actsOnTrue = input.actsOnTrue ?? new Map();
   }
 
   protected override decide(name: DieName, draw: Draw, natural: number): number {
@@ -141,8 +148,7 @@ export class ForcedDicePRNG extends WatchedPRNG {
 
   private force(key: string, die: ForcedDie, draw: Draw, natural: number): number {
     const note = this.notes.get(key) ?? { draws: 0, noChance: false, shapes: [] };
-    const script = this.scripts.get(key);
-    const answer = script === undefined ? answerDie(die.name.kind, die.result, draw, this.watch.battle.gen) : this.scripted(script, note.draws, natural);
+    const answer = this.answerFor(key, die, draw, natural, note.draws);
     note.draws++;
     note.shapes.push({ ...draw });
     if (note.draws === 1) note.logIndex = this.watch.battle.log.length;
@@ -157,6 +163,18 @@ export class ForcedDicePRNG extends WatchedPRNG {
       return natural;
     }
     return answer.value;
+  }
+
+  /** The answer to a forced die's draw: the learned script, or the answer of the die's kind (a status check's turned round when its draw's true stops the body). */
+  private answerFor(key: string, die: ForcedDie, draw: Draw, natural: number, drawn: number): Answered | null {
+    const script = this.scripts.get(key);
+    if (script !== undefined) return this.scripted(script, drawn, natural);
+    // a status check: the answer is what the body does, the draw's true stops it unless the probe read otherwise
+    const turned = die.name.kind === 'status-check' && this.actsOnTrue.get(key) !== true;
+    const result: DieResult = turned && 'happens' in die.result ? { happens: !die.result.happens } : die.result;
+    const answer = answerDie(die.name.kind, result, draw, this.watch.battle.gen);
+    if (turned && answer && answer.chance !== undefined) answer.chance = 1 - answer.chance;
+    return answer;
   }
 
   /** The learned raw answer of a die's draw, the stream's own after the script ends, or the word that no sequence reaches the answer. */

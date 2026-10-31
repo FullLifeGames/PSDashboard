@@ -4,6 +4,7 @@ import type { DieReport, ForcedDie } from './types.ts';
 import type { MoveSight } from './watch.ts';
 import { about, applied, otherwise, parts, shows, slotOfIdent, type Witness } from './report-lines.ts';
 import { moveNoDraw, moveWitness } from './report-moves.ts';
+import { statusNoDraw, statusReport } from './report-turn.ts';
 
 /**
  * Round 82 (forced dice), decision D9: what became of a forced die. The real turn's PRNG notes whether the simulator drew the
@@ -24,6 +25,7 @@ import { moveNoDraw, moveWitness } from './report-moves.ts';
  * - hit count: the `|-hitcount|` line equals the count; a count no draw gives is `no-chance` (the learner found none).
  * - stalling: no `|-fail|` for the user in the action means it succeeded.
  * - power: the handler's own `|-activate|` line for its move means the stronger draw.
+ * - status check: a yes shows as a line that names the condition after the draw; a no has no line of its own (report-turn.ts).
  */
 
 export interface ReportInput {
@@ -88,7 +90,7 @@ const QUIET = new Set(['debug', '-nothing', '']);
 /** Why the simulator never drew the die, read from the protocol of the turn. */
 function noDraw(input: ReportInput): DieReport {
   const { die, battle, start } = input;
-  const { moveId, slot, targetSlot, kind } = die.name;
+  const { moveId, slot } = die.name;
   const move = battle.dex.moves.get(moveId);
   const turn = battle.log.slice(start);
   const moveLine = turn.findIndex(line => {
@@ -103,7 +105,13 @@ function noDraw(input: ReportInput): DieReport {
   if (next !== undefined && parts(next)[1] === 'cant' && slotOfIdent(parts(next)[2]) === slot) {
     return { die, took: 'no-draw', reason: `${move.name} did not run: ${shows(next)}` };
   }
-  const action = windowOf(turn, moveLine + 1);
+  return statusNoDraw(input, move.name, turn) ?? noDrawInAction(input, move, windowOf(turn, moveLine + 1));
+}
+
+/** The move ran and a hit followed: why the simulator drew no die for it, read from the lines of the action. */
+function noDrawInAction(input: ReportInput, move: ReturnType<Battle['dex']['moves']['get']>, action: string[]): DieReport {
+  const { die } = input;
+  const { targetSlot, kind } = die.name;
   const blocker = action.find(line => isBlocker(line, targetSlot));
   if (blocker) return { die, took: 'no-draw', reason: `${move.name} drew no ${kind}: ${shows(blocker)}` };
   // A future move draws in the end-of-turn residual two turns later, when no move is in flight.
@@ -154,14 +162,21 @@ export function reportOf(input: ReportInput): DieReport {
     const percent = note.chance === undefined ? '' : ` (chance ${Math.round(note.chance * 10000) / 100} percent)`;
     return { die, took: 'no-chance', ...seen, reason: `the draw has no way to give this answer${percent}` };
   }
-  const { kind, targetSlot, moveId } = die.name;
+  const { targetSlot, moveId } = die.name;
   const action = windowOf(battle.log, note.logIndex ?? battle.log.length);
   const witness: Witness = {
     die, seen, note, action, targetSlot, target: action.filter(line => about(line, targetSlot)), name: battle.dex.moves.get(moveId).name || moveId,
   };
-  const { result } = die;
+  return witnessOf(witness, battle);
+}
+
+/** The witness of the die's kind. */
+function witnessOf(witness: Witness, battle: Battle): DieReport {
+  const { kind } = witness.die.name;
+  const { result } = witness.die;
   if (kind === 'accuracy' && 'happens' in result) return accuracyReport(witness, result.happens);
   if (kind === 'crit' && 'happens' in result) return critReport(witness, result.happens);
   if (kind === 'damage-roll') return rollReport(witness);
+  if (kind === 'status-check' && 'happens' in result) return statusReport(witness, result.happens, battle.log);
   return moveWitness(witness, battle) ?? applied(witness);
 }

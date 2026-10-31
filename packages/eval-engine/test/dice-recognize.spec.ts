@@ -163,7 +163,8 @@ describe.each(RULES)('the confusion self-hit rolls a die of its own: $name', (ru
   };
 
   // Gens 1 and 2 compute the self-hit without a damage roll (Gen 1 inline, Gen 2 with noDamageVariance): only the check draws.
-  test('the roll of the hurt body carries the condition and no move die follows it', () => {
+  // The check is a die of its own (round 82, A3b: the status check of the body about to move); no move die follows a self-hit.
+  test('the roll of the hurt body carries the condition and the check is the only other die', () => {
     let selfHits = 0;
     for (let index = 0; index < 40; index++) {
       const played = named(rules, CONFUSED, 'singles', seedOf(index))!;
@@ -171,7 +172,7 @@ describe.each(RULES)('the confusion self-hit rolls a die of its own: $name', (ru
       selfHits++;
       const rolls = played.names.filter(entry => entry.name.kind === 'damage-roll');
       expect(rolls.map(entry => entry.name.effectId), `seed ${index}`).toEqual(rules.generation <= 2 ? [] : ['confusion']);
-      expect(played.names.filter(entry => entry.name.kind !== 'damage-roll'), `seed ${index}`).toEqual([]);
+      expect(played.names.filter(entry => entry.name.kind !== 'damage-roll').map(entry => [entry.name.kind, entry.name.effectId]), `seed ${index}`).toEqual([['status-check', 'confusion']]);
     }
     expect(selfHits, 'a seed hurts the body').toBeGreaterThan(0);
   });

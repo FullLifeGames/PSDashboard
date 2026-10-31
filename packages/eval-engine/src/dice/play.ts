@@ -4,6 +4,7 @@ import { copyOf } from '../sim-ask/copy.ts';
 import { learnHitCount } from './learn.ts';
 import { ForcedDicePRNG, RecordingPRNG } from './prng.ts';
 import { reportOf } from './report.ts';
+import { probeCheck } from './status-probe.ts';
 import { dieKey, type DiceReport, type ForcedDie, type NaturalRecord } from './types.ts';
 import { watchBattle } from './watch.ts';
 
@@ -65,6 +66,17 @@ function learnedScripts(input: Omit<Parameters<typeof learnHitCount>[0], 'fork' 
   return scripts;
 }
 
+/** Which way each forced status check goes: whether the body acts when the draw comes true, read from the condition's own handler. */
+function checkPolarities(live: Battle, forced: readonly ForcedDie[]): Map<string, boolean> {
+  const polarities = new Map<string, boolean>();
+  for (const die of forced) {
+    if (die.name.kind !== 'status-check' || !die.name.effectId) continue;
+    const probe = probeCheck(live, die.name.slot, die.name.effectId, die.name.moveId);
+    if (probe) polarities.set(dieKey(die.name), probe.actsOnTrue);
+  }
+  return polarities;
+}
+
 export function playForcedTurn({ live, forced, play }: ForcedTurnInput): DiceReport {
   if (forced.length === 0) {
     play(live);
@@ -75,7 +87,8 @@ export function playForcedTurn({ live, forced, play }: ForcedTurnInput): DiceRep
   const watch = watchBattle(live);
   const start = live.log.length;
   const scripts = learnedScripts({ live, forced, record: natural.record, play });
-  const prng = new ForcedDicePRNG({ inner, watch, forced, record: natural.record, scripts });
+  const actsOnTrue = checkPolarities(live, forced);
+  const prng = new ForcedDicePRNG({ inner, watch, forced, record: natural.record, scripts, actsOnTrue });
   live.prng = prng;
   try {
     play(live);
