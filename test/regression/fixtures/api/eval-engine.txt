@@ -6,6 +6,7 @@ type BattleSlot
 type BranchChoiceActive
 type BranchChoiceErrorLog
 type BranchChoices
+type BranchDiceTurn
 type BranchExecuteResult
 type BranchFieldState
 type BranchMoveModifier
@@ -24,6 +25,14 @@ type DamageCalcContext
 type DamageResult
 type DecidedSweep
 type DeniedEnd
+type DiceReport
+type DieKind
+type DieName
+type DieOffer
+type DieReport
+type DieResult
+type DieTook
+type DieWords
 type EndgameCaps
 type EndgameFlag
 type EndgameResult
@@ -44,6 +53,7 @@ type EvalSettings
 type EvalSubSearchJob
 type EvalWorkerRequest
 type EvalWorkerResponse
+type ForcedDie
 type ForcedWin
 type ForcedWinCaveat
 type ForcedWinInput
@@ -60,6 +70,7 @@ type LeadAnalysis
 type LeadEvalData
 type LeadSideAnalysis
 type LiveHit
+type LoggedOptions
 type MatchupCache
 type MctsCallbacks
 type MctsTreeStats
@@ -122,6 +133,7 @@ type WinPath
 value AUTO_MCTS_FAINTED_FRACTION
 value BLUNDER_SWING
 value DASHBOARD_ORIGINS
+value DIE_KINDS
 value ENDGAME_CAPS
 value ENDGAME_MAX_BODIES
 value ENGINE_PROTOCOL
@@ -168,6 +180,8 @@ value deserializeBattleExact
 value detectRolls
 value detectSacks
 value diceEventTurns
+value dieKey
+value dieLabel
 value diffChoices
 value endgameScope
 value engineOptions
@@ -186,16 +200,22 @@ value heldDecided
 value hiddenPowerFacts
 value loadSimMods
 value loadSimModsFor
+value loggedDice
+value loggedTurnDice
 value lostGround
 value matchPlayedSide
 value matchReplacementOption
 value mctsSearch
 value mctsTreeSearch
+value mergeLoggedDice
 value mergeMctsTrees
 value moveAtUse
 value notationSideLabel
 value notationSlotChoice
 value noteSpokenClaim
+value offeredDice
+value offeredEndDice
+value offeredOrderDice
 value parseLeadSpecies
 value parsePlayedActions
 value parsePlayedActionsDoubles
@@ -228,6 +248,7 @@ value searchBudgetTag
 value searchOrchestrated
 value searchPosition
 value searchTreesOrchestrated
+value secondariesIn
 value selectKeyTurns
 value selectProbeCombos
 value serializeLiveBattle
@@ -248,6 +269,7 @@ value switchChoiceKey
 value switchOptionKey
 value takeSimFastReport
 value teraKey
+value tieName
 value unansweredSeenKey
 value validateBranchRuntime
 value validateEngineResponse
