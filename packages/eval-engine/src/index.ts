@@ -38,6 +38,7 @@ export type { DieWords } from './dice/die-label.ts';
 export { loggedDice, mergeLoggedDice } from './dice/logged-results.ts';
 export type { LoggedOptions } from './dice/logged-results.ts';
 export { offeredDice, offeredEndDice, offeredOrderDice } from './dice/offer.ts';
+export { loggedTurnDice } from './dice/turn.ts';
 export type { DieOffer } from './dice/offer.ts';
 export { secondariesIn } from './dice/secondaries.ts';
 export type { BranchChoices } from './branch/types.ts';

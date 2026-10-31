@@ -3,9 +3,9 @@ import { describe, expect, test } from 'vitest';
 import type { ReplayData } from '@fulllifegames/replay-core';
 import { loadSimMods } from '../src/forward/sim-mods';
 import { LoggedRollPRNG } from '../src/branch/logged-rolls';
-import { turnChanges, userDice } from '../src/dice/turn';
+import { loggedTurnDice, turnChanges, userDice } from '../src/dice/turn';
 import { dieKey, type DieReport } from '../src/dice/types';
-import { clickWith } from './branch-dice-support';
+import { branchOf, clickWith, mon } from './branch-dice-support';
 import { playTurn, reconstruct } from './arrival-turn';
 
 /**
@@ -67,6 +67,16 @@ describe('the first turn through executeBranchChoices joins the log\'s dice to t
     expect(logged.turn).toBe(FIRE_FANG.turn);
     expect(logged.lines.some(line => line.startsWith('|move|p2a: Penal Battalion|Fire Fang|'))).toBe(true);
     expect(logged.choices.p1).toMatch(/^move \d/);
+  });
+
+  test('loggedTurnDice names what the log shows for the position, for the chips of the panel; a position without a logged turn shows none', { timeout: 300000 }, async () => {
+    const { runtime } = await reconstruct(FIRE_FANG.fixture, FIRE_FANG.turn, FIRE_FANG.source);
+    const dice = loggedTurnDice(runtime.battleStream.battle!);
+    const fangMiss = dice.find(die => die.name.slot === 'p2a' && die.name.moveId === 'firefang' && die.name.kind === 'accuracy');
+    expect(fangMiss?.result).toEqual({ happens: false });
+    expect(dice.some(die => die.name.slot === 'p1a' && die.name.moveId === 'bodypress' && die.name.kind === 'accuracy')).toBe(true);
+    const plain = await branchOf('gen9customgame', [mon('Pikachu', ['tackle'])], [mon('Snorlax', ['tackle'])], '1,2,3,4');
+    expect(loggedTurnDice(plain.battleStream.battle!)).toEqual([]);
   });
 
   test('singles (smogtours-gen8ou-573756 t73): forcing the crit of Body Press keeps the Fire Fang miss of the log', { timeout: 300000 }, async () => {

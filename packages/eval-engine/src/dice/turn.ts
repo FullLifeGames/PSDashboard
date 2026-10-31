@@ -133,6 +133,16 @@ function firstTurnDice(input: BranchTurnInput, mine: readonly ForcedDie[]): Forc
   });
 }
 
+/**
+ * What the log shows for the position a branch opened on (the dice of every action as logged), for the panel's chips on the
+ * first turn ("Crit, log"). Empty when the battle no longer stands in that turn or has no logged turn. The panel keys a chip by
+ * `dieKey`; the user's own die replaces the log's of the same key.
+ */
+export function loggedTurnDice(battle: Battle): ForcedDie[] {
+  const logged = battleLoggedTurn(battle);
+  return logged ? loggedDice(logged.lines, loggedOptions(battle, logged.choices)) : [];
+}
+
 /** The logged turn of the live PRNG when the battle still stands in that turn. */
 function battleLoggedTurn(battle: Battle) {
   const prng = battle.prng;
