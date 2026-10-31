@@ -912,6 +912,21 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * ROUND 81 2026-10-31 (improvement round 81, one small fix on r81 from dev
+ * d747096: the user's report of the morning after the release of 1.0.2;
+ * probes docs/perf/probes/2026-10-31-r81/). Gate: the user's answer "1b" (the
+ * app reloads; deploy.ps1 stays as it is).
+ * DELIVERED: T298 (a lazy chunk that a deploy removed reloads the page once:
+ * production showed "Error loading .../assets/opponent-inferrer-DmwVZADz.js"
+ * until a hard reload; the app answers Vite's vite:preloadError with one
+ * reload, a second failure within a minute shows the error, and without
+ * session storage the page never reloads).
+ * MEASUREMENT: lossless, no engine code. The ui spec was red without the
+ * module; the build e2e test was red without the wiring (no reload) and is
+ * green on the minified bundle. ui project 820 passed, e2e 92 passed and 1
+ * skipped, lint and tsc -b green; no feedback runs (no measured code moved).
+ * Next free T299.
+ *
  * ROUND 80 2026-10-30 (improvement round 80, a small batch on r80 from dev
  * 54e5d3b: T292 of the round 79 gate, T294 and T295 from the user's requests
  * of the same afternoon, T296 from the user's report of the evening and T297

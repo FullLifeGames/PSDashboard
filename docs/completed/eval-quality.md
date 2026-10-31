@@ -1,6 +1,6 @@
 # Erledigt · Eval-Qualität
 
-Abgeschlossene Verbesserungsrunden über den Expert-Feedback-Korpus (Runden 4 bis 15 und 32 bis 80, ohne 38, 39, 59 und 71) und die geschlossenen Korpus-Gaps. Maschinen-Quellen: der Ledger in `test/regression/eval-calibration.spec.ts` und die Pins in `test/e2e-feedback/corpus.ts`. Runden 1 bis 3 stehen nur im Ledger. Offene Reste: NextSteps.md.
+Abgeschlossene Verbesserungsrunden über den Expert-Feedback-Korpus (Runden 4 bis 15 und 32 bis 81, ohne 38, 39, 59 und 71) und die geschlossenen Korpus-Gaps. Maschinen-Quellen: der Ledger in `test/regression/eval-calibration.spec.ts` und die Pins in `test/e2e-feedback/corpus.ts`. Runden 1 bis 3 stehen nur im Ledger. Offene Reste: NextSteps.md.
 
 ## Inhalt
 
@@ -61,6 +61,7 @@ Abgeschlossene Verbesserungsrunden über den Expert-Feedback-Korpus (Runden 4 bi
 - Runde 78 · Dependencies für 1.0.1 (29.10., der @pkmn-Zug 0.10.12 mit Showdown b354a81f, Teil A, der korrigierte Einwechsler in Gen 1 bis 4, Dex vor Rechner, Cache v72; übernommen am User-Gate 29.10. 15:15, T277 bis T279 geparkt)
 - Runde 79 · Welle 7: Spielbericht, Aufbau, Ersatz nach K.O. (30.10., T282 bis T288 und T290, Cache v73; übernommen am User-Gate 30.10. 15:05, T289, T291 und T293 geparkt, T292, T294 und T295 als nächster Batch)
 - Runde 80 · Kleiner Batch: Picker, Turn-Karte, Near-Stufe, Turn-0-Start (30.10., T292 als Schnell-Fix, T294 bis T297, Cache v74; übernommen am User-Gate 30.10. 22:05, der Rest von T292 geparkt)
+- Runde 81 · Ein kleiner Fix: Neuladen nach einem Deploy (31.10., T298; übernommen mit der Antwort „1b“)
 - Geschlossene Korpus-Gaps (desired-Seite, e2e-feedback/corpus.ts)
 
 ## Runde 4 · Abschluss der Hax-Alignment-Runde (16.08.)
@@ -771,3 +772,14 @@ Ziel: T292 aus dem Abschluss-Gate von Runde 79 und die beiden Wünsche des Users
 - Gate: Abschluss 22:05 („1a 2a 3a 4b“): (1) der Batch wie gemessen übernommen, T296 mit Nummer ohne Backlog-Abschnitt; (2) die drei Lücken von T292 geparkt mit Trigger; (3) T297 freigegeben und im Batch gebaut; (4) `dev` geht auf den Buchungs-Commit, danach werden `r80`, der Worktree `w8t` und `r80-t292` entfernt, und Release 1.0.2 wird vorbereitet. Um 22:20 gab der User das Go für das Release, den Push auf master und das Deployment auf den Server, sobald die Reviewer und ein Check der Docs nichts mehr offen lassen.
 - Lehren: (1) Eine Regel, die nur im Kommentar steht, gilt nicht: „Own active, own click“ stand seit Runde 15 über Code, der jeden Teamkollegen nahm; ein User-Report (573756 t71, bis T282 in Runde 79) und ein Fund der Korpus-Zählung (2695803506 t2) hingen daran. (2) Ein Schlüssel, der einen Neuaufbau als denselben Stand erkennt, muss einen neuen Start des Users davon trennen. (3) Zwei rote Gesamtläufe beweisen keine Regression: Basis und Bisektion im Worktree und ein dritter Lauf im Haupt-Checkout waren grün, der Test wartete 5 s auf ein Ereignis, das unter Last später kommt. (4) Wer schnell fixt, bucht den Rest: Die drei Lücken von T292 stehen geparkt mit Trigger. (5) Ein Docs-Check vor dem Release lohnt: Die Paket-READMEs nannten seit 1.0.1 eine Simulator-Version, die kein Manifest mehr trug.
 - Reste: T292 geparkt (drei Lücken); T289, T291 und T293 bleiben geparkt; beobachtet bleiben die späte Singles-Warnung aus Runde 79 und T287 auf Zellen mit wenigen Besuchen.
+
+## Runde 81 · Ein kleiner Fix: Neuladen nach einem Deploy (31.10.2026; T298; Arbeitsordner `docs/perf/probes/2026-10-31-r81/`; Branch `r81` ab dev d747096: 1c9f9a0; Buchung im Folge-Commit; ÜBERNOMMEN mit der Antwort des Users „1b“ am 31.10.)
+
+Ziel: Der Report des Users vom Morgen nach dem Release von 1.0.2: Die Produktion zeigte „Error loading https://fulllifegames.com/Tools/PSDashboard/assets/opponent-inferrer-DmwVZADz.js“, bis ein harter Reload half.
+
+- Ursache: Jeder Build benennt seine nachgeladenen Teile neu, und `deploy.ps1` leert beim Deploy den Ordner auf dem Server. Eine Seite aus dem alten Build (ein offener Tab oder ein `index.html` aus dem Browser-Cache; Apache schickt für `index.html` keinen `Cache-Control`-Header) fragt nach Dateien, die es nicht mehr gibt; der Server antwortete auf die alte Datei mit 404.
+- Geliefert: T298: Die App antwortet auf Vites `vite:preloadError` mit einem einmaligen Neuladen, das das neue `index.html` holt (`src/lib/stale-chunk-reload.ts`, eingehängt in `main.tsx`). Ein zweiter Fehlschlag binnen einer Minute zeigt den Fehler, und ohne Session-Storage lädt die Seite nie neu. Das wirkt in der Produktion und auf GitHub Pages ab dem nächsten Release; eine Seite aus 1.0.2 trägt den Handler noch nicht.
+- Belege und Messung: verlustfrei, kein Engine-Code. Die UI-Spec war rot ohne das Modul und ist grün; der Build-e2e-Test (`test/e2e-build/build-smoke.spec.ts`, das minifizierte Bundle mit einem 404 auf den ersten Abruf des `opponent-inferrer`-Chunks) war rot ohne die Einbindung, weil die Seite nie neu lud, und ist grün. UI-Projekt 820 grün, e2e 92 grün und 1 übersprungen, Lint und `tsc -b` grün. Keine Feedback-Läufe: Die Änderung berührt keinen Code, den der Korpus misst.
+- Gate: Antwort „1b“ vom 31.10.: nur das Neuladen in der App; `deploy.ps1` bleibt, wie es ist.
+- Lehren: Ein Deploy, der den Ordner ersetzt, bricht jede offene Seite beim nächsten Nachladen; die App fängt das jetzt selbst auf.
+- Reste: keine; T298 wartet auf dem nächsten Release.
