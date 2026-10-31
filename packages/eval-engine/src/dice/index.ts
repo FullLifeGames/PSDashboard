@@ -20,3 +20,4 @@ export { readsStartRoll } from './start-roll.ts';
 export { secondaryEffectId } from './recognize.ts';
 export { loggedActions, loggedDice, mergeLoggedDice, type LoggedAction, type LoggedOptions, type MergeInput } from './logged-results.ts';
 export { dieLabel, type DieWords } from './die-label.ts';
+export { secondariesIn } from './secondaries.ts';

@@ -8,7 +8,8 @@ import type { ForcedDie } from '../src/dice/types';
 import {
   boardOf, clicksOf, PIKACHU, playClicks, RULES, seedOf, SNORLAX, type Mode, type Mon, type Rules, type Scene,
 } from './dice-fixtures';
-import { dexOfRules, secondariesIn } from './dice-sweep-support';
+import { secondariesIn } from '../src/dice/secondaries';
+import { dexOfRules } from './dice-sweep-support';
 
 /**
  * Round 82 (forced dice), step A5: the simulator is the oracle of the log reader. A turn played on one seed writes a log;

@@ -8,7 +8,7 @@ import { loggedDice, mergeLoggedDice } from '../src/dice/logged-results';
 import { playForcedTurn } from '../src/dice/play';
 import { dieKey, type ForcedDie } from '../src/dice/types';
 import { loggedClicks, reconstruct } from './arrival-turn';
-import { secondariesIn } from './dice-sweep-support';
+import { secondariesIn } from '../src/dice/secondaries';
 
 /**
  * Round 82 (forced dice), step A5, gate answer 19a, on the app's own reconstruction of real games: once the user forces any die
