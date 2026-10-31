@@ -11,6 +11,7 @@ import { extractProtocolEvents, scoreAlignment } from '../src/hax-alignment';
 import { buildForcedSwitchChoice, hasForceSwitch } from '../src/branch/corrections';
 import { actionKey } from '../src/branch/logged-rolls';
 import type { SimBattle } from '../src/branch/types';
+import type { BranchSlotChoice } from '../src/branch-choices';
 import { collectForcedSwitchSpecies, getMainChoice, parseTurnBlocks } from '../src/branch/protocol-choices';
 import { rulesDex } from '@fulllifegames/replay-core';
 
@@ -59,18 +60,24 @@ export const prngOf = (runtime: BranchRuntime) => runtime.battleStream.battle!.p
  */
 export async function playTurn(
   runtime: BranchRuntime, replayLog: string, turn: number, choices?: string | { p1?: string; p2?: string },
+  dice?: { p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] },
 ) {
   const replaced = typeof choices === 'string' ? { p2: choices } : choices ?? {};
   const block = parseTurnBlocks(replayLog).turns.find(entry => entry.turn === turn)!;
   const battle = runtime.battleStream.battle!;
-  const send = (commands: { side: 'p1' | 'p2'; command: string }[]) =>
-    executeBranchChoices({ streams: runtime.streams, log: runtime.log, choiceErrors: runtime.choiceErrors, commands });
+  // round 82 (A6): with `dice` the turn plays through the dice module; the later calls (forced replacements) carry no choices, as the app's
+  const send = (commands: { side: 'p1' | 'p2'; command: string }[], first = false) =>
+    executeBranchChoices({
+      streams: runtime.streams, log: runtime.log, choiceErrors: runtime.choiceErrors, commands,
+      ...(dice ? { dice: { battle, p1Choices: first ? dice.p1 : [], p2Choices: first ? dice.p2 : [] } } : {}),
+    });
   const logStart = battle.log.length;
   const first = await send([
     { side: 'p1', command: replaced.p1 ?? getMainChoice(block.preUpkeep, 'p1', battle) },
     { side: 'p2', command: replaced.p2 ?? getMainChoice(block.preUpkeep, 'p2', battle) },
-  ]);
+  ], true);
   expect(first.ok).toBe(true);
+  let report = first.ok ? first.dice : undefined;
   const forced = {
     p1: collectForcedSwitchSpecies(block.preUpkeep, block.postUpkeep, 'p1', rulesDex(9)),
     p2: collectForcedSwitchSpecies(block.preUpkeep, block.postUpkeep, 'p2', rulesDex(9)),
@@ -82,11 +89,12 @@ export async function playTurn(
       return choice ? [{ side, command: choice }] : [];
     });
     if (commands.length === 0) break;
-    await send(commands);
+    const later = await send(commands);
+    if (later.ok && later.dice) report = later.dice;
   }
   const lines = battle.log.slice(logStart);
   const expected = extractProtocolEvents([...block.preUpkeep, ...block.postUpkeep]);
-  return { lines, score: scoreAlignment(expected, extractProtocolEvents(lines)) };
+  return { lines, report, score: scoreAlignment(expected, extractProtocolEvents(lines)) };
 }
 
 export interface Draw { key: string | null; from?: number; to?: number; value: number }
