@@ -23,6 +23,33 @@ export function snapshotConditionDuration(value: unknown): number | undefined {
 }
 
 /**
+ * The remaining turns the snapshot allows, from the client's minimum to its maximum. A maximum of 0 makes the minimum the
+ * exact count (no item extends the condition); neither count means the client counts no turns.
+ */
+function snapshotConditionRange(value: unknown): { min: number; max: number } | null {
+  if (!value || typeof value !== 'object') return null;
+  const counts = value as { minDuration?: unknown; maxDuration?: unknown; duration?: unknown };
+  const turns = (count: unknown): number => (typeof count === 'number' && Number.isFinite(count) && count > 0 ? count : 0);
+  const exact = turns(counts.duration);
+  if (exact) return { min: exact, max: exact };
+  const min = turns(counts.minDuration);
+  const max = turns(counts.maxDuration);
+  if (!min && !max) return null;
+  return { min, max: max || min };
+}
+
+/**
+ * The remaining turns a synced condition keeps. The simulator's own count stands where the snapshot allows it: the simulator
+ * knows the setter's item, and the client, which never sees it, counts a screen of a Light Clay holder from five turns, not
+ * eight (round 83, T307, GitHub issue #3). Otherwise the snapshot's count, as before.
+ */
+function syncedDuration(held: number | undefined, value: unknown): number | undefined {
+  const range = snapshotConditionRange(value);
+  if (held !== undefined && range && held >= range.min && held <= range.max) return held;
+  return snapshotConditionDuration(value);
+}
+
+/**
  * Whether the sim stacks this condition: its dex condition restarts
  * (onSideRestart, in 0.10.11 exactly Spikes and Toxic Spikes, which count
  * layers there). The client counts the same setter as `level`.
@@ -45,7 +72,7 @@ function syncEffectTableFromSnapshot(battle: SimBattle, table: Record<string, Ef
   }
   for (const [key, value] of Object.entries(snapshotTable)) {
     const id = toId(key);
-    const duration = snapshotConditionDuration(value);
+    const duration = syncedDuration(table[id]?.duration, value);
     const layers = stacks(battle, id) ? snapshotLevel(value) : undefined;
     table[id] = {
       ...(table[id] ?? {}),
