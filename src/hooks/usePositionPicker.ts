@@ -6,6 +6,7 @@ import { buildReplayTeams, type TeamBuildSources } from '../lib/eval-acquire';
 import type { VariationSpan } from '../lib/timeline';
 import type { BranchHistoryEntry, BranchSimState } from './useBranch';
 import type { PlayedAtPosition, PlayedPick } from '../lib/played-pick';
+import { mergeChoices, seedChoices } from '../lib/dock-seed';
 
 /**
  * Picker state for the viewed position when the live sim is elsewhere
@@ -30,11 +31,13 @@ export function usePositionPicker(args: {
   draftChoices: { p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] };
   /** The live sim's state: the panel's stand-in for the first frames after leaving the tip. */
   liveSimState: BranchSimState | null;
+  /** Round 84 (turn dock): what the viewed line played here; every untouched slot starts with it (the seed). */
+  played?: PlayedAtPosition | null;
 }) {
   const {
     replayData, snapshots, sources, bringOnlyLists, replayGenNumber, liveTip, viewingVariation,
     serializedAtView, viewTurn, variationStartTurn, startSerialized, getExact, exactPositionsVersion,
-    draftChoices, liveSimState,
+    draftChoices, liveSimState, played,
   } = args;
   // The last resolution, with the position it belongs to (a position that
   // cannot be shown resolves to no picker).
@@ -68,16 +71,7 @@ export function usePositionPicker(args: {
     replayData, sources, replayGenNumber, getExact, exactPositionsVersion, bringOnlyLists,
   ]);
 
-  /** Non-live positions render the resolved picker state with the DRAFT
-   *  choices mirrored in — the panel's selection logic reads simState. */
-  // (resolver lives below the hook to keep this function under the caps)
-  const pickerSimState = useMemo(() => (shownState ? {
-    ...shownState,
-    p1Choice: draftChoices.p1[0] ?? null,
-    p1Choices: draftChoices.p1,
-    p2Choice: draftChoices.p2[0] ?? null,
-    p2Choices: draftChoices.p2,
-  } : null), [shownState, draftChoices]);
+  const { pickerSeed, pickerSimState } = useEffectivePicker(shownState, positionPicker, played, draftChoices);
 
   // Round 82 (forced dice), step A7b: the battle of a stored position, for the dice chips' offers. One function per battle, so the
   // panel's effect asks again only when the position changes.
@@ -86,7 +80,38 @@ export function usePositionPicker(args: {
   // The main line shows the replay's own turn at a stored position: the log's dice are read from the replay's lines. A variation's
   // position is no turn of the replay.
   const pickerReplayLog = pickerBattle && !viewingVariation ? replayData?.log : undefined;
-  return { positionPicker, pickerSimState, pickerStale: standIn !== null, getPickerBattle: pickerBattle ? getPickerBattle : undefined, pickerReplayLog };
+  return { positionPicker, pickerSimState, pickerSeed, pickerStale: standIn !== null, getPickerBattle: pickerBattle ? getPickerBattle : undefined, pickerReplayLog };
+}
+
+/**
+ * Round 84 (turn dock): the seed is derived, never stored. A slot the user has not touched (no entry in the draft) shows the
+ * choice the viewed line played; the draft wins slot by slot, and navigation clearing it brings the seed back. The seed reads
+ * the resolved picker only: a stand-in belongs to another position. When the exact position replaces the snapshot picker, the
+ * memo runs again, and an untouched slot gains the target and gimmick the exact picker offers.
+ *
+ * Non-live positions render the shown picker state with the effective choices (seed under draft) mirrored in: the panel's
+ * selection logic reads simState.
+ */
+function useEffectivePicker(
+  shownState: BranchSimState | null, positionPicker: ResolvedPicker | null, played: PlayedAtPosition | null | undefined,
+  draftChoices: { p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] },
+) {
+  const pickerSeed = useMemo(
+    () => (positionPicker && played ? seedChoices(played, positionPicker.simState) : null),
+    [positionPicker, played],
+  );
+  const pickerSimState = useMemo(() => {
+    if (!shownState) return null;
+    const effective = pickerSeed ? mergeChoices(pickerSeed, draftChoices) : draftChoices;
+    return {
+      ...shownState,
+      p1Choice: effective.p1[0] ?? null,
+      p1Choices: effective.p1,
+      p2Choice: effective.p2[0] ?? null,
+      p2Choices: effective.p2,
+    };
+  }, [shownState, pickerSeed, draftChoices]);
+  return { pickerSeed, pickerSimState };
 }
 
 /** The picker of a viewed position; `battle` is the revived battle of a stored position (none for the snapshot's approximation). */

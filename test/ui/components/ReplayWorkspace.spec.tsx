@@ -65,7 +65,9 @@ describe('ReplayWorkspace', () => {
     act(() => app().board.timeline.navigateTo({ turn: 2, line: 'main' }));
     await waitFor(() => expect(app().engine.pickerSimState).not.toBeNull(), { timeout: 30_000 });
     expect(sideLabels()).toEqual(['P1', 'P2']);
-    expect(screen.getByRole('button', { name: /^Select/ })).toBeDisabled();
+    // Round 84 (turn dock, gate list 1 and 3): every slot starts with the choice the log played, so Execute is ready at once
+    // (it used to wait for a pick on each side).
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Execute Turn' })).toBeEnabled(), { timeout: 30_000 });
     expect(screen.getByText(/^Choices/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Advanced ▸' })).toBeInTheDocument();
   }, 90_000);

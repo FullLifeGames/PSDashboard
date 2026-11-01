@@ -47,19 +47,7 @@ function useAcquireLayer(ctx: ReplayContext, transients: Transients, board: Boar
     playOut, evaluation, usageStats: ctx.smogon.usageStats, setAssumptions: ctx.smogon.setAssumptions,
   });
   const acquire = useEvalAcquire({ replayData, source: positions, getBattle, viewTurn, dwellEnabled, smogonPending });
-  const { positionPicker, pickerSimState, pickerStale, getPickerBattle, pickerReplayLog } = usePositionPicker({
-    replayData, snapshots, sources: teamSources, bringOnlyLists, replayGenNumber,
-    liveTip, viewingVariation, serializedAtView, viewTurn, variationStartTurn, startSerialized,
-    getExact: acquire.getExact, exactPositionsVersion: acquire.exactPositionsVersion, draftChoices,
-    liveSimState: ctx.branch.simState,
-  });
-  // Round 77 (D2): a draft pick that the rebuilt position no longer offers goes, instead of failing on Execute. The
-  // reconciliation runs in render: the draft state lives in this same component.
-  const resolvedForView = !liveTip ? positionPicker?.simState ?? null : null;
-  if (resolvedForView) {
-    const kept = dropStaleDraft(draftChoices, resolvedForView);
-    if (kept !== draftChoices) transients.setDraftChoices(kept);
-  }
+  // Round 84 (turn dock): read before the picker, which seeds its untouched slots with it.
   // Round 75 (T160): the played-action parser reads the replay's own Dex (generation and mod).
   const rules = useMemo(() => logRules(replayData?.log ?? ''), [replayData]);
   const parseSingles = useCallback((lines: string[]) => parsePlayedActions(lines, rules), [rules]);
@@ -68,7 +56,20 @@ function useAcquireLayer(ctx: ReplayContext, transients: Transients, board: Boar
     history: ctx.branch.history, snapshots, doubles: ctx.meta.evalIsDoubles,
     parseSingles, parseDoubles: parsePlayedActionsDoubles,
   });
-  return { acquire, smogonPending, positionPicker, pickerSimState, pickerStale, getPickerBattle, pickerReplayLog, playedAtView };
+  const { positionPicker, pickerSimState, pickerSeed, pickerStale, getPickerBattle, pickerReplayLog } = usePositionPicker({
+    replayData, snapshots, sources: teamSources, bringOnlyLists, replayGenNumber,
+    liveTip, viewingVariation, serializedAtView, viewTurn, variationStartTurn, startSerialized,
+    getExact: acquire.getExact, exactPositionsVersion: acquire.exactPositionsVersion, draftChoices,
+    liveSimState: ctx.branch.simState, played: playedAtView,
+  });
+  // Round 77 (D2): a draft pick that the rebuilt position no longer offers goes, instead of failing on Execute. The
+  // reconciliation runs in render: the draft state lives in this same component.
+  const resolvedForView = !liveTip ? positionPicker?.simState ?? null : null;
+  if (resolvedForView) {
+    const kept = dropStaleDraft(draftChoices, resolvedForView);
+    if (kept !== draftChoices) transients.setDraftChoices(kept);
+  }
+  return { acquire, smogonPending, positionPicker, pickerSimState, pickerSeed, pickerStale, getPickerBattle, pickerReplayLog, playedAtView };
 }
 
 function useEvalViewLayer(

@@ -222,8 +222,10 @@ export function useDeviation(inputs: DeviationInputs) {
     branch.setChoice(side, choice, activeSlot);
   }, [timeline.liveTip, draftChoices, setDraftChoices, branch]);
 
-  const handleExecuteDraft = useCallback(() => {
-    requests.requestDeviation({ p1Choices: draftChoices.p1, p2Choices: draftChoices.p2 });
+  // Round 84 (turn dock): the dock hands over the effective choices (the played seed under the user's picks); without them the
+  // bare draft goes, as before.
+  const handleExecuteDraft = useCallback((choices: { p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] } = draftChoices) => {
+    requests.requestDeviation({ p1Choices: choices.p1, p2Choices: choices.p2 });
   }, [requests, draftChoices]);
 
   const { leadOptions, defaultLeadSelection } = useLeadDefaults(snapshots, bringCount, replayGameType, replayData);

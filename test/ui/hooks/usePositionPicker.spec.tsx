@@ -1,8 +1,10 @@
 import { describe, expect, test, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
-import type { BranchSimState } from '@fulllifegames/eval-engine';
+import type { BranchSimState, BranchSlotChoice } from '@fulllifegames/eval-engine';
 import { usePositionPicker } from '../../../src/hooks/usePositionPicker';
 import type { TeamBuildSources } from '../../../src/lib/eval-acquire';
+import type { PlayedAtPosition } from '../../../src/lib/played-pick';
+import { simState } from '../fixtures/sim-state';
 
 /** The recorded positions resolve when the test says so: each serialized string names its picker state and the battle it was read from. */
 const pending = new Map<string, (state: BranchSimState, battle?: unknown) => void>();
@@ -109,5 +111,70 @@ describe('usePositionPicker', () => {
     await waitFor(() => expect(result.current.pickerStale).toBe(false));
     expect(result.current.pickerSimState).toBeNull();
     expect(result.current.positionPicker).toBeNull();
+  });
+
+  describe('the seed of the dock (round 84, lane A)', () => {
+    const played: PlayedAtPosition = {
+      p1: { kind: 'move', name: 'Flare Blitz', targetLoc: 2 }, p2: { kind: 'move', name: 'Wood Hammer', targetLoc: 1 },
+      p1Slots: [{ kind: 'move', name: 'Flare Blitz', targetLoc: 2 }, { kind: 'move', name: 'Moonblast' }],
+      p2Slots: [{ kind: 'move', name: 'Wood Hammer', targetLoc: 1 }, null],
+    };
+    const mine: BranchSlotChoice = { kind: 'move', moveId: 'protect', moveName: 'Protect' };
+    const names = (choices: (BranchSlotChoice | null)[] | undefined) => (choices ?? []).map(choice => (choice && choice.kind === 'move' ? choice.moveName : choice));
+
+    test('an untouched slot shows the seed, a touched one the draft, and the draft clearing brings the seed back', async () => {
+      const { result, rerender } = renderHook((props: Args) => usePositionPicker(props), { initialProps: args({ played }) });
+      rerender(args({ serializedAtView: 'seeded', played }));
+      await land('seeded', simState('doubles'));
+      await waitFor(() => expect(result.current.pickerSimState?.p1Choices).toHaveLength(2));
+      const shown = result.current.pickerSimState!;
+      expect(names(shown.p1Choices)).toEqual(['Flare Blitz', null]);
+      expect(names(shown.p2Choices)).toEqual(['Wood Hammer', null]);
+      expect(shown.p1Choice).toBe(shown.p1Choices[0]);
+      expect(result.current.pickerSeed?.p1[1]).toEqual({ choice: null, played: played.p1Slots![1] });
+
+      rerender(args({ serializedAtView: 'seeded', played, draftChoices: { p1: [mine], p2: [] } }));
+      expect(names(result.current.pickerSimState?.p1Choices)).toEqual(['Protect', null]);
+      expect(names(result.current.pickerSimState?.p2Choices)).toEqual(['Wood Hammer', null]);
+      // Navigation clears the draft: the seed stands again.
+      rerender(args({ serializedAtView: 'seeded', played }));
+      expect(names(result.current.pickerSimState?.p1Choices)).toEqual(['Flare Blitz', null]);
+    });
+
+    test('the swap from the snapshot picker to the exact position gives an untouched slot its target', async () => {
+      // The snapshot picker lists no targets, so its seed carries none; the exact position lists them and the same slot re-seeds.
+      const approximate = simState('doubles');
+      approximate.p1MovesBySlot[0] = approximate.p1MovesBySlot[0].map(option => ({ ...option, targetOptions: [] }));
+      const targetOf = (current: ReturnType<typeof usePositionPicker>) => {
+        const choice = current.pickerSimState?.p1Choices[0];
+        return choice && choice.kind === 'move' ? choice.targetLoc : 'no choice';
+      };
+      const { result, rerender } = renderHook((props: Args) => usePositionPicker(props), { initialProps: args({ played }) });
+      rerender(args({ serializedAtView: 'approximate', played }));
+      await land('approximate', approximate);
+      await waitFor(() => expect(result.current.positionPicker).not.toBeNull());
+      expect(targetOf(result.current)).toBeUndefined();
+      rerender(args({ serializedAtView: 'exact', played }));
+      await land('exact', simState('doubles'));
+      await waitFor(() => expect(targetOf(result.current)).toBe(2));
+    });
+
+    test('no seed on a stand-in: the played record belongs to the viewed position, not to the one on screen', async () => {
+      const { result, rerender } = renderHook((props: Args) => usePositionPicker(props), { initialProps: args({ viewTurn: 3, serializedAtView: 'three', played }) });
+      await land('three', simState('doubles'));
+      await waitFor(() => expect(result.current.pickerSeed).not.toBeNull());
+      rerender(args({ viewTurn: 2, serializedAtView: 'two', played }));
+      expect(result.current.pickerStale).toBe(true);
+      expect(result.current.pickerSeed).toBeNull();
+      expect(names(result.current.pickerSimState?.p1Choices)).toEqual([]);
+    });
+
+    test('without a played record the draft stands as it was', async () => {
+      const draftChoices = { p1: [mine], p2: [] };
+      const { result, rerender } = renderHook((props: Args) => usePositionPicker(props), { initialProps: args({ draftChoices }) });
+      rerender(args({ serializedAtView: 'plain', draftChoices }));
+      await land('plain', simState('doubles'));
+      await waitFor(() => expect(result.current.pickerSimState?.p1Choices).toBe(draftChoices.p1));
+    });
   });
 });

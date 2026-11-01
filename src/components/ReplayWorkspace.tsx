@@ -150,7 +150,8 @@ function PickerRegion({ app, replayData }: WorkspaceProps) {
       gen={replayGen}
       onSetChoice={handleSetChoice}
       onHypotheticalMove={app.handleHypotheticalMove}
-      onExecuteTurn={liveTip ? app.handleExecuteTurn : handleExecuteDraft}
+      // Round 84 (turn dock): off the tip the effective choices (the played seed under the user's picks) go to Execute.
+      onExecuteTurn={liveTip ? app.handleExecuteTurn : () => handleExecuteDraft(pickerSimState ? { p1: pickerSimState.p1Choices, p2: pickerSimState.p2Choices } : undefined)}
       played={playedAtView}
       positionKey={`${replayData.id}:${evalViewKey}`}
       getBattle={liveTip ? app.ctx.branch.getBattle : getPickerBattle}

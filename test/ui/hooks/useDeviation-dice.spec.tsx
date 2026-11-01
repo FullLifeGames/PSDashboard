@@ -25,7 +25,8 @@ type Picks = { p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] 
 describe.each(CASES)('Execute from a viewed position, $kind', ({ kind, turn }) => {
   const fixture = replayFixture(kind);
 
-  test('the draft\'s forced die reaches the first turn of the branch', async () => {
+  /** The hook over a viewed position of the fixture, and the picks a user could click there (one move per slot and side). */
+  async function viewedPosition() {
     const { result } = renderHook(() => {
       const branch = useBranch();
       const [draft, setDraft] = useState<Picks>({ p1: [], p2: [] });
@@ -55,6 +56,11 @@ describe.each(CASES)('Execute from a viewed position, $kind', ({ kind, turn }) =
     const p2 = Array.from({ length: slots }, (_, slot) => click('p2', slot));
     const die: ForcedDie = { name: { slot: 'p1a', moveId: p1[0].moveId, targetSlot: 'p2a', kind: 'accuracy' }, result: { happens: false } };
     act(() => result.current.branch.stopBranch());
+    return { result, p1, p2, die };
+  }
+
+  test('the draft\'s forced die reaches the first turn of the branch', async () => {
+    const { result, p1, p2, die } = await viewedPosition();
 
     // The user forces the die in the draft, then presses Execute at the viewed position.
     act(() => result.current.setDraft({ p1: p1.map((choice, slot) => (slot === 0 ? { ...choice, dice: [die] } : choice)), p2 }));
@@ -67,5 +73,18 @@ describe.each(CASES)('Execute from a viewed position, $kind', ({ kind, turn }) =
     // the user's report holds the user's die alone: the log's own results joined the turn but stay out of the user's view
     expect(entry.diceReport?.forced.map(report => report.die)).toEqual([die]);
     expect(['applied', 'no-draw', 'no-chance', 'blocked']).toContain(entry.diceReport!.forced[0].took);
+  }, 300_000);
+
+  test('Execute sends the effective choices it is given, seed included, and not the bare draft (round 84, turn dock)', async () => {
+    // The dock's seed is derived, not stored in the draft: the caller hands the merge of seed and draft to Execute.
+    const { result, p1, p2 } = await viewedPosition();
+    expect(result.current.draft).toEqual({ p1: [], p2: [] });
+    act(() => result.current.deviation.handleExecuteDraft({ p1, p2 }));
+    await waitFor(() => expect(result.current.branch.history).toHaveLength(1), { timeout: 120_000 });
+
+    expect(result.current.branch.executeError).toBeNull();
+    const entry = result.current.branch.history[0];
+    expect(entry.p1SlotChoices).toEqual(p1);
+    expect(entry.p2SlotChoices).toEqual(p2);
   }, 300_000);
 });
