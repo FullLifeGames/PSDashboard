@@ -5,7 +5,7 @@ import type { PickerBattle, PickerSource } from '../lib/picker-state';
 import { buildReplayTeams, type TeamBuildSources } from '../lib/eval-acquire';
 import type { VariationSpan } from '../lib/timeline';
 import type { BranchHistoryEntry, BranchSimState } from './useBranch';
-import type { PlayedAtPosition, PlayedPick } from '../components/BranchPanel';
+import type { PlayedAtPosition, PlayedPick } from '../lib/played-pick';
 
 /**
  * Picker state for the viewed position when the live sim is elsewhere
@@ -193,7 +193,10 @@ export function usePlayedAtView(args: {
   }, [viewingVariation, variationSpan, viewTurn, history, snapshots, doubles, parseSingles, parseDoubles]);
 }
 
-type PlayedAction = { kind: 'move' | 'switch'; name: string; species?: string };
+type PlayedAction = {
+  kind: 'move' | 'switch'; name: string; species?: string;
+  tera?: boolean; mega?: boolean; ultra?: boolean; targetLoc?: number | null;
+};
 type PlayedActions = {
   p1: PlayedAction | null;
   p2: PlayedAction | null;
@@ -201,8 +204,16 @@ type PlayedActions = {
   p2Slots?: (PlayedAction | null)[];
 };
 
+/** Round 84 (turn dock): the pick keeps the log's target and gimmick, which the dock's seed reads. */
 function fromAction(action: PlayedAction | null): PlayedPick | null {
-  return action ? { kind: action.kind, name: action.name, ...(action.species ? { species: action.species } : {}) } : null;
+  if (!action) return null;
+  const modifier = action.tera ? 'terastallize' : action.mega ? 'mega' : action.ultra ? 'ultra' : undefined;
+  return {
+    kind: action.kind, name: action.name,
+    ...(action.species ? { species: action.species } : {}),
+    ...(action.targetLoc !== undefined ? { targetLoc: action.targetLoc } : {}),
+    ...(modifier ? { modifier } : {}),
+  };
 }
 
 /** A doubles record: the slot lists, and each side's first pick for the readers of `p1`/`p2`. */
@@ -213,8 +224,13 @@ function withSlots(p1Slots: (PlayedPick | null)[], p2Slots: (PlayedPick | null)[
 function fromChoice(choice: BranchSlotChoice | null): PlayedPick | null {
   if (!choice) return null;
   return choice.kind === 'move'
-    ? { kind: 'move', name: choice.moveName }
-    : { kind: 'switch', name: choice.pokemonName, species: choice.speciesId };
+    ? {
+      kind: 'move', name: choice.moveName,
+      ...(choice.targetLoc !== undefined ? { targetLoc: choice.targetLoc } : {}),
+      ...(choice.modifier ? { modifier: choice.modifier } : {}),
+      recorded: choice,
+    }
+    : { kind: 'switch', name: choice.pokemonName, species: choice.speciesId, recorded: choice };
 }
 
 function playedFromHistory(history: BranchHistoryEntry[], index: number): PlayedAtPosition | null {

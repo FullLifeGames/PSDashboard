@@ -6,13 +6,14 @@ import {
 } from '@fulllifegames/eval-engine';
 import type { PickerSource } from '../lib/picker-state';
 import { computePreviewDamage, EMPTY_SIDE_DAMAGE, type DamagePreviewInputs, type SideDamage } from '../lib/branch-damage';
-import { SideControls, type PlayedPick } from './branch/SideControls';
+import { SideControls } from './branch/SideControls';
+import type { PlayedAtPosition, PlayedPick } from '../lib/played-pick';
 import { useGimmickToggles, type Gimmick } from '../hooks/useSideControlsState';
 import { ExecuteRow, PickerSourceLine, RawLogToggle } from './branch/PanelStatus';
 import { DICE_WAIT_NOTE, TurnDice } from './branch/DiceChips';
 import { useDiceViews, type DiceViews } from '../hooks/useDiceView';
 
-export type { PlayedPick } from './branch/SideControls';
+export type { PlayedPick, PlayedAtPosition } from '../lib/played-pick';
 
 interface Props {
   simState: BranchSimState | null;
@@ -56,16 +57,6 @@ interface Props {
 
 type LiveBattle = LiveHit['battle'];
 
-/**
- * What each side played at a position. Doubles carry one pick per slot (`p1Slots`, index 0 = slot A);
- * singles carry the side's pick alone.
- */
-export interface PlayedAtPosition {
-  p1: PlayedPick | null;
-  p2: PlayedPick | null;
-  p1Slots?: (PlayedPick | null)[];
-  p2Slots?: (PlayedPick | null)[];
-}
 
 /** The pick one slot shows: its own entry in a doubles record, else the side's pick on slot A. */
 function playedOfSlot(slots: (PlayedPick | null)[] | undefined, side: PlayedPick | null | undefined, slot: number): PlayedPick | null {

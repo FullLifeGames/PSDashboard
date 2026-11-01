@@ -10,15 +10,9 @@ import { SwitchBtn } from './ChoiceButtons';
 import { displayName } from '../../lib/branch-history';
 import { FightSection, type FightSectionProps, type WhatIfState } from './FightSection';
 import { toId } from '@fulllifegames/replay-core';
+import type { PlayedPick } from '../../lib/played-pick';
 
-/** What the viewed line actually played at this position (badge on the
- *  matching button + header note): the replay's action on the main line,
- *  the variation's recorded choice on variation positions. */
-export interface PlayedPick {
-  kind: 'move' | 'switch';
-  name: string;
-  species?: string;
-}
+export type { PlayedPick } from '../../lib/played-pick';
 
 export interface SideControlsProps {
   label: string;
