@@ -1,18 +1,18 @@
 # Backlog
 
-This file holds the details of every open TODO, one section per TODO under its fixed T-number. Release v1.0.2 is out (30.10.2026), and round 82 (forced dice in branches) waits on dev for the next release. Round 83 carries four approved TODOs (T299, T304 to T306); every other TODO is parked with a trigger, and a trigger that fires brings its TODO to a gate. The next free T-number is T307.
+This file holds the details of every open TODO, one section per TODO under its fixed T-number. Release v1.0.2 is out (30.10.2026), and round 82 (forced dice in branches) waits on dev for the next release. Round 84 carries four approved TODOs (T299, T304 to T306); round 83 is a small batch of two GitHub issues (T307, T308, details in `NextSteps.md`); every other TODO is parked with a trigger, and a trigger that fires brings its TODO to a gate. The next free T-number is T309.
 
 Evidence paths of the form `r<NN>/…` point to that round's probe folder, `docs/perf/probes/<date>-r<NN>/`; `docs/` is local, so they exist only on the maintainer's machine. Each round's entry in `docs/completed/` names its folder and the gate that approved its TODOs. Line numbers in a section refer to the state when the TODO was written.
 
-## Round 83 · the engine reads the dice
+## Round 84 · the engine reads the dice
 
-The final gate of round 82 (01.11.2026, "2a") approved these TODOs for round 83, the engine setup; each leaves this file with that round's booking.
+The final gate of round 82 (01.11.2026, "2a") approved these TODOs for the next round, the engine setup; the gate of 11:31 ("3a") put a small batch first, so they form round 84. Each leaves this file with that round's booking.
 
 ### T304 · The report plays the game's biggest roll the other way
 
 *Engine · round 82 · feature · report prose (pins move)*
 
-**Approved for round 83 (final gate of round 82, 01.11.2026, "2a"; the user: "Ich will schon, dass Fire Fang korrekt als Miss deklariert und dass das das Game geändert hat. Das Engine Setup generell wäre für mich die nächste Runde").**
+**Approved for round 84 (final gate of round 82, 01.11.2026, "2a"; the user: "Ich will schon, dass Fire Fang korrekt als Miss deklariert und dass das das Game geändert hat. Das Engine Setup generell wäre für mich die nächste Runde").**
 
 **Problem.** smogtours-gen8ou-573756 turn 73: LordEnz's Garchomp at +4 misses Fire Fang (95 %) on SOULWIND's Corviknight at 15 % (59 of 399 HP, after Stealth Rock), and the report reads "The game's biggest roll came on turn 73: Fire Fang (95%) missed, worth +13% to SOULWIND." (T284, round 79, `packages/eval-engine/src/biggest-roll.ts:45-49`). The +13 % is the turn's chance part (`chanceDelta`, `packages/eval-engine/src/analysis.ts:67-69`): the next root's score after the miss against the price of the played pair, which averages hit and miss at their chances and also holds the turn's other dice and model error. The report never names the win chance a hit would have left, so it cannot say what the miss took from LordEnz. The gap pin of 573756 turn 73 (since 2026-08) still asks that "the bar shows how close the sweep stood".
 
@@ -30,7 +30,7 @@ The final gate of round 82 (01.11.2026, "2a") approved these TODOs for round 83,
 
 *Engine · round 82 · feature · score-touching (D3)*
 
-**Approved for round 83 (final gate of round 82, 01.11.2026, "2a": the engine setup is the next round).**
+**Approved for round 84 (final gate of round 82, 01.11.2026, "2a": the engine setup is the next round).**
 
 **Problem.** The tree's class path prices a singles cell by outcome classes: miss, kill roll, non-kill roll, and both orders of a speed tie (`Outcome` in `packages/eval-engine/src/search/outcome-children.ts:64`, `foldClassWeights` in `packages/eval-engine/src/cell-blend.ts:289-297`). A secondary effect has no class, and the scripted dice cannot force one (`RollScript` carries hit, crit, roll and order, `forward/scripted-prng.ts:17-26`). The tree draws the natural base seed first, then at most six forced draws for the classes it did not show (`search/expansion.ts:107`, `TREE_FORCED_CAP` at `:31`), and each class keeps one representative child, so a burn, a flinch or a stat drop counts with the whole weight of its class or not at all. A flinch writes a `|cant|` line, and `classifyChild` returns null for any `|cant|` on an event side (`cell-blend.ts:235-239`), so a base draw with a flinch sends the cell to a single seed (`outcome-children.ts:228`, `expansion.ts:121`). A cell without a miss or a kill has no class at all: smogtours-gen8ou-573756 turn 8, LordEnz's fifth Scald in a row into Clefable, against Knock Off. The narrative counts the burn chance compounding to about 83 % over the streak (a truth pin since round 6), and the tree prices the cell from `SEARCH_SEEDS[0]`, so the burn counts fully or not at all. The doubles pair plan reads a flinch chance only to fall back from its pattern (`pair/pattern.ts:74-81`, used at `:219`).
 
@@ -48,7 +48,7 @@ The final gate of round 82 (01.11.2026, "2a") approved these TODOs for round 83,
 
 *Engine · round 82 · feature · score-touching (D3: the replay's positions move)*
 
-**Approved for round 83 (final gate of round 82, 01.11.2026, "2a": the engine setup is the next round).**
+**Approved for round 84 (final gate of round 82, 01.11.2026, "2a": the engine setup is the next round).**
 
 **Problem.** The reconstruction replays each turn's choices and searches 16 pinned seeds for one whose discrete results match the log: faints, the end, move order, misses, crits, secondary effects, hit counts, `|cant|` reasons and confusion self-hits (`ALIGNMENT_SEEDS` and `chooseAlignedSeed` in `packages/eval-engine/src/hax-alignment.ts:208-266`). In the feedback runs of round 82 the best seed matches the log in 332 of 356 turns: 286 of 297 in singles, 17 of 25 in Doubles OU, 29 of 34 in VGC. In the other 24 turns the rebuilt position carries a result the game did not have, or lacks one it had, until the next snapshot corrects it; 5 of them carry a faint mismatch (`faint-residual`). The first turn of a branch repeats its seed search on every adopt: `alignArrivalDice` always runs it (`branch/adopt.ts:52`, `branch/runtime.ts:274`), and the serialized position keeps only a seed, not the logged draws.
 
@@ -66,7 +66,7 @@ The final gate of round 82 (01.11.2026, "2a") approved these TODOs for round 83,
 
 *Engine · round 82 · small · score-touching*
 
-**Approved for round 83 (final gate of round 82, 01.11.2026, "2a": the engine setup is the next round). Parked before (planning of round 82, 31.10.2026, "11a"); its trigger fires in round 83, which moves the scripted dice onto the forced-dice module.**
+**Approved for round 84 (final gate of round 82, 01.11.2026, "2a": the engine setup is the next round). Parked before (planning of round 82, 31.10.2026, "11a"); its trigger fires in round 84, which moves the scripted dice onto the forced-dice module.**
 
 **Problem.** The tree's scripted dice tell a draw by the numbers in the call, and the simulator draws the attacker's status checks inside the same action: `runMove` sets the active move before `BeforeMove` (`@pkmn/sim` 0.10.12, `battle-actions.js:292` and `:301`).
 

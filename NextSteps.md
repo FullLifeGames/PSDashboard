@@ -1,6 +1,6 @@
-# Next Steps (as of 01.11.2026, round 82 booked, round 83 next)
+# Next Steps (as of 01.11.2026, round 83 open)
 
-Open work only. Each step is one round; its TODOs carry fixed T-numbers, and their details are in `docs/backlog.md`. Rules for agents: `AGENTS.md`. Finished rounds: `docs/completed/`. Next free T-number: T307.
+Open work only. Each step is one round; its TODOs carry fixed T-numbers, and their details are in `docs/backlog.md`. Rules for agents: `AGENTS.md`. Finished rounds: `docs/completed/`. Next free T-number: T309.
 
 ## State
 
@@ -8,9 +8,11 @@ Release v1.0.2 (30.10.2026) is on master, on GitHub Pages with the frozen copies
 
 ## Next rounds
 
-Round 83 · The engine reads the dice (feature, score-touching D3). The engine adopts the dice module of round 82 (`packages/eval-engine/src/dice/`, words in `GLOSSARY.md`, decisions in `docs/adr/`). T304: the report plays the game's biggest roll the other way and states the win chance with the other result (smogtours-gen8ou-573756 turn 73, the 95 % Fire Fang that missed). T305: the search tree prices secondary effects at their chance. T306: the reconstruction forces the logged results instead of searching 16 seeds. T299: the tree's scripted dice move onto the module. Next: brainstorming and spec; the design gate sets the order and whether one round carries all four.
+Round 83 · Small batch: two GitHub issues (user gate 01.11.2026 11:31, "1a 2b 3a 4a"), on branch `r83`. T307 (issue #3): a screen of a Light Clay holder keeps its eight turns in a variation; the turn boundary wrote the client's minimum (five turns) over the simulator's count. Score-touching: the cache version once, two feedback runs with the tier census, the bank in CI. T308 (issue #2): the set editor and the import take moves and abilities the species cannot have, each with a note. dev goes to origin with rounds 82 and 83 after the user's go; then a reply to issue #3 for the user to post.
 
-After round 83, bug reports from real use and the dependency upkeep of AGENTS.md bring the next round, and a parked TODO whose trigger fires comes to a gate.
+Round 84 · The engine reads the dice (feature, score-touching D3). The engine adopts the dice module of round 82 (`packages/eval-engine/src/dice/`, words in `GLOSSARY.md`, decisions in `docs/adr/`). T304: the report plays the game's biggest roll the other way and states the win chance with the other result (smogtours-gen8ou-573756 turn 73, the 95 % Fire Fang that missed). T305: the search tree prices secondary effects at their chance. T306: the reconstruction forces the logged results instead of searching 16 seeds. T299: the tree's scripted dice move onto the module. Next: brainstorming and spec; the design gate sets the order and whether one round carries all four.
+
+After round 84, bug reports from real use and the dependency upkeep of AGENTS.md bring the next round, and a parked TODO whose trigger fires comes to a gate.
 
 ## Parked
 
