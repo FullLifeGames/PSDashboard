@@ -67,4 +67,44 @@ describe('cloneBattle', () => {
     expect(copyBattle(source)).toBeNull();
     expect(simFastStatus()).toBe('fallback');
   });
+
+  // Round 82, the user's test of 01.11.2026 (gen9draft-2058494320, turn 1): a copy of a branch's live battle kept the battle's
+  // `send`, so the copy's output went into the live stream; a click the copy refused read as a refused turn of the branch.
+  type Fields = Record<string, unknown>;
+  const fields = (object: object): Fields => object as Fields;
+  const levels = (battle: Battle): [string, Fields][] => [
+    ['battle', fields(battle)], ['field', fields(battle.field)],
+    ...battle.sides.flatMap((side, i): [string, Fields][] => [
+      [`side ${i}`, fields(side)], ...side.pokemon.map((pokemon, j): [string, Fields] => [`side ${i} pokemon ${j}`, fields(pokemon)]),
+    ]),
+  ];
+
+  test('a copy shares a function with its source only where a deserialized copy does, every fixture', () => {
+    for (const position of positions) {
+      const source = fresh(position.serialized);
+      // a branch battle's send writes its stream
+      (source as unknown as { send: () => void }).send = () => {};
+      const copy = levels(cloneBattle(source));
+      const standard = levels(fresh(serializeBattleStable(source)));
+      levels(source).forEach(([label, object], index) => {
+        for (const key of Object.keys(object)) {
+          if (typeof object[key] !== 'function' || copy[index][1][key] !== object[key]) continue;
+          expect(standard[index][1][key], `${position.id}: ${label}.${key}`).toBe(object[key]);
+        }
+      });
+    }
+  });
+
+  test('a click the copy refuses reaches no stream of its source', () => {
+    const source = fresh(positions[0].serialized);
+    const sent: string[] = [];
+    (source as unknown as { send: (type: string) => void }).send = type => { sent.push(type); };
+    const copy = cloneBattle(source);
+    try {
+      expect(copy.choose('p1', 'switch 99')).toBe(false);
+    } catch {
+      // with strict choices the simulator throws after it sent the error
+    }
+    expect(sent).toEqual([]);
+  });
 });

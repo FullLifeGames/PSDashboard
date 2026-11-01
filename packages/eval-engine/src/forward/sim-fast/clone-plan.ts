@@ -92,7 +92,7 @@ export const FIELD_SPECIAL: Readonly<Record<string, string>> = { battle: 'x.batt
 export const BATTLE_SPECIAL: Readonly<Record<string, string>> = {
   field: 'x.field', sides: 'x.sides', queue: 'h.queue', actions: 'h.actions', prng: 'h.prng', log: 'h.log',
   inputLog: 'h.inputLog', messageLog: 'h.messageLog', dex: 's.dex', format: 's.format', ruleTable: 's.ruleTable',
-  activeMove: 'h.activeMove',
+  activeMove: 'h.activeMove', send: 'h.send',
 };
 
 type ClosureFactory = (this: Obj) => unknown[];

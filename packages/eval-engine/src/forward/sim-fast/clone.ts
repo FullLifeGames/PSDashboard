@@ -167,7 +167,13 @@ function shellOf(proto: object): Obj {
   return Object.create(proto) as Obj;
 }
 
-/** Queue, actions and the move in flight (deep), PRNG and history for the battle's filler. */
+/**
+ * A copy writes to no stream, as a deserialized battle does (`new Battle` without `send` gets a no-op). Round 82, the user's
+ * test of 01.11.2026: a copy of a branch's live battle kept its `send`, and a click the copy refused reached the branch's stream.
+ */
+const silentSend = (): void => {};
+
+/** Queue, actions and the move in flight (deep), PRNG, history and the silent send for the battle's filler. */
 function battleParts(src: Source, x: Ctx, history: boolean): Obj {
   x.deep = true;
   const queue = shellOf(Object.getPrototypeOf(src.queue) as object);
@@ -179,7 +185,7 @@ function battleParts(src: Source, x: Ctx, history: boolean): Obj {
   const actions = shellOf(Object.getPrototypeOf(src.actions) as object);
   for (const key of Object.keys(src.actions)) actions[key] = key === 'battle' ? x.battle : src.actions[key];
   return {
-    queue, actions, activeMove,
+    queue, actions, activeMove, send: silentSend,
     prng: history ? new PRNG(src.prng.getSeed(), src.prng.startingSeed) : null,
     log: history ? src.log.slice() : [],
     inputLog: history ? src.inputLog.slice() : [],
