@@ -113,6 +113,27 @@ export function getMovePool(species: string, gen: number, format?: string): Prom
   return request;
 }
 
+/**
+ * Every move of the generation (Champions: of the mod), sorted: what the editor and the import accept next to a species' own
+ * pool. A name outside this list is no move of the game.
+ */
+export function getEveryMovePool(gen: number, format?: string): string[] {
+  if (isChampions(format)) {
+    return [...championsDex().moves.all()].filter(move => !move.isNonstandard).map(move => move.name).sort((a, b) => a.localeCompare(b));
+  }
+  return allGenMoves(clampGen(gen));
+}
+
+/** Every ability of the generation (Champions: of the mod), sorted; empty before Generation 3, which has no abilities. */
+export function getEveryAbilityPool(gen: number, format?: string): string[] {
+  if (isChampions(format)) {
+    return [...championsDex().abilities.all()].filter(ability => !ability.isNonstandard).map(ability => ability.name).sort((a, b) => a.localeCompare(b));
+  }
+  const generation = gens.get(clampGen(gen));
+  if (generation.num < 3) return [];
+  return [...generation.abilities].map(ability => ability.name).sort((a, b) => a.localeCompare(b));
+}
+
 export function getItemPool(gen: number, format?: string): string[] {
   if (isChampions(format)) {
     return [...championsDex().items.all()].filter(item => !item.isNonstandard).map(item => item.name).sort((a, b) => a.localeCompare(b));

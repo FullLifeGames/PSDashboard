@@ -1,5 +1,5 @@
 import { type PokemonEvs, type RevealedPokemonInfo, itemSetValue, toId } from '@fulllifegames/replay-core';
-import { EV_STATS, sourceLabel, type EditorPools, type EvLimits } from '../../lib/team-editor';
+import { EV_STATS, isOutsidePool, sourceLabel, type EditorPools, type EvLimits } from '../../lib/team-editor';
 import type { TeamDraft } from '../../hooks/useTeamDraft';
 import { ComboBox } from '../ComboBox';
 
@@ -14,8 +14,21 @@ function FieldCaption({ children }: { children: React.ReactNode }) {
   return <div style={{ fontSize: 9, color: '#8899aa', marginBottom: 2 }}>{children}</div>;
 }
 
+/** The species' own abilities, the other abilities of the generation, and whether the user's pick lies outside the species' own. */
+function abilityChoices(entry: RevealedPokemonInfo, pools: EditorPools | null) {
+  const own = pools?.abilitiesBySpecies[entry.species] ?? [];
+  const ownIds = new Set(own.map(toId));
+  const others = (pools?.allAbilities ?? []).filter(name => !ownIds.has(toId(name)));
+  const known = new Set([...own, ...others].map(toId));
+  const value = entry.ability.value;
+  // Only the user's own pick gets the note: a revealed or guessed ability is the battle's or the engine's word.
+  const outside = entry.ability.source === 'manual' && !!value && own.length > 0 && !ownIds.has(toId(value));
+  return { own, others, known, outside };
+}
+
 export function AbilityField({ entry, index, pools, draft }: FieldProps) {
   const { updateField } = draft;
+  const { own, others, known, outside } = abilityChoices(entry, pools);
   return (
     <div>
       <FieldCaption>
@@ -30,11 +43,15 @@ export function AbilityField({ entry, index, pools, draft }: FieldProps) {
           style={{ width: '100%' }}
         >
           <option value="">Unknown</option>
-          {pools.abilitiesBySpecies[entry.species].map(name => (
+          {own.map(name => (
             <option key={name} value={name}>{name}</option>
           ))}
-          {entry.ability.value &&
-            !pools.abilitiesBySpecies[entry.species].includes(entry.ability.value) && (
+          {others.length > 0 && (
+            <optgroup label="Other abilities">
+              {others.map(name => <option key={name} value={name}>{name}</option>)}
+            </optgroup>
+          )}
+          {entry.ability.value && !known.has(toId(entry.ability.value)) && (
             <option value={entry.ability.value}>{entry.ability.value}</option>
           )}
         </select>
@@ -46,6 +63,11 @@ export function AbilityField({ entry, index, pools, draft }: FieldProps) {
           className="ps-input"
           style={{ width: '100%' }}
         />
+      )}
+      {outside && (
+        <div style={{ fontSize: 9, color: '#e0c080', marginTop: 2 }}>
+          {entry.ability.value} is not an ability of {entry.species}.
+        </div>
       )}
     </div>
   );
@@ -186,7 +208,7 @@ export function EvGrid({ entry, index, draft }: Omit<FieldProps, 'pools'>) {
   );
 }
 
-function MoveChips({ entry, index, draft }: Omit<FieldProps, 'pools'>) {
+function MoveChips({ entry, index, pools, draft }: FieldProps) {
   const { removeMove } = draft;
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 4 }}>
@@ -204,6 +226,10 @@ function MoveChips({ entry, index, draft }: Omit<FieldProps, 'pools'>) {
           <span style={{ color: '#9fb5d9', fontSize: 9 }}>
             {sourceLabel(move.source, move.probability)}
           </span>
+          {/* Only the user's own pick gets the note: a revealed or guessed move is the battle's or the engine's word. */}
+          {move.source === 'manual' && isOutsidePool(pools?.movesBySpecies[entry.species], move.name) && (
+            <span style={{ color: '#e0c080', fontSize: 9 }}>not learnable</span>
+          )}
           <button
             type="button"
             onClick={() => removeMove(index, moveIndex)}
@@ -223,10 +249,16 @@ function MoveChips({ entry, index, draft }: Omit<FieldProps, 'pools'>) {
 
 function MoveAdder({ entry, index, pools, draft }: FieldProps) {
   const { moveDraft, setMoveDraft, addMove } = draft;
+  // The species' own moves first, then the rest of the generation; the dropdown lists what the set does not hold yet.
+  const own = pools?.movesBySpecies[entry.species] ?? [];
+  const ownIds = new Set(own.map(toId));
+  const outside = own.length > 0 ? (pools?.allMoves ?? []).filter(name => !ownIds.has(toId(name))) : [];
+  const outsideIds = new Set(outside.map(toId));
+  const options = [...own, ...outside].filter(name => !entry.moves.some(known => toId(known.name) === toId(name)));
   return (
     <ComboBox
-      options={(pools?.movesBySpecies[entry.species] ?? [])
-        .filter(name => !entry.moves.some(known => toId(known.name) === toId(name)))}
+      options={options}
+      optionNote={option => (outsideIds.has(toId(option)) ? 'not learnable' : undefined)}
       value={moveDraft[index] ?? ''}
       onChange={value => setMoveDraft(prev => ({ ...prev, [index]: value }))}
       onSelect={option => {
@@ -246,7 +278,7 @@ export function MovesField({ entry, index, pools, draft }: FieldProps) {
   return (
     <div>
       <FieldCaption>Moves ({entry.moves.length}/4)</FieldCaption>
-      <MoveChips entry={entry} index={index} draft={draft} />
+      <MoveChips entry={entry} index={index} pools={pools} draft={draft} />
       {entry.moves.length < 4 && <MoveAdder entry={entry} index={index} pools={pools} draft={draft} />}
       {moveError[index] && (
         <div role="alert" style={{ fontSize: 10, color: '#f3a6a6', marginTop: 4 }}>

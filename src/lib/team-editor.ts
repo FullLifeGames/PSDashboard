@@ -6,6 +6,9 @@ export interface EditorPools {
   natures: readonly string[];
   movesBySpecies: Record<string, string[]>;
   abilitiesBySpecies: Record<string, string[]>;
+  /** Every move and every ability of the generation (empty before Generation 3 for abilities): the editor takes these beside the species' own. */
+  allMoves: string[];
+  allAbilities: string[];
   /** The simulator's total EV limit of the format (`null`: none); absent until the pools are read. */
   evLimit?: number | null;
 }
@@ -50,10 +53,25 @@ export function clampEv(value: string, limits: EvLimits = evLimitsFor(''), other
   return Math.min(limits.perStat, room, Math.max(0, parsed));
 }
 
-/** The move's canonical pool spelling, or the illegality verdict when the species' pool is known. */
-export function canonicalMove(pool: string[] | undefined, trimmed: string): { canonical: string } | { illegal: true } {
-  if (pool && pool.length > 0 && !pool.some(name => toId(name) === toId(trimmed))) return { illegal: true };
-  return { canonical: pool?.find(name => toId(name) === toId(trimmed)) ?? trimmed };
+/**
+ * The move's canonical spelling and whether it lies outside the species' own pool (`outside`: the editor marks it with a note),
+ * or `unknown` when the generation's whole list is known and does not hold the name. Before the lists load (`everyMove` empty
+ * or absent) any name is taken as typed. A species without a pool of its own has no note to carry.
+ */
+export function canonicalMove(
+  pool: string[] | undefined, trimmed: string, everyMove?: string[],
+): { canonical: string; outside: boolean } | { unknown: true } {
+  const find = (names: string[] | undefined) => names?.find(name => toId(name) === toId(trimmed));
+  const own = find(pool);
+  if (own) return { canonical: own, outside: false };
+  if (!everyMove || everyMove.length === 0) return { canonical: trimmed, outside: false };
+  const other = find(everyMove);
+  return other ? { canonical: other, outside: !!pool && pool.length > 0 } : { unknown: true };
+}
+
+/** Whether a move lies outside a species' own pool (a species without a pool, and the lists before they load, count as inside). */
+export function isOutsidePool(pool: string[] | undefined, move: string): boolean {
+  return !!pool && pool.length > 0 && !pool.some(name => toId(name) === toId(move));
 }
 
 /** The team with `canonical` appended to one Pokémon's moves (up to four, no duplicates). */

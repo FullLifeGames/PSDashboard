@@ -10,6 +10,8 @@ const pools: EditorPools = {
   natures: ['Jolly', 'Timid'],
   movesBySpecies: { Garchomp: ['Earthquake', 'Fire Fang', 'Scale Shot', 'Stone Edge', 'Swords Dance'] },
   abilitiesBySpecies: { Garchomp: ['Sand Veil', 'Rough Skin'] },
+  allMoves: ['Earthquake', 'Fire Fang', 'Power Whip', 'Scale Shot', 'Spore', 'Stone Edge', 'Swords Dance'],
+  allAbilities: ['Intimidate', 'Rough Skin', 'Sand Veil'],
 };
 
 const initial = () => teamInfo('singles', 'p1').pokemon;
@@ -33,7 +35,7 @@ describe('useTeamDraft', () => {
     expect(result.current.pokemon[0].evs.value.atk).toBe(0);
   });
 
-  test('a legal move joins the set under its pool spelling, an illegal one is refused with a message', () => {
+  test('a legal move joins under its pool spelling, a move of the Dex the species cannot learn joins too, an unknown name is refused', () => {
     const { result } = renderHook(() => useTeamDraft(initial(), pools));
     let added = false;
     act(() => { added = result.current.addMove(0, ' fire fang '); });
@@ -42,9 +44,17 @@ describe('useTeamDraft', () => {
     expect(result.current.pokemon[0].moves[2].source).toBe('manual');
     expect(result.current.moveError[0]).toBeNull();
 
-    act(() => { added = result.current.addMove(0, 'Spore'); });
+    // Round 83 (T308, GitHub issue #2): Spore is in the generation's Dex, not in Garchomp's learnset, and still joins.
+    act(() => { added = result.current.addMove(0, ' power whip'); });
+    expect(added).toBe(true);
+    expect(result.current.pokemon[0].moves.map(move => move.name)).toEqual(['Protect', 'Earthquake', 'Fire Fang', 'Power Whip']);
+    expect(result.current.pokemon[0].moves[3].source).toBe('manual');
+    expect(result.current.moveError[0]).toBeNull();
+    act(() => result.current.removeMove(0, 3));
+
+    act(() => { added = result.current.addMove(0, 'Moon Landing'); });
     expect(added).toBe(false);
-    expect(result.current.moveError[0]).toBe("Spore is not in Garchomp's legal moves for this generation.");
+    expect(result.current.moveError[0]).toBe('"Moon Landing" is not a known move.');
     expect(result.current.pokemon[0].moves).toHaveLength(3);
 
     act(() => { added = result.current.addMove(0, '   '); });
@@ -83,6 +93,9 @@ describe('useEditorPools', () => {
     expect(Object.keys(loaded.movesBySpecies).sort()).toEqual(['Amoonguss', 'Flutter Mane', 'Incineroar', 'Urshifu']);
     expect(loaded.movesBySpecies.Amoonguss).toContain('Spore');
     expect(loaded.abilitiesBySpecies.Incineroar).toContain('Intimidate');
+    // The whole lists of the generation come with the species' own pools (T308).
+    expect(loaded.allMoves).toEqual(expect.arrayContaining(['Spore', 'Power Whip']));
+    expect(loaded.allAbilities).toEqual(expect.arrayContaining(['Intimidate', 'Rough Skin']));
     expect(loaded.items).toContain('Leftovers');
     expect(loaded.teraTypes).toContain('Fire');
     expect(loaded.natures).toContain('Jolly');
@@ -90,5 +103,7 @@ describe('useEditorPools', () => {
     const gen3 = renderHook(() => useEditorPools(teamInfo('singles', 'p2'), 3));
     await waitFor(() => expect(gen3.result.current).not.toBeNull(), { timeout: 30_000 });
     expect(gen3.result.current!.teraTypes).toEqual([]);
+    expect(gen3.result.current!.allMoves).toContain('Spore');
+    expect(gen3.result.current!.allMoves).not.toContain('Scale Shot');
   }, 60_000);
 });

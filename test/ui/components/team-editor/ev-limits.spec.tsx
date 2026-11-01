@@ -14,7 +14,7 @@ import { getEvLimit } from '../../../../src/lib/pokemon-options';
  * total) and has no Tera type; Scarlet/Violet counts EVs (252 per stat, 510).
  */
 const pools = (evLimit?: number | null): EditorPools => ({
-  items: [], teraTypes: ['Fire', 'Steel'], natures: ['Jolly'], movesBySpecies: {}, abilitiesBySpecies: {},
+  items: [], teraTypes: ['Fire', 'Steel'], natures: ['Jolly'], movesBySpecies: {}, abilitiesBySpecies: {}, allMoves: [], allAbilities: [],
   ...(evLimit === undefined ? {} : { evLimit }),
 });
 

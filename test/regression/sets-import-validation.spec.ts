@@ -31,18 +31,38 @@ describe.each([
 
   test('names a move, an ability, an item, a nature and a Tera type the game does not have', async () => {
     const text = textOf([
-      'Corviknight @ Foo Orb', 'Ability: Foo Bar', 'Tera Type: Moonlight', 'Wobbly Nature', '- Moon Landing', '- Hydro Cannon', '- Roost',
+      'Corviknight @ Foo Orb', 'Ability: Foo Bar', 'Tera Type: Moonlight', 'Wobbly Nature', '- Moon Landing', '- Sky Cannon', '- Roost',
     ].join('\n'));
     const errors = await check(format, 9, team(entry('Corviknight')), team(), text);
     const all = errors.join('\n');
     expect(all).toMatch(/Moon Landing/);
-    expect(all).toMatch(/Hydro Cannon/);
+    expect(all).toMatch(/Sky Cannon/);
     expect(all).toMatch(/Foo Bar/);
     expect(all).toMatch(/Foo Orb/);
     expect(all).toMatch(/Wobbly/);
     expect(all).toMatch(/Moonlight/);
     expect(all).not.toMatch(/Roost/);
     expect(errors.every(message => message.startsWith('P1 Corviknight'))).toBe(true);
+  });
+
+  // Round 83 (T308, GitHub issue #2): a move or an ability the species cannot have imports, the Dex decides what exists.
+  test('a move and an ability the species cannot have import; the editor marks them with a note', async () => {
+    const text = textOf('Corviknight @ Leftovers\nAbility: Intimidate\n- Power Whip\n- Spore\n- Roost');
+    expect(await check(format, 9, team(entry('Corviknight')), team(), text)).toEqual([]);
+    const pools = await loadImportPools(['Corviknight'], 9, format);
+    expect(pools.movesBySpecies.Corviknight).not.toContain('Power Whip');
+    expect(pools.allMoves).toContain('Power Whip');
+    expect(pools.abilitiesBySpecies.Corviknight).not.toContain('Intimidate');
+    expect(pools.allAbilities).toContain('Intimidate');
+  });
+
+  test('a name the Dex does not know stays an error next to values the species cannot have', async () => {
+    const text = textOf('Corviknight\nAbility: Foo Bar\n- Power Whip\n- Moon Landing');
+    const errors = await check(format, 9, team(entry('Corviknight')), team(), text);
+    expect(errors).toHaveLength(2);
+    expect(errors.join('\n')).toMatch(/Foo Bar/);
+    expect(errors.join('\n')).toMatch(/Moon Landing/);
+    expect(errors.join('\n')).not.toMatch(/Power Whip/);
   });
 
   test('names a set whose species is not on the side, on either side', async () => {
@@ -73,9 +93,9 @@ describe.each([
     expect(validateSetsImport(parsed, { p1: team(entry('Corviknight')), p2: team() }, { gen: 9, pools }, { p1: team(shown), p2: team() })).toEqual([]);
     // Without the shown sets the same text is refused, and a value neither view holds is refused with them.
     expect(validateSetsImport(parsed, { p1: team(entry('Corviknight')), p2: team() }, { gen: 9, pools }).join('\n')).toMatch(/Moon Landing/);
-    const other = parseSetsImport(textOf('Corviknight\n- Hydro Cannon'));
+    const other = parseSetsImport(textOf('Corviknight\n- Sky Cannon'));
     expect(validateSetsImport(other, { p1: team(entry('Corviknight')), p2: team() }, { gen: 9, pools }, { p1: team(shown), p2: team() }).join('\n'))
-      .toMatch(/Hydro Cannon/);
+      .toMatch(/Sky Cannon/);
   });
 
   test('before the pools load, the species check still runs and the pool checks wait', async () => {
@@ -109,6 +129,10 @@ describe('sets import validation sweep over the generations', () => {
       const lines = [mon.name, `Ability: ${abilities[0]}`, ...moves.map(move => `- ${move}`)];
       const valid = validateSetsImport(parseSetsImport(textOf(lines.join('\n'))), { p1: team(entry(mon.name)), p2: team() }, { gen, pools });
       expect(valid, mon.name).toEqual([]);
+      const foreign = pools.allMoves.find(name => !(pools.movesBySpecies[mon.name] ?? []).includes(name));
+      const foreignAbility = pools.allAbilities.find(name => !abilities.includes(name));
+      const outside = validateSetsImport(parseSetsImport(textOf(`${mon.name}\nAbility: ${foreignAbility}\n- ${foreign}`)), { p1: team(entry(mon.name)), p2: team() }, { gen, pools });
+      expect(outside, mon.name).toEqual([]);
       const broken = validateSetsImport(parseSetsImport(textOf(`${mon.name}\nAbility: Foo Bar\n- Moon Landing`)), { p1: team(entry(mon.name)), p2: team() }, { gen, pools });
       expect(broken.join('\n'), mon.name).toMatch(/Foo Bar/);
       expect(broken.join('\n'), mon.name).toMatch(/Moon Landing/);

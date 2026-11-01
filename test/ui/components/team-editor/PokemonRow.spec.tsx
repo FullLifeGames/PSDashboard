@@ -9,6 +9,7 @@ import { revealedPokemon } from '../../fixtures/team-info';
 const pools: EditorPools = {
   items: ['Leftovers'], teraTypes: ['Fire'], natures: ['Jolly'],
   movesBySpecies: { Heatran: ['Magma Storm', 'Earth Power'] }, abilitiesBySpecies: { Heatran: ['Flash Fire'] },
+  allMoves: ['Earth Power', 'Magma Storm', 'Spore'], allAbilities: ['Flash Fire', 'Intimidate'],
 };
 
 function Row({ gen, withPools }: { gen: number; withPools: EditorPools | null }) {

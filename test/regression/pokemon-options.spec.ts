@@ -2,6 +2,8 @@ import { test, expect, describe } from 'vitest';
 import {
   NATURES,
   getAbilityPool,
+  getEveryAbilityPool,
+  getEveryMovePool,
   getItemPool,
   getMovePool,
   getTeraTypePool,
@@ -28,6 +30,26 @@ describe('legal option pools', () => {
   test('ability pool lists the species abilities and is empty before gen 3', () => {
     expect(getAbilityPool('Garchomp', 9).sort()).toEqual(['Rough Skin', 'Sand Veil']);
     expect(getAbilityPool('Machoke', 2)).toEqual([]);
+  });
+
+  // Round 83 (T308, GitHub issue #2): the editor takes a move or an ability the species cannot have, so it needs the
+  // generation's whole list next to the species' own pool.
+  test('the whole move list of a generation holds what the species cannot learn and nothing the Dex does not know', () => {
+    const gen9 = getEveryMovePool(9);
+    expect(gen9).toEqual(expect.arrayContaining(['Spore', 'Power Whip', 'Earthquake']));
+    expect(gen9).not.toContain('Moon Landing');
+    expect(new Set(gen9).size).toBe(gen9.length);
+    expect(getEveryMovePool(3)).toContain('Spore');
+    expect(getEveryMovePool(3)).not.toContain('Scale Shot');
+    expect(getEveryMovePool(1)).toContain('Tackle');
+  });
+
+  test('the whole ability list of a generation holds every ability, and is empty before gen 3', () => {
+    expect(getEveryAbilityPool(9)).toEqual(expect.arrayContaining(['Intimidate', 'Rough Skin']));
+    expect(getEveryAbilityPool(9)).not.toContain('Foo Bar');
+    expect(getEveryAbilityPool(3)).toContain('Intimidate');
+    expect(getEveryAbilityPool(2)).toEqual([]);
+    expect(getEveryAbilityPool(1)).toEqual([]);
   });
 
   test('item pool is gen-aware', () => {

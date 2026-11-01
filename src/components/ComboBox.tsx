@@ -14,6 +14,8 @@ interface Props {
   placeholder?: string;
   ariaLabel?: string;
   disabled?: boolean;
+  /** A short note shown beside an option (the editor marks a move the species cannot learn). */
+  optionNote?: (option: string) => string | undefined;
   inputStyle?: React.CSSProperties;
 }
 
@@ -74,11 +76,12 @@ function comboKeyHandler(ctx: KeyContext) {
   };
 }
 
-function ComboBoxPopup({ idBase, filtered, highlight, value, onCommit, onHighlight }: {
+function ComboBoxPopup({ idBase, filtered, highlight, value, optionNote, onCommit, onHighlight }: {
   idBase: string;
   filtered: string[];
   highlight: number;
   value: string;
+  optionNote?: (option: string) => string | undefined;
   onCommit: (option: string) => void;
   onHighlight: (index: number) => void;
 }) {
@@ -99,6 +102,7 @@ function ComboBoxPopup({ idBase, filtered, highlight, value, onCommit, onHighlig
             onMouseEnter={() => onHighlight(index)}
           >
             {option}
+            {optionNote?.(option) && <>{' '}<span className="ps-combobox-note">{optionNote(option)}</span></>}
           </li>
         ))}
         {filtered.length > MAX_VISIBLE_OPTIONS && (
@@ -112,6 +116,14 @@ function ComboBoxPopup({ idBase, filtered, highlight, value, onCommit, onHighlig
   return value.trim() ? (
     <div className="ps-combobox-pop ps-combobox-empty">No matching option</div>
   ) : null;
+}
+
+/** Keeps the highlighted option of an open popup in view. */
+function useScrollToHighlight(open: boolean, idBase: string, highlight: number) {
+  useEffect(() => {
+    if (!open) return;
+    document.getElementById(`${idBase}-${highlight}`)?.scrollIntoView({ block: 'nearest' });
+  }, [highlight, open, idBase]);
 }
 
 /**
@@ -129,18 +141,14 @@ export function ComboBox({
   placeholder,
   ariaLabel,
   disabled = false,
+  optionNote,
   inputStyle,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const idBase = `ps-combobox-${useId().replace(/[^a-zA-Z0-9-]/g, '')}`;
-
   const filtered = useMemo(() => filterOptions(options, value), [options, value]);
-
-  useEffect(() => {
-    if (!open) return;
-    document.getElementById(`${idBase}-${highlight}`)?.scrollIntoView({ block: 'nearest' });
-  }, [highlight, open, idBase]);
+  useScrollToHighlight(open, idBase, highlight);
 
   const commit = (option: string) => {
     onSelect(option);
@@ -148,7 +156,6 @@ export function ComboBox({
   };
 
   const handleKeyDown = comboKeyHandler({ open, filtered, highlight, options, value, setOpen, setHighlight, commit, onEnterFreeText });
-
   return (
     <div className="ps-combobox">
       <input
@@ -179,7 +186,7 @@ export function ComboBox({
         onKeyDown={handleKeyDown}
       />
       {open && !disabled && (
-        <ComboBoxPopup idBase={idBase} filtered={filtered} highlight={highlight} value={value} onCommit={commit} onHighlight={setHighlight} />
+        <ComboBoxPopup idBase={idBase} filtered={filtered} highlight={highlight} value={value} optionNote={optionNote} onCommit={commit} onHighlight={setHighlight} />
       )}
     </div>
   );

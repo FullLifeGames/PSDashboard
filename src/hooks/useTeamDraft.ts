@@ -27,6 +27,8 @@ export function useEditorPools(teamInfo: OpponentTeamInfo, gen: number, format =
         natures: options.NATURES,
         movesBySpecies,
         abilitiesBySpecies,
+        allMoves: options.getEveryMovePool(gen, format),
+        allAbilities: options.getEveryAbilityPool(gen, format),
         evLimit: options.getEvLimit(format),
       });
     })();
@@ -74,9 +76,9 @@ export function useTeamDraft(initial: RevealedPokemonInfo[], pools: EditorPools 
     if (!trimmed) return false;
 
     const species = pokemon[index]?.species ?? '';
-    const resolved = canonicalMove(pools?.movesBySpecies[species], trimmed);
-    if ('illegal' in resolved) {
-      setMoveError(prev => ({ ...prev, [index]: `${trimmed} is not in ${species}'s legal moves for this generation.` }));
+    const resolved = canonicalMove(pools?.movesBySpecies[species], trimmed, pools?.allMoves);
+    if ('unknown' in resolved) {
+      setMoveError(prev => ({ ...prev, [index]: `"${trimmed}" is not a known move.` }));
       return false;
     }
 

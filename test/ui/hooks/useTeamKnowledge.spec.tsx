@@ -150,14 +150,14 @@ describe('useTeamKnowledge', () => {
       await waitFor(() => expect(result.current.setsPanelOpen).toBe(true));
 
       const bad = [
-        `=== p1: A ===`, '', `${lead} @ Choice Band`, 'Ability: Foo Bar', '- Moon Landing', '- Hydro Cannon', '',
+        `=== p1: A ===`, '', `${lead} @ Choice Band`, 'Ability: Foo Bar', '- Moon Landing', '- Sky Cannon', '',
         'Foo Mon', '- Splash', '', `=== p2: B ===`, '',
       ].join(NL);
       let outcome: string | null = null;
       act(() => { outcome = result.current.applySetsText(bad); });
       expect(outcome).toMatch(/Foo Bar/);
       expect(outcome).toMatch(/Moon Landing/);
-      expect(outcome).toMatch(/Hydro Cannon/);
+      expect(outcome).toMatch(/Sky Cannon/);
       expect(outcome).toMatch(/foomon/i);
       expect(result.current.editedP1Info).toBeNull();
       expect(wired.onTeamsEdited).not.toHaveBeenCalled();

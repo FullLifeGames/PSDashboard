@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, test } from 'vitest';
 import { Dex } from '@pkmn/sim';
 import { loadSimMods } from '@fulllifegames/eval-engine';
 import {
-  getAbilityPool, getEvLimit, getItemPool, getMovePool, getTeraTypePool,
+  getAbilityPool, getEveryAbilityPool, getEveryMovePool, getEvLimit, getItemPool, getMovePool, getTeraTypePool,
 } from '../../../src/lib/pokemon-options';
 
 /**
@@ -51,6 +51,14 @@ describe('Champions pools', () => {
     test(`${format}: a species the mod marks Past (Golisopod) still gets a non-empty pool`, async () => {
       expect(getAbilityPool('Golisopod', 9, format)).toContain('Emergency Exit');
       expect((await getMovePool('Golisopod', 9, format)).length).toBeGreaterThan(0);
+    });
+
+    test(`${format}: the whole move and ability lists are the mod's standard entries`, () => {
+      const moves = [...mod().moves.all()].filter(move => !move.isNonstandard).map(move => move.name);
+      const abilities = [...mod().abilities.all()].filter(ability => !ability.isNonstandard).map(ability => ability.name);
+      expect([...getEveryMovePool(9, format)].sort()).toEqual([...moves].sort());
+      expect([...getEveryAbilityPool(9, format)].sort()).toEqual([...abilities].sort());
+      expect(getEveryAbilityPool(9, format)).toContain('Intimidate');
     });
 
     test(`${format}: the EV limit is the validator limit of 66`, () => {

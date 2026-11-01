@@ -146,6 +146,8 @@ export async function loadImportPools(speciesList: string[], gen: number, format
     natures: options.NATURES,
     movesBySpecies,
     abilitiesBySpecies,
+    allMoves: options.getEveryMovePool(gen, format),
+    allAbilities: options.getEveryAbilityPool(gen, format),
     evLimit: options.getEvLimit(format),
   };
 }
@@ -154,7 +156,8 @@ type SideId = 'p1' | 'p2';
 
 /**
  * What an import cannot apply, one message per value (empty: the text is fine). The import is all or nothing: the caller applies
- * nothing while this list is not empty, as the team editor refuses a move outside the species' pool. Only values that differ
+ * nothing while this list is not empty, as the team editor refuses a name the generation's Dex does not know. A move or an ability the species cannot have applies (round 83,
+ * T308); the editor marks it with a note. Only values that differ
  * from what the panel already holds are checked, so the export of the panel itself always imports (a swapped ability, a move
  * copied by Transform, an item of a custom game stay as they are). The pool checks wait until the pools load (`pools: null`),
  * as the editor stays free text until then. `shown` is the view the export reads (the stats panel's solved sets, round 70
@@ -193,16 +196,15 @@ type ValueCheck = (who: string, before: RevealedPokemonInfo, after: RevealedPoke
 const moveErrors: ValueCheck = (who, before, after, { pools }) => {
   const held = new Set(before.moves.map(move => toId(move.name)));
   return after.moves
-    .filter(move => !held.has(toId(move.name)) && 'illegal' in canonicalMove(pools.movesBySpecies[after.species], move.name))
-    .map(move => `${who}: ${move.name} is not in ${after.species}'s legal moves for this generation.`);
+    .filter(move => !held.has(toId(move.name)) && 'unknown' in canonicalMove(pools.movesBySpecies[after.species], move.name, pools.allMoves))
+    .map(move => `${who}: "${move.name}" is not a known move.`);
 };
 
 const abilityErrors: ValueCheck = (who, before, after, { gen, pools }) => {
   const value = after.ability.value;
   if (!changed(before.ability.value, value)) return [];
   if (gen < 3) return [`${who}: generation ${gen} has no abilities, so ${value} cannot apply.`];
-  const pool = pools.abilitiesBySpecies[after.species] ?? [];
-  return pool.length > 0 && !listed(pool, value) ? [`${who}: ${value} is not an ability of ${after.species}.`] : [];
+  return pools.allAbilities.length > 0 && !listed(pools.allAbilities, value) ? [`${who}: "${value}" is not a known ability.`] : [];
 };
 
 const itemErrors: ValueCheck = (who, before, after, { gen, pools }) => {

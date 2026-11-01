@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { RevealedPokemonInfo } from '@fulllifegames/replay-core';
 import { AbilityField, EvGrid, ItemField, MovesField, NatureField, TeraField } from '../../../../src/components/team-editor/fields';
@@ -13,6 +13,8 @@ const pools: EditorPools = {
   natures: ['Jolly', 'Timid'],
   movesBySpecies: { Garchomp: ['Earthquake', 'Fire Fang', 'Scale Shot', 'Stone Edge'] },
   abilitiesBySpecies: { Garchomp: ['Sand Veil', 'Rough Skin'] },
+  allMoves: ['Earthquake', 'Fire Fang', 'Power Whip', 'Scale Shot', 'Spore', 'Stone Edge'],
+  allAbilities: ['Intimidate', 'Rough Skin', 'Sand Veil'],
 };
 
 /** All fields of one Pokémon over a live draft, as the editor's row composes them. */
@@ -85,10 +87,45 @@ describe('team editor fields', () => {
     expect(draftOf().moves.map(move => move.name)).toEqual(['Protect', 'Earthquake', 'Scale Shot']);
     expect(screen.getByText('Moves (3/4)')).toBeInTheDocument();
 
-    await userEvent.type(adder, 'Spore{Enter}');
-    expect(screen.getByRole('alert')).toHaveTextContent("Spore is not in Garchomp's legal moves for this generation.");
+    await userEvent.type(adder, 'Moon Landing{Enter}');
+    expect(screen.getByRole('alert')).toHaveTextContent('"Moon Landing" is not a known move.');
 
     await userEvent.click(screen.getByRole('button', { name: 'Remove Earthquake from Garchomp' }));
     expect(draftOf().moves.map(move => move.name)).toEqual(['Protect', 'Scale Shot']);
+  });
+
+  // Round 83 (T308, GitHub issue #2): the pickers offer the species' own entries first, then the rest of the generation.
+  test('the move dropdown lists the species own moves first, then the other moves of the generation with a note', async () => {
+    render(<Fields initial={revealedPokemon('Garchomp')} withPools={pools} />);
+    await userEvent.click(screen.getByPlaceholderText('Add move...'));
+    const names = within(screen.getByRole('listbox')).getAllByRole('option').map(option => option.textContent);
+    // Protect and Earthquake stand in the set already.
+    expect(names).toEqual(['Fire Fang', 'Scale Shot', 'Stone Edge', 'Power Whip not learnable', 'Spore not learnable']);
+    expect(screen.getByRole('option', { name: 'Fire Fang' })).toBeInTheDocument();
+  });
+
+  test('a move the species cannot learn joins the set and its chip carries the note; a learnable one carries none', async () => {
+    render(<Fields initial={revealedPokemon('Garchomp')} withPools={pools} />);
+    const adder = screen.getByPlaceholderText('Add move...');
+    await userEvent.type(adder, 'spore');
+    await userEvent.click(screen.getByRole('option', { name: 'Spore not learnable' }));
+    expect(draftOf().moves.map(move => move.name)).toEqual(['Protect', 'Earthquake', 'Spore']);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getAllByText('not learnable')).toHaveLength(1);
+    await userEvent.type(adder, 'scale');
+    await userEvent.click(screen.getByRole('option', { name: 'Scale Shot' }));
+    expect(screen.getAllByText('not learnable')).toHaveLength(1);
+  });
+
+  test('the ability select lists the species own abilities first, then the other abilities, and a chosen one carries a note', async () => {
+    render(<Fields initial={revealedPokemon('Garchomp', { ability: { value: 'Sand Veil', source: 'guessed' } })} withPools={pools} />);
+    const select = screen.getByRole('combobox', { name: 'Garchomp ability' });
+    expect([...select.querySelectorAll('option')].map(option => option.textContent)).toEqual(['Unknown', 'Sand Veil', 'Rough Skin', 'Intimidate']);
+    expect(screen.queryByText(/not an ability of Garchomp/)).not.toBeInTheDocument();
+    await userEvent.selectOptions(select, 'Intimidate');
+    expect(draftOf().ability).toEqual({ value: 'Intimidate', source: 'manual' });
+    expect(screen.getByText('Intimidate is not an ability of Garchomp.')).toBeInTheDocument();
+    await userEvent.selectOptions(select, 'Rough Skin');
+    expect(screen.queryByText(/not an ability of Garchomp/)).not.toBeInTheDocument();
   });
 });

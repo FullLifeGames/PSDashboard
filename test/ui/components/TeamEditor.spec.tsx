@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TeamEditor } from '../../../src/components/TeamEditor';
 import { teamInfo } from '../fixtures/team-info';
@@ -16,7 +16,9 @@ describe('TeamEditor', () => {
     // The pools arrive after the lazy load: the ability field becomes a select with the species' abilities.
     const ability = await screen.findByRole('combobox', { name: 'Garchomp ability' }, { timeout: 30_000 });
     await waitFor(() => expect(ability.tagName).toBe('SELECT'), { timeout: 30_000 });
-    expect(screen.getByRole('option', { name: 'Rough Skin' })).toBeInTheDocument();
+    expect(within(ability).getByRole('option', { name: 'Rough Skin' })).toBeInTheDocument();
+    // Round 83 (T308): the other abilities of the generation follow, so Garchomp can hold Intimidate.
+    expect(within(ability).getByRole('option', { name: 'Intimidate' })).toBeInTheDocument();
     await userEvent.selectOptions(ability, 'Rough Skin');
 
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
@@ -31,7 +33,8 @@ describe('TeamEditor', () => {
       const { unmount } = render(<TeamEditor title="Edit Player" teamInfo={teamInfo('singles', 'p1')} gen={9} format={format} onSave={vi.fn()} onClose={vi.fn()} />);
       const ability = await screen.findByRole('combobox', { name: 'Garchomp ability' }, { timeout: 30_000 });
       await waitFor(() => expect(ability.tagName).toBe('SELECT'), { timeout: 30_000 });
-      expect(screen.getByRole('option', { name: 'Rough Skin' })).toBeInTheDocument();
+      expect(within(ability).getByRole('option', { name: 'Rough Skin' })).toBeInTheDocument();
+      expect(within(ability).getByRole('option', { name: 'Intimidate' })).toBeInTheDocument();
       expect(screen.queryByLabelText(/tera type/)).toBeNull();
       expect(screen.getAllByRole('spinbutton', { name: /Garchomp HP EVs/ })[0]).toHaveAttribute('max', '32');
       unmount();

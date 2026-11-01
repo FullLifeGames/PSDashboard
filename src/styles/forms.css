@@ -74,6 +74,11 @@
   background: #3a5a8c;
   color: #fff;
 }
+.ps-combobox-note {
+  color: #8899aa;
+  font-size: 10px;
+}
+.ps-combobox-option-active .ps-combobox-note { color: #cfe0f5; }
 .ps-combobox-more {
   color: #8899aa;
   font-size: 10px;

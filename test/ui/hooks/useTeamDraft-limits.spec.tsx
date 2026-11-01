@@ -12,7 +12,7 @@ import { evs, revealedPokemon } from '../fixtures/team-info';
  */
 const blank = () => [revealedPokemon('Garchomp', { evs: evs('manual') })];
 const pools = (evLimit?: number | null): EditorPools => ({
-  items: [], teraTypes: [], natures: [], movesBySpecies: {}, abilitiesBySpecies: {}, ...(evLimit === undefined ? {} : { evLimit }),
+  items: [], teraTypes: [], natures: [], movesBySpecies: {}, abilitiesBySpecies: {}, allMoves: [], allAbilities: [], ...(evLimit === undefined ? {} : { evLimit }),
 });
 
 describe('useTeamDraft.updateEv by format', () => {
