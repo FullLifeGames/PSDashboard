@@ -964,6 +964,23 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * user wants the Fire Fang miss of 573756 t73 declared as the roll that
  * changed the game); (3) the worktree w9a and the branches t299, r82-a
  * and r82 go once everything is merged, before the push.
+ * AFTER THE GATE (the user's own test, 01.11. 09:17): gen9draft-2058494320
+ * viewed at turn 1, Advanced, U-turn against Chilly Reception: Execute
+ * showed "Can't move: You need a switch response" and undid the variation.
+ * A speed-layer copy (cloneBattle) kept its source's send. While Execute
+ * waited for the turn, the panel asked for the turn's dice with both picks
+ * on a copy of the live battle, which already owed P1's switch; the copy
+ * refused the move, and the refusal reached the live error log. Only the
+ * dev server showed it (its chips landed inside the wait); the production
+ * build passed the same clicks. Fix 2b3f90e: a copy gets a silent send, as
+ * a deserialized battle does. Red before the fix: a census over every
+ * clone fixture (a copy shares a function with its source only where a
+ * deserialized copy does), the scene in the engine
+ * (dice-panel-stream.spec.ts), the clicks in e2e (branch-dice-pivot.spec.ts).
+ * Check: lint and tsc -b green; feedback twice, 12 of 12 dumps
+ * byte-identical with g1; e2e on a dev server with its own Vite cache 92
+ * passed, 1 skipped, 3 timed out on the cold server (embed, engines,
+ * loader) and passed on the rerun (24 of 24).
  * RESTS: T300 to T303 parked; round 83: T299, T304, T305 and T306. Next
  * free T307.
  *
