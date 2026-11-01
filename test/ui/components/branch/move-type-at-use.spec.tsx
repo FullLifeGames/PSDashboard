@@ -33,6 +33,7 @@ describe('move button type at use (T85)', () => {
     const [cudgel] = state.p1MovesBySlot[0];
     render(<MoveBtn move={cudgel} targetDamage={{}} pendingChoice={null} onClick={vi.fn()} />);
     expect(screen.getByText('Water')).toHaveClass('ps-movebtn-type');
-    expect(screen.getByRole('button', { name: /Ivy Cudgel/ })).toHaveStyle({ background: '#6890F0' });
+    // round 83: the tinted tile carries its full type color as --type (typeTileVars)
+    expect(screen.getByRole('button', { name: /Ivy Cudgel/ }).style.getPropertyValue('--type')).toBe('#6890F0');
   });
 });

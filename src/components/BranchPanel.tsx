@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, type CSSProperties } from 'react';
 import type { BranchSimState, BranchMoveOption, BranchSwitchOption, SimPokemonInfo } from '../hooks/useBranch';
 import {
   type BranchSlotModifiers, branchSideChoicesReady, requiredChoicesForActiveSlots, switchChoiceKey,
@@ -239,22 +239,28 @@ function slotChoiceProps(props: SideColumnProps, slot: number) {
   };
 }
 
+/** The panel grid's slot rows: the larger side's slot count (round 83, the slots of both sides line up row by row). */
+const slotRows = (p1: readonly unknown[], p2: readonly unknown[]): CSSProperties =>
+  ({ '--ps-slot-rows': Math.max(p1.length, p2.length, 1) } as CSSProperties);
+
 function SideColumn(props: SideColumnProps) {
   const { side, activeSlots, gen, advanced, played, playedSlots, waitingFor, onSetChoice, onHypotheticalMove } = props;
   return (
     <div className="ps-branch-side-column" inert={waitingFor !== null} style={waitingFor ? { opacity: 0.6 } : undefined}>
-      {waitingFor && <div className="ps-force-switch-note">Waiting for {waitingFor} to choose a replacement.</div>}
+      {waitingFor && <div className="ps-force-switch-note ps-side-note">Waiting for {waitingFor} to choose a replacement.</div>}
+      {/* Round 83 (the user, 01.11.2026): each slot takes its own row of the panel's grid, so P1A stands beside P2A and P1B beside P2B at one height. */}
       {activeSlots.map((active, slot) => (
-        <SideControls
-          key={`${side}-${slot}`}
-          {...slotIdentity(side, slot, activeSlots, active)}
-          {...slotChoiceProps(props, slot)}
-          gen={gen}
-          advanced={advanced}
-          played={playedOfSlot(playedSlots, played, slot)}
-          onChoice={(choice) => onSetChoice(side, choice, slot)}
-          onHypotheticalMove={(params) => onHypotheticalMove(side, slot, params)}
-        />
+        <div key={`${side}-${slot}`} className="ps-side-slot" style={{ gridRow: slot + 2 }}>
+          <SideControls
+            {...slotIdentity(side, slot, activeSlots, active)}
+            {...slotChoiceProps(props, slot)}
+            gen={gen}
+            advanced={advanced}
+            played={playedOfSlot(playedSlots, played, slot)}
+            onChoice={(choice) => onSetChoice(side, choice, slot)}
+            onHypotheticalMove={(params) => onHypotheticalMove(side, slot, params)}
+          />
+        </div>
       ))}
     </div>
   );
@@ -326,7 +332,7 @@ export function BranchPanel({ simState, stale, source, acquiringExact, executeEr
       {/* Controls — stacked vertically for P1 + P2 selection */}
       {!simState.ended && (
         <div className="ps-branch-controls-shell">
-          <div className="ps-branch-controls-grid">
+          <div className="ps-branch-controls-grid ps-slot-rows" style={slotRows(p1ActiveSlots, p2ActiveSlots)}>
             <SideColumn
               side="p1"
               activeSlots={p1ActiveSlots}

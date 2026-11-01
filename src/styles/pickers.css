@@ -1,5 +1,23 @@
 /* Pickers: the branch panel with its side controls, move, switch, and target pickers, gimmick toggles, execute row, choice errors, and the raw protocol log (BranchPanel, LeadPanel, components/branch/). */
 
+/* Round 83 (the user's design gate of 01.11.2026): the colors of the move tiles, the badges and the switch chips. A move tile gets
+   its type colors as --type, --type-on, --tint, --tint-low and --tint-edge (typeTileVars in src/lib/type-colors.ts);
+   test/regression/move-tile-contrast.spec.ts holds every text below at 4.5 : 1 or more on every type. */
+:root {
+  --ps-tile-text: #f6f9ff;
+  --ps-tile-sub: #e2eaf5;
+  --ps-tile-dmg: #e8eef7;
+  --ps-tile-ko: #ffe7a3;
+  --ps-badge-forced-bg: #ffe7a3;
+  --ps-badge-forced-fg: #3a2a00;
+  --ps-badge-played-bg: #cfe3ff;
+  --ps-badge-played-fg: #16233b;
+  --ps-switch-bg: #22355a;
+  --ps-switch-text: #eef6ff;
+  --ps-switch-sub: #b4c6de;
+  --ps-switch-ring: #7cb7e8;
+}
+
 /* PS HP bar */
 .ps-hpbar-track {
   height: 6px;
@@ -20,36 +38,22 @@
 .ps-hpbar-yellow { background: linear-gradient(180deg, #f0d000 0%, #c8a800 100%); }
 .ps-hpbar-red { background: linear-gradient(180deg, #f02020 0%, #c00000 100%); }
 
-/* "played" marker on the move/switch actually taken at the viewed position */
-.ps-played-badge {
-  display: inline-block;
-  margin-left: 5px;
-  padding: 0 5px;
-  border-radius: 999px;
-  font-size: 8px;
-  font-weight: bold;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  vertical-align: middle;
-  background: rgba(0, 0, 0, 0.45);
-  color: #ffeeba;
-  border: 1px solid rgba(240, 199, 107, 0.6);
-}
-/* Round 82: Basic marks a move that carries forced dice. */
+/* "played" marker on the move/switch actually taken at the viewed position; round 82: "forced" marks a move that carries forced
+   dice in Basic. Round 83: a filled label in plain 9px type reads sharp on every tile (the outlined 8px capitals looked soft). */
+.ps-played-badge,
 .ps-forced-badge {
   display: inline-block;
   margin-left: 5px;
-  padding: 0 5px;
+  padding: 1px 6px;
   border-radius: 999px;
-  font-size: 8px;
+  font-size: 9px;
   font-weight: bold;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
+  line-height: 1.3;
   vertical-align: middle;
-  background: rgba(0, 0, 0, 0.45);
-  color: #ffd9a0;
-  border: 1px solid rgba(208, 160, 95, 0.8);
+  text-shadow: none;
 }
+.ps-played-badge { background: var(--ps-badge-played-bg); color: var(--ps-badge-played-fg); }
+.ps-forced-badge { background: var(--ps-badge-forced-bg); color: var(--ps-badge-forced-fg); }
 
 /* ── PS Controls Panel ── */
 .ps-controls {
@@ -116,6 +120,13 @@
   grid-template-columns: repeat(2, minmax(120px, 1fr));
   gap: 6px;
 }
+/*
+ * Round 83: the tiles of one grid row share their height, and the target buttons of the row line up below them. A cell spans two
+ * rows of the grid (its tile, its target buttons); the space between two rows of tiles moves from the gap onto the cells.
+ */
+.ps-movegrid:not(.ps-movegrid-compact) { row-gap: 0; }
+.ps-movegrid:not(.ps-movegrid-compact) > .ps-movecell { display: grid; grid-row: span 2; grid-template-rows: subgrid; }
+.ps-movegrid:not(.ps-movegrid-compact) > .ps-movecell:nth-child(n+3) { margin-top: 6px; }
 
 .ps-movebtn {
   width: 100%;
@@ -123,40 +134,55 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  border: 1px solid rgba(255,255,255,0.22);
+  border: 1px solid var(--tint-edge, rgba(255,255,255,0.22));
   border-radius: 6px;
   padding: 8px 10px;
   cursor: pointer;
   text-align: center;
-  color: #fff;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  color: var(--ps-tile-text);
+  background: linear-gradient(180deg, var(--tint, #344b6c) 0%, var(--tint-low, #2b405f) 100%);
   transition: filter 0.15s, transform 0.1s, box-shadow 0.15s;
   position: relative;
   overflow: hidden;
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.24),
+    inset 0 2px 0 var(--type, transparent),
     0 4px 10px rgba(0,0,0,0.2);
 }
 .ps-movebtn:hover:not(:disabled) {
-  filter: brightness(1.15);
+  filter: brightness(1.1);
   transform: translateY(-1px);
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.3),
+    inset 0 2px 0 var(--type, transparent),
     0 7px 14px rgba(0,0,0,0.25);
 }
 .ps-movebtn:active:not(:disabled) { transform: scale(0.98); }
 .ps-movebtn:disabled { opacity: 0.35; cursor: not-allowed; }
-.ps-movebtn-selected {
-  outline: 3px solid #fff;
+/* Round 83: the selection is one ring in the type color that lies on the tile's own edge, with a soft glow. */
+.ps-movebtn-selected,
+.ps-movebtn-selected:hover:not(:disabled) {
+  outline: 2px solid var(--type, #fff);
   outline-offset: -1px;
-  filter: brightness(1.2);
+  box-shadow:
+    inset 0 2px 0 var(--type, transparent),
+    0 0 12px -2px var(--type, #fff);
 }
 .ps-movebtn-name { font-size: 12px; font-weight: bold; line-height: 1.2; }
 .ps-movebtn-info { display: flex; justify-content: space-between; align-items: center; margin-top: 2px; }
-.ps-movebtn-type { font-size: 9px; font-weight: bold; text-transform: uppercase; opacity: 0.9; }
-.ps-movebtn-pp { font-size: 9px; opacity: 0.75; }
-.ps-movebtn-dmg { font-size: 9px; margin-top: 2px; opacity: 0.9; }
-.ps-movebtn-ko { font-weight: bold; color: #ffe066; text-shadow: 0 0 4px rgba(255,200,0,0.5); }
+.ps-movebtn-type {
+  font-size: 9px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--type, transparent);
+  color: var(--type-on, inherit);
+  border-radius: 3px;
+  padding: 0 5px;
+}
+.ps-movebtn-pp { font-size: 9px; color: var(--ps-tile-sub); }
+.ps-movebtn-dmg { font-size: 9px; margin-top: 2px; color: var(--ps-tile-dmg); }
+/* Round 83: one target's damage stays on one line, so the tiles of a row keep one height; the tooltip holds the whole sentence. */
+.ps-movebtn-dmg-one { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ps-movebtn-ko { font-weight: bold; color: var(--ps-tile-ko); }
 
 /* Basic view: small action chips instead of the 2x2 detail grid. */
 .ps-movegrid-compact {
@@ -250,21 +276,26 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  background: rgba(255,255,255,0.1);
-  border: 1px solid rgba(255,255,255,0.12);
+  background: var(--ps-switch-bg);
+  border: 1px solid rgba(183,216,255,0.18);
   border-radius: 6px;
   padding: 6px 8px;
-  color: #fff;
+  color: var(--ps-switch-text);
   cursor: pointer;
-  transition: background 0.15s;
+  transition: filter 0.15s, box-shadow 0.15s;
   text-align: left;
 }
-.ps-switchbtn:hover:not(:disabled) { background: rgba(255,255,255,0.16); }
+.ps-switchbtn:hover:not(:disabled) { filter: brightness(1.12); }
 .ps-switchbtn:disabled { opacity: 0.3; cursor: not-allowed; }
-.ps-switchbtn-selected { border-color: #6cc2ff; background: rgba(76,119,166,0.38); }
+/* Round 83: the switch chips stay neutral, their selection is the same ring as a move tile's, in the app's accent. */
+.ps-switchbtn-selected {
+  outline: 2px solid var(--ps-switch-ring);
+  outline-offset: -1px;
+  box-shadow: 0 0 10px -2px var(--ps-switch-ring);
+}
 .ps-switchbtn img { width: 32px; height: 32px; image-rendering: pixelated; object-fit: contain; }
 .ps-switchbtn-name { font-size: 11px; font-weight: bold; }
-.ps-switchbtn-hp { font-size: 9px; color: #aaa; }
+.ps-switchbtn-hp { font-size: 9px; color: var(--ps-switch-sub); }
 
 /* Basic view: switch chips share the row with the move chips. */
 .ps-switchgrid-compact {
@@ -410,8 +441,7 @@
 .ps-movebtn-zmove {
   font-size: 10px;
   font-weight: bold;
-  color: #ffe9a8;
-  text-shadow: 0 1px 1px rgba(0,0,0,0.5);
+  color: var(--ps-tile-ko);
 }
 
 /* Per-target ranges for untargeted (spread) moves in doubles */
@@ -492,6 +522,26 @@
   background: linear-gradient(180deg, transparent, rgba(255,255,255,0.2), transparent);
 }
 
+/* Round 83 (the user, 01.11.2026): the branch panel's two sides share one row grid, a row for the waiting note and one per
+   slot, so P1A stands beside P2A and P1B beside P2B at one height. Each side column lays its slots into the panel's rows
+   (subgrid); --ps-slot-rows is the larger side's slot count. A browser without subgrid keeps each column's own rows. */
+.ps-slot-rows {
+  grid-template-rows: auto repeat(var(--ps-slot-rows, 1), auto);
+}
+.ps-slot-rows > .ps-branch-side-column {
+  display: grid;
+  grid-row: 1 / -1;
+  grid-template-rows: subgrid;
+}
+.ps-slot-rows > .ps-side-divider { grid-row: 1 / -1; }
+.ps-side-note { grid-row: 1; }
+.ps-side-slot {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.ps-side-slot > .ps-side-controls { flex: 1; }
+
 .ps-log-toggle {
   background: none;
   border: none;
@@ -530,6 +580,14 @@
     height: 1px;
     background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
   }
+  /* Stacked sides: each column keeps its own slots again, one side after the other. */
+  .ps-slot-rows { grid-template-rows: none; }
+  .ps-slot-rows > .ps-branch-side-column {
+    display: flex;
+    grid-row: auto;
+    grid-template-rows: none;
+  }
+  .ps-slot-rows > .ps-side-divider { grid-row: auto; }
 }
 
 @media (max-width: 640px) {
@@ -537,6 +595,8 @@
   .ps-switchgrid {
     grid-template-columns: 1fr;
   }
+  /* one tile per row: the second tile starts the second row */
+  .ps-movegrid:not(.ps-movegrid-compact) > .ps-movecell:nth-child(2) { margin-top: 6px; }
   .ps-custom-choice {
     flex-direction: column;
   }

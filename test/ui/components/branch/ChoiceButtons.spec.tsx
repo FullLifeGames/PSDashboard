@@ -40,16 +40,33 @@ describe('MoveBtn', () => {
 
   test('the full button spells out type and damage, marks the pending move, and names its Z-Move', () => {
     const move = moveOption('Earthquake', { type: 'Ground' });
-    const { rerender } = render(<MoveBtn move={move} dmg={damage('Earthquake', 30, 35, '25% chance to 3HKO')} targetDamage={{}} pendingChoice={null} onClick={vi.fn()} />);
+    const { rerender } = render(<MoveBtn move={move} dmg={damage('Earthquake', 30, 35)} targetDamage={{}} pendingChoice={null} onClick={vi.fn()} />);
     const button = screen.getByRole('button', { name: /Earthquake/ });
     expect(button).toHaveTextContent('Ground');
-    expect(button).toHaveTextContent('30% - 35% (25% chance to 3HKO)');
+    expect(button).toHaveTextContent('30% - 35%');
     expect(button).not.toHaveAttribute('title');
     expect(button).not.toHaveClass('ps-movebtn-selected');
 
     rerender(<MoveBtn move={move} targetDamage={{}} pendingChoice={{ kind: 'move', moveId: 'earthquake', moveName: 'Earthquake' }} zMoveName="Tectonic Rage" onClick={vi.fn()} />);
     expect(screen.getByRole('button', { name: /Earthquake/ })).toHaveClass('ps-movebtn-selected');
     expect(screen.getByText('→ Tectonic Rage')).toBeInTheDocument();
+  });
+
+  // Round 83 (the user, 01.11.2026: "I want them to be aligned", then "we still have run-over text"): the calc's sentence wrapped
+  // onto a second line ("after Leftovers recovery", "62.5% chance to OHKO"), so tiles in a row stood at different heights. The
+  // tile shows a short verdict on one line; the tooltip keeps the range and the whole sentence.
+  test('the full button shows a short KO verdict and keeps the whole sentence in its tooltip', () => {
+    const { rerender } = render(<MoveBtn move={moveOption('Earth Power', { type: 'Ground' })} dmg={damage('Earth Power', 66.8, 78.8, 'guaranteed 2HKO after Leftovers recovery')} targetDamage={{}} pendingChoice={null} onClick={vi.fn()} />);
+    const earthPower = screen.getByRole('button', { name: /Earth Power/ });
+    expect(earthPower).toHaveTextContent('66.8% - 78.8% (guaranteed 2HKO)');
+    expect(earthPower).not.toHaveTextContent('Leftovers');
+    expect(earthPower).toHaveAttribute('title', '66.8% - 78.8% (guaranteed 2HKO after Leftovers recovery)');
+
+    rerender(<MoveBtn move={moveOption('Psyshock', { type: 'Psychic' })} dmg={damage('Psyshock', 93.9, 111.2, '62.5% chance to OHKO')} targetDamage={{}} pendingChoice={null} onClick={vi.fn()} />);
+    const psyshock = screen.getByRole('button', { name: /Psyshock/ });
+    expect(psyshock).toHaveTextContent('93.9% - 111.2% (62.5% to OHKO)');
+    expect(psyshock).toHaveAttribute('title', '93.9% - 111.2% (62.5% chance to OHKO)');
+    expect(psyshock.querySelector('.ps-movebtn-dmg')).toHaveClass('ps-movebtn-dmg-one');
   });
 
   test('spread damage lists one range per target', () => {
@@ -136,7 +153,9 @@ describe('the hit distribution on the move button (T136 point 1, round 67)', () 
     const { rerender } = render(<MoveBtn move={bulletSeed} dmg={result} targetDamage={{}} pendingChoice={null} compact onClick={vi.fn()} />);
     expect(screen.getByRole('button', { name: /Bullet Seed/ })).toHaveAttribute('title', `Grass · 30/30 PP · ${result.range}${result.koChance ? ` (${result.koChance})` : ''} · ${expected}`);
     rerender(<MoveBtn move={bulletSeed} dmg={result} targetDamage={{}} pendingChoice={null} onClick={vi.fn()} />);
-    expect(screen.getByRole('button', { name: /Bullet Seed/ })).toHaveAttribute('title', expected);
+    // round 83: the full button's tooltip leads with the range and the whole KO sentence, the tile shows its short verdict
+    const sentence = result.koChance ? `${result.range} (${result.koChance}) · ` : '';
+    expect(screen.getByRole('button', { name: /Bullet Seed/ })).toHaveAttribute('title', `${sentence}${expected}`);
     expect(expected).toContain('2 hits (35%)');
     expect(expected).toContain('5 hits (15%)');
   });

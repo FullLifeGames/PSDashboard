@@ -61,11 +61,12 @@ describe('the Tera toggle labels the move buttons (T182)', () => {
   test('singles: Tera Blast reads Normal, then Fairy once the toggle is pressed; other moves stay', async () => {
     render(<Host state={stateOf('gen9customgame', [chomp()], [foe('Snorlax')])} advanced />);
     expect(button(0, /Tera Blast/)).toHaveTextContent('Normal');
-    expect(button(0, /Tera Blast/)).toHaveStyle({ background: typeBg('Normal') });
+    // round 83: the tinted tile carries its full type color as --type (typeTileVars)
+    expect(button(0, /Tera Blast/).style.getPropertyValue('--type')).toBe(typeBg('Normal'));
     await userEvent.click(toggle(0));
     expect(button(0, /Tera Blast/)).toHaveTextContent('Fairy');
     expect(within(button(0, /Tera Blast/)).getByText('Fairy')).toHaveClass('ps-movebtn-type');
-    expect(button(0, /Tera Blast/)).toHaveStyle({ background: typeBg('Fairy') });
+    expect(button(0, /Tera Blast/).style.getPropertyValue('--type')).toBe(typeBg('Fairy'));
     expect(button(0, /Earthquake/)).toHaveTextContent('Ground');
     await userEvent.click(toggle(0));
     expect(button(0, /Tera Blast/)).toHaveTextContent('Normal');
@@ -84,7 +85,7 @@ describe('the Tera toggle labels the move buttons (T182)', () => {
     expect(button(0, /Tera Starstorm/)).toHaveTextContent('Normal');
     await userEvent.click(toggle(0));
     expect(button(0, /Tera Starstorm/)).toHaveTextContent('Stellar');
-    expect(button(0, /Tera Starstorm/)).toHaveStyle({ background: typeBg('Stellar') });
+    expect(button(0, /Tera Starstorm/).style.getPropertyValue('--type')).toBe(typeBg('Stellar'));
   });
 
   test('doubles (VGC takes the same path): only the slot whose toggle is pressed changes, the partner stays', async () => {

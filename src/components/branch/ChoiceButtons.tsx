@@ -4,7 +4,8 @@ import type { SpreadTargetDamage } from '../../lib/branch-damage';
 import { spriteUrl } from '../../lib/sprite-url';
 import { useReplayRules } from '../../lib/replay-rules';
 import { toId } from '@fulllifegames/replay-core';
-import { typeBg } from '../../lib/type-colors';
+import type { CSSProperties } from 'react';
+import { typeTileVars } from '../../lib/type-colors';
 import { displayName } from '../../lib/branch-history';
 
 function hpBarClass(pct: number) {
@@ -32,6 +33,20 @@ function compactMoveTitle(move: BranchMoveOption, dmg: DamageResult | undefined,
     (shares ? ` · ${shares}` : '');
 }
 
+/**
+ * Round 83 (the user, 01.11.2026: "I want them to be aligned", then "we still have run-over text"): the calc's verdict on one
+ * line. The "after ..." clause names the end-of-turn chip and recovery the verdict already counts ("guaranteed 2HKO after
+ * Leftovers recovery"), and "N% chance to" shortens to "N% to"; the full sentence wrapped onto a second line and left the tiles
+ * of a row at different heights. The tooltip keeps the whole sentence.
+ */
+const koVerdict = (koChance: string): string => koChance.split(' after ')[0].replace(' chance to ', ' to ');
+
+/** The full button's tooltip: the range with the whole KO sentence, then the drawn hit counts. */
+function fullMoveTitle(dmg: DamageResult | undefined): string | undefined {
+  const sentence = dmg?.koChance ? `${dmg.range} (${dmg.koChance})` : '';
+  return [sentence, hitSharesText(dmg)].filter(Boolean).join(' · ') || undefined;
+}
+
 type PendingMove = Extract<BranchSlotChoice, { kind: 'move' }> | null;
 
 const PLAYED_TITLE = 'The action played at this position on the line you are viewing.';
@@ -50,9 +65,9 @@ function MoveDamage({ dmg, spreadDamage }: { dmg?: DamageResult; spreadDamage?: 
   }
   if (!(dmg && dmg.maxPercent > 0)) return null;
   return (
-    <div className="ps-movebtn-dmg">
+    <div className="ps-movebtn-dmg ps-movebtn-dmg-one">
       {dmg.range}
-      {dmg.koChance && <span className="ps-movebtn-ko"> ({dmg.koChance})</span>}
+      {dmg.koChance && <span className="ps-movebtn-ko"> ({koVerdict(dmg.koChance)})</span>}
     </div>
   );
 }
@@ -150,18 +165,17 @@ export function MoveBtn({ move, dmg, spreadDamage, zMoveName, targetDamage, pend
   onClick: (targetLoc?: number) => void;
 }) {
   const type = shownType(move, teraArmed);
-  const bg = typeBg(type);
   const pendingMove = pendingChoice?.kind === 'move' ? pendingChoice : null;
   const selected = pendingMove?.moveId === toId(move.name);
   return (
-    <div>
+    <div className="ps-movecell">
       <button
         type="button"
         onClick={() => onClick(move.targetOptions[0]?.targetLoc)}
         disabled={move.disabled || (move.requiresTarget && move.targetOptions.length === 0)}
         className={`ps-movebtn ${compact ? 'ps-movebtn-compact ' : ''}${selected ? 'ps-movebtn-selected' : ''}`}
-        style={{ background: bg }}
-        title={compact ? compactMoveTitle(move, dmg, type) : hitSharesText(dmg) || undefined}
+        style={typeTileVars(type) as CSSProperties}
+        title={compact ? compactMoveTitle(move, dmg, type) : fullMoveTitle(dmg)}
       >
         <MoveBtnBody
           move={move}
