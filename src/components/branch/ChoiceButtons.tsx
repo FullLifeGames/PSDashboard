@@ -7,12 +7,8 @@ import { toId } from '@fulllifegames/replay-core';
 import type { CSSProperties } from 'react';
 import { typeTileVars } from '../../lib/type-colors';
 import { displayName } from '../../lib/branch-history';
+import { hpBarClass } from '../../lib/hit-bar';
 
-function hpBarClass(pct: number) {
-  if (pct > 50) return 'ps-hpbar-green';
-  if (pct > 20) return 'ps-hpbar-yellow';
-  return 'ps-hpbar-red';
-}
 
 const ppTextFor = (move: BranchMoveOption) => (move.maxpp > 0 ? `${move.pp}/${move.maxpp}` : '—');
 
