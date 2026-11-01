@@ -961,6 +961,37 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * weights) and T310 (Light Clay from the screen turns in the log) join
  * round 84, T311 parks with a trigger; (4) dev takes r83, the push waits
  * for the user's go, then a reply to issue #3 for the user to post.
+ * AFTER THE GATE (the user's requests of 01.11. after the final gate,
+ * before the push): the move tiles of the branch panel. The yellow KO note
+ * read badly on light types, white text blurred on the light blue of Ice,
+ * and the badges looked blurry. Design gate on an artifact page: tinted
+ * tiles (B) in Advanced and Basic and on the switch chips (2a), neutral
+ * switch chips (B1), one ring in the type color for a pick (c). d34e312:
+ * a tile mixes its type color into the panel's navy and keeps the full
+ * color on its top line, its badge and its ring, every text at 4.5:1 or
+ * more (move-tile-contrast.spec.ts); the KO verdict stands on one line
+ * ("guaranteed 2HKO"), the tooltip keeps the sentence; P1A stands beside
+ * P2A and P1B beside P2B at one height, and the tiles of one grid row
+ * share their height. b1deb3a (the user: "the damage on P1B is missing
+ * and which hit you're controlling is not really defined"): a move whose
+ * Dex target is allAdjacent lists the user's partner after the foes,
+ * priced behind the screens of its own side, and each target's set of
+ * dice has a heading with slot and name. Red before each fix: the
+ * contrast spec, the scenes and the sweep of
+ * damage-preview-partner.spec.ts (every damaging move in Gens 3 to 9 and
+ * Champions against the simulator's targets), the headings in jsdom, and
+ * an e2e scene with Discharge (gen9doubles-spread-test) that measured
+ * Discharge 26 px below Thunderbolt without the new rules; the first
+ * version of that scene stayed green without them, because every tile of
+ * its fixture sat at the minimum height. One test narrowed: the Tera
+ * toggle scene of damage-preview-landing.spec.ts reads the foes' rows; the
+ * new partner row (Corviknight, immune to Ground) reads 0 with and
+ * without the toggle. Check: lint and tsc -b green; suite in the main
+ * checkout 12,804 passed, 116 expected fails, 24 skipped, 5 timeouts under
+ * load green alone; e2e on a dev server with its own Vite cache 95
+ * passed, 1 skipped, and engines.spec.ts, which timed out on the cold
+ * server, passed alone. No engine code moved and the feedback harness
+ * reads no tile, so no feedback run and no cache bump.
  * RESTS: round 84: T299, T304, T305, T306, T309, T310; T311 parked. Next
  * free T312.
  *
