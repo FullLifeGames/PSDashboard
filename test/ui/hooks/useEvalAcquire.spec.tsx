@@ -114,4 +114,28 @@ describe('useEvalAcquire', () => {
     expect(source.acquireExact).toHaveBeenCalledTimes(1);
     await act(async () => { release('{"turn":2}'); await vi.runAllTimersAsync(); });
   });
+
+  // Round 82 (A7e): the dwell timer of a turn that fires while another acquisition runs used to drop the turn for good (nothing
+  // re-ran the effect when the acquisition ended), so a picker stayed approximate until the user scrubbed again.
+  test('the turn the pointer settled on while another acquire ran is acquired when that one ends', async () => {
+    vi.useFakeTimers();
+    const releases: ((value: string) => void)[] = [];
+    const stored = new Set<string>();
+    const source = fakeSource({
+      hasStored: vi.fn((key: string) => stored.has(key)),
+      acquireExact: vi.fn((turn: number) => new Promise<string>(resolve => { releases.push(value => { stored.add(`${replayData.id}:${turn}:fp`); resolve(value); }); })),
+    });
+    const { rerender } = renderHook((props: Inputs) => useEvalAcquire(props), { initialProps: inputs({ source, dwellEnabled: true, viewTurn: 2 }) });
+    act(() => vi.advanceTimersByTime(900));
+    rerender(inputs({ source, dwellEnabled: true, viewTurn: 13 }));
+    act(() => vi.advanceTimersByTime(2000));
+    expect(source.acquireExact).toHaveBeenCalledTimes(1);
+    await act(async () => { releases[0]('{"turn":2}'); await Promise.resolve(); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+    expect(source.acquireExact).toHaveBeenCalledTimes(2);
+    expect(source.acquireExact).toHaveBeenLastCalledWith(13, expect.any(Function));
+    await act(async () => { releases[1]('{"turn":13}'); await vi.runAllTimersAsync(); });
+    // a turn that stored its position is not acquired again
+    expect(source.acquireExact).toHaveBeenCalledTimes(2);
+  });
 });

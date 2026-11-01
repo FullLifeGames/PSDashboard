@@ -30,6 +30,9 @@ function useDwellReconstruction(args: {
     if (!replayData || !dwellEnabled || smogonPending) return;
     const key = exactKeyFor(viewTurn);
     if (!key || hasStored(key) || hasFailed(key)) return;
+    // Round 82 (A7e): one acquisition at a time. A turn the pointer settled on while another runs waits for it: the effect runs
+    // again when the acquisition ends (`exactAcquiringTurn` is a dependency) instead of dropping the turn for good.
+    if (exactAcquiringTurn !== null) return;
     const turn = viewTurn;
     const timer = window.setTimeout(() => {
       if (exactAcquireBusyRef.current) return;
@@ -48,7 +51,7 @@ function useDwellReconstruction(args: {
         });
     }, 900);
     return () => window.clearTimeout(timer);
-  }, [replayData, dwellEnabled, smogonPending, viewTurn, exactKeyFor, hasStored, hasFailed, markFailed, acquireExact]);
+  }, [replayData, dwellEnabled, smogonPending, viewTurn, exactAcquiringTurn, exactKeyFor, hasStored, hasFailed, markFailed, acquireExact]);
   return exactAcquiringTurn;
 }
 
