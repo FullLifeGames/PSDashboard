@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { BranchSlotChoice, BranchSlotModifiers, BranchMoveModifier } from '@fulllifegames/eval-engine';
+import { gimmickApplies } from '../lib/dock-seed';
 
 /** Legal move pool for "What if it had …" — loaded lazily per active species. */
 export function useMovePool(activeSpecies: string, gen: number): string[] {
@@ -27,15 +28,6 @@ type ArmedGimmicks = Record<Side, (BranchMoveModifier | null)[]>;
 
 const NONE_ARMED: ArmedGimmicks = { p1: [], p2: [] };
 const NO_SLOT_MODIFIERS: BranchSlotModifiers = { teraType: null, canMegaEvo: false, canUltraBurst: false, zMoves: [] };
-
-/** Whether a gimmick still applies to a slot's active Pokémon. */
-function gimmickApplies(kind: BranchMoveModifier, modifiers: BranchSlotModifiers | undefined): boolean {
-  if (!modifiers) return false;
-  if (kind === 'terastallize') return !!modifiers.teraType;
-  if (kind === 'mega') return modifiers.canMegaEvo;
-  if (kind === 'ultra') return modifiers.canUltraBurst;
-  return modifiers.zMoves.some(Boolean);
-}
 
 /** The gimmicks other slots of the side hold this turn, each with the holder's slot label ("P1A"). */
 type HeldGimmicks = Partial<Record<BranchMoveModifier, string>>;
