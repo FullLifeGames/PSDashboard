@@ -1,6 +1,6 @@
 # Next Steps (as of 01.11.2026, round 83 booked, round 84 next)
 
-Open work only. Each step is one round; its TODOs carry fixed T-numbers, and their details are in `docs/backlog.md`. Rules for agents: `AGENTS.md`. Finished rounds: `docs/completed/`. Next free T-number: T312.
+Open work only. Each step is one round; its TODOs carry fixed T-numbers, and their details are in `docs/backlog.md`. Rules for agents: `AGENTS.md`. Finished rounds: `docs/completed/`. Next free T-number: T313.
 
 ## State
 
@@ -8,9 +8,11 @@ Release v1.0.2 (30.10.2026) is on master, on GitHub Pages with the frozen copies
 
 ## Next rounds
 
-Round 84 · The engine reads the dice (feature, score-touching D3). The engine adopts the dice module of round 82 (`packages/eval-engine/src/dice/`, words in `GLOSSARY.md`, decisions in `docs/adr/`). T304: the report plays the game's biggest roll the other way and states the win chance with the other result (smogtours-gen8ou-573756 turn 73, the 95 % Fire Fang that missed). T305: the search tree prices secondary effects at their chance. T306: the reconstruction forces the logged results instead of searching 16 seeds. T299: the tree's scripted dice move onto the module. T309: a refit of the doubles weights after T307 (round 83), whose game-correct screen turns the bank reads as harm in doubles. T310: Light Clay from the screen turns in the log. Next: brainstorming and spec; the design gate sets the order and whether one round carries all six.
+Round 84 · The turn dock (feature; lossless for the engine, D4; design gate 01.11.2026 19:20, "16 5, 17a, 18 a"). T312: two rows of slot chips under the replay build the turn. At a replay turn every slot starts with the move the replay played; at the live tip of a variation the engine fills the slots the user has not touched. A tray per slot holds the moves as tiles with the target's HP bar, the target row, the switches, the gimmicks, and behind "Dice · What if" the dice as a table, the What-if row and "All choices…". Basic and Advanced give way to the dock. Success: an e2e test holds six tasks at 1366 × 768 to 3, 4, 3, 3, 8 and 3 clicks without scrolling the left column, and VGC gets scenes of its own. Spec: `docs/superpowers/specs/2026-11-01-round-84-turn-dock-design.md`. Next: the plan, then the build on branch `r84`.
 
-After round 84, bug reports from real use and the dependency upkeep of AGENTS.md bring the next round, and a parked TODO whose trigger fires comes to a gate.
+Round 85 · The engine reads the dice (feature, score-touching D3). The engine adopts the dice module of round 82 (`packages/eval-engine/src/dice/`, words in `GLOSSARY.md`, decisions in `docs/adr/`). T304: the report plays the game's biggest roll the other way and states the win chance with the other result (smogtours-gen8ou-573756 turn 73, the 95 % Fire Fang that missed). T305: the search tree prices secondary effects at their chance. T306: the reconstruction forces the logged results instead of searching 16 seeds. T299: the tree's scripted dice move onto the module. T309: a refit of the doubles weights after T307 (round 83), whose game-correct screen turns the bank reads as harm in doubles. T310: Light Clay from the screen turns in the log. Next: brainstorming and spec; the design gate sets the order and whether one round carries all six.
+
+After round 85, bug reports from real use and the dependency upkeep of AGENTS.md bring the next round, and a parked TODO whose trigger fires comes to a gate.
 
 ## Parked
 
@@ -19,7 +21,7 @@ The TODOs in the backlog's section "Parked" wait for their trigger. The Showdown
 ## Known drifts
 
 - smogtours-gen8ou-562428 t10 and t12: expert pins in known drift. t10 still misses the Heatran read; t12 reads LordEnz's Close Combat as a shift, not as a read that paid off.
-- smogtours-gen8ou-573756 t73: the gap pin reads open. The Fire Fang miss is a key moment, and the verify scene reads Body Press without a tier, as the Monte-Carlo reference does (a margin of 0.004 to the decided line). T304 in round 83 works on it.
+- smogtours-gen8ou-573756 t73: the gap pin reads open. The Fire Fang miss is a key moment, and the verify scene reads Body Press without a tier, as the Monte-Carlo reference does (a margin of 0.004 to the decided line). T304 in round 85 works on it.
 - The golden 655336 stays in known drift. The tiers of VGC 2629703929 turn 8 expect the reference and fail until T242. The draft t56 play-out pin is armed.
 
 ## Upstream list for the user
