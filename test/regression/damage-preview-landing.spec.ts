@@ -221,8 +221,10 @@ describe('the Tera toggle in the preview equals the calc after the click (T20, d
       [wall('Snorlax'), wall('Blissey')]);
     const off = preview(current).p1;
     const on = preview(current, { p1: ['Ground', null], p2: [null, null] }).p1;
+    // round 83: Earthquake lists its partner's row too; Corviknight takes nothing from a Ground move, with or without the toggle
+    expect(on.spread[0][1].find(row => row.label === 'P1B')?.result.maxPercent).toBe(0);
     const rows = (side: typeof on) => [
-      ...side.spread[0][1].map(row => span(row.result)),
+      ...side.spread[0][1].filter(row => row.label !== 'P1B').map(row => span(row.result)),
       span(side.targets[0]['2:1']), span(side.targets[0]['2:2']),
     ];
     rows(on).forEach((row, index) => expect(row).not.toEqual(rows(off)[index]));

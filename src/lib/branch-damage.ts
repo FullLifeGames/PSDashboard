@@ -85,8 +85,14 @@ function forcedContext(chosen: Extract<BranchSlotChoice, { kind: 'move' }> | nul
   return { rolls: true, ...(crit ? { isCrit: true } : {}), ...(count ? { hits: count.hits } : {}) };
 }
 
-/** Per-move damage of one active slot: targeted entries, the best untargeted range, and spread breakdowns. */
-function slotDamage(args: {
+/**
+ * Round 83 (the user, 01.11.2026: "the damage on P1B is missing"): a move whose Dex target is `allAdjacent` (Earthquake, Surf)
+ * hits every body next to its user, the user's partner among them, and the preview lists the partner's row after the foes'.
+ * `damage-preview-partner.spec.ts` holds this reading to the simulator's targets for every damaging move of the Dex.
+ */
+export const hitsPartner = (move: Pick<BranchMoveOption, 'targetType'>): boolean => move.targetType === 'allAdjacent';
+
+interface SlotDamageArgs {
   active: SimPokemonInfo;
   moves: BranchMoveOption[];
   enemySide: 'p1' | 'p2';
@@ -98,11 +104,10 @@ function slotDamage(args: {
   battle?: LiveHit['battle'] | null;
   /** The Tera type each slot has armed, by side. */
   armed: { p1: (string | null)[]; p2: (string | null)[] };
-}) {
-  const { active, moves, enemySide, enemyActives, slots, choices, context, calc, battle, armed } = args;
-  const defaults: DamageResult[] = [];
-  const spread: Record<number, SpreadTargetDamage[]> = {};
-  const targetEntries: [string, DamageResult][] = [];
+}
+
+/** The calc's context for a hit of the slot's attacker into the body at a side and slot, with the forced dice of its chosen move. */
+function hitContext({ active, slots, choices, context, battle, armed }: SlotDamageArgs) {
   const attackerSide = slots.p1.includes(active) ? 'p1' : 'p2';
   const attackerSlot = slots[attackerSide].indexOf(active);
   const liveHit = (side: 'p1' | 'p2', slot: number): { liveHit?: LiveHit } => (battle ? {
@@ -115,10 +120,27 @@ function slotDamage(args: {
   } : {});
   const pick = choices[attackerSide][attackerSlot];
   const chosen = pick?.kind === 'move' ? pick : null;
-  const contextInto = (side: 'p1' | 'p2', slot: number, move: BranchMoveOption): DamageContext => ({
+  return (side: 'p1' | 'p2', slot: number, move: BranchMoveOption): DamageContext => ({
     ...(context?.gameType === 'Doubles' ? { ...context, ...fieldFacts(slots, choices, active, side, slot), ...liveHit(side, slot) } : context),
+    // the partner stands behind the screens of its own side, which is the attacker's
+    ...(side === attackerSide ? { defenderSideConditions: context?.attackerSideConditions } : {}),
     ...forcedContext(chosen, move, `${side}${String.fromCharCode(97 + slot)}`),
   });
+}
+
+const rowLabel = (side: 'p1' | 'p2', slot: number): string => `${side.toUpperCase()}${String.fromCharCode(65 + slot)}`;
+
+/** Per-move damage of one active slot: targeted entries, the best untargeted range, and spread breakdowns. */
+function slotDamage(args: SlotDamageArgs) {
+  const { active, moves, enemySide, enemyActives, slots, calc } = args;
+  const defaults: DamageResult[] = [];
+  const spread: Record<number, SpreadTargetDamage[]> = {};
+  const targetEntries: [string, DamageResult][] = [];
+  const contextInto = hitContext(args);
+  const attackerSide = slots.p1.includes(active) ? 'p1' : 'p2';
+  const partnerSlot = slots[attackerSide].findIndex(info => info !== active && isLiving(info));
+  const rowInto = (side: 'p1' | 'p2', slot: number, defender: SimPokemonInfo, move: BranchMoveOption): SpreadTargetDamage =>
+    ({ label: rowLabel(side, slot), result: calc(active, defender, move, contextInto(side, slot, move)) });
   moves.forEach((move, moveIndex) => {
     for (const target of move.targetOptions) {
       const defender = slots[target.side][target.activeSlot];
@@ -129,18 +151,14 @@ function slotDamage(args: {
 
     if (enemyActives.length === 0) return;
     // Untargeted moves (spread/self/singles): one range per living enemy (G6).
-    const perTarget = enemyActives.map(enemy => ({
-      label: `${enemySide.toUpperCase()}${String.fromCharCode(65 + enemy.index)}`,
-      result: calc(active, enemy.active, move, contextInto(enemySide, enemy.index, move)),
-    }));
+    const perTarget = enemyActives.map(enemy => rowInto(enemySide, enemy.index, enemy.active, move));
     const best = perTarget.reduce((currentBest, candidate) =>
       candidate.result.maxPercent > currentBest.result.maxPercent ? candidate : currentBest,
     perTarget[0]);
     defaults[moveIndex] = best.result;
-    if (move.targetOptions.length === 0 && perTarget.length > 1 &&
-      perTarget.some(target => target.result.maxPercent > 0)) {
-      spread[move.slot] = perTarget;
-    }
+    // the partner's row follows the foes' and never becomes the move's default range
+    const rows = hitsPartner(move) && partnerSlot >= 0 ? [...perTarget, rowInto(attackerSide, partnerSlot, slots[attackerSide][partnerSlot]!, move)] : perTarget;
+    if (move.targetOptions.length === 0 && rows.length > 1 && rows.some(row => row.result.maxPercent > 0)) spread[move.slot] = rows;
   });
   return { defaults, spread, targets: Object.fromEntries(targetEntries) };
 }

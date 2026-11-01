@@ -294,4 +294,47 @@ test.describe('PS Dashboard', () => {
     }
     await expect(pikachuControls).not.toContainText('Targeting');
   });
+
+  test('a spread move lists its partner, its dice name each target, and the tiles and slots line up (round 83)', async ({ page }) => {
+    await page.locator('input[type="text"]').fill('gen9doubles-spread-test');
+    await page.locator('button', { hasText: 'Load' }).click();
+    await expect(page.getByText('Alice', { exact: true }).first()).toBeVisible({ timeout: 10000 });
+    await waitForExactPickers(page);
+    await page.locator('button', { hasText: 'Advanced' }).click();
+    const pikachuControls = page.locator('.ps-side-controls').first();
+    await expect(pikachuControls.locator('.ps-target-btn').first()).toBeVisible({ timeout: 5000 });
+    // Discharge hits Bulbasaur, Charmander and Pikachu's partner Eevee: three rows, which wrap onto a second line
+    const discharge = pikachuControls.locator('.ps-movebtn', { hasText: 'Discharge' });
+    await expect(discharge.locator('.ps-movebtn-spread-target')).toHaveText([/^P2A /, /^P2B /, /^P1B /], { timeout: 10000 });
+    // The hover lift moves a tile by a pixel: measure with the mouse away.
+    await page.mouse.move(0, 0);
+    const layout = await page.evaluate(() => {
+      const box = (element: Element) => {
+        const { top, bottom } = element.getBoundingClientRect();
+        return { top: Math.round(top), bottom: Math.round(bottom) };
+      };
+      // Pikachu's first row holds Discharge, two lines of damage, next to Thunderbolt, one line and target buttons below it.
+      const rows = [...document.querySelectorAll('.ps-movegrid')].flatMap(grid => {
+        const byTop = new Map<number, { tile: string; bottom: number }[]>();
+        for (const tile of grid.querySelectorAll('.ps-movebtn')) {
+          const { top, bottom } = box(tile);
+          byTop.set(top, [...(byTop.get(top) ?? []), { tile: tile.querySelector('.ps-movebtn-name')?.textContent ?? '', bottom }]);
+        }
+        return [...byTop.values()].filter(row => row.length > 1);
+      });
+      return { slots: [...document.querySelectorAll('.ps-side-slot')].map(box), rows };
+    });
+    expect(layout.slots).toHaveLength(4);
+    const [p1a, p1b, p2a, p2b] = layout.slots;
+    expect(p2a, 'P2A starts and ends with P1A').toEqual(p1a);
+    expect(p2b, 'P2B starts and ends with P1B').toEqual(p1b);
+    expect(layout.rows.some(row => row.some(({ tile }) => tile === 'Discharge'))).toBe(true);
+    for (const row of layout.rows) expect(new Set(row.map(({ bottom }) => bottom)).size, JSON.stringify(row)).toBe(1);
+
+    await discharge.click();
+    const dice = pikachuControls.locator('.ps-dice');
+    for (const target of ['P2A Bulbasaur', 'P2B Charmander', 'P1B Eevee']) {
+      await expect(dice.getByRole('group', { name: target }).locator('.ps-dice-heading'), target).toHaveText(target, { timeout: 15000 });
+    }
+  });
 });

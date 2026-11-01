@@ -35,3 +35,10 @@ export const doublesReplay: ReplayData = {
     '|turn|1',
   ].join('\n'),
 };
+
+/** Round 83: the same game with Pikachu's Quick Attack swapped for Discharge, which hits both foes and Pikachu's partner. */
+export const doublesSpreadReplay: ReplayData = {
+  ...doublesReplay,
+  id: 'gen9doubles-spread-test',
+  log: doublesReplay.log.replace('- Thunderbolt<br />- Quick Attack<br />', '- Thunderbolt<br />- Discharge<br />'),
+};

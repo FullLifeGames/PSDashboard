@@ -99,6 +99,12 @@ export interface SlotDiceProps {
   onToggle: (die: ForcedDie) => void;
 }
 
+/**
+ * Round 83 (the user, 01.11.2026: "which hit you're controlling is not really defined"): the heading of a spread move's set of
+ * chips names its target by slot and name, so two bodies of one species stay apart.
+ */
+const targetHeading = (target: string, words: DieWords): string => `${target.toUpperCase()} ${words.slot(target)}`;
+
 /** The dice of one slot's chosen move: one set of chips per target of a spread move. */
 export function SlotDice({ offers, dice, logged, words, label, rollsOf, onToggle }: SlotDiceProps) {
   if (offers === null) return null;
@@ -108,7 +114,8 @@ export function SlotDice({ offers, dice, logged, words, label, rollsOf, onToggle
   return (
     <div className="ps-dice" role="group" aria-label={`Dice for ${label}`}>
       {chipGroups(offers).map(group => (
-        <div key={group.key} className="ps-dice-set">
+        <div key={group.key} className="ps-dice-set" {...(group.target ? { role: 'group', 'aria-label': targetHeading(group.target, words) } : {})}>
+          {group.target && <div className="ps-dice-heading">{targetHeading(group.target, words)}</div>}
           {group.offers.map(offer => (
             <DieRow key={dieKey(offer.name)} offer={offer} dice={dice} logged={logged} words={words} target={group.target} rollsOf={rollsOf} onToggle={onToggle} />
           ))}

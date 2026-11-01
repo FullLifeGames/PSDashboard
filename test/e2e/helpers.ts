@@ -3,7 +3,7 @@ import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import type { ReplayData } from '@fulllifegames/replay-core';
-import { doublesReplay } from './fixtures/doubles-replay';
+import { doublesReplay, doublesSpreadReplay } from './fixtures/doubles-replay';
 import { vgcReplay } from './fixtures/vgc-replay';
 import { emptySmogon, routeSmogon } from './smogon-routes';
 
@@ -172,6 +172,7 @@ export async function routeOfflineFixtures(page: Page): Promise<void> {
   await page.route('**/replay.pokemonshowdown.com/**', (route) => {
     const url = route.request().url();
     const replay = url.includes(vgcReplay.id) ? vgcReplay
+      : url.includes(doublesSpreadReplay.id) ? doublesSpreadReplay
       : url.includes(doublesReplay.id) ? doublesReplay
       : fixtureReplay;
     route.fulfill({
