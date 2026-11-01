@@ -912,6 +912,61 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * ROUND 82 2026-11-01 (improvement round 82, a feature: forced dice in
+ * branches; T299's red sweep on t299 from dev c42b5df, then r82 from t299,
+ * lane A in the worktree w9a on r82-a; spec docs/superpowers/specs/
+ * 2026-10-31-forced-dice-design.md, probes docs/perf/probes/
+ * 2026-10-31-r82/). Gates: grilling 31.10. (answers 1a to 19a, "passt"),
+ * spec 16:21 ("okay"), after A1 17:04 ("1a 2a 3a 4a": the 39 damage roll
+ * steps of Gens 1 and 2, the stream reset after a forced turn, ADR 0002's
+ * second rule, builders end only their own processes), during the build
+ * 23:21 ("1b 2a": the full dice sweeps in a CI job of their own, a
+ * branch's first turn always joins the log's visible results), final
+ * 01.11. 07:51 ("1a 2a 3a").
+ * DELIVERED: the dice module (packages/eval-engine/src/dice/). It names a
+ * die by the simulator hook that runs right before the draw, else by the
+ * enclosing simulator method and the draw's form (ADR 0002), and answers
+ * a forced die with a number from the draw's range, so every draw still
+ * consumes the stream. A natural copy records each die by name; the real
+ * turn replays them with the forced ones, then the stream resets to the
+ * natural turn's end seed. Kinds: accuracy, crit, damage roll, secondary
+ * and self effects, hit counts, status checks, speed tie, move-first
+ * (Quick Claw, Quick Draw), stalling, power, the dice of abilities and
+ * items, end of turn. The branch panel's Advanced mode offers chips
+ * before Execute, a damage roll select with a crit preview, the log's
+ * results on a branch's first turn ("Crit · log"), frame lines ("Forced:
+ * Air Slash flinch, 30 %"), history rows and share labels. Forced dice
+ * ride on BranchSlotChoice.dice (ADR 0001), an optional field, so the
+ * engine protocol, the support state and share links keep their versions.
+ * GLOSSARY.md and docs/adr/ are new and tracked; T299 booked parked with
+ * its red sweep (88 test.fails rows); the CI job "Dice sweeps, every
+ * move" plays DICE_SWEEPS=full. Fixed on the way: the dice offer raised
+ * ModifyMove without an active move (Choice items threw "Battle.activeMove
+ * is null"), a turn the pointer settled on while another acquisition ran
+ * stayed approximated, the picker had no battle at a viewed replay
+ * position.
+ * MEASUREMENT: lossless (D4), no cache bump. Bank in CI: r82-base (dev
+ * c42b5df) against r82-head (179b360) and r82-head2 (69a403b), 837 of 837
+ * rows byte-identical (sha256 b2be4d91...). Feedback f1 to f3 (179b360)
+ * and g1, g2 (69a403b): exit 0, 12 dumps each, all byte-identical to each
+ * other and to round 80's f1. e2e 94 passed, 1 skipped (repro-state); the
+ * first run read 3 failures, fixed in A7e. Suite in the main checkout:
+ * 671 files, 12,436 passed, 94 expected fails (88 T299, 4 Champions
+ * preview rows, 2 older), 24 skipped (all older); the dice sweeps with
+ * every move 33 files, 33,177 passed in 72 s. Lint, tsc -b and pack:smoke
+ * green. The hook probe of A1 read 10,188 pairs identical with the watch
+ * on (Gens 1 to 9, Champions). The plain suite took 400 s, against 275 to
+ * 362 s before the round.
+ * USER GATE 2026-11-01 07:51 ("1a 2a 3a"): (1) r82 goes to dev with this
+ * booking, and the push waits for the user's go after the user's own
+ * test; (2) all seven proposals approved: T300 to T303 parked with a
+ * trigger, T304 to T306 with T299 form round 83, the engine setup (the
+ * user wants the Fire Fang miss of 573756 t73 declared as the roll that
+ * changed the game); (3) the worktree w9a and the branches t299, r82-a
+ * and r82 go once everything is merged, before the push.
+ * RESTS: T300 to T303 parked; round 83: T299, T304, T305 and T306. Next
+ * free T307.
+ *
  * ROUND 81 2026-10-31 (improvement round 81, one small fix on r81 from dev
  * d747096: the user's report of the morning after the release of 1.0.2;
  * probes docs/perf/probes/2026-10-31-r81/). Gate: the user's answer "1b" (the

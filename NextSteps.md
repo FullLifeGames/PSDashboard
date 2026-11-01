@@ -1,16 +1,16 @@
-# Next Steps (as of 31.10.2026, round 82 open)
+# Next Steps (as of 01.11.2026, round 82 booked, round 83 next)
 
-Open work only. Each step is one round; its TODOs carry fixed T-numbers, and their details are in `docs/backlog.md`. Rules for agents: `AGENTS.md`. Finished rounds: `docs/completed/`. Next free T-number: T300.
+Open work only. Each step is one round; its TODOs carry fixed T-numbers, and their details are in `docs/backlog.md`. Rules for agents: `AGENTS.md`. Finished rounds: `docs/completed/`. Next free T-number: T307.
 
 ## State
 
-Release v1.0.2 (30.10.2026) is on master, on GitHub Pages with the frozen copies `/v1.0.0/` to `/v1.0.2/`, on npm with both packages, and in production on fulllifegames.com. dev carries T298 (round 81: after a deploy the app reloads once when a lazy chunk is gone) for the next release. master moves only with the user's okay.
+Release v1.0.2 (30.10.2026) is on master, on GitHub Pages with the frozen copies `/v1.0.0/` to `/v1.0.2/`, on npm with both packages, and in production on fulllifegames.com. dev carries T298 (round 81: after a deploy the app reloads once when a lazy chunk is gone) and round 82 (forced dice in branches: in the branch panel's Advanced mode the user sets single dice of a turn, and every other die falls as it would have) for the next release. master moves only with the user's okay.
 
 ## Next rounds
 
-Round 82 · Forced dice in branches (feature, lossless D4), on branch `r82`. In the branch panel's Advanced mode the user sets single dice of a turn (hit or miss, crit, the damage roll, a secondary effect, a status check, the dice of abilities and items) and every other die falls as it would have. Spec `docs/superpowers/specs/2026-10-31-forced-dice-design.md`, plan `docs/superpowers/plans/2026-10-31-forced-dice-plan.md`, words in `GLOSSARY.md`, decisions in `docs/adr/`. Next: step A1, the probe of the simulator's hooks and the lane plan.
+Round 83 · The engine reads the dice (feature, score-touching D3). The engine adopts the dice module of round 82 (`packages/eval-engine/src/dice/`, words in `GLOSSARY.md`, decisions in `docs/adr/`). T304: the report plays the game's biggest roll the other way and states the win chance with the other result (smogtours-gen8ou-573756 turn 73, the 95 % Fire Fang that missed). T305: the search tree prices secondary effects at their chance. T306: the reconstruction forces the logged results instead of searching 16 seeds. T299: the tree's scripted dice move onto the module. Next: brainstorming and spec; the design gate sets the order and whether one round carries all four.
 
-After round 82, bug reports from real use and the dependency upkeep of AGENTS.md bring the next round, and a parked TODO whose trigger fires comes to a gate.
+After round 83, bug reports from real use and the dependency upkeep of AGENTS.md bring the next round, and a parked TODO whose trigger fires comes to a gate.
 
 ## Parked
 
@@ -19,7 +19,7 @@ The TODOs in the backlog's section "Parked" wait for their trigger. The Showdown
 ## Known drifts
 
 - smogtours-gen8ou-562428 t10 and t12: expert pins in known drift. t10 still misses the Heatran read; t12 reads LordEnz's Close Combat as a shift, not as a read that paid off.
-- smogtours-gen8ou-573756 t73: the gap pin reads open. The Fire Fang miss is a key moment, and the verify scene reads Body Press without a tier, as the Monte-Carlo reference does (a margin of 0.004 to the decided line).
+- smogtours-gen8ou-573756 t73: the gap pin reads open. The Fire Fang miss is a key moment, and the verify scene reads Body Press without a tier, as the Monte-Carlo reference does (a margin of 0.004 to the decided line). T304 in round 83 works on it.
 - The golden 655336 stays in known drift. The tiers of VGC 2629703929 turn 8 expect the reference and fail until T242. The draft t56 play-out pin is armed.
 
 ## Upstream list for the user
@@ -33,3 +33,4 @@ The TODOs in the backlog's section "Parked" wait for their trigger. The Showdown
 - `@pkmn/sim` 0.10.12 gives the Mega-Z formes no Mega flag (`dex-species.mjs:49` counts Mega, Mega-X and Mega-Y; Showdown's own source at b354a81f reads `forme.includes('Mega')`).
 - Showdown's `replay-embed.js` appends its sixteen scripts without `async = false`, so they run in the order they arrive. When jQuery comes after `data/graphics.js`, `Object.assign($.easing, …)` throws "$ is not defined" and the replay never builds; holding jQuery back reproduces it (`test/e2e/replay-sprites.spec.ts`). The dashboard's frame document orders the scripts itself (`EMBED_SCRIPT_ORDER_SCRIPT` in `src/lib/replay-compat.ts`).
 - `@pkmn/smogon` 0.6.1 keeps a sets file in `Smogon.get` only once its response arrived, so concurrent `sets()` calls of one format fetch it once per call (a VGC 2026 team asked twelve times for the missing `sets/gen9vgc2026.json`). The app shares one fetch per file (`keepingSetsFiles` in `src/lib/smogon-sets.ts`).
+- `@smogon/calc` 0.12.0 builds its Champions moves (generation 0) from `CHAMPIONS_LIST` and `CHAMPIONS_PATCH` (`dist/data/moves.js`, `CHAMPIONS` at line 5476). The patch sets Gear Grind `{ bp: 60 }` and Triple Dive `{ bp: 35 }`, which the list lacks, so both come out without type, category or `multihit`: `calculate` with `new Move(gen0, 'Triple Dive')` prices a move with no type. The list also omits 15 multi-hit moves that the simulator's Champions mod defines, all `Past` there (Arm Thrust, Double Kick, Fury Attack and twelve more); that half may be on purpose, the patch entries are an inconsistency either way (T300; evidence `docs/perf/probes/2026-10-31-r82/review/champions-multihit.md`).

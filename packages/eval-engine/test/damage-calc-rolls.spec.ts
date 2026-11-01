@@ -71,9 +71,9 @@ describe.each(SWEEP_CASES)('the calculator rolls: $name', ({ rules, mode }) => {
 });
 
 describe.each(SWEEP_CASES)('the calculator rolls of a multi-hit move: $name', ({ rules, mode }) => {
-  // The calculator's Champions data (its generation 0) carries no `multihit` for the mod's moves (`modOverrides` in calc/move.ts copies
-  // the power, type, category, flags and target), so the Champions preview prices one hit of Double Kick and Fury Attack. That is the
-  // preview's today, outside this round (it would move the engine's prices): the rows stand as `fails` and turn red when it is fixed.
+  // The calculator's Champions data (its generation 0) lacks the mod's Past multi-hit moves (`modOverrides` in calc/move.ts copies
+  // the power, type, category, flags and target), so the Champions preview prices one hit of Double Kick and Fury Attack. Only the
+  // preview reads it (the engine's prices take the simulator's hit count); the rows stand as `fails` and turn red when T300 fixes it.
   const rowTest = rules.name === 'Champions' ? test.fails : test;
   rowTest.each([{ move: 'doublekick', hits: 2 }, { move: 'furyattack', hits: 3 }])('$move: every hit takes the step, the damage is the sum', ({ move, hits }) => {
     const battle = board(rules, move, mode);

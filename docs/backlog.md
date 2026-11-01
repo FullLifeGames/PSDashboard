@@ -1,8 +1,90 @@
 # Backlog
 
-This file holds the details of every open TODO, one section per TODO under its fixed T-number. Release v1.0.2 is out (30.10.2026), no round is open, and every TODO is parked with a trigger; a trigger that fires brings its TODO to a gate. The next free T-number is T300.
+This file holds the details of every open TODO, one section per TODO under its fixed T-number. Release v1.0.2 is out (30.10.2026), and round 82 (forced dice in branches) waits on dev for the next release. Round 83 carries four approved TODOs (T299, T304 to T306); every other TODO is parked with a trigger, and a trigger that fires brings its TODO to a gate. The next free T-number is T307.
 
 Evidence paths of the form `r<NN>/…` point to that round's probe folder, `docs/perf/probes/<date>-r<NN>/`; `docs/` is local, so they exist only on the maintainer's machine. Each round's entry in `docs/completed/` names its folder and the gate that approved its TODOs. Line numbers in a section refer to the state when the TODO was written.
+
+## Round 83 · the engine reads the dice
+
+The final gate of round 82 (01.11.2026, "2a") approved these TODOs for round 83, the engine setup; each leaves this file with that round's booking.
+
+### T304 · The report plays the game's biggest roll the other way
+
+*Engine · round 82 · feature · report prose (pins move)*
+
+**Approved for round 83 (final gate of round 82, 01.11.2026, "2a"; the user: "Ich will schon, dass Fire Fang korrekt als Miss deklariert und dass das das Game geändert hat. Das Engine Setup generell wäre für mich die nächste Runde").**
+
+**Problem.** smogtours-gen8ou-573756 turn 73: LordEnz's Garchomp at +4 misses Fire Fang (95 %) on SOULWIND's Corviknight at 15 % (59 of 399 HP, after Stealth Rock), and the report reads "The game's biggest roll came on turn 73: Fire Fang (95%) missed, worth +13% to SOULWIND." (T284, round 79, `packages/eval-engine/src/biggest-roll.ts:45-49`). The +13 % is the turn's chance part (`chanceDelta`, `packages/eval-engine/src/analysis.ts:67-69`): the next root's score after the miss against the price of the played pair, which averages hit and miss at their chances and also holds the turn's other dice and model error. The report never names the win chance a hit would have left, so it cannot say what the miss took from LordEnz. The gap pin of 573756 turn 73 (since 2026-08) still asks that "the bar shows how close the sweep stood".
+
+**Idea.** The report plays the biggest roll's other result: the dice module replays the turn on a copy with that die forced the other way (Fire Fang hits), every other die as the game rolled it, and the engine evaluates the position after it like any root. The report states both win chances, with the miss and had it hit.
+
+**Benefit.** App: the report says what the roll changed, measured in the game's own position after a hit.
+
+**Success.** The gap pin 573756 turn 73 moves toward its desired and comes to the round's gate as a truth candidate. The sentence moves in the two corpus reports that carry it (573756, and 562428 turn 11: "Stone Edge (80%) missed, worth +14% to Dflo"), each at the gate, and it speaks only where the log names the event (gate 30.10.2026, "2a"). Both scenes are singles: in doubles the sentence names no move today (`sureKillRoll` in `denied-end.ts:39-47`), so the round finds a Doubles OU and a VGC scene in the census or states that none exists. The forced copy rests on the dice sweeps of round 82; a Node probe prices the extra evaluation per replay; scores stay as they are, so three feedback runs read byte-identical apart from the moved prose.
+
+**Singles and doubles.** Both: the dice module names a doubles die by slot and target, where the round-79 sentence names no move for a doubles pair.
+
+**Evidence.** `r82/gate/feedback/g1/feedback-full-smogtours-gen8ou-573756.json` (`gameReport.summary`); the log of turns 72 and 73 in `test/e2e-feedback/fixtures/smogtours-gen8ou-573756.json` (Corviknight enters at 108/399, Stealth Rock leaves it at 59/399, then `|move|p2a: Penal Battalion|Fire Fang|p1a: Corviknight|[miss]`).
+
+### T305 · The search tree prices secondary effects at their chance
+
+*Engine · round 82 · feature · score-touching (D3)*
+
+**Approved for round 83 (final gate of round 82, 01.11.2026, "2a": the engine setup is the next round).**
+
+**Problem.** The tree's class path prices a singles cell by outcome classes: miss, kill roll, non-kill roll, and both orders of a speed tie (`Outcome` in `packages/eval-engine/src/search/outcome-children.ts:64`, `foldClassWeights` in `packages/eval-engine/src/cell-blend.ts:289-297`). A secondary effect has no class, and the scripted dice cannot force one (`RollScript` carries hit, crit, roll and order, `forward/scripted-prng.ts:17-26`). The tree draws the natural base seed first, then at most six forced draws for the classes it did not show (`search/expansion.ts:107`, `TREE_FORCED_CAP` at `:31`), and each class keeps one representative child, so a burn, a flinch or a stat drop counts with the whole weight of its class or not at all. A flinch writes a `|cant|` line, and `classifyChild` returns null for any `|cant|` on an event side (`cell-blend.ts:235-239`), so a base draw with a flinch sends the cell to a single seed (`outcome-children.ts:228`, `expansion.ts:121`). A cell without a miss or a kill has no class at all: smogtours-gen8ou-573756 turn 8, LordEnz's fifth Scald in a row into Clefable, against Knock Off. The narrative counts the burn chance compounding to about 83 % over the streak (a truth pin since round 6), and the tree prices the cell from `SEARCH_SEEDS[0]`, so the burn counts fully or not at all. The doubles pair plan reads a flinch chance only to fall back from its pattern (`pair/pattern.ts:74-81`, used at `:219`).
+
+**Idea.** The dice module names each secondary die of a move by its hook (`ModifySecondaries`, per target) and answers it on demand, so a cell draws "hit with burn" and "hit without burn" as classes of their own at the chance the simulator uses. That widens the class path to every cell with a secondary chance, including the cells without a miss or a kill. Serene Grace and Sheer Force rewrite the move in `ModifyMove`, which the offer runs before `ModifySecondaries` (`dice/offer.ts:65-81`); the tree's plan reads them the same way. The tree's scripted dice move onto the module first (T299), so one set of names serves the branch and the tree.
+
+**Benefit.** Engine: a 30 % burn or a 30 % flinch counts at 30 % in every cell, and a grade no longer rests on whether one seed showed it.
+
+**Success.** First a reach probe: how many tree cells of the bank carry a secondary under 100 %, split into cells with a class plan and cells without, and the tree's cost with the wider class path. Then a sweep over every Dex move with a secondary chance under 100, Serene Grace and Sheer Force included, in every generation and mod the corpus plays, compares the class weights with the simulator's chance; then the play-out pin, the golden 655336 and the bank in that order (AGENTS.md, tree changes), the bank and the holdouts without harm, the tier census with `--moved`, the cache version once.
+
+**Singles and doubles.** Both: the doubles pair plan gets the same classes per target.
+
+**Evidence.** The log of turns 4 to 8 in `test/e2e-feedback/fixtures/smogtours-gen8ou-573756.json` (p2a Scald into p1a Clefable on each; turn 8 burns: `|-damage|p1a: Clefable|239/393 brn`); the truth pin in `test/e2e-feedback/corpus.ts:118-122`.
+
+### T306 · The reconstruction forces the logged results
+
+*Engine · round 82 · feature · score-touching (D3: the replay's positions move)*
+
+**Approved for round 83 (final gate of round 82, 01.11.2026, "2a": the engine setup is the next round).**
+
+**Problem.** The reconstruction replays each turn's choices and searches 16 pinned seeds for one whose discrete results match the log: faints, the end, move order, misses, crits, secondary effects, hit counts, `|cant|` reasons and confusion self-hits (`ALIGNMENT_SEEDS` and `chooseAlignedSeed` in `packages/eval-engine/src/hax-alignment.ts:208-266`). In the feedback runs of round 82 the best seed matches the log in 332 of 356 turns: 286 of 297 in singles, 17 of 25 in Doubles OU, 29 of 34 in VGC. In the other 24 turns the rebuilt position carries a result the game did not have, or lacks one it had, until the next snapshot corrects it; 5 of them carry a faint mismatch (`faint-residual`). The first turn of a branch repeats its seed search on every adopt: `alignArrivalDice` always runs it (`branch/adopt.ts:52`, `branch/runtime.ts:274`), and the serialized position keeps only a seed, not the logged draws.
+
+**Idea.** The reconstruction forces the log's results with the dice module, as the first turn of a branch does since round 82 (`firstTurnDice` in `packages/eval-engine/src/dice/turn.ts:133`, reading the log through `loggedDice` in `dice/logged-results.ts:280`; it still runs on top of the seed search). A turn with logged results costs two advances (a natural copy and the real turn) instead of up to 16 trials plus the real one, a quiet turn costs one, and the dice the log hides come from one seed.
+
+**Benefit.** Engine and app: every rebuilt position carries the game's own results, doubles above all, and no turn tries more than one seed.
+
+**Success.** The drift report's alignment line reads perfect for every turn whose mismatch is a logged result, per singles, Doubles OU and VGC. The log hides damage rolls (`logged-results.ts:14-18`), so the 5 turns with a faint mismatch may stay; the design gate decides whether a roll step read from the log's HP joins. The reconstruction's positions move: the cache version once, three feedback runs, the tier census with `--moved`, the bank and the holdouts without harm; the time of a reconstruction and of an adopt, interleaved with the base on a quiet machine.
+
+**Singles and doubles.** Both; doubles gain most (46 of 59 turns align today).
+
+**Evidence.** `r82/gate/feedback/g1/feedback-drift.md`, line 6 (`meta.alignmentByReplay` in `feedback-drift.json`).
+
+### T299 · A scripted die decides the attacker's status check
+
+*Engine · round 82 · small · score-touching*
+
+**Approved for round 83 (final gate of round 82, 01.11.2026, "2a": the engine setup is the next round). Parked before (planning of round 82, 31.10.2026, "11a"); its trigger fires in round 83, which moves the scripted dice onto the forced-dice module.**
+
+**Problem.** The tree's scripted dice tell a draw by the numbers in the call, and the simulator draws the attacker's status checks inside the same action: `runMove` sets the active move before `BeforeMove` (`@pkmn/sim` 0.10.12, `battle-actions.js:292` and `:301`).
+
+`ScriptedPRNG` (singles, `packages/eval-engine/src/forward/scripted-prng.ts:80-86`) takes the first `randomChance(x, 100)` of a scripted move as its accuracy roll and any `randomChance(1, d)` with a crit denominator as its crit roll. A script therefore decides full paralysis (1 in 4, 1 in 8 in Champions), the infatuation (1 in 2), the Champions thaw (1 in 4) and the confusion check. From Gen 7 the check draws 33 in 100, and `{ hit: true }` makes a confused Snorlax hit itself on every seed, where the plain seeds show a self-hit on a third of them; in Gens 2 to 6 it draws 1 in 2, true means no self-hit, and `{ crit: false }` forces the self-hit. A check read as the accuracy roll also spends the action's accuracy flag, so the move's real accuracy roll goes unscripted (`:80-81`). The self-hit's damage roll takes the script's roll, because the script answers the first `random(16)` of the action (`:91-100`).
+
+`PairPRNG` (doubles, `pair/prng.ts:107-119`) guards the crit with `inDamage()`. From Gen 7 it books the confusion check as an accuracy record of 33, lets a script decide it, and leaves the move's real accuracy roll unrecorded (`:107-108`). It books every `random(16)` of the action as a roll of the move (`:131-146`), the self-hit's too: on the attacker from Gen 7, and on the move's own target in Gens 3 to 6, a hit that never happened. The guard `randomDeviation` (`pair/log.ts:40-48`, read at `pair/pattern.ts:227`) sends every draw with a confusion check to the plain mean, so these records do not reach the pattern today; the fix makes them true for the code after the guard and keeps the scripts off the check.
+
+In Gens 1 and 2 accuracy and crit draw in 256ths and the damage roll is `random(217, 256)`, so `ScriptedPRNG` reaches none of them. The singles tree checks each forced draw against its log (`search/outcome-children.ts:201-202`), so a misread draw there tends to leave a class empty rather than fill a wrong one; nobody has measured the grades it moves.
+
+**Idea.** Name a draw by where the simulator draws it (ADR 0002): first by the hook that runs right before it (the `Accuracy` event, `ModifyCritRatio`, `battle.randomizer`, and in every generation the `BeforeMove` handler that draws a status check), else by the simulator method that encloses the draw. Gen 1 draws the crit from base Speed without `ModifyCritRatio` (`data/mods/gen1/scripts.js:796-825`); Gen 2 runs the hook but draws the crit as `random(256)` (`gen2/scripts.js:541-547`) and runs `Accuracy` twice before one draw (the draw at `:243`); both draw the damage roll as `random(217, 256)` (`gen1/scripts.js:937`, `gen2/scripts.js:687`). Round 82 builds this recognition for forced dice; the scripted dice move onto it.
+
+**Benefit.** Engine: the tree's outcome classes and the pair plan's records describe the move, also for a confused, paralyzed or infatuated attacker and in Gens 1 and 2.
+
+**Success.** The 88 `test.fails` rows of `packages/eval-engine/test/scripted-dice-status.spec.ts` become plain tests. Before the fix, a probe counts the tree and pair cells of the bank whose attacker carries one of these checks, the reach of the fix. The recognition watches the simulator's hooks; where it calls a Dex handler, the `fingerprint` sweep of AGENTS.md proves the live battle unchanged. Then the batch check: two feedback runs byte-identical, the tier census with `--moved`.
+
+**Singles and doubles.** Both: `ScriptedPRNG` serves the singles tree, `PairPRNG` the doubles pair plan; the sweep plays each in every generation and mod the corpus plays.
+
+**Evidence.** `packages/eval-engine/test/scripted-dice-status.spec.ts`; the simulator's draws in `@pkmn/sim` 0.10.12 `data/conditions.js:47` (paralysis) and `:201` (confusion from Gen 7), `data/mods/gen2/conditions.js:146`, `gen4/conditions.js:77` and `gen6/conditions.js:31` (confusion up to Gen 6), `data/moves.js:758` (infatuation), and `@pkmn/mods` `build/champions/index.js:122` (paralysis, 1 in 8) and `:162` (thaw, 1 in 4).
 
 ## Parked
 
@@ -285,29 +367,71 @@ The triage of 21.10.2026 and the user gates after it parked these TODOs; each se
 
 **Singles and doubles.** Both.
 
-### T299 · A scripted die decides the attacker's status check
+### T300 · The Champions preview prices every hit of a Past multi-hit move
 
-*Engine · round 82 · small · score-touching*
+*App · round 82 · small · lossless (preview only)*
 
-**Parked (user gate 31.10.2026, planning of round 82, "11a").** Trigger: the engine moves its scripted dice onto the forced-dice module of round 82, or the next batch of small fixes.
+**Parked (final gate of round 82, 01.11.2026, "2a"). Trigger: a Champions Custom Game replay or a draft-league report with one of the 17 moves, or a `@smogon/calc` release that changes its Champions move list.**
 
-**Problem.** The tree's scripted dice tell a draw by the numbers in the call, and the simulator draws the attacker's status checks inside the same action: `runMove` sets the active move before `BeforeMove` (`@pkmn/sim` 0.10.12, `battle-actions.js:292` and `:301`).
+**Problem.** In a Champions Custom Game (a draft league) the branch panel's damage preview prices one hit of the 17 multi-hit moves that the Champions mod marks `isNonstandard: 'Past'`: Double Kick previews 23 where the simulator deals 46, Fury Attack 18 against 54 at three hits (roll step 0, singles). The calculator's Champions data lacks 15 of them and holds Gear Grind and Triple Dive as entries without type, category or hit count (upstream list in `NextSteps.md`). Two places in our code expect the calculator to read the hit count itself. `modOverrides` (`packages/eval-engine/src/calc/move.ts:63-73`) copies power, type, category, flags and target for a move the calculator lacks and compares power, type and category for a move it holds, Gear Grind and Triple Dive included, never `multihit` or `multiaccuracy`. `hitCounts` (`packages/eval-engine/src/damage-calc.ts:233-239`, called at `:336-338`) leaves a fixed count to the calculator and passes Fury Attack's `hits`, which the calculator ignores for a move without `multihit` data. The team validator rejects all 17 moves in Champions OU and VGC; only the two Custom Game formats (`gen9championscustomgame`, `gen9championsdoublescustomgame`) accept them, and none of the 1,875 Champions logs of `.fit-corpus` and the feedback fixtures uses one. The engine's prices read the simulator's hit count (`ko-odds.ts:123-126`, `pair/guards.ts:50`, `score/move-facts.ts:279-292`), so only the preview is wrong.
 
-`ScriptedPRNG` (singles, `packages/eval-engine/src/forward/scripted-prng.ts:80-86`) takes the first `randomChance(x, 100)` of a scripted move as its accuracy roll and any `randomChance(1, d)` with a crit denominator as its crit roll. A script therefore decides full paralysis (1 in 4, 1 in 8 in Champions), the infatuation (1 in 2), the Champions thaw (1 in 4) and the confusion check. From Gen 7 the check draws 33 in 100, and `{ hit: true }` makes a confused Snorlax hit itself on every seed, where the plain seeds show a self-hit on a third of them; in Gens 2 to 6 it draws 1 in 2, true means no self-hit, and `{ crit: false }` forces the self-hit. A check read as the accuracy roll also spends the action's accuracy flag, so the move's real accuracy roll goes unscripted (`:80-81`). The self-hit's damage roll takes the script's roll, because the script answers the first `random(16)` of the action (`:91-100`).
+**Idea.** Both branches of `modOverrides` carry `multihit` and `multiaccuracy` from the battle's Dex move whenever the calculator lacks them. Triple Kick, whose power rises per hit, gets its own row in the sweep.
 
-`PairPRNG` (doubles, `pair/prng.ts:107-119`) guards the crit with `inDamage()`. From Gen 7 it books the confusion check as an accuracy record of 33, lets a script decide it, and leaves the move's real accuracy roll unrecorded (`:107-108`). It books every `random(16)` of the action as a roll of the move (`:131-146`), the self-hit's too: on the attacker from Gen 7, and on the move's own target in Gens 3 to 6, a hit that never happened. The guard `randomDeviation` (`pair/log.ts:40-48`, read at `pair/pattern.ts:227`) sends every draw with a confusion check to the plain mean, so these records do not reach the pattern today; the fix makes them true for the code after the guard and keeps the scripts off the check.
+**Benefit.** App: the preview of a draft-league team with Double Kick or Fury Swipes shows the damage the simulator deals.
 
-In Gens 1 and 2 accuracy and crit draw in 256ths and the damage roll is `random(217, 256)`, so `ScriptedPRNG` reaches none of them. The singles tree checks each forced draw against its log (`search/outcome-children.ts:201-202`), so a misread draw there tends to leave a class empty rather than fill a wrong one; nobody has measured the grades it moves.
+**Success.** A sweep over every multi-hit move of the simulator's Champions Dex (31 today, 17 of them Past) compares the preview's range at every roll step and hit count with the simulator; the four Champions rows of `packages/eval-engine/test/damage-calc-rolls.spec.ts:73-86` (Double Kick and Fury Attack in singles and doubles, `test.fails` today) become plain tests. No score moves.
 
-**Idea.** Name a draw by where the simulator draws it (ADR 0002): first by the hook that runs right before it (the `Accuracy` event, `ModifyCritRatio`, `battle.randomizer`, and in every generation the `BeforeMove` handler that draws a status check), else by the simulator method that encloses the draw. Gen 1 draws the crit from base Speed without `ModifyCritRatio` (`data/mods/gen1/scripts.js:796-825`); Gen 2 runs the hook but draws the crit as `random(256)` (`gen2/scripts.js:541-547`) and runs `Accuracy` twice before one draw (the draw at `:243`); both draw the damage roll as `random(217, 256)` (`gen1/scripts.js:937`, `gen2/scripts.js:687`). Round 82 builds this recognition for forced dice; the scripted dice move onto it.
+**Singles and doubles.** Both: the preview prices a doubles target the same way, and the sweep plays both boards.
 
-**Benefit.** Engine: the tree's outcome classes and the pair plan's records describe the move, also for a confused, paralyzed or infatuated attacker and in Gens 1 and 2.
+**Evidence.** `r82/review/champions-multihit.md` with its probes (`multihit.vt.ts`, `legal.vt.ts`, `preview.vt.ts`, `scene.cjs`).
 
-**Success.** The 88 `test.fails` rows of `packages/eval-engine/test/scripted-dice-status.spec.ts` become plain tests. Before the fix, a probe counts the tree and pair cells of the bank whose attacker carries one of these checks, the reach of the fix. The recognition watches the simulator's hooks; where it calls a Dex handler, the `fingerprint` sweep of AGENTS.md proves the live battle unchanged. Then the batch check: two feedback runs byte-identical, the tier census with `--moved`.
+### T301 · A dice list after Execute
 
-**Singles and doubles.** Both: `ScriptedPRNG` serves the singles tree, `PairPRNG` the doubles pair plan; the sweep plays each in every generation and mod the corpus plays.
+*App · round 82 · feature · lossless*
 
-**Evidence.** `packages/eval-engine/test/scripted-dice-status.spec.ts`; the simulator's draws in `@pkmn/sim` 0.10.12 `data/conditions.js:47` (paralysis) and `:201` (confusion from Gen 7), `data/mods/gen2/conditions.js:146`, `gen4/conditions.js:77` and `gen6/conditions.js:31` (confusion up to Gen 6), `data/moves.js:758` (infatuation), and `@pkmn/mods` `build/champions/index.js:122` (paralysis, 1 in 8) and `:162` (thaw, 1 in 4).
+**Parked (final gate of round 82, 01.11.2026, "2a"). Trigger: the user wants to force a die that no chip offers.**
+
+**Problem.** Round 82 sets dice before Execute only (spec decision 3, option a). The chips offer the dice the module can name from the chosen moves and the bodies' state at choice time (`offeredDice`, `offeredOrderDice` and `offeredEndDice` in `packages/eval-engine/src/dice/offer.ts`; `checkOffers` reads `status` and `volatiles` at `:203-212`). A die that arises during the turn gets no chip, such as the status check of a paralysis or a confusion that starts in the same turn (`dice-offer-turn.spec.ts:122-146`). A forced die still applies to it, but only a restored state file of `Report issue` can carry one; a share link keeps the dice as text marks. After Execute the frame names the forced dice only ("Forced: Air Slash flinch, 30 %", `src/lib/branch-dice-lines.ts`). The natural copy records every die it rolls by name (`naturalTurn` in `packages/eval-engine/src/dice/play.ts`: `names`, `chances`), and `playForcedTurn` returns the forced dice only (`DiceReport.forced`).
+
+**Idea.** `playForcedTurn` also returns the dice the turn rolled, by name and result. The history row of a branch turn opens a list of them; a click flips one die and replays the turn with it forced, every other die as the turn rolled it (spec decision 3, option b).
+
+**Benefit.** App: the user sees every die of a turn after it ran and can flip any of them, also the dice no chip offered.
+
+**Success.** A ui spec over the list (it shows the turn's dice and their results; a click replays the turn with that die flipped and leaves the others); an e2e scene on the GPL replay; criterion 2 of round 82 (`dice-keep-dice.spec.ts`) holds for a flip from the list.
+
+**Singles and doubles.** Both: doubles list the dice per slot and target.
+
+### T302 · A chip that a rule blocks turns gray
+
+*App · round 82 · small · lossless*
+
+**Parked (final gate of round 82, 01.11.2026, "2a"). Trigger: a report of a chip that took no effect.**
+
+**Problem.** A chip stays clickable when a rule keeps its result from taking effect (spec decision 10, option a). `secondaryOffers` (`packages/eval-engine/src/dice/offer.ts:112-124`) offers every entry that `ModifySecondaries` leaves, so a flinch chip stands on a move whose target acts first, and a burn chip against a Fire type. The user learns it after Execute, from the frame line "Forced burn had no effect" with the report's reason (`noEffectText` in `src/lib/branch-dice-lines.ts:57-58`; `took: 'blocked'`, `DieTook` in `packages/eval-engine/src/dice/types.ts:31`, set for a secondary in `dice/report-moves.ts:69`).
+
+**Idea.** Before the chips render, a trial run on a copy plays the turn with each chip's die forced, and a chip whose result takes no effect turns gray with the reason as its tooltip (spec decision 10, option b). The trial reads the chosen moves of both sides, so it runs again when a choice changes.
+
+**Benefit.** App: the user sees before Execute which dice can change the turn.
+
+**Success.** A ui spec over the panel: the flinch chip of a slower Air Slash user is gray with its reason, the same chip on the faster user is not; a sweep over every offered chip in the scenes of the dice sweeps compares the trial's verdict with the report of the real turn; a Node probe prices the trial runs per turn on the main thread in singles, doubles and VGC, and the gate decides with that cost.
+
+**Singles and doubles.** Both: a doubles turn has a chip per target.
+
+### T303 · Duration dice, random picks and three draws without a kind
+
+*Engine · round 82 · feature · lossless*
+
+**Parked (final gate of round 82, 01.11.2026, "2a"). Trigger: a request from the user for one of them.**
+
+**Problem.** The dice module names and forces the dice that decide one result. Duration dice (sleep turns, confusion turns, Outrage's lock, the turns of a trap) and random picks (Metronome, Sleep Talk, Assist, Tri Attack's and Dire Claw's status, Moody, Pickup, random targets in doubles, Trace, Forewarn) follow the seed (spec, "Out of scope"). The census of draw handlers marks three draws in scope that no recognition names yet (`packages/eval-engine/test/dice-census-support.ts:162-174`): a second Ally Switch in a row draws `randomChance(1, counter)` under `Restart`, not `StallMove`, and the move has no `stallingMove` flag; Gen 2 Pursuit settles a speed tie against a switching body with a coin that the order's shuffle does not carry; Gen 1 draws a secondary effect against a Substitute inside the Substitute handler, which the secondary rule skips. All of them follow the stream, and no chip offers them.
+
+**Idea.** A duration die answers with a number of turns, a random pick with an entry of its list; both need a chip with more than two results, like the damage roll's select. The three draws get their recognition from the hook that runs before them.
+
+**Benefit.** App: the user can let a sleep last one turn or a Metronome call a chosen move.
+
+**Success.** A sweep per new kind over every Dex entry that draws it, in every generation and mod the corpus plays, singles, doubles and VGC; the three census rows lose their `open` mark; the fingerprint proof for every stand-in that calls a Dex handler.
+
+**Singles and doubles.** Both; random targets are doubles only.
 
 ### T259 · A smoother price for a stage drop at the bench gate
 
