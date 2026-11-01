@@ -114,30 +114,39 @@ test.describe('PS Dashboard', () => {
     await expect(page.locator('.ps-main-right')).toContainText('Choice Band', { timeout: 10000 });
   });
 
-  test('team editor offers legal dropdown pools and validates moves', async ({ page }) => {
+  test('team editor offers legal dropdown pools first, takes other moves and abilities with a note, and rejects unknown moves', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
     await fromSetup(page, 'Edit Player');
     const editor = page.getByRole('dialog', { name: 'Edit Player Team' });
     const garchompCard = editor.locator('.ps-panel').filter({ hasText: 'Garchomp' }).first();
 
-    // Ability is a select restricted to the species' real abilities.
+    // Ability is a select: the species' real abilities first, then every other ability of the generation (T308, issue #2).
     const abilitySelect = garchompCard.getByLabel('Garchomp ability');
     await expect(abilitySelect.locator('option', { hasText: 'Rough Skin' })).toHaveCount(1, { timeout: 10000 });
     await expect(abilitySelect.locator('option', { hasText: 'Sand Veil' })).toHaveCount(1);
-    await expect(abilitySelect.locator('option', { hasText: 'Intimidate' })).toHaveCount(0);
+    await expect(abilitySelect.locator('optgroup[label="Other abilities"] option', { hasText: 'Intimidate' })).toHaveCount(1);
+    await abilitySelect.selectOption('Intimidate');
+    await expect(garchompCard.getByText('Intimidate is not an ability of Garchomp.')).toBeVisible();
+    await abilitySelect.selectOption('Rough Skin');
+    await expect(garchompCard.getByText(/is not an ability of Garchomp/)).toHaveCount(0);
 
     // Nature select carries the 25 natures.
     await garchompCard.getByLabel('Garchomp nature').selectOption('Adamant');
 
-    // Illegal move is rejected; a legal one is picked by CLICKING the
-    // combobox option — no Enter required.
+    // A name the Dex does not know is rejected; a move the species cannot learn joins with a note; a legal one is picked by
+    // CLICKING the combobox option, no Enter required.
     const moveInput = garchompCard.getByPlaceholder('Add move...');
     await garchompCard.getByLabel(/Remove .* from Garchomp/).first().click();
-    await moveInput.fill('Spore');
+    await moveInput.fill('Moon Landing');
     await expect(garchompCard.getByText('No matching option')).toBeVisible();
     await moveInput.press('Enter');
-    await expect(garchompCard.getByRole('alert')).toContainText('not in Garchomp');
+    await expect(garchompCard.getByRole('alert')).toContainText('"Moon Landing" is not a known move.');
+    await moveInput.fill('Spore');
+    await garchompCard.getByRole('option', { name: 'Spore not learnable', exact: true }).click();
+    await expect(garchompCard.getByText('not learnable', { exact: true })).toHaveCount(1);
+    await expect(garchompCard.getByRole('alert')).toHaveCount(0);
+    await garchompCard.getByLabel('Remove Spore from Garchomp').click();
     await moveInput.fill('Flame');
     await garchompCard.getByRole('option', { name: 'Flamethrower' }).click();
     await expect(garchompCard).toContainText('Flamethrower');
