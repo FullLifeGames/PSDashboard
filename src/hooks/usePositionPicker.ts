@@ -207,22 +207,32 @@ export function usePlayedAtView(args: {
     if (viewingVariation && variationSpan) {
       return playedFromHistory(history, viewTurn - variationSpan.startTurn);
     }
-    const lines = snapshots[viewTurn]?.log;
-    if (!lines || lines.length === 0) return null;
-    const turn = doubles ? parseDoubles(lines) : parseSingles(lines);
-    if (!doubles) return turn.p1 || turn.p2 ? { p1: fromAction(turn.p1), p2: fromAction(turn.p2) } : null;
-    const p1Slots = (turn.p1Slots ?? []).map(fromAction);
-    const p2Slots = (turn.p2Slots ?? []).map(fromAction);
-    if (![...p1Slots, ...p2Slots].some(Boolean)) return null;
-    return withSlots(p1Slots, p2Slots);
+    return playedFromLines(snapshots[viewTurn]?.log, doubles, parseSingles, parseDoubles);
   }, [viewingVariation, variationSpan, viewTurn, history, snapshots, doubles, parseSingles, parseDoubles]);
+}
+
+/**
+ * The main line's played record of one turn, read from the replay's lines (round 84: exported for the regression spec over the
+ * fixtures and the corpus).
+ */
+export function playedFromLines(
+  lines: string[] | undefined, doubles: boolean,
+  parseSingles: (lines: string[]) => PlayedActions, parseDoubles: (lines: string[]) => PlayedActions,
+): PlayedAtPosition | null {
+  if (!lines || lines.length === 0) return null;
+  const turn = doubles ? parseDoubles(lines) : parseSingles(lines);
+  if (!doubles) return turn.p1 || turn.p2 ? { p1: fromAction(turn.p1), p2: fromAction(turn.p2) } : null;
+  const p1Slots = (turn.p1Slots ?? []).map(fromAction);
+  const p2Slots = (turn.p2Slots ?? []).map(fromAction);
+  if (![...p1Slots, ...p2Slots].some(Boolean)) return null;
+  return withSlots(p1Slots, p2Slots);
 }
 
 type PlayedAction = {
   kind: 'move' | 'switch'; name: string; species?: string;
   tera?: boolean; mega?: boolean; ultra?: boolean; targetLoc?: number | null;
 };
-type PlayedActions = {
+export type PlayedActions = {
   p1: PlayedAction | null;
   p2: PlayedAction | null;
   p1Slots?: (PlayedAction | null)[];
