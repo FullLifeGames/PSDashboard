@@ -912,6 +912,58 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * ROUND 83 2026-11-01 (improvement round 83, a small batch: the GitHub
+ * issues #2 and #3, on r83 from dev 24a7235; lane A in the worktree w9b by
+ * the integrator, lane B in w9c by a wave-builder; probes
+ * docs/perf/probes/2026-11-01-r83/ and 2026-11-01-issue3/). Gates: 11:31
+ * ("1a 2b 3a 4a"), final 13:26 ("1a 2a 3a 4a").
+ * DELIVERED: T307 (issue #3, gen9terapreviewdraft-2182991758: Latias with
+ * Light Clay set Light Screen on turn 34 and Reflect on turn 35, and the
+ * variation from turn 38 ended both after five turns; the simulator set
+ * eight, and every turn boundary wrote the client's minimum, which counts
+ * five because the log never shows the item; the boundary now keeps the
+ * simulator's count where the snapshot allows it, 42538a3), T308 (issue
+ * #2: the set editor and the import take moves and abilities the species
+ * cannot have, each manual pick with a note, "not learnable" or "Other
+ * abilities"; a name the Dex does not know stays an error; ada15fd,
+ * 3b7dccc), cache v75 (e2a2b9d). The sweep of T307 plays every move that
+ * sets a side condition or a pseudo weather, in every rule set and game
+ * type, by a holder of no item and of every item and ability that changes
+ * the condition's turns: red before the fix on the Light Clay screens of
+ * Gens 4 to 9 and Champions; it also found a second cause (the boundary
+ * deletes a condition the client cannot see: Fairy Lock from Gen 6, Lucky
+ * Chant, Mud Sport and Water Sport in Gens 8 and 9), 22 rows that stand as
+ * expected fails (T311).
+ * MEASUREMENT: score-touching. Bank in CI: r83-base (52ac6f0) 837 rows
+ * byte-identical to r82-base; r83-head (3b7dccc) moved 39 rows (34
+ * doubles); full all/all +16 bp [+5, +29] and doubles all +56 bp [+18,
+ * +95] B worse (harm), doubles mid +142 bp [+57, +235], singles all -1 bp
+ * [-2, +0], hq all +7 bp [-4, +20] unresolved. With its own K per game
+ * type and phase the bank reads no harm in the pooled rows and warns in
+ * the mid cells (full all +28 bp [+6, +56], doubles +82 bp [+15, +166]):
+ * the doubles K of the middle phase falls from 1.49 to 1.16 (the gate text
+ * named only the fixed-K table). In the moved games 24 of 25
+ * ended screens lasted eight turns (the game proves Light Clay); one Aurora
+ * Veil lasted five, and its built set holds Light Clay
+ * (gen9vgc2026regi-2630181744); the moved doubles predictions moved away
+ * from the outcome in 23 of 34 rows. Feedback twice, 12 of 12 dumps
+ * byte-identical with each other and with round 82's g1; census unchanged,
+ * 0 moved turns, no pin moved. e2e 95 passed, 1 skipped (a dev server with
+ * its own Vite cache, so the user's dev server kept its dependencies).
+ * Suite in the worktree 12,769 passed, 116 expected fails (94 and the 22
+ * of T311), 25 skipped; 3 timeouts under load green alone; the local
+ * saved-replay test of reconstruction.spec.ts green in the main checkout.
+ * Lint and tsc -b green. The reporter's state file: Light Screen 7, 6, 5,
+ * 4 turns left at turns 35 to 38 (before 4, 3, 2, 1).
+ * USER GATE 2026-11-01 13:26 ("1a 2a 3a 4a"): (1) T307 adopted with the
+ * bank's harm, a rule right by the game stays (AGENTS.md), the refit
+ * becomes T309; (2) T308 as built; (3) T309 (the refit of the doubles
+ * weights) and T310 (Light Clay from the screen turns in the log) join
+ * round 84, T311 parks with a trigger; (4) dev takes r83, the push waits
+ * for the user's go, then a reply to issue #3 for the user to post.
+ * RESTS: round 84: T299, T304, T305, T306, T309, T310; T311 parked. Next
+ * free T312.
+ *
  * ROUND 82 2026-11-01 (improvement round 82, a feature: forced dice in
  * branches; T299's red sweep on t299 from dev c42b5df, then r82 from t299,
  * lane A in the worktree w9a on r82-a; spec docs/superpowers/specs/

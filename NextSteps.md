@@ -1,16 +1,14 @@
-# Next Steps (as of 01.11.2026, round 83 open)
+# Next Steps (as of 01.11.2026, round 83 booked, round 84 next)
 
-Open work only. Each step is one round; its TODOs carry fixed T-numbers, and their details are in `docs/backlog.md`. Rules for agents: `AGENTS.md`. Finished rounds: `docs/completed/`. Next free T-number: T309.
+Open work only. Each step is one round; its TODOs carry fixed T-numbers, and their details are in `docs/backlog.md`. Rules for agents: `AGENTS.md`. Finished rounds: `docs/completed/`. Next free T-number: T312.
 
 ## State
 
-Release v1.0.2 (30.10.2026) is on master, on GitHub Pages with the frozen copies `/v1.0.0/` to `/v1.0.2/`, on npm with both packages, and in production on fulllifegames.com. dev carries T298 (round 81: after a deploy the app reloads once when a lazy chunk is gone) and round 82 (forced dice in branches: in the branch panel's Advanced mode the user sets single dice of a turn, and every other die falls as it would have) for the next release. master moves only with the user's okay.
+Release v1.0.2 (30.10.2026) is on master, on GitHub Pages with the frozen copies `/v1.0.0/` to `/v1.0.2/`, on npm with both packages, and in production on fulllifegames.com. dev carries T298 (round 81: after a deploy the app reloads once when a lazy chunk is gone), round 82 (forced dice in branches: in the branch panel's Advanced mode the user sets single dice of a turn, and every other die falls as it would have) and round 83 (GitHub issues #2 and #3: the set editor takes moves and abilities a species cannot have; a screen of a Light Clay holder keeps its eight turns in a variation) for the next release. The push of dev waits for the user's go; then a reply to issue #3 for the user to post. master moves only with the user's okay.
 
 ## Next rounds
 
-Round 83 · Small batch: two GitHub issues (user gate 01.11.2026 11:31, "1a 2b 3a 4a"), on branch `r83`. T307 (issue #3): a screen of a Light Clay holder keeps its eight turns in a variation; the turn boundary wrote the client's minimum (five turns) over the simulator's count. Score-touching: the cache version once, two feedback runs with the tier census, the bank in CI. T308 (issue #2): the set editor and the import take moves and abilities the species cannot have, each with a note. dev goes to origin with rounds 82 and 83 after the user's go; then a reply to issue #3 for the user to post.
-
-Round 84 · The engine reads the dice (feature, score-touching D3). The engine adopts the dice module of round 82 (`packages/eval-engine/src/dice/`, words in `GLOSSARY.md`, decisions in `docs/adr/`). T304: the report plays the game's biggest roll the other way and states the win chance with the other result (smogtours-gen8ou-573756 turn 73, the 95 % Fire Fang that missed). T305: the search tree prices secondary effects at their chance. T306: the reconstruction forces the logged results instead of searching 16 seeds. T299: the tree's scripted dice move onto the module. Next: brainstorming and spec; the design gate sets the order and whether one round carries all four.
+Round 84 · The engine reads the dice (feature, score-touching D3). The engine adopts the dice module of round 82 (`packages/eval-engine/src/dice/`, words in `GLOSSARY.md`, decisions in `docs/adr/`). T304: the report plays the game's biggest roll the other way and states the win chance with the other result (smogtours-gen8ou-573756 turn 73, the 95 % Fire Fang that missed). T305: the search tree prices secondary effects at their chance. T306: the reconstruction forces the logged results instead of searching 16 seeds. T299: the tree's scripted dice move onto the module. T309: a refit of the doubles weights after T307 (round 83), whose game-correct screen turns the bank reads as harm in doubles. T310: Light Clay from the screen turns in the log. Next: brainstorming and spec; the design gate sets the order and whether one round carries all six.
 
 After round 84, bug reports from real use and the dependency upkeep of AGENTS.md bring the next round, and a parked TODO whose trigger fires comes to a gate.
 

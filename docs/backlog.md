@@ -1,12 +1,12 @@
 # Backlog
 
-This file holds the details of every open TODO, one section per TODO under its fixed T-number. Release v1.0.2 is out (30.10.2026), and round 82 (forced dice in branches) waits on dev for the next release. Round 84 carries four approved TODOs (T299, T304 to T306); round 83 is a small batch of two GitHub issues (T307, T308, details in `NextSteps.md`); every other TODO is parked with a trigger, and a trigger that fires brings its TODO to a gate. The next free T-number is T309.
+This file holds the details of every open TODO, one section per TODO under its fixed T-number. Release v1.0.2 is out (30.10.2026), and round 82 (forced dice in branches) waits on dev for the next release. Round 84 carries six approved TODOs (T299, T304 to T306, T309, T310); every other TODO is parked with a trigger, and a trigger that fires brings its TODO to a gate. The next free T-number is T312.
 
 Evidence paths of the form `r<NN>/…` point to that round's probe folder, `docs/perf/probes/<date>-r<NN>/`; `docs/` is local, so they exist only on the maintainer's machine. Each round's entry in `docs/completed/` names its folder and the gate that approved its TODOs. Line numbers in a section refer to the state when the TODO was written.
 
 ## Round 84 · the engine reads the dice
 
-The final gate of round 82 (01.11.2026, "2a") approved these TODOs for the next round, the engine setup; the gate of 11:31 ("3a") put a small batch first, so they form round 84. Each leaves this file with that round's booking.
+The final gate of round 82 (01.11.2026, "2a") approved these TODOs for the next round, the engine setup; the gate of 11:31 ("3a") put a small batch first, so they form round 84, and the final gate of that batch (13:26, "3a") added T309 and T310. Each leaves this file with that round's booking.
 
 ### T304 · The report plays the game's biggest roll the other way
 
@@ -85,6 +85,40 @@ In Gens 1 and 2 accuracy and crit draw in 256ths and the damage roll is `random(
 **Singles and doubles.** Both: `ScriptedPRNG` serves the singles tree, `PairPRNG` the doubles pair plan; the sweep plays each in every generation and mod the corpus plays.
 
 **Evidence.** `packages/eval-engine/test/scripted-dice-status.spec.ts`; the simulator's draws in `@pkmn/sim` 0.10.12 `data/conditions.js:47` (paralysis) and `:201` (confusion from Gen 7), `data/mods/gen2/conditions.js:146`, `gen4/conditions.js:77` and `gen6/conditions.js:31` (confusion up to Gen 6), `data/moves.js:758` (infatuation), and `@pkmn/mods` `build/champions/index.js:122` (paralysis, 1 in 8) and `:162` (thaw, 1 in 4).
+
+### T309 · A refit of the doubles weights after T307
+
+*Engine · round 83 · refit · score-touching (D3)*
+
+**Approved for round 84 (gate of round 83, 01.11.2026 13:26, "3a").**
+
+**Problem.** T307 keeps the simulator's count of a side condition at the turn boundary (`syncedDuration` in `packages/eval-engine/src/branch/field-correction.ts`), so a screen of a Light Clay holder lasts eight turns in the rebuilt positions, as in the game. The paired bank (r83-base at 52ac6f0 against r83-head at 3b7dccc) moved 39 of 837 rows, 34 of them doubles (Doubles OU 24, 15 of them farther from the outcome; VGC 10, 8 farther). At the base's fixed K it reads harm: full all +16 bp [+5, +29], doubles all +56 bp [+18, +95], doubles mid +142 bp [+57, +235]; singles −1 bp [−2, +0]. With its own K per game type and phase it reads no harm in the pooled rows and warns in the mid cells (full all +28 bp [+6, +56], doubles +82 bp [+15, +166]): the doubles K of the middle phase falls from 1.49 to 1.16. The positions are right: in the moved games 24 of 25 screens that ended lasted eight turns. The static score counts standing screens, not their turns (`screenCount`, `score/features.ts:103-105`), so the shift comes through the search, which now plays the screens longer. The doubles weights (`screens: 88` in `DOUBLES_FEATURE_WEIGHTS`, `score/weights.ts:259`; 48 for VGC at `:328`, 83 for Champions doubles at `:436`) and the doubles K were fitted on positions whose screens always ran out at the client's minimum.
+
+**Idea.** A refit of the doubles K per phase, the middle phase first, and where the bank still reads harm, of the doubles screen weights, on the bank with T307 in place. AGENTS.md: a refit runs only where the bank reads harm after a game-correct change, which is this case.
+
+**Benefit.** Engine: doubles positions under screens are priced on the game's screen turns without the harm the bank reads today.
+
+**Success.** The paired bank against r83-head without harm in the pooled rows at the fixed K; the Doubles OU, VGC and Champions holdouts (D26) without harm, Doubles OU and VGC read apart (two weight tables); the tier census with `--moved`.
+
+**Singles and doubles.** Doubles and VGC carry the harm; singles stay as the guard (unchanged today).
+
+**Evidence.** `r83/paired-bank.txt`; `r83/todo-review.md` (the recounts per game type).
+
+### T310 · Light Clay from the screen turns in the log
+
+*Replay-core · round 83 · small · rule · score-touching*
+
+**Approved for round 84 (gate of round 83, 01.11.2026 13:26, "3a").**
+
+**Problem.** The log names Light Clay only when another effect reveals it (Knock Off, Frisk, Trick, Poltergeist: 37 of 5,754 corpus replays); for most setters only the screen's length shows it. The team build takes the item from the published sets and the inference, so a setter without Light Clay can hold it in the build, and since T307 its rebuilt screen lasts eight turns (gen9vgc2026regi-2630181744: p2's Aurora Veil lasted turns 1 to 5, and the built set holds Light Clay). A setter with Light Clay can miss it: in gen9terapreviewdraft-2182991758 the log proves it for Latias (screens of eight turns on turns 1 to 8, 25 to 32 and 26 to 33). Whether the build without the reporter's paste gives that Latias Light Clay is open (the unpasted p1 Latias of the same file got Leftovers); `buildAppTeams` on the log settles it.
+
+**Idea.** A screen that outlasts its plain turns proves the item that extends it on its setter; a screen that ends at exactly its plain turns rules that item out, the way `packages/replay-core/src/inference/item-evidence.ts` rules out items by a line the log does not show. The turns come from the simulator: the condition's own duration rule with and without each item, never a list.
+
+**Benefit.** App and engine: the build holds Light Clay where the game proves it and drops it where the game rules it out, so the rebuilt screens last as long as the game's.
+
+**Success.** A sweep over every screen and every item that changes its turns, in every generation and mod the corpus plays: the inference reads what the simulator's turns prove. Rows where the turns prove nothing: a removal on the plain last turn (in the same state file p1's Aurora Veil of turn 11 ended after four turns by Brick Break), Klutz, Embargo, Magic Room, an item traded before the screen. The two scenes as rows; set diffs on every build path before the bank (AGENTS.md, set and solver changes); the batch check.
+
+**Singles and doubles.** Both.
 
 ## Parked
 
@@ -432,6 +466,24 @@ The triage of 21.10.2026 and the user gates after it parked these TODOs; each se
 **Success.** A sweep per new kind over every Dex entry that draws it, in every generation and mod the corpus plays, singles, doubles and VGC; the three census rows lose their `open` mark; the fingerprint proof for every stand-in that calls a Dex handler.
 
 **Singles and doubles.** Both; random targets are doubles only.
+
+### T311 · The turn boundary keeps a condition the client cannot see
+
+*Engine · round 83 · small · score-touching*
+
+**Parked (gate of round 83, 01.11.2026 13:26, "3a"). Trigger: a report or a replay with Fairy Lock, or with Lucky Chant, Mud Sport or Water Sport in Gens 8 and 9.**
+
+**Problem.** At every turn boundary `syncEffectTableFromSnapshot` (`packages/eval-engine/src/branch/field-correction.ts`) deletes each side condition and pseudo weather the client's snapshot does not hold. The client holds what it can name. Fairy Lock writes only `-fieldactivate` (Gens 6 on), so the client never tracks it. The client of Gens 8 and 9 does not know the Past moves Lucky Chant, Mud Sport and Water Sport and files them under a stray key such as `moveluckychant`, so the boundary deletes the real condition and writes the stray entry into the simulator's table. The simulator keeps each of them, and the boundary takes them away: a variation that starts on the turn after Fairy Lock lets both sides switch, where the game traps them. The sweep of T307 holds these 22 rows as expected fails (`packages/eval-engine/test/field-correction-sweep.spec.ts`, `clientBlind`).
+
+**Idea.** The boundary deletes a condition only when the client showed it before and no longer does (the previous snapshot), so a condition the client never saw keeps the simulator's state, and a key the simulator's Dex does not know never enters its table; for the Past moves, the client's Dex knows the Past entries in a format that plays them.
+
+**Benefit.** Engine and app: a variation keeps Fairy Lock's trap and the Past conditions as the game keeps them.
+
+**Success.** The 22 rows turn into plain tests, and a row holds the simulator's table free of stray keys; the batch check.
+
+**Singles and doubles.** Both.
+
+**Reach.** No replay of `.fit-corpus` or the feedback fixtures plays Fairy Lock, Lucky Chant, Mud Sport or Water Sport. The usage fixtures show Fairy Lock only on Klefki: Gen 9 OU on 0.12 of Klefki's sets (Klefki on 0.35 % of teams), Champions OU 0.056, Champions VGC 0.006, Gen 9 Doubles OU 0.004, Gens 6 and 8 OU 0.0004 to 0.0026; Lucky Chant, Mud Sport and Water Sport in none.
 
 ### T259 · A smoother price for a stage drop at the bench gate
 
