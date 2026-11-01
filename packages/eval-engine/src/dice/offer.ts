@@ -64,9 +64,19 @@ function targetsOf(user: Pokemon, move: ActiveMove, choice: MoveChoice): Pokemon
 /** The move as the simulator rewrites it for this user and target, read on a copy of the battle. */
 function activeMoveOn(copy: Battle, user: Pokemon, target: Pokemon | undefined, moveId: string): ActiveMove {
   const active = copy.dex.getActiveMove(moveId) as unknown as ActiveMove;
-  const events = copy as unknown as { singleEvent(...args: unknown[]): unknown; runEvent(...args: unknown[]): unknown };
-  events.singleEvent('ModifyMove', active, null, user, target, active, active);
-  events.runEvent('ModifyMove', user, target, active, active);
+  const events = copy as unknown as {
+    singleEvent(...args: unknown[]): unknown; runEvent(...args: unknown[]): unknown;
+    setActiveMove(move: unknown, pokemon: Pokemon, target?: Pokemon): void; clearActiveMove(failed?: boolean): void;
+  };
+  // Round 82 (A7e): `runMove` sets the move in flight before `ModifyMove`, and handlers read it (a Choice item's `choicelock` throws
+  // "Battle.activeMove is null" without it). The copy gets the same context for the two events and loses it again after them.
+  events.setActiveMove(active, user, target);
+  try {
+    events.singleEvent('ModifyMove', active, null, user, target, active, active);
+    events.runEvent('ModifyMove', user, target, active, active);
+  } finally {
+    events.clearActiveMove(true);
+  }
   return active;
 }
 
@@ -134,10 +144,17 @@ function hitEvents(copy: Battle, userSlot: string, targetSlot: string, moveId: s
   const target = bodyAt(copy, targetSlot);
   if (!user || !target) return;
   const move = copy.dex.getActiveMove(moveId);
-  const events = copy as unknown as { setActiveMove(move: unknown, pokemon: Pokemon, target?: Pokemon): void; runEvent(...args: unknown[]): unknown };
+  const events = copy as unknown as {
+    setActiveMove(move: unknown, pokemon: Pokemon, target?: Pokemon): void; clearActiveMove(failed?: boolean): void; runEvent(...args: unknown[]): unknown;
+  };
   events.setActiveMove(move, user, target);
-  events.runEvent('DamagingHit', target, user, move, 1);
-  events.runEvent('Damage', target, user, move, 1);
+  try {
+    events.runEvent('DamagingHit', target, user, move, 1);
+    events.runEvent('Damage', target, user, move, 1);
+  } finally {
+    // Round 82 (A7e): the move in flight ends with the hit, as it does in the simulator's `runMove`
+    events.clearActiveMove(true);
+  }
 }
 
 /**

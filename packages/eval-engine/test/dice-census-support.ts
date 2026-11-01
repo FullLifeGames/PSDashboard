@@ -47,6 +47,43 @@ function handlersOf(value: unknown, path: string, out: [string, string][], depth
   for (const [key, inner] of Object.entries(value)) handlersOf(inner, path ? `${path}.${key}` : key, out, depth + 1);
 }
 
+/**
+ * Round 82 (forced dice), step A7e: the abilities and items whose handlers read `battle.activeMove`, directly or through a volatile
+ * they add whose condition does (a Choice item adds `choicelock`). The simulator sets the move in flight in `runMove` before
+ * `BeforeMove` and `ModifyMove`, so a stand-in that raises such a handler on a copy must set it too. `throwing` marks the entries
+ * that throw "Battle.activeMove is null" when it is not set. Read from the data tables, not from a list of names.
+ */
+export function activeMoveReaders(): { kind: 'abilities' | 'items'; id: string; throwing: boolean }[] {
+  const sourceOf = (value: unknown, depth = 0): string => {
+    if (typeof value === 'function') return value.toString();
+    if (typeof value !== 'object' || value === null || depth > 4) return '';
+    return Object.values(value).map(inner => sourceOf(inner, depth + 1)).join(' ');
+  };
+  const all = sources();
+  const THROWS = /if \(!this\.activeMove\)\s*throw/;
+  const reading = new Map<string, boolean>();
+  for (const source of all) {
+    for (const [id, entry] of Object.entries(source.tables.Conditions ?? {})) {
+      const text = sourceOf(entry);
+      if (/\bactiveMove\b/.test(text)) reading.set(id, THROWS.test(text) || (reading.get(id) ?? false));
+    }
+  }
+  const found = new Map<string, { kind: 'abilities' | 'items'; id: string; throwing: boolean }>();
+  for (const source of all) {
+    for (const [kind, table] of [['abilities', source.tables.Abilities], ['items', source.tables.Items]] as const) {
+      for (const [id, entry] of Object.entries(table ?? {})) {
+        const text = sourceOf(entry);
+        const added = [...text.matchAll(/addVolatile\(['"](\w+)['"]/g)].map(match => match[1]).filter(name => reading.has(name));
+        if (!/\bactiveMove\b/.test(text) && added.length === 0) continue;
+        const throwing = THROWS.test(text) || added.some(name => reading.get(name));
+        const key = `${kind}/${id}`;
+        found.set(key, { kind, id, throwing: throwing || (found.get(key)?.throwing ?? false) });
+      }
+    }
+  }
+  return [...found.values()];
+}
+
 /** Every handler with a draw: `table/entry/handler` mapped to the sorted distinct calls it makes, across all sources. */
 export function scan(): Map<string, Set<string>> {
   const found = new Map<string, Set<string>>();
