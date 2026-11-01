@@ -140,6 +140,90 @@ describe('useGimmickToggles', () => {
   });
 });
 
+/**
+ * Round 84 (turn dock), C4: with a pick standing on a slot (the seed or the user's), the gimmick toggle edits that pick instead of
+ * arming the next click: "chip, Tera, Execute" is three clicks. A slot without a move pick keeps the armed toggle.
+ */
+describe('useGimmickToggles on a slot with a move pick (round 84, C4)', () => {
+  const flare = { kind: 'move' as const, moveId: 'flareblitz', moveName: 'Flare Blitz', targetLoc: 1 };
+  const spore = { kind: 'move' as const, moveId: 'spore', moveName: 'Spore' };
+  const switchPick = { kind: 'switch' as const, speciesId: 'rillaboom', pokemonName: 'Rillaboom' };
+  type Pending = { p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] };
+
+  function renderEditing(pending: Pending, modifiers: Sides = { p1: [withTera, withTera], p2: [] }) {
+    const edits: [string, number, BranchSlotChoice][] = [];
+    const hook = renderHook(({ now }: { now: Pending }) => useGimmickToggles(modifiers.p1, modifiers.p2, 'k', now, {
+      onEdit: (side, slot, choice) => edits.push([side, slot, choice]),
+    }), { initialProps: { now: pending } });
+    return { ...hook, edits };
+  }
+
+  test('the toggle writes the modifier into the pick and shows pressed from it', () => {
+    const { result, rerender, edits } = renderEditing({ p1: [flare, null], p2: [] });
+    expect(result.current.gimmickFor('p1', 0).modifier).toBeNull();
+    act(() => result.current.gimmickFor('p1', 0).toggle('terastallize'));
+    expect(edits).toEqual([['p1', 0, { ...flare, modifier: 'terastallize' }]]);
+    // the caller stores the edited pick; the toggle reads it back
+    rerender({ now: { p1: [{ ...flare, modifier: 'terastallize' }, null], p2: [] } });
+    expect(result.current.gimmickFor('p1', 0)).toMatchObject({ modifier: 'terastallize', modifierAvailable: true });
+    act(() => result.current.gimmickFor('p1', 0).toggle('terastallize'));
+    expect(edits[1]).toEqual(['p1', 0, flare]);
+    expect(edits[1][2]).not.toHaveProperty('modifier');
+  });
+
+  test('an edit never arms the toggle for the next click', () => {
+    const { result, rerender } = renderEditing({ p1: [flare, null], p2: [] });
+    act(() => result.current.gimmickFor('p1', 0).toggle('terastallize'));
+    // the pick goes away (a switch replaces it): nothing stays armed behind it
+    rerender({ now: { p1: [switchPick, null], p2: [] } });
+    expect(result.current.gimmickFor('p1', 0).modifier).toBeNull();
+  });
+
+  test('teraBySlot names the Tera type from the pick', () => {
+    const { result } = renderEditing({ p1: [{ ...flare, modifier: 'terastallize' }, spore], p2: [] });
+    expect(result.current.teraBySlot).toEqual({ p1: ['Fire', null], p2: [] });
+  });
+
+  test('the partner holding the gimmick blocks the edit', () => {
+    const { result, edits } = renderEditing({ p1: [flare, { ...spore, modifier: 'terastallize' }], p2: [] });
+    expect(result.current.gimmickFor('p1', 0).heldBy).toEqual({ terastallize: 'P1B' });
+    act(() => result.current.gimmickFor('p1', 0).toggle('terastallize'));
+    expect(edits).toEqual([]);
+  });
+
+  test('a slot that does not offer the gimmick takes no edit', () => {
+    const { result, edits } = renderEditing({ p1: [flare, spore], p2: [] }, { p1: [withTera, NO_MODIFIERS], p2: [] });
+    act(() => result.current.gimmickFor('p1', 1).toggle('terastallize'));
+    expect(edits).toEqual([]);
+  });
+
+  test('a switch or an empty slot still arms the toggle for the next click', () => {
+    const { result, edits } = renderEditing({ p1: [switchPick, null], p2: [] });
+    act(() => result.current.gimmickFor('p1', 0).toggle('terastallize'));
+    act(() => result.current.gimmickFor('p1', 1).toggle('terastallize'));
+    expect(edits).toEqual([]);
+    expect(result.current.gimmickFor('p1', 1).modifier).toBe('terastallize');
+  });
+
+  test('a Z-Move toggle edits only a move that has a Z option', () => {
+    const moves = { p1: [[
+      { name: 'Dragon Claw', slot: 1 }, { name: 'Flamethrower', slot: 2 },
+    ]] } as never;
+    const withZ = { ...NO_MODIFIERS, zMoves: [null, 'Inferno Overdrive'] };
+    const edits: BranchSlotChoice[] = [];
+    const claw = { kind: 'move' as const, moveId: 'dragonclaw', moveName: 'Dragon Claw' };
+    const flame = { kind: 'move' as const, moveId: 'flamethrower', moveName: 'Flamethrower' };
+    const hook = renderHook(({ pick }: { pick: BranchSlotChoice }) => useGimmickToggles([withZ], [], 'k', { p1: [pick], p2: [] }, {
+      onEdit: (_side, _slot, choice) => edits.push(choice), movesBySlot: moves,
+    }), { initialProps: { pick: claw as BranchSlotChoice } });
+    act(() => hook.result.current.gimmickFor('p1', 0).toggle('zmove'));
+    expect(edits).toEqual([]);
+    hook.rerender({ pick: flame });
+    act(() => hook.result.current.gimmickFor('p1', 0).toggle('zmove'));
+    expect(edits).toEqual([{ ...flame, modifier: 'zmove' }]);
+  });
+});
+
 describe('useMovePool', () => {
   test('loads the legal gen 9 pool of the active species', async () => {
     const { result } = renderHook(() => useMovePool('Garchomp', 9));

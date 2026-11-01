@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { BranchSlotChoice, BranchSlotModifiers, BranchMoveModifier } from '@fulllifegames/eval-engine';
+import type { BranchSlotChoice, BranchSlotModifiers, BranchMoveModifier, BranchMoveOption } from '@fulllifegames/eval-engine';
+import { toId } from '@fulllifegames/replay-core';
 import { gimmickApplies } from '../lib/dock-seed';
 
 /** Legal move pool for "What if it had …" — loaded lazily per active species. */
@@ -78,8 +79,42 @@ function heldByPartners(side: Side, slot: number, armed: ArmedGimmicks, pending:
 const keepApplying = (armed: (BranchMoveModifier | null)[], modifiers: BranchSlotModifiers[]) =>
   armed.map((kind, slot) => (kind && gimmickApplies(kind, modifiers[slot]) ? kind : null));
 
-const teraOf = (armed: (BranchMoveModifier | null)[], modifiers: BranchSlotModifiers[]) =>
-  modifiers.map((slotModifiers, slot) => (armed[slot] === 'terastallize' ? slotModifiers.teraType : null));
+/**
+ * A slot's gimmick as the panel reads it. Where picks are editable (round 84), a slot with a move pick shows the modifier the
+ * pick carries; elsewhere, and on a slot without a move pick, its armed toggle.
+ */
+function modifierOf(
+  pick: BranchSlotChoice | null | undefined, armed: BranchMoveModifier | null | undefined, editable: boolean,
+): BranchMoveModifier | null {
+  if (editable && pick?.kind === 'move') return pick.modifier ?? null;
+  return armed ?? null;
+}
+
+const teraOf = (
+  armed: (BranchMoveModifier | null)[], modifiers: BranchSlotModifiers[], picks: (BranchSlotChoice | null)[], editable: boolean,
+) => modifiers.map((slotModifiers, slot) => (modifierOf(picks[slot], armed[slot], editable) === 'terastallize' ? slotModifiers.teraType : null));
+
+/** Round 84 (turn dock), C4: where an edit of a pending move goes, and the moves a Z toggle checks. */
+export interface PendingEdit {
+  onEdit: (side: Side, slot: number, choice: BranchSlotChoice) => void;
+  movesBySlot?: Partial<Record<Side, BranchMoveOption[][]>>;
+}
+
+/** The pending move with the toggle applied (or released), or null when this slot's toggle may not change it. */
+function editedPick(
+  pick: Extract<BranchSlotChoice, { kind: 'move' }>, kind: BranchMoveModifier, modifiers: BranchSlotModifiers | undefined,
+  moves: BranchMoveOption[] | undefined, heldBy: HeldGimmicks,
+): BranchSlotChoice | null {
+  if (pick.modifier === kind) {
+    const plain = { ...pick };
+    delete plain.modifier;
+    return plain;
+  }
+  if (heldBy[kind] || !gimmickApplies(kind, modifiers)) return null;
+  // A Z toggle only applies to moves that actually have a Z option.
+  if (kind === 'zmove' && !modifiers?.zMoves[(moves ?? []).findIndex(option => toId(option.name) === pick.moveId)]) return null;
+  return { ...pick, modifier: kind };
+}
 
 /**
  * The armed gimmicks of one position. A new position key starts every slot
@@ -108,6 +143,7 @@ export function useGimmickToggles(
   p2Modifiers: BranchSlotModifiers[],
   positionKey?: string,
   pending: PendingChoices = NO_PENDING,
+  edit?: PendingEdit,
 ) {
   const { armed, setArmed } = useArmedAt(positionKey);
   // Once a gimmick is spent (or the active Pokémon changed and can't use
@@ -116,21 +152,31 @@ export function useGimmickToggles(
   const kept = { p1: keepApplying(armed.p1, p1Modifiers), p2: keepApplying(armed.p2, p2Modifiers) };
   const spent = (side: Side) => kept[side].some((kind, slot) => kind !== (armed[side][slot] ?? null));
   if (spent('p1') || spent('p2')) setArmed(() => kept);
-  const toggle = useCallback((side: Side, slot: number, kind: BranchMoveModifier) => setArmed(current => {
-    const arming = current[side][slot] !== kind;
-    if (arming && heldByPartners(side, slot, current, pending)[kind]) return current;
-    // Arming takes the kind from a partner whose pick no longer carries it, so it cannot ride on that slot's next pick.
-    const next = current[side].map(held => (arming && held === kind ? null : held));
-    next[slot] = arming ? kind : null;
-    return { ...current, [side]: next };
-  }), [setArmed, pending]);
+  const toggle = useCallback((side: Side, slot: number, kind: BranchMoveModifier) => {
+    const pick = pending[side][slot];
+    if (edit && pick?.kind === 'move') {
+      // Round 84, C4: a slot with a move pick (the seed or the user's) takes the gimmick into that pick.
+      const modifiers = (side === 'p1' ? p1Modifiers : p2Modifiers)[slot];
+      const next = editedPick(pick, kind, modifiers, edit.movesBySlot?.[side]?.[slot], heldByPartners(side, slot, armed, pending));
+      if (next) edit.onEdit(side, slot, next);
+      return;
+    }
+    setArmed(current => {
+      const arming = current[side][slot] !== kind;
+      if (arming && heldByPartners(side, slot, current, pending)[kind]) return current;
+      // Arming takes the kind from a partner whose pick no longer carries it, so it cannot ride on that slot's next pick.
+      const next = current[side].map(held => (arming && held === kind ? null : held));
+      next[slot] = arming ? kind : null;
+      return { ...current, [side]: next };
+    });
+  }, [setArmed, pending, edit, armed, p1Modifiers, p2Modifiers]);
   const teraBySlot = useMemo(
-    () => ({ p1: teraOf(armed.p1, p1Modifiers), p2: teraOf(armed.p2, p2Modifiers) }),
-    [armed, p1Modifiers, p2Modifiers],
+    () => ({ p1: teraOf(armed.p1, p1Modifiers, pending.p1, !!edit), p2: teraOf(armed.p2, p2Modifiers, pending.p2, !!edit) }),
+    [armed, p1Modifiers, p2Modifiers, pending, edit],
   );
   const gimmickFor = (side: Side, slot: number): Gimmick => gimmickView(
     (side === 'p1' ? p1Modifiers : p2Modifiers)[slot] ?? NO_SLOT_MODIFIERS,
-    armed[side][slot] ?? null,
+    modifierOf(pending[side][slot], armed[side][slot], !!edit),
     kind => toggle(side, slot, kind),
     heldByPartners(side, slot, armed, pending),
   );
