@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
-import {
-  type EvalResult, type RankedChoice, evalChoiceToSlotChoices, requiredChoicesForActiveSlots,
-  type BranchSlotChoice,
-} from '@fulllifegames/eval-engine';
+import type { EvalResult, RankedChoice, BranchSlotChoice } from '@fulllifegames/eval-engine';
+import { slotChoicesOf } from '../lib/dock-fill';
 import type { BranchSimState, useBranch } from './useBranch';
 import type { useEvaluation } from './useEvaluation';
 
@@ -33,22 +31,11 @@ interface WalkRefs {
   walkProcessedRef: MutableRefObject<EvalResult | null>;
 }
 
-/** Maps an engine choice string onto the live pickers, slot-aligned. */
+/** Maps an engine choice string onto the live pickers, slot-aligned (round 84: `slotChoicesOf` is the dock fill's too). */
 function useApplyEvalChoice(simState: BranchSimState | null, handleSetChoice: EngineWalkInputs['handleSetChoice']) {
   return useCallback((side: 'p1' | 'p2', ranked: RankedChoice): boolean => {
     if (!simState) return false;
-    const movesBySlot = side === 'p1' ? simState.p1MovesBySlot : simState.p2MovesBySlot;
-    const switchesBySlot = side === 'p1' ? simState.p1SwitchesBySlot : simState.p2SwitchesBySlot;
-    // The engine's choice string carries one part per slot WITH choices —
-    // a doubles forced replacement is a single part that belongs to the
-    // forced slot, so the mask aligns parts with the request's slots.
-    const activeSlots = side === 'p1' ? simState.p1ActiveSlots : simState.p2ActiveSlots;
-    const forcedSlots = side === 'p1' ? simState.p1ForceSwitches : simState.p2ForceSwitches;
-    const mask = requiredChoicesForActiveSlots(
-      activeSlots.map(active => (active ? { fainted: active.fainted } : null)),
-      forcedSlots,
-    );
-    const slotChoices = evalChoiceToSlotChoices(ranked.choice, movesBySlot, switchesBySlot, ranked.label, mask);
+    const slotChoices = slotChoicesOf(simState, side, ranked);
     if (!slotChoices) return false;
     let applied = false;
     slotChoices.forEach((choice, activeSlot) => {
