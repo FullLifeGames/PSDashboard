@@ -5,6 +5,7 @@ import {
   type BranchMoveOption, type BranchSimState, type BranchSlotModifiers, type BranchSwitchOption, type MoveUser, type SimPokemonInfo,
 } from '@fulllifegames/eval-engine';
 import { teraBanned } from './picker-tera';
+import { fieldRow } from './field-row';
 
 /**
  * Data sources for the always-visible pickers (spec: input variant B).
@@ -286,7 +287,8 @@ function holdsOtherGimmick(dex: GenDex, itemName: string, species: GenSpecies): 
 interface SnapshotSideOptions {
   movesBySlot: BranchMoveOption[][];
   switchesBySlot: BranchSwitchOption[][];
-  activeSlots: SimPokemonInfo[];
+  /** One entry per field slot; null where the slot's body fainted and nobody replaced it. */
+  activeSlots: (SimPokemonInfo | null)[];
   infos: SimPokemonInfo[];
   modifiersBySlot: BranchSlotModifiers[];
 }
@@ -298,7 +300,7 @@ function snapshotSideOptions(
 ): SnapshotSideOptions {
   const rules: GameRules = { gen, mod: champions ? CHAMPIONS_MOD : undefined };
   const pokemon = snapshot[side].pokemon;
-  const actives = pokemon.filter(mon => mon.isActive && !mon.fainted);
+  const actives = fieldRow(pokemon);
   const setFor = (mon: PokemonSnapshot) =>
     team.find(set => set.species === mon.speciesForme || set.name === mon.name);
   // A never-revealed bench mon (maxhp 0 on the percent scale) is a healthy
@@ -311,12 +313,12 @@ function snapshotSideOptions(
   const fainted = pokemon.filter(mon => mon.fainted).length;
   // One Tera per side and battle: a terastallized teammate spent it.
   const sideMayTera = teraAllowed && !pokemon.some(mon => mon.terastallized);
-  const activeSlots = actives.map((mon, index) => pokemonInfoFromSnapshot(mon, setFor(mon), index, gen, champions, fainted));
+  const activeSlots = actives.map((mon, index) => (mon ? pokemonInfoFromSnapshot(mon, setFor(mon), index, gen, champions, fainted) : null));
   const field = { weather: snapshot.field.weather || '', terrain: snapshot.field.terrain || '' };
-  const movesBySlot = actives.map((mon, index) => moveOptionsFor(
-    mon, setFor(mon), index, gen, champions, { info: activeSlots[index], type: snapshotTeraType(mon, setFor(mon), gen, sideMayTera, champions) }, field,
-  ));
-  const switchesBySlot = actives.map((_, activeSlot): BranchSwitchOption[] =>
+  const movesBySlot = actives.map((mon, index) => (mon ? moveOptionsFor(
+    mon, setFor(mon), index, gen, champions, { info: activeSlots[index]!, type: snapshotTeraType(mon, setFor(mon), gen, sideMayTera, champions) }, field,
+  ) : []));
+  const switchesBySlot = actives.map((mon, activeSlot): BranchSwitchOption[] => !mon ? [] :
     pokemon
       .filter(mon => !mon.isActive && !mon.fainted && benchPercent(mon) > 0 && inBring(mon))
       .map((mon, index) => ({
@@ -331,7 +333,7 @@ function snapshotSideOptions(
   const infos = pokemon.map(mon =>
     pokemonInfoFromSnapshot(mon, setFor(mon), mon.isActive ? actives.indexOf(mon) : null, gen, champions, fainted));
   const modifiersBySlot = actives.map((mon, index) => ({
-    teraType: snapshotTeraType(mon, setFor(mon), gen, sideMayTera, champions),
+    teraType: mon ? snapshotTeraType(mon, setFor(mon), gen, sideMayTera, champions) : null,
     canMegaEvo: false,
     canUltraBurst: false,
     zMoves: (movesBySlot[index] ?? []).map(() => null),
