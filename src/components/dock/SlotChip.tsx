@@ -18,6 +18,7 @@ export function SlotChip({ slot, open, onToggle }: { slot: DockSlotModel; open: 
       data-chip={chipKey(slot.side, slot.slot)}
       data-origin={origin ?? undefined}
       data-empty={pending ? undefined : 'true'}
+      data-forced={slot.forceSwitch ? 'true' : undefined}
       style={picked ? typeTileVars(picked.type) as CSSProperties : undefined}
       aria-expanded={open}
       disabled={slot.nobodyLeft}

@@ -34,12 +34,14 @@ export function blockedSwitchKeys(choices: (BranchSlotChoice | null)[], required
   return blocked;
 }
 
-export function pendingLabelFor(simState: BranchSimState, bothChosen: boolean, isMultiActive: boolean): string {
-  return bothChosen
-    ? 'Execute Turn'
-    : isMultiActive
-      ? 'Select all active choices'
-      : `Select ${!simState.p1Choice ? 'P1' : ''}${!simState.p1Choice && !simState.p2Choice ? ' & ' : ''}${!simState.p2Choice ? 'P2' : ''} choice`;
+export function pendingLabelFor(
+  simState: BranchSimState, bothChosen: boolean, isMultiActive: boolean, waits: { p1Waits: boolean; p2Waits: boolean } = { p1Waits: false, p2Waits: false },
+): string {
+  if (bothChosen) return 'Execute Turn';
+  if (isMultiActive) return 'Select all active choices';
+  // The side that waits for the other's replacement is not asked.
+  const missing = [!simState.p1Choice && !waits.p1Waits ? 'P1' : '', !simState.p2Choice && !waits.p2Waits ? 'P2' : ''].filter(Boolean);
+  return `Select ${missing.join(' & ')} choice`;
 }
 
 /** The identity part of one slot's controls: label and the active Pokémon. */
@@ -57,15 +59,17 @@ export function slotIdentity(side: 'p1' | 'p2', slot: number, activeSlots: (SimP
 export function panelFlags(simState: BranchSimState, p1ActiveSlots: (SimPokemonInfo | null)[], p2ActiveSlots: (SimPokemonInfo | null)[]) {
   const p1RequiredChoices = requiredChoicesForActiveSlots(p1ActiveSlots, simState.p1ForceSwitches);
   const p2RequiredChoices = requiredChoicesForActiveSlots(p2ActiveSlots, simState.p2ForceSwitches);
-  const bothChosen = branchSideChoicesReady(simState.p1Choices, p1RequiredChoices) &&
-    branchSideChoicesReady(simState.p2Choices, p2RequiredChoices);
+  // One side replaces while the other has nothing to choose: its pickers take no input, so no stale pick reaches the next turn (B5).
+  const p1Waits = simState.p2ForceSwitch && !simState.p1ForceSwitch;
+  const p2Waits = simState.p1ForceSwitch && !simState.p2ForceSwitch;
+  // Round 84 (A7a): a side that waits owes no choice, so Execute at a forced replacement is ready when the replacing side holds its picks.
+  const bothChosen = (p1Waits || branchSideChoicesReady(simState.p1Choices, p1RequiredChoices)) &&
+    (p2Waits || branchSideChoicesReady(simState.p2Choices, p2RequiredChoices));
   const isMultiActive = p1ActiveSlots.length > 1 || p2ActiveSlots.length > 1;
   return {
     isForceSwitch: simState.p1ForceSwitch || simState.p2ForceSwitch,
     p1RequiredChoices, p2RequiredChoices, bothChosen,
-    pendingLabel: pendingLabelFor(simState, bothChosen, isMultiActive),
-    // One side replaces while the other has nothing to choose: its pickers take no input, so no stale pick reaches the next turn (B5).
-    p1Waits: simState.p2ForceSwitch && !simState.p1ForceSwitch,
-    p2Waits: simState.p1ForceSwitch && !simState.p2ForceSwitch,
+    pendingLabel: pendingLabelFor(simState, bothChosen, isMultiActive, { p1Waits, p2Waits }),
+    p1Waits, p2Waits,
   };
 }

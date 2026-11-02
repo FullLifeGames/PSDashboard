@@ -170,59 +170,105 @@ function recordSlotChoice(refs: BranchRefs, side: SideId, activeSlot: number, ch
   ref.current[activeSlot] = choice;
 }
 
-/** Records one slot's choice and fires the forced-switch or both-sides-ready follow-ups. */
-function useSetChoice(
+/** Mirrors the pending picks into the state the pickers read. */
+function publishChoices(refs: BranchRefs, setters: BranchSetters): void {
+  const { p1ChoicesRef, p2ChoicesRef } = refs;
+  setters.setSimState(prev => prev ? {
+    ...prev,
+    p1Choice: p1ChoicesRef.current[0] ?? null,
+    p1Choices: [...p1ChoicesRef.current],
+    p2Choice: p2ChoicesRef.current[0] ?? null,
+    p2Choices: [...p2ChoicesRef.current],
+  } : null);
+}
+
+/**
+ * What a complete forced replacement sets in motion, after `side` just completed its picks: the lone replacing side's command
+ * resolves now, and when both sides replace the turn runs once both are complete. False when nothing is due yet.
+ */
+function useSettle(
   refs: BranchRefs, setters: BranchSetters,
   executeTurn: () => Promise<void>,
   executeForcedSide: (side: SideId, command: string, slotChoices: (BranchSlotChoice | null)[]) => Promise<void>,
 ) {
-  const { executingRef, battleStreamRef, branchEngineRef, p1ChoicesRef, p2ChoicesRef } = refs;
-  const { setExecuteError, setSimState } = setters;
-  return useCallback((side: SideId, choice: BranchSlotChoice, activeSlot = 0) => {
-    if (executingRef.current) return;
-    recordSlotChoice(refs, side, activeSlot, choice);
-    setExecuteError(null);
-
-    const battleStream = battleStreamRef.current;
+  const { battleStreamRef, branchEngineRef, p1ChoicesRef, p2ChoicesRef } = refs;
+  const { setExecuteError } = setters;
+  return useCallback((side: SideId): boolean => {
+    const battle = battleStreamRef.current?.battle;
     const branchEngine = branchEngineRef.current;
-    const battle = battleStream?.battle;
-    if (!battle || !branchEngine) return;
+    if (!battle || !branchEngine) return false;
 
     const p1Forced = forceSwitches(battle, 'p1').some(Boolean);
     const p2Forced = forceSwitches(battle, 'p2').some(Boolean);
 
     const forcedCommand = forcedSideCommand(branchEngine, battle, refs, side, { p1: p1Forced, p2: p2Forced });
     if (forcedCommand) {
-      if ('error' in forcedCommand) {
-        setExecuteError(forcedCommand.error);
-        return;
-      }
-      void executeForcedSide(forcedCommand.side, forcedCommand.command, forcedCommand.slotChoices);
-      return;
+      if ('error' in forcedCommand) setExecuteError(forcedCommand.error);
+      else void executeForcedSide(forcedCommand.side, forcedCommand.command, forcedCommand.slotChoices);
+      return true;
     }
 
     if ((p1Forced || p2Forced) &&
       hasAllChoices(battle, 'p1', p1ChoicesRef.current) &&
       hasAllChoices(battle, 'p2', p2ChoicesRef.current)) {
       void executeTurn();
-      return;
+      return true;
     }
+    return false;
+  }, [executeForcedSide, executeTurn, refs, battleStreamRef, branchEngineRef, p1ChoicesRef, p2ChoicesRef, setExecuteError]);
+}
 
-    setSimState(prev => prev ? {
-      ...prev,
-      p1Choice: p1ChoicesRef.current[0] ?? null,
-      p1Choices: [...p1ChoicesRef.current],
-      p2Choice: p2ChoicesRef.current[0] ?? null,
-      p2Choices: [...p2ChoicesRef.current],
-    } : null);
-  }, [executeForcedSide, executeTurn, refs, executingRef, battleStreamRef, branchEngineRef, p1ChoicesRef, p2ChoicesRef,
-    setExecuteError, setSimState]);
+/** Records one slot's choice and fires the forced-switch or both-sides-ready follow-ups. */
+function useSetChoice(refs: BranchRefs, setters: BranchSetters, settle: (side: SideId) => boolean) {
+  const { executingRef } = refs;
+  const { setExecuteError } = setters;
+  return useCallback((side: SideId, choice: BranchSlotChoice, activeSlot = 0) => {
+    if (executingRef.current) return;
+    recordSlotChoice(refs, side, activeSlot, choice);
+    setExecuteError(null);
+    if (!refs.battleStreamRef.current?.battle || !refs.branchEngineRef.current) return;
+    if (!settle(side)) publishChoices(refs, setters);
+  }, [settle, refs, setters, executingRef, setExecuteError]);
+}
+
+/**
+ * Round 84 (A7a): records a pick and sends nothing, the way the engine's fill writes a forced replacement the user has not
+ * confirmed. A click on the bench uses `setChoice`, which sends the replacement at once.
+ */
+function useRecordChoice(refs: BranchRefs, setters: BranchSetters) {
+  const { executingRef } = refs;
+  const { setExecuteError } = setters;
+  return useCallback((side: SideId, choice: BranchSlotChoice, activeSlot = 0) => {
+    if (executingRef.current) return;
+    recordSlotChoice(refs, side, activeSlot, choice);
+    setExecuteError(null);
+    publishChoices(refs, setters);
+  }, [refs, setters, executingRef, setExecuteError]);
+}
+
+/**
+ * Round 84 (A7a): Execute for whatever the position is waiting for. At a forced replacement it sends the picks the dock holds
+ * (a lone replacing side's command, or the turn when both replace); otherwise it runs the turn.
+ */
+function useExecutePending(refs: BranchRefs, executeTurn: () => Promise<void>, settle: (side: SideId) => boolean) {
+  const { battleStreamRef, executingRef } = refs;
+  return useCallback(async () => {
+    const battle = battleStreamRef.current?.battle;
+    if (!battle || executingRef.current) return;
+    const forced = (['p1', 'p2'] as const).filter(side => forceSwitches(battle, side).some(Boolean));
+    if (forced.length === 0) { await executeTurn(); return; }
+    // The side that replaces first: for a lone side its command, for two sides the turn once both are complete.
+    settle(forced[0]);
+  }, [battleStreamRef, executingRef, executeTurn, settle]);
 }
 
 /** The execute side of the branch: turn execution, forced-switch interludes, and choice recording. */
 export function useBranchExecute(refs: BranchRefs, setters: BranchSetters, clearChoices: () => void) {
   const executeTurn = useExecuteTurn(refs, setters, clearChoices);
   const executeForcedSide = useExecuteForcedSide(refs, setters);
-  const setChoice = useSetChoice(refs, setters, executeTurn, executeForcedSide);
-  return { executeTurn, setChoice };
+  const settle = useSettle(refs, setters, executeTurn, executeForcedSide);
+  const setChoice = useSetChoice(refs, setters, settle);
+  const recordChoice = useRecordChoice(refs, setters);
+  const executePending = useExecutePending(refs, executeTurn, settle);
+  return { executeTurn, setChoice, recordChoice, executePending };
 }

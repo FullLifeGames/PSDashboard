@@ -64,11 +64,11 @@ describe('chipPlaceholder', () => {
     expect(chipPlaceholder({ ...base, forceSwitch: true })).toBe('choose a replacement');
     expect(chipPlaceholder({ ...base, nobodyLeft: true })).toBe('fainted · no one left');
   });
-  test('while the engine fills or is blocked by the game analysis, an empty slot says so; a forced replacement and an empty bench keep their text', () => {
+  test('while the engine fills or is blocked by the game analysis, an empty slot says so; an empty bench keeps its text, and so does a forced replacement while the analysis blocks the engine', () => {
     expect(chipPlaceholder({ ...base, hasRecord: false, engine: 'pending' })).toBe('engine choosing…');
     expect(chipPlaceholder({ ...base, hasRecord: false, engine: 'busy' })).toBe('engine busy with the game analysis');
     expect(chipPlaceholder({ ...base, hasRecord: false, engine: null })).toBe('choose');
-    expect(chipPlaceholder({ ...base, hasRecord: false, engine: 'pending', forceSwitch: true })).toBe('choose a replacement');
+    expect(chipPlaceholder({ ...base, hasRecord: false, engine: 'busy', forceSwitch: true })).toBe('choose a replacement');
     expect(chipPlaceholder({ ...base, hasRecord: false, engine: 'busy', nobodyLeft: true })).toBe('fainted · no one left');
   });
 });
@@ -84,5 +84,14 @@ describe("chipPlaceholder, the engine's deferred pick (round 84, A7a)", () => {
     expect(chipPlaceholder({ ...base, played, hasRecord: true, deferred: { kind: 'move', name: 'Rock Slide' } })).toBe('engine: Rock Slide · choose');
     expect(chipPlaceholder({ ...base, forceSwitch: true, deferred: { kind: 'switch', name: 'Kingambit' } })).toBe('engine: → Kingambit · choose');
     expect(chipPlaceholder({ ...base, nobodyLeft: true, deferred: { kind: 'switch', name: 'Kingambit' } })).toBe('fainted · no one left');
+  });
+});
+
+describe('chipPlaceholder, a forced replacement the engine fills (round 84, A7a, ruling 2a)', () => {
+  const base = { forceSwitch: true, nobodyLeft: false, played: null, hasRecord: false };
+  test('while the run is pending the forced slot says the engine is choosing, as any slot; with no engine it asks for a replacement', () => {
+    expect(chipPlaceholder({ ...base, engine: 'pending' })).toBe('engine choosing…');
+    expect(chipPlaceholder({ ...base, engine: null })).toBe('choose a replacement');
+    expect(chipPlaceholder(base)).toBe('choose a replacement');
   });
 });

@@ -129,11 +129,12 @@ export async function pickSwitch(page: Page, slot: DockSlotKey, body: string | R
 }
 
 /**
- * The forced replacement the position asks of a slot ("choose a replacement" on its chip): opens the chip's bench and sends
- * the first body that may enter. The pick executes at once.
+ * The forced replacement the position asks of a slot (its chip carries `data-forced`): opens the chip's bench and sends
+ * the first body that may enter. The pick executes at once, whatever the engine's fill holds for the slot.
  */
 export async function pickForcedReplacement(page: Page, options?: TrayOptions): Promise<void> {
-  const tray = await openChip(page, page.locator('.ps-dock-chip', { hasText: 'choose a replacement' }).first(), options);
+  // Round 84 (A7a): the engine fills the forced slot too, so its chip no longer reads "choose a replacement"; the chip carries data-forced.
+  const tray = await openChip(page, page.locator('.ps-dock-chip[data-forced="true"]:not([inert])').first(), options);
   await tray.locator('.ps-switchbtn:enabled').first().click({ timeout: options?.timeout });
 }
 

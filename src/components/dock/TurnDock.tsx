@@ -77,7 +77,7 @@ function useDockElement(attachRoot: (element: HTMLElement | null) => void) {
   }, [attachRoot, reportHeight]);
 }
 
-/** Execute: locked until every slot holds a choice, except while the engine's fill is pending: then a press queues behind it. */
+/** Execute: locked until every slot holds a choice, except while the engine's fill is pending: then a press queues behind it. A forced replacement shows it only with a pick or a pending run. */
 function DockExecute({ model, fill, executing, onRun, onClose }: {
   model: ReturnType<typeof buildDockModel>;
   fill: DockFillView | null | undefined;
@@ -85,8 +85,10 @@ function DockExecute({ model, fill, executing, onRun, onClose }: {
   onRun: () => void;
   onClose: () => void;
 }) {
-  if (model.flags.isForceSwitch) return null;
   const waitsForFill = !!fill?.pending && !model.flags.bothChosen;
+  // Round 84 (A7a): a forced replacement shows Execute once the engine's pick stands (or its run is pending); with no pick a bench
+  // click sends the body in at once, as before.
+  if (model.flags.isForceSwitch && !model.flags.bothChosen && !waitsForFill) return null;
   return (
     <ExecuteButton
       ready={model.flags.bothChosen || waitsForFill}

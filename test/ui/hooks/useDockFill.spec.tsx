@@ -103,17 +103,6 @@ describe('useDockFill: when a run starts', () => {
     expect(handleEvaluate).toHaveBeenCalledTimes(2);
   });
 
-  test('a forced replacement is the user pick: no run for either side, in either format', () => {
-    for (const kind of ['singles', 'doubles'] as const) {
-      const p1 = inputsOf(kind, { simState: simState(kind, { p1ForceSwitch: true }) });
-      renderHook(() => useDockFill(p1.wired));
-      const p2 = inputsOf(kind, { simState: simState(kind, { p2ForceSwitch: true }) });
-      renderHook(() => useDockFill(p2.wired));
-      expect(p1.handleEvaluate).not.toHaveBeenCalled();
-      expect(p2.handleEvaluate).not.toHaveBeenCalled();
-    }
-  });
-
   test.each([
     ['not at the live tip', { liveTip: false }],
     ['not in a variation', { branching: false }],
@@ -467,5 +456,81 @@ describe('useDockFill: the engine\'s choice for a held slot waits until the tray
     act(() => result.current.holdTray(null));
     act(() => onResultOf(handleEvaluate)(doublesResult()));
     expect(result.current.deferred.p1).toEqual([null, null]);
+  });
+});
+
+describe('useDockFill: a forced replacement is filled like any slot (round 84, A7a, ruling 2a)', () => {
+  const heatran = { kind: 'switch', speciesId: 'heatran', pokemonName: 'Heatran' };
+  const fluttermane = { kind: 'switch', speciesId: 'fluttermane', pokemonName: 'Flutter Mane' };
+  const wait = rankedChoice('wait', '(waiting)', 0);
+
+  /** The replacing side's ranked bench, the waiting side's single "wait" line (the evaluation at an open request). */
+  const benchOf = (kind: FormatKind, side: 'p1' | 'p2') => {
+    const label = { singles: { p1: 'Heatran', p2: 'Rotom-Wash' }, doubles: { p1: 'Flutter Mane', p2: 'Kingambit' } }[kind][side];
+    return rankedChoice(kind === 'doubles' ? 'switch 3' : 'switch 2', `→ ${label}`, 0.2);
+  };
+  const forcedResult = (kind: FormatKind, replacing: 'p1' | 'p2'): EvalResult => (
+    { ...evalResult(kind), perSide: { p1: [replacing === 'p1' ? benchOf(kind, 'p1') : wait], p2: [replacing === 'p2' ? benchOf(kind, 'p2') : wait] } }
+  );
+  const stateOf = (kind: FormatKind, ...replacing: ('p1' | 'p2')[]) => simState(kind, Object.fromEntries(replacing.flatMap(side => [
+    [`${side}ForceSwitch`, true], [`${side}ForceSwitches`, kind === 'doubles' ? [false, true] : [true]],
+  ])));
+
+  const kingambit = { kind: 'switch', speciesId: 'kingambit', pokemonName: 'Kingambit' };
+  const rotom = { kind: 'switch', speciesId: 'rotomwash', pokemonName: 'Rotom-Wash' };
+  test.each([['singles', 'p1', heatran, 0], ['doubles', 'p1', fluttermane, 1], ['singles', 'p2', rotom, 0], ['doubles', 'p2', kingambit, 1]] as const)(
+    '%s, %s replaces: a run starts, and the result writes the replacement into the forced slot only',
+    (kind, side, replacement, slot) => {
+      const { wired, handleEvaluate, branch } = inputsOf(kind, { simState: stateOf(kind, side) });
+      const { result } = renderHook(() => useDockFill(wired));
+      expect(handleEvaluate).toHaveBeenCalledTimes(1);
+      expect(result.current.pending).toBe(true);
+      act(() => onResultOf(handleEvaluate)(forcedResult(kind, side)));
+      expect(branch.setChoice).toHaveBeenCalledTimes(1);
+      expect(branch.setChoice).toHaveBeenCalledWith(side, expect.objectContaining(replacement), slot);
+      const other = side === 'p1' ? 'p2' : 'p1';
+      expect(branch.choices[other].every(isNull)).toBe(true);
+      expect(result.current.engine[side][slot]).toBe(true);
+      expect(result.current.engine[other].every(mark => !mark)).toBe(true);
+      expect(result.current.pending).toBe(false);
+    },
+  );
+
+  test.each(['singles', 'doubles'] as const)('%s, both sides replace: both get the engine\'s replacement', (kind) => {
+    const { wired, handleEvaluate, branch } = inputsOf(kind, { simState: stateOf(kind, 'p1', 'p2') });
+    const { result } = renderHook(() => useDockFill(wired));
+    act(() => onResultOf(handleEvaluate)({ ...evalResult(kind), perSide: { p1: [benchOf(kind, 'p1')], p2: [benchOf(kind, 'p2')] } }));
+    expect(branch.setChoice).toHaveBeenCalledTimes(2);
+    expect(result.current.engine.p1.some(Boolean)).toBe(true);
+    expect(result.current.engine.p2.some(Boolean)).toBe(true);
+  });
+
+  test('an Execute pressed before the fill waits and runs after it', async () => {
+    const { wired, handleEvaluate, branch } = inputsOf('doubles', { simState: stateOf('doubles', 'p1') });
+    const { result } = renderHook(() => useDockFill(wired));
+    act(() => result.current.queueExecute());
+    expect(result.current.waits).toBe(true);
+    await act(async () => onResultOf(handleEvaluate)(forcedResult('doubles', 'p1')));
+    expect(branch.executeTurn).toHaveBeenCalledTimes(1);
+    expect(branch.executeTurn.mock.invocationCallOrder[0]).toBeGreaterThan(branch.setChoice.mock.invocationCallOrder[0]);
+  });
+
+  test('a replacement the user held open gets the engine\'s pick as a deferred pick, as any slot', () => {
+    const { wired, handleEvaluate, branch } = inputsOf('singles', { simState: stateOf('singles', 'p1') });
+    const { result } = renderHook(() => useDockFill(wired));
+    act(() => result.current.holdTray({ side: 'p1', slot: 0 }));
+    act(() => onResultOf(handleEvaluate)(forcedResult('singles', 'p1')));
+    expect(branch.setChoice).not.toHaveBeenCalled();
+    expect(result.current.deferred.p1[0]).toEqual(expect.objectContaining(heatran));
+  });
+
+  test('no run at a replay turn\'s forced position, and none while the game analysis runs (the chips say it is busy)', () => {
+    const replay = inputsOf('singles', { simState: stateOf('singles', 'p1'), liveTip: false });
+    renderHook(() => useDockFill(replay.wired));
+    expect(replay.handleEvaluate).not.toHaveBeenCalled();
+    const busy = inputsOf('singles', { simState: stateOf('singles', 'p1'), evaluation: evaluationOf({ running: true }).evaluation });
+    const { result } = renderHook(() => useDockFill(busy.wired));
+    expect(busy.handleEvaluate).not.toHaveBeenCalled();
+    expect(result.current.busy).toBe(true);
   });
 });

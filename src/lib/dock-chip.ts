@@ -50,8 +50,9 @@ export function chipPlaceholder({ forceSwitch, nobodyLeft, played, hasRecord, en
 }): string {
   if (nobodyLeft) return 'fainted · no one left';
   if (deferred) return `engine: ${deferred.kind === 'move' ? deferred.name : `→ ${deferred.name}`} · choose`;
-  if (forceSwitch) return 'choose a replacement';
+  // A forced replacement is filled like any slot; while the analysis blocks the engine the user has to choose.
   if (engine === 'pending') return 'engine choosing…';
+  if (forceSwitch) return 'choose a replacement';
   if (engine === 'busy') return 'engine busy with the game analysis';
   if (played) return `played: ${played.kind === 'move' ? played.name : `→ ${played.name}`} · choose`;
   return hasRecord ? 'no logged move · choose' : 'choose';

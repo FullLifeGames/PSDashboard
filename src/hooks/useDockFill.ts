@@ -31,7 +31,7 @@ export interface DockFillInputs {
   handleEvaluate: (options?: EvaluateOptions) => void;
   /** The picks of both sides now: the branch's at the tip, the picker's effective choices (logged action under the user's picks) at a replay turn. */
   getChoices: Branch['getChoices'];
-  /** The tip writes the fill into the branch; a replay turn never calls it: the fill stays in the view (`choices`). */
+  /** The tip writes the fill into the branch without sending anything (a forced replacement waits for Execute); a replay turn never calls it: the fill stays in the view (`choices`). */
   setChoice: Branch['setChoice'];
   /** Runs the turn after the fill; gets the choices the turn is made of (the tip ignores them: its branch holds them). */
   executeTurn: (choices: SideChoices) => unknown;
@@ -89,7 +89,9 @@ function gate(inputs: DockFillInputs, armedKey: string | null): { key: string; o
   const { simState, liveTip, branching, executing, branchPreparing, playOutActive, evalAvailable, evaluation } = inputs;
   // `historyLength` separates the position after a forced replacement from the turn before it.
   const key = `${inputs.sessionKey}:${inputs.evalViewKey}:${inputs.historyLength}`;
-  const forced = !!simState && (simState.p1ForceSwitch || simState.p2ForceSwitch);
+  // Round 84 (A7a, ruling 2a): a forced replacement at the live tip is filled like any slot (the evaluation prices the open request);
+  // a replay turn never stands at one.
+  const forced = !liveTip && !!simState && (simState.p1ForceSwitch || simState.p2ForceSwitch);
   const reachable = !!simState && !simState.ended && !forced && evalAvailable && !executing && !branchPreparing && !playOutActive;
   const open = reachable && (liveTip ? branching : armedKey === key && !inputs.stale);
   return { key, open, eligible: open && !evaluation.graph.running };
@@ -236,7 +238,7 @@ function landedView(landed: Settled | null, liveTip: boolean): Pick<DockFillView
  * ranked choice into every slot the user has not touched, nor holds open. At the live tip of a variation it starts at once and
  * writes into the branch; at a replay turn it starts with the user's first click on a chip and keeps its choices in the view
  * (`choices`), under the draft and over the logged seed. It never starts while the game analysis
- * runs (a single evaluation stops its sweep), during a play-out, at a forced replacement, or for a game type without evaluation,
+ * runs (a single evaluation stops its sweep), during a play-out, or for a game type without evaluation,
  * and it never sets the Auto preference. An Execute pressed while the run is pending waits and runs after the fill.
  * The fill applies where the result lands (`onResult`); the marks it leaves are state read by the chips.
  */

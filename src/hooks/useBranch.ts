@@ -12,6 +12,15 @@ export type {
 } from '@fulllifegames/eval-engine';
 export type { BranchHistoryEntry } from './branch/shared';
 
+/** Wraps an executor so it resolves to the error text the tracked setter recorded while it ran (null when none). */
+function useReportingExecutor(run: () => Promise<void>, lastErrorRef: React.RefObject<string | null>) {
+  return useCallback(async (): Promise<string | null> => {
+    lastErrorRef.current = null;
+    await run();
+    return lastErrorRef.current;
+  }, [run, lastErrorRef]);
+}
+
 /**
  * The branch simulator: one live @pkmn/sim battle rebuilt at a replay turn,
  * with the execute side (turns, forced interludes, choice recording) and the
@@ -74,18 +83,16 @@ export function useBranch() {
       setters.setExecuteError(value);
     },
   }), [setters]);
-  const { executeTurn: runTurn, setChoice } = useBranchExecute(refs, trackedSetters, clearChoices);
+  const { executeTurn: runTurn, setChoice, recordChoice, executePending: runPending } = useBranchExecute(refs, trackedSetters, clearChoices);
   /** Runs the pending choices; resolves to the executor's error text, or null when the turn ran or nothing was due. */
-  const executeTurn = useCallback(async (): Promise<string | null> => {
-    lastExecuteErrorRef.current = null;
-    await runTurn();
-    return lastExecuteErrorRef.current;
-  }, [runTurn]);
+  const executeTurn = useReportingExecutor(runTurn, lastExecuteErrorRef);
+  /** Round 84 (A7a): Execute of the dock: the forced replacement it holds, else the turn. Same result as `executeTurn`. */
+  const executePending = useReportingExecutor(runPending, lastExecuteErrorRef);
   const { startBranch, getBattle, stopBranch } = useBranchSession(refs, setters, clearChoices, updateState);
 
   return {
     branching, simState, history, executeError, executing,
     variationStartTurn, startSerialized,
-    startBranch, setChoice, executeTurn, stopBranch, getBattle, getChoices,
+    startBranch, setChoice, recordChoice, executeTurn, executePending, stopBranch, getBattle, getChoices,
   };
 }

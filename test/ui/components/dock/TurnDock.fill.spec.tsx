@@ -267,3 +267,73 @@ describe.each(['singles', 'doubles'] as const)('TurnDock fill, the engine\'s cho
     expect(execute()).toBeDisabled();
   });
 });
+
+describe.each(['singles', 'doubles'] as const)('TurnDock fill, a forced replacement, %s', (kind) => {
+  // P1 replaces: singles its only slot, doubles slot B (the other slot plays on); P2 waits.
+  const slot = kind === 'doubles' ? 1 : 0;
+  const forcedChip = kind === 'doubles' ? 'P1B' : 'P1';
+  const waitingChip = kind === 'doubles' ? 'P2A' : 'P2';
+  const forcedFlags = { p1ForceSwitch: true, p1ForceSwitches: kind === 'doubles' ? [false, true] : [true] };
+  const body = kind === 'doubles' ? { speciesId: 'fluttermane', pokemonName: 'Flutter Mane' } : { speciesId: 'heatran', pokemonName: 'Heatran' };
+  const pick: BranchSlotChoice = { kind: 'switch', ...body };
+  const filled = () => simState(kind, { ...forcedFlags, p1Choices: kind === 'doubles' ? [null, pick] : [pick] });
+  const engineMarks = { p1: kind === 'doubles' ? [false, true] : [true], p2: kind === 'doubles' ? [false, false] : [false] };
+
+  test('while the run is pending the forced slot reads "engine choosing…", the waiting side and the partner do not', () => {
+    renderDock(kind, fillOf({ pending: true }), {}, simState(kind, forcedFlags));
+    expect(chip(forcedChip)).toHaveTextContent('engine choosing…');
+    expect(chip(forcedChip).querySelector('.ps-dock-pick')).toHaveAttribute('data-wait', 'pending');
+    expect(chip(waitingChip)).not.toHaveTextContent('engine');
+    expect(chip(waitingChip)).toHaveAttribute('inert');
+    if (kind === 'doubles') expect(chip('P1A')).not.toHaveTextContent('engine choosing');
+  });
+
+  test('the chip of the slot that must replace is marked, whatever it reads', () => {
+    renderDock(kind, fillOf({ pending: true }), {}, simState(kind, forcedFlags));
+    expect(chip(forcedChip)).toHaveAttribute('data-forced', 'true');
+    expect(chip(waitingChip)).not.toHaveAttribute('data-forced');
+  });
+
+  test('an Execute pressed before the fill queues behind it', async () => {
+    const fill = fillOf({ pending: true });
+    const props = renderDock(kind, fill, {}, simState(kind, forcedFlags));
+    expect(execute()).toBeEnabled();
+    expect(execute()).toHaveTextContent('Execute Turn');
+    await userEvent.click(execute());
+    expect(fill.queueExecute).toHaveBeenCalledTimes(1);
+    expect(props.onExecuteTurn).not.toHaveBeenCalled();
+  });
+
+  test('the engine\'s replacement stands on the chip with the mark "engine", and Execute sends it', async () => {
+    const props = renderDock(kind, fillOf({ engine: engineMarks }), {}, filled());
+    expect(chip(forcedChip)).toHaveAttribute('data-origin', 'engine');
+    expect(chip(forcedChip)).toHaveTextContent(`→ ${body.pokemonName} engine`);
+    expect(execute()).toBeEnabled();
+    await userEvent.click(execute());
+    expect(props.onExecuteTurn).toHaveBeenCalledTimes(1);
+  });
+
+  test('a queued Execute reads "Waits for engine…"', () => {
+    renderDock(kind, fillOf({ pending: true, waits: true }), {}, simState(kind, forcedFlags));
+    expect(execute()).toHaveTextContent('Waits for engine…');
+    expect(execute()).toBeDisabled();
+  });
+
+  test('without a pick and without a run there is no Execute: a click on the bench still sends the body in at once', async () => {
+    const props = renderDock(kind, fillOf(), {}, simState(kind, forcedFlags));
+    expect(execute()).toBeNull();
+    await userEvent.click(chip(forcedChip));
+    await userEvent.click(within(document.querySelector('.ps-tray') as HTMLElement).getByRole('button', { name: new RegExp(body.pokemonName) }));
+    expect(props.onSetChoice).toHaveBeenCalledWith('p1', { kind: 'switch', ...body }, slot);
+  });
+
+  test('the engine\'s replacement can be changed by a bench click, which is the user\'s pick', async () => {
+    const fill = fillOf({ engine: engineMarks });
+    const props = renderDock(kind, fill, {}, filled());
+    await userEvent.click(chip(forcedChip));
+    const other = kind === 'doubles' ? 'Urshifu' : 'Latias';
+    await userEvent.click(within(document.querySelector('.ps-tray') as HTMLElement).getByRole('button', { name: new RegExp(other) }));
+    expect(fill.onUserChoice).toHaveBeenCalledWith('p1', slot);
+    expect(props.onSetChoice).toHaveBeenCalledWith('p1', expect.objectContaining({ kind: 'switch', pokemonName: other }), slot);
+  });
+});

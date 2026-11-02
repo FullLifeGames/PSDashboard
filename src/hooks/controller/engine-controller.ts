@@ -119,7 +119,7 @@ function useFillLayer(
   ctx: ReplayContext, transients: Transients, board: BoardController,
   evalView: ReturnType<typeof useEvalViewLayer>, acquireLayer: ReturnType<typeof useAcquireLayer>,
 ) {
-  const { simState, branching, executing, history, variationStartTurn, getChoices, setChoice, executeTurn } = ctx.branch;
+  const { simState, branching, executing, history, variationStartTurn, getChoices, recordChoice, executePending } = ctx.branch;
   const { liveTip, evalViewKey } = board.timeline;
   const { pickerSimState, pickerStale } = acquireLayer;
   const { handleExecuteDraft } = board.deviation;
@@ -127,14 +127,14 @@ function useFillLayer(
   // The picks of a replay turn are the picker state's own: the logged actions under the user's.
   const getPickerChoices = useCallback(() => ({ p1: pickerSimState?.p1Choices ?? [], p2: pickerSimState?.p2Choices ?? [] }), [pickerSimState]);
   const runTurn = useCallback((choices: SideChoices) => (
-    liveTip ? executeTurn() : handleExecuteDraft(choices)
-  ), [liveTip, executeTurn, handleExecuteDraft]);
+    liveTip ? executePending() : handleExecuteDraft(choices)
+  ), [liveTip, executePending, handleExecuteDraft]);
   const fill = useDockFill({
     simState: viewed, liveTip, branching, executing, branchPreparing: board.deviation.branchPreparing,
     playOutActive: transients.playOut?.active ?? false, evalAvailable: evalView.evalAvailable, evaluation: ctx.evaluation,
     liveEvalStatus: board.liveEvalStatus, evalViewKey, historyLength: liveTip ? history.length : 0, stale: pickerStale,
     sessionKey: `${ctx.replay.replayData?.id ?? ''}:${board.deviation.branchSession}:${variationStartTurn ?? 0}`,
-    handleEvaluate: evalView.handleEvaluate, getChoices: liveTip ? getChoices : getPickerChoices, setChoice, executeTurn: runTurn,
+    handleEvaluate: evalView.handleEvaluate, getChoices: liveTip ? getChoices : getPickerChoices, setChoice: recordChoice, executeTurn: runTurn,
   });
   const dockSimState = useMemo(() => overlayFill(pickerSimState, fill.choices), [pickerSimState, fill.choices]);
   return { fill, dockSimState };

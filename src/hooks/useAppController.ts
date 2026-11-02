@@ -125,10 +125,11 @@ export function useAppController() {
   const board = useTimelineController(ctx, transients);
   const engine = useEngineController(ctx, transients, board);
   const handleHypotheticalMove = useHypotheticalMove(ctx, board);
-  const { executeTurn } = ctx.branch;
+  // Round 84 (A7a): the dock's Execute also sends a forced replacement the engine filled.
+  const { executePending } = ctx.branch;
   const handleExecuteTurn = useCallback(async () => {
-    await executeTurn();
-  }, [executeTurn]);
+    await executePending();
+  }, [executePending]);
   const analysis = useAnalysisSurface(ctx, board, engine);
   const support = useSupport({ ctx, transients, board });
   return { ctx, transients, board, engine, handleHypotheticalMove, handleExecuteTurn, analysis, support };
