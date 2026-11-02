@@ -233,7 +233,7 @@ export async function routeSlowReplayEmbed(page: Page, delayMs: number): Promise
 }
 
 /**
- * Round 84 (turn dock): four corpus games with played turns, byte copies of `.fit-corpus` files. The hand-written doubles and
+ * Round 84 (turn dock): five corpus games with played turns, byte copies of `.fit-corpus` files. The hand-written doubles and
  * VGC fixtures hold no played turn, so the dock's seed (the logged choice of every slot) needs these. Served by their ids.
  */
 export const dockReplays: ReplayData[] = [
@@ -241,6 +241,7 @@ export const dockReplays: ReplayData[] = [
   'dock-doublesou-2693620934.json',
   'dock-vgcregi-2573391549.json',
   'dock-championsvgc-2625939941.json',
+  'dock-championsvgc-2623421463.json',
 ].map(name => JSON.parse(readFileSync(fixturePath(name), 'utf-8')) as ReplayData);
 
 /** The offline routes every dashboard test starts from: cached replay embed, fixture replays, empty Smogon data. */

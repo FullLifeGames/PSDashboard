@@ -18,6 +18,7 @@ const FIXTURES = [
   'test/e2e/fixtures/dock-vgcregi-2573391549.json',
   'test/e2e/fixtures/dock-championsvgc-2625939941.json',
   'test/e2e/fixtures/dock-doublesou-2693620934.json',
+  'test/e2e/fixtures/dock-championsvgc-2623421463.json',
 ];
 
 type Replay = { id: string; log: string };

@@ -9,12 +9,15 @@ import {
  * Round 84 (turn dock), step A6c: the two VGC scenes, counted on their own at 1366 x 768 with no variation standing.
  * Scarlet/Violet VGC (task 4, Tera): turn 3 of `gen9vgc2026regi-2573391549`, where all four slots acted and Zacian terastallizes
  * (P2A). The user's side has not: chip P1A, "Tera (type)", Execute. The bench shows the four brought bodies only.
- * Champions VGC (Mega Evolve): turn 1 of `gen9championsvgc2026regma-2625939941`, before Aerodactylite is used (the game logs the
+ * Champions VGC (Mega Evolve): turn 1 of `gen9championsvgc2026regma-2623421463`, before Blastoisinite is used (the game logs the
  * Mega Evolution in turn 2, and a side takes it once, so a later turn has none left to click): chip P2A, "Mega Evolve", Execute.
- * Champions has no Tera toggle, and the bench lists the brought bodies only.
+ * Champions has no Tera toggle. The bench lists the brought bodies only, which the app knows when both sides fielded four
+ * (`replayBringOnly`): the game of the criterion 5 case (2625939941, the user's side fielded three) is not pinned and lists its
+ * whole team, so the bench is read on this second game (test/regression/dock-bring-fixture.spec.ts).
  */
 const SV_VGC = 'gen9vgc2026regi-2573391549';
 const CHAMPIONS = 'gen9championsvgc2026regma-2625939941';
+const CHAMPIONS_PINNED = 'gen9championsvgc2026regma-2623421463';
 const replayOf = (id: string) => dockReplays.find(replay => replay.id === id)!;
 
 test.beforeAll(installReplayEmbedCache);
@@ -77,15 +80,16 @@ test.describe('Scarlet/Violet VGC, turn 3', () => {
 test.describe('Champions VGC', () => {
   test('Mega Evolve: 3 clicks (chip, "Mega Evolve", Execute); no Tera toggle; the bench lists the brought bodies only', async ({ page }) => {
     test.setTimeout(180_000);
-    await loadDockReplay(page, CHAMPIONS, 1);
+    await loadDockReplay(page, CHAMPIONS_PINNED, 1);
     await expectDockLayout(page);
     const clicks = new Clicks();
     await clicks.click(dockChip(page, 'p2a'));
     const tray = dockTray(page);
-    // P2 brought Aerodactyl, Kingambit, Farigiraf and Sylveon (all four show in the game); Torkoal and the sixth body stay out.
+    // P2 brought Blastoise, Vivillon, Pelipper and Basculegion (all four show in the game); Sneasler and Sinistcha stay home.
     const bench = await benchNames(tray);
     expect(bench, 'bench of P2A').toHaveLength(2);
-    expect(hasBody(bench, 'Farigiraf') && hasBody(bench, 'Sylveon')).toBe(true);
+    expect(hasBody(bench, 'Pelipper') && hasBody(bench, 'Basculegion')).toBe(true);
+    expect(hasBody(bench, 'Sneasler') || hasBody(bench, 'Sinistcha')).toBe(false);
     await expect(tray.getByRole('button', { name: /^Tera/ })).toHaveCount(0);
     await expectDockLayout(page);
     const mega = tray.getByRole('button', { name: 'Mega Evolve' });
