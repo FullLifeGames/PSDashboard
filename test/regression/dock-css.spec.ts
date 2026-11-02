@@ -251,3 +251,16 @@ describe('the chip (variant A, ruling 8a)', () => {
     expect(rule(base, '.ps-dock-rows') ?? '').toMatch(/grid-auto-rows:\s*46px/);
   });
 });
+
+describe('the bench tile badges never change the tile (A7b)', () => {
+  const base = css.slice(0, css.indexOf('@media (max-width: 1050px)'));
+
+  test('the bench tile is the containing block of the flag row, and the flags stand out of the flow', () => {
+    expect(rule(base, '.ps-dock .ps-switchbtn') ?? '').toMatch(/position:\s*relative/);
+    expect(rule(base, '.ps-tile-flags') ?? '').toMatch(/position:\s*absolute/);
+  });
+
+  test('the bench rows leave room for the flags of the row below', () => {
+    expect(rule(base, '.ps-switch-row') ?? '').toMatch(/gap:\s*10px 6px/);
+  });
+});

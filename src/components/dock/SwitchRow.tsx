@@ -10,6 +10,10 @@ import type { PlayedPick } from '../../lib/played-pick';
 const PLAYED_TITLE = 'The action played at this position on the line you are viewing.';
 const ENGINE_TITLE = "The engine's choice for this slot. It takes the slot when you close the tray, unless you pick something else.";
 
+/**
+ * Round 84 (A7b): the played and engine badges stand in the tile's flag row on its top edge (the move tile's place, `.ps-tile-flags`),
+ * out of the tile's flow, so a badge that appears under an open tray never widens the tile or reflows the bench.
+ */
 function SwitchTile({ sw, selected, disabled, disabledReason, wasPlayed, engine, onPick }: {
   sw: BranchSwitchOption; selected: boolean; disabled: boolean; disabledReason: string; wasPlayed: boolean; engine: boolean; onPick: () => void;
 }) {
@@ -26,12 +30,14 @@ function SwitchTile({ sw, selected, disabled, disabledReason, wasPlayed, engine,
       className={`ps-switchbtn ${selected ? 'ps-switchbtn-selected' : ''}`}
     >
       <img src={spriteUrl(sw.species, rules)} alt={label} />
-      <span className="ps-switch-text">
-        <span className="ps-switchbtn-name">
-          {label}
+      {(wasPlayed || engine) && (
+        <span className="ps-tile-flags">
           {wasPlayed && <span className="ps-played-badge" title={PLAYED_TITLE}>played</span>}
           {engine && <span className="ps-engine-badge" title={ENGINE_TITLE}>engine</span>}
         </span>
+      )}
+      <span className="ps-switch-text">
+        <span className="ps-switchbtn-name">{label}</span>
         <span className="ps-hpbar-track ps-switch-hp-track">
           <span className={`ps-hpbar-fill ${hpBarClass(sw.hpPercent)}`} style={{ width: `${sw.hpPercent}%` }} />
         </span>

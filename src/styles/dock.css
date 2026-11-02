@@ -354,8 +354,10 @@
 .ps-target-btn-selected .ps-target-meta { color: #ffffff; }
 
 /* ── The bench (scoped: the lead picker shares the base .ps-switchbtn rules of pickers.css) ── */
-.ps-switch-row { display: flex; flex-wrap: wrap; gap: 6px; }
-.ps-dock .ps-switchbtn { padding: 4px 10px 4px 5px; border-color: rgba(183, 216, 255, 0.18); }
+/* Round 84 (A7b): the played and engine badges stand in the tile's flag row on its top edge (`.ps-tile-flags`, out of the flow), so a
+   badge never changes a bench tile's box; the 10 px between the rows keeps the flags of one row off the tiles of the row above. */
+.ps-switch-row { display: flex; flex-wrap: wrap; gap: 10px 6px; }
+.ps-dock .ps-switchbtn { position: relative; padding: 4px 10px 4px 5px; border-color: rgba(183, 216, 255, 0.18); }
 .ps-dock .ps-switchbtn-selected {
   background: linear-gradient(180deg, #3d6998 0%, #2d5078 100%);
   border-color: rgba(220, 238, 255, 0.75);

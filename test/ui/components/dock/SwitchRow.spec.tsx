@@ -90,3 +90,26 @@ describe('the switch tile label', () => {
     expect(second).not.toHaveTextContent('(');
   });
 });
+
+describe('the badges of a tile (A7b)', () => {
+  // The badge must not change the tile's box: it stands in the flag row on the tile's top edge, never in the name line.
+  test('played and engine stand in the flag row, outside the name line', () => {
+    const { container } = render(row({
+      played: { kind: 'switch', name: 'Heatran', species: 'Heatran' },
+      deferred: { kind: 'switch', speciesId: 'heatran', pokemonName: 'Heatran' },
+    }).ui);
+    const flags = container.querySelector('.ps-switchbtn > .ps-tile-flags');
+    expect(flags).not.toBeNull();
+    expect([...flags!.children].map(badge => badge.textContent)).toEqual(['played', 'engine']);
+    expect(container.querySelector('.ps-switchbtn-name')).toHaveTextContent(/^Heatran$/);
+    expect(container.querySelector('.ps-switchbtn-name .ps-played-badge, .ps-switchbtn-name .ps-engine-badge')).toBeNull();
+  });
+
+  test('a tile without a badge has no flag row, and the name line reads the same with or without', () => {
+    const plain = render(row().ui).container;
+    expect(plain.querySelector('.ps-tile-flags')).toBeNull();
+    const flagged = render(row({ played: { kind: 'switch', name: 'Heatran', species: 'Heatran' } }).ui).container;
+    expect(flagged.querySelector('.ps-switchbtn-name')?.textContent).toBe(plain.querySelector('.ps-switchbtn-name')?.textContent);
+  });
+});
+
