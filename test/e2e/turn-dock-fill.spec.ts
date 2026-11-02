@@ -176,10 +176,35 @@ test('Q19 b, at a replay turn: the first click on the flinched slot\'s chip star
 
   await releaseEval(page);
   await expect(dockChip(page, 'p2b')).toHaveAttribute('data-origin', 'engine', { timeout: 180_000 });
-  // The slot whose tray is open stays empty, whenever the result lands.
+  // The slot whose tray is open stays empty, whenever the result lands; it holds the engine's pick for when the tray closes (A7a, ruling 1a).
   await expect(dockChip(page, 'p2a')).toHaveAttribute('aria-expanded', 'true');
   await expect(dockChip(page, 'p2a')).toHaveAttribute('data-empty', 'true');
-  await expect(dockChip(page, 'p2a')).toContainText('no logged move · choose');
+  await expect(dockChip(page, 'p2a')).toContainText(/engine: .+ · choose/);
+  await expect(dockTray(page).locator('.ps-engine-badge')).toHaveCount(1);
   for (const slot of ['p1a', 'p1b'] as const) await expect(dockChip(page, slot)).toHaveAttribute('data-origin', 'played');
-  expectSameBoxes(await chipBoxes(page, DOUBLES_SLOTS), before, 'after the fill');
+  expectSameBoxes(await chipBoxes(page, DOUBLES_SLOTS), before, 'after the fill, tray open');
+
+  // The tray closes without a pick: the chip takes the engine's pick with the mark "engine", and no box moves.
+  await dockTray(page).getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(dockChip(page, 'p2a')).toHaveAttribute('data-origin', 'engine');
+  await expect(dockChip(page, 'p2a')).not.toHaveAttribute('data-empty', 'true');
+  expectSameBoxes(await chipBoxes(page, DOUBLES_SLOTS), before, 'after the fill, tray closed');
+});
+
+test("at the tip the engine's pick for the open slot waits in the tray, and Execute with the tray open takes it", async ({ page }) => {
+  test.setTimeout(300_000);
+  await reachHeldTip(page);
+  // P2A's tray opens while the engine is out; the result lands under it.
+  await openTray(page, 'p2a');
+  await releaseEval(page);
+  await expect(dockChip(page, 'p2a')).toContainText(/engine: .+ · choose/, { timeout: 180_000 });
+  await expect(dockTray(page).locator('.ps-engine-badge')).toHaveCount(1);
+  for (const slot of ['p1a', 'p1b', 'p2b'] as const) await expect(dockChip(page, slot)).not.toHaveAttribute('data-empty', 'true', { timeout: 30_000 });
+  // Execute with the tray open counts the engine's pick as chosen, closes the tray and runs the turn.
+  const execute = page.locator('.ps-execute-btn');
+  await expect(execute).toHaveText('Execute Turn');
+  await expect(execute).toBeEnabled();
+  await execute.click();
+  await expect(dockTray(page)).toHaveCount(0);
+  await expect(variationPanel(page)).toContainText('Turn 2', { timeout: 90_000 });
 });
