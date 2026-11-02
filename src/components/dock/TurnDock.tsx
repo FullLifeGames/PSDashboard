@@ -5,6 +5,7 @@ import type { PlayedAtPosition } from '../../lib/played-pick';
 import type { SeedChoices, SideChoices } from '../../lib/dock-seed';
 import { useDockPreview } from '../../hooks/useDockPreview';
 import { useDiceViews } from '../../hooks/useDiceView';
+import { useDockHeight } from '../../hooks/useDockHeight';
 import type { DockFillView } from '../../hooks/useDockFill';
 import { useTrayState, type TrayOpen } from '../../hooks/useTrayState';
 import { buildDockModel, type Side } from './dock-model';
@@ -67,6 +68,15 @@ function useHeldTray(fill: DockFillView | null | undefined, open: TrayOpen | nul
   }, [holdTray, side, slot]);
 }
 
+/** One callback ref for the dock's element: the tray state finds its chips through it, and the page learns the dock's height (narrow windows). */
+function useDockElement(attachRoot: (element: HTMLElement | null) => void) {
+  const reportHeight = useDockHeight();
+  return useCallback((element: HTMLDivElement | null) => {
+    attachRoot(element);
+    reportHeight(element);
+  }, [attachRoot, reportHeight]);
+}
+
 /** Execute: locked until every slot holds a choice, except while the engine's fill is pending: then a press queues behind it. */
 function DockExecute({ model, fill, executing, onRun, onClose }: {
   model: ReturnType<typeof buildDockModel>;
@@ -106,14 +116,15 @@ export function TurnDock(props: TurnDockProps) {
   const { slots, gimmickFor, damageBySide } = useDockPreview(simState, gen, positionKey, getBattle, onEdit);
   const { open, attachRoot, close, toggleChip, toggleMore, onKeyDown } = useTrayState(positionKey);
   useHeldTray(fill, open);
+  const attachDock = useDockElement(attachRoot);
   const diceViews = useDiceViews({ diceOpen: open?.more ?? false, stale, simState, getBattle, replayLog, onSetChoice: setChoice });
   if (!simState) return null;
-  if (simState.ended) return <div className="ps-dock"><EndedNotice winner={simState.winner} /></div>;
+  if (simState.ended) return <div className="ps-dock" ref={attachDock}><EndedNotice winner={simState.winner} /></div>;
 
   const model = buildDockModel({ simState, slots, damageBySide, gimmickFor, played, seed, fill });
   const openSlot = open ? model[open.side][open.slot] : undefined;
   return (
-    <div className="ps-dock" ref={attachRoot} onKeyDown={onKeyDown} inert={stale} aria-busy={stale || undefined}>
+    <div className="ps-dock" ref={attachDock} onKeyDown={onKeyDown} inert={stale} aria-busy={stale || undefined}>
       <DockStatus source={source} acquiringExact={acquiringExact} executeError={executeError} model={model} diceOpen={!!open?.more} />
       <div className="ps-dock-anchor">
         {open && openSlot && (

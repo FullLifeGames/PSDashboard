@@ -1,7 +1,7 @@
 /* The turn dock (components/dock/): the chips at the foot of the replay column, the tray above them, the move tiles with their hit bars, the bench, and Execute.
    Round 84, style 5 of the design gate (01.11.2026): the shell of the app's own buttons (.ps-btn) on dark, the type as a 4 px edge and a tag,
    the selection in a darker .ps-btn blue (white and the tile's light texts read at 4.5 : 1 on it), the open chip in --ps-accent-warm, Execute in the .ps-btn-red gradient. The colors of the move tile's texts are
-   the tokens of pickers.css (test/regression/move-tile-contrast.spec.ts). The rules for narrow windows (1050 px and 640 px) wait for step A6. */
+   the tokens of pickers.css (test/regression/move-tile-contrast.spec.ts). The narrow windows (1050 px and 640 px) close the file. */
 
 /* ── The dock ── */
 .ps-dock {
@@ -354,3 +354,38 @@
 
 /* The Raw Protocol Log toggle sits directly above the dock; its margin pushes both to the foot of a short column. */
 .ps-dock-log { margin-top: auto; }
+
+/* ── Narrow windows (round 84, A6b) ──
+   At 1050 px the layout stacks (layout.css): the dock stands fixed at the viewport's lower edge across the full width, so the chips
+   stay in reach while the page scrolls. useDockHeight writes the dock's height as --ps-dock-h on the root element; the page pads by
+   it and the tray, a sheet of up to 70 % of the viewport, stands on top of the dock. Execute takes its own row under the chips. */
+@media (max-width: 1050px) {
+  .ps-app-root { padding-bottom: calc(16px + var(--ps-dock-h, 0px)); }
+  .ps-dock {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+  }
+  .ps-tray {
+    position: fixed;
+    bottom: var(--ps-dock-h, 168px);
+    max-height: 70vh;
+  }
+  .ps-tray.ps-tray-roomy { max-height: 70vh; }
+  .ps-dock-bar { grid-template-columns: minmax(0, 1fr); }
+  .ps-dock .ps-execute-btn {
+    width: 100%;
+    max-width: none;
+    min-height: 36px;
+    padding: 8px 18px;
+  }
+}
+
+/* At 640 px the chips stay two per row; they take the app's 640 px control sizes (layout.css gives its buttons 40 px). */
+@media (max-width: 640px) {
+  .ps-dock-chip { min-height: 40px; }
+  .ps-dock .ps-execute-btn { min-height: 40px; }
+  .ps-tray { width: 100%; }
+}
