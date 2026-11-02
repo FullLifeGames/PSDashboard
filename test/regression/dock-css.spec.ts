@@ -104,3 +104,30 @@ describe('the tray\'s tiles at 640 px and below', () => {
     expect(css).toMatch(/\.ps-tile-grid\s*\{[^}]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/);
   });
 });
+
+describe('the dock above 1050 px: the label of Execute never moves a chip', () => {
+  // Round 84 (turn dock, A6d): the Execute column was `auto`, so the label ("Select all active choices", "Waits for engine…",
+  // "Execute Turn") sized it and the chip columns beside it changed width by a few pixels (P1A: 4.3 px in the Q19 b scene).
+  // The column is a fixed width that fits every label; the button fills it and wraps a long label.
+  const base = css.slice(0, css.indexOf('@media (max-width: 1050px)'));
+
+  test('the chips share the bar with a column of fixed width', () => {
+    const bar = rule(base, '.ps-dock-bar');
+    expect(bar, 'a .ps-dock-bar rule').not.toBeNull();
+    const columns = /grid-template-columns:\s*minmax\(0,\s*1fr\)\s+(\S+)\s*;/.exec(bar ?? '');
+    expect(columns, 'the bar has the chips and one more column').not.toBeNull();
+    expect(columns![1]).toBe('150px');
+  });
+
+  test('Execute fills its column whatever it reads, so its content never sizes the column', () => {
+    const execute = rule(base, '.ps-dock .ps-execute-btn');
+    expect(execute, 'a rule for Execute').not.toBeNull();
+    expect(execute).toMatch(/width:\s*100%/);
+    expect(execute).toMatch(/min-width:\s*0/);
+    expect(execute).toMatch(/max-width:\s*none/);
+  });
+
+  test('the rows keep one height whatever the chips and Execute read', () => {
+    expect(rule(base, '.ps-dock-rows') ?? '').toMatch(/grid-auto-rows:\s*46px/);
+  });
+});
