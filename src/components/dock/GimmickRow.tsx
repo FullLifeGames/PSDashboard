@@ -28,8 +28,8 @@ function ModifierToggle({ label, kind, gimmick }: { label: string; kind: BranchM
 }
 
 /**
- * Round 84 (turn dock): the gimmick toggles of a slot, moved out of FightSection.tsx. In the dock's tray header a toggle edits
- * the slot's pending move (`gimmick.toggle`, wired through `edit`); the old panel's toggle still arms the next pick.
+ * Round 84 (turn dock): the gimmick toggles of a slot, in the dock's tray header. A toggle edits the slot's pending move
+ * (`gimmick.toggle`, wired through `edit`); a slot with no move pick arms the next pick instead.
  */
 export function ModifierRow({ label, modifiers, gimmick }: { label: string; modifiers: BranchSlotModifiers; gimmick: Gimmick }) {
   return (

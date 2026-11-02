@@ -4,7 +4,7 @@ import type { StepDamage } from '../../lib/branch-rolls';
 import { RollSelect } from './RollSelect';
 
 /**
- * Round 82 (forced dice), step A7a: the chips of Advanced. A chip is one result of one die; a click forces it, a second click
+ * Round 82 (forced dice), step A7a: the chips of a slot's dice. A chip is one result of one die; a click forces it, a second click
  * on the same chip gives the die back to the seed. A chip carries no chance (decision 14a): the result line after Execute names
  * the chance the simulator used. A die the simulator draws for a rule the panel cannot see in advance stays set and shows up
  * in the list below the chips, so the user can always clear what the turn will force.
@@ -139,7 +139,7 @@ export interface TurnDiceProps {
 
 const END = 'end-of-turn';
 
-/** Shown in Advanced where the position is only approximated: the offers need the simulator's battle, which the exact position brings (round 82, step A7b). */
+/** Shown in the tray's dice section where the position is only approximated: the offers need the simulator's battle, which the exact position brings (round 82, step A7b). */
 export const DICE_WAIT_NOTE = 'Dice need the exact position. They appear once it is ready.';
 
 const SHARED_ROLL_NOTE = 'The game draws this die once per turn for every holder on the field, so a chip here applies to all of them.';

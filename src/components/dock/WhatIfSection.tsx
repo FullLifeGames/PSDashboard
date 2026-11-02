@@ -5,8 +5,8 @@ import { ComboBox } from '../ComboBox';
 import { displayName } from '../../lib/branch-history';
 
 /**
- * Round 84 (turn dock): "All choices" and "What if it had…", moved out of FightSection.tsx and not restyled. The dock's tray
- * shows them under "Dice · What if"; the old panel's Advanced view still renders the same parts.
+ * Round 84 (turn dock): "All choices" and "What if it had…", not restyled since the old panel. The dock's tray shows them
+ * under "Dice · What if".
  */
 
 export interface WhatIfState {

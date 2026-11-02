@@ -1,8 +1,8 @@
 import type { BranchMoveOption, DamageResult } from '@fulllifegames/eval-engine';
 
 /**
- * Round 84 (turn dock): the texts a move tile and its tooltip read from the calc's verdict, one module for the old panel's
- * buttons and the dock's tiles.
+ * Round 84 (turn dock): the texts a move tile and its tooltip read from the calc's verdict, one module for the dock's tiles and
+ * their tooltips.
  */
 
 export const ppTextFor = (move: BranchMoveOption): string => (move.maxpp > 0 ? `${move.pp}/${move.maxpp}` : '—');

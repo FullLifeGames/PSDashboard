@@ -6,8 +6,8 @@ import { wordsOf } from '../lib/branch-dice';
 
 /**
  * Round 82 (forced dice), step A7a: the dice the engine offers for the position the panel shows. The engine's offers read the live
- * battle on copies, so they exist only where the panel has the branch's battle (the live tip) and only in Advanced, where the chips
- * show. The answer lands after the lazy chunk loads, like the damage preview; `null` means the panel is still asking.
+ * battle on copies, so they exist only where the panel has the branch's battle (the live tip) and only while a tray shows the dice
+ * ("Dice · What if" open). The answer lands after the lazy chunk loads, like the damage preview; `null` means the panel is still asking.
  */
 
 type Battle = LiveHit['battle'];

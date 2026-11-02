@@ -5,9 +5,9 @@ import { EMPTY_MOVES, EMPTY_SWITCHES } from '../lib/dock-panel';
 import { useGimmickToggles, type PendingEdit } from './useSideControlsState';
 
 /**
- * Round 84 (turn dock): the slot views, the gimmick toggles and the damage preview of a position, moved out of BranchPanel.tsx.
- * The toggles live here, not per slot: the preview reads both sides' Tera (T20). With `onEdit` (the dock) a toggle edits the
- * slot's pending move; without it (the old panel) a toggle arms the slot's next pick.
+ * Round 84 (turn dock): the slot views, the gimmick toggles and the damage preview of a position, as the old BranchPanel read them.
+ * The toggles live here, not per slot: the preview reads both sides' Tera (T20). With `onEdit` a toggle edits the slot's
+ * pending move; without it a toggle arms the slot's next pick.
  */
 
 type Side = 'p1' | 'p2';

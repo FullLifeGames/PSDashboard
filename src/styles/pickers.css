@@ -1,4 +1,4 @@
-/* Pickers: the branch panel with its side controls, move, switch, and target pickers, gimmick toggles, execute row, choice errors, and the raw protocol log (BranchPanel, LeadPanel, components/branch/). */
+/* Pickers: the parts the turn dock, the turn 0 lead picker (LeadPanel) and the dice chips (components/branch/) share: HP bars, badges, switch chips, the Execute button, gimmick toggles, the choice picker, dice chips, choice errors, and the raw protocol log. The dock's own rules are in dock.css. */
 
 /* Round 83 (the user's design gate of 01.11.2026): the colors of the move tiles, the badges and the switch chips. A move tile gets
    its type colors as --type, --type-on, --tint, --tint-low and --tint-edge (typeTileVars in src/lib/type-colors.ts);
@@ -39,7 +39,7 @@
 .ps-hpbar-red { background: linear-gradient(180deg, #f02020 0%, #c00000 100%); }
 
 /* "played" marker on the move/switch actually taken at the viewed position; round 82: "forced" marks a move that carries forced
-   dice in Basic. Round 83: a filled label in plain 9px type reads sharp on every tile (the outlined 8px capitals looked soft). */
+   dice (a flag on the dock's tile). Round 83: a filled label in plain 9px type reads sharp on every tile (the outlined 8px capitals looked soft). */
 .ps-played-badge,
 .ps-forced-badge {
   display: inline-block;
@@ -90,13 +90,6 @@
   text-transform: uppercase;
 }
 
-.ps-pending-choice {
-  color: #8fd19e;
-  font-family: 'Consolas', 'Courier New', monospace;
-  font-size: 10px;
-  margin-left: auto;
-}
-
 .ps-force-switch-note {
   background: rgba(240,199,107,0.11);
   border: 1px solid rgba(240,199,107,0.28);
@@ -108,57 +101,6 @@
   padding: 6px 8px;
 }
 
-.ps-tab-row {
-  display: flex;
-  gap: 5px;
-  margin-bottom: 7px;
-}
-
-/* Move buttons 2x2 grid */
-.ps-movegrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(120px, 1fr));
-  gap: 6px;
-}
-/*
- * Round 83: the tiles of one grid row share their height, and the target buttons of the row line up below them. A cell spans two
- * rows of the grid (its tile, its target buttons); the space between two rows of tiles moves from the gap onto the cells.
- */
-.ps-movegrid:not(.ps-movegrid-compact) { row-gap: 0; }
-.ps-movegrid:not(.ps-movegrid-compact) > .ps-movecell { display: grid; grid-row: span 2; grid-template-rows: subgrid; }
-.ps-movegrid:not(.ps-movegrid-compact) > .ps-movecell:nth-child(n+3) { margin-top: 6px; }
-
-.ps-movebtn-info { display: flex; justify-content: space-between; align-items: center; margin-top: 2px; }
-.ps-movebtn-type {
-  font-size: 9px;
-  font-weight: bold;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  background: var(--type, transparent);
-  color: var(--type-on, inherit);
-  border-radius: 3px;
-  padding: 0 5px;
-}
-.ps-movebtn-dmg { font-size: 9px; margin-top: 2px; color: var(--ps-tile-dmg); }
-/* Round 83: one target's damage stays on one line, so the tiles of a row keep one height; the tooltip holds the whole sentence. */
-.ps-movebtn-dmg-one { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ps-movebtn-ko { font-weight: bold; color: var(--ps-tile-ko); }
-
-/* Basic view: small action chips instead of the 2x2 detail grid. */
-.ps-movegrid-compact {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-.ps-movebtn-compact {
-  width: auto;
-  min-height: 0;
-  flex-direction: row;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 8px;
-}
-.ps-movebtn-compact .ps-movebtn-name { font-size: 11px; }
 /* Switch buttons */
 .ps-switchgrid {
   display: grid;
@@ -190,7 +132,7 @@
 .ps-switchbtn-name { font-size: 11px; font-weight: bold; }
 .ps-switchbtn-hp { font-size: 9px; color: var(--ps-switch-sub); }
 
-/* Basic view: switch chips share the row with the move chips. */
+/* T0 lead picker: the lead chips in a wrapping row. */
 .ps-switchgrid-compact {
   display: flex;
   flex-wrap: wrap;
@@ -200,22 +142,6 @@
 .ps-switchbtn-compact { padding: 2px 8px; gap: 4px; }
 .ps-switchbtn-compact img { width: 20px; height: 20px; }
 .ps-switchbtn-compact .ps-switchbtn-name { font-size: 10px; }
-
-/* Tab buttons */
-.ps-controls-tab {
-  background: rgba(255,255,255,0.09);
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 999px;
-  padding: 6px 16px;
-  color: #ddd;
-  cursor: pointer;
-  font-size: 11px;
-  font-weight: bold;
-  font-family: inherit;
-  transition: background 0.15s;
-}
-.ps-controls-tab:hover { background: rgba(255,255,255,0.15); }
-.ps-controls-tab-active { background: linear-gradient(180deg, #7cb7e8 0%, #517fae 100%); color: #fff; }
 
 /* T0 lead picker: doubles slot marker on a selected lead chip (a/b). */
 .ps-lead-slot {
@@ -337,14 +263,6 @@
   color: var(--ps-tile-ko);
 }
 
-/* Per-target ranges for untargeted (spread) moves in doubles */
-.ps-movebtn-spread-target {
-  display: inline-block;
-  margin-right: 6px;
-  white-space: nowrap;
-}
-.ps-movebtn-spread-target:last-child { margin-right: 0; }
-
 /* Rejected choice / failed execute feedback */
 .ps-choice-error {
   background: rgba(224,102,112,0.12);
@@ -415,26 +333,6 @@
   background: linear-gradient(180deg, transparent, rgba(255,255,255,0.2), transparent);
 }
 
-/* Round 83 (the user, 01.11.2026): the branch panel's two sides share one row grid, a row for the waiting note and one per
-   slot, so P1A stands beside P2A and P1B beside P2B at one height. Each side column lays its slots into the panel's rows
-   (subgrid); --ps-slot-rows is the larger side's slot count. A browser without subgrid keeps each column's own rows. */
-.ps-slot-rows {
-  grid-template-rows: auto repeat(var(--ps-slot-rows, 1), auto);
-}
-.ps-slot-rows > .ps-branch-side-column {
-  display: grid;
-  grid-row: 1 / -1;
-  grid-template-rows: subgrid;
-}
-.ps-slot-rows > .ps-side-divider { grid-row: 1 / -1; }
-.ps-side-note { grid-row: 1; }
-.ps-side-slot {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-.ps-side-slot > .ps-side-controls { flex: 1; }
-
 .ps-log-toggle {
   background: none;
   border: none;
@@ -473,23 +371,12 @@
     height: 1px;
     background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
   }
-  /* Stacked sides: each column keeps its own slots again, one side after the other. */
-  .ps-slot-rows { grid-template-rows: none; }
-  .ps-slot-rows > .ps-branch-side-column {
-    display: flex;
-    grid-row: auto;
-    grid-template-rows: none;
-  }
-  .ps-slot-rows > .ps-side-divider { grid-row: auto; }
 }
 
 @media (max-width: 640px) {
-  .ps-movegrid,
   .ps-switchgrid {
     grid-template-columns: 1fr;
   }
-  /* one tile per row: the second tile starts the second row */
-  .ps-movegrid:not(.ps-movegrid-compact) > .ps-movecell:nth-child(2) { margin-top: 6px; }
   .ps-custom-choice {
     flex-direction: column;
   }

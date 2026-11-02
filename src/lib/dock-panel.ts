@@ -6,7 +6,7 @@ import {
 import type { PlayedPick } from './played-pick';
 
 /**
- * Round 84 (turn dock): what a position asks of the two sides, read by the old panel and by the dock. Moved out of
+ * Round 84 (turn dock): what a position asks of the two sides, read by the dock. The rules come from the old
  * BranchPanel.tsx unchanged; one rule lives here.
  */
 
