@@ -1,16 +1,17 @@
 /**
  * Round 84 (turn dock), lane A: the parts of the bar under a target. It shows the target's HP and what one hit does to it, in
- * percent of its maximum HP and from the left: `solid` is what surely stays (after the highest damage roll), `striped` what the
- * roll decides, `ghost` what even the lowest roll takes, `lost` what the target has lost already. The four add up to 100.
+ * percent of its maximum HP and from the left: `rest` is what surely stays (after the highest damage roll, drawn grey), `roll`
+ * what the roll decides (striped), `sure` what even the lowest roll takes, `lost` what the target has lost already. The four
+ * add up to 100. Variant F (A7b): the roll's part and the sure part take one colour, `tone`.
  */
 export type HpTone = 'green' | 'yellow' | 'red';
 
 export interface HitBarSegments {
-  solid: number;
-  striped: number;
-  ghost: number;
+  rest: number;
+  roll: number;
+  sure: number;
   lost: number;
-  /** The colour of the solid and striped parts: the HP left after the highest roll. */
+  /** The colour of the roll's and the sure part: the share of the target's present HP that the lowest roll takes. */
   tone: HpTone;
 }
 
@@ -28,11 +29,14 @@ export function hpBarClass(percent: number): string {
   return `ps-hpbar-${hpTone(percent)}`;
 }
 
-/** The segments for a target at `hpPercent` hit for `minPercent` to `maxPercent` of its maximum HP. */
+/**
+ * The segments for a target at `hpPercent` hit for `minPercent` to `maxPercent` of its maximum HP. The tone reads the lowest
+ * roll against the HP the target has now, so a sure knock out is always green (the thresholds of `hpTone`).
+ */
 export function hitBarSegments(hpPercent: number, minPercent: number, maxPercent: number): HitBarSegments {
   const hp = clamp(hpPercent, 100);
   const lowest = clamp(minPercent, hp);
   const highest = Math.max(clamp(maxPercent, hp), lowest);
-  const solid = hp - highest;
-  return { solid, striped: highest - lowest, ghost: lowest, lost: 100 - hp, tone: hpTone(solid) };
+  const share = hp > 0 ? (lowest / hp) * 100 : 0;
+  return { rest: hp - highest, roll: highest - lowest, sure: lowest, lost: 100 - hp, tone: hpTone(share) };
 }

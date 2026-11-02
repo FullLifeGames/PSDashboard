@@ -200,3 +200,24 @@ describe("the dock follows the column's content (ruling 4a)", () => {
     expect(bar).toMatch(/border-radius:\s*10px 10px 0 0/);
   });
 });
+
+describe('the hit bar (variant F, A7b)', () => {
+  const grey = 'rgba(255, 255, 255, 0.24)';
+
+  test('what stays is grey, the roll and the lowest roll take the hit\'s tone', () => {
+    expect(rule(css, '.ps-hitbar-rest')).toContain(grey);
+    expect(rule(css, '.ps-hitbar-sure')).toMatch(/#00e800/);
+    expect(rule(css, '.ps-hitbar-roll')).toMatch(/#00d000/);
+    for (const [tone, solid, striped] of [['yellow', '#f0d000', '#e0c000'], ['red', '#f02020', '#e02020']]) {
+      expect(rule(css, `.ps-hitbar[data-tone="${tone}"] .ps-hitbar-sure`)).toContain(solid);
+      expect(rule(css, `.ps-hitbar[data-tone="${tone}"] .ps-hitbar-roll`)).toContain(striped);
+    }
+  });
+
+  test('the legend has a grey swatch and three tones for each of the two colored parts', () => {
+    expect(rule(css, '.ps-legend-rest')).toContain(grey);
+    for (const part of ['sure', 'roll']) {
+      for (const tone of ['green', 'yellow', 'red']) expect(rule(css, `.ps-legend-${part}-${tone}`), `${part} ${tone}`).not.toBeNull();
+    }
+  });
+});

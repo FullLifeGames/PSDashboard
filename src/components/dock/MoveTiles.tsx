@@ -4,19 +4,9 @@ import { moveChoiceFor, type ChoiceContext } from '../branch/choice-context';
 import { tileBars, tileTarget } from '../../lib/dock-tile';
 import { fullMoveTitle, shownType } from '../../lib/move-damage-text';
 import type { DockSlotModel } from './dock-model';
+import { BarLegend } from './BarLegend';
 import { MoveTile } from './MoveTile';
 import { TargetRow } from './TargetRow';
-
-/** The line under the tiles that says what the bars mean. */
-function BarLegend() {
-  return (
-    <div className="ps-tile-legend">
-      <span><i className="ps-legend-swatch ps-legend-solid" />HP left after the highest roll</span>
-      <span><i className="ps-legend-swatch ps-legend-striped" />the roll decides</span>
-      <span><i className="ps-legend-swatch ps-legend-ghost" />HP even the lowest roll takes</span>
-    </div>
-  );
-}
 
 /**
  * Round 84 (turn dock): the move tiles of an open tray, the targets of the pending move below them, and the legend of the bars.

@@ -276,7 +276,7 @@
 .ps-tile-bar-ko { color: var(--ps-tile-ko); font-weight: bold; }
 .ps-tile-none { color: var(--ps-tile-sub); font-size: 10px; }
 
-/* ── Hit bars: solid stays, striped is the roll's, light is taken by even the lowest roll ── */
+/* ── Hit bars (variant F): grey stays, the roll's striped part and the lowest roll's part take the hit's tone ── */
 .ps-hitbar {
   display: flex;
   box-sizing: border-box;
@@ -288,26 +288,31 @@
   border-radius: 3px;
 }
 .ps-hitbar i { display: block; flex: 0 0 auto; height: 100%; }
-.ps-hitbar-solid { background: linear-gradient(180deg, #00e800 0%, #00c000 100%); }
-.ps-hitbar-striped { background: repeating-linear-gradient(135deg, #00d000 0 2px, rgba(0, 208, 0, 0.3) 2px 4px); }
-.ps-hitbar[data-tone="yellow"] .ps-hitbar-solid { background: linear-gradient(180deg, #f0d000 0%, #c8a800 100%); }
-.ps-hitbar[data-tone="yellow"] .ps-hitbar-striped { background: repeating-linear-gradient(135deg, #e0c000 0 2px, rgba(224, 192, 0, 0.3) 2px 4px); }
-.ps-hitbar[data-tone="red"] .ps-hitbar-solid { background: linear-gradient(180deg, #f02020 0%, #c00000 100%); }
-.ps-hitbar[data-tone="red"] .ps-hitbar-striped { background: repeating-linear-gradient(135deg, #e02020 0 2px, rgba(224, 32, 32, 0.3) 2px 4px); }
-.ps-hitbar-ghost { background: rgba(255, 255, 255, 0.24); }
+.ps-hitbar-rest { background: rgba(255, 255, 255, 0.24); }
+.ps-hitbar-sure { background: linear-gradient(180deg, #00e800 0%, #00c000 100%); }
+.ps-hitbar-roll { background: repeating-linear-gradient(135deg, #00d000 0 2px, rgba(0, 208, 0, 0.3) 2px 4px); }
+.ps-hitbar[data-tone="yellow"] .ps-hitbar-sure { background: linear-gradient(180deg, #f0d000 0%, #c8a800 100%); }
+.ps-hitbar[data-tone="yellow"] .ps-hitbar-roll { background: repeating-linear-gradient(135deg, #e0c000 0 2px, rgba(224, 192, 0, 0.3) 2px 4px); }
+.ps-hitbar[data-tone="red"] .ps-hitbar-sure { background: linear-gradient(180deg, #f02020 0%, #c00000 100%); }
+.ps-hitbar[data-tone="red"] .ps-hitbar-roll { background: repeating-linear-gradient(135deg, #e02020 0 2px, rgba(224, 32, 32, 0.3) 2px 4px); }
 .ps-tile-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; color: var(--ps-switch-sub); font-size: 10px; }
 .ps-legend-swatch {
   display: inline-block;
   width: 16px;
   height: 7px;
-  margin-right: 4px;
+  margin-right: 2px;
   border: 1px solid rgba(0, 0, 0, 0.5);
   border-radius: 2px;
   vertical-align: -1px;
 }
-.ps-legend-solid { background: linear-gradient(180deg, #00e800 0%, #00c000 100%); }
-.ps-legend-striped { background: repeating-linear-gradient(135deg, #00d000 0 2px, rgba(0, 208, 0, 0.3) 2px 4px); }
-.ps-legend-ghost { background: rgba(255, 255, 255, 0.24); }
+.ps-legend-swatch:last-of-type { margin-right: 4px; }
+.ps-legend-rest { background: rgba(255, 255, 255, 0.24); }
+.ps-legend-sure-green { background: linear-gradient(180deg, #00e800 0%, #00c000 100%); }
+.ps-legend-sure-yellow { background: linear-gradient(180deg, #f0d000 0%, #c8a800 100%); }
+.ps-legend-sure-red { background: linear-gradient(180deg, #f02020 0%, #c00000 100%); }
+.ps-legend-roll-green { background: repeating-linear-gradient(135deg, #00d000 0 2px, rgba(0, 208, 0, 0.3) 2px 4px); }
+.ps-legend-roll-yellow { background: repeating-linear-gradient(135deg, #e0c000 0 2px, rgba(224, 192, 0, 0.3) 2px 4px); }
+.ps-legend-roll-red { background: repeating-linear-gradient(135deg, #e02020 0 2px, rgba(224, 32, 32, 0.3) 2px 4px); }
 
 /* ── Targets ── */
 .ps-target-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px; }
