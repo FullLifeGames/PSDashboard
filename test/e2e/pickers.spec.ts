@@ -1,32 +1,39 @@
 import { test, expect } from '@playwright/test';
-import { fromSetup, installReplayEmbedCache, routeOfflineFixtures, startVariationAt, waitForExactPickers } from './helpers';
+import {
+  dockChip, dockTray, fromSetup, installReplayEmbedCache, openTray, openTrayMore, pickMove, routeOfflineFixtures, startVariationAt, waitForExactPickers,
+} from './helpers';
 
 test.beforeAll(installReplayEmbedCache);
 
+// Round 84 (turn dock): the pickers are the dock's chips and trays. A chip opens its slot's tray (move tiles, the targets of the
+// pending move, bench tiles); the dice, the What-if loader and all choices sit behind the tray's "Dice · What if".
 test.describe('PS Dashboard', () => {
   test.beforeEach(async ({ page }) => {
     await routeOfflineFixtures(page);
     await page.goto('/');
   });
 
-  test('the loaded replay shows P1 and P2 move controls without any mode switch', async ({ page }) => {
+  test('the loaded replay shows P1 and P2 chips whose trays list moves and switches', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
 
     // Round 80 (T297): the pickers themselves carry the load wait. The Battle Statistics panel shows its "P1" first, and
     // under the full suite the pickers came more than five seconds after it.
-    const columns = page.locator('.ps-branch-side-column');
-    await expect(columns.first().locator('.ps-movebtn').first()).toBeVisible({ timeout: 15000 });
-    await expect(columns.first()).toContainText('P1');
-    await expect(columns.nth(1)).toContainText('P2');
-    // The basic view lists moves AND switches as compact chips — no tabs.
-    await expect(columns.first().locator('.ps-switchbtn').first()).toBeVisible();
+    const chips = page.locator('.ps-dock-chip');
+    await expect(chips.first()).toBeVisible({ timeout: 15000 });
+    await expect(chips.first()).toContainText('P1');
+    await expect(chips.nth(1)).toContainText('P2');
+    // One tray lists the slot's moves AND its switches, no tabs.
+    const tray = await openTray(page, 'p1a');
+    await expect(tray.locator('.ps-movebtn').first()).toBeVisible();
+    await expect(tray.locator('.ps-switchbtn').first()).toBeVisible();
   });
 
-  test('always-on pickers show move buttons with type info', async ({ page }) => {
+  test('the move tiles show type and damage', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
-    await expect(page.locator('.ps-movebtn').first()).toBeVisible({ timeout: 15000 });
-    // Type and damage details live in the Advanced (full) picker.
-    await page.locator('button', { hasText: 'Advanced' }).click();
+    await expect(dockChip(page, 'p1a')).toBeVisible({ timeout: 15000 });
+    const tray = await openTray(page, 'p1a');
+    const earthquake = tray.locator('.ps-movebtn', { hasText: 'Earthquake' });
+    await expect(earthquake.locator('.ps-type-tag')).toHaveText('Ground');
     // Range history: shifted when spread inference started overlaying
     // damage-consistent EVs (51–60.9%), then again when the goodness-of-fit
     // forfeit rejected this synthetic log's hand-authored damage numbers —
@@ -34,36 +41,37 @@ test.describe('PS Dashboard', () => {
     // Garchomp) falls back to the species default and Earthquake hits real.
     // The snapshot picker feeds the same guessed sets (nature/EV spread)
     // into the same calc, so the pinned range carries over unchanged.
-    await expect(page.locator('.ps-movebtn', { hasText: 'Earthquake' })).toContainText('69.8% - 82.2%', { timeout: 10000 });
+    // Round 84 (turn dock): the tile's bar shows the whole-percent range; the exact range sits in the tile's tooltip.
+    await expect(earthquake).toHaveAttribute('title', /69\.8% - 82\.2%/, { timeout: 10000 });
   });
 
-  test('always-on pickers can pick moves without Smogon stats', async ({ page }) => {
+  test('the dock picks moves without Smogon stats', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
+    await expect(dockChip(page, 'p1a')).toBeVisible({ timeout: 15000 });
 
-    const firstMove = page.locator('.ps-movebtn').first();
-    await expect(firstMove).toBeVisible({ timeout: 15000 });
-    await firstMove.click();
-
-    // Pending chips read as notation: the bare move name, no raw command.
-    await expect(page.locator('.ps-pending-choice').first()).toBeVisible({ timeout: 5000 });
+    // The chip reads the pick as notation: the bare move name, no raw command (pickMove waits for the name on the chip).
+    await pickMove(page, 'p1a');
+    await expect(dockChip(page, 'p1a')).not.toHaveAttribute('data-empty', 'true');
   });
 
-  test('always-on pickers accept custom move choices', async ({ page }) => {
+  test('the dock accepts custom move choices from the tray\'s choice picker', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
+    await expect(dockChip(page, 'p1a')).toBeVisible({ timeout: 15000 });
 
-    // The free-choice dropdown lives in the Advanced row.
-    await page.locator('button', { hasText: 'Advanced' }).click();
-    const pickers = page.locator('select[aria-label^="Choice picker"]');
-    await expect(pickers.first()).toBeVisible({ timeout: 15000 });
-    await pickers.first().selectOption({ index: 1 });
+    // The free-choice dropdown lives behind "Dice · What if".
+    const tray = await openTrayMore(page, 'p1a');
+    const picker = tray.locator('select[aria-label^="Choice picker"]');
+    await expect(picker).toBeVisible({ timeout: 15000 });
+    await picker.selectOption({ index: 1 });
 
-    // Pending chips show the move identity as notation (B1).
-    await expect(page.locator('.ps-pending-choice').first()).toBeVisible({ timeout: 5000 });
+    // The chip shows the pick as the user's own (no "played" mark) in notation (B1).
+    await expect(dockChip(page, 'p1a')).not.toHaveAttribute('data-empty', 'true');
+    await expect(dockChip(page, 'p1a')).not.toHaveAttribute('data-origin', 'played');
   });
 
   test('saving player edits refreshes the pickers and exposes EV controls', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
-    await expect(page.locator('.ps-movebtn').first()).toBeVisible({ timeout: 15000 });
+    await expect(dockChip(page, 'p1a')).toBeVisible({ timeout: 15000 });
 
     await fromSetup(page, 'Edit Player');
     const editor = page.getByRole('dialog', { name: 'Edit Player Team' });
@@ -82,7 +90,11 @@ test.describe('PS Dashboard', () => {
     await garchompCard.getByPlaceholder('Add move...').press('Enter');
     await editor.locator('button', { hasText: /^Save$/ }).click();
 
-    await expect(page.locator('.ps-branch-side-column').first()).toContainText('Dragon Claw', { timeout: 15000 });
+    // The rebuilt picker may close an open tray: open it again until it lists the new move.
+    await expect(async () => {
+      const tray = await openTray(page, 'p1a', { timeout: 3000 });
+      await expect(tray).toContainText('Dragon Claw', { timeout: 3000 });
+    }).toPass({ timeout: 15000 });
     await expect(page.locator('.ps-main-right')).toContainText('252 HP / 252 Atk / 4 Spe EVs');
 
     await fromSetup(page, 'Edit Player');
@@ -92,15 +104,13 @@ test.describe('PS Dashboard', () => {
 
   test('saving player edits mid-branch preserves branch progress and pending choices', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
-    const p1Controls = page.locator('.ps-branch-side-column').first();
-    const p2Controls = page.locator('.ps-branch-side-column').nth(1);
     await startVariationAt(page, 1, { p1Move: 'Swords Dance' });
     await expect(page.getByText(/Branching · Turn 2/)).toBeVisible({ timeout: 15000 });
     await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 1');
 
-    await p2Controls.locator('.ps-movebtn').first().click();
-    // Pending chips show the move identity instead of the grid slot (B1).
-    await expect(p2Controls.locator('.ps-pending-choice')).toBeVisible();
+    // The chip shows the pending pick (pickMove waits for the name on the chip).
+    const p2Move = await pickMove(page, 'p2a');
+    await expect(dockChip(page, 'p2a')).not.toHaveAttribute('data-empty', 'true');
 
     await fromSetup(page, 'Edit Player');
     const editor = page.getByRole('dialog', { name: 'Edit Player Team' });
@@ -112,13 +122,17 @@ test.describe('PS Dashboard', () => {
 
     await expect(page.getByText(/Branching.*Turn 2/)).toBeVisible({ timeout: 15000 });
     await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 1');
-    await expect(p1Controls).toContainText('Stone Edge');
-    await expect(p1Controls).not.toContainText('Earthquake');
-    await expect(p2Controls.locator('.ps-pending-choice')).toBeVisible();
+    await expect(async () => {
+      const tray = await openTray(page, 'p1a', { timeout: 3000 });
+      await expect(tray).toContainText('Stone Edge', { timeout: 3000 });
+      await expect(tray).not.toContainText('Earthquake', { timeout: 3000 });
+    }).toPass({ timeout: 15000 });
+    await expect(dockChip(page, 'p2a')).toContainText(p2Move);
 
     // While the rebuilt position lands the pickers stand in for it and take no input (round 77): click until the pick holds.
     await expect(async () => {
-      await p1Controls.locator('.ps-movebtn', { hasText: 'Stone Edge' }).click();
+      const tray = await openTray(page, 'p1a', { timeout: 3000 });
+      await tray.locator('.ps-movebtn', { hasText: 'Stone Edge' }).click({ timeout: 3000 });
       await expect(page.locator('button', { hasText: 'Execute Turn' })).toBeEnabled({ timeout: 2_000 });
     }).toPass({ timeout: 30_000 });
   });
@@ -130,109 +144,84 @@ test.describe('PS Dashboard', () => {
     await expect(page.locator('button', { hasText: 'Rebuild exact position' })).toHaveCount(0);
     // … and after settling, the background reconstruction upgrades it in
     // place: real PP appears and the source line says so.
-    await expect(page.getByText('Choices from the reconstructed position')).toBeVisible({ timeout: 90_000 });
-    await expect(page.locator('.ps-movebtn-pp').first()).toHaveText(/\d+\/\d+/);
-  });
-
-  test('compact move chips grow into full move buttons in Advanced', async ({ page }) => {
-    await page.locator('button', { hasText: 'Load' }).click();
-    await expect(page.locator('.ps-movebtn').first()).toBeVisible({ timeout: 15000 });
-
-    // Basic: small action chips to save space.
-    const chipBox = await page.locator('.ps-movebtn').first().boundingBox();
-    expect(chipBox?.height).toBeLessThanOrEqual(40);
-
-    // Advanced: the full readable move buttons with type and damage info.
-    await page.locator('button', { hasText: 'Advanced' }).click();
-    await expect(page.locator('.ps-movebtn-info').first()).toBeVisible({ timeout: 5000 });
-    const box = await page.locator('.ps-movebtn').first().boundingBox();
-    expect(box?.height).toBeGreaterThanOrEqual(58);
-    expect(box?.width).toBeGreaterThanOrEqual(120);
-  });
-
-  test('switch options show as chips in basic and behind the Pokémon tab in Advanced', async ({ page }) => {
-    await page.locator('button', { hasText: 'Load' }).click();
-    // Basic: switch chips sit right next to the move chips.
-    await expect(page.locator('.ps-switchbtn').first()).toBeVisible({ timeout: 15000 });
-
-    // Advanced: the full picker keeps the Fight/Pokémon tabs.
-    await page.locator('button', { hasText: 'Advanced' }).click();
-    await expect(page.locator('button', { hasText: 'Pokémon' }).first()).toBeVisible({ timeout: 5000 });
-    await page.locator('button', { hasText: 'Pokémon' }).first().click();
-    await expect(page.locator('.ps-switchbtn').first()).toBeVisible({ timeout: 5000 });
+    await waitForExactPickers(page);
+    const tray = await openTray(page, 'p1a');
+    await expect(tray.locator('.ps-movebtn-pp').first()).toHaveText(/\d+\/\d+/);
   });
 
   test('selecting moves for both sides enables Execute Turn', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
+    await expect(dockChip(page, 'p1a')).toBeVisible({ timeout: 15000 });
 
-    const moveBtns = page.locator('.ps-movebtn');
-    await expect(moveBtns.first()).toBeVisible({ timeout: 15000 });
+    await pickMove(page, 'p1a');
+    await pickMove(page, 'p2a');
 
-    const allMoveBtns = await moveBtns.all();
-    if (allMoveBtns.length >= 2) {
-      await allMoveBtns[0].click();
-      const p2Moves = page.locator('.ps-movegrid').nth(1).locator('.ps-movebtn');
-      await p2Moves.first().click();
-
-      const execBtn = page.locator('button', { hasText: 'Execute Turn' });
-      await expect(execBtn).toBeVisible({ timeout: 5000 });
-      await expect(execBtn).toBeEnabled();
-    }
+    const execBtn = page.locator('button', { hasText: 'Execute Turn' });
+    await expect(execBtn).toBeVisible({ timeout: 5000 });
+    await expect(execBtn).toBeEnabled();
   });
 
   test('branching can load a hypothetical move from the legal pool', async ({ page }) => {
     await page.locator('button', { hasText: 'Load' }).click();
-    // Variant B: the what-if controls live in the Advanced row — open it,
+    // The what-if controls live behind "Dice · What if" — open it,
     // then loading the move rebuilds the sim with the choice pre-seeded.
-    await page.locator('button', { hasText: 'Advanced' }).click();
-    const p1Controls = page.locator('.ps-branch-side-column').first();
-    const whatIf = p1Controls.getByLabel('Hypothetical move for P1');
+    const tray = await openTrayMore(page, 'p1a');
+    const whatIf = tray.getByLabel('Hypothetical move for P1');
 
     // Garchomp knows 3 moves — the hypothetical simply becomes the 4th.
     // Picking from the combobox popup fills the field without pressing Enter.
     await expect(whatIf).toBeVisible({ timeout: 15000 });
-    await expect(p1Controls.getByLabel('Replaced move for P1')).toHaveCount(0);
+    await expect(tray.getByLabel('Replaced move for P1')).toHaveCount(0);
     await whatIf.fill('Flamethr');
-    await p1Controls.getByRole('option', { name: 'Flamethrower' }).click();
+    await tray.getByRole('option', { name: 'Flamethrower' }).click();
     await expect(whatIf).toHaveValue('Flamethrower');
-    await p1Controls.locator('button', { hasText: 'Load move' }).click();
+    await tray.locator('button', { hasText: 'Load move' }).click();
 
-    // The branch rebuilds with the move in the set and pre-selected as pending.
+    // The branch rebuilds with the move in the set and pre-selected as pending: the chip names it, the tray lists it.
     await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
-    await expect(p1Controls.locator('.ps-movebtn', { hasText: 'Flamethrower' })).toBeVisible({ timeout: 15000 });
-    await expect(p1Controls).toContainText('[Flamethrower]');
+    await expect(dockChip(page, 'p1a')).toContainText('Flamethrower', { timeout: 15000 });
+    // The rebuild closes the tray the loader belonged to: open it again until it stands with the new tile.
+    await expect(async () => {
+      const reopened = await openTrayMore(page, 'p1a', { timeout: 3000 });
+      await expect(reopened.locator('.ps-movebtn', { hasText: 'Flamethrower' })).toBeVisible({ timeout: 3000 });
+    }).toPass({ timeout: 15000 });
+    const trayAgain = dockTray(page);
 
     // Now the set is full — a second hypothetical must replace a chosen move.
-    const whatIfAgain = p1Controls.getByLabel('Hypothetical move for P1');
+    const whatIfAgain = trayAgain.getByLabel('Hypothetical move for P1');
     await whatIfAgain.fill('Fire Blast');
-    await p1Controls.getByLabel('Replaced move for P1').selectOption({ label: 'Earthquake' });
-    await p1Controls.locator('button', { hasText: 'Load move' }).click();
+    await trayAgain.getByLabel('Replaced move for P1').selectOption({ label: 'Earthquake' });
+    await trayAgain.locator('button', { hasText: 'Load move' }).click();
 
-    await expect(p1Controls.locator('.ps-movebtn', { hasText: 'Fire Blast' })).toBeVisible({ timeout: 15000 });
-    await expect(p1Controls).toContainText('[Fire Blast]');
-    await expect(p1Controls.locator('.ps-movebtn', { hasText: 'Earthquake' })).toHaveCount(0);
+    await expect(dockChip(page, 'p1a')).toContainText('Fire Blast', { timeout: 15000 });
+    await expect(async () => {
+      const trayLast = await openTray(page, 'p1a', { timeout: 3000 });
+      await expect(trayLast.locator('.ps-movebtn', { hasText: 'Fire Blast' })).toBeVisible({ timeout: 3000 });
+      await expect(trayLast.locator('.ps-movebtn', { hasText: 'Earthquake' })).toHaveCount(0, { timeout: 3000 });
+    }).toPass({ timeout: 15000 });
   });
 
-  test('doubles branch shows slot controls and blocks duplicate simultaneous switches', async ({ page }) => {
+  test('doubles branch shows slot chips and blocks duplicate simultaneous switches', async ({ page }) => {
     await page.locator('input[type="text"]').fill('gen9doubles-test');
     await page.locator('button', { hasText: 'Load' }).click();
     await expect(page.getByText('Alice', { exact: true }).first()).toBeVisible({ timeout: 10000 });
     // Doubles targeting needs the real request — the dwell upgrade delivers it.
     await waitForExactPickers(page);
 
-    const controls = page.locator('.ps-side-controls');
-    await expect(controls).toHaveCount(4);
-    await expect(controls.nth(0)).toContainText('P1A');
-    await expect(controls.nth(1)).toContainText('P1B');
-    await expect(controls.nth(2)).toContainText('P2A');
-    await expect(controls.nth(3)).toContainText('P2B');
+    const chips = page.locator('.ps-dock-chip');
+    await expect(chips).toHaveCount(4);
+    await expect(chips.nth(0)).toContainText('P1A');
+    await expect(chips.nth(1)).toContainText('P1B');
+    await expect(chips.nth(2)).toContainText('P2A');
+    await expect(chips.nth(3)).toContainText('P2B');
 
-    // The compact picker lists switch chips per slot without a tab switch.
-    await expect(controls.nth(0).locator('.ps-switchbtn').first()).toBeVisible({ timeout: 5000 });
-    await expect(controls.nth(1).locator('.ps-switchbtn').first()).toBeVisible();
-
-    await controls.nth(0).locator('.ps-switchbtn').first().click();
-    await expect(controls.nth(1).locator('.ps-switchbtn').first()).toBeDisabled();
+    // Each slot's tray lists its switch tiles without a tab switch.
+    const trayA = await openTray(page, 'p1a');
+    await expect(trayA.locator('.ps-switchbtn').first()).toBeVisible({ timeout: 5000 });
+    await trayA.locator('.ps-switchbtn').first().click();
+    const trayB = await openTray(page, 'p1b');
+    await expect(trayB.locator('.ps-switchbtn').first()).toBeVisible();
+    await expect(trayB.locator('.ps-switchbtn').first()).toBeDisabled();
   });
 
   test('doubles target buttons identify and highlight the selected target', async ({ page }) => {
@@ -242,9 +231,11 @@ test.describe('PS Dashboard', () => {
     // Doubles targeting needs the real request — the dwell upgrade delivers it.
     await waitForExactPickers(page);
 
-    const pikachuControls = page.locator('.ps-side-controls').first();
-    const bulbasaurTarget = pikachuControls.locator('.ps-target-btn[title^="Thunderbolt into Bulbasaur"]');
-    const charmanderTarget = pikachuControls.locator('.ps-target-btn[title^="Thunderbolt into Charmander"]');
+    // Round 84 (turn dock): the target buttons of a move show once the move is the slot's pending pick.
+    const pikachuTray = await openTray(page, 'p1a');
+    await pikachuTray.locator('.ps-movebtn', { hasText: 'Thunderbolt' }).click();
+    const bulbasaurTarget = pikachuTray.locator('.ps-target-btn[title^="Thunderbolt into Bulbasaur"]');
+    const charmanderTarget = pikachuTray.locator('.ps-target-btn[title^="Thunderbolt into Charmander"]');
     await expect(bulbasaurTarget).toBeVisible();
     await expect(charmanderTarget).toBeVisible();
     await expect(bulbasaurTarget).toContainText('P2A Bulbasaur');
@@ -261,14 +252,14 @@ test.describe('PS Dashboard', () => {
     await expect(page.getByText('Alice', { exact: true }).first()).toBeVisible({ timeout: 10000 });
     await waitForExactPickers(page);
 
-    const pikachuControls = page.locator('.ps-side-controls').first();
-    const moves = pikachuControls.locator('.ps-movebtn');
-    // Measured from the side's own box: a click scrolls the page to its button.
-    const boxes = () => pikachuControls.evaluate(side => {
-      const origin = side.getBoundingClientRect();
-      return [...side.querySelectorAll('.ps-movebtn')].map(button => {
+    const tray = await openTray(page, 'p1a');
+    const moves = tray.locator('.ps-movebtn');
+    // Measured in the tray's own content box: the target row grows the tray upwards, and a click scrolls the page to its button.
+    const boxes = () => tray.evaluate(box => {
+      const origin = box.getBoundingClientRect();
+      return [...box.querySelectorAll('.ps-movebtn')].map(button => {
         const { x, y, width, height } = button.getBoundingClientRect();
-        return { name: button.querySelector('.ps-movebtn-name')?.textContent, x: x - origin.x, y: y - origin.y, width, height };
+        return { name: button.querySelector('.ps-movebtn-name')?.textContent, x: x - origin.x, y: y - origin.y + box.scrollTop, width, height };
       });
     });
     // The hover lift moves a button by a pixel: measure with the mouse away.
@@ -277,62 +268,69 @@ test.describe('PS Dashboard', () => {
       return boxes();
     };
 
-    for (const view of ['Basic', 'Advanced']) {
-      if (view === 'Advanced') await page.locator('button', { hasText: 'Advanced' }).click();
-      await expect(pikachuControls.locator('.ps-target-btn').first()).toBeVisible({ timeout: 5000 });
-      const before = await settledBoxes();
-      expect(before.length, `${view}: Pikachu's moves`).toBeGreaterThan(1);
-
-      // The user's scene: a click on the move itself, then on a target tile.
-      await moves.first().click();
-      await expect(moves.first()).toHaveClass(/ps-movebtn-selected/);
-      await expect.poll(settledBoxes, { message: `${view}: after the move click`, timeout: 5000 }).toEqual(before);
-      const lastTarget = pikachuControls.locator('.ps-target-btn').last();
-      await lastTarget.click();
-      await expect(lastTarget).toHaveClass(/ps-target-btn-selected/);
-      await expect.poll(settledBoxes, { message: `${view}: after the target click`, timeout: 5000 }).toEqual(before);
+    await expect(moves.first()).toBeVisible({ timeout: 5000 });
+    // The damage bars land after the tiles: take the reading once two reads in a row agree.
+    let before = await settledBoxes();
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      await page.waitForTimeout(250);
+      const next = await settledBoxes();
+      if (JSON.stringify(next) === JSON.stringify(before)) break;
+      before = next;
     }
-    await expect(pikachuControls).not.toContainText('Targeting');
+    expect(before.length, "Pikachu's moves").toBeGreaterThan(1);
+
+    // The user's scene: a click on the move itself, then on a target tile.
+    await moves.first().click();
+    await expect(moves.first()).toHaveClass(/ps-movebtn-selected/);
+    await expect(tray.locator('.ps-target-btn').first()).toBeVisible({ timeout: 5000 });
+    await expect.poll(settledBoxes, { message: 'after the move click', timeout: 5000 }).toEqual(before);
+    const lastTarget = tray.locator('.ps-target-btn').last();
+    await lastTarget.click();
+    await expect(lastTarget).toHaveClass(/ps-target-btn-selected/);
+    await expect.poll(settledBoxes, { message: 'after the target click', timeout: 5000 }).toEqual(before);
+    await expect(tray).not.toContainText('Targeting');
   });
 
-  test('a spread move lists its partner, its dice name each target, and the tiles and slots line up (round 83)', async ({ page }) => {
+  test('a spread move lists its partner, its dice name each target, and the tiles and chips line up (round 83)', async ({ page }) => {
     await page.locator('input[type="text"]').fill('gen9doubles-spread-test');
     await page.locator('button', { hasText: 'Load' }).click();
     await expect(page.getByText('Alice', { exact: true }).first()).toBeVisible({ timeout: 10000 });
     await waitForExactPickers(page);
-    await page.locator('button', { hasText: 'Advanced' }).click();
-    const pikachuControls = page.locator('.ps-side-controls').first();
-    await expect(pikachuControls.locator('.ps-target-btn').first()).toBeVisible({ timeout: 5000 });
-    // Discharge hits Bulbasaur, Charmander and Pikachu's partner Eevee: three rows, which wrap onto a second line
-    const discharge = pikachuControls.locator('.ps-movebtn', { hasText: 'Discharge' });
-    await expect(discharge.locator('.ps-movebtn-spread-target')).toHaveText([/^P2A /, /^P2B /, /^P1B /], { timeout: 10000 });
+    const tray = await openTray(page, 'p1a');
+    // Discharge hits Bulbasaur, Charmander and Pikachu's partner Eevee: one bar row per body, which wrap onto more lines
+    const discharge = tray.locator('.ps-movebtn', { hasText: 'Discharge' });
+    await expect(discharge.locator('.ps-tile-bar-label')).toHaveText(['P2A', 'P2B', 'P1B'], { timeout: 10000 });
     // The hover lift moves a tile by a pixel: measure with the mouse away.
     await page.mouse.move(0, 0);
     const layout = await page.evaluate(() => {
       const box = (element: Element) => {
-        const { top, bottom } = element.getBoundingClientRect();
-        return { top: Math.round(top), bottom: Math.round(bottom) };
+        const { top, bottom, left, right } = element.getBoundingClientRect();
+        return { top: Math.round(top), bottom: Math.round(bottom), left: Math.round(left), right: Math.round(right) };
       };
-      // Pikachu's first row holds Discharge, two lines of damage, next to Thunderbolt, one line and target buttons below it.
-      const rows = [...document.querySelectorAll('.ps-movegrid')].flatMap(grid => {
-        const byTop = new Map<number, { tile: string; bottom: number }[]>();
-        for (const tile of grid.querySelectorAll('.ps-movebtn')) {
-          const { top, bottom } = box(tile);
-          byTop.set(top, [...(byTop.get(top) ?? []), { tile: tile.querySelector('.ps-movebtn-name')?.textContent ?? '', bottom }]);
-        }
-        return [...byTop.values()].filter(row => row.length > 1);
+      // Tiles that share a top edge: in the open tray's grid, one row of tiles.
+      const byTop = new Map<number, { tile: string; bottom: number }[]>();
+      for (const tile of document.querySelectorAll('.ps-tray .ps-movebtn')) {
+        const { top, bottom } = box(tile);
+        byTop.set(top, [...(byTop.get(top) ?? []), { tile: tile.querySelector('.ps-movebtn-name')?.textContent ?? '', bottom }]);
+      }
+      const rows = [...byTop.values()].filter(row => row.length > 1);
+      // The chips: P1's row over P2's, so a slot keeps its column.
+      const chips = ['p10', 'p11', 'p20', 'p21'].map(key => {
+        const chip = document.querySelector(`.ps-dock-chip[data-chip="${key}"]`);
+        return chip ? box(chip) : null;
       });
-      return { slots: [...document.querySelectorAll('.ps-side-slot')].map(box), rows };
+      return { chips, rows };
     });
-    expect(layout.slots).toHaveLength(4);
-    const [p1a, p1b, p2a, p2b] = layout.slots;
-    expect(p2a, 'P2A starts and ends with P1A').toEqual(p1a);
-    expect(p2b, 'P2B starts and ends with P1B').toEqual(p1b);
+    expect(layout.chips.every(Boolean)).toBe(true);
+    const [p1a, p1b, p2a, p2b] = layout.chips as { left: number; right: number }[];
+    expect([p2a.left, p2a.right], 'P2A stands in the column of P1A').toEqual([p1a.left, p1a.right]);
+    expect([p2b.left, p2b.right], 'P2B stands in the column of P1B').toEqual([p1b.left, p1b.right]);
     expect(layout.rows.some(row => row.some(({ tile }) => tile === 'Discharge'))).toBe(true);
     for (const row of layout.rows) expect(new Set(row.map(({ bottom }) => bottom)).size, JSON.stringify(row)).toBe(1);
 
     await discharge.click();
-    const dice = pikachuControls.locator('.ps-dice');
+    const moreTray = await openTrayMore(page, 'p1a');
+    const dice = moreTray.locator('.ps-dice');
     for (const target of ['P2A Bulbasaur', 'P2B Charmander', 'P1B Eevee']) {
       await expect(dice.getByRole('group', { name: target }).locator('.ps-dice-heading'), target).toHaveText(target, { timeout: 15000 });
     }
