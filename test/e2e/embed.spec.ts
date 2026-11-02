@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { encodeBranchShare } from '../../src/lib/branch-share';
 import { sharedBranchPayload } from './fixtures/shared-branch';
-import { installReplayEmbedCache, routeOfflineFixtures, startVariationAt, type ReplayWindow } from './helpers';
+import { installReplayEmbedCache, openLoader, routeOfflineFixtures, startVariationAt, type ReplayWindow } from './helpers';
 
 test.beforeAll(installReplayEmbedCache);
 
@@ -56,8 +56,9 @@ test.describe('PS Dashboard', () => {
     await expect.poll(async () => frame!.evaluate(() =>
       (window as ReplayWindow).Replays?.battle?.viewpointSwitched ?? false
     ), { timeout: 30_000 }).toBe(true);
-    // The mirrored loader link keeps the perspective flag.
-    await expect(page.getByLabel('Replay URL or ID')).toHaveValue(/\?p2$/);
+    // The mirrored loader link keeps the perspective flag. Round 84 (Q20 a): the loader is the top bar's Load panel now.
+    const panel = await openLoader(page);
+    await expect(panel.getByLabel('Replay URL or ID')).toHaveValue(/\?p2$/);
   });
 
   test('opens shared branch links as a replayable read-only branch', async ({ page }) => {

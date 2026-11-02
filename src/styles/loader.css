@@ -48,3 +48,39 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Round 84 (turn dock, Q20 a): with a replay loaded the loader is the Load button beside Setup; its panel opens under the button
+   like the Setup panel and holds the loader's body (ReplayLoader, variant menu). */
+.ps-loader-menu {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.ps-btn.ps-loader-toggle {
+  padding: 2px 8px;
+  font-size: 10px;
+}
+.ps-btn.ps-loader-toggle-drop {
+  outline: 2px dashed #8cf;
+  outline-offset: 1px;
+}
+.ps-loader-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 40;
+  box-sizing: border-box;
+  width: min(440px, calc(100vw - 14px));
+  padding: 10px;
+  background: #22324f;
+  border: 1px solid var(--ps-border);
+  border-radius: 6px;
+  box-shadow: var(--ps-shadow);
+}
+
+@media (max-width: 640px) {
+  /* The panel spans the bar: the button may stand anywhere in a wrapped row. */
+  .ps-topbar { position: relative; }
+  .ps-loader-menu { position: static; }
+  .ps-loader-panel { left: 0; right: 0; width: auto; }
+}

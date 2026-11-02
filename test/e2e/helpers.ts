@@ -182,6 +182,14 @@ export async function fromSetup(page: Page, entry: string) {
   await page.locator('.ps-setup-panel').getByRole('button', { name: entry, exact: true }).click();
 }
 
+/** Opens the top bar's Load panel (round 84, Q20 a: once a replay is loaded the loader lives there, not in the column) and returns it. */
+export async function openLoader(page: Page): Promise<Locator> {
+  await page.locator('.ps-loader-toggle').click();
+  const panel = page.locator('.ps-loader-panel');
+  await expect(panel).toBeVisible();
+  return panel;
+}
+
 /** Waits for the dwell upgrade: after ~1s on a main-line turn the app
  *  reconstructs the exact position in the background and the snapshot
  *  approximation upgrades in place (no button — the unified timeline's

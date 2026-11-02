@@ -1,4 +1,5 @@
 import type { BranchSimState } from '../hooks/useBranch';
+import { LoaderMenu } from './LoaderMenu';
 import { SetupMenu } from './SetupMenu';
 import { SupportLinks } from './SupportLinks';
 
@@ -18,6 +19,8 @@ interface AppTopBarProps {
   onOpenSets: () => void;
   /** A host site frames the app (round 77: the creator link is left out). */
   embed: boolean;
+  /** Round 84: the replay loader's props; the Load button sits beside Setup. Left out in the embedded view, which keeps no loader. */
+  loader?: Parameters<typeof LoaderMenu>[0];
   onReportIssue: () => void;
 }
 
@@ -82,7 +85,7 @@ function TopBarBranchStatus({
 }
 
 /**
- * Match info, branch status, the Setup menu and the support links in one row above the iframe (round 77,
+ * Match info, branch status, the Load and Setup menus and the support links in one row above the iframe (round 77,
  * user request 28.10.2026: the winner moved to the branch panel, the toggle and the team actions into Setup).
  */
 export function AppTopBar(props: AppTopBarProps) {
@@ -99,6 +102,7 @@ export function AppTopBar(props: AppTopBarProps) {
           branchDivergence={props.branchDivergence}
           onCancelPreparation={props.onCancelPreparation}
         />
+        {props.loader && <LoaderMenu {...props.loader} />}
         <SetupMenu
           animateBranchTurns={props.animateBranchTurns}
           onAnimateChange={props.onAnimateChange}

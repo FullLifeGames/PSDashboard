@@ -3,7 +3,6 @@ import { DockRegion } from './dock/DockRegion';
 import { LeadPanel } from './LeadPanel';
 import { BranchHistoryPanel } from './BranchHistoryPanel';
 import { BranchSaveSharePanel } from './BranchSaveSharePanel';
-import { ReplayLoader } from './ReplayLoader';
 import { AppTopBar } from './AppTopBar';
 import { TimelineBar } from './TimelineBar';
 import { ConfirmBanner } from './ConfirmBanner';
@@ -21,7 +20,8 @@ interface WorkspaceProps {
 
 function WorkspaceTopBar({ app, replayData }: WorkspaceProps) {
   const { branchPreparing, branchProgress, cancelPreparation, branchDivergence } = app.board.deviation;
-  const { setEditorSide, setSetsPanelOpen } = app.ctx.knowledge;
+  const { setEditorSide, setSetsPanelOpen, handleTeamLoad, teamPasteStatus, teamPasteError } = app.ctx.knowledge;
+  const { loading, error, embed, loadReplay, loadReplayFile, loadedReplayUrl } = app.ctx.replay;
   return (
     <AppTopBar
       replayData={replayData}
@@ -37,7 +37,18 @@ function WorkspaceTopBar({ app, replayData }: WorkspaceProps) {
       onAnimateChange={app.ctx.setAnimateBranchTurns}
       onEditSide={setEditorSide}
       onOpenSets={() => setSetsPanelOpen(true)}
-      embed={app.ctx.replay.embed}
+      embed={embed}
+      // Round 84 (Q20 a): with a replay loaded the loader is the top bar's Load button; the embedded view keeps none.
+      loader={embed ? undefined : {
+        onLoad: loadReplay,
+        onLoadFile: loadReplayFile,
+        onTeamLoad: handleTeamLoad,
+        loading,
+        error,
+        loadedUrl: loadedReplayUrl,
+        teamStatus: teamPasteStatus,
+        teamError: teamPasteError,
+      }}
       onReportIssue={app.support.reportIssue}
     />
   );
@@ -169,11 +180,9 @@ function WorkspaceLeft({ app, replayData }: WorkspaceProps) {
   const { branchDivergence, variationNotice } = app.board.deviation;
   const { variationSpan } = app.board.timeline;
   const { branching } = app.ctx.branch;
-  const { loading, error, embed, loadReplay, loadReplayFile, loadedReplayUrl } = app.ctx.replay;
-  const { handleTeamLoad, teamPasteStatus, teamPasteError } = app.ctx.knowledge;
   return (
     <div className="ps-main-left">
-      {/* Match info + loader collapsed into one bar */}
+      {/* Match info, the Load and Setup menus in one bar */}
       <WorkspaceTopBar app={app} replayData={replayData} />
       {/* Single iframe */}
       <BattleFrame app={app} replayData={replayData} />
@@ -198,18 +207,6 @@ function WorkspaceLeft({ app, replayData }: WorkspaceProps) {
       {/* Round 84 (turn dock): at turn 0 the lead picker keeps its old place; elsewhere the dock region is the column's last child. */}
       <LeadSlot app={app} replayData={replayData} />
       {(branching || variationSpan !== null) && <BranchSidePanels app={app} replayData={replayData} />}
-      {!embed && (
-        <ReplayLoader
-          onLoad={loadReplay}
-          onLoadFile={loadReplayFile}
-          onTeamLoad={handleTeamLoad}
-          loading={loading}
-          error={error}
-          loadedUrl={loadedReplayUrl}
-          teamStatus={teamPasteStatus}
-          teamError={teamPasteError}
-        />
-      )}
       <DockRegion app={app} replayId={replayData.id} />
     </div>
   );

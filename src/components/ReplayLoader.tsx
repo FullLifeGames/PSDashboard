@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { parseTeamText } from '@fulllifegames/replay-core';
 import { AlertBox } from './AlertBox';
 
-interface Props {
+export interface ReplayLoaderProps {
   onLoad: (url: string) => void;
   onLoadFile: (content: string, fileName?: string) => void;
   onTeamLoad: (teamText: string) => void;
@@ -13,7 +13,11 @@ interface Props {
   teamStatus?: string | null;
   teamError?: string | null;
   showGuide?: boolean;
+  /** Round 84: 'menu' is the body in the top bar's Load panel: no frame, no title, and the page takes the dropped file. */
+  variant?: 'panel' | 'menu';
 }
+
+type Props = ReplayLoaderProps;
 
 function UrlForm({ url, setUrl, loading, onLoad }: { url: string; setUrl: (url: string) => void; loading: boolean; onLoad: (url: string) => void }) {
   return (
@@ -44,11 +48,11 @@ function UrlForm({ url, setUrl, loading, onLoad }: { url: string; setUrl: (url: 
   );
 }
 
-function FileRow({ loading, onFile }: { loading: boolean; onFile: (file: File | null | undefined) => void }) {
+function FileRow({ loading, onFile, dropHint }: { loading: boolean; onFile: (file: File | null | undefined) => void; dropHint: string }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, fontSize: 11, color: '#8899aa' }}>
-      <span>… or drop an exported replay (.html) anywhere in this panel</span>
+      <span>{dropHint}</span>
       <button
         type="button"
         className="ps-btn"
@@ -135,7 +139,7 @@ function TeamPasteDetails({ teamStatus, teamError, onTeamLoad }: Pick<Props, 'te
   );
 }
 
-export function ReplayLoader({ onLoad, onLoadFile, onTeamLoad, loading, error, loadedUrl = null, teamStatus = null, teamError = null, showGuide = false }: Props) {
+export function ReplayLoader({ onLoad, onLoadFile, onTeamLoad, loading, error, loadedUrl = null, teamStatus = null, teamError = null, showGuide = false, variant = 'panel' }: Props) {
   const [url, setUrl] = useState('https://replay.pokemonshowdown.com/gen9draft-2058494320');
 
   // Once a replay is loaded the input shows ITS link, not the default or a
@@ -149,12 +153,38 @@ export function ReplayLoader({ onLoad, onLoadFile, onTeamLoad, loading, error, l
     if (loadedUrl) setUrl(loadedUrl);
   }
   const [dragActive, setDragActive] = useState(false);
+  const inMenu = variant === 'menu';
 
   const readReplayFile = (file: File | null | undefined) => {
     if (!file || loading) return;
     void file.text().then(content => onLoadFile(content, file.name));
   };
 
+  const body = (
+    <>
+      {!inMenu && <div style={{ fontSize: 13, fontWeight: 'bold', marginBottom: 8 }}>Load Replay</div>}
+
+      <UrlForm url={url} setUrl={setUrl} loading={loading} onLoad={onLoad} />
+
+      <FileRow
+        loading={loading}
+        onFile={readReplayFile}
+        dropHint={inMenu ? '… or drop an exported replay (.html) anywhere on the page' : '… or drop an exported replay (.html) anywhere in this panel'}
+      />
+
+      {error && (
+        <AlertBox style={{ marginBottom: 8, fontSize: 12, padding: '6px 10px' }}>
+          {error}
+        </AlertBox>
+      )}
+
+      {showGuide && <WorkflowGuide />}
+
+      <TeamPasteDetails teamStatus={teamStatus} teamError={teamError} onTeamLoad={onTeamLoad} />
+    </>
+  );
+  // In the top bar's panel the page takes the drop (LoaderMenu), so the body has no frame of its own.
+  if (inMenu) return <div className="ps-loader-body">{body}</div>;
   return (
     <div
       className="ps-panel"
@@ -175,21 +205,7 @@ export function ReplayLoader({ onLoad, onLoadFile, onTeamLoad, loading, error, l
         readReplayFile(event.dataTransfer.files?.[0]);
       }}
     >
-      <div style={{ fontSize: 13, fontWeight: 'bold', marginBottom: 8 }}>Load Replay</div>
-
-      <UrlForm url={url} setUrl={setUrl} loading={loading} onLoad={onLoad} />
-
-      <FileRow loading={loading} onFile={readReplayFile} />
-
-      {error && (
-        <AlertBox style={{ marginBottom: 8, fontSize: 12, padding: '6px 10px' }}>
-          {error}
-        </AlertBox>
-      )}
-
-      {showGuide && <WorkflowGuide />}
-
-      <TeamPasteDetails teamStatus={teamStatus} teamError={teamError} onTeamLoad={onTeamLoad} />
+      {body}
     </div>
   );
 }

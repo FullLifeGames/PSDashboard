@@ -67,6 +67,21 @@ describe('AppTopBar', () => {
     expect(setup).toHaveAttribute('aria-expanded', 'false');
   });
 
+  test('the Load button stands beside Setup once the workspace passes a loader, and a bar without one has none (the embedded view)', async () => {
+    // Round 84 (turn dock, Q20 a): the loader folds into the top bar when a replay is loaded.
+    const loader = { onLoad: vi.fn(), onLoadFile: vi.fn(), onTeamLoad: vi.fn(), loading: false, error: null };
+    const { rerender } = render(<AppTopBar {...props()} />);
+    expect(screen.queryByRole('button', { name: 'Load' })).toBeNull();
+    rerender(<AppTopBar {...props({ loader })} />);
+    const load = screen.getByRole('button', { name: 'Load' });
+    const setup = screen.getByRole('button', { name: 'Setup' });
+    expect(load.compareDocumentPosition(setup) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(load.closest('.ps-topbar-actions')).toBe(setup.closest('.ps-topbar-actions'));
+    await userEvent.click(load);
+    await userEvent.type(screen.getByRole('textbox', { name: 'Replay URL or ID' }), '{Enter}');
+    expect(loader.onLoad).toHaveBeenCalledTimes(1);
+  });
+
   test('the Smogon states read as loading or unavailable', () => {
     render(<AppTopBar {...props({ usageStats: { loading: true, error: null }, setAssumptions: { loading: false, error: 'gone' } })} />);
     expect(screen.getByText('Smogon stats loading...')).toBeInTheDocument();

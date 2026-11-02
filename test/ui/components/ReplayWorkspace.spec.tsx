@@ -51,12 +51,18 @@ const sideLabels = () => [...document.querySelectorAll('.ps-dock-label')].map(la
 const chip = (label: string) => screen.getByRole('button', { name: new RegExp(`^${label}\\b`) });
 
 describe('ReplayWorkspace', () => {
-  test('a loaded singles replay shows the top bar, the battle frame, the timeline, the loader, the pickers, and the evaluation column', async () => {
+  test('a loaded singles replay shows the top bar with the Load button, the battle frame, the timeline, the pickers, and the evaluation column', async () => {
     const { app, replay } = await mountLoaded('singles');
     expect(screen.getByRole('button', { name: 'Setup' })).toBeInTheDocument();
     expect(screen.getByTitle('PS Replay')).toHaveAttribute('src', expect.stringMatching(/^blob:/));
     expect(screen.getByRole('slider', { name: 'Timeline turn selector' })).toBeInTheDocument();
+    // Round 84 (Q20 a): the column holds no loader; the Load button in the top bar opens it with the loaded link.
+    expect(document.querySelector('.ps-main-left .ps-panel input[aria-label="Replay URL or ID"]')).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'Replay URL or ID' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Load' }));
     expect((screen.getByRole('textbox', { name: 'Replay URL or ID' }) as HTMLInputElement).value).toContain(replay.id);
+    expect(document.querySelector('.ps-topbar-actions .ps-loader-panel')).not.toBeNull();
+    await userEvent.keyboard('{Escape}');
     expect(screen.getByText('Evaluation')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Let it play out/ })).toBeInTheDocument();
     expect(screen.getByText('Battle Statistics')).toBeInTheDocument();
