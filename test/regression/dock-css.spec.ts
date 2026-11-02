@@ -221,3 +221,33 @@ describe('the hit bar (variant F, A7b)', () => {
     }
   });
 });
+
+describe('the chip (variant A, ruling 8a)', () => {
+  const base = css.slice(0, css.indexOf('@media (max-width: 1050px)'));
+  const chip = rule(base, '.ps-dock-chip') ?? '';
+
+  test("the type is the tile's 4 px edge on the left, in the tile's color source, and no bar on top", () => {
+    expect(chip).toMatch(/border-left:\s*4px solid var\(--type,\s*rgba\(183, 216, 255, 0\.22\)\)/);
+    expect(chip).not.toMatch(/inset 0 3px 0/);
+    expect(rule(base, '.ps-movebtn') ?? '').toMatch(/border-left:\s*4px solid var\(--type,\s*rgba\(183, 216, 255, 0\.22\)\)/);
+  });
+
+  test('three columns: the label, the middle with both lines, the aside across both lines', () => {
+    expect(chip).toMatch(/grid-template-columns:\s*auto minmax\(0,\s*1fr\);/);
+    expect(rule(base, '.ps-dock-chip[data-aside="true"]') ?? '').toMatch(/grid-template-columns:\s*auto minmax\(0,\s*1fr\) auto/);
+    const aside = rule(base, '.ps-dock-aside') ?? '';
+    expect(aside).toMatch(/grid-column:\s*3/);
+    expect(aside).toMatch(/grid-row:\s*1\s*\/\s*3/);
+  });
+
+  test('every chip keeps the same left edge and padding, so the empty chip keeps its box', () => {
+    expect(chip).toMatch(/padding:\s*4px 10px 4px 8px/);
+  });
+
+  test('the sprite is 32 px, which fits the 46 px row with the chip\'s padding', () => {
+    const sprite = rule(base, '.ps-dock-sprite') ?? '';
+    expect(sprite).toMatch(/width:\s*32px/);
+    expect(sprite).toMatch(/height:\s*32px/);
+    expect(rule(base, '.ps-dock-rows') ?? '').toMatch(/grid-auto-rows:\s*46px/);
+  });
+});

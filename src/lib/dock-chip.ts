@@ -1,5 +1,6 @@
 import { toId } from '@fulllifegames/replay-core';
-import type { BranchMoveModifier, BranchMoveOption, BranchSlotChoice } from '@fulllifegames/eval-engine';
+import type { BranchMoveModifier, BranchMoveOption, BranchSlotChoice, BranchSwitchOption } from '@fulllifegames/eval-engine';
+import { shownType } from './move-damage-text';
 import type { PlayedPick } from './played-pick';
 
 /**
@@ -56,4 +57,22 @@ export function chipPlaceholder({ forceSwitch, nobodyLeft, played, hasRecord, en
   if (engine === 'busy') return 'engine busy with the game analysis';
   if (played) return `played: ${played.kind === 'move' ? played.name : `→ ${played.name}`} · choose`;
   return hasRecord ? 'no logged move · choose' : 'choose';
+}
+
+/** What stands at the right of a chip (round 84, A7b): the type of the move it holds, or the species that comes in. */
+export type ChipAside = { kind: 'type'; type: string } | { kind: 'sprite'; species: string };
+
+/**
+ * The aside of a chip. A move shows the type its tile shows (`shownType`: the Tera type counts while the slot's Tera toggle is
+ * pressed); a switch shows the body from the bench list, else the name the choice carries; no choice or a move the slot does not
+ * list shows nothing.
+ */
+export function chipAside(
+  choice: BranchSlotChoice | null | undefined, moves: BranchMoveOption[], switches: Pick<BranchSwitchOption, 'species'>[], teraArmed: boolean,
+): ChipAside | null {
+  if (choice?.kind === 'switch') {
+    return { kind: 'sprite', species: switches.find(sw => toId(sw.species) === choice.speciesId)?.species ?? choice.pokemonName };
+  }
+  const move = choice?.kind === 'move' ? moves.find(option => toId(option.name) === choice.moveId) : undefined;
+  return move ? { kind: 'type', type: shownType(move, teraArmed) } : null;
 }

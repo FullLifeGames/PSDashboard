@@ -63,16 +63,23 @@
   align-content: center;
   align-items: center;
   text-align: left;
-  padding: 4px 10px;
+  /* Round 84 (A7b, ruling 8a): the tile's 4 px type edge on the left for every chip (the plain border color while nothing is
+     chosen), so the box does not change when a choice lands; the 8 px padding after it keeps the content where it stood. */
+  padding: 4px 10px 4px 8px;
   border: 1px solid rgba(183, 216, 255, 0.22);
+  border-left: 4px solid var(--type, rgba(183, 216, 255, 0.22));
   border-radius: 6px;
   background: linear-gradient(180deg, rgba(52, 76, 112, 0.95) 0%, rgba(36, 54, 84, 0.95) 100%);
   color: var(--ps-tile-text);
   font-family: inherit;
   cursor: pointer;
-  box-shadow: inset 0 3px 0 var(--type, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
   transition: filter 0.15s;
 }
+/* The type tag or the incoming body's sprite stands at the right across both lines; the pick line keeps the middle column. */
+.ps-dock-chip[data-aside="true"] { grid-template-columns: auto minmax(0, 1fr) auto; }
+.ps-dock-aside { grid-column: 3; grid-row: 1 / 3; display: flex; align-items: center; }
+.ps-dock-sprite { width: 32px; height: 32px; image-rendering: pixelated; object-fit: contain; }
 .ps-dock-chip:hover:not(:disabled) { filter: brightness(1.1); }
 .ps-dock-chip:disabled { opacity: 0.5; cursor: not-allowed; }
 .ps-dock-chip[aria-expanded="true"] { outline: 2px solid var(--ps-accent-warm); outline-offset: -1px; }

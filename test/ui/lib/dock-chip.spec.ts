@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { BranchSlotChoice } from '@fulllifegames/eval-engine';
-import { chipOrigin, chipPickText, chipPlaceholder } from '../../../src/lib/dock-chip';
+import { chipAside, chipOrigin, chipPickText, chipPlaceholder } from '../../../src/lib/dock-chip';
 import { moveOption, targetOption } from '../fixtures/sim-state';
 
 /** Round 84 (turn dock): what a slot's chip says about its choice. */
@@ -93,5 +93,26 @@ describe('chipPlaceholder, a forced replacement the engine fills (round 84, A7a,
     expect(chipPlaceholder({ ...base, engine: 'pending' })).toBe('engine choosing…');
     expect(chipPlaceholder({ ...base, engine: null })).toBe('choose a replacement');
     expect(chipPlaceholder(base)).toBe('choose a replacement');
+  });
+});
+
+describe('chipAside (A7b, ruling 8a)', () => {
+  const blast = moveOption('Tera Blast', { type: 'Normal', typeUnderTera: 'Fire' });
+  const pick: BranchSlotChoice = { kind: 'move', moveId: 'terablast', moveName: 'Tera Blast' };
+
+  test('a move shows the type its tile shows, the Tera type while the toggle is pressed', () => {
+    expect(chipAside(pick, [blast], [], false)).toEqual({ kind: 'type', type: 'Normal' });
+    expect(chipAside(pick, [blast], [], true)).toEqual({ kind: 'type', type: 'Fire' });
+  });
+
+  test('a switch shows the bench body\'s species, else the name the choice carries', () => {
+    const choice: BranchSlotChoice = { kind: 'switch', speciesId: 'heatran', pokemonName: 'Lava' };
+    expect(chipAside(choice, [], [{ species: 'Heatran' }], false)).toEqual({ kind: 'sprite', species: 'Heatran' });
+    expect(chipAside(choice, [], [], false)).toEqual({ kind: 'sprite', species: 'Lava' });
+  });
+
+  test('no choice, or a move the slot does not list, shows nothing', () => {
+    expect(chipAside(null, [blast], [], false)).toBeNull();
+    expect(chipAside(pick, [], [], false)).toBeNull();
   });
 });
