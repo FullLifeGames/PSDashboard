@@ -7,6 +7,33 @@
   gap: 8px;
 }
 
+/* Round 84 (A7b, ruling 9a): the panel is closed at the dock's foot; its heading stays and its list scrolls inside it, fading out over
+   the last 36 px while more follows (`data-more`, written by `useScrollFade`; no fade at the list's end). 96 px keep the heading and
+   a first look at the teams; under that the whole column scrolls. */
+.ps-main-right > .ps-stats-panel {
+  flex: 1 1 auto;
+  flex-shrink: 1;
+  min-height: 96px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.ps-stats-panel > .ps-stats-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.ps-stats-panel > .ps-stats-grid[data-more="true"] {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 36px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 36px), transparent);
+}
+@media (max-width: 1050px) {
+  .ps-main-right > .ps-stats-panel { flex: none; overflow: visible; }
+  .ps-stats-panel > .ps-stats-grid { flex: none; overflow-y: visible; }
+  .ps-stats-panel > .ps-stats-grid[data-more="true"] { -webkit-mask-image: none; mask-image: none; }
+}
+
 .ps-stats-team {
   background: rgba(0,0,0,0.18);
   border: 1px solid rgba(255,255,255,0.07);

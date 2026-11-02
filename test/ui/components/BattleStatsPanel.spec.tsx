@@ -72,4 +72,13 @@ describe('BattleStatsPanel', () => {
     const { container } = render(<BattleStatsPanel replayData={singlesReplay()} p1Info={null} p2Info={null} />);
     expect(container).toBeEmptyDOMElement();
   });
+
+  // Round 84 (A7b, ruling 9a): the panel is the closed panel at the right column's foot, and its list carries the fade mark.
+  test('is the closed stats panel, and its list is the one that scrolls and fades', () => {
+    const replayData = { ...singlesReplay(), players: ['Alice', 'Bob'] };
+    const { container } = render(<BattleStatsPanel replayData={replayData} p1Info={teamInfo('singles', 'p1')} p2Info={null} />);
+    const panel = container.firstElementChild as HTMLElement;
+    expect(panel).toHaveClass('ps-panel', 'ps-stats-panel');
+    expect(panel.querySelector(':scope > .ps-stats-grid')).not.toBeNull();
+  });
 });

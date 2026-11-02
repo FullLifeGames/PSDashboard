@@ -1,3 +1,4 @@
+import { useLayoutHeight } from '../hooks/useLayoutHeight';
 import { PSReplayFrame } from './PSReplayFrame';
 import type { BranchSharePayload } from '../lib/branch-share';
 import { REPLAY_FRAME_HEIGHT } from '../lib/replay-html';
@@ -101,8 +102,9 @@ export function SharedBranchView({
   onLoadOriginal: (replayId: string) => void;
   onClear: () => void;
 }) {
+  const layoutRef = useLayoutHeight();
   return (
-    <div className="ps-main-layout">
+    <div className="ps-main-layout" ref={layoutRef}>
       <div className="ps-main-left">
         <SharedBranchTopbar branch={branch} onLoadOriginal={onLoadOriginal} onClear={onClear} />
         <div className="ps-iframe-wrap">

@@ -6,6 +6,7 @@ import type {
   ReplayData,
   RevealedPokemonInfo,
 } from '@fulllifegames/replay-core';
+import { useScrollFade } from '../hooks/useScrollFade';
 import { sourceAccent, sourceLabel } from '../lib/provenance-labels';
 import { spriteUrl } from '../lib/sprite-url';
 import { useReplayRules } from '../lib/replay-rules';
@@ -205,14 +206,19 @@ function TeamColumn({ label, playerName, info, isRandomFormat }: {
   );
 }
 
+/**
+ * Round 84 (turn dock), A7b (ruling 9a): a closed panel at the foot of the right column. The heading stays; the list scrolls inside
+ * the panel and fades out over its last 36 px while more follows (stats-panel.css).
+ */
 export function BattleStatsPanel({ replayData, p1Info, p2Info }: Props) {
+  const fadeRef = useScrollFade();
   if (!p1Info && !p2Info) return null;
   const isRandomFormat = (replayData.formatid || '').includes('random');
 
   return (
-    <div className="ps-panel" style={{ marginTop: 10 }}>
+    <div className="ps-panel ps-stats-panel" style={{ marginTop: 10 }}>
       <div style={{ fontSize: 13, fontWeight: 'bold', marginBottom: 8 }}>Battle Statistics</div>
-      <div className="ps-stats-grid">
+      <div className="ps-stats-grid" ref={fadeRef}>
         {p1Info && (
           <TeamColumn label="P1" playerName={replayData.players[0]} info={p1Info} isRandomFormat={isRandomFormat} />
         )}

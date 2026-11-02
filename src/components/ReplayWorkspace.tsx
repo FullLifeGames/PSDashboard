@@ -6,6 +6,7 @@ import { BranchSaveSharePanel } from './BranchSaveSharePanel';
 import { AppTopBar } from './AppTopBar';
 import { TimelineBar } from './TimelineBar';
 import { ConfirmBanner } from './ConfirmBanner';
+import { useLayoutHeight } from '../hooks/useLayoutHeight';
 import { WorkspaceEvalColumn } from './WorkspaceEvalColumn';
 import type { AppController } from '../hooks/useAppController';
 import { useMemo } from 'react';
@@ -215,9 +216,11 @@ function WorkspaceLeft({ app, replayData }: WorkspaceProps) {
 /** The loaded-replay layout: battle iframe and panels beside the evaluation column. */
 export function ReplayWorkspace({ app, replayData }: WorkspaceProps) {
   const rules = useMemo(() => logRules(replayData.log), [replayData]);
+  // Round 84 (A7b, ruling 9a): the layout's height caps the left column; the right column follows the dock's foot.
+  const layoutRef = useLayoutHeight();
   return (
     <ReplayRulesContext.Provider value={rules}>
-      <div className="ps-main-layout">
+      <div className="ps-main-layout" ref={layoutRef}>
         {/* Left column: iframe */}
         <WorkspaceLeft app={app} replayData={replayData} />
         {/* Right column: evaluation beside the battle (chess-style), then stats */}

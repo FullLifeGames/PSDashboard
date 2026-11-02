@@ -10,8 +10,13 @@
   flex-direction: column;
 }
 
+/* Round 84 (A7b, ruling 9a): one grid row for both columns. Its height is the left column's content (the dock's foot), capped at the
+   layout's own height (`--ps-layout-h`, written by `useLayoutHeight`); the right column adds nothing to it (`contain: size`) and
+   ends on the same line. */
 .ps-main-layout {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  align-content: start;
   gap: 10px;
   flex: 1;
   min-height: 0;
@@ -19,9 +24,9 @@
 }
 
 .ps-main-left {
-  flex: 1 1 0;
   min-width: 0;
   min-height: 0;
+  max-height: var(--ps-layout-h, 100%);
   display: flex;
   flex-direction: column;
   overflow-y: auto;
@@ -32,14 +37,15 @@
 }
 
 .ps-main-right {
-  flex: 0 0 380px;
-  min-width: 320px;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
   overflow-y: auto;
-  max-height: calc(100vh - 60px);
+  contain: size;
 }
+/* Evaluation and Play out keep their height at the top; the Battle Statistics panel takes the rest (stats-panel.css). */
+.ps-main-right > :not(.ps-stats-panel) { flex: 0 0 auto; }
 
 .ps-topbar {
   flex: 0 0 auto;
@@ -182,6 +188,7 @@
     padding: 0 7px 16px;
   }
   .ps-main-layout {
+    display: flex;
     flex-direction: column;
     flex: none;
     min-height: auto;
@@ -190,13 +197,14 @@
   .ps-main-left {
     flex: none;
     min-height: auto;
+    max-height: none;
     overflow-y: visible;
     padding-bottom: 0;
   }
   .ps-main-right {
     flex: none;
     min-width: 0;
-    max-height: none;
+    contain: none;
     overflow-y: visible;
     width: 100%;
   }
