@@ -42,6 +42,20 @@ export interface EvaluateParams {
    * and column in the verify step. Absent for live and variation positions.
    */
   keepPlayed?: EvalSettings['keepPlayed'];
+  /**
+   * Round 84 (turn dock): called once where this run's result lands: after the search, from the stored hit or from the memory
+   * hit. Never for a partial result, and not for a run that was superseded, cancelled or failed. The dock's engine fill acts here.
+   */
+  onResult?: (result: EvalResult) => void;
+}
+
+/** The caller's hook on a landed result. A failure in it never turns the finished run into an error. */
+function deliverResult(params: EvaluateParams, result: EvalResult): void {
+  try {
+    params.onResult?.(result);
+  } catch (err) {
+    console.error('The result callback of an evaluation failed', err);
+  }
 }
 
 export interface CachedEval {
@@ -111,6 +125,7 @@ async function resolveEngineAndStored(
       });
       io.setResult(stored.result);
       io.setStatus('done');
+      deliverResult(params, stored.result);
       return 'done';
     }
   }
@@ -168,6 +183,7 @@ async function searchAndInstall(
       result: final, depth: resolved.depth, samples: resolved.samples, mode: resolved.mode, tera: params.tera, savedAt: Date.now(),
     });
   }
+  deliverResult(params, final);
 }
 
 async function runSingleEvaluation(
@@ -212,6 +228,7 @@ function useEvaluateAction(
         setError(null);
         setProgress(null);
         setReconstructProgress(null);
+        deliverResult(params, hit.result);
         return;
       }
     }

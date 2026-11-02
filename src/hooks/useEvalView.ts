@@ -4,6 +4,7 @@ import {
   getBranchSimulatorFormat, inferReplayFormatId, logRules, replayRuleset,
 } from '@fulllifegames/replay-core';
 import { resolveAutoTurnSettings, type TurnEvalSettings, useEvaluation } from './useEvaluation';
+import type { EvaluateParams } from './evaluation/single-eval';
 import type { useEvalAcquire } from './useEvalAcquire';
 import { makePreviewAcquire, type TeamBuildSources } from '../lib/eval-acquire';
 import { evalStorePrefix } from '../lib/eval-cache-store';
@@ -90,20 +91,26 @@ function useEvalFormat(inputs: EvalViewInputs) {
 
 type EvalFormat = ReturnType<typeof useEvalFormat>;
 
+/** What a caller may hand to Evaluate: the dock's engine fill acts on the result (round 84). */
+export type EvaluateOptions = Pick<EvaluateParams, 'onResult'>;
+
 /** The Evaluate action for whatever position the pointer holds, and the
  *  variation-score recording of finished live evals. */
 function useEvaluateAction(inputs: EvalViewInputs, format: EvalFormat) {
   const { replayData, snapshots, evalIsDoubles, evaluation, liveTip, viewingVariation, serializedAtView, viewTurn, setsFingerprint, evalViewKey, acquire, setVariationScores } = inputs;
   const { effectiveTera, effectiveSleepClause, effectiveRuleset } = format;
-  const handleEvaluate = useCallback(() => {
+  // Round 84: `onResult` is read by name, never spread: the Evaluate button hands its click event to this function. Evaluate
+  // never sets `prefs.auto`; only the explore click of the engine walk does.
+  const handleEvaluate = useCallback((options?: EvaluateOptions) => {
     if (!replayData) return;
+    const onResult = typeof options?.onResult === 'function' ? options.onResult : undefined;
     if (liveTip) {
-      evaluation.evaluate({ cacheKey: null, tera: effectiveTera, sleepClause: effectiveSleepClause, ruleset: effectiveRuleset, acquire: acquire.acquireBranchPosition, tag: evalViewKey });
+      evaluation.evaluate({ cacheKey: null, tera: effectiveTera, sleepClause: effectiveSleepClause, ruleset: effectiveRuleset, acquire: acquire.acquireBranchPosition, tag: evalViewKey, onResult });
     } else if (viewingVariation && serializedAtView) {
       // A recorded variation position: acquisition is instant — the search
       // itself still runs at the configured settings.
       const stored = serializedAtView;
-      evaluation.evaluate({ cacheKey: null, tera: effectiveTera, sleepClause: effectiveSleepClause, ruleset: effectiveRuleset, acquire: async () => stored, tag: evalViewKey });
+      evaluation.evaluate({ cacheKey: null, tera: effectiveTera, sleepClause: effectiveSleepClause, ruleset: effectiveRuleset, acquire: async () => stored, tag: evalViewKey, onResult });
     } else {
       evaluation.evaluate({
         cacheKey: `${replayData.id}:${viewTurn}:${setsFingerprint}${engineCacheTag()}`,
@@ -112,6 +119,7 @@ function useEvaluateAction(inputs: EvalViewInputs, format: EvalFormat) {
         ruleset: effectiveRuleset,
         acquire: acquire.acquireReplayPosition,
         tag: evalViewKey,
+        onResult,
         // The sweep stores this turn under the same key: search it with the same played action.
         keepPlayed: keptPlayed(playedOn(snapshots, viewTurn, evalIsDoubles, logRules(replayData.log))),
       });

@@ -58,6 +58,12 @@ export function useBranch() {
     p2ChoicesRef.current = [];
   }, []);
 
+  /** Round 84 (turn dock): the pending picks of both sides right now. The dock's engine fill reads them where its result lands, when a render's copy is stale. */
+  const getChoices = useCallback(() => ({
+    p1: p1ChoicesRef.current as readonly (BranchSlotChoice | null)[],
+    p2: p2ChoicesRef.current as readonly (BranchSlotChoice | null)[],
+  }), []);
+
   // executeTurn hands its failure to the caller: a deviation that replaced a variation needs it to roll back
   // (round 77, A-2). The tracked setter records what the executor reported last.
   const lastExecuteErrorRef = useRef<string | null>(null);
@@ -80,6 +86,6 @@ export function useBranch() {
   return {
     branching, simState, history, executeError, executing,
     variationStartTurn, startSerialized,
-    startBranch, setChoice, executeTurn, stopBranch, getBattle,
+    startBranch, setChoice, executeTurn, stopBranch, getBattle, getChoices,
   };
 }

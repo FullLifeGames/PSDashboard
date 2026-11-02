@@ -95,6 +95,29 @@ describe('useEvalView', () => {
     expect(spies.evaluate).toHaveBeenLastCalledWith(expect.objectContaining({ cacheKey: `${replayData.id}:3:fp1`, tag: 'main:3', acquire: main.acquire.acquireReplayPosition }));
   });
 
+  // Round 84 (turn dock): the engine fill hands a result callback to Evaluate; it reaches the run at every position and never
+  // turns the "Auto" preference on. A click event (the Evaluate button) carries no callback.
+  test('Evaluate passes a result callback on to the run at every position and never sets Auto', () => {
+    const { evaluation, spies } = evaluationOf();
+    const onResult = vi.fn();
+    const { result, rerender } = renderHook((props: EvalViewInputs) => useEvalView(props), {
+      initialProps: inputs(evaluation, { liveTip: true, liveEvalView: true, evalViewKey: 'variation:3' }),
+    });
+    act(() => result.current.handleEvaluate({ onResult }));
+    expect(spies.evaluate.mock.calls.at(-1)![0]).toMatchObject({ cacheKey: null, tag: 'variation:3', onResult });
+    rerender(inputs(evaluation, { viewingVariation: true, liveEvalView: true, serializedAtView: '{"turn":3}', evalViewKey: 'variation:3' }));
+    act(() => result.current.handleEvaluate({ onResult }));
+    expect(spies.evaluate.mock.calls.at(-1)![0]).toMatchObject({ onResult });
+    rerender(inputs(evaluation));
+    act(() => result.current.handleEvaluate({ onResult }));
+    expect(spies.evaluate.mock.calls.at(-1)![0]).toMatchObject({ tag: 'main:3', onResult });
+    expect(spies.setPrefs).not.toHaveBeenCalled();
+
+    rerender(inputs(evaluation, { liveTip: true, liveEvalView: true, evalViewKey: 'variation:3' }));
+    act(() => (result.current.handleEvaluate as unknown as (event: unknown) => void)({ type: 'click', target: {} }));
+    expect((spies.evaluate.mock.calls.at(-1)![0] as { onResult?: unknown }).onResult).toBeUndefined();
+  });
+
   // Round 63 (final review): Evaluate and Analyze game store a replay turn under one cache key, so both hand the
   // search the same played action (the verify step joins its row and column, T78); live and variation positions have none.
   test('Evaluate on a replay turn hands the search the played action the sweep would; live and variation evaluations none', () => {

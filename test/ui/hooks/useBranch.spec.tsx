@@ -104,6 +104,24 @@ describe('useBranch', () => {
     expect(result.current.simState?.turnNumber).toBe(2);
   }, 60_000);
 
+  // Round 84 (turn dock): the engine fill reads the picks at the moment its result lands; a render closure would be stale.
+  test('getChoices reads the pending picks of the moment, and nothing after the turn ran', async () => {
+    const data = fixture('singles');
+    const { result } = renderHook(() => useBranch());
+    await startAt(result, data, 2);
+    const state = result.current.simState!;
+    expect(result.current.getChoices()).toEqual({ p1: [], p2: [] });
+
+    const read = result.current.getChoices;
+    act(() => result.current.setChoice('p1', firstMove(state, 'p1')));
+    // The same function sees the pick although this render's closure was made before it.
+    expect(read().p1[0]).toEqual(firstMove(state, 'p1'));
+    expect(read().p2).toEqual([]);
+    act(() => result.current.setChoice('p2', firstMove(state, 'p2')));
+    await act(async () => { await result.current.executeTurn(); });
+    expect(read()).toEqual({ p1: [], p2: [] });
+  }, 60_000);
+
   test('stopBranch returns to the idle state', async () => {
     const data = fixture('singles');
     const { result } = renderHook(() => useBranch());
