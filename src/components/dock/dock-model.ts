@@ -4,7 +4,8 @@ import type {
 import type { SideDamage, SpreadTargetDamage } from '../../lib/branch-damage';
 import type { Gimmick } from '../../hooks/useSideControlsState';
 import type { PlayedAtPosition, PlayedPick } from '../../lib/played-pick';
-import type { SeedChoices } from '../../lib/dock-seed';
+import type { SeedChoices, SideChoices } from '../../lib/dock-seed';
+import { withDeferred } from '../../lib/dock-fill';
 import type { DockFillView } from '../../hooks/useDockFill';
 import { chipOrigin, chipPickText, chipPlaceholder, type ChipOrigin, type EngineWait } from '../../lib/dock-chip';
 import {
@@ -50,6 +51,8 @@ export interface DockSlotModel {
   /** What the engine does about this empty chip: the placeholder's style reads it (a shimmer while the run is pending). */
   wait: EngineWait | null;
   origin: ChipOrigin | null;
+  /** Round 84 (A7a): the engine's pick for this slot while its tray is open; the chip and the tile name it, the slot takes it on close. */
+  deferred: BranchSlotChoice | null;
   /** The HP of the one living foe, for a move that names no target. */
   foeHp: number | undefined;
 }
@@ -60,6 +63,8 @@ export interface DockModel {
   /** The HP of every body on the field by slot label. */
   hpByLabel: Record<string, number>;
   flags: ReturnType<typeof panelFlags>;
+  /** What Execute sends: the effective choices, the engine's deferred picks counted in. */
+  sendChoices: SideChoices;
 }
 
 type SlotViews = {
@@ -85,12 +90,22 @@ function engineWait(fill: DockFillView | null | undefined): EngineWait | null {
   return fill?.busy ? 'busy' : null;
 }
 
-/** What an empty chip says, and the engine's state as the placeholder's style shows it (only a chip that waits for the engine has one). */
+/** The engine's state for one slot: none for the side that waits and for a slot the position asks nothing of (the partner of a forced replacement). */
+function slotEngine(fill: DockFillView | null | undefined, view: Pick<SideView, 'waits' | 'required'>, slot: number): EngineWait | null {
+  return view.waits || !view.required[slot] ? null : engineWait(fill);
+}
+
+/**
+ * What an empty chip says, and the engine's state as the placeholder's style shows it (only a chip that waits for the engine has
+ * one). A forced replacement shimmers while the run is pending like any slot; when the game analysis blocks the engine it keeps
+ * its own text, since the user has to choose.
+ */
 function emptyChip(
-  pending: BranchSlotChoice | null, facts: Omit<Parameters<typeof chipPlaceholder>[0], 'engine'>, fill: DockFillView | null | undefined,
+  pending: BranchSlotChoice | null, facts: Omit<Parameters<typeof chipPlaceholder>[0], 'deferred'>, deferred: BranchSlotChoice | null,
 ): { placeholder: string; wait: EngineWait | null } {
-  const engine = engineWait(fill);
-  return { placeholder: chipPlaceholder({ ...facts, engine }), wait: pending || facts.forceSwitch || facts.nobodyLeft ? null : engine };
+  const word = deferred ? { kind: deferred.kind, name: deferred.kind === 'move' ? deferred.moveName : deferred.pokemonName } : null;
+  const silent = pending || deferred || facts.nobodyLeft || (facts.forceSwitch && facts.engine === 'busy');
+  return { placeholder: chipPlaceholder({ ...facts, deferred: word }), wait: silent ? null : facts.engine ?? null };
 }
 
 const isLiving = (info: SimPokemonInfo | null | undefined): info is SimPokemonInfo => !!info && !info.fainted && info.hp > 0;
@@ -138,8 +153,21 @@ function damageOf(damage: SideDamage, slot: number) {
   return { dmg: damage.default[slot] ?? [], spread: damage.spread[slot] ?? {}, targets: damage.targets[slot] ?? {} };
 }
 
+/** The chip of one slot: the pick line or the placeholder, the origin, and the engine's deferred pick. */
+function chipOf(side: Side, slot: number, view: SideView, args: DockModelArgs, facts: { forceSwitch: boolean; nobodyLeft: boolean; played: PlayedPick | null }) {
+  const { seed, fill } = args;
+  const pending = view.choices[slot] ?? null;
+  const deferred = pending ? null : fill?.deferred[side][slot] ?? null;
+  return {
+    pickText: chipPickText(pending, view.movesBySlot[slot] ?? EMPTY_MOVES),
+    ...emptyChip(pending, { ...facts, hasRecord: !!args.played, engine: slotEngine(fill, view, slot) }, deferred),
+    origin: chipOrigin(pending, seed?.[side]?.[slot]?.choice, fill?.engine[side][slot] === true),
+    deferred,
+  };
+}
+
 function slotModel(side: Side, slot: number, view: SideView, args: DockModelArgs): DockSlotModel {
-  const { played, seed, gimmickFor, fill } = args;
+  const { played, gimmickFor } = args;
   const active = view.actives[slot] ?? null;
   const identity = slotIdentity(side, slot, view.actives, active);
   const moves = view.movesBySlot[slot] ?? EMPTY_MOVES;
@@ -156,9 +184,7 @@ function slotModel(side: Side, slot: number, view: SideView, args: DockModelArgs
     modifiers: view.modifiersBySlot[slot] ?? EMPTY_MODIFIERS, gimmick: gimmickFor(side, slot),
     ...damageOf(view.damage, slot),
     played: pick,
-    pickText: chipPickText(pending, moves),
-    ...emptyChip(pending, { forceSwitch, nobodyLeft, played: pick, hasRecord: !!played }, fill),
-    origin: chipOrigin(pending, seed?.[side]?.[slot]?.choice, fill?.engine[side][slot] === true),
+    ...chipOf(side, slot, view, args, { forceSwitch, nobodyLeft, played: pick }),
     foeHp: view.foeHp,
   };
 }
@@ -170,7 +196,9 @@ function sideSlots(side: Side, args: DockModelArgs, flags: DockModel['flags']): 
 
 export function buildDockModel(args: DockModelArgs): DockModel {
   const { simState, slots } = args;
-  const flags = panelFlags(simState, slots.p1ActiveSlots, slots.p2ActiveSlots);
+  // Execute counts the engine's deferred pick of an open slot as chosen.
+  const effective = withDeferred(simState, args.fill?.deferred);
+  const flags = panelFlags(effective, slots.p1ActiveSlots, slots.p2ActiveSlots);
   const p1 = sideSlots('p1', args, flags);
   const p2 = sideSlots('p2', args, flags);
   const hpByLabel: Record<string, number> = {};
@@ -179,5 +207,5 @@ export function buildDockModel(args: DockModelArgs): DockModel {
     hpByLabel[slot.label] = slot.hpPercent;
     hpByLabel[`${slot.side.toUpperCase()}${String.fromCharCode(65 + slot.slot)}`] = slot.hpPercent;
   }
-  return { p1, p2, hpByLabel, flags };
+  return { p1, p2, hpByLabel, flags, sendChoices: { p1: effective.p1Choices, p2: effective.p2Choices } };
 }

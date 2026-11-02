@@ -20,8 +20,8 @@ const move = (moveId: string, moveName: string, targetLoc?: number): BranchSlotC
 
 function fillOf(overrides: Partial<DockFillView> = {}): DockFillView {
   return {
-    pending: false, busy: false, waits: false, engine: { p1: [], p2: [] }, choices: null, queueExecute: vi.fn(), onUserChoice: vi.fn(),
-    holdTray: vi.fn(), arm: vi.fn(), ...overrides,
+    pending: false, busy: false, waits: false, engine: { p1: [], p2: [] }, choices: null, deferred: { p1: [], p2: [] }, queueExecute: vi.fn(), onUserChoice: vi.fn(),
+    holdTray: vi.fn(), release: vi.fn(), arm: vi.fn(), ...overrides,
   };
 }
 
@@ -164,5 +164,106 @@ describe.each(['singles', 'doubles'] as const)('TurnDock fill, the open tray, %s
     expect(fill.arm).not.toHaveBeenCalled();
     await userEvent.click(chip(first));
     expect(fill.arm).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe.each(['singles', 'doubles'] as const)('TurnDock fill, the engine\'s choice for the open slot, %s', (kind) => {
+  const first = kind === 'doubles' ? 'P1A' : 'P1';
+  const second = kind === 'doubles' ? 'P1B' : 'P2';
+  const deferredMove = kind === 'doubles' ? move('flareblitz', 'Flare Blitz', 2) : move('earthquake', 'Earthquake');
+  const moveName = kind === 'doubles' ? 'Flare Blitz' : 'Earthquake';
+  const benched = kind === 'doubles' ? { speciesId: 'fluttermane', pokemonName: 'Flutter Mane' } : { speciesId: 'heatran', pokemonName: 'Heatran' };
+  const deferredSwitch: BranchSlotChoice = { kind: 'switch', ...benched };
+  const withDeferred = (choice: BranchSlotChoice) => fillOf({ deferred: { p1: [choice, null], p2: [null, null] } });
+  const tray = () => within(document.querySelector('.ps-tray') as HTMLElement);
+
+  test('the chip reads "engine: <pick> · choose", stays empty and carries no origin; no box changes its size', () => {
+    renderDock(kind, withDeferred(deferredMove));
+    expect(chip(first)).toHaveTextContent(`engine: ${moveName} · choose`);
+    expect(chip(first)).toHaveAttribute('data-empty', 'true');
+    expect(chip(first)).not.toHaveAttribute('data-origin');
+    expect(chip(first).querySelector('.ps-dock-pick')).not.toHaveAttribute('data-wait');
+    expect(chip(second)).not.toHaveTextContent('engine:');
+    expect(document.querySelectorAll('.ps-dock-chip')).toHaveLength(kind === 'doubles' ? 4 : 2);
+  });
+
+  test('a deferred switch reads in the dock\'s notation', () => {
+    renderDock(kind, withDeferred(deferredSwitch));
+    expect(chip(first)).toHaveTextContent(`engine: → ${benched.pokemonName} · choose`);
+  });
+
+  test('the engine\'s move tile carries the "engine" badge, and no other tile does', async () => {
+    renderDock(kind, withDeferred(deferredMove));
+    await userEvent.click(chip(first));
+    const badges = document.querySelectorAll('.ps-tray .ps-movebtn .ps-engine-badge');
+    expect(badges).toHaveLength(1);
+    expect(badges[0]).toHaveTextContent('engine');
+    expect(badges[0].closest('.ps-movebtn')).toHaveTextContent(moveName);
+    expect(document.querySelectorAll('.ps-tray .ps-switchbtn .ps-engine-badge')).toHaveLength(0);
+  });
+
+  test('the engine\'s bench tile carries the "engine" badge', async () => {
+    renderDock(kind, withDeferred(deferredSwitch));
+    await userEvent.click(chip(first));
+    const badges = document.querySelectorAll('.ps-tray .ps-switchbtn .ps-engine-badge');
+    expect(badges).toHaveLength(1);
+    expect(badges[0].closest('.ps-switchbtn')).toHaveTextContent(benched.pokemonName);
+    expect(document.querySelectorAll('.ps-tray .ps-movebtn .ps-engine-badge')).toHaveLength(0);
+  });
+
+  test('every way to close the tray hands the slot back to the fill', async () => {
+    const fill = withDeferred(deferredMove);
+    renderDock(kind, fill);
+    const closed = async (close: () => Promise<void>) => {
+      await userEvent.click(chip(first));
+      vi.mocked(fill.release).mockClear();
+      await close();
+      expect(fill.release).toHaveBeenCalledTimes(1);
+      expect(fill.release).toHaveBeenCalledWith('p1', 0);
+      expect(document.querySelector('.ps-tray')).toBeNull();
+    };
+    await closed(() => userEvent.click(tray().getByRole('button', { name: 'Done' })));
+    await closed(() => userEvent.click(chip(first)));
+    await closed(() => userEvent.keyboard('{Escape}'));
+    await closed(() => userEvent.click(document.body));
+    // Another chip's tray closes the first one's and opens its own.
+    await userEvent.click(chip(first));
+    vi.mocked(fill.release).mockClear();
+    await userEvent.click(chip(second));
+    expect(fill.release).toHaveBeenCalledWith('p1', 0);
+    expect(document.querySelector('.ps-tray')).not.toBeNull();
+  });
+
+  test('opening the dice section is not a release', async () => {
+    const fill = withDeferred(deferredMove);
+    renderDock(kind, fill);
+    await userEvent.click(chip(first));
+    await userEvent.click(tray().getByRole('button', { name: /Dice · What if/ }));
+    expect(fill.release).not.toHaveBeenCalled();
+  });
+
+  test('Execute with the tray open takes the deferred pick as the slot\'s choice, closes the tray and runs the turn with it', async () => {
+    const others = kind === 'doubles'
+      ? { p1Choices: [null, move('ragepowder', 'Rage Powder')], p2Choices: [move('grassyglide', 'Grassy Glide', 1), move('tailwind', 'Tailwind')] }
+      : { p1Choices: [null], p2Choices: [move('leechseed', 'Leech Seed')] };
+    const state = simState(kind, others);
+    const fill = withDeferred(deferredMove);
+    const props = renderDock(kind, fill, {}, state);
+    // The label counts the deferred pick as chosen.
+    expect(execute()).toBeEnabled();
+    expect(execute()).toHaveTextContent('Execute Turn');
+    await userEvent.click(chip(first));
+    await userEvent.click(execute());
+    expect(fill.release).toHaveBeenCalledWith('p1', 0);
+    expect(document.querySelector('.ps-tray')).toBeNull();
+    expect(props.onExecuteTurn).toHaveBeenCalledTimes(1);
+    const sent = vi.mocked(props.onExecuteTurn).mock.calls[0][0];
+    expect(sent.p1[0]).toEqual(deferredMove);
+    expect(sent.p2).toEqual(state.p2Choices);
+  });
+
+  test('a deferred pick that leaves another slot empty keeps Execute locked', () => {
+    renderDock(kind, withDeferred(deferredMove), {}, simState(kind));
+    expect(execute()).toBeDisabled();
   });
 });

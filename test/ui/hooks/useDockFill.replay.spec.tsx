@@ -222,3 +222,34 @@ describe('useDockFill at a replay turn: Execute while the run is pending', () =>
     expect(executeTurn).not.toHaveBeenCalled();
   });
 });
+
+describe('useDockFill at a replay turn: the engine\'s choice for the clicked slot waits until its tray closes (round 84, A7a)', () => {
+  test('doubles: the clicked empty slot keeps a deferred pick, the view shows it only after the release', () => {
+    const { wired, handleEvaluate, setChoice } = replayInputs(doublesTurn());
+    const { result } = renderHook(() => useDockFill(wired));
+    act(() => result.current.arm());
+    act(() => result.current.holdTray({ side: 'p2', slot: 0 }));
+    act(() => onResultOf(handleEvaluate)(doublesResult()));
+    expect(result.current.deferred.p2[0]).toEqual(expect.objectContaining({ moveId: 'grassyglide' }));
+    expect(result.current.choices?.p2[0]).toBeNull();
+    expect(result.current.choices?.p2[1]).toEqual(expect.objectContaining({ moveId: 'tailwind' }));
+    act(() => result.current.release('p2', 0));
+    expect(result.current.choices?.p2[0]).toEqual(expect.objectContaining({ moveId: 'grassyglide' }));
+    expect(result.current.engine.p2).toEqual([true, true]);
+    expect(result.current.deferred.p2).toEqual([null, null]);
+    // A replay turn never writes into the branch.
+    expect(setChoice).not.toHaveBeenCalled();
+  });
+
+  test('singles: a choice of the user in the slot drops the deferred pick', () => {
+    const { wired, handleEvaluate } = replayInputs(singlesTurn());
+    const { result } = renderHook(() => useDockFill(wired));
+    act(() => result.current.arm());
+    act(() => result.current.holdTray({ side: 'p1', slot: 0 }));
+    act(() => onResultOf(handleEvaluate)(evalResult('singles')));
+    expect(result.current.deferred.p1[0]).toEqual(expect.objectContaining({ moveId: 'earthquake' }));
+    act(() => result.current.onUserChoice('p1', 0));
+    act(() => result.current.release('p1', 0));
+    expect(result.current.choices?.p1[0]).toBeNull();
+  });
+});

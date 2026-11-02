@@ -365,3 +365,107 @@ describe('useDockFill: a queued Execute dies with its run', () => {
     expect(branch.executeTurn).not.toHaveBeenCalled();
   });
 });
+
+describe('useDockFill: the engine\'s choice for a held slot waits until the tray closes (round 84, A7a, ruling 1a)', () => {
+  const fakeOut = expect.objectContaining({ kind: 'move', moveId: 'fakeout', targetLoc: 1 });
+
+  test('doubles: the held slot stays empty and its part of the joint choice is the deferred pick; the partner slot fills from the same choice', () => {
+    const { wired, handleEvaluate, branch } = inputsOf('doubles');
+    const { result } = renderHook(() => useDockFill(wired));
+    act(() => result.current.holdTray({ side: 'p1', slot: 0 }));
+    act(() => onResultOf(handleEvaluate)(doublesResult()));
+    expect(branch.choices.p1[0]).toBeNull();
+    expect(branch.choices.p1[1]).toEqual(expect.objectContaining({ moveId: 'spore' }));
+    expect(result.current.deferred.p1).toEqual([fakeOut, null]);
+    expect(result.current.deferred.p2).toEqual([null, null]);
+    expect(result.current.engine.p1).toEqual([false, true]);
+  });
+
+  test('releasing the slot writes the deferred pick into the branch with the mark "engine", once', () => {
+    const { wired, handleEvaluate, branch } = inputsOf('doubles');
+    const { result } = renderHook(() => useDockFill(wired));
+    act(() => result.current.holdTray({ side: 'p1', slot: 0 }));
+    act(() => onResultOf(handleEvaluate)(doublesResult()));
+    act(() => result.current.release('p1', 0));
+    expect(branch.setChoice).toHaveBeenLastCalledWith('p1', fakeOut, 0);
+    expect(branch.choices.p1[0]).toEqual(fakeOut);
+    expect(result.current.engine.p1).toEqual([true, true]);
+    expect(result.current.deferred.p1).toEqual([null, null]);
+    const writes = branch.setChoice.mock.calls.length;
+    act(() => result.current.release('p1', 0));
+    expect(branch.setChoice).toHaveBeenCalledTimes(writes);
+  });
+
+  test('singles: the same, for the only slot of a side', () => {
+    const { wired, handleEvaluate, branch } = inputsOf('singles');
+    const { result } = renderHook(() => useDockFill(wired));
+    act(() => result.current.holdTray({ side: 'p2', slot: 0 }));
+    act(() => onResultOf(handleEvaluate)(evalResult('singles')));
+    expect(result.current.deferred.p2).toEqual([expect.objectContaining({ moveId: 'leechseed' })]);
+    act(() => result.current.release('p2', 0));
+    expect(branch.choices.p2[0]).toEqual(expect.objectContaining({ moveId: 'leechseed' }));
+    expect(result.current.engine).toEqual({ p1: [true], p2: [true] });
+  });
+
+  test('a choice of the user in the slot drops the deferred pick: releasing writes nothing', () => {
+    const { wired, handleEvaluate, branch } = inputsOf('doubles');
+    const { result } = renderHook(() => useDockFill(wired));
+    act(() => result.current.holdTray({ side: 'p1', slot: 0 }));
+    act(() => onResultOf(handleEvaluate)(doublesResult()));
+    const writes = branch.setChoice.mock.calls.length;
+    act(() => result.current.onUserChoice('p1', 0));
+    expect(result.current.deferred.p1).toEqual([null, null]);
+    act(() => result.current.release('p1', 0));
+    expect(branch.setChoice).toHaveBeenCalledTimes(writes);
+    expect(result.current.engine.p1).toEqual([false, true]);
+  });
+
+  test('a slot that holds a choice by the time the tray closes keeps it', () => {
+    const user: BranchSlotChoice = { kind: 'move', moveId: 'protect', moveName: 'Protect' };
+    const { wired, handleEvaluate, branch } = inputsOf('doubles');
+    const { result } = renderHook(() => useDockFill(wired));
+    act(() => result.current.holdTray({ side: 'p1', slot: 0 }));
+    act(() => onResultOf(handleEvaluate)(doublesResult()));
+    branch.choices.p1[0] = user;
+    act(() => result.current.release('p1', 0));
+    expect(branch.choices.p1[0]).toBe(user);
+    expect(result.current.engine.p1[0]).toBe(false);
+  });
+
+  test('a body the partner slot sends in meanwhile does not fit: the slot stays empty and says "choose"', () => {
+    const { wired, handleEvaluate, branch } = inputsOf('doubles');
+    const { result } = renderHook(() => useDockFill(wired));
+    const ranked: EvalResult = { ...evalResult('doubles'), perSide: { p1: [rankedChoice('switch 3, move spore 2', 'Flutter Mane + Spore', 0.2)], p2: [] } };
+    act(() => result.current.holdTray({ side: 'p1', slot: 0 }));
+    act(() => onResultOf(handleEvaluate)(ranked));
+    expect(result.current.deferred.p1[0]).toEqual(expect.objectContaining({ kind: 'switch', pokemonName: 'Flutter Mane' }));
+    branch.choices.p1[1] = { kind: 'switch', speciesId: 'fluttermane', pokemonName: 'Flutter Mane' };
+    const writes = branch.setChoice.mock.calls.length;
+    act(() => result.current.release('p1', 0));
+    expect(branch.setChoice).toHaveBeenCalledTimes(writes);
+    expect(result.current.deferred.p1).toEqual([null, null]);
+  });
+
+  test('releasing a slot that has no deferred pick, or at another position, writes nothing', () => {
+    const { wired, handleEvaluate, branch } = inputsOf('doubles');
+    const { rerender, result } = renderHook((props: DockFillInputs) => useDockFill(props), { initialProps: wired });
+    act(() => result.current.holdTray({ side: 'p1', slot: 0 }));
+    act(() => onResultOf(handleEvaluate)(doublesResult()));
+    const writes = branch.setChoice.mock.calls.length;
+    act(() => result.current.release('p2', 1));
+    expect(branch.setChoice).toHaveBeenCalledTimes(writes);
+    rerender({ ...wired, historyLength: 2, evalViewKey: 'variation:4' });
+    expect(result.current.deferred).toEqual({ p1: [], p2: [] });
+    act(() => result.current.release('p1', 0));
+    expect(branch.setChoice).toHaveBeenCalledTimes(writes);
+  });
+
+  test('a tray that was open when the run began but closed before the result lands has nothing to defer', () => {
+    const { wired, handleEvaluate } = inputsOf('doubles');
+    const { result } = renderHook(() => useDockFill(wired));
+    act(() => result.current.holdTray({ side: 'p1', slot: 0 }));
+    act(() => result.current.holdTray(null));
+    act(() => onResultOf(handleEvaluate)(doublesResult()));
+    expect(result.current.deferred.p1).toEqual([null, null]);
+  });
+});

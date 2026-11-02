@@ -114,7 +114,9 @@ export function TurnDock(props: TurnDockProps) {
   const setChoice = useUserChoice(fill, onSetChoice);
   const onEdit = useCallback((side: Side, slot: number, choice: BranchSlotChoice) => setChoice(side, choice, slot), [setChoice]);
   const { slots, gimmickFor, damageBySide } = useDockPreview(simState, gen, positionKey, getBattle, onEdit);
-  const { open, attachRoot, close, toggleChip, toggleMore, onKeyDown } = useTrayState(positionKey);
+  const release = fill?.release;
+  const onLeave = useCallback((left: TrayOpen) => release?.(left.side, left.slot), [release]);
+  const { open, attachRoot, close, toggleChip, toggleMore, onKeyDown } = useTrayState(positionKey, onLeave);
   useHeldTray(fill, open);
   const attachDock = useDockElement(attachRoot);
   const diceViews = useDiceViews({ diceOpen: open?.more ?? false, stale, simState, getBattle, replayLog, onSetChoice: setChoice });
@@ -137,6 +139,8 @@ export function TurnDock(props: TurnDockProps) {
             diceViews={diceViews}
             onChoice={choice => setChoice(open.side, choice, open.slot)}
             onHypotheticalMove={params => {
+              // The loaded move becomes the slot's choice: the engine's held-back pick is no longer wanted.
+              fill?.onUserChoice(open.side, open.slot);
               onHypotheticalMove(open.side, open.slot, params);
               close();
             }}
@@ -151,7 +155,7 @@ export function TurnDock(props: TurnDockProps) {
             fill={fill}
             executing={executing}
             onClose={close}
-            onRun={() => onExecuteTurn({ p1: simState.p1Choices, p2: simState.p2Choices })}
+            onRun={() => onExecuteTurn(model.sendChoices)}
           />
         </div>
       </div>

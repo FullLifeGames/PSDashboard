@@ -72,3 +72,17 @@ describe('chipPlaceholder', () => {
     expect(chipPlaceholder({ ...base, hasRecord: false, engine: 'busy', nobodyLeft: true })).toBe('fainted · no one left');
   });
 });
+
+describe("chipPlaceholder, the engine's deferred pick (round 84, A7a)", () => {
+  const base = { forceSwitch: false, nobodyLeft: false, played: null, hasRecord: false };
+  test('a held slot with a deferred pick reads "engine: <pick> · choose", in the manner of the played pick', () => {
+    expect(chipPlaceholder({ ...base, deferred: { kind: 'move', name: 'Rock Slide' } })).toBe('engine: Rock Slide · choose');
+    expect(chipPlaceholder({ ...base, deferred: { kind: 'switch', name: 'Kingambit' } })).toBe('engine: → Kingambit · choose');
+  });
+  test("the deferred pick outranks the played one and a forced replacement's text; an empty bench keeps its own", () => {
+    const played = { kind: 'move' as const, name: 'Protect' };
+    expect(chipPlaceholder({ ...base, played, hasRecord: true, deferred: { kind: 'move', name: 'Rock Slide' } })).toBe('engine: Rock Slide · choose');
+    expect(chipPlaceholder({ ...base, forceSwitch: true, deferred: { kind: 'switch', name: 'Kingambit' } })).toBe('engine: → Kingambit · choose');
+    expect(chipPlaceholder({ ...base, nobodyLeft: true, deferred: { kind: 'switch', name: 'Kingambit' } })).toBe('fainted · no one left');
+  });
+});

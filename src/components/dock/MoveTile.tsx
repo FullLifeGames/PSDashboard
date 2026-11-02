@@ -7,6 +7,7 @@ import { HitBar } from './HitBar';
 import { TypeTag } from './TypeTag';
 
 const PLAYED_TITLE = 'The action played at this position on the line you are viewing.';
+const ENGINE_TITLE = "The engine's choice for this slot. It takes the slot when you close the tray, unless you pick something else.";
 const FORCED_TITLE = 'This move carries forced dice. Open "Dice · What if" to see them.';
 
 export interface MoveTileProps {
@@ -17,6 +18,8 @@ export interface MoveTileProps {
   selected: boolean;
   /** This is the move the viewed line played at this position. */
   wasPlayed: boolean;
+  /** Round 84 (A7a): the engine's choice for the open slot, held back until the tray closes. */
+  engine?: boolean;
   /** The move is the slot's pick and carries forced dice (round 82). */
   forced: boolean;
   /** The Z-Move the pressed Z toggle turns this move into. */
@@ -36,7 +39,7 @@ function BarRow({ bar }: { bar: TileBar }) {
 }
 
 /** Round 84 (turn dock), style 5: name, type tag and PP, then one hit bar per body the move reaches. A click picks the move on its preselected target. */
-export function MoveTile({ move, type, bars, selected, wasPlayed, forced, zMoveName, title, onPick }: MoveTileProps) {
+export function MoveTile({ move, type, bars, selected, wasPlayed, engine = false, forced, zMoveName, title, onPick }: MoveTileProps) {
   return (
     <button
       type="button"
@@ -47,10 +50,11 @@ export function MoveTile({ move, type, bars, selected, wasPlayed, forced, zMoveN
       title={title}
       onClick={onPick}
     >
-      {(wasPlayed || forced) && (
+      {(wasPlayed || forced || engine) && (
         <span className="ps-tile-flags">
           {wasPlayed && <span className="ps-played-badge" title={PLAYED_TITLE}>played</span>}
           {forced && <span className="ps-forced-badge" title={FORCED_TITLE}>forced</span>}
+          {engine && <span className="ps-engine-badge" title={ENGINE_TITLE}>engine</span>}
         </span>
       )}
       <span className="ps-movebtn-name">{move.name}</span>

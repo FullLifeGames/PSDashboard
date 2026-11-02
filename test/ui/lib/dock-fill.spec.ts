@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { BranchSlotChoice, RankedChoice } from '@fulllifegames/eval-engine';
-import { overlayFill, pickFill, slotChoicesOf } from '../../../src/lib/dock-fill';
+import { fitsBeside, overlayFill, pickFill, pickFillParts, slotChoicesOf } from '../../../src/lib/dock-fill';
 import { rankedChoice } from '../fixtures/eval-result';
 import { simState } from '../fixtures/sim-state';
 
@@ -172,6 +172,56 @@ describe('pickFill, held slots (the rule against jumping)', () => {
   test('singles: the only slot held leaves the side empty', () => {
     const ranked = [rankedChoice('move earthquake', 'Earthquake', 0.35)];
     expect(pickFill('p1', ranked, simState('singles'), [null], [true])).toEqual([null]);
+  });
+});
+
+describe("pickFillParts, the held slot's deferred pick (round 84, A7a, ruling 1a)", () => {
+  const doubles = simState('doubles');
+
+  test('a held slot keeps its part of the best joint choice as the deferred pick, and the other slot is filled from the same choice', () => {
+    const { filled, deferred } = pickFillParts('p1', doublesRanked, doubles, [null, null], [true, false]);
+    expect(filled[0]).toBeNull();
+    expect(filled[1]).toEqual(expect.objectContaining({ moveId: 'spore', targetLoc: 2 }));
+    expect(deferred[0]).toEqual(expect.objectContaining({ moveId: 'fakeout', targetLoc: 1 }));
+    expect(deferred[1]).toBeNull();
+    // pickFill is the filled half and nothing else.
+    expect(pickFill('p1', doublesRanked, doubles, [null, null], [true, false])).toEqual(filled);
+  });
+
+  test('a touched slot has no deferred pick, held or not; without a held slot nothing is deferred', () => {
+    const { deferred } = pickFillParts('p1', doublesRanked, doubles, [flareBlitz, null], [true, false]);
+    expect(deferred).toEqual([null, null]);
+    expect(pickFillParts('p1', doublesRanked, doubles, [null, null]).deferred).toEqual([null, null]);
+  });
+
+  test('singles: the only slot held defers the best choice', () => {
+    const ranked = [rankedChoice('move earthquake', 'Earthquake', 0.35)];
+    const { filled, deferred } = pickFillParts('p1', ranked, simState('singles'), [null], [true]);
+    expect(filled).toEqual([null]);
+    expect(deferred).toEqual([{ kind: 'move', moveId: 'earthquake', moveName: 'Earthquake' }]);
+  });
+
+  test('no agreeing joint choice defers nothing', () => {
+    const { filled, deferred } = pickFillParts('p1', doublesRanked, doubles, [protect, null], [false, true]);
+    expect(filled).toEqual([null, null]);
+    expect(deferred).toEqual([null, null]);
+  });
+});
+
+describe('fitsBeside (a deferred pick lands after the user chose beside it)', () => {
+  const heatran: BranchSlotChoice = { kind: 'switch', speciesId: 'heatran', pokemonName: 'Heatran' };
+  const tera: BranchSlotChoice = { ...flareBlitz, modifier: 'terastallize' };
+
+  test('a body the partner slot already sends in does not fit; another body does', () => {
+    expect(fitsBeside(heatran, [null, heatran], 0)).toBe(false);
+    expect(fitsBeside(heatran, [null, { ...heatran, speciesId: 'latias', pokemonName: 'Latias' }], 0)).toBe(true);
+    expect(fitsBeside(heatran, [heatran, null], 0)).toBe(true);
+  });
+
+  test('a second Tera or Mega on the side does not fit', () => {
+    expect(fitsBeside({ ...protect, modifier: 'terastallize' }, [null, tera], 0)).toBe(false);
+    expect(fitsBeside({ ...protect, modifier: 'mega' }, [null, tera], 0)).toBe(true);
+    expect(fitsBeside(protect, [null, tera], 0)).toBe(true);
   });
 });
 

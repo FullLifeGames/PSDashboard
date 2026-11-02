@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { BranchSimState, BranchSlotChoice, EvalResult } from '@fulllifegames/eval-engine';
-import { pickFill } from '../lib/dock-fill';
+import { fitsBeside, pickFillParts } from '../lib/dock-fill';
 import type { SideChoices } from '../lib/dock-seed';
 import type { EvaluateOptions } from './useEvalView';
 import type { useBranch } from './useBranch';
@@ -62,12 +62,19 @@ export interface DockFillView {
   arm: () => void;
   /** The dock reports its open tray (null when none): the fill never writes that slot, whenever the result lands. */
   holdTray: (open: HeldSlot | null) => void;
+  /**
+   * Round 84 (A7a, ruling 1a): the engine's pick for a slot whose tray was open when the result landed, by slot (null elsewhere).
+   * The chip and the tile show it as the engine's pick; the slot takes it when `release` runs.
+   */
+  deferred: SideChoices;
+  /** The tray of a slot closed (Done, a click beside, Escape, a chip): the slot takes its deferred pick unless the user chose there. */
+  release: (side: Side, slot: number) => void;
 }
 
 const NO_MARKS: EngineMarks = { p1: [], p2: [] };
 const RUNNING = new Set<Evaluation['status']>(['reconstructing', 'searching']);
 
-interface Settled { key: string | null; marks: EngineMarks; choices: SideChoices }
+interface Settled { key: string | null; marks: EngineMarks; choices: SideChoices; deferred: SideChoices }
 
 const NO_CHOICES: SideChoices = { p1: [], p2: [] };
 
@@ -90,7 +97,7 @@ function gate(inputs: DockFillInputs, armedKey: string | null): { key: string; o
 
 /** The marks the fill left and the Execute queued behind it, in state for the chips and mirrored in refs for the callbacks of a run. */
 function useFillMarks() {
-  const [settled, setSettled] = useState<Settled>({ key: null, marks: NO_MARKS, choices: NO_CHOICES });
+  const [settled, setSettled] = useState<Settled>({ key: null, marks: NO_MARKS, choices: NO_CHOICES, deferred: NO_CHOICES });
   const [queued, setQueued] = useState<string | null>(null);
   const settledRef = useRef(settled);
   const heldRef = useRef<HeldSlot | null>(null);
@@ -104,9 +111,23 @@ function useFillMarks() {
   return { settled, queued, settledRef, heldRef, commit, queue, unqueue, holdTray };
 }
 
+/** The user chose in a slot: it is no longer the engine's, and the pick held back for it is gone. */
+function useOnUserChoice({ settledRef, commit }: Pick<FillMarks, 'settledRef' | 'commit'>) {
+  return useCallback((side: Side, slot: number) => {
+    const current = settledRef.current;
+    const deferred = current.deferred[side][slot];
+    if (!current.marks[side][slot] && !deferred) return;
+    const next = current.marks[side].map((mark, index) => mark && index !== slot);
+    commit({
+      ...current, marks: { ...current.marks, [side]: next },
+      deferred: { ...current.deferred, [side]: current.deferred[side].map((pick, index) => (index === slot ? null : pick)) },
+    });
+  }, [commit, settledRef]);
+}
+
 type FillMarks = ReturnType<typeof useFillMarks>;
 
-/** Writes the result into the untouched slots of both sides, then runs an Execute that waited for it. */
+/** Writes the result into the untouched slots of both sides, then runs an Execute that waited for it; `release` hands a held slot its deferred pick. */
 function useFillApply(inputs: DockFillInputs, key: string, eligible: boolean, marks: FillMarks) {
   const { simState, getChoices, setChoice, executeTurn } = inputs;
   const { settledRef, heldRef, queued, commit, unqueue } = marks;
@@ -116,34 +137,57 @@ function useFillApply(inputs: DockFillInputs, key: string, eligible: boolean, ma
   useEffect(() => {
     latest.current = { key, eligible, simState, getChoices, setChoice, executeTurn, queued, liveTip };
   });
-  return useCallback((runKey: string, result: EvalResult) => {
+  const apply = useCallback((runKey: string, result: EvalResult) => {
     const now = latest.current;
     if (now.key !== runKey || !now.eligible || !now.simState || settledRef.current.key === runKey) return;
     const state = now.simState;
     const choices = now.getChoices();
     const written: EngineMarks = { p1: [], p2: [] };
     const wrote: SideChoices = { p1: [], p2: [] };
+    const deferred: SideChoices = { p1: [], p2: [] };
     const merged: SideChoices = { p1: [], p2: [] };
     for (const side of ['p1', 'p2'] as const) {
       // A slot with a choice already is the user's: the fill runs once per position, so no earlier fill wrote it.
       const touched = Array.from({ length: slotCount(state, side) }, (_, slot): BranchSlotChoice | null => choices[side][slot] ?? null);
       // Round 84: the slot whose tray is open stays as it is, like a touched one.
       const held = touched.map((_, slot) => heldRef.current?.side === side && heldRef.current.slot === slot);
-      const filled = pickFill(side, result.perSide[side], state, touched, held);
+      const { filled, deferred: later } = pickFillParts(side, result.perSide[side], state, touched, held);
       written[side] = filled.map(choice => choice !== null);
       wrote[side] = filled;
+      deferred[side] = later;
       merged[side] = filled.map((choice, slot) => touched[slot] ?? choice);
       if (now.liveTip) filled.forEach((choice, slot) => { if (choice) now.setChoice(side, choice, slot); });
     }
-    commit({ key: runKey, marks: written, choices: wrote });
+    commit({ key: runKey, marks: written, choices: wrote, deferred });
     if (now.queued === runKey) {
       unqueue();
       void now.executeTurn(merged);
     }
   }, [settledRef, heldRef, commit, unqueue]);
+  const release = useCallback((side: Side, slot: number) => {
+    const now = latest.current;
+    const current = settledRef.current;
+    const choice = current.deferred[side][slot];
+    if (current.key !== now.key || !choice) return;
+    const others = now.getChoices()[side] as (BranchSlotChoice | null)[];
+    const withSlot = <T,>(list: T[], value: T): T[] => Array.from({ length: Math.max(list.length, slot + 1) }, (_, index) => (index === slot ? value : list[index]));
+    const deferred = { ...current.deferred, [side]: withSlot(current.deferred[side], null) };
+    // The user may have chosen in this slot or beside it while the tray stood open: then the engine's pick is gone or no longer fits.
+    if (others[slot] || !fitsBeside(choice, others, slot)) {
+      commit({ ...current, deferred });
+      return;
+    }
+    if (now.liveTip) now.setChoice(side, choice, slot);
+    commit({
+      ...current, deferred,
+      marks: { ...current.marks, [side]: withSlot(current.marks[side], true) },
+      choices: { ...current.choices, [side]: withSlot(current.choices[side], choice) },
+    });
+  }, [settledRef, commit]);
+  return { apply, release };
 }
 
-type Apply = ReturnType<typeof useFillApply>;
+type Apply = ReturnType<typeof useFillApply>['apply'];
 
 /** The view's own effects start the evaluation of a live position in these cases (`useEvalHousekeeping`); the fill leaves the run to them. */
 function startedByHousekeeping(liveTip: boolean, prefs: Pick<Evaluation['prefs'], 'auto' | 'autoAnalyze'>, status: Evaluation['status']): boolean {
@@ -180,6 +224,13 @@ function useFillTrigger(inputs: DockFillInputs, key: string, eligible: boolean, 
   }, [key, eligible, attempted, running, evaluation.status, evaluation.result, evaluation.prefs, liveEvalStatus, liveTip, handleEvaluate, apply, settledRef]);
 }
 
+/** What the dock reads of a fill that landed for this position (nothing before). A replay turn reads its choices from the view. */
+function landedView(landed: Settled | null, liveTip: boolean): Pick<DockFillView, 'engine' | 'choices' | 'deferred'> {
+  return {
+    engine: landed?.marks ?? NO_MARKS, choices: landed && !liveTip ? landed.choices : null, deferred: landed?.deferred ?? NO_CHOICES,
+  };
+}
+
 /**
  * Round 84 (turn dock): the engine fill. Once per position the hook asks the evaluation for the position and writes the best
  * ranked choice into every slot the user has not touched, nor holds open. At the live tip of a variation it starts at once and
@@ -196,12 +247,13 @@ export function useDockFill(inputs: DockFillInputs): DockFillView {
   // The click that arms the fill belongs to its position: another turn needs its own, and so does a return.
   if (armedKey !== null && armedKey !== key) setArmedKey(null);
   const marks = useFillMarks();
-  const { settled, queued, settledRef, commit, queue, unqueue, holdTray } = marks;
+  const { settled, queued, settledRef, queue, unqueue, holdTray } = marks;
+  const onUserChoice = useOnUserChoice(marks);
   const done = settled.key === key;
   const attempted = evaluation.resultTag === inputs.evalViewKey;
   const running = attempted && RUNNING.has(evaluation.status);
   const pending = eligible && !done && (running || !attempted);
-  const apply = useFillApply(inputs, key, eligible, marks);
+  const { apply, release } = useFillApply(inputs, key, eligible, marks);
   useFillTrigger(inputs, key, eligible, running, apply, settledRef);
 
   // A queued Execute lives as long as its run is pending: a run that failed or that something stopped takes it along, so a later
@@ -212,16 +264,10 @@ export function useDockFill(inputs: DockFillInputs): DockFillView {
   const queueExecute = useCallback(() => queue(key), [queue, key]);
   const liveTip = inputs.liveTip;
   const arm = useCallback(() => { if (!liveTip) setArmedKey(key); }, [liveTip, key]);
-  const onUserChoice = useCallback((side: Side, slot: number) => {
-    const current = settledRef.current;
-    if (!current.marks[side][slot]) return;
-    const next = current.marks[side].map((mark, index) => mark && index !== slot);
-    commit({ ...current, marks: { ...current.marks, [side]: next } });
-  }, [commit, settledRef]);
-
+  const landed = done ? settled : null;
   return {
     pending, busy: open && evaluation.graph.running && !done, waits,
-    engine: done ? settled.marks : NO_MARKS, choices: done && !liveTip ? settled.choices : null,
-    queueExecute, onUserChoice, holdTray, arm,
+    ...landedView(landed, liveTip),
+    queueExecute, onUserChoice, holdTray, release, arm,
   };
 }

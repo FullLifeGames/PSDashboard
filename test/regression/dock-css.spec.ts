@@ -148,3 +148,18 @@ describe('the HP bar of a bench tile', () => {
     expect(rule(css, '.ps-switch-hp-track') ?? '').toMatch(/display:\s*block/);
   });
 });
+
+describe('the engine badge of a tile', () => {
+  // Round 84 (A7a): the engine's held-back pick wears the played badge's face (same tokens, so the contrast spec covers it), shares the
+  // badge box rules, and sits in the tile's flag row beside the played and forced badges.
+  const pickers = readFileSync(new URL('../../src/styles/pickers.css', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+
+  test('it takes the played badge\'s colors and the shared box of the badges', () => {
+    expect(pickers).toMatch(/\n\.ps-engine-badge \{ background: var\(--ps-badge-played-bg\); color: var\(--ps-badge-played-fg\); \}/);
+    expect(pickers).toMatch(/\.ps-played-badge,\n\.ps-forced-badge,\n\.ps-engine-badge\s*\{/);
+  });
+
+  test('on a move tile it joins the flags above the tile and takes no room', () => {
+    expect(css).toMatch(/\.ps-tile-flags \.ps-engine-badge\s*\{[^}]*margin:\s*0/);
+  });
+});

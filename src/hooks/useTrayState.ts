@@ -5,6 +5,8 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 're
  * position (a new `positionKey` closes it in the same render, the way `useArmedAt` drops the armed gimmicks). A click beside
  * the dock closes it; the replay is an iframe, whose clicks never reach this document, so the window losing focus to an iframe
  * closes it too. Escape closes it and returns the focus to the chip, except while the What-if box has its list open.
+ * Round 84 (A7a): `onLeave` reports the slot a tray leaves (closed, or replaced by another chip's), from the event that does it, so the
+ * engine's deferred pick for that slot lands then. A new `positionKey` reports nothing: the pick belonged to the old position.
  */
 
 type Side = 'p1' | 'p2';
@@ -18,7 +20,7 @@ export interface TrayOpen {
 
 export const chipKey = (side: Side, slot: number): string => `${side}${slot}`;
 
-export function useTrayState(positionKey: string | undefined) {
+export function useTrayState(positionKey: string | undefined, onLeave?: (left: TrayOpen) => void) {
   const [state, setState] = useState<{ key: string | undefined; open: TrayOpen | null }>({ key: positionKey, open: null });
   const moved = state.key !== positionKey;
   if (moved) setState({ key: positionKey, open: null });
@@ -29,13 +31,15 @@ export function useTrayState(positionKey: string | undefined) {
 
   const close = useCallback((returnFocus = false) => {
     if (returnFocus && open) root.current?.querySelector<HTMLElement>(`[data-chip="${chipKey(open.side, open.slot)}"]`)?.focus();
+    if (open) onLeave?.(open);
     setState({ key: positionKey, open: null });
-  }, [open, positionKey]);
+  }, [open, positionKey, onLeave]);
 
   /** A chip opens its tray, switches to it from another slot's, or closes it when it is the open one. */
   const toggleChip = useCallback((side: Side, slot: number) => {
+    if (open) onLeave?.(open);
     setState({ key: positionKey, open: open?.side === side && open.slot === slot ? null : { side, slot, more: false } });
-  }, [open, positionKey]);
+  }, [open, positionKey, onLeave]);
 
   const toggleMore = useCallback(() => {
     setState({ key: positionKey, open: open ? { ...open, more: !open.more } : null });

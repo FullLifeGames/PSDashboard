@@ -42,7 +42,8 @@
 /* "played" marker on the move/switch actually taken at the viewed position; round 82: "forced" marks a move that carries forced
    dice (a flag on the dock's tile). Round 83: a filled label in plain 9px type reads sharp on every tile (the outlined 8px capitals looked soft). */
 .ps-played-badge,
-.ps-forced-badge {
+.ps-forced-badge,
+.ps-engine-badge {
   display: inline-block;
   margin-left: 5px;
   padding: 1px 6px;
@@ -55,6 +56,8 @@
 }
 .ps-played-badge { background: var(--ps-badge-played-bg); color: var(--ps-badge-played-fg); }
 .ps-forced-badge { background: var(--ps-badge-forced-bg); color: var(--ps-badge-forced-fg); }
+/* Round 84 (A7a): the engine's held-back pick wears the played badge's face, like the chip's own "engine" word. */
+.ps-engine-badge { background: var(--ps-badge-played-bg); color: var(--ps-badge-played-fg); }
 
 /* ── PS Controls Panel ── */
 .ps-controls {

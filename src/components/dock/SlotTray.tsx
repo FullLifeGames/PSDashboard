@@ -34,6 +34,7 @@ export function SlotTray({ slot, hpByLabel, gen, moreOpen, diceViews, onChoice, 
             pending={slot.pending}
             blockedSwitchKeys={slot.blockedSwitchKeys}
             played={slot.played}
+            deferred={slot.deferred}
             onPick={onChoice}
           />
         </div>

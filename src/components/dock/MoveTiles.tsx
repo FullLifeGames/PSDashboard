@@ -27,10 +27,11 @@ export function MoveTiles({ slot, hpByLabel, onChoice }: {
   hpByLabel: Record<string, number>;
   onChoice: (choice: BranchSlotChoice) => void;
 }) {
-  const { moves, pending, gimmick, modifiers, side, played } = slot;
+  const { moves, pending, gimmick, modifiers, side, played, deferred } = slot;
   const ctx: ChoiceContext = { modifier: gimmick.modifier, modifierAvailable: gimmick.modifierAvailable, moves, modifiers };
   const pendingMove = pending?.kind === 'move' ? pending : null;
   const playedMove = played?.kind === 'move' ? played : null;
+  const engineMove = deferred?.kind === 'move' ? deferred : null;
   const picked = pendingMove ? moves.find(move => toId(move.name) === pendingMove.moveId) : undefined;
   const entries = moves.map((move, index) => {
     const selected = pendingMove?.moveId === toId(move.name);
@@ -49,6 +50,7 @@ export function MoveTiles({ slot, hpByLabel, onChoice }: {
       bars={bars}
       selected={selected}
       wasPlayed={playedMove !== null && toId(move.name) === toId(playedMove.name)}
+      engine={engineMove !== null && toId(move.name) === engineMove.moveId}
       forced={selected && (pendingMove?.dice?.length ?? 0) > 0}
       zMoveName={ctx.modifier === 'zmove' ? modifiers.zMoves[move.slot - 1] ?? null : null}
       title={bars.length > 0 ? bars.map(bar => bar.title).join(' · ') : fullMoveTitle(slot.dmg[index])}

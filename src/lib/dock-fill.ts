@@ -58,24 +58,45 @@ function activeCount(state: BranchSimState, side: Side): number {
   return slots?.length ?? 1;
 }
 
+/** What the fill gives one side: the choices to write now, and the picks held slots will take once their trays close. */
+export interface FillParts { filled: Choices; deferred: Choices }
+
 /**
- * The choices to write for one side: the first of `ranked` (best first, as the chess walk reads it) that maps onto the pickers,
+ * The choices for one side: the first of `ranked` (best first, as the chess walk reads it) that maps onto the pickers,
  * agrees with every touched slot and clashes with none of their gimmicks. Touched slots come back null (the fill never writes
  * them), and so does every slot when no joint choice qualifies: those slots stay empty and the chip says "choose".
  * `touched[slot]` is the user's own pick, null where the user has not chosen.
- * `held[slot]` marks a slot whose tray is open (the rule against jumping): it is never written either, but it holds no pick,
- * so it puts no demand on the joint choice.
+ * `held[slot]` marks a slot whose tray is open (the rule against jumping): it is never written, but it holds no pick, so it puts
+ * no demand on the joint choice. Round 84 (A7a, ruling 1a): its part of the same joint choice comes back as `deferred`, which the
+ * slot takes when its tray closes and the user chose nothing there.
  */
-export function pickFill(side: Side, ranked: RankedChoice[], state: BranchSimState, touched: Choices, held: readonly boolean[] = []): Choices {
+export function pickFillParts(side: Side, ranked: RankedChoice[], state: BranchSimState, touched: Choices, held: readonly boolean[] = []): FillParts {
   for (const candidate of ranked) {
     if (candidate.choice === 'wait') continue;
     const parts = slotChoicesOf(state, side, candidate);
     if (!parts || !agreesWithTouched(parts, touched)) continue;
     const filled = parts.map((part, slot) => (touched[slot] || held[slot] ? null : part));
-    if (clashesWithTouched(touched, filled)) continue;
-    return filled;
+    const deferred = parts.map((part, slot) => (!touched[slot] && held[slot] ? part : null));
+    if (clashesWithTouched(touched, [...filled, ...deferred])) continue;
+    return { filled, deferred };
   }
-  return new Array<BranchSlotChoice | null>(activeCount(state, side)).fill(null);
+  const none = () => new Array<BranchSlotChoice | null>(activeCount(state, side)).fill(null);
+  return { filled: none(), deferred: none() };
+}
+
+/** The choices to write now (see `pickFillParts`). */
+export function pickFill(side: Side, ranked: RankedChoice[], state: BranchSimState, touched: Choices, held: readonly boolean[] = []): Choices {
+  return pickFillParts(side, ranked, state, touched, held).filled;
+}
+
+/**
+ * Whether a deferred pick still fits when its tray closes: the user may have chosen in the other slots meanwhile. A body another
+ * slot of the side sends in does not fit, nor a second Tera or Mega on the side. `others` is the side's choices by slot.
+ */
+export function fitsBeside(choice: BranchSlotChoice, others: Choices, slot: number): boolean {
+  const beside = others.map((other, index) => (index === slot ? null : other));
+  if (choice.kind === 'switch') return !beside.some(other => other?.kind === 'switch' && other.speciesId === choice.speciesId);
+  return !clashesWithTouched(beside, [choice]);
 }
 
 /**
@@ -95,6 +116,31 @@ export function overlayFill(state: BranchSimState | null, fill: SideChoices | nu
       if (held || !choice || !stillOffered(choice, state, key, slot)) return held;
       changed = true;
       return choice;
+    });
+  };
+  const p1Choices = side('p1');
+  const p2Choices = side('p2');
+  if (!changed) return state;
+  return { ...state, p1Choices, p1Choice: p1Choices[0] ?? null, p2Choices, p2Choice: p2Choices[0] ?? null };
+}
+
+/**
+ * The state with the deferred picks of the held slots counted as chosen: Execute reads it, so its label counts the open slot and the
+ * turn it sends carries the engine's pick. A deferred pick that no longer fits beside the user's choices stays out, as `release` does.
+ */
+export function withDeferred(state: BranchSimState, deferred: SideChoices | null | undefined): BranchSimState {
+  if (!deferred) return state;
+  let changed = false;
+  const side = (key: Side): Choices => {
+    const own = key === 'p1' ? state.p1Choices : state.p2Choices;
+    // The list grows only where a deferred pick lands beyond the slots the state already lists.
+    const reach = deferred[key].reduce((n, pick, slot) => (pick ? slot + 1 : n), 0);
+    const merged = Array.from({ length: Math.max(own.length, reach) }, (_, slot): BranchSlotChoice | null => own[slot] ?? null);
+    return merged.map((held, slot) => {
+      const pick = deferred[key][slot];
+      if (held || !pick || !fitsBeside(pick, merged, slot)) return held;
+      changed = true;
+      return pick;
     });
   };
   const p1Choices = side('p1');
