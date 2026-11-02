@@ -115,19 +115,29 @@ export function withDice(choice: BranchSlotChoice, dice: readonly ForcedDie[]): 
 /** The dice of the turn that belong to no single move: the order of the actions and the end of the turn. */
 export const TURN_KINDS: ReadonlySet<DieName['kind']> = new Set(['speed-tie', 'move-first', 'end-of-turn']);
 
-/** One set of chips: the dice of one target, or the dice of the move that name no target. */
-export interface ChipGroup { key: string; target?: string; offers: DieOffer[] }
+/** One row of the dice table: one kind of die, with its die for each column (null where that target has none). */
+export interface DiceRow { key: string; cells: (DieOffer | null)[] }
+
+/** The dice of a move as a table: `heads` are the target slots of the columns (empty: one column without a head). */
+export interface DiceTableModel { heads: string[]; rows: DiceRow[]; shared: DieOffer[] }
+
+const keyWithoutTarget = (name: DieName): string => dieKey({ ...name, targetSlot: undefined });
 
 /**
- * The offers grouped for display: a move with one target shows one set, a move with several (a spread move in doubles) one set per
- * target, and the dice that name no target (the hit count, a status check) in a last set.
+ * Round 84 (turn dock), step A4: the offers as a table. A move with several targets (a spread move in doubles) gets one column per
+ * target and one row per kind of die, so a die lines up with its twin on the other target; the dice that name no target (the hit
+ * count, a status check) stand apart in `shared`. A move with one target is one column without a head, a row per die.
  */
-export function chipGroups(offers: readonly DieOffer[]): ChipGroup[] {
-  const targets = [...new Set(offers.map(offer => offer.name.targetSlot).filter((slot): slot is string => slot !== undefined))];
-  if (targets.length <= 1) return offers.length > 0 ? [{ key: 'all', offers: [...offers] }] : [];
-  const groups: ChipGroup[] = targets.map(target => ({ key: target, target, offers: offers.filter(offer => offer.name.targetSlot === target) }));
-  const rest = offers.filter(offer => offer.name.targetSlot === undefined);
-  return rest.length > 0 ? [...groups, { key: 'move', offers: rest }] : groups;
+export function diceTable(offers: readonly DieOffer[]): DiceTableModel {
+  const heads = [...new Set(offers.map(offer => offer.name.targetSlot).filter((slot): slot is string => slot !== undefined))];
+  if (heads.length <= 1) return { heads: [], rows: offers.map(offer => ({ key: dieKey(offer.name), cells: [offer] })), shared: [] };
+  const aimed = offers.filter(offer => offer.name.targetSlot !== undefined);
+  const keys = [...new Set(aimed.map(offer => keyWithoutTarget(offer.name)))];
+  const rows = keys.map(key => ({
+    key,
+    cells: heads.map(head => aimed.find(offer => offer.name.targetSlot === head && keyWithoutTarget(offer.name) === key) ?? null),
+  }));
+  return { heads, rows, shared: offers.filter(offer => offer.name.targetSlot === undefined) };
 }
 
 /**

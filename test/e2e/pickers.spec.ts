@@ -330,9 +330,10 @@ test.describe('PS Dashboard', () => {
 
     await discharge.click();
     const moreTray = await openTrayMore(page, 'p1a');
-    const dice = moreTray.locator('.ps-dice');
-    for (const target of ['P2A Bulbasaur', 'P2B Charmander', 'P1B Eevee']) {
-      await expect(dice.getByRole('group', { name: target }).locator('.ps-dice-heading'), target).toHaveText(target, { timeout: 15000 });
+    // Round 84 (A4): the dice are a table, one column per target; each head names its slot and body.
+    const heads = moreTray.locator('.ps-dice-table .ps-dice-heading');
+    for (const [index, target] of ['P2A Bulbasaur', 'P2B Charmander', 'P1B Eevee'].entries()) {
+      await expect(heads.nth(index), target).toHaveText(target, { timeout: 15000 });
     }
   });
 });

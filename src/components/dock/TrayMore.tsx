@@ -4,14 +4,15 @@ import { useMovePool } from '../../hooks/useSideControlsState';
 import type { DiceViews } from '../../hooks/useDiceView';
 import { rollsFor } from '../../lib/branch-rolls';
 import { pickedChoice, type ChoiceContext } from '../branch/choice-context';
-import { SlotDice, TurnDice } from '../branch/DiceChips';
+import { TurnDice } from '../branch/DiceChips';
+import { DiceTable } from './DiceTable';
 import type { DockSlotModel } from './dock-model';
 import { ChoicePicker, WhatIfRow, type WhatIfState } from './WhatIfSection';
 
 /**
  * Round 84 (turn dock): the part of the tray behind "Dice · What if": the forced dice of the slot's move and of the turn, the
- * "What if it had…" loader and the list of all choices. The parts are today's, moved here and not restyled; the dice chips
- * become a table in step A4. The pool of moves loads when this section opens.
+ * "What if it had…" loader and the list of all choices. The dice of the slot's move are a table (A4), with the dice of the turn
+ * under it; the "What if" loader and the list are today's. The pool of moves loads when this section opens.
  */
 export function TrayMore({ slot, gen, diceViews, onChoice, onHypotheticalMove }: {
   slot: DockSlotModel;
@@ -36,7 +37,7 @@ export function TrayMore({ slot, gen, diceViews, onChoice, onHypotheticalMove }:
       <div className="ps-tray-block">
         <span className="ps-tray-label">Dice</span>
         {dice
-          ? <SlotDice {...dice} label={label} rollsOf={name => rollsFor(name, { moves, dmgResults: slot.dmg, spreadDamageResults: slot.spread, targetDamageResults: slot.targets })} />
+          ? <DiceTable {...dice} label={label} rollsOf={name => rollsFor(name, { moves, dmgResults: slot.dmg, spreadDamageResults: slot.spread, targetDamageResults: slot.targets })} />
           : <span className="ps-tray-hint">Pick a move to see its dice.</span>}
         {diceViews.turn && <TurnDice {...diceViews.turn} />}
       </div>

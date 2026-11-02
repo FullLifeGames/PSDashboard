@@ -170,6 +170,21 @@
 .ps-tray-block .ps-custom-choice { margin-top: 0; }
 .ps-tray-hint { color: var(--ps-switch-sub); font-size: 11px; }
 
+/* ── The dice table (round 84, A4): a column per target, a row per kind of die ── */
+.ps-dice.ps-dice-table {
+  display: grid;
+  grid-template-columns: max-content repeat(var(--dice-cols, 1), minmax(0, 1fr));
+  align-items: center;
+  gap: 4px 10px;
+  margin: 2px 0;
+}
+.ps-dice-table .ps-dice-heading { font-size: 11px; padding-bottom: 2px; border-bottom: 1px solid rgba(255, 255, 255, 0.12); }
+.ps-dice-table .ps-dice-caption { min-width: 0; font-size: 11px; color: var(--ps-muted); }
+.ps-dice-table .ps-dice-cell { min-width: 0; }
+.ps-dice-table .ps-dice-cell-shared { grid-column: 2 / -1; }
+.ps-dice-table .ps-dice-wide { grid-column: 1 / -1; }
+.ps-dice-turn .ps-tray-label { display: block; margin-bottom: 2px; }
+
 /* ── Move tiles (style 5) ── */
 .ps-tile-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
 .ps-movebtn {

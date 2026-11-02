@@ -3,7 +3,8 @@ import { dieKey, type BranchSlotChoice, type DieOffer, type ForcedDie, type Live
 import type { BranchSimState } from './useBranch';
 import { useDiceOffers } from './useDiceOffers';
 import { TURN_KINDS, applyDie, toggleDie, withDice } from '../lib/branch-dice';
-import type { SlotDiceProps, TurnDiceProps } from '../components/branch/DiceChips';
+import type { TurnDiceProps } from '../components/branch/DiceChips';
+import type { DiceTableProps } from '../components/dock/DiceTable';
 
 /**
  * Round 82 (forced dice), step A7a: what the panel hands to the chips. Each die rides on the choice of its own slot (ADR 0001):
@@ -12,7 +13,7 @@ import type { SlotDiceProps, TurnDiceProps } from '../components/branch/DiceChip
  * the slot, which sends a fresh choice, gives its dice back to the seed.
  */
 
-export type SlotDiceView = Omit<SlotDiceProps, 'label'>;
+export type SlotDiceView = Omit<DiceTableProps, 'label'>;
 type Side = 'p1' | 'p2';
 
 const sideOf = (slot: string): Side => (slot[1] === '1' ? 'p1' : 'p2');
@@ -25,15 +26,16 @@ export interface DiceViews {
 }
 
 export function useDiceViews(args: {
-  advanced: boolean;
+  /** The tray's "Dice · What if" section is open: the dock asks the simulator for the dice only then. */
+  diceOpen: boolean;
   stale: boolean | undefined;
   simState: BranchSimState | null;
   getBattle: (() => LiveHit['battle'] | null) | undefined;
   replayLog?: string;
   onSetChoice: (side: Side, choice: BranchSlotChoice, activeSlot?: number) => void;
 }): DiceViews {
-  const { advanced, stale, simState, getBattle, replayLog, onSetChoice } = args;
-  const view = useDiceOffers({ enabled: advanced && !stale, simState, getBattle, replayLog });
+  const { diceOpen, stale, simState, getBattle, replayLog, onSetChoice } = args;
+  const view = useDiceOffers({ enabled: diceOpen && !stale, simState, getBattle, replayLog });
   const choiceAt = useCallback((side: Side, index: number): BranchSlotChoice | null =>
     (side === 'p1' ? simState?.p1Choices : simState?.p2Choices)?.[index] ?? null, [simState]);
   /** A move's die settles the dice around it (the hit it needs); a die of the turn is a plain toggle. */

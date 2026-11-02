@@ -150,11 +150,12 @@ const doubles = () => diceBattle({
 });
 
 describe('the dock dice chips in doubles', () => {
-  test('a spread move shows one set of chips per target, each target named', async () => {
+  test('a spread move shows one column per target, each target named in its head', async () => {
     const latest = renderDock(doubles());
     await openDice('P1A');
     await userEvent.click(tile(/Rock Slide/));
     const dice = await screen.findByRole('group', { name: 'Dice for P1A' });
+    expect([...dice.querySelectorAll('.ps-dice-heading')].map(head => head.textContent)).toEqual(['P2A Snorlax', 'P2B Chansey']);
     for (const name of ['Snorlax', 'Chansey']) {
       expect(await within(dice).findByRole('group', { name: `Hit against ${name}` })).toBeInTheDocument();
       expect(within(dice).getByRole('group', { name: `Flinch against ${name}` })).toBeInTheDocument();
@@ -174,6 +175,8 @@ describe('the dock dice of the turn', () => {
     const latest = renderDock(tied(), { first: { p1: [tackle], p2: [tackle] } });
     await openDice('P1');
     const order = await screen.findByRole('group', { name: 'Move order' });
+    // Round 84 (A4): the dice of the turn stand under the table in a section of their own, "This turn"
+    expect(within(screen.getByRole('group', { name: 'Dice of the turn' })).getByText('This turn')).toHaveClass('ps-tray-label');
     expect(within(order).getAllByRole('button').map(chip => chip.textContent)).toEqual(['Alpha Mon first', 'Beta Mon first']);
     await userEvent.click(within(order).getByRole('button', { name: 'Beta Mon first' }));
     expect(kinds(diceOf(latest.picks, 'p1'))).toEqual([['speed-tie', { first: 'p2a' }]]);

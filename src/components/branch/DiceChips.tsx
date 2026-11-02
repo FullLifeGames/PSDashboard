@@ -1,10 +1,10 @@
 import { dieKey, dieLabel, type DieName, type DieOffer, type DieWords, type ForcedDie } from '@fulllifegames/eval-engine';
-import { TURN_KINDS, captionOf, chipGroups, pullNotes, resultWord } from '../../lib/branch-dice';
+import { TURN_KINDS, captionOf, resultWord } from '../../lib/branch-dice';
 import type { StepDamage } from '../../lib/branch-rolls';
 import { RollSelect } from './RollSelect';
 
 /**
- * Round 82 (forced dice), step A7a: the chips of a slot's dice. A chip is one result of one die; a click forces it, a second click
+ * Round 82 (forced dice), step A7a: the chips of a slot's dice (in a table since round 84, `dock/DiceTable.tsx`). A chip is one result of one die; a click forces it, a second click
  * on the same chip gives the die back to the seed. A chip carries no chance (decision 14a): the result line after Execute names
  * the chance the simulator used. A die the simulator draws for a rule the panel cannot see in advance stays set and shows up
  * in the list below the chips, so the user can always clear what the turn will force.
@@ -12,7 +12,7 @@ import { RollSelect } from './RollSelect';
 
 const sameResult = (a: ForcedDie['result'], b: ForcedDie['result']): boolean => JSON.stringify(a) === JSON.stringify(b);
 
-interface DieRowProps {
+export interface DieRowProps {
   offer: DieOffer;
   dice: readonly ForcedDie[];
   logged: readonly ForcedDie[];
@@ -23,6 +23,8 @@ interface DieRowProps {
   withMove?: boolean;
   /** The calculator's damage for each step of the roll, for the damage roll select. */
   rollsOf?: (name: DieName) => StepDamage | undefined;
+  /** The row stands in a cell of the dice table, whose row label is the caption (round 84, A4); `shared` spans the columns. */
+  cell?: 'cell' | 'shared';
   onToggle: (die: ForcedDie) => void;
 }
 
@@ -44,7 +46,7 @@ function Chip({ die, set, logMark, words, onToggle }: { die: ForcedDie; set: boo
 const critForced = (dice: readonly ForcedDie[], name: DieName): boolean =>
   dice.some(die => die.name.kind === 'crit' && die.name.slot === name.slot && die.name.moveId === name.moveId && die.name.targetSlot === name.targetSlot && 'happens' in die.result && die.result.happens);
 
-function DieRow({ offer, dice, logged, words, target, withMove, rollsOf, onToggle }: DieRowProps) {
+export function DieRow({ offer, dice, logged, words, target, withMove, rollsOf, cell, onToggle }: DieRowProps) {
   const key = dieKey(offer.name);
   const held = dice.find(die => dieKey(die.name) === key);
   const seen = logged.find(die => dieKey(die.name) === key);
@@ -55,8 +57,8 @@ function DieRow({ offer, dice, logged, words, target, withMove, rollsOf, onToggl
     target ? `against ${words.slot(target)}` : '',
   ].filter(Boolean).join(' ');
   return (
-    <div className="ps-dice-row" role="group" aria-label={label}>
-      <span className="ps-dice-caption">{caption}</span>
+    <div className={`ps-dice-row${cell ? ` ps-dice-cell${cell === 'shared' ? ' ps-dice-cell-shared' : ''}` : ''}`} role="group" aria-label={label}>
+      {!cell && <span className="ps-dice-caption">{caption}</span>}
       {offer.name.kind === 'damage-roll' ? <RollSelect offer={offer} held={held} label={label} words={words} rolls={rollsOf?.(offer.name)} crit={critForced(dice, offer.name)} onToggle={onToggle} /> : offer.results.map(result => {
         const die: ForcedDie = { name: offer.name, result };
         return (
@@ -75,54 +77,11 @@ function DieRow({ offer, dice, logged, words, target, withMove, rollsOf, onToggl
 }
 
 /** Dice the user has set that the panel does not offer now: chips that read as set, and clear on a click. */
-function StrayDice({ dice, words, onToggle }: { dice: readonly ForcedDie[]; words: DieWords; onToggle: (die: ForcedDie) => void }) {
+export function StrayDice({ dice, words, onToggle }: { dice: readonly ForcedDie[]; words: DieWords; onToggle: (die: ForcedDie) => void }) {
   if (dice.length === 0) return null;
   return (
     <div className="ps-dice-row" role="group" aria-label="Forced dice the move no longer offers">
       {dice.map(die => <Chip key={dieKey(die.name)} die={die} set logMark={false} words={words} onToggle={onToggle} />)}
-    </div>
-  );
-}
-
-export interface SlotDiceProps {
-  /** The dice the engine offers for the slot's chosen move; null while the panel asks. */
-  offers: DieOffer[] | null;
-  /** The slot choice's forced dice that belong to the move. */
-  dice: readonly ForcedDie[];
-  /** What the log shows for this turn (first turn of a branch). */
-  logged: readonly ForcedDie[];
-  words: DieWords;
-  label: string;
-  /** The calculator's damage for each step of the roll of a die's target (the preview computes it for the chosen move). */
-  rollsOf?: (name: DieName) => StepDamage | undefined;
-  /** The panel edits the slot choice: a die is set, replaced or cleared there. */
-  onToggle: (die: ForcedDie) => void;
-}
-
-/**
- * Round 83 (the user, 01.11.2026: "which hit you're controlling is not really defined"): the heading of a spread move's set of
- * chips names its target by slot and name, so two bodies of one species stay apart.
- */
-const targetHeading = (target: string, words: DieWords): string => `${target.toUpperCase()} ${words.slot(target)}`;
-
-/** The dice of one slot's chosen move: one set of chips per target of a spread move. */
-export function SlotDice({ offers, dice, logged, words, label, rollsOf, onToggle }: SlotDiceProps) {
-  if (offers === null) return null;
-  const offered = new Set(offers.map(offer => dieKey(offer.name)));
-  const stray = dice.filter(die => !offered.has(dieKey(die.name)));
-  if (offers.length === 0 && stray.length === 0) return null;
-  return (
-    <div className="ps-dice" role="group" aria-label={`Dice for ${label}`}>
-      {chipGroups(offers).map(group => (
-        <div key={group.key} className="ps-dice-set" {...(group.target ? { role: 'group', 'aria-label': targetHeading(group.target, words) } : {})}>
-          {group.target && <div className="ps-dice-heading">{targetHeading(group.target, words)}</div>}
-          {group.offers.map(offer => (
-            <DieRow key={dieKey(offer.name)} offer={offer} dice={dice} logged={logged} words={words} target={group.target} rollsOf={rollsOf} onToggle={onToggle} />
-          ))}
-        </div>
-      ))}
-      {pullNotes(dice, offers, words).map(note => <div key={note} className="ps-dice-note">{note}</div>)}
-      <StrayDice dice={stray} words={words} onToggle={onToggle} />
     </div>
   );
 }
@@ -156,6 +115,7 @@ export function TurnDice({ offers, dice, logged, words, onToggle }: TurnDiceProp
   const sharedRoll = order.some(offer => offer.name.kind === 'move-first' && offer.chance === undefined);
   return (
     <div className="ps-dice ps-dice-turn" role="group" aria-label="Dice of the turn">
+      <span className="ps-tray-label">This turn</span>
       {order.length > 0 && (
         <div className="ps-dice-set" role="group" aria-label="Move order">
           <div className="ps-dice-heading">Move order</div>

@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { Dex } from '@pkmn/sim';
 import type { BranchSlotChoice, DieOffer, ForcedDie } from '@fulllifegames/eval-engine';
-import { STATUS_WORDS, applyDie, captionOf, chipGroups, pullNotes, resultWord, toggleDie, wordsOf, withDice } from '../../../src/lib/branch-dice';
+import { STATUS_WORDS, applyDie, captionOf, diceTable, pullNotes, resultWord, toggleDie, wordsOf, withDice } from '../../../src/lib/branch-dice';
 import { diceBattle, setOf } from '../fixtures/dice-battle';
 
 /**
@@ -80,21 +80,34 @@ describe('editing the dice of a slot choice', () => {
   });
 });
 
-describe('the groups the chips show', () => {
+describe('the table the dice show (round 84, A4)', () => {
   const offer = (kind: ForcedDie['name']['kind'], extra: Partial<ForcedDie['name']> = {}, results: DieOffer['results'] = [{ happens: true }, { happens: false }]): DieOffer => ({
     name: { slot: 'p1a', moveId: 'rockslide', targetSlot: 'p2a', kind, ...extra }, results,
   });
 
-  test('a spread move gets one set per target, each target named; one target names none', () => {
+  test('a spread move gets one column per target and one row per kind of die; the dice that name no target stand apart', () => {
     const offers = [
       offer('accuracy'), offer('crit'), offer('accuracy', { targetSlot: 'p2b' }), offer('crit', { targetSlot: 'p2b' }),
       offer('hit-count', { targetSlot: undefined }, [{ hits: 2 }, { hits: 3 }]),
     ];
-    const groups = chipGroups(offers);
-    expect(groups.map(group => [group.target, group.offers.map(entry => entry.name.kind)])).toEqual([
-      ['p2a', ['accuracy', 'crit']], ['p2b', ['accuracy', 'crit']], [undefined, ['hit-count']],
+    const table = diceTable(offers);
+    expect(table.heads).toEqual(['p2a', 'p2b']);
+    expect(table.rows.map(row => row.cells.map(cell => cell && [cell.name.targetSlot, cell.name.kind]))).toEqual([
+      [['p2a', 'accuracy'], ['p2b', 'accuracy']], [['p2a', 'crit'], ['p2b', 'crit']],
     ]);
-    expect(chipGroups(offers.slice(0, 2)).map(group => group.target)).toEqual([undefined]);
+    expect(table.shared.map(entry => entry.name.kind)).toEqual(['hit-count']);
+  });
+
+  test('a die only one target has leaves a gap in the other column', () => {
+    const table = diceTable([offer('accuracy'), offer('accuracy', { targetSlot: 'p2b' }), offer('secondary', { effectId: 'flinch', targetSlot: 'p2b' })]);
+    expect(table.rows.map(row => row.cells.map(cell => cell?.name.kind ?? null))).toEqual([['accuracy', 'accuracy'], [null, 'secondary']]);
+  });
+
+  test('one target gives one column without a heading, every die a row', () => {
+    const table = diceTable([offer('accuracy'), offer('crit')]);
+    expect(table.heads).toEqual([]);
+    expect(table.rows.map(row => row.cells.map(cell => cell?.name.kind))).toEqual([['accuracy'], ['crit']]);
+    expect(diceTable([])).toEqual({ heads: [], rows: [], shared: [] });
   });
 });
 

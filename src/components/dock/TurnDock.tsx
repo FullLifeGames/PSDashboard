@@ -56,7 +56,7 @@ export function TurnDock(props: TurnDockProps) {
   const onEdit = useCallback((side: Side, slot: number, choice: BranchSlotChoice) => onSetChoice(side, choice, slot), [onSetChoice]);
   const { slots, gimmickFor, damageBySide } = useDockPreview(simState, gen, positionKey, getBattle, onEdit);
   const { open, attachRoot, close, toggleChip, toggleMore, onKeyDown } = useTrayState(positionKey);
-  const diceViews = useDiceViews({ advanced: open?.more ?? false, stale, simState, getBattle, replayLog, onSetChoice });
+  const diceViews = useDiceViews({ diceOpen: open?.more ?? false, stale, simState, getBattle, replayLog, onSetChoice });
   if (!simState) return null;
   if (simState.ended) return <div className="ps-dock"><EndedNotice winner={simState.winner} /></div>;
 
