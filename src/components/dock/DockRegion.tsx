@@ -1,6 +1,6 @@
 import type { AppController } from '../../hooks/useAppController';
 import { ConfirmBanner } from '../ConfirmBanner';
-import { RawLogToggle } from '../branch/PanelStatus';
+import { RawLogToggle } from './RawLogToggle';
 import { TurnDock, type TurnDockProps } from './TurnDock';
 
 /** What the dock reads from the app: the live branch at its tip, the resolved picker (with its seed) at every other position. */
