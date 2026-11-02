@@ -17,6 +17,7 @@ const FIXTURES = [
   'test/e2e/fixtures/dock-doublesou-2662153814.json',
   'test/e2e/fixtures/dock-vgcregi-2573391549.json',
   'test/e2e/fixtures/dock-championsvgc-2625939941.json',
+  'test/e2e/fixtures/dock-doublesou-2693620934.json',
 ];
 
 type Replay = { id: string; log: string };
@@ -122,6 +123,19 @@ describe('the played record of the committed dock fixtures', () => {
     const record = playedRecord(replay, 2, parseReplayLog(replay.log))!;
     expect(record.p2Slots![0]).toMatchObject({ kind: 'move', modifier: 'mega' });
     expect(record.p1Slots![1]).toMatchObject({ kind: 'move', modifier: 'mega' });
+  });
+});
+
+describe('the second Doubles OU fixture of the task e2e', () => {
+  test('turn 5: all four slots acted, with Knock Off and Rock Slide on the first side', () => {
+    const replay = JSON.parse(readFileSync(FIXTURES[3], 'utf-8')) as Replay;
+    expectSlotsToMatch(replay);
+    const record = playedRecord(replay, 5, parseReplayLog(replay.log))!;
+    for (const side of [record.p1Slots!, record.p2Slots!]) for (const pick of side) expect(pick).not.toBeNull();
+    expect(record.p1Slots!.map(pick => pick!.name)).toEqual(['Knock Off', 'Rock Slide']);
+    expect(record.p1Slots![0]).toMatchObject({ kind: 'move', targetLoc: 1 });
+    // Rock Slide hits both foes: the seed drops the target the log names for the first (dock-seed.spec.ts).
+    expect(record.p2Slots!.map(pick => pick!.name)).toEqual(['Trick Room', 'Sludge Bomb']);
   });
 });
 
