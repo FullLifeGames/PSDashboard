@@ -49,7 +49,8 @@ describe('LeadPanel', () => {
     expect(screen.getByRole('button', { name: /^Amoonguss/ })).toHaveTextContent('b');
 
     await userEvent.click(screen.getByRole('button', { name: /^Incineroar/ }));
-    expect(screen.getByRole('button', { name: 'Pick 2 per side' })).toBeDisabled();
+    // Round 84 (A7b): Start names what is missing, as Execute does (old: 'Pick 2 per side').
+    expect(screen.getByRole('button', { name: 'Pick 1 more for P1' })).toBeDisabled();
     await userEvent.click(screen.getByRole('button', { name: /^Urshifu/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Play from turn 0' }));
     expect(wired.onStart).toHaveBeenCalledWith({ p1: ['Amoonguss', 'Urshifu'], p2: ['Tornadus', 'Kingambit'] });
@@ -60,7 +61,8 @@ describe('LeadPanel', () => {
     expect(screen.getByText('Turn 0 · team preview: pick the 4 each side brings. The first 2 lead, then play the game from the start.')).toBeInTheDocument();
     expect(screen.getAllByText('Who comes along? Pick 4. The first 2 lead')).toHaveLength(2);
     expect(screen.getByRole('button', { name: /^Flutter Mane/ })).toHaveTextContent('3');
-    expect(screen.getByRole('button', { name: 'Pick 4 per side' })).toBeDisabled();
+    // Round 84 (A7b): Start names what is missing; P1 has three of four picked here (old: 'Pick 4 per side').
+    expect(screen.getByRole('button', { name: 'Pick 1 more for P1' })).toBeDisabled();
   });
 
   test('a bring-three format with one lead says the first one leads and sets no dash', () => {

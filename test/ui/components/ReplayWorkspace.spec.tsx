@@ -158,7 +158,7 @@ describe('ReplayWorkspace', () => {
     await waitFor(() => expect(published()).not.toBeNull());
     expect(published()!.p1).toHaveLength(leads);
     const before = published()!.p1;
-    const benched = [...document.querySelectorAll<HTMLButtonElement>('.ps-switchgrid-compact button[aria-pressed="false"]')][0];
+    const benched = [...document.querySelectorAll<HTMLButtonElement>('.ps-lead-side button[aria-pressed="false"]')][0];
     await userEvent.click(benched);
     await waitFor(() => expect(published()!.p1).not.toEqual(before));
     act(() => app().board.timeline.navigateTo({ turn: 2, line: 'main' }));

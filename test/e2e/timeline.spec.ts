@@ -258,7 +258,7 @@ test.describe('PS Dashboard', () => {
       // preselected and badged.
       await page.locator('.ps-branch-bar button[title^="Turn 0"]').click();
       await expect(page.getByText('team preview: pick each side')).toBeVisible();
-      const p1Column = page.locator('.ps-branch-side-column').first();
+      const p1Column = page.locator('.ps-lead-side').first();
       await expect(p1Column.locator('.ps-switchbtn-selected .ps-played-badge')).toBeVisible();
 
       // A different P1 lead + play: a fresh game opens at turn 1 and the
@@ -303,7 +303,7 @@ test.describe('PS Dashboard', () => {
 
       await page.locator('.ps-branch-bar button[title^="Turn 0"]').click();
       await expect(page.getByText('pick both leads per side')).toBeVisible();
-      const p1Column = page.locator('.ps-branch-side-column').first();
+      const p1Column = page.locator('.ps-lead-side').first();
       // Both real leads come preselected; swapping one lead replaces the
       // oldest pick instead of demanding a deselect first.
       await expect(p1Column.locator('.ps-switchbtn-selected')).toHaveCount(2);
@@ -330,7 +330,7 @@ test.describe('PS Dashboard', () => {
       // preselected (leads first).
       await page.locator('.ps-branch-bar button[title^="Turn 0"]').click();
       await expect(page.getByText('pick the 4 each side brings')).toBeVisible();
-      const p1Column = page.locator('.ps-branch-side-column').first();
+      const p1Column = page.locator('.ps-lead-side').first();
       await expect(p1Column.locator('.ps-switchbtn')).toHaveCount(6);
       await expect(p1Column.locator('.ps-switchbtn-selected')).toHaveCount(4);
       // Swap in a never-brought Pokémon — the oldest pick gives way.

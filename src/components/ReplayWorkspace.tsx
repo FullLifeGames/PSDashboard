@@ -127,7 +127,7 @@ function LeadRegion({ app, replayData }: WorkspaceProps) {
   );
 }
 
-/** The lead picker of turn 0 and the confirm banner above it; the dock region takes over everywhere else. */
+/** The lead picker of turn 0 and the confirm banner above it (the dock's place at turn 0); the dock region takes over everywhere else. */
 function LeadSlot({ app, replayData }: WorkspaceProps) {
   const { pendingConfirm, setPendingConfirm, playOut } = app.transients;
   if (!app.board.timeline.viewT0 || playOut?.active) return null;
@@ -205,9 +205,9 @@ function WorkspaceLeft({ app, replayData }: WorkspaceProps) {
       />
       {branchDivergence && !app.analysis.showBranch && <WorkspaceAlert text={`⚠ ${branchDivergence}`} />}
       {variationNotice && <WorkspaceAlert text={variationNotice} />}
-      {/* Round 84 (turn dock): at turn 0 the lead picker keeps its old place; elsewhere the dock region is the column's last child. */}
-      <LeadSlot app={app} replayData={replayData} />
       {(branching || variationSpan !== null) && <BranchSidePanels app={app} replayData={replayData} />}
+      {/* Round 84 (A7b): at turn 0 the lead picker stands where the dock stands, as the column's last child. */}
+      <LeadSlot app={app} replayData={replayData} />
       <DockRegion app={app} replayId={replayData.id} />
     </div>
   );

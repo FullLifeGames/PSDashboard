@@ -59,40 +59,6 @@
 /* Round 84 (A7a): the engine's held-back pick wears the played badge's face, like the chip's own "engine" word. */
 .ps-engine-badge { background: var(--ps-badge-played-bg); color: var(--ps-badge-played-fg); }
 
-/* ── PS Controls Panel ── */
-.ps-controls {
-  background:
-    linear-gradient(180deg, rgba(48, 55, 72, 0.98) 0%, rgba(35, 39, 51, 0.98) 100%);
-  border-radius: 0 0 5px 5px;
-  padding: 7px 12px;
-}
-
-.ps-side-controls {
-  flex: 1;
-  border-top: 1px solid rgba(255,255,255,0.06);
-}
-
-.ps-whatdo {
-  font-size: 12px;
-  color: #ddd;
-  margin-bottom: 6px;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 5px;
-}
-.ps-whatdo strong { color: #fff; }
-
-.ps-side-label {
-  border: 1px solid rgba(124,183,232,0.36);
-  border-radius: 999px;
-  color: #cbe6ff;
-  font-size: 9px;
-  font-weight: bold;
-  letter-spacing: 0.04em;
-  padding: 1px 7px;
-  text-transform: uppercase;
-}
 
 .ps-force-switch-note {
   background: rgba(240,199,107,0.11);
@@ -105,12 +71,7 @@
   padding: 6px 8px;
 }
 
-/* Switch buttons */
-.ps-switchgrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-}
+
 .ps-switchbtn {
   display: flex;
   align-items: center;
@@ -136,30 +97,6 @@
 .ps-switchbtn-name { font-size: 11px; font-weight: bold; }
 .ps-switchbtn-hp { font-size: 9px; color: var(--ps-switch-sub); }
 
-/* T0 lead picker: the lead chips in a wrapping row. */
-.ps-switchgrid-compact {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 4px;
-}
-.ps-switchbtn-compact { padding: 2px 8px; gap: 4px; }
-.ps-switchbtn-compact img { width: 20px; height: 20px; }
-.ps-switchbtn-compact .ps-switchbtn-name { font-size: 10px; }
-
-/* T0 lead picker: doubles slot marker on a selected lead chip (a/b). */
-.ps-lead-slot {
-  display: inline-block;
-  margin-right: 4px;
-  padding: 0 4px;
-  border-radius: 3px;
-  font-size: 8px;
-  font-weight: bold;
-  text-transform: uppercase;
-  background: rgba(108, 194, 255, 0.25);
-  border: 1px solid rgba(108, 194, 255, 0.5);
-  color: #bfe3ff;
-}
 
 .ps-custom-choice {
   display: flex;
@@ -281,16 +218,8 @@
   font-weight: bold;
 }
 
-/* Execute turn button — sticky so the CTA never hides below the fold (G14) */
-.ps-execute-wrap {
-  position: sticky;
-  bottom: 8px;
-  z-index: 5;
-  background:
-    linear-gradient(180deg, rgba(35,39,51,0.98) 0%, rgba(28,31,43,0.98) 100%);
-  padding: 2px 10px 8px;
-}
 
+/* Execute (the dock's and the lead picker's Start): the base look; dock.css sets the size and the colors under .ps-dock. */
 .ps-execute-btn {
   width: 100%;
   padding: 7px;
@@ -307,35 +236,6 @@
 }
 .ps-execute-btn:hover:not(:disabled) { transform: scale(1.01); }
 .ps-execute-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-.ps-branch-controls-shell {
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 7px;
-  box-shadow: var(--ps-shadow);
-  margin-top: 4px;
-  overflow: hidden;
-}
-
-.ps-branch-controls-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
-  align-items: stretch;
-}
-
-.ps-branch-side-column {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.ps-branch-side-column .ps-side-controls {
-  height: 100%;
-}
-
-.ps-side-divider {
-  min-height: 1px;
-  background: linear-gradient(180deg, transparent, rgba(255,255,255,0.2), transparent);
-}
 
 .ps-log-toggle {
   background: none;
@@ -367,20 +267,7 @@
 .ps-log::-webkit-scrollbar-track { background: transparent; }
 .ps-log::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
 
-@media (max-width: 1050px) {
-  .ps-branch-controls-grid {
-    grid-template-columns: 1fr;
-  }
-  .ps-side-divider {
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
-  }
-}
-
 @media (max-width: 640px) {
-  .ps-switchgrid {
-    grid-template-columns: 1fr;
-  }
   .ps-custom-choice {
     flex-direction: column;
   }
