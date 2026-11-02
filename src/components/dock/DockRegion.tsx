@@ -8,9 +8,10 @@ function dockProps(app: AppController, replayId: string): TurnDockProps {
   const { viewTurn, liveTip, evalViewKey } = app.board.timeline;
   const { simState, executing, executeError } = app.ctx.branch;
   const { branchPreparing, handleSetChoice, handleExecuteDraft } = app.board.deviation;
-  const { positionPicker, pickerSimState, pickerSeed, pickerStale, playedAtView, getPickerBattle, pickerReplayLog } = app.engine;
+  const { positionPicker, dockSimState, pickerSeed, pickerStale, playedAtView, getPickerBattle, pickerReplayLog } = app.engine;
   return {
-    simState: liveTip ? simState : pickerSimState,
+    // A replay turn shows the picker's state with the engine's fill laid over its empty slots (Q19 b).
+    simState: liveTip ? simState : dockSimState,
     stale: !liveTip && pickerStale,
     source: liveTip ? 'live' : positionPicker?.source,
     acquiringExact: !liveTip && app.engine.acquire.exactAcquiringTurn === viewTurn,
@@ -26,8 +27,8 @@ function dockProps(app: AppController, replayId: string): TurnDockProps {
     getBattle: liveTip ? app.ctx.branch.getBattle : getPickerBattle,
     replayLog: pickerReplayLog,
     seed: liveTip ? null : pickerSeed,
-    // Q19 (open): a replay turn's empty slots take no fill; a second trigger can call the same fill for that position.
-    fill: liveTip ? app.engine.dockFill : null,
+    // The first chip click at a replay turn starts the fill for its empty slots; the tip fills at once.
+    fill: app.engine.dockFill,
   };
 }
 

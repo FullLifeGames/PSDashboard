@@ -12,6 +12,8 @@ import type { ReplayContext } from './replay-context';
 import type { Transients } from './transients';
 import type { BoardController } from './board-controller';
 import { dropStaleDraft } from './draft-guard';
+import { overlayFill } from '../../lib/dock-fill';
+import type { SideChoices } from '../../lib/dock-seed';
 
 /** View-side gates for the acquisition hook: whether the dwell rebuild may
  *  arm (main-line position, nothing busy) and whether Smogon data is due. */
@@ -108,20 +110,34 @@ function useEvalViewLayer(
   });
 }
 
-/** Round 84 (turn dock): the engine fill at the live tip. It reads the evaluation the view layer drives and the branch's picks. */
+/**
+ * Round 84 (turn dock): the engine fill. At the live tip it reads the evaluation the view layer drives and writes into the branch's
+ * picks. At a replay turn (Q19 b) it works on the picker's effective choices (the logged seed under the user's picks), keeps what
+ * it writes in the view, and hands the dock the state with that fill laid over the empty slots.
+ */
 function useFillLayer(
   ctx: ReplayContext, transients: Transients, board: BoardController,
-  evalView: ReturnType<typeof useEvalViewLayer>,
+  evalView: ReturnType<typeof useEvalViewLayer>, acquireLayer: ReturnType<typeof useAcquireLayer>,
 ) {
   const { simState, branching, executing, history, variationStartTurn, getChoices, setChoice, executeTurn } = ctx.branch;
   const { liveTip, evalViewKey } = board.timeline;
-  return useDockFill({
-    simState, liveTip, branching, executing, branchPreparing: board.deviation.branchPreparing,
+  const { pickerSimState, pickerStale } = acquireLayer;
+  const { handleExecuteDraft } = board.deviation;
+  const viewed = liveTip ? simState : pickerSimState;
+  // The picks of a replay turn are the picker state's own: the logged actions under the user's.
+  const getPickerChoices = useCallback(() => ({ p1: pickerSimState?.p1Choices ?? [], p2: pickerSimState?.p2Choices ?? [] }), [pickerSimState]);
+  const runTurn = useCallback((choices: SideChoices) => (
+    liveTip ? executeTurn() : handleExecuteDraft(choices)
+  ), [liveTip, executeTurn, handleExecuteDraft]);
+  const fill = useDockFill({
+    simState: viewed, liveTip, branching, executing, branchPreparing: board.deviation.branchPreparing,
     playOutActive: transients.playOut?.active ?? false, evalAvailable: evalView.evalAvailable, evaluation: ctx.evaluation,
-    liveEvalStatus: board.liveEvalStatus, evalViewKey, historyLength: history.length,
-    sessionKey: `${board.deviation.branchSession}:${variationStartTurn ?? 0}`,
-    handleEvaluate: evalView.handleEvaluate, getChoices, setChoice, executeTurn,
+    liveEvalStatus: board.liveEvalStatus, evalViewKey, historyLength: liveTip ? history.length : 0, stale: pickerStale,
+    sessionKey: `${ctx.replay.replayData?.id ?? ''}:${board.deviation.branchSession}:${variationStartTurn ?? 0}`,
+    handleEvaluate: evalView.handleEvaluate, getChoices: liveTip ? getChoices : getPickerChoices, setChoice, executeTurn: runTurn,
   });
+  const dockSimState = useMemo(() => overlayFill(pickerSimState, fill.choices), [pickerSimState, fill.choices]);
+  return { fill, dockSimState };
 }
 
 function usePlayLayer(
@@ -170,9 +186,9 @@ function usePlayLayer(
 export function useEngineController(ctx: ReplayContext, transients: Transients, board: BoardController) {
   const acquireLayer = useAcquireLayer(ctx, transients, board);
   const evalView = useEvalViewLayer(ctx, transients, board, acquireLayer);
-  const dockFill = useFillLayer(ctx, transients, board, evalView);
+  const { fill: dockFill, dockSimState } = useFillLayer(ctx, transients, board, evalView, acquireLayer);
   const { walk, playOutControls } = usePlayLayer(ctx, transients, board, evalView);
-  return { ...acquireLayer, evalView, dockFill, walk, playOutControls };
+  return { ...acquireLayer, evalView, dockFill, dockSimState, walk, playOutControls };
 }
 
 export type EngineController = ReturnType<typeof useEngineController>;

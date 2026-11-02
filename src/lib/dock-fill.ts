@@ -2,6 +2,8 @@ import {
   evalChoiceToSlotChoices, requiredChoicesForActiveSlots, type BranchSimState, type BranchSlotChoice, type RankedChoice,
 } from '@fulllifegames/eval-engine';
 
+import { stillOffered, type SideChoices } from './dock-seed';
+
 type Side = 'p1' | 'p2';
 type Choices = (BranchSlotChoice | null)[];
 
@@ -74,4 +76,29 @@ export function pickFill(side: Side, ranked: RankedChoice[], state: BranchSimSta
     return filled;
   }
   return new Array<BranchSlotChoice | null>(activeCount(state, side)).fill(null);
+}
+
+/**
+ * A replay turn keeps the fill in the view, not in the draft (the draft is the user's touched mark). The state shown holds the
+ * logged seed under the user's picks; an empty slot takes the fill, and only while the position still offers it (the exact
+ * position can replace the snapshot picker after the fill landed). Returns the very same state when nothing changes.
+ */
+export function overlayFill(state: BranchSimState | null, fill: SideChoices | null): BranchSimState | null {
+  if (!state || !fill) return state;
+  let changed = false;
+  const side = (key: Side): Choices => {
+    const own = key === 'p1' ? state.p1Choices : state.p2Choices;
+    // The effective choices can be shorter than the slots: with nothing logged and nothing picked they are the empty draft.
+    return Array.from({ length: Math.max(own.length, fill[key].length) }, (_, slot) => {
+      const held = own[slot] ?? null;
+      const choice = fill[key][slot];
+      if (held || !choice || !stillOffered(choice, state, key, slot)) return held;
+      changed = true;
+      return choice;
+    });
+  };
+  const p1Choices = side('p1');
+  const p2Choices = side('p2');
+  if (!changed) return state;
+  return { ...state, p1Choices, p1Choice: p1Choices[0] ?? null, p2Choices, p2Choice: p2Choices[0] ?? null };
 }

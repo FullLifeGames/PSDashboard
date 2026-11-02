@@ -86,7 +86,8 @@ describe('ReplayWorkspace', () => {
     expect(screen.getByText('Variation moves')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save Branch' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Copy Share Link' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Evaluate' })).toBeInTheDocument();
+    // Round 84 (A6a): the engine fill starts a run at the variation's tip by itself, so the entry reads Cancel while it goes.
+    expect(screen.getByRole('button', { name: /^(Evaluate|Cancel|Re-evaluate)$/ })).toBeInTheDocument();
     expect(screen.queryByText(/^Choices/)).toBeNull();
     // The branch start is still the replay's own position: the replay frame stays until the variation has a turn of its own.
     expect(screen.getByTitle('PS Replay')).toBeInTheDocument();

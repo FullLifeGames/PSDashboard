@@ -20,8 +20,8 @@ const move = (moveId: string, moveName: string, targetLoc?: number): BranchSlotC
 
 function fillOf(overrides: Partial<DockFillView> = {}): DockFillView {
   return {
-    pending: false, busy: false, waits: false, engine: { p1: [], p2: [] }, queueExecute: vi.fn(), onUserChoice: vi.fn(),
-    holdTray: vi.fn(), ...overrides,
+    pending: false, busy: false, waits: false, engine: { p1: [], p2: [] }, choices: null, queueExecute: vi.fn(), onUserChoice: vi.fn(),
+    holdTray: vi.fn(), arm: vi.fn(), ...overrides,
   };
 }
 
@@ -142,5 +142,13 @@ describe.each(['singles', 'doubles'] as const)('TurnDock fill, the open tray, %s
     expect(fill.holdTray).toHaveBeenLastCalledWith({ side: 'p1', slot: 0 });
     await userEvent.click(chip(first));
     expect(fill.holdTray).toHaveBeenLastCalledWith(null);
+  });
+
+  test('a click on a chip arms the fill (Q19 b, the trigger at a replay turn)', async () => {
+    const fill = fillOf();
+    renderDock(kind, fill);
+    expect(fill.arm).not.toHaveBeenCalled();
+    await userEvent.click(chip(first));
+    expect(fill.arm).toHaveBeenCalledTimes(1);
   });
 });

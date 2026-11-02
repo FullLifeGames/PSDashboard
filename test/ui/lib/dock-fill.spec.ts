@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { BranchSlotChoice, RankedChoice } from '@fulllifegames/eval-engine';
-import { pickFill, slotChoicesOf } from '../../../src/lib/dock-fill';
+import { overlayFill, pickFill, slotChoicesOf } from '../../../src/lib/dock-fill';
 import { rankedChoice } from '../fixtures/eval-result';
 import { simState } from '../fixtures/sim-state';
 
@@ -172,5 +172,47 @@ describe('pickFill, held slots (the rule against jumping)', () => {
   test('singles: the only slot held leaves the side empty', () => {
     const ranked = [rankedChoice('move earthquake', 'Earthquake', 0.35)];
     expect(pickFill('p1', ranked, simState('singles'), [null], [true])).toEqual([null]);
+  });
+});
+
+describe('overlayFill (a replay turn: the fill under the draft and over nothing)', () => {
+  const rageowder: BranchSlotChoice = { kind: 'move', moveId: 'ragepowder', moveName: 'Rage Powder' };
+  const earthquake: BranchSlotChoice = { kind: 'move', moveId: 'earthquake', moveName: 'Earthquake' };
+
+  test('no fill, or a fill that wrote nothing, leaves the very same state', () => {
+    const doubles = simState('doubles');
+    expect(overlayFill(doubles, null)).toBe(doubles);
+    expect(overlayFill(doubles, { p1: [null, null], p2: [null, null] })).toBe(doubles);
+    expect(overlayFill(null, { p1: [earthquake], p2: [null] })).toBeNull();
+  });
+
+  test('doubles: an empty slot takes the fill, a slot that holds a choice keeps it', () => {
+    const logged: BranchSlotChoice = { kind: 'move', moveId: 'flareblitz', moveName: 'Flare Blitz', targetLoc: 2 };
+    const state = simState('doubles', { p1Choices: [logged, null] });
+    const shown = overlayFill(state, { p1: [protect, rageowder], p2: [null, null] });
+    expect(shown?.p1Choices).toEqual([logged, rageowder]);
+    expect(shown?.p1Choice).toBe(logged);
+    expect(shown?.p2Choices).toEqual([null, null]);
+    // The state it came from stays as it was.
+    expect(state.p1Choices).toEqual([logged, null]);
+  });
+
+  test('singles: the empty side takes the fill and the first choice mirrors it', () => {
+    const shown = overlayFill(simState('singles'), { p1: [earthquake], p2: [null] });
+    expect(shown?.p1Choices).toEqual([earthquake]);
+    expect(shown?.p1Choice).toBe(earthquake);
+    expect(shown?.p2Choice).toBeNull();
+  });
+
+  test('the empty draft (nothing logged, nothing picked) is shorter than the slots and still takes the fill', () => {
+    const state = simState('doubles', { p1Choices: [], p2Choices: [] });
+    const shown = overlayFill(state, { p1: [null, rageowder], p2: [null, null] });
+    expect(shown?.p1Choices).toEqual([null, rageowder]);
+  });
+
+  test('a fill choice that the picker no longer offers (the exact position replaced the snapshot) is dropped', () => {
+    const gone: BranchSlotChoice = { kind: 'move', moveId: 'hyperbeam', moveName: 'Hyper Beam' };
+    const state = simState('singles');
+    expect(overlayFill(state, { p1: [gone], p2: [null] })).toBe(state);
   });
 });

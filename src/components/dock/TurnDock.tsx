@@ -134,7 +134,7 @@ export function TurnDock(props: TurnDockProps) {
           />
         )}
         <div className="ps-dock-bar">
-          <DockRows model={model} open={open} onToggle={toggleChip} />
+          <DockRows model={model} open={open} onToggle={(side, slot) => { fill?.arm(); toggleChip(side, slot); }} />
           <DockExecute
             model={model}
             fill={fill}
