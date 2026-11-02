@@ -30,7 +30,7 @@ describe('tileBars', () => {
     const args = { ...NONE, move: targeted, side: 'p1' as const, targets: { '2:1': result(10, 20), '2:2': result(40, 60, '35% chance to 2HKO after Leftovers recovery') }, playedLoc: null };
     const preselected = tileBars({ ...args, chosenLoc: undefined });
     expect(preselected).toHaveLength(1);
-    expect(preselected[0]).toMatchObject({ label: 'P2B', hp: 100, min: 40, max: 60, range: '40-60%', ko: '35% to 2HKO' });
+    expect(preselected[0]).toMatchObject({ label: 'P2B', hp: 100, min: 40, max: 60, range: '40-60%', ko: '35% 2HKO' });
     expect(tileBars({ ...args, chosenLoc: 1 })[0]).toMatchObject({ label: 'P2A', min: 10, max: 20 });
   });
 

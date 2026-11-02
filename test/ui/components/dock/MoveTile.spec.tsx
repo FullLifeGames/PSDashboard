@@ -5,7 +5,7 @@ import type { PokemonSet } from '@pkmn/sim';
 import type { TurnSnapshot } from '@fulllifegames/replay-core';
 import { MoveTile, type MoveTileProps } from '../../../../src/components/dock/MoveTile';
 import type { TileBar } from '../../../../src/lib/dock-tile';
-import { fullMoveTitle, koVerdict, shownType } from '../../../../src/lib/move-damage-text';
+import { fullMoveTitle, koShort, shownType } from '../../../../src/lib/move-damage-text';
 import { pickerStateFromSnapshot } from '../../../../src/lib/picker-state';
 import { moveOption } from '../../fixtures/sim-state';
 
@@ -59,16 +59,16 @@ describe('MoveTile', () => {
   test('a bar shows the short KO verdict in place of the range, and keeps the whole sentence in its tooltip', () => {
     const sentence = 'guaranteed 2HKO after Leftovers recovery';
     const damage = { moveName: 'Earth Power', minPercent: 66.8, maxPercent: 78.8, range: '66.8% - 78.8%', koChance: sentence };
-    const { rerender } = render(tile({ bars: [bar({ min: 66.8, max: 78.8, range: '67-79%', ko: koVerdict(sentence), title: `66.8% - 78.8% (${sentence})` })] }).ui);
+    const { rerender } = render(tile({ bars: [bar({ min: 66.8, max: 78.8, range: '67-79%', ko: koShort(sentence), title: `66.8% - 78.8% (${sentence})` })] }).ui);
     const shown = document.querySelector('.ps-tile-bar-value') as HTMLElement;
-    expect(shown).toHaveTextContent('guaranteed 2HKO');
+    expect(shown).toHaveTextContent(/^2HKO$/);
     expect(shown).not.toHaveTextContent('Leftovers');
     expect(shown).toHaveClass('ps-tile-bar-ko');
     expect(document.querySelector('.ps-tile-bar')).toHaveAttribute('title', `66.8% - 78.8% (${sentence})`);
     expect(fullMoveTitle(damage)).toBe(`66.8% - 78.8% (${sentence})`);
 
-    rerender(tile({ bars: [bar({ ko: koVerdict('62.5% chance to OHKO') })] }).ui);
-    expect(document.querySelector('.ps-tile-bar-value')).toHaveTextContent('62.5% to OHKO');
+    rerender(tile({ bars: [bar({ ko: koShort('62.5% chance to OHKO') })] }).ui);
+    expect(document.querySelector('.ps-tile-bar-value')).toHaveTextContent('62.5% OHKO');
     rerender(tile({ bars: [bar()] }).ui);
     expect(document.querySelector('.ps-tile-bar-value')).toHaveTextContent('30-35%');
     expect(document.querySelector('.ps-tile-bar-value')).not.toHaveClass('ps-tile-bar-ko');

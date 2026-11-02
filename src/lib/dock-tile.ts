@@ -1,6 +1,6 @@
 import type { BranchMoveOption, DamageResult } from '@fulllifegames/eval-engine';
 import type { SpreadTargetDamage } from './branch-damage';
-import { koVerdict, shortRange } from './move-damage-text';
+import { koShort, shortRange } from './move-damage-text';
 import { preselectTarget } from './preselect-target';
 
 /**
@@ -16,7 +16,7 @@ export interface TileBar {
   min: number;
   max: number;
   range: string;
-  /** The calc's KO verdict on one line; empty without one. */
+  /** The calc's KO verdict in its short form ("2HKO", "62.5% OHKO"); empty without one. */
   ko: string;
   /** The tooltip: the calc's whole sentence. */
   title: string;
@@ -42,7 +42,7 @@ function barOf(label: string, hp: number, result: DamageResult | undefined): Til
   if (!result || result.maxPercent <= 0) return null;
   return {
     label, hp, min: result.minPercent, max: result.maxPercent, range: shortRange(result.minPercent, result.maxPercent),
-    ko: result.koChance ? koVerdict(result.koChance) : '',
+    ko: result.koChance ? koShort(result.koChance) : '',
     title: `${label ? `${label}: ` : ''}${result.range}${result.koChance ? ` (${result.koChance})` : ''}`,
   };
 }

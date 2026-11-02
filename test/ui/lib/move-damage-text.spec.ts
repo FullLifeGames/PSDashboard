@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { calcSingleDamageRange, type DamageResult } from '@fulllifegames/eval-engine';
-import { fullMoveTitle, hitSharesText, koVerdict, ppTextFor, shortRange } from '../../../src/lib/move-damage-text';
+import { fullMoveTitle, hitSharesText, koShort, koVerdict, ppTextFor, shortRange } from '../../../src/lib/move-damage-text';
 import { moveOption, pokemon } from '../fixtures/sim-state';
 
 /**
@@ -15,6 +15,17 @@ describe('move damage text', () => {
     expect(koVerdict('guaranteed 2HKO after Leftovers recovery')).toBe('guaranteed 2HKO');
     expect(koVerdict('62.5% chance to OHKO')).toBe('62.5% to OHKO');
     expect(koVerdict('')).toBe('');
+  });
+
+  // Round 84 (turn dock), A4: the bar row of a tile is about 12 characters wide; "guaranteed 2..." was cut. The tile shows the
+  // verdict's core, the target row and the tooltip keep the longer text.
+  test('the short KO verdict is the hit count, with the chance in front when the calc gives one', () => {
+    expect(koShort('guaranteed OHKO')).toBe('OHKO');
+    expect(koShort('guaranteed 2HKO after Leftovers recovery')).toBe('2HKO');
+    expect(koShort('62.5% chance to OHKO')).toBe('62.5% OHKO');
+    expect(koShort('35% chance to 2HKO after Leftovers recovery')).toBe('35% 2HKO');
+    expect(koShort('possible 3HKO')).toBe('possible 3HKO');
+    expect(koShort('')).toBe('');
   });
 
   test('a range reads in whole percent, and one number when both ends round alike', () => {

@@ -20,6 +20,10 @@
   align-items: baseline;
   font-size: 10px;
   color: var(--ps-muted);
+  /* Round 84, A4: opaque like the bar, so the column's text does not show through the sticky dock. */
+  background: var(--ps-bg-deep);
+  padding: 3px 10px;
+  border-radius: 8px 8px 0 0;
 }
 .ps-dock-status:empty { display: none; }
 .ps-dock-status .ps-force-switch-note { margin: 0; padding: 2px 8px; font-size: 10px; }

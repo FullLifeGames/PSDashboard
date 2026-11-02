@@ -25,6 +25,13 @@ export const shownType = (move: BranchMoveOption, teraArmed: boolean | undefined
  */
 export const koVerdict = (koChance: string): string => koChance.split(' after ')[0].replace(' chance to ', ' to ');
 
+/**
+ * Round 84 (turn dock), A4 (the integrator's look check: "guaranteed 2..." ran out of the bar row): the verdict's core for the
+ * bar of a tile, "OHKO" or "2HKO", with the chance in front when the calc gives one ("62.5% OHKO"). The target row and the
+ * tooltip keep the longer text.
+ */
+export const koShort = (koChance: string): string => koVerdict(koChance).replace(/^guaranteed /, '').replace(' to ', ' ');
+
 /** The full button's tooltip: the range with the whole KO sentence, then the drawn hit counts. */
 export function fullMoveTitle(dmg: DamageResult | undefined): string | undefined {
   const sentence = dmg?.koChance ? `${dmg.range} (${dmg.koChance})` : '';
