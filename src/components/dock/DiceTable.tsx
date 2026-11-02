@@ -1,6 +1,6 @@
 import { Fragment, type CSSProperties } from 'react';
 import { dieKey, type DieName, type DieOffer, type DieWords, type ForcedDie } from '@fulllifegames/eval-engine';
-import { captionOf, diceTable, pullNotes } from '../../lib/branch-dice';
+import { captionOf, diceTable, pullNotes, targetHeading } from '../../lib/branch-dice';
 import type { StepDamage } from '../../lib/branch-rolls';
 import { DieRow, StrayDice } from '../branch/DiceChips';
 
@@ -27,8 +27,6 @@ export interface DiceTableProps {
   /** The dock edits the slot choice: a die is set, replaced or cleared there. */
   onToggle: (die: ForcedDie) => void;
 }
-
-const targetHeading = (target: string, words: DieWords): string => `${target.toUpperCase()} ${words.slot(target)}`;
 
 export function DiceTable({ offers, dice, logged, words, label, rollsOf, onToggle }: DiceTableProps) {
   if (offers === null) return null;

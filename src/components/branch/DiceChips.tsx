@@ -1,5 +1,5 @@
 import { dieKey, dieLabel, type DieName, type DieOffer, type DieWords, type ForcedDie } from '@fulllifegames/eval-engine';
-import { TURN_KINDS, captionOf, resultWord } from '../../lib/branch-dice';
+import { TURN_KINDS, captionOf, resultWord, targetHeading } from '../../lib/branch-dice';
 import type { StepDamage } from '../../lib/branch-rolls';
 import { RollSelect } from './RollSelect';
 
@@ -54,7 +54,7 @@ export function DieRow({ offer, dice, logged, words, target, withMove, rollsOf, 
   const label = [
     caption,
     withMove && offer.name.moveId ? `of ${words.move(offer.name.moveId)}` : '',
-    target ? `against ${words.slot(target)}` : '',
+    target ? `against ${targetHeading(target, words)}` : '',
   ].filter(Boolean).join(' ');
   return (
     <div className={`ps-dice-row${cell ? ` ps-dice-cell${cell === 'shared' ? ' ps-dice-cell-shared' : ''}` : ''}`} role="group" aria-label={label}>

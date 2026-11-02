@@ -38,20 +38,20 @@ describe('the dice table of a spread move', () => {
     for (const caption of ['Hit', 'Crit', 'Damage roll', 'flinch']) {
       expect(within(dice).getAllByText(caption, { selector: '.ps-dice-caption' }), caption).toHaveLength(1);
     }
-    for (const name of ['Calyrex', 'Ninetales']) {
-      const hit = within(dice).getAllByRole('group', { name: `Hit against ${name}` });
-      for (const cell of hit) expect(within(cell).getAllByRole('button').map(chip => chip.textContent)).toEqual(['Hits', 'Misses']);
+    for (const target of ['P2A Calyrex', 'P2B Ninetales', 'P1B Calyrex']) {
+      const hit = within(dice).getByRole('group', { name: `Hit against ${target}` });
+      expect(within(hit).getAllByRole('button').map(chip => chip.textContent)).toEqual(['Hits', 'Misses']);
     }
-    // two bodies share the name Calyrex: P2A and P1B are two cells with one name, apart by their column
-    expect(within(dice).getAllByRole('group', { name: 'Hit against Calyrex' })).toHaveLength(2);
-    expect(within(dice).getAllByRole('group', { name: 'flinch against Ninetales' })).toHaveLength(1);
+    // Round 84 (A6a): the cell's label names the slot, so the two bodies named Calyrex (P2A and P1B) stay apart by it.
+    expect(within(dice).queryAllByRole('group', { name: 'Hit against Calyrex' })).toHaveLength(0);
+    expect(within(dice).getAllByRole('group', { name: 'flinch against P2B Ninetales' })).toHaveLength(1);
   });
 
   test('the damage roll is a select in each column', () => {
     table();
     const selects = screen.getAllByRole('combobox');
     expect(selects.map(select => select.getAttribute('aria-label'))).toEqual([
-      'Damage roll against Calyrex', 'Damage roll against Ninetales', 'Damage roll against Calyrex',
+      'Damage roll against P2A Calyrex', 'Damage roll against P2B Ninetales', 'Damage roll against P1B Calyrex',
     ]);
   });
 
@@ -63,7 +63,7 @@ describe('the dice table of a spread move', () => {
   test('a click on a chip hands the die of its own target to the dock', async () => {
     const onToggle = vi.fn();
     table({ onToggle });
-    await userEvent.click(within(screen.getByRole('group', { name: 'flinch against Ninetales' })).getAllByRole('button')[0]);
+    await userEvent.click(within(screen.getByRole('group', { name: 'flinch against P2B Ninetales' })).getAllByRole('button')[0]);
     expect(onToggle).toHaveBeenCalledWith({ name: spread().find(entry => entry.name.kind === 'secondary' && entry.name.targetSlot === 'p2b')!.name, result: { happens: true } });
   });
 

@@ -156,11 +156,11 @@ describe('the dock dice chips in doubles', () => {
     await userEvent.click(tile(/Rock Slide/));
     const dice = await screen.findByRole('group', { name: 'Dice for P1A' });
     expect([...dice.querySelectorAll('.ps-dice-heading')].map(head => head.textContent)).toEqual(['P2A Snorlax', 'P2B Chansey']);
-    for (const name of ['Snorlax', 'Chansey']) {
-      expect(await within(dice).findByRole('group', { name: `Hit against ${name}` })).toBeInTheDocument();
-      expect(within(dice).getByRole('group', { name: `Flinch against ${name}` })).toBeInTheDocument();
+    for (const target of ['P2A Snorlax', 'P2B Chansey']) {
+      expect(await within(dice).findByRole('group', { name: `Hit against ${target}` })).toBeInTheDocument();
+      expect(within(dice).getByRole('group', { name: `Flinch against ${target}` })).toBeInTheDocument();
     }
-    await userEvent.click(within(within(dice).getByRole('group', { name: 'Flinch against Chansey' })).getByRole('button', { name: 'Flinch' }));
+    await userEvent.click(within(within(dice).getByRole('group', { name: 'Flinch against P2B Chansey' })).getByRole('button', { name: 'Flinch' }));
     expect(diceOf(latest.picks, 'p1')?.map(die => [die.name.targetSlot, die.name.kind, die.result])).toEqual([['p2b', 'secondary', { happens: true }], ['p2b', 'accuracy', { happens: true }]]);
   });
 });
@@ -239,7 +239,7 @@ describe('the dock dice a forced die needs (decision 5a)', () => {
     const latest = renderDock(doubles());
     await openDice('P1A');
     await userEvent.click(tile(/Rock Slide/));
-    await userEvent.click(within(await screen.findByRole('group', { name: 'Crit against Chansey' })).getByRole('button', { name: 'Crit' }));
+    await userEvent.click(within(await screen.findByRole('group', { name: 'Crit against P2B Chansey' })).getByRole('button', { name: 'Crit' }));
     expect(diceOf(latest.picks, 'p1')?.map(die => [die.name.kind, die.name.targetSlot])).toEqual([['crit', 'p2b'], ['accuracy', 'p2b']]);
   });
 });
@@ -363,8 +363,8 @@ describe('the dock damage roll select', () => {
     renderDock(battle);
     await openDice('P1A');
     await userEvent.click(tile(/Rock Slide/));
-    const first = await screen.findByRole('combobox', { name: 'Damage roll against Snorlax' });
-    const second = screen.getByRole('combobox', { name: 'Damage roll against Chansey' });
+    const first = await screen.findByRole('combobox', { name: 'Damage roll against P2A Snorlax' });
+    const second = screen.getByRole('combobox', { name: 'Damage roll against P2B Chansey' });
     expect(within(first).getAllByRole('option')).toHaveLength(17);
     const top = (select: HTMLElement) => percent(within(select).getAllByRole('option').at(-1)!);
     expect(top(first)).toBeGreaterThan(0);

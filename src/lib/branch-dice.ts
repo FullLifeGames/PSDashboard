@@ -74,6 +74,9 @@ export function resultWord(die: ForcedDie, words: DieWords): string {
   return upperFirst(label.slice(label.lastIndexOf(': ') + 2));
 }
 
+/** A target as the table's head and the cells' labels name it: its slot and its body ("P2A Calyrex"), so two bodies of one species stay apart. */
+export const targetHeading = (target: string, words: DieWords): string => `${target.toUpperCase()} ${words.slot(target)}`;
+
 /** The caption above the chips of one die. */
 export function captionOf(name: DieName, words: DieWords): string {
   switch (name.kind) {
