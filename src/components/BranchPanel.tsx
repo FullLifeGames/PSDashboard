@@ -9,6 +9,7 @@ import type { Gimmick } from '../hooks/useSideControlsState';
 import { ExecuteRow, PickerSourceLine, RawLogToggle } from './branch/PanelStatus';
 import { DICE_WAIT_NOTE, TurnDice } from './branch/DiceChips';
 import { useDiceViews, type DiceViews } from '../hooks/useDiceView';
+import { EndedNotice } from './dock/DockStatus';
 import { useDockPreview } from '../hooks/useDockPreview';
 import { EMPTY_MODIFIERS, EMPTY_MOVES, EMPTY_SWITCHES, blockedSwitchKeys, panelFlags, playedOfSlot, slotIdentity } from '../lib/dock-panel';
 
@@ -150,15 +151,6 @@ function SideColumn(props: SideColumnProps) {
           />
         </div>
       ))}
-    </div>
-  );
-}
-
-/** Round 77 (user request 28.10.2026): the winner left the top bar for the place of the pickers. */
-function EndedNotice({ winner }: { winner: string | null }) {
-  return (
-    <div className="ps-branch-ended" role="status">
-      {winner ? `${winner} wins this variation.` : 'The variation ended without a winner.'} Go back a turn to play it another way.
     </div>
   );
 }
