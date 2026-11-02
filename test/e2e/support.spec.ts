@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { readFileSync } from 'fs';
-import { installReplayEmbedCache, routeOfflineFixtures, startVariationAt } from './helpers';
+import { installReplayEmbedCache, openTray, pickMove, routeOfflineFixtures, startVariationAt } from './helpers';
 
 test.beforeAll(installReplayEmbedCache);
 
@@ -81,17 +81,17 @@ test.describe('support', () => {
     test.setTimeout(180_000);
     await page.locator('button', { hasText: 'Load' }).click();
     await startVariationAt(page, 1, { p1Move: 'Swords Dance' });
-    const p1 = page.locator('.ps-branch-side-column').first();
-    const p2 = page.locator('.ps-branch-side-column').nth(1);
-    await p1.locator('.ps-movebtn:enabled').first().click();
-    await p2.locator('.ps-movebtn:enabled').first().click();
+    await pickMove(page, 'p1a');
+    await pickMove(page, 'p2a');
     await page.locator('.ps-execute-btn').click();
     const history = page.locator('.ps-panel', { hasText: 'Variation moves' });
     await expect(history).toContainText('Turn 2', { timeout: 60_000 });
     // One turn back and a draft pick there: a non-tip view with a pending choice.
     await page.locator('.ps-branch-bar button', { hasText: '◀' }).click();
     await expect(page.getByText('T2/')).toBeVisible();
-    await p1.locator('.ps-movebtn:enabled').nth(1).click();
+    // Round 84 (turn dock): the tray's second enabled tile. The draft holds the user's pick only: the seed under it is derived
+    // from the recorded turn and never reaches the draft.
+    await (await openTray(page, 'p1a')).locator('.ps-movebtn:enabled').nth(1).click();
     const saved = await capture(page);
     expect(saved.choices.draft.p1.length).toBe(1);
 

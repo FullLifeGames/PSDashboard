@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { expectReplayTurn, installReplayEmbedCache, routeOfflineFixtures, startVariationAt, type ReplayWindow } from './helpers';
+import { expectReplayTurn, installReplayEmbedCache, openTray, pickMove, routeOfflineFixtures, startVariationAt, type ReplayWindow } from './helpers';
 
 test.beforeAll(installReplayEmbedCache);
 
@@ -155,10 +155,8 @@ test.describe('PS Dashboard', () => {
       await page.locator('button', { hasText: 'Load' }).click();
       // Two turns of variation: Swords Dance keeps turn 1 KO-free.
       await startVariationAt(page, 1, { p1Move: 'Swords Dance' });
-      const p1 = page.locator('.ps-branch-side-column').first();
-      const p2 = page.locator('.ps-branch-side-column').nth(1);
-      await p1.locator('.ps-movebtn:enabled').first().click();
-      await p2.locator('.ps-movebtn:enabled').first().click();
+      await pickMove(page, 'p1a');
+      await pickMove(page, 'p2a');
       await page.locator('.ps-execute-btn').click();
       await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 2', { timeout: 60_000 });
 
@@ -170,8 +168,8 @@ test.describe('PS Dashboard', () => {
 
       // Deviate here: a DIFFERENT P1 move — NO confirm may appear (chess
       // rules: truncation inside the variation is silent).
-      await p1.locator('.ps-movebtn:enabled').nth(1).click();
-      await p2.locator('.ps-movebtn:enabled').first().click();
+      await (await openTray(page, 'p1a')).locator('.ps-movebtn:enabled').nth(1).click();
+      await pickMove(page, 'p2a');
       await page.locator('.ps-execute-btn').click();
       await expect(page.locator('[role="alertdialog"]')).toHaveCount(0);
       await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 2', { timeout: 60_000 });
@@ -190,10 +188,8 @@ test.describe('PS Dashboard', () => {
       await expect(page.getByText('T3/')).toBeVisible();
       await expect(page.locator('.ps-line-chip button.on-main')).toBeVisible();
 
-      const p1 = page.locator('.ps-branch-side-column').first();
-      const p2 = page.locator('.ps-branch-side-column').nth(1);
-      await p1.locator('.ps-movebtn:enabled').first().click();
-      await p2.locator('.ps-movebtn:enabled').first().click();
+      await pickMove(page, 'p1a');
+      await pickMove(page, 'p2a');
       await page.locator('.ps-execute-btn').click();
       const confirm = page.locator('[role="alertdialog"]');
       await expect(confirm).toContainText('You are on the main line (turn 3): replace the existing variation from turn 1');
@@ -215,10 +211,8 @@ test.describe('PS Dashboard', () => {
 
       // Deviating ON the main line asks first; Cancel keeps the variation.
       await page.locator('.ps-branch-bar input[type="range"]').fill('1');
-      const p1 = page.locator('.ps-branch-side-column').first();
-      const p2 = page.locator('.ps-branch-side-column').nth(1);
-      await p1.locator('.ps-movebtn:enabled').first().click();
-      await p2.locator('.ps-movebtn:enabled').first().click();
+      await pickMove(page, 'p1a');
+      await pickMove(page, 'p2a');
       await page.locator('.ps-execute-btn').click();
       const confirm = page.locator('[role="alertdialog"]');
       await expect(confirm).toBeVisible();
@@ -322,8 +316,8 @@ test.describe('PS Dashboard', () => {
       await expect(history).toContainText('Turn 0');
       // Two leads per side, slot-ordered ("lead X + Y").
       await expect(history).toContainText('+');
-      // The doubles branch opens with per-slot controls for all four actives.
-      await expect(page.locator('.ps-side-controls')).toHaveCount(4);
+      // The doubles branch opens with a chip for each of the four actives (round 84: the per-slot controls became chips).
+      await expect(page.locator('.ps-dock-chip')).toHaveCount(4);
     });
 
     test('VGC T0 picks the brought four and the branch fields only them', async ({ page }) => {
@@ -350,8 +344,8 @@ test.describe('PS Dashboard', () => {
       await expect(history).toContainText('back');
       // The live branch fields ONLY the chosen four — every evaluation and
       // play-out runs on this battle, so each slot's bench holds exactly 2.
-      await expect(page.locator('.ps-side-controls')).toHaveCount(4);
-      await expect(page.locator('.ps-side-controls').first().locator('.ps-switchbtn')).toHaveCount(2);
+      await expect(page.locator('.ps-dock-chip')).toHaveCount(4);
+      await expect((await openTray(page, 'p1a')).locator('.ps-switchbtn')).toHaveCount(2);
     });
 
     test('VGC T0 starts again over a standing turn-0 variation once the replace is confirmed', async ({ page }) => {
@@ -373,7 +367,7 @@ test.describe('PS Dashboard', () => {
       await expect(confirm).toContainText('Start a new game from turn 0: replace the existing variation from turn 0');
       await confirm.locator('button', { hasText: 'Replace' }).click();
       await expect(page.getByText(/Branching · Turn 1/)).toBeVisible({ timeout: 60_000 });
-      await expect(page.locator('.ps-side-controls')).toHaveCount(4);
+      await expect(page.locator('.ps-dock-chip')).toHaveCount(4);
       await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 0');
     });
   });

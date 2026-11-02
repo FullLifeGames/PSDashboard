@@ -1,6 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'fs';
-import { expectReplaySettled, expectReplayTurnAtLeast, fixturePath, installReplayEmbedCache, routeOfflineFixtures, routeSlowReplayEmbed, startVariationAt, type ReplayWindow } from './helpers';
+import {
+  dockChip, expectReplaySettled, expectReplayTurnAtLeast, fixturePath, installReplayEmbedCache, pickForcedReplacement, pickMove, pickSwitch,
+  routeOfflineFixtures, routeSlowReplayEmbed, startVariationAt, type ReplayWindow,
+} from './helpers';
 
 test.beforeAll(installReplayEmbedCache);
 
@@ -36,10 +39,9 @@ test.describe('PS Dashboard', () => {
     await expect(page.getByText('T56/')).toBeVisible();
     // Executing a turn here funnels through the same healed reconstruction
     // the old materialize button used — t56 must arrive LIVE and play.
-    const p1 = page.locator('.ps-branch-side-column').first();
-    const p2 = page.locator('.ps-branch-side-column').nth(1);
-    await p1.locator('.ps-movebtn:enabled').first().click();
-    await p2.locator('.ps-movebtn:enabled').first().click();
+    // Round 84 (turn dock): each slot gets the first enabled move through its tray, as the columns did.
+    await pickMove(page, 'p1a');
+    await pickMove(page, 'p2a');
     await page.locator('.ps-execute-btn').click();
     await expect(page.getByText(/Branching · Turn 5[6-9]/)).toBeVisible({ timeout: 120_000 });
     await expect(page.getByText(/already ended|wedged at turn/)).toHaveCount(0);
@@ -98,10 +100,8 @@ test.describe('PS Dashboard', () => {
     await expect(page.getByText('puffelmaedchen', { exact: true }).first()).toBeVisible({ timeout: 15_000 });
     await slider.fill('56');
     await expect(page.getByText('T56/')).toBeVisible();
-    const p1 = page.locator('.ps-branch-side-column').first();
-    const p2 = page.locator('.ps-branch-side-column').nth(1);
-    await p1.locator('.ps-movebtn', { hasText: 'Ice Beam' }).click();
-    await p2.locator('.ps-switchbtn', { hasText: 'Slow Shadow' }).click();
+    await pickMove(page, 'p1a', 'Ice Beam');
+    await pickSwitch(page, 'p2a', 'Slow Shadow');
     await page.locator('.ps-execute-btn').click();
     await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 56', { timeout: 120_000 });
 
@@ -161,27 +161,24 @@ test.describe('PS Dashboard', () => {
     await page.locator('.ps-execute-btn', { hasText: 'Play from turn 0' }).click();
     await expect(page.getByText(/Branching · Turn 1/)).toBeVisible({ timeout: 60_000 });
 
-    const p1 = page.locator('.ps-branch-side-column').first();
-    const p2 = page.locator('.ps-branch-side-column').nth(1);
     const history = page.locator('.ps-panel', { hasText: 'Variation moves' });
     // Turn 1: U-turn and Chilly Reception, each side then sends its first switch-in.
-    await p1.locator('.ps-movebtn', { hasText: 'U-turn' }).click();
-    await p2.locator('.ps-movebtn', { hasText: 'Chilly Reception' }).click();
+    await pickMove(page, 'p1a', 'U-turn');
+    await pickMove(page, 'p2a', 'Chilly Reception');
     await page.locator('.ps-execute-btn').click();
     for (const side of ['P1', 'P2']) {
-      const forced = page.locator('.ps-side-controls', { has: page.locator('.ps-force-switch-note') }).first();
-      await forced.locator('.ps-switchbtn:enabled').first().click();
+      await pickForcedReplacement(page);
       await expect(history).toContainText(`forced replacement (${side})`, { timeout: 30_000 });
     }
     // Turn 2 as played first, then one turn back and Freeze-Dry instead.
-    await p1.locator('.ps-movebtn', { hasText: 'Ice Beam' }).click();
-    await p2.locator('.ps-movebtn', { hasText: 'Close Combat' }).click();
+    await pickMove(page, 'p1a', 'Ice Beam');
+    await pickMove(page, 'p2a', 'Close Combat');
     await page.locator('.ps-execute-btn').click();
     await expect(history).toContainText('Ice Beam | Close Combat', { timeout: 60_000 });
     await page.locator('.ps-branch-bar button', { hasText: '◀' }).click();
     await expect(page.getByText('T2/')).toBeVisible();
-    await p1.locator('.ps-movebtn', { hasText: 'Freeze-Dry' }).click();
-    await p2.locator('.ps-movebtn', { hasText: 'Close Combat' }).click();
+    await pickMove(page, 'p1a', 'Freeze-Dry');
+    await pickMove(page, 'p2a', 'Close Combat');
     await page.locator('.ps-execute-btn').click();
     await expect(history).toContainText('Freeze-Dry | Close Combat', { timeout: 60_000 });
     await expect(history).not.toContainText('Ice Beam | Close Combat');
@@ -217,8 +214,8 @@ test.describe('PS Dashboard', () => {
 
     // Swords Dance for P1 (no damage — a max-damage pick can crit-KO and
     // turn P2's controls into a forced-switch prompt), any move for P2.
-    await page.locator('.ps-branch-side-column').first().locator('.ps-movebtn', { hasText: 'Swords Dance' }).click();
-    await page.locator('.ps-branch-side-column').nth(1).locator('.ps-movebtn').first().click();
+    await pickMove(page, 'p1a', 'Swords Dance');
+    await pickMove(page, 'p2a');
     const iframe = await page.locator('iframe[title="Branch Simulation"]').elementHandle();
     await page.locator('button', { hasText: 'Execute Turn' }).click();
 
@@ -250,10 +247,8 @@ test.describe('PS Dashboard', () => {
     };
     const beforeLength = await settledLogLength();
 
-    const p1Side = page.locator('.ps-branch-side-column').first();
-    const p2Side = page.locator('.ps-branch-side-column').nth(1);
-    await p1Side.locator('.ps-movebtn:enabled').first().click();
-    await p2Side.locator('.ps-movebtn:enabled').first().click();
+    await pickMove(page, 'p1a');
+    await pickMove(page, 'p2a');
     await page.locator('.ps-execute-btn').click();
 
     // The appended turn grows the visible log — a marker that does not
@@ -296,10 +291,8 @@ test.describe('PS Dashboard', () => {
       }) as Window['postMessage'];
     });
 
-    const p1Side = page.locator('.ps-branch-side-column').first();
-    const p2Side = page.locator('.ps-branch-side-column').nth(1);
-    await p1Side.locator('.ps-movebtn:enabled').first().click();
-    await p2Side.locator('.ps-movebtn:enabled').first().click();
+    await pickMove(page, 'p1a');
+    await pickMove(page, 'p2a');
     await page.locator('.ps-execute-btn').click();
 
     // startVariationAt already executed turn 2 (and resolved its forced
@@ -350,10 +343,8 @@ test.describe('PS Dashboard', () => {
     const branchIframe = page.locator('iframe[title="Branch Simulation"]');
     const initialBox = await branchIframe.boundingBox();
 
-    const p1Controls = page.locator('.ps-branch-side-column').first();
-    const p2Controls = page.locator('.ps-branch-side-column').nth(1);
-    await p1Controls.locator('.ps-movebtn', { hasText: 'Swords Dance' }).click();
-    await p2Controls.locator('.ps-movebtn').first().click();
+    await pickMove(page, 'p1a', 'Swords Dance');
+    await pickMove(page, 'p2a');
     await page.locator('button', { hasText: 'Execute Turn' }).click();
     await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 2', { timeout: 10000 });
 
@@ -368,10 +359,9 @@ test.describe('PS Dashboard', () => {
     await page.locator('input[type="range"]').fill('2');
     await expect(page.getByText('T2/')).toBeVisible();
 
-    const p1Controls = page.locator('.ps-branch-side-column').nth(0);
-    const p2Controls = page.locator('.ps-branch-side-column').nth(1);
-    await expect(p1Controls).toContainText('What will Garchomp do?');
-    await expect(p2Controls).toContainText(/What will .* do\?/);
+    // Round 84 (turn dock): the chips name the active bodies (the "What will X do?" header is gone).
+    await expect(dockChip(page, 'p1a')).toContainText('Garchomp');
+    await expect(dockChip(page, 'p2a')).toContainText('P2');
 
     const executeBox = await page.locator('.ps-execute-btn').boundingBox();
     expect(executeBox).toBeTruthy();
@@ -432,8 +422,8 @@ test.describe('the branch frame plays executed turns', () => {
     await page.locator('button', { hasText: 'Load' }).click();
     await page.locator('.ps-branch-bar input[type="range"]').fill('2');
     await expect(page.getByText('T2/')).toBeVisible();
-    await page.locator('.ps-branch-side-column').first().locator('.ps-movebtn', { hasText: 'Swords Dance' }).click();
-    await page.locator('.ps-branch-side-column').nth(1).locator('.ps-movebtn:enabled').first().click();
+    await pickMove(page, 'p1a', 'Swords Dance');
+    await pickMove(page, 'p2a');
     await page.locator('.ps-execute-btn').click();
 
     type Sample = { turn: number; paused: boolean; seeking: number | null };

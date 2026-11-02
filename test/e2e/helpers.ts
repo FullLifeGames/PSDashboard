@@ -1,4 +1,4 @@
-import { expect, type Frame, type Page } from '@playwright/test';
+import { expect, type Frame, type Locator, type Page } from '@playwright/test';
 import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
@@ -69,43 +69,111 @@ export async function expectReplaySettled(frame: Frame) {
   }), { timeout: 60_000 }).toBe(true);
 }
 
+/** The four slots a chip can stand for: side and field position. A singles game has `p1a` and `p2a` only. */
+export type DockSlotKey = 'p1a' | 'p1b' | 'p2a' | 'p2b';
+
+/** Round 84 (turn dock): the chip of one slot. Its `data-chip` is the side and the slot index (`p10`, `p11`, `p20`, `p21`). */
+export const dockChip = (page: Page, slot: DockSlotKey): Locator =>
+  page.locator(`.ps-dock-chip[data-chip="${slot.slice(0, 2)}${slot[2] === 'a' ? 0 : 1}"]`);
+
+/** The tray above the dock; only one is open at a time. */
+export const dockTray = (page: Page): Locator => page.locator('.ps-tray');
+
+/** The slot a chip's `data-chip` names (`p21` is `p2b`). */
+const slotOfChip = (raw: string): DockSlotKey => `${raw.slice(0, 2)}${raw[2] === '0' ? 'a' : 'b'}` as DockSlotKey;
+
+interface TrayOptions {
+  /** For a retry loop: the clicks and the checks give up after this time (a stale dock takes no input). */
+  timeout?: number;
+}
+
+/** Opens a chip's tray and waits until it stands; a chip that is the open one stays open (the chip itself toggles). */
+async function openChip(page: Page, chip: Locator, { timeout }: TrayOptions = {}): Promise<Locator> {
+  if ((await chip.getAttribute('aria-expanded', { timeout })) !== 'true') await chip.click({ timeout });
+  await expect(chip).toHaveAttribute('aria-expanded', 'true', { timeout });
+  return dockTray(page);
+}
+
+/** Round 84 (turn dock): opens the tray of one slot. A tray that stands for this slot already stays as it is. */
+export function openTray(page: Page, slot: DockSlotKey, options?: TrayOptions): Promise<Locator> {
+  return openChip(page, dockChip(page, slot), options);
+}
+
+/** Opens the slot's tray and its "Dice · What if" section (the dice, the What-if loader and all choices). */
+export async function openTrayMore(page: Page, slot: DockSlotKey, options?: TrayOptions): Promise<Locator> {
+  const tray = await openTray(page, slot, options);
+  const toggle = tray.getByRole('button', { name: /Dice · What if/ });
+  if ((await toggle.getAttribute('aria-expanded', { timeout: options?.timeout })) !== 'true') await toggle.click({ timeout: options?.timeout });
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true', { timeout: options?.timeout });
+  return tray;
+}
+
 /**
- * Unified-timeline helper: moves the slider to `turn`, picks a move for both
- * sides from the ALWAYS-visible pickers (variant B), executes, and waits for
- * the rebuilt sim's history entry — after this a live variation covers
- * `turn` and the pointer sits on its tip.
+ * Round 84 (turn dock): picks a move of one slot in its tray: the named one, else the first enabled one (what the old column
+ * helper took). The tile click makes it the slot's own choice (a draft entry), so the executed turn names this move in this
+ * slot whatever the seed was. Returns the move's name once the chip shows it.
+ */
+export async function pickMove(page: Page, slot: DockSlotKey, move?: string | RegExp, options?: TrayOptions): Promise<string> {
+  const tray = await openTray(page, slot, options);
+  const tile = move ? tray.locator('.ps-movebtn', { hasText: move }) : tray.locator('.ps-movebtn:enabled').first();
+  const name = ((await tile.locator('.ps-movebtn-name').first().textContent({ timeout: options?.timeout })) ?? '').trim();
+  await tile.click({ timeout: options?.timeout });
+  await expect(dockChip(page, slot)).toContainText(name, { timeout: options?.timeout });
+  return name;
+}
+
+/** Picks a switch tile of one slot's tray, by the body's name. */
+export async function pickSwitch(page: Page, slot: DockSlotKey, body: string | RegExp, options?: TrayOptions): Promise<void> {
+  const tray = await openTray(page, slot, options);
+  await tray.locator('.ps-switchbtn', { hasText: body }).click({ timeout: options?.timeout });
+}
+
+/**
+ * The forced replacement the position asks of a slot ("choose a replacement" on its chip): opens the chip's bench and sends
+ * the first body that may enter. The pick executes at once.
+ */
+export async function pickForcedReplacement(page: Page, options?: TrayOptions): Promise<void> {
+  const tray = await openChip(page, page.locator('.ps-dock-chip', { hasText: 'choose a replacement' }).first(), options);
+  await tray.locator('.ps-switchbtn:enabled').first().click({ timeout: options?.timeout });
+}
+
+/**
+ * Unified-timeline helper: moves the slider to `turn`, gives EVERY active slot an explicit move through its tray, executes,
+ * and waits for the rebuilt sim's history entry: after this a live variation covers `turn` and the pointer sits on its tip.
+ *
+ * Round 84 (turn dock): the slots start with the logged choice, so the helper picks in every slot the move the old column
+ * helper took (the first enabled one; `p1Move` for the first P1 slot), and the executed turn stays the one the specs always
+ * executed. The explicit pick also fills a slot with no logged action (a flinch, a faint before the move), which would hold
+ * Execute locked.
  */
 export async function startVariationAt(page: Page, turn: number, options?: { p1Move?: string | RegExp }) {
   if (turn > 1) {
     await page.locator('.ps-branch-bar input[type="range"]').fill(String(turn));
     await expect(page.getByText(`T${turn}/`)).toBeVisible();
   }
-  const p1 = page.locator('.ps-branch-side-column').first();
-  const p2 = page.locator('.ps-branch-side-column').nth(1);
-  if (options?.p1Move) {
-    await p1.locator('.ps-movebtn', { hasText: options.p1Move }).click();
-  } else {
-    await p1.locator('.ps-movebtn:enabled').first().click();
+  const chips = page.locator('.ps-dock-chip');
+  await expect(chips.first()).toBeVisible({ timeout: 30_000 });
+  const slots = (await chips.evaluateAll(elements => elements.map(element => element.getAttribute('data-chip') ?? '')))
+    .map(slotOfChip);
+  for (const slot of slots) {
+    await pickMove(page, slot, slot === slots[0] ? options?.p1Move : undefined);
   }
-  await p2.locator('.ps-movebtn:enabled').first().click();
   await page.locator('.ps-execute-btn').click();
   await expect(page.locator('.ps-panel', { hasText: 'Variation moves' }))
     .toContainText(`Turn ${turn}`, { timeout: 60_000 });
-  // A first-move KO is common — resolve the trailing forced replacement so
-  // callers always get both sides' pickers back. The compact picker shows
-  // switch chips at every position, so the forced state is detected via its
-  // prompt, never via mere switch-button visibility.
+  // A first-move KO is common: resolve the trailing forced replacement so callers always get both sides' pickers back. The
+  // chips show at every position, so the forced state is detected via the strip's prompt, never via a chip alone.
   const forcedNote = page.locator('.ps-force-switch-note').first();
   await forcedNote.waitFor({ state: 'visible', timeout: 4000 }).catch(() => {});
   if (await forcedNote.isVisible().catch(() => false)) {
-    const forcedControls = page.locator('.ps-side-controls', { has: page.locator('.ps-force-switch-note') }).first();
-    await forcedControls.locator('.ps-switchbtn:enabled').first().click();
+    await pickForcedReplacement(page);
     await expect(page.locator('.ps-panel', { hasText: 'Variation moves' }))
       .toContainText('forced replacement', { timeout: 30_000 });
   }
-  for (const side of [p1, p2]) {
-    await expect(side.locator('.ps-movebtn').first()).toBeVisible({ timeout: 30_000 });
+  for (const slot of slots) {
+    await expect(dockChip(page, slot)).toBeVisible({ timeout: 30_000 });
   }
+  await expect(page.locator('.ps-force-switch-note')).toHaveCount(0, { timeout: 30_000 });
 }
 
 /** Opens the top bar's Setup menu and clicks one of its entries (round 77: the team actions moved there). */
@@ -123,7 +191,7 @@ export async function waitForExactPickers(page: Page, turn?: number) {
     await page.locator('.ps-branch-bar input[type="range"]').fill(String(turn));
     await expect(page.getByText(`T${turn}/`)).toBeVisible();
   }
-  await expect(page.getByText('Choices from the reconstructed position')).toBeVisible({ timeout: 90_000 });
+  await expect(page.locator('.ps-dock-status').getByText('Choices from the reconstructed position')).toBeVisible({ timeout: 90_000 });
 }
 
 // The embed script is fetched from play.pokemonshowdown.com by every test's
@@ -156,6 +224,16 @@ export async function routeSlowReplayEmbed(page: Page, delayMs: number): Promise
   });
 }
 
+/**
+ * Round 84 (turn dock): three corpus games with played turns, byte copies of `.fit-corpus` files. The hand-written doubles and
+ * VGC fixtures hold no played turn, so the dock's seed (the logged choice of every slot) needs these. Served by their ids.
+ */
+export const dockReplays: ReplayData[] = [
+  'dock-doublesou-2662153814.json',
+  'dock-vgcregi-2573391549.json',
+  'dock-championsvgc-2625939941.json',
+].map(name => JSON.parse(readFileSync(fixturePath(name), 'utf-8')) as ReplayData);
+
 /** The offline routes every dashboard test starts from: cached replay embed, fixture replays, empty Smogon data. */
 export async function routeOfflineFixtures(page: Page): Promise<void> {
   await page.route('**/play.pokemonshowdown.com/js/replay-embed.js*', async (route) => {
@@ -174,7 +252,7 @@ export async function routeOfflineFixtures(page: Page): Promise<void> {
     const replay = url.includes(vgcReplay.id) ? vgcReplay
       : url.includes(doublesSpreadReplay.id) ? doublesSpreadReplay
       : url.includes(doublesReplay.id) ? doublesReplay
-      : fixtureReplay;
+      : dockReplays.find(dock => url.includes(dock.id)) ?? fixtureReplay;
     route.fulfill({
       status: 200,
       contentType: 'application/json',
