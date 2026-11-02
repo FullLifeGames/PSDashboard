@@ -121,6 +121,12 @@ function useFillApply(inputs: DockFillInputs, key: string, eligible: boolean, ma
 
 type Apply = ReturnType<typeof useFillApply>;
 
+/** The view's own effects start the evaluation of a live position in these cases (`useEvalHousekeeping`); the fill leaves the run to them. */
+function startedByHousekeeping(prefs: Pick<Evaluation['prefs'], 'auto' | 'autoAnalyze'>, status: Evaluation['status']): boolean {
+  if (prefs.auto && status === 'stale') return true;
+  return prefs.autoAnalyze && (status === 'idle' || status === 'stale');
+}
+
 /** The trigger only acts: a run for the position, or the result of a run another trigger started (Auto, the walk). */
 function useFillTrigger(inputs: DockFillInputs, key: string, eligible: boolean, running: boolean, apply: Apply, settledRef: FillMarks['settledRef']) {
   const { evaluation, liveEvalStatus, evalViewKey, handleEvaluate } = inputs;
@@ -130,17 +136,22 @@ function useFillTrigger(inputs: DockFillInputs, key: string, eligible: boolean, 
   const attempted = evaluation.resultTag === evalViewKey;
   useEffect(() => {
     if (baseRef.current.key !== key) baseRef.current = { key, result: evaluation.result };
-    if (!eligible || settledRef.current.key === key) return;
+    if (settledRef.current.key === key) return;
+    if (!eligible) {
+      // A run that the game analysis (or anything else) stopped starts again once the fill may run.
+      attemptRef.current = null;
+      return;
+    }
     if (evaluation.status === 'done' && evaluation.result !== null && attempted && evaluation.result !== baseRef.current.result) {
       apply(key, evaluation.result);
       return;
     }
     if (attemptRef.current === key || running) return;
-    // With Auto on, the effect that follows an executed turn starts the run; its result comes through the branch above.
-    if (evaluation.prefs.auto && liveEvalStatus === 'stale') return;
+    // With Auto or "always on", the housekeeping effects of the view start this run; its result comes through the branch above.
+    if (startedByHousekeeping(evaluation.prefs, liveEvalStatus)) return;
     attemptRef.current = key;
     handleEvaluate({ onResult: result => apply(key, result) });
-  }, [key, eligible, attempted, running, evaluation.status, evaluation.result, evaluation.prefs.auto, liveEvalStatus, handleEvaluate, apply, settledRef]);
+  }, [key, eligible, attempted, running, evaluation.status, evaluation.result, evaluation.prefs, liveEvalStatus, handleEvaluate, apply, settledRef]);
 }
 
 /**

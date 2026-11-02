@@ -20,13 +20,14 @@ interface Shape {
   resultTag?: string | null;
   running?: boolean;
   auto?: boolean;
+  autoAnalyze?: boolean;
 }
 
 function evaluationOf(shape: Shape = {}) {
   const setPrefs = vi.fn();
   const evaluation = {
     status: shape.status ?? 'idle', result: shape.result ?? null, resultTag: shape.resultTag ?? null, setPrefs,
-    prefs: { depth: 1, samples: 1, mode: 'matrix', auto: shape.auto ?? false, autoAnalyze: false, tera: 'auto' },
+    prefs: { depth: 1, samples: 1, mode: 'matrix', auto: shape.auto ?? false, autoAnalyze: shape.autoAnalyze ?? false, tera: 'auto' },
     graph: { running: shape.running ?? false },
   } as unknown as Evaluation;
   return { evaluation, setPrefs };
@@ -87,6 +88,13 @@ describe('useDockFill: when a run starts', () => {
     expect(setPrefs).not.toHaveBeenCalled();
   });
 
+  test('with "always on" an effect of the view starts the run of an idle live position: the fill starts none', () => {
+    const { evaluation } = evaluationOf({ autoAnalyze: true });
+    const { wired, handleEvaluate } = inputsOf('doubles', { evaluation, liveEvalStatus: 'idle' });
+    renderHook(() => useDockFill(wired));
+    expect(handleEvaluate).not.toHaveBeenCalled();
+  });
+
   test('a new variation at the same turn is a new position and runs again', () => {
     const { wired, handleEvaluate } = inputsOf('singles');
     const { rerender } = renderHook((props: DockFillInputs) => useDockFill(props), { initialProps: wired });
@@ -133,6 +141,16 @@ describe('useDockFill: when a run starts', () => {
     expect(handleEvaluate).toHaveBeenCalledTimes(1);
     expect(result.current.busy).toBe(false);
     expect(result.current.pending).toBe(true);
+  });
+
+  test('a run that the game analysis stopped starts again when the analysis has ended', () => {
+    const { wired, handleEvaluate } = inputsOf('singles');
+    const { rerender } = renderHook((props: DockFillInputs) => useDockFill(props), { initialProps: wired });
+    expect(handleEvaluate).toHaveBeenCalledTimes(1);
+    rerender({ ...wired, evaluation: evaluationOf({ running: true, status: 'idle', resultTag: 'variation:3' }).evaluation });
+    expect(handleEvaluate).toHaveBeenCalledTimes(1);
+    rerender({ ...wired, evaluation: evaluationOf({ running: false, status: 'idle', resultTag: 'variation:3' }).evaluation });
+    expect(handleEvaluate).toHaveBeenCalledTimes(2);
   });
 
   test('with Auto on, the evaluation that follows an executed turn is the Auto effect run: the fill waits for its result', () => {
