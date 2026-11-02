@@ -30,18 +30,26 @@ export function chipPickText(choice: BranchSlotChoice | null | undefined, moves:
 
 /**
  * Where a chip's choice came from. The merge hands an untouched slot the seed's own object, so identity tells a seeded choice
- * from the user's pick (even one that equals the seed). The engine's fill (A5) marks its own slots.
+ * from the user's pick (even one that equals the seed). The engine's fill marks the slots it wrote (`engine`), which wins: at the
+ * live tip no seed stands, and a slot the engine filled was empty.
  */
-export function chipOrigin(choice: BranchSlotChoice | null, seedChoice: BranchSlotChoice | null | undefined): ChipOrigin | null {
-  return choice && seedChoice && choice === seedChoice ? 'played' : null;
+export function chipOrigin(choice: BranchSlotChoice | null, seedChoice: BranchSlotChoice | null | undefined, engine = false): ChipOrigin | null {
+  if (!choice) return null;
+  if (engine) return 'engine';
+  return seedChoice && choice === seedChoice ? 'played' : null;
 }
 
+/** What the engine is doing about an empty slot: filling it, or kept off by the game analysis. */
+export type EngineWait = 'pending' | 'busy';
+
 /** The text of an empty chip. `hasRecord`: the position has a played record to seed from (a replay turn), so an empty slot is a slot nothing was logged for. */
-export function chipPlaceholder({ forceSwitch, nobodyLeft, played, hasRecord }: {
-  forceSwitch: boolean; nobodyLeft: boolean; played: Pick<PlayedPick, 'kind' | 'name'> | null; hasRecord: boolean;
+export function chipPlaceholder({ forceSwitch, nobodyLeft, played, hasRecord, engine }: {
+  forceSwitch: boolean; nobodyLeft: boolean; played: Pick<PlayedPick, 'kind' | 'name'> | null; hasRecord: boolean; engine?: EngineWait | null;
 }): string {
   if (nobodyLeft) return 'fainted · no one left';
   if (forceSwitch) return 'choose a replacement';
+  if (engine === 'pending') return 'engine choosing…';
+  if (engine === 'busy') return 'engine busy with the game analysis';
   if (played) return `played: ${played.kind === 'move' ? played.name : `→ ${played.name}`} · choose`;
   return hasRecord ? 'no logged move · choose' : 'choose';
 }

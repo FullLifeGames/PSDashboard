@@ -4,6 +4,7 @@ import { useEvalAcquire } from '../useEvalAcquire';
 import { usePlayedAtView, usePositionPicker } from '../usePositionPicker';
 import { useEvalView } from '../useEvalView';
 import { useEngineWalk } from '../useEngineWalk';
+import { useDockFill } from '../useDockFill';
 import { usePlayOut } from '../usePlayOut';
 import { useEvaluation } from '../useEvaluation';
 import { parsePlayedActions, parsePlayedActionsDoubles } from '@fulllifegames/eval-engine';
@@ -107,6 +108,22 @@ function useEvalViewLayer(
   });
 }
 
+/** Round 84 (turn dock): the engine fill at the live tip. It reads the evaluation the view layer drives and the branch's picks. */
+function useFillLayer(
+  ctx: ReplayContext, transients: Transients, board: BoardController,
+  evalView: ReturnType<typeof useEvalViewLayer>,
+) {
+  const { simState, branching, executing, history, variationStartTurn, getChoices, setChoice, executeTurn } = ctx.branch;
+  const { liveTip, evalViewKey } = board.timeline;
+  return useDockFill({
+    simState, liveTip, branching, executing, branchPreparing: board.deviation.branchPreparing,
+    playOutActive: transients.playOut?.active ?? false, evalAvailable: evalView.evalAvailable, evaluation: ctx.evaluation,
+    liveEvalStatus: board.liveEvalStatus, evalViewKey, historyLength: history.length,
+    sessionKey: `${board.deviation.branchSession}:${variationStartTurn ?? 0}`,
+    handleEvaluate: evalView.handleEvaluate, getChoices, setChoice, executeTurn,
+  });
+}
+
 function usePlayLayer(
   ctx: ReplayContext, transients: Transients, board: BoardController,
   evalView: ReturnType<typeof useEvalViewLayer>,
@@ -153,8 +170,9 @@ function usePlayLayer(
 export function useEngineController(ctx: ReplayContext, transients: Transients, board: BoardController) {
   const acquireLayer = useAcquireLayer(ctx, transients, board);
   const evalView = useEvalViewLayer(ctx, transients, board, acquireLayer);
+  const dockFill = useFillLayer(ctx, transients, board, evalView);
   const { walk, playOutControls } = usePlayLayer(ctx, transients, board, evalView);
-  return { ...acquireLayer, evalView, walk, playOutControls };
+  return { ...acquireLayer, evalView, dockFill, walk, playOutControls };
 }
 
 export type EngineController = ReturnType<typeof useEngineController>;

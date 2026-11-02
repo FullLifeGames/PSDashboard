@@ -42,6 +42,14 @@ describe('chipOrigin', () => {
     expect(chipOrigin(seeded, null)).toBeNull();
     expect(chipOrigin(seeded, undefined)).toBeNull();
   });
+  test('a choice the engine filled is "engine", also over a seed; no choice has none even if marked', () => {
+    expect(chipOrigin(flare(), null, true)).toBe('engine');
+    expect(chipOrigin(flare(), undefined, true)).toBe('engine');
+    const seeded = flare();
+    expect(chipOrigin(seeded, seeded, true)).toBe('engine');
+    expect(chipOrigin(null, null, true)).toBeNull();
+    expect(chipOrigin(flare(), null, false)).toBeNull();
+  });
 });
 
 describe('chipPlaceholder', () => {
@@ -55,5 +63,12 @@ describe('chipPlaceholder', () => {
     expect(chipPlaceholder({ ...base, hasRecord: false })).toBe('choose');
     expect(chipPlaceholder({ ...base, forceSwitch: true })).toBe('choose a replacement');
     expect(chipPlaceholder({ ...base, nobodyLeft: true })).toBe('fainted · no one left');
+  });
+  test('while the engine fills or is blocked by the game analysis, an empty slot says so; a forced replacement and an empty bench keep their text', () => {
+    expect(chipPlaceholder({ ...base, hasRecord: false, engine: 'pending' })).toBe('engine choosing…');
+    expect(chipPlaceholder({ ...base, hasRecord: false, engine: 'busy' })).toBe('engine busy with the game analysis');
+    expect(chipPlaceholder({ ...base, hasRecord: false, engine: null })).toBe('choose');
+    expect(chipPlaceholder({ ...base, hasRecord: false, engine: 'pending', forceSwitch: true })).toBe('choose a replacement');
+    expect(chipPlaceholder({ ...base, hasRecord: false, engine: 'busy', nobodyLeft: true })).toBe('fainted · no one left');
   });
 });

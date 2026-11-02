@@ -5,6 +5,7 @@ import type { PlayedAtPosition } from '../../lib/played-pick';
 import type { SeedChoices, SideChoices } from '../../lib/dock-seed';
 import { useDockPreview } from '../../hooks/useDockPreview';
 import { useDiceViews } from '../../hooks/useDiceView';
+import type { DockFillView } from '../../hooks/useDockFill';
 import { useTrayState } from '../../hooks/useTrayState';
 import { buildDockModel, type Side } from './dock-model';
 import { DockRows } from './DockRows';
@@ -42,6 +43,42 @@ export interface TurnDockProps {
   replayLog?: string;
   /** The played choice of each slot, validated against the picker; an untouched slot shows it. */
   seed?: SeedChoices | null;
+  /** The engine's fill at the live tip: a pending run holds the empty chips and queues an Execute; null off the tip. */
+  fill?: DockFillView | null;
+}
+
+/** A pick of the user takes the slot from the engine's fill first, then the choice is stored. */
+function useUserChoice(fill: DockFillView | null | undefined, onSetChoice: TurnDockProps['onSetChoice']) {
+  const onUserChoice = fill?.onUserChoice;
+  return useCallback((side: Side, choice: BranchSlotChoice, slot?: number) => {
+    onUserChoice?.(side, slot ?? 0);
+    onSetChoice(side, choice, slot);
+  }, [onUserChoice, onSetChoice]);
+}
+
+/** Execute: locked until every slot holds a choice, except while the engine's fill is pending: then a press queues behind it. */
+function DockExecute({ model, fill, executing, onRun, onClose }: {
+  model: ReturnType<typeof buildDockModel>;
+  fill: DockFillView | null | undefined;
+  executing: boolean;
+  onRun: () => void;
+  onClose: () => void;
+}) {
+  if (model.flags.isForceSwitch) return null;
+  const waitsForFill = !!fill?.pending && !model.flags.bothChosen;
+  return (
+    <ExecuteButton
+      ready={model.flags.bothChosen || waitsForFill}
+      executing={executing}
+      waits={waitsForFill && !!fill?.waits}
+      label={waitsForFill ? 'Execute Turn' : model.flags.pendingLabel}
+      onClick={() => {
+        onClose();
+        if (waitsForFill) fill.queueExecute();
+        else onRun();
+      }}
+    />
+  );
 }
 
 /**
@@ -51,21 +88,18 @@ export interface TurnDockProps {
 export function TurnDock(props: TurnDockProps) {
   const {
     simState, stale, source, acquiringExact, executeError, executing, gen, onSetChoice, onHypotheticalMove, onExecuteTurn, played,
-    positionKey, getBattle, replayLog, seed,
+    positionKey, getBattle, replayLog, seed, fill,
   } = props;
-  const onEdit = useCallback((side: Side, slot: number, choice: BranchSlotChoice) => onSetChoice(side, choice, slot), [onSetChoice]);
+  const setChoice = useUserChoice(fill, onSetChoice);
+  const onEdit = useCallback((side: Side, slot: number, choice: BranchSlotChoice) => setChoice(side, choice, slot), [setChoice]);
   const { slots, gimmickFor, damageBySide } = useDockPreview(simState, gen, positionKey, getBattle, onEdit);
   const { open, attachRoot, close, toggleChip, toggleMore, onKeyDown } = useTrayState(positionKey);
-  const diceViews = useDiceViews({ diceOpen: open?.more ?? false, stale, simState, getBattle, replayLog, onSetChoice });
+  const diceViews = useDiceViews({ diceOpen: open?.more ?? false, stale, simState, getBattle, replayLog, onSetChoice: setChoice });
   if (!simState) return null;
   if (simState.ended) return <div className="ps-dock"><EndedNotice winner={simState.winner} /></div>;
 
-  const model = buildDockModel({ simState, slots, damageBySide, gimmickFor, played, seed });
+  const model = buildDockModel({ simState, slots, damageBySide, gimmickFor, played, seed, fill });
   const openSlot = open ? model[open.side][open.slot] : undefined;
-  const execute = () => {
-    close();
-    onExecuteTurn({ p1: simState.p1Choices, p2: simState.p2Choices });
-  };
   return (
     <div className="ps-dock" ref={attachRoot} onKeyDown={onKeyDown} inert={stale} aria-busy={stale || undefined}>
       <DockStatus source={source} acquiringExact={acquiringExact} executeError={executeError} model={model} diceOpen={!!open?.more} />
@@ -78,7 +112,7 @@ export function TurnDock(props: TurnDockProps) {
             gen={gen}
             moreOpen={open.more}
             diceViews={diceViews}
-            onChoice={choice => onSetChoice(open.side, choice, open.slot)}
+            onChoice={choice => setChoice(open.side, choice, open.slot)}
             onHypotheticalMove={params => {
               onHypotheticalMove(open.side, open.slot, params);
               close();
@@ -89,9 +123,13 @@ export function TurnDock(props: TurnDockProps) {
         )}
         <div className="ps-dock-bar">
           <DockRows model={model} open={open} onToggle={toggleChip} />
-          {!model.flags.isForceSwitch && (
-            <ExecuteButton ready={model.flags.bothChosen} executing={executing} label={model.flags.pendingLabel} onClick={execute} />
-          )}
+          <DockExecute
+            model={model}
+            fill={fill}
+            executing={executing}
+            onClose={close}
+            onRun={() => onExecuteTurn({ p1: simState.p1Choices, p2: simState.p2Choices })}
+          />
         </div>
       </div>
     </div>

@@ -5,7 +5,8 @@ import type { SideDamage, SpreadTargetDamage } from '../../lib/branch-damage';
 import type { Gimmick } from '../../hooks/useSideControlsState';
 import type { PlayedAtPosition, PlayedPick } from '../../lib/played-pick';
 import type { SeedChoices } from '../../lib/dock-seed';
-import { chipOrigin, chipPickText, chipPlaceholder, type ChipOrigin } from '../../lib/dock-chip';
+import type { DockFillView } from '../../hooks/useDockFill';
+import { chipOrigin, chipPickText, chipPlaceholder, type ChipOrigin, type EngineWait } from '../../lib/dock-chip';
 import {
   EMPTY_MODIFIERS, EMPTY_MOVES, EMPTY_SWITCHES, blockedSwitchKeys, panelFlags, playedOfSlot, slotIdentity,
 } from '../../lib/dock-panel';
@@ -72,6 +73,14 @@ export interface DockModelArgs {
   gimmickFor: (side: Side, slot: number) => Gimmick;
   played?: PlayedAtPosition | null;
   seed?: SeedChoices | null;
+  /** The engine's fill at the live tip: which chips it wrote, and whether it is under way. */
+  fill?: DockFillView | null;
+}
+
+/** What the engine does about an empty chip right now. */
+function engineWait(fill: DockFillView | null | undefined): EngineWait | null {
+  if (fill?.pending) return 'pending';
+  return fill?.busy ? 'busy' : null;
 }
 
 const isLiving = (info: SimPokemonInfo | null | undefined): info is SimPokemonInfo => !!info && !info.fainted && info.hp > 0;
@@ -120,7 +129,7 @@ function damageOf(damage: SideDamage, slot: number) {
 }
 
 function slotModel(side: Side, slot: number, view: SideView, args: DockModelArgs): DockSlotModel {
-  const { played, seed, gimmickFor } = args;
+  const { played, seed, gimmickFor, fill } = args;
   const active = view.actives[slot] ?? null;
   const identity = slotIdentity(side, slot, view.actives, active);
   const moves = view.movesBySlot[slot] ?? EMPTY_MOVES;
@@ -138,8 +147,8 @@ function slotModel(side: Side, slot: number, view: SideView, args: DockModelArgs
     ...damageOf(view.damage, slot),
     played: pick,
     pickText: chipPickText(pending, moves),
-    placeholder: chipPlaceholder({ forceSwitch, nobodyLeft, played: pick, hasRecord: !!played }),
-    origin: chipOrigin(pending, seed?.[side]?.[slot]?.choice),
+    placeholder: chipPlaceholder({ forceSwitch, nobodyLeft, played: pick, hasRecord: !!played, engine: engineWait(fill) }),
+    origin: chipOrigin(pending, seed?.[side]?.[slot]?.choice, fill?.engine[side][slot] === true),
     foeHp: view.foeHp,
   };
 }

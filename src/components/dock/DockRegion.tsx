@@ -26,6 +26,8 @@ function dockProps(app: AppController, replayId: string): TurnDockProps {
     getBattle: liveTip ? app.ctx.branch.getBattle : getPickerBattle,
     replayLog: pickerReplayLog,
     seed: liveTip ? null : pickerSeed,
+    // Q19 (open): a replay turn's empty slots take no fill; a second trigger can call the same fill for that position.
+    fill: liveTip ? app.engine.dockFill : null,
   };
 }
 

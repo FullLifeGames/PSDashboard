@@ -112,7 +112,8 @@ describe('WorkspaceEvalColumn', () => {
     act(() => app().board.timeline.navigateTo({ turn: 2, line: 'main' }));
     act(() => app().board.deviation.requestDeviation(null));
     await waitFor(() => expect(app().board.timeline.liveEvalView).toBe(true), { timeout: 60_000 });
-    expect(screen.getByRole('button', { name: /Evaluate/ })).toBeInTheDocument();
+    // Round 84 (A5): the dock's fill runs the engine at the tip by itself, so the entry reads Cancel while it runs and Re-evaluate after.
+    expect(screen.getByRole('button', { name: /evaluate|cancel/i })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Auto' })).toBeInTheDocument();
     expect(screen.queryByText('Game report', { selector: 'span' })).toBeNull();
     expect(screen.queryByRole('button', { name: /Think deeper/ })).toBeNull();

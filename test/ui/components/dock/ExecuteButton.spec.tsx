@@ -23,6 +23,22 @@ describe('ExecuteButton', () => {
   });
 });
 
+describe('ExecuteButton, waiting for the engine', () => {
+  test('a pending fill keeps Execute pressable; a queued Execute reads "Waits for engine…" and cannot be pressed again', async () => {
+    const onClick = vi.fn();
+    const { rerender } = render(<ExecuteButton ready executing={false} label="Execute Turn" onClick={onClick} />);
+    rerender(<ExecuteButton ready executing={false} waits label="Execute Turn" onClick={onClick} />);
+    expect(screen.getByRole('button', { name: 'Waits for engine…' })).toBeDisabled();
+    expect(screen.getByRole('button')).not.toHaveClass('ps-execute-btn-ready');
+    expect(screen.getByRole('button')).toHaveAttribute('aria-busy', 'true');
+    await userEvent.click(screen.getByRole('button'));
+    expect(onClick).not.toHaveBeenCalled();
+    // A turn that runs wins over the wait.
+    rerender(<ExecuteButton ready executing waits label="Execute Turn" onClick={onClick} />);
+    expect(screen.getByRole('button', { name: 'Executing…' })).toBeDisabled();
+  });
+});
+
 describe('RawLogToggle', () => {
   test('opens the protocol log without chat, split, and timestamp lines', async () => {
     render(<RawLogToggle log={['|turn|1', '|c|☆Alice|gl', '|split|p1', '|t:|1700000000', '|move|p1a: Garchomp|Earthquake|p2a: Ferrothorn']} />);
