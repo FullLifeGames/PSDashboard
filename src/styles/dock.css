@@ -1,6 +1,6 @@
 /* The turn dock (components/dock/): the chips at the foot of the replay column, the tray above them, the move tiles with their hit bars, the bench, and Execute.
    Round 84, style 5 of the design gate (01.11.2026): the shell of the app's own buttons (.ps-btn) on dark, the type as a 4 px edge and a tag,
-   the selection in the .ps-btn blue, the open chip in --ps-accent-warm, Execute in the .ps-btn-red gradient. The colors of the move tile's texts are
+   the selection in a darker .ps-btn blue (white and the tile's light texts read at 4.5 : 1 on it), the open chip in --ps-accent-warm, Execute in the .ps-btn-red gradient. The colors of the move tile's texts are
    the tokens of pickers.css (test/regression/move-tile-contrast.spec.ts). The rules for narrow windows (1050 px and 640 px) wait for step A6. */
 
 /* ── The dock ── */
@@ -80,7 +80,7 @@
   padding: 2px 6px;
   border: 1px solid rgba(190, 222, 255, 0.3);
   border-radius: 4px;
-  background: linear-gradient(180deg, #75a8d5 0%, #567fa7 100%);
+  background: linear-gradient(180deg, #3d6998 0%, #2d5078 100%);
   color: #ffffff;
   font-size: 10px;
   font-weight: bold;
@@ -174,7 +174,7 @@
 .ps-tray-spacer { flex: 1 1 0; }
 .ps-tray-head .ps-modifier-row { margin: 0; }
 .ps-tray-btn { padding: 3px 12px; font-size: 11px; }
-.ps-tray-btn[aria-expanded="true"] { background: linear-gradient(180deg, #8fc0e8 0%, #6a96c2 100%); }
+.ps-tray-btn[aria-expanded="true"] { background: linear-gradient(180deg, #3d6998 0%, #2d5078 100%); }
 .ps-tray-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .ps-tray-label {
   flex: 0 0 auto;
@@ -229,7 +229,7 @@
 .ps-movebtn:disabled { opacity: 0.35; cursor: not-allowed; }
 .ps-movebtn-selected,
 .ps-movebtn-selected:hover:not(:disabled) {
-  background: linear-gradient(180deg, #75a8d5 0%, #567fa7 100%);
+  background: linear-gradient(180deg, #3d6998 0%, #2d5078 100%);
   border-color: rgba(220, 238, 255, 0.75);
   border-left-color: var(--type, rgba(220, 238, 255, 0.75));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 0 0 1px rgba(124, 183, 232, 0.5);
@@ -325,7 +325,7 @@
 .ps-target-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .ps-target-btn-selected,
 .ps-target-btn-selected:hover:not(:disabled) {
-  background: linear-gradient(180deg, #75a8d5 0%, #567fa7 100%);
+  background: linear-gradient(180deg, #3d6998 0%, #2d5078 100%);
   border-color: rgba(220, 238, 255, 0.75);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 0 0 1px rgba(124, 183, 232, 0.5);
 }
@@ -342,7 +342,7 @@
 .ps-switch-row { display: flex; flex-wrap: wrap; gap: 6px; }
 .ps-dock .ps-switchbtn { padding: 4px 10px 4px 5px; border-color: rgba(183, 216, 255, 0.18); }
 .ps-dock .ps-switchbtn-selected {
-  background: linear-gradient(180deg, #75a8d5 0%, #567fa7 100%);
+  background: linear-gradient(180deg, #3d6998 0%, #2d5078 100%);
   border-color: rgba(220, 238, 255, 0.75);
   outline: none;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 0 0 1px rgba(124, 183, 232, 0.5);
