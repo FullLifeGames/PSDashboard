@@ -1,24 +1,19 @@
 import type { BranchMoveOption, BranchSwitchOption } from '../../hooks/useBranch';
 import {
-  type BranchMoveModifier, type BranchSlotModifiers, type DamageResult, switchOptionKey, type BranchSlotChoice,
+  type BranchSlotModifiers, type DamageResult, type BranchSlotChoice,
 } from '@fulllifegames/eval-engine';
 import type { SpreadTargetDamage } from '../../lib/branch-damage';
 import type { Gimmick } from '../../hooks/useSideControlsState';
-import { ComboBox } from '../ComboBox';
+import { ModifierRow } from '../dock/GimmickRow';
+import { ChoicePicker, WhatIfRow, type WhatIfState } from '../dock/WhatIfSection';
 import { MoveBtn } from './ChoiceButtons';
 import { SlotDice, type SlotDiceProps } from './DiceChips';
 import { rollsFor } from '../../lib/branch-rolls';
 import { moveChoiceFor, pickedChoice, type ChoiceContext } from './choice-context';
 import type { PlayedPick } from './SideControls';
 import { toId } from '@fulllifegames/replay-core';
-import { displayName } from '../../lib/branch-history';
 
-export interface WhatIfState {
-  whatIfMove: string;
-  setWhatIfMove: (value: string) => void;
-  whatIfReplace: string | null;
-  setWhatIfReplace: (value: string | null) => void;
-}
+export type { WhatIfState };
 
 export interface FightSectionProps {
   label: string;
@@ -40,43 +35,6 @@ export interface FightSectionProps {
   whatIf: WhatIfState;
   onChoice: (choice: BranchSlotChoice) => void;
   onHypotheticalMove: (params: { species: string; move: string; replace: string | null }) => void;
-}
-
-/** What the partner holding a gimmick does this turn, for the blocked toggle's title. */
-const HELD_ACTION: Record<BranchMoveModifier, string> = {
-  terastallize: 'terastallizes',
-  mega: 'mega evolves',
-  ultra: 'ultra bursts',
-  zmove: 'uses a Z-Move',
-};
-
-function ModifierToggle({ label, kind, gimmick }: { label: string; kind: BranchMoveModifier; gimmick: Gimmick }) {
-  const active = gimmick.modifier === kind;
-  // A side takes each gimmick once per turn: a partner that holds it blocks this toggle (T124).
-  const holder = active ? undefined : gimmick.heldBy[kind];
-  return (
-    <button
-      type="button"
-      className={`ps-modifier-toggle ${active ? 'ps-modifier-toggle-active' : ''}`}
-      aria-pressed={active}
-      disabled={!!holder}
-      title={holder ? `${holder} already ${HELD_ACTION[kind]} this turn.` : undefined}
-      onClick={() => gimmick.toggle(kind)}
-    >
-      {label}
-    </button>
-  );
-}
-
-function ModifierRow({ label, modifiers, gimmick }: { label: string; modifiers: BranchSlotModifiers; gimmick: Gimmick }) {
-  return (
-    <div className="ps-modifier-row" role="group" aria-label={`Battle gimmicks for ${label}`}>
-      {modifiers.teraType && <ModifierToggle label={`Tera (${modifiers.teraType})`} kind="terastallize" gimmick={gimmick} />}
-      {modifiers.canMegaEvo && <ModifierToggle label="Mega Evolve" kind="mega" gimmick={gimmick} />}
-      {modifiers.canUltraBurst && <ModifierToggle label="Ultra Burst" kind="ultra" gimmick={gimmick} />}
-      {gimmick.hasZMoves && <ModifierToggle label="Z-Move" kind="zmove" gimmick={gimmick} />}
-    </div>
-  );
 }
 
 function MoveGrid({ moves, advanced, dmgResults, spreadDamageResults, targetDamageResults, modifiers, pending, played, ctx, onChoice }: Pick<FightSectionProps,
@@ -106,94 +64,6 @@ function MoveGrid({ moves, advanced, dmgResults, spreadDamageResults, targetDama
         />
       ))}
     </div>
-  );
-}
-
-function ChoicePicker({ label, moves, switches, blockedSwitchKeys, onPick }: Pick<FightSectionProps,
-  'label' | 'moves' | 'switches' | 'blockedSwitchKeys'> & { onPick: (value: string) => void }) {
-  return (
-    <select
-      className="ps-input"
-      aria-label={`Choice picker for ${label}`}
-      value=""
-      onChange={event => onPick(event.target.value)}
-    >
-      <option value="" disabled>All choices…</option>
-      <optgroup label="Moves">
-        {moves.filter(move => !move.disabled).flatMap(move => (
-          move.targetOptions.length > 0
-            ? move.targetOptions.map(target => (
-              <option key={`m-${move.slot}-${target.targetLoc}`} value={`move:${move.slot}:${target.targetLoc}`}>
-                {move.name} → {target.label} {target.name}
-              </option>
-            ))
-            : [
-              <option key={`m-${move.slot}`} value={`move:${move.slot}`}>
-                {move.name}
-              </option>,
-            ]
-        ))}
-      </optgroup>
-      {switches.length > 0 && (
-        <optgroup label="Switch to">
-          {switches.map(sw => (
-            <option
-              key={`s-${sw.slot}`}
-              value={`switch:${sw.slot}`}
-              disabled={!!sw.trapped || blockedSwitchKeys.has(switchOptionKey(sw))}
-            >
-              Switch: {displayName(sw.name, sw.species)} ({sw.hpPercent}% HP)
-            </option>
-          ))}
-        </optgroup>
-      )}
-    </select>
-  );
-}
-
-function WhatIfRow({ label, moves, activeSpecies, movePool, whatIf, onHypotheticalMove }: Pick<FightSectionProps,
-  'label' | 'moves' | 'activeSpecies' | 'movePool' | 'whatIf' | 'onHypotheticalMove'>) {
-  const { whatIfMove, setWhatIfMove, whatIfReplace, setWhatIfReplace } = whatIf;
-  return (
-    <>
-      <ComboBox
-        options={movePool.filter(name => !moves.some(known => toId(known.name) === toId(name)))}
-        value={whatIfMove}
-        onChange={setWhatIfMove}
-        onSelect={setWhatIfMove}
-        placeholder="What if it had…"
-        ariaLabel={`Hypothetical move for ${label}`}
-      />
-      {moves.length >= 4 && (
-        <select
-          className="ps-input"
-          aria-label={`Replaced move for ${label}`}
-          value={whatIfReplace ?? moves[moves.length - 1].name}
-          onChange={event => setWhatIfReplace(event.target.value)}
-          style={{ flex: '0 1 110px' }}
-        >
-          {moves.map(known => <option key={known.slot} value={known.name}>{known.name}</option>)}
-        </select>
-      )}
-      <button
-        type="button"
-        className="ps-btn"
-        disabled={
-          !whatIfMove.trim() ||
-          !movePool.some(name => toId(name) === toId(whatIfMove))
-        }
-        onClick={() => {
-          onHypotheticalMove({
-            species: activeSpecies,
-            move: movePool.find(name => toId(name) === toId(whatIfMove)) ?? whatIfMove.trim(),
-            replace: moves.length >= 4 ? (whatIfReplace ?? moves[moves.length - 1].name) : null,
-          });
-          setWhatIfMove('');
-        }}
-      >
-        Load move
-      </button>
-    </>
   );
 }
 

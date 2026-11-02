@@ -1,17 +1,16 @@
-import { useEffect, useState, useMemo, type CSSProperties } from 'react';
+import { useState, type CSSProperties } from 'react';
 import type { BranchSimState, BranchMoveOption, BranchSwitchOption, SimPokemonInfo } from '../hooks/useBranch';
-import {
-  type BranchSlotModifiers, branchSideChoicesReady, requiredChoicesForActiveSlots, switchChoiceKey,
-  type BranchSlotChoice, type LiveHit,
-} from '@fulllifegames/eval-engine';
+import { type BranchSlotChoice, type LiveHit } from '@fulllifegames/eval-engine';
 import type { PickerSource } from '../lib/picker-state';
-import { computePreviewDamage, EMPTY_SIDE_DAMAGE, type DamagePreviewInputs, type SideDamage } from '../lib/branch-damage';
+import type { SideDamage } from '../lib/branch-damage';
 import { SideControls } from './branch/SideControls';
 import type { PlayedAtPosition, PlayedPick } from '../lib/played-pick';
-import { useGimmickToggles, type Gimmick } from '../hooks/useSideControlsState';
+import type { Gimmick } from '../hooks/useSideControlsState';
 import { ExecuteRow, PickerSourceLine, RawLogToggle } from './branch/PanelStatus';
 import { DICE_WAIT_NOTE, TurnDice } from './branch/DiceChips';
 import { useDiceViews, type DiceViews } from '../hooks/useDiceView';
+import { useDockPreview } from '../hooks/useDockPreview';
+import { EMPTY_MODIFIERS, EMPTY_MOVES, EMPTY_SWITCHES, blockedSwitchKeys, panelFlags, playedOfSlot, slotIdentity } from '../lib/dock-panel';
 
 export type { PlayedPick, PlayedAtPosition } from '../lib/played-pick';
 
@@ -58,23 +57,6 @@ interface Props {
 type LiveBattle = LiveHit['battle'];
 
 
-/** The pick one slot shows: its own entry in a doubles record, else the side's pick on slot A. */
-function playedOfSlot(slots: (PlayedPick | null)[] | undefined, side: PlayedPick | null | undefined, slot: number): PlayedPick | null {
-  if (slots) return slots[slot] ?? null;
-  return slot === 0 ? side ?? null : null;
-}
-
-const EMPTY_MOVES: BranchMoveOption[] = [];
-const EMPTY_SWITCHES: BranchSwitchOption[] = [];
-const EMPTY_MODIFIERS: BranchSlotModifiers = {
-  teraType: null,
-  canMegaEvo: false,
-  canUltraBurst: false,
-  zMoves: [],
-};
-const EMPTY_SLOT_MODIFIERS: BranchSlotModifiers[] = [];
-const EMPTY_CHOICES: (BranchSlotChoice | null)[] = [];
-
 const ADVANCED_KEY = 'ps-replay-interceptor:picker-advanced';
 
 /**
@@ -104,80 +86,6 @@ function useAdvancedToggle() {
   return { advanced, toggleAdvanced };
 }
 
-/** Per-slot views of the sim state (singles fall back to the single-active fields). */
-function useSlots(simState: BranchSimState | null) {
-  const p1ActiveSlots = useMemo(
-    () => simState?.p1ActiveSlots ?? (simState?.p1Active ? [simState.p1Active] : []),
-    [simState],
-  );
-  const p2ActiveSlots = useMemo(
-    () => simState?.p2ActiveSlots ?? (simState?.p2Active ? [simState.p2Active] : []),
-    [simState],
-  );
-  const p1MovesBySlot = useMemo(
-    () => simState?.p1MovesBySlot ?? [simState?.p1Moves ?? EMPTY_MOVES],
-    [simState],
-  );
-  const p2MovesBySlot = useMemo(
-    () => simState?.p2MovesBySlot ?? [simState?.p2Moves ?? EMPTY_MOVES],
-    [simState],
-  );
-  const p1SwitchesBySlot = simState?.p1SwitchesBySlot ?? [simState?.p1Switches ?? EMPTY_SWITCHES];
-  const p2SwitchesBySlot = simState?.p2SwitchesBySlot ?? [simState?.p2Switches ?? EMPTY_SWITCHES];
-  return { p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, p1SwitchesBySlot, p2SwitchesBySlot };
-}
-
-/** The damage preview per side, recomputed whenever the actives, moves, field, gen, armed Tera toggles, or picks change. */
-function usePreviewDamage(inputs: DamagePreviewInputs, getBattle: Props['getBattle']) {
-  const { p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, fieldState, gen, teraBySlot, choices } = inputs;
-  const [damageBySide, setDamageBySide] = useState<{ p1: SideDamage; p2: SideDamage }>({
-    p1: EMPTY_SIDE_DAMAGE,
-    p2: EMPTY_SIDE_DAMAGE,
-  });
-  useEffect(() => {
-    let cancelled = false;
-
-    async function calculatePreviewDamage() {
-      const { calcSingleDamageRange } = await import('../lib/lazy/damage-calc');
-      if (cancelled) return;
-      if (!cancelled) {
-        setDamageBySide(computePreviewDamage(
-          { p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, fieldState, gen, teraBySlot, choices, battle: getBattle?.() ?? null },
-          calcSingleDamageRange,
-        ));
-      }
-    }
-
-    void calculatePreviewDamage();
-    return () => {
-      cancelled = true;
-    };
-  }, [p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, fieldState, gen, teraBySlot, choices, getBattle]);
-  return damageBySide;
-}
-
-function blockedSwitchKeys(choices: (BranchSlotChoice | null)[], required: boolean[], activeSlot: number): Set<string> {
-  const blocked = new Set<string>();
-  choices.forEach((choice, index) => {
-    if (index === activeSlot) return;
-    // A pending choice on a slot the request does not let act (a stale
-    // pick during the other slot's forced replacement) must not reserve
-    // a species — it locked the forced slot's only legal switch-in.
-    if (!required[index]) return;
-    const target = switchChoiceKey(choice);
-    if (target !== null) blocked.add(target);
-  });
-  return blocked;
-}
-
-function pendingLabelFor(simState: BranchSimState, bothChosen: boolean, isMultiActive: boolean): string {
-  return bothChosen
-    ? 'Execute Turn'
-    : isMultiActive
-      ? 'Select all active choices'
-      : `Select ${!simState.p1Choice ? 'P1' : ''}${!simState.p1Choice && !simState.p2Choice ? ' & ' : ''}${!simState.p2Choice ? 'P2' : ''} choice`;
-}
-
 interface SideColumnProps {
   side: 'p1' | 'p2';
   simState: BranchSimState;
@@ -196,17 +104,6 @@ interface SideColumnProps {
   diceViews: DiceViews;
   onSetChoice: Props['onSetChoice'];
   onHypotheticalMove: Props['onHypotheticalMove'];
-}
-
-/** The identity part of one slot's controls: label and the active Pokémon. */
-function slotIdentity(side: 'p1' | 'p2', slot: number, activeSlots: (SimPokemonInfo | null)[], active: SimPokemonInfo | null) {
-  const prefix = side === 'p1' ? 'P1' : 'P2';
-  return {
-    label: activeSlots.length > 1 ? `${prefix}${String.fromCharCode(65 + slot)}` : prefix,
-    activeName: active?.name || '???',
-    activeSpecies: active?.species || '',
-    activeFainted: active?.fainted ?? true,
-  };
 }
 
 /** The choice part of one slot's controls: options, pending state, gimmicks, damage. */
@@ -257,26 +154,6 @@ function SideColumn(props: SideColumnProps) {
   );
 }
 
-/**
- * The slot views, the gimmick toggles and the damage preview of a position.
- * The toggles live here, not per slot: the preview reads both sides' Tera (T20).
- */
-function usePanelPreview(simState: BranchSimState | null, gen: number, positionKey: string | undefined, getBattle: Props['getBattle']) {
-  const slots = useSlots(simState);
-  // Both sides' chosen actions: a gimmick in one slot's pick is the side's for this turn (T124).
-  const choices = useMemo(() => ({ p1: simState?.p1Choices ?? EMPTY_CHOICES, p2: simState?.p2Choices ?? EMPTY_CHOICES }), [simState]);
-  const { gimmickFor, teraBySlot } = useGimmickToggles(
-    simState?.p1ModifiersBySlot ?? EMPTY_SLOT_MODIFIERS,
-    simState?.p2ModifiersBySlot ?? EMPTY_SLOT_MODIFIERS,
-    positionKey,
-    choices,
-  );
-  const { p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot } = slots;
-  const fieldState = simState?.field ?? null;
-  const damageBySide = usePreviewDamage({ p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, fieldState, gen, teraBySlot, choices }, getBattle);
-  return { slots, gimmickFor, damageBySide };
-}
-
 /** Round 77 (user request 28.10.2026): the winner left the top bar for the place of the pickers. */
 function EndedNotice({ winner }: { winner: string | null }) {
   return (
@@ -286,27 +163,10 @@ function EndedNotice({ winner }: { winner: string | null }) {
   );
 }
 
-/** What the position asks of each side: the required slots, whether Execute is ready, and which side waits for the other's replacement. */
-function panelFlags(simState: BranchSimState, p1ActiveSlots: (SimPokemonInfo | null)[], p2ActiveSlots: (SimPokemonInfo | null)[]) {
-  const p1RequiredChoices = requiredChoicesForActiveSlots(p1ActiveSlots, simState.p1ForceSwitches);
-  const p2RequiredChoices = requiredChoicesForActiveSlots(p2ActiveSlots, simState.p2ForceSwitches);
-  const bothChosen = branchSideChoicesReady(simState.p1Choices, p1RequiredChoices) &&
-    branchSideChoicesReady(simState.p2Choices, p2RequiredChoices);
-  const isMultiActive = p1ActiveSlots.length > 1 || p2ActiveSlots.length > 1;
-  return {
-    isForceSwitch: simState.p1ForceSwitch || simState.p2ForceSwitch,
-    p1RequiredChoices, p2RequiredChoices, bothChosen,
-    pendingLabel: pendingLabelFor(simState, bothChosen, isMultiActive),
-    // One side replaces while the other has nothing to choose: its pickers take no input, so no stale pick reaches the next turn (B5).
-    p1Waits: simState.p2ForceSwitch && !simState.p1ForceSwitch,
-    p2Waits: simState.p1ForceSwitch && !simState.p2ForceSwitch,
-  };
-}
-
 /* ── Main BranchPanel (controls only, no iframe) ── */
 export function BranchPanel({ simState, stale, source, acquiringExact, executeError, executing, gen, onSetChoice, onHypotheticalMove, onExecuteTurn, played, positionKey, getBattle, replayLog }: Props) {
   const { advanced, toggleAdvanced } = useAdvancedToggle();
-  const { slots, gimmickFor, damageBySide } = usePanelPreview(simState, gen, positionKey, getBattle);
+  const { slots, gimmickFor, damageBySide } = useDockPreview(simState, gen, positionKey, getBattle);
   const diceViews = useDiceViews({ advanced, stale, simState, getBattle, replayLog, onSetChoice });
   const { p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot, p1SwitchesBySlot, p2SwitchesBySlot } = slots;
 
