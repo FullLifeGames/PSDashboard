@@ -31,6 +31,9 @@ export interface DockFillInputs {
   executeTurn: Branch['executeTurn'];
 }
 
+/** The slot whose tray is open: the fill leaves it alone. */
+export interface HeldSlot { side: Side; slot: number }
+
 /** Which slots hold the engine's choice. */
 export interface EngineMarks { p1: boolean[]; p2: boolean[] }
 
@@ -47,6 +50,8 @@ export interface DockFillView {
   queueExecute: () => void;
   /** The user chose in a slot: it is no longer the engine's. */
   onUserChoice: (side: Side, slot: number) => void;
+  /** The dock reports its open tray (null when none): the fill never writes that slot, whenever the result lands. */
+  holdTray: (open: HeldSlot | null) => void;
 }
 
 const NO_MARKS: EngineMarks = { p1: [], p2: [] };
@@ -71,20 +76,15 @@ function useFillMarks() {
   const [settled, setSettled] = useState<Settled>({ key: null, marks: NO_MARKS });
   const [queued, setQueued] = useState<string | null>(null);
   const settledRef = useRef(settled);
-  const queuedRef = useRef<string | null>(null);
+  const heldRef = useRef<HeldSlot | null>(null);
   const commit = useCallback((next: Settled) => {
     settledRef.current = next;
     setSettled(next);
   }, []);
-  const queue = useCallback((key: string) => {
-    queuedRef.current = key;
-    setQueued(key);
-  }, []);
-  const unqueue = useCallback(() => {
-    queuedRef.current = null;
-    setQueued(null);
-  }, []);
-  return { settled, queued, settledRef, queuedRef, commit, queue, unqueue };
+  const queue = useCallback((key: string) => setQueued(key), []);
+  const unqueue = useCallback(() => setQueued(null), []);
+  const holdTray = useCallback((open: HeldSlot | null) => { heldRef.current = open; }, []);
+  return { settled, queued, settledRef, heldRef, commit, queue, unqueue, holdTray };
 }
 
 type FillMarks = ReturnType<typeof useFillMarks>;
@@ -92,11 +92,11 @@ type FillMarks = ReturnType<typeof useFillMarks>;
 /** Writes the result into the untouched slots of both sides, then runs an Execute that waited for it. */
 function useFillApply(inputs: DockFillInputs, key: string, eligible: boolean, marks: FillMarks) {
   const { simState, getChoices, setChoice, executeTurn } = inputs;
-  const { settledRef, queuedRef, commit, unqueue } = marks;
+  const { settledRef, heldRef, queued, commit, unqueue } = marks;
   // The callbacks of a run read the position of the moment they fire, never the one they were made for.
-  const latest = useRef({ key, eligible, simState, getChoices, setChoice, executeTurn });
+  const latest = useRef({ key, eligible, simState, getChoices, setChoice, executeTurn, queued });
   useEffect(() => {
-    latest.current = { key, eligible, simState, getChoices, setChoice, executeTurn };
+    latest.current = { key, eligible, simState, getChoices, setChoice, executeTurn, queued };
   });
   return useCallback((runKey: string, result: EvalResult) => {
     const now = latest.current;
@@ -107,16 +107,18 @@ function useFillApply(inputs: DockFillInputs, key: string, eligible: boolean, ma
     for (const side of ['p1', 'p2'] as const) {
       // A slot with a choice already is the user's: the fill runs once per position, so no earlier fill wrote it.
       const touched = Array.from({ length: slotCount(state, side) }, (_, slot): BranchSlotChoice | null => choices[side][slot] ?? null);
-      const filled = pickFill(side, result.perSide[side], state, touched);
+      // Round 84: the slot whose tray is open stays as it is, like a touched one.
+      const held = touched.map((_, slot) => heldRef.current?.side === side && heldRef.current.slot === slot);
+      const filled = pickFill(side, result.perSide[side], state, touched, held);
       written[side] = filled.map(choice => choice !== null);
       filled.forEach((choice, slot) => { if (choice) now.setChoice(side, choice, slot); });
     }
     commit({ key: runKey, marks: written });
-    if (queuedRef.current === runKey) {
+    if (now.queued === runKey) {
       unqueue();
       void now.executeTurn();
     }
-  }, [settledRef, queuedRef, commit, unqueue]);
+  }, [settledRef, heldRef, commit, unqueue]);
 }
 
 type Apply = ReturnType<typeof useFillApply>;
@@ -165,13 +167,18 @@ export function useDockFill(inputs: DockFillInputs): DockFillView {
   const { evaluation } = inputs;
   const { key, open, eligible } = gate(inputs);
   const marks = useFillMarks();
-  const { settled, queued, settledRef, commit, queue } = marks;
+  const { settled, queued, settledRef, commit, queue, unqueue, holdTray } = marks;
   const done = settled.key === key;
   const attempted = evaluation.resultTag === inputs.evalViewKey;
   const running = attempted && RUNNING.has(evaluation.status);
   const pending = eligible && !done && (running || !attempted);
   const apply = useFillApply(inputs, key, eligible, marks);
   useFillTrigger(inputs, key, eligible, running, apply, settledRef);
+
+  // A queued Execute lives as long as its run is pending: a run that failed or that something stopped takes it along, so a later
+  // Evaluate by hand never executes the turn. Reconciled in render, like the other state that follows the position.
+  const waits = queued === key && pending;
+  if (queued !== null && !waits) unqueue();
 
   const queueExecute = useCallback(() => queue(key), [queue, key]);
   const onUserChoice = useCallback((side: Side, slot: number) => {
@@ -182,7 +189,7 @@ export function useDockFill(inputs: DockFillInputs): DockFillView {
   }, [commit, settledRef]);
 
   return {
-    pending, busy: open && evaluation.graph.running && !done, waits: queued === key && pending,
-    engine: done ? settled.marks : NO_MARKS, queueExecute, onUserChoice,
+    pending, busy: open && evaluation.graph.running && !done, waits,
+    engine: done ? settled.marks : NO_MARKS, queueExecute, onUserChoice, holdTray,
   };
 }

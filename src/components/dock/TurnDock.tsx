@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import type { BranchSimState, BranchSlotChoice, LiveHit } from '@fulllifegames/eval-engine';
 import type { PickerSource } from '../../lib/picker-state';
 import type { PlayedAtPosition } from '../../lib/played-pick';
@@ -6,7 +6,7 @@ import type { SeedChoices, SideChoices } from '../../lib/dock-seed';
 import { useDockPreview } from '../../hooks/useDockPreview';
 import { useDiceViews } from '../../hooks/useDiceView';
 import type { DockFillView } from '../../hooks/useDockFill';
-import { useTrayState } from '../../hooks/useTrayState';
+import { useTrayState, type TrayOpen } from '../../hooks/useTrayState';
 import { buildDockModel, type Side } from './dock-model';
 import { DockRows } from './DockRows';
 import { DockStatus, EndedNotice } from './DockStatus';
@@ -56,6 +56,17 @@ function useUserChoice(fill: DockFillView | null | undefined, onSetChoice: TurnD
   }, [onUserChoice, onSetChoice]);
 }
 
+/** Round 84: tells the fill which slot's tray is open, so a result that lands later never writes it. The effect only writes a ref. */
+function useHeldTray(fill: DockFillView | null | undefined, open: TrayOpen | null) {
+  const holdTray = fill?.holdTray;
+  const side = open?.side;
+  const slot = open?.slot;
+  useEffect(() => {
+    holdTray?.(side !== undefined && slot !== undefined ? { side, slot } : null);
+    return () => holdTray?.(null);
+  }, [holdTray, side, slot]);
+}
+
 /** Execute: locked until every slot holds a choice, except while the engine's fill is pending: then a press queues behind it. */
 function DockExecute({ model, fill, executing, onRun, onClose }: {
   model: ReturnType<typeof buildDockModel>;
@@ -94,6 +105,7 @@ export function TurnDock(props: TurnDockProps) {
   const onEdit = useCallback((side: Side, slot: number, choice: BranchSlotChoice) => setChoice(side, choice, slot), [setChoice]);
   const { slots, gimmickFor, damageBySide } = useDockPreview(simState, gen, positionKey, getBattle, onEdit);
   const { open, attachRoot, close, toggleChip, toggleMore, onKeyDown } = useTrayState(positionKey);
+  useHeldTray(fill, open);
   const diceViews = useDiceViews({ diceOpen: open?.more ?? false, stale, simState, getBattle, replayLog, onSetChoice: setChoice });
   if (!simState) return null;
   if (simState.ended) return <div className="ps-dock"><EndedNotice winner={simState.winner} /></div>;

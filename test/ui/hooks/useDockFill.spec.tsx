@@ -280,3 +280,88 @@ describe('useDockFill: Execute while the run is pending', () => {
     expect(result.current.waits).toBe(false);
   });
 });
+
+describe('useDockFill: the rule against jumping', () => {
+  test('doubles: the slot whose tray is open stays empty when the result lands, the other empty slot fills', () => {
+    const { wired, handleEvaluate, branch } = inputsOf('doubles');
+    const { result } = renderHook(() => useDockFill(wired));
+    act(() => result.current.holdTray({ side: 'p1', slot: 0 }));
+    act(() => onResultOf(handleEvaluate)(doublesResult()));
+    expect(branch.choices.p1[0]).toBeNull();
+    expect(branch.choices.p1[1]).toEqual(expect.objectContaining({ moveId: 'spore' }));
+    expect(result.current.engine.p1).toEqual([false, true]);
+    expect(result.current.engine.p2).toEqual([true, true]);
+  });
+
+  test('singles: the open slot stays empty, the other side fills', () => {
+    const { wired, handleEvaluate, branch } = inputsOf('singles');
+    const { result } = renderHook(() => useDockFill(wired));
+    act(() => result.current.holdTray({ side: 'p2', slot: 0 }));
+    act(() => onResultOf(handleEvaluate)(evalResult('singles')));
+    expect(branch.choices.p2[0]).toBeNull();
+    expect(branch.choices.p1[0]).toEqual(expect.objectContaining({ moveId: 'earthquake' }));
+    expect(result.current.engine).toEqual({ p1: [true], p2: [false] });
+  });
+
+  test('a tray that closed before the result lands holds nothing back', () => {
+    const { wired, handleEvaluate, branch } = inputsOf('doubles');
+    const { result } = renderHook(() => useDockFill(wired));
+    act(() => result.current.holdTray({ side: 'p1', slot: 0 }));
+    act(() => result.current.holdTray(null));
+    act(() => onResultOf(handleEvaluate)(doublesResult()));
+    expect(branch.choices.p1[0]).not.toBeNull();
+    expect(result.current.engine.p1).toEqual([true, true]);
+  });
+
+  test('the user touched a slot, the other one is held: the fill writes neither and still fills the other side', () => {
+    const user: BranchSlotChoice = { kind: 'move', moveId: 'flareblitz', moveName: 'Flare Blitz', targetLoc: 2 };
+    const { wired, handleEvaluate, branch } = inputsOf('doubles');
+    branch.choices.p1[0] = user;
+    const { result } = renderHook(() => useDockFill(wired));
+    act(() => result.current.holdTray({ side: 'p1', slot: 1 }));
+    act(() => onResultOf(handleEvaluate)(doublesResult()));
+    expect(branch.choices.p1).toEqual([user, null]);
+    expect(result.current.engine.p2).toEqual([true, true]);
+  });
+
+  test('a queued Execute closes the tray first, so the fill that lands writes the slot and the turn runs', async () => {
+    const { wired, handleEvaluate, branch } = inputsOf('doubles');
+    const { result } = renderHook(() => useDockFill(wired));
+    act(() => result.current.holdTray({ side: 'p1', slot: 0 }));
+    act(() => result.current.queueExecute());
+    // The dock closes the tray on the Execute press, before the result lands.
+    act(() => result.current.holdTray(null));
+    await act(async () => onResultOf(handleEvaluate)(doublesResult()));
+    expect(branch.choices.p1[0]).not.toBeNull();
+    expect(branch.executeTurn).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('useDockFill: a queued Execute dies with its run', () => {
+  test('a run that failed clears the queue: a manual Evaluate afterwards fills but never executes the turn', async () => {
+    const { wired, branch } = inputsOf('doubles');
+    const { rerender, result } = renderHook((props: DockFillInputs) => useDockFill(props), { initialProps: wired });
+    act(() => result.current.queueExecute());
+    rerender({ ...wired, evaluation: evaluationOf({ status: 'error', resultTag: 'variation:3' }).evaluation });
+    expect(result.current.waits).toBe(false);
+    // The user presses Evaluate by hand: a run, then a result for the same position.
+    rerender({ ...wired, evaluation: evaluationOf({ status: 'searching', resultTag: 'variation:3' }).evaluation });
+    expect(result.current.waits).toBe(false);
+    await act(async () => {
+      rerender({ ...wired, evaluation: evaluationOf({ status: 'done', resultTag: 'variation:3', result: doublesResult() }).evaluation });
+    });
+    expect(branch.executeTurn).not.toHaveBeenCalled();
+  });
+
+  test('a run that the game analysis stopped clears the queue too', async () => {
+    const { wired, handleEvaluate, branch } = inputsOf('singles');
+    const { rerender, result } = renderHook((props: DockFillInputs) => useDockFill(props), { initialProps: wired });
+    const onResult = onResultOf(handleEvaluate);
+    act(() => result.current.queueExecute());
+    rerender({ ...wired, evaluation: evaluationOf({ running: true }).evaluation });
+    expect(result.current.waits).toBe(false);
+    rerender({ ...wired, evaluation: evaluationOf({ running: false }).evaluation });
+    await act(async () => onResult(evalResult('singles')));
+    expect(branch.executeTurn).not.toHaveBeenCalled();
+  });
+});

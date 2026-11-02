@@ -151,3 +151,26 @@ describe('pickFill, doubles', () => {
     expect(filled[1]).toEqual(expect.objectContaining({ moveId: 'tailwind' }));
   });
 });
+
+describe('pickFill, held slots (the rule against jumping)', () => {
+  const doubles = simState('doubles');
+
+  test('a held slot is never written, and the other slot still takes its part of the best joint choice', () => {
+    const filled = pickFill('p1', doublesRanked, doubles, [null, null], [true, false]);
+    expect(filled[0]).toBeNull();
+    expect(filled[1]).toEqual(expect.objectContaining({ moveId: 'spore', targetLoc: 2 }));
+    expect(pickFill('p1', doublesRanked, doubles, [null, null], [false, true])[1]).toBeNull();
+  });
+
+  test('a held slot puts no demand on the joint choice: it needs no agreeing part', () => {
+    // Only the third choice moves Protect in the second slot; the held first slot takes no part in the choosing.
+    const filled = pickFill('p1', [doublesRanked[2]], doubles, [null, null], [true, false]);
+    expect(filled[0]).toBeNull();
+    expect(filled[1]).toEqual(expect.objectContaining({ moveId: 'protect' }));
+  });
+
+  test('singles: the only slot held leaves the side empty', () => {
+    const ranked = [rankedChoice('move earthquake', 'Earthquake', 0.35)];
+    expect(pickFill('p1', ranked, simState('singles'), [null], [true])).toEqual([null]);
+  });
+});

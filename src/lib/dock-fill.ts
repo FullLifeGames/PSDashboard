@@ -61,13 +61,15 @@ function activeCount(state: BranchSimState, side: Side): number {
  * agrees with every touched slot and clashes with none of their gimmicks. Touched slots come back null (the fill never writes
  * them), and so does every slot when no joint choice qualifies: those slots stay empty and the chip says "choose".
  * `touched[slot]` is the user's own pick, null where the user has not chosen.
+ * `held[slot]` marks a slot whose tray is open (the rule against jumping): it is never written either, but it holds no pick,
+ * so it puts no demand on the joint choice.
  */
-export function pickFill(side: Side, ranked: RankedChoice[], state: BranchSimState, touched: Choices): Choices {
+export function pickFill(side: Side, ranked: RankedChoice[], state: BranchSimState, touched: Choices, held: readonly boolean[] = []): Choices {
   for (const candidate of ranked) {
     if (candidate.choice === 'wait') continue;
     const parts = slotChoicesOf(state, side, candidate);
     if (!parts || !agreesWithTouched(parts, touched)) continue;
-    const filled = parts.map((part, slot) => (touched[slot] ? null : part));
+    const filled = parts.map((part, slot) => (touched[slot] || held[slot] ? null : part));
     if (clashesWithTouched(touched, filled)) continue;
     return filled;
   }
