@@ -4,35 +4,35 @@ import userEvent from '@testing-library/user-event';
 import { useMemo, useState } from 'react';
 import type { Battle } from '@pkmn/sim';
 import { calcSingleDamageRange, createBranchStateFromBattle, type BranchSlotChoice, type ForcedDie } from '@fulllifegames/eval-engine';
-import { BranchPanel } from '../../../src/components/BranchPanel';
-import { diceBattle, setOf } from '../fixtures/dice-battle';
+import { TurnDock } from '../../../../src/components/dock/TurnDock';
+import { diceBattle, setOf } from '../../fixtures/dice-battle';
 
 /**
- * Round 82 (forced dice), step A7a: the chips of Advanced on a real battle. The panel asks the simulator which dice the chosen
- * move draws, shows one set of chips per slot (one per target of a spread move), and a click edits the slot's choice, which the
- * panel hands to `onSetChoice` like any other pick. Basic shows no chips.
+ * Round 82 (forced dice), step A7a, moved to the dock in round 84 (A3b): the dice chips on a real battle. The dock asks the
+ * simulator which dice the chosen move draws once a tray opens "Dice · What if", shows one set of chips per slot (one per target
+ * of a spread move), and a click edits the slot's choice, which the dock hands to `onSetChoice` like any other pick. A closed
+ * tray asks nothing and shows no chips.
  */
-vi.mock('../../../src/lib/pokemon-options', () => ({ getMovePool: async () => [] }));
+vi.mock('../../../../src/lib/pokemon-options', () => ({ getMovePool: async () => [] }));
 
 /** What the log shows for the first turn: a spec sets it. The engine reads it from the battle's logged PRNG (arrival-dice.ts), which a battle built in this file does not have. */
 const shown = vi.hoisted(() => ({ logged: [] as unknown[] }));
-vi.mock('../../../src/lib/lazy/branch-engine', async importOriginal => ({
-  ...(await importOriginal<typeof import('../../../src/lib/lazy/branch-engine')>()),
+vi.mock('../../../../src/lib/lazy/branch-engine', async importOriginal => ({
+  ...(await importOriginal<typeof import('../../../../src/lib/lazy/branch-engine')>()),
   loggedTurnDice: () => shown.logged,
 }));
 
 type Picks = { p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] };
 
-/** The panel over a live battle with its own picks, as the app keeps them. `latest` shows what the app would hold. */
-function renderPanel(battle: Battle, options: { advanced?: boolean; live?: boolean; first?: Picks } = {}) {
-  const { advanced = true, live = true, first = { p1: [], p2: [] } } = options;
-  localStorage.setItem('ps-replay-interceptor:picker-advanced', advanced ? '1' : '0');
+/** The dock over a live battle with its own picks, as the app keeps them. `latest` shows what the app would hold. */
+function renderDock(battle: Battle, options: { live?: boolean; first?: Picks } = {}) {
+  const { live = true, first = { p1: [], p2: [] } } = options;
   const latest: { picks: Picks } = { picks: first };
   function Host() {
     const [picks, setPicks] = useState<Picks>(first);
     const simState = useMemo(() => createBranchStateFromBattle(battle as never, [], { p1Choices: picks.p1, p2Choices: picks.p2 }), [picks]);
     return (
-      <BranchPanel
+      <TurnDock
         simState={simState} executeError={null} executing={false} gen={9} positionKey="dice"
         onSetChoice={(side, choice, slot = 0) => setPicks(held => {
           const next = { ...held, [side]: [...held[side]] };
@@ -49,10 +49,15 @@ function renderPanel(battle: Battle, options: { advanced?: boolean; live?: boole
   return latest;
 }
 
-const side = (label: string) => {
-  const heading = [...document.querySelectorAll('.ps-side-label')].find(entry => entry.textContent === label)!;
-  return within(heading.closest('.ps-side-controls') as HTMLElement);
-};
+const dockChip = (label: string) => screen.getByRole('button', { name: new RegExp(`^${label}\\b`) });
+const tray = () => within(document.querySelector('.ps-tray') as HTMLElement);
+/** Opens the slot's tray and its "Dice · What if" section. */
+async function openDice(label: string) {
+  await userEvent.click(dockChip(label));
+  await userEvent.click(tray().getByRole('button', { name: /Dice · What if/ }));
+}
+/** A move tile of the open tray. */
+const tile = (name: RegExp) => tray().getByRole('button', { name });
 
 const singles = () => diceBattle({
   p1: [setOf('Noivern', ['airslash', 'splash'])], p2: [setOf('Snorlax', ['splash'])],
@@ -62,24 +67,27 @@ const diceOf = (picks: Picks, who: 'p1' | 'p2', slot = 0): ForcedDie[] | undefin
 const kinds = (dice: ForcedDie[] | undefined) => dice?.map(die => [die.name.kind, die.result]);
 const settle = () => new Promise(resolve => setTimeout(resolve, 250));
 
-describe('BranchPanel dice chips', () => {
-  test('Basic shows no chips, even with a move chosen', async () => {
-    renderPanel(singles(), { advanced: false, first: { p1: [{ kind: 'move', moveId: 'airslash', moveName: 'Air Slash' }], p2: [] } });
-    await screen.findByRole('button', { name: /Air Slash/ });
+describe('the dock dice chips', () => {
+  test('a closed tray shows no chips, even with a move chosen', async () => {
+    renderDock(singles(), { first: { p1: [{ kind: 'move', moveId: 'airslash', moveName: 'Air Slash' }], p2: [] } });
+    await settle();
+    expect(screen.queryByRole('group', { name: /Dice for/ })).toBeNull();
+    await userEvent.click(dockChip('P1'));
     await settle();
     expect(screen.queryByRole('group', { name: /Dice for/ })).toBeNull();
   });
 
   test('without the branch battle there are no chips to offer', async () => {
-    renderPanel(singles(), { live: false, first: { p1: [{ kind: 'move', moveId: 'airslash', moveName: 'Air Slash' }], p2: [] } });
-    await screen.findByRole('button', { name: /Air Slash/ });
+    renderDock(singles(), { live: false, first: { p1: [{ kind: 'move', moveId: 'airslash', moveName: 'Air Slash' }], p2: [] } });
+    await openDice('P1');
     await settle();
     expect(screen.queryByRole('group', { name: /Dice for/ })).toBeNull();
   });
 
   test('a chosen move shows its dice, a click forces a result and a second click gives it back', async () => {
-    const latest = renderPanel(singles());
-    await userEvent.click(await side('P1').findByRole('button', { name: /Air Slash/ }));
+    const latest = renderDock(singles());
+    await openDice('P1');
+    await userEvent.click(tile(/Air Slash/));
     const dice = await screen.findByRole('group', { name: 'Dice for P1' });
     for (const caption of ['Hit', 'Crit', 'Flinch']) expect(within(dice).getByRole('group', { name: caption })).toBeInTheDocument();
     expect(within(within(dice).getByRole('group', { name: 'Hit' })).getAllByRole('button').map(chip => chip.textContent)).toEqual(['Hits', 'Misses']);
@@ -102,8 +110,9 @@ describe('BranchPanel dice chips', () => {
   });
 
   test('the other result of a die replaces the first, and the damage roll is a select', async () => {
-    const latest = renderPanel(singles());
-    await userEvent.click(await side('P1').findByRole('button', { name: /Air Slash/ }));
+    const latest = renderDock(singles());
+    await openDice('P1');
+    await userEvent.click(tile(/Air Slash/));
     const crit = () => screen.getByRole('group', { name: 'Crit' });
     await userEvent.click(await within(await screen.findByRole('group', { name: 'Crit' })).findByRole('button', { name: 'Crit' }));
     await userEvent.click(within(crit()).getByRole('button', { name: 'No crit' }));
@@ -113,18 +122,20 @@ describe('BranchPanel dice chips', () => {
   });
 
   test('a new move for the slot gives its dice back to the seed', async () => {
-    const latest = renderPanel(singles());
-    await userEvent.click(await side('P1').findByRole('button', { name: /Air Slash/ }));
+    const latest = renderDock(singles());
+    await openDice('P1');
+    await userEvent.click(tile(/Air Slash/));
     await userEvent.click(within(await screen.findByRole('group', { name: 'Flinch' })).getByRole('button', { name: 'Flinch' }));
     expect(diceOf(latest.picks, 'p1')).toHaveLength(2);
-    await userEvent.click(side('P1').getByRole('button', { name: /Splash/ }));
+    await userEvent.click(tile(/Splash/));
     expect('dice' in latest.picks.p1[0]!).toBe(false);
     await waitFor(() => expect(screen.queryByRole('group', { name: 'Flinch' })).toBeNull());
   });
 
   test('a die the panel does not offer any more stays visible as a set chip and clears on a click', async () => {
     const stray: ForcedDie = { name: { slot: 'p1a', moveId: 'airslash', targetSlot: 'p2a', kind: 'secondary', effectId: 'confusion' }, result: { happens: true } };
-    const latest = renderPanel(singles(), { first: { p1: [{ kind: 'move', moveId: 'airslash', moveName: 'Air Slash', dice: [stray] }], p2: [] } });
+    const latest = renderDock(singles(), { first: { p1: [{ kind: 'move', moveId: 'airslash', moveName: 'Air Slash', dice: [stray] }], p2: [] } });
+    await openDice('P1');
     const chip = await screen.findByRole('button', { name: 'Confusion' });
     expect(chip).toHaveAttribute('aria-pressed', 'true');
     await userEvent.click(chip);
@@ -138,10 +149,11 @@ const doubles = () => diceBattle({
   p2: [setOf('Snorlax', ['splash']), setOf('Chansey', ['splash'])],
 });
 
-describe('BranchPanel dice chips in doubles', () => {
+describe('the dock dice chips in doubles', () => {
   test('a spread move shows one set of chips per target, each target named', async () => {
-    const latest = renderPanel(doubles());
-    await userEvent.click(await side('P1A').findByRole('button', { name: /Rock Slide/ }));
+    const latest = renderDock(doubles());
+    await openDice('P1A');
+    await userEvent.click(tile(/Rock Slide/));
     const dice = await screen.findByRole('group', { name: 'Dice for P1A' });
     for (const name of ['Snorlax', 'Chansey']) {
       expect(await within(dice).findByRole('group', { name: `Hit against ${name}` })).toBeInTheDocument();
@@ -152,14 +164,15 @@ describe('BranchPanel dice chips in doubles', () => {
   });
 });
 
-describe('BranchPanel dice of the turn', () => {
+describe('the dock dice of the turn', () => {
   const tied = () => diceBattle({
     p1: [setOf('Snorlax', ['tackle'], { name: 'Alpha Mon' })], p2: [setOf('Snorlax', ['tackle', 'splash'], { name: 'Beta Mon' })],
   });
   const tackle: BranchSlotChoice = { kind: 'move', moveId: 'tackle', moveName: 'Tackle' };
 
   test('two bodies that tie in speed get a speed tie chip once both sides chose, set on the lower slot', async () => {
-    const latest = renderPanel(tied(), { first: { p1: [tackle], p2: [tackle] } });
+    const latest = renderDock(tied(), { first: { p1: [tackle], p2: [tackle] } });
+    await openDice('P1');
     const order = await screen.findByRole('group', { name: 'Move order' });
     expect(within(order).getAllByRole('button').map(chip => chip.textContent)).toEqual(['Alpha Mon first', 'Beta Mon first']);
     await userEvent.click(within(order).getByRole('button', { name: 'Beta Mon first' }));
@@ -172,7 +185,8 @@ describe('BranchPanel dice of the turn', () => {
       p1: [setOf('Snorlax', ['splash'])], p2: [setOf('Tropius', ['splash'], { ability: 'Harvest', item: 'Sitrus Berry' })],
     });
     const splash: BranchSlotChoice = { kind: 'move', moveId: 'splash', moveName: 'Splash' };
-    const latest = renderPanel(battle, { first: { p1: [splash], p2: [splash] } });
+    const latest = renderDock(battle, { first: { p1: [splash], p2: [splash] } });
+    await openDice('P1');
     const row = await screen.findByRole('group', { name: 'End of turn for Tropius' });
     expect(within(row).getByRole('group', { name: 'Harvest' })).toBeInTheDocument();
     await userEvent.click(within(row).getByRole('button', { name: 'Triggers' }));
@@ -180,18 +194,20 @@ describe('BranchPanel dice of the turn', () => {
   });
 
   test('before both sides chose there is no row for the turn', async () => {
-    renderPanel(tied(), { first: { p1: [tackle], p2: [] } });
+    renderDock(tied(), { first: { p1: [tackle], p2: [] } });
+    await openDice('P1');
     await settle();
     expect(screen.queryByRole('group', { name: 'Dice of the turn' })).toBeNull();
   });
 });
 
-describe('BranchPanel dice a forced die needs (decision 5a)', () => {
+describe('the dock dice a forced die needs (decision 5a)', () => {
   const airSlash: BranchSlotChoice = { kind: 'move', moveId: 'airslash', moveName: 'Air Slash' };
 
   test('forcing a crit sets the hit and says why, and a miss takes the crit back', async () => {
-    const latest = renderPanel(singles());
-    await userEvent.click(await side('P1').findByRole('button', { name: /Air Slash/ }));
+    const latest = renderDock(singles());
+    await openDice('P1');
+    await userEvent.click(tile(/Air Slash/));
     await userEvent.click(within(await screen.findByRole('group', { name: 'Crit' })).getByRole('button', { name: 'Crit' }));
     expect(kinds(diceOf(latest.picks, 'p1'))).toEqual([['crit', { happens: true }], ['accuracy', { happens: true }]]);
     await waitFor(() => expect(within(screen.getByRole('group', { name: 'Hit' })).getByRole('button', { name: 'Hits' })).toHaveAttribute('aria-pressed', 'true'));
@@ -205,7 +221,8 @@ describe('BranchPanel dice a forced die needs (decision 5a)', () => {
   test('a paralysed attacker has a status check chip that says what the body does, and a forced secondary passes it', async () => {
     const battle = singles();
     battle.sides[0].active[0]!.setStatus('par');
-    const latest = renderPanel(battle, { first: { p1: [airSlash], p2: [] } });
+    const latest = renderDock(battle, { first: { p1: [airSlash], p2: [] } });
+    await openDice('P1');
     const check = await screen.findByRole('group', { name: 'Paralysis check' });
     expect(within(check).getAllByRole('button').map(chip => chip.textContent)).toEqual(['Paralysis lets it move', 'Paralysis stops it']);
     await userEvent.click(within(screen.getByRole('group', { name: 'Flinch' })).getByRole('button', { name: 'Flinch' }));
@@ -216,21 +233,23 @@ describe('BranchPanel dice a forced die needs (decision 5a)', () => {
   });
 
   test('a spread move sets the hit on the target of the forced die only', async () => {
-    const latest = renderPanel(doubles());
-    await userEvent.click(await side('P1A').findByRole('button', { name: /Rock Slide/ }));
+    const latest = renderDock(doubles());
+    await openDice('P1A');
+    await userEvent.click(tile(/Rock Slide/));
     await userEvent.click(within(await screen.findByRole('group', { name: 'Crit against Chansey' })).getByRole('button', { name: 'Crit' }));
     expect(diceOf(latest.picks, 'p1')?.map(die => [die.name.kind, die.name.targetSlot])).toEqual([['crit', 'p2b'], ['accuracy', 'p2b']]);
   });
 });
 
-describe('BranchPanel chips on the first turn of a branch', () => {
+describe('the dock chips on the first turn of a branch', () => {
   const airSlash: BranchSlotChoice = { kind: 'move', moveId: 'airslash', moveName: 'Air Slash' };
   const loggedCrit = { name: { slot: 'p1a', moveId: 'airslash', targetSlot: 'p2a', kind: 'crit' }, result: { happens: true } };
 
   test('the log result of an action left as logged reads "log", and a click forces the other result', async () => {
     shown.logged = [loggedCrit];
     try {
-      const latest = renderPanel(singles(), { first: { p1: [airSlash], p2: [] } });
+      const latest = renderDock(singles(), { first: { p1: [airSlash], p2: [] } });
+      await openDice('P1');
       const crit = await screen.findByRole('group', { name: 'Crit' });
       expect(within(crit).getAllByRole('button').map(chip => chip.textContent)).toEqual(['Crit · log', 'No crit']);
       expect(within(crit).getByRole('button', { name: 'Crit · log' })).toHaveAttribute('aria-pressed', 'false');
@@ -245,7 +264,8 @@ describe('BranchPanel chips on the first turn of a branch', () => {
   test('another move shows no log result: the logged die belongs to the logged action', async () => {
     shown.logged = [loggedCrit];
     try {
-      renderPanel(singles(), { first: { p1: [{ kind: 'move', moveId: 'splash', moveName: 'Splash' }], p2: [] } });
+      renderDock(singles(), { first: { p1: [{ kind: 'move', moveId: 'splash', moveName: 'Splash' }], p2: [] } });
+      await openDice('P1');
       await settle();
       expect(screen.queryByRole('button', { name: /· log/ })).toBeNull();
     } finally {
@@ -254,7 +274,7 @@ describe('BranchPanel chips on the first turn of a branch', () => {
   });
 });
 
-describe('BranchPanel Quick Claw die', () => {
+describe('the dock Quick Claw die', () => {
   const quickClaw = (format: string) => diceBattle({
     format,
     p1: [setOf('Snorlax', ['tackle'], { name: 'Alpha Mon', item: 'Quick Claw' })], p2: [setOf('Snorlax', ['tackle'], { name: 'Beta Mon' })],
@@ -262,20 +282,22 @@ describe('BranchPanel Quick Claw die', () => {
   const tackle: BranchSlotChoice = { kind: 'move', moveId: 'tackle', moveName: 'Tackle' };
 
   test('Gen 3 draws it once per turn for every holder on the field, and the chip says so', async () => {
-    renderPanel(quickClaw('gen3customgame'), { first: { p1: [tackle], p2: [tackle] } });
+    renderDock(quickClaw('gen3customgame'), { first: { p1: [tackle], p2: [tackle] } });
+    await openDice('P1');
     const row = await screen.findByRole('group', { name: 'Quick Claw on Alpha Mon' });
     expect(within(row).getAllByRole('button').map(chip => chip.textContent)).toEqual(['Acts first', 'Does not act first']);
     expect(screen.getByText('The game draws this die once per turn for every holder on the field, so a chip here applies to all of them.')).toBeInTheDocument();
   });
 
   test('Gen 9 draws it per holder: no such note', async () => {
-    renderPanel(quickClaw('gen9customgame'), { first: { p1: [tackle], p2: [tackle] } });
+    renderDock(quickClaw('gen9customgame'), { first: { p1: [tackle], p2: [tackle] } });
+    await openDice('P1');
     await screen.findByRole('group', { name: 'Quick Claw on Alpha Mon' });
     expect(screen.queryByText(/for every holder on the field/)).toBeNull();
   });
 });
 
-describe('BranchPanel damage roll select', () => {
+describe('the dock damage roll select', () => {
   const airSlash: BranchSlotChoice = { kind: 'move', moveId: 'airslash', moveName: 'Air Slash' };
   const percent = (option: HTMLElement) => Number(/(\d+(?:\.\d)?)%/.exec(option.textContent ?? '')![1]);
 
@@ -288,7 +310,8 @@ describe('BranchPanel damage roll select', () => {
 
   test('every step lists its damage from the calculator, lowest first, and min and max set the ends', async () => {
     const battle = singles();
-    const latest = renderPanel(battle, { first: { p1: [airSlash], p2: [] } });
+    const latest = renderDock(battle, { first: { p1: [airSlash], p2: [] } });
+    await openDice('P1');
     const select = await screen.findByRole('combobox', { name: 'Damage roll' });
     const options = within(select).getAllByRole('option');
     expect(options.map(option => option.textContent)[0]).toBe('As rolled');
@@ -309,7 +332,8 @@ describe('BranchPanel damage roll select', () => {
     const battle = singles();
     const damage = stepsOf(battle);
     battle.sides[1].active[0]!.hp = damage[8];
-    const latest = renderPanel(battle, { first: { p1: [airSlash], p2: [] } });
+    const latest = renderDock(battle, { first: { p1: [airSlash], p2: [] } });
+    await openDice('P1');
     const select = await screen.findByRole('combobox', { name: 'Damage roll' });
     const texts = within(select).getAllByRole('option').slice(1).map(option => option.textContent ?? '');
     expect(texts.map(text => text.endsWith(' · KO'))).toEqual(damage.map(value => value >= damage[8]));
@@ -320,7 +344,8 @@ describe('BranchPanel damage roll select', () => {
 
   test('a forced crit switches the numbers to the crit damage and says so', async () => {
     const battle = singles();
-    renderPanel(battle, { first: { p1: [airSlash], p2: [] } });
+    renderDock(battle, { first: { p1: [airSlash], p2: [] } });
+    await openDice('P1');
     await userEvent.click(within(await screen.findByRole('group', { name: 'Crit' })).getByRole('button', { name: 'Crit' }));
     const maxhp = battle.sides[1].active[0]!.maxhp;
     await waitFor(() => {
@@ -332,8 +357,9 @@ describe('BranchPanel damage roll select', () => {
 
   test('a spread move has one select per target, each with its own damage', async () => {
     const battle = doubles();
-    renderPanel(battle);
-    await userEvent.click(await side('P1A').findByRole('button', { name: /Rock Slide/ }));
+    renderDock(battle);
+    await openDice('P1A');
+    await userEvent.click(tile(/Rock Slide/));
     const first = await screen.findByRole('combobox', { name: 'Damage roll against Snorlax' });
     const second = screen.getByRole('combobox', { name: 'Damage roll against Chansey' });
     expect(within(first).getAllByRole('option')).toHaveLength(17);
@@ -343,21 +369,27 @@ describe('BranchPanel damage roll select', () => {
   });
 });
 
-describe('BranchPanel Basic badge', () => {
+describe('the dock marks a move that carries forced dice', () => {
   const forcedCrit: ForcedDie = { name: { slot: 'p1a', moveId: 'airslash', targetSlot: 'p2a', kind: 'crit' }, result: { happens: true } };
 
-  test('Basic keeps the forced dice of a pick and marks that move "forced", Advanced shows chips instead', async () => {
+  test('the chip says "dice", and the tile of the picked move carries the "forced" flag', async () => {
     const pick: BranchSlotChoice = { kind: 'move', moveId: 'airslash', moveName: 'Air Slash', dice: [forcedCrit] };
-    renderPanel(singles(), { advanced: false, first: { p1: [pick], p2: [] } });
-    const airSlash = await side('P1').findByRole('button', { name: /Air Slash/ });
-    expect(within(airSlash).getByText('forced')).toBeInTheDocument();
-    expect(within(side('P1').getByRole('button', { name: /Splash/ })).queryByText('forced')).toBeNull();
+    renderDock(singles(), { first: { p1: [pick], p2: [] } });
+    expect(dockChip('P1')).toHaveTextContent('Air Slash · dice');
+    await userEvent.click(dockChip('P1'));
+    expect(within(tile(/Air Slash/)).getByText('forced')).toBeInTheDocument();
+    expect(within(tile(/Splash/)).queryByText('forced')).toBeNull();
   });
 
   test('in doubles each slot marks its own move', async () => {
     const pick: BranchSlotChoice = { kind: 'move', moveId: 'rockslide', moveName: 'Rock Slide', dice: [{ ...forcedCrit, name: { ...forcedCrit.name, moveId: 'rockslide', targetSlot: 'p2b' } }] };
-    renderPanel(doubles(), { advanced: false, first: { p1: [pick, { kind: 'move', moveId: 'splash', moveName: 'Splash' }], p2: [] } });
-    expect(within(await side('P1A').findByRole('button', { name: /Rock Slide/ })).getByText('forced')).toBeInTheDocument();
-    expect(within(side('P1B').getByRole('button', { name: /Splash/ })).queryByText('forced')).toBeNull();
+    renderDock(doubles(), { first: { p1: [pick, { kind: 'move', moveId: 'splash', moveName: 'Splash' }], p2: [] } });
+    expect(dockChip('P1A')).toHaveTextContent('Rock Slide · dice');
+    expect(dockChip('P1B')).not.toHaveTextContent('dice');
+    await userEvent.click(dockChip('P1A'));
+    expect(within(tile(/Rock Slide/)).getByText('forced')).toBeInTheDocument();
+    expect(within(tile(/Splash/)).queryByText('forced')).toBeNull();
+    await userEvent.click(dockChip('P1B'));
+    expect(within(tile(/Splash/)).queryByText('forced')).toBeNull();
   });
 });

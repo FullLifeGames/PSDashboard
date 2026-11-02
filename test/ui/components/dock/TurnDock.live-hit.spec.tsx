@@ -1,16 +1,18 @@
 import { describe, expect, test, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { Battle, Teams, toID, type PokemonSet } from '@pkmn/sim';
 import { createBranchStateFromBattle } from '@fulllifegames/eval-engine';
-import { BranchPanel } from '../../../src/components/BranchPanel';
+import { TurnDock } from '../../../../src/components/dock/TurnDock';
 
 /**
+ * Moved to the dock in round 84 (A3b): the tile of the open tray reads the range from its tooltip.
  * Round 73 (T202, design gate 3a): Hatterene's Expanding Force in Psychic Terrain against a lone Blissey behind a screen. The
  * calculator spreads the move over every foe and holds no screen factor for the one target the simulator plays, so the preview
  * hands the live battle of the branch to the engine and shows the simulator's own range. Without a live battle it shows no range.
  * The oracle is the simulator: it plays the move and the HP the foe loses lies in the shown range.
  */
-vi.mock('../../../src/lib/pokemon-options', () => ({ getMovePool: async () => ['Dragon Claw'] }));
+vi.mock('../../../../src/lib/pokemon-options', () => ({ getMovePool: async () => ['Dragon Claw'] }));
 
 const STATS = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
 const set = (species: string, moves: string[]): PokemonSet => ({
@@ -44,30 +46,25 @@ function simulatorPercent(screen: string): number {
   return Math.round((before - foe.hp) / foe.maxhp * 1000) / 10;
 }
 
-const p1a = () => {
-  const heading = [...document.querySelectorAll('.ps-side-label')].find(label => label.textContent === 'P1A')!;
-  return within(heading.closest('.ps-side-controls') as HTMLElement);
-};
-
-function renderPanel(screen: string | null, live: boolean) {
-  localStorage.setItem('ps-replay-interceptor:picker-advanced', '1');
+async function renderDock(screen: string | null, live: boolean) {
   const battle = loneFoeBehind(screen);
-  render(<BranchPanel
+  render(<TurnDock
     simState={createBranchStateFromBattle(battle as never, [], {})} executeError={null} executing={false} gen={9}
     onSetChoice={vi.fn()} onHypotheticalMove={vi.fn()} onExecuteTurn={vi.fn()} positionKey={`live-hit:${screen ?? 'none'}`}
     {...(live ? { getBattle: () => battle as never } : {})}
   />);
-  return p1a().getByRole('button', { name: /Expanding Force/ });
+  await userEvent.click(within(document.body).getByRole('button', { name: /^P1A/ }));
+  return within(document.querySelector('.ps-tray') as HTMLElement).getByRole('button', { name: /Expanding Force/ });
 }
 
-const RANGE = /^(\d+(?:\.\d+)?)% - (\d+(?:\.\d+)?)%/;
-/** The damage line of a move row (the range, then the KO chance). */
-const shownRange = (row: HTMLElement) => row.querySelector('.ps-movebtn-dmg')?.textContent ?? '';
+const RANGE = /(\d+(?:\.\d+)?)% - (\d+(?:\.\d+)?)%/;
+/** The range of a move tile: the calc's sentence in its tooltip (the tile itself shows whole percent). */
+const shownRange = (row: HTMLElement) => row.getAttribute('title') ?? '';
 
-describe('BranchPanel: the preview of a forced spread on a lone foe behind a screen', () => {
+describe('the dock: the preview of a forced spread on a lone foe behind a screen', () => {
   for (const screen of ['reflect', 'lightscreen', 'auroraveil']) {
     test(`behind ${screen}: with the live battle the range holds the simulator's damage`, async () => {
-      const row = renderPanel(screen, true);
+      const row = await renderDock(screen, true);
       await waitFor(() => expect(shownRange(row)).toMatch(RANGE));
       const [, low, high] = shownRange(row).match(RANGE)!.map(Number);
       const percent = simulatorPercent(screen);
@@ -78,13 +75,12 @@ describe('BranchPanel: the preview of a forced spread on a lone foe behind a scr
   }
 
   test('without a screen the calc prices the hit, live battle or not (the wait below is long enough to see a range)', async () => {
-    const row = renderPanel(null, false);
+    const row = await renderDock(null, false);
     await waitFor(() => expect(shownRange(row)).toMatch(RANGE));
   });
 
   test('without the live battle (a stored position) the row shows no range', async () => {
-    const row = renderPanel('lightscreen', false);
-    await waitFor(() => expect(screen.getAllByRole('button', { name: /Expanding Force/ }).length).toBeGreaterThan(0));
+    const row = await renderDock('lightscreen', false);
     await new Promise(resolve => setTimeout(resolve, 500));
     expect(shownRange(row)).toBe('');
   });
