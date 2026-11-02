@@ -22,7 +22,7 @@ export function SlotTray({ slot, hpByLabel, gen, moreOpen, diceViews, onChoice, 
   onDone: () => void;
 }) {
   return (
-    <div className="ps-tray" role="region" aria-label={`Choices for ${slot.label} ${slot.name}`}>
+    <div className={`ps-tray${moreOpen ? ' ps-tray-roomy' : ''}`} role="region" aria-label={`Choices for ${slot.label} ${slot.name}`}>
       <TrayHeader slot={slot} moreOpen={moreOpen} onMore={onMore} onDone={onDone} />
       {!slot.forceSwitch && slot.moves.length > 0 && <MoveTiles slot={slot} hpByLabel={hpByLabel} onChoice={onChoice} />}
       {slot.switches.length > 0 && (

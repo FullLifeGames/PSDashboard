@@ -128,45 +128,6 @@
 .ps-movegrid:not(.ps-movegrid-compact) > .ps-movecell { display: grid; grid-row: span 2; grid-template-rows: subgrid; }
 .ps-movegrid:not(.ps-movegrid-compact) > .ps-movecell:nth-child(n+3) { margin-top: 6px; }
 
-.ps-movebtn {
-  width: 100%;
-  min-height: 64px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  border: 1px solid var(--tint-edge, rgba(255,255,255,0.22));
-  border-radius: 6px;
-  padding: 8px 10px;
-  cursor: pointer;
-  text-align: center;
-  color: var(--ps-tile-text);
-  background: linear-gradient(180deg, var(--tint, #344b6c) 0%, var(--tint-low, #2b405f) 100%);
-  transition: filter 0.15s, transform 0.1s, box-shadow 0.15s;
-  position: relative;
-  overflow: hidden;
-  box-shadow:
-    inset 0 2px 0 var(--type, transparent),
-    0 4px 10px rgba(0,0,0,0.2);
-}
-.ps-movebtn:hover:not(:disabled) {
-  filter: brightness(1.1);
-  transform: translateY(-1px);
-  box-shadow:
-    inset 0 2px 0 var(--type, transparent),
-    0 7px 14px rgba(0,0,0,0.25);
-}
-.ps-movebtn:active:not(:disabled) { transform: scale(0.98); }
-.ps-movebtn:disabled { opacity: 0.35; cursor: not-allowed; }
-/* Round 83: the selection is one ring in the type color that lies on the tile's own edge, with a soft glow. */
-.ps-movebtn-selected,
-.ps-movebtn-selected:hover:not(:disabled) {
-  outline: 2px solid var(--type, #fff);
-  outline-offset: -1px;
-  box-shadow:
-    inset 0 2px 0 var(--type, transparent),
-    0 0 12px -2px var(--type, #fff);
-}
-.ps-movebtn-name { font-size: 12px; font-weight: bold; line-height: 1.2; }
 .ps-movebtn-info { display: flex; justify-content: space-between; align-items: center; margin-top: 2px; }
 .ps-movebtn-type {
   font-size: 9px;
@@ -178,7 +139,6 @@
   border-radius: 3px;
   padding: 0 5px;
 }
-.ps-movebtn-pp { font-size: 9px; color: var(--ps-tile-sub); }
 .ps-movebtn-dmg { font-size: 9px; margin-top: 2px; color: var(--ps-tile-dmg); }
 /* Round 83: one target's damage stays on one line, so the tiles of a row keep one height; the tooltip holds the whole sentence. */
 .ps-movebtn-dmg-one { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -199,104 +159,12 @@
   padding: 3px 8px;
 }
 .ps-movebtn-compact .ps-movebtn-name { font-size: 11px; }
-.ps-target-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(116px, 1fr));
-  gap: 4px;
-  margin-top: 4px;
-}
-
-.ps-target-btn {
-  background: rgba(0,0,0,0.26);
-  border: 1px solid rgba(255,255,255,0.22);
-  border-radius: 6px;
-  color: #f5f5f5;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  font-family: inherit;
-  font-size: 9px;
-  font-weight: bold;
-  min-height: 38px;
-  padding: 5px 7px;
-  text-align: left;
-}
-
-.ps-target-btn:hover:not(:disabled) {
-  background: rgba(124,183,232,0.22);
-  border-color: rgba(124,183,232,0.45);
-}
-
-.ps-target-btn-selected {
-  background: rgba(124,183,232,0.36);
-  border-color: #d8f0ff;
-  box-shadow:
-    0 0 0 2px rgba(124,183,232,0.35),
-    inset 0 1px 0 rgba(255,255,255,0.18);
-}
-
-.ps-target-btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
-}
-
-.ps-target-main {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  min-width: 0;
-}
-
-.ps-target-slot {
-  color: #a9d7ff;
-  flex: 0 0 auto;
-  font-size: 9px;
-}
-
-.ps-target-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.ps-target-meta {
-  color: #c9d4e6;
-  font-size: 8px;
-  line-height: 1.2;
-}
-
 /* Switch buttons */
 .ps-switchgrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 6px;
 }
-.ps-switchbtn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--ps-switch-bg);
-  border: 1px solid rgba(183,216,255,0.18);
-  border-radius: 6px;
-  padding: 6px 8px;
-  color: var(--ps-switch-text);
-  cursor: pointer;
-  transition: filter 0.15s, box-shadow 0.15s;
-  text-align: left;
-}
-.ps-switchbtn:hover:not(:disabled) { filter: brightness(1.12); }
-.ps-switchbtn:disabled { opacity: 0.3; cursor: not-allowed; }
-/* Round 83: the switch chips stay neutral, their selection is the same ring as a move tile's, in the app's accent. */
-.ps-switchbtn-selected {
-  outline: 2px solid var(--ps-switch-ring);
-  outline-offset: -1px;
-  box-shadow: 0 0 10px -2px var(--ps-switch-ring);
-}
-.ps-switchbtn img { width: 32px; height: 32px; image-rendering: pixelated; object-fit: contain; }
-.ps-switchbtn-name { font-size: 11px; font-weight: bold; }
-.ps-switchbtn-hp { font-size: 9px; color: var(--ps-switch-sub); }
-
 /* Basic view: switch chips share the row with the move chips. */
 .ps-switchgrid-compact {
   display: flex;
@@ -475,23 +343,6 @@
     linear-gradient(180deg, rgba(35,39,51,0.98) 0%, rgba(28,31,43,0.98) 100%);
   padding: 2px 10px 8px;
 }
-
-.ps-execute-btn {
-  width: 100%;
-  padding: 7px;
-  border: 1px solid rgba(255,255,255,0.14);
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: bold;
-  font-family: inherit;
-  cursor: pointer;
-  transition: background 0.15s, transform 0.1s;
-  margin-top: 6px;
-  color: #fff;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 5px 12px rgba(0,0,0,0.2);
-}
-.ps-execute-btn:hover:not(:disabled) { transform: scale(1.01); }
-.ps-execute-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .ps-branch-controls-shell {
   border: 1px solid rgba(255,255,255,0.12);

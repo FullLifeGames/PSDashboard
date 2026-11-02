@@ -19,11 +19,11 @@ export function TrayHeader({ slot, moreOpen, onMore, onDone }: {
       <span className="ps-tray-spacer" />
       {!forceSwitch && gimmick.hasAnyModifier && <ModifierRow label={label} modifiers={modifiers} gimmick={gimmick} />}
       {!forceSwitch && (
-        <button type="button" className="ps-tray-btn" aria-expanded={moreOpen} onClick={onMore}>
+        <button type="button" className="ps-btn ps-tray-btn" aria-expanded={moreOpen} onClick={onMore}>
           Dice · What if {moreOpen ? '▴' : '▾'}
         </button>
       )}
-      <button type="button" className="ps-tray-btn" onClick={onDone}>Done</button>
+      <button type="button" className="ps-btn ps-tray-btn" onClick={onDone}>Done</button>
     </div>
   );
 }
