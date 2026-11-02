@@ -116,6 +116,16 @@ describe('the What-if section of the tray (singles)', () => {
     expect(screen.getByRole('combobox', { name: 'Choice picker for P1' })).toBeInTheDocument();
   });
 
+  test('the loader hands the hypothetical move to the handler with its side and slot', async () => {
+    pool.list = ['Dragon Claw'];
+    const onHypotheticalMove = vi.fn();
+    render(<TurnDock simState={singles} executeError={null} executing={false} gen={9} onSetChoice={vi.fn()} onHypotheticalMove={onHypotheticalMove} onExecuteTurn={vi.fn()} />);
+    await openMore();
+    await userEvent.type(await screen.findByRole('combobox', { name: 'Hypothetical move for P1' }), 'Dragon Claw');
+    await userEvent.click(screen.getByRole('button', { name: 'Load move' }));
+    expect(onHypotheticalMove).toHaveBeenCalledWith('p1', 0, { species: 'Garchomp', move: 'Dragon Claw', replace: 'Scale Shot' });
+  });
+
   test('without a pool the row is absent and all choices stay', async () => {
     pool.list = [];
     render(dock());

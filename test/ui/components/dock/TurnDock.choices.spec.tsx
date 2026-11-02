@@ -179,3 +179,35 @@ describe('the states of a slot', () => {
     expect(chip('P1B')).toBeEnabled();
   });
 });
+
+// Round 77, B5: P1 clicked Tailwind while P2 had to replace a Chien-Pao, and the pick rode into the next turn.
+describe('the side that does not replace takes no input (B5)', () => {
+  const down = (side: 'p1' | 'p2') => ({ [`${side}ForceSwitch`]: true, [`${side}ForceSwitches`]: [true, false] });
+
+  test('singles: P2 replaces, so the P1 chip is inert and the strip says whom it waits for', () => {
+    render(<TurnDock {...props({ simState: simState('singles', { p2ForceSwitch: true, p2ForceSwitches: [true] }) })} />);
+    expect(chip('P1')).toHaveAttribute('inert');
+    expect(screen.getByText('Waiting for P2 to choose a replacement.')).toBeInTheDocument();
+    expect(chip('P2')).not.toHaveAttribute('inert');
+  });
+
+  test('doubles: one side replaces, the other waits; both replacing leaves both live', () => {
+    const { rerender } = render(<TurnDock {...props({ simState: simState('doubles', down('p2')) })} />);
+    expect(chip('P1A')).toHaveAttribute('inert');
+    expect(chip('P1B')).toHaveAttribute('inert');
+    expect(screen.getByText('Waiting for P2 to choose a replacement.')).toBeInTheDocument();
+    rerender(<TurnDock {...props({ simState: simState('doubles', down('p1')) })} />);
+    expect(chip('P2A')).toHaveAttribute('inert');
+    expect(screen.getByText('Waiting for P1 to choose a replacement.')).toBeInTheDocument();
+    rerender(<TurnDock {...props({ simState: simState('doubles', { ...down('p1'), ...down('p2') }) })} />);
+    expect(chip('P1A')).not.toHaveAttribute('inert');
+    expect(chip('P2A')).not.toHaveAttribute('inert');
+    expect(screen.queryByText(/Waiting for/)).toBeNull();
+  });
+
+  test('a normal turn leaves both sides live', () => {
+    render(<TurnDock {...props()} />);
+    expect(chip('P1')).not.toHaveAttribute('inert');
+    expect(chip('P2')).not.toHaveAttribute('inert');
+  });
+});
