@@ -40,6 +40,9 @@ describe('SwitchRow', () => {
     expect(container.querySelector('.ps-hpbar-fill')).toHaveStyle({ width: '70%' });
     rerender(row({ switches: [switchOption('Heatran', { hp: '45/300', hpPercent: 15 })] }).ui);
     expect(container.querySelector('.ps-hpbar-fill')).toHaveClass('ps-hpbar-red');
+    expect(container.querySelector('.ps-hpbar-fill')).toHaveStyle({ width: '15%' });
+    rerender(row({ switches: [switchOption('Heatran', { hp: '300/300', hpPercent: 100 })] }).ui);
+    expect(container.querySelector('.ps-hpbar-fill')).toHaveStyle({ width: '100%' });
     expect(screen.getByRole('button')).not.toHaveClass('ps-switchbtn-selected');
   });
 

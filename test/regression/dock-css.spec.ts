@@ -131,3 +131,20 @@ describe('the dock above 1050 px: the label of Execute never moves a chip', () =
     expect(rule(base, '.ps-dock-rows') ?? '').toMatch(/grid-auto-rows:\s*46px/);
   });
 });
+
+describe('the HP bar of a bench tile', () => {
+  // Round 84 (turn dock, A7a): the fill is a span; without `display: block` it stays inline and its width does nothing, so every bench
+  // tile showed the bare grey track, at 15 % as at 100 %. The only users of `.ps-hpbar-fill` are the dock's bench tiles.
+  const pickers = readFileSync(new URL('../../src/styles/pickers.css', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+
+  test('the fill is a block, so its inline width sets the bar', () => {
+    const fill = rule(`${pickers}\n${css}`, '.ps-hpbar-fill');
+    expect(fill, 'a .ps-hpbar-fill rule').not.toBeNull();
+    expect(fill).toMatch(/display:\s*block/);
+  });
+
+  test('the track clips the fill and the dock sets it to a block of its own width', () => {
+    expect(rule(pickers, '.ps-hpbar-track') ?? '').toMatch(/overflow:\s*hidden/);
+    expect(rule(css, '.ps-switch-hp-track') ?? '').toMatch(/display:\s*block/);
+  });
+});

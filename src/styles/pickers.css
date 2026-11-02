@@ -29,6 +29,7 @@
 }
 
 .ps-hpbar-fill {
+  display: block; /* round 84: a span stays inline without it and ignores its width */
   height: 100%;
   transition: width 0.4s ease;
   border-radius: 2px;
