@@ -39,8 +39,9 @@
   padding: 8px 10px;
   background: linear-gradient(180deg, #26395c 0%, #18253e 100%);
   border: 1px solid rgba(183, 216, 255, 0.22);
-  border-bottom: 0;
-  border-radius: 10px 10px 0 0;
+  /* Round 84 (A7a, ruling 4a): the dock follows the column's content now, so the bar is closed on all four sides; below 1050 px the dock
+     stands at the viewport's edge again and keeps its open bottom. */
+  border-radius: 10px;
   box-shadow: 0 -8px 22px rgba(6, 12, 24, 0.3);
 }
 .ps-tray + .ps-dock-bar { border-top-left-radius: 0; border-top-right-radius: 0; }
@@ -354,8 +355,9 @@
 .ps-dock .ps-switchbtn-selected .ps-switchbtn-hp { color: #ffffff; }
 .ps-switch-hp-track { display: block; width: 60px; height: 4px; margin-top: 0; }
 
-/* The Raw Protocol Log toggle sits directly above the dock; its margin pushes both to the foot of a short column. */
-.ps-dock-log { margin-top: auto; }
+/* The Raw Protocol Log toggle sits directly above the dock, in the column's flow: both follow the last panel (round 84, A7a, ruling 4a;
+   a `margin-top: auto` here pushed them to the foot of a tall window and left a gap under the timeline). The dock stays sticky at the
+   column's foot when the content is longer than the window. */
 
 /* ── Narrow windows (round 84, A6b) ──
    At 1050 px the layout stacks (layout.css): the dock stands fixed at the viewport's lower edge across the full width, so the chips
@@ -376,7 +378,7 @@
     max-height: 70vh;
   }
   .ps-tray.ps-tray-roomy { max-height: 70vh; }
-  .ps-dock-bar { grid-template-columns: minmax(0, 1fr); }
+  .ps-dock-bar { grid-template-columns: minmax(0, 1fr); border-bottom: 0; border-radius: 10px 10px 0 0; }
   .ps-dock .ps-execute-btn {
     width: 100%;
     max-width: none;

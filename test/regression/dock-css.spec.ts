@@ -163,3 +163,40 @@ describe('the engine badge of a tile', () => {
     expect(css).toMatch(/\.ps-tile-flags \.ps-engine-badge\s*\{[^}]*margin:\s*0/);
   });
 });
+
+describe("the dock follows the column's content (ruling 4a)", () => {
+  // Round 84 (A7a): `.ps-dock-log { margin-top: auto }` pushed the toggle and the dock to the foot of a tall column, and a gap of about
+  // 400 px opened under the timeline at 2560 x 1440. The dock now stands directly under the last panel; it stays sticky at the column's
+  // foot when the content is longer than the window, and the tray stays absolute above the bar, so a tray moves no chip.
+  const base = css.slice(0, css.indexOf('@media (max-width: 1050px)'));
+  const narrow = media(1050) ?? '';
+
+  test('the log toggle takes no auto margin', () => {
+    const log = rule(css, '.ps-dock-log');
+    expect(log === null || !/margin(-top)?:\s*auto/.test(log), 'no auto margin on .ps-dock-log').toBe(true);
+  });
+
+  test("the dock stays sticky at the column's foot, and the tray stays above the bar", () => {
+    expect(rule(base, '.ps-dock') ?? '').toMatch(/position:\s*sticky/);
+    expect(rule(base, '.ps-dock') ?? '').toMatch(/bottom:\s*0/);
+    expect(rule(base, '.ps-tray') ?? '').toMatch(/position:\s*absolute/);
+    expect(rule(base, '.ps-tray') ?? '').toMatch(/bottom:\s*100%/);
+  });
+
+  test('the bar is closed at the bottom: a bottom border and all four corners round', () => {
+    const bar = rule(base, '.ps-dock-bar') ?? '';
+    expect(bar).toMatch(/border:\s*1px solid/);
+    expect(bar).not.toMatch(/border-bottom:\s*0/);
+    expect(bar).toMatch(/border-radius:\s*10px\s*;/);
+  });
+
+  test('a tray joins the bar at the top: the bar keeps square top corners under it', () => {
+    expect(rule(base, '.ps-tray + .ps-dock-bar') ?? '').toMatch(/border-top-left-radius:\s*0;\s*border-top-right-radius:\s*0/);
+  });
+
+  test('below 1050 px, where the dock is fixed at the lower edge, the bar keeps its open bottom', () => {
+    const bar = rule(narrow, '.ps-dock-bar') ?? '';
+    expect(bar).toMatch(/border-bottom:\s*0/);
+    expect(bar).toMatch(/border-radius:\s*10px 10px 0 0/);
+  });
+});
