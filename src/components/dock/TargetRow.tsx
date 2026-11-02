@@ -31,7 +31,10 @@ export function TargetRow({ move, selectedLoc, targets, onPick }: {
           >
             <span className="ps-target-main">
               <span className="ps-target-slot">{target.label}</span>
+              {/* The spaces keep the button's text readable ("P2A Bulbasaur 61%"): flex items lay out without them. */}
+              {' '}
               <span className="ps-target-name">{target.name}</span>
+              {' '}
               <span className="ps-target-hp">{target.hpPercent}%</span>
             </span>
             <HitBar hp={target.hpPercent} min={hit?.minPercent ?? 0} max={hit?.maxPercent ?? 0} />
