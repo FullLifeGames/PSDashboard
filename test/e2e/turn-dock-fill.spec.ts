@@ -99,19 +99,44 @@ test('Execute pressed before the fill reads "Waits for engine…" and runs the t
 
   await releaseEval(page);
   await expect(variationPanel(page)).toContainText('Turn 2', { timeout: 240_000 });
-  await expect(execute).not.toHaveText('Waits for engine…');
+  // The turn ran and the queue is gone. The button itself may be hidden: the next position can ask for a forced replacement, and
+  // Execute does not show there.
+  await expect(page.getByText('Waits for engine…')).toHaveCount(0);
+});
+
+/** The game analysis (with the engine held, so it keeps running) started from the eval panel; resolves once the sweep runs. */
+async function startAnalysis(page: Page): Promise<() => Promise<boolean>> {
+  type DebugWindow = Window & { __psDebug?: { graph: { running: boolean } } };
+  const analysisRuns = () => page.evaluate(() => (window as DebugWindow).__psDebug?.graph.running ?? false);
+  await page.locator('.ps-main-right .ps-eval-panel').locator('button', { hasText: 'Analyze game' }).click();
+  await expect.poll(analysisRuns, { timeout: 30_000 }).toBe(true);
+  return analysisRuns;
+}
+
+test('opening a variation ends the analysis that runs at the replay turn, and the fill starts at once', async ({ page }) => {
+  test.setTimeout(240_000);
+  // Entering branch mode resets the evaluation (useEvalView, useDockFill.sweep.spec): nothing is left for the fill to stop.
+  await loadDockReplay(page, TIP_GAME, 1);
+  await holdEval(page);
+  const analysisRuns = await startAnalysis(page);
+  await executeSeededTurn(page, 1);
+  await expect.poll(analysisRuns, { timeout: 30_000 }).toBe(false);
+  for (const slot of DOUBLES_SLOTS) await expect(pickLine(page, slot)).toHaveAttribute('data-wait', 'pending', { timeout: 30_000 });
 });
 
 test('while "Analyze game" runs no fill starts: the chips say the engine is busy and the analysis keeps running', async ({ page }) => {
-  test.setTimeout(240_000);
-  type DebugWindow = Window & { __psDebug?: { graph: { running: boolean } } };
-  const analysisRuns = () => page.evaluate(() => (window as DebugWindow).__psDebug?.graph.running ?? false);
+  test.setTimeout(300_000);
+  // The analysis can only start at a tip once no single evaluation runs there, so the first tip fills with the engine free. The
+  // analysis then starts (the engine held keeps it running) and the next turn is executed from the filled chips: branch mode
+  // stays, so the sweep keeps running and the new tip must not fill.
   await loadDockReplay(page, TIP_GAME, 1);
-  await holdEval(page);
-  await page.locator('.ps-main-right .ps-eval-panel').locator('button', { hasText: 'Analyze game' }).click();
-  await expect.poll(analysisRuns, { timeout: 30_000 }).toBe(true);
-
   await executeSeededTurn(page, 1);
+  for (const slot of DOUBLES_SLOTS) {
+    await expect(dockChip(page, slot)).toHaveAttribute('data-origin', 'engine', { timeout: 180_000 });
+  }
+  await holdEval(page);
+  const analysisRuns = await startAnalysis(page);
+  await executeSeededTurn(page, 2);
   for (const slot of DOUBLES_SLOTS) {
     await expect(pickLine(page, slot)).toHaveAttribute('data-wait', 'busy', { timeout: 30_000 });
     await expect(dockChip(page, slot)).toContainText('engine busy with the game analysis');
@@ -124,6 +149,9 @@ test('while "Analyze game" runs no fill starts: the chips say the engine is busy
     await expect(dockChip(page, slot)).toHaveAttribute('data-empty', 'true');
     await expect(dockChip(page, slot)).not.toHaveAttribute('data-origin', 'engine');
   }
+  // Cancelling the analysis frees the engine: the fill starts for the position.
+  await page.locator('.ps-main-right .ps-eval-panel').locator('button', { hasText: /^Cancel$/ }).first().click();
+  for (const slot of DOUBLES_SLOTS) await expect(pickLine(page, slot)).toHaveAttribute('data-wait', 'pending', { timeout: 30_000 });
 });
 
 test('Q19 b, at a replay turn: the first click on the flinched slot\'s chip starts the run, that slot stays empty while its tray is open, the other empty slot fills, no chip changes its box', async ({ page }) => {
