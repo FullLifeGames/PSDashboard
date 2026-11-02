@@ -1,5 +1,5 @@
 import { PSReplayFrame } from './PSReplayFrame';
-import { BranchPanel } from './BranchPanel';
+import { DockRegion } from './dock/DockRegion';
 import { LeadPanel } from './LeadPanel';
 import { BranchHistoryPanel } from './BranchHistoryPanel';
 import { BranchSaveSharePanel } from './BranchSaveSharePanel';
@@ -115,48 +115,21 @@ function LeadRegion({ app, replayData }: WorkspaceProps) {
   );
 }
 
-/* Variant B: the pickers are ALWAYS there — live sim state at the
-   tip, resolved picker state (stored/snapshot) everywhere else.
-   On T0 the lead picker takes their place. */
-function PickerRegion({ app, replayData }: WorkspaceProps) {
-  const { playOut } = app.transients;
-  const { viewT0, viewTurn, liveTip, evalViewKey } = app.board.timeline;
-  const { simState, executing, executeError } = app.ctx.branch;
-  const { branchPreparing, handleSetChoice, handleExecuteDraft } = app.board.deviation;
-  const { replayGen } = app.ctx.meta;
-  const { positionPicker, pickerSimState, pickerStale, playedAtView, getPickerBattle, pickerReplayLog } = app.engine;
-  if (playOut?.active) {
-    /* A steady stand-in while the engine plays: the per-turn picker
-       churn was the "everything keeps switching" complaint, and a
-       click here mid-run would corrupt the loop anyway. */
-    return (
-      <div className="ps-panel" role="status" style={{ fontSize: 11, color: '#aabbcc' }}>
-        <span className="ps-spinner" aria-hidden="true" />{' '}
-        The engine is picking both sides&rsquo; moves. The pickers come back when it stops.
-      </div>
-    );
-  }
-  if (viewT0) {
-    return <LeadRegion app={app} replayData={replayData} />;
-  }
+/** The lead picker of turn 0 and the confirm banner above it; the dock region takes over everywhere else. */
+function LeadSlot({ app, replayData }: WorkspaceProps) {
+  const { pendingConfirm, setPendingConfirm, playOut } = app.transients;
+  if (!app.board.timeline.viewT0 || playOut?.active) return null;
   return (
-    <BranchPanel
-      simState={liveTip ? simState : pickerSimState}
-      stale={!liveTip && pickerStale}
-      source={liveTip ? 'live' : positionPicker?.source}
-      acquiringExact={!liveTip && app.engine.acquire.exactAcquiringTurn === viewTurn}
-      executeError={liveTip ? executeError : null}
-      executing={executing || branchPreparing}
-      gen={replayGen}
-      onSetChoice={handleSetChoice}
-      onHypotheticalMove={app.handleHypotheticalMove}
-      // Round 84 (turn dock): off the tip the effective choices (the played seed under the user's picks) go to Execute.
-      onExecuteTurn={liveTip ? app.handleExecuteTurn : () => handleExecuteDraft(pickerSimState ? { p1: pickerSimState.p1Choices, p2: pickerSimState.p2Choices } : undefined)}
-      played={playedAtView}
-      positionKey={`${replayData.id}:${evalViewKey}`}
-      getBattle={liveTip ? app.ctx.branch.getBattle : getPickerBattle}
-      replayLog={pickerReplayLog}
-    />
+    <>
+      {pendingConfirm && (
+        <ConfirmBanner
+          message={pendingConfirm.message}
+          onProceed={pendingConfirm.proceed}
+          onCancel={() => { setPendingConfirm(null); app.engine.walk.clearPendingPick(); }}
+        />
+      )}
+      <LeadRegion app={app} replayData={replayData} />
+    </>
   );
 }
 
@@ -194,7 +167,6 @@ function WorkspaceAlert({ text }: { text: string }) {
 
 function WorkspaceLeft({ app, replayData }: WorkspaceProps) {
   const { branchDivergence, variationNotice } = app.board.deviation;
-  const { pendingConfirm, setPendingConfirm } = app.transients;
   const { variationSpan } = app.board.timeline;
   const { branching } = app.ctx.branch;
   const { loading, error, embed, loadReplay, loadReplayFile, loadedReplayUrl } = app.ctx.replay;
@@ -223,14 +195,8 @@ function WorkspaceLeft({ app, replayData }: WorkspaceProps) {
       />
       {branchDivergence && !app.analysis.showBranch && <WorkspaceAlert text={`⚠ ${branchDivergence}`} />}
       {variationNotice && <WorkspaceAlert text={variationNotice} />}
-      {pendingConfirm && (
-        <ConfirmBanner
-          message={pendingConfirm.message}
-          onProceed={pendingConfirm.proceed}
-          onCancel={() => { setPendingConfirm(null); app.engine.walk.clearPendingPick(); }}
-        />
-      )}
-      <PickerRegion app={app} replayData={replayData} />
+      {/* Round 84 (turn dock): at turn 0 the lead picker keeps its old place; elsewhere the dock region is the column's last child. */}
+      <LeadSlot app={app} replayData={replayData} />
       {(branching || variationSpan !== null) && <BranchSidePanels app={app} replayData={replayData} />}
       {!embed && (
         <ReplayLoader
@@ -244,6 +210,7 @@ function WorkspaceLeft({ app, replayData }: WorkspaceProps) {
           teamError={teamPasteError}
         />
       )}
+      <DockRegion app={app} replayId={replayData.id} />
     </div>
   );
 }

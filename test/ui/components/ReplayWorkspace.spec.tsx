@@ -46,7 +46,9 @@ async function mountLoaded(kind: ReplayKind) {
   return { app: () => latest.current!, replay };
 }
 
-const sideLabels = () => [...document.querySelectorAll('.ps-side-label')].map(label => label.textContent);
+// Round 84 (turn dock): the slot labels sit on the dock's chips.
+const sideLabels = () => [...document.querySelectorAll('.ps-dock-label')].map(label => label.textContent);
+const chip = (label: string) => screen.getByRole('button', { name: new RegExp(`^${label}\\b`) });
 
 describe('ReplayWorkspace', () => {
   test('a loaded singles replay shows the top bar, the battle frame, the timeline, the loader, the pickers, and the evaluation column', async () => {
@@ -69,7 +71,11 @@ describe('ReplayWorkspace', () => {
     // (it used to wait for a pick on each side).
     await waitFor(() => expect(screen.getByRole('button', { name: 'Execute Turn' })).toBeEnabled(), { timeout: 30_000 });
     expect(screen.getByText(/^Choices/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Advanced ▸' })).toBeInTheDocument();
+    // The dock is the last child of the replay column, and the Advanced toggle is gone.
+    expect(document.querySelector('.ps-main-left')!.lastElementChild).toHaveClass('ps-dock');
+    expect(screen.queryByRole('button', { name: /^Advanced/ })).toBeNull();
+    // Ruling C6 (integrator, 01.11.2026): the Raw Protocol Log toggle stays at every position, directly above the dock.
+    expect(screen.getByRole('button', { name: 'Show Raw Protocol Log' }).closest('.ps-dock-log')!.nextElementSibling).toHaveClass('ps-dock');
   }, 90_000);
 
   test('a variation opens the branch panels; its first executed turn swaps the frame to the branch simulation; a pending confirm shows its banner', async () => {
@@ -115,17 +121,23 @@ describe('ReplayWorkspace', () => {
       await waitFor(() => expect(app().engine.positionPicker?.source).toBe('stored'), { timeout: 60_000 });
       await waitFor(() => expect(app().engine.pickerSimState?.turnNumber).toBe(turn), { timeout: 30_000 });
     };
+    // Round 84 (turn dock): the toggle sits in the open slot's tray, and a new position closes the tray.
     const tera = () => screen.getAllByRole('button', { name: /^Tera \(/ })[0];
+    const openTray = async () => {
+      await userEvent.click(chip('P1'));
+      await screen.findAllByRole('button', { name: /^Tera \(/ }, { timeout: 10_000 });
+    };
     // Both positions rebuilt once: the way back reads them from the store, with no snapshot step in between.
     await exactAt(3);
     await exactAt(2);
-    await screen.findAllByRole('button', { name: /^Tera \(/ }, { timeout: 10_000 });
+    await openTray();
     await userEvent.click(tera());
     expect(tera()).toHaveAttribute('aria-pressed', 'true');
     // Turn 3 keeps the same two actives, both still able to terastallize, and comes from the store at once:
     // only the move to a new position can release the toggle.
     await exactAt(3);
-    await screen.findAllByRole('button', { name: /^Tera \(/ }, { timeout: 10_000 });
+    expect(document.querySelector('.ps-tray')).toBeNull();
+    await openTray();
     expect(sideLabels()).toEqual(['P1', 'P2']);
     expect(tera()).toHaveAttribute('aria-pressed', 'false');
   }, 90_000);
@@ -146,11 +158,14 @@ describe('ReplayWorkspace', () => {
     await waitFor(() => expect(published()).toBeNull());
   }, 90_000);
 
-  test('a doubles replay renders two slot columns per side', async () => {
+  test('a doubles replay renders two rows of two chips', async () => {
     const { app } = await mountLoaded('doubles');
     act(() => app().board.timeline.navigateTo({ turn: 2, line: 'main' }));
     await waitFor(() => expect(app().engine.pickerSimState).not.toBeNull(), { timeout: 30_000 });
     expect(sideLabels()).toEqual(['P1A', 'P1B', 'P2A', 'P2B']);
+    expect([...document.querySelectorAll('.ps-dock-row')].map(row => row.querySelectorAll('.ps-dock-chip').length)).toEqual([2, 2]);
+    // The fixture's turn 2 logs no action for some slot, so that chip starts empty and Execute waits for its pick (gate list 7).
+    expect(document.querySelector('.ps-dock-chip[data-empty="true"]')).not.toBeNull();
     expect(screen.getByRole('button', { name: 'Select all active choices' })).toBeDisabled();
   }, 90_000);
 });

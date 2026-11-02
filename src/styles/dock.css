@@ -110,26 +110,20 @@
   vertical-align: middle;
 }
 
-/* ── Execute ── */
-.ps-execute-btn {
+/* ── Execute (scoped: the turn 0 lead picker has its own .ps-execute-btn in pickers.css) ── */
+.ps-dock .ps-execute-btn {
   align-self: stretch;
+  width: auto;
   min-width: 110px;
   max-width: 150px;
+  margin-top: 0;
   padding: 0 18px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 6px;
   background: #555555;
-  color: #ffffff;
-  font-family: inherit;
   font-size: 14px;
-  font-weight: bold;
   line-height: 1.2;
-  cursor: pointer;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 3px 8px rgba(0, 0, 0, 0.16);
 }
-.ps-execute-btn-ready { background: linear-gradient(180deg, #d95565 0%, #aa3344 100%); border-color: #993344; }
-.ps-execute-btn:hover:not(:disabled) { filter: brightness(1.1); }
-.ps-execute-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.ps-dock .ps-execute-btn-ready { background: linear-gradient(180deg, #d95565 0%, #aa3344 100%); border-color: #993344; }
+.ps-dock .ps-execute-btn:hover:not(:disabled) { transform: none; filter: brightness(1.1); }
 
 /* ── The tray ── */
 .ps-tray {
@@ -307,32 +301,19 @@
 .ps-target-btn-selected .ps-target-hp,
 .ps-target-btn-selected .ps-target-meta { color: #ffffff; }
 
-/* ── The bench ── */
+/* ── The bench (scoped: the lead picker shares the base .ps-switchbtn rules of pickers.css) ── */
 .ps-switch-row { display: flex; flex-wrap: wrap; gap: 6px; }
-.ps-switchbtn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px 4px 5px;
-  border: 1px solid rgba(183, 216, 255, 0.18);
-  border-radius: 6px;
-  background: var(--ps-switch-bg);
-  color: var(--ps-switch-text);
-  font-family: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: filter 0.15s;
-}
-.ps-switchbtn:hover:not(:disabled) { filter: brightness(1.12); }
-.ps-switchbtn:disabled { opacity: 0.3; cursor: not-allowed; }
-.ps-switchbtn-selected {
+.ps-dock .ps-switchbtn { padding: 4px 10px 4px 5px; border-color: rgba(183, 216, 255, 0.18); }
+.ps-dock .ps-switchbtn-selected {
   background: linear-gradient(180deg, #75a8d5 0%, #567fa7 100%);
   border-color: rgba(220, 238, 255, 0.75);
+  outline: none;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 0 0 1px rgba(124, 183, 232, 0.5);
 }
-.ps-switchbtn img { width: 32px; height: 32px; image-rendering: pixelated; object-fit: contain; }
 .ps-switch-text { display: grid; gap: 2px; min-width: 70px; }
-.ps-switchbtn-name { font-size: 11px; font-weight: bold; }
-.ps-switchbtn-hp { color: var(--ps-switch-sub); font-size: 9px; }
-.ps-switchbtn-selected .ps-switchbtn-hp { color: #ffffff; }
+.ps-dock .ps-switchbtn-hp { margin-left: 4px; }
+.ps-dock .ps-switchbtn-selected .ps-switchbtn-hp { color: #ffffff; }
 .ps-switch-hp-track { display: block; width: 60px; height: 4px; margin-top: 0; }
+
+/* The Raw Protocol Log toggle sits directly above the dock; its margin pushes both to the foot of a short column. */
+.ps-dock-log { margin-top: auto; }
