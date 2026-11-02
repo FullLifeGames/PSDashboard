@@ -89,3 +89,18 @@ describe('the dock at 640 px and below', () => {
     expect(rule(block ?? '', '.ps-tray') ?? '').toMatch(/width:\s*100%/);
   });
 });
+
+describe('the tray\'s tiles at 640 px and below', () => {
+  const block = media(640);
+
+  test('the move tiles stand two per row, so a name like "Rock Slide" is not cut at 390 px', () => {
+    // Round 84 (turn dock, A6c): at 390 px a row of four tiles left about 80 px a tile; two per row leave about 170.
+    const grid = rule(block ?? '', '.ps-tile-grid');
+    expect(grid, 'a .ps-tile-grid rule in the 640 px block').not.toBeNull();
+    expect(grid).toMatch(/grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
+  });
+
+  test('wide windows keep four tiles per row', () => {
+    expect(css).toMatch(/\.ps-tile-grid\s*\{[^}]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/);
+  });
+});

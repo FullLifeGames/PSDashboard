@@ -388,4 +388,6 @@
   .ps-dock-chip { min-height: 40px; }
   .ps-dock .ps-execute-btn { min-height: 40px; }
   .ps-tray { width: 100%; }
+  /* Round 84 (A6c): four tiles a row left about 80 px at 390 px and cut "Rock Slide"; two a row leave about 170. */
+  .ps-tile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
