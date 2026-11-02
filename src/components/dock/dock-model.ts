@@ -47,6 +47,8 @@ export interface DockSlotModel {
   pickText: string;
   /** The text of an empty chip. */
   placeholder: string;
+  /** What the engine does about this empty chip: the placeholder's style reads it (a shimmer while the run is pending). */
+  wait: EngineWait | null;
   origin: ChipOrigin | null;
   /** The HP of the one living foe, for a move that names no target. */
   foeHp: number | undefined;
@@ -81,6 +83,14 @@ export interface DockModelArgs {
 function engineWait(fill: DockFillView | null | undefined): EngineWait | null {
   if (fill?.pending) return 'pending';
   return fill?.busy ? 'busy' : null;
+}
+
+/** What an empty chip says, and the engine's state as the placeholder's style shows it (only a chip that waits for the engine has one). */
+function emptyChip(
+  pending: BranchSlotChoice | null, facts: Omit<Parameters<typeof chipPlaceholder>[0], 'engine'>, fill: DockFillView | null | undefined,
+): { placeholder: string; wait: EngineWait | null } {
+  const engine = engineWait(fill);
+  return { placeholder: chipPlaceholder({ ...facts, engine }), wait: pending || facts.forceSwitch || facts.nobodyLeft ? null : engine };
 }
 
 const isLiving = (info: SimPokemonInfo | null | undefined): info is SimPokemonInfo => !!info && !info.fainted && info.hp > 0;
@@ -147,7 +157,7 @@ function slotModel(side: Side, slot: number, view: SideView, args: DockModelArgs
     ...damageOf(view.damage, slot),
     played: pick,
     pickText: chipPickText(pending, moves),
-    placeholder: chipPlaceholder({ forceSwitch, nobodyLeft, played: pick, hasRecord: !!played, engine: engineWait(fill) }),
+    ...emptyChip(pending, { forceSwitch, nobodyLeft, played: pick, hasRecord: !!played }, fill),
     origin: chipOrigin(pending, seed?.[side]?.[slot]?.choice, fill?.engine[side][slot] === true),
     foeHp: view.foeHp,
   };

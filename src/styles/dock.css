@@ -101,6 +101,24 @@
   white-space: nowrap;
 }
 .ps-dock-chip[data-empty="true"] .ps-dock-pick { color: var(--ps-tile-sub); font-style: italic; font-weight: normal; }
+/* Round 84, A6a: the placeholder of a slot the engine has not filled. The pick line keeps its 16 px box; only a bar shows in it, and the
+   text inside it clips as always, so the chip's size never depends on what lands. */
+.ps-dock-pick[data-wait="busy"] {
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.05);
+}
+.ps-dock-pick[data-wait="pending"] {
+  border-radius: 3px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.14) 50%, rgba(255, 255, 255, 0.05) 100%) 0 0 / 200% 100%;
+  animation: ps-dock-shimmer 1.4s linear infinite;
+}
+@keyframes ps-dock-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ps-dock-pick[data-wait="pending"] { animation: none; }
+}
 .ps-dock-origin {
   display: inline-block;
   padding: 0 6px;

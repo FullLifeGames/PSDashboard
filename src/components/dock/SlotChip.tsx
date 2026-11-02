@@ -29,7 +29,7 @@ export function SlotChip({ slot, open, onToggle }: { slot: DockSlotModel; open: 
       {' '}
       <span className="ps-dock-mon">{slot.name} · {slot.hpPercent}%</span>
       {' '}
-      <span className="ps-dock-pick">
+      <span className="ps-dock-pick" data-wait={!pending ? slot.wait ?? undefined : undefined}>
         {pending ? slot.pickText : slot.placeholder}
         {origin && ' '}
         {origin && <span className="ps-dock-origin">{origin}</span>}

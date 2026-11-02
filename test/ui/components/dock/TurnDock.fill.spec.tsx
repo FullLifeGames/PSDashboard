@@ -50,6 +50,20 @@ describe.each(['singles', 'doubles'] as const)('TurnDock fill, %s', (kind) => {
     expect(document.querySelectorAll('.ps-dock-chip')).toHaveLength(labels.length);
   });
 
+  test('the placeholder is marked for the style: pending while the run goes, busy during the game analysis, nothing otherwise', () => {
+    const wait = () => [...document.querySelectorAll('.ps-dock-chip .ps-dock-pick')].map(pick => pick.getAttribute('data-wait'));
+    const { unmount } = render(<TurnDock {...({ simState: simState(kind), executeError: null, executing: false, gen: 9, onSetChoice: vi.fn(), onHypotheticalMove: vi.fn(), onExecuteTurn: vi.fn(), fill: fillOf({ pending: true }) } as Props)} />);
+    expect(wait()).toEqual(labels.map(() => 'pending'));
+    unmount();
+    render(<TurnDock {...({ simState: simState(kind), executeError: null, executing: false, gen: 9, onSetChoice: vi.fn(), onHypotheticalMove: vi.fn(), onExecuteTurn: vi.fn(), fill: fillOf({ busy: true }) } as Props)} />);
+    expect(wait()).toEqual(labels.map(() => 'busy'));
+  });
+
+  test('a chip that holds a choice, or whose fill found nothing, carries no mark', () => {
+    renderDock(kind, fillOf());
+    expect([...document.querySelectorAll('.ps-dock-pick')].every(pick => !pick.hasAttribute('data-wait'))).toBe(true);
+  });
+
   test('during the game analysis the empty chips say the engine is busy, and Execute stays locked', () => {
     renderDock(kind, fillOf({ busy: true }));
     for (const label of labels) expect(chip(label)).toHaveTextContent('engine busy with the game analysis');
