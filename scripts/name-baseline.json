@@ -41,8 +41,7 @@
       "noability"
     ],
     "packages/eval-engine/src/calc/move.ts": [
-      "hiddenpower",
-      "lastrespects"
+      "hiddenpower"
     ],
     "packages/eval-engine/src/calc/tera-click.ts": [
       "noability",
@@ -200,7 +199,6 @@
       "wonderroom"
     ],
     "packages/eval-engine/src/pair/log.ts": [
-      "attract",
       "confusion"
     ],
     "packages/eval-engine/src/pair/pattern.ts": [

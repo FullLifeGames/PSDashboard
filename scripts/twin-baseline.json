@@ -1,9 +1,5 @@
 {
   "groups": {
-    "a,b,c": [
-      "packages/eval-engine/src/turn-analysis/odds-stopped.ts",
-      "src/components/LeadPanel.tsx"
-    ],
     "accuracy,atk,def,evasion,spa,spd,spe": [
       "packages/eval-engine/src/branch/corrections.ts",
       "packages/eval-engine/src/search/hints.ts"
