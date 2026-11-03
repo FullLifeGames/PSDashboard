@@ -5,6 +5,7 @@
  */
 
 import { EMBED_SCRIPT_ORDER_SCRIPT, fontAwesomeOverrideStyle, POINTER_SOURCE_SHIM_SCRIPT } from './replay-compat';
+import { PHONE_FIT_SCRIPT, PHONE_STYLES } from './replay-phone';
 
 const REPLAY_STYLES = `<style>
 html,body {font-family:Verdana, sans-serif;font-size:10pt;margin:0;padding:0;}
@@ -277,6 +278,8 @@ export function generateReplayHtml(opts: {
 <base href="https://play.pokemonshowdown.com/fx/">
 <title>${displayTitle}</title>
 ${REPLAY_STYLES}
+${PHONE_STYLES}
+${PHONE_FIT_SCRIPT}
 ${SILENT_AUDIO_SCRIPT}
 ${POINTER_SOURCE_SHIM_SCRIPT}
 <div class="wrapper replay-wrapper">

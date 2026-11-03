@@ -250,13 +250,5 @@
     min-height: 40px;
     min-width: 40px;
   }
-  /* The Showdown embed keeps its desktop layout; a scrollable container with
-     a minimum width keeps the battle log reachable on phones (B9b). */
-  .ps-iframe-wrap {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-  .ps-iframe-wrap iframe {
-    min-width: 640px;
-  }
+  /* Round 84 (A7c, ruling 10a): the replay document fits itself to the frame's width (replay-phone.ts): no minimum width, no sideways scroll. */
 }

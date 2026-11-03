@@ -24,7 +24,8 @@ describe('PSReplayFrame', () => {
     rerender(<PSReplayFrame log={LOG} title="Battle" height={480} />);
     const frame = screen.getByTitle('Battle');
     expect(frame).toHaveAttribute('src', 'blob:test/1');
-    expect(frame).toHaveStyle({ height: '480px' });
+    // Round 84 (A7c): the document may set --ps-frame-h in phone mode; without it the frame keeps its own height.
+    expect(frame.style.height).toBe('var(--ps-frame-h, 480px)');
     expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
   });
 

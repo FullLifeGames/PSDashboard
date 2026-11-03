@@ -1,7 +1,8 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   extendsLines, frameLines, useLiveAppend, useReplayBlobUrl, useSeekRequests, useSeekTurn, useTurnReports, type SeekRequest,
 } from '../hooks/useReplayFrame';
+import { followContentHeight } from '../lib/replay-frame-height';
 
 interface Props {
   log: string;
@@ -130,6 +131,9 @@ function PSReplayFrameDocument({
   seekRequest = null,
 }: DocumentProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  // Round 84 (A7c, ruling 10a): a phone frame's height follows its document; each load of the frame starts a new follower.
+  const followRef = useRef<(() => void) | null>(null);
+  useEffect(() => () => followRef.current?.(), []);
   const reportTurn = !!onTurnChange;
   const [documentLog] = useState(initialDocumentLog);
   const [initialSeek] = useState(() => ({ seekTurn: documentSeekTurn, autoPlay }));
@@ -155,6 +159,8 @@ function PSReplayFrameDocument({
       ref={iframeRef}
       src={blobUrl}
       onLoad={() => {
+        followRef.current?.();
+        followRef.current = iframeRef.current ? followContentHeight(iframeRef.current) : null;
         if (frameSeekTurn == null) return;
         iframeRef.current?.contentWindow?.postMessage({
           type: 'ps-seek-turn',
@@ -164,7 +170,8 @@ function PSReplayFrameDocument({
       }}
       style={{
         width: '100%',
-        height,
+        // The document sets --ps-frame-h in phone mode (replay-frame-height.ts); the desktop layout keeps `height`.
+        height: `var(--ps-frame-h, ${height}px)`,
         border: 'none',
         borderRadius: 5,
         background: '#344b6c',

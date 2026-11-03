@@ -120,3 +120,11 @@ describe('the top bar at 640 px and below', () => {
     expect(rule(phone, '.ps-topbar .ps-support-name')).toMatch(/display:\s*none/);
   });
 });
+
+describe('the replay frame at 640 px and below', () => {
+  // Round 84 (A7c, ruling 10a): the document shrinks its scene to the frame's width; the frame keeps no 640 px minimum and no sideways scroll.
+  test('the frame has no minimum width and its wrapper no horizontal scroll', () => {
+    expect(media(layout, 640)).not.toMatch(/min-width:\s*640px/);
+    expect(media(layout, 640)).not.toMatch(/\.ps-iframe-wrap\s*\{[^}]*overflow-x:\s*auto/);
+  });
+});
