@@ -138,11 +138,15 @@ test('the Size setting overrides Auto, persists across a reload, and disables a 
   await expect(size).toHaveValue('2');
 
   // A narrower window disables the steps that would leave under 1050 px (1600 / 1.75 = 914) and holds the chosen 200 % back to 150 %.
+  // The options are read through their `disabled` property: toBeDisabled() and toBeEnabled() retarget an element inside a <label> to the
+  // label's control (Playwright's `retarget` with `follow-label`), so on an option of this select they read the select, which is never
+  // disabled (the A7d run: "Received: enabled" for an option whose attribute and label were right; the ui spec of the menu follows the
+  // same resize). The label text is read as it is.
   await page.setViewportSize({ width: 1600, height: 1000 });
-  await expect(size.locator('option', { hasText: /^175 %/ })).toBeDisabled();
-  await expect(size.locator('option', { hasText: /^200 %/ })).toBeDisabled();
+  await expect(size.locator('option', { hasText: /^175 %/ })).toHaveJSProperty('disabled', true);
+  await expect(size.locator('option', { hasText: /^200 %/ })).toHaveJSProperty('disabled', true);
   await expect(size.locator('option', { hasText: /^175 %/ })).toHaveText('175 % (needs a window at least 1838 px wide)');
-  await expect(size.locator('option', { hasText: /^150 %/ })).toBeEnabled();
+  await expect(size.locator('option', { hasText: /^150 %/ })).toHaveJSProperty('disabled', false);
   await expect.poll(() => rootScale(page)).toBe('1.5');
 
   // Auto takes the choice back: this window gives 100 %.

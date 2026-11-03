@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SetupMenu } from '../../../src/components/SetupMenu';
 import { UI_SCALE_STORAGE_KEY } from '../../../src/lib/ui-scale-setting';
@@ -80,5 +80,28 @@ describe('the Size select', () => {
     windowOf(2000, 1000);
     window.dispatchEvent(new Event('resize'));
     expect((await screen.findByRole('option', { name: '175 %' }) as HTMLOptionElement).disabled).toBe(false);
+  });
+
+  test('the window shrinking disables the steps it can no longer hold, relabels them, and holds a chosen 200 % back to 150 %', async () => {
+    localStorage.setItem(UI_SCALE_STORAGE_KEY, '2');
+    stop = startUiScale();
+    const select = await openMenu();
+    const option = (name: RegExp) => within(select).getByRole('option', { name }) as HTMLOptionElement;
+    expect(option(/^175 %/).disabled).toBe(false);
+    expect(option(/^200 %/).disabled).toBe(false);
+    expect(getUiScaleState()).toMatchObject({ setting: 2, scale: 2 });
+    windowOf(1600, 1000);
+    act(() => { window.dispatchEvent(new Event('resize')); });
+    expect(option(/^175 %/).disabled).toBe(true);
+    expect(option(/^200 %/).disabled).toBe(true);
+    expect(option(/^175 %/).textContent).toBe('175 % (needs a window at least 1838 px wide)');
+    expect(option(/^150 %/).disabled).toBe(false);
+    expect(getUiScaleState()).toMatchObject({ setting: 2, scale: 1.5, width: 1600 });
+    expect(document.documentElement.style.getPropertyValue('--ps-scale')).toBe('1.5');
+    // The choice stays stored: the window growing back gives the 200 % again.
+    windowOf(2560, 1290);
+    act(() => { window.dispatchEvent(new Event('resize')); });
+    expect(option(/^200 %/).disabled).toBe(false);
+    expect(document.documentElement.style.getPropertyValue('--ps-scale')).toBe('2');
   });
 });
