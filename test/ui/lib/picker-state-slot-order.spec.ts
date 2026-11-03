@@ -50,4 +50,24 @@ describe('snapshot picker, doubles slots', () => {
     // The check means something only where the party order and the field order differ.
     expect(reordered, 'a snapshot whose team order differs from its field order').toBeGreaterThan(0);
   }, 120_000);
+
+  /**
+   * Round 84 (final gate, answer 2a): the scene of T271. In Doubles OU 2663093831 the snapshot picker listed P2's actives in
+   * party order while the exact position loaded: P2A and P2B swapped at turns 5 and 12. At turn 15 slot A of both sides fainted
+   * with nobody left to come in; the picker keeps two slots a side and leaves slot A empty.
+   */
+  test('Doubles OU 2663093831: the slots of turns 5, 12 and 15 as the protocol has them', async () => {
+    const replay = JSON.parse(readFileSync('test/e2e-feedback/fixtures/gen9doublesou-2663093831.json', 'utf-8')) as { log: string };
+    await loadSimMods('gen9doublesou');
+    const snapshots: TurnSnapshot[] = parseReplayLog(replay.log);
+    const { p1Team, p2Team } = buildTeamsFromReplay(replay.log);
+    const slots = (turn: number) => {
+      const snapshot = snapshots.find(entry => entry.turn === turn)!;
+      const state = pickerStateFromSnapshot(snapshot, p1Team, p2Team, 9, null, { format: 'gen9doublesou' });
+      return { p1: state.p1ActiveSlots.map(mon => mon?.name ?? null), p2: state.p2ActiveSlots.map(mon => mon?.name ?? null) };
+    };
+    expect(slots(5).p2).toEqual(['the aids missle', 'kanye']);
+    expect(slots(12).p2).toEqual(['inflatabully', 'tea pot']);
+    expect(slots(15)).toEqual({ p1: [null, 'Chien-Pao'], p2: [null, 'dog'] });
+  }, 120_000);
 });
