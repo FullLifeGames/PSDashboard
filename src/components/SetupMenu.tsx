@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { SizeSelect } from './SizeSelect';
 
 interface SetupMenuProps {
   animateBranchTurns: boolean;
@@ -10,7 +11,8 @@ interface SetupMenuProps {
 /**
  * Round 77 (user request 28.10.2026): the top bar keeps one row. The animate toggle and the three team
  * actions open from one button; a pick closes the menu, the toggle keeps it open, and so do Escape and
- * a click outside it.
+ * a click outside it. Round 84 (T315): the Size select of the app's scale stands under the animate toggle and keeps the menu
+ * open like it.
  */
 export function SetupMenu({ animateBranchTurns, onAnimateChange, onEditSide, onOpenSets }: SetupMenuProps) {
   const [open, setOpen] = useState(false);
@@ -52,6 +54,7 @@ export function SetupMenu({ animateBranchTurns, onAnimateChange, onEditSide, onO
             <input type="checkbox" checked={animateBranchTurns} onChange={event => onAnimateChange(event.target.checked)} />
             Animate branch turns
           </label>
+          <SizeSelect />
           <button type="button" className="ps-btn" onClick={pick(() => onEditSide('p1'))}>Edit Player</button>
           <button type="button" className="ps-btn" onClick={pick(() => onEditSide('p2'))}>Edit Opp</button>
           <button type="button" className="ps-btn" onClick={pick(onOpenSets)}>Import/Export Sets</button>

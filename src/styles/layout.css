@@ -5,7 +5,7 @@
   max-width: 1400px;
   margin: 0 auto;
   padding: 0 10px 16px;
-  height: 100vh;
+  height: calc(100 * var(--ps-vh));
   display: flex;
   flex-direction: column;
 }
@@ -138,6 +138,24 @@
   font-size: 11px;
   color: #aabbcc;
 }
+/* Round 84 (T315, A7d): the Size select of the app's scale. */
+.ps-setup-size {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: #aabbcc;
+}
+.ps-setup-size-select {
+  font: inherit;
+  max-width: 230px;
+  padding: 2px 4px;
+  color: var(--ps-text);
+  background: var(--ps-bg-deep);
+  border: 1px solid var(--ps-border-strong);
+  border-radius: 4px;
+}
 
 /* The winner of an ended variation, where the pickers were. */
 .ps-branch-ended {
@@ -186,7 +204,7 @@
 @media (max-width: 1050px) {
   .ps-app-root {
     height: auto;
-    min-height: 100vh;
+    min-height: calc(100 * var(--ps-vh));
     padding: 0 7px 16px;
   }
   .ps-main-layout {

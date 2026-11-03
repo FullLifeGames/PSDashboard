@@ -24,7 +24,7 @@ export function ModalDialog({ title, closeLabel, onClose, children }: {
         tabIndex={-1}
         style={{
           background: '#2a3a5c', border: '2px solid #8aa', borderRadius: 8,
-          padding: 20, maxWidth: 640, width: '100%', maxHeight: '80vh', overflowY: 'auto', outline: 'none',
+          padding: 20, maxWidth: 640, width: '100%', maxHeight: 'calc(80 * var(--ps-vh))', overflowY: 'auto', outline: 'none',
         }}
         role="dialog"
         aria-modal="true"

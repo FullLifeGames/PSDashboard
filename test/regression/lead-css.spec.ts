@@ -39,7 +39,7 @@ describe('the lead picker styles', () => {
     const start = lead.indexOf('@media (max-width: 1050px) {');
     expect(start).toBeGreaterThanOrEqual(0);
     const block = lead.slice(start);
-    expect(block).toMatch(/\.ps-lead \.ps-dock-bar\s*\{[^}]*max-height:\s*60vh[^}]*overflow-y:\s*auto/);
+    expect(block).toMatch(/\.ps-lead \.ps-dock-bar\s*\{[^}]*max-height:\s*calc\(60 \* var\(--ps-vh\)\)[^}]*overflow-y:\s*auto/);
   });
 
   test('the sides stand in rows and take the full width of their column', () => {

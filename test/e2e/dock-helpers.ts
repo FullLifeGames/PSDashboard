@@ -251,3 +251,11 @@ export function failOnResizeLoops(spec: typeof import('@playwright/test').test):
     expect(resizeLoops.get(page) ?? [], 'ResizeObserver loop errors raised by the page').toEqual([]);
   });
 }
+
+/**
+ * Round 84 (T315, A7d): pins the app's size before `page.goto` (the Size setting's stored step, `ui-scale-setting.ts`). A spec whose
+ * window is large enough for Auto to grow the app (1750 x 1025 and up) and whose geometry belongs to the app's own 100 % pins 1.
+ */
+export async function pinUiScale(page: Page, step: number): Promise<void> {
+  await page.addInitScript(value => localStorage.setItem('ps-replay-interceptor:ui-scale', String(value)), step);
+}

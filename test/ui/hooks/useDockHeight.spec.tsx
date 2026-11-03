@@ -25,6 +25,7 @@ function stubObserver() {
 afterEach(() => {
   vi.unstubAllGlobals();
   root.style.removeProperty('--ps-dock-h');
+  root.style.removeProperty('--ps-scale');
 });
 
 /**
@@ -59,4 +60,18 @@ describe('useDockHeight', () => {
     unmount();
     expect(read()).toBe('');
   });
+
+  /**
+   * Round 84 (T315, A7d): under the root's zoom `getBoundingClientRect` reads visual pixels (150 for a 100 px box at 150 %, Chromium
+   * and WebKit), while the property feeds a CSS length inside the zoomed tree. The hook divides by the factor the root carries.
+   */
+  test.each([[1.5, 150, '100px'], [2, 301, '151px'], [1.25, 125, '100px'], [1, 120, '120px']])(
+    'at the root factor %f a box of %f visual px writes %s',
+    (factor, visual, expected) => {
+      stubObserver();
+      root.style.setProperty('--ps-scale', String(factor));
+      render(<Probe height={visual} />);
+      expect(read()).toBe(expected);
+    },
+  );
 });

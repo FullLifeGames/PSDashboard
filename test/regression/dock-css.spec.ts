@@ -56,8 +56,9 @@ describe('the dock at 1050 px and below', () => {
     expect(tray, 'a .ps-tray rule').not.toBeNull();
     expect(tray).toMatch(/position:\s*fixed/);
     expect(tray).toMatch(/bottom:\s*var\(--ps-dock-h/);
-    expect(tray).toMatch(/max-height:\s*70vh/);
-    expect(rule(block ?? '', '.ps-tray.ps-tray-roomy') ?? '').toMatch(/max-height:\s*70vh/);
+    // Round 84 (A7d): the vh units divide by the root's scale (`--ps-vh`).
+    expect(tray).toMatch(/max-height:\s*calc\(70 \* var\(--ps-vh\)\)/);
+    expect(rule(block ?? '', '.ps-tray.ps-tray-roomy') ?? '').toMatch(/max-height:\s*calc\(70 \* var\(--ps-vh\)\)/);
   });
 
   test('Execute takes its own row under the chips', () => {

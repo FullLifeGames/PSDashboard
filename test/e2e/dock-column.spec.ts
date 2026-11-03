@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { readFileSync } from 'fs';
 import { emptySmogon, routeSmogon } from './smogon-routes';
 import { fixturePath, installReplayEmbedCache, pickMove, routeOfflineFixtures, waitForExactPickers } from './helpers';
-import { failOnResizeLoops, lightEngine, loadDockReplay } from './dock-helpers';
+import { failOnResizeLoops, lightEngine, loadDockReplay, pinUiScale } from './dock-helpers';
 
 /**
  * Round 84 (turn dock), step A7a, ruling 4a: the dock follows the column's content directly. At 2560 x 1290 the column is shorter
@@ -18,6 +18,8 @@ test.use({ viewport: { width: 2560, height: 1290 } });
 
 test.beforeEach(async ({ page }) => {
   await lightEngine(page);
+  // Round 84 (T315): Auto would take 150 % at this window; the geometry here is the app's own 100 % (scale.spec holds the 150 % case).
+  await pinUiScale(page, 1);
   await routeOfflineFixtures(page);
 });
 

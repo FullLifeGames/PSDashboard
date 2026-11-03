@@ -38,5 +38,5 @@
 
 /* A fixed bar of two sides with six bodies each is tall on a phone: it keeps to 60 % of the window and scrolls inside. */
 @media (max-width: 1050px) {
-  .ps-lead .ps-dock-bar { max-height: 60vh; overflow-y: auto; }
+  .ps-lead .ps-dock-bar { max-height: calc(60 * var(--ps-vh)); overflow-y: auto; }
 }

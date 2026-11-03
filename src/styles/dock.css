@@ -176,7 +176,7 @@
   scrollbar-width: thin;
 }
 /* The dice are the one part that may grow the tray. */
-.ps-tray-roomy { max-height: min(560px, 70vh); }
+.ps-tray-roomy { max-height: min(560px, calc(70 * var(--ps-vh))); }
 .ps-tray-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .ps-tray-title { font-size: 12px; }
 .ps-tray-hp { color: var(--ps-switch-sub); font-size: 10px; }
@@ -389,9 +389,9 @@
   .ps-tray {
     position: fixed;
     bottom: var(--ps-dock-h, 168px);
-    max-height: 70vh;
+    max-height: calc(70 * var(--ps-vh));
   }
-  .ps-tray.ps-tray-roomy { max-height: 70vh; }
+  .ps-tray.ps-tray-roomy { max-height: calc(70 * var(--ps-vh)); }
   .ps-dock-bar { grid-template-columns: minmax(0, 1fr); border-bottom: 0; border-radius: 10px 10px 0 0; }
   .ps-dock .ps-execute-btn {
     width: 100%;
