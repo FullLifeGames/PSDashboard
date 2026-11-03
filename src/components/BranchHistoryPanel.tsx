@@ -1,10 +1,21 @@
-import { useId, useState } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import type { TurnSnapshot } from '@fulllifegames/replay-core';
 import type { BranchHistoryEntry } from '../hooks/useBranch';
 import { notationSideLabel } from '@fulllifegames/eval-engine';
 import type { TimelinePosition } from '../lib/timeline';
 import { activeSummary, alignHistoryRows, branchSummary, type SideSummary } from '../lib/branch-history';
 import { markText, turnDiceMarks, type DiceMarks } from '../lib/branch-dice-marks';
+
+/**
+ * Round 84 (A7i, ruling 20a): what the caller hands the panel. `actions` stand at the right end of the toggle line, `status` under
+ * the line (it learns whether the body is open), `saved` in the body under the moves; `onOpenChange` hears each toggle.
+ */
+export interface BranchHistorySlots {
+  actions: ReactNode;
+  status: (open: boolean) => ReactNode;
+  saved: ReactNode;
+  onOpenChange?: (open: boolean) => void;
+}
 
 interface Props {
   branchStartTurn: number;
@@ -16,6 +27,7 @@ interface Props {
   onNavigate?: (position: TimelinePosition) => void;
   /** The live sim has a winner: the tip is an end, not a place to play on (round 77, C7). */
   ended?: boolean;
+  slots?: BranchHistorySlots;
 }
 
 const cellReset = {
@@ -195,19 +207,27 @@ function HistoryList({ branchStartTurn, history, snapshots, currentPosition, onN
  * longer pushes the left column under the sticky dock. The caller keys it by the variation's start turn: it starts closed in every
  * variation, keeps the user's setting while that variation lives, and the app stores nothing.
  */
-export function BranchHistoryPanel({ ended = false, ...props }: Props) {
+export function BranchHistoryPanel({ ended = false, slots, ...props }: Props) {
   const [open, setOpen] = useState(false);
   const bodyId = useId();
   const { history, onNavigate } = props;
   const turnEntries = history.filter(entry => entry.kind !== 'forced').length;
+  const toggle = () => {
+    setOpen(!open);
+    slots?.onOpenChange?.(!open);
+  };
   return (
     <div className="ps-panel" style={{ marginTop: 8, flex: '0 0 auto' }}>
-      <button
-        type="button" className="ps-eval-analysis-toggle ps-history-toggle" aria-expanded={open} aria-controls={bodyId}
-        onClick={() => setOpen(!open)}
-      >
-        {open ? '▾' : '▸'} Variation moves{turnEntries > 0 && ` · ${turnEntries} ${turnEntries === 1 ? 'turn' : 'turns'}`}
-      </button>
+      <div className="ps-history-line">
+        <button
+          type="button" className="ps-eval-analysis-toggle ps-history-toggle" aria-expanded={open} aria-controls={bodyId}
+          onClick={toggle}
+        >
+          {open ? '▾' : '▸'} Variation moves{turnEntries > 0 && ` · ${turnEntries} ${turnEntries === 1 ? 'turn' : 'turns'}`}
+        </button>
+        {slots && <span className="ps-history-actions">{slots.actions}</span>}
+      </div>
+      {slots?.status(open)}
       <div id={bodyId} hidden={!open}>
         {onNavigate && history.length > 0 && (
           <div style={{ fontSize: 10, color: '#8899aa', margin: '6px 0 8px' }}>
@@ -220,6 +240,7 @@ export function BranchHistoryPanel({ ended = false, ...props }: Props) {
           </div>
         )}
         <HistoryList {...props} ended={ended} />
+        {slots?.saved}
       </div>
     </div>
   );

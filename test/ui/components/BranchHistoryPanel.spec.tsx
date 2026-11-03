@@ -209,3 +209,46 @@ describe('the dice of a turn in its row', () => {
     expect(screen.queryByText(/no effect/)).toBeNull();
   });
 });
+
+/** Round 84 (A7i, ruling 20a): the caller hands in the buttons for the toggle line, a line under it, and the saved rows for the body. */
+describe('the slots of the toggle line', () => {
+  const slots = (onOpenChange = vi.fn()) => ({
+    actions: <><button type="button">Save here</button><button type="button">Share here</button></>,
+    status: (open: boolean) => <div>{open ? 'status open' : 'status closed'}</div>,
+    saved: <div>saved rows</div>,
+    onOpenChange,
+  });
+
+  test('the actions stand at the right end of the toggle line, outside the toggle button', () => {
+    render(<BranchHistoryPanel branchStartTurn={2} history={[entry(2)]} snapshots={snapshots} slots={slots()} />);
+    const line = toggle().parentElement!;
+    for (const name of ['Save here', 'Share here']) {
+      const button = screen.getByRole('button', { name });
+      expect(line).toContainElement(button);
+      expect(toggle()).not.toContainElement(button);
+      expect(button).toBeVisible();
+    }
+    expect(toggle().nextElementSibling).toContainElement(screen.getByRole('button', { name: 'Save here' }));
+    expect(toggle()).toHaveAccessibleName('▸ Variation moves · 1 turn');
+  });
+
+  test('the status line shows under the toggle line, closed or open', () => {
+    render(<BranchHistoryPanel branchStartTurn={2} history={[entry(2)]} snapshots={snapshots} slots={slots()} />);
+    expect(screen.getByText('status closed')).toBeVisible();
+    expect(toggle().parentElement!.nextElementSibling).toHaveTextContent('status closed');
+    fireEvent.click(toggle());
+    expect(screen.getByText('status open')).toBeVisible();
+  });
+
+  test('the saved rows live in the body: hidden while closed, shown when open, and the callback hears each toggle', () => {
+    const onOpenChange = vi.fn();
+    render(<BranchHistoryPanel branchStartTurn={2} history={[entry(2)]} snapshots={snapshots} slots={slots(onOpenChange)} />);
+    const body = document.getElementById(toggle().getAttribute('aria-controls')!)!;
+    expect(body).toContainElement(screen.getByText('saved rows'));
+    expect(screen.getByText('saved rows')).not.toBeVisible();
+    fireEvent.click(toggle());
+    expect(screen.getByText('saved rows')).toBeVisible();
+    fireEvent.click(toggle());
+    expect(onOpenChange.mock.calls).toEqual([[true], [false]]);
+  });
+});

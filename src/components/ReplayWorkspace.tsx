@@ -2,7 +2,7 @@ import { PSReplayFrame } from './PSReplayFrame';
 import { DockRegion } from './dock/DockRegion';
 import { LeadPanel } from './LeadPanel';
 import { BranchHistoryPanel } from './BranchHistoryPanel';
-import { BranchSaveSharePanel } from './BranchSaveSharePanel';
+import { useBranchSaveShare } from './useBranchSaveShare';
 import { AppTopBar } from './AppTopBar';
 import { TimelineBar } from './TimelineBar';
 import { ConfirmBanner } from './ConfirmBanner';
@@ -149,24 +149,19 @@ function BranchSidePanels({ app, replayData }: WorkspaceProps) {
   const { viewTurn, viewingVariation, variationSpan, navigateTo } = app.board.timeline;
   const { history } = app.ctx.branch;
   const { snapshots } = app.ctx.replay;
+  const branchStartTurn = variationSpan?.startTurn ?? viewTurn;
+  const slots = useBranchSaveShare({ replayData, branchTurn: branchStartTurn, history, finalLog: app.analysis.simLog });
   return (
-    <>
-      <BranchHistoryPanel
-        key={variationSpan?.startTurn ?? viewTurn}
-        branchStartTurn={variationSpan?.startTurn ?? viewTurn}
-        history={history}
-        snapshots={snapshots}
-        currentPosition={{ turn: viewTurn, line: viewingVariation ? 'variation' : 'main' }}
-        onNavigate={navigateTo}
-        ended={app.ctx.branch.simState?.ended ?? false}
-      />
-      <BranchSaveSharePanel
-        replayData={replayData}
-        branchTurn={variationSpan?.startTurn ?? viewTurn}
-        history={history}
-        finalLog={app.analysis.simLog}
-      />
-    </>
+    <BranchHistoryPanel
+      key={branchStartTurn}
+      branchStartTurn={branchStartTurn}
+      history={history}
+      snapshots={snapshots}
+      currentPosition={{ turn: viewTurn, line: viewingVariation ? 'variation' : 'main' }}
+      onNavigate={navigateTo}
+      ended={app.ctx.branch.simState?.ended ?? false}
+      slots={slots}
+    />
   );
 }
 

@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { readFileSync } from 'fs';
 import { emptySmogon, routeSmogon } from './smogon-routes';
 import { fixturePath, installReplayEmbedCache, pickMove, routeOfflineFixtures, waitForExactPickers } from './helpers';
-import { failOnResizeLoops, lightEngine, loadDockReplay, openVariationHistory, pinUiScale, variationPanel } from './dock-helpers';
+import { TASK_VIEWPORT, failOnResizeLoops, lightEngine, loadDockReplay, openVariationHistory, pinUiScale, variationPanel } from './dock-helpers';
 
 /**
  * Round 84 (turn dock), step A7a, ruling 4a: the dock follows the column's content directly. At 2560 x 1290 the column is shorter
@@ -89,4 +89,41 @@ test('a variation\'s forced replacement with the history panel closed and open: 
   const strip = (await page.locator('.ps-dock-status').boundingBox())!;
   const history = (await page.locator('.ps-panel', { hasText: 'Variation moves' }).boundingBox())!;
   expect(strip.y, 'the status strip starts below the history panel').toBeGreaterThanOrEqual(history.y + history.height - 1);
+});
+
+/**
+ * Round 84 (A7i, ruling 20a): at 1366 x 768 the Save / Share panel slid under the sticky dock. Save Branch and Copy Share Link now
+ * stand on the toggle line, so both lie above the dock; Copy Share Link fills the link field while the history is closed.
+ */
+test('a variation at 1366 x 768: Save Branch and Copy Share Link stand above the dock, and the link shows with the history closed', async ({ page }) => {
+  test.setTimeout(240_000);
+  await page.setViewportSize(TASK_VIEWPORT);
+  const draftReplay = readFileSync(fixturePath('draft-replay.json'), 'utf-8');
+  await page.route('**/replay.pokemonshowdown.com/**', route => route.fulfill({ status: 200, contentType: 'application/json', body: draftReplay }));
+  await page.goto('/');
+  await routeSmogon(page, emptySmogon);
+  await page.locator('button', { hasText: 'Load' }).click();
+  await expect(page.locator('.ps-branch-bar input[type="range"]')).toBeVisible({ timeout: 30_000 });
+  await page.locator('.ps-branch-bar input[type="range"]').fill('1');
+  await expect(page.getByText('T1/')).toBeVisible();
+  await waitForExactPickers(page);
+  await pickMove(page, 'p1a', 'U-turn');
+  await pickMove(page, 'p2a', 'Chilly Reception');
+  await page.locator('.ps-execute-btn').click();
+  await expect(page.locator('.ps-force-switch-note').first()).toBeVisible({ timeout: 60_000 });
+
+  const toggle = variationPanel(page).getByRole('button', { name: /Variation moves/ });
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  const save = page.getByRole('button', { name: 'Save Branch' });
+  const share = page.getByRole('button', { name: 'Copy Share Link' });
+  await expect(save).toBeVisible();
+  await expect(share).toBeVisible();
+  const dock = (await page.locator('.ps-dock').boundingBox())!;
+  for (const button of [save, share]) {
+    const box = (await button.boundingBox())!;
+    expect(box.y + box.height, 'the button ends above the dock').toBeLessThanOrEqual(dock.y + 1);
+  }
+  await share.click();
+  await expect(page.locator('input[aria-label="Branch share link"]')).toHaveValue(/#branch=/);
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
 });

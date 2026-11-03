@@ -1,28 +1,8 @@
-import { useMemo, useState } from 'react';
-import type { BranchHistoryEntry } from '../hooks/useBranch';
-import {
-  deleteSavedBranch,
-  encodeBranchShare,
-  loadSavedBranches,
-  makeBranchSharePayload,
-  saveBranchPayload,
-  type BranchSharePayload,
-} from '../lib/branch-share';
-import type { ReplayData } from '@fulllifegames/replay-core';
+import type { BranchSharePayload } from '../lib/branch-share';
 
-interface Props {
-  replayData: ReplayData;
-  branchTurn: number;
-  history: BranchHistoryEntry[];
-  finalLog: string;
-}
+/** Round 84 (A7i): the parts of the save and share logic that draw something; `useBranchSaveShare` wires them to the history panel. */
 
-function shareUrl(encoded: string): string {
-  const base = `${window.location.origin}${window.location.pathname}`;
-  return `${base}#branch=${encoded}`;
-}
-
-function ShareLinkField({ link }: { link: string }) {
+export function ShareLinkField({ link }: { link: string }) {
   return (
     <input
       readOnly
@@ -88,82 +68,20 @@ function SavedBranchRow({ entry, onOpen, onRemove }: {
   );
 }
 
-/** The share link of the current branch and whether the clipboard took it. */
-function useShareLink(payload: BranchSharePayload) {
-  const [link, setLink] = useState('');
-  const [copied, setCopied] = useState(false);
-  const createLink = async () => {
-    const nextLink = shareUrl(encodeBranchShare(payload));
-    setLink(nextLink);
-    setCopied(false);
-    try {
-      await navigator.clipboard?.writeText(nextLink);
-      setCopied(true);
-    } catch {
-      setCopied(false);
-    }
-  };
-  return { link, copied, createLink };
-}
-
-export function BranchSaveSharePanel({ replayData, branchTurn, history, finalLog }: Props) {
-  const [saved, setSaved] = useState<BranchSharePayload[]>(() => loadSavedBranches(replayData.id));
-
-  const payload = useMemo(() => makeBranchSharePayload({
-    replay: replayData,
-    branchTurn,
-    history,
-    finalLog,
-  }), [replayData, branchTurn, history, finalLog]);
-  const { link, copied, createLink } = useShareLink(payload);
-
-  const saveBranch = () => {
-    setSaved(saveBranchPayload(payload));
-  };
-
-  // Opening a saved branch reuses the share-link flow: setting the hash
-  // triggers the app's hashchange handler and shows the read-only view (G16).
-  const openSaved = (entry: BranchSharePayload) => {
-    window.location.assign(`#branch=${encodeBranchShare(entry)}`);
-  };
-
-  const removeSaved = (entry: BranchSharePayload) => {
-    setSaved(deleteSavedBranch(entry));
-  };
-
+/** The saved branches of this replay, one row each, for the body of the history panel. */
+export function SavedList({ saved, onOpen, onRemove }: {
+  saved: BranchSharePayload[];
+  onOpen: (entry: BranchSharePayload) => void;
+  onRemove: (entry: BranchSharePayload) => void;
+}) {
+  if (saved.length === 0) return null;
   return (
-    <div className="ps-panel" style={{ marginTop: 8 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 'bold' }}>Save / Share Branch</div>
-          <div style={{ fontSize: 10, color: '#8899aa' }}>
-            Stores replay id, branch turn, choices, and final branch log.
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 4 }}>
-          <button type="button" className="ps-btn" onClick={saveBranch} style={{ padding: '3px 8px', fontSize: 10 }}>
-            Save Branch
-          </button>
-          <button type="button" className="ps-btn" onClick={createLink} style={{ padding: '3px 8px', fontSize: 10 }}>
-            Copy Share Link
-          </button>
-        </div>
-      </div>
-
-      {link && <ShareLinkField link={link} />}
-
-      {copied && (
-        <div style={{ marginTop: 4, fontSize: 10, color: '#8fd19e' }}>Copied to clipboard.</div>
-      )}
-
-      {saved.length > 0 && (
-        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 180, overflowY: 'auto' }}>
-          {saved.map((entry, index) => (
-            // The index joins the key: rows saved before the stamps were unique may share createdAt and branchTurn.
-            <SavedBranchRow key={`${entry.createdAt}-${entry.branchTurn}-${index}`} entry={entry} onOpen={openSaved} onRemove={removeSaved} />
-          ))}
-        </div>
-      )}
+    <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 180, overflowY: 'auto' }}>
+      <div style={{ fontSize: 10, color: '#8899aa' }}>Saved branches</div>
+      {saved.map((entry, index) => (
+        // The index joins the key: rows saved before the stamps were unique may share createdAt and branchTurn.
+        <SavedBranchRow key={`${entry.createdAt}-${entry.branchTurn}-${index}`} entry={entry} onOpen={onOpen} onRemove={onRemove} />
+      ))}
     </div>
   );
 }

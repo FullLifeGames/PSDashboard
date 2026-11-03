@@ -145,6 +145,23 @@ button.ps-eval-choice:hover,
   font-size: 13px;
   font-weight: bold;
 }
+/* Round 84 (A7i): the toggle and the Save / Share buttons share one line; at a phone width the buttons wrap below the toggle. */
+.ps-history-line {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  justify-content: space-between;
+}
+.ps-history-line > .ps-history-toggle {
+  align-self: center;
+  text-align: left;
+}
+.ps-history-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 4px;
+}
 .ps-eval-report {
   gap: 4px;
 }
