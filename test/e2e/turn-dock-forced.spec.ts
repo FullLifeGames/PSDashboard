@@ -109,7 +109,8 @@ test('one forced slot in doubles: its partner stands inert like the waiting side
   await page.goto('/');
   await loadDockReplay(page, 'gen9doubles-forced-test', 1);
   await pickMove(page, 'p1a', 'Memento');
-  await pickMove(page, 'p1b');
+  // Eevee's first tile is its own Memento; Protect keeps it on the field.
+  await pickMove(page, 'p1b', 'Protect');
   await pickMove(page, 'p2a');
   await pickMove(page, 'p2b');
   const execute = page.locator('.ps-execute-btn');

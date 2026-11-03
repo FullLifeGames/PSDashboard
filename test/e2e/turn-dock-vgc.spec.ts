@@ -2,7 +2,7 @@ import { test, expect, type Locator, type Page } from '@playwright/test';
 import { dockChip, dockReplays, dockTray, installReplayEmbedCache, routeOfflineFixtures } from './helpers';
 import {
   Clicks, DOUBLES_SLOTS, TASK_VIEWPORT, expectChipsShowLoggedTurn, expectDockLayout, expectEverySlotActed, expectExecutedLoggedTurn,
-  lightEngine, loadDockReplay, loggedTurn, variationPanel,
+  lightEngine, loadDockReplay, loggedTurn, openVariationHistory, variationPanel,
 } from './dock-helpers';
 
 /**
@@ -59,6 +59,7 @@ test.describe('Scarlet/Violet VGC, turn 3', () => {
     expect(clicks.count).toBe(3);
     await expect(variationPanel(page)).toContainText('Turn 3', { timeout: 90_000 });
     // Both sides terastallized in the executed turn: the user's P1A and the logged P2A.
+    await openVariationHistory(page);
     await expect(variationPanel(page).getByText(/\(Tera\)/).first()).toBeVisible();
     await expect(variationPanel(page)).toContainText(/Bleakwind Storm[^|]*\(Tera\)/);
   });

@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { routeSmogon, emptySmogon } from './smogon-routes';
 import { expectReplaySettled, fixturePath, installReplayEmbedCache, openTrayMore, pickMove, routeOfflineFixtures, waitForExactPickers } from './helpers';
+import { openVariationHistory } from './dock-helpers';
 
 /**
  * Round 82 (forced dice), criterion 5: the draft league replay DzBQ5azlO5l, turn 13. Noivern's Air Slash left Cobalion's flinch
@@ -42,6 +43,7 @@ test('Air Slash with the chip "Flinch": the branch frame shows Cobalion flinchin
   expect(mark).toBeGreaterThanOrEqual(0);
   expect(flinched).toBeGreaterThan(mark);
   expect(shown.filter(entry => entry.startsWith('Forced: Air Slash flinch'))).toHaveLength(1);
-  // the history row lists the die as well
+  // the history row lists the die as well (round 84, ruling 18a: the closed history opens first, a role query skips hidden rows)
+  await openVariationHistory(page);
   await expect(page.getByRole('group', { name: 'Forced dice' })).toContainText('P1 Air Slash: Flinch');
 });

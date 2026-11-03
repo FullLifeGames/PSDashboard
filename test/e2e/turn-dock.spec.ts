@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { dockChip, dockReplays, dockTray, fixtureReplay, installReplayEmbedCache, routeOfflineFixtures, waitForExactPickers } from './helpers';
 import {
   Clicks, DOUBLES_SLOTS, TASK_VIEWPORT, branchFrameEntries, expectChipsShowLoggedTurn, expectDockLayout, expectEverySlotActed,
-  expectExecutedLoggedTurn, lightEngine, loadDockReplay, loggedTurn, variationPanel,
+  expectExecutedLoggedTurn, lightEngine, loadDockReplay, loggedTurn, openVariationHistory, variationPanel,
 } from './dock-helpers';
 
 /**
@@ -69,6 +69,7 @@ test.describe('Doubles OU, turn 5, no variation standing', () => {
     await clicks.click(execute(page));
     expect(clicks.count).toBe(4);
     await expect(variationPanel(page)).toContainText(`Turn ${TURN}`, { timeout: 90_000 });
+    await openVariationHistory(page);
     await expect(page.getByRole('group', { name: 'Forced dice' })).toContainText(/Rock Slide.*Flinch/);
     const entries = await branchFrameEntries(page);
     await expect.poll(async () => (await entries()).some(entry => entry.startsWith('Forced: Rock Slide flinch')), { timeout: 60_000 }).toBe(true);
