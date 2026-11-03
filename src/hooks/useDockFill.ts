@@ -253,6 +253,21 @@ function landedView(landed: Settled | null, liveTip: boolean): Pick<DockFillView
 }
 
 /**
+ * Whether the fill is under way for this position, and whether a run is. Round 84 (A7i): the run of the request before stands done
+ * under the same tag in the first render of a new key; the position counts as begun once a run was seen under way while the fill
+ * could start, and until then that finished result is no answer, so `pending` holds from the first render of the key.
+ */
+function useFillPending(inputs: DockFillInputs, key: string, eligible: boolean, done: boolean) {
+  const { evaluation } = inputs;
+  const attempted = evaluation.resultTag === inputs.evalViewKey;
+  const running = attempted && RUNNING.has(evaluation.status);
+  const [begunKey, setBegunKey] = useState<string | null>(null);
+  if (running && eligible && begunKey !== key) setBegunKey(key);
+  const standing = begunKey !== key && evaluation.status === 'done';
+  return { running, pending: eligible && !done && (running || !attempted || standing) };
+}
+
+/**
  * Round 84 (turn dock): the engine fill. Once per position the hook asks the evaluation for the position and writes the best
  * ranked choice into every slot the user has not touched, nor holds open. At the live tip of a variation it starts at once and
  * writes into the branch; at a replay turn it starts with the user's first click on a chip and keeps its choices in the view
@@ -271,9 +286,7 @@ export function useDockFill(inputs: DockFillInputs): DockFillView {
   const { settled, queued, settledRef, queue, unqueue, holdTray } = marks;
   const onUserChoice = useOnUserChoice(marks);
   const done = settled.key === key;
-  const attempted = evaluation.resultTag === inputs.evalViewKey;
-  const running = attempted && RUNNING.has(evaluation.status);
-  const pending = eligible && !done && (running || !attempted);
+  const { running, pending } = useFillPending(inputs, key, eligible, done);
   const { apply, release } = useFillApply(inputs, key, eligible, marks);
   useFillTrigger(inputs, key, eligible, running, apply, settledRef);
 

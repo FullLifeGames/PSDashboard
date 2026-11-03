@@ -118,3 +118,59 @@ describe('useDockFill: the key moves while a run is under way', () => {
     expect(handleEvaluate).toHaveBeenCalledTimes(1);
   });
 });
+
+/**
+ * Step A7i: the first frame of a new position. The previous request's run stands done with the same tag, so the render in which
+ * the key moves has no run under way and no tag to tell it apart. `pending` must hold there already, until the fill's own run
+ * lands or fails.
+ */
+describe('useDockFill: the first frame of a new key', () => {
+  function renderFilled(kind: FormatKind) {
+    const pendingByRender: boolean[] = [];
+    const setChoice = vi.fn();
+    const view = renderHook((props: { history: number }) => {
+      const out = useFilled(kind, props.history, setChoice);
+      pendingByRender.push(out.fill.pending);
+      return out;
+    }, { initialProps: { history: 1 } });
+    return { ...view, pendingByRender };
+  }
+
+  async function settleFirstRequest(kind: FormatKind, runs: ((value: EvalResult) => void)[], view: ReturnType<typeof renderFilled>) {
+    await waitFor(() => expect(runs).toHaveLength(1));
+    await act(async () => runs[0](evalResult(kind)));
+    await waitFor(() => expect(view.result.current.fill.pending).toBe(false));
+    expect(view.result.current.evaluation.status).toBe('done');
+  }
+
+  test.each(['singles', 'doubles'] as const)('%s: pending holds in the render that moves the key and until its own run lands', async (kind) => {
+    const runs = scriptRuns();
+    const view = renderFilled(kind);
+    await settleFirstRequest(kind, runs, view);
+    const before = view.pendingByRender.length;
+    view.rerender({ history: 2 });
+    // The first render of the new key: the old result stands done under the same tag, and the fill has not started its run yet.
+    expect(view.pendingByRender[before]).toBe(true);
+    await waitFor(() => expect(runs).toHaveLength(2));
+    expect(view.pendingByRender.slice(before).every(Boolean)).toBe(true);
+    await act(async () => runs[1](evalResult(kind)));
+    await waitFor(() => expect(view.result.current.fill.pending).toBe(false));
+    expect(view.result.current.fill.engine.p1[0]).toBe(true);
+  });
+
+  test.each(['singles', 'doubles'] as const)('%s: a run that fails ends the pending state', async (kind) => {
+    // The same script, but the second run rejects.
+    const resolvers: ((value: EvalResult) => void)[] = [];
+    const rejecters: ((reason: Error) => void)[] = [];
+    script.evaluate = () => new Promise<EvalResult>((resolve, reject) => { resolvers.push(resolve); rejecters.push(reject); });
+    const view = renderFilled(kind);
+    await settleFirstRequest(kind, resolvers, view);
+    view.rerender({ history: 2 });
+    await waitFor(() => expect(resolvers).toHaveLength(2));
+    expect(view.result.current.fill.pending).toBe(true);
+    await act(async () => rejecters[1](new Error('search failed')));
+    await waitFor(() => expect(view.result.current.evaluation.status).toBe('error'));
+    expect(view.result.current.fill.pending).toBe(false);
+    expect(view.result.current.fill.engine.p1[0]).toBeFalsy();
+  });
+});
