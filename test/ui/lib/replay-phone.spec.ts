@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { runInNewContext } from 'node:vm';
 import { generateReplayHtml } from '../../../src/lib/replay-html';
 import {
-  PHONE_BATTLE, PHONE_BREAKPOINT, PHONE_CLASS, PHONE_FIT_SCRIPT, PHONE_INSET, PHONE_SCALE_PROPERTY, PHONE_STYLES,
+  PHONE_BATTLE, PHONE_BREAKPOINT, PHONE_CLASS, PHONE_FIT_SCRIPT, PHONE_SCALE_PROPERTY, PHONE_STYLES,
 } from '../../../src/lib/replay-phone';
 
 /**
@@ -36,17 +36,16 @@ describe('the phone document', () => {
     expect(PHONE_BREAKPOINT).toBe(642);
   });
 
-  test('a frame of 390 px takes the phone class and the scale of its width less the inset, over 642', () => {
+  test('a frame of 390 px takes the phone class and the scale of its width over the battle\'s border box, 642', () => {
     const { classes, props } = runFit(390);
     expect(classes.has(PHONE_CLASS)).toBe(true);
-    expect(Number(props.get(PHONE_SCALE_PROPERTY))).toBeCloseTo((390 - PHONE_INSET) / 642, 6);
+    expect(Number(props.get(PHONE_SCALE_PROPERTY))).toBeCloseTo(390 / 642, 9);
   });
 
-  test('the scene stays inside the frame: its scaled width never passes the frame\x27s width, whatever the width', () => {
-    expect(PHONE_INSET).toBeGreaterThanOrEqual(2);
-    for (const width of [320, 360, 372, 390, 480, 641]) {
+  test('the scene fits the frame exactly: its scaled border box is the frame\'s width, whatever the width, with no inset', () => {
+    for (const width of [320, 360, 362, 372, 390, 480, 641]) {
       const { props } = runFit(width);
-      expect(Number(props.get(PHONE_SCALE_PROPERTY)) * PHONE_BATTLE.width, `${width} px`).toBeLessThanOrEqual(width - PHONE_INSET + 1e-9);
+      expect(Number(props.get(PHONE_SCALE_PROPERTY)) * PHONE_BATTLE.width, `${width} px`).toBeCloseTo(width, 9);
     }
   });
 
@@ -67,7 +66,7 @@ describe('the phone document', () => {
     const run = runFit(900);
     run.resize(360);
     expect(run.classes.has(PHONE_CLASS)).toBe(true);
-    expect(Number(run.props.get(PHONE_SCALE_PROPERTY))).toBeCloseTo((360 - PHONE_INSET) / 642, 6);
+    expect(Number(run.props.get(PHONE_SCALE_PROPERTY))).toBeCloseTo(360 / 642, 9);
     run.resize(1000);
     expect(run.classes.has(PHONE_CLASS)).toBe(false);
     expect(run.props.get(PHONE_SCALE_PROPERTY)).toBe('1');
@@ -86,10 +85,15 @@ describe('the phone stylesheet', () => {
   });
 
   test('the scene is scaled by the document\'s factor from its top left corner, and its height follows', () => {
-    expect(rules).toContain(`transform:scale(var(${PHONE_SCALE_PROPERTY},1))`);
     expect(rules).toContain('transform-origin:0 0');
-    expect(rules).toContain(`margin-bottom:calc((var(${PHONE_SCALE_PROPERTY},1) - 1) * 362px)`);
     expect(rules).toMatch(/\.battle\{position:relative;top:0;left:0;/);
+  });
+
+  test('the scene\'s transform and margin win over the inline ones of Showdown\'s onResize (scale(width / 640) below 640 px)', () => {
+    // battle.js `onResize` sets `transform: scale(width / 640)` and `margin-bottom` inline on the battle frame whenever the window is
+    // narrower than 640 px; an inline style beats a plain rule, so only !important keeps the scale on the border box (642 px).
+    expect(rules).toContain(`transform:scale(var(${PHONE_SCALE_PROPERTY},1)) !important`);
+    expect(rules).toMatch(/margin-bottom:calc\(\(var\(--ps-k,1\) - 1\) \* 362px\) !important/);
   });
 
   test('the wrapper stacks the scene, the controls, the speed row and the log in one column at their own size', () => {

@@ -10,14 +10,6 @@
 /** The battle's box in the embed: 640 x 360 plus the 1 px border on each side. */
 export const PHONE_BATTLE = { width: 642, height: 362 } as const;
 
-/**
- * Round 84 (A7d): the scene is scaled to the frame's width less this inset. The e2e run of A7c read the scene's right edge 1.1 px past
- * the frame's (372.125 against 371) at 390 px: the width the document reports and the frame's box differ by a pixel or two (the
- * frame's fractional width against the document's whole one), so a scene fitted to the last pixel overshoots. Two pixels keep the
- * scene's 1 px border inside the frame's rounded corner at every width.
- */
-export const PHONE_INSET = 2;
-
 /** A frame narrower than this is a phone frame. */
 export const PHONE_BREAKPOINT = PHONE_BATTLE.width;
 
@@ -25,9 +17,16 @@ export const PHONE_BREAKPOINT = PHONE_BATTLE.width;
 export const PHONE_CLASS = 'ps-phone';
 export const PHONE_SCALE_PROPERTY = '--ps-k';
 
+/**
+ * Round 84 (A7e): the scale is the frame's width over the battle's border box (642 px), with no inset. The 1.1 px overshoot of A7c and
+ * A7d was Showdown's own scaling, not a rounding: `Battle.onResize` (battle.js, with `autoresize` on) writes an inline
+ * `transform: scale(width / 640)` and `margin-bottom` on the battle frame whenever the window is under 640 px, and an inline style beats
+ * a plain rule, so the document drew the scene at 642 x width / 640 = 363.1 px in a 362 px frame whatever `--ps-k` said. The two
+ * declarations below carry `!important`, which beats the inline ones, so `--ps-k` decides.
+ */
 export const PHONE_STYLES = `<style>
 html.${PHONE_CLASS} .wrapper.replay-wrapper{display:flex;flex-direction:column;padding-top:0 !important;margin-top:0;}
-html.${PHONE_CLASS} .battle{position:relative;top:0;left:0;flex:none;transform:scale(var(${PHONE_SCALE_PROPERTY},1));transform-origin:0 0;margin-bottom:calc((var(${PHONE_SCALE_PROPERTY},1) - 1) * ${PHONE_BATTLE.height}px);}
+html.${PHONE_CLASS} .battle{position:relative;top:0;left:0;flex:none;transform:scale(var(${PHONE_SCALE_PROPERTY},1)) !important;transform-origin:0 0;margin-bottom:calc((var(${PHONE_SCALE_PROPERTY},1) - 1) * ${PHONE_BATTLE.height}px) !important;}
 html.${PHONE_CLASS} .replay-controls,html.${PHONE_CLASS} .replay-controls-2{position:static;top:auto;left:auto;right:auto;padding:6px 5px 0;}
 html.${PHONE_CLASS} .replay-controls{order:1;}
 html.${PHONE_CLASS} .replay-controls-2{order:2;}
@@ -43,7 +42,7 @@ export const PHONE_FIT_SCRIPT = `<script>
     var width = root.clientWidth;
     var narrow = width > 0 && width < ${PHONE_BREAKPOINT};
     root.classList.toggle('${PHONE_CLASS}', narrow);
-    root.style.setProperty('${PHONE_SCALE_PROPERTY}', narrow ? String((width - ${PHONE_INSET}) / ${PHONE_BATTLE.width}) : '1');
+    root.style.setProperty('${PHONE_SCALE_PROPERTY}', narrow ? String(width / ${PHONE_BATTLE.width}) : '1');
   }
   window.addEventListener('resize', fit);
   window.addEventListener('load', fit);

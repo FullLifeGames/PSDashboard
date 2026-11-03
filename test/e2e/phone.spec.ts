@@ -34,14 +34,15 @@ test('the battle scene stands inside the frame with the log under it, and the pa
   await expect(frameOf(page).locator('html')).toHaveClass(/ps-phone/);
   const battleBox = (await battle.boundingBox())!;
   const logBox = (await frameOf(page).locator('.battle-log').boundingBox())!;
-  // Round 84 (A7d): the numbers sit in the message, and the document's own coordinates decide the fit apart from the frame's offset.
+  // Round 84 (A7e): the scale is the frame's width over the battle's border box (642), so the scene's right edge is the frame's width
+  // (Showdown's inline scale(width / 640) overshot by 1.1 px until the document's rule took !important). The numbers sit in the message.
   const inside = await frameOf(page).locator('html').evaluate(root => ({
     width: root.clientWidth,
     battleRight: root.querySelector('.battle')!.getBoundingClientRect().right,
     scale: root.style.getPropertyValue('--ps-k'),
   }));
   const numbers = JSON.stringify({ frameBox, battleBox, inside });
-  expect(inside.battleRight, `the scene's right edge inside the document ${numbers}`).toBeLessThanOrEqual(inside.width);
+  expect(inside.battleRight, `the scene's right edge inside the document ${numbers}`).toBeLessThanOrEqual(inside.width + 0.05);
   expect(battleBox.x + battleBox.width, `the scene's right edge ${numbers}`).toBeLessThanOrEqual(frameBox.x + frameBox.width + 1);
   expect(battleBox.x).toBeGreaterThanOrEqual(frameBox.x - 1);
   expect(logBox.y, 'the log stands under the scene').toBeGreaterThanOrEqual(battleBox.y + battleBox.height - 1);
