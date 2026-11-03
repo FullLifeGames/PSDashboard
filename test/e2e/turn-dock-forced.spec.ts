@@ -96,3 +96,37 @@ test('two forced slots of one side: a bench click records the choice while the o
   await expect(page.locator('.ps-force-switch-note')).toHaveCount(0, { timeout: 30_000 });
   await expect(variationPanel(page)).toContainText('forced replacement (P1)');
 });
+
+/**
+ * Round 84 (A7f): the partner of a forced replacement takes no input. Same hand-written replay, but only Pikachu uses Memento, so
+ * P1A alone must be replaced and Eevee (P1B) keeps its place: the position asks nothing of it, so its chip stands inert like the
+ * chips of the waiting side (P2A, P2B), while P1A's chip stays live and the engine fills it.
+ */
+test('one forced slot in doubles: its partner stands inert like the waiting side, the forced slot stays live', async ({ page }) => {
+  test.setTimeout(420_000);
+  await lightEngine(page);
+  await routeOfflineFixtures(page);
+  await page.goto('/');
+  await loadDockReplay(page, 'gen9doubles-forced-test', 1);
+  await pickMove(page, 'p1a', 'Memento');
+  await pickMove(page, 'p1b');
+  await pickMove(page, 'p2a');
+  await pickMove(page, 'p2b');
+  const execute = page.locator('.ps-execute-btn');
+  await expect(execute).toBeEnabled();
+  await execute.click();
+
+  const [p1a, p1b] = [dockChip(page, 'p1a'), dockChip(page, 'p1b')];
+  await expect(p1a).toHaveAttribute('data-forced', 'true', { timeout: 120_000 });
+  await expect(p1a).toHaveAttribute('data-origin', 'engine', { timeout: 240_000 });
+  await expect(p1b).not.toHaveAttribute('data-forced', 'true');
+  await expect(p1a).not.toHaveAttribute('inert');
+  await expect(p1b).toHaveAttribute('inert', '');
+  await expect(dockChip(page, 'p2a')).toHaveAttribute('inert', '');
+  await expect(dockChip(page, 'p2b')).toHaveAttribute('inert', '');
+  // The inert chip opens no tray; the forced slot's chip does.
+  await p1b.click({ force: true });
+  await expect(page.locator('.ps-tray')).toHaveCount(0);
+  await openTray(page, 'p1a');
+  await expect(page.locator('.ps-tray')).toHaveCount(1);
+});

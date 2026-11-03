@@ -96,6 +96,14 @@ function slotEngine(fill: DockFillView | null | undefined, view: Pick<SideView, 
 }
 
 /**
+ * Round 84 (A7f): a slot that takes no input. The side that waits for the other's replacement, and the partner of a forced
+ * replacement on the replacing side (it is asked nothing); a slot the user must fill, forced or not, stays live.
+ */
+function slotWaits(view: Pick<SideView, 'waits' | 'required' | 'forceSwitches'>, slot: number): boolean {
+  return view.waits || (view.forceSwitches.some(Boolean) && !view.required[slot]);
+}
+
+/**
  * What an empty chip says, and the engine's state as the placeholder's style shows it (only a chip that waits for the engine has
  * one). A forced replacement shimmers while the run is pending like any slot; when the game analysis blocks the engine it keeps
  * its own text, since the user has to choose.
@@ -179,7 +187,7 @@ function slotModel(side: Side, slot: number, view: SideView, args: DockModelArgs
   return {
     side, slot, label: identity.label, name: identity.activeName, species: identity.activeSpecies,
     hpPercent: active?.hpPercent ?? 0, fainted: identity.activeFainted,
-    moves, switches, forceSwitch, nobodyLeft, waits: view.waits,
+    moves, switches, forceSwitch, nobodyLeft, waits: slotWaits(view, slot),
     pending, blockedSwitchKeys: blockedSwitchKeys(view.choices, view.required, slot),
     modifiers: view.modifiersBySlot[slot] ?? EMPTY_MODIFIERS, gimmick: gimmickFor(side, slot),
     ...damageOf(view.damage, slot),

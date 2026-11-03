@@ -205,6 +205,28 @@ describe('the side that does not replace takes no input (B5)', () => {
     expect(screen.queryByText(/Waiting for/)).toBeNull();
   });
 
+  // Round 84 (A7f): the partner of a forced replacement is asked nothing, so its chip takes the waiting side's state (user's own test,
+  // Champions VGC: P2B fainted and P2A stood live though the position asked nothing of it).
+  test('doubles: the partner of the one forced slot takes no input, the forced slot stays live', () => {
+    const { rerender } = render(<TurnDock {...props({ simState: simState('doubles', down('p2')) })} />);
+    expect(chip('P2A')).not.toHaveAttribute('inert');
+    expect(chip('P2B')).toHaveAttribute('inert');
+    expect(chip('P1A')).toHaveAttribute('inert');
+    rerender(<TurnDock {...props({ simState: simState('doubles', { ...down('p1'), ...down('p2') }) })} />);
+    expect(chip('P1A')).not.toHaveAttribute('inert');
+    expect(chip('P2A')).not.toHaveAttribute('inert');
+    expect(chip('P1B')).toHaveAttribute('inert');
+    expect(chip('P2B')).toHaveAttribute('inert');
+  });
+
+  test('doubles: both slots of a side forced, both chips stay live (16a); singles: the forced chip stays live', () => {
+    const { rerender } = render(<TurnDock {...props({ simState: simState('doubles', { p2ForceSwitch: true, p2ForceSwitches: [true, true] }) })} />);
+    expect(chip('P2A')).not.toHaveAttribute('inert');
+    expect(chip('P2B')).not.toHaveAttribute('inert');
+    rerender(<TurnDock {...props({ simState: simState('singles', { p2ForceSwitch: true, p2ForceSwitches: [true] }) })} />);
+    expect(chip('P2')).not.toHaveAttribute('inert');
+  });
+
   test('a normal turn leaves both sides live', () => {
     render(<TurnDock {...props()} />);
     expect(chip('P1')).not.toHaveAttribute('inert');
