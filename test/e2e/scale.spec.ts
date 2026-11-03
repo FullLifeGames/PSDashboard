@@ -26,16 +26,21 @@ test.beforeEach(async ({ page }) => {
 const rootScale = (page: Page) => page.evaluate(() => document.documentElement.style.getPropertyValue('--ps-scale'));
 const frameOf = (page: Page) => page.frameLocator('.ps-iframe-wrap iframe').first();
 
-/** The battle's box on the screen, from the page: the rect inside the frame (CSS px of its document) times the frame's visual over CSS width. */
+/**
+ * The battle's box on the screen, from the page: its share of the frame's document (the rect inside over the document's clientWidth)
+ * times the frame's rect on the screen. Chromium reads the rect inside in the frame's CSS px (641 of 976, the frame 1,464 px wide on
+ * the screen); WebKit's zoomed document reads it in screen px (962 of 1,464). The share is the same number in both.
+ */
 async function battleOnScreen(page: Page) {
   return page.evaluate(() => {
     const frame = document.querySelector('.ps-iframe-wrap iframe') as HTMLIFrameElement;
     const inside = frame.contentDocument!.querySelector('.battle')!.getBoundingClientRect();
     const outside = frame.getBoundingClientRect();
-    const k = outside.width / frame.offsetWidth;
+    const documentWidth = frame.contentDocument!.documentElement.clientWidth;
+    const k = outside.width / documentWidth;
     return {
       k, width: inside.width * k, left: outside.left + inside.left * k, right: outside.left + inside.right * k,
-      frameLeft: outside.left, frameRight: outside.right, rectInside: { x: inside.x, w: inside.width }, frameCss: frame.offsetWidth,
+      frameLeft: outside.left, frameRight: outside.right, rectInside: { x: inside.x, w: inside.width }, documentWidth,
     };
   });
 }
@@ -68,11 +73,11 @@ test('Auto at 2560 x 1290 takes 150 %: the app fills the window, the column does
   expect(facts.leftOverflow, 'the left column does not scroll').toBeLessThanOrEqual(1);
   expect(facts.leftScrollTop).toBe(0);
   expect(facts.frameVisual / facts.frameCss, 'the frame element\'s scale').toBeCloseTo(1.5, 1);
-  // The replay's content scales with the frame, drawn at the zoomed size: its 642 px battle stands about 963 px wide on the screen and
-  // inside the frame. In WebKit a frame that kept its 100 % layout shows it at 642. Playwright's boundingBox() of an element inside a
-  // zoomed frame reads page coordinates divided by the zoom (641 for 963; the A7d run), so the width on the screen comes from the page:
-  // the battle's rect in the frame's own CSS px times the frame's rect width over its offsetWidth (both engines read the frame's rect
-  // in screen px and the rect inside it in the frame's CSS px, the zoom probe of A7c).
+  // The replay's content scales with the frame, drawn at the zoomed size: its 642 px battle stands about 963 px wide on the screen. In
+  // WebKit a frame that kept its 100 % layout shows it at 642. Playwright's boundingBox() of an element inside a zoomed frame reads page
+  // coordinates divided by the zoom (641 for 963; the A7d run), and the engines read the rect inside in different units (Chromium in
+  // the frame's CSS px, WebKit in screen px; the A7e run), so the width on the screen is the battle's share of the document times the
+  // frame's rect on the screen.
   await expect(frameOf(page).locator('.battle')).toBeVisible({ timeout: 60_000 });
   const shown = await battleOnScreen(page);
   const message = `the battle on the screen ${JSON.stringify(shown)}`;

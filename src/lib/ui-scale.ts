@@ -12,7 +12,11 @@ export type UiScaleStep = (typeof UI_SCALE_STEPS)[number];
 /** The user's choice: Auto, or one fixed step. */
 export type UiScaleSetting = 'auto' | UiScaleStep;
 
-/** The room Auto keeps for the app after the scale: the width of the app's layout column and the height the dock, the replay and the timeline need. */
+/**
+ * The room Auto keeps for the app after the scale: the width of the app's layout column and the height the dock, the replay and the
+ * timeline need. Round 84 measured the smallest window at which the left column does not scroll (width 1,280 and up, `sweet-spot.spec`):
+ * 670 px high on a singles replay turn, 720 doubles, 920 singles and 980 doubles in a variation with the history panel, 1,060 px wide.
+ */
 export const UI_SCALE_ROOM = { width: 1400, height: 820 } as const;
 
 /**
