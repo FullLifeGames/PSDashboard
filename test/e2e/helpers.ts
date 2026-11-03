@@ -139,6 +139,32 @@ export async function pickForcedReplacement(page: Page, options?: TrayOptions): 
 }
 
 /**
+ * Round 84 (A7e): moves the timeline slider to `turn`. Chromium takes `fill()` on the range input, as every spec did before. WebKit's
+ * range input does not take it (the A7d run: "T5/" never showed in WebKit through `fill()`, while a click with the pointer moved the
+ * slider), so there the helper clicks the track where the turn lies (the thumb is about 16 px wide, so the click may land a turn
+ * or two off) and settles on the turn with the arrow keys, which the input handles natively.
+ */
+export async function moveTimeline(page: Page, turn: number): Promise<void> {
+  const slider = page.locator('.ps-branch-bar input[type="range"]');
+  if (page.context().browser()?.browserType().name() !== 'webkit') {
+    await slider.fill(String(turn));
+    return;
+  }
+  await slider.scrollIntoViewIfNeeded();
+  const { min, max } = await slider.evaluate(input => ({ min: Number((input as HTMLInputElement).min), max: Number((input as HTMLInputElement).max) }));
+  const box = (await slider.boundingBox())!;
+  const thumb = 16;
+  const ratio = max > min ? (turn - min) / (max - min) : 0;
+  await page.mouse.click(box.x + thumb / 2 + ratio * (box.width - thumb), box.y + box.height / 2);
+  for (let presses = 0; presses < max - min + 2; presses++) {
+    const value = Number(await slider.inputValue());
+    if (value === turn) return;
+    await slider.press(value < turn ? 'ArrowRight' : 'ArrowLeft');
+  }
+  expect(Number(await slider.inputValue()), `the slider after the pointer and the arrow keys (range ${min} to ${max})`).toBe(turn);
+}
+
+/**
  * Unified-timeline helper: moves the slider to `turn`, gives EVERY active slot an explicit move through its tray, executes,
  * and waits for the rebuilt sim's history entry: after this a live variation covers `turn` and the pointer sits on its tip.
  *
@@ -149,7 +175,7 @@ export async function pickForcedReplacement(page: Page, options?: TrayOptions): 
  */
 export async function startVariationAt(page: Page, turn: number, options?: { p1Move?: string | RegExp }) {
   if (turn > 1) {
-    await page.locator('.ps-branch-bar input[type="range"]').fill(String(turn));
+    await moveTimeline(page, turn);
     await expect(page.getByText(`T${turn}/`)).toBeVisible();
   }
   const chips = page.locator('.ps-dock-chip');
@@ -197,7 +223,7 @@ export async function openLoader(page: Page): Promise<Locator> {
  *  exactness promise). */
 export async function waitForExactPickers(page: Page, turn?: number) {
   if (turn && turn > 1) {
-    await page.locator('.ps-branch-bar input[type="range"]').fill(String(turn));
+    await moveTimeline(page, turn);
     await expect(page.getByText(`T${turn}/`)).toBeVisible();
   }
   await expect(page.locator('.ps-dock-status').getByText('Choices from the reconstructed position')).toBeVisible({ timeout: 90_000 });
