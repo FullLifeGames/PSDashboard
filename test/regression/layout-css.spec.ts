@@ -46,6 +46,11 @@ describe('the two columns above 1050 px', () => {
     expect(rule(base, '.ps-main-left')).toMatch(/max-height:\s*var\(--ps-layout-h,\s*100%\)/);
   });
 
+  test('the left column has no padding below the dock, so the shared row ends on the foot of the dock', () => {
+    // Round 84 (A7c, item 0a): a padding-bottom of 12px made the row 12px longer than the dock, and the right column reached past it.
+    expect(rule(base, '.ps-main-left')).not.toMatch(/padding-bottom:\s*[1-9]/);
+  });
+
   test('the right column adds no height to the row and scrolls only itself', () => {
     const right = rule(base, '.ps-main-right');
     expect(right).toMatch(/contain:\s*size/);
