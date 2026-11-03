@@ -98,3 +98,25 @@ describe('the columns below 1050 px', () => {
     expect(rule(narrowStats, '.ps-stats-panel > .ps-stats-grid')).toMatch(/overflow-y:\s*visible/);
   });
 });
+
+describe('the top bar at 640 px and below', () => {
+  // Round 84 (A7c, ruling 11a): the bar took three lines (74 px at 390 px); two at most: the match, then the menus with the support links.
+  const phone = media(layout, 640);
+
+  test('the match takes the first line, the menus and the support links share the second', () => {
+    const bar = rule(phone, '.ps-topbar');
+    expect(bar).toMatch(/flex-direction:\s*row/);
+    expect(bar).toMatch(/flex-wrap:\s*wrap/);
+    expect(rule(phone, '.ps-topbar-match')).toMatch(/flex:\s*1 0 100%/);
+    const actions = rule(phone, '.ps-topbar > .ps-topbar-actions');
+    expect(actions).toMatch(/flex-wrap:\s*nowrap/);
+    expect(actions).toMatch(/min-width:\s*0/);
+    const links = rule(phone, '.ps-topbar > .ps-support-links');
+    expect(links).toMatch(/flex-wrap:\s*nowrap/);
+    expect(links).toMatch(/white-space:\s*nowrap/);
+  });
+
+  test('the name of the app leaves the bar, the links stay', () => {
+    expect(rule(phone, '.ps-topbar .ps-support-name')).toMatch(/display:\s*none/);
+  });
+});

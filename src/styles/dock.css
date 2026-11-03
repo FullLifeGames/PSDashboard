@@ -401,8 +401,12 @@
   }
 }
 
-/* At 640 px the chips stay two per row; they take the app's 640 px control sizes (layout.css gives its buttons 40 px). */
+/* At 640 px the chips take one row each (round 84, A7c, ruling 11a: two a row cut the choice after about twelve letters at 390 px):
+   doubles four rows, singles two. The rows keep the dock's 46 px; the chips take the app's 640 px control sizes (layout.css gives its
+   buttons 40 px). useDockHeight follows the taller dock. */
 @media (max-width: 640px) {
+  .ps-dock-rows { grid-auto-rows: auto; }
+  .ps-dock-row { grid-template-columns: minmax(0, 1fr); grid-auto-rows: 46px; }
   .ps-dock-chip { min-height: 40px; }
   .ps-dock .ps-execute-btn { min-height: 40px; }
   .ps-tray { width: 100%; }

@@ -35,17 +35,24 @@ for (const width of [1000, 390]) {
     const rightBox = (await page.locator('.ps-main-right').boundingBox())!;
     expect(rightBox.y + rightBox.height).toBeLessThanOrEqual(box.y + 1);
 
-    // Two chips per row, Execute on its own row under them, the app's 40 px minimum at 640 px.
+    // Above 640 px two chips a row; at 640 px and below one chip a row (round 84, A7c, ruling 11a): four rows in doubles, each 46 px.
+    // Execute takes its own row under the chips, the app's 40 px minimum at 640 px.
     const first = (await dockChip(page, 'p1a').boundingBox())!;
     const partner = (await dockChip(page, 'p1b').boundingBox())!;
+    const last = (await dockChip(page, 'p2b').boundingBox())!;
     const execute = (await page.locator('.ps-execute-btn').boundingBox())!;
-    expect(partner.y).toBe(first.y);
-    expect(partner.x).toBeGreaterThan(first.x);
-    expect(execute.y).toBeGreaterThanOrEqual((await dockChip(page, 'p2a').boundingBox())!.y + first.height);
     if (width <= 640) {
-      expect(first.height).toBeGreaterThanOrEqual(40);
+      expect(partner.x).toBe(first.x);
+      expect(partner.y).toBeGreaterThanOrEqual(first.y + first.height);
+      expect(Math.round(first.height)).toBe(46);
+      expect(Math.round(last.height)).toBe(46);
+      expect(last.y).toBeGreaterThan(partner.y);
       expect(execute.height).toBeGreaterThanOrEqual(40);
+    } else {
+      expect(partner.y).toBe(first.y);
+      expect(partner.x).toBeGreaterThan(first.x);
     }
+    expect(execute.y).toBeGreaterThanOrEqual(last.y + last.height);
 
     // The tray opens above the dock, across the width, up to 70 % of the viewport.
     const tray = await openTray(page, 'p1a');

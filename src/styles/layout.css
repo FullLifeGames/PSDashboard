@@ -63,6 +63,8 @@
 }
 /* The match info keeps its own width for the line break and shortens long names instead of running under its neighbours. */
 .ps-topbar-match {
+  /* Round 84 (A7c): in the stylesheet, so the 640 px block can give the match a line of its own. */
+  flex: 1 1 auto;
   overflow: hidden;
 }
 .ps-topbar-match > span {
@@ -220,12 +222,29 @@
 }
 
 @media (max-width: 640px) {
+  /* Round 84 (A7c, ruling 11a): two lines at most. The match takes the first, the menus and the support links share the second
+     (the name of the app is left out; the links keep their words). A long divergence notice shortens with its ellipsis. */
   .ps-topbar {
-    align-items: stretch;
-    flex-direction: column;
-  }
-  .ps-topbar > div {
+    align-items: center;
+    flex-direction: row;
     flex-wrap: wrap;
+  }
+  .ps-topbar-match {
+    flex: 1 0 100%;
+  }
+  .ps-topbar > .ps-topbar-actions {
+    flex: 1 1 0;
+    flex-wrap: nowrap;
+    min-width: 0;
+  }
+  .ps-topbar > .ps-support-links {
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+    gap: 8px;
+  }
+  .ps-topbar .ps-support-name {
+    display: none;
   }
   .ps-branch-bar .ps-btn {
     min-height: 40px;

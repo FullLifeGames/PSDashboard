@@ -26,7 +26,7 @@ interface AppTopBarProps {
 
 function TopBarMatchInfo({ replayData, usageStats, setAssumptions }: Pick<AppTopBarProps, 'replayData' | 'usageStats' | 'setAssumptions'>) {
   return (
-    <div className="ps-topbar-match" style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '1 1 auto', minWidth: 0 }}>
+    <div className="ps-topbar-match" style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
       <span className="ps-format-tag">{replayData.format}</span>
       <span style={{ fontSize: 11, color: '#8ac' }}>{replayData.players[0]}</span>
       <span style={{ fontSize: 10, color: '#556' }}>vs</span>
