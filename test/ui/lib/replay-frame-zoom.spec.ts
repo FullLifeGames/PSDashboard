@@ -22,7 +22,7 @@ function frame(outer: number, width: (zoom: number) => number) {
   return { iframe, root };
 }
 
-const chromium = (outer: number) => (_zoom: number) => outer;
+const chromium = (outer: number) => () => outer;
 const webkit = (outer: number, scale: number) => (zoom: number) => (outer * scale) / zoom;
 
 describe('followFrameZoom', () => {
