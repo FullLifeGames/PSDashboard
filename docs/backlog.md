@@ -1,30 +1,8 @@
 # Backlog
 
-This file holds the details of every open TODO, one section per TODO under its fixed T-number. Release v1.0.2 is out (30.10.2026), and round 82 (forced dice in branches) waits on dev for the next release. Round 84 carries T312 (the turn dock, design gate of 01.11.2026), round 85 the six approved TODOs of the engine setup (T299, T304 to T306, T309, T310); every other TODO is parked with a trigger, and a trigger that fires brings its TODO to a gate. The next free T-number is T313.
+This file holds the details of every open TODO, one section per TODO under its fixed T-number. Release v1.0.2 is out (30.10.2026), and rounds 82 to 84 (forced dice in branches, the GitHub issues #2 and #3, the turn dock) wait on dev for the next release. Round 85 carries the six approved TODOs of the engine setup (T299, T304 to T306, T309, T310); T313, T314, T316 and T317 are approved and wait for a round; every other TODO is parked with a trigger, and a trigger that fires brings its TODO to a gate. The next free T-number is T318.
 
 Evidence paths of the form `r<NN>/…` point to that round's probe folder, `docs/perf/probes/<date>-r<NN>/`; `docs/` is local, so they exist only on the maintainer's machine. Each round's entry in `docs/completed/` names its folder and the gate that approved its TODOs. Line numbers in a section refer to the state when the TODO was written.
-
-## Round 84 · the turn dock
-
-The design gate of 01.11.2026 (the grilling of the branch panel's Advanced mode, Q1 to Q18, final answers 19:20) approved T312 and put it before the engine setup. It leaves this file with the round's booking.
-
-### T312 · The turn dock: two rows under the replay build the turn
-
-*App · design gate 01.11.2026 · feature · lossless for the engine (D4), the panel's tests re-pin*
-
-**Approved for round 84 (design gate of 01.11.2026, final answers 19:20, "16 5, 17a, 18 a"; the user: "Right now you need to scroll down from the replay and then select and really have to think what to do with a thousand options. There should be a better way to do this.").**
-
-**Problem.** The panel that builds a branch turn sits under the replay in the left column (`src/components/ReplayWorkspace.tsx:206-232`: the replay frame of 456 px, the timeline bar, then `BranchPanel`). On a laptop window of 1366 × 768 the user scrolls the left column from the replay down to the panel and back. Every slot starts empty: the move the replay played feeds only the header line and, in Basic, the played badge (`usePlayedAtView`, `src/hooks/usePositionPicker.ts:170-193`), so a turn that changes one move still needs a choice in every slot before Execute (`pendingLabelFor`, `BranchPanel.tsx:182-188`), which sits at the panel's end. Advanced adds the full tiles with damage, the dice chips, the "All choices…" select and the "What if it had…" row; the target row shows in both modes. The user counted about 6 clicks and 650 px of scrolling on a screenshot (turn 6 of a doubles game) for Earthquake instead of Rock Slide.
-
-**Idea.** A dock at the lower edge of the replay column builds the turn, like the command bar of a game. Doubles and VGC: P1 in the upper row, P2 in the lower one, two chips per row with the slot's choice, Execute on the right over both rows; singles needs one row. At a replay turn every slot starts with the move the replay played, with its target and Tera (`targetLoc` and `tera` of `parsePlayedActions*`, which `usePlayedAtView` drops today, `usePositionPicker.ts:204-206`); at a variation position behind the tip the slots start with the recorded choices. At the live tip of a variation the dock starts one engine evaluation (singles and doubles, never while the game analysis or a play-out runs) and fills each slot the user has not touched from the best joint choice of its side that agrees with the touched slots; the chips keep their size while it computes, an Execute pressed before the fill waits for it, and a slot with no agreeing choice stays empty. A click on a chip opens its tray above the dock: the moves as tiles in the style "Balken" (the app's own button shell, the type as Showdown's type tag, the damage as the target's HP bar with what surely stays, what the roll decides and what surely goes, the numbers beside it); for a targeted move the target row from the simulator's valid targets, preselected with the foe that takes the most damage (the played move keeps its played target; at a replay turn the row and the dice wait for the exact position, as today); the switches and the position's gimmicks (Tera, Mega Evolve, Ultra Burst, Z-Move); behind "Dice · What if" the dice as a table (one column per target, one row per die), the What-if row and "All choices…". The tray closes with Done, Escape or a click beside it. Basic and Advanced give way to the one dock. The right column keeps its full height and its panels. Below 1050 px the dock spans the window's lower edge, the tray opens from below, and Execute moves under the rows. Team preview (turn 0) and a running play-out keep their own views; forced switches, the ended notice, the execute error, the source note, the log toggle, History and Save/Share keep a place the spec names. The editor shows no engine ranking. No format version moves (`SUPPORT_STATE_VERSION`, the share link's `version`, `ENGINE_PROTOCOL`); the stored key `picker-advanced` is no longer read.
-
-**Benefit.** App: a what-if turn takes 3 clicks instead of about 6, the left column no longer scrolls to build a turn, the replay stays in view while the tray is closed, and every die names in its column the target it belongs to.
-
-**Success.** An e2e test plays the six tasks of the design page at 1366 × 768 with no variation standing and holds each to its clicks, Execute included and Done not needed, with `.ps-main-left` never scrolled: a move instead of the played one 3, a forced flinch 4, a switch 3, Tera 3, a What-if move 8, a singles move 3. VGC counts on its own: a Scarlet/Violet VGC scene with Tera and a Champions scene with Mega and a bring-limited bench. A variation scene shows the engine filling the untouched slots without the chips changing size, an Execute pressed before the fill running after it, and a touched slot keeping the user's choice. With the dice closed, the open tray covers at most 256 px of the 456 px frame (bounding boxes in the e2e). The 10 e2e and 17 ui specs that address today's panel (`r84/review/t312-review.md`, answer b) move to the dock; their changed expectations (the default target, the filled slots, no Execute lock) wait for the user gate. Lossless for the bank and the feedback run, which do not drive the panel (D4: three byte-identical feedback runs, the bank digit-identical), regression, lint, `tsc -b`; the dock is built as small components under the lint ratchet. The user's own test before the gate.
-
-**Singles and doubles.** Both, and VGC on its own: one row in singles, two in doubles and VGC.
-
-**Evidence.** The two design pages in `r84/design/` (`turn-editor-drafts.html`: four layouts, A chosen with two rows; `turn-editor-buttons.html`: five button styles, "5 · Balken" chosen); today's panel in `r83/advanced-redesign-facts.md` (its section 4 reads the engine lines as writing a choice; a click there plays the turn out, `useEngineWalk.ts:98-124`); the review `r84/review/t312-review.md`; the decisions Q1 to Q18 in the round's spec (`docs/superpowers/specs/2026-11-01-round-84-turn-dock-design.md`).
 
 ## Round 85 · the engine reads the dice
 
@@ -142,6 +120,82 @@ In Gens 1 and 2 accuracy and crit draw in 256ths and the damage roll is `random(
 
 **Singles and doubles.** Both.
 
+## Approved, waiting for a round
+
+The gates of round 84 (02.11.2026 and 03.11.2026) approved these TODOs. T313 and T317 form the next small batch; T314 is a larger bug (D3) and T316 a feature, each its own round. Each leaves this file with its round's booking.
+
+### T313 · The app's buttons read at 4.5 : 1
+
+*App · round 84 · small fix · lossless*
+
+**Approved for the next small batch (final gate of round 84, 02.11.2026, "2a": with a before and after image before the build).**
+
+**Problem.** The app's buttons carry white bold text on gradients that miss the 4.5 : 1 contrast normal text needs. `.ps-btn` (Setup, Analyze game, Play out, Cancel and the rest) on #75a8d5 to #567fa7 reaches 2.5 : 1 at the top and 4.2 : 1 at the bottom; `.ps-btn-red` (Load, Discard variation, Replace, Save, Import) on #d95565 to #aa3344 reaches 3.9 : 1 at the top (`src/styles/forms.css:94-112`). Execute paints its own copy of the red gradient (`.ps-dock .ps-execute-btn-ready`, `src/styles/dock.css:156`, hover `brightness(1.1)` at `dock.css:157`), the lead picker's Start button paints the same copy (`src/components/LeadPanel.tsx:80`), and the loader's guide steps copy the blue (`src/styles/loader.css:22`). `.ps-btn:hover` brightens by 1.12 (`forms.css:107`), so a stop that just passes at rest fails under the pointer. Round 84 darkened the dock's selection blue to #3d6998 to #2d5078 for the same reason; it holds 4.75 : 1 under hover.
+
+**Idea.** Darken both gradients until white text passes 4.5 : 1 at every stop, at rest and under hover, keeping the hue, and change the two copies with them (or let them read the same tokens). The hue-keeping minimum is about #547999 and #c54d5c at rest, about #4c6d8a and #b04552 with hover; the dock's selection blue is the model for the blue.
+
+**Benefit.** App: every button reads for users with weak eyes.
+
+**Success.** A contrast spec reads `forms.css`, `dock.css:156`, the Start button's style and `loader.css:22` and holds white against each stop, and against each stop at its hover brightness (1.12 for `.ps-btn`, 1.1 for Execute), to 4.5 : 1. The user approves a before and after image before the build: the top bar, the eval panel's Analyze game and Cancel, and the dock's Execute. The engine lines and report moments of the eval panel are dark chips (`eval-panel.css:71-76`) and stay as they are.
+
+**Singles and doubles.** Not affected (styles only).
+
+**Evidence.** `r84/lanes/A/ledger.md`, A6a (the contrast numbers and the dock's blue); `r84/review/t313-t314-review.md`. The line "Execute on `.ps-btn-red`" of A6a and the header of `test/regression/move-tile-contrast.spec.ts` name the wrong class; the build fixes the header.
+
+### T314 · A bench offers bodies the side never brought
+
+*Replay core and app · round 84 · larger bug · score-touching (D3)*
+
+**Approved (final gate of round 84, 02.11.2026, "3a").**
+
+**Problem.** In a bring-limited format the app pins the brought bodies only when both sides fielded all of them during the game: `replayBringOnly` (`packages/replay-core/src/replay-format.ts:280-298`) returns null when either side shows fewer, by design for the evaluation. The null opens both sides: the reconstruction builds the whole team of six (`src/hooks/controller/replay-context.ts:91`, `bringOnlyLists`; `src/hooks/branch/session.ts:170`), so the dock's bench, the What-if and the engine's ranked choices offer bodies that never came to the battle. Champions VGC game 2625939941: P1 fielded three bodies, so P2's four are known (Aerodactyl, Kingambit, Farigiraf, Sylveon), yet the bench of P2A at turn 1 reads Kangaskhan, Farigiraf, Torkoal, Sylveon. In `.fit-corpus`, 111 of the 511 Champions VGC bo1 games (regma, regmb, regmc) are open, and the bo3 games (file names with a bo3 prefix) hold 174 more of 690, files with a hash suffix left out; 102 of the 111 have one side short and the other fully known. Scarlet/Violet VGC goes through the same rule: 236 of 1,200 bo1 games are open. Battle Stadium Singles has no corpus game.
+
+**Idea.** Pinning each side on its own is the per-side variant that A.3c measured and rejected: a pinned four against an open six flipped game 2630452654 from 4/4 to 0/4 (`docs/completed/timeline-ux.md:66`). The fix therefore has to price the open side fairly. The build starts by choosing among (a) a bench-only change that leaves the evaluation as it is (two readings of one game), (b) per-side pins that keep the open side's unfielded bodies and weight them, (c) a list type of known bodies plus one unknown, with a chance step in the engine. Option (c) needs four parts the code lacks: the list type (it crosses the worker types), a rule in `trimTeamToBring` (today it keeps exactly the named sets and would leave the open side with three bodies), the engine's step for the unknown body (chance node, sample or placeholder), and a bench row for it. Per-side lists already flow: an empty or absent list leaves that side whole (`team-order.ts:16`, `picker-state.ts:311`).
+
+**Benefit.** App and engine: a switch the game cannot have is no longer offered, and the evaluation of those games prices only bodies the side could have brought.
+
+**Success.** A sweep over the bring-limited games of `.fit-corpus` and `.calibration/replays` (2630452654 is only in the latter), with Champions VGC and Scarlet/Violet VGC as separate rows and Battle Stadium Singles on a synthetic log, holds every bench to the bodies the log fields or the chosen option allows. Game 2630452654 keeps its four of four samples of the A.3c gate. Bank plus the VGC and Champions VGC holdouts without harm, with the cache version bumped once (D3). The specs that move are re-pins for the gate: `bring-limit.spec.ts:104` ("both sides or neither"), case 1 of `dock-bring-fixture.spec.ts`, and the comment of that rule. The stale comment at `replay-context.ts:88-90` ("`[]` on a side stays whole", which `replayBringOnly` never returns now) goes with the fix.
+
+**Singles and doubles.** Both: Battle Stadium Singles brings three, VGC and Champions VGC four.
+
+**Evidence.** `r84/lanes/A/ledger.md`, A6d (the first draft and count); `r84/review/t313-t314-review.md` (the corrected counts, the bo3 and Scarlet/Violet rows); `docs/completed/timeline-ux.md:66` (the A.3c measurement); `test/regression/dock-bring-fixture.spec.ts`.
+
+### T316 · The replay frame drops the turn buttons the timeline covers
+
+*App · round 84 · feature (the dock following Switch sides is new behaviour) · lossless*
+
+**Approved (02.11.2026, "13a"; the user: "glaube play muss bleiben?"; 20:17: "Switch Sides find ich wichtig, Color scheme und Music schon egal (solange das default off ist)").**
+
+**Problem.** The replay frame shows Showdown's own controls (Play, Reset, Last turn, Next turn, Go to turn…, Switch sides, Speed, Music, Color scheme), and the app's timeline under it moves through the same turns (`TimelineBar.tsx`: the turn slider, the arrows, T0). Two controls for one job; on a phone Showdown's rows take two lines and get cut (`r84/gate/preview/m-phone-390x844-1-first-screen.png`).
+
+**Idea.** The app builds the frame's document itself (`src/lib/replay-html.ts`), so it hides the buttons the timeline covers (Last turn, Next turn, Go to turn…) and keeps what the timeline lacks. The user's answers (the question round, 20:14 to 20:18): Play (the timeline has no autoplay), Reset, Speed and Switch sides stay; Last turn, Next turn and Go to turn… go; Music and Color scheme may go as long as the music stays off by default. The dock follows Switch sides: today the dock puts P1, the side the frame shows near (at its foot), in the top row (`DockRows.tsx:18`); after Switch sides P2 stands near, and its row moves to the top. The frame tells the app its side state (it is same-origin), and the chips keep their labels. The frame can start from P2's side (`viewpoint`, the `?p2` link flag, `replay-html.ts:208`), and a rebuild of the frame resets Switch sides; the dock reads the frame's state after each of these, never a count of clicks. `test/e2e/branch.spec.ts:262-266` clicks the frame's Last turn and Next turn and moves to the timeline.
+
+**Benefit.** App: one way to move through the turns, and the frame's controls fit a phone.
+
+**Success.** An e2e that the hidden buttons are gone and Play, Reset, Speed and Switch sides still work, the music off at load; the dock's top row belongs to the side the frame shows near, at load (P1, and P2 with `?p2`), after Switch sides and after a rebuild of the frame, in singles and doubles; on the phone case of T315 the frame's remaining controls fit the 362 px frame without a cut (today the row needs about 390 px before Switch sides joins it).
+
+**Singles and doubles.** Both: the dock's row order follows Switch sides in singles (one row, the two sides' chips swap places) and in doubles and VGC (the two rows swap).
+
+**Evidence.** The user's screenshots and `r84/gate/preview/m-phone-*.png` (02.11.2026).
+
+### T317 · "EVs ?" names what is unknown
+
+*App · round 84 · small fix · lossless*
+
+**Approved for the next small batch (02.11.2026, "15a").**
+
+**Problem.** The Battle Statistics tag of a body without known EVs reads "EVs ? UNKNOWN" (`src/components/BattleStatsPanel.tsx:43`: `evs.source === 'unknown' ? 'EVs ?' : '0 EVs'`); the question mark reads like an error, beside tags such as "252 HP / 4 SpD / 252 Spe EVs FROM MOVE ORDER".
+
+**Idea.** Say it in words, for example "EVs not yet known", keeping the tag's pattern (value, then source) or dropping the doubled source word.
+
+**Benefit.** App: the statistics read without a puzzle.
+
+**Success.** A ui spec on the tag's text; `test/ui/components/BattleStatsPanel.spec.tsx:43` expects "EVs ?" today and moves with the fix (a re-pin for the batch gate); the stop-slop rules.
+
+**Singles and doubles.** Not affected.
+
+**Evidence.** The integrator's screenshots of 02.11.2026 (`r84/gate/preview/r9-*.png`).
+
 ## Parked
 
 The triage of 21.10.2026 and the user gates after it parked these TODOs; each section names its trigger, and a trigger that fires brings its TODO to a gate.
@@ -199,23 +253,6 @@ The triage of 21.10.2026 and the user gates after it parked these TODOs; each se
 
 **Steps.**
 - [ ] Red specs for both scenes, then the fixes.
-
-### T271 · Doubles slots of the approximated position follow the protocol
-
-*App · round 77 · small · confusing · swarm finding B4*
-
-**Parked (user gate 28.10.2026, "4b").** Trigger: a user report, or the first round after the release.
-
-**Problem.** gen9doublesou-2663093831, main line: until the exact position is rebuilt, the picker shows the approximation from the turn snapshot and the guessed teams (`pickerStateFromSnapshot`, `src/lib/picker-state.ts:391`). At T5 it reads "P2A kanye | P2B the aids missle", the exact position "P2A the aids missle | P2B kanye", and the protocol puts Glimmora in `p2a`; T12 is reversed the same way; at T15 the approximation shows one slot a side, the exact position four (3 of 3). No wrong execution from a click in that window was shown.
-
-**Benefit.** App: the slots a doubles player sees while the position loads are the slots the move goes to.
-
-**Success.** The approximation orders each side's actives as the protocol does, and a two-slot side keeps two slots; a doubles and a VGC row in a spec.
-
-**Evidence.** Lane B of the branching swarm (`docs/perf/probes/2026-10-24-r77/swarm/findings.md`, B4; report `swarm/reports/lane-B-report.txt`).
-
-**Steps.**
-- [ ] A red spec from the three turns, then the fix in the snapshot picker.
 
 ### T272 · Old share links name their moves
 

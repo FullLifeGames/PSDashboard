@@ -912,6 +912,69 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * ROUND 84 2026-11-01 to 2026-11-03 (improvement round 84, a feature: the
+ * turn dock, T312, with T315 after the gate; on r84-a from dev f549a27 in
+ * the worktree w84a, one fresh wave-builder per step; probes
+ * docs/perf/probes/2026-11-01-r84/). Gates: design 01.11. 19:20 ("16 5,
+ * 17a, 18 a"), spec 19:44 ("Passt"), final 02.11. 19:15 ("1a 2a 3a 4a
+ * 5a"), the user's own test (answer 6b) and the rulings after it (02.11.
+ * 19:34 to 03.11. 15:40, 1a to 20a), final part two 03.11. 16:39 ("1a 2a
+ * 3a 4a").
+ * DELIVERED: T312. Two rows of slot chips under the replay build the turn,
+ * Execute on their right; a replay turn starts with the logged picks, and
+ * the engine fills every slot the user has not touched: at the live tip of
+ * a variation at once, at a replay turn after the first click on a chip
+ * (Q19 b), a forced replacement included (2a). A tray per slot holds the
+ * moves as tiles with the target's hit bar (variant F: the share even the
+ * lowest roll takes, green over half, yellow over a fifth, else red), the
+ * target row, the switches, the gimmicks, and behind "Dice · What if" the
+ * dice table, the What-if row and "All choices…". Basic and Advanced are
+ * gone; the loader folds into "Load" beside Setup (Q20 a); the lead picker
+ * takes the dock's look (12b); the right column ends on the dock's foot
+ * (9a); the chip carries the tile's type edge and the type tag or the
+ * incoming body's sprite (8a); the variation's moves sit under a toggle
+ * with Save Branch and Copy Share Link on its line (18a, 20a); the top bar
+ * keeps one line with a long format name (19a). T315: Auto picks the
+ * largest 25 % step at which the window keeps 1400 x 820 CSS px (17a:
+ * 2560 x 1290 gets 150 %), a Size select under Setup overrides it, and a
+ * phone shows the whole battle and one chip a row (10a, 11a). Fixes on the
+ * way: the snapshot picker lists doubles actives in field order (06633f9;
+ * the probe found 41 to 46 % of the doubles actives in the wrong slot;
+ * T271's scene pinned in 5995d60, red on the old order); the partner of a
+ * forced replacement is inert (b23df6f); the tray closes when a forced
+ * replacement goes out (397d030); a run under way when a position begins
+ * is foreign to it (b19dc1e), the fill is pending from the first frame
+ * (8b8d1a1), and the chip shows the body a bench click sends (b094db1).
+ * MEASUREMENT: lossless (D4), no cache bump; packages/ and the team build
+ * have no diff. Bank in CI r84-head (37fb8b5) 837 of 837 rows
+ * byte-identical to r83-head. Feedback f1 to f3 on 37fb8b5, 12 of 12 dumps
+ * byte-identical with each other and with round 83's k1; f4 on b094db1,
+ * after the post-gate steps, 12 of 12 byte-identical with f1. The six
+ * tasks at 1366 x 768 without scrolling the left column: 3, 4, 3, 3 (Tera,
+ * Scarlet/Violet VGC; 3 with Mega in Champions VGC), 6 (What-if, the plan
+ * allowed 8) and 3 clicks. e2e on b094db1: Chromium 136 passed, 8 skipped
+ * (opt-in), no ResizeObserver loop; WebKit 18 of 18 (scale, phone, right
+ * column, narrow dock, top bar, forced replacements); Firefox 17 of 17
+ * (the layout specs, gate answer 3a). ui project on b094db1: 171 files,
+ * 1,410 tests. Suite in the main checkout with DICE_SWEEPS=full: 724 files,
+ * 42,026 passed, 116 expected fails, 24 skipped, the same as round 82's
+ * (opt-in runs and two documented divergences of the saved replay), 437 s;
+ * its one red spec, twin-lists.spec.ts, read the twin a,b,c that the lead
+ * picker's redesign removed, and c087cb2 shrinks the twin and name
+ * baselines. Lint and tsc -b green.
+ * USER GATE 2026-11-02 19:15 ("1a 2a 3a 4a 5a"): the 88 changed
+ * expectations accepted; T313 (button contrast) and T314 (a bench of
+ * bodies never brought) approved; the 1000 x 700 timeline under the fixed
+ * dock and the darker selection blue stay. Answer 6b, the user's own test:
+ * the findings that became A7a to A7j, with T315 built in the round (5b).
+ * FINAL GATE PART TWO 2026-11-03 16:39 ("1a 2a 3a 4a"): (1) the 42 changed
+ * expectations of the post-gate steps accepted; (2) T271 closed, its scene
+ * pinned; (3) Firefox through Playwright; (4) dev takes r84 and is pushed
+ * with rounds 82 to 84.
+ * RESTS: T313 and T317 for the next small batch, T314 (larger bug, D3),
+ * T316 (the frame's turn buttons, feature); round 85 the engine setup,
+ * with the eval panel's jargon in its spec (14a). Next free T318.
+ *
  * ROUND 83 2026-11-01 (improvement round 83, a small batch: the GitHub
  * issues #2 and #3, on r83 from dev 24a7235; lane A in the worktree w9b by
  * the integrator, lane B in w9c by a wave-builder; probes
