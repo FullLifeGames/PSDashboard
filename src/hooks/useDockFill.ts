@@ -199,31 +199,50 @@ function startedByHousekeeping(liveTip: boolean, prefs: Pick<Evaluation['prefs']
   return prefs.autoAnalyze && (status === 'idle' || status === 'stale');
 }
 
+/**
+ * The result that stood when the position began: only a newer one belongs to it. Round 84 (A7h): `foreign` marks a run that was
+ * under way when the position began (the replacement's run, when a forced replacement was just sent: the next request of the turn
+ * has the same `evalViewKey`, so the tag cannot tell the two apart). Its result belongs to the request before; once it is over,
+ * whatever stands is its result and the new base.
+ */
+interface FillBase { key: string; result: EvalResult | null; foreign: boolean }
+
+function useFillBase(key: string, result: EvalResult | null, running: boolean) {
+  const ref = useRef<FillBase>({ key, result, foreign: running });
+  const update = useCallback((nextKey: string, nextResult: EvalResult | null, nextRunning: boolean): FillBase => {
+    if (ref.current.key !== nextKey) ref.current = { key: nextKey, result: nextResult, foreign: nextRunning };
+    else if (ref.current.foreign && !nextRunning) ref.current = { key: nextKey, result: nextResult, foreign: false };
+    return ref.current;
+  }, []);
+  return update;
+}
+
 /** The trigger only acts: a run for the position, or the result of a run another trigger started (Auto, the walk). */
 function useFillTrigger(inputs: DockFillInputs, key: string, eligible: boolean, running: boolean, apply: Apply, settledRef: FillMarks['settledRef']) {
   const { evaluation, liveEvalStatus, evalViewKey, handleEvaluate, liveTip } = inputs;
   const attemptRef = useRef<string | null>(null);
-  // The result that stood when the position began: only a newer one belongs to it.
-  const baseRef = useRef<{ key: string; result: EvalResult | null }>({ key, result: evaluation.result });
+  const updateBase = useFillBase(key, evaluation.result, running);
   const attempted = evaluation.resultTag === evalViewKey;
   useEffect(() => {
-    if (baseRef.current.key !== key) baseRef.current = { key, result: evaluation.result };
+    const current = updateBase(key, evaluation.result, running);
     if (settledRef.current.key === key) return;
     if (!eligible) {
       // A run that the game analysis (or anything else) stopped starts again once the fill may run.
       attemptRef.current = null;
       return;
     }
-    if (evaluation.status === 'done' && evaluation.result !== null && attempted && evaluation.result !== baseRef.current.result) {
+    if (!current.foreign && evaluation.status === 'done' && evaluation.result !== null && attempted && evaluation.result !== current.result) {
       apply(key, evaluation.result);
       return;
     }
-    if (attemptRef.current === key || running) return;
+    // A foreign run is no run for this position: the fill starts its own, which supersedes it.
+    if (attemptRef.current === key || (running && !current.foreign)) return;
     // With Auto or "always on", the housekeeping effects of the view start this run; its result comes through the branch above.
-    if (startedByHousekeeping(liveTip, evaluation.prefs, liveEvalStatus)) return;
+    if (!current.foreign && startedByHousekeeping(liveTip, evaluation.prefs, liveEvalStatus)) return;
     attemptRef.current = key;
+    current.foreign = false;
     handleEvaluate({ onResult: result => apply(key, result) });
-  }, [key, eligible, attempted, running, evaluation.status, evaluation.result, evaluation.prefs, liveEvalStatus, liveTip, handleEvaluate, apply, settledRef]);
+  }, [key, eligible, attempted, running, evaluation.status, evaluation.result, evaluation.prefs, liveEvalStatus, liveTip, handleEvaluate, apply, settledRef, updateBase]);
 }
 
 /** What the dock reads of a fill that landed for this position (nothing before). A replay turn reads its choices from the view. */

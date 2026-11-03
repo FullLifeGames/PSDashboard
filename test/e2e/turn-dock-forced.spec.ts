@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'fs';
 import { emptySmogon, routeSmogon } from './smogon-routes';
-import { dockChip, fixturePath, installReplayEmbedCache, openTray, pickMove, routeOfflineFixtures, waitForExactPickers } from './helpers';
-import { lightEngine, loadDockReplay, variationPanel } from './dock-helpers';
+import { dockChip, fixturePath, installReplayEmbedCache, openTray, pickForcedReplacement, pickMove, routeOfflineFixtures, waitForExactPickers } from './helpers';
+import { DOUBLES_SLOTS, lightEngine, loadDockReplay, variationPanel } from './dock-helpers';
 
 /**
  * Round 84 (turn dock), step A7a, ruling 2a: a forced replacement gets the engine's choice like any slot. The draft replay of the
@@ -130,4 +130,30 @@ test('one forced slot in doubles: its partner stands inert like the waiting side
   await expect(page.locator('.ps-tray')).toHaveCount(0);
   await openTray(page, 'p1a');
   await expect(page.locator('.ps-tray')).toHaveCount(1);
+});
+
+/**
+ * Round 84 (A7h): the bench click that comes while the engine's run for the replacement is still under way. Champions VGC
+ * 2625939941, turn 1 with the logged picks: Flip Turn asks P1B for a replacement and the fill starts its run for that request. The
+ * user sends a body at once (ruling 2a), so the next request, the moves of turn 2, begins with that run still going. It carries
+ * the same evalViewKey (`variation:2`), and its result is the replacement's analysis: the fill must not settle on it. It starts its
+ * own run, and all four chips of turn 2 take the engine's pick with Execute ready.
+ */
+test('a bench click while the run for the replacement is under way: the next request is filled by its own run', async ({ page }) => {
+  test.setTimeout(420_000);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await lightEngine(page);
+  await routeOfflineFixtures(page);
+  await page.goto('/');
+  await loadDockReplay(page, 'gen9championsvgc2026regma-2625939941', 1);
+  await page.locator('.ps-execute-btn').click();
+  await expect(page.locator('.ps-dock-chip[data-forced="true"]:not([inert])').first()).toBeVisible({ timeout: 120_000 });
+  await pickForcedReplacement(page);
+  await expect(page.locator('.ps-dock-chip[data-forced="true"]')).toHaveCount(0, { timeout: 60_000 });
+  await expect(variationPanel(page)).toContainText('forced replacement', { timeout: 30_000 });
+  for (const slot of DOUBLES_SLOTS) {
+    await expect(dockChip(page, slot)).toHaveAttribute('data-origin', 'engine', { timeout: 240_000 });
+  }
+  await expect(page.locator('.ps-execute-btn')).toHaveText('Execute Turn');
+  await expect(page.locator('.ps-execute-btn')).toBeEnabled();
 });
