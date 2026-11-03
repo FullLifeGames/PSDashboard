@@ -1,6 +1,7 @@
 /**
  * Round 59 (T91): the hash gate. The pre-check and the rule-table lever rely
- * on these @pkmn/sim functions doing exactly what 0.10.11 does. Under Node
+ * on these @pkmn/sim functions doing exactly what the pinned release does
+ * (PINNED_SIM_HASHES below names it). Under Node
  * the layer hashes their source (FNV-1a over Function.prototype.toString:
  * synchronous, no node:crypto in engine code) at first use and steps back
  * (status hash-mismatch) when one changed; forced mode throws. A browser

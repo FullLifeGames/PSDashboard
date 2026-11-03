@@ -1,6 +1,7 @@
 /**
- * Round 59 (T91): the speed layer for @pkmn/sim 0.10.11. Three levers, each
- * behind the switch in state.ts: rule tables built once per format
+ * Round 59 (T91): the speed layer for the pinned @pkmn/sim release (named at
+ * PINNED_SIM_HASHES in guard.ts). Three levers, each behind the switch in
+ * state.ts: rule tables built once per format
  * (rule-table.ts), battles copied instead of deserialized (clone.ts), and a
  * pre-check that answers event dispatches nobody listens to (dispatch.ts).
  * Results never change, only time (spec

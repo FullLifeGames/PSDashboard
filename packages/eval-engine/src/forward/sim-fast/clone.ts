@@ -1,6 +1,7 @@
 /**
- * Round 59 (T91), lever clone: a Battle -> Battle copy for @pkmn/sim 0.10.11,
- * no JSON and no constructor. Phase one allocates a shell for the battle,
+ * Round 59 (T91), lever clone: a Battle -> Battle copy for the pinned
+ * @pkmn/sim release (named at PINNED_SIM_HASHES in guard.ts), no JSON and no
+ * constructor. Phase one allocates a shell for the battle,
  * the field, every side and every Pokemon; phase two fills each shell field
  * by field and remaps back-references through the shells.
  *
