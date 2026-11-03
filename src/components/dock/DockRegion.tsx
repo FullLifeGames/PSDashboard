@@ -25,7 +25,8 @@ function dockProps(app: AppController, replayId: string): TurnDockProps {
     // The tip executes its own pending choices; off the tip the effective choices (the played seed under the picks) go along.
     onExecuteTurn: choices => (liveTip ? void app.handleExecuteTurn() : handleExecuteDraft(choices)),
     played: playedAtView,
-    positionKey: `${replayId}:${evalViewKey}`,
+    // The step within the turn counts: a forced replacement and the choice after it share the turn, and the tray and the armed gimmicks of the one are not the other's.
+    positionKey: `${replayId}:${evalViewKey}:${liveTip ? app.ctx.branch.history.length : 0}`,
     getBattle: liveTip ? app.ctx.branch.getBattle : getPickerBattle,
     replayLog: pickerReplayLog,
     seed: liveTip ? null : pickerSeed,
