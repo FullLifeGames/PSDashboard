@@ -26,6 +26,20 @@ test.beforeEach(async ({ page }) => {
 const rootScale = (page: Page) => page.evaluate(() => document.documentElement.style.getPropertyValue('--ps-scale'));
 const frameOf = (page: Page) => page.frameLocator('.ps-iframe-wrap iframe').first();
 
+/** The battle's box on the screen, from the page: the rect inside the frame (CSS px of its document) times the frame's visual over CSS width. */
+async function battleOnScreen(page: Page) {
+  return page.evaluate(() => {
+    const frame = document.querySelector('.ps-iframe-wrap iframe') as HTMLIFrameElement;
+    const inside = frame.contentDocument!.querySelector('.battle')!.getBoundingClientRect();
+    const outside = frame.getBoundingClientRect();
+    const k = outside.width / frame.offsetWidth;
+    return {
+      k, width: inside.width * k, left: outside.left + inside.left * k, right: outside.left + inside.right * k,
+      frameLeft: outside.left, frameRight: outside.right, rectInside: { x: inside.x, w: inside.width }, frameCss: frame.offsetWidth,
+    };
+  });
+}
+
 async function openSetup(page: Page) {
   await page.getByRole('button', { name: 'Setup', exact: true }).click();
   return page.getByRole('combobox', { name: 'Size' });
@@ -54,16 +68,19 @@ test('Auto at 2560 x 1290 takes 150 %: the app fills the window, the column does
   expect(facts.leftOverflow, 'the left column does not scroll').toBeLessThanOrEqual(1);
   expect(facts.leftScrollTop).toBe(0);
   expect(facts.frameVisual / facts.frameCss, 'the frame element\'s scale').toBeCloseTo(1.5, 1);
-  // The replay's content scales with the frame, drawn at the zoomed size: its 642 px battle stands 963 px wide on the screen and
-  // inside the frame. In WebKit a frame that kept its 100 % layout shows it at 642.
-  const frame = (await page.locator('.ps-iframe-wrap iframe').first().boundingBox())!;
-  const battle = frameOf(page).locator('.battle');
-  await expect(battle).toBeVisible({ timeout: 60_000 });
-  const box = (await battle.boundingBox())!;
-  expect(box.width, `width of the battle on the screen ${JSON.stringify({ box, frame })}`).toBeGreaterThan(BATTLE_WIDTH * 1.5 - 6);
-  expect(box.width).toBeLessThan(BATTLE_WIDTH * 1.5 + 6);
-  expect(box.x).toBeGreaterThanOrEqual(frame.x - 1);
-  expect(box.x + box.width).toBeLessThanOrEqual(frame.x + frame.width + 1);
+  // The replay's content scales with the frame, drawn at the zoomed size: its 642 px battle stands about 963 px wide on the screen and
+  // inside the frame. In WebKit a frame that kept its 100 % layout shows it at 642. Playwright's boundingBox() of an element inside a
+  // zoomed frame reads page coordinates divided by the zoom (641 for 963; the A7d run), so the width on the screen comes from the page:
+  // the battle's rect in the frame's own CSS px times the frame's rect width over its offsetWidth (both engines read the frame's rect
+  // in screen px and the rect inside it in the frame's CSS px, the zoom probe of A7c).
+  await expect(frameOf(page).locator('.battle')).toBeVisible({ timeout: 60_000 });
+  const shown = await battleOnScreen(page);
+  const message = `the battle on the screen ${JSON.stringify(shown)}`;
+  expect(shown.width, message).toBeGreaterThan(BATTLE_WIDTH * 1.5 - 6);
+  expect(shown.width, message).toBeLessThan(BATTLE_WIDTH * 1.5 + 6);
+  // The battle's box may start 1 CSS px left of the document (its border), which is 1.5 px on the screen.
+  expect(shown.left, message).toBeGreaterThanOrEqual(shown.frameLeft - 1.5 - 0.5);
+  expect(shown.right, message).toBeLessThanOrEqual(shown.frameRight + 1);
 });
 
 test('the timeline slider lands where the pointer shows at 150 %', async ({ page }) => {
