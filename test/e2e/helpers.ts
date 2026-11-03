@@ -3,7 +3,7 @@ import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import type { ReplayData } from '@fulllifegames/replay-core';
-import { doublesReplay, doublesSpreadReplay } from './fixtures/doubles-replay';
+import { doublesForcedReplay, doublesReplay, doublesSpreadReplay } from './fixtures/doubles-replay';
 import { vgcReplay } from './fixtures/vgc-replay';
 import { emptySmogon, routeSmogon } from './smogon-routes';
 
@@ -262,6 +262,7 @@ export async function routeOfflineFixtures(page: Page): Promise<void> {
     const url = route.request().url();
     const replay = url.includes(vgcReplay.id) ? vgcReplay
       : url.includes(doublesSpreadReplay.id) ? doublesSpreadReplay
+      : url.includes(doublesForcedReplay.id) ? doublesForcedReplay
       : url.includes(doublesReplay.id) ? doublesReplay
       : dockReplays.find(dock => url.includes(dock.id)) ?? fixtureReplay;
     route.fulfill({

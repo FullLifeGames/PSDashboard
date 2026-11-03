@@ -42,3 +42,19 @@ export const doublesSpreadReplay: ReplayData = {
   id: 'gen9doubles-spread-test',
   log: doublesReplay.log.replace('- Thunderbolt<br />- Quick Attack<br />', '- Thunderbolt<br />- Discharge<br />'),
 };
+
+/**
+ * Round 84 (A7d): the same game with Pikachu's and Eevee's first moves swapped for Memento and four bodies on P1's bench
+ * (Raichu, Jolteon, Vaporeon, Flareon). Two Mementos faint both bodies of P1 whatever the dice roll (accuracy 100, the user faints
+ * when it hits) while P2 loses nothing, so the executed turn ends at a replacement of both P1 slots: the scene of ruling 16a.
+ */
+export const doublesForcedReplay: ReplayData = {
+  ...doublesReplay,
+  id: 'gen9doubles-forced-test',
+  log: doublesReplay.log
+    .replace('- Thunderbolt<br />- Quick Attack<br />- Protect', '- Memento<br />- Quick Attack<br />- Protect')
+    .replace('- Tackle<br />- Quick Attack<br />- Protect', '- Memento<br />- Quick Attack<br />- Protect')
+    .replace('|poke|p2|Bulbasaur, L50|item', '|poke|p1|Vaporeon, L50|\n|poke|p1|Flareon, L50|\n|poke|p2|Bulbasaur, L50|item')
+    .replace('Jolteon<br />Ability: Volt Absorb<br />- Thunderbolt<br />- Protect<br /></details>',
+      'Jolteon<br />Ability: Volt Absorb<br />- Thunderbolt<br />- Protect<br /><br />Vaporeon<br />Ability: Water Absorb<br />- Scald<br />- Protect<br /><br />Flareon<br />Ability: Flash Fire<br />- Flare Blitz<br />- Protect<br /></details>'),
+};

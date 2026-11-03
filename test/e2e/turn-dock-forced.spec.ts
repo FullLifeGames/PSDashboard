@@ -45,30 +45,39 @@ test('a forced replacement: the engine fills the slot, Execute sends it, on both
 });
 
 /**
- * Round 84 (A7c, ruling 16a): doubles, both slots of P1 forced. Turn 6 of the Doubles OU fixture 2693620934 ends with Dragonite and
- * Zapdos fainting (and Sinistcha of P2), so the executed turn leaves P1A, P1B and P2B to replace. The engine fills all three. A bench
- * click in P1A while P1B (and P2B) hold only the engine's pick records the choice and sends nothing; Execute stays and sends the
- * turn with the user's pick in P1A and the engine's in the others.
+ * Round 84 (A7c, ruling 16a; A7d: a scene the sim fixes): doubles, both slots of P1 forced. The hand-written replay
+ * `gen9doubles-forced-test` gives Pikachu and Eevee a Memento each, and Memento faints its user when it hits (accuracy 100, no
+ * damage roll decides it), so the executed turn 1 leaves P1A and P1B to replace from a bench of four (Raichu, Jolteon, Vaporeon,
+ * Flareon) and P2 untouched. The engine fills both. A bench click in P1A while P1B holds only the engine's pick records the choice and
+ * sends nothing; Execute stays and sends the turn with the user's pick in P1A and the engine's in P1B. (The A7c case took turn 6 of a
+ * corpus game whose two faints depend on the damage rolls; the sim never asked for both replacements there.)
  */
+const BENCH = ['Raichu', 'Jolteon', 'Vaporeon', 'Flareon'];
+
 test('two forced slots of one side: a bench click records the choice while the other holds only the engine pick', async ({ page }) => {
   test.setTimeout(420_000);
   await lightEngine(page);
   await routeOfflineFixtures(page);
   await page.goto('/');
-  await loadDockReplay(page, 'gen9doublesou-2693620934', 6);
-  // Dragonite (P1B) fainted before it moved, so its chip starts empty; Rock Slide, a move it used earlier, leaves the turn as it was.
-  await pickMove(page, 'p1b', 'Rock Slide');
+  await loadDockReplay(page, 'gen9doubles-forced-test', 1);
+  // The first move of every other slot (Vine Whip, Ember) and Memento in both P1 slots; nobody protects.
+  await pickMove(page, 'p1a', 'Memento');
+  await pickMove(page, 'p1b', 'Memento');
+  await pickMove(page, 'p2a');
+  await pickMove(page, 'p2b');
   const execute = page.locator('.ps-execute-btn');
   await expect(execute).toBeEnabled();
   await execute.click();
 
-  const [p1a, p1b, p2b] = [dockChip(page, 'p1a'), dockChip(page, 'p1b'), dockChip(page, 'p2b')];
-  for (const chip of [p1a, p1b, p2b]) {
+  const [p1a, p1b] = [dockChip(page, 'p1a'), dockChip(page, 'p1b')];
+  for (const chip of [p1a, p1b]) {
     await expect(chip).toHaveAttribute('data-forced', 'true', { timeout: 120_000 });
     await expect(chip).toHaveAttribute('data-origin', 'engine', { timeout: 240_000 });
   }
+  await expect(dockChip(page, 'p2a')).not.toHaveAttribute('data-forced', 'true');
+  await expect(dockChip(page, 'p2b')).not.toHaveAttribute('data-forced', 'true');
   const taken = `${await p1a.textContent()} ${await p1b.textContent()}`;
-  const body = ['Sylveon', 'Gyarados', 'Kingambit', 'Arcanine'].find(name => !taken.includes(name))!;
+  const body = BENCH.find(name => !taken.includes(name))!;
   expect(body, 'a bench body the engine did not pick').toBeTruthy();
 
   const tray = await openTray(page, 'p1a');
@@ -85,4 +94,5 @@ test('two forced slots of one side: a bench click records the choice while the o
   await execute.click();
   await expect(page.locator('.ps-dock-chip[data-forced="true"]')).toHaveCount(0, { timeout: 120_000 });
   await expect(page.locator('.ps-force-switch-note')).toHaveCount(0, { timeout: 30_000 });
+  await expect(variationPanel(page)).toContainText('forced replacement (P1)');
 });

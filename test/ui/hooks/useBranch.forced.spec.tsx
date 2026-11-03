@@ -154,3 +154,31 @@ describe('the branch at a forced replacement of both slots of one side, doubles'
   }, 180_000);
 });
 
+
+/**
+ * Round 84 (A7d): the scene of the e2e case `turn-dock-forced` (the hand-written Doubles OU replay `gen9doubles-forced-test`). Two
+ * Mementos faint both bodies of P1 whatever the dice roll, as long as neither foe protects: Memento's accuracy is 100 and the user
+ * faints when it hits. The A7c case took a corpus turn whose two faints depend on the damage rolls, and the sim never asked for both
+ * replacements there. The sim asks P1 for two replacements here, and P2 for none.
+ */
+describe('two Mementos force both slots of P1 and no slot of P2, doubles', () => {
+  const p1 = [mon('Pikachu', ['memento', 'quickattack', 'protect']), mon('Eevee', ['memento', 'quickattack', 'protect']),
+    mon('Raichu', ['thunderbolt']), mon('Jolteon', ['thunderbolt']), mon('Vaporeon', ['scald']), mon('Flareon', ['flamecharge'])];
+  const p2 = [mon('Bulbasaur', ['vinewhip', 'protect']), mon('Charmander', ['ember', 'protect']), mon('Squirtle', ['watergun']), mon('Ivysaur', ['vinewhip'])];
+
+  test('the sim asks P1 for two replacements', async () => {
+    const hook = renderHook(() => useBranch());
+    await act(async () => {
+      await hook.result.current.startBranch('gen9doublesou', [...p1], [...p2], freshLog({ format: 'gen9doublesou', p1: [...p1], p2: [...p2] }), 1, null, { playerNames: ['A', 'B'] });
+    });
+    act(() => {
+      hook.result.current.setChoice('p1', { kind: 'move', moveId: 'memento', moveName: 'Memento', targetLoc: 1 }, 0);
+      hook.result.current.setChoice('p1', { kind: 'move', moveId: 'memento', moveName: 'Memento', targetLoc: 1 }, 1);
+      hook.result.current.setChoice('p2', { kind: 'move', moveId: 'vinewhip', moveName: 'Vine Whip', targetLoc: 1 }, 0);
+      hook.result.current.setChoice('p2', { kind: 'move', moveId: 'ember', moveName: 'Ember', targetLoc: 1 }, 1);
+    });
+    await act(async () => { await hook.result.current.executeTurn(); });
+    expect(hook.result.current.simState!.p1ForceSwitches).toEqual([true, true]);
+    expect(hook.result.current.simState!.p2ForceSwitch).toBe(false);
+  }, 180_000);
+});
