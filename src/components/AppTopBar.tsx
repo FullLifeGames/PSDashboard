@@ -1,5 +1,6 @@
 import type { BranchSimState } from '../hooks/useBranch';
 import { LoaderMenu } from './LoaderMenu';
+import { MatchTitle } from './MatchTitle';
 import { SetupMenu } from './SetupMenu';
 import { SupportLinks } from './SupportLinks';
 
@@ -26,11 +27,8 @@ interface AppTopBarProps {
 
 function TopBarMatchInfo({ replayData, usageStats, setAssumptions }: Pick<AppTopBarProps, 'replayData' | 'usageStats' | 'setAssumptions'>) {
   return (
-    <div className="ps-topbar-match" style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-      <span className="ps-format-tag">{replayData.format}</span>
-      <span style={{ fontSize: 11, color: '#8ac' }}>{replayData.players[0]}</span>
-      <span style={{ fontSize: 10, color: '#556' }}>vs</span>
-      <span style={{ fontSize: 11, color: '#c8a' }}>{replayData.players[1]}</span>
+    <div className="ps-topbar-match" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <MatchTitle format={replayData.format} players={replayData.players} />
       {usageStats.loading && (
         <span style={{ fontSize: 10, color: '#b6a46a' }}>Smogon stats loading...</span>
       )}

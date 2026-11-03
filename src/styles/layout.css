@@ -61,11 +61,17 @@
   /* Round 77: where the support links do not fit beside a live branch's status, they take a line of their own. */
   flex-wrap: wrap;
 }
-/* The match info keeps its own width for the line break and shortens long names instead of running under its neighbours. */
+/* Round 84 (A7f, ruling 19a): the bar stays on one line with a long format name. The match takes what the actions and the support
+   links leave (a zero basis, so its text never forces the wrap) and wraps only below a floor that holds the shortened tag and both
+   shortened names. Inside it the format tag shrinks first (a weight far above the names'), the names next; each clips with an
+   ellipsis and carries its full text in a title. The floor sits on a selector the stacked layout's `.ps-topbar > div` cannot beat. */
 .ps-topbar-match {
   /* Round 84 (A7c): in the stylesheet, so the 640 px block can give the match a line of its own. */
-  flex: 1 1 auto;
+  flex: 1 1 0;
   overflow: hidden;
+}
+.ps-topbar > .ps-topbar-match {
+  min-width: 240px;
 }
 .ps-topbar-match > span {
   white-space: nowrap;
@@ -74,7 +80,11 @@
   min-width: 0;
 }
 .ps-topbar-match > .ps-format-tag {
-  flex-shrink: 0;
+  flex: 0 1000000 auto;
+  min-width: 56px;
+}
+.ps-topbar-match > .ps-player {
+  min-width: 44px;
 }
 
 .ps-format-tag {

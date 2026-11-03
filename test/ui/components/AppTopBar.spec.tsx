@@ -56,6 +56,14 @@ describe('AppTopBar', () => {
     expect(screen.queryByText(/Smogon/)).toBeNull();
   });
 
+  // Round 84 (A7f, ruling 19a): a long format name shortens first; the full names ride in the titles.
+  test('the format tag and both player names carry their full text in a title', () => {
+    render(<AppTopBar {...props({ replayData: { format: '[Gen 9 Champions] VGC 2026 Reg M-B (Bo3)', players: ['SpiringOcean', 'sigueinventando'] } })} />);
+    expect(screen.getByText('[Gen 9 Champions] VGC 2026 Reg M-B (Bo3)')).toHaveAttribute('title', '[Gen 9 Champions] VGC 2026 Reg M-B (Bo3)');
+    expect(screen.getByText('SpiringOcean')).toHaveAttribute('title', 'SpiringOcean');
+    expect(screen.getByText('sigueinventando')).toHaveAttribute('title', 'sigueinventando');
+  });
+
   test('the Setup menu closes on Escape and on a click outside it', async () => {
     render(<AppTopBar {...props()} />);
     const setup = screen.getByRole('button', { name: 'Setup' });

@@ -1,4 +1,5 @@
 import { useLayoutHeight } from '../hooks/useLayoutHeight';
+import { MatchTitle } from './MatchTitle';
 import { PSReplayFrame } from './PSReplayFrame';
 import type { BranchSharePayload } from '../lib/branch-share';
 import { REPLAY_FRAME_HEIGHT } from '../lib/replay-html';
@@ -14,11 +15,8 @@ function SharedBranchTopbar({
 }) {
   return (
     <div className="ps-topbar">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
-        <span className="ps-format-tag">{branch.format}</span>
-        <span style={{ fontSize: 11, color: '#8ac' }}>{branch.players[0]}</span>
-        <span style={{ fontSize: 10, color: '#556' }}>vs</span>
-        <span style={{ fontSize: 11, color: '#c8a' }}>{branch.players[1]}</span>
+      <div className="ps-topbar-match" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <MatchTitle format={branch.format} players={branch.players} />
       </div>
       <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
         <span style={{ fontSize: 11, fontWeight: 'bold', color: '#8cf' }}>

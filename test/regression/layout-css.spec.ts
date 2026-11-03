@@ -99,6 +99,30 @@ describe('the columns below 1050 px', () => {
   });
 });
 
+describe('the top bar above 640 px stays on one line with a long format name', () => {
+  // Round 84 (A7f, ruling 19a): the match had `flex: 1 1 auto`, so its basis was its whole text and the support links wrapped before
+  // anything shrank. The match takes a zero basis and a floor; inside it the format tag shortens first (a shrink weight far above the
+  // names'), the names next; the bar wraps only where even that floor does not fit.
+  test('the match has no content basis and a floor that wins over the stacked layout min-width: 0', () => {
+    expect(rule(base, '.ps-topbar-match')).toMatch(/flex:\s*1 1 0/);
+    const floor = rule(base, '.ps-topbar > .ps-topbar-match');
+    expect(floor).toMatch(/min-width:\s*\d+px/);
+  });
+
+  test('the format tag shortens first with an ellipsis, the names next, none disappears', () => {
+    const tag = rule(base, '.ps-topbar-match > .ps-format-tag');
+    expect(tag).toMatch(/flex:\s*0 1000000 auto/);
+    expect(tag).toMatch(/min-width:\s*\d/);
+    // Every span of the match (tag, names, notes) clips with an ellipsis.
+    const clip = rule(base, '.ps-topbar-match > span');
+    expect(clip).toMatch(/overflow:\s*hidden/);
+    expect(clip).toMatch(/text-overflow:\s*ellipsis/);
+    const name = rule(base, '.ps-topbar-match > .ps-player');
+    expect(name).toMatch(/min-width:\s*\d/);
+    expect(name).not.toMatch(/flex-shrink:\s*0/);
+  });
+});
+
 describe('the top bar at 640 px and below', () => {
   // Round 84 (A7c, ruling 11a): the bar took three lines (74 px at 390 px); two at most: the match, then the menus with the support links.
   const phone = media(layout, 640);
