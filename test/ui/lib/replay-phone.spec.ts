@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { runInNewContext } from 'node:vm';
 import { generateReplayHtml } from '../../../src/lib/replay-html';
 import {
-  PHONE_BATTLE, PHONE_BREAKPOINT, PHONE_CLASS, PHONE_FIT_SCRIPT, PHONE_SCALE_PROPERTY, PHONE_STYLES,
+  PHONE_BATTLE, PHONE_BREAKPOINT, PHONE_CLASS, PHONE_FIT_SCRIPT, PHONE_INSET, PHONE_SCALE_PROPERTY, PHONE_STYLES,
 } from '../../../src/lib/replay-phone';
 
 /**
@@ -36,10 +36,18 @@ describe('the phone document', () => {
     expect(PHONE_BREAKPOINT).toBe(642);
   });
 
-  test('a frame of 390 px takes the phone class and the scale 390 / 642', () => {
+  test('a frame of 390 px takes the phone class and the scale of its width less the inset, over 642', () => {
     const { classes, props } = runFit(390);
     expect(classes.has(PHONE_CLASS)).toBe(true);
-    expect(Number(props.get(PHONE_SCALE_PROPERTY))).toBeCloseTo(390 / 642, 6);
+    expect(Number(props.get(PHONE_SCALE_PROPERTY))).toBeCloseTo((390 - PHONE_INSET) / 642, 6);
+  });
+
+  test('the scene stays inside the frame: its scaled width never passes the frame\x27s width, whatever the width', () => {
+    expect(PHONE_INSET).toBeGreaterThanOrEqual(2);
+    for (const width of [320, 360, 372, 390, 480, 641]) {
+      const { props } = runFit(width);
+      expect(Number(props.get(PHONE_SCALE_PROPERTY)) * PHONE_BATTLE.width, `${width} px`).toBeLessThanOrEqual(width - PHONE_INSET + 1e-9);
+    }
   });
 
   test('a frame as wide as the battle or wider keeps the desktop layout at scale 1', () => {
@@ -59,7 +67,7 @@ describe('the phone document', () => {
     const run = runFit(900);
     run.resize(360);
     expect(run.classes.has(PHONE_CLASS)).toBe(true);
-    expect(Number(run.props.get(PHONE_SCALE_PROPERTY))).toBeCloseTo(360 / 642, 6);
+    expect(Number(run.props.get(PHONE_SCALE_PROPERTY))).toBeCloseTo((360 - PHONE_INSET) / 642, 6);
     run.resize(1000);
     expect(run.classes.has(PHONE_CLASS)).toBe(false);
     expect(run.props.get(PHONE_SCALE_PROPERTY)).toBe('1');

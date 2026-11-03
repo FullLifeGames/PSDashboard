@@ -10,6 +10,14 @@
 /** The battle's box in the embed: 640 x 360 plus the 1 px border on each side. */
 export const PHONE_BATTLE = { width: 642, height: 362 } as const;
 
+/**
+ * Round 84 (A7d): the scene is scaled to the frame's width less this inset. The e2e run of A7c read the scene's right edge 1.1 px past
+ * the frame's (372.125 against 371) at 390 px: the width the document reports and the frame's box differ by a pixel or two (the
+ * frame's fractional width against the document's whole one), so a scene fitted to the last pixel overshoots. Two pixels keep the
+ * scene's 1 px border inside the frame's rounded corner at every width.
+ */
+export const PHONE_INSET = 2;
+
 /** A frame narrower than this is a phone frame. */
 export const PHONE_BREAKPOINT = PHONE_BATTLE.width;
 
@@ -35,7 +43,7 @@ export const PHONE_FIT_SCRIPT = `<script>
     var width = root.clientWidth;
     var narrow = width > 0 && width < ${PHONE_BREAKPOINT};
     root.classList.toggle('${PHONE_CLASS}', narrow);
-    root.style.setProperty('${PHONE_SCALE_PROPERTY}', narrow ? String(width / ${PHONE_BATTLE.width}) : '1');
+    root.style.setProperty('${PHONE_SCALE_PROPERTY}', narrow ? String((width - ${PHONE_INSET}) / ${PHONE_BATTLE.width}) : '1');
   }
   window.addEventListener('resize', fit);
   window.addEventListener('load', fit);
