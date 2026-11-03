@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { readFileSync } from 'fs';
 import { emptySmogon, routeSmogon } from './smogon-routes';
 import { fixturePath, installReplayEmbedCache, pickMove, routeOfflineFixtures, waitForExactPickers } from './helpers';
-import { lightEngine, loadDockReplay } from './dock-helpers';
+import { failOnResizeLoops, lightEngine, loadDockReplay } from './dock-helpers';
 
 /**
  * Round 84 (turn dock), step A7a, ruling 4a: the dock follows the column's content directly. At 2560 x 1290 the column is shorter
@@ -13,6 +13,7 @@ import { lightEngine, loadDockReplay } from './dock-helpers';
  * the task specs).
  */
 test.beforeAll(installReplayEmbedCache);
+failOnResizeLoops(test);
 test.use({ viewport: { width: 2560, height: 1290 } });
 
 test.beforeEach(async ({ page }) => {

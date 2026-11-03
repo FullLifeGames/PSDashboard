@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { installReplayEmbedCache, routeOfflineFixtures } from './helpers';
-import { lightEngine, loadDockReplay } from './dock-helpers';
+import { failOnResizeLoops, lightEngine, loadDockReplay } from './dock-helpers';
 
 /**
  * Round 84 (turn dock), step A7b, ruling 9a: the right column ends on the line of the dock's foot. Evaluation and Play out keep
@@ -10,6 +10,7 @@ import { lightEngine, loadDockReplay } from './dock-helpers';
  * uses the same column and keeps its panel.
  */
 test.beforeAll(installReplayEmbedCache);
+failOnResizeLoops(test);
 
 test.beforeEach(async ({ page }) => {
   await lightEngine(page);

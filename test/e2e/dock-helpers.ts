@@ -231,3 +231,23 @@ export async function expectExecutedLoggedTurn(page: Page, replay: ReplayData, t
   if (tera > 0) await expect.poll(async () => (await entries()).filter(entry => /terastallized/i.test(entry)).length, { timeout: 60_000 }).toBeGreaterThanOrEqual(tera);
   if (mega > 0) await expect.poll(async () => (await entries()).filter(entry => /Mega Evolved/i.test(entry)).length, { timeout: 60_000 }).toBeGreaterThanOrEqual(mega);
 }
+
+const resizeLoops = new WeakMap<Page, string[]>();
+
+/**
+ * Round 84 (A7d): a spec that calls this fails when its page raises "ResizeObserver loop completed with undelivered notifications".
+ * The A7c run raised it 15 times in 19 tests and nothing failed, because the browser reports it as an uncaught error that no
+ * assertion read. Call it once at the top of the spec file, with the file's `test`.
+ */
+export function failOnResizeLoops(spec: typeof import('@playwright/test').test): void {
+  spec.beforeEach(({ page }) => {
+    const found: string[] = [];
+    resizeLoops.set(page, found);
+    page.on('pageerror', error => {
+      if (/ResizeObserver loop/.test(error.message)) found.push(error.message);
+    });
+  });
+  spec.afterEach(({ page }) => {
+    expect(resizeLoops.get(page) ?? [], 'ResizeObserver loop errors raised by the page').toEqual([]);
+  });
+}

@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { dockChip, dockTray, installReplayEmbedCache, routeOfflineFixtures } from './helpers';
-import { Clicks, DOUBLES_SLOTS, lightEngine, loadDockReplay, variationPanel } from './dock-helpers';
+import { Clicks, DOUBLES_SLOTS, failOnResizeLoops, lightEngine, loadDockReplay, variationPanel } from './dock-helpers';
 
 /**
  * Round 84 (turn dock), step A7c, rulings 10a and 11a: the app on a phone (390 x 844, touch). The replay's battle scene shrinks to
@@ -12,6 +12,7 @@ const DOUBLES = 'gen9doublesou-2693620934';
 const TURN = 5;
 
 test.beforeAll(installReplayEmbedCache);
+failOnResizeLoops(test);
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
 
 test.beforeEach(async ({ page }) => {
