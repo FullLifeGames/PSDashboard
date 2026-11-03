@@ -29,6 +29,18 @@ describe('PSReplayFrame', () => {
     expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
   });
 
+  test('each load starts the zoom follower of the frame: a document laid out wider than its frame (WebKit under the zoom of the root) is zoomed to fit', () => {
+    render(<PSReplayFrame log={LOG} title="Zoomed" />);
+    const frame = screen.getByTitle('Zoomed') as HTMLIFrameElement;
+    const doc = document.implementation.createHTMLDocument('frame');
+    Object.defineProperty(frame, 'contentDocument', { configurable: true, value: doc });
+    const root = doc.documentElement;
+    Object.defineProperty(frame, 'clientWidth', { configurable: true, value: 400 });
+    Object.defineProperty(root, 'clientWidth', { configurable: true, get: () => 600 / (Number(root.style.zoom) || 1) });
+    fireEvent.load(frame);
+    expect(Number(root.style.zoom)).toBeCloseTo(1.5, 6);
+  });
+
   test('the frame seeks to its turn once the document loaded and again on an explicit request', () => {
     render(<PSReplayFrame log={LOG} seekTurn={2} autoPlay seekRequest={{ turn: 1, seq: 1 }} />);
     const frame = screen.getByTitle('PS Replay') as HTMLIFrameElement;

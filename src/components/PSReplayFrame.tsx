@@ -3,6 +3,7 @@ import {
   extendsLines, frameLines, useLiveAppend, useReplayBlobUrl, useSeekRequests, useSeekTurn, useTurnReports, type SeekRequest,
 } from '../hooks/useReplayFrame';
 import { followContentHeight } from '../lib/replay-frame-height';
+import { followFrameZoom } from '../lib/replay-frame-zoom';
 
 interface Props {
   log: string;
@@ -160,7 +161,10 @@ function PSReplayFrameDocument({
       src={blobUrl}
       onLoad={() => {
         followRef.current?.();
-        followRef.current = iframeRef.current ? followContentHeight(iframeRef.current) : null;
+        // Round 84 (T315, A7d): the zoom first (it decides the document's layout width), then the height that follows the content.
+        const frame = iframeRef.current;
+        const stops = frame ? [followFrameZoom(frame), followContentHeight(frame)] : [];
+        followRef.current = () => stops.forEach(stop => stop());
         if (frameSeekTurn == null) return;
         iframeRef.current?.contentWindow?.postMessage({
           type: 'ps-seek-turn',
