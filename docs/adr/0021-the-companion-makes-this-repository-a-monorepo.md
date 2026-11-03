@@ -1,0 +1,19 @@
+---
+Status: proposed (never built; its own project after the release, user gate 21.10.2026, "3b")
+---
+
+# The Showdown Companion makes this repository a monorepo, with the Companion at the site root and the dashboard under `/dashboard/`
+
+The Showdown Companion is a programme around the dashboard: a front page that searches a Showdown username, keeps a library of that player's games, pools their teams and reads a profile of how they play. The user settled its shape on the morning of 04.09.2026. At 09:44 it was a new shell app that used the published packages and embedded the dashboard through its iframe protocol. At 09:46 the user ruled that the old Replay Scouter stays as it is, so the Companion is a new app and not an evolution of the Scouter. At 09:51 the user moved it into this repository: the repository becomes a monorepo, with the dashboard as one app beside the Companion, "so a person with an engine problem searches one repo". At 09:59 the user set the site layout: the Companion takes the Pages root, the dashboard moves to `/dashboard/` with its nightly, `latest` and frozen channels, and the Companion forwards old `?replay=` links from the root. At 11:48 the user split the programme into two surfaces. The public site runs in the visitor's browser and never holds a Showdown account. A local Node app on the player's own machine holds everything that touches an account or a live battle: the bot and the live assistant. The two exchange a library file, with no server between them. The design of the same day lays out step 0: `apps/dashboard` and `apps/companion` beside the shared packages, every app file moved with `git mv` so its history follows, lint zones in which an app never imports another app and reaches a package only by its name, and two release lines (the dashboard keeps its `v<version>` tags, the Companion starts at `companion-v1.0.0`). In that design the Companion grades through a new package `eval-runtime`, the grading pipeline lifted out of the dashboard's hooks, and the iframe serves only for viewing. The gate of 21.10.2026 made the Companion its own project after the release.
+
+## Considered options
+
+- A mode inside the current app, recommended in the exploration of 04.09.2026 for its one deploy and one embed protocol: the user chose an overarching app in which the dashboard is one part, as the site already framed its tools.
+- A separate repository that uses the published packages (the reading of 09:44): replaced at 09:51 by the monorepo, so engine problems stay in one repository.
+- Building on the old Replay Scouter: ruled out at 09:46; the Scouter keeps its code and hosting, and the Companion ports its rules to TypeScript.
+
+## Consequences
+
+Step 0 moves every path in the repository, so it runs alone and never beside an engine round: the feedback gates and the lint ratchet name today's paths. A one-off script rewrites the ratchet's pinned paths, and the feedback corpus runs three times byte-identical against a report captured before the move. The frozen dashboard copies at the site root become redirect stubs, and `deploy.ps1` points at the dashboard's new build folder. Step 0 reverses one choice of ADR 0016, which kept the app at the root to spare the deploy, test and Vite configs. Step 2a adds `eval-runtime` as a third package beside the two of ADR 0016; it holds app-side code (the worker pool, the caches, the whole-game sweep), not the reconstruction, so the cycle that ruled out a third package there does not arise.
+
+Sources: `docs/superpowers/specs/2026-09-04-player-evaluation-brainstorm.md` (sections 10 to 12, decisions of 04.09.2026 at 09:44, 09:46, 09:51 and 09:59), `docs/superpowers/specs/2026-09-04-showdown-companion-design.md` (sections 1 to 3), `docs/superpowers/plans/2026-09-04-showdown-companion-plan.md`, `docs/backlog.md` (After the release: Showdown Companion; user 04.09. 11:48; gate 21.10.2026), `NextSteps.md` (Parked).

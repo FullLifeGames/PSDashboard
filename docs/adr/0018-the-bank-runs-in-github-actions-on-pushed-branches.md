@@ -1,0 +1,17 @@
+# The bank runs in GitHub Actions on a pushed branch, from a hash-checked data tarball
+
+Measurements took most of the machine: round 69 spent about 17 of 23 hours on bank and holdout runs, and a crash under six slices zeroed `.git` files several times. Round 71 moved the default to GitHub's Linux runners (gate 13.10.2026 18:48, "1a 2a 3a 4a", then "5a 6a" at 18:53; accepted 19.10.2026). `node scripts/bank-ci.mjs --name <name>` pushes one branch `bank/<name>`, built with `commit-tree` from the measured commit plus `.bank-run.json`; the workflow starts only on a push to `bank/**`, runs by default 16 jobs of 4 slices (`bank-ci.mjs`), merges the slices into one run folder, and the script downloads it to `.calibration/<name>/` and deletes the branch. The trigger is a push because `workflow_dispatch` works only for workflows on the default branch, which is `master` and redeploys the nightly site. In round 71 CI rows were byte-identical to local rows of the same engine (837 of 837 bank rows, 1,121 of 1,121 VGC holdout rows), so a CI run pairs with a local base and the other way round; AGENTS.md holds the current timings. The data comes as a tarball (`.smogon-cache` and every replay of `.fit-corpus` that the fit source and the holdouts read, a release asset `bank-data-<hash>` marked as a pre-release that is never "Latest"); a tracked file (`test/regression/fixtures/bank-data.json`) names its sha256 and folder hashes, and a job unpacks only after both checks. The security design is part of the decision: no `pull_request` trigger, a read-only token, no secret in any job, actions pinned to commits, `.bank-run.json` treated as untrusted input behind an allowlist, and `ubuntu-24.04` named by version (round 76) because `ubuntu-latest` moves. CI measures only commits that carry this tooling.
+
+## Considered options
+
+- Local runs only: bank and holdouts together took about 2.5 hours on four slices, and AGENTS.md allows no other heavy run meanwhile.
+- Data as an orphan branch `bank-data` (every clone would fetch it) or in a separate public repository: the gate chose the release asset.
+- 20 jobs (fastest single run, but every other run queues) or 8 jobs: the gate chose 16 jobs of 4 slices.
+- Replays that carry a password in the public tarball: the okay of 19.10.2026 ("1b 2a") put the 133 password replays of the holdouts into it and kept their links in the tracked manifests (the holdout manifest since 09.10.2026); the sources do not spell out the other options.
+- The feedback corpus in CI: kept local, because its anchor is the browser build (T247 holds it for a later round).
+
+## Consequences
+
+The standing okay of the user covers pushing and deleting `bank/<name>` branches and nothing else. `bank-ci.mjs` writes to `.git`, so it does not start while a local heavy run goes. A change to the data means packing again and a new upload. The upload of round 74 (gate 22.10.2026, "1a") put every fit-corpus replay into the asset, 353 of them with passwords, whose links stand in the tracked fit manifest since 08.08.2026. The user confirmed on 03.11.2026 ("1a") that the okays cover them as they cover the holdouts: the links are public in the manifests anyway.
+
+Sources: `docs/completed/test-infrastructure.md` (round 71), `docs/superpowers/specs/2026-10-13-round-71-bank-in-ci-design.md` (gates 13.10. and 19.10.2026), `docs/superpowers/plans/2026-10-17-round-71-bank-in-ci-plan.md`, `docs/superpowers/specs/2026-10-23-round-76-last-wave-design.md`, `docs/backlog.md` (T247), `AGENTS.md` (Tools and pitfalls).

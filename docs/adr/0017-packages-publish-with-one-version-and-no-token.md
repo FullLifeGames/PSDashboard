@@ -1,0 +1,15 @@
+# Both packages publish from the release at one version, with no npm token
+
+The version in the root `package.json` is the single source (`npm version patch --workspaces --include-workspace-root`). `release.yml` publishes both packages at that version on every release (since release 1.0.1). `scripts/publish-packages.mjs` writes the version into each package and still compares each package with the previous `v*` tag (`changedSince`), but a release bump changes every manifest, so it selects both; the first publish always publishes. The workspace reference `"@fulllifegames/replay-core": "*"` becomes a caret range at publish time, so no tarball carries a bare `*`. Publishing runs through npm Trusted Publishing: each package names this repository and `release.yml` as its publisher, the job carries `id-token: write`, and no workflow reads a secret. Every version published by `release.yml` (0.7.1 onward) carries a provenance attestation; 0.7.0, published by hand, has none. The old `NPM_TOKEN` secret, which no workflow read after the move to Trusted Publishing, was deleted on 03.11.2026 (user, "2a"). The first publish (0.7.0, 06.09.2026) failed on a classic token that demanded a one-time code (`EOTP`), which is why the project went to OIDC and not to an automation token. `@pkmn/sim` and `@pkmn/mods` are peer dependencies pinned to one exact version (see ADR 0003), so a consumer's simulator cannot differ from ours. `pack:smoke` installs the tarballs into a throwaway project, runs the worked examples and type-checks a NodeNext consumer. Round 78 set the package manifests to the release version in place of the placeholder 0.1.0, and `package-api.spec.ts` holds them to the root version.
+
+## Considered options
+
+- Independent versions per package: the user's requirement of 29.08.2026 was one global version with changed-only publishing, hooked into the existing release ritual; the sources give no further reason. Round 78 and release 1.0.1 then made every release publish both packages.
+- A manual publish: used once, for 0.7.0, because the token failed; it left a trap (a failed publish run must not be restarted after a hand publish, because the script picks the same version again and npm refuses to overwrite).
+- An `NPM_TOKEN` secret: planned first (phase 7 of the refactor), replaced by Trusted Publishing.
+
+## Consequences
+
+Barrel changes show as snapshot diffs (T43, the release check with the exact simulator pin, closed with the release of 1.0.0). Both packages always carry the root version; the changed-only selection matters only for a manual run with an unbumped manifest. The release of 1.0.0 showed two npm edge cases: the registry listed it six minutes after the publish, and npm 12 trimmed the `bin` path and called it invalid (fixed in round 78).
+
+Sources: `docs/superpowers/specs/2026-08-29-architecture-refactor-design.md` (phase 7, decision 2), `docs/superpowers/plans/2026-09-03-phase-7-publish-readiness.md`, `docs/completed/architecture-refactor.md` (round 28 and the supplement of 06.09.2026), `docs/completed/eval-quality.md` (rounds 77 and 78), `README.md`.

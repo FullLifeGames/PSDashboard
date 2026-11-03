@@ -1,0 +1,16 @@
+# Searches run in a worker pool and stop by termination; reconstruction has its own worker
+
+The simulator is synchronous: a search inside a worker never yields to `onmessage`, so a cancel message would arrive after the search ended. The design of 31.07.2026 therefore has no cancel message. The client cancels by terminating the busy workers and builds new ones when the next run needs them. Two kinds of worker follow from that. The evaluation pool (sized by `src/lib/eval/pool-size.ts`) runs searches. A separate replay worker runs reconstruction and the spread solve, so that cancelling an evaluation never kills a reconstruction (round 38), and cancelling a job terminates only the replay worker. Each is its own instance of the same script (`src/workers/eval-worker.ts`), built as an ES module so the replay handlers form a chunk that only the replay worker loads; as an iife (one self-contained script) the pool's script grew from 7 to 12 MB, parsed by each worker of the pool. A serialized battle crosses the thread boundary as the string `State.serializeBattle` produces, and the simulator encodes object references by `constructor.name`, so both bundles keep class names (`keepNames`): minified names turned every worker's deserialized `Pokemon` into a plain object, and the sweep swallowed the error as an empty game graph (reported 12.08.2026). The simulator and the dex data stay out of the entry chunk, behind the lazy facades in `src/lib/lazy/` and `sideEffects: false` in both packages: a package barrel imported both statically and dynamically collapses into the entry chunk (the first measurement without the facades added about 215 kB gzip, +14 %).
+
+## Considered options
+
+- Moving the main-thread solves and merges into a worker: measured before building (round 16, 28.08.2026): rank and merge cost 1.1 s of 95 s, and the workers were saturated, so the idea was dropped. T318 (approved for round 85) measures the main-thread cost first (30 to 60 ms per dock fill for the ranking and the equilibrium solve) and may move the merge and solve into a worker; it may also leave the pool a core.
+- Yielding inside the search instead of a worker: rejected in round 38, because the thread stays 90 % busy.
+- A cooperative cancel flag checked inside the search: not recorded as considered; the sources give only the reason against a message.
+- More workers: 18 workers froze the page (about 350 MB each), 12 workers ran the 573756 sweep in 70 to 76 s against 101 to 106 s with 6, and 6 to 12 measured 1.4 to 1.5x.
+
+## Consequences
+
+A cancelled worker loses its warm caches. The worker file stays in the app so that its URL stays stable (refactor spec, risks). The tree search runs a fixed number of trees (`searchBudget().trees`) and does not follow the pool size, so a result never depends on the machine; the pool moves wall-clock time only.
+
+Sources: `docs/superpowers/specs/2026-07-31-eval-engine-design.md` (Worker protocol), `docs/superpowers/plans/2026-07-31-eval-engine.md`, `docs/completed/performance.md` (round 16; performance evaluation of 01.09.2026), `docs/superpowers/specs/2026-09-05-round-38-ui-smoothness-design.md`, `docs/superpowers/specs/2026-08-29-architecture-refactor-design.md` (section 7), `docs/completed/architecture-refactor.md` (lazy facades), `docs/backlog.md` (T318), `ARCHITECTURE.md`; gate 03.11.2026.

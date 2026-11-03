@@ -1,0 +1,16 @@
+# The search plays on the real simulator, and the leaf estimate stays hand-built
+
+The engine forks `@pkmn/sim` battles to advance a position, so the game's own rules decide every line the search plays ("the sim is the forward model, nothing is reimplemented", design of 31.07.2026). At the end of a line, `evaluatePosition` scores the position with our own feature vector and weight tables (HP, status, boosts, hazards, matchup terms and more), not with the simulator or `@smogon/calc`. Round 58 (user gate 24.09.2026, "1a 2a 3a 4a 5a") measured the alternative. An estimate whose damage comes from the simulator would predict outcomes about 16 bp better at the ceiling (16.4 bp, band 7.6 to 25.3, three quarters of it in Gen 9 singles, and only after a refit of the weights). The calculator reached 11.8 bp. But the cold static cost 22 times as much with the calculator and 40 times as much with the simulator. The pre-registered rule said that a cold static over 3x keeps our own core in the leaf, so the calculator and the simulator became referees and test oracles, and the program "More Simulation" spent its effort on making the simulator cheaper (see ADR 0003). Where the calculator and the simulator disagree, the simulator wins (round 67 gate "9a", round 68). The calculator still prices odds outside the leaf: kill odds at the root cells and the spread inference.
+
+## Considered options
+
+- Reimplement the rules in the engine: the first design rules it out. The inventory of round 58 shows the cost of the rules we kept by hand: 184 places that encode game rules (about 5,090 lines), 61 of them a second copy of a rule that another place also encodes, and 57 rule faults found on the side.
+- `@pkmn/engine` as the forward model: Gens 1 and 2 only. A poke-engine port was rejected on 31.07.2026. An own object-graph clone with an undo model was rejected twice: the roadmap of 31.07.2026 holds that undo cannot be retrofitted onto `@pkmn/sim` (its mutations are pervasive), and the roadmap of 02.09.2026 found no precedent for Gens 6, 8 and 9 or for doubles and a risk that the copy drifts from the simulator.
+- The calculator or the simulator in the leaf: priced above.
+- A better static with the old weights: round 58 found that each variant needs its own calibration; measuring a more accurate static against old weights confuses accuracy with calibration.
+
+## Consequences
+
+A rule that the static misses (a move's power at use, Tera) shows up as a bank or pin gap and gets a feature or a refit, not a second rules engine. The static reads moves through a rule table held to the simulator by a test, not through the simulator (see ADR 0005, hot-path lists). The round 58 verdict names the calculator and the simulator as referees and test oracles for the static's damage.
+
+Sources: `docs/superpowers/specs/2026-07-31-eval-engine-design.md` (decision 3), `docs/completed/eval-quality.md` (round 58, gate 24.09.2026; rounds 67 and 68, gate "9a"), `docs/superpowers/plans/2026-09-24-program-more-simulation.md`, `docs/superpowers/plans/2026-07-31-eval-performance-roadmap.md`, `docs/superpowers/plans/2026-09-02-analysis-quality-roadmap.md`, `docs/superpowers/plans/2026-09-04-showdown-companion-plan.md` (calculator in the spread solver), `docs/completed/performance.md` (`@pkmn/engine`); backlog branch `r58-oracle`.
