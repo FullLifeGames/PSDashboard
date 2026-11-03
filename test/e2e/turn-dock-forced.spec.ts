@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'fs';
 import { emptySmogon, routeSmogon } from './smogon-routes';
-import { dockChip, fixturePath, installReplayEmbedCache, pickMove, routeOfflineFixtures, waitForExactPickers } from './helpers';
-import { lightEngine } from './dock-helpers';
+import { dockChip, fixturePath, installReplayEmbedCache, openTray, pickMove, routeOfflineFixtures, waitForExactPickers } from './helpers';
+import { lightEngine, loadDockReplay, variationPanel } from './dock-helpers';
 
 /**
  * Round 84 (turn dock), step A7a, ruling 2a: a forced replacement gets the engine's choice like any slot. The draft replay of the
@@ -41,5 +41,48 @@ test('a forced replacement: the engine fills the slot, Execute sends it, on both
     await execute.click();
     await expect(history).toContainText(`forced replacement (${side})`, { timeout: 60_000 });
   }
+  await expect(page.locator('.ps-force-switch-note')).toHaveCount(0, { timeout: 30_000 });
+});
+
+/**
+ * Round 84 (A7c, ruling 16a): doubles, both slots of P1 forced. Turn 6 of the Doubles OU fixture 2693620934 ends with Dragonite and
+ * Zapdos fainting (and Sinistcha of P2), so the executed turn leaves P1A, P1B and P2B to replace. The engine fills all three. A bench
+ * click in P1A while P1B (and P2B) hold only the engine's pick records the choice and sends nothing; Execute stays and sends the
+ * turn with the user's pick in P1A and the engine's in the others.
+ */
+test('two forced slots of one side: a bench click records the choice while the other holds only the engine pick', async ({ page }) => {
+  test.setTimeout(420_000);
+  await lightEngine(page);
+  await routeOfflineFixtures(page);
+  await page.goto('/');
+  await loadDockReplay(page, 'gen9doublesou-2693620934', 6);
+  // Dragonite (P1B) fainted before it moved, so its chip starts empty; Rock Slide, a move it used earlier, leaves the turn as it was.
+  await pickMove(page, 'p1b', 'Rock Slide');
+  const execute = page.locator('.ps-execute-btn');
+  await expect(execute).toBeEnabled();
+  await execute.click();
+
+  const [p1a, p1b, p2b] = [dockChip(page, 'p1a'), dockChip(page, 'p1b'), dockChip(page, 'p2b')];
+  for (const chip of [p1a, p1b, p2b]) {
+    await expect(chip).toHaveAttribute('data-forced', 'true', { timeout: 120_000 });
+    await expect(chip).toHaveAttribute('data-origin', 'engine', { timeout: 240_000 });
+  }
+  const taken = `${await p1a.textContent()} ${await p1b.textContent()}`;
+  const body = ['Sylveon', 'Gyarados', 'Kingambit', 'Arcanine'].find(name => !taken.includes(name))!;
+  expect(body, 'a bench body the engine did not pick').toBeTruthy();
+
+  const tray = await openTray(page, 'p1a');
+  await tray.locator('.ps-switchbtn:enabled', { hasText: body }).click();
+  await expect(p1a).toContainText(body);
+  // Nothing went out: the old behaviour sent the turn at once and the position moved on within a worker round trip.
+  await page.waitForTimeout(2_000);
+  await expect(p1a).toHaveAttribute('data-forced', 'true');
+  await expect(p1a).not.toHaveAttribute('data-origin', 'engine');
+  await expect(p1b).toHaveAttribute('data-origin', 'engine');
+  await expect(variationPanel(page)).not.toContainText('forced replacement');
+  await expect(execute).toBeEnabled();
+
+  await execute.click();
+  await expect(page.locator('.ps-dock-chip[data-forced="true"]')).toHaveCount(0, { timeout: 120_000 });
   await expect(page.locator('.ps-force-switch-note')).toHaveCount(0, { timeout: 30_000 });
 });

@@ -337,3 +337,48 @@ describe.each(['singles', 'doubles'] as const)('TurnDock fill, a forced replacem
     expect(props.onSetChoice).toHaveBeenCalledWith('p1', expect.objectContaining({ kind: 'switch', pokemonName: other }), slot);
   });
 });
+
+describe('TurnDock fill, two forced slots of one side (ruling 16a, doubles)', () => {
+  // P1 replaces both bodies; P2 waits. The engine holds slot A with Flutter Mane; the user's bench click is in slot B.
+  const flags = { p1ForceSwitch: true, p1ForceSwitches: [true, true] };
+  const flutter: BranchSlotChoice = { kind: 'switch', speciesId: 'fluttermane', pokemonName: 'Flutter Mane' };
+  const urshifu: BranchSlotChoice = { kind: 'switch', speciesId: 'urshifu', pokemonName: 'Urshifu' };
+  const clickUrshifuInB = async () => {
+    await userEvent.click(chip('P1B'));
+    await userEvent.click(within(document.querySelector('.ps-tray') as HTMLElement).getByRole('button', { name: /Urshifu/ }));
+  };
+  const withOnlyA = () => simState('doubles', { ...flags, p1Choices: [flutter, null] });
+
+  test('while another forced slot holds only the engine pick, the click records the choice and sends nothing', async () => {
+    const onRecordChoice = vi.fn();
+    const fill = fillOf({ engine: { p1: [true, false], p2: [false, false] } });
+    const props = renderDock('doubles', fill, { onRecordChoice }, withOnlyA());
+    await clickUrshifuInB();
+    expect(fill.onUserChoice).toHaveBeenCalledWith('p1', 1);
+    expect(onRecordChoice).toHaveBeenCalledWith('p1', urshifu, 1);
+    expect(props.onSetChoice).not.toHaveBeenCalled();
+  });
+
+  test('when the other forced slot holds a pick of the user, the click sends at once as before', async () => {
+    const onRecordChoice = vi.fn();
+    const props = renderDock('doubles', fillOf({ engine: { p1: [false, false], p2: [false, false] } }), { onRecordChoice }, withOnlyA());
+    await clickUrshifuInB();
+    expect(props.onSetChoice).toHaveBeenCalledWith('p1', urshifu, 1);
+    expect(onRecordChoice).not.toHaveBeenCalled();
+  });
+
+  test('without a record path (a replay turn) the click goes through onSetChoice', async () => {
+    const props = renderDock('doubles', fillOf({ engine: { p1: [true, false], p2: [false, false] } }), {}, withOnlyA());
+    await clickUrshifuInB();
+    expect(props.onSetChoice).toHaveBeenCalledWith('p1', urshifu, 1);
+  });
+
+  test('after the recorded click Execute stays, enabled, with both picks counted', async () => {
+    const both = simState('doubles', { ...flags, p1Choices: [flutter, urshifu] });
+    const props = renderDock('doubles', fillOf({ engine: { p1: [true, false], p2: [false, false] } }), { onRecordChoice: vi.fn() }, both);
+    expect(execute()).toBeEnabled();
+    await userEvent.click(execute());
+    expect(props.onExecuteTurn).toHaveBeenCalledTimes(1);
+  });
+});
+

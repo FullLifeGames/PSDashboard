@@ -103,3 +103,54 @@ describe.each(SCENES)('the branch at a forced replacement, $kind', scene => {
     expect(hook.result.current.history).toHaveLength(1);
   }, 180_000);
 });
+
+/**
+ * Round 84 (A7c, ruling 16a), doubles with both slots of P1 forced: Garchomp's Explosion also faints the ally Magikarp, so P1 owes
+ * two replacements. The branch holds both recorded picks without sending anything (the dock records the click while the other
+ * slot holds only the engine's pick), and `executePending` then sends the side's command once. A single slot of one side is
+ * covered above; singles have one slot per side, so the rule has nothing to hold back there.
+ */
+describe('the branch at a forced replacement of both slots of one side, doubles', () => {
+  const p1 = [mon('Garchomp', ['explosion']), mon('Magikarp', ['splash']), mon('Clefable', ['protect']), mon('Snorlax', ['protect'])];
+  const p2 = [mon('Blissey', ['protect']), mon('Chansey', ['protect']), mon('Skarmory', ['protect'])];
+  const pick = (id: string) => ({ kind: 'switch' as const, speciesId: id, pokemonName: id });
+
+  async function atBothForced() {
+    const hook = renderHook(() => useBranch());
+    await act(async () => {
+      await hook.result.current.startBranch('gen9doublesou', [...p1], [...p2], freshLog({ format: 'gen9doublesou', p1: [...p1], p2: [...p2] }), 1, null, { playerNames: ['A', 'B'] });
+    });
+    act(() => {
+      hook.result.current.setChoice('p1', { kind: 'move', moveId: 'explosion', moveName: 'Explosion' }, 0);
+      hook.result.current.setChoice('p1', { kind: 'move', moveId: 'splash', moveName: 'Splash' }, 1);
+      hook.result.current.setChoice('p2', { kind: 'move', moveId: 'protect', moveName: 'Protect' }, 0);
+      hook.result.current.setChoice('p2', { kind: 'move', moveId: 'protect', moveName: 'Protect' }, 1);
+    });
+    await act(async () => { await hook.result.current.executeTurn(); });
+    expect(hook.result.current.simState!.p1ForceSwitches).toEqual([true, true]);
+    return hook.result;
+  }
+
+  test('two recorded picks send nothing; executePending sends both bodies in once', async () => {
+    const result = await atBothForced();
+    const before = result.current.history.length;
+    act(() => result.current.recordChoice('p1', pick('clefable'), 0));
+    expect(result.current.history).toHaveLength(before);
+    act(() => result.current.recordChoice('p1', pick('snorlax'), 1));
+    expect(result.current.history).toHaveLength(before);
+    expect(result.current.simState!.p1ForceSwitch).toBe(true);
+    await act(async () => { await result.current.executePending(); });
+    await waitFor(() => expect(result.current.history).toHaveLength(before + 1));
+    expect(result.current.history[before].kind).toBe('forced');
+    expect(result.current.simState!.p1ForceSwitch).toBe(false);
+  }, 180_000);
+
+  test('a click through setChoice on the second slot still sends the side at once (the dock chooses between the two)', async () => {
+    const result = await atBothForced();
+    const before = result.current.history.length;
+    act(() => result.current.recordChoice('p1', pick('clefable'), 0));
+    await act(async () => { result.current.setChoice('p1', pick('snorlax'), 1); });
+    await waitFor(() => expect(result.current.history).toHaveLength(before + 1));
+  }, 180_000);
+});
+

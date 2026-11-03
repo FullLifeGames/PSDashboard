@@ -100,6 +100,20 @@ export function fitsBeside(choice: BranchSlotChoice, others: Choices, slot: numb
 }
 
 /**
+ * Round 84 (A7c, ruling 16a): whether another forced slot of the turn (either side) holds only the engine's pick. A bench click in
+ * a forced slot sends the replacement at once only while this is false; otherwise it records the choice and Execute stays, so
+ * nothing goes out that the user has not seen. `engine` is the fill's marks by side and slot.
+ */
+export function engineHoldsForcedBeside(
+  state: BranchSimState, engine: { p1: readonly boolean[]; p2: readonly boolean[] }, side: Side, slot: number,
+): boolean {
+  return (['p1', 'p2'] as const).some(other => {
+    const forced = other === 'p1' ? state.p1ForceSwitches : state.p2ForceSwitches;
+    return (forced ?? []).some((isForced, index) => isForced && !(other === side && index === slot) && !!engine[other][index]);
+  });
+}
+
+/**
  * A replay turn keeps the fill in the view, not in the draft (the draft is the user's touched mark). The state shown holds the
  * logged seed under the user's picks; an empty slot takes the fill, and only while the position still offers it (the exact
  * position can replace the snapshot picker after the fill landed). Returns the very same state when nothing changes.

@@ -19,6 +19,8 @@ function dockProps(app: AppController, replayId: string): TurnDockProps {
     executing: executing || branchPreparing,
     gen: app.ctx.meta.replayGen,
     onSetChoice: handleSetChoice,
+    // The live tip can hold a forced replacement back for Execute (ruling 16a); a replay turn has none.
+    onRecordChoice: liveTip ? app.ctx.branch.recordChoice : undefined,
     onHypotheticalMove: app.handleHypotheticalMove,
     // The tip executes its own pending choices; off the tip the effective choices (the played seed under the picks) go along.
     onExecuteTurn: choices => (liveTip ? void app.handleExecuteTurn() : handleExecuteDraft(choices)),

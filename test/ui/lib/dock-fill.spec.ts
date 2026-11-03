@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { BranchSlotChoice, RankedChoice } from '@fulllifegames/eval-engine';
-import { fitsBeside, overlayFill, pickFill, pickFillParts, slotChoicesOf } from '../../../src/lib/dock-fill';
+import { engineHoldsForcedBeside, fitsBeside, overlayFill, pickFill, pickFillParts, slotChoicesOf } from '../../../src/lib/dock-fill';
 import { rankedChoice } from '../fixtures/eval-result';
 import { simState } from '../fixtures/sim-state';
 
@@ -264,5 +264,37 @@ describe('overlayFill (a replay turn: the fill under the draft and over nothing)
     const gone: BranchSlotChoice = { kind: 'move', moveId: 'hyperbeam', moveName: 'Hyper Beam' };
     const state = simState('singles');
     expect(overlayFill(state, { p1: [gone], p2: [null] })).toBe(state);
+  });
+});
+
+describe('engineHoldsForcedBeside', () => {
+  // Round 84 (A7c, ruling 16a): a bench click sends a replacement at once only when no other forced slot of the turn holds just the engine's pick.
+  const marks = (p1: boolean[], p2: boolean[] = [false]) => ({ p1, p2 });
+
+  test("doubles, both slots of P1 forced: an engine pick beside holds the click back, the user's own pick does not", () => {
+    const state = simState('doubles', { p1ForceSwitch: true, p1ForceSwitches: [true, true] });
+    expect(engineHoldsForcedBeside(state, marks([false, true], [false, false]), 'p1', 0)).toBe(true);
+    expect(engineHoldsForcedBeside(state, marks([true, true], [false, false]), 'p1', 0)).toBe(true);
+    expect(engineHoldsForcedBeside(state, marks([true, false], [false, false]), 'p1', 0)).toBe(false);
+    expect(engineHoldsForcedBeside(state, marks([true, false], [false, false]), 'p1', 1)).toBe(true);
+    expect(engineHoldsForcedBeside(state, marks([false, false], [false, false]), 'p1', 1)).toBe(false);
+  });
+
+  test('a slot the position does not ask about counts for nothing, even with a mark', () => {
+    const state = simState('doubles', { p1ForceSwitch: true, p1ForceSwitches: [false, true] });
+    expect(engineHoldsForcedBeside(state, marks([true, true], [false, false]), 'p1', 1)).toBe(false);
+  });
+
+  test('singles, one forced slot alone: nothing beside it', () => {
+    const state = simState('singles', { p1ForceSwitch: true, p1ForceSwitches: [true] });
+    expect(engineHoldsForcedBeside(state, marks([true]), 'p1', 0)).toBe(false);
+  });
+
+  test('both sides forced (singles and doubles): an engine pick on the other side holds the click back', () => {
+    const singles = simState('singles', { p1ForceSwitch: true, p1ForceSwitches: [true], p2ForceSwitch: true, p2ForceSwitches: [true] });
+    expect(engineHoldsForcedBeside(singles, marks([false], [true]), 'p1', 0)).toBe(true);
+    expect(engineHoldsForcedBeside(singles, marks([false], [false]), 'p1', 0)).toBe(false);
+    const doubles = simState('doubles', { p1ForceSwitch: true, p1ForceSwitches: [true, false], p2ForceSwitch: true, p2ForceSwitches: [false, true] });
+    expect(engineHoldsForcedBeside(doubles, marks([false, false], [false, true]), 'p1', 0)).toBe(true);
   });
 });
