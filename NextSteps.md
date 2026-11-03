@@ -1,6 +1,6 @@
 # Next Steps (as of 03.11.2026, round 84 booked, round 85 next)
 
-Open work only. Each step is one round; its TODOs carry fixed T-numbers, and their details are in `docs/backlog.md`. Rules for agents: `AGENTS.md`. Finished rounds: `docs/completed/`. Next free T-number: T318.
+Open work only. Each step is one round; its TODOs carry fixed T-numbers, and their details are in `docs/backlog.md`. Rules for agents: `AGENTS.md`. Finished rounds: `docs/completed/`. Next free T-number: T319.
 
 ## State
 
@@ -8,11 +8,13 @@ Release v1.0.2 (30.10.2026) is on master, on GitHub Pages with the frozen copies
 
 ## Next rounds
 
-Round 85 · The engine reads the dice (feature, score-touching D3). The engine adopts the dice module of round 82 (`packages/eval-engine/src/dice/`, words in `GLOSSARY.md`, decisions in `docs/adr/`). T304: the report plays the game's biggest roll the other way and states the win chance with the other result (smogtours-gen8ou-573756 turn 73, the 95 % Fire Fang that missed). T305: the search tree prices secondary effects at their chance. T306: the reconstruction forces the logged results instead of searching 16 seeds. T299: the tree's scripted dice move onto the module. T309: a refit of the doubles weights after T307 (round 83), whose game-correct screen turns the bank reads as harm in doubles. T310: Light Clay from the screen turns in the log. The spec also rewords the eval panel's jargon ("estimate from a sim search, no oracle", "line: fast scan, then depth 1 everywhere"; round 84, ruling 14a). Next: brainstorming and spec; the design gate sets the order and whether one round carries all six.
+Round 85 · The UI stays smooth (larger bug, lossless D4; gate 03.11.2026, "1a 2b"). T318: the app lags in spikes of up to 335 ms while it loads and the engine computes, on the production site too. The probe of 03.11.2026 names three sources: Showdown's data scripts run again on every rebuild of the replay frame, frames that only render, and the ranking of results on the main thread. The round measures at the user's window first (2560 × 1290 at 150 %, GPU on, Chromium and Firefox, pools of 12, 8 and 6 workers), then fixes what the trace confirms. Success: no frame over 200 ms while the engine computes, Analyze game runs or a variation starts, the blocking time per scene at most half the baseline, and the engine's results byte-identical across pool sizes. Next: the measurement at the user's window, then a short spec.
+
+Round 86 · The engine reads the dice (feature, score-touching D3). The engine adopts the dice module of round 82 (`packages/eval-engine/src/dice/`, words in `GLOSSARY.md`, decisions in `docs/adr/`). T304: the report plays the game's biggest roll the other way and states the win chance with the other result (smogtours-gen8ou-573756 turn 73, the 95 % Fire Fang that missed). T305: the search tree prices secondary effects at their chance. T306: the reconstruction forces the logged results instead of searching 16 seeds. T299: the tree's scripted dice move onto the module. T309: a refit of the doubles weights after T307 (round 83), whose game-correct screen turns the bank reads as harm in doubles. T310: Light Clay from the screen turns in the log. The spec also rewords the eval panel's jargon ("estimate from a sim search, no oracle", "line: fast scan, then depth 1 everywhere"; round 84, ruling 14a). Next: brainstorming and spec; the design gate sets the order and whether one round carries all six.
 
 Approved, each waiting for a round: T313 and T317 form the next small batch (the app's buttons at 4.5 : 1, with a before and after image before the build; "EVs ?" in words). T314: a bench in a bring-limited format offers bodies the side never brought (larger bug, D3). T316: the replay frame drops the turn buttons the timeline covers, and the dock's rows follow Switch sides (feature, lossless).
 
-After round 85, bug reports from real use and the dependency upkeep of AGENTS.md bring the next round, and a parked TODO whose trigger fires comes to a gate.
+After round 86, bug reports from real use and the dependency upkeep of AGENTS.md bring the next round, and a parked TODO whose trigger fires comes to a gate.
 
 ## Parked
 
@@ -21,7 +23,7 @@ The TODOs in the backlog's section "Parked" wait for their trigger. The Showdown
 ## Known drifts
 
 - smogtours-gen8ou-562428 t10 and t12: expert pins in known drift. t10 still misses the Heatran read; t12 reads LordEnz's Close Combat as a shift, not as a read that paid off.
-- smogtours-gen8ou-573756 t73: the gap pin reads open. The Fire Fang miss is a key moment, and the verify scene reads Body Press without a tier, as the Monte-Carlo reference does (a margin of 0.004 to the decided line). T304 in round 85 works on it.
+- smogtours-gen8ou-573756 t73: the gap pin reads open. The Fire Fang miss is a key moment, and the verify scene reads Body Press without a tier, as the Monte-Carlo reference does (a margin of 0.004 to the decided line). T304 in round 86 works on it.
 - The golden 655336 stays in known drift. The tiers of VGC 2629703929 turn 8 expect the reference and fail until T242. The draft t56 play-out pin is armed.
 
 ## Upstream list for the user

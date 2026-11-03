@@ -1,18 +1,40 @@
 # Backlog
 
-This file holds the details of every open TODO, one section per TODO under its fixed T-number. Release v1.0.2 is out (30.10.2026), and rounds 82 to 84 (forced dice in branches, the GitHub issues #2 and #3, the turn dock) wait on dev for the next release. Round 85 carries the six approved TODOs of the engine setup (T299, T304 to T306, T309, T310); T313, T314, T316 and T317 are approved and wait for a round; every other TODO is parked with a trigger, and a trigger that fires brings its TODO to a gate. The next free T-number is T318.
+This file holds the details of every open TODO, one section per TODO under its fixed T-number. Release v1.0.2 is out (30.10.2026), and rounds 82 to 84 (forced dice in branches, the GitHub issues #2 and #3, the turn dock) wait on dev for the next release. Round 85 carries T318 (the UI stays smooth while the app loads and the engine computes), round 86 the six approved TODOs of the engine setup (T299, T304 to T306, T309, T310); T313, T314, T316 and T317 are approved and wait for a round; every other TODO is parked with a trigger, and a trigger that fires brings its TODO to a gate. The next free T-number is T319.
 
 Evidence paths of the form `r<NN>/…` point to that round's probe folder, `docs/perf/probes/<date>-r<NN>/`; `docs/` is local, so they exist only on the maintainer's machine. Each round's entry in `docs/completed/` names its folder and the gate that approved its TODOs. Line numbers in a section refer to the state when the TODO was written.
 
-## Round 85 · the engine reads the dice
+## Round 85 · the UI stays smooth
 
-The final gate of round 82 (01.11.2026, "2a") approved these TODOs for the next round, the engine setup; the gate of 11:31 ("3a") put a small batch first, the final gate of that batch (13:26, "3a") added T309 and T310, and the design gate of 19:20 ("17a") put the turn dock first, so they form round 85. Each leaves this file with that round's booking.
+The gate of 03.11.2026 ("1a 2b, aber auch weniger") approved T318 as its own small round right after round 84, so the engine setup moves to round 86. It leaves this file with the round's booking.
+
+### T318 · The UI stays smooth while the app loads and the engine computes
+
+*App and eval engine · gate of 03.11.2026 · larger bug · lossless (D4)*
+
+**Approved for round 85 (03.11.2026, "1a 2b, aber auch weniger"; the user: "The app doesn't feel very smooth and a bit laggy, specifically when something is loading (like the engine calculating, etc.)", and the lag shows on fulllifegames.com too, less than on the test server).**
+
+**Problem.** The probe of 03.11.2026 (Champions VGC 2625939941, the default engine settings, 1366 x 768, headless Chromium, a production build and the dev server) finds the main thread idle between spikes of up to 335 ms (frames over 50 ms run from 51 to 335 ms). Each rebuild of the replay frame's document (a variation start swaps the `replay` frame for a `branch` frame, `src/components/ReplayWorkspace.tsx:67`) writes Showdown's embed loader again (`src/lib/replay-html.ts:88`), and the frame runs Showdown's `teambuilder-tables.js` again: 186 ms at load and 319 ms at the variation start, in a probe whose routing switches the HTTP cache off, so the repeat on the live site is an upper bound. Frames of 116 to 335 ms carry no attributed script (rendering is the likely rest). `rankFromMatrix` (`packages/eval-engine/src/ranking/order.ts`) and `solveMatrixGame` (`ranking/solve.ts`, which holds `mixFromRegret`) run on the main thread inside the merge of the trees (`mcts-merge.ts`, `tree-orchestrator.ts`) and the matrix orchestrator (`orchestrator.ts`): 30 to 60 ms per dock fill and about 240 ms over 25 s of Analyze game. The pool takes 12 workers on a 24-thread machine (`src/lib/eval/pool-size.ts`); whether that starves the main thread or the compositor is open, since the main thread idled 89 % of Analyze game. On the dev server React's development runtime adds up to 300 ms of main-thread time per scene.
+
+**Idea.** Measure first at the user's window (2560 x 1290 at 150 %, GPU on, headed Chromium and Firefox): a trace that splits style, layout and paint, three runs per scene, pools of 12, 8 and 6 workers, and the HTTP cache on. Then fix what the trace confirms. The replay frame stops running Showdown's data scripts again on a rebuild: a variation start mounts a new frame, so this needs a replace message to a kept frame or a second frame kept warm, or it leaves out a script the replay view never reads (nothing in the repository reads `BattleTeambuilderTable`; Showdown's remote tooltips may, so a check per generation with the script blocked decides). T316 edits `replay-html.ts` as well; the two rounds agree on the order first. The merge of the trees and the matrix solve move into a worker (a new `EvalWorkerRequest` type: a barrel change with the API snapshot and `pack:smoke`; `ENGINE_PROTOCOL` stays). The pool leaves the main thread a core if the trace shows the contention. Progress renders are throttled already (`single-eval.ts`); the trace says whether more batching pays.
+
+**Benefit.** App: scrolling, clicks and the replay's animation stay smooth while the engine computes, while Analyze game runs and when a variation starts.
+
+**Success.** At the user's window on a production build, three runs per scene with the median read: no long animation frame over 200 ms while the engine computes, Analyze game runs or a variation starts, and the sum of `blockingDuration` per scene at most half of the baseline measured first; the longest input delay during Analyze game under 100 ms (Event Timing); Analyze game and a dock fill at most 10 % slower at the chosen pool than at 12 workers. Chromium reads the long animation frames; Firefox, which has no such API, reads the requestAnimationFrame gaps. Lossless (D4): a spec compares a pooled search at 12, 8 and 6 workers and the worker-side merge with the in-process result byte for byte (the bank and the feedback harness search in process, so they cannot see a pool or merge change), three byte-identical feedback runs, regression, e2e, lint, `tsc -b`.
+
+**Singles and doubles.** Singles, Doubles OU, Scarlet/Violet VGC and Champions VGC, each its own row; the singles scene needs a new fixture.
+
+**Evidence.** `docs/perf/probes/2026-11-03-perf/` (`findings.md`, `main-thread-prod.json`, `main-thread-dev.json`, `run-2.log`, the review `t318-review.md`).
+
+## Round 86 · the engine reads the dice
+
+The final gate of round 82 (01.11.2026, "2a") approved these TODOs for the next round, the engine setup; the gate of 11:31 ("3a") put a small batch first, the final gate of that batch (13:26, "3a") added T309 and T310, the design gate of 19:20 ("17a") put the turn dock first, and the gate of 03.11.2026 ("1a") put T318 first, so they form round 86. Each leaves this file with that round's booking.
 
 ### T304 · The report plays the game's biggest roll the other way
 
 *Engine · round 82 · feature · report prose (pins move)*
 
-**Approved for round 85 (final gate of round 82, 01.11.2026, "2a"; the user: "Ich will schon, dass Fire Fang korrekt als Miss deklariert und dass das das Game geändert hat. Das Engine Setup generell wäre für mich die nächste Runde").**
+**Approved for round 86 (final gate of round 82, 01.11.2026, "2a"; the user: "Ich will schon, dass Fire Fang korrekt als Miss deklariert und dass das das Game geändert hat. Das Engine Setup generell wäre für mich die nächste Runde").**
 
 **Problem.** smogtours-gen8ou-573756 turn 73: LordEnz's Garchomp at +4 misses Fire Fang (95 %) on SOULWIND's Corviknight at 15 % (59 of 399 HP, after Stealth Rock), and the report reads "The game's biggest roll came on turn 73: Fire Fang (95%) missed, worth +13% to SOULWIND." (T284, round 79, `packages/eval-engine/src/biggest-roll.ts:45-49`). The +13 % is the turn's chance part (`chanceDelta`, `packages/eval-engine/src/analysis.ts:67-69`): the next root's score after the miss against the price of the played pair, which averages hit and miss at their chances and also holds the turn's other dice and model error. The report never names the win chance a hit would have left, so it cannot say what the miss took from LordEnz. The gap pin of 573756 turn 73 (since 2026-08) still asks that "the bar shows how close the sweep stood".
 
@@ -30,7 +52,7 @@ The final gate of round 82 (01.11.2026, "2a") approved these TODOs for the next 
 
 *Engine · round 82 · feature · score-touching (D3)*
 
-**Approved for round 85 (final gate of round 82, 01.11.2026, "2a": the engine setup is the next round).**
+**Approved for round 86 (final gate of round 82, 01.11.2026, "2a": the engine setup is the next round).**
 
 **Problem.** The tree's class path prices a singles cell by outcome classes: miss, kill roll, non-kill roll, and both orders of a speed tie (`Outcome` in `packages/eval-engine/src/search/outcome-children.ts:64`, `foldClassWeights` in `packages/eval-engine/src/cell-blend.ts:289-297`). A secondary effect has no class, and the scripted dice cannot force one (`RollScript` carries hit, crit, roll and order, `forward/scripted-prng.ts:17-26`). The tree draws the natural base seed first, then at most six forced draws for the classes it did not show (`search/expansion.ts:107`, `TREE_FORCED_CAP` at `:31`), and each class keeps one representative child, so a burn, a flinch or a stat drop counts with the whole weight of its class or not at all. A flinch writes a `|cant|` line, and `classifyChild` returns null for any `|cant|` on an event side (`cell-blend.ts:235-239`), so a base draw with a flinch sends the cell to a single seed (`outcome-children.ts:228`, `expansion.ts:121`). A cell without a miss or a kill has no class at all: smogtours-gen8ou-573756 turn 8, LordEnz's fifth Scald in a row into Clefable, against Knock Off. The narrative counts the burn chance compounding to about 83 % over the streak (a truth pin since round 6), and the tree prices the cell from `SEARCH_SEEDS[0]`, so the burn counts fully or not at all. The doubles pair plan reads a flinch chance only to fall back from its pattern (`pair/pattern.ts:74-81`, used at `:219`).
 
@@ -48,7 +70,7 @@ The final gate of round 82 (01.11.2026, "2a") approved these TODOs for the next 
 
 *Engine · round 82 · feature · score-touching (D3: the replay's positions move)*
 
-**Approved for round 85 (final gate of round 82, 01.11.2026, "2a": the engine setup is the next round).**
+**Approved for round 86 (final gate of round 82, 01.11.2026, "2a": the engine setup is the next round).**
 
 **Problem.** The reconstruction replays each turn's choices and searches 16 pinned seeds for one whose discrete results match the log: faints, the end, move order, misses, crits, secondary effects, hit counts, `|cant|` reasons and confusion self-hits (`ALIGNMENT_SEEDS` and `chooseAlignedSeed` in `packages/eval-engine/src/hax-alignment.ts:208-266`). In the feedback runs of round 82 the best seed matches the log in 332 of 356 turns: 286 of 297 in singles, 17 of 25 in Doubles OU, 29 of 34 in VGC. In the other 24 turns the rebuilt position carries a result the game did not have, or lacks one it had, until the next snapshot corrects it; 5 of them carry a faint mismatch (`faint-residual`). The first turn of a branch repeats its seed search on every adopt: `alignArrivalDice` always runs it (`branch/adopt.ts:52`, `branch/runtime.ts:274`), and the serialized position keeps only a seed, not the logged draws.
 
@@ -66,7 +88,7 @@ The final gate of round 82 (01.11.2026, "2a") approved these TODOs for the next 
 
 *Engine · round 82 · small · score-touching*
 
-**Approved for round 85 (final gate of round 82, 01.11.2026, "2a": the engine setup is the next round). Parked before (planning of round 82, 31.10.2026, "11a"); its trigger fires in round 85, which moves the scripted dice onto the forced-dice module.**
+**Approved for round 86 (final gate of round 82, 01.11.2026, "2a": the engine setup is the next round). Parked before (planning of round 82, 31.10.2026, "11a"); its trigger fires in round 86, which moves the scripted dice onto the forced-dice module.**
 
 **Problem.** The tree's scripted dice tell a draw by the numbers in the call, and the simulator draws the attacker's status checks inside the same action: `runMove` sets the active move before `BeforeMove` (`@pkmn/sim` 0.10.12, `battle-actions.js:292` and `:301`).
 
@@ -90,7 +112,7 @@ In Gens 1 and 2 accuracy and crit draw in 256ths and the damage roll is `random(
 
 *Engine · round 83 · refit · score-touching (D3)*
 
-**Approved for round 85 (gate of round 83, 01.11.2026 13:26, "3a").**
+**Approved for round 86 (gate of round 83, 01.11.2026 13:26, "3a").**
 
 **Problem.** T307 keeps the simulator's count of a side condition at the turn boundary (`syncedDuration` in `packages/eval-engine/src/branch/field-correction.ts`), so a screen of a Light Clay holder lasts eight turns in the rebuilt positions, as in the game. The paired bank (r83-base at 52ac6f0 against r83-head at 3b7dccc) moved 39 of 837 rows, 34 of them doubles (Doubles OU 24, 15 of them farther from the outcome; VGC 10, 8 farther). At the base's fixed K it reads harm: full all +16 bp [+5, +29], doubles all +56 bp [+18, +95], doubles mid +142 bp [+57, +235]; singles −1 bp [−2, +0]. With its own K per game type and phase it reads no harm in the pooled rows and warns in the mid cells (full all +28 bp [+6, +56], doubles +82 bp [+15, +166]): the doubles K of the middle phase falls from 1.49 to 1.16. The positions are right: in the moved games 24 of 25 screens that ended lasted eight turns. The static score counts standing screens, not their turns (`screenCount`, `score/features.ts:103-105`), so the shift comes through the search, which now plays the screens longer. The doubles weights (`screens: 88` in `DOUBLES_FEATURE_WEIGHTS`, `score/weights.ts:259`; 48 for VGC at `:328`, 83 for Champions doubles at `:436`) and the doubles K were fitted on positions whose screens always ran out at the client's minimum.
 
@@ -108,7 +130,7 @@ In Gens 1 and 2 accuracy and crit draw in 256ths and the damage roll is `random(
 
 *Replay-core · round 83 · small · rule · score-touching*
 
-**Approved for round 85 (gate of round 83, 01.11.2026 13:26, "3a").**
+**Approved for round 86 (gate of round 83, 01.11.2026 13:26, "3a").**
 
 **Problem.** The log names Light Clay only when another effect reveals it (Knock Off, Frisk, Trick, Poltergeist: 37 of 5,754 corpus replays); for most setters only the screen's length shows it. The team build takes the item from the published sets and the inference, so a setter without Light Clay can hold it in the build, and since T307 its rebuilt screen lasts eight turns (gen9vgc2026regi-2630181744: p2's Aurora Veil lasted turns 1 to 5, and the built set holds Light Clay). A setter with Light Clay can miss it: in gen9terapreviewdraft-2182991758 the log proves it for Latias (screens of eight turns on turns 1 to 8, 25 to 32 and 26 to 33). Whether the build without the reporter's paste gives that Latias Light Clay is open (the unpasted p1 Latias of the same file got Leftovers); `buildAppTeams` on the log settles it.
 
