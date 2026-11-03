@@ -172,13 +172,15 @@ function recordSlotChoice(refs: BranchRefs, side: SideId, activeSlot: number, ch
 
 /** Mirrors the pending picks into the state the pickers read. */
 function publishChoices(refs: BranchRefs, setters: BranchSetters): void {
-  const { p1ChoicesRef, p2ChoicesRef } = refs;
+  // Round 84 (A7j): the picks are copied now, not when the updater runs: a send that clears the refs first cannot publish an empty list.
+  const p1Choices = [...refs.p1ChoicesRef.current];
+  const p2Choices = [...refs.p2ChoicesRef.current];
   setters.setSimState(prev => prev ? {
     ...prev,
-    p1Choice: p1ChoicesRef.current[0] ?? null,
-    p1Choices: [...p1ChoicesRef.current],
-    p2Choice: p2ChoicesRef.current[0] ?? null,
-    p2Choices: [...p2ChoicesRef.current],
+    p1Choice: p1Choices[0] ?? null,
+    p1Choices,
+    p2Choice: p2Choices[0] ?? null,
+    p2Choices,
   } : null);
 }
 
@@ -227,7 +229,9 @@ function useSetChoice(refs: BranchRefs, setters: BranchSetters, settle: (side: S
     recordSlotChoice(refs, side, activeSlot, choice);
     setExecuteError(null);
     if (!refs.battleStreamRef.current?.battle || !refs.branchEngineRef.current) return;
-    if (!settle(side)) publishChoices(refs, setters);
+    // Round 84 (A7j): the pick is published before the send goes out, so the chip shows the clicked body and Execute "Executing..." while the replacement plays. The updater is queued ahead of the send's own `setSimState(nextState)`, which wins.
+    publishChoices(refs, setters);
+    settle(side);
   }, [settle, refs, setters, executingRef, setExecuteError]);
 }
 

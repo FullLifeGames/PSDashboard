@@ -86,6 +86,20 @@ describe.each(SCENES)('the branch at a forced replacement, $kind', scene => {
     expect(result.current.history[1].kind).toBe('forced');
   }, 180_000);
 
+  // Round 84 (A7j): the bench click publishes its pick before the send goes out, so the dock's chip shows the clicked body (and
+  // Execute reads "Executing...") for the moments the send takes, not "choose a replacement" or the engine's earlier pick.
+  test('a click on the bench publishes the clicked body while the send is under way', async () => {
+    const result = await atForcedPosition();
+    const forcedSlot = result.current.simState!.p1ForceSwitches.findIndex(Boolean);
+    act(() => { result.current.setChoice('p1', replacement, forcedSlot); });
+    expect(result.current.executing).toBe(true);
+    expect(result.current.history).toHaveLength(1);
+    expect(result.current.simState!.p1Choices[forcedSlot]).toEqual(replacement);
+    await waitFor(() => expect(result.current.history).toHaveLength(2));
+    expect(result.current.simState!.p1ForceSwitch).toBe(false);
+    expect(result.current.executing).toBe(false);
+  }, 180_000);
+
   test('without a replacement open, executePending runs the turn like executeTurn', async () => {
     const hook = renderHook(() => useBranch());
     await act(async () => {

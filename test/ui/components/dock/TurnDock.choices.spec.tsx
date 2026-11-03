@@ -70,6 +70,21 @@ describe('Execute waits for every slot (singles)', () => {
   });
 });
 
+// Round 84 (A7j): a bench click at a forced replacement publishes its pick before the send goes out; the chip shows that body and Execute
+// reads "Executing..." while the replacement plays.
+describe.each(['singles', 'doubles'] as const)('a forced replacement that is going out (%s)', type => {
+  test('the chip shows the clicked body and Execute reads "Executing..."', () => {
+    const forced = simState(type, {
+      p1ForceSwitch: true, p1ForceSwitches: type === 'singles' ? [true] : [true, false],
+      p1Choice: rotom, p1Choices: [rotom],
+    });
+    render(<TurnDock {...props({ simState: forced, executing: true })} />);
+    expect(chip(type === 'singles' ? 'P1' : 'P1A')).toHaveTextContent('Rotom-Wash');
+    expect(chip(type === 'singles' ? 'P1' : 'P1A')).not.toHaveTextContent('choose');
+    expect(screen.getByRole('button', { name: 'Executing…' })).toBeDisabled();
+  });
+});
+
 describe('Execute waits for every slot (doubles)', () => {
   test('four empty chips; a tile sends its target with the slot index, a bench tile its slot', async () => {
     const wired = props({ simState: simState('doubles') });
