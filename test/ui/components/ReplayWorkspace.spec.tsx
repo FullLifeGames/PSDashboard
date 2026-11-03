@@ -89,7 +89,8 @@ describe('ReplayWorkspace', () => {
     act(() => app().board.timeline.navigateTo({ turn: 2, line: 'main' }));
     act(() => app().board.deviation.requestDeviation(null));
     await waitFor(() => expect(app().analysis.showBranch).toBe(true), { timeout: 60_000 });
-    expect(screen.getByText('Variation moves')).toBeInTheDocument();
+    // Round 84 (A7f): the panel stands closed under its toggle.
+    expect(screen.getByRole('button', { name: /Variation moves/ })).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByRole('button', { name: 'Save Branch' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Copy Share Link' })).toBeInTheDocument();
     // Round 84 (A6a): the engine fill starts a run at the variation's tip by itself, so the entry reads Cancel while it goes.
@@ -110,6 +111,9 @@ describe('ReplayWorkspace', () => {
     expect(await screen.findByTitle('Branch Simulation', {}, { timeout: 10_000 })).toHaveAttribute('src', expect.stringMatching(/^blob:/));
     expect(screen.queryByTitle('PS Replay')).toBeNull();
     expect(app().board.timeline.viewingVariation).toBe(true);
+    // The history stays closed after the turn, and the toggle counts it.
+    expect(screen.getByRole('button', { name: /Variation moves · 1 turn/ })).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.click(screen.getByRole('button', { name: /Variation moves/ }));
     expect(screen.getByRole('button', { name: /Main line \(turn 3\)/ })).toBeInTheDocument();
 
     const proceed = vi.fn();

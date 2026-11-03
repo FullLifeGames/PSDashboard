@@ -1,3 +1,4 @@
+import { useId, useState } from 'react';
 import type { TurnSnapshot } from '@fulllifegames/replay-core';
 import type { BranchHistoryEntry } from '../hooks/useBranch';
 import { notationSideLabel } from '@fulllifegames/eval-engine';
@@ -144,60 +145,81 @@ function HistoryRow({ entry, settled, marks, originalTurn, variationTurn, snapsh
   );
 }
 
-export function BranchHistoryPanel({ branchStartTurn, history, snapshots, currentPosition, onNavigate, ended = false }: Props) {
+/** The open panel's list: one row per executed turn (a forced replacement is its own row) and the tip button. */
+function HistoryList({ branchStartTurn, history, snapshots, currentPosition, onNavigate, ended }: Props & { ended: boolean }) {
   const rows = alignHistoryRows(history, branchStartTurn);
   const turnEntries = history.filter(entry => entry.kind !== 'forced').length;
   const tipTurn = branchStartTurn + turnEntries;
   return (
-    <div className="ps-panel" style={{ marginTop: 8, flex: '0 0 auto' }}>
-      <div style={{ fontSize: 13, fontWeight: 'bold', marginBottom: 8 }}>
-        Variation moves
-        {onNavigate && history.length > 0 && (
-          <span style={{ fontWeight: 'normal', fontSize: 10, color: '#8899aa', marginLeft: 8 }}>
-            click a cell to jump: left opens the main line, right the variation
-          </span>
-        )}
-      </div>
-      {history.length === 0 && (
-        <div style={{ fontSize: 11, color: '#8899aa' }}>
-          Execute turns to compare the original replay line with your branch.
-        </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {rows.map(({ entry, settled, originalTurn, variationTurn }, index) => (
+        entry.kind === 'forced' || originalTurn === null || variationTurn === null
+          ? <ForcedRow key={`forced-${entry.turnNumber}-${index}`} entry={entry} />
+          : (
+            <HistoryRow
+              key={`${entry.turnNumber}-${index}`}
+              entry={entry}
+              settled={settled}
+              marks={turnDiceMarks(history, index)}
+              originalTurn={originalTurn}
+              variationTurn={variationTurn}
+              snapshots={snapshots}
+              currentPosition={currentPosition}
+              onNavigate={onNavigate}
+            />
+          )
+      ))}
+      {onNavigate && turnEntries > 0 && (
+        <button
+          type="button"
+          onClick={() => onNavigate({ turn: tipTurn, line: 'variation' })}
+          style={{
+            ...cellReset,
+            border: '1px dashed rgba(240,199,107,0.4)',
+            borderRadius: 6,
+            padding: '6px 10px',
+            fontSize: 11,
+            color: '#ffeeba',
+            background: 'rgba(240,199,107,0.06)',
+          }}
+        >
+          {ended ? 'End of the variation: the game is over here' : 'Tip of the variation: continue playing here'}
+        </button>
       )}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {rows.map(({ entry, settled, originalTurn, variationTurn }, index) => (
-          entry.kind === 'forced' || originalTurn === null || variationTurn === null
-            ? <ForcedRow key={`forced-${entry.turnNumber}-${index}`} entry={entry} />
-            : (
-              <HistoryRow
-                key={`${entry.turnNumber}-${index}`}
-                entry={entry}
-                settled={settled}
-                marks={turnDiceMarks(history, index)}
-                originalTurn={originalTurn}
-                variationTurn={variationTurn}
-                snapshots={snapshots}
-                currentPosition={currentPosition}
-                onNavigate={onNavigate}
-              />
-            )
-        ))}
-        {onNavigate && turnEntries > 0 && (
-          <button
-            type="button"
-            onClick={() => onNavigate({ turn: tipTurn, line: 'variation' })}
-            style={{
-              ...cellReset,
-              border: '1px dashed rgba(240,199,107,0.4)',
-              borderRadius: 6,
-              padding: '6px 10px',
-              fontSize: 11,
-              color: '#ffeeba',
-              background: 'rgba(240,199,107,0.06)',
-            }}
-          >
-            {ended ? 'End of the variation: the game is over here' : 'Tip of the variation: continue playing here'}
-          </button>
+    </div>
+  );
+}
+
+/**
+ * Round 84 (A7f, ruling 18a): the panel sits closed under a one-line toggle, like the turn's explanation, so a variation's history no
+ * longer pushes the left column under the sticky dock. The caller keys it by the variation's start turn: it starts closed in every
+ * variation, keeps the user's setting while that variation lives, and the app stores nothing.
+ */
+export function BranchHistoryPanel({ ended = false, ...props }: Props) {
+  const [open, setOpen] = useState(false);
+  const bodyId = useId();
+  const { history, onNavigate } = props;
+  const turnEntries = history.filter(entry => entry.kind !== 'forced').length;
+  return (
+    <div className="ps-panel" style={{ marginTop: 8, flex: '0 0 auto' }}>
+      <button
+        type="button" className="ps-eval-analysis-toggle ps-history-toggle" aria-expanded={open} aria-controls={bodyId}
+        onClick={() => setOpen(!open)}
+      >
+        {open ? '▾' : '▸'} Variation moves{turnEntries > 0 && ` · ${turnEntries} ${turnEntries === 1 ? 'turn' : 'turns'}`}
+      </button>
+      <div id={bodyId} hidden={!open}>
+        {onNavigate && history.length > 0 && (
+          <div style={{ fontSize: 10, color: '#8899aa', margin: '6px 0 8px' }}>
+            click a cell to jump: left opens the main line, right the variation
+          </div>
         )}
+        {history.length === 0 && (
+          <div style={{ fontSize: 11, color: '#8899aa', marginTop: 6 }}>
+            Execute turns to compare the original replay line with your branch.
+          </div>
+        )}
+        <HistoryList {...props} ended={ended} />
       </div>
     </div>
   );

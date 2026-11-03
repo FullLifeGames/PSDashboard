@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { readFileSync } from 'fs';
 import { emptySmogon, routeSmogon } from './smogon-routes';
 import { fixturePath, installReplayEmbedCache, pickMove, routeOfflineFixtures, waitForExactPickers } from './helpers';
-import { failOnResizeLoops, lightEngine, loadDockReplay, pinUiScale } from './dock-helpers';
+import { failOnResizeLoops, lightEngine, loadDockReplay, openVariationHistory, pinUiScale, variationPanel } from './dock-helpers';
 
 /**
  * Round 84 (turn dock), step A7a, ruling 4a: the dock follows the column's content directly. At 2560 x 1290 the column is shorter
@@ -61,7 +61,7 @@ test('a replay turn: the log toggle and the dock follow the timeline directly an
   expect(dock.y + dock.height, 'the dock ends well above the window\'s foot').toBeLessThan(1290 - 100);
 });
 
-test('a variation\'s forced replacement with the history panel showing: no gap, no overlap', async ({ page }) => {
+test('a variation\'s forced replacement with the history panel closed and open: no gap, no overlap', async ({ page }) => {
   test.setTimeout(240_000);
   // The draft replay of the pivot spec: U-turn against Chilly Reception at turn 1 ends in a forced replacement of P1.
   const draftReplay = readFileSync(fixturePath('draft-replay.json'), 'utf-8');
@@ -78,7 +78,11 @@ test('a variation\'s forced replacement with the history panel showing: no gap, 
   await page.locator('.ps-execute-btn').click();
 
   await expect(page.locator('.ps-force-switch-note').first()).toBeVisible({ timeout: 60_000 });
-  await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toBeVisible();
+  // Round 84 (A7f): the panel stands closed (no cell shows); the geometry holds closed and open.
+  await expect(variationPanel(page)).toBeVisible();
+  await expect(page.getByText('Variation result').first()).toBeHidden();
+  expectFollowsContent(await columnGeometry(page), 'forced replacement, history closed');
+  await openVariationHistory(page);
   await expect(page.getByText('Variation result').first()).toBeVisible();
   expectFollowsContent(await columnGeometry(page), 'forced replacement');
   // The status strip above the chips belongs to the dock and stays below the history panel.

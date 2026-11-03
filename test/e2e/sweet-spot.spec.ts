@@ -1,13 +1,13 @@
 import { test, type Page } from '@playwright/test';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { fixtureReplay, installReplayEmbedCache, routeOfflineFixtures, startVariationAt } from './helpers';
-import { lightEngine, loadDockReplay, pinUiScale } from './dock-helpers';
+import { lightEngine, loadDockReplay, openVariationHistory, pinUiScale } from './dock-helpers';
 
 /**
  * Round 84 (T315, A7d, spec addendum A, "the sweet spot"): an opt-in measurement, never part of a run until `PS_SWEET_SPOT=1` is set.
  * At 100 % it finds, per scene, the smallest window at which the left column fits without scrolling and the evaluation column shows
  * its head: the smallest height at five widths and the smallest width at a tall window, in steps of 10 px. The scenes are a replay
- * turn and a variation with the history panel showing, in singles and in doubles. The numbers go to `test-results/sweet-spot.json`
+ * turn and a variation, in singles and in doubles; the variation is measured with the history panel closed (it starts so, A7f) and open. The numbers go to `test-results/sweet-spot.json`
  * (merged scene by scene), and decide whether Auto's room of 1400 x 820 px stands.
  *
  *   PS_SWEET_SPOT=1 PS_DEV_PORT=<port> npx playwright test test/e2e/sweet-spot.spec.ts --project=chromium
@@ -25,11 +25,22 @@ const OUTPUT = 'test-results/sweet-spot.json';
 
 interface Scene { name: string; setup: (page: Page) => Promise<void> }
 
+const variation = (name: string, id: string, turn: number, open: boolean): Scene => ({
+  name: `${name}-${open ? 'open' : 'closed'}`,
+  setup: async page => {
+    await loadDockReplay(page, id, turn);
+    await startVariationAt(page, turn);
+    if (open) await openVariationHistory(page);
+  },
+});
+
 const SCENES: Scene[] = [
   { name: 'replay-singles', setup: page => loadDockReplay(page, fixtureReplay.id, 1) },
   { name: 'replay-doubles', setup: page => loadDockReplay(page, DOUBLES, 5) },
-  { name: 'variation-singles', setup: async page => { await loadDockReplay(page, fixtureReplay.id, 1); await startVariationAt(page, 1); } },
-  { name: 'variation-doubles', setup: async page => { await loadDockReplay(page, DOUBLES, 5); await startVariationAt(page, 5); } },
+  variation('variation-singles', fixtureReplay.id, 1, false),
+  variation('variation-singles', fixtureReplay.id, 1, true),
+  variation('variation-doubles', DOUBLES, 5, false),
+  variation('variation-doubles', DOUBLES, 5, true),
 ];
 
 async function fits(page: Page, width: number, height: number): Promise<boolean> {

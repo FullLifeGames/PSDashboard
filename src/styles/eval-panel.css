@@ -140,6 +140,11 @@ button.ps-eval-choice:hover,
 .ps-eval-analysis-toggle:hover {
   color: #cde;
 }
+/* Round 84 (A7f): the history panel's toggle carries the panel's heading size. */
+.ps-history-toggle {
+  font-size: 13px;
+  font-weight: bold;
+}
 .ps-eval-report {
   gap: 4px;
 }

@@ -119,6 +119,30 @@ test('task 1 at 150 %, a move instead of the played one: the same 3 clicks (chip
   await expect(variationPanel(page)).toContainText(name);
 });
 
+/** Round 84 (A7f, ruling 18a): the history panel stands closed under its toggle, so a doubles variation with a turn in it still fits. */
+test('a doubles variation with its history at 150 %: the left column does not scroll while the panel is closed', async ({ page }) => {
+  test.setTimeout(180_000);
+  await loadDockReplay(page, DOUBLES, TURN);
+  expect(await rootScale(page)).toBe('1.5');
+  await dockChip(page, 'p1a').click();
+  await dockTray(page).locator('.ps-movebtn:enabled', { hasNotText: 'Knock Off' }).first().click();
+  await page.locator('.ps-execute-btn').click();
+  await expect(variationPanel(page)).toContainText(`Turn ${TURN}`, { timeout: 90_000 });
+  const toggle = variationPanel(page).getByRole('button', { name: /Variation moves/ });
+  await expect(toggle).toHaveText(/^▸ Variation moves · 1 turn$/);
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  const overflow = () => page.evaluate(() => {
+    const left = document.querySelector('.ps-main-left') as HTMLElement;
+    return { overflow: left.scrollHeight - left.clientHeight, scrollTop: left.scrollTop };
+  });
+  const closed = await overflow();
+  expect(closed.overflow, `closed ${JSON.stringify(closed)}`).toBeLessThanOrEqual(1);
+  expect(closed.scrollTop).toBe(0);
+  // Open, the history may need the column's scroll (the panel's own height); the toggle opens it and the cells show.
+  await toggle.click();
+  await expect(page.getByText('Variation result').first()).toBeVisible();
+});
+
 test('the Size setting overrides Auto, persists across a reload, and disables a step that leaves under 1050 px', async ({ page }) => {
   test.setTimeout(180_000);
   await loadDockReplay(page, DOUBLES, TURN);

@@ -4,6 +4,7 @@ import {
   dockChip, expectReplaySettled, expectReplayTurnAtLeast, fixturePath, installReplayEmbedCache, pickForcedReplacement, pickMove, pickSwitch,
   routeOfflineFixtures, routeSlowReplayEmbed, startVariationAt, type ReplayWindow,
 } from './helpers';
+import { openVariationHistory } from './dock-helpers';
 
 test.beforeAll(installReplayEmbedCache);
 
@@ -107,6 +108,8 @@ test.describe('PS Dashboard', () => {
 
     await page.locator('button', { hasText: 'Let it play out' }).click();
     await expect(page.getByText(/Play-out finished|Play-out stopped/)).toBeVisible({ timeout: 500_000 });
+    // Round 84 (A7f): innerText reads the rendered text, so the closed history opens first.
+    await openVariationHistory(page);
     const lines = (await page.locator('.ps-panel', { hasText: 'Variation moves' }).innerText()).split('\n');
     // P2's switch targets in play order: the right half of a turn's move row
     // when it is a switch, and the forced-replacement rows of P2.

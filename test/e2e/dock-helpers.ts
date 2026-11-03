@@ -201,6 +201,16 @@ export async function branchFrameEntries(page: Page): Promise<() => Promise<stri
 /** The history panel of a variation. */
 export const variationPanel = (page: Page): Locator => page.locator('.ps-panel', { hasText: 'Variation moves' });
 
+/**
+ * Round 84 (A7f, ruling 18a): the history panel stands closed under its toggle in every variation. A spec that reads or clicks the
+ * history cells (the cells, the tip button, the hint) opens it first; the text of a closed panel stays in the DOM, so `toContainText` needs no opening.
+ */
+export async function openVariationHistory(page: Page): Promise<void> {
+  const toggle = variationPanel(page).getByRole('button', { name: /Variation moves/ });
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+}
+
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**

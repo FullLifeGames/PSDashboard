@@ -152,6 +152,7 @@ function BranchSidePanels({ app, replayData }: WorkspaceProps) {
   return (
     <>
       <BranchHistoryPanel
+        key={variationSpan?.startTurn ?? viewTurn}
         branchStartTurn={variationSpan?.startTurn ?? viewTurn}
         history={history}
         snapshots={snapshots}
