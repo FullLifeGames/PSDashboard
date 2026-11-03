@@ -71,8 +71,19 @@ test('the dock: four chip rows of 46 px with the whole choice, Execute under the
   // The top bar: two lines at most. Its height is below three lines' (74 px before).
   const bar = (await page.locator('.ps-topbar').boundingBox())!;
   expect(bar.height, 'height of the top bar').toBeLessThan(64);
-  const lines = await page.locator('.ps-topbar > *').evaluateAll(elements => new Set(elements.map(element => Math.round(element.getBoundingClientRect().top / 10))).size);
-  expect(lines, 'rows of the top bar\'s children').toBeLessThanOrEqual(2);
+  // A row is a run of children whose boxes overlap in height: the children of one row differ in height and sit centred, so their
+  // tops differ by several px (the A7c run bucketed the tops by tens and counted one row twice).
+  const rows = await page.locator('.ps-topbar > *').evaluateAll(elements => {
+    const boxes = elements.map(element => element.getBoundingClientRect()).sort((a, b) => a.top - b.top);
+    const found: { top: number; bottom: number }[] = [];
+    for (const box of boxes) {
+      const row = found[found.length - 1];
+      if (row && box.top < row.bottom - 1) row.bottom = Math.max(row.bottom, box.bottom);
+      else found.push({ top: box.top, bottom: box.bottom });
+    }
+    return found;
+  });
+  expect(rows.length, `rows of the top bar's children ${JSON.stringify(rows)}`).toBeLessThanOrEqual(2);
 });
 
 test('task 1 on a phone, a move instead of the played one: the same 3 clicks (chip, tile, Execute)', async ({ page }) => {
