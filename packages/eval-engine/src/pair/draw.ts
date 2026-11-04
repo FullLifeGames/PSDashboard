@@ -34,7 +34,8 @@ export function drawPair(
   applyChoice(battle, 'p1', p1Choice);
   applyChoice(battle, 'p2', p2Choice);
   resolveForcedSwitches(battle, seed, { p1: p1Choice.split(' > ')[1], p2: p2Choice.split(' > ')[1] });
-  // The child is a plain battle again: the same seed state, no recorder attached.
+  // The child is a plain battle again: the same seed state, no recorder attached, no watch on the battle (round 86, T299).
+  prng.release();
   battle.prng = new PRNG(prng.getSeed());
   const records = prng.records.map(record => ('logIndex' in record ? { ...record, logIndex: record.logIndex - logStart } : record));
   const child = toPosition(battle);
