@@ -18,12 +18,12 @@ import type { SimView } from './sim-views';
  *  - nothing is read when the turns prove nothing: a removal (the screen ends in the action phase), a screen moved by Court
  *    Change, a screen still standing at the log's end, an item that did not count (Klutz, Embargo, Magic Room), an item the
  *    log showed change, an Illusion team, a generation without the item (Generations 1 to 3).
- * These rows are red before the reader (step C2 of lane C): `red` is `test.fails` until step C3 builds the reader and flips it.
+ * These rows were red before the reader (step C2 of lane C, `test.fails`); step C3 built the reader and flipped them to `test`.
  * The rows that read nothing pass both before and after; they guard the cases a careless reader would get wrong.
  * Every log below comes from the simulator, in singles and in doubles (the setter in either slot), in the simulator's own style
  * and with the log's `|t:|` lines taken out (a reconstructed log).
  */
-const red = test.fails;
+const red = test;
 
 const SCENE_FILES = {
   vgc: new URL('../../eval-engine/test/fixtures/gen9vgc2026regi-2630181744.json', import.meta.url),
@@ -151,9 +151,12 @@ describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 4))('the turns prove not
     expect(ruledOut(standing, 'p1', SNORLAX)).toBe(false);
   });
 
-  red('an Illusion user on the team: the setter may be the user\'s disguise, no verdict', () => {
+  red('an Illusion user on the team: the setter may be the user\'s disguise, no verdict (where the generation has Illusion)', () => {
     expect(ruledOut(control({ species: SNORLAX }), 'p1', SNORLAX)).toBe(true);
-    expect(ruledOut(control({ species: SNORLAX }, { bench: [{ species: 'Zoroark', ability: 'Illusion' }] }), 'p1', SNORLAX)).toBe(false);
+    // Round 86 (C3): the generation decides, read from the Dex. Where the ability does not exist, a bench the log never shows holds no disguise.
+    const illusion = view.dex.abilities.get('illusion');
+    const hasIllusion = illusion.exists && illusion.gen <= view.dex.gen;
+    expect(ruledOut(control({ species: SNORLAX }, { bench: [{ species: 'Zoroark', ability: 'Illusion' }] }), 'p1', SNORLAX)).toBe(!hasIllusion);
   });
 
   test('an item knocked off before the screen: the log showed it, the rule-out stays off', () => {
@@ -225,6 +228,8 @@ describe.each(RULE_VIEWS.filter(view => view.dex.gen < 4))('no table before Ligh
 describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 2 && screenMoves(view).length >= 2))('S3, removers and movers of screens: $name', view => {
   const found = swept(view);
   const both = (log: string): [boolean, boolean] => [ruledOut(log, 'p1', SNORLAX), ruledOut(log, 'p2', 'Vaporeon')];
+  // Round 86 (C3): before Generation 4 no item changes a screen's turns (Light Clay debuts there), so no screen gives a verdict.
+  const verdicts = (clean: [boolean, boolean]): [boolean, boolean] => (view.dex.gen >= 4 ? clean : [false, false]);
 
   test('the sweep found the removers and movers the rule set has', () => {
     expect(found.played).toBeGreaterThan(0);
@@ -232,14 +237,14 @@ describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 2 && screenMoves(view).l
   });
 
   red('the control: with no move on the last plain turn both screens ran out on their own sides', () => {
-    expect(both(found.log(null))).toEqual([true, true]);
+    expect(both(found.log(null))).toEqual(verdicts([true, true]));
   });
 
   for (const move of found.moves) {
     red(`${move.id} (${move.kind}) on turn 5: a side reads a verdict only if its screen ran out on its own side`, () => {
       const log = found.log(move.id);
-      expect(both(found.log(null))).toEqual([true, true]);
-      expect(both(log)).toEqual([endsCleanly(log, 'p1', 'reflect'), endsCleanly(log, 'p2', 'lightscreen')]);
+      expect(both(found.log(null))).toEqual(verdicts([true, true]));
+      expect(both(log)).toEqual(verdicts([endsCleanly(log, 'p1', 'reflect'), endsCleanly(log, 'p2', 'lightscreen')]));
     });
   }
 });

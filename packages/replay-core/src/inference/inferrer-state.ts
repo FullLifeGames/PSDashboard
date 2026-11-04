@@ -6,6 +6,7 @@ import { calcModOf, type CHAMPIONS_MOD } from '../calc-gen.ts';
 import { dexOf } from '../rules-dex.ts';
 import type { ItemWatch } from './item-evidence.ts';
 import type { TriggerWatch } from './trigger-evidence.ts';
+import type { ScreenWatch } from './screen-evidence.ts';
 import type { HitWalk } from './hits.ts';
 import { arg, type LogLine } from './log-line.ts';
 
@@ -52,6 +53,8 @@ export interface InferrerState {
   itemWatch?: ItemWatch;
   /** Item evidence by a trigger without its line (round 67, T130); trigger-evidence.ts creates it. */
   triggerWatch?: TriggerWatch;
+  /** Item evidence by a screen's turns (round 86, T310); screen-evidence.ts creates it. */
+  screenWatch?: ScreenWatch;
   /** The client walk that collects each opponent attacker's clean hits (round 67, T130); hits.ts creates it. */
   hitWalk?: HitWalk;
 }
