@@ -1,7 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs';
-import { afterAll, describe, expect, test } from 'vitest';
+import { afterAll, describe, expect, test, vi } from 'vitest';
 import { rulesDex, toId, type ReplayData } from '@fulllifegames/replay-core';
-import { strengthMix } from '../src/calc/fickle';
 import { parseTurnBlocks } from '../src/branch/protocol-choices';
 import { loadSimMods } from '../src/forward/sim-mods';
 import { secondariesIn } from '../src/dice/secondaries';
@@ -10,7 +9,7 @@ import { CLASSES } from './dice-census-support';
 import { mon, playClicks, type Mode, type Rules } from './dice-fixtures';
 import { CHECKS } from './dice-status-support';
 import { dexOfRules, picksOne, sweepClicks, sweepMoves, SWEEP_CASES, type DexMove } from './dice-sweep-support';
-import { clickedOf, moveScene, scan, witnessesWanted, type Scan, type Scene } from './dice-logged-sweep-support';
+import { clickedOf, moveScene, powerMoves, scan, witnessesWanted, type Scan, type Scene } from './dice-logged-sweep-support';
 import { battleOf } from './power-oracle';
 
 /**
@@ -23,11 +22,13 @@ import { battleOf } from './power-oracle';
  * and, new in this round, stalling (the `|-fail|` of a second Protect). The last block counts the kinds the log may show and the
  * reader does not name (the census of the ledger). A plain run plays the fixed sample of each list, `DICE_SWEEPS=full` every entry.
  *
- * KNOWN (`test.fails`, red today): the stalling rows (B3 builds the reader), the multi-accuracy rows (Q4) and two gaps the sweep found in the
- * reader (a secondary that picks its status, a self effect of a spread move in doubles); each has a plain row that holds the sweep finds a
- * seed pair to repair, so a row never goes green because it played nothing. Moves aimed at a random foe in doubles stay out (see `randomAim`).
+ * KNOWN (`test.fails`, red today): the stalling rows (B3 builds the reader), the multi-accuracy rows (Q4) and the five causes the full sweep
+ * found in the reader (`GAPS`); each has a plain row that holds the sweep finds a seed pair to repair, so a row never goes green because it
+ * played nothing. Moves aimed at a random foe in doubles stay out (see `randomAim`).
  */
 await loadSimMods('gen9championsou');
+// a full sweep plays every Dex move of a rule set in one test (about two minutes for the crits of a doubles cell)
+vi.setConfig({ testTimeout: 900_000 });
 
 const logPath = process.env.DICE_SWEEP_LOG;
 const summaries: string[] = [];
@@ -345,7 +346,7 @@ describe('the kinds the log may show and the reader does not name: the census of
     });
     for (const kind of unnamed) {
       const entries = kind === 'power'
-        ? dex.moves.all().filter(move => move.exists && strengthMix(dex, move.name) !== null).map(move => ({ table: 'moves', id: move.id, name: move.name }))
+        ? powerMoves(dex).map(move => ({ table: 'moves', id: move.id, name: move.name }))
         : Object.entries(CLASSES).filter(([, entry]) => entry.kind === kind).map(([key]) => key.split('/')).map(([table, id]) => ({ table, id, name: (table === 'items' ? dex.items : dex.abilities).get(id).name }));
       const ids = [...new Set(entries.map(entry => entry.id))];
       const carries = (lines: string[]): boolean => lines.some(line => entries.some(entry => entry.name && (entry.table === 'moves'

@@ -1,5 +1,6 @@
 import type { Battle, PokemonSet } from '@pkmn/sim';
 import { extractProtocolEvents, isPerfectAlignment, scoreAlignment, type ProtocolEvents } from '../src/hax-alignment';
+import { strengthMix } from '../src/calc/fickle';
 import { loggedActions, loggedDice, type LoggedOptions } from '../src/dice/logged-results';
 import { playForcedTurn } from '../src/dice/play';
 import type { ForcedDie } from '../src/dice/types';
@@ -150,3 +151,9 @@ function outfitted(rules: Rules, mode: Mode, moveId: string, seed: string, outfi
 
 /** The seeds a sweep plays per move: two in a plain run, four with `DICE_SWEEPS=full`. */
 export const witnessesWanted = (): number => sweepSelection([0, 1, 2, 3], 'seeds').length;
+
+/** Every move of the Dex with a chance that changes its power (the census reads the whole list, as `dice-census.spec.ts` does). */
+export function powerMoves(dex: Parameters<typeof strengthMix>[0]): { id: string; name: string }[] {
+  return (dex as unknown as { moves: { all(): { exists: boolean; id: string; name: string }[] } }).moves.all()
+    .filter(move => move.exists && strengthMix(dex, move.name) !== null).map(move => ({ id: move.id, name: move.name }));
+}
