@@ -57,7 +57,6 @@ const GAPS: { cause: string; moves: string[]; modes: Mode[] }[] = [
   { cause: 'a move that fails before its accuracy draw is logged with no target, so no accuracy die names it', moves: ['present', 'psychoshift'], modes: ['singles', 'doubles'] },
   { cause: 'a secondary that picks its status (the die names the chance, the pick follows the stream)', moves: ['triattack', 'direclaw'], modes: ['singles', 'doubles'] },
   { cause: 'a self effect of a spread move: the log writes one boost per target', moves: ['diamondstorm'], modes: ['doubles'] },
-  { cause: 'the second hit of a move that picks its target names it in |-anim| only', moves: ['dragondarts'], modes: ['doubles'] },
 ];
 /**
  * The moves the full sweep found the reader missed (04.11.2026) and B3 fixed, each group with its cause. One plain row per group plays them
@@ -65,6 +64,7 @@ const GAPS: { cause: string; moves: string[]; modes: Mode[] }[] = [
  */
 const FIXED: { cause: string; moves: string[]; modes: Mode[] }[] = [
   { cause: 'the status line of the secondary carries "[from] move:" (the move itself), which the reader skipped as an effect of something else', moves: ['relicsong', 'wickedtorque'], modes: ['singles', 'doubles'] },
+  { cause: 'the second hit of a move that picks its target names it in |-anim| only (Dragon Darts in doubles)', moves: ['dragondarts'], modes: ['singles', 'doubles'] },
 ];
 
 /** Whether the move is a gap of this game type (a gap may hold in singles and stay open in doubles). */
@@ -166,7 +166,7 @@ describe.each(SWEEP_CASES)('the logged secondaries and self effects give the log
 // turn repairs none of them (somewhere). Where a rule set does not show the cause (Tri Attack has no secondary in Gen 1) its pairs just pass.
 describe.each(SWEEP_CASES)('the moves the reader once missed hold on another seed: $name', ({ rules, mode }) => {
   const dex = dexOfRules(rules);
-  for (const { cause, moves: ids, modes } of FIXED.filter(entry => entry.modes.includes(mode))) {
+  for (const { cause, moves: ids } of FIXED.filter(entry => entry.modes.includes(mode))) {
     test(cause, () => {
       const present = ids.filter(id => { const move = dex.moves.get(id); return move.exists && move.gen <= dex.gen && !move.isNonstandard; });
       const result = sweepMovesOf(`fixed ${ids[0]}`, rules, mode, move => ids.includes(move.id), move => {

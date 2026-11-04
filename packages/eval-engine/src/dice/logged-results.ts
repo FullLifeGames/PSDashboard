@@ -121,6 +121,17 @@ function readMiss(action: LoggedAction, parts: string[]): void {
   if (!action.targets.includes(target)) action.targets.push(target);
 }
 
+/**
+ * A `|-anim|` line of the move names the target of a later hit (Round 86, T306: the second dart of Dragon Darts goes to the other foe in
+ * doubles, and the `|move|` line names the first one only). The damage lines of that hit then read against that target.
+ */
+function readAnim(action: LoggedAction, parts: string[]): void {
+  const target = slotOf(field(parts, 4));
+  if (!target || toId(field(parts, 3)) !== action.moveId || action.targets.includes(target)) return;
+  action.idents[target] ??= field(parts, 4);
+  action.targets.push(target);
+}
+
 /** A damage line: the confusion self-hit, or damage the move dealt (no `[from]`). */
 function readDamage(action: LoggedAction, key: string, line: string): void {
   const selfHit = SELF_HIT.exec(line);
@@ -143,6 +154,7 @@ function readLine(action: LoggedAction, parts: string[], line: string): void {
   else if (tag === '-hitcount') action.hitCounts[key] = Number(field(parts, 3));
   else if (tag === '-damage') readDamage(action, key, line);
   else if (tag === '-fail' && !line.includes('[from]')) bump(action.fails, key);
+  else if (tag === '-anim') readAnim(action, parts);
   else if (EFFECT_TAGS.has(tag) && ownEffect(action, line)) readEffect(action, parts, key);
 }
 
