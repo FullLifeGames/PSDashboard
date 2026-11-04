@@ -3,6 +3,7 @@ import { boundaryEvent, randomCallMoves, type BoundaryEvent } from './ko-odds.ts
 import { pairKoOdds } from './pair/odds.ts';
 import { accuracyRollReached } from './search/event-reach.ts';
 import { stopsHits } from './dex-facts/protect.ts';
+import { dieTokens, eventSecondaries, hitClasses, hitKey, type EventSecondary, type SecondaryDie } from './search/secondary-classes.ts';
 import type { KoOddsInfo } from './types.ts';
 import { hazardConditions, sideIndex, type RulesDex } from '@fulllifegames/replay-core';
 
@@ -22,6 +23,11 @@ export interface CellEvent {
   /** Protocol ident of the event's defender, e.g. "p2a: Medicham" (nickname). */
   defenderIdent: string;
   event: BoundaryEvent;
+  /**
+   * Round 86 (T305): the secondary entries of the move against this defender, each a die under 1 (search/secondary-classes.ts).
+   * A hit that does not kill splits by the entries that came true. Absent when the defender is not on the field yet (a switch).
+   */
+  secondary?: EventSecondary[];
 }
 
 export type CellEventPlan =
@@ -29,7 +35,8 @@ export type CellEventPlan =
   | { kind: 'fail' }                    // a guard tripped — keep today's path
   | { kind: 'events'; events: CellEvent[] };
 
-type EventOutcome = 'miss' | 'hit-kill' | 'hit-nokill' | 'none';
+/** `miss`, `hit-kill`, `none`, or `hit-nokill` with the secondary effects that came true (`hit-nokill+brn`). */
+type EventOutcome = string;
 
 /**
  * Fixed probe seeds for boundary cells whose analytic classes went
@@ -107,6 +114,24 @@ function unpricedMovePlan(dex: RulesDex, move: DexMove): SideEventPlan {
   return { kind: 'skip' };
 }
 
+/**
+ * The event of a move that reached its accuracy roll: kept when it can miss, can kill without being sure to, or (round 86, T305)
+ * can draw a secondary die, which has outcome classes of its own also for a move that cannot miss or kill. A certain hit with a
+ * certain outcome and no die is no event.
+ */
+function pricedEvent(battle: Battle, side: 'p1' | 'p2', moveId: string, defender: Pokemon, oppChoice: string, event: BoundaryEvent): SideEventPlan {
+  const secondary = /^switch\s+\d+/.test(oppChoice.trim()) ? undefined : eventSecondaries(battle, `${side}a`, moveId, defender);
+  if (secondary === null) return { kind: 'fail' };
+  const priced = !!secondary?.length && event.killFraction < 1;
+  if (event.accuracy < 1 || (event.killFraction > 0 && event.killFraction < 1) || priced) {
+    return {
+      kind: 'event',
+      event: { side, moveId, defenderIdent: `${defender.side.id}a: ${defender.name}`, event, ...(secondary?.length ? { secondary } : {}) },
+    };
+  }
+  return { kind: 'skip' };
+}
+
 /** One side's boundary event for the cell: fail when a guard trips, skip when the side has no priceable roll. */
 function planSideEvent(battle: Battle, side: 'p1' | 'p2', choice: string, oppChoice: string): SideEventPlan {
   const moveId = moveIdOf(choice)!;
@@ -129,11 +154,7 @@ function planSideEvent(battle: Battle, side: 'p1' | 'p2', choice: string, oppCho
     const [p1Choice, p2Choice] = side === 'p1' ? [choice, oppChoice] : [oppChoice, choice];
     if (!accuracyRollReached(battle, side, move.id, p1Choice, p2Choice)) return { kind: 'skip' };
   }
-  if (event.accuracy < 1 || (event.killFraction > 0 && event.killFraction < 1)) {
-    return { kind: 'event', event: { side, moveId: move.id, defenderIdent: `${defender.side.id}a: ${defender.name}`, event } };
-  }
-  // Fully deterministic event (certain hit, certain outcome): no event.
-  return { kind: 'skip' };
+  return pricedEvent(battle, side, move.id, defender, oppChoice, event);
 }
 
 /**
@@ -224,31 +245,58 @@ function sideOutcome(
 }
 
 /**
+ * Round 86 (T305): the |cant| lines of the event sides. A cant that the other event side's secondary die explains (a flinch that
+ * came true, reason = the effect id) cuts the side's move and leaves its outcome `none`; any other |cant| on an event side is an
+ * unmodeled skip (null). Returns the cut sides with their reasons.
+ */
+function cutSides(log: string[], events: CellEvent[]): Map<'p1' | 'p2', string> | null {
+  const cut = new Map<'p1' | 'p2', string>();
+  for (const ev of events) {
+    const cants = log.filter(line => line.startsWith(`|cant|${ev.side}a:`));
+    if (cants.length === 0) continue;
+    const reason = cants[0].split('|')[3];
+    const other = events.find(entry => entry.side !== ev.side);
+    if (cants.length > 1 || !other?.secondary?.some(entry => entry.truncates && entry.effectId === reason)) return null;
+    cut.set(ev.side, reason);
+  }
+  return cut;
+}
+
+/**
  * Read a seed child's outcome class from its advance log, or null when the
- * lines deviate from the kill-truncation occurrence model (flinch, full
+ * lines deviate from the kill-truncation occurrence model (full
  * paralysis, ambiguous faints — anything the fold did not predict).
  * Key = event sides' outcomes in p1→p2 order joined with '|'.
+ *
+ * Round 86 (T305): a hit that does not kill carries the secondary effects that came true. `dice` (the fork's `DiceSink`) says
+ * which; without it only the effects the log shows by a cut move (a flinch) are known. A |cant| of that effect on the other event
+ * side is the flinch class, not a deviation.
  */
-export function classifyChild(log: string[], events: CellEvent[]): string | null {
+export function classifyChild(log: string[], events: CellEvent[], dice?: readonly SecondaryDie[]): string | null {
   const moveIndex = eventMoveIndices(log, events);
   if (!moveIndex) return null;
-  // Any |cant| on an event side is an unmodeled skip.
-  for (const ev of events) {
-    const cantPrefix = `|cant|${ev.side}a:`;
-    if (log.some(line => line.startsWith(cantPrefix))) return null;
-  }
+  const cut = cutSides(log, events);
+  if (!cut) return null;
 
   const outcomes = new Map<'p1' | 'p2', EventOutcome>();
   for (const ev of events) {
     const index = moveIndex.get(ev.side);
     if (index === undefined) continue;
-    outcomes.set(ev.side, sideOutcome(log, events, moveIndex, ev, index));
+    const outcome = sideOutcome(log, events, moveIndex, ev, index);
+    if (outcome !== 'hit-nokill') {
+      outcomes.set(ev.side, outcome);
+      continue;
+    }
+    const cuts = [...cut].filter(([side]) => side !== ev.side).map(([, reason]) => reason);
+    const tokens = new Set([...(dice ? dieTokens(dice, ev.side, ev.moveId, ev.secondary) : []), ...cuts]);
+    outcomes.set(ev.side, hitKey([...tokens].sort()));
   }
-  // Event sides without a move line are valid only as kill-truncation.
+  // Event sides without a move line are valid only as kill-truncation or as the side a secondary die cut.
   for (const ev of events) {
     if (outcomes.has(ev.side)) continue;
     const other = events.find(entry => entry.side !== ev.side);
-    if (!other || outcomes.get(other.side) !== 'hit-kill') return null;
+    const otherOutcome = other ? outcomes.get(other.side) : undefined;
+    if (!other || !(otherOutcome === 'hit-kill' || (cut.has(ev.side) && otherOutcome?.startsWith('hit-nokill+')))) return null;
     outcomes.set(ev.side, 'none');
   }
   return events.map(ev => outcomes.get(ev.side)!).join('|');
@@ -287,12 +335,13 @@ export function observeOrder(logs: string[][], events: CellEvent[]): 'p1' | 'p2'
  * in p1→p2 side order regardless of acting order; weights sum to 1.
  */
 export function foldClassWeights(events: CellEvent[], first: 'p1' | 'p2'): Map<string, number> {
-  const outcomesOf = (event: CellEvent): [EventOutcome, number][] => {
+  // [outcome key, weight, whether the outcome cuts the second mover]
+  const outcomesOf = (event: CellEvent): [EventOutcome, number, boolean][] => {
     const { accuracy: a, killFraction: k } = event.event;
-    const list: [EventOutcome, number][] = [];
-    if (a < 1) list.push(['miss', 1 - a]);
-    if (k > 0) list.push(['hit-kill', a * k]);
-    if (k < 1) list.push(['hit-nokill', a * (1 - k)]);
+    const list: [EventOutcome, number, boolean][] = [];
+    if (a < 1) list.push(['miss', 1 - a, false]);
+    if (k > 0) list.push(['hit-kill', a * k, false]);
+    if (k < 1) for (const cls of hitClasses(event.secondary)) list.push([hitKey(cls.tokens), a * (1 - k) * cls.weight, cls.cuts]);
     return list;
   };
   const weights = new Map<string, number>();
@@ -307,9 +356,9 @@ export function foldClassWeights(events: CellEvent[], first: 'p1' | 'p2'): Map<s
   const secondEvent = events.find(ev => ev.side !== first)!;
   const key = (firstOutcome: EventOutcome, secondOutcome: EventOutcome) =>
     first === 'p1' ? `${firstOutcome}|${secondOutcome}` : `${secondOutcome}|${firstOutcome}`;
-  for (const [o1, w1] of outcomesOf(firstEvent)) {
-    if (o1 === 'hit-kill') {
-      add(key(o1, 'none'), w1); // the second actor is the first's defender here
+  for (const [o1, w1, cuts] of outcomesOf(firstEvent)) {
+    if (o1 === 'hit-kill' || cuts) {
+      add(key(o1, 'none'), w1); // the second actor is the first's defender here: a kill or a flinch takes its move
       continue;
     }
     for (const [o2, w2] of outcomesOf(secondEvent)) add(key(o1, o2), w1 * w2);

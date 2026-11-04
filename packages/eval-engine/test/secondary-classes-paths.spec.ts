@@ -81,6 +81,17 @@ describe.each(SINGLES)('the class weights of the singles paths: $name', ({ rules
     return { problems, read };
   }
 
+  // Round 86 (T305, A5a): `boundaryEvent` reads no hit of Generation 1 or 2 (the calc has no rule set for them), so no cell there
+  // has a class plan; a secondary stays seed-priced. The three class rows below are rows of Gens 3 and up.
+  if (rules.generation <= 2) {
+    test(`${name}: no cell has a class plan, so the secondary dice stay seed-priced`, () => {
+      const kinds = moves.slice(0, 12).map(move => planCellEvents(sweepBoard(rules, move.id, 'singles', '1,2,3,4', false, FAST), `move ${move.id}`, 'move splash').kind);
+      expect(kinds.length).toBeGreaterThan(0);
+      expect(kinds).not.toContain('events');
+    });
+    return;
+  }
+
   row('fold')(`${name}: the fold of the plan splits a hit as the chances do`, () => {
     const { problems, read } = over(cell => foldClassWeights(cell.events, 'p1'));
     expect(joined(problems)).toBe('');
