@@ -3,6 +3,7 @@ import { extractProtocolEvents, isPerfectAlignment, scoreAlignment, type Protoco
 import { strengthMix } from '../src/calc/fickle';
 import { loggedActions, loggedDice, type LoggedOptions } from '../src/dice/logged-results';
 import { playForcedTurn } from '../src/dice/play';
+import { loggedOptions } from '../src/dice/turn';
 import type { ForcedDie } from '../src/dice/types';
 import { playClicks, sweepSelection, type Mode, type Rules } from './dice-fixtures';
 import { sweepBoard, sweepClicks, clicksAccepted, isCharge, isDelayed, type DexMove } from './dice-sweep-support';
@@ -137,6 +138,8 @@ export function moveScene(
       return battle;
     },
     clicks, ...extra,
+    // what the app reads from the offers and the Dex of the click (`loggedOptions`): the rest of the options the caller names
+    options: { ...extra.options, selfOf: loggedOptions(probe, clicks).selfOf },
   };
 }
 

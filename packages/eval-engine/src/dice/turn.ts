@@ -7,6 +7,7 @@ import type { SimBattle } from '../branch/types.ts';
 import { loggedDice, mergeLoggedDice, type LoggedOptions } from './logged-results.ts';
 import { offeredDice } from './offer.ts';
 import { playForcedTurn } from './play.ts';
+import { secondaryEffectId } from './recognize.ts';
 import { secondariesIn } from './secondaries.ts';
 import { dieKey, type DiceReport, type DieReport, type DieTook, type ForcedDie } from './types.ts';
 
@@ -111,6 +112,17 @@ export function turnChanges(
   return { changed, switched };
 }
 
+/**
+ * Round 86 (T306): the effect id of a move's own chance to move its user (`move.self.chance` below 100: Diamond Storm in Gens 7 and later
+ * keeps the chance there and no entry in its secondaries), from the game's own Dex. Only a gain of stats: no move keeps a chance for a condition of its user there.
+ */
+function selfChanceIn(dex: Battle['dex']): (moveId: string) => string | undefined {
+  return moveId => {
+    const self = (dex.moves.get(moveId) as unknown as { self?: { chance?: number; boosts?: Record<string, number> } }).self;
+    return self?.chance !== undefined && self.chance < 100 && self.boosts ? secondaryEffectId({ self: { boosts: self.boosts } }) : undefined;
+  };
+}
+
 /** What the log cannot name (`LoggedOptions`): the move each body clicked, the checks each body stood under, the secondaries of every move. */
 export function loggedOptions(battle: Battle, logged: { p1: string; p2: string }): LoggedOptions {
   const clicked = new Map<string, string>();
@@ -130,7 +142,7 @@ export function loggedOptions(battle: Battle, logged: { p1: string; p2: string }
       if (stall) stalling.set(slot, stall);
     });
   }
-  return { clicked, checks, stalling, secondariesOf: secondariesIn(battle.dex) };
+  return { clicked, checks, stalling, secondariesOf: secondariesIn(battle.dex), selfOf: selfChanceIn(battle.dex) };
 }
 
 /** The forced list of a turn the user has just chosen: the user's dice, joined by the log's on the branch's first turn. */

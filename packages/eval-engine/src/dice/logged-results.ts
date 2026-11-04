@@ -32,6 +32,11 @@ export interface LoggedOptions {
    * it a stalling move the log shows as `|-fail|` is a logged failure, and one without is a logged success.
    */
   stalling?: ReadonlyMap<string, string>;
+  /**
+   * The effect id (`self:def`) of a move's own chance to move its user (`self.chance` below 100, Diamond Storm in Gens 7 and later), or
+   * nothing. The simulator draws it once per target, and the log shows what the user gained: no gain is a no, a gain on every target a yes.
+   */
+  selfOf?: (moveId: string) => string | undefined;
 }
 
 /** One stretch of the log: a body's `|move|` or `|cant|` line and the lines up to the next action, or the lines between actions. */
@@ -238,38 +243,72 @@ function flinchedBy(actions: readonly LoggedAction[]): Map<number, Set<string>> 
   return flinched;
 }
 
+/**
+ * How often the stat changes of a self entry (`self:atk+def`) stand in the user's boosts of the action, in whole repeats; null when the
+ * boosts are another effect's (or none): the entry then reads from the plain effect ids.
+ */
+function appliedTimes(stats: readonly string[], effectId: string): number | null {
+  if (!effectId.startsWith('self:') || stats.length === 0) return null;
+  const own = effectId.slice('self:'.length).split('+');
+  if (stats.length % own.length !== 0 || !stats.every((stat, index) => stat === own[index % own.length])) return null;
+  return stats.length / own.length;
+}
+
+/** What the log shows of one target a move hit: its crit and its secondaries (the chance entries as a yes or a no, the effects the move left as yes). */
+function hitDice(
+  actions: readonly LoggedAction[], index: number, target: string, drawn: number, flinched: ReadonlySet<string>, options: LoggedOptions,
+): ForcedDie[] {
+  const action = actions[index];
+  const dice: ForcedDie[] = [];
+  const entries = options.secondariesOf?.(action.moveId) ?? [];
+  const stats = action.boosts[action.slot] ?? [];
+  const crit = critOf(action, target);
+  if (crit !== null) dice.push({ name: { ...ofMove(action), targetSlot: target, kind: 'crit' }, result: happens(crit) });
+  const shown = shownEffects(action, target, false);
+  if (flinched.has(target)) shown.push('flinch');
+  const seen = [...shown, ...shownEffects(action, action.slot, true).filter(id => id.startsWith('self:'))];
+  for (const effectId of entries) {
+    // a spread move draws a self secondary once per target and the log writes the gain once per target that fired: the first targets fired
+    const times = appliedTimes(stats, effectId);
+    const fired = times === null ? seen.includes(effectId) : drawn < times;
+    // a flinch the log disproves needs a later move of the target; a stat change the log shows reads as it is
+    if (!fired && effectId === 'flinch' && !actsAfter(actions, index, target)) continue;
+    dice.push({ name: { ...ofMove(action), targetSlot: target, kind: 'secondary', effectId }, result: happens(fired) });
+  }
+  for (const effectId of seen.filter(id => !entries.includes(id))) {
+    dice.push({ name: { ...ofMove(action), targetSlot: target, kind: 'secondary', effectId }, result: happens(true) });
+  }
+  return dice;
+}
+
+/** The self effect of a move: its own chance (`self.chance`, one die for every target) or the gain the log shows. */
+function selfEffectDice(action: LoggedAction, foes: readonly string[], options: LoggedOptions): ForcedDie[] {
+  const selfId = options.selfOf?.(action.moveId);
+  const struck = foes.filter(target => !action.missed.includes(target)).length;
+  const die = (result: boolean): ForcedDie[] => [{ name: { ...ofMove(action), kind: 'self-effect' }, result: happens(result) }];
+  if (struck > 0 && selfId) {
+    // it holds when no target or every target that was hit gave the gain; a log where only some did cannot be forced by one die
+    const times = appliedTimes(action.boosts[action.slot] ?? [], selfId) ?? 0;
+    return times === 0 || times >= struck ? die(times > 0) : [];
+  }
+  return foes.length > 0 && shownEffects(action, action.slot, true).some(id => id.startsWith('self:')) ? die(true) : [];
+}
+
 function moveDice(
   actions: readonly LoggedAction[], index: number, flinched: ReadonlySet<string>, options: LoggedOptions,
 ): ForcedDie[] {
   const action = actions[index];
   const dice: ForcedDie[] = [];
   const foes = action.targets.filter(target => target !== action.slot);
-  const entries = options.secondariesOf?.(action.moveId) ?? [];
+  let drawn = 0;
   for (const target of foes) {
     const missed = action.missed.includes(target);
     dice.push({ name: { ...ofMove(action), targetSlot: target, kind: 'accuracy' }, result: happens(!missed) });
-    if (missed) continue;
-    const crit = critOf(action, target);
-    if (crit !== null) dice.push({ name: { ...ofMove(action), targetSlot: target, kind: 'crit' }, result: happens(crit) });
-    const shown = shownEffects(action, target, false);
-    if (flinched.has(target)) shown.push('flinch');
-    const self = shownEffects(action, action.slot, true).filter(id => id.startsWith('self:'));
-    const seen = [...shown, ...self];
-    for (const effectId of entries) {
-      const fired = seen.includes(effectId);
-      // a flinch the log disproves needs a later move of the target; a stat change the log shows reads as it is
-      if (!fired && effectId === 'flinch' && !actsAfter(actions, index, target)) continue;
-      dice.push({ name: { ...ofMove(action), targetSlot: target, kind: 'secondary', effectId }, result: happens(fired) });
-    }
-    for (const effectId of seen.filter(id => !entries.includes(id))) {
-      dice.push({ name: { ...ofMove(action), targetSlot: target, kind: 'secondary', effectId }, result: happens(true) });
-    }
+    if (!missed) dice.push(...hitDice(actions, index, target, drawn++, flinched, options));
   }
   const counts = Object.values(action.hitCounts);
   if (counts.length > 0) dice.push({ name: { ...ofMove(action), kind: 'hit-count' }, result: { hits: counts[0] } });
-  if (foes.length > 0 && shownEffects(action, action.slot, true).some(id => id.startsWith('self:'))) {
-    dice.push({ name: { ...ofMove(action), kind: 'self-effect' }, result: happens(true) });
-  }
+  dice.push(...selfEffectDice(action, foes, options));
   return dice;
 }
 

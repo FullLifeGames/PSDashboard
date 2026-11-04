@@ -56,15 +56,16 @@ const randomAim = (mode: Mode, move: DexMove): boolean => mode === 'doubles' && 
 const GAPS: { cause: string; moves: string[]; modes: Mode[] }[] = [
   { cause: 'a move that fails before its accuracy draw is logged with no target, so no accuracy die names it', moves: ['present', 'psychoshift'], modes: ['singles', 'doubles'] },
   { cause: 'a secondary that picks its status (the die names the chance, the pick follows the stream)', moves: ['triattack', 'direclaw'], modes: ['singles', 'doubles'] },
-  { cause: 'a self effect of a spread move: the log writes one boost per target', moves: ['diamondstorm'], modes: ['doubles'] },
+  { cause: "a move's own chance to move its user (Gens 7 and later) is one die for every target of a spread move, and a log where only one target gave the gain cannot be forced", moves: ['diamondstorm'], modes: ['doubles'] },
 ];
 /**
  * The moves the full sweep found the reader missed (04.11.2026) and B3 fixed, each group with its cause. One plain row per group plays them
  * through every rule set that has them, so the main rows' sample cannot leave them out; a group moves to `GAPS` when a rule set shows it again.
  */
-const FIXED: { cause: string; moves: string[]; modes: Mode[] }[] = [
+const FIXED: { cause: string; moves: string[]; modes: Mode[]; when?: (rules: Rules, mode: Mode) => boolean }[] = [
   { cause: 'the status line of the secondary carries "[from] move:" (the move itself), which the reader skipped as an effect of something else', moves: ['relicsong', 'wickedtorque'], modes: ['singles', 'doubles'] },
   { cause: 'the second hit of a move that picks its target names it in |-anim| only (Dragon Darts in doubles)', moves: ['dragondarts'], modes: ['singles', 'doubles'] },
+  { cause: 'a self effect that a spread move draws once per target: the log writes one gain per target that gave it (Diamond Storm, singles and the secondary entry of Gen 6)', moves: ['diamondstorm'], modes: ['singles', 'doubles'], when: (rules, mode) => mode === 'singles' || rules.generation <= 6 },
 ];
 
 /** Whether the move is a gap of this game type (a gap may hold in singles and stay open in doubles). */
@@ -166,7 +167,7 @@ describe.each(SWEEP_CASES)('the logged secondaries and self effects give the log
 // turn repairs none of them (somewhere). Where a rule set does not show the cause (Tri Attack has no secondary in Gen 1) its pairs just pass.
 describe.each(SWEEP_CASES)('the moves the reader once missed hold on another seed: $name', ({ rules, mode }) => {
   const dex = dexOfRules(rules);
-  for (const { cause, moves: ids } of FIXED.filter(entry => entry.modes.includes(mode))) {
+  for (const { cause, moves: ids } of FIXED.filter(entry => entry.modes.includes(mode) && (entry.when?.(rules, mode) ?? true))) {
     test(cause, () => {
       const present = ids.filter(id => { const move = dex.moves.get(id); return move.exists && move.gen <= dex.gen && !move.isNonstandard; });
       const result = sweepMovesOf(`fixed ${ids[0]}`, rules, mode, move => ids.includes(move.id), move => {
