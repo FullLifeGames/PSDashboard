@@ -5,6 +5,7 @@
  */
 
 import { EMBED_SCRIPT_ORDER_SCRIPT, fontAwesomeOverrideStyle, POINTER_SOURCE_SHIM_SCRIPT } from './replay-compat';
+import { tableSwapScript } from './teambuilder-table';
 import { PHONE_FIT_SCRIPT, PHONE_STYLES } from './replay-phone';
 
 const REPLAY_STYLES = `<style>
@@ -260,10 +261,12 @@ export function generateReplayHtml(opts: {
   viewpoint?: 'p1' | 'p2';
   /** Replaces the embed's FontAwesome face (see replay-compat.ts). */
   fontAwesomeWoff2Url?: string;
+  /** Round 85 (T318): the script of the teambuilder table's part a replay reads, loaded in place of Showdown's file (teambuilder-table.ts). */
+  teambuilderTableUrl?: string;
 }): string {
   const {
     log, format = '', p1 = 'Player 1', p2 = 'Player 2', title, seekTurn, autoPlay = false,
-    reportTurn = false, viewpoint = 'p1', fontAwesomeWoff2Url,
+    reportTurn = false, viewpoint = 'p1', fontAwesomeWoff2Url, teambuilderTableUrl,
   } = opts;
   const displayTitle = title || `${format ? `[${format}] ` : ''}${p1} vs. ${p2}`;
   // Escape forward slashes for the script tag content (PS format)
@@ -290,7 +293,7 @@ ${escapedLog}
 </script>
 </div>
 ${EMBED_SCRIPT_ORDER_SCRIPT}
-${EMBED_LOADER_SCRIPT}
+${teambuilderTableUrl ? `${tableSwapScript(teambuilderTableUrl)}\n` : ''}${EMBED_LOADER_SCRIPT}
 ${fontAwesomeWoff2Url ? `${fontAwesomeOverrideStyle(fontAwesomeWoff2Url)}\n` : ''}${replayBridgeScript(seekTurn, autoPlay, viewpoint)}${reportTurn ? TURN_TRACKER_SCRIPT : ''}`;
 }
 

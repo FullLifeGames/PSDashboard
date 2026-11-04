@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { generateReplayHtml, createBlobUrl, revokeBlobUrl } from '../lib/replay-html';
 import { localFontAwesomeUrl } from '../lib/replay-compat';
+import { subscribeTablePart, tablePartPending, teambuilderTablePartUrl } from '../lib/teambuilder-table';
 
 type FrameRef = React.RefObject<HTMLIFrameElement | null>;
 
@@ -19,8 +20,11 @@ export function useReplayBlobUrl(args: {
   viewpoint?: 'p1' | 'p2';
 }): string | null {
   const { documentLog, format, p1, p2, title, initialSeek, reportTurn, viewpoint } = args;
+  // Round 85 (T318): a frame opened right after the app starts waits for the teambuilder table's part (at most until
+  // TABLE_PART_WAIT_MS); the flag turns false once and stays false, so no frame that stands is rebuilt by it.
+  const tableWait = useSyncExternalStore(subscribeTablePart, tablePartPending, () => false);
   const blobUrl = useMemo(() => {
-    if (!documentLog.trim()) {
+    if (!documentLog.trim() || tableWait) {
       return null;
     }
 
@@ -35,9 +39,11 @@ export function useReplayBlobUrl(args: {
       reportTurn,
       viewpoint,
       fontAwesomeWoff2Url: localFontAwesomeUrl(),
+      // Read when the document is built, not a dependency: a part that arrives later never reloads a frame.
+      teambuilderTableUrl: teambuilderTablePartUrl(),
     });
     return createBlobUrl(html);
-  }, [documentLog, format, p1, p2, title, initialSeek, reportTurn, viewpoint]);
+  }, [documentLog, format, p1, p2, title, initialSeek, reportTurn, viewpoint, tableWait]);
 
   useEffect(() => {
     if (!blobUrl) return;
