@@ -76,6 +76,9 @@ describe('the callers of the simulator', () => {
       // Round 73 (T210): a recording stand-in with no battle behind it, so nothing can be written; held to the simulator by
       // replay-core's hit-power-census.spec.ts (every Dex, Generations 1 to 9 and Champions) and hit-power-played.spec.ts.
       'replay-core:spreads/hit-power.ts',
+      // Round 86 (T310): a stand-in source with no battle behind it, held to the simulator by replay-core's
+      // screen-turns-sweep.spec.ts (every screen condition and every item, Generations 1 to 9 and Champions).
+      'replay-core:dex-facts/screen-turns.ts',
     ];
     expect(called).toEqual([...rests].sort());
   });
