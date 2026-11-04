@@ -157,5 +157,7 @@ export function forkBattleWithPrng(position: SimPosition, prng: PRNG & { attach(
 }
 
 export function toPosition(battle: Battle): SimPosition {
+  // Round 86 (T299): a scripted PRNG's watch leaves the battle before the position wraps it.
+  if (battle.prng instanceof ScriptedPRNG) battle.prng.release();
   return new Position(null, battle, battleRuleset(battle));
 }
