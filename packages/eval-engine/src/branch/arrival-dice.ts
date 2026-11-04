@@ -25,6 +25,30 @@ export interface AlignedBlock {
   expectedEvents: ExpectedEvents;
   alignForced: { p1: string[]; p2: string[] };
   seedChoice: SeedChoice;
+  /** Round 86 (T306): `forced` when the block plays under seed index 0 with the log's dice forced, `fallback` when the seed search chose. */
+  via: 'forced' | 'fallback';
+}
+
+/** What the block's lines say before any seed plays: the events the sim must reproduce and the species the log sends in for each forced replacement. */
+export function blockOf(battle: SimBattle, turnBlock: TurnBlock): Pick<AlignedBlock, 'expectedEvents' | 'alignForced'> {
+  return {
+    expectedEvents: extractProtocolEvents([...turnBlock.preUpkeep, ...turnBlock.postUpkeep]),
+    alignForced: {
+      p1: collectForcedSwitchSpecies(turnBlock.preUpkeep, turnBlock.postUpkeep, 'p1', battle.dex),
+      p2: collectForcedSwitchSpecies(turnBlock.preUpkeep, turnBlock.postUpkeep, 'p2', battle.dex),
+    },
+  };
+}
+
+/**
+ * Round 86 (T306): the block played with the log's dice forced, under the hidden dice of seed index 0. There is no trial, so no score:
+ * `trialPerfect` is false and `candidatesTried` 0, and the record scores the truly emitted block.
+ */
+export function forcedBlock(battle: SimBattle, turnBlock: TurnBlock): AlignedBlock {
+  return {
+    ...blockOf(battle, turnBlock), via: 'forced',
+    seedChoice: { seed: ALIGNMENT_SEEDS[0], trialScore: null, trialPerfect: false, candidatesTried: 0, trialsFailed: 0 },
+  };
 }
 
 /**
@@ -39,11 +63,7 @@ export function alignBlockSeed(
   battle: SimBattle, turnBlock: TurnBlock, p1Choice: string, p2Choice: string,
   shouldStop?: () => boolean,
 ): AlignedBlock {
-  const expectedEvents = extractProtocolEvents([...turnBlock.preUpkeep, ...turnBlock.postUpkeep]);
-  const alignForced = {
-    p1: collectForcedSwitchSpecies(turnBlock.preUpkeep, turnBlock.postUpkeep, 'p1', battle.dex),
-    p2: collectForcedSwitchSpecies(turnBlock.preUpkeep, turnBlock.postUpkeep, 'p2', battle.dex),
-  };
+  const { expectedEvents, alignForced } = blockOf(battle, turnBlock);
   let seedChoice: SeedChoice = {
     seed: ALIGNMENT_SEEDS[0], trialScore: null, trialPerfect: false,
     candidatesTried: 0, trialsFailed: 0,
@@ -67,7 +87,7 @@ export function alignBlockSeed(
   } catch {
     // Serialization failure on an odd state: run the block exactly as today.
   }
-  return { expectedEvents, alignForced, seedChoice };
+  return { expectedEvents, alignForced, seedChoice, via: 'fallback' };
 }
 
 /**

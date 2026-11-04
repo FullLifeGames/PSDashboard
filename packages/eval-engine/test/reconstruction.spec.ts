@@ -619,11 +619,12 @@ describe('hax alignment records', () => {
     expect(first.haxAlignment.map(record => record.turn))
       .toEqual(Array.from({ length: targetTurn - 1 }, (_, index) => index + 1));
     for (const record of first.haxAlignment) {
-      expect(record.candidatesTried).toBeGreaterThanOrEqual(1);
+      // Round 86 (T306): a turn plays under seed index 0 with the log's dice forced, no search (before: candidatesTried >= 1 and a searched seed)
+      expect({ via: record.via, candidatesTried: record.candidatesTried, seed: record.seed }).toEqual({ via: 'forced', candidatesTried: 0, seed: '1,2,3,4' });
       expect(typeof record.actual.softMismatches).toBe('number');
       expect(record.actual.endedMismatch).toBe(false);
     }
-    // Determinism: the same replay picks the same seed schedule (draft T48).
+    // Determinism: the same replay plays the same seed schedule (draft T48).
     expect(second.haxAlignment.map(record => record.seed))
       .toEqual(first.haxAlignment.map(record => record.seed));
   });

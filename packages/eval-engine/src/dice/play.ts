@@ -31,6 +31,27 @@ export interface ForcedTurnInput {
   forced: readonly ForcedDie[];
   /** Writes the choices of both sides to the battle it gets and plays the turn out; runs twice, on a copy and on the live battle. */
   play: (battle: Battle) => void;
+  /**
+   * Round 86 (the log's dice, T306): told every draw of the real turn with the answer the turn took (a forced die's answer, not the
+   * stream's value). The arrival records the draws of the turn the log's dice force, so an action the user leaves as logged rolls the same.
+   */
+  observe?: (from: number | undefined, to: number | undefined, value: number) => void;
+}
+
+/** The real turn's PRNG that reports each answer it gives. */
+class ObservedForcedPRNG extends ForcedDicePRNG {
+  private readonly observe: NonNullable<ForcedTurnInput['observe']>;
+
+  constructor(input: ConstructorParameters<typeof ForcedDicePRNG>[0], observe: NonNullable<ForcedTurnInput['observe']>) {
+    super(input);
+    this.observe = observe;
+  }
+
+  override random(from?: number, to?: number): number {
+    const value = super.random(from, to);
+    this.observe(from, to, value);
+    return value;
+  }
 }
 
 /** A stream at the PRNG's place, attached to the battle it will play on. */
@@ -123,7 +144,7 @@ function checkPolarities(live: Battle, forced: readonly ForcedDie[]): Map<string
   return polarities;
 }
 
-export function playForcedTurn({ live, forced, play }: ForcedTurnInput): DiceReport {
+export function playForcedTurn({ live, forced, play, observe }: ForcedTurnInput): DiceReport {
   if (forced.length === 0) {
     play(live);
     return { forced: [], naturalEndSeed: String(live.prng.getSeed()) };
@@ -135,7 +156,8 @@ export function playForcedTurn({ live, forced, play }: ForcedTurnInput): DiceRep
   const start = live.log.length;
   const scripts = learnedScripts({ live, forced, record: natural.record, play });
   const actsOnTrue = checkPolarities(live, forced);
-  const prng = new ForcedDicePRNG({ inner, watch, forced, record: natural.record, scripts, actsOnTrue });
+  const input = { inner, watch, forced, record: natural.record, scripts, actsOnTrue };
+  const prng = observe ? new ObservedForcedPRNG(input, observe) : new ForcedDicePRNG(input);
   live.prng = prng;
   try {
     play(live);

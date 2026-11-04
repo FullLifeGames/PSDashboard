@@ -271,6 +271,12 @@ export interface TurnAlignmentRecord {
   trialPerfect: boolean;
   trialsFailed: number;
   candidatesTried: number;
+  /**
+   * Round 86 (the log's dice, T306): how the turn's dice were set. `forced`: the log's dice forced on the hidden dice of seed index 0
+   * (no search, `candidatesTried` 0, `trialPerfect` false: there is no trial). `fallback`: the forced turn could not play (a choice the
+   * copy refused, an odd state) and the sixteen-seed search ran. Absent on a record from before the round.
+   */
+  via?: 'forced' | 'fallback';
   /** Scored from the TRULY emitted block, not the trial — instrumentation
    *  cannot flatter itself; a trial-vs-actual gap is a fork-fidelity finding. */
   actual: AlignmentScore;
@@ -282,6 +288,8 @@ export interface AlignmentSummary {
   softResidual: number;
   faintResidualTurns: number;
   endedMismatches: number;
+  /** Turns that fell back to the seed search (`via: 'fallback'`); absent when none did. */
+  fallbackTurns?: number;
 }
 
 export function summarizeAlignment(records: TurnAlignmentRecord[]): AlignmentSummary {
@@ -294,6 +302,7 @@ export function summarizeAlignment(records: TurnAlignmentRecord[]): AlignmentSum
     summary.softResidual += record.actual.softMismatches;
     if (record.actual.faintMismatches > 0) summary.faintResidualTurns += 1;
     if (record.actual.endedMismatch) summary.endedMismatches += 1;
+    if (record.via === 'fallback') summary.fallbackTurns = (summary.fallbackTurns ?? 0) + 1;
   }
   return summary;
 }

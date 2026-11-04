@@ -89,7 +89,9 @@ describe('scene: 751543, the alignment keeps the KO the game had', () => {
         },
       },
     });
-    expect(runtime.haxAlignment.find(record => record.turn === 19)?.trialPerfect).toBe(true);
+    // Round 86 (T306): the turn plays under the log's dice and the record scores the block it emitted (before: the trial of the chosen seed was perfect)
+    const record = runtime.haxAlignment.find(entry => entry.turn === 19);
+    expect(record).toMatchObject({ via: 'forced', actual: { endedMismatch: false, faintMismatches: 0, softMismatches: 0 } });
     expect(dragapultTaunted).toBe(false);
   });
 });
@@ -109,7 +111,8 @@ describe('scene: doubles 912884, Bleakwind Storm KOs the nicknamed Ting-Lu', () 
     });
     const log = runtime.battleStream.battle!.log;
     const block = log.slice(log.lastIndexOf('|turn|7') + 1, log.lastIndexOf('|turn|8'));
-    expect(runtime.haxAlignment.find(record => record.turn === 7)?.trialPerfect).toBe(true);
+    const record = runtime.haxAlignment.find(entry => entry.turn === 7);
+    expect(record).toMatchObject({ via: 'forced', actual: { endedMismatch: false, faintMismatches: 0, softMismatches: 0 } });
     expect(block.some(line => line.startsWith('|faint|p2') && line.includes(': JOHN PEEL'))).toBe(true);
   });
 });

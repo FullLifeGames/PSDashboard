@@ -3,7 +3,9 @@ import { normalizeLineEndings } from '../line-endings.ts';
 import type { BranchRuntime, SimBattle, TurnBlock } from './types.ts';
 import { getMainChoice, parseTurnBlocks } from './protocol-choices.ts';
 import { faintedSlots, logGoesOn, shownBodyIds, type ProtocolBench } from './team-order.ts';
-import { alignArrivalDice, alignBlockSeed, type AlignedBlock } from './arrival-dice.ts';
+import { forcedTurnDiceOrNull, writeBlockPart } from '../dice/logged-block.ts';
+import type { ForcedDie } from '../dice/types.ts';
+import { alignArrivalDice, alignBlockSeed, forcedBlock, type AlignedBlock } from './arrival-dice.ts';
 import {
   buildForcedSwitchChoice, correctActivesFromProtocol, correctBattleFromSnapshot, forceSwitches, hasForceSwitch,
   refreshRequestsFromLiveState, repairStaleForcedSwitchRequest,
@@ -48,13 +50,33 @@ function chooseBlockSeed(
 }
 
 /**
+ * Round 86 (the log's dice, T306): one part of a block (the choices of both sides, or the answers to a forced replacement) goes to the sim
+ * through the dice module when the block has dice to force, plain otherwise. False: the module could not play it and nothing reached the
+ * live battle (`writeBlockPart`).
+ */
+function writePart(
+  session: ReconstructionSession, battle: SimBattle, dice: readonly ForcedDie[] | null, commands: { side: 'p1' | 'p2'; command: string }[],
+): boolean {
+  const write = () => session.writeSim(commands.map(({ side, command }) => `>${side} ${command}`).join('\n'));
+  if (!dice) {
+    write();
+    return true;
+  }
+  return writeBlockPart({ live: battle, dice, commands, write });
+}
+
+/**
  * Waking up on choice rejections keeps wedged turns from burning the full
  * wait timeout on every retry (B17 — 30-60s "Preparing branch…" hangs).
+ * False: the dice module could not play the choices and nothing was written.
  */
-async function commitMainChoices(session: ReconstructionSession, turnBeforeChoice: number, p1Choice: string, p2Choice: string) {
+async function commitMainChoices(
+  session: ReconstructionSession, turnBeforeChoice: number, p1Choice: string, p2Choice: string, dice: readonly ForcedDie[] | null = null,
+): Promise<boolean> {
   const { battleStream, choiceErrors } = session;
   const mainChoiceErrors = choiceErrors.count;
-  session.writeSim(`>p1 ${p1Choice}\n>p2 ${p2Choice}`);
+  const commands = [{ side: 'p1' as const, command: p1Choice }, { side: 'p2' as const, command: p2Choice }];
+  if (!battleStream.battle || !writePart(session, battleStream.battle, dice, commands)) return false;
   await waitForBattle(session, currentBattle =>
     currentBattle.ended ||
     currentBattle.turn > turnBeforeChoice ||
@@ -69,6 +91,7 @@ async function commitMainChoices(session: ReconstructionSession, turnBeforeChoic
       await commitRejectedChoicesWithDefaults(session, turnBeforeChoice);
     }
   }
+  return true;
 }
 
 /**
@@ -122,6 +145,7 @@ function offerReplacement(
 /** Answers the sim's forced replacements with the protocol's switch-ins, in order. */
 async function resolveForcedSwitches(
   session: ReconstructionSession, turnBeforeChoice: number, alignForced: AlignedBlock['alignForced'], blockLines: readonly string[],
+  dice: readonly ForcedDie[] | null = null,
 ) {
   const { battleStream, choiceErrors } = session;
   const p1Forced = alignForced.p1;
@@ -136,6 +160,7 @@ async function resolveForcedSwitches(
       goesOn: logGoesOn(session.params.replayLog, turnBeforeChoice),
     });
 
+  let forcedDice = dice;
   let maxIterations = 10;
   let ordinal = 0;
   while (maxIterations-- > 0) {
@@ -151,15 +176,19 @@ async function resolveForcedSwitches(
     const cursors = { p1: p1ForceIndex.current, p2: p2ForceIndex.current };
     if (offerReplacement(session, currentBattle, turnBeforeChoice, ordinal, blockLines, forcedAnswers, cursors)) ordinal++;
 
-    const commands: string[] = [];
+    const commands: { side: 'p1' | 'p2'; command: string }[] = [];
     const p1ForcedChoice = buildForcedSwitchChoice(currentBattle, 0, p1Forced, p1ForceIndex, protocolBench('p1'));
     const p2ForcedChoice = buildForcedSwitchChoice(currentBattle, 1, p2Forced, p2ForceIndex, protocolBench('p2'));
-    if (p1ForcedChoice) commands.push(`>p1 ${p1ForcedChoice}`);
-    if (p2ForcedChoice) commands.push(`>p2 ${p2ForcedChoice}`);
+    if (p1ForcedChoice) commands.push({ side: 'p1', command: p1ForcedChoice });
+    if (p2ForcedChoice) commands.push({ side: 'p2', command: p2ForcedChoice });
 
     if (commands.length === 0) break;
     const forcedChoiceErrors = choiceErrors.count;
-    session.writeSim(commands.join('\n'));
+    // a part the dice module cannot play goes in plain, and so does the rest of the block
+    if (!writePart(session, currentBattle, forcedDice, commands)) {
+      forcedDice = null;
+      writePart(session, currentBattle, null, commands);
+    }
     await waitForBattle(session, currentBattle =>
       currentBattle.ended ||
       currentBattle.turn > turnBeforeChoice ||
@@ -190,6 +219,7 @@ function scoreBlock(session: ReconstructionSession, turnBlock: TurnBlock, aligne
   session.haxAlignment.push({
     turn: turnBlock.turn,
     seed: aligned.seedChoice.seed,
+    via: aligned.via,
     trialPerfect: aligned.seedChoice.trialPerfect,
     trialsFailed: aligned.seedChoice.trialsFailed,
     candidatesTried: aligned.seedChoice.candidatesTried,
@@ -198,6 +228,30 @@ function scoreBlock(session: ReconstructionSession, turnBlock: TurnBlock, aligne
       extractProtocolEvents(latestBattle.log.slice(simLogStart)),
     ),
   });
+}
+
+/**
+ * Round 86 (the log's dice, T306): the block plays under the hidden dice of seed index 0 with the log's dice forced; a block the dice module
+ * cannot play (a choice the copy refuses, a state the reader cannot name the clicks of) falls back to the sixteen-seed search. The forced
+ * replacements that follow play through the module too, part by part.
+ */
+async function playBlock(
+  session: ReconstructionSession, battle: SimBattle, turnBlock: TurnBlock, p1Choice: string, p2Choice: string,
+): Promise<{ aligned: AlignedBlock; simLogStart: number }> {
+  const turnBeforeChoice = battle.turn;
+  const lines = [...turnBlock.preUpkeep, ...turnBlock.postUpkeep];
+  let aligned = forcedBlock(battle, turnBlock);
+  battle.resetRNG(aligned.seedChoice.seed);
+  let simLogStart = battle.log.length;
+  const dice = forcedTurnDiceOrNull(battle, lines, { p1: p1Choice, p2: p2Choice });
+  if (!dice || !(await commitMainChoices(session, turnBeforeChoice, p1Choice, p2Choice, dice))) {
+    aligned = chooseBlockSeed(session, battle, turnBlock, p1Choice, p2Choice);
+    battle.resetRNG(aligned.seedChoice.seed);
+    simLogStart = battle.log.length;
+    await commitMainChoices(session, turnBeforeChoice, p1Choice, p2Choice);
+  }
+  await resolveForcedSwitches(session, turnBeforeChoice, aligned.alignForced, lines, aligned.via === 'forced' ? dice : null);
+  return { aligned, simLogStart };
 }
 
 /**
@@ -232,17 +286,10 @@ async function replayBlock(session: ReconstructionSession, turnBlock: TurnBlock)
 
   captureBoundary(session, battle, turnBlock.turn);
 
-  const turnBeforeChoice = battle.turn;
-
   const p1Choice = getMainChoice(turnBlock.preUpkeep, 'p1', battle);
   const p2Choice = getMainChoice(turnBlock.preUpkeep, 'p2', battle);
 
-  const aligned = chooseBlockSeed(session, battle, turnBlock, p1Choice, p2Choice);
-  battle.resetRNG(aligned.seedChoice.seed);
-  const simLogStart = battle.log.length;
-
-  await commitMainChoices(session, turnBeforeChoice, p1Choice, p2Choice);
-  await resolveForcedSwitches(session, turnBeforeChoice, aligned.alignForced, [...turnBlock.preUpkeep, ...turnBlock.postUpkeep]);
+  const { aligned, simLogStart } = await playBlock(session, battle, turnBlock, p1Choice, p2Choice);
   scoreBlock(session, turnBlock, aligned, simLogStart);
   return 'continue';
 }
