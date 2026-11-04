@@ -37,7 +37,7 @@ export const T305_RED = process.env.T305_RED === '1';
 
 /** The rows that fail today and turn green with A5 (A5 removes each id when its commit turns the row green). */
 export const KNOWN = new Set<string>([
-  'reader', 'reader-outfit', 'script-singles', 'script-doubles',
+  'script-singles', 'script-doubles',
   'fold', 'sampler', 'children', 'pair', 'flinch-classify', 'scene-573756', 'scene-flinch-singles', 'scene-book', 'scene-flinch-doubles',
   'forks-singles', 'forks-children', 'forks-pair',
 ]);
