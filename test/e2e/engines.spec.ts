@@ -45,5 +45,5 @@ test('an engine added by address evaluates the position, and the dropdown and th
 
   // Back to the own engine: the dropdown stays, the panel names the sim search again.
   await page.getByRole('combobox', { name: 'Engine' }).selectOption('ps-dashboard');
-  await expect(page.getByText('estimate from a sim search, no oracle')).toBeVisible();
+  await expect(page.getByText('built-in engine: it plays the turns in the simulator')).toBeVisible();
 });
