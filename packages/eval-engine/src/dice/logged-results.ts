@@ -102,6 +102,15 @@ function readEffect(action: LoggedAction, parts: string[], key: string): void {
 
 const EFFECT_TAGS = new Set(['-status', '-start', '-boost', '-unboost']);
 
+/**
+ * Whether an effect line is the move's own: no `[from]`, or a `[from] move: <this move>` (Round 86, T306: Relic Song and Wicked Torque
+ * write the status of their secondary that way). The effects of items, abilities and the weather keep their `[from]` and stay out.
+ */
+function ownEffect(action: LoggedAction, line: string): boolean {
+  const from = /\[from\] move: ([^|]+)/.exec(line);
+  return from ? toId(from[1]) === action.moveId : !line.includes('[from]');
+}
+
 /** A `|-miss|` line: the target is the one the line names (Gens 1 and 2 name none: the move's aimed one). */
 function readMiss(action: LoggedAction, parts: string[]): void {
   action.misses += 1;
@@ -134,7 +143,7 @@ function readLine(action: LoggedAction, parts: string[], line: string): void {
   else if (tag === '-hitcount') action.hitCounts[key] = Number(field(parts, 3));
   else if (tag === '-damage') readDamage(action, key, line);
   else if (tag === '-fail' && !line.includes('[from]')) bump(action.fails, key);
-  else if (EFFECT_TAGS.has(tag) && !line.includes('[from]')) readEffect(action, parts, key);
+  else if (EFFECT_TAGS.has(tag) && ownEffect(action, line)) readEffect(action, parts, key);
 }
 
 /** The log of a turn cut into actions; the lines before the first action and between actions form `other` stretches. */

@@ -56,13 +56,21 @@ const randomAim = (mode: Mode, move: DexMove): boolean => mode === 'doubles' && 
 const GAPS: { cause: string; moves: string[]; modes: Mode[] }[] = [
   { cause: 'a move that fails before its accuracy draw is logged with no target, so no accuracy die names it', moves: ['present', 'psychoshift'], modes: ['singles', 'doubles'] },
   { cause: 'a secondary that picks its status (the die names the chance, the pick follows the stream)', moves: ['triattack', 'direclaw'], modes: ['singles', 'doubles'] },
-  { cause: 'the status line of the secondary carries "[from] move:", which the reader skips as an effect of something else', moves: ['relicsong', 'wickedtorque'], modes: ['singles', 'doubles'] },
   { cause: 'a self effect of a spread move: the log writes one boost per target', moves: ['diamondstorm'], modes: ['doubles'] },
   { cause: 'the second hit of a move that picks its target names it in |-anim| only', moves: ['dragondarts'], modes: ['doubles'] },
 ];
-const gapIds = new Set(GAPS.flatMap(gap => gap.moves));
-/** The moves of the main rows: no gap move, no move of the multi-accuracy row (ruling Q4). */
-const sound = (move: DexMove): boolean => !gapIds.has(move.id) && !multiAccuracy(move);
+/**
+ * The moves the full sweep found the reader missed (04.11.2026) and B3 fixed, each group with its cause. One plain row per group plays them
+ * through every rule set that has them, so the main rows' sample cannot leave them out; a group moves to `GAPS` when a rule set shows it again.
+ */
+const FIXED: { cause: string; moves: string[]; modes: Mode[] }[] = [
+  { cause: 'the status line of the secondary carries "[from] move:" (the move itself), which the reader skipped as an effect of something else', moves: ['relicsong', 'wickedtorque'], modes: ['singles', 'doubles'] },
+];
+
+/** Whether the move is a gap of this game type (a gap may hold in singles and stay open in doubles). */
+const gapped = (mode: Mode, id: string): boolean => GAPS.some(gap => gap.modes.includes(mode) && gap.moves.includes(id));
+/** The moves of the main rows: none of the multi-accuracy row (ruling Q4); the moves of a gap leave through `sweepMovesOf`. */
+const sound = (move: DexMove): boolean => !multiAccuracy(move);
 const lowAccuracy = (move: DexMove): boolean => typeof move.accuracy === 'number' && move.accuracy < 100;
 
 /** What a block of a case counted, for the log and the census. */
@@ -79,9 +87,9 @@ function total(label: string, moves: number, scans: Scan[]): Scan {
 
 /** Plays every move of a list through `sceneOf` and checks that the forced turn gives the log's turn. */
 function sweepMovesOf(
-  label: string, rules: Rules, mode: Mode, keep: (move: DexMove) => boolean, sceneOf: (move: DexMove) => Scene | null, foesOnly = true,
+  label: string, rules: Rules, mode: Mode, keep: (move: DexMove) => boolean, sceneOf: (move: DexMove) => Scene | null, foesOnly = true, withGaps = false,
 ): Scan {
-  const { moves } = sweepMoves(rules, move => keep(move) && !randomAim(mode, move), foesOnly);
+  const { moves } = sweepMoves(rules, move => keep(move) && !randomAim(mode, move) && (withGaps || !gapped(mode, move.id)), foesOnly);
   const scans: Scan[] = [];
   const failures: string[] = [];
   for (const move of moves) {
@@ -156,6 +164,24 @@ describe.each(SWEEP_CASES)('the logged secondaries and self effects give the log
 
 // Known gaps (see GAPS), one row per cause over every rule set that has its moves: the sweep finds seed pairs the log would repair, and the forced
 // turn repairs none of them (somewhere). Where a rule set does not show the cause (Tri Attack has no secondary in Gen 1) its pairs just pass.
+describe.each(SWEEP_CASES)('the moves the reader once missed hold on another seed: $name', ({ rules, mode }) => {
+  const dex = dexOfRules(rules);
+  for (const { cause, moves: ids, modes } of FIXED.filter(entry => entry.modes.includes(mode))) {
+    test(cause, () => {
+      const present = ids.filter(id => { const move = dex.moves.get(id); return move.exists && move.gen <= dex.gen && !move.isNonstandard; });
+      const result = sweepMovesOf(`fixed ${ids[0]}`, rules, mode, move => ids.includes(move.id), move => {
+        const scene = moveScene(rules, mode, move, {
+          channels: ['misses', 'crits', 'secondaries', 'cants', 'hitCounts'], options: { clicked: clickedOf(move.id, mode), secondariesOf: secondariesIn(dex) },
+        });
+        return scene && { ...scene, pool: 40, want: 10 };
+      }, false, true);
+      expect(result.failures).toEqual([]);
+      // a rule set that lacks the moves plays none
+      expect(result.witnesses > 0 || present.length === 0, 'the sweep found a seed pair the log repairs').toBe(true);
+    });
+  }
+});
+
 describe.each(GAPS)('known gap: $cause', ({ moves: ids, modes }) => {
   let played: { witnesses: number; failures: string[] } | null = null;
   const rows = () => {
@@ -168,7 +194,7 @@ describe.each(GAPS)('known gap: $cause', ({ moves: ids, modes }) => {
           channels: ['misses', 'crits', 'secondaries', 'cants', 'hitCounts'], options: { clicked: clickedOf(move.id, mode), secondariesOf: secondariesIn(dex) },
         });
         return scene && { ...scene, pool: 40, want: 10 };
-      }, false);
+      }, false, true);
       result.witnesses += sum.witnesses;
       result.failures.push(...sum.failures.map(failure => `${name} ${failure}`));
     }
