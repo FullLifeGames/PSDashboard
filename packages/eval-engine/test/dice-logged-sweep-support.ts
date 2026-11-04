@@ -65,6 +65,9 @@ export interface Scene {
   extra?(log: string[], forcedLog: string[]): string | null;
 }
 
+/** The options of `loggedOptions` that a scene takes from the board and the Dex; the caller names the rest (the clicked moves, the secondaries). */
+const pick = ({ selfOf, accuracyTargets }: LoggedOptions): LoggedOptions => ({ selfOf, accuracyTargets });
+
 function turn(battle: Battle, scene: Scene, forced?: readonly ForcedDie[]): string[] {
   const start = battle.log.length;
   if (forced) playForcedTurn({ live: battle, forced, play: played => playClicks(played, scene.clicks) });
@@ -139,7 +142,7 @@ export function moveScene(
     },
     clicks, ...extra,
     // what the app reads from the offers and the Dex of the click (`loggedOptions`): the rest of the options the caller names
-    options: { ...extra.options, selfOf: loggedOptions(probe, clicks).selfOf },
+    options: { ...extra.options, ...pick(loggedOptions(probe, clicks)) },
   };
 }
 

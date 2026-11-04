@@ -128,6 +128,7 @@ export function loggedOptions(battle: Battle, logged: { p1: string; p2: string }
   const clicked = new Map<string, string>();
   const checks = new Map<string, readonly string[]>();
   const stalling = new Map<string, string>();
+  const accuracyTargets = new Map<string, readonly string[]>();
   for (const side of ['p1', 'p2'] as const) {
     slotsOf(side, logged[side]).forEach(({ slot, fragment }, index) => {
       if (fragment.kind !== 'move') return;
@@ -140,9 +141,11 @@ export function loggedOptions(battle: Battle, logged: { p1: string; p2: string }
       // Round 86 (T306): the condition that makes a stalling move draw its chance to succeed again, as the offer names it
       const stall = offers.find(offer => offer.name.kind === 'stalling' && offer.name.effectId)?.name.effectId;
       if (stall) stalling.set(slot, stall);
+      // Round 86 (T306): the foes the click draws an accuracy for, for a move the log writes without an aim
+      accuracyTargets.set(slot, offers.filter(offer => offer.name.kind === 'accuracy' && offer.name.targetSlot).map(offer => offer.name.targetSlot!));
     });
   }
-  return { clicked, checks, stalling, secondariesOf: secondariesIn(battle.dex), selfOf: selfChanceIn(battle.dex) };
+  return { clicked, checks, stalling, accuracyTargets, secondariesOf: secondariesIn(battle.dex), selfOf: selfChanceIn(battle.dex) };
 }
 
 /** The forced list of a turn the user has just chosen: the user's dice, joined by the log's on the branch's first turn. */

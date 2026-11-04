@@ -33,6 +33,11 @@ export interface LoggedOptions {
    */
   stalling?: ReadonlyMap<string, string>;
   /**
+   * The foe slots a body's clicked move draws an accuracy for (the offers of its click), by slot. A move the log writes with no aim
+   * (`|move|p1a: X|Psycho Shift||[still]` and a `|-fail|`) passed its accuracy draw before it failed: the log shows no miss.
+   */
+  accuracyTargets?: ReadonlyMap<string, readonly string[]>;
+  /**
    * The effect id (`self:def`) of a move's own chance to move its user (`self.chance` below 100, Diamond Storm in Gens 7 and later), or
    * nothing. The simulator draws it once per target, and the log shows what the user gained: no gain is a no, a gain on every target a yes.
    */
@@ -300,6 +305,12 @@ function moveDice(
   const action = actions[index];
   const dice: ForcedDie[] = [];
   const foes = action.targets.filter(target => target !== action.slot);
+  // a move the log writes with no aim at all passed its accuracy draw and failed after it (Psycho Shift without a status to give)
+  if (action.targets.length === 0 && options.clicked?.get(action.slot) === action.moveId) {
+    for (const target of options.accuracyTargets?.get(action.slot) ?? []) {
+      dice.push({ name: { ...ofMove(action), targetSlot: target, kind: 'accuracy' }, result: happens(true) });
+    }
+  }
   let drawn = 0;
   for (const target of foes) {
     const missed = action.missed.includes(target);

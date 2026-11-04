@@ -54,7 +54,7 @@ const randomAim = (mode: Mode, move: DexMove): boolean => mode === 'doubles' && 
  * Names stand here because the sweep's oracle is the simulator's own log of each move; the code that fixes a cause reads the Dex, not these ids.
  */
 const GAPS: { cause: string; moves: string[]; modes: Mode[] }[] = [
-  { cause: 'a move that fails before its accuracy draw is logged with no target, so no accuracy die names it', moves: ['present', 'psychoshift'], modes: ['singles', 'doubles'] },
+  { cause: 'the power Present picks (damage or a heal) is a draw no kind of die names, so the other seed can pick another power than the log shows', moves: ['present'], modes: ['singles', 'doubles'] },
   { cause: 'a secondary that picks its status (the die names the chance, the pick follows the stream)', moves: ['triattack', 'direclaw'], modes: ['singles', 'doubles'] },
   { cause: "a move's own chance to move its user (Gens 7 and later) is one die for every target of a spread move, and a log where only one target gave the gain cannot be forced", moves: ['diamondstorm'], modes: ['doubles'] },
 ];
@@ -65,6 +65,7 @@ const GAPS: { cause: string; moves: string[]; modes: Mode[] }[] = [
 const FIXED: { cause: string; moves: string[]; modes: Mode[]; when?: (rules: Rules, mode: Mode) => boolean }[] = [
   { cause: 'the status line of the secondary carries "[from] move:" (the move itself), which the reader skipped as an effect of something else', moves: ['relicsong', 'wickedtorque'], modes: ['singles', 'doubles'] },
   { cause: 'the second hit of a move that picks its target names it in |-anim| only (Dragon Darts in doubles)', moves: ['dragondarts'], modes: ['singles', 'doubles'] },
+  { cause: 'a move that fails after its accuracy draw is logged with no target (Psycho Shift without a status to pass): the offers of the click name the accuracy die (a miss shows only below 100 percent: Gens 4 and 5)', moves: ['psychoshift'], modes: ['singles', 'doubles'], when: rules => rules.generation <= 5 },
   { cause: 'a self effect that a spread move draws once per target: the log writes one gain per target that gave it (Diamond Storm, singles and the secondary entry of Gen 6)', moves: ['diamondstorm'], modes: ['singles', 'doubles'], when: (rules, mode) => mode === 'singles' || rules.generation <= 6 },
 ];
 
