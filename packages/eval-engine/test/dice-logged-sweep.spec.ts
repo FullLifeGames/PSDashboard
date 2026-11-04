@@ -1,8 +1,10 @@
+import type { Battle } from '@pkmn/sim';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { afterAll, describe, expect, test, vi } from 'vitest';
 import { rulesDex, toId, type ReplayData } from '@fulllifegames/replay-core';
 import { parseTurnBlocks } from '../src/branch/protocol-choices';
 import { loadSimMods } from '../src/forward/sim-mods';
+import { loggedOptions } from '../src/dice/turn';
 import { secondariesIn } from '../src/dice/secondaries';
 import { DIE_KINDS, type DieKind } from '../src/dice/types';
 import { CLASSES } from './dice-census-support';
@@ -19,10 +21,10 @@ import { battleOf } from './power-oracle';
  * on the same board under another seed, must give the log's turn (`scoreAlignment` perfect). The kinds: accuracy, crit, secondary
  * and self-effect (every move with a chance entry, also under Serene Grace and Sheer Force), hit-count (the multi-accuracy
  * moves are the Triple Axel row of ruling Q4 and stay a known gap), status-check (every condition whose handler draws), speed-tie
- * and, new in this round, stalling (the `|-fail|` of a second Protect). The last block counts the kinds the log may show and the
+ * and, new in this round, stalling (the `|-fail|` of a second Protect, read with the condition the caller names). The last block counts the kinds the log may show and the
  * reader does not name (the census of the ledger). A plain run plays the fixed sample of each list, `DICE_SWEEPS=full` every entry.
  *
- * KNOWN (`test.fails`, red today): the stalling rows (B3 builds the reader), the multi-accuracy rows (Q4) and the five causes the full sweep
+ * KNOWN (`test.fails`, red today): the multi-accuracy rows (Q4) and the five causes the full sweep
  * found in the reader (`GAPS`); each has a plain row that holds the sweep finds a seed pair to repair, so a row never goes green because it
  * played nothing. Moves aimed at a random foe in doubles stay out (see `randomAim`).
  */
@@ -280,13 +282,16 @@ function stallScene(rules: Rules, mode: Mode, move: DexMove): Scene | null {
   const first = sweepClicks(mode, move.target);
   const probe = moveScene(rules, mode, move, { channels: [], options: {} });
   if (!probe) return null;
+  const board = (seed: string): Battle => {
+    const battle = probe.board(seed);
+    playClicks(battle, first);
+    return battle;
+  };
+  // the condition the first use left on the user, as the app reads it from the offers of the body's click (`loggedOptions`)
+  const { stalling } = loggedOptions(board('1,2,3,4'), first);
   return {
-    board: seed => {
-      const battle = probe.board(seed);
-      playClicks(battle, first);
-      return battle;
-    },
-    clicks: first, options: { clicked: clickedOf(move.id, mode), secondariesOf: secondariesIn(dexOfRules(rules)) },
+    board,
+    clicks: first, options: { clicked: clickedOf(move.id, mode), secondariesOf: secondariesIn(dexOfRules(rules)), ...(stalling ? { stalling } : {}) },
     // a failed second use writes `|-fail|` only: no channel of the alignment sees it, so the two logs decide the witness
     channels: [], kind: 'stalling',
     differs: (log, naturalLog) => failsOf(log, 'p1a') !== failsOf(naturalLog, 'p1a'),
@@ -294,8 +299,8 @@ function stallScene(rules: Rules, mode: Mode, move: DexMove): Scene | null {
   };
 }
 
-// KNOWN (B3 builds the reader): the log shows a second Protect that failed as `|-fail|`, and `loggedDice` names no stalling die for it
-// (2629703929 turn 10: the base was perfect by seed luck, the plain forced turn breaks it).
+// The log shows a second Protect that failed as `|-fail|`: `loggedDice` names the stalling die for it (2629703929 turn 10: the base was perfect
+// by seed luck, the plain forced turn broke it; B3 builds the reader, the caller names the condition that makes the move draw).
 describe.each(SWEEP_CASES)('the logged stalling die gives the turn of the log: $name', ({ rules, mode }) => {
   const { moves } = sweepMoves(rules, stalling, false);
   let played: { failures: string[]; sum: Scan } | null = null;
@@ -319,7 +324,7 @@ describe.each(SWEEP_CASES)('the logged stalling die gives the turn of the log: $
     else expect(moves).toEqual([]);
   });
 
-  (moves.length > 0 ? test.fails : test.skip)('a stalling move used twice: the log names the die and the second use fails or succeeds as the log shows', () => {
+  (moves.length > 0 ? test : test.skip)('a stalling move used twice: the log names the die and the second use fails or succeeds as the log shows', () => {
     const { failures, sum } = rows();
     expect(sum.named, 'the log names the die').toBe(sum.witnesses);
     expect(failures).toEqual([]);

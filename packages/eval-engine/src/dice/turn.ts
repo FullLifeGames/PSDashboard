@@ -112,9 +112,10 @@ export function turnChanges(
 }
 
 /** What the log cannot name (`LoggedOptions`): the move each body clicked, the checks each body stood under, the secondaries of every move. */
-function loggedOptions(battle: Battle, logged: { p1: string; p2: string }): LoggedOptions {
+export function loggedOptions(battle: Battle, logged: { p1: string; p2: string }): LoggedOptions {
   const clicked = new Map<string, string>();
   const checks = new Map<string, readonly string[]>();
+  const stalling = new Map<string, string>();
   for (const side of ['p1', 'p2'] as const) {
     slotsOf(side, logged[side]).forEach(({ slot, fragment }, index) => {
       if (fragment.kind !== 'move') return;
@@ -124,9 +125,12 @@ function loggedOptions(battle: Battle, logged: { p1: string; p2: string }): Logg
       clicked.set(slot, moveId);
       const offers = offeredDice(battle, slot, { kind: 'move', moveId, moveName: moveId, ...(fragment.aim === undefined ? {} : { targetLoc: fragment.aim }) });
       checks.set(slot, offers.filter(offer => offer.name.kind === 'status-check' && offer.name.effectId).map(offer => offer.name.effectId!));
+      // Round 86 (T306): the condition that makes a stalling move draw its chance to succeed again, as the offer names it
+      const stall = offers.find(offer => offer.name.kind === 'stalling' && offer.name.effectId)?.name.effectId;
+      if (stall) stalling.set(slot, stall);
     });
   }
-  return { clicked, checks, secondariesOf: secondariesIn(battle.dex) };
+  return { clicked, checks, stalling, secondariesOf: secondariesIn(battle.dex) };
 }
 
 /** The forced list of a turn the user has just chosen: the user's dice, joined by the log's on the branch's first turn. */

@@ -26,6 +26,12 @@ export interface LoggedOptions {
    * secondaries that carry a chance. With them a secondary the log shows nothing of is a logged no.
    */
   secondariesOf?: (moveId: string) => readonly string[];
+  /**
+   * Round 86 (the log's dice, T306): the condition each body stands under that makes its clicked move draw the chance to succeed again
+   * (a stalling move used twice in a row), by slot. The die's name carries it (`stall`), and only the simulator's own hook knows it. With
+   * it a stalling move the log shows as `|-fail|` is a logged failure, and one without is a logged success.
+   */
+  stalling?: ReadonlyMap<string, string>;
 }
 
 /** One stretch of the log: a body's `|move|` or `|cant|` line and the lines up to the next action, or the lines between actions. */
@@ -56,6 +62,8 @@ export interface LoggedAction {
   effects: Record<string, string[]>;
   /** The stats a slot gained or lost in the block (no `[from]`), in line order. */
   boosts: Record<string, string[]>;
+  /** The `|-fail|` lines (no `[from]`) per slot: a stalling move that failed writes one for its user. */
+  fails: Record<string, number>;
 }
 
 const SLOT = /^(p[12][a-d])(?::|$)/;
@@ -70,7 +78,7 @@ const BREAKS = new Set(['move', 'cant', 'switch', 'drag', 'replace', 'upkeep', '
 function blank(type: LoggedAction['type'], ident = '', moveId = '', reason = ''): LoggedAction {
   return {
     type, queued: false, slot: slotOf(ident), ident, moveId, reason, idents: ident ? { [slotOf(ident)]: ident } : {}, targets: [], missed: [], misses: 0,
-    damaged: {}, crits: {}, hitCounts: {}, selfHits: {}, selfHitBy: {}, effects: {}, boosts: {},
+    damaged: {}, crits: {}, hitCounts: {}, selfHits: {}, selfHitBy: {}, effects: {}, boosts: {}, fails: {},
   };
 }
 
@@ -125,6 +133,7 @@ function readLine(action: LoggedAction, parts: string[], line: string): void {
   else if (tag === '-crit') bump(action.crits, key);
   else if (tag === '-hitcount') action.hitCounts[key] = Number(field(parts, 3));
   else if (tag === '-damage') readDamage(action, key, line);
+  else if (tag === '-fail' && !line.includes('[from]')) bump(action.fails, key);
   else if (EFFECT_TAGS.has(tag) && !line.includes('[from]')) readEffect(action, parts, key);
 }
 
@@ -274,7 +283,7 @@ function checkDice(actions: readonly LoggedAction[], options: LoggedOptions): Fo
 
 /**
  * The dice a log shows for the turn, per action in the log's order: accuracy and crit per target the move reached, its
- * secondaries and self effect, its hit count, and the status checks. The names are the names the module gives the draws
+ * secondaries and self effect, its hit count, the status checks and the chance of a stalling move to succeed again. The names are the names the module gives the draws
  * (`recognize.ts`), so a forced list made of them forces what the log rolled.
  */
 export function loggedDice(turnLines: readonly string[], options: LoggedOptions = {}): ForcedDie[] {
@@ -284,7 +293,7 @@ export function loggedDice(turnLines: readonly string[], options: LoggedOptions 
   actions.forEach((action, index) => {
     if (action.type === 'move') dice.push(...moveDice(actions, index, flinched.get(index) ?? new Set(), options));
   });
-  dice.push(...checkDice(actions, options), ...orderDice(actions));
+  dice.push(...checkDice(actions, options), ...stallingDice(actions, options), ...orderDice(actions));
   const seen = new Set<string>();
   return dice.filter(die => {
     const key = dieKey(die.name);
@@ -292,6 +301,21 @@ export function loggedDice(turnLines: readonly string[], options: LoggedOptions 
     seen.add(key);
     return true;
   });
+}
+
+/**
+ * Round 86 (the log's dice, T306): the chance of a stalling move to succeed again. A body whose click is its stalling move (the caller
+ * names the condition that makes it draw) succeeded when the log shows no `|-fail|` for it in its action, and failed when it shows one. A
+ * failure the simulator reached without a draw (nobody acts after the user) is a die that is never drawn: forcing it changes nothing.
+ */
+function stallingDice(actions: readonly LoggedAction[], options: LoggedOptions): ForcedDie[] {
+  const dice: ForcedDie[] = [];
+  for (const action of actions) {
+    const effectId = options.stalling?.get(action.slot);
+    if (action.type !== 'move' || !action.queued || !effectId || options.clicked?.get(action.slot) !== action.moveId) continue;
+    dice.push({ name: { slot: action.slot, moveId: action.moveId, kind: 'stalling', effectId }, result: happens((action.fails[action.slot] ?? 0) === 0) });
+  }
+  return dice;
 }
 
 /**
