@@ -1,6 +1,6 @@
 # Backlog
 
-This file holds the details of every open TODO, one section per TODO under its fixed T-number. Release v1.0.2 is out (30.10.2026), and rounds 82 to 84 (forced dice in branches, the GitHub issues #2 and #3, the turn dock) wait on dev for the next release. Round 85 carries T318 (the UI stays smooth while the app loads and the engine computes), round 86 the six approved TODOs of the engine setup (T299, T304 to T306, T309, T310); T313, T314, T316 and T317 are approved and wait for a round; every other TODO is parked with a trigger, and a trigger that fires brings its TODO to a gate. The next free T-number is T319.
+This file holds the details of every open TODO, one section per TODO under its fixed T-number. Release v1.0.2 is out (30.10.2026), and rounds 82 to 84 (forced dice in branches, the GitHub issues #2 and #3, the turn dock) wait on dev for the next release. Round 85 carries T318 (the UI stays smooth while the app loads and the engine computes), round 86 the six approved TODOs of the engine setup (T299, T304 to T306, T309, T310); T313, T314, T316 and T317 are approved and wait for a round, and T319 (an inventory of dead code) follows round 86; every other TODO is parked with a trigger, and a trigger that fires brings its TODO to a gate. The next free T-number is T320.
 
 Evidence paths of the form `r<NN>/…` point to that round's probe folder, `docs/perf/probes/<date>-r<NN>/`; `docs/` is local, so they exist only on the maintainer's machine. Each round's entry in `docs/completed/` names its folder and the gate that approved its TODOs. Line numbers in a section refer to the state when the TODO was written.
 
@@ -144,7 +144,7 @@ In Gens 1 and 2 accuracy and crit draw in 256ths and the damage roll is `random(
 
 ## Approved, waiting for a round
 
-The gates of round 84 (02.11.2026 and 03.11.2026) approved these TODOs. T313 and T317 form the next small batch; T314 is a larger bug (D3) and T316 a feature, each its own round. Each leaves this file with its round's booking.
+The gates of round 84 (02.11.2026 and 03.11.2026) approved these TODOs. T313 and T317 form the next small batch; T314 is a larger bug (D3) and T316 a feature, each its own round. The gate of 04.11.2026 approved T319 for after round 86. Each leaves this file with its round's booking.
 
 ### T313 · The app's buttons read at 4.5 : 1
 
@@ -217,6 +217,24 @@ The gates of round 84 (02.11.2026 and 03.11.2026) approved these TODOs. T313 and
 **Singles and doubles.** Not affected.
 
 **Evidence.** The integrator's screenshots of 02.11.2026 (`r84/gate/preview/r9-*.png`).
+
+### T319 · An inventory of dead code, before it misleads the next round
+
+*Engine, replay core and app · gate of 04.11.2026 · probe first, deletions as TODOs at its gate · lossless*
+
+**Approved for after round 86 (04.11.2026, "1c"; the user on 03.11.2026: "dass wir vielleicht einmal analysieren sollten wie viel und ob wir toten Code aktuell mit uns rumschleppen"; on 04.11.2026: adding `@vitest/coverage-v8` for the coverage run is okay).**
+
+**Problem.** T305 named the tree's chance-node path (`groupedDraw` with `TREE_FORCED_CAP` in `packages/eval-engine/src/search/expansion.ts`) as the class path round 86 should widen. That path runs only with `CHANCE_NODES` on, and the switch stays off since round 43; the review of the ADR sweep found the slip on 03.11.2026 (f0bd821). Switched-off code reads like live code. `npx knip` on dev 3e742b6 reports one unused file (`packages/eval-engine/src/dice/index.ts`), 56 unused exports and 27 unused exported types; an unused export may still serve its own module, so the list needs sorting. knip cannot see code behind a fixed switch (`CHANCE_NODES = false` in `search/expansion.ts`, the other branch of `FORCED_SWITCH_NODES = true` in `mcts.ts` and of `FIRST_TURN_JOINS_LOG = true` in `dice/turn.ts`), variants and environment levers that default off, or tests that cover only switched-off code.
+
+**Idea.** A probe that deletes nothing, in three parts. (1) Sort knip's list into unused code and a superfluous `export`. (2) Find the code behind fixed switches and default-off levers in `packages/*/src` and `src/`, with its lines and its tests. (3) A coverage run of the suites (`@vitest/coverage-v8` as a dev dependency at the version of `vitest`) shows the code no test reaches; code that only a test reaches stands out against the feedback harness. The result is one table with a recommendation per finding: delete, keep with its reason (ADR 0009 keeps the chance-node machinery on purpose), or a new TODO.
+
+**Benefit.** Engine and app: an agent that plans a round reads only code that runs, or code whose ADR says why it waits; the suite stops testing paths no user reaches.
+
+**Success.** The table covers every knip finding, every fixed switch and every default-off lever, each with its lines, its tests, the game type it serves and a recommendation; the user rules on it at the probe's gate. Each deletion that follows is lossless (D4): three byte-identical feedback runs, the bank digit-identical, regression, e2e, lint, `tsc -b`, and the API snapshot with `npm run pack:smoke` where a barrel changes.
+
+**Singles and doubles.** Both: a switch can hold a doubles-only path (the pair sampler, the doubles prover), so the table names the game type of each finding.
+
+**Evidence.** `docs/perf/probes/2026-11-04-dead-code/knip-2026-11-03.txt` (the knip run on 3e742b6); `docs/perf/probes/2026-11-03-adr/review/A.md` (the T305 finding); commit f0bd821.
 
 ## Parked
 

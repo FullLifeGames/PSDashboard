@@ -1,10 +1,10 @@
 # Next Steps (as of 03.11.2026, round 84 booked, round 85 next)
 
-Open work only. Each step is one round; its TODOs carry fixed T-numbers, and their details are in `docs/backlog.md`. Rules for agents: `AGENTS.md`. Finished rounds: `docs/completed/`. Next free T-number: T319.
+Open work only. Each step is one round; its TODOs carry fixed T-numbers, and their details are in `docs/backlog.md`. Rules for agents: `AGENTS.md`. Finished rounds: `docs/completed/`. Next free T-number: T320.
 
 ## State
 
-Release v1.0.2 (30.10.2026) is on master, on GitHub Pages with the frozen copies `/v1.0.0/` to `/v1.0.2/`, on npm with both packages, and in production on fulllifegames.com. dev carries T298 (round 81: after a deploy the app reloads once when a lazy chunk is gone), round 82 (forced dice in branches: the user sets single dice of a turn, and every other die falls as it would have), round 83 (GitHub issues #2 and #3: the set editor takes moves and abilities a species cannot have; a screen of a Light Clay holder keeps its eight turns in a variation) and round 84 (the turn dock: two rows of slot chips under the replay build the turn, and the engine fills the slots the user has not touched; the app fits its window from phone to 4K) for the next release. dev goes to origin with the booking of round 84 (user gate 03.11.2026, "4a"); then a reply to issue #3 for the user to post. master moves only with the user's okay.
+Release v1.0.2 (30.10.2026) is on master, on GitHub Pages with the frozen copies `/v1.0.0/` to `/v1.0.2/`, on npm with both packages, and in production on fulllifegames.com. dev carries T298 (round 81: after a deploy the app reloads once when a lazy chunk is gone), round 82 (forced dice in branches: the user sets single dice of a turn, and every other die falls as it would have), round 83 (GitHub issues #2 and #3: the set editor takes moves and abilities a species cannot have; a screen of a Light Clay holder keeps its eight turns in a variation) and round 84 (the turn dock: two rows of slot chips under the replay build the turn, and the engine fills the slots the user has not touched; the app fits its window from phone to 4K) for the next release. dev is on origin with the booking of round 84 (user gate 03.11.2026, "4a") and the ADRs 0003 to 0021 (03.11.2026); then a reply to issue #3 for the user to post. master moves only with the user's okay.
 
 ## Next rounds
 
@@ -14,7 +14,7 @@ Round 86 · The engine reads the dice (feature, score-touching D3). The engine a
 
 Approved, each waiting for a round: T313 and T317 form the next small batch (the app's buttons at 4.5 : 1, with a before and after image before the build; "EVs ?" in words). T314: a bench in a bring-limited format offers bodies the side never brought (larger bug, D3). T316: the replay frame drops the turn buttons the timeline covers, and the dock's rows follow Switch sides (feature, lossless).
 
-After round 86, bug reports from real use and the dependency upkeep of AGENTS.md bring the next round, and a parked TODO whose trigger fires comes to a gate.
+After round 86 comes T319 (gate 04.11.2026, "1c"): a probe lists the dead code (knip's findings, the code behind fixed switches and default-off levers, and a coverage run with `@vitest/coverage-v8`), each finding with a recommendation; deletions follow as TODOs at its gate, each lossless (D4). Then bug reports from real use and the dependency upkeep of AGENTS.md bring the next round, and a parked TODO whose trigger fires comes to a gate.
 
 ## Parked
 
