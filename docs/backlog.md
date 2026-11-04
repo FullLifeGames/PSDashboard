@@ -1,48 +1,8 @@
 # Backlog
 
-This file holds the details of every open TODO, one section per TODO under its fixed T-number. Release v1.0.2 is out (30.10.2026), and rounds 82 to 84 (forced dice in branches, the GitHub issues #2 and #3, the turn dock) wait on dev for the next release. Round 85 carries T318 (the UI stays smooth while the app loads and the engine computes) and T320 (the dock skips a Tatsugiri that commands its Dondozo), round 86 the six approved TODOs of the engine setup (T299, T304 to T306, T309, T310); T313, T314, T316 and T317 are approved and wait for a round, and T319 (an inventory of dead code) follows round 86; every other TODO is parked with a trigger, and a trigger that fires brings its TODO to a gate. The next free T-number is T321.
+This file holds the details of every open TODO, one section per TODO under its fixed T-number. Release v1.0.2 is out (30.10.2026), and rounds 82 to 85 (forced dice in branches, the GitHub issues #2 and #3, the turn dock, the smooth UI) wait on dev for the next release. Round 86 carries the six approved TODOs of the engine setup (T299, T304 to T306, T309, T310); T313, T314, T316 and T317 are approved and wait for a round, and T319 (an inventory of dead code) follows round 86; every other TODO is parked with a trigger, and a trigger that fires brings its TODO to a gate. The next free T-number is T322.
 
 Evidence paths of the form `r<NN>/…` point to that round's probe folder, `docs/perf/probes/<date>-r<NN>/`; `docs/` is local, so they exist only on the maintainer's machine. Each round's entry in `docs/completed/` names its folder and the gate that approved its TODOs. Line numbers in a section refer to the state when the TODO was written.
-
-## Round 85 · the UI stays smooth
-
-The gate of 03.11.2026 ("1a 2b, aber auch weniger") approved T318 as its own small round right after round 84, so the engine setup moves to round 86. The gate of 04.11.2026 ("2a") added T320, a dock fault the round's baseline ran into. Both leave this file with the round's booking.
-
-### T318 · The UI stays smooth while the app loads and the engine computes
-
-*App and eval engine · gate of 03.11.2026 · larger bug · lossless (D4)*
-
-**Approved for round 85 (03.11.2026, "1a 2b, aber auch weniger"; the user: "The app doesn't feel very smooth and a bit laggy, specifically when something is loading (like the engine calculating, etc.)", and the lag shows on fulllifegames.com too, less than on the test server).**
-
-**Problem.** The probe of 03.11.2026 (Champions VGC 2625939941, the default engine settings, 1366 x 768, headless Chromium, a production build and the dev server) finds the main thread idle between spikes of up to 335 ms (frames over 50 ms run from 51 to 335 ms). Each rebuild of the replay frame's document (a variation start swaps the `replay` frame for a `branch` frame, `src/components/ReplayWorkspace.tsx:67`) writes Showdown's embed loader again (`src/lib/replay-html.ts:88`), and the frame runs Showdown's `teambuilder-tables.js` again: 186 ms at load and 319 ms at the variation start, in a probe whose routing switches the HTTP cache off, so the repeat on the live site is an upper bound. Frames of 116 to 335 ms carry no attributed script (rendering is the likely rest). `rankFromMatrix` (`packages/eval-engine/src/ranking/order.ts`) and `solveMatrixGame` (`ranking/solve.ts`, which holds `mixFromRegret`) run on the main thread inside the merge of the trees (`mcts-merge.ts`, `tree-orchestrator.ts`) and the matrix orchestrator (`orchestrator.ts`): 30 to 60 ms per dock fill and about 240 ms over 25 s of Analyze game. The pool takes 12 workers on a 24-thread machine (`src/lib/eval/pool-size.ts`); whether that starves the main thread or the compositor is open, since the main thread idled 89 % of Analyze game. On the dev server React's development runtime adds up to 300 ms of main-thread time per scene.
-
-**Idea.** Measure first at the user's window (2560 x 1290 at 150 %, GPU on, headed Chromium and Firefox): a trace that splits style, layout and paint, three runs per scene, pools of 12, 8 and 6 workers, and the HTTP cache on. Then fix what the trace confirms. The replay frame stops running Showdown's data scripts again on a rebuild: a variation start mounts a new frame, so this needs a replace message to a kept frame, a second frame kept warm, or the data shared across frame documents. The script stays: Showdown's client reads `BattleTeambuilderTable` for its per-generation Dex (`battledata.js:1325-1481` in the local copy of 13.10.2026, `docs/perf/probes/2026-10-13-branch-icons/client/`), a Champions replay falls back to the base Generation 9 data without it, and a replay of Generation 8 or older throws in the tooltips; a fix holds every generation and mod the corpus plays. T316 edits `replay-html.ts` as well; the two rounds agree on the order first. The merge of the trees and the matrix solve move into a worker (a new `EvalWorkerRequest` type: a barrel change with the API snapshot and `pack:smoke`; `ENGINE_PROTOCOL` stays). The pool leaves the main thread a core if the trace shows the contention. Progress renders are throttled already (`single-eval.ts`); the trace says whether more batching pays.
-
-**Benefit.** App: scrolling, clicks and the replay's animation stay smooth while the engine computes, while Analyze game runs and when a variation starts.
-
-**Success.** At the user's window on a production build, three runs per scene with the median read: no long animation frame over 200 ms while the engine computes, Analyze game runs or a variation starts, and the sum of `blockingDuration` per scene at most half of the baseline measured first; the longest input delay during Analyze game under 100 ms (Event Timing); Analyze game and a dock fill at most 10 % slower at the chosen pool than at 12 workers. Chromium reads the long animation frames; Firefox, which has no such API, reads the requestAnimationFrame gaps. Lossless (D4): a spec compares a pooled search at 12, 8 and 6 workers and the worker-side merge with the in-process result byte for byte (the bank and the feedback harness search in process, so they cannot see a pool or merge change), three byte-identical feedback runs, regression, e2e, lint, `tsc -b`.
-
-**Singles and doubles.** Singles, Doubles OU, Scarlet/Violet VGC and Champions VGC, each its own row; the singles scene needs a new fixture.
-
-**Evidence.** `docs/perf/probes/2026-11-03-perf/` (`findings.md`, `main-thread-prod.json`, `main-thread-dev.json`, `run-2.log`, the review `t318-review.md`).
-
-### T320 · The dock skips a Tatsugiri that commands its Dondozo
-
-*App and eval engine · gate of 04.11.2026 · small fix with a sweep · lossless (D4)*
-
-**Approved for round 85 (04.11.2026, "2a"): fixed test-first in its own commit on the round's branch, measured with the round's check.**
-
-**Problem.** Round 85's baseline hung on Scarlet/Violet VGC 2556366252 in both browsers. A variation started at turn 1 with the logged picks reaches turn 3, where Tatsugiri-Curly rides the opposing Dondozo through Commander since turn 2. The dock fills P1 (Electro Shot → P2A, Sludge Bomb → P2A), the eval panel ranks Dondozo's moves for P2 (Rest, Order Up → Archaludon, Tera + Order Up → Amoonguss), and both P2 chips stay at "choose"; "Select all active choices" stays shut. The code path: `requiredChoicesForActiveSlots` (`packages/eval-engine/src/branch-choices.ts:105`) marks every living active as a slot that must choose, and `SimPokemonInfo` carries `fainted` but nothing about Commander. The simulator passes a commanding slot (side.js `getChoiceIndex`, read by `nextChoosingSlot` in `packages/eval-engine/src/forward/request-moves.ts:32`), so the engine's line for the side has one part. `partSlotMapping` (`branch-choices.ts:241`) finds one part for two required slots and returns null, `pickFillParts` (`src/lib/dock-fill.ts:73`) skips every ranked line, and `panelFlags` (`src/lib/dock-panel.ts:60`) waits for a pick in Tatsugiri's slot that the game never asks for. A replay turn with a commanding Tatsugiri reaches the same flags: its seed has no logged move there, so the chip reads "no logged move · choose". What the simulator does with a user's pick for the commanding slot is the first thing the red test reads (round 72, T246c: a `move` for a commanding slot went to the partner's slot, and the simulator rejected the side's choice).
-
-**Idea.** The slots that choose come from one rule, the simulator's own: the slot info carries the simulator's `volatiles['commanding']` (an optional field, so a barrel change with the API snapshot and `pack:smoke`), `requiredChoicesForActiveSlots` leaves such a slot out, the engine's line maps through the same mask, and the chip says that the slot passes this turn. The sweep plays every kind of slot the simulator passes (fainted, empty, commanding) in every doubles format and mod the corpus plays where the Dex gives a species Commander, and compares the slots the simulator asks for with the dock's required mask; the scene of 2556366252 turn 3 becomes one row.
-
-**Benefit.** App: in a doubles game with Commander the dock fills Dondozo's side like any other, and Execute goes without a pick for Tatsugiri.
-
-**Success.** The red test of the scene turns green: the engine's line fills Dondozo's chip, Tatsugiri's chip reads as passing, and Execute opens. The sweep holds the required mask to the simulator. The engine's numbers stay as they are (lossless, D4, inside round 85's check).
-
-**Singles and doubles.** Commander needs an ally, so the rule acts in doubles only; the sweep covers Doubles OU, Scarlet/Violet VGC and Champions VGC where their Dex allows the species.
-
-**Evidence.** `docs/perf/probes/2026-11-04-r85/test-results/r85-main-thread-sv-vgc-pool-12-run-1-chromium/` (screenshot and page snapshot), the failed runs in `runs/failed-commander-flinch/`.
 
 ## Round 86 · the engine reads the dice
 
@@ -601,6 +561,24 @@ The triage of 21.10.2026 and the user gates after it parked these TODOs; each se
 **Singles and doubles.** Both.
 
 **Reach.** No replay of `.fit-corpus` or the feedback fixtures plays Fairy Lock, Lucky Chant, Mud Sport or Water Sport. The usage fixtures show Fairy Lock only on Klefki: Gen 9 OU on 0.12 of Klefki's sets (Klefki on 0.35 % of teams), Champions OU 0.056, Champions VGC 0.006, Gen 9 Doubles OU 0.004, Gens 6 and 8 OU 0.0004 to 0.0026; Lucky Chant, Mud Sport and Water Sport in none.
+
+### T321 · The merge of the trees leaves the main thread
+
+*App and eval engine · round 85 · larger bug · lossless (D4)*
+
+**Parked (final gate of round 85, 04.11.2026, "3a"). Trigger: a frame over 100 ms in a dock fill or in Analyze game at the user's window.**
+
+**Problem.** Round 85 left this part of T318 out (design gate of 04.11.2026, "2a"). After the round, one scene of its probe blocks the main thread: Doubles OU 2695411495, Analyze game at a pool of 12, with frames of up to 70 ms and 17 to 18 ms of blocking per run, before the change as after. The long frames name `Worker.onmessage`, 249 ms over three runs. The main thread merges the workers' trees there: `src/lib/eval/worker-client.ts:226` calls `searchTreesOrchestrated` (`packages/eval-engine/src/tree-orchestrator.ts`), which runs `mergeMctsTrees` (`mcts-merge.ts`), and the merge ranks through `rankFromMatrix` (`ranking/order.ts`) and `solveMatrixGame` (`ranking/solve.ts`); the answer round reaches the ranking a second way (`answerRound`, `gradedRanking` in `search/answers.ts`). The probe does not split the 249 ms between the merge, the answer round and the structured clone of the trees that arrive. Every other scene of the probe reads no blocking in the fills and in Analyze game.
+
+**Idea.** Split the time first: the stages of `perfSync` (`packages/eval-engine/src/perf-trace.ts`) around the merge, the ranking and the answer round, read in that scene. Then move what dominates into a worker: a new request and response variant of `EvalWorkerRequest` and `EvalWorkerResponse` (`packages/eval-engine/src/types.ts`) and a branch in `src/workers/eval-worker.ts`. Sending the trees to that worker costs a second clone, and the probe weighs it against the gain. `mergeMctsTrees` is in the barrel already, so the API snapshot moves only if a new name enters it; `ENGINE_PROTOCOL` versions the HTTP engine format and stays.
+
+**Benefit.** App: Analyze game and the dock's fills stay free of long frames when the search grows (a longer budget, larger doubles trees).
+
+**Success.** At the user's window on a production build, three runs per scene with the median read: Doubles OU's Analyze game at most half of round 85's blocking, no other scene worse, in Chromium and in Firefox. Lossless (D4): the feedback harness drives the real app through the pool, so three byte-identical feedback runs see the change; the bank searches in process (`test/regression/bank-search.ts`), so a spec compares the worker-side merge with the in-process result byte for byte; regression, e2e, lint, `tsc -b`.
+
+**Singles and doubles.** Both; the doubles trees are the larger ones, so Doubles OU, Scarlet/Violet VGC and Champions VGC each get their own row.
+
+**Evidence.** `docs/perf/probes/2026-11-04-r85/` (`findings.md`, source 3; `compare.md`, the row Doubles OU, pool 12, Analyze game).
 
 ### T259 · A smoother price for a stage drop at the bench gate
 

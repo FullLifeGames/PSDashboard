@@ -912,6 +912,58 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * ROUND 85 2026-11-04 (improvement round 85, a larger bug: the UI stays
+ * smooth, T318, with T320; on r85 from dev da2efa7; probes
+ * docs/perf/probes/2026-11-04-r85/). Gates: 04.11. ("1a 2a": Doubles OU
+ * and Scarlet/Violet VGC measured again, T320 approved), design ("1a mit
+ * Möglichkeit auf 1b wenn zu viele Probleme auftreten", "2a"), the after
+ * measurement ("Go ahead"), final 13:03 ("1a 2a 3a 4a").
+ * DELIVERED: T318. Every replay frame ran Showdown's
+ * data/teambuilder-tables.js (15.8 MB) at load and again at every
+ * variation start, 140 to 205 ms of blocking each time. A module worker
+ * fetches the table once per session and cuts the part the replay client
+ * reads (gen1 to gen8 and the mods champions, gen7letsgo and gen9ssb, 1.14
+ * MB); the frame's script hook swaps the table's source for the part's
+ * blob URL (src/lib/teambuilder-table.ts,
+ * src/workers/teambuilder-table-worker.ts; 628b9eb). A frame built in the
+ * first 1.5 s after the app starts waits for the part; a failed or silent
+ * worker leaves the whole table. The e2e sweep teambuilder-table.spec.ts
+ * reads species, moves, items, abilities and types of gen1 to gen9 and the
+ * three mods through the part and the whole table alike. The design gate
+ * (2a) dropped the worker-side merge and the pool change; the pool stays
+ * at 12. T320 (606e974): the dock skips a Tatsugiri that commands its
+ * Dondozo. The required mask, the slot info and the chip read the
+ * simulator's volatiles['commanding']; the sweep commander-slots.spec.ts
+ * plays every Dex species with Commander in both rule sets, on either side
+ * and slot (36 cases red before the fix). New barrel value
+ * branchChoiceActive.
+ * MEASUREMENT: lossless (D4), no cache bump. At the user's window (2560 x
+ * 1290 at 150 %, GPU on, headed, production build, HTTP cache on), three
+ * runs per scene, the median: Chromium load longest frame 214 to 221 -> 55
+ * to 103 ms, blocking 140 to 205 -> 0 to 53 ms; variation start 147 to 199
+ * -> 0 to 55 ms, blocking 89 to 135 -> 0; fills and Analyze game as
+ * before. Firefox longest load gap 312 to 326 -> 76 to 139 ms, variation
+ * start 215 to 285 -> 0 to 111 ms. Criteria 60 of 66 met. Missed: the
+ * Firefox load gap time fell 32 to 42 % where the spec asked half (the
+ * excess over 50 ms per gap fell 62 to 80 %), and Doubles OU's Analyze
+ * game blocking 17 -> 18 ms (Worker.onmessage on the main thread, T321).
+ * Wall time the same or faster; the engine's picks identical in all 24
+ * comparisons. Bank in CI r85-head (628b9eb) 837 of 837 rows
+ * byte-identical to r84-head. Feedback f1 to f3 on 628b9eb, 12 of 12 dumps
+ * byte-identical with each other and with round 84's f4. Suite in the main
+ * checkout with DICE_SWEEPS=full: 727 files passed, 3 skipped; 42,076
+ * passed, 116 expected fails, 24 skipped, the same as round 84; 268 s. e2e
+ * 137 passed, 8 skipped (opt-in), 355 s. Lint, tsc -b and pack:smoke
+ * green.
+ * USER GATE 2026-11-04 13:03 ("1a 2a 3a 4a"): (1) the Firefox load counts
+ * as met by the excess over 50 ms, both readings booked; (2) the frame
+ * wait stays; (3) the merge of the trees parked as T321; (4) dev takes r85
+ * as a fast-forward and is pushed over HTTPS with gh's token while GitHub
+ * refuses the SSH key.
+ * RESTS: T321 parked (trigger: a frame over 100 ms in a dock fill or in
+ * Analyze game at the user's window); round 86 the engine setup. Next free
+ * T322.
+ *
  * ROUND 84 2026-11-01 to 2026-11-03 (improvement round 84, a feature: the
  * turn dock, T312, with T315 after the gate; on r84-a from dev f549a27 in
  * the worktree w84a, one fresh wave-builder per step; probes
