@@ -138,7 +138,7 @@ describe.each(SWEEP_CASES)('a script answers the secondary die: $name', ({ rules
           secondary[id] = happens;
           const log = scriptedLog(mode, move, board, secondary);
           scripted++;
-          const shown = effectShown({ log } as unknown as Battle, 0, entry, 'p2a', 'p1a') && !log.some(line => line.startsWith('|-miss|'));
+          const shown = effectShown({ log } as unknown as Battle, 0, entry, 'p2a', 'p1a') && !log.some(line => line.startsWith('|-miss|') && (line.split('|')[3] === undefined || line.split('|')[3].startsWith('p2a:')));
           if (shown !== happens) problems.push(`${move.id} ${id} ${happens ? 'yes' : 'no'}: the protocol shows ${shown ? 'the effect' : 'no effect'}`);
         }
       }

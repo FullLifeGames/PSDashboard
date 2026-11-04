@@ -2,7 +2,8 @@ import { PRNG } from '@pkmn/sim';
 import type { Battle, PRNGSeed } from '@pkmn/sim';
 import { strengthMix } from '../calc/fickle.ts';
 import { DrawNamer } from '../dice/namer.ts';
-import type { DieName } from '../dice/types.ts';
+import { answerDie } from '../dice/answer.ts';
+import type { DieName, Draw } from '../dice/types.ts';
 import type { PricedHit } from './kill-table.ts';
 import { captureHit, type HitSnapshot } from './snapshot.ts';
 
@@ -32,6 +33,10 @@ import { captureHit, type HitSnapshot } from './snapshot.ts';
  * attacker's status check (the confusion check has an accuracy shape, the others a
  * crit shape) and the confusion self-hit's random(16) leave no record. The draws
  * stay the plain PRNG's number for number, as before.
+ *
+ * Round 86 (T305): a secondary die (an entry of the move's `secondaries`, one `random(100)` per entry the target's rules leave)
+ * is booked per hit instance with its effect id, its chance and the result it had. A script answers it by effect id
+ * (`secondary`); as with the other rolls the natural value is drawn first, so the stream stays where it would have been.
  */
 
 export interface PairScript {
@@ -41,6 +46,8 @@ export interface PairScript {
   roll?: number;
   /** The strength draw of a move that doubles on a chance (Fickle Beam): true is the stronger strength. */
   doubled?: boolean;
+  /** The secondary dice by effect id (`secondaryEffectId`): true lets the entry happen, false stops it; an id left out keeps the natural draw. */
+  secondary?: Record<string, boolean>;
 }
 
 export type PairScripts = ReadonlyMap<string, PairScript>;
@@ -73,9 +80,22 @@ export interface RollRecord {
   snapshot: PricedHit;
 }
 
-export type PairRecord = AccuracyRecord | CritRecord | RollRecord | { kind: 'tie' };
+export interface SecondaryRecord {
+  kind: 'secondary';
+  key: string;
+  instance: number;
+  effectId: string;
+  /** The entry's chance, 0 to 1. */
+  chance: number;
+  happened: boolean;
+  logIndex: number;
+}
 
-interface Instance { id: number; key: string; script: PairScript | undefined; accuracy: boolean; crit: boolean; roll: boolean; strength?: number }
+export type PairRecord = AccuracyRecord | CritRecord | RollRecord | SecondaryRecord | { kind: 'tie' };
+
+interface Instance {
+  id: number; key: string; script: PairScript | undefined; accuracy: boolean; crit: boolean; roll: boolean; secondary: Set<string>; strength?: number;
+}
 interface QueueAction { choice?: string; pokemon?: unknown }
 
 /** Every item of the range is a move action with an acting Pokémon: speedSort shuffling a tie in the queue. */
@@ -151,7 +171,10 @@ export class PairPRNG extends PRNG {
 
   override random(from?: number, to?: number): number {
     if (this.delegating) return super.random(from, to);
-    const name = PairPRNG.ownDie(this.namer?.name({ call: 'random', from, to }) ?? null);
+    const draw: Draw = { call: 'random', from, to };
+    const named = this.namer?.name(draw) ?? null;
+    if (named?.kind === 'secondary') return this.secondaryRandom(named, draw);
+    const name = PairPRNG.ownDie(named);
     if (name?.kind !== 'damage-roll') return super.random(from, to);
     const natural = super.random(from, to);
     const hit = this.instance();
@@ -168,6 +191,26 @@ export class PairPRNG extends PRNG {
     return roll;
   }
 
+  /** The entry's `random(100)`: the natural value is drawn, the script (once per effect of the instance) may replace it, the record keeps the result. */
+  private secondaryRandom(name: DieName, draw: Draw): number {
+    const natural = super.random(draw.from, draw.to);
+    const hit = name.targetSlot ? this.instance(name.targetSlot) : null;
+    if (!hit || !name.effectId) return natural;
+    const happens = hit.script?.secondary?.[name.effectId];
+    let value = natural;
+    if (happens !== undefined && !hit.secondary.has(name.effectId)) {
+      const answer = answerDie('secondary', { happens }, draw, this.battle!.gen);
+      if (answer && 'value' in answer) value = answer.value;
+    }
+    hit.secondary.add(name.effectId);
+    const chance = draw.chance ?? 1;
+    this.records.push({
+      kind: 'secondary', key: hit.key, instance: hit.id, effectId: name.effectId, chance, happened: value < Math.round(chance * 1e6) / 1e4,
+      logIndex: this.battle!.log.length,
+    });
+    return value;
+  }
+
   override sample<T>(items: readonly T[]): T {
     this.namer?.name({ call: 'sample', from: items.length, items });
     return this.delegate(() => super.sample(items));
@@ -180,23 +223,22 @@ export class PairPRNG extends PRNG {
   }
 
   /** The instance the sim rolls for: one per move object and target slot; a script answers only the first instance of its key. */
-  private instance(): Instance | null {
+  private instance(targetSlot?: string): Instance | null {
     const move = this.battle?.activeMove;
     const pokemon = this.battle?.activePokemon;
-    const target = this.battle?.activeTarget;
-    if (!move || !pokemon || !target) return null;
+    const slot = targetSlot ?? this.battle?.activeTarget?.getSlot();
+    if (!move || !pokemon || !slot) return null;
     let byTarget = this.instances.get(move);
     if (!byTarget) {
       byTarget = new Map();
       this.instances.set(move, byTarget);
     }
-    const slot = target.getSlot();
     let found = byTarget.get(slot);
     if (!found) {
       const key = `${pokemon.getSlot()}:${move.id}>${slot}`;
       const script = this.usedScripts.has(key) ? undefined : this.scripts.get(key);
       if (script) this.usedScripts.add(key);
-      found = { id: this.nextInstance++, key, script, accuracy: false, crit: false, roll: false };
+      found = { id: this.nextInstance++, key, script, accuracy: false, crit: false, roll: false, secondary: new Set() };
       byTarget.set(slot, found);
     }
     return found;

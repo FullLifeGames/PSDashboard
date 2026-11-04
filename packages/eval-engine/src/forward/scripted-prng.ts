@@ -21,6 +21,10 @@ import type { DieName, Draw } from '../dice/types.ts';
  * has the shape of a crit or an accuracy and draws from the seed; Gens 1 and 2,
  * which draw accuracy and crit in 256ths and the roll as random(217, 256), are
  * reached too. An answer consumes no draw, as before.
+ *
+ * Round 86 (T305): a secondary die (the entry of the move's `secondaries` the simulator draws after a hit) is named too. A script
+ * answers it by effect id (`secondary`), and a `DiceSink` as the scripts map records every secondary die of the turn with the
+ * result it had, answered or drawn, so a class draw reads which effects came true from the dice, not from the log.
  */
 export interface RollScript {
   /** The accuracy roll: true connects, false misses. */
@@ -29,6 +33,8 @@ export interface RollScript {
   crit?: boolean;
   /** The damage roll random(16): 0 is the maximum roll, 15 the minimum (randomizer: base × (100 − roll) / 100). */
   roll?: number;
+  /** The secondary dice by effect id (`secondaryEffectId`): true lets the entry happen, false stops it. An id the script leaves out draws from the seed. */
+  secondary?: Record<string, boolean>;
   /** Speed tie: the side whose move acts first. */
   first?: 'p1' | 'p2';
 }
@@ -36,7 +42,28 @@ export interface RollScript {
 /** Scripts keyed `${sideId}:${moveId}`, e.g. `p1:thunder`. */
 export type RollScripts = ReadonlyMap<string, RollScript>;
 
-interface Answered { accuracy: boolean; crit: boolean; roll: boolean }
+/** A secondary die of a turn: whose move, against whom, which entry, its chance and whether it came true. */
+export interface SecondaryRecord {
+  slot: string;
+  moveId: string;
+  targetSlot?: string;
+  effectId: string;
+  /** 0 to 1: the entry's chance (a Gen 1 or 2 entry draws n in 256: the fraction of the draw). */
+  chance: number;
+  happened: boolean;
+  /** `battle.log.length` when the die was drawn. */
+  logIndex: number;
+}
+
+/**
+ * Scripts that record. A class draw passes a sink (an empty map is fine) as the fork's `scripts`; `forkBattle` builds the recording
+ * `ScriptedPRNG` for it, and the caller reads `secondaries` after the advance.
+ */
+export class DiceSink extends Map<string, RollScript> {
+  readonly secondaries: SecondaryRecord[] = [];
+}
+
+interface Answered { accuracy: boolean; crit: boolean; roll: boolean; secondary: Set<string> }
 interface MoveLike { choice?: string; pokemon?: { side: { id: string } } }
 
 /** Every item of the range is a move action with an acting Pokémon (speedSort's tie shuffle). */
@@ -75,22 +102,50 @@ export class ScriptedPRNG extends PRNG {
 
   /** The script and the answer state of the move the sim is executing, when this die is one of its own and a script names the move. */
   private active(name: DieName | null): { script: RollScript; state: Answered } | null {
-    if (!name || name.effectId !== undefined) return null;
-    if (name.kind !== 'accuracy' && name.kind !== 'crit' && name.kind !== 'damage-roll') return null;
+    if (!name) return null;
+    // the move's own accuracy, crit and damage roll carry no effect; a secondary die always does
+    const own = name.kind === 'secondary' ? name.effectId !== undefined : name.effectId === undefined
+      && (name.kind === 'accuracy' || name.kind === 'crit' || name.kind === 'damage-roll');
+    if (!own) return null;
     const move = this.battle?.activeMove;
     if (!move) return null;
     const script = this.scripts.get(`${name.slot.slice(0, 2)}:${name.moveId}`);
     if (!script) return null;
     let state = this.answered.get(move);
     if (!state) {
-      state = { accuracy: false, crit: false, roll: false };
+      state = { accuracy: false, crit: false, roll: false, secondary: new Set() };
       this.answered.set(move, state);
     }
     return { script, state };
   }
 
+  /**
+   * What the script says about a secondary die, once per target and effect of the move in flight: the raw value to return, or
+   * undefined when the script is silent (the seed answers).
+   */
+  private secondaryAnswer(name: DieName, draw: Draw): number | undefined {
+    const hit = this.active(name);
+    const happens = hit?.script.secondary?.[name.effectId!];
+    if (!hit || happens === undefined) return undefined;
+    const key = `${name.targetSlot}|${name.effectId}`;
+    if (hit.state.secondary.has(key)) return undefined;
+    hit.state.secondary.add(key);
+    const answer = answerDie('secondary', { happens }, draw, this.battle!.gen);
+    return answer && 'value' in answer ? answer.value : undefined;
+  }
+
+  /** The sink's record of a secondary die and the result it had. */
+  private note(name: DieName, chance: number, happened: boolean): void {
+    if (!(this.scripts instanceof DiceSink)) return;
+    this.scripts.secondaries.push({
+      slot: name.slot, moveId: name.moveId, targetSlot: name.targetSlot, effectId: name.effectId!, chance, happened, logIndex: this.battle!.log.length,
+    });
+  }
+
   override randomChance(numerator: number, denominator: number): boolean {
-    const name = this.namer?.name({ call: 'chance', from: denominator, numerator }) ?? null;
+    const draw: Draw = { call: 'chance', from: denominator, numerator };
+    const name = this.namer?.name(draw) ?? null;
+    if (name?.kind === 'secondary') return this.secondaryChance(name, draw, numerator, denominator);
     const hit = this.active(name);
     if (hit) {
       const { script, state } = hit;
@@ -109,12 +164,29 @@ export class ScriptedPRNG extends PRNG {
     if (this.delegating) return super.random(from, to);
     const draw: Draw = { call: 'random', from, to };
     const name = this.namer?.name(draw) ?? null;
+    if (name?.kind === 'secondary') return this.secondaryRandom(name, draw);
     const hit = this.active(name);
     if (hit) {
       const answer = this.answerRandom(name!, hit, draw);
       if (answer !== undefined) return answer;
     }
     return super.random(from, to);
+  }
+
+  /** Gens 1 and 2: the entry's `chance(n, 256)`. */
+  private secondaryChance(name: DieName, draw: Draw, numerator: number, denominator: number): boolean {
+    const answered = this.secondaryAnswer(name, draw);
+    const happened = answered === undefined ? this.delegate(() => super.randomChance(numerator, denominator)) : answered < numerator;
+    this.note(name, numerator / denominator, happened);
+    return happened;
+  }
+
+  /** Gens 3 and up: the entry's `random(100)`, compared with its percent by the simulator (`draw.chance` is the naming's reading of the entry). */
+  private secondaryRandom(name: DieName, draw: Draw): number {
+    const value = this.secondaryAnswer(name, draw) ?? super.random(draw.from, draw.to);
+    const chance = draw.chance ?? 1;
+    this.note(name, chance, value < Math.round(chance * 1e6) / 1e4);
+    return value;
   }
 
   /** The value a script gives a `random` call: the damage roll, or Gen 2's crit (`random(256)` against a threshold). */

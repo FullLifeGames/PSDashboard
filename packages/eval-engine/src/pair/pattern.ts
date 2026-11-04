@@ -57,7 +57,8 @@ const targetOf = (key: string) => key.slice(key.indexOf('>') + 1);
 function hitsOf(records: readonly PairRecord[]): Hit[] {
   const byInstance = new Map<number, Hit>();
   for (const record of records) {
-    if (record.kind === 'tie') continue;
+    // Round 86 (T305): the secondary records are read from the doubles plan's own step (commit 6); until then the pattern ignores them
+    if (record.kind === 'tie' || record.kind === 'secondary') continue;
     let hit = byInstance.get(record.instance);
     if (!hit) {
       hit = { key: record.key, rolls: [] };

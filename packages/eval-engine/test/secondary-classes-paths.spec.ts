@@ -366,7 +366,7 @@ describe('scene: a doubles cell with secondary dice (the pair plan)', () => {
     for (const target of ['p2a', 'p2b']) expect(massOf(blend, `p1a:rockslide>${target}`, 'flinch')).toBeCloseTo(0.9 * 0.3, 1);
   });
 
-  row('scene-flinch-doubles')('a script answers the flinch die of one hit: yes cuts that target, no does not', () => {
+  row('script-doubles')('a script answers the flinch die of one hit: yes cuts that target, no does not', () => {
     for (const seed of ['1,2,3,4', '5,6,7,8', '9,10,11,12']) {
       for (const happens of [true, false]) {
         const scripts = new Map([['p1a:extrasensory>p2a', { hit: true, crit: false, roll: 7, secondary: { flinch: happens } }]]);

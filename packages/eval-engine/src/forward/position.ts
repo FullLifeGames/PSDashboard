@@ -4,7 +4,7 @@ import { deserializeFromParsed, parseSearchState, type ParsedSearchState } from 
 import { restoreSideInvariants, serializeBattleStable } from './serialize.ts';
 import { adoptTemplate, copyBattle, prepareBattle, simFastOn } from './sim-fast/index.ts';
 import { repairFaintedActives } from './switches.ts';
-import { ScriptedPRNG, type RollScripts } from './scripted-prng.ts';
+import { DiceSink, ScriptedPRNG, type RollScripts } from './scripted-prng.ts';
 import { battleRuleset, tagRuleset } from './ruleset.ts';
 import type { StaticRuleset } from '../score/weights.ts';
 
@@ -133,7 +133,7 @@ function freshBattle(position: SimPosition): Battle {
  */
 export function forkBattle(position: SimPosition, seed: PRNGSeed, scripts?: RollScripts): Battle {
   const battle = tagRuleset(freshBattle(position), position.ruleset ?? 'standard');
-  if (scripts && scripts.size > 0) {
+  if (scripts && (scripts.size > 0 || scripts instanceof DiceSink)) {
     const prng = new ScriptedPRNG(seed, scripts);
     prng.attach(battle);
     battle.prng = prng;
