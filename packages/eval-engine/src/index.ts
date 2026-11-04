@@ -16,7 +16,7 @@ export type {
 } from './analysis.ts';
 export {
   notationSlotChoice, notationSideLabel, notationDice, switchChoiceKey, switchOptionKey, requiredChoicesForActiveSlots,
-  branchSideChoicesReady, evalChoiceToSlotChoices,
+  branchSideChoicesReady, evalChoiceToSlotChoices, branchChoiceActive,
 } from './branch-choices.ts';
 export type { BranchChoiceActive, BranchMoveModifier, BranchSlotChoice } from './branch-choices.ts';
 export {

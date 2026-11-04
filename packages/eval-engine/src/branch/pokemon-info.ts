@@ -2,6 +2,7 @@ import { dexOf, type GameRules } from '@fulllifegames/replay-core';
 import { bodyFromInfo, simBodyFacts } from '../calc/body.ts';
 import { teraClicked } from '../calc/tera-click.ts';
 import { twinBattle, twinFormat } from '../sim-ask/index.ts';
+import { isCommanding } from '../forward/request-moves.ts';
 import type { PokemonStatTable, SimPokemon, SimPokemonInfo, SimSide } from './types.ts';
 
 function statTableWithDefaults(
@@ -88,6 +89,7 @@ export function makePokemonInfo(
     // What the calc cannot see on its own, read as the engine's one builder reads it (round 67, T76).
     ...simBodyFacts(pokemon),
     ...(pokemon.battle.dex.currentMod === 'champions' ? { mod: 'champions' } : {}),
+    ...(isCommanding(pokemon) ? { commanding: true } : {}),
     boosts: { ...pokemon.boosts },
     level,
     types,

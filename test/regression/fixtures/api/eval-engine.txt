@@ -157,6 +157,7 @@ value annotateNicknames
 value applyForcedWin
 value applyTargetCorrections
 value autoTurnSettings
+value branchChoiceActive
 value branchSideChoicesReady
 value buildChoiceLockContext
 value buildEngineRequest

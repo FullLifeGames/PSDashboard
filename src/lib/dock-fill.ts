@@ -22,7 +22,7 @@ export function slotChoicesOf(state: BranchSimState, side: Side, ranked: RankedC
   const activeSlots = side === 'p1' ? state.p1ActiveSlots : state.p2ActiveSlots;
   const forcedSlots = side === 'p1' ? state.p1ForceSwitches : state.p2ForceSwitches;
   const mask = requiredChoicesForActiveSlots(
-    activeSlots.map(active => (active ? { fainted: active.fainted } : null)),
+    activeSlots.map(active => (active ? { fainted: active.fainted, commanding: active.commanding } : null)),
     forcedSlots,
   );
   return evalChoiceToSlotChoices(ranked.choice, movesBySlot, switchesBySlot, ranked.label, mask);

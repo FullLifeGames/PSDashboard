@@ -1,6 +1,6 @@
 import type { BattleStreams } from '@pkmn/sim';
 import {
-  type BranchChoiceErrorLog, type BranchSimState, branchSideChoicesReady, requiredChoicesForActiveSlots,
+  type BranchChoiceErrorLog, type BranchSimState, branchChoiceActive, branchSideChoicesReady, requiredChoicesForActiveSlots,
   type BranchSlotChoice,
 } from '@fulllifegames/eval-engine';
 import { sideIndex, type SideId } from '@fulllifegames/replay-core';
@@ -49,7 +49,7 @@ export function requiredChoices(battle: LiveBattle, side: SideId): boolean[] {
   const party = (sideState.activeRequest as { side?: { pokemon?: { active?: boolean; reviving?: boolean }[] } } | null)?.side?.pokemon;
   const revival = !!party?.some(entry => entry.active && entry.reviving);
   const switchIns = revival ? undefined : sideState.pokemon.slice(sideState.active.length).filter(pokemon => pokemon && !pokemon.fainted).length;
-  return requiredChoicesForActiveSlots(sideState.active, forced, switchIns);
+  return requiredChoicesForActiveSlots(sideState.active.map(branchChoiceActive), forced, switchIns);
 }
 
 export function hasAllChoices(

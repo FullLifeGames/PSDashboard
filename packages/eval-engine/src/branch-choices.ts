@@ -2,10 +2,18 @@ import type { BranchMoveOption, BranchSwitchOption } from './branch-engine.ts';
 import { splitCombinedLabel } from './analysis.ts';
 import { toId } from '@fulllifegames/replay-core';
 import { dieLabel, type DieWords } from './dice/die-label.ts';
+import { isCommanding } from './forward/request-moves.ts';
 import type { ForcedDie } from './dice/types.ts';
 
 export interface BranchChoiceActive {
   fainted: boolean;
+  /** Round 85 (T320): a Tatsugiri inside its Dondozo; the simulator passes its slot, so it is asked nothing. */
+  commanding?: boolean;
+}
+
+/** The facts `requiredChoicesForActiveSlots` reads, from a simulator body (the live battle's actives). */
+export function branchChoiceActive(pokemon: { fainted: boolean; volatiles: Record<string, unknown> } | null | undefined): BranchChoiceActive | null {
+  return pokemon ? { fainted: pokemon.fainted, commanding: isCommanding(pokemon) } : null;
 }
 
 export type BranchMoveModifier = 'terastallize' | 'mega' | 'zmove' | 'ultra';
@@ -111,7 +119,8 @@ export function requiredChoicesForActiveSlots(
     const fillable = fillableForcedSlots(forceSwitches, switchIns);
     return activeSlots.map((_, index) => fillable[index] ?? false);
   }
-  return activeSlots.map(active => !!active && !active.fainted);
+  // A commanding Tatsugiri passes like a fainted body (side.js getChoiceIndex); a forced replacement never meets one.
+  return activeSlots.map(active => !!active && !active.fainted && !active.commanding);
 }
 
 export function conflictingSwitchTargets(

@@ -112,7 +112,7 @@ function emptyChip(
   pending: BranchSlotChoice | null, facts: Omit<Parameters<typeof chipPlaceholder>[0], 'deferred'>, deferred: BranchSlotChoice | null,
 ): { placeholder: string; wait: EngineWait | null } {
   const word = deferred ? { kind: deferred.kind, name: deferred.kind === 'move' ? deferred.moveName : deferred.pokemonName } : null;
-  const silent = pending || deferred || facts.nobodyLeft || (facts.forceSwitch && facts.engine === 'busy');
+  const silent = pending || deferred || facts.nobodyLeft || facts.commanding || (facts.forceSwitch && facts.engine === 'busy');
   return { placeholder: chipPlaceholder({ ...facts, deferred: word }), wait: silent ? null : facts.engine ?? null };
 }
 
@@ -162,7 +162,10 @@ function damageOf(damage: SideDamage, slot: number) {
 }
 
 /** The chip of one slot: the pick line or the placeholder, the origin, and the engine's deferred pick. */
-function chipOf(side: Side, slot: number, view: SideView, args: DockModelArgs, facts: { forceSwitch: boolean; nobodyLeft: boolean; played: PlayedPick | null }) {
+function chipOf(
+  side: Side, slot: number, view: SideView, args: DockModelArgs,
+  facts: { forceSwitch: boolean; nobodyLeft: boolean; commanding: boolean; played: PlayedPick | null },
+) {
   const { seed, fill } = args;
   const pending = view.choices[slot] ?? null;
   const deferred = pending ? null : fill?.deferred[side][slot] ?? null;
@@ -183,16 +186,18 @@ function slotModel(side: Side, slot: number, view: SideView, args: DockModelArgs
   const forceSwitch = view.forceSwitches[slot] ?? false;
   const pending = view.choices[slot] ?? null;
   const nobodyLeft = identity.activeFainted && !forceSwitch && switches.length === 0;
+  // Round 85 (T320): a Tatsugiri inside its Dondozo takes no input; the position asks its slot nothing.
+  const commanding = !!active?.commanding && !identity.activeFainted && !view.required[slot];
   const pick = playedIn(side, played, slot);
   return {
     side, slot, label: identity.label, name: identity.activeName, species: identity.activeSpecies,
     hpPercent: active?.hpPercent ?? 0, fainted: identity.activeFainted,
-    moves, switches, forceSwitch, nobodyLeft, waits: slotWaits(view, slot),
+    moves, switches, forceSwitch, nobodyLeft, waits: commanding || slotWaits(view, slot),
     pending, blockedSwitchKeys: blockedSwitchKeys(view.choices, view.required, slot),
     modifiers: view.modifiersBySlot[slot] ?? EMPTY_MODIFIERS, gimmick: gimmickFor(side, slot),
     ...damageOf(view.damage, slot),
     played: pick,
-    ...chipOf(side, slot, view, args, { forceSwitch, nobodyLeft, played: pick }),
+    ...chipOf(side, slot, view, args, { forceSwitch, nobodyLeft, commanding, played: pick }),
     foeHp: view.foeHp,
   };
 }

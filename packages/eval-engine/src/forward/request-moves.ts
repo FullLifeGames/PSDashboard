@@ -29,12 +29,17 @@ export function isLockedEntry(move: RequestMove): boolean {
   return !('target' in move);
 }
 
+/** A Tatsugiri inside its Dondozo (the simulator's `commanding` volatile): the simulator passes its slot (side.js getChoiceIndex). */
+export function isCommanding(pokemon: { volatiles: Record<string, unknown> }): boolean {
+  return !!pokemon.volatiles['commanding'];
+}
+
 /** The first slot at or after `from` the sim asks a choice for (side.js getChoiceIndex: fainted and commanding actives pass). */
 export function nextChoosingSlot(sideState: Side, from: number): number {
   let slot = from;
   while (slot < sideState.active.length) {
     const active = sideState.active[slot];
-    if (!active || (!active.fainted && !active.volatiles['commanding'])) return slot;
+    if (!active || (!active.fainted && !isCommanding(active))) return slot;
     slot++;
   }
   return slot;

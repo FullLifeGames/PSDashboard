@@ -87,6 +87,8 @@ export interface SimPokemonInfo {
   hpPower?: number;
   /** 'champions' on a body of a Champions battle: its evs hold Stat Points, which the calc reads as EVs (round 67, decision 30). */
   mod?: string;
+  /** Round 85 (T320): a Tatsugiri inside its Dondozo (the simulator's `commanding` volatile); the simulator passes its slot. */
+  commanding?: boolean;
   boosts: Record<string, number>;
   level: number;
   types: string[];
