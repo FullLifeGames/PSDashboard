@@ -6,7 +6,7 @@ Evidence paths of the form `r<NN>/…` point to that round's probe folder, `docs
 
 ## Round 86 · the engine reads the dice
 
-The final gate of round 82 (01.11.2026, "2a") approved these TODOs for the next round, the engine setup; the gate of 11:31 ("3a") put a small batch first, the final gate of that batch (13:26, "3a") added T309 and T310, the design gate of 19:20 ("17a") put the turn dock first, and the gate of 03.11.2026 ("1a") put T318 first, so they form round 86. Each leaves this file with that round's booking.
+The final gate of round 82 (01.11.2026, "2a") approved these TODOs for the next round, the engine setup; the gate of 11:31 ("3a") put a small batch first, the final gate of that batch (13:26, "3a") added T309 and T310, the design gate of 19:20 ("17a") put the turn dock first, and the gate of 03.11.2026 ("1a") put T318 first, so they form round 86. The design gate of 04.11.2026 (14:07, "1c, 2b, 3a, 4a") runs them in three lanes: A carries T299 and then T305, B carries T306 and then T304, C carries T310, and T309 follows the merge. The spec gate (15:37, "1a 2a 3a 4a") lets T305 make a search at most 20 % slower, gives T304 a sentence with both win chances of the side that rolled, and lets T306 fall back to the seed search, counted on the drift line. Each leaves this file with that round's booking.
 
 ### T304 · The report plays the game's biggest roll the other way
 
