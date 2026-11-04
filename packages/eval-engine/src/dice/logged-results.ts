@@ -390,12 +390,13 @@ function stallingDice(actions: readonly LoggedAction[], options: LoggedOptions):
 }
 
 /**
- * The order the log shows: for every two bodies whose moves the queue ran, the one that moved first goes first. Two bodies that
- * did not tie in speed and priority have no such die (the report says `no-draw`), so the dice only hold where the simulator
- * shuffled the two.
+ * The order the log shows: for every two bodies whose moves the queue ran, the one that moved first goes first. A body the log
+ * stops with a `|cant|` line (Taunt, paralysis, a flinch) had its move in the queue too, and its line is the only mark of its place
+ * (Round 86, T306: smogtours-gen9ou-752301 turn 1). Two bodies that did not tie in speed and priority have no such die (the report
+ * says `no-draw`), so the dice only hold where the simulator shuffled the two.
  */
 function orderDice(actions: readonly LoggedAction[]): ForcedDie[] {
-  const moves = actions.filter(action => action.type === 'move' && action.queued);
+  const moves = actions.filter(action => (action.type === 'move' && action.queued) || action.type === 'cant');
   const dice: ForcedDie[] = [];
   moves.forEach((earlier, index) => {
     for (const later of moves.slice(index + 1)) {
