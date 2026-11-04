@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { PRNG, type Battle } from '@pkmn/sim';
 import { loadSimMods } from '../src/forward/sim-mods';
 import { serializeBattleStable } from '../src/forward/serialize';
+import { copyBattle } from '../src/forward/sim-fast';
 import { attachDispatch } from '../src/forward/sim-fast/dispatch';
 import { configureSimFast, SIM_FAST_DEFAULT } from '../src/forward/sim-fast/state';
 import { copyOf } from '../src/sim-ask/copy';
@@ -124,5 +125,46 @@ describe('the watch reads the battle and writes nothing', () => {
     watch.uninstall();
     watch.uninstall();
     expect(keysOf(battle)).toBe(keys);
+  });
+});
+
+// Round 86 (T299): the tree's scripted PRNGs keep a watch on a forked battle while that battle is copied (a forced switch's
+// snapshot, a child's template). The wrappers are hidden from key walks, so such a copy carries no wrapper of the old watch.
+describe.each(cases)('the wrappers are hidden from key walks: $rules.name $mode', ({ rules, mode }: { rules: Rules; mode: Mode }) => {
+  const enumerable = (battle: Battle): string[] => [
+    ...Object.keys(battle), ...Object.keys((battle as unknown as { actions: object }).actions),
+    ...battle.sides.flatMap(side => side.pokemon.flatMap(body => Object.keys(body))),
+  ].sort();
+
+  test('a watched battle shows the own keys of an unwatched twin, and its copy carries no wrapper', () => {
+    const scene = SCENES[0];
+    const battle = boardOf(rules, scene, mode, seedOf(7))!;
+    const twin = boardOf(rules, scene, mode, seedOf(7))!;
+    const watch = watchBattle(battle);
+    expect(enumerable(battle)).toEqual(enumerable(twin));
+    const copy = copyBattle(battle);
+    const plainCopy = copyBattle(twin);
+    expect(copy, 'the speed layer copies a watched battle').not.toBeNull();
+    expect(enumerable(copy!)).toEqual(enumerable(plainCopy!));
+    expect(Object.hasOwn(copy!, 'runEvent') && copy!.runEvent === battle.runEvent).toBe(false);
+    // a wrapper an own property carried into the copy hears nothing: the old watch sees none of the copy's turn
+    copy!.prng = new PRNG(battle.prng.getSeed());
+    playClicks(copy!, clicksOf(scene, mode));
+    expect(watch.moves.size, 'moves the old watch saw on the copy').toBe(0);
+    expect(watch.scope()).toBeNull();
+    watch.uninstall();
+    expect(enumerable(battle)).toEqual(enumerable(twin));
+  });
+
+  test('a hidden wrapper still plays: the watched turn equals the plain turn', () => {
+    const scene = SCENES[0];
+    const plain = boardOf(rules, scene, mode, seedOf(8))!;
+    const watched = boardOf(rules, scene, mode, seedOf(8))!;
+    const watch = watchBattle(watched);
+    playClicks(watched, clicksOf(scene, mode));
+    expect(watch.scope()).toBeNull();
+    watch.uninstall();
+    playClicks(plain, clicksOf(scene, mode));
+    expect(stableLog(watched)).toBe(stableLog(plain));
   });
 });
