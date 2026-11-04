@@ -179,15 +179,13 @@ describe.each(RESOLVED.map(row => [key(row), row] as const))('the arrival plays 
     return { built, played: await playTurn(adopted, built.replay.log, row.turn) };
   }
 
-  // KNOWN until the arrival plays the forced turn too (the next commit): the arrival searches sixteen seeds, the rebuild forces the log's dice
-  const arrivalPending = RESOLVED.some(entry => key(entry) === key(row)) && key(row) !== 'smogtours-gen6ou-648453 t7';
-  (arrivalPending ? test.fails : test)(`${typeOf(row.id)}: the played lines and HP equal the reconstruction's emitted block`, { timeout: 120_000 }, async () => {
+  test(`${typeOf(row.id)}: the played lines and HP equal the reconstruction's emitted block`, { timeout: 120_000 }, async () => {
     const { built, played } = await arrival();
     const lines = played.lines.filter(line => !line.startsWith('|t:|'));
     expect(lines).toEqual(emittedBlock(built.battleLog, row.turn));
   });
 
-  (KNOWN.has(key(row)) || arrivalPending ? test.fails : test)(`${typeOf(row.id)}: the played block matches the log`, { timeout: 120_000 }, async () => {
+  (KNOWN.has(key(row)) ? test.fails : test)(`${typeOf(row.id)}: the played block matches the log`, { timeout: 120_000 }, async () => {
     const { played } = await arrival();
     expect(played.score, shown(row)).toEqual({ endedMismatch: false, faintMismatches: 0, softMismatches: 0 });
   });

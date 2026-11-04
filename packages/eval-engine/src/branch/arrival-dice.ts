@@ -1,10 +1,11 @@
 import { PRNG } from '@pkmn/sim';
+import { forcedTurnDice } from '../dice/logged-block.ts';
 import { serializeBattleStable, trialAdvanceLog } from '../forward-model.ts';
 import {
   ALIGNMENT_SEEDS, chooseAlignedSeed, extractProtocolEvents, type SeedChoice,
 } from '../hax-alignment.ts';
 import { hasForceSwitch } from './corrections.ts';
-import { LoggedRollPRNG, recordLoggedRolls } from './logged-rolls.ts';
+import { LoggedRollPRNG, recordForcedRolls, recordLoggedRolls } from './logged-rolls.ts';
 import { collectForcedSwitchSpecies, getMainChoice, parseTurnBlocks } from './protocol-choices.ts';
 import type { SimBattle, TurnBlock } from './types.ts';
 
@@ -98,6 +99,9 @@ export function alignBlockSeed(
  * in doubles; later actions draw from the same stream, so they stay deterministic
  * but are no longer the logged rolls.
  *
+ * Round 86 (T306): the seed is index 0 of `ALIGNMENT_SEEDS` and the logged rolls are the draws of the turn the reconstruction plays, the
+ * log's dice forced on that seed (`arrivalRolls`); the sixteen-seed search only runs when the forced turn cannot play.
+ *
  * A direct PRNG swap, not `resetRNG`: that one writes a message line into the
  * battle log, and an adopted position's log is the replay's. Null (nothing
  * changed) when the battle does not stand at the turn's move request: ended,
@@ -117,12 +121,11 @@ export function alignArrivalDice(
   try {
     const p1Choice = getMainChoice(block.preUpkeep, 'p1', battle);
     const p2Choice = getMainChoice(block.preUpkeep, 'p2', battle);
-    const aligned = alignBlockSeed(battle, block, p1Choice, p2Choice, shouldStop);
-    if (aligned.seedChoice.trialScore === null) return null;
-    const { seed } = aligned.seedChoice;
-    const logged = recordLoggedRolls(battle, seed, p1Choice, p2Choice, aligned.alignForced);
-    if (logged) {
-      const prng = new LoggedRollPRNG(seed, logged, targetTurn, {
+    const aligned = arrivalRolls(battle, block, p1Choice, p2Choice, shouldStop);
+    if (!aligned) return null;
+    const { seed } = aligned.block.seedChoice;
+    if (aligned.logged) {
+      const prng = new LoggedRollPRNG(seed, aligned.logged, targetTurn, {
         lines: [...block.preUpkeep, ...block.postUpkeep], choices: { p1: p1Choice, p2: p2Choice },
       });
       prng.attach(battle);
@@ -130,8 +133,30 @@ export function alignArrivalDice(
     } else {
       battle.prng = new PRNG(seed);
     }
-    return aligned.seedChoice;
+    return aligned.block.seedChoice;
   } catch {
     return null;
   }
+}
+
+/**
+ * Round 86 (T306): the seed and the logged draws of the arrival turn. The turn plays as the reconstruction plays it: seed index 0 with the
+ * log's dice forced, and the draws it takes are the logged draws (`recordForcedRolls`). When the forced turn cannot play (the copy refuses a
+ * choice, the state is odd) the sixteen-seed search of before chooses, and null comes back when no trial plays either: the fallback seed
+ * is no reading of the log.
+ */
+function arrivalRolls(
+  battle: SimBattle, block: TurnBlock, p1Choice: string, p2Choice: string, shouldStop?: () => boolean,
+): { block: AlignedBlock; logged: ReturnType<typeof recordLoggedRolls> } | null {
+  const forced = forcedBlock(battle, block);
+  try {
+    const dice = forcedTurnDice(battle, [...block.preUpkeep, ...block.postUpkeep], { p1: p1Choice, p2: p2Choice });
+    const logged = recordForcedRolls(battle, dice, forced.seedChoice.seed, p1Choice, p2Choice, forced.alignForced);
+    if (logged) return { block: forced, logged };
+  } catch {
+    // an odd state: the search below reads the block as before
+  }
+  const searched = alignBlockSeed(battle, block, p1Choice, p2Choice, shouldStop);
+  if (searched.seedChoice.trialScore === null) return null;
+  return { block: searched, logged: recordLoggedRolls(battle, searched.seedChoice.seed, p1Choice, p2Choice, searched.alignForced) };
 }

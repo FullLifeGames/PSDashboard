@@ -14,21 +14,25 @@ import { playTurn, prngOf, reconstruct } from './arrival-turn';
  * alignment); the arrival now plays its own turn under that seed too, in singles and in doubles.
  */
 
-/** The scenes: turns the replay plays under another seed than 1,2,3,4 (the aligned seed is pinned), and one it plays under 1,2,3,4. */
-const SINGLES = { label: 'singles (GPL DzBQ5azlO5l)', fixture: 'gpl-replay', turn: 13, seed: '5,9,13,17' };
-const DOUBLES = { label: 'doubles (Doubles OU 912884)', fixture: 'smogtours-gen9doublesou-912884', turn: 10, seed: '5,9,13,17' };
-const VGC = { label: 'VGC doubles (Regulation I 2630181744)', fixture: 'gen9vgc2026regi-2630181744', turn: 3, seed: '3,1,4,1' };
+/**
+ * The scenes: turns the seed search of before round 86 played under another seed than 1,2,3,4 (5,9,13,17 and 3,1,4,1 were pinned). The
+ * rebuild now plays every turn under the hidden dice of seed index 0 with the log's dice forced (T306), so the arrival carries 1,2,3,4 in all of them.
+ */
+const SINGLES = { label: 'singles (GPL DzBQ5azlO5l)', fixture: 'gpl-replay', turn: 13, seed: '1,2,3,4' };
+const DOUBLES = { label: 'doubles (Doubles OU 912884)', fixture: 'smogtours-gen9doublesou-912884', turn: 10, seed: '1,2,3,4' };
+const VGC = { label: 'VGC doubles (Regulation I 2630181744)', fixture: 'gen9vgc2026regi-2630181744', turn: 3, seed: '1,2,3,4' };
 const QUIET = { fixture: 'gpl-replay', turn: 12 };
 
 const PERFECT = { endedMismatch: false, faintMismatches: 0, softMismatches: 0 };
 
 describe.each([SINGLES, DOUBLES, VGC])('a branch plays the logged turn as the log has it: $label', ({ fixture, turn, seed }) => {
-  test('the arrival carries the seed the replay plays this turn under', { timeout: 300000 }, async () => {
+  test('the arrival carries the seed the replay plays this turn under, with the logged dice forced on it', { timeout: 300000 }, async () => {
     const { runtime: arrival } = await reconstruct(fixture, turn);
     const { runtime: past } = await reconstruct(fixture, turn + 1);
     const aligned = past.haxAlignment.find(record => record.turn === turn)!;
     expect(aligned.seed).toBe(seed);
-    expect(aligned.trialPerfect).toBe(true);
+    // Round 86 (T306): no trial exists, the record scores the block the forced turn emitted (before: the best trial of sixteen seeds was perfect)
+    expect(aligned).toMatchObject({ via: 'forced', trialPerfect: false, candidatesTried: 0, actual: PERFECT });
     expect(prngOf(arrival)).toBe(aligned.seed);
   });
 

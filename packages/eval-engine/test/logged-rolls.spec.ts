@@ -5,6 +5,7 @@ import { LoggedRollPRNG, type LoggedRolls } from '../src/branch/logged-rolls';
 import { getMainChoice, parseTurnBlocks } from '../src/branch/protocol-choices';
 import { drawsByAction, observeDraws, playTurn, prngOf, reconstruct, type Draw } from './arrival-turn';
 import { loadSimMods } from '../src/forward/sim-mods';
+import { compareAlignment } from '../src/hax-alignment';
 
 // Round 75 (T160): a Champions game reads the registered Champions Dex, so the mod loads first, as the hosts do.
 await loadSimMods('gen9championsou');
@@ -54,7 +55,7 @@ async function play(scene: Scene, replaced: boolean, plainSeed = false) {
   const clicks = replaced ? getMainChoice(block.preUpkeep, scene.changed.side, battle).split(', ') : [];
   if (replaced) clicks[scene.changed.slot] = scene.changed.click;
   const played = await playTurn(runtime, replay.log, scene.turn, replaced ? { [scene.changed.side]: clicks.join(', ') } : undefined);
-  return { draws, byAction: drawsByAction(draws), lines: played.lines };
+  return { draws, byAction: drawsByAction(draws), lines: played.lines, score: played.score };
 }
 
 const values = (draws: Draw[] | undefined) => draws?.map(draw => [draw.from, draw.to, draw.value]);
@@ -108,12 +109,14 @@ describe.each(SCENES)('the first branch turn keeps the logged dice of the action
     }
   });
 
-  test('a turn whose actions all stay as logged draws exactly what the plain seed gives', { timeout: 300000 }, async () => {
+  // Round 86 (T306): the arrival records the draws of the turn the rebuild plays, the log's dice forced on the hidden dice of seed index 0. A forced
+  // die answers with the number that gives the log's result (a hit is 0) where the plain seed draws its own, and a forced order of a speed tie
+  // changes the shuffles that follow. So the draws are no longer the plain seed's: the turn is held to the log's block, never worse than the plain
+  // seed's turn (a body the log never shows acting still gets a move filled in, ruling Q1 of the plan). Before: the draws and the lines were equal.
+  test('a turn whose actions all stay as logged plays the block of the log at least as well as the plain seed', { timeout: 300000 }, async () => {
     const logged = await play(scene, false);
     const plain = await play(scene, false, true);
-    expect(values(logged.draws)).toEqual(values(plain.draws));
-    const untimed = (lines: string[]) => lines.filter(line => !line.startsWith('|t:|'));
-    expect(untimed(logged.lines)).toEqual(untimed(plain.lines));
+    expect(compareAlignment(logged.score, plain.score)).toBeLessThanOrEqual(0);
   });
 });
 
