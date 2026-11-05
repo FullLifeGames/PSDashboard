@@ -337,3 +337,37 @@ describe('null-swapped recommendations (round 5)', () => {
     expect(report.summary).not.toContain('Will-O-Wisp');
   });
 });
+
+/**
+ * Round 86 (T304, spec gate 2a): the report's biggest-roll sentence holds both chances of the side that rolled. 562428 turn 11: Tapu
+ * Bulu's 80 % Stone Edge missed Ikki, and the winner (p1) stood well ahead after it; a hit would have left it further ahead. 573756
+ * turn 73 reads the same way for p2 (the shapes of both scenes, the numbers of the copy's engine score are in test/regression/rolled-copy.spec.ts).
+ */
+describe('the biggest roll in the game report (T304)', () => {
+  const stoneEdge = {
+    ...ranked('move stoneedge', 'Stone Edge', 0.2),
+    koOdds: { accuracy: 0.8, killFraction: 1 },
+  };
+  const game = (): TurnAnalysis[] => [
+    mk(1, 0.2, 0.3, { chanceDelta: 0, rolledFor: { p1: false, p2: false } }),
+    mk(2, 0.3, 0.5, { chanceDelta: 0.05, rolledFor: { p1: false, p2: false } }),
+    mk(3, 0.5, 0.6, {
+      chanceDelta: -0.3, rolledFor: { p1: false, p2: true }, p1: { playedRaw: null, played: stoneEdge, best: null, safe: null, regret: 0 },
+      faintedFractionAfter: 0.25,
+    }),
+    mk(4, 0.6, 0.8, { chanceDelta: 0.02, rolledFor: { p1: false, p2: false } }),
+  ];
+
+  test('562428 shape: the winner\'s Stone Edge missed; the sentence says what a hit would have left and where the winner stood', () => {
+    const report = buildGameReport(game(), names, 'p1', true, new Set([3]), { turn: 3, score: 0.9, faintedFraction: 0.25 });
+    expect(report.summary).toContain(
+      "The game's biggest roll came on turn 3: Stone Edge (80%) missed. A hit would have left Alpha 84% to win; after the miss Alpha stood at 75%.",
+    );
+  });
+
+  test('a copy of another turn is not read', () => {
+    const report = buildGameReport(game(), names, 'p1', true, new Set([3]), { turn: 2, score: 0.9 });
+    expect(report.summary).toContain('Stone Edge (80%) missed. After the miss Alpha stood at 75%.');
+    expect(report.summary).not.toContain('A hit would');
+  });
+});

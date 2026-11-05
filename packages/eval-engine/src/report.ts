@@ -1,5 +1,5 @@
 import type { SideAnalysis, TurnAnalysis, VerdictTier } from './analysis.ts';
-import { type BiggestRoll, biggestRollFor, biggestRollSentence } from './biggest-roll.ts';
+import { type BiggestRoll, biggestRollFor, biggestRollSentence, type RolledHit } from './biggest-roll.ts';
 import { type DeniedEnd, deniedEndFor, deniedEndSentence } from './denied-end.ts';
 import { KEY_MOMENT_SWING, keyMomentsFor } from './key-moments.ts';
 import { regretSpanFor } from './prose/phrases.ts';
@@ -278,14 +278,14 @@ function winStoryFor(args: {
   diceAnchor: number | null;
   chanceSplit: LuckSplit | null;
   diceTurns: ReadonlySet<number> | null;
+  rolledHit: RolledHit | null;
 }): WinStory {
   const { known, winner, turningPoint, playedTracking } = args;
   const loser = winner === 'p1' ? 'p2' : 'p1';
   const seeds = !playedTracking ? [] : seedsOfTheLoss(known, loser, turningPoint);
   const conversion = conversionFor(known, winner, args.playerNames);
   const denied = deniedEndFor(known, args.diceTurns);
-  const rolled = biggestRollFor(known, winner);
-  const roll = rolled && rolled.turn !== denied?.turn ? rolled : null;
+  const roll = biggestRollFor(known, winner, args.rolledHit, denied?.turn);
   const tip = tipClause(known, winner, args.playerNames[sideIndex(winner)], turningPoint, args.diceTurns);
   const path = winPathFor({
     known, series: args.series, boundary: args.boundary, winner, playerNames: args.playerNames, chanceTotal: args.chanceTotal,
@@ -319,7 +319,7 @@ function winnerSentences(
   const loser = winner === 'p1' ? 'p2' : 'p1';
   const loserName = playerNames[sideIndex(loser)];
   if (story.denied) sentences.push(deniedEndSentence(story.denied, winner, loserName));
-  if (story.roll) sentences.push(biggestRollSentence(story.roll, loserName));
+  if (story.roll) sentences.push(biggestRollSentence(story.roll, winnerName));
   if (story.seeds.length > 0) {
     const parts = story.seeds.map(analysis => seedPhrase(analysis, loser));
     sentences.push(`The seeds of the loss: ${parts.join(' and ')}.`);
@@ -382,6 +382,8 @@ export function buildGameReport(
   playedTracking = true,
   /** Turns with a protocol-visible dice event (dice-events.ts); null = no dice info, luck claims stay ungated. */
   diceTurns: ReadonlySet<number> | null = null,
+  /** Round 86 (T304): the engine's score of the next root with the biggest roll's die turned over (rolled-copy.ts); null = not played. */
+  rolledHit: RolledHit | null = null,
 ): GameReport {
   const known = analyses.filter((entry): entry is TurnAnalysis => entry !== null);
 
@@ -407,7 +409,7 @@ export function buildGameReport(
   // The play that produced the boundary score happened on the turn before.
   const turningPoint = boundary !== null && boundary > 1 ? boundary - 1 : null;
   const story = winner === null ? null : winStoryFor({
-    known, series, boundary, playerNames, winner, turningPoint, playedTracking, chanceTotal, diceAnchor, chanceSplit, diceTurns,
+    known, series, boundary, playerNames, winner, turningPoint, playedTracking, chanceTotal, diceAnchor, chanceSplit, diceTurns, rolledHit,
   });
   const summary = reportSummary(known, playerNames, winner, turningPoint, playedTracking, decisionTotals,
     { chanceTotal, diceAnchor, split: chanceSplit }, story, series, standoffs);

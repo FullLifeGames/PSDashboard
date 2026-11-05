@@ -140,6 +140,46 @@ describe('573756 turn 73: a hit leaves LordEnz ahead', () => {
   });
 });
 
+/**
+ * Round 86 (B6): the report hands the copy the roll it named (the side that rolled, the move, the doubles click's target body and
+ * attacker slot) and the copy finds the die in the log: the winner's accuracy die that came out as a miss, on that move and that body.
+ */
+describe('the roll the report names finds its die in the log', () => {
+  const copyFor = (scene: Scene, roll: NonNullable<Parameters<typeof rolledCopy>[0]['roll']>): RolledCopy | null => {
+    const built = rebuilt.get(scene.id)!;
+    return rolledCopy({ position: built.positions.get(scene.turn)!, replayLog: built.replay.log, turn: scene.turn, roll });
+  };
+
+  test.each([
+    ['573756 t73, singles: Fire Fang of p2', SCENES[0], { side: 'p2', move: 'Fire Fang' }],
+    ['562428 t11, singles: Stone Edge of p1', SCENES[1], { side: 'p1', move: 'Stone Edge' }],
+    ['912045 t5, Doubles OU: Heat Wave of p2a on Incineroar', SCENES[2], { side: 'p2', move: 'Heat Wave', target: 'Incineroar', slot: 0 }],
+    ['2629703929 t10, VGC: Precipice Blades of p2a on Koraidon', SCENES[4], { side: 'p2', move: 'Precipice Blades', target: 'Koraidon', slot: 0 }],
+  ] as const)('%s turns the same die over as its key does', (_name, scene, roll) => {
+    const byRoll = copyFor(scene, roll);
+    const byKey = copyOf(scene);
+    expect(byRoll).not.toBeNull();
+    expect(byRoll!.serialized).toBe(byKey!.serialized);
+    expect(byRoll!.flip).toBe(scene.flip);
+  });
+
+  test('a copy that ends the game hands over the score of the end, from p1\'s view (2629703929 t10: p2 wins)', () => {
+    const copy = copyFor(SCENES[4], { side: 'p2', move: 'Precipice Blades', target: 'Koraidon', slot: 0 });
+    expect(copy!.stage).toBe('ended');
+    expect(copy!.terminal).toBe(-1);
+    expect(copyFor(SCENES[0], { side: 'p2', move: 'Fire Fang' })!.terminal).toBeNull();
+  });
+
+  test('no die, no copy: another move, another side, another target body, another slot, a hit instead of a miss', () => {
+    expect(copyFor(SCENES[0], { side: 'p2', move: 'Thunder Fang' })).toBeNull();
+    expect(copyFor(SCENES[0], { side: 'p1', move: 'Fire Fang' })).toBeNull();
+    expect(copyFor(SCENES[2], { side: 'p2', move: 'Heat Wave', target: 'Volcarona', slot: 0 })).toBeNull();
+    expect(copyFor(SCENES[2], { side: 'p2', move: 'Heat Wave', target: 'Incineroar', slot: 1 })).toBeNull();
+    // Gunk Shot hit in the log: there is no miss to turn into a hit
+    expect(copyFor(SCENES[3], { side: 'p2', move: 'Gunk Shot', target: 'Volcarona', slot: 1 })).toBeNull();
+  });
+});
+
 describe('what the copy refuses', () => {
   test('a die the log does not name gives no copy (the sentence speaks only where the log names the event)', () => {
     const built = rebuilt.get('smogtours-gen8ou-573756')!;
