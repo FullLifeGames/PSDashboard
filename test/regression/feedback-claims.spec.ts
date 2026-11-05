@@ -169,19 +169,22 @@ describe('drift report rendering', () => {
     expect(markdown).toContain('Eval-layer gaps: smogtours-gen8ou-573756: t3 "boom"');
   });
 
-  test('hax-alignment summaries render as their own meta line, residuals only when present', () => {
+  test('hax-alignment summaries render as their own meta line, residuals and fallbacks only when present', () => {
     const { markdown } = renderReport([], {
       commit: 'abc', date: 'd', settingsLine: 's', wallTimes: {},
       noticeByReplay: {}, evalErrorsByReplay: {},
       alignmentByReplay: {
-        'smogtours-gen8ou-653785': { turns: 40, perfectTurns: 33, softResidual: 9, faintResidualTurns: 1, endedMismatches: 1 },
+        'smogtours-gen8ou-653785': { turns: 40, perfectTurns: 33, softResidual: 9, faintResidualTurns: 1, endedMismatches: 1, fallbackTurns: 2 },
+        'one-fallback': { turns: 10, perfectTurns: 9, softResidual: 0, faintResidualTurns: 0, endedMismatches: 0, fallbackTurns: 1 },
         'quiet-replay': { turns: 20, perfectTurns: 20, softResidual: 0, faintResidualTurns: 0, endedMismatches: 0 },
         'no-sweep': null,
       },
     });
-    expect(markdown).toContain('Hax alignment: smogtours-gen8ou-653785 perfect 33/40 · soft 9 · faint-residual 1 · ended-mismatch 1');
+    expect(markdown).toContain('Hax alignment: smogtours-gen8ou-653785 perfect 33/40 · soft 9 · faint-residual 1 · fallback 2 · ended-mismatch 1');
+    expect(markdown).toContain('one-fallback perfect 9/10 · soft 0 · fallback 1');
     expect(markdown).toContain('quiet-replay perfect 20/20 · soft 0');
     expect(markdown).not.toContain('quiet-replay perfect 20/20 · soft 0 · faint');
+    expect(markdown).not.toContain('quiet-replay perfect 20/20 · soft 0 · fallback');
     expect(markdown).not.toContain('no-sweep');
   });
 });
