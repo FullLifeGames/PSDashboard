@@ -3,9 +3,9 @@ import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import { mergeMctsTrees } from '../src/mcts-merge';
 import { cellKey } from '../src/rank';
-import { classifyChild, planCellEvents, PROBE_SEEDS } from '../src/cell-blend';
+import { planCellEvents } from '../src/cell-blend';
 import { createMatchupCache } from '../src/eval-function';
-import { advancePosition, advancePositionWithLog, createRootPosition, positionBattle, type SimPosition } from '../src/forward-model';
+import { advancePosition, createRootPosition, positionBattle, type SimPosition } from '../src/forward-model';
 import { createLocalExecutor, subSearchDepth1 } from '../src/search';
 import { countFainted, leafValue, SEARCH_SEEDS } from '../src/search/leaf';
 import { sampleCell } from '../src/search/cell-sampler';
@@ -218,15 +218,20 @@ describe('the verify executor deepens per class (round 63, T16)', () => {
     if (plan.kind !== 'events') return;
     const [value] = await createLocalExecutor(root.serialized).evalCells([{ i: 0, j: 0, p1Choice: FOCUS[0], p2Choice: FOCUS[1], samples: 3, deepen: SUB }]);
     const classes = value.blend!.classes;
-    expect(classes.map(cls => cls.key).sort()).toEqual(['hit-nokill', 'miss']);
-    // The class's representative is its first draw in the sampler's seed order; 0.7 and 0.3 both go deeper.
-    // Round 64 (T119): a class whose draws leave several states (Focus Blast's 10 % Special Defense drop)
-    // mixes them by share, the first draw standing for its own state.
-    const order = [...SEARCH_SEEDS.slice(0, 3), ...PROBE_SEEDS];
+    // Round 86 (T305): Focus Blast's 10 % Special Defense drop is an outcome class of its own. Old expectation: the classes were
+    // `hit-nokill` and `miss`, and the hit class mixed the dropped and the undropped state by share (round 64, T119). New: the
+    // drop is the class `hit-nokill+boosts:spd`, the sampler forces it by script when the base draws miss it, and each class holds
+    // one state.
+    expect(classes.map(cls => cls.key).sort()).toEqual(['hit-nokill', 'hit-nokill+boosts:spd', 'miss']);
+    // The class's representative is its first draw in the sampler's seed order; 0.63 and 0.3 both go deeper. The class of the drop
+    // (weight 0.07) lies beyond the cover: it takes its leaf shifted by their step, as every class beyond the cover does.
     const sample = sampleCell(root, countFainted(positionBattle(root)), ...FOCUS, 3, createMatchupCache(), true, VERIFY_PLAIN_DRAWS);
-    for (const cls of classes) {
-      const seed = order.find(s => classifyChild(advancePositionWithLog(root, ...FOCUS, s).log, plan.events) === cls.key)!;
-      const first = deepened(root, advancePosition(root, ...FOCUS, seed));
+    const shifted = classes.find(cls => cls.key === 'hit-nokill+boosts:spd')!;
+    const covered = classes.filter(cls => cls !== shifted);
+    const step = covered.reduce((sum, cls) => sum + cls.weight * (cls.deepened! - cls.leafSum / cls.count), 0) / covered.reduce((sum, cls) => sum + cls.weight, 0);
+    expect(shifted.deepened).toBeCloseTo(shifted.leafSum / shifted.count + step, 12);
+    for (const cls of covered) {
+      const first = deepened(root, sample.classChildren!.get(cls.key)!);
       const states = sample.classGroups?.get(cls.key);
       if (!states) {
         expect(cls.deepened, cls.key).toBe(first);
@@ -237,7 +242,8 @@ describe('the verify executor deepens per class (round 63, T16)', () => {
         position => deepened(root, position), VERIFY_STATE_RULE.singles.cover, VERIFY_STATE_RULE.singles.cap);
       expect(cls.deepened, cls.key).toBeCloseTo(states.reduce((sum, state, index) => sum + state.share * values[index], 0), 12);
     }
-    expect(sample.classGroups?.size, 'a class with more than one state').toBeGreaterThan(0);
+    // the drop that mixed two states inside one class is a class now: no class of this cell leaves several states
+    expect(sample.classGroups?.size ?? 0).toBe(0);
     // The one-ply blend itself is today's.
     const plain = sampleCell(root, countFainted(positionBattle(root)), ...FOCUS, 3, createMatchupCache(), true);
     expect(value.value).toBe(plain.value);

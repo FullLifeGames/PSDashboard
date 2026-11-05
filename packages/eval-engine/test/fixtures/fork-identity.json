@@ -2543,31 +2543,31 @@
       "depthCompleted": 1,
       "p1": [
         {
-          "choice": "move tackle 2",
-          "ev": 0.9,
+          "choice": "move protect",
+          "ev": 0.8999999999999999,
           "expected": 0.9,
           "worstCase": 0.9,
           "punishedBy": "Ember"
         },
         {
-          "choice": "move protect",
-          "ev": 0.9,
-          "expected": 0.9,
-          "worstCase": 0.9,
+          "choice": "move tackle 2",
+          "ev": 0.8900012500000001,
+          "expected": 0.895,
+          "worstCase": 0.8900000000000001,
           "punishedBy": "Ember"
         }
       ],
       "p2": [
         {
           "choice": "move ember 2",
-          "ev": -0.9,
-          "expected": -0.9,
+          "ev": -0.89999875,
+          "expected": -0.895,
           "worstCase": -0.9,
-          "punishedBy": "Tackle"
+          "punishedBy": "Protect"
         },
         {
           "choice": "move protect",
-          "ev": -0.9,
+          "ev": -0.8999999999999999,
           "expected": -0.9,
           "worstCase": -0.9,
           "punishedBy": "Tackle"
