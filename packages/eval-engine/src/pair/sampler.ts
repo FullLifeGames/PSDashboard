@@ -54,8 +54,8 @@ interface Cell {
 
 const memos = new WeakMap<SimPosition, Map<string, KillTable | null>>();
 
-/** Kill tables memoized per root. */
-function tablesFor(root: SimPosition): TableFor {
+/** Kill tables memoized per root (the doubles trees read them through `pair/tree-key.ts`, round 86). */
+export function tablesFor(root: SimPosition): TableFor {
   let memo = memos.get(root);
   if (!memo) {
     memo = new Map();
@@ -75,7 +75,7 @@ const read = (cell: Cell, draw: PairDraw): PatternRead =>
  * Round 86 (T305): the entries a hit's move would draw, read from the simulator on the root's battle (`secondaryChances`), for a
  * hit that recorded none (a miss, a kill) and so offers the classes of its dice as alternatives. Null when the question is refused.
  */
-function entriesOf(battle: Battle): EntriesFor {
+export function entriesOf(battle: Battle): EntriesFor {
   return key => {
     const [user, rest = ''] = key.split(':');
     const [moveId, target = ''] = rest.split('>');
