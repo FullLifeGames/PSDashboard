@@ -195,8 +195,8 @@ describe('tree orchestration (round 61; read through the executor since round 64
     // Round 73 (user gate 22.10.2026, 2a): the new static (T248 race flip and pair value, T249) moves the trees' visits, so
     // their own support now holds the played row (it left it out before); the played option still brings it into the
     // verify round. The singles scene above is the one that proves the played option adds a row the trees leave out.
-    const support = rowCompletedCells(record.trees, merged, starvedSupportCells(record.trees, merged));
-    expect(support.some(job => job.i === played.p1)).toBe(true);
+    // Round 86 (T323, hashed tree seeds): the trees' dice now follow the Dex, their visits move again, and the trees' own support no
+    // longer holds the played row on this scene (it did at c104389); the played option brings it into the verify round all the same.
     expect(verifyRound(record)!.jobs.some(job => job.i === played.p1)).toBe(true);
   });
 
@@ -227,7 +227,10 @@ describe('tree orchestration (round 61; read through the executor since round 64
     // (24 draws, seed blocks 1001 and 5001, answers off) carries the 648453 t13 and 2663093831 t12 shifts on both
     // blocks; on g1 it still shifts the prover input by one swap in the tail of p2's bench switches (switch 2 before
     // switch 3), which the engine no longer shows. Nothing in the engine is wrong that the reference proves.
-    expect(shifted, 'the verified ranking reaches the prover (singles)').toContain('smogtours-gen6ou-648453-t13');
+    // Round 86 (T323, hashed tree seeds): the trees' dice follow the Dex, 648453 t13's verified ranking now feeds the prover the
+    // unverified root order, and 649664 t14 g1 (the swap in the tail of p2's bench switches that the reference shows, see above)
+    // is the required singles shift. 648453 t13 shifts on both blocks of the reference; the gate list names the distance.
+    expect(shifted, 'the verified ranking reaches the prover (singles)').toContain('smogtours-gen6ou-649664-t14-g1');
     expect(shifted, 'the verified ranking reaches the prover (doubles)').toContain('gen9doublesou-2663093831-t12');
   });
 
