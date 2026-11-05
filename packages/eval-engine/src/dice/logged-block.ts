@@ -1,6 +1,7 @@
 import type { Battle, PRNGSeed } from '@pkmn/sim';
 import { sideIndex, toId } from '@fulllifegames/replay-core';
-import { buildForcedSwitchChoice, hasForceSwitch } from '../branch/corrections.ts';
+import { buildForcedSwitchChoice, forceSwitches, hasForceSwitch } from '../branch/corrections.ts';
+import type { SimBattle } from '../branch/types.ts';
 import { faintedSlots, logGoesOn, shownBodyIds, type ProtocolBench } from '../branch/team-order.ts';
 import { serializeBattleStable } from '../forward-model.ts';
 import { forkBattle } from '../forward/position.ts';
@@ -98,6 +99,12 @@ function submittable(battle: Battle, side: 'p1' | 'p2', choice: string): string 
   return submittableChoice(battle.sides[sideIndex(side)], first);
 }
 
+/** A forced slot whose body fainted: the request of a knockout (a pivot's or an ejected body's request has a living body in the slot). */
+function opensKnockout(battle: Battle): boolean {
+  return [0, 1].some(index =>
+    forceSwitches(battle as SimBattle, index).some((needed, slot) => needed && !!battle.sides[index].active[slot]?.fainted));
+}
+
 export interface BlockOnCopy {
   copy: Battle;
   dice: readonly ForcedDie[];
@@ -109,6 +116,8 @@ export interface BlockOnCopy {
   onDraw?: ForcedTurnInput['onDraw'];
   /** Runs one part; the caller wraps it (the arrival mutes its recorder's own stream while a forced part plays). */
   around?: (run: () => void) => void;
+  /** Round 86 (T304): stop where a knockout opens a replacement request, the position the sweep's replacement round prices. A pivot's request is answered as the log answers it. */
+  stopAtRequest?: boolean;
 }
 
 /**
@@ -116,7 +125,7 @@ export interface BlockOnCopy {
  * sides, then every answer to a forced replacement the log gives), each part through the dice module with the block's whole list. Throws where
  * the copy refuses a choice. The reports of every part, in order.
  */
-export function playBlockOnCopy({ copy, dice, choices, forced, bench, observe, onDraw, around }: BlockOnCopy): DieReport[] {
+export function playBlockOnCopy({ copy, dice, choices, forced, bench, observe, onDraw, around, stopAtRequest }: BlockOnCopy): DieReport[] {
   const reports: DieReport[] = [];
   const part = (answers: { side: 'p1' | 'p2'; choice: string }[]): void => {
     const commands = answers.map(({ side, choice }) => ({ side, command: submittable(copy, side, choice) }));
@@ -133,6 +142,7 @@ export function playBlockOnCopy({ copy, dice, choices, forced, bench, observe, o
   part([{ side: 'p1', choice: choices.p1 }, { side: 'p2', choice: choices.p2 }]);
   const cursors = { p1: { current: 0 }, p2: { current: 0 } };
   for (let guard = 0; guard < 6 && !copy.ended; guard++) {
+    if (stopAtRequest && opensKnockout(copy)) break;
     const answers = (['p1', 'p2'] as const).flatMap((side, index) => {
       const choice = hasForceSwitch(copy, index) ? buildForcedSwitchChoice(copy, index, forced[side], cursors[side], bench?.(side)) : null;
       return choice ? [{ side, choice }] : [];
