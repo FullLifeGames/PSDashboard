@@ -359,7 +359,7 @@ describe('the biggest roll in the game report (T304)', () => {
   ];
 
   test('562428 shape: the winner\'s Stone Edge missed; the sentence says what a hit would have left and where the winner stood', () => {
-    const report = buildGameReport(game(), names, 'p1', true, new Set([3]), { turn: 3, score: 0.9, faintedFraction: 0.25 });
+    const report = buildGameReport(game(), names, 'p1', true, new Set([3]), { turn: 3, score: 0.9 });
     expect(report.summary).toContain(
       "The game's biggest roll came on turn 3: Stone Edge (80%) missed. A hit would have left Alpha 84% to win; after the miss Alpha stood at 75%.",
     );

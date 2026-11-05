@@ -20,17 +20,10 @@ import { winPercent } from './winprob.ts';
 
 type Side = 'p1' | 'p2';
 
-/** What the copy hands back: the engine's score (p1 view) of the next root with the die turned over, and that root's fainted share. */
-export interface RolledHit {
+/** What the copy hands back: the engine's score (p1 view) of the next root with the die turned over. */
+export interface RollFlip {
   turn: number;
   score: number;
-  faintedFraction?: number | null;
-}
-
-/** The winner's win chance at a position, as the graph prints it (the map of that position's fainted share). */
-interface Standing {
-  score: number;
-  faintedFraction?: number | null;
 }
 
 export interface BiggestRoll {
@@ -47,10 +40,10 @@ export interface BiggestRoll {
   /** Doubles: the odds' label names the click's target body, and the slot of the attacker that makes the odds (0 or 1). */
   target?: string;
   slot?: number;
-  /** The actual next root. */
-  after: Standing;
+  /** The actual next root: its score (p1 view) and fainted share, the map both chances print at. */
+  after: { score: number; faintedFraction?: number | null };
   /** The copy's next root; absent until the copy ran, or where it found no such die. */
-  hit?: RolledHit;
+  hit?: RollFlip;
 }
 
 const toward = (side: Side, delta: number): number => (side === 'p1' ? delta : -delta);
@@ -99,7 +92,7 @@ export function rollToCopy(known: TurnAnalysis[], winner: Side | null, diceTurns
  * The roll the sentence speaks. With the copy of its turn the sentence holds both chances. Singles speak without it (the miss and where
  * the winner stood after it); a doubles click waits for the copy, since the copy is what finds the die in the log.
  */
-export function biggestRollFor(known: TurnAnalysis[], winner: Side | null, hit: RolledHit | null = null, deniedTurn?: number): BiggestRoll | null {
+export function biggestRollFor(known: TurnAnalysis[], winner: Side | null, hit: RollFlip | null = null, deniedTurn?: number): BiggestRoll | null {
   const roll = candidateRoll(known, winner, deniedTurn);
   if (!roll) return null;
   const copy = hit && hit.turn === roll.turn ? hit : undefined;
@@ -107,9 +100,9 @@ export function biggestRollFor(known: TurnAnalysis[], winner: Side | null, hit: 
   return copy ? { ...roll, hit: copy } : roll;
 }
 
-/** The percent of the side that rolled, for a score in p1's view. */
-const percentFor = (winner: Side, at: Standing): number =>
-  winPercent(winner === 'p1' ? at.score : -at.score, at.faintedFraction);
+/** The percent of the side that rolled, for a score in p1's view, at the map of the actual next root (both chances read on one scale). */
+const percentFor = (winner: Side, score: number, faintedFraction: number | null | undefined): number =>
+  winPercent(winner === 'p1' ? score : -score, faintedFraction);
 
 /**
  * "The game's biggest roll came on turn 73: Fire Fang (95%) missed. A hit would have left LordEnz 81% to win; after the miss LordEnz
@@ -118,7 +111,8 @@ const percentFor = (winner: Side, at: Standing): number =>
 export function biggestRollSentence(roll: BiggestRoll, winnerName: string): string {
   const aim = roll.target ? ` ${roll.target}` : '';
   const head = `The game's biggest roll came on turn ${roll.turn}: ${roll.move} (${percentBelowSure(roll.accuracy)}%) missed${aim}.`;
-  const after = percentFor(roll.winner, roll.after);
+  const { score, faintedFraction } = roll.after;
+  const after = percentFor(roll.winner, score, faintedFraction);
   if (!roll.hit) return `${head} After the miss ${winnerName} stood at ${after}%.`;
-  return `${head} A hit would have left ${winnerName} ${percentFor(roll.winner, roll.hit)}% to win; after the miss ${winnerName} stood at ${after}%.`;
+  return `${head} A hit would have left ${winnerName} ${percentFor(roll.winner, roll.hit.score, faintedFraction)}% to win; after the miss ${winnerName} stood at ${after}%.`;
 }

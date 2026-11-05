@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { SideAnalysis, TurnAnalysis } from '../src/analysis';
-import { biggestRollFor, rollToCopy, type RolledHit } from '../src/biggest-roll';
+import { biggestRollFor, rollToCopy, type RollFlip } from '../src/biggest-roll';
 import { buildGameReport } from '../src/report';
 import type { KoOddsInfo, RankedChoice } from '../src/types';
 import { winPercent } from '../src/winprob';
@@ -44,7 +44,7 @@ const game = (rollTurn: Partial<TurnAnalysis>, extra: TurnAnalysis[] = []): Turn
 ];
 const fireFang = sideOf({ played: choice('Fire Fang', { accuracy: 0.95, killFraction: 1, attacker: { slot: 0, species: 'Garchomp' } }) });
 /** The copy's next root: Beta's score if the Fire Fang had hit (p1 view). */
-const hitOf = (score: number, over: Partial<RolledHit> = {}): RolledHit => ({ turn: 3, score, ...over });
+const hitOf = (score: number): RollFlip => ({ turn: 3, score });
 
 describe('the game\'s biggest roll against the winner (T284, T304)', () => {
   test('573756 shape: the sentence names what a hit would have left the side that rolled and where it stood after the miss', () => {
@@ -60,10 +60,10 @@ describe('the game\'s biggest roll against the winner (T284, T304)', () => {
     expect(report.summary).toContain('Fire Fang (95%) missed. A hit would have left Alpha 84% to win; after the miss Alpha stood at 72%.');
   });
 
-  test('the fainted share of each position sets its own map', () => {
+  test('both chances print on the map of the actual next root\'s fainted share', () => {
     const turns = game({ chanceDelta: 0.27, rolledFor: forP1, p2: fireFang, faintedFractionAfter: 0.75 });
-    const report = buildGameReport(turns, names, 'p2', true, new Set([3]), hitOf(-0.9, { faintedFraction: 0.5 }));
-    const hit = winPercent(0.9, 0.5);
+    const report = buildGameReport(turns, names, 'p2', true, new Set([3]), hitOf(-0.9));
+    const hit = winPercent(0.9, 0.75);
     const after = winPercent(0.62, 0.75);
     expect(report.summary).toContain(`A hit would have left Beta ${hit}% to win; after the miss Beta stood at ${after}%.`);
     expect(hit).not.toBe(winPercent(0.9));
