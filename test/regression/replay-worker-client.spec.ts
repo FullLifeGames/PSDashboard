@@ -1,7 +1,9 @@
 import { test, expect, describe, vi } from 'vitest';
 import { perfReport, perfReset } from '@fulllifegames/eval-engine';
 import { ReplayWorkerClient, type WorkerLike } from '../../src/lib/replay-jobs/client';
-import type { ReconstructJob, ReconstructOutcome, ReplayJobRequest, ReplayJobResponse, SolveSpreadsJob } from '../../src/lib/replay-jobs/types';
+import type {
+  ReconstructJob, ReconstructOutcome, ReplayJobRequest, ReplayJobResponse, RolledCopyJob, SolveSpreadsJob,
+} from '../../src/lib/replay-jobs/types';
 import { readSimFastLevers } from '../../src/lib/eval/sim-fast-setting';
 
 /** A worker stand-in: records what the client posts, lets the test answer. */
@@ -82,6 +84,21 @@ describe('ReplayWorkerClient', () => {
     });
     const solved = await promise;
     expect(solved.get('p1:garchomp')?.nature).toBe('Jolly');
+  });
+
+  test('rolledCopy posts the roll and resolves the copy, or null where the log has no such miss (round 86, T304)', async () => {
+    const { client, workers } = makeClient();
+    const job: RolledCopyJob = {
+      format: 'gen8ou', replayLog: '', position: 'position-73', turn: 73, roll: { side: 'p2', move: 'Fire Fang' },
+    };
+    const found = client.rolledCopy(job);
+    const [worker] = workers;
+    expect(worker.posted[0]).toMatchObject({ type: 'rolledCopy', job });
+    worker.emit({ type: 'rolledCopyResult', id: idOf(worker.posted[0]), outcome: { serialized: 'copy-74', stage: 'request', terminal: null } });
+    expect(await found).toEqual({ serialized: 'copy-74', stage: 'request', terminal: null });
+    const none = client.rolledCopy(job);
+    worker.emit({ type: 'rolledCopyResult', id: idOf(worker.posted[1]), outcome: null });
+    expect(await none).toBeNull();
   });
 
   test('jobs run one after another on one worker', async () => {

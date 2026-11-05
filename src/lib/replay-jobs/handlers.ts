@@ -1,12 +1,12 @@
 import {
-  buildChoiceLockContext, reconstructBranchRuntime, reconstructionReached, serializeLiveBattle, validateBranchRuntime,
+  buildChoiceLockContext, reconstructBranchRuntime, reconstructionReached, rolledCopy, serializeLiveBattle, validateBranchRuntime,
   type ReconstructParams,
 } from '@fulllifegames/eval-engine';
 import { solveReplaySpreads, type TurnSnapshot } from '@fulllifegames/replay-core';
 import { snapshotAt } from '../eval-acquire';
 import { loadReplayMods } from '../replay-mods';
 import { replaySolveOptions } from '../team-build-options';
-import type { ReconstructJob, ReconstructOutcome, ReplayJobRequest, ReplayJobResponse } from './types';
+import type { ReconstructJob, ReconstructOutcome, ReplayJobRequest, ReplayJobResponse, RolledCopyJob, RolledCopyOutcome } from './types';
 
 export type ReplayPost = (message: ReplayJobResponse) => void;
 
@@ -30,10 +30,20 @@ export async function handleReplayJob(message: ReplayJobRequest, post: ReplayPos
       post({ type: 'solveSpreadsResult', id: message.id, entries: [...solved.entries()] });
       return;
     }
+    if (message.type === 'rolledCopy') {
+      post({ type: 'rolledCopyResult', id: message.id, outcome: playRolledCopy(message.job) });
+      return;
+    }
     post({ type: 'reconstructResult', id: message.id, outcome: await reconstruct(message.job, message.id, post) });
   } catch (error) {
     post({ type: 'replayError', id: message.id, message: error instanceof Error ? error.message : String(error) });
   }
+}
+
+/** Round 86 (T304): the copy of the turn with the roll's die turned over; null where the log shows no such miss. */
+function playRolledCopy(job: RolledCopyJob): RolledCopyOutcome | null {
+  const copy = rolledCopy({ position: job.position, replayLog: job.replayLog, turn: job.turn, roll: job.roll });
+  return copy ? { serialized: copy.serialized, stage: copy.stage, terminal: copy.terminal } : null;
 }
 
 /** The boundaries (and, when the job asks, the open replacement requests) the replay hands out as messages. A broken one is a gap for the caller, never a failed job. */
