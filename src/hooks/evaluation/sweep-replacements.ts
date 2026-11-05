@@ -11,8 +11,8 @@ import { aborted, isCancelled, type SweepEnv } from './sweep-types';
  * card is a silent gap: the turns, the report and the verdicts never read this stage.
  */
 
-/** The in-memory entry, else the persisted one (the run's prefetch, or one read when no prefetch could run). */
-async function loadReplacementResult(
+/** The in-memory entry, else the persisted one (the run's prefetch, or one read when no prefetch could run). Round 86 (T304): the copy's evaluation reads it too. */
+export async function loadCachedResult(
   env: SweepEnv, engine: TurnEvalSettings, key: string, storeKey: string,
 ): Promise<'abort' | EvalResult | null> {
   const memory = env.cacheRef.current.get(key);
@@ -60,7 +60,7 @@ async function replacementOf(env: SweepEnv, round: ReplacementRound): Promise<'a
   if (!replacementKeyFor || !engine || round.turn >= env.params.turns) return null;
   const key = replacementKeyFor(round.turn, round.ordinal);
   const storeKey = evalStoreKey(key, engine.depth, engine.samples, engine.mode, env.params.tera);
-  const cached = await loadReplacementResult(env, engine, key, storeKey);
+  const cached = await loadCachedResult(env, engine, key, storeKey);
   if (cached === 'abort') return 'abort';
   const result = cached ?? await searchReplacement(env, round, engine, key, storeKey);
   if (result === 'abort') return 'abort';

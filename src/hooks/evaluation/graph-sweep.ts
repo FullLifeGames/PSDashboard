@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import {
-  type TurnSensitivity, type TurnVerification, type LeadEvalData, type ReplacementEvalData, type PlayedTurn, perfReport, perfReset,
+  type TurnSensitivity, type TurnVerification, type LeadEvalData, type ReplacementEvalData, type PlayedTurn, type RollFlip, perfReport, perfReset,
   perfSpan, selectKeyTurns, type EvalPreferences, type EvalResult, type EvalSettings, teraKey,
 } from '@fulllifegames/eval-engine';
 import { EvalWorkerClient, type AppEvalSettings } from '../../lib/eval/worker-client';
@@ -10,6 +10,7 @@ import type { CachedEval } from './single-eval';
 import type { GraphSweepParams, SweepData, SweepEnv, SweepSettings } from './sweep-types';
 import { sweepTurns } from './sweep-core';
 import { evaluateReplacements } from './sweep-replacements';
+import { evaluateRolledCopy } from './sweep-rolled';
 import { coverageNotice, makePositionSource } from './sweep-positions';
 
 export type { GraphSweepParams } from './sweep-types';
@@ -59,6 +60,11 @@ export interface EvalGraphState {
    */
   replacements?: (ReplacementEvalData[] | null)[];
   /**
+   * Round 86 (T304): the engine's score (p1's view) of the next root with the game's biggest roll's die turned over, played by the
+   * sweep's last stage. Null = no named roll or no copy; absent = no full sweep ran.
+   */
+  rollFlip?: RollFlip | null;
+  /**
    * Why the line is short, when it is: the single-pass acquisition only
    * reached part of the game (a diverging reconstruction). Silence here
    * used to leave the panel showing an unexplained empty graph.
@@ -74,7 +80,7 @@ export interface EvalGraphState {
 }
 
 /** The persisted-between-sweeps slice of the graph state (range sweeps merge into it). */
-export type GraphData = Pick<EvalGraphState, 'scores' | 'results' | 'settings' | 'faintedFractions' | 'played' | 'playedOutcome' | 'verified' | 'sensitivity' | 'evalErrors' | 'lead' | 'replacements'>;
+export type GraphData = Pick<EvalGraphState, 'scores' | 'results' | 'settings' | 'faintedFractions' | 'played' | 'playedOutcome' | 'verified' | 'sensitivity' | 'evalErrors' | 'lead' | 'replacements' | 'rollFlip'>;
 
 const emptyGraphState = (): EvalGraphState => ({
   scores: [], results: [], settings: [], faintedFractions: [], played: [], playedOutcome: [], verified: [], sensitivity: [], evalErrors: [], lead: null, replacements: [],
@@ -104,6 +110,7 @@ function buildSweepData(params: GraphSweepParams, previous: GraphData | null): S
     evalErrors: carriedArray(keptSized(previous?.evalErrors), params.turns),
     lead: keepPrevious ? previous.lead : null,
     replacements: carriedArray(keptSized(previous?.replacements), params.turns),
+    rollFlip: keepPrevious ? previous.rollFlip ?? null : null,
     notice: null,
   };
 }
@@ -182,13 +189,13 @@ async function evaluateLead(
   return true;
 }
 
-/** The stages after the turn passes: the lead, then the replacement points. false = aborted. */
+/** The stages after the turn passes: the lead, the replacement points, then the biggest roll played the other way. false = aborted. */
 async function evaluateEnd(
   env: SweepEnv,
   sweep: { depth: EvalSettings['depth']; samples: EvalSettings['samples']; mode: EvalPreferences['mode'] },
   paintFinal: (running: boolean) => void,
 ): Promise<boolean> {
-  return (await evaluateLead(env, sweep, paintFinal)) && (await evaluateReplacements(env, paintFinal));
+  return (await evaluateLead(env, sweep, paintFinal)) && (await evaluateReplacements(env, paintFinal)) && (await evaluateRolledCopy(env));
 }
 
 /**
@@ -299,7 +306,7 @@ export function useGraphSweepRunner(env: {
         scores: [...data.scores], results: [...data.results], settings: [...data.turnSettings],
         faintedFractions: [...data.faintedFractions], played: [...data.played],
         playedOutcome: [...data.playedOutcome], verified: [...data.verified], sensitivity: [...data.sensitivity],
-        evalErrors: [...data.evalErrors], lead: data.lead, replacements: [...data.replacements],
+        evalErrors: [...data.evalErrors], lead: data.lead, replacements: [...data.replacements], rollFlip: data.rollFlip,
         notice: data.notice,
       };
       graphDataRef.current = out;
