@@ -229,3 +229,26 @@ describe.each([...RESOLVED, ...RESIDUALS].map(row => [key(row), row] as const))(
     expect(lines).toEqual(emittedBlock(built.battleLog, row.turn));
   });
 });
+
+/**
+ * Round 86 (B4b, the phantom procs): smogtours-gen8ou-573756 built from the log alone gives Clefable its first ability, Cute Charm, and
+ * Conscripts (a Toxapex) hits it with Knock Off on turn 1. The log shows no Attract. The forced turn answered only the dice the log shows,
+ * so the hidden dice of seed 0 said yes to the 30 percent proc and Conscripts carried `attract` from turn 2 to turn 10. The app's own
+ * build (a Smogon set with Magic Guard) never meets that die; a build from the log alone, as the engine package's helpers use, does.
+ */
+describe('a proc the log does not show: 573756 built from the log alone', () => {
+  let naked: Rebuilt;
+  beforeAll(async () => { naked = await rebuild('smogtours-gen8ou-573756', { naked: true }); }, 120_000);
+
+  test('no turn of the rebuild shows Cute Charm or an Attract the log lacks', () => {
+    const shown = (lines: readonly string[]) => lines.filter(line => /Cute Charm|Attract/.test(line));
+    const logged = [...naked.records.keys()].flatMap(turn => naked.logBlock(turn));
+    expect(shown(logged), 'the log has no infatuation').toEqual([]);
+    expect(shown(naked.battleLog)).toEqual([]);
+  });
+
+  test('Conscripts carries no attract at the start of any turn', () => {
+    const carrying = [...naked.positions.entries()].filter(([, serialized]) => serialized.includes('"attract"')).map(([turn]) => turn);
+    expect(carrying).toEqual([]);
+  });
+});

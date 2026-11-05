@@ -2,7 +2,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  getBranchSimulatorFormat, parseReplayLog, parseReplayLogWithObservations, replayBringOnly, type ReplayData,
+  buildTeamsFromReplay, getBranchSimulatorFormat, parseReplayLog, parseReplayLogWithObservations, replayBringOnly, type ReplayData,
 } from '@fulllifegames/replay-core';
 import { buildChoiceLockContext, reconstructBranchRuntime, serializeLiveBattle, loadSimMods } from '@fulllifegames/eval-engine';
 import type { TurnAlignmentRecord } from '@fulllifegames/eval-engine';
@@ -54,11 +54,14 @@ export interface Rebuilt {
 }
 
 /** Rebuilds a fixture like the app: teams as the bank builds them, the 16-seed (or later the forced) reconstruction, boundaries captured. */
-export async function rebuild(id: FixtureId): Promise<Rebuilt> {
+export async function rebuild(id: FixtureId, options: { naked?: boolean } = {}): Promise<Rebuilt> {
   const replay = JSON.parse(readFileSync(join('test', 'e2e-feedback', 'fixtures', `${id}.json`), 'utf-8')) as Fixture;
   await loadSimMods(getBranchSimulatorFormat(replay));
   const parsed = parseReplayLogWithObservations(replay.log);
-  const built = await bankTeamsFor({ log: replay.log, formatId: replay.formatid ?? id, parsed, fetcher: pinnedFetcher });
+  // Round 86 (B4b): `naked` builds the teams from the log alone, with no Smogon data (the engine package's test helper does the same), so a species keeps its first ability
+  const built = options.naked
+    ? { teams: buildTeamsFromReplay(replay.log, { observations: parsed.observations, speedOrders: parsed.speedOrders }), reason: 'no teams' }
+    : await bankTeamsFor({ log: replay.log, formatId: replay.formatid ?? id, parsed, fetcher: pinnedFetcher });
   if (!built.teams) throw new Error(`${id}: no teams (${built.reason})`);
   const { p1Team, p2Team } = built.teams;
   const { snapshots, observations } = parsed;
