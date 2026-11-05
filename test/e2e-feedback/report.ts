@@ -41,6 +41,7 @@ export function renderReport(results: ClaimResult[], meta: DriftMeta): { markdow
     lines.push(`- Hax alignment: ${alignments.map(([id, summary]) =>
       `${id} perfect ${summary!.perfectTurns}/${summary!.turns} · soft ${summary!.softResidual}` +
       `${summary!.faintResidualTurns > 0 ? ` · faint-residual ${summary!.faintResidualTurns}` : ''}` +
+      `${(summary!.seededTurns ?? 0) > 0 ? ` · seeded ${summary!.seededTurns}` : ''}` +
       `${(summary!.fallbackTurns ?? 0) > 0 ? ` · fallback ${summary!.fallbackTurns}` : ''}` +
       `${summary!.endedMismatches > 0 ? ` · ended-mismatch ${summary!.endedMismatches}` : ''}`,
     ).join(' · ')}`);

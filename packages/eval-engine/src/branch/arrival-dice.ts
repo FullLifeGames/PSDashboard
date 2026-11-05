@@ -154,11 +154,12 @@ function arrivalRolls(
     const choices = { p1: p1Choice, p2: p2Choice };
     const bench = protocolBenchOf(replayLog, lines, block.turn);
     // the faint step the rebuild took for this block (same function, same position, same seed), then the draws of that turn
-    const { dice } = faintStep({
+    const { dice, seed } = faintStep({
       battle, expected: forced.expectedEvents, seed: forced.seedChoice.seed, choices, lines, forced: forced.alignForced, bench,
     }, forcedTurnDice(battle, lines, choices));
-    const logged = dice && recordForcedRolls(battle, dice, forced.seedChoice.seed, p1Choice, p2Choice, forced.alignForced, bench);
-    if (logged) return { block: forced, logged };
+    // Round 86 (ruling C2): the seed the step found for the dice no `DieKind` names is the seed the rebuild played the turn under
+    const logged = dice && recordForcedRolls(battle, dice, seed, p1Choice, p2Choice, forced.alignForced, bench);
+    if (logged) return { block: seed === forced.seedChoice.seed ? forced : { ...forced, seedChoice: { ...forced.seedChoice, seed } }, logged };
   } catch {
     // an odd state: the search below reads the block as before
   }

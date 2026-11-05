@@ -241,10 +241,17 @@ async function playBlock(
   const choices = { p1: p1Choice, p2: p2Choice };
   const logged = forcedTurnDiceOrNull(battle, lines, choices);
   // Round 86 (the faint step, T306): the damage roll of the hits that decide a faint or a die the log shows; null sends the block to the seed search
-  const dice = logged && faintStep({
+  const step = logged && faintStep({
     battle, expected: aligned.expectedEvents, seed: aligned.seedChoice.seed, choices, lines, forced: aligned.alignForced,
     bench: protocolBenchOf(session.params.replayLog, lines, turnBeforeChoice),
-  }, logged).dice;
+  }, logged);
+  const dice = step && step.dice;
+  // Round 86 (ruling C2, the hybrid): a turn that still missed the log under seed 0 plays under the seed the step found for the dice no `DieKind` names
+  if (dice && step.seed !== aligned.seedChoice.seed) {
+    aligned = { ...aligned, seedChoice: { ...aligned.seedChoice, seed: step.seed } };
+    battle.resetRNG(step.seed);
+    simLogStart = battle.log.length;
+  }
   if (!dice || !(await commitMainChoices(session, turnBeforeChoice, p1Choice, p2Choice, dice))) {
     aligned = chooseBlockSeed(session, battle, turnBlock, p1Choice, p2Choice);
     battle.resetRNG(aligned.seedChoice.seed);

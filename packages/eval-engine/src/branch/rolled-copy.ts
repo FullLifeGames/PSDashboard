@@ -121,7 +121,7 @@ export function rolledCopy({ position, replayLog, turn, flip: key, roll }: Rolle
     const lines = [...block.preUpkeep, ...block.postUpkeep];
     const aligned = forcedBlock(battle, block);
     const bench = protocolBenchOf(log, lines, turn);
-    const { dice } = faintStep({
+    const { dice, seed: playSeed } = faintStep({
       battle, expected: aligned.expectedEvents, seed, choices, lines, forced: aligned.alignForced, bench,
     }, forcedTurnDice(battle, lines, choices));
     // a turn the forced path cannot play (it ends a game the log goes on past) has no copy either
@@ -130,7 +130,8 @@ export function rolledCopy({ position, replayLog, turn, flip: key, roll }: Rolle
     if (flip === null) return null;
     const played = flip === undefined ? dice : turnedOver(dice, flip);
     if (!played) return null;
-    const copy = forkBattle({ serialized: position }, seed);
+    // Round 86 (ruling C2): the copy plays under the seed the rebuild found for the dice no `DieKind` names
+    const copy = forkBattle({ serialized: position }, playSeed);
     const start = copy.log.length;
     playBlockOnCopy({ copy, dice: played, choices, forced: aligned.alignForced, bench, stopAtRequest: true });
     return { ...standingOf(copy as SimBattle, copy.log.slice(start)), ...(flip !== undefined ? { flip } : {}) };

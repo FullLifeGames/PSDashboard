@@ -148,6 +148,14 @@ describe('the counts of the drift line', () => {
     expect({ singles: byType('singles'), doubles: byType('doubles'), vgc: byType('vgc'), total: imperfect.length }).toEqual({ singles: 4, doubles: 5, vgc: 4, total: 13 });
   });
 
+  // Round 86 (ruling C2): the turns the hybrid search plays under another seed than index 0
+  // 2630685175 turn 3 is a named residual (the aim of a charge move sits in |-anim|): the search keeps the seed whose unnamed dice fit best and the row stays imperfect
+  test('the seeded turns of the twelve replays: only 2630685175 turn 3, still a named residual', () => {
+    const seeded = FIXTURES.flatMap(({ id }) => [...rebuilt.get(id)!.records.values()].filter(record => record.via === 'forced' && record.seed !== '1,2,3,4').map(record => `${key({ id, turn: record.turn })} ${record.seed}`));
+    expect(seeded).toEqual([`${key({ id: 'gen9vgc2026regi-2630685175', turn: 3 })} 2,4,6,8`]);
+    expect(isPerfectAlignment(recordOf({ id: 'gen9vgc2026regi-2630685175', turn: 3 }).actual)).toBe(false);
+  });
+
   // ruling Q2: a forced turn that ends a game the log goes on past is no reading of the log; the block falls back to the seed search
   test('the fallback turns of the twelve replays: only 2630685175 turn 9, and the records say so', () => {
     const fallbacks = FIXTURES.flatMap(({ id }) => [...rebuilt.get(id)!.records.values()].filter(record => record.via === 'fallback').map(record => key({ id, turn: record.turn })));
@@ -202,11 +210,13 @@ describe.each([...RESOLVED, ...RESIDUALS].map(row => [key(row), row] as const))(
     const logged = loggedDiceAt(live, built.replay.log);
     const aligned = forcedBlock(live as never, block as never);
     // the faint step's dice, as the rebuild plays them; null is the fallback, whose block the seed search emits
-    const { dice } = faintStep({ battle: live, expected: aligned.expectedEvents, seed: aligned.seedChoice.seed, choices, forced, bench: protocolBenchOf(built.replay.log, [...block.preUpkeep, ...block.postUpkeep], row.turn) }, logged);
+    const { dice, seed } = faintStep({ battle: live, expected: aligned.expectedEvents, seed: aligned.seedChoice.seed, choices, forced, bench: protocolBenchOf(built.replay.log, [...block.preUpkeep, ...block.postUpkeep], row.turn) }, logged);
     if (!dice) {
       expect(recordOf(row).via, key(row)).toBe('fallback');
       return;
     }
+    // Round 86 (ruling C2): the seed the faint step found for the dice no `DieKind` names, the seed the rebuild plays the turn under
+    if (seed !== aligned.seedChoice.seed) live.resetRNG(seed);
     const start = live.log.length;
     playForcedTurn({
       live, forced: dice,

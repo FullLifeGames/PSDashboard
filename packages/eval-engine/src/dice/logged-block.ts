@@ -7,7 +7,9 @@ import { serializeBattleStable } from '../forward-model.ts';
 import { forkBattle } from '../forward/position.ts';
 import { submittableChoice } from '../forward/request-moves.ts';
 import { applyChoice } from '../forward/switches.ts';
-import { extractProtocolEvents, isPerfectAlignment, scoreAlignment, type ProtocolEvents } from '../hax-alignment.ts';
+import {
+  ALIGNMENT_SEEDS, compareAlignment, extractProtocolEvents, isPerfectAlignment, scoreAlignment, type AlignmentScore, type ProtocolEvents,
+} from '../hax-alignment.ts';
 import { loggedDice } from './logged-results.ts';
 import { playForcedTurn, type ForcedTurnInput } from './play.ts';
 import { quietProcs } from './phantom-procs.ts';
@@ -166,8 +168,11 @@ export interface BlockQuery {
   bench?: (side: 'p1' | 'p2') => ProtocolBench | undefined;
 }
 
-/** `dice` null: the forced turn ends a game the log goes on past, and the seed search takes the block. `quiet`: the proc dice added to the list. */
-export interface FaintStepResult { dice: ForcedDie[] | null; plays: number; quiet: number }
+/**
+ * `dice` null: the forced turn ends a game the log goes on past, and the seed search takes the block. `quiet`: the proc dice added to the list.
+ * `seed`: the hidden dice the list plays under; the query's seed unless the hybrid search (ruling C2) found another that fits the log better.
+ */
+export interface FaintStepResult { dice: ForcedDie[] | null; plays: number; quiet: number; seed: PRNGSeed }
 
 /** The damage rolls the forced turn drew, by die key: the name and the raw value of the first draw. */
 type Rolls = Map<string, { name: DieName; value: number }>;
@@ -175,9 +180,9 @@ type Rolls = Map<string, { name: DieName; value: number }>;
 interface Trial { events: ProtocolEvents; rolls: Rolls; procs: Map<string, DieName>; reports: DieReport[]; log: readonly string[] }
 
 /** One play of the whole block with a list of dice on a fork of the position; null where the copy cannot play it. */
-function trialOf(checkpoint: string, query: BlockQuery, dice: readonly ForcedDie[]): Trial | null {
+function trialOf(checkpoint: string, query: BlockQuery, dice: readonly ForcedDie[], seed: PRNGSeed = query.seed): Trial | null {
   try {
-    const copy = forkBattle({ serialized: checkpoint }, query.seed);
+    const copy = forkBattle({ serialized: checkpoint }, seed);
     const start = copy.log.length;
     const rolls: Rolls = new Map();
     const procs = new Map<string, DieName>();
@@ -259,6 +264,33 @@ function targetsOf(trial: Trial, expected: ProtocolEvents, bySlot: ReadonlyMap<s
   return { up, down };
 }
 
+/** One seed's turn: the list of dice with the phantom procs added, the trial that list plays, and what it cost. */
+interface Settled { dice: readonly ForcedDie[]; trial: Trial | null; plays: number; quiet: number }
+
+/**
+ * Round 86 (T306, the phantom procs): a proc die the forced turn drew and the log does not show is forced not to happen, and the turn is
+ * played again (a proc that stays away can let a body act that the proc stopped, and that body's hit draws its own procs: at most three
+ * passes). A proc die belongs to the hidden dice of a seed, so every seed of the hybrid search settles its own.
+ */
+function settle(checkpoint: string, query: BlockQuery, seed: PRNGSeed, forced: readonly ForcedDie[]): Settled {
+  let dice = forced;
+  let trial = trialOf(checkpoint, query, dice, seed);
+  let plays = 1;
+  let quiet = 0;
+  for (let pass = 0; pass < 3 && trial && query.lines; pass++) {
+    const added = quietProcs(trial.procs, dice, query.lines);
+    if (added.length === 0) break;
+    dice = [...dice, ...added];
+    quiet += added.length;
+    trial = trialOf(checkpoint, query, dice, seed);
+    plays++;
+  }
+  return { dice, trial, plays, quiet };
+}
+
+/** What the faint step keeps while it searches: the list of dice, the seed it plays under, its trial and the trial's score against the log. */
+interface Best { dice: readonly ForcedDie[]; seed: PRNGSeed; trial: Trial; score: AlignmentScore }
+
 /**
  * Round 86 (the log's dice, T306, gate answer 2b with the rulings Q2 and Q3): the faint step. The log's dice leave the damage roll to the
  * hidden dice of the seed, and a roll can knock out a body the log's roll left standing, or the other way round. This plays the block on
@@ -268,34 +300,30 @@ function targetsOf(trial: Trial, expected: ProtocolEvents, bySlot: ReadonlyMap<s
  * (faints and every die). None: the forced result stays, a named residual. A forced turn that ends a game the log goes on past is no
  * residual: `dice` null sends the block to the seed search, like a turn the copy cannot play.
  *
- * One function for the rebuild and the arrival, so both find the same steps. At most one play of the forced turn, up to three more for the phantom procs, and fifteen of the steps.
+ * Round 86 (ruling C2, the hybrid): a turn that is still imperfect after the steps plays under seeds 1 to 15 of `ALIGNMENT_SEEDS` for the
+ * dice no `DieKind` names (a sleep duration, the lock of Outrage and its random target, the move Metronome calls), with the forced list
+ * kept, and keeps the best by (ended, faint, soft); a tie keeps the earlier seed, so seed 0 stays unless another is strictly better. The
+ * result carries the seed the rebuild and the arrival play under.
+ *
+ * One function for the rebuild and the arrival, so both find the same steps and the same seed. At most one play of the forced turn, up to
+ * three more for the phantom procs, fifteen of the steps, and for each of the fifteen seeds one play and up to three more for its procs.
  */
 export function faintStep(query: BlockQuery, forced: readonly ForcedDie[]): FaintStepResult {
   let checkpoint: string;
   try {
     checkpoint = serializeBattleStable(query.battle);
   } catch {
-    return { dice: [...forced], plays: 0, quiet: 0 };
+    return { dice: [...forced], plays: 0, quiet: 0, seed: query.seed };
   }
-  let dice = forced;
-  let base = trialOf(checkpoint, query, dice);
-  let plays = 1;
+  const first = settle(checkpoint, query, query.seed, forced);
+  let { plays } = first;
+  const { quiet } = first;
   // a block the copy cannot play stays as it is: the live write refuses it the same way and the caller's fallback takes over
-  if (!base) return { dice: [...dice], plays, quiet: 0 };
-  // Round 86 (T306, the phantom procs): a proc die the forced turn drew and the log does not show is forced not to happen, and the turn is played
-  // again (a proc that stays away can let a body act that the proc stopped, and that body's hit draws its own procs: at most three passes)
-  let quiet = 0;
-  for (let pass = 0; pass < 3 && query.lines; pass++) {
-    const added = quietProcs(base.procs, dice, query.lines);
-    if (added.length === 0) break;
-    dice = [...dice, ...added];
-    quiet += added.length;
-    const again = trialOf(checkpoint, query, dice);
-    plays++;
-    if (!again) return { dice: [...dice], plays, quiet };
-    base = again;
-  }
-  if (isPerfectAlignment(scoreAlignment(query.expected, base.events))) return { dice: [...dice], plays, quiet };
+  if (!first.trial) return { dice: [...first.dice], plays, quiet, seed: query.seed };
+  const base = first.trial;
+  const { dice } = first;
+  let best: Best = { dice, seed: query.seed, trial: base, score: scoreAlignment(query.expected, base.events) };
+  if (isPerfectAlignment(best.score)) return { dice: [...dice], plays, quiet, seed: query.seed };
   const bySlot = identsBySlot(query.battle, base.log);
   const hits = hitsOn(base, targetsOf(base, query.expected, bySlot), bySlot, query.battle.gen);
   const longest = Math.max(0, ...hits.map(hit => hit.order.length));
@@ -307,8 +335,18 @@ export function faintStep(query: BlockQuery, forced: readonly ForcedDie[]): Fain
     ];
     plays++;
     const trial = trialOf(checkpoint, query, next);
-    if (trial && isPerfectAlignment(scoreAlignment(query.expected, trial.events))) return { dice: next, plays, quiet };
+    if (trial && isPerfectAlignment(scoreAlignment(query.expected, trial.events))) return { dice: next, plays, quiet, seed: query.seed };
   }
-  const endsEarly = base.events.ended && !query.expected.ended;
-  return { dice: endsEarly ? null : [...dice], plays, quiet };
+  for (const seed of ALIGNMENT_SEEDS) {
+    if (seed === query.seed) continue;
+    const settled = settle(checkpoint, query, seed, dice);
+    plays += settled.plays;
+    if (!settled.trial) continue;
+    const score = scoreAlignment(query.expected, settled.trial.events);
+    if (compareAlignment(score, best.score) >= 0) continue;
+    best = { dice: settled.dice, seed, trial: settled.trial, score };
+    if (isPerfectAlignment(score)) break;
+  }
+  const endsEarly = best.trial.events.ended && !query.expected.ended;
+  return { dice: endsEarly ? null : [...best.dice], plays, quiet: best.dice.length - forced.length, seed: best.seed };
 }
