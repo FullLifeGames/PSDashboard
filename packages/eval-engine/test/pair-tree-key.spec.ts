@@ -96,8 +96,13 @@ describe('(b) the key of a keyed draw is the sampler\'s class key', () => {
       for (let iteration = 0; iteration < 40; iteration++) {
         const drawn = keyedAdvance(owner, root, cellKey(0, 0), p1, p2, treeSeed(iteration, 1), false);
         expect(drawn).not.toBeNull();
-        expect(drawn!.classKey).not.toBeNull();
-        seen.add(drawn!.classKey!);
+        // Round 86 (T323): the hashed seeds reach a paralysed target that cannot move on the same turn (a read the pair plan
+        // falls back on, `cant:par`), which the five lattice seeds never drew in forty iterations: such a draw books no key.
+        if (drawn!.classKey === null) {
+          expect(drawn!.log.some(line => line.startsWith('|cant|')), `iteration ${iteration}`).toBe(true);
+          continue;
+        }
+        seen.add(drawn!.classKey);
       }
       expect(blend.classes.map(cls => cls.key)).toEqual(expect.arrayContaining([...seen]));
       // the die that names the board shows: some seed of the forty draws the effect (or the miss)

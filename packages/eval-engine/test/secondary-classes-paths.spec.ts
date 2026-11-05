@@ -305,7 +305,8 @@ describe('scene: a singles cell with a flinching first mover', () => {
       const j = stats.p2Options.findIndex(option => option.choice === WATERFALL.p2);
       const cell = stats.cells.find(entry => entry.key === cellKey(i, j))!;
       const drawn = new Set<string>();
-      for (let iteration = 0; iteration < SEARCH_SEEDS.length; iteration++) {
+      // Round 86 (T323): the seed hashes (offset, iteration), so the cell's draw is one of the first iterations' seeds
+      for (let iteration = 0; iteration < 40; iteration++) {
         drawn.add(waterfallKey(advancePositionWithLog(root, WATERFALL.p1, WATERFALL.p2, treeSeed(iteration, offset)).log, true));
       }
       expect([...drawn], `offset ${offset}: the tree's class ${cell.classKey}`).toContain(cell.classKey);
