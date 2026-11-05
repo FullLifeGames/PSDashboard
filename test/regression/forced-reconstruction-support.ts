@@ -9,6 +9,7 @@ import type { TurnAlignmentRecord } from '@fulllifegames/eval-engine';
 import { extractProtocolEvents, type ProtocolEvents } from '../../packages/eval-engine/src/hax-alignment';
 import { parseTurnBlocks } from '../../packages/eval-engine/src/branch/protocol-choices';
 import { bankTeamsFor } from './bank-build';
+import { diskCachedSmogonFetcher } from './smogon-fetch-cache';
 
 /**
  * Round 86 (the engine reads the dice), lane B, step B2: the twelve feedback fixtures rebuilt the way the bank builds them (pinned
@@ -54,14 +55,15 @@ export interface Rebuilt {
 }
 
 /** Rebuilds a fixture like the app: teams as the bank builds them, the 16-seed (or later the forced) reconstruction, boundaries captured. */
-export async function rebuild(id: FixtureId, options: { naked?: boolean } = {}): Promise<Rebuilt> {
-  const replay = JSON.parse(readFileSync(join('test', 'e2e-feedback', 'fixtures', `${id}.json`), 'utf-8')) as Fixture;
+export async function rebuild(id: string, options: { naked?: boolean; corpus?: boolean } = {}): Promise<Rebuilt> {
+  // Round 86 (B9): `corpus` reads a replay of the local fit corpus (the bank's replays) with the disk-cached Smogon data the bank pins
+  const replay = JSON.parse(readFileSync(options.corpus ? join('.fit-corpus', `${id}.json`) : join('test', 'e2e-feedback', 'fixtures', `${id}.json`), 'utf-8')) as Fixture;
   await loadSimMods(getBranchSimulatorFormat(replay));
   const parsed = parseReplayLogWithObservations(replay.log);
   // Round 86 (B4b): `naked` builds the teams from the log alone, with no Smogon data (the engine package's test helper does the same), so a species keeps its first ability
   const built = options.naked
     ? { teams: buildTeamsFromReplay(replay.log, { observations: parsed.observations, speedOrders: parsed.speedOrders }), reason: 'no teams' }
-    : await bankTeamsFor({ log: replay.log, formatId: replay.formatid ?? id, parsed, fetcher: pinnedFetcher });
+    : await bankTeamsFor({ log: replay.log, formatId: replay.formatid ?? id, parsed, fetcher: options.corpus ? diskCachedSmogonFetcher() : pinnedFetcher });
   if (!built.teams) throw new Error(`${id}: no teams (${built.reason})`);
   const { p1Team, p2Team } = built.teams;
   const { snapshots, observations } = parsed;

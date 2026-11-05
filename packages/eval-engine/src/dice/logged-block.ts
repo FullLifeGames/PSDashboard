@@ -289,7 +289,7 @@ function settle(checkpoint: string, query: BlockQuery, seed: PRNGSeed, forced: r
 }
 
 /** What the faint step keeps while it searches: the list of dice, the seed it plays under, its trial and the trial's score against the log. */
-interface Best { dice: readonly ForcedDie[]; seed: PRNGSeed; trial: Trial; score: AlignmentScore }
+interface Best { dice: readonly ForcedDie[]; seed: PRNGSeed; trial: Trial; score: AlignmentScore; quiet: number }
 
 /**
  * Round 86 (the log's dice, T306, gate answer 2b with the rulings Q2 and Q3): the faint step. The log's dice leave the damage roll to the
@@ -297,7 +297,8 @@ interface Best { dice: readonly ForcedDie[]; seed: PRNGSeed; trial: Trial; score
  * copies, with the same parts the rebuild plays: when the forced turn is the log's turn (a perfect score) the list stays. When a faint
  * differs, or a die the log shows could not land (a burn on a body the simulator's roll knocked out first), it forces the damage roll of
  * the hits on those bodies, from the natural step in the direction the log's faint asks for, and keeps the first set of steps under which the turn is the log's turn
- * (faints and every die). None: the forced result stays, a named residual. A forced turn that ends a game the log goes on past is no
+ * (faints and every die). Round 86 (ruling C1): without such a set, the first one that gives the log's faints and no ended mismatch with no more soft
+ * mismatches than the natural turn has stands; one that misses a logged faint never does. None: the forced result stays, a named residual. A forced turn that ends a game the log goes on past is no
  * residual: `dice` null sends the block to the seed search, like a turn the copy cannot play.
  *
  * Round 86 (ruling C2, the hybrid): a turn that is still imperfect after the steps plays under seeds 1 to 15 of `ALIGNMENT_SEEDS` for the
@@ -316,37 +317,65 @@ export function faintStep(query: BlockQuery, forced: readonly ForcedDie[]): Fain
     return { dice: [...forced], plays: 0, quiet: 0, seed: query.seed };
   }
   const first = settle(checkpoint, query, query.seed, forced);
-  let { plays } = first;
-  const { quiet } = first;
   // a block the copy cannot play stays as it is: the live write refuses it the same way and the caller's fallback takes over
-  if (!first.trial) return { dice: [...first.dice], plays, quiet, seed: query.seed };
-  const base = first.trial;
-  const { dice } = first;
-  let best: Best = { dice, seed: query.seed, trial: base, score: scoreAlignment(query.expected, base.events) };
-  if (isPerfectAlignment(best.score)) return { dice: [...dice], plays, quiet, seed: query.seed };
-  const bySlot = identsBySlot(query.battle, base.log);
-  const hits = hitsOn(base, targetsOf(base, query.expected, bySlot), bySlot, query.battle.gen);
+  if (!first.trial) return { dice: [...first.dice], plays: first.plays, quiet: first.quiet, seed: query.seed };
+  let best: Best = { dice: first.dice, seed: query.seed, trial: first.trial, score: scoreAlignment(query.expected, first.trial.events), quiet: first.quiet };
+  const result = (dice: readonly ForcedDie[] | null, plays: number, from: Best): FaintStepResult => ({ dice: dice && [...dice], plays, quiet: from.quiet, seed: from.seed });
+  if (isPerfectAlignment(best.score)) return result(best.dice, first.plays, best);
+  const steps = stepSets(checkpoint, query, best);
+  let plays = first.plays + steps.plays;
+  if (steps.perfect) return result(steps.perfect.dice, plays, steps.perfect);
+  if (steps.accepted && compareAlignment(steps.accepted.score, best.score) < 0) best = steps.accepted;
+  const searched = seedSearch(checkpoint, query, best);
+  plays += searched.plays;
+  best = searched.best;
+  const endsEarly = best.trial.events.ended && !query.expected.ended;
+  return result(endsEarly ? null : best.dice, plays, best);
+}
+
+/**
+ * The faint step's roll steps on the seed of the query: the forced damage roll of the hits on the bodies of the mismatch, each set tried in turn.
+ * Round 86 (ruling C1): a set also stands when it is no perfect turn but gives the log's faints, no ended mismatch and no more soft
+ * mismatches than the natural turn has (a soft mismatch no die mends, a body that acts in another order, must not cost the faint). The first
+ * such set (`accepted`) stays unless a later one is perfect (`perfect`, which ends the search); a set that misses a logged faint is never taken.
+ */
+function stepSets(checkpoint: string, query: BlockQuery, natural: Best): { perfect: Best | null; accepted: Best | null; plays: number } {
+  const bySlot = identsBySlot(query.battle, natural.trial.log);
+  const hits = hitsOn(natural.trial, targetsOf(natural.trial, query.expected, bySlot), bySlot, query.battle.gen);
   const longest = Math.max(0, ...hits.map(hit => hit.order.length));
   const keys = new Set(hits.map(hit => dieKey(hit.name)));
+  let accepted: Best | null = null;
+  let plays = 0;
   for (let index = 1; index < longest; index++) {
     const next = [
-      ...dice.filter(die => !keys.has(dieKey(die.name))),
+      ...natural.dice.filter(die => !keys.has(dieKey(die.name))),
       ...hits.map((hit): ForcedDie => ({ name: hit.name, result: { step: hit.order[Math.min(index, hit.order.length - 1)] } })),
     ];
     plays++;
     const trial = trialOf(checkpoint, query, next);
-    if (trial && isPerfectAlignment(scoreAlignment(query.expected, trial.events))) return { dice: next, plays, quiet, seed: query.seed };
+    if (!trial) continue;
+    const score = scoreAlignment(query.expected, trial.events);
+    const found: Best = { dice: next, seed: query.seed, trial, score, quiet: natural.quiet };
+    if (isPerfectAlignment(score)) return { perfect: found, accepted, plays };
+    const fits = !score.endedMismatch && score.faintMismatches === 0 && score.softMismatches <= natural.score.softMismatches;
+    if (fits && !accepted) accepted = found;
   }
+  return { perfect: null, accepted, plays };
+}
+
+/** Round 86 (ruling C2): seeds 1 to 15 for the dice no `DieKind` names, each with its own phantom procs; the strictly better score replaces, the first perfect one ends the search. */
+function seedSearch(checkpoint: string, query: BlockQuery, from: Best): { best: Best; plays: number } {
+  let best = from;
+  let plays = 0;
   for (const seed of ALIGNMENT_SEEDS) {
     if (seed === query.seed) continue;
-    const settled = settle(checkpoint, query, seed, dice);
+    const settled = settle(checkpoint, query, seed, from.dice);
     plays += settled.plays;
     if (!settled.trial) continue;
     const score = scoreAlignment(query.expected, settled.trial.events);
     if (compareAlignment(score, best.score) >= 0) continue;
-    best = { dice: settled.dice, seed, trial: settled.trial, score };
+    best = { dice: settled.dice, seed, trial: settled.trial, score, quiet: from.quiet + settled.quiet };
     if (isPerfectAlignment(score)) break;
   }
-  const endsEarly = best.trial.events.ended && !query.expected.ended;
-  return { dice: endsEarly ? null : [...best.dice], plays, quiet: best.dice.length - forced.length, seed: best.seed };
+  return { best, plays };
 }

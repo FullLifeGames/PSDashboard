@@ -91,4 +91,23 @@ describe.each(SWEEP_CASES)('the faint step finds the roll that gives the knockou
       expect(isPerfectAlignment(scoreAlignment(expected, events(hitPoints, result.dice!, seed))), `${rules.name} seed ${seed}`).toBe(true);
     }
   });
+  // Round 86 (ruling C1): the log's turn also holds a soft mismatch no die mends (here a flinch the log shows and the simulator never plays).
+  // No step set is perfect then, but the one that gives the log's faint stands, and the seed search that follows finds nothing strictly better.
+  test.each([
+    { direction: 'the log knocks the Vaporeon out, the hidden dice leave it standing', hp: () => lost(lastStep), logStep: lastStep, naturalFaints: false },
+    { direction: 'the log leaves the Vaporeon standing, the hidden dice knock it out', hp: () => lost(0) + 1, logStep: 0, naturalFaints: true },
+  ])('with a soft mismatch no die mends: $direction', ({ hp, logStep, naturalFaints }) => {
+    const hitPoints = hp();
+    const expected = events(hitPoints, [...fixed, roll(logStep)], LOG_SEED);
+    expected.cants.set('p2:vaporeon:flinch', 1);
+    const witnesses = SEEDS.filter(seed => (events(hitPoints, fixed, seed).faints.size > 0) === naturalFaints);
+    for (const seed of witnesses) {
+      const result = faintStep({ battle: board(seed, hitPoints), expected, seed: seed as never, choices: scene.clicks }, fixed);
+      expect(result.dice, `${rules.name} seed ${seed}: the step set that gives the log's faint`).not.toBeNull();
+      expect(result.dice!.some(die => die.name.kind === 'damage-roll'), `${rules.name} seed ${seed}: a damage-roll die was added`).toBe(true);
+      expect(result.seed, `${rules.name} seed ${seed}: the seed stays, the steps fit`).toBe(seed);
+      const score = scoreAlignment(expected, events(hitPoints, result.dice!, seed));
+      expect({ faint: score.faintMismatches, ended: score.endedMismatch, soft: score.softMismatches }, `${rules.name} seed ${seed}`).toEqual({ faint: 0, ended: false, soft: 1 });
+    }
+  });
 });
