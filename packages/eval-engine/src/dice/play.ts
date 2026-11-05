@@ -8,7 +8,7 @@ import { reportOf } from './report.ts';
 import { actionOrder } from './report-turn.ts';
 import { readsStartRoll } from './start-roll.ts';
 import { probeCheck } from './status-probe.ts';
-import { dieKey, type DiceReport, type DieName, type ForcedDie, type NaturalRecord } from './types.ts';
+import { dieKey, type DiceReport, type DieName, type Draw, type ForcedDie, type NaturalRecord } from './types.ts';
 import { watchBattle } from './watch.ts';
 
 /**
@@ -36,20 +36,31 @@ export interface ForcedTurnInput {
    * stream's value). The arrival records the draws of the turn the log's dice force, so an action the user leaves as logged rolls the same.
    */
   observe?: (from: number | undefined, to: number | undefined, value: number) => void;
+  /**
+   * Round 86 (T306): told every recognized die of the real turn with the raw value the turn took. The faint step reads the damage rolls
+   * the forced turn really draws (the log's dice can add a hit the natural turn lacks) and the step each one took.
+   */
+  onDraw?: (name: DieName, value: number) => void;
 }
 
-/** The real turn's PRNG that reports each answer it gives. */
+/** The real turn's PRNG that reports each answer it gives, and each die it names. */
 class ObservedForcedPRNG extends ForcedDicePRNG {
-  private readonly observe: NonNullable<ForcedTurnInput['observe']>;
+  private readonly hooks: Pick<ForcedTurnInput, 'observe' | 'onDraw'>;
 
-  constructor(input: ConstructorParameters<typeof ForcedDicePRNG>[0], observe: NonNullable<ForcedTurnInput['observe']>) {
+  constructor(input: ConstructorParameters<typeof ForcedDicePRNG>[0], hooks: Pick<ForcedTurnInput, 'observe' | 'onDraw'>) {
     super(input);
-    this.observe = observe;
+    this.hooks = hooks;
   }
 
   override random(from?: number, to?: number): number {
     const value = super.random(from, to);
-    this.observe(from, to, value);
+    this.hooks.observe?.(from, to, value);
+    return value;
+  }
+
+  protected override decide(name: DieName, draw: Draw, natural: number): number {
+    const value = super.decide(name, draw, natural);
+    this.hooks.onDraw?.(name, value);
     return value;
   }
 }
@@ -144,8 +155,8 @@ function checkPolarities(live: Battle, forced: readonly ForcedDie[]): Map<string
   return polarities;
 }
 
-export function playForcedTurn({ live, forced, play, observe }: ForcedTurnInput): DiceReport {
-  if (forced.length === 0) {
+export function playForcedTurn({ live, forced, play, observe, onDraw }: ForcedTurnInput): DiceReport {
+  if (forced.length === 0 && !observe && !onDraw) {
     play(live);
     return { forced: [], naturalEndSeed: String(live.prng.getSeed()) };
   }
@@ -157,7 +168,7 @@ export function playForcedTurn({ live, forced, play, observe }: ForcedTurnInput)
   const scripts = learnedScripts({ live, forced, record: natural.record, play });
   const actsOnTrue = checkPolarities(live, forced);
   const input = { inner, watch, forced, record: natural.record, scripts, actsOnTrue };
-  const prng = observe ? new ObservedForcedPRNG(input, observe) : new ForcedDicePRNG(input);
+  const prng = observe || onDraw ? new ObservedForcedPRNG(input, { observe, onDraw }) : new ForcedDicePRNG(input);
   live.prng = prng;
   try {
     play(live);

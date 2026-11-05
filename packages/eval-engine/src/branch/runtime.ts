@@ -2,8 +2,8 @@ import { extractProtocolEvents, scoreAlignment } from '../hax-alignment.ts';
 import { normalizeLineEndings } from '../line-endings.ts';
 import type { BranchRuntime, SimBattle, TurnBlock } from './types.ts';
 import { getMainChoice, parseTurnBlocks } from './protocol-choices.ts';
-import { faintedSlots, logGoesOn, shownBodyIds, type ProtocolBench } from './team-order.ts';
-import { forcedTurnDiceOrNull, writeBlockPart } from '../dice/logged-block.ts';
+import { faintedSlots } from './team-order.ts';
+import { faintStep, forcedTurnDiceOrNull, protocolBenchOf, writeBlockPart } from '../dice/logged-block.ts';
 import type { ForcedDie } from '../dice/types.ts';
 import { alignArrivalDice, alignBlockSeed, forcedBlock, type AlignedBlock } from './arrival-dice.ts';
 import {
@@ -153,12 +153,7 @@ async function resolveForcedSwitches(
   const p1ForceIndex = { current: 0 };
   const p2ForceIndex = { current: 0 };
   // What the protocol says about each side's bench (T250): read once, and only when a forced switch needs it.
-  const benchCache: Partial<Record<'p1' | 'p2', ProtocolBench>> = {};
-  const protocolBench = (side: 'p1' | 'p2') =>
-    (benchCache[side] ??= {
-      shown: shownBodyIds(session.params.replayLog, side), fainted: faintedSlots(blockLines, side),
-      goesOn: logGoesOn(session.params.replayLog, turnBeforeChoice),
-    });
+  const protocolBench = protocolBenchOf(session.params.replayLog, blockLines, turnBeforeChoice);
 
   let forcedDice = dice;
   let maxIterations = 10;
@@ -243,7 +238,13 @@ async function playBlock(
   let aligned = forcedBlock(battle, turnBlock);
   battle.resetRNG(aligned.seedChoice.seed);
   let simLogStart = battle.log.length;
-  const dice = forcedTurnDiceOrNull(battle, lines, { p1: p1Choice, p2: p2Choice });
+  const choices = { p1: p1Choice, p2: p2Choice };
+  const logged = forcedTurnDiceOrNull(battle, lines, choices);
+  // Round 86 (the faint step, T306): the damage roll of the hits that decide a faint or a die the log shows; null sends the block to the seed search
+  const dice = logged && faintStep({
+    battle, expected: aligned.expectedEvents, seed: aligned.seedChoice.seed, choices, forced: aligned.alignForced,
+    bench: protocolBenchOf(session.params.replayLog, lines, turnBeforeChoice),
+  }, logged).dice;
   if (!dice || !(await commitMainChoices(session, turnBeforeChoice, p1Choice, p2Choice, dice))) {
     aligned = chooseBlockSeed(session, battle, turnBlock, p1Choice, p2Choice);
     battle.resetRNG(aligned.seedChoice.seed);

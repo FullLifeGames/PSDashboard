@@ -129,7 +129,9 @@ describe('a turn the search once missed: the logged results stand beside the use
   test(`${VGC.label}: forcing the crit of Body Press keeps the crit High Horsepower rolled in the log`, { timeout: 300000 }, async () => {
     const crit = die('p2b', 'bodypress', 'p1b', 'crit', { happens: true });
     const alone = await firstTurn(VGC, [crit], false);
-    expect(has(alone.lines, '|-crit|p2b: Zamazenta')).toBe(true);
+    // ruling Q2: the log's crit kills Zamazenta and ends the game in the simulator while the log goes on, so the block falls back to the seed search,
+    // whose turn shows no crit; the joined list below still forces both crits
+    expect(has(alone.lines, '|-crit|p2b: Zamazenta')).toBe(false);
     const joined = await firstTurn(VGC, [crit], true);
     expect(tookOf(joined.report, crit)).toBe('applied');
     expect(has(joined.lines, '|-crit|p1b: TeraTurtle')).toBe(true);

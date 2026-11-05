@@ -69,10 +69,9 @@ describe('the capture hook meets every request round of the protocol', () => {
     byKind[kind] = { rounds: (byKind[kind]?.rounds ?? 0) + rounds.length, skipped: (byKind[kind]?.skipped ?? 0) + skipped };
   });
 
-  // KNOWN until the faint step of B4 (round 86, T306): the forced turn plays the hidden damage rolls of seed index 0, and three VGC turns of this set
-  // (2630181744 turn 4, 2687970740 turn 4, 2679053861 turn 1) keep a body alive that the log knocked out, where the old seed search found a seed that
-  // knocked it out: VGC 3 of 11 skipped, bound 0.25. The faint step tries the roll steps on exactly such turns.
-  test.fails('the skip rate over the set stays under the measured bound, singles and doubles apart', () => {
+  // Round 86 (T306): the faint step repairs the VGC turns where the forced turn kept a body alive that the log knocked out (2630181744 turn 4,
+  // 2687970740 turn 4, 2679053861 turn 1: VGC 3 of 11 skipped before it, bound 0.25).
+  test('the skip rate over the set stays under the measured bound, singles and doubles apart', () => {
     expect(tally.rounds).toBeGreaterThan(0);
     for (const [kind, counts] of Object.entries(byKind)) {
       expect(counts.skipped / counts.rounds, `${kind}: ${JSON.stringify(counts)}`).toBeLessThanOrEqual(SKIP_BOUND);

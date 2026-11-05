@@ -1,8 +1,10 @@
 /* eslint-disable no-restricted-imports -- Round 86 (B2): a white-box measurement chain like eval-calibration.spec.ts: it reads the alignment reader, the turn-block parser and the first-turn helper of the engine package, none of which the barrel exports. The integrator adds this spec and its support file to the `ignores` of the root-spec zone in eslint.zones.mjs and drops this line. */
 import { beforeAll, describe, expect, test } from 'vitest';
 import { adoptSerializedRuntime } from '@fulllifegames/eval-engine';
+import { forcedBlock } from '../../packages/eval-engine/src/branch/arrival-dice';
 import { buildForcedSwitchChoice, hasForceSwitch } from '../../packages/eval-engine/src/branch/corrections';
 import { collectForcedSwitchSpecies, getMainChoice, parseTurnBlocks } from '../../packages/eval-engine/src/branch/protocol-choices';
+import { faintStep, protocolBenchOf } from '../../packages/eval-engine/src/dice/logged-block';
 import { playForcedTurn } from '../../packages/eval-engine/src/dice/play';
 import { loggedDiceAt } from '../../packages/eval-engine/src/dice/turn';
 import { forkBattle } from '../../packages/eval-engine/src/forward/position';
@@ -19,7 +21,7 @@ import { diffsOf, emittedBlock, FIXTURES, rebuild, type FixtureId, type GameType
  *
  * Rows by kind:
  * - resolved by forcing (8) and by the faint step (2), plus 648453 turn 7 (ruling Q3: a burn the simulator's damage roll blocks), perfect
- *   after B3 and B4. B3 flipped the eight of forcing to plain tests; the three of the faint step stay KNOWN (`test.fails`) until B4;
+ *   after B3 and B4. B3 flipped the eight of forcing to plain tests, B4a the three of the faint step;
  * - named residuals (12, and 2628340185 turn 13 by ruling Q4): the turn stays imperfect for a cause that is no die of the log. A row
  *   holds the cause where the base and the forced turn share it, so a later fix moves a row to the gate by failing it;
  * - guards: the two turns the base plays perfectly by seed luck and a plain forced turn breaks (2629703929 turn 10, a failed second
@@ -44,8 +46,6 @@ const BY_FAINT_STEP: Row[] = [
   { id: 'smogtours-gen6ou-649664', turn: 8 }, { id: 'gen9doublesou-2663093831', turn: 12 }, { id: 'smogtours-gen6ou-648453', turn: 7 },
 ];
 const RESOLVED = [...BY_FORCING, ...BY_FAINT_STEP];
-/** The rows that are red today: the turns the faint step resolves (B4). B3 flipped the rows of `BY_FORCING` to plain tests. */
-const KNOWN = new Set(BY_FAINT_STEP.map(key));
 
 interface Residual extends Row { cause: string; /** The diff of the emitted block against the log that the base and the forced turn share. */ stays: string | null }
 const RESIDUALS: Residual[] = [
@@ -65,13 +65,6 @@ const RESIDUALS: Residual[] = [
 ];
 /** The turns the base plays perfectly and a plain forced turn breaks: the rebuild must keep them perfect. */
 const GUARDS: Row[] = [{ id: 'gen9vgc2026regi-2629703929', turn: 10 }, { id: 'gen9doublesou-2663093831', turn: 11 }];
-/**
- * KNOWN until B4: 2663093831 turn 11 (the simulator's damage roll leaves Gouging Fire alive, steps 12 to 15 of the roll kill it: the faint step),
- * and the replay of 2630685175, where the forced crit of turn 9 kills Zamazenta and ends the game in the simulator while the log goes on (ruling
- * Q2: the fallback takes that turn), so the rebuild stops after turn 9 and the other turns of that game are one short.
- */
-const GUARD_KNOWN = new Set([key({ id: 'gen9doublesou-2663093831', turn: 11 })]);
-const ENDS_EARLY = new Set<FixtureId>(['gen9vgc2026regi-2630685175']);
 const NAMED = new Set([...RESOLVED, ...RESIDUALS, ...GUARDS].map(key));
 /** Perfect turns outside the named rows, per replay (330 of the 356 turns). */
 const OTHER_PERFECT: Record<FixtureId, number> = {
@@ -103,13 +96,11 @@ const shown = (row: Row): string => {
   const { actual } = recordOf(row);
   return `${key(row)} [${typeOf(row.id)}] seed ${recordOf(row).seed}: faint ${actual.faintMismatches}, soft ${actual.softMismatches}, ended ${actual.endedMismatch}; ${diffsOf(rebuilt.get(row.id)!, row.turn).join(' ; ')}`;
 };
-/** A KNOWN row is red until the step that resolves it: `test.fails` while the set names it, a plain test after. */
-const rowTest = (row: Row) => (KNOWN.has(key(row)) ? test.fails : test);
 
 describe.each(['singles', 'doubles', 'vgc'] as GameType[])('the rebuild plays the turn the log shows: %s', type => {
   describe('resolved by forcing the logged dice (B3)', () => {
     for (const row of BY_FORCING.filter(entry => typeOf(entry.id) === type)) {
-      rowTest(row)(`${key(row)}: the emitted block matches the log in faints and every die`, () => {
+      test(`${key(row)}: the emitted block matches the log in faints and every die`, () => {
         expect(isPerfectAlignment(recordOf(row).actual), shown(row)).toBe(true);
       });
     }
@@ -117,7 +108,7 @@ describe.each(['singles', 'doubles', 'vgc'] as GameType[])('the rebuild plays th
 
   describe.skipIf(!BY_FAINT_STEP.some(entry => typeOf(entry.id) === type))('resolved by the faint step (B4)', () => {
     for (const row of BY_FAINT_STEP.filter(entry => typeOf(entry.id) === type)) {
-      rowTest(row)(`${key(row)}: the emitted block matches the log in faints and every die`, () => {
+      test(`${key(row)}: the emitted block matches the log in faints and every die`, () => {
         expect(isPerfectAlignment(recordOf(row).actual), shown(row)).toBe(true);
       });
     }
@@ -134,7 +125,7 @@ describe.each(['singles', 'doubles', 'vgc'] as GameType[])('the rebuild plays th
 
   describe('guards: the turns that stay perfect', () => {
     for (const row of GUARDS.filter(entry => typeOf(entry.id) === type)) {
-      (GUARD_KNOWN.has(key(row)) ? test.fails : test)(`${key(row)}: perfect today, perfect after the forced turn`, () => {
+      test(`${key(row)}: perfect today, perfect after the forced turn`, () => {
         expect(isPerfectAlignment(recordOf(row).actual), shown(row)).toBe(true);
       });
     }
@@ -143,23 +134,28 @@ describe.each(['singles', 'doubles', 'vgc'] as GameType[])('the rebuild plays th
       const others = [...rebuilt.get(id)!.records.keys()].filter(turn => !NAMED.has(key({ id, turn })));
       const imperfect = others.filter(turn => !isPerfectAlignment(recordOf({ id, turn }).actual));
       expect(imperfect.map(turn => shown({ id, turn }))).toEqual([]);
-      // the game that ends early in the simulator loses its last turn (KNOWN until the fallback of ruling Q2, B4)
-      expect(others.length, 'the count of the other perfect turns').toBe(OTHER_PERFECT[id] - (ENDS_EARLY.has(id) ? 1 : 0));
+      expect(others.length, 'the count of the other perfect turns').toBe(OTHER_PERFECT[id]);
     });
   });
 });
 
 describe('the counts of the drift line', () => {
   // 24 turns of the named rows missed the log in round 85 (singles 11, Doubles OU 8, VGC 5, with Q3 and Q4); B3 resolved the eight of forcing, B4
-  // resolves the three of the faint step: the imperfect rows are the KNOWN ones and the residuals
-  test('the named rows that miss the log: the faint step rows and the residuals (singles 6, Doubles OU 6, VGC 4 after B3)', () => {
+  // resolves the three of the faint step: the imperfect rows are the residuals
+  test('the named rows that miss the log: the residuals (singles 4, Doubles OU 5, VGC 4 after B4a)', () => {
     const imperfect = [...RESOLVED, ...RESIDUALS].filter(row => !isPerfectAlignment(recordOf(row).actual));
     const byType = (type: GameType) => imperfect.filter(row => typeOf(row.id) === type).length;
-    expect({ singles: byType('singles'), doubles: byType('doubles'), vgc: byType('vgc'), total: imperfect.length }).toEqual({ singles: 6, doubles: 6, vgc: 4, total: 16 });
+    expect({ singles: byType('singles'), doubles: byType('doubles'), vgc: byType('vgc'), total: imperfect.length }).toEqual({ singles: 4, doubles: 5, vgc: 4, total: 13 });
   });
 
-  // KNOWN until B4 (ruling Q2): the replay of 2630685175 stops after turn 9, so the rebuild has 355 records
-  test.fails('every one of the 356 turns has a record', () => {
+  // ruling Q2: a forced turn that ends a game the log goes on past is no reading of the log; the block falls back to the seed search
+  test('the fallback turns of the twelve replays: only 2630685175 turn 9, and the records say so', () => {
+    const fallbacks = FIXTURES.flatMap(({ id }) => [...rebuilt.get(id)!.records.values()].filter(record => record.via === 'fallback').map(record => key({ id, turn: record.turn })));
+    expect(fallbacks).toEqual([key({ id: 'gen9vgc2026regi-2630685175', turn: 9 })]);
+  });
+
+  // ruling Q2: the forced crit of 2630685175 turn 9 ends the game in the simulator, the fallback takes that turn, and the replay goes on
+  test('every one of the 356 turns has a record', () => {
     const all = [...rebuilt.values()].reduce((sum, entry) => sum + entry.records.size, 0);
     expect(all).toBe(356);
   });
@@ -168,7 +164,7 @@ describe('the counts of the drift line', () => {
 /**
  * The arrival: a branch opens at a turn of the replay (`adoptSerializedRuntime` of the position the reconstruction captured there)
  * and the user plays the first turn with nothing changed. The turn must show the block the reconstruction emitted, lines and HP,
- * and (KNOWN) the log's block. The arrival and the rebuild search the same seeds today; after B3 both play the forced turn.
+ * and the log's block. The arrival and the rebuild play the same forced turn, the faint step included.
  */
 describe.each(RESOLVED.map(row => [key(row), row] as const))('the arrival plays the reconstruction\'s block: %s', (_label, row) => {
   async function arrival() {
@@ -185,7 +181,7 @@ describe.each(RESOLVED.map(row => [key(row), row] as const))('the arrival plays 
     expect(lines).toEqual(emittedBlock(built.battleLog, row.turn));
   });
 
-  (KNOWN.has(key(row)) ? test.fails : test)(`${typeOf(row.id)}: the played block matches the log`, { timeout: 120_000 }, async () => {
+  test(`${typeOf(row.id)}: the played block matches the log`, { timeout: 120_000 }, async () => {
     const { played } = await arrival();
     expect(played.score, shown(row)).toEqual({ endedMismatch: false, faintMismatches: 0, softMismatches: 0 });
   });
@@ -203,9 +199,17 @@ describe.each([...RESOLVED, ...RESIDUALS].map(row => [key(row), row] as const))(
     const block = parseTurnBlocks(built.replay.log).turns.find(entry => entry.turn === row.turn)!;
     const choices = { p1: getMainChoice(block.preUpkeep, 'p1', live as never), p2: getMainChoice(block.preUpkeep, 'p2', live as never) };
     const forced = { p1: collectForcedSwitchSpecies(block.preUpkeep, block.postUpkeep, 'p1', live.dex), p2: collectForcedSwitchSpecies(block.preUpkeep, block.postUpkeep, 'p2', live.dex) };
+    const logged = loggedDiceAt(live, built.replay.log);
+    const aligned = forcedBlock(live as never, block as never);
+    // the faint step's dice, as the rebuild plays them; null is the fallback, whose block the seed search emits
+    const { dice } = faintStep({ battle: live, expected: aligned.expectedEvents, seed: aligned.seedChoice.seed, choices, forced, bench: protocolBenchOf(built.replay.log, [...block.preUpkeep, ...block.postUpkeep], row.turn) }, logged);
+    if (!dice) {
+      expect(recordOf(row).via, key(row)).toBe('fallback');
+      return;
+    }
     const start = live.log.length;
     playForcedTurn({
-      live, forced: loggedDiceAt(live, built.replay.log),
+      live, forced: dice,
       play: battle => {
         applyChoice(battle, 'p1', choices.p1);
         applyChoice(battle, 'p2', choices.p2);

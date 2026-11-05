@@ -1,5 +1,5 @@
 import { PRNG } from '@pkmn/sim';
-import { forcedTurnDice } from '../dice/logged-block.ts';
+import { faintStep, forcedTurnDice, protocolBenchOf } from '../dice/logged-block.ts';
 import { serializeBattleStable, trialAdvanceLog } from '../forward-model.ts';
 import {
   ALIGNMENT_SEEDS, chooseAlignedSeed, extractProtocolEvents, type SeedChoice,
@@ -121,7 +121,7 @@ export function alignArrivalDice(
   try {
     const p1Choice = getMainChoice(block.preUpkeep, 'p1', battle);
     const p2Choice = getMainChoice(block.preUpkeep, 'p2', battle);
-    const aligned = arrivalRolls(battle, block, p1Choice, p2Choice, shouldStop);
+    const aligned = arrivalRolls(battle, block, replayLog, p1Choice, p2Choice, shouldStop);
     if (!aligned) return null;
     const { seed } = aligned.block.seedChoice;
     if (aligned.logged) {
@@ -141,17 +141,23 @@ export function alignArrivalDice(
 
 /**
  * Round 86 (T306): the seed and the logged draws of the arrival turn. The turn plays as the reconstruction plays it: seed index 0 with the
- * log's dice forced, and the draws it takes are the logged draws (`recordForcedRolls`). When the forced turn cannot play (the copy refuses a
+ * log's dice forced (and the damage-roll steps of the faint step), and the draws it takes are the logged draws (`recordForcedRolls`). When the forced turn cannot play (the copy refuses a
  * choice, the state is odd) the sixteen-seed search of before chooses, and null comes back when no trial plays either: the fallback seed
  * is no reading of the log.
  */
 function arrivalRolls(
-  battle: SimBattle, block: TurnBlock, p1Choice: string, p2Choice: string, shouldStop?: () => boolean,
+  battle: SimBattle, block: TurnBlock, replayLog: string, p1Choice: string, p2Choice: string, shouldStop?: () => boolean,
 ): { block: AlignedBlock; logged: ReturnType<typeof recordLoggedRolls> } | null {
   const forced = forcedBlock(battle, block);
   try {
-    const dice = forcedTurnDice(battle, [...block.preUpkeep, ...block.postUpkeep], { p1: p1Choice, p2: p2Choice });
-    const logged = recordForcedRolls(battle, dice, forced.seedChoice.seed, p1Choice, p2Choice, forced.alignForced);
+    const lines = [...block.preUpkeep, ...block.postUpkeep];
+    const choices = { p1: p1Choice, p2: p2Choice };
+    const bench = protocolBenchOf(replayLog, lines, block.turn);
+    // the faint step the rebuild took for this block (same function, same position, same seed), then the draws of that turn
+    const { dice } = faintStep({
+      battle, expected: forced.expectedEvents, seed: forced.seedChoice.seed, choices, forced: forced.alignForced, bench,
+    }, forcedTurnDice(battle, lines, choices));
+    const logged = dice && recordForcedRolls(battle, dice, forced.seedChoice.seed, p1Choice, p2Choice, forced.alignForced, bench);
     if (logged) return { block: forced, logged };
   } catch {
     // an odd state: the search below reads the block as before

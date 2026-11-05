@@ -2,12 +2,11 @@ import { PRNG } from '@pkmn/sim';
 import type { Battle, PRNGSeed } from '@pkmn/sim';
 import { serializeBattleStable } from '../forward-model.ts';
 import { forkBattleWithPrng } from '../forward/position.ts';
-import { submittableChoice } from '../forward/request-moves.ts';
 import { applyChoice, resolveForcedSwitches } from '../forward/switches.ts';
-import { sideIndex } from '@fulllifegames/replay-core';
-import { playBlockPart } from '../dice/logged-block.ts';
+import { playBlockOnCopy } from '../dice/logged-block.ts';
 import type { ForcedDie } from '../dice/types.ts';
 import { buildForcedSwitchChoice, hasForceSwitch } from './corrections.ts';
+import type { ProtocolBench } from './team-order.ts';
 
 /**
  * Round 73 (T232): the logged dice of every action in a branch's first turn. The arrival plays its turn under the seed whose
@@ -162,41 +161,25 @@ export function recordLoggedRolls(
  */
 export function recordForcedRolls(
   battle: Battle, dice: readonly ForcedDie[], seed: PRNGSeed, p1Choice: string, p2Choice: string, forced: { p1: string[]; p2: string[] },
+  bench?: (side: 'p1' | 'p2') => ProtocolBench | undefined,
 ): LoggedRolls | null {
   try {
     const recorder = new RollRecorder(seed);
     const copy = forkBattleWithPrng({ serialized: serializeBattleStable(battle) }, recorder);
-    const part = (choices: { side: 'p1' | 'p2'; choice: string }[]): void => {
-      const commands = choices.map(({ side, choice }) => ({ side, command: submittable(copy, side, choice) }));
-      recorder.muted = true;
-      try {
-        playBlockPart({
-          live: copy, dice, commands, observe: (from, to, value) => recorder.record(from, to, value),
-          write: () => { for (const { side, choice } of choices) applyChoice(copy, side, choice); },
-        });
-      } finally {
-        recorder.muted = false;
-      }
-    };
-    part([{ side: 'p1', choice: p1Choice }, { side: 'p2', choice: p2Choice }]);
-    const cursors = { p1: { current: 0 }, p2: { current: 0 } };
-    for (let guard = 0; guard < 6 && !copy.ended; guard++) {
-      const answers = (['p1', 'p2'] as const).flatMap((side, index) => {
-        const choice = hasForceSwitch(copy, index) ? buildForcedSwitchChoice(copy, index, forced[side], cursors[side]) : null;
-        return choice ? [{ side, choice }] : [];
-      });
-      if (answers.length === 0) break;
-      part(answers);
-    }
+    playBlockOnCopy({
+      copy, dice, choices: { p1: p1Choice, p2: p2Choice }, forced, bench, observe: (from, to, value) => recorder.record(from, to, value),
+      around: run => {
+        recorder.muted = true;
+        try {
+          run();
+        } finally {
+          recorder.muted = false;
+        }
+      },
+    });
     resolveForcedSwitches(copy, seed);
     return recorder.rolls;
   } catch {
     return null;
   }
-}
-
-/** The choice as `applyChoice` submits it, so the natural turn's copy takes the same command the live copy does. */
-function submittable(battle: Battle, side: 'p1' | 'p2', choice: string): string {
-  const [first] = choice.split(' > ');
-  return submittableChoice(battle.sides[sideIndex(side)], first);
 }
