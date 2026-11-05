@@ -40,9 +40,16 @@ async function searchCopy(
   }
 }
 
-/** The copy of the roll's turn: the turn's start position through the worker. */
+/**
+ * The copy of the roll's turn: the turn's start position through the worker. The pool of the sweep gives its workers back first: a long
+ * game ends its sweep with twelve of them and the replay worker alive (573756: about 6.2 GB in the renderer), and the copy's worker as
+ * one more took the whole page down, so the feedback test hung for 40 minutes. The evaluation after it refills the pool.
+ */
 async function copyOf(env: SweepEnv, params: RolledCopyParams, roll: BiggestRoll): Promise<'abort' | RolledCopyOutcome | null> {
   try {
+    // A run that took over owns the pool now: only the run that still holds it gives it back.
+    if (aborted(env)) return 'abort';
+    env.clientRef.current?.dispose();
     const position = await env.positionFor(roll.turn);
     if (aborted(env)) return 'abort';
     const copy = await params.playCopy(roll, position);

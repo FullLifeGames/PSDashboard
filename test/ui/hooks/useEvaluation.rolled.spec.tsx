@@ -27,7 +27,7 @@ vi.mock('../../../src/lib/eval/worker-client', async importOriginal => {
     }
     async evalPair() { return 0.1; }
     cancel() {}
-    dispose() {}
+    dispose() { script.events.push('pool disposed'); }
   }
   return { ...actual, EvalWorkerClient: FakeEvalWorkerClient };
 });
@@ -48,12 +48,16 @@ type Outcome = { serialized: string; stage: 'turn' | 'request' | 'ended'; termin
 
 beforeEach(() => {
   script.calls = [];
+  script.events = [];
   script.evaluate = async serialized => evalResult('singles', { score: serialized === COPY_AT ? -0.9 : 0 });
 });
 afterEach(() => localStorage.clear());
 
 const sweepOf = (named: BiggestRoll | null, copy: Outcome | (() => Promise<Outcome>)) => {
-  const playCopy = vi.fn<(roll: BiggestRoll, position: string) => Promise<Outcome>>(async () => (typeof copy === 'function' ? copy() : copy));
+  const playCopy = vi.fn<(roll: BiggestRoll, position: string) => Promise<Outcome>>(async () => {
+    script.events.push('copy plays');
+    return typeof copy === 'function' ? copy() : copy;
+  });
   const namedRoll = vi.fn(() => named);
   const acquireAll = vi.fn(async (_report: unknown, onPosition?: (turn: number, serialized: string) => void) => {
     for (const turn of [1, 2, 3]) onPosition?.(turn, position(turn - 1));
@@ -93,6 +97,16 @@ describe('the sweep\'s biggest-roll stage', () => {
     expect(copyCalls()[0].settings).toMatchObject({ depth: 1, samples: 1, mode: 'matrix', prove: false });
     expect(result.current.graph.rollFlip).toEqual({ turn: 2, score: -0.9 });
     expect(result.current.graph.scores).toEqual([0, 0, 0]);
+  });
+
+  test('the pool gives its workers back before the copy\'s worker spawns: the stage never runs a worker beside a full pool (573756 died of it)', async () => {
+    // Round 86 (B8): 573756 holds twelve pool workers and the replay worker at the end of its sweep, about 6.2 GB in the renderer;
+    // the copy's own worker was the one more that took the page down, and the feedback test hung for 40 minutes.
+    const { params } = sweepOf(roll, { serialized: COPY_AT, stage: 'request', terminal: null });
+    await runSweeps(params);
+    const playing = script.events.indexOf('copy plays');
+    expect(playing).toBeGreaterThanOrEqual(0);
+    expect(script.events.slice(0, playing)).toContain('pool disposed');
   });
 
   test('the evaluation runs inside the sweep: the flip is in the graph in the very state that ends the run', async () => {
