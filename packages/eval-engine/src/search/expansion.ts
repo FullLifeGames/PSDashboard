@@ -2,6 +2,8 @@ import type { Battle, PRNGSeed } from '@pkmn/sim';
 import type { MatchupCache } from '../eval-function.ts';
 import { advancePositionWithLog, positionBattle, type SimPosition } from '../forward-model.ts';
 import { classifyChild, planCellEvents, type CellEvent } from '../cell-blend.ts';
+import { DiceSink } from '../forward/scripted-prng.ts';
+import { hasSecondary } from './secondary-classes.ts';
 import { cellKey } from '../rank.ts';
 import type { TeraAllowance } from '../types.ts';
 import { makeNode, type Node } from './mcts-node.ts';
@@ -75,16 +77,21 @@ function movedFirst(log: string[]): 'p1' | 'p2' | null {
 /**
  * One child from a plain advance; a root boundary cell records the drawn class from the log. Round 69 (T146 c5): a
  * tied singles cell's sampler classes carry the order (`p1:hit-kill|none`), so the drawn class names the order the
- * coin flip gave this tree, and the merge finds the class its pool belongs to.
+ * coin flip gave this tree, and the merge finds the class its pool belongs to. Round 86 (T305): a root cell with a secondary
+ * die draws under a recording sink, so the drawn class names the effects whose die came true (`hit-nokill+brn`), as the
+ * sampler's classes do; the tree below the root stays flat.
  */
 function singleChild(
   node: Node, p1Choice: string, p2Choice: string, seed: PRNGSeed, ctx: ExpansionContext, book: RootClassBook | undefined, key: number,
 ): Expanded {
-  const { child, log, pendingSwitch } = advancePositionWithLog(node.position, p1Choice, p2Choice, seed, { stopAtForcedSwitch: ctx.stopAtForcedSwitch });
+  const events = book ? rootEvents(book, key, p1Choice, p2Choice) : null;
+  const sink = events && hasSecondary(events) ? new DiceSink() : null;
+  const { child, log, pendingSwitch } = advancePositionWithLog(node.position, p1Choice, p2Choice, seed, {
+    stopAtForcedSwitch: ctx.stopAtForcedSwitch, ...(sink ? { scripts: sink } : {}),
+  });
   const made = nodeFrom(child, pendingSwitch, ctx);
   if (book) {
-    const events = rootEvents(book, key, p1Choice, p2Choice);
-    const classKey = events ? classifyChild(log, events) : null;
+    const classKey = events ? classifyChild(log, events, sink?.secondaries) : null;
     const order = classKey !== null && speedTie(book.battle, p1Choice, p2Choice) ? movedFirst(log) : null;
     if (classKey !== null) book.keys.set(key, order ? `${order}:${classKey}` : classKey);
   }

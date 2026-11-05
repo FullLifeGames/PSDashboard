@@ -246,7 +246,8 @@ function waterfallKey(log: readonly string[], withDice = false): string {
 const WATERFALL = { p1: 'move waterfall', p2: 'move thunder' };
 
 describe('scene: a singles cell with a flinching first mover', () => {
-  const { board, root } = board1v1({ species: 'Pikachu', moves: ['waterfall'] }, { species: 'Snorlax', moves: ['thunder'] });
+  // Blissey, not Pikachu: an Electric body is immune to the Thunder's paralysis, and the row reads the status in the log
+  const { board, root } = board1v1({ species: 'Blissey', moves: ['waterfall'] }, { species: 'Snorlax', moves: ['thunder'] });
   const plan = planCellEvents(board, WATERFALL.p1, WATERFALL.p2);
   // Round 86 (T305): Thunder carries a 30 percent paralysis die of its own, so its hit splits in two classes
   const chance = (hit: number, thunder: number, flinch: number, par: number): Map<string, number> => new Map([
@@ -260,7 +261,7 @@ describe('scene: a singles cell with a flinching first mover', () => {
   const par = played.get('p1a')?.find(entry => entry.effectId === 'par')?.chance ?? Number.NaN;
   const want = chance(1, 0.7, flinch, par);
 
-  test('the board is what the row says (Waterfall flinches, Thunder cannot kill, Pikachu moves first)', () => {
+  test('the board is what the row says (Waterfall flinches, Thunder cannot kill, Blissey moves first)', () => {
     expect(flinch).toBeGreaterThan(0);
     expect(flinch).toBeLessThan(1);
     expect(par).toBeGreaterThan(0);
@@ -297,7 +298,8 @@ describe('scene: a singles cell with a flinching first mover', () => {
   row('scene-book')('the tree records the drawn class of the root cell with its flinch', () => {
     const settings = { depth: 1 as const, samples: 1 as const, tera: false as const, mode: 'mcts' as const, prove: false };
     let flinched = 0;
-    for (let offset = 0; offset < 12; offset++) {
+    let paralysed = 0;
+    for (let offset = 0; offset < 60; offset++) {
       const stats = mctsTreeSearch(root.serialized, settings, offset);
       const i = stats.p1Options.findIndex(option => option.choice === WATERFALL.p1);
       const j = stats.p2Options.findIndex(option => option.choice === WATERFALL.p2);
@@ -308,8 +310,11 @@ describe('scene: a singles cell with a flinching first mover', () => {
       }
       expect([...drawn], `offset ${offset}: the tree's class ${cell.classKey}`).toContain(cell.classKey);
       if (cell.classKey?.includes('+flinch')) flinched++;
+      if (cell.classKey?.includes('+par')) paralysed++;
     }
     expect(flinched).toBeGreaterThan(0);
+    // the Thunder's paralysis is a die of the recording sink, not a line the class reading of the log would show
+    expect(paralysed).toBeGreaterThan(0);
   });
 });
 
