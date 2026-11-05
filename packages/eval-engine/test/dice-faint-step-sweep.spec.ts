@@ -5,7 +5,7 @@ import { loadSimMods } from '../src/forward/sim-mods';
 import { genShape } from '../src/dice/recognize';
 import type { ForcedDie } from '../src/dice/types';
 import { extractProtocolEvents, isPerfectAlignment, scoreAlignment } from '../src/hax-alignment';
-import { dexOfRules, dieOf, forcedOn, monOf, SWEEP_CASES, sweepBoard, sweepClicks, type DexMove } from './dice-sweep-support';
+import { dieOf, forcedOn, monOf, SWEEP_CASES, sweepBoard, sweepClicks, sweepMoves, type DexMove } from './dice-sweep-support';
 import type { Mode, Rules } from './dice-fixtures';
 
 /**
@@ -28,10 +28,7 @@ const hasNoExtra = (move: DexMove): boolean =>
 
 /** A move the scene can use in a rule set, read from the Dex. */
 function plainHit(rules: Rules): DexMove | undefined {
-  const dex = dexOfRules(rules);
-  return dex.moves.all()
-    .filter(move => move.exists && !move.isZ && !move.isMax && move.gen <= dex.gen && !move.isNonstandard && isPlainShape(move) && hasNoExtra(move))
-    .sort((a, b) => a.id.localeCompare(b.id))[0];
+  return sweepMoves(rules, move => !move.isNonstandard && isPlainShape(move) && hasNoExtra(move)).moves.sort((x, y) => x.id.localeCompare(y.id))[0];
 }
 
 await loadSimMods('gen9championsou');
