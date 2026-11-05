@@ -113,7 +113,9 @@ describe.each(SINGLES)('the class weights of the singles paths: $name', ({ rules
       if (!children) return 'no class path';
       const shares = new Map<string, number>();
       for (const entry of [...children.children, ...children.missing]) shares.set(entry.key.replace(/^p1:/, ''), entry.share);
-      if (children.missing.length > 0) return `classes never reached: ${children.missing.map(entry => entry.key)}`;
+      // a class with an effect under the mass floor stays unpriced (T305: the pair plan's floor), and the weights row allows its mass
+      const open = children.missing.filter(entry => entry.share >= MIN_MASS);
+      if (open.length > 0) return `classes never reached: ${open.map(entry => entry.key)}`;
       return shares;
     });
     expect(joined(problems)).toBe('');
@@ -194,7 +196,12 @@ describe('scene: smogtours-gen8ou-573756 turn 8, the fifth Scald into Clefable (
   async function turn8(clear: boolean): Promise<{ board: Battle; root: SimPosition }> {
     const { runtime } = await reconstruct('smogtours-gen8ou-573756', 8, feedback('smogtours-gen8ou-573756'));
     const board = runtime.battleStream.battle as unknown as Battle;
-    if (clear) (board.sides[1].active[0] as unknown as { removeVolatile(id: string): boolean }).removeVolatile('attract');
+    if (clear) {
+      const scalder = board.sides[1].active[0] as unknown as { removeVolatile(id: string): boolean; ability: string; baseAbility: string };
+      scalder.removeVolatile('attract');
+      // the Scald user's ability (a crit-ratio handler) trips the odds guard as well, and a guard stays a guard: the row clears it too
+      scalder.ability = scalder.baseAbility = 'noability';
+    }
     return { board, root: createRootPosition(serializeLiveBattle(board)) };
   }
 
@@ -225,10 +232,15 @@ function board1v1(p1: { species: string; moves: string[] }, p2: { species: strin
   return { board, root: rootOf(board) };
 }
 
-/** The class a Waterfall into Snorlax's Thunder reads as in the protocol: the flinch cuts the Thunder, the others split on its accuracy. */
-function waterfallKey(log: readonly string[]): string {
+/**
+ * The class a Waterfall into Snorlax's Thunder reads as in the protocol: the flinch cuts the Thunder, the others split on its
+ * accuracy. `withDice` adds the Thunder's own paralysis die (30 percent): the key a draw with the dice record gives, while
+ * `classifyChild` without dice sees only the effects a cut move shows.
+ */
+function waterfallKey(log: readonly string[], withDice = false): string {
   if (has(log, /^\|cant\|p2a: [^|]*\|flinch/)) return 'hit-nokill+flinch|none';
-  return has(log, /^\|-miss\|p2a:/) ? 'hit-nokill|miss' : 'hit-nokill|hit-nokill';
+  if (has(log, /^\|-miss\|p2a:/)) return 'hit-nokill|miss';
+  return withDice && has(log, /^\|-status\|p1a: [^|]*\|par/) ? 'hit-nokill|hit-nokill+par' : 'hit-nokill|hit-nokill';
 }
 
 const WATERFALL = { p1: 'move waterfall', p2: 'move thunder' };
@@ -236,15 +248,22 @@ const WATERFALL = { p1: 'move waterfall', p2: 'move thunder' };
 describe('scene: a singles cell with a flinching first mover', () => {
   const { board, root } = board1v1({ species: 'Pikachu', moves: ['waterfall'] }, { species: 'Snorlax', moves: ['thunder'] });
   const plan = planCellEvents(board, WATERFALL.p1, WATERFALL.p2);
-  const chance = (hit: number, thunder: number, flinch: number): Map<string, number> => new Map([
-    ['hit-nokill|miss', hit * (1 - flinch) * (1 - thunder)], ['hit-nokill|hit-nokill', hit * (1 - flinch) * thunder], ['hit-nokill+flinch|none', hit * flinch],
+  // Round 86 (T305): Thunder carries a 30 percent paralysis die of its own, so its hit splits in two classes
+  const chance = (hit: number, thunder: number, flinch: number, par: number): Map<string, number> => new Map([
+    ['hit-nokill|miss', hit * (1 - flinch) * (1 - thunder)],
+    ['hit-nokill|hit-nokill', hit * (1 - flinch) * thunder * (1 - par)],
+    ['hit-nokill|hit-nokill+par', hit * (1 - flinch) * thunder * par],
+    ['hit-nokill+flinch|none', hit * flinch],
   ]);
-  const flinch = playedChances(board, { p1: 'move 1', p2: 'move 1' }, ['p2a']).get('p2a')?.find(entry => entry.effectId === 'flinch')?.chance ?? Number.NaN;
-  const want = chance(1, 0.7, flinch);
+  const played = playedChances(board, { p1: 'move 1', p2: 'move 1' }, ['p1a', 'p2a']);
+  const flinch = played.get('p2a')?.find(entry => entry.effectId === 'flinch')?.chance ?? Number.NaN;
+  const par = played.get('p1a')?.find(entry => entry.effectId === 'par')?.chance ?? Number.NaN;
+  const want = chance(1, 0.7, flinch, par);
 
   test('the board is what the row says (Waterfall flinches, Thunder cannot kill, Pikachu moves first)', () => {
     expect(flinch).toBeGreaterThan(0);
     expect(flinch).toBeLessThan(1);
+    expect(par).toBeGreaterThan(0);
     expect(plan.kind).toBe('events');
     const thunder = (plan as { events: CellEvent[] }).events.find(event => event.moveId === 'thunder');
     expect(thunder).toBeDefined();
@@ -263,7 +282,7 @@ describe('scene: a singles cell with a flinching first mover', () => {
     expect(seen.size).toBe(3);
   });
 
-  row('scene-flinch-singles')('the fold, the sampler and the class children agree on the three classes', () => {
+  row('scene-flinch-singles')('the fold, the sampler and the class children agree on the four classes', () => {
     expect(plan.kind).toBe('events');
     const events = (plan as { events: CellEvent[] }).events;
     expect(joined(weightProblems(foldClassWeights(events, 'p1'), want))).toBe('');
@@ -285,7 +304,7 @@ describe('scene: a singles cell with a flinching first mover', () => {
       const cell = stats.cells.find(entry => entry.key === cellKey(i, j))!;
       const drawn = new Set<string>();
       for (let iteration = 0; iteration < SEARCH_SEEDS.length; iteration++) {
-        drawn.add(waterfallKey(advancePositionWithLog(root, WATERFALL.p1, WATERFALL.p2, treeSeed(iteration, offset)).log));
+        drawn.add(waterfallKey(advancePositionWithLog(root, WATERFALL.p1, WATERFALL.p2, treeSeed(iteration, offset)).log, true));
       }
       expect([...drawn], `offset ${offset}: the tree's class ${cell.classKey}`).toContain(cell.classKey);
       if (cell.classKey?.includes('+flinch')) flinched++;
@@ -338,7 +357,8 @@ describe('fork counts: a missing secondary class costs one forced draw, never a 
     let blend: CellBlend | undefined;
     const used = draws(() => { blend = sampleCell(root, 0, FANG.p1, FANG.p2, 3, cache, true).blend; }, root);
     expect(joined(weightProblems(classMap(blend), want))).toBe('');
-    expect(used).toBeLessThanOrEqual(3 + missing + 0.5);
+    // one more copy for the reader's own read of the Fire Fang's dice (`secondaryChances`, once per cell); a chase would add up to 13
+    expect(used).toBeLessThanOrEqual(3 + missing + 1 + 0.5);
   });
 
   row('forks-children')('the class children draw their five base seeds and one forced draw per missing class', () => {

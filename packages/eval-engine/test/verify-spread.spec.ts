@@ -142,17 +142,19 @@ describe('hidden lengths go one ply deeper one by one (round 64, T119)', () => {
 });
 
 describe('secondary effects inside a class (round 64, T119)', () => {
-  test('singles: the hit class of Steam Eruption goes deeper burned and unburned, mixed by its share of the class draws', () => {
+  // Round 86 (T305): the 30 percent burn of Steam Eruption is an outcome class of its own (`hit-nokill+brn`), so the hit no longer
+  // mixes burned and unburned draws in one class. Old expectation: the class `hit-nokill` went deeper at the burned share of its draws
+  // (0.3125 of the sixteen verify seeds). New: the class of the unburned hit goes deeper unburned and the burned hit burned.
+  test('singles: the burn of Steam Eruption is a class of its own, so the unburned hit goes deeper unburned and the burned hit burned', () => {
     const root = steamRoot();
     const plan = planCellEvents(positionBattle(root), 'move steameruption', 'move curse');
     expect(plan.kind).toBe('events');
     if (plan.kind !== 'events') return;
     const value = deepenWith(root, 'move steameruption', 'move curse', burned);
-    const hit = value.blend!.classes.find(cls => cls.key === 'hit-nokill')!;
-    const inClass = naturalDraws(root, 'move steameruption', 'move curse', log => classifyChild(log, plan.events) === 'hit-nokill');
-    const expected = shareOf(inClass.map(draw => draw.child), burned);
-    expect(expected).toBeGreaterThan(0);
-    expect(hit.deepened).toBeCloseTo(expected, 12);
+    const classes = new Map(value.blend!.classes.map(cls => [cls.key, cls]));
+    expect(classes.get('hit-nokill')!.deepened).toBe(0);
+    expect(classes.get('hit-nokill+brn')!.deepened).toBe(1);
+    expect(classes.get('hit-nokill+brn')!.weight).toBeCloseTo(0.95 * 0.3, 9);
   });
 
   test("doubles reads only the counts: a burn inside the heaviest class keeps the class's first draw", () => {

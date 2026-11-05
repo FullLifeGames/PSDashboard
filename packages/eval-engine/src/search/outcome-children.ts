@@ -1,7 +1,8 @@
 import type { Battle, PRNGSeed } from '@pkmn/sim';
 import { advancePositionWithLog, positionBattle, type SimPosition } from '../forward-model.ts';
 import { classifyChild, foldClassWeights, observeOrder, planCellEvents, type CellEvent } from '../cell-blend.ts';
-import type { RollScript, RollScripts } from '../forward/scripted-prng.ts';
+import { DiceSink, type RollScript, type RollScripts, type SecondaryRecord } from '../forward/scripted-prng.ts';
+import { hasSecondary, splitOutcome, worthForcing } from './secondary-classes.ts';
 import { countFainted, rollSensitivePair, speedTie, tieOrderScripts } from './leaf.ts';
 
 /**
@@ -58,10 +59,11 @@ export interface Draw {
   measure: number;
   fainted: number;
   pendingSwitch: boolean;
+  /** Round 86 (T305): the secondary dice of the draw with the result they had, for a cell that draws one (`record`). */
+  dice?: SecondaryRecord[];
 }
 
 type Order = 'p1' | 'p2';
-type Outcome = 'miss' | 'hit-kill' | 'hit-nokill' | 'none';
 
 export const totalHp = (battle: Battle): number =>
   battle.sides.reduce((sum, side) => sum + side.pokemon.reduce((hp, pokemon) => hp + pokemon.hp, 0), 0);
@@ -74,11 +76,18 @@ function moveIdOf(choice: string): string | null {
 
 export function drawChild(
   root: SimPosition, rootHp: number, p1Choice: string, p2Choice: string, seed: PRNGSeed,
-  opts: { stopAtForcedSwitch?: boolean; scripts?: RollScripts } = {},
+  opts: { stopAtForcedSwitch?: boolean; scripts?: RollScripts; record?: boolean } = {},
 ): Draw {
-  const { child, log, pendingSwitch } = advancePositionWithLog(root, p1Choice, p2Choice, seed, opts);
+  // Round 86 (T305): a recording draw runs under a `DiceSink` that keeps the scripts and notes every secondary die
+  const sink = opts.record ? new DiceSink(opts.scripts) : null;
+  const { child, log, pendingSwitch } = advancePositionWithLog(root, p1Choice, p2Choice, seed, {
+    stopAtForcedSwitch: opts.stopAtForcedSwitch, scripts: sink ?? opts.scripts,
+  });
   const battle = positionBattle(child);
-  return { position: child, log, ended: battle.ended, measure: rootHp - totalHp(battle), fainted: countFainted(battle), pendingSwitch };
+  return {
+    position: child, log, ended: battle.ended, measure: rootHp - totalHp(battle), fainted: countFainted(battle), pendingSwitch,
+    ...(sink ? { dice: sink.secondaries } : {}),
+  };
 }
 
 /** The draw whose damage measure sits closest to the group's mean; ties keep the earliest draw. */
@@ -120,15 +129,20 @@ function expectedGroups(events: CellEvent[], orders: Order[]): Map<string, numbe
 function groupOf(draw: Draw, events: CellEvent[], tie: boolean, order: Order | null): string | null {
   const first = tie ? firstMover(draw.log) : order;
   if (!first) return null;
-  const key = events.length > 0 ? classifyChild(draw.log, events) : 'none';
+  const key = events.length > 0 ? classifyChild(draw.log, events, draw.dice) : 'none';
   return key === null ? null : `${first}:${key}`;
 }
 
 /** The roll script that aims a side's move at one outcome; `extreme` takes the edge roll for the retry. */
-function scriptFor(event: CellEvent, outcome: Outcome, extreme: boolean): RollScript | null {
+function scriptFor(event: CellEvent, outcomeKey: string, extreme: boolean): RollScript | null {
   const { normalKillRolls: n, critKillRolls: c } = event.event;
+  // Round 86 (T305): a hit that does not kill names the effects that came true (`hit-nokill+brn`); the script says yes to those and no to the others
+  const { base: outcome, tokens } = splitOutcome(outcomeKey, event.secondary);
   if (outcome === 'miss') return { hit: false };
-  if (outcome === 'hit-nokill') return { hit: true, crit: false, roll: extreme ? 15 : n + Math.floor((16 - n - 1) / 2) };
+  if (outcome === 'hit-nokill') {
+    const secondary = event.secondary?.length ? { secondary: Object.fromEntries(event.secondary.map(entry => [entry.effectId, tokens.includes(entry.effectId)])) } : {};
+    return { hit: true, crit: false, roll: extreme ? 15 : n + Math.floor((16 - n - 1) / 2), ...secondary };
+  }
   if (outcome === 'hit-kill') {
     return n > 0
       ? { hit: true, crit: false, roll: extreme ? 0 : Math.floor((n - 1) / 2) }
@@ -143,9 +157,11 @@ function scriptFor(event: CellEvent, outcome: Outcome, extreme: boolean): RollSc
  * (`tieMoves` names each side's move id; null without a tie). Two attempts
  * (median roll, then the edge roll) when a damage roll is involved.
  */
-function scriptsFor(groupKey: string, events: CellEvent[], tieMoves: { p1: string; p2: string } | null): RollScripts[] {
-  const [order, classKey] = groupKey.split(':') as [Order, string];
-  const outcomes = classKey.split('|') as Outcome[];
+export function scriptsFor(groupKey: string, events: CellEvent[], tieMoves: { p1: string; p2: string } | null): RollScripts[] {
+  // the class key may hold a colon itself (`hit-nokill+boosts:spe`): split at the first one only
+  const cut = groupKey.indexOf(':');
+  const [order, classKey] = [groupKey.slice(0, cut) as Order, groupKey.slice(cut + 1)];
+  const outcomes = classKey.split('|');
   const build = (extreme: boolean): RollScripts => {
     const scripts = new Map<string, RollScript>();
     events.forEach((event, index) => {
@@ -158,8 +174,15 @@ function scriptsFor(groupKey: string, events: CellEvent[], tieMoves: { p1: strin
     }
     return scripts;
   };
-  const rolls = outcomes.some(outcome => outcome === 'hit-kill' || outcome === 'hit-nokill');
+  const rolls = outcomes.some(outcome => outcome === 'hit-kill' || splitOutcome(outcome).base === 'hit-nokill');
   return rolls ? [build(false), build(true)] : [build(false)];
+}
+
+/** `extra` over `base`: a key both name keeps the fields of both (a class script beside a tied cell's order script). */
+export function mergeScripts(base: RollScripts | undefined, extra: RollScripts): RollScripts {
+  const merged = new Map<string, RollScript>(base);
+  for (const [key, script] of extra) merged.set(key, { ...merged.get(key), ...script });
+  return merged;
 }
 
 function push(groups: Map<string, Draw[]>, key: string, draw: Draw): void {
@@ -186,6 +209,8 @@ interface ClassCell {
   tie: boolean;
   order: Order | null;
   advance: { stopAtForcedSwitch?: boolean };
+  /** Round 86 (T305): the cell has a secondary die, so its draws record the dice. */
+  record: boolean;
 }
 
 /** Forced draws for every expected group the base draws never reached, within the cap (retries included). */
@@ -193,11 +218,11 @@ function forceMissing(cell: ClassCell, expected: Map<string, number>, grouped: M
   const tieMoves = cell.tie ? { p1: moveIdOf(cell.p1Choice)!, p2: moveIdOf(cell.p2Choice)! } : null;
   let forced = 0;
   for (const key of expected.keys()) {
-    if (grouped.has(key)) continue;
+    if (grouped.has(key) || !worthForcing(key, expected.get(key)!)) continue;
     for (const scripts of scriptsFor(key, cell.events, tieMoves)) {
       if (forced >= forcedCap) return;
       forced += 1;
-      const draw = drawChild(cell.root, cell.rootHp, cell.p1Choice, cell.p2Choice, seed, { ...cell.advance, scripts });
+      const draw = drawChild(cell.root, cell.rootHp, cell.p1Choice, cell.p2Choice, seed, { ...cell.advance, scripts, record: cell.record });
       const landed = groupOf(draw, cell.events, cell.tie, cell.order);
       if (landed !== null && expected.has(landed) && !grouped.has(landed)) push(grouped, landed, draw);
       if (grouped.has(key)) break;
@@ -218,7 +243,8 @@ export function classChildren(root: SimPosition, p1Choice: string, p2Choice: str
   const events = plan.kind === 'events' ? plan.events : [];
   const rootHp = totalHp(battle);
   const advance = { stopAtForcedSwitch: opts.stopAtForcedSwitch };
-  const draws = opts.baseSeeds.map(seed => drawChild(root, rootHp, p1Choice, p2Choice, seed, advance));
+  const record = hasSecondary(events);
+  const draws = opts.baseSeeds.map(seed => drawChild(root, rootHp, p1Choice, p2Choice, seed, { ...advance, record }));
   const order: Order | null = tie ? null : (events.length > 0 ? observeOrder(draws.map(draw => draw.log), events) : 'p1');
   if (!tie && order === null) return null;
   const expected = expectedGroups(events, tie ? ['p1', 'p2'] : [order!]);
@@ -228,7 +254,7 @@ export function classChildren(root: SimPosition, p1Choice: string, p2Choice: str
     if (key === null || !expected.has(key)) return null;
     push(grouped, key, draw);
   }
-  forceMissing({ root, rootHp, p1Choice, p2Choice, events, tie, order, advance }, expected, grouped, opts.forcedCap, opts.baseSeeds[0]);
+  forceMissing({ root, rootHp, p1Choice, p2Choice, events, tie, order, advance, record }, expected, grouped, opts.forcedCap, opts.baseSeeds[0]);
   return toChildren(expected, grouped, events, tie);
 }
 

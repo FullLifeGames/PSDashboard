@@ -92,3 +92,26 @@ export function dieTokens(dice: readonly SecondaryDie[], side: 'p1' | 'p2', move
   const came = dice.filter(die => die.happened && die.slot.startsWith(side) && die.moveId === moveId && known.has(die.effectId)).map(die => die.effectId);
   return [...new Set(came)].sort();
 }
+
+/** Whether a cell's events draw a secondary die: its draws record the dice, and a missing class is forced by script, never chased with probe seeds. */
+export const hasSecondary = (events: readonly { secondary?: readonly EventSecondary[] }[]): boolean => events.some(event => !!event.secondary?.length);
+
+/** The mass under which a class that carries a secondary effect is left unpriced: a forced draw for it would cost more than it moves (the pair plan's floor). */
+export const MIN_CLASS_MASS = 0.01;
+
+/** A class key with a secondary effect in it (`hit-nokill+brn`, `hit-nokill+flinch|none`). */
+export const isTokened = (classKey: string): boolean => classKey.includes('+');
+
+/**
+ * The outcome of a script key (`hit-nokill+brn+flinch`) as its base outcome and the entries' effect ids that came true. An effect id
+ * may hold a plus itself (`boosts:atk+def`), so the entries of the cell tell the ids apart, never a split at every plus.
+ */
+export function splitOutcome(outcome: string, secondary: readonly EventSecondary[] = []): { base: string; tokens: string[] } {
+  const cut = outcome.indexOf('+');
+  if (cut < 0) return { base: outcome, tokens: [] };
+  const rest = `+${outcome.slice(cut + 1)}+`;
+  return { base: outcome.slice(0, cut), tokens: secondary.map(entry => entry.effectId).filter(id => rest.includes(`+${id}+`)) };
+}
+
+/** Whether a missing class is worth a forced draw: every class of a plain cell, a class with an effect only from the mass floor up. */
+export const worthForcing = (classKey: string, share: number): boolean => !isTokened(classKey) || share >= MIN_CLASS_MASS;

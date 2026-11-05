@@ -5,7 +5,9 @@ import {
   BOUNDARY_DRAW_BUDGET, classifyChild, foldClassWeights, observeOrder, planCellEvents, PROBE_SEEDS, type CellEvent,
 } from '../cell-blend.ts';
 import type { CellBlend, CellBlendClass, CellDraw, KoOddsMismatch } from '../types.ts';
-import type { RollScripts } from '../forward/scripted-prng.ts';
+import { DiceSink, type RollScripts, type SecondaryRecord } from '../forward/scripted-prng.ts';
+import { mergeScripts, scriptsFor } from './outcome-children.ts';
+import { hasSecondary, worthForcing } from './secondary-classes.ts';
 import { countFainted, leafValue, rollSensitivePair, SEARCH_SEEDS, speedTie, tieOrderScripts } from './leaf.ts';
 import { pairCellSample, type FirstDraw } from '../pair/sampler.ts';
 import {
@@ -126,6 +128,8 @@ interface Draw {
   log: string[];
   leaf: number;
   ended: boolean;
+  /** Round 86 (T305): the secondary dice of the draw, when the cell records them. */
+  dice?: SecondaryRecord[];
 }
 
 interface ClassEntry {
@@ -146,10 +150,15 @@ function allDrawsSample(draws: Draw[]): CellSample {
 }
 
 /** One seeded draw with its protocol log and leaf value. */
-function drawCell(root: SimPosition, p1Choice: string, p2Choice: string, seed: PRNGSeed, matchupCache: MatchupCache, scripts?: RollScripts): Draw {
-  const { child, log } = advancePositionWithLog(root, p1Choice, p2Choice, seed, scripts ? { scripts } : undefined);
+function drawCell(
+  root: SimPosition, p1Choice: string, p2Choice: string, seed: PRNGSeed, matchupCache: MatchupCache, scripts?: RollScripts, record = false,
+): Draw {
+  // Round 86 (T305): a cell with a secondary die draws under a `DiceSink`, and the draw keeps the dice it saw
+  const sink = record ? new DiceSink(scripts) : null;
+  const given = sink ?? scripts;
+  const { child, log } = advancePositionWithLog(root, p1Choice, p2Choice, seed, given ? { scripts: given } : undefined);
   const battle = positionBattle(child);
-  return { child, log, leaf: leafValue(battle, matchupCache), ended: battle.ended };
+  return { child, log, leaf: leafValue(battle, matchupCache), ended: battle.ended, ...(sink ? { dice: sink.secondaries } : {}) };
 }
 
 /** Books a draw into its outcome class; false when the draw fits no analytically expected class. */
@@ -160,7 +169,7 @@ function classifyDraw(
   draw: Draw,
   isFirst: boolean,
 ): boolean {
-  const key = classifyChild(draw.log, events);
+  const key = classifyChild(draw.log, events, draw.dice);
   if (key === null || !expected.has(key)) return false;
   const entry = classes.get(key) ?? { leafSum: 0, count: 0, hasFirst: false, ended: true, child: draw.child, draws: [] };
   entry.draws.push(draw);
@@ -229,14 +238,53 @@ function classPools(
   root: SimPosition, events: CellEvent[], p1Choice: string, p2Choice: string, plainDraws: number,
   matchupCache: MatchupCache, classes: Map<string, ClassEntry>, drawnBySeed: Map<string, Draw>,
 ): Map<string, Draw[]> {
+  const record = hasSecondary(events);
   const pools = new Map([...classes].map(([key, cls]) => [key, [...cls.draws]]));
   for (const seed of VERIFY_PLAIN_SEEDS.slice(0, plainDraws)) {
     if (drawnBySeed.has(String(seed))) continue;
-    const draw = drawCell(root, p1Choice, p2Choice, seed, matchupCache);
-    const key = classifyChild(draw.log, events);
+    const draw = drawCell(root, p1Choice, p2Choice, seed, matchupCache, undefined, record);
+    const key = classifyChild(draw.log, events, draw.dice);
     if (key !== null) pools.get(key)?.push(draw);
   }
   return pools;
+}
+
+/**
+ * Round 86 (T305): a cell with a secondary die draws every class the base draws missed once, by script (the plan's miss, kill and
+ * effect classes alike), and never chases them with probe seeds: a chase for a 3 percent class costs up to 13 more draws. A
+ * class with an effect under the mass floor stays unpriced. A script is a request: the draw books into the class the log shows,
+ * and only when that class is expected and still open; the retry with the edge roll runs when the first attempt missed its class.
+ */
+function forceMissingClasses(
+  root: SimPosition, events: CellEvent[], first: 'p1' | 'p2', expected: Map<string, number>, classes: Map<string, ClassEntry>,
+  draws: Draw[], p1Choice: string, p2Choice: string, matchupCache: MatchupCache, scripts?: RollScripts,
+): void {
+  for (const [key, share] of expected) {
+    if (classes.has(key) || !worthForcing(key, share)) continue;
+    for (const aimed of scriptsFor(`${first}:${key}`, events, null)) {
+      const draw = drawCell(root, p1Choice, p2Choice, SEARCH_SEEDS[0], matchupCache, mergeScripts(scripts, aimed), true);
+      const landed = classifyChild(draw.log, events, draw.dice);
+      if (landed === null || !expected.has(landed) || classes.has(landed)) continue;
+      draws.push(draw);
+      classifyDraw(classes, expected, events, draw, false);
+      if (classes.has(key)) break;
+    }
+  }
+}
+
+/** Probe seeds for the classes the base draws missed (a cell without a secondary die); false when a draw fits no expected class. */
+function chaseMissingClasses(
+  expected: Map<string, number>, classes: Map<string, ClassEntry>, draws: Draw[], drawSeed: (seed: PRNGSeed) => void, events: CellEvent[],
+): boolean {
+  let probeIndex = 0;
+  while (
+    [...expected.keys()].some(key => !classes.has(key)) &&
+    draws.length < BOUNDARY_DRAW_BUDGET && probeIndex < PROBE_SEEDS.length
+  ) {
+    drawSeed(PROBE_SEEDS[probeIndex++]);
+    if (!classifyDraw(classes, expected, events, draws[draws.length - 1], false)) return false;
+  }
+  return true;
 }
 
 /**
@@ -257,8 +305,9 @@ function blendCellSample(
 ): CellSample {
   const draws: Draw[] = [];
   const drawnBySeed = new Map<string, Draw>();
+  const record = hasSecondary(events);
   const drawSeed = (seed: PRNGSeed) => {
-    draws.push(drawCell(root, p1Choice, p2Choice, seed, matchupCache, scripts));
+    draws.push(drawCell(root, p1Choice, p2Choice, seed, matchupCache, scripts, record));
     drawnBySeed.set(String(seed), draws[draws.length - 1]);
   };
   const baseDraws = blendBaseDraws(samples);
@@ -279,15 +328,9 @@ function blendCellSample(
   for (let index = 0; index < draws.length; index++) {
     if (!classifyDraw(classes, expected, events, draws[index], index === 0)) return fallback();
   }
-  // Chase analytically-expected classes the base draws missed.
-  let probeIndex = 0;
-  while (
-    [...expected.keys()].some(key => !classes.has(key)) &&
-    draws.length < BOUNDARY_DRAW_BUDGET && probeIndex < PROBE_SEEDS.length
-  ) {
-    drawSeed(PROBE_SEEDS[probeIndex++]);
-    if (!classifyDraw(classes, expected, events, draws[draws.length - 1], false)) return fallback();
-  }
+  // Chase analytically-expected classes the base draws missed; a cell with a secondary die forces them by script instead.
+  if (record) forceMissingClasses(root, events, first, expected, classes, draws, p1Choice, p2Choice, matchupCache, scripts);
+  else if (!chaseMissingClasses(expected, classes, draws, drawSeed, events)) return fallback();
 
   const missing = [...expected.keys()].filter(key => !classes.has(key));
   let weightTotal = 0;
