@@ -9,6 +9,7 @@ import { applyChoice } from '../forward/switches.ts';
 import { extractProtocolEvents, isPerfectAlignment, scoreAlignment, type ProtocolEvents } from '../hax-alignment.ts';
 import { loggedDice } from './logged-results.ts';
 import { playForcedTurn, type ForcedTurnInput } from './play.ts';
+import { quietProcs } from './phantom-procs.ts';
 import { genShape } from './recognize.ts';
 import { loggedOptions } from './turn.ts';
 import { dieKey, type DiceReport, type DieName, type DieReport, type ForcedDie } from './types.ts';
@@ -148,18 +149,20 @@ export interface BlockQuery {
   expected: ProtocolEvents;
   seed: PRNGSeed;
   choices: BlockCommands;
+  /** The lines of the block in the log: a proc die the forced turn draws and no line names is forced not to happen (`quietProcs`). */
+  lines?: readonly string[];
   /** The species the log sends in for each forced replacement, per side. */
   forced?: { p1: string[]; p2: string[] };
   bench?: (side: 'p1' | 'p2') => ProtocolBench | undefined;
 }
 
-/** `dice` null: the forced turn ends a game the log goes on past, and the seed search takes the block. */
-export interface FaintStepResult { dice: ForcedDie[] | null; plays: number }
+/** `dice` null: the forced turn ends a game the log goes on past, and the seed search takes the block. `quiet`: the proc dice added to the list. */
+export interface FaintStepResult { dice: ForcedDie[] | null; plays: number; quiet: number }
 
 /** The damage rolls the forced turn drew, by die key: the name and the raw value of the first draw. */
 type Rolls = Map<string, { name: DieName; value: number }>;
 
-interface Trial { events: ProtocolEvents; rolls: Rolls; reports: DieReport[]; log: readonly string[] }
+interface Trial { events: ProtocolEvents; rolls: Rolls; procs: Map<string, DieName>; reports: DieReport[]; log: readonly string[] }
 
 /** One play of the whole block with a list of dice on a fork of the position; null where the copy cannot play it. */
 function trialOf(checkpoint: string, query: BlockQuery, dice: readonly ForcedDie[]): Trial | null {
@@ -167,13 +170,15 @@ function trialOf(checkpoint: string, query: BlockQuery, dice: readonly ForcedDie
     const copy = forkBattle({ serialized: checkpoint }, query.seed);
     const start = copy.log.length;
     const rolls: Rolls = new Map();
+    const procs = new Map<string, DieName>();
     const reports = playBlockOnCopy({
       copy, dice, choices: query.choices, forced: query.forced ?? { p1: [], p2: [] }, bench: query.bench, onDraw: (name, value) => {
         if (name.kind === 'damage-roll' && !rolls.has(dieKey(name))) rolls.set(dieKey(name), { name, value });
+        if (name.kind === 'ability-proc' || name.kind === 'item-proc') procs.set(dieKey(name), name);
       },
     });
     const log = copy.log.slice(start);
-    return { events: extractProtocolEvents([...log]), rolls, reports, log };
+    return { events: extractProtocolEvents([...log]), rolls, procs, reports, log };
   } catch {
     return null;
   }
@@ -253,20 +258,34 @@ function targetsOf(trial: Trial, expected: ProtocolEvents, bySlot: ReadonlyMap<s
  * (faints and every die). None: the forced result stays, a named residual. A forced turn that ends a game the log goes on past is no
  * residual: `dice` null sends the block to the seed search, like a turn the copy cannot play.
  *
- * One function for the rebuild and the arrival, so both find the same steps. At most one play of the forced turn and fifteen of the steps.
+ * One function for the rebuild and the arrival, so both find the same steps. At most one play of the forced turn, up to three more for the phantom procs, and fifteen of the steps.
  */
-export function faintStep(query: BlockQuery, dice: readonly ForcedDie[]): FaintStepResult {
+export function faintStep(query: BlockQuery, forced: readonly ForcedDie[]): FaintStepResult {
   let checkpoint: string;
   try {
     checkpoint = serializeBattleStable(query.battle);
   } catch {
-    return { dice: [...dice], plays: 0 };
+    return { dice: [...forced], plays: 0, quiet: 0 };
   }
-  const base = trialOf(checkpoint, query, dice);
-  // a block the copy cannot play stays as it is: the live write refuses it the same way and the caller's fallback takes over
-  if (!base) return { dice: [...dice], plays: 1 };
-  if (isPerfectAlignment(scoreAlignment(query.expected, base.events))) return { dice: [...dice], plays: 1 };
+  let dice = forced;
+  let base = trialOf(checkpoint, query, dice);
   let plays = 1;
+  // a block the copy cannot play stays as it is: the live write refuses it the same way and the caller's fallback takes over
+  if (!base) return { dice: [...dice], plays, quiet: 0 };
+  // Round 86 (T306, the phantom procs): a proc die the forced turn drew and the log does not show is forced not to happen, and the turn is played
+  // again (a proc that stays away can let a body act that the proc stopped, and that body's hit draws its own procs: at most three passes)
+  let quiet = 0;
+  for (let pass = 0; pass < 3 && query.lines; pass++) {
+    const added = quietProcs(base.procs, dice, query.lines);
+    if (added.length === 0) break;
+    dice = [...dice, ...added];
+    quiet += added.length;
+    const again = trialOf(checkpoint, query, dice);
+    plays++;
+    if (!again) return { dice: [...dice], plays, quiet };
+    base = again;
+  }
+  if (isPerfectAlignment(scoreAlignment(query.expected, base.events))) return { dice: [...dice], plays, quiet };
   const bySlot = identsBySlot(query.battle, base.log);
   const hits = hitsOn(base, targetsOf(base, query.expected, bySlot), bySlot, query.battle.gen);
   const longest = Math.max(0, ...hits.map(hit => hit.order.length));
@@ -278,8 +297,8 @@ export function faintStep(query: BlockQuery, dice: readonly ForcedDie[]): FaintS
     ];
     plays++;
     const trial = trialOf(checkpoint, query, next);
-    if (trial && isPerfectAlignment(scoreAlignment(query.expected, trial.events))) return { dice: next, plays };
+    if (trial && isPerfectAlignment(scoreAlignment(query.expected, trial.events))) return { dice: next, plays, quiet };
   }
   const endsEarly = base.events.ended && !query.expected.ended;
-  return { dice: endsEarly ? null : [...dice], plays };
+  return { dice: endsEarly ? null : [...dice], plays, quiet };
 }

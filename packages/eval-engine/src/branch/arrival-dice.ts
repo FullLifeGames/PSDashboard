@@ -155,7 +155,7 @@ function arrivalRolls(
     const bench = protocolBenchOf(replayLog, lines, block.turn);
     // the faint step the rebuild took for this block (same function, same position, same seed), then the draws of that turn
     const { dice } = faintStep({
-      battle, expected: forced.expectedEvents, seed: forced.seedChoice.seed, choices, forced: forced.alignForced, bench,
+      battle, expected: forced.expectedEvents, seed: forced.seedChoice.seed, choices, lines, forced: forced.alignForced, bench,
     }, forcedTurnDice(battle, lines, choices));
     const logged = dice && recordForcedRolls(battle, dice, forced.seedChoice.seed, p1Choice, p2Choice, forced.alignForced, bench);
     if (logged) return { block: forced, logged };

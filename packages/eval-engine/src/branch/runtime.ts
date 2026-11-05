@@ -242,7 +242,7 @@ async function playBlock(
   const logged = forcedTurnDiceOrNull(battle, lines, choices);
   // Round 86 (the faint step, T306): the damage roll of the hits that decide a faint or a die the log shows; null sends the block to the seed search
   const dice = logged && faintStep({
-    battle, expected: aligned.expectedEvents, seed: aligned.seedChoice.seed, choices, forced: aligned.alignForced,
+    battle, expected: aligned.expectedEvents, seed: aligned.seedChoice.seed, choices, lines, forced: aligned.alignForced,
     bench: protocolBenchOf(session.params.replayLog, lines, turnBeforeChoice),
   }, logged).dice;
   if (!dice || !(await commitMainChoices(session, turnBeforeChoice, p1Choice, p2Choice, dice))) {
