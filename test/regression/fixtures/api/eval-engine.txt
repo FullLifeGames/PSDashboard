@@ -3,6 +3,7 @@ type AlignmentScore
 type AlignmentSummary
 type AnalyzeTurnParams
 type BattleSlot
+type BiggestRoll
 type BranchChoiceActive
 type BranchChoiceErrorLog
 type BranchChoices
@@ -96,6 +97,9 @@ type ReplacementPoint
 type ReplacementRound
 type ReplacementSideAnalysis
 type ResolvedSideCommand
+type RollFlip
+type RollSelector
+type RolledCopy
 type RolledHit
 type SackInfo
 type SearchBudget
@@ -245,6 +249,8 @@ value requiredChoicesForActiveSlots
 value resolveSideChoices
 value resolveTeraPreference
 value rollText
+value rollToCopy
+value rolledCopy
 value rowCompletedCells
 value searchBudget
 value searchBudgetTag
