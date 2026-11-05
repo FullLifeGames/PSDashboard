@@ -102,5 +102,5 @@ Every change gets a class before work starts: the integrator proposes it, the us
 
 ## Agents
 
-- Roles in `.claude/agents/`: `wave-builder` (Sonnet, builds one step), `wave-reviewer` (Sonnet, checks claims against the code), `wave-scout` (Haiku, finds and counts), `wave-reader` (Haiku, reads measurements by the rules above). The main session stays on Opus; sub-agents never run on Opus (`.claude/settings.local.json` lifts the global Opus setting).
+- Roles in `.claude/agents/`: `wave-planner` (Opus, effort high, plans a step that needs judgment: a lane plan, a feature's stages, a diagnosis across modules; no commit), `wave-builder` (Sonnet, builds one step), `wave-reviewer` (Sonnet, checks claims against the code), `wave-scout` (Haiku, finds and counts), `wave-reader` (Haiku, reads measurements by the rules above). The main session stays on Opus; of the sub-agents only `wave-planner` runs on Opus (user 05.11.2026), the others name Sonnet or Haiku in their frontmatter (`.claude/settings.local.json` lifts the global Opus setting).
 - One fresh agent per step, starting from the brief, the plan, the ledger and `git log`, and writing its step into the ledger before it stops. After a pause of more than five minutes do not resume an old agent. A monitor reports the end of a measurement, never a sleep.

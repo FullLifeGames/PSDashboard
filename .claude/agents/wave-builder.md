@@ -1,6 +1,6 @@
 ---
 name: wave-builder
-description: Builds one step of one wave lane in ps-dashboard-2 (a lane plan, one TODO test-first, or the follow-up after a measurement) in the lane's worktree, then stops with PLAN READY, MEASURE, TODO DONE, LANE DONE or STUCK. One fresh agent per step; the integrator dispatches it with the lane letter, the step, the worktree and the round's brief.
+description: Builds one step of one wave lane in ps-dashboard-2 (one TODO test-first, a small plan inside a lane, or the follow-up after a measurement; a plan that needs design judgment goes to wave-planner) in the lane's worktree, then stops with PLAN READY, MEASURE, TODO DONE, LANE DONE or STUCK. One fresh agent per step; the integrator dispatches it with the lane letter, the step, the worktree and the round's brief.
 tools: Read, Edit, Write, Grep, Glob, Bash, PowerShell
 model: claude-sonnet-5-5
 effort: high
