@@ -8,6 +8,7 @@ import type { EvaluateParams } from './evaluation/single-eval';
 import type { useEvalAcquire } from './useEvalAcquire';
 import { makePreviewAcquire, type TeamBuildSources } from '../lib/eval-acquire';
 import { evalStorePrefix } from '../lib/eval-cache-store';
+import { rolledCopyParams } from '../lib/rolled-copy-stage';
 import { engineCacheTag } from '../lib/eval/engine-setting';
 import { keptPlayed } from './evaluation/sweep-core';
 import {
@@ -176,9 +177,9 @@ function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
       // Turn 0: the lead decision at team preview.
       acquirePreview: makePreviewAcquire(replayData, sources, bringOnlyLists),
       playedLeads: parseLeadSpecies(replayData.log),
-      sensitivityTargetsFor,
+      sensitivityTargetsFor, rolledCopy: rolledCopyParams({ replayData, snapshots, rules, setsFingerprint }),
     });
-  }, [replayData, evaluation, analyzableTurns, effectiveTera, effectiveSleepClause, effectiveRuleset, evalIsDoubles, setsFingerprint, acquire, playedFor, rules, sources, bringOnlyLists, sensitivityTargetsFor]);
+  }, [replayData, snapshots, evaluation, analyzableTurns, effectiveTera, effectiveSleepClause, effectiveRuleset, evalIsDoubles, setsFingerprint, acquire, playedFor, rules, sources, bringOnlyLists, sensitivityTargetsFor]);
 
   // Explains ONE turn: a two-turn mini sweep (turn + its follow-up) so the
   // report can price the played outcome, at the panel's settings. Runs ONLY

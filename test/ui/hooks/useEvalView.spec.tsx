@@ -157,10 +157,15 @@ describe('useEvalView', () => {
     const withRounds = sweep as typeof sweep & { replacementRounds: unknown; replacementKeyFor: (turn: number, ordinal: number) => string };
     expect(withRounds.replacementRounds).toEqual(replacementRounds(replayData.log));
     expect(withRounds.replacementKeyFor(3, 1)).toBe(`${replayData.id}:3r1:fp1`);
+    // Round 86 (T304): and the last stage that plays the game's biggest roll the other way, with its own cache key beside the turn keys.
+    const withStage = sweep as typeof sweep & { rolledCopy: { keyFor: (turn: number) => string; namedRoll: unknown; playCopy: unknown } };
+    expect(withStage.rolledCopy.keyFor(3)).toBe(`${replayData.id}:3x:fp1`);
+    expect(withStage.rolledCopy).toEqual({ keyFor: expect.any(Function), namedRoll: expect.any(Function), playCopy: expect.any(Function) });
 
     act(() => result.current.analyzeTurnNow(5));
     expect(spies.runGraphSweep.mock.calls[1][0]).toMatchObject({ from: 5, to: 6 });
     expect(spies.runGraphSweep.mock.calls[1][0]).not.toHaveProperty('replacementRounds');
+    expect(spies.runGraphSweep.mock.calls[1][0]).not.toHaveProperty('rolledCopy');
     act(() => result.current.analyzeTurnNow(6));
     expect(spies.runGraphSweep.mock.calls[2][0]).toMatchObject({ from: 6, to: 6 });
   });
