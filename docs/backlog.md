@@ -6,7 +6,7 @@ Evidence paths of the form `r<NN>/…` point to that round's probe folder, `docs
 
 ## Round 86 · the engine reads the dice
 
-The final gate of round 82 (01.11.2026, "2a") approved these TODOs for the next round, the engine setup; the gate of 11:31 ("3a") put a small batch first, the final gate of that batch (13:26, "3a") added T309 and T310, the design gate of 19:20 ("17a") put the turn dock first, and the gate of 03.11.2026 ("1a") put T318 first, so they form round 86. The design gate of 04.11.2026 (14:07, "1c, 2b, 3a, 4a") runs them in three lanes: A carries T299 and then T305, B carries T306 and then T304, C carries T310, and T309 follows the merge. The spec gate (15:37, "1a 2a 3a 4a") lets T305 make a search at most 20 % slower, gives T304 a sentence with both win chances of the side that rolled, and lets T306 fall back to the seed search, counted on the drift line. Each leaves this file with that round's booking.
+The final gate of round 82 (01.11.2026, "2a") approved these TODOs for the next round, the engine setup; the gate of 11:31 ("3a") put a small batch first, the final gate of that batch (13:26, "3a") added T309 and T310, the design gate of 19:20 ("17a") put the turn dock first, and the gate of 03.11.2026 ("1a") put T318 first, so they form round 86. The design gate of 04.11.2026 (14:07, "1c, 2b, 3a, 4a") runs them in three lanes: A carries T299 and then T305, B carries T306 and then T304, C carries T310, and T309 follows the merge. The spec gate (15:37, "1a 2a 3a 4a") lets T305 make a search at most 20 % slower, gives T304 a sentence with both win chances of the side that rolled, and lets T306 fall back to the seed search, counted on the drift line. The gates of 05.11.2026 (18:19, "1b 2a 3a"; 20:47, "1a 2a 3a 4a") add T322 to lane A after T305. Each leaves this file with that round's booking.
 
 ### T304 · The report plays the game's biggest roll the other way
 
@@ -119,6 +119,28 @@ In Gens 1 and 2 accuracy and crit draw in 256ths and the damage roll is `random(
 **Success.** A sweep over every screen and every item that changes its turns, in every generation and mod the corpus plays: the inference reads what the simulator's turns prove. Rows where the turns prove nothing: a removal on the plain last turn (in the same state file p1's Aurora Veil of turn 11 ended after four turns by Brick Break), Klutz, Embargo, Magic Room, an item traded before the screen. The two scenes as rows; set diffs on every build path before the bank (AGENTS.md, set and solver changes); the batch check.
 
 **Singles and doubles.** Both.
+
+### T322 · The search explores the strands of a turn by their chance
+
+*Eval engine · round 86 · feature · score-touching (D3)*
+
+**Approved for round 86 (gates of 05.11.2026, 18:19, "1b 2a 3a", and 20:47, "1a 2a 3a 4a"), lane A after T305.**
+
+**Problem.** Each outcome of a turn is a strand: Iron Head flinches (30 %) or it does not. Since T305 the verify round weights every strand of a root cell by its Dex chance. A strand gets the trees' depth only when at least two trees drew it, they agree within `VERIFY_DISAGREEMENT` and the pool has played the cell out (`deepPool` in `packages/eval-engine/src/mcts-merge.ts`); every other strand takes the one-ply estimate. Four trees draw each root cell once by their seed, so a 30 % strand gets two trees in about a third of the searches and none in a quarter. In Doubles OU gen9doublesou-2694111300 t13, three trees read the hit class of Swords Dance against Thunderbolt at -0.907. Two of them are thin (21 and 3 visits) and spread the pool 0.003 past the limit, so the merge takes the one-ply +0.600, and the game value reads +0.440 for the side that lost. Over 51 holdout rows A9 counted a deep pool in 1.8 % of the open classes.
+
+**Idea.** Four stages, each measured on its own against c104389 (A9b):
+1. References: a large search from each class child of pre-registered scenes, and the endgame solver where at most three bodies stand.
+2. The trust rule for keyed class pools, built on the references. Thin trees leave the count and the spread, a standard error replaces the fixed 0.075, and a single played-out tree with enough visits may stand. The floor of 0.9 stays, and 655336 t24 stays its guard.
+3. Block 1, the trees cover the strands. The strands of a root cell, ordered by their one-ply value, get on average four times their chance of the four trees through a random offset per cell (systematic sampling). The score weights each world by its Dex chance, and the line the app shows comes from a tree of the main strand.
+4. Block 2, a strand that can tip the decision gets its own search. It runs only at the best options and the played one, screened by the bound a strand of chance p and one-ply value q puts on its cell (at most p (1 - q) up and p (1 + q) down), with every compared option at one depth. It starts by softening a grade and naming the strand ("only the 30 % flinch saves this"), and it re-prices only where the references back it.
+
+**Benefit.** Engine and app: a move whose only out is an unlikely die reads its real chance, and a grade no longer hangs on the strands four trees happened to draw.
+
+**Success.** Set in the round's spec before the first measurement: the flagship cells land inside the reference's band; 655336 t24 keeps Dragon Dance level with Dragon Claw; the trust rule's acceptances lie closer to the reference than the one-ply estimate in at least 70 % of the census; no harm on the bank or the four holdouts. Cost against c104389: the trust rule adds no forks, block 1 at most 2 % forks, block 2 at most 10 % mean wall per tree turn and 25 % on the slowest turn, singles and doubles counted apart.
+
+**Singles and doubles.** Both in each stage; Doubles OU, VGC and Champions VGC each get their own row.
+
+**Evidence.** `docs/perf/probes/2026-11-04-r86/research/t322-chance-strands.md` (prior art and the ranked options); `docs/perf/probes/2026-11-04-r86/lanes/A/ledger.md` (A8, A9, A9b).
 
 ## Approved, waiting for a round
 
