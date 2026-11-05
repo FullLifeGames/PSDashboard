@@ -415,7 +415,8 @@ describe('scene: a doubles cell with secondary dice (the pair plan)', () => {
   row('forks-pair')('the pair plan of a one-die cell draws the natural first draw and one forced draw', () => {
     const cell = pairCellSample(eyes(), ...EXTRASENSORY, 3, cache);
     expect(cell).toMatchObject({ kind: 'sample', via: 'plan' });
-    expect((cell as { draws: number }).draws).toBeLessThanOrEqual(2);
+    // the three base seeds and at most one forced draw for the flinch (the A4 row counted the draws beyond the base: at most 2)
+    expect((cell as { draws: number }).draws).toBeLessThanOrEqual(3 + 1);
     const rock = pairCellSample(eyes(), ...ROCKSLIDE, 3, cache);
     expect((rock as { draws?: number }).draws ?? 0).toBeLessThanOrEqual(PAIR_DRAW_BUDGET);
     expect(rock).toMatchObject({ kind: 'sample', via: 'plan' });

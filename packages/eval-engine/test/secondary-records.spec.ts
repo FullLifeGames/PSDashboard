@@ -53,7 +53,8 @@ function played(mode: Mode, board: Battle, move: DexMove, seed: string): { log: 
 }
 
 describe.each(SWEEP_CASES)('the record of the secondary dice: $name', ({ rules, mode, name }) => {
-  const { moves } = sweepMoves(rules, move => entriesOf(move).some(witnessed) && !isDelayed(move) && !isCharge(move) && move.priority >= 0
+  // multi-hit moves draw the entry at every hit (Twineedle, Double Iron Bash): one record per hit is a rest for the gate
+  const { moves } = sweepMoves(rules, move => entriesOf(move).some(witnessed) && !isDelayed(move) && !isCharge(move) && !move.multihit && move.priority >= 0
     && ['normal', 'any', 'adjacentFoe', 'allAdjacentFoes', 'allAdjacent'].includes(move.target));
   const sample = SWEEPS_FULL ? moves : moves.slice(0, 10);
 

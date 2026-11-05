@@ -1,9 +1,10 @@
 import type { Battle } from '@pkmn/sim';
 import { strengthMix, type StrengthMix } from '../calc/fickle.ts';
 import { killCount, killShare, rollValue, type KillTable, type PricedHit } from './kill-table.ts';
-import { hpAfterHit, movesLater, randomDeviation } from './log.ts';
-import type { AccuracyRecord, CritRecord, PairRecord, PairScript, RollRecord } from './prng.ts';
+import { actsLater, hpAfterHit, randomDeviation } from './log.ts';
+import type { AccuracyRecord, CritRecord, PairRecord, PairScript, RollRecord, SecondaryRecord } from './prng.ts';
 import type { HitSnapshot } from './snapshot.ts';
+import { hitClasses, truncates, type EventSecondary } from '../search/secondary-classes.ts';
 
 /**
  * Round 56: one draw read as a class of the doubles pair plan. Every hit
@@ -16,12 +17,18 @@ import type { HitSnapshot } from './snapshot.ts';
  * product of their probabilities. Order, truncation, retargeting and
  * redirection are whatever the sim did in the draw. What the plan does not
  * price makes the read a fallback (spec rules F2 to F6).
+ *
+ * Round 86 (T305): the secondary dice of a hit are part of its class. The recorded dice (the effect, its chance, the result) name
+ * the effects that came true, the class key appends them (`p1a:rockslide>p2a=hit-nokill+flinch`), and the other results of the
+ * dice are alternatives with the script that asks for them. A flinch is priced only where the target has not moved yet.
  */
 
 export type PairOutcome = 'miss' | 'hit' | 'hit-kill' | 'hit-nokill';
 
 export interface Alternative {
   outcome: PairOutcome;
+  /** The effects that came true in the class (a hit that does not kill; sorted). */
+  tokens?: string[];
   probability: number;
   script: PairScript;
 }
@@ -30,6 +37,8 @@ export interface PairEvent {
   /** `${attackerSlot}:${moveId}>${targetSlot}` */
   key: string;
   outcome: PairOutcome;
+  /** The effects whose die came true on the drawn hit (sorted); empty for a miss, a kill and a hit without a die. */
+  tokens: string[];
   /** Probability of the drawn outcome. */
   probability: number;
   /** The other outcomes, with their probability and the script that asks for them. */
@@ -39,17 +48,16 @@ export interface PairEvent {
 export type Pattern = { kind: 'pattern'; key: string; weight: number; events: PairEvent[] };
 export type PatternRead = Pattern | { kind: 'fallback'; reason: string };
 export type TableFor = (snapshot: PricedHit) => KillTable | null;
+/** The entries a hit's move would draw (a missed hit and a kill record none); null when the simulator refuses the question. */
+export type EntriesFor = (hitKey: string) => readonly EventSecondary[] | null;
 
 type Dex = Battle['dex'];
 type Read = PairEvent | null | { fallback: string };
 
-interface Hit { key: string; accuracy?: AccuracyRecord; crit?: CritRecord; rolls: RollRecord[] }
+interface Hit { key: string; accuracy?: AccuracyRecord; crit?: CritRecord; rolls: RollRecord[]; dice: SecondaryRecord[] }
 /** A hit's tables: its one table, or for a move that doubles on a chance (Fickle Beam, T154) the table at each strength. */
 interface Priced { weak: KillTable; strong: KillTable | null; mix: StrengthMix | null }
 interface KillOdds { pKill: number; killed: boolean; priced: Priced | null }
-
-const FLINCH_ITEMS = new Set(['kingsrock', 'razorfang']);
-const FLINCH_PROOF = new Set(['innerfocus', 'shielddust']);
 
 const targetOf = (key: string) => key.slice(key.indexOf('>') + 1);
 
@@ -57,28 +65,44 @@ const targetOf = (key: string) => key.slice(key.indexOf('>') + 1);
 function hitsOf(records: readonly PairRecord[]): Hit[] {
   const byInstance = new Map<number, Hit>();
   for (const record of records) {
-    // Round 86 (T305): the secondary records are read from the doubles plan's own step (commit 6); until then the pattern ignores them
-    if (record.kind === 'tie' || record.kind === 'secondary') continue;
+    if (record.kind === 'tie') continue;
     let hit = byInstance.get(record.instance);
     if (!hit) {
-      hit = { key: record.key, rolls: [] };
+      hit = { key: record.key, rolls: [], dice: [] };
       byInstance.set(record.instance, hit);
     }
     if (record.kind === 'accuracy') hit.accuracy = record;
     else if (record.kind === 'crit') hit.crit = record;
+    else if (record.kind === 'secondary') hit.dice.push(record);
     else hit.rolls.push(record);
   }
   return [...byInstance.values()];
 }
 
-/** A landed hit whose move can make a target that has not moved yet flinch (spec rule F3). */
-function flinchChance(dex: Dex, roll: RollRecord, log: readonly string[]): boolean {
-  const { attacker, defender, moveId } = roll.snapshot;
-  if (FLINCH_PROOF.has(defender.abilityId) || defender.itemId === 'covertcloak') return false;
-  const secondaries = dex.moves.get(moveId).secondaries ?? [];
-  const flinches = FLINCH_ITEMS.has(attacker.itemId) || attacker.abilityId === 'stench' ||
-    secondaries.some(secondary => secondary.volatileStatus === 'flinch' && (secondary.chance ?? 100) < 100);
-  return flinches && movesLater(log, roll.logIndex, targetOf(roll.key));
+/**
+ * The entries a hit's dice decide: the recorded dice when the hit drew some, else the read of the move's entries (a missed hit and a
+ * kill draw none the plan can see). An effect that stops a target that has not moved yet counts only when the target moves later.
+ */
+function effectsOf(dex: Dex, hit: Hit, log: readonly string[], entriesFor: EntriesFor | undefined): EventSecondary[] | { fallback: string } {
+  const recorded: EventSecondary[] = hit.dice.map(die => ({ effectId: die.effectId, chance: die.chance, truncates: truncates(dex, die.effectId) }));
+  const entries = recorded.length > 0 || !entriesFor ? recorded : entriesFor(hit.key);
+  if (entries === null) return { fallback: 'secondary-read' };
+  const later = actsLater(log, hit.rolls[0]?.logIndex ?? hit.accuracy?.logIndex ?? 0, targetOf(hit.key));
+  return entries.filter(entry => entry.chance < 1 && (!entry.truncates || later));
+}
+
+/** The effects of a landed hit that came true, by the recorded dice (sorted, once each). */
+const cameOf = (hit: Hit, effects: readonly EventSecondary[]): string[] =>
+  [...new Set(effects.filter(entry => hit.dice.some(die => die.happened && die.effectId === entry.effectId)).map(entry => entry.effectId))].sort();
+
+/** The hit-nokill classes of the effects other than the drawn one, with the script that asks for each (`base` carries the hit, roll and crit). */
+function tokenAlternatives(pNoKill: number, effects: readonly EventSecondary[], drawn: readonly string[] | null, base: PairScript): Alternative[] {
+  return hitClasses(effects).filter(cls => !drawn || cls.tokens.join('+') !== drawn.join('+')).map(cls => ({
+    outcome: 'hit-nokill' as const,
+    tokens: cls.tokens,
+    probability: pNoKill * cls.weight,
+    script: effects.length === 0 ? base : { ...base, secondary: Object.fromEntries(effects.map(entry => [entry.effectId, cls.tokens.includes(entry.effectId)])) },
+  }));
 }
 
 /** The crit chance of a roll: the rolled denominator, none against a blocked crit, the drawn crit where nothing was rolled. */
@@ -174,68 +198,93 @@ function noKillScript(priced: Priced, hp: number): PairScript {
   return { hit: true, crit: false, roll: normal + Math.floor((16 - normal - 1) / 2), ...(priced.strong ? { doubled: false } : {}) };
 }
 
-/** A hit's outcomes as alternatives, the drawn one left out. */
-function hitAlternatives(pHit: number, pKill: number, priced: Priced, hp: number, drawn: PairOutcome): Alternative[] {
+/** A hit's outcomes as alternatives, the drawn one left out; the classes of the hit's dice split the no-kill outcome. */
+function hitAlternatives(
+  pHit: number, pKill: number, priced: Priced, hp: number, drawn: PairOutcome, effects: readonly EventSecondary[] = [], tokens: readonly string[] = [],
+): Alternative[] {
   const out: Alternative[] = [];
   if (pKill > 0 && drawn !== 'hit-kill') out.push({ outcome: 'hit-kill', probability: pHit * pKill, script: killScript(priced, hp) });
-  if (pKill < 1 && drawn !== 'hit-nokill' && killCount(priced.weak.normal, hp) < 16) {
-    out.push({ outcome: 'hit-nokill', probability: pHit * (1 - pKill), script: noKillScript(priced, hp) });
+  const noKill = drawn === 'hit-nokill';
+  if (pKill < 1 && (noKill || killCount(priced.weak.normal, hp) < 16)) {
+    out.push(...tokenAlternatives(pHit * (1 - pKill), effects, noKill ? tokens : null, noKill ? {} : noKillScript(priced, hp)));
   }
   return out;
 }
 
 /** A missed roll: its alternatives are the hit classes from the table of the accuracy snapshot (checked when a flip draws them). */
-function missRead(dex: Dex, hit: Hit, pHit: number, tableFor: TableFor): PairEvent {
+function missRead(dex: Dex, hit: Hit, pHit: number, tableFor: TableFor, effects: readonly EventSecondary[]): PairEvent {
   const snap = hit.accuracy?.snapshot ?? null;
   const damaging = !!snap && dex.moves.get(snap.moveId).category !== 'Status';
   const priced = snap && damaging ? priceHit(snap, dex, tableFor) : null;
   const alternatives = snap && priced
-    ? hitAlternatives(pHit, pricedShare(priced, snap.defender.hp, missedCrit(dex, snap)), priced, snap.defender.hp, 'miss')
+    ? hitAlternatives(pHit, pricedShare(priced, snap.defender.hp, missedCrit(dex, snap)), priced, snap.defender.hp, 'miss', effects)
     : [{ outcome: 'hit' as const, probability: pHit, script: { hit: true } }];
-  return { key: hit.key, outcome: 'miss', probability: 1 - pHit, alternatives };
+  return { key: hit.key, outcome: 'miss', tokens: [], probability: 1 - pHit, alternatives };
 }
 
 /** A landed hit: its kill odds, or no event where hit and kill are both certain. */
-function hitRead(hit: Hit, pHit: number, log: readonly string[], dex: Dex, tableFor: TableFor): Read {
+function hitRead(hit: Hit, pHit: number, log: readonly string[], dex: Dex, tableFor: TableFor, entriesFor?: EntriesFor): Read {
   const roll = hit.rolls[0];
   const missAlternative: Alternative[] = pHit < 1 ? [{ outcome: 'miss', probability: 1 - pHit, script: { hit: false } }] : [];
-  if (!roll) return pHit < 1 ? { key: hit.key, outcome: 'hit', probability: pHit, alternatives: missAlternative } : null;
+  if (!roll) return pHit < 1 ? { key: hit.key, outcome: 'hit', tokens: [], probability: pHit, alternatives: missAlternative } : null;
   const odds = killOdds(hit, roll, log, dex, tableFor);
   if ('fallback' in odds) return odds;
-  if (pHit >= 1 && (odds.pKill === 0 || odds.pKill === 1)) return null;
+  const effects = effectsOf(dex, hit, log, entriesFor);
+  if ('fallback' in effects) return effects;
+  // a landed hit that does not kill draws its dice; none recorded for an effect the read names is a read the plan cannot trust
+  if (!odds.killed && effects.length > 0 && hit.dice.length === 0) return { fallback: 'secondary-unread' };
+  if (pHit >= 1 && (odds.pKill === 1 || (odds.pKill === 0 && effects.length === 0))) return null;
+  return landedRead(hit, roll, pHit, odds, effects, missAlternative);
+}
+
+/** A landed hit's event: its class (the effects that came true), its probability and the other classes as alternatives. */
+function landedRead(hit: Hit, roll: RollRecord, pHit: number, odds: KillOdds, effects: readonly EventSecondary[], missAlternative: Alternative[]): Read {
   const outcome: PairOutcome = odds.killed ? 'hit-kill' : 'hit-nokill';
+  const tokens = odds.killed ? [] : cameOf(hit, effects);
+  const share = hitClasses(effects).find(cls => cls.tokens.join('+') === tokens.join('+'))?.weight;
+  if (share === undefined) return { fallback: 'secondary-class' };
   const hp = roll.snapshot.defender.hp;
   return {
     key: hit.key,
     outcome,
-    probability: pHit * (odds.killed ? odds.pKill : 1 - odds.pKill),
-    alternatives: odds.priced ? [...missAlternative, ...hitAlternatives(pHit, odds.pKill, odds.priced, hp, outcome)] : missAlternative,
+    tokens,
+    probability: pHit * (odds.killed ? odds.pKill : (1 - odds.pKill) * share),
+    alternatives: odds.priced
+      ? [...missAlternative, ...hitAlternatives(pHit, odds.pKill, odds.priced, hp, outcome, effects, tokens)]
+      : [...missAlternative, ...(outcome === 'hit-nokill' ? tokenAlternatives(pHit, effects, tokens, {}) : [])],
   };
 }
 
-function readHit(dex: Dex, hit: Hit, log: readonly string[], tableFor: TableFor): Read {
+function readHit(dex: Dex, hit: Hit, log: readonly string[], tableFor: TableFor, entriesFor?: EntriesFor): Read {
   if (hit.rolls.length > 1) return { fallback: 'multi-roll' };
   const roll = hit.rolls[0];
   if (roll?.snapshot.shielded) return { fallback: `shielded:${roll.snapshot.shielded}` };
-  if (roll && flinchChance(dex, roll, log)) return { fallback: 'flinch-chance' };
   const pHit = hit.accuracy ? Math.min(1, hit.accuracy.numerator / 100) : 1;
-  if (hit.accuracy && !hit.accuracy.hit) return missRead(dex, hit, pHit, tableFor);
-  return hitRead(hit, pHit, log, dex, tableFor);
+  if (hit.accuracy && !hit.accuracy.hit) {
+    const effects = effectsOf(dex, hit, log, entriesFor);
+    return 'fallback' in effects ? effects : missRead(dex, hit, pHit, tableFor, effects);
+  }
+  return hitRead(hit, pHit, log, dex, tableFor, entriesFor);
 }
 
-export function readPattern(records: readonly PairRecord[], log: readonly string[], dex: Dex, tableFor: TableFor): PatternRead {
+/** The `<slot>|<effect id>` pairs a recorded die explains: a stopping effect that came true on a target (its |cant| line is no deviation). */
+const explainedCants = (hits: readonly Hit[], dex: Dex): Set<string> =>
+  new Set(hits.flatMap(hit => hit.dice.filter(die => die.happened && truncates(dex, die.effectId)).map(die => `${targetOf(hit.key)}|${die.effectId}`)));
+
+export function readPattern(records: readonly PairRecord[], log: readonly string[], dex: Dex, tableFor: TableFor, entriesFor?: EntriesFor): PatternRead {
   if (records.some(record => record.kind === 'tie')) return { kind: 'fallback', reason: 'tie' };
-  const deviation = randomDeviation(log);
+  const hits = hitsOf(records);
+  const deviation = randomDeviation(log, explainedCants(hits, dex));
   if (deviation) return { kind: 'fallback', reason: deviation };
   const events: PairEvent[] = [];
-  for (const hit of hitsOf(records)) {
-    const read = readHit(dex, hit, log, tableFor);
+  for (const hit of hits) {
+    const read = readHit(dex, hit, log, tableFor, entriesFor);
     if (read && 'fallback' in read) return { kind: 'fallback', reason: read.fallback };
     if (read) events.push(read);
   }
   return {
     kind: 'pattern',
-    key: events.map(event => `${event.key}=${event.outcome}`).join('|'),
+    key: events.map(event => `${event.key}=${event.outcome}${event.tokens.map(token => `+${token}`).join('')}`).join('|'),
     weight: events.reduce((product, event) => product * event.probability, 1),
     events,
   };

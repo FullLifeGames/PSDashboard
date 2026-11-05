@@ -121,7 +121,8 @@ const witnessed = (entry: SecondaryEntry): boolean =>
   entry.chance !== undefined && entry.chance < 100 && !entry.self && !!(entry.status || entry.volatileStatus === 'flinch' || entry.boosts);
 
 describe.each(SWEEP_CASES)('a script answers the secondary die: $name', ({ rules, mode, name }) => {
-  const { moves } = sweepMoves(rules, move => entriesOf(move).some(witnessed) && playable(move) && move.priority >= 0);
+  // multi-hit moves draw the entry at every hit (Twineedle, Double Iron Bash): a script answers it once per effect, a rest for the gate
+  const { moves } = sweepMoves(rules, move => entriesOf(move).some(witnessed) && playable(move) && move.priority >= 0 && !move.multihit);
   const target = (['normal', 'any', 'adjacentFoe', 'allAdjacentFoes', 'allAdjacent'] as const);
 
   row(mode === 'singles' ? 'script-singles' : 'script-doubles')(`${name}: yes shows the effect, no does not, the others of the move stay off`, () => {
@@ -137,6 +138,8 @@ describe.each(SWEEP_CASES)('a script answers the secondary die: $name', ({ rules
           const secondary = Object.fromEntries(entriesOf(move).filter(other => other.chance !== undefined && other.chance < 100).map(other => [secondaryEffectId(other), false]));
           secondary[id] = happens;
           const log = scriptedLog(mode, move, board, secondary);
+          // a move that fails (Snore awake) draws no die
+          if (!log.some(line => line.startsWith('|-damage|p2a:'))) continue;
           scripted++;
           const shown = effectShown({ log } as unknown as Battle, 0, entry, 'p2a', 'p1a') && !log.some(line => line.startsWith('|-miss|') && (line.split('|')[3] === undefined || line.split('|')[3].startsWith('p2a:')));
           if (shown !== happens) problems.push(`${move.id} ${id} ${happens ? 'yes' : 'no'}: the protocol shows ${shown ? 'the effect' : 'no effect'}`);

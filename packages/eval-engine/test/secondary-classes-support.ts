@@ -37,7 +37,7 @@ export const T305_RED = process.env.T305_RED === '1';
 
 /** The rows that fail today and turn green with A5 (A5 removes each id when its commit turns the row green). */
 export const KNOWN = new Set<string>([
-  'pair', 'scene-flinch-doubles', 'forks-pair',
+  // empty: every row of the T305 specs is a plain test
 ]);
 
 /** A row: `test.fails` while its id is in KNOWN, a plain test otherwise (and under `T305_RED=1`). */

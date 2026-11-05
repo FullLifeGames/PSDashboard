@@ -36,15 +36,27 @@ export function hpAfterHit(log: readonly string[], from: number, targetSlot: str
   return null;
 }
 
-/** A random outcome the plan does not price: a |cant| from flinch, paralysis, freeze or attraction, a confusion check, a random drag-in. */
-export function randomDeviation(log: readonly string[]): string | null {
+/**
+ * A random outcome the plan does not price: a |cant| from flinch, paralysis, freeze or attraction, a confusion check, a random drag-in.
+ * Round 86 (T305): a |cant| that a recorded secondary die explains (`<slot>|<effect id>`: the flinch the hit's die came true with) is
+ * priced as a token of the hit's class, not a deviation.
+ */
+export function randomDeviation(log: readonly string[], explained: ReadonlySet<string> = new Set()): string | null {
   for (const line of log) {
     const parts = line.split('|');
-    if (parts[1] === 'cant' && RANDOM_CANT.has(parts[3] ?? '')) return `cant:${parts[3]}`;
+    const reason = parts[3] ?? '';
+    if (parts[1] === 'cant' && RANDOM_CANT.has(reason) && !explained.has(`${(parts[2] ?? '').split(':')[0]}|${reason.toLowerCase()}`)) return `cant:${reason}`;
     if (parts[1] === '-activate' && parts[3] === 'confusion') return 'confusion';
     if (parts[1] === 'drag') return 'drag';
   }
   return null;
+}
+
+/** Whether the body in `slot` has a |move| or a |cant| line at or after `from`: it takes its turn later (a flinched body shows the |cant|). */
+export function actsLater(log: readonly string[], from: number, slot: string): boolean {
+  const prefixes = [`|move|${slot}: `, `|cant|${slot}: `];
+  for (let index = from; index < log.length; index++) if (prefixes.some(prefix => log[index].startsWith(prefix))) return true;
+  return false;
 }
 
 /** Whether the body in `slot` has a |move| line at or after `from`: it acts later in the turn. */
