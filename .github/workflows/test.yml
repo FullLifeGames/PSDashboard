@@ -16,7 +16,7 @@ concurrency:
 jobs:
   node:
     name: Node suites
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - name: Check out repository
@@ -42,7 +42,7 @@ jobs:
   # forced-on pass still takes 12.
   engine-speed-layer:
     name: Engine suite, speed layer ${{ matrix.speed-layer }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     strategy:
       fail-fast: false
@@ -74,7 +74,7 @@ jobs:
   # fixed sample of them. One full run per push, beside the other jobs (user gate 31.10.2026, "1b").
   dice-sweeps:
     name: Dice sweeps, every move
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - name: Check out repository
@@ -96,7 +96,7 @@ jobs:
 
   browser:
     name: Browser flows
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - name: Check out repository
@@ -127,7 +127,7 @@ jobs:
 
   build:
     name: Production build smoke
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - name: Check out repository

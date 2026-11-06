@@ -17,7 +17,7 @@ concurrency:
 jobs:
   check:
     name: Check version
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.version.outputs.version }}
       should_release: ${{ steps.version.outputs.should_release }}
@@ -44,7 +44,7 @@ jobs:
     name: Release
     needs: check
     if: needs.check.outputs.should_release == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
       actions: write
@@ -112,7 +112,7 @@ jobs:
     name: Publish packages
     needs: [check, release]
     if: needs.check.outputs.should_release == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       # The token npm exchanges for its publish credential.
       id-token: write
