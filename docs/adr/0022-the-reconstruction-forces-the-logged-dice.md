@@ -1,0 +1,35 @@
+---
+Status: accepted (round 86, T306; the user approved it at the final gate of round 82, 01.11.2026, "2a", and at the spec gate of 04.11.2026, "1a 2a 3a 4a"). Supersedes ADR 0008.
+---
+
+# The reconstruction forces the dice the log names and searches seeds only for the dice no name covers
+
+A replay log holds the results of a game: the miss, the crit, the flinch. The simulator rolls its own dice when the dashboard rebuilds a turn, so a rebuilt turn can show a result the game did not have. ADR 0008 chose the least bad seed out of 16 for each turn. A seed fits the visible results by luck and leaves the hidden dice arbitrary: in the feedback runs of round 82, 24 of 356 turns still carried a result the game did not have, and one seeded crit cost game 653785 two turns. The dice module of round 82 (ADR 0002) can name a die and answer it, so the rebuild now says what the log says. The decision of round 86 (T306):
+
+- **The forced turn.** `playBlock` (`branch/runtime.ts`) reads the dice the block's lines show (`forcedTurnDice` in `dice/logged-block.ts`, over `loggedDice` in `dice/logged-results.ts`: accuracy, crit, hit count, secondary effect, self effect, status check, speed tie) and plays the block through the dice module with them forced. The dice the log hides, above all the damage rolls, come from index 0 of `ALIGNMENT_SEEDS` (`'1,2,3,4'`), reseeded every turn as before.
+- **The faint step** (user answer 2b; `faintStep`). The turn plays once on a copy of the battle. A perfect score against the log keeps the list. Otherwise `stepSets` moves the damage-roll step of the hits on the bodies whose faint differs, in the direction the log's faint asks for, the last step first. A set stands when it gives the log's dice, or when it gives the log's faints with no ended mismatch and no more soft mismatches than the natural turn has (ruling C1). A set that misses a logged faint never stands.
+- **The seed search for unnamed dice** (ruling C2, the hybrid). A turn that is still imperfect plays seeds 1 to 15 of `ALIGNMENT_SEEDS` for the dice no `DieKind` names (a sleep duration, Outrage's lock, the move Metronome calls), with the forced list kept, and keeps the best by (ended, faint, soft). A tie keeps the earlier seed. The drift line counts these turns as "seeded N".
+- **Phantom procs.** `quietProcs` (`dice/phantom-procs.ts`) forces an ability or item proc that the forced turn draws and no line of the block names to not happen. A proc the log shows stays with the dice.
+- **The fallback** (spec gate 4a). A turn that the copy cannot play forced, or that would end a game the log goes on past, takes the search over 16 seeds of ADR 0008 (`alignBlockSeed`), and the drift line shows "fallback N".
+- **The arrival and the adopt.** `alignArrivalDice` runs the same `faintStep`, so the first turn of a branch carries the dice of the rebuild, and the branch's own first turn joins the user's forced dice to the same list (ADR 0001).
+
+What ADR 0008 decided and this one keeps: `ALIGNMENT_SEEDS` is a frozen literal with `'1,2,3,4'` at index 0, and changing it is a cache-version event. The battle is reseeded every turn, so the turns' random streams stay independent. The pick is deterministic. Corrections from a snapshot write state directly (round 60). Damage magnitude stays unscored, because the boundary snapshots pin HP; the faint step looks at damage rolls only where a faint decides.
+
+## Considered options
+
+- Keep the search over 16 seeds (ADR 0008): measured at 332 perfect turns of 356, with the misses a seed cannot fix because the hidden dice decide them.
+- Force every die and no seed search: round 86's own reading (B7) found the head wrong where the base was right in 18 of 50 moved VGC rows, because dice no kind names (the sleep duration, the lock of Outrage, a called move) have no logged result. Hence the hybrid.
+- Force the damage roll from the log: the log never shows it; the boundary HP pins its effect, and the faint step searches exactly that part.
+- Force the procs the log shows to happen: not built. The symmetric rule needs a hit index in `DieName`, because a die key repeats for every hit of a multi-hit move.
+- `Battle#forceRandomChance` or rewriting move data: rejected in ADR 0002.
+
+## Consequences
+
+- Measured in round 86. Feedback corpus: perfect turns 332 to 343 of 356 (singles 293 of 297, Doubles OU 20 of 25, VGC 30 of 34), faint-residual 8, fallback 1. The bank's VGC replays (44 replays, 338 turns): perfect turns 206 to 229, soft mismatches 264 to 249, turns with a faint mismatch 24 to 29. Champions VGC (41 replays, 290 turns): perfect 186 to 207, soft 192 to 125, faint mismatch 28 to 28. Twelve of the 50 moved VGC rows stay right in the base and wrong here.
+- Cost. A quiet turn plays one more block on a copy. The seed search adds 46 block plays per VGC replay (largest 105) and 38 per Champions VGC replay (largest 120), against 16 trials for each imperfect turn in the base. Over the 12 fixtures the rebuild cost 57 % more than the base before the wait fix; `resolveForcedSwitches` now ends its wait when either side holds a new request object, so a replacement that faints on entry to hazards asks for the next one without a 1.5 s timeout, and `stepSets` plays the last step first, which cut 136 trials in the 12 fixtures with no result changed. The spec set no budget for the rebuild; the numbers went to the round's gate.
+- Bodies that leave the field. `takeBodyOut` (`branch/team-order.ts`) takes a body out the way the simulator's faint does (the End events of its ability and item, `faintQueued`, the fallen count). A sweep over every Dex ability with an End handler holds it to the simulator in every rule set the corpus plays.
+- Named rests. A proc the log shows can still fail under the frozen seed. Dice that need a hit index (Diamond Storm in doubles, a multi-accuracy chain, Present's power) and random-target moves in doubles cannot be forced. A knockout that only the simulator plays can leave the rebuilt side with more living bodies than the log shows until a snapshot corrects it.
+- The same machinery plays the report's copy: `rolledCopy` (`branch/rolled-copy.ts`) turns one die of a logged turn over and the engine prices the result (T304).
+- The cache version rises once at the merge (76), because rebuilt positions move. No protocol, support state or share link changes, so no format version rises; `AlignmentSummary` gains the optional fields `seededTurns` and `fallbackTurns`.
+
+Sources: `docs/superpowers/specs/2026-11-04-round-86-engine-reads-the-dice-design.md` (T306), `docs/adr/0008-reconstruction-replays-choices-and-searches-sixteen-seeds.md`, `docs/adr/0002-dice-recognized-by-simulator-hooks.md`, `docs/adr/0001-forced-dice-ride-on-the-slot-choice.md`, `docs/backlog.md` (T306), `test/regression/forced-reconstruction.spec.ts`, `packages/eval-engine/test/dice-faint-step-sweep.spec.ts`, `dice-faint-seed-sweep.spec.ts`, `dice-phantom-proc-sweep.spec.ts`, `body-out-sweep.spec.ts`; gates of 01.11.2026, 04.11.2026 and 06.11.2026.

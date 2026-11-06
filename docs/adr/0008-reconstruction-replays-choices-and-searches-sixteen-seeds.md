@@ -1,5 +1,5 @@
 ---
-Status: accepted, under review by T306 (approved for round 86)
+Status: superseded by ADR 0022 (round 86, T306)
 ---
 
 # The reconstruction replays choices and picks the simulator's dice by a search over 16 seeds
@@ -14,6 +14,6 @@ A replay log holds the results of a game (a miss, a crit, a flinch), but the sim
 
 ## Consequences
 
-Up to 16 trial advances per turn plus the real one. In round 82, the 24 turns without a perfect match carry a result the game did not have until the next snapshot corrects it. T306 (approved at the final gate of round 82, 01.11.2026, "2a", moved to round 86) replaces the search with forced logged results where the log shows them. If it lands, this ADR gets the status "superseded by" the ADR of that round, and one fixed seed stays for the dice the log hides (damage rolls).
+Up to 16 trial advances per turn plus the real one. In round 82, the 24 turns without a perfect match carry a result the game did not have until the next snapshot corrects it. T306 (approved at the final gate of round 82, 01.11.2026, "2a", built in round 86) replaced the search with forced logged results where the log shows them. ADR 0022 supersedes this ADR: one fixed seed stays for the dice the log hides (damage rolls), and the search over 16 seeds survives as the fallback and as the search for dice no name covers. The text above records the decision of 15.08.2026 as it stood.
 
 Sources: `docs/superpowers/specs/2026-08-15-hax-alignment-design.md` (section 2, approach 1 of 3), `docs/superpowers/plans/2026-08-15-hax-alignment.md`, `docs/superpowers/specs/2026-08-14-feedback-corpus-harness-design.md` (determinism), `docs/superpowers/specs/2026-10-02-round-60-design.md`, `ARCHITECTURE.md`, `docs/backlog.md` (T306), `docs/adr/0002-dice-recognized-by-simulator-hooks.md`; gate 01.11.2026.
