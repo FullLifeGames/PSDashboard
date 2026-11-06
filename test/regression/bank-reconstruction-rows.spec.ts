@@ -1,6 +1,9 @@
 /* eslint-disable no-restricted-imports -- Round 86 (B9): a white-box measurement chain like forced-reconstruction.spec.ts, which this spec shares its support file with: it reads the alignment records of the engine package, none of which the barrel exports. */
 import { existsSync } from 'node:fs';
 import { beforeAll, describe, expect, test } from 'vitest';
+import { applyTargetCorrections } from '../../packages/eval-engine/src/branch-engine';
+import type { SimBattle } from '../../packages/eval-engine/src/branch/types';
+import { deserializeBattleExact } from '../../packages/eval-engine/src/forward-model';
 import { isPerfectAlignment } from '../../packages/eval-engine/src/hax-alignment';
 import { rebuild, type Rebuilt } from './forced-reconstruction-support';
 
@@ -11,7 +14,18 @@ import { rebuild, type Rebuilt } from './forced-reconstruction-support';
  *
  * - C1, 2243810213 (Regulation H) turn 6: the log has Jet Punch knock out Annihilape. The turn has a soft mismatch no die mends, so the faint
  *   step used to throw its step set away and Annihilape stood at 14 of 186.
+ * - C3, 2243810213 turn 7 and 2159578969 turn 5: a body the log faints and the turn leaves standing. The correction at the turn's boundary
+ *   used to write `fainted` and hp 0 and nothing else: the unshown bench of p2 (Typhlosion and Farigiraf never came out) stayed alive, so p2
+ *   stood at three living bodies against the log's one; Weezing's Neutralizing Gas never ended, so Slow Start never started on Regigigas.
  */
+
+/** The position the bank scores: the boundary position of the rebuild with the snapshot's corrections (`applyTargetCorrections`). */
+const bankPosition = (rebuilt: Rebuilt, turn: number): SimBattle => {
+  const battle = deserializeBattleExact(rebuilt.positions.get(turn)!) as SimBattle;
+  applyTargetCorrections(battle, rebuilt.snapshotFor(turn));
+  return battle;
+};
+const living = (battle: SimBattle, side: 0 | 1): number => battle.sides[side].pokemon.filter(body => !body.fainted && body.hp > 0).length;
 
 const present = (id: string): boolean => existsSync(`.fit-corpus/${id}.json`);
 const SCENE_C1 = 'gen9vgc2024regh-2243810213';
@@ -29,5 +43,48 @@ describe.skipIf(!present(SCENE_C1))('C1: the faint step takes a step set that gi
     const { actual } = rebuilt.records.get(6)!;
     expect(isPerfectAlignment(actual)).toBe(false);
     expect(actual.softMismatches).toBeGreaterThan(0);
+  });
+});
+
+/** The raw boundary position of a turn with the snapshot of a later turn applied: a body the log faints in between, the simulator's turn never did. */
+const correctedWith = (rebuilt: Rebuilt, turn: number, snapshotTurn: number): SimBattle => {
+  const battle = deserializeBattleExact(rebuilt.positions.get(turn)!) as SimBattle;
+  applyTargetCorrections(battle, rebuilt.snapshotFor(snapshotTurn));
+  return battle;
+};
+
+describe.skipIf(!present(SCENE_C1))('C3: a body the correction faints leaves the game as the simulator takes it out (2243810213)', () => {
+  let rebuilt: Rebuilt;
+  beforeAll(async () => { rebuilt = await rebuild(SCENE_C1, { corpus: true, through: 7 }); }, 300_000);
+
+  test('turn 7: p2 stands at the one living body the log shows', () => {
+    expect(living(bankPosition(rebuilt, 7), 1), 'living bodies of p2').toBe(1);
+  });
+
+  // The log's turn 6 knocks out Annihilape and sends nobody in; the position at turn 6 still has it at 138 of 186, and the correction is all that
+  // faints it. Typhlosion and Farigiraf never come out of the bag (the log shows four bodies of p2): they leave with it.
+  test('the correction that faints the last shown body of p2 retires the unshown bench', () => {
+    const battle = correctedWith(rebuilt, 6, 7);
+    const names = battle.sides[1].pokemon.filter(body => !body.fainted && body.hp > 0).map(body => body.name);
+    expect(names).toEqual(['Unashamed']);
+  });
+});
+
+const SCENE_C3B = 'gen9vgc2024regg-2159578969';
+describe.skipIf(!present(SCENE_C3B))('C3: the end of Neutralizing Gas starts what the gas held back (2159578969)', () => {
+  let rebuilt: Rebuilt;
+  beforeAll(async () => { rebuilt = await rebuild(SCENE_C3B, { corpus: true, through: 5 }); }, 300_000);
+
+  // The log's turn 2: Earth Power knocks out Weezing, `-end Neutralizing Gas`, `-start Slow Start` on Regigigas. The position at turn 2 has Weezing
+  // alive (gas on, Slow Start held back); the correction to the log's turn 3 takes Weezing out through its End event. The rebuild itself meets the same
+  // faint one step earlier, in `faintThePredecessor` (branch/entry-effects.ts, the switch-in of Grafaiai in its slot), which has its own flags and no End
+  // event: that path is not lane B's file, and the row of the whole rebuild (the position at turn 5) waits for it (ledger B9).
+  test('turn 2 with the snapshot of turn 3: Weezing stands at 0 and Slow Start runs on Regigigas', () => {
+    const battle = correctedWith(rebuilt, 2, 3);
+    const bodies = battle.sides.flatMap(side => side.pokemon);
+    const regigigas = bodies.find(body => body.species.id === 'regigigas')!;
+    const weezing = bodies.find(body => body.name === 'Weezing')!;
+    // Slow Start keeps its counter in the ability's state (the log's `-start` line)
+    expect({ slowStart: (regigigas.abilityState as { counter?: number }).counter, weezing: weezing.hp }).toEqual({ slowStart: 5, weezing: 0 });
   });
 });
