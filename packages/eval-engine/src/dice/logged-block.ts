@@ -20,7 +20,7 @@ import { dieKey, type DiceReport, type DieName, type DieReport, type ForcedDie }
 /**
  * Round 86 (the log's dice, T306): a logged turn through the dice module. The reconstruction used to replay a block's choices under the
  * best of sixteen seeds; now it plays them under the hidden dice of one frozen seed (index 0 of `ALIGNMENT_SEEDS`) with the dice the
- * log shows forced on top (ADR 0008, decision 4a). Three callers share this file: the reconstruction (`branch/runtime.ts`), the arrival
+ * log shows forced on top (ADR 0022). Three callers share this file: the reconstruction (`branch/runtime.ts`), the arrival
  * and the adopt (`branch/arrival-dice.ts`, which records the draws of the same turn), and the branch's first turn (`dice/turn.ts`
  * joins the same list to the user's dice).
  *

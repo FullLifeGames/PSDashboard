@@ -29,10 +29,10 @@ function mix32(x: number): number {
 
 /**
  * Round 61: the seed a tree cell draws at creation. Round 86 (the engine reads the dice, T323): a hash of (seedOffset,
- * iteration). The five SEARCH_SEEDS are one arithmetic progression of the Gen 5 LCG state, so at draw n a die came true
- * in 0, 1 or 2 of the five streams, never in a fifth of them at random: a 10 % paralysis in 0 or 20 % of a tree's
- * cells, a 90 % move missing in 73 % of slot 1's cells and in at most 7 % of the others, the same outcome in every cell
- * of one slot (A10). A tree expands at most one cell per iteration, so (offset, iteration) names the expansion and
+ * iteration). The five SEARCH_SEEDS are one arithmetic progression of the Gen 5 LCG state, so at one draw index a die came true
+ * in 0, 1 or 2 of the five streams, never in a tenth of them at random: a 10 % paralysis in none or in a fifth of the five
+ * seeds (in the singles tree one seed carried it in 74 % of its cells, the other four in at most 2 %), a 90 % move missing
+ * in 73 % of slot 1's cells and in at most 7 % of the others, the same outcome in every cell of one slot (A10). A tree expands at most one cell per iteration, so (offset, iteration) names the expansion and
  * needs no cell key. The four 16-bit words of the seed come from a chain of the finalizer, none zero, and any tree
  * count gets its own streams. The sampler, the matrix search, the verify round and the endgame children keep
  * SEARCH_SEEDS.
