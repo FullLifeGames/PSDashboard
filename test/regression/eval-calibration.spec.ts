@@ -912,6 +912,76 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * ROUND 87 2026-11-06 (improvement round 87, the release wave of 1.1.0:
+ * the dependencies with the @pkmn train at 0.10.15, T313 and T317; before
+ * it the CI fix b04a434 on dev; on r87 from dev b04a434, opening 430d2bb;
+ * lane A in w87a on r87-a with its own node_modules, lane B in w87b on
+ * r87-b, one fresh agent per step; merged in the clone ps-dashboard-2-m87
+ * (be0c344, 1e2f89d, 1c00394 cache v77); 25c774a the README picture,
+ * 4615f51 the runners; probes docs/perf/probes/2026-11-06-r87/). Gates:
+ * opening about 16:40 ("1a, können wir eventuell auch als parallele Wave
+ * machen, der Rest für 1.1.1 dann", "2a"), lane B's images 17:52 ("1a
+ * 2a"), the README picture ("Nimm es neu auf"), final 20:47 ("1a 2a 3a").
+ * DELIVERED: the CI fix (b04a434). The first push after round 86 turned
+ * the dev test workflow red: two fork rows of T305 in
+ * secondary-classes-paths.spec.ts count copies with the speed layer's
+ * counter, which stays at 0 in the job with the layer forced off
+ * (EVAL_SIM_FAST=0). The rows switch the layer on for themselves, as
+ * contact-hits.spec.ts does, and reset it after; 48 of 48 pass with the
+ * layer off, on and at its default, and CI on b04a434 is green in all six
+ * jobs.
+ * Lane A part 1 (7c4703a, lossless): eight dev packages to their latest
+ * (playwright 1.65.0, tailwind 4.3.5, plugin-react 6.2.1, eslint 10.14.0,
+ * globals 17.14.0, knip 6.44.1, vite 8.3.6, vitest 5.1.0); TypeScript
+ * stays on 6.0.3 (typescript-eslint 8.72.1 asks <6.1.0) and @types/node on
+ * 24. Part 2 (3f4822c): the @pkmn train 0.10.12 to 0.10.15 (Showdown
+ * b354a81f..16db150a, 48 commits), smogon 0.6.3, sets 6.0.0, types 5.0.0.
+ * Three rules change (A2 played each on both versions): a Struggle that
+ * deals no damage costs its user a quarter of its HP (4148c11; Gen 4
+ * rounds down), a Gen 1 Transform resets the last selected slot (035c1a1),
+ * a typeless Synchronoise misses a typeless target (f460bee); no scene of
+ * them in the 7,035 fit-corpus logs. None of the 14 speed-layer hashes
+ * moves; T103 stays parked.
+ * Lane B: T313 (49de792) darkens the button gradients by one factor per
+ * gradient: .ps-btn #4b6c89 to #37526c, .ps-btn-red and Execute #b04552 to
+ * #8a2937; white text reads at least 5.5 : 1 at rest and 4.6 : 1 under
+ * hover (before 2.5 and 2.0 at the top stop); button-contrast.spec.ts
+ * holds forms.css, dock.css and loader.css (red in 10 of 17 rows first).
+ * T317 (9d5c1f5): an unknown spread reads "EVs not yet known" without a
+ * source word. Also: the README picture retaken in the UI of 1.1.0 (1412 x
+ * 663, the turn dock and T313's buttons; link-preview.spec.ts red on the
+ * old height first), and every workflow job names ubuntu-24.04
+ * (workflow-runners.spec.ts red in three workflows first).
+ * MEASUREMENT: classes set at the opening: lane A part 1 lossless, part 2
+ * score-touching by the simulator with the batch check, lane B lossless.
+ * Base r87-base (430d2bb) in CI: bank 838, Doubles OU 1,092, vgc2 4,217,
+ * Champions OU 445, Champions VGC 1,449 rows. A1 alone: bank 838 of 838
+ * rows byte-identical, feedback a1f1 and a1f2 12 of 12 byte-identical with
+ * each other and with round 86's w1. Wave (1c00394) against r87-base:
+ * every row byte-identical, 8,041 of 8,041 over the bank and the four
+ * holdouts; no gain, no harm, no warning at the fixed and the own K.
+ * Feedback w1 and w2 in MAIN: 12 of 12 byte-identical with each other and
+ * with round 86's w1; census unchanged (singles 39/6/2, doubles 16/3/1), 0
+ * moved turns. e2e 137 passed, 8 skipped. Final suite in MAIN
+ * (DICE_SWEEPS=full, 4 workers, 1,941 s): 44,461 passed, 47 expected fail,
+ * 27 skipped, 0 failed, all 757 files started. Engine project with
+ * EVAL_SIM_FAST=0: 10,811 passed, 0 failed. One expectation moved:
+ * BattleStatsPanel.spec.tsx:43 from "EVs ?" to "EVs not yet known".
+ * USER GATE 2026-11-06 20:47 ("1a 2a 3a"): (1) the wave as measured, with
+ * the one re-pin; (2) the workflows on ubuntu-24.04 before the release;
+ * (3) after the booking dev goes to r87 and is pushed, then the release
+ * commit on dev; master and deploy.ps1 wait for the user's own okay.
+ * Rulings after A2: the README version lines in A3's commit, T103 parked,
+ * the integrator runs EVAL_SIM_FAST=0 and DICE_SWEEPS=full, 0.10.15 ships
+ * without waiting for 0.10.16.
+ * RESTS: npm audit reads 10 moderate findings from minimatch below 11.0.1
+ * under eslint (fix only by --force with eslint 9; --omit=dev reads 0);
+ * TypeScript 7 waits for typescript-eslint, @types/node 26 for the
+ * workflows' Node, @pkmn/sets 7 for the next sim. Round 88 is T322, then
+ * T319; T314, T316, T324 to T329 and T336 to T339 wait for 1.1.1. The
+ * worktrees w87a and w87b and the clone m87 go after the release. No new
+ * TODO; next free T343.
+ *
  * ROUND 86 2026-11-04 to 2026-11-06 (improvement round 86, a feature: the
  * engine reads the dice, T299, T305, T323, T306, T304 and T310, with T322
  * stage 0 as probes, T309 closed without a refit, and a fresh VGC holdout;

@@ -1,48 +1,8 @@
 # Backlog
 
-This file holds the details of every open TODO, one section per TODO under its fixed T-number. Release v1.0.2 is out (30.10.2026), and rounds 82 to 86 (forced dice in branches, the GitHub issues #2 and #3, the turn dock, the smooth UI, the engine that reads the dice) wait on dev for the next release. Round 87 is the release wave of 1.1.0 (the dependencies, T313, T317); round 88 carries T322 (the search explores the strands of a turn by their chance, blocks 1 and 2), and T319 (an inventory of dead code) follows it; T314, T316, T324 to T329 and T336 to T339 are approved and wait for a round of 1.1.1; every other TODO is parked with a trigger, and a trigger that fires brings its TODO to a gate. The next free T-number is T343.
+This file holds the details of every open TODO, one section per TODO under its fixed T-number. Release v1.0.2 is out (30.10.2026), and rounds 81 to 87 (the reload after a deploy, forced dice in branches, the GitHub issues #2 and #3, the turn dock, the smooth UI, the engine that reads the dice, the dependencies of 1.1.0 with T313 and T317) wait on dev for the release of 1.1.0. Round 88 carries T322 (the search explores the strands of a turn by their chance, blocks 1 and 2), and T319 (an inventory of dead code) follows it; T314, T316, T324 to T329 and T336 to T339 are approved and wait for a round of 1.1.1; every other TODO is parked with a trigger, and a trigger that fires brings its TODO to a gate. The next free T-number is T343.
 
 Evidence paths of the form `r<NN>/…` point to that round's probe folder, `docs/perf/probes/<date>-r<NN>/`; `docs/` is local, so they exist only on the maintainer's machine. Each round's entry in `docs/completed/` names its folder and the gate that approved its TODOs. Line numbers in a section refer to the state when the TODO was written.
-
-## Round 87 · release 1.1.0
-
-The user on 06.11.2026 ("1a, können wir eventuell auch als parallele Wave machen, der Rest für 1.1.1 dann"): round 87 is the release wave of 1.1.0, two lanes side by side. Lane A moves the dependencies (the rest of `npm outdated`, then the @pkmn train from 0.10.12 to 0.10.15 with T103); lane B builds T313 and T317. Every other approved TODO waits for 1.1.1. They leave this file with that round's booking.
-
-### T313 · The app's buttons read at 4.5 : 1
-
-*App · round 84 · small fix · lossless*
-
-**Approved for the next small batch (final gate of round 84, 02.11.2026, "2a": with a before and after image before the build); round 87, lane B (06.11.2026).**
-
-**Problem.** The app's buttons carry white bold text on gradients that miss the 4.5 : 1 contrast normal text needs. `.ps-btn` (Setup, Analyze game, Play out, Cancel and the rest) on #75a8d5 to #567fa7 reaches 2.5 : 1 at the top and 4.2 : 1 at the bottom; `.ps-btn-red` (Load, Discard variation, Replace, Save, Import) on #d95565 to #aa3344 reaches 3.9 : 1 at the top (`src/styles/forms.css:94-112`). Execute paints its own copy of the red gradient (`.ps-dock .ps-execute-btn-ready`, `src/styles/dock.css:156`, hover `brightness(1.1)` at `dock.css:157`), the lead picker's Start button paints the same copy (`src/components/LeadPanel.tsx:80`), and the loader's guide steps copy the blue (`src/styles/loader.css:22`). `.ps-btn:hover` brightens by 1.12 (`forms.css:107`), so a stop that just passes at rest fails under the pointer. Round 84 darkened the dock's selection blue to #3d6998 to #2d5078 for the same reason; it holds 4.75 : 1 under hover.
-
-**Idea.** Darken both gradients until white text passes 4.5 : 1 at every stop, at rest and under hover, keeping the hue, and change the two copies with them (or let them read the same tokens). The hue-keeping minimum is about #547999 and #c54d5c at rest, about #4c6d8a and #b04552 with hover; the dock's selection blue is the model for the blue.
-
-**Benefit.** App: every button reads for users with weak eyes.
-
-**Success.** A contrast spec reads `forms.css`, `dock.css:156`, the Start button's style and `loader.css:22` and holds white against each stop, and against each stop at its hover brightness (1.12 for `.ps-btn`, 1.1 for Execute), to 4.5 : 1. The user approves a before and after image before the build: the top bar, the eval panel's Analyze game and Cancel, and the dock's Execute. The engine lines and report moments of the eval panel are dark chips (`eval-panel.css:71-76`) and stay as they are.
-
-**Singles and doubles.** Not affected (styles only).
-
-**Evidence.** `r84/lanes/A/ledger.md`, A6a (the contrast numbers and the dock's blue); `r84/review/t313-t314-review.md`. The line "Execute on `.ps-btn-red`" of A6a and the header of `test/regression/move-tile-contrast.spec.ts` name the wrong class; the build fixes the header.
-
-### T317 · "EVs ?" names what is unknown
-
-*App · round 84 · small fix · lossless*
-
-**Approved for the next small batch (02.11.2026, "15a"); round 87, lane B (06.11.2026).**
-
-**Problem.** The Battle Statistics tag of a body without known EVs reads "EVs ? UNKNOWN" (`src/components/BattleStatsPanel.tsx:43`: `evs.source === 'unknown' ? 'EVs ?' : '0 EVs'`); the question mark reads like an error, beside tags such as "252 HP / 4 SpD / 252 Spe EVs FROM MOVE ORDER".
-
-**Idea.** Say it in words, for example "EVs not yet known", keeping the tag's pattern (value, then source) or dropping the doubled source word.
-
-**Benefit.** App: the statistics read without a puzzle.
-
-**Success.** A ui spec on the tag's text; `test/ui/components/BattleStatsPanel.spec.tsx:43` expects "EVs ?" today and moves with the fix (a re-pin for the batch gate); the stop-slop rules.
-
-**Singles and doubles.** Not affected.
-
-**Evidence.** The integrator's screenshots of 02.11.2026 (`r84/gate/preview/r9-*.png`).
 
 ## Round 88 · the search explores the strands of a turn
 
@@ -72,7 +32,7 @@ The gates of 05.11.2026 (18:19, "1b 2a 3a"; 20:47, "1a 2a 3a 4a") approved T322 
 
 ## Approved, waiting for a round
 
-The gates of round 84 (02.11.2026 and 03.11.2026) approved T313, T314, T316 and T317: T313 and T317 run in round 87, T314 is a larger bug (D3) and T316 a feature, each its own round. The gate of 04.11.2026 approved T319 for after round 86; the final gate of round 86 (06.11.2026, "7a") put it after T322, which runs as round 88. The gates of round 86 approved T324 to T329 (06.11.2026, about 07:50) and T336 to T339 (11:50). Each leaves this file with its round's booking.
+The gates of round 84 (02.11.2026 and 03.11.2026) approved T313, T314, T316 and T317: round 87 delivered T313 and T317, T314 is a larger bug (D3) and T316 a feature, each its own round. The gate of 04.11.2026 approved T319 for after round 86; the final gate of round 86 (06.11.2026, "7a") put it after T322, which runs as round 88. The gates of round 86 approved T324 to T329 (06.11.2026, about 07:50) and T336 to T339 (11:50). Each leaves this file with its round's booking.
 
 ### T314 · A bench offers bodies the side never brought
 
@@ -1378,7 +1338,7 @@ The triage of 21.10.2026 and the user gates after it parked these TODOs; each se
 
 **Status.** 05.10.: since round 61 the layer carries the time gate, and no hash check runs in the browser (guard.ts:85-88); at the upgrade T103 runs first. Round 62 restated this; the old checkboxes in the source plan were background, and the round's spec rewrites the steps. Round 78 (29.10.2026, user gate "2a": only what the upgrade needs) moved the simulator to 0.10.12: three of the fourteen hashes changed and a review against 0.10.11 found no code the layer needs (runEvent's syntax, getCallback's SwitchIn fallback in every generation, getRuleTable's tag rules), so six pins moved; the engine suite passed in all three speed-layer modes; an agent read every gap above against 0.10.12 and found none that the release reaches (`r78/notes.md`). The gaps stay.
 
-**Trigger.** The next change of the @pkmn/sim version: upgrade (D24) or a new version in the weekly version check (section C of `NextSteps.md`). State 29.10.2026: 0.10.12 is the newest, installed in round 78.
+**Trigger.** The next change of the @pkmn/sim version: upgrade (D24) or a new version in the weekly version check (section C of `NextSteps.md`). State 06.11.2026: 0.10.15 is the newest, installed in round 87; none of the fourteen hashes moved and the release reaches none of the points above (round 87, lane A, step A2), so the TODO stays parked.
 
 **Open decisions.** (1) Should an unknown value in the app's kill switch switch the layer off, report loudly, or fall back to the default as today? (2) Does the layer check data below the top classes at runtime (costs time per copy), or only the census in CI?
 
@@ -1512,9 +1472,9 @@ Each bullet reads "signal → when to act".
 - [ ] The browser build is part of the feedback anchor: a Chromium change shifts the last floating-point place → every Playwright upgrade re-anchors with `FEEDBACK_DUMP=1`.
 - [ ] TypeScript stays on 6.x until typescript-eslint parses the native compiler; `@types/node` follows the CI Node major (24) → watch the peer range.
 - [ ] `ubuntu-latest` moves to Ubuntu 26; `bank.yml` pins Node 24.21.0 → once the runs report Ubuntu 26, run the identity pair again (two CI runs and a local run of one commit, `docs/perf/probes/2026-10-19-r71/compare.mjs`) before a verdict pairs a new CI run with an older base.
-- [ ] Weekly version check of `@pkmn/sim` (pin 0.10.12, exact in every manifest) → on a new version, `npm run upgrade:pkmn <version>` moves sim, mods, dex and data together and prints the checks (T103, the engine suite in all speed-layer modes, the batch check).
+- [ ] Weekly version check of `@pkmn/sim` (pin 0.10.15, exact in every manifest) → on a new version, `npm run upgrade:pkmn <version>` moves sim, mods, dex and data together and prints the checks (T103, the engine suite in all speed-layer modes, the batch check).
 - [ ] Screenshot probe `docs/probes/2026-09-03-css/` (32 tests, 34 screens, 0 pixel tolerance; `node scripts/run-e2e.mjs -c docs/probes/2026-09-03-css/shots.config.ts`, fixed on port 5174) → reuse it as a pixel gate for a UI round; re-record the baseline with `--update-snapshots` when copy or layout change on purpose.
-- [ ] Library bugs still open after `@pkmn` 0.10.12: the Mega-Z formes carry no Mega flag, and `@pkmn/client` 0.7.4 books a Z-move or Max-move name as a move slot and lacks a null check (T188); scenes and drafts in the upstream list of `NextSteps.md` → the user reports them; watch for a fix. Since 0.10.12 `DexFormats.extend` writes `data.Rulesets`, which may fix the silent base-Dex fallback of `Dex.formats.get('gen9championsou@@@Sleep Clause Mod')` → probe it first before `replay-format.ts:265` relies on it.
+- [ ] Library bugs still open after `@pkmn` 0.10.15: the Mega-Z formes carry no Mega flag, and `@pkmn/client` 0.7.4 books a Z-move or Max-move name as a move slot and lacks a null check (T188); scenes and drafts in the upstream list of `NextSteps.md` → the user reports them; watch for a fix. Since 0.10.12 `DexFormats.extend` writes `data.Rulesets`, which may fix the silent base-Dex fallback of `Dex.formats.get('gen9championsou@@@Sleep Clause Mod')` → probe it first before `replay-format.ts:265` relies on it.
 - [ ] `@smogon/calc` 0.12 lets Unseen Fist hit through Protect at a quarter in Gen 7 to 9, the Champions reading; in Scarlet/Violet it hits in full. `calc/protect.ts` asks the simulator for the mode first. The user decides on a report as a mode question (draft `r68/steps/upstream-calc-draft.md`) → watch whether the calculator binds the reading to the mode, then simplify `calc/protect.ts`.
 
 **Parked branches**
