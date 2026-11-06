@@ -190,14 +190,20 @@ const feedback = (name: string): ReplayData =>
 const has = (log: readonly string[], pattern: RegExp): boolean => log.some(line => pattern.test(line));
 
 describe('scene: smogtours-gen8ou-573756 turn 8, the fifth Scald into Clefable (singles)', () => {
-  // The reconstructed turn-8 position leaves Conscripts infatuated (Cute Charm of turn 1, the volatile `attract`), and the
-  // cell guard fences an infatuated attacker: a guard stays a guard, so the real cell stays seed-priced. The burn die of the
-  // Scald is the scene: the same board without the infatuation prices the burn as a class.
-  async function turn8(clear: boolean): Promise<{ board: Battle; root: SimPosition }> {
+  // Round 86 (B4b with lane A's scene, user gate of 06.11.2026, 2a). Before the merge the reconstructed turn-8 position left
+  // Conscripts infatuated (a Cute Charm proc of turn 1 that the log never shows, the volatile `attract`), and the cell guard
+  // fences an infatuated attacker: a guard stays a guard, so the real cell stayed seed-priced and the row read `fail`. Lane B
+  // forces the logged dice and quiets the phantom proc (`quietProcs`), so the real position carries no `attract` and reads
+  // `none` (Clefable stands burned already, so the Scald burn is no event, and Merciless adds none). The row that the guard
+  // fences an infatuated attacker keeps its purpose: it sets the volatile on purpose. The burn die of the Scald is the scene:
+  // the same board without the infatuation prices the burn as a class.
+  type Scalder = { removeVolatile(id: string): boolean; addVolatile(id: string, source: unknown): unknown; volatiles: Record<string, unknown>; ability: string; baseAbility: string };
+  async function turn8(mode: 'real' | 'infatuated' | 'clear'): Promise<{ board: Battle; root: SimPosition }> {
     const { runtime } = await reconstruct('smogtours-gen8ou-573756', 8, feedback('smogtours-gen8ou-573756'));
     const board = runtime.battleStream.battle as unknown as Battle;
-    if (clear) {
-      const scalder = board.sides[1].active[0] as unknown as { removeVolatile(id: string): boolean; ability: string; baseAbility: string };
+    const scalder = board.sides[1].active[0] as unknown as Scalder;
+    if (mode === 'infatuated') scalder.addVolatile('attract', board.sides[0].active[0]);
+    if (mode === 'clear') {
       scalder.removeVolatile('attract');
       // the Scald user's ability (a crit-ratio handler) trips the odds guard as well, and a guard stays a guard: the row clears it too
       scalder.ability = scalder.baseAbility = 'noability';
@@ -205,13 +211,20 @@ describe('scene: smogtours-gen8ou-573756 turn 8, the fifth Scald into Clefable (
     return { board, root: createRootPosition(serializeLiveBattle(board)) };
   }
 
-  test('the real position: the infatuated Scald user fences the cell (a guard stays a guard)', { timeout: 120000 }, async () => {
-    const { board } = await turn8(false);
+  test('the real position (round 86: no phantom infatuation): the Scald is no event, the cell reads none', { timeout: 120000 }, async () => {
+    const { board } = await turn8('real');
+    expect(board.sides[1].active[0].volatiles.attract).toBeUndefined();
+    expect(planCellEvents(board, 'move softboiled', 'move scald').kind).toBe('none');
+  });
+
+  test('an infatuated Scald user fences the cell (set on purpose; a guard stays a guard)', { timeout: 120000 }, async () => {
+    const { board } = await turn8('infatuated');
+    expect(board.sides[1].active[0].volatiles.attract).toBeDefined();
     expect(planCellEvents(board, 'move softboiled', 'move scald').kind).toBe('fail');
   });
 
   row('scene-573756')('without the infatuation: Soft-Boiled against Scald is a plan, and the 30 percent burn splits the hit', { timeout: 120000 }, async () => {
-    const { board, root } = await turn8(true);
+    const { board, root } = await turn8('clear');
     const played = playedChances(board, { p1: 'move softboiled', p2: 'move scald' }, ['p1a']).get('p1a') ?? [];
     expect(played.map(entry => entry.effectId)).toContain('brn');
     const plan = planCellEvents(board, 'move softboiled', 'move scald');
