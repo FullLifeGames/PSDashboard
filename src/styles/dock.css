@@ -153,7 +153,7 @@
   font-size: 14px;
   line-height: 1.2;
 }
-.ps-dock .ps-execute-btn-ready { background: linear-gradient(180deg, #d95565 0%, #aa3344 100%); border-color: #993344; }
+.ps-dock .ps-execute-btn-ready { background: linear-gradient(180deg, #b04552 0%, #8a2937 100%); border-color: #7c2937; }
 .ps-dock .ps-execute-btn:hover:not(:disabled) { transform: none; filter: brightness(1.1); }
 
 /* ── The tray ── */
