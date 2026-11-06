@@ -1,11 +1,11 @@
 import { readFileSync } from 'node:fs';
 import type { Battle } from '@pkmn/sim';
-import { describe, expect, test } from 'vitest';
+import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import type { ReplayData } from '@fulllifegames/replay-core';
 import { classifyChild, foldClassWeights, planCellEvents, type CellEvent } from '../src/cell-blend';
 import { createMatchupCache } from '../src/eval-function';
 import { advancePositionWithLog, createRootPosition, positionBattle, type SimPosition } from '../src/forward-model';
-import { simFastCounters } from '../src/forward/sim-fast/state';
+import { configureSimFast, resetSimFastForTests, SIM_FAST_DEFAULT, simFastCounters } from '../src/forward/sim-fast/state';
 import { loadSimMods } from '../src/forward/sim-mods';
 import { mctsTreeSearch } from '../src/mcts';
 import { drawPair } from '../src/pair/draw';
@@ -357,6 +357,10 @@ function draws(run: () => unknown, root: SimPosition): number {
 }
 
 describe('fork counts: a missing secondary class costs one forced draw, never a chase with probe seeds', () => {
+  // The rows count forks with the speed layer's copy counter, so they switch the layer on for themselves, as
+  // contact-hits.spec.ts does; under EVAL_SIM_FAST=0 (the CI job with the layer forced off) the counter stays at 0.
+  beforeAll(() => configureSimFast(SIM_FAST_DEFAULT));
+  afterAll(() => resetSimFastForTests());
   const { board, root } = board1v1({ species: 'Pikachu', moves: ['firefang'] }, { species: 'Vaporeon', moves: ['splash'] });
   const want = new Map<string, number>([...expectedClasses(0.95, [{ effectId: 'brn', chance: 0.1 }, { effectId: 'flinch', chance: 0.1 }])]);
   const priced = [...want].filter(([, weight]) => weight >= MIN_MASS).map(([key]) => key);
