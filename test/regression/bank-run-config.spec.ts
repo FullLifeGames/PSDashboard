@@ -69,6 +69,8 @@ describe('the allowlist of .bank-run.json', () => {
     const families = new Set(manifest.sets.map(set => set.family));
     for (const family of ['championsou', 'championsvgc', 'doublesou', 'vgc']) families.add(family);
     expect(holdoutTranches()).toEqual([...families].map(family => `holdout-${family}`).sort());
+    // The draw of 06.11.2026 (user gate "1c 2a 3a 4a 5a"): the fresh VGC holdout is in the manifest.
+    expect(holdoutTranches()).toContain('holdout-vgc2');
   });
 });
 

@@ -315,7 +315,8 @@ describe('quick tier', () => {
     const whole = bankUniverse(bank);
     expect(new Set(whole.ids).size).toBe(whole.ids.length);
     const wholeCounts = counted(whole, (_id, tranche) => tranche);
-    expect(wholeCounts.size).toBe(4);
+    // Round 86: the four families of the fit corpus plus vgc2, the fresh VGC holdout drawn on 06.11.2026.
+    expect(wholeCounts.size).toBe(5);
     for (const fraction of [0.1, 0.25, 0.5]) {
       process.env.EVAL_CALIBRATION_FRACTION = String(fraction);
       const quick = bankUniverse(bank);

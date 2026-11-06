@@ -1,11 +1,11 @@
 {
   "format": 1,
-  "release": "bank-data-0c5ed6c275536da9",
-  "asset": "bank-data-0c5ed6c275536da9.tar.gz",
-  "sha256": "03ec84279bd190cb168db45938cd1627ad0434f2a40dc5a76055a2bb610d0199",
-  "bytes": 14378451,
-  "tarSha256": "0c5ed6c275536da91dfa1f4c5c88b0fb9844b898ee0fa0a7c7fb610ae1292f23",
-  "files": 5690,
+  "release": "bank-data-f34e4cefce9fc811",
+  "asset": "bank-data-f34e4cefce9fc811.tar.gz",
+  "sha256": "9b21cd8c5c99bcad6d50c8ac3df1e5e68b0205887278255364cc4738a131ea9f",
+  "bytes": 15664266,
+  "tarSha256": "f34e4cefce9fc81150eca5d9c1eced21c81af992a97b452507ca3ff6198fb718",
+  "files": 7100,
   "dirs": {
     ".smogon-cache": {
       "files": 68,
@@ -13,9 +13,9 @@
       "sha256": "db8f6d0d89753f4a95dc87f99b2a725c0c2733bb3ca714ba643850bd74251b7f"
     },
     ".fit-corpus": {
-      "files": 5622,
-      "bytes": 55189015,
-      "sha256": "c82097f22b49ea186047b4c8a91195e19db1d99b2b9e1fbc91235740ddd19f5b"
+      "files": 7032,
+      "bytes": 64408961,
+      "sha256": "b85ee255de192eb4298ff01d161a5c07584326e9f29d68dfa844247f8356f05e"
     }
   }
 }
