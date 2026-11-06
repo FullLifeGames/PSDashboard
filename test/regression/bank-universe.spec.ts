@@ -73,7 +73,20 @@ describe('bank universe', () => {
     const corpus = new Set((JSON.parse(readFileSync(FIT_MANIFEST, 'utf-8')) as { replays: { id: string }[] }).replays.map(entry => entry.id));
     expect(barred.size).toBeGreaterThanOrEqual(134);
     expect([...corpus].filter(id => barred.has(id))).toEqual([]);
-    expect(holdoutSets().flatMap(set => set.ids).filter(id => !corpus.has(id))).toEqual([]);
+    // Round 86: the sets of the four families come from the corpus; a family that scripts/fresh-holdout.mjs drew does not.
+    const own = new Set(['championsou', 'championsvgc', 'doublesou', 'vgc']);
+    expect(holdoutSets().filter(set => own.has(set.family)).flatMap(set => set.ids).filter(id => !corpus.has(id))).toEqual([]);
+  });
+
+  // Round 86 (the fresh VGC holdout): a drawn family holds replays that no fit, bank or feedback run has read.
+  test('a drawn holdout family shares no replay with the fit corpus, the bank or the feedback corpus', () => {
+    const quoted = (path: string) => [...readFileSync(path, 'utf-8').matchAll(/'((?:[a-z0-9]+-)+\d+)'/g)].map(match => match[1]);
+    const barred = new Set([...quoted('test/regression/eval-calibration.spec.ts'), ...quoted('test/e2e-feedback/corpus.ts')]);
+    const corpus = new Set((JSON.parse(readFileSync(FIT_MANIFEST, 'utf-8')) as { replays: { id: string }[] }).replays.map(entry => entry.id));
+    const own = new Set(['championsou', 'championsvgc', 'doublesou', 'vgc']);
+    const drawn = holdoutSets().filter(set => !own.has(set.family)).flatMap(set => set.ids);
+    expect(new Set(drawn).size).toBe(drawn.length);
+    expect(drawn.filter(id => corpus.has(id) || barred.has(id))).toEqual([]);
   });
 
   test('the fit corpus needs a dump path, and an unknown source stops the run', () => {

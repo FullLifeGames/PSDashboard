@@ -63,7 +63,12 @@ describe('the allowlist of .bank-run.json', () => {
     const harness = readFileSync(fileURLToPath(new URL('./eval-calibration.spec.ts', import.meta.url)), 'utf8');
     const declared = [...harness.matchAll(/^\s+tranche: '([^']+)',$/gm)].map(match => match[1]).sort();
     expect([...BANK_TRANCHES].sort()).toEqual(declared);
-    expect(holdoutTranches()).toEqual(['holdout-championsou', 'holdout-championsvgc', 'holdout-doublesou', 'holdout-vgc']);
+    // Round 86 (the fresh VGC holdout): the manifest also carries the family scripts/fresh-holdout.mjs drew (vgc2), so the
+    // tranches are the four of the fit corpus plus one per drawn family, whatever the manifest holds.
+    const manifest = JSON.parse(readFileSync(fileURLToPath(new URL('./fixtures/fit-holdout-manifest.json', import.meta.url)), 'utf8')) as { sets: { family: string }[] };
+    const families = new Set(manifest.sets.map(set => set.family));
+    for (const family of ['championsou', 'championsvgc', 'doublesou', 'vgc']) families.add(family);
+    expect(holdoutTranches()).toEqual([...families].map(family => `holdout-${family}`).sort());
   });
 });
 
