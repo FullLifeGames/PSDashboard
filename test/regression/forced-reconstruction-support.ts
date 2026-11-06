@@ -55,7 +55,7 @@ export interface Rebuilt {
 }
 
 /** Rebuilds a fixture like the app: teams as the bank builds them, the 16-seed (or later the forced) reconstruction, boundaries captured. */
-export async function rebuild(id: string, options: { naked?: boolean; corpus?: boolean } = {}): Promise<Rebuilt> {
+export async function rebuild(id: string, options: { naked?: boolean; corpus?: boolean; through?: number } = {}): Promise<Rebuilt> {
   // Round 86 (B9): `corpus` reads a replay of the local fit corpus (the bank's replays) with the disk-cached Smogon data the bank pins
   const replay = JSON.parse(readFileSync(options.corpus ? join('.fit-corpus', `${id}.json`) : join('test', 'e2e-feedback', 'fixtures', `${id}.json`), 'utf-8')) as Fixture;
   await loadSimMods(getBranchSimulatorFormat(replay));
@@ -69,7 +69,8 @@ export async function rebuild(id: string, options: { naked?: boolean; corpus?: b
   const { snapshots, observations } = parsed;
   const snapshotFor = (turn: number) => snapshots[Math.min(turn - 1, snapshots.length - 1)] ?? null;
   const blocks = parseTurnBlocks(replay.log).turns;
-  const lastTurn = blocks[blocks.length - 1].turn;
+  // `through`: the last turn whose boundary position the caller needs (the reconstruction captures a position when it reaches the next turn)
+  const lastTurn = options.through === undefined ? blocks[blocks.length - 1].turn : options.through + 1;
   const positions = new Map<number, string>();
   const runtime = await reconstructBranchRuntime({
     format: getBranchSimulatorFormat(replay), p1Team, p2Team, replayLog: replay.log, targetTurn: lastTurn,
