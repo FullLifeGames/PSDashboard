@@ -1,4 +1,3 @@
-/* eslint-disable no-restricted-imports -- Round 86 (B2): a white-box measurement chain like eval-calibration.spec.ts: it reads the alignment reader, the turn-block parser and the first-turn helper of the engine package, none of which the barrel exports. The integrator adds this spec and its support file to the `ignores` of the root-spec zone in eslint.zones.mjs and drops this line. */
 import { beforeAll, describe, expect, test } from 'vitest';
 import { adoptSerializedRuntime } from '@fulllifegames/eval-engine';
 import { forcedBlock } from '../../packages/eval-engine/src/branch/arrival-dice';

@@ -1,4 +1,3 @@
-/* eslint-disable no-restricted-imports -- Round 86 (B5): a white-box row like forced-reconstruction.spec.ts: it reads the copy of the engine package (not in the barrel) and the rebuild support. The integrator adds this spec to the `ignores` of the root-spec zone in eslint.zones.mjs and drops this line. */
 import { beforeAll, describe, expect, test } from 'vitest';
 import { rolledCopy, type RolledCopy } from '../../packages/eval-engine/src/branch/rolled-copy';
 import { evaluatePosition } from '../../packages/eval-engine/src/eval-function';

@@ -1,4 +1,3 @@
-/* eslint-disable no-restricted-imports -- Round 86 (B9): a white-box measurement chain like forced-reconstruction.spec.ts, which this spec shares its support file with: it reads the alignment records of the engine package, none of which the barrel exports. */
 import { existsSync } from 'node:fs';
 import { beforeAll, describe, expect, test } from 'vitest';
 import { applyTargetCorrections } from '../../packages/eval-engine/src/branch-engine';

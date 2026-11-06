@@ -331,7 +331,10 @@ export interface StoredEval {
 //      click (T292); stored near stages, the forced-win starts they name and the denied ends read new values.
 // v75 (round 83, small batch): the turn boundary keeps the simulator's count of a side condition or a pseudo weather
 //      where the client's snapshot allows it (T307); positions under a screen of a Light Clay holder read new turns.
-const EVAL_ENGINE_CACHE_VERSION = 75;
+// v76 (round 86, the engine reads the dice): the rebuild plays each turn with the dice the log shows (T306), the report
+//      prices the copy of the turn's biggest roll (T304), and the item reader sees screen turns (T310); rebuilt positions
+//      and reports move.
+const EVAL_ENGINE_CACHE_VERSION = 76;
 
 /** Round 61: a search-budget form stores under its own tag; the default keeps today's keys. */
 const versionTag = (): string => {
