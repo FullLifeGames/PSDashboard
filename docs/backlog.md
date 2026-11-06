@@ -1,150 +1,38 @@
 # Backlog
 
-This file holds the details of every open TODO, one section per TODO under its fixed T-number. Release v1.0.2 is out (30.10.2026), and rounds 82 to 85 (forced dice in branches, the GitHub issues #2 and #3, the turn dock, the smooth UI) wait on dev for the next release. Round 86 carries the six approved TODOs of the engine setup (T299, T304 to T306, T309, T310); T313, T314, T316 and T317 are approved and wait for a round, and T319 (an inventory of dead code) follows round 86; every other TODO is parked with a trigger, and a trigger that fires brings its TODO to a gate. The next free T-number is T322.
+This file holds the details of every open TODO, one section per TODO under its fixed T-number. Release v1.0.2 is out (30.10.2026), and rounds 82 to 86 (forced dice in branches, the GitHub issues #2 and #3, the turn dock, the smooth UI, the engine that reads the dice) wait on dev for the next release. Round 87 carries T322 (the search explores the strands of a turn by their chance, blocks 1 and 2), and T319 (an inventory of dead code) follows it; T313, T314, T316, T317, T324 to T329 and T336 to T339 are approved and wait for a round; every other TODO is parked with a trigger, and a trigger that fires brings its TODO to a gate. The next free T-number is T342.
 
 Evidence paths of the form `r<NN>/…` point to that round's probe folder, `docs/perf/probes/<date>-r<NN>/`; `docs/` is local, so they exist only on the maintainer's machine. Each round's entry in `docs/completed/` names its folder and the gate that approved its TODOs. Line numbers in a section refer to the state when the TODO was written.
 
-## Round 86 · the engine reads the dice
+## Round 87 · the search explores the strands of a turn
 
-The final gate of round 82 (01.11.2026, "2a") approved these TODOs for the next round, the engine setup; the gate of 11:31 ("3a") put a small batch first, the final gate of that batch (13:26, "3a") added T309 and T310, the design gate of 19:20 ("17a") put the turn dock first, and the gate of 03.11.2026 ("1a") put T318 first, so they form round 86. The design gate of 04.11.2026 (14:07, "1c, 2b, 3a, 4a") runs them in three lanes: A carries T299 and then T305, B carries T306 and then T304, C carries T310, and T309 follows the merge. The spec gate (15:37, "1a 2a 3a 4a") lets T305 make a search at most 20 % slower, gives T304 a sentence with both win chances of the side that rolled, and lets T306 fall back to the seed search, counted on the drift line. The gates of 05.11.2026 (18:19, "1b 2a 3a"; 20:47, "1a 2a 3a 4a") add T322 to lane A after T305. Each leaves this file with that round's booking.
-
-### T304 · The report plays the game's biggest roll the other way
-
-*Engine · round 82 · feature · report prose (pins move)*
-
-**Approved for round 86 (final gate of round 82, 01.11.2026, "2a"; the user: "Ich will schon, dass Fire Fang korrekt als Miss deklariert und dass das das Game geändert hat. Das Engine Setup generell wäre für mich die nächste Runde").**
-
-**Problem.** smogtours-gen8ou-573756 turn 73: LordEnz's Garchomp at +4 misses Fire Fang (95 %) on SOULWIND's Corviknight at 15 % (59 of 399 HP, after Stealth Rock), and the report reads "The game's biggest roll came on turn 73: Fire Fang (95%) missed, worth +13% to SOULWIND." (T284, round 79, `packages/eval-engine/src/biggest-roll.ts:45-49`). The +13 % is the turn's chance part (`chanceDelta`, `packages/eval-engine/src/analysis.ts:67-69`): the next root's score after the miss against the price of the played pair, which averages hit and miss at their chances and also holds the turn's other dice and model error. The report never names the win chance a hit would have left, so it cannot say what the miss took from LordEnz. The gap pin of 573756 turn 73 (since 2026-08) still asks that "the bar shows how close the sweep stood".
-
-**Idea.** The report plays the biggest roll's other result: the dice module replays the turn on a copy with that die forced the other way (Fire Fang hits), every other die as the game rolled it, and the engine evaluates the position after it like any root. The report states both win chances, with the miss and had it hit.
-
-**Benefit.** App: the report says what the roll changed, measured in the game's own position after a hit.
-
-**Success.** The gap pin 573756 turn 73 moves toward its desired and comes to the round's gate as a truth candidate. The sentence moves in the two corpus reports that carry it (573756, and 562428 turn 11: "Stone Edge (80%) missed, worth +14% to Dflo"), each at the gate, and it speaks only where the log names the event (gate 30.10.2026, "2a"). Both scenes are singles: in doubles the sentence names no move today (`sureKillRoll` in `denied-end.ts:39-47`), so the round finds a Doubles OU and a VGC scene in the census or states that none exists. The forced copy rests on the dice sweeps of round 82; a Node probe prices the extra evaluation per replay; scores stay as they are, so three feedback runs read byte-identical apart from the moved prose.
-
-**Singles and doubles.** Both: the dice module names a doubles die by slot and target, where the round-79 sentence names no move for a doubles pair.
-
-**Evidence.** `r82/gate/feedback/g1/feedback-full-smogtours-gen8ou-573756.json` (`gameReport.summary`); the log of turns 72 and 73 in `test/e2e-feedback/fixtures/smogtours-gen8ou-573756.json` (Corviknight enters at 108/399, Stealth Rock leaves it at 59/399, then `|move|p2a: Penal Battalion|Fire Fang|p1a: Corviknight|[miss]`).
-
-### T305 · The search tree prices secondary effects at their chance
-
-*Engine · round 82 · feature · score-touching (D3)*
-
-**Approved for round 86 (final gate of round 82, 01.11.2026, "2a": the engine setup is the next round).**
-
-**Problem.** The engine prices a singles cell by outcome classes: miss, kill roll, non-kill roll, and both orders of a speed tie (`Outcome` in `packages/eval-engine/src/search/outcome-children.ts:64`, `foldClassWeights` in `packages/eval-engine/src/cell-blend.ts:289-297`). A secondary effect has no class, and the scripted dice cannot force one (`RollScript` carries hit, crit, roll and order, `forward/scripted-prng.ts:17-26`). Three class paths run today: the root cell sampler (`search/cell-sampler.ts`, probe seeds and forced draws up to `BOUNDARY_DRAW_BUDGET`; in doubles `pair/sampler.ts`), the class book of the tree's root cells (`RootClassBook` in `search/expansion.ts`: each tree draws one natural child per root cell and records its class through `classifyChild`), and the children of the endgame solver and the prover (`classChildren` in `endgame/children.ts`). The tree's own chance nodes (`groupedDraw` with `TREE_FORCED_CAP` in `search/expansion.ts`) run only with `CHANCE_NODES` on, and that switch stays off since round 43 (ADR 0009). On every live path a class takes its weight from the odds, and a burn, a flinch or a stat drop inside it counts at the share of the drawn children that happened to show it, not at its chance. A flinch writes a `|cant|` line, and `classifyChild` returns null for any `|cant|` on an event side (`cell-blend.ts:235-239`), so a draw with a flinch drops out of the class pricing (`outcome-children.ts:228`). A cell without a miss or a kill has no class at all: smogtours-gen8ou-573756 turn 8, LordEnz's fifth Scald in a row into Clefable, against Knock Off. The narrative counts the burn chance compounding to about 83 % over the streak (a truth pin since round 6), and a cell without a class reads the burn from whichever seeds it draws, so it counts fully or not at all. Corrected 03.11.2026 (user, "3a"): the first text named the chance-node path as the tree's class path; the spec of round 86 decides which live path T305 widens. The doubles pair plan reads a flinch chance only to fall back from its pattern (`pair/pattern.ts:74-81`, used at `:219`).
-
-**Idea.** The dice module names each secondary die of a move by its hook (`ModifySecondaries`, per target) and answers it on demand, so a cell draws "hit with burn" and "hit without burn" as classes of their own at the chance the simulator uses. That widens the class path to every cell with a secondary chance, including the cells without a miss or a kill. Serene Grace and Sheer Force rewrite the move in `ModifyMove`, which the offer runs before `ModifySecondaries` (`dice/offer.ts:65-81`); the tree's plan reads them the same way. The tree's scripted dice move onto the module first (T299), so one set of names serves the branch and the tree.
-
-**Benefit.** Engine: a 30 % burn or a 30 % flinch counts at 30 % in every cell, and a grade no longer rests on whether one seed showed it.
-
-**Success.** First a reach probe: how many tree cells of the bank carry a secondary under 100 %, split into cells with a class plan and cells without, and the tree's cost with the wider class path. Then a sweep over every Dex move with a secondary chance under 100, Serene Grace and Sheer Force included, in every generation and mod the corpus plays, compares the class weights with the simulator's chance; then the play-out pin, the golden 655336 and the bank in that order (AGENTS.md, tree changes), the bank and the holdouts without harm, the tier census with `--moved`, the cache version once.
-
-**Singles and doubles.** Both: the doubles pair plan gets the same classes per target.
-
-**Evidence.** The log of turns 4 to 8 in `test/e2e-feedback/fixtures/smogtours-gen8ou-573756.json` (p2a Scald into p1a Clefable on each; turn 8 burns: `|-damage|p1a: Clefable|239/393 brn`); the truth pin in `test/e2e-feedback/corpus.ts:118-122`.
-
-### T306 · The reconstruction forces the logged results
-
-*Engine · round 82 · feature · score-touching (D3: the replay's positions move)*
-
-**Approved for round 86 (final gate of round 82, 01.11.2026, "2a": the engine setup is the next round).**
-
-**Problem.** The reconstruction replays each turn's choices and searches 16 pinned seeds for one whose discrete results match the log: faints, the end, move order, misses, crits, secondary effects, hit counts, `|cant|` reasons and confusion self-hits (`ALIGNMENT_SEEDS` and `chooseAlignedSeed` in `packages/eval-engine/src/hax-alignment.ts:208-266`). In the feedback runs of round 82 the best seed matches the log in 332 of 356 turns: 286 of 297 in singles, 17 of 25 in Doubles OU, 29 of 34 in VGC. In the other 24 turns the rebuilt position carries a result the game did not have, or lacks one it had, until the next snapshot corrects it; 5 of them carry a faint mismatch (`faint-residual`). The first turn of a branch repeats its seed search on every adopt: `alignArrivalDice` always runs it (`branch/adopt.ts:52`, `branch/runtime.ts:274`), and the serialized position keeps only a seed, not the logged draws.
-
-**Idea.** The reconstruction forces the log's results with the dice module, as the first turn of a branch does since round 82 (`firstTurnDice` in `packages/eval-engine/src/dice/turn.ts:133`, reading the log through `loggedDice` in `dice/logged-results.ts:280`; it still runs on top of the seed search). A turn with logged results costs two advances (a natural copy and the real turn) instead of up to 16 trials plus the real one, a quiet turn costs one, and the dice the log hides come from one seed.
-
-**Benefit.** Engine and app: every rebuilt position carries the game's own results, doubles above all, and no turn tries more than one seed.
-
-**Success.** The drift report's alignment line reads perfect for every turn whose mismatch is a logged result, per singles, Doubles OU and VGC. The log hides damage rolls (`logged-results.ts:14-18`), so the 5 turns with a faint mismatch may stay; the design gate decides whether a roll step read from the log's HP joins. The reconstruction's positions move: the cache version once, three feedback runs, the tier census with `--moved`, the bank and the holdouts without harm; the time of a reconstruction and of an adopt, interleaved with the base on a quiet machine.
-
-**Singles and doubles.** Both; doubles gain most (46 of 59 turns align today).
-
-**Evidence.** `r82/gate/feedback/g1/feedback-drift.md`, line 6 (`meta.alignmentByReplay` in `feedback-drift.json`).
-
-### T299 · A scripted die decides the attacker's status check
-
-*Engine · round 82 · small · score-touching*
-
-**Approved for round 86 (final gate of round 82, 01.11.2026, "2a": the engine setup is the next round). Parked before (planning of round 82, 31.10.2026, "11a"); its trigger fires in round 86, which moves the scripted dice onto the forced-dice module.**
-
-**Problem.** The tree's scripted dice tell a draw by the numbers in the call, and the simulator draws the attacker's status checks inside the same action: `runMove` sets the active move before `BeforeMove` (`@pkmn/sim` 0.10.12, `battle-actions.js:292` and `:301`).
-
-`ScriptedPRNG` (singles, `packages/eval-engine/src/forward/scripted-prng.ts:80-86`) takes the first `randomChance(x, 100)` of a scripted move as its accuracy roll and any `randomChance(1, d)` with a crit denominator as its crit roll. A script therefore decides full paralysis (1 in 4, 1 in 8 in Champions), the infatuation (1 in 2), the Champions thaw (1 in 4) and the confusion check. From Gen 7 the check draws 33 in 100, and `{ hit: true }` makes a confused Snorlax hit itself on every seed, where the plain seeds show a self-hit on a third of them; in Gens 2 to 6 it draws 1 in 2, true means no self-hit, and `{ crit: false }` forces the self-hit. A check read as the accuracy roll also spends the action's accuracy flag, so the move's real accuracy roll goes unscripted (`:80-81`). The self-hit's damage roll takes the script's roll, because the script answers the first `random(16)` of the action (`:91-100`).
-
-`PairPRNG` (doubles, `pair/prng.ts:107-119`) guards the crit with `inDamage()`. From Gen 7 it books the confusion check as an accuracy record of 33, lets a script decide it, and leaves the move's real accuracy roll unrecorded (`:107-108`). It books every `random(16)` of the action as a roll of the move (`:131-146`), the self-hit's too: on the attacker from Gen 7, and on the move's own target in Gens 3 to 6, a hit that never happened. The guard `randomDeviation` (`pair/log.ts:40-48`, read at `pair/pattern.ts:227`) sends every draw with a confusion check to the plain mean, so these records do not reach the pattern today; the fix makes them true for the code after the guard and keeps the scripts off the check.
-
-In Gens 1 and 2 accuracy and crit draw in 256ths and the damage roll is `random(217, 256)`, so `ScriptedPRNG` reaches none of them. The singles tree checks each forced draw against its log (`search/outcome-children.ts:201-202`), so a misread draw there tends to leave a class empty rather than fill a wrong one; nobody has measured the grades it moves.
-
-**Idea.** Name a draw by where the simulator draws it (ADR 0002): first by the hook that runs right before it (the `Accuracy` event, `ModifyCritRatio`, `battle.randomizer`, and in every generation the `BeforeMove` handler that draws a status check), else by the simulator method that encloses the draw. Gen 1 draws the crit from base Speed without `ModifyCritRatio` (`data/mods/gen1/scripts.js:796-825`); Gen 2 runs the hook but draws the crit as `random(256)` (`gen2/scripts.js:541-547`) and runs `Accuracy` twice before one draw (the draw at `:243`); both draw the damage roll as `random(217, 256)` (`gen1/scripts.js:937`, `gen2/scripts.js:687`). Round 82 builds this recognition for forced dice; the scripted dice move onto it.
-
-**Benefit.** Engine: the tree's outcome classes and the pair plan's records describe the move, also for a confused, paralyzed or infatuated attacker and in Gens 1 and 2.
-
-**Success.** The 88 `test.fails` rows of `packages/eval-engine/test/scripted-dice-status.spec.ts` become plain tests. Before the fix, a probe counts the tree and pair cells of the bank whose attacker carries one of these checks, the reach of the fix. The recognition watches the simulator's hooks; where it calls a Dex handler, the `fingerprint` sweep of AGENTS.md proves the live battle unchanged. Then the batch check: two feedback runs byte-identical, the tier census with `--moved`.
-
-**Singles and doubles.** Both: `ScriptedPRNG` serves the singles tree, `PairPRNG` the doubles pair plan; the sweep plays each in every generation and mod the corpus plays.
-
-**Evidence.** `packages/eval-engine/test/scripted-dice-status.spec.ts`; the simulator's draws in `@pkmn/sim` 0.10.12 `data/conditions.js:47` (paralysis) and `:201` (confusion from Gen 7), `data/mods/gen2/conditions.js:146`, `gen4/conditions.js:77` and `gen6/conditions.js:31` (confusion up to Gen 6), `data/moves.js:758` (infatuation), and `@pkmn/mods` `build/champions/index.js:122` (paralysis, 1 in 8) and `:162` (thaw, 1 in 4).
-
-### T309 · A refit of the doubles weights after T307
-
-*Engine · round 83 · refit · score-touching (D3)*
-
-**Approved for round 86 (gate of round 83, 01.11.2026 13:26, "3a").**
-
-**Problem.** T307 keeps the simulator's count of a side condition at the turn boundary (`syncedDuration` in `packages/eval-engine/src/branch/field-correction.ts`), so a screen of a Light Clay holder lasts eight turns in the rebuilt positions, as in the game. The paired bank (r83-base at 52ac6f0 against r83-head at 3b7dccc) moved 39 of 837 rows, 34 of them doubles (Doubles OU 24, 15 of them farther from the outcome; VGC 10, 8 farther). At the base's fixed K it reads harm: full all +16 bp [+5, +29], doubles all +56 bp [+18, +95], doubles mid +142 bp [+57, +235]; singles −1 bp [−2, +0]. With its own K per game type and phase it reads no harm in the pooled rows and warns in the mid cells (full all +28 bp [+6, +56], doubles +82 bp [+15, +166]): the doubles K of the middle phase falls from 1.49 to 1.16. The positions are right: in the moved games 24 of 25 screens that ended lasted eight turns. The static score counts standing screens, not their turns (`screenCount`, `score/features.ts:103-105`), so the shift comes through the search, which now plays the screens longer. The doubles weights (`screens: 88` in `DOUBLES_FEATURE_WEIGHTS`, `score/weights.ts:259`; 48 for VGC at `:328`, 83 for Champions doubles at `:436`) and the doubles K were fitted on positions whose screens always ran out at the client's minimum.
-
-**Idea.** A refit of the doubles K per phase, the middle phase first, and where the bank still reads harm, of the doubles screen weights, on the bank with T307 in place. AGENTS.md: a refit runs only where the bank reads harm after a game-correct change, which is this case.
-
-**Benefit.** Engine: doubles positions under screens are priced on the game's screen turns without the harm the bank reads today.
-
-**Success.** The paired bank against r83-head without harm in the pooled rows at the fixed K; the Doubles OU, VGC and Champions holdouts (D26) without harm, Doubles OU and VGC read apart (two weight tables); the tier census with `--moved`.
-
-**Singles and doubles.** Doubles and VGC carry the harm; singles stay as the guard (unchanged today).
-
-**Evidence.** `r83/paired-bank.txt`; `r83/todo-review.md` (the recounts per game type).
-
-### T310 · Light Clay from the screen turns in the log
-
-*Replay-core · round 83 · small · rule · score-touching*
-
-**Approved for round 86 (gate of round 83, 01.11.2026 13:26, "3a").**
-
-**Problem.** The log names Light Clay only when another effect reveals it (Knock Off, Frisk, Trick, Poltergeist: 37 of 5,754 corpus replays); for most setters only the screen's length shows it. The team build takes the item from the published sets and the inference, so a setter without Light Clay can hold it in the build, and since T307 its rebuilt screen lasts eight turns (gen9vgc2026regi-2630181744: p2's Aurora Veil lasted turns 1 to 5, and the built set holds Light Clay). A setter with Light Clay can miss it: in gen9terapreviewdraft-2182991758 the log proves it for Latias (screens of eight turns on turns 1 to 8, 25 to 32 and 26 to 33). Whether the build without the reporter's paste gives that Latias Light Clay is open (the unpasted p1 Latias of the same file got Leftovers); `buildAppTeams` on the log settles it.
-
-**Idea.** A screen that outlasts its plain turns proves the item that extends it on its setter; a screen that ends at exactly its plain turns rules that item out, the way `packages/replay-core/src/inference/item-evidence.ts` rules out items by a line the log does not show. The turns come from the simulator: the condition's own duration rule with and without each item, never a list.
-
-**Benefit.** App and engine: the build holds Light Clay where the game proves it and drops it where the game rules it out, so the rebuilt screens last as long as the game's.
-
-**Success.** A sweep over every screen and every item that changes its turns, in every generation and mod the corpus plays: the inference reads what the simulator's turns prove. Rows where the turns prove nothing: a removal on the plain last turn (in the same state file p1's Aurora Veil of turn 11 ended after four turns by Brick Break), Klutz, Embargo, Magic Room, an item traded before the screen. The two scenes as rows; set diffs on every build path before the bank (AGENTS.md, set and solver changes); the batch check.
-
-**Singles and doubles.** Both.
+The gates of 05.11.2026 (18:19, "1b 2a 3a"; 20:47, "1a 2a 3a 4a") approved T322 for lane A of round 86. Round 86 delivered its stage 0 as probes and built hashed tree seeds first (T323); the gate of 06.11.2026 08:00 ("2a") left the trust rule unbuilt, and the final gate (11:50, "7a") made blocks 1 and 2 with the rule's variant round 87, on the merged base. It leaves this file with that round's booking.
 
 ### T322 · The search explores the strands of a turn by their chance
 
-*Eval engine · round 86 · feature · score-touching (D3)*
+*Eval engine · round 87 · feature · score-touching (D3)*
 
-**Approved for round 86 (gates of 05.11.2026, 18:19, "1b 2a 3a", and 20:47, "1a 2a 3a 4a"), lane A after T305.**
+**Approved for round 86 (gates of 05.11.2026, 18:19, "1b 2a 3a", and 20:47, "1a 2a 3a 4a"); round 87 after the final gate of round 86 (06.11.2026, 11:50, "7a").**
 
-**Problem.** Each outcome of a turn is a strand: Iron Head flinches (30 %) or it does not. Since T305 the verify round weights every strand of a root cell by its Dex chance. A strand gets the trees' depth only when at least two trees drew it, they agree within `VERIFY_DISAGREEMENT` and the pool has played the cell out (`deepPool` in `packages/eval-engine/src/mcts-merge.ts`); every other strand takes the one-ply estimate. Four trees draw each root cell once by their seed, so a 30 % strand gets two trees in about a third of the searches and none in a quarter. In Doubles OU gen9doublesou-2694111300 t13, three trees read the hit class of Swords Dance against Thunderbolt at -0.907. Two of them are thin (21 and 3 visits) and spread the pool 0.003 past the limit, so the merge takes the one-ply +0.600, and the game value reads +0.440 for the side that lost. Over 51 holdout rows A9 counted a deep pool in 1.8 % of the open classes.
+**Problem.** Each outcome of a turn is a strand: Iron Head flinches (30 %) or it does not. Since T305 the verify round weights every strand of a root cell by its Dex chance. A strand gets the trees' depth only when at least two trees drew it, they agree within `VERIFY_DISAGREEMENT` and the pool has played the cell out (`deepPool` in `packages/eval-engine/src/mcts-merge.ts`); every other strand takes the one-ply estimate. Four trees draw each root cell once by their seed, so a 30 % strand gets two trees in about a third of the searches and none in a quarter. Before T323, Doubles OU gen9doublesou-2694111300 t13 read +0.440 for the side that lost, because two thin trees spread the pool past the limit; with the hashed tree seeds of round 86 it reads -0.938 against a reference of -0.983 +- 0.007, and the strands four trees happen to draw still decide the other cells: over the 38 census cells round 86 reread, the mean distance to the reference stays 0.332 with or without the trust rule (A14).
 
-**Idea.** Four stages, each measured on its own against c104389 (A9b):
-1. References: a large search from each class child of pre-registered scenes, and the endgame solver where at most three bodies stand.
-2. The trust rule for keyed class pools, built on the references. Thin trees leave the count and the spread, a standard error replaces the fixed 0.075, and a single played-out tree with enough visits may stand. The floor of 0.9 stays, and 655336 t24 stays its guard.
-3. Block 1, the trees cover the strands. The strands of a root cell, ordered by their one-ply value, get on average four times their chance of the four trees through a random offset per cell (systematic sampling). The score weights each world by its Dex chance, and the line the app shows comes from a tree of the main strand.
+**Idea.** On the merged base of round 86:
+1. Fresh references: a search of 9,600 iterations per tree from each class child of the pre-registered scenes (600 iterations do not carry a value: 655336 t24 reads 0.612 at 600 and 0.821 at 19,200), the endgame solver where at most three bodies stand, and a fresh census draw. 43 of round 86's 103 reference classes no longer occur at c743f2e, and both halves of its census are read. The scenes add VGC 2629703929 t10, whose biggest-roll sentence T323 removed (gate 6a).
+2. The trust rule for keyed class pools in its variant without the middlegame floor (ruling of 06.11.2026 08:00): thin trees leave the count and the spread, a standard error replaces the fixed 0.075, and a single played-out tree with enough visits may stand. A14 found two clauses of round 86's draft that cost accuracy on the census: a per-tree floor of 8 visits and an endgame test of at most two bodies per side.
+3. Block 1, the trees cover the strands, in A11's form (morning gate 06.11.2026, "3a"): tree k answers each named die of a root draw with the systematic quantile `U = (k + u_d) / 4`, `u_d` hashed from the position, the cell and the die, so each strand gets on average four times its chance of the four trees, without forks and without an order by value. The score weights each world by its Dex chance, and the line the app shows comes from a tree of the main strand.
 4. Block 2, a strand that can tip the decision gets its own search. It runs only at the best options and the played one, screened by the bound a strand of chance p and one-ply value q puts on its cell (at most p (1 - q) up and p (1 + q) down), with every compared option at one depth. It starts by softening a grade and naming the strand ("only the 30 % flinch saves this"), and it re-prices only where the references back it.
 
 **Benefit.** Engine and app: a move whose only out is an unlikely die reads its real chance, and a grade no longer hangs on the strands four trees happened to draw.
 
-**Success.** Set in the round's spec before the first measurement: the flagship cells land inside the reference's band; 655336 t24 keeps Dragon Dance level with Dragon Claw; the trust rule's acceptances lie closer to the reference than the one-ply estimate in at least 70 % of the census; no harm on the bank or the four holdouts. Cost against c104389: the trust rule adds no forks, block 1 at most 2 % forks, block 2 at most 10 % mean wall per tree turn and 25 % on the slowest turn, singles and doubles counted apart.
+**Success.** Set in the round's spec before the first measurement: the flagship cells land as close to the reference as a tree of production size can (A14: a 600-iteration tree reads 0.03 to 0.04 short of its asymptote, so the gate reads the distance and not 2.5 SE of the reference); 655336 t24 keeps Dragon Dance level with Dragon Claw; the trust rule's acceptances lie closer to the reference than the one-ply estimate in at least 70 % of the census; no harm on the bank or the four holdouts (`holdout-vgc2` in place of `holdout-vgc` since round 86). Cost against the merged base: the trust rule adds no forks, block 1 at most 2 % forks, block 2 at most 10 % mean wall per tree turn and 25 % on the slowest turn, singles and doubles counted apart.
 
 **Singles and doubles.** Both in each stage; Doubles OU, VGC and Champions VGC each get their own row.
 
-**Evidence.** `docs/perf/probes/2026-11-04-r86/research/t322-chance-strands.md` (prior art and the ranked options); `docs/perf/probes/2026-11-04-r86/lanes/A/ledger.md` (A8, A9, A9b).
+**Evidence.** `r86/research/t322-chance-strands.md` (prior art and the ranked options); `r86/lanes/A/ledger.md` (A8, A9, A9b; A11 the plan; A12 the references; A14 the analysis); the probes `r86/lanes/A/t322-*`.
 
 ## Approved, waiting for a round
 
-The gates of round 84 (02.11.2026 and 03.11.2026) approved these TODOs. T313 and T317 form the next small batch; T314 is a larger bug (D3) and T316 a feature, each its own round. The gate of 04.11.2026 approved T319 for after round 86. Each leaves this file with its round's booking.
+The gates of round 84 (02.11.2026 and 03.11.2026) approved T313, T314, T316 and T317: T313 and T317 form the next small batch, T314 is a larger bug (D3) and T316 a feature, each its own round. The gate of 04.11.2026 approved T319 for after round 86, and the final gate of round 86 (06.11.2026, "7a") put it after round 87. The gates of round 86 approved T324 to T329 (06.11.2026, about 07:50) and T336 to T339 (11:50). Each leaves this file with its round's booking.
 
 ### T313 · The app's buttons read at 4.5 : 1
 

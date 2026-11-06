@@ -912,6 +912,282 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * ROUND 86 2026-11-04 to 2026-11-06 (improvement round 86, a feature: the
+ * engine reads the dice, T299, T305, T323, T306, T304 and T310, with T322
+ * stage 0 as probes, T309 closed without a refit, and a fresh VGC holdout;
+ * on r86 from dev c129889, opening e7eef5e; lanes A, B and C in the
+ * worktrees w86a, w86b and w86c on r86-a, r86-b and r86-c, one fresh
+ * wave-builder per step; merged in the clone ps-dashboard-2-m86 on m86
+ * (cfb8130, 02b0c83, 9c6a383, 314b8c8, 3cbbc0c, 88e873e; docs cc9f18e to
+ * 394b0a5); after the final suite f798c33, 77e1af3 and 3bac8f5; the fresh
+ * holdout 5bc974c, e947f9b and 35f5744; probes
+ * docs/perf/probes/2026-11-04-r86/). Gates: design 04.11. 14:07 ("1c, 2b,
+ * 3a, 4a"), spec 15:37 ("1a 2a 3a 4a"), 05.11. 14:13 ("1a"), 18:19 ("1b 2a
+ * 3a"), 20:47 ("1a 2a 3a 4a"), night 21:35 ("1a 2a 3a"), 06.11. about
+ * 07:50 ("1a, 3a, 4a, 5a, 6 as recommended"), about 08:00 ("2a"), about
+ * 09:30 (T309, "1a 2a"), final 11:50 ("1c, 2a, 3 as recommended, 4a, 5a,
+ * 6a, 7a, 8a"), the fresh holdout's plan 12:11 ("1c 2a 3a 4a 5a").
+ * DELIVERED: T299 (7785888 to 1e22edd). ScriptedPRNG and PairPRNG named a
+ * draw by the numbers in the call, so a script decided full paralysis,
+ * infatuation, the Champions thaw and confusion but never the move's own
+ * accuracy. Both now ask DrawNamer (dice/namer.ts), which names a draw by
+ * the hook that runs right before it (ADR 0002); scriptRoll maps a
+ * script's damage roll to the raw value in every generation. The 88
+ * expected-fail rows of scripted-dice-status.spec.ts are plain tests (196
+ * of 196); scripted-dice-parity.spec.ts (215 rows) holds an unused script
+ * equal to the plain PRNG and the new class equal to a frozen copy of the
+ * old one.
+ * T305 (695e0f1 to fc7a66e, 07f46b3, c104389). secondaryChances
+ * (dice/secondaries.ts) reads every entry under 100 % from the Dex. A cell
+ * with such a die gets classes like hit-nokill+brn at the product of the
+ * Dex chances, and a flinch counts in its class instead of dropping out.
+ * Paths: the singles cell sampler, the class children of the endgame
+ * solver and the prover, the tree's root book and the doubles pair plan
+ * (FLINCH_ITEMS, FLINCH_PROOF and the flinch-chance fallback are gone). A
+ * missing class takes one scripted draw; a chase with probe seeds would
+ * have cost +25 % forks in the singles matrix. A8 found that the doubles
+ * trees keyed none of their root draws (Doubles OU 2694111300 t13, game
+ * value -0.789 to +0.440); after gate "1a" of 05.11. they key them by the
+ * pair plan's classes (pair/tree-key.ts). The sweeps (secondary-classes*,
+ * secondary-records, secondary-fold; KNOWN empty) play every move with a
+ * chance under 100 %, with Serene Grace and Sheer Force, in every rule
+ * set, singles and doubles.
+ * T323 (a25ead2, c743f2e). A10 found that the tree's five seeds are one
+ * arithmetic progression of the Gen 5 state: a 90 % move hit in 94, 27,
+ * 100, 99 and 100 % of the cases by seed slot, and a 10 % paralysis came
+ * true in 0 or 20 % of a tree's cells, never in a tenth. treeSeed
+ * (search/leaf.ts) now hashes the seed from offset and iteration with
+ * integer arithmetic. The seeds of the sampler, the matrix search, the
+ * verify round and the endgame children stay on the lattice (T324). Every
+ * band with more than 150 events sits within 2 points of the Dex chance
+ * (VGC accuracy 95 to 99: 91.0 against 95.0 on 156 events), and the tie
+ * between cells is gone (singles, first die: 83.7 % agreement against 82.0
+ * % for independent dice, before 93.3 %).
+ * T306 (0439312 to 9689057, 24c5b1b, c987889; ADR 0022 replaces ADR 0008).
+ * The rebuild plays each turn with the dice the log names; the hidden dice
+ * come from seed index 0. The faint step tries the damage rolls of the
+ * hits on the bodies whose faint differs, on copies, in at most 1 + 15
+ * plays. Dice no die kind names (Metronome, sleep length) get seeds 1 to
+ * 15 with the forced list kept ("seeded N"); a turn that cannot be played,
+ * or ends a game the log goes on past, falls back to the 16-seed search
+ * ("fallback N"). A die the log does not show is forced not to happen
+ * (Cute Charm in 573756 t1). takeBodyOut removes a body the way the
+ * simulator does. The wait ends on a new request and the roll steps play
+ * the last step first (B12). The reader closes six gaps (stalling, [from]
+ * move:, the aim in |-anim|, self effects per target, Psycho Shift, the
+ * order die with |cant|). Sweeps over every rule set the corpus plays,
+ * singles and doubles: dice-logged (258 plain), dice-faint-step (54),
+ * dice-faint-seed (18 cells), dice-phantom-proc (167 plain, 287 full),
+ * body-out (48 and 16).
+ * T304 (be409ff, a321eba to b91e650, ff2b344). rolledCopy
+ * (branch/rolled-copy.ts) replays the biggest roll's turn on a copy with
+ * that die turned over; the replay worker plays it and the sweep's last
+ * stage evaluates it, with no new engine message. The sentence names both
+ * chances of the side that rolled: "The game's biggest roll came on turn
+ * 73: Fire Fang (95%) missed. A hit would have left LordEnz 93% to win;
+ * after the miss LordEnz stood at 87%." Scenes: singles 573756 t73 and
+ * 562428 t11, VGC 2629703929 t10 (under T323 the turn reads shift instead
+ * of chance and loses the sentence, gate 6a); Doubles OU has none (912045
+ * t5 is the loser's hit, T333). B8: the 573756 feedback test hung for 40
+ * minutes because the renderer died (12 pool workers, the replay worker
+ * and the copy's worker, 6.2 GB); the copy frees the pool first, and the
+ * test runs in 83 s.
+ * T310 (ed45ec3 to 7de9cbc). conditionTurns (replay-core
+ * dex-facts/screen-turns.ts) reads a screen's turns per item from the Dex;
+ * inference/screen-evidence.ts reads its start and end in the log. An end
+ * in the residual phase after 5 turns rules out every item that changes
+ * the count, 8 turns prove Light Clay; a removal in the action phase and
+ * every doubt (item shown, swap, Illusion, Klutz, Embargo, Magic Room)
+ * give no verdict. Sweeps S1 to S4 hold durations, ignorers, removers and
+ * scenes to the simulator (340 red rows before the build, none after).
+ * 2630181744: the opponent's Ninetales-Alola goes from Light Clay to Focus
+ * Sash; 2182991758: Latias goes from Weakness Policy to Light Clay. The
+ * panel reads "built-in engine: it plays the turns in the simulator" and
+ * the graph hint "graph: a quick pass over every turn, then {mode} on
+ * each".
+ * T322 stage 0 (probes, no commit): 103 reference classes (42 from 12
+ * scenes, 61 from 40 census cells), 16 trees (census 8) of 9,600
+ * iterations, about 2.9 hours; 600 iterations do not carry a value (655336
+ * t24 reads 0.612 at 600 and 0.821 at 19,200). On paper the trust rule
+ * moves the Doubles OU flagship from +0.440 to -0.950 (reference -0.983 +-
+ * 0.007) at c104389 and little else (3 of 61 pools accepted); at c743f2e
+ * production already reads -0.938 and the rule moves 5 of 38 cells by at
+ * most 0.04. Stage 1 is not built (gate "2a"). Docs: EVALUATION,
+ * ARCHITECTURE, GLOSSARY and three READMEs follow the code, ADR 0002 and
+ * ADR 0009 carry consequences; a fresh review found 13 wrong claims in 40
+ * and 6beb699 applied the findings on the docs; after the final gate the
+ * glossary uses the code's names (5a), and the booking corrects the header
+ * comment of dice/watch.ts. T324 to T335 are booked (394b0a5), T336 to
+ * T341 after the final gate (3bac8f5).
+ * MEASUREMENT: score-touching (D3), cache v76 once for the round. Bank and
+ * holdouts in CI against r86-base (e7eef5e); counts split singles, Doubles
+ * OU, VGC and Champions. Lane A: T299 (1e22edd) moves 1 of 837 bank rows
+ * (gen9ou-2658660641 t23, 0.135958 to 0.135953), every verdict row +0 bp,
+ * forks identical on 36 searches. T305 (fc7a66e): no harm or warning in
+ * the bank and the four holdouts; the doubles bar score moves in 0 of 252
+ * bank rows, 0 of 1,090 Doubles OU, 1 of 1,225 VGC, 3 of 1,449 Champions
+ * VGC; forks against e7eef5e: singles matrix +4.9 %, singles tree +0.7 %,
+ * Doubles OU -2.3 %, VGC +0.8 % (budget +20 %). With the keyed doubles
+ * draws (c104389): no harm or warning; Doubles OU +4.1 %, VGC +7.9 %. The
+ * play-out pin read 7 switches at fc7a66e (A6: a near tie at t58,
+ * game-correct) and 15 of 15 green at c743f2e. Expert pin 573756 t73 left
+ * the key moments at fc7a66e (chance share 0.2686 to 0.2489) and came back
+ * at c743f2e. Feedback a1 to a3 on fc7a66e: 36 of 36 dumps byte-identical,
+ * singles 39/6/2 to 43/7/1, doubles 10/5/0.
+ * T323 (c743f2e) against c104389: Doubles OU gain -11 bp, Champions VGC
+ * gain -15, Champions OU clean; VGC HARM luck-adjusted +28 (own K +31),
+ * warnings hq mid +50 and luck-adjusted late +29; the bank at fixed K
+ * harms hq singles +11 and luck-adjusted singles +13 (own K no harm).
+ * Forks against c104389: singles tree -4.0 %, VGC -6.2 %, Doubles OU +13.8
+ * %, Champions VGC +8.6 %; against e7eef5e Doubles OU +11.5 %, VGC -5.5 %.
+ * Five searches grow by more than 20 % (Doubles OU 2660818097#4 +53.2 %,
+ * 912883#4 +38.5 %; Champions VGC 2625188996#2 +37.3 %, 2606358514#6 +34.4
+ * %, 2629098485#6 +24.5 %): the verify round picks 2 to 4 more cells,
+ * cause not isolated. Feedback byte-identical; census singles 43/7/1 to
+ * 39/6/2, doubles 11/4/0 to 16/3/1, about 40 moved turns; the golden's
+ * drift channel t18 reads p2-decision. Null measurement (A13 with another
+ * salt, 0718bf9, never merged): against A13 no harm (VGC warns late hq
+ * +42, the noise floor of a seed change); against c104389 the VGC harm
+ * repeats (hq +21, luck-adjusted +19, own K +20 and +23), so it is no
+ * accident of one seed on that holdout.
+ * Lane B: 862d181 reads VGC harm (full +12 bp, mid +19); 9689057 reads VGC
+ * gain luck-adjusted -6, Champions VGC gain hq -18, no harm in the bank,
+ * Doubles OU or Champions OU. VGC (44 replays, 338 turns): faint-mismatch
+ * turns 24 at the base, 44 at 862d181, 29 at 9689057; perfect 206, 210,
+ * 229; soft 264, 358, 249. Champions VGC (41 replays, 290 turns): 28, 37,
+ * 28; 186, 195, 207; 192, 164, 125. Drift line at 88e873e: perfect 343 of
+ * 356 (singles 293 of 297, Doubles OU 20 of 25, VGC and Champions VGC 30
+ * of 34; the base read 332), faint-residual 7, seeded 1, fallback 1. Cost:
+ * the rebuild +56.7 % over the 12 fixtures before B12 (9,821 to 15,386 ms;
+ * 653785 from 284 to 2,115 ms, of which B11 counted 1.5 s idle wait). W
+ * leaves log, state and alignment records identical in 12 of 12 fixtures;
+ * X cuts step trials 384 to 176 (VGC bank), 356 to 113 (Champions VGC
+ * bank) and 173 to 37 (fixtures) without changing a result. The
+ * biggest-roll copy costs one evaluation in 3 of 12 replays (573756 t73
+ * about 1.6 s). A quiet interleaved timing of 88e873e is open. Lane C: no
+ * harm or warning (Doubles OU -2 bp, VGC -1, Champions OU 0, Champions VGC
+ * +1), feedback byte-identical with round 85's f1; 334 of 5,672 replays
+ * change their infos, 52 filled sets change (singles 17, Doubles OU 14,
+ * VGC 10, Champions VGC 11), 22 setters lose a Smogon Light Clay, 566 of
+ * 1,209 screens (47 %) give a verdict, 148 verdicts against items the base
+ * knew agree, 0 contradictions.
+ * Wave (88e873e) against r86-base: bank clean (full all +3 bp, hq singles
+ * +10, luck-adjusted singles +12, none resolved); Doubles OU gain full
+ * -13, luck-adjusted -15; Champions VGC gain full -16, hq -41; Champions
+ * OU clean; VGC HARM hq +18, luck-adjusted +21 (own K +25), warnings hq
+ * mid +59 (+45). Feedback w1 to w3: 12 of 12 dumps byte-identical; census
+ * against round 85's f1: singles 39/6/2 unchanged, doubles 10/5/0 to
+ * 16/3/1, 59 moved turns. e2e 137 passed, 8 skipped. Projects at c987889:
+ * eval-engine 10,166 passed (135 expected fails, 23 skipped), replay-core
+ * 1,608, ui 1,436, app 1,246 (4 skipped). 56 expectations moved on purpose
+ * (gate-list.md: lane A 24, lane B 15, lane C 7, measured 10); the three
+ * Monte-Carlo rows of verify-scenes.spec.ts stand on references recomputed
+ * with hashed draws (a919c06): 648453 t13 0.130 +- 0.02 inaccuracy, 573756
+ * t73 0.014 +- 0.02 no tier, 912045 t8 0.288 +- 0.04 mistake. Final suite
+ * in MAIN at 394b0a5 (DICE_SWEEPS=full, 4 workers, 2,304 s): 44,386
+ * passed, 47 expected fail, 27 skipped (5 opt-in runs and 22 rows the code
+ * skips as known gaps; none for missing local data), 5 failed. F1: one
+ * spec expected cache key v75 (f798c33); four rows moved by T305 and T323
+ * the game's way (forced-win focus-blast-range to no proof, two doubles
+ * rows of tree-endgame-cases, the 573756 t8 guard row of
+ * secondary-classes-paths), re-pinned at the gate (2a, 77e1af3). [Rerun at
+ * the booking commit.]
+ * T309: E1 reads the VGC harm as a loss of sorting, not of scale: the own
+ * K per phase, refitted on the holdout itself, still reads luck-adjusted
+ * +25 [+3, +49], and the AUC falls (full 0.8221 to 0.8206, hq mid 0.7200
+ * to 0.7092). The phase cells are noise at this size (two hashed
+ * realizations of one engine differ by -21.7 bp in hq mid and +41.9 in hq
+ * late). No VGC table saw a tree: VGC_WINPROB_K.doubles is the static fit
+ * of 2026-08-09 and the VGC weights are round 69's static refit. Gate "1a
+ * 2a": stage 0 captures the VGC fit side twice in CI (r86-e-fit-base on
+ * e7eef5e, r86-e-fit-wave on 88e873e); stage 1 would choose among three
+ * VGC leaf K, never-merged commits r86-e-k1 to k3 (3.50 + 0.88 ff, 4.00 +
+ * 0.88 ff, 2.98 + 2.00 ff), on the fit side only. Stage 0 (2,334 VGC
+ * positions without the holdout) reads the wave without harm and better in
+ * every pooled row: full -5.9 bp (AUC 0.8118 to 0.8132), hq -7.7,
+ * luck-adjusted -2.3; warnings only early (hq +22, luck-adjusted +28).
+ * Pre-registered reading N: the harm does not repeat on the fit side, so a
+ * refit has nothing to fit. Stage 1 did not run; T309 closes without a
+ * refit and T323 stays (2a).
+ * FRESH VGC HOLDOUT (final gate 1c, plan H1, gate "1c 2a 3a 4a 5a"): the
+ * VGC holdout has judged every VGC choice since round 65; a third sample
+ * no measurement has read separates a real loss from a spent holdout.
+ * scripts/fresh-holdout.mjs (5bc974c, fresh-holdout.spec.ts 12 rows, red
+ * first) draws rated games >= 1500 of the old holdout's seven formats that
+ * no tracked file, no docs/ record and no .fit-corpus file names, the
+ * highest rated first, one game per player pair, plus gen9vgc2025regj,
+ * which the old holdout never held; build-fit-holdout.mjs keeps a drawn
+ * family. Drawn 06.11.: 1,410 games, the seven formats at their quota of
+ * 1,245 (hq 722, 58.0 %), regj 165 (hq 48); none of the ids in any of 544
+ * earlier merged.jsonl. Family vgc2 in the manifest beside the 1,137 old
+ * sets, unchanged (35f5744); tarball bank-data-f34e4cefce9fc811 uploaded
+ * as a pre-release (4a), v1.0.2 stays Latest, the .smogon-cache hash
+ * unchanged. The reading, fixed before the run, decides on the seven
+ * formats: R (harm in any of the six pooled rows) a real loss, S (no harm,
+ * and the upper band ends of hq and luck-adjusted at the fixed K below the
+ * old points +18 and +21) a spent holdout, U between. CI on overlay
+ * commits (r86-base-h 0c109e3 = e7eef5e with the data, r86-wave-h dfddbbd
+ * = 88e873e with the data; 38 minutes for a run): 4,214 and 4,217 rows,
+ * all 1,410 games in both, 13 and 10 turns skipped. The seven formats
+ * (3,720 rows) at the fixed K: full -15 [-25, -5] gain, hq -8 [-21, +4],
+ * luck-adjusted -11 [-24, +2]; own K: full -14 gain, hq -6, luck-adjusted
+ * -10; no harm, no warning. AUC rises in every view (full 0.8097 to
+ * 0.8128); hq mid reads -23 [-47, -2] where the old holdout warned at +59.
+ * Reading S: the old VGC holdout is spent, and holdout-vgc2 replaces it as
+ * the judge from round 87 (AGENTS.md, ADR 0006); the manifest keeps the
+ * old sets under vgc, and fits keep dropping them. regj alone (494 rows)
+ * resolves nothing (full -25 [-60, +6]); all eight formats read gains full
+ * -16 and luck-adjusted -14.
+ * USER GATE 2026-11-06 about 07:50 ("1a, 3a, 4a, 5a, 6 as recommended"):
+ * (1a) A13 stays as T323 and T309 becomes the refit after the merge; (3a)
+ * block 1 of T322 takes A11's form; (4a) lane B builds W and X before the
+ * merge; (5a) the three Monte-Carlo rows on their references, the golden's
+ * channel t18 on p2-decision, the builders' rows as in the list, the
+ * play-out pin and 573756 t73 stay; (6) book P1, P4, P5, P6, P9, P10, P11,
+ * P13 and P15 after a check against the code, park P2, P3, P7, P8, P12 and
+ * P14, P16 lapses. About 08:00 ("2a"): stage 1 of T322 is not built, round
+ * 86 closes with A13, B and C, and T322 becomes its own round on the
+ * merged base (blocks 1 and 2, the trust rule without the middlegame
+ * floor, fresh references and a fresh census draw). About 09:30 (T309, "1a
+ * 2a"): see above. Final 11:50 ("1c, 2a, 3 as recommended, 4a, 5a, 6a, 7a,
+ * 8a"): (1c) the round settles the VGC holdout question before it closes,
+ * with a fresh holdout; (2a) re-pin the four rows as F1 recommends; (3)
+ * the fresh holdout becomes this round's work, book T336 to T339, the
+ * power pick of Present joins T303, park T340 and T341; (4a) T333's
+ * trigger as D3 proposed; (5a) the glossary uses the code's names
+ * ("Biggest roll", "Rolled copy"); (6a) T304's VGC scene loses its
+ * sentence under T323 and becomes a scene for T322; (7a) round 87 is T322
+ * blocks 1 and 2 with the trust rule's variant and fresh references, then
+ * T319; (8a) after the booking dev fast-forwards to r86 and is pushed,
+ * then the round branches, the probe branches, the worktrees and the clone
+ * go; master stays. 12:11 ("1c 2a 3a 4a 5a"): the fresh holdout's
+ * exclusion plus regj, three times the size, the highest rated first with
+ * one game per pair, the upload okay, the tooling on r86 before the
+ * booking.
+ * RESTS: booked and approved: T324 (the seeds of the verify round,
+ * sampler, matrix search and endgame children), T325 (a body that never
+ * acts in the log gets a stand-in that keeps the logged order), T326 (a
+ * biggest-roll copy that ends the game goes into the cache), T327 (a body
+ * the log never shows stays on the field after a simulator-only faint),
+ * T328 (the feedback harness stops on a dead renderer within minutes),
+ * T329 (weather and terrain prove the setter's item), T336 (the prover
+ * carries a proof over a secondary that only helps the mover), T337 (an
+ * accuracy die per hit, Triple Axel in 2628340185 t13), T338 (the log
+ * reader forces Diamond Storm's gain once per move in doubles), T339 (five
+ * VGC turns whose set cannot reach the logged knockout, a diagnosis
+ * first). Parked: T330 to T335, T340 (an undrawn speed-tie order at its
+ * Dex weight), T341 (a charge move's aim from |-anim|). Round 87: T322
+ * blocks 1 and 2 (block 1 in A11's form) with the trust rule's variant
+ * without the middlegame floor, fresh references on the merged base (43 of
+ * 103 reference classes no longer occur there) and a fresh census draw;
+ * the probes lanes/A/t322-*, A14's analysis and the VGC scene 2629703929
+ * t10 carry over. Then T319. A TODO proposal for the gate: a rotation rule
+ * for holdouts (a holdout judges a named number of rounds, then a fresh
+ * draw), the same question for holdout-doublesou. Open measurements: a
+ * quiet interleaved timing of the rebuild at 88e873e; why the hashed draws
+ * make the verify round pick more cells in five searches; a Doubles OU
+ * scene for T304 (T333). Next free T342.
+ *
  * ROUND 85 2026-11-04 (improvement round 85, a larger bug: the UI stays
  * smooth, T318, with T320; on r85 from dev da2efa7; probes
  * docs/perf/probes/2026-11-04-r85/). Gates: 04.11. ("1a 2a": Doubles OU
