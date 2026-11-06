@@ -236,6 +236,114 @@ The gates of round 84 (02.11.2026 and 03.11.2026) approved these TODOs. T313 and
 
 **Evidence.** `docs/perf/probes/2026-11-04-dead-code/knip-2026-11-03.txt` (the knip run on 3e742b6); `docs/perf/probes/2026-11-03-adr/review/A.md` (the T305 finding); commit f0bd821.
 
+### T324 · The verify round, the samplers and the endgame still draw from the lattice
+
+*Engine · round 86 · larger bug · score-touching (D3) once the probe finds a bias*
+
+**Approved (round 86 gate of 06.11.2026, 6). The probe comes first; the build waits for its table.**
+
+**Problem.** Round 86 hashed the tree's seeds (T323), because the five `SEARCH_SEEDS` (`packages/eval-engine/src/search/leaf.ts:17`) are one arithmetic progression of the Gen 5 LCG state: at one draw index a 10 % die came true in 0 % or 20 % of a tree's cells, never in a tenth, and the singles tree's 90 % move hit 94, 27, 100, 99 and 100 % of the time by seed slot (A10). T323 changed `treeSeed` only. Every other path still draws from the lattice. The verify round prices a plain cell with `VERIFY_PLAIN_SEEDS = [...SEARCH_SEEDS, ...PROBE_SEEDS]` (`search/verify-cell.ts:43`), and `PROBE_SEEDS` (`cell-blend.ts:45-49`: `21,22,23,24`, `25,26,27,28`, and on in steps of four) is the same progression, so all 16 draws of a plain cell sit on it. The pair sampler holds `FALLBACK_SEEDS` (`pair/sampler.ts:30`) and its base draws (`:225-264`); the singles matrix search reads `SEARCH_SEEDS` in `search/cell-sampler.ts:46,103-120,265,314` and `search/position.ts:367,393`; the trend probe (`search/trend-probe.ts:19`), the endgame's children (`endgame/children.ts:69-101`), the order of a log (`mcts.ts:264`) and a tree expansion's class children and single child (`search/expansion.ts:35,133-147`) read them too. The scene: the verify round pays for a cell by the Dex weights of its outcome classes and uses the draws to pick one child per class (A10, point 5), so a class is reached through its lattice slot, and the same slot gives the same child in every cell. Round 62 measured the second fixed seed missing in 21 of 22 cells with a miss chance and the first never missing (the note at `search/verify-cell.ts:17-19`). Round 63 replaced that single seed by 16 draws grouped by outcome, so the damage that remains is unmeasured.
+
+**Idea.** Two steps. First a probe with no score effect: a recorder like `a10-dice.vt.ts` over the verify round's, the samplers', the matrix search's and the endgame's draws, with the hit rate against the Dex per band (accuracy, secondaries at 10, 20, 30 and 50 %, crit) and the binomial z by events and by streams, per group. If every band sits inside its binomial band, T324 closes without a build. If a band does not, the build hashes the seed of each path from its own name and the draw's index through the module that holds `treeSeed`'s hash (`mix32` in `search/leaf.ts`), so one rule makes the seeds, and a fork count shows the cost (the hash itself costs no fork, the draws it changes can). The build follows T309, the refit that T323 started: the weights and the K were fitted on lattice draws, and a second change of the draws before that refit would blur its reading. It also follows the next T322 round.
+
+**Benefit.** Engine: a cell's rare outcomes (a 10 % paralysis, a 5 % miss) come in the share the Dex gives, in the verify round and the endgame as in the tree, so a grade that rests on one such outcome stops depending on which slot drew it.
+
+**Success.** The probe's table: per group and band, the count, the observed frequency, the Dex chance and the z, with the clone counts of the recorded run equal to the unrecorded run (A10's invariance check). If the build runs: the paired bank and the four holdouts against the base after T323 and T309, the cache version bumped once (D3), three byte-identical feedback runs, the tier census, and the cost probe `a9-cost.vt.ts` with forks per group within the round 86 budget (+20 % against the base). The specs that move are the ones that name `SEARCH_SEEDS` or `VERIFY_PLAIN_SEEDS` as a rule (search the tests for both names); each goes to the gate with its old and new expectation.
+
+**Singles and doubles.** Both. The verify round and the samplers run in both, the matrix search in singles, the pair sampler in doubles. Singles matrix, singles tree, Doubles OU, VGC and Champions VGC each get their own row.
+
+**Evidence.** `r86/lanes/A/ledger.md` (A10 from its line 629, point 5 and the closing note; A13 open point 5); `r86/gate/todo-review.md` (P1: the wider list of paths, and that round 62's reading is the single seed, not the present verify round).
+
+### T325 · A body that never acts in the log gets a stand-in that keeps the logged order
+
+*Engine, reconstruction · round 86 · small fix · score-touching (the rebuilt positions of six turns move)*
+
+**Approved (round 86 gate of 06.11.2026, 6).**
+
+**Problem.** When the log shows no action for a slot, the rebuild fills the click in with the first enabled move of the request: `defaultChoiceForSlot` (`packages/eval-engine/src/branch/protocol-choices.ts:369`) calls `defaultMoveChoice` (`:195`), which takes `active.moveSlots[0]`. In the Gen 6 OU game 653785 turn 23 Lopunny faints before it moves, the log shows no move for it, the rebuild plays Fake Out, and Fake Out's priority flips the turn (the pinned row `moveCount p1:lopunny:fakeout log=0 sim=1`, `test/regression/forced-reconstruction.spec.ts:52`). Six turns of the corpus show the same flip from an unlogged choice: 653785 t23, 2628340185 t23 (Shadow Sneak, `:53`), 2663093831 t9 and t10 (flinched bodies that get Protect; the log shows a `|cant|` line and no move, `:58-59`), 2695803506 t1 (Sneasler's Fake Out, `:60`) and 2629703929 t9 (Chi-Yu's Protect, `:61`).
+
+**Idea.** A clerk who never spoke gets the form that keeps the queue as it was. The fill-in takes the enabled move of the lowest priority at 0 or below, as `slowestRequestMove` (`:282`) already does for a body that switched out before it acted (`:324-331`), and falls back to the first move when none qualifies. The Dex gives the priorities; no name list.
+
+**Benefit.** Engine and app: six more turns of the singles, Doubles OU, VGC and Champions VGC corpus rebuild as the log shows them, and the positions after them carry the right faints and moves.
+
+**Success.** The six residual rows leave `RESIDUALS` (`forced-reconstruction.spec.ts:52-61`) and turn plain; no turn that is perfect on the drift line breaks (the line counted 343 of 356 at lane B's b1 run; read the count again at the build); a sweep over the Dex's priority brackets in every rule set the corpus plays, singles and doubles, keeps the stand-in from moving before a flincher or a killer that the log shows first. Score-touching, so the batch check reads the cache version, the feedback runs and the tier census, and the bank and the four holdouts check for harm, because the six turns sit in singles, Doubles OU, VGC and Champions VGC.
+
+**Singles and doubles.** Both: 653785 (Gen 6 OU) and 2628340185 (Champions OU) are singles, 2663093831 is Doubles OU, 2629703929 VGC and 2695803506 Champions VGC. The sweep plays singles and doubles in every rule set.
+
+**Evidence.** `r86/lanes/B/ledger.md` (B2, proposal 1, which counts seven because it adds the unlogged aim of the Meteor Beam turn; B3, B7); `r86/gate/todo-review.md` (P4: six turns, the fix site and the model).
+
+### T326 · A copy of the biggest roll that ends the game goes into the cache
+
+*App · round 86 · small fix · lossless*
+
+**Approved (round 86 gate of 06.11.2026, 6).**
+
+**Problem.** The report's biggest-roll sentence plays the roll the other way on a copy of the turn and prices the copy's next root. When the copy ends the game (VGC 2629703929 turn 10, where the turned die ends the game with the terminal score -1), `flipOf` returns that score at once (`src/hooks/evaluation/sweep-rolled.ts:74`), before `searchCopy` writes the cache (`:31-35`). A second sweep of the same game finds no entry (`loadCachedResult`, `:69`), rebuilds the position of the turn (`env.positionFor`, `:53`) and plays the copy again (`:55`): about 15 ms in the worker plus the position, which a fully cached sweep otherwise skips.
+
+**Idea.** `flipOf` writes the terminal result under the copy's key (`keyFor`, `src/lib/rolled-copy-stage.ts:64`, a key that no other code reads), in memory and in the store as `searchCopy` does. The cache holds an `EvalResult` (`loadCachedResult`, `src/hooks/evaluation/sweep-replacements.ts:15-27`; required fields `score`, `interval`, `depthCompleted` and `perSide`, `packages/eval-engine/src/types.ts:216-232`), so the entry is a minimal result with the terminal score, an interval of 0, depth 0 and empty `perSide`; the alternative is a small store of terminals beside it.
+
+**Benefit.** App: a second analysis of a game whose biggest roll ends it plays no copy and rebuilds no position.
+
+**Success.** A row in `test/ui/hooks/useEvaluation.rolled.spec.tsx`, beside "a second sweep of the same game reads the evaluation from the cache: no new copy, no new search" (`:165`), for an ending copy (2629703929 turn 10): the second sweep plays no copy and the flip's score stands. Lossless: no score and no sentence moves.
+
+**Singles and doubles.** Both. The stage is one code path for every game type (a named roll decides, not the type), and the rows of that spec run on the stage's fake; the one corpus scene that ends in the copy is VGC.
+
+**Evidence.** `r86/lanes/B/ledger.md` (B6 open point 3, B8 open point 2); `r86/gate/todo-review.md` (P9: the code that decides is `sweep-rolled.ts`, not `rolled-copy-stage.ts`).
+
+### T327 · A body the log never shows stays on the field after a simulator-only faint
+
+*Engine, reconstruction · round 86 · larger bug · score-touching (D3)*
+
+**Approved (round 86 gate of 06.11.2026, 6).**
+
+**Problem.** In VGC game 2565721987 the log shows four bodies of p1 (Iron Bundle, Grimmsnarl, Ditto, Miraidon); Kyogre and Archaludon never leave the bench. At turn 5 the simulator knocks out Iron Bundle, whom the log leaves at 1 hit point, after an order and three crits that the log lacks. The replacement round runs `retireUnshownBench` (`packages/eval-engine/src/branch/team-order.ts:189`), which returns at once because the simulator forces a slot the log did not faint: `if (!forcedSlots.every(slot => fainted.has(slot))) return false;` (`:195`). The simulator sends Kyogre in, the boundary correction then revives Iron Bundle from the snapshot (1/100) and moves the bodies back, and the entry hides from the position of turn 6. The same refusal repeats at turn 6, and at turn 7 p1 holds three living bodies (Miraidon and Archaludon on the field, Kyogre on the bench) where the log has one. The engine prices a team with two bodies too many.
+
+**Idea.** Do not loosen the guard: with no living body left, `retireUnshownBench` calls `battle.checkWin()` (`:199`), and the simulator would end a game that the log continues. Take the body out where the correction meets it. After `correctActivesFromSnapshot` (`packages/eval-engine/src/branch/corrections.ts:269`, called at `:347`), an active body that the snapshot never saw leaves through `takeBodyOut` (on the field, End events included) and its slot stays empty, as the log's slot is. The guard has three callers to read first: `corrections.ts:143`, and `retireBenchAfterFaints` (`team-order.ts:210-221`, called at `corrections.ts:348`).
+
+**Benefit.** Engine and app: after a knockout that only the simulator makes, the position carries the bodies the game has, and the evaluation of the turns that follow stops counting a body the log never shows.
+
+**Success.** Rows for 2565721987 turns 6 and 7 hold one living body of p1 as the log has it; a sweep in the shape of `packages/eval-engine/test/body-out-sweep.spec.ts` plays every Dex ability with an End handler on a replacement the log does not show, in every rule set the corpus plays, singles and doubles; the VGC and Champions VGC holdouts show no harm. 2565721987 sits in the VGC holdout manifest (`test/regression/fixtures/fit-holdout-manifest.json`), so the holdout does not judge this scene independently: the rows and the sweep do.
+
+**Singles and doubles.** Both: the guard and the correction are one code path for every game type, so the sweep plays singles and doubles; the scene is VGC.
+
+**Evidence.** `r86/lanes/B/ledger.md` (B10, the 2565721987 t7 diagnosis and its proposal; B7); `r86/gate/todo-review.md` (P11: the guard's callers and the corrected hook). The second cause of the same row is T334.
+
+### T328 · The feedback harness stops on a dead renderer within minutes
+
+*Test harness · round 86 · small fix · lossless*
+
+**Approved (round 86 gate of 06.11.2026, 6).**
+
+**Problem.** When the page dies, the feedback harness waits for the whole test timeout. In round 86 the 573756 test ran out of memory in the renderer (B8): all workers closed in one millisecond, the page's own timer stopped, and `page.evaluate` never returned. Playwright raised no `crash` event. `waitForSweepEnd` (`test/e2e-feedback/feedback-drift.spec.ts`) calls `page.evaluate` at `:92` with no timeout inside a loop whose stall check (`STALL_MS` 6 minutes, `:85`, checked at `:111`) and cap (`CAP_MS` 35 minutes, `:86`, checked at `:116`) sit after it, so a dead renderer never reaches either. The only bound is the test timeout of 2,400,000 ms, 40 minutes (`playwright.feedback.config.ts:16`). The three other `page.evaluate` calls of the file (`:155`, `:162`, `:184`) are unguarded as well. The cause of B8's hang is fixed (`ff2b344`); this is the guard for the next one.
+
+**Idea.** Race each `page.evaluate` against a timeout of a few poll intervals and count consecutive timeouts; after three, return `{ ok: false, reason }`. The reason text stays fixed with no elapsed seconds, because the report keeps determinism diffs clean (the doc comment above `waitForSweepEnd`). The function moves into a helper module so that a plain spec can import it.
+
+**Benefit.** Harness: a feedback run that loses its page fails within minutes with a stable reason, instead of holding the machine for 40 minutes.
+
+**Success.** A spec hands `waitForSweepEnd` a page whose `evaluate` never settles and expects `{ ok: false, reason }` within the poll time, with a reason free of elapsed seconds; the other three evaluates go through the same race. Lossless: the report of a healthy run stays byte for byte.
+
+**Singles and doubles.** Not affected (harness only).
+
+**Evidence.** `r86/lanes/B/ledger.md` (B8, cause and open point 3); `r86/gate/todo-review.md` (P13: the unguarded evaluate and the constants' lines).
+
+### T329 · Weather and terrain prove the setter's item
+
+*Replay core and app · round 86 · feature (a second reader beside T310's) · score-touching (D3)*
+
+**Approved (round 86 gate of 06.11.2026, 6). The count of observed weather ends comes first; if the corpus holds too few, the build waits.**
+
+**Problem.** A sun team opens with Torkoal. With a Heat Rock the sun lasts eight turns, without it five. The replay shows only `-weather|SunnyDay` at the start and `-weather|none` at the end, so the build takes Torkoal's item from usage. When the guess lacks the rock, the simulator's own count is five, which lies inside the client's range of 5 to 8 (`snapshotConditionRange`, `packages/eval-engine/src/branch/field-correction.ts:29-39`). `syncWeather` (`:88-96`) returns at `:90` when the simulator's weather id matches the snapshot's, so the simulator's five turns stand. A branch that starts on turns 1 to 4 drops the sun at turn 5, where the game keeps it until turn 8. A branch from turn 6 on is right: the simulator's sun has ended, the log's has not, and `syncWeather` takes the snapshot's remaining turns. Terrain Extender on a terrain setter, Damp Rock, Smooth Rock and Icy Rock behave the same way. In Gen 9 the Dex has 18 conditions with a `durationCallback` and 12 condition and item pairs that change the count: the three screens with Light Clay (T310), Hail and Snowscape with Icy Rock, the four terrains with Terrain Extender, Rain Dance with Damp Rock, Sandstorm with Smooth Rock and Sunny Day with Heat Rock. That makes six items, of which T310 covers one: nine pairs and five items are new.
+
+**Idea.** Extend T310's reader to the field. `conditionTurns` (`packages/replay-core/src/dex-facts/screen-turns.ts:50`) already reads turns from the simulator, and `screen-evidence.ts` watches `-sidestart` only (`packages/replay-core/src/inference/screen-evidence.ts:137`). A sibling reader watches `-weather` and `-fieldstart`. The setter is the user of the move, or the body named by `[of]` on a `[from] ability:` line (Drizzle, Drought, Snow Warning, Grassy Surge). The interval ends at the residual `-weather|none` or `-fieldend`: its length proves or rules out the item. A second setter that replaces the weather ends the first outside the residual, so it gives no verdict, as a removal does for a screen. The cost is one more file in `inference/` of about the screen reader's size, with its sweeps.
+
+**Benefit.** App: the opponent's set names the rock in the team panel when the weather's turns prove it, and the what-if lines hold the weather for the right number of turns.
+
+**Success.** Entry gate: count the weather and terrain intervals of `.fit-corpus` that end in a residual `-weather|none` or `-fieldend`, per rule set and per game type; the user rules on the count before the build. Then: a sweep over every weather and terrain setter, moves and abilities, in each rule set the corpus plays, compares the reader with the simulator (the model is `screen-turns-sweep.spec.ts`, whose S1 holds the conditions' turns to the simulator already); set diffs on every build path before the bank (AGENTS.md); a branch row that starts on turn 3 of a Heat Rock game and keeps the sun to its logged end; the batch check or D3 as the set diffs say.
+
+**Singles and doubles.** Both: weather and terrain setters appear in singles, Doubles OU and VGC. Doubles OU, Scarlet/Violet VGC and Champions VGC get their own rows in the count, since terrain teams are most common in VGC.
+
+**Evidence.** `r86/lanes/C/ledger.md` (C2, the proposal for the weather and terrain reader; C3, the screen reader's design); `r86/gate/todo-review.md` (P15: the corrected scene, the count of 18 conditions, 12 pairs and 6 items). Lane C's ledger says a branch from turn 6 on loses the sun two turns too early; the reviewer found the error in turns 1 to 4 instead, and the scene above follows the reviewer.
+
 ## Parked
 
 The triage of 21.10.2026 and the user gates after it parked these TODOs; each section names its trigger, and a trigger that fires brings its TODO to a gate.
@@ -601,6 +709,114 @@ The triage of 21.10.2026 and the user gates after it parked these TODOs; each se
 **Singles and doubles.** Both; the doubles trees are the larger ones, so Doubles OU, Scarlet/Violet VGC and Champions VGC each get their own row.
 
 **Evidence.** `docs/perf/probes/2026-11-04-r85/` (`findings.md`, source 3; `compare.md`, the row Doubles OU, pool 12, Analyze game).
+
+### T330 · A move without a secondary effect gets its rare miss class priced
+
+*Engine · round 86 · larger bug · score-touching (D3)*
+
+**Parked (round 86 gate of 06.11.2026, 6). Trigger: a scene in which the missing miss class flips a note (a tier or a key moment).**
+
+**Problem.** In singles game 573756 turn 73 Garchomp's 95 % Fire Fang would end the game by knocking out Corviknight, and it missed. The verify round prices the cell Body Press against Fire Fang. Fire Fang carries a burn and a flinch entry in the Dex (10 % each), so `hasSecondary` is true for the cell and `blendCellSample` (`packages/eval-engine/src/search/cell-sampler.ts:296`) takes `forceMissingClasses` (`:331-332`): one scripted draw prices the 5 % miss class, and the cell reads -0.8711 where the base read -0.8908 (A7). A move with no secondary entry takes the other route, `chaseMissingClasses` (`:333`): up to 16 draws on probe seeds, and a class below `MISSING_WEIGHT_CUT` of 0.2 (`:83`) that no draw reached is dropped and the others renormalised. Fourteen hits in a row come up in 0.95^14, 49 % of the cases, so the base priced that cell as a sure kill by luck of its seeds. The route depends on `hasSecondary` (`:241`, `:308`), not on whether the plan holds a rare class.
+
+**Idea.** Force the missing plan classes by script in every cell that has a plan, as the secondary route does today, so a 5 % miss gets its price whether or not the move carries a secondary entry. The cost is a draw per missing class in cells the chase covers now; the build starts from the fork probe `a9-cost.vt.ts`.
+
+**Benefit.** Engine: a rare miss or a rare crit is priced at its Dex weight in every cell, not only in the cells of moves with a side effect.
+
+**Success.** A sweep over every move with an accuracy below 100 % and no secondary entry compares the cell's class prices with the plan in every rule set the corpus plays; forks per group stay within round 86's budget (+20 %); the bank and the four holdouts show no harm against the base after T323; the scene that fires the trigger is one row of the sweep.
+
+**Singles and doubles.** Both: `blendCellSample` serves the singles matrix and tree; the doubles pair plan has its own sampler (`pair/sampler.ts`), which the build reads for the same route.
+
+**Evidence.** `r86/lanes/A/ledger.md` (A7: the diagnosis of 573756 turn 73 and the rest it names).
+
+### T331 · The rests of T305's class plans
+
+*Engine · round 86 · feature (five rests of T305) · score-touching (D3)*
+
+**Parked (round 86 gate of 06.11.2026, 6). Trigger: a feedback scene that one of the five prices wrongly.**
+
+**Problem.** T305 prices a secondary effect at its chance through outcome classes. Five cases keep the older, coarser price. (1) Gens 1 and 2 have no class plan: `boundaryEvent` returns null for `genNum <= 2` (`packages/eval-engine/src/ko-odds.ts:222`), so no class path sees a cell. (2) A multi-hit move with a secondary entry draws the entry at every hit (Twineedle in Gens 3 to 7, Double Iron Bash from Gen 8); the script rows skip those moves (`packages/eval-engine/test/secondary-classes.spec.ts:124`), and so do the weights and record rows (A5b). (3) Random-target moves in doubles. (4) A self effect on a knockout. (5) A flinch that another status of the same hit pre-empts: the singles cell falls back, and in doubles the record says `happened` while the class carries the token. All five follow the plain draws that every cell used before round 86, so none is a regression. The bank holds no Gen 1 or 2 position (A3).
+
+**Idea.** One rest at a time, each with its own sweep: a class plan for Gens 1 and 2 (the calculator has no hit there, so the plan needs another source for the hit chance), a die per hit for multi-hit entries, a class per target for random-target moves, and so on.
+
+**Benefit.** Engine: the dice of these moves read at their chance, as the rest of T305's dice do.
+
+**Success.** Per rest, a sweep over every Dex entry that reaches it, in every generation and mod the corpus plays, singles and doubles, compares the class prices with the simulator; the fingerprint proof for every stand-in that calls a Dex handler; the bank and the holdouts without harm.
+
+**Singles and doubles.** Both: random targets exist in doubles only; Gens 1 and 2 are singles.
+
+**Evidence.** `r86/lanes/A/ledger.md` (A4 findings 2 to 4 and the rests of A5a and A5b).
+
+### T332 · A proc the log shows fires in the rebuild
+
+*Engine, reconstruction · round 86 · feature · score-touching*
+
+**Parked (round 86 gate of 06.11.2026, 6). Trigger: a second scene, a corpus turn where the log shows a proc and the rebuild lacks its effect.**
+
+**Problem.** The rebuild forces the dice the log names and quiets a proc the log does not show (`quietProcs`, `packages/eval-engine/src/dice/phantom-procs.ts:31`). A proc the log does show stays with the frozen seed (`:38` skips it), and the seed may say no. A Focus Band that saves a body in the game, or a Flame Body burn, then does not fire in the rebuild. The position lacks the rescue or the burn until the next boundary corrects it, or the whole block falls back to the seed search.
+
+**Idea.** The other half of the same rule: force the proc the log shows to happen, and the end-of-turn dice with it. Where a move hits several times, the die needs a hit index in `DieName` (`dice/types.ts`), the multi-accuracy proposal that is not booked yet.
+
+**Benefit.** Engine and app: a branch opened on a turn with a shown proc starts from the position the game had.
+
+**Success.** A row for the scene that fires the trigger; the sweep of `dice-logged-sweep.spec.ts` gains a row per proc kind (ability proc, item proc), singles and doubles; the drift line's seeded and fallback counts do not rise.
+
+**Singles and doubles.** Both: the sweep plays both, and the rebuild reads one die key in either.
+
+**Evidence.** `r86/lanes/B/ledger.md` (B4b, proposal 1).
+
+### T333 · The report names a roll of the loser that hit
+
+*Engine, report · round 86 · feature · score-touching (the report's prose is pinned by the feedback corpus)*
+
+**Parked (round 86 gate of 06.11.2026, 6). Trigger: the gate table names none; proposed: a user asks for a sentence on a roll that hit, or a feedback scene whose biggest swing is the loser's hit.**
+
+**Problem.** In Doubles OU game 912045 turn 5 the loser's 80 % Gunk Shot hit and Volcarona fell. The report says nothing about it. `carriedRoll` (`packages/eval-engine/src/biggest-roll.ts:52`) names a roll only when the winner's played move provably carried it, and `biggestRollSentence` (`:111`) speaks of a miss. The copy of the turn flips a hit into a miss as it flips a miss into a hit (a row of `test/regression/rolled-copy.spec.ts` proves it), so the sentence is buildable: "Gunk Shot (80%) hit. A miss would have left Smudge X% to win; after the hit Smudge stood at Y%."
+
+**Idea.** A second sentence shape for a roll that hit and helped the loser, with the same two chances. The gate's wording of 04.11.2026 (2a) said "missed" only, so the user rules on the words first.
+
+**Benefit.** App: the report of a Doubles OU game explains a swing that came from a hit, not only one that came from a miss.
+
+**Success.** The sentence for 912045 turn 5 with both chances; a row per game type; the feedback corpus's pins re-pinned at the gate that accepts the words.
+
+**Singles and doubles.** Both: 912045 is the one scene known, and B5 counted no singles scene; a doubles click finds its die through the copy and `koOdds.label` (B6).
+
+**Evidence.** `r86/lanes/B/ledger.md` (B5, the question for the gate; B6).
+
+### T334 · A revived body keeps the boost its terrain gave
+
+*Engine, reconstruction · round 86 · larger bug (the cause is not examined to the end) · score-touching*
+
+**Parked (round 86 gate of 06.11.2026, 6). Trigger: a second scene, a corpus turn where a revived body loses a boost that the log's `-start` line gave it.**
+
+**Problem.** In VGC game 2565721987 turn 6 Iron Bundle comes back from a correction at 1/100 without its Quark Drive speed boost, so Landorus moves before it in the simulator, survives Icy Wind and hits Miraidon with Earth Power, where the log's Landorus faints at once. `playProtocolStarts` (`packages/eval-engine/src/branch/entry-effects.ts:319`, called at `corrections.ts:88`) reads a `-start|...|quarkdrivespe` line only from the block that shows it, and the simulator had knocked the body out in that block. The speed factor reads `pokemon.volatiles[ability]?.bestStat` (`packages/eval-engine/src/speed.ts:58`), which the revive loses. B10 did not examine it further.
+
+**Idea.** Start with the sweep: every Dex ability whose `-start` volatile a revive can lose (Protosynthesis, Quark Drive, and what the sweep finds), then one rule that carries the volatile across the revive. It belongs next to T327, the first cause of the same row.
+
+**Benefit.** Engine and app: a body that returns from the correction keeps the speed and stat boosts the game gave it.
+
+**Success.** The row for 2565721987 turn 6 shows Iron Bundle's boost after the revive; the sweep passes in every rule set the corpus plays, singles and doubles; the VGC and Champions VGC holdouts show no harm.
+
+**Singles and doubles.** Both: the abilities exist in every game type; the scene is VGC.
+
+**Evidence.** `r86/lanes/B/ledger.md` (B10, the second cause).
+
+### T335 · A new worker beside a full pool can take a long game's page down
+
+*App · round 86 · larger bug · lossless*
+
+**Parked (round 86 gate of 06.11.2026, 6). Trigger: a second scene in which a worker beside a full pool takes the page down (a user report of a hung analysis on a long game, or a feedback run that dies the same way).**
+
+**Problem.** In round 86 the feedback test of the 139-turn game 573756 hung for 40 minutes: the renderer died at about 6.2 GB with 12 pool workers, the replay worker and the new worker of the biggest-roll copy, 14 in all (B8). The commit `ff2b344` frees the pool before the copy spawns (`src/hooks/evaluation/sweep-rolled.ts:50-52`), which closes that path. The pool's own brake does not cover the others: `computePoolSize` (`src/lib/eval/pool-size.ts:19`) lowers the size by `navigator.deviceMemory` at 0.6 GB per worker, and Chrome reports at most 8, so the brake allows 13 workers and never lowers a pool of 12. Any other worker that starts beside a full pool on a long game meets the same ceiling.
+
+**Idea.** A worker budget per sweep that counts every worker (the pool, the replay worker, any extra), or one rule that every extra worker takes the pool down first, as the copy does now.
+
+**Benefit.** App: the analysis of a long game ends instead of hanging, on a machine with many cores.
+
+**Success.** A spec on a fake `Worker` counts live workers across the stages of one sweep and holds them to the budget; a probe on 573756 reads the peak count of workers and the renderer's memory and stays below B8's 14 workers and 6.2 GB. Lossless: no score moves.
+
+**Singles and doubles.** Not affected: the ceiling is a property of the pool and the game's length (B8 saw it on the longest singles game).
+
+**Evidence.** `r86/lanes/B/ledger.md` (B8, cause, fix and open point 1); the ruling "After B8" of the round's brief.
 
 ### T259 · A smoother price for a stage drop at the bench gate
 
