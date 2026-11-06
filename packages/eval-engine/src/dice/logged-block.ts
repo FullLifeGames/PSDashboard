@@ -346,13 +346,28 @@ function stepSets(checkpoint: string, query: BlockQuery, natural: Best): { perfe
   const keys = new Set(hits.map(hit => dieKey(hit.name)));
   let accepted: Best | null = null;
   let plays = 0;
-  for (let index = 1; index < longest; index++) {
-    const next = [
-      ...natural.dice.filter(die => !keys.has(dieKey(die.name))),
-      ...hits.map((hit): ForcedDie => ({ name: hit.name, result: { step: hit.order[Math.min(index, hit.order.length - 1)] } })),
-    ];
+  const setAt = (index: number): ForcedDie[] => [
+    ...natural.dice.filter(die => !keys.has(dieKey(die.name))),
+    ...hits.map((hit): ForcedDie => ({ name: hit.name, result: { step: hit.order[Math.min(index, hit.order.length - 1)] } })),
+  ];
+  // Round 86 (B12): the last step is the extreme of every order. When even it misses a logged faint, no step between gives the faints, and the steps stop at this one play.
+  let last: { index: number; trial: Trial } | null = null;
+  if (longest > 2) {
+    const trial = trialOf(checkpoint, query, setAt(longest - 1));
     plays++;
-    const trial = trialOf(checkpoint, query, next);
+    if (trial) {
+      if (scoreAlignment(query.expected, trial.events).faintMismatches > 0) return { perfect: null, accepted: null, plays };
+      last = { index: longest - 1, trial };
+    }
+  }
+  for (let index = 1; index < longest; index++) {
+    const next = setAt(index);
+    let trial: Trial | null;
+    if (last && index === last.index) trial = last.trial;
+    else {
+      plays++;
+      trial = trialOf(checkpoint, query, next);
+    }
     if (!trial) continue;
     const score = scoreAlignment(query.expected, trial.events);
     const found: Best = { dice: next, seed: query.seed, trial, score, quiet: natural.quiet };
