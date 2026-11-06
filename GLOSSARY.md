@@ -15,11 +15,14 @@ The die that sets a hit's damage to one step between 85 and 100 percent: 16 step
 _Avoid_: roll
 
 **Logged dice**:
-The dice of a replay turn as its log shows them.
+The dice of a replay turn as its log shows them. The reconstruction forces them, so a rebuilt turn shows what the log shows.
 _Avoid_: logged rolls
 
+**Hidden dice**:
+The dice a replay's log does not show, such as damage rolls and sleep turns. The reconstruction draws them from one frozen seed.
+
 **Forced die**:
-A die whose result the user sets in a branch turn. The simulator decides whether that result can take effect.
+A die whose result comes from outside the simulator's draw: the user sets it in a branch turn, or the reconstruction takes it from the log (logged dice). The simulator decides whether that result can take effect.
 _Avoid_: forced hax, forced outcome
 
 **Hax**:
@@ -34,3 +37,27 @@ _Avoid_: duration roll
 
 **Random pick**:
 A die that chooses one option out of several, such as the move Metronome calls or the status Tri Attack inflicts.
+
+**Faint step**:
+The reconstruction's search over the damage-roll steps of the hits on a body whose faint differs from the log's. It plays the turn on copies and keeps the first step set that gives the log's faints.
+
+**Phantom proc**:
+An ability or item proc that the forced turn draws and the log does not show, such as a Flame Body burn. The reconstruction forces it not to happen.
+
+**Seeded turn**:
+A rebuilt turn that plays its hidden dice under a seed other than the first because that seed fits the log better. The drift line counts them as "seeded N".
+
+**Fallback turn**:
+A rebuilt turn that no forced play can repair, so the search over sixteen seeds plays it. The drift line counts them as "fallback N".
+
+**Outcome class**:
+One result of a cell that the search prices as a whole: a hit without a knock-out, a miss, a knock-out, or a hit with a secondary effect (`hit-nokill+brn`). The weights come from the Dex chances.
+
+**Tree seed**:
+The seed of one tree expansion's dice, hashed from the tree's number and the iteration, so the dice come true at the Dex chance.
+
+**Rolled copy**:
+A copy of a logged turn that plays with one die turned over, a miss turned into a hit. The report uses it to price the biggest roll.
+
+**Biggest roll**:
+The report's name for the one die that swung a decided game most toward the loser: a miss of the winner's sure kill. Its sentence gives the winner's chance after a hit and after the miss.
