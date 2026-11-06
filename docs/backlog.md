@@ -344,6 +344,78 @@ The gates of round 84 (02.11.2026 and 03.11.2026) approved these TODOs. T313 and
 
 **Evidence.** `r86/lanes/C/ledger.md` (C2, the proposal for the weather and terrain reader; C3, the screen reader's design); `r86/gate/todo-review.md` (P15: the corrected scene, the count of 18 conditions, 12 pairs and 6 items). Lane C's ledger says a branch from turn 6 on loses the sun two turns too early; the reviewer found the error in turns 1 to 4 instead, and the scene above follows the reviewer.
 
+### T336 · The prover carries a proof over a secondary that only helps the mover
+
+*Engine, prover · round 86 · feature (a game rule in the prover) · score-touching (D3)*
+
+**Approved (round 86 final gate of 06.11.2026, 3).**
+
+**Problem.** A Gengar with a 70 % Focus Blast faces a Blissey whose Seismic Toss cannot touch a Ghost. The win is certain, but only after a chain of up to twelve turns in which the Focus Blast misses now and then. Until round 86 the prover proved it (mass 0.9999 in 12 turns). Since T305 the 10 % Special Defense drop of the Focus Blast is a class of its own (`hit-nokill+boosts:spd`), the memo no longer collapses the hit positions, and the proof needs 163 cells where `PROVER_BUDGET.cells` allows 100 (`packages/eval-engine/src/endgame/prover.ts:44`). The prover returns no proof, and the forced-win label is gone for a chain whose attack carries a secondary effect. The position is still a win by the game: at 200 cells and 400 states the proof returns 0.9989 in 12 turns. The round re-pinned the row `focus-blast-range` of `test/regression/forced-win.spec.ts:54` to no proof (user gate of 06.11.2026, 2a).
+
+**Idea.** `dominates` (`prover.ts:104`) already lets a class that no draw showed inherit the proof of a drawn class when the two differ in one event only: the opponent's move missed, or the side's own move knocked out. Add a third case. A class in which a secondary effect that only helps the mover fired inherits the proof of the class in which it did not fire, because the effect can only improve the mover's position. The Dex says which secondary only helps the mover (a stat drop on the target, a stat gain on the user); no name list. This is a game rule, so the build starts with the sweep that AGENTS.md asks for. The alternative, a larger `PROVER_BUDGET`, costs time on every position, and the bank cannot judge it.
+
+**Benefit.** App: a won endgame in which the winning attack carries a side effect shows its forced-win label again, as it did before round 86.
+
+**Success.** The row `focus-blast-range` returns to mass 0.9999 (`digits: 3`) in 12 turns with the caveat `sampled-rolls`; a sweep over every Dex move with a secondary entry that only helps the mover, in every generation and mod the corpus plays, singles and doubles, compares the reading with the simulator (models: `pair-stall-guard.spec.ts`, `power-handlers-census.spec.ts`); the fingerprint proof for every stand-in that calls a Dex handler. Score-touching, so the batch check reads the cache version, the feedback runs and the tier census.
+
+**Singles and doubles.** Both: `dominates` serves the singles and the doubles prover. The fixture is singles; the doubles prover rows pass today and stay as the guard, and the sweep plays both.
+
+**Evidence.** `r86/lanes/D/ledger.md` (F1, row 2: the bisect to `ca8223f`, the cell counts and the options); `r86/lanes/A/ledger.md` (A3 and A5 gate list, the class `hit-nokill+boosts:spd`).
+
+### T337 · An accuracy die per hit of a multi-accuracy move
+
+*Engine, reconstruction · round 86 · feature · score-touching (the rebuilt positions of the chain turns move)*
+
+**Approved (round 86 final gate of 06.11.2026, 3).**
+
+**Problem.** In the Champions OU game 2628340185 turn 13 Triple Axel lands once and misses its second hit. The rebuild plays two hits, and a new knockout follows. `DieName` has no hit field (`packages/eval-engine/src/dice/types.ts:19`), and `dieKey` drops repeats on purpose (`:38-43`: a forced die applies to every repeat), so the accuracy of one hit is no die the module names. The dice sweep keeps the multi-accuracy rows red on purpose as `test.fails` (ruling Q4, `packages/eval-engine/test/dice-logged-sweep.spec.ts:228-246`), and the residual row sits at `test/regression/forced-reconstruction.spec.ts:54`.
+
+**Idea.** A hit index in `DieName` (an optional field), read by the log reader and carried by the key of an accuracy die of a move with `multiaccuracy`. `dice/recognize.ts`, `answer.ts`, `offer.ts` and `types.ts` change; the engine protocol does not. `DieName` is exported (`packages/eval-engine/src/index.ts:35`), so the API snapshot moves; a new optional field keeps the formats that leave the app. The same index serves T332 (a proc the log shows) for a move that hits several times.
+
+**Benefit.** Engine and app: a chain that broke after one or two hits rebuilds as the log shows it, and a branch from such a turn starts from the game's position. A chip "second hit misses" becomes possible.
+
+**Success.** The multi-accuracy rows of the dice sweep turn plain (`test.fails` off) in every generation and mod the corpus plays, singles and doubles; the residual row of 2628340185 turn 13 leaves `RESIDUALS` and turns plain; the drift line's perfect count does not fall; the fingerprint proof for every stand-in that calls a Dex handler. Score-touching: the batch check, and the bank and the four holdouts for harm.
+
+**Singles and doubles.** Both: the sweep plays the multi-accuracy moves of the Dex in both modes; the scene is singles.
+
+**Evidence.** `r86/lanes/B/ledger.md` (B2, proposal 2; B3); `r86/gate/todo-review.md` (P5: the first of its four parts).
+
+### T338 · The log reader forces Diamond Storm's gain once per move in doubles
+
+*Engine, reconstruction · round 86 · small fix · score-touching (the rebuilt positions of the affected turns move)*
+
+**Approved (round 86 final gate of 06.11.2026, 3).**
+
+**Problem.** In a doubles turn a Diancie fires Diamond Storm into two foes. From Gen 7 the simulator draws the move's own `self.chance` once per move, not once per target: `selfDrops` in `@pkmn/sim` (`battle-actions.js:1346-1360`) sets `move.selfDropped` after the first draw for a move without `multihit`. The reviewer's probe (300 seeds, `gen9doublescustomgame`) gave no boost line in 150 runs and exactly one in the other 150, never two. The reader demands one gain line per struck foe: `selfEffectDice` (`packages/eval-engine/src/dice/logged-results.ts:290-300`) returns a die only when `times === 0 || times >= struck` (`:297`). A log with one gain line against two struck foes returns no die, and the rebuild draws the gain by seed. The comment in `dice-logged-sweep.spec.ts:59` ("a log where only one target gave the gain") describes a log the simulator cannot write.
+
+**Idea.** For a `self.chance` entry from Gen 7 the die holds when the log shows at least one gain (`times > 0`); a Gen 6 secondary entry keeps the count per target (`dice-logged-sweep.spec.ts:69`). No hit index is involved (that is T337). The build starts with a sweep over every Dex move with a `self.chance` entry in every generation and mod the corpus plays.
+
+**Benefit.** Engine and app: a branch from a doubles turn with Diamond Storm starts with the stat gain the game had.
+
+**Success.** The Diamond Storm doubles row of the dice sweep (`dice-logged-sweep.spec.ts:59`) leaves `GAPS` for `FIXED`; the sweep over the `self.chance` moves passes for singles and doubles; the drift line's seeded and fallback counts do not rise. The cartridge may roll once per target where the simulator rolls once per move; the reader follows the simulator, and a difference belongs on the upstream list.
+
+**Singles and doubles.** Doubles for the change (the spread move strikes two foes); the singles row of the same sweep (`:69`) stays as the guard.
+
+**Evidence.** `r86/lanes/B/ledger.md` (B3, gap 4); `r86/gate/todo-review.md` (P5: the corrected cause and the probe).
+
+### T339 · Five VGC turns whose set cannot reach the logged knockout
+
+*Engine, set inference · round 86 · larger bug (the cause is unproven) · diagnosis first, then by its score class*
+
+**Approved (round 86 final gate of 06.11.2026, 3). The diagnosis comes first.**
+
+**Problem.** In 5 of the 22 VGC turns that only the head leaves residual (4 of 16 in Champions VGC) the inferred set of the attacker cannot knock out at the maximum damage roll. The base reached the knockout only through a crit that the log does not show, and the head's forced no-crit is right by the game, so the defender survives in the rebuild. The solver already reads a lethal hit as a lower bound: `observationError` (`packages/replay-core/src/spreads/fit.ts:251`, the comment at `:262-265` and the distance at `:266-270`) refutes a rung only when its best roll falls short of the observed fraction and accepts overkill; `spread-inference.ts:223-226` documents the same, and `choice-lock.ts:337` does it for the choice-lock reader (`DamageObservation.lethal`, `packages/replay-core/src/types.ts:98`, set at `protocol/handlers.ts:268`). So the cause is not a missing bound. One candidate: an attacker seen only in knockouts gets `keep.add(offenseStat)` (`packages/replay-core/src/spread-inference.ts:279`), so the bound can refute rungs but never raises the offense.
+
+**Idea.** Find why each of the five sets misses the knockout. Name the five turns (lane B's ledger never listed them), run the solver on each with the observations it saw, and write down the set that makes the knockout reachable and the step of the solver that rejects it. Then book the fix as its own TODO, or close this one if the cause lies in the log and not in the solver.
+
+**Benefit.** Engine and app: a VGC attacker's set explains the knockouts the log shows, and the rebuilt turn keeps its faint without a crit.
+
+**Success.** The five turns named, each with the set diff that makes the knockout reachable, and a decision on the fix. Set and solver changes read set diffs on every build path before the bank (AGENTS.md).
+
+**Singles and doubles.** VGC and Champions VGC (doubles): the five turns sit in doubles formats. A singles turn of the same kind is not known; the diagnosis counts it.
+
+**Evidence.** `r86/lanes/B/ledger.md` (B7, cause C4 and the proposal for the solver); `r86/gate/todo-review.md` (P10: the solver already reads the bound; the count of 5 of 22 is not shown to the file).
+
 ## Parked
 
 The triage of 21.10.2026 and the user gates after it parked these TODOs; each section names its trigger, and a trigger that fires brings its TODO to a gate.
@@ -668,6 +740,8 @@ The triage of 21.10.2026 and the user gates after it parked these TODOs; each se
 
 **Idea.** A duration die answers with a number of turns, a random pick with an entry of its list; both need a chip with more than two results, like the damage roll's select. The three draws get their recognition from the hook that runs before them.
 
+**Round 86 gate 06.11.2026.** Present's power pick joins this TODO. The pinned simulator (0.10.12) draws `this.random(10)` in `onModifyMove` (`data/moves.js:14131-14141`): 0 or 1 heals a quarter of the target, 2 to 5 gives power 40, 6 to 8 gives 80, anything else 120. No kind of die names it (`packages/eval-engine/src/dice/recognize.ts`). It is a pick with four results, so `DieResult` already has the shape (`{ option }`, `dice/types.ts:25`) and no hit index is involved. The scene: a Present that healed the foe at full hit points in the game hits under another seed in the rebuild (lane B, B3). The earlier ledger wrote `random(100)`; the reviewer read `random(10)`. The old cartridge used a different table in Gens 2 to 4; the sweep reads the simulator, and a difference belongs on the upstream list. Tri Attack's and Dire Claw's status pick, already in the list above, stays with this TODO too.
+
 **Benefit.** App: the user can let a sleep last one turn or a Metronome call a chosen move.
 
 **Success.** A sweep per new kind over every Dex entry that draws it, in every generation and mod the corpus plays, singles, doubles and VGC; the three census rows lose their `open` mark; the fingerprint proof for every stand-in that calls a Dex handler.
@@ -754,7 +828,7 @@ The triage of 21.10.2026 and the user gates after it parked these TODOs; each se
 
 **Problem.** The rebuild forces the dice the log names and quiets a proc the log does not show (`quietProcs`, `packages/eval-engine/src/dice/phantom-procs.ts:31`). A proc the log does show stays with the frozen seed (`:38` skips it), and the seed may say no. A Focus Band that saves a body in the game, or a Flame Body burn, then does not fire in the rebuild. The position lacks the rescue or the burn until the next boundary corrects it, or the whole block falls back to the seed search.
 
-**Idea.** The other half of the same rule: force the proc the log shows to happen, and the end-of-turn dice with it. Where a move hits several times, the die needs a hit index in `DieName` (`dice/types.ts`), the multi-accuracy proposal that is not booked yet.
+**Idea.** The other half of the same rule: force the proc the log shows to happen, and the end-of-turn dice with it. Where a move hits several times, the die needs a hit index in `DieName` (`dice/types.ts`), the multi-accuracy hit index (T337).
 
 **Benefit.** Engine and app: a branch opened on a turn with a shown proc starts from the position the game had.
 
@@ -768,7 +842,7 @@ The triage of 21.10.2026 and the user gates after it parked these TODOs; each se
 
 *Engine, report · round 86 · feature · score-touching (the report's prose is pinned by the feedback corpus)*
 
-**Parked (round 86 gate of 06.11.2026, 6). Trigger: the gate table names none; proposed: a user asks for a sentence on a roll that hit, or a feedback scene whose biggest swing is the loser's hit.**
+**Parked (round 86 gate of 06.11.2026, 6). Trigger: a user asks for a sentence on a roll that hit, or a feedback scene whose biggest swing is the loser's hit.**
 
 **Problem.** In Doubles OU game 912045 turn 5 the loser's 80 % Gunk Shot hit and Volcarona fell. The report says nothing about it. `carriedRoll` (`packages/eval-engine/src/biggest-roll.ts:52`) names a roll only when the winner's played move provably carried it, and `biggestRollSentence` (`:111`) speaks of a miss. The copy of the turn flips a hit into a miss as it flips a miss into a hit (a row of `test/regression/rolled-copy.spec.ts` proves it), so the sentence is buildable: "Gunk Shot (80%) hit. A miss would have left Smudge X% to win; after the hit Smudge stood at Y%."
 
@@ -817,6 +891,42 @@ The triage of 21.10.2026 and the user gates after it parked these TODOs; each se
 **Singles and doubles.** Not affected: the ceiling is a property of the pool and the game's length (B8 saw it on the longest singles game).
 
 **Evidence.** `r86/lanes/B/ledger.md` (B8, cause, fix and open point 1); the ruling "After B8" of the round's brief.
+
+### T340 · The root cell's undrawn speed-tie order carries its Dex weight
+
+*Engine · round 86 · feature · score-touching (D3)*
+
+**Parked (round 86 final gate of 06.11.2026, 3). Trigger: a feedback scene in which an equal-speed tie that no tree drew at its Dex weight flips a note (a tier or a key moment).**
+
+**Problem.** Two Machamps at 1 hit point, equal speed, Close Combat each: the first mover wins, a coin flip. The solver reads 0 exactly and the prover reads 0.5. The tree's score is the plain mean of the trees' root cells, and each tree draws the tie once, with `treeSeed(0, offset)` (`packages/eval-engine/src/search/leaf.ts:40`; the first visit of the root cell is iteration 0). Under the hashed seeds that draw puts p2 first for offsets 0 to 13, so four trees read -1 where the lattice seeds read 0.5 (F1, row 3). The weakness is older: two or three trees read 1 at c104389. The fixture is `doubles-ohko-tie` (`test/regression/endgame-fixtures.ts:142`). Round 86 dropped the row's tree-score assertion (`test/regression/tree-endgame-cases.spec.ts`, user gate of 06.11.2026, 2a).
+
+**Idea.** Price the tie order at its Dex weight instead of by one draw per tree: a class per order in the cell, or the systematic quantile per die and cell that T322's block 1 prescribes (the gate of 06.11.2026, 3a). It belongs beside T322.
+
+**Benefit.** Engine: a speed tie in the cell reads one half, whatever number of trees the search runs.
+
+**Success.** The row `doubles-ohko-tie` regains an assertion that the tree's score stays inside a band around 0 at the default four trees and at 2, 3, 6, 8 and 16 trees; a sweep over the equal-speed fixtures of singles and doubles; the bank and the four holdouts show no harm against the base after T323.
+
+**Singles and doubles.** Doubles for the scene; the singles `ohko-tie` rows pass (F1), and the sweep covers both.
+
+**Evidence.** `r86/lanes/D/ledger.md` (F1, row 3: the tree counts at c104389 and under the hashed seeds, the offsets 0 to 199).
+
+### T341 · A charge move's aim comes from the `|-anim|` line
+
+*Engine, reconstruction · round 86 · feature · score-touching*
+
+**Parked (round 86 final gate of 06.11.2026, 3). Trigger: a second scene, a corpus turn where a charge move fires with no target in its `|move|` line and the rebuild aims it at the other foe.**
+
+**Problem.** In VGC game 2630685175 turn 3 Terapagos holds a Power Herb, so its Meteor Beam fires on the first turn. The log writes `|move|p1b: TeraTurtle|Meteor Beam||[still]` with no target and shows the aim only in `|-anim|p1b: TeraTurtle|Meteor Beam|p2b: Dragonite`. The forced turn takes the empty target (`packages/eval-engine/src/branch/protocol-choices.ts:338-346`), `protocolTargetLoc` (`:110`) returns 0, and `targetLocSuffixForChoice` (`:160-177`) falls back to `firstLegalTargetLoc` (`:179`): the first legal foe. The aim can differ from the game's. The pinned row says it (`test/regression/forced-reconstruction.spec.ts:62`, `stays: null`). The earlier proposal named Ruination, but Ruination names its target in the log (`|move|p2a: Chien-Pao|Ruination|p1b: TeraTurtle|[miss]`); the move without a target is the Meteor Beam.
+
+**Idea.** A reader of the `|-anim|` line for a move whose `|move|` line names no target. The dice reader already reads `|-anim|` for the later hits of Dragon Darts (`readAnim`, `packages/eval-engine/src/dice/logged-results.ts:138`); the build checks whether the two share it. Random-target moves (Outrage and its kind) have no scene in the corpus and stay with T303.
+
+**Benefit.** Engine and app: a charge move that fires with a Power Herb, or the second turn of a semi-invulnerable move, hits the foe the game chose.
+
+**Success.** The row 2630685175 turn 3 leaves `RESIDUALS` and turns plain; a sweep over every Dex move whose `|move|` line carries no target in doubles (Power Herb and semi-invulnerable second turns), in every rule set the corpus plays. Score-touching: the batch check.
+
+**Singles and doubles.** Doubles only: singles have one foe, so the aim cannot differ.
+
+**Evidence.** `r86/lanes/B/ledger.md` (B2, proposal 4; B3); `r86/gate/todo-review.md` (P6: the corrected scene, the Meteor Beam and the fix site).
 
 ### T259 · A smoother price for a stage drop at the bench gate
 

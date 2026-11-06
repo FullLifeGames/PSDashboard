@@ -56,9 +56,9 @@ One result of a cell that the search prices as a whole: a hit without a knock-ou
 **Tree seed**:
 The seed of one tree expansion's dice, hashed from the tree's number and the iteration, so the dice come true at the Dex chance.
 
-**Turned-die copy**:
-A copy of a logged turn that plays with one die turned over, a miss turned into a hit (`rolledCopy` in the code). The report uses it to price the die behind its "biggest roll" sentence.
+**Rolled copy**:
+A copy of a logged turn that plays with one die turned over, a miss turned into a hit (`rolledCopy` in the code). The report uses it to price the die behind its "biggest roll" sentence. The headword follows the code; the report's sentence keeps "roll" for this die.
 
-**Biggest-roll die**:
-The die with the largest chance against the eventual winner: a miss of the winner's sure kill, in singles or as a named click in doubles (`BiggestRoll` in `biggest-roll.ts`). The report's own sentence calls it "The game's biggest roll" and gives the winner's chance after a hit and after the miss.
+**Biggest roll**:
+The die with the largest chance against the eventual winner: a miss of the winner's sure kill, in singles or as a named click in doubles (`BiggestRoll` in `biggest-roll.ts`, built by `biggestRollFor`). The headword follows the code; the report's sentence keeps "roll" for this die. The report's own sentence calls it "The game's biggest roll" and gives the winner's chance after a hit and after the miss.
 _Avoid_: roll (outside "damage roll" and the report's quoted sentence)
