@@ -1,4 +1,4 @@
-import type { PRNGSeed } from '@pkmn/sim';
+import type { Battle, PRNGSeed } from '@pkmn/sim';
 import type { MatchupCache } from '../eval-function.ts';
 import { advancePosition, positionBattle, type SimPosition } from '../forward-model.ts';
 import { PROBE_SEEDS } from '../cell-blend.ts';
@@ -9,7 +9,8 @@ import { drawPlain, firstDraw, outcomeGroups, stateGroups, VERIFY_PLAIN_SEEDS, V
 import { drawPair, type PairDraw } from './draw.ts';
 import { parsePairChoice, planTimeFallback } from './guards.ts';
 import { memoKillTable, type KillTable } from './kill-table.ts';
-import { readPattern, type PairEvent, type PairOutcome, type Pattern, type PatternRead, type TableFor } from './pattern.ts';
+import { readPattern, type EntriesFor, type PairEvent, type PairOutcome, type Pattern, type PatternRead, type TableFor } from './pattern.ts';
+import { eventSecondaries } from '../search/secondary-classes.ts';
 import type { PairScript } from './prng.ts';
 
 /**
@@ -46,13 +47,15 @@ interface Found {
   /** Round 64: every draw of the class, the plan's in order, then the verify pool's. */
   draws: PairDraw[];
 }
-interface Candidate { id: string; prior: number; branch: Branch; prefix: PairEvent[]; flipKey: string; outcome: PairOutcome }
-interface Cell { root: SimPosition; p1Choice: string; p2Choice: string; samples: number; matchupCache: MatchupCache; tableFor: TableFor; plainDraws?: number }
+interface Candidate { id: string; prior: number; branch: Branch; prefix: PairEvent[]; flipKey: string; outcome: PairOutcome; tokens?: string[] }
+interface Cell {
+  root: SimPosition; p1Choice: string; p2Choice: string; samples: number; matchupCache: MatchupCache; tableFor: TableFor; entriesFor: EntriesFor; plainDraws?: number;
+}
 
 const memos = new WeakMap<SimPosition, Map<string, KillTable | null>>();
 
-/** Kill tables memoized per root. */
-function tablesFor(root: SimPosition): TableFor {
+/** Kill tables memoized per root (the doubles trees read them through `pair/tree-key.ts`, round 86). */
+export function tablesFor(root: SimPosition): TableFor {
   let memo = memos.get(root);
   if (!memo) {
     memo = new Map();
@@ -66,7 +69,20 @@ const drawn = (cell: Cell, seed: PRNGSeed, scripts: ReadonlyMap<string, PairScri
   drawPair(cell.root, cell.p1Choice, cell.p2Choice, seed, scripts, cell.matchupCache);
 
 const read = (cell: Cell, draw: PairDraw): PatternRead =>
-  readPattern(draw.records, draw.log, positionBattle(cell.root).dex, cell.tableFor);
+  readPattern(draw.records, draw.log, positionBattle(cell.root).dex, cell.tableFor, cell.entriesFor);
+
+/**
+ * Round 86 (T305): the entries a hit's move would draw, read from the simulator on the root's battle (`secondaryChances`), for a
+ * hit that recorded none (a miss, a kill) and so offers the classes of its dice as alternatives. Null when the question is refused.
+ */
+export function entriesOf(battle: Battle): EntriesFor {
+  return key => {
+    const [user, rest = ''] = key.split(':');
+    const [moveId, target = ''] = rest.split('>');
+    const defender = battle.getAtSlot(target as never);
+    return defender ? eventSecondaries(battle, user, moveId, defender) : null;
+  };
+}
 
 /**
  * Rule F: the plain mean over the eight fallback seeds; the first natural
@@ -113,7 +129,10 @@ function candidatesOf(found: Found): Candidate[] {
       if (prior < MIN_MASS) continue;
       const scripts = new Map(found.branch.scripts).set(event.key, alternative.script);
       const id = `${found.branch.seed}#${[...scripts].map(([key, script]) => `${key}=${JSON.stringify(script)}`).sort().join(';')}`;
-      out.push({ id, prior, branch: { seed: found.branch.seed, scripts, from: index }, prefix: found.events.slice(0, index), flipKey: event.key, outcome: alternative.outcome });
+      out.push({
+        id, prior, branch: { seed: found.branch.seed, scripts, from: index }, prefix: found.events.slice(0, index), flipKey: event.key,
+        outcome: alternative.outcome, ...(alternative.tokens ? { tokens: alternative.tokens } : {}),
+      });
     }
     prefix *= event.probability;
   });
@@ -130,14 +149,22 @@ function nextCandidate(candidates: Map<string, Candidate>, tried: Set<string>): 
   return best;
 }
 
-/** Rule F7: the prefix replayed as drawn and the flipped event came out as asked ('hit' asks for any hit). */
+const sameTokens = (a: readonly string[], b: readonly string[]): boolean => a.join('+') === b.join('+');
+
+/**
+ * Rule F7: the prefix replayed as drawn and the flipped event came out as asked ('hit' asks for any hit; a hit-nokill with the effects
+ * that came true named). The prefix compares keys and outcomes only: a flip that drops a later hit's damage roll moves the natural
+ * stream under an earlier hit's secondary die, so the effects of the prefix may come out the other way (the draw books its own class).
+ */
 function landed(events: PairEvent[], candidate: Candidate): boolean {
   const index = candidate.prefix.length;
   for (let i = 0; i < index; i++) {
-    if (events[i]?.key !== candidate.prefix[i].key || events[i].outcome !== candidate.prefix[i].outcome) return false;
+    const asked = candidate.prefix[i];
+    if (events[i]?.key !== asked.key || events[i].outcome !== asked.outcome) return false;
   }
   const flipped = events[index];
   if (!flipped || flipped.key !== candidate.flipKey) return false;
+  if (candidate.tokens && !sameTokens(flipped.tokens, candidate.tokens)) return false;
   return candidate.outcome === 'hit' ? flipped.outcome !== 'miss' : flipped.outcome === candidate.outcome;
 }
 
@@ -231,7 +258,7 @@ export function pairCellSample(
   const p1 = parsePairChoice(battle, 0, p1Choice);
   const p2 = parsePairChoice(battle, 1, p2Choice);
   if (!p1 || !p2) return { kind: 'skip' };
-  const cell: Cell = { root, p1Choice, p2Choice, samples, matchupCache, tableFor: tablesFor(root), ...(plainDraws ? { plainDraws } : {}) };
+  const cell: Cell = { root, p1Choice, p2Choice, samples, matchupCache, tableFor: tablesFor(root), entriesFor: entriesOf(battle), ...(plainDraws ? { plainDraws } : {}) };
   const early = planTimeFallback(battle, [p1, p2]);
   if (early) return fallbackCell(cell, null, early, 0);
   const first = drawn(cell, SEARCH_SEEDS[0], NO_SCRIPTS);

@@ -21,8 +21,11 @@ const pattern = (value: PatternRead): Pattern => {
 describe('a draw read as a class of the pair plan (round 56)', () => {
   test('the played cell: the Play Rough miss at 10 %, the Matcha Gotcha hit at 90 %, the sure Flare Blitz kill is no event', () => {
     const read1 = pattern(read(anchorRoot(), ...PLAYED));
-    expect(read1.key).toBe('p1b:playrough>p2b=miss|p2a:matchagotcha>p1b=hit-nokill');
-    expect(read1.weight).toBeCloseTo(0.09, 9);
+    // Round 86 (T305): the Matcha Gotcha burned Sinistcha's side in this draw, and the burn die (20 percent) is part of the class.
+    // Old expectation: the key ended in `=hit-nokill` and the weight was 0.09 (the miss at 10 percent times the hit at 90 percent).
+    // New: the key ends in `=hit-nokill+brn` and the weight multiplies the burn's chance (0.09 * 0.2).
+    expect(read1.key).toBe('p1b:playrough>p2b=miss|p2a:matchagotcha>p1b=hit-nokill+brn');
+    expect(read1.weight).toBeCloseTo(0.018, 9);
     const [playRough] = read1.events;
     expect(playRough.alternatives).toEqual([
       { outcome: 'hit-kill', probability: expect.closeTo(0.9, 9), script: { hit: true, crit: false, roll: 7 } },
@@ -61,14 +64,33 @@ describe('a draw read as a class of the pair plan (round 56)', () => {
 
   // In the built battles below every acting body has its own speed: two equal bodies on one priority are a
   // speed tie, and the tie rule answers before the rule a test is about.
-  test('a flinch-capable hit on a target that moves later sends the read to the fallback', () => {
-    // Extrasensory flinches one time in ten and not in this draw, so the rule on the chance answers
-    // (Rock Slide's two 30 % rolls flinched here, and a real flinch answers as cant:flinch).
+  // Round 86 (T305): a flinch die on a target that moves later is part of the hit's class. Old expectation: the read fell back with
+  // `flinch-chance` (a name list of items and abilities decided it) and a real flinch fell back with `cant:flinch`. New: the read is a
+  // pattern, the recorded die names the flinch, and the other result of the die is an alternative with the script that asks for it.
+  describe('a flinch die (Extrasensory, one time in ten, into two bodies that move later)', () => {
     const root = doublesRoot(
       [pairSet('Fast', 'Aerodactyl', ['Extrasensory', 'Protect'], { nature: 'Jolly', evs: { hp: 0, atk: 252, def: 0, spa: 0, spd: 4, spe: 252 } }), pairSet('Wall', 'Blissey', ['Soft-Boiled', 'Protect'])],
       [pairSet('Slow1', 'Snorlax', ['Body Slam', 'Protect']), pairSet('Slow2', 'Munchlax', ['Body Slam', 'Protect'])],
     );
-    expect(read(root, 'move extrasensory 1, move softboiled', 'move bodyslam 1, move bodyslam 1')).toEqual({ kind: 'fallback', reason: 'flinch-chance' });
+    const choices = ['move extrasensory 1, move softboiled', 'move bodyslam 1, move bodyslam 1'] as const;
+
+    test('no flinch in the draw: the class has no token and the flinch is the alternative', () => {
+      const hit = pattern(read(root, ...choices)).events.find(event => event.key === 'p1a:extrasensory>p2a')!;
+      expect(hit).toMatchObject({ outcome: 'hit-nokill', tokens: [] });
+      expect(hit.probability).toBeCloseTo(0.9, 9);
+      const flinch = hit.alternatives.find(alternative => alternative.tokens?.join() === 'flinch')!;
+      expect(flinch.probability).toBeCloseTo(0.1, 9);
+      expect(flinch.script).toEqual({ secondary: { flinch: true } });
+    });
+
+    test('a flinch in the draw: the class carries the token, and the cant line is no deviation', () => {
+      const flinched = pattern(read(root, ...choices, new Map([['p1a:extrasensory>p2a', { secondary: { flinch: true } }]])));
+      const hit = flinched.events.find(event => event.key === 'p1a:extrasensory>p2a')!;
+      expect(hit).toMatchObject({ outcome: 'hit-nokill', tokens: ['flinch'] });
+      expect(hit.probability).toBeCloseTo(0.1, 9);
+      expect(flinched.key).toContain('p1a:extrasensory>p2a=hit-nokill+flinch');
+      expect(flinched.events.some(event => event.key.startsWith('p2a:bodyslam'))).toBe(false);
+    });
   });
 
   test('a Focus Sash on full HP sends the read to the fallback', () => {

@@ -6,7 +6,7 @@ import { mctsTreeSearch } from '../src/mcts';
 import { cellKey } from '../src/rank';
 import { cellContribution } from '../src/search/merge-pool';
 import { sampleCell } from '../src/search/cell-sampler';
-import { SEARCH_SEEDS, treeSeed } from '../src/search/leaf';
+import { treeSeed } from '../src/search/leaf';
 import { classifyChild, planCellEvents } from '../src/cell-blend';
 import { doublesRoot, pairSet } from './pair-battles';
 
@@ -42,6 +42,10 @@ function thunderTie(setup: (battle: Battle) => void = () => {}): SimPosition {
   return createRootPosition(JSON.stringify(State.serializeBattle(battle)));
 }
 
+// Round 86 (T323): a tree's seed hashes (offset, iteration), so the seeds a root cell can draw are the ones of the iterations
+// that can first visit it; a board of a few options reaches every cell within these.
+const FIRST_VISITS = 40;
+
 /**
  * The keys the simulator gives the cell over the seeds a tree of this offset can draw it with (the iteration that
  * first reaches the cell is not fixed): the first mover's side and the class of the log, as the sampler writes them.
@@ -50,7 +54,7 @@ function drawnKeys(root: SimPosition, p1: string, p2: string, offset: number): S
   const plan = planCellEvents(positionBattle(root), p1, p2);
   if (plan.kind !== 'events') throw new Error('the cell has no class plan');
   const keys = new Set<string>();
-  for (let iteration = 0; iteration < SEARCH_SEEDS.length; iteration++) {
+  for (let iteration = 0; iteration < FIRST_VISITS; iteration++) {
     const { log } = advancePositionWithLog(root, p1, p2, treeSeed(iteration, offset));
     const first = log.find(line => line.startsWith('|move|'))!.startsWith('|move|p1a:') ? 'p1' : 'p2';
     keys.add(`${first}:${classifyChild(log, plan.events)}`);

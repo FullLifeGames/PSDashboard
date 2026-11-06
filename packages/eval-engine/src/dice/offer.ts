@@ -49,6 +49,8 @@ interface ActiveMove {
 type Base = Omit<DieName, 'kind' | 'targetSlot'>;
 type MoveChoice = Extract<BranchSlotChoice, { kind: 'move' }>;
 
+const bodyAt = (battle: Battle, slot: string): Pokemon | undefined => battle.sides[slot[1] === '1' ? 0 : 1].active[slot[2] === 'a' ? 0 : 1];
+
 const slotOf = (body: Pokemon | undefined | null): string | undefined => (body && !body.fainted ? body.getSlot() : undefined);
 
 /** The bodies a move aimed by this choice can reach: the chosen one, or every foe (and the ally for a move that hits all). */
@@ -108,19 +110,37 @@ function damageOffers(battle: Battle, move: ActiveMove, base: Base, targets: str
   ]);
 }
 
-/** The entries `ModifySecondaries` leaves for each target, one die each (the target's own rules may remove them). */
-function secondaryOffers(copy: Battle, user: Pokemon, move: ActiveMove, base: Base, targets: Pokemon[]): DieOffer[] {
+/** The entries `ModifySecondaries` leaves for one target: the target's own rules may remove them (Gens 1 and 2 have no hook). */
+function entriesOn(copy: Battle, user: Pokemon, move: ActiveMove, target: Pokemon): SecondaryEntry[] {
   if (!move.secondaries?.length) return [];
   const runner = copy as unknown as { runEvent(...args: unknown[]): SecondaryEntry[] | undefined };
-  return targets.flatMap(target => {
-    const entries = copy.gen >= 3 ? runner.runEvent('ModifySecondaries', target, user, move, move.secondaries!.slice()) ?? [] : move.secondaries!;
-    // Gens 1 and 2 apply an entry with no chance without a draw
-    return entries.filter(entry => copy.gen >= 3 || entry.chance !== undefined).map((entry): DieOffer => ({
-      name: { ...base, targetSlot: target.getSlot(), kind: 'secondary', effectId: secondaryEffectId(entry) },
-      results: YES_NO,
-      chance: chanceOfEntry(entry.chance),
-    }));
-  });
+  const entries = copy.gen >= 3 ? runner.runEvent('ModifySecondaries', target, user, move, move.secondaries.slice()) ?? [] : move.secondaries;
+  // Gens 1 and 2 apply an entry with no chance without a draw
+  return entries.filter(entry => copy.gen >= 3 || entry.chance !== undefined);
+}
+
+/** The entries `ModifySecondaries` leaves for each target, one die each (the target's own rules may remove them). */
+function secondaryOffers(copy: Battle, user: Pokemon, move: ActiveMove, base: Base, targets: Pokemon[]): DieOffer[] {
+  return targets.flatMap(target => entriesOn(copy, user, move, target).map((entry): DieOffer => ({
+    name: { ...base, targetSlot: target.getSlot(), kind: 'secondary', effectId: secondaryEffectId(entry) },
+    results: YES_NO,
+    chance: chanceOfEntry(entry.chance),
+  })));
+}
+
+/**
+ * Round 86 (T305): the secondary dice a move of `userSlot` draws against `targetSlot`, as the simulator will draw them: the
+ * entries after the move's and the user's `ModifyMove` and the target's `ModifySecondaries`, each with its chance, in the
+ * draw's order. Read on a copy (the live battle is never written); `dice/secondaries.ts` caches it.
+ */
+export function secondaryDiceOf(battle: Battle, userSlot: string, moveId: string, targetSlot: string): { effectId: string; chance: number }[] {
+  const copy = copyOf(battle);
+  copy.prng ??= battle.prng.clone();
+  const user = bodyAt(copy, userSlot);
+  const target = bodyAt(copy, targetSlot);
+  if (!user || !target || user.fainted || target.fainted) return [];
+  const move = activeMoveOn(copy, user, target, moveId);
+  return entriesOn(copy, user, move, target).map(entry => ({ effectId: secondaryEffectId(entry), chance: chanceOfEntry(entry.chance) }));
 }
 
 function moveOffers(copy: Battle, user: Pokemon, move: ActiveMove, targets: Pokemon[]): DieOffer[] {
@@ -135,8 +155,6 @@ function moveOffers(copy: Battle, user: Pokemon, move: ActiveMove, targets: Poke
   if (mix) offers.push({ name: { ...base, kind: 'power', effectId: move.id }, results: YES_NO, chance: mix.chance });
   return offers;
 }
-
-const bodyAt = (battle: Battle, slot: string): Pokemon | undefined => battle.sides[slot[1] === '1' ? 0 : 1].active[slot[2] === 'a' ? 0 : 1];
 
 /** The events of a hit that holders' abilities and items answer: the target was hit, then it took damage. Runs on a copy. */
 function hitEvents(copy: Battle, userSlot: string, targetSlot: string, moveId: string): void {

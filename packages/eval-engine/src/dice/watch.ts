@@ -7,7 +7,8 @@ import type { SecondaryEntry } from './types.ts';
  * inside `getDamage`). The watch is a set of own-property wrappers on one battle that note both and change nothing: each
  * wrapper calls the saved original with the same arguments and returns its value. It lives for the natural copy's turn and
  * the real turn; `uninstall()` puts the saved property descriptors back, so the battle is the one it was (own keys, stable
- * serialization, the speed layer's pre-check). A battle under watch is never cloned (the clone walks own keys).
+ * serialization, the speed layer's pre-check). Round 86 (T299): the wrappers are non-enumerable, so a copy of a battle under watch
+ * (a forced switch's snapshot) walks past them and carries none; the tree's scripted PRNGs rely on that.
  *
  * Not `battle.onEvent` listeners: a listener joins the speed sort and can draw a tie shuffle of its own, and not
  * `forceRandomChance`: it shifts later draws (docs/adr/0002).
@@ -103,6 +104,25 @@ function noteSecondaries(watch: BattleWatch, args: unknown[], entries: Secondary
   if (targetSlot && given && entries.length < given.length) sightOf(watch, args[3]).removedFor.push(targetSlot);
 }
 
+/** Puts `make(original)` in the place of an owner's function property and notes how to put the property back. */
+function wrapProperty(undo: (() => void)[], owner: object, name: string, make: (original: AnyFn) => AnyFn): void {
+  const original = (owner as Record<string, unknown>)[name];
+  if (typeof original !== 'function') return;
+  const had = Object.getOwnPropertyDescriptor(owner, name);
+  const watched = make(original as AnyFn);
+  // Round 86 (T299): a copy of a watched battle that walks the own keys takes the wrapper of an own property along (the mods
+  // override some script calls as own properties). Called on any object but the watched one, the wrapper only passes the call on.
+  const wrapper: AnyFn = function (this: unknown, ...args: unknown[]) {
+    return (this === owner ? watched : (original as AnyFn)).apply(this, args);
+  };
+  // A property the owner inherited stays hidden from key walks: a speed-layer copy then carries no wrapper of this watch.
+  Object.defineProperty(owner, name, { value: wrapper, enumerable: had?.enumerable ?? false, writable: true, configurable: true });
+  undo.push(() => {
+    if (had) Object.defineProperty(owner, name, had);
+    else delete (owner as Record<string, unknown>)[name];
+  });
+}
+
 export function watchBattle(battle: Battle): BattleWatch {
   const undo: (() => void)[] = [];
   const scopes: string[] = [];
@@ -121,16 +141,7 @@ export function watchBattle(battle: Battle): BattleWatch {
     },
   };
 
-  const wrap = (owner: object, name: string, make: (original: AnyFn) => AnyFn): void => {
-    const original = (owner as Record<string, unknown>)[name];
-    if (typeof original !== 'function') return;
-    const had = Object.getOwnPropertyDescriptor(owner, name);
-    (owner as Record<string, unknown>)[name] = make(original as AnyFn);
-    undo.push(() => {
-      if (had) Object.defineProperty(owner, name, had);
-      else delete (owner as Record<string, unknown>)[name];
-    });
-  };
+  const wrap = (owner: object, name: string, make: (original: AnyFn) => AnyFn): void => wrapProperty(undo, owner, name, make);
 
   wrap(battle, 'runEvent', original => function (this: unknown, ...args: unknown[]) {
     const id = args[0];

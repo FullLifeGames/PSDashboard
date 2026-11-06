@@ -74,3 +74,13 @@ export function answerDie(kind: DieKind, result: DieResult, draw: Draw, gen: num
   }
   return null;
 }
+
+/**
+ * Round 86 (T299): the raw value of a script's damage roll. A script names the roll as `random(16)` does (0 is the top roll, 15
+ * the bottom one); Gens 3 and up draw exactly that, Gens 1 and 2 draw `random(217, 256)` with 39 steps, and the 16 rolls spread
+ * over them from the top step (255) to the bottom one (217).
+ */
+export function scriptRoll(gen: number, roll: number): number {
+  const shape = genShape(gen).roll;
+  return shape.raw(Math.round((15 - roll) * (shape.steps - 1) / 15));
+}

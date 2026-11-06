@@ -18,17 +18,33 @@ export const SEARCH_SEEDS: readonly PRNGSeed[] = [
   '1,2,3,4', '5,6,7,8', '9,10,11,12', '13,14,15,16', '17,18,19,20',
 ];
 
+/** A murmur-style 32-bit finalizer: integer arithmetic only, so the browser and Node agree to the bit. */
+function mix32(x: number): number {
+  let h = x >>> 0;
+  h ^= h >>> 16; h = Math.imul(h, 0x7feb352d);
+  h ^= h >>> 15; h = Math.imul(h, 0x846ca68b);
+  h ^= h >>> 16;
+  return h >>> 0;
+}
+
 /**
- * Round 61: the seed a tree cell draws at creation. Tree k uses family
- * floor(k / 5); family 0 is SEARCH_SEEDS, so trees 0 to 4 keep the
- * sequences they had (a sixth tree used to copy the first).
+ * Round 61: the seed a tree cell draws at creation. Round 86 (the engine reads the dice, T323): a hash of (seedOffset,
+ * iteration). The five SEARCH_SEEDS are one arithmetic progression of the Gen 5 LCG state, so at draw n a die came true
+ * in 0, 1 or 2 of the five streams, never in a fifth of them at random: a 10 % paralysis in 0 or 20 % of a tree's
+ * cells, a 90 % move missing in 73 % of slot 1's cells and in at most 7 % of the others, the same outcome in every cell
+ * of one slot (A10). A tree expands at most one cell per iteration, so (offset, iteration) names the expansion and
+ * needs no cell key. The four 16-bit words of the seed come from a chain of the finalizer, none zero, and any tree
+ * count gets its own streams. The sampler, the matrix search, the verify round and the endgame children keep
+ * SEARCH_SEEDS.
  */
 export function treeSeed(iteration: number, seedOffset: number): PRNGSeed {
-  const family = Math.floor(seedOffset / SEARCH_SEEDS.length);
-  const slot = (iteration + seedOffset) % SEARCH_SEEDS.length;
-  if (family === 0) return SEARCH_SEEDS[slot];
-  const base = 20 * family + 4 * slot;
-  return `${base + 1},${base + 2},${base + 3},${base + 4}` as PRNGSeed;
+  let h = mix32((Math.imul(seedOffset + 1, 0x9e3779b1) ^ Math.imul(iteration + 1, 0x85ebca6b)) >>> 0);
+  const words: number[] = [];
+  for (let i = 0; i < 4; i++) {
+    h = mix32((h + 0x632be5ab) >>> 0);
+    words.push((h & 0xffff) || 1);
+  }
+  return words.join(',') as PRNGSeed;
 }
 
 export function countFainted(battle: ReturnType<typeof positionBattle>): number {

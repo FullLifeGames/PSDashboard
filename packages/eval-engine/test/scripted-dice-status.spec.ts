@@ -11,16 +11,14 @@ import { battleOf } from './power-oracle';
  * seed. The simulator draws those checks inside the attacker's action, because `runMove` sets the active move before
  * `BeforeMove`: full paralysis (1 in 4; 63 in 256 in Gens 1 and 2; 1 in 8 in the Champions mod), the thaw (1 in 5; Gen 2
  * thaws at the end of the turn; 1 in 4 under the Champions timer), the infatuation (1 in 2) and the confusion self-hit
- * (1 in 2 up to Gen 6, 33 in 100 from Gen 7) with a damage roll of its own. `ScriptedPRNG` (the singles tree) reads the
- * first `randomChance(x, 100)` of a scripted move as its accuracy roll and any `randomChance(1, d)` with a crit denominator
- * as its crit roll, and answers the first `random(16)` of the action with the script's roll; `PairPRNG` (the doubles pair
- * plan) guards the crit with `inDamage()` but not the accuracy, and books every `random(16)` of the action as a roll of
- * the move. In Gens 1 and 2 accuracy and crit draw in 256ths and the damage roll is `random(217, 256)`, so a script
- * reaches none of them.
+ * (1 in 2 up to Gen 6, 33 in 100 from Gen 7) with a damage roll of its own. Those draws have the shape of a crit or an
+ * accuracy, and the confusion self-hit's `random(16)` has the shape of the move's roll, so a PRNG that told a draw by its
+ * numbers (the singles tree's `ScriptedPRNG` and the doubles pair plan's `PairPRNG` did, and in Gens 1 and 2, which draw
+ * accuracy and crit in 256ths and the roll as `random(217, 256)`, they reached nothing) took the script's answer for them.
  *
- * The sweep plays every check in every generation and mod the corpus plays, singles for `ScriptedPRNG` and doubles for
- * `PairPRNG`, and compares each seed with the plain PRNG on the same seed. A row the code reads wrong today is a
- * `test.fails` in KNOWN: the day the fix lands, the row turns red and leaves the list.
+ * Round 86 (T299): both PRNGs ask the module's `DrawNamer` which die a draw is. The sweep plays every check in every
+ * generation and mod the corpus plays, singles for `ScriptedPRNG` and doubles for `PairPRNG`, and compares each seed with
+ * the plain PRNG on the same seed. The 88 rows that were expected failures (`test.fails`) are plain tests.
  */
 
 await loadSimMods('gen9championsou');
@@ -103,32 +101,6 @@ const CHECKS: Record<string, Check> = {
 
 const checksOf = (rules: Rules) => Object.entries(CHECKS).filter(([, check]) => rules.generation >= check.from);
 
-const BOTH = ['hit and crit', 'miss, no crit'];
-const named = (prefix: string, rules: string[], rows: string[]): string[] => rules.flatMap(name => rows.map(entry => `${prefix} ${name} ${entry}`));
-const FROM_GEN_3 = ['Gen 3', 'Gen 4', 'Gen 5', 'Gen 6', 'Gen 7', 'Gen 8', 'Gen 9', 'Champions'];
-const FROM_GEN_7 = ['Gen 7', 'Gen 8', 'Gen 9', 'Champions'];
-
-/** Rows the code reads wrong today (expected failures), by cause. */
-const KNOWN: ReadonlySet<string> = new Set([
-  // Gens 1 and 2 draw accuracy and crit in 256ths and the damage roll as random(217, 256): ScriptedPRNG reaches none of them.
-  ...named('scripted', ['Gen 1', 'Gen 2'], ['a scripted miss misses', 'a scripted crit crits', 'a scripted roll']),
-  // The infatuation (1 in 2) and the confusion check (1 in 2 up to Gen 6: a crit shape; 33 in 100 from Gen 7: an accuracy
-  // shape) take the script's answer.
-  ...named('scripted', ['Gen 2', ...FROM_GEN_3], BOTH.flatMap(label => [`infatuation ${label}`, `confusion self-hit ${label}`])),
-  // Full paralysis (1 in 4, 1 in 8 in Champions) has a crit shape; Gens 1 and 2 draw it as 63 in 256.
-  ...named('scripted', FROM_GEN_3, BOTH.map(label => `full paralysis ${label}`)),
-  // The Champions thaw draws 1 in 4 while its timer runs: a crit shape.
-  ...named('scripted', ['Champions'], BOTH.map(label => `thaw ${label}`)),
-  // The self-hit's random(16) takes the script's roll.
-  ...named('scripted', FROM_GEN_3, ['self-hit roll']),
-  // PairPRNG guards the crit with inDamage(), not the accuracy: the confusion check of Gen 7 on is read and booked as accuracy 33.
-  ...named('pair', FROM_GEN_7, [...BOTH.map(label => `confusion self-hit ${label}`), 'accuracy record']),
-  // The self-hit's random(16) books a roll of the move: on the attacker from Gen 7, on the move's own target before.
-  ...named('pair', FROM_GEN_3, ['self-hit roll']),
-]);
-
-const row = (id: string) => (KNOWN.has(id) ? test.fails : test);
-
 const SCRIPTS: Record<string, RollScript & PairScript> = {
   'hit and crit': { hit: true, crit: true },
   'miss, no crit': { hit: false, crit: false },
@@ -137,8 +109,7 @@ const SCRIPTS: Record<string, RollScript & PairScript> = {
 describe.each(RULES)('ScriptedPRNG, $name singles: the script decides the move and nothing else (T299)', rules => {
   for (const [name, check] of checksOf(rules)) {
     for (const [label, script] of Object.entries(SCRIPTS)) {
-      const id = `scripted ${rules.name} ${name} ${label}`;
-      row(id)(`${name} under "${label}": every seed's check comes out as on the plain seed`, () => {
+      test(`${name} under "${label}": every seed's check comes out as on the plain seed`, () => {
         const base = SEEDS.map(seed => check.shows(play(singlesBoard(rules, seed), new PRNG(seed), check.start, SINGLES_TURN).log));
         const ours = SEEDS.map(seed => check.shows(play(
           singlesBoard(rules, seed), new ScriptedPRNG(seed, new Map([['p1:tackle', script]])), check.start, SINGLES_TURN).log));
@@ -153,14 +124,17 @@ describe.each(RULES)('ScriptedPRNG, $name singles: the script decides the move a
     'a scripted crit crits': { script: { hit: true, crit: true }, holds: shown(/^\|-crit\|p2a: Pikachu/) },
   };
   for (const [name, { script, holds }] of Object.entries(reach)) {
-    const id = `scripted ${rules.name} ${name}`;
-    row(id)(`${name} on every seed`, () => {
+    test(`${name} on every seed`, () => {
+      // Gens 1 and 2 draw no accuracy for a move of 100 percent (the draw is 255 in 256 and the simulator skips a sure one):
+      // the row plays a move under 100 there, which Tackle is in those generations, so a script has a draw to answer.
+      const accuracy = singlesBoard(rules, SEEDS[0]).dex.moves.get('tackle').accuracy;
+      if (rules.generation <= 2) expect(accuracy, "Tackle's accuracy in this generation").toBeLessThan(100);
       const missed = SEEDS.filter(seed => !holds(play(singlesBoard(rules, seed), new ScriptedPRNG(seed, new Map([['p1:tackle', script]])), null, SINGLES_TURN).log));
       expect(missed, 'seeds the script did not reach').toEqual([]);
     });
   }
 
-  row(`scripted ${rules.name} a scripted roll`)('the top roll hurts more than the bottom roll on every seed', () => {
+  test('the top roll hurts more than the bottom roll on every seed', () => {
     const damage = (seed: string, roll: number): number => {
       const battle = play(singlesBoard(rules, seed), new ScriptedPRNG(seed, new Map([['p1:tackle', { hit: true, crit: false, roll }]])), null, SINGLES_TURN);
       const target = battle.sides[1].active[0]!;
@@ -169,7 +143,7 @@ describe.each(RULES)('ScriptedPRNG, $name singles: the script decides the move a
     expect(SEEDS.filter(seed => damage(seed, 0) <= damage(seed, 15)), 'seeds where the roll did not move the damage').toEqual([]);
   });
 
-  row(`scripted ${rules.name} self-hit roll`)('a confusion self-hit keeps the damage roll of the plain seed', () => {
+  test('a confusion self-hit keeps the damage roll of the plain seed', () => {
     const confusion = CHECKS['confusion self-hit'];
     /** The HP the self-hit took, or null on a seed without one. */
     const selfHit = (seed: string, dice: Dice): number | null => {
@@ -186,8 +160,7 @@ describe.each(RULES)('ScriptedPRNG, $name singles: the script decides the move a
 describe.each(RULES.filter(rules => rules.doubles !== null))('PairPRNG, $name doubles: the records hold the move and nothing else (T299)', rules => {
   for (const [name, check] of checksOf(rules)) {
     for (const [label, script] of Object.entries(SCRIPTS)) {
-      const id = `pair ${rules.name} ${name} ${label}`;
-      row(id)(`${name} under "${label}": every seed's check comes out as on the plain seed`, () => {
+      test(`${name} under "${label}": every seed's check comes out as on the plain seed`, () => {
         const base = SEEDS.map(seed => check.shows(play(doublesBoard(rules, seed), new PRNG(seed), check.start, DOUBLES_TURN).log));
         const ours = SEEDS.map(seed => check.shows(play(
           doublesBoard(rules, seed), new PairPRNG(seed, new Map([['p1a:tackle>p2a', script]])), check.start, DOUBLES_TURN).log));
@@ -202,7 +175,7 @@ describe.each(RULES.filter(rules => rules.doubles !== null))('PairPRNG, $name do
     return { battle: play(doublesBoard(rules, seed), dice, CHECKS['confusion self-hit'].start, DOUBLES_TURN), dice };
   };
 
-  row(`pair ${rules.name} accuracy record`)('a confused attacker\'s accuracy records carry the move\'s accuracy', () => {
+  test('a confused attacker\'s accuracy records carry the move\'s accuracy', () => {
     const wrong = SEEDS.flatMap(seed => {
       const { battle, dice } = confused(seed);
       const accuracy = battle.dex.moves.get('tackle').accuracy;
@@ -212,7 +185,7 @@ describe.each(RULES.filter(rules => rules.doubles !== null))('PairPRNG, $name do
     expect(wrong, 'accuracy records of another draw').toEqual([]);
   });
 
-  row(`pair ${rules.name} self-hit roll`)('a turn the attacker spends hitting itself leaves no damage roll record of its move', () => {
+  test('a turn the attacker spends hitting itself leaves no damage roll record of its move', () => {
     const selfHits = SEEDS.map(seed => [seed, confused(seed)] as const)
       .filter(([, { battle }]) => CHECKS['confusion self-hit'].shows(battle.log));
     expect(selfHits.length, 'the plain seeds never show a self-hit').toBeGreaterThan(0);

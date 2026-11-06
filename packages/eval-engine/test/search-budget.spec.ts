@@ -49,15 +49,18 @@ describe('search budget (round 61)', () => {
     expect(() => parseSearchBudget('tree-from=')).toThrow(/tree-from/);
   });
 
-  test('tree seeds: trees 0 to 4 keep their sequences, 16 trees draw 16 different ones', () => {
+  test('tree seeds: a pure function of (offset, iteration), 16 trees draw 16 different sequences (round 86, T323)', () => {
     for (let offset = 0; offset < 5; offset++) {
       for (let iteration = 0; iteration < 12; iteration++) {
-        expect(treeSeed(iteration, offset)).toBe(SEARCH_SEEDS[(iteration + offset) % SEARCH_SEEDS.length]);
+        expect(treeSeed(iteration, offset)).toBe(treeSeed(iteration, offset));
+        expect(SEARCH_SEEDS).not.toContain(treeSeed(iteration, offset));
       }
     }
     const sequences = new Set(Array.from({ length: 16 }, (_, offset) =>
       Array.from({ length: 10 }, (_, iteration) => treeSeed(iteration, offset)).join('|')));
     expect(sequences.size).toBe(16);
+    // no tree repeats a seed inside its own schedule: the lattice's five seeds came round every fifth iteration
+    expect(new Set(Array.from({ length: 10 }, (_, iteration) => treeSeed(iteration, 0))).size).toBe(10);
   });
 });
 

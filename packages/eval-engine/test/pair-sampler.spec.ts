@@ -36,7 +36,8 @@ describe('the pair plan at the root (round 56)', () => {
     expect(Math.abs(cell.sample.value - truth)).toBeLessThan(0.05);
     const blend = cell.sample.blend!;
     expect(blend.classes.reduce((sum, cls) => sum + cls.weight, 0)).toBeCloseTo(1, 9);
-    expect(blend.classes.find(cls => cls.hasFirst)?.key).toBe('p1b:playrough>p2b=miss|p2a:matchagotcha>p1b=hit-nokill');
+    // Round 86 (T305): the first draw burned the Matcha Gotcha's target, so its class names the burn (old key: `...=hit-nokill`).
+    expect(blend.classes.find(cls => cls.hasFirst)?.key).toBe('p1b:playrough>p2b=miss|p2a:matchagotcha>p1b=hit-nokill+brn');
   });
 
   test('sampleCell routes a doubles root cell through the plan and stays the same when computed twice', () => {
@@ -76,15 +77,22 @@ describe('the pair plan at the root (round 56)', () => {
     expect(cell.sample.value).toBeCloseTo(meanOver(root, 'move dragonclaw 1, move softboiled', 'move rest, move rest', FALLBACK_SEEDS as string[]), 12);
   });
 
-  test('a flinch chance falls back after the first draw, reusing it', () => {
-    // The battle of pair-pattern.spec.ts: every acting body has its own speed (no tie), and Extrasensory
-    // does not flinch in the first draw, so the rule on the chance answers.
+  // Round 86 (T305): old expectation, the cell fell back after the first draw with `flinch-chance` (8 draws, the plain mean). New: the
+  // flinch die is part of the class, the cell is a plan, and the classes with the flinch carry its chance.
+  test('a flinch die is part of the plan: the classes with the flinch weigh its chance', () => {
+    // The battle of pair-pattern.spec.ts: every acting body has its own speed (no tie).
     const root = doublesRoot(
       [pairSet('Fast', 'Aerodactyl', ['Extrasensory', 'Protect'], { nature: 'Jolly', evs: { hp: 0, atk: 252, def: 0, spa: 0, spd: 4, spe: 252 } }), pairSet('Wall', 'Blissey', ['Soft-Boiled', 'Protect'])],
       [pairSet('Slow1', 'Snorlax', ['Body Slam', 'Protect']), pairSet('Slow2', 'Munchlax', ['Body Slam', 'Protect'])],
     );
     const cell = pairCellSample(root, 'move extrasensory 1, move softboiled', 'move bodyslam 1, move bodyslam 1', 1, createMatchupCache());
-    expect(cell).toMatchObject({ kind: 'sample', via: 'fallback', reason: 'flinch-chance', draws: 8 });
+    expect(cell).toMatchObject({ kind: 'sample', via: 'plan', reason: null });
+    if (cell.kind !== 'sample') return;
+    const blend = cell.sample.blend!;
+    expect(blend.classes.reduce((sum, cls) => sum + cls.weight, 0)).toBeCloseTo(1, 9);
+    const flinched = blend.classes.filter(cls => cls.key.split('|').some(part => part.startsWith('p1a:extrasensory>p2a=') && part.includes('+flinch')));
+    expect(flinched.length).toBeGreaterThan(0);
+    expect(flinched.reduce((sum, cls) => sum + cls.weight, 0)).toBeCloseTo(0.1, 1);
   });
 
   test('three base seeds (the verify path): same value on repeat, still near the truth', { timeout: 60_000 }, () => {

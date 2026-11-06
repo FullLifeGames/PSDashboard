@@ -68,7 +68,10 @@ describe('an endgame keeps the trees\' verdict (round 77, T267)', () => {
     const result = await searchTreesOrchestrated(createLocalTreeExecutor(position.serialized, position.ruleset), {
       depth: 1, samples: 1, mode: 'mcts', tera: position.tera, sleepClause: position.sleepClause, ruleset: position.ruleset,
     });
-    expect(result.perSide.p1[0].label).toBe('Dark Pulse');
+    // Round 86 (T323, hashed tree seeds): the trees' dice follow the Dex and Water Spout joins Dark Pulse as a proven win: both
+    // rows read 1 and the order between two proven wins is a tie. The row holds the proof, not the order.
+    expect(result.perSide.p1[0].ev).toBeCloseTo(1, 6);
+    expect(result.perSide.p1.find(choice => choice.label === 'Dark Pulse')!.ev).toBeCloseTo(1, 6);
     expect(result.forcedWin).toMatchObject({ side: 'p1', mass: 1 });
     expect(result.score).toBe(1);
   });

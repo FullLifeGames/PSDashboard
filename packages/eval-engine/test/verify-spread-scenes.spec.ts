@@ -65,8 +65,10 @@ describe('verify scenes: hidden lengths (round 64, T119)', () => {
     const executor: TreeExecutor = { ...local, evalCells: async (jobs, onDone) => { rounds.push(jobs); return local.evalCells(jobs, onDone); } };
     await searchTreesOrchestrated(executor, settingsOf(position));
     const verify = rounds.find(jobs => jobs.length > 0 && jobs.every(job => job.deepen !== undefined && !job.plain))!;
-    const template = verify.find(job => job.p1Choice === 'move heatwave, move flareblitz 2' && job.p2Choice === 'move rockslide, move sleeppowder 1')!;
-    const [old] = await local.evalCells([{ ...template, p1Choice: 'move heatwave, move flareblitz 1' }], () => {});
+    // Round 86 (T323, hashed tree seeds): the trees' dice follow the Dex and the verify round no longer holds this cell; the
+    // row prices it through any verify job of the scene (its deepen settings are the scene's), the cell named by its choices.
+    const template = verify.find(job => job.p1Choice === 'move heatwave, move flareblitz 2' && job.p2Choice === 'move rockslide, move sleeppowder 1') ?? verify[0];
+    const [old] = await local.evalCells([{ ...template, p1Choice: 'move heatwave, move flareblitz 1', p2Choice: 'move rockslide, move sleeppowder 1' }], () => {});
     expect(Math.abs(blendedValue(old) - 0.5847)).toBeLessThan(2.5 * 0.079);
     // Round 70 (batch gate, 1a): the engine grades p1's played Heat Wave + Protect an inaccuracy (0.1736, best Heat Wave +
     // Flare Blitz→Jumpluff) and p2's Protect + Encore→Koraidon an inaccuracy (0.1936, best Precipice Blades + Sleep
