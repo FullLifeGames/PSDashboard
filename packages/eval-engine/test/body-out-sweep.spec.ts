@@ -1,5 +1,6 @@
-import type { Battle, Pokemon } from '@pkmn/sim';
+import type { Battle, Pokemon, PokemonSet } from '@pkmn/sim';
 import { describe, expect, test } from 'vitest';
+import { correctActivesFromProtocol } from '../src/branch/corrections';
 import { takeBodyOut } from '../src/branch/team-order';
 import type { SimPokemon } from '../src/branch/types';
 import { loadSimMods } from '../src/forward/sim-mods';
@@ -39,13 +40,16 @@ function witnessOf(rules: Rules): { species: string; ability: string } {
   return dexOfRules(rules).species.get('regigigas').exists ? { species: 'Regigigas', ability: 'Slow Start' } : { species: 'Slaking', ability: 'Truant' };
 }
 
+/** The bench body of the entry rows: Intimidate starts on entry, so a Start event that runs twice or too early shows in the foe's Attack. */
+const intimidator = (rules: Rules) => set('Gyarados', ['splash'], { level: rules.level, ability: 'Intimidate', ...(rules.evs ? { evs: rules.evs } : {}) });
+
 /** A board past team preview: the holder leads p1 with the ability, witnesses beside and across, one benched body each so no win ends the scene. */
-function board(rules: Rules, mode: Mode, ability: string): Battle {
+function board(rules: Rules, mode: Mode, ability: string, entering?: PokemonSet): Battle {
   const witness = () => set(witnessOf(rules).species, ['splash'], { level: rules.level, ability: witnessOf(rules).ability, ...(rules.evs ? { evs: rules.evs } : {}) });
-  const bench = () => mon(rules, { species: 'Blissey', moves: ['splash'] });
+  const bench = () => entering ?? mon(rules, { species: 'Blissey', moves: ['splash'] });
   const holder = set('Snorlax', ['splash'], { level: rules.level, ability, ...(rules.evs ? { evs: rules.evs } : {}), gender: 'M' });
   const p1 = mode === 'singles' ? [holder, bench()] : [holder, witness(), bench()];
-  const p2 = mode === 'singles' ? [witness(), bench()] : [witness(), mon(rules, { species: 'Chansey', moves: ['splash'] }), bench()];
+  const p2 = mode === 'singles' ? [witness(), mon(rules, { species: 'Blissey', moves: ['splash'] })] : [witness(), mon(rules, { species: 'Chansey', moves: ['splash'] }), mon(rules, { species: 'Blissey', moves: ['splash'] })];
   return battleOf(mode === 'singles' ? rules.singles : rules.doubles!, p1, p2);
 }
 
@@ -100,6 +104,40 @@ function flagged(rules: Rules, mode: Mode, ability: string): unknown {
   return worldState(battle, holder);
 }
 
+/** The turn both sides splash, so the board stands at a boundary (turn 2) and the simulator's block holds no switch line. */
+function atBoundary(rules: Rules, mode: Mode, ability: string): Battle {
+  const battle = board(rules, mode, ability, intimidator(rules));
+  const clicks = mode === 'singles' ? 'move 1' : 'move 1, move 1';
+  battle.choose('p1', clicks);
+  battle.choose('p2', clicks);
+  return battle;
+}
+
+const protocolBody = (battle: Battle) => battle.sides[0].pokemon.find(body => body.species.name === 'Gyarados')!;
+
+/** Round 86 (B10): the simulator's own replacement: the holder faints and its End events run, then the bench body switches in. */
+function replacedBySimulator(rules: Rules, mode: Mode, ability: string): unknown {
+  const battle = atBoundary(rules, mode, ability);
+  const holder = battle.sides[0].active[0]!;
+  holder.faint();
+  battle.resolveFaints();
+  battle.actions.switchIn(protocolBody(battle), 0);
+  while (battle.queue.list.length > 0) battle.runAction(battle.queue.shift()!);
+  return worldState(battle, holder);
+}
+
+/**
+ * Round 86 (B10): the rebuild's way, the boundary correction of a protocol that shows the faint and the switch-in on the slot while the simulator's
+ * holder still stands (`faintThePredecessor` in `branch/entry-effects.ts`): the replacement is repointed into the slot first, and the faint of the
+ * predecessor has to run its End events as if the replacement were not there yet.
+ */
+function replacedByCorrection(rules: Rules, mode: Mode, ability: string): unknown {
+  const battle = atBoundary(rules, mode, ability);
+  const holder = battle.sides[0].active[0]!;
+  correctActivesFromProtocol(battle as never, ['|faint|p1a: Snorlax', '|switch|p1a: Gyarados|Gyarados, L50, F|100/100']);
+  return worldState(battle, holder);
+}
+
 describe.each(RULE_SETS.flatMap(rules => (['singles', 'doubles'] as const).map(mode => ({ rules, mode, name: `${rules.name} ${mode}` }))))(
   'a body taken out as the simulator takes it out: $name', ({ rules, mode }) => {
     const abilities = endingAbilities(rules);
@@ -116,5 +154,13 @@ describe.each(RULE_SETS.flatMap(rules => (['singles', 'doubles'] as const).map(m
     test('control: the flags alone differ from the simulator for the abilities whose end changes another body', () => {
       const changing = abilities.filter(ability => JSON.stringify(flagged(rules, mode, ability)) !== JSON.stringify(faintedBySimulator(rules, mode, ability)));
       if (abilities.includes('Neutralizing Gas')) expect(changing, `${rules.name}: Neutralizing Gas is one of them`).toContain('Neutralizing Gas');
+    });
+
+    // Round 86 (B10): the on-field path. The body leaves while a replacement already stands in its slot (the log's switch-in, repointed by the
+    // correction), as in 2159578969 turn 2 (Weezing's gas, Grafaiai in its slot). The End events run with the holder on the field and the
+    // replacement not yet in, then the replacement's own entry runs once.
+    test('every ability with an End handler: the holder leaves a repointed slot as the simulator replaces it', () => {
+      const wrong = abilities.filter(ability => JSON.stringify(replacedByCorrection(rules, mode, ability)) !== JSON.stringify(replacedBySimulator(rules, mode, ability)));
+      expect(wrong, `${rules.name} ${mode}: abilities whose end differs from the simulator's replacement`).toEqual([]);
     });
   });
