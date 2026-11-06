@@ -1,18 +1,58 @@
 # Backlog
 
-This file holds the details of every open TODO, one section per TODO under its fixed T-number. Release v1.0.2 is out (30.10.2026), and rounds 82 to 86 (forced dice in branches, the GitHub issues #2 and #3, the turn dock, the smooth UI, the engine that reads the dice) wait on dev for the next release. Round 87 carries T322 (the search explores the strands of a turn by their chance, blocks 1 and 2), and T319 (an inventory of dead code) follows it; T313, T314, T316, T317, T324 to T329 and T336 to T339 are approved and wait for a round; every other TODO is parked with a trigger, and a trigger that fires brings its TODO to a gate. The next free T-number is T343.
+This file holds the details of every open TODO, one section per TODO under its fixed T-number. Release v1.0.2 is out (30.10.2026), and rounds 82 to 86 (forced dice in branches, the GitHub issues #2 and #3, the turn dock, the smooth UI, the engine that reads the dice) wait on dev for the next release. Round 87 is the release wave of 1.1.0 (the dependencies, T313, T317); round 88 carries T322 (the search explores the strands of a turn by their chance, blocks 1 and 2), and T319 (an inventory of dead code) follows it; T314, T316, T324 to T329 and T336 to T339 are approved and wait for a round of 1.1.1; every other TODO is parked with a trigger, and a trigger that fires brings its TODO to a gate. The next free T-number is T343.
 
 Evidence paths of the form `r<NN>/…` point to that round's probe folder, `docs/perf/probes/<date>-r<NN>/`; `docs/` is local, so they exist only on the maintainer's machine. Each round's entry in `docs/completed/` names its folder and the gate that approved its TODOs. Line numbers in a section refer to the state when the TODO was written.
 
-## Round 87 · the search explores the strands of a turn
+## Round 87 · release 1.1.0
 
-The gates of 05.11.2026 (18:19, "1b 2a 3a"; 20:47, "1a 2a 3a 4a") approved T322 for lane A of round 86. Round 86 delivered its stage 0 as probes and built hashed tree seeds first (T323); the gate of 06.11.2026 08:00 ("2a") left the trust rule unbuilt, and the final gate (11:50, "7a") made blocks 1 and 2 with the rule's variant round 87, on the merged base. It leaves this file with that round's booking.
+The user on 06.11.2026 ("1a, können wir eventuell auch als parallele Wave machen, der Rest für 1.1.1 dann"): round 87 is the release wave of 1.1.0, two lanes side by side. Lane A moves the dependencies (the rest of `npm outdated`, then the @pkmn train from 0.10.12 to 0.10.15 with T103); lane B builds T313 and T317. Every other approved TODO waits for 1.1.1. They leave this file with that round's booking.
+
+### T313 · The app's buttons read at 4.5 : 1
+
+*App · round 84 · small fix · lossless*
+
+**Approved for the next small batch (final gate of round 84, 02.11.2026, "2a": with a before and after image before the build); round 87, lane B (06.11.2026).**
+
+**Problem.** The app's buttons carry white bold text on gradients that miss the 4.5 : 1 contrast normal text needs. `.ps-btn` (Setup, Analyze game, Play out, Cancel and the rest) on #75a8d5 to #567fa7 reaches 2.5 : 1 at the top and 4.2 : 1 at the bottom; `.ps-btn-red` (Load, Discard variation, Replace, Save, Import) on #d95565 to #aa3344 reaches 3.9 : 1 at the top (`src/styles/forms.css:94-112`). Execute paints its own copy of the red gradient (`.ps-dock .ps-execute-btn-ready`, `src/styles/dock.css:156`, hover `brightness(1.1)` at `dock.css:157`), the lead picker's Start button paints the same copy (`src/components/LeadPanel.tsx:80`), and the loader's guide steps copy the blue (`src/styles/loader.css:22`). `.ps-btn:hover` brightens by 1.12 (`forms.css:107`), so a stop that just passes at rest fails under the pointer. Round 84 darkened the dock's selection blue to #3d6998 to #2d5078 for the same reason; it holds 4.75 : 1 under hover.
+
+**Idea.** Darken both gradients until white text passes 4.5 : 1 at every stop, at rest and under hover, keeping the hue, and change the two copies with them (or let them read the same tokens). The hue-keeping minimum is about #547999 and #c54d5c at rest, about #4c6d8a and #b04552 with hover; the dock's selection blue is the model for the blue.
+
+**Benefit.** App: every button reads for users with weak eyes.
+
+**Success.** A contrast spec reads `forms.css`, `dock.css:156`, the Start button's style and `loader.css:22` and holds white against each stop, and against each stop at its hover brightness (1.12 for `.ps-btn`, 1.1 for Execute), to 4.5 : 1. The user approves a before and after image before the build: the top bar, the eval panel's Analyze game and Cancel, and the dock's Execute. The engine lines and report moments of the eval panel are dark chips (`eval-panel.css:71-76`) and stay as they are.
+
+**Singles and doubles.** Not affected (styles only).
+
+**Evidence.** `r84/lanes/A/ledger.md`, A6a (the contrast numbers and the dock's blue); `r84/review/t313-t314-review.md`. The line "Execute on `.ps-btn-red`" of A6a and the header of `test/regression/move-tile-contrast.spec.ts` name the wrong class; the build fixes the header.
+
+### T317 · "EVs ?" names what is unknown
+
+*App · round 84 · small fix · lossless*
+
+**Approved for the next small batch (02.11.2026, "15a"); round 87, lane B (06.11.2026).**
+
+**Problem.** The Battle Statistics tag of a body without known EVs reads "EVs ? UNKNOWN" (`src/components/BattleStatsPanel.tsx:43`: `evs.source === 'unknown' ? 'EVs ?' : '0 EVs'`); the question mark reads like an error, beside tags such as "252 HP / 4 SpD / 252 Spe EVs FROM MOVE ORDER".
+
+**Idea.** Say it in words, for example "EVs not yet known", keeping the tag's pattern (value, then source) or dropping the doubled source word.
+
+**Benefit.** App: the statistics read without a puzzle.
+
+**Success.** A ui spec on the tag's text; `test/ui/components/BattleStatsPanel.spec.tsx:43` expects "EVs ?" today and moves with the fix (a re-pin for the batch gate); the stop-slop rules.
+
+**Singles and doubles.** Not affected.
+
+**Evidence.** The integrator's screenshots of 02.11.2026 (`r84/gate/preview/r9-*.png`).
+
+## Round 88 · the search explores the strands of a turn
+
+The gates of 05.11.2026 (18:19, "1b 2a 3a"; 20:47, "1a 2a 3a 4a") approved T322 for lane A of round 86. Round 86 delivered its stage 0 as probes and built hashed tree seeds first (T323); the gate of 06.11.2026 08:00 ("2a") left the trust rule unbuilt, and the final gate (11:50, "7a") made blocks 1 and 2 with the rule's variant the next round, on the merged base; the user moved it behind the release wave of 1.1.0 (06.11.2026), so it runs as round 88. It leaves this file with that round's booking.
 
 ### T322 · The search explores the strands of a turn by their chance
 
-*Eval engine · round 87 · feature · score-touching (D3)*
+*Eval engine · round 88 · feature · score-touching (D3)*
 
-**Approved for round 86 (gates of 05.11.2026, 18:19, "1b 2a 3a", and 20:47, "1a 2a 3a 4a"); round 87 after the final gate of round 86 (06.11.2026, 11:50, "7a").**
+**Approved for round 86 (gates of 05.11.2026, 18:19, "1b 2a 3a", and 20:47, "1a 2a 3a 4a"); the next round after the final gate of round 86 (06.11.2026, 11:50, "7a"), round 88 behind the release wave of 1.1.0 (user 06.11.2026).**
 
 **Problem.** Each outcome of a turn is a strand: Iron Head flinches (30 %) or it does not. Since T305 the verify round weights every strand of a root cell by its Dex chance. A strand gets the trees' depth only when at least two trees drew it, they agree within `VERIFY_DISAGREEMENT` and the pool has played the cell out (`deepPool` in `packages/eval-engine/src/mcts-merge.ts`); every other strand takes the one-ply estimate. Four trees draw each root cell once by their seed, so a 30 % strand gets two trees in about a third of the searches and none in a quarter. Before T323, Doubles OU gen9doublesou-2694111300 t13 read +0.440 for the side that lost, because two thin trees spread the pool past the limit; with the hashed tree seeds of round 86 it reads -0.938 against a reference of -0.983 +- 0.007, and the strands four trees happen to draw still decide the other cells: over the 38 census cells round 86 reread, the mean distance to the reference stays 0.332 with or without the trust rule (A14).
 
@@ -32,25 +72,7 @@ The gates of 05.11.2026 (18:19, "1b 2a 3a"; 20:47, "1a 2a 3a 4a") approved T322 
 
 ## Approved, waiting for a round
 
-The gates of round 84 (02.11.2026 and 03.11.2026) approved T313, T314, T316 and T317: T313 and T317 form the next small batch, T314 is a larger bug (D3) and T316 a feature, each its own round. The gate of 04.11.2026 approved T319 for after round 86, and the final gate of round 86 (06.11.2026, "7a") put it after round 87. The gates of round 86 approved T324 to T329 (06.11.2026, about 07:50) and T336 to T339 (11:50). Each leaves this file with its round's booking.
-
-### T313 · The app's buttons read at 4.5 : 1
-
-*App · round 84 · small fix · lossless*
-
-**Approved for the next small batch (final gate of round 84, 02.11.2026, "2a": with a before and after image before the build).**
-
-**Problem.** The app's buttons carry white bold text on gradients that miss the 4.5 : 1 contrast normal text needs. `.ps-btn` (Setup, Analyze game, Play out, Cancel and the rest) on #75a8d5 to #567fa7 reaches 2.5 : 1 at the top and 4.2 : 1 at the bottom; `.ps-btn-red` (Load, Discard variation, Replace, Save, Import) on #d95565 to #aa3344 reaches 3.9 : 1 at the top (`src/styles/forms.css:94-112`). Execute paints its own copy of the red gradient (`.ps-dock .ps-execute-btn-ready`, `src/styles/dock.css:156`, hover `brightness(1.1)` at `dock.css:157`), the lead picker's Start button paints the same copy (`src/components/LeadPanel.tsx:80`), and the loader's guide steps copy the blue (`src/styles/loader.css:22`). `.ps-btn:hover` brightens by 1.12 (`forms.css:107`), so a stop that just passes at rest fails under the pointer. Round 84 darkened the dock's selection blue to #3d6998 to #2d5078 for the same reason; it holds 4.75 : 1 under hover.
-
-**Idea.** Darken both gradients until white text passes 4.5 : 1 at every stop, at rest and under hover, keeping the hue, and change the two copies with them (or let them read the same tokens). The hue-keeping minimum is about #547999 and #c54d5c at rest, about #4c6d8a and #b04552 with hover; the dock's selection blue is the model for the blue.
-
-**Benefit.** App: every button reads for users with weak eyes.
-
-**Success.** A contrast spec reads `forms.css`, `dock.css:156`, the Start button's style and `loader.css:22` and holds white against each stop, and against each stop at its hover brightness (1.12 for `.ps-btn`, 1.1 for Execute), to 4.5 : 1. The user approves a before and after image before the build: the top bar, the eval panel's Analyze game and Cancel, and the dock's Execute. The engine lines and report moments of the eval panel are dark chips (`eval-panel.css:71-76`) and stay as they are.
-
-**Singles and doubles.** Not affected (styles only).
-
-**Evidence.** `r84/lanes/A/ledger.md`, A6a (the contrast numbers and the dock's blue); `r84/review/t313-t314-review.md`. The line "Execute on `.ps-btn-red`" of A6a and the header of `test/regression/move-tile-contrast.spec.ts` name the wrong class; the build fixes the header.
+The gates of round 84 (02.11.2026 and 03.11.2026) approved T313, T314, T316 and T317: T313 and T317 run in round 87, T314 is a larger bug (D3) and T316 a feature, each its own round. The gate of 04.11.2026 approved T319 for after round 86; the final gate of round 86 (06.11.2026, "7a") put it after T322, which runs as round 88. The gates of round 86 approved T324 to T329 (06.11.2026, about 07:50) and T336 to T339 (11:50). Each leaves this file with its round's booking.
 
 ### T314 · A bench offers bodies the side never brought
 
@@ -87,24 +109,6 @@ The gates of round 84 (02.11.2026 and 03.11.2026) approved T313, T314, T316 and 
 **Singles and doubles.** Both: the dock's row order follows Switch sides in singles (one row, the two sides' chips swap places) and in doubles and VGC (the two rows swap).
 
 **Evidence.** The user's screenshots and `r84/gate/preview/m-phone-*.png` (02.11.2026).
-
-### T317 · "EVs ?" names what is unknown
-
-*App · round 84 · small fix · lossless*
-
-**Approved for the next small batch (02.11.2026, "15a").**
-
-**Problem.** The Battle Statistics tag of a body without known EVs reads "EVs ? UNKNOWN" (`src/components/BattleStatsPanel.tsx:43`: `evs.source === 'unknown' ? 'EVs ?' : '0 EVs'`); the question mark reads like an error, beside tags such as "252 HP / 4 SpD / 252 Spe EVs FROM MOVE ORDER".
-
-**Idea.** Say it in words, for example "EVs not yet known", keeping the tag's pattern (value, then source) or dropping the doubled source word.
-
-**Benefit.** App: the statistics read without a puzzle.
-
-**Success.** A ui spec on the tag's text; `test/ui/components/BattleStatsPanel.spec.tsx:43` expects "EVs ?" today and moves with the fix (a re-pin for the batch gate); the stop-slop rules.
-
-**Singles and doubles.** Not affected.
-
-**Evidence.** The integrator's screenshots of 02.11.2026 (`r84/gate/preview/r9-*.png`).
 
 ### T319 · An inventory of dead code, before it misleads the next round
 
