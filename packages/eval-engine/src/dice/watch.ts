@@ -7,8 +7,10 @@ import type { SecondaryEntry } from './types.ts';
  * inside `getDamage`). The watch is a set of own-property wrappers on one battle that note both and change nothing: each
  * wrapper calls the saved original with the same arguments and returns its value. It lives for the natural copy's turn and
  * the real turn; `uninstall()` puts the saved property descriptors back, so the battle is the one it was (own keys, stable
- * serialization, the speed layer's pre-check). Round 86 (T299): the wrappers are non-enumerable, so a copy of a battle under watch
- * (a forced switch's snapshot) walks past them and carries none; the tree's scripted PRNGs rely on that.
+ * serialization, the speed layer's pre-check). Round 86 (T299): a wrapper keeps the enumerability of the property it replaces,
+ * so an inherited script call stays hidden from key walks, and called on any object but the watched battle it only passes
+ * the call on; a copy of a battle under watch (a forced switch's snapshot) therefore notes nothing into this watch, and the
+ * tree's scripted PRNGs rely on that.
  *
  * Not `battle.onEvent` listeners: a listener joins the speed sort and can draw a tie shuffle of its own, and not
  * `forceRandomChance`: it shifts later draws (docs/adr/0002).
