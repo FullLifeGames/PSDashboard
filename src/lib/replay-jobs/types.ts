@@ -3,7 +3,7 @@ import type {
   DamageObservation, OpponentTeamInfo, SmogonSetAssumptions, SmogonUsageStats, SpeedOrderObservation, SpreadCandidate,
   TurnSnapshot,
 } from '@fulllifegames/replay-core';
-import type { ReplacementPoint, SimFastLever, SimFastReport, TurnAlignmentRecord } from '@fulllifegames/eval-engine';
+import type { ReplacementPoint, RollSelector, SimFastLever, SimFastReport, TurnAlignmentRecord } from '@fulllifegames/eval-engine';
 
 /**
  * The replay-side jobs the app hands to a worker (round 38): the spread
@@ -64,9 +64,29 @@ export interface ReconstructOutcome {
   choiceErrors: { count: number; last: string | null };
 }
 
+/**
+ * Round 86 (T304): the copy of a turn with the biggest roll's die turned over, played where the simulator is loaded. The job carries the
+ * turn's start position (the sweep's boundary), the replay's log and the roll the report names; the worker finds the die in the log.
+ */
+export interface RolledCopyJob {
+  format: string;
+  replayLog: string;
+  position: string;
+  turn: number;
+  roll: RollSelector;
+}
+
+/** The copy's next root and where the copy stands there; `terminal` is the score of a game that ends in it (p1's view). */
+export interface RolledCopyOutcome {
+  serialized: string;
+  stage: 'turn' | 'request' | 'ended';
+  terminal: number | null;
+}
+
 export type ReplayJobRequest = (
   | { type: 'solveSpreads'; id: number; job: SolveSpreadsJob }
   | { type: 'reconstruct'; id: number; job: ReconstructJob }
+  | { type: 'rolledCopy'; id: number; job: RolledCopyJob }
 ) & { simFast?: readonly SimFastLever[] };
 export type ReplayJobResponse = (
   | { type: 'replayProgress'; id: number; turn: number; target: number }
@@ -74,8 +94,9 @@ export type ReplayJobResponse = (
   | { type: 'replayReplacement'; id: number; point: ReplacementPoint; serialized: string }
   | { type: 'reconstructResult'; id: number; outcome: ReconstructOutcome }
   | { type: 'solveSpreadsResult'; id: number; entries: [string, SpreadCandidate][] }
+  | { type: 'rolledCopyResult'; id: number; outcome: RolledCopyOutcome | null }
   | { type: 'replayError'; id: number; message: string }
 ) & { simFast?: SimFastReport };
 
 export const isReplayJob = (message: { type: string }): message is ReplayJobRequest =>
-  message.type === 'solveSpreads' || message.type === 'reconstruct';
+  message.type === 'solveSpreads' || message.type === 'reconstruct' || message.type === 'rolledCopy';

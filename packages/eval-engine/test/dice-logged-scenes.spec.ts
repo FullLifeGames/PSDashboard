@@ -78,12 +78,15 @@ describe('a die the log does not show: the flinch Air Slash never had', () => {
   });
 });
 
-describe('an imperfect search: the log\'s results join the user\'s die', () => {
+// Round 86 (T306): these four turns were the ones the sixteen-seed search could not make match the log, so the arrival's turn alone showed another
+// result than the log and only the joined list repaired it. The arrival now carries the draws of the turn the log's dice force, so the turn alone
+// already shows the log's results and the user\'s die joins them: the `alone` rows moved from "differs from the log" to "shows the log", the joined rows stay.
+describe('a turn the search once missed: the logged results stand beside the user\'s die', () => {
   test(`${FIRE_FANG.label}: forcing the crit of Body Press keeps the Fire Fang miss of the log`, { timeout: 300000 }, async () => {
     const crit = die('p1a', 'bodypress', 'p2a', 'crit', { happens: true });
     const alone = await firstTurn(FIRE_FANG, [crit], false);
-    // the seed of the arrival hits with Fire Fang: that is the turn the search could not make match the log
-    expect(has(alone.lines, '|move|p2a: Penal Battalion|Fire Fang|p1a: Corviknight|[miss]')).toBe(false);
+    // before round 86 the arrival's seed hit with Fire Fang (the turn the search could not make match the log); its logged draws now miss as the log does
+    expect(has(alone.lines, '|move|p2a: Penal Battalion|Fire Fang|p1a: Corviknight|[miss]')).toBe(true);
     const joined = await firstTurn(FIRE_FANG, [crit], true);
     expect(tookOf(joined.report, crit)).toBe('applied');
     expect(has(joined.lines, '|move|p2a: Penal Battalion|Fire Fang|p1a: Corviknight|[miss]')).toBe(true);
@@ -104,7 +107,7 @@ describe('an imperfect search: the log\'s results join the user\'s die', () => {
   test(`${FIRE_BLAST.label}: forcing the crit of Fire Blast keeps the burn the log shows`, { timeout: 300000 }, async () => {
     const crit = die('p1a', 'fireblast', 'p2a', 'crit', { happens: true });
     const alone = await firstTurn(FIRE_BLAST, [crit], false);
-    expect(has(alone.lines, '|-status|p2a: Corviknight|brn')).toBe(false);
+    expect(has(alone.lines, '|-status|p2a: Corviknight|brn')).toBe(true);
     const joined = await firstTurn(FIRE_BLAST, [crit], true);
     expect(tookOf(joined.report, crit)).toBe('applied');
     expect(has(joined.lines, '|-crit|p2a: Corviknight')).toBe(true);
@@ -114,7 +117,7 @@ describe('an imperfect search: the log\'s results join the user\'s die', () => {
   test(`${DOUBLES.label}: forcing no burn from Matcha Gotcha keeps Scale Shot at the four hits and the no crit of the log`, { timeout: 300000 }, async () => {
     const noBurn = die('p1a', 'matchagotcha', 'p2b', 'secondary', { happens: false }, 'brn');
     const alone = await firstTurn(DOUBLES, [noBurn], false);
-    expect([...alone.events.hitCounts]).not.toEqual([...alone.expected.hitCounts]);
+    expect([...alone.events.hitCounts]).toEqual([...alone.expected.hitCounts]);
     const joined = await firstTurn(DOUBLES, [noBurn], true);
     expect(tookOf(joined.report, noBurn)).toBe('applied');
     expect([...joined.events.hitCounts]).toEqual([...joined.expected.hitCounts]);
@@ -126,6 +129,8 @@ describe('an imperfect search: the log\'s results join the user\'s die', () => {
   test(`${VGC.label}: forcing the crit of Body Press keeps the crit High Horsepower rolled in the log`, { timeout: 300000 }, async () => {
     const crit = die('p2b', 'bodypress', 'p1b', 'crit', { happens: true });
     const alone = await firstTurn(VGC, [crit], false);
+    // ruling Q2: the log's crit kills Zamazenta and ends the game in the simulator while the log goes on, so the block falls back to the seed search,
+    // whose turn shows no crit; the joined list below still forces both crits
     expect(has(alone.lines, '|-crit|p2b: Zamazenta')).toBe(false);
     const joined = await firstTurn(VGC, [crit], true);
     expect(tookOf(joined.report, crit)).toBe('applied');

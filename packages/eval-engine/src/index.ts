@@ -103,6 +103,11 @@ export type { PlayedAction, PlayedTurn, SackInfo } from './played.ts';
 export { cellKey } from './rank.ts';
 export { KEY_MOMENT_SWING, buildGameReport } from './report.ts';
 export type { GameReport } from './report.ts';
+// Round 86 (B6, T304): the biggest roll the app plays the other way (the sweep's last stage) and the copy that plays it.
+export { rollToCopy } from './biggest-roll.ts';
+export type { BiggestRoll, RollFlip } from './biggest-roll.ts';
+export { rolledCopy } from './branch/rolled-copy.ts';
+export type { RolledCopy, RollSelector } from './branch/rolled-copy.ts';
 export type { WinConversion, WinPath } from './win-reason.ts';
 export type { DeniedEnd } from './denied-end.ts';
 export { detectRolls, diceEventTurns } from './dice-events.ts';

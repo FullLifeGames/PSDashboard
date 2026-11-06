@@ -1,6 +1,6 @@
 import { toId } from '@fulllifegames/replay-core';
 import type { SimBattle, SimPokemon } from './types.ts';
-import { normalizeBattleOnlyFormeId } from './team-order.ts';
+import { normalizeBattleOnlyFormeId, takeBodyOut } from './team-order.ts';
 
 /**
  * Round 67 (T133): a body the boundary correction puts on the field, where the
@@ -87,14 +87,28 @@ function faintThePredecessor(battle: SimBattle, entry: FreshEntry, before: (SimP
     .find(line => SWITCH_IN.test(line) && line.split('|')[2].startsWith(ident))?.match(SWITCH_IN)?.[4].trim();
   const letter = ident[2];
   if (earlier ? !sameSpecies(predecessor, earlier) : simSwitchedIn(simLines, sideId, slotLetter => slotLetter === letter)) return true;
-  predecessor.hp = 0;
-  predecessor.fainted = true;
-  predecessor.faintQueued = true;
+  takeThePredecessorOut(predecessor, entry);
+  return true;
+}
+
+/**
+ * Round 86 (B10, ruling C3): the predecessor leaves through `takeBodyOut`, so its ability ends the way the simulator's faint ends it (Weezing's
+ * Neutralizing Gas in 2159578969 turn 2: Slow Start starts on Regigigas). The simulator's End events run before the replacement comes in, but the
+ * repoint has already put the replacement in the slot: the predecessor stands in its slot again while its End events run, then the replacement
+ * goes back (without it, the gas's end would start the replacement's ability once here and once more in its entry).
+ */
+function takeThePredecessorOut(predecessor: SimPokemon, entry: FreshEntry) {
+  const { side } = predecessor;
+  const replacement = side.active[entry.slot];
+  const wasActive = predecessor.isActive;
+  side.active[entry.slot] = predecessor;
+  predecessor.isActive = true;
+  takeBodyOut(predecessor, { fallen: true });
+  side.active[entry.slot] = replacement;
+  predecessor.isActive = wasActive;
   predecessor.status = '' as SimPokemon['status'];
   predecessor.clearVolatile(false);
   predecessor.isStarted = false;
-  if (predecessor.side.totalFainted < 100) predecessor.side.totalFainted++;
-  return true;
 }
 
 interface EntryWay { afterFaint: boolean; drag: boolean }

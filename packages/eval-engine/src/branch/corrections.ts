@@ -2,7 +2,7 @@ import { type PokemonSnapshot, type TurnSnapshot, choiceItems, sideIndex, toId }
 import { protocolChoiceLock, type ChoiceLockContext } from '../choice-lock.ts';
 import { restoreSideInvariants } from '../forward-model.ts';
 import type { SimBattle, SimPokemon, SimSide } from './types.ts';
-import { normalizeBattleOnlyFormeId, retireUnshownBench, sameBodyName, type ProtocolBench } from './team-order.ts';
+import { normalizeBattleOnlyFormeId, retireBenchAfterFaints, retireUnshownBench, sameBodyName, settleFaintFromSnapshot, type ProtocolBench } from './team-order.ts';
 import { findFirstAvailableSwitchSlot, findPokemonOnSide, findSlotBySpecies } from './protocol-choices.ts';
 import { correctFieldFromSnapshot } from './field-correction.ts';
 import { applyProtocolHeldItems } from './held-items.ts';
@@ -223,27 +223,24 @@ function simBodyOf(side: SimSide, snapshotPokemon: SnapshotPokemon): SimPokemon 
  * Overlord and Last Respects read it; 752324's Kingambit counted no fallen
  * ally after the correction fainted Amoonguss).
  */
-function correctBodyFromSnapshot(battlePokemon: SimPokemon, snapshotPokemon: SnapshotPokemon, log: readonly string[]) {
+function correctBodyFromSnapshot(battlePokemon: SimPokemon, snapshotPokemon: SnapshotPokemon, log: readonly string[]): boolean {
   if (!snapshotPokemon.isActive && battlePokemon.fainted === snapshotPokemon.fainted) {
     if (!snapshotPokemon.fainted) battlePokemon.hp = benchHpFromSighting(battlePokemon, snapshotPokemon);
-    return;
+    return false;
   }
-  if (battlePokemon.fainted !== snapshotPokemon.fainted) {
-    const side = battlePokemon.side;
-    side.totalFainted = Math.max(0, side.totalFainted + (snapshotPokemon.fainted ? 1 : -1));
-  }
-  battlePokemon.hp = Math.max(0, hpOfSighting(battlePokemon, snapshotPokemon));
-  battlePokemon.fainted = snapshotPokemon.fainted;
-  battlePokemon.faintQueued = snapshotPokemon.fainted;
-  if (snapshotPokemon.fainted) battlePokemon.hp = 0;
+  const leavesTheField = snapshotPokemon.fainted && !battlePokemon.fainted && battlePokemon.side.active.includes(battlePokemon);
+  settleFaintFromSnapshot(battlePokemon, snapshotPokemon);
   if (!snapshotPokemon.fainted && battlePokemon.hp <= 0 && snapshotPokemon.hpPercent > 0) battlePokemon.hp = 1;
   correctStatusFromSnapshot(battlePokemon, snapshotPokemon, log);
   for (const stat of ['atk', 'def', 'spa', 'spd', 'spe', 'accuracy', 'evasion'] as const) {
     battlePokemon.boosts[stat] = snapshotPokemon.boosts[stat] ?? 0;
   }
+  return leavesTheField;
 }
 
-function correctHpFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
+/** The bodies the correction took out of the field: the log faints them and the simulator's turn left them standing. */
+function correctHpFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot): Set<SimPokemon> {
+  const tookOut = new Set<SimPokemon>();
   for (let sideIndex = 0; sideIndex < 2; sideIndex++) {
     const snapshotSide = sideIndex === 0 ? snapshot.p1 : snapshot.p2;
     const battleSide = battle.sides[sideIndex];
@@ -251,10 +248,14 @@ function correctHpFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
     for (const snapshotPokemon of snapshotSide.pokemon) {
       const battlePokemon = simBodyOf(battleSide, snapshotPokemon);
       // Round 76 (T265): the hits taken are the log's count, as the side's fallen are, for the bench too.
-      if (battlePokemon && snapshotPokemon.maxhp > 0) { battlePokemon.timesAttacked = snapshotPokemon.timesAttacked ?? 0; correctBodyFromSnapshot(battlePokemon, snapshotPokemon, snapshot.log ?? []); }
+      if (battlePokemon && snapshotPokemon.maxhp > 0) {
+        battlePokemon.timesAttacked = snapshotPokemon.timesAttacked ?? 0;
+        if (correctBodyFromSnapshot(battlePokemon, snapshotPokemon, snapshot.log ?? [])) tookOut.add(battlePokemon);
+      }
     }
   }
   restoreSideInvariants(battle);
+  return tookOut;
 }
 
 /**
@@ -340,10 +341,11 @@ function swapActiveSlots(side: SimSide, from: number, to: number) {
 
 export function correctBattleFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
   const offTheField = bodiesOffTheField(battle);
-  correctHpFromSnapshot(battle, snapshot);
+  const tookOut = correctHpFromSnapshot(battle, snapshot);
   endLocksTheGameEnded(battle, snapshot, simBodyOf);
   restoreTeraFromSnapshot(battle, snapshot);
   correctActivesFromSnapshot(battle, snapshot);
+  retireBenchAfterFaints(battle, snapshot, tookOut);
   restoreExitVolatiles(battle, snapshot, offTheField, simBodyOf);
   correctFieldFromSnapshot(battle, snapshot);
 }

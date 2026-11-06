@@ -7,6 +7,7 @@ import type { SimBattle } from '../branch/types.ts';
 import { loggedDice, mergeLoggedDice, type LoggedOptions } from './logged-results.ts';
 import { offeredDice } from './offer.ts';
 import { playForcedTurn } from './play.ts';
+import { secondaryEffectId } from './recognize.ts';
 import { secondariesIn } from './secondaries.ts';
 import { dieKey, type DiceReport, type DieReport, type DieTook, type ForcedDie } from './types.ts';
 
@@ -111,10 +112,23 @@ export function turnChanges(
   return { changed, switched };
 }
 
+/**
+ * Round 86 (T306): the effect id of a move's own chance to move its user (`move.self.chance` below 100: Diamond Storm in Gens 7 and later
+ * keeps the chance there and no entry in its secondaries), from the game's own Dex. Only a gain of stats: no move keeps a chance for a condition of its user there.
+ */
+function selfChanceIn(dex: Battle['dex']): (moveId: string) => string | undefined {
+  return moveId => {
+    const self = (dex.moves.get(moveId) as unknown as { self?: { chance?: number; boosts?: Record<string, number> } }).self;
+    return self?.chance !== undefined && self.chance < 100 && self.boosts ? secondaryEffectId({ self: { boosts: self.boosts } }) : undefined;
+  };
+}
+
 /** What the log cannot name (`LoggedOptions`): the move each body clicked, the checks each body stood under, the secondaries of every move. */
-function loggedOptions(battle: Battle, logged: { p1: string; p2: string }): LoggedOptions {
+export function loggedOptions(battle: Battle, logged: { p1: string; p2: string }): LoggedOptions {
   const clicked = new Map<string, string>();
   const checks = new Map<string, readonly string[]>();
+  const stalling = new Map<string, string>();
+  const accuracyTargets = new Map<string, readonly string[]>();
   for (const side of ['p1', 'p2'] as const) {
     slotsOf(side, logged[side]).forEach(({ slot, fragment }, index) => {
       if (fragment.kind !== 'move') return;
@@ -124,9 +138,14 @@ function loggedOptions(battle: Battle, logged: { p1: string; p2: string }): Logg
       clicked.set(slot, moveId);
       const offers = offeredDice(battle, slot, { kind: 'move', moveId, moveName: moveId, ...(fragment.aim === undefined ? {} : { targetLoc: fragment.aim }) });
       checks.set(slot, offers.filter(offer => offer.name.kind === 'status-check' && offer.name.effectId).map(offer => offer.name.effectId!));
+      // Round 86 (T306): the condition that makes a stalling move draw its chance to succeed again, as the offer names it
+      const stall = offers.find(offer => offer.name.kind === 'stalling' && offer.name.effectId)?.name.effectId;
+      if (stall) stalling.set(slot, stall);
+      // Round 86 (T306): the foes the click draws an accuracy for, for a move the log writes without an aim
+      accuracyTargets.set(slot, offers.filter(offer => offer.name.kind === 'accuracy' && offer.name.targetSlot).map(offer => offer.name.targetSlot!));
     });
   }
-  return { clicked, checks, secondariesOf: secondariesIn(battle.dex) };
+  return { clicked, checks, stalling, accuracyTargets, secondariesOf: secondariesIn(battle.dex), selfOf: selfChanceIn(battle.dex) };
 }
 
 /** The forced list of a turn the user has just chosen: the user's dice, joined by the log's on the branch's first turn. */

@@ -5,7 +5,7 @@ import {
   type TurnAlignmentRecord,
 } from '@fulllifegames/eval-engine';
 import {
-  analyzeTurnAt, buildPlayedHistory, graphFaintedFractions, computeGameReportData, computeTurnReads,
+  analyzeTurnAt, buildAnalysisContext, graphFaintedFractions, computeGameReportData, computeTurnReads, replayWinnerOf,
   type ReplayTendencies, type TurnAnalysisContext,
 } from '../lib/analysis-context';
 import type { useEvaluation } from './useEvaluation';
@@ -31,28 +31,10 @@ function useAnalysisContext(args: {
     () => (replayData ? allTurnEvents(replayData.log) : []),
     [replayData],
   );
-  const context = useMemo<TurnAnalysisContext>(() => ({
-    snapshots,
-    turnEventsIndex,
-    // Null-move guard board context: the PRE-TURN active species per side,
-    // anything but exactly one live active per side passes null and keeps
-    // the guard off (fail closed). Singles meet that every turn; a doubles
-    // endgame with one body left per side meets it too.
-    activesForTurn: (turn: number) => {
-      const snapshot = snapshots[turn - 1] ?? null;
-      if (!snapshot) return null;
-      const activeOf = (side: typeof snapshot.p1) => {
-        const active = side.pokemon.filter(pokemon => pokemon.isActive && !pokemon.fainted);
-        return active.length === 1 ? active[0] : null;
-      };
-      const [p1, p2] = [activeOf(snapshot.p1), activeOf(snapshot.p2)];
-      return {
-        p1: p1?.speciesForme ?? null, p2: p2?.speciesForme ?? null, gen: replayGen, mod,
-        p1Tera: p1?.terastallized || null, p2Tera: p2?.terastallized || null,
-      };
-    },
-    playedHistory: buildPlayedHistory(graphPlayed, snapshots, turnEventsIndex),
-  }), [snapshots, turnEventsIndex, graphPlayed, replayGen, mod]);
+  const context = useMemo<TurnAnalysisContext>(
+    () => buildAnalysisContext({ snapshots, turnEventsIndex, graphPlayed, replayGen, mod }),
+    [snapshots, turnEventsIndex, graphPlayed, replayGen, mod],
+  );
   return { tendencies, context };
 }
 
@@ -66,14 +48,7 @@ function useGameReportData(args: {
   tendencies: ReplayTendencies | null;
 }) {
   const { replayData, graph, context, tendencies } = args;
-  const replayWinner = useMemo<'p1' | 'p2' | null>(() => {
-    if (!replayData) return null;
-    const name = replayData.log.match(/\|win\|(.+)/)?.[1]?.trim();
-    if (!name) return null;
-    if (name === replayData.players[0]) return 'p1';
-    if (name === replayData.players[1]) return 'p2';
-    return null;
-  }, [replayData]);
+  const replayWinner = useMemo<'p1' | 'p2' | null>(() => (replayData ? replayWinnerOf(replayData) : null), [replayData]);
   // While a sweep runs, the LAST report stays up — recomputing waits for
   // completion (per-tick rebuilds are expensive), but returning null there
   // made the report blink on every turn click once selection started

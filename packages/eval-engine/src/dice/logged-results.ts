@@ -26,6 +26,22 @@ export interface LoggedOptions {
    * secondaries that carry a chance. With them a secondary the log shows nothing of is a logged no.
    */
   secondariesOf?: (moveId: string) => readonly string[];
+  /**
+   * Round 86 (the log's dice, T306): the condition each body stands under that makes its clicked move draw the chance to succeed again
+   * (a stalling move used twice in a row), by slot. The die's name carries it (`stall`), and only the simulator's own hook knows it. With
+   * it a stalling move the log shows as `|-fail|` is a logged failure, and one without is a logged success.
+   */
+  stalling?: ReadonlyMap<string, string>;
+  /**
+   * The foe slots a body's clicked move draws an accuracy for (the offers of its click), by slot. A move the log writes with no aim
+   * (`|move|p1a: X|Psycho Shift||[still]` and a `|-fail|`) passed its accuracy draw before it failed: the log shows no miss.
+   */
+  accuracyTargets?: ReadonlyMap<string, readonly string[]>;
+  /**
+   * The effect id (`self:def`) of a move's own chance to move its user (`self.chance` below 100, Diamond Storm in Gens 7 and later), or
+   * nothing. The simulator draws it once per target, and the log shows what the user gained: no gain is a no, a gain on every target a yes.
+   */
+  selfOf?: (moveId: string) => string | undefined;
 }
 
 /** One stretch of the log: a body's `|move|` or `|cant|` line and the lines up to the next action, or the lines between actions. */
@@ -56,6 +72,8 @@ export interface LoggedAction {
   effects: Record<string, string[]>;
   /** The stats a slot gained or lost in the block (no `[from]`), in line order. */
   boosts: Record<string, string[]>;
+  /** The `|-fail|` lines (no `[from]`) per slot: a stalling move that failed writes one for its user. */
+  fails: Record<string, number>;
 }
 
 const SLOT = /^(p[12][a-d])(?::|$)/;
@@ -70,7 +88,7 @@ const BREAKS = new Set(['move', 'cant', 'switch', 'drag', 'replace', 'upkeep', '
 function blank(type: LoggedAction['type'], ident = '', moveId = '', reason = ''): LoggedAction {
   return {
     type, queued: false, slot: slotOf(ident), ident, moveId, reason, idents: ident ? { [slotOf(ident)]: ident } : {}, targets: [], missed: [], misses: 0,
-    damaged: {}, crits: {}, hitCounts: {}, selfHits: {}, selfHitBy: {}, effects: {}, boosts: {},
+    damaged: {}, crits: {}, hitCounts: {}, selfHits: {}, selfHitBy: {}, effects: {}, boosts: {}, fails: {},
   };
 }
 
@@ -94,6 +112,15 @@ function readEffect(action: LoggedAction, parts: string[], key: string): void {
 
 const EFFECT_TAGS = new Set(['-status', '-start', '-boost', '-unboost']);
 
+/**
+ * Whether an effect line is the move's own: no `[from]`, or a `[from] move: <this move>` (Round 86, T306: Relic Song and Wicked Torque
+ * write the status of their secondary that way). The effects of items, abilities and the weather keep their `[from]` and stay out.
+ */
+function ownEffect(action: LoggedAction, line: string): boolean {
+  const from = /\[from\] move: ([^|]+)/.exec(line);
+  return from ? toId(from[1]) === action.moveId : !line.includes('[from]');
+}
+
 /** A `|-miss|` line: the target is the one the line names (Gens 1 and 2 name none: the move's aimed one). */
 function readMiss(action: LoggedAction, parts: string[]): void {
   action.misses += 1;
@@ -102,6 +129,17 @@ function readMiss(action: LoggedAction, parts: string[]): void {
   action.idents[target] ??= field(parts, 3);
   if (!action.missed.includes(target)) action.missed.push(target);
   if (!action.targets.includes(target)) action.targets.push(target);
+}
+
+/**
+ * A `|-anim|` line of the move names the target of a later hit (Round 86, T306: the second dart of Dragon Darts goes to the other foe in
+ * doubles, and the `|move|` line names the first one only). The damage lines of that hit then read against that target.
+ */
+function readAnim(action: LoggedAction, parts: string[]): void {
+  const target = slotOf(field(parts, 4));
+  if (!target || toId(field(parts, 3)) !== action.moveId || action.targets.includes(target)) return;
+  action.idents[target] ??= field(parts, 4);
+  action.targets.push(target);
 }
 
 /** A damage line: the confusion self-hit, or damage the move dealt (no `[from]`). */
@@ -125,7 +163,9 @@ function readLine(action: LoggedAction, parts: string[], line: string): void {
   else if (tag === '-crit') bump(action.crits, key);
   else if (tag === '-hitcount') action.hitCounts[key] = Number(field(parts, 3));
   else if (tag === '-damage') readDamage(action, key, line);
-  else if (EFFECT_TAGS.has(tag) && !line.includes('[from]')) readEffect(action, parts, key);
+  else if (tag === '-fail' && !line.includes('[from]')) bump(action.fails, key);
+  else if (tag === '-anim') readAnim(action, parts);
+  else if (EFFECT_TAGS.has(tag) && ownEffect(action, line)) readEffect(action, parts, key);
 }
 
 /** The log of a turn cut into actions; the lines before the first action and between actions form `other` stretches. */
@@ -208,38 +248,78 @@ function flinchedBy(actions: readonly LoggedAction[]): Map<number, Set<string>> 
   return flinched;
 }
 
+/**
+ * How often the stat changes of a self entry (`self:atk+def`) stand in the user's boosts of the action, in whole repeats; null when the
+ * boosts are another effect's (or none): the entry then reads from the plain effect ids.
+ */
+function appliedTimes(stats: readonly string[], effectId: string): number | null {
+  if (!effectId.startsWith('self:') || stats.length === 0) return null;
+  const own = effectId.slice('self:'.length).split('+');
+  if (stats.length % own.length !== 0 || !stats.every((stat, index) => stat === own[index % own.length])) return null;
+  return stats.length / own.length;
+}
+
+/** What the log shows of one target a move hit: its crit and its secondaries (the chance entries as a yes or a no, the effects the move left as yes). */
+function hitDice(
+  actions: readonly LoggedAction[], index: number, target: string, drawn: number, flinched: ReadonlySet<string>, options: LoggedOptions,
+): ForcedDie[] {
+  const action = actions[index];
+  const dice: ForcedDie[] = [];
+  const entries = options.secondariesOf?.(action.moveId) ?? [];
+  const stats = action.boosts[action.slot] ?? [];
+  const crit = critOf(action, target);
+  if (crit !== null) dice.push({ name: { ...ofMove(action), targetSlot: target, kind: 'crit' }, result: happens(crit) });
+  const shown = shownEffects(action, target, false);
+  if (flinched.has(target)) shown.push('flinch');
+  const seen = [...shown, ...shownEffects(action, action.slot, true).filter(id => id.startsWith('self:'))];
+  for (const effectId of entries) {
+    // a spread move draws a self secondary once per target and the log writes the gain once per target that fired: the first targets fired
+    const times = appliedTimes(stats, effectId);
+    const fired = times === null ? seen.includes(effectId) : drawn < times;
+    // a flinch the log disproves needs a later move of the target; a stat change the log shows reads as it is
+    if (!fired && effectId === 'flinch' && !actsAfter(actions, index, target)) continue;
+    dice.push({ name: { ...ofMove(action), targetSlot: target, kind: 'secondary', effectId }, result: happens(fired) });
+  }
+  for (const effectId of seen.filter(id => !entries.includes(id))) {
+    dice.push({ name: { ...ofMove(action), targetSlot: target, kind: 'secondary', effectId }, result: happens(true) });
+  }
+  return dice;
+}
+
+/** The self effect of a move: its own chance (`self.chance`, one die for every target) or the gain the log shows. */
+function selfEffectDice(action: LoggedAction, foes: readonly string[], options: LoggedOptions): ForcedDie[] {
+  const selfId = options.selfOf?.(action.moveId);
+  const struck = foes.filter(target => !action.missed.includes(target)).length;
+  const die = (result: boolean): ForcedDie[] => [{ name: { ...ofMove(action), kind: 'self-effect' }, result: happens(result) }];
+  if (struck > 0 && selfId) {
+    // it holds when no target or every target that was hit gave the gain; a log where only some did cannot be forced by one die
+    const times = appliedTimes(action.boosts[action.slot] ?? [], selfId) ?? 0;
+    return times === 0 || times >= struck ? die(times > 0) : [];
+  }
+  return foes.length > 0 && shownEffects(action, action.slot, true).some(id => id.startsWith('self:')) ? die(true) : [];
+}
+
 function moveDice(
   actions: readonly LoggedAction[], index: number, flinched: ReadonlySet<string>, options: LoggedOptions,
 ): ForcedDie[] {
   const action = actions[index];
   const dice: ForcedDie[] = [];
   const foes = action.targets.filter(target => target !== action.slot);
-  const entries = options.secondariesOf?.(action.moveId) ?? [];
+  // a move the log writes with no aim at all passed its accuracy draw and failed after it (Psycho Shift without a status to give)
+  if (action.targets.length === 0 && options.clicked?.get(action.slot) === action.moveId) {
+    for (const target of options.accuracyTargets?.get(action.slot) ?? []) {
+      dice.push({ name: { ...ofMove(action), targetSlot: target, kind: 'accuracy' }, result: happens(true) });
+    }
+  }
+  let drawn = 0;
   for (const target of foes) {
     const missed = action.missed.includes(target);
     dice.push({ name: { ...ofMove(action), targetSlot: target, kind: 'accuracy' }, result: happens(!missed) });
-    if (missed) continue;
-    const crit = critOf(action, target);
-    if (crit !== null) dice.push({ name: { ...ofMove(action), targetSlot: target, kind: 'crit' }, result: happens(crit) });
-    const shown = shownEffects(action, target, false);
-    if (flinched.has(target)) shown.push('flinch');
-    const self = shownEffects(action, action.slot, true).filter(id => id.startsWith('self:'));
-    const seen = [...shown, ...self];
-    for (const effectId of entries) {
-      const fired = seen.includes(effectId);
-      // a flinch the log disproves needs a later move of the target; a stat change the log shows reads as it is
-      if (!fired && effectId === 'flinch' && !actsAfter(actions, index, target)) continue;
-      dice.push({ name: { ...ofMove(action), targetSlot: target, kind: 'secondary', effectId }, result: happens(fired) });
-    }
-    for (const effectId of seen.filter(id => !entries.includes(id))) {
-      dice.push({ name: { ...ofMove(action), targetSlot: target, kind: 'secondary', effectId }, result: happens(true) });
-    }
+    if (!missed) dice.push(...hitDice(actions, index, target, drawn++, flinched, options));
   }
   const counts = Object.values(action.hitCounts);
   if (counts.length > 0) dice.push({ name: { ...ofMove(action), kind: 'hit-count' }, result: { hits: counts[0] } });
-  if (foes.length > 0 && shownEffects(action, action.slot, true).some(id => id.startsWith('self:'))) {
-    dice.push({ name: { ...ofMove(action), kind: 'self-effect' }, result: happens(true) });
-  }
+  dice.push(...selfEffectDice(action, foes, options));
   return dice;
 }
 
@@ -274,7 +354,7 @@ function checkDice(actions: readonly LoggedAction[], options: LoggedOptions): Fo
 
 /**
  * The dice a log shows for the turn, per action in the log's order: accuracy and crit per target the move reached, its
- * secondaries and self effect, its hit count, and the status checks. The names are the names the module gives the draws
+ * secondaries and self effect, its hit count, the status checks and the chance of a stalling move to succeed again. The names are the names the module gives the draws
  * (`recognize.ts`), so a forced list made of them forces what the log rolled.
  */
 export function loggedDice(turnLines: readonly string[], options: LoggedOptions = {}): ForcedDie[] {
@@ -284,7 +364,7 @@ export function loggedDice(turnLines: readonly string[], options: LoggedOptions 
   actions.forEach((action, index) => {
     if (action.type === 'move') dice.push(...moveDice(actions, index, flinched.get(index) ?? new Set(), options));
   });
-  dice.push(...checkDice(actions, options), ...orderDice(actions));
+  dice.push(...checkDice(actions, options), ...stallingDice(actions, options), ...orderDice(actions));
   const seen = new Set<string>();
   return dice.filter(die => {
     const key = dieKey(die.name);
@@ -295,12 +375,28 @@ export function loggedDice(turnLines: readonly string[], options: LoggedOptions 
 }
 
 /**
- * The order the log shows: for every two bodies whose moves the queue ran, the one that moved first goes first. Two bodies that
- * did not tie in speed and priority have no such die (the report says `no-draw`), so the dice only hold where the simulator
- * shuffled the two.
+ * Round 86 (the log's dice, T306): the chance of a stalling move to succeed again. A body whose click is its stalling move (the caller
+ * names the condition that makes it draw) succeeded when the log shows no `|-fail|` for it in its action, and failed when it shows one. A
+ * failure the simulator reached without a draw (nobody acts after the user) is a die that is never drawn: forcing it changes nothing.
+ */
+function stallingDice(actions: readonly LoggedAction[], options: LoggedOptions): ForcedDie[] {
+  const dice: ForcedDie[] = [];
+  for (const action of actions) {
+    const effectId = options.stalling?.get(action.slot);
+    if (action.type !== 'move' || !action.queued || !effectId || options.clicked?.get(action.slot) !== action.moveId) continue;
+    dice.push({ name: { slot: action.slot, moveId: action.moveId, kind: 'stalling', effectId }, result: happens((action.fails[action.slot] ?? 0) === 0) });
+  }
+  return dice;
+}
+
+/**
+ * The order the log shows: for every two bodies whose moves the queue ran, the one that moved first goes first. A body the log
+ * stops with a `|cant|` line (Taunt, paralysis, a flinch) had its move in the queue too, and its line is the only mark of its place
+ * (Round 86, T306: smogtours-gen9ou-752301 turn 1). Two bodies that did not tie in speed and priority have no such die (the report
+ * says `no-draw`), so the dice only hold where the simulator shuffled the two.
  */
 function orderDice(actions: readonly LoggedAction[]): ForcedDie[] {
-  const moves = actions.filter(action => action.type === 'move' && action.queued);
+  const moves = actions.filter(action => (action.type === 'move' && action.queued) || action.type === 'cant');
   const dice: ForcedDie[] = [];
   moves.forEach((earlier, index) => {
     for (const later of moves.slice(index + 1)) {

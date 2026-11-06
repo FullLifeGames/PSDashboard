@@ -1,7 +1,7 @@
 import {
   matchPlayedSide, phantomStayIn, type TurnSensitivity, type TurnVerification, type SensitivityTarget,
   type LeadEvalData, type ReplacementEvalData, type ReplacementPoint, type ReplacementRound, type PlayedTurn, type EvalPreferences, type EvalResult, type EvalSettings,
-  type RankedChoice, type StaticRuleset, type TeraAllowance,
+  type RankedChoice, type RollFlip, type StaticRuleset, type TeraAllowance,
 } from '@fulllifegames/eval-engine';
 import type { GameRules } from '@fulllifegames/replay-core';
 import type { EvalWorkerClient } from '../../lib/eval/worker-client';
@@ -9,6 +9,7 @@ import type { StoredEval } from '../../lib/eval-cache-store';
 import type { AppEvalSettings } from '../../lib/eval/worker-client';
 import type { EngineMode, TurnEvalSettings } from './prefs';
 import type { CachedEval } from './single-eval';
+import type { RolledCopyParams } from '../../lib/rolled-copy-stage';
 
 /** Played-pair matching with the KO'd-before-acting stand-in: a side that
  * never got to act still prices its pair through the charitable
@@ -92,6 +93,11 @@ export interface GraphSweepParams {
    */
   replacementRounds?: ReplacementRound[];
   replacementKeyFor?(turn: number, ordinal: number): string;
+  /**
+   * Round 86 (T304): the last stage plays the game's biggest roll the other way (full-game sweeps only). Absent = no stage, and the
+   * graph keeps the flip of the sweep before it.
+   */
+  rolledCopy?: RolledCopyParams;
 }
 
 /** The sweep's working arrays plus the lead/notice slots — mutated in place, painted via snapshots. */
@@ -108,6 +114,8 @@ export interface SweepData {
   lead: LeadEvalData | null;
   /** Round 79 (T290): the replacement points of the knockout turn t at index t (the card of turn t + 1 reads index (t + 1) - 1). */
   replacements: (ReplacementEvalData[] | null)[];
+  /** Round 86 (T304): the engine's score of the next root with the biggest roll's die turned over; null = no named roll or no copy. */
+  rollFlip: RollFlip | null;
   notice: string | null;
 }
 

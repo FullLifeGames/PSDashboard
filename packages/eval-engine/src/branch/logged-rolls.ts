@@ -3,7 +3,10 @@ import type { Battle, PRNGSeed } from '@pkmn/sim';
 import { serializeBattleStable } from '../forward-model.ts';
 import { forkBattleWithPrng } from '../forward/position.ts';
 import { applyChoice, resolveForcedSwitches } from '../forward/switches.ts';
+import { playBlockOnCopy } from '../dice/logged-block.ts';
+import type { ForcedDie } from '../dice/types.ts';
 import { buildForcedSwitchChoice, hasForceSwitch } from './corrections.ts';
+import type { ProtocolBench } from './team-order.ts';
 
 /**
  * Round 73 (T232): the logged dice of every action in a branch's first turn. The arrival plays its turn under the seed whose
@@ -36,6 +39,8 @@ export function actionKey(battle: Pick<Battle, 'activeMove' | 'activePokemon'> |
 class RollRecorder extends PRNG {
   readonly rolls = new Map<string, Draw[]>();
   private battle: Battle | null = null;
+  /** Round 86 (T306): while a forced part plays, its own observer writes the answers down and this stream stays silent. */
+  muted = false;
 
   attach(battle: Battle): void {
     this.battle = battle;
@@ -43,12 +48,16 @@ class RollRecorder extends PRNG {
 
   override random(from?: number, to?: number): number {
     const value = super.random(from, to);
+    if (!this.muted) this.record(from, to, value);
+    return value;
+  }
+
+  record(from: number | undefined, to: number | undefined, value: number): void {
     const key = actionKey(this.battle);
-    if (key === null) return value;
+    if (key === null) return;
     const draws = this.rolls.get(key);
     if (draws) draws.push({ from, to, value });
     else this.rolls.set(key, [{ from, to, value }]);
-    return value;
   }
 }
 
@@ -136,6 +145,38 @@ export function recordLoggedRolls(
       if (answers.length === 0) break;
       for (const { side, choice } of answers) if (!copy.choose(side, choice)) return null;
     }
+    resolveForcedSwitches(copy, seed);
+    return recorder.rolls;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Round 86 (the log's dice, T306): the draws of the logged turn as the reconstruction plays it now: the block's choices under the hidden
+ * dice of `seed` with the log's dice forced (`dice`), part by part (the choices, then every forced replacement the log answers), so an action
+ * the user leaves as logged rolls what the rebuilt position rolled, damage roll included. The draws the forced parts take are the answers
+ * the module gave, not the stream's values: the same die forced again reads the same. Null when the copy cannot play the turn; the caller
+ * falls back to the seed search then.
+ */
+export function recordForcedRolls(
+  battle: Battle, dice: readonly ForcedDie[], seed: PRNGSeed, p1Choice: string, p2Choice: string, forced: { p1: string[]; p2: string[] },
+  bench?: (side: 'p1' | 'p2') => ProtocolBench | undefined,
+): LoggedRolls | null {
+  try {
+    const recorder = new RollRecorder(seed);
+    const copy = forkBattleWithPrng({ serialized: serializeBattleStable(battle) }, recorder);
+    playBlockOnCopy({
+      copy, dice, choices: { p1: p1Choice, p2: p2Choice }, forced, bench, observe: (from, to, value) => recorder.record(from, to, value),
+      around: run => {
+        recorder.muted = true;
+        try {
+          run();
+        } finally {
+          recorder.muted = false;
+        }
+      },
+    });
     resolveForcedSwitches(copy, seed);
     return recorder.rolls;
   } catch {

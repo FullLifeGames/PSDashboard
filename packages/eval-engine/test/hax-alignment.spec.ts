@@ -116,6 +116,20 @@ describe('seed list + summary', () => {
     ]);
     expect(summary).toEqual({ turns: 3, perfectTurns: 1, softResidual: 2, faintResidualTurns: 1, endedMismatches: 1 });
   });
+
+  // Round 86 (ruling C2): a forced turn under another seed than index 0 is "seeded", a turn of the seed search is "fallback", never both
+  test('summarizeAlignment counts the forced turns that play under another seed, apart from the fallback turns', () => {
+    const perfect: AlignmentScore = { endedMismatch: false, faintMismatches: 0, softMismatches: 0 };
+    const record = (turn: number, seed: string, via: 'forced' | 'fallback'): TurnAlignmentRecord => ({
+      turn, seed: seed as never, via, trialPerfect: false, trialsFailed: 0, candidatesTried: 0, actual: perfect,
+    });
+    const summary = summarizeAlignment([
+      record(1, '1,2,3,4', 'forced'), record(2, '5,9,13,17', 'forced'), record(3, '2,4,6,8', 'forced'), record(4, '5,9,13,17', 'fallback'),
+    ]);
+    expect(summary.seededTurns).toBe(2);
+    expect(summary.fallbackTurns).toBe(1);
+    expect(summarizeAlignment([record(1, '1,2,3,4', 'forced')]).seededTurns).toBeUndefined();
+  });
 });
 
 function makeSet(species: string, moves: string[], extras: Partial<PokemonSet> = {}): PokemonSet {

@@ -1,5 +1,7 @@
 import type { PokemonSet } from '@pkmn/sim';
-import { CHAMPIONS_MOD, logRules, speciesBaseId, toId, type GameRules } from '@fulllifegames/replay-core';
+import { CHAMPIONS_MOD, logRules, speciesBaseId, toId, type GameRules, type TurnSnapshot } from '@fulllifegames/replay-core';
+import { restoreSideInvariants } from '../forward-model.ts';
+import { hpOfSighting } from './pokemon-info.ts';
 import { normalizeLineEndings } from '../line-endings.ts';
 import type { PokemonIdent, SimBattle, SimPokemon } from './types.ts';
 
@@ -134,15 +136,48 @@ export function faintedSlots(blockLines: readonly string[], sideId: 'p1' | 'p2')
   return slots;
 }
 
-const wasShown = (body: SimPokemon, shown: ReadonlySet<string>) => {
-  const rules: GameRules = { gen: body.battle.gen, mod: body.battle.dex.currentMod === CHAMPIONS_MOD ? CHAMPIONS_MOD : undefined };
+const rulesOf = (battle: SimBattle): GameRules => ({ gen: battle.gen, mod: battle.dex.currentMod === CHAMPIONS_MOD ? CHAMPIONS_MOD : undefined });
+
+/** Whether the log shows the body: its name, species or base species is among the shown ids. */
+export const wasShownBody = (body: SimPokemon, shown: ReadonlySet<string>) => {
+  const rules = rulesOf(body.battle);
   return [body.name, body.species.name, body.baseSpecies.name].some(name => shown.has(toId(name)) || shown.has(speciesBaseId(name, rules)));
 };
+
+
+/** Round 86 (B9): the shown ids of a snapshot's seen bodies, in the form `shownBodyIds` gives for a log (a body's name, its forme and their base species). */
+export function shownIdsOfSnapshot(battle: SimBattle, seen: readonly { name: string; speciesForme: string }[]): Set<string> {
+  const rules = rulesOf(battle);
+  const shown = new Set<string>();
+  for (const entry of seen) for (const name of [entry.name, entry.speciesForme]) shown.add(toId(name)).add(speciesBaseId(name, rules));
+  return shown;
+}
 
 /** Whether a body's species or set can carry an ability that changes how it shows on entry (the Dex's BeforeSwitchIn handler: Illusion). */
 export const mayDisguise = (body: SimPokemon) =>
   [body.ability, body.baseAbility, ...Object.values(body.species.abilities)].some(name =>
     typeof (body.battle.dex.abilities.get(name) as { onBeforeSwitchIn?: unknown }).onBeforeSwitchIn === 'function');
+
+/**
+ * Round 86 (B9, ruling C3): the one way a body leaves the game outside the simulator's own turn, in the order of `Battle#resolveFaints`: the
+ * fallen count, then the End events of the body's ability and item, then the flags. A body on the field runs the End events (Neutralizing Gas
+ * ends and starts what it held back, Desolate Land clears its weather); a bench body that the log never shows was never in the game and runs
+ * none. `fallen`: the body fainted in the game and counts as a fallen ally (the side's `totalFainted`, which Last Respects and Supreme Overlord
+ * read). `test/body-out-sweep.spec.ts` holds the function to the simulator over every Dex ability with an End handler.
+ */
+export function takeBodyOut(body: SimPokemon, { fallen }: { fallen: boolean }): void {
+  const { side, battle } = body;
+  const onField = !body.fainted && side.active.includes(body);
+  body.hp = 0;
+  body.faintQueued = true;
+  if (side.pokemonLeft > 0) side.pokemonLeft--;
+  if (fallen && side.totalFainted < 100) side.totalFainted++;
+  if (onField) {
+    battle.singleEvent('End', body.getAbility(), body.abilityState, body);
+    battle.singleEvent('End', body.getItem(), body.itemState, body);
+  }
+  body.fainted = true;
+}
 
 /**
  * The game left a forced slot empty (every forced slot is one the block faints, and no switch followed for at least one): the living bench bodies the protocol never shows were not brought (a player with a
@@ -156,16 +191,50 @@ export function retireUnshownBench(battle: SimBattle, sideIdx: number, bench: Pr
   if (!goesOn) return false;
   const side = battle.sides[sideIdx];
   const living = side.pokemon.filter(body => !body.isActive && !body.fainted);
-  const phantoms = living.filter(body => !wasShown(body, shown));
+  const phantoms = living.filter(body => !wasShownBody(body, shown));
   if (!forcedSlots.every(slot => fainted.has(slot))) return false;
   if (phantoms.length === 0 || living.length - phantoms.length > answers || phantoms.some(mayDisguise)) return false;
-  for (const body of phantoms) {
-    body.hp = 0;
-    body.fainted = true;
-    body.faintQueued = true;
-    if (side.pokemonLeft > 0) side.pokemonLeft--;
-  }
+  for (const body of phantoms) takeBodyOut(body, { fallen: false });
   side.clearChoice();
   if (side.pokemonLeft === 0) battle.checkWin();
   return true;
+}
+
+/**
+ * Round 86 (B9, ruling C3): a body the correction took out leaves a slot empty when the snapshot has nobody to stand in it. The game left that
+ * slot empty because its side had no body to send, so the bench bodies the log never shows were not brought: they leave the game, as they do
+ * when the rebuild's own replacement round meets the empty slot (`buildForcedSwitchChoice`). The same rule (`retireUnshownBench`) with the
+ * snapshot's shown bodies (the ones the log saw: a team preview entry nobody saw has no hit points), and only while the side has a shown
+ * body alive, so the retire never ends a game the log goes on with.
+ */
+export function retireBenchAfterFaints(battle: SimBattle, snapshot: TurnSnapshot, tookOut: ReadonlySet<SimPokemon>) {
+  if (tookOut.size === 0) return;
+  for (let sideIdx = 0; sideIdx < 2; sideIdx++) {
+    const side = battle.sides[sideIdx];
+    const slots = side.active.flatMap((body, slot) => (body && tookOut.has(body) ? [slot] : []));
+    if (slots.length === 0) continue;
+    const seen = (sideIdx === 0 ? snapshot.p1 : snapshot.p2).pokemon.filter(entry => entry.maxhp > 0);
+    const shown = shownIdsOfSnapshot(battle, seen);
+    if (!side.pokemon.some(body => !body.fainted && body.hp > 0 && wasShownBody(body, shown))) continue;
+    if (retireUnshownBench(battle, sideIdx, { shown, fainted: new Set(slots), goesOn: true }, 0, slots)) restoreSideInvariants(battle);
+  }
+}
+
+/**
+ * The faint state of one body against its snapshot entry. Round 86 (ruling C3): the log's faint of a body the simulator's turn left standing
+ * takes it out the way the simulator does (`takeBodyOut`); a faint written or taken back otherwise moves the side's fainted count.
+ */
+export function settleFaintFromSnapshot(battlePokemon: SimPokemon, snapshotPokemon: TurnSnapshot['p1']['pokemon'][number]) {
+  if (snapshotPokemon.fainted && !battlePokemon.fainted) {
+    takeBodyOut(battlePokemon, { fallen: true });
+    return;
+  }
+  if (battlePokemon.fainted !== snapshotPokemon.fainted) {
+    const side = battlePokemon.side;
+    side.totalFainted = Math.max(0, side.totalFainted + (snapshotPokemon.fainted ? 1 : -1));
+  }
+  battlePokemon.hp = Math.max(0, hpOfSighting(battlePokemon, snapshotPokemon));
+  battlePokemon.fainted = snapshotPokemon.fainted;
+  battlePokemon.faintQueued = snapshotPokemon.fainted;
+  if (snapshotPokemon.fainted) battlePokemon.hp = 0;
 }

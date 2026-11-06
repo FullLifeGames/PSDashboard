@@ -2,7 +2,7 @@ import type { ReplacementPoint } from '@fulllifegames/eval-engine';
 import type { SpreadCandidate } from '@fulllifegames/replay-core';
 import { recordSimFastReport, simFastLevers } from '../eval/sim-fast-setting';
 import type {
-  ReconstructJob, ReconstructOutcome, ReplayJobRequest, ReplayJobResponse, SolveSpreadsJob,
+  ReconstructJob, ReconstructOutcome, ReplayJobRequest, ReplayJobResponse, RolledCopyJob, RolledCopyOutcome, SolveSpreadsJob,
 } from './types';
 
 /** The slice of the Worker interface the client uses — a test hands in a fake. */
@@ -61,6 +61,13 @@ export class ReplayWorkerClient {
     const response = await this.run({ type: 'solveSpreads', id: this.nextId++, job }, {}, signal);
     if (response.type !== 'solveSpreadsResult') throw new Error('unexpected replay worker response');
     return new Map(response.entries);
+  }
+
+  /** Round 86 (T304): plays the turn with the biggest roll's die turned over; null where the log shows no such miss. */
+  async rolledCopy(job: RolledCopyJob, signal?: AbortSignal): Promise<RolledCopyOutcome | null> {
+    const response = await this.run({ type: 'rolledCopy', id: this.nextId++, job }, {}, signal);
+    if (response.type !== 'rolledCopyResult') throw new Error('unexpected replay worker response');
+    return response.outcome;
   }
 
   /** Spawns the worker ahead of the first job, so its bundle parse overlaps the replay load. */
