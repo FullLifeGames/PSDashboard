@@ -335,7 +335,10 @@ export interface StoredEval {
 //      their chance (T305), the doubles trees key their root draws, and the trees' seeds follow the Dex (T323); the
 //      rebuild plays each turn with the dice the log shows (T306), the report prices the copy of the turn's biggest
 //      roll (T304), and the item reader sees screen turns (T310). Every tree turn, rebuilt position and report moves.
-const EVAL_ENGINE_CACHE_VERSION = 76;
+// v77 (round 87, release 1.1.0): the @pkmn train moves from 0.10.12 to 0.10.15 (Showdown 16db150a); a Struggle that
+//      deals no damage costs its user a quarter of its HP, a Gen 1 Transform resets the last move slot, and a typeless
+//      Synchronoise misses a typeless target, so any search line that reaches them reads new values.
+const EVAL_ENGINE_CACHE_VERSION = 77;
 
 /** Round 61: a search-budget form stores under its own tag; the default keeps today's keys. */
 const versionTag = (): string => {
