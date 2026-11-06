@@ -5,7 +5,7 @@ import { loadSimMods } from '../src/forward/sim-mods';
 import { ALIGNMENT_SEEDS, extractProtocolEvents, isPerfectAlignment, scoreAlignment, type ProtocolEvents } from '../src/hax-alignment';
 import { dexOfRules, forcedOn, SWEEP_CASES, sweepBoard, sweepClicks } from './dice-sweep-support';
 import type { ForcedDie } from '../src/dice/types';
-import type { Mode } from './dice-fixtures';
+import { sweepSelection, type Mode } from './dice-fixtures';
 
 /**
  * Round 86 (the engine reads the dice), lane B, step B9 (T306, the hybrid of ruling C2): the seed search after the faint step. The dice
@@ -56,7 +56,7 @@ describe.each(SWEEP_CASES)('the faint step finds the seed of the unnamed die: $n
   });
 
   test('a turn that another seed plays: the step returns that seed and the turn is perfect', () => {
-    for (const logSeed of witnesses.slice(0, 4)) {
+    for (const logSeed of sweepSelection(witnesses, 'seeds')) {
       const expected = eventsAt(logSeed);
       const result = faintStep({ battle: board(seed0), expected, seed: seed0, choices: clicks }, []);
       expect(result.dice, `${rules.name} ${mode} log seed ${logSeed}`).not.toBeNull();
