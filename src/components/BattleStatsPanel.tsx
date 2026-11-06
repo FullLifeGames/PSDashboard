@@ -26,6 +26,9 @@ function formatFieldValue(field: PokemonFieldInfo): string {
 
 const STAT_LABELS = { hp: 'HP', atk: 'Atk', def: 'Def', spa: 'SpA', spd: 'SpD', spe: 'Spe' } as const;
 
+/** Round 87 (release 1.1.0), T317: the tag's words for a spread nobody has revealed; it carries no source word, since "unknown" is the whole claim. */
+const EVS_UNKNOWN = 'EVs not yet known';
+
 function formatEvs(evs: PokemonEvsInfo, isRandomFormat: boolean): string {
   const labels = [
     ['HP', evs.value.hp],
@@ -40,7 +43,7 @@ function formatEvs(evs: PokemonEvsInfo, isRandomFormat: boolean): string {
     // Random sets run fixed 85 EVs across the board; "0 EVs" would be
     // misleading for unknown spreads too (G21).
     if (isRandomFormat && evs.source === 'unknown') return '85 EVs each (random set)';
-    return evs.source === 'unknown' ? 'EVs ?' : '0 EVs';
+    return evs.source === 'unknown' ? EVS_UNKNOWN : '0 EVs';
   }
   return `${nonZero.map(([label, value]) => `${value} ${label}`).join(' / ')} EVs`;
 }
@@ -124,9 +127,11 @@ function SpreadTag({ info, text }: { info: PokemonEvsInfo; text: string }) {
       title={info.sourceDetail || sourceLabel(info.source, info.probability, info.sourceDetail)}
     >
       {text}
-      <span style={{ marginLeft: 6, color: sourceAccent(info.source), fontSize: 9, textTransform: 'uppercase' }}>
-        {sourceLabel(info.source, info.probability, info.sourceDetail)}
-      </span>
+      {text !== EVS_UNKNOWN && (
+        <span style={{ marginLeft: 6, color: sourceAccent(info.source), fontSize: 9, textTransform: 'uppercase' }}>
+          {sourceLabel(info.source, info.probability, info.sourceDetail)}
+        </span>
+      )}
     </span>
   );
 }
