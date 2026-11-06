@@ -45,10 +45,10 @@
   },
   "peerDependencies": {
     "@pkmn/client": "^0.7.4",
-    "@pkmn/data": "^0.10.12",
-    "@pkmn/dex": "^0.10.12",
+    "@pkmn/data": "^0.10.15",
+    "@pkmn/dex": "^0.10.15",
     "@pkmn/protocol": "^0.7.4",
-    "@pkmn/sim": "0.10.12",
+    "@pkmn/sim": "0.10.15",
     "@smogon/calc": "^0.12.0"
   }
 }

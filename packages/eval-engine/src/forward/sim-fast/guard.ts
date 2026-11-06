@@ -24,7 +24,9 @@ const FUNCTIONS: readonly [keyof SimProtos, string, readonly string[]][] = [
 ];
 
 /**
- * @pkmn/sim 0.10.12; the ESM and CJS builds print three of these functions differently. Round 78 re-pinned three of
+ * @pkmn/sim 0.10.15 (round 87, release 1.1.0: the 14 hashes carry over from 0.10.12, since battle, field and dex-formats stay
+ * byte-identical and pokemon.mjs changes only inside transformInto); the ESM and CJS builds print three of these functions
+ * differently. Round 78 re-pinned three of
  * them after a review against 0.10.11: runEvent changed only its syntax (`sourceEffect?.effectType`), getCallback's
  * SwitchIn fallback now holds in every generation (dispatch.ts counts it wide), and getRuleTable rewrote the tag rules,
  * which the layer does not read.
