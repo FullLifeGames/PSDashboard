@@ -1,6 +1,6 @@
 # Backlog
 
-This file holds the details of every open TODO, one section per TODO under its fixed T-number. Release v1.0.2 is out (30.10.2026), and rounds 82 to 86 (forced dice in branches, the GitHub issues #2 and #3, the turn dock, the smooth UI, the engine that reads the dice) wait on dev for the next release. Round 87 carries T322 (the search explores the strands of a turn by their chance, blocks 1 and 2), and T319 (an inventory of dead code) follows it; T313, T314, T316, T317, T324 to T329 and T336 to T339 are approved and wait for a round; every other TODO is parked with a trigger, and a trigger that fires brings its TODO to a gate. The next free T-number is T342.
+This file holds the details of every open TODO, one section per TODO under its fixed T-number. Release v1.0.2 is out (30.10.2026), and rounds 82 to 86 (forced dice in branches, the GitHub issues #2 and #3, the turn dock, the smooth UI, the engine that reads the dice) wait on dev for the next release. Round 87 carries T322 (the search explores the strands of a turn by their chance, blocks 1 and 2), and T319 (an inventory of dead code) follows it; T313, T314, T316, T317, T324 to T329 and T336 to T339 are approved and wait for a round; every other TODO is parked with a trigger, and a trigger that fires brings its TODO to a gate. The next free T-number is T343.
 
 Evidence paths of the form `r<NN>/…` point to that round's probe folder, `docs/perf/probes/<date>-r<NN>/`; `docs/` is local, so they exist only on the maintainer's machine. Each round's entry in `docs/completed/` names its folder and the gate that approved its TODOs. Line numbers in a section refer to the state when the TODO was written.
 
@@ -815,6 +815,24 @@ The triage of 21.10.2026 and the user gates after it parked these TODOs; each se
 **Singles and doubles.** Doubles only: singles have one foe, so the aim cannot differ.
 
 **Evidence.** `r86/lanes/B/ledger.md` (B2, proposal 4; B3); `r86/gate/todo-review.md` (P6: the corrected scene, the Meteor Beam and the fix site).
+
+### T342 · A fresh draw for every holdout family, and a rotation
+
+*Measurement · round 86 · tooling · lossless*
+
+**Parked (round 86, gate of 06.11.2026 14:47, "1a"). Trigger: a holdout family other than VGC reads harm in a pooled row that the fit side does not repeat. AGENTS.md's rule then asks for a fresh draw of that family before any refit, and the draw tool knows VGC only.**
+
+**Problem.** A holdout that serves round after round can drift. The VGC holdout, in service since round 65 (round 66 grew it to 415 games), read the wave of round 86 as harm (hq +18, luck-adjusted +21 bp at the fixed K; the null measurement ties the harm to the hashed tree seeds of T323). The VGC fit side read the same wave without harm (full -5.9 bp, warnings only in early cells), and 1,245 fresh games of the same seven formats read it better (full -15 bp [-25, -5], no harm), so `holdout-vgc2` replaced it. `holdout-doublesou`, `holdout-championsou` and `holdout-championsvgc` have served since round 65 as well (the manifest's `note`). `scripts/fresh-holdout.mjs` cannot draw them: its format table holds VGC formats only (`FRESH_FORMATS`), its readers of known ids match VGC ids only (`idsIn` at line 55, `knownIds` at line 177), and the rule it writes into the manifest's `drawn` names "Round 86" in its text (line 236).
+
+**Idea.** Two parts. First the tool: a format table with quotas per family, a reader of known ids for that family's formats, a new family name for a replacement (`appendFamily` refuses a family drawn before, line 128), and the round as an argument. A count probe in the form of `r86/lanes/H/h1-count.mjs` counts the fresh rated games per family before the first draw (VGC had about 5,900). Second the rotation: each family serves a number of score-touching rounds that the gate of this TODO sets, then a fresh draw takes its place; the manifest keeps the old sets, and the fits keep dropping them.
+
+**Benefit.** Users of the app and the packages: a refit or a re-pin follows a loss that games no measurement has read show too.
+
+**Success.** `scripts/fresh-holdout.mjs` draws a Doubles OU, a Champions OU and a Champions VGC family, each with spec rows for its formats and its known ids; every family in `test/regression/fixtures/fit-holdout-manifest.json` names the round of its draw in `drawn`, the four families of round 65 included; the first fresh family outside VGC reads base against head under round 86's rule H5 (R, S or U, fixed before the run).
+
+**Singles and doubles.** Three families are doubles (Doubles OU, VGC, Champions VGC) and one is singles (Champions OU); the tool and the rotation cover all four, and the bank stays as it is.
+
+**Evidence.** `r86/lanes/H/ledger.md` (H1 the plan and the reading, H2 the tool, H4 and H5 the measurement); `r86/gate/pair-wave-hold-vgc2-seven.txt`; `r86/gate/pair-e-fit-wave.txt` (the fit side of T309); `r86/gate/t342-review.md` (the check of this TODO against the code).
 
 ### T259 · A smoother price for a stage drop at the bench gate
 

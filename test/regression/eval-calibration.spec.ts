@@ -926,7 +926,8 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * 3a"), 20:47 ("1a 2a 3a 4a"), night 21:35 ("1a 2a 3a"), 06.11. about
  * 07:50 ("1a, 3a, 4a, 5a, 6 as recommended"), about 08:00 ("2a"), about
  * 09:30 (T309, "1a 2a"), final 11:50 ("1c, 2a, 3 as recommended, 4a, 5a,
- * 6a, 7a, 8a"), the fresh holdout's plan 12:11 ("1c 2a 3a 4a 5a").
+ * 6a, 7a, 8a"), the fresh holdout's plan 12:11 ("1c 2a 3a 4a 5a"), the
+ * holdout rule 14:47 ("1a").
  * DELIVERED: T299 (7785888 to 1e22edd). ScriptedPRNG and PairPRNG named a
  * draw by the numbers in the call, so a script decided full paralysis,
  * infatuation, the Champions thaw and confusion but never the move's own
@@ -1090,8 +1091,11 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * spec expected cache key v75 (f798c33); four rows moved by T305 and T323
  * the game's way (forced-win focus-blast-range to no proof, two doubles
  * rows of tree-endgame-cases, the 573756 t8 guard row of
- * secondary-classes-paths), re-pinned at the gate (2a, 77e1af3). [Rerun at
- * the booking commit.]
+ * secondary-classes-paths), re-pinned at the gate (2a, 77e1af3). Rerun at
+ * the booking commit 177efaa (DICE_SWEEPS=full, 4 workers, 3,146 s):
+ * 44,392 passed, 47 expected fail, 27 skipped, 0 failed; three ui files
+ * (ReplayWorkspace, TurnDock.dice, sets-roundtrip-t205) did not start
+ * under load (worker start timeout) and passed alone (48 of 48).
  * T309: E1 reads the VGC harm as a loss of sorting, not of scale: the own
  * K per phase, refitted on the holdout itself, still reads luck-adjusted
  * +25 [+3, +49], and the AUC falls (full 0.8221 to 0.8206, hq mid 0.7200
@@ -1110,8 +1114,8 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * refit has nothing to fit. Stage 1 did not run; T309 closes without a
  * refit and T323 stays (2a).
  * FRESH VGC HOLDOUT (final gate 1c, plan H1, gate "1c 2a 3a 4a 5a"): the
- * VGC holdout has judged every VGC choice since round 65; a third sample
- * no measurement has read separates a real loss from a spent holdout.
+ * VGC holdout has served since round 65; a third sample no measurement has
+ * read separates a real loss from a spent holdout.
  * scripts/fresh-holdout.mjs (5bc974c, fresh-holdout.spec.ts 12 rows, red
  * first) draws rated games >= 1500 of the old holdout's seven formats that
  * no tracked file, no docs/ record and no .fit-corpus file names, the
@@ -1163,7 +1167,10 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * go; master stays. 12:11 ("1c 2a 3a 4a 5a"): the fresh holdout's
  * exclusion plus regj, three times the size, the highest rated first with
  * one game per pair, the upload okay, the tooling on r86 before the
- * booking.
+ * booking. 14:47 ("1a"): AGENTS.md gets the rule that a holdout reading
+ * harm in a pooled row the fit side does not repeat gets a fresh draw of
+ * its family before any refit; the tool for the other families and a
+ * rotation park as T342.
  * RESTS: booked and approved: T324 (the seeds of the verify round,
  * sampler, matrix search and endgame children), T325 (a body that never
  * acts in the log gets a stand-in that keeps the logged order), T326 (a
@@ -1181,12 +1188,12 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * without the middlegame floor, fresh references on the merged base (43 of
  * 103 reference classes no longer occur there) and a fresh census draw;
  * the probes lanes/A/t322-*, A14's analysis and the VGC scene 2629703929
- * t10 carry over. Then T319. A TODO proposal for the gate: a rotation rule
- * for holdouts (a holdout judges a named number of rounds, then a fresh
- * draw), the same question for holdout-doublesou. Open measurements: a
- * quiet interleaved timing of the rebuild at 88e873e; why the hashed draws
- * make the verify round pick more cells in five searches; a Doubles OU
- * scene for T304 (T333). Next free T342.
+ * t10 carry over. Then T319. Parked at the gate of 14:47: T342 (the draw
+ * tool for every holdout family, today VGC only, and a rotation; trigger:
+ * a family other than VGC reads harm the fit side does not repeat). Open
+ * measurements: a quiet interleaved timing of the rebuild at 88e873e; why
+ * the hashed draws make the verify round pick more cells in five searches;
+ * a Doubles OU scene for T304 (T333). Next free T343.
  *
  * ROUND 85 2026-11-04 (improvement round 85, a larger bug: the UI stays
  * smooth, T318, with T320; on r85 from dev da2efa7; probes

@@ -1,6 +1,6 @@
 # Next Steps (as of 06.11.2026, round 86 booked, round 87 open)
 
-Open work only. Each step is one round; its TODOs carry fixed T-numbers, and their details are in `docs/backlog.md`. Rules for agents: `AGENTS.md`. Finished rounds: `docs/completed/`. Next free T-number: T342.
+Open work only. Each step is one round; its TODOs carry fixed T-numbers, and their details are in `docs/backlog.md`. Rules for agents: `AGENTS.md`. Finished rounds: `docs/completed/`. Next free T-number: T343.
 
 ## State
 
