@@ -123,7 +123,7 @@ export function EvalControls({ prefs, onPrefsChange, running, showAuto, showTera
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
       <span style={{ fontSize: 13, fontWeight: 'bold' }}>Evaluation</span>
-      <span style={{ fontSize: 10, color: '#778' }}>{external ? `estimate from ${engines.selected.name}` : 'estimate from a sim search, no oracle'}</span>
+      <span style={{ fontSize: 10, color: '#778' }}>{external ? `estimate from ${engines.selected.name}` : 'built-in engine: it plays the turns in the simulator'}</span>
       <span style={{ flex: 1 }} />
       {engines && <EngineControls engines={engines.engines} selected={engines.selected} running={running} onSelect={engines.select} onAdd={engines.add} onRemove={engines.remove} />}
       {!external && <DepthSelect prefs={prefs} onPrefsChange={onPrefsChange} running={running} />}

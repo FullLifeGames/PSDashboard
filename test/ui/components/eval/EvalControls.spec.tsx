@@ -25,7 +25,7 @@ describe('EvalControls', () => {
     const wired = props();
     const { rerender } = render(<EvalControls {...wired} />);
     expect(screen.getByText('Evaluation')).toBeInTheDocument();
-    expect(screen.getByText('estimate from a sim search, no oracle')).toBeInTheDocument();
+    expect(screen.getByText('built-in engine: it plays the turns in the simulator')).toBeInTheDocument();
 
     await userEvent.selectOptions(select('Depth'), '2');
     expect(wired.onPrefsChange).toHaveBeenLastCalledWith({ ...prefs, mode: 'matrix', depth: 2 });

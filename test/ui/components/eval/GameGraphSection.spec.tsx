@@ -7,6 +7,7 @@ import { evalGraph, evalResult, gameReport } from '../../fixtures/eval-result';
 import { leadAnalysis, turnAnalysis } from '../../fixtures/analysis';
 
 const names: [string, string] = ['Alice', 'Bob'];
+const HINT_TITLE = 'Analyze game makes a quick depth-1 pass over every turn, then re-evaluates each turn with the settings above, starting with the swings worth reporting. Tera applies to every turn.';
 const prefs: EvalPreferences = { depth: 2, samples: 1, mode: 'matrix', auto: false, autoAnalyze: false, tera: 'auto' };
 const emptyGraph = () => evalGraph('singles', {
   scores: [], results: [], settings: [], faintedFractions: [], played: [], playedOutcome: [], verified: [], sensitivity: [], evalErrors: [],
@@ -28,8 +29,9 @@ describe('GameGraphSection', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Analyze game' }));
     expect(wired.onAnalyzeGame).toHaveBeenCalledTimes(1);
     // Round 67 (T109): the deeper stage left with Think deeper, so the hint names none.
-    expect(screen.getByText(/^line:/)).toHaveTextContent(/^line: fast scan, then depth 2 everywhere$/);
-    expect(screen.getByText(/^line:/).getAttribute('title')).not.toMatch(/deeper/i);
+    expect(screen.getByText(/^graph:/)).toHaveTextContent(/^graph: a quick pass over every turn, then depth 2 on each$/);
+    expect(screen.getByText(/^graph:/).getAttribute('title')).not.toMatch(/deeper/i);
+    expect(screen.getByText(/^graph:/).getAttribute('title')).toBe(HINT_TITLE);
     expect(screen.queryByRole('img')).toBeNull();
 
     rerender(<GameGraphSection {...wired} hasGraph graph={evalGraph()} />);
@@ -44,13 +46,13 @@ describe('GameGraphSection', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(wired.onCancel).toHaveBeenCalledTimes(1);
     // Round 63 default (T110): auto runs early singles turns on the matrix.
-    expect(screen.getByText(/^line:/)).toHaveTextContent(/then auto \(matrix early, MCTS late\) everywhere$/);
+    expect(screen.getByText(/^graph:/)).toHaveTextContent(/then auto \(matrix early, MCTS late\) on each$/);
 
     rerender(<GameGraphSection {...wired} hasGraph smogonPending prefs={{ ...prefs, mode: 'mcts' }} />);
     const analyze = screen.getByRole('button', { name: 'Re-analyze' });
     expect(analyze).toBeDisabled();
     expect(analyze).toHaveAttribute('title', expect.stringMatching(/^Waiting for Smogon data/));
-    expect(screen.getByText(/^line:/)).toHaveTextContent('then MCTS everywhere');
+    expect(screen.getByText(/^graph:/)).toHaveTextContent('then MCTS on each');
   });
 
   // Round 77 (C1): a single evaluation that took over a running sweep leaves a status line instead of a silent stop.
@@ -74,9 +76,9 @@ describe('GameGraphSection', () => {
     onTestFinished(() => configureSearchBudget(null));
     const auto = { ...prefs, mode: 'auto' as const };
     const { rerender } = render(<GameGraphSection {...props({ prefs: auto })} />);
-    expect(screen.getByText(/^line:/)).toHaveTextContent(/^line: fast scan, then auto \(matrix early, MCTS late\) everywhere$/);
+    expect(screen.getByText(/^graph:/)).toHaveTextContent(/^graph: a quick pass over every turn, then auto \(matrix early, MCTS late\) on each$/);
     rerender(<GameGraphSection {...props({ prefs: auto, doubles: true })} />);
-    expect(screen.getByText(/^line:/)).toHaveTextContent('line: fast scan, then auto (MCTS every turn) everywhere');
+    expect(screen.getByText(/^graph:/)).toHaveTextContent('graph: a quick pass over every turn, then auto (MCTS every turn) on each');
   });
 
   test('the notice, the gap-turn reason with its analysis control, and the variation-only hint explain partial lines', () => {

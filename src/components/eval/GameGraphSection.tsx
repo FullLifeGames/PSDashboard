@@ -65,11 +65,11 @@ function LineHint({ prefs, doubles }: { prefs: EvalPreferences; doubles?: boolea
   return (
     <div
       style={{ fontSize: 10, color: '#778', marginTop: 2 }}
-      title="Analyze game paints the whole line with a fast depth-1 scan first, then converges every turn to the settings above, report-worthy swings first. Tera applies everywhere."
+      title="Analyze game makes a quick depth-1 pass over every turn, then re-evaluates each turn with the settings above, starting with the swings worth reporting. Tera applies to every turn."
     >
-      line: fast scan, then {prefs.mode === 'mcts' ? 'MCTS'
+      graph: a quick pass over every turn, then {prefs.mode === 'mcts' ? 'MCTS'
         : prefs.mode === 'auto' ? (autoTreeEverywhere ? 'auto (MCTS every turn)' : 'auto (matrix early, MCTS late)')
-        : `depth ${prefs.depth}`} everywhere
+        : `depth ${prefs.depth}`} on each
     </div>
   );
 }
