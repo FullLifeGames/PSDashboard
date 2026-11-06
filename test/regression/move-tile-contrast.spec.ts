@@ -12,8 +12,8 @@ import { TYPE_BG, contrastRatio, typeTileVars } from '../../src/lib/type-colors'
  *
  * Round 84 (turn dock), A6a: the dock's own colors in dock.css are held to the same bar: the chip, the type tag, the selected
  * tile, target and switch, the flags, the legend and the strip. The selection blue (white text read 2.5 : 1 on the .ps-btn
- * gradient, the integrator's look check of 02.11.2026) is darker in the dock. Execute is not in this list: its white on the
- * app's .ps-btn-red gradient reads 3.9 : 1 and is shared with the other red buttons of the app.
+ * gradient, the integrator's look check of 02.11.2026) is darker in the dock. Execute is not in this list: round 87 (release 1.1.0,
+ * T313) holds it, with .ps-btn, .ps-btn-red and the loader's guide steps, in button-contrast.spec.ts.
  */
 const read = (file: string): string => readFileSync(new URL(`../../src/styles/${file}`, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 const css = read('pickers.css');

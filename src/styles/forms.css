@@ -92,7 +92,7 @@
 .ps-input:focus { border-color: var(--ps-accent); box-shadow: 0 0 0 2px rgba(124,183,232,0.14); }
 
 .ps-btn {
-  background: linear-gradient(180deg, #75a8d5 0%, #567fa7 100%);
+  background: linear-gradient(180deg, #4b6c89 0%, #37526c 100%);
   border: 1px solid rgba(190,222,255,0.26);
   border-radius: 5px;
   padding: 6px 16px;
@@ -107,8 +107,8 @@
 .ps-btn:hover { filter: brightness(1.12); transform: translateY(-1px); }
 .ps-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .ps-btn-red {
-  background: linear-gradient(180deg, #d95565 0%, #aa3344 100%);
-  border-color: #993344;
+  background: linear-gradient(180deg, #b04552 0%, #8a2937 100%);
+  border-color: #7c2937;
 }
 
 /* Range slider */

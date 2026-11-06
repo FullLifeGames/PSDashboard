@@ -24,7 +24,7 @@ describe('BattleStatsPanel', () => {
     expect(garchomp).toHaveTextContent('252 HP / 4 Def / 252 SpD EVs');
   });
 
-  test('a damage-fitted spread reads fitted, unknown EVs read as a question, Tera and level show when set', () => {
+  test('a damage-fitted spread reads fitted, unknown EVs read in words, Tera and level show when set', () => {
     const replayData = singlesReplay();
     const fitted = revealedPokemon('Heatran', {
       evs: { ...evs('guessed', { hp: 0, atk: 0, def: 0, spa: 252, spd: 4, spe: 252 }), sourceDetail: INFERRED_SPREAD_DETAIL },
@@ -40,7 +40,7 @@ describe('BattleStatsPanel', () => {
     expect(heatran).toHaveTextContent('♀');
 
     const latias = screen.getByRole('img', { name: 'Latias' }).parentElement!;
-    expect(latias).toHaveTextContent('EVs ?');
+    expect(latias).toHaveTextContent('EVs not yet known');
     expect(latias).toHaveTextContent('Has item');
   });
 
@@ -65,6 +65,29 @@ describe('BattleStatsPanel', () => {
       expect(noivern).toHaveTextContent('from move order');
       expect(noivern).not.toHaveTextContent('fitted');
       expect(screen.getByRole('img', { name: 'Latias' }).parentElement!).toHaveTextContent('HP from log');
+    });
+  });
+
+  // Round 87 (release 1.1.0), T317: an unknown spread says "EVs not yet known" and drops the doubled source word, singles and doubles alike.
+  describe.each(['singles', 'doubles'] as const)('an unknown spread (%s)', kind => {
+    const replayData = () => (kind === 'singles' ? singlesReplay() : { ...singlesReplay(), formatid: 'gen9doublesou' });
+
+    test('reads "EVs not yet known" with no source word, and the hover title still says unknown', () => {
+      const mon = revealedPokemon('Latias', { evs: evs('unknown'), moves: [] });
+      render(<BattleStatsPanel replayData={replayData()} p1Info={{ pokemon: [mon] }} p2Info={null} />);
+      const tag = screen.getByText('EVs not yet known');
+      expect(tag).toHaveClass('ps-stats-tag');
+      expect(tag.textContent).toBe('EVs not yet known');
+      expect(tag.querySelector('span')).toBeNull();
+      expect(tag).toHaveAttribute('title', 'unknown');
+      expect(screen.queryByText('EVs ?')).not.toBeInTheDocument();
+    });
+
+    test('a known spread keeps its source word', () => {
+      const mon = revealedPokemon('Noivern', { evs: evs('guessed', { hp: 252, atk: 0, def: 4, spa: 252, spd: 0, spe: 0 }), moves: [] });
+      render(<BattleStatsPanel replayData={replayData()} p1Info={{ pokemon: [mon] }} p2Info={null} />);
+      const tag = screen.getByText(/252 HP \/ 4 Def \/ 252 SpA EVs/);
+      expect(tag.querySelector('span')).not.toBeNull();
     });
   });
 
