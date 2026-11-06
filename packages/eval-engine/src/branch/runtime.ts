@@ -179,6 +179,8 @@ async function resolveForcedSwitches(
 
     if (commands.length === 0) break;
     const forcedChoiceErrors = choiceErrors.count;
+    // Round 86 (B12): the requests the simulator holds now; a new object on either side means it moved on (a second replacement, a chain)
+    const requestsBefore = currentBattle.sides.map(side => side.activeRequest);
     // a part the dice module cannot play goes in plain, and so does the rest of the block
     if (!writePart(session, currentBattle, forcedDice, commands)) {
       forcedDice = null;
@@ -188,6 +190,7 @@ async function resolveForcedSwitches(
       currentBattle.ended ||
       currentBattle.turn > turnBeforeChoice ||
       (!hasForceSwitch(currentBattle, 0) && !hasForceSwitch(currentBattle, 1)) ||
+      currentBattle.sides.some((side, index) => side.activeRequest !== requestsBefore[index]) ||
       choiceErrors.count > forcedChoiceErrors,
     );
     if (choiceErrors.count > forcedChoiceErrors) {
