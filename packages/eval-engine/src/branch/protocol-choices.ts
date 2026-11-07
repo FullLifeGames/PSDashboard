@@ -188,9 +188,13 @@ function firstLegalTargetLoc(battle: SimBattle, active: SimPokemon, targetType: 
 
 /**
  * The slot's default when its protocol shows no action: `pass` for a slot the sim itself passes (fainted, or a Tatsugiri
- * commanding a Dondozo: side.js getChoiceIndex, read through `nextChoosingSlot`), else the first enabled move. A `move`
- * for a commanding slot went to the partner's slot, the sim rejected the side's whole choice, and the half-built choice
- * counted as done, so no repair committed the turn (round 72, T246c).
+ * commanding a Dondozo: side.js getChoiceIndex, read through `nextChoosingSlot`), else the enabled move of the lowest priority
+ * at 0 or below, else the first enabled move. A `move` for a commanding slot went to the partner's slot, the sim rejected the
+ * side's whole choice, and the half-built choice counted as done, so no repair committed the turn (round 72, T246c).
+ * Round 88 (T325, #61): the log shows no action because the body fainted before it moved or flinched, so the foe acted first,
+ * and the first move (Fake Out, Shadow Sneak, Protect) could run ahead of the foe the log shows first (653785 t23, 2628340185
+ * t23, 2663093831 t9 and t10, 2695803506 t1, 2629703929 t9). The slowest move keeps the logged order, as it does for a body that
+ * switched out before it acted; a body with no move at 0 or below keeps its first move.
  */
 function defaultMoveChoice(battle: SimBattle, active: SimPokemon | null | undefined): string {
   if (!active || nextChoosingSlot(active.side, active.position) !== active.position) return 'pass';
@@ -202,7 +206,9 @@ function defaultMoveChoice(battle: SimBattle, active: SimPokemon | null | undefi
   // (gen9vgc2026regi-2630452654 t4, Miraidon locked into Snarl) had `move 1`
   // disabled, and the rejected side choice cost its partner the Encore.
   const requestMoves = active.getMoveRequestData().moves;
-  const enabledIndex = Math.max(0, requestMoves.findIndex(move => !move.disabled));
+  const slowest = slowestRequestMove(battle.dex, active);
+  const slowestIndex = slowest ? requestMoves.findIndex(move => move.id === slowest) : -1;
+  const enabledIndex = slowestIndex >= 0 ? slowestIndex : Math.max(0, requestMoves.findIndex(move => !move.disabled));
   const requestEntry = requestMoves[enabledIndex];
   const targetType = requestEntry
     ? (requestEntry.target || '')
