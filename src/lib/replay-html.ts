@@ -7,6 +7,7 @@
 import { EMBED_SCRIPT_ORDER_SCRIPT, fontAwesomeOverrideStyle, POINTER_SOURCE_SHIM_SCRIPT } from './replay-compat';
 import { tableSwapScript } from './teambuilder-table';
 import { PHONE_FIT_SCRIPT, PHONE_STYLES } from './replay-phone';
+import { appControlsStyles, sideTrackerScript } from './replay-controls';
 
 const REPLAY_STYLES = `<style>
 html,body {font-family:Verdana, sans-serif;font-size:10pt;margin:0;padding:0;}
@@ -270,6 +271,10 @@ export function generateReplayHtml(opts: {
   seekTurn?: number;
   autoPlay?: boolean;
   reportTurn?: boolean;
+  /** Round 88 (T316): reports the side the frame shows near (`ps-side`), for the dock's row order. */
+  reportSide?: boolean;
+  /** Round 88 (T316): hides Last turn, Next turn, Go to turn..., Color scheme and Music (replay-controls.ts). */
+  hideTurnControls?: boolean;
   /** Viewer perspective — 'p2' renders the battle from player 2's side (the ?p2 replay-URL flag). */
   viewpoint?: 'p1' | 'p2';
   /** Replaces the embed's FontAwesome face (see replay-compat.ts). */
@@ -279,7 +284,7 @@ export function generateReplayHtml(opts: {
 }): string {
   const {
     log, format = '', p1 = 'Player 1', p2 = 'Player 2', title, seekTurn, autoPlay = false,
-    reportTurn = false, viewpoint = 'p1', fontAwesomeWoff2Url, teambuilderTableUrl,
+    reportTurn = false, reportSide = false, hideTurnControls = false, viewpoint = 'p1', fontAwesomeWoff2Url, teambuilderTableUrl,
   } = opts;
   const displayTitle = title || `${format ? `[${format}] ` : ''}${p1} vs. ${p2}`;
   // Escape forward slashes for the script tag content (PS format)
@@ -295,7 +300,7 @@ export function generateReplayHtml(opts: {
 <title>${displayTitle}</title>
 ${REPLAY_STYLES}
 ${PHONE_STYLES}
-${PHONE_FIT_SCRIPT}
+${appControlsStyles(hideTurnControls)}${PHONE_FIT_SCRIPT}
 ${SILENT_AUDIO_SCRIPT}
 ${POINTER_SOURCE_SHIM_SCRIPT}
 <div class="wrapper replay-wrapper">
@@ -307,7 +312,7 @@ ${escapedLog}
 </div>
 ${EMBED_SCRIPT_ORDER_SCRIPT}
 ${teambuilderTableUrl ? `${tableSwapScript(teambuilderTableUrl)}\n` : ''}${EMBED_LOADER_SCRIPT}
-${fontAwesomeWoff2Url ? `${fontAwesomeOverrideStyle(fontAwesomeWoff2Url)}\n` : ''}${replayBridgeScript(seekTurn, autoPlay, viewpoint)}${reportTurn ? TURN_TRACKER_SCRIPT : ''}`;
+${fontAwesomeWoff2Url ? `${fontAwesomeOverrideStyle(fontAwesomeWoff2Url)}\n` : ''}${replayBridgeScript(seekTurn, autoPlay, viewpoint)}${reportTurn ? TURN_TRACKER_SCRIPT : ''}${sideTrackerScript(reportSide, viewpoint)}`;
 }
 
 /**
