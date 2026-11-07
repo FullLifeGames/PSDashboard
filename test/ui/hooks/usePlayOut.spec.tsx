@@ -243,6 +243,82 @@ describe('usePlayOut', () => {
     expect(again.wired.holdTipFollow).toHaveBeenCalledTimes(1);
   });
 
+  // Round 88 (T347, #83): a turn in flight lands after the stop in the append mode of the run ('hold': no seek, no play,
+  // no follow-end), so the frame stays where the user watches it. The run stays active until that turn landed.
+  describe('a stop with a turn in flight', () => {
+    const inFlight = () => {
+      const { evaluation } = evaluationOf({ auto: true });
+      const hook = setup(evaluation);
+      act(() => hook.result.current.playOut.startPlayOut());
+      const done = evaluationOf({ auto: true, status: 'done', result: evalResult(), resultTag: 'variation:3' }).evaluation;
+      hook.rerender({ evaluation: done, wiring: hook.wired }); // the run plays its first turn
+      hook.rerender({ evaluation: done, wiring: { ...hook.wired, executing: true } });
+      return { ...hook, done };
+    };
+
+    test('keeps the run active and holds the tip-follow, then finishes when the turn landed', () => {
+      const { result, rerender, wired, done } = inFlight();
+      act(() => result.current.transients.stopPlayOutRef.current?.());
+      expect(result.current.transients.playOut).toMatchObject({ active: true, turns: 1, stopping: { navigated: false } });
+      expect(result.current.transients.playOutNotice).toBeNull();
+      expect(result.current.transients.playOutRef.current).toEqual(expect.objectContaining({ active: true }));
+      expect(wired.holdTipFollow).toHaveBeenCalledTimes(1);
+      expect(wired.navigateTo).not.toHaveBeenCalled();
+
+      rerender({ evaluation: done, wiring: wired }); // executing false: the turn landed
+      expect(result.current.transients.playOut).toBeNull();
+      expect(result.current.transients.playOutNotice).toEqual({ text: 'Play-out stopped: 1 turn played (they stay in the variation).', watchTurn: 3 });
+      expect(wired.navigateTo).toHaveBeenCalledTimes(1);
+      expect(wired.navigateTo).toHaveBeenCalledWith({ turn: 3, line: 'variation' }, { seek: false, internal: true, toFrame: true });
+    });
+
+    test('a navigation during the stop, or one that stops the run itself, finishes it without moving the pointer', () => {
+      const first = inFlight();
+      act(() => first.result.current.transients.stopPlayOutRef.current?.());
+      act(() => first.result.current.transients.stopPlayOutRef.current?.({ navigated: true }));
+      first.rerender({ evaluation: first.done, wiring: first.wired });
+      expect(first.result.current.transients.playOut).toBeNull();
+      expect(first.wired.navigateTo).not.toHaveBeenCalled();
+
+      const second = inFlight();
+      act(() => second.result.current.transients.stopPlayOutRef.current?.({ navigated: true }));
+      expect(second.result.current.transients.playOut).toMatchObject({ active: true, stopping: { navigated: true } });
+      expect(second.wired.holdTipFollow).toHaveBeenCalledTimes(1);
+      second.rerender({ evaluation: second.done, wiring: second.wired });
+      expect(second.result.current.transients.playOut).toBeNull();
+      expect(second.result.current.transients.playOutNotice?.text).toBe('Play-out stopped: 1 turn played (they stay in the variation).');
+      expect(second.wired.navigateTo).not.toHaveBeenCalled();
+    });
+
+    test('plays nothing more while it waits: a finished evaluation is left alone', () => {
+      const { result, rerender, wired } = inFlight();
+      act(() => result.current.transients.stopPlayOutRef.current?.());
+      const calls = (wired.applyEvalChoice as ReturnType<typeof vi.fn>).mock.calls.length;
+      const next = evaluationOf({ auto: true, status: 'done', result: evalResult('doubles'), resultTag: 'variation:3' }).evaluation;
+      rerender({ evaluation: next, wiring: { ...wired, executing: false } });
+      // The turn landed: the run finished instead of playing the next result.
+      expect(wired.applyEvalChoice).toHaveBeenCalledTimes(calls);
+      expect(wired.executeTurn).toHaveBeenCalledTimes(1);
+      expect(result.current.transients.playOut).toBeNull();
+    });
+
+    test('a refused turn that lands during the stop ends the run once, with the refusal', async () => {
+      const { evaluation } = evaluationOf({ auto: true });
+      let refuse: (message: string) => void = () => {};
+      const wired = wiring({ executeTurn: vi.fn(() => new Promise<string | void>(resolve => { refuse = resolve; })) });
+      const { result, rerender } = setup(evaluation, wired);
+      act(() => result.current.playOut.startPlayOut());
+      const done = evaluationOf({ auto: true, status: 'done', result: evalResult(), resultTag: 'variation:3' }).evaluation;
+      rerender({ evaluation: done, wiring: wired });
+      rerender({ evaluation: done, wiring: { ...wired, executing: true } });
+      act(() => result.current.transients.stopPlayOutRef.current?.({ navigated: true }));
+      await act(async () => { refuse('Earthquake is disabled for Garchomp right now.'); });
+      expect(result.current.transients.playOut).toBeNull();
+      expect(result.current.transients.playOutNotice?.text).toContain('the turn could not be played');
+      expect(wired.navigateTo).not.toHaveBeenCalled(); // the user's own navigation stands
+    });
+  });
+
   test('the fast option pins the run to the depth-1 matrix before its first evaluation and releases the engine when the run ends', () => {
     const { evaluation, setPrefs, setEngineOverride } = evaluationOf({});
     const wired = wiring({ fastPlayOut: true });

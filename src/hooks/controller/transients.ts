@@ -8,6 +8,8 @@ export interface PlayOutState {
   turns: number;
   startTurn: number;
   prevAuto: boolean;
+  /** Round 88 (T347, #83): Stop was pressed with a turn in flight; the run ends when that turn landed. */
+  stopping?: { text: string; navigated: boolean } | null;
 }
 
 export interface PendingConfirm {
@@ -26,7 +28,7 @@ export interface PendingConfirm {
  * the finish's move to the frame's turn) keep the run alive.
  */
 export function useTransients(replayId: string | undefined) {
-  const playOutRef = useRef<{ active: boolean } | null>(null);
+  const playOutRef = useRef<{ active: boolean; stopping?: { navigated: boolean } | null } | null>(null);
   const stopPlayOutRef = useRef<((opts?: { navigated?: boolean }) => void) | null>(null);
 
   // ── "Let it play out": the engine plays BOTH sides' top choice from the
