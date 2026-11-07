@@ -5,6 +5,7 @@ import { splitOutcome } from '../search/secondary-classes.ts';
 import type { EndgameChildren } from './children.ts';
 import { positionBattle } from '../forward-model.ts';
 import type { Side } from './prover-order.ts';
+import { foeReadsStages } from './stage-readers.ts';
 
 /**
  * Round 88 (T336, #72): a class in which a secondary effect fired inherits the proof of the class in which it did not, when the
@@ -18,6 +19,10 @@ import type { Side } from './prover-order.ts';
  * another kind: Defiant, Competitive and Contrary move a stage the other way, Mirror Armor moves the user's stage, Eject Pack and
  * White Herb use up the item, Mirror Herb and Opportunist copy the gain, a Clear Body that blocks the drop leaves nothing to
  * compare. Any such difference and the classes keep their own proofs, as before.
+ *
+ * The rule holds for one turn of realized state; a later move of the foe can read the stages it moved. So the fired class takes nothing
+ * over while a living body of the foe's side (the bench too) can click a move the simulator shows to read or move stages: Foul Play,
+ * Punishment, Psych Up, Spectral Thief, Topsy-Turvy, the Swap moves (stage-readers.ts, a census played on a twin battle per move).
  */
 
 /** A class key `${order}:${outcomes}` split at its first colon (an effect id holds one itself: `hit-nokill+boosts:spd`). */
@@ -96,7 +101,9 @@ export function helpedSources(cell: Pick<EndgameChildren, 'children' | 'events'>
       const [fired, plain] = [splitOutcome(mine.outcomes[differing[0]], event.secondary), splitOutcome(theirs.outcomes[differing[0]], event.secondary)];
       const extra = tokensOf(mine.outcomes[differing[0]], event).filter(token => !tokensOf(theirs.outcomes[differing[0]], event).includes(token));
       if (fired.base !== 'hit-nokill' || plain.base !== 'hit-nokill' || extra.length === 0 || extra.length !== fired.tokens.length - plain.tokens.length) return;
-      if (plain.tokens.length >= fewest || !onlyHelpsMover(positionBattle(sibling.position), positionBattle(child.position), side)) return;
+      if (plain.tokens.length >= fewest) return;
+      const firedBattle = positionBattle(child.position);
+      if (foeReadsStages(firedBattle, side) || !onlyHelpsMover(positionBattle(sibling.position), firedBattle, side)) return;
       [best, fewest] = [other, plain.tokens.length];
     });
     sources[index] = best;
