@@ -238,11 +238,11 @@ describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 4))('S7, the turns prove
 
 /**
  * S8, the removers and the silent movers, found by playing every move of the rule set against a board with a weather and a
- * terrain standing (p1's Sunny Day with the rock and p2's Electric Terrain with Terrain Extender, both on turn 1), p1 playing the move on turn 5, the
- * last turn a plain field stands. A
- * log whose field ended cleanly must read the held item (a log that shows an item change may abstain, never read a wrong one), a log whose field was removed, replaced or moved must read
- * none: the oracle is `cleanEnd`, so a move that ends or changes the field with no line the reader knows fails here. The plain
- * run plays every tenth move and the moves whose Dex entry mentions a weather or a terrain; `DICE_SWEEPS=full` plays them all.
+ * terrain standing (p1's Sunny Day with the rock and p2's Electric Terrain with Terrain Extender, both on turn 1), p1 playing
+ * the move on turn 5, the last turn a plain field stands. A log whose field ended cleanly must read the held item (a log that
+ * shows an item change may abstain, never read a wrong one); a log whose field was removed, replaced or moved must read none.
+ * The oracle is `cleanEnd`, so a move that ends or changes the field with no line the reader knows fails here. The plain run
+ * plays every tenth move and the moves whose Dex entry mentions a weather or a terrain; `DICE_SWEEPS=full` plays them all.
  */
 describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 4 && itemsOf(view, 'sunnyday').length > 0))('S8, removers and movers of weather and terrain: $name', view => {
   const rock = itemsOf(view, 'sunnyday')[0];
