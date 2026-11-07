@@ -22,7 +22,7 @@ export function upgradeChecks(version) {
   return [
     '',
     `The @pkmn train stands at ${version}. Before a new simulator ships:`,
-    '- T103 (docs/backlog.md): harden the speed layer for it (hash gate, census over Gen 1 to 9).',
+    '- T103 (issue #6): harden the speed layer for it (hash gate, census over Gen 1 to 9).',
     '- npx vitest run --project eval-engine, also with EVAL_SIM_FAST=0 and EVAL_SIM_FAST=1 (the CI modes).',
     '- the full dice sweeps (a plain run plays a sample of them): DICE_SWEEPS=full npx vitest run --project eval-engine packages/eval-engine/test/dice-',
     '- the batch check of AGENTS.md: a new simulator can move every score, so a feedback run and the paired bank.',

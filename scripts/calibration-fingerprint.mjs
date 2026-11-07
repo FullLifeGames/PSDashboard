@@ -24,7 +24,7 @@
 // HTTP errors is incomplete. Runs from before this recipe carry no fingerprint and never match.
 //
 // Everything under test/regression/ is an input, so a ledger block booked into test/regression/eval-calibration.spec.ts
-// changes the value although it changes no behavior. Commits that touch only docs, NextSteps.md or AGENTS.md keep it.
+// changes the value although it changes no behavior. Commits that touch only docs or AGENTS.md keep it.
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
