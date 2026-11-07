@@ -23,7 +23,9 @@ import { diffsOf, emittedBlock, FIXTURES, rebuild, type FixtureId, type GameType
  *   after B3 and B4. B3 flipped the eight of forcing to plain tests, B4a the three of the faint step;
  * - resolved by the slowest stand-in (3, round 88, T325): the log shows no action of a body that fainted or flinched before it moved, and the
  *   click that fills in takes the enabled move of the lowest priority at 0 or below, so the foe's logged action stays first;
- * - named residuals (9, and 2628340185 turn 13 by ruling Q4): the turn stays imperfect for a cause that is no die of the log. A row
+ * - resolved by the accuracy of one hit (1, round 88, T337): 2628340185 turn 13 (ruling Q4), a Triple Axel whose log shows one hit: the
+ *   die of hit 2 names the miss the log never writes (only `|-hitcount|1`), so the forced turn stops the chain where the game's did;
+ * - named residuals (9): the turn stays imperfect for a cause that is no die of the log. A row
  *   holds the cause where the base and the forced turn share it, so a later fix moves a row to the gate by failing it;
  * - guards: the two turns the base plays perfectly by seed luck and a plain forced turn breaks (2629703929 turn 10, a failed second
  *   Protect; 2663093831 turn 11, a damage roll the faint step repairs), and the 330 other perfect turns, counted per replay;
@@ -50,13 +52,14 @@ const BY_FAINT_STEP: Row[] = [
 const BY_STAND_IN: Row[] = [
   { id: 'smogtours-gen6ou-653785', turn: 23 }, { id: 'gen9vgc2026regi-2629703929', turn: 9 }, { id: 'gen9championsvgc2026regmc-2695803506', turn: 1 },
 ];
-const RESOLVED = [...BY_FORCING, ...BY_FAINT_STEP, ...BY_STAND_IN];
+/** Turns that the accuracy die of one hit resolves (round 88, T337): the log shows a multi-accuracy chain that broke, the miss of the next hit has no line. */
+const BY_HIT_DIE: Row[] = [{ id: 'gen9championsou-2628340185', turn: 13 }];
+const RESOLVED = [...BY_FORCING, ...BY_FAINT_STEP, ...BY_STAND_IN, ...BY_HIT_DIE];
 
 interface Residual extends Row { cause: string; /** The diff of the emitted block against the log that the base and the forced turn share. */ stays: string | null }
 const RESIDUALS: Residual[] = [
   { id: 'smogtours-gen6ou-648453', turn: 4, cause: 'damage model: the simulator keeps Rotom alive that the log\'s hit knocked out (no step of the roll kills it)', stays: null },
   { id: 'gen9championsou-2628340185', turn: 23, cause: 'damage model: the log shows the Shadow Sneak of Aegislash leaving Floette at 1/100, the roll of the simulator knocks Floette out first (round 88, T325: no unlogged choice, the move of Aegislash is in the log)', stays: 'moveCount p1:floette:moonblast log=1 sim=0' },
-  { id: 'gen9championsou-2628340185', turn: 13, cause: 'ruling Q4: Triple Axel plays two hits where the log shows one (the accuracy of one hit is no die the module names), a new faint', stays: null },
   { id: 'gen9doublesou-2663093831', turn: 8, cause: 'build: the set has Inner Focus, the log shows the Intimidate drop of Multiscale', stays: 'secondaries p1:dragonite:unboost:atk:1 log=1 sim=0' },
   { id: 'smogtours-gen9doublesou-912045', turn: 9, cause: 'build: an item (Throat Spray) the log disproves', stays: 'secondaries p1:ursaluna:boost:spa:1 log=0 sim=1' },
   { id: 'smogtours-gen9doublesou-912045', turn: 1, cause: 'damage model: the simulator deals half of the log\'s damage to Rillaboom', stays: 'faint log-only p2:rillaboom' },
@@ -124,6 +127,14 @@ describe.each(['singles', 'doubles', 'vgc'] as GameType[])('the rebuild plays th
     }
   });
 
+  describe.skipIf(!BY_HIT_DIE.some(entry => typeOf(entry.id) === type))('resolved by the accuracy of one hit (T337)', () => {
+    for (const row of BY_HIT_DIE.filter(entry => typeOf(entry.id) === type)) {
+      test(`${key(row)}: the emitted block matches the log in faints and every die`, () => {
+        expect(isPerfectAlignment(recordOf(row).actual), shown(row)).toBe(true);
+      });
+    }
+  });
+
   describe('named residuals: the cause is no die of the log', () => {
     for (const row of RESIDUALS.filter(entry => typeOf(entry.id) === type)) {
       test(`${key(row)}: ${row.cause}`, () => {
@@ -151,11 +162,11 @@ describe.each(['singles', 'doubles', 'vgc'] as GameType[])('the rebuild plays th
 
 describe('the counts of the drift line', () => {
   // 24 turns of the named rows missed the log in round 85 (singles 11, Doubles OU 8, VGC 5, with Q3 and Q4); B3 resolved the eight of forcing, B4
-  // resolves the three of the faint step, T325 (round 88) the three of the stand-in: the imperfect rows are the residuals
-  test('the named rows that miss the log: the residuals (singles 3, Doubles OU 5, VGC 2 after T325)', () => {
+  // resolves the three of the faint step, T325 (round 88) the three of the stand-in, T337 the one of the hit die: the imperfect rows are the residuals
+  test('the named rows that miss the log: the residuals (singles 2, Doubles OU 5, VGC 2 after T337)', () => {
     const imperfect = [...RESOLVED, ...RESIDUALS].filter(row => !isPerfectAlignment(recordOf(row).actual));
     const byType = (type: GameType) => imperfect.filter(row => typeOf(row.id) === type).length;
-    expect({ singles: byType('singles'), doubles: byType('doubles'), vgc: byType('vgc'), total: imperfect.length }).toEqual({ singles: 3, doubles: 5, vgc: 2, total: 10 });
+    expect({ singles: byType('singles'), doubles: byType('doubles'), vgc: byType('vgc'), total: imperfect.length }).toEqual({ singles: 2, doubles: 5, vgc: 2, total: 9 });
   });
 
   // Round 86 (ruling C2): the turns the hybrid search plays under another seed than index 0
