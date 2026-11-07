@@ -23,11 +23,11 @@ export interface PendingConfirm {
  * engine plays must STOP the run — the loop only advances while the
  * pointer sits on the live tip, so a silent stall with "Engine is
  * playing…" frozen was the alternative. Internal navigations (tip-follow,
- * the finish's return to the start turn) keep the run alive.
+ * the finish's move to the frame's turn) keep the run alive.
  */
 export function useTransients(replayId: string | undefined) {
   const playOutRef = useRef<{ active: boolean } | null>(null);
-  const stopPlayOutRef = useRef<((opts?: { returnToStart?: boolean }) => void) | null>(null);
+  const stopPlayOutRef = useRef<((opts?: { navigated?: boolean }) => void) | null>(null);
 
   // ── "Let it play out": the engine plays BOTH sides' top choice from the
   // current position until the game ends, the user stops, or the safety cap
@@ -74,7 +74,7 @@ export function useTransients(replayId: string | undefined) {
 
   const interruptPlayOut = useCallback(() => {
     if (playOutRef.current?.active) {
-      stopPlayOutRef.current?.({ returnToStart: false });
+      stopPlayOutRef.current?.({ navigated: true });
     }
   }, []);
   const clearDraftChoices = useCallback(() => {

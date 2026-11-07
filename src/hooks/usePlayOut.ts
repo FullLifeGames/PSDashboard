@@ -23,7 +23,7 @@ export interface PlayOutInputs {
   playOutProcessedRef: MutableRefObject<EvalResult | null>;
   /** App-level mirrors the timeline's navigation interrupt reads. */
   playOutRef: MutableRefObject<{ active: boolean } | null>;
-  stopPlayOutRef: MutableRefObject<((opts?: { returnToStart?: boolean }) => void) | null>;
+  stopPlayOutRef: MutableRefObject<((opts?: { navigated?: boolean }) => void) | null>;
   evaluation: Evaluation;
   /** Session option: every evaluation of the run uses the depth-1 matrix instead of the Auto line. */
   fastPlayOut: boolean;
@@ -37,7 +37,7 @@ export interface PlayOutInputs {
   tipTurn: number | null;
   /** Keeps the pointer where the run leaves it when a turn still in flight lands (the timeline's tip-follow). */
   holdTipFollow: () => void;
-  navigateTo: (position: { turn: number; line: 'main' | 'variation' }, opts?: { seek?: boolean; internal?: boolean }) => void;
+  navigateTo: (position: { turn: number; line: 'main' | 'variation' }, opts?: { seek?: boolean; internal?: boolean; toFrame?: true | number }) => void;
   setNavSeek: Dispatch<SetStateAction<{ turn: number; seq: number; play?: boolean } | null>>;
   executing: boolean;
   branchPreparing: boolean;
@@ -56,7 +56,7 @@ export interface PlayOutInputs {
 /** Finish/stop plumbing plus the watch-from-turn seek. */
 function usePlayOutFinish(args: PlayOutInputs) {
   const { evaluation, setPlayOut, setPlayOutNotice, playOutRef, navigateTo, setNavSeek, tipTurn, playOut, holdTipFollow } = args;
-  const finishPlayOut = useCallback((current: PlayOutState, text: string, opts?: { returnToStart?: boolean }) => {
+  const finishPlayOut = useCallback((current: PlayOutState, text: string, opts?: { navigated?: boolean }) => {
     const restored = prefsAfterRun(evaluation.prefs, current);
     if (restored) evaluation.setPrefs(restored);
     evaluation.setEngineOverride(null);
@@ -64,28 +64,29 @@ function usePlayOutFinish(args: PlayOutInputs) {
     holdTipFollow();
     setPlayOut(null);
     setPlayOutNotice({ text, watchTurn: current.startTurn });
-    // The engine's play dragged the pointer along to the tip; hand the view
-    // back to the turn the run started from — the user replays the line
-    // from there themselves (the Watch button, or just pressing play).
-    if ((opts?.returnToStart ?? true) && current.turns > 0) {
-      navigateTo({ turn: current.startTurn, line: 'variation' }, { seek: true, internal: true });
+    // Round 88 (T347, #83): the run leaves the frame where the user watches it, playing or not, with no seek back to the
+    // start. The engine's play dragged the pointer to the tip; it takes the frame's turn now (the Watch button of the
+    // notice replays from the start). A finish after the user's own navigation leaves the pointer where they put it.
+    if (!opts?.navigated && current.turns > 0) {
+      navigateTo({ turn: tipTurn ?? current.startTurn, line: 'variation' }, { seek: false, internal: true, toFrame: true });
     }
-  }, [evaluation, setPlayOut, setPlayOutNotice, playOutRef, navigateTo, holdTipFollow]);
+  }, [evaluation, setPlayOut, setPlayOutNotice, playOutRef, navigateTo, holdTipFollow, tipTurn]);
 
-  const stopPlayOut = useCallback((opts?: { returnToStart?: boolean }) => {
+  const stopPlayOut = useCallback((opts?: { navigated?: boolean }) => {
     if (playOut) {
       finishPlayOut(playOut, `Play-out stopped: ${playOut.turns} turn${playOut.turns === 1 ? '' : 's'} played (they stay in the variation).`, opts);
     }
   }, [playOut, finishPlayOut]);
 
   /** Seek the branch frame to the play-out's start and let it play — the
-   *  point of the feature: watch how the game runs on from your move. */
+   *  point of the feature: watch how the game runs on from your move. The pointer takes the variation position of that
+   *  turn (T1 for a run from turn 0), not the tip, so the slider follows the frame from its first report on. */
   const watchFrom = useCallback((turn: number) => {
-    if (tipTurn !== null) navigateTo({ turn: tipTurn, line: 'variation' }, { seek: false, internal: true });
+    navigateTo({ turn, line: 'variation' }, { seek: false, internal: true, toFrame: turn });
     window.setTimeout(() => {
       setNavSeek(prev => ({ turn, seq: (prev?.seq ?? 0) + 1, play: true }));
     }, 250);
-  }, [navigateTo, tipTurn, setNavSeek]);
+  }, [navigateTo, setNavSeek]);
 
   return { finishPlayOut, stopPlayOut, watchFrom };
 }

@@ -128,7 +128,7 @@ describe('useTimeline', () => {
       const { result, rerender, base } = setup();
       rerender(running([entry(2), entry(3)], true, base));
       expect(result.current.viewTurn).toBe(4);
-      // The play-out stops with a third turn in flight and returns the pointer to its start turn.
+      // The play-out stops with a third turn in flight and hands the view back (a navigation, as the interrupt does).
       act(() => {
         result.current.holdTipFollow();
         result.current.navigateTo({ turn: 3, line: 'variation' }, { seek: true, internal: true });

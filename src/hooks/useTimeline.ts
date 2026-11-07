@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { finalPlayedTurn, type TurnSnapshot } from '@fulllifegames/replay-core';
 import {
-  normalizePosition, variationCovers, variationTip,
+  normalizePosition, pointerAtFrame, variationCovers, variationTip,
   type TimelinePosition, type VariationSpan, type ViewLine,
 } from '../lib/timeline';
 import type { BranchHistoryEntry } from './useBranch';
@@ -162,6 +162,8 @@ interface NavArgs {
 }
 
 type SeekIntentRef = { current: { turn: number; until: number } | null };
+/** The last turn any frame reported, whether the guards let it move the pointer or not (round 88, T347). */
+type FrameTurnRef = { current: number | null };
 
 /**
  * How long the frame's reports count as the app's own while it plays a followed turn in. The guard ends when the frame
@@ -170,17 +172,27 @@ type SeekIntentRef = { current: { turn: number; until: number } | null };
  */
 const PLAY_IN_GUARD_MS = 20_000;
 
-type Navigate = (position: TimelinePosition, opts?: { seek?: boolean; internal?: boolean; followPlay?: boolean }) => void;
+/**
+ * `toFrame` (round 88, T347, #83): the pointer takes the variation position of a turn the branch frame shows and never
+ * seeks it. `true` names the last turn any frame reported, a number the turn the frame is about to show (Watch from turn
+ * N); without a variation or a report the given position stands.
+ */
+type Navigate = (
+  position: TimelinePosition,
+  opts?: { seek?: boolean; internal?: boolean; followPlay?: boolean; toFrame?: true | number },
+) => void;
 
 /** The single pointer move plus the tip-follow after executed turns. */
-function useNavigateTo(args: NavArgs, seekIntentRef: SeekIntentRef) {
-  const { pointer, derived, interruptPlayOut, onNavigate } = args;
+function useNavigateTo(args: NavArgs, seekIntentRef: SeekIntentRef, frameTurnRef: FrameTurnRef) {
+  const { pointer, derived, interruptPlayOut, onNavigate, variationEnded } = args;
   const { setViewTurn, setViewLine, setViewT0, setNavSeek, setFollowedPlay } = pointer;
   const { maxTurn, variationSpan } = derived;
 
   const navigateTo = useCallback<Navigate>((position, opts) => {
     if (!opts?.internal) interruptPlayOut();
-    const next = normalizePosition(position, maxTurn, variationSpan);
+    const frameTurn = opts?.toFrame === true ? frameTurnRef.current : opts?.toFrame ?? null;
+    const atFrame = pointerAtFrame(frameTurn, variationSpan, variationEnded);
+    const next = atFrame !== null ? { turn: atFrame, line: 'variation' as const } : normalizePosition(position, maxTurn, variationSpan);
     setViewT0(false);
     setViewTurn(next.turn);
     setFollowedPlay(!!opts?.followPlay);
@@ -193,11 +205,14 @@ function useNavigateTo(args: NavArgs, seekIntentRef: SeekIntentRef) {
       : position.line;
     setViewLine(sticky);
     onNavigate();
-    if (opts?.seek !== false) {
+    if (atFrame !== null) {
+      // The frame's own reports move the pointer from here on: the guard of the run's tip-follow ends.
+      seekIntentRef.current = null;
+    } else if (opts?.seek !== false) {
       setNavSeek(prev => ({ turn: next.turn, seq: (prev?.seq ?? 0) + 1 }));
       seekIntentRef.current = { turn: next.turn, until: Date.now() + 4000 };
     }
-  }, [maxTurn, variationSpan, setViewTurn, setViewLine, setViewT0, setNavSeek, setFollowedPlay, interruptPlayOut, onNavigate, seekIntentRef]);
+  }, [maxTurn, variationSpan, variationEnded, setViewTurn, setViewLine, setViewT0, setNavSeek, setFollowedPlay, interruptPlayOut, onNavigate, seekIntentRef, frameTurnRef]);
 
   return { navigateTo, ...useTipFollow(args, seekIntentRef, navigateTo) };
 }
@@ -283,9 +298,13 @@ function useTimelineNav(args: NavArgs) {
   // fresh selection straight back. Stale echoes are ignored until the embed
   // confirms the seek or the window lapses.
   const seekIntentRef = useRef<{ turn: number; until: number } | null>(null);
-  const { navigateTo, restorePointer, holdTipFollow, followNextTip } = useNavigateTo(args, seekIntentRef);
+  const frameTurnRef = useRef<number | null>(null);
+  const { navigateTo, restorePointer, holdTipFollow, followNextTip } = useNavigateTo(args, seekIntentRef, frameTurnRef);
 
   const handleReplayTurn = useCallback((turn: number) => {
+    // Remembered before the guards drop it: a tracker posts a turn only when it changes, so a dropped report never comes
+    // again, and the finish of a play-out needs the turn the frame shows (round 88, T347).
+    frameTurnRef.current = turn;
     if (turn < 1) return;
     const intent = seekIntentRef.current;
     if (intent && Date.now() < intent.until) {

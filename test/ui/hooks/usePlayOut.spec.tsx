@@ -158,7 +158,8 @@ describe('usePlayOut', () => {
     expect(result.current.transients.playOut).toMatchObject({ executed: 1, turns: 0 });
   });
 
-  test('an ended battle finishes the run, restores the auto setting, and returns to the start after played turns', async () => {
+  // Round 88 (T347, #83): the finish leaves the frame where the user watches it; the pointer takes the frame's turn.
+  test('an ended battle finishes the run, restores the auto setting, and leaves the frame where it stands after played turns', async () => {
     const { evaluation, setPrefs } = evaluationOf({});
     const { result, rerender, wired } = setup(evaluation);
     act(() => result.current.playOut.startPlayOut());
@@ -170,7 +171,17 @@ describe('usePlayOut', () => {
     expect(result.current.transients.playOut).toBeNull();
     expect(result.current.transients.playOutNotice).toEqual({ text: 'Play-out finished: the battle ended after 1 turn.', watchTurn: 3 });
     expect(setPrefs).toHaveBeenLastCalledWith(expect.objectContaining({ auto: false }));
-    expect(wired.navigateTo).toHaveBeenCalledWith({ turn: 3, line: 'variation' }, { seek: true, internal: true });
+    expect(wired.navigateTo).toHaveBeenCalledWith({ turn: 3, line: 'variation' }, { seek: false, internal: true, toFrame: true });
+    expect((wired.navigateTo as ReturnType<typeof vi.fn>).mock.calls.every(([, opts]) => opts?.seek !== true)).toBe(true);
+  });
+
+  test('a run that played no turn leaves the pointer alone and a navigation interrupt moves nothing', () => {
+    const { evaluation } = evaluationOf({ auto: true });
+    const { result, wired } = setup(evaluation);
+    act(() => result.current.playOut.startPlayOut());
+    act(() => result.current.transients.stopPlayOutRef.current?.({ navigated: true }));
+    expect(result.current.transients.playOut).toBeNull();
+    expect(wired.navigateTo).not.toHaveBeenCalled();
   });
 
   test('an unplayable engine choice and a failed evaluation end the run with their reasons', () => {
@@ -188,7 +199,7 @@ describe('usePlayOut', () => {
     expect(result.current.transients.playOut).toBeNull();
   });
 
-  test('stopPlayOut ends the run by hand and watchFrom seeks the frame after the tip lands', () => {
+  test('stopPlayOut ends the run by hand and watchFrom seeks the frame after the pointer moved', () => {
     vi.useFakeTimers();
     const { evaluation } = evaluationOf({ auto: true });
     const { result, wired } = setup(evaluation);
@@ -197,12 +208,25 @@ describe('usePlayOut', () => {
     expect(result.current.transients.playOut).toBeNull();
     expect(result.current.transients.playOutNotice?.text).toBe('Play-out stopped: 0 turns played (they stay in the variation).');
 
+    // The pointer takes the variation position of the turn the frame is about to show, never the tip (T347).
     act(() => result.current.playOut.watchFrom(2));
-    expect(wired.navigateTo).toHaveBeenCalledWith({ turn: 3, line: 'variation' }, { seek: false, internal: true });
+    expect(wired.navigateTo).toHaveBeenCalledWith({ turn: 2, line: 'variation' }, { seek: false, internal: true, toFrame: 2 });
     expect(wired.setNavSeek).not.toHaveBeenCalled();
     act(() => vi.advanceTimersByTime(250));
     const updater = (wired.setNavSeek as ReturnType<typeof vi.fn>).mock.calls[0][0] as (prev: null) => unknown;
     expect(updater(null)).toEqual({ turn: 2, seq: 1, play: true });
+  });
+
+  // Round 88 (T343 builds on it): the lead variation's Watch from turn 0 reads T1 while the frame plays the leads in.
+  test('watchFrom turn 0 asks for the frame position of turn 0 and seeks turn 0', () => {
+    vi.useFakeTimers();
+    const { evaluation } = evaluationOf({ auto: true });
+    const { result, wired } = setup(evaluation);
+    act(() => result.current.playOut.watchFrom(0));
+    expect(wired.navigateTo).toHaveBeenCalledWith({ turn: 0, line: 'variation' }, { seek: false, internal: true, toFrame: 0 });
+    act(() => vi.advanceTimersByTime(250));
+    const updater = (wired.setNavSeek as ReturnType<typeof vi.fn>).mock.calls[0][0] as (prev: null) => unknown;
+    expect(updater(null)).toEqual({ turn: 0, seq: 1, play: true });
   });
 
   // Round 77 (C5): a turn in flight lands after the stop; the timeline must not follow it to the tip.
@@ -215,7 +239,7 @@ describe('usePlayOut', () => {
 
     const again = setup(evaluation);
     act(() => again.result.current.playOut.startPlayOut());
-    act(() => again.result.current.transients.stopPlayOutRef.current?.({ returnToStart: false }));
+    act(() => again.result.current.transients.stopPlayOutRef.current?.({ navigated: true }));
     expect(again.wired.holdTipFollow).toHaveBeenCalledTimes(1);
   });
 
