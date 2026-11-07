@@ -3,6 +3,7 @@ import type { OpponentTeamInfo, ReplayData } from '@fulllifegames/replay-core';
 import type { BranchSlotChoice, EvalPreferences } from '@fulllifegames/eval-engine';
 import type { BranchHistoryEntry } from './branch-history';
 import type { ViewLine } from './timeline';
+import { turnEntryCount } from './variation-turns';
 
 /**
  * Round 77 (user gate 28.10.2026, "1a 2a 3a 4a 5a"): the app's state as one readable file for a bug
@@ -75,7 +76,7 @@ export function isSupportState(value: unknown): value is SupportState {
 /** "T7 in the variation from turn 5 (2 turns)", "T28 on the main line (variation from turn 5, 2 turns)": the line once. */
 export function positionLabel(state: Pick<SupportState, 'view' | 'variation'>): string {
   const { view, variation } = state;
-  const turns = variation.history.filter(entry => entry.kind !== 'forced').length;
+  const turns = turnEntryCount(variation.history);
   const length = `${turns} ${turns === 1 ? 'turn' : 'turns'}`;
   const hasVariation = variation.startTurn !== null && turns > 0;
   if (!view.t0 && view.viewingVariation && hasVariation) return `T${view.turn} in the variation from turn ${variation.startTurn} (${length})`;

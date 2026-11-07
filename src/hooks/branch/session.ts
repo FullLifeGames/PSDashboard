@@ -3,6 +3,7 @@ import type { PokemonSet } from '@pkmn/sim';
 import type { TurnSnapshot } from '@fulllifegames/replay-core';
 import type { ChoiceLockContext, BranchRuntime, BranchSlotChoice, ReconstructParams } from '@fulllifegames/eval-engine';
 import { entryDice, turnStart } from '../../lib/branch-dice-lines';
+import { turnEntryCount } from '../../lib/variation-turns';
 import {
   makeHistoryEntry, requiredChoices,
   type BranchEngineModule, type BranchHistoryEntry, type BranchRefs, type BranchSetters, type BattleStream, type SideId,
@@ -269,14 +270,13 @@ async function replayKeptHistory(
 /** What a rebuild reports: `endedNotice` names the variation that was lost when the rebuild kept no turn. */
 export interface StartOutcome { endedNotice: string | null }
 
-const turnCount = (entries: BranchHistoryEntry[]) => entries.filter(entry => entry.kind !== 'forced').length;
 
 /**
  * The text for a variation that a rebuild could not keep at all (round 77, D1): the first recorded move no longer
  * applies, so no turn survives and no variation stays behind.
  */
 function endedNoticeFor(startTurn: number, recorded: BranchHistoryEntry[], reason: string): string {
-  const turns = turnCount(recorded);
+  const turns = turnEntryCount(recorded);
   return `The variation from turn ${startTurn} (${turns} ${turns === 1 ? 'turn' : 'turns'}) ended: ${reason}`;
 }
 
@@ -296,7 +296,7 @@ async function replayStartHistory(
   }
   const failure = await replayKeptHistory(runtime, branchEngine, historyToReplay, replayedHistory);
   if (!failure) return { replayedHistory, branchError: null, endedNotice: null };
-  if (turnCount(replayedHistory) === 0 && turnCount(historyToReplay) > 0) {
+  if (turnEntryCount(replayedHistory) === 0 && turnEntryCount(historyToReplay) > 0) {
     return { replayedHistory, branchError: null, endedNotice: endedNoticeFor(targetTurn, historyToReplay, failure.error) };
   }
   return {

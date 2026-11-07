@@ -4,6 +4,7 @@ import {
   normalizePosition, pointerAtFrame, variationCovers, variationTip,
   type TimelinePosition, type VariationSpan, type ViewLine,
 } from '../lib/timeline';
+import { settledEntryAfterTurns, turnEntryCount } from '../lib/variation-turns';
 import type { BranchHistoryEntry } from './useBranch';
 
 export interface TimelineInputs {
@@ -97,10 +98,10 @@ function useTimelineDerived(args: {
   }, [snapshots]);
   const atEndPosition = endSnapshotTurn !== null && viewTurn >= endSnapshotTurn;
   /** The variation as a pure span: null until a turn actually executed.
-   *  Forced interludes do not consume a turn (mirrors alignHistoryRows). */
+   *  Interludes (a replacement on one side or on both) do not consume a turn (round 88, T348: `variation-turns.ts`). */
   const variationSpan = useMemo<VariationSpan | null>(() => {
     if (variationStartTurn === null) return null;
-    const turnEntries = history.filter(entry => entry.kind !== 'forced').length;
+    const turnEntries = turnEntryCount(history);
     return turnEntries > 0 ? { startTurn: variationStartTurn, length: turnEntries } : null;
   }, [variationStartTurn, history]);
   // The T0 view is a side trip: the line stays as the user left it (the step forward returns there), but nothing of
@@ -122,17 +123,7 @@ function useTimelineDerived(args: {
   /** Recorded position for the VIEWED variation turn (variant B pickers). */
   const serializedAtView = useMemo(() => {
     if (!viewingVariation || !variationSpan) return null;
-    const wanted = viewTurn - variationSpan.startTurn;
-    let consumed = 0;
-    let last: string | null = null;
-    for (const entry of history) {
-      if (entry.kind !== 'forced') {
-        if (consumed === wanted) break;
-        consumed += 1;
-      }
-      if (consumed <= wanted) last = entry.serializedPosition ?? null;
-    }
-    return consumed === wanted ? last : null;
+    return settledEntryAfterTurns(history, viewTurn - variationSpan.startTurn)?.serializedPosition ?? null;
   }, [viewingVariation, variationSpan, viewTurn, history]);
   // The sweep counts PLAYED turns: the end snapshot is the slider's "End"
   // sentinel, not a turn.

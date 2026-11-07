@@ -2,6 +2,7 @@ import type { TurnSnapshot, SideId } from '@fulllifegames/replay-core';
 import type { BranchSlotChoice, DiceReport, SimPokemonInfo } from '@fulllifegames/eval-engine';
 import type { DieLine } from './branch-dice-lines';
 import type { DiceMarks } from './branch-dice-marks';
+import { interludesAfter, isInterlude } from './variation-turns';
 
 export interface BranchHistoryEntry {
   turnNumber: number;
@@ -91,7 +92,8 @@ export interface HistoryRowAlignment {
 
 /**
  * Forced-switch interludes are recorded as their own entries (B15) but must
- * not shift the turn-by-turn alignment with the original replay.
+ * not shift the turn-by-turn alignment with the original replay. Round 88 (T348): an interlude on both sides is one of them
+ * (`isInterlude`, the one rule of which entries make a turn).
  * `variationTurn` is the position AFTER the row's move — where clicking the
  * branch column navigates (the notation reads "this move led here"). That
  * position includes the forced replacements that follow the turn, so the
@@ -100,16 +102,13 @@ export interface HistoryRowAlignment {
 export function alignHistoryRows(history: BranchHistoryEntry[], branchStartTurn: number): HistoryRowAlignment[] {
   let turnIndex = 0;
   return history.map((entry, index) => {
-    const isForced = entry.kind === 'forced';
-    if (!isForced) turnIndex += 1;
-    let settled = entry;
-    if (!isForced) {
-      for (let next = index + 1; next < history.length && history[next].kind === 'forced'; next += 1) settled = history[next];
-    }
+    const interlude = isInterlude(history, index);
+    if (!interlude) turnIndex += 1;
+    const settled = interlude ? entry : history[index + interludesAfter(history, index)];
     return {
       entry,
-      originalTurn: isForced ? null : branchStartTurn + turnIndex,
-      variationTurn: isForced ? null : branchStartTurn + turnIndex,
+      originalTurn: interlude ? null : branchStartTurn + turnIndex,
+      variationTurn: interlude ? null : branchStartTurn + turnIndex,
       settled,
     };
   });

@@ -1,4 +1,5 @@
 import { notationDice, type DiceReport, type DieWords } from '@fulllifegames/eval-engine';
+import { isInterlude } from './variation-turns';
 
 /**
  * Round 82 (forced dice), step A7c, decision 6a: what the history rows and the share links say about the dice the user forced in
@@ -36,11 +37,11 @@ export const sideMarkTexts = (marks: DiceMarks | undefined, side: Side): string[
 /**
  * The marks a turn's row shows. A turn that paused for a switch has the turn entry (a partial report: the dice it never reached
  * read as not drawn) and the forced entries that finish it (the last one holds the joined report), so the row reads the last
- * entry of the turn that has marks. A forced entry has no row of its own for dice.
+ * entry of the turn that has marks. An interlude (a replacement on one side or on both) has no row of its own for dice.
  */
-export function turnDiceMarks(history: readonly { kind?: 'turn' | 'forced'; diceMarks?: DiceMarks }[], index: number): DiceMarks | undefined {
-  if (history[index]?.kind === 'forced') return undefined;
+export function turnDiceMarks(history: readonly { kind?: 'turn' | 'forced'; turnNumber?: number; diceMarks?: DiceMarks }[], index: number): DiceMarks | undefined {
+  if (isInterlude(history, index)) return undefined;
   let marks = history[index]?.diceMarks;
-  for (let next = index + 1; next < history.length && history[next].kind === 'forced'; next += 1) marks = history[next].diceMarks ?? marks;
+  for (let next = index + 1; isInterlude(history, next); next += 1) marks = history[next].diceMarks ?? marks;
   return marks;
 }
