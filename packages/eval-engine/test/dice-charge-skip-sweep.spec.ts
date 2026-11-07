@@ -8,7 +8,7 @@ import { dieKey, type ForcedDie } from '../src/dice/types';
 import { watchBattle } from '../src/dice/watch';
 import { copyOf } from '../src/sim-ask/copy';
 import { CHAMPIONS, playClicks, RULES, standing, type Mode, type Rules } from './dice-fixtures';
-import { clicksAccepted, dexOfRules, forcedOn, type DexMove } from './dice-sweep-support';
+import { clicksAccepted, dexOfRules, forcedOn, sweepMoves, type DexMove } from './dice-sweep-support';
 import { set } from './move-oracle';
 import { fingerprint } from './power-oracle';
 
@@ -185,11 +185,8 @@ function exercise(rules: Rules, mode: Mode, vgc: boolean, scene: Scene, move: De
   return problems;
 }
 
-const chargeMoves = (rules: Rules): DexMove[] => {
-  const dex = dexOfRules(rules);
-  return dex.moves.all().filter(move => move.exists && !move.isZ && !move.isMax && move.gen <= dex.gen
-    && (move.isNonstandard === null || move.isNonstandard === undefined || move.isNonstandard === 'Past') && !!move.flags.charge);
-};
+/** Every charge move the rule set plays, through the shared selection (a plain run plays a sample; `DICE_SWEEPS=full` plays all). The reported scenes below name their moves. */
+const chargeMoves = (rules: Rules): DexMove[] => sweepMoves(rules, move => !!move.flags.charge, false).moves;
 
 /** The rule sets and game types of the sweep: singles everywhere, doubles from Gen 3, VGC (a team of six) in Scarlet/Violet and Champions. */
 const CASES: { rules: Rules; mode: Mode; vgc: boolean; name: string }[] = RULES.flatMap(rules => [
