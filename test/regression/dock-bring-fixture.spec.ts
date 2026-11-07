@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, test } from 'vitest';
 import { parseReplayLog, replayBringOnly } from '@fulllifegames/replay-core';
 import { loadSimMods } from '@fulllifegames/eval-engine';
+import { replayBench } from '../../src/lib/bench';
 import { dockReplays } from '../e2e/helpers';
 import { loggedTurn } from '../e2e/dock-helpers';
 
@@ -8,8 +9,9 @@ import { loggedTurn } from '../e2e/dock-helpers';
  * Round 84 (turn dock), step A6d: the Champions VGC scene that proves a bring-limited bench. `replayBringOnly` pins the bring
  * lists only when BOTH sides fielded all four bodies during the game, and returns null otherwise (by design, for the evaluation:
  * a pinned four against an open six overrates the open side). The first Champions fixture (2625939941) is such a game: the user's
- * side fielded three, so its bench lists the whole team. The second one (2623421463) pins both sides, so the bench of P2A lists the
- * two brought bodies and leaves the two that stayed home out.
+ * side fielded three, so the rebuild keeps both teams whole. Round 88 (T314, #55) filters the bench per side on top of that
+ * (`replayBench`, src/lib/bench.ts): P2 fielded four, so its bench lists those four. The second fixture (2623421463) pins both sides,
+ * so the bench of P2A lists the two brought bodies and leaves the two that stayed home out.
  */
 const byId = (id: string) => dockReplays.find(replay => replay.id === id)!;
 const OPEN = byId('gen9championsvgc2026regma-2625939941');
@@ -22,6 +24,12 @@ beforeAll(async () => {
 describe('the Champions VGC fixtures and the bring lists', () => {
   test('the first fixture is not pinned: the user\'s side fielded three bodies only', () => {
     expect(replayBringOnly(OPEN, parseReplayLog(OPEN.log))).toBeNull();
+  });
+
+  test('the first fixture still lists the four bodies of P2 on the bench (round 88, T314): the rebuild is open, the bench is per side', () => {
+    const bench = replayBench(OPEN, parseReplayLog(OPEN.log));
+    expect(bench?.lists.p1).toEqual([]);
+    expect([...(bench?.lists.p2 ?? [])].sort()).toEqual(['Aerodactyl', 'Farigiraf', 'Kingambit', 'Sylveon']);
   });
 
   test('the second fixture pins both sides to the four bodies they fielded', () => {
