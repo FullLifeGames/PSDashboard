@@ -14,6 +14,7 @@ import { useEngineChoice } from '../useEngineChoice';
 import { setEngineGameFormat } from '../../lib/eval/engine-setting';
 import { useReplayWorker } from '../useReplayWorker';
 import { usePositionSource } from '../usePositionSource';
+import { replayBench } from '../../lib/bench';
 import {
   type OpponentTeamInfo, type ReplayData, type TurnSnapshot, getReplayBringCount, getReplayGameType,
   getReplayGeneration, replayBringOnly,
@@ -85,11 +86,17 @@ function useFormatMeta(replayData: ReplayData | null, snapshots: TurnSnapshot[])
     () => (replayData ? getReplayBringCount(replayData) : null),
     [replayData],
   );
-  /** Per-side bring lists from the protocol (null = bring-all format;
-   *  [] on a side = its full selection never entered, that side stays
-   *  whole). Shared by every branch, sweep, and preview reconstruction. */
+  /** The bring lists the rebuild pins, from the protocol: null for a bring-all format and for any game where either side's full
+   *  selection never entered (both sides or neither: a pinned four against an open six flips games, A.3c). Shared by every branch,
+   *  sweep, and preview reconstruction. */
   const bringOnlyLists = useMemo(
     () => (replayData ? replayBringOnly(replayData, snapshots) : null),
+    [replayData, snapshots],
+  );
+  /** Round 88 (T314, #55): the bench the user sees, per side: a side that fielded its whole selection lists only those bodies, even
+   *  when the other side stayed short and the rebuild keeps its six. Null when no side has a list. */
+  const bench = useMemo(
+    () => (replayData ? replayBench(replayData, snapshots) : null),
     [replayData, snapshots],
   );
   const replayGameType = useMemo(
@@ -97,7 +104,7 @@ function useFormatMeta(replayData: ReplayData | null, snapshots: TurnSnapshot[])
     [replayData],
   );
   const evalIsDoubles = replayGameType === 'doubles';
-  return { replayGen, bringCount, bringOnlyLists, replayGameType, evalIsDoubles };
+  return { replayGen, bringCount, bringOnlyLists, bench, replayGameType, evalIsDoubles };
 }
 
 /** One team-source bundle for every acquisition path; deps are the inner
@@ -141,7 +148,9 @@ type PinnedKnowledge = ReturnType<typeof withPinnedTeams>;
 export function useReplayContext() {
   const replayWorker = useReplayWorker();
   const replay = useReplaySurface();
-  const branch = useBranch();
+  // Round 88 (T314, #55): the branch filters its bench by the bring lists, so the format meta is read before it.
+  const meta = useFormatMeta(replay.replayData, replay.snapshots);
+  const branch = useBranch(meta.bench);
   const evaluation = useEvaluation();
   // Round 77: another engine's results never mix with the own engine's on screen.
   const engines = useEngineChoice(() => {
@@ -165,7 +174,6 @@ export function useReplayContext() {
     usageStats: smogon.usageStats, setAssumptions: smogon.setAssumptions,
     onTeamsEdited: refreshQueue.handleTeamsEdited, replayWorker,
   }), pins);
-  const meta = useFormatMeta(replay.replayData, replay.snapshots);
   const teamSources = useTeamSources(knowledge, smogon, replay.hpEvidence);
   // Every exact position (Evaluate, the sweep, the dwell, a branch start)
   // comes from one source: the store, else the replay worker.

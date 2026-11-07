@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getBranchSimulatorFormat, type ReplayData, type TurnSnapshot } from '@fulllifegames/replay-core';
 import type { BranchSlotChoice } from '@fulllifegames/eval-engine';
 import type { PickerBattle, PickerSource } from '../lib/picker-state';
+import type { Bench } from '../lib/bench';
 import { buildReplayTeams, type TeamBuildSources } from '../lib/eval-acquire';
 import type { VariationSpan } from '../lib/timeline';
 import type { BranchHistoryEntry, BranchSimState } from './useBranch';
@@ -19,7 +20,8 @@ export function usePositionPicker(args: {
   replayData: ReplayData | null;
   snapshots: TurnSnapshot[];
   sources: TeamBuildSources;
-  bringOnlyLists: { p1: string[]; p2: string[] } | null;
+  /** Round 88 (T314, #55): the bench lists of a bring-limited game; the snapshot and the stored pickers offer only those bodies. */
+  bench: Bench | null;
   replayGenNumber: number;
   liveTip: boolean;
   viewingVariation: boolean;
@@ -36,7 +38,7 @@ export function usePositionPicker(args: {
   played?: PlayedAtPosition | null;
 }) {
   const {
-    replayData, snapshots, sources, bringOnlyLists, replayGenNumber, liveTip, viewingVariation,
+    replayData, snapshots, sources, bench, replayGenNumber, liveTip, viewingVariation,
     serializedAtView, viewTurn, variationStartTurn, startSerialized, getExact, exactPositionsVersion,
     draftChoices, liveSimState, played,
   } = args;
@@ -60,7 +62,7 @@ export function usePositionPicker(args: {
       ? serializedAtView
       : (viewTurn === variationStartTurn ? startSerialized : null) ?? exactMainLine;
     void resolvePickerState({
-      stored, viewingVariation, viewTurn, snapshots, replayData, sources, replayGenNumber, bringOnlyLists,
+      stored, viewingVariation, viewTurn, snapshots, replayData, sources, replayGenNumber, bench,
     }).then(resolved => {
       if (!cancelled) setResolution({ viewKey, picker: resolved });
     });
@@ -69,7 +71,7 @@ export function usePositionPicker(args: {
     };
   }, [
     liveTip, viewingVariation, viewKey, serializedAtView, variationStartTurn, startSerialized, viewTurn, snapshots,
-    replayData, sources, replayGenNumber, getExact, exactPositionsVersion, bringOnlyLists,
+    replayData, sources, replayGenNumber, getExact, exactPositionsVersion, bench,
   ]);
 
   const { pickerSeed, pickerSimState } = useEffectivePicker(shownState, positionPicker, played, draftChoices);
@@ -148,13 +150,13 @@ async function resolvePickerState(args: {
   replayData: ReplayData | null;
   sources: TeamBuildSources;
   replayGenNumber: number;
-  bringOnlyLists: { p1: string[]; p2: string[] } | null;
+  bench: Bench | null;
 }): Promise<ResolvedPicker | null> {
-  const { stored, viewingVariation, viewTurn, snapshots, replayData, sources, replayGenNumber, bringOnlyLists } = args;
+  const { stored, viewingVariation, viewTurn, snapshots, replayData, sources, replayGenNumber, bench } = args;
   if (stored) {
     const { pickerFromSerialized } = await import('../lib/picker-state');
     try {
-      const { state, battle } = await pickerFromSerialized(stored);
+      const { state, battle } = await pickerFromSerialized(stored, bench);
       return { simState: state, source: 'stored', battle };
     } catch {
       // Fall through to the snapshot approximation.
@@ -183,7 +185,7 @@ async function resolvePickerState(args: {
   // format exists only once its mod is loaded.
   const { loadSimMods } = await import('../lib/lazy/branch-engine');
   await loadSimMods(rules.format);
-  return { simState: pickerStateFromSnapshot(snapshot, teams.p1Team, teams.p2Team, replayGenNumber, bringOnlyLists, rules), source: 'snapshot' };
+  return { simState: pickerStateFromSnapshot(snapshot, teams.p1Team, teams.p2Team, replayGenNumber, bench?.lists ?? null, rules), source: 'snapshot' };
 }
 
 /**

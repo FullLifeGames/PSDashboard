@@ -8,8 +8,12 @@ import { simState } from '../fixtures/sim-state';
 
 /** The recorded positions resolve when the test says so: each serialized string names its picker state and the battle it was read from. */
 const pending = new Map<string, (state: BranchSimState, battle?: unknown) => void>();
+const benches: unknown[] = [];
 vi.mock('../../../src/lib/picker-state', () => ({
-  pickerFromSerialized: (serialized: string) => new Promise(resolve => pending.set(serialized, (state, battle = { turn: 0 }) => resolve({ state, battle }))),
+  pickerFromSerialized: (serialized: string, bench: unknown) => {
+    benches.push(bench);
+    return new Promise(resolve => pending.set(serialized, (state, battle = { turn: 0 }) => resolve({ state, battle })));
+  },
 }));
 
 type Args = Parameters<typeof usePositionPicker>[0];
@@ -20,7 +24,7 @@ const LIVE = stateFor('Kyurem at the tip');
 
 function args(overrides: Partial<Args>): Args {
   return {
-    replayData: null, snapshots: [], sources: {} as TeamBuildSources, bringOnlyLists: null, replayGenNumber: 9,
+    replayData: null, snapshots: [], sources: {} as TeamBuildSources, bench: null, replayGenNumber: 9,
     liveTip: false, viewingVariation: true, serializedAtView: null, viewTurn: 1, variationStartTurn: 0, startSerialized: null,
     getExact: () => null, exactPositionsVersion: 0, draftChoices: NO_DRAFT, liveSimState: LIVE, ...overrides,
   };
@@ -32,6 +36,15 @@ async function land(serialized: string, state: BranchSimState, battle?: unknown)
 }
 
 describe('usePositionPicker', () => {
+  // Round 88 (T314, #55): a stored position is read through the bench of the bring-limited game.
+  test('a stored position is read through the game\'s bench', async () => {
+    const bench = { lists: { p1: [], p2: ['Kyurem'] }, rules: { gen: 9 } };
+    benches.length = 0;
+    renderHook((props: Args) => usePositionPicker(props), { initialProps: args({ viewTurn: 2, serializedAtView: 'bench-turn-2', bench }) });
+    await waitFor(() => expect(pending.has('bench-turn-2')).toBe(true));
+    expect(benches).toEqual([bench]);
+  });
+
   test('while the viewed position resolves, the panel keeps what it showed last, as stale', async () => {
     // Round 77 (user report 28.10.2026): one turn back from the tip of a turn-0 variation showed another position's picker
     // (Mienshao's moves) for about 40 ms until turn 3 (Kyurem) resolved, and a click there would choose a move of a Pokémon
