@@ -1,6 +1,6 @@
 # Backlog
 
-This file holds the details of every open TODO, one section per TODO under its fixed T-number. Release v1.1.0 is out (06.11.2026), with rounds 81 to 87 since v1.0.2 (the reload after a deploy, forced dice in branches, the GitHub issues #2 and #3, the turn dock, the smooth UI, the engine that reads the dice, the dependencies with T313 and T317). Round 88 carries T322 (the search explores the strands of a turn by their chance, blocks 1 and 2), and T319 (an inventory of dead code) follows it; T314, T316, T324 to T329 and T336 to T339 are approved and wait for a round of 1.1.1; every other TODO is parked with a trigger, and a trigger that fires brings its TODO to a gate. The next free T-number is T343.
+This file holds the details of every open TODO, one section per TODO under its fixed T-number. Release v1.1.0 is out (06.11.2026), with rounds 81 to 87 since v1.0.2 (the reload after a deploy, forced dice in branches, the GitHub issues #2 and #3, the turn dock, the smooth UI, the engine that reads the dice, the dependencies with T313 and T317). Round 88 carries T322 (the search explores the strands of a turn by their chance, blocks 1 and 2), and T319 (an inventory of dead code) follows it; T314, T316, T324 to T329 and T336 to T339 are approved and wait for a round of 1.1.1; every other TODO is parked with a trigger, and a trigger that fires brings its TODO to a gate. The next free T-number is T348.
 
 Evidence paths of the form `r<NN>/…` point to that round's probe folder, `docs/perf/probes/<date>-r<NN>/`; `docs/` is local, so they exist only on the maintainer's machine. Each round's entry in `docs/completed/` names its folder and the gate that approved its TODOs. Line numbers in a section refer to the state when the TODO was written.
 
@@ -32,7 +32,97 @@ The gates of 05.11.2026 (18:19, "1b 2a 3a"; 20:47, "1a 2a 3a 4a") approved T322 
 
 ## Approved, waiting for a round
 
-The gates of round 84 (02.11.2026 and 03.11.2026) approved T313, T314, T316 and T317: round 87 delivered T313 and T317, T314 is a larger bug (D3) and T316 a feature, each its own round. The gate of 04.11.2026 approved T319 for after round 86; the final gate of round 86 (06.11.2026, "7a") put it after T322, which runs as round 88. The gates of round 86 approved T324 to T329 (06.11.2026, about 07:50) and T336 to T339 (11:50). Each leaves this file with its round's booking.
+The gates of round 84 (02.11.2026 and 03.11.2026) approved T313, T314, T316 and T317: round 87 delivered T313 and T317, T314 is a larger bug (D3) and T316 a feature, each its own round. The gate of 04.11.2026 approved T319 for after round 86; the final gate of round 86 (06.11.2026, "7a") put it after T322, which runs as round 88. The gates of round 86 approved T324 to T329 (06.11.2026, about 07:50) and T336 to T339 (11:50). The user approved T343 to T347 on 07.11.2026 for after the release of 1.1.0. Each leaves this file with its round's booking.
+
+### T343 · A play-out from turn 0 hands the view back at turn 1
+
+*App · user report 07.11.2026 · small fix · lossless*
+
+**Approved (user 07.11.2026, "A todo for after 1.1.0").**
+
+**Problem.** The user opens T0, keeps or changes the leads in the picker and presses Let it play out. The bar says "engine plays the game from turn 0 with the leads picked above", and the engine plays a lead variation from the picked leads. While the run plays, the branch frame stands at turn 1 and the progress line reads "Engine is playing both sides from turn 1" (`src/components/eval/EvalStatus.tsx:17`). When the run ends, the app hands the view back at turn 1 of the variation and the notice offers "Watch from turn 1", so the user never sees the leads come in. Cause: the T0 path arms the run with `startTurn` 1 (`armRun(1)`, `src/hooks/usePlayOut.ts:123`); `finishPlayOut` returns the pointer to that turn (`navigateTo`, line 71), and the notice's `watchTurn` takes it too (line 66). Two pins hold the turn: `test/ui/hooks/usePlayOut.spec.tsx:264` (`startTurn: 1`, a singles row and a doubles row) and `test/e2e/timeline.spec.ts:291-295` (`T1/` and the gold line chip after a run from T0).
+
+**Idea.** It builds on T347, which ends the return to the start turn for every run, so the finish leaves the view where it stands. The T0 path arms the run with turn 0, so the progress line and the notice name turn 0, and "Watch from turn 0" plays from the team preview. The timeline has no turn 0 on the variation line: `normalizePosition` lifts every turn to at least 1 (`src/lib/timeline.ts:49`), and `variationCovers` starts after the variation's start (line 32). Watch therefore keeps the pointer on turn 1 of the variation and sends the branch frame to its own turn 0 through `setNavSeek`, the road `watchFrom` takes (`src/hooks/usePlayOut.ts:83-88`). The build first checks in a browser that the branch frame seeks to its turn 0 and that its log carries the preview and the lead switch-ins (`branchFrameLog`, `src/lib/branch-log.ts:25`, strips only `|split|`, `|c|` and `|debug|`). The slider then reads T1 over the frame's team preview, and `handleReplayTurn` drops the frame's echoes below turn 1 (`src/hooks/useTimeline.ts:289`). The boundary of the class: a pointer that stands on a T0 of the variation line changes `normalizePosition` and `variationCovers`, and the TODO then becomes a larger bug; the gate of the batch decides.
+
+**Benefit.** App users: a play-out from turn 0 shows the game from the leads on, as the bar says.
+
+**Success.** A red spec first. During a run from T0 the progress line names turn 0; after it the notice offers "Watch from turn 0", and Watch sends the branch frame to its turn 0 (`battle.turn` reads 0) and plays from the team preview; a run from any later turn keeps its turn. The pin `startTurn: 1` in `usePlayOut.spec.tsx:264` moves at the gate of the batch; the e2e pin `test/e2e/timeline.spec.ts:291-295` moves with T347. A new e2e row plays a doubles replay from T0 (today only singles runs a play-out from T0). The build follows T347.
+
+**Singles and doubles.** Both: the unit spec's T0 rows cover singles and a VGC bring of four, and the e2e check gets a doubles row beside the singles one.
+
+**Evidence.** The user's report of 07.11.2026; `src/hooks/usePlayOut.ts:114-125` (the T0 path of round 77, C2); the review of this TODO against the code, `r87/review/t343-review.md`; the review of T347, `r87/review/t346-t347-review.md` (the two finishes conflicted as first written).
+
+### T344 · A charge move that skips its charge turn offers its dice
+
+*Eval engine and app · user report 07.11.2026 · small fix · lossless, held by the batch check*
+
+**Approved (user 07.11.2026, "Another TODO for 1.1.1 is Hax editing (crits, etc.) for Electro Shot").**
+
+**Problem.** Archaludon clicks Electro Shot in rain. The simulator fires it on the same turn, but the dice table offers no chip for it: no hit, no crit, no damage roll. Every charge move that skips its charge turn shows the same gap. The probe of 07.11.2026 read `offeredDice` on the turn of the click and then played the turn in the simulator: Electro Shot in rain (singles, doubles, Champions), Electro Shot and Meteor Beam with Power Herb, and Solar Beam and Solar Blade in sun (Gen 9, and Solar Beam in Gen 4) all fire at once, and all offer nothing. Mega Sol fires Solar Beam and Solar Blade at once in any weather (`@pkmn/sim` `pokemon.js:1879-1895`; Champions makes the ability legal). Cause: `charged` (`packages/eval-engine/src/dice/offer.ts:86-87`) counts a move with the Dex flag `charge` as charging unless its user already holds the volatile of that charge, so it never asks whether this turn charges. The same offer feeds `loggedOptions` (`packages/eval-engine/src/dice/turn.ts:139`), which reads the log's dice when a branch arrives at a logged turn (`packages/eval-engine/src/dice/logged-block.ts:41`), and the bank's and the feedback's rebuilds call it for every logged block (`packages/eval-engine/src/branch/runtime.ts:245`). That path reads only the accuracy targets, and only where the log names no target.
+
+**Idea.** The offer asks the simulator, on a copy of the battle, whether the move charges this turn, instead of reading the volatile alone: the move's own `TryMove` handler and the `ChargeMove` event decide it. A hand-kept list would miss the rules both ways. Skips: the move's weather, Power Herb, Mega Sol. Blocks of a skip: Utility Umbrella, Cloud Nine or Air Lock on the field, Klutz, Embargo or Magic Room on a Power Herb holder; the reviewer's script confirmed each. A sweep in the form of `packages/eval-engine/test/dice-offer.spec.ts` plays every Dex move with the flag `charge`, in every generation and mod the corpus plays, singles and doubles, under each of these skips and blocks. It compares the offer with the dice the natural turn draws and proves the live battle unchanged (`fingerprint`, `packages/eval-engine/test/power-oracle.ts:51`); the reported scene, Electro Shot in rain, is one row. The charge rows of the existing sweeps (`dice-offer.spec.ts:57-62` and the crit and accuracy sweeps) keep their neutral board, where the first turn charges.
+
+**Benefit.** App users: the hax of Electro Shot in rain, a Power Herb Meteor Beam and a Solar Beam in sun or from a Mega Sol holder can be set like any other move's. Package users: `offeredDice` names the dice the simulator draws for those moves.
+
+**Success.** The sweep goes red on the probe's rows first, then green: a charge move that fires on the turn of the click offers the dice its natural turn draws, and a move that charges offers none. The batch check reads the rebuilds (two feedback runs compared byte for byte, the tier census), and a count over the corpus's charge turns finds no new null from `forcedTurnDiceOrNull`: a throw in the new copy would send a rebuild to its 16-seed search and move it without any change of score.
+
+**Singles and doubles.** Both: Electro Shot in rain is a VGC scene (Archaludon beside a rain setter), and the sweep runs singles and doubles in every rule set, Champions included.
+
+**Evidence.** `r87/facts/charge-offer.vt.ts` (the probe and its rows); the review `r87/review/t344-t345-review.md`; the user's report of 07.11.2026. Parked T341 concerns the same Meteor Beam turn of VGC 2630685175 (turn 3).
+
+### T345 · The timeline bar keeps its slider in line at every width
+
+*App · user report 07.11.2026 · small fix · lossless*
+
+**Approved (user 07.11.2026, "dass ps-timeline-track in manchen Dimensionen nach oben rutscht und nicht gut aussieht").**
+
+**Problem.** In a window from 641 px to 1050 px wide, the timeline's slider sits higher than the step buttons beside it: its centre lies 6 px above theirs, 9 px with a variation open, and the word "Timeline" and the turn label ride up with it. From 1051 px up all centres agree. Cause: the media query `max-width: 1050px` gives `.ps-branch-bar` `align-items: flex-start` together with the top bar (`src/styles/layout.css:241-245`), so each item of the bar hangs from the top of its row; T0 and the arrows differ by 2 px there too. At 640 px and less the slider takes its own row with a height of 28 px (`src/styles/timeline.css:48-57`), and the grey background of the 6 px track (`src/styles/forms.css:115-121`) fills all 28 px, a grey block across the bar; the labels still sit high, because the query of 640 px sets `align-items: center` for `.ps-topbar` only. With a variation open, the line chip and Discard variation stay on the slider's row and squeeze it in two bands: 139 px at 1100 px and 90 px at 1051 px, outside the query of 1050 px, and 135 px at 700 px and 76 px at 641 px.
+
+**Idea.** The bar keeps `align-items: center` in the media query of 1050 px and in the one of 640 px (the top bar keeps its own rules), and the slider row of 640 px draws the thin track centred in its touch box of 28 px, which `scale.spec.ts:95` and the WebKit `moveTimeline` click in the middle. Once the slider would fall below 200 px, the line chip and Discard variation move to a second row; the gate of the batch sets the number, with screenshots.
+
+**Benefit.** App users on a laptop, a tablet or a narrow window: the timeline reads as one tidy row.
+
+**Success.** An e2e row measures the bar at a ladder of widths (2560, 1920, 1440, 1100, 1051, 1050, 1000, 800, 700, 641, 640, 390), with and without a variation: where items share a row with the step buttons, their centres lie within 1 px of the buttons'; at 640 px and less the slider's own row shows the thin track without the grey block; the slider keeps the width the gate sets. The probe of 07.11.2026 reads 0.0 px from 1051 px up and -6.0 px (-9.3 px with a variation) from 1050 px down.
+
+**Singles and doubles.** The bar is the same for both; the e2e row loads a singles replay and a doubles replay.
+
+**Evidence.** `r87/gif/timeline.probe.ts`, its rows in `r87/timeline/run.log` and the screenshots `r87/timeline/*.png`; the review `r87/review/t344-t345-review.md`; the user's report of 07.11.2026.
+
+### T346 · The Battle Statistics keep a readable height in a short window
+
+*App · user report 07.11.2026 · small fix · lossless*
+
+**Approved (user 07.11.2026, "One thing we should fix, the Battle Statistics can get veeery small and not readable and scrollable here").**
+
+**Problem.** The user's screenshot of 07.11.2026: a Gen 9 Custom Game at turn 14, the Evaluation panel with the turn's swing and both sides' ranked choices, Let it play out below it. The Battle Statistics panel under them keeps its heading and one line of chips, and the line under it fades out; the list scrolls inside a strip too thin to read or to aim the wheel at. Cause: since round 84 (A7b, ruling 9a) the panel takes the room the column has left and may shrink to a floor of 96 px (`.ps-main-right > .ps-stats-panel`, `src/styles/stats-panel.css:13-20`), and its list fades over its last 36 px while more follows (`src/styles/stats-panel.css:27-30`, `data-more` from `src/hooks/useScrollFade.ts`). At the floor the heading takes about half of the 96 px, and the fade covers most of the rest. The column itself scrolls only once the panel stands at its floor.
+
+**Idea.** The floor rises to the heading plus one full Pokémon entry, so a window too short for that scrolls the whole column instead of the list. An entry is 57 to 197 px high in one replay (the reviewer's probe), so the floor is about 185 to 285 px: either a chosen constant or a measure of the first entry at run time in `useScrollFade`. A fade that starts only where the list's room is several times its 36 px needs that hook too; CSS alone cannot read the height. A second variant folds the ranked choices of the Evaluation panel in a short window; only "Explanation" folds today (`src/components/eval/EvalTurnAnalysis.tsx:70-77`, closed by default), so that variant is a feature of its own, and the gate of the batch decides whether it gets a TODO.
+
+**Benefit.** App users on a laptop or a short window: the Battle Statistics stay readable, and the column scrolls when the room runs out.
+
+**Success.** An e2e row in the form of `test/e2e/right-column.spec.ts` loads a replay with a tall Evaluation panel at a ladder of window heights that crosses both root scales (1920 x 1000 reads 100 %, 1920 x 1050 reads 125 %), plus 1366 x 768: the statistics list shows at least one full Pokémon entry without the fade, or the column scrolls; the list scrolls by the wheel. The rows of round 84 hold: at 1366 x 768 and 1707 x 860 the panel's bottom lies within 2 px of the dock's bottom while Evaluation fits (the reviewer's probe read the panel at 394 px at 1366 x 768). `test/regression/layout-css.spec.ts:66` reads any floor in px and moves only for a floor in another unit or a new fade rule.
+
+**Singles and doubles.** Both: a doubles turn makes the Evaluation panel taller (four slots of ranked choices), so the e2e row loads a singles replay and a doubles replay.
+
+**Evidence.** The user's screenshot of 07.11.2026; `src/styles/stats-panel.css:10-35`; round 84's rows in `test/e2e/right-column.spec.ts:21-51`; the reviewer's probe `r87/gif/stats.probe.ts` and the review `r87/review/t346-t347-review.md`.
+
+### T347 · The end of a play-out leaves the replay where the user watches it
+
+*App · user report 07.11.2026 · larger bug · lossless*
+
+**Approved (user 07.11.2026, "Für 1.1.1 müssen wir auch das Problem lösen, dass beim Let it play out, bereits das Replay läuft, am Ende aber alles nochmal auf die initiale Turn resetted wird und den Flow unterbricht").**
+
+**Problem.** The user presses Let it play out and plays the line in the branch frame while the engine streams its turns in; during the run the frame appends them without a seek and without a play command (`liveAppendMode` 'hold', `src/components/ReplayWorkspace.tsx:62`; `src/hooks/useReplayFrame.ts:228-236`, pinned in `test/ui/hooks/useReplayFrame.spec.tsx:198-210`). When the run ends, the app seeks the frame back to the turn the run started from, and the replay the user was watching jumps back. Cause: `finishPlayOut` returns the pointer to `startTurn` with a seek after every run that played a turn (`src/hooks/usePlayOut.ts:67-72`, `returnToStart` true by default); only a stop by navigation passes `returnToStart: false` (`src/hooks/controller/transients.ts:77`). `test/ui/hooks/usePlayOut.spec.tsx:173` pins the seek.
+
+**Idea.** The finish leaves the frame where it stands and lets a running replay play on, and the pointer takes the frame's turn without a seek; the notice keeps its "Watch from turn N" button for a replay from the start. Pointer and frame part ways during the run, so this is a larger bug: the pointer sits on the tip, the tip-follow sets a guard of 20 s (`src/hooks/useTimeline.ts:170`, `236-248`) that drops the frame's reports of other turns (`:290-293`), and the frame's tracker posts a turn only when it changes (`TURN_TRACKER_SCRIPT` in `src/lib/replay-html.ts`), so a dropped report never comes again; the frame's last report lives inside `PSReplayFrame` and the seek intent inside `useTimelineNav`. Diagnosis first, as a probe with the scene: whether Showdown's client plays on through turns appended after its queue ran out, and where pointer and frame stand at the finish. A stop with a turn in flight belongs to the same fix: the late turn lands in the play or follow-end mode and moves the frame. T343 builds on this finish.
+
+**Benefit.** App users: the engine's line plays to its end without a jump back.
+
+**Success.** A red spec first: a run that ends while the frame plays leaves the frame's turn and its play as they were; a run that ends while the frame stands still leaves it there; a stop with a turn in flight leaves the frame where the user watches; after the finish pointer and frame name the same turn; Watch from turn N plays from N. The pin at `usePlayOut.spec.tsx:173` and the e2e pin `test/e2e/timeline.spec.ts:291-295` move at the gate of the batch. An e2e row plays out a singles replay and a doubles replay, presses play in the frame during the run, and reads the frame's turn after the finish.
+
+**Singles and doubles.** Both: the e2e row runs a singles and a doubles play-out.
+
+**Evidence.** The user's report of 07.11.2026; `src/hooks/usePlayOut.ts:59-73`; the review `r87/review/t346-t347-review.md`.
 
 ### T314 · A bench offers bodies the side never brought
 
