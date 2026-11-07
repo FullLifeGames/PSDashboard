@@ -313,15 +313,18 @@ function useTimelineNav(args: NavArgs) {
     }
     if (derived.viewingVariation) {
       // The branch frame's own Last turn / Next turn. A turn the variation does not cover is the shared prefix: the
-      // pointer leaves for the main line there, and the main frame that opens gets the same echo guard.
+      // pointer leaves for the main line there, and the main frame that opens gets the same echo guard. The start turn
+      // itself is the exception (round 88, T347): the branch frame's turn there shows the variation's own moves, so the pointer
+      // stays on the variation at its first covered turn.
       // Like the main line's end (B12): the frame stays on the last played turn when the pointer sits on the end.
       if (atVariationEnd && derived.tipTurn !== null && turn >= derived.tipTurn - 1) return;
-      if (!variationCovers(derived.variationSpan, turn)) seekIntentRef.current = { turn, until: Date.now() + 4000 };
+      const atStart = turn === derived.variationSpan?.startTurn;
+      if (!atStart && !variationCovers(derived.variationSpan, turn)) seekIntentRef.current = { turn, until: Date.now() + 4000 };
       // A landed report spends the play: the user's own step, or the frame on the tip after playing the turn in. A
       // rebuild afterwards (a set edit) opens its document on the tip and plays nothing in again; that replay's landing
       // on the turn before the tip moved the pointer off the variation (round 77).
       setFollowedPlay(false);
-      setViewTurn(turn);
+      setViewTurn(atStart ? pointerAtFrame(turn, derived.variationSpan, false) ?? turn : turn);
       return;
     }
     setViewTurn(current => {
