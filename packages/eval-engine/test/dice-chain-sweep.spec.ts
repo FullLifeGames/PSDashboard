@@ -2,6 +2,7 @@ import { writeFileSync } from 'node:fs';
 import { afterAll, describe, expect, test } from 'vitest';
 import { loadSimMods } from '../src/forward/sim-mods';
 import { RecordingPRNG } from '../src/dice/prng';
+import { reportOf } from '../src/dice/report';
 import type { ForcedDie } from '../src/dice/types';
 import { watchBattle } from '../src/dice/watch';
 import { copyOf } from '../src/sim-ask/copy';
@@ -146,9 +147,17 @@ describe.each(CASES.filter(entry => entry.rules.generation >= 3))('the accuracy 
         expect(hitcounts(lines), `${move.id}: hit ${hit} forced to miss`).toEqual([hit - 1]);
         expect(missesOf(broken.battle, broken.start, 'p2a'), `${move.id}: a later miss writes no |-miss|`).toBe(0);
         expect(broken.report.forced[0].took, `${move.id} hit ${hit}: ${broken.report.forced[0].reason}`).toBe('applied');
+        // the report reads the hit count: the die of the hit that missed is applied, a later hit of the chain was never rolled
+        expect(broken.report.forced[1].took, `${move.id} hit ${hit}: ${broken.report.forced[1].reason}`).toBe('applied');
+        if (hit < hits) {
+          const later = forcedOn(board, clicks, [yes(move.id), hitDie(move.id, hit, false), hitDie(move.id, hit + 1, true)]);
+          expect(later.report.forced[2].took, `${move.id} hit ${hit + 1}`).toBe('no-draw');
+          expect(later.report.forced[2].reason, `${move.id} hit ${hit + 1}`).toMatch(new RegExp(`ended after ${hit - 1} hits?.*hit ${hit + 1}`));
+        }
       }
       const every = forcedOn(board, clicks, [yes(move.id), ...Array.from({ length: hits - 1 }, (_, index) => hitDie(move.id, index + 2, true))]);
       expect(hitcounts(every.battle.log.slice(every.start)), `${move.id}: every hit forced to land`).toEqual([hits]);
+      expect(every.report.forced.map(report => report.took), `${move.id}: every hit forced to land`).toEqual(Array(hits).fill('applied'));
       // a hit die alone leaves the first hit to the stream: it never moves a hit before it
       const first = forcedOn(board, clicks, [hitDie(move.id, 2, false)]);
       const counts = hitcounts(first.battle.log.slice(first.start));
@@ -158,6 +167,7 @@ describe.each(CASES.filter(entry => entry.rules.generation >= 3))('the accuracy 
       expect(missesOf(no.battle, no.start, 'p2a'), `${move.id}: a plain no`).toBeGreaterThan(0);
       expect(hitcounts(no.battle.log.slice(no.start)), `${move.id}: a plain no`).toEqual([]);
       expect(no.report.forced[1].took, `${move.id}: ${no.report.forced[1].reason}`).toBe('no-draw');
+      expect(no.report.forced[1].reason, `${move.id}: the first hit missed`).toMatch(/-miss/);
     }
   });
 
@@ -175,8 +185,29 @@ describe.each(CASES.filter(entry => entry.rules.generation >= 3))('the accuracy 
       expect(natural.keys.filter(key => hitOfKey(key) !== null), `${move.id} with ${label}`).toEqual([]);
       const forced = forcedOn(board, clicks, [hitDie(move.id, 2, false)]);
       expect(forced.report.forced[0].took, `${move.id} with ${label}: ${forced.report.forced[0].reason}`).toBe('no-draw');
+      expect(forced.report.forced[0].reason, `${move.id} with ${label}`).toMatch(/rolls no accuracy for hit 2/);
       expect(forced.battle.log.slice(forced.start).filter(untimed), `${move.id} with ${label}: the log is the natural turn's`).toEqual(natural.lines.filter(untimed));
     }
+  });
+});
+
+describe('the report of a hit die reads the hit count of its target', () => {
+  const board = sweepBoard(RULES[9], 'tripleaxel', 'singles', '1,2,3,4', false, FAST);
+  const report = (hit: number, happens: boolean, lines: string[]) => reportOf({
+    die: hitDie('tripleaxel', hit, happens), note: { draws: 1, noChance: false, shapes: [], logIndex: 1 },
+    battle: { log: ['|move|p1a: Pikachu|Triple Axel|p2a: Vaporeon', ...lines], dex: board.dex } as unknown as typeof board, start: 0,
+  });
+  const damage = '|-damage|p2a: Vaporeon|80/100';
+
+  test.each([
+    ['a no at the hit the chain ended on is applied', 2, false, '|-hitcount|p2a: Vaporeon|1', 'applied'],
+    ['a no at a hit that landed is no chance', 2, false, '|-hitcount|p2a: Vaporeon|2', 'no-chance'],
+    ['a yes at a hit that landed is applied', 2, true, '|-hitcount|p2a: Vaporeon|3', 'applied'],
+    ['a yes at a hit the chain never reached is blocked', 3, true, '|-hitcount|p2a: Vaporeon|1', 'blocked'],
+  ] as const)('%s', (_name, hit, happens, count, took) => {
+    const shown = report(hit, happens, [damage, count]);
+    expect(shown.took, shown.reason).toBe(took);
+    if (took === 'blocked' || took === 'no-chance') expect(shown.reason).toMatch(new RegExp(`hit ${hit}`));
   });
 });
 
