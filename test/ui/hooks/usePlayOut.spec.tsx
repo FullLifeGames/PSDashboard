@@ -361,7 +361,29 @@ describe('usePlayOut', () => {
       expect(result.current.transients.playOut).toBeNull();
       const onStart = (wired.startLeadVariation as ReturnType<typeof vi.fn>).mock.calls[0][1].onStart as () => void;
       act(() => onStart());
-      expect(result.current.transients.playOut).toMatchObject({ active: true, startTurn: 1 });
+      // Round 88 (T343, #79): the run arms with turn 0, so the progress line and the notice name the turn the game starts at.
+      expect(result.current.transients.playOut).toMatchObject({ active: true, startTurn: 0 });
+    });
+
+    // Round 88 (T343, #79): the notice offers Watch from turn 0, and Watch plays the frame from its team preview while
+    // the pointer reads T1 (the variation line has no turn 0). A run from a later turn keeps its turn (the rows above).
+    test.each([
+      ['singles', singlesPicks],
+      ['doubles with a bring of four', vgcPicks],
+    ])('%s: the finish notice offers Watch from turn 0 and Watch seeks the frame to turn 0', (_name, picks) => {
+      vi.useFakeTimers();
+      const { evaluation } = evaluationOf({ auto: true });
+      const wired = wiring({ viewT0: true, liveTip: false, viewingVariation: false, leadPicksRef: { current: picks } });
+      const { result, rerender } = setup(evaluation, wired);
+      act(() => result.current.playOut.startPlayOut());
+      act(() => result.current.transients.stopPlayOutRef.current?.());
+      expect(result.current.transients.playOutNotice).toEqual({ text: 'Play-out stopped: 0 turns played (they stay in the variation).', watchTurn: 0 });
+      rerender({ evaluation, wiring: wired });
+      act(() => result.current.playOut.watchFrom(result.current.transients.playOutNotice?.watchTurn ?? -1));
+      expect(wired.navigateTo).toHaveBeenCalledWith({ turn: 0, line: 'variation' }, { seek: false, internal: true, toFrame: 0 });
+      act(() => vi.advanceTimersByTime(250));
+      const updater = (wired.setNavSeek as ReturnType<typeof vi.fn>).mock.calls[0][0] as (prev: null) => unknown;
+      expect(updater(null)).toEqual({ turn: 0, seq: 1, play: true });
     });
 
     test('an unfinished picker starts nothing and says why', () => {

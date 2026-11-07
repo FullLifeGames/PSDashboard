@@ -141,7 +141,9 @@ function useStartPlayOut(args: PlayOutInputs) {
         setVariationNotice('Finish the lead picks above before the engine plays from turn 0.');
         return;
       }
-      startLeadVariation(picks, { onStart: () => armRun(1) });
+      // Round 88 (T343, #79): the run arms with turn 0, the turn the leads come in: the progress line and the notice name it,
+      // and Watch from turn 0 plays the frame from its team preview while the pointer reads T1 (the line has no turn 0).
+      startLeadVariation(picks, { onStart: () => armRun(0) });
       return;
     }
     // The post-battle sentinel has nothing to play — surface the existing
