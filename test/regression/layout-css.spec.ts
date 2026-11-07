@@ -60,7 +60,7 @@ describe('the two columns above 1050 px', () => {
 });
 
 describe('the Battle Statistics panel', () => {
-  test('takes the room that is left and may shrink to its heading, the others keep their height', () => {
+  test('takes the room that is left down to a floor of one readable entry, the others keep their height', () => {
     const panel = rule(stats, '.ps-main-right > .ps-stats-panel');
     expect(panel).toMatch(/flex:\s*1 1 auto/);
     expect(panel).toMatch(/min-height:\s*\d+px/);
