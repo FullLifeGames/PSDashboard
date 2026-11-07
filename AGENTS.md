@@ -11,7 +11,7 @@ PS Dashboard analyzes Pokémon Showdown replays: it replays a game turn by turn,
 - `packages/eval-engine` (`@fulllifegames/eval-engine`): static evaluation, MCTS trees, verify round, prover, report.
 - `test/regression/`: Node tests of the app and the calibration bank (`eval-calibration.spec.ts`, which also holds the ledger of every round); `test/ui/`: component and hook specs under jsdom; `test/e2e/` and `test/e2e-build/`: Playwright; `test/e2e-feedback/`: the feedback corpus with the expert pins (`corpus.ts`). Each package keeps its specs in its own `test/`.
 - Keep the three layers apart: ingestion and inference, deterministic reconstruction with `@pkmn/sim`, user interface.
-- Branches: work happens on `dev` (pushed to origin; it was `v1` until the release of 1.0.0, user 29.10.2026). Each round runs on its own branch from `dev`, deleted after the push. `master` moves only with the user's okay; it carries the release v1.1.0 (tag `v1.1.0`, 06.11.2026), and GitHub Pages builds from it. The production copy on fulllifegames.com, which the README calls the release, changes only through the local `deploy.ps1` (the releases of 1.0.0 to 1.1.0 ran it after the master push).
+- Branches: since the release of 1.1.0 the work lands on `master` (user gate 07.11.2026, "1a 2a 3a"; `dev` carried it from 1.0.0 to 1.1.0). Each round runs on its own branch from `master`, deleted after the push. A push to master updates the nightly at the root of GitHub Pages once its Tests run passes (`pages.yml` waits for `test.yml`). A release is the commit that raises the version (`npm version <minor|patch> --workspaces --include-workspace-root --no-git-tag-version`): `release.yml` finds a version without a tag and makes the tag, the GitHub Release, the npm packages and the frozen copy; the last one is v1.1.0 (tag `v1.1.0`, 07.11.2026). The production copy on fulllifegames.com, which the README calls the release, changes only through the local `deploy.ps1`, run after the release's push (1.0.0 to 1.1.0).
 
 ## Working with the user
 
@@ -19,7 +19,7 @@ PS Dashboard analyzes Pokémon Showdown replays: it replays a game turn by turn,
 - Gates: numbered questions in plain text, two sentences of scene per question, options a/b/c in one or two sentences each, the recommendation marked, answer format "1a 2a 3a".
 - Tracked documents and every user-facing string go through the `stop-slop` skill: no dashes as separators, no filler adverbs, active voice, specific claims. Exceptions: verbatim quotes of app output, technical invariants with "never" or "always", placeholder glyphs. The engine's prose (`summary.ts`, `report.ts`) is pinned by the feedback corpus: a change to it moves pins, and they wait for the gate of its round or batch.
 - Commits: English, imperative, release style, no attribution lines (no Co-Authored-By). Write messages with quotes to a file and use `git commit -F <file>`.
-- No push, and no deleting branches, worktrees or files you did not create, without the user's okay. An okay covers the named state only.
+- No push, and no deleting branches, worktrees or files you did not create, without the user's okay. An okay covers the named state only. A release (the commit that raises the version) and `deploy.ps1` each need an okay of their own that names the release (user 29.10.2026 and 07.11.2026).
 - The user reports library bugs upstream himself; collect them as an upstream list with a scene and evidence.
 - Re-pins (a test or pin whose expected verdict changes) happen only at the user gate.
 
