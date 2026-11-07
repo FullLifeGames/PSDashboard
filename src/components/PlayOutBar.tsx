@@ -2,7 +2,8 @@ import type { SearchBudget } from '@fulllifegames/eval-engine';
 import { readSearchBudget, treeThresholdText } from '../lib/eval/search-budget-setting';
 
 interface PlayOutBarProps {
-  playOut: { active: boolean } | null;
+  /** `stopping` is set after Stop with a turn in flight (round 88, T347): the run ends when that turn landed. */
+  playOut: { active: boolean; stopping?: unknown } | null;
   playOutNotice: { text: string; watchTurn: number } | null;
   hasVariation: boolean;
   /** The viewed position is an ended game: nothing is left to play out (round 77, A-6). */
@@ -31,16 +32,18 @@ function fastTitle(budget: SearchBudget): string {
 }
 
 /** The running state: spinner, the fast marker, and Stop. */
-function RunningRow({ fastPlayOut, onStopPlayOut }: Pick<PlayOutBarProps, 'fastPlayOut' | 'onStopPlayOut'>) {
+function RunningRow({ fastPlayOut, stopping, onStopPlayOut }: Pick<PlayOutBarProps, 'fastPlayOut' | 'onStopPlayOut'> & { stopping: boolean }) {
   return (
     <>
       <span className="ps-spinner" aria-hidden="true" />
       {/* The detailed progress line lives in the Evaluation
           panel (beside the growing graph) — one place, not two. */}
       <span style={{ fontSize: 11, color: '#f0c76b' }}>
-        Engine play-out running{fastPlayOut ? ' (fast: depth-1 matrix)' : ''}
+        {stopping
+          ? 'Stopping: the engine finishes the turn in flight, then stops.'
+          : `Engine play-out running${fastPlayOut ? ' (fast: depth-1 matrix)' : ''}`}
       </span>
-      <button type="button" className="ps-btn" onClick={() => onStopPlayOut()} style={{ padding: '2px 10px', fontSize: 11 }}>
+      <button type="button" className="ps-btn" onClick={() => onStopPlayOut()} disabled={stopping} style={{ padding: '2px 10px', fontSize: 11 }}>
         Stop
       </button>
     </>
@@ -88,7 +91,7 @@ export function PlayOutBar({
   return (
     <div className="ps-panel" style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
       {playOut?.active
-        ? <RunningRow fastPlayOut={fastPlayOut} onStopPlayOut={onStopPlayOut} />
+        ? <RunningRow fastPlayOut={fastPlayOut} stopping={!!playOut.stopping} onStopPlayOut={onStopPlayOut} />
         : ended
         ? <span style={{ fontSize: 11, color: '#8fa3bd' }}>The game ended at this position: nothing left to play out.</span>
         : (
