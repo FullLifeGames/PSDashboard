@@ -5,8 +5,9 @@ import { subscribeTablePart, tablePartPending, teambuilderTablePartUrl } from '.
 
 type FrameRef = React.RefObject<HTMLIFrameElement | null>;
 
-const postSeek = (iframeRef: FrameRef, turn: number, autoPlay: boolean) =>
-  iframeRef.current?.contentWindow?.postMessage({ type: 'ps-seek-turn', turn, autoPlay }, '*');
+/** `id` names one request across its retries: the bridge runs a play seek with an id once (round 88, T347). */
+const postSeek = (iframeRef: FrameRef, turn: number, autoPlay: boolean, id?: number) =>
+  iframeRef.current?.contentWindow?.postMessage(id === undefined ? { type: 'ps-seek-turn', turn, autoPlay } : { type: 'ps-seek-turn', turn, autoPlay, id }, '*');
 
 /** The replay document as a blob URL (revoked when it changes or the frame unmounts). */
 export function useReplayBlobUrl(args: {
@@ -134,7 +135,7 @@ export function useSeekRequests(iframeRef: FrameRef, seekRequest: SeekRequest | 
   useEffect(() => {
     if (!seekRequest || seekRequest.seq === seenSeekSeqRef.current) return;
     seenSeekSeqRef.current = seekRequest.seq;
-    const send = () => postSeek(iframeRef, seekRequest.turn, !!seekRequest.play);
+    const send = () => postSeek(iframeRef, seekRequest.turn, !!seekRequest.play, seekRequest.seq);
     send();
     const retry = window.setInterval(send, 200);
     const stopRetry = window.setTimeout(() => window.clearInterval(retry), 1200);

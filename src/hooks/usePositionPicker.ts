@@ -7,6 +7,7 @@ import type { VariationSpan } from '../lib/timeline';
 import type { BranchHistoryEntry, BranchSimState } from './useBranch';
 import type { PlayedAtPosition, PlayedPick } from '../lib/played-pick';
 import { mergeChoices, seedChoices } from '../lib/dock-seed';
+import { turnEntryAt } from '../lib/variation-turns';
 
 /**
  * Picker state for the viewed position when the live sim is elsewhere
@@ -268,18 +269,13 @@ function fromChoice(choice: BranchSlotChoice | null): PlayedPick | null {
     : { kind: 'switch', name: choice.pokemonName, species: choice.speciesId, recorded: choice };
 }
 
-function playedFromHistory(history: BranchHistoryEntry[], index: number): PlayedAtPosition | null {
-  let count = 0;
-  for (const entry of history) {
-    if (entry.kind === 'forced') continue;
-    if (count === index) {
-      const p1Slots = (entry.p1SlotChoices ?? []).map(fromChoice);
-      const p2Slots = (entry.p2SlotChoices ?? []).map(fromChoice);
-      // Singles record one choice a side: the side pick alone, as before.
-      if (p1Slots.length <= 1 && p2Slots.length <= 1) return { p1: p1Slots[0] ?? null, p2: p2Slots[0] ?? null };
-      return withSlots(p1Slots, p2Slots);
-    }
-    count += 1;
-  }
-  return null;
+export function playedFromHistory(history: BranchHistoryEntry[], index: number): PlayedAtPosition | null {
+  // Round 88 (T348): the entry that plays the turn, whatever the interludes before it (a replacement on both sides is one).
+  const entry = turnEntryAt(history, index);
+  if (!entry) return null;
+  const p1Slots = (entry.p1SlotChoices ?? []).map(fromChoice);
+  const p2Slots = (entry.p2SlotChoices ?? []).map(fromChoice);
+  // Singles record one choice a side: the side pick alone, as before.
+  if (p1Slots.length <= 1 && p2Slots.length <= 1) return { p1: p1Slots[0] ?? null, p2: p2Slots[0] ?? null };
+  return withSlots(p1Slots, p2Slots);
 }

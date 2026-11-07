@@ -2,6 +2,7 @@ import type { PokemonSet } from '@pkmn/sim';
 import type { DamageObservation, OpponentTeamInfo, ReplayData } from '@fulllifegames/replay-core';
 import type { BranchHistoryEntry } from './branch-history';
 import { buildReplayTeams, type TeamBuildSources } from './eval-acquire';
+import { entriesOfTurns } from './variation-turns';
 
 export interface BranchInputs {
   p1Team: PokemonSet[];
@@ -46,18 +47,9 @@ export function divergenceNoticeFor(
   return null;
 }
 
-/** Kept entries for a truncating rebuild: forced interludes ride along with
+/** Kept entries for a truncating rebuild: interludes (a replacement on one side or on both) ride along with
  *  the turn they resolve — keep them until the NEXT turn entry past the cut
- *  (mirrors alignHistoryRows). */
+ *  (mirrors alignHistoryRows; round 88, T348: one rule in `variation-turns.ts`). */
 export function keptHistorySlice(history: BranchHistoryEntry[], keepTurns: number): BranchHistoryEntry[] {
-  const kept: BranchHistoryEntry[] = [];
-  let remaining = keepTurns;
-  for (const entry of history) {
-    if (entry.kind !== 'forced') {
-      if (remaining === 0) break;
-      remaining -= 1;
-    }
-    kept.push(entry);
-  }
-  return kept;
+  return entriesOfTurns(history, keepTurns);
 }

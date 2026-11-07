@@ -34,7 +34,7 @@ describe('useTransients', () => {
 
     result.current.playOutRef.current = { active: true };
     act(() => result.current.interruptPlayOut());
-    expect(stop).toHaveBeenCalledWith({ returnToStart: false });
+    expect(stop).toHaveBeenCalledWith({ navigated: true });
   });
 
   test('a new replay clears every transient', () => {

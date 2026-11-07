@@ -1,6 +1,6 @@
 import { test, expect } from 'vitest';
 import {
-  classifyDeviation, keptEntries, normalizePosition, sliderMax, variationCovers, variationTip,
+  classifyDeviation, keptEntries, normalizePosition, pointerAtFrame, sliderMax, variationCovers, variationTip,
   type TimelinePosition, type VariationSpan,
 } from '../../src/lib/timeline';
 
@@ -65,4 +65,24 @@ test('a variation-line position the variation does not cover is the main line: a
 test('keptEntries counts the entries that survive a truncating deviation', () => {
   expect(keptEntries(span, { turn: 16, line: 'variation' })).toBe(1); // keep the turn-15 entry
   expect(keptEntries(span, { turn: 18, line: 'variation' })).toBe(3); // extend keeps all
+});
+
+// Round 88 (T347, #83): where the pointer stands for a turn the branch frame shows. The rule reads turns only, so one
+// span shape holds for singles, doubles and VGC.
+test('pointerAtFrame names the variation position the frame shows, clamped to the covered turns', () => {
+  expect(pointerAtFrame(null, span, false)).toBeNull();
+  expect(pointerAtFrame(16, null, false)).toBeNull();
+  expect(pointerAtFrame(16, { startTurn: 15, length: 0 }, false)).toBeNull();
+  expect(pointerAtFrame(17, span, false)).toBe(17); // a covered turn
+  expect(pointerAtFrame(18, span, false)).toBe(18); // the tip
+  expect(pointerAtFrame(15, span, false)).toBe(16); // the start turn: the frame holds back |turn|16, the pointer takes the first covered turn
+  expect(pointerAtFrame(30, span, false)).toBe(18); // past the tip
+  expect(pointerAtFrame(0, { startTurn: 0, length: 3 }, false)).toBe(1); // the T0 variation: leads on screen, slider on T1
+});
+
+test('pointerAtFrame gives an ended variation its tip once the frame stands on the last played turn', () => {
+  expect(pointerAtFrame(17, span, true)).toBe(18); // tip - 1: the frame cannot report the end position itself
+  expect(pointerAtFrame(18, span, true)).toBe(18);
+  expect(pointerAtFrame(16, span, true)).toBe(16);
+  expect(pointerAtFrame(15, { startTurn: 15, length: 1 }, true)).toBe(16);
 });

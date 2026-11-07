@@ -26,7 +26,7 @@ describe.each(['singles', 'doubles'] as const)('variationBoardShares, %s', kind 
   const total = 2 * BODIES[kind];
 
   test('every executed turn names the share of the board it ended on, at the turn that board opens', () => {
-    const history = [entry(kind, [1, 0]), entry(kind, [2, 1]), entry(kind, [3, 2])];
+    const history = [entry(kind, [1, 0], { turnNumber: 4 }), entry(kind, [2, 1], { turnNumber: 5 }), entry(kind, [3, 2], { turnNumber: 6 })];
     const shares = variationBoardShares(history, 4);
     // The shared prefix (turn 4 and before) has no variation board: only the main line stands there.
     expect(shares.slice(0, 4)).toEqual([null, null, null, null]);
@@ -38,9 +38,9 @@ describe.each(['singles', 'doubles'] as const)('variationBoardShares, %s', kind 
 
   test('a forced replacement consumes no turn: the board after it is the position before the next turn', () => {
     const history = [
-      entry(kind, [1, 0]),
-      entry(kind, [1, 1], { kind: 'forced', forcedSide: 'p2' }),
-      entry(kind, [2, 1]),
+      entry(kind, [1, 0], { turnNumber: 4 }),
+      entry(kind, [1, 1], { turnNumber: 4, kind: 'forced', forcedSide: 'p2' }),
+      entry(kind, [2, 1], { turnNumber: 5 }),
     ];
     const shares = variationBoardShares(history, 4);
     expect(shares[4]).toBeCloseTo(2 / total);
@@ -49,7 +49,7 @@ describe.each(['singles', 'doubles'] as const)('variationBoardShares, %s', kind 
   });
 
   test('a lead variation starts at turn 0 and its first entry opens turn 1', () => {
-    const shares = variationBoardShares([entry(kind, [0, 0]), entry(kind, [0, 1])], 0);
+    const shares = variationBoardShares([entry(kind, [0, 0], { turnNumber: 0 }), entry(kind, [0, 1], { turnNumber: 1 })], 0);
     expect(shares[0]).toBe(0);
     expect(shares[1]).toBeCloseTo(1 / total);
   });
