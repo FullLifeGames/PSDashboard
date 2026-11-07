@@ -292,9 +292,11 @@ function selfEffectDice(action: LoggedAction, foes: readonly string[], options: 
   const struck = foes.filter(target => !action.missed.includes(target)).length;
   const die = (result: boolean): ForcedDie[] => [{ name: { ...ofMove(action), kind: 'self-effect' }, result: happens(result) }];
   if (struck > 0 && selfId) {
-    // it holds when no target or every target that was hit gave the gain; a log where only some did cannot be forced by one die
+    // Round 88 (T338, #74): `self.chance` is the entry of Gens 7 and later, drawn once per move (`selfDrops` sets `selfDropped` after the first
+    // draw of a move without hit counts), so the log writes one gain for the move however many foes it struck: one gain or more is a yes.
+    // The per-target draw of Gen 6 is a secondary entry (`hitDice`), not this one.
     const times = appliedTimes(action.boosts[action.slot] ?? [], selfId) ?? 0;
-    return times === 0 || times >= struck ? die(times > 0) : [];
+    return die(times > 0);
   }
   return foes.length > 0 && shownEffects(action, action.slot, true).some(id => id.startsWith('self:')) ? die(true) : [];
 }

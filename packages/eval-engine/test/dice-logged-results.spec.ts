@@ -137,6 +137,19 @@ describe('the dice a log shows, action by action', () => {
     expect(loggedDice(selfOnly)).toEqual([]);
   });
 
+  // Round 88 (T338, #74): `self.chance` is drawn once per move from Gen 7, so one gain line against two struck foes is a yes
+  test('a self chance is one die for the move: one gain line against two struck foes is a yes, none is a no', () => {
+    const selfOf = (move: string) => (move === 'diamondstorm' ? 'self:def' : undefined);
+    const spread = (gain: string) => lines(`
+|move|p1a: A|Diamond Storm|p2a: B
+|-damage|p2a: B|60/100
+|-damage|p2b: C|60/100
+${gain}`);
+    const asked = (log: string[]) => show(loggedDice(log, { selfOf })).filter(entry => entry.includes(':self-effect'));
+    expect(asked(spread('|-boost|p1a: A|def|2'))).toEqual(['p1a:diamondstorm::self-effect {"happens":true}']);
+    expect(asked(spread(''))).toEqual(['p1a:diamondstorm::self-effect {"happens":false}']);
+  });
+
   test('a flinch is the secondary of the move before it', () => {
     const turn = lines(`
 |move|p1a: A|Air Slash|p2a: B
