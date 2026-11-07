@@ -49,6 +49,8 @@ export interface TurnDockProps {
   seed?: SeedChoices | null;
   /** The engine's fill at the live tip: a pending run holds the empty chips and queues an Execute; null off the tip. */
   fill?: DockFillView | null;
+  /** Round 88 (T316): the side the replay frame shows near; its chips come first. Default P1. */
+  nearSide?: Side;
 }
 
 /**
@@ -122,7 +124,7 @@ function DockExecute({ model, fill, executing, onRun, onClose }: {
 export function TurnDock(props: TurnDockProps) {
   const {
     simState, stale, source, acquiringExact, executeError, executing, gen, onSetChoice, onRecordChoice, onHypotheticalMove, onExecuteTurn,
-    played, positionKey, getBattle, replayLog, seed, fill,
+    played, positionKey, getBattle, replayLog, seed, fill, nearSide,
   } = props;
   const setChoice = useUserChoice(simState, fill, onSetChoice, onRecordChoice);
   const onEdit = useCallback((side: Side, slot: number, choice: BranchSlotChoice) => setChoice(side, choice, slot), [setChoice]);
@@ -162,7 +164,7 @@ export function TurnDock(props: TurnDockProps) {
           />
         )}
         <div className="ps-dock-bar">
-          <DockRows model={model} open={open} onToggle={(side, slot) => { fill?.arm(); toggleChip(side, slot); }} />
+          <DockRows model={model} open={open} nearSide={nearSide} onToggle={(side, slot) => { fill?.arm(); toggleChip(side, slot); }} />
           <DockExecute
             model={model}
             fill={fill}

@@ -9,7 +9,8 @@ import { ConfirmBanner } from './ConfirmBanner';
 import { useLayoutHeight } from '../hooks/useLayoutHeight';
 import { WorkspaceEvalColumn } from './WorkspaceEvalColumn';
 import type { AppController } from '../hooks/useAppController';
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import type { FrameSide } from '../hooks/useReplayFrame';
 import { logRules, type ReplayData } from '@fulllifegames/replay-core';
 import { ReplayRulesContext } from '../lib/replay-rules';
 import { REPLAY_FRAME_HEIGHT } from '../lib/replay-html';
@@ -55,7 +56,29 @@ function WorkspaceTopBar({ app, replayData }: WorkspaceProps) {
   );
 }
 
-function BattleFrame({ app, replayData }: WorkspaceProps) {
+/**
+ * Round 88 (T316): names the frame the workspace shows: the main line's frame, or the branch's for one session of the variation.
+ * The replay's id and viewpoint are part of it, so a new document of the same replay (a link with ?p2) starts a new report.
+ */
+function frameIdentity(app: AppController, replayData: ReplayData): string {
+  const base = `${replayData.id}:${replayData.viewpoint ?? 'p1'}`;
+  return app.analysis.showBranch && app.board.timeline.viewingVariation ? `${base}:branch:${app.analysis.branchReloadKey}` : `${base}:replay`;
+}
+
+/**
+ * Round 88 (T316): the side the frame shows near, for the dock. The frame's document reports it (Switch sides, the ?p2 flag); until
+ * its first report, and for a frame that mounted after the last report (the swap between the main and the branch frame, a new
+ * branch session, a new replay), it is the replay's viewpoint. A report belongs to the frame that sent it; the identity changing
+ * drops it during render, as state that follows a prop is reconciled.
+ */
+function useNearSide(identity: string, viewpoint: FrameSide | undefined) {
+  const [report, setReport] = useState<{ frame: string; side: FrameSide | null }>({ frame: identity, side: null });
+  if (report.frame !== identity) setReport({ frame: identity, side: null });
+  const onSideChange = useCallback((side: FrameSide) => setReport({ frame: identity, side }), [identity]);
+  return { nearSide: (report.frame === identity ? report.side : null) ?? viewpoint ?? 'p1', onSideChange };
+}
+
+function BattleFrame({ app, replayData, onSideChange }: WorkspaceProps & { onSideChange: (side: FrameSide) => void }) {
   const { showBranch, simLog, latestBranchHistoryEntry, branchReloadKey } = app.analysis;
   const { viewingVariation, viewTurn, viewT0, navSeek, handleReplayTurn, followedPlay, tipTurn } = app.board.timeline;
   const { playOut } = app.transients;
@@ -83,6 +106,8 @@ function BattleFrame({ app, replayData }: WorkspaceProps) {
           reloadKey={branchReloadKey}
           seekRequest={navSeek}
           onTurnChange={handleReplayTurn}
+          onSideChange={onSideChange}
+          turnControls={false}
         />
       ) : (
         <PSReplayFrame
@@ -97,6 +122,8 @@ function BattleFrame({ app, replayData }: WorkspaceProps) {
           viewpoint={replayData.viewpoint}
           reloadKey={`${replayData.id}:original`}
           onTurnChange={handleReplayTurn}
+          onSideChange={onSideChange}
+          turnControls={false}
         />
       )}
     </div>
@@ -177,12 +204,13 @@ function WorkspaceLeft({ app, replayData }: WorkspaceProps) {
   const { branchDivergence, variationNotice } = app.board.deviation;
   const { variationSpan } = app.board.timeline;
   const { branching } = app.ctx.branch;
+  const { nearSide, onSideChange } = useNearSide(frameIdentity(app, replayData), replayData.viewpoint);
   return (
     <div className="ps-main-left">
       {/* Match info, the Load and Setup menus in one bar */}
       <WorkspaceTopBar app={app} replayData={replayData} />
       {/* Single iframe */}
-      <BattleFrame app={app} replayData={replayData} />
+      <BattleFrame app={app} replayData={replayData} onSideChange={onSideChange} />
       {/* Timeline bar: always visible — one slider over main line and variation */}
       <TimelineBar
         viewT0={app.board.timeline.viewT0}
@@ -204,7 +232,7 @@ function WorkspaceLeft({ app, replayData }: WorkspaceProps) {
       {(branching || variationSpan !== null) && <BranchSidePanels app={app} replayData={replayData} />}
       {/* Round 84 (A7b): at turn 0 the lead picker stands where the dock stands, as the column's last child. */}
       <LeadSlot app={app} replayData={replayData} />
-      <DockRegion app={app} replayId={replayData.id} />
+      <DockRegion app={app} replayId={replayData.id} nearSide={nearSide} />
     </div>
   );
 }
