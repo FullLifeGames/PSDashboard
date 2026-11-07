@@ -172,3 +172,37 @@ test.describe('the end of a play-out', () => {
     });
   }
 });
+
+// Round 88 (T343, #79): a run from the turn 0 view names turn 0, and Watch from turn 0 plays the branch frame from its team
+// preview while the slider reads T1 (the variation line has no turn 0). Singles and doubles (the doubles replay brings its
+// leads preselected, two per side).
+test.describe('a play-out from turn 0', () => {
+  for (const [name, file] of REPLAYS) {
+    test(`${name}: the notice offers Watch from turn 0 and the frame plays the leads in while the slider reads T1`, async ({ page }) => {
+      test.setTimeout(240_000);
+      await load(page, file);
+      await page.locator('.ps-branch-bar button[title^="Turn 0"]').click();
+      await expect(page.getByText(/team preview: pick each side|pick both leads per side/)).toBeVisible();
+      await page.getByLabel('Fast play-out').check();
+      await page.locator('button', { hasText: 'Let it play out' }).click();
+      await expect(page.locator('.ps-playout-progress')).toContainText('from turn 0', { timeout: 60_000 });
+      await expect(notice(page)).toBeVisible({ timeout: 180_000 });
+      const watch = page.getByRole('button', { name: /Watch from turn 0/ });
+      await expect(watch).toBeVisible();
+      await expect(page.locator('.ps-line-chip button.on-vari')).toBeVisible();
+
+      const frame = await branchFrame(page);
+      await watch.click();
+      // The frame seeks to its turn 0 (the leads' switch-ins after the team preview) and plays on; the slider names T1.
+      await expect.poll(async () => (await frameState(frame)).turn, { timeout: 10_000, intervals: [50] }).toBe(0);
+      expect(await sliderTurn(page)).toBe(1);
+      const log = await frame.evaluate(() => ((window as ReplayWindow).Replays?.battle as { stepQueue?: string[] } | undefined)?.stepQueue ?? []);
+      const firstTurn = log.findIndex(line => line.startsWith('|turn|'));
+      expect(log.slice(0, firstTurn).some(line => line.startsWith('|teampreview'))).toBe(true);
+      expect(log.slice(0, firstTurn).filter(line => line.startsWith('|switch|') || line.startsWith('|drag|')).length).toBeGreaterThanOrEqual(2);
+      await expect.poll(async () => (await frameState(frame)).turn, { timeout: 30_000 }).toBeGreaterThanOrEqual(1);
+      await expect(branchIframe(page)).toHaveCount(1);
+      await expect(page.locator('.ps-line-chip button.on-vari')).toBeVisible();
+    });
+  }
+});
