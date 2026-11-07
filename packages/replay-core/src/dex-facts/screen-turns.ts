@@ -55,6 +55,26 @@ export function conditionTurns(dex: RulesDex, conditionId: string): ConditionTur
   return table.get(id)!;
 }
 
+/**
+ * Round 88 (T329): whether an ability's start leaves a weather or a terrain standing for good. Before Generation 6 the condition's
+ * `onFieldStart` handler sets the duration of a field that an ability starts to 0 (the callback of `conditionTurns` answers five
+ * or eight for every source), so a field of an ability's start never ends on its own there. The reader runs the handler on a
+ * stand-in battle and reads the duration it leaves; a handler that needs more than that gives true (the answer is unknown, never
+ * guessed, so no verdict follows). The sweep `field-evidence-sweep.spec.ts` (S9) holds the answer to the simulator.
+ */
+export function startsForGood(dex: RulesDex, conditionId: string, abilityId: string): boolean {
+  const handler = (dex.conditions.get(conditionId) as unknown as { onFieldStart?: (this: unknown, ...args: unknown[]) => unknown }).onFieldStart;
+  if (typeof handler !== 'function') return false;
+  const effectState: { duration?: number } = { duration: 5 };
+  const effect = dex.abilities.get(abilityId);
+  try {
+    handler.call({ gen: dex.gen, effectState, add: () => undefined }, {}, {}, effect);
+    return effectState.duration === 0;
+  } catch {
+    return true;
+  }
+}
+
 function read(dex: RulesDex, id: string): ConditionTurns | null {
   const setter = settingMove(dex, id);
   if (!setter) return null;

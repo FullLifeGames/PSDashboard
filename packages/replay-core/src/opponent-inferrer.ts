@@ -11,6 +11,7 @@ import {
 import { recordGigantamax } from './inference/power-moves.ts';
 import { watchItemEvidence } from './inference/item-evidence.ts';
 import { watchScreenEvidence } from './inference/screen-evidence.ts';
+import { watchFieldEvidence } from './inference/field-evidence.ts';
 import { watchTriggerEvidence } from './inference/trigger-evidence.ts';
 import { attachHits, collectHits } from './inference/hits.ts';
 import { syncClientFacts } from './inference/client-facts.ts';
@@ -174,6 +175,7 @@ export function inferOpponentTeam(rawLog: string, opponentSide: 'p1' | 'p2' = 'p
   for (const line of lines) {
     watchItemEvidence(state, line);
     watchScreenEvidence(state, line);
+    watchFieldEvidence(state, line);
     noteMoveOrBoundary(state, line);
     noteGravity(state, line);
     noteEntry(state, line);
