@@ -18,6 +18,8 @@ export const fixtureReplay: ReplayData = JSON.parse(readFileSync(fixturePath('re
 
 export type ReplayWindow = Window & {
   Replays?: {
+    /** The embed's own music flag: false at load, then true once its update sees the muted `BattleSound` (round 88, T316). */
+    muted?: boolean;
     battle?: {
       turn?: number;
       currentStep?: number;
@@ -25,8 +27,12 @@ export type ReplayWindow = Window & {
       seeking?: number | null;
       atQueueEnd?: boolean;
       viewpointSwitched?: boolean;
+      /** The side the frame shows near: Switch sides and the ?p2 flag set it (round 88, T316). */
+      nearSide?: { sideid?: string } | null;
+      messageFadeTime?: number;
     };
   };
+  BattleSound?: { muted?: boolean };
   __psPostedMessages?: unknown[];
 };
 

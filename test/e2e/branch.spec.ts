@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'fs';
 import {
-  dockChip, expectReplaySettled, expectReplayTurnAtLeast, fixturePath, installReplayEmbedCache, pickForcedReplacement, pickMove, pickSwitch,
+  dockChip, expectReplaySettled, expectReplayTurnAtLeast, fixturePath, installReplayEmbedCache, moveTimeline, pickForcedReplacement, pickMove, pickSwitch,
   routeOfflineFixtures, routeSlowReplayEmbed, startVariationAt, type ReplayWindow,
 } from './helpers';
 import { openVariationHistory } from './dock-helpers';
@@ -227,7 +227,7 @@ test.describe('PS Dashboard', () => {
     expect(sameIframe).toBe(true);
   });
 
-  test('branch replay follows appended branch events and keeps iframe turn controls usable', async ({ page }) => {
+  test('branch replay follows appended branch events and moves with the timeline', async ({ page }) => {
     // T280: the frame plays turn 2 and the appended turn to their ends at normal speed, about 16 s more than before.
     test.setTimeout(150_000);
     await page.locator('button', { hasText: 'Load' }).click();
@@ -262,11 +262,13 @@ test.describe('PS Dashboard', () => {
       frame!.evaluate(() => (document.querySelector('.battle-log')?.textContent ?? '').match(/Battle started/g)?.length ?? 0)
     ).toBe(1);
 
-    await frame!.locator('button', { hasText: 'Last turn' }).click();
+    // Round 88 (T316, #56): the frame's Last turn and Next turn are hidden, the timeline moves through the turns. The variation
+    // from turn 2 covers turns 3 and 4 after the two Executes, so turn 3 sits inside it: the log of the same frame is shorter
+    // there, and longer again at the tip.
+    await expect(frame!.locator('button[data-action="rewind"]')).toBeHidden();
+    await moveTimeline(page, 3);
     await expect.poll(logLength).toBeLessThan(afterLength);
-
-    await frame!.locator('button', { hasText: 'Next turn' }).click();
-    await frame!.locator('button', { hasText: 'Next turn' }).click();
+    await moveTimeline(page, 4);
     await expect.poll(logLength).toBeGreaterThanOrEqual(afterLength);
   });
 
