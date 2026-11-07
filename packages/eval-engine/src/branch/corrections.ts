@@ -3,6 +3,7 @@ import { protocolChoiceLock, type ChoiceLockContext } from '../choice-lock.ts';
 import { restoreSideInvariants } from '../forward-model.ts';
 import type { SimBattle, SimPokemon, SimSide } from './types.ts';
 import { normalizeBattleOnlyFormeId, retireBenchAfterFaints, retireUnshownBench, sameBodyName, settleFaintFromSnapshot, type ProtocolBench } from './team-order.ts';
+import { retireUnshownActives } from './unshown-actives.ts';
 import { findFirstAvailableSwitchSlot, findPokemonOnSide, findSlotBySpecies } from './protocol-choices.ts';
 import { correctFieldFromSnapshot } from './field-correction.ts';
 import { applyProtocolHeldItems } from './held-items.ts';
@@ -345,7 +346,13 @@ export function correctBattleFromSnapshot(battle: SimBattle, snapshot: TurnSnaps
   endLocksTheGameEnded(battle, snapshot, simBodyOf);
   restoreTeraFromSnapshot(battle, snapshot);
   correctActivesFromSnapshot(battle, snapshot);
-  retireBenchAfterFaints(battle, snapshot, tookOut);
+  // Round 88 (T327, #63): a body the log never shows on a slot the log leaves empty leaves the field before the bench behind it retires.
+  const strangers = retireUnshownActives(battle, snapshot);
+  retireBenchAfterFaints(battle, snapshot, new Set([...tookOut, ...strangers]));
+  if (strangers.size > 0) {
+    restoreSideInvariants(battle);
+    refreshRequestsFromLiveState(battle);
+  }
   restoreExitVolatiles(battle, snapshot, offTheField, simBodyOf);
   correctFieldFromSnapshot(battle, snapshot);
 }
