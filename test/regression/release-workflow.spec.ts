@@ -34,3 +34,39 @@ describe('the release starts the Pages build of its frozen copy', () => {
     expect(pages).toMatch(/^ {2}workflow_dispatch:/m);
   });
 });
+
+/**
+ * User gate 07.11.2026 ("1a 2a 3a"): after the release of 1.1.0 the work lands on master, and the root of GitHub Pages is the
+ * nightly of master. A push that breaks the app must not reach the nightly while its tests still run: Pages builds a push of
+ * master only after the Tests workflow passed on that very commit. A release and a dispatch keep their own triggers.
+ */
+describe('the nightly deploys a push of master only after its tests passed', () => {
+  const on = /^on:\n((?:(?: {2}.*)?\n)+)/m.exec(pages)?.[1] ?? '';
+  const build = jobOf(pages, 'build');
+
+  test('a finished Tests run on master starts the build, and a push no longer does', () => {
+    expect(on).toMatch(/^ {2}workflow_run:\n {4}workflows:\n {6}- Tests\n {4}types:\n {6}- completed\n {4}branches:\n {6}- master\n/m);
+    expect(on).not.toMatch(/^ {2}push:/m);
+    expect(on).toMatch(/^ {2}release:/m);
+    expect(on).toMatch(/^ {2}workflow_dispatch:/m);
+  });
+
+  test('the build runs only for a Tests run of a push that succeeded', () => {
+    const condition = /^ {4}if: \$\{\{ (.*) \}\}$/m.exec(build)?.[1] ?? '';
+    expect(condition).toContain("github.event.workflow_run.conclusion == 'success'");
+    expect(condition).toContain("github.event.workflow_run.event == 'push'");
+    expect(condition).toContain("github.event_name != 'workflow_run'");
+    // the bank's data releases still build nothing
+    expect(condition).toContain("startsWith(github.event.release.tag_name, 'bank-data-')");
+  });
+
+  test('the build checks out the commit the tests passed on', () => {
+    expect(build).toMatch(/uses: actions\/checkout@v\d+\n {8}with:\n(?: {10}#.*\n)* {10}ref: \$\{\{ github\.event\.workflow_run\.head_sha \|\| github\.sha \}\}\n/);
+  });
+
+  test('the Tests workflow that pages.yml names exists under that name and runs on pushes to master', () => {
+    const tests = read('test.yml');
+    expect(tests).toMatch(/^name: Tests$/m);
+    expect(tests).toMatch(/^ {4}branches: \[master, main\]$/m);
+  });
+});

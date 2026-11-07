@@ -1,7 +1,14 @@
 name: Deploy GitHub Pages
 
 on:
-  push:
+  # The root of the site is the nightly of master (user gate 07.11.2026, "3a"): a push of master deploys only after the
+  # Tests workflow passed on that very commit, so a push that breaks the app never reaches the nightly. The build job's
+  # condition drops a Tests run that failed, was cancelled or ran for a pull request.
+  workflow_run:
+    workflows:
+      - Tests
+    types:
+      - completed
     branches:
       - master
       - main
@@ -28,11 +35,15 @@ jobs:
     name: Build
     # Round 71: a data release of the bank (bank-data-<hash>, scripts/bank-data-pack.mjs --upload) carries no build and
     # its tag may not deploy to github-pages; the site has nothing to rebuild for it.
-    if: ${{ github.event_name != 'release' || !startsWith(github.event.release.tag_name, 'bank-data-') }}
+    if: ${{ (github.event_name != 'release' || !startsWith(github.event.release.tag_name, 'bank-data-')) && (github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')) }}
     runs-on: ubuntu-24.04
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
+        with:
+          # A workflow_run event carries the newest commit of the default branch in github.sha; the build takes the commit
+          # the tests passed on. A release or a dispatch has no workflow_run and builds github.sha.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v7
