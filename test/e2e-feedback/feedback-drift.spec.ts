@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import { execSync } from 'child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
@@ -13,6 +13,7 @@ import { FEEDBACK_CENSUS_REPLAYS, FEEDBACK_CORPUS, FEEDBACK_REPLAYS } from './co
 import { evaluateItem, validateCorpus, type ClaimResult } from './claims';
 import { installHermeticRoutes, RECORD } from './hermetic';
 import { renderReport, type DriftMeta } from './report';
+import { guardedEvaluate, isRendererDead, RENDERER_DEAD_REASON, waitForSweepEnd } from './sweep-wait';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -28,6 +29,8 @@ const SIM_FAST = process.env.FEEDBACK_SIM_FAST;
 const SEARCH_BUDGET = process.env.FEEDBACK_SEARCH_BUDGET;
 parseSearchBudget(SEARCH_BUDGET);
 const perfByReplay: Record<string, unknown> = {};
+/** Round 88 (T328): how long one single read of the debug handle may take before the page counts as dead. */
+const READ_TIMEOUT_MS = 120_000;
 
 /**
  * The expert-feedback drift run: analyzes each pinned replay through the
@@ -64,62 +67,6 @@ function pushErrorResults(replayId: string, details: string[]) {
   if (items.length === 0) noticeByReplay[replayId] = `harness failure: ${details.join(' · ')}`;
 }
 
-interface SweepPoll {
-  running: boolean;
-  done: number;
-  total: number;
-}
-
-/**
- * Waits for the sweep to TERMINATE (running false), with a stall detector:
- * the 653785 baseline wedged mid-sweep at "10/26" and burned the full
- * 35-minute wait — running stayed true with frozen progress (the registered
- * return102 family taking down the whole sweep, not just branching). Six
- * minutes without a progress tick is declared a wedge; the slowest healthy
- * per-turn step in the baseline was far under one minute. The stable reason
- * string (no elapsed seconds) feeds the report so determinism diffs stay
- * clean.
- */
-async function waitForSweepEnd(page: Page): Promise<{ ok: true } | { ok: false; reason: string }> {
-  const POLL_MS = 10_000;
-  const STALL_MS = 360_000;
-  const CAP_MS = 2_100_000;
-  const startedAt = Date.now();
-  let sawRunning = false;
-  let lastDone = -2;
-  let lastProgressAt = Date.now();
-  for (;;) {
-    const state = await page.evaluate((): SweepPoll | null => {
-      const dbg = (window as unknown as {
-        __psDebug?: { graph: { running: boolean; progress: { done: number; total: number } | null } };
-      }).__psDebug;
-      if (!dbg) return null;
-      return {
-        running: dbg.graph.running,
-        done: dbg.graph.progress?.done ?? -1,
-        total: dbg.graph.progress?.total ?? -1,
-      };
-    });
-    const elapsed = Date.now() - startedAt;
-    if (state) {
-      if (state.running) sawRunning = true;
-      if (state.done !== lastDone) {
-        lastDone = state.done;
-        lastProgressAt = Date.now();
-      }
-      if (!state.running && (sawRunning || elapsed > 30_000)) return { ok: true };
-      if (state.running && Date.now() - lastProgressAt > STALL_MS) {
-        return {
-          ok: false,
-          reason: `sweep wedged at ${state.done}/${state.total} — no progress for ${Math.round(STALL_MS / 1000)}s`,
-        };
-      }
-    }
-    if (elapsed > CAP_MS) return { ok: false, reason: `sweep did not finish within ${Math.round(CAP_MS / 1000)}s` };
-    await page.waitForTimeout(POLL_MS);
-  }
-}
-
 test('corpus is well-formed against the real fixtures', () => {
   const turnsByReplay = Object.fromEntries(FEEDBACK_REPLAYS.map(id => {
     const replay = JSON.parse(readFileSync(join(__dirname, 'fixtures', `${id}.json`), 'utf-8')) as { log: string };
@@ -150,16 +97,27 @@ for (const replayId of [...FEEDBACK_REPLAYS, ...FEEDBACK_CENSUS_REPLAYS]) {
     const panel = page.locator('.ps-main-right .ps-eval-panel');
     await panel.locator('button', { hasText: 'Analyze game' }).click();
     const wait = await waitForSweepEnd(page);
+    // Round 88 (T328): the single reads race a timeout as well; the generous bound covers the serialising of a full dump.
+    const read = async <R>(fn: () => R | Promise<R>): Promise<R> => {
+      try {
+        return await guardedEvaluate(page, fn, { evalTimeoutMs: READ_TIMEOUT_MS });
+      } catch (error) {
+        if (!isRendererDead(error)) throw error;
+        noticeByReplay[replayId] = RENDERER_DEAD_REASON;
+        pushErrorResults(replayId, [RENDERER_DEAD_REASON]);
+        throw new Error(`harness failure: ${RENDERER_DEAD_REASON}`, { cause: error });
+      }
+    };
     wallTimes[replayId] = Math.round((Date.now() - started) / 1000);
-    if (SIM_FAST !== undefined) {
-      perfByReplay[replayId] = await page.evaluate(() => (window as unknown as { __EVAL_PERF__?: unknown }).__EVAL_PERF__ ?? null);
+    if (SIM_FAST !== undefined && !(!wait.ok && wait.reason === RENDERER_DEAD_REASON)) {
+      perfByReplay[replayId] = await read(() => (window as unknown as { __EVAL_PERF__?: unknown }).__EVAL_PERF__ ?? null);
     }
     if (!wait.ok) {
       noticeByReplay[replayId] = wait.reason;
       pushErrorResults(replayId, [wait.reason]);
       throw new Error(`harness failure: ${wait.reason}`);
     }
-    const dbg = await page.evaluate(() => {
+    const dbg = await read(() => {
       const raw = (window as unknown as {
         __psDebug: {
           graph: { scores: unknown; notice: unknown; evalErrors: unknown; results: ({ koDiagnostics?: unknown[] } | null)[] };
@@ -181,7 +139,7 @@ for (const replayId of [...FEEDBACK_REPLAYS, ...FEEDBACK_CENSUS_REPLAYS]) {
       .map((error, index) => (error === null ? null : { turn: index + 1, error }))
       .filter((entry): entry is { turn: number; error: string } => entry !== null);
     if (DUMP) {
-      const full = await page.evaluate(() =>
+      const full = await read(() =>
         JSON.parse(JSON.stringify((window as unknown as { __psDebug: unknown }).__psDebug)));
       mkdirSync(REPORT_DIR, { recursive: true });
       writeFileSync(join(REPORT_DIR, `feedback-full-${replayId}.json`), JSON.stringify(full, null, 2));
