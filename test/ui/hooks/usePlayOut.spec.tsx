@@ -158,6 +158,23 @@ describe('usePlayOut', () => {
     expect(result.current.transients.playOut).toMatchObject({ executed: 1, turns: 0 });
   });
 
+  // Round 88 (T348, #84): a replacement on both sides is played as a pair, but the battle's turn does not move: no turn is counted.
+  test.each([
+    ['singles', [true], [true]],
+    ['doubles', [true, false], [false, true]],
+  ] as const)('%s: a pair that replaces on both sides executes but counts no turn', (kind, p1Force, p2Force) => {
+    const side = (forceSwitch: readonly boolean[]) => ({ active: forceSwitch.map(() => ({})), activeRequest: { forceSwitch } });
+    const bothReplace = vi.fn(() => ({ ended: false, sides: [side(p1Force), side(p2Force)] }) as unknown as ReturnType<PlayOutInputs['getBattle']>);
+    const { evaluation } = evaluationOf({ auto: true });
+    const { result, rerender, wired } = setup(evaluation, wiring({ getBattle: bothReplace }));
+    act(() => result.current.playOut.startPlayOut());
+    const done = evalResult(kind);
+    rerender({ evaluation: evaluationOf({ auto: true, status: 'done', result: done, resultTag: 'variation:3' }).evaluation, wiring: wired });
+    expect(wired.applyEvalChoice).toHaveBeenCalledTimes(2);
+    expect(wired.executeTurn).toHaveBeenCalledTimes(1);
+    expect(result.current.transients.playOut).toMatchObject({ executed: 1, turns: 0 });
+  });
+
   // Round 88 (T347, #83): the finish leaves the frame where the user watches it; the pointer takes the frame's turn.
   test('an ended battle finishes the run, restores the auto setting, and leaves the frame where it stands after played turns', async () => {
     const { evaluation, setPrefs } = evaluationOf({});

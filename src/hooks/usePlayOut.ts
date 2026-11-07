@@ -2,6 +2,7 @@ import { useCallback, useEffect, type Dispatch, type MutableRefObject, type SetS
 import type { EvalResult, RankedChoice } from '@fulllifegames/eval-engine';
 import { FAST_PLAY_OUT_SETTINGS, nextPlayOutStep, playOutDoneText, prefsAfterRun } from '../lib/play-out';
 import type { useBranch } from './useBranch';
+import { forceSwitches } from './branch/shared';
 import type { useEvaluation } from './useEvaluation';
 import type { LeadSelection } from './useDeviation';
 
@@ -201,8 +202,9 @@ function usePlayOutLoop(args: PlayOutInputs, finishPlayOut: ReturnType<typeof us
     if (evaluation.resultTag !== null && evaluation.resultTag !== evalViewKey) return;
     if (playOutProcessedRef.current === evaluation.result) return;
     playOutProcessedRef.current = evaluation.result;
-    const step = nextPlayOutStep(evaluation.result, getBattle()?.ended ?? false, playOut.executed);
-    applyLoopStep({ step, playOut, playOutRef, finishPlayOut, applyEvalChoice, setPlayOut, executeTurn });
+    const battle = getBattle();
+    const step = nextPlayOutStep(evaluation.result, battle?.ended ?? false, playOut.executed);
+    applyLoopStep({ step, interlude: bothSidesReplace(battle), playOut, playOutRef, finishPlayOut, applyEvalChoice, setPlayOut, executeTurn });
   }, [playOut, liveTip, executing, branchPreparing, evaluation.status, evaluation.result, evaluation.resultTag, evalViewKey, getBattle, applyEvalChoice, executeTurn, finishPlayOut, playOutProcessedRef, playOutRef, setPlayOut]);
 
   /**
@@ -217,9 +219,20 @@ function usePlayOutLoop(args: PlayOutInputs, finishPlayOut: ReturnType<typeof us
   }, [playOut, executing, branchPreparing, evaluation.status, evaluation.error, finishPlayOut]);
 }
 
+/**
+ * Round 88 (T348, #84): the position waits for a replacement on both sides, so the pair the loop plays is an interlude: the
+ * battle's turn does not move, and the variation gains no turn (the same entry `variation-turns.ts` leaves out of its count).
+ */
+function bothSidesReplace(battle: ReturnType<Branch['getBattle']>): boolean {
+  if (!battle?.sides) return false;
+  return (['p1', 'p2'] as const).every(side => forceSwitches(battle, side).some(Boolean));
+}
+
 /** One loop step: end the run, play a full pair, or submit the forced side. */
 function applyLoopStep(args: {
   step: ReturnType<typeof nextPlayOutStep>;
+  /** The position waits for a replacement on both sides: a pair then plays no turn. */
+  interlude: boolean;
   playOut: PlayOutState;
   playOutRef: PlayOutInputs['playOutRef'];
   finishPlayOut: (current: PlayOutState, text: string, opts?: { navigated?: boolean }) => void;
@@ -227,7 +240,7 @@ function applyLoopStep(args: {
   setPlayOut: PlayOutInputs['setPlayOut'];
   executeTurn: PlayOutInputs['executeTurn'];
 }) {
-  const { step, playOut, playOutRef, finishPlayOut, applyEvalChoice, setPlayOut, executeTurn } = args;
+  const { step, interlude, playOut, playOutRef, finishPlayOut, applyEvalChoice, setPlayOut, executeTurn } = args;
   const turnWord = playOut.turns === 1 ? '' : 's';
   if (step.kind === 'done') {
     finishPlayOut(playOut, playOutDoneText(step.reason, playOut.turns));
@@ -238,7 +251,7 @@ function applyLoopStep(args: {
       finishPlayOut(playOut, `Play-out stopped after ${playOut.turns} turn${turnWord}: the engine's choice was not playable at this position.`);
       return;
     }
-    setPlayOut({ ...playOut, executed: playOut.executed + 1, turns: playOut.turns + 1 });
+    setPlayOut({ ...playOut, executed: playOut.executed + 1, turns: playOut.turns + (interlude ? 0 : 1) });
     // The next position is evaluated once the turn landed: by the Auto pref (stale position, set on by the run) or,
     // with Auto off, by the kick effect. A call here used the closure of the turn before, tagged the result with the
     // old position and cancelled the evaluation of the right one.
