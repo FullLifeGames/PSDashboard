@@ -15,4 +15,4 @@ In VGC, Champions VGC and Battle Stadium Singles each player brings a part of th
 
 The rule lives in `replayBringOnly` and `trimTeamToBring`, and the specs `packages/eval-engine/test/bring-limit.spec.ts` and `test/regression/dock-bring-fixture.spec.ts` pin "both sides or neither". If T314 picks option (b) or (c), this ADR gets the status "superseded by" the ADR of that round.
 
-Sources: `docs/completed/timeline-ux.md` (rounds 20c and 21, 29.08.2026, A.3c), `docs/completed/eval-quality.md` (round 73), `docs/superpowers/plans/2026-08-04-eval-scoring-overhaul.md` (phase G, 05.08.2026), `docs/superpowers/specs/2026-10-21-round-73-wave-5-design.md`, `docs/backlog.md` (T278, T314); gate 02.11.2026.
+Sources: `docs/completed/timeline-ux.md` (rounds 20c and 21, 29.08.2026, A.3c), `docs/completed/eval-quality.md` (round 73), `docs/superpowers/plans/2026-08-04-eval-scoring-overhaul.md` (phase G, 05.08.2026), `docs/superpowers/specs/2026-10-21-round-73-wave-5-design.md`, issues #44 (T278) and #55 (T314); gate 02.11.2026.

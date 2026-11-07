@@ -1,6 +1,6 @@
 name: Bug report
 description: Something in PS Dashboard behaves wrong. "Report issue" in the app fills most of this form.
-labels: ["bug"]
+labels: ["bug", "needs triage"]
 body:
   - type: textarea
     id: what-happened

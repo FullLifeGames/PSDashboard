@@ -69,7 +69,7 @@ The app posts `ps-embed-ready` once it accepts replays and answers every `ps-loa
 - `test/regression/`: Vitest specs for the app code and the measurement harnesses; `test/ui/`: component and hook specs under jsdom.
 - `test/e2e/`: Playwright browser flows, one file per theme; `test/e2e-build/`: a smoke test of the minified bundle; `test/e2e-feedback/`: the expert-feedback drift suite.
 - `scripts/`: release, pack, lint-ratchet, and calibration tooling; `examples/`: the embed host page; `packages/eval-engine/examples/engine-python/`: a sample engine; `public/`: static assets.
-- [NextSteps.md](./NextSteps.md) lists the open work, [docs/backlog.md](./docs/backlog.md) the detail behind each item, and [docs/completed/](./docs/completed/) the finished rounds. [AGENTS.md](./AGENTS.md) holds the working rules for agents and contributors.
+- [Issues](https://github.com/FullLifeGames/PSDashboard/issues) hold the open work, [milestones](https://github.com/FullLifeGames/PSDashboard/milestones) the releases it belongs to, and [docs/completed/](./docs/completed/) the finished rounds. [AGENTS.md](./AGENTS.md) holds the working rules for agents and contributors.
 
 ## Development
 
@@ -100,6 +100,7 @@ CI ([test.yml](./.github/workflows/test.yml)) runs on every push to master and o
 
 ### Contributing
 
+- Report a bug with the form under [Issues](https://github.com/FullLifeGames/PSDashboard/issues/new/choose) ("Report issue" in the app fills most of it); a new report starts with the label `needs triage`. Changes reach `master` through pull requests that pass the six jobs of the test workflow.
 - New files stay under the lint ceilings of 300 lines per file, 60 per function, and complexity 15. Older files sit on shrink-only pins in `eslint.ratchet.mjs`; `node scripts/update-lint-ratchet.mjs` re-measures them and refuses to raise a pin.
 - `eslint.zones.mjs` makes the layering a lint error: a package never reaches `src/`, replay-core never imports the engine, the app imports the packages by name (dynamic imports go through `src/lib/lazy/`), and nothing under `src/lib` imports the UI.
 - Keep the knip report empty; internal helpers stay unexported.
@@ -108,7 +109,7 @@ CI ([test.yml](./.github/workflows/test.yml)) runs on every push to master and o
 
 ## Releases and hosting
 
-Bumping the version on `master` cuts a release (`npm version patch --workspaces --include-workspace-root --no-git-tag-version` moves the app and both packages, then commit and push). The [release workflow](./.github/workflows/release.yml) builds the app, tags `v<version>`, and publishes a GitHub Release with `ps-dashboard-<version>.zip`.
+Bumping the version on `master` cuts a release (`npm version patch --workspaces --include-workspace-root --no-git-tag-version` moves the app and both packages; the pull request with that commit is merged). The [release workflow](./.github/workflows/release.yml) builds the app, tags `v<version>`, and publishes a GitHub Release with `ps-dashboard-<version>.zip`.
 
 The same release publishes both library packages at that version ([scripts/publish-packages.mjs](./scripts/publish-packages.mjs), `--dry-run` prints the plan). Each package names this repository and `release.yml` as its npm trusted publisher, so there is no npm secret and every published version carries a provenance attestation.
 

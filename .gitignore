@@ -37,7 +37,6 @@ FIXPLAN.md
 /docs/*
 !/docs/completed/
 !/docs/adr/
-!/docs/backlog.md
 
 # Fitting corpus cache (manifest is committed; logs are re-downloadable)
 .fit-corpus/
