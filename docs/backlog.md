@@ -1,18 +1,18 @@
 # Backlog
 
-This file holds the details of every open TODO, one section per TODO under its fixed T-number. Release v1.1.0 is out (06.11.2026), with rounds 81 to 87 since v1.0.2 (the reload after a deploy, forced dice in branches, the GitHub issues #2 and #3, the turn dock, the smooth UI, the engine that reads the dice, the dependencies with T313 and T317). Round 88 carries T322 (the search explores the strands of a turn by their chance, blocks 1 and 2), and T319 (an inventory of dead code) follows it; T314, T316, T324 to T329 and T336 to T339 are approved and wait for a round of 1.1.1; every other TODO is parked with a trigger, and a trigger that fires brings its TODO to a gate. The next free T-number is T348.
+This file holds the details of every open TODO, one section per TODO under its fixed T-number. Release v1.1.0 is out (06.11.2026), with rounds 81 to 87 since v1.0.2 (the reload after a deploy, forced dice in branches, the GitHub issues #2 and #3, the turn dock, the smooth UI, the engine that reads the dice, the dependencies with T313 and T317). Round 88 is the wave of 1.1.1 (user gate 07.11.2026, "1a 2a"): every TODO of the section "Approved, waiting for a round" but T319, in five lanes. Round 89 carries T322 (the search explores the strands of a turn by their chance, blocks 1 and 2), and T319 (an inventory of dead code) follows it; every other TODO is parked with a trigger, and a trigger that fires brings its TODO to a gate. The next free T-number is T350.
 
 Evidence paths of the form `r<NN>/…` point to that round's probe folder, `docs/perf/probes/<date>-r<NN>/`; `docs/` is local, so they exist only on the maintainer's machine. Each round's entry in `docs/completed/` names its folder and the gate that approved its TODOs. Line numbers in a section refer to the state when the TODO was written.
 
-## Round 88 · the search explores the strands of a turn
+## Round 89 · the search explores the strands of a turn
 
-The gates of 05.11.2026 (18:19, "1b 2a 3a"; 20:47, "1a 2a 3a 4a") approved T322 for lane A of round 86. Round 86 delivered its stage 0 as probes and built hashed tree seeds first (T323); the gate of 06.11.2026 08:00 ("2a") left the trust rule unbuilt, and the final gate (11:50, "7a") made blocks 1 and 2 with the rule's variant the next round, on the merged base; the user moved it behind the release wave of 1.1.0 (06.11.2026), so it runs as round 88. It leaves this file with that round's booking.
+The gates of 05.11.2026 (18:19, "1b 2a 3a"; 20:47, "1a 2a 3a 4a") approved T322 for lane A of round 86. Round 86 delivered its stage 0 as probes and built hashed tree seeds first (T323); the gate of 06.11.2026 08:00 ("2a") left the trust rule unbuilt, and the final gate (11:50, "7a") made blocks 1 and 2 with the rule's variant the next round, on the merged base; the user moved it behind the release wave of 1.1.0 (06.11.2026) and behind the wave of 1.1.1 (07.11.2026), so it runs as round 89. It leaves this file with that round's booking.
 
 ### T322 · The search explores the strands of a turn by their chance
 
-*Eval engine · round 88 · feature · score-touching (D3)*
+*Eval engine · round 89 · feature · score-touching (D3)*
 
-**Approved for round 86 (gates of 05.11.2026, 18:19, "1b 2a 3a", and 20:47, "1a 2a 3a 4a"); the next round after the final gate of round 86 (06.11.2026, 11:50, "7a"), round 88 behind the release wave of 1.1.0 (user 06.11.2026).**
+**Approved for round 86 (gates of 05.11.2026, 18:19, "1b 2a 3a", and 20:47, "1a 2a 3a 4a"); the next round after the final gate of round 86 (06.11.2026, 11:50, "7a"), round 89 behind the release wave of 1.1.0 (user 06.11.2026) and the wave of 1.1.1 (user 07.11.2026).**
 
 **Problem.** Each outcome of a turn is a strand: Iron Head flinches (30 %) or it does not. Since T305 the verify round weights every strand of a root cell by its Dex chance. A strand gets the trees' depth only when at least two trees drew it, they agree within `VERIFY_DISAGREEMENT` and the pool has played the cell out (`deepPool` in `packages/eval-engine/src/mcts-merge.ts`); every other strand takes the one-ply estimate. Four trees draw each root cell once by their seed, so a 30 % strand gets two trees in about a third of the searches and none in a quarter. Before T323, Doubles OU gen9doublesou-2694111300 t13 read +0.440 for the side that lost, because two thin trees spread the pool past the limit; with the hashed tree seeds of round 86 it reads -0.938 against a reference of -0.983 +- 0.007, and the strands four trees happen to draw still decide the other cells: over the 38 census cells round 86 reread, the mean distance to the reference stays 0.332 with or without the trust rule (A14).
 
@@ -32,7 +32,7 @@ The gates of 05.11.2026 (18:19, "1b 2a 3a"; 20:47, "1a 2a 3a 4a") approved T322 
 
 ## Approved, waiting for a round
 
-The gates of round 84 (02.11.2026 and 03.11.2026) approved T313, T314, T316 and T317: round 87 delivered T313 and T317, T314 is a larger bug (D3) and T316 a feature, each its own round. The gate of 04.11.2026 approved T319 for after round 86; the final gate of round 86 (06.11.2026, "7a") put it after T322, which runs as round 88. The gates of round 86 approved T324 to T329 (06.11.2026, about 07:50) and T336 to T339 (11:50). The user approved T343 to T347 on 07.11.2026 for after the release of 1.1.0. Each leaves this file with its round's booking.
+The gates of round 84 (02.11.2026 and 03.11.2026) approved T313, T314, T316 and T317: round 87 delivered T313 and T317, T314 is a larger bug (D3) and T316 a feature, each its own round. The gate of 04.11.2026 approved T319 for after round 86; the final gate of round 86 (06.11.2026, "7a") put it after T322, which runs as round 88. The gates of round 86 approved T324 to T329 (06.11.2026, about 07:50) and T336 to T339 (11:50). The user approved T343 to T347 on 07.11.2026 for after the release of 1.1.0, and T348 and T349 (GitHub issues #4 and #5) at the gate of the same day. Round 88, the wave of 1.1.1, takes all of them but T319. Each leaves this file with its round's booking.
 
 ### T343 · A play-out from turn 0 hands the view back at turn 1
 
@@ -123,6 +123,42 @@ The gates of round 84 (02.11.2026 and 03.11.2026) approved T313, T314, T316 and 
 **Singles and doubles.** Both: the e2e row runs a singles and a doubles play-out.
 
 **Evidence.** The user's report of 07.11.2026; `src/hooks/usePlayOut.ts:59-73`; the review `r87/review/t346-t347-review.md`.
+
+### T348 · The dock on an inner turn of a variation shows that turn, after a replacement on both sides too
+
+*App · GitHub issue #4 (check of 1.1.0, 07.11.2026) · larger bug · lossless*
+
+**Approved (user gate 07.11.2026, "1a"), for 1.1.1.**
+
+**Problem.** GitHub issue #4 (gen9vgc2025regg-2335527677, reported against 1.0.2): at T5 of a variation from turn 1 the dock asked to send a replacement into a slot whose Pokémon had not fainted that turn, and Execute Turn was gone. The reporter's state file no longer replays in 1.1.0 (the simulator of 0.10.15 draws other dice, and the restore stops after turn 2), so the check of 07.11.2026 rebuilt the scene: the same replay, a variation from turn 1 that the engine plays out, then the pointer on each turn inside it. Turn 1 holds a voluntary switch, one side replaces after turn 2, both sides replace after turn 3 (Dusclops by Tsareena, Fallen by Pelipper). On T4 the branch frame shows turn 4 with both replacements on the field, but the dock shows the interlude before them ("Dusclops fainted! Choose who to send in", "Fallen fainted! Choose who to send in", both at 0 %) and no Execute Turn; on T5 it shows the choices of turn 4. Cause: a replacement on one side is stored as an entry of kind `forced` (`src/hooks/branch/execute.ts:130`), a replacement on both sides as an ordinary turn entry (`executeTurn` at `:213-217`, the kind written at `:70`), with the `turnNumber` of the entry before it. Every reader counts "an entry that is not forced is a turn": `variationSpan`, `serializedAtView`, `playedFromHistory`, `keptHistorySlice`, `alignHistoryRows`, `variationBoardShares` and `positionLabel`. So after each interlude on both sides every later turn of the variation reads one entry behind, up to the tip; the slider and the "N turns" texts count one turn too many per such interlude (a variation that ends in turn 10 reads 11 turns, and the issue's "6 turns" are 4); a branch from an inner turn cuts before the replacements.
+
+**Idea.** One rule in one module decides which entries make a turn, and every reader imports it. Saved branches and state files already hold interludes on both sides as entries of kind `turn`, so the rule reads them by their `turnNumber`: an entry with the number of the entry before it belongs to that turn's interlude. That covers the old data without a new version of the share link or the state file. Whether the writer stores such an interlude as `forced` too is the build's choice; a writer change alone leaves the old data wrong and breaks `ForcedRow` and the share link.
+
+**Benefit.** App users: stepping back inside a variation shows the turn the frame shows, with its choices and Execute Turn, and the turn counts are right.
+
+**Success.** A red spec first: a variation with an interlude of one side and one of both sides; every reader names the same turn for every entry; the dock on each inner turn names the bodies the branch frame shows, a forced prompt appears only where the position waits for a replacement, and Execute Turn stands wherever the position takes a turn; the tip, the slider and the turn counts count real turns; a branch from an inner turn keeps the replacements; a saved branch and a state file of 1.1.0 with such an entry read right. The variation graph's points, its row numbers and its counts move, and the ui and e2e pins that read them move at the gate of the wave. An e2e row plays the issue's replay (doubles) and a singles replay with a double knockout.
+
+**Singles and doubles.** Both: a double knockout makes both sides replace in singles too.
+
+**Evidence.** GitHub issue #4 and its state file; `issue4b.txt` and `issue4c.txt` (the reviewer's probe; in `issue4b.txt` the frame column reads `null`, so the frame side rests on the screenshots `issue4b-T*.png`), all under `docs/perf/probes/2026-11-07-issues/`; the review `r88/t348-t349-review.md`. The bench of the same issue, which offers Torracat and Tsareena though the side brought Clefable, Dusclops, Ursaluna and Gastrodon, is T314.
+
+### T349 · A terrain seed or Room Service that never fired is ruled out
+
+*Replay core · GitHub issue #5 (check of 1.1.0, 07.11.2026) · small fix · score-touching, held by the batch check*
+
+**Approved (user gate 07.11.2026, "2a"), for 1.1.1.**
+
+**Problem.** GitHub issue #5 (gen9championsvgc2026regmc-2710507840, reported against 1.0.2, unchanged in 1.1.0): at T1 the set guess gives Indeedee-F a Psychic Seed. Indeedee-F enters (log line 34) and its Psychic Surge sets Psychic Terrain (line 35); a Psychic Seed is used the moment its holder stands in its terrain (`onStart` and `onTerrainChange` of the item in `@pkmn/sim`), with its own line and a Special Defense boost, and the log shows neither. The inference rules out items whose trigger the log shows without the item's line (`packages/replay-core/src/inference/trigger-evidence.ts`: Air Balloon, Booster Energy, Eject Pack; `item-triggers.ts`: Lum Berry, Sitrus Berry, Eject Button, Red Card), but no rule covers the items that fire on a change of terrain or room. In the Dex of 0.10.15 those are the four terrain seeds (`onTerrainChange`, Gen 7 on) and Room Service (`onAnyPseudoWeatherChange`, Gen 8 on; `Past` in the Champions mod, which keeps the four seeds legal).
+
+**Idea.** A rule in a new file, in the shape of the module's others: the item is used only at its trigger (the holder's entry, the start of its terrain, and for Room Service any new field condition while Trick Room stands), so the rule reads the gates at the trigger, as the Air Balloon rule does at entry, and rules the item out when the trigger passed without the item's line. The gates the simulator applies: Klutz (off under Neutralizing Gas), Embargo and Magic Room stop all five items, and a seed blocked at its trigger stays unused after the block ends; each seed reacts to its own terrain only; a seed still fires at +6, with Contrary and for a Commander holder; Unnerve does not matter; a second Trick Room that ends the first does not fire Room Service. `TriggerWatch` has no Trick Room flag yet. Only items still unknown and never swapped are ruled out, and a team that may hold an Illusion user is not judged (`ruleOutUnknown`, `item-evidence.ts`). A sweep plays each of the five items in every generation and mod the corpus plays, singles and doubles, with every trigger and every gate above, and compares the simulator's use of the item with the rule; the issue's scene is one row.
+
+**Benefit.** App and package users: the set guess no longer names a seed or Room Service the game has already ruled out, and the evaluation stops pricing it.
+
+**Success.** The sweep is red on the issue's row first, then green; Indeedee-F in gen9championsvgc2026regmc-2710507840 at T1 no longer shows Psychic Seed. Set diffs on every build path before the wave's measurement; the batch check (two feedback runs compared byte for byte, the tier census) reads the moved rows.
+
+**Singles and doubles.** Both: the sweep runs singles and doubles in every rule set, Champions included; the issue's scene is Champions VGC.
+
+**Evidence.** GitHub issue #5 and its screenshot; `docs/perf/probes/2026-11-07-issues/issues.probe.ts` and `issue5-stats.txt` (1.1.0: "Psychic Seed GUESSED"); the reviewer's simulator probes `seeds-sim.probe.mjs`, `seeds-dex.probe.mjs`, `seed-commander.probe.mjs` and `rs-late.probe.mjs` in the same folder; the review `r88/t348-t349-review.md`.
 
 ### T314 · A bench offers bodies the side never brought
 
