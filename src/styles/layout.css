@@ -196,9 +196,13 @@
   min-width: 0;
 }
 
+/* Round 88 (T345, #81): the bar wraps at every width, so the slider keeps its 200 px (timeline.css) and the line chip with
+   Discard variation (one wrapper) take a second row below it. The bar centres its items in every query: the 1050 px query used to hang
+   them from the top of the row, which put the slider 6 px (9 px with a variation) above the step buttons. */
 .ps-branch-bar {
   flex: 0 0 auto;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 7px;
   background:
@@ -238,13 +242,11 @@
     overflow-y: visible;
     width: 100%;
   }
-  .ps-topbar,
-  .ps-branch-bar {
+  .ps-topbar {
     flex-wrap: wrap;
     align-items: flex-start;
   }
-  .ps-topbar > div,
-  .ps-branch-bar > input[type="range"] {
+  .ps-topbar > div {
     min-width: 0;
   }
 }

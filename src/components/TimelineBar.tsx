@@ -149,27 +149,30 @@ export function TimelineBar(props: TimelineBarProps) {
         viewingVariation={props.viewingVariation}
         variationEnded={props.variationEnded}
       />
-      {/* The chip stays put while a variation exists — flickering away
-          outside the covered turns made the whole bar jump around. */}
-      {variationSpan !== null && (
-        <TimelineLineChip
-          viewTurn={viewTurn}
-          variationSpan={variationSpan}
-          maxTurn={maxTurn}
-          viewingVariation={props.viewingVariation}
-          onNavigate={onNavigate}
-        />
-      )}
+      {/* Round 88 (T345, #81): the chip and Discard variation share one wrapper, so they move to a second row together when the slider
+          would fall below 200 px. The chip stays put while a variation exists: flickering away outside the covered turns made the
+          whole bar jump around. */}
       {(variationSpan !== null || branching) && (
-        <button
-          type="button"
-          className="ps-btn ps-btn-red"
-          onClick={onDiscard}
-          title="Drops every played variation move."
-          style={{ padding: '3px 10px', fontSize: 11 }}
-        >
-          Discard variation
-        </button>
+        <div className="ps-branch-bar-vari">
+          {variationSpan !== null && (
+            <TimelineLineChip
+              viewTurn={viewTurn}
+              variationSpan={variationSpan}
+              maxTurn={maxTurn}
+              viewingVariation={props.viewingVariation}
+              onNavigate={onNavigate}
+            />
+          )}
+          <button
+            type="button"
+            className="ps-btn ps-btn-red"
+            onClick={onDiscard}
+            title="Drops every played variation move."
+            style={{ padding: '3px 10px', fontSize: 11 }}
+          >
+            Discard variation
+          </button>
+        </div>
       )}
     </div>
   );
