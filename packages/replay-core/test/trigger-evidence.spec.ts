@@ -198,3 +198,37 @@ describe('Eject Pack switches its holder out after a stat drop (T130)', () => {
     expect(ruledOut(play(p1, [holder('Leftovers'), wall()], turns), 'Garchomp')).not.toContain('ejectpack');
   });
 });
+
+describe('the terrain seeds and Room Service are used when the field changes (T349)', () => {
+  const surge = (item: string) => set('Tapu Koko', item, 'Electric Surge', ['Thunderbolt', 'Protect']);
+  const turn: [string, string] = ['move softboiled', 'move protect'];
+  const doublesTurn: [string, string] = ['move softboiled, move softboiled', 'move protect, move protect'];
+  const p1Doubles = () => [wall(), set('Chansey', 'Eviolite', 'Natural Cure', ['Soft-Boiled'])];
+
+  test('singles: a lead that raises its own terrain without the seed\'s line has no Electric Seed', () => {
+    expect(play([wall()], [surge('Electric Seed'), wall()], [turn])).toMatch(/\|-enditem\|p2a: Tapu Koko\|Electric Seed/);
+    expect(ruledOut(play([wall()], [surge('Leftovers'), wall()], [turn]), 'Tapu Koko')).toContain('electricseed');
+  });
+
+  test('doubles: the issue\'s scene, a Psychic Surge lead without the seed\'s line has no Psychic Seed, and no other seed is ruled out', () => {
+    const indeedee = (item: string) => set('Indeedee-F', item, 'Psychic Surge', ['Follow Me', 'Protect']);
+    const p2 = (item: string) => [indeedee(item), set('Torkoal', 'Charcoal', 'Drought', ['Protect', 'Eruption']), wall()];
+    expect(play(p1Doubles(), p2('Psychic Seed'), [doublesTurn], { doubles: true })).toMatch(/\|-enditem\|p2a: Indeedee\|Psychic Seed/);
+    const out = ruledOut(play(p1Doubles(), p2('Leftovers'), [doublesTurn], { doubles: true }), 'Indeedee-F');
+    expect(out).toContain('psychicseed');
+    expect(out).not.toContain('electricseed');
+  });
+
+  test('singles: Trick Room set with the holder out, no Room Service line, rules Room Service out', () => {
+    const hatterene = set('Hatterene', 'Leftovers', 'Magic Bounce', ['Trick Room', 'Protect']);
+    const torkoal = (item: string) => set('Torkoal', item, 'Drought', ['Protect', 'Eruption']);
+    const trick: [string, string] = ['move trickroom', 'move protect'];
+    expect(play([hatterene], [torkoal('Room Service'), wall()], [trick])).toMatch(/\|-enditem\|p2a: Torkoal\|Room Service/);
+    expect(ruledOut(play([hatterene], [torkoal('Leftovers'), wall()], [trick]), 'Torkoal')).toContain('roomservice');
+  });
+
+  test('a team that may hold an Illusion user is not judged', () => {
+    const zoroark = set('Zoroark-Hisui', 'Leftovers', 'Illusion', ['Bitter Malice']);
+    expect(ruledOut(play([wall()], [surge('Leftovers'), zoroark], [turn]), 'Tapu Koko')).not.toContain('electricseed');
+  });
+});
