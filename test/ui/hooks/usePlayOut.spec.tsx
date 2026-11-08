@@ -37,7 +37,7 @@ function wiring(overrides: Partial<Wiring> = {}): Wiring {
     viewT0: false, viewTurn: 3, tipTurn: 3, fastPlayOut: false,
     navigateTo: vi.fn(), holdTipFollow: vi.fn(), setNavSeek: vi.fn(), executing: false, branchPreparing: false,
     getBattle: vi.fn(() => ({ ended: false }) as unknown as ReturnType<PlayOutInputs['getBattle']>),
-    executeTurn: vi.fn(async () => {}), handleEvaluate: vi.fn(), applyEvalChoice: vi.fn(() => true),
+    executeTurn: vi.fn(async () => {}), executeError: null, handleEvaluate: vi.fn(), applyEvalChoice: vi.fn(() => true),
     requestDeviation: vi.fn(),
     startLeadVariation: vi.fn((_leads, opts) => opts?.onStart?.()),
     leadPicksRef: { current: null }, setVariationNotice: vi.fn(),
@@ -134,7 +134,7 @@ describe('usePlayOut', () => {
     rerender({ evaluation: evaluationOf({ auto: true, status: 'done', result: evalResult(), resultTag: 'variation:3' }).evaluation, wiring: wired });
     await act(async () => {});
     expect(result.current.transients.playOut).toBeNull();
-    expect(result.current.transients.playOutNotice?.text).toBe('Play-out stopped after 0 turns: the turn could not be played (Earthquake is disabled for Garchomp right now.).');
+    expect(result.current.transients.playOutNotice?.text).toBe('Play-out stopped after 0 turns: the turn could not be played (Earthquake is disabled for Garchomp right now).');
   });
 
   test('a result tagged for another position is left alone', () => {
@@ -413,5 +413,57 @@ describe('usePlayOut', () => {
       expect(result.current.transients.playOut).toBeNull();
       expect(setPrefs).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('usePlayOut, a step that fails', () => {
+  // Round 88 (#103, A7): the forced replacement settles with an execute error (the resolver refused the body, or the
+  // simulator refused the command). The position never changes, so no new evaluation comes: the run ends with the reason.
+  const REFUSED = 'Ogerpon (Ogerpon-Teal-Tera) is no longer available to switch in.';
+  test.each(['singles', 'doubles'] as const)('%s: a forced replacement that fails ends the run with its reason instead of waiting', kind => {
+    const { evaluation, setPrefs } = evaluationOf({});
+    const { result, rerender, wired } = setup(evaluation);
+    act(() => result.current.playOut.startPlayOut());
+    const base = evalResult(kind);
+    const forced = evalResult(kind, { perSide: { p1: base.perSide.p1, p2: waitOnly() } });
+    rerender({ evaluation: evaluationOf({ status: 'done', result: forced, resultTag: 'variation:3' }, setPrefs).evaluation, wiring: wired });
+    expect(wired.applyEvalChoice).toHaveBeenCalledWith('p1', forced.perSide.p1[0]);
+    expect(result.current.transients.playOut).toMatchObject({ executed: 1, turns: 0 });
+    // The settle stored the error; the position (and so the evaluation) stays as it was.
+    rerender({ evaluation: evaluationOf({ status: 'done', result: forced, resultTag: 'variation:3' }, setPrefs).evaluation, wiring: { ...wired, executeError: REFUSED } });
+    expect(result.current.transients.playOut).toBeNull();
+    expect(result.current.transients.playOutNotice).toEqual({
+      text: 'Play-out stopped after 0 turns: the forced replacement could not be played (Ogerpon (Ogerpon-Teal-Tera) is no longer available to switch in).',
+      watchTurn: 3,
+    });
+    expect(setPrefs).toHaveBeenLastCalledWith(expect.objectContaining({ auto: false }));
+  });
+
+  test('a forced replacement that lands cleanly keeps the run going, and an error left from before the run does not end it', () => {
+    const { evaluation } = evaluationOf({ auto: true });
+    const { result, rerender, wired } = setup(evaluation, wiring({ executeError: 'Left over from a click before the run.' }));
+    act(() => result.current.playOut.startPlayOut());
+    expect(result.current.transients.playOut).toMatchObject({ active: true });
+    const forced = evalResult('singles', { perSide: { p1: evalResult().perSide.p1, p2: waitOnly() } });
+    rerender({ evaluation: evaluationOf({ auto: true, status: 'done', result: forced, resultTag: 'variation:3' }).evaluation, wiring: { ...wired, executeError: null } });
+    expect(result.current.transients.playOut).toMatchObject({ active: true, executed: 1 });
+    // The next position's pair plays on: the forced step's watch is over.
+    rerender({ evaluation: evaluationOf({ auto: true, status: 'done', result: evalResult(), resultTag: 'variation:3' }).evaluation, wiring: { ...wired, executeError: null } });
+    expect(result.current.transients.playOut).toMatchObject({ active: true, executed: 2, turns: 1 });
+  });
+
+  test.each(['singles', 'doubles'] as const)('%s: a turn that fails after played turns ends the run and names the count', async kind => {
+    const { evaluation } = evaluationOf({ auto: true });
+    const executeTurn = vi.fn(async () => null as string | null).mockResolvedValueOnce(null).mockResolvedValueOnce('Spore is disabled for Amoonguss right now.');
+    const wired = wiring({ executeTurn });
+    const { result, rerender } = setup(evaluation, wired);
+    act(() => result.current.playOut.startPlayOut());
+    rerender({ evaluation: evaluationOf({ auto: true, status: 'done', result: evalResult(kind), resultTag: 'variation:3' }).evaluation, wiring: wired });
+    await act(async () => {});
+    expect(result.current.transients.playOut).toMatchObject({ active: true, turns: 1 });
+    rerender({ evaluation: evaluationOf({ auto: true, status: 'done', result: evalResult(kind), resultTag: 'variation:3' }).evaluation, wiring: wired });
+    await act(async () => {});
+    expect(result.current.transients.playOut).toBeNull();
+    expect(result.current.transients.playOutNotice?.text).toBe('Play-out stopped after 1 turn: the turn could not be played (Spore is disabled for Amoonguss right now).');
   });
 });
