@@ -5,8 +5,9 @@ import {
 import { lightEngine, loadDockReplay } from './dock-helpers';
 
 /**
- * Round 88 (T316, #56): the workspace's replay frames hide the buttons the timeline covers (Last turn, Next turn, Go to turn...) and
- * the two choosers that do nothing in the app (Color scheme, Music). Play, Reset, Speed and Switch sides stay and work, and the
+ * Round 88 (T316, #56): the workspace's replay frames hide the two choosers that do nothing in the app (Color scheme, Music). Play,
+ * Last turn, Next turn, Go to turn..., Reset, Speed and Switch sides stay and work (the gate of 08.11.2026 brought the three turn
+ * buttons back, which T316 had hidden), and the
  * dock's top row belongs to the side the frame shows near: at load (P1, P2 with ?p2), after Switch sides and after a rebuild of the
  * frame. Singles and doubles. State is read from the frame's own battle (`Replays.battle`), never from a click count.
  */
@@ -56,13 +57,10 @@ async function loadSingles(page: Page) {
   await expect(page.locator('iframe[title="PS Replay"]')).toBeVisible({ timeout: 10_000 });
 }
 
-async function expectTurnControlsGone(frame: Frame) {
+async function expectFrameControls(frame: Frame) {
   // One button plays and pauses (the live branch frame plays at once, so it reads pause): both stand for the first control.
   const row1 = async () => (await visibleActions(frame, '.replay-controls')).map(action => (action === 'pause' ? 'play' : action));
-  await expect.poll(row1).toEqual(['play', 'reset', 'switchViewpoint']);
-  for (const action of ['rewind', 'ff', 'ffto']) {
-    await expect(frame.locator(`.replay-controls button[data-action="${action}"]`)).toBeHidden();
-  }
+  await expect.poll(row1).toEqual(['play', 'rewind', 'ff', 'ffto', 'reset', 'switchViewpoint']);
   await expect(frame.locator('.replay-controls-2 .speedchooser')).toBeVisible();
   await expect(frame.locator('.replay-controls-2 .colorchooser')).toBeHidden();
   await expect(frame.locator('.replay-controls-2 .soundchooser')).toBeHidden();
@@ -71,21 +69,21 @@ async function expectTurnControlsGone(frame: Frame) {
   await expect.poll(() => frame.evaluate(() => (window as ReplayWindow).Replays?.muted === true && (window as ReplayWindow).BattleSound?.muted === true)).toBe(true);
 }
 
-test.describe('the frame keeps Play, Reset, Speed and Switch sides', () => {
-  test('singles, main frame: no Last turn, Next turn, Go to turn..., Color scheme or Music; music off at load', async ({ page }) => {
+test.describe('the frame keeps Play, the turn buttons, Reset, Speed and Switch sides', () => {
+  test('singles, main frame: Last turn, Next turn and Go to turn... shown; no Color scheme or Music; music off at load', async ({ page }) => {
     test.setTimeout(120_000);
     await loadSingles(page);
-    await expectTurnControlsGone(await frameOf(page));
+    await expectFrameControls(await frameOf(page));
   });
 
   test('singles, branch frame: the same controls', async ({ page }) => {
     test.setTimeout(240_000);
     await loadSingles(page);
     await startVariationAt(page, 2);
-    await expectTurnControlsGone(await frameOf(page, 'Branch Simulation'));
+    await expectFrameControls(await frameOf(page, 'Branch Simulation'));
   });
 
-  test('the four kept controls work: Hyperfast, Play, Pause, Switch sides, Reset', async ({ page }) => {
+  test('the kept controls work: Hyperfast, Play, Pause, Next turn, Last turn, Switch sides, Reset', async ({ page }) => {
     test.setTimeout(180_000);
     await loadSingles(page);
     await moveTimeline(page, 1);
@@ -107,6 +105,15 @@ test.describe('the frame keeps Play, Reset, Speed and Switch sides', () => {
 
     await frame.locator('.replay-controls button[data-action="pause"]').click();
     await expect.poll(async () => (await battle()).paused).toBe(true);
+
+    // Next turn and Last turn move the frame one turn, and the timeline follows the frame's report
+    const paused = (await battle()).turn;
+    await frame.locator('.replay-controls button[data-action="rewind"]').click();
+    await expect.poll(async () => (await battle()).turn).toBe(paused - 1);
+    await expect.poll(async () => Number(await slider.inputValue())).toBe(paused - 1);
+    await frame.locator('.replay-controls button[data-action="ff"]').click();
+    await expect.poll(async () => (await battle()).turn).toBe(paused);
+    await expect.poll(async () => Number(await slider.inputValue())).toBe(paused);
 
     await switchSides(frame);
     await expect.poll(() => nearSide(frame)).toBe('p2');

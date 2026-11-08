@@ -29,8 +29,8 @@ interface Props {
   onTurnChange?: (turn: number) => void;
   /** Round 88 (T316): the frame reports the side it shows near (Switch sides, the ?p2 flag); the dock puts that side on top. */
   onSideChange?: (side: FrameSide) => void;
-  /** Round 88 (T316): false hides Last turn, Next turn, Go to turn..., Color scheme and Music (the timeline moves through the turns). Default true. */
-  turnControls?: boolean;
+  /** Round 88 (T316): false hides Color scheme and Music, which do nothing in the app's frames. Default true. */
+  choosers?: boolean;
   /**
    * Explicit one-shot seek command for live-update frames, which ignore
    * seekTurn prop changes after mount (re-seeking on every render fought
@@ -141,7 +141,7 @@ function PSReplayFrameDocument({
   viewpoint,
   onTurnChange,
   onSideChange,
-  turnControls = true,
+  choosers = true,
   seekRequest = null,
 }: DocumentProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -156,7 +156,7 @@ function PSReplayFrameDocument({
   const frameSeekTurn = liveUpdates ? initialSeek.seekTurn : seekTurn;
 
   const blobUrl = useReplayBlobUrl({
-    documentLog, format, p1, p2, title, initialSeek, reportTurn, reportSide: !!onSideChange, hideTurnControls: !turnControls, viewpoint,
+    documentLog, format, p1, p2, title, initialSeek, reportTurn, reportSide: !!onSideChange, hideChoosers: !choosers, viewpoint,
   });
   const lastReportedTurnRef = useTurnReports(onTurnChange, blobUrl);
   useSideReports(iframeRef, onSideChange);

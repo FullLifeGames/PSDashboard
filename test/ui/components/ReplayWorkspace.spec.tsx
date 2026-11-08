@@ -247,10 +247,11 @@ describe("ReplayWorkspace: the dock follows the frame's near side", () => {
     expect(sideLabels().at(-1)).toMatch(/^P1/);
   }, 90_000);
 
-  test('the frames report their side and hide the turn buttons: the workspace frame carries both', async () => {
+  test('the frames report their side and hide the two choosers, and keep the turn buttons', async () => {
     await mountLoaded('singles');
     const html = await (vi.mocked(URL.createObjectURL).mock.calls[0][0] as Blob).text();
     expect(html).toContain('trackSide');
-    expect(html).toContain('[data-action="ffto"]');
+    expect(html).toContain('.soundchooser');
+    expect(html).not.toContain('[data-action="ffto"]');
   }, 90_000);
 });

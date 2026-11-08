@@ -1,17 +1,16 @@
 /**
- * Round 88 (T316, #56): the controls of the workspace's replay frames. The app's timeline moves through the turns, so the frame hides
- * Showdown's Last turn, Next turn and Go to turn... buttons; Color scheme and Music go too (Music does nothing in our frame, which
- * silences every sound, and the OS setting picks light or dark). Play, Reset, Speed and Switch sides stay. The embed rewrites row 1
- * with `.html()` on every battle update, so a removed button comes back at the next update: the hiding is CSS on `data-action`,
- * and the embed shows its sound chooser with an inline `display`, so that rule needs `!important`.
+ * Round 88 (T316, #56): the controls of the workspace's replay frames. Color scheme and Music go (Music does nothing in our frame,
+ * which silences every sound, and the OS setting picks light or dark). Play, Last turn, Next turn, Go to turn..., Reset, Speed and
+ * Switch sides stay; T316 had hidden the three turn buttons, and the gate of 08.11.2026 brought them back. The embed shows its sound
+ * chooser with an inline `display`, so the rule needs `!important`.
  */
 
-/** The style of a frame that hides the turn controls (`hideTurnControls`). */
+/** The style of a frame that hides the two choosers (`hideChoosers`). */
 export const APP_CONTROLS_STYLES = `<style>
-.replay-controls button[data-action="rewind"],.replay-controls button[data-action="ff"],.replay-controls button[data-action="ffto"],.replay-controls-2 .colorchooser,.replay-controls-2 .soundchooser{display:none !important;}
+.replay-controls-2 .colorchooser,.replay-controls-2 .soundchooser{display:none !important;}
 </style>`;
 
-/** The style of a frame that hides the turn controls, with its line break; empty for the other frames. */
+/** The style of a frame that hides the two choosers, with its line break; empty for the other frames. */
 export function appControlsStyles(hide: boolean): string {
   return hide ? `${APP_CONTROLS_STYLES}\n` : '';
 }

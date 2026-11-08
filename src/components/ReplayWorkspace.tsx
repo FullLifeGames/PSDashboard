@@ -108,7 +108,7 @@ function BattleFrame({ app, replayData, onSideChange }: WorkspaceProps & { onSid
           seekRequest={navSeek}
           onTurnChange={handleReplayTurn}
           onSideChange={onSideChange}
-          turnControls={false}
+          choosers={false}
         />
       ) : (
         <PSReplayFrame
@@ -124,7 +124,7 @@ function BattleFrame({ app, replayData, onSideChange }: WorkspaceProps & { onSid
           reloadKey={`${replayData.id}:original`}
           onTurnChange={handleReplayTurn}
           onSideChange={onSideChange}
-          turnControls={false}
+          choosers={false}
         />
       )}
     </div>

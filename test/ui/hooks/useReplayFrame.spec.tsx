@@ -96,18 +96,19 @@ describe('useSideReports', () => {
 });
 
 describe('useReplayBlobUrl with the workspace options', () => {
-  test('reportSide and hideTurnControls build a document that carries them', async () => {
+  test('reportSide and hideChoosers build a document that carries them', async () => {
     const initialSeek = { seekTurn: 1 };
-    renderHook(() => useReplayBlobUrl({ documentLog: LOG, initialSeek, reportTurn: true, reportSide: true, hideTurnControls: true, viewpoint: 'p2' }));
+    renderHook(() => useReplayBlobUrl({ documentLog: LOG, initialSeek, reportTurn: true, reportSide: true, hideChoosers: true, viewpoint: 'p2' }));
     const html = await (vi.mocked(URL.createObjectURL).mock.calls[0][0] as Blob).text();
     expect(html).toContain('trackSide');
     expect(html).toContain("var ownSide = 'p2';");
-    expect(html).toContain('data-action="ffto"');
+    expect(html).toContain('.soundchooser');
+    expect(html).not.toContain('data-action="ffto"');
 
     renderHook(() => useReplayBlobUrl({ documentLog: LOG, initialSeek, reportTurn: true }));
     const plain = await (vi.mocked(URL.createObjectURL).mock.calls[1][0] as Blob).text();
     expect(plain).not.toContain('trackSide');
-    expect(plain).not.toContain('data-action="ffto"');
+    expect(plain).not.toContain('.soundchooser');
   });
 });
 

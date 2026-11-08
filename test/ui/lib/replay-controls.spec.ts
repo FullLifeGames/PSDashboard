@@ -27,22 +27,22 @@ function runTracker(viewpoint: 'p1' | 'p2', replays?: unknown) {
 
 const near = (sideid: string) => ({ battle: { nearSide: { sideid } } });
 
-describe('the frame document that hides the turn controls', () => {
-  test('hideTurnControls adds the style that hides rewind, ff, ffto and the two choosers, and nothing the app keeps', () => {
-    const html = generateReplayHtml({ log, hideTurnControls: true });
+describe('the frame document that hides the two choosers', () => {
+  // Round 88 (gate of 08.11.2026): Last turn, Next turn and Go to turn... are back in the frame; Color scheme and Music stay hidden
+  test('hideChoosers adds the style that hides the two choosers, and none of the buttons the app keeps', () => {
+    const html = generateReplayHtml({ log, hideChoosers: true });
     expect(html).toContain(APP_CONTROLS_STYLES);
-    for (const hidden of ['rewind', 'ff', 'ffto']) expect(APP_CONTROLS_STYLES).toContain(`[data-action="${hidden}"]`);
     expect(APP_CONTROLS_STYLES).toContain('.colorchooser');
     expect(APP_CONTROLS_STYLES).toContain('.soundchooser');
     expect(APP_CONTROLS_STYLES).toContain('display:none !important');
-    for (const kept of ['play', 'pause', 'reset', 'switchViewpoint']) expect(APP_CONTROLS_STYLES).not.toContain(`data-action="${kept}"`);
+    for (const kept of ['play', 'pause', 'rewind', 'ff', 'ffto', 'reset', 'switchViewpoint']) expect(APP_CONTROLS_STYLES).not.toContain(`data-action="${kept}"`);
     expect(APP_CONTROLS_STYLES).not.toContain('speedchooser');
   });
 
   test('the default document holds no such style and no side tracker', () => {
     const html = generateReplayHtml({ log });
     expect(html).not.toContain(APP_CONTROLS_STYLES);
-    expect(html).not.toContain('data-action="rewind"');
+    expect(html).not.toContain('.soundchooser');
     expect(html).not.toContain('trackSide');
   });
 
@@ -50,7 +50,7 @@ describe('the frame document that hides the turn controls', () => {
     expect(scriptBodies(generateReplayHtml({ log, reportSide: true })).some(body => body.includes('trackSide'))).toBe(true);
     expect(generateReplayHtml({ log, reportSide: true, viewpoint: 'p2' })).toContain("var ownSide = 'p2';");
     expect(generateReplayHtml({ log, reportSide: true })).toContain("var ownSide = 'p1';");
-    expect(generateReplayHtml({ log, hideTurnControls: true })).not.toContain('trackSide');
+    expect(generateReplayHtml({ log, hideChoosers: true })).not.toContain('trackSide');
   });
 });
 

@@ -21,12 +21,12 @@ export function useReplayBlobUrl(args: {
   title?: string;
   initialSeek: { seekTurn?: number; autoPlay?: boolean };
   reportTurn: boolean;
-  /** Round 88 (T316): the document reports the side it shows near, and hides the turn buttons the timeline covers. */
+  /** Round 88 (T316): the document reports the side it shows near, and hides the two choosers (Color scheme, Music). */
   reportSide?: boolean;
-  hideTurnControls?: boolean;
+  hideChoosers?: boolean;
   viewpoint?: 'p1' | 'p2';
 }): string | null {
-  const { documentLog, format, p1, p2, title, initialSeek, reportTurn, reportSide, hideTurnControls, viewpoint } = args;
+  const { documentLog, format, p1, p2, title, initialSeek, reportTurn, reportSide, hideChoosers, viewpoint } = args;
   // Round 85 (T318): a frame opened right after the app starts waits for the teambuilder table's part (at most until
   // TABLE_PART_WAIT_MS); the flag turns false once and stays false, so no frame that stands is rebuilt by it.
   const tableWait = useSyncExternalStore(subscribeTablePart, tablePartPending, () => false);
@@ -45,14 +45,14 @@ export function useReplayBlobUrl(args: {
       autoPlay: initialSeek.autoPlay,
       reportTurn,
       reportSide,
-      hideTurnControls,
+      hideChoosers,
       viewpoint,
       fontAwesomeWoff2Url: localFontAwesomeUrl(),
       // Read when the document is built, not a dependency: a part that arrives later never reloads a frame.
       teambuilderTableUrl: teambuilderTablePartUrl(),
     });
     return createBlobUrl(html);
-  }, [documentLog, format, p1, p2, title, initialSeek, reportTurn, reportSide, hideTurnControls, viewpoint, tableWait]);
+  }, [documentLog, format, p1, p2, title, initialSeek, reportTurn, reportSide, hideChoosers, viewpoint, tableWait]);
 
   useEffect(() => {
     if (!blobUrl) return;

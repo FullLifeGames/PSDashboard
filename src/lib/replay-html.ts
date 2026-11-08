@@ -273,8 +273,8 @@ export function generateReplayHtml(opts: {
   reportTurn?: boolean;
   /** Round 88 (T316): reports the side the frame shows near (`ps-side`), for the dock's row order. */
   reportSide?: boolean;
-  /** Round 88 (T316): hides Last turn, Next turn, Go to turn..., Color scheme and Music (replay-controls.ts). */
-  hideTurnControls?: boolean;
+  /** Round 88 (T316): hides Color scheme and Music (replay-controls.ts). */
+  hideChoosers?: boolean;
   /** Viewer perspective — 'p2' renders the battle from player 2's side (the ?p2 replay-URL flag). */
   viewpoint?: 'p1' | 'p2';
   /** Replaces the embed's FontAwesome face (see replay-compat.ts). */
@@ -284,7 +284,7 @@ export function generateReplayHtml(opts: {
 }): string {
   const {
     log, format = '', p1 = 'Player 1', p2 = 'Player 2', title, seekTurn, autoPlay = false,
-    reportTurn = false, reportSide = false, hideTurnControls = false, viewpoint = 'p1', fontAwesomeWoff2Url, teambuilderTableUrl,
+    reportTurn = false, reportSide = false, hideChoosers = false, viewpoint = 'p1', fontAwesomeWoff2Url, teambuilderTableUrl,
   } = opts;
   const displayTitle = title || `${format ? `[${format}] ` : ''}${p1} vs. ${p2}`;
   // Escape forward slashes for the script tag content (PS format)
@@ -300,7 +300,7 @@ export function generateReplayHtml(opts: {
 <title>${displayTitle}</title>
 ${REPLAY_STYLES}
 ${PHONE_STYLES}
-${appControlsStyles(hideTurnControls)}${PHONE_FIT_SCRIPT}
+${appControlsStyles(hideChoosers)}${PHONE_FIT_SCRIPT}
 ${SILENT_AUDIO_SCRIPT}
 ${POINTER_SOURCE_SHIM_SCRIPT}
 <div class="wrapper replay-wrapper">
