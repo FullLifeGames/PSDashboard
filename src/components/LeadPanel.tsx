@@ -70,8 +70,8 @@ export function LeadPanel({ playerNames, p1Options, p2Options, leadsPerSide, bri
       <div className="ps-dock-anchor">
         <div className="ps-dock-bar">
           <div className="ps-lead-rows">
-            <LeadSide label={`P1 · ${playerNames[0]}`} options={p1Options} selected={p1Leads} leadsPerSide={leadsPerSide} maxPicks={maxPicks} onToggle={toggleP1} />
-            <LeadSide label={`P2 · ${playerNames[1]}`} options={p2Options} selected={p2Leads} leadsPerSide={leadsPerSide} maxPicks={maxPicks} onToggle={toggleP2} />
+            <LeadSide side="p1" label={`P1 · ${playerNames[0]}`} options={p1Options} selected={p1Leads} leadsPerSide={leadsPerSide} maxPicks={maxPicks} onToggle={toggleP1} />
+            <LeadSide side="p2" label={`P2 · ${playerNames[1]}`} options={p2Options} selected={p2Leads} leadsPerSide={leadsPerSide} maxPicks={maxPicks} onToggle={toggleP2} />
           </div>
           <button
             type="button"

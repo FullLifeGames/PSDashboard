@@ -260,7 +260,8 @@
 .ps-tile-flags { position: absolute; top: -7px; right: 8px; display: flex; gap: 3px; }
 .ps-tile-flags .ps-played-badge,
 .ps-tile-flags .ps-forced-badge,
-.ps-tile-flags .ps-engine-badge { margin: 0; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4); }
+.ps-tile-flags .ps-engine-badge,
+.ps-tile-flags .ps-guess-badge { margin: 0; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4); }
 .ps-tile-bars { display: grid; gap: 3px; }
 .ps-tile-bar {
   display: grid;

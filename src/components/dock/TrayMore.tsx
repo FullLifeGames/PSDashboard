@@ -52,7 +52,7 @@ export function TrayMore({ slot, gen, diceViews, onChoice, onHypotheticalMove }:
       <div className="ps-tray-block">
         <span className="ps-tray-label">All choices</span>
         <div className="ps-custom-choice">
-          <ChoicePicker label={label} moves={moves} switches={switches} blockedSwitchKeys={slot.blockedSwitchKeys} onPick={onPickChoice} />
+          <ChoicePicker side={slot.side} label={label} moves={moves} switches={switches} blockedSwitchKeys={slot.blockedSwitchKeys} onPick={onPickChoice} />
         </div>
       </div>
     </div>

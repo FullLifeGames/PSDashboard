@@ -11,6 +11,7 @@ import { useScrollFade } from '../hooks/useScrollFade';
 import { sourceAccent, sourceLabel } from '../lib/provenance-labels';
 import { spriteUrl } from '../lib/sprite-url';
 import { useReplayRules } from '../lib/replay-rules';
+import { STAND_IN_MARK, STAND_IN_TITLE } from '../lib/stand-in-mark';
 import { typeBg } from '../lib/type-colors';
 
 interface Props {
@@ -29,10 +30,6 @@ const STAT_LABELS = { hp: 'HP', atk: 'Atk', def: 'Def', spa: 'SpA', spd: 'SpD', 
 
 /** Round 87 (release 1.1.0), T317: the tag's words for a spread nobody has revealed; it carries no source word, since "unknown" is the whole claim. */
 const EVS_UNKNOWN = 'EVs not yet known';
-
-/** Round 88 (F, #101): the marker of a stand-in, a body the log never showed that the format's teammate usage names. */
-const STAND_IN_MARK = 'Not revealed (guessed from teammate usage)';
-const STAND_IN_TITLE = 'The log never showed this Pokémon. The statistics of the format name it as a likely teammate, so the engine plays with it. Edit it or paste your team to replace the guess.';
 
 function formatEvs(evs: PokemonEvsInfo, isRandomFormat: boolean): string {
   const labels = [

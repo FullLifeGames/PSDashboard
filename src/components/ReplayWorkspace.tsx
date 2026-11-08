@@ -13,6 +13,7 @@ import { useCallback, useMemo, useState } from 'react';
 import type { FrameSide } from '../hooks/useReplayFrame';
 import { logRules, type ReplayData } from '@fulllifegames/replay-core';
 import { ReplayRulesContext } from '../lib/replay-rules';
+import { GuessedBodiesContext, guessedBodies } from '../lib/stand-in-mark';
 import { REPLAY_FRAME_HEIGHT } from '../lib/replay-html';
 
 interface WorkspaceProps {
@@ -240,16 +241,21 @@ function WorkspaceLeft({ app, replayData }: WorkspaceProps) {
 /** The loaded-replay layout: battle iframe and panels beside the evaluation column. */
 export function ReplayWorkspace({ app, replayData }: WorkspaceProps) {
   const rules = useMemo(() => logRules(replayData.log), [replayData]);
+  // Round 88 (F, #101): the bodies the log never showed wear the stats panel's marker wherever the What-if offers them.
+  const { statsP1Info, statsP2Info } = app.ctx.knowledge;
+  const isGuessed = useMemo(() => guessedBodies(statsP1Info, statsP2Info, rules), [statsP1Info, statsP2Info, rules]);
   // Round 84 (A7b, ruling 9a): the layout's height caps the left column; the right column follows the dock's foot.
   const layoutRef = useLayoutHeight();
   return (
     <ReplayRulesContext.Provider value={rules}>
-      <div className="ps-main-layout" ref={layoutRef}>
-        {/* Left column: iframe */}
-        <WorkspaceLeft app={app} replayData={replayData} />
-        {/* Right column: evaluation beside the battle (chess-style), then stats */}
-        <WorkspaceEvalColumn app={app} replayData={replayData} />
-      </div>
+      <GuessedBodiesContext.Provider value={isGuessed}>
+        <div className="ps-main-layout" ref={layoutRef}>
+          {/* Left column: iframe */}
+          <WorkspaceLeft app={app} replayData={replayData} />
+          {/* Right column: evaluation beside the battle (chess-style), then stats */}
+          <WorkspaceEvalColumn app={app} replayData={replayData} />
+        </div>
+      </GuessedBodiesContext.Provider>
     </ReplayRulesContext.Provider>
   );
 }
