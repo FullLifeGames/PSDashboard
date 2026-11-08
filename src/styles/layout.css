@@ -273,6 +273,11 @@
     white-space: nowrap;
     gap: 8px;
   }
+  /* Round 88 (#107): the Setup panel spans the bar like the Load panel (loader.css): the button stands at the left of a wrapped row,
+     and a panel anchored at its right edge ran past the window's left edge. */
+  .ps-topbar { position: relative; }
+  .ps-setup-menu { position: static; }
+  .ps-setup-panel { left: 0; right: 0; }
   .ps-topbar .ps-support-name {
     display: none;
   }
