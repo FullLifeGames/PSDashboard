@@ -13,6 +13,11 @@ import { FIXTURES, rebuild, type FixtureId, type GameType } from './forced-recon
  * The rows hold the twelve fixtures: the count of `playForcedTurn` calls one rebuild makes (`plays`; a trial is one or two calls; the count
  * before the change in the comment; the faint steps' own trials fall by 136 over the ten replays that move), and the hash of the rebuild's
  * battle log and of its alignment records, which the change must not move.
+ *
+ * Round 88 (gate of 08.11.2026): T325 (the slowest move as the stand-in of a body that never acts), T337 (an accuracy die per hit) and X2
+ * (a body with a cant line keeps its place in the turn) move six rows. 2629703929 turns 9 to 12, 2695803506 turn 1, 2663093831 turns 10
+ * and 11 and 648453 turn 33 now rebuild as the log shows them; 653785 turn 22 shows one more difference (the simulator knocks Lopunny out
+ * with Dragon Claw where the log leaves it 18/271 HP), and 2630685175 shifts only its damage dice from turn 1.
  */
 
 const counter = vi.hoisted(() => ({ plays: 0 }));
@@ -27,16 +32,16 @@ interface Row { plays: number; log: string; records: string }
 const ROWS: Record<FixtureId, Row> = {
   'smogtours-gen8ou-573756': { plays: 306, log: '55385:-227915766', records: '12037:-849299304' }, // 306 before
   'smogtours-gen8ou-562428': { plays: 70, log: '14065:878376274', records: '1906:-1870928336' }, // 70 before
-  'smogtours-gen6ou-648453': { plays: 228, log: '17309:-798091621', records: '3222:2021864078' }, // 253 before
+  'smogtours-gen6ou-648453': { plays: 243, log: '17383:369831988', records: '3222:356002956' }, // 253 before
   'smogtours-gen6ou-649664': { plays: 90, log: '14045:-1895746750', records: '1993:-1082029582' }, // 99 before
-  'smogtours-gen6ou-653785': { plays: 194, log: '14332:-2131591829', records: '2168:-1519866860' }, // 250 before
+  'smogtours-gen6ou-653785': { plays: 194, log: '14309:-1595011329', records: '2168:818953523' }, // 250 before
   'smogtours-gen6ou-655336': { plays: 92, log: '14086:452960982', records: '2341:-2010242956' }, // 101 before
   'gen9championsou-2628340185': { plays: 109, log: '13184:-452248840', records: '2082:-679139574' }, // 117 before
   'smogtours-gen9doublesou-912045': { plays: 94, log: '11255:-274969247', records: '863:-177670543' }, // 124 before
-  'gen9doublesou-2663093831': { plays: 216, log: '15578:-421419384', records: '1212:830153463' }, // 255 before
-  'gen9vgc2026regi-2630685175': { plays: 79, log: '12128:-462531378', records: '866:495371160' }, // 80 before
-  'gen9vgc2026regi-2629703929': { plays: 110, log: '8366:-291886899', records: '1040:-1097407566' }, // 121 before
-  'gen9championsvgc2026regmc-2695803506': { plays: 48, log: '10419:-1678134465', records: '1036:-515572330' }, // 57 before
+  'gen9doublesou-2663093831': { plays: 188, log: '16457:-327827304', records: '1216:1131273756' }, // 255 before
+  'gen9vgc2026regi-2630685175': { plays: 79, log: '12127:2084224386', records: '866:495371160' }, // 80 before
+  'gen9vgc2026regi-2629703929': { plays: 34, log: '8112:-157510885', records: '1036:-1509701834' }, // 121 before
+  'gen9championsvgc2026regmc-2695803506': { plays: 34, log: '10550:-1779205691', records: '1036:-1509701834' }, // 57 before
 };
 
 describe.each(['singles', 'doubles', 'vgc'] as GameType[])('the faint step plays the last roll step first: %s', type => {

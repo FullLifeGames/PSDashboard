@@ -171,9 +171,12 @@ describe('the counts of the drift line', () => {
 
   // Round 86 (ruling C2): the turns the hybrid search plays under another seed than index 0
   // 2630685175 turn 3 is a named residual (the aim of a charge move sits in |-anim|): the search keeps the seed whose unnamed dice fit best and the row stays imperfect
-  test('the seeded turns of the twelve replays: only 2630685175 turn 3, still a named residual', () => {
+  // Round 88 (gate of 08.11.2026): since X2 Sinistcha's flinch of 2663093831 turn 9 lands; the forced pass still misses the log (the built
+  // Dragonite holds Inner Focus), and the seed search finds a seed that fits the turn's other dice better
+  test('the seeded turns of the twelve replays: 2663093831 turn 9 and 2630685175 turn 3, both named residuals', () => {
     const seeded = FIXTURES.flatMap(({ id }) => [...rebuilt.get(id)!.records.values()].filter(record => record.via === 'forced' && record.seed !== '1,2,3,4').map(record => `${key({ id, turn: record.turn })} ${record.seed}`));
-    expect(seeded).toEqual([`${key({ id: 'gen9vgc2026regi-2630685175', turn: 3 })} 2,4,6,8`]);
+    expect(seeded).toEqual([`${key({ id: 'gen9doublesou-2663093831', turn: 9 })} 62,64,33,83`, `${key({ id: 'gen9vgc2026regi-2630685175', turn: 3 })} 2,4,6,8`]);
+    expect(isPerfectAlignment(recordOf({ id: 'gen9doublesou-2663093831', turn: 9 }).actual)).toBe(false);
     expect(isPerfectAlignment(recordOf({ id: 'gen9vgc2026regi-2630685175', turn: 3 }).actual)).toBe(false);
   });
 
