@@ -1,5 +1,5 @@
 import { toID } from '@pkmn/dex';
-import type { ReplayData, RulesMod, TurnSnapshot } from '@fulllifegames/replay-core';
+import { teamSizes, type ReplayData, type RulesMod, type TurnSnapshot } from '@fulllifegames/replay-core';
 import {
   analyzeTurn, decidedSeenKey, diceEventTurns, forcedWinSeenKey, forcedWinSpeaks, PAYOFF_WINDOW, unansweredSeenKey, type TurnAnalysis, detectSacks,
   type PlayedTurn, type StreakHistoryEntry, buildGameReport, type GameReport, computeRead, type EvalResult, noteSpokenClaim, releaseBrokenClaims,
@@ -26,12 +26,8 @@ export interface AnalysisGraphData {
  * lists); null for a side the log does not size.
  */
 function broughtCounts(snapshots: TurnSnapshot[]): { p1: number | null; p2: number | null } {
-  const counts: { p1: number | null; p2: number | null } = { p1: null, p2: null };
-  for (const line of snapshots[0]?.log ?? []) {
-    const match = line.match(/^\|teamsize\|(p[12])\|(\d+)/);
-    if (match) counts[match[1] as 'p1' | 'p2'] = Number(match[2]);
-  }
-  return counts;
+  // Round 88 (F, #101): the one `|teamsize|` reader of replay-core.
+  return teamSizes(snapshots[0]?.log ?? []);
 }
 
 /**

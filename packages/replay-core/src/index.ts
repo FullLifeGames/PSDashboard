@@ -29,7 +29,7 @@ export { parseReplayLog, parseReplayLogWithObservations } from './protocol-parse
 export {
   splitReplayPassword, getReplayGameType, inferReplayFormatId, getReplayDisplayFormat, getReplayGeneration,
   getReplayBringCount, speciesBaseId, broughtSpeciesFor, replayBringOnly, formatEnforcesSleepClause, replayRuleset,
-  getBranchSimulatorFormat, replayRules,
+  getBranchSimulatorFormat, replayRules, teamSizes,
 } from './replay-format.ts';
 export type { ReplayRuleset } from './replay-format.ts';
 export { finalPlayedTurn } from './replay-turns.ts';

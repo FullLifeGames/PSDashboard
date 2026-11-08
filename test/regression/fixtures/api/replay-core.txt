@@ -141,6 +141,7 @@ value speciesBaseId
 value speciesOverrides
 value splitReplayPassword
 value standingScreens
+value teamSizes
 value terrainConditions
 value toId
 value twinBattle
