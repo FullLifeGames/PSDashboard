@@ -2,6 +2,7 @@ import type { PokemonIdent, SimBattle, SimPokemon, SimSide, TurnBlock } from './
 import { formatTargetLoc, slotLetter } from './team-order.ts';
 import { sameBodyForme } from './body-forme.ts';
 import { answersForcedRequest } from './forced-request.ts';
+import { cantStandIn } from './cant-stand-in.ts';
 import { nextChoosingSlot } from '../forward/request-moves.ts';
 import { sideIndex, toId, type RulesDex } from '@fulllifegames/replay-core';
 
@@ -183,8 +184,11 @@ function firstLegalTargetLoc(battle: SimBattle, active: SimPokemon, targetType: 
  * and the first move (Fake Out, Shadow Sneak, Protect) could run ahead of the foe the log shows first (653785 t23, 2628340185
  * t23, 2663093831 t9 and t10, 2695803506 t1, 2629703929 t9). The slowest move keeps the logged order, as it does for a body that
  * switched out before it acted; a body with no move at 0 or below keeps its first move.
+ * Round 88 (X2): a body whose turn shows a `|cant|` line (a flinch, a full paralysis) has its place in the log's order, so the
+ * slowest move can put it behind an action the log shows after that line (2663093831 t9: Trick Room, -7, put p1's Sinistcha behind
+ * the Shadow Ball that knocked it out, and its flinch never came): `cantStandIn` reads the move that keeps its place.
  */
-function defaultMoveChoice(battle: SimBattle, active: SimPokemon | null | undefined): string {
+function defaultMoveChoice(battle: SimBattle, active: SimPokemon | null | undefined, events: string[] = [], ident = ''): string {
   if (!active || nextChoosingSlot(active.side, active.position) !== active.position) return 'pass';
   const firstMove = active.moveSlots[0];
   if (!firstMove) return 'pass';
@@ -194,7 +198,7 @@ function defaultMoveChoice(battle: SimBattle, active: SimPokemon | null | undefi
   // (gen9vgc2026regi-2630452654 t4, Miraidon locked into Snarl) had `move 1`
   // disabled, and the rejected side choice cost its partner the Encore.
   const requestMoves = active.getMoveRequestData().moves;
-  const slowest = slowestRequestMove(battle.dex, active);
+  const slowest = cantStandIn(battle, active, events, ident) ?? slowestRequestMove(battle.dex, active);
   const slowestIndex = slowest ? requestMoves.findIndex(move => move.id === slowest) : -1;
   const enabledIndex = slowestIndex >= 0 ? slowestIndex : Math.max(0, requestMoves.findIndex(move => !move.disabled));
   const requestEntry = requestMoves[enabledIndex];
@@ -361,7 +365,7 @@ function getChoiceForSlot(
  * 54). `pass` takes no modifier, the sim rejects it.
  */
 function defaultChoiceForSlot(events: string[], ident: string, battle: SimBattle, active: SimPokemon | null | undefined): string {
-  const fallback = defaultMoveChoice(battle, active);
+  const fallback = defaultMoveChoice(battle, active, events, ident);
   return fallback.startsWith('move ') ? `${fallback}${gimmickSuffixForSlot(events, ident, active)}` : fallback;
 }
 
