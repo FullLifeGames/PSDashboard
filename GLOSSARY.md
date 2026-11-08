@@ -62,3 +62,18 @@ A copy of a logged turn that plays with one die turned over, a miss turned into 
 **Biggest roll**:
 The die with the largest chance against the eventual winner: a miss of the winner's sure kill, in singles or as a named click in doubles (`BiggestRoll` in `biggest-roll.ts`, built by `biggestRollFor`). The headword follows the code; the report's sentence keeps "roll" for this die. The report's own sentence calls it "The game's biggest roll" and gives the winner's chance after a hit and after the miss.
 _Avoid_: roll (outside "damage roll" and the report's quoted sentence)
+
+### Teams
+
+**Body**:
+One Pokémon of a side as the battle holds it, on the field or on the bench.
+
+**Bench**:
+The bodies a side can switch to. In a bring-limited game the What-if bench, the stored positions and the snapshot pickers offer only the bodies a side brought once that side fielded its whole selection; a side that did not stays whole (`src/lib/bench.ts`). The engine and the play-out choose from every body the rebuild holds: four per side when both sides fielded their whole selection, otherwise six.
+
+**Stand-in**:
+A body the log never showed, filled in for a side that never showed its whole team in a game without Team Preview (Gen 1 to 4). It comes from the format's teammate statistics and carries the flag `standIn` (`team/stand-ins.ts` in replay-core); the app marks it "Not revealed (guessed from teammate usage)" with the badge "guessed".
+_Avoid_: placeholder
+
+**Stand-in move**:
+The move the reconstruction gives a body that never acts in a logged turn: its slowest move at priority 0 or below, so the turn keeps the log's order (`slowestRequestMove`), or, for a body whose cant line stands before a logged action, the move that keeps its place in the turn (`cantStandIn`).
