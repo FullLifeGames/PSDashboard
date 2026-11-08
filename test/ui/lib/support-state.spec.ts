@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import {
   NEW_ISSUE_URL, buildSupportState, isSupportState, issueUrl, positionLabel, screenMessage, supportFileName,
@@ -65,7 +67,8 @@ describe('the support state file (round 77, user gate 28.10.2026)', () => {
     expect(url.searchParams.get('position')).toBe('T28 on the main line (variation from turn 5, 1 turn)');
     expect(url.searchParams.get('message')).toBe('PBA S 2 3 & 5 (Kyurem) no longer knows Brave Bird.');
     expect(url.searchParams.get('title')).toBe('gen9draft-2058494320: PBA S 2 3 & 5 (Kyurem) no longer knows Brave Bird.');
-    expect(url.searchParams.get('state-file')).toContain('state.json');
+    // Round 88 (user report 08.11.2026): the form takes the state file in an upload field, which a link cannot fill
+    expect(url.searchParams.get('state-file')).toBeNull();
     // Round 77 (user report 28.10.2026): GitHub reads issue forms from the default branch only; without the form the link
     // opened a blank issue with the title alone. The description carries the facts for that case.
     const body = url.searchParams.get('body') ?? '';
@@ -78,5 +81,14 @@ describe('the support state file (round 77, user gate 28.10.2026)', () => {
     expect(clipped.length).toBeLessThanOrEqual(600);
     expect(clipped.endsWith('…')).toBe(true);
     expect(issueUrl(long, 'state.json').length).toBeLessThan(8000);
+  });
+
+  // Round 88 (user report 08.11.2026): GitHub took no .json file in the form's text box on a new issue (#108 carries the
+  // instruction instead of the file). An issue form's upload field takes .json files.
+  test('the issue form takes the state file in an upload field that accepts .json', () => {
+    const form = readFileSync(join('.github', 'ISSUE_TEMPLATE', 'bug_report.yml'), 'utf-8').replace(/\r\n/g, '\n');
+    const field = /- type: (\w+)\n\s+id: state-file\n([\s\S]*?)(?=\n {2}- type:|$)/.exec(form);
+    expect(field?.[1]).toBe('upload');
+    expect(field?.[2]).toMatch(/accept: "\.json"/);
   });
 });
