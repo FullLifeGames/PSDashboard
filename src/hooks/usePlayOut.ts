@@ -1,4 +1,4 @@
-import { useCallback, useEffect, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
+import { useCallback, useEffect, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import type { EvalResult, RankedChoice } from '@fulllifegames/eval-engine';
 import { FAST_PLAY_OUT_SETTINGS, nextPlayOutStep, playOutDoneText, prefsAfterRun } from '../lib/play-out';
 import type { useBranch } from './useBranch';
@@ -43,6 +43,8 @@ export interface PlayOutInputs {
   navigateTo: (position: { turn: number; line: 'main' | 'variation' }, opts?: { seek?: boolean; internal?: boolean; toFrame?: true | number }) => void;
   setNavSeek: Dispatch<SetStateAction<{ turn: number; seq: number; play?: boolean } | null>>;
   executing: boolean;
+  /** Round 88 (#103, A7): what the last execute or forced replacement reported; the loop reads it after a forced step. */
+  executeError: string | null;
   branchPreparing: boolean;
   getBattle: Branch['getBattle'];
   executeTurn: Branch['executeTurn'];
@@ -176,8 +178,11 @@ function useStartPlayOut(args: PlayOutInputs) {
 function usePlayOutLoop(args: PlayOutInputs, finishPlayOut: ReturnType<typeof usePlayOutFinish>['finishPlayOut']) {
   const {
     playOut, setPlayOut, playOutProcessedRef, evaluation, evalViewKey, liveEvalStatus,
-    liveTip, executing, branchPreparing, getBattle, executeTurn, handleEvaluate, applyEvalChoice, playOutRef,
+    liveTip, executing, executeError, branchPreparing, getBattle, executeTurn, handleEvaluate, applyEvalChoice, playOutRef,
   } = args;
+  // Round 88 (#103, A7): set while the run waits on a forced replacement it submitted; the settle reports a refusal through
+  // `executeError` and the position does not change, so no evaluation would ever end the wait.
+  const forcedPendingRef = useRef(false);
   /**
    * A play-out started from the MAIN LINE arms before its rebuild finishes —
    * startPlayOut cannot evaluate a sim that does not exist yet, and entering
@@ -202,10 +207,21 @@ function usePlayOutLoop(args: PlayOutInputs, finishPlayOut: ReturnType<typeof us
     if (evaluation.resultTag !== null && evaluation.resultTag !== evalViewKey) return;
     if (playOutProcessedRef.current === evaluation.result) return;
     playOutProcessedRef.current = evaluation.result;
+    forcedPendingRef.current = false;
     const battle = getBattle();
     const step = nextPlayOutStep(evaluation.result, battle?.ended ?? false, playOut.executed);
-    applyLoopStep({ step, interlude: bothSidesReplace(battle), playOut, playOutRef, finishPlayOut, applyEvalChoice, setPlayOut, executeTurn });
+    applyLoopStep({ step, interlude: bothSidesReplace(battle), playOut, playOutRef, forcedPendingRef, finishPlayOut, applyEvalChoice, setPlayOut, executeTurn });
   }, [playOut, liveTip, executing, branchPreparing, evaluation.status, evaluation.result, evaluation.resultTag, evalViewKey, getBattle, applyEvalChoice, executeTurn, finishPlayOut, playOutProcessedRef, playOutRef, setPlayOut]);
+
+  useEffect(() => {
+    if (!playOut?.active) {
+      forcedPendingRef.current = false;
+      return;
+    }
+    if (playOut.stopping || executing || !forcedPendingRef.current || !executeError) return;
+    forcedPendingRef.current = false;
+    finishPlayOut(playOut, `Play-out stopped after ${playOut.turns} turn${playOut.turns === 1 ? '' : 's'}: the forced replacement could not be played (${withoutFullStop(executeError)}).`);
+  }, [playOut, executing, executeError, finishPlayOut]);
 
   /**
    * The loop advances on COMPLETED evaluations — an evaluation that fails
@@ -217,6 +233,11 @@ function usePlayOutLoop(args: PlayOutInputs, finishPlayOut: ReturnType<typeof us
     if (evaluation.status !== 'error') return;
     finishPlayOut(playOut, `Play-out stopped after ${playOut.turns} turn${playOut.turns === 1 ? '' : 's'}: the evaluation failed here${evaluation.error ? ` (${evaluation.error})` : ''}.`);
   }, [playOut, executing, branchPreparing, evaluation.status, evaluation.error, finishPlayOut]);
+}
+
+/** Round 88 (#103, A7): the simulator's reasons end in a full stop; inside the notice's parentheses it would read ").)." */
+function withoutFullStop(reason: string): string {
+  return reason.replace(/\.\s*$/, '');
 }
 
 /**
@@ -235,12 +256,13 @@ function applyLoopStep(args: {
   interlude: boolean;
   playOut: PlayOutState;
   playOutRef: PlayOutInputs['playOutRef'];
+  forcedPendingRef: MutableRefObject<boolean>;
   finishPlayOut: (current: PlayOutState, text: string, opts?: { navigated?: boolean }) => void;
   applyEvalChoice: PlayOutInputs['applyEvalChoice'];
   setPlayOut: PlayOutInputs['setPlayOut'];
   executeTurn: PlayOutInputs['executeTurn'];
 }) {
-  const { step, interlude, playOut, playOutRef, finishPlayOut, applyEvalChoice, setPlayOut, executeTurn } = args;
+  const { step, interlude, playOut, playOutRef, forcedPendingRef, finishPlayOut, applyEvalChoice, setPlayOut, executeTurn } = args;
   const turnWord = playOut.turns === 1 ? '' : 's';
   if (step.kind === 'done') {
     finishPlayOut(playOut, playOutDoneText(step.reason, playOut.turns));
@@ -259,7 +281,7 @@ function applyLoopStep(args: {
       // A finish that came first (Stop, a navigation) owns the notice; a stop that waits for this turn keeps the user's navigation.
       const live = playOutRef.current;
       if (error && live?.active) {
-        finishPlayOut(playOut, `Play-out stopped after ${playOut.turns} turn${playOut.turns === 1 ? '' : 's'}: the turn could not be played (${error}).`, { navigated: !!live.stopping?.navigated });
+        finishPlayOut(playOut, `Play-out stopped after ${playOut.turns} turn${playOut.turns === 1 ? '' : 's'}: the turn could not be played (${withoutFullStop(error)}).`, { navigated: !!live.stopping?.navigated });
       }
     });
     return;
@@ -271,6 +293,7 @@ function applyLoopStep(args: {
     finishPlayOut(playOut, `Play-out stopped after ${playOut.turns} turn${turnWord}: the forced replacement could not be submitted.`);
     return;
   }
+  forcedPendingRef.current = true;
   setPlayOut({ ...playOut, executed: playOut.executed + 1 });
 }
 

@@ -144,7 +144,7 @@ function usePlayLayer(
   ctx: ReplayContext, transients: Transients, board: BoardController,
   evalView: ReturnType<typeof useEvalViewLayer>,
 ) {
-  const { simState, branching, executing, getBattle, executeTurn } = ctx.branch;
+  const { simState, branching, executing, executeError, getBattle, executeTurn } = ctx.branch;
   const { evaluation } = ctx;
   const {
     playOut, setPlayOut, setPlayOutNotice, playOutProcessedRef, playOutRef, stopPlayOutRef,
@@ -173,7 +173,7 @@ function usePlayLayer(
     playOut, setPlayOut, setPlayOutNotice, playOutProcessedRef, playOutRef, stopPlayOutRef,
     evaluation, fastPlayOut, evalViewKey, liveEvalStatus: board.liveEvalStatus, liveTip, viewingVariation, atEndPosition, viewT0,
     viewTurn, tipTurn, holdTipFollow, navigateTo, setNavSeek,
-    executing, branchPreparing, getBattle, executeTurn, handleEvaluate, applyEvalChoice: walk.applyEvalChoice,
+    executing, executeError, branchPreparing, getBattle, executeTurn, handleEvaluate, applyEvalChoice: walk.applyEvalChoice,
     requestDeviation, startLeadVariation, leadPicksRef, setVariationNotice,
   });
   return { walk, playOutControls };

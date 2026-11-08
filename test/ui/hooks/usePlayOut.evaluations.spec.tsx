@@ -83,7 +83,7 @@ function useRunHarness(kind: FormatKind, forcedAt: number[], endAfterTurns: numb
     playOutProcessedRef: transients.playOutProcessedRef, playOutRef: transients.playOutRef, stopPlayOutRef: transients.stopPlayOutRef,
     evaluation, fastPlayOut: false, evalViewKey, liveEvalStatus, liveTip: true, viewingVariation: true, atEndPosition: false,
     viewT0: false, viewTurn, tipTurn: viewTurn, holdTipFollow: vi.fn(), navigateTo: vi.fn(), setNavSeek: vi.fn(),
-    executing, branchPreparing: false,
+    executing, executeError: null, branchPreparing: false,
     getBattle: () => ({ ended: turns >= endAfterTurns }) as never,
     executeTurn: async () => { land('turn'); await Promise.resolve(); return null; },
     handleEvaluate,

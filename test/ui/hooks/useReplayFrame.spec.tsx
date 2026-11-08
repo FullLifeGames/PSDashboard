@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import {
-  useLiveAppend, useReplayBlobUrl, useSeekRequests, useSeekTurn, useTurnReports, type SeekRequest,
+  useLiveAppend, useReplayBlobUrl, useSeekRequests, useSeekTurn, useSideReports, useTurnReports, type SeekRequest,
 } from '../../../src/hooks/useReplayFrame';
 
 type FrameRef = React.RefObject<HTMLIFrameElement | null>;
@@ -48,6 +48,66 @@ describe('useReplayBlobUrl', () => {
 
     unmount();
     expect(URL.revokeObjectURL).toHaveBeenCalledTimes(2);
+  });
+});
+
+/** A message the way the frame's tracker posts it: `source` is the posting window. */
+function postFromFrame(source: unknown, data: unknown) {
+  const event = new MessageEvent('message', { data });
+  Object.defineProperty(event, 'source', { value: source });
+  act(() => { window.dispatchEvent(event); });
+}
+
+// Round 88 (T316, #56): the side the frame shows near reaches the app through `ps-side`, from its own window only.
+describe('useSideReports', () => {
+  test('forwards the side its own frame reports and nothing else', () => {
+    const { iframeRef } = frame();
+    const onSideChange = vi.fn();
+    renderHook(() => useSideReports(iframeRef, onSideChange));
+
+    postFromFrame(iframeRef.current?.contentWindow, { type: 'ps-side', side: 'p2' });
+    expect(onSideChange).toHaveBeenCalledTimes(1);
+    expect(onSideChange).toHaveBeenLastCalledWith('p2');
+    postFromFrame(iframeRef.current?.contentWindow, { type: 'ps-side', side: 'p1' });
+    expect(onSideChange).toHaveBeenLastCalledWith('p1');
+
+    // Another window (a dying document, another frame), a side that is no side, a missing side and other messages.
+    postFromFrame({}, { type: 'ps-side', side: 'p2' });
+    postFromFrame(iframeRef.current?.contentWindow, { type: 'ps-side', side: 'p3' });
+    postFromFrame(iframeRef.current?.contentWindow, { type: 'ps-side' });
+    postFromFrame(iframeRef.current?.contentWindow, { type: 'ps-turn', turn: 3 });
+    expect(onSideChange).toHaveBeenCalledTimes(2);
+  });
+
+  test('adds no listener without a callback, and removes its own on unmount', () => {
+    const { iframeRef } = frame();
+    const add = vi.spyOn(window, 'addEventListener');
+    const remove = vi.spyOn(window, 'removeEventListener');
+    renderHook(() => useSideReports(iframeRef, undefined));
+    expect(add).not.toHaveBeenCalledWith('message', expect.anything());
+
+    const { unmount } = renderHook(() => useSideReports(iframeRef, vi.fn()));
+    expect(add).toHaveBeenCalledWith('message', expect.anything());
+    unmount();
+    expect(remove).toHaveBeenCalledWith('message', expect.anything());
+    add.mockRestore();
+    remove.mockRestore();
+  });
+});
+
+describe('useReplayBlobUrl with the workspace options', () => {
+  test('reportSide and hideTurnControls build a document that carries them', async () => {
+    const initialSeek = { seekTurn: 1 };
+    renderHook(() => useReplayBlobUrl({ documentLog: LOG, initialSeek, reportTurn: true, reportSide: true, hideTurnControls: true, viewpoint: 'p2' }));
+    const html = await (vi.mocked(URL.createObjectURL).mock.calls[0][0] as Blob).text();
+    expect(html).toContain('trackSide');
+    expect(html).toContain("var ownSide = 'p2';");
+    expect(html).toContain('data-action="ffto"');
+
+    renderHook(() => useReplayBlobUrl({ documentLog: LOG, initialSeek, reportTurn: true }));
+    const plain = await (vi.mocked(URL.createObjectURL).mock.calls[1][0] as Blob).text();
+    expect(plain).not.toContain('trackSide');
+    expect(plain).not.toContain('data-action="ffto"');
   });
 });
 
