@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import type { Pokemon } from '@pkmn/sim';
 import type { PokemonSnapshot } from '@fulllifegames/replay-core';
 import { sameMon } from '../src/branch/corrections';
+import { sameSpecies } from '../src/branch/entry-effects';
 import { RULESETS, become, forcedBoard, type GameType, type Ruleset } from './forme-boards';
 
 /**
@@ -55,6 +56,12 @@ const BOARDS = RULESETS.flatMap(rules => (['singles', 'doubles'] as const).map(t
 describe.each(BOARDS)('$rules.label $type: sites read a body by its Dex family (#103)', ({ rules, type }) => {
   test('corrections: the active body of the snapshot (sameMon)', () => {
     const { failures, formes } = sweep(rules, type, (body, species) => sameMon(body, { speciesForme: species, name: 'Other' } as PokemonSnapshot));
+    expect(formes).toBeGreaterThan(100);
+    expect(failures).toEqual([]);
+  });
+
+  test('entry effects: the body the protocol switched in (sameSpecies)', () => {
+    const { failures, formes } = sweep(rules, type, sameSpecies);
     expect(formes).toBeGreaterThan(100);
     expect(failures).toEqual([]);
   });
