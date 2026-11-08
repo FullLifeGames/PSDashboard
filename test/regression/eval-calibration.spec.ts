@@ -612,7 +612,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * survives in BOTH sub-tranches and the merge: the widened DUCT tree beats
  * d1 on tournament early (+3/+4) and doubles (+8/+4), and on the grand bed
  * pure MCTS beats d1 in EVERY bucket and beats auto on early/mid/doubles
- * and all Briers, tying late — the user's "MCTS is winning" reading holds
+ * and all Briers, tying late — the user's reading that MCTS is winning holds
  * with tight numbers. Auto's remaining niche: ladder-stratum late sign
  * (81 vs 79). FEATURE TRADE for the default decision: verification,
  * sensitivity probes, and the think-deeper depth ladder are MATRIX-side
@@ -1192,9 +1192,9 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * r87-b, one fresh agent per step; merged in the clone ps-dashboard-2-m87
  * (be0c344, 1e2f89d, 1c00394 cache v77); 25c774a the README picture,
  * 4615f51 the runners; probes docs/perf/probes/2026-11-06-r87/). Gates:
- * opening about 16:40 ("1a, können wir eventuell auch als parallele Wave
- * machen, der Rest für 1.1.1 dann", "2a"), lane B's images 17:52 ("1a
- * 2a"), the README picture ("Nimm es neu auf"), final 20:47 ("1a 2a 3a").
+ * opening about 16:40 (the user wanted a parallel wave, the rest goes to
+ * 1.1.1), lane B's images 17:52, the README picture (recorded anew), final
+ * 20:47.
  * DELIVERED: the CI fix (b04a434). The first push after round 86 turned
  * the dev test workflow red: two fork rows of T305 in
  * secondary-classes-paths.spec.ts count copies with the speed layer's
@@ -1240,7 +1240,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * 27 skipped, 0 failed, all 757 files started. Engine project with
  * EVAL_SIM_FAST=0: 10,811 passed, 0 failed. One expectation moved:
  * BattleStatsPanel.spec.tsx:43 from "EVs ?" to "EVs not yet known".
- * USER GATE 2026-11-06 20:47 ("1a 2a 3a"): (1) the wave as measured, with
+ * USER GATE 2026-11-06 20:47: (1) the wave as measured, with
  * the one re-pin; (2) the workflows on ubuntu-24.04 before the release;
  * (3) after the booking dev goes to r87 and is pushed, then the release
  * commit on dev; master and deploy.ps1 wait for the user's own okay.
@@ -1264,13 +1264,10 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * (cfb8130, 02b0c83, 9c6a383, 314b8c8, 3cbbc0c, 88e873e; docs cc9f18e to
  * 394b0a5); after the final suite f798c33, 77e1af3 and 3bac8f5; the fresh
  * holdout 5bc974c, e947f9b and 35f5744; probes
- * docs/perf/probes/2026-11-04-r86/). Gates: design 04.11. 14:07 ("1c, 2b,
- * 3a, 4a"), spec 15:37 ("1a 2a 3a 4a"), 05.11. 14:13 ("1a"), 18:19 ("1b 2a
- * 3a"), 20:47 ("1a 2a 3a 4a"), night 21:35 ("1a 2a 3a"), 06.11. about
- * 07:50 ("1a, 3a, 4a, 5a, 6 as recommended"), about 08:00 ("2a"), about
- * 09:30 (T309, "1a 2a"), final 11:50 ("1c, 2a, 3 as recommended, 4a, 5a,
- * 6a, 7a, 8a"), the fresh holdout's plan 12:11 ("1c 2a 3a 4a 5a"), the
- * holdout rule 14:47 ("1a").
+ * docs/perf/probes/2026-11-04-r86/). Gates: design 04.11. 14:07, spec 15:37,
+ * 05.11. 14:13, 18:19, 20:47,
+ * night 21:35, 06.11. about 07:50, about 08:00, about 09:30 (T309), final
+ * 11:50, the fresh holdout's plan 12:11, the holdout rule 14:47.
  * DELIVERED: T299 (7785888 to 1e22edd). ScriptedPRNG and PairPRNG named a
  * draw by the numbers in the call, so a script decided full paralysis,
  * infatuation, the Champions thaw and confusion but never the move's own
@@ -1291,7 +1288,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * missing class takes one scripted draw; a chase with probe seeds would
  * have cost +25 % forks in the singles matrix. A8 found that the doubles
  * trees keyed none of their root draws (Doubles OU 2694111300 t13, game
- * value -0.789 to +0.440); after gate "1a" of 05.11. they key them by the
+ * value -0.789 to +0.440); after the gate of 05.11. they key them by the
  * pair plan's classes (pair/tree-key.ts). The sweeps (secondary-classes*,
  * secondary-records, secondary-fold; KNOWN empty) play every move with a
  * chance under 100 %, with Serene Grace and Sheer Force, in every rule
@@ -1331,7 +1328,8 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * 73: Fire Fang (95%) missed. A hit would have left LordEnz 93% to win;
  * after the miss LordEnz stood at 87%." Scenes: singles 573756 t73 and
  * 562428 t11, VGC 2629703929 t10 (under T323 the turn reads shift instead
- * of chance and loses the sentence, gate 6a); Doubles OU has none (912045
+ * of chance and loses the sentence, as the gate ruled); Doubles OU has none
+ * (912045
  * t5 is the loser's hit, T333). B8: the 573756 feedback test hung for 40
  * minutes because the renderer died (12 pool workers, the replay worker
  * and the copy's worker, 6.2 GB); the copy frees the pool first, and the
@@ -1356,11 +1354,11 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * moves the Doubles OU flagship from +0.440 to -0.950 (reference -0.983 +-
  * 0.007) at c104389 and little else (3 of 61 pools accepted); at c743f2e
  * production already reads -0.938 and the rule moves 5 of 38 cells by at
- * most 0.04. Stage 1 is not built (gate "2a"). Docs: EVALUATION,
+ * most 0.04. Stage 1 is not built (gate ruling). Docs: EVALUATION,
  * ARCHITECTURE, GLOSSARY and three READMEs follow the code, ADR 0002 and
  * ADR 0009 carry consequences; a fresh review found 13 wrong claims in 40
  * and 6beb699 applied the findings on the docs; after the final gate the
- * glossary uses the code's names (5a), and the booking corrects the header
+ * glossary uses the code's names, and the booking corrects the header
  * comment of dice/watch.ts. T324 to T335 are booked (394b0a5), T336 to
  * T341 after the final gate (3bac8f5).
  * MEASUREMENT: score-touching (D3), cache v76 once for the round. Bank and
@@ -1434,7 +1432,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * spec expected cache key v75 (f798c33); four rows moved by T305 and T323
  * the game's way (forced-win focus-blast-range to no proof, two doubles
  * rows of tree-endgame-cases, the 573756 t8 guard row of
- * secondary-classes-paths), re-pinned at the gate (2a, 77e1af3). Rerun at
+ * secondary-classes-paths), re-pinned at the gate (77e1af3). Rerun at
  * the booking commit 177efaa (DICE_SWEEPS=full, 4 workers, 3,146 s):
  * 44,392 passed, 47 expected fail, 27 skipped, 0 failed; three ui files
  * (ReplayWorkspace, TurnDock.dice, sets-roundtrip-t205) did not start
@@ -1445,8 +1443,8 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * to 0.7092). The phase cells are noise at this size (two hashed
  * realizations of one engine differ by -21.7 bp in hq mid and +41.9 in hq
  * late). No VGC table saw a tree: VGC_WINPROB_K.doubles is the static fit
- * of 2026-08-09 and the VGC weights are round 69's static refit. Gate "1a
- * 2a": stage 0 captures the VGC fit side twice in CI (r86-e-fit-base on
+ * of 2026-08-09 and the VGC weights are round 69's static refit. Gate: stage
+ * 0 captures the VGC fit side twice in CI (r86-e-fit-base on
  * e7eef5e, r86-e-fit-wave on 88e873e); stage 1 would choose among three
  * VGC leaf K, never-merged commits r86-e-k1 to k3 (3.50 + 0.88 ff, 4.00 +
  * 0.88 ff, 2.98 + 2.00 ff), on the fit side only. Stage 0 (2,334 VGC
@@ -1455,8 +1453,8 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * luck-adjusted -2.3; warnings only early (hq +22, luck-adjusted +28).
  * Pre-registered reading N: the harm does not repeat on the fit side, so a
  * refit has nothing to fit. Stage 1 did not run; T309 closes without a
- * refit and T323 stays (2a).
- * FRESH VGC HOLDOUT (final gate 1c, plan H1, gate "1c 2a 3a 4a 5a"): the
+ * refit and T323 stays.
+ * FRESH VGC HOLDOUT (final gate, plan H1): the
  * VGC holdout has served since round 65; a third sample no measurement has
  * read separates a real loss from a spent holdout.
  * scripts/fresh-holdout.mjs (5bc974c, fresh-holdout.spec.ts 12 rows, red
@@ -1468,7 +1466,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * 1,245 (hq 722, 58.0 %), regj 165 (hq 48); none of the ids in any of 544
  * earlier merged.jsonl. Family vgc2 in the manifest beside the 1,137 old
  * sets, unchanged (35f5744); tarball bank-data-f34e4cefce9fc811 uploaded
- * as a pre-release (4a), v1.0.2 stays Latest, the .smogon-cache hash
+ * as a pre-release, v1.0.2 stays Latest, the .smogon-cache hash
  * unchanged. The reading, fixed before the run, decides on the seven
  * formats: R (harm in any of the six pooled rows) a real loss, S (no harm,
  * and the upper band ends of hq and luck-adjusted at the fixed K below the
@@ -1485,32 +1483,32 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * old sets under vgc, and fits keep dropping them. regj alone (494 rows)
  * resolves nothing (full -25 [-60, +6]); all eight formats read gains full
  * -16 and luck-adjusted -14.
- * USER GATE 2026-11-06 about 07:50 ("1a, 3a, 4a, 5a, 6 as recommended"):
- * (1a) A13 stays as T323 and T309 becomes the refit after the merge; (3a)
- * block 1 of T322 takes A11's form; (4a) lane B builds W and X before the
- * merge; (5a) the three Monte-Carlo rows on their references, the golden's
+ * USER GATE 2026-11-06 about 07:50:
+ * (1) A13 stays as T323 and T309 becomes the refit after the merge; (3)
+ * block 1 of T322 takes A11's form; (4) lane B builds W and X before the
+ * merge; (5) the three Monte-Carlo rows on their references, the golden's
  * channel t18 on p2-decision, the builders' rows as in the list, the
  * play-out pin and 573756 t73 stay; (6) book P1, P4, P5, P6, P9, P10, P11,
  * P13 and P15 after a check against the code, park P2, P3, P7, P8, P12 and
- * P14, P16 lapses. About 08:00 ("2a"): stage 1 of T322 is not built, round
+ * P14, P16 lapses. About 08:00: stage 1 of T322 is not built, round
  * 86 closes with A13, B and C, and T322 becomes its own round on the
  * merged base (blocks 1 and 2, the trust rule without the middlegame
- * floor, fresh references and a fresh census draw). About 09:30 (T309, "1a
- * 2a"): see above. Final 11:50 ("1c, 2a, 3 as recommended, 4a, 5a, 6a, 7a,
- * 8a"): (1c) the round settles the VGC holdout question before it closes,
- * with a fresh holdout; (2a) re-pin the four rows as F1 recommends; (3)
+ * floor, fresh references and a fresh census draw). About 09:30 (T309): see
+ * above. Final 11:50: (1) the round settles the VGC holdout question before
+ * it closes,
+ * with a fresh holdout; (2) re-pin the four rows as F1 recommends; (3)
  * the fresh holdout becomes this round's work, book T336 to T339, the
- * power pick of Present joins T303, park T340 and T341; (4a) T333's
- * trigger as D3 proposed; (5a) the glossary uses the code's names
- * ("Biggest roll", "Rolled copy"); (6a) T304's VGC scene loses its
- * sentence under T323 and becomes a scene for T322; (7a) round 87 is T322
+ * power pick of Present joins T303, park T340 and T341; (4) T333's
+ * trigger as D3 proposed; (5) the glossary uses the code's names
+ * ("Biggest roll", "Rolled copy"); (6) T304's VGC scene loses its
+ * sentence under T323 and becomes a scene for T322; (7) round 87 is T322
  * blocks 1 and 2 with the trust rule's variant and fresh references, then
- * T319; (8a) after the booking dev fast-forwards to r86 and is pushed,
+ * T319; (8) after the booking dev fast-forwards to r86 and is pushed,
  * then the round branches, the probe branches, the worktrees and the clone
- * go; master stays. 12:11 ("1c 2a 3a 4a 5a"): the fresh holdout's
+ * go; master stays. 12:11: the fresh holdout's
  * exclusion plus regj, three times the size, the highest rated first with
  * one game per pair, the upload okay, the tooling on r86 before the
- * booking. 14:47 ("1a"): AGENTS.md gets the rule that a holdout reading
+ * booking. 14:47: AGENTS.md gets the rule that a holdout reading
  * harm in a pooled row the fit side does not repeat gets a fresh draw of
  * its family before any refit; the tool for the other families and a
  * rotation park as T342.
@@ -1540,10 +1538,10 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  *
  * ROUND 85 2026-11-04 (improvement round 85, a larger bug: the UI stays
  * smooth, T318, with T320; on r85 from dev da2efa7; probes
- * docs/perf/probes/2026-11-04-r85/). Gates: 04.11. ("1a 2a": Doubles OU
- * and Scarlet/Violet VGC measured again, T320 approved), design ("1a mit
- * Möglichkeit auf 1b wenn zu viele Probleme auftreten", "2a"), the after
- * measurement ("Go ahead"), final 13:03 ("1a 2a 3a 4a").
+ * docs/perf/probes/2026-11-04-r85/). Gates: 04.11. (Doubles OU
+ * and Scarlet/Violet VGC measured again, T320 approved), design (one worker
+ * splits the part, option 1b stays the fall back if too many problems
+ * appear), the after measurement (approved), final 13:03.
  * DELIVERED: T318. Every replay frame ran Showdown's
  * data/teambuilder-tables.js (15.8 MB) at load and again at every
  * variation start, 140 to 205 ms of blocking each time. A module worker
@@ -1556,7 +1554,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * worker leaves the whole table. The e2e sweep teambuilder-table.spec.ts
  * reads species, moves, items, abilities and types of gen1 to gen9 and the
  * three mods through the part and the whole table alike. The design gate
- * (2a) dropped the worker-side merge and the pool change; the pool stays
+ * dropped the worker-side merge and the pool change; the pool stays
  * at 12. T320 (606e974): the dock skips a Tatsugiri that commands its
  * Dondozo. The required mask, the slot info and the chip read the
  * simulator's volatiles['commanding']; the sweep commander-slots.spec.ts
@@ -1581,7 +1579,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * passed, 116 expected fails, 24 skipped, the same as round 84; 268 s. e2e
  * 137 passed, 8 skipped (opt-in), 355 s. Lint, tsc -b and pack:smoke
  * green.
- * USER GATE 2026-11-04 13:03 ("1a 2a 3a 4a"): (1) the Firefox load counts
+ * USER GATE 2026-11-04 13:03: (1) the Firefox load counts
  * as met by the excess over 50 ms, both readings booked; (2) the frame
  * wait stays; (3) the merge of the trees parked as T321; (4) dev takes r85
  * as a fast-forward and is pushed over HTTPS with gh's token while GitHub
@@ -1593,11 +1591,10 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * ROUND 84 2026-11-01 to 2026-11-03 (improvement round 84, a feature: the
  * turn dock, T312, with T315 after the gate; on r84-a from dev f549a27 in
  * the worktree w84a, one fresh wave-builder per step; probes
- * docs/perf/probes/2026-11-01-r84/). Gates: design 01.11. 19:20 ("16 5,
- * 17a, 18 a"), spec 19:44 ("Passt"), final 02.11. 19:15 ("1a 2a 3a 4a
- * 5a"), the user's own test (answer 6b) and the rulings after it (02.11.
- * 19:34 to 03.11. 15:40, 1a to 20a), final part two 03.11. 16:39 ("1a 2a
- * 3a 4a").
+ * docs/perf/probes/2026-11-01-r84/). Gates: design 01.11. 19:20, spec 19:44,
+ * final 02.11. 19:15,
+ * the user's own test and the rulings after it (02.11. 19:34 to 03.11.
+ * 15:40, decisions 1a to 20a), final part two 03.11. 16:39.
  * DELIVERED: T312. Two rows of slot chips under the replay build the turn,
  * Execute on their right; a replay turn starts with the logged picks, and
  * the engine fills every slot the user has not touched: at the live tip of
@@ -1633,19 +1630,19 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * allowed 8) and 3 clicks. e2e on b094db1: Chromium 136 passed, 8 skipped
  * (opt-in), no ResizeObserver loop; WebKit 18 of 18 (scale, phone, right
  * column, narrow dock, top bar, forced replacements); Firefox 17 of 17
- * (the layout specs, gate answer 3a). ui project on b094db1: 171 files,
+ * (the layout specs, as the gate ruled). ui project on b094db1: 171 files,
  * 1,410 tests. Suite in the main checkout with DICE_SWEEPS=full: 724 files,
  * 42,026 passed, 116 expected fails, 24 skipped, the same as round 82's
  * (opt-in runs and two documented divergences of the saved replay), 437 s;
  * its one red spec, twin-lists.spec.ts, read the twin a,b,c that the lead
  * picker's redesign removed, and c087cb2 shrinks the twin and name
  * baselines. Lint and tsc -b green.
- * USER GATE 2026-11-02 19:15 ("1a 2a 3a 4a 5a"): the 88 changed
+ * USER GATE 2026-11-02 19:15: the 88 changed
  * expectations accepted; T313 (button contrast) and T314 (a bench of
  * bodies never brought) approved; the 1000 x 700 timeline under the fixed
- * dock and the darker selection blue stay. Answer 6b, the user's own test:
- * the findings that became A7a to A7j, with T315 built in the round (5b).
- * FINAL GATE PART TWO 2026-11-03 16:39 ("1a 2a 3a 4a"): (1) the 42 changed
+ * dock and the darker selection blue stay. The user's own test:
+ * the findings that became A7a to A7j, with T315 built in the round.
+ * FINAL GATE PART TWO 2026-11-03 16:39: (1) the 42 changed
  * expectations of the post-gate steps accepted; (2) T271 closed, its scene
  * pinned; (3) Firefox through Playwright; (4) dev takes r84 and is pushed
  * with rounds 82 to 84.
@@ -1656,8 +1653,8 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * ROUND 83 2026-11-01 (improvement round 83, a small batch: the GitHub
  * issues #2 and #3, on r83 from dev 24a7235; lane A in the worktree w9b by
  * the integrator, lane B in w9c by a wave-builder; probes
- * docs/perf/probes/2026-11-01-r83/ and 2026-11-01-issue3/). Gates: 11:31
- * ("1a 2b 3a 4a"), final 13:26 ("1a 2a 3a 4a").
+ * docs/perf/probes/2026-11-01-r83/ and 2026-11-01-issue3/). Gates: 11:31,
+ * final 13:26.
  * DELIVERED: T307 (issue #3, gen9terapreviewdraft-2182991758: Latias with
  * Light Clay set Light Screen on turn 34 and Reflect on turn 35, and the
  * variation from turn 38 ended both after five turns; the simulator set
@@ -1696,7 +1693,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * saved-replay test of reconstruction.spec.ts green in the main checkout.
  * Lint and tsc -b green. The reporter's state file: Light Screen 7, 6, 5,
  * 4 turns left at turns 35 to 38 (before 4, 3, 2, 1).
- * USER GATE 2026-11-01 13:26 ("1a 2a 3a 4a"): (1) T307 adopted with the
+ * USER GATE 2026-11-01 13:26: (1) T307 adopted with the
  * bank's harm, a rule right by the game stays (AGENTS.md), the refit
  * becomes T309; (2) T308 as built; (3) T309 (the refit of the doubles
  * weights) and T310 (Light Clay from the screen turns in the log) join
@@ -1740,13 +1737,13 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * branches; T299's red sweep on t299 from dev c42b5df, then r82 from t299,
  * lane A in the worktree w9a on r82-a; spec docs/superpowers/specs/
  * 2026-10-31-forced-dice-design.md, probes docs/perf/probes/
- * 2026-10-31-r82/). Gates: grilling 31.10. (answers 1a to 19a, "passt"),
- * spec 16:21 ("okay"), after A1 17:04 ("1a 2a 3a 4a": the 39 damage roll
+ * 2026-10-31-r82/). Gates: grilling 31.10. (decisions 1a to 19a),
+ * spec 16:21, after A1 17:04 (the 39 damage roll
  * steps of Gens 1 and 2, the stream reset after a forced turn, ADR 0002's
  * second rule, builders end only their own processes), during the build
- * 23:21 ("1b 2a": the full dice sweeps in a CI job of their own, a
+ * 23:21 (the full dice sweeps in a CI job of their own, a
  * branch's first turn always joins the log's visible results), final
- * 01.11. 07:51 ("1a 2a 3a").
+ * 01.11. 07:51.
  * DELIVERED: the dice module (packages/eval-engine/src/dice/). It names a
  * die by the simulator hook that runs right before the draw, else by the
  * enclosing simulator method and the draw's form (ADR 0002), and answers
@@ -1781,7 +1778,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * green. The hook probe of A1 read 10,188 pairs identical with the watch
  * on (Gens 1 to 9, Champions). The plain suite took 400 s, against 275 to
  * 362 s before the round.
- * USER GATE 2026-11-01 07:51 ("1a 2a 3a"): (1) r82 goes to dev with this
+ * USER GATE 2026-11-01 07:51: (1) r82 goes to dev with this
  * booking, and the push waits for the user's go after the user's own
  * test; (2) all seven proposals approved: T300 to T303 parked with a
  * trigger, T304 to T306 with T299 form round 83, the engine setup (the
@@ -1810,8 +1807,8 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  *
  * ROUND 81 2026-10-31 (improvement round 81, one small fix on r81 from dev
  * d747096: the user's report of the morning after the release of 1.0.2;
- * probes docs/perf/probes/2026-10-31-r81/). Gate: the user's answer "1b" (the
- * app reloads; deploy.ps1 stays as it is).
+ * probes docs/perf/probes/2026-10-31-r81/). Gate: the user chose that the
+ * app reloads; deploy.ps1 stays as it is.
  * DELIVERED: T298 (a lazy chunk that a deploy removed reloads the page once:
  * production showed "Error loading .../assets/opponent-inferrer-DmwVZADz.js"
  * until a hard reload; the app answers Vite's vite:preloadError with one
@@ -1827,7 +1824,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * 54e5d3b: T292 of the round 79 gate, T294 and T295 from the user's requests
  * of the same afternoon, T296 from the user's report of the evening and T297
  * from the round's own gate; probes docs/perf/probes/2026-10-30-r80/).
- * Gate: final 22:05 ("1a 2a 3a 4b").
+ * Gate: final 22:05.
  * DELIVERED: T295 (the doubles move button names no target, so a pick never
  * resizes it), T294 (the turn card's summary folds under an Explanation
  * toggle, closed on every turn), T292 as a quick fix (the near stage names
@@ -1854,7 +1851,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * bisect read 54e5d3b 90, 4754c58 91, afde053 92 and b8541e7 92 passed (1
  * skipped each); after T297 the pickers file passed 14 of 14, and the full
  * e2e suite on 2148e95 read 92 passed, 1 skipped.
- * USER GATE 2026-10-30 22:05 ("1a 2a 3a 4b"): the batch adopted as measured;
+ * USER GATE 2026-10-30 22:05: the batch adopted as measured;
  * the three remaining gaps of T292 parked with a trigger; T297 approved and
  * built in the batch; dev goes to the booking commit, and release 1.0.2 is
  * prepared next. At 22:20 the user gave the go for the release, the push to
@@ -1868,12 +1865,12 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * of 30.10.2026 on the game report of smogtours-gen8ou-573756, setup in the
  * GPL replay and the replacements after a knockout; lanes w7-a to w7-d from
  * r79 (dev a5491bf), merged on r79-merge; probes
- * docs/perf/probes/2026-10-30-r79/). Gates: design 08:50 ("1a 2a 3c 4a 5a 6a
- * 7a 8a"), final 15:05 ("1a 2a 3a 4a 5a 6a 7a 8a").
+ * docs/perf/probes/2026-10-30-r79/). Gates: design 08:50, final 15:05.
  * DELIVERED: lane A T282 (the near-decided click weighed by the chance its
  * user still acts), T283 (a finite race tie to the first mover only by its
  * own hit), T284 (the biggest roll against the winner, named only where the
- * log proves the event, gate "2a"; the chip prints the roll and the net), T285
+ * log proves the event, by the gate's ruling; the chip prints the roll and
+ * the net), T285
  * (no shifts or reads from a standoff of 10 turns without a faint or a
  * switch), T286 (plain words for the residual without a roll), and the
  * hazard-sack gate reads the dice; lane B T288 (a Def or SpD stage that takes
@@ -1896,7 +1893,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * fails, 24 skipped; e2e 90 passed, 1 skipped; build smoke, pack smoke and the
  * dev CI on 5aa439c green. T290's interleaved timing did not resolve (10 s
  * steps, drift); per root: singles tree +11 %, Doubles OU +15 %, VGC +6 %.
- * USER GATE 2026-10-30 15:05 ("1a 2a 3a 4a 5a 6a 7a 8a"): the wave adopted
+ * USER GATE 2026-10-30 15:05: the wave adopted
  * with its moves; the biggest roll only with a proven event; the standoff
  * sentence kept; the late warning watched, no refit; T291 and T293 parked,
  * T292 next; dev on 5aa439c. T294 and T295 approved the same afternoon for
@@ -1907,11 +1904,11 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * without jumps).
  *
  * ROUND 78 2026-10-29 (improvement round 78, the dependencies for 1.0.1:
- * the user's "Die @pkmn Dependencies scheinen updated worden zu sein" after
+ * the user's note that the @pkmn dependencies seemed to be updated, after
  * the release of 1.0.0; branch r78 from dev, which v1 became; probes
- * docs/perf/probes/2026-10-29-r78/). Gates 12:25 ("1a 2a": 1.0.1 brings the
+ * docs/perf/probes/2026-10-29-r78/). Gates 12:25 (1.0.1 brings the
  * dependencies and the @pkmn train, T103 only as far as the upgrade needs
- * it) and 15:15 ("1a 2a 3b 4a").
+ * it) and 15:15.
  * DELIVERED: part A (ff9352a: react 19.3.1, vite 8.3.5, vitest 5.0.5, eslint
  * 10.13.0, typescript-eslint 8.72.1, @playwright/test 1.64.1 and the rest of
  * npm outdated; npm audit fix for the dev-only brace-expansion and undici;
@@ -1933,7 +1930,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * status '' where 0.10.11 kept 'fnt'). Cache v72 (a102a84), the bin path
  * without ./ (d834e4a), the app and UI specs on M-C and the generator floors
  * of Gens 2 and 3 (cec3d98), a test timeout (3711088), the Pages build of a
- * release started by release.yml (c064b5a, gate "3b"). Before the round the
+ * release started by release.yml (c064b5a). Before the round the
  * Tests workflow learned to run on dev (c34eea6, 3b30440) and the two
  * fit-corpus specs to skip without the corpus (b418a75).
  * MEASUREMENT: part A lossless: r77-fix2 (the 1.0.0 engine) against
@@ -1956,7 +1953,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * load flake in the first full run, 16 of 16 alone); build smoke 3 of 3;
  * pack smoke green; start load 1,646 kB gzip (1,627 for 1.0.0, the same
  * method); the Champions chunk 46 kB gzip in one file (992 kB twice before).
- * USER GATE 2026-10-29 15:15 ("1a 2a 3b 4a"): the upgrade adopted (the
+ * USER GATE 2026-10-29 15:15: the upgrade adopted (the
  * Champions OU harm game-correct, T277 for the refit), the moved specs and
  * the identity reference taken as listed, T277 to T279 parked, the Pages
  * dispatch built before 1.0.1, and 1.0.1 prepared: r78 into dev, the
@@ -1964,8 +1961,8 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * T103 stays parked, trigger: the next simulator upgrade. Next free T280.
  * RESTS: T277 (the Champions OU K on the 0.10.12 rebuild), T278 (an M-B
  * replay on the M-B overlay), T279 (the recoil chip with the crit share).
- * RELEASE 1.0.1 2026-10-29 (user 17:29 "1a 2a 3a", 17:58 "1a 2a 3a", 18:40
- * "1a"): the README picture cropped to the app (fd692d8), the package
+ * RELEASE 1.0.1 2026-10-29 (user okays 17:29,
+ * 17:58, 18:40): the README picture cropped to the app (fd692d8), the package
  * manifests on the release version instead of 0.1.0 (e32f720), and T280
  * (84bef28): the branch replay's browser flow read the log while the frame
  * still played turn 2 and failed three Tests runs on dev in a row; it now
@@ -1974,7 +1971,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * to 84bef28; release.yml tagged v1.0.1, published both packages as 1.0.1
  * with provenance and started the Pages build; deploy.ps1 moved production;
  * the Tests run on master green at the first attempt. After the release
- * (user 20:35 "1a"): T281 (e5ecdb5), the branch replay's play controls flow
+ * (user 20:35): T281 (e5ecdb5), the branch replay's play controls flow
  * paused while the frame still played its turn in and the app repeated its
  * seek; it now waits for the same settled frame (expectReplaySettled in
  * test/e2e/helpers.ts), and the Tests run on dev went green at the first
@@ -1985,8 +1982,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * move, a branching review swarm and its two fix waves, T267; branch r77
  * from v1, lanes L1 to L5 in worktrees r77-L1..5, merged in the main
  * checkout: 1b55346 (L1), 0e18b11 (L2), 6350915 (L3), 5ec993f (L4), fb63aba
- * (L5); probes docs/perf/probes/2026-10-24-r77/). Swarm gates 28.10. ("1a 2d
- * 3a 4b + A-5 5b", "1a 2a 3a 4a 5a 6a").
+ * (L5); probes docs/perf/probes/2026-10-24-r77/). Swarm gates 28.10.
  * DELIVERED: A to C (a20919f, e416be5, f42b4fe, 81194df: the frame shows the
  * turn a variation played, the picker takes input only for the position it
  * shows), D (44913ee: a move where the variation does not reach is a main
@@ -2036,7 +2032,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * five faults no lane saw: the first T267 form, the recharge turn (fbd3318),
  * the import of the panel's own export (0c685b1), the start load (bd70952)
  * and the pointer after a set edit (5ceffe8).
- * USER GATE 2026-10-29 07:38 ("1a 2a 3a 4a 5a 6a 7a 8b"): T267 with the visit
+ * USER GATE 2026-10-29 07:38: T267 with the visit
  * bar adopted, the nine moved attributions taken as listed (no pinned verdict
  * moved), the rests parked as T272 to T276 with the trigger "a user report"
  * (the three internal points as one, T276; the review merged the ended tip
@@ -2060,7 +2056,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * reverted in 1459923), 8803bca (cache v70), 3785973 (T262), 372a2d6, a3b65ab
  * and 4777df5 (the wave run's rests), d92c7ff (the re-pins); spec
  * docs/superpowers/specs/2026-10-23-round-76-last-wave-design.md, probes
- * docs/perf/probes/2026-10-23-r76/). Design gate 23.10. ("1a 2a": four lanes,
+ * docs/perf/probes/2026-10-23-r76/). Design gate 23.10. (four lanes,
  * T262 after the merge; the play-out pin is not bent).
  * DELIVERED: T264 (a dice turn against the winner joins the key moments,
  * keyMomentsFor in key-moments.ts; 573756 t73 back in the list), T233 (a tied
@@ -2109,7 +2105,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * probe read a cell with two outcomes from three draws (T227). GitHub held a
  * finished run open for an hour in round 74; the round's own measurements ran
  * without hand work after T266.
- * USER GATE 2026-10-24 13:36 ("1a 2a 3a 4a 5a"): the re-pins where the fresh
+ * USER GATE 2026-10-24 13:36: the re-pins where the fresh
  * reference carries the engine (573756 t73 and 912045 t8 without a tier, the
  * search identity recorded anew, 648453 t13 the required singles scene of the
  * matrix test), no re-fit of the doubles weights, T259 parked with a trigger,
@@ -2126,7 +2122,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * 9f58393 (the eval-engine and app sweeps), e400835 (the lint rule for
  * eval-engine and the app), a2e7c2b (the replay worker loads the mod); spec
  * docs/superpowers/specs/2026-10-23-round-75-design.md, probes
- * docs/perf/probes/2026-10-23-r75/). Design gate 23.10. ("1a 2a 3a" with the
+ * docs/perf/probes/2026-10-23-r75/). Design gate 23.10. (with the
  * user's notes: the type chart changes from Gen 1 to 2 and from Gen 6, a
  * species' stats and abilities change between generations, and the global Dex
  * is read nowhere, without exceptions).
@@ -2160,7 +2156,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * resolver and the Champions rule exported, five replay-core and seven
  * eval-engine functions take a Dex, rules or a mod, the analysis carries
  * setupMove): T43 bumps the versions.
- * USER GATE 2026-10-23 17:41 ("1a 2a"): the rule into AGENTS.md (every rule
+ * USER GATE 2026-10-23 17:41: the rule into AGENTS.md (every rule
  * from the game's Dex, the global Dex read only in the resolver, every realm
  * loads the mod first), booked and pushed; next the last wave. No new TODO,
  * next free T267.
@@ -2173,8 +2169,8 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * percent), 78d7cf3 (VGC matchup 123, reverted in 80b98cd), 1ae7eab (the bank
  * guards against harm), 0806c90 (the fits as comments); spec
  * docs/superpowers/specs/2026-10-22-round-74-design.md, probes
- * docs/perf/probes/2026-10-22-r74/). Design gate 22.10. ("1a 2a 3a 4a 5a 6a":
- * the capture with search in CI on the full fit corpus and the upload of its
+ * docs/perf/probes/2026-10-22-r74/). Design gate 22.10. (the capture with
+ * search in CI on the full fit corpus and the upload of its
  * data pack, all five families, the leaf K first, then the matchup weight,
  * then the display scale, the adoption rule per family, T264 and T265 to the
  * last wave).
@@ -2215,12 +2211,12 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * end of the session stopped the local watchers of r74-m (T266). A lower leaf
  * K in VGC flattens the leaves and sorts the positions worse, although the
  * root reads too confident.
- * USER GATE 2026-10-23 13:06 ("1a 2a 3a 4a 5a 6a"): T163 and T263 closed, the
+ * USER GATE 2026-10-23 13:06: T163 and T263 closed, the
  * HP percent fix kept, the final suite of a round runs in the main checkout
  * and its report lists the skipped tests, T266 (the bank in CI after a hung
  * run or an ended watcher, the pinned runner image) to the last wave, a
  * target without player noise parked for after the release, booked and
- * pushed; next T160. The rule of 22.10.2026 ("Passt"): the bank guards
+ * pushed; next T160. The rule of 22.10.2026 (approved): the bank guards
  * against harm and does not prove a gain. New TODO T266, next free T267.
  *
  * WAVE 5 2026-10-21..22 (improvement round 73, the first step of the finish
@@ -2231,9 +2227,9 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * names the new readers), 387cfe7 (Plus and Minus line by line), 3af7060 (the
  * re-pins: 2e4ce39 and 10bbc76); spec
  * docs/superpowers/specs/2026-10-21-round-73-wave-5-design.md, probes
- * docs/perf/probes/2026-10-21-r73/). Gates: 21.10. ("1a 2a 3b 4a" of round
- * 72: wave 5 with four lanes), the triage of 21.10. ("1a 2a 3b": three lanes,
- * 15 TODOs), the design gate of 21.10. ("1a 2a 3a, 4b": T224's re-fit after
+ * docs/perf/probes/2026-10-21-r73/). Gates: 21.10. (on round
+ * 72: wave 5 with four lanes), the triage of 21.10. (three lanes,
+ * 15 TODOs), the design gate of 21.10. (T224's re-fit after
  * the merge of H and I, breaks above 1e-3 go, the cut spread hits priced by
  * the simulator, T210 with every group).
  * DELIVERED: lane F: T225 (the bench credit only where the holder wins its
@@ -2280,8 +2276,8 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * Champions VGC row where the simulator KOs a body the game kept at 7 %
  * (T260); the name census reads no block exception; CI ran 24 runs side by
  * side for an hour, so a local capture waited for the queue (D23).
- * USER GATE 2026-10-22 12:12 ("1: 562428 okay, 573756 turn 73 must be
- * clarified; 2a, watching 573756; 3a 4a 5a 6a"): 562428 t12 becomes known
+ * USER GATE 2026-10-22 12:12 (the user okayed 562428, asked to clarify
+ * 573756 turn 73 and to keep watching 573756): 562428 t12 becomes known
  * drift, the six scene pins follow fresh references (the tiers of 2629703929
  * t8 expect the reference, T242), the play-out pin stays fixme with T243 and
  * T258 in the last wave, T262 for the VGC tree time, the TODO proposals as
@@ -2302,10 +2298,11 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * again in 45af626), aa52996 (the 2b labels), 65a1181 (B's step 6 with its
  * fixes); cache v68 5c9f9bf; spec
  * docs/superpowers/specs/2026-10-19-round-72-wave-4-design.md, probes
- * docs/perf/probes/2026-10-19-r72/). Gates: 19.10. ("1a (vll kann man das
- * sogar optimieren) 2a 3a 4a": the speed tie from the simulator's queue and
- * made cheap, one cache bump with share links at format version 1, T246 first
- * in lane A, four lanes in parallel), 20.10. ("1c 2b": lane B's step 6
+ * docs/perf/probes/2026-10-19-r72/). Gates: 19.10. (the speed tie from the
+ * simulator's queue and
+ * made cheap, with the user's hint that it may be optimized further, one
+ * cache bump with share links at format version 1, T246 first
+ * in lane A, four lanes in parallel), 20.10. (lane B's step 6
  * repaired and measured with the wave before the booking; the branch panel's
  * switch buttons and picker name a body as the history does, "Nickname
  * (Species)").
@@ -2373,9 +2370,9 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * timeline e2e test fails on a cold Vite cache, on v1 too; round 70's batch
  * check ran feedback once and could not see T257; @smogon/calc 0.12 has no
  * flag for Mud Sport, Water Sport or Ion Deluge (upstream list).
- * USER GATES 2026-10-20 11:30 ("1c 2b": step 6 repaired and measured with the
+ * USER GATES 2026-10-20 11:30 (step 6 repaired and measured with the
  * wave before the booking; the switch buttons and the picker as the history)
- * and 2026-10-21 10:04 ("1a 2a 3b 4a": r72 is booked and pushed to v1 and the
+ * and 2026-10-21 10:04 (r72 is booked and pushed to v1 and the
  * wave's worktrees and branches go; a timing window checks out both sides in
  * one worktree; wave 5 runs next with lanes F (static), G (feedback in CI), H
  * (rebuild) and I (package C), T163 right after it; the batch check runs
@@ -2385,12 +2382,12 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * score touch; branch r71 from 421c6ed (= v1), commits 0c22a04 to 4694469;
  * spec docs/superpowers/specs/2026-10-13-round-71-bank-in-ci-design.md, plan
  * docs/superpowers/plans/2026-10-17-round-71-bank-in-ci-plan.md, probes
- * docs/perf/probes/2026-10-19-r71/). Gates: 13.10. ("1a 2a 3a 4a": a release
+ * docs/perf/probes/2026-10-19-r71/). Gates: 13.10. (a release
  * asset for the data, 16 jobs of 4 slices, CI bases reused, the feedback
- * corpus stays local; "5a 6a": a push of bank/<name> starts a run, a standing
- * okay for pushing and deleting those branches), 17.10. ("1a": CI measures
- * only commits with the tooling), 19.10. ("1b 2a": the 133 password replays of
- * the holdouts go into the tarball, the links in the repository stay; "1a":
+ * corpus stays local; a push of bank/<name> starts a run, a standing
+ * okay for pushing and deleting those branches), 17.10. (CI measures
+ * only commits with the tooling), 19.10. (the 133 password replays of
+ * the holdouts go into the tarball, the links in the repository stay;
  * the upload and the identity check).
  * DELIVERED: run-calibration.mjs --slice-range and --merge
  * (calibration-jobs.mjs); the data tarball (bank-data.mjs, bank-data-pack.mjs:
@@ -2426,7 +2423,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * the data release started pages.yml, whose deploy the github-pages
  * environment refused for a tag (6ae01d6, 4694469); ubuntu-latest moves to
  * Ubuntu 26 from 19.10.
- * USER GATE 2026-10-19 09:37 ("1a 2a 3a"): CI is the default for bank and
+ * USER GATE 2026-10-19 09:37: CI is the default for bank and
  * holdouts (AGENTS.md); r71 is booked and pushed to v1; wave 4 runs next
  * after its own gate, with T246 in the fitting lane; new TODO T247 (the
  * feedback corpus in CI), next free T248.
@@ -2507,7 +2504,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * passes 12; under the log's dice the result turns at 0da5ec7 and 57d1539;
  * head to head, round 70 as p2 wins 16 of 16 against v1 as p1 (pin 10), and
  * round 70 as p1 takes one of 16 from v1 as p2 (pin 11).
- * USER GATE 2026-10-17 11:09 ("1a 2a 3a 4a 5a"): the Protect tempo stays and
+ * USER GATE 2026-10-17 11:09: the Protect tempo stays and
  * 2629703929 t8 takes the engine's verdicts with the reference in the
  * comment (T242); the play-out pin is test.fixme until T243; 648453 t13
  * (0.187), 912045 t8 (0.016), 2630685175 t7 and t8 (the Taunt stays the
@@ -2519,8 +2516,8 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * AFTER THE GATE: the review of the new TODOs found the harm in the hq
  * tables of the two quarter-tier holdouts, which the gate text had called
  * free of harm, and that the reference grades 2629703929 t8 a mistake on the
- * new rows too (the distance lies in cell values, T242). User 17.10. 11:37
- * ("1a"): the full VGC holdout runs before the push, and without the Protect
+ * new rows too (the distance lies in cell values, T242). User 17.10. 11:37:
+ * the full VGC holdout runs before the push, and without the Protect
  * tempo as well if the harm holds. FULL VGC HOLDOUT on cea908e against
  * r69-w2-hold-vgc (1,121 of 1,123 positions): no harm, no gain (all +2
  * [-15, +18]; hq luck-adjusted +17 [+0, +33] and own K +16 [+0, +32],
@@ -2664,7 +2661,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * front (p2 Pain Split 0.029 to 0.285); 653785 t19 since T102, the verify
  * round re-prices different rows per run (0.034 to 0.259 across search
  * budgets).
- * GATE STATE aafd8c5 (pairFocus 0, user answer 6b), measured as w2 against
+ * GATE STATE aafd8c5 (pairFocus 0, as the user chose), measured as w2 against
  * the same bases: bank no harm in all four tables (all -36 [-75, +2],
  * doubles -30), the step from w better on the bank's doubles rows (-7 [-13,
  * -3] resolved); VGC holdout -49 [-85, -11] resolved better (own K -32
@@ -2677,7 +2674,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * request (294cd10): AGENTS.md, NextSteps.md as packages, docs/backlog.md,
  * docs/completed/ and .claude/agents/ tracked, README, ARCHITECTURE and
  * EVALUATION rewritten, MoreSimulation.md removed.
- * USER GATE 2026-10-13 16:28 ("1a 2a 3a 4a 5a 6b 7a 8a 9a"): the four
+ * USER GATE 2026-10-13 16:28: the four
  * Monte-Carlo pins take the fresh references; T49 and T102 stay and the two
  * expert pins stand as known drift (T218, T219; the expert is right);
  * published-ivs follows T132 point 2 (p1 Sinistcha Speed 31, Attack 0; p2
@@ -2741,7 +2738,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * spreads, the defender's item in choice-lock), next free T194. Base of the
  * code state: .calibration/r68-m2 (Brier 0.2536/0.2307/0.1120, hq
  * 0.2454/0.2038/0.1069, K 2.41).
- * USER GATE 2026-10-12 18:19 ("1a 2a 3 4"): all of round 68 stays (the
+ * USER GATE 2026-10-12 18:19: all of round 68 stays (the
  * Champions OU holdout harm comes from rules that are right by the game);
  * T190 stays third in wave 3 lane A; v1 fast-forwarded and pushed, r68 and
  * the measurement worktree deleted. On Unseen Fist (user): a mode change,
@@ -2755,8 +2752,8 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * the morning of 11.10.), merged on r67-merge by cherry-pick in the order
  * F, C, A, B, G, E, D and fast-forwarded onto r67 at 8e7dc0b; cache v63 to
  * v64; ledger, lane reports, chains and probes under
- * docs/perf/probes/2026-10-10-r67/). Gate of 10.10. 09:53 ("1a 2 3a 4a 5b
- * 6a 7a"): the lanes share no file; Champions runs on the Champions mod of
+ * docs/perf/probes/2026-10-10-r67/). Gate of 10.10. 09:53: the lanes share no
+ * file; Champions runs on the Champions mod of
  * @pkmn/mods (Stat Points in the sets' evs, the server's statModify, no
  * Tera); Champions refits in lane F; one Champions VGC and one Champions OU
  * census game in the feedback run; Think deeper goes; T128 lists every legal
@@ -2844,9 +2841,10 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * green, 1 red (eval-gpl t35: a custom game counted as a format with free
  * abilities, so Noivern could hold Magic Guard and the boots guess fell);
  * lint, tsc -b, build, pack:smoke green after 54dc49b.
- * USER GATE 2026-10-11 20:43 ("Recs", that is 1a 2a 3a 4a 5b 6a 7a 8a 9a
- * 12a; to 5: "Noivern kann niemals Magic Guard haben"; 10 explained, the
- * library reports wait for an okay; no wave 4): the answer round keeps
+ * USER GATE 2026-10-11 20:43 (the user took the recommendations; on question 5
+ * the user noted that Noivern can never have Magic Guard; question 10
+ * explained, the library reports wait for an okay; no wave 4): the answer
+ * round keeps
  * Protect, the tree score stays the visit mean, sack rule A, Champions OU
  * keeps the singles K (T164 refits with search), T108 step 2 stays at 4 of
  * 11 handlers (the rest parked as T170), doubles verify cover stays (T148),
@@ -2912,7 +2910,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * holdout. The candidate 05ae0fa on the holdout's 491 Champions VGC games
  * with search: -16 [-35, +3] (early -45 [-86, -7], M-C -50 [-92, -13]; own
  * K -6), no harm, no warning; bank and feedback byte-identical, e2e 75/75.
- * USER GATE 2026-10-09 19:40 ("1a 2a 3a 4b 5a"): T141 and T142 stay;
+ * USER GATE 2026-10-09 19:40: T141 and T142 stay;
  * Champions doubles take the fit (8e629a4, v63); Scarlet/Violet VGC keeps
  * the hand doubles table, and T144 (tailwind and coverage in VGC first)
  * goes to wave 3 lane B; T145 (the reconstruction feeds Champions stat
@@ -2966,8 +2964,8 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * screens weight alone carries the holdout gain and the bank harm.
  * Standard singles 17 of 20 and Champions VGC 7 of 20 keep their hand
  * weights.
- * USER GATE 2026-10-09 11:38 ("1a / 2b (wir sollten auf jeden Fall mehr
- * VGC Spiele haben, das wird eine große Audience des Tools) / 3a / 4a"):
+ * USER GATE 2026-10-09 11:38 (the user wanted more VGC games, since VGC is a
+ * large audience of the tool):
  * (1) Champions OU keeps its fit; (2) Doubles OU takes its fit and VGC
  * outside Champions becomes a rule set of its own with the hand doubles
  * table (359769a, cache v60; replayRuleset in replay-core), more VGC games
@@ -2994,7 +2992,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * round-64-wave-1-5-plan.md; branch r64 from 5360833 (= v1), cache v58;
  * probes, queue and lane ledgers under docs/perf/probes/2026-10-06-r64/).
  * Eight sub-agents in their own worktrees, one lane each, sharing no file
- * (design gate 06.10. 12:46 "1a 2a 3a 4a 5a 6a"): A T118 (the doubles
+ * (design gate 06.10. 12:46): A T118 (the doubles
  * prover's AND node takes every legal reply from the simulator; 2630685175
  * t7 checks 36 of 36 and 2660809089 #8 42 of 42, both false forced wins
  * gone; doubles proofs bank 3 -> 2, dumps 2 -> 1; singles unchanged),
@@ -3070,8 +3068,8 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * counts hold on the merged state (broken orders 0, board item against
  * protocol 0, doubles proofs 3; D's IVs break no order). Regression 2282
  * green, lint and tsc -b clean.
- * USER GATE 2026-10-08 20:38 ("1b will den Stab behalten / 2a 3a 4a 5a
- * 6a"): (1) STAB by the rules stays and T127 runs at once as round 65,
+ * USER GATE 2026-10-08 20:38 (the user wants to keep STAB): (1) STAB by the
+ * rules stays and T127 runs at once as round 65,
  * with the bank as its fit target, before wave 2; (2) the round-42
  * play-out pin keeps its intent: p2 (Bene) wins the turn-56 play-out by
  * turn 70 (the old switch order held only through near ties of 0.001 to
@@ -3176,10 +3174,10 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * new TODOs T112 to T116. No bank run: no run request would have flipped a
  * keep or a close. Closed TODOs with evidence and old text in
  * docs/completed/triage.md; table, reports and probes under
- * docs/perf/probes/2026-10-04-r62/. Gate 2026-10-05 09:41 "1a", on the
- * order "run the next steps with several sub-agents in parallel" (the list
+ * docs/perf/probes/2026-10-04-r62/. Gate 2026-10-05 09:41, on the
+ * order to run the next steps with several sub-agents in parallel (the list
  * now runs as three waves of lanes that share no file, NextSteps D25),
- * "3a" (fast-forward r59 into v1 and push v1; master stays).
+ * and on the push (fast-forward r59 into v1 and push v1; master stays).
  *
  * SEARCH BUDGET 2026-10-02 (improvement round 61, iteration S2 of the
  * program "more simulation", T97 and T98; spec
@@ -3250,7 +3248,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * capture of round 58 reproduced at sim +16.4 [+7.6, +25.3]): mean mode
  * +3.0 [-1.3, +7.3] (18 % of the sim gain), singles +5.1 [+1.3, +8.7].
  *
- * VERDICT. Gate 1 (03.10. 23:30, "1a, 2a, 3a"): T98 takes trees from the
+ * VERDICT. Gate 1 (03.10. 23:30): T98 takes trees from the
  * first turn plus 1200 iterations, fallback trees from the first turn
  * alone; no game-type exception; both probes noted (play-outs do not pay
  * pooled; the singles number goes to T99; the accuracy axis has no cheap
@@ -3260,7 +3258,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * default (3d94f71, cache v56): bank r61-t98b byte-identical to the T97 run
  * of the form, time gate green at 158.8 s against 184.4 s; feedback three
  * times byte-identical; singles tiers 41/1/0 -> 22/3/0, doubles 9/4/0
- * unchanged. Gate 2 (04.10. 12:46, "1a 2a 3a 4a"): T98 adopted; the
+ * unchanged. Gate 2 (04.10. 12:46): T98 adopted; the
  * think-deeper ladder leaves auto (a tree turn offers no rung), a deeper
  * tree rung only if markedly deeper (T109); 649664 t8 accepts chance
  * (Fire Blast's 12 % kill under the published set, 53 % under the older
@@ -3520,7 +3518,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * pre-check with the rule table alone held 40726 turns, the clone alone
  * 2502 turns, 746 mid-turn states and 24 trees; gen9ou and gen4ou rebuild
  * the rule table on every fork (14-17 % of a gen9ou search). VERDICT
- * (user gate 24 Sep 18:38, "1a 2a 3a 4a 5a"): program "more simulation",
+ * (user gate 24 Sep 18:38): program "more simulation",
  * rounds 59 to 62: T91 speed layer (5a: own module forward/sim-fast.ts
  * hooked per battle, exact pin @pkmn/sim 0.10.11, hash gate with fallback,
  * switch EVAL_SIM_FAST; gates 0 deviations in about 40700 turns and 48
@@ -3672,7 +3670,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * each finding checked by a refuter, reports in audit/): about 30 text
  * corrections, none in code, folded into this block and NextSteps
  * (b933ef9) and into the untracked spec, completed entry and backlog
- * plan. VERDICT (user gate 24 Sep 12:13, "1a 2a 3a 4a"): adopted; r57
+ * plan. VERDICT (user gate 24 Sep 12:13): adopted; r57
  * goes to master by fast-forward and the master state to origin v1
  * (origin/master stays e7f618f); T81 stays parked on r57-power as a
  * re-fit candidate beside T71 (iteration 10a); the gap 653785 t19 is
@@ -3692,7 +3690,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * score-touching as a correction with its own evidence; probes, the
  * census, the reading, the audit and both gate chains under
  * docs/perf/probes/2026-09-23-r56/; adopted at the user gate of 23 Sep
- * 17:18 ("1a 2a 3a"): r56 fast-forwards to master, branch v1 follows and
+ * 17:18: r56 fast-forwards to master, branch v1 follows and
  * is pushed, origin/master stays on e7f618f; iterations 4g (T77, T78) and
  * 7d (T79, T80) stand where the booking placed them).
  * INSTRUMENT: the bank's 833 positions rebuilt with the round-54 instrument
@@ -3931,7 +3929,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * every correction is in this entry, NextSteps and the spec. Found on the
  * way: origin/master was pushed to e7f618f on 21 Sep 17:18:58, 18 s after v1
  * (reflog), while D1 and the round-55 entry below said master stays
- * unpushed; the user gate of round 56 settled it ("2a"): only v1 follows
+ * unpushed; the user gate of round 56 settled it: only v1 follows
  * the master state, origin/master stays on e7f618f.
  * REMAINS: T77 (rule E's 0.95 coverage stop drops a rare expensive class,
  * the game-ending crit of 2629703929 t13 among them; a Fake Out flinch is
@@ -4049,7 +4047,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * docs/perf/probes/2026-09-20-r54/; close audit BEFORE the gate, four lenses
  * with a refuter each: 39 findings confirmed (several raised by two lenses)
  * and worked in, 7 refuted, every bank number re-derived and found right;
- * adopted at the user gate of 21 Sep 16:21, "1a 2a 3b 4a": the line without
+ * adopted at the user gate of 21 Sep 16:21: the line without
  * the STAB rule stands and fast-forwards to master, the rule stays parked for
  * T71; T74 with T70 moves ahead of iteration 4c as iteration 4e and becomes
  * round 55, T73 moves right behind 4c as iteration 4f; branch v1 follows
@@ -4246,7 +4244,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  *
  * PRE-SOLVE CARRY 2026-09-20 (improvement round 53, T66; 5c6dcf6 plus the
  * closing commit, cache v49, score-touching as a correction with its own
- * evidence; adopted at the user gate of 20 Sep 16:22, "1a 2a 3a": the carry
+ * evidence; adopted at the user gate of 20 Sep 16:22: the carry
  * stands and fast-forwards to master, the t86 remainder stays a C signal
  * without a TODO, branch v1 follows master and is pushed; spec
  * docs/superpowers/specs/2026-09-20-round-53-design.md, sighting and probes
@@ -4347,7 +4345,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  *
  * BANK BUILD 2026-09-20 (improvement round 52, T56 and T61; 8e73953 and
  * c4bbe02, harness and app plumbing only, no engine touch, no cache bump,
- * cache stays v48; adopted at the user gate of 20 Sep 14:50, "1a 2a 3a": the
+ * cache stays v48; adopted at the user gate of 20 Sep 14:50: the
  * instrument stands with its harm line booked as the new zero, T66 moves
  * ahead of iteration 4b, fast-forward to master; spec
  * docs/superpowers/specs/2026-09-20-round-52-design.md,
@@ -4570,7 +4568,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * (round 15 again); under the held rule it moves 2 bp. Held sweeps win
  * 94.7 % where the bank K promises 88.8 %; equally high bars without a held
  * sweep win 84.3 % against 86.6 % promised.
- * BUILT (user gate "1a 2a 3b 4a"): heldDecided(result) is the sweep where
+ * BUILT (user gate): heldDecided(result) is the sweep where
  * the score backs it. The turn card, the once-per-game sentence, the
  * chance prose on a decided board and the graph strip read it; the
  * conversion sentence takes the first forced or held turn from which the
@@ -5089,7 +5087,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * GATES on r45 (d62a656 + e30e72a): tsc, lint (ratchet: PlayOutBar split
  * into a running row and a start row), knip, Vitest all projects green,
  * e2e 75/75 (2.1 min).
- * VERDICT 2026-09-12 (user gate, 15:20, "Agreed"): ADOPTED — r45
+ * VERDICT 2026-09-12 (user gate, 15:20): ADOPTED — r45
  * fast-forwarded to master (d62a656, e30e72a, 0f4c832 and this commit);
  * r45-threshold stays parked with .calibration/r45-b as its measurement
  * stand; no re-pin, no cache bump on master (the sets fingerprint keys
@@ -6106,7 +6104,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  *    as pinned healers across a 32-turn paper grind. The measured anchors
  *    split cleanly: real clean-ups run 1–5 expected turns, the false
  *    positives 23–39.
- * (B) THE NEAR-DECIDED ROLL (user-gated "display 95%-to-win as such"): no
+ * (B) THE NEAR-DECIDED ROLL (user-gated: display 95%-to-win as such): no
  *    sweep stands, but one boundary event ≥ NEAR_DECIDED_ODDS=0.9 against
  *    the standing enemy active removes it and the REST clears — 573756
  *    t73 renders "Garchomp is one 95% roll from clearing the rest —
@@ -6156,7 +6154,8 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * NO cache bump and NO calibration bench — the score path never reads the
  * new fields, and three full feedback runs were bit-identical in every
  * channel including the alignment/koMismatch meta):
- * (A) COIN-FLIP CHECK (user-gated "Satz + Münzwurf-Check"): the unanswered
+ * (A) COIN-FLIP CHECK (user-gated: a sentence plus the coin-flip check): the
+ * unanswered
  *    profile's races run on EXPECTED rates — pairThreat carries the
  *    category-max move's accuracy in new optional fields (physicalAcc/
  *    specialAcc) the score never reads, beatsEntry weighs both fracs and
@@ -6186,7 +6185,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  *    by Heatran, 649664 t21, 653785 t2/t25, 655336 t11, 573756 t75);
  *    watch: the species-mirror reading ("Toxapex ... only the standing
  *    Toxapex holds it").
- * (C) ONCE PER MON AND STAGE (user-gated "nur erstes Mal"): the game
+ * (C) ONCE PER MON AND STAGE (user-gated: only the first time): the game
  *    report's walk feeds its spoken keys back into analyzeTurn
  *    (unansweredSeen / unansweredSeenKey), so each mon's entry sentence
  *    appears on its first entry only — 573756 drops from ten identical
@@ -6885,7 +6884,8 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * The two REGISTERED BUG entries below are CLOSED by this change.
  *
  * EMPTY GAME GRAPH ON THE BUILD — MINIFIED CLASS NAMES 2026-08-12 (the
- * user's actual report, isolated by "works on dev but not on build"):
+ * user's actual report, isolated as a case that works on dev but not on the
+ * build):
  * @pkmn/sim's state serializer encodes every object reference as
  * `[${obj.constructor.name}:id]` (sim/state.mjs:348) and rebuilds classes
  * from those names on deserialize. Minification renames Pokemon → "t", so

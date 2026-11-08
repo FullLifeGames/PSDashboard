@@ -2,7 +2,7 @@
 
 The simulator's PRNG calls carry no label: an accuracy check, a confusion check and a secondary effect can all arrive as a draw out of 100. The forced-dice module names a die by two rules, in this order. First, by the hook the simulator runs right before the draw: the `Accuracy` event, `ModifyCritRatio`, `ModifySecondaries` for each target, the handler of a status, ability or item (`BeforeMove`, `DamagingHit`, `Damage`, `FractionalPriority`, `Residual`), and `battle.randomizer` for the damage roll; a hook that runs twice before one draw (Gen 2's `Accuracy`) names one die. Second, where no hook runs, by the simulator method that encloses the draw together with the draw's form: the hit count in the multi-hit loop, the speed tie in the queue's shuffle, the self effect in `selfDrops`, and in Gens 1 and 2 the crit and the damage roll in `getDamage` and the secondary in `tryMoveHit` after the hook `Hit`. The numbers of a call decide nothing on their own. The module answers a die with a number from its range, so the simulator's own comparison turns the number into the result. Until round 86 the engine's scripted dice told draws by the numbers of the call and read a paralysis, infatuation or confusion check as the move's own die; since T299 they ask the module (see Consequences).
 
-The hook probe of round 82 (step A1, 31.10.2026) found the seven kinds without a hook; the user approved the second rule at the gate after it ("3a").
+The hook probe of round 82 (step A1, 31.10.2026) found the seven kinds without a hook; the user approved the second rule at the gate after it.
 
 ## Considered options
 
