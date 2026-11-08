@@ -1117,7 +1117,9 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * After the gate: tsc -b 0, lint 0, the touched unit and regression specs
  * green, frame-controls.spec.ts with support.spec.ts 8 of 8 (the first run
  * read two rows red until ad6ce3b), branch.spec.ts "keeps iframe turn
- * controls usable" 1 of 1.
+ * controls usable" 1 of 1. The CI of PR #123 read phone.spec.ts red: its
+ * T316 row held row 1 to three buttons on one line; with the turn buttons
+ * back row 1 holds six in two lines, as in 1.1.0 (4 of 4 after the fix).
  * USER GATE 2026-11-08 (draft gate/final-gate.md, 21 questions, sent about
  * 18:50): (1) all seven rebuild rows pinned to the new values: four games
  * rebuild better than in 1.1.0 (2629703929 5 to 0 diffs, 2695803506 2 to 0,

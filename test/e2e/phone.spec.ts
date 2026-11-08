@@ -54,10 +54,10 @@ test('the battle scene stands inside the frame with the log under it, and the pa
   expect(sideways, 'horizontal scroll of the page').toBeLessThanOrEqual(0);
 });
 
-// Round 88 (T316, #56): the frame keeps Play, Reset, Switch sides and Speed. On the 362 px frame row 1 stays on one line, the speed
-// chooser fits its row, and nothing of either row reaches past the document's edge (before: Last turn, Next turn and Go to turn...
-// broke row 1 into two lines and Music was cut). The widths go to the test's annotations for the ledger.
-test('the frame\'s remaining controls fit the phone frame: row 1 on one line, the speed chooser whole, nothing past the edge', async ({ page }) => {
+// Round 88 (T316, #56): the frame hides Color scheme and Music (before, Music was cut on the 362 px frame). After the gate of
+// 08.11.2026 Last turn, Next turn and Go to turn... are back, so row 1 holds six buttons and takes two lines on a phone, as in 1.1.0.
+// The speed chooser fits its row, and nothing of either row reaches past the document's edge. The widths go to the test's annotations.
+test('the frame\'s controls fit the phone frame: row 1 in at most two lines, the speed chooser whole, nothing past the edge', async ({ page }) => {
   test.setTimeout(120_000);
   const frame = frameOf(page);
   await expect(frame.locator('.replay-controls button[data-action="play"]')).toBeVisible({ timeout: 60_000 });
@@ -76,7 +76,7 @@ test('the frame\'s remaining controls fit the phone frame: row 1 on one line, th
       documentWidth: root.clientWidth,
       row1: row1.map(button => button.getAttribute('data-action')),
       row1Right: Math.max(...row1.map(button => button.getBoundingClientRect().right)),
-      row1TopSpread: spread(row1),
+      row1Lines: new Set(row1.map(button => Math.round(button.getBoundingClientRect().top))).size,
       row2Right: Math.max(...row2.map(button => button.getBoundingClientRect().right)),
       speedButtons: row2.length,
       speedTopSpread: spread(visible('.speedchooser button')),
@@ -86,8 +86,8 @@ test('the frame\'s remaining controls fit the phone frame: row 1 on one line, th
   });
   test.info().annotations.push({ type: 'phone-controls', description: JSON.stringify(measured) });
   const numbers = JSON.stringify(measured);
-  expect(measured.row1, `visible buttons of row 1 ${numbers}`).toEqual(['play', 'reset', 'switchViewpoint']);
-  expect(measured.row1TopSpread, `row 1 shares one top ${numbers}`).toBeLessThanOrEqual(2);
+  expect(measured.row1, `visible buttons of row 1 ${numbers}`).toEqual(['play', 'reset', 'rewind', 'ff', 'ffto', 'switchViewpoint']);
+  expect(measured.row1Lines, `row 1 takes at most two lines ${numbers}`).toBeLessThanOrEqual(2);
   expect(measured.row1Right, `row 1 ends inside the document ${numbers}`).toBeLessThanOrEqual(measured.documentWidth + 0.5);
   expect(measured.speedButtons, `row 2 holds the five speed buttons ${numbers}`).toBe(5);
   expect(measured.speedTopSpread, `the five speed buttons share one top ${numbers}`).toBeLessThanOrEqual(2);
