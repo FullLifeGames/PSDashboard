@@ -1,13 +1,12 @@
 import { describe, expect, test } from 'vitest';
 import { Dex } from '@pkmn/sim';
-import type { Battle, Pokemon, PokemonSet } from '@pkmn/sim';
-import { loadSimMods } from '../src/forward/sim-mods';
+import type { Battle, Pokemon } from '@pkmn/sim';
 import { resolveSideChoices } from '../src/branch/execute';
 import type { BranchSlotChoice } from '../src/branch-choices';
 import type { SimBattle } from '../src/branch/types';
 import { toId } from '@fulllifegames/replay-core';
 import { battleOf } from './power-oracle';
-import { set } from './move-oracle';
+import { RULESETS, become, forcedBoard, fingerprint, mon } from './forme-boards';
 
 /**
  * Round 88 (#103): a body keeps its identity across an in-battle forme change. The switch resolver once cut a suffix list ('tera',
@@ -23,50 +22,9 @@ import { set } from './move-oracle';
  * the battle as it found it. The scene of #103 and the Terapagos scene are rows of their own, played through real choices.
  */
 
-await loadSimMods('gen9championsou');
-
-interface Ruleset { label: string; singles: string; doubles: string; level: number; evs?: PokemonSet['evs'] }
-const RULESETS: Ruleset[] = [
-  ...[3, 4, 5, 6, 7, 8, 9].map(gen => ({ label: `gen ${gen}`, singles: `gen${gen}customgame`, doubles: `gen${gen}doublescustomgame`, level: 100 })),
-  { label: 'Champions', singles: 'gen9championscustomgame', doubles: 'gen9championsdoublescustomgame', level: 50, evs: { hp: 32, atk: 32, def: 0, spa: 32, spd: 2, spe: 0 } },
-];
-
-const mon = (rules: Ruleset, species: string, moves: string[], extra: Partial<PokemonSet> = {}): PokemonSet =>
-  set(species, moves, { level: rules.level, ...(rules.evs ? { evs: rules.evs } : {}), ...extra });
-
-type GameType = 'singles' | 'doubles';
-
 /** The slot's chip as the app builds it (state.ts, SwitchRow.tsx): the species the body holds now, its name. */
 const chipOf = (body: Pokemon): Extract<BranchSlotChoice, { kind: 'switch' }> =>
   ({ kind: 'switch', speciesId: toId(body.species.name), pokemonName: body.name });
-
-/**
- * A battle at p1's forced replacement: p1's level-1 Magikarp faints to Mewtwo's Psychic. The bench holds the target (an Eevee the
- * sweep turns into any forme) and a decoy of another species behind it, so a wrong pick shows as the wrong position.
- */
-function forcedBoard(rules: Ruleset, type: GameType, bench: PokemonSet[] = []): Battle {
-  const fodder = mon(rules, 'Magikarp', ['splash'], { level: 1 });
-  const spare = bench.length > 0 ? bench : [mon(rules, 'Eevee', ['splash']), mon(rules, 'Meowth', ['splash'])];
-  const doubles = type === 'doubles';
-  const p1 = doubles ? [mon(rules, 'Pikachu', ['splash']), fodder, ...spare] : [fodder, ...spare];
-  const p2 = doubles ? [mon(rules, 'Mewtwo', ['psychic', 'splash']), mon(rules, 'Mew', ['splash'])] : [mon(rules, 'Mewtwo', ['psychic', 'splash'])];
-  const battle = battleOf(type === 'doubles' ? rules.doubles : rules.singles, p1, p2);
-  expect(battle.format.exists, `${type === 'doubles' ? rules.doubles : rules.singles} is a format of the Dex`).toBe(true);
-  battle.choose('p1', doubles ? 'move 1, move 1' : 'move 1');
-  battle.choose('p2', doubles ? 'move 1 2, move 1' : 'move 1');
-  expect(battle.sides[0].requestState, 'the fodder fainted and p1 must replace it').toBe('switch');
-  return battle;
-}
-
-/** What the resolver must leave alone: the log, the dice, the requests and every body's own state (read only). */
-function fingerprint(battle: Battle): string {
-  return JSON.stringify({
-    log: battle.log.length,
-    seed: battle.prng.getSeed(),
-    requests: battle.sides.map(side => side.requestState),
-    bodies: battle.sides.map(side => side.pokemon.map(body => [body.name, body.species.name, body.hp, body.isActive, body.fainted, body.position])),
-  });
-}
 
 /** The forced slots of the side: the actives that fainted. */
 const forcedSlots = (battle: Battle): boolean[] => battle.sides[0].active.map(body => !!body && body.fainted);
@@ -79,12 +37,6 @@ function resolve(battle: Battle, choice: BranchSlotChoice): string {
   expect(fingerprint(battle), 'the resolver reads the battle and changes nothing').toBe(before);
   // Doubles: the command passes the slots that need nothing ("pass, switch 3").
   return resolved.ok ? resolved.command.replace(/^(pass, )+/, '') : resolved.error;
-}
-
-/** The body takes a forme the way the simulator changes it in a battle (permanent, no source). */
-function become(body: Pokemon, species: string, name: string): void {
-  expect(body.formeChange(species, null, true), `the simulator changes ${body.name} into ${species}`).toBeTruthy();
-  body.name = name;
 }
 
 const NICKNAME = 'Nick';
