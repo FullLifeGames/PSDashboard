@@ -22,6 +22,7 @@ import { toId } from './ids.ts';
 import { normalizeLineEndings } from './line-endings.ts';
 import { isChampionsFormat } from './champions-format.ts';
 import { withReplayIdentity } from './team-identity.ts';
+import { withStandIns } from './team/stand-ins.ts';
 
 /**
  * Build PokemonSet arrays for both sides from a replay's protocol log.
@@ -78,7 +79,13 @@ function itemTells(
 }
 
 function infosFor(log: string, options: BuildOptions): SideInfos {
-  return { p1: options?.p1Info || inferOpponentTeam(log, 'p1'), p2: options?.p2Info || inferOpponentTeam(log, 'p2') };
+  const given = (side: 'p1' | 'p2') => options?.[`${side}Info`] || null;
+  const inferred = { p1: given('p1') || inferOpponentTeam(log, 'p1'), p2: given('p2') || inferOpponentTeam(log, 'p2') };
+  if (given('p1') && given('p2')) return inferred;
+  // Round 88 (F, #101): a side the builder infers itself gets the stand-in step the app's enriched infos got before they came here.
+  const filled = withStandIns(inferred, log, options?.usageStats, { p1: importedUserTeam(options?.userTeamText) ?? [] });
+  const pick = (side: 'p1' | 'p2') => (given(side) ? inferred[side] : filled[side]);
+  return { p1: pick('p1'), p2: pick('p2') };
 }
 
 /** The user's pasted team, else the sheets embedded in the log. */

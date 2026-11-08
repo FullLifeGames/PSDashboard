@@ -25,6 +25,7 @@ export { toId, sideIndex } from './ids.ts';
 export type { SideId } from './ids.ts';
 export { isSitrusBerry, sitrusKeptAt } from './inference/item-triggers.ts';
 export { inferOpponentTeam } from './opponent-inferrer.ts';
+export { withStandIns, missingBodies } from './team/stand-ins.ts';
 export { parseReplayLog, parseReplayLogWithObservations } from './protocol-parser.ts';
 export {
   splitReplayPassword, getReplayGameType, inferReplayFormatId, getReplayDisplayFormat, getReplayGeneration,

@@ -1,7 +1,7 @@
 import type { PokemonSet } from '@pkmn/sim';
 import {
   buildTeamsFromReplay, enrichTeamInfos, inferOpponentTeam, judgeItemsByDamage, parseReplayLogWithObservations,
-  logRules, resolveHiddenPowerType, solveReplaySpreads,
+  logRules, resolveHiddenPowerType, solveReplaySpreads, withStandIns,
   type DamageObservation, type HiddenPowerEvidence, type OpponentTeamInfo, type SmogonSetAssumptions,
   type SmogonUsageStats, type SpeedOrderObservation, type SpreadCandidate,
 } from '@fulllifegames/replay-core';
@@ -59,7 +59,8 @@ export function buildAppTeams(log: string, seed: AppTeamSeed, knowledge: {
   const { usageStats, setAssumptions } = knowledge;
   const hpResolver = (side: 'p1' | 'p2') => (species: string) => resolveHiddenPowerType(
     seed.hpEvidence.filter(entry => entry.attackerSide === side), usageStats, species, logRules(log));
-  const infos = enrichTeamInfos(seed.rawInfos, usageStats, setAssumptions, { p1: hpResolver('p1'), p2: hpResolver('p2') }, judgeItemsByDamage);
+  // Round 88 (F, #101): the sides of a game without team preview that showed fewer bodies than their `|teamsize|`, filled as the panel's are.
+  const infos = enrichTeamInfos(withStandIns(seed.rawInfos, log, usageStats), usageStats, setAssumptions, { p1: hpResolver('p1'), p2: hpResolver('p2') }, judgeItemsByDamage);
   const shared = { p1Info: infos.p1, p2Info: infos.p2, usageStats, setAssumptions };
   const inferredSpreads = solveReplaySpreads(log, seed.observations,
     replaySolveOptions({ ...shared, speedOrders: seed.speedOrders }));

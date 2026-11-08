@@ -118,6 +118,7 @@ value logRules
 value manualEvs
 value manualField
 value manualMove
+value missingBodies
 value parsePastedTeam
 value parseReplayLog
 value parseReplayLogWithObservations
@@ -149,3 +150,4 @@ value typedHiddenPowerId
 value umbrellaWeathers
 value unknownEvs
 value withHiddenPowerType
+value withStandIns
