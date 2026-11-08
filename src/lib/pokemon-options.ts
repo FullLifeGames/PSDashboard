@@ -1,4 +1,5 @@
 import type { GenerationNum } from '@pkmn/data';
+import { RuleTable, TeamValidator, type PokemonSet } from '@pkmn/sim';
 import { CHAMPIONS_MOD, evBudget, generationsFor, rulesDex, simFormats, toId } from '@fulllifegames/replay-core';
 
 /**
@@ -53,6 +54,74 @@ export function getEvLimit(format: string): number | null {
 }
 
 const toSimId = (name: string): string => toId(name);
+
+type PoolKind = 'items' | 'moves' | 'abilities';
+
+/**
+ * Round 88 (#102): the entries a format's simulator lets exist beyond the generation's standard pool. A listed format
+ * answers by its own rule table (an entry exists unless a rule such as `-Nonexistent` removes it: a Custom Game has none, so
+ * it plays every Past, Future, Unobtainable, CAP, Legends and LGPE entry; Standard pulls `Obtainable` in and refuses them;
+ * National Dex lifts what its rule table names). An id the simulator does not list, a draft league's, reads as the Custom Game
+ * of its generation. The simulator's own TeamValidator decides, in two steps. First its checks on a copy of the rule table that
+ * keeps only the existence rules (the bans of single items, moves and abilities and the tier rules are no question of existence:
+ * the app lists a banned entry). Then, in a format that refuses existence at all, the validator's own verdict on a one-entry set,
+ * because a rule of the format can refine the table (National Dex's `NatDex Mod` lifts `+Past` and still refuses a Past item and
+ * the Unobtainable moves of the current generation in its `onValidateSet`). A call without a format keeps the standard pools, and
+ * Champions reads its mod (the callers branch before).
+ */
+const existenceCache = new Map<string, Record<PoolKind, string[]>>();
+
+type Standing = { exists: boolean; isNonstandard?: string | null; name: string };
+
+/** What the validator says of an entry that does not exist in the game (its wording: "does not exist in Gen 9", "not obtainable without hacking", ...). */
+const NOT_EXISTING = /does not exist|not obtainable|Smogon CAP|Let's Go|placeholder for/;
+
+function existingBeyondStandard(gen: GenerationNum, format: string | undefined): Record<PoolKind, string[]> | null {
+  if (!format || isChampions(format)) return null;
+  const own = simFormats().get(format.split('@@@')[0]);
+  const id = own.exists ? own.id : `gen${gen}customgame`;
+  const key = `${gen}:${id}`;
+  const cached = existenceCache.get(key);
+  if (cached) return cached;
+
+  const dex = rulesDex(gen);
+  const lists: Record<PoolKind, Standing[]> = { items: [...dex.items.all()], moves: [...dex.moves.all()], abilities: [...dex.abilities.all()] };
+  const standing = (thing: Standing) => thing.exists && !!thing.isNonstandard;
+  const tags = new Set(Object.values(lists).flat().filter(standing).map(thing => toId(thing.isNonstandard ?? '')));
+  const validator = new TeamValidator(id);
+  const existenceRules = new RuleTable();
+  for (const [rule, source] of validator.ruleTable) {
+    const name = /^[+\-*](.+)$/.exec(rule)?.[1];
+    if (name === 'nonexistent' || (name?.startsWith('tag:') && tags.has(name.slice(4)))) existenceRules.set(rule, source);
+  }
+  existenceRules.getTagRules();
+  const judge = Object.assign(Object.create(validator) as TeamValidator, { ruleTable: existenceRules });
+  const set = { name: '' } as PokemonSet;
+  // A format without any existence rule refuses nothing of the sort, and its onValidateSet hooks are not asked.
+  const refusesExistence = existenceRules.size > 0 && [...existenceRules.keys()].some(rule => rule.startsWith('-'));
+  const refusedByFormat = (kind: PoolKind, thing: Standing): boolean => {
+    if (!refusesExistence) return false;
+    const entry = kind === 'items' ? { item: thing.name } : kind === 'moves' ? { moves: [thing.name] } : { ability: thing.name };
+    const probe = { name: 'T', species: 'Pikachu', item: '', ability: gen >= 3 ? 'Static' : '', moves: ['Thunderbolt'], evs: {}, ivs: {}, ...entry } as PokemonSet;
+    try {
+      return !!validator.validateSet(probe, {})?.some(problem => problem.includes(thing.name) && NOT_EXISTING.test(problem));
+    } catch {
+      return false;
+    }
+  };
+  const names = (kind: PoolKind, refusal: (thing: never) => string | null | undefined): string[] =>
+    lists[kind].filter(thing => standing(thing) && !refusal(thing as never) && !refusedByFormat(kind, thing)).map(thing => thing.name);
+  const result: Record<PoolKind, string[]> = {
+    items: gen < 2 ? [] : names('items', thing => judge.checkItem(set, thing, {})),
+    moves: names('moves', thing => judge.checkMove(set, thing, {})),
+    abilities: gen < 3 ? [] : names('abilities', thing => judge.checkAbility(set, thing, {})),
+  };
+  existenceCache.set(key, result);
+  return result;
+}
+
+const withExisting = (standard: string[], extra: string[] | undefined): string[] =>
+  (extra?.length ? [...standard, ...extra] : standard).sort((a, b) => a.localeCompare(b));
 
 async function getChampionsMovePool(species: string): Promise<string[]> {
   const dex = championsDex();
@@ -121,7 +190,8 @@ export function getEveryMovePool(gen: number, format?: string): string[] {
   if (isChampions(format)) {
     return [...championsDex().moves.all()].filter(move => !move.isNonstandard).map(move => move.name).sort((a, b) => a.localeCompare(b));
   }
-  return allGenMoves(clampGen(gen));
+  const generation = clampGen(gen);
+  return withExisting(allGenMoves(generation), existingBeyondStandard(generation, format)?.moves);
 }
 
 /** Every ability of the generation (Champions: of the mod), sorted; empty before Generation 3, which has no abilities. */
@@ -131,7 +201,7 @@ export function getEveryAbilityPool(gen: number, format?: string): string[] {
   }
   const generation = gens.get(clampGen(gen));
   if (generation.num < 3) return [];
-  return [...generation.abilities].map(ability => ability.name).sort((a, b) => a.localeCompare(b));
+  return withExisting([...generation.abilities].map(ability => ability.name), existingBeyondStandard(generation.num, format)?.abilities);
 }
 
 export function getItemPool(gen: number, format?: string): string[] {
@@ -140,7 +210,7 @@ export function getItemPool(gen: number, format?: string): string[] {
   }
   const generation = gens.get(clampGen(gen));
   if (generation.num < 2) return [];
-  return [...generation.items].map(item => item.name).sort((a, b) => a.localeCompare(b));
+  return withExisting([...generation.items].map(item => item.name), existingBeyondStandard(generation.num, format)?.items);
 }
 
 export function getAbilityPool(species: string, gen: number, format?: string): string[] {
