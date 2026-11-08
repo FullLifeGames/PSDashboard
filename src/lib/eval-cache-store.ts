@@ -338,7 +338,14 @@ export interface StoredEval {
 // v77 (round 87, release 1.1.0): the @pkmn train moves from 0.10.12 to 0.10.15 (Showdown 16db150a); a Struggle that
 //      deals no damage costs its user a quarter of its HP, a Gen 1 Transform resets the last move slot, and a typeless
 //      Synchronoise misses a typeless target, so any search line that reaches them reads new values.
-const EVAL_ENGINE_CACHE_VERSION = 77;
+// v78 (round 88, the wave of 1.1.1): the set reader rules out a terrain seed or Room Service that never fired (T349)
+//      and reads weather and terrain as proof of the setter's item (T329); the bench offers brought bodies only
+//      (T314); the rebuild keeps the logged order for a body that never acts (T325), takes out a body the log never
+//      shows (T327), forces Diamond Storm's gain once per move in doubles (T338) and keeps a battle-only forme through
+//      a switch (#103); a game without team preview fills its unseen bodies with stand-ins (#101); the dice offer a
+//      charge move that skips its charge turn (T344) and one accuracy die per hit (T337); the prover carries a proof
+//      over a secondary that only helps the mover (T336). Positions of those games and turns read new values.
+const EVAL_ENGINE_CACHE_VERSION = 78;
 
 /** Round 61: a search-budget form stores under its own tag; the default keeps today's keys. */
 const versionTag = (): string => {

@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'fs';
 import {
-  dockChip, expectReplaySettled, expectReplayTurnAtLeast, fixturePath, installReplayEmbedCache, pickForcedReplacement, pickMove, pickSwitch,
+  dockChip, expectReplaySettled, expectReplayTurnAtLeast, fixturePath, installReplayEmbedCache, moveTimeline, pickForcedReplacement, pickMove, pickSwitch,
   routeOfflineFixtures, routeSlowReplayEmbed, startVariationAt, type ReplayWindow,
 } from './helpers';
 import { openVariationHistory } from './dock-helpers';
@@ -124,8 +124,8 @@ test.describe('PS Dashboard', () => {
     });
     const lastTurn = Number(/Branching · Turn (\d+)/.exec(await page.getByText(/Branching · Turn \d+/).innerText())?.[1]);
     const line = `ended at turn ${lastTurn}, p2 switches: ${p2Switches.join(', ')}`;
-    // The finished run hands the view back to its start turn (round 77, C5: the last turn no longer drags the pointer
-    // to the tip); the tip names the winner.
+    // The finished run leaves the frame where the user watches it (round 88, T347: no return to the start turn; the last
+    // turn still does not drag the pointer to the tip); the click goes to the tip, which names the winner.
     await page.getByRole('button', { name: 'End of the variation: the game is over here' }).click();
     await expect(page.locator('.ps-branch-ended'), line).toContainText('Bene wins this variation.');
     expect(lastTurn, line).toBeLessThanOrEqual(75);
@@ -262,11 +262,17 @@ test.describe('PS Dashboard', () => {
       frame!.evaluate(() => (document.querySelector('.battle-log')?.textContent ?? '').match(/Battle started/g)?.length ?? 0)
     ).toBe(1);
 
+    // Round 88 (gate of 08.11.2026): the frame's Last turn and Next turn are back. The variation from turn 2 covers turns 3 and 4
+    // after the two Executes: Last turn shortens the log of the same frame, Next turn twice brings it back, and the timeline
+    // moves it too.
     await frame!.locator('button', { hasText: 'Last turn' }).click();
     await expect.poll(logLength).toBeLessThan(afterLength);
-
     await frame!.locator('button', { hasText: 'Next turn' }).click();
     await frame!.locator('button', { hasText: 'Next turn' }).click();
+    await expect.poll(logLength).toBeGreaterThanOrEqual(afterLength);
+    await moveTimeline(page, 3);
+    await expect.poll(logLength).toBeLessThan(afterLength);
+    await moveTimeline(page, 4);
     await expect.poll(logLength).toBeGreaterThanOrEqual(afterLength);
   });
 

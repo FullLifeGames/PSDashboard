@@ -3,6 +3,7 @@ import type { BranchChoiceErrorLog, BranchSimState, BranchSlotChoice } from '@fu
 import type { BattleStream, BranchEngineModule, BranchHistoryEntry, BranchRefs, PlayerStreams } from './branch/shared';
 import { useBranchExecute } from './branch/execute';
 import { useBranchSession } from './branch/session';
+import { limitBench, type Bench } from '../lib/bench';
 
 export type {
   BranchMoveOption,
@@ -25,10 +26,16 @@ function useReportingExecutor(run: () => Promise<void>, lastErrorRef: React.RefO
  * The branch simulator: one live @pkmn/sim battle rebuilt at a replay turn,
  * with the execute side (turns, forced interludes, choice recording) and the
  * session side (rebuild, battle access, teardown) composed over shared refs.
+ *
+ * Round 88 (T314, #55): `bench` is the bring-limited game's bench lists (`replayBench`). The battle keeps the whole team the rebuild
+ * built; the state the pickers and the dock read offers only the bodies the bring allows, so the What-if and its forced replacements
+ * never name a body that stayed home. Round 88 (M3): `engineSimState` is the state as the battle offers it, for the engine's own
+ * choices (a ranked line, the play-out, a forced replacement), which still reach the unbrought bodies (option (c), round 89).
  */
-export function useBranch() {
+export function useBranch(bench: Bench | null = null) {
   const [branching, setBranching] = useState(false);
-  const [simState, setSimState] = useState<BranchSimState | null>(null);
+  const [rawSimState, setSimState] = useState<BranchSimState | null>(null);
+  const simState = useMemo(() => (rawSimState ? limitBench(rawSimState, bench) : null), [rawSimState, bench]);
   const [history, setHistory] = useState<BranchHistoryEntry[]>([]);
   /** Turn the current branch runtime was started at (null = no runtime). */
   const [variationStartTurn, setVariationStartTurn] = useState<number | null>(null);
@@ -91,7 +98,7 @@ export function useBranch() {
   const { startBranch, getBattle, stopBranch } = useBranchSession(refs, setters, clearChoices, updateState);
 
   return {
-    branching, simState, history, executeError, executing,
+    branching, simState, engineSimState: rawSimState, history, executeError, executing,
     variationStartTurn, startSerialized,
     startBranch, setChoice, recordChoice, executeTurn, executePending, stopBranch, getBattle, getChoices,
   };

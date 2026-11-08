@@ -36,7 +36,7 @@ describe('ChoicePicker (All choices)', () => {
   test('sends moves with targets and switches, and blocks reserved switch-ins', async () => {
     const onPick = vi.fn();
     const switches = doubles.p1SwitchesBySlot[0];
-    render(<ChoicePicker label="P1" moves={doubles.p1MovesBySlot[0]} switches={switches} blockedSwitchKeys={new Set([switchOptionKey(switches[0])])} onPick={onPick} />);
+    render(<ChoicePicker side="p1" label="P1" moves={doubles.p1MovesBySlot[0]} switches={switches} blockedSwitchKeys={new Set([switchOptionKey(switches[0])])} onPick={onPick} />);
     const picker = screen.getByRole('combobox', { name: 'Choice picker for P1' });
     expect(within(picker).getByRole('option', { name: 'Flare Blitz → P2B Tornadus' })).toBeInTheDocument();
     await userEvent.selectOptions(picker, 'move:2:2');
@@ -49,7 +49,7 @@ describe('ChoicePicker (All choices)', () => {
 
   test('a trapped Pokemon has its picker options disabled', () => {
     const trapped = singles.p1SwitchesBySlot[0].map(sw => ({ ...sw, trapped: true }));
-    render(<ChoicePicker label="P1" moves={singles.p1MovesBySlot[0]} switches={trapped} blockedSwitchKeys={new Set()} onPick={vi.fn()} />);
+    render(<ChoicePicker side="p1" label="P1" moves={singles.p1MovesBySlot[0]} switches={trapped} blockedSwitchKeys={new Set()} onPick={vi.fn()} />);
     const picker = screen.getByRole('combobox', { name: 'Choice picker for P1' });
     for (const option of picker.querySelectorAll('optgroup[label="Switch to"] option')) expect(option).toBeDisabled();
   });
@@ -147,7 +147,7 @@ describe('displayName in the picker', () => {
 
   test('singles: a nicknamed body reads "Switch: Nickname (Species) (HP% HP)", a plain body its species', () => {
     const switches = [switchOption('Meowstic', { name: 'Power Police', slot: 2 }), switchOption('Heatran', { slot: 3 })];
-    render(<ChoicePicker label="P1" moves={singles.p1MovesBySlot[0]} switches={switches} blockedSwitchKeys={new Set()} onPick={vi.fn()} />);
+    render(<ChoicePicker side="p1" label="P1" moves={singles.p1MovesBySlot[0]} switches={switches} blockedSwitchKeys={new Set()} onPick={vi.fn()} />);
     const picker = screen.getByRole('combobox', { name: 'Choice picker for P1' });
     expect(within(picker).getByRole('option', { name: 'Switch: Power Police (Meowstic) (100% HP)' })).toBeInTheDocument();
     expect(within(picker).getByRole('option', { name: 'Switch: Heatran (100% HP)' })).toBeInTheDocument();
@@ -156,7 +156,7 @@ describe('displayName in the picker', () => {
   test('doubles: the same labels on the second active slot', () => {
     const bench = doubles.p1SwitchesBySlot[1];
     const switches = [{ ...bench[0], name: 'Power Police', species: 'Meowstic' }, bench[1]];
-    render(<ChoicePicker label="P1B" moves={doubles.p1MovesBySlot[1]} switches={switches} blockedSwitchKeys={new Set()} onPick={vi.fn()} />);
+    render(<ChoicePicker side="p1" label="P1B" moves={doubles.p1MovesBySlot[1]} switches={switches} blockedSwitchKeys={new Set()} onPick={vi.fn()} />);
     const picker = screen.getByRole('combobox', { name: 'Choice picker for P1B' });
     expect(within(picker).getByRole('option', { name: 'Switch: Power Police (Meowstic) (100% HP)' })).toBeInTheDocument();
     expect(within(picker).getByRole('option', { name: `Switch: ${bench[1].species} (100% HP)` })).toBeInTheDocument();

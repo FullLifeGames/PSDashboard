@@ -7,6 +7,7 @@
 import { EMBED_SCRIPT_ORDER_SCRIPT, fontAwesomeOverrideStyle, POINTER_SOURCE_SHIM_SCRIPT } from './replay-compat';
 import { tableSwapScript } from './teambuilder-table';
 import { PHONE_FIT_SCRIPT, PHONE_STYLES } from './replay-phone';
+import { appControlsStyles, sideTrackerScript } from './replay-controls';
 
 const REPLAY_STYLES = `<style>
 html,body {font-family:Verdana, sans-serif;font-size:10pt;margin:0;padding:0;}
@@ -122,6 +123,9 @@ const REPLAY_BRIDGE_BODY = `
     setTimeout(function() { waitSeekEnd(battle); }, 100);
   }
 
+  // Ids of the play seeks already run: the app sends one request with retries, all under one id (round 88, T347).
+  var lastPlaySeekId = null;
+
   function applySeek() {
     silenceAudio();
     if (!pendingSeek) return;
@@ -133,6 +137,16 @@ const REPLAY_BRIDGE_BODY = `
     var battle = Replays.battle;
     var seek = pendingSeek;
     pendingSeek = null;
+    // A play seek with an id is the app's own request (Watch from turn N). It runs once per id whatever the battle does at
+    // the time: a frame that already plays at or past the turn is the case the guards below would drop. Its retries carry
+    // the same id and change nothing.
+    if (seek.autoPlay && typeof seek.id === 'number') {
+      if (seek.id === lastPlaySeekId) return;
+      lastPlaySeekId = seek.id;
+      battle.seekTurn(seek.turn);
+      waitSeekEnd(battle);
+      return;
+    }
     // Parent-side retries land here after the seek finished — or while the
     // very same seek is still scrubbing: nothing to do either way.
     if (battle.seeking === null && battle.turn === seek.turn && !seek.autoPlay) return;
@@ -153,8 +167,8 @@ const REPLAY_BRIDGE_BODY = `
     if (seek.autoPlay) waitSeekEnd(battle);
   }
 
-  function queueSeek(turn, shouldPlay) {
-    pendingSeek = { turn: turn, autoPlay: !!shouldPlay };
+  function queueSeek(turn, shouldPlay, id) {
+    pendingSeek = { turn: turn, autoPlay: !!shouldPlay, id: id };
     applySeek();
   }
 
@@ -185,7 +199,7 @@ const REPLAY_BRIDGE_BODY = `
   window.addEventListener('message', function(event) {
     var data = event.data || {};
     if (data.type === 'ps-seek-turn' && typeof data.turn === 'number') {
-      queueSeek(data.turn, !!data.autoPlay);
+      queueSeek(data.turn, !!data.autoPlay, data.id);
     } else if (data.type === 'ps-append-log') {
       appendAndFollow(data);
     }
@@ -257,6 +271,10 @@ export function generateReplayHtml(opts: {
   seekTurn?: number;
   autoPlay?: boolean;
   reportTurn?: boolean;
+  /** Round 88 (T316): reports the side the frame shows near (`ps-side`), for the dock's row order. */
+  reportSide?: boolean;
+  /** Round 88 (T316): hides Color scheme and Music (replay-controls.ts). */
+  hideChoosers?: boolean;
   /** Viewer perspective — 'p2' renders the battle from player 2's side (the ?p2 replay-URL flag). */
   viewpoint?: 'p1' | 'p2';
   /** Replaces the embed's FontAwesome face (see replay-compat.ts). */
@@ -266,7 +284,7 @@ export function generateReplayHtml(opts: {
 }): string {
   const {
     log, format = '', p1 = 'Player 1', p2 = 'Player 2', title, seekTurn, autoPlay = false,
-    reportTurn = false, viewpoint = 'p1', fontAwesomeWoff2Url, teambuilderTableUrl,
+    reportTurn = false, reportSide = false, hideChoosers = false, viewpoint = 'p1', fontAwesomeWoff2Url, teambuilderTableUrl,
   } = opts;
   const displayTitle = title || `${format ? `[${format}] ` : ''}${p1} vs. ${p2}`;
   // Escape forward slashes for the script tag content (PS format)
@@ -282,7 +300,7 @@ export function generateReplayHtml(opts: {
 <title>${displayTitle}</title>
 ${REPLAY_STYLES}
 ${PHONE_STYLES}
-${PHONE_FIT_SCRIPT}
+${appControlsStyles(hideChoosers)}${PHONE_FIT_SCRIPT}
 ${SILENT_AUDIO_SCRIPT}
 ${POINTER_SOURCE_SHIM_SCRIPT}
 <div class="wrapper replay-wrapper">
@@ -294,7 +312,7 @@ ${escapedLog}
 </div>
 ${EMBED_SCRIPT_ORDER_SCRIPT}
 ${teambuilderTableUrl ? `${tableSwapScript(teambuilderTableUrl)}\n` : ''}${EMBED_LOADER_SCRIPT}
-${fontAwesomeWoff2Url ? `${fontAwesomeOverrideStyle(fontAwesomeWoff2Url)}\n` : ''}${replayBridgeScript(seekTurn, autoPlay, viewpoint)}${reportTurn ? TURN_TRACKER_SCRIPT : ''}`;
+${fontAwesomeWoff2Url ? `${fontAwesomeOverrideStyle(fontAwesomeWoff2Url)}\n` : ''}${replayBridgeScript(seekTurn, autoPlay, viewpoint)}${reportTurn ? TURN_TRACKER_SCRIPT : ''}${sideTrackerScript(reportSide, viewpoint)}`;
 }
 
 /**

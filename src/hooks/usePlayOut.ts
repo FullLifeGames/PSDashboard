@@ -1,7 +1,8 @@
-import { useCallback, useEffect, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
+import { useCallback, useEffect, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import type { EvalResult, RankedChoice } from '@fulllifegames/eval-engine';
 import { FAST_PLAY_OUT_SETTINGS, nextPlayOutStep, playOutDoneText, prefsAfterRun } from '../lib/play-out';
 import type { useBranch } from './useBranch';
+import { forceSwitches } from './branch/shared';
 import type { useEvaluation } from './useEvaluation';
 import type { LeadSelection } from './useDeviation';
 
@@ -14,6 +15,8 @@ interface PlayOutState {
   turns: number;
   startTurn: number;
   prevAuto: boolean;
+  /** Round 88 (T347, #83): Stop was pressed with a turn in flight; the run ends when that turn landed. */
+  stopping?: { text: string; navigated: boolean } | null;
 }
 
 export interface PlayOutInputs {
@@ -22,8 +25,8 @@ export interface PlayOutInputs {
   setPlayOutNotice: (notice: { text: string; watchTurn: number } | null) => void;
   playOutProcessedRef: MutableRefObject<EvalResult | null>;
   /** App-level mirrors the timeline's navigation interrupt reads. */
-  playOutRef: MutableRefObject<{ active: boolean } | null>;
-  stopPlayOutRef: MutableRefObject<((opts?: { returnToStart?: boolean }) => void) | null>;
+  playOutRef: MutableRefObject<{ active: boolean; stopping?: { navigated: boolean } | null } | null>;
+  stopPlayOutRef: MutableRefObject<((opts?: { navigated?: boolean }) => void) | null>;
   evaluation: Evaluation;
   /** Session option: every evaluation of the run uses the depth-1 matrix instead of the Auto line. */
   fastPlayOut: boolean;
@@ -37,9 +40,11 @@ export interface PlayOutInputs {
   tipTurn: number | null;
   /** Keeps the pointer where the run leaves it when a turn still in flight lands (the timeline's tip-follow). */
   holdTipFollow: () => void;
-  navigateTo: (position: { turn: number; line: 'main' | 'variation' }, opts?: { seek?: boolean; internal?: boolean }) => void;
+  navigateTo: (position: { turn: number; line: 'main' | 'variation' }, opts?: { seek?: boolean; internal?: boolean; toFrame?: true | number }) => void;
   setNavSeek: Dispatch<SetStateAction<{ turn: number; seq: number; play?: boolean } | null>>;
   executing: boolean;
+  /** Round 88 (#103, A7): what the last execute or forced replacement reported; the loop reads it after a forced step. */
+  executeError: string | null;
   branchPreparing: boolean;
   getBattle: Branch['getBattle'];
   executeTurn: Branch['executeTurn'];
@@ -55,8 +60,8 @@ export interface PlayOutInputs {
 
 /** Finish/stop plumbing plus the watch-from-turn seek. */
 function usePlayOutFinish(args: PlayOutInputs) {
-  const { evaluation, setPlayOut, setPlayOutNotice, playOutRef, navigateTo, setNavSeek, tipTurn, playOut, holdTipFollow } = args;
-  const finishPlayOut = useCallback((current: PlayOutState, text: string, opts?: { returnToStart?: boolean }) => {
+  const { evaluation, setPlayOut, setPlayOutNotice, playOutRef, navigateTo, setNavSeek, tipTurn, playOut, holdTipFollow, executing } = args;
+  const finishPlayOut = useCallback((current: PlayOutState, text: string, opts?: { navigated?: boolean }) => {
     const restored = prefsAfterRun(evaluation.prefs, current);
     if (restored) evaluation.setPrefs(restored);
     evaluation.setEngineOverride(null);
@@ -64,28 +69,47 @@ function usePlayOutFinish(args: PlayOutInputs) {
     holdTipFollow();
     setPlayOut(null);
     setPlayOutNotice({ text, watchTurn: current.startTurn });
-    // The engine's play dragged the pointer along to the tip; hand the view
-    // back to the turn the run started from — the user replays the line
-    // from there themselves (the Watch button, or just pressing play).
-    if ((opts?.returnToStart ?? true) && current.turns > 0) {
-      navigateTo({ turn: current.startTurn, line: 'variation' }, { seek: true, internal: true });
+    // Round 88 (T347, #83): the run leaves the frame where the user watches it, playing or not, with no seek back to the
+    // start. The engine's play dragged the pointer to the tip; it takes the frame's turn now (the Watch button of the
+    // notice replays from the start). A finish after the user's own navigation leaves the pointer where they put it.
+    if (!opts?.navigated && current.turns > 0) {
+      navigateTo({ turn: tipTurn ?? current.startTurn, line: 'variation' }, { seek: false, internal: true, toFrame: true });
     }
-  }, [evaluation, setPlayOut, setPlayOutNotice, playOutRef, navigateTo, holdTipFollow]);
+  }, [evaluation, setPlayOut, setPlayOutNotice, playOutRef, navigateTo, holdTipFollow, tipTurn]);
 
-  const stopPlayOut = useCallback((opts?: { returnToStart?: boolean }) => {
-    if (playOut) {
-      finishPlayOut(playOut, `Play-out stopped: ${playOut.turns} turn${playOut.turns === 1 ? '' : 's'} played (they stay in the variation).`, opts);
+  const stopPlayOut = useCallback((opts?: { navigated?: boolean }) => {
+    if (!playOut) return;
+    const navigated = !!opts?.navigated;
+    if (playOut.stopping) {
+      // A second Stop waits with the first; the user's own navigation in the meantime keeps the pointer where they put it.
+      if (navigated && !playOut.stopping.navigated) setPlayOut({ ...playOut, stopping: { ...playOut.stopping, navigated } });
+      return;
     }
-  }, [playOut, finishPlayOut]);
+    const text = `Play-out stopped: ${playOut.turns} turn${playOut.turns === 1 ? '' : 's'} played (they stay in the variation).`;
+    if (executing) {
+      // The turn in flight lands after the click: the run stays active, so the frame keeps appending in 'hold' (no seek,
+      // no play, no follow-end), and the timeline's tip-follow lets the turn land where the user is not looking.
+      holdTipFollow();
+      setPlayOut({ ...playOut, stopping: { text, navigated } });
+      return;
+    }
+    finishPlayOut(playOut, text, opts);
+  }, [playOut, executing, holdTipFollow, setPlayOut, finishPlayOut]);
+
+  const stopping = playOut?.stopping ?? null;
+  useEffect(() => {
+    if (playOut && stopping && !executing) finishPlayOut(playOut, stopping.text, { navigated: stopping.navigated });
+  }, [playOut, stopping, executing, finishPlayOut]);
 
   /** Seek the branch frame to the play-out's start and let it play — the
-   *  point of the feature: watch how the game runs on from your move. */
+   *  point of the feature: watch how the game runs on from your move. The pointer takes the variation position of that
+   *  turn (T1 for a run from turn 0), not the tip, so the slider follows the frame from its first report on. */
   const watchFrom = useCallback((turn: number) => {
-    if (tipTurn !== null) navigateTo({ turn: tipTurn, line: 'variation' }, { seek: false, internal: true });
+    navigateTo({ turn, line: 'variation' }, { seek: false, internal: true, toFrame: turn });
     window.setTimeout(() => {
       setNavSeek(prev => ({ turn, seq: (prev?.seq ?? 0) + 1, play: true }));
     }, 250);
-  }, [navigateTo, tipTurn, setNavSeek]);
+  }, [navigateTo, setNavSeek]);
 
   return { finishPlayOut, stopPlayOut, watchFrom };
 }
@@ -120,7 +144,9 @@ function useStartPlayOut(args: PlayOutInputs) {
         setVariationNotice('Finish the lead picks above before the engine plays from turn 0.');
         return;
       }
-      startLeadVariation(picks, { onStart: () => armRun(1) });
+      // Round 88 (T343, #79): the run arms with turn 0, the turn the leads come in: the progress line and the notice name it,
+      // and Watch from turn 0 plays the frame from its team preview while the pointer reads T1 (the line has no turn 0).
+      startLeadVariation(picks, { onStart: () => armRun(0) });
       return;
     }
     // The post-battle sentinel has nothing to play — surface the existing
@@ -152,8 +178,11 @@ function useStartPlayOut(args: PlayOutInputs) {
 function usePlayOutLoop(args: PlayOutInputs, finishPlayOut: ReturnType<typeof usePlayOutFinish>['finishPlayOut']) {
   const {
     playOut, setPlayOut, playOutProcessedRef, evaluation, evalViewKey, liveEvalStatus,
-    liveTip, executing, branchPreparing, getBattle, executeTurn, handleEvaluate, applyEvalChoice,
+    liveTip, executing, executeError, branchPreparing, getBattle, executeTurn, handleEvaluate, applyEvalChoice, playOutRef,
   } = args;
+  // Round 88 (#103, A7): set while the run waits on a forced replacement it submitted; the settle reports a refusal through
+  // `executeError` and the position does not change, so no evaluation would ever end the wait.
+  const forcedPendingRef = useRef(false);
   /**
    * A play-out started from the MAIN LINE arms before its rebuild finishes —
    * startPlayOut cannot evaluate a sim that does not exist yet, and entering
@@ -162,25 +191,37 @@ function usePlayOutLoop(args: PlayOutInputs, finishPlayOut: ReturnType<typeof us
    * forever. Fires once the live tip stands and no evaluation is in flight.
    */
   useEffect(() => {
-    if (!playOut?.active || !liveTip || executing || branchPreparing) return;
+    if (!playOut?.active || playOut.stopping || !liveTip || executing || branchPreparing) return;
     // A stale position is the Auto pref's to evaluate (the run switched it on): asking here too sent two
     // evaluations per position. Only a user who turned Auto off mid-run leaves the kick to us.
     const autoCovers = liveEvalStatus === 'stale' && evaluation.prefs.auto;
     if ((liveEvalStatus !== 'idle' && liveEvalStatus !== 'stale') || autoCovers) return;
     handleEvaluate();
-  }, [playOut?.active, liveTip, executing, branchPreparing, liveEvalStatus, evaluation.prefs.auto, handleEvaluate]);
+  }, [playOut?.active, playOut?.stopping, liveTip, executing, branchPreparing, liveEvalStatus, evaluation.prefs.auto, handleEvaluate]);
 
   useEffect(() => {
-    if (!playOut?.active || !liveTip || executing || branchPreparing) return;
+    if (!playOut?.active || playOut.stopping || !liveTip || executing || branchPreparing) return;
     if (evaluation.status !== 'done' || !evaluation.result) return;
     // A result finished for another position (navigation race, pre-play-out
     // leftovers) must never be played from here — the tip's own eval follows.
     if (evaluation.resultTag !== null && evaluation.resultTag !== evalViewKey) return;
     if (playOutProcessedRef.current === evaluation.result) return;
     playOutProcessedRef.current = evaluation.result;
-    const step = nextPlayOutStep(evaluation.result, getBattle()?.ended ?? false, playOut.executed);
-    applyLoopStep({ step, playOut, finishPlayOut, applyEvalChoice, setPlayOut, executeTurn });
-  }, [playOut, liveTip, executing, branchPreparing, evaluation.status, evaluation.result, evaluation.resultTag, evalViewKey, getBattle, applyEvalChoice, executeTurn, finishPlayOut, playOutProcessedRef, setPlayOut]);
+    forcedPendingRef.current = false;
+    const battle = getBattle();
+    const step = nextPlayOutStep(evaluation.result, battle?.ended ?? false, playOut.executed);
+    applyLoopStep({ step, interlude: bothSidesReplace(battle), playOut, playOutRef, forcedPendingRef, finishPlayOut, applyEvalChoice, setPlayOut, executeTurn });
+  }, [playOut, liveTip, executing, branchPreparing, evaluation.status, evaluation.result, evaluation.resultTag, evalViewKey, getBattle, applyEvalChoice, executeTurn, finishPlayOut, playOutProcessedRef, playOutRef, setPlayOut]);
+
+  useEffect(() => {
+    if (!playOut?.active) {
+      forcedPendingRef.current = false;
+      return;
+    }
+    if (playOut.stopping || executing || !forcedPendingRef.current || !executeError) return;
+    forcedPendingRef.current = false;
+    finishPlayOut(playOut, `Play-out stopped after ${playOut.turns} turn${playOut.turns === 1 ? '' : 's'}: the forced replacement could not be played (${withoutFullStop(executeError)}).`);
+  }, [playOut, executing, executeError, finishPlayOut]);
 
   /**
    * The loop advances on COMPLETED evaluations — an evaluation that fails
@@ -188,22 +229,40 @@ function usePlayOutLoop(args: PlayOutInputs, finishPlayOut: ReturnType<typeof us
    * playing…" stuck forever with no message. End the run with its reason.
    */
   useEffect(() => {
-    if (!playOut?.active || executing || branchPreparing) return;
+    if (!playOut?.active || playOut.stopping || executing || branchPreparing) return;
     if (evaluation.status !== 'error') return;
     finishPlayOut(playOut, `Play-out stopped after ${playOut.turns} turn${playOut.turns === 1 ? '' : 's'}: the evaluation failed here${evaluation.error ? ` (${evaluation.error})` : ''}.`);
   }, [playOut, executing, branchPreparing, evaluation.status, evaluation.error, finishPlayOut]);
 }
 
+/** Round 88 (#103, A7): the simulator's reasons end in a full stop; inside the notice's parentheses it would read ").)." */
+function withoutFullStop(reason: string): string {
+  return reason.replace(/\.\s*$/, '');
+}
+
+/**
+ * Round 88 (T348, #84): the position waits for a replacement on both sides, so the pair the loop plays is an interlude: the
+ * battle's turn does not move, and the variation gains no turn (the same entry `variation-turns.ts` leaves out of its count).
+ */
+function bothSidesReplace(battle: ReturnType<Branch['getBattle']>): boolean {
+  if (!battle?.sides) return false;
+  return (['p1', 'p2'] as const).every(side => forceSwitches(battle, side).some(Boolean));
+}
+
 /** One loop step: end the run, play a full pair, or submit the forced side. */
 function applyLoopStep(args: {
   step: ReturnType<typeof nextPlayOutStep>;
+  /** The position waits for a replacement on both sides: a pair then plays no turn. */
+  interlude: boolean;
   playOut: PlayOutState;
-  finishPlayOut: (current: PlayOutState, text: string) => void;
+  playOutRef: PlayOutInputs['playOutRef'];
+  forcedPendingRef: MutableRefObject<boolean>;
+  finishPlayOut: (current: PlayOutState, text: string, opts?: { navigated?: boolean }) => void;
   applyEvalChoice: PlayOutInputs['applyEvalChoice'];
   setPlayOut: PlayOutInputs['setPlayOut'];
   executeTurn: PlayOutInputs['executeTurn'];
 }) {
-  const { step, playOut, finishPlayOut, applyEvalChoice, setPlayOut, executeTurn } = args;
+  const { step, interlude, playOut, playOutRef, forcedPendingRef, finishPlayOut, applyEvalChoice, setPlayOut, executeTurn } = args;
   const turnWord = playOut.turns === 1 ? '' : 's';
   if (step.kind === 'done') {
     finishPlayOut(playOut, playOutDoneText(step.reason, playOut.turns));
@@ -214,12 +273,16 @@ function applyLoopStep(args: {
       finishPlayOut(playOut, `Play-out stopped after ${playOut.turns} turn${turnWord}: the engine's choice was not playable at this position.`);
       return;
     }
-    setPlayOut({ ...playOut, executed: playOut.executed + 1, turns: playOut.turns + 1 });
+    setPlayOut({ ...playOut, executed: playOut.executed + 1, turns: playOut.turns + (interlude ? 0 : 1) });
     // The next position is evaluated once the turn landed: by the Auto pref (stale position, set on by the run) or,
     // with Auto off, by the kick effect. A call here used the closure of the turn before, tagged the result with the
     // old position and cancelled the evaluation of the right one.
     void executeTurn().then(error => {
-      if (error) finishPlayOut(playOut, `Play-out stopped after ${playOut.turns} turn${playOut.turns === 1 ? '' : 's'}: the turn could not be played (${error}).`);
+      // A finish that came first (Stop, a navigation) owns the notice; a stop that waits for this turn keeps the user's navigation.
+      const live = playOutRef.current;
+      if (error && live?.active) {
+        finishPlayOut(playOut, `Play-out stopped after ${playOut.turns} turn${playOut.turns === 1 ? '' : 's'}: the turn could not be played (${withoutFullStop(error)}).`, { navigated: !!live.stopping?.navigated });
+      }
     });
     return;
   }
@@ -230,6 +293,7 @@ function applyLoopStep(args: {
     finishPlayOut(playOut, `Play-out stopped after ${playOut.turns} turn${turnWord}: the forced replacement could not be submitted.`);
     return;
   }
+  forcedPendingRef.current = true;
   setPlayOut({ ...playOut, executed: playOut.executed + 1 });
 }
 

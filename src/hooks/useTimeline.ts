@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { finalPlayedTurn, type TurnSnapshot } from '@fulllifegames/replay-core';
 import {
-  normalizePosition, variationCovers, variationTip,
+  normalizePosition, pointerAtFrame, variationCovers, variationTip,
   type TimelinePosition, type VariationSpan, type ViewLine,
 } from '../lib/timeline';
+import { settledEntryAfterTurns, turnEntryCount } from '../lib/variation-turns';
 import type { BranchHistoryEntry } from './useBranch';
 
 export interface TimelineInputs {
@@ -97,10 +98,10 @@ function useTimelineDerived(args: {
   }, [snapshots]);
   const atEndPosition = endSnapshotTurn !== null && viewTurn >= endSnapshotTurn;
   /** The variation as a pure span: null until a turn actually executed.
-   *  Forced interludes do not consume a turn (mirrors alignHistoryRows). */
+   *  Interludes (a replacement on one side or on both) do not consume a turn (round 88, T348: `variation-turns.ts`). */
   const variationSpan = useMemo<VariationSpan | null>(() => {
     if (variationStartTurn === null) return null;
-    const turnEntries = history.filter(entry => entry.kind !== 'forced').length;
+    const turnEntries = turnEntryCount(history);
     return turnEntries > 0 ? { startTurn: variationStartTurn, length: turnEntries } : null;
   }, [variationStartTurn, history]);
   // The T0 view is a side trip: the line stays as the user left it (the step forward returns there), but nothing of
@@ -122,17 +123,7 @@ function useTimelineDerived(args: {
   /** Recorded position for the VIEWED variation turn (variant B pickers). */
   const serializedAtView = useMemo(() => {
     if (!viewingVariation || !variationSpan) return null;
-    const wanted = viewTurn - variationSpan.startTurn;
-    let consumed = 0;
-    let last: string | null = null;
-    for (const entry of history) {
-      if (entry.kind !== 'forced') {
-        if (consumed === wanted) break;
-        consumed += 1;
-      }
-      if (consumed <= wanted) last = entry.serializedPosition ?? null;
-    }
-    return consumed === wanted ? last : null;
+    return settledEntryAfterTurns(history, viewTurn - variationSpan.startTurn)?.serializedPosition ?? null;
   }, [viewingVariation, variationSpan, viewTurn, history]);
   // The sweep counts PLAYED turns: the end snapshot is the slider's "End"
   // sentinel, not a turn.
@@ -162,6 +153,8 @@ interface NavArgs {
 }
 
 type SeekIntentRef = { current: { turn: number; until: number } | null };
+/** The last turn any frame reported, whether the guards let it move the pointer or not (round 88, T347). */
+type FrameTurnRef = { current: number | null };
 
 /**
  * How long the frame's reports count as the app's own while it plays a followed turn in. The guard ends when the frame
@@ -170,17 +163,27 @@ type SeekIntentRef = { current: { turn: number; until: number } | null };
  */
 const PLAY_IN_GUARD_MS = 20_000;
 
-type Navigate = (position: TimelinePosition, opts?: { seek?: boolean; internal?: boolean; followPlay?: boolean }) => void;
+/**
+ * `toFrame` (round 88, T347, #83): the pointer takes the variation position of a turn the branch frame shows and never
+ * seeks it. `true` names the last turn any frame reported, a number the turn the frame is about to show (Watch from turn
+ * N); without a variation or a report the given position stands.
+ */
+type Navigate = (
+  position: TimelinePosition,
+  opts?: { seek?: boolean; internal?: boolean; followPlay?: boolean; toFrame?: true | number },
+) => void;
 
 /** The single pointer move plus the tip-follow after executed turns. */
-function useNavigateTo(args: NavArgs, seekIntentRef: SeekIntentRef) {
-  const { pointer, derived, interruptPlayOut, onNavigate } = args;
+function useNavigateTo(args: NavArgs, seekIntentRef: SeekIntentRef, frameTurnRef: FrameTurnRef) {
+  const { pointer, derived, interruptPlayOut, onNavigate, variationEnded } = args;
   const { setViewTurn, setViewLine, setViewT0, setNavSeek, setFollowedPlay } = pointer;
   const { maxTurn, variationSpan } = derived;
 
   const navigateTo = useCallback<Navigate>((position, opts) => {
     if (!opts?.internal) interruptPlayOut();
-    const next = normalizePosition(position, maxTurn, variationSpan);
+    const frameTurn = opts?.toFrame === true ? frameTurnRef.current : opts?.toFrame ?? null;
+    const atFrame = pointerAtFrame(frameTurn, variationSpan, variationEnded);
+    const next = atFrame !== null ? { turn: atFrame, line: 'variation' as const } : normalizePosition(position, maxTurn, variationSpan);
     setViewT0(false);
     setViewTurn(next.turn);
     setFollowedPlay(!!opts?.followPlay);
@@ -193,11 +196,14 @@ function useNavigateTo(args: NavArgs, seekIntentRef: SeekIntentRef) {
       : position.line;
     setViewLine(sticky);
     onNavigate();
-    if (opts?.seek !== false) {
+    if (atFrame !== null) {
+      // The frame's own reports move the pointer from here on: the guard of the run's tip-follow ends.
+      seekIntentRef.current = null;
+    } else if (opts?.seek !== false) {
       setNavSeek(prev => ({ turn: next.turn, seq: (prev?.seq ?? 0) + 1 }));
       seekIntentRef.current = { turn: next.turn, until: Date.now() + 4000 };
     }
-  }, [maxTurn, variationSpan, setViewTurn, setViewLine, setViewT0, setNavSeek, setFollowedPlay, interruptPlayOut, onNavigate, seekIntentRef]);
+  }, [maxTurn, variationSpan, variationEnded, setViewTurn, setViewLine, setViewT0, setNavSeek, setFollowedPlay, interruptPlayOut, onNavigate, seekIntentRef, frameTurnRef]);
 
   return { navigateTo, ...useTipFollow(args, seekIntentRef, navigateTo) };
 }
@@ -283,9 +289,13 @@ function useTimelineNav(args: NavArgs) {
   // fresh selection straight back. Stale echoes are ignored until the embed
   // confirms the seek or the window lapses.
   const seekIntentRef = useRef<{ turn: number; until: number } | null>(null);
-  const { navigateTo, restorePointer, holdTipFollow, followNextTip } = useNavigateTo(args, seekIntentRef);
+  const frameTurnRef = useRef<number | null>(null);
+  const { navigateTo, restorePointer, holdTipFollow, followNextTip } = useNavigateTo(args, seekIntentRef, frameTurnRef);
 
   const handleReplayTurn = useCallback((turn: number) => {
+    // Remembered before the guards drop it: a tracker posts a turn only when it changes, so a dropped report never comes
+    // again, and the finish of a play-out needs the turn the frame shows (round 88, T347).
+    frameTurnRef.current = turn;
     if (turn < 1) return;
     const intent = seekIntentRef.current;
     if (intent && Date.now() < intent.until) {
@@ -294,15 +304,18 @@ function useTimelineNav(args: NavArgs) {
     }
     if (derived.viewingVariation) {
       // The branch frame's own Last turn / Next turn. A turn the variation does not cover is the shared prefix: the
-      // pointer leaves for the main line there, and the main frame that opens gets the same echo guard.
+      // pointer leaves for the main line there, and the main frame that opens gets the same echo guard. The start turn
+      // itself is the exception (round 88, T347): the branch frame's turn there shows the variation's own moves, so the pointer
+      // stays on the variation at its first covered turn.
       // Like the main line's end (B12): the frame stays on the last played turn when the pointer sits on the end.
       if (atVariationEnd && derived.tipTurn !== null && turn >= derived.tipTurn - 1) return;
-      if (!variationCovers(derived.variationSpan, turn)) seekIntentRef.current = { turn, until: Date.now() + 4000 };
+      const atStart = turn === derived.variationSpan?.startTurn;
+      if (!atStart && !variationCovers(derived.variationSpan, turn)) seekIntentRef.current = { turn, until: Date.now() + 4000 };
       // A landed report spends the play: the user's own step, or the frame on the tip after playing the turn in. A
       // rebuild afterwards (a set edit) opens its document on the tip and plays nothing in again; that replay's landing
       // on the turn before the tip moved the pointer off the variation (round 77).
       setFollowedPlay(false);
-      setViewTurn(turn);
+      setViewTurn(atStart ? pointerAtFrame(turn, derived.variationSpan, false) ?? turn : turn);
       return;
     }
     setViewTurn(current => {

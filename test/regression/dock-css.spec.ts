@@ -160,11 +160,17 @@ describe('the engine badge of a tile', () => {
 
   test('it takes the played badge\'s colors and the shared box of the badges', () => {
     expect(pickers).toMatch(/\n\.ps-engine-badge \{ background: var\(--ps-badge-played-bg\); color: var\(--ps-badge-played-fg\); \}/);
-    expect(pickers).toMatch(/\.ps-played-badge,\n\.ps-forced-badge,\n\.ps-engine-badge\s*\{/);
+    expect(pickers).toMatch(/\.ps-played-badge,\n\.ps-forced-badge,\n\.ps-engine-badge,\n\.ps-guess-badge\s*\{/);
   });
 
   test('on a move tile it joins the flags above the tile and takes no room', () => {
-    expect(css).toMatch(/\.ps-tile-flags \.ps-engine-badge\s*\{[^}]*margin:\s*0/);
+    expect(css).toMatch(/\.ps-tile-flags \.ps-engine-badge,\n\.ps-tile-flags \.ps-guess-badge\s*\{[^}]*margin:\s*0/);
+  });
+
+  // Round 88 (F, #101): a stand-in's tile wears the forced badge's face (same tokens, so the contrast spec covers it) in the same box and
+  // the same flag row.
+  test('the stand-in badge takes the forced badge\'s colors', () => {
+    expect(pickers).toMatch(/\n\.ps-guess-badge \{ background: var\(--ps-badge-forced-bg\); color: var\(--ps-badge-forced-fg\); \}/);
   });
 });
 

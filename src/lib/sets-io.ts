@@ -128,8 +128,9 @@ export function parseSetsImport(text: string): { p1: PastedSet[]; p2: PastedSet[
 export interface ImportGame { gen: number; pools: EditorPools | null }
 
 /**
- * The editor's pools for the species of a game, loaded lazily (the move pools read learnsets). The same pools the team editor
- * offers (`useEditorPools` in useTeamDraft.ts), so the import and the editor accept the same values.
+ * The import's pools for the species of a game, loaded lazily (the move pools read learnsets). The pools the team editor offers
+ * (`useEditorPools` in useTeamDraft.ts), except for a format id the simulator does not list: there the import accepts what the
+ * generation's Custom Game plays, and the editor lists the standard pool (round 88, `PoolUse` in pokemon-options.ts).
  */
 export async function loadImportPools(speciesList: string[], gen: number, format: string): Promise<EditorPools> {
   const options = await import('./pokemon-options');
@@ -141,13 +142,13 @@ export async function loadImportPools(speciesList: string[], gen: number, format
     abilitiesBySpecies[species] = options.getAbilityPool(species, gen, format);
   }));
   return {
-    items: options.getItemPool(gen, format),
+    items: options.getItemPool(gen, format, 'import'),
     teraTypes: options.getTeraTypePool(gen, format),
     natures: options.NATURES,
     movesBySpecies,
     abilitiesBySpecies,
-    allMoves: options.getEveryMovePool(gen, format),
-    allAbilities: options.getEveryAbilityPool(gen, format),
+    allMoves: options.getEveryMovePool(gen, format, 'import'),
+    allAbilities: options.getEveryAbilityPool(gen, format, 'import'),
     evLimit: options.getEvLimit(format),
   };
 }

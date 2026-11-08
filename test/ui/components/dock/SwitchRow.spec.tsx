@@ -14,7 +14,7 @@ type Props = Parameters<typeof SwitchRow>[0];
 function row(overrides: Partial<Props> = {}) {
   const onPick = vi.fn();
   const props: Props = {
-    activeName: 'Garchomp', switches: [switchOption('Heatran', { hp: '210/300', hpPercent: 70 })], pending: null,
+    side: 'p1', activeName: 'Garchomp', switches: [switchOption('Heatran', { hp: '210/300', hpPercent: 70 })], pending: null,
     blockedSwitchKeys: new Set(), played: null, onPick, ...overrides,
   };
   return { onPick, ui: <SwitchRow {...props} /> };

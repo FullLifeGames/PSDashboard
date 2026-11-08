@@ -2,7 +2,9 @@ import { type PokemonSnapshot, type TurnSnapshot, choiceItems, sideIndex, toId }
 import { protocolChoiceLock, type ChoiceLockContext } from '../choice-lock.ts';
 import { restoreSideInvariants } from '../forward-model.ts';
 import type { SimBattle, SimPokemon, SimSide } from './types.ts';
-import { normalizeBattleOnlyFormeId, retireBenchAfterFaints, retireUnshownBench, sameBodyName, settleFaintFromSnapshot, type ProtocolBench } from './team-order.ts';
+import { sameBodyForme } from './body-forme.ts';
+import { retireBenchAfterFaints, retireUnshownBench, sameBodyName, settleFaintFromSnapshot, type ProtocolBench } from './team-order.ts';
+import { retireUnshownActives } from './unshown-actives.ts';
 import { findFirstAvailableSwitchSlot, findPokemonOnSide, findSlotBySpecies } from './protocol-choices.ts';
 import { correctFieldFromSnapshot } from './field-correction.ts';
 import { applyProtocolHeldItems } from './held-items.ts';
@@ -266,6 +268,12 @@ function correctHpFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot): Set<S
  * benched-dead while the protocol had it casting Future Sight two turns
  * later. The snapshot knows who really stood on the field; put them back.
  */
+/** Whether the body on the field is the snapshot's entry: the same species by the Dex (one body in another forme counts, round 88, #103) or the same name. */
+export function sameMon(pokemon: SimPokemon | null | undefined, want: PokemonSnapshot): boolean {
+  if (!pokemon) return false;
+  return sameBodyForme(pokemon.battle.dex, pokemon.species?.name, want.speciesForme) || sameBodyName(pokemon.name, want.name);
+}
+
 function correctActivesFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
   let moved = false;
   for (let sideIdx = 0; sideIdx < 2; sideIdx++) {
@@ -273,13 +281,6 @@ function correctActivesFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
     const side = battle.sides[sideIdx];
     const desired = snapshotSide.pokemon.filter(pokemon => pokemon.isActive && !pokemon.fainted);
     if (desired.length === 0) continue;
-
-    const sameMon = (pokemon: SimPokemon | null | undefined, want: PokemonSnapshot) => {
-      if (!pokemon) return false;
-      const speciesId = normalizeBattleOnlyFormeId(toId(pokemon.species?.name || ''));
-      const wantId = normalizeBattleOnlyFormeId(toId(want.speciesForme));
-      return speciesId === wantId || sameBodyName(pokemon.name, want.name);
-    };
 
     const missing = desired.filter(want => !side.active.some(active => sameMon(active, want)));
     for (const want of missing) {
@@ -345,7 +346,13 @@ export function correctBattleFromSnapshot(battle: SimBattle, snapshot: TurnSnaps
   endLocksTheGameEnded(battle, snapshot, simBodyOf);
   restoreTeraFromSnapshot(battle, snapshot);
   correctActivesFromSnapshot(battle, snapshot);
-  retireBenchAfterFaints(battle, snapshot, tookOut);
+  // Round 88 (T327, #63): a body the log never shows on a slot the log leaves empty leaves the field before the bench behind it retires.
+  const strangers = retireUnshownActives(battle, snapshot);
+  retireBenchAfterFaints(battle, snapshot, new Set([...tookOut, ...strangers]));
+  if (strangers.size > 0) {
+    restoreSideInvariants(battle);
+    refreshRequestsFromLiveState(battle);
+  }
   restoreExitVolatiles(battle, snapshot, offTheField, simBodyOf);
   correctFieldFromSnapshot(battle, snapshot);
 }

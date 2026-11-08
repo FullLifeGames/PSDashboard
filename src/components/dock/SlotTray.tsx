@@ -29,6 +29,7 @@ export function SlotTray({ slot, hpByLabel, gen, moreOpen, diceViews, onChoice, 
         <div className="ps-tray-line">
           <span className="ps-tray-label">Switch to</span>
           <SwitchRow
+            side={slot.side}
             activeName={slot.name}
             switches={slot.switches}
             pending={slot.pending}

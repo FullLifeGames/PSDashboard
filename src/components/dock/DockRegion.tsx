@@ -1,6 +1,7 @@
 import type { AppController } from '../../hooks/useAppController';
 import { ConfirmBanner } from '../ConfirmBanner';
 import { RawLogToggle } from './RawLogToggle';
+import type { Side } from './dock-model';
 import { TurnDock, type TurnDockProps } from './TurnDock';
 
 /** What the dock reads from the app: the live branch at its tip, the resolved picker (with its seed) at every other position. */
@@ -48,9 +49,9 @@ function PlayOutStandIn() {
 /**
  * Round 84 (turn dock): the last child of the replay column: the confirm banner, the Raw Protocol Log toggle directly above the
  * dock, and the dock. While the engine plays out, the stand-in takes the dock's place. At turn 0 the lead picker takes it, so the
- * region renders nothing.
+ * region renders nothing. Round 88 (T316): `nearSide` is the side the replay frame shows near; the dock puts its chips first.
  */
-export function DockRegion({ app, replayId }: { app: AppController; replayId: string }) {
+export function DockRegion({ app, replayId, nearSide }: { app: AppController; replayId: string; nearSide?: Side }) {
   const { playOut, pendingConfirm, setPendingConfirm } = app.transients;
   if (app.board.timeline.viewT0 && !playOut?.active) return null;
   const banner = pendingConfirm && (
@@ -66,7 +67,7 @@ export function DockRegion({ app, replayId }: { app: AppController; replayId: st
     <>
       {banner}
       {props.simState && <div className="ps-dock-log"><RawLogToggle log={props.simState.log} /></div>}
-      <TurnDock {...props} />
+      <TurnDock {...props} nearSide={nearSide} />
     </>
   );
 }

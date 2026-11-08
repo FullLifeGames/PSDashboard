@@ -52,15 +52,6 @@ export function findByName<T>(items: readonly T[], nameOf: (item: T) => string |
   return items.find(item => nameOf(item) === name) ?? items.find(item => sameBodyName(nameOf(item), name));
 }
 
-const BATTLE_ONLY_FORME_SUFFIXES = ['terastal', 'stellar', 'tera'];
-
-export function normalizeBattleOnlyFormeId(id: string): string {
-  for (const suffix of BATTLE_ONLY_FORME_SUFFIXES) {
-    if (id.endsWith(suffix)) return id.slice(0, -suffix.length);
-  }
-  return id;
-}
-
 export function slotLetter(index: number): string {
   return String.fromCharCode('a'.charCodeAt(0) + index);
 }

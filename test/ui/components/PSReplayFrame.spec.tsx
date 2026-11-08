@@ -63,6 +63,33 @@ describe('PSReplayFrame', () => {
     expect(quiet).not.toContain('trackTurn');
   });
 
+  // Round 88 (T316, #56): the workspace's frames hide the two choosers and report the side they show near; the shared-branch page
+  // renders the same component with neither. The gate of 08.11.2026 brought Last turn, Next turn and Go to turn... back.
+  test('a frame with a side listener and no choosers carries the tracker and the hiding style, and forwards a side report of its window', async () => {
+    const onSideChange = vi.fn();
+    render(<PSReplayFrame log={LOG} liveUpdates reloadKey="session" title="Workspace" choosers={false} onSideChange={onSideChange} viewpoint="p2" />);
+    const html = await (vi.mocked(URL.createObjectURL).mock.calls[0][0] as Blob).text();
+    expect(html).toContain('trackSide');
+    expect(html).toContain("var ownSide = 'p2';");
+    expect(html).toContain('.soundchooser');
+    expect(html).not.toContain('data-action="ffto"');
+
+    const frame = screen.getByTitle('Workspace') as HTMLIFrameElement;
+    const contentWindow = { postMessage: vi.fn() };
+    Object.defineProperty(frame, 'contentWindow', { configurable: true, value: contentWindow });
+    const own = new MessageEvent('message', { data: { type: 'ps-side', side: 'p2' } });
+    Object.defineProperty(own, 'source', { value: contentWindow });
+    act(() => { window.dispatchEvent(own); });
+    expect(onSideChange).toHaveBeenCalledWith('p2');
+  });
+
+  test('a frame without them (the shared-branch page) keeps every button and reports no side', async () => {
+    render(<PSReplayFrame log={LOG} liveUpdates reloadKey="shared" title="Shared" />);
+    const html = await (vi.mocked(URL.createObjectURL).mock.calls[0][0] as Blob).text();
+    expect(html).not.toContain('trackSide');
+    expect(html).not.toContain('.soundchooser');
+  });
+
   test('a new reload key remounts the document; a live frame keeps its document across log growth', () => {
     const { rerender } = render(<PSReplayFrame log={LOG} reloadKey="a" />);
     rerender(<PSReplayFrame log={LOG} reloadKey="b" />);

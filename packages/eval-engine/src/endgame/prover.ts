@@ -9,6 +9,7 @@ import { searchOptions } from '../search/options.ts';
 import { MIN_FORCED_MASS, type ForcedWinCaveat, type ForcedWinProof, type TeraAllowance } from '../types.ts';
 import { endgameChildren, type EndgameChildren } from './children.ts';
 import { endgameKey } from './key.ts';
+import { helpedSources, splitClassKey } from './prover-helping.ts';
 import { firstMoveId, openFields, orderByOdds, orderByRanking, other, type Cell, type CellProof, type Proven, type Side } from './prover-order.ts';
 
 /**
@@ -100,13 +101,15 @@ const sampled = (root: Battle, cell: Cell): boolean => cell.plain && (root.gameT
  * move KNOCKED OUT (never worse for the side than the survived hit). A
  * class model leaks mass on rare outcomes otherwise: a 90% Toxic whose
  * three draws all hit left ten percent of a certain win unproven.
+ *
+ * Round 88 (T336): a class in which a secondary that only helps the mover fired is a third case, and it is decided by the
+ * positions the cell drew, not by the keys (prover-helping.ts: helpedSources). A class the draws never showed (the forced-draw cap
+ * reached, or a secondary class under MIN_CLASS_MASS) keeps the two cases above, because no position says what its effect did.
  */
-function dominates(drawnKey: string, missingKey: string, events: CellEvent[], side: Side): boolean {
-  const [drawnOrder, drawnRest] = drawnKey.split(':');
-  const [missingOrder, missingRest] = missingKey.split(':');
-  if (drawnOrder !== missingOrder || drawnRest === undefined || missingRest === undefined) return false;
-  const drawn = drawnRest.split('|');
-  const missing = missingRest.split('|');
+export function dominates(drawnKey: string, missingKey: string, events: CellEvent[], side: Side): boolean {
+  const [drawnClass, missingClass] = [splitClassKey(drawnKey), splitClassKey(missingKey)];
+  if (!drawnClass || !missingClass || drawnClass.order !== missingClass.order) return false;
+  const [drawn, missing] = [drawnClass.outcomes, missingClass.outcomes];
   if (drawn.length !== missing.length || drawn.length !== events.length) return false;
   let differing = -1;
   for (let index = 0; index < drawn.length; index++) {
@@ -293,7 +296,11 @@ class ForcedWinProver {
     // that class open (its share never enters the mass) unless a drawn
     // class dominates it, and proves the rest.
     if (cell.unpriced && cell.plain) return { cell, proofs: [], proven: NONE };
-    const proofs = cell.children.map(child => this.prove(child.position, ply + 1));
+    // Round 88 (T336, #72): a child in which a secondary that only helps this side fired takes the proof of the child in which it
+    // did not (prover-helping.ts); only the sources are proven, so the positions behind the effect cost no cells.
+    const sources = helpedSources(cell, this.side);
+    const proofs: Proven[] = cell.children.map((child, index) => (sources[index] < 0 ? this.prove(child.position, ply + 1) : NONE));
+    sources.forEach((source, index) => { if (source >= 0) proofs[index] = proofs[source]; });
     let mass = 0;
     let turns = 0;
     let caveat: ForcedWinCaveat = sampled(root, cell) ? 'sampled-rolls' : this.survivedHit(root, cell, proofs) ? 'barring-crit' : 'none';

@@ -41,4 +41,10 @@ describe('EvalStatus', () => {
     expect(screen.getByRole('status')).toHaveTextContent('3 turns played, now at turn 8.');
     expect(screen.queryByText(/Position changed/)).toBeNull();
   });
+
+  // Round 88 (T343, #79): a run from the turn 0 view names turn 0, the turn the leads come in.
+  test('a run from turn 0 names turn 0 in the status line', () => {
+    render(<EvalStatus {...base} status="searching" playOutProgress={{ startTurn: 0, turns: 0, atTurn: 1 }} />);
+    expect(screen.getByRole('status')).toHaveTextContent('Engine is playing both sides from turn 0. 0 turns played, now at turn 1.');
+  });
 });

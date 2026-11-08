@@ -9,14 +9,16 @@ body:
       description: The steps that led there, what you saw, and what you expected instead.
     validations:
       required: true
-  - type: textarea
+  - type: upload
     id: state-file
     attributes:
       label: State file
       description: >-
         "Report issue" downloads a ps-dashboard-state-….json file with the replay, the sets, the variation and the
-        position on screen. Drag it into this box; it lets the bug be replayed exactly. It contains a pasted team if you
-        pasted one.
+        position on screen. Drop it here, or click to pick it; with it the bug replays exactly. It contains a pasted team
+        if you pasted one.
+    validations:
+      accept: ".json"
   - type: input
     id: version
     attributes:

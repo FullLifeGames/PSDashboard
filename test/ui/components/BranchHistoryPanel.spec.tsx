@@ -105,10 +105,27 @@ describe('BranchHistoryPanel', () => {
     expect(onNavigate).toHaveBeenCalledWith({ turn: 4, line: 'variation' });
   });
 
+  // Round 88 (T348, #84): a replacement on both sides is stored as an entry of kind turn with the number of the entry before it.
+  test.each([
+    ['singles', 1],
+    ['doubles', 2],
+  ] as const)('%s: a replacement on both sides is an interlude row: no turn of its own, both choices, no cells', (_name, slots) => {
+    const both = entry(3, {
+      kind: 'turn', p1Choice: 'switch 3', p2Choice: 'switch 4',
+      p1SlotChoices: Array.from({ length: slots }, () => ({ kind: 'switch' as const, speciesId: 'garchomp', pokemonName: 'Garchomp' })),
+      p2SlotChoices: Array.from({ length: slots }, () => ({ kind: 'switch' as const, speciesId: 'rotomwash', pokemonName: 'Rotom-Wash' })),
+    });
+    renderOpen(<BranchHistoryPanel branchStartTurn={2} history={[entry(2), entry(3), both, entry(4)]} snapshots={snapshots} onNavigate={vi.fn()} />);
+    expect(toggle()).toHaveTextContent('▾ Variation moves · 3 turns');
+    expect(screen.getByText(/Turn 3 · forced replacement \(both sides\)/)).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /Variation result/ })).toHaveLength(3);
+  });
+
   test('a forced replacement is its own row and consumes no turn', () => {
-    const forced = entry(3, { kind: 'forced', forcedSide: 'p2', p1Choice: '—', p2Choice: 'switch 3' });
+    // a replacement finishes the turn it follows: it carries that turn's number (the battle's turn has not moved)
+    const forced = entry(2, { kind: 'forced', forcedSide: 'p2', p1Choice: '—', p2Choice: 'switch 3' });
     renderOpen(<BranchHistoryPanel branchStartTurn={2} history={[entry(2), forced, entry(3)]} snapshots={snapshots} onNavigate={vi.fn()} />);
-    expect(screen.getByText(/Turn 3 · forced replacement \(P2\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Turn 2 · forced replacement \(P2\)/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Tip of the variation/ })).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /Variation result/ })).toHaveLength(2);
   });

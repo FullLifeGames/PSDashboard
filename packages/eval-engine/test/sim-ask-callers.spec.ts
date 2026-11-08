@@ -73,6 +73,10 @@ describe('the callers of the simulator', () => {
       'eval-engine:calc/typeless.ts', 'eval-engine:damage-calc.ts', 'eval-engine:score/move-facts.ts',
       'replay-core:inference/item-evidence.ts', 'replay-core:inference/item-triggers.ts', 'replay-core:inference/rocks-tell.ts',
       'replay-core:inference/trigger-evidence.ts',
+      // Round 88 (T349): the terrain seeds' and Room Service's own handlers on a recording stand-in holder with no battle
+      // behind it, held to the simulator by replay-core's field-item-triggers-sweep.spec.ts (every scene of the five items,
+      // Generations 6 to 9 and Champions, singles and doubles).
+      'replay-core:inference/field-item-triggers.ts',
       // Round 73 (T210): a recording stand-in with no battle behind it, so nothing can be written; held to the simulator by
       // replay-core's hit-power-census.spec.ts (every Dex, Generations 1 to 9 and Champions) and hit-power-played.spec.ts.
       'replay-core:spreads/hit-power.ts',

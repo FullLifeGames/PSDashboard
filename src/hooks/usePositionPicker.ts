@@ -2,11 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getBranchSimulatorFormat, type ReplayData, type TurnSnapshot } from '@fulllifegames/replay-core';
 import type { BranchSlotChoice } from '@fulllifegames/eval-engine';
 import type { PickerBattle, PickerSource } from '../lib/picker-state';
+import type { Bench } from '../lib/bench';
 import { buildReplayTeams, type TeamBuildSources } from '../lib/eval-acquire';
 import type { VariationSpan } from '../lib/timeline';
 import type { BranchHistoryEntry, BranchSimState } from './useBranch';
 import type { PlayedAtPosition, PlayedPick } from '../lib/played-pick';
 import { mergeChoices, seedChoices } from '../lib/dock-seed';
+import { turnEntryAt } from '../lib/variation-turns';
 
 /**
  * Picker state for the viewed position when the live sim is elsewhere
@@ -18,7 +20,8 @@ export function usePositionPicker(args: {
   replayData: ReplayData | null;
   snapshots: TurnSnapshot[];
   sources: TeamBuildSources;
-  bringOnlyLists: { p1: string[]; p2: string[] } | null;
+  /** Round 88 (T314, #55): the bench lists of a bring-limited game; the snapshot and the stored pickers offer only those bodies. */
+  bench: Bench | null;
   replayGenNumber: number;
   liveTip: boolean;
   viewingVariation: boolean;
@@ -35,7 +38,7 @@ export function usePositionPicker(args: {
   played?: PlayedAtPosition | null;
 }) {
   const {
-    replayData, snapshots, sources, bringOnlyLists, replayGenNumber, liveTip, viewingVariation,
+    replayData, snapshots, sources, bench, replayGenNumber, liveTip, viewingVariation,
     serializedAtView, viewTurn, variationStartTurn, startSerialized, getExact, exactPositionsVersion,
     draftChoices, liveSimState, played,
   } = args;
@@ -59,7 +62,7 @@ export function usePositionPicker(args: {
       ? serializedAtView
       : (viewTurn === variationStartTurn ? startSerialized : null) ?? exactMainLine;
     void resolvePickerState({
-      stored, viewingVariation, viewTurn, snapshots, replayData, sources, replayGenNumber, bringOnlyLists,
+      stored, viewingVariation, viewTurn, snapshots, replayData, sources, replayGenNumber, bench,
     }).then(resolved => {
       if (!cancelled) setResolution({ viewKey, picker: resolved });
     });
@@ -68,7 +71,7 @@ export function usePositionPicker(args: {
     };
   }, [
     liveTip, viewingVariation, viewKey, serializedAtView, variationStartTurn, startSerialized, viewTurn, snapshots,
-    replayData, sources, replayGenNumber, getExact, exactPositionsVersion, bringOnlyLists,
+    replayData, sources, replayGenNumber, getExact, exactPositionsVersion, bench,
   ]);
 
   const { pickerSeed, pickerSimState } = useEffectivePicker(shownState, positionPicker, played, draftChoices);
@@ -147,13 +150,13 @@ async function resolvePickerState(args: {
   replayData: ReplayData | null;
   sources: TeamBuildSources;
   replayGenNumber: number;
-  bringOnlyLists: { p1: string[]; p2: string[] } | null;
+  bench: Bench | null;
 }): Promise<ResolvedPicker | null> {
-  const { stored, viewingVariation, viewTurn, snapshots, replayData, sources, replayGenNumber, bringOnlyLists } = args;
+  const { stored, viewingVariation, viewTurn, snapshots, replayData, sources, replayGenNumber, bench } = args;
   if (stored) {
     const { pickerFromSerialized } = await import('../lib/picker-state');
     try {
-      const { state, battle } = await pickerFromSerialized(stored);
+      const { state, battle } = await pickerFromSerialized(stored, bench);
       return { simState: state, source: 'stored', battle };
     } catch {
       // Fall through to the snapshot approximation.
@@ -182,7 +185,7 @@ async function resolvePickerState(args: {
   // format exists only once its mod is loaded.
   const { loadSimMods } = await import('../lib/lazy/branch-engine');
   await loadSimMods(rules.format);
-  return { simState: pickerStateFromSnapshot(snapshot, teams.p1Team, teams.p2Team, replayGenNumber, bringOnlyLists, rules), source: 'snapshot' };
+  return { simState: pickerStateFromSnapshot(snapshot, teams.p1Team, teams.p2Team, replayGenNumber, bench?.lists ?? null, rules), source: 'snapshot' };
 }
 
 /**
@@ -268,18 +271,13 @@ function fromChoice(choice: BranchSlotChoice | null): PlayedPick | null {
     : { kind: 'switch', name: choice.pokemonName, species: choice.speciesId, recorded: choice };
 }
 
-function playedFromHistory(history: BranchHistoryEntry[], index: number): PlayedAtPosition | null {
-  let count = 0;
-  for (const entry of history) {
-    if (entry.kind === 'forced') continue;
-    if (count === index) {
-      const p1Slots = (entry.p1SlotChoices ?? []).map(fromChoice);
-      const p2Slots = (entry.p2SlotChoices ?? []).map(fromChoice);
-      // Singles record one choice a side: the side pick alone, as before.
-      if (p1Slots.length <= 1 && p2Slots.length <= 1) return { p1: p1Slots[0] ?? null, p2: p2Slots[0] ?? null };
-      return withSlots(p1Slots, p2Slots);
-    }
-    count += 1;
-  }
-  return null;
+export function playedFromHistory(history: BranchHistoryEntry[], index: number): PlayedAtPosition | null {
+  // Round 88 (T348): the entry that plays the turn, whatever the interludes before it (a replacement on both sides is one).
+  const entry = turnEntryAt(history, index);
+  if (!entry) return null;
+  const p1Slots = (entry.p1SlotChoices ?? []).map(fromChoice);
+  const p2Slots = (entry.p2SlotChoices ?? []).map(fromChoice);
+  // Singles record one choice a side: the side pick alone, as before.
+  if (p1Slots.length <= 1 && p2Slots.length <= 1) return { p1: p1Slots[0] ?? null, p2: p2Slots[0] ?? null };
+  return withSlots(p1Slots, p2Slots);
 }

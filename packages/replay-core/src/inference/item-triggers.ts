@@ -4,6 +4,7 @@ import { type InferrerState } from './inferrer-state.ts';
 import { possibleAbilities, ruleOutUnknown } from './item-evidence.ts';
 import { arg, hasKw, identOf, keyOf, namesEffect, type LogLine } from './log-line.ts';
 import { toId } from '../ids.ts';
+import { teamSizes } from '../replay-format.ts';
 
 /**
  * Four more items the protocol rules out by a trigger it shows without the
@@ -98,8 +99,9 @@ export function newItemTriggerWatch(state: InferrerState): ItemTriggerWatch {
 
 /** How many Pokémon a side brought: the `|teamsize|` the log prints last (VGC brings 4 of 6), else the preview, else the entries. */
 export function teamSizeOf(state: InferrerState, side: string): number {
-  const sizes = state.lines.filter(line => line.cmd === 'teamsize' && arg(line, 1) === side).map(line => Number(arg(line, 2)));
-  if (sizes.length > 0 && sizes[sizes.length - 1] > 0) return sizes[sizes.length - 1];
+  // Round 88 (F, #101): the one `|teamsize|` reader of replay-core.
+  const sized = teamSizes(state.lines.map(line => line.raw))[side as 'p1' | 'p2'];
+  if (sized !== null && sized !== undefined && sized > 0) return sized;
   const preview = state.lines.filter(line => line.cmd === 'poke' && arg(line, 1) === side).length;
   if (preview > 0) return preview;
   return new Set(state.lines

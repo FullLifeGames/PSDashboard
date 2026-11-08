@@ -137,6 +137,70 @@ describe('the dice a log shows, action by action', () => {
     expect(loggedDice(selfOnly)).toEqual([]);
   });
 
+  // Round 88 (T338, #74): `self.chance` is drawn once per move from Gen 7, so one gain line against two struck foes is a yes
+  test('a self chance is one die for the move: one gain line against two struck foes is a yes, none is a no', () => {
+    const selfOf = (move: string) => (move === 'diamondstorm' ? 'self:def' : undefined);
+    const spread = (gain: string) => lines(`
+|move|p1a: A|Diamond Storm|p2a: B
+|-damage|p2a: B|60/100
+|-damage|p2b: C|60/100
+${gain}`);
+    const asked = (log: string[]) => show(loggedDice(log, { selfOf })).filter(entry => entry.includes(':self-effect'));
+    expect(asked(spread('|-boost|p1a: A|def|2'))).toEqual(['p1a:diamondstorm::self-effect {"happens":true}']);
+    expect(asked(spread(''))).toEqual(['p1a:diamondstorm::self-effect {"happens":false}']);
+  });
+
+  // Round 88 (T337, #73): a move whose every hit rolls its accuracy writes `|-hitcount|` and no miss for a later hit
+  describe('the accuracy of each hit of a multi-accuracy move', () => {
+    const hitsOf = (move: string) => (move === 'tripleaxel' ? 3 : undefined);
+    const axe = (count: string, first = '|-damage|p2a: B|70/100') => lines(`
+|move|p1a: A|Triple Axel|p2a: B
+${first}
+${count}`);
+    const asked = (log: string[], options: Parameters<typeof loggedDice>[1] = { hitsOf }) =>
+      show(loggedDice(log, options)).filter(entry => entry.includes(':accuracy'));
+    const plain = 'p1a:tripleaxel:p2a:accuracy {"happens":true}';
+
+    test('hits 2 to the count land, the next hit missed', () => {
+      expect(asked(axe('|-hitcount|p2a: B|1'))).toEqual([plain, 'p1a:tripleaxel:p2a:accuracy:hit2 {"happens":false}']);
+      expect(asked(axe('|-hitcount|p2a: B|2'))).toEqual([plain, 'p1a:tripleaxel:p2a:accuracy:hit2 {"happens":true}', 'p1a:tripleaxel:p2a:accuracy:hit3 {"happens":false}']);
+    });
+
+    test('a full chain names every later hit and no hit after the last', () => {
+      expect(asked(axe('|-hitcount|p2a: B|3'))).toEqual([plain, 'p1a:tripleaxel:p2a:accuracy:hit2 {"happens":true}', 'p1a:tripleaxel:p2a:accuracy:hit3 {"happens":true}']);
+    });
+
+    test('a miss of the first hit is the plain no and names no later hit', () => {
+      const missed = lines(`
+|move|p1a: A|Triple Axel|p2a: B|[miss]
+|-miss|p1a: A|p2a: B`);
+      expect(asked(missed)).toEqual(['p1a:tripleaxel:p2a:accuracy {"happens":false}']);
+    });
+
+    test('a move the game gives no hits for (no option, or not multi-accuracy) names no hit', () => {
+      const seed = lines(`
+|move|p1a: A|Bullet Seed|p2a: B
+|-damage|p2a: B|70/100
+|-hitcount|p2a: B|4`);
+      expect(asked(seed)).toEqual(['p1a:bulletseed:p2a:accuracy {"happens":true}']);
+      expect(asked(axe('|-hitcount|p2a: B|1'), {})).toEqual([plain]);
+    });
+
+    test('an older replay keys the count by the side: the one foe reads it', () => {
+      expect(asked(axe('|-hitcount|p2: B|1'))).toEqual([plain, 'p1a:tripleaxel:p2a:accuracy:hit2 {"happens":false}']);
+    });
+
+    test('the plain accuracy die of the user drops the logged hit dice of its move and target, the crit die of the user keeps them', () => {
+      const logged = loggedDice(axe('|-hitcount|p2a: B|1'), { hitsOf });
+      const mine = (kind: 'accuracy' | 'crit'): ForcedDie => ({ name: { slot: 'p1a', moveId: 'tripleaxel', targetSlot: 'p2a', kind }, result: { happens: true } });
+      expect(show(mergeLoggedDice({ logged, forced: [mine('accuracy')], changed: new Set() })).filter(entry => entry.includes(':accuracy')))
+        .toEqual([plain]);
+      expect(show(mergeLoggedDice({ logged, forced: [mine('crit')], changed: new Set() })).filter(entry => entry.includes(':accuracy:hit2')))
+        .toEqual(['p1a:tripleaxel:p2a:accuracy:hit2 {"happens":false}']);
+      expect(show(mergeLoggedDice({ logged, forced: [], changed: new Set(['p1a']) })).filter(entry => entry.startsWith('p1a:tripleaxel'))).toEqual([]);
+    });
+  });
+
   test('a flinch is the secondary of the move before it', () => {
     const turn = lines(`
 |move|p1a: A|Air Slash|p2a: B

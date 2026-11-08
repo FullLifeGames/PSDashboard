@@ -32,6 +32,20 @@ export function variationCovers(span: VariationSpan | null, turn: number): boole
   return span !== null && span.length > 0 && turn > span.startTurn && turn <= variationTip(span);
 }
 
+/**
+ * Round 88 (T347, #83): the variation position a turn of the branch frame stands for. The frame's turn is clamped to
+ * the covered turns: its start turn holds the shared prefix (the frame waits there for |turn|), the pointer then takes
+ * the first covered turn, and turn 0 of a T0 variation reads T1. An ended variation has no turn of its own at its tip:
+ * the frame stays on the last played turn, and the pointer takes the tip (the end position). Null without a report or
+ * a variation.
+ */
+export function pointerAtFrame(frameTurn: number | null, span: VariationSpan | null, ended: boolean): number | null {
+  if (frameTurn === null || span === null || span.length === 0) return null;
+  const tip = variationTip(span);
+  if (ended && frameTurn >= tip - 1) return tip;
+  return Math.min(Math.max(frameTurn, span.startTurn + 1), tip);
+}
+
 export function sliderMax(replayMax: number, span: VariationSpan | null): number {
   return span && span.length > 0 ? Math.max(replayMax, variationTip(span)) : replayMax;
 }

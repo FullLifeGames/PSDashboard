@@ -24,7 +24,7 @@ export function ReportIssueDialog({ report, onDownload, onClose }: {
         {report.downloaded && <span role="status" style={{ fontSize: 11, color: '#9c9' }}>Downloaded {report.fileName}</span>}
       </div>
       <p style={STEP_STYLE}>
-        2. Open the issue form on GitHub, describe what happened, and drag the file into it.
+        2. Open the issue form on GitHub, describe what happened, and drop the file into its State file field.
       </p>
       <a className="ps-btn" style={ACTION_STYLE} href={report.issueUrl} target="_blank" rel="noopener noreferrer">
         Open the issue on GitHub

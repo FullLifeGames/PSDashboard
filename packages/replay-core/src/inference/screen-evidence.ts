@@ -23,8 +23,8 @@ import { illusionPossible, possibleAbilities, ruleOutUnknown } from './item-evid
  * to the simulator in every rule set and both game types.
  */
 
-/** A screen standing on one side, opened at its setter's move. */
-interface Interval {
+/** A screen standing on one side, opened at its setter's move (round 88, T329: a weather or a terrain, opened at its setter's move or ability, shares the interval and the verdict). */
+export interface Interval {
   /** The `|turn|` the setter used the move on. */
   turn: number;
   /** The setter's ident with its position, and its key without. */
@@ -93,7 +93,7 @@ function mayIgnoreItem(state: InferrerState, interval: Interval): boolean {
 }
 
 /** The verdict of an observed end: the lifetime in turns against the Dex's table. */
-function judge(state: InferrerState, interval: Interval, lifetime: number) {
+export function judge(state: InferrerState, interval: Interval, lifetime: number) {
   const { plain, byItem } = interval.table;
   if (interval.doubt || illusionPossible(state) || !interval.key.startsWith(state.opponentSide)) return;
   if ([...state.swappedIdents.keys()].some(ident => keyOf(ident) === interval.key)) return;

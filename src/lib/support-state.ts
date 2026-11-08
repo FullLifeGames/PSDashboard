@@ -3,6 +3,7 @@ import type { OpponentTeamInfo, ReplayData } from '@fulllifegames/replay-core';
 import type { BranchSlotChoice, EvalPreferences } from '@fulllifegames/eval-engine';
 import type { BranchHistoryEntry } from './branch-history';
 import type { ViewLine } from './timeline';
+import { turnEntryCount } from './variation-turns';
 
 /**
  * Round 77 (user gate 28.10.2026, "1a 2a 3a 4a 5a"): the app's state as one readable file for a bug
@@ -75,7 +76,7 @@ export function isSupportState(value: unknown): value is SupportState {
 /** "T7 in the variation from turn 5 (2 turns)", "T28 on the main line (variation from turn 5, 2 turns)": the line once. */
 export function positionLabel(state: Pick<SupportState, 'view' | 'variation'>): string {
   const { view, variation } = state;
-  const turns = variation.history.filter(entry => entry.kind !== 'forced').length;
+  const turns = turnEntryCount(variation.history);
   const length = `${turns} ${turns === 1 ? 'turn' : 'turns'}`;
   const hasVariation = variation.startTurn !== null && turns > 0;
   if (!view.t0 && view.viewingVariation && hasVariation) return `T${view.turn} in the variation from turn ${variation.startTurn} (${length})`;
@@ -100,7 +101,8 @@ const clip = (text: string) => (text.length > FIELD_MAX ? `${text.slice(0, FIELD
 
 /**
  * The new-issue link with the issue form's fields filled (`.github/ISSUE_TEMPLATE/bug_report.yml`):
- * GitHub fills a form's text fields from query parameters named by their ids. GitHub reads forms from the
+ * GitHub fills a form's text fields from query parameters named by their ids. The state file goes into the form's upload
+ * field, which no link fills (round 88, user report 08.11.2026: the text box took no .json file). GitHub reads forms from the
  * default branch only, and without the form it opens a blank issue: the description then carries the same
  * facts (round 77, user report 28.10.2026: the issue held the title alone).
  */
@@ -109,7 +111,7 @@ export function issueUrl(state: SupportState, fileName: string): string {
   const replay = state.replay ? `https://replay.pokemonshowdown.com/${state.replay.id}` : 'none loaded';
   const version = `${state.app.version} (${state.app.commit})`;
   const position = positionLabel(state);
-  const stateFile = `Drag ${fileName} (downloaded by "Report issue") into this box.`;
+  const stateFile = `Attach ${fileName} (downloaded by "Report issue") to this issue.`;
   const body = [
     '### What happened?', '', 'The steps that led there, what you saw, and what you expected instead.', '',
     '### State file', '', stateFile, '',
@@ -123,7 +125,6 @@ export function issueUrl(state: SupportState, fileName: string): string {
     replay,
     position,
     message: clip(message ?? ''),
-    'state-file': stateFile,
     body,
   });
   return `${NEW_ISSUE_URL}?${params.toString()}`;

@@ -40,7 +40,7 @@ function useAcquireLayer(ctx: ReplayContext, transients: Transients, board: Boar
   const { getBattle, executing, variationStartTurn, startSerialized } = ctx.branch;
   const { evaluation, teamSources, positions } = ctx;
   const { replayGenNumber } = ctx.knowledge;
-  const { bringOnlyLists } = ctx.meta;
+  const { bench } = ctx.meta;
   const { playOut, draftChoices } = transients;
   const { liveTip, viewingVariation, atEndPosition, viewTurn, serializedAtView } = board.timeline;
   const { branchPreparing } = board.deviation;
@@ -60,7 +60,7 @@ function useAcquireLayer(ctx: ReplayContext, transients: Transients, board: Boar
     parseSingles, parseDoubles: parsePlayedActionsDoubles,
   });
   const { positionPicker, pickerSimState, pickerSeed, pickerStale, getPickerBattle, pickerReplayLog } = usePositionPicker({
-    replayData, snapshots, sources: teamSources, bringOnlyLists, replayGenNumber,
+    replayData, snapshots, sources: teamSources, bench, replayGenNumber,
     liveTip, viewingVariation, serializedAtView, viewTurn, variationStartTurn, startSerialized,
     getExact: acquire.getExact, exactPositionsVersion: acquire.exactPositionsVersion, draftChoices,
     liveSimState: ctx.branch.simState, played: playedAtView,
@@ -144,7 +144,7 @@ function usePlayLayer(
   ctx: ReplayContext, transients: Transients, board: BoardController,
   evalView: ReturnType<typeof useEvalViewLayer>,
 ) {
-  const { simState, branching, executing, getBattle, executeTurn } = ctx.branch;
+  const { engineSimState, branching, executing, executeError, getBattle, executeTurn } = ctx.branch;
   const { evaluation } = ctx;
   const {
     playOut, setPlayOut, setPlayOutNotice, playOutProcessedRef, playOutRef, stopPlayOutRef,
@@ -162,7 +162,8 @@ function usePlayLayer(
   // Engine walk: clicking a line plays the turn out; queued picks follow
   // a rebuild; interludes finish forced replacements.
   const walk = useEngineWalk({
-    simState, liveTip, branching, branchPreparing, executing,
+    // Round 88 (M3): the walk applies the engine's own choices, which the filtered bench of the pickers must not refuse.
+    simState: engineSimState, liveTip, branching, branchPreparing, executing,
     confirmOpen: pendingConfirm !== null, playOutActive: playOut?.active ?? false,
     evaluation, evalViewKey, getBattle, executeTurn, handleEvaluate, handleSetChoice,
     requestDeviation, setBranchDivergence,
@@ -173,7 +174,7 @@ function usePlayLayer(
     playOut, setPlayOut, setPlayOutNotice, playOutProcessedRef, playOutRef, stopPlayOutRef,
     evaluation, fastPlayOut, evalViewKey, liveEvalStatus: board.liveEvalStatus, liveTip, viewingVariation, atEndPosition, viewT0,
     viewTurn, tipTurn, holdTipFollow, navigateTo, setNavSeek,
-    executing, branchPreparing, getBattle, executeTurn, handleEvaluate, applyEvalChoice: walk.applyEvalChoice,
+    executing, executeError, branchPreparing, getBattle, executeTurn, handleEvaluate, applyEvalChoice: walk.applyEvalChoice,
     requestDeviation, startLeadVariation, leadPicksRef, setVariationNotice,
   });
   return { walk, playOutControls };

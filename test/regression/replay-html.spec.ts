@@ -43,6 +43,51 @@ describe('Replay iframe HTML', () => {
     expect(html).toContain('battle.play()');
   });
 
+  // Round 88 (T347, #83): the bridge's guard against its own retries dropped Watch from turn N while the frame already
+  // played at or past N. A play seek with an id (the app's request, sent with retries) runs once per id instead.
+  describe('play seeks with an id', () => {
+    const bridge = () => {
+      const html = generateReplayHtml({ log });
+      const body = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(match => match[1]).find(text => text.includes('replayBridge'));
+      const calls: string[] = [];
+      const battle = {
+        paused: false, seeking: null as number | null, turn: 5, sound: {},
+        seekTurn(turn: number) { calls.push(`seek ${turn}`); battle.turn = turn; },
+        play() { calls.push('play'); battle.paused = false; },
+        pause() { calls.push('pause'); battle.paused = true; },
+        setViewpoint() {},
+      };
+      let listener: (event: { data: unknown }) => void = () => {};
+      const sandbox: Record<string, unknown> = {
+        Replays: { battle }, setInterval: () => 0, setTimeout: () => 0, parent: { postMessage() {} },
+        addEventListener: (type: string, fn: typeof listener) => { if (type === 'message') listener = fn; },
+      };
+      sandbox.window = sandbox;
+      runInNewContext(body ?? '', sandbox);
+      return { battle, calls, send: (data: Record<string, unknown>) => listener({ data: { type: 'ps-seek-turn', ...data } }) };
+    };
+
+    test('a frame that plays past the turn goes back to it once per id; the retries of that id change nothing', () => {
+      const { battle, calls, send } = bridge();
+      send({ turn: 3, autoPlay: true, id: 4 });
+      expect(calls).toEqual(['seek 3', 'play']);
+      battle.turn = 5; // the frame plays on
+      send({ turn: 3, autoPlay: true, id: 4 });
+      send({ turn: 3, autoPlay: true, id: 4 });
+      expect(calls).toEqual(['seek 3', 'play']);
+      send({ turn: 3, autoPlay: true, id: 5 }); // the user presses Watch again
+      expect(calls).toEqual(['seek 3', 'play', 'seek 3', 'play']);
+    });
+
+    test('seeks without an id keep the guards against the app\'s own retries', () => {
+      const { calls, send } = bridge();
+      send({ turn: 3, autoPlay: true }); // the frame plays at turn 5, past the request: nothing to do
+      expect(calls).toEqual([]);
+      send({ turn: 8, autoPlay: true });
+      expect(calls).toEqual(['seek 8', 'play']);
+    });
+  });
+
   test('a p2 viewpoint request switches sides once the embed is ready', () => {
     const html = generateReplayHtml({ log, viewpoint: 'p2' });
     expect(html).toContain("var pendingViewpoint = 'p2';");

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  extendsLines, frameLines, useLiveAppend, useReplayBlobUrl, useSeekRequests, useSeekTurn, useTurnReports, type SeekRequest,
+  extendsLines, frameLines, useLiveAppend, useReplayBlobUrl, useSeekRequests, useSeekTurn, useSideReports, useTurnReports, type FrameSide, type SeekRequest,
 } from '../hooks/useReplayFrame';
 import { followFrame } from '../lib/replay-frame-follow';
 
@@ -27,6 +27,10 @@ interface Props {
   /** Viewer perspective — 'p2' renders from player 2's side (the ?p2 replay-URL flag). */
   viewpoint?: 'p1' | 'p2';
   onTurnChange?: (turn: number) => void;
+  /** Round 88 (T316): the frame reports the side it shows near (Switch sides, the ?p2 flag); the dock puts that side on top. */
+  onSideChange?: (side: FrameSide) => void;
+  /** Round 88 (T316): false hides Color scheme and Music, which do nothing in the app's frames. Default true. */
+  choosers?: boolean;
   /**
    * Explicit one-shot seek command for live-update frames, which ignore
    * seekTurn prop changes after mount (re-seeking on every render fought
@@ -111,6 +115,14 @@ function EmptyFrame({ height }: { height: number }) {
   );
 }
 
+/** Each load of the frame starts a new height follower and sends the frame's first seek. */
+function onFrameLoad(frame: HTMLIFrameElement | null, followRef: { current: (() => void) | null }, seekTurn: number | undefined, autoPlay: boolean) {
+  followRef.current?.();
+  followRef.current = frame ? followFrame(frame) : null;
+  if (seekTurn == null) return;
+  frame?.contentWindow?.postMessage({ type: 'ps-seek-turn', turn: seekTurn, autoPlay }, '*');
+}
+
 function PSReplayFrameDocument({
   log,
   documentLog: initialDocumentLog,
@@ -128,6 +140,8 @@ function PSReplayFrameDocument({
   reloadKey = 'default',
   viewpoint,
   onTurnChange,
+  onSideChange,
+  choosers = true,
   seekRequest = null,
 }: DocumentProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -141,8 +155,11 @@ function PSReplayFrameDocument({
   // lines through appends, so a later seekTurn never moves it (a late load event would end a turn playing in).
   const frameSeekTurn = liveUpdates ? initialSeek.seekTurn : seekTurn;
 
-  const blobUrl = useReplayBlobUrl({ documentLog, format, p1, p2, title, initialSeek, reportTurn, viewpoint });
+  const blobUrl = useReplayBlobUrl({
+    documentLog, format, p1, p2, title, initialSeek, reportTurn, reportSide: !!onSideChange, hideChoosers: !choosers, viewpoint,
+  });
   const lastReportedTurnRef = useTurnReports(onTurnChange, blobUrl);
+  useSideReports(iframeRef, onSideChange);
   useSeekTurn({ iframeRef, seekTurn: frameSeekTurn, autoPlay, blobUrl, liveUpdates, lastReportedTurnRef });
   useSeekRequests(iframeRef, seekRequest);
   useLiveAppend({ iframeRef, liveUpdates, reloadKey, blobUrl, documentLog, log, seekTurn, liveAppendMode, liveAppendTurn });
@@ -158,16 +175,7 @@ function PSReplayFrameDocument({
     <iframe
       ref={iframeRef}
       src={blobUrl}
-      onLoad={() => {
-        followRef.current?.();
-        followRef.current = iframeRef.current ? followFrame(iframeRef.current) : null;
-        if (frameSeekTurn == null) return;
-        iframeRef.current?.contentWindow?.postMessage({
-          type: 'ps-seek-turn',
-          turn: frameSeekTurn,
-          autoPlay: !!autoPlay,
-        }, '*');
-      }}
+      onLoad={() => onFrameLoad(iframeRef.current, followRef, frameSeekTurn, !!autoPlay)}
       style={{
         width: '100%',
         // The document sets --ps-frame-h in phone mode (replay-frame-height.ts); the desktop layout keeps `height`.

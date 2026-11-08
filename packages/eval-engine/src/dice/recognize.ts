@@ -122,8 +122,17 @@ export function recognize(draw: Draw, watch: BattleWatch, gen: number): DieName 
 
   if (watch.scope() === shape.roll.scope && isRollCall(draw, shape.roll)) return { ...base, ...target(), kind: 'damage-roll' };
   if (isCritDraw(draw, shape, watch)) return { ...base, ...target(), kind: 'crit' };
-  if (draw.call === 'chance' && armed?.kind === 'accuracy') return { ...base, targetSlot: armed.targetSlot, kind: 'accuracy' };
+  if (draw.call === 'chance' && armed?.kind === 'accuracy') return { ...base, targetSlot: armed.targetSlot, kind: 'accuracy', ...hitOf(move) };
   return recognizeMoveDraw(draw, watch, gen, base);
+}
+
+/**
+ * Round 88 (T337): a move whose every hit rolls its own accuracy (`multiaccuracy`) draws the accuracy of hit N at `move.hit` N
+ * (the first hit's draw runs before the loop with `move.hit` 0); the die of a later hit carries the number. Skill Link and Loaded
+ * Dice clear the flag, so their draws name no hit.
+ */
+function hitOf(move: { multiaccuracy?: boolean; hit?: number }): { hit?: number } {
+  return move.multiaccuracy && typeof move.hit === 'number' && move.hit >= 2 ? { hit: move.hit } : {};
 }
 
 type Base = { slot: string; moveId: string };

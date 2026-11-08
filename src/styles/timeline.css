@@ -24,7 +24,9 @@
 /* Slider wrapper carrying the gold variation stripe */
 .ps-timeline-track {
   position: relative;
-  flex: 1;
+  /* Round 88 (T345, #81): the basis is the slider's minimum, 200 px (user 07.11.2026). The wrapping bar moves the chip and Discard variation
+     (.ps-branch-bar-vari) to a second row before the slider falls below it. */
+  flex: 1 1 200px;
   min-width: 0;
   display: flex;
   align-items: center;
@@ -34,6 +36,12 @@
   min-width: 0;
   position: relative;
   z-index: 1;
+}
+/* The line chip and Discard variation travel together: one flex item, so the pair drops to the second row as one. */
+.ps-branch-bar-vari {
+  display: flex;
+  align-items: center;
+  gap: 7px;
 }
 .ps-timeline-stripe {
   position: absolute;
@@ -53,5 +61,11 @@
     flex: 1 1 100%;
     order: 10;
     min-height: 28px;
+  }
+  /* Round 88 (T345, #81): the 28 px box stays the touch target (scale.spec.ts and the WebKit moveTimeline click its middle), and the
+     6 px track draws centred inside it, not as a grey block across the whole box. */
+  .ps-branch-bar input[type="range"] {
+    background: linear-gradient(#555, #555) center / 100% 6px no-repeat;
+    box-shadow: none;
   }
 }

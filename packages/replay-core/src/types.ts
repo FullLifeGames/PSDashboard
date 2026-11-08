@@ -378,6 +378,11 @@ export interface RevealedPokemonInfo {
   ruledOut?: { abilities: string[]; items: string[] };
   /** The clean hits this Pokémon dealt (round 67, T130): the damage judge reads them against its item candidates. */
   hits?: LoggedHit[];
+  /**
+   * Round 88 (F, #101): a body the log never showed, guessed from the format's teammate statistics because the side's `|teamsize|`
+   * says it has more bodies than it showed (a game without team preview). The panel marks it "not revealed"; an edit drops the flag.
+   */
+  standIn?: true;
 }
 
 export interface OpponentTeamInfo {

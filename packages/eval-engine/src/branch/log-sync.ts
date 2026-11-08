@@ -1,5 +1,6 @@
 import type { SimBattle, SimPokemon } from './types.ts';
-import { normalizeBattleOnlyFormeId, sameBodyName, slotLetter } from './team-order.ts';
+import { sameBodyName, slotLetter } from './team-order.ts';
+import { sameBodyForme } from './body-forme.ts';
 import { toId } from '@fulllifegames/replay-core';
 
 function replayLogPrefixThroughTurn(replayLog: string, targetTurn: number): string[] {
@@ -36,14 +37,14 @@ export function branchLogForPosition(replayLog: string, targetTurn: number, batt
   return log;
 }
 
-interface LoggedActive {
+export interface LoggedActive {
   side: 'p1' | 'p2';
   activeSlot: number;
   name: string;
   speciesId: string;
 }
 
-function parseLoggedActive(line: string): LoggedActive | null {
+export function parseLoggedActive(line: string): LoggedActive | null {
   const match = line.match(/^\|(switch|drag|replace)\|(p[12])([a-d]):\s*([^|]*)\|([^|]*)\|/);
   if (!match) return null;
 
@@ -51,14 +52,14 @@ function parseLoggedActive(line: string): LoggedActive | null {
     side: match[2] as 'p1' | 'p2',
     activeSlot: match[3].charCodeAt(0) - 'a'.charCodeAt(0),
     name: match[4].trim(),
-    speciesId: normalizeBattleOnlyFormeId(toId(match[5].split(',')[0] || '')),
+    speciesId: toId(match[5].split(',')[0] || ''),
   };
 }
 
-function activeMatchesLog(pokemon: SimPokemon, logged: LoggedActive | undefined): boolean {
+export function activeMatchesLog(pokemon: SimPokemon, logged: LoggedActive | undefined): boolean {
   if (!logged) return false;
-  const speciesId = normalizeBattleOnlyFormeId(toId(pokemon.species?.name || ''));
-  return sameBodyName(logged.name, pokemon.name) || logged.speciesId === speciesId;
+  // Round 88 (#103): the species counts by the Dex of the battle, one body in another forme included.
+  return sameBodyName(logged.name, pokemon.name) || sameBodyForme(pokemon.battle.dex, pokemon.species?.name, logged.speciesId);
 }
 
 function formatPokemonDetails(pokemon: SimPokemon): string {

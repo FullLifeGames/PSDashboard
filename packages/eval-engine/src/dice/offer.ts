@@ -82,9 +82,27 @@ function activeMoveOn(copy: Battle, user: Pokemon, target: Pokemon | undefined, 
   return active;
 }
 
-/** Whether the move is on its second turn: a charge move draws nothing on the turn it charges. */
-const charged = (user: Pokemon, move: ActiveMove): boolean =>
-  !move.flags.charge || Object.values(user.volatiles).some(volatile => (volatile as { move?: string }).move === move.id);
+/** Whether the user holds the volatile of the move's charge: the move is on its second turn. */
+const holdsCharge = (user: Pokemon, move: ActiveMove): boolean =>
+  Object.values(user.volatiles).some(volatile => (volatile as { move?: string }).move === move.id);
+
+/**
+ * Round 88 (T344, #80): whether a charge move spends this turn charging. The simulator decides it: the move's weather, Power Herb
+ * and Mega Sol skip the charge, and Utility Umbrella, Cloud Nine, Air Lock, Klutz, Embargo and Magic Room block such a skip. So the
+ * move runs on a second copy of the battle (the copy that `moveOffers` reads stays untouched: Electro Shot boosts on its charge turn
+ * and Power Herb is used up), and the user holds the volatile of the charge afterwards when it charged. No list of the skips.
+ */
+function chargesThisTurn(battle: Battle, slot: string, choice: MoveChoice, move: ActiveMove): boolean {
+  if (!move.flags.charge) return false;
+  const copy = copyOf(battle);
+  copy.prng ??= battle.prng.clone();
+  const user = bodyAt(copy, slot);
+  if (!user || user.fainted) return false;
+  if (holdsCharge(user, move)) return false;
+  const aimed = choice.targetLoc === undefined ? user.foes()[0] : user.getAtLoc(choice.targetLoc);
+  copy.actions.useMove(move.id, user, { target: aimed });
+  return holdsCharge(user, move);
+}
 
 /** The condition on the user that makes a stalling move draw (the one with a `StallMove` handler), or undefined. */
 function stallCondition(user: Pokemon, battle: Battle): string | undefined {
@@ -243,7 +261,7 @@ export function offeredDice(battle: Battle, slot: string, choice: BranchSlotChoi
   const move = activeMoveOn(copy, user, aimed, choice.moveId);
   // the checks before a move draw whatever the move does next, also on the turn a charge move charges
   const checks = checkOffers(battle, slot, move.id);
-  if (move.flags.futuremove || !charged(user, move)) return checks;
+  if (move.flags.futuremove || chargesThisTurn(battle, slot, choice, move)) return checks;
   const targets = FOE_REACHING.has(move.target) ? targetsOf(user, move, choice) : [];
   const offers = targets.length > 0 ? moveOffers(copy, user, move, targets) : [];
   offers.push(...procOffers(copy, user, move, targets));

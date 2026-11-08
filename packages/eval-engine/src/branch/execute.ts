@@ -2,7 +2,8 @@ import type { BranchSlotChoice } from '../branch-choices.ts';
 import type { BranchChoiceErrorLog, BranchExecuteResult, BranchRuntime, SimBattle, SimPokemon } from './types.ts';
 import type { PendingTurn } from '../dice/turn.ts';
 import type { DiceReport } from '../dice/types.ts';
-import { findByName, normalizeBattleOnlyFormeId, sameBodyName, slotLetter } from './team-order.ts';
+import { findByName, sameBodyName, slotLetter } from './team-order.ts';
+import { sameBodyForme } from './body-forme.ts';
 import { targetLocSuffixForChoice } from './protocol-choices.ts';
 import { sideIndex, toId } from '@fulllifegames/replay-core';
 
@@ -69,6 +70,19 @@ function heldBody(battle: SimBattle, sideIdx: number, activeSlot: number): SimPo
   return side.requestState === 'move' && body && !body.fainted && body.trapped ? body : null;
 }
 
+/**
+ * Round 88 (#103): how well a bench body fits the clicked species, 0 best, -1 not at all. A body is the species' kin when the Dex ties the two
+ * (one body in another forme: Ogerpon-Teal-Tera for Ogerpon, a Mega for its base) or its name is the species' id. The order: kin with the exact
+ * name, kin with the same name by id, any kin, then a body by its name alone (Shaymin-Sky frozen back to Shaymin keeps its name and no Dex tie).
+ */
+function switchRank(battle: SimBattle, pokemon: SimPokemon, choice: Extract<BranchSlotChoice, { kind: 'switch' }>): number {
+  const kin = sameBodyForme(battle.dex, pokemon.species?.name, choice.speciesId) || toId(pokemon.name || '') === choice.speciesId;
+  const exactName = !!choice.pokemonName && pokemon.name === choice.pokemonName;
+  const sameName = sameBodyName(pokemon.name, choice.pokemonName);
+  if (kin) return exactName ? 0 : sameName ? 1 : 2;
+  return exactName ? 3 : sameName ? 4 : -1;
+}
+
 function resolveSwitchSlotChoice(
   battle: SimBattle,
   side: 'p1' | 'p2',
@@ -80,18 +94,12 @@ function resolveSwitchSlotChoice(
   const held = heldBody(battle, sideIdx, activeSlot);
   if (held) return { ok: false, error: `${describePokemon(held)} is trapped and cannot switch out right now.` };
 
-  // The bench bodies of the clicked species: the exact name decides, then an equal id (an empty id is no key), then the first.
-  const candidates: number[] = [];
-  for (let index = 0; index < bench.length; index++) {
-    const pokemon = bench[index];
-    if (pokemon.isActive || pokemon.fainted) continue;
-    const benchSpecies = normalizeBattleOnlyFormeId(toId(pokemon.species?.name || ''));
-    if (benchSpecies !== choice.speciesId && toId(pokemon.name || '') !== choice.speciesId) continue;
-    candidates.push(index);
-  }
-  const picked = candidates.find(index => bench[index].name === choice.pokemonName) ??
-    candidates.find(index => sameBodyName(bench[index].name, choice.pokemonName)) ?? candidates[0];
-  if (picked !== undefined) return { ok: true, command: `switch ${picked + 1}` };
+  const ranked = bench.flatMap((pokemon, index) => {
+    const rank = pokemon.isActive || pokemon.fainted ? -1 : switchRank(battle, pokemon, choice);
+    return rank >= 0 ? [{ index, rank }] : [];
+  });
+  const picked = ranked.reduce<{ index: number; rank: number } | undefined>((best, entry) => (!best || entry.rank < best.rank ? entry : best), undefined);
+  if (picked) return { ok: true, command: `switch ${picked.index + 1}` };
   const named = findByName(bench, pokemon => pokemon.name, choice.pokemonName);
   return { ok: false, error: `${named ? describePokemon(named) : choice.pokemonName} is no longer available to switch in.` };
 }

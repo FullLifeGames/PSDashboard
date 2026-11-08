@@ -1,0 +1,408 @@
+{
+ "note": "Round 88 (#103): the reporter's variation of public replay gen9ou-2710066092 from turn 21 (data of the Report issue state file: the built sets, the two history entries by their slot choices, the live choice of the forced replacement). The log is gen9ou-2710066092.json beside it.",
+ "formatid": "gen9ou",
+ "players": [
+  "K4NE2FALCONSOWCS",
+  "Bad Player Seb"
+ ],
+ "startTurn": 21,
+ "builtSets": {
+  "p1Team": [
+   {
+    "name": "Ninetales-Alola",
+    "species": "Ninetales-Alola",
+    "gender": "F",
+    "item": "Light Clay",
+    "ability": "Snow Warning",
+    "teraType": "Water",
+    "evs": {
+     "hp": 248,
+     "atk": 0,
+     "def": 8,
+     "spa": 0,
+     "spd": 0,
+     "spe": 252
+    },
+    "nature": "Timid",
+    "ivs": {
+     "hp": 31,
+     "atk": 0,
+     "def": 31,
+     "spa": 31,
+     "spd": 31,
+     "spe": 31
+    },
+    "moves": [
+     "Aurora Veil",
+     "Blizzard",
+     "Snowscape",
+     "Encore"
+    ],
+    "level": 100
+   },
+   {
+    "name": "Roaring Moon",
+    "species": "Roaring Moon",
+    "gender": "",
+    "item": "Booster Energy",
+    "ability": "Protosynthesis",
+    "teraType": "Flying",
+    "evs": {
+     "hp": 0,
+     "atk": 252,
+     "def": 0,
+     "spa": 0,
+     "spd": 4,
+     "spe": 252
+    },
+    "nature": "Adamant",
+    "moves": [
+     "Dragon Dance",
+     "Substitute",
+     "Acrobatics",
+     "Knock Off"
+    ],
+    "level": 100
+   },
+   {
+    "name": "Maushold",
+    "species": "Maushold",
+    "gender": "",
+    "item": "Wide Lens",
+    "ability": "Technician",
+    "teraType": "Ghost",
+    "evs": {
+     "hp": 4,
+     "atk": 252,
+     "def": 0,
+     "spa": 0,
+     "spd": 0,
+     "spe": 252
+    },
+    "nature": "Jolly",
+    "moves": [
+     "Tidy Up",
+     "Population Bomb",
+     "Encore",
+     "Bite"
+    ],
+    "level": 100
+   },
+   {
+    "name": "Cloyster",
+    "species": "Cloyster",
+    "gender": "F",
+    "item": "Never-Melt Ice",
+    "ability": "Skill Link",
+    "teraType": "Ice",
+    "evs": {
+     "hp": 56,
+     "atk": 252,
+     "def": 0,
+     "spa": 0,
+     "spd": 0,
+     "spe": 200
+    },
+    "nature": "Adamant",
+    "moves": [
+     "Substitute",
+     "Shell Smash",
+     "Icicle Spear",
+     "Ice Shard"
+    ],
+    "level": 100
+   },
+   {
+    "name": "",
+    "species": "Gholdengo",
+    "gender": "",
+    "item": "Air Balloon",
+    "ability": "Good as Gold",
+    "teraType": "Water",
+    "evs": {
+     "hp": 4,
+     "atk": 0,
+     "def": 0,
+     "spa": 252,
+     "spd": 0,
+     "spe": 252
+    },
+    "nature": "Modest",
+    "ivs": {
+     "hp": 31,
+     "atk": 0,
+     "def": 31,
+     "spa": 31,
+     "spd": 31,
+     "spe": 31
+    },
+    "moves": [
+     "Shadow Ball",
+     "Nasty Plot",
+     "Psyshock",
+     "Make It Rain"
+    ],
+    "level": 100
+   },
+   {
+    "name": "Gliscor",
+    "species": "Gliscor",
+    "gender": "F",
+    "item": "Toxic Orb",
+    "ability": "Poison Heal",
+    "teraType": "Normal",
+    "evs": {
+     "hp": 244,
+     "atk": 8,
+     "def": 0,
+     "spa": 0,
+     "spd": 252,
+     "spe": 4
+    },
+    "nature": "Careful",
+    "moves": [
+     "Swords Dance",
+     "Facade",
+     "Earthquake",
+     "Agility"
+    ],
+    "level": 100
+   }
+  ],
+  "p2Team": [
+   {
+    "name": "Rillaboom",
+    "species": "Rillaboom",
+    "item": "Choice Band",
+    "ability": "Grassy Surge",
+    "moves": [
+     "Grassy Glide",
+     "Wood Hammer",
+     "U-turn",
+     "Knock Off"
+    ],
+    "nature": "Adamant",
+    "evs": {
+     "hp": 172,
+     "atk": 252,
+     "def": 4,
+     "spa": 0,
+     "spd": 0,
+     "spe": 80
+    },
+    "ivs": {
+     "hp": 31,
+     "atk": 31,
+     "def": 31,
+     "spa": 31,
+     "spd": 31,
+     "spe": 31
+    },
+    "level": 100,
+    "gender": "F"
+   },
+   {
+    "name": "Ogerpon",
+    "species": "Ogerpon",
+    "item": "Heavy-Duty Boots",
+    "ability": "Defiant",
+    "moves": [
+     "U-turn",
+     "Ivy Cudgel",
+     "Knock Off",
+     "Encore"
+    ],
+    "nature": "Adamant",
+    "evs": {
+     "hp": 0,
+     "atk": 252,
+     "def": 4,
+     "spa": 0,
+     "spd": 0,
+     "spe": 252
+    },
+    "ivs": {
+     "hp": 31,
+     "atk": 31,
+     "def": 31,
+     "spa": 31,
+     "spd": 31,
+     "spe": 31
+    },
+    "level": 100,
+    "gender": "F",
+    "teraType": "Grass"
+   },
+   {
+    "name": "Iron Treads",
+    "species": "Iron Treads",
+    "item": "Leftovers",
+    "ability": "Quark Drive",
+    "moves": [
+     "Stealth Rock",
+     "Earthquake",
+     "Rapid Spin",
+     "Knock Off"
+    ],
+    "nature": "Jolly",
+    "evs": {
+     "hp": 0,
+     "atk": 252,
+     "def": 0,
+     "spa": 0,
+     "spd": 4,
+     "spe": 252
+    },
+    "ivs": {
+     "hp": 31,
+     "atk": 31,
+     "def": 31,
+     "spa": 31,
+     "spd": 31,
+     "spe": 31
+    },
+    "level": 100,
+    "gender": ""
+   },
+   {
+    "name": "Slowking",
+    "species": "Slowking",
+    "item": "Heavy-Duty Boots",
+    "ability": "Regenerator",
+    "moves": [
+     "Scald",
+     "Future Sight",
+     "Chilly Reception",
+     "Thunder Wave"
+    ],
+    "nature": "Relaxed",
+    "evs": {
+     "hp": 252,
+     "atk": 0,
+     "def": 252,
+     "spa": 0,
+     "spd": 4,
+     "spe": 0
+    },
+    "ivs": {
+     "hp": 31,
+     "atk": 0,
+     "def": 31,
+     "spa": 31,
+     "spd": 31,
+     "spe": 0
+    },
+    "level": 100,
+    "gender": "F"
+   },
+   {
+    "name": "Tornadus-Therian",
+    "species": "Tornadus-Therian",
+    "item": "Assault Vest",
+    "ability": "Regenerator",
+    "moves": [
+     "Bleakwind Storm",
+     "U-turn",
+     "Knock Off",
+     "Heat Wave"
+    ],
+    "nature": "Timid",
+    "evs": {
+     "hp": 252,
+     "atk": 0,
+     "def": 0,
+     "spa": 0,
+     "spd": 4,
+     "spe": 252
+    },
+    "ivs": {
+     "hp": 31,
+     "atk": 31,
+     "def": 31,
+     "spa": 31,
+     "spd": 31,
+     "spe": 31
+    },
+    "level": 100,
+    "gender": "M"
+   },
+   {
+    "name": "Kingambit",
+    "species": "Kingambit",
+    "item": "Lum Berry",
+    "ability": "Supreme Overlord",
+    "moves": [
+     "Iron Head",
+     "Kowtow Cleave",
+     "Sucker Punch",
+     "Swords Dance"
+    ],
+    "nature": "Adamant",
+    "evs": {
+     "hp": 0,
+     "atk": 252,
+     "def": 4,
+     "spa": 0,
+     "spd": 0,
+     "spe": 252
+    },
+    "ivs": {
+     "hp": 31,
+     "atk": 31,
+     "def": 31,
+     "spa": 31,
+     "spd": 31,
+     "spe": 31
+    },
+    "level": 100,
+    "gender": "F"
+   }
+  ]
+ },
+ "history": [
+  {
+   "turnNumber": 21,
+   "p1SlotChoices": [
+    {
+     "kind": "move",
+     "moveId": "iceshard",
+     "moveName": "Ice Shard"
+    }
+   ],
+   "p2SlotChoices": [
+    {
+     "kind": "switch",
+     "speciesId": "slowking",
+     "pokemonName": "Slowking"
+    }
+   ]
+  },
+  {
+   "turnNumber": 22,
+   "p1SlotChoices": [
+    {
+     "kind": "move",
+     "moveId": "iciclespear",
+     "moveName": "Icicle Spear"
+    }
+   ],
+   "p2SlotChoices": [
+    {
+     "kind": "switch",
+     "speciesId": "kingambit",
+     "pokemonName": "Kingambit"
+    }
+   ]
+  }
+ ],
+ "live": {
+  "p1": [],
+  "p2": [
+   {
+    "kind": "switch",
+    "speciesId": "ogerpontealtera",
+    "pokemonName": "Ogerpon"
+   }
+  ]
+ }
+}

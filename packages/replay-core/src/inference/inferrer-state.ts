@@ -7,6 +7,7 @@ import { dexOf } from '../rules-dex.ts';
 import type { ItemWatch } from './item-evidence.ts';
 import type { TriggerWatch } from './trigger-evidence.ts';
 import type { ScreenWatch } from './screen-evidence.ts';
+import type { FieldWatch } from './field-evidence.ts';
 import type { HitWalk } from './hits.ts';
 import { arg, type LogLine } from './log-line.ts';
 
@@ -55,6 +56,8 @@ export interface InferrerState {
   triggerWatch?: TriggerWatch;
   /** Item evidence by a screen's turns (round 86, T310); screen-evidence.ts creates it. */
   screenWatch?: ScreenWatch;
+  /** Item evidence by a weather's or a terrain's turns (round 88, T329); field-evidence.ts creates it. */
+  fieldWatch?: FieldWatch;
   /** The client walk that collects each opponent attacker's clean hits (round 67, T130); hits.ts creates it. */
   hitWalk?: HitWalk;
 }

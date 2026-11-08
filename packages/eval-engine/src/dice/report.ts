@@ -16,7 +16,9 @@ import { moveFirstReport, orderNoDraw, startRollReport, statusNoDraw, statusRepo
  *
  * The witness per kind (the user's answer against the lines of the action, from the log index of the first draw to the next
  * action):
- * - accuracy: yes needs no `|-miss|` for the target and an effect line for it, no needs the `|-miss|`.
+ * - accuracy: yes needs no `|-miss|` for the target and an effect line for it, no needs the `|-miss|`. The die of a later hit of a
+ *   multi-accuracy move (round 88, T337) reads the target's `|-hitcount|` instead: no is applied when the chain ended just before
+ *   that hit, yes when the count reaches it.
  * - crit: yes needs the `|-crit|` line, no needs none. The Gen 2 crit compares a number to a threshold the draw does not
  *   show, so the module answers 0 or 255 and the protocol decides.
  * - damage roll: the draw ran, so a damage line for the target (or the Substitute's `[damage]` activation) has to follow.
@@ -127,6 +129,7 @@ function noDrawInAction(input: ReportInput, move: ReturnType<Battle['dex']['move
   // A future move draws in the end-of-turn residual two turns later, when no move is in flight.
   if (move.flags.futuremove) return { die, took: 'no-draw', reason: `${move.name} lands two turns later: its draws fall in the end-of-turn residual` };
   const happened = action.some(line => (about(line, targetSlot) && isEffect(line)) || parts(line)[1] === '-activate');
+  if (kind === 'accuracy' && die.name.hit !== undefined && happened) return hitNoDraw(input, move.name, action);
   // A die the simulator never drew is `no-draw` for both answers; `no-chance` stays for a draw that ran and cannot give the answer.
   if (kind === 'accuracy' && happened) return { die, took: 'no-draw', reason: `${move.name} hit without an accuracy draw: it cannot miss here` };
   if (kind === 'crit' && move.willCrit && action.some(line => about(line, targetSlot) && isEffect(line))) {
@@ -138,7 +141,37 @@ function noDrawInAction(input: ReportInput, move: ReturnType<Battle['dex']['move
   return { die, took: 'no-draw', reason: `the simulator drew no ${kind} for ${move.name} this turn` };
 }
 
+/** The hits the target's `|-hitcount|` line counts in the lines of a move's action, or nothing when it shows none. */
+function hitCountIn(action: readonly string[], targetSlot: string | undefined): number | undefined {
+  const line = action.find(entry => parts(entry)[1] === '-hitcount' && about(entry, targetSlot));
+  return line === undefined ? undefined : Number(parts(line)[3]);
+}
+
+/** Round 88 (T337): a later hit's die the simulator never drew: the chain ended before that hit, or the move rolls one accuracy for every hit here (Skill Link, Loaded Dice). */
+function hitNoDraw(input: ReportInput, move: string, action: readonly string[]): DieReport {
+  const { die } = input;
+  const count = hitCountIn(action, die.name.targetSlot);
+  const hit = die.name.hit!;
+  if (count !== undefined && count < hit) {
+    return { die, took: 'no-draw', reason: `${move} ended after ${count} hit${count === 1 ? '' : 's'}, so hit ${hit} was never rolled` };
+  }
+  return { die, took: 'no-draw', reason: `${move} rolls no accuracy for hit ${hit} here: one roll covers every hit` };
+}
+
+/** Round 88 (T337): the accuracy die of a later hit: no needs the chain to end just before it, yes needs the count to reach it. */
+function hitReport(w: Witness, happens: boolean): DieReport {
+  const hit = w.die.name.hit!;
+  const count = hitCountIn(w.action, w.targetSlot);
+  if (happens) {
+    if (count !== undefined && count >= hit) return applied(w);
+    return otherwise(w, 'blocked', `${w.name} stopped after ${count ?? 0} hit${count === 1 ? '' : 's'} although the die gave hit ${hit}`);
+  }
+  if (count === hit - 1) return applied(w);
+  return otherwise(w, 'no-chance', `${w.name} landed hit ${hit} although the die gave a miss (the protocol counts ${count ?? 'no'} hits)`);
+}
+
 function accuracyReport(w: Witness, happens: boolean): DieReport {
+  if (w.die.name.hit !== undefined) return hitReport(w, happens);
   const missed = w.action.some(line => missFor(line, w.targetSlot));
   if (!happens) return missed ? applied(w) : otherwise(w, 'no-chance', `${w.name} hit although the die gave a miss`);
   if (missed) return otherwise(w, 'blocked', `${w.name} missed although the die gave a hit`);

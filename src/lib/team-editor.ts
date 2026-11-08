@@ -90,3 +90,18 @@ export function withAddedMove(list: RevealedPokemonInfo[], index: number, canoni
 export function evsBeside(evs: Partial<Record<StatId, number>>, stat: StatId): number {
   return EV_STATS.reduce((sum, entry) => (entry.id === stat ? sum : sum + (evs[entry.id] ?? 0)), 0);
 }
+
+/**
+ * Round 88 (F, #101): the saved team without the stand-in flag on every body the user changed. A stand-in the editor left as it was
+ * stays a guess (the panel keeps its marker); a changed one is the user's own, like any edited body. Bodies match by species.
+ */
+export function withEditedStandIns(saved: RevealedPokemonInfo[], original: RevealedPokemonInfo[]): RevealedPokemonInfo[] {
+  return saved.map(entry => {
+    if (!entry.standIn) return entry;
+    const before = original.find(candidate => candidate.species === entry.species);
+    if (before && JSON.stringify(before) === JSON.stringify(entry)) return entry;
+    const { standIn: guessed, ...edited } = entry;
+    void guessed;
+    return edited;
+  });
+}

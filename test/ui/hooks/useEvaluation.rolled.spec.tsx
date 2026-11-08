@@ -170,6 +170,15 @@ describe('the sweep\'s biggest-roll stage', () => {
     expect(result.current.graph.rollFlip).toEqual({ turn: 2, score: -0.9 });
   });
 
+  test('a second sweep of a game that ends in the copy reads the end from the cache: no new copy (one code path for singles, doubles and VGC)', async () => {
+    // Round 88 (T326, #62): the terminal score used to return before the cache write, so every sweep of 2629703929 (turn 10) played the copy again.
+    const { params, playCopy } = sweepOf(roll, { serialized: COPY_AT, stage: 'ended', terminal: -1 });
+    const result = await runSweeps(params, 2);
+    expect(playCopy).toHaveBeenCalledTimes(1);
+    expect(copyCalls()).toHaveLength(0);
+    expect(result.current.graph.rollFlip).toEqual({ turn: 2, score: -1 });
+  });
+
   test('a sweep without the stage (a single turn\'s analysis) keeps the flip of the full sweep before it', async () => {
     const { params } = sweepOf(roll, { serialized: COPY_AT, stage: 'turn', terminal: null });
     const result = await runSweeps(params);

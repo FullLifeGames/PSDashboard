@@ -5,8 +5,12 @@ import { subscribeTablePart, tablePartPending, teambuilderTablePartUrl } from '.
 
 type FrameRef = React.RefObject<HTMLIFrameElement | null>;
 
-const postSeek = (iframeRef: FrameRef, turn: number, autoPlay: boolean) =>
-  iframeRef.current?.contentWindow?.postMessage({ type: 'ps-seek-turn', turn, autoPlay }, '*');
+/** The side a frame shows near (round 88, T316). */
+export type FrameSide = 'p1' | 'p2';
+
+/** `id` names one request across its retries: the bridge runs a play seek with an id once (round 88, T347). */
+const postSeek = (iframeRef: FrameRef, turn: number, autoPlay: boolean, id?: number) =>
+  iframeRef.current?.contentWindow?.postMessage(id === undefined ? { type: 'ps-seek-turn', turn, autoPlay } : { type: 'ps-seek-turn', turn, autoPlay, id }, '*');
 
 /** The replay document as a blob URL (revoked when it changes or the frame unmounts). */
 export function useReplayBlobUrl(args: {
@@ -17,9 +21,12 @@ export function useReplayBlobUrl(args: {
   title?: string;
   initialSeek: { seekTurn?: number; autoPlay?: boolean };
   reportTurn: boolean;
+  /** Round 88 (T316): the document reports the side it shows near, and hides the two choosers (Color scheme, Music). */
+  reportSide?: boolean;
+  hideChoosers?: boolean;
   viewpoint?: 'p1' | 'p2';
 }): string | null {
-  const { documentLog, format, p1, p2, title, initialSeek, reportTurn, viewpoint } = args;
+  const { documentLog, format, p1, p2, title, initialSeek, reportTurn, reportSide, hideChoosers, viewpoint } = args;
   // Round 85 (T318): a frame opened right after the app starts waits for the teambuilder table's part (at most until
   // TABLE_PART_WAIT_MS); the flag turns false once and stays false, so no frame that stands is rebuilt by it.
   const tableWait = useSyncExternalStore(subscribeTablePart, tablePartPending, () => false);
@@ -37,13 +44,15 @@ export function useReplayBlobUrl(args: {
       seekTurn: initialSeek.seekTurn,
       autoPlay: initialSeek.autoPlay,
       reportTurn,
+      reportSide,
+      hideChoosers,
       viewpoint,
       fontAwesomeWoff2Url: localFontAwesomeUrl(),
       // Read when the document is built, not a dependency: a part that arrives later never reloads a frame.
       teambuilderTableUrl: teambuilderTablePartUrl(),
     });
     return createBlobUrl(html);
-  }, [documentLog, format, p1, p2, title, initialSeek, reportTurn, viewpoint, tableWait]);
+  }, [documentLog, format, p1, p2, title, initialSeek, reportTurn, reportSide, hideChoosers, viewpoint, tableWait]);
 
   useEffect(() => {
     if (!blobUrl) return;
@@ -76,6 +85,23 @@ export function useTurnReports(onTurnChange: ((turn: number) => void) | undefine
   }, [blobUrl]);
 
   return lastReportedTurnRef;
+}
+
+/**
+ * Round 88 (T316): forwards the side the frame's own document shows near. The source check keeps a report of a document that is
+ * going away from reaching the app; no callback adds no listener.
+ */
+export function useSideReports(iframeRef: FrameRef, onSideChange: ((side: FrameSide) => void) | undefined) {
+  useEffect(() => {
+    if (!onSideChange) return;
+    const handler = (e: MessageEvent) => {
+      if (e.source !== iframeRef.current?.contentWindow) return;
+      const side = e.data && e.data.type === 'ps-side' ? e.data.side : null;
+      if (side === 'p1' || side === 'p2') onSideChange(side);
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, [iframeRef, onSideChange]);
 }
 
 /** Seeks the frame to seekTurn (once for live frames; never for a turn the frame itself just reported). */
@@ -134,7 +160,7 @@ export function useSeekRequests(iframeRef: FrameRef, seekRequest: SeekRequest | 
   useEffect(() => {
     if (!seekRequest || seekRequest.seq === seenSeekSeqRef.current) return;
     seenSeekSeqRef.current = seekRequest.seq;
-    const send = () => postSeek(iframeRef, seekRequest.turn, !!seekRequest.play);
+    const send = () => postSeek(iframeRef, seekRequest.turn, !!seekRequest.play, seekRequest.seq);
     send();
     const retry = window.setInterval(send, 200);
     const stopRetry = window.setTimeout(() => window.clearInterval(retry), 1200);

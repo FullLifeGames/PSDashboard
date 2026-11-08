@@ -57,3 +57,56 @@ for (const viewport of [{ width: 2560, height: 1290 }, { width: 1366, height: 76
     if (facts.tagClipped) expect(facts.namesClipped, `the names stay whole while the tag clips ${message}`).toEqual([false, false]);
   });
 }
+
+/**
+ * Round 88 (#107): the Setup panel opened off the screen on a phone. At 640 px and less the top bar wraps and the Setup button
+ * stands at the left of its row, so a panel anchored at the button's right edge ran past the window's left edge. Now the panel spans
+ * the bar like the Load panel; above 640 px it keeps its place under the button, its right edge on the button's.
+ */
+async function openSetupPanel(page: Page, viewport: { width: number; height: number }) {
+  await page.setViewportSize(viewport);
+  await lightEngine(page);
+  await routeOfflineFixtures(page);
+  await page.goto('/');
+  await loadDockReplay(page, 'gen9doublesou-2693620934', 1);
+  const button = page.getByRole('button', { name: 'Setup', exact: true });
+  await button.click();
+  const panel = page.locator('.ps-setup-panel');
+  await expect(panel).toBeVisible();
+  const boxes = await page.evaluate(() => {
+    const rect = (selector: string) => {
+      const box = document.querySelector(selector)!.getBoundingClientRect();
+      return { left: box.left, right: box.right, top: box.top, bottom: box.bottom };
+    };
+    return { panel: rect('.ps-setup-panel'), button: rect('.ps-setup-toggle'), width: document.documentElement.clientWidth };
+  });
+  return { panel, boxes, message: JSON.stringify(boxes) };
+}
+
+for (const width of [390, 640]) {
+  test(`${width} px: the open Setup panel lies inside the window with every control visible`, async ({ page }) => {
+    test.setTimeout(120_000);
+    const { panel, boxes, message } = await openSetupPanel(page, { width, height: 844 });
+    expect(boxes.panel.left, `the panel's left edge ${message}`).toBeGreaterThanOrEqual(0);
+    expect(boxes.panel.right, `the panel's right edge ${message}`).toBeLessThanOrEqual(boxes.width);
+    expect(boxes.panel.top, `the panel hangs under the button ${message}`).toBeGreaterThanOrEqual(boxes.button.bottom);
+    await expect(panel.getByRole('checkbox', { name: 'Animate branch turns' })).toBeVisible();
+    await expect(panel.getByLabel('Size')).toBeVisible();
+    for (const name of ['Edit Player', 'Edit Opp', 'Import/Export Sets']) await expect(panel.getByRole('button', { name, exact: true })).toBeVisible();
+    for (const control of await panel.locator('input, select, button').all()) {
+      const box = (await control.boundingBox())!;
+      expect(box.x, `a control's left edge ${message}`).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width, `a control's right edge ${message}`).toBeLessThanOrEqual(width);
+    }
+  });
+}
+
+for (const width of [641, 1366]) {
+  test(`${width} px: the open Setup panel keeps its place under the button`, async ({ page }) => {
+    test.setTimeout(120_000);
+    const { boxes, message } = await openSetupPanel(page, { width, height: 768 });
+    expect(boxes.panel.right, `the panel's right edge is the button's ${message}`).toBeCloseTo(boxes.button.right, 0);
+    expect(boxes.panel.top, `the panel hangs 4 px under the button ${message}`).toBeCloseTo(boxes.button.bottom + 4, 0);
+    expect(boxes.panel.left, `the panel stays inside the window ${message}`).toBeGreaterThanOrEqual(0);
+  });
+}

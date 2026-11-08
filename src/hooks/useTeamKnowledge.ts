@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   type DamageObservation, type HiddenPowerEvidence, type ItemDamageJudge, type OpponentTeamInfo, type ReplayData,
   type SpeedOrderObservation, applyPastedTeam, countMatchingSpecies, applyInferredSpreads, enrichTeamInfos,
-  applyTeamSheetToInfo, enrichPokemonInfo, inferReplayFormatId,
+  applyTeamSheetToInfo, enrichPokemonInfo, inferReplayFormatId, withStandIns,
 } from '@fulllifegames/replay-core';
 import { loadImportPools, parseSetsImport, validateSetsImport, type ImportGame } from '../lib/sets-io';
 import type { EditorPools } from '../lib/team-editor';
@@ -167,10 +167,14 @@ export function useTeamKnowledge(inputs: TeamKnowledgeInputs) {
   // panel builds it (round 67, T130), and the build reads these same infos.
   const enriched = useMemo(() => {
     const empty = { pokemon: [] };
-    const both = enrichTeamInfos({ p1: p1Info ?? empty, p2: opponentInfo ?? empty }, usageStats.stats, setAssumptions.assumptions,
+    const inferred = { p1: p1Info ?? empty, p2: opponentInfo ?? empty };
+    // Round 88 (F, #101): a side of a game without team preview that showed fewer bodies than its `|teamsize|` gets the pasted bodies
+    // it lacks, then stand-ins from the format's teammate statistics, before the enrichment, as buildAppTeams does.
+    const sized = replayData ? withStandIns(inferred, replayData.log, usageStats.stats, { p1: paste.pastedSets ?? [] }) : inferred;
+    const both = enrichTeamInfos(sized, usageStats.stats, setAssumptions.assumptions,
       { p1: hpResolverFor('p1'), p2: hpResolverFor('p2') }, itemJudge ?? undefined);
     return { p1: p1Info ? both.p1 : null, p2: opponentInfo ? both.p2 : null };
-  }, [p1Info, opponentInfo, usageStats.stats, setAssumptions.assumptions, hpResolverFor, itemJudge]);
+  }, [replayData, p1Info, opponentInfo, usageStats.stats, setAssumptions.assumptions, paste.pastedSets, hpResolverFor, itemJudge]);
 
   const effectiveP1Info = useMemo(() => {
     if (edits.editedP1Info) return edits.editedP1Info;

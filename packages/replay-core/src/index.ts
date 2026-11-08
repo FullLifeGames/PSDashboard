@@ -25,11 +25,12 @@ export { toId, sideIndex } from './ids.ts';
 export type { SideId } from './ids.ts';
 export { isSitrusBerry, sitrusKeptAt } from './inference/item-triggers.ts';
 export { inferOpponentTeam } from './opponent-inferrer.ts';
+export { withStandIns, missingBodies } from './team/stand-ins.ts';
 export { parseReplayLog, parseReplayLogWithObservations } from './protocol-parser.ts';
 export {
   splitReplayPassword, getReplayGameType, inferReplayFormatId, getReplayDisplayFormat, getReplayGeneration,
   getReplayBringCount, speciesBaseId, broughtSpeciesFor, replayBringOnly, formatEnforcesSleepClause, replayRuleset,
-  getBranchSimulatorFormat, replayRules,
+  getBranchSimulatorFormat, replayRules, teamSizes,
 } from './replay-format.ts';
 export type { ReplayRuleset } from './replay-format.ts';
 export { finalPlayedTurn } from './replay-turns.ts';

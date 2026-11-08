@@ -3,6 +3,7 @@ import { switchOptionKey } from '@fulllifegames/eval-engine';
 import { toId } from '@fulllifegames/replay-core';
 import { ComboBox } from '../ComboBox';
 import { displayName } from '../../lib/branch-history';
+import { STAND_IN_MARK, useIsGuessed, type GuessedSide } from '../../lib/stand-in-mark';
 
 /**
  * Round 84 (turn dock): "All choices" and "What if it had…", not restyled since the old panel. The dock's tray shows them
@@ -16,9 +17,12 @@ export interface WhatIfState {
   setWhatIfReplace: (value: string | null) => void;
 }
 
-export function ChoicePicker({ label, moves, switches, blockedSwitchKeys, onPick }: {
+export function ChoicePicker({ side, label, moves, switches, blockedSwitchKeys, onPick }: {
+  /** The side of the slot: its stand-ins carry the marker of the stats panel (round 88, #101). */
+  side: GuessedSide;
   label: string; moves: BranchMoveOption[]; switches: BranchSwitchOption[]; blockedSwitchKeys: Set<string>; onPick: (value: string) => void;
 }) {
+  const isGuessed = useIsGuessed();
   return (
     <select
       className="ps-input"
@@ -50,7 +54,7 @@ export function ChoicePicker({ label, moves, switches, blockedSwitchKeys, onPick
               value={`switch:${sw.slot}`}
               disabled={!!sw.trapped || blockedSwitchKeys.has(switchOptionKey(sw))}
             >
-              Switch: {displayName(sw.name, sw.species)} ({sw.hpPercent}% HP)
+              Switch: {displayName(sw.name, sw.species)} ({sw.hpPercent}% HP){isGuessed(side, sw.species) ? ` · ${STAND_IN_MARK}` : ''}
             </option>
           ))}
         </optgroup>

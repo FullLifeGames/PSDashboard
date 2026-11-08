@@ -35,13 +35,13 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-async function mountLoaded(kind: ReplayKind) {
+async function mountLoaded(kind: ReplayKind, link?: (id: string) => string) {
   const replay = replayData(kind);
   stubReplayFetch([replay]);
   const latest = { current: null as AppController | null };
   render(<Workspace latestRef={latest} />);
   expect(screen.getByText('No replay loaded')).toBeInTheDocument();
-  await act(async () => { await latest.current!.ctx.replay.loadReplay(replay.id); });
+  await act(async () => { await latest.current!.ctx.replay.loadReplay(link ? link(replay.id) : replay.id); });
   await waitFor(() => expect(latest.current!.engine.smogonPending).toBe(false));
   return { app: () => latest.current!, replay };
 }
@@ -49,6 +49,22 @@ async function mountLoaded(kind: ReplayKind) {
 // Round 84 (turn dock): the slot labels sit on the dock's chips.
 const sideLabels = () => [...document.querySelectorAll('.ps-dock-label')].map(label => label.textContent);
 const chip = (label: string) => screen.getByRole('button', { name: new RegExp(`^${label}\\b`) });
+
+// Round 88 (T316): a side report the way the frame's tracker posts it. The iframe's window is a stand-in the test owns.
+const frameWindow = (title = 'PS Replay') => {
+  const frame = screen.getByTitle(title) as HTMLIFrameElement;
+  if (!(frame as unknown as { fakeWindow?: unknown }).fakeWindow) {
+    const fakeWindow = { postMessage: vi.fn() };
+    Object.defineProperty(frame, 'contentWindow', { configurable: true, value: fakeWindow });
+    (frame as unknown as { fakeWindow: unknown }).fakeWindow = fakeWindow;
+  }
+  return (frame as unknown as { fakeWindow: object }).fakeWindow;
+};
+const reportSide = (source: object, side: string) => {
+  const event = new MessageEvent('message', { data: { type: 'ps-side', side } });
+  Object.defineProperty(event, 'source', { value: source });
+  act(() => { window.dispatchEvent(event); });
+};
 
 describe('ReplayWorkspace', () => {
   test('a loaded singles replay shows the top bar with the Load button, the battle frame, the timeline, the pickers, and the evaluation column', async () => {
@@ -109,11 +125,17 @@ describe('ReplayWorkspace', () => {
     };
     act(() => app().board.deviation.handleSetChoice('p1', firstLegal(sim.p1MovesBySlot[0]), 0));
     act(() => app().board.deviation.handleSetChoice('p2', firstLegal(sim.p2MovesBySlot[0]), 0));
+    // Round 88 (T316): Switch sides in the main frame puts P2 first; the branch frame that takes over is a new document at the viewpoint.
+    reportSide(frameWindow(), 'p2');
+    expect(sideLabels()[0]).toBe('P2');
     await userEvent.click(screen.getByRole('button', { name: 'Execute Turn' }));
     await waitFor(() => expect(app().ctx.branch.history).toHaveLength(1), { timeout: 30_000 });
     expect(await screen.findByTitle('Branch Simulation', {}, { timeout: 10_000 })).toHaveAttribute('src', expect.stringMatching(/^blob:/));
     expect(screen.queryByTitle('PS Replay')).toBeNull();
     expect(app().board.timeline.viewingVariation).toBe(true);
+    await waitFor(() => expect(sideLabels()[0]).toBe('P1'));
+    reportSide(frameWindow('Branch Simulation'), 'p2');
+    expect(sideLabels()[0]).toBe('P2');
     // The history stays closed after the turn, and the toggle counts it.
     expect(screen.getByRole('button', { name: /Variation moves · 1 turn/ })).toHaveAttribute('aria-expanded', 'false');
     await userEvent.click(screen.getByRole('button', { name: /Variation moves/ }));
@@ -181,5 +203,55 @@ describe('ReplayWorkspace', () => {
     // The fixture's turn 2 logs no action for some slot, so that chip starts empty and Execute waits for its pick (gate list 7).
     expect(document.querySelector('.ps-dock-chip[data-empty="true"]')).not.toBeNull();
     expect(screen.getByRole('button', { name: 'Select all active choices' })).toBeDisabled();
+  }, 90_000);
+});
+
+// Round 88 (T316, #56): the side the replay frame shows near stands first in the dock: the left chip in singles, the upper row in
+// doubles and VGC. The frame tells it through `ps-side`; a report counts only from the frame's own window.
+describe("ReplayWorkspace: the dock follows the frame's near side", () => {
+  const firstRow = () => [...document.querySelector('.ps-dock-row')!.querySelectorAll('.ps-dock-label')].map(label => label.textContent);
+
+  test('doubles at turn 2: a p2 report puts P2A and P2B on top, p1 brings P1 back, another window changes nothing', async () => {
+    const { app } = await mountLoaded('doubles');
+    act(() => app().board.timeline.navigateTo({ turn: 2, line: 'main' }));
+    await waitFor(() => expect(app().engine.pickerSimState).not.toBeNull(), { timeout: 30_000 });
+    expect(firstRow()).toEqual(['P1A', 'P1B']);
+    const source = frameWindow();
+    reportSide({}, 'p2');
+    expect(firstRow()).toEqual(['P1A', 'P1B']);
+    reportSide(source, 'p2');
+    expect(firstRow()).toEqual(['P2A', 'P2B']);
+    expect(sideLabels()).toEqual(['P2A', 'P2B', 'P1A', 'P1B']);
+    reportSide(source, 'p1');
+    expect(firstRow()).toEqual(['P1A', 'P1B']);
+  }, 90_000);
+
+  test('singles at turn 2: the first chip follows the report', async () => {
+    const { app } = await mountLoaded('singles');
+    act(() => app().board.timeline.navigateTo({ turn: 2, line: 'main' }));
+    await waitFor(() => expect(app().engine.pickerSimState).not.toBeNull(), { timeout: 30_000 });
+    expect(sideLabels()).toEqual(['P1', 'P2']);
+    const source = frameWindow();
+    reportSide(source, 'p2');
+    expect(sideLabels()).toEqual(['P2', 'P1']);
+    reportSide(source, 'p1');
+    expect(sideLabels()).toEqual(['P1', 'P2']);
+  }, 90_000);
+
+  test.each(['singles', 'doubles'] as const)('a %s replay loaded with ?p2 shows P2 on top before any report', async kind => {
+    const { app } = await mountLoaded(kind, id => `https://replay.pokemonshowdown.com/${id}?p2`);
+    act(() => app().board.timeline.navigateTo({ turn: 2, line: 'main' }));
+    await waitFor(() => expect(app().engine.pickerSimState).not.toBeNull(), { timeout: 30_000 });
+    expect(app().ctx.replay.replayData?.viewpoint).toBe('p2');
+    expect(sideLabels()[0]).toMatch(/^P2/);
+    expect(sideLabels().at(-1)).toMatch(/^P1/);
+  }, 90_000);
+
+  test('the frames report their side and hide the two choosers, and keep the turn buttons', async () => {
+    await mountLoaded('singles');
+    const html = await (vi.mocked(URL.createObjectURL).mock.calls[0][0] as Blob).text();
+    expect(html).toContain('trackSide');
+    expect(html).toContain('.soundchooser');
+    expect(html).not.toContain('[data-action="ffto"]');
   }, 90_000);
 });

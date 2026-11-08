@@ -4,12 +4,13 @@ import { LoggedRollPRNG } from '../branch/logged-rolls.ts';
 import { getMainChoice, parseTurnBlocks } from '../branch/protocol-choices.ts';
 import { slotLetter } from '../branch/team-order.ts';
 import type { SimBattle } from '../branch/types.ts';
+import { hitsIn } from './chain.ts';
 import { loggedDice, mergeLoggedDice, type LoggedOptions } from './logged-results.ts';
 import { offeredDice } from './offer.ts';
 import { playForcedTurn } from './play.ts';
 import { secondaryEffectId } from './recognize.ts';
 import { secondariesIn } from './secondaries.ts';
-import { dieKey, type DiceReport, type DieReport, type DieTook, type ForcedDie } from './types.ts';
+import { dieKey, plainKey, type DiceReport, type DieReport, type DieTook, type ForcedDie } from './types.ts';
 
 /**
  * Round 82 (forced dice), step A6: the branch's turn through the dice module. `executeBranchChoices` loads this file with a
@@ -145,7 +146,7 @@ export function loggedOptions(battle: Battle, logged: { p1: string; p2: string }
       accuracyTargets.set(slot, offers.filter(offer => offer.name.kind === 'accuracy' && offer.name.targetSlot).map(offer => offer.name.targetSlot!));
     });
   }
-  return { clicked, checks, stalling, accuracyTargets, secondariesOf: secondariesIn(battle.dex), selfOf: selfChanceIn(battle.dex) };
+  return { clicked, checks, stalling, accuracyTargets, secondariesOf: secondariesIn(battle.dex), selfOf: selfChanceIn(battle.dex), hitsOf: hitsIn(battle.dex) };
 }
 
 /** The forced list of a turn the user has just chosen: the user's dice, joined by the log's on the branch's first turn. */
@@ -214,7 +215,8 @@ export function playBranchTurn(input: BranchTurnInput): BranchTurnResult {
   const carried = pending && pending.turn === battle.turn && !battle.ended ? pending : undefined;
   const fresh = userDice(input.p1Choices, input.p2Choices);
   const taken = new Set(fresh.map(die => dieKey(die.name)));
-  const later = <T extends ForcedDie>(dice: readonly T[]): T[] => dice.filter(die => !taken.has(dieKey(die.name)));
+  // a die of the user's without a hit covers every hit of its move: the logged hit dice of it leave (round 88, T337)
+  const later = <T extends ForcedDie>(dice: readonly T[]): T[] => dice.filter(die => !taken.has(dieKey(die.name)) && !(die.name.hit !== undefined && taken.has(plainKey(die.name))));
   const mine = carried ? [...fresh, ...later(carried.mine)] : fresh;
   const forced = carried ? [...fresh, ...later(carried.forced)] : fresh.length > 0 || battle.requestState === 'move' ? firstTurnDice(input, fresh) : [];
   if (forced.length === 0) {
