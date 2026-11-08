@@ -16,6 +16,15 @@ import { aborted, isCancelled, type SweepEnv } from './sweep-types';
  * that fails and an evaluation that fails are silent: the sentence then speaks without the number.
  */
 
+/** The copy's result under the copy's key, in memory and in the store. */
+function remember(env: SweepEnv, engine: TurnEvalSettings, key: string, storeKey: string, result: EvalResult): void {
+  env.cacheRef.current.set(key, { result, depth: engine.depth, samples: engine.samples, mode: engine.mode, tera: env.params.tera, prove: false });
+  void saveStoredEval({
+    key: storeKey, result, depth: engine.depth, samples: engine.samples, mode: engine.mode, tera: env.params.tera, prove: false,
+    savedAt: Date.now(),
+  });
+}
+
 /** Search the copy's next root (no forced-win proof: nothing is graded) and persist the result. */
 async function searchCopy(
   env: SweepEnv, serialized: string, engine: TurnEvalSettings, key: string, storeKey: string,
@@ -28,11 +37,7 @@ async function searchCopy(
     };
     const result = await perfSpan('rolled-copy', () => env.clientRef.current!.evaluate(serialized, settings));
     if (aborted(env)) return 'abort';
-    env.cacheRef.current.set(key, { result, depth: engine.depth, samples: engine.samples, mode: engine.mode, tera: env.params.tera, prove: false });
-    void saveStoredEval({
-      key: storeKey, result, depth: engine.depth, samples: engine.samples, mode: engine.mode, tera: env.params.tera, prove: false,
-      savedAt: Date.now(),
-    });
+    remember(env, engine, key, storeKey, result);
     return result;
   } catch (err) {
     if (aborted(env) || isCancelled(err)) return 'abort';
@@ -71,7 +76,12 @@ async function flipOf(env: SweepEnv, params: RolledCopyParams, roll: BiggestRoll
   if (cached) return { turn: roll.turn, score: cached.score };
   const copy = await copyOf(env, params, roll);
   if (copy === 'abort' || copy === null) return copy;
-  if (copy.stage === 'ended' && copy.terminal !== null) return { turn: roll.turn, score: copy.terminal };
+  if (copy.stage === 'ended' && copy.terminal !== null) {
+    // Round 88 (T326, #62): the end's score is cached too (a result with no search behind it: interval 0, depth 0, no ranked choices), so a
+    // second sweep of a game that ends in its biggest roll plays no copy and rebuilds no position.
+    remember(env, engine, key, storeKey, { score: copy.terminal, interval: 0, depthCompleted: 0, perSide: { p1: [], p2: [] } });
+    return { turn: roll.turn, score: copy.terminal };
+  }
   const result = await searchCopy(env, copy.serialized, engine, key, storeKey);
   if (result === 'abort' || result === null) return result;
   return { turn: roll.turn, score: result.score };
