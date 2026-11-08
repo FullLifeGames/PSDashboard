@@ -1,5 +1,6 @@
 import type { PokemonIdent, SimBattle, SimPokemon, SimSide, TurnBlock } from './types.ts';
-import { formatTargetLoc, normalizeBattleOnlyFormeId, slotLetter } from './team-order.ts';
+import { formatTargetLoc, slotLetter } from './team-order.ts';
+import { sameBodyForme } from './body-forme.ts';
 import { answersForcedRequest } from './forced-request.ts';
 import { nextChoosingSlot } from '../forward/request-moves.ts';
 import { sideIndex, toId, type RulesDex } from '@fulllifegames/replay-core';
@@ -53,33 +54,27 @@ export function extractLeads(log: string): { p1Leads: PokemonIdent[]; p2Leads: P
   return { p1Leads, p2Leads };
 }
 
-/** Whether a bench body is the species by its forme, its name or a shared prefix (a base name for a forme). */
-function matchesSpeciesId(pokemon: SimPokemon, speciesId: string, normalizedSpeciesId: string): boolean {
+/** Round 88 (#103): whether a bench body is the species by the Dex of its battle (one body in another forme counts) or by its name. */
+function isSpeciesBody(pokemon: SimPokemon, species: string): boolean {
+  return sameBodyForme(pokemon.battle.dex, pokemon.species?.name, species) || toId(pokemon.name || '') === toId(species);
+}
+
+/** The old reading, kept as the second pass: a shared prefix of the ids (a base name for a forme the Dex does not tie). */
+function sharesPrefix(pokemon: SimPokemon, speciesId: string): boolean {
   const speciesName = toId(pokemon.species?.name || '');
-  const displayName = toId(pokemon.name || '');
-  return (
-    speciesName === speciesId ||
-    speciesName === normalizedSpeciesId ||
-    displayName === speciesId ||
-    displayName === normalizedSpeciesId ||
-    speciesName.startsWith(speciesId) ||
-    speciesId.startsWith(speciesName) ||
-    speciesName.startsWith(normalizedSpeciesId) ||
-    normalizedSpeciesId.startsWith(speciesName)
-  );
+  return speciesName.startsWith(speciesId) || speciesId.startsWith(speciesName);
 }
 
 export function findSlotBySpecies(battle: SimBattle, sideIdx: number, species: string): number {
   const side = battle.sides[sideIdx];
   const speciesId = toId(species);
-  const normalizedSpeciesId = normalizeBattleOnlyFormeId(speciesId);
   // An empty id (a name without Latin letters) is no key: it is a prefix of every species.
   if (speciesId === '') return findFirstAvailableSwitchSlot(battle, sideIdx);
 
-  for (let i = 0; i < side.pokemon.length; i++) {
-    const pokemon = side.pokemon[i];
-    if (pokemon.isActive || pokemon.fainted) continue;
-    if (matchesSpeciesId(pokemon, speciesId, normalizedSpeciesId)) return i + 1;
+  // The Dex first, so that a base species reaches its own body before a longer name that starts with it (Rotom before Rotom-Wash), then the prefix.
+  for (const matches of [(pokemon: SimPokemon) => isSpeciesBody(pokemon, species), (pokemon: SimPokemon) => sharesPrefix(pokemon, speciesId)]) {
+    const index = side.pokemon.findIndex(pokemon => !pokemon.isActive && !pokemon.fainted && matches(pokemon));
+    if (index >= 0) return index + 1;
   }
 
   return findFirstAvailableSwitchSlot(battle, sideIdx);
@@ -95,16 +90,9 @@ export function findFirstAvailableSwitchSlot(battle: SimBattle, sideIdx: number)
 
 /** A body by the exact name the simulator carries (the replay's own), else by species or by the id of its name; an empty id is no key. */
 export function findPokemonOnSide(side: SimSide, species: string): SimPokemon | null {
-  const speciesId = toId(species);
-  const normalizedSpeciesId = normalizeBattleOnlyFormeId(speciesId);
   const exact = species ? side.pokemon.find(pokemon => pokemon.name === species) : undefined;
-  if (exact || speciesId === '') return exact ?? null;
-  return side.pokemon.find(pokemon =>
-    toId(pokemon.species?.name || '') === speciesId ||
-    toId(pokemon.species?.name || '') === normalizedSpeciesId ||
-    toId(pokemon.name || '') === speciesId ||
-    toId(pokemon.name || '') === normalizedSpeciesId
-  ) ?? null;
+  if (exact || toId(species) === '') return exact ?? null;
+  return side.pokemon.find(pokemon => isSpeciesBody(pokemon, species)) ?? null;
 }
 
 function protocolTargetLoc(
