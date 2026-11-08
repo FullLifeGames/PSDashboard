@@ -912,6 +912,275 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * ROUND 88 2026-11-07 to 2026-11-08 (improvement round 88, the wave of
+ * 1.1.1: 17 planned issues, five more that joined during the wave (#101,
+ * #102, #103, #107, #122), 22 closed by the pull request; base r88 at
+ * b6b2cab (master after PR #100); lanes A to E in w88a to w88e on r88-a to
+ * r88-e, lane F in w88f on r88-f from r88-c 7440994, lane G in w88g on r88-g
+ * from r88-d with r88-e merged at 2b2d84a; one fresh agent per step; merged
+ * in the clone ps-dashboard-2-m88 on m88: cf38679 lanes C and F, 82d156d
+ * lane A, 9d0ec92 lane B, c52c09f lanes D, E and G, 8ef1c36 cache v78; then
+ * the steps M1 8af4265, M2 92afdc5, X2 7bac59d and M3 6dfea20; after the
+ * gate 600c8c7, 202350a, 95ec633, 34ce65d, ad6ce3b and 0dab075; probes
+ * docs/perf/probes/2026-11-07-r88/). Gates: the opening 07.11. (the wave
+ * takes every approved TODO of 1.1.1 in five lanes, with eight rulings on
+ * the plan), the mid-wave gate 07.11. about 21:00, the gate on #101 and #103
+ * 08.11. about 09:50, the final gate 08.11. about 18:50 (21 questions,
+ * answered the same evening).
+ * DELIVERED: Lane A, play-out, variation and frame (af22a77..6aa0cd4,
+ * lossless). T347 (#83): a play-out that ends leaves the replay where the
+ * user watches it (d2eab20), a stop with a turn in flight leaves the frame
+ * where it is (8e37940), a branch frame turn names its variation position
+ * (af22a77), Watch from turn N plays from N in every scene (4cf35da), the
+ * end of a play-out pinned in the browser for singles and doubles (6a72144);
+ * the play-out pin did not move. T343 (#79): a play-out from turn 0 arms
+ * with turn 0, the frame plays the leads in while the slider reads T1
+ * (1e6f961, 5b72490), and a stopped play-out says "Stopping: the engine
+ * finishes the turn in flight, then stops." (9d0a2b7). T348 (#84): one rule,
+ * src/lib/variation-turns.ts, counts the turns of a variation with a
+ * replacement on both sides (79d1eb2), the play-out counts that interlude as
+ * no turn (ee07b32), and variation-interlude.spec.ts pins the dock against
+ * the frame on every inner turn, red on the old source (5e05261). T316
+ * (#56): the workspace frames hide Color scheme and Music, report the side
+ * they show near (battle.nearSide), and the dock puts that side's row first
+ * (8ed6e6b, 68c5a51, f6dbd74, 245a624, bdeeba4; src/lib/replay-controls.ts).
+ * A7 (6aa0cd4, the hang of #103): a play-out whose forced replacement cannot
+ * be played ends with "Play-out stopped after N turns: the forced
+ * replacement could not be played (REASON)" instead of waiting; red rows for
+ * singles and doubles, 14 files and 142 tests green.
+ * Lane B, layout and small fixes (800ebb6..02e58ae, lossless). T345 (#81,
+ * 800ebb6): the timeline slider keeps its line at every width, minimum 200
+ * px, the line chip and Discard variation take a second row below it. T346
+ * (#82, a2f5831): the Battle Statistics keep a floor of 285 px; four rows in
+ * right-column.spec.ts, red first. T326 (#62, 37e096c): remember() in
+ * sweep-rolled.ts puts the copy of the biggest roll that ends the game into
+ * the cache (red: 2 calls of playCopy instead of 1). T328 (#64, ef40a12):
+ * test/e2e-feedback/sweep-wait.ts stops the feedback harness on a dead
+ * renderer within minutes. #102 (2db9760): a Custom Game imports the moves,
+ * items and abilities its simulator plays; pokemon-options.ts reads the
+ * format's existence rules through the simulator's TeamValidator, and
+ * custom-game-pools.spec.ts held 109 rows, 42 red first. #107 (02e58ae): the
+ * Setup menu stays on the screen on a phone (three rules in the 640 px query
+ * of layout.css; four rows in topbar.spec.ts, the 390 and 640 px rows red
+ * first with the left edge at -135.5 px).
+ * Lane C, inference and bench (7f71ade, e334d67..f37396f, 3f0d348, 7440994;
+ * score-touching). T349 (#85): field-item-triggers.ts rules out a terrain
+ * seed or Room Service that never fired (sweep red 10 of 17 first); bare
+ * inference drops a field item for 21,263 holders in 3,376 games and none of
+ * them shows it; on the bank's build path 111 holders in 107 games change
+ * their item (singles 0, Doubles OU 20, VGC SV 57, Champions OU 2, Champions
+ * VGC bo1 32). T329 (#65): field-evidence.ts with startsForGood (an
+ * ability's field never ends before Gen 6) lets weather and terrain prove
+ * the setter's item; sweep of 940 tests, 677 of 917 red first; the harness
+ * build changes the item for 207 holders in 208 games (singles 67, Doubles
+ * OU 74, VGC SV 3, Champions OU 61, Champions VGC bo1 2). T314 (#55):
+ * src/lib/bench.ts (replayBench) lists only the brought bodies of a side
+ * that fielded its whole selection, in the snapshot pickers, the stored
+ * positions and the live What-if (scope (i), option (a) of the mid-wave
+ * gate); the engine's ranked choices and the play-out keep the unbrought
+ * bodies; test/e2e/bench-bring.spec.ts offers Torracat 100% at T1 with the
+ * rule off and not with it. T339 (#75) had its diagnosis only (see RESTS).
+ * Lane D, dice and the logged turn (39e3734..110cd7c, score-touching). T344
+ * (#80): chargesThisTurn plays a charge move on a second copy and reads the
+ * charge volatile, so Electro Shot in rain offers its dice; sweep red 91 of
+ * 224, then 224 green. T338 (#74): selfEffectDice reads self.chance once per
+ * move in doubles; sweep red 4 of 36, then green; five Doubles OU rebuilds
+ * move. T325 (#61): slowestRequestMove in protocol-choices.ts gives a body
+ * that never acts in the log its slowest move as a stand-in; sweep red 36 of
+ * 100, then green (also with DICE_SWEEPS=full); 100 corpus replays, 15 move,
+ * imperfect turns 108 to 93; a776d8c reads turn 6 of VGC 2630181744 as the
+ * log has it (Calyrex never acts). T337 (#73): an optional hit on the
+ * accuracy die of hit 2 or later of a multi-accuracy move (hits from the
+ * Dex), the log reader reads the hits of a broken chain; 126 corpus replays,
+ * chain turns perfect 75 to 116 of 173, imperfect 217 to 176, none new
+ * (cdadc0f, f277a34, 07dfe17, 4c62ced, 110cd7c). The rebuild drift line
+ * reads 347 of 356 perfect turns (343 at the base).
+ * Lane E, prover and body correction (4751298, 9a8f9b0, 6ffeb57). T336
+ * (#72): prover-helping.ts carries a proof over a secondary that only helps
+ * the mover; focus-blast-range proves again at 0.9999 in 12 turns (57 cells,
+ * was 163); stage-readers.ts counts nine moves over every Dex move that read
+ * or move stages (Foul Play, Punishment, Psych Up, Spectral Thief,
+ * Topsy-Turvy, Power Swap, Heart Swap, Guard Swap, Transform) and keeps the
+ * old behaviour while a living foe body carries one; the class-key colon
+ * split is fixed. T327 (#63): retireUnshownActives
+ * (branch/unshown-actives.ts) takes a body the log never shows off the field
+ * where the log leaves a slot empty (singles cannot move); VGC 2565721987
+ * turn 7 goes from 3 living p1 bodies to 1, with a fixture copy of its log
+ * so CI runs the rows; sweeps red 63 of 89, then green. T324 (#60): probe
+ * only; every cell of a fixed-seed search draws from the same few seeds (see
+ * RESTS).
+ * Lane F, games without Team Preview (#101, db1b6f0..eb29717, score-touching
+ * in Gens 1 to 4): teamSizes reads |teamsize| from one reader, the stats
+ * parser keeps the teammate lists, and team/stand-ins.ts (withStandIns,
+ * flagged standIn) fills a side that never showed its whole team with
+ * stand-ins by the format's teammate statistics, in the bank chain, the live
+ * chain and the builder; the panel marks them "Not revealed (guessed from
+ * teammate usage)", a pasted team fills open slots first, an edit clears the
+ * flag; a format without a stats file (Random Battles) shows one notice
+ * line; a doubles format keeps its generation when it falls back to its
+ * stats file (a3ebdaa). Gen 4 544639 turn 1 goes from -0.750 to -0.022; in
+ * 32 short games the turn-1 sign agrees with the winner in 17 (was 1). Lane
+ * G, battle-only formes (#103, 1e43e1a..f05e423): branch/body-forme.ts reads
+ * the battleOnly families from battle.dex at the switch resolver,
+ * corrections.ts, entry-effects.ts, log-sync.ts and protocol-choices.ts, and
+ * the suffix list of team-order.ts is gone; switch-forme-sweep.spec.ts red
+ * (6 formes by the chip, 14 by an origin choice, 129 by a forme choice),
+ * then green; gen9ou-2710066092 is a fixture row, so Ogerpon-Teal-Tera stays
+ * available after a switch.
+ * Merge and wave steps: 8ef1c36 raises EVAL_ENGINE_CACHE_VERSION from 77 to
+ * 78. M1 (8af4265, db2c965) and M2 (92afdc5): the badge "guessed" on the
+ * What-if's switch tiles and the lead picker, with the panel's text in the
+ * title; words and Dex lookup in src/lib/stand-in-mark.ts;
+ * stand-in-tiles.spec.tsx 8 rows (6 red first), two browser rows in
+ * stand-ins.spec.ts. X2 (7bac59d, after the X1 diagnosis of Doubles OU
+ * 2663093831 turn 9): cant-stand-in.ts gives a body with a cant line and a
+ * move action after it the lowest-priority move that is certainly ahead of
+ * every action after the line and behind every one before it (priorities
+ * from battle.dex, speed from the live getActionSpeed(), a tie proves
+ * nothing); sweep red 31 of 159, then green in Gens 1 to 9 and Champions,
+ * singles, doubles and VGC. M3 (6dfea20): the full e2e run found that T314's
+ * bench filter also fed the engine, so a play-out of issue #4's VGC replay
+ * stopped with "the forced replacement could not be submitted" and a Pokemon
+ * re-picked at turn 0 left the bench; useBranch now returns engineSimState
+ * (unfiltered) for the engine walk, and limitBench leaves a side whole when
+ * the battle's own party is no larger than its list; red 2 of 4 rows and 2
+ * rows, then green. The replay-core barrel gained three exports
+ * (missingBodies, teamSizes, withStandIns;
+ * test/regression/fixtures/api/replay-core.txt); package-api 10 of 10 and
+ * pack:smoke passed. ENGINE_PROTOCOL, SUPPORT_STATE_VERSION and the
+ * share-link version stay.
+ * After the gate: 600c8c7 pins the seven rebuild rows
+ * (faint-step-last-first.spec.ts six rows, forced-reconstruction.spec.ts the
+ * seeded turns); 202350a keeps the editor's lists on the standard pool for
+ * an unlisted format id while the import accepts the Custom Game's pool
+ * (lint 0 after one complexity split in pokemon-options.ts); 95ec633 and
+ * ad6ce3b bring Last turn, Next turn and Go to turn... back in the
+ * workspace's frames (T316 keeps Color scheme and Music hidden, the flag is
+ * hideChoosers, the prop choosers, and the dock follows the frame's near
+ * side); 34ce65d puts the state file of the issue form into an upload field
+ * that accepts .json (#122; the text box took no .json file, and #108 shows
+ * the instruction text where the file belonged); 0dab075 leaves the hit dice
+ * from hit 2 on out of the dice-offer sweep and names #114
+ * (DICE_SWEEPS=full: 10,957 passed).
+ * MEASUREMENT: classes: lanes A and B lossless, lanes C to G and X2
+ * score-touching by the simulator or the logged die. Base r88-base (b6b2cab)
+ * in CI is byte-identical with r87-wave in all five tables (bank 838,
+ * Doubles OU 1,092, vgc2 4,217, Champions OU 445, Champions VGC 1,449 rows),
+ * and feedback q0 is byte-identical with round 87's w1. Per lane against it:
+ * A feedback a1 = a2 = q0 (12 of 12), e2e frame-controls, play-out-finish,
+ * variation-interlude, timeline, phone and branch 55 passed in one worker; B
+ * b1 = b2 = q0, e2e timeline-bar, right-column and scale 13 passed, mobile
+ * layout 1; neither runs a bank (no file in the bank's import closure
+ * changed). C: no harm, no warning (bank +1 bp, Doubles OU -5 [-9, -1], vgc2
+ * -1, Champions OU +0, Champions VGC +0); c1 = c2 = q0, 0 moved turns; every
+ * differing game lies in T349's or T329's list. D: no harm, no warning (bank
+ * +0 to +1, Doubles OU -2, vgc2 +0, Champions OU +2 [+0, +6], Champions VGC
+ * -8 [-18, +0]); differing rows bank 1, Doubles OU 18, vgc2 66, Champions OU
+ * 3, Champions VGC 29; d1 = d2 with 13 of 13 passed, census moves Doubles OU
+ * 2663093831 turns 9 and 10; engine project with EVAL_SIM_FAST=0 371 files,
+ * 11,303 passed. E: bank, Doubles OU and Champions OU byte-identical, vgc2 9
+ * rows in 8 games (-1 [-2, +0]), Champions VGC 1 row; its first CI run
+ * failed in all five runs on the bank data download (HTTP 504), the rerun is
+ * the one read. F is byte-identical with C in all five tables, f1 = f2 = q0.
+ * G equals its base r88-gbase (2b2d84a) in the four tables with a base and
+ * moves 2 vgc2 rows at +0; g1 = g2.
+ * Wave (7bac59d) against r88-base, no harm in any pooled row: bank 31 rows
+ * in 9 games, +1 [-1, +4] full and +1 [-2, +4] hq; Doubles OU 71 rows in 42
+ * games, -7 [-13, -1]; vgc2 125 rows in 90 games, +0 [-3, +2] full and -2
+ * [-6, +2] hq; Champions OU 35 rows in 16 games, +3 [+0, +6]; Champions VGC
+ * 52 rows in 38 games, -10 [-23, +0]. D26 doubles: bank +4 [+0, +9], Doubles
+ * OU -7, vgc2 +0. Warnings: Champions OU mid phase +7 [+0, +16] (own K +6
+ * [+0, +13]; neither lane C nor lane D warned there alone, the games move
+ * C's sets and D's rebuild together); the bank's doubles mid cell prints +5
+ * [+1, +10] on 101 rows in 46 games, which the script lists under 5 bp and
+ * the reader counts as a warning by its printed value. Five rows did not add
+ * up against the lane readings: three move only in the wave and each holds a
+ * |cant| line, so X2 moves them; two move only in lane D and hold none
+ * (candidate: lane C's sets and lane D's rebuild in one game). No harm
+ * either way. Feedback w1 = w2 = w3 byte-identical (12 of 12); against q0
+ * five dumps differ (the five of lanes D and G), and the census moves two
+ * turns, both Doubles OU 2663093831 (turn 9 unclear to quiet, turn 10 chance
+ * to p2-read with a P2 inaccuracy, regret 0.081 to 0.124); tiers singles
+ * 39/6/2, doubles 16/3/1 to 17/3/1; no pinned turn moves. Final suite at
+ * 7bac59d in MAIN (DICE_SWEEPS=full, 1,550 s): 784 files passed, 3 failed, 3
+ * skipped; 46,868 tests passed, 29 failed, 30 expected fail, 27 skipped; the
+ * failures are the seven rebuild rows and 22 rows of dice-offer.spec.ts;
+ * reconstruction.spec.ts ran 155 rows on MAIN's local data. Engine project
+ * with EVAL_SIM_FAST=0: 381 files, 11,949 passed, 30 expected fail, 22
+ * skipped, 0 failed. Full e2e at 7bac59d on a loaded machine: 155 passed, 18
+ * failed, 8 skipped (14 timeouts from load; of the other four,
+ * timeline.spec.ts:326 and variation-interlude.spec.ts:92 were M3's,
+ * topbar.spec.ts:105 and engines.spec.ts:9 passed on the rerun without a
+ * change); the failed rows on 6dfea20: 19 of 19; full e2e on 6dfea20 on a
+ * quiet machine: 173 passed, 8 skipped, 0 failed (10.1 min). ui and app
+ * projects on 6dfea20: 3,038 passed, 7 failed (the rebuild rows), 4 skipped.
+ * After the gate: tsc -b 0, lint 0, the touched unit and regression specs
+ * green, frame-controls.spec.ts with support.spec.ts 8 of 8 (the first run
+ * read two rows red until ad6ce3b), branch.spec.ts "keeps iframe turn
+ * controls usable" 1 of 1.
+ * USER GATE 2026-11-08 (draft gate/final-gate.md, 21 questions, sent about
+ * 18:50): (1) all seven rebuild rows pinned to the new values: four games
+ * rebuild better than in 1.1.0 (2629703929 5 to 0 diffs, 2695803506 2 to 0,
+ * 648453 23 to 21, 2663093831 16 to 11), 2630685175 moves only the damage
+ * dice from turn 1, and 653785 turn 22 shows one more diff (the simulator
+ * knocks out Lopunny with Dragon Claw where the log leaves 18/271 HP); (2)
+ * the dice-offer sweep exempts the hit dice from hit 2 on and points to the
+ * new issue on a die per hit; (3) the 30 spec rows and the 15 text and
+ * behaviour rows of gate/gate-list.md are approved, among them
+ * focus-blast-range in forced-win.spec.ts back to proving, which reverses
+ * the pin of 06.11. in favour of T336; (4) the badge word "guessed" stays;
+ * (5) small fix before the pull request: the editor's lists keep the
+ * standard pool for an unlisted format id, the import accepts the Custom
+ * Game's pool; (6) T324 (#60) stays open and moves to 1.2.0 for round 89
+ * with a seed per cell; (7) T339 (#75) takes the diagnosis as its text and
+ * moves to 1.2.0; (8 to 12, 14 to 16, 18, 19) approved as new issues for
+ * 1.2.0, filed as #110 to #119 in the order of the draft; (13, 17) parked as
+ * #120 and #121; (20) a separate small pull request after the wave replaces
+ * quotes of the user and gate shorthand in docs/completed, this ledger and
+ * AGENTS.md with "Approved (user, date)"; (21) the user approves the merge
+ * once the six jobs are green. After the gate, approved (user, 08.11.2026):
+ * the three turn buttons come back in the frame, the issue form takes the
+ * state file in an upload field, and #108 (Champions VGC 2710981835 turn 7,
+ * a reading names Extreme Speed where the log's order rules it out, reported
+ * on 1.0.2) goes to 1.2.0 as a larger bug.
+ * LESSONS: (1) The dice sweeps run a sample by default, and lane D's runs
+ * missed the 22 rows of dice-offer.spec.ts that DICE_SWEEPS=full found in
+ * the wave; a lane that adds a die to the engine runs the full sweep of the
+ * offer before it measures. (2) Each lane's e2e run passes on its own base;
+ * the full run of the merge found the interplay (T314's bench filter stopped
+ * a play-out); the integrator runs the full e2e on the merge head before the
+ * gate. (3) The first full e2e run on a loaded machine had 14 timeouts; a
+ * run on a quiet machine cleared them (173 of 173), so the first run is a
+ * screen. (4) The issue form of round 77 asked for a file that its text box
+ * did not take, and no test read the form; support-state.spec.ts now holds
+ * the form's field type and accept list. (5) The gate list caught three
+ * wrong statements in lane ledgers (lane G's "no spec moved", lane D's speed
+ * cause for 2663093831 turn 9, a missing row text in A4's list); a reviewer
+ * compares each ledger with the merge diff. (6) The bank CI's data download
+ * failed with HTTP 504 (lane E in all five runs, r88-gbase in one of 16
+ * jobs); --resume and gh run rerun --failed caught up without changing the
+ * measurement.
+ * RESTS: new issues approved for 1.2.0: #110 (a logged effect does not rule
+ * out the ability that blocks it; 78 of 7,035 corpus replays, VGC 56,
+ * Doubles OU 18, singles 4), #111 (the stand-in move and the cant order
+ * ignore priority abilities), #112 (a play-out without Fast play-out can
+ * wait forever on the frame), #113 (the lead picker at turn 0 ignores Switch
+ * sides), #114 (a die per hit in the dice panel), #115 (a forced-win label
+ * loses its open text when the open class carries an effect), #116 (a
+ * transformed Ditto breaks the bring list), #117 (Random Battles without
+ * Team Preview count 4 against 6), #118 (findSlotBySpecies falls back to a
+ * shared name prefix), #119 (the status line still says the engine plays
+ * while the play-out stops); #108 and the two moved issues #60 and #75 join
+ * them. Parked with triggers: #120 (Metronome reaches a stage reader the
+ * prover's guard does not see) and #121 (stand-ins from published Smogon
+ * sets). T339's diagnosis (#75): a lethal hit reads without slack and opens
+ * the held offence, then an item step; 2 to 7 % of the lethal hits per
+ * family. T314's option (c), hiding the unbrought bodies from the engine's
+ * choices, stays for round 89. The Champions OU mid-phase warning goes into
+ * the next Champions measurement. T322 and T319 stay in 1.2.0. The worktrees
+ * w88a to w88g and the clone m88 go after the merge, on the user's okay. No
+ * upstream finding. Next free issue number #123.
+ *
  * ROUND 87 2026-11-06 (improvement round 87, the release wave of 1.1.0:
  * the dependencies with the @pkmn train at 0.10.15, T313 and T317; before
  * it the CI fix b04a434 on dev; on r87 from dev b04a434, opening 430d2bb;
