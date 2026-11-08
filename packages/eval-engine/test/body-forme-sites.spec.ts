@@ -3,6 +3,7 @@ import type { Pokemon } from '@pkmn/sim';
 import type { PokemonSnapshot } from '@fulllifegames/replay-core';
 import { sameMon } from '../src/branch/corrections';
 import { sameSpecies } from '../src/branch/entry-effects';
+import { activeMatchesLog, parseLoggedActive } from '../src/branch/log-sync';
 import { RULESETS, become, forcedBoard, type GameType, type Ruleset } from './forme-boards';
 
 /**
@@ -62,6 +63,13 @@ describe.each(BOARDS)('$rules.label $type: sites read a body by its Dex family (
 
   test('entry effects: the body the protocol switched in (sameSpecies)', () => {
     const { failures, formes } = sweep(rules, type, sameSpecies);
+    expect(formes).toBeGreaterThan(100);
+    expect(failures).toEqual([]);
+  });
+
+  test('log sync: the body the log last switched into the slot (activeMatchesLog)', () => {
+    const { failures, formes } = sweep(rules, type, (body, species) =>
+      activeMatchesLog(body, parseLoggedActive(`|switch|p1a: Other|${species}, L50|100/100`) ?? undefined));
     expect(formes).toBeGreaterThan(100);
     expect(failures).toEqual([]);
   });
