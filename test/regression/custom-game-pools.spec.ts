@@ -2,14 +2,16 @@ import { describe, expect, test } from 'vitest';
 import { Dex, TeamValidator, Teams, Battle } from '@pkmn/sim';
 import { loadSimMods } from '@fulllifegames/eval-engine';
 import { toId, type OpponentTeamInfo, type RevealedPokemonInfo } from '@fulllifegames/replay-core';
-import { getEveryAbilityPool, getEveryMovePool, getItemPool } from '../../src/lib/pokemon-options';
+import { getEveryAbilityPool, getEveryMovePool, getItemPool, type PoolUse } from '../../src/lib/pokemon-options';
 import { loadImportPools, parseSetsImport, validateSetsImport } from '../../src/lib/sets-io';
 
 /**
  * Round 88 (#102): the pools of the editor and the sets import follow what the format's simulator lets exist. A Custom
  * Game has no `-Nonexistent` rule, so it plays every Past, Future, Unobtainable, CAP, Legends and LGPE entry; a standard format
- * (`gen9ou`) refuses them; National Dex lifts the rule for what its own rule table names; an id the simulator does not list (a
- * draft league's) reads as a Custom Game. The user report: P2 Landorus-Therian "Flying Gem", P2 Banette "Spectral Thief" and P2
+ * (`gen9ou`) refuses them; National Dex lifts the rule for what its own rule table names. An id the simulator does not list (a
+ * draft league's, and every Scarlet/Violet VGC regulation but 2024 Reg G and 2025 Reg I in @pkmn/sim 0.10.15) keeps the standard
+ * pools in the editor's lists, and the import accepts what the Custom Game of its generation plays (round 88, gate of 08.11.2026:
+ * the editor of a VGC 2026 game offered about 620 Past, CAP and placeholder entries). The user report: P2 Landorus-Therian "Flying Gem", P2 Banette "Spectral Thief" and P2
  * Infernape "Fire Mane" were refused by the import, and the simulator plays all three in `gen9customgame`.
  *
  * The sweep compares the existence verdict of the simulator's own TeamValidator with the pools, per kind. Its other refusals
@@ -108,9 +110,9 @@ describe('a branch battle of a Custom Game plays the three entries', () => {
 const EXISTENCE_REFUSAL = /does not exist|not obtainable|Smogon CAP|Let's Go|placeholder|is tagged|Legends|not in the list of allowed/;
 
 const KINDS = {
-  item: { all: (gen: number) => [...Dex.forGen(gen).items.all()], pool: (gen: number, format: string) => getItemPool(gen, format), minGen: 2 },
-  move: { all: (gen: number) => [...Dex.forGen(gen).moves.all()], pool: (gen: number, format: string) => getEveryMovePool(gen, format), minGen: 1 },
-  ability: { all: (gen: number) => [...Dex.forGen(gen).abilities.all()], pool: (gen: number, format: string) => getEveryAbilityPool(gen, format), minGen: 3 },
+  item: { all: (gen: number) => [...Dex.forGen(gen).items.all()], pool: (gen: number, format: string, use?: PoolUse) => getItemPool(gen, format, use), minGen: 2 },
+  move: { all: (gen: number) => [...Dex.forGen(gen).moves.all()], pool: (gen: number, format: string, use?: PoolUse) => getEveryMovePool(gen, format, use), minGen: 1 },
+  ability: { all: (gen: number) => [...Dex.forGen(gen).abilities.all()], pool: (gen: number, format: string, use?: PoolUse) => getEveryAbilityPool(gen, format, use), minGen: 3 },
 } as const;
 
 const setOf = (kind: keyof typeof KINDS, name: string, gen: number) => {
@@ -180,14 +182,23 @@ describe('the pools hold what the simulator lets exist (sweep over every non-sta
     expect(getItemPool(9, 'gen9nationaldex')).not.toContain('Flying Gem');
   });
 
-  test('a draft league id reads as the Custom Game of its generation, singles and doubles', () => {
+  test('an unlisted id: the editor lists the standard pool, the import accepts the Custom Game of its generation, singles and doubles', () => {
     for (const gen of [5, 8, 9]) {
-      for (const id of ['natdexdraft', 'doublesdraftleague']) {
+      for (const id of ['natdexdraft', 'doublesdraftleague', ...(gen === 9 ? ['vgc2026regi', 'vgc2026regf'] : [])]) {
+        expect(listed(`gen${gen}${id}`)).toBe(false);
         for (const spec of Object.values(KINDS)) {
           if (gen < spec.minGen) continue;
-          expect(spec.pool(gen, `gen${gen}${id}`)).toEqual(spec.pool(gen, `gen${gen}customgame`));
+          expect(spec.pool(gen, `gen${gen}${id}`)).toEqual(spec.pool(gen, ''));
+          expect(spec.pool(gen, `gen${gen}${id}`, 'editor')).toEqual(spec.pool(gen, ''));
+          expect(spec.pool(gen, `gen${gen}${id}`, 'import')).toEqual(spec.pool(gen, `gen${gen}customgame`));
         }
       }
+    }
+  });
+
+  test('a listed format reads its own rule table in the editor and the import alike', () => {
+    for (const format of ['gen9customgame', 'gen9doublescustomgame', 'gen9nationaldex', 'gen9ou', 'gen9vgc2025regi']) {
+      for (const spec of Object.values(KINDS)) expect(spec.pool(9, format, 'import')).toEqual(spec.pool(9, format, 'editor'));
     }
   });
 });

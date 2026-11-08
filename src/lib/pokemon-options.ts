@@ -58,11 +58,18 @@ const toSimId = (name: string): string => toId(name);
 type PoolKind = 'items' | 'moves' | 'abilities';
 
 /**
+ * Who reads a pool: the editor's lists or the sets import. They differ only for a format id the simulator does not list (round 88,
+ * gate of 08.11.2026): the editor lists the generation's standard pool, the import accepts what the generation's Custom Game plays.
+ */
+export type PoolUse = 'editor' | 'import';
+
+/**
  * Round 88 (#102): the entries a format's simulator lets exist beyond the generation's standard pool. A listed format
  * answers by its own rule table (an entry exists unless a rule such as `-Nonexistent` removes it: a Custom Game has none, so
  * it plays every Past, Future, Unobtainable, CAP, Legends and LGPE entry; Standard pulls `Obtainable` in and refuses them;
- * National Dex lifts what its rule table names). An id the simulator does not list, a draft league's, reads as the Custom Game
- * of its generation. The simulator's own TeamValidator decides, in two steps. First its checks on a copy of the rule table that
+ * National Dex lifts what its rule table names). An id the simulator does not list (a draft league's, and every Scarlet/Violet
+ * VGC regulation but 2024 Reg G and 2025 Reg I in @pkmn/sim 0.10.15) adds nothing to the editor's lists, and the import reads it
+ * as the Custom Game of its generation (`PoolUse`). The simulator's own TeamValidator decides, in two steps. First its checks on a copy of the rule table that
  * keeps only the existence rules (the bans of single items, moves and abilities and the tier rules are no question of existence:
  * the app lists a banned entry). Then, in a format that refuses existence at all, the validator's own verdict on a one-entry set,
  * because a rule of the format can refine the table (National Dex's `NatDex Mod` lifts `+Past` and still refuses a Past item and
@@ -76,10 +83,17 @@ type Standing = { exists: boolean; isNonstandard?: string | null; name: string }
 /** What the validator says of an entry that does not exist in the game (its wording: "does not exist in Gen 9", "not obtainable without hacking", ...). */
 const NOT_EXISTING = /does not exist|not obtainable|Smogon CAP|Let's Go|placeholder for/;
 
-function existingBeyondStandard(gen: GenerationNum, format: string | undefined): Record<PoolKind, string[]> | null {
+/** The simulator format whose existence rules a pool reads (`null`: the standard pool alone). */
+function existenceFormat(gen: GenerationNum, format: string | undefined, use: PoolUse): string | null {
   if (!format || isChampions(format)) return null;
   const own = simFormats().get(format.split('@@@')[0]);
-  const id = own.exists ? own.id : `gen${gen}customgame`;
+  if (own.exists) return own.id;
+  return use === 'import' ? `gen${gen}customgame` : null;
+}
+
+function existingBeyondStandard(gen: GenerationNum, format: string | undefined, use: PoolUse): Record<PoolKind, string[]> | null {
+  const id = existenceFormat(gen, format, use);
+  if (!id) return null;
   const key = `${gen}:${id}`;
   const cached = existenceCache.get(key);
   if (cached) return cached;
@@ -186,31 +200,31 @@ export function getMovePool(species: string, gen: number, format?: string): Prom
  * Every move of the generation (Champions: of the mod), sorted: what the editor and the import accept next to a species' own
  * pool. A name outside this list is no move of the game.
  */
-export function getEveryMovePool(gen: number, format?: string): string[] {
+export function getEveryMovePool(gen: number, format?: string, use: PoolUse = 'editor'): string[] {
   if (isChampions(format)) {
     return [...championsDex().moves.all()].filter(move => !move.isNonstandard).map(move => move.name).sort((a, b) => a.localeCompare(b));
   }
   const generation = clampGen(gen);
-  return withExisting(allGenMoves(generation), existingBeyondStandard(generation, format)?.moves);
+  return withExisting(allGenMoves(generation), existingBeyondStandard(generation, format, use)?.moves);
 }
 
 /** Every ability of the generation (Champions: of the mod), sorted; empty before Generation 3, which has no abilities. */
-export function getEveryAbilityPool(gen: number, format?: string): string[] {
+export function getEveryAbilityPool(gen: number, format?: string, use: PoolUse = 'editor'): string[] {
   if (isChampions(format)) {
     return [...championsDex().abilities.all()].filter(ability => !ability.isNonstandard).map(ability => ability.name).sort((a, b) => a.localeCompare(b));
   }
   const generation = gens.get(clampGen(gen));
   if (generation.num < 3) return [];
-  return withExisting([...generation.abilities].map(ability => ability.name), existingBeyondStandard(generation.num, format)?.abilities);
+  return withExisting([...generation.abilities].map(ability => ability.name), existingBeyondStandard(generation.num, format, use)?.abilities);
 }
 
-export function getItemPool(gen: number, format?: string): string[] {
+export function getItemPool(gen: number, format?: string, use: PoolUse = 'editor'): string[] {
   if (isChampions(format)) {
     return [...championsDex().items.all()].filter(item => !item.isNonstandard).map(item => item.name).sort((a, b) => a.localeCompare(b));
   }
   const generation = gens.get(clampGen(gen));
   if (generation.num < 2) return [];
-  return withExisting([...generation.items].map(item => item.name), existingBeyondStandard(generation.num, format)?.items);
+  return withExisting([...generation.items].map(item => item.name), existingBeyondStandard(generation.num, format, use)?.items);
 }
 
 export function getAbilityPool(species: string, gen: number, format?: string): string[] {
