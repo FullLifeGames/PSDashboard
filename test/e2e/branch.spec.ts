@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'fs';
 import {
-  dockChip, expectReplaySettled, expectReplayTurnAtLeast, fixturePath, installReplayEmbedCache, moveTimeline, pickForcedReplacement, pickMove, pickSwitch,
+  dockChip, expectReplaySettled, expectReplayTurnAtLeast, fixturePath, installReplayEmbedCache, pickForcedReplacement, pickMove, pickSwitch,
   routeOfflineFixtures, routeSlowReplayEmbed, startVariationAt, type ReplayWindow,
 } from './helpers';
 import { openVariationHistory } from './dock-helpers';
@@ -263,16 +263,13 @@ test.describe('PS Dashboard', () => {
     ).toBe(1);
 
     // Round 88 (gate of 08.11.2026): the frame's Last turn and Next turn are back. The variation from turn 2 covers turns 3 and 4
-    // after the two Executes: Last turn shortens the log of the same frame, Next turn twice brings it back, and the timeline
-    // moves it too.
+    // after the two Executes: Last turn shortens the log of the same frame, and Next turn twice brings it back. The timeline's own
+    // moves of the frame stay with frame-controls.spec.ts: right after the frame's clicks the pointer may already stand on turn 3,
+    // and a move to 3 then changes nothing (the master run of fa103de read the log unchanged).
     await frame!.locator('button', { hasText: 'Last turn' }).click();
     await expect.poll(logLength).toBeLessThan(afterLength);
     await frame!.locator('button', { hasText: 'Next turn' }).click();
     await frame!.locator('button', { hasText: 'Next turn' }).click();
-    await expect.poll(logLength).toBeGreaterThanOrEqual(afterLength);
-    await moveTimeline(page, 3);
-    await expect.poll(logLength).toBeLessThan(afterLength);
-    await moveTimeline(page, 4);
     await expect.poll(logLength).toBeGreaterThanOrEqual(afterLength);
   });
 
