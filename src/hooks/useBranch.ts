@@ -29,7 +29,8 @@ function useReportingExecutor(run: () => Promise<void>, lastErrorRef: React.RefO
  *
  * Round 88 (T314, #55): `bench` is the bring-limited game's bench lists (`replayBench`). The battle keeps the whole team the rebuild
  * built; the state the pickers and the dock read offers only the bodies the bring allows, so the What-if and its forced replacements
- * never name a body that stayed home.
+ * never name a body that stayed home. Round 88 (M3): `engineSimState` is the state as the battle offers it, for the engine's own
+ * choices (a ranked line, the play-out, a forced replacement), which still reach the unbrought bodies (option (c), round 89).
  */
 export function useBranch(bench: Bench | null = null) {
   const [branching, setBranching] = useState(false);
@@ -97,7 +98,7 @@ export function useBranch(bench: Bench | null = null) {
   const { startBranch, getBattle, stopBranch } = useBranchSession(refs, setters, clearChoices, updateState);
 
   return {
-    branching, simState, history, executeError, executing,
+    branching, simState, engineSimState: rawSimState, history, executeError, executing,
     variationStartTurn, startSerialized,
     startBranch, setChoice, recordChoice, executeTurn, executePending, stopBranch, getBattle, getChoices,
   };

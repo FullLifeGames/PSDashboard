@@ -144,7 +144,7 @@ function usePlayLayer(
   ctx: ReplayContext, transients: Transients, board: BoardController,
   evalView: ReturnType<typeof useEvalViewLayer>,
 ) {
-  const { simState, branching, executing, executeError, getBattle, executeTurn } = ctx.branch;
+  const { engineSimState, branching, executing, executeError, getBattle, executeTurn } = ctx.branch;
   const { evaluation } = ctx;
   const {
     playOut, setPlayOut, setPlayOutNotice, playOutProcessedRef, playOutRef, stopPlayOutRef,
@@ -162,7 +162,8 @@ function usePlayLayer(
   // Engine walk: clicking a line plays the turn out; queued picks follow
   // a rebuild; interludes finish forced replacements.
   const walk = useEngineWalk({
-    simState, liveTip, branching, branchPreparing, executing,
+    // Round 88 (M3): the walk applies the engine's own choices, which the filtered bench of the pickers must not refuse.
+    simState: engineSimState, liveTip, branching, branchPreparing, executing,
     confirmOpen: pendingConfirm !== null, playOutActive: playOut?.active ?? false,
     evaluation, evalViewKey, getBattle, executeTurn, handleEvaluate, handleSetChoice,
     requestDeviation, setBranchDivergence,

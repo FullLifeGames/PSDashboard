@@ -42,6 +42,14 @@ describe.each([['singles' as const], ['doubles' as const]])('useBranch with a be
     expect(run.filtered.current.getBattle()?.sides[1].pokemon.length).toBe(run.whole.current.getBattle()?.sides[1].pokemon.length);
   }, 60_000);
 
+  test('the engine state keeps every body: a ranked choice, the play-out and a forced replacement reach the unbrought ones (M3)', async () => {
+    const run = await started(kind, open => ({ lists: { p1: [], p2: open.p2.slice(0, 1) }, rules: replayRules(replayFixture(kind).replayData) }));
+    const engine = run.filtered.current.engineSimState!;
+    expect(engine.p2SwitchesBySlot).toEqual(run.whole.current.simState!.p2SwitchesBySlot);
+    expect(engine.p2Switches).toEqual(run.whole.current.simState!.p2Switches);
+    expect(run.filtered.current.simState!.p2SwitchesBySlot).not.toEqual(engine.p2SwitchesBySlot);
+  }, 60_000);
+
   test('no bench leaves the state as the simulator gave it', async () => {
     const run = await started(kind, () => null);
     expect(run.filtered.current.simState!.p2SwitchesBySlot).toEqual(run.whole.current.simState!.p2SwitchesBySlot);

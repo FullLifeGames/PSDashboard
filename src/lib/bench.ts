@@ -47,7 +47,8 @@ function limitOptions(
 
 /**
  * The state with the unbrought bodies out of both sides' switch options. Slot numbers stay (they name the party position the
- * simulator's `switch N` takes). Returns the same object when nothing changes.
+ * simulator's `switch N` takes). A side whose battle party is no larger than its list stays whole. Returns the same object when
+ * nothing changes.
  */
 export function limitBench(state: BranchSimState, bench: Bench | null): BranchSimState {
   if (!bench) return state;
@@ -55,6 +56,10 @@ export function limitBench(state: BranchSimState, bench: Bench | null): BranchSi
   let changed = false;
   for (const side of ['p1', 'p2'] as const) {
     if (bench.lists[side].length === 0) continue;
+    // Round 88 (M3): a battle that holds no more bodies than the selection already IS the selection (a turn-0 pick or a pinned
+    // bring builds it that way), whatever the replay's own list names: the user's swapped-in body stays on the bench.
+    const party = state[`${side}Pokemon`];
+    if (party && party.length > 0 && party.length <= bench.lists[side].length) continue;
     const allowed = new Set(bench.lists[side].map(name => speciesBaseId(name, bench.rules)));
     const forcedBySlot = state[`${side}ForceSwitches`] ?? [];
     const bySlot = state[`${side}SwitchesBySlot`].map((options, slot) =>
