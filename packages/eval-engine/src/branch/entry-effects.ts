@@ -1,6 +1,7 @@
 import { toId } from '@fulllifegames/replay-core';
 import type { SimBattle, SimPokemon } from './types.ts';
-import { normalizeBattleOnlyFormeId, takeBodyOut } from './team-order.ts';
+import { takeBodyOut } from './team-order.ts';
+import { sameBodyForme } from './body-forme.ts';
 
 /**
  * Round 67 (T133): a body the boundary correction puts on the field, where the
@@ -37,8 +38,8 @@ function simSwitchedIn(lines: string[], sideId: string, test: (slotLetter: strin
   });
 }
 
-const sameSpecies = (body: SimPokemon, species: string) =>
-  normalizeBattleOnlyFormeId(toId(body.species.name)) === normalizeBattleOnlyFormeId(toId(species));
+/** Round 88 (#103): the body holds the species or another forme of it, by the Dex of its battle. */
+export const sameSpecies = (body: SimPokemon, species: string) => sameBodyForme(body.battle.dex, body.species.name, species);
 
 /**
  * Bodies active after the repoints that were not active in the sim before them,

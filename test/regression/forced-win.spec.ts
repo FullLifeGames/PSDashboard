@@ -16,9 +16,7 @@ import { proveForcedWin, MIN_FORCED_MASS, type ForcedWinCaveat } from '@fulllife
  * choice-locked at mass 1 once a missing class inherits the proof of the
  * class that dominates it, struggle-lock 0.997); the greedy probe let
  * focus-blast-range (a twelve-turn miss chain) spend the full budget and
- * prove 0.9999 until round 86 (T305: the Special Defense drop of the Focus
- * Blast is a class of its own now and the proof needs 163 cells against the
- * budget's 100, so the row reads no proof; user gate of 06.11.2026, 2a), while
+ * prove 0.9999 (round 86 lost the proof to 163 cells against the budget's 100, and round 88, T336, brought it back: the class in which the Special Defense drop fired takes the proof of the class in which it did not), while
  * the six-turn heal war healer-vs-band lies beyond the probe's five turns;
  * fixed-vs-ghost and the sack fail at the depth cap or
  * at unpriced cells, honestly; doubles proofs carry the sampled-rolls
@@ -45,13 +43,12 @@ const EXPECTED: Record<string, Expected> = {
   'toxic-stall': { side: 'p2', mass: 1, turns: 2, caveat: 'barring-crit' },
   'one-v-two-breaker': { side: 'p1', mass: 1, turns: 4, caveat: 'barring-crit' },
   'two-v-one-sack': { side: 'p1', mass: null },
-  // Round 86 (T305, secondary effects priced at their chance, A3 ca8223f): the 10 % Special Defense drop of the Focus Blast
-  // is a class of its own, so the memo no longer collapses the hit positions and the twelve-turn proof needs 163 cells
-  // where PROVER_BUDGET.cells allows 100 (endgame/prover.ts). Before: { mass: 1, digits: 3, turns: 12, caveat: 'sampled-rolls' }
-  // (0.9999 in 12 turns). At cells 200 and states 400 the proof returns 0.9989 in 12 turns, so the position is a win by the
-  // game and only the label is gone. Re-pinned to no proof at the user gate of 06.11.2026 (2a); the prover that carries a
-  // proof over a secondary which only helps the mover is T336.
-  'focus-blast-range': { side: 'p1', mass: null },
+  // Round 88 (T336, #72): back at 0.9999 in 12 turns. Round 86 (T305, secondary effects priced at their chance, A3 ca8223f) made
+  // the 10 % Special Defense drop of the Focus Blast a class of its own, so the memo no longer collapsed the hit positions and the
+  // twelve-turn proof needed 163 cells where PROVER_BUDGET.cells allows 100; the row read no proof (user gate of 06.11.2026, 2a).
+  // Now the class in which the drop fired takes the proof of the class in which it did not (endgame/prover-helping.ts), because
+  // the two positions differ only by the foe's lowered Special Defense.
+  'focus-blast-range': { side: 'p1', mass: 1, digits: 3, turns: 12, caveat: 'sampled-rolls' },
   'struggle-lock': { side: 'p2', mass: 0.997, digits: 3, turns: 5, caveat: 'sampled-rolls' },
   'healer-vs-band': { side: 'p2', mass: null },
   'healer-burned': { side: 'p2', mass: 1, turns: 4, caveat: 'sampled-rolls' },

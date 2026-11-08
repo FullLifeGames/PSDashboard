@@ -1,5 +1,6 @@
 import { toId } from '@fulllifegames/replay-core';
-import { dieKey, tieName, type ForcedDie } from './types.ts';
+import { chainDice } from './chain.ts';
+import { dieKey, plainKey, tieName, type ForcedDie } from './types.ts';
 
 /**
  * Round 82 (forced dice), step A5, gate answer 19a: the dice a log shows, read per action. On the first turn of a branch the
@@ -42,6 +43,12 @@ export interface LoggedOptions {
    * nothing. The simulator draws it once per target, and the log shows what the user gained: no gain is a no, a gain on every target a yes.
    */
   selfOf?: (moveId: string) => string | undefined;
+  /**
+   * Round 88 (T337, #73): the number of hits of a move whose every hit rolls its own accuracy (`hitsIn`, the Dex's `multiaccuracy` and
+   * `multihit`), or nothing. The log writes no miss for a later hit, only `|-hitcount|`: with the count k, hits 2 to k landed and
+   * the hit after them missed (or the chain ended with nothing to draw). A move without it names no hit die.
+   */
+  hitsOf?: (moveId: string) => number | undefined;
 }
 
 /** One stretch of the log: a body's `|move|` or `|cant|` line and the lines up to the next action, or the lines between actions. */
@@ -292,9 +299,11 @@ function selfEffectDice(action: LoggedAction, foes: readonly string[], options: 
   const struck = foes.filter(target => !action.missed.includes(target)).length;
   const die = (result: boolean): ForcedDie[] => [{ name: { ...ofMove(action), kind: 'self-effect' }, result: happens(result) }];
   if (struck > 0 && selfId) {
-    // it holds when no target or every target that was hit gave the gain; a log where only some did cannot be forced by one die
+    // Round 88 (T338, #74): `self.chance` is the entry of Gens 7 and later, drawn once per move (`selfDrops` sets `selfDropped` after the first
+    // draw of a move without hit counts), so the log writes one gain for the move however many foes it struck: one gain or more is a yes.
+    // The per-target draw of Gen 6 is a secondary entry (`hitDice`), not this one.
     const times = appliedTimes(action.boosts[action.slot] ?? [], selfId) ?? 0;
-    return times === 0 || times >= struck ? die(times > 0) : [];
+    return die(times > 0);
   }
   return foes.length > 0 && shownEffects(action, action.slot, true).some(id => id.startsWith('self:')) ? die(true) : [];
 }
@@ -315,7 +324,7 @@ function moveDice(
   for (const target of foes) {
     const missed = action.missed.includes(target);
     dice.push({ name: { ...ofMove(action), targetSlot: target, kind: 'accuracy' }, result: happens(!missed) });
-    if (!missed) dice.push(...hitDice(actions, index, target, drawn++, flinched, options));
+    if (!missed) dice.push(...chainDice(action, target, foes, options.hitsOf), ...hitDice(actions, index, target, drawn++, flinched, options));
   }
   const counts = Object.values(action.hitCounts);
   if (counts.length > 0) dice.push({ name: { ...ofMove(action), kind: 'hit-count' }, result: { hits: counts[0] } });
@@ -425,7 +434,8 @@ export interface MergeInput {
 export function mergeLoggedDice({ logged, forced, changed, switched }: MergeInput): ForcedDie[] {
   const taken = new Set(forced.map(die => dieKey(die.name)));
   // a tie belongs to two bodies: when either one changed its action the order of the log no longer holds
-  const kept = logged.filter(die => !taken.has(dieKey(die.name)) && !changed.has(die.name.slot)
+  // Round 88 (T337): the user's die for a multi-accuracy move without a hit covers every hit, so the logged hit dice of the same die leave
+  const kept = logged.filter(die => !taken.has(dieKey(die.name)) && !(die.name.hit !== undefined && taken.has(plainKey(die.name))) && !changed.has(die.name.slot)
     && !(die.name.kind === 'speed-tie' && die.name.targetSlot !== undefined && changed.has(die.name.targetSlot))
     && !(die.name.targetSlot !== undefined && switched?.has(die.name.targetSlot)));
   return [...forced, ...kept];

@@ -1,7 +1,7 @@
 import { PRNG, type PRNGSeed } from '@pkmn/sim';
 import { answerDie, type Answered } from './answer.ts';
 import { recognize } from './recognize.ts';
-import { dieKey, tieName, type Answer, type DieName, type DieResult, type Draw, type ForcedDie, type NaturalRecord } from './types.ts';
+import { dieKey, plainKey, tieName, type Answer, type DieName, type DieResult, type Draw, type ForcedDie, type NaturalRecord } from './types.ts';
 import type { BattleWatch } from './watch.ts';
 
 /**
@@ -243,8 +243,10 @@ export class ForcedDicePRNG extends WatchedPRNG {
 
   protected override decide(name: DieName, draw: Draw, natural: number): number {
     const key = dieKey(name);
-    const forced = this.forced.get(key);
-    if (forced) return this.force(key, forced, draw, natural);
+    // Round 88 (T337): a later hit looks up its own die first, then the die that covers every hit, and notes under the key it used
+    const forcedKey = name.hit && !this.forced.has(key) ? plainKey(name) : key;
+    const forced = this.forced.get(forcedKey);
+    if (forced) return this.force(forcedKey, forced, draw, natural);
     const cursor = this.cursors.get(key) ?? 0;
     this.cursors.set(key, cursor + 1);
     const answer = this.record.get(key)?.[cursor];

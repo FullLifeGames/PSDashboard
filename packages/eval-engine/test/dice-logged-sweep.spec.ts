@@ -5,6 +5,7 @@ import { rulesDex, toId, type ReplayData } from '@fulllifegames/replay-core';
 import { parseTurnBlocks } from '../src/branch/protocol-choices';
 import { loadSimMods } from '../src/forward/sim-mods';
 import { loggedOptions } from '../src/dice/turn';
+import { hitsIn as hitsOfDex } from '../src/dice/chain';
 import { secondariesIn } from '../src/dice/secondaries';
 import { DIE_KINDS, type DieKind } from '../src/dice/types';
 import { CLASSES } from './dice-census-support';
@@ -20,11 +21,11 @@ import { battleOf } from './power-oracle';
  * everywhere, doubles from Gen 3), a turn plays under one seed and writes a log; the dice `loggedDice` reads from that log, forced
  * on the same board under another seed, must give the log's turn (`scoreAlignment` perfect). The kinds: accuracy, crit, secondary
  * and self-effect (every move with a chance entry, also under Serene Grace and Sheer Force), hit-count (the multi-accuracy
- * moves are the Triple Axel row of ruling Q4 and stay a known gap), status-check (every condition whose handler draws), speed-tie
+ * moves join the main rows since round 88, T337, and have the Triple Axel row of ruling Q4: the accuracy die of each hit), status-check (every condition whose handler draws), speed-tie
  * and, new in this round, stalling (the `|-fail|` of a second Protect, read with the condition the caller names). The last block counts the kinds the log may show and the
  * reader does not name (the census of the ledger). A plain run plays the fixed sample of each list, `DICE_SWEEPS=full` every entry.
  *
- * KNOWN (`test.fails`, red today): the multi-accuracy rows (Q4) and the five causes the full sweep
+ * KNOWN (`test.fails`, red today): the causes the full sweep
  * found in the reader (`GAPS`); each has a plain row that holds the sweep finds a seed pair to repair, so a row never goes green because it
  * played nothing. Moves aimed at a random foe in doubles stay out (see `randomAim`).
  */
@@ -56,7 +57,6 @@ const randomAim = (mode: Mode, move: DexMove): boolean => mode === 'doubles' && 
 const GAPS: { cause: string; moves: string[]; modes: Mode[] }[] = [
   { cause: 'the power Present picks (damage or a heal) is a draw no kind of die names, so the other seed can pick another power than the log shows', moves: ['present'], modes: ['singles', 'doubles'] },
   { cause: 'a secondary that picks its status (the die names the chance, the pick follows the stream)', moves: ['triattack', 'direclaw'], modes: ['singles', 'doubles'] },
-  { cause: "a move's own chance to move its user (Gens 7 and later) is one die for every target of a spread move, and a log where only one target gave the gain cannot be forced", moves: ['diamondstorm'], modes: ['doubles'] },
 ];
 /**
  * The moves the full sweep found the reader missed (04.11.2026) and B3 fixed, each group with its cause. One plain row per group plays them
@@ -66,13 +66,11 @@ const FIXED: { cause: string; moves: string[]; modes: Mode[]; when?: (rules: Rul
   { cause: 'the status line of the secondary carries "[from] move:" (the move itself), which the reader skipped as an effect of something else', moves: ['relicsong', 'wickedtorque'], modes: ['singles', 'doubles'] },
   { cause: 'the second hit of a move that picks its target names it in |-anim| only (Dragon Darts in doubles)', moves: ['dragondarts'], modes: ['singles', 'doubles'] },
   { cause: 'a move that fails after its accuracy draw is logged with no target (Psycho Shift without a status to pass): the offers of the click name the accuracy die (a miss shows only below 100 percent: Gens 4 and 5)', moves: ['psychoshift'], modes: ['singles', 'doubles'], when: rules => rules.generation <= 5 },
-  { cause: 'a self effect that a spread move draws once per target: the log writes one gain per target that gave it (Diamond Storm, singles and the secondary entry of Gen 6)', moves: ['diamondstorm'], modes: ['singles', 'doubles'], when: (rules, mode) => mode === 'singles' || rules.generation <= 6 },
+  { cause: 'a self effect of a spread move: one gain for the whole move from Gen 7 (`self.chance`, drawn once per move: Diamond Storm in doubles) and one per target that gave it in the secondary entry of Gen 6 (round 88, T338)', moves: ['diamondstorm'], modes: ['singles', 'doubles'] },
 ];
 
 /** Whether the move is a gap of this game type (a gap may hold in singles and stay open in doubles). */
 const gapped = (mode: Mode, id: string): boolean => GAPS.some(gap => gap.modes.includes(mode) && gap.moves.includes(id));
-/** The moves of the main rows: none of the multi-accuracy row (ruling Q4); the moves of a gap leave through `sweepMovesOf`. */
-const sound = (move: DexMove): boolean => !multiAccuracy(move);
 const lowAccuracy = (move: DexMove): boolean => typeof move.accuracy === 'number' && move.accuracy < 100;
 
 /** What a block of a case counted, for the log and the census. */
@@ -108,13 +106,13 @@ function sweepMovesOf(
 
 /** The cases of a block: the rule sets and game types, and whether the rule set has the moves at all. */
 const KINDS = {
-  accuracy: { keep: (move: DexMove) => sound(move) && lowAccuracy(move), channels: ['misses'] },
-  crit: { keep: (move: DexMove) => sound(move) && move.category !== 'Status', channels: ['crits'] },
+  accuracy: { keep: (move: DexMove) => lowAccuracy(move), channels: ['misses'] },
+  crit: { keep: (move: DexMove) => move.category !== 'Status', channels: ['crits'] },
 } as const;
 
 describe.each(SWEEP_CASES)('the logged accuracy and crit dice give the log\'s turn: $name', ({ rules, mode }) => {
   const dex = dexOfRules(rules);
-  const options = (move: DexMove) => ({ clicked: clickedOf(move.id, mode), secondariesOf: secondariesIn(dex) });
+  const options = (move: DexMove) => ({ clicked: clickedOf(move.id, mode), secondariesOf: secondariesIn(dex), hitsOf: hitsOfDex(dex) });
 
   for (const [kind, spec] of Object.entries(KINDS) as [keyof typeof KINDS, typeof KINDS[keyof typeof KINDS]][]) {
     test(`${kind}: every move that draws one`, () => {
@@ -131,11 +129,11 @@ describe.each(SWEEP_CASES)('the logged accuracy and crit dice give the log\'s tu
 describe.each(SWEEP_CASES)('the logged secondaries and self effects give the log\'s turn: $name', ({ rules, mode }) => {
   const dex = dexOfRules(rules);
   const secondaries = secondariesIn(dex);
-  const options = (move: DexMove) => ({ clicked: clickedOf(move.id, mode), secondariesOf: secondaries });
+  const options = (move: DexMove) => ({ clicked: clickedOf(move.id, mode), secondariesOf: secondaries, hitsOf: hitsOfDex(dex) });
   const entries = (move: DexMove): string[] => secondaries(move.id);
   const has = (kind: 'items' | 'abilities', id: string): boolean => { const entry = dex[kind].get(id); return entry.exists && entry.gen <= dex.gen && !entry.isNonstandard; };
 
-  const plain = (move: DexMove): boolean => sound(move) && entries(move).length > 0;
+  const plain = (move: DexMove): boolean => entries(move).length > 0;
   const ownSelf = (move: DexMove): boolean => entries(move).some(id => id.startsWith('self:'));
   const sceneOf = (move: DexMove, outfit?: { ability: string }): Scene | null =>
     moveScene(rules, mode, move, { channels: ['secondaries', 'cants'], kind: 'secondary', options: options(move) }, outfit);
@@ -147,7 +145,7 @@ describe.each(SWEEP_CASES)('the logged secondaries and self effects give the log
   });
 
   test('self-effect: every move whose chance entry moves its own user', () => {
-    const keep = (move: DexMove): boolean => sound(move) && ownSelf(move);
+    const keep = (move: DexMove): boolean => ownSelf(move);
     const result = sweepMovesOf('self-effect', rules, mode, keep, move => sceneOf(move));
     expect(result.failures).toEqual([]);
     // a rule set whose Dex has no such move plays none (Gen 1 has no stat change of the user as a secondary)
@@ -215,18 +213,19 @@ describe.each(GAPS)('known gap: $cause', ({ moves: ids, modes }) => {
 
 describe.each(SWEEP_CASES)('the logged hit count gives the log\'s turn: $name', ({ rules, mode }) => {
   const dex = dexOfRules(rules);
-  const options = (move: DexMove) => ({ clicked: clickedOf(move.id, mode), secondariesOf: secondariesIn(dex) });
+  const options = (move: DexMove) => ({ clicked: clickedOf(move.id, mode), secondariesOf: secondariesIn(dex), hitsOf: hitsOfDex(dex) });
   const multi = (move: DexMove): boolean => multihitOf(move) !== undefined && move.category !== 'Status';
 
   test('a move with a range of hits', () => {
-    const result = sweepMovesOf('hit-count', rules, mode, move => sound(move) && multi(move) && Array.isArray(multihitOf(move)),
+    const result = sweepMovesOf('hit-count', rules, mode, move => multi(move) && Array.isArray(multihitOf(move)),
       move => moveScene(rules, mode, move, { channels: ['hitCounts'], kind: 'hit-count', options: options(move) }));
     expect(result.failures).toEqual([]);
-    expect(result.witnesses > 0 || sweepMoves(rules, move => sound(move) && multi(move) && Array.isArray(multihitOf(move))).moves.length === 0).toBe(true);
+    expect(result.witnesses > 0 || sweepMoves(rules, move => multi(move) && Array.isArray(multihitOf(move))).moves.length === 0).toBe(true);
   });
 
-  // Ruling Q4 (04.11.2026): the accuracy of one hit of a multi-accuracy move (Triple Axel, Triple Kick) is no die the module names, so a chain
-  // that broke after two hits comes back as an accuracy yes and three hits. KNOWN: red until a die names the one hit (TODO proposal in the ledger).
+  // Ruling Q4 (04.11.2026): the accuracy of one hit of a multi-accuracy move (Triple Axel, Triple Kick) was no die the module named, so a chain
+  // that broke after two hits came back as an accuracy yes and three hits. Round 88 (T337, #73): the die of each later hit carries its `hit`,
+  // and the reader writes hits 2 to the count as yes and the next hit as no from the Dex's hit count (`hitsIn`), so the row holds.
   const chain = sweepMoves(rules, multiAccuracy).moves.length > 0;
   const hitsIn = (log: string[]): number => Math.max(0, ...log.filter(line => line.startsWith('|-hitcount|')).map(line => Number(line.split('|')[3])));
   const rows = () => sweepMovesOf('multi-accuracy', rules, mode, multiAccuracy, move => {
@@ -244,7 +243,7 @@ describe.each(SWEEP_CASES)('the logged hit count gives the log\'s turn: $name', 
     else expect(sweepMoves(rules, multiAccuracy).moves).toEqual([]);
   });
 
-  (chain ? test.fails : test.skip)('a move whose every hit rolls its accuracy: the hit count of the log holds on another seed (the Triple Axel row, Q4)', () => {
+  (chain ? test : test.skip)('a move whose every hit rolls its accuracy: the hit count of the log holds on another seed (the Triple Axel row, Q4)', () => {
     expect(rows().failures).toEqual([]);
   });
 });

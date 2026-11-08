@@ -15,8 +15,12 @@ export const DIE_KINDS = [
 ] as const;
 export type DieKind = typeof DIE_KINDS[number];
 
-/** `slot` is the body that holds the draw (the user of the move; the holder for end-of-turn dice), `moveId` is empty outside a move. */
-export interface DieName { slot: string; moveId: string; targetSlot?: string; kind: DieKind; effectId?: string }
+/**
+ * `slot` is the body that holds the draw (the user of the move; the holder for end-of-turn dice), `moveId` is empty outside a move.
+ * `hit` (round 88, T337): the accuracy die of a later hit of a move whose every hit rolls its own accuracy (`multiaccuracy`), the
+ * simulator's own `move.hit`, 2 and up. The first hit keeps the name without it.
+ */
+export interface DieName { slot: string; moveId: string; targetSlot?: string; kind: DieKind; effectId?: string; hit?: number }
 
 export type DieResult =
   | { happens: boolean }        // a chance: accuracy, crit, secondary, procs, stalling, end of turn; a status check: the body goes on; a first mover: it acts first
@@ -35,11 +39,18 @@ export interface DieReport { die: ForcedDie; took: DieTook; chance?: number; log
 export interface DiceReport { forced: DieReport[]; naturalEndSeed: string }
 
 /**
- * The key of a die: its name without the index of a repeat (the third hit, the second secondary). A forced die applies to
- * every repeat, so the key is what the user's choice and the record of the natural turn share.
+ * The key of a die: its name without the index of a repeat (the second secondary, the next hit of a move that draws no accuracy
+ * per hit). A forced die applies to every repeat, so the key is what the user's choice and the record of the natural turn share.
+ * The accuracy die of a later hit of a multi-accuracy move is the exception (round 88, T337): its key ends in `hit<N>`, so the
+ * user can decide one hit; a forced die without a hit still covers every hit (`plainKey`).
  */
 export function dieKey(name: DieName): string {
-  return [name.slot, name.moveId, name.targetSlot ?? '', name.kind, ...(name.effectId ? [name.effectId] : [])].join(':');
+  return [name.slot, name.moveId, name.targetSlot ?? '', name.kind, ...(name.effectId ? [name.effectId] : []), ...(name.hit ? [`hit${name.hit}`] : [])].join(':');
+}
+
+/** The key of a die without its hit: the die that covers every hit of the move (the first hit's own key). */
+export function plainKey(name: DieName): string {
+  return dieKey({ ...name, hit: undefined });
 }
 
 /**
