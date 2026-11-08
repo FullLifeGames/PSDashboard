@@ -1183,7 +1183,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * w88a to w88g and the clone m88 go after the merge, on the user's okay. No
  * upstream finding. The pull request is #123. After it #124 (T314's option
  * (c), the engine's choices without unbrought bodies) and #125 (fewer tests
- * with the same protection) went to 1.2.0; next free issue number #126.
+ * with the same protection) went to 1.2.0.
  *
  * ROUND 87 2026-11-06 (improvement round 87, the release wave of 1.1.0:
  * the dependencies with the @pkmn train at 0.10.15, T313 and T317; before
