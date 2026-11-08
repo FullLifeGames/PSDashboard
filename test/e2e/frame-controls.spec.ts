@@ -60,7 +60,7 @@ async function loadSingles(page: Page) {
 async function expectFrameControls(frame: Frame) {
   // One button plays and pauses (the live branch frame plays at once, so it reads pause): both stand for the first control.
   const row1 = async () => (await visibleActions(frame, '.replay-controls')).map(action => (action === 'pause' ? 'play' : action));
-  await expect.poll(row1).toEqual(['play', 'rewind', 'ff', 'ffto', 'reset', 'switchViewpoint']);
+  await expect.poll(row1).toEqual(['play', 'reset', 'rewind', 'ff', 'ffto', 'switchViewpoint']);
   await expect(frame.locator('.replay-controls-2 .speedchooser')).toBeVisible();
   await expect(frame.locator('.replay-controls-2 .colorchooser')).toBeHidden();
   await expect(frame.locator('.replay-controls-2 .soundchooser')).toBeHidden();
