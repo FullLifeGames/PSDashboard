@@ -1,3 +1,5 @@
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import type { Pokemon } from '@pkmn/sim';
 import type { PokemonSnapshot } from '@fulllifegames/replay-core';
@@ -102,5 +104,18 @@ describe.each(BOARDS)('$rules.label $type: sites read a body by its Dex family (
       activeMatchesLog(body, parseLoggedActive(`|switch|p1a: Other|${species}, L50|100/100`) ?? undefined));
     expect(formes).toBeGreaterThan(100);
     expect(failures).toEqual([]);
+  });
+});
+
+describe('no site reads a species suffix list (#103)', () => {
+  // The suffix list of team-order.ts ('terastal', 'stellar', 'tera') is gone: the six sites ask `branch/body-forme.ts`, which reads the Dex.
+  test('no source file of the packages or the app names the list, its helper or a Tera suffix test', () => {
+    const roots = ['packages/eval-engine/src', 'packages/replay-core/src', 'src'];
+    const files = roots.flatMap(root => readdirSync(root, { recursive: true, withFileTypes: true })
+      .filter(entry => entry.isFile() && /\.tsx?$/.test(entry.name))
+      .map(entry => join(entry.parentPath, entry.name)));
+    expect(files.length).toBeGreaterThan(200);
+    const pattern = /normalizeBattleOnlyFormeId|BATTLE_ONLY_FORME_SUFFIXES|endsWith\((['"])(tera|stellar|terastal)\1\)/;
+    expect(files.filter(file => pattern.test(readFileSync(file, 'utf8')))).toEqual([]);
   });
 });
