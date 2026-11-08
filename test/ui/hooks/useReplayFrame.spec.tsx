@@ -132,9 +132,11 @@ describe('useSeekRequests', () => {
 
     const bump: SeekRequest = { turn: 7, seq: 2, play: true };
     rerender(bump);
-    expect(postMessage).toHaveBeenCalledWith({ type: 'ps-seek-turn', turn: 7, autoPlay: true }, '*');
+    // Round 88 (T347, #83): the request's seq rides every retry as its id; the bridge runs a play seek once per id.
+    expect(postMessage).toHaveBeenCalledWith({ type: 'ps-seek-turn', turn: 7, autoPlay: true, id: 2 }, '*');
     act(() => vi.advanceTimersByTime(400));
     expect(postMessage).toHaveBeenCalledTimes(3);
+    expect(postMessage.mock.calls.every(([message]) => (message as { id?: number }).id === 2)).toBe(true);
 
     // The same request re-rendered (same object, as the app's state keeps it) changes nothing.
     rerender(bump);

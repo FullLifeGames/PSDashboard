@@ -1,10 +1,11 @@
-import type {
-  OpponentTeamInfo,
-  PokemonEvsInfo,
-  PokemonFieldInfo,
-  PokemonMoveInfo,
-  ReplayData,
-  RevealedPokemonInfo,
+import {
+  missingBodies, teamSizes,
+  type OpponentTeamInfo,
+  type PokemonEvsInfo,
+  type PokemonFieldInfo,
+  type PokemonMoveInfo,
+  type ReplayData,
+  type RevealedPokemonInfo,
 } from '@fulllifegames/replay-core';
 import { useScrollFade } from '../hooks/useScrollFade';
 import { sourceAccent, sourceLabel } from '../lib/provenance-labels';
@@ -28,6 +29,10 @@ const STAT_LABELS = { hp: 'HP', atk: 'Atk', def: 'Def', spa: 'SpA', spd: 'SpD', 
 
 /** Round 87 (release 1.1.0), T317: the tag's words for a spread nobody has revealed; it carries no source word, since "unknown" is the whole claim. */
 const EVS_UNKNOWN = 'EVs not yet known';
+
+/** Round 88 (F, #101): the marker of a stand-in, a body the log never showed that the format's teammate usage names. */
+const STAND_IN_MARK = 'Not revealed (guessed from teammate usage)';
+const STAND_IN_TITLE = 'The log never showed this Pokémon. The statistics of the format name it as a likely teammate, so the engine plays with it. Edit it or paste your team to replace the guess.';
 
 function formatEvs(evs: PokemonEvsInfo, isRandomFormat: boolean): string {
   const labels = [
@@ -151,6 +156,7 @@ function PokemonEntry({ poke, isRandomFormat }: { poke: RevealedPokemonInfo; isR
           {poke.level !== 100 && <span className="ps-stats-level"> L{poke.level}</span>}
           {poke.gender && <span className="ps-stats-gender"> {poke.gender === 'M' ? '♂' : '♀'}</span>}
         </div>
+        {poke.standIn && <div className="ps-stats-standin" title={STAND_IN_TITLE} style={{ color: '#8899aa', fontSize: 10 }}>{STAND_IN_MARK}</div>}
         {poke.moves.length > 0 && (
           <div className="ps-stats-moves">
             {poke.moves.map(move => (
@@ -178,11 +184,22 @@ function PokemonEntry({ poke, isRandomFormat }: { poke: RevealedPokemonInfo; isR
   );
 }
 
-function TeamColumn({ label, playerName, info, isRandomFormat }: {
+/**
+ * Round 88 (F, #101): the bodies of a side that the log's `|teamsize|` counts and the panel could not fill, in a game without team
+ * preview: the engine plays the side with the bodies shown. No stats file (a Random Battle) or an unreachable one leaves this notice.
+ */
+function missingNotice(log: string, side: 'p1' | 'p2', built: number): string | null {
+  const missing = missingBodies(log, built, side);
+  const size = teamSizes(log)[side];
+  return missing > 0 && size !== null ? `${side.toUpperCase()} never showed ${missing} of ${size} Pokémon. The engine counts only the shown ones.` : null;
+}
+
+function TeamColumn({ label, playerName, info, isRandomFormat, notice }: {
   label: string;
   playerName: string;
   info: OpponentTeamInfo;
   isRandomFormat: boolean;
+  notice: string | null;
 }) {
   // Random battles always run six Pokémon — show the not-yet-revealed slots
   // instead of implying the team is complete (G21).
@@ -193,6 +210,7 @@ function TeamColumn({ label, playerName, info, isRandomFormat }: {
       <div className="ps-stats-header">
         <span className="ps-stats-label">{label}</span> {playerName}
       </div>
+      {notice && <div className="ps-stats-notice" style={{ color: '#8899aa', fontSize: 10, marginBottom: 6 }}>{notice}</div>}
       {info.pokemon.map(p => (
         <PokemonEntry key={p.species} poke={p} isRandomFormat={isRandomFormat} />
       ))}
@@ -225,10 +243,12 @@ export function BattleStatsPanel({ replayData, p1Info, p2Info }: Props) {
       <div style={{ fontSize: 13, fontWeight: 'bold', marginBottom: 8 }}>Battle Statistics</div>
       <div className="ps-stats-grid" ref={fadeRef}>
         {p1Info && (
-          <TeamColumn label="P1" playerName={replayData.players[0]} info={p1Info} isRandomFormat={isRandomFormat} />
+          <TeamColumn label="P1" playerName={replayData.players[0]} info={p1Info} isRandomFormat={isRandomFormat}
+            notice={missingNotice(replayData.log, 'p1', p1Info.pokemon.length)} />
         )}
         {p2Info && (
-          <TeamColumn label="P2" playerName={replayData.players[1]} info={p2Info} isRandomFormat={isRandomFormat} />
+          <TeamColumn label="P2" playerName={replayData.players[1]} info={p2Info} isRandomFormat={isRandomFormat}
+            notice={missingNotice(replayData.log, 'p2', p2Info.pokemon.length)} />
         )}
       </div>
     </div>

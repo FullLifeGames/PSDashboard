@@ -84,6 +84,22 @@ function fractionalProbabilityRows(
   return usageRows(numericEntries(entries), detail, kind, normalizeFractionalProbability);
 }
 
+/**
+ * Round 88 (F, #101): a teammate list as probability rows, sorted by share and then name. `probabilityOf` prices one raw entry;
+ * four digits stay, because the stand-in step sums a few of them and the three-digit rounding of the other rows would tie them.
+ */
+function teammateRows(
+  entries: Record<string, number | string> | undefined,
+  detail: string,
+  probabilityOf: (count: number) => number,
+): UsageProbability[] | undefined {
+  const rows = numericEntries(entries)
+    .map(([value, count]) => ({ value: lookupDisplayName('species', value), probability: Math.round(probabilityOf(count) * 10000) / 10000, sourceDetail: detail }))
+    .filter(row => row.value && row.probability > 0)
+    .sort((a, b) => b.probability - a.probability || a.value.localeCompare(b.value));
+  return rows.length > 0 ? rows : undefined;
+}
+
 export function parseSpread(spread: string): Pick<UsageSpread, 'nature' | 'evs'> | null {
   const [nature, evText] = spread.split(':');
   const evs = evText?.split('/').map(part => Number.parseInt(part, 10));
@@ -141,6 +157,9 @@ function fractionalSpreadRows(
   return spreadRowsOf(numericEntries(entries), detail, normalizeFractionalProbability);
 }
 
+/** The optional field only where the file has the list: a species without one keeps the shape it had before. */
+const withTeammates = (teammates: UsageProbability[] | undefined): { teammates?: UsageProbability[] } => (teammates ? { teammates } : {});
+
 function parseDataPkmnStats(
   payload: PkmnStatsPayload,
   options: { format: string; month: string },
@@ -159,6 +178,7 @@ function parseDataPkmnStats(
       items: fractionalProbabilityRows(stats.items, detail, 'items'),
       moves: fractionalProbabilityRows(stats.moves, detail, 'moves'),
       spreads: fractionalSpreadRows(stats.spreads, detail),
+      ...withTeammates(teammateRows(stats.teammates, detail, count => (count <= 1 ? count : Math.min(1, count / 100)))),
     };
   }
 
@@ -193,6 +213,7 @@ export function parseSmogonChaosStats(
       items: probabilityRows(stats.Items, rawCount, detail, 'items'),
       moves: probabilityRows(stats.Moves, rawCount, detail, 'moves'),
       spreads: spreadRows(stats.Spreads, rawCount, detail),
+      ...withTeammates(teammateRows(stats.Teammates, detail, count => (rawCount > 0 ? Math.min(1, count / rawCount) : 0))),
     };
   }
 

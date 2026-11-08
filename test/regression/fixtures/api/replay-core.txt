@@ -118,6 +118,7 @@ value logRules
 value manualEvs
 value manualField
 value manualMove
+value missingBodies
 value parsePastedTeam
 value parseReplayLog
 value parseReplayLogWithObservations
@@ -141,6 +142,7 @@ value speciesBaseId
 value speciesOverrides
 value splitReplayPassword
 value standingScreens
+value teamSizes
 value terrainConditions
 value toId
 value twinBattle
@@ -148,3 +150,4 @@ value typedHiddenPowerId
 value umbrellaWeathers
 value unknownEvs
 value withHiddenPowerType
+value withStandIns

@@ -6,6 +6,7 @@ import { arg, keyOf, namesEffect, ofIdent, type LogLine } from './log-line.ts';
 import { newItemTriggerWatch, teamSizeOf, watchItemTriggers, type ItemTriggerWatch } from './item-triggers.ts';
 import { toId } from '../ids.ts';
 import { terrainConditions } from '../dex-facts/index.ts';
+import { newFieldItemWatch, watchFieldItems, type FieldItemWatch } from './field-item-triggers.ts';
 
 /**
  * Items the protocol rules out by a trigger it shows without the item's line
@@ -19,7 +20,9 @@ import { terrainConditions } from '../dex-facts/index.ts';
  *    outside the weather or terrain that ability reads (gen 9);
  *  - Eject Pack switches its holder out after any drop but Parting Shot's, at
  *    the latest in the residual phase after the next move, while a teammate
- *    can come in (gens 8 and 9).
+ *    can come in (gens 8 and 9);
+ *  - the terrain seeds and Room Service are used when the field changes
+ *    (field-item-triggers.ts, round 88, T349).
  * Only items still unknown and never swapped are ruled out, and a team that
  * may hold an Illusion user is not judged (ruleOutUnknown, item-evidence.ts).
  */
@@ -53,13 +56,15 @@ export interface TriggerWatch {
   drops: Map<string, { moved: boolean }>;
   /** The Lum Berry, Sitrus Berry, Eject Button and Red Card windows (item-triggers.ts). */
   items: ItemTriggerWatch;
+  /** The terrain seeds and Room Service (field-item-triggers.ts, round 88, T349). */
+  field: FieldItemWatch;
 }
 
 function newWatch(state: InferrerState): TriggerWatch {
   return {
     gravity: false, magicRoom: false, weather: '', terrain: '', slots: new Map(), fainted: new Set(), teamSize: teamSizeOf(state, state.opponentSide),
     embargoed: new Set(), commanding: new Set(), neutralized: state.lines.some(line => namesEffect(line, 'Neutralizing Gas')),
-    entries: new Map(), drops: new Map(), items: newItemTriggerWatch(state),
+    entries: new Map(), drops: new Map(), items: newItemTriggerWatch(state), field: newFieldItemWatch(),
   };
 }
 
@@ -227,4 +232,5 @@ export function watchTriggerEvidence(state: InferrerState, line: LogLine) {
   const key = keyOf(arg(line, 1));
   if (key.startsWith(state.opponentSide)) onOpponentLine(state, watch, line, key);
   watchItemTriggers(state, watch.items, watch, line);
+  watchFieldItems(state, watch, line);
 }

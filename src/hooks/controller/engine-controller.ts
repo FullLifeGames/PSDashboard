@@ -40,7 +40,7 @@ function useAcquireLayer(ctx: ReplayContext, transients: Transients, board: Boar
   const { getBattle, executing, variationStartTurn, startSerialized } = ctx.branch;
   const { evaluation, teamSources, positions } = ctx;
   const { replayGenNumber } = ctx.knowledge;
-  const { bringOnlyLists } = ctx.meta;
+  const { bench } = ctx.meta;
   const { playOut, draftChoices } = transients;
   const { liveTip, viewingVariation, atEndPosition, viewTurn, serializedAtView } = board.timeline;
   const { branchPreparing } = board.deviation;
@@ -60,7 +60,7 @@ function useAcquireLayer(ctx: ReplayContext, transients: Transients, board: Boar
     parseSingles, parseDoubles: parsePlayedActionsDoubles,
   });
   const { positionPicker, pickerSimState, pickerSeed, pickerStale, getPickerBattle, pickerReplayLog } = usePositionPicker({
-    replayData, snapshots, sources: teamSources, bringOnlyLists, replayGenNumber,
+    replayData, snapshots, sources: teamSources, bench, replayGenNumber,
     liveTip, viewingVariation, serializedAtView, viewTurn, variationStartTurn, startSerialized,
     getExact: acquire.getExact, exactPositionsVersion: acquire.exactPositionsVersion, draftChoices,
     liveSimState: ctx.branch.simState, played: playedAtView,

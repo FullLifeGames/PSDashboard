@@ -48,6 +48,16 @@ describe('PlayOutBar', () => {
     expect(wired.onStopPlayOut).toHaveBeenCalledTimes(1);
   });
 
+  // Round 88 (T347, #83): Stop with a turn in flight keeps the run active until that turn lands; the bar says so.
+  test('after Stop with a turn in flight the bar says the engine ends the run after that turn and offers no second Stop', () => {
+    const wired = props({ playOut: { active: true, stopping: { text: 'Play-out stopped', navigated: false } }, fastPlayOut: true });
+    render(<PlayOutBar {...wired} />);
+    expect(screen.getByText('Stopping: the engine finishes the turn in flight, then stops.')).toBeInTheDocument();
+    expect(screen.queryByText(/Engine play-out running/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Stop' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /Let it play out/ })).toBeNull();
+  });
+
   test('a finished run shows its notice and, with a variation, the watch button seeks to its start', async () => {
     const notice = { text: 'Play-out finished: the battle ended after 3 turns.', watchTurn: 4 };
     const wired = props({ playOutNotice: notice, hasVariation: true });

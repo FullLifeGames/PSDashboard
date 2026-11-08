@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+import { loadSimMods } from '@fulllifegames/eval-engine';
+import type { ReplayData } from '@fulllifegames/replay-core';
 import { doublesReplay, singlesReplay } from '../../fixtures/replay';
 import { stubReplayFetch } from '../../fixtures/network';
 import { realReplayWorkerClient } from '../../fixtures/worker';
@@ -13,13 +16,16 @@ const { useReplayContext } = await import('../../../../src/hooks/controller/repl
 
 beforeEach(() => {
   worker.current = realReplayWorkerClient();
-  stubReplayFetch([singlesReplay(), doublesReplay()]);
+  stubReplayFetch([singlesReplay(), doublesReplay(), championsOpenGame()]);
   window.history.replaceState(null, '', '/');
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
+
+/** Round 88 (T314, #55): Champions VGC 2625939941, where P1 fielded three bodies: no pinned lists, but P2's four are known. */
+const championsOpenGame = () => JSON.parse(readFileSync('test/e2e/fixtures/dock-championsvgc-2625939941.json', 'utf-8')) as ReplayData;
 
 describe('useReplayContext', () => {
   test('starts with every section in its neutral state', () => {
@@ -34,7 +40,7 @@ describe('useReplayContext', () => {
     expect(ctx.shared.sharedBranch).toBeNull();
     expect(ctx.refreshQueue.pendingBranchRefresh).toBeNull();
     expect(ctx.knowledge.effectiveP1Info).toBeNull();
-    expect(ctx.meta).toEqual({ replayGen: 9, bringCount: null, bringOnlyLists: null, replayGameType: null, evalIsDoubles: false });
+    expect(ctx.meta).toEqual({ replayGen: 9, bringCount: null, bringOnlyLists: null, bench: null, replayGameType: null, evalIsDoubles: false });
     expect(ctx.animateBranchTurns).toBe(true);
     expect(ctx.branchWindowOpenRef.current).toBe(false);
     expect(ctx.positions.getExact(1)).toBeNull();
@@ -58,6 +64,16 @@ describe('useReplayContext', () => {
     await waitFor(() => expect(result.current.smogon.usageStats.loading).toBe(false));
     expect(result.current.smogon.usageStats.error).toMatch(/No Smogon usage stats/);
     await waitFor(() => expect(result.current.smogon.setAssumptions.loading).toBe(false));
+  });
+
+  test('an open bring-limited game keeps its rebuild whole and hands the bench of the full side to the branch', async () => {
+    await loadSimMods('gen9championsvgc2026regma');
+    const replay = championsOpenGame();
+    const { result } = renderHook(() => useReplayContext());
+    await act(async () => { await result.current.replay.loadReplay(replay.id); });
+    expect(result.current.meta.bringOnlyLists).toBeNull();
+    expect(result.current.meta.bench?.lists.p1).toEqual([]);
+    expect([...(result.current.meta.bench?.lists.p2 ?? [])].sort()).toEqual(['Aerodactyl', 'Farigiraf', 'Kingambit', 'Sylveon']);
   });
 
   test('a doubles replay reads as doubles for the evaluation', async () => {

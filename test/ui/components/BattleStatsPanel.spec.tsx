@@ -104,4 +104,39 @@ describe('BattleStatsPanel', () => {
     expect(panel).toHaveClass('ps-panel', 'ps-stats-panel');
     expect(panel.querySelector(':scope > .ps-stats-grid')).not.toBeNull();
   });
+
+  // Round 88 (F, #101): a game without team preview where a side showed fewer bodies than its |teamsize|. Singles and doubles both.
+  describe.each([['singles', 'gen4ou', '[Gen 4] OU'], ['doubles', 'gen4doublesou', '[Gen 4] Doubles OU']] as const)('the bodies a side never showed (%s)', (_kind, formatid, tier) => {
+    const NL = String.fromCharCode(10);
+    const log = (teamsize: number, preview = false) => [
+      `|tier|${tier}`, '|gen|4', `|teamsize|p1|${teamsize}`, `|teamsize|p2|${teamsize}`,
+      ...(preview ? ['|poke|p1|Azelf|', '|poke|p2|Azelf|'] : []),
+      '|start', '|turn|1',
+    ].join(NL);
+    const replay = (teamsize: number, preview = false) => ({ ...singlesReplay(), formatid, log: log(teamsize, preview), players: ['Alice', 'Bob'] });
+    const shown = revealedPokemon('Azelf', { moves: [move('Nasty Plot', 'revealed')] });
+    const guessed = revealedPokemon('Tyranitar', { standIn: true, moves: [], item: field('', 'unknown'), ability: field('', 'unknown'), evs: evs('unknown') });
+
+    test('a stand-in carries the not revealed marker and says where it comes from; a shown body does not', () => {
+      render(<BattleStatsPanel replayData={replay(2)} p1Info={{ pokemon: [shown, guessed] }} p2Info={null} />);
+      const standIn = screen.getByRole('img', { name: 'Tyranitar' }).parentElement!;
+      expect(standIn).toHaveTextContent('Not revealed (guessed from teammate usage)');
+      expect(screen.getByRole('img', { name: 'Azelf' }).parentElement!).not.toHaveTextContent('Not revealed');
+      expect(screen.queryByText(/never showed/)).toBeNull();
+    });
+
+    test('a side the format has no stand-ins for says how many bodies the engine does not count', () => {
+      render(<BattleStatsPanel replayData={replay(6)} p1Info={{ pokemon: [shown] }} p2Info={{ pokemon: Array.from({ length: 6 }, (_, i) => revealedPokemon(`Mon${i}`)) }} />);
+      expect(screen.getByText('P1 never showed 5 of 6 Pokémon. The engine counts only the shown ones.')).toBeInTheDocument();
+      expect(screen.getAllByText(/never showed/)).toHaveLength(1);
+    });
+
+    test('a side that is not short, and a game with a team preview, get no notice', () => {
+      const { unmount } = render(<BattleStatsPanel replayData={replay(1)} p1Info={{ pokemon: [shown] }} p2Info={{ pokemon: [shown] }} />);
+      expect(screen.queryByText(/never showed/)).toBeNull();
+      unmount();
+      render(<BattleStatsPanel replayData={replay(6, true)} p1Info={{ pokemon: [shown] }} p2Info={null} />);
+      expect(screen.queryByText(/never showed/)).toBeNull();
+    });
+  });
 });

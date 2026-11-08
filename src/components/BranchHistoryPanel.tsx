@@ -5,6 +5,7 @@ import { notationSideLabel } from '@fulllifegames/eval-engine';
 import type { TimelinePosition } from '../lib/timeline';
 import { activeSummary, alignHistoryRows, branchSummary, type SideSummary } from '../lib/branch-history';
 import { markText, turnDiceMarks, type DiceMarks } from '../lib/branch-dice-marks';
+import { turnEntryCount } from '../lib/variation-turns';
 
 /**
  * Round 84 (A7i, ruling 20a): what the caller hands the panel. `actions` stand at the right end of the toggle line, `status` under
@@ -38,10 +39,12 @@ const cellReset = {
   boxSizing: 'border-box' as const,
 };
 
+/** One interlude: a replacement on one side, or (round 88, T348) on both sides, an entry of kind turn that no side marks. */
 function ForcedRow({ entry }: { entry: BranchHistoryEntry }) {
-  const forcedChoice = entry.forcedSide === 'p1'
-    ? notationSideLabel(entry.p1SlotChoices, entry.p1Choice)
-    : notationSideLabel(entry.p2SlotChoices, entry.p2Choice);
+  const p1 = notationSideLabel(entry.p1SlotChoices, entry.p1Choice);
+  const p2 = notationSideLabel(entry.p2SlotChoices, entry.p2Choice);
+  const both = entry.kind !== 'forced' || !entry.forcedSide;
+  const forcedChoice = both ? `P1 ${p1} | P2 ${p2}` : entry.forcedSide === 'p1' ? p1 : p2;
   return (
     <div
       style={{
@@ -53,7 +56,7 @@ function ForcedRow({ entry }: { entry: BranchHistoryEntry }) {
         color: '#9fb5d9',
       }}
     >
-      Turn {entry.turnNumber} · forced replacement ({entry.forcedSide?.toUpperCase()}): {forcedChoice}
+      Turn {entry.turnNumber} · forced replacement ({both ? 'both sides' : entry.forcedSide?.toUpperCase()}): {forcedChoice}
     </div>
   );
 }
@@ -157,15 +160,15 @@ function HistoryRow({ entry, settled, marks, originalTurn, variationTurn, snapsh
   );
 }
 
-/** The open panel's list: one row per executed turn (a forced replacement is its own row) and the tip button. */
+/** The open panel's list: one row per executed turn (a replacement on one side or both is its own row) and the tip button. */
 function HistoryList({ branchStartTurn, history, snapshots, currentPosition, onNavigate, ended }: Props & { ended: boolean }) {
   const rows = alignHistoryRows(history, branchStartTurn);
-  const turnEntries = history.filter(entry => entry.kind !== 'forced').length;
+  const turnEntries = turnEntryCount(history);
   const tipTurn = branchStartTurn + turnEntries;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {rows.map(({ entry, settled, originalTurn, variationTurn }, index) => (
-        entry.kind === 'forced' || originalTurn === null || variationTurn === null
+        originalTurn === null || variationTurn === null
           ? <ForcedRow key={`forced-${entry.turnNumber}-${index}`} entry={entry} />
           : (
             <HistoryRow
@@ -211,7 +214,7 @@ export function BranchHistoryPanel({ ended = false, slots, ...props }: Props) {
   const [open, setOpen] = useState(false);
   const bodyId = useId();
   const { history, onNavigate } = props;
-  const turnEntries = history.filter(entry => entry.kind !== 'forced').length;
+  const turnEntries = turnEntryCount(history);
   const toggle = () => {
     setOpen(!open);
     slots?.onOpenChange?.(!open);

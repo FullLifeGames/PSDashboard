@@ -110,6 +110,21 @@ function extractGen(source: ReplayFormatSource & { formatid?: string }): string 
   return '9';
 }
 
+/**
+ * Round 88 (F, #101): how many bodies each side really has, as the simulator's `|teamsize|` line prints them at the start action
+ * (the brought count after a team preview, the whole team without one). The last line of a side wins; null for a side the log
+ * does not size. A log or its lines: the near sentence's phase reads a snapshot's lines, the builder and the inference a text.
+ */
+export function teamSizes(log: string | readonly string[]): { p1: number | null; p2: number | null } {
+  const sizes: { p1: number | null; p2: number | null } = { p1: null, p2: null };
+  const lines = typeof log === 'string' ? (lfLog(log) ?? '').split('\n') : log;
+  for (const line of lines) {
+    const match = /^\|teamsize\|(p[12])\|(\d+)/.exec(line);
+    if (match) sizes[match[1] as 'p1' | 'p2'] = Number(match[2]);
+  }
+  return sizes;
+}
+
 export function getReplayGameType(log: string | undefined): string | null {
   const raw = lfLog(log)?.match(/^\|gametype\|([^|\n]+)/m)?.[1];
   return raw ? optionalId(raw) : null;

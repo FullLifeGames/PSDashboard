@@ -124,8 +124,8 @@ test.describe('PS Dashboard', () => {
     });
     const lastTurn = Number(/Branching · Turn (\d+)/.exec(await page.getByText(/Branching · Turn \d+/).innerText())?.[1]);
     const line = `ended at turn ${lastTurn}, p2 switches: ${p2Switches.join(', ')}`;
-    // The finished run hands the view back to its start turn (round 77, C5: the last turn no longer drags the pointer
-    // to the tip); the tip names the winner.
+    // The finished run leaves the frame where the user watches it (round 88, T347: no return to the start turn; the last
+    // turn still does not drag the pointer to the tip); the click goes to the tip, which names the winner.
     await page.getByRole('button', { name: 'End of the variation: the game is over here' }).click();
     await expect(page.locator('.ps-branch-ended'), line).toContainText('Bene wins this variation.');
     expect(lastTurn, line).toBeLessThanOrEqual(75);

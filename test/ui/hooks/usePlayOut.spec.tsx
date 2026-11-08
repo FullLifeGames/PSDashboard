@@ -158,7 +158,25 @@ describe('usePlayOut', () => {
     expect(result.current.transients.playOut).toMatchObject({ executed: 1, turns: 0 });
   });
 
-  test('an ended battle finishes the run, restores the auto setting, and returns to the start after played turns', async () => {
+  // Round 88 (T348, #84): a replacement on both sides is played as a pair, but the battle's turn does not move: no turn is counted.
+  test.each([
+    ['singles', [true], [true]],
+    ['doubles', [true, false], [false, true]],
+  ] as const)('%s: a pair that replaces on both sides executes but counts no turn', (kind, p1Force, p2Force) => {
+    const side = (forceSwitch: readonly boolean[]) => ({ active: forceSwitch.map(() => ({})), activeRequest: { forceSwitch } });
+    const bothReplace = vi.fn(() => ({ ended: false, sides: [side(p1Force), side(p2Force)] }) as unknown as ReturnType<PlayOutInputs['getBattle']>);
+    const { evaluation } = evaluationOf({ auto: true });
+    const { result, rerender, wired } = setup(evaluation, wiring({ getBattle: bothReplace }));
+    act(() => result.current.playOut.startPlayOut());
+    const done = evalResult(kind);
+    rerender({ evaluation: evaluationOf({ auto: true, status: 'done', result: done, resultTag: 'variation:3' }).evaluation, wiring: wired });
+    expect(wired.applyEvalChoice).toHaveBeenCalledTimes(2);
+    expect(wired.executeTurn).toHaveBeenCalledTimes(1);
+    expect(result.current.transients.playOut).toMatchObject({ executed: 1, turns: 0 });
+  });
+
+  // Round 88 (T347, #83): the finish leaves the frame where the user watches it; the pointer takes the frame's turn.
+  test('an ended battle finishes the run, restores the auto setting, and leaves the frame where it stands after played turns', async () => {
     const { evaluation, setPrefs } = evaluationOf({});
     const { result, rerender, wired } = setup(evaluation);
     act(() => result.current.playOut.startPlayOut());
@@ -170,7 +188,17 @@ describe('usePlayOut', () => {
     expect(result.current.transients.playOut).toBeNull();
     expect(result.current.transients.playOutNotice).toEqual({ text: 'Play-out finished: the battle ended after 1 turn.', watchTurn: 3 });
     expect(setPrefs).toHaveBeenLastCalledWith(expect.objectContaining({ auto: false }));
-    expect(wired.navigateTo).toHaveBeenCalledWith({ turn: 3, line: 'variation' }, { seek: true, internal: true });
+    expect(wired.navigateTo).toHaveBeenCalledWith({ turn: 3, line: 'variation' }, { seek: false, internal: true, toFrame: true });
+    expect((wired.navigateTo as ReturnType<typeof vi.fn>).mock.calls.every(([, opts]) => opts?.seek !== true)).toBe(true);
+  });
+
+  test('a run that played no turn leaves the pointer alone and a navigation interrupt moves nothing', () => {
+    const { evaluation } = evaluationOf({ auto: true });
+    const { result, wired } = setup(evaluation);
+    act(() => result.current.playOut.startPlayOut());
+    act(() => result.current.transients.stopPlayOutRef.current?.({ navigated: true }));
+    expect(result.current.transients.playOut).toBeNull();
+    expect(wired.navigateTo).not.toHaveBeenCalled();
   });
 
   test('an unplayable engine choice and a failed evaluation end the run with their reasons', () => {
@@ -188,7 +216,7 @@ describe('usePlayOut', () => {
     expect(result.current.transients.playOut).toBeNull();
   });
 
-  test('stopPlayOut ends the run by hand and watchFrom seeks the frame after the tip lands', () => {
+  test('stopPlayOut ends the run by hand and watchFrom seeks the frame after the pointer moved', () => {
     vi.useFakeTimers();
     const { evaluation } = evaluationOf({ auto: true });
     const { result, wired } = setup(evaluation);
@@ -197,12 +225,25 @@ describe('usePlayOut', () => {
     expect(result.current.transients.playOut).toBeNull();
     expect(result.current.transients.playOutNotice?.text).toBe('Play-out stopped: 0 turns played (they stay in the variation).');
 
+    // The pointer takes the variation position of the turn the frame is about to show, never the tip (T347).
     act(() => result.current.playOut.watchFrom(2));
-    expect(wired.navigateTo).toHaveBeenCalledWith({ turn: 3, line: 'variation' }, { seek: false, internal: true });
+    expect(wired.navigateTo).toHaveBeenCalledWith({ turn: 2, line: 'variation' }, { seek: false, internal: true, toFrame: 2 });
     expect(wired.setNavSeek).not.toHaveBeenCalled();
     act(() => vi.advanceTimersByTime(250));
     const updater = (wired.setNavSeek as ReturnType<typeof vi.fn>).mock.calls[0][0] as (prev: null) => unknown;
     expect(updater(null)).toEqual({ turn: 2, seq: 1, play: true });
+  });
+
+  // Round 88 (T343 builds on it): the lead variation's Watch from turn 0 reads T1 while the frame plays the leads in.
+  test('watchFrom turn 0 asks for the frame position of turn 0 and seeks turn 0', () => {
+    vi.useFakeTimers();
+    const { evaluation } = evaluationOf({ auto: true });
+    const { result, wired } = setup(evaluation);
+    act(() => result.current.playOut.watchFrom(0));
+    expect(wired.navigateTo).toHaveBeenCalledWith({ turn: 0, line: 'variation' }, { seek: false, internal: true, toFrame: 0 });
+    act(() => vi.advanceTimersByTime(250));
+    const updater = (wired.setNavSeek as ReturnType<typeof vi.fn>).mock.calls[0][0] as (prev: null) => unknown;
+    expect(updater(null)).toEqual({ turn: 0, seq: 1, play: true });
   });
 
   // Round 77 (C5): a turn in flight lands after the stop; the timeline must not follow it to the tip.
@@ -215,8 +256,84 @@ describe('usePlayOut', () => {
 
     const again = setup(evaluation);
     act(() => again.result.current.playOut.startPlayOut());
-    act(() => again.result.current.transients.stopPlayOutRef.current?.({ returnToStart: false }));
+    act(() => again.result.current.transients.stopPlayOutRef.current?.({ navigated: true }));
     expect(again.wired.holdTipFollow).toHaveBeenCalledTimes(1);
+  });
+
+  // Round 88 (T347, #83): a turn in flight lands after the stop in the append mode of the run ('hold': no seek, no play,
+  // no follow-end), so the frame stays where the user watches it. The run stays active until that turn landed.
+  describe('a stop with a turn in flight', () => {
+    const inFlight = () => {
+      const { evaluation } = evaluationOf({ auto: true });
+      const hook = setup(evaluation);
+      act(() => hook.result.current.playOut.startPlayOut());
+      const done = evaluationOf({ auto: true, status: 'done', result: evalResult(), resultTag: 'variation:3' }).evaluation;
+      hook.rerender({ evaluation: done, wiring: hook.wired }); // the run plays its first turn
+      hook.rerender({ evaluation: done, wiring: { ...hook.wired, executing: true } });
+      return { ...hook, done };
+    };
+
+    test('keeps the run active and holds the tip-follow, then finishes when the turn landed', () => {
+      const { result, rerender, wired, done } = inFlight();
+      act(() => result.current.transients.stopPlayOutRef.current?.());
+      expect(result.current.transients.playOut).toMatchObject({ active: true, turns: 1, stopping: { navigated: false } });
+      expect(result.current.transients.playOutNotice).toBeNull();
+      expect(result.current.transients.playOutRef.current).toEqual(expect.objectContaining({ active: true }));
+      expect(wired.holdTipFollow).toHaveBeenCalledTimes(1);
+      expect(wired.navigateTo).not.toHaveBeenCalled();
+
+      rerender({ evaluation: done, wiring: wired }); // executing false: the turn landed
+      expect(result.current.transients.playOut).toBeNull();
+      expect(result.current.transients.playOutNotice).toEqual({ text: 'Play-out stopped: 1 turn played (they stay in the variation).', watchTurn: 3 });
+      expect(wired.navigateTo).toHaveBeenCalledTimes(1);
+      expect(wired.navigateTo).toHaveBeenCalledWith({ turn: 3, line: 'variation' }, { seek: false, internal: true, toFrame: true });
+    });
+
+    test('a navigation during the stop, or one that stops the run itself, finishes it without moving the pointer', () => {
+      const first = inFlight();
+      act(() => first.result.current.transients.stopPlayOutRef.current?.());
+      act(() => first.result.current.transients.stopPlayOutRef.current?.({ navigated: true }));
+      first.rerender({ evaluation: first.done, wiring: first.wired });
+      expect(first.result.current.transients.playOut).toBeNull();
+      expect(first.wired.navigateTo).not.toHaveBeenCalled();
+
+      const second = inFlight();
+      act(() => second.result.current.transients.stopPlayOutRef.current?.({ navigated: true }));
+      expect(second.result.current.transients.playOut).toMatchObject({ active: true, stopping: { navigated: true } });
+      expect(second.wired.holdTipFollow).toHaveBeenCalledTimes(1);
+      second.rerender({ evaluation: second.done, wiring: second.wired });
+      expect(second.result.current.transients.playOut).toBeNull();
+      expect(second.result.current.transients.playOutNotice?.text).toBe('Play-out stopped: 1 turn played (they stay in the variation).');
+      expect(second.wired.navigateTo).not.toHaveBeenCalled();
+    });
+
+    test('plays nothing more while it waits: a finished evaluation is left alone', () => {
+      const { result, rerender, wired } = inFlight();
+      act(() => result.current.transients.stopPlayOutRef.current?.());
+      const calls = (wired.applyEvalChoice as ReturnType<typeof vi.fn>).mock.calls.length;
+      const next = evaluationOf({ auto: true, status: 'done', result: evalResult('doubles'), resultTag: 'variation:3' }).evaluation;
+      rerender({ evaluation: next, wiring: { ...wired, executing: false } });
+      // The turn landed: the run finished instead of playing the next result.
+      expect(wired.applyEvalChoice).toHaveBeenCalledTimes(calls);
+      expect(wired.executeTurn).toHaveBeenCalledTimes(1);
+      expect(result.current.transients.playOut).toBeNull();
+    });
+
+    test('a refused turn that lands during the stop ends the run once, with the refusal', async () => {
+      const { evaluation } = evaluationOf({ auto: true });
+      let refuse: (message: string) => void = () => {};
+      const wired = wiring({ executeTurn: vi.fn(() => new Promise<string | void>(resolve => { refuse = resolve; })) });
+      const { result, rerender } = setup(evaluation, wired);
+      act(() => result.current.playOut.startPlayOut());
+      const done = evaluationOf({ auto: true, status: 'done', result: evalResult(), resultTag: 'variation:3' }).evaluation;
+      rerender({ evaluation: done, wiring: wired });
+      rerender({ evaluation: done, wiring: { ...wired, executing: true } });
+      act(() => result.current.transients.stopPlayOutRef.current?.({ navigated: true }));
+      await act(async () => { refuse('Earthquake is disabled for Garchomp right now.'); });
+      expect(result.current.transients.playOut).toBeNull();
+      expect(result.current.transients.playOutNotice?.text).toContain('the turn could not be played');
+      expect(wired.navigateTo).not.toHaveBeenCalled(); // the user's own navigation stands
+    });
   });
 
   test('the fast option pins the run to the depth-1 matrix before its first evaluation and releases the engine when the run ends', () => {
@@ -261,7 +378,29 @@ describe('usePlayOut', () => {
       expect(result.current.transients.playOut).toBeNull();
       const onStart = (wired.startLeadVariation as ReturnType<typeof vi.fn>).mock.calls[0][1].onStart as () => void;
       act(() => onStart());
-      expect(result.current.transients.playOut).toMatchObject({ active: true, startTurn: 1 });
+      // Round 88 (T343, #79): the run arms with turn 0, so the progress line and the notice name the turn the game starts at.
+      expect(result.current.transients.playOut).toMatchObject({ active: true, startTurn: 0 });
+    });
+
+    // Round 88 (T343, #79): the notice offers Watch from turn 0, and Watch plays the frame from its team preview while
+    // the pointer reads T1 (the variation line has no turn 0). A run from a later turn keeps its turn (the rows above).
+    test.each([
+      ['singles', singlesPicks],
+      ['doubles with a bring of four', vgcPicks],
+    ])('%s: the finish notice offers Watch from turn 0 and Watch seeks the frame to turn 0', (_name, picks) => {
+      vi.useFakeTimers();
+      const { evaluation } = evaluationOf({ auto: true });
+      const wired = wiring({ viewT0: true, liveTip: false, viewingVariation: false, leadPicksRef: { current: picks } });
+      const { result, rerender } = setup(evaluation, wired);
+      act(() => result.current.playOut.startPlayOut());
+      act(() => result.current.transients.stopPlayOutRef.current?.());
+      expect(result.current.transients.playOutNotice).toEqual({ text: 'Play-out stopped: 0 turns played (they stay in the variation).', watchTurn: 0 });
+      rerender({ evaluation, wiring: wired });
+      act(() => result.current.playOut.watchFrom(result.current.transients.playOutNotice?.watchTurn ?? -1));
+      expect(wired.navigateTo).toHaveBeenCalledWith({ turn: 0, line: 'variation' }, { seek: false, internal: true, toFrame: 0 });
+      act(() => vi.advanceTimersByTime(250));
+      const updater = (wired.setNavSeek as ReturnType<typeof vi.fn>).mock.calls[0][0] as (prev: null) => unknown;
+      expect(updater(null)).toEqual({ turn: 0, seq: 1, play: true });
     });
 
     test('an unfinished picker starts nothing and says why', () => {

@@ -1,4 +1,5 @@
 import type { BranchHistoryEntry } from './branch-history';
+import { isInterlude } from './variation-turns';
 
 /**
  * The fainted share of the board an entry left behind: fainted bodies over all bodies of both sides, counting a body
@@ -14,16 +15,16 @@ function boardShare(entry: BranchHistoryEntry): number | null {
 /**
  * Round 70 (T216): the fainted share of the variation's own board before each turn, indexed like the variation
  * scores (shares[turn - 1]). Entry k plays turn startTurn + k and leaves the board that opens turn startTurn + k + 1;
- * a forced replacement consumes no turn, so the board after it replaces the one before (the same mapping as the
+ * a replacement (one side or both) consumes no turn, so the board after it replaces the one before (the same mapping as the
  * recorded position of a viewed variation turn). The shared prefix (startTurn and before) has no variation board:
  * only the main line's own share stands there, and those slots stay null.
  */
 export function variationBoardShares(history: BranchHistoryEntry[], startTurn: number): (number | null)[] {
   const shares: (number | null)[] = Array.from({ length: startTurn }, () => null);
   let turn = startTurn;
-  for (const entry of history) {
-    if (entry.kind !== 'forced') turn += 1;
+  history.forEach((entry, index) => {
+    if (!isInterlude(history, index)) turn += 1;
     if (turn > startTurn) shares[turn - 1] = boardShare(entry);
-  }
+  });
   return shares;
 }

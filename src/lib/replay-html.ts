@@ -122,6 +122,9 @@ const REPLAY_BRIDGE_BODY = `
     setTimeout(function() { waitSeekEnd(battle); }, 100);
   }
 
+  // Ids of the play seeks already run: the app sends one request with retries, all under one id (round 88, T347).
+  var lastPlaySeekId = null;
+
   function applySeek() {
     silenceAudio();
     if (!pendingSeek) return;
@@ -133,6 +136,16 @@ const REPLAY_BRIDGE_BODY = `
     var battle = Replays.battle;
     var seek = pendingSeek;
     pendingSeek = null;
+    // A play seek with an id is the app's own request (Watch from turn N). It runs once per id whatever the battle does at
+    // the time: a frame that already plays at or past the turn is the case the guards below would drop. Its retries carry
+    // the same id and change nothing.
+    if (seek.autoPlay && typeof seek.id === 'number') {
+      if (seek.id === lastPlaySeekId) return;
+      lastPlaySeekId = seek.id;
+      battle.seekTurn(seek.turn);
+      waitSeekEnd(battle);
+      return;
+    }
     // Parent-side retries land here after the seek finished — or while the
     // very same seek is still scrubbing: nothing to do either way.
     if (battle.seeking === null && battle.turn === seek.turn && !seek.autoPlay) return;
@@ -153,8 +166,8 @@ const REPLAY_BRIDGE_BODY = `
     if (seek.autoPlay) waitSeekEnd(battle);
   }
 
-  function queueSeek(turn, shouldPlay) {
-    pendingSeek = { turn: turn, autoPlay: !!shouldPlay };
+  function queueSeek(turn, shouldPlay, id) {
+    pendingSeek = { turn: turn, autoPlay: !!shouldPlay, id: id };
     applySeek();
   }
 
@@ -185,7 +198,7 @@ const REPLAY_BRIDGE_BODY = `
   window.addEventListener('message', function(event) {
     var data = event.data || {};
     if (data.type === 'ps-seek-turn' && typeof data.turn === 'number') {
-      queueSeek(data.turn, !!data.autoPlay);
+      queueSeek(data.turn, !!data.autoPlay, data.id);
     } else if (data.type === 'ps-append-log') {
       appendAndFollow(data);
     }

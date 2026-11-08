@@ -1,4 +1,5 @@
 import type { BranchSimState } from '@fulllifegames/eval-engine';
+import { limitBench, type Bench } from './bench';
 
 /**
  * Exact pickers from a recorded position: the position's serialized battle revives, the picker state is read off it. Round 82
@@ -17,14 +18,20 @@ async function reviveBattle(serialized: string) {
   return deserializeBattleExact(serialized);
 }
 
-/** The picker state of a recorded position with the battle it was read from. */
-export async function pickerFromSerialized(serialized: string): Promise<{ state: BranchSimState; battle: PickerBattle }> {
+/**
+ * The picker state of a recorded position with the battle it was read from. Round 88 (T314, #55): the state's bench offers only the
+ * bodies the bring allows (`bench`, from `replayBench`); the battle keeps the whole team the rebuild built.
+ */
+export async function pickerFromSerialized(
+  serialized: string, bench: Bench | null = null,
+): Promise<{ state: BranchSimState; battle: PickerBattle }> {
   const { createBranchStateFromBattle } = await import('./lazy/branch-engine');
   const battle = await reviveBattle(serialized);
-  return { state: createBranchStateFromBattle(battle, battle.log ?? [], { p1Choices: [], p2Choices: [] }), battle };
+  const state = createBranchStateFromBattle(battle, battle.log ?? [], { p1Choices: [], p2Choices: [] });
+  return { state: limitBench(state, bench), battle };
 }
 
 /** Exact pickers from a recorded position — no live stream needed. */
-export async function pickerStateFromSerialized(serialized: string): Promise<BranchSimState> {
-  return (await pickerFromSerialized(serialized)).state;
+export async function pickerStateFromSerialized(serialized: string, bench: Bench | null = null): Promise<BranchSimState> {
+  return (await pickerFromSerialized(serialized, bench)).state;
 }

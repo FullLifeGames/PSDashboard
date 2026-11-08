@@ -2,6 +2,7 @@ import type { OpponentTeamInfo } from '@fulllifegames/replay-core';
 import { useEditorPools, useTeamDraft } from '../hooks/useTeamDraft';
 import { ModalDialog } from './ModalDialog';
 import { PokemonRow } from './team-editor/PokemonRow';
+import { withEditedStandIns } from '../lib/team-editor';
 
 interface Props {
   title: string;
@@ -32,7 +33,7 @@ export function TeamEditor({ title, teamInfo, gen, format, onSave, onClose }: Pr
         </div>
 
         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-          <button type="button" className="ps-btn ps-btn-red" style={{ flex: 1 }} onClick={() => onSave({ pokemon })}>
+          <button type="button" className="ps-btn ps-btn-red" style={{ flex: 1 }} onClick={() => onSave({ pokemon: withEditedStandIns(pokemon, teamInfo.pokemon) })}>
             Save
           </button>
           <button type="button" className="ps-btn" style={{ flex: 1 }} onClick={onClose}>

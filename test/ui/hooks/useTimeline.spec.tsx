@@ -128,7 +128,7 @@ describe('useTimeline', () => {
       const { result, rerender, base } = setup();
       rerender(running([entry(2), entry(3)], true, base));
       expect(result.current.viewTurn).toBe(4);
-      // The play-out stops with a third turn in flight and returns the pointer to its start turn.
+      // The play-out stops with a third turn in flight and hands the view back (a navigation, as the interrupt does).
       act(() => {
         result.current.holdTipFollow();
         result.current.navigateTo({ turn: 3, line: 'variation' }, { seek: true, internal: true });
@@ -313,8 +313,13 @@ describe('useTimeline', () => {
       act(() => result.current.handleReplayTurn(5));
       expect(result.current.viewTurn).toBe(3);
       act(() => result.current.handleReplayTurn(3));
+      // Round 88 (T347, #83): the branch frame's turn 2 is the variation's start turn (it shows the variation's own moves, the
+      // main replay's turn 2 does not): the pointer stays on the variation at its first covered turn.
       act(() => result.current.handleReplayTurn(2));
-      expect(result.current).toMatchObject({ viewTurn: 2, viewingVariation: false });
+      expect(result.current).toMatchObject({ viewTurn: 3, viewLine: 'variation', viewingVariation: true });
+      // A turn before the start still leaves for the main line.
+      act(() => result.current.handleReplayTurn(1));
+      expect(result.current).toMatchObject({ viewTurn: 1, viewingVariation: false });
     });
 
     test('Reset reports turn 0, which the pointer ignores as on the main line; a turn before the start leaves the variation', () => {
@@ -344,9 +349,9 @@ describe('useTimeline', () => {
       act(() => result.current.handleReplayTurn(3));
       expect(result.current.viewTurn).toBe(4);
 
-      // Going back with the frame's own button is the user's: turn 2 is before the end.
+      // Going back with the frame's own button is the user's: the frame's turn 2 is the start turn, and the pointer takes the first covered turn (round 88, T347).
       act(() => result.current.handleReplayTurn(2));
-      expect(result.current).toMatchObject({ viewTurn: 2, atVariationEnd: false });
+      expect(result.current).toMatchObject({ viewTurn: 3, viewingVariation: true, atVariationEnd: false });
     });
 
     test('the frame landing on the last played turn ends the guard: Last turn right after the end moves the pointer', () => {
@@ -359,7 +364,7 @@ describe('useTimeline', () => {
       act(() => result.current.handleReplayTurn(3));
       expect(result.current.viewTurn).toBe(4);
       act(() => result.current.handleReplayTurn(2));
-      expect(result.current).toMatchObject({ viewTurn: 2, atVariationEnd: false });
+      expect(result.current).toMatchObject({ viewTurn: 3, viewingVariation: true, atVariationEnd: false });
     });
 
     test('a win that lands a render after its turn retargets the guard to the last played turn', () => {
@@ -370,7 +375,7 @@ describe('useTimeline', () => {
       expect(result.current).toMatchObject({ viewTurn: 4, atVariationEnd: true });
       act(() => result.current.handleReplayTurn(3));
       act(() => result.current.handleReplayTurn(2));
-      expect(result.current.viewTurn).toBe(2);
+      expect(result.current.viewTurn).toBe(3);
     });
 
     test('a variation that has not ended has no end position', () => {

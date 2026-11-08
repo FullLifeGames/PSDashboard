@@ -284,14 +284,17 @@ test.describe('PS Dashboard', () => {
       // turn-1 prefix produced a variation whose moves list started at
       // turn 1 and whose first turn fell back to the main line.
       await page.locator('button', { hasText: 'Let it play out' }).click();
+      // Round 88 (T343, #79): the run starts at turn 0, the turn the leads come in; the status line says so.
+      await expect(page.locator('.ps-playout-progress')).toContainText('from turn 0', { timeout: 60_000 });
       const history = page.locator('.ps-panel', { hasText: 'Variation moves' });
       await expect(history).toContainText('Turn 0', { timeout: 60_000 });
       await expect(history).toContainText('lead');
 
-      // When the run ends the pointer returns to turn 1 — a VARIATION
-      // position (the line chip stays on gold), not a main-line fallback.
+      // When the run ends the view stays on a VARIATION position (the line chip stays on gold), not a main-line
+      // fallback, and the notice offers the watch from turn 0 (round 88, T347 and T343: the pointer takes the frame's
+      // turn instead of returning to turn 1).
       await expect(page.getByText(/Play-out (finished|stopped)/)).toBeVisible({ timeout: 120_000 });
-      await expect(page.getByText('T1/')).toBeVisible();
+      await expect(page.getByRole('button', { name: /Watch from turn 0/ })).toBeVisible();
       await expect(page.locator('.ps-line-chip button.on-vari')).toBeVisible();
     });
 
