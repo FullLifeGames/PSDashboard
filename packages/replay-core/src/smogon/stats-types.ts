@@ -16,6 +16,11 @@ export interface PokemonUsageStats {
   items: UsageProbability[];
   moves: UsageProbability[];
   spreads: UsageSpread[];
+  /**
+   * Round 88 (F, #101): the species that share a team with this one, most common first (`probability` is the share of this
+   * species' teams that carry the teammate). Absent when the stats file lists none; the stand-in step reads it.
+   */
+  teammates?: UsageProbability[];
 }
 
 export interface SmogonUsageStats {
@@ -39,6 +44,7 @@ interface ChaosPokemonStats {
   Items?: Record<string, number | string>;
   Moves?: Record<string, number | string>;
   Spreads?: Record<string, number | string>;
+  Teammates?: Record<string, number | string>;
 }
 
 export interface ChaosStatsPayload {
@@ -51,6 +57,7 @@ interface PkmnPokemonStats {
   items?: Record<string, number | string>;
   moves?: Record<string, number | string>;
   spreads?: Record<string, number | string>;
+  teammates?: Record<string, number | string>;
 }
 
 export interface PkmnStatsPayload {
