@@ -12,8 +12,9 @@ import {
  * Champions VGC (Mega Evolve): turn 1 of `gen9championsvgc2026regma-2623421463`, before Blastoisinite is used (the game logs the
  * Mega Evolution in turn 2, and a side takes it once, so a later turn has none left to click): chip P2A, "Mega Evolve", Execute.
  * Champions has no Tera toggle. The bench lists the brought bodies only, which the app knows when both sides fielded four
- * (`replayBringOnly`): the game of the criterion 5 case (2625939941, the user's side fielded three) is not pinned and lists its
- * whole team, so the bench is read on this second game (test/regression/dock-bring-fixture.spec.ts).
+ * (`replayBringOnly`): the game of the criterion 5 case (2625939941, the user's side fielded three) is not pinned, and since
+ * round 88 (T314) its bench lists the other side's four and the user's whole team, so the bench is read on this second game
+ * (test/regression/dock-bring-fixture.spec.ts).
  */
 const SV_VGC = 'gen9vgc2026regi-2573391549';
 const CHAMPIONS = 'gen9championsvgc2026regma-2625939941';
