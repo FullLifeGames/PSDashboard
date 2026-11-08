@@ -24,15 +24,25 @@ export function championsSetsFormat(id: string): string | null {
 
 /**
  * Where a format's published data lives when the format itself has none:
- * doubles ladders read Doubles OU, draft formats and Custom Game read their
+ * doubles ladders read their generation's Doubles OU, draft formats and Custom Game read their
  * generation's OU, everything else is itself. A VGC format with a year reads
  * its year's files first (vgcYearFormat); only a VGC id without one lands
  * here on Doubles OU.
  */
 export function ouFallbackFormat(id: string): string {
-  if (id.includes('doubles') || id.includes('vgc')) return 'gen9doublesou';
+  // Round 88 (F, #101): the generation stays: Gen 4 Doubles OU has a stats file of its own, and a Gen 3 one falls through to the generation's OU.
+  if (id.includes('doubles') || id.includes('vgc')) return `${id.match(/^gen\d+/)?.[0] ?? 'gen9'}doublesou`;
   if (/^gen\d+draft/.test(id)) return id.replace(/draft.*$/, 'ou');
   const customGame = id.match(/^(gen\d+)customgame$/);
   if (customGame) return `${customGame[1]}ou`;
   return id || 'gen9ou';
+}
+
+/**
+ * Round 88 (F, #101): the National Dex Doubles file of the format's own generation (gen9nationaldexdoubles, gen8nationaldexdoubles);
+ * null for every other format. Both the stats and the sets lookup read it here, and a generation without a file falls through to the
+ * generation's OU like any other format.
+ */
+export function nationalDexDoublesFormat(id: string): string | null {
+  return id.includes('nationaldexdoubles') ? `${id.match(/^gen\d+/)?.[0] ?? 'gen9'}nationaldexdoubles` : null;
 }

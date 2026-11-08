@@ -1,6 +1,6 @@
 import { type SmogonUsageStats, toId } from '@fulllifegames/replay-core';
 import { dataPkmnStatsUrl, parseSmogonChaosStats } from './smogon/stats-parse';
-import { ouFallbackFormat, vgcYearFormat } from './smogon/format-fallback';
+import { nationalDexDoublesFormat, ouFallbackFormat, vgcYearFormat } from './smogon/format-fallback';
 import { fetcherKey } from './smogon/fetcher-key';
 import { withSmogonFallback, type SmogonFetch } from './smogon/hosts';
 
@@ -16,7 +16,8 @@ const isAbort = (error: unknown) => error instanceof DOMException && error.name 
 
 export function getSmogonStatsFormat(formatId: string | undefined): string {
   const id = toId(formatId || 'gen9ou').replace(/^smogtours/, '');
-  if (id.includes('nationaldexdoubles')) return 'gen9nationaldexdoubles';
+  const nationalDex = nationalDexDoublesFormat(id);
+  if (nationalDex) return nationalDex;
   // VGC: the year-level stats file aggregates all regulations and holds
   // species the Smogon doubles ladder never sees (e.g. Annihilape).
   // Pokémon Champions VGC keeps a year file of its own (round 66, T141):

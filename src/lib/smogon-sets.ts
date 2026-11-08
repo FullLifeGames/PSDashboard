@@ -3,7 +3,7 @@ import type { ID } from '@pkmn/data';
 import {
   generationsFor, toId, type PokemonSetAssumption, type SetAssumption, type SetSpreadAssumption, type SmogonSetAssumptions,
 } from '@fulllifegames/replay-core';
-import { championsSetsFormat, ouFallbackFormat, vgcYearFormat } from './smogon/format-fallback';
+import { championsSetsFormat, nationalDexDoublesFormat, ouFallbackFormat, vgcYearFormat } from './smogon/format-fallback';
 import { fetcherKey } from './smogon/fetcher-key';
 import { withSmogonFallback, type SmogonFetch } from './smogon/hosts';
 
@@ -55,8 +55,7 @@ function genFromFormat(formatId: string | undefined): number {
  */
 function normalizeFormat(formatId: string | undefined): string {
   const id = toId(formatId || 'gen9ou');
-  if (id.includes('nationaldexdoubles')) return 'gen9nationaldexdoubles';
-  return vgcYearFormat(id) ?? championsSetsFormat(id) ?? ouFallbackFormat(id);
+  return nationalDexDoublesFormat(id) ?? vgcYearFormat(id) ?? championsSetsFormat(id) ?? ouFallbackFormat(id);
 }
 
 function sourceDetail(format: string): string {
