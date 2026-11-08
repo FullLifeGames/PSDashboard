@@ -95,6 +95,36 @@ describe('the scene: P1 shows 3 of 6 in a Gen 4 OU game', () => {
   });
 });
 
+describe('a pasted team fills the open slots before any stand-in (user ruling 2)', () => {
+  const PASTE = [
+    ['Azelf', 'Nasty Plot'], ['Gyarados', 'Dragon Dance'], ['Metagross', 'Meteor Mash'],
+    ['Heatran', 'Fire Blast'], ['Scizor', 'Bullet Punch'], ['Dragonite', 'Outrage'],
+  ].map(([species, move]) => [`${species} @ Leftovers`, 'Ability: Pressure', `- ${move}`].join('\n')).join('\n\n');
+  const bodies = [{ species: 'Heatran' }, { species: 'Scizor' }, { species: 'Dragonite' }, { species: 'Azelf' }];
+
+  test('the three unshown bodies of a six-body paste take the three open slots, and no guess follows', () => {
+    const raw = { p1: inferOpponentTeam(SCENE, 'p1'), p2: inferOpponentTeam(SCENE, 'p2') };
+    const filled = withStandIns(raw, SCENE, GEN4, { p1: bodies });
+    expect(speciesOf(filled.p1)).toEqual(['Azelf', 'Gyarados', 'Metagross', 'Heatran', 'Scizor', 'Dragonite']);
+    expect(standIns(filled.p1)).toHaveLength(0);
+  });
+
+  test('a paste that lists fewer than the open slots leaves the rest to the stand-ins', () => {
+    const raw = { p1: inferOpponentTeam(SCENE, 'p1'), p2: inferOpponentTeam(SCENE, 'p2') };
+    const filled = withStandIns(raw, SCENE, GEN4, { p1: [{ species: 'Heatran' }] });
+    expect(speciesOf(filled.p1).slice(0, 4)).toEqual(['Azelf', 'Gyarados', 'Metagross', 'Heatran']);
+    expect(filled.p1.pokemon).toHaveLength(6);
+    expect(standIns(filled.p1)).toHaveLength(2);
+  });
+
+  test('the builder builds the pasted bodies with the pasted sets, without any stand-in', () => {
+    const { p1Team } = buildTeamsFromReplay(SCENE, { usageStats: GEN4, userTeamText: PASTE });
+    expect(p1Team.map(set => set.species)).toEqual(['Azelf', 'Gyarados', 'Metagross', 'Heatran', 'Scizor', 'Dragonite']);
+    expect(p1Team[4].moves).toContain('Bullet Punch');
+    expect(p1Team[5].moves).toContain('Outrage');
+  });
+});
+
 describe('doubles: Gen 4 Doubles OU has no team preview either', () => {
   const log = simulatorLog('gen4doublesou', SIX);
 

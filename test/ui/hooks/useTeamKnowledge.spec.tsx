@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import * as simulator from '@pkmn/sim';
 import { describe, expect, test, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { inferOpponentTeam, type SmogonUsageStats } from '@fulllifegames/replay-core';
@@ -193,5 +195,79 @@ describe('useTeamKnowledge', () => {
     await waitFor(() => expect(result.current.solvedSpreads).not.toBeNull());
     expect(result.current.statsP1Info?.pokemon[0].evs.value.atk).toBe(252);
     expect(result.current.sensitivityTargetsFor('p1')).toEqual([]);
+  });
+});
+
+/**
+ * Round 88 (F, #101): a game without team preview where a side showed fewer bodies than its |teamsize|. The panel's infos carry the
+ * stand-ins the format's teammate statistics name, flagged; a pasted team fills the open slots first, and the paste's own sets overlay
+ * them as manual knowledge; an edit of a stand-in takes the flag off. Gen 4 OU stands for singles, a simulator-made Gen 4 Doubles OU log
+ * for doubles (neither has a preview).
+ */
+describe('useTeamKnowledge, stand-ins for the bodies a side never showed', () => {
+  const fixture = (name: string) => JSON.parse(readFileSync(`test/regression/fixtures/${name}.json`, 'utf-8'));
+  const sceneLog: string = fixture('smogtours-gen4ou-544639').log;
+  const stats = (() => {
+    const payload = fixture('stats-gen4ou-trimmed') as { pokemon: Record<string, { count: number; teammates: Record<string, number> }> };
+    const pokemon: SmogonUsageStats['pokemon'] = {};
+    for (const [name, entry] of Object.entries(payload.pokemon)) {
+      pokemon[name.toLowerCase().replace(/[^a-z0-9]/g, '')] = {
+        species: name, rawCount: entry.count, abilities: [], items: [], moves: [], spreads: [],
+        teammates: Object.entries(entry.teammates).map(([value, probability]) => ({ value, probability, sourceDetail: 'test' })),
+      };
+    }
+    return { format: 'gen4ou', month: 'test', source: 'test', pokemon } as SmogonUsageStats;
+  })();
+
+  const sceneInputs = (overrides: Partial<TeamKnowledgeInputs> = {}) => inputs({
+    replayData: { ...replayData, id: 'smogtours-gen4ou-544639', format: '[Gen 4] OU', formatid: 'gen4ou', log: sceneLog },
+    p1Info: inferOpponentTeam(sceneLog, 'p1'), opponentInfo: inferOpponentTeam(sceneLog, 'p2'),
+    usageStats: { stats, loading: false, error: null }, ...overrides,
+  });
+
+  test('P1 shows 3 of 6: the panel lists six, the three guesses flagged and last, P2 untouched', () => {
+    const { result } = renderHook(wired => useTeamKnowledge(wired), { initialProps: sceneInputs() });
+    const p1 = result.current.effectiveP1Info!.pokemon;
+    expect(p1).toHaveLength(6);
+    expect(p1.slice(0, 3).map(mon => mon.species)).toEqual(['Azelf', 'Gyarados', 'Metagross']);
+    expect(p1.map(mon => !!mon.standIn)).toEqual([false, false, false, true, true, true]);
+    expect(result.current.effectiveP2Info!.pokemon.some(mon => mon.standIn)).toBe(false);
+  });
+
+  test('without the format\'s statistics the panel stays at the three bodies the log shows', () => {
+    const { result } = renderHook(wired => useTeamKnowledge(wired), { initialProps: sceneInputs({ usageStats: { stats: null, loading: false, error: null } }) });
+    expect(result.current.effectiveP1Info!.pokemon).toHaveLength(3);
+  });
+
+  test('a pasted six-body team fills the three open slots with its own sets, and no guess is left', () => {
+    const { result } = renderHook(wired => useTeamKnowledge(wired), { initialProps: sceneInputs() });
+    const paste = [['Azelf', 'Nasty Plot'], ['Gyarados', 'Dragon Dance'], ['Metagross', 'Meteor Mash'], ['Heatran', 'Fire Blast'], ['Scizor', 'Bullet Punch'], ['Dragonite', 'Outrage']]
+      .map(([species, move]) => `${species} @ Leftovers\nAbility: Pressure\n- ${move}`).join('\n\n');
+    act(() => result.current.handleTeamLoad(paste));
+    const p1 = result.current.effectiveP1Info!.pokemon;
+    expect(p1.map(mon => mon.species)).toEqual(['Azelf', 'Gyarados', 'Metagross', 'Heatran', 'Scizor', 'Dragonite']);
+    expect(p1.some(mon => mon.standIn)).toBe(false);
+    expect(p1[4].moves).toEqual([{ name: 'Bullet Punch', source: 'manual' }]);
+    expect(result.current.teamPasteStatus).toBe('Team loaded (6 Pokémon, 3 match this replay)');
+  });
+
+  test('a simulator-made Doubles OU log fills both sides to six', () => {
+    const { Battle, Teams } = simulator;
+    const set = (species: string) => ({
+      name: species, species, item: '', ability: '', moves: ['tackle'], nature: '', gender: '',
+      evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, level: 100,
+    });
+    const team = Teams.pack(['Azelf', 'Gyarados', 'Metagross', 'Heatran', 'Latias', 'Tyranitar'].map(set) as never);
+    const battle = new Battle({ formatid: 'gen4doublesou' as never, seed: [1, 2, 3, 4], p1: { name: 'a', team }, p2: { name: 'b', team } });
+    battle.makeChoices('default', 'default');
+    const log = battle.log.join('\n');
+    const doubles = sceneInputs({
+      replayData: { ...replayData, id: 'gen4doublesou-1', format: '[Gen 4] Doubles OU', formatid: 'gen4doublesou', log },
+      p1Info: inferOpponentTeam(log, 'p1'), opponentInfo: inferOpponentTeam(log, 'p2'),
+    });
+    const { result } = renderHook(wired => useTeamKnowledge(wired), { initialProps: doubles });
+    expect(result.current.effectiveP1Info!.pokemon).toHaveLength(6);
+    expect(result.current.effectiveP2Info!.pokemon).toHaveLength(6);
+    expect(result.current.effectiveP1Info!.pokemon.filter(mon => mon.standIn)).toHaveLength(4);
   });
 });

@@ -71,8 +71,11 @@ export function applyPastedTeam(
     const set = byId.get(toId(entry.species)) ?? byId.get(toId(entry.species.split('-')[0]));
     if (!set) return entry;
     matched += 1;
+    // Round 88 (F, #101): the user's own set replaces a stand-in's guess, so the body is no stand-in any more.
+    const { standIn: guessed, ...body } = entry;
+    void guessed;
     return {
-      ...entry,
+      ...body,
       moves: set.moves.map(manualMove),
       ability: set.ability ? manualField(set.ability) : entry.ability,
       item: set.item ? manualField(set.item) : entry.item,

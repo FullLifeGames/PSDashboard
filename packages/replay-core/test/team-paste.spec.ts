@@ -91,6 +91,19 @@ describe('team paste pipeline (G15)', () => {
     expect(applied.pokemon[0].level).toBe(78);
   });
 
+  // Round 88 (F, #101): the user's own paste is knowledge, a stand-in is a guess; the overlay turns the guess into the user's body.
+  test('a pasted set that matches a stand-in takes the flag off: the body is the user body now', () => {
+    const standIn: OpponentTeamInfo['pokemon'][number] = { ...baseInfo.pokemon[1], standIn: true };
+    const other: OpponentTeamInfo['pokemon'][number] = { ...baseInfo.pokemon[0], species: 'Skarmory', standIn: true };
+    const sets = parsePastedTeam('Garchomp @ Loaded Dice\nAbility: Rough Skin\n- Earthquake');
+    const { info, matched } = applyPastedTeam({ pokemon: [standIn, other] }, sets);
+    expect(matched).toBe(1);
+    expect(info.pokemon[0].standIn).toBeUndefined();
+    expect('standIn' in info.pokemon[0]).toBe(false);
+    expect(info.pokemon[0].item).toEqual({ value: 'Loaded Dice', source: 'manual' });
+    expect(info.pokemon[1].standIn).toBe(true);
+  });
+
   test('strips "(consumed)" annotations from pasted item lines', () => {
     const sets = parsePastedTeam('Sneasler @ Heavy-Duty Boots (consumed)\n- Close Combat');
     expect(sets[0].item).toBe('Heavy-Duty Boots');
