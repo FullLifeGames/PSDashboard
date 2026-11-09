@@ -6,6 +6,7 @@ import { attachKoOdds, hasUnansweredContent, koOddsMapsFor } from './search/root
 import { matrixCells, topVisitedIndex, treeScore } from './mcts-merge.ts';
 import { makeNode, pick, principalVariation, treeMatrix, type Node } from './search/mcts-node.ts';
 import { cellStats, isChanceNode, pickClass } from './search/chance-node.ts';
+import { positionSalt } from './search/root-quantile.ts';
 import { expandCell, type ExpansionContext, type RootClassBook } from './search/expansion.ts';
 import { forcedWinFor } from './search/forced-win.ts';
 import { applyForcedWin, forcedWinInput } from './search/forced-win-apply.ts';
@@ -172,12 +173,19 @@ function reportIteration(
   }
 }
 
+/** Round 89 (#59, ruling D2): the root quantiles of a tree inside the budget's tree count; a lone tree has no strata to spread, and a tree past the count keeps the stream. */
+function treeQuantiles(serializedBattle: string, seedOffset: number, trees: number | undefined): RootClassBook['quantiles'] {
+  if (trees === undefined || trees < 2 || seedOffset < 0 || seedOffset >= trees) return undefined;
+  return { salt: positionSalt(serializedBattle), offset: seedOffset, trees };
+}
+
 function runMcts(
   serializedBattle: string,
   settings: EvalSettings,
   callbacks?: MctsCallbacks,
   seedOffset = 0,
-): { root: Node; maxDepth: number; result: EvalResult; koOdds?: RootKoOdds; rootClassKeys: Map<number, string> } {
+  trees?: number,
+): { root: Node; maxDepth: number; result: EvalResult; koOdds?: RootKoOdds; rootClassKeys: Map<number, string>; rootClassWeights: Map<number, number> } {
   const matchupCache = createMatchupCache(settings.ruleset);
   const tera = settings.tera ?? true;
   // keepPlayed applies to the root only — children have their own spaces.
@@ -188,6 +196,7 @@ function runMcts(
       maxDepth: 1,
       result: { score: root.value, interval: 0, depthCompleted: 1, perSide: { p1: [], p2: [] } },
       rootClassKeys: new Map(),
+      rootClassWeights: new Map(),
     };
   }
 
@@ -201,7 +210,9 @@ function runMcts(
   // Round 13: root unanswered-mon profile, once per root like the ko odds.
   const unanswered = unansweredMons(rootBattle, matchupCache);
   const ctx: ExpansionContext = { tera, matchupCache, sleepClause: settings.sleepClause, stopAtForcedSwitch: FORCED_SWITCH_NODES };
-  const book: RootClassBook = { battle: rootBattle, events: new Map(), keys: new Map() };
+  const book: RootClassBook = { battle: rootBattle, events: new Map(), keys: new Map(), weights: new Map() };
+  // Round 89 (#59, ruling D2): only a tree inside the budget's tree count spreads its root dice; a lone tree has no strata to spread.
+  book.quantiles = treeQuantiles(serializedBattle, seedOffset, trees);
 
   let maxDepth = 1;
   const iterations = searchBudget().iterations;
@@ -215,7 +226,7 @@ function runMcts(
 
   const result = toResult(root, maxDepth, koOdds, unanswered);
   callbacks?.onPartial?.(result);
-  return { root, maxDepth, result, koOdds, rootClassKeys: book.keys };
+  return { root, maxDepth, result, koOdds, rootClassKeys: book.keys, rootClassWeights: book.weights };
 }
 
 /** Round 67 (T129): the tree runs on the board with its bench in canonical order and names its choices in the given board's slots. */
@@ -331,7 +342,7 @@ function treeSearchOn(
   seedOffset: number,
   callbacks?: MctsCallbacks,
 ): MctsTreeStats {
-  const { root, maxDepth, result, koOdds, rootClassKeys } = runMcts(serializedBattle, settings, callbacks, seedOffset);
+  const { root, maxDepth, result, koOdds, rootClassKeys, rootClassWeights } = runMcts(serializedBattle, settings, callbacks, seedOffset, searchBudget().trees);
   // Boundary flags for the merge's verify selection. Analytic only (one
   // calc per damaging pair, no sim advances) and identical across trees,
   // and the merge reads trees[0] alone — so only the offset-0 tree pays
@@ -346,7 +357,7 @@ function treeSearchOn(
   const legal = seedOffset === 0 && doubles ? rootLegal(root, settings.tera ?? true) : {};
   const sides = positionBattle(root.position).sides;
   const living = { p1: sides[0].pokemon.filter(mon => !mon.fainted).length, p2: sides[1].pokemon.filter(mon => !mon.fainted).length };
-  const cells = [...root.children.entries()].map(([key, child]) => cellStats(key, child, rootClassKeys.get(key)));
+  const cells = [...root.children.entries()].map(([key, child]) => cellStats(key, child, rootClassKeys.get(key), rootClassWeights.get(key)));
   // Round 69 (T64): a single tree is never merged (mergeMctsTrees returns this result), so it writes its own cell visits.
   if (result.matrix) {
     const visits = new Map(cells.map(cell => [cell.key, cell.visits]));

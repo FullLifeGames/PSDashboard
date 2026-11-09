@@ -24,8 +24,26 @@ export interface DieQuantiles {
   answer(name: DieName, draw: Draw): number | boolean | undefined;
 }
 
-/** The salt of a root: a hash of its serialized battle, shared by every cell and every tree of the search. */
-export const rootSalt = (serialized: string): number => hash32(hashText(serialized));
+/** The salt of a root: a hash of a text, shared by every cell and every tree of the search. */
+export const rootSalt = (text: string): number => hash32(hashText(text));
+
+interface SaltBody { details?: string; hp?: number; status?: string; fainted?: boolean; item?: string; ability?: string; boosts?: unknown; moveSlots?: { id: string; pp: number }[] }
+interface SaltState { turn?: number; gameType?: string; formatid?: string; sides?: { pokemon?: SaltBody[] }[] }
+
+/**
+ * The salt of a serialized battle, read from the state of the game and nothing else: the turn, and per body (in the order the
+ * search keeps, bench canonical) its details, hit points, status, boosts, item, ability and moves with their PP. The text itself
+ * carries the input log, the effect counters and the switch flags of the way the board was reached, and two boards of one game
+ * state in two bench orders differ there (round 67, T129: `bench-order.spec.ts` holds the boards to one ranking).
+ */
+export function positionSalt(serialized: string): number {
+  const state = JSON.parse(serialized) as SaltState;
+  const bodies = (state.sides ?? []).map(side => (side.pokemon ?? []).map(body => [
+    body.details, body.hp, body.status, body.fainted, body.item, body.ability, JSON.stringify(body.boosts ?? null),
+    (body.moveSlots ?? []).map(slot => `${slot.id}:${slot.pp}`).join(','),
+  ].join('~')).join('/'));
+  return rootSalt([state.formatid, state.gameType, state.turn, ...bodies].join('|'));
+}
 
 /** The key of a root cell inside its root: the salt and the two choice strings (swapping the sides gives another key). */
 export const cellHash = (salt: number, p1Choice: string, p2Choice: string): number =>

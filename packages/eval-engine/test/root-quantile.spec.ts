@@ -4,7 +4,7 @@ import { QuantileSink } from '../src/forward/scripted-prng';
 import { loadSimMods } from '../src/forward/sim-mods';
 import type { DieName, Draw } from '../src/dice/types';
 import { drawKeyed } from '../src/pair/draw';
-import { cellHash, RootQuantiles, rootSalt, type DieQuantiles } from '../src/search/root-quantile';
+import { cellHash, positionSalt, RootQuantiles, rootSalt, type DieQuantiles } from '../src/search/root-quantile';
 import { RULES } from './dice-fixtures';
 import { sweepBoard } from './dice-sweep-support';
 import { rootOf } from './secondary-classes-support';
@@ -213,5 +213,23 @@ describe('(a5) a quantile answer replaces the natural number, and the records ca
     const hit = !singlesDraw(null, seed).log.some(line => line.startsWith('|-miss|'));
     const accuracyOnly: DieQuantiles = { answer: (name, draw) => (name.kind === 'accuracy' && draw.call === 'chance' ? hit : undefined) };
     expect(seedAfter(accuracyOnly)).toBe(seedAfter(null));
+  });
+});
+
+describe('(a6) the salt of a position reads the game state, not the way the board was reached (round 67, T129)', () => {
+  const body = (hp: number) => ({ details: 'Keldeo, L83', hp, status: '', fainted: false, item: 'choicespecs', ability: 'justified', boosts: { atk: 0 }, moveSlots: [{ id: 'hydropump', pp: 6 }] });
+  const board = (extra: Record<string, unknown>, hp = 213, turn = 14) => JSON.stringify({
+    formatid: 'gen6ou', gameType: 'singles', turn, sides: [{ pokemon: [body(hp)] }, { pokemon: [body(200)] }], ...extra,
+  });
+
+  test('the input log, the log and the effect counters leave it unchanged', () => {
+    expect(positionSalt(board({ inputLog: ['>p1 move 1'], log: ['|turn|14'], effectOrder: 18 }))).toBe(positionSalt(board({ inputLog: [] })));
+  });
+
+  test('a hit point, a turn and a format each move it', () => {
+    const base = positionSalt(board({}));
+    expect(positionSalt(board({}, 212))).not.toBe(base);
+    expect(positionSalt(board({}, 213, 15))).not.toBe(base);
+    expect(positionSalt(board({ formatid: 'gen9ou' }))).not.toBe(base);
   });
 });

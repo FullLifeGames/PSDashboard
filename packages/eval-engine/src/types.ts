@@ -604,6 +604,11 @@ export interface MctsTreeStats {
      */
     classKey?: string;
     /**
+     * Round 89 (#59, T322 block 1): the plan's chance of the drawn class (the Dex weight the sampler gives it, half of it in a tied
+     * singles cell), booked beside `classKey`. Absent on an unkeyed cell and on a class the fold names no weight for.
+     */
+    classWeight?: number;
+    /**
      * Round 43: a root chance cell's outcome classes with their subtree
      * stats (`total` = leaves backed through the class, `value` = the
      * class child's static, one prior each); the merge pools them per

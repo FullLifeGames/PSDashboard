@@ -1,8 +1,9 @@
 import type { Battle, PRNGSeed } from '@pkmn/sim';
 import type { MatchupCache } from '../eval-function.ts';
 import { advancePositionWithLog, positionBattle, type SimPosition } from '../forward-model.ts';
-import { classifyChild, planCellEvents, type CellEvent } from '../cell-blend.ts';
-import { DiceSink } from '../forward/scripted-prng.ts';
+import { classifyChild, drawnClassWeight, planCellEvents, type CellEvent } from '../cell-blend.ts';
+import { DiceSink, QuantileSink, type SecondaryRecord } from '../forward/scripted-prng.ts';
+import { cellHash, RootQuantiles, type DieQuantiles } from './root-quantile.ts';
 import { hasSecondary } from './secondary-classes.ts';
 import { cellKey } from '../rank.ts';
 import type { TeraAllowance } from '../types.ts';
@@ -48,6 +49,10 @@ export interface RootClassBook {
   battle: Battle;
   events: Map<number, CellEvent[] | null>;
   keys: Map<number, string>;
+  /** Round 89 (#59): the plan's chance of each booked class, beside its key (the merge weighs a keyed cell by it). */
+  weights: Map<number, number>;
+  /** Round 89 (#59): the tree's place among the search's trees; set only for a tree inside the budget's tree count, where the root draws spread their dice. */
+  quantiles?: { salt: number; offset: number; trees: number };
 }
 
 export interface Expanded {
@@ -82,13 +87,39 @@ function movedFirst(log: string[]): 'p1' | 'p2' | null {
  */
 function doublesRootChild(
   node: Node, p1Choice: string, p2Choice: string, seed: PRNGSeed, ctx: ExpansionContext, book: RootClassBook, key: number,
+  quantiles?: DieQuantiles,
 ): Expanded | null {
   if (book.battle.gameType !== 'doubles') return null;
-  const keyed = keyedAdvance(book, node.position, key, p1Choice, p2Choice, seed, ctx.stopAtForcedSwitch);
+  const keyed = keyedAdvance(book, node.position, key, p1Choice, p2Choice, seed, ctx.stopAtForcedSwitch, quantiles);
   if (!keyed) return null;
   const made = nodeFrom(keyed.child, keyed.pendingSwitch, ctx);
-  if (keyed.classKey !== null) book.keys.set(key, keyed.classKey);
+  if (keyed.classKey !== null) {
+    book.keys.set(key, keyed.classKey);
+    if (keyed.classWeight !== null) book.weights.set(key, keyed.classWeight);
+  }
   return { child: made, leaf: made.value, boundary: made.boundary };
+}
+
+/**
+ * Books the class one singles root draw showed, with its weight (round 89, #59): the sampler's chance of the class, as the fold gives
+ * it for the order this log shows, and half of it in a tied cell, whose two orders the sampler prices at one half each.
+ */
+function bookDrawnClass(
+  book: RootClassBook, key: number, events: CellEvent[], log: string[], dice: SecondaryRecord[] | undefined, tied: () => boolean,
+): void {
+  const classKey = classifyChild(log, events, dice);
+  if (classKey === null) return;
+  const order = tied() ? movedFirst(log) : null;
+  book.keys.set(key, order ? `${order}:${classKey}` : classKey);
+  const first = order ?? movedFirst(log);
+  const weight = events.length === 1 ? drawnClassWeight(events, classKey, 'p1') : first ? drawnClassWeight(events, classKey, first) : null;
+  if (weight !== null) book.weights.set(key, order ? weight / 2 : weight);
+}
+
+/** The sink of a singles root draw: the quantiles when the tree spreads its dice (a doubles cell the pair plan never reads keeps the stream), else the recorder of the secondary dice. */
+function drawSink(quantiles: DieQuantiles | undefined, book: RootClassBook | undefined, recording: boolean): DiceSink | null {
+  if (quantiles && book?.battle.gameType !== 'doubles') return new QuantileSink(quantiles);
+  return recording ? new DiceSink() : null;
 }
 
 /**
@@ -102,18 +133,18 @@ function singleChild(
   node: Node, p1Choice: string, p2Choice: string, seed: PRNGSeed, ctx: ExpansionContext, book: RootClassBook | undefined, key: number,
 ): Expanded {
   const events = book ? rootEvents(book, key, p1Choice, p2Choice) : null;
-  const keyed = book && !events ? doublesRootChild(node, p1Choice, p2Choice, seed, ctx, book, key) : null;
+  // Round 89 (#59): inside the budget's tree count, tree k answers the named dice of this root draw by quantile
+  const q = book?.quantiles;
+  const quantiles = q ? new RootQuantiles(cellHash(q.salt, p1Choice, p2Choice), q.offset, q.trees) : undefined;
+  const keyed = book && !events ? doublesRootChild(node, p1Choice, p2Choice, seed, ctx, book, key, quantiles) : null;
   if (keyed) return keyed;
-  const sink = events && hasSecondary(events) ? new DiceSink() : null;
+  const recording = !!events && hasSecondary(events);
+  const sink = drawSink(quantiles, book, recording);
   const { child, log, pendingSwitch } = advancePositionWithLog(node.position, p1Choice, p2Choice, seed, {
     stopAtForcedSwitch: ctx.stopAtForcedSwitch, ...(sink ? { scripts: sink } : {}),
   });
   const made = nodeFrom(child, pendingSwitch, ctx);
-  if (book) {
-    const classKey = events ? classifyChild(log, events, sink?.secondaries) : null;
-    const order = classKey !== null && speedTie(book.battle, p1Choice, p2Choice) ? movedFirst(log) : null;
-    if (classKey !== null) book.keys.set(key, order ? `${order}:${classKey}` : classKey);
-  }
+  if (book && events) bookDrawnClass(book, key, events, log, recording ? sink?.secondaries : undefined, () => speedTie(book.battle, p1Choice, p2Choice));
   return { child: made, leaf: made.value, boundary: made.boundary };
 }
 
