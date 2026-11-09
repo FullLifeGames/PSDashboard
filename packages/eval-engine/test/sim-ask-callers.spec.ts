@@ -86,4 +86,14 @@ describe('the callers of the simulator', () => {
     ];
     expect(called).toEqual([...rests].sort());
   });
+
+  test('the rebuild asks the queue for the priority of a stand-in and of a logged action', () => {
+    // Round 89 (#111): the stand-in of a body the log never shows acting (`protocol-choices.ts`) and the order of a cant line
+    // (`cant-stand-in.ts`) read the simulator's priority of the action (`actionPriority`, `queuePlace`: Prankster, Gale Wings, Triage,
+    // Stall, Quick Claw and the other handlers), not the Dex move's. The one Dex read left is the move of a logged body that is off the
+    // field, whose handlers the battle cannot show. The sweep `stand-in-priority-sweep.spec.ts` holds both to the simulator.
+    const rebuild = ['eval-engine:branch/cant-stand-in.ts', 'eval-engine:branch/protocol-choices.ts'];
+    expect(filesWith(/\b(?:actionPriority|queuePlace)\(/)).toEqual(rebuild);
+    expect(filesWith(/\.moves\.get\([^)]*\)\.priority\b/).filter(name => rebuild.includes(name))).toEqual(['eval-engine:branch/cant-stand-in.ts']);
+  });
 });

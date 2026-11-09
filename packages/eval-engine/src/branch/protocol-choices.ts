@@ -3,6 +3,7 @@ import { formatTargetLoc, slotLetter } from './team-order.ts';
 import { sameBodyForme } from './body-forme.ts';
 import { answersForcedRequest } from './forced-request.ts';
 import { cantStandIn } from './cant-stand-in.ts';
+import { actionPriority, activated } from '../sim-ask/index.ts';
 import { nextChoosingSlot } from '../forward/request-moves.ts';
 import { sideIndex, toId, type RulesDex } from '@fulllifegames/replay-core';
 
@@ -183,7 +184,10 @@ function firstLegalTargetLoc(battle: SimBattle, active: SimPokemon, targetType: 
  * Round 88 (T325, #61): the log shows no action because the body fainted before it moved or flinched, so the foe acted first,
  * and the first move (Fake Out, Shadow Sneak, Protect) could run ahead of the foe the log shows first (653785 t23, 2628340185
  * t23, 2663093831 t9 and t10, 2695803506 t1, 2629703929 t9). The slowest move keeps the logged order, as it does for a body that
- * switched out before it acted; a body with no move at 0 or below keeps its first move.
+ * switched out before it acted.
+ * Round 89 (#111): "slowest" is the simulator's priority of the action, not the Dex's (`actionPriority`: Prankster, Gale Wings, Triage,
+ * Stall, Quick Draw and the rest of the handlers change the queue's order), and there is no cut at 0: a body that knows only priority
+ * moves takes the slowest of them, as its order is the nearest to the logged one.
  * Round 88 (X2): a body whose turn shows a `|cant|` line (a flinch, a full paralysis) has its place in the log's order, so the
  * slowest move can put it behind an action the log shows after that line (2663093831 t9: Trick Room, -7, put p1's Sinistcha behind
  * the Shadow Ball that knocked it out, and its flinch never came): `cantStandIn` reads the move that keeps its place.
@@ -198,7 +202,7 @@ function defaultMoveChoice(battle: SimBattle, active: SimPokemon | null | undefi
   // (gen9vgc2026regi-2630452654 t4, Miraidon locked into Snarl) had `move 1`
   // disabled, and the rejected side choice cost its partner the Encore.
   const requestMoves = active.getMoveRequestData().moves;
-  const slowest = cantStandIn(battle, active, events, ident) ?? slowestRequestMove(battle.dex, active);
+  const slowest = cantStandIn(battle, active, events, ident) ?? slowestRequestMove(active, events);
   const slowestIndex = slowest ? requestMoves.findIndex(move => move.id === slowest) : -1;
   const enabledIndex = slowestIndex >= 0 ? slowestIndex : Math.max(0, requestMoves.findIndex(move => !move.disabled));
   const requestEntry = requestMoves[enabledIndex];
@@ -234,7 +238,8 @@ function moveChoiceForActive(active: SimPokemon | null | undefined, moveName: st
  * known is that it ran after the Encore. The stand-in is the request's
  * lowest-priority other move at priority 0 or below, which the Encore then
  * bends exactly as it did in the game. No such move: the line stays the
- * choice, as before round 55.
+ * choice, as before round 55. Round 89 (#111): "priority 0 or below" is the simulator's bracket of the action (`actionPriority`), so a
+ * Prankster status move (Dex 0, queue +1) is cut like a Protect.
  */
 function clickBehindEncore(
   events: string[],
@@ -248,7 +253,7 @@ function clickBehindEncore(
     line.startsWith(`|-start|${ident}`) && line.split('|')[3] === 'Encore');
   if (!encoredFirst) return null;
 
-  return slowestRequestMove(active.battle.dex, active, toId(shownMove));
+  return slowestRequestMove(active, events, { exceptId: toId(shownMove), cutAtZero: true });
 }
 
 /** Whether the body's request or move slots carry the move. */
@@ -262,27 +267,35 @@ function knowsMove(active: SimPokemon, moveName: string): boolean {
  * The click behind a `|cant|` move the body's set lacks (round 67, T108). The
  * move never ran: its blocker stopped it. The stand-in is one of the body's
  * own moves the same blocker stops, the first enabled request move with the
- * shown move's Dex category and priority (752301 t1: Landorus, built without
+ * shown move's Dex category and the simulator's priority of the action, `actionPriority` (752301 t1: Landorus, built without
  * Taunt, clicks Stealth Rock, and the same-turn Taunt stops it as it stopped
  * the Taunt in the game); else the slowest move. Null: no enabled move.
  */
-function clickBehindBlockedMove(active: SimPokemon, shownMove: string): string | null {
+function clickBehindBlockedMove(active: SimPokemon, shownMove: string, events: string[]): string | null {
   const dex = active.battle.dex;
   const shown = dex.moves.get(shownMove);
+  const chance = activated(active.battle, active, events);
+  const shownPriority = actionPriority(active.battle, active, shown.id, chance);
   const alike = active.getMoveRequestData().moves.find(entry => {
     const move = dex.moves.get(entry.id);
-    return !entry.disabled && move.category === shown.category && move.priority === shown.priority;
+    return !entry.disabled && move.category === shown.category && actionPriority(active.battle, active, entry.id, chance) === shownPriority;
   });
-  return alike?.id ?? slowestRequestMove(dex, active);
+  return alike?.id ?? slowestRequestMove(active, events);
 }
 
-/** The request's lowest-priority enabled move at priority 0 or below (other than `exceptId`), or null. */
-function slowestRequestMove(dex: RulesDex, active: SimPokemon, exceptId = ''): string | null {
+/**
+ * Round 89 (#111): the request's enabled move that stands last in the simulator's queue (`actionPriority` of the body, the first of a tie),
+ * the order a body whose log shows no action keeps behind the foe's logged one. The chance answer is the turn's own: yes when its lines show
+ * the activation of the body's Quick Claw, Custap Berry or Quick Draw (`activated`). No cut at 0 unless `cutAtZero` (the Encore stand-in:
+ * its click ran after the Encore, so a move of a higher bracket is no click), and `exceptId` leaves one move out. Null: no such move.
+ */
+function slowestRequestMove(active: SimPokemon, events: string[], { exceptId = '', cutAtZero = false } = {}): string | null {
+  const chance = activated(active.battle, active, events);
   let standIn: { id: string; priority: number } | null = null;
   for (const entry of active.getMoveRequestData().moves) {
     if (entry.id === exceptId || entry.disabled) continue;
-    const priority = dex.moves.get(entry.id).priority;
-    if (priority > 0) continue;
+    const priority = actionPriority(active.battle, active, entry.id, chance);
+    if (cutAtZero && Math.floor(priority) > 0) continue;
     if (!standIn || priority < standIn.priority) standIn = { id: entry.id, priority };
   }
   return standIn?.id ?? null;
@@ -324,7 +337,7 @@ function getChoiceForSlot(
       // land first, as in the game.
       if (answersForcedRequest(events, lineIndex, ident, battle.dex)) {
         const active = battle.sides[sideIdx].active[activeSlot];
-        const standIn = active ? slowestRequestMove(battle.dex, active) : null;
+        const standIn = active ? slowestRequestMove(active, events) : null;
         if (!standIn) break;
         const suffix = targetLocSuffixForChoice(battle, active, standIn, 0);
         return `${moveChoiceForActive(active, standIn)}${suffix}${gimmickSuffixForSlot(events, ident, active)}`;
@@ -384,7 +397,7 @@ function choiceFromCant(
 ): string | undefined {
   const shownMove = line.includes('[of]') ? undefined : line.split('|')[4]?.trim();
   if (!shownMove) return undefined;
-  const moveName = active && !knowsMove(active, shownMove) ? clickBehindBlockedMove(active, shownMove) : shownMove;
+  const moveName = active && !knowsMove(active, shownMove) ? clickBehindBlockedMove(active, shownMove, events) : shownMove;
   if (!moveName) return defaultChoiceForSlot(events, ident, battle, active);
   const suffix = targetLocSuffixForChoice(battle, active, moveName, 0);
   return `${moveChoiceForActive(active, moveName)}${suffix}${gimmickSuffixForSlot(events, ident, active)}`;
