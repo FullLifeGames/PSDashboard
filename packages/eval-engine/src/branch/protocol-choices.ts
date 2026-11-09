@@ -5,8 +5,11 @@ import { answersForcedRequest } from './forced-request.ts';
 import { cantStandIn } from './cant-stand-in.ts';
 import { isRelayedMoveLine } from './relayed-move.ts';
 import { actionPriority, activated } from '../sim-ask/index.ts';
+import { firstLegalTargetLoc, hiddenTargetLoc, protocolTargetLoc, targetLocSuffixForChoice, targetTypeForMove, type Aiming } from './target-loc.ts';
+
+export { targetLocSuffixForChoice, targetTypeForMove };
 import { nextChoosingSlot } from '../forward/request-moves.ts';
-import { sideIndex, toId, type RulesDex } from '@fulllifegames/replay-core';
+import { sideIndex, toId } from '@fulllifegames/replay-core';
 
 export function parseTurnBlocks(log: string): { preGame: string[]; turns: TurnBlock[] } {
   const lines = log.split('\n');
@@ -109,85 +112,6 @@ export function findPokemonOnSide(side: SimSide, species: string): SimPokemon | 
   const exact = species ? side.pokemon.find(pokemon => pokemon.name === species) : undefined;
   if (exact || toId(species) === '') return exact ?? null;
   return side.pokemon.find(pokemon => isSpeciesBody(pokemon, species)) ?? null;
-}
-
-function protocolTargetLoc(
-  battle: SimBattle,
-  sourceSide: 'p1' | 'p2',
-  sourceActiveSlot: number,
-  targetIdent: string | undefined,
-): number {
-  const match = targetIdent?.match(/^(p[12])([a-d]):/);
-  if (!match) return 0;
-
-  const sourceSideIdx = sideIndex(sourceSide);
-  const targetSideIdx = match[1] === 'p1' ? 0 : 1;
-  const targetActiveSlot = match[2].charCodeAt(0) - 'a'.charCodeAt(0);
-  const source = battle.sides[sourceSideIdx].active[sourceActiveSlot];
-  const target = battle.sides[targetSideIdx].active[targetActiveSlot];
-
-  if (source && target) return source.getLocOf(target);
-  return targetSideIdx === sourceSideIdx ? -(targetActiveSlot + 1) : targetActiveSlot + 1;
-}
-
-export function targetTypeForMove(dex: RulesDex, active: SimPokemon | null | undefined, moveName: string): string {
-  if (!active) return dex.moves.get(moveName).target || '';
-  const moveId = toId(moveName);
-  const request = active.getMoveRequestData();
-  return request.moves.find(move => move.id === moveId)?.target || dex.moves.get(moveName).target || '';
-}
-
-function shouldAppendTargetLoc(
-  battle: SimBattle,
-  active: SimPokemon | null | undefined,
-  moveName: string,
-  targetLoc: number,
-): boolean {
-  if (!active || !targetLoc || active.side.active.length < 2) return false;
-  const targetType = targetTypeForMove(battle.dex, active, moveName);
-  return battle.actions.targetTypeChoices(targetType) && battle.validTargetLoc(targetLoc, active, targetType);
-}
-
-/**
- * A locked request (recharge, the release turn of Fly or Dig, a continued
- * rampage) carries one entry WITHOUT a `target`, and the sim rejects any loc
- * on it together with the whole side choice. The Dex fallback in
- * `targetTypeForMove` would still name a target type there.
- */
-function requestEntryHasNoTarget(active: SimPokemon | null | undefined, moveName: string): boolean {
-  if (!active) return false;
-  const moveId = toId(moveName);
-  const entry = active.getMoveRequestData().moves.find(move => move.id === moveId);
-  return !!entry && !entry.target;
-}
-
-export function targetLocSuffixForChoice(
-  battle: SimBattle,
-  active: SimPokemon | null | undefined,
-  moveName: string,
-  protocolTargetLoc: number,
-): string {
-  if (requestEntryHasNoTarget(active, moveName)) return '';
-  if (shouldAppendTargetLoc(battle, active, moveName, protocolTargetLoc)) {
-    return ` ${formatTargetLoc(protocolTargetLoc)}`;
-  }
-
-  if (!active || active.side.active.length < 2) return '';
-  const targetType = targetTypeForMove(battle.dex, active, moveName);
-  if (!battle.actions.targetTypeChoices(targetType)) return '';
-
-  const fallbackTargetLoc = firstLegalTargetLoc(battle, active, targetType);
-  return fallbackTargetLoc ? ` ${formatTargetLoc(fallbackTargetLoc)}` : '';
-}
-
-function firstLegalTargetLoc(battle: SimBattle, active: SimPokemon, targetType: string): number | null {
-  if (active.side.active.length < 2 || !battle.actions.targetTypeChoices(targetType)) return null;
-  for (let loc = 1; loc <= battle.activePerHalf; loc++) {
-    for (const targetLoc of [loc, -loc]) {
-      if (battle.validTargetLoc(targetLoc, active, targetType)) return targetLoc;
-    }
-  }
-  return null;
 }
 
 /**
@@ -355,11 +279,33 @@ function gimmickSuffixForSlot(events: string[], ident: string, active: SimPokemo
   return '';
 }
 
+/**
+ * The click a `|move|` line of the slot shows. The aim is the log's target; a line that hides its target (a move the game stopped before it
+ * animated) asks the simulator which aim makes the move fail as logged (round 89, #136), and an aim answered earlier stands.
+ */
+function choiceFromMoveLine(
+  events: string[], lineIndex: number, line: string, side: 'p1' | 'p2', activeSlot: number, battle: SimBattle, aiming: Aiming,
+): string {
+  const ident = `${side}${slotLetter(activeSlot)}:`;
+  const active = battle.sides[sideIndex(side)].active[activeSlot];
+  const shown = line.split('|')[3];
+  const clicked = clickBehindEncore(events, lineIndex, ident, active, shown);
+  const moveName = playableMove(active, clicked ?? shown, events);
+  const loggedLoc = clicked ? 0 : protocolTargetLoc(battle, side, activeSlot, line.split('|')[4]);
+  const asked = loggedLoc === 0 && !clicked && moveName === shown
+    ? hiddenTargetLoc(line, side, activeSlot, battle, moveName, aiming, (owner, slot, inner) => getChoiceForSlot(events, owner, slot, battle, inner))
+    : loggedLoc;
+  const targetLoc = aiming.resolved.get(ident.slice(0, -1)) ?? asked;
+  const suffix = targetLocSuffixForChoice(battle, active, moveName, targetLoc);
+  return `${moveChoiceForActive(active, moveName)}${suffix}${gimmickSuffixForSlot(events, ident, active)}`;
+}
+
 function getChoiceForSlot(
   events: string[],
   side: 'p1' | 'p2',
   activeSlot: number,
   battle: SimBattle,
+  aiming: Aiming = { ask: false, resolved: new Map() },
 ): string {
   const sideIdx = sideIndex(side);
   const ident = `${side}${slotLetter(activeSlot)}:`;
@@ -385,17 +331,7 @@ function getChoiceForSlot(
     // A move another effect dispatched for the body (Magic Bounce, Dancer, Magic Coat, Snatch) is no click: the body's own line comes
     // later in the block, or the body did not click a move (round 89, #135).
     if (line.startsWith(`|move|${ident}`) && !isRelayedMoveLine(line, battle.dex)) {
-      const active = battle.sides[sideIdx].active[activeSlot];
-      const clicked = clickBehindEncore(events, lineIndex, ident, active, line.split('|')[3]);
-      const moveName = playableMove(active, clicked ?? line.split('|')[3], events);
-      const targetLoc = clicked ? 0 : protocolTargetLoc(battle, side, activeSlot, line.split('|')[4]);
-      const suffix = targetLocSuffixForChoice(
-        battle,
-        active,
-        moveName,
-        targetLoc,
-      );
-      return `${moveChoiceForActive(active, moveName)}${suffix}${gimmickSuffixForSlot(events, ident, active)}`;
+      return choiceFromMoveLine(events, lineIndex, line, side, activeSlot, battle, aiming);
     }
 
     if (line.startsWith(`|cant|${ident}`)) {
@@ -447,7 +383,8 @@ function choiceFromCant(
 export function getMainChoice(events: string[], side: 'p1' | 'p2', battle: SimBattle): string {
   const sideIdx = sideIndex(side);
   const actives = battle.sides[sideIdx].active;
-  const choices = actives.map((_, activeSlot) => getChoiceForSlot(events, side, activeSlot, battle));
+  const aiming: Aiming = { ask: true, resolved: new Map() };
+  const choices = actives.map((_, activeSlot) => getChoiceForSlot(events, side, activeSlot, battle, aiming));
   return choices.length > 0 ? choices.join(', ') : 'move 1';
 }
 
