@@ -81,7 +81,7 @@ function EvalSection({ app, replayData }: WorkspaceColumnProps) {
       onAnalyzeGame={handleAnalyzeGame}
       ended={endedFor(atVariationEnd, app.ctx.branch.simState)}
       positionLabel={liveEvalView ? resultPositionLabel(evaluation.resultTag, { viewTurn, viewingVariation }) : null}
-      playOutProgress={playOut?.active ? { startTurn: playOut.startTurn, turns: playOut.turns, atTurn: liveSimTurn, fast: fastPlayOut } : null}
+      playOutProgress={playOut?.active ? { startTurn: playOut.startTurn, turns: playOut.turns, atTurn: liveSimTurn, fast: fastPlayOut, stopping: !!playOut.stopping } : null}
       graphMaxTurn={analyzableTurns}
       analysisTurn={analysisTurn}
       onSelectTurn={handleGraphSelectLine}

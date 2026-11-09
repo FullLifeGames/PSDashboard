@@ -7,6 +7,8 @@ export interface PlayOutProgress {
   atTurn: number | null;
   /** The run uses the depth-1 matrix on every turn (the fast option). */
   fast?: boolean;
+  /** Stop was pressed with a turn in flight (round 89, #119): the run ends when that turn landed. */
+  stopping?: boolean;
 }
 
 function PlayOutProgressLine({ playOutProgress }: { playOutProgress: PlayOutProgress }) {
@@ -14,12 +16,14 @@ function PlayOutProgressLine({ playOutProgress }: { playOutProgress: PlayOutProg
     <div className="ps-playout-progress" role="status">
       <span className="ps-spinner" aria-hidden="true" />
       <span>
-        Engine is playing both sides from turn {playOutProgress.startTurn}.{' '}
+        {playOutProgress.stopping
+          ? 'Stopping: the engine finishes the turn in flight, then the play-out ends.'
+          : `Engine is playing both sides from turn ${playOutProgress.startTurn}.`}{' '}
         {playOutProgress.turns} turn{playOutProgress.turns === 1 ? '' : 's'} played
         {playOutProgress.atTurn !== null && playOutProgress.atTurn > playOutProgress.startTurn
           ? `, now at turn ${playOutProgress.atTurn}` : ''}.
-        The gold line below grows as it plays.
-        {playOutProgress.fast ? ' Fast mode: every turn is a depth-1 matrix search.' : ''}
+        {playOutProgress.stopping ? '' : ' The gold line below grows as it plays.'}
+        {playOutProgress.fast && !playOutProgress.stopping ? ' Fast mode: every turn is a depth-1 matrix search.' : ''}
       </span>
     </div>
   );
