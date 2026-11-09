@@ -87,14 +87,17 @@ const clickable = (dex: Dex): DexMove[] => dex.moves.all().filter((move: DexMove
   && move.gen <= dex.gen && (move.isNonstandard === null || move.isNonstandard === undefined || move.isNonstandard === 'Past')
   && CLICKABLE.has(move.target) && !move.flags.charge && !move.flags.futuremove);
 
-/** The board: Snorlax with `moves` against Pikachu (or `foeSpecies`) with `foeMoves`; the scene's entry sits on the holder; doubles add two splashers. */
-function boardOf(c: Case, moves: string[], foeMoves: string[], scene: Scene, foeSpecies = 'Pikachu'): Battle {
+/**
+ * The board: Snorlax (or `bodySpecies`) with `moves` against Pikachu (or `foeSpecies`) with `foeMoves`; the scene's entry sits on the holder;
+ * doubles add two splashers. Round 89 (#111): a row that names a species whose own abilities carry the entry (Comfey and Triage) passes it.
+ */
+function boardOf(c: Case, moves: string[], foeMoves: string[], scene: Scene, foeSpecies = 'Pikachu', bodySpecies = 'Snorlax'): Battle {
   const splash = (species: string) => mon(c.rules, { species, moves: ['splash'] });
   const worn = (holder: Holder): { ability?: string; item?: string } => {
     if (scene.holder !== holder || !scene.entry) return {};
     return scene.entry.kind === 'ability' ? { ability: scene.entry.id } : scene.entry.kind === 'item' ? { item: scene.entry.id } : {};
   };
-  const body = { ...mon(c.rules, { species: 'Snorlax', moves, gender: 'M' }), ...worn('body') };
+  const body = { ...mon(c.rules, { species: bodySpecies, moves, gender: 'M' }), ...worn('body') };
   const foe = { ...mon(c.rules, { species: foeSpecies, moves: foeMoves }), ...worn('foe') };
   const bench = c.vgc ? ['Pikachu', 'Chansey', 'Snorlax', 'Blissey'].map(splash) : [];
   const p1 = c.mode === 'singles' ? [body] : [body, splash('Blissey'), ...bench];
@@ -425,18 +428,34 @@ describe('the reported rows', () => {
     { name: 'VGC', c: { rules: GEN9, mode: 'doubles', vgc: true, name: 'VGC' } },
     { name: 'Champions VGC', c: { rules: CHAMPIONS, mode: 'doubles', vgc: true, name: 'Champions VGC' } },
   ];
-  const standIn = (c: Case, scene: Scene, body: string[], events: string[], foeMoves: string[], species = 'Pikachu'): string => {
-    const board = boardOf(c, body, foeMoves, scene, species);
+  const standIn = (c: Case, scene: Scene, body: string[], events: string[], foeMoves: string[], species = 'Pikachu', bodySpecies = 'Snorlax'): string => {
+    const board = boardOf(c, body, foeMoves, scene, species, bodySpecies);
     const index = Number(/^move (\d+)/.exec(getMainChoice(events, 'p1', board as never))![1]);
     return board.sides[0].active[0].getMoveRequestData().moves[index - 1].id;
   };
   const worn = (kind: Kind, id: string, variant: Variant = 'plain', holder: Holder = 'body'): Scene => ({ entry: { kind, id }, holder, variant });
   const unseen = (c: Case): string[] => c.mode === 'doubles' ? ['|move|p1b: Blissey|Splash|p1b: Blissey', '|move|p2b: Vaporeon|Splash|p2b: Vaporeon'] : [];
 
-  // 2694081754 turn 9: Comfey (Triage) never acts; the Draining Kiss stand-in ran at +3 ahead of the Grassy Glide (+1 in Grassy Terrain) that knocked it out
-  test.each(REPORTED)('Triage: the draining move is no stand-in behind a foe the log shows first ($name)', ({ c }) => {
-    const events = [foeLine('Pikachu', 'Grassy Glide'), ...unseen(c)];
-    expect(standIn(c, worn('ability', 'triage', 'grassy', 'body'), ['drainingkiss', 'leechseed'], events, ['grassyglide'])).toBe('leechseed');
+  // 2694081754 turn 9 (Doubles OU, Gen 9): Comfey with Triage never acts; the Draining Kiss stand-in ran at +3 ahead of the Grassy Glide (+1 in
+  // Grassy Terrain) of Rillaboom that knocked it out. Comfey carries Triage as its own ability in the Gen 9 Dex, so the row runs in the Gen 9
+  // rule sets (singles, doubles, VGC); the Champions Dex lists no species with Triage (Comfey is Past there), see the row below.
+  const TRIAGE_ROWS = REPORTED.filter(row => row.c.rules === GEN9);
+  test.each(TRIAGE_ROWS)('Triage: the draining move of Comfey is no stand-in behind the Grassy Glide the log shows first ($name)', ({ c }) => {
+    const events = [foeLine('Rillaboom', 'Grassy Glide', 'p1a: Comfey'), ...unseen(c)];
+    const scene = worn('ability', 'triage', 'grassy', 'body');
+    expect(standIn(c, scene, ['drainingkiss', 'leechseed'], events, ['grassyglide'], 'Rillaboom', 'Comfey')).toBe('leechseed');
+    // the move order of the request does not decide it
+    expect(standIn(c, scene, ['leechseed', 'drainingkiss'], events, ['grassyglide'], 'Rillaboom', 'Comfey')).toBe('leechseed');
+  });
+
+  test('Triage: Comfey has it as its own ability in the Gen 9 Dex, and no species of the Champions Dex has it (the Champions VGC row is dropped)', () => {
+    const carriers = (rules: Rules) => {
+      const dex = dexOfRules(rules);
+      return dex.species.all().filter(species => species.exists && !species.isNonstandard
+        && Object.values(species.abilities).some(name => dex.abilities.get(name).id === 'triage')).map(species => species.name);
+    };
+    expect(carriers(GEN9)).toEqual(['Comfey']);
+    expect(carriers(CHAMPIONS)).toEqual([]);
   });
 
   // a Prankster body whose stand-in is a status move moves ahead of a foe at priority 0 that the log shows first
