@@ -283,10 +283,12 @@ export function broughtSpeciesFor(snapshots: TurnSnapshot[], side: 'p1' | 'p2', 
   for (const turn of snapshots) {
     for (const pokemon of turn[side].pokemon) {
       if (!pokemon.isActive) continue;
-      const base = speciesBaseId(pokemon.speciesForme, rules);
+      // Round 89 (#116): a body that wears a Transform copy (Imposter, the move) lists the species it entered with, never the copy.
+      const own = pokemon.baseSpeciesForme ?? pokemon.speciesForme;
+      const base = speciesBaseId(own, rules);
       if (seenBases.has(base)) continue;
       seenBases.add(base);
-      ordered.push(pokemon.speciesForme);
+      ordered.push(own);
     }
   }
   return ordered;

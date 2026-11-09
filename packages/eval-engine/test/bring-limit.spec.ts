@@ -1,6 +1,11 @@
+import { readFileSync } from 'node:fs';
 import { test, expect, describe } from 'vitest';
 import { createBranchState, reconstructBranchRuntime, serializePreviewPosition } from '../src/branch-engine';
-import { getReplayBringCount, replayBringOnly, parseReplayLogWithObservations } from '@fulllifegames/replay-core';
+import { trimTeamToBring } from '../src/branch/team-order';
+import {
+  buildTeamsFromReplay, getBranchSimulatorFormat, getReplayBringCount, parseReplayLog, replayBringOnly, replayRules,
+  parseReplayLogWithObservations, type ReplayData,
+} from '@fulllifegames/replay-core';
 import type { PokemonSet } from '@pkmn/sim';
 
 function mon(name: string, move: string): PokemonSet {
@@ -213,4 +218,85 @@ describe('bring-limited team preview (VGC 4 of 6)', () => {
     expect(open).not.toBeNull();
     expect(legalChoices(createRootPosition(open!), 'p2')).toHaveLength(15);
   });
+});
+
+/**
+ * Round 89 (#116): a Ditto that copied a foe stands in the snapshot as the foe's species, and the bring list named the copy.
+ * The list names the body's own species (the client's `baseSpeciesForme` of a transformed body), so the trim keeps the Ditto
+ * and drops the unbrought body of the copied species. VGC (doubles, bring four) and Battle Stadium Singles (bring three).
+ */
+const baseNames = (sets: PokemonSet[]) => sets.map(set => set.species).sort();
+
+describe('a transformed body keeps its own species on the bring list (#116)', () => {
+  test('VGC 2565721987: P1 brought Iron Bundle, Grimmsnarl, Ditto and Miraidon, and the rebuild fields four against four', async () => {
+    const replay = JSON.parse(readFileSync(new URL('./fixtures/gen9vgc2026regi-2565721987.json', import.meta.url), 'utf-8')) as ReplayData;
+    const brought = replayBringOnly(replay, parseReplayLog(replay.log));
+    expect(brought).not.toBeNull();
+    expect([...brought!.p1].sort()).toEqual(['Ditto', 'Grimmsnarl', 'Iron Bundle', 'Miraidon']);
+    expect(brought!.p2).toHaveLength(4);
+
+    const { observations, speedOrders } = parseReplayLogWithObservations(replay.log);
+    const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });
+    const rules = replayRules(replay);
+    const trimmed = trimTeamToBring(p1Team, brought!.p1, rules);
+    expect(trimmed).toHaveLength(4);
+    expect(trimmed.map(set => set.species)).toContain('Ditto');
+
+    const runtime = await reconstructBranchRuntime({
+      format: getBranchSimulatorFormat(replay), p1Team, p2Team, replayLog: replay.log, targetTurn: 1,
+      playerNames: [replay.players[0], replay.players[1]], bringOnly: brought!, deadlineMs: 120_000,
+    });
+    const battle = runtime.battleStream.battle!;
+    expect(battle.sides[0].pokemon).toHaveLength(4);
+    expect(battle.sides[1].pokemon).toHaveLength(4);
+    expect(battle.sides[0].pokemon.map(body => body.species.name)).toContain('Ditto');
+  }, 240_000);
+
+  /** Game 2382086291's shape: the side holds its own foe-species body in the preview, leaves it at home and brings a Ditto that copies the foe's. */
+  const COPIED = 'Tornadus';
+  const homeSet = (names: string[]) => names.map(name => mon(name, 'Tackle'));
+  const SHAPES = {
+    singles: {
+      formatid: 'gen9battlestadiumsinglesregi', count: 3, gametype: 'singles',
+      p1: [COPIED, 'Ditto', 'Pikachu', 'Eevee', 'Raichu', 'Jolteon'], p1Brought: ['Ditto', 'Pikachu', 'Eevee'],
+      p2: [COPIED, 'Bulbasaur', 'Charmander', 'Squirtle', 'Ivysaur', 'Charmeleon'],
+      play: [
+        '|switch|p1a: Ditto|Ditto, L50|100/100', '|switch|p2a: Tornadus|Tornadus, L50, M|100/100',
+        '|-transform|p1a: Ditto|p2a: Tornadus|[from] ability: Imposter', '|turn|1',
+        '|switch|p1a: Pikachu|Pikachu, L50|100/100', '|switch|p2a: Bulbasaur|Bulbasaur, L50|100/100', '|turn|2',
+        '|switch|p1a: Eevee|Eevee, L50|100/100', '|switch|p2a: Charmander|Charmander, L50|100/100', '|turn|3',
+      ],
+    },
+    doubles: {
+      formatid: 'gen9vgc2026regi', count: 4, gametype: 'doubles',
+      p1: [COPIED, 'Ditto', 'Pikachu', 'Eevee', 'Raichu', 'Jolteon'], p1Brought: ['Ditto', 'Pikachu', 'Eevee', 'Raichu'],
+      p2: [COPIED, 'Bulbasaur', 'Charmander', 'Squirtle', 'Ivysaur', 'Charmeleon'],
+      play: [
+        '|switch|p1a: Ditto|Ditto, L50|100/100', '|switch|p1b: Pikachu|Pikachu, L50|100/100',
+        '|switch|p2a: Tornadus|Tornadus, L50, M|100/100', '|switch|p2b: Bulbasaur|Bulbasaur, L50|100/100',
+        '|-transform|p1a: Ditto|p2a: Tornadus|[from] ability: Imposter', '|turn|1',
+        '|switch|p1b: Eevee|Eevee, L50|100/100', '|switch|p2b: Charmander|Charmander, L50|100/100', '|turn|2',
+        '|switch|p1b: Raichu|Raichu, L50|100/100', '|switch|p2a: Squirtle|Squirtle, L50|100/100', '|turn|3',
+      ],
+    },
+  } as const;
+
+  for (const [kind, shape] of Object.entries(SHAPES)) {
+    test(`${kind}: the trimmed team holds the Ditto, not the unbrought ${COPIED}`, () => {
+      const log = [
+        '|player|p1|Alice|', '|player|p2|Bob|', `|gametype|${shape.gametype}`, '|gen|9',
+        ...shape.p1.map(name => `|poke|p1|${name}, L50|`), ...shape.p2.map(name => `|poke|p2|${name}, L50|`),
+        '|teampreview', '|start', ...shape.play,
+      ].join('\n');
+      const source = { formatid: shape.formatid, log };
+      expect(getReplayBringCount(source)).toBe(shape.count);
+      const brought = replayBringOnly(source, parseReplayLog(log));
+      expect(brought).not.toBeNull();
+      expect([...brought!.p1].sort()).toEqual([...shape.p1Brought].sort());
+
+      const trimmed = trimTeamToBring(homeSet(shape.p1), brought!.p1, replayRules(source));
+      expect(baseNames(trimmed)).toEqual([...shape.p1Brought].sort());
+      expect(baseNames(trimmed)).not.toContain(COPIED);
+    });
+  }
 });

@@ -42,6 +42,7 @@ function snapshotPokemon(mon: Pokemon): PokemonSnapshot {
   return {
     name: mon.name,
     speciesForme: mon.speciesForme,
+    ...(mon.volatiles.transform ? { baseSpeciesForme: mon.baseSpeciesForme } : {}),
     hp: mon.hp,
     maxhp: mon.maxhp,
     hpPercent: mon.maxhp > 0 ? Math.round((mon.hp / mon.maxhp) * 100) : 0,
