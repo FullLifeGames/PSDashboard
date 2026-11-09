@@ -1,5 +1,5 @@
 ---
-Status: accepted (round 86, T306; the user approved it at the final gate of round 82, 01.11.2026, "2a", at the design gate of 04.11.2026, "2b" for the faint step, and at the spec gate of 04.11.2026, "1a 2a 3a 4a"). Supersedes ADR 0008.
+Status: accepted (round 86, T306; the user approved it at the final gate of round 82, 01.11.2026, at the design gate of 04.11.2026 for the faint step, and at the spec gate of 04.11.2026). Supersedes ADR 0008.
 ---
 
 # The reconstruction forces the dice the log names and searches seeds only for the dice no name covers
@@ -10,7 +10,7 @@ A replay log holds the results of a game: the miss, the crit, the flinch. The si
 - **The faint step** (`faintStep`). The turn plays once on a copy of the battle. A perfect score against the log keeps the list. Otherwise `stepSets` moves the damage-roll step of the hits on the bodies whose faint differs, in the direction the log's faint asks for, the last step first. A set stands when it gives the log's dice, or when it gives the log's faints with no ended mismatch and no more soft mismatches than the natural turn has (the ruling of 05.11.2026). A set that misses a logged faint never stands.
 - **The seed search for unnamed dice** (the hybrid, the ruling of 05.11.2026). A turn that is still imperfect plays seeds 1 to 15 of `ALIGNMENT_SEEDS` for the dice no `DieKind` names (a sleep duration, Outrage's lock, the move Metronome calls), with the forced list kept, and keeps the best by (ended, faint, soft). A tie keeps the earlier seed. The drift line counts these turns as "seeded N".
 - **Phantom procs.** `quietProcs` (`dice/phantom-procs.ts`) forces an ability or item proc that the forced turn draws and no line of the block names to not happen. A proc the log shows stays with the dice.
-- **The fallback** (spec gate 4a). A turn that the copy cannot play forced, or that would end a game the log goes on past, takes the search over 16 seeds of ADR 0008 (`alignBlockSeed`), and the drift line shows "fallback N".
+- **The fallback** (spec gate). A turn that the copy cannot play forced, or that would end a game the log goes on past, takes the search over 16 seeds of ADR 0008 (`alignBlockSeed`), and the drift line shows "fallback N".
 - **The arrival and the adopt.** `alignArrivalDice` runs the same `faintStep`, so the first turn of a branch carries the dice of the rebuild, and the branch's own first turn joins the user's forced dice to the same list (ADR 0001).
 
 What ADR 0008 decided and this one keeps: `ALIGNMENT_SEEDS` is a frozen literal with `'1,2,3,4'` at index 0, and changing it is a cache-version event. The battle is reseeded every turn, so the turns' random streams stay independent. The pick is deterministic. Corrections from a snapshot write state directly (round 60). Damage magnitude stays unscored, because the boundary snapshots pin HP; the faint step looks at damage rolls only where a faint decides.

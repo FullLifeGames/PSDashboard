@@ -1,6 +1,6 @@
 # Triage (Runde 62)
 
-TODOs, die die Triage nach dem Umbau „Mehr Simulation“ geschlossen hat: obsolet (die Szene liest auf dem neuen Stand richtig), verworfen (ohne messbaren Nutzen für Engine oder App) oder zusammengelegt (der Inhalt lebt in einem anderen TODO weiter). Je TODO das Urteil, der Beleg, der Grund und der alte Text. Kommt ein Problem wieder, bekommt es eine neue T-Nummer. Gate 05.10.2026 „1a“. Tabelle, Berichte und Sonden: `docs/perf/probes/2026-10-04-r62/`.
+TODOs, die die Triage nach dem Umbau „Mehr Simulation“ geschlossen hat: obsolet (die Szene liest auf dem neuen Stand richtig), verworfen (ohne messbaren Nutzen für Engine oder App) oder zusammengelegt (der Inhalt lebt in einem anderen TODO weiter). Je TODO das Urteil, der Beleg, der Grund und der alte Text. Kommt ein Problem wieder, bekommt es eine neue T-Nummer. Gate 05.10.2026. Tabelle, Berichte und Sonden: `docs/perf/probes/2026-10-04-r62/`.
 
 ## Inhalt
 
@@ -839,11 +839,11 @@ TODOs, die die Triage nach dem Umbau „Mehr Simulation“ geschlossen hat: obso
 
 **Alter Text in NextSteps.md:**
 
-> - ☐ **T71 · STAB nach den Spielregeln übernehmen** (Re-Fit, Mini-Runde, klein, score-berührend D3, braucht T49 oder T50; geparkt, bis S2 gemessen hat, Urteil in T99, Gate der Runde 58 „1a“)
+> - ☐ **T71 · STAB nach den Spielregeln übernehmen** (Re-Fit, Mini-Runde, klein, score-berührend D3, braucht T49 oder T50; geparkt, bis S2 gemessen hat, Urteil in T99, Gate der Runde 58)
 > 
 >   Ein Garchomp mit Tera Boden trifft mit Earthquake 2,0-fach statt 1,5-fach, ein Tera-Feuer-Garchomp bekommt auf Fire Fang 1,5 statt 1,0. Die Regel ist gebaut (d8eb0a3, Branch `r54-stab`), gegen den Simulator auf acht Fällen nachgerechnet, und der Schiedsrichter stützt sie: 116 von 150 strittigen Paaren liegen näher am Schadensrechner. Die Bank liest mit ihr Doubles schlechter: glücksbereinigt +10 bp [+0, +22] gegen den Stand ohne sie, dazu Warnungen in Doubles spät (hq +8, glücksbereinigt +23); Singles steht still. Warum die Bank mit der richtigeren Regel schlechter liest, ist ungemessen. Die Arbeitsvermutung: Gewichte und K sind gegen die blinde Statik gefittet, wie ein neues, genaueres Thermometer an einer Heizung, deren Regler auf das alte geeicht ist.
 > 
->   Hinweis: Runde 54 hat die Regel mit c910b91 geparkt; ein glatter `git revert c910b91` scheitert am Cache-Kommentar, den die Buchung danach geändert hat; c910b91 zeigt aber genau, was zurück muss (die Funktion `stabMultiplier`, ihr Aufruf, ihre Tests). Der Test „STAB stays tera-blind while the rule is parked“ in `tera-statics.spec.ts` wird dabei durch die Tabelle der Regel ersetzt. Erster Schritt ist die Probe auf die Vermutung: dieselbe Regel mit neu gefitteten Gewichten gegen die Basis messen. Sie gehört neben den Re-Fit der Gewichte, nicht davor. Seit Runde 57 gehören dazu: Adaptability, der 60er-Boden der Tera-Züge und der Bonus für Tera Blast nach dem Klick (Runde 57 gibt Tera Blast Typ und Kategorie, unter Stellar die Stärke 100 und doppelten Schaden gegen terastallisierte Ziele; der eigene Typ-Bonus nach dem Klick fehlt; User-Gate 23.09., „2a 3a“).
+>   Hinweis: Runde 54 hat die Regel mit c910b91 geparkt; ein glatter `git revert c910b91` scheitert am Cache-Kommentar, den die Buchung danach geändert hat; c910b91 zeigt aber genau, was zurück muss (die Funktion `stabMultiplier`, ihr Aufruf, ihre Tests). Der Test „STAB stays tera-blind while the rule is parked“ in `tera-statics.spec.ts` wird dabei durch die Tabelle der Regel ersetzt. Erster Schritt ist die Probe auf die Vermutung: dieselbe Regel mit neu gefitteten Gewichten gegen die Basis messen. Sie gehört neben den Re-Fit der Gewichte, nicht davor. Seit Runde 57 gehören dazu: Adaptability, der 60er-Boden der Tera-Züge und der Bonus für Tera Blast nach dem Klick (Runde 57 gibt Tera Blast Typ und Kategorie, unter Stellar die Stärke 100 und doppelten Schaden gegen terastallisierte Ziele; der eigene Typ-Bonus nach dem Klick fehlt; User-Gate 23.09.).
 > 
 >   *Erfolg:* Mit neu gefitteten Gewichten zeigt keine gepoolte Bank-Zeile Schaden, der Schiedsrichter-Gewinn bleibt (116 zu 34), die Tier-Zählung hält. *Plan T71:* 3 Schritte, 1 offene Entscheidung.
 
@@ -851,7 +851,7 @@ TODOs, die die Triage nach dem Umbau „Mehr Simulation“ geschlossen hat: obso
 
 > ### T71 · STAB nach den Spielregeln übernehmen
 > 
-> **Geparkt, bis Iteration S2 gemessen hat** (User-Gate der Runde 58, „1a“): Die Obergrenze der ganzen Genauigkeits-Achse liegt bei +16,4 bp [7,6; 25,3] und braucht neu gefittete Gewichte; ob das TODO nach dem Umbau noch gebraucht wird, entscheidet danach die Triage (T99).
+> **Geparkt, bis Iteration S2 gemessen hat** (User-Gate der Runde 58): Die Obergrenze der ganzen Genauigkeits-Achse liegt bei +16,4 bp [7,6; 25,3] und braucht neu gefittete Gewichte; ob das TODO nach dem Umbau noch gebraucht wird, entscheidet danach die Triage (T99).
 > 
 > *Re-Fit · Mini-Runde · klein · score-berührend D3 · braucht T49 oder T50*
 > 
@@ -877,7 +877,7 @@ TODOs, die die Triage nach dem Umbau „Mehr Simulation“ geschlossen hat: obso
 
 **Alter Text in NextSteps.md:**
 
-> - ☐ **T82 · Züge, deren Katalog-Stärke beim Einsatz steigt oder fällt** (Endspiel, Runde, mittel, score-berührend D3; geparkt, bis S2 gemessen hat, Urteil in T99, Gate der Runde 58 „1a“)
+> - ☐ **T82 · Züge, deren Katalog-Stärke beim Einsatz steigt oder fällt** (Endspiel, Runde, mittel, score-berührend D3; geparkt, bis S2 gemessen hat, Urteil in T99, Gate der Runde 58)
 > 
 >   Knock Off trifft ein Ziel mit Item mit 97 statt 65 Stärke; auf der Bank steht er in 292 Feld-Stellungen. Facade trifft mit Status doppelt, Hex gegen einen Statusträger, Acrobatics ohne Item; Eruption, Water Spout und Dragon Energy fallen mit den KP (die Statik rechnet immer 150), Stored Power steigt mit Boosts, Expanding Force im Psycho-Feld, Solar Beam halbiert sich im Regen, und Mehrfachtreffer wie Triple Axel zählen einen Treffer. Die Statik rechnet all das mit der Katalog-Stärke. Schiedsrichter der Runde 57: Water Spout 0,533, Eruption 0,241, Acrobatics 0,156, Hex 0,074 Fehler.
 > 
@@ -889,7 +889,7 @@ TODOs, die die Triage nach dem Umbau „Mehr Simulation“ geschlossen hat: obso
 
 > ### T82 · Züge, deren Katalog-Stärke beim Einsatz steigt oder fällt
 > 
-> **Geparkt, bis Iteration S2 gemessen hat** (User-Gate der Runde 58, „1a“): Die Obergrenze der ganzen Genauigkeits-Achse liegt bei +16,4 bp [7,6; 25,3] und braucht neu gefittete Gewichte; ob das TODO nach dem Umbau noch gebraucht wird, entscheidet danach die Triage (T99).
+> **Geparkt, bis Iteration S2 gemessen hat** (User-Gate der Runde 58): Die Obergrenze der ganzen Genauigkeits-Achse liegt bei +16,4 bp [7,6; 25,3] und braucht neu gefittete Gewichte; ob das TODO nach dem Umbau noch gebraucht wird, entscheidet danach die Triage (T99).
 > 
 > *Endspiel · Runde · mittel · score-berührend D3*
 > 
@@ -917,7 +917,7 @@ TODOs, die die Triage nach dem Umbau „Mehr Simulation“ geschlossen hat: obso
 
 **Alter Text in NextSteps.md:**
 
-> - ☐ **T88 · Body Press, Psyshock und Foul Play rechnen mit den falschen Werten** (Endspiel, Mini-Runde, klein, score-berührend D3; geparkt, bis S2 gemessen hat, Urteil in T99, Gate der Runde 58 „1a“)
+> - ☐ **T88 · Body Press, Psyshock und Foul Play rechnen mit den falschen Werten** (Endspiel, Mini-Runde, klein, score-berührend D3; geparkt, bis S2 gemessen hat, Urteil in T99, Gate der Runde 58)
 > 
 >   Die Statik nimmt Angriff gegen Verteidigung oder Spezial-Angriff gegen Spezial-Verteidigung, je nach Kategorie. Body Press rechnet aber mit der Verteidigung des Angreifers, Psyshock gegen die Verteidigung des Ziels, Foul Play mit dem Angriff des Ziels; die Stufen in `boostedFraction` folgen derselben falschen Achse. Auf der Bank: Body Press in 110 Feld-Stellungen und 289 mit einem Träger, Psyshock 23 und 93, Foul Play 6 und 32 (Zählung der Runde 57).
 > 
@@ -927,7 +927,7 @@ TODOs, die die Triage nach dem Umbau „Mehr Simulation“ geschlossen hat: obso
 
 > ### T88 · Body Press, Psyshock und Foul Play rechnen mit den falschen Werten
 > 
-> **Geparkt, bis Iteration S2 gemessen hat** (User-Gate der Runde 58, „1a“): Die Obergrenze der ganzen Genauigkeits-Achse liegt bei +16,4 bp [7,6; 25,3] und braucht neu gefittete Gewichte; ob das TODO nach dem Umbau noch gebraucht wird, entscheidet danach die Triage (T99).
+> **Geparkt, bis Iteration S2 gemessen hat** (User-Gate der Runde 58): Die Obergrenze der ganzen Genauigkeits-Achse liegt bei +16,4 bp [7,6; 25,3] und braucht neu gefittete Gewichte; ob das TODO nach dem Umbau noch gebraucht wird, entscheidet danach die Triage (T99).
 > 
 > *Endspiel · Mini-Runde · klein · score-berührend D3*
 > 
@@ -953,7 +953,7 @@ TODOs, die die Triage nach dem Umbau „Mehr Simulation“ geschlossen hat: obso
 
 **Alter Text in NextSteps.md:**
 
-> - ☐ **T90 · Reste der Zug-Tabelle** (Endspiel, Mini-Runde, klein, score-berührend D3; geparkt, bis S2 gemessen hat, Urteil in T99, Gate der Runde 58 „1a“)
+> - ☐ **T90 · Reste der Zug-Tabelle** (Endspiel, Mini-Runde, klein, score-berührend D3; geparkt, bis S2 gemessen hat, Urteil in T99, Gate der Runde 58)
 > 
 >   Aus dem finalen Review der Runde 57: Mega Sol (Meganium-Mega: die eigenen Züge wie in Sonne, Weather Ball also Feuer) und Eelevate (Eelektross-Mega schwebt) fehlen im Adapter, und Champions-Replays liegen im Korpus. Judgment mit einem Z-Kristall bleibt im Simulator Normal (`!item.zMove`), die Tabelle liest nur die Platte. Normalize lässt in Gen 5 und 6 Züge, die sich selbst umtypen (Weather Ball, Hidden Power), bei ihrem Typ. Der Null-Zug-Satz liest für Revelation Dance die Typen der Art (Soak, Reflect Type, Burn Up). `landedOrCatalog` gibt den geteilten Dex-Zug als veränderbares Objekt heraus. `UserFacts.item` baut bei jedem Lesen ein neues Objekt, und `byItem` liest es zweimal.
 > 
@@ -963,7 +963,7 @@ TODOs, die die Triage nach dem Umbau „Mehr Simulation“ geschlossen hat: obso
 
 > ### T90 · Reste der Zug-Tabelle
 > 
-> **Geparkt, bis Iteration S2 gemessen hat** (User-Gate der Runde 58, „1a“): Die Obergrenze der ganzen Genauigkeits-Achse liegt bei +16,4 bp [7,6; 25,3] und braucht neu gefittete Gewichte; ob das TODO nach dem Umbau noch gebraucht wird, entscheidet danach die Triage (T99).
+> **Geparkt, bis Iteration S2 gemessen hat** (User-Gate der Runde 58): Die Obergrenze der ganzen Genauigkeits-Achse liegt bei +16,4 bp [7,6; 25,3] und braucht neu gefittete Gewichte; ob das TODO nach dem Umbau noch gebraucht wird, entscheidet danach die Triage (T99).
 > 
 > *Endspiel · Mini-Runde · klein · score-berührend D3*
 > 
@@ -2261,7 +2261,7 @@ Am Gate der Runde 67 (11.10.) bekamen die Funde der Spuren die Nummern T146 bis 
 
 ## Nachtrag Triage vor dem Release (21.10.2026)
 
-Vor dem Release sortierte die Triage alle 52 offenen TODOs nach einer Frage: Sieht ein Nutzer den Fehler in echten Spielen, oder braucht das Release ihn? 21 bleiben auf dem Weg zum Release (Welle 5 mit den Spuren F, H und I, T163, T160, die letzte Welle, T43), 28 parken mit einem Trigger im Abschnitt „Parked“ von `docs/backlog.md`, drei sind hier stillgelegt. Ein TODO, das eine falsche Spielregel nennt, parkt nur. Gate 21.10.2026 „1a 2a 3b“ (3b: der Showdown Companion bleibt als eigenes Projekt nach dem Release geparkt). Tabelle: `docs/perf/probes/2026-10-19-r72/triage/gate-triage.md`.
+Vor dem Release sortierte die Triage alle 52 offenen TODOs nach einer Frage: Sieht ein Nutzer den Fehler in echten Spielen, oder braucht das Release ihn? 21 bleiben auf dem Weg zum Release (Welle 5 mit den Spuren F, H und I, T163, T160, die letzte Welle, T43), 28 parken mit einem Trigger im Abschnitt „Parked“ von `docs/backlog.md`, drei sind hier stillgelegt. Ein TODO, das eine falsche Spielregel nennt, parkt nur. Gate 21.10.2026 (der Showdown Companion bleibt als eigenes Projekt nach dem Release geparkt). Tabelle: `docs/perf/probes/2026-10-19-r72/triage/gate-triage.md`.
 
 ### T255 · Der lexikalische gen.num-Check
 
@@ -2323,7 +2323,7 @@ Vor dem Release sortierte die Triage alle 52 offenen TODOs nach einer Frage: Sie
 >
 > *Surface and search · programme · parked*
 >
-> **Problem.** Gate of round 67 of 10.10. ("5b"): "Think deeper" is dropped. A deeper analysis returns when it is settled what it computes beyond Auto, how long a click waits (click at move 2 in the worker pool since round 67: doubles warm 2.5 s, cold 8.9 s) and how the panel shows its result. The C line on 573756 turns 134 to 136 measures against it.
+> **Problem.** Gate of round 67 of 10.10.: "Think deeper" is dropped. A deeper analysis returns when it is settled what it computes beyond Auto, how long a click waits (click at move 2 in the worker pool since round 67: doubles warm 2.5 s, cold 8.9 s) and how the panel shows its result. The C line on 573756 turns 134 to 136 measures against it.
 >
 > **Benefit.** App: whoever wants to give more compute time gets a level with a known gain.
 >
