@@ -58,6 +58,29 @@ export function treeSeed(iteration: number, seedOffset: number): PRNGSeed {
   return words.join(',') as PRNGSeed;
 }
 
+/**
+ * Round 89 (#60, T324): the seed a cell reads at slot `index` of its list. Today's fixed list (`SEARCH_SEEDS`, `PROBE_SEEDS`,
+ * `VERIFY_PLAIN_SEEDS`) gives every cell of a search the same stream, so a die at one draw index came true in none or in all of
+ * the cells (a 20 % secondary in 73 to 80 % of a singles matrix, a crit at 1.4 % against 4.2 %: A1b, round 88's E1). Every path
+ * that reads slot s of the fixed list reads `cellSeed(s, key)` instead, so the paths keep sharing one list per cell: the matrix's
+ * first child is the verify round's, the trend probe rebuilds the matrix's child. `key` is the cell's hash (`cellHash` of the
+ * position's key and the two choice strings, `search/root-quantile.ts`). Two 32-bit lanes (one of the key and the slot each, a
+ * bijection of 32 bits) make the map from (slot, key) to the seed one to one up to the zero guard, and the lanes' constants keep
+ * the streams apart from `treeSeed`'s. Integer arithmetic only: the browser and Node agree to the bit.
+ */
+export function cellSeed(index: number, key: number): PRNGSeed {
+  const a = mix32((key ^ Math.imul(index + 1, 0x85ebca6b) ^ 0x165667b1) >>> 0);
+  const b = mix32((key ^ Math.imul(index + 1, 0x9e3779b1) ^ 0x27d4eb2f) >>> 0);
+  const x = mix32((b ^ mix32(a)) >>> 0);
+  const y = mix32((a ^ x) >>> 0);
+  return [(x & 0xffff) || 1, (x >>> 16) || 1, (y & 0xffff) || 1, (y >>> 16) || 1].join(',') as PRNGSeed;
+}
+
+/** The first `count` slots of a cell's list: a path that reads the first n of the fixed list reads the first n of this one. */
+export function cellSeedList(key: number, count: number): PRNGSeed[] {
+  return Array.from({ length: count }, (_, index) => cellSeed(index, key));
+}
+
 export function countFainted(battle: ReturnType<typeof positionBattle>): number {
   return battle.sides[0].pokemon.filter(p => p.fainted).length +
     battle.sides[1].pokemon.filter(p => p.fainted).length;

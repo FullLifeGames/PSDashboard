@@ -1,3 +1,4 @@
+import type { SimPosition } from '../forward/position.ts';
 import { dieKey, type DieName, type Draw } from '../dice/types.ts';
 import { hash32, hashText } from './leaf.ts';
 
@@ -43,6 +44,22 @@ export function positionSalt(serialized: string): number {
     (body.moveSlots ?? []).map(slot => `${slot.id}:${slot.pp}`).join(','),
   ].join('~')).join('/'));
   return rootSalt([state.formatid, state.gameType, state.turn, ...bodies].join('|'));
+}
+
+const positionKeys = new WeakMap<object, number>();
+
+/**
+ * Round 89 (#60, T324): the key of a root position for the seeds of its cells, `positionSalt` of its saved text, computed once
+ * per position object (a live child serializes on the first call and never again). The text is read for the game state only,
+ * so two bench orders of one state give one key.
+ */
+export function positionKey(position: SimPosition): number {
+  let key = positionKeys.get(position);
+  if (key === undefined) {
+    key = positionSalt(position.serialized);
+    positionKeys.set(position, key);
+  }
+  return key;
 }
 
 /** The key of a root cell inside its root: the salt and the two choice strings (swapping the sides gives another key). */
