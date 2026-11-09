@@ -1,17 +1,19 @@
 import { test, expect, type Page } from '@playwright/test';
 import { readFileSync } from 'fs';
 import {
-  dockChip, fixturePath, installReplayEmbedCache, moveTimeline, openTray, pickMove, routeOfflineFixtures, type DockSlotKey,
+  dockChip, dockReplays, fixturePath, installReplayEmbedCache, moveTimeline, openTray, pickMove, routeOfflineFixtures, type DockSlotKey, dockTray,
 } from './helpers';
+import { lightEngine, loadDockReplay, openVariationHistory, variationPanel } from './dock-helpers';
 
 test.beforeAll(installReplayEmbedCache);
 
 // Round 88 (T314, #55): a bench offers only bodies the side could have brought. The replay of GitHub issue #4
 // (gen9vgc2025regg-2335527677, a bring-four game): P1 fielded Clefable, Dusclops, Ursaluna and Gastrodon, so its bench holds no
 // Torracat and no Tsareena (the report: "allowed me to send in torracat as 5th mon"). P2 fielded three bodies (Overqwil,
-// Archaludon, Pelipper), so its fourth is unknown and its bench stays whole. The rebuild keeps six bodies per side for the
-// evaluation (a pinned four against an open six flips games), so the filter reads the same on the replay's own turns (a stored
-// position), on the What-if's turns (a stored position of the variation, the live tip) and at a forced replacement.
+// Archaludon, Pelipper), so its fourth is unknown: since round 89 (#124) the rebuild plays the heaviest world of that guess, so P2's
+// bench holds its fielded bodies and the guess (a body of its team preview), never the whole six. The filter reads the same on the
+// replay's own turns (a stored position), on the What-if's turns (a stored position of the variation, the live tip) and at a
+// forced replacement.
 const FILE = 'interlude-vgc-2335527677.json';
 const P1_BROUGHT = /Clefable|Dusclops|Ursaluna|Gastrodon/;
 const P1_HOME = /Torracat|Tsareena/;
@@ -39,7 +41,7 @@ async function bench(page: Page, slot: DockSlotKey): Promise<string[]> {
   return (await tray.locator('.ps-switchbtn').allInnerTexts()).map(text => text.replace(/\s+/g, ' ').trim());
 }
 
-/** P1's bench never names a body that stayed home; P2's whole bench stays (its fourth body is unknown). */
+/** P1's bench never names a body that stayed home; P2's bench holds its guess, a body of its preview (its fourth body is unknown). */
 async function expectBenches(page: Page, label: string, { expectP1 = true } = {}) {
   for (const slot of ['p1a', 'p1b'] as const) {
     const offered = await bench(page, slot);
@@ -52,7 +54,7 @@ async function expectBenches(page: Page, label: string, { expectP1 = true } = {}
   }
   const p2 = (await bench(page, 'p2a')).join(' | ');
   log(`${label} p2a: ${p2}`);
-  expect(p2, `${label} p2a keeps its whole bench`).toMatch(P2_HOME);
+  expect(p2, `${label} p2a offers its guess`).toMatch(P2_HOME);
 }
 
 /** A forced replacement of the variation: the bench it offers is the filtered one; the first body takes the slot. */
@@ -106,4 +108,72 @@ test('doubles, bring four: the What-if tip, its inner turn and its forced replac
   await expect(page.getByText('T2/')).toBeVisible();
   await expect(page.locator('.ps-dock-chip').first()).toBeVisible({ timeout: 30_000 });
   await expectBenches(page, 'variation inner turn');
+});
+
+// Round 89 (#124): Champions VGC 2625939941, doubles. P1 fielded Farigiraf, Basculegion and Lopunny and never its fourth body (Ceruledge,
+// Ninetales-Alola or Kingambit); P2 brought Aerodactyl, Kingambit, Farigiraf and Sylveon and left Kangaskhan and Torkoal home. Before
+// the issue the engine kept six bodies per side and could rank a switch to Kangaskhan; now the rebuild trims both sides to four, P1's
+// fourth is the heaviest world's guess, and the other worlds blend into the values. Singles (Battle Stadium Singles) have no e2e
+// fixture: the same code is read by the unit rows of the worlds (replay-context-worlds, bench-sweep).
+const CHAMPIONS_SHORT = 'gen9championsvgc2026regma-2625939941';
+const P2_HOME_BODIES = /Kangaskhan|Torkoal/;
+const P1_FIELDED = /Farigiraf|Basculegion|Lopunny/;
+const P1_CANDIDATES = /Ceruledge|Ninetales|Kingambit/;
+
+test.describe('Champions VGC, P1 short by one body (2625939941)', () => {
+  test.use({ viewport: { width: 1366, height: 768 } });
+
+  test.beforeEach(async ({ page }) => {
+    await lightEngine(page);
+    await routeOfflineFixtures(page);
+    await page.goto('/');
+    await loadDockReplay(page, CHAMPIONS_SHORT, 1);
+  });
+
+  test('P1\'s fourth tile carries the guess mark and the engine panel ranks no body P2 left home', async ({ page }) => {
+    test.setTimeout(600_000);
+    expect(dockReplays.some(replay => replay.id === CHAMPIONS_SHORT)).toBe(true);
+    // The bench of P1: its other fielded body and the guess, which wears the mark and names where it comes from.
+    const tray = await openTray(page, 'p1a');
+    const tiles = tray.locator('.ps-switchbtn');
+    await tiles.first().waitFor({ timeout: 10_000 });
+    const names = (await tiles.locator('.ps-switchbtn-name').allInnerTexts()).map(name => name.trim());
+    log(`p1a bench: ${names.join(' | ')}`);
+    expect(names.length).toBe(2);
+    const marked = tray.locator('.ps-switchbtn', { has: page.locator('.ps-guess-badge') });
+    await expect(marked).toHaveCount(1);
+    await expect(marked).toContainText(P1_CANDIDATES);
+    await expect(marked.locator('.ps-guess-badge')).toHaveAttribute('title', /The log never showed this player's last Pokémon\. The engine plays/);
+    await expect(tray.locator('.ps-switchbtn', { hasText: P1_FIELDED }).locator('.ps-guess-badge')).toHaveCount(0);
+    // P2 fielded four, so its bench is the four brought bodies and wears no mark.
+    const p2 = (await (await openTray(page, 'p2a')).locator('.ps-switchbtn').allInnerTexts()).join(' | ');
+    expect(p2).not.toMatch(P2_HOME_BODIES);
+    await expect(dockTray(page).locator('.ps-guess-badge')).toHaveCount(0);
+
+    // The panel ranks choices of the worlds' blend: the rows name no unbrought body of P2.
+    const panel = page.locator('.ps-main-right .ps-eval-panel');
+    await panel.locator('button', { hasText: 'Analyze game' }).click();
+    await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 360_000 });
+    await panel.locator('.ps-eval-graph rect[data-turn="1"]').click();
+    await expect(panel.locator('.ps-eval-choice').first()).toBeVisible({ timeout: 120_000 });
+    const rows = (await panel.locator('.ps-eval-choice').allInnerTexts()).join('\n');
+    log(`ranked rows: ${rows.replace(/\s+/g, ' ').slice(0, 400)}`);
+    expect(rows).not.toMatch(P2_HOME_BODIES);
+  });
+
+  test('Let it play out from turn 1 fields no body P2 left home', async ({ page }) => {
+    test.setTimeout(420_000);
+    await page.locator('button', { hasText: 'Let it play out' }).click();
+    await expect(page.getByText(/Engine is playing both sides from turn 1/)).toBeVisible({ timeout: 120_000 });
+    await expect.poll(async () => {
+      const body = await page.textContent('body');
+      return /Engine is playing both sides from turn 1\. [1-9]/.test(body ?? '') || /after [1-9]\d* turns?/.test(body ?? '');
+    }, { timeout: 300_000 }).toBe(true);
+    await page.locator('.ps-btn', { hasText: 'Stop' }).click();
+    await expect(page.getByText(/Play-out stopped|Play-out finished/)).toBeVisible({ timeout: 60_000 });
+    await openVariationHistory(page);
+    const history = await variationPanel(page).innerText();
+    log(`history: ${history.replace(/\s+/g, ' ').slice(0, 400)}`);
+    expect(history).not.toMatch(P2_HOME_BODIES);
+  });
 });
