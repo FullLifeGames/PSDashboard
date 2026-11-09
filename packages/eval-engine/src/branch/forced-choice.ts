@@ -1,5 +1,6 @@
 import type { SimBattle } from './types.ts';
-import { forcedAnswersOf, revivingSlots, type ForcedAnswer } from './forced-request.ts';
+import { revivingSlots } from '../forward/request-reviving.ts';
+import { forcedAnswersOf, type ForcedAnswer } from './forced-request.ts';
 import { forceSwitches } from './forced-slots.ts';
 import { findFaintedSlot, findFirstAvailableSwitchSlot, findSpeciesSlot } from './protocol-choices.ts';
 import { retireUnshownBench, type ProtocolBench } from './team-order.ts';
@@ -132,7 +133,7 @@ export function buildForcedSwitchChoice(
   const needs = forceSwitches(battle, sideIdx);
   if (!needs.some(Boolean)) return null;
 
-  const reviving = revivingSlots(battle, sideIdx);
+  const reviving = revivingSlots(battle.sides[sideIdx]);
   const request: Request = {
     battle, sideIdx, list: forcedSpecies, answers: forcedAnswersOf(forcedSpecies), cursor, taken: new Set<number>(), choices: needs.map(() => null),
   };

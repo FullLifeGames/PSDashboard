@@ -1,5 +1,4 @@
 import type { RulesDex } from '@fulllifegames/replay-core';
-import type { SimBattle } from './types.ts';
 
 /**
  * A line the slot's choice made: a move, a switch, or a `|cant|` that names
@@ -59,16 +58,6 @@ const answersOf = new WeakMap<readonly string[], readonly ForcedAnswer[]>();
 
 /** The record of a list that `collectForcedSwitchSpecies` made, parallel to it; undefined for any other array. */
 export const forcedAnswersOf = (list: readonly string[]): readonly ForcedAnswer[] | undefined => answersOf.get(list);
-
-/**
- * The slots of a side whose request asks for a fainted body (Revival Blessing): the request marks the user's party entry `reviving`
- * (`@pkmn/sim` pokemon.js, getSwitchRequestData). Whether a request revives comes from the request, never from a move name.
- */
-export function revivingSlots(battle: SimBattle, sideIdx: number): boolean[] {
-  const side = battle.sides[sideIdx];
-  const party = (side.activeRequest as { side?: { pokemon?: { reviving?: boolean }[] } } | null)?.side?.pokemon;
-  return side.active.map((_, slot) => !!party?.[slot]?.reviving);
-}
 
 /**
  * The entries of one block as requests: a run of switches into different slots is one request, and a revive line is one of its own. A

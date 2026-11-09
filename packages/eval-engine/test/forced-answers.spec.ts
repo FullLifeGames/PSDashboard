@@ -2,7 +2,8 @@ import { describe, expect, test } from 'vitest';
 import type { Battle } from '@pkmn/sim';
 import { rulesDex } from '@fulllifegames/replay-core';
 import { buildForcedSwitchChoice } from '../src/branch/corrections';
-import { forcedAnswersOf, revivingSlots } from '../src/branch/forced-request';
+import { forcedAnswersOf } from '../src/branch/forced-request';
+import { revivingSlots } from '../src/forward/request-reviving';
 import { collectForcedSwitchSpecies, parseTurnBlocks } from '../src/branch/protocol-choices';
 import { forceSwitches } from '../src/branch/forced-slots';
 import type { SimBattle } from '../src/branch/types';
@@ -137,7 +138,7 @@ function playTurn(board: ReviveBoard, mode: Mode, target?: number): { revived: b
     const pending = battle.sides.filter(side => side.requestState === 'switch' && !side.isChoiceDone());
     if (pending.length === 0) break;
     for (const side of pending) {
-      const reviving = revivingSlots(simOf(battle), side.n);
+      const reviving = revivingSlots(simOf(battle).sides[side.n]);
       if (side.n === 0 && reviving.some(Boolean) && target !== undefined) {
         revived = true;
         const needs = forceSwitches(simOf(battle), 0);
@@ -157,7 +158,7 @@ function stopAtPrompt(board: ReviveBoard, mode: Mode): boolean {
   const { battle } = board;
   battle.choose('p1', board.click);
   battle.choose('p2', foeClick(mode));
-  return revivingSlots(simOf(battle), 0).some(Boolean);
+  return revivingSlots(simOf(battle).sides[0]).some(Boolean);
 }
 
 describe('the revive answer, every Dex move with a slot condition (#131)', () => {
@@ -208,7 +209,7 @@ describe('a replacement request is not a revive request', () => {
     battle.choose('p1', 'move 1');
     battle.choose('p2', 'move 1');
     expect(battle.sides[0].requestState).toBe('switch');
-    expect(revivingSlots(simOf(battle), 0)).toEqual([false]);
+    expect(revivingSlots(simOf(battle).sides[0])).toEqual([false]);
     // the revive line of an earlier request that the rebuild never asked (it drifted), then the replacement the log sends
     const list = collectForcedSwitchSpecies(['|-heal|p1: Pikachu|49/100|[from] move: Revival Blessing'], ['|switch|p1a: Chansey|Chansey, F|100/100'], 'p1', DEX);
     expect(list).toEqual(['Pikachu', 'Chansey']);
