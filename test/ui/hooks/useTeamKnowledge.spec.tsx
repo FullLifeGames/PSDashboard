@@ -271,3 +271,40 @@ describe('useTeamKnowledge, stand-ins for the bodies a side never showed', () =>
     expect(result.current.effectiveP1Info!.pokemon.filter(mon => mon.standIn)).toHaveLength(4);
   });
 });
+
+/**
+ * Round 89 (lane B, #117): a game whose format generates its team fills the bodies a side never showed from the format's random-set
+ * file, which the set fetch carries (`setAssumptions.assumptions.randomSets`). Gen 3 Random Battle for singles, Gen 9 Random Doubles
+ * for doubles: logs the simulator played (packages/replay-core/test/fixtures/random-*.json).
+ */
+describe.each([
+  { label: 'Gen 3 Random Battle', id: 'gen3randombattle-1', missing: 3 },
+  { label: 'Gen 9 Random Doubles Battle', id: 'gen9randomdoublesbattle-11', missing: 2 },
+])('useTeamKnowledge, random-set stand-ins: $label', ({ id, missing }) => {
+  const game = JSON.parse(readFileSync(`packages/replay-core/test/fixtures/random-${id}.json`, 'utf-8')) as {
+    formatid: string; log: string; randomSets: Record<string, never>;
+  };
+  const randomInputs = (withFile: boolean) => inputs({
+    replayData: { ...replayData, id, format: game.formatid, formatid: game.formatid, log: game.log },
+    p1Info: inferOpponentTeam(game.log, 'p1'), opponentInfo: inferOpponentTeam(game.log, 'p2'),
+    setAssumptions: {
+      assumptions: withFile ? { format: game.formatid, source: 'test', pokemon: {}, randomSets: game.randomSets } : null,
+      loading: false, error: null,
+    },
+  });
+
+  test('the side that showed fewer bodies gets guesses with the file\'s moves, the other side stays', () => {
+    const { result } = renderHook(wired => useTeamKnowledge(wired), { initialProps: randomInputs(true) });
+    const p1 = result.current.effectiveP1Info!.pokemon;
+    expect(p1).toHaveLength(6);
+    expect(p1.filter(mon => mon.standIn)).toHaveLength(missing);
+    for (const guess of p1.filter(mon => mon.standIn)) expect(guess.moves.length).toBeGreaterThan(0);
+    expect(result.current.effectiveP2Info!.pokemon).toHaveLength(6);
+    expect(result.current.effectiveP2Info!.pokemon.some(mon => mon.standIn)).toBe(false);
+  });
+
+  test('without the file the panel stays at the bodies the log shows', () => {
+    const { result } = renderHook(wired => useTeamKnowledge(wired), { initialProps: randomInputs(false) });
+    expect(result.current.effectiveP1Info!.pokemon).toHaveLength(6 - missing);
+  });
+});

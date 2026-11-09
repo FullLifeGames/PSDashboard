@@ -169,8 +169,10 @@ export function useTeamKnowledge(inputs: TeamKnowledgeInputs) {
     const empty = { pokemon: [] };
     const inferred = { p1: p1Info ?? empty, p2: opponentInfo ?? empty };
     // Round 88 (F, #101): a side of a game without team preview that showed fewer bodies than its `|teamsize|` gets the pasted bodies
-    // it lacks, then stand-ins from the format's teammate statistics, before the enrichment, as buildAppTeams does.
-    const sized = replayData ? withStandIns(inferred, replayData.log, usageStats.stats, { p1: paste.pastedSets ?? [] }) : inferred;
+    // it lacks, then stand-ins from the format's teammate statistics, before the enrichment, as buildAppTeams does. Round 89 (#117): a
+    // generated-team format takes them from its random-set file, which the set fetch carries.
+    const randomSets = setAssumptions.assumptions?.randomSets;
+    const sized = replayData ? withStandIns(inferred, replayData.log, usageStats.stats, { p1: paste.pastedSets ?? [] }, randomSets) : inferred;
     const both = enrichTeamInfos(sized, usageStats.stats, setAssumptions.assumptions,
       { p1: hpResolverFor('p1'), p2: hpResolverFor('p2') }, itemJudge ?? undefined);
     return { p1: p1Info ? both.p1 : null, p2: opponentInfo ? both.p2 : null };

@@ -1,15 +1,16 @@
 import { Smogon } from '@pkmn/smogon';
 import type { ID } from '@pkmn/data';
 import {
-  generationsFor, toId, type PokemonSetAssumption, type SetAssumption, type SetSpreadAssumption, type SmogonSetAssumptions,
+  generationsFor, toId, type PokemonSetAssumption, type SetAssumption, type SetSpreadAssumption, type SmogonSetAssumptions as PublishedSets,
 } from '@fulllifegames/replay-core';
 import { championsSetsFormat, nationalDexDoublesFormat, ouFallbackFormat, vgcYearFormat } from './smogon/format-fallback';
 import { fetcherKey } from './smogon/fetcher-key';
 import { withSmogonFallback, type SmogonFetch } from './smogon/hosts';
+import { fetchRandomSets, generatesTeam, type RandomSetFile } from './random-sets';
 
-export type {
-  PokemonSetAssumption, SetAssumption, SetSpreadAssumption, SmogonSetAssumptions,
-} from '@fulllifegames/replay-core';
+export type { PokemonSetAssumption, SetAssumption, SetSpreadAssumption } from '@fulllifegames/replay-core';
+/** The published sets of a request; round 89 (#117): a generated-team format carries its random-set file beside them. */
+export type SmogonSetAssumptions = PublishedSets & { randomSets?: RandomSetFile };
 export { getSpeciesSetAssumption } from '@fulllifegames/replay-core';
 
 type SmogonFetcher = ConstructorParameters<typeof Smogon>[0];
@@ -194,6 +195,18 @@ function normalizeSet(
   };
 }
 
+/** The random-set file of a generated-team format, or null; a failed fetch leaves its message in `errors` and the game plays as before. */
+async function randomSetsOf(formatId: string | undefined, fetcher: SmogonFetch, errors: string[]): Promise<RandomSetFile | null> {
+  const id = toId(formatId || '');
+  if (!generatesTeam(id)) return null;
+  try {
+    return await fetchRandomSets(id, fetcher);
+  } catch (error) {
+    errors.push(`random sets: ${error instanceof Error ? error.message : String(error)}`);
+    return null;
+  }
+}
+
 export async function fetchSmogonSetAssumptions(params: {
   formatId: string | undefined;
   species: string[];
@@ -240,12 +253,15 @@ export async function fetchSmogonSetAssumptions(params: {
 
     // Every species failed: the source is down, not the species absent.
     if (errors.length === species.length) throw new Error(`Smogon sets unavailable: ${errors[0]}`);
-    return Object.keys(pokemon).length > 0 ? {
+    // Round 89 (#117): a format that generates its team has no sets file; its random-set file fills the bodies the log never showed.
+    const randomSets = await randomSetsOf(params.formatId, fetcher, errors);
+    return Object.keys(pokemon).length > 0 || randomSets ? {
       format,
       source: 'https://data.pkmn.cc',
       pokemon,
       ...(errors.length > 0 ? { errors } : {}),
       formats: [format, ...[...formats].filter(entry => entry !== format)],
+      ...(randomSets ? { randomSets } : {}),
     } : null;
   })();
 
