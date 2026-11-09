@@ -278,6 +278,28 @@ function knowsMove(active: SimPokemon, moveName: string): boolean {
 }
 
 /**
+ * Round 89 (#143): the move to send for a move the log shows. The simulator refuses a move the body's request lacks and a move the request
+ * marks disabled (`side.js` chooseMove), and a refusal sends the whole side's `default`: a logged switch does not happen, a Tera or Mega
+ * click is lost, and the partner loses its action. The Struggle of a Choice-locked body, a move an Encore then a Disable ended, a drifted
+ * volatile and a move at 0 PP reach it. A move the request offers enabled stays. One it lacks or disables becomes a stand-in of the
+ * request by the rule of `clickBehindBlockedMove` (the first enabled move of the shown move's Dex category and the simulator's
+ * `actionPriority`, else the slowest). A Z-move or Max move that the request offers (`canZMove`, `maxMoves`) stays: the simulator maps its
+ * name onto the base move (`side.js` 423-434). No stand-in (no enabled move): the shown move, refused as before.
+ */
+function playableMove(active: SimPokemon | null | undefined, moveName: string, events: string[]): string {
+  if (!active) return moveName;
+  const moveId = toId(moveName);
+  const request = active.getMoveRequestData() as ReturnType<SimPokemon['getMoveRequestData']> & {
+    canZMove?: ({ move: string } | null)[]; maxMoves?: { maxMoves?: { move: string }[] };
+  };
+  const entry = request.moves.find(move => move.id === moveId || toId(move.move) === moveId);
+  if (entry) return entry.disabled ? clickBehindBlockedMove(active, moveName, events) ?? moveName : moveName;
+  const gimmickMoves = [...(request.canZMove ?? []).map(move => move?.move), ...(request.maxMoves?.maxMoves ?? []).map(move => move.move)];
+  if (gimmickMoves.some(move => move && toId(move) === moveId)) return moveName;
+  return clickBehindBlockedMove(active, moveName, events) ?? moveName;
+}
+
+/**
  * The click behind a `|cant|` move the body's set lacks (round 67, T108). The
  * move never ran: its blocker stopped it. The stand-in is one of the body's
  * own moves the same blocker stops, the first enabled request move with the
@@ -365,7 +387,7 @@ function getChoiceForSlot(
     if (line.startsWith(`|move|${ident}`) && !isRelayedMoveLine(line, battle.dex)) {
       const active = battle.sides[sideIdx].active[activeSlot];
       const clicked = clickBehindEncore(events, lineIndex, ident, active, line.split('|')[3]);
-      const moveName = clicked ?? line.split('|')[3];
+      const moveName = playableMove(active, clicked ?? line.split('|')[3], events);
       const targetLoc = clicked ? 0 : protocolTargetLoc(battle, side, activeSlot, line.split('|')[4]);
       const suffix = targetLocSuffixForChoice(
         battle,
@@ -413,8 +435,11 @@ function choiceFromCant(
 ): string | undefined {
   const shownMove = line.includes('[of]') ? undefined : line.split('|')[4]?.trim();
   if (!shownMove) return undefined;
-  const moveName = active && !knowsMove(active, shownMove) ? clickBehindBlockedMove(active, shownMove, events) : shownMove;
-  if (!moveName) return defaultChoiceForSlot(events, ident, battle, active);
+  // Round 89 (#143): an Encore before the `cant` line bent the click, and the line shows the encored move, not the click.
+  const encored = clickBehindEncore(events, events.indexOf(line), ident, active, shownMove);
+  const asked = encored ?? (active && !knowsMove(active, shownMove) ? clickBehindBlockedMove(active, shownMove, events) : shownMove);
+  if (!asked) return defaultChoiceForSlot(events, ident, battle, active);
+  const moveName = playableMove(active, asked, events);
   const suffix = targetLocSuffixForChoice(battle, active, moveName, 0);
   return `${moveChoiceForActive(active, moveName)}${suffix}${gimmickSuffixForSlot(events, ident, active)}`;
 }
