@@ -1,7 +1,7 @@
 import { cellKey, rankFromMatrix, toResult as rankedToResult } from './rank.ts';
 import { attachKoOdds, koOddsMapsFor } from './search/root-payload.ts';
 import type { CellBlendClass, EvalCellValue, EvalMatrix, EvalResult, KoOddsMismatch, MatrixCell, MctsTreeStats, PlannedCell } from './types.ts';
-import { cellContribution, pooledChanceValue, type TreeCell } from './search/merge-pool.ts';
+import { cellContribution, classPoolTrust, pooledChanceValue, VERIFY_ENDGAME_MIN_VISITS, type PoolEntry, type TreeCell } from './search/merge-pool.ts';
 import { VERIFY_DISAGREEMENT, VERIFY_MIN_TREES, VERIFY_MIN_VISITS, weightedDisagreement } from './verify-select.ts';
 
 // Round 63: the verify cell selection lives in verify-select.ts; its names stay importable from here.
@@ -40,13 +40,6 @@ const VERIFY_DEPTH_FLOOR = 0.9;
  * ranking advised U-turn beside a score that saw the other side winning. The middlegame keeps the floor (655336 t24).
  */
 const VERIFY_ENDGAME_LIVING = 2;
-
-/**
- * A value short of a decided game needs a pool that played the cell out, more than the VERIFY_MIN_VISITS a decided
- * pool needs. Champions VGC 2628166702 turn 7 (the last pair) pooled 24 visits of Dark Pulse into Protect at about
- * 0.1, while the sampler one ply deeper read the win the prover proves in two turns (T63's pools held 400 to 650).
- */
-const VERIFY_ENDGAME_MIN_VISITS = 100;
 
 const endgameOf = (trees: MctsTreeStats[]): boolean => {
   const living = trees[0]?.living;
@@ -95,24 +88,21 @@ function pooledCells(trees: MctsTreeStats[]): Map<number, PooledCell> {
  */
 function poolContinuation(
   trees: MctsTreeStats[], key: number, classKey?: string, acceptUnkeyed = false,
-): { value: number; visits: number; trees: number; disagreement: number } {
+): { value: number; visits: number; trees: number; disagreement: number; entries: PoolEntry[] } {
   let total = 0;
   let weight = 0;
   let visits = 0;
-  const entries: { mean: number; weight: number }[] = [];
+  const entries: PoolEntry[] = [];
   for (const tree of trees) {
     const own = cellContribution(tree.cells.find(entry => entry.key === key), classKey, acceptUnkeyed);
     if (!own) continue;
     total += own.mean * own.weight;
     weight += own.weight;
     visits += own.visits;
-    entries.push({ mean: own.mean, weight: own.weight });
+    entries.push(own);
   }
-  return { value: weight > 0 ? total / weight : NaN, visits, trees: entries.length, disagreement: weightedDisagreement(entries) };
+  return { value: weight > 0 ? total / weight : NaN, visits, trees: entries.length, disagreement: weightedDisagreement(entries), entries };
 }
-
-/** A class pool rich enough to carry depth: VERIFY_MIN_VISITS visits over at least two trees (four trees split across classes). */
-const VERIFY_MIN_CLASS_TREES = 2;
 
 /** A pool that has played its cell out and agrees: its depth outranks the one-ply sampler (in an endgame below the floor too, given the visits). */
 function deepPool(pool: ReturnType<typeof poolContinuation>, minTrees: number, endgame: boolean): boolean {
@@ -133,7 +123,9 @@ function deepPool(pool: ReturnType<typeof poolContinuation>, minTrees: number, e
  * while the one miss tree sat at +0.2 — the hit class keeps its depth,
  * the miss class keeps the sampler). Trees without a recorded class join
  * a pool only in the one-open-class shape, where every open draw must
- * belong to that class (round 32's rule as the special case). Round 63
+ * belong to that class (round 32's rule as the special case). Round 89 (T322): "deep" for a class is classPoolTrust's
+ * rule (merge-pool.ts: thin trees leave, a standard error and the visits decide, no depth floor, no endgame clause);
+ * the plain path keeps deepPool and the floor. Round 63
  * (T16): the verify step takes every open class one ply deeper
  * (cls.deepened) and a plain cell's outcome groups mixed by share
  * (cell.deepened), so no verified cell mixes depths.
@@ -162,7 +154,9 @@ function verifiedValue(trees: MctsTreeStats[], key: number, cell: EvalCellValue,
       continue;
     }
     const pool = poolContinuation(trees, key, cls.key, open.length === 1);
-    value += cls.weight * (deepPool(pool, VERIFY_MIN_CLASS_TREES, endgame) ? pool.value : classMean(cls));
+    // Round 89 (T322, #59): the class's trust rule (merge-pool.ts), without the depth floor and the endgame clause.
+    const trust = classPoolTrust(pool.entries);
+    value += cls.weight * (trust.deep ? trust.value : classMean(cls));
   }
   return value;
 }

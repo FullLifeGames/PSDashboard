@@ -1,6 +1,7 @@
 import { test, expect, describe } from 'vitest';
 import { mergeMctsTrees, rowCompletedCells, starvedSupportCells, VERIFY_DISAGREEMENT, VERIFY_SAMPLES, weightedDisagreement } from '../src/mcts-merge';
 import { cellKey } from '../src/rank';
+import { classPoolTrust } from '../src/search/merge-pool';
 import type { MctsTreeStats } from '../src/types';
 
 /**
@@ -223,17 +224,19 @@ describe('starved support cells are verified before the verdict', () => {
     expect(mergeMctsTrees(middlegame, verified).matrix!.values[0][0]).toBeCloseTo(0.4, 10);
   });
 
-  test('a rich, agreeing boundary cell below the depth floor keeps the sampler blend (round 32)', () => {
-    // 655336 t24: 528 visits agreed at +0.52 for Dragon Claw × Return while
-    // the sampler's static read +0.08; a middlegame mean over exploration is
-    // not a verdict, so the round-7 sampler stands.
+  test('a rich, agreeing boundary cell below the old depth floor keeps its pool in the blend (round 89, was round 32)', () => {
+    // 655336 t24: 528 visits agreed at +0.52 for Dragon Claw x Return while the sampler's static read +0.08. Round 32
+    // kept the sampler below the depth floor of 0.9; round 89 (ruling of 09.11.2026, A14 finding 3) drops the floor on
+    // the blend path, because four agreeing trees of 30 visits have played the class out as far as the search can. The plain
+    // path keeps the floor (the plain row above).
     const mid = (offset: number) => mk({ p1N: [40, 2], p1W: [20, 1], p2N: [40, 2], p2W: [20, 1] }, [
       { key: cellKey(0, 0), visits: 30, total: 15.6 - offset * 0.1, value: 0.5, ended: false },
     ]);
     const trees = [mid(0), mid(1), mid(2), mid(3)];
     const blend = { firstLeaf: 0.08, classes: [{ key: 'hit-nokill', weight: 1, leafSum: 1.12, count: 14, hasFirst: true, ended: false }] };
     const verified = new Map([[cellKey(0, 0), { i: 0, j: 0, value: 0.08, ended: false, blend }]]);
-    expect(mergeMctsTrees(trees, verified).matrix!.values[0][0]).toBeCloseTo(0.08, 10);
+    // One open class, so the unkeyed trees join: the pool is (sum of totals + values) / (sum of visits + trees).
+    expect(mergeMctsTrees(trees, verified).matrix!.values[0][0]).toBeCloseTo((64.4 - 0.6) / 124, 10);
   });
 
   test('a rich, agreeing cell with two open classes keeps the sampler blend (round 32)', () => {
@@ -458,5 +461,77 @@ describe('chance cells pool per class (round 43)', () => {
     const plain = mk([{ key: cellKey(0, 0), visits: 8, total: 4.8, value: 0.5, ended: false }]);
     const merged = mergeMctsTrees([plain, plain]);
     expect(merged.matrix!.values[0][0]).toBeCloseTo((4.8 + 4.8 + 0.5) / 17, 10);
+  });
+});
+
+describe('the trust rule for a class pool of the blend path (round 89, T322, #59)', () => {
+  // One entry per kept tree: its prior-blended mean, weight visits + 1, and its visits (what poolContinuation collects).
+  const entry = (visits: number, mean: number) => ({ mean, weight: visits + 1, visits });
+
+  test('two equal trees read the old spread as their standard error', () => {
+    const trust = classPoolTrust([entry(9, 0.1), entry(9, 0.25)]);
+    expect(trust.spread).toBeCloseTo(VERIFY_DISAGREEMENT, 10);
+    expect(trust.deep).toBe(true);
+    expect(classPoolTrust([entry(9, 0.1), entry(9, 0.27)]).deep).toBe(false);
+  });
+
+  test('a tree below an eighth of the deepest leaves the count, the spread and the value', () => {
+    // 199, 21 and 3 visits: the last two are thin (199 / 8 = 24.9); the 199 stands alone with its own mean.
+    const trust = classPoolTrust([entry(199, -0.9), entry(21, 0.4), entry(3, 0.9)]);
+    expect(trust.trees).toBe(1);
+    expect(trust.visits).toBe(199);
+    expect(trust.value).toBeCloseTo(-0.9, 10);
+    expect(trust.deep).toBe(true);
+    // 25 visits is no longer thin (25 >= 199 / 8): it joins, and the 1.3 gap between the two means breaks the spread.
+    expect(classPoolTrust([entry(199, -0.9), entry(25, 0.4)]).deep).toBe(false);
+  });
+
+  test('one tree stands from 100 visits and not below, at any magnitude', () => {
+    expect(classPoolTrust([entry(120, -0.5)])).toMatchObject({ deep: true, trees: 1 });
+    expect(classPoolTrust([entry(120, -0.5)]).value).toBeCloseTo(-0.5, 10);
+    expect(classPoolTrust([entry(99, -0.5)]).deep).toBe(false);
+    expect(classPoolTrust([]).deep).toBe(false);
+  });
+
+  test('two or more trees need 8 pooled visits', () => {
+    expect(classPoolTrust([entry(3, 0.5), entry(3, 0.5)]).deep).toBe(false);
+    expect(classPoolTrust([entry(4, 0.5), entry(4, 0.5)]).deep).toBe(true);
+  });
+
+  test('thin pools of Champions VGC 2628166702 (Flare Blitz, 2 to 7 visits per tree, 16 to 17 pooled at +0.98) stand', () => {
+    expect(classPoolTrust([entry(7, 0.98), entry(5, 0.98), entry(3, 0.97), entry(2, 0.99)]).deep).toBe(true);
+    expect(classPoolTrust([entry(6, 0.98), entry(5, 0.98), entry(3, 0.98), entry(2, 0.98)]).deep).toBe(true);
+  });
+
+  const options = (labels: string[]) => labels.map(label => ({ choice: label, label }));
+  const emptyResult = { score: 0, interval: 0, depthCompleted: 2, perSide: { p1: [], p2: [] } };
+  const mk = (cells: MctsTreeStats['cells']): MctsTreeStats => ({
+    p1Options: options(['Safe', 'Sack']), p2Options: options(['X', 'Y']),
+    p1N: [40, 2], p1W: [-30, 1], p2N: [40, 2], p2W: [-30, 1],
+    visits: 42, depth: 2, rootValue: 0.5, cells, result: emptyResult, living: { p1: 4, p2: 4 },
+  });
+  const cell = (visits: number, mean: number, classKey: string) => ({
+    key: cellKey(0, 0), visits, total: mean * (visits + 1) + 0.1, value: -0.1, ended: false, classKey,
+  });
+  const blend = { firstLeaf: -0.1, classes: [
+    { key: 'hit-nokill', weight: 0.8, leafSum: -0.3, count: 3, hasFirst: true, ended: false },
+    { key: 'miss', weight: 0.2, leafSum: 0.6, count: 3, hasFirst: false, ended: false },
+  ] };
+  const verified = new Map([[cellKey(0, 0), { i: 0, j: 0, value: -0.04, ended: false, blend }]]);
+
+  test('a lone 120-visit tree at -0.5 stands in a middlegame; a lone 60-visit tree takes the sampler mean', () => {
+    // Both sides hold four Pokemon, so no endgame clause helps; the miss class (one tree, 5 visits) takes the sampler.
+    const lone = (visits: number) => mergeMctsTrees([
+      mk([cell(visits, -0.5, 'hit-nokill')]), mk([cell(5, 0.2, 'miss')]),
+    ], verified).matrix!.values[0][0];
+    expect(lone(120)).toBeCloseTo(0.8 * -0.5 + 0.2 * 0.2, 10);
+    expect(lone(60)).toBeCloseTo(0.8 * (-0.3 / 3) + 0.2 * 0.2, 10);
+  });
+
+  test('a thin tree leaves the pooled value of its class in the merge', () => {
+    const trees = [
+      mk([cell(199, -0.9, 'hit-nokill')]), mk([cell(21, 0.4, 'hit-nokill')]), mk([cell(3, 0.9, 'hit-nokill')]), mk([cell(5, 0.2, 'miss')]),
+    ];
+    expect(mergeMctsTrees(trees, verified).matrix!.values[0][0]).toBeCloseTo(0.8 * -0.9 + 0.2 * 0.2, 10);
   });
 });
