@@ -3,7 +3,7 @@ import type { MatchupCache } from '../eval-function.ts';
 import { advancePositionWithLog, positionBattle, type ChoiceOption, type SimPosition } from '../forward-model.ts';
 import { PROBE_SEEDS } from '../cell-blend.ts';
 import { GIMMICK_TOKENS } from '../rank.ts';
-import type { EvalCellValue } from '../types.ts';
+import type { ClassPricing, EvalCellValue } from '../types.ts';
 import { combinedOptionHints, isCombined } from './hints.ts';
 import { leafValue, SEARCH_SEEDS } from './leaf.ts';
 
@@ -81,6 +81,11 @@ export interface CheapDeepening {
   price: (child: SimPosition) => number;
   statesOnly: boolean;
   minWeight: number;
+  /**
+   * Round 89 (T322, #59): after a `price` call, whether that call's light search cut neither side's option list, so it
+   * was the full search. Absent means the lists may have been cut.
+   */
+  uncut?: () => boolean;
 }
 
 /**
@@ -320,7 +325,20 @@ export function deeperValues(
   outcomes: readonly Outcome[], deepen: (child: SimPosition) => number, cover: number, cap = Number.POSITIVE_INFINITY,
   states: StateRule = VERIFY_STATE_RULE.singles, cheap?: CheapDeepening,
 ): number[] {
+  return deeperPriced(outcomes, deepen, cover, cap, states, cheap).values;
+}
+
+/**
+ * `deeperValues` with the depth each outcome got (round 89, T322, #59): 'full' for the outcomes the cover loop took and for
+ * a light price that cut neither list (the search was the full one), 'light' for the cheap callback's price, 'shift' for the
+ * one-ply leaf plus the mean step. An ended outcome keeps its leaf and reads 'full'. The values are `deeperValues`' own.
+ */
+export function deeperPriced(
+  outcomes: readonly Outcome[], deepen: (child: SimPosition) => number, cover: number, cap = Number.POSITIVE_INFINITY,
+  states: StateRule = VERIFY_STATE_RULE.singles, cheap?: CheapDeepening,
+): { values: number[]; priced: ClassPricing[] } {
   const values = outcomes.map(outcome => outcome.leaf);
+  const priced = outcomes.map((): ClassPricing => 'full');
   const open = outcomes.map((outcome, index) => ({ outcome, index })).filter(entry => !entry.outcome.ended)
     .sort((a, b) => b.outcome.weight - a.outcome.weight || a.index - b.index);
   const target = cover * open.reduce((sum, entry) => sum + entry.outcome.weight, 0);
@@ -341,11 +359,29 @@ export function deeperValues(
   }
   for (const index of rest) {
     const outcome = outcomes[index];
-    const priced = cheap !== undefined && outcome.weight >= cheap.minWeight;
-    if (priced && outcome.groups) values[index] = deeperStates(outcome.groups, cheap.price, states).value;
-    else values[index] = priced && !cheap.statesOnly ? cheap.price(outcome.child) : outcome.leaf + step / covered;
+    const cheapPrice = cheap !== undefined && outcome.weight >= cheap.minWeight;
+    if (cheapPrice) {
+      let cut = false;
+      const price = (child: SimPosition): number => {
+        const value = cheap.price(child);
+        if (cheap.uncut?.() !== true) cut = true;
+        return value;
+      };
+      if (outcome.groups) {
+        values[index] = deeperStates(outcome.groups, price, states).value;
+        priced[index] = cut ? 'light' : 'full';
+        continue;
+      }
+      if (!cheap.statesOnly) {
+        values[index] = price(outcome.child);
+        priced[index] = cut ? 'light' : 'full';
+        continue;
+      }
+    }
+    values[index] = outcome.leaf + step / covered;
+    priced[index] = 'shift';
   }
-  return values;
+  return { values, priced };
 }
 
 /**
@@ -374,14 +410,41 @@ export function deepenVerifiedCell(
   const states = stateRuleFor(draws.firstChild);
   if (value.blend) {
     const open = value.blend.classes.filter(cls => !cls.ended && draws.classChildren?.has(cls.key));
-    const values = deeperValues(open.map(cls => {
+    const { values, priced } = deeperPriced(open.map(cls => {
       const groups = draws.classGroups?.get(cls.key);
       return { weight: cls.weight, child: draws.classChildren!.get(cls.key)!, leaf: cls.leafSum / cls.count, ended: false, ...(groups ? { groups } : {}) };
     }), deepen, cover, Number.POSITIVE_INFINITY, states, cheap);
-    open.forEach((cls, index) => { cls.deepened = values[index]; });
+    open.forEach((cls, index) => { cls.deepened = values[index]; cls.priced = priced[index]; });
     return;
   }
   const groups = draws.outcomes ?? [{ share: 1, child: draws.firstChild, leaf: value.value, ended: value.ended }];
   const values = deeperValues(groups.map(group => ({ ...group, weight: group.share })), deepen, cover, Number.POSITIVE_INFINITY, states, cheap);
   value.deepened = groups.reduce((sum, group, index) => sum + group.share * values[index], 0);
+}
+
+/**
+ * Round 89 (T322, #59): the full price of one class of a sampled cell, the one the cover loop gives its heaviest class: the
+ * class child through `deepen`, or its states through the rule's cover and cap where its draws differ. Undefined where the
+ * cell holds no such class (a plain cell, an ended class or a key the cell lacks). The strand job reads it.
+ */
+export function deepenClass(
+  value: EvalCellValue, draws: VerifyDraws, classKey: string, deepen: (child: SimPosition) => number,
+): number | undefined {
+  const cls = value.blend?.classes.find(entry => entry.key === classKey);
+  const child = draws.classChildren?.get(classKey);
+  if (!cls || cls.ended || !child) return undefined;
+  const groups = draws.classGroups?.get(classKey);
+  return groups ? deeperStates(groups, deepen, stateRuleFor(draws.firstChild)).value : deepen(child);
+}
+
+/** Round 89 (T322, #59): the full price of each named class of a re-sampled verify cell; a key the cell lacks has no entry. */
+export function strandValues(
+  value: EvalCellValue, draws: VerifyDraws, keys: readonly string[], price: (child: SimPosition) => number,
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const key of keys) {
+    const priced = deepenClass(value, draws, key, price);
+    if (priced !== undefined) out[key] = priced;
+  }
+  return out;
 }

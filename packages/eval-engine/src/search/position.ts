@@ -8,11 +8,12 @@ import {
 } from '../rank.ts';
 import { koOddsForOptions } from '../cell-blend.ts';
 import type { CellValue, SearchExecutor } from '../orchestrator.ts';
-import type { CellDraw, EvalCellJob, EvalResult, EvalSettings, RankedChoice } from '../types.ts';
+import type { CellDraw, EvalResult, EvalSettings, RankedChoice } from '../types.ts';
 import { countFainted, leafValue, SEARCH_SEEDS } from './leaf.ts';
-import { sampleCell, type CellSample } from './cell-sampler.ts';
+import { sampleCell } from './cell-sampler.ts';
 import { probeDraw } from './trend-probe.ts';
-import { deepenVerifiedCell, lightOptions, VERIFY_CHEAP, VERIFY_DEEPEN_COVER, VERIFY_LIGHT, VERIFY_PLAIN_DRAWS, type CheapDeepening } from './verify-cell.ts';
+import { lightOptions, VERIFY_PLAIN_DRAWS } from './verify-cell.ts';
+import { cellValueOf, deepenVerifyJob, strandCell, type JobPrices } from './verify-job.ts';
 import { isCombined } from './hints.ts';
 import { expandPivotPairs, restrictOptions, searchOptions } from './options.ts';
 import { attachRootPayload, koOddsMapsFor, type RootPayload } from './root-payload.ts';
@@ -45,9 +46,11 @@ export function subSearchDepth1(
   settings: EvalSettings,
   matchupCache: MatchupCache = createMatchupCache(settings.ruleset),
   light = false,
+  report?: { cut: boolean },
 ): EvalResult {
   const root = createRootPosition(serializedBattle, settings.ruleset);
   const battle = positionBattle(root);
+  if (report) report.cut = false;
   if (battle.ended) {
     return { score: leafValue(battle, matchupCache), interval: 0, depthCompleted: settings.depth, perSide: { p1: [], p2: [] } };
   }
@@ -56,6 +59,8 @@ export function subSearchDepth1(
   const full2 = searchOptions(root, 'p2', { tera, keep: settings.keepPlayed?.p2Slots, sleepClause: settings.sleepClause });
   const p1Options = light ? lightOptions(root, 'p1', full1) : full1;
   const p2Options = light ? lightOptions(root, 'p2', full2) : full2;
+  // Round 89 (T322, #59): the verify round marks a light price that cut neither list as a full one.
+  if (report) report.cut = p1Options.length < full1.length || p2Options.length < full2.length;
   if (p1Options.length === 0 || p2Options.length === 0) {
     return searchOn(serializedBattle, settings, undefined, matchupCache);
   }
@@ -305,32 +310,11 @@ export function createLocalExecutor(serializedBattle: string, ruleset: StaticRul
   return executorToGiven(order, localExecutorOn(order.serialized, ruleset));
 }
 
-/**
- * One verify job's deepening: the heaviest outcomes through a full depth-1 sub-search, and (round 69, T148) the doubles
- * outcomes beyond the cover through a light one. The perf counters are the cost proxy of the verify round.
- */
-function deepenVerifyJob(
-  value: CellValue, cell: CellSample, deepen: EvalSettings, matchupCache: MatchupCache, gameType: 'singles' | 'doubles',
-): void {
-  const full = (child: SimPosition) => { perfCount('verify-sub-full'); return subSearch(child.serialized, deepen, matchupCache).score; };
-  const mode = VERIFY_CHEAP[gameType];
-  const cheap: CheapDeepening | undefined = mode === 'off' ? undefined : {
-    price: child => { perfCount('verify-sub-light'); return subSearchDepth1(child.serialized, deepen, matchupCache, true).score; },
-    statesOnly: mode === 'states',
-    minWeight: VERIFY_LIGHT.minWeight,
-  };
-  deepenVerifiedCell(value, cell, full, VERIFY_DEEPEN_COVER[gameType], cheap);
-}
-
-/** A sampled root cell as the executor reports it; round 70: with the base draws the trend probe replays. */
-function cellValueOf(job: EvalCellJob, cell: CellSample): CellValue {
-  return {
-    i: job.i, j: job.j, value: cell.value, ended: cell.ended,
-    ...(cell.blend ? { blend: cell.blend } : {}),
-    ...(cell.diagnostic ? { diagnostic: { ...cell.diagnostic, i: job.i, j: job.j } } : {}),
-    ...(cell.baseDraws ? { baseDraws: cell.baseDraws } : {}),
-  };
-}
+/** The sub-searches a verify or strand job prices with: the verify settings' own search, and the light one that reports whether it cut a list. */
+const jobPrices = (deepen: EvalSettings, matchupCache: MatchupCache): JobPrices => ({
+  full: child => subSearch(child.serialized, deepen, matchupCache).score,
+  light: (child, report) => subSearchDepth1(child.serialized, deepen, matchupCache, true, report).score,
+});
 
 function localExecutorOn(serializedBattle: string, ruleset: StaticRuleset): SearchExecutor {
   const matchupCache = createMatchupCache(ruleset);
@@ -380,8 +364,11 @@ function localExecutorOn(serializedBattle: string, ruleset: StaticRuleset): Sear
         const { deepen } = job;
         const cell = sampleCell(root, rootFainted, job.p1Choice, job.p2Choice, job.samples, matchupCache, true, deepen ? VERIFY_PLAIN_DRAWS : undefined);
         const value = cellValueOf(job, cell);
-        if (deepen) deepenVerifyJob(value, cell, deepen, matchupCache, gameType);
-        out.push(value);
+        if (deepen && job.strands) out.push(strandCell(value, cell, job.strands, jobPrices(deepen, matchupCache)));
+        else {
+          if (deepen) deepenVerifyJob(value, cell, gameType, jobPrices(deepen, matchupCache));
+          out.push(value);
+        }
         completed += 1;
         onDone?.(completed);
       }
