@@ -61,26 +61,46 @@ function isSpeciesBody(pokemon: SimPokemon, species: string): boolean {
   return sameBodyForme(pokemon.battle.dex, pokemon.species?.name, species) || toId(pokemon.name || '') === toId(species);
 }
 
-export function findSlotBySpecies(battle: SimBattle, sideIdx: number, species: string): number {
+/**
+ * The party slot (1-based) of the living bench body that is `species`, or null. `taken`: slots another answer of the same choice sent
+ * already (the simulator refuses one body in two slots: "can only switch in once").
+ */
+export function findSpeciesSlot(battle: SimBattle, sideIdx: number, species: string, taken?: ReadonlySet<number>): number | null {
   const side = battle.sides[sideIdx];
-  const speciesId = toId(species);
   // An empty id (a name without Latin letters) is no key: it is a prefix of every species.
-  if (speciesId === '') return findFirstAvailableSwitchSlot(battle, sideIdx);
+  if (toId(species) === '') return null;
 
   // Round 89 (#118): the Dex only. The second pass (a shared prefix of the ids) tied Mew to Mewtwo and Porygon to Porygon2; over 7,032 corpus
   // games it answered one lookup, Greninja-Ash against a "Greninja" slot, which `formeFamily` now ties through the Dex.
-  const index = side.pokemon.findIndex(pokemon => !pokemon.isActive && !pokemon.fainted && isSpeciesBody(pokemon, species));
-  if (index >= 0) return index + 1;
-
-  return findFirstAvailableSwitchSlot(battle, sideIdx);
+  const index = side.pokemon.findIndex((pokemon, at) => !pokemon.isActive && !pokemon.fainted && !taken?.has(at + 1) && isSpeciesBody(pokemon, species));
+  return index >= 0 ? index + 1 : null;
 }
 
-export function findFirstAvailableSwitchSlot(battle: SimBattle, sideIdx: number): number {
+export function findSlotBySpecies(battle: SimBattle, sideIdx: number, species: string, taken?: ReadonlySet<number>): number {
+  return findSpeciesSlot(battle, sideIdx, species, taken) ?? findFirstAvailableSwitchSlot(battle, sideIdx, taken);
+}
+
+/** Round 89 (#144, b): `taken` skips the bench bodies another answer of the same choice sent. */
+export function findFirstAvailableSwitchSlot(battle: SimBattle, sideIdx: number, taken?: ReadonlySet<number>): number {
   const side = battle.sides[sideIdx];
   for (let i = 0; i < side.pokemon.length; i++) {
-    if (!side.pokemon[i].isActive && !side.pokemon[i].fainted) return i + 1;
+    if (!side.pokemon[i].isActive && !side.pokemon[i].fainted && !taken?.has(i + 1)) return i + 1;
   }
   return 2;
+}
+
+/**
+ * Round 89 (#131): the party slot (1-based) of the fainted body a Revival Blessing request brings back: the body the log names (by the
+ * name the simulator carries, else by species), else the first fainted body that is not taken, which is the body the simulator's own
+ * `default` revives. Null where the party has none.
+ */
+export function findFaintedSlot(battle: SimBattle, sideIdx: number, name: string | undefined, taken?: ReadonlySet<number>): number | null {
+  const side = battle.sides[sideIdx];
+  const fainted = (pokemon: SimPokemon, at: number) => !pokemon.isActive && pokemon.fainted && !taken?.has(at + 1);
+  const named = name ? side.pokemon.findIndex((pokemon, at) => fainted(pokemon, at) && pokemon.name === name) : -1;
+  const kin = named >= 0 || !name || toId(name) === '' ? named : side.pokemon.findIndex((pokemon, at) => fainted(pokemon, at) && isSpeciesBody(pokemon, name));
+  const index = kin >= 0 ? kin : side.pokemon.findIndex(fainted);
+  return index >= 0 ? index + 1 : null;
 }
 
 /** A body by the exact name the simulator carries (the replay's own), else by species or by the id of its name; an empty id is no key. */

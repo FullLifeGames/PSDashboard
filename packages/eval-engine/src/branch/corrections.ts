@@ -3,9 +3,10 @@ import { protocolChoiceLock, type ChoiceLockContext } from '../choice-lock.ts';
 import { restoreSideInvariants } from '../forward-model.ts';
 import type { SimBattle, SimPokemon, SimSide } from './types.ts';
 import { sameBodyForme } from './body-forme.ts';
-import { retireBenchAfterFaints, retireUnshownBench, sameBodyName, settleFaintFromSnapshot, type ProtocolBench } from './team-order.ts';
+import { retireBenchAfterFaints, sameBodyName, settleFaintFromSnapshot } from './team-order.ts';
 import { retireUnshownActives } from './unshown-actives.ts';
-import { findFirstAvailableSwitchSlot, findPokemonOnSide, findSlotBySpecies } from './protocol-choices.ts';
+import { findPokemonOnSide } from './protocol-choices.ts';
+import { buildForcedSwitchChoice } from './forced-choice.ts';
 import { correctFieldFromSnapshot } from './field-correction.ts';
 import { applyProtocolHeldItems } from './held-items.ts';
 import { playProtocolEntries, playProtocolStarts } from './entry-effects.ts';
@@ -18,7 +19,7 @@ import { hpOfSighting } from './pokemon-info.ts';
 import { normalizeLines } from '../line-endings.ts';
 import { forceSwitches, hasForceSwitch } from './forced-slots.ts';
 
-export { forceSwitches, hasForceSwitch };
+export { forceSwitches, hasForceSwitch, buildForcedSwitchChoice };
 
 function repointActiveSlot(side: SimSide, activeSlot: number, target: SimPokemon): boolean {
   if (side.active[activeSlot] === target) return false;
@@ -124,36 +125,6 @@ function restampProtocolLocks(battle: SimBattle, context: ChoiceLockContext, tur
     // the direct volatile carries everything the sim needs.
     active.volatiles['choicelock'] = { id: 'choicelock', move: lock.moveId } as never;
   }
-}
-
-/**
- * `bench`: what the protocol says about the side (ProtocolBench). With it, a forced slot the log leaves empty after its body
- * fainted takes `pass` once the bench bodies the protocol never shows are out of the game (round 73, T250); without it the
- * slot takes the first living body, as before.
- */
-export function buildForcedSwitchChoice(
-  battle: SimBattle,
-  sideIdx: number,
-  forcedSpecies: string[],
-  cursor: { current: number },
-  bench?: ProtocolBench,
-): string | null {
-  const needs = forceSwitches(battle, sideIdx);
-  if (!needs.some(Boolean)) return null;
-
-  const forced = needs.filter(Boolean).length;
-  const answers = Math.min(forced, Math.max(0, forcedSpecies.length - cursor.current));
-  const empty = !!bench && answers < forced &&
-    retireUnshownBench(battle, sideIdx, bench, answers, needs.flatMap((need, slot) => (need ? [slot] : [])));
-  if (battle.ended) return null;
-  const choices = needs.map(need => {
-    if (!need) return 'pass';
-    const species = forcedSpecies[cursor.current++];
-    if (species) return `switch ${findSlotBySpecies(battle, sideIdx, species)}`;
-    return empty ? 'pass' : `switch ${findFirstAvailableSwitchSlot(battle, sideIdx)}`;
-  });
-
-  return choices.join(', ');
 }
 
 /**
