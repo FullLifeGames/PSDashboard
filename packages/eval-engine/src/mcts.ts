@@ -6,13 +6,12 @@ import { attachKoOdds, hasUnansweredContent, koOddsMapsFor } from './search/root
 import { matrixCells, topVisitedIndex, treeScore } from './mcts-merge.ts';
 import { makeNode, pick, principalVariation, treeMatrix, type Node } from './search/mcts-node.ts';
 import { cellStats, isChanceNode, pickClass } from './search/chance-node.ts';
-import { positionSalt } from './search/root-quantile.ts';
+import { cellSeeds, positionSalt } from './search/root-quantile.ts';
 import { expandCell, type ExpansionContext, type RootClassBook } from './search/expansion.ts';
 import { forcedWinFor } from './search/forced-win.ts';
 import { applyForcedWin, forcedWinInput } from './search/forced-win-apply.ts';
 import { perfSync } from './perf-trace.ts';
 import { searchBudget, SEARCH_BUDGET_DEFAULT } from './search/budget.ts';
-import { SEARCH_SEEDS } from './search/leaf.ts';
 import { benchOrder, callbacksToGiven, resultToGiven, treeToGiven } from './search/bench-order.ts';
 import { pairPlanAnswer } from './pair/root-plan.ts';
 import { findPlayedOption } from './turn-analysis/played-match.ts';
@@ -266,13 +265,13 @@ const sortedClasses = (weights: Map<string, number>): CellOutcomeClass[] =>
 
 /**
  * Round 69 (T178): the outcome classes of a rolled root cell. One event folds in its own order; two events fold in
- * the order one advance of the cell shows (the first fixed search seed); an order the log does not settle gives no
+ * the order one advance of the cell shows (slot 0 of the cell's seed list, round 89); an order the log does not settle gives no
  * classes (the cell still reads events). Analytic weights, summing to 1.
  */
-function classesOf(root: Node, p1Choice: string, p2Choice: string, events: CellEvent[]): CellOutcomeClass[] | undefined {
+export function classesOf(root: Node, p1Choice: string, p2Choice: string, events: CellEvent[]): CellOutcomeClass[] | undefined {
   const first = events.length === 1
     ? events[0].side
-    : observeOrder([advancePositionWithLog(root.position, p1Choice, p2Choice, SEARCH_SEEDS[0]).log], events);
+    : observeOrder([advancePositionWithLog(root.position, p1Choice, p2Choice, cellSeeds(root.position, p1Choice, p2Choice)[0]).log], events);
   return first ? sortedClasses(foldClassWeights(events, first)) : undefined;
 }
 

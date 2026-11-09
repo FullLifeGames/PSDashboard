@@ -2,6 +2,7 @@ import type { Battle } from '@pkmn/sim';
 import { positionBattle, type SimPosition } from '../forward-model.ts';
 import { BOUNDARY_DRAW_BUDGET, type CellEvent } from '../cell-blend.ts';
 import { SEARCH_SEEDS } from '../search/leaf.ts';
+import { cellSeeds } from '../search/root-quantile.ts';
 import { classChildren, drawChild, median, totalHp, type Draw } from '../search/outcome-children.ts';
 import { createMatchupCache } from '../eval-function.ts';
 import { battleRuleset } from '../forward/ruleset.ts';
@@ -16,7 +17,7 @@ import { drawPair } from '../pair/draw.ts';
  * of chasing it with probe seeds; `missing` now means the sim refused the
  * class (calc/sim disagreement) or the forced cap was reached. Round 35:
  * `share` keeps the analytic weight for the prover, `plain` marks the
- * median path.
+ * median path. Round 89 (#60): every seed is a slot of the cell's own list (`cellSeeds`), the matrix's slots; the base count stays 5.
  */
 interface EndgameChild {
   position: SimPosition;
@@ -66,7 +67,7 @@ function plainGroup(draws: Draw[]): { pick: Draw; unpriced: boolean; spread: boo
  */
 function doublesTie(root: SimPosition, battle: Battle, p1Choice: string, p2Choice: string): boolean {
   if (battle.gameType === 'singles') return false;
-  return drawPair(root, p1Choice, p2Choice, SEARCH_SEEDS[0], new Map(), createMatchupCache(battleRuleset(battle))).records
+  return drawPair(root, p1Choice, p2Choice, cellSeeds(root, p1Choice, p2Choice)[0], new Map(), createMatchupCache(battleRuleset(battle))).records
     .some(record => record.kind === 'tie');
 }
 
@@ -79,15 +80,16 @@ function doublesTie(root: SimPosition, battle: Battle, p1Choice: string, p2Choic
  */
 function plainChildren(root: SimPosition, battle: Battle, rootHp: number, p1Choice: string, p2Choice: string): EndgameChildren {
   const count = damagingPair(battle, p1Choice, p2Choice) ? PLAIN_DRAWS : 1;
+  const seeds = cellSeeds(root, p1Choice, p2Choice).slice(0, count);
   if (doublesTie(root, battle, p1Choice, p2Choice)) {
-    const orders = (['p1', 'p2'] as const).map(first => plainGroup(SEARCH_SEEDS.slice(0, count).map(seed =>
+    const orders = (['p1', 'p2'] as const).map(first => plainGroup(seeds.map(seed =>
       drawChild(root, rootHp, p1Choice, p2Choice, seed, { scripts: new Map([[`${first}:tie`, { first }]]) }))));
     return {
       children: orders.map(order => ({ position: order.pick.position, weight: 0.5, share: 0.5, ended: order.pick.ended })),
       unpriced: orders.some(order => order.unpriced), plain: true, spread: orders.some(order => order.spread), missing: [], events: [],
     };
   }
-  const { pick, unpriced, spread } = plainGroup(SEARCH_SEEDS.slice(0, count).map(seed => drawChild(root, rootHp, p1Choice, p2Choice, seed)));
+  const { pick, unpriced, spread } = plainGroup(seeds.map(seed => drawChild(root, rootHp, p1Choice, p2Choice, seed)));
   return { children: [{ position: pick.position, weight: 1, share: 1, ended: pick.ended }], unpriced, plain: true, spread, missing: [], events: [] };
 }
 
@@ -98,7 +100,7 @@ function plainChildren(root: SimPosition, battle: Battle, rootHp: number, p1Choi
  */
 export function endgameChildren(root: SimPosition, p1Choice: string, p2Choice: string, drawBudget = BOUNDARY_DRAW_BUDGET): EndgameChildren {
   const battle = positionBattle(root);
-  const classes = classChildren(root, p1Choice, p2Choice, { baseSeeds: SEARCH_SEEDS, forcedCap: drawBudget });
+  const classes = classChildren(root, p1Choice, p2Choice, { baseSeeds: cellSeeds(root, p1Choice, p2Choice).slice(0, SEARCH_SEEDS.length), forcedCap: drawBudget });
   if (classes) {
     const children = classes.children.map(child => ({ position: child.position, weight: child.weight, share: child.share, ended: child.ended, key: child.key }));
     return { children, unpriced: classes.missing.length > 0, plain: false, spread: false, missing: classes.missing, events: classes.events };

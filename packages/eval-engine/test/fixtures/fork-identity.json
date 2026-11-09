@@ -2531,7 +2531,7 @@
       }
     ],
     "matrix": {
-      "score": 1,
+      "score": 0.9,
       "interval": 0,
       "depthCompleted": 1,
       "p1": [
@@ -2566,14 +2566,7 @@
           "punishedBy": "Tackle"
         }
       ],
-      "forcedWin": {
-        "side": "p1",
-        "turns": 5,
-        "mass": 1,
-        "caveat": "sampled-rolls",
-        "engineScore": 0.9,
-        "states": 14
-      }
+      "forcedWin": null
     },
     "mcts": {
       "score": 0.9313759368836287,
