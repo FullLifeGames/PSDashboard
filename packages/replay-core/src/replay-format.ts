@@ -281,18 +281,44 @@ export function speciesBaseId(name: string, rules: GameRules): string {
 export function broughtSpeciesFor(snapshots: TurnSnapshot[], side: 'p1' | 'p2', rules: GameRules): string[] {
   const seenBases = new Set<string>();
   const ordered: string[] = [];
+  const add = (own: string) => {
+    const base = speciesBaseId(own, rules);
+    if (seenBases.has(base)) return;
+    seenBases.add(base);
+    ordered.push(own);
+  };
   for (const turn of snapshots) {
     for (const pokemon of turn[side].pokemon) {
       if (!pokemon.isActive) continue;
       // Round 89 (#116): a body that wears a Transform copy (Imposter, the move) lists the species it entered with, never the copy.
-      const own = pokemon.baseSpeciesForme ?? pokemon.speciesForme;
-      const base = speciesBaseId(own, rules);
-      if (seenBases.has(base)) continue;
-      seenBases.add(base);
-      ordered.push(own);
+      add(pokemon.baseSpeciesForme ?? pokemon.speciesForme);
     }
+    // Round 89 (#124): a snapshot shows the bodies on the field at the turn's end, so a body that entered and fainted or left
+    // within the turn is in the turn's log lines only.
+    for (const name of enteredInLog(turn.log, side)) add(name);
   }
   return ordered;
+}
+
+/**
+ * Round 89 (#124): the species each protocol line of one turn brings onto the field for a side, in line order: `switch` (a
+ * player's switch, a U-turn or Volt Switch with `[from]`, the forced replacement after a faint) and `drag` (Roar, Whirlwind,
+ * Dragon Tail, Red Card). `replace` (an Illusion that breaks) names the real body, and the `switch` line it replaces named only
+ * the disguise, a party member that may never have fielded, so the replace drops that entry. The species is the first word of
+ * the details field, the species the body entered with.
+ */
+function enteredInLog(lines: readonly string[] | undefined, side: 'p1' | 'p2'): string[] {
+  const entries: { slot: string; species: string }[] = [];
+  for (const line of lines ?? []) {
+    const match = /^\|(switch|drag|replace)\|(p[1-4][a-d]): [^|]*\|([^|,]+)/.exec(line);
+    if (!match || !match[2].startsWith(side)) continue;
+    if (match[1] === 'replace') {
+      const disguised = entries.map(entry => entry.slot).lastIndexOf(match[2]);
+      if (disguised >= 0) entries.splice(disguised, 1);
+    }
+    entries.push({ slot: match[2], species: match[3] });
+  }
+  return entries.map(entry => entry.species);
 }
 
 /**

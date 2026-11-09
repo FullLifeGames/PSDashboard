@@ -83,18 +83,20 @@ const SCENES = [
   {
     label: 'Champions VGC 2625939941 (doubles; P1 short)', file: 'gen9championsvgc2026regma-2625939941.json', short: 'p1' as const,
     stats: statsOf([['Kingambit', 717550], ['Ninetales-Alola', 168774], ['Ceruledge', 91889]]),
-    order: ['Kingambit', 'Ninetales-Alola', 'Ceruledge'], noBody: ['Kangaskhan', 'Torkoal'],
+    order: ['Kingambit', 'Ninetales-Alola', 'Ceruledge'], noBody: ['Kangaskhan', 'Torkoal'], turns: [2, 4],
   },
   {
-    label: 'VGC 2630452654 (doubles; P2 short)', file: 'gen9vgc2026regi-2630452654.json', short: 'p2' as const,
-    stats: statsOf([['Urshifu-Rapid-Strike', 31258], ['Urshifu-Single-Strike', 6992], ['Farigiraf', 20502], ['Volcarona', 4479]]),
-    order: ['Urshifu', 'Farigiraf', 'Volcarona'], noBody: [] as string[],
+    // Round 89 (#124, B5b): 2630452654 fielded all four P2 bodies (Farigiraf came in and fainted within turn 2), so 2630181744
+    // (P1 never fielded its fourth body) carries the VGC Scarlet/Violet scene; the counts are test data.
+    label: 'VGC 2630181744 (doubles; P1 short)', file: 'gen9vgc2026regi-2630181744.json', short: 'p1' as const,
+    stats: statsOf([['Incineroar', 400000], ['Amoonguss', 200000], ['Grimmsnarl', 50000]]),
+    order: ['Incineroar', 'Amoonguss', 'Grimmsnarl'], noBody: [] as string[], turns: [2, 4, 6],
   },
 ];
 
 describe('#124: the blend of the worlds of a short-side game', () => {
   for (const scene of SCENES) {
-    test(`${scene.label}: turns 2 and 4 blend three worlds with one choice string for the unknown body`, async () => {
+    test(`${scene.label}: turns ${scene.turns.join(', ')} blend three worlds with one choice string for the unknown body`, async () => {
       const replay = fixture(scene.file);
       await loadSimMods(getBranchSimulatorFormat(replay));
       const worlds = bringWorlds(replayBringList(replay, parseReplayLog(replay.log), scene.stats), BRING_WORLD_CAP)!;
@@ -102,7 +104,8 @@ describe('#124: the blend of the worlds of a short-side game', () => {
       expect(worlds.map(world => world[scene.short][3].split('-')[0])).toEqual(scene.order.map(name => name.split('-')[0]));
       const teams = buildTeamsFromReplay(replay.log);
       let held = 0;
-      for (const turn of [2, 4]) {
+      let differed = 0;
+      for (const turn of scene.turns) {
         const results: EvalResult[] = [];
         for (const world of worlds) results.push(await evaluateWorld(replay, world, teams, turn));
         const weights = worlds.map(world => world.weight);
@@ -130,9 +133,10 @@ describe('#124: the blend of the worlds of a short-side game', () => {
           const evs = blended.perSide[side].map(row => row.ev);
           expect(evs).toEqual([...evs].sort((a, b) => b - a));
         }
-        // The worlds differ: the blend is not the heaviest world's own score.
-        expect(new Set(results.map(result => result.score.toFixed(9))).size, `turn ${turn}: the worlds read differently`).toBeGreaterThan(1);
+        // The worlds differ at some turn: the blend is not the heaviest world's own score (before the unknown body can enter, the worlds agree).
+        if (new Set(results.map(result => result.score.toFixed(9))).size > 1) differed++;
       }
+      expect(differed, 'the worlds read differently at some turn').toBeGreaterThan(0);
       expect(held, "the heaviest world ranks a switch to the unknown body at some turn").toBeGreaterThan(0);
     }, 600_000);
   }

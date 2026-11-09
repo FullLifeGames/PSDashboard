@@ -85,8 +85,10 @@ describe.skipIf(!HAVE_CORPUS)('the worlds of the corpus (#124)', () => {
     // Round 89: 4,033 games (Champions VGC bo1 523, bo3 900, VGC SV 2,610), 3,190 pinned and 843 short (113, 219, 511), 128 of them with more than three worlds.
     const all = Object.values(counts);
     expect(all.length).toBeGreaterThanOrEqual(3);
-    expect(all.reduce((sum, family) => sum + family.short, 0)).toBeGreaterThan(800);
-    expect(all.reduce((sum, family) => sum + family.capped, 0)).toBeGreaterThan(100);
+    // Round 89 (B5b): 550 short games once a body that entered and fainted within one turn counts as fielded (843 before).
+    expect(all.reduce((sum, family) => sum + family.short, 0)).toBeGreaterThan(500);
+    // 80 games hold more than three worlds (128 before).
+    expect(all.reduce((sum, family) => sum + family.capped, 0)).toBeGreaterThan(50);
     expect(wrong, JSON.stringify(counts)).toEqual([]);
   }, 600_000);
 });

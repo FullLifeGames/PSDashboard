@@ -315,11 +315,17 @@ const SCENES = [
     label: 'Champions VGC 2625939941 (doubles; P1 short, candidates Ceruledge, Ninetales-Alola, Kingambit)',
     file: 'gen9championsvgc2026regma-2625939941.json', short: 'p1' as const,
     fielded: ['Farigiraf', 'Basculegion', 'Lopunny'], candidates: ['Ceruledge', 'Ninetales', 'Kingambit'], noBody: ['Kangaskhan', 'Torkoal'],
+    lastBoundaryDiverges: false,
   },
   {
-    label: 'VGC 2630452654 (doubles; P2 short, candidates Urshifu-*, Volcarona, Farigiraf)',
-    file: 'gen9vgc2026regi-2630452654.json', short: 'p2' as const,
-    fielded: null, candidates: null, noBody: [] as string[],
+    // Round 89 (#124, B5b): 2630452654 was the VGC row until its P2 read as short by mistake (Farigiraf entered on Volt Switch and
+    // fainted in the same turn, so P2 fielded all four); 2630181744 is short by the log: P1 never fielded its fourth body.
+    label: 'VGC 2630181744 (doubles; P1 short, candidates Incineroar, Grimmsnarl, Amoonguss)',
+    file: 'gen9vgc2026regi-2630181744.json', short: 'p1' as const,
+    fielded: ['Calyrex-Shadow', 'Solgaleo', 'Rillaboom'], candidates: ['Incineroar', 'Grimmsnarl', 'Amoonguss'], noBody: ['Incineroar', 'Rillaboom'],
+    // The sim loses a P1 body at turn 6 that the log keeps, and its forced switch brings the guess in: the last boundary reads
+    // a replay divergence of the sim, not the list, so the party checks stop one boundary short.
+    lastBoundaryDiverges: true,
   },
 ];
 
@@ -379,17 +385,21 @@ describe('#124: the worlds of a short side', () => {
 
       const teams = buildTeamsFromReplay(replay.log);
       const shortIndex = scene.short === 'p1' ? 0 : 1;
+      const checkedParties = (boundaries: Boundaries) => {
+        const turnsOf = Object.keys(boundaries.parties).map(Number).sort((a, b) => a - b);
+        return (scene.lastBoundaryDiverges ? turnsOf.slice(0, -1) : turnsOf).map(turn => boundaries.parties[turn]);
+      };
       const rebuilt: Boundaries[] = [];
       for (const world of worlds) rebuilt.push(await rebuildWorld(replay, world, teams));
       worlds.forEach((world, index) => {
         expect(rebuilt[index].sizes).toEqual([4, 4]);
         const guess = speciesBaseId(world[scene.short][3], rules);
-        for (const party of Object.values(rebuilt[index].parties)) {
+        for (const party of checkedParties(rebuilt[index])) {
           expect(party[shortIndex][3], 'the guess of the world is the last slot').toBe(guess);
           for (const name of scene.noBody) expect(party[1 - shortIndex]).not.toContain(speciesBaseId(name, rules));
         }
       });
-      const turns = Object.keys(rebuilt[0].parties).map(Number);
+      const turns = Object.keys(rebuilt[0].parties).map(Number).sort((a, b) => a - b).slice(0, scene.lastBoundaryDiverges ? -1 : undefined);
       expect(turns.length).toBeGreaterThan(3);
       for (const turn of turns) {
         for (const next of rebuilt.slice(1)) {
@@ -400,14 +410,21 @@ describe('#124: the worlds of a short side', () => {
     }, 240_000);
   }
 
-  test('VGC 2630452654: the usage counts weigh Urshifu-* 0.61, Farigiraf 0.32, Volcarona 0.07 and Urshifu\'s world comes first', () => {
-    const replay = fixture('gen9vgc2026regi-2630452654.json');
-    const stats = statsOf([['Urshifu-Rapid-Strike', 31258], ['Urshifu-Single-Strike', 6992], ['Farigiraf', 20502], ['Volcarona', 4479]]);
+  test('VGC 2630181744: the usage counts weigh the candidates and the heaviest one comes first', () => {
+    const replay = fixture('gen9vgc2026regi-2630181744.json');
+    const stats = statsOf([['Incineroar', 4000], ['Amoonguss', 2000], ['Grimmsnarl', 500]]);
     const worlds = bringWorlds(replayBringList(replay, parseReplayLog(replay.log), stats), BRING_WORLD_CAP)!;
-    const total = 31258 + 6992 + 20502 + 4479;
-    expect(worlds.map(world => world.weight)).toEqual([38250 / total, 20502 / total, 4479 / total].map(weight => expect.closeTo(weight, 9)));
-    expect(worlds[0].p2[3]).toMatch(/^Urshifu/);
+    expect(worlds.map(world => world.weight)).toEqual([4000 / 6500, 2000 / 6500, 500 / 6500].map(weight => expect.closeTo(weight, 9)));
+    expect(worlds.map(world => world.p1[3])).toEqual(['Incineroar', 'Amoonguss', 'Grimmsnarl']);
     expect(worlds.reduce((sum, world) => sum + world.weight, 0)).toBeCloseTo(1, 9);
+  });
+
+  test('VGC 2630452654 is not short: P2\'s Farigiraf entered on Volt Switch and fainted the same turn, so both sides fielded four', () => {
+    const replay = fixture('gen9vgc2026regi-2630452654.json');
+    const list = replayBringList(replay, parseReplayLog(replay.log))!;
+    expect([list.p1.open, list.p2.open]).toEqual([0, 0]);
+    expect(bringWorlds(list, BRING_WORLD_CAP)).toHaveLength(1);
+    expect(replayBringOnly(replay, parseReplayLog(replay.log))!.p2).toContain('Farigiraf');
   });
 
   test('Battle Stadium Singles: four candidates, the three heaviest keep their share renormalized, every world rebuilds three against three', async () => {
