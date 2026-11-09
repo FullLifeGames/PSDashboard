@@ -17,9 +17,10 @@ import { usePositionSource } from '../usePositionSource';
 import { replayBench } from '../../lib/bench';
 import {
   type OpponentTeamInfo, type ReplayData, type TurnSnapshot, getReplayBringCount, getReplayGameType,
-  getReplayGeneration, replayBringOnly,
+  getReplayGeneration, replayBringList, replayBringOnly,
 } from '@fulllifegames/replay-core';
-import type { BranchSlotChoice } from '@fulllifegames/eval-engine';
+import { BRING_WORLD_CAP, bringWorlds, type BranchSlotChoice } from '@fulllifegames/eval-engine';
+import type { SmogonUsageStats } from '../../lib/smogon-stats';
 
 interface PendingBranchRefresh {
   p1Info: OpponentTeamInfo;
@@ -79,32 +80,44 @@ function useTeamRefreshQueue(
   return { pendingBranchRefresh, setPendingBranchRefresh, handleTeamsEdited, clearRefreshRequest };
 }
 
-function useFormatMeta(replayData: ReplayData | null, snapshots: TurnSnapshot[]) {
+function useFormatMeta(replayData: ReplayData | null, snapshots: TurnSnapshot[], usageStats: SmogonUsageStats | null) {
   const replayGen = useMemo(() => replayData ? getReplayGeneration(replayData) : 9, [replayData]);
   /** Bring-limited team preview (VGC 4 of 6, BSS 3 of 6) — null brings all. */
   const bringCount = useMemo(
     () => (replayData ? getReplayBringCount(replayData) : null),
     [replayData],
   );
-  /** The bring lists the rebuild pins, from the protocol: null for a bring-all format and for any game where either side's full
-   *  selection never entered (both sides or neither: a pinned four against an open six flips games, A.3c). Shared by every branch,
-   *  sweep, and preview reconstruction. */
-  const bringOnlyLists = useMemo(
-    () => (replayData ? replayBringOnly(replayData, snapshots) : null),
-    [replayData, snapshots],
-  );
-  /** Round 88 (T314, #55): the bench the user sees, per side: a side that fielded its whole selection lists only those bodies, even
-   *  when the other side stayed short and the rebuild keeps its six. Null when no side has a list. */
+  /** Round 89 (#124): the worlds of a game where a side brought more bodies than it fielded, the heaviest first (the guesses come
+   *  from the side's team preview, weighted by the format's usage counts). Null for every other game: a bring-all format and a game
+   *  whose sides both fielded their whole selection (one pinned world) read through `replayBringOnly` as before. The weights follow
+   *  the statistics when they arrive, so the memo reads them. */
+  const bringWorldsOfGame = useMemo(() => {
+    const list = replayData ? replayBringList(replayData, snapshots, usageStats) : null;
+    if (!list || (list.p1.open === 0 && list.p2.open === 0)) return null;
+    return bringWorlds(list, BRING_WORLD_CAP);
+  }, [replayData, snapshots, usageStats]);
+  /** The bring lists the rebuild pins, from the protocol: null for a bring-all format. A game with a short side plays its heaviest
+   *  world: the fielded bodies plus the guesses, which `guessed` counts at the end of each list (round 89, #124; before it, a
+   *  short side left both teams at six, ADR 0010). Shared by every branch, sweep, and preview reconstruction. */
+  const bringOnlyLists = useMemo(() => {
+    if (bringWorldsOfGame) {
+      const { p1, p2, guessed } = bringWorldsOfGame[0];
+      return { p1, p2, guessed };
+    }
+    return replayData ? replayBringOnly(replayData, snapshots) : null;
+  }, [replayData, snapshots, bringWorldsOfGame]);
+  /** Round 88 (T314, #55): the bench the user sees, per side: the bodies the side fielded, and for a short side the heaviest
+   *  world's guess besides (round 89). Null when no side has a list. */
   const bench = useMemo(
-    () => (replayData ? replayBench(replayData, snapshots) : null),
-    [replayData, snapshots],
+    () => (replayData ? replayBench(replayData, snapshots, bringWorldsOfGame?.[0]) : null),
+    [replayData, snapshots, bringWorldsOfGame],
   );
   const replayGameType = useMemo(
     () => (replayData ? getReplayGameType(replayData.log) : null),
     [replayData],
   );
   const evalIsDoubles = replayGameType === 'doubles';
-  return { replayGen, bringCount, bringOnlyLists, bench, replayGameType, evalIsDoubles };
+  return { replayGen, bringCount, bringOnlyLists, bringWorlds: bringWorldsOfGame, bench, replayGameType, evalIsDoubles };
 }
 
 /** One team-source bundle for every acquisition path; deps are the inner
@@ -148,8 +161,10 @@ type PinnedKnowledge = ReturnType<typeof withPinnedTeams>;
 export function useReplayContext() {
   const replayWorker = useReplayWorker();
   const replay = useReplaySurface();
-  // Round 88 (T314, #55): the branch filters its bench by the bring lists, so the format meta is read before it.
-  const meta = useFormatMeta(replay.replayData, replay.snapshots);
+  // Round 88 (T314, #55): the branch filters its bench by the bring lists, so the format meta is read before it. Round 89 (#124):
+  // the worlds of a short side weigh by the usage statistics, so the Smogon bundle is read first.
+  const smogon = useSmogonBundle(replay.replayData, replay.p1Info, replay.opponentInfo);
+  const meta = useFormatMeta(replay.replayData, replay.snapshots, smogon.usageStats.stats);
   const branch = useBranch(meta.bench);
   const evaluation = useEvaluation();
   // Round 77: another engine's results never mix with the own engine's on screen.
@@ -163,7 +178,6 @@ export function useReplayContext() {
     setEngineGameFormat(replayFormat);
   }, [replayFormat]);
   const branchWindowOpenRef = useRef(false);
-  const smogon = useSmogonBundle(replay.replayData, replay.p1Info, replay.opponentInfo);
   const [animateBranchTurns, setAnimateBranchTurns] = useState(true);
   const { sharedBranch, sharedBranchError, clearSharedBranch } = useSharedBranch();
   const refreshQueue = useTeamRefreshQueue(branch.history, branch.simState, branchWindowOpenRef);
@@ -179,7 +193,7 @@ export function useReplayContext() {
   // comes from one source: the store, else the replay worker.
   const positions = usePositionSource({
     replayData: replay.replayData, snapshots: replay.snapshots, observations: replay.observations,
-    sources: teamSources, setsFingerprint: knowledge.setsFingerprint, bringOnlyLists: meta.bringOnlyLists,
+    sources: teamSources, setsFingerprint: knowledge.setsFingerprint, bringOnlyLists: meta.bringOnlyLists, bringWorlds: meta.bringWorlds,
     smogonPending: smogon.usageStats.loading || smogon.setAssumptions.loading, replayWorker,
   });
   const { loadReplay } = replay;

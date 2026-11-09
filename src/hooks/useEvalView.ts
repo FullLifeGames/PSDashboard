@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, type Dispatch, type SetStateAction } from 'react';
+import type { BringWorld } from '@fulllifegames/eval-engine';
 import {
   type GameRules, type OpponentTeamInfo, type ReplayData, type TurnSnapshot, formatEnforcesSleepClause,
   getBranchSimulatorFormat, inferReplayFormatId, logRules, replayRuleset,
@@ -48,6 +49,8 @@ export interface EvalViewInputs {
   acquire: Pick<Acquire, 'acquireBranchPosition' | 'acquireReplayPosition' | 'makeReplayAcquire' | 'makeSweepAcquireAll'>;
   sources: TeamBuildSources;
   bringOnlyLists: { p1: string[]; p2: string[] } | null;
+  /** Round 89 (#124): the worlds of a short-side game (the heaviest first); null for any other game. */
+  bringWorlds?: BringWorld[] | null;
   setsFingerprint: string;
   sensitivityTargetsFor: (side: 'p1' | 'p2') => SensitivityTarget[];
   editedP1Info: OpponentTeamInfo | null;
@@ -148,7 +151,7 @@ function useEvaluateAction(inputs: EvalViewInputs, format: EvalFormat) {
 /** Analyze game (full sweep incl. turn 0), a gap turn's single analysis,
  *  and the "always on" auto-analyze. */
 function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
-  const { replayData, snapshots, evaluation, analyzableTurns, evalIsDoubles, acquire, sources, bringOnlyLists, setsFingerprint, sensitivityTargetsFor, smogonPending } = inputs;
+  const { replayData, snapshots, evaluation, analyzableTurns, evalIsDoubles, acquire, sources, bringOnlyLists, bringWorlds = null, setsFingerprint, sensitivityTargetsFor, smogonPending } = inputs;
   const { effectiveTera, effectiveSleepClause, effectiveRuleset, evalAvailable } = format;
 
   // Round 75 (T160): the replay's generation and mod, for the Dex reads of the played-action parser and the sweep.
@@ -175,11 +178,11 @@ function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
       // actions actually played on `turn`.
       playedFor,
       // Turn 0: the lead decision at team preview.
-      acquirePreview: makePreviewAcquire(replayData, sources, bringOnlyLists),
+      acquirePreview: makePreviewAcquire(replayData, sources, bringOnlyLists, bringWorlds),
       playedLeads: parseLeadSpecies(replayData.log),
       sensitivityTargetsFor, rolledCopy: rolledCopyParams({ replayData, snapshots, rules, setsFingerprint }),
     });
-  }, [replayData, snapshots, evaluation, analyzableTurns, effectiveTera, effectiveSleepClause, effectiveRuleset, evalIsDoubles, setsFingerprint, acquire, playedFor, rules, sources, bringOnlyLists, sensitivityTargetsFor]);
+  }, [replayData, snapshots, evaluation, analyzableTurns, effectiveTera, effectiveSleepClause, effectiveRuleset, evalIsDoubles, setsFingerprint, acquire, playedFor, rules, sources, bringOnlyLists, bringWorlds, sensitivityTargetsFor]);
 
   // Explains ONE turn: a two-turn mini sweep (turn + its follow-up) so the
   // report can price the played outcome, at the panel's settings. Runs ONLY

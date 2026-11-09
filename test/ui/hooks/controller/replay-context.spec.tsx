@@ -24,7 +24,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-/** Round 88 (T314, #55): Champions VGC 2625939941, where P1 fielded three bodies: no pinned lists, but P2's four are known. */
+/** Round 88 (T314, #55): Champions VGC 2625939941, where P1 fielded three bodies and P2's four are known. */
 const championsOpenGame = () => JSON.parse(readFileSync('test/e2e/fixtures/dock-championsvgc-2625939941.json', 'utf-8')) as ReplayData;
 
 describe('useReplayContext', () => {
@@ -40,7 +40,7 @@ describe('useReplayContext', () => {
     expect(ctx.shared.sharedBranch).toBeNull();
     expect(ctx.refreshQueue.pendingBranchRefresh).toBeNull();
     expect(ctx.knowledge.effectiveP1Info).toBeNull();
-    expect(ctx.meta).toEqual({ replayGen: 9, bringCount: null, bringOnlyLists: null, bench: null, replayGameType: null, evalIsDoubles: false });
+    expect(ctx.meta).toEqual({ replayGen: 9, bringCount: null, bringOnlyLists: null, bringWorlds: null, bench: null, replayGameType: null, evalIsDoubles: false });
     expect(ctx.animateBranchTurns).toBe(true);
     expect(ctx.branchWindowOpenRef.current).toBe(false);
     expect(ctx.positions.getExact(1)).toBeNull();
@@ -66,13 +66,15 @@ describe('useReplayContext', () => {
     await waitFor(() => expect(result.current.smogon.setAssumptions.loading).toBe(false));
   });
 
-  test('an open bring-limited game keeps its rebuild whole and hands the bench of the full side to the branch', async () => {
+  // Round 89 (#124): a short side is no longer left whole: the rebuild plays the heaviest world (the worlds are in replay-context-worlds.spec.tsx).
+  test('an open bring-limited game rebuilds its heaviest world and hands the bench of both sides to the branch', async () => {
     await loadSimMods('gen9championsvgc2026regma');
     const replay = championsOpenGame();
     const { result } = renderHook(() => useReplayContext());
     await act(async () => { await result.current.replay.loadReplay(replay.id); });
-    expect(result.current.meta.bringOnlyLists).toBeNull();
-    expect(result.current.meta.bench?.lists.p1).toEqual([]);
+    expect(result.current.meta.bringOnlyLists?.p1).toHaveLength(4);
+    expect(result.current.meta.bringOnlyLists?.guessed).toEqual({ p1: 1, p2: 0 });
+    expect(result.current.meta.bench?.lists.p1).toEqual(result.current.meta.bringOnlyLists?.p1);
     expect([...(result.current.meta.bench?.lists.p2 ?? [])].sort()).toEqual(['Aerodactyl', 'Farigiraf', 'Kingambit', 'Sylveon']);
   });
 

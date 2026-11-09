@@ -82,7 +82,7 @@ function useEvalViewLayer(
   const { replayData, snapshots } = ctx.replay;
   const { branching, executing, history } = ctx.branch;
   const { evaluation, teamSources } = ctx;
-  const { replayGameType, evalIsDoubles, bringOnlyLists } = ctx.meta;
+  const { replayGameType, evalIsDoubles, bringOnlyLists, bringWorlds } = ctx.meta;
   const { setsFingerprint, sensitivityTargetsFor, editedP1Info, editedP2Info } = ctx.knowledge;
   const { playOut } = transients;
   const {
@@ -105,7 +105,7 @@ function useEvalViewLayer(
       makeReplayAcquire: acquire.makeReplayAcquire,
       makeSweepAcquireAll: acquire.makeSweepAcquireAll,
     },
-    sources: teamSources, bringOnlyLists, setsFingerprint, sensitivityTargetsFor,
+    sources: teamSources, bringOnlyLists, bringWorlds, setsFingerprint, sensitivityTargetsFor,
     editedP1Info, editedP2Info, historyLength: history.length, setVariationScores,
   });
 }
