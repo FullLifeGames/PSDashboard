@@ -28,6 +28,17 @@ function mix32(x: number): number {
 }
 
 /**
+ * Round 89 (#59, T322 block 1): the finalizer and a text hash for the modules that key a draw by hash (the root quantiles of
+ * `search/root-quantile.ts`; round 86's tree seeds keep `mix32` here). FNV-1a over the UTF-16 units, integer arithmetic only.
+ */
+export const hash32 = mix32;
+export function hashText(text: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  return h >>> 0;
+}
+
+/**
  * Round 61: the seed a tree cell draws at creation. Round 86 (the engine reads the dice, T323): a hash of (seedOffset,
  * iteration). The five SEARCH_SEEDS are one arithmetic progression of the Gen 5 LCG state, so at one draw index a die came true
  * in 0, 1 or 2 of the five streams, never in a tenth of them at random: a 10 % paralysis in none or in a fifth of the five
