@@ -86,7 +86,7 @@ function useEvalViewLayer(
   const { setsFingerprint, sensitivityTargetsFor, editedP1Info, editedP2Info } = ctx.knowledge;
   const { playOut } = transients;
   const {
-    viewTurn, viewLine, viewingVariation, liveTip, liveEvalView, evalViewKey,
+    viewTurn, viewLine, viewingVariation, liveTip, liveEvalView, evalViewKey, tip,
     serializedAtView, analysisTurn, analyzableTurns, setVariationScores,
   } = board.timeline;
   const { branchPreparing } = board.deviation;
@@ -97,7 +97,7 @@ function useEvalViewLayer(
   return useEvalView({
     replayData, snapshots, evaluation, replayGameType, evalIsDoubles,
     viewTurn, viewLine, viewingVariation, liveTip, liveEvalView, evalViewKey, serializedAtView,
-    liveEvalStatus: board.liveEvalStatus, analysisTurn, analyzableTurns, branching, executing, branchPreparing,
+    liveEvalStatus: board.liveEvalStatus, tip, tipEvalStatus: board.tipEvalStatus, analysisTurn, analyzableTurns, branching, executing, branchPreparing,
     playOutActive: playOut?.active ?? false, smogonPending,
     acquire: {
       acquireBranchPosition: acquire.acquireBranchPosition,
@@ -144,7 +144,7 @@ function usePlayLayer(
   ctx: ReplayContext, transients: Transients, board: BoardController,
   evalView: ReturnType<typeof useEvalViewLayer>,
 ) {
-  const { engineSimState, branching, executing, executeError, getBattle, executeTurn } = ctx.branch;
+  const { engineSimState, branching, executing, executeError, getBattle, executeTurn, setChoice } = ctx.branch;
   const { evaluation } = ctx;
   const {
     playOut, setPlayOut, setPlayOutNotice, playOutProcessedRef, playOutRef, stopPlayOutRef,
@@ -152,12 +152,19 @@ function usePlayLayer(
   } = transients;
   const {
     liveTip, viewingVariation, atEndPosition, viewT0, viewTurn, tipTurn,
-    holdTipFollow, navigateTo, setNavSeek, evalViewKey,
+    holdTipFollow, navigateTo, setNavSeek, evalViewKey, tip,
   } = board.timeline;
   const {
     branchPreparing, handleSetChoice, requestDeviation, setBranchDivergence, startLeadVariation, setVariationNotice,
   } = board.deviation;
   const { handleEvaluate } = evalView;
+  // Round 89 (#112): a run plays the live sim wherever the pointer stands. The pickers' handler files the choice as a draft
+  // for the viewed turn when the pointer is off the tip, which would leave the run's turn without its choices.
+  const runAtTip = (playOut?.active ?? false) && tip !== null;
+  const handleSetChoiceForWalk = useCallback<typeof handleSetChoice>(
+    (side, choice, activeSlot) => (runAtTip ? setChoice(side, choice, activeSlot) : handleSetChoice(side, choice, activeSlot)),
+    [runAtTip, setChoice, handleSetChoice],
+  );
 
   // Engine walk: clicking a line plays the turn out; queued picks follow
   // a rebuild; interludes finish forced replacements.
@@ -165,14 +172,14 @@ function usePlayLayer(
     // Round 88 (M3): the walk applies the engine's own choices, which the filtered bench of the pickers must not refuse.
     simState: engineSimState, liveTip, branching, branchPreparing, executing,
     confirmOpen: pendingConfirm !== null, playOutActive: playOut?.active ?? false,
-    evaluation, evalViewKey, getBattle, executeTurn, handleEvaluate, handleSetChoice,
+    evaluation, evalViewKey, getBattle, executeTurn, handleEvaluate, handleSetChoice: handleSetChoiceForWalk,
     requestDeviation, setBranchDivergence,
   });
 
   // "Let it play out": the engine plays both sides from the viewed position.
   const playOutControls = usePlayOut({
     playOut, setPlayOut, setPlayOutNotice, playOutProcessedRef, playOutRef, stopPlayOutRef,
-    evaluation, fastPlayOut, evalViewKey, liveEvalStatus: board.liveEvalStatus, liveTip, viewingVariation, atEndPosition, viewT0,
+    evaluation, fastPlayOut, tip, tipEvalStatus: board.tipEvalStatus, liveTip, viewingVariation, atEndPosition, viewT0,
     viewTurn, tipTurn, holdTipFollow, navigateTo, setNavSeek,
     executing, executeError, branchPreparing, getBattle, executeTurn, handleEvaluate, applyEvalChoice: walk.applyEvalChoice,
     requestDeviation, startLeadVariation, leadPicksRef, setVariationNotice,

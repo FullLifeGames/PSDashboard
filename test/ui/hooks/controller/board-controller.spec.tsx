@@ -35,7 +35,7 @@ describe('useTimelineController', () => {
   test('before a replay the pointer sits at turn 1 of a one-turn range with nothing to evaluate', () => {
     const { result } = renderHook(() => useBoardHarness());
     expect(result.current.board.timeline).toMatchObject({ viewTurn: 1, maxTurn: 1, viewLine: 'main', variationSpan: null });
-    expect(result.current.board).toMatchObject({ liveEvalStatus: 'idle', evalResultMatchesView: true });
+    expect(result.current.board).toMatchObject({ liveEvalStatus: 'idle', tipEvalStatus: 'idle', evalResultMatchesView: true });
     expect(result.current.board.deviation.branchPreparing).toBe(false);
   });
 

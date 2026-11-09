@@ -37,7 +37,7 @@ function inputs(evaluation: Evaluation, overrides: Partial<EvalViewInputs> = {})
   return {
     replayData, snapshots, evaluation, replayGameType: 'singles', evalIsDoubles: false, viewTurn: 3, viewLine: 'main',
     viewingVariation: false, liveTip: false, liveEvalView: false, evalViewKey: 'main:3', serializedAtView: null,
-    liveEvalStatus: 'idle', analysisTurn: 3, analyzableTurns: 6, branching: false, executing: false, branchPreparing: false,
+    liveEvalStatus: 'idle', tip: null, tipEvalStatus: 'idle', analysisTurn: 3, analyzableTurns: 6, branching: false, executing: false, branchPreparing: false,
     playOutActive: false, smogonPending: false,
     acquire: { acquireBranchPosition: vi.fn(), acquireReplayPosition: vi.fn(), makeReplayAcquire: vi.fn(), makeSweepAcquireAll: vi.fn(() => vi.fn()) },
     sources, bringOnlyLists: null, setsFingerprint: 'fp1', sensitivityTargetsFor: vi.fn(() => []), editedP1Info: null, editedP2Info: null,
@@ -285,5 +285,49 @@ describe('useEvalView', () => {
     const pending = evaluationOf({ prefs: { autoAnalyze: true } });
     renderHook(() => useEvalView(inputs(pending.evaluation, { smogonPending: true })));
     expect(pending.spies.runGraphSweep).not.toHaveBeenCalled();
+  });
+
+  // Round 89 (#112): a frame report can park the pointer on an earlier turn of the variation while a play-out runs at the tip.
+  // The run's evaluation (the user's and the Auto one) is the live sim's, tagged with the tip, and its score fills the tip's slot.
+  describe.each(['singles', 'doubles'] as const)('a run with the pointer behind the tip, %s', kind => {
+    const fixture = replayFixture(kind);
+    const behind = (evaluation: Evaluation, overrides: Partial<EvalViewInputs> = {}) => inputs(evaluation, {
+      replayData: fixture.replayData, snapshots: fixture.snapshots, replayGameType: kind, evalIsDoubles: kind === 'doubles',
+      viewTurn: 3, viewLine: 'variation', viewingVariation: true, liveEvalView: true, evalViewKey: 'variation:3',
+      serializedAtView: '{"turn":3}', branching: true, tip: { key: 'variation:4', turn: 4, variation: true }, ...overrides,
+    });
+
+    test('Evaluate asks for the live sim and tags the tip; without a run the pointer decides', async () => {
+      const { evaluation, spies } = evaluationOf();
+      const run = behind(evaluation, { playOutActive: true });
+      const view = renderHook(() => useEvalView(run));
+      act(() => view.result.current.handleEvaluate());
+      expect(spies.evaluate).toHaveBeenLastCalledWith(expect.objectContaining({ cacheKey: null, tag: 'variation:4', acquire: run.acquire.acquireBranchPosition }));
+
+      const idle = renderHook(() => useEvalView(behind(evaluation)));
+      act(() => idle.result.current.handleEvaluate());
+      const recorded = spies.evaluate.mock.calls.at(-1)![0] as { tag: string; acquire: () => Promise<string> };
+      expect(recorded.tag).toBe('variation:3');
+      await expect(recorded.acquire()).resolves.toBe('{"turn":3}');
+    });
+
+    test('Auto re-evaluates a stale tip during a run, whatever the pointer shows', () => {
+      const { evaluation, spies } = evaluationOf({ prefs: { auto: true }, status: 'done', resultTag: 'variation:3' });
+      // The pointer's reading is current (the result is its own); the tip's is not.
+      const stale = { liveEvalStatus: 'done' as const, tipEvalStatus: 'stale' as const };
+      renderHook(() => useEvalView(behind(evaluation, { ...stale, playOutActive: false })));
+      expect(spies.evaluate).not.toHaveBeenCalled();
+      renderHook(() => useEvalView(behind(evaluation, { ...stale, playOutActive: true })));
+      expect(spies.evaluate).toHaveBeenCalledTimes(1);
+      expect(spies.evaluate).toHaveBeenLastCalledWith(expect.objectContaining({ tag: 'variation:4' }));
+    });
+
+    test("the tip's finished evaluation fills the tip's score slot", () => {
+      const { evaluation } = evaluationOf({ status: 'done', result: evalResult(kind, { score: 0.42 }), resultTag: 'variation:4' });
+      const setVariationScores = vi.fn();
+      renderHook(() => useEvalView(behind(evaluation, { playOutActive: true, setVariationScores })));
+      const updater = setVariationScores.mock.calls[0][0] as (previous: (number | null)[]) => (number | null)[];
+      expect(updater([0.1, null, null])).toEqual([0.1, null, null, 0.42]);
+    });
   });
 });

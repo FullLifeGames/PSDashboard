@@ -33,7 +33,7 @@ type Wiring = Omit<PlayOutInputs, 'playOut' | 'setPlayOut' | 'setPlayOutNotice' 
 
 function wiring(overrides: Partial<Wiring> = {}): Wiring {
   return {
-    evalViewKey: 'variation:3', liveEvalStatus: 'idle', liveTip: true, viewingVariation: true, atEndPosition: false,
+    tip: { key: 'variation:3' }, tipEvalStatus: 'idle', liveTip: true, viewingVariation: true, atEndPosition: false,
     viewT0: false, viewTurn: 3, tipTurn: 3, fastPlayOut: false,
     navigateTo: vi.fn(), holdTipFollow: vi.fn(), setNavSeek: vi.fn(), executing: false, branchPreparing: false,
     getBattle: vi.fn(() => ({ ended: false }) as unknown as ReturnType<PlayOutInputs['getBattle']>),

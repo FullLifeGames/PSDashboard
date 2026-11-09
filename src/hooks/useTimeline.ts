@@ -120,6 +120,16 @@ function useTimelineDerived(args: {
   /** Identity of the position on screen for the eval result (stale guard). */
   const evalViewKey = `${viewingVariation ? 'variation' : 'main'}:${viewTurn}`;
   const tipTurn = variationSpan ? variationTip(variationSpan) : null;
+  /**
+   * Round 89 (#112): the live sim's own position, whatever the pointer shows: `key` is what `evalViewKey` reads while the pointer
+   * stands on the tip. The play-out evaluates and steps on this position, so a frame report that moves the pointer elsewhere
+   * does not stop the run.
+   */
+  const spanned = variationSpan !== null;
+  const tip = useMemo(
+    () => (liveSimTurn === null ? null : { key: `${spanned ? 'variation' : 'main'}:${liveSimTurn}`, turn: liveSimTurn, variation: spanned }),
+    [liveSimTurn, spanned],
+  );
   /** Recorded position for the VIEWED variation turn (variant B pickers). */
   const serializedAtView = useMemo(() => {
     if (!viewingVariation || !variationSpan) return null;
@@ -133,7 +143,7 @@ function useTimelineDerived(args: {
   );
   return {
     maxTurn, endSnapshotTurn, atEndPosition, variationSpan, viewingVariation,
-    liveSimTurn, liveTip, liveEvalView, evalViewKey, tipTurn, serializedAtView, analyzableTurns,
+    liveSimTurn, liveTip, liveEvalView, evalViewKey, tipTurn, tip, serializedAtView, analyzableTurns,
   };
 }
 
