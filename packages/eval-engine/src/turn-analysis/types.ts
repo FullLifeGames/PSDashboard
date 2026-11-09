@@ -37,6 +37,16 @@ export const TIER_THRESHOLDS: Record<VerdictTier, number> = {
  */
 export const DECIDED_SCORE = 0.7;
 
+/** One tier softer (a decided position, a sack, a strand): the lowest tier softens to none. */
+export const demoteTier = (current: VerdictTier | undefined): VerdictTier | undefined =>
+  current === 'blunder' ? 'mistake' : current === 'mistake' ? 'inaccuracy' : undefined;
+
+/** The band of a regret in wp-units, before any leniency. */
+export const tierOf = (regretValue: number): VerdictTier | undefined =>
+  regretValue >= TIER_THRESHOLDS.blunder ? 'blunder'
+    : regretValue >= TIER_THRESHOLDS.mistake ? 'mistake'
+      : regretValue >= TIER_THRESHOLDS.inaccuracy ? 'inaccuracy' : undefined;
+
 /**
  * Own-perspective score at or above which a HEALTHY-body feed can read as a
  * deliberate simplification sack (both before and after the sack). Anchored

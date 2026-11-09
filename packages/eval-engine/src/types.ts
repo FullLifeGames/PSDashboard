@@ -137,7 +137,16 @@ export interface CellBlendClass {
    * ply deeper — set by the verify step on every open class.
    */
   deepened?: number;
+  /**
+   * Round 89 (T322, #59): how the verify round priced the class: 'full' (a full depth-1 sub-search, or a light one
+   * that cut neither side's options), 'light' (the light search of the cheap mode), 'shift' (the one-ply leaf plus
+   * the mean step). Set by the verify step on open classes; the strand screen reads it.
+   */
+  priced?: ClassPricing;
 }
+
+/** Round 89 (T322, #59): the depth a verify round gave one open class of a blend. */
+export type ClassPricing = 'full' | 'light' | 'shift';
 
 /**
  * A root boundary cell's analytic class blend. Deepening re-blends through
