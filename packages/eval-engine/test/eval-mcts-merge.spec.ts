@@ -1,7 +1,7 @@
 import { test, expect, describe } from 'vitest';
 import { mergeMctsTrees, rowCompletedCells, starvedSupportCells, VERIFY_DISAGREEMENT, VERIFY_SAMPLES, weightedDisagreement } from '../src/mcts-merge';
 import { cellKey } from '../src/rank';
-import { classPoolTrust } from '../src/search/merge-pool';
+import { classPoolTrust, keyedCellValue } from '../src/search/merge-pool';
 import type { MctsTreeStats } from '../src/types';
 
 /**
@@ -533,5 +533,112 @@ describe('the trust rule for a class pool of the blend path (round 89, T322, #59
       mk([cell(199, -0.9, 'hit-nokill')]), mk([cell(21, 0.4, 'hit-nokill')]), mk([cell(3, 0.9, 'hit-nokill')]), mk([cell(5, 0.2, 'miss')]),
     ];
     expect(mergeMctsTrees(trees, verified).matrix!.values[0][0]).toBeCloseTo(0.8 * -0.9 + 0.2 * 0.2, 10);
+  });
+});
+
+describe('the merge weighs a keyed cell by the Dex (round 89, T322, #59)', () => {
+  // One root cell per tree draws one outcome class; the merge weighs the classes by the plan's chances, not by the trees' visits.
+  const options = (labels: string[]) => labels.map(label => ({ choice: label, label }));
+  const SHAPES = {
+    doubles: { heavy: 'p1a:ironhead>p2a=hit-nokill', light: 'p1a:ironhead>p2a=hit-nokill+flinch', wHeavy: 0.9, wLight: 0.1 },
+    // A tied singles cell: the key starts with the order the tree drew, and its weight is half of the sampler's.
+    singles: { heavy: 'p1:hit-nokill|hit-nokill', light: 'p1:hit-nokill|miss', wHeavy: 0.45, wLight: 0.05 },
+  } as const;
+  type Shape = (typeof SHAPES)[keyof typeof SHAPES];
+  type Cell = MctsTreeStats['cells'][number];
+  const line = (turn: number) => [{ p1: `A${turn}`, p2: `X${turn}` }];
+  const tree = (cells: Cell[], donor = 0, top = 'A'): MctsTreeStats => {
+    const on = (side: 'p1' | 'p2') => cells.reduce((sum, cell) => sum + (side === 'p1' ? (cell.key < 10_000 ? cell.visits : 0) : cell.visits), 0);
+    const bTotal = cells.filter(cell => cell.key >= 10_000).reduce((sum, cell) => sum + cell.total, 0);
+    const aTotal = cells.filter(cell => cell.key < 10_000).reduce((sum, cell) => sum + cell.total, 0);
+    const aVisits = on('p1');
+    const bVisits = on('p2') - aVisits;
+    return {
+      p1Options: options(['A', 'B']), p2Options: options(['X']),
+      p1N: [aVisits, bVisits], p1W: [aTotal, bTotal], p2N: [aVisits + bVisits], p2W: [aTotal + bTotal],
+      visits: aVisits + bVisits, depth: 2, rootValue: 0.1, cells, living: { p1: 4, p2: 4 },
+      result: {
+        score: 0, interval: 0, depthCompleted: 2,
+        perSide: { p1: [{ choice: top, label: top, line: line(donor) } as never], p2: [] },
+      },
+    };
+  };
+  const cell = (row: number, visits: number, total: number, value: number, classKey?: string, classWeight?: number): Cell => ({
+    key: cellKey(row, 0), visits, total, value, ended: false,
+    ...(classKey !== undefined ? { classKey } : {}), ...(classWeight !== undefined ? { classWeight } : {}),
+  });
+  const mean = (cells: Cell[]) => cells.reduce((sum, c) => sum + c.total + c.value, 0) / cells.reduce((sum, c) => sum + c.visits + 1, 0);
+  const aCells = (shape: Shape) => ({
+    heavy: [cell(0, 300, 150, 0.5, shape.heavy, shape.wHeavy), cell(0, 300, 160, 0.5, shape.heavy, shape.wHeavy), cell(0, 300, 140, 0.5, shape.heavy, shape.wHeavy)],
+    light: [cell(0, 10, -5, -0.5, shape.light, shape.wLight)],
+  });
+
+  describe.each(Object.entries(SHAPES))('%s', (_name, shape) => {
+    test('(d) classes of 0.9 and 0.1 read 0.9 m_a + 0.1 m_b, not the visit pool', () => {
+      const { heavy, light } = aCells(shape);
+      const cells = [...heavy, ...light];
+      const merged = mergeMctsTrees(cells.map(entry => tree([entry])));
+      const expected = (shape.wHeavy * mean(heavy) + shape.wLight * mean(light)) / (shape.wHeavy + shape.wLight);
+      expect(merged.matrix!.values[0][0]).toBeCloseTo(expected, 10);
+      expect(keyedCellValue(cells)).toBeCloseTo(expected, 10);
+      // the visit pool sits near the heavy class: the two differ
+      const pool = cells.reduce((sum, c) => sum + c.total, 0) / cells.reduce((sum, c) => sum + c.visits, 0);
+      expect(Math.abs(expected - pool)).toBeGreaterThan(0.03);
+    });
+
+    test('(d) a tree without a class leaves the weighted value; one class and no key give null', () => {
+      const { heavy, light } = aCells(shape);
+      const unkeyed = cell(0, 200, -100, 0.1);
+      expect(keyedCellValue([...heavy, ...light, unkeyed])).toBeCloseTo(keyedCellValue([...heavy, ...light])!, 12);
+      expect(keyedCellValue(heavy)).toBeNull();
+      expect(keyedCellValue([unkeyed])).toBeNull();
+      expect(keyedCellValue([cell(0, 10, 1, 0.1, shape.heavy), cell(0, 10, 1, 0.1, shape.light)])).toBeNull();
+    });
+
+    test('(e) a one-class row scores as the same trees without keys, to the bit', () => {
+      const { heavy } = aCells(shape);
+      const keyed = heavy.map(entry => tree([entry]));
+      const plain = heavy.map(entry => tree([{ ...entry, classKey: undefined, classWeight: undefined }]));
+      const a = mergeMctsTrees(keyed);
+      const b = mergeMctsTrees(plain);
+      expect(a.score).toBe(b.score);
+      expect(a.interval).toBe(b.interval);
+      expect(a.matrix!.values).toEqual(b.matrix!.values);
+    });
+
+    test('(e) a two-class row scores with the weighted cell in its top row and column only', () => {
+      const { heavy, light } = aCells(shape);
+      const rowA = [...heavy, ...light];
+      // Row B is a two-class cell too; the column X holds both rows, row A is the top row.
+      const rowB = [cell(1, 4, -0.8, -0.2, shape.heavy, shape.wHeavy), cell(1, 4, -2.4, -0.6, shape.light, shape.wLight)];
+      const trees = rowA.map((entry, index) => tree([entry, ...(rowB[index] ? [{ ...rowB[index] }] : [])]));
+      const merged = mergeMctsTrees(trees);
+      const m = (cells: Cell[]) => {
+        const [h, l] = [cells.filter(c => c.classKey === shape.heavy), cells.filter(c => c.classKey === shape.light)];
+        return (shape.wHeavy * mean(h) + shape.wLight * mean(l)) / (shape.wHeavy + shape.wLight);
+      };
+      const fix = (cells: Cell[]) => {
+        const visits = cells.reduce((sum, c) => sum + c.visits, 0);
+        return visits * m(cells) - cells.reduce((sum, c) => sum + c.total, 0);
+      };
+      const sum = (pick: (t: MctsTreeStats) => number) => trees.reduce((total, t) => total + pick(t), 0);
+      const v1 = (sum(t => t.p1W[0]) + fix(rowA)) / sum(t => t.p1N[0]);
+      const v2 = (sum(t => t.p2W[0]) + fix(rowA) + fix(rowB)) / sum(t => t.p2N[0]);
+      expect(merged.score).toBeCloseTo((v1 + v2) / 2, 10);
+      expect(merged.interval).toBeCloseTo(Math.abs(v2 - v1), 10);
+    });
+
+    test('(f) the donor line comes from a tree of the heaviest drawn class in the principal cell', () => {
+      const { heavy, light } = aCells(shape);
+      // Tree 0 drew the light class, trees 1 and 2 the heavy one, tree 3 disagrees on the top choice and drew the heavy one.
+      const trees = [
+        tree([light[0]], 10), tree([heavy[0]], 11), tree([heavy[1]], 12), tree([heavy[2]], 13, 'B'),
+      ];
+      expect(mergeMctsTrees(trees).perSide.p1[0].line).toEqual(line(11));
+      // No keyed tree in the principal cell: today's rule, the first tree that agrees.
+      const bare = (entry: Cell): Cell => ({ ...entry, classKey: undefined, classWeight: undefined });
+      const unkeyed = [tree([bare(heavy[0])], 20), tree([bare(heavy[1])], 21)];
+      expect(mergeMctsTrees(unkeyed).perSide.p1[0].line).toEqual(line(20));
+    });
   });
 });

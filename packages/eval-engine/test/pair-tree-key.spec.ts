@@ -368,3 +368,32 @@ describe('(f) a real search draws its root cells by quantile: a die of chance p 
     });
   });
 });
+
+describe('(g) a root row reads the same through its marginals and through its cells (round 89, T322, #59)', () => {
+  // The merge corrects the visit mean of the top row and column by the cells of a keyed class mix: that holds only while
+  // the row's visits and totals ARE the sums of its cells.
+  const settings = { depth: 1 as const, samples: 1 as const, tera: false as const, mode: 'mcts' as const, prove: false };
+  const boards = {
+    doubles: () => doublesRoot([pairSet('Fast', 'Aerodactyl', ['Iron Head', 'Protect'], SPEED), pairSet('Wall', 'Blissey', ['Soft-Boiled', 'Protect'])], slow()).serialized,
+    singles: () => rootOf(battleOf('gen9customgame', [set('Aerodactyl', ['ironhead', 'protect'])], [set('Snorlax', ['earthquake', 'rest'])])).serialized,
+  };
+  test.each(Object.keys(boards) as (keyof typeof boards)[])('%s: visits and totals of a row and a column equal the sums of the cells that did not end', name => {
+    configureSearchBudget({ ...SEARCH_BUDGET_DEFAULT, iterations: 120 });
+    try {
+      let keyed = 0;
+      for (let offset = 0; offset < 4; offset++) {
+        const stats = mctsTreeSearch(boards[name](), settings, offset);
+        const side = (marginal: number[], total: number[], pick: (key: number) => number) => marginal.forEach((visits, index) => {
+          const cells = stats.cells.filter(cell => pick(cell.key) === index);
+          expect(cells.some(cell => cell.ended), `${name} offset ${offset}`).toBe(false);
+          expect(cells.reduce((sum, cell) => sum + cell.visits, 0), `${name} offset ${offset} visits ${index}`).toBe(visits);
+          expect(cells.reduce((sum, cell) => sum + cell.total, 0), `${name} offset ${offset} total ${index}`).toBeCloseTo(total[index], 9);
+          keyed += cells.filter(cell => cell.classKey !== undefined).length;
+        });
+        side(stats.p1N, stats.p1W, key => Math.floor(key / 10_000));
+        side(stats.p2N, stats.p2W, key => key % 10_000);
+      }
+      expect(keyed, 'keyed cells seen').toBeGreaterThan(0);
+    } finally { configureSearchBudget(null); }
+  });
+});

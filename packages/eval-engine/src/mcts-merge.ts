@@ -1,7 +1,7 @@
 import { cellKey, rankFromMatrix, toResult as rankedToResult } from './rank.ts';
 import { attachKoOdds, koOddsMapsFor } from './search/root-payload.ts';
 import type { CellBlendClass, EvalCellValue, EvalMatrix, EvalResult, KoOddsMismatch, MatrixCell, MctsTreeStats, PlannedCell } from './types.ts';
-import { cellContribution, classPoolTrust, pooledChanceValue, VERIFY_ENDGAME_MIN_VISITS, type PoolEntry, type TreeCell } from './search/merge-pool.ts';
+import { cellContribution, classPoolTrust, keyedCell, pooledChanceValue, VERIFY_ENDGAME_MIN_VISITS, type PoolEntry, type TreeCell } from './search/merge-pool.ts';
 import { VERIFY_DISAGREEMENT, VERIFY_MIN_TREES, VERIFY_MIN_VISITS, weightedDisagreement } from './verify-select.ts';
 
 // Round 63: the verify cell selection lives in verify-select.ts; its names stay importable from here.
@@ -177,7 +177,8 @@ function pooledMatrix(
     const entry = pooled.get(cellKey(i, j));
     if (!entry) return base.rootValue;
     // Round 43: a chance cell pools per class across the trees (merge-pool.ts).
-    return pooledChanceValue(entry.cells) ?? (entry.total + entry.value) / (entry.visits + 1);
+    // Round 89 (T322, #59): a keyed cell weighs its drawn classes by the Dex, then the visit pool.
+    return pooledChanceValue(entry.cells) ?? keyedCell(entry.cells)?.value ?? (entry.total + entry.value) / (entry.visits + 1);
   }));
   const ended = base.p1Options.map((_, i) =>
     base.p2Options.map((_, j) => pooled.get(cellKey(i, j))?.ended ?? false));
@@ -238,7 +239,7 @@ function verifiedDiagnostics(verified: Map<number, EvalCellValue> | undefined): 
  * visit-mean formulation — bit-comparable with the standing records —
  * while the rankings carry the pooled equilibrium.
  */
-function visitMeanScore(trees: MctsTreeStats[], base: MctsTreeStats): { score: number; interval: number } {
+function visitMeanScore(trees: MctsTreeStats[], base: MctsTreeStats, pooled: Map<number, PooledCell>): { score: number; interval: number } {
   const sum = (key: 'p1N' | 'p1W' | 'p2N' | 'p2W'): number[] =>
     base[key].map((_, index) => trees.reduce((total, tree) => total + (tree[key][index] ?? 0), 0));
   const p1N = sum('p1N');
@@ -247,8 +248,23 @@ function visitMeanScore(trees: MctsTreeStats[], base: MctsTreeStats): { score: n
   const p2W = sum('p2W');
   const i = topVisitedIndex(p1N);
   const j = topVisitedIndex(p2N);
-  const v1 = i >= 0 ? p1W[i] / p1N[i] : base.rootValue;
-  const v2 = j >= 0 ? p2W[j] / p2N[j] : base.rootValue;
+  // Round 89 (T322, #59): the top row and column swap the totals of a keyed cell's trees for their visits at the Dex-weighted
+  // value (`N m - T`; a row's visits and totals are the sums of its cells, pair-tree-key.spec.ts (g)). A row without such a cell
+  // takes no term.
+  let fix1 = 0;
+  let fix2 = 0;
+  for (const [key, entry] of pooled) {
+    const onRow = i >= 0 && Math.floor(key / 10_000) === i;
+    const onColumn = j >= 0 && key % 10_000 === j;
+    if (!onRow && !onColumn) continue;
+    const keyed = keyedCell(entry.cells);
+    if (!keyed) continue;
+    const term = keyed.visits * keyed.value - keyed.total;
+    if (onRow) fix1 += term;
+    if (onColumn) fix2 += term;
+  }
+  const v1 = i >= 0 ? (p1W[i] + fix1) / p1N[i] : base.rootValue;
+  const v2 = j >= 0 ? (p2W[j] + fix2) / p2N[j] : base.rootValue;
   return { score: (v1 + v2) / 2, interval: Math.abs(v2 - v1) };
 }
 
@@ -290,11 +306,24 @@ export function topVisitedIndex(n: number[]): number {
   return best;
 }
 
-/** The follow-up line comes from a tree that agrees on the top choice. */
-function attachDonorLine(trees: MctsTreeStats[], result: EvalResult): void {
+/**
+ * The follow-up line comes from a tree that agrees on the top choice. Round 89 (T322, #59): where the principal cell (p1's top
+ * row against p2's top column) is keyed, from the first such tree that drew the cell's heaviest drawn class, so the line shows the
+ * dice the plan weighs most; else the first that agrees.
+ */
+function attachDonorLine(trees: MctsTreeStats[], result: EvalResult, base: MctsTreeStats): void {
   if (result.perSide.p1.length > 0) {
-    const donor = trees.find(tree =>
-      tree.result.perSide.p1[0]?.choice === result.perSide.p1[0].choice && tree.result.perSide.p1[0].line);
+    const top = result.perSide.p1[0].choice;
+    const agrees = trees.filter(tree => tree.result.perSide.p1[0]?.choice === top && tree.result.perSide.p1[0].line);
+    const i = base.p1Options.findIndex(option => option.choice === top);
+    const j = base.p2Options.findIndex(option => option.choice === result.perSide.p2[0]?.choice);
+    const key = cellKey(i, j);
+    const classOf = (tree: MctsTreeStats) => (i >= 0 && j >= 0 ? tree.cells.find(entry => entry.key === key) : undefined);
+    const heaviest = trees.reduce<TreeCell | undefined>((best, tree) => {
+      const drawn = classOf(tree);
+      return drawn?.classKey !== undefined && drawn.classWeight !== undefined && (!best || drawn.classWeight > best.classWeight!) ? drawn : best;
+    }, undefined);
+    const donor = (heaviest && agrees.find(tree => classOf(tree)?.classKey === heaviest.classKey)) ?? agrees[0];
     if (donor) result.perSide.p1[0].line = donor.result.perSide.p1[0].line;
   }
 }
@@ -326,11 +355,11 @@ export function mergeMctsTrees(trees: MctsTreeStats[], verified?: Map<number, Ev
   // Round 13: the root unanswered profile is tree-invariant — take trees[0]'s.
   if (base.result.unanswered) result.unanswered = base.result.unanswered;
 
-  const { score, interval } = visitMeanScore(trees, base);
+  const { score, interval } = visitMeanScore(trees, base, pooled);
   // rankedToResult wrote the matrix mode's score; the visit mean replaces it unless EVAL_TREE_SCORE says otherwise (T114).
   result.score = treeScore(score, result.score);
   result.interval = interval;
-  attachDonorLine(trees, result);
+  attachDonorLine(trees, result, base);
 
   // Round 7: analytic per-option kill odds, shipped by the trees (this
   // module stays sim-free — the shared payload helpers are sim-free too).
