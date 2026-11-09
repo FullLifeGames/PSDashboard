@@ -10,6 +10,8 @@ import { correctFieldFromSnapshot } from './field-correction.ts';
 import { applyProtocolHeldItems } from './held-items.ts';
 import { playProtocolEntries, playProtocolStarts } from './entry-effects.ts';
 import { restoreTeraFromSnapshot } from './tera-restore.ts';
+import { restorePpFromSnapshot } from './pp-restore.ts';
+import { swapActiveSlots } from './active-slots.ts';
 import { bodiesOffTheField, restoreAfterProtocolEntry, restoreExitVolatiles } from './exit-volatiles.ts';
 import { endLocksTheGameEnded, settleSleepCounter } from './sleep-counter.ts';
 import { hpOfSighting } from './pokemon-info.ts';
@@ -327,19 +329,6 @@ function placeOnSlots(
   return moved;
 }
 
-/** Two actives trade slots; both stay in play, so unlike a switch-in nothing about either body (its lock, its last move) is reset. */
-function swapActiveSlots(side: SimSide, from: number, to: number) {
-  const [first, second] = [side.active[from], side.active[to]];
-  side.active[from] = second;
-  side.active[to] = first;
-  // The sim keeps side.pokemon[i] === side.active[i] for the active slots.
-  const [firstIndex, secondIndex] = [side.pokemon.indexOf(first), side.pokemon.indexOf(second)];
-  side.pokemon[firstIndex] = second;
-  side.pokemon[secondIndex] = first;
-  first.position = secondIndex;
-  second.position = firstIndex;
-}
-
 export function correctBattleFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
   const offTheField = bodiesOffTheField(battle);
   const tookOut = correctHpFromSnapshot(battle, snapshot);
@@ -355,6 +344,7 @@ export function correctBattleFromSnapshot(battle: SimBattle, snapshot: TurnSnaps
   }
   restoreExitVolatiles(battle, snapshot, offTheField, simBodyOf);
   correctFieldFromSnapshot(battle, snapshot);
+  if (restorePpFromSnapshot(battle, snapshot, simBodyOf) && strangers.size === 0) refreshRequestsFromLiveState(battle);
 }
 
 /**
