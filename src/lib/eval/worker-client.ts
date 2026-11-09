@@ -1,5 +1,5 @@
 import {
-  perfCount, searchOrchestrated, searchTreesOrchestrated, forcedWinPossible,
+  perfCount, blendValues, blendWorlds, searchOrchestrated, searchTreesOrchestrated, forcedWinPossible,
   type SearchExecutor, type TreeExecutor, type EvalCellValue, type EvalResult, type EvalSettings, type EvalWorkerRequest,
   type EvalWorkerResponse, type MctsTreeStats, type SearchProgress, type StaticRuleset,
 } from '@fulllifegames/eval-engine';
@@ -7,6 +7,7 @@ import { evalPoolSize } from './pool-size';
 import { selectedEngine } from './engine-setting';
 import { searchBudgetStamp } from './search-budget-setting';
 import { recordSimFastReport, simFastLevers } from './sim-fast-setting';
+import { worldPositionsOf, type WorldPosition } from './world-positions';
 
 /**
  * The engine protocol builds its request on the simulator, so it loads with the first evaluation another engine answers
@@ -188,7 +189,57 @@ export class EvalWorkerClient {
     };
   }
 
+  /**
+   * Round 89 (#124): a position the world registry knows (a short-side game's heaviest world) runs once per world, one after the
+   * other, and comes back blended by usage; any other position runs once, exactly as before. The first world takes the caller's
+   * `exclusive` and streams its partials (the heaviest world, the one the user sees), the rest never cancel it. Another engine
+   * over HTTP reads the heaviest world alone.
+   */
   evaluate(
+    serializedBattle: string,
+    settings: AppEvalSettings,
+    handlers?: EvalRunHandlers,
+    opts?: { exclusive?: boolean },
+  ): Promise<EvalResult> {
+    const worlds = selectedEngine() ? null : worldPositionsOf(serializedBattle);
+    if (!worlds) return this.evaluateOne(serializedBattle, settings, handlers, opts);
+    return this.evaluateWorlds(worlds, settings, handlers, opts);
+  }
+
+  private async evaluateWorlds(
+    worlds: readonly WorldPosition[],
+    settings: AppEvalSettings,
+    handlers: EvalRunHandlers | undefined,
+    opts: { exclusive?: boolean } | undefined,
+  ): Promise<EvalResult> {
+    // The first world's evaluation bumps the generation when it is exclusive, so the loop reads it right after that call.
+    const first = this.evaluateOne(worlds[0].position, settings, handlers && { ...handlers, onProgress: this.worldProgress(handlers, 0, worlds.length) }, opts);
+    const generation = this.generation;
+    const results = [await first];
+    const weights = [worlds[0].weight];
+    for (let index = 1; index < worlds.length; index += 1) {
+      // A cancel between two worlds leaves no call to reject: the loop itself stops.
+      if (generation !== this.generation) throw new Error('cancelled');
+      try {
+        const progress = handlers?.onProgress && { onProgress: this.worldProgress(handlers, index, worlds.length) };
+        results.push(await this.evaluateOne(worlds[index].position, settings, progress, { exclusive: false }));
+        weights.push(worlds[index].weight);
+      } catch (error) {
+        // A lighter world that cannot answer leaves the blend; a cancel ends the loop.
+        if (generation !== this.generation) throw error;
+      }
+    }
+    return blendWorlds(results, weights);
+  }
+
+  /** One world's progress as a share of the whole loop: the bar runs once across the worlds, not once per world. */
+  private worldProgress(handlers: EvalRunHandlers, index: number, count: number): EvalRunHandlers['onProgress'] {
+    const { onProgress } = handlers;
+    if (!onProgress) return undefined;
+    return progress => onProgress({ ...progress, done: progress.done + index * progress.total, total: progress.total * count });
+  }
+
+  private evaluateOne(
     serializedBattle: string,
     settings: AppEvalSettings,
     handlers?: EvalRunHandlers,
@@ -276,6 +327,26 @@ export class EvalWorkerClient {
    * estimator disagreement into the decision/chance decomposition.
    */
   async evalPair(serializedBattle: string, p1Choice: string, p2Choice: string, settings: AppEvalSettings): Promise<number> {
+    // Round 89 (#124): the pair is valued in every world of a short-side position and blended by usage (see `evaluate`).
+    const worlds = selectedEngine() ? null : worldPositionsOf(serializedBattle);
+    if (!worlds) return this.evalPairOne(serializedBattle, p1Choice, p2Choice, settings);
+    const generation = this.generation;
+    const values: number[] = [];
+    const weights: number[] = [];
+    for (const [index, world] of worlds.entries()) {
+      if (generation !== this.generation) throw new Error('cancelled');
+      try {
+        values.push(await this.evalPairOne(world.position, p1Choice, p2Choice, settings));
+        weights.push(world.weight);
+      } catch (error) {
+        // The heaviest world must answer; a lighter one that cannot leaves the blend, and a cancel ends the loop.
+        if (index === 0 || generation !== this.generation) throw error;
+      }
+    }
+    return blendValues(values, weights);
+  }
+
+  private async evalPairOne(serializedBattle: string, p1Choice: string, p2Choice: string, settings: AppEvalSettings): Promise<number> {
     const ruleset = settings.ruleset;
     if (!ruleset) throw new Error(MISSING_RULESET);
     const engine = selectedEngine();
