@@ -18,6 +18,7 @@ type BranchSlotChoice
 type BranchSlotModifiers
 type BranchSwitchOption
 type BranchTargetOption
+type BringWorld
 type CellBlend
 type CellBlendClass
 type ChoiceLockContext
@@ -136,6 +137,7 @@ type WinConversion
 type WinPath
 value AUTO_MCTS_FAINTED_FRACTION
 value BLUNDER_SWING
+value BRING_WORLD_CAP
 value DASHBOARD_ORIGINS
 value DIE_KINDS
 value ENDGAME_CAPS
@@ -163,6 +165,7 @@ value applyTargetCorrections
 value autoTurnSettings
 value branchChoiceActive
 value branchSideChoicesReady
+value bringWorlds
 value buildChoiceLockContext
 value buildEngineRequest
 value buildGameReport

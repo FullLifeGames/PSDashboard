@@ -108,6 +108,9 @@ export { rollToCopy } from './biggest-roll.ts';
 export type { BiggestRoll, RollFlip } from './biggest-roll.ts';
 export { rolledCopy } from './branch/rolled-copy.ts';
 export type { RolledCopy, RollSelector } from './branch/rolled-copy.ts';
+// Round 89 (#124): the worlds of a bring-limited game, for the hosts that measure (the bank) and the app's world registry.
+export { BRING_WORLD_CAP, bringWorlds } from './branch/bring-worlds.ts';
+export type { BringWorld } from './branch/bring-worlds.ts';
 export type { WinConversion, WinPath } from './win-reason.ts';
 export type { DeniedEnd } from './denied-end.ts';
 export { detectRolls, diceEventTurns } from './dice-events.ts';
