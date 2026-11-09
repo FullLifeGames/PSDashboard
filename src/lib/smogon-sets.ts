@@ -254,7 +254,8 @@ export async function fetchSmogonSetAssumptions(params: {
     // Every species failed: the source is down, not the species absent.
     if (errors.length === species.length) throw new Error(`Smogon sets unavailable: ${errors[0]}`);
     // Round 89 (#117): a format that generates its team has no sets file; its random-set file fills the bodies the log never showed.
-    const randomSets = await randomSetsOf(params.formatId, fetcher, errors);
+    // The Smogon hosts' wrapper is no use here (the file is not on the Smogon mirror): fetchRandomSets tries its own two hosts.
+    const randomSets = await randomSetsOf(params.formatId, (params.fetcher ?? boundFetch) as SmogonFetch, errors);
     return Object.keys(pokemon).length > 0 || randomSets ? {
       format,
       source: 'https://data.pkmn.cc',

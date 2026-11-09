@@ -54,6 +54,19 @@ describe('the fetch', () => {
     expect(seen.some(url => url.endsWith(`/random/${game.formatid}.json`))).toBe(true);
   });
 
+  test('the set fetch reaches the randbats pages when data.pkmn.cc is down', async () => {
+    const hosts: string[] = [];
+    const flaky = async (url: string): Promise<Response> => {
+      hosts.push(url);
+      if (url.startsWith('https://data.pkmn.cc')) throw new Error('Failed to fetch');
+      if (url.startsWith('https://pkmn.github.io/randbats/data/')) return { ok: true, status: 200, json: async () => game.randomSets } as Response;
+      return { ok: false, status: 404, json: async () => ({}) } as Response;
+    };
+    const assumptions = await fetchSmogonSetAssumptions({ formatId: game.formatid, species: ['Cacturne'], fetcher: flaky as never });
+    expect(assumptions?.randomSets).toEqual(game.randomSets);
+    expect(hosts).toContain(`https://pkmn.github.io/randbats/data/${game.formatid}.json`);
+  });
+
   test('a format that does not generate its team asks for no random-set file', async () => {
     const seen: string[] = [];
     await fetchSmogonSetAssumptions({ formatId: 'gen9ou', species: ['Great Tusk'], fetcher: fakeFetch(game, seen) as never });
