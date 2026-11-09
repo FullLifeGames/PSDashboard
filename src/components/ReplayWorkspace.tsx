@@ -131,7 +131,7 @@ function BattleFrame({ app, replayData, onSideChange }: WorkspaceProps & { onSid
   );
 }
 
-function LeadRegion({ app, replayData }: WorkspaceProps) {
+function LeadRegion({ app, replayData, nearSide }: WorkspaceProps & { nearSide: FrameSide }) {
   const { variationSpan } = app.board.timeline;
   const { executing, history } = app.ctx.branch;
   const { branchPreparing, leadOptions, startLeadVariation } = app.board.deviation;
@@ -151,12 +151,13 @@ function LeadRegion({ app, replayData }: WorkspaceProps) {
       executing={executing || branchPreparing}
       onStart={leads => startLeadVariation(withBring(leads))}
       onPicksChange={picks => setLeadPicks(picks && withBring(picks))}
+      nearSide={nearSide}
     />
   );
 }
 
 /** The lead picker of turn 0 and the confirm banner above it (the dock's place at turn 0); the dock region takes over everywhere else. */
-function LeadSlot({ app, replayData }: WorkspaceProps) {
+function LeadSlot({ app, replayData, nearSide }: WorkspaceProps & { nearSide: FrameSide }) {
   const { pendingConfirm, setPendingConfirm, playOut } = app.transients;
   if (!app.board.timeline.viewT0 || playOut?.active) return null;
   return (
@@ -168,7 +169,7 @@ function LeadSlot({ app, replayData }: WorkspaceProps) {
           onCancel={() => { setPendingConfirm(null); app.engine.walk.clearPendingPick(); }}
         />
       )}
-      <LeadRegion app={app} replayData={replayData} />
+      <LeadRegion app={app} replayData={replayData} nearSide={nearSide} />
     </>
   );
 }
@@ -232,7 +233,7 @@ function WorkspaceLeft({ app, replayData }: WorkspaceProps) {
       {variationNotice && <WorkspaceAlert text={variationNotice} />}
       {(branching || variationSpan !== null) && <BranchSidePanels app={app} replayData={replayData} />}
       {/* Round 84 (A7b): at turn 0 the lead picker stands where the dock stands, as the column's last child. */}
-      <LeadSlot app={app} replayData={replayData} />
+      <LeadSlot app={app} replayData={replayData} nearSide={nearSide} />
       <DockRegion app={app} replayId={replayData.id} nearSide={nearSide} />
     </div>
   );
