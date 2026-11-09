@@ -3,7 +3,7 @@ import { switchOptionKey } from '@fulllifegames/eval-engine';
 import { toId } from '@fulllifegames/replay-core';
 import { ComboBox } from '../ComboBox';
 import { displayName } from '../../lib/branch-history';
-import { STAND_IN_MARK, useIsGuessed, type GuessedSide } from '../../lib/stand-in-mark';
+import { useIsGuessed, type GuessedSide } from '../../lib/stand-in-mark';
 
 /**
  * Round 84 (turn dock): "All choices" and "What if it had…", not restyled since the old panel. The dock's tray shows them
@@ -48,15 +48,18 @@ export function ChoicePicker({ side, label, moves, switches, blockedSwitchKeys, 
       </optgroup>
       {switches.length > 0 && (
         <optgroup label="Switch to">
-          {switches.map(sw => (
-            <option
-              key={`s-${sw.slot}`}
-              value={`switch:${sw.slot}`}
-              disabled={!!sw.trapped || blockedSwitchKeys.has(switchOptionKey(sw))}
-            >
-              Switch: {displayName(sw.name, sw.species)} ({sw.hpPercent}% HP){isGuessed(side, sw.species) ? ` · ${STAND_IN_MARK}` : ''}
-            </option>
-          ))}
+          {switches.map(sw => {
+            const mark = isGuessed(side, sw.species);
+            return (
+              <option
+                key={`s-${sw.slot}`}
+                value={`switch:${sw.slot}`}
+                disabled={!!sw.trapped || blockedSwitchKeys.has(switchOptionKey(sw))}
+              >
+                Switch: {displayName(sw.name, sw.species)} ({sw.hpPercent}% HP){mark ? ` · ${mark.text}` : ''}
+              </option>
+            );
+          })}
         </optgroup>
       )}
     </select>
