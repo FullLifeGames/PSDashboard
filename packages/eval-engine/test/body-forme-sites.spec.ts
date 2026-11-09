@@ -99,6 +99,65 @@ describe.each(BOARDS)('$rules.label $type: sites read a body by its Dex family (
     expect(toId(findPokemonOnSide(battle.sides[0], 'Rotom')!.species.name)).toBe('rotom');
   });
 
+  test('protocol choices: the bench slot follows the name the log shows for the origin (#118, the prefix pass is gone)', () => {
+    // The simulator's own log (`getUpdatedDetails`) shows Greninja-Bond as "Greninja". Every forme whose origin the log shows under another
+    // name ties to the body that name stands for; a forme whose origin the log shows by its own name never ties to the base species.
+    const battle = forcedBoard(rules, type, [mon(rules, 'Meowth', ['splash']), mon(rules, 'Eevee', ['splash'])]);
+    const target = battle.sides[0].pokemon.find(body => body.set.species === 'Eevee')!;
+    const slotOf = (held: string, named: string): number => {
+      become(target, held, NICKNAME);
+      return findSlotBySpecies(battle, 0, named);
+    };
+    const place = battle.sides[0].pokemon.indexOf(target) + 1;
+    const dex = battle.dex;
+    const failures: string[] = [];
+    const tied: string[] = [];
+    let apart = 0;
+    for (const forme of dex.species.all()) {
+      if (!forme.exists || forme.isNonstandard === 'Custom' || forme.isNonstandard === 'CAP' || !forme.battleOnly) continue;
+      const origins = [forme.battleOnly].flat() as string[];
+      for (const originName of origins) {
+        const origin = dex.species.get(originName);
+        if (origin.name === origin.baseSpecies) continue;
+        become(target, origin.name, NICKNAME);
+        const shown = target.getUpdatedDetails().split(',')[0];
+        if (shown !== origin.name) {
+          tied.push(`${shown} / ${forme.name}`);
+          if (slotOf(shown, forme.name) !== place) failures.push(`tied: ${shown} held, ${forme.name} named`);
+          if (slotOf(forme.name, shown) !== place) failures.push(`tied: ${forme.name} held, ${shown} named`);
+        } else if (!origins.includes(origin.baseSpecies)) {
+          apart++;
+          if (slotOf(origin.baseSpecies, forme.name) === place) failures.push(`apart: ${origin.baseSpecies} held, ${forme.name} named`);
+        }
+      }
+    }
+    expect(apart).toBeGreaterThan(5);
+    // The real scene: smogtours-gen7ubers-317232 turn 28, the log asks Greninja-Ash and the slot holds Greninja. It is the one pair.
+    expect(tied).toEqual(['Greninja / Greninja-Ash']);
+    expect(failures).toEqual([]);
+  });
+
+  test('protocol choices: names that merely share a prefix stay apart (#118)', () => {
+    const PAIRS: [string, string][] = [
+      ['Mewtwo', 'Mew'], ['Mew', 'Mewtwo'], ['Porygon2', 'Porygon'], ['Porygon', 'Porygon2'], ['Porygon-Z', 'Porygon'], ['Porygon', 'Porygon-Z'], ['Porygon2', 'Porygon-Z'],
+      ['Pawmot', 'Pawmo'], ['Pawmo', 'Pawmot'], ['Urshifu-Rapid-Strike', 'Urshifu'], ['Urshifu', 'Urshifu-Rapid-Strike'],
+      ['Rotom-Wash', 'Rotom'], ['Rotom', 'Rotom-Wash'],
+    ];
+    const battle = forcedBoard(rules, type, [mon(rules, 'Meowth', ['splash']), mon(rules, 'Eevee', ['splash'])]);
+    const target = battle.sides[0].pokemon.find(body => body.set.species === 'Eevee')!;
+    const place = battle.sides[0].pokemon.indexOf(target) + 1;
+    const failures: string[] = [];
+    let played = 0;
+    for (const [held, named] of PAIRS) {
+      if (!battle.dex.species.get(held).exists || !battle.dex.species.get(named).exists) continue;
+      played++;
+      become(target, held, NICKNAME);
+      if (findSlotBySpecies(battle, 0, named) === place) failures.push(`${held} held, ${named} named`);
+    }
+    expect(played).toBeGreaterThan(2);
+    expect(failures).toEqual([]);
+  });
+
   test('log sync: the body the log last switched into the slot (activeMatchesLog)', () => {
     const { failures, formes } = sweep(rules, type, (body, species) =>
       activeMatchesLog(body, parseLoggedActive(`|switch|p1a: Other|${species}, L50|100/100`) ?? undefined));

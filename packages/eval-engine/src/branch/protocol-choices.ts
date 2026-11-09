@@ -61,23 +61,16 @@ function isSpeciesBody(pokemon: SimPokemon, species: string): boolean {
   return sameBodyForme(pokemon.battle.dex, pokemon.species?.name, species) || toId(pokemon.name || '') === toId(species);
 }
 
-/** The old reading, kept as the second pass: a shared prefix of the ids (a base name for a forme the Dex does not tie). */
-function sharesPrefix(pokemon: SimPokemon, speciesId: string): boolean {
-  const speciesName = toId(pokemon.species?.name || '');
-  return speciesName.startsWith(speciesId) || speciesId.startsWith(speciesName);
-}
-
 export function findSlotBySpecies(battle: SimBattle, sideIdx: number, species: string): number {
   const side = battle.sides[sideIdx];
   const speciesId = toId(species);
   // An empty id (a name without Latin letters) is no key: it is a prefix of every species.
   if (speciesId === '') return findFirstAvailableSwitchSlot(battle, sideIdx);
 
-  // The Dex first, so that a base species reaches its own body before a longer name that starts with it (Rotom before Rotom-Wash), then the prefix.
-  for (const matches of [(pokemon: SimPokemon) => isSpeciesBody(pokemon, species), (pokemon: SimPokemon) => sharesPrefix(pokemon, speciesId)]) {
-    const index = side.pokemon.findIndex(pokemon => !pokemon.isActive && !pokemon.fainted && matches(pokemon));
-    if (index >= 0) return index + 1;
-  }
+  // Round 89 (#118): the Dex only. The second pass (a shared prefix of the ids) tied Mew to Mewtwo and Porygon to Porygon2; over 7,032 corpus
+  // games it answered one lookup, Greninja-Ash against a "Greninja" slot, which `formeFamily` now ties through the Dex.
+  const index = side.pokemon.findIndex(pokemon => !pokemon.isActive && !pokemon.fainted && isSpeciesBody(pokemon, species));
+  if (index >= 0) return index + 1;
 
   return findFirstAvailableSwitchSlot(battle, sideIdx);
 }
