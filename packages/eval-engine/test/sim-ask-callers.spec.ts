@@ -92,8 +92,10 @@ describe('the callers of the simulator', () => {
     // (`cant-stand-in.ts`) read the simulator's priority of the action (`actionPriority`, `queuePlace`: Prankster, Gale Wings, Triage,
     // Stall, Quick Claw and the other handlers), not the Dex move's. The one Dex read left is the move of a logged body that is off the
     // field, whose handlers the battle cannot show. The sweep `stand-in-priority-sweep.spec.ts` holds both to the simulator.
-    const rebuild = ['eval-engine:branch/cant-stand-in.ts', 'eval-engine:branch/protocol-choices.ts'];
+    // Round 89 (#108): `action-bound.ts` holds the order rules both read (the places of the logged actions, `loggedActions`) and the bound of a
+    // body that fell before it acted (`ruledOutMoves`); the Dex read of an off-field body moved there from `cant-stand-in.ts`.
+    const rebuild = ['eval-engine:branch/action-bound.ts', 'eval-engine:branch/cant-stand-in.ts', 'eval-engine:branch/protocol-choices.ts'];
     expect(filesWith(/\b(?:actionPriority|queuePlace)\(/)).toEqual(rebuild);
-    expect(filesWith(/\.moves\.get\([^)]*\)\.priority\b/).filter(name => rebuild.includes(name))).toEqual(['eval-engine:branch/cant-stand-in.ts']);
+    expect(filesWith(/\.moves\.get\([^)]*\)\.priority\b/).filter(name => rebuild.includes(name))).toEqual(['eval-engine:branch/action-bound.ts']);
   });
 });
