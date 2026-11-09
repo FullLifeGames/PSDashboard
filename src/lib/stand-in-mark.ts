@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import { speciesBaseId, type GameRules, type OpponentTeamInfo } from '@fulllifegames/replay-core';
+import { speciesBaseId, type GameRules, type OpponentTeamInfo, type RevealedPokemonInfo } from '@fulllifegames/replay-core';
 import type { BringWorld } from '@fulllifegames/eval-engine';
 
 /**
@@ -13,6 +13,16 @@ export const STAND_IN_TITLE = 'The log never showed this Pokémon. The statistic
 export const STAND_IN_BADGE = 'guessed';
 export const STAND_IN_BADGE_TITLE = `${STAND_IN_MARK}. ${STAND_IN_TITLE}`;
 
+/**
+ * Round 89 (lane B, #117): a Random Battle has no teammate statistics; its stand-ins come from the format's random-set data and say so
+ * in the words of their mark. `RANDOM_SET_DETAIL` is the provenance replay-core's fill writes on the body's moves (a spec reads the fill's
+ * output through this lookup, so the two strings cannot drift).
+ */
+export const RANDOM_SET_DETAIL = 'random-set data';
+export const RANDOM_SET_MARK = 'Not revealed (guessed from random-set data)';
+export const RANDOM_SET_TITLE = "The log never showed this Pokémon. The game draws its teams from random sets, so the engine plays one draw from the format's random-set data: species, level, role, moves, ability and item. Edit it or paste your team to replace the guess.";
+const RANDOM_SET_BADGE_TITLE = `${RANDOM_SET_MARK}. ${RANDOM_SET_TITLE}`;
+
 export type GuessedSide = 'p1' | 'p2';
 
 /**
@@ -23,6 +33,8 @@ export interface StandInMark {
   badge: string;
   title: string;
   text: string;
+  /** The sentence the stats panel shows beside the text (round 89: the title without the text it repeats). */
+  explanation: string;
 }
 
 /** The mark of a body of this side and species, or null when the body is no guess. */
@@ -30,7 +42,14 @@ export type IsGuessed = (side: GuessedSide, species: string) => StandInMark | nu
 
 const NONE: IsGuessed = () => null;
 
-const STAND_IN: StandInMark = { badge: STAND_IN_BADGE, title: STAND_IN_BADGE_TITLE, text: STAND_IN_MARK };
+const STAND_IN: StandInMark = { badge: STAND_IN_BADGE, title: STAND_IN_BADGE_TITLE, text: STAND_IN_MARK, explanation: STAND_IN_TITLE };
+const RANDOM_SET: StandInMark = { badge: STAND_IN_BADGE, title: RANDOM_SET_BADGE_TITLE, text: RANDOM_SET_MARK, explanation: RANDOM_SET_TITLE };
+
+/** The mark of one body of the team infos: null for a body the log showed, the random-set words for a guess from the random-set data, else the teammate words. */
+export function standInMarkOf(poke: RevealedPokemonInfo): StandInMark | null {
+  if (!poke.standIn) return null;
+  return poke.moves?.some(move => move.sourceDetail === RANDOM_SET_DETAIL) ? RANDOM_SET : STAND_IN;
+}
 
 /** Round 89 (#124): the text of a bring guess in the All choices list. */
 export const BRING_GUESS_TEXT = 'Not fielded (guessed from usage)';
@@ -64,9 +83,11 @@ function bringGuessesOf(worlds: readonly BringWorld[] | null | undefined, side: 
 export function guessedBodies(
   p1: OpponentTeamInfo | null, p2: OpponentTeamInfo | null, rules: GameRules, worlds?: readonly BringWorld[] | null,
 ): IsGuessed {
-  const basesOf = (info: OpponentTeamInfo | null) =>
-    new Set((info?.pokemon ?? []).filter(poke => poke.standIn).map(poke => speciesBaseId(poke.species, rules)));
-  const standIns = { p1: basesOf(p1), p2: basesOf(p2) };
+  const marksOf = (info: OpponentTeamInfo | null) => new Map((info?.pokemon ?? []).flatMap(poke => {
+    const mark = standInMarkOf(poke);
+    return mark ? [[speciesBaseId(poke.species, rules), mark] as const] : [];
+  }));
+  const standIns = { p1: marksOf(p1), p2: marksOf(p2) };
   const bring = {
     p1: new Map(bringGuessesOf(worlds, 'p1').map(guess => [speciesBaseId(guess.species, rules), guess.title])),
     p2: new Map(bringGuessesOf(worlds, 'p2').map(guess => [speciesBaseId(guess.species, rules), guess.title])),
@@ -75,8 +96,8 @@ export function guessedBodies(
   return (side, species) => {
     const base = speciesBaseId(species, rules);
     const title = bring[side].get(base);
-    if (title !== undefined) return { badge: STAND_IN_BADGE, title, text: BRING_GUESS_TEXT };
-    return standIns[side].has(base) ? STAND_IN : null;
+    if (title !== undefined) return { badge: STAND_IN_BADGE, title, text: BRING_GUESS_TEXT, explanation: title };
+    return standIns[side].get(base) ?? null;
   };
 }
 

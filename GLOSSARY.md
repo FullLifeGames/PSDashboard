@@ -72,7 +72,7 @@ One Pokémon of a side as the battle holds it, on the field or on the bench.
 The bodies a side can switch to. In a bring-limited game the What-if bench, the stored positions and the snapshot pickers offer only the bodies a side brought once that side fielded its whole selection; a side that did not stays whole (`src/lib/bench.ts`). The engine and the play-out choose from every body the rebuild holds: four per side when both sides fielded their whole selection, otherwise six.
 
 **Stand-in**:
-A body the log never showed, filled in for a side that never showed its whole team in a game without Team Preview (Gen 1 to 4). It comes from the format's teammate statistics and carries the flag `standIn` (`team/stand-ins.ts` in replay-core); the app marks it "Not revealed (guessed from teammate usage)" with the badge "guessed".
+A body the log never showed, filled in for a side that never showed its whole team in a game without Team Preview (Gen 1 to 4). It comes from the format's teammate statistics and carries the flag `standIn` (`team/stand-ins.ts` in replay-core); the app marks it "Not revealed (guessed from teammate usage)" with the badge "guessed". In a Random Battle (any generation) it comes from the format's random-set data instead, and the mark reads "Not revealed (guessed from random-set data)".
 _Avoid_: placeholder
 
 **Stand-in move**:

@@ -1,5 +1,5 @@
 import {
-  missingBodies, teamSizes,
+  inferReplayFormatId, missingBodies, teamSizes,
   type OpponentTeamInfo,
   type PokemonEvsInfo,
   type PokemonFieldInfo,
@@ -11,7 +11,8 @@ import { useScrollFade } from '../hooks/useScrollFade';
 import { sourceAccent, sourceLabel } from '../lib/provenance-labels';
 import { spriteUrl } from '../lib/sprite-url';
 import { useReplayRules } from '../lib/replay-rules';
-import { STAND_IN_MARK, STAND_IN_TITLE } from '../lib/stand-in-mark';
+import { generatesTeam } from '../lib/random-sets';
+import { standInMarkOf } from '../lib/stand-in-mark';
 import { typeBg } from '../lib/type-colors';
 
 interface Props {
@@ -140,6 +141,7 @@ function SpreadTag({ info, text }: { info: PokemonEvsInfo; text: string }) {
 
 function PokemonEntry({ poke, isRandomFormat }: { poke: RevealedPokemonInfo; isRandomFormat: boolean }) {
   const rules = useReplayRules();
+  const mark = standInMarkOf(poke);
   return (
     <div className="ps-stats-pokemon">
       <img
@@ -153,7 +155,7 @@ function PokemonEntry({ poke, isRandomFormat }: { poke: RevealedPokemonInfo; isR
           {poke.level !== 100 && <span className="ps-stats-level"> L{poke.level}</span>}
           {poke.gender && <span className="ps-stats-gender"> {poke.gender === 'M' ? '♂' : '♀'}</span>}
         </div>
-        {poke.standIn && <div className="ps-stats-standin" title={STAND_IN_TITLE} style={{ color: '#8899aa', fontSize: 10 }}>{STAND_IN_MARK}</div>}
+        {mark && <div className="ps-stats-standin" title={mark.explanation} style={{ color: '#8899aa', fontSize: 10 }}>{mark.text}</div>}
         {poke.moves.length > 0 && (
           <div className="ps-stats-moves">
             {poke.moves.map(move => (
@@ -233,7 +235,8 @@ function TeamColumn({ label, playerName, info, isRandomFormat, notice }: {
 export function BattleStatsPanel({ replayData, p1Info, p2Info }: Props) {
   const fadeRef = useScrollFade();
   if (!p1Info && !p2Info) return null;
-  const isRandomFormat = (replayData.formatid || '').includes('random');
+  // Round 89 (#117): the Dex entry decides whether the format generates its team, never a name.
+  const isRandomFormat = generatesTeam(inferReplayFormatId(replayData));
 
   return (
     <div className="ps-panel ps-stats-panel" style={{ marginTop: 10 }}>
