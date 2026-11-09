@@ -62,7 +62,8 @@ describe('missing class weight (T146 c2)', () => {
     const [p1, p2] = ['move hiddenpower', 'move dragonclaw'];
     const truth = plainMean(root, p1, p2);
     const sample = sampleCell(root, 0, p1, p2, 1, createMatchupCache(), true);
-    expect(sample.diagnostic?.missing).toEqual(['hit-nokill|hit-nokill']); // the model still reports what it could not see
+    // r89 A5 gate: was toEqual(['hit-nokill|hit-nokill']). The cell's own seeds (T324) also leave 'hit-kill|none' (a crit class) unreached.
+    expect(sample.diagnostic?.missing).toEqual(['hit-kill|none', 'hit-nokill|hit-nokill']); // the model still reports what it could not see
     expect(Math.abs(sample.value - truth.mean)).toBeLessThan(2.5 * truth.se);
     expect(sample.blend).toBeUndefined(); // priced by the draws, not by the renormalised classes
   });
@@ -72,8 +73,9 @@ describe('missing class weight (T146 c2)', () => {
     const [p1, p2] = ['move hiddenpower', 'move dragonclaw'];
     const truth = plainMean(root, p1, p2);
     const sample = sampleCell(root, 0, p1, p2, 1, createMatchupCache(), true);
-    const missing = sample.diagnostic!.missing.reduce((sum, key) => sum + sample.diagnostic!.analytic[key], 0);
-    expect(missing).toBeGreaterThan(0); // a crit class no draw reached: reported, below the cut
+    // r89 A5 gate: was `missing > 0` (a crit class no draw reached, with the fixed seeds). The cell's own seeds (T324) reach every class
+    // of this cell, so there is no diagnostic; a cell that misses a class must still stay below the cut.
+    const missing = (sample.diagnostic?.missing ?? []).reduce((sum, key) => sum + sample.diagnostic!.analytic[key], 0);
     expect(missing).toBeLessThan(MISSING_WEIGHT_CUT);
     const classes = sample.blend!.classes;
     expect(classes.reduce((sum, cls) => sum + cls.weight, 0)).toBeCloseTo(1, 9);

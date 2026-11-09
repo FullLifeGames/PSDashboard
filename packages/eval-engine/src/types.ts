@@ -160,7 +160,7 @@ export interface CellBlend {
 
 /**
  * Round 70: one of the base draws that priced a root cell, the draws the
- * horizon-trend probe replays: the index of its search seed (SEARCH_SEEDS)
+ * horizon-trend probe replays: the slot of its seed in the cell's list (round 89: `cellSeeds`; before, SEARCH_SEEDS)
  * and, for a speed-tied singles cell, the move order scripted into it.
  */
 export interface CellDraw {

@@ -164,4 +164,12 @@ describe('(d) the key of a cell', () => {
     expect(cellHash(a, 'move 2', 'move 2')).not.toBe(base);
     expect(cellHash(a, 'move 2', 'move 1')).not.toBe(base);
   });
+
+  test('a shiny flag is no part of the game state: the key is the same with and without it (identity-blind.spec.ts)', () => {
+    const text = fixture('gen9ou-2658658993-t2').serialized;
+    const state = JSON.parse(text) as { sides: { pokemon: { details: string }[] }[] };
+    expect(state.sides.every(side => side.pokemon.every(body => !body.details.includes('shiny')))).toBe(true);
+    for (const side of state.sides) for (const body of side.pokemon) body.details += ', shiny';
+    expect(positionSalt(JSON.stringify(state))).toBe(positionSalt(text));
+  });
 });

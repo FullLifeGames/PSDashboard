@@ -1127,108 +1127,108 @@
       }
     ],
     "matrix": {
-      "score": -0.034252582633818175,
-      "interval": 0.0038978495402401947,
+      "score": -0.03604803971002368,
+      "interval": 0,
       "depthCompleted": 1,
       "p1": [
         {
           "choice": "move willowisp",
-          "ev": -0.02341240448546919,
-          "expected": 0.16949963424957162,
-          "worstCase": -0.027275256488505872,
+          "ev": -0.03404452904397534,
+          "expected": 0.16389506597509154,
+          "worstCase": -0.034113277539797315,
           "punishedBy": "Spikes"
         },
         {
           "choice": "move uturn > switch 4",
-          "ev": -0.05347709699878905,
-          "expected": 0.09859485341486239,
-          "worstCase": -0.057339181155643584,
-          "punishedBy": "Gyro Ball"
-        },
-        {
-          "choice": "move uturn > switch 5",
-          "ev": -0.057940149357608765,
-          "expected": 0.14723777968963386,
-          "worstCase": -0.06294456718321462,
+          "ev": -0.05414707390821053,
+          "expected": 0.10005875538029613,
+          "worstCase": -0.054193591527587626,
           "punishedBy": "Spikes"
         },
         {
-          "choice": "move dragondarts",
-          "ev": -0.06845679287002865,
-          "expected": 0.15344237332151558,
-          "worstCase": -0.07068220852023654,
+          "choice": "move uturn > switch 5",
+          "ev": -0.05920159003456913,
+          "expected": 0.14753786147839726,
+          "worstCase": -0.05927466296715689,
           "punishedBy": "Spikes"
         },
         {
           "choice": "move uturn > switch 2",
-          "ev": -0.06882288841960167,
-          "expected": 0.12936129748513553,
-          "worstCase": -0.07351162841760794,
+          "ev": -0.0677871679651293,
+          "expected": 0.12964037303251483,
+          "worstCase": -0.06785093488014193,
+          "punishedBy": "Spikes"
+        },
+        {
+          "choice": "move dragondarts",
+          "ev": -0.0687230266377096,
+          "expected": 0.15641009841268622,
+          "worstCase": -0.06879489423403284,
           "punishedBy": "Spikes"
         },
         {
           "choice": "move uturn > switch 6",
-          "ev": -0.07097692619568197,
-          "expected": 0.07371290388164972,
-          "worstCase": -0.29878333365849186,
+          "ev": -0.07442470218563443,
+          "expected": 0.08396861687389835,
+          "worstCase": -0.29237035098631536,
           "punishedBy": "Power Whip"
         },
         {
           "choice": "switch 4",
-          "ev": -0.09177732529966123,
-          "expected": 0.06865415462622956,
-          "worstCase": -0.0943824029566116,
+          "ev": -0.09172274127255173,
+          "expected": 0.06889803579380374,
+          "worstCase": -0.10180723368367783,
           "punishedBy": "Gyro Ball"
         },
         {
           "choice": "switch 5",
-          "ev": -0.11344433869501062,
-          "expected": 0.10046616382523693,
+          "ev": -0.118397625057561,
+          "expected": 0.10082086558765596,
           "worstCase": -0.11847531418191515,
           "punishedBy": "Spikes"
         },
         {
           "choice": "move protect",
-          "ev": -0.12504415000338634,
+          "ev": -0.13044283086471253,
           "expected": 0.10154092045692696,
           "worstCase": -0.13052568409304433,
           "punishedBy": "Spikes"
         },
         {
           "choice": "switch 2",
-          "ev": -0.12582936074777404,
-          "expected": 0.07808166877414485,
+          "ev": -0.13045572372639885,
+          "expected": 0.08315744313440206,
           "worstCase": -0.13052568409304433,
           "punishedBy": "Spikes"
         },
         {
           "choice": "switch 6",
-          "ev": -0.12798154132889408,
-          "expected": 0.024490891145297414,
-          "worstCase": -0.3527723253011774,
+          "ev": -0.1304912578649213,
+          "expected": 0.031527362412240044,
+          "worstCase": -0.28088570584689737,
           "punishedBy": "Power Whip"
         }
       ],
       "p2": [
         {
           "choice": "move gyroball",
-          "ev": 0.07504753084788499,
-          "expected": -0.023164338990339782,
-          "worstCase": -0.12869465468992722,
+          "ev": 0.09057577023172286,
+          "expected": -0.00010784189586775239,
+          "worstCase": -0.11448039018899347,
           "punishedBy": "U-turn → Corviknight"
         },
         {
           "choice": "move spikes",
-          "ev": 0.052501706179023985,
-          "expected": 0.10506033906343491,
-          "worstCase": 0.05230305677737895,
+          "ev": 0.054239430024761746,
+          "expected": 0.10553409903007979,
+          "worstCase": 0.054193591527587626,
           "punishedBy": "U-turn → Kyurem"
         },
         {
           "choice": "move powerwhip",
-          "ev": -0.0877152620063237,
-          "expected": -0.01664392543509111,
-          "worstCase": -0.18003273067236433,
+          "ev": -0.08447877183581659,
+          "expected": -0.025991227219751813,
+          "worstCase": -0.16112975526040735,
           "punishedBy": "Will-O-Wisp"
         },
         {
@@ -1240,31 +1240,31 @@
         },
         {
           "choice": "switch 5",
-          "ev": -0.16863910955951572,
-          "expected": -0.16846859137332582,
-          "worstCase": -0.23091346498338927,
+          "ev": -0.16590262018681004,
+          "expected": -0.16720935075869894,
+          "worstCase": -0.2316522285929088,
           "punishedBy": "Dragon Darts"
         },
         {
           "choice": "switch 4",
-          "ev": -0.17850845578482025,
-          "expected": -0.17062031339857134,
-          "worstCase": -0.28441492877380914,
+          "ev": -0.18271828199348972,
+          "expected": -0.17165272670571793,
+          "worstCase": -0.289546818964342,
           "punishedBy": "Dragon Darts"
         },
         {
           "choice": "switch 2",
-          "ev": -0.20614766930476944,
-          "expected": -0.18295904068647423,
-          "worstCase": -0.2696540539308654,
+          "ev": -0.20213483154841924,
+          "expected": -0.18173037990746232,
+          "worstCase": -0.27119563045024386,
           "punishedBy": "Dragon Darts"
         },
         {
           "choice": "switch 6",
-          "ev": -0.25250432973182624,
-          "expected": -0.19185309484319105,
-          "worstCase": -0.2526366028125411,
-          "punishedBy": "U-turn → Kyurem"
+          "ev": -0.2468059004061178,
+          "expected": -0.1968606433944583,
+          "worstCase": -0.31576534759363684,
+          "punishedBy": "U-turn → Chansey"
         }
       ],
       "forcedWin": null
@@ -2536,25 +2536,25 @@
       "depthCompleted": 1,
       "p1": [
         {
+          "choice": "move tackle 2",
+          "ev": 0.8900024999999999,
+          "expected": 0.9,
+          "worstCase": 0.89,
+          "punishedBy": "Ember"
+        },
+        {
           "choice": "move protect",
           "ev": 0.8999999999999999,
           "expected": 0.9,
           "worstCase": 0.9,
-          "punishedBy": "Ember"
-        },
-        {
-          "choice": "move tackle 2",
-          "ev": 0.8900012500000001,
-          "expected": 0.895,
-          "worstCase": 0.8900000000000001,
           "punishedBy": "Ember"
         }
       ],
       "p2": [
         {
           "choice": "move ember 2",
-          "ev": -0.89999875,
-          "expected": -0.895,
+          "ev": -0.8999975,
+          "expected": -0.89,
           "worstCase": -0.9,
           "punishedBy": "Protect"
         },

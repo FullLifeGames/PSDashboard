@@ -42,9 +42,15 @@ async function keyedModule(): Promise<typeof import('../src/pair/tree-key')> {
 
 /** The sampler's blend of a cell (the plan's classes), for the keys a tree draw may name. */
 function blendOf(root: SimPosition, p1: string, p2: string): CellBlend {
+  const blend = blendIfPlanned(root, p1, p2);
+  if (!blend) throw new Error(`no class plan for ${p1} / ${p2}`);
+  return blend;
+}
+
+/** The blend, or null when the sampler prices the cell by its fallback (r89 A5 gate: a cell's own seeds can reach a read the plan refuses). */
+function blendIfPlanned(root: SimPosition, p1: string, p2: string): CellBlend | null {
   const cell = pairCellSample(root, p1, p2, 3, cache);
-  if (cell.kind !== 'sample' || !cell.sample.blend) throw new Error(`no class plan for ${p1} / ${p2}: ${cell.kind}`);
-  return cell.sample.blend;
+  return cell.kind === 'sample' && cell.sample.blend ? cell.sample.blend : null;
 }
 
 // Extrasensory (a flinch of one in ten), Thunderbolt (a paralysis of one in ten) and a plain 80 percent move (a miss class).
@@ -123,11 +129,16 @@ describe('(b) the key of a keyed draw is the sampler\'s class key', () => {
       const stats = mctsTreeSearch(root.serialized, settings, 0);
       const keyed = stats.cells.filter(cell => cell.classKey !== undefined);
       expect(keyed.length).toBeGreaterThan(0);
+      let planned = 0;
       for (const cell of keyed) {
         const [i, j] = [Math.floor(cell.key / 10_000), cell.key % 10_000];
-        const blend = blendOf(root, stats.p1Options[i].choice, stats.p2Options[j].choice);
+        // r89 A5 gate: Thunderbolt / Rest is a cell whose own seeds (T324) reach a paralysed read, so the sampler falls back and has no blend.
+        const blend = blendIfPlanned(root, stats.p1Options[i].choice, stats.p2Options[j].choice);
+        if (!blend) continue;
+        planned++;
         expect(blend.classes.map(cls => cls.key), `${stats.p1Options[i].choice} / ${stats.p2Options[j].choice}`).toContain(cell.classKey);
       }
+      expect(planned).toBeGreaterThan(0);
     } finally {
       configureSearchBudget(null);
     }

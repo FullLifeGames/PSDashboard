@@ -176,7 +176,8 @@ describe('(e) the executor marks its verify cells and prices a strand', () => {
     expect(par.priced).toBe('shift');
     const [strand] = await round.executor.evalCells([{ ...round.job, strands: [par.key] }]);
     expect(strand.strandValues![par.key]).toBe(expectedStrandValue(round, par.key, verified));
-    expect(strand.strandValues![par.key]).not.toBe(par.deepened);
+    // r89 A5 gate: was `expect(strand.strandValues![par.key]).not.toBe(par.deepened)`. With the cell's own seeds (T324) the shifted price and
+    // the child's depth-1 value are both 0.9, so this scene no longer tells the two apart; the line above pins the strand value.
   });
 
   test('the root stays as it was: the same verify job reads the same before and after a strand job', async () => {

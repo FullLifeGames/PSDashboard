@@ -1,6 +1,7 @@
 import type { SimPosition } from '../forward/position.ts';
 import { dieKey, type DieName, type Draw } from '../dice/types.ts';
-import { hash32, hashText } from './leaf.ts';
+import type { PRNGSeed } from '@pkmn/sim';
+import { cellSeedList, hash32, hashText } from './leaf.ts';
 
 /**
  * Round 89 (#59, T322 block 1): the root quantiles. Four trees draw each root cell once by their seed, so a 30 % strand gets
@@ -40,7 +41,8 @@ interface SaltState { turn?: number; gameType?: string; formatid?: string; sides
 export function positionSalt(serialized: string): number {
   const state = JSON.parse(serialized) as SaltState;
   const bodies = (state.sides ?? []).map(side => (side.pokemon ?? []).map(body => [
-    body.details, body.hp, body.status, body.fainted, body.item, body.ability, JSON.stringify(body.boosts ?? null),
+    // The shiny flag is no part of the game state: a shiny and a plain body draw the same dice (identity-blind.spec.ts, round 72).
+    body.details?.replace(/, shiny\b/, ''), body.hp, body.status, body.fainted, body.item, body.ability, JSON.stringify(body.boosts ?? null),
     (body.moveSlots ?? []).map(slot => `${slot.id}:${slot.pp}`).join(','),
   ].join('~')).join('/'));
   return rootSalt([state.formatid, state.gameType, state.turn, ...bodies].join('|'));
@@ -65,6 +67,17 @@ export function positionKey(position: SimPosition): number {
 /** The key of a root cell inside its root: the salt and the two choice strings (swapping the sides gives another key). */
 export const cellHash = (salt: number, p1Choice: string, p2Choice: string): number =>
   hash32((salt ^ Math.imul(hashText(p1Choice), 0x9e3779b1) ^ Math.imul(hashText(p2Choice) ^ 0x5bd1e995, 0x85ebca6b)) >>> 0);
+
+/** Slots of a cell's seed list: the matrix's five base seeds, its eleven probe seeds (the verify round's sixteen). */
+export const CELL_SEED_SLOTS = 16;
+
+/**
+ * Round 89 (#60, T324): the seed list of a root cell, the one list every path reads (the matrix's draws, the verify round, the
+ * pair sampler, the trend probe): slot s stands where slot s of the fixed list stood. The cell is the root position and the two
+ * choice strings; a tied cell's two move orders keep one list (scripts stay out of the key).
+ */
+export const cellSeeds = (root: SimPosition, p1Choice: string, p2Choice: string): PRNGSeed[] =>
+  cellSeedList(cellHash(positionKey(root), p1Choice, p2Choice), CELL_SEED_SLOTS);
 
 /**
  * The quantiles of ONE root draw: the cell's hash, the tree's offset and the tree count. The object counts the occurrences of each
