@@ -28,10 +28,13 @@ function repointActiveSlot(side: SimSide, activeSlot: number, target: SimPokemon
   if (previous) previous.isActive = false;
 
   const duplicateActiveSlot = side.active.findIndex(active => active === target);
-  if (duplicateActiveSlot >= 0 && duplicateActiveSlot !== activeSlot && previous) {
+  const swapped = duplicateActiveSlot >= 0 && duplicateActiveSlot !== activeSlot && !!previous;
+  if (swapped) {
     side.active[duplicateActiveSlot] = previous;
     previous.isActive = true;
   }
+  // Round 89 (#138): the simulator's switch ends the old active's volatiles (`oldActive.clearVolatile()`, battle-actions.js); a body this repoint takes off the field leaves the same way, or it carries them back in (Taunt on a Sableye of Champions VGC 2685328963).
+  if (previous && !swapped) previous.clearVolatile();
 
   // Mirror BattleActions#switchIn's array swap: the sim keeps
   // side.pokemon[i] === side.active[i], and its next real switch swaps via

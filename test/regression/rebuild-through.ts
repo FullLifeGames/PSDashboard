@@ -46,6 +46,8 @@ export async function rebuildThrough(id: string, through: number) {
     emitted: publicLines(emittedBlock(runtime.battleStream.battle!.log, through)),
     refusals: runtime.choiceErrors.count,
     lastError: runtime.choiceErrors.last,
+    /** The rebuilt battle at the start of turn `through + 1`. */
+    battle: runtime.battleStream.battle!,
   };
 }
 
