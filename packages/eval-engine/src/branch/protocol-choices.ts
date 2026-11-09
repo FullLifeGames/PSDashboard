@@ -3,6 +3,7 @@ import { formatTargetLoc, slotLetter } from './team-order.ts';
 import { sameBodyForme } from './body-forme.ts';
 import { answersForcedRequest } from './forced-request.ts';
 import { cantStandIn } from './cant-stand-in.ts';
+import { isRelayedMoveLine } from './relayed-move.ts';
 import { actionPriority, activated } from '../sim-ask/index.ts';
 import { nextChoosingSlot } from '../forward/request-moves.ts';
 import { sideIndex, toId, type RulesDex } from '@fulllifegames/replay-core';
@@ -359,7 +360,9 @@ function getChoiceForSlot(
       return `switch ${findSlotBySpecies(battle, sideIdx, species)}`;
     }
 
-    if (line.startsWith(`|move|${ident}`)) {
+    // A move another effect dispatched for the body (Magic Bounce, Dancer, Magic Coat, Snatch) is no click: the body's own line comes
+    // later in the block, or the body did not click a move (round 89, #135).
+    if (line.startsWith(`|move|${ident}`) && !isRelayedMoveLine(line, battle.dex)) {
       const active = battle.sides[sideIdx].active[activeSlot];
       const clicked = clickBehindEncore(events, lineIndex, ident, active, line.split('|')[3]);
       const moveName = clicked ?? line.split('|')[3];

@@ -1,13 +1,6 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
-import {
-  getBranchSimulatorFormat, parseReplayLog, parseReplayLogWithObservations, replayBringOnly, type ReplayData,
-} from '@fulllifegames/replay-core';
-import { buildChoiceLockContext, loadSimMods, reconstructBranchRuntime } from '@fulllifegames/eval-engine';
-import { bankTeamsFor } from './bank-build';
-import { emittedBlock } from './forced-reconstruction-support';
-import { diskCachedSmogonFetcher } from './smogon-fetch-cache';
+import { CORPUS, rebuildThrough, refusalsOfTurn } from './rebuild-through';
 
 /**
  * Round 89 (#131, #144): the forced answers of the rebuild. A replacement request is answered from the log's switch lines, and a Revival
@@ -20,55 +13,6 @@ import { diskCachedSmogonFetcher } from './smogon-fetch-cache';
  * Each row rebuilds a corpus game like the bank does, through the turn, and compares the turn's emitted block with the log's block. The
  * unit rows with the same causes are in `packages/eval-engine/test/forced-answers.spec.ts`.
  */
-
-type Fixture = ReplayData & { formatid: string };
-
-/** The games sit in the local fit corpus (`.fit-corpus`), which a clone lacks: the rows then skip. */
-const CORPUS = (id: string): string => join('.fit-corpus', `${id}.json`);
-
-/** The log's lines of a turn: from its `|turn|` line to the next, without the `|upkeep` marker. */
-function logBlock(log: string, turn: number): string[] {
-  const lines = log.split('\n');
-  const from = lines.indexOf(`|turn|${turn}`);
-  const to = lines.findIndex((line, at) => at > from && line.startsWith('|turn|'));
-  return lines.slice(from + 1, to < 0 ? undefined : to).filter(line => line !== '|upkeep');
-}
-
-async function rebuildThrough(id: string, through: number) {
-  const replay = JSON.parse(readFileSync(CORPUS(id), 'utf-8')) as Fixture;
-  await loadSimMods(getBranchSimulatorFormat(replay));
-  const parsed = parseReplayLogWithObservations(replay.log);
-  const built = await bankTeamsFor({ log: replay.log, formatId: replay.formatid ?? id, parsed, fetcher: diskCachedSmogonFetcher() });
-  if (!built.teams) throw new Error(`${id}: no teams (${built.reason})`);
-  const { p1Team, p2Team } = built.teams;
-  const snapshotFor = (turn: number) => parsed.snapshots[Math.min(turn - 1, parsed.snapshots.length - 1)] ?? null;
-  const runtime = await reconstructBranchRuntime({
-    format: getBranchSimulatorFormat(replay), p1Team, p2Team, replayLog: replay.log, targetTurn: through + 1,
-    snapshot: snapshotFor(through + 1), playerNames: [replay.players[0], replay.players[1]],
-    choiceLocks: buildChoiceLockContext(replay.log, { p1Team, p2Team }, parsed.observations),
-    bringOnly: replayBringOnly(replay, parseReplayLog(replay.log)) ?? undefined,
-    deadlineMs: 600_000,
-  });
-  return {
-    logged: logBlock(replay.log, through),
-    emitted: publicLines(emittedBlock(runtime.battleStream.battle!.log, through)),
-    refusals: runtime.choiceErrors.count,
-  };
-}
-
-/** The refusals the turn itself adds: the count through the turn less the count through the turn before (earlier turns keep their own causes). */
-async function refusalsOfTurn(id: string, through: number, upTo: number): Promise<number> {
-  return upTo - (through > 1 ? (await rebuildThrough(id, through - 1)).refusals : 0);
-}
-
-/** The public half of a battle log: the simulator writes each private line twice (`|split|pN`, the owner's line, the spectator's line). */
-function publicLines(lines: string[]): string[] {
-  const out: string[] = [];
-  for (let index = 0; index < lines.length; index++) {
-    if (lines[index].startsWith('|split|')) index++; else out.push(lines[index]);
-  }
-  return out;
-}
 
 /** The revive lines of a block: the name of the body each `-heal ... [from] move: Revival Blessing` brings back. */
 const revived = (lines: string[]): string[] =>
