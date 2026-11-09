@@ -4,7 +4,7 @@ import { logRules, type TurnSnapshot } from '@fulllifegames/replay-core';
 import type { ChoiceLockContext } from '../choice-lock.ts';
 import type { TurnAlignmentRecord } from '../hax-alignment.ts';
 import type { BranchChoiceErrorLog, PokemonIdent, SimBattle } from './types.ts';
-import { reorderForLeads, trimTeamToBring } from './team-order.ts';
+import { reorderForLeads, trimTeamsToBring } from './team-order.ts';
 import { extractLeads } from './protocol-choices.ts';
 import { hasForceSwitch } from './corrections.ts';
 import { recordVolatilesAtExit } from './exit-volatiles.ts';
@@ -80,9 +80,13 @@ export interface ReconstructParams {
    * species per side. The branch runs on a bring-all base format, which
    * would otherwise bench never-brought Pokémon for the engine — and every
    * evaluation and play-out on the live battle — to switch into. Fail-open:
-   * a list that does not match the team exactly leaves the team whole.
+   * a list that does not match the team exactly leaves the team whole, and
+   * since round 89 (#124) both teams: they trim together or not at all.
+   * `guessed[side]` (round 89): how many trailing names of that side's list
+   * are guesses for a body the side brought and never fielded; they take the
+   * last party slots. Callers that pass none keep every name a known body.
    */
-  bringOnly?: { p1: string[]; p2: string[] } | null;
+  bringOnly?: { p1: string[]; p2: string[]; guessed?: { p1: number; p2: number } } | null;
 }
 
 /** Everything one reconstruction run shares between its stages. */
@@ -105,8 +109,11 @@ export function orderTeams(params: ReconstructParams): { orderedP1: PokemonSet[]
   const rules = logRules(params.replayLog);
   const leadsFor = (replayLeads: PokemonIdent[], override: string[] | null | undefined): PokemonIdent[] =>
     override && override.length > 0 ? override.map(name => ({ name, species: name })) : replayLeads;
-  const orderedP1 = trimTeamToBring(reorderForLeads(params.p1Team, leadsFor(p1Leads, params.leadOverride?.p1)), params.bringOnly?.p1, rules);
-  const orderedP2 = trimTeamToBring(reorderForLeads(params.p2Team, leadsFor(p2Leads, params.leadOverride?.p2)), params.bringOnly?.p2, rules);
+  const { p1: orderedP1, p2: orderedP2 } = trimTeamsToBring(
+    reorderForLeads(params.p1Team, leadsFor(p1Leads, params.leadOverride?.p1)),
+    reorderForLeads(params.p2Team, leadsFor(p2Leads, params.leadOverride?.p2)),
+    params.bringOnly, rules,
+  );
   return { orderedP1, orderedP2 };
 }
 

@@ -1,10 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { test, expect, describe } from 'vitest';
 import { createBranchState, reconstructBranchRuntime, serializePreviewPosition } from '../src/branch-engine';
-import { trimTeamToBring } from '../src/branch/team-order';
+import { trimTeamToBring, trimTeamsToBring } from '../src/branch/team-order';
+import { BRING_WORLD_CAP, bringWorlds, type BringWorld } from '../src/branch/bring-worlds';
+import { loadSimMods } from '../src/forward/sim-mods';
 import {
-  buildTeamsFromReplay, getBranchSimulatorFormat, getReplayBringCount, parseReplayLog, replayBringOnly, replayRules,
-  parseReplayLogWithObservations, type ReplayData,
+  buildTeamsFromReplay, getBranchSimulatorFormat, getReplayBringCount, parseReplayLog, replayBringList, replayBringOnly, replayRules,
+  parseReplayLogWithObservations, speciesBaseId, type ReplayData, type SmogonUsageStats,
 } from '@fulllifegames/replay-core';
 import type { PokemonSet } from '@pkmn/sim';
 
@@ -101,9 +103,11 @@ describe('bring-limited team preview (VGC 4 of 6)', () => {
       },
     });
 
+    // Round 89 (#124): both sides trim or neither. P1's list does not resolve, so P2's four does not trim alone either
+    // (was 6 v 4: a pinned four against an open six, the asymmetry that flipped game 452654 in the A.3c gate).
     const battle = runtime.battleStream.battle!;
     expect(battle.sides[0].pokemon).toHaveLength(6);
-    expect(battle.sides[1].pokemon).toHaveLength(4);
+    expect(battle.sides[1].pokemon).toHaveLength(6);
   });
 
   test('replayBringOnly pins both sides or neither and dedupes battle formes', () => {
@@ -299,4 +303,205 @@ describe('a transformed body keeps its own species on the bring list (#116)', ()
       expect(baseNames(trimmed)).not.toContain(COPIED);
     });
   }
+});
+
+/**
+ * Round 89 (#124, stage 1): a side that never fielded its whole selection plays its fielded bodies plus one guess for each
+ * missing body, taken from its team preview. The rebuild of every world fields the count on both sides, the guess takes the last
+ * party slot, and every known body keeps one party index in all worlds, so a choice string names the same body in each world.
+ */
+const SCENES = [
+  {
+    label: 'Champions VGC 2625939941 (doubles; P1 short, candidates Ceruledge, Ninetales-Alola, Kingambit)',
+    file: 'gen9championsvgc2026regma-2625939941.json', short: 'p1' as const,
+    fielded: ['Farigiraf', 'Basculegion', 'Lopunny'], candidates: ['Ceruledge', 'Ninetales', 'Kingambit'], noBody: ['Kangaskhan', 'Torkoal'],
+  },
+  {
+    label: 'VGC 2630452654 (doubles; P2 short, candidates Urshifu-*, Volcarona, Farigiraf)',
+    file: 'gen9vgc2026regi-2630452654.json', short: 'p2' as const,
+    fielded: null, candidates: null, noBody: [] as string[],
+  },
+];
+
+interface Boundaries { sizes: [number, number]; parties: Record<number, [string[], string[]]> }
+
+/** One world's rebuild through the whole log: the party of both sides (base species, by party index) at every raw boundary. */
+async function rebuildWorld(replay: ReplayData, world: BringWorld, teams: { p1Team: PokemonSet[]; p2Team: PokemonSet[] }): Promise<Boundaries> {
+  const format = getBranchSimulatorFormat(replay);
+  await loadSimMods(format);
+  const rules = replayRules(replay);
+  const snapshots = parseReplayLog(replay.log);
+  const parties: Boundaries['parties'] = {};
+  const runtime = await reconstructBranchRuntime({
+    format, ...teams, replayLog: replay.log, targetTurn: snapshots.length, snapshot: snapshots[snapshots.length - 1],
+    bringOnly: { p1: world.p1, p2: world.p2, guessed: world.guessed }, deadlineMs: 120_000,
+    onRawBoundary: (turn, battle) => {
+      parties[turn] = [0, 1].map(index => battle.sides[index].pokemon.map(body => speciesBaseId(body.baseSpecies.name, rules))) as [string[], string[]];
+    },
+  });
+  const battle = runtime.battleStream.battle!;
+  return { sizes: [battle.sides[0].pokemon.length, battle.sides[1].pokemon.length], parties };
+}
+
+const entry = (species: string, rawCount: number) =>
+  [species.toLowerCase().replace(/[^a-z0-9]/g, ''), { species, rawCount, abilities: [], items: [], moves: [], spreads: [] }] as const;
+const statsOf = (counts: [string, number][]): SmogonUsageStats => ({
+  format: 'test', month: '2026-10', source: 'test', pokemon: Object.fromEntries(counts.map(([species, rawCount]) => entry(species, rawCount))),
+});
+const guessedOf = (short: 'p1' | 'p2') => (short === 'p1' ? { p1: 1, p2: 0 } : { p1: 0, p2: 1 });
+const fixture = (file: string) => JSON.parse(readFileSync(new URL(`./fixtures/${file}`, import.meta.url), 'utf-8')) as ReplayData;
+
+describe('#124: the worlds of a short side', () => {
+  for (const scene of SCENES) {
+    test(`${scene.label}: replayBringList names the fielded bodies and the candidates, and every world rebuilds the count against the count`, async () => {
+      const replay = fixture(scene.file);
+      await loadSimMods(getBranchSimulatorFormat(replay));
+      const rules = replayRules(replay);
+      const list = replayBringList(replay, parseReplayLog(replay.log))!;
+      expect(list).not.toBeNull();
+      expect(list.count).toBe(4);
+      const other = scene.short === 'p1' ? 'p2' : 'p1';
+      const shortSide = list[scene.short];
+      expect(shortSide.fielded).toHaveLength(3);
+      expect(shortSide.open).toBe(1);
+      expect(shortSide.candidates).toHaveLength(3);
+      expect(shortSide.candidates.every(candidate => Math.abs(candidate.weight - 1 / 3) < 1e-9)).toBe(true);
+      expect(list[other].open).toBe(0);
+      expect(list[other].candidates).toEqual([]);
+      if (scene.fielded) {
+        expect(shortSide.fielded.map(name => speciesBaseId(name, rules)).sort()).toEqual(scene.fielded.map(name => speciesBaseId(name, rules)).sort());
+        expect(shortSide.candidates.map(candidate => speciesBaseId(candidate.species, rules))).toEqual(scene.candidates!.map(name => speciesBaseId(name, rules)));
+      }
+
+      const worlds = bringWorlds(list, BRING_WORLD_CAP)!;
+      expect(worlds).toHaveLength(3);
+      expect(worlds.map(world => world.guessed)).toEqual(Array(3).fill(guessedOf(scene.short)));
+
+      const teams = buildTeamsFromReplay(replay.log);
+      const shortIndex = scene.short === 'p1' ? 0 : 1;
+      const rebuilt: Boundaries[] = [];
+      for (const world of worlds) rebuilt.push(await rebuildWorld(replay, world, teams));
+      worlds.forEach((world, index) => {
+        expect(rebuilt[index].sizes).toEqual([4, 4]);
+        const guess = speciesBaseId(world[scene.short][3], rules);
+        for (const party of Object.values(rebuilt[index].parties)) {
+          expect(party[shortIndex][3], 'the guess of the world is the last slot').toBe(guess);
+          for (const name of scene.noBody) expect(party[1 - shortIndex]).not.toContain(speciesBaseId(name, rules));
+        }
+      });
+      const turns = Object.keys(rebuilt[0].parties).map(Number);
+      expect(turns.length).toBeGreaterThan(3);
+      for (const turn of turns) {
+        for (const next of rebuilt.slice(1)) {
+          expect(next.parties[turn][1 - shortIndex], `turn ${turn}: the full side is one body list`).toEqual(rebuilt[0].parties[turn][1 - shortIndex]);
+          expect(next.parties[turn][shortIndex].slice(0, 3), `turn ${turn}: the known bodies keep their party index`).toEqual(rebuilt[0].parties[turn][shortIndex].slice(0, 3));
+        }
+      }
+    }, 240_000);
+  }
+
+  test('VGC 2630452654: the usage counts weigh Urshifu-* 0.61, Farigiraf 0.32, Volcarona 0.07 and Urshifu\'s world comes first', () => {
+    const replay = fixture('gen9vgc2026regi-2630452654.json');
+    const stats = statsOf([['Urshifu-Rapid-Strike', 31258], ['Urshifu-Single-Strike', 6992], ['Farigiraf', 20502], ['Volcarona', 4479]]);
+    const worlds = bringWorlds(replayBringList(replay, parseReplayLog(replay.log), stats), BRING_WORLD_CAP)!;
+    const total = 31258 + 6992 + 20502 + 4479;
+    expect(worlds.map(world => world.weight)).toEqual([38250 / total, 20502 / total, 4479 / total].map(weight => expect.closeTo(weight, 9)));
+    expect(worlds[0].p2[3]).toMatch(/^Urshifu/);
+    expect(worlds.reduce((sum, world) => sum + world.weight, 0)).toBeCloseTo(1, 9);
+  });
+
+  test('Battle Stadium Singles: four candidates, the three heaviest keep their share renormalized, every world rebuilds three against three', async () => {
+    const preview = ['Garchomp', 'Gholdengo', 'Kingambit', 'Dragonite', 'Corviknight', 'Glimmora'];
+    const log = [
+      '|player|p1|Alice|', '|player|p2|Bob|', '|gametype|singles', '|gen|9', '|tier|[Gen 9] Battle Stadium Singles Regulation H',
+      ...preview.map(name => `|poke|p1|${name}, L50|`), ...preview.map(name => `|poke|p2|${name}, L50|`), '|teampreview|3', '|start',
+      '|switch|p1a: Garchomp|Garchomp, L50|100/100', '|switch|p2a: Kingambit|Kingambit, L50|100/100', '|turn|1',
+      '|switch|p1a: Gholdengo|Gholdengo, L50|100/100', '|switch|p2a: Dragonite|Dragonite, L50|100/100', '|turn|2',
+      '|switch|p2a: Corviknight|Corviknight, L50|100/100', '|turn|3',
+      '|switch|p1a: Garchomp|Garchomp, L50|100/100', '|turn|4',
+    ].join('\n');
+    const replay = { id: 'synthetic-bss-worlds', formatid: 'gen9battlestadiumsinglesregh', format: '[Gen 9] Battle Stadium Singles Regulation H', players: ['Alice', 'Bob'], log } as ReplayData;
+    const stats = statsOf([['Kingambit', 500], ['Dragonite', 300], ['Corviknight', 150], ['Glimmora', 50]]);
+    const list = replayBringList(replay, parseReplayLog(log), stats)!;
+    expect(list.p1.candidates).toHaveLength(4);
+    const worlds = bringWorlds(list, BRING_WORLD_CAP)!;
+    expect(worlds.map(world => world.p1[2])).toEqual(['Kingambit', 'Dragonite', 'Corviknight']);
+    expect(worlds.map(world => world.weight)).toEqual([500 / 950, 300 / 950, 150 / 950].map(weight => expect.closeTo(weight, 9)));
+    expect(worlds.map(world => world.p2)).toEqual(Array(3).fill(['Kingambit', 'Dragonite', 'Corviknight']));
+    const teams = { p1Team: preview.map(name => mon(name, 'Tackle')), p2Team: preview.map(name => mon(name, 'Tackle')) };
+    const rules = replayRules(replay);
+    for (const world of worlds) {
+      const rebuilt = await rebuildWorld(replay, world, teams);
+      expect(rebuilt.sizes).toEqual([3, 3]);
+      for (const party of Object.values(rebuilt.parties)) expect(party[0][2]).toBe(speciesBaseId(world.p1[2], rules));
+    }
+  }, 240_000);
+
+  test('doubles with both sides short: nine worlds cap at three, each one rebuilds four against four with both guesses last', async () => {
+    const log = [
+      '|player|p1|Alice|', '|player|p2|Bob|', '|gametype|doubles', '|gen|9', '|tier|[Gen 9] VGC 2026 Regulation I',
+      ...p1Team.map(set => `|poke|p1|${set.species}, L50|`), ...p2Team.map(set => `|poke|p2|${set.species}, L50|`), '|teampreview', '|start',
+      '|switch|p1a: Pikachu|Pikachu, L50|100/100', '|switch|p1b: Eevee|Eevee, L50|100/100',
+      '|switch|p2a: Bulbasaur|Bulbasaur, L50|100/100', '|switch|p2b: Charmander|Charmander, L50|100/100', '|turn|1',
+      '|switch|p1b: Raichu|Raichu, L50|100/100', '|switch|p2b: Squirtle|Squirtle, L50|100/100', '|turn|2',
+      '|turn|3',
+    ].join('\n');
+    const replay = { id: 'synthetic-vgc-both-short', formatid: 'gen9vgc2026regi', format: '[Gen 9] VGC 2026 Regulation I', players: ['Alice', 'Bob'], log } as ReplayData;
+    const stats = statsOf([['Jolteon', 50], ['Flareon', 30], ['Vaporeon', 20], ['Ivysaur', 60], ['Charmeleon', 25], ['Wartortle', 15]]);
+    const list = replayBringList(replay, parseReplayLog(log), stats)!;
+    expect(list.p1.open).toBe(1);
+    expect(list.p2.open).toBe(1);
+    expect(bringWorlds(list, 100)!).toHaveLength(9);
+    const worlds = bringWorlds(list, BRING_WORLD_CAP)!;
+    expect(worlds).toHaveLength(3);
+    // 0.50*0.60, 0.30*0.60 and 0.50*0.25 over their sum 0.605.
+    expect(worlds.map(world => `${world.p1[3]}/${world.p2[3]}`)).toEqual(['Jolteon/Ivysaur', 'Flareon/Ivysaur', 'Jolteon/Charmeleon']);
+    expect(worlds.map(world => world.weight)).toEqual([0.3 / 0.605, 0.18 / 0.605, 0.125 / 0.605].map(weight => expect.closeTo(weight, 9)));
+    const rules = replayRules(replay);
+    for (const world of worlds) {
+      const rebuilt = await rebuildWorld(replay, world, { p1Team, p2Team });
+      expect(rebuilt.sizes).toEqual([4, 4]);
+      for (const party of Object.values(rebuilt.parties)) {
+        expect(party[0][3]).toBe(speciesBaseId(world.p1[3], rules));
+        expect(party[1][3]).toBe(speciesBaseId(world.p2[3], rules));
+      }
+    }
+  }, 240_000);
+});
+
+describe('#124: trimTeamsToBring trims both teams or neither', () => {
+  const rules = { gen: 9, mod: undefined };
+  const names = (team: PokemonSet[]) => team.map(set => set.name);
+  const p2Four = ['Squirtle', 'Ivysaur', 'Bulbasaur', 'Charmander'];
+
+  test('the guessed set moves behind the known bodies, which keep team order', () => {
+    // Team order: Pikachu, Eevee, Raichu, Jolteon. The guess is Eevee, which sits before two known non-leads.
+    const { p1, p2 } = trimTeamsToBring(p1Team, p2Team, { p1: ['Pikachu', 'Raichu', 'Jolteon', 'Eevee'], p2: p2Four, guessed: { p1: 1, p2: 0 } }, rules);
+    expect(names(p1)).toEqual(['Pikachu', 'Raichu', 'Jolteon', 'Eevee']);
+    expect(names(p2)).toEqual(['Bulbasaur', 'Charmander', 'Squirtle', 'Ivysaur']);
+  });
+
+  test('two guessed sets take the last two slots in list order', () => {
+    const { p1 } = trimTeamsToBring(p1Team, p2Team, { p1: ['Pikachu', 'Raichu', 'Vaporeon', 'Eevee'], p2: p2Four, guessed: { p1: 2, p2: 0 } }, rules);
+    expect(names(p1)).toEqual(['Pikachu', 'Raichu', 'Vaporeon', 'Eevee']);
+  });
+
+  test('a list without guesses trims each side as trimTeamToBring does', () => {
+    const list = { p1: ['Jolteon', 'Pikachu', 'Eevee', 'Raichu'], p2: p2Four };
+    const { p1, p2 } = trimTeamsToBring(p1Team, p2Team, list, rules);
+    expect(p1).toEqual(trimTeamToBring(p1Team, list.p1, rules));
+    expect(p2).toEqual(trimTeamToBring(p2Team, list.p2, rules));
+  });
+
+  test('a side whose list names a stranger, is empty or is missing keeps both teams whole', () => {
+    const good = ['Pikachu', 'Eevee', 'Raichu', 'Jolteon'];
+    for (const bad of [['Raichu', 'Jolteon', 'Pikachu', 'Mewtwo'], [], undefined]) {
+      const first = trimTeamsToBring(p1Team, p2Team, { p1: bad as string[], p2: p2Four }, rules);
+      expect([first.p1.length, first.p2.length]).toEqual([6, 6]);
+      const second = trimTeamsToBring(p1Team, p2Team, { p1: good, p2: bad as string[] }, rules);
+      expect([second.p1.length, second.p2.length]).toEqual([6, 6]);
+    }
+    expect(trimTeamsToBring(p1Team, p2Team, null, rules)).toEqual({ p1: p1Team, p2: p2Team });
+    expect(trimTeamsToBring(p1Team, p2Team, undefined, rules)).toEqual({ p1: p1Team, p2: p2Team });
+  });
 });
