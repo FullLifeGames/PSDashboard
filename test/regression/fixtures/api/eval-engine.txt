@@ -163,6 +163,8 @@ value annotateNicknames
 value applyForcedWin
 value applyTargetCorrections
 value autoTurnSettings
+value blendValues
+value blendWorlds
 value branchChoiceActive
 value branchSideChoicesReady
 value bringWorlds

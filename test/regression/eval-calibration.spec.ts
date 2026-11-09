@@ -5,14 +5,14 @@ import type { Battle } from '@pkmn/sim';
 import { buildTeamsFromReplay } from '../../packages/replay-core/src/team-builder';
 import { applyTargetCorrections, reconstructBranchRuntime } from '../../packages/eval-engine/src/branch-engine';
 import { buildChoiceLockContext } from '../../packages/eval-engine/src/choice-lock';
-import { getBranchSimulatorFormat, replayBringOnly } from '../../packages/replay-core/src/replay-format';
+import { getBranchSimulatorFormat } from '../../packages/replay-core/src/replay-format';
 import { parseReplayLogWithObservations } from '../../packages/replay-core/src/protocol-parser';
 import { logRules } from '../../packages/replay-core/src/rules-dex';
 import { battleFaintedFraction, searchPosition } from '../../packages/eval-engine/src/search';
 import { leafValue } from '../../packages/eval-engine/src/search/leaf';
 import { bankKeepPlayed, bankSampleCount, bankSearch, bankSettings } from './bank-search';
 import { diskCachedSmogonFetcher } from './smogon-fetch-cache';
-import { bankTeamsFor } from './bank-build';
+import { bankTeamsFor, bankWorldsFor, blendReadings, type BankWorld, type WorldReading } from './bank-build';
 import { loadReplayMods } from '../../src/lib/replay-mods';
 import { bankUniverse, phaseOf } from './bank-universe';
 import { createMatchupCache, evalFeatures, EVAL_WEIGHTS, FEATURE_WEIGHTS, type EvalFeatures } from '../../packages/eval-engine/src/eval-function';
@@ -7429,6 +7429,98 @@ async function exportPosition(
   }));
 }
 
+/**
+ * Round 89 (#124): what the bank needs to read one world of a replay at a sampled turn: the replay, its teams and snapshots, the
+ * pass instrument and the run's levers. One world reads exactly as the bank always read a replay.
+ */
+type WorldReadContext = {
+  id: string; replay: { id: string; log: string; formatid?: string }; p1Team: Parameters<typeof buildChoiceLockContext>[1]['p1Team'];
+  p2Team: Parameters<typeof buildChoiceLockContext>[1]['p2Team']; snapshots: ReturnType<typeof parseReplayLogWithObservations>['snapshots'];
+  instrument: ReturnType<typeof passInstrument>; legacy: boolean; replaySettings: ReturnType<typeof bankSettings>;
+  sampleCount: Parameters<typeof bankSearch>[0]['samples']; gameType: Sample['gameType'];
+};
+
+type WorldRead = WorldReading & { battle: Battle; serialized: string; faintedFraction: number; root: RootReading };
+
+/**
+ * One world's reading at a sampled turn: its boundary from the single pass (or the per-target fallback), the position's
+ * features and the root search. Null when the world cannot read the turn (no live battle, an ended reconstruction, a NaN score);
+ * the bank's blend then renormalizes over the worlds that did.
+ */
+async function readWorld(ctx: WorldReadContext, world: BankWorld, rawAt: Map<number, string>, turn: number): Promise<WorldRead | null> {
+  const { id, replay, p1Team, p2Team, snapshots, instrument, legacy, replaySettings, sampleCount, gameType } = ctx;
+    let battle: Battle;
+    const raw = legacy ? undefined : rawAt.get(turn);
+    if (raw) {
+      battle = deserializeBattleExact(raw);
+      applyTargetCorrections(battle, snapshots[Math.min(turn - 1, snapshots.length - 1)]);
+    } else {
+      // One reconstruction for this sample — either forced
+      // (EVAL_CALIBRATION_LEGACY=1) or as the per-sample fallback
+      // for a boundary the single pass never handed out (a wedged
+      // or prematurely ended pass, or the rare replay whose async
+      // stream timing shifts under the pass). It carries the same
+      // instrument parameters as the pass on purpose, so the few
+      // fallback samples (4 per bank run, 15 on the raw pass) sit
+      // on the same board as the rest.
+      if (!legacy) console.log(`${id} turn ${turn}: single-pass boundary missing — per-target fallback`);
+      const runtime = await reconstructBranchRuntime({
+        format: getBranchSimulatorFormat(replay), p1Team, p2Team, replayLog: replay.log, targetTurn: turn,
+        snapshot: snapshots[Math.min(turn - 1, snapshots.length - 1)], bringOnly: world.bringOnly, ...instrument.perTarget,
+      });
+      const live = runtime.battleStream.battle;
+      if (!live) return null;
+      battle = live;
+    }
+    if (battle.ended) {
+      // A sampled turn is always BEFORE the real game's end (the loop
+      // stops short of maxTurn), so an ended reconstruction is always
+      // a divergence artifact: the choice replay cascaded a side into
+      // a wipe the real game never had (gen9draft-2058494320 t56+ —
+      // five greedy forced switches fed into a kill zone). Scoring it
+      // would hand the record a free ±1.00 with the real winner's
+      // sign; 55/827 grand-bed d1 rows carried exactly that.
+      console.log(`${id} turn ${turn}: reconstruction ended prematurely — skipped`);
+      return null;
+    }
+    // EVAL_CALIBRATION_FEATURES=1: capture the static eval's scaled
+    // feature vector (identical construction to eval-fit's g) so the
+    // offline suspect diagnosis can compare feature profiles.
+    let g: number[] | undefined;
+    if (process.env.EVAL_CALIBRATION_FEATURES === '1') {
+      const featureCache = createMatchupCache(replaySettings.ruleset);
+      const features = evalFeatures(battle, featureCache);
+      const teamSize = Math.max(battle.sides[0].pokemon.length, battle.sides[1].pokemon.length, 1);
+      const scaleOverNorm = EVAL_WEIGHTS.scale / (teamSize * (EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp));
+      g = (Object.keys(FEATURE_WEIGHTS) as (keyof EvalFeatures)[]).map(key => features[key] * scaleOverNorm);
+    }
+    const serialized = JSON.stringify(State.serializeBattle(battle));
+    // EVAL_CALIBRATION_DEPTH separates the two levers: does more
+    // search fix a phase, or is the static eval itself miscalibrated?
+    // EVAL_CALIBRATION_MODE=mcts runs the DUCT tree instead — the
+    // matrix path is gated every round; MCTS earns numbers here too.
+    // (Round 61: tree turns run the app's searchTreesOrchestrated, bank-search.ts.)
+    const depth = process.env.EVAL_CALIBRATION_DEPTH === '2' ? 2 : 1;
+    const faintedFraction = battleFaintedFraction(battle);
+    // EVAL_CALIBRATION_MODE=auto mirrors the app's sweep dispatch
+    // exactly: matrix below the threshold, the DUCT tree at or above.
+    // Round 61: the app's dispatch and the app's tree search (bank-search.ts).
+    // Round 65: rootReading runs the search, or the static alone under EVAL_CALIBRATION_STATIC=1.
+    const root = await rootReading(battle, {
+      serialized, faintedFraction, depth, samples: sampleCount, mode: process.env.EVAL_CALIBRATION_MODE,
+      settings: {
+        ...replaySettings,
+        keepPlayed: bankKeepPlayed(snapshots.map(snapshot => snapshot.log), turn, gameType === 'doubles', logRules(replay.log)),
+      },
+    });
+    if (Number.isNaN(root.score)) {
+      // A NaN would silently poison every aggregate — surface it loudly.
+      console.log(`NaN score: ${id} turn ${turn}`);
+      return null;
+    }
+    return { weight: world.weight, score: root.score, gameValue: root.gameValue, g, battle, serialized, faintedFraction, root };
+}
+
 describe.skipIf(!process.env.EVAL_CALIBRATION)('eval calibration against real replays', () => {
 
   test('score sign tracks the actual winner', { timeout: 3600000 }, async () => {
@@ -7505,10 +7597,11 @@ describe.skipIf(!process.env.EVAL_CALIBRATION)('eval calibration against real re
       const maxTurn = snapshots.length;
       const sampleTurns = universe.sampleTurns(maxTurn);
 
-      // A.3c: bring-limited replays (the VGC tranche) reconstruct with only
-      // the brought species per side — the same trim the app's sweep and
-      // single-turn acquire apply. Per-side fail-open, null for bring-all.
-      const bringOnly = replayBringOnly(replay, snapshots) ?? undefined;
+      // A.3c: bring-limited replays (the VGC tranche) reconstruct with only the brought species per side, the same trim the app's
+      // sweep and single-turn acquire apply. Round 89 (#124): a side that never fielded its whole selection plays its fielded
+      // bodies plus a guess for each missing one, so a short-side game gets up to three worlds (the heaviest by usage weight), and
+      // each sampled turn is read in every world and blended. A bring-all or fully pinned game has one world and reads as before.
+      const worlds = bankWorldsFor(replay, snapshots, built.usageStats);
 
       // SINGLE-PASS RECONSTRUCTION (time-performance round, 2026-08-28):
       // ONE pass per replay hands out the boundary state at every sampled
@@ -7531,101 +7624,41 @@ describe.skipIf(!process.env.EVAL_CALIBRATION)('eval calibration against real re
       // docs/perf/probes/2026-09-18-r46/t04.
       const legacy = process.env.EVAL_CALIBRATION_LEGACY === '1';
       const instrument = passInstrument(replay.log, { p1Team, p2Team }, observations, snapshots);
-      const rawAt = new Map<number, string>();
+      const readContext: WorldReadContext = { id, replay, p1Team, p2Team, snapshots, instrument, legacy, replaySettings, sampleCount, gameType };
+      const rawAts = worlds.map(() => new Map<number, string>());
       if (!legacy && sampleTurns.length > 0) {
-        try {
-          await reconstructBranchRuntime({
-            format: getBranchSimulatorFormat(replay),
-            p1Team, p2Team,
-            replayLog: replay.log,
-            bringOnly,
-            // The one pass carries the whole per-target family's work, so
-            // it gets the family's total deadline, not a single run's 60s.
-            deadlineMs: 60_000 * Math.max(1, sampleTurns.length),
-            ...instrument.singlePass(sampleTurns, rawAt),
-          });
-        } catch (error) {
-          console.log(`${id}: single-pass reconstruction failed — ${error instanceof Error ? error.message : error}`);
+        for (const [index, world] of worlds.entries()) {
+          try {
+            await reconstructBranchRuntime({
+              format: getBranchSimulatorFormat(replay), p1Team, p2Team, replayLog: replay.log, bringOnly: world.bringOnly,
+              // The one pass carries the whole per-target family's work, so
+              // it gets the family's total deadline, not a single run's 60s.
+              deadlineMs: 60_000 * Math.max(1, sampleTurns.length),
+              ...instrument.singlePass(sampleTurns, rawAts[index]),
+            });
+          } catch (error) {
+            console.log(`${id}: single-pass reconstruction failed — ${error instanceof Error ? error.message : error}`);
+          }
         }
       }
 
       for (const turn of sampleTurns) {
         try {
-          let battle: Battle;
-          const raw = legacy ? undefined : rawAt.get(turn);
-          if (raw) {
-            battle = deserializeBattleExact(raw);
-            applyTargetCorrections(battle, snapshots[Math.min(turn - 1, snapshots.length - 1)]);
-          } else {
-            // One reconstruction for this sample — either forced
-            // (EVAL_CALIBRATION_LEGACY=1) or as the per-sample fallback
-            // for a boundary the single pass never handed out (a wedged
-            // or prematurely ended pass, or the rare replay whose async
-            // stream timing shifts under the pass). It carries the same
-            // instrument parameters as the pass on purpose, so the few
-            // fallback samples (4 per bank run, 15 on the raw pass) sit
-            // on the same board as the rest.
-            if (!legacy) console.log(`${id} turn ${turn}: single-pass boundary missing — per-target fallback`);
-            const runtime = await reconstructBranchRuntime({
-              format: getBranchSimulatorFormat(replay),
-              p1Team, p2Team,
-              replayLog: replay.log,
-              targetTurn: turn,
-              snapshot: snapshots[Math.min(turn - 1, snapshots.length - 1)],
-              bringOnly,
-              ...instrument.perTarget,
-            });
-            const live = runtime.battleStream.battle;
-            if (!live) continue;
-            battle = live;
+          // One reading per world; a world that cannot read this turn (no live battle, an ended reconstruction, a NaN) drops out
+          // and the blend renormalizes over the rest. The first world that reads is the heaviest of them (the worlds come
+          // heaviest first), and its position carries every field the blend does not average.
+          const readings: WorldRead[] = [];
+          for (const [index, world] of worlds.entries()) {
+            try {
+              const reading = await readWorld(readContext, world, rawAts[index], turn);
+              if (reading) readings.push(reading);
+            } catch (error) {
+              console.log(`${id} turn ${turn}: ${error instanceof Error ? error.message : error}`);
+            }
           }
-          if (battle.ended) {
-            // A sampled turn is always BEFORE the real game's end (the loop
-            // stops short of maxTurn), so an ended reconstruction is always
-            // a divergence artifact: the choice replay cascaded a side into
-            // a wipe the real game never had (gen9draft-2058494320 t56+ —
-            // five greedy forced switches fed into a kill zone). Scoring it
-            // would hand the record a free ±1.00 with the real winner's
-            // sign; 55/827 grand-bed d1 rows carried exactly that.
-            console.log(`${id} turn ${turn}: reconstruction ended prematurely — skipped`);
-            continue;
-          }
-          // EVAL_CALIBRATION_FEATURES=1: capture the static eval's scaled
-          // feature vector (identical construction to eval-fit's g) so the
-          // offline suspect diagnosis can compare feature profiles.
-          let g: number[] | undefined;
-          if (process.env.EVAL_CALIBRATION_FEATURES === '1') {
-            const featureCache = createMatchupCache(replaySettings.ruleset);
-            const features = evalFeatures(battle, featureCache);
-            const teamSize = Math.max(battle.sides[0].pokemon.length, battle.sides[1].pokemon.length, 1);
-            const scaleOverNorm = EVAL_WEIGHTS.scale / (teamSize * (EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp));
-            g = (Object.keys(FEATURE_WEIGHTS) as (keyof EvalFeatures)[]).map(key => features[key] * scaleOverNorm);
-          }
-          const serialized = JSON.stringify(State.serializeBattle(battle));
-          // EVAL_CALIBRATION_DEPTH separates the two levers: does more
-          // search fix a phase, or is the static eval itself miscalibrated?
-          // EVAL_CALIBRATION_MODE=mcts runs the DUCT tree instead — the
-          // matrix path is gated every round; MCTS earns numbers here too.
-          // (Round 61: tree turns run the app's searchTreesOrchestrated, bank-search.ts.)
-          const depth = process.env.EVAL_CALIBRATION_DEPTH === '2' ? 2 : 1;
-          const faintedFraction = battleFaintedFraction(battle);
-          // EVAL_CALIBRATION_MODE=auto mirrors the app's sweep dispatch
-          // exactly: matrix below the threshold, the DUCT tree at or above.
-          // Round 61: the app's dispatch and the app's tree search (bank-search.ts).
-          // Round 65: rootReading runs the search, or the static alone under EVAL_CALIBRATION_STATIC=1.
-          const root = await rootReading(battle, {
-            serialized, faintedFraction, depth, samples: sampleCount, mode: process.env.EVAL_CALIBRATION_MODE,
-            settings: {
-              ...replaySettings,
-              keepPlayed: bankKeepPlayed(snapshots.map(snapshot => snapshot.log), turn, gameType === 'doubles', logRules(replay.log)),
-            },
-          });
-          const { score } = root;
-          if (Number.isNaN(score)) {
-            // A NaN would silently poison every aggregate — surface it loudly.
-            console.log(`NaN score: ${id} turn ${turn}`);
-            continue;
-          }
+          if (readings.length === 0) continue;
+          const { battle, serialized, faintedFraction, root } = readings[0];
+          const blended = blendReadings(readings);
           const rating = replay.rating ?? null;
           const sample: Sample = {
             id,
@@ -7633,8 +7666,8 @@ describe.skipIf(!process.env.EVAL_CALIBRATION)('eval calibration against real re
             tranche: trancheOf.get(id) ?? 'unknown',
             phase: phaseOf(turn, maxTurn),
             gameType,
-            score,
-            gameValue: root.gameValue,
+            score: blended.score,
+            gameValue: blended.gameValue,
             faintedFraction,
             p1Won,
             // Round 32 enabler for Q4: the root's decided-sweep side, so the
@@ -7645,10 +7678,10 @@ describe.skipIf(!process.env.EVAL_CALIBRATION)('eval calibration against real re
             lastPair: lastPairAt(battle),
             rating,
             quality: qualityOf(id, rating),
-            luckAgainstFavored: luckFlag(replay.log, turn, score),
+            luckAgainstFavored: luckFlag(replay.log, turn, blended.score),
             forcedWinMass: root.forcedWinMass,
             forcedWinTurns: root.forcedWinTurns,
-            ...(g ? { g } : {}),
+            ...(blended.g ? { g: blended.g } : {}),
           };
           samples.push(sample);
           await exportPosition(process.env.EVAL_CALIBRATION_POSITIONS, sample, serialized, livingTotal(battle), replaySettings);
@@ -7736,87 +7769,89 @@ describe.skipIf(process.env.CALIB_POS_PROBE !== '1')('single-pass position ident
       if (sampleTurns.length === 0) continue;
       const format = getBranchSimulatorFormat(replay);
       const snapshotAt = (turn: number) => snapshots[Math.min(turn - 1, snapshots.length - 1)];
-      // Same bring trim as the calibration instrument (A.3c) — both paths.
-      const bringOnly = replayBringOnly(replay, snapshots) ?? undefined;
+      // Same bring trim as the calibration instrument (A.3c) — both paths. Round 89 (#124): the probe compares the two paths in
+      // every world of a short-side game (equal weights, the naked build holds no usage stats).
+      for (const { bringOnly } of bankWorldsFor(replay, snapshots, null)) {
 
-      // Path A — the instrument before 28 Aug: one reconstruction per
-      // sampled turn, without the app parameters (the RAW family; the
-      // bank's default since round 46 is not what this probe compares).
-      const canonA = new Map<number, string>();
-      for (const turn of sampleTurns) {
-        const runtime = await reconstructBranchRuntime({
-          format, p1Team, p2Team, replayLog: replay.log, targetTurn: turn, snapshot: snapshotAt(turn), bringOnly,
+        // Path A — the instrument before 28 Aug: one reconstruction per
+        // sampled turn, without the app parameters (the RAW family; the
+        // bank's default since round 46 is not what this probe compares).
+        const canonA = new Map<number, string>();
+        for (const turn of sampleTurns) {
+          const runtime = await reconstructBranchRuntime({
+            format, p1Team, p2Team, replayLog: replay.log, targetTurn: turn, snapshot: snapshotAt(turn), bringOnly,
+          });
+          const battle = runtime.battleStream.battle;
+          canonA.set(turn, !battle ? 'NONE' : battle.ended ? 'ENDED' : canon(battle));
+        }
+
+        // Path B — ONE pass; raw boundaries; clone + target corrections.
+        const rawAt = new Map<number, string>();
+        const pending = [...sampleTurns].sort((a, b) => a - b);
+        const targetTurn = pending[pending.length - 1];
+        await reconstructBranchRuntime({
+          format, p1Team, p2Team, replayLog: replay.log, targetTurn, snapshot: null, bringOnly,
+          // One pass carries the whole per-target family's work, so it gets
+          // the family's total deadline budget, not a single run's 60s.
+          deadlineMs: 60_000 * Math.max(1, sampleTurns.length),
+          onRawBoundary: (blockTurn, battle) => {
+            if (pending.length === 0 || blockTurn < pending[0]) return;
+            const serialized = JSON.stringify(State.serializeBattle(battle));
+            while (pending.length > 0 && pending[0] <= blockTurn) {
+              rawAt.set(pending[0], serialized);
+              pending.shift();
+            }
+          },
         });
-        const battle = runtime.battleStream.battle;
-        canonA.set(turn, !battle ? 'NONE' : battle.ended ? 'ENDED' : canon(battle));
-      }
-
-      // Path B — ONE pass; raw boundaries; clone + target corrections.
-      const rawAt = new Map<number, string>();
-      const pending = [...sampleTurns].sort((a, b) => a - b);
-      const targetTurn = pending[pending.length - 1];
-      await reconstructBranchRuntime({
-        format, p1Team, p2Team, replayLog: replay.log, targetTurn, snapshot: null, bringOnly,
-        // One pass carries the whole per-target family's work, so it gets
-        // the family's total deadline budget, not a single run's 60s.
-        deadlineMs: 60_000 * Math.max(1, sampleTurns.length),
-        onRawBoundary: (blockTurn, battle) => {
-          if (pending.length === 0 || blockTurn < pending[0]) return;
-          const serialized = JSON.stringify(State.serializeBattle(battle));
-          while (pending.length > 0 && pending[0] <= blockTurn) {
-            rawAt.set(pending[0], serialized);
-            pending.shift();
+        for (const turn of sampleTurns) {
+          comparedSamples += 1;
+          const raw = rawAt.get(turn);
+          let canonB: string | null = null;
+          if (raw) {
+            const clone = deserializeBattleExact(raw);
+            applyTargetCorrections(clone, snapshotAt(turn));
+            if (!clone.ended) canonB = canon(clone);
           }
-        },
-      });
-      for (const turn of sampleTurns) {
-        comparedSamples += 1;
-        const raw = rawAt.get(turn);
-        let canonB: string | null = null;
-        if (raw) {
-          const clone = deserializeBattleExact(raw);
-          applyTargetCorrections(clone, snapshotAt(turn));
-          if (!clone.ended) canonB = canon(clone);
-        }
-        const a = canonA.get(turn) ?? 'NONE';
-        const aExists = a !== 'NONE' && a !== 'ENDED';
-        const bExists = canonB !== null;
-        // Both sides skip the sample (ended/none/past-the-end) — the
-        // instrument records nothing either way: equivalent.
-        if (!aExists && !bExists) continue;
-        if (aExists && bExists && a === canonB) continue;
-        // Discrepancy. Is the OLD instrument even stable here? A per-target
-        // run that hits its 60s deadline truncates at a timing-dependent
-        // block and then snapshot-corrects — such samples have no stable
-        // old value to reproduce. Rerun path A once: if it disagrees with
-        // itself (or flags the deadline), the sample is excluded as
-        // old-instrument-unstable; a REPRODUCIBLE old value that path B
-        // misses is a hard failure.
-        const rerun = await reconstructBranchRuntime({
-          format, p1Team, p2Team, replayLog: replay.log, targetTurn: turn, snapshot: snapshotAt(turn), bringOnly,
-        });
-        const rerunBattle = rerun.battleStream.battle;
-        const a2 = !rerunBattle ? 'NONE' : rerunBattle.ended ? 'ENDED' : canon(rerunBattle);
-        if (a2 !== a || rerun.timedOut) {
-          unstable += 1;
-          console.log(`${id} t${turn}: old-instrument unstable (timedOut=${rerun.timedOut}) — excluded`);
-          continue;
-        }
-        if (!bExists) {
-          // The single pass never handed this boundary out — the switched
-          // instrument serves it through the verbatim per-target fallback,
-          // so the sample stays exactly the old instrument's. Bounded, not
-          // a value risk.
-          fallbackServed += 1;
-          console.log(`${id} t${turn}: boundary missing from the pass — served by the per-target fallback`);
-          continue;
-        }
-        mismatches += 1;
-        if (details.length < 20) {
-          const b = canonB ?? (raw ? 'ENDED' : 'MISSING');
-          let at = 0;
-          while (at < Math.min(a.length, b.length) && a[at] === b[at]) at++;
-          details.push(`${id} t${turn}: first divergence at char ${at}: A …${a.slice(Math.max(0, at - 40), at + 80)}… B …${b.slice(Math.max(0, at - 40), at + 80)}…`);
+          const a = canonA.get(turn) ?? 'NONE';
+          const aExists = a !== 'NONE' && a !== 'ENDED';
+          const bExists = canonB !== null;
+          // Both sides skip the sample (ended/none/past-the-end) — the
+          // instrument records nothing either way: equivalent.
+          if (!aExists && !bExists) continue;
+          if (aExists && bExists && a === canonB) continue;
+          // Discrepancy. Is the OLD instrument even stable here? A per-target
+          // run that hits its 60s deadline truncates at a timing-dependent
+          // block and then snapshot-corrects — such samples have no stable
+          // old value to reproduce. Rerun path A once: if it disagrees with
+          // itself (or flags the deadline), the sample is excluded as
+          // old-instrument-unstable; a REPRODUCIBLE old value that path B
+          // misses is a hard failure.
+          const rerun = await reconstructBranchRuntime({
+            format, p1Team, p2Team, replayLog: replay.log, targetTurn: turn, snapshot: snapshotAt(turn), bringOnly,
+          });
+          const rerunBattle = rerun.battleStream.battle;
+          const a2 = !rerunBattle ? 'NONE' : rerunBattle.ended ? 'ENDED' : canon(rerunBattle);
+          if (a2 !== a || rerun.timedOut) {
+            unstable += 1;
+            console.log(`${id} t${turn}: old-instrument unstable (timedOut=${rerun.timedOut}) — excluded`);
+            continue;
+          }
+          if (!bExists) {
+            // The single pass never handed this boundary out — the switched
+            // instrument serves it through the verbatim per-target fallback,
+            // so the sample stays exactly the old instrument's. Bounded, not
+            // a value risk.
+            fallbackServed += 1;
+            console.log(`${id} t${turn}: boundary missing from the pass — served by the per-target fallback`);
+            continue;
+          }
+          mismatches += 1;
+          if (details.length < 20) {
+            const b = canonB ?? (raw ? 'ENDED' : 'MISSING');
+            let at = 0;
+            while (at < Math.min(a.length, b.length) && a[at] === b[at]) at++;
+            details.push(`${id} t${turn}: first divergence at char ${at}: A …${a.slice(Math.max(0, at - 40), at + 80)}… B …${b.slice(Math.max(0, at - 40), at + 80)}…`);
+          }
         }
       }
       replays += 1;
