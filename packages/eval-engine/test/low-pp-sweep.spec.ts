@@ -270,6 +270,35 @@ describe.each(MODS)('#106 Pressure, Spite and Eerie Spell (%s)', (_label, rules)
   });
 });
 
+/**
+ * Round 89 (#106): the client's Pressure count has a Generation 3 branch, because the log of that generation does not always show the foe's
+ * ability: a foe whose species can only have Pressure charges it, a foe whose species can have it beside another ability leaves the count a
+ * range. `getPressurePP` of parser-state.ts reads the generation from the client's Dex; this row holds that read to the simulator in
+ * Generation 3, singles and doubles, against a species with the one ability (Zapdos), and one with two (Aerodactyl: Rock Head or Pressure,
+ * played with each).
+ */
+const GEN3: Rules = RULES.find(rules => rules.generation === 3)!;
+const PRESSURE_FOES: { label: string; species: string; ability: string; perUse: number; exact: boolean }[] = [
+  { label: 'a species that can only have Pressure', species: 'Zapdos', ability: 'pressure', perUse: 2, exact: true },
+  { label: 'a species with Pressure or Rock Head, holding Pressure', species: 'Aerodactyl', ability: 'pressure', perUse: 2, exact: false },
+  { label: 'a species with Pressure or Rock Head, holding Rock Head', species: 'Aerodactyl', ability: 'rockhead', perUse: 1, exact: false },
+];
+
+describe.each(['singles', 'doubles'] as const)('#106 Pressure in Generation 3, %s', mode => {
+  test.each(PRESSURE_FOES)('$label: the log\'s count holds the simulator\'s PP', ({ species, ability, perUse, exact }) => {
+    const board = boardFor({ rules: GEN3, mode, moves: ['overheat', 'splash'], foe: { species, moves: ['splash'], ability } });
+    expect(play(board, [1, 2].map(() => ({ p1: clickOf(mode, 1, 'normal'), p2: splashClick(mode) })))).toBe(2);
+    const slot = slotsOf(board.battle).get('overheat')!;
+    expect(slot.pp).toBe(slot.maxpp - 2 * perUse);
+    const snapshot = snapshotOf(board.battle);
+    expect(readingProblem(snapshot, board.battle, 'Overheat')).toBeNull();
+    // the single-ability species charges two PP per use whatever the log shows; the other leaves a range around the simulator's count
+    if (exact) expect(snapshot.p1.pokemon[0].ppUsed).toMatchObject({ Overheat: 4 });
+    else expect(snapshot.p1.pokemon[0].ppUsed?.Overheat).not.toBeUndefined();
+    expect(driftProblems(board.battle, snapshot, ['Overheat'])).toEqual([]);
+  });
+});
+
 describe('#106 a snapshot without the count changes nothing', () => {
   test('a snapshot written before round 89 leaves the slots alone', () => {
     const board = boardFor({ rules: GEN9, mode: 'singles', moves: ['revivalblessing', 'splash'] });

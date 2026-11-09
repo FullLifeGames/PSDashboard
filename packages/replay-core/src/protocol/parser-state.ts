@@ -126,7 +126,8 @@ type PressurePP = number | [number, number];
 (Pokemon.prototype as unknown as { getPressurePP(pp: PressurePP, foes: Pokemon[]): PressurePP }).getPressurePP = function (this: Pokemon, pp, foes) {
   for (const foe of foes) {
     const abilities = Object.values(this.side.battle.gen.species.get(foe.speciesForme)?.abilities ?? {}).map(toId);
-    const canHavePressure = this.side.battle.gen.num === 3 && abilities.includes(PRESSURE);
+    // The game's generation is the client Dex's own number; calc-generation.spec.ts keeps the calculator generation's number out of this read
+    const canHavePressure = this.side.battle.gen.dex.gen === 3 &&abilities.includes(PRESSURE);
     if (toId(foe.effectiveAbility()) === PRESSURE || (canHavePressure && abilities.length === 1)) {
       if (typeof pp === 'number') pp += 1;
       else { pp[0] += 1; pp[1] += 1; }
