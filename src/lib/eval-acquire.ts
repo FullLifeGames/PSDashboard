@@ -6,7 +6,8 @@ import {
 import { loadReplayMods } from './replay-mods';
 import { replayBuildOptions } from './team-build-options';
 
-import type { ReplacementPoint } from '@fulllifegames/eval-engine';
+import type { BringWorld, ReplacementPoint } from '@fulllifegames/eval-engine';
+import { registerWorldPositions } from './eval/world-positions';
 
 type BranchEngineModule = typeof import('./lazy/branch-engine');
 type ReconstructOptions = Parameters<BranchEngineModule['reconstructBranchRuntime']>[0];
@@ -69,23 +70,35 @@ export async function buildReplayTeams(
   }, await sources.getInferredSpreads(overrides?.p1, overrides?.p2, opts)));
 }
 
-/** Turn-0 team preview for the lead analysis, bring-trimmed (A.3c). */
+/**
+ * Turn-0 team preview for the lead analysis, bring-trimmed (A.3c). Round 89 (#124): a game with the worlds of a short side previews
+ * each world (the lighter ones registered under the heaviest world's position, which comes back), so the lead analysis blends them.
+ */
 export function makePreviewAcquire(
   replayData: ReplayData,
   sources: TeamBuildSources,
-  bringOnlyLists: { p1: string[]; p2: string[] } | null,
+  bringOnlyLists: { p1: string[]; p2: string[]; guessed?: { p1: number; p2: number } } | null,
+  worlds: readonly BringWorld[] | null = null,
 ) {
   return async (): Promise<string | null> => {
     const branchEngine = await import('./lazy/branch-engine');
     const { p1Team, p2Team } = await buildReplayTeams(replayData, sources);
     if (p1Team.length === 0 || p2Team.length === 0) return null;
     // Bring-limited replays: the lead analysis enumerates pairs over the
-    // brought species, not the whole six. Per-side fail-open keeps an
-    // unpinned side's full pool. A Champions preview plays on the Champions
-    // mod, loaded first (round 67, T145).
+    // brought species, not the whole six. Both sides trim or neither (round
+    // 89). A Champions preview plays on the Champions mod, loaded first
+    // (round 67, T145).
     const format = getBranchSimulatorFormat(replayData);
     await branchEngine.loadSimMods(format);
-    return branchEngine.serializePreviewPosition(format, p1Team, p2Team, bringOnlyLists);
+    const primary = branchEngine.serializePreviewPosition(format, p1Team, p2Team, bringOnlyLists);
+    if (primary !== null && worlds && worlds.length > 1) {
+      const previews = worlds.slice(1).flatMap(world => {
+        const position = branchEngine.serializePreviewPosition(format, p1Team, p2Team, { p1: world.p1, p2: world.p2, guessed: world.guessed });
+        return position === null ? [] : [{ position, weight: world.weight }];
+      });
+      registerWorldPositions([{ position: primary, weight: worlds[0].weight }, ...previews]);
+    }
+    return primary;
   };
 }
 

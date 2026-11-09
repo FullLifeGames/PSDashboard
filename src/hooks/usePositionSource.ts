@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PokemonSet } from '@pkmn/sim';
 import { type DamageObservation, type ReplayData, type TurnSnapshot, getBranchSimulatorFormat } from '@fulllifegames/replay-core';
-import type { BranchRuntime, ReconstructParams, ReplacementPoint, TurnAlignmentRecord } from '@fulllifegames/eval-engine';
+import type { BranchRuntime, BringWorld, ReconstructParams, ReplacementPoint, TurnAlignmentRecord } from '@fulllifegames/eval-engine';
 import { buildReplayTeams, type TeamBuildSources } from '../lib/eval-acquire';
 import { throttleLatest } from '../lib/eval/throttle-latest';
+import { registerWorldPositions, worldPositionsOf, type WorldPosition } from '../lib/eval/world-positions';
 import type { ReplayWorkerClient } from '../lib/replay-jobs/client';
 import type { ReconstructJob, ReconstructOutcome } from '../lib/replay-jobs/types';
 
@@ -38,12 +39,13 @@ interface ExactStore {
  * approximate to exact the moment a position is known, and every later
  * consumer of the same position reads it instead of reconstructing again.
  */
-function useExactPositions(replayData: ReplayData | null, setsFingerprint: string, smogonPending: boolean) {
+function useExactPositions(replayData: ReplayData | null, setsFingerprint: string, smogonPending: boolean, worldsKey: string) {
   // New replay or new set knowledge means yesterday's reconstructions no
   // longer describe these positions: the store swaps itself lazily when its
   // identity key changes (per-entry keys differ anyway; this is memory
   // hygiene). Accessed only from callbacks/effects, never during render.
-  const storeIdentity = `${replayData?.id}:${setsFingerprint}`;
+  // Round 89 (#124): the main line is the heaviest world's, so other worlds (the statistics moved the heaviest guess) are other positions.
+  const storeIdentity = `${replayData?.id}:${setsFingerprint}:${worldsKey}`;
   const storeRef = useRef({ identity: storeIdentity, positions: new Map<string, string>(), failed: new Set<string>() });
   // A position built while the Smogon sets are still loading was built on
   // other teams than the settled ones — it may be used once, never kept.
@@ -88,8 +90,10 @@ interface ReconstructArgs {
   targetTurn: number;
   mode: ReconstructJob['mode'];
   teams: Teams;
-  bringOnly?: { p1: string[]; p2: string[] } | null;
+  bringOnly?: ReconstructJob['bringOnly'];
   leadOverride?: ReconstructJob['leadOverride'];
+  /** Round 89 (#124): false for a pass over another world: its positions never enter the main line's exact store. */
+  store?: boolean;
   onProgress?: Report;
   onPosition?: (turn: number, serialized: string) => void;
   /** Round 79 (T290): asks the worker for the open replacement requests of the knockouts too. */
@@ -126,7 +130,7 @@ function useWorkerReconstruct(args: {
     return replayWorker.reconstruct(job, {
       onProgress: run.onProgress,
       onPosition: (turn, serialized) => {
-        if (run.mode === 'replay') exact.storeExactPosition(turn, serialized);
+        if (run.mode === 'replay' && run.store !== false) exact.storeExactPosition(turn, serialized);
         run.onPosition?.(turn, serialized);
       },
       onReplacement: run.onReplacement,
@@ -153,24 +157,89 @@ function sweepDiagnostic(outcome: ReconstructOutcome, turns: number): string | n
     'no candidate seed avoided the divergence, so later turns have no positions.';
 }
 
-/** Main-line acquisitions: the single exact turn (Evaluate, the dwell) and the sweep's streamed pass. */
-function useMainLineAcquire(args: {
+/** A sibling world's list as the replay job takes it. */
+const listOf = (world: BringWorld) => ({ p1: world.p1, p2: world.p2, guessed: world.guessed });
+const pointKey = (point: ReplacementPoint) => `${point.turn}:${point.ordinal}`;
+
+/** What the lighter worlds' passes found: their positions per turn and their replacement requests per point. */
+interface SiblingPasses {
+  positions: Map<string, string>[];
+  replacements: Map<string, string>[];
+  worlds: BringWorld[];
+}
+
+/**
+ * Round 89 (#124): the main-line positions the user plays are the heaviest world's. This registers the positions of every other
+ * world beside each one (`world-positions.ts`), so the worker client searches them all and blends by usage. The passes of the
+ * lighter worlds run first, one after the other; a world whose pass fails drops out and the rest keep their weights.
+ */
+function useWorldPasses(args: { reconstruct: Reconstruct; bringWorlds: BringWorld[] | null }) {
+  const { reconstruct, bringWorlds } = args;
+  const worlds = bringWorlds && bringWorlds.length > 1 ? bringWorlds : null;
+
+  const runSiblings = useCallback(async (run: {
+    targetTurn: number; teams: Teams; report?: Report; signal?: AbortSignal; replacements: boolean;
+  }): Promise<SiblingPasses | null> => {
+    if (!worlds) return null;
+    const passes: SiblingPasses = { positions: [], replacements: [], worlds: [] };
+    for (const world of worlds.slice(1)) {
+      const positions = new Map<string, string>();
+      const replacements = new Map<string, string>();
+      try {
+        const outcome = await reconstruct({
+          targetTurn: run.targetTurn, mode: 'replay', teams: run.teams, bringOnly: listOf(world), store: false, onProgress: run.report, signal: run.signal,
+          onPosition: (turn, serialized) => { if (turn <= run.targetTurn) positions.set(String(turn), serialized); },
+          ...(run.replacements ? { onReplacement: (point: ReplacementPoint, serialized: string) => { replacements.set(pointKey(point), serialized); } } : {}),
+        });
+        if (!outcome.invalid && outcome.serialized && outcome.reached) positions.set(String(run.targetTurn), outcome.serialized);
+      } catch (error) {
+        if (run.signal?.aborted) throw error;
+        continue;
+      }
+      passes.positions.push(positions);
+      passes.replacements.push(replacements);
+      passes.worlds.push(world);
+    }
+    return passes;
+  }, [reconstruct, worlds]);
+
+  /** Registers one position of the heaviest world with the lighter worlds' positions found under `key` (a turn, or a replacement point). */
+  const register = useCallback((primary: string, passes: SiblingPasses | null, found: 'positions' | 'replacements', key: string) => {
+    if (!worlds || !passes) return;
+    const siblings = passes[found].flatMap((held, index): WorldPosition[] => {
+      const position = held.get(key);
+      return position === undefined ? [] : [{ position, weight: passes.worlds[index].weight }];
+    });
+    registerWorldPositions([{ position: primary, weight: worlds[0].weight }, ...siblings]);
+  }, [worlds]);
+
+  return { runSiblings, register, hasWorlds: worlds !== null };
+}
+
+interface MainLineArgs {
   exact: ExactStore;
   reconstruct: Reconstruct;
   buildTeams: BuildTeams;
-  bringOnlyLists: { p1: string[]; p2: string[] } | null;
-}) {
-  const { exact, reconstruct, buildTeams, bringOnlyLists } = args;
-  // Per-block seed/residual records of the last sweep reconstruction —
-  // instrumentation only (debug handle + drift report), never verdicts.
-  const [sweepAlignment, setSweepAlignment] = useState<TurnAlignmentRecord[] | null>(null);
+  bringOnlyLists: ReconstructJob['bringOnly'];
+  worlds: ReturnType<typeof useWorldPasses>;
+}
 
-  /** The exact position of a main-line turn: stored, else reconstructed (healed) in the worker. */
-  const acquireExact = useCallback(async (turn: number, report: Report, signal?: AbortSignal): Promise<string> => {
+/** The exact position of a main-line turn: stored, else reconstructed (healed) in the worker, with the lighter worlds' siblings beside it. */
+function useAcquireExact(args: MainLineArgs) {
+  const { exact, reconstruct, buildTeams, bringOnlyLists, worlds: { runSiblings, register, hasWorlds } } = args;
+  return useCallback(async (turn: number, report: Report, signal?: AbortSignal): Promise<string> => {
     const stored = exact.getExact(turn);
-    if (stored) return stored;
-    const teams = await buildTeams();
-    const outcome = await reconstruct({ targetTurn: turn, mode: 'replay', teams, bringOnly: bringOnlyLists, onProgress: report, signal });
+    const teams = stored && (!hasWorlds || worldPositionsOf(stored)) ? null : await buildTeams();
+    if (stored) {
+      // A position the branch start stored has no siblings yet: the lighter worlds' passes to this turn complete it.
+      if (teams) register(stored, await runSiblings({ targetTurn: turn, teams, report, signal, replacements: false }), 'positions', String(turn));
+      return stored;
+    }
+    const siblings = await runSiblings({ targetTurn: turn, teams: teams!, report, signal, replacements: false });
+    const outcome = await reconstruct({
+      targetTurn: turn, mode: 'replay', teams: teams!, bringOnly: bringOnlyLists, onProgress: report, signal,
+      onPosition: (boundary, serialized) => register(serialized, siblings, 'positions', String(boundary)),
+    });
     if (outcome.invalid) throw new Error(outcome.invalid);
     if (!outcome.serialized) throw new Error('Reconstruction produced no battle.');
     // Backstop for replays healing cannot save: an ended (or short)
@@ -179,12 +248,16 @@ function useMainLineAcquire(args: {
     if (!outcome.reached) {
       throw new Error(`The reconstruction diverged before turn ${turn}: the guessed sets could not reproduce this position. Correcting items/moves via Edit Player/Opp is the common fix.`);
     }
+    register(outcome.serialized, siblings, 'positions', String(turn));
     exact.storeExactPosition(turn, outcome.serialized);
     return outcome.serialized;
-  }, [exact, buildTeams, reconstruct, bringOnlyLists]);
+  }, [exact, buildTeams, reconstruct, bringOnlyLists, hasWorlds, runSiblings, register]);
+}
 
-  /** Single-pass sweep acquisition: one reconstruction captures every turn boundary. */
-  const acquireAll = useCallback(async (
+/** Single-pass sweep acquisition: one reconstruction captures every turn boundary. */
+function useAcquireAll(args: MainLineArgs & { setSweepAlignment: (records: TurnAlignmentRecord[] | null) => void }) {
+  const { exact, reconstruct, buildTeams, bringOnlyLists, setSweepAlignment, worlds: { runSiblings, register } } = args;
+  return useCallback(async (
     turns: number,
     report: Report,
     onPosition?: (turn: number, serialized: string) => void,
@@ -194,26 +267,43 @@ function useMainLineAcquire(args: {
     setSweepAlignment(null);
     const teams = await buildTeams();
     const positions: (string | null)[] = new Array(turns).fill(null);
+    // Round 89 (#124): the lighter worlds first, so every position the sweep receives already knows its siblings.
+    const siblings = await runSiblings({ targetTurn: turns, teams, report, replacements: onReplacement !== undefined });
     const outcome = await reconstruct({
       targetTurn: turns, mode: 'replay', teams, bringOnly: bringOnlyLists, onProgress: report,
       onPosition: (turn, serialized) => {
         if (turn > turns) return;
         positions[turn - 1] = serialized;
+        register(serialized, siblings, 'positions', String(turn));
         onPosition?.(turn, serialized);
       },
-      onReplacement,
+      onReplacement: onReplacement && ((point, serialized) => {
+        register(serialized, siblings, 'replacements', pointKey(point));
+        onReplacement(point, serialized);
+      }),
     });
     setSweepAlignment(outcome.haxAlignment);
     const diagnostic = sweepDiagnostic(outcome, turns);
     if (diagnostic) onDiagnostic?.(diagnostic);
     if (!outcome.invalid && outcome.serialized && outcome.reached) {
       positions[turns - 1] = outcome.serialized;
+      register(outcome.serialized, siblings, 'positions', String(turns));
       exact.storeExactPosition(turns, outcome.serialized);
       onPosition?.(turns, outcome.serialized);
     }
     return positions;
-  }, [buildTeams, reconstruct, bringOnlyLists, exact]);
+  }, [buildTeams, reconstruct, bringOnlyLists, exact, runSiblings, register, setSweepAlignment]);
+}
 
+/** Main-line acquisitions: the single exact turn (Evaluate, the dwell) and the sweep's streamed pass. */
+function useMainLineAcquire(args: Omit<MainLineArgs, 'worlds'> & { bringWorlds: BringWorld[] | null }) {
+  const { bringWorlds, ...rest } = args;
+  const worlds = useWorldPasses({ reconstruct: args.reconstruct, bringWorlds });
+  // Per-block seed/residual records of the last sweep reconstruction —
+  // instrumentation only (debug handle + drift report), never verdicts.
+  const [sweepAlignment, setSweepAlignment] = useState<TurnAlignmentRecord[] | null>(null);
+  const acquireExact = useAcquireExact({ ...rest, worlds });
+  const acquireAll = useAcquireAll({ ...rest, worlds, setSweepAlignment });
   return { sweepAlignment, acquireExact, acquireAll };
 }
 
@@ -264,18 +354,21 @@ export function usePositionSource(inputs: {
   observations: DamageObservation[];
   sources: TeamBuildSources;
   setsFingerprint: string;
-  bringOnlyLists: { p1: string[]; p2: string[] } | null;
+  bringOnlyLists: ReconstructJob['bringOnly'];
+  /** Round 89 (#124): the worlds of a short-side game, the heaviest first (`bringOnlyLists` is its list); null for any other game. */
+  bringWorlds?: BringWorld[] | null;
   smogonPending: boolean;
   replayWorker: ReplayWorkerClient;
 }) {
-  const { replayData, snapshots, observations, sources, setsFingerprint, bringOnlyLists, smogonPending, replayWorker } = inputs;
-  const { exact, exactPositionsVersion } = useExactPositions(replayData, setsFingerprint, smogonPending);
+  const { replayData, snapshots, observations, sources, setsFingerprint, bringOnlyLists, bringWorlds = null, smogonPending, replayWorker } = inputs;
+  const worldsKey = useMemo(() => (bringWorlds ? JSON.stringify(bringWorlds) : ''), [bringWorlds]);
+  const { exact, exactPositionsVersion } = useExactPositions(replayData, setsFingerprint, smogonPending, worldsKey);
   // The worker's bundle parses while the replay is still loading.
   useEffect(() => {
     if (replayData) replayWorker.warm();
   }, [replayData, replayWorker]);
   const { reconstruct, buildTeams } = useWorkerReconstruct({ replayData, snapshots, observations, sources, replayWorker, exact });
-  const { sweepAlignment, acquireExact, acquireAll } = useMainLineAcquire({ exact, reconstruct, buildTeams, bringOnlyLists });
+  const { sweepAlignment, acquireExact, acquireAll } = useMainLineAcquire({ exact, reconstruct, buildTeams, bringOnlyLists, bringWorlds });
   const acquireRuntime = useRuntimeAcquire({ replayData, exact, reconstruct });
   return useMemo(() => ({
     ...exact, exactPositionsVersion, sweepAlignment, acquireExact, acquireAll, acquireRuntime,
