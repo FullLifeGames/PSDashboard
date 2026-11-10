@@ -60,9 +60,19 @@ export function extractLeads(log: string): { p1Leads: PokemonIdent[]; p2Leads: P
   return { p1Leads, p2Leads };
 }
 
-/** Round 88 (#103): whether a bench body is the species by the Dex of its battle (one body in another forme counts) or by its name. */
+/** Round 89 (#138): whether a body is the species by the Dex of its battle in the species it has of its own, before a Transform (Ditto copying Porygon-Z). */
+function isOwnSpeciesBody(pokemon: SimPokemon, species: string): boolean {
+  return sameBodyForme(pokemon.battle.dex, pokemon.baseSpecies?.name, species);
+}
+
+/**
+ * Round 88 (#103): whether a body is the species by the Dex of its battle (one body in another forme counts) or by its name.
+ * Round 89 (#138): a body that holds a Transform (Imposter, the move) is also its own species: the log names a Ditto `Ditto` while the
+ * simulator's body carries the species it copied. The simulator keeps that species in `baseSpecies`; a forme change that lasts the game
+ * (a Mega) moves it too, and `sameBodyForme` ties the two.
+ */
 function isSpeciesBody(pokemon: SimPokemon, species: string): boolean {
-  return sameBodyForme(pokemon.battle.dex, pokemon.species?.name, species) || toId(pokemon.name || '') === toId(species);
+  return isOwnSpeciesBody(pokemon, species) || sameBodyForme(pokemon.battle.dex, pokemon.species?.name, species) || toId(pokemon.name || '') === toId(species);
 }
 
 /**
@@ -107,11 +117,12 @@ export function findFaintedSlot(battle: SimBattle, sideIdx: number, name: string
   return index >= 0 ? index + 1 : null;
 }
 
-/** A body by the exact name the simulator carries (the replay's own), else by species or by the id of its name; an empty id is no key. */
+/** A body by the exact name the simulator carries (the replay's own), else by the species of its own, else by its current species or the id of its name; an empty id is no key. */
 export function findPokemonOnSide(side: SimSide, species: string): SimPokemon | null {
   const exact = species ? side.pokemon.find(pokemon => pokemon.name === species) : undefined;
   if (exact || toId(species) === '') return exact ?? null;
-  return side.pokemon.find(pokemon => isSpeciesBody(pokemon, species)) ?? null;
+  // A body by the species of its own comes first: a Ditto that copied the Pikachu of its bench is not that Pikachu's line (round 89, #138).
+  return side.pokemon.find(pokemon => isOwnSpeciesBody(pokemon, species)) ?? side.pokemon.find(pokemon => isSpeciesBody(pokemon, species)) ?? null;
 }
 
 /**

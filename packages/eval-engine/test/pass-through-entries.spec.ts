@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import type { Battle } from '@pkmn/sim';
 import { correctActivesFromProtocol } from '../src/branch/corrections';
+import { findPokemonOnSide } from '../src/branch/protocol-choices';
 import type { SimBattle } from '../src/branch/types';
 import { loadSimMods } from '../src/forward/sim-mods';
 import { mon, RULES, RULES_WITH_DOUBLES, type Mode, type Rules } from './dice-fixtures';
@@ -100,5 +101,112 @@ describe('the sweep: a block that passes through a bench body and back leaves th
     expect(body.lastMove?.id).toBe('splash');
     expect(body.moveSlots.every(slotOfMove => slotOfMove.disabled)).toBe(true);
     expect([body.isActive, body.position]).toEqual([true, slot]);
+  });
+});
+
+/**
+ * Round 89 (#138, the rest): the correction finds the body of an entry line by the species the line names (`Ditto`). A body that holds a
+ * Transform carries the copied species, and a nickname without letters ties by nothing, so the Ditto line of Smogtours Gen 9 RU 887325
+ * turn 19 (`|switch|p2a: :)|Ditto, shiny`) was skipped, the line before it (the Breloom that falls on arrival) was the only repoint of the
+ * slot, took the simulator's Ditto off the field and cleared its Transform. The lookup now also ties a body by the species it has by the
+ * Dex before a transform (`baseSpecies`, the simulator's own field), and prefers that tie to a tie by the copied species.
+ */
+const nicked = (rules: Rules, species: string, name: string, moves: string[], ability?: string) => {
+  const set = mon(rules, { species, moves });
+  set.name = name;
+  if (ability) set.ability = ability;
+  return set;
+};
+
+/** A battle whose slot p1a (singles) or p1b (doubles) holds a nicknamed Ditto that Imposter made a copy of the foe `copied`. */
+function transformedScene(mode: Mode, copied: string, benchName: string) {
+  const ditto = nicked(GEN9, 'Ditto', ':)', ['transform'], 'Imposter');
+  const bench = [nicked(GEN9, 'Pikachu', benchName, ['splash'])];
+  const lead = mode === 'singles' ? [ditto, ...bench] : [mon(GEN9, { species: 'Blissey', moves: ['splash'] }), ditto, ...bench];
+  const foes = [mon(GEN9, { species: copied, moves: ['splash'] })];
+  if (mode === 'doubles') foes.push(mon(GEN9, { species: 'Chansey', moves: ['splash'] }));
+  const battle = battleOf(mode === 'singles' ? GEN9.singles : GEN9.doubles!, lead, foes) as unknown as SimBattle;
+  const side = battle.sides[0];
+  return { battle, side, ditto: side.pokemon.find(body => body.name === ':)')!, slot: mode === 'singles' ? 'p1a' : 'p1b', at: mode === 'singles' ? 0 : 1 };
+}
+
+describe.each(['singles', 'doubles'] as const)('a nicknamed Ditto that holds a Transform is found by its entry line (%s)', mode => {
+  test('the block that passes through another body and back keeps the transformed Ditto', () => {
+    const { battle, side, ditto, slot, at } = transformedScene(mode, 'Snorlax', 'Sparky');
+    expect(ditto.transformed, 'the scene: Imposter fired at the lead').toBe(true);
+    expect(ditto.species.name, 'the copy').toBe('Snorlax');
+    const before = Object.keys(ditto.volatiles).sort();
+    correctActivesFromProtocol(battle, [`|switch|${slot}: Sparky|Pikachu, F|100/100`, `|switch|${slot}: :)|Ditto, F|100/100`]);
+    expect(side.active[at]).toBe(ditto);
+    expect(ditto.transformed).toBe(true);
+    expect(ditto.species.name).toBe('Snorlax');
+    expect(Object.keys(ditto.volatiles).sort()).toEqual(before);
+  });
+
+  test('the copied species is also on the bench: each line finds its own body', () => {
+    const { battle, side, ditto, slot, at } = transformedScene(mode, 'Pikachu', 'Sparky');
+    const sparky = side.pokemon.find(body => body.name === 'Sparky')!;
+    expect(ditto.species.name, 'the scene: a Ditto that looks like the Pikachu beside it').toBe('Pikachu');
+    // The Ditto sits first in the party, so a lookup by the current species would hand its line to the transformed Ditto.
+    expect(findPokemonOnSide(side, 'Ditto')).toBe(ditto);
+    expect(findPokemonOnSide(side, 'Pikachu')).toBe(sparky);
+    // The slot passes through Sparky and back to the Ditto: the Ditto stays what the simulator played.
+    correctActivesFromProtocol(battle, [`|switch|${slot}: Sparky|Pikachu, F|100/100`, `|switch|${slot}: :)|Ditto, F|100/100`]);
+    expect(side.active[at]).toBe(ditto);
+    expect(ditto.transformed).toBe(true);
+  });
+
+  test('a Pikachu that really comes in takes the slot from the transformed Ditto and clears it', () => {
+    const { battle, side, ditto, slot, at } = transformedScene(mode, 'Pikachu', 'Sparky');
+    correctActivesFromProtocol(battle, [`|switch|${slot}: Sparky|Pikachu, F|100/100`]);
+    expect(side.active[at]).toBe(side.pokemon.find(body => body.name === 'Sparky'));
+    expect(ditto.transformed).toBe(false);
+    expect(ditto.species.name).toBe('Ditto');
+  });
+});
+
+describe('a body that is not a Ditto is looked up as before', () => {
+  test('an Illusion body on the bench does not take the line of the species it shows (Absol)', () => {
+    // Round 89 (#141): the log shows a Zoroark under Illusion as `|switch|p1a: Absol|Absol, L50, M`. The lookup of that line gives the real
+    // Absol today and the Zoroark never answers to it (its base species is Zoroark): the new tie changes nothing for it.
+    const zoroark = nicked(GEN9, 'Zoroark', 'Zoroark', ['splash'], 'Illusion');
+    const battle = battleOf(GEN9.singles, [mon(GEN9, { species: 'Pikachu', moves: ['splash'] }), mon(GEN9, { species: 'Absol', moves: ['splash'] }), zoroark], [mon(GEN9, { species: 'Snorlax', moves: ['splash'] })]) as unknown as SimBattle;
+    const side = battle.sides[0];
+    expect(findPokemonOnSide(side, 'Absol')).toBe(side.pokemon.find(body => body.species.name === 'Absol'));
+    expect(findPokemonOnSide(side, 'Zoroark')).toBe(side.pokemon.find(body => body.species.name === 'Zoroark'));
+  });
+});
+
+describe('the sweep: a body that copied any species of the Dex is still found by the species it has of its own', () => {
+  // Imposter and Transform both end in the simulator's `transformInto`; the sweep copies every Dex species onto a Ditto (Imposter) and a Mew
+  // (the move Transform) of one side, nicknamed so that no name ties them, and asks the lookup for `Ditto` and `Mew`.
+  test('every species of the Dex as the copy', () => {
+    const lead = [nicked(GEN9, 'Ditto', ':)', ['transform'], 'Imposter'), nicked(GEN9, 'Mew', ':(', ['transform']), mon(GEN9, { species: 'Pikachu', moves: ['splash'] })];
+    const battle = battleOf(GEN9.doubles!, lead, [mon(GEN9, { species: 'Snorlax', moves: ['splash'] }), mon(GEN9, { species: 'Chansey', moves: ['splash'] })]) as unknown as SimBattle;
+    const side = battle.sides[0];
+    const [ditto, mew] = [side.pokemon[0], side.pokemon[1]];
+    const foe = battle.sides[1].active[0]!;
+    const species = battle.dex.species.all().filter(entry => entry.exists);
+    expect(species.length).toBeGreaterThan(1000);
+    const wrong: string[] = [];
+    const refused: string[] = [];
+    for (const entry of species) {
+      foe.setSpecies(entry);
+      // The simulator stops a battle whose unsent log passes 1,000 lines ("Infinite loop"): a sweep of this size sends none.
+      battle.sentLogPos = battle.log.length;
+      for (const body of [ditto, mew]) {
+        body.clearVolatile();
+        body.transformInto(foe);
+      }
+      if (ditto.species.name !== entry.name || mew.species.name !== entry.name) {
+        refused.push(entry.name);
+        continue;
+      }
+      if (findPokemonOnSide(side, 'Ditto') !== ditto) wrong.push(`${entry.name}: Ditto`);
+      if (findPokemonOnSide(side, 'Mew') !== mew) wrong.push(`${entry.name}: Mew`);
+    }
+    expect(wrong).toEqual([]);
+    // The one species the simulator's `transformInto` refuses to copy (`pokemon.species.name === 'Eternatus-Eternamax'`): no Transform to look up.
+    expect(refused).toEqual(['Eternatus-Eternamax']);
   });
 });
