@@ -1,7 +1,7 @@
 import type { Battle, Pokemon, Side, Field } from '@pkmn/client';
 import type { GenerationNum } from '@pkmn/data';
 import type { DamageObservation, PokemonSnapshot, SideSnapshot, FieldSnapshot } from '../types.ts';
-import { flushSpeedOrder, speedContaminatedAt, type ClientIdent, type ParserState, type PendingMove } from './parser-state.ts';
+import { flushSpeedOrder, ppUsedOf, speedContaminatedAt, type ClientIdent, type ParserState, type PendingMove } from './parser-state.ts';
 import { firstMoverContaminated, foreignAction, secondMoverContaminated, switchTriggered } from './speed-evidence.ts';
 import { toId } from '../ids.ts';
 import { standingScreens } from '../dex-facts/index.ts';
@@ -39,6 +39,7 @@ function snapshotPokemon(mon: Pokemon): PokemonSnapshot {
   const slot = mon.side.active.indexOf(mon);
   const boostedStat = boostedStatOf(mon);
   const fallen = fallenOf(mon);
+  const ppUsed = ppUsedOf(mon);
   return {
     name: mon.name,
     speciesForme: mon.speciesForme,
@@ -60,6 +61,7 @@ function snapshotPokemon(mon: Pokemon): PokemonSnapshot {
     ...(boostedStat ? { boostedStat } : {}),
     ...(fallen ? { fallen } : {}),
     ...(mon.timesAttacked ? { timesAttacked: mon.timesAttacked } : {}),
+    ...(ppUsed ? { ppUsed } : {}),
   };
 }
 

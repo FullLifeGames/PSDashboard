@@ -19,20 +19,24 @@ export interface DiceSpec {
   quantile?: number;
   /** Every `randomChance` answers this; left out, chances draw from the seeded stream as the PRNG does. */
   chance?: boolean;
+  /** Round 89 (#136): every `randomChance` answers yes when it is at least even (an accuracy of 90 hits, a flinch of 30 does not); wins over `chance`. */
+  likely?: boolean;
 }
 
 /** Dice that answer every draw with one quantile of its range, and optionally every chance with one answer. */
 export class FixedDice extends PRNG {
   private readonly quantile: number;
   private readonly chance: boolean | undefined;
+  private readonly likely: boolean;
   private draws = 0;
   /** The first chance a handler asked since the last `clearChance`, numerator over denominator; null until one is asked. */
   firstChance: number | null = null;
 
-  constructor({ quantile = 0.5, chance }: DiceSpec) {
+  constructor({ quantile = 0.5, chance, likely = false }: DiceSpec) {
     super('1,2,3,4');
     this.quantile = quantile;
     this.chance = chance;
+    this.likely = likely;
   }
 
   override random(from?: number, to?: number): number {
@@ -51,6 +55,10 @@ export class FixedDice extends PRNG {
 
   override randomChance(numerator: number, denominator: number): boolean {
     this.firstChance ??= numerator / denominator;
+    if (this.likely) {
+      if (++this.draws > MAX_DRAWS) throw new Error('the dice of a played question ran out');
+      return numerator * 2 >= denominator;
+    }
     if (this.chance === undefined) return super.randomChance(numerator, denominator);
     if (++this.draws > MAX_DRAWS) throw new Error('the dice of a played question ran out');
     return this.chance;

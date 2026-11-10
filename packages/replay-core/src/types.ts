@@ -47,6 +47,12 @@ export interface PokemonSnapshot {
    * round 76 (T265).
    */
   timesAttacked?: number;
+  /**
+   * The PP the log shows spent, by move name, as @pkmn/client counts it (Pressure's extra point included, a Leppa or Mystery Berry
+   * restore taken off); a pair is the range when the log leaves Pressure open. The body's own moves only, never the copies a
+   * Transform holds. Absent means no information, and so on snapshots written before round 89 (#106).
+   */
+  ppUsed?: Record<string, number | [number, number]>;
 }
 
 export interface SideSnapshot {

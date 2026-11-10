@@ -1,6 +1,7 @@
+// Round 89 (#108): a body that fell before it acted is bounded by the order rules the caller reads from the simulator (`branch/action-bound.ts`).
 // Round 75 (T160): move priorities (the stay-in phantom) and the setup moves are read by the replay's own Dex, handed in by the caller.
 import type { EvalResult, RankedChoice } from '../types.ts';
-import type { PlayedAction, PlayedTurn } from '../played.ts';
+import type { PlayedAction, PlayedBounds, PlayedTurn, SlotBound } from '../played.ts';
 import type { SideAnalysis } from './types.ts';
 import { dexOf, toId, type GameRules, type RulesDex } from '@fulllifegames/replay-core';
 import { setupMoves } from '../dex-facts/setup.ts';
@@ -107,14 +108,39 @@ export function findConsistentOptions<T extends { choice: string; label: string 
   });
 }
 
+/** Whether the order bound rules out one slot's part of a choice: a move id it lists, or a switch when it rules switches out. */
+function ruledOut(choicePart: string, bound: SlotBound): boolean {
+  const tokens = choicePart.split(' ');
+  return tokens[0] === 'switch' ? bound.switchOut : tokens[0] === 'move' && bound.moves.includes(tokens[1] ?? '');
+}
+
+/**
+ * Round 89 (#108): the options a hidden slot's bound leaves. A bound that leaves none is no proof (the log and the queue disagree), and
+ * the options stay as they are.
+ */
+function withinBounds(options: RankedChoice[], slots: (PlayedAction | null)[], bounds: (SlotBound | null)[] | undefined): RankedChoice[] {
+  if (!bounds) return options;
+  const kept = options.filter(option => {
+    const parts = option.choice.split(',').map(part => part.trim());
+    return slots.every((action, index) => {
+      const bound = bounds[index];
+      return action !== null || !bound || !ruledOut(parts[index] ?? '', bound);
+    });
+  });
+  return kept.length > 0 ? kept : options;
+}
+
 /**
  * Doubles matcher: the exact combo when every slot was observed, otherwise
  * the CHARITABLE pick among consistent combos — the hidden slot is assumed
  * to have chosen whatever grades best, so regret becomes a lower bound.
+ * Round 89 (#108): a hidden slot that fell before it acted carries a bound (per slot, optional): the moves and the switch the order rules
+ * out are not among the consistent combos. Absent, the pick is as before.
  */
 export function matchPlayedSlots(
   options: RankedChoice[],
   slots: (PlayedAction | null)[] | undefined,
+  bounds?: (SlotBound | null)[],
 ): { played: RankedChoice | null; partial: boolean } {
   const exact = findPlayedOption(options, slots);
   if (exact) return { played: exact, partial: false };
@@ -123,7 +149,7 @@ export function matchPlayedSlots(
     return { played: null, partial: false };
   }
   // Charitable pick by the grading reference: equilibrium EV.
-  const played = consistent.reduce((a, b) => (b.ev > a.ev ? b : a));
+  const played = withinBounds(consistent, slots, bounds).reduce((a, b) => (b.ev > a.ev ? b : a));
   return { played, partial: true };
 }
 
@@ -185,10 +211,11 @@ export function matchPlayedSide(
   result: EvalResult,
   side: 'p1' | 'p2',
   played: PlayedTurn | null,
+  bounds?: PlayedBounds,
 ): RankedChoice | null {
   if (!played) return null;
   const slots = side === 'p1' ? played.p1Slots : played.p2Slots;
-  if (slots) return matchPlayedSlots(result.perSide[side], slots).played;
+  if (slots) return matchPlayedSlots(result.perSide[side], slots, bounds?.[side]).played;
   return matchPlayedChoice(result, side, played[side]);
 }
 
@@ -219,22 +246,26 @@ export function matchClickedColumn(
  * Null when the marker is absent, the parse is doubles-shaped, or only
  * priority moves exist. Cant-family preventions (sleep, flinch, full
  * paralysis) get NO phantom — their hidden choice may have mattered.
+ * Round 89 (#108): with the side's order bound (`ruledOutMoves`: the simulator's priority and speed against the actions the log shows
+ * before the fall) the best-ranked move the bound does not rule out stands in, and the Dex priority is not read: Prankster, Grassy Glide
+ * and the other handlers move a status move or an attack above 0, and a slower body's own priority move is no contradiction. A bound that
+ * rules out every move is no proof, and the Dex pick stays. Absent, the pick is as before.
  */
 export function phantomStayIn(
   result: EvalResult,
   side: 'p1' | 'p2',
   played: PlayedTurn | null | undefined,
   rules: GameRules | undefined,
+  bound?: SlotBound | null,
 ): RankedChoice | null {
   if (!played || played[side] !== null || !rules) return null;
   const dex = dexOf(rules);
   if (played.p1Slots || played.p2Slots) return null;
   if (played.prevented?.[side] !== 'faint') return null;
-  const option = result.perSide[side].find(candidate => {
-    if (!candidate.choice.startsWith('move ')) return false;
-    const id = candidate.choice.split(' ')[1] ?? '';
-    return (dex.moves.get(id).priority ?? 0) === 0;
-  });
+  const moves = result.perSide[side].filter(candidate => candidate.choice.startsWith('move '));
+  const idOf = (candidate: RankedChoice): string => candidate.choice.split(' ')[1] ?? '';
+  const open = bound ? moves.filter(candidate => !bound.moves.includes(idOf(candidate))) : [];
+  const option = open[0] ?? moves.find(candidate => (dex.moves.get(idOf(candidate)).priority ?? 0) === 0);
   return option ? { ...option, label: 'stayed in (KO’d before acting)' } : null;
 }
 

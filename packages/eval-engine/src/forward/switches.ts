@@ -6,6 +6,7 @@ import { battleRuleset } from './ruleset.ts';
 import { sideIndex } from '@fulllifegames/replay-core';
 import { switchAssignments } from './assignments.ts';
 import { submittableChoice } from './request-moves.ts';
+import { isReviving } from './request-reviving.ts';
 import { deserializeFromParsed, parseSearchState, type ParsedSearchState } from './parsed-state.ts';
 import { restoreSideInvariants, serializeBattleStable } from './serialize.ts';
 import { adoptTemplate, copyBattle, prepareBattle, simFastOn } from './sim-fast/index.ts';
@@ -53,8 +54,7 @@ export function repairFaintedActives(battle: Battle): void {
  * T101: 677869 lost 4 of 11 turns to the rejected pick).
  */
 export function switchInSlots(side: Side): number[] {
-  const party = (side.activeRequest as { side?: { pokemon?: { active?: boolean; reviving?: boolean }[] } } | null)?.side?.pokemon;
-  const reviving = !!party?.some(entry => entry.active && entry.reviving);
+  const reviving = isReviving(side);
   return side.pokemon.flatMap((pokemon, index) => (!pokemon.isActive && pokemon.fainted === reviving ? [index + 1] : []));
 }
 

@@ -1,4 +1,5 @@
 import { fillableForcedSlots } from '../branch-choices.ts';
+import { isReviving } from '../forward/request-reviving.ts';
 import type { SimBattle, SimSide } from './types.ts';
 
 /**
@@ -7,8 +8,7 @@ import type { SimBattle, SimSide } from './types.ts';
  * `reviving`): the target of that switch is a fainted one.
  */
 export function switchInsOf(side: SimSide): number | null {
-  const party = (side.activeRequest as { side?: { pokemon?: { active?: boolean; reviving?: boolean }[] } } | null)?.side?.pokemon;
-  if (party?.some(entry => entry.active && entry.reviving)) return null;
+  if (isReviving(side)) return null;
   return side.pokemon.slice(side.active.length).filter(pokemon => pokemon && !pokemon.fainted).length;
 }
 

@@ -3,20 +3,23 @@ import { protocolChoiceLock, type ChoiceLockContext } from '../choice-lock.ts';
 import { restoreSideInvariants } from '../forward-model.ts';
 import type { SimBattle, SimPokemon, SimSide } from './types.ts';
 import { sameBodyForme } from './body-forme.ts';
-import { retireBenchAfterFaints, retireUnshownBench, sameBodyName, settleFaintFromSnapshot, type ProtocolBench } from './team-order.ts';
+import { retireBenchAfterFaints, sameBodyName, settleFaintFromSnapshot } from './team-order.ts';
 import { retireUnshownActives } from './unshown-actives.ts';
-import { findFirstAvailableSwitchSlot, findPokemonOnSide, findSlotBySpecies } from './protocol-choices.ts';
+import { findPokemonOnSide } from './protocol-choices.ts';
+import { buildForcedSwitchChoice } from './forced-choice.ts';
 import { correctFieldFromSnapshot } from './field-correction.ts';
 import { applyProtocolHeldItems } from './held-items.ts';
 import { playProtocolEntries, playProtocolStarts } from './entry-effects.ts';
 import { restoreTeraFromSnapshot } from './tera-restore.ts';
+import { restorePpFromSnapshot } from './pp-restore.ts';
+import { swapActiveSlots } from './active-slots.ts';
 import { bodiesOffTheField, restoreAfterProtocolEntry, restoreExitVolatiles } from './exit-volatiles.ts';
 import { endLocksTheGameEnded, settleSleepCounter } from './sleep-counter.ts';
 import { hpOfSighting } from './pokemon-info.ts';
 import { normalizeLines } from '../line-endings.ts';
 import { forceSwitches, hasForceSwitch } from './forced-slots.ts';
 
-export { forceSwitches, hasForceSwitch };
+export { forceSwitches, hasForceSwitch, buildForcedSwitchChoice };
 
 function repointActiveSlot(side: SimSide, activeSlot: number, target: SimPokemon): boolean {
   if (side.active[activeSlot] === target) return false;
@@ -25,10 +28,13 @@ function repointActiveSlot(side: SimSide, activeSlot: number, target: SimPokemon
   if (previous) previous.isActive = false;
 
   const duplicateActiveSlot = side.active.findIndex(active => active === target);
-  if (duplicateActiveSlot >= 0 && duplicateActiveSlot !== activeSlot && previous) {
+  const swapped = duplicateActiveSlot >= 0 && duplicateActiveSlot !== activeSlot && !!previous;
+  if (swapped) {
     side.active[duplicateActiveSlot] = previous;
     previous.isActive = true;
   }
+  // Round 89 (#138): the simulator's switch ends the old active's volatiles (`oldActive.clearVolatile()`, battle-actions.js); a body this repoint takes off the field leaves the same way, or it carries them back in (Taunt on a Sableye of Champions VGC 2685328963).
+  if (previous && !swapped) previous.clearVolatile();
 
   // Mirror BattleActions#switchIn's array swap: the sim keeps
   // side.pokemon[i] === side.active[i], and its next real switch swaps via
@@ -122,36 +128,6 @@ function restampProtocolLocks(battle: SimBattle, context: ChoiceLockContext, tur
     // the direct volatile carries everything the sim needs.
     active.volatiles['choicelock'] = { id: 'choicelock', move: lock.moveId } as never;
   }
-}
-
-/**
- * `bench`: what the protocol says about the side (ProtocolBench). With it, a forced slot the log leaves empty after its body
- * fainted takes `pass` once the bench bodies the protocol never shows are out of the game (round 73, T250); without it the
- * slot takes the first living body, as before.
- */
-export function buildForcedSwitchChoice(
-  battle: SimBattle,
-  sideIdx: number,
-  forcedSpecies: string[],
-  cursor: { current: number },
-  bench?: ProtocolBench,
-): string | null {
-  const needs = forceSwitches(battle, sideIdx);
-  if (!needs.some(Boolean)) return null;
-
-  const forced = needs.filter(Boolean).length;
-  const answers = Math.min(forced, Math.max(0, forcedSpecies.length - cursor.current));
-  const empty = !!bench && answers < forced &&
-    retireUnshownBench(battle, sideIdx, bench, answers, needs.flatMap((need, slot) => (need ? [slot] : [])));
-  if (battle.ended) return null;
-  const choices = needs.map(need => {
-    if (!need) return 'pass';
-    const species = forcedSpecies[cursor.current++];
-    if (species) return `switch ${findSlotBySpecies(battle, sideIdx, species)}`;
-    return empty ? 'pass' : `switch ${findFirstAvailableSwitchSlot(battle, sideIdx)}`;
-  });
-
-  return choices.join(', ');
 }
 
 /**
@@ -327,19 +303,6 @@ function placeOnSlots(
   return moved;
 }
 
-/** Two actives trade slots; both stay in play, so unlike a switch-in nothing about either body (its lock, its last move) is reset. */
-function swapActiveSlots(side: SimSide, from: number, to: number) {
-  const [first, second] = [side.active[from], side.active[to]];
-  side.active[from] = second;
-  side.active[to] = first;
-  // The sim keeps side.pokemon[i] === side.active[i] for the active slots.
-  const [firstIndex, secondIndex] = [side.pokemon.indexOf(first), side.pokemon.indexOf(second)];
-  side.pokemon[firstIndex] = second;
-  side.pokemon[secondIndex] = first;
-  first.position = secondIndex;
-  second.position = firstIndex;
-}
-
 export function correctBattleFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
   const offTheField = bodiesOffTheField(battle);
   const tookOut = correctHpFromSnapshot(battle, snapshot);
@@ -355,6 +318,7 @@ export function correctBattleFromSnapshot(battle: SimBattle, snapshot: TurnSnaps
   }
   restoreExitVolatiles(battle, snapshot, offTheField, simBodyOf);
   correctFieldFromSnapshot(battle, snapshot);
+  if (restorePpFromSnapshot(battle, snapshot, simBodyOf) && strangers.size === 0) refreshRequestsFromLiveState(battle);
 }
 
 /**

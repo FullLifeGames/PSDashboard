@@ -113,3 +113,82 @@ function queueTie(battle: Battle, first: ActionAsk, second: ActionAsk): boolean 
     return copy.comparePriority(moveAction(copy, first) as never, moveAction(copy, second) as never) === 0;
   });
 }
+
+/**
+ * Round 89 (#111): where a move action stands in the queue, for the body that will use it: the queue's own priority (the Dex priority
+ * after the move's ModifyPriority, the ModifyPriority event and the FractionalPriority event) and the action speed, as the simulator
+ * resolves them on a copy with fixed dice. The rebuild reads it where a click is unknown (the stand-in of a body whose log shows no
+ * action) and where an action of the log stands in an order (a cant line between two moves); the Dex priority alone misses Prankster,
+ * Gale Wings, Triage, Grassy Glide (ModifyPriority) and Stall, Lagging Tail, Full Incense, Custap Berry, Quick Claw, Quick Draw,
+ * Mycelium Might (FractionalPriority). `chance` answers every chance of the question: `activated` reads it from the turn's lines.
+ * Behind the same exact prefilter as `actionsTie` a body and move free of every handler keep their Dex priority without a copy
+ * (from Generation 4 on: Generation 3's Quick Claw sits in `getActionSpeed` through the battle's `quickClawRoll`, which the copy
+ * sets to the answer). A Generation 4 Quick Claw or Custap Berry holds no priority handler: its `onBeforeTurn` queues an event at
+ * the action's priority plus 0.1 that runs the move at once, so an activated holder stands at that priority.
+ */
+export interface QueuePlace {
+  priority: number;
+  speed: number;
+}
+
+/** The priority the queue's own `Custap` event (Generation 4: Quick Claw, Custap Berry) gives an activated holder over its action. */
+const CUSTAP_EVENT_GAIN = 0.1;
+
+function hasCustapEvent(battle: Battle, pokemon: Pokemon): boolean {
+  const item = battle.dex.items.get(pokemon.item) as unknown as { exists: boolean; onCustap?: unknown };
+  return item.exists && item.onCustap !== undefined;
+}
+
+export function queuePlace(battle: Battle, pokemon: Pokemon, moveId: string, chance: boolean): QueuePlace {
+  return guarded(battle, [], () => {
+    const gain = chance && hasCustapEvent(battle, pokemon) ? CUSTAP_EVENT_GAIN : 0;
+    const plain = plainPriority(battle, moveId);
+    if (plain !== null && battle.gen > 3 && freeOfPriorityHandlers(battle, pokemon)) {
+      return { priority: plain + gain, speed: speedOf(battle, pokemon) };
+    }
+    const copy = copyOf(battle);
+    copy.prng = new FixedDice({ chance });
+    if (copy.gen === 3) copy.quickClawRoll = chance;
+    const action = moveAction(copy, { pokemon, moveId });
+    return { priority: action.priority + gain, speed: action.speed };
+  });
+}
+
+/** `queuePlace`'s priority alone. */
+export function actionPriority(battle: Battle, pokemon: Pokemon, moveId: string, chance: boolean): number {
+  return queuePlace(battle, pokemon, moveId, chance).priority;
+}
+
+/**
+ * The chance answer of a body's action in one turn, read from the turn's lines and the Dex: yes when the lines show an activation
+ * of this body (`|-activate|p1a: Name|item: X` or `|ability: X`) whose item or ability the simulator's queue reads for the order
+ * (a FractionalPriority or Custap handler in the Dex entry; Generation 3's Quick Claw has none and moves the body through the
+ * action speed, which the copy shows as a difference between the two answers). Else no.
+ */
+export function activated(battle: Battle, pokemon: Pokemon, lines: readonly string[]): boolean {
+  const slot = pokemon.getSlot();
+  const names = lines.flatMap(line => {
+    const parts = line.split('|');
+    const effect = /^(item|ability): (.+)$/.exec(parts[3] ?? '');
+    return parts[1] === '-activate' && (parts[2] ?? '').startsWith(`${slot}:`) && effect ? [{ kind: effect[1], name: effect[2] }] : [];
+  });
+  return names.some(({ kind, name }) => {
+    const entry = (kind === 'item' ? battle.dex.items.get(name) : battle.dex.abilities.get(name)) as unknown as
+      { exists: boolean; id: string; onFractionalPriority?: unknown; onCustap?: unknown };
+    if (!entry.exists || (kind === 'item' ? pokemon.item : pokemon.ability) !== entry.id) return false;
+    if (entry.onFractionalPriority !== undefined || entry.onCustap !== undefined) return true;
+    return battle.gen === 3 && kind === 'item' && speedRollMoves(battle, pokemon);
+  });
+}
+
+/** Does the battle's own speed roll move this body's action speed (Generation 3's Quick Claw)? */
+function speedRollMoves(battle: Battle, pokemon: Pokemon): boolean {
+  return guarded(battle, [], () => {
+    const speeds = ANSWERS.map(roll => {
+      const copy = copyOf(battle);
+      copy.quickClawRoll = roll;
+      return onCopy(copy, pokemon).getActionSpeed();
+    });
+    return speeds[0] !== speeds[1];
+  });
+}
