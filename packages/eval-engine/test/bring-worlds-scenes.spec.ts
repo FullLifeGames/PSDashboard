@@ -91,10 +91,11 @@ const SCENES = [
     // (P1 never fielded its fourth body) carries the VGC Scarlet/Violet scene; the counts are test data.
     label: 'VGC 2630181744 (doubles; P1 short)', file: 'gen9vgc2026regi-2630181744.json', short: 'p1' as const,
     stats: statsOf([['Incineroar', 400000], ['Amoonguss', 200000], ['Grimmsnarl', 50000]]),
-    order: ['Incineroar', 'Amoonguss', 'Grimmsnarl'], noBody: [] as string[], turns: [2, 4, 6],
+    order: ['Incineroar', 'Amoonguss', 'Grimmsnarl'], noBody: [] as string[], turns: [2, 4],
     // Round 89 (#143): the app's build of this game (usage stats and set assumptions, frozen). The naked build (no items, no spreads,
     // Tackle for every unlogged slot) drifts from the log in turn 1 (Ninetales faints to Bulldoze), so the logged clicks of turns 2 to 4
     // meet other bodies, and since the stand-in for a refused move the rebuilt game plays to its end before turn 6.
+    // Turn 6 is not asserted: at the log's real position no world ranks a switch to the unknown body, so the row would check nothing.
     teamsFile: 'gen9vgc2026regi-2630181744-teams.json',
   },
 ];
