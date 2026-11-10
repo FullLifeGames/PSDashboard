@@ -21,7 +21,14 @@ import { forceSwitches, hasForceSwitch } from './forced-slots.ts';
 
 export { forceSwitches, hasForceSwitch, buildForcedSwitchChoice };
 
-function repointActiveSlot(side: SimSide, activeSlot: number, target: SimPokemon): boolean {
+/**
+ * Round 89 (#138): the repoints of one block pass through bodies the block's later lines put back (a slot whose first entrant fell on
+ * arrival, the body that entered after it was the one the simulator already held). `returning` holds the bodies a later entry line of the
+ * block puts back; `passed` the ones this pass has taken off and not yet put back.
+ */
+interface Passing { returning: ReadonlySet<SimPokemon>; passed: Set<SimPokemon> }
+
+function repointActiveSlot(side: SimSide, activeSlot: number, target: SimPokemon, passing?: Passing): boolean {
   if (side.active[activeSlot] === target) return false;
 
   const previous = side.active[activeSlot];
@@ -33,8 +40,7 @@ function repointActiveSlot(side: SimSide, activeSlot: number, target: SimPokemon
     side.active[duplicateActiveSlot] = previous;
     previous.isActive = true;
   }
-  // Round 89 (#138): the simulator's switch ends the old active's volatiles (`oldActive.clearVolatile()`, battle-actions.js); a body this repoint takes off the field leaves the same way, or it carries them back in (Taunt on a Sableye of Champions VGC 2685328963).
-  if (previous && !swapped) previous.clearVolatile();
+  if (previous && !swapped) leaveTheField(previous, passing);
 
   // Mirror BattleActions#switchIn's array swap: the sim keeps
   // side.pokemon[i] === side.active[i], and its next real switch swaps via
@@ -52,16 +58,31 @@ function repointActiveSlot(side: SimSide, activeSlot: number, target: SimPokemon
   target.position = activeSlot;
   side.active[activeSlot] = target;
 
-  // The REAL game brought this Pokémon in fresh; the sim history being
-  // corrected may never have switched it out at all — a diverged GPL
-  // reconstruction kept Vileplume on the field locked into its tricked
-  // scarf's Sludge Bomb, and the stale lock followed it into the corrected
-  // position (T38: "Grass Knot not among the options"). Mirror the parts of
-  // a real entry that gate move choice.
+  // A body put back after the pass took it off is the body the simulator entered itself: what it did since stays.
+  if (!passing?.passed.delete(target)) enterFresh(target);
+  return true;
+}
+
+/**
+ * Round 89 (#138): the simulator's switch ends the old active's volatiles (`oldActive.clearVolatile()`, battle-actions.js); a body a repoint
+ * takes off the field leaves the same way, or it carries them back in (Taunt on a Sableye of Champions VGC 2685328963). A body the block's
+ * later lines put back was never off the field for the game: the simulator played both entries itself and holds what the log shows
+ * (Ditto's Imposter Transform, Gen 6 Ubers 902024 turn 23).
+ */
+function leaveTheField(previous: SimPokemon, passing?: Passing) {
+  if (passing?.returning.has(previous)) passing.passed.add(previous);
+  else previous.clearVolatile();
+}
+
+/**
+ * The REAL game brought this Pokémon in fresh; the sim history being corrected may never have switched it out at all — a diverged GPL
+ * reconstruction kept Vileplume on the field locked into its tricked scarf's Sludge Bomb, and the stale lock followed it into the corrected
+ * position (T38: "Grass Knot not among the options"). Mirror the parts of a real entry that gate move choice.
+ */
+function enterFresh(target: SimPokemon) {
   delete target.volatiles['choicelock'];
   target.lastMove = null;
   for (const slot of target.moveSlots) slot.disabled = false;
-  return true;
 }
 
 export function correctActivesFromProtocol(
@@ -74,17 +95,18 @@ export function correctActivesFromProtocol(
   const events = normalizeLines(rawEvents);
   const before = battle.sides.map(side => [...side.active]);
   let repointed = false;
-  for (const line of events) {
+  const passed = new Set<SimPokemon>();
+  const entries = events.flatMap(line => {
     const match = line.match(/^\|(switch|drag)\|(p[12])([a-d]): ?([^|]*)\|([^,|]+)/);
-    if (!match) continue;
-
-    const sideIdx = match[2] === 'p1' ? 0 : 1;
+    if (!match) return [];
+    const side = battle.sides[match[2] === 'p1' ? 0 : 1];
+    const target = findPokemonOnSide(side, match[5].trim());
+    return target ? [{ match, side, target }] : [];
+  });
+  for (const [at, { match, side, target }] of entries.entries()) {
     const activeSlot = match[3].charCodeAt(0) - 'a'.charCodeAt(0);
-    const species = match[5].trim();
-    const side = battle.sides[sideIdx];
-    const target = findPokemonOnSide(side, species);
-    if (!target) continue;
-    if (repointActiveSlot(side, activeSlot, target)) {
+    const returning = new Set(entries.slice(at + 1).filter(later => later.side === side).map(later => later.target));
+    if (repointActiveSlot(side, activeSlot, target, { returning, passed })) {
       repointed = true;
       restoreAfterProtocolEntry(battle, target, `${match[2]}${match[3]}: ${match[4]}`, events);
     }
