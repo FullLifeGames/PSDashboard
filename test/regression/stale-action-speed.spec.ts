@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, test } from 'vitest';
-import { setAskCheck } from '../../packages/eval-engine/src/sim-ask/guard';
 import { emittedBlock, rebuild } from './forced-reconstruction-support';
 
 /**
@@ -14,7 +13,13 @@ import { emittedBlock, rebuild } from './forced-reconstruction-support';
 
 const orderOf = (lines: string[]): string[] => lines.filter(line => /^\|(move|cant)\|/.test(line)).slice(0, 4);
 
-afterEach(() => setAskCheck(null));
+// The guard reads `EVAL_ASK_CHECK=1` from the environment at each call (`sim-ask/guard.ts`, `askCheckOn`), so the row sets it for its own rebuild;
+// a root spec reaches the package only through its barrel, and `setAskCheck` stays out of it.
+const before = process.env.EVAL_ASK_CHECK;
+afterEach(() => {
+  if (before === undefined) delete process.env.EVAL_ASK_CHECK;
+  else process.env.EVAL_ASK_CHECK = before;
+});
 
 describe('the flinch stands where the log has it', () => {
   test('gen9vgc2026regi-2630685175 turn 5 (Trick Room): Fake Out, the flinch, Tera Starstorm, Pollen Puff', { timeout: 180_000 }, async () => {
@@ -29,7 +34,7 @@ describe('the flinch stands where the log has it', () => {
   // The development check re-reads a memoized answer and throws `AskLeak` when it changed: the check that would have found the fault
   // here, had a spec of the rebuild run with it on (`sim-ask.spec.ts` runs it on, and asks no question twice on a changing body).
   test('the same rebuild with the development check on raises no AskLeak', { timeout: 180_000 }, async () => {
-    setAskCheck(true);
+    process.env.EVAL_ASK_CHECK = '1';
     const built = await rebuild('gen9vgc2026regi-2630685175', { bare: true });
     expect(orderOf(emittedBlock(built.battleLog, 5))).toEqual(orderOf(built.logBlock(5)));
   });
