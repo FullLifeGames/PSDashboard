@@ -1,23 +1,32 @@
 import { existsSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
-import { CORPUS, rebuildThrough, refusalsOfTurn } from './rebuild-through';
+import { toId } from '@fulllifegames/replay-core';
+import { CORPUS, rebuildThrough } from './rebuild-through';
 
 /**
  * Round 89 (#143): a move the simulator refuses turned the whole side to `default`. Each row rebuilds a corpus game through the turn,
  * like the bank does: the turn adds no refusal, and the side keeps the actions the log shows (the switch of a partner, the move lines of
  * both bodies, the Tera or Mega click). The unit and sweep rows are in `packages/eval-engine/test/refused-choice-stand-in.spec.ts`.
+ *
+ * Round 89 (lane M): a row that passes without a refusal due tests nothing, so every row that is not a guard also asserts that the click
+ * the log shows is unplayable on the board at the start of the turn (the request lacks the move, or lists it disabled): without the
+ * stand-in the simulator would refuse it. A row whose scene drifts away turns red there. A guard row asserts only what the turn adds.
  */
 
-/** `side`: the side whose actions the row reads (the other side's block drifts by its own cause); both when absent. */
-interface Row { id: string; turn: number; type: string; what: string; side?: 'p1' | 'p2' }
+/**
+ * `side`: the side whose actions the row reads (the other side's block drifts by its own cause); both when absent.
+ * `click`: the body and the move the log shows for it (`|move|` or `|cant|`), unplayable at the turn's start.
+ * `guard`: the turn after the shape, a row that holds the text and has no refusal due.
+ */
+interface Row { id: string; turn: number; type: string; what: string; side?: 'p1' | 'p2'; click?: { slot: string; move: string }; guard?: true }
 
 const ROWS: Row[] = [
-  { id: 'gen9vgc2025regg-2318522075', turn: 7, type: 'VGC', what: 'Disable stops Dragonite and the log shows Struggle (a Choice item held it)' },
-  { id: 'smogtours-gen6ou-658228', turn: 42, type: 'Gen 6 OU', what: 'a refused move in singles (Ditto\'s Moonblast) beside the other side\'s switch' },
-  { id: 'gen9doublesou-2694097898', turn: 6, type: 'Doubles OU', what: 'a refused move in doubles (the p1 side drifts: Chi-Yu enters a turn early)', side: 'p2' },
-  { id: 'gen9championsvgc2026regmc-2693006013', turn: 11, type: 'Champions VGC', what: 'Encore lands, then Disable stops Archaludon\'s Dragon Pulse' },
-  { id: 'gen9championsvgc2026regmc-2693006013', turn: 12, type: 'Champions VGC', what: 'the turn after the Encore then Disable shape' },
-  { id: 'gen9championsvgc2026regmb-2674079451', turn: 5, type: 'Champions VGC', what: 'Encore then Disable on Toxapex' },
+  { id: 'gen9vgc2025regg-2318522075', turn: 7, type: 'VGC', what: 'Disable stops Dragonite and the log shows Struggle (a Choice item held it)', click: { slot: 'p2b', move: 'Struggle' } },
+  { id: 'smogtours-gen6ubers-902024', turn: 24, type: 'Gen 6 Ubers', what: 'a refused move in singles', click: { slot: 'p1a', move: 'Sludge Bomb' } },
+  { id: 'gen9doublesou-2694097898', turn: 6, type: 'Doubles OU', what: 'a refused move in doubles (the p1 side drifts: Chi-Yu enters a turn early)', side: 'p2', click: { slot: 'p1a', move: 'Protect' } },
+  { id: 'gen9championsvgc2026regmc-2693006013', turn: 11, type: 'Champions VGC', what: 'Encore lands, then Disable stops Archaludon\'s Dragon Pulse', click: { slot: 'p2a', move: 'Dragon Pulse' } },
+  { id: 'gen9championsvgc2026regmc-2693006013', turn: 12, type: 'Champions VGC', what: 'the turn after the Encore then Disable shape', guard: true },
+  { id: 'gen9championsvgc2026regmb-2674079451', turn: 5, type: 'Champions VGC', what: 'Encore then Disable on Toxapex', click: { slot: 'p2b', move: 'Infestation' } },
 ];
 
 /** The actions of a block the choice decides: the move and switch lines, with the actor and the move or body. */
@@ -28,7 +37,14 @@ describe('a refused choice keeps the rest of the side (#143)', () => {
   for (const row of ROWS) {
     test.skipIf(!existsSync(CORPUS(row.id)))(`${row.type} ${row.id} turn ${row.turn}: ${row.what}`, async () => {
       const { logged, emitted, refusals } = await rebuildThrough(row.id, row.turn);
-      expect(await refusalsOfTurn(row.id, row.turn, refusals), 'refusals of the turn').toBe(0);
+      const earlier = row.turn > 1 ? await rebuildThrough(row.id, row.turn - 1) : null;
+      if (row.click) {
+        // The board at the start of the turn: the click of the log is no choice of its request.
+        const body = earlier!.battle.sides[Number(row.click.slot[1]) - 1].active['abcd'.indexOf(row.click.slot[2])];
+        const offered = body.getMoveRequestData().moves.find(entry => toId(entry.move) === toId(row.click!.move));
+        expect(!offered || !!offered.disabled, `${row.click.move} of ${row.click.slot} is unplayable at the start of the turn`).toBe(true);
+      }
+      expect(refusals - (earlier?.refusals ?? 0), 'refusals of the turn').toBe(0);
       const own = (action: string) => (action.startsWith('switch') || action.startsWith('-')) && (!row.side || action.includes(`|${row.side}`));
       expect(actionsOf(emitted).filter(own)).toEqual(actionsOf(logged).filter(own));
     }, 300_000);
