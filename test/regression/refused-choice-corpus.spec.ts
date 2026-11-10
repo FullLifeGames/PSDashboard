@@ -13,7 +13,7 @@ interface Row { id: string; turn: number; type: string; what: string; side?: 'p1
 
 const ROWS: Row[] = [
   { id: 'gen9vgc2025regg-2318522075', turn: 7, type: 'VGC', what: 'Disable stops Dragonite and the log shows Struggle (a Choice item held it)' },
-  { id: 'smogtours-gen6ubers-902024', turn: 24, type: 'Gen 6 Ubers', what: 'a refused move in singles' },
+  { id: 'smogtours-gen6ou-658228', turn: 42, type: 'Gen 6 OU', what: 'a refused move in singles (Ditto\'s Moonblast) beside the other side\'s switch' },
   { id: 'gen9doublesou-2694097898', turn: 6, type: 'Doubles OU', what: 'a refused move in doubles (the p1 side drifts: Chi-Yu enters a turn early)', side: 'p2' },
   { id: 'gen9championsvgc2026regmc-2693006013', turn: 11, type: 'Champions VGC', what: 'Encore lands, then Disable stops Archaludon\'s Dragon Pulse' },
   { id: 'gen9championsvgc2026regmc-2693006013', turn: 12, type: 'Champions VGC', what: 'the turn after the Encore then Disable shape' },

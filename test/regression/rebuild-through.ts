@@ -40,6 +40,9 @@ export async function rebuildThrough(id: string, through: number) {
     choiceLocks: buildChoiceLockContext(replay.log, { p1Team, p2Team }, parsed.observations),
     bringOnly: replayBringOnly(replay, parseReplayLog(replay.log)) ?? undefined,
     deadlineMs: 600_000,
+    // The bank's and the app's correction (`passInstrument.perTarget`): an empty capture turns on the snapshot correction of HP and
+    // faints at every boundary of the pass.
+    capturePositions: { snapshotFor, onPosition: () => {} },
   });
   return {
     logged: logBlock(replay.log, through),
