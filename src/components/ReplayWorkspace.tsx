@@ -244,7 +244,9 @@ export function ReplayWorkspace({ app, replayData }: WorkspaceProps) {
   const rules = useMemo(() => logRules(replayData.log), [replayData]);
   // Round 88 (F, #101): the bodies the log never showed wear the stats panel's marker wherever the What-if offers them.
   const { statsP1Info, statsP2Info } = app.ctx.knowledge;
-  const isGuessed = useMemo(() => guessedBodies(statsP1Info, statsP2Info, rules), [statsP1Info, statsP2Info, rules]);
+  // Round 89 (#124): a short-side game's heaviest world guesses the bodies its side never fielded; they wear a mark of their own.
+  const { bringWorlds } = app.ctx.meta;
+  const isGuessed = useMemo(() => guessedBodies(statsP1Info, statsP2Info, rules, bringWorlds), [statsP1Info, statsP2Info, rules, bringWorlds]);
   // Round 84 (A7b, ruling 9a): the layout's height caps the left column; the right column follows the dock's foot.
   const layoutRef = useLayoutHeight();
   return (

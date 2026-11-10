@@ -1,3 +1,5 @@
+type BringList
+type BringSide
 type CalcGeneration
 type CalcPokemonOptions
 type ChaosStatsPayload
@@ -126,6 +128,7 @@ value parseTeamText
 value poweredMove
 value protectKind
 value registerChampionsDex
+value replayBringList
 value replayBringOnly
 value replayRules
 value replayRuleset

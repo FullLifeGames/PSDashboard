@@ -1,6 +1,10 @@
 import { describe, expect, test } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { INFERRED_SPREAD_DETAIL, MEASURED_HP_SPREAD_DETAIL, ORDER_SPREAD_DETAIL } from '@fulllifegames/replay-core';
+import { readFileSync } from 'node:fs';
+import {
+  INFERRED_SPREAD_DETAIL, MEASURED_HP_SPREAD_DETAIL, ORDER_SPREAD_DETAIL, inferOpponentTeam, withStandIns,
+} from '@fulllifegames/replay-core';
+import { RANDOM_SET_MARK, RANDOM_SET_TITLE } from '../../../src/lib/stand-in-mark';
 import { BattleStatsPanel } from '../../../src/components/BattleStatsPanel';
 import { singlesReplay } from '../fixtures/replay';
 import { evs, field, move, revealedPokemon, teamInfo } from '../fixtures/team-info';
@@ -50,6 +54,47 @@ describe('BattleStatsPanel', () => {
     render(<BattleStatsPanel replayData={replayData} p1Info={{ pokemon: [mon] }} p2Info={null} />);
     expect(screen.getByText(/85 EVs each \(random set\)/)).toBeInTheDocument();
     expect(screen.getAllByText('Not yet revealed')).toHaveLength(5);
+  });
+
+  // Round 89 (lane B, #117): whether a format generates its team comes from the Dex entry, never from a name.
+  test('the Dex decides: Hackmons Cup generates its team, a name with "random" in it does not', () => {
+    const mon = revealedPokemon('Garchomp', { evs: evs('unknown'), moves: [move('Earthquake', 'revealed')] });
+    const hackmons = render(<BattleStatsPanel replayData={{ ...singlesReplay(), formatid: 'gen9hackmonscup' }} p1Info={{ pokemon: [mon] }} p2Info={null} />);
+    expect(screen.getByText(/85 EVs each \(random set\)/)).toBeInTheDocument();
+    expect(screen.getAllByText('Not yet revealed')).toHaveLength(5);
+    hackmons.unmount();
+    render(<BattleStatsPanel replayData={{ ...singlesReplay(), formatid: 'gen9randomthing' }} p1Info={{ pokemon: [mon] }} p2Info={null} />);
+    expect(screen.queryByText(/85 EVs each/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Not yet revealed')).not.toBeInTheDocument();
+  });
+
+  // Round 89 (lane B, #117): a Random Battle that showed 4 of 6 lists six bodies; the guesses wear the random-set mark and the
+  // "never showed" notice is gone. Singles (Gen 3) and doubles (Gen 9 Random Doubles) read the same panel.
+  describe.each([
+    { label: 'singles', id: 'gen3randombattle-1', missing: 3 },
+    { label: 'doubles', id: 'gen9randomdoublesbattle-11', missing: 2 },
+  ])('a random-set guess ($label)', ({ id, missing }) => {
+    const game = JSON.parse(readFileSync(`packages/replay-core/test/fixtures/random-${id}.json`, 'utf-8')) as {
+      formatid: string; log: string; randomSets: never;
+    };
+    const raw = { p1: inferOpponentTeam(game.log, 'p1'), p2: inferOpponentTeam(game.log, 'p2') };
+    const replayData = { ...singlesReplay(), formatid: game.formatid, log: game.log, players: ['Alice', 'Bob'] };
+
+    test('the mark stands in place of the notice', () => {
+      const filled = withStandIns(raw, game.log, null, undefined, game.randomSets);
+      render(<BattleStatsPanel replayData={replayData} p1Info={filled.p1} p2Info={filled.p2} />);
+      const marks = screen.getAllByText(RANDOM_SET_MARK);
+      expect(marks).toHaveLength(missing);
+      expect(marks[0]).toHaveAttribute('title', RANDOM_SET_TITLE);
+      expect(screen.queryByText(/never showed/)).not.toBeInTheDocument();
+      expect(screen.queryByText('Not yet revealed')).not.toBeInTheDocument();
+    });
+
+    test('without the file the notice stays and the slots read not yet revealed', () => {
+      render(<BattleStatsPanel replayData={replayData} p1Info={raw.p1} p2Info={raw.p2} />);
+      expect(screen.getByText(new RegExp(`P1 never showed ${missing} of 6`))).toBeInTheDocument();
+      expect(screen.queryByText(RANDOM_SET_MARK)).not.toBeInTheDocument();
+    });
   });
 
   // Round 69 (T69). Singles and doubles replays share the panel, so both run each case.

@@ -4,6 +4,7 @@ import { isChampionsFormat } from './champions-format.ts';
 import { CHAMPIONS_MOD } from './calc-gen.ts';
 import { generationsFor } from './format-generations.ts';
 import type { ReplayData, TurnSnapshot } from './types.ts';
+import type { SmogonUsageStats } from './smogon/stats-types.ts';
 import { toId } from './ids.ts';
 import { dexOf, simFormats, type GameRules } from './rules-dex.ts';
 import { normalizeLineEndings } from './line-endings.ts';
@@ -280,16 +281,44 @@ export function speciesBaseId(name: string, rules: GameRules): string {
 export function broughtSpeciesFor(snapshots: TurnSnapshot[], side: 'p1' | 'p2', rules: GameRules): string[] {
   const seenBases = new Set<string>();
   const ordered: string[] = [];
+  const add = (own: string) => {
+    const base = speciesBaseId(own, rules);
+    if (seenBases.has(base)) return;
+    seenBases.add(base);
+    ordered.push(own);
+  };
   for (const turn of snapshots) {
     for (const pokemon of turn[side].pokemon) {
       if (!pokemon.isActive) continue;
-      const base = speciesBaseId(pokemon.speciesForme, rules);
-      if (seenBases.has(base)) continue;
-      seenBases.add(base);
-      ordered.push(pokemon.speciesForme);
+      // Round 89 (#116): a body that wears a Transform copy (Imposter, the move) lists the species it entered with, never the copy.
+      add(pokemon.baseSpeciesForme ?? pokemon.speciesForme);
     }
+    // Round 89 (#124): a snapshot shows the bodies on the field at the turn's end, so a body that entered and fainted or left
+    // within the turn is in the turn's log lines only.
+    for (const name of enteredInLog(turn.log, side)) add(name);
   }
   return ordered;
+}
+
+/**
+ * Round 89 (#124): the species each protocol line of one turn brings onto the field for a side, in line order: `switch` (a
+ * player's switch, a U-turn or Volt Switch with `[from]`, the forced replacement after a faint) and `drag` (Roar, Whirlwind,
+ * Dragon Tail, Red Card). `replace` (an Illusion that breaks) names the real body, and the `switch` line it replaces named only
+ * the disguise, a party member that may never have fielded, so the replace drops that entry. The species is the first word of
+ * the details field, the species the body entered with.
+ */
+function enteredInLog(lines: readonly string[] | undefined, side: 'p1' | 'p2'): string[] {
+  const entries: { slot: string; species: string }[] = [];
+  for (const line of lines ?? []) {
+    const match = /^\|(switch|drag|replace)\|(p[1-4][a-d]): [^|]*\|([^|,]+)/.exec(line);
+    if (!match || !match[2].startsWith(side)) continue;
+    if (match[1] === 'replace') {
+      const disguised = entries.map(entry => entry.slot).lastIndexOf(match[2]);
+      if (disguised >= 0) entries.splice(disguised, 1);
+    }
+    entries.push({ slot: match[2], species: match[3] });
+  }
+  return entries.map(entry => entry.species);
 }
 
 /**
@@ -310,6 +339,81 @@ export function replayBringOnly(
   const p1 = broughtSpeciesFor(snapshots, 'p1', rules);
   const p2 = broughtSpeciesFor(snapshots, 'p2', rules);
   return p1.length === bringCount && p2.length === bringCount ? { p1, p2 } : null;
+}
+
+/**
+ * Round 89 (#124): one side of a bring list. `fielded`: the bodies the protocol shows on the field, in first-appearance order.
+ * `open`: how many of the side's brought bodies never entered (the count minus `fielded`). `candidates`: the preview bodies the
+ * side never fielded, in preview order, each with its share of the side's open choice (the shares sum to 1; empty when `open` is 0).
+ */
+export interface BringSide {
+  fielded: string[];
+  candidates: { species: string; weight: number }[];
+  open: number;
+}
+
+/** Round 89 (#124): the bring lists of a bring-limited game with the unknown bodies a short side still holds. */
+export interface BringList {
+  count: number;
+  p1: BringSide;
+  p2: BringSide;
+}
+
+/**
+ * Round 89 (#124): the usage count of each base species, the sum of `rawCount` over the stats entries that share the base
+ * (Urshifu-Rapid-Strike and Urshifu-Single-Strike are one Urshifu).
+ */
+function usageCountsByBase(stats: SmogonUsageStats | null | undefined, rules: GameRules): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const entry of Object.values(stats?.pokemon ?? {})) {
+    if (!(entry.rawCount > 0)) continue;
+    const base = speciesBaseId(entry.species, rules);
+    counts.set(base, (counts.get(base) ?? 0) + entry.rawCount);
+  }
+  return counts;
+}
+
+/**
+ * Round 89 (#124): the bring list of a bring-limited replay with the bodies a side brought but never fielded, or null for
+ * bring-all formats and for a game whose preview cannot name enough candidates. A side that fielded its whole selection has
+ * `open` 0 and no candidates; a short side's candidates are its preview bodies it never fielded. A candidate weighs by the usage
+ * count of its base species in the format's stats; one the stats lack takes the smallest count present (the stats list every
+ * species above their cutoff, so a missing one is rarer); without any count the weights are equal. `replayBringOnly` keeps its
+ * meaning (both sides full, or null) for the readers that need a pinned list.
+ */
+export function replayBringList(
+  source: ReplayFormatSource,
+  snapshots: TurnSnapshot[],
+  stats?: SmogonUsageStats | null,
+): BringList | null {
+  const count = getReplayBringCount(source);
+  if (count === null) return null;
+  const rules = replayRules(source);
+  const byBase = usageCountsByBase(stats, rules);
+  const smallest = byBase.size > 0 ? Math.min(...byBase.values()) : 0;
+  const sideOf = (side: 'p1' | 'p2'): BringSide | null => {
+    const fielded = broughtSpeciesFor(snapshots, side, rules);
+    const open = count - fielded.length;
+    if (open < 0) return null;
+    if (open === 0) return { fielded, candidates: [], open };
+    const have = new Set(fielded.map(name => speciesBaseId(name, rules)));
+    const seen = new Set<string>();
+    const previewed: string[] = [];
+    for (const pokemon of snapshots[0]?.[side].pokemon ?? []) {
+      const base = speciesBaseId(pokemon.baseSpeciesForme ?? pokemon.speciesForme, rules);
+      if (have.has(base) || seen.has(base)) continue;
+      seen.add(base);
+      previewed.push(pokemon.baseSpeciesForme ?? pokemon.speciesForme);
+    }
+    if (previewed.length < open) return null;
+    const raw = previewed.map(species => byBase.get(speciesBaseId(species, rules)) ?? smallest);
+    const total = raw.reduce((sum, value) => sum + value, 0);
+    const candidates = previewed.map((species, index) => ({ species, weight: total > 0 ? raw[index] / total : 1 / previewed.length }));
+    return { fielded, candidates, open };
+  };
+  const p1 = sideOf('p1');
+  const p2 = sideOf('p2');
+  return p1 && p2 ? { count, p1, p2 } : null;
 }
 
 /** Round 65: the rule set a replay's static weighs by (the engine's StaticRuleset). */

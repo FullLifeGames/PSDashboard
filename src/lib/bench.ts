@@ -1,4 +1,4 @@
-import type { BranchSimState, BranchSwitchOption } from '@fulllifegames/eval-engine';
+import type { BranchSimState, BranchSwitchOption, BringWorld } from '@fulllifegames/eval-engine';
 import {
   broughtSpeciesFor, getReplayBringCount, replayRules, speciesBaseId, type GameRules, type TurnSnapshot,
 } from '@fulllifegames/replay-core';
@@ -20,11 +20,16 @@ export interface BenchLists { p1: string[]; p2: string[] }
 /** The lists with the rules their species names resolve by (generation and mod of the game's own Dex). */
 export interface Bench { lists: BenchLists; rules: GameRules }
 
-/** The bench lists of a replay, or null when no side has one (a bring-all format, or neither side played its whole selection). */
-export function replayBench(source: ReplaySource, snapshots: TurnSnapshot[]): Bench | null {
+/**
+ * The bench lists of a replay, or null when no side has one (a bring-all format, or neither side played its whole selection).
+ * Round 89 (#124): a game with a short side passes the world the user plays (the heaviest): each side then lists the bodies of that
+ * world, a short side its fielded bodies plus the guess, because the rebuild trims that side to those bodies.
+ */
+export function replayBench(source: ReplaySource, snapshots: TurnSnapshot[], world?: Pick<BringWorld, 'p1' | 'p2'>): Bench | null {
   const count = getReplayBringCount(source);
   if (count === null) return null;
   const rules = replayRules(source);
+  if (world) return { lists: { p1: world.p1, p2: world.p2 }, rules };
   const listOf = (side: 'p1' | 'p2') => {
     const fielded = broughtSpeciesFor(snapshots, side, rules);
     return fielded.length === count ? fielded : [];

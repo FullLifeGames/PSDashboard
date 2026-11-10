@@ -23,6 +23,10 @@ import { serializeLiveBattle } from '../src/serialize';
  * The replay is a fixture copy (`fixtures/gen9vgc2026regi-2565721987.json`, the log of the VGC holdout's game, ruling 8 of round 88),
  * rebuilt with the teams the log alone gives, as the engine package's other replay rows do: the scene reproduces without Smogon data.
  * The sweep over the abilities with an End handler is `unshown-body-sweep.spec.ts`.
+ *
+ * Round 89 (#116): the bring list names the Ditto's own species now, so the rebuild of 2565721987 fields the four bodies the log
+ * shows and Kyogre and Archaludon no longer enter the battle: the scene above needs the six-body team, and this describe rebuilds
+ * without `bringOnly` (the other describes keep the app's own reading).
  */
 
 const replayOf = (name: string) => JSON.parse(readFileSync(new URL(`./fixtures/${name}.json`, import.meta.url), 'utf-8')) as ReplayData;
@@ -30,7 +34,7 @@ const replayOf = (name: string) => JSON.parse(readFileSync(new URL(`./fixtures/$
 interface Rebuilt { positions: Map<number, SimBattle>; snapshots: TurnSnapshot[]; atTarget: SimBattle }
 
 /** The positions of every turn up to `through` as the bank captures them, and the live battle of the app's rebuild to the same turn. */
-async function rebuild(name: string, through: number): Promise<Rebuilt> {
+async function rebuild(name: string, through: number, bringLimited = true): Promise<Rebuilt> {
   const replay = replayOf(name);
   await loadSimMods(getBranchSimulatorFormat(replay));
   const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
@@ -42,7 +46,7 @@ async function rebuild(name: string, through: number): Promise<Rebuilt> {
     format: getBranchSimulatorFormat(replay), p1Team, p2Team, replayLog: replay.log, targetTurn: capture ? through + 1 : through, snapshot: snapshotFor(capture ? through + 1 : through),
     playerNames: [replay.players[0], replay.players[1]],
     choiceLocks: buildChoiceLockContext(replay.log, { p1Team, p2Team }, observations),
-    bringOnly: replayBringOnly(replay, parseReplayLog(replay.log)) ?? undefined,
+    bringOnly: bringLimited ? replayBringOnly(replay, parseReplayLog(replay.log)) ?? undefined : undefined,
     deadlineMs: 120_000,
     capturePositions: capture ? { snapshotFor, onPosition: (turn, battle) => { serialized.set(turn, serializeLiveBattle(battle)); } } : undefined,
   });
@@ -68,7 +72,7 @@ function unshownOnField(battle: SimBattle, snapshot: TurnSnapshot): string[] {
 
 describe('VGC 2565721987 (Regulation I): the position holds the bodies the log has', () => {
   let rebuilt: Rebuilt;
-  beforeAll(async () => { rebuilt = await rebuild('gen9vgc2026regi-2565721987', 7); }, 240_000);
+  beforeAll(async () => { rebuilt = await rebuild('gen9vgc2026regi-2565721987', 7, false); }, 240_000);
 
   test('turn 7: one living body of p1, as the log has it (Miraidon; Iron Bundle fell at turn 6, p1b stays empty)', () => {
     const position = rebuilt.positions.get(7)!;

@@ -15,6 +15,11 @@ export interface ReplayData {
 export interface PokemonSnapshot {
   name: string;
   speciesForme: string;
+  /**
+   * The species the body entered with, only while it wears a Transform copy (`speciesForme` then reads the copied species);
+   * absent otherwise and on snapshots written before round 89 (#116).
+   */
+  baseSpeciesForme?: string;
   hp: number;
   maxhp: number;
   hpPercent: number;

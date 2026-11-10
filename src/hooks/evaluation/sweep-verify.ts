@@ -3,6 +3,7 @@ import {
   selectProbeCombos, type PlayedTurn, type EvalResult, type RankedChoice,
 } from '@fulllifegames/eval-engine';
 import { EvalWorkerClient, type AppEvalSettings } from '../../lib/eval/worker-client';
+import { registerPatchedWorlds } from '../../lib/eval/world-positions';
 import { matchOrPhantom, type SweepEnv } from './sweep-types';
 
 /**
@@ -84,6 +85,8 @@ async function runProbeCombos(env: SweepEnv, args: {
   for (const combo of combos) {
     const patched = patchSerializedItem(serialized, opposing, combo.species, combo.item);
     if (!patched) continue;
+    // Round 89 (#124): the edited item is valued in every world of a short-side position (a world without the body leaves the blend).
+    registerPatchedWorlds(serialized, patched, world => patchSerializedItem(world, opposing, combo.species, combo.item));
     env.clientRef.current ??= new EvalWorkerClient();
     const playedEv = await env.clientRef.current.evalPair(patched, p1Choice.choice, p2Choice.choice, probeSettings);
     const bestEv = side === 'p1'

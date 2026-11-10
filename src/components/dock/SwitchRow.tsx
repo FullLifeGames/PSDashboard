@@ -6,7 +6,7 @@ import { hpBarClass } from '../../lib/hit-bar';
 import { useReplayRules } from '../../lib/replay-rules';
 import { spriteUrl } from '../../lib/sprite-url';
 import type { PlayedPick } from '../../lib/played-pick';
-import { STAND_IN_BADGE, STAND_IN_BADGE_TITLE, useIsGuessed, type GuessedSide } from '../../lib/stand-in-mark';
+import { useIsGuessed, type GuessedSide, type StandInMark } from '../../lib/stand-in-mark';
 
 const PLAYED_TITLE = 'The action played at this position on the line you are viewing.';
 const ENGINE_TITLE = "The engine's choice for this slot. It takes the slot when you close the tray, unless you pick something else.";
@@ -16,7 +16,7 @@ const ENGINE_TITLE = "The engine's choice for this slot. It takes the slot when 
  * out of the tile's flow, so a badge that appears under an open tray never widens the tile or reflows the bench.
  */
 function SwitchTile({ sw, selected, disabled, disabledReason, wasPlayed, engine, guessed, onPick }: {
-  sw: BranchSwitchOption; selected: boolean; disabled: boolean; disabledReason: string; wasPlayed: boolean; engine: boolean; guessed: boolean; onPick: () => void;
+  sw: BranchSwitchOption; selected: boolean; disabled: boolean; disabledReason: string; wasPlayed: boolean; engine: boolean; guessed: StandInMark | null; onPick: () => void;
 }) {
   const label = displayName(sw.name, sw.species);
   const rules = useReplayRules();
@@ -33,7 +33,7 @@ function SwitchTile({ sw, selected, disabled, disabledReason, wasPlayed, engine,
       <img src={spriteUrl(sw.species, rules)} alt={label} />
       {(wasPlayed || engine || guessed) && (
         <span className="ps-tile-flags">
-          {guessed && <span className="ps-guess-badge" title={STAND_IN_BADGE_TITLE}>{STAND_IN_BADGE}</span>}
+          {guessed && <span className="ps-guess-badge" title={guessed.title}>{guessed.badge}</span>}
           {wasPlayed && <span className="ps-played-badge" title={PLAYED_TITLE}>played</span>}
           {engine && <span className="ps-engine-badge" title={ENGINE_TITLE}>engine</span>}
         </span>

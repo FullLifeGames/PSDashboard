@@ -12,7 +12,7 @@ Chess-style analysis for Pokémon Showdown replays. Load a replay, scrub to any 
 ## What it does
 
 - **Load any replay.** A Showdown URL, a `psim.us/r/<id>` short link, or an id (private `-…pw` links and smogtours ids included), or a downloaded replay `.html` or raw protocol log dropped onto the page.
-- **See both teams.** Revealed facts come from the protocol, the rest from usage stats and Smogon sets, and EV spreads are fitted to the damage the replay showed. Every field is labeled revealed, sheet, guessed, or manual. In a game without Team Preview (Gen 1 to 4) a side that never showed its whole team gets stand-ins for the missing Pokémon, guessed from the format's teammate statistics and marked as not revealed, with the badge `guessed`.
+- **See both teams.** Revealed facts come from the protocol, the rest from usage stats and Smogon sets, and EV spreads are fitted to the damage the replay showed. Every field is labeled revealed, sheet, guessed, or manual. In a game without Team Preview (Gen 1 to 4) a side that never showed its whole team gets stand-ins for the missing Pokémon, guessed from the format's teammate statistics and marked as not revealed, with the badge `guessed`. A Random Battle has no such statistics, so its stand-ins come from the format's random-set data and the mark says so.
 - **Read the position like a chess engine.** A search on the real simulator plays out every legal choice pair, solves the result as a matrix game, and reports a win probability calibrated on real game outcomes. It covers singles, doubles, VGC bring-four, and Pokémon Champions.
 - **Grade the whole game.** `Analyze game` draws the win-probability graph, bands every turn as inaccuracy, mistake, or blunder, splits each swing into decision and luck, and writes a report with accuracy scores, key moments, paid-off reads, and, when a sure kill missed, the die that swung the game with the winner's chance after a hit and after the miss.
 - **Play your own line.** Execute a different move at any turn, turn 0 included, and the variation opens right there. Step back, try another move, or let the engine finish the game for both sides.
@@ -30,7 +30,7 @@ Chess-style analysis for Pokémon Showdown replays. Load a replay, scrub to any 
 5. `Analyze game` grades every turn. Click a graph point to jump to that turn's analysis.
 6. The `Setup` menu in the top bar holds `Edit Player`, `Edit Opp`, and `Import/Export Sets`, which fix the hidden information when a guess is wrong, and the switch for animating branch turns.
 
-The score is an estimate for spotting swings and blunders, not an oracle. The app needs the network: replays come from replay.pokemonshowdown.com (file drops work offline), the viewer script and sprites from play.pokemonshowdown.com, and usage stats from data.pkmn.cc with a GitHub Pages mirror.
+The score is an estimate for spotting swings and blunders, not an oracle. The app needs the network: replays come from replay.pokemonshowdown.com (file drops work offline), the viewer script and sprites from play.pokemonshowdown.com, and usage stats from data.pkmn.cc with a GitHub Pages mirror. A Random Battle also reads its random-set data from data.pkmn.cc/random, mirrored by the randbats pages.
 
 ## Reporting a problem
 

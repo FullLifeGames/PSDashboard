@@ -34,7 +34,8 @@ export interface ReconstructJob {
   playerNames?: [string, string];
   /** Damage record for the choice-lock context. */
   observations: DamageObservation[];
-  bringOnly?: { p1: string[]; p2: string[] } | null;
+  /** Round 89 (#124): `guessed` counts the trailing names of each list that are guesses (a short side's world). */
+  bringOnly?: { p1: string[]; p2: string[]; guessed?: { p1: number; p2: number } } | null;
   /**
    * 'replay': the protocol's choices up to targetTurn with per-boundary
    * healing, choice locks, and position capture (Evaluate, the sweep, a
