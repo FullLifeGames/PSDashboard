@@ -23,7 +23,7 @@ const entry = (species: string, rawCount: number) =>
 const statsOf = (counts: [string, number][]): SmogonUsageStats => ({
   format: 'test', month: '2026-10', source: 'test', pokemon: Object.fromEntries(counts.map(([species, rawCount]) => entry(species, rawCount))),
 });
-const fixture = (file: string) => JSON.parse(readFileSync(new URL(`./fixtures/${file}`, import.meta.url), 'utf-8')) as ReplayData;
+const fixture = <T = ReplayData>(file: string) => JSON.parse(readFileSync(new URL(`./fixtures/${file}`, import.meta.url), 'utf-8')) as T;
 
 function mon(name: string, move: string): PokemonSet {
   return {
@@ -84,6 +84,7 @@ const SCENES = [
     label: 'Champions VGC 2625939941 (doubles; P1 short)', file: 'gen9championsvgc2026regma-2625939941.json', short: 'p1' as const,
     stats: statsOf([['Kingambit', 717550], ['Ninetales-Alola', 168774], ['Ceruledge', 91889]]),
     order: ['Kingambit', 'Ninetales-Alola', 'Ceruledge'], noBody: ['Kangaskhan', 'Torkoal'], turns: [2, 4],
+    teamsFile: null,
   },
   {
     // Round 89 (#124, B5b): 2630452654 fielded all four P2 bodies (Farigiraf came in and fainted within turn 2), so 2630181744
@@ -91,6 +92,10 @@ const SCENES = [
     label: 'VGC 2630181744 (doubles; P1 short)', file: 'gen9vgc2026regi-2630181744.json', short: 'p1' as const,
     stats: statsOf([['Incineroar', 400000], ['Amoonguss', 200000], ['Grimmsnarl', 50000]]),
     order: ['Incineroar', 'Amoonguss', 'Grimmsnarl'], noBody: [] as string[], turns: [2, 4, 6],
+    // Round 89 (#143): the app's build of this game (usage stats and set assumptions, frozen). The naked build (no items, no spreads,
+    // Tackle for every unlogged slot) drifts from the log in turn 1 (Ninetales faints to Bulldoze), so the logged clicks of turns 2 to 4
+    // meet other bodies, and since the stand-in for a refused move the rebuilt game plays to its end before turn 6.
+    teamsFile: 'gen9vgc2026regi-2630181744-teams.json',
   },
 ];
 
@@ -102,7 +107,7 @@ describe('#124: the blend of the worlds of a short-side game', () => {
       const worlds = bringWorlds(replayBringList(replay, parseReplayLog(replay.log), scene.stats), BRING_WORLD_CAP)!;
       expect(worlds).toHaveLength(3);
       expect(worlds.map(world => world[scene.short][3].split('-')[0])).toEqual(scene.order.map(name => name.split('-')[0]));
-      const teams = buildTeamsFromReplay(replay.log);
+      const teams = scene.teamsFile ? fixture<{ p1Team: PokemonSet[]; p2Team: PokemonSet[] }>(scene.teamsFile) : buildTeamsFromReplay(replay.log);
       let held = 0;
       let differed = 0;
       for (const turn of scene.turns) {
