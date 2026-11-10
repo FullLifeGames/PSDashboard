@@ -35,10 +35,11 @@ describe.each(SWEEP_CASES.filter(({ mode, rules }) => mode === 'singles' && rule
     return [...(entry.secondaries ?? []), ...(entry.secondary ? [entry.secondary] : [])].some(one => one.boosts && (one.chance ?? 100) < 100);
   })!;
 
-  const cellOf = (lead: string[], bench: string[]): EndgameChildren => {
+  /** `benchLevel` moves the bench body's level only: another position, so another cell seed (round 89, #148). */
+  const cellOf = (lead: string[], bench: string[], benchLevel = 0): EndgameChildren => {
     const user = mon(rules, { species: 'Snorlax', moves: [mover], gender: 'M' });
     const foe = mon(rules, { species: 'Vaporeon', moves: lead });
-    const battle = battleOf(rules.singles, [user], [foe, mon(rules, { species: 'Blissey', moves: bench })]);
+    const battle = battleOf(rules.singles, [user], [foe, { ...mon(rules, { species: 'Blissey', moves: bench }), level: rules.level - benchLevel }]);
     const root = createRootPosition(JSON.stringify(State.serializeBattle(battle)));
     return endgameChildren(root, `move ${mover}`, 'move splash', 6);
   };
@@ -50,6 +51,16 @@ describe.each(SWEEP_CASES.filter(({ mode, rules }) => mode === 'singles' && rule
     expect(`fired ${fired(cell).length > 0}`).toBe('fired true');
     expect(helpedSources(cell, 'p1').some(source => source >= 0)).toBe(true);
   });
+
+  // Round 89 (#148): the control over eight boards (the bench body's level differs, so each cell draws its own seeds): a crit that
+  // lands on a representative child must not keep the fired class from its source.
+  for (let level = 0; level < 8; level++) {
+    test(`the control, board ${level}: the fired class takes the proof whatever the seed rolls`, () => {
+      const cell = cellOf(['splash'], ['splash'], level);
+      expect(`board ${level} fired ${fired(cell).length > 0}`).toBe(`board ${level} fired true`);
+      expect(`board ${level} source ${helpedSources(cell, 'p1').some(source => source >= 0)}`).toBe(`board ${level} source true`);
+    });
+  }
 
   for (const reader of READERS) {
     if (!drawn(dex, reader)) continue;

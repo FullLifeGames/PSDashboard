@@ -336,18 +336,34 @@ class ForcedWinProver {
   }
 }
 
-/** Proves from a serialized battle or a root position the caller already holds (no second deserialization). */
-export function proveForcedWin(rootOrSerialized: string | SimPosition, request: ProveRequest): ForcedWinProof {
+/** Which root candidates the full proof tries: the probe's winners (production), or a list the caller names. */
+type PickCandidates = (prover: ForcedWinProver, root: SimPosition, request: ProveRequest) => string[];
+
+function runProof(rootOrSerialized: string | SimPosition, request: ProveRequest, pick: PickCandidates): ForcedWinProof {
   const root = typeof rootOrSerialized === 'string' ? createRootPosition(rootOrSerialized, request.ruleset) : rootOrSerialized;
   const battle = positionBattle(root);
   const budget = { ...PROVER_BUDGET, ...request.budget };
   const spent = request.spent ?? { states: 0, cells: 0 };
   const prover = new ForcedWinProver(request.side, { tera: request.tera, sleepClause: request.sleepClause, ruleset: request.ruleset }, budget, spent);
   if (battle.ended || prover.states >= budget.states) return { ...NONE, openValue: null, states: prover.states, cells: prover.cells };
-  const winners = prover.probe(root, request.rootOrder);
+  const winners = pick(prover, root, request);
   if (winners.length === 0) return { ...NONE, openValue: null, states: prover.states, cells: prover.cells };
   prover.states += 1;
   const { proven, cells } = prover.expand(root, 0, winners);
   const fields = openFields(battle, request.side, cells, createMatchupCache(request.ruleset));
   return { ...proven, ...fields, states: prover.states, cells: prover.cells };
+}
+
+/** Proves from a serialized battle or a root position the caller already holds (no second deserialization). */
+export function proveForcedWin(rootOrSerialized: string | SimPosition, request: ProveRequest): ForcedWinProof {
+  return runProof(rootOrSerialized, request, (prover, root, asked) => prover.probe(root, asked.rootOrder));
+}
+
+/**
+ * Round 89 (#148): the full proof for the root candidates the caller names, without the greedy probe that nominates them. The probe
+ * reads plain children, so which candidates it passes depends on the cell's dice; a spec whose subject is the full proof (every
+ * legal reply of the defender) starts here instead of hoping the probe nominates its line. Not in the package barrel.
+ */
+export function proveCandidates(rootOrSerialized: string | SimPosition, request: ProveRequest, candidates: string[]): ForcedWinProof {
+  return runProof(rootOrSerialized, request, () => candidates);
 }

@@ -34,8 +34,14 @@ export function splitClassKey(key: string): { order: string; outcomes: string[] 
 /**
  * The fields of a serialized position that follow the damage a roll dealt, never the class (the classes already average over rolls):
  * the HP, the last damage, the damage a body took and the totals a move line keeps. They sit at several depths, so the drop is deep.
+ * Round 89 (#148): `moveHitData` joins them. It holds the critical hit the roll drew (and the type modifier and the Protect bypass of
+ * that one hit) on the finished move at three places (`battle.lastMove`, the user's `lastMove` and `lastMoveUsed`). A crit is a fact
+ * of the roll like the damage and sits outside the class model (`prover.ts`: the proof answers "barring a crit"); when one of the
+ * two drawn children crit and the other did not, the rule saw a difference and kept the classes apart. The simulator reads the
+ * record only inside the move that made it (every `getMoveHitData(move)` of @pkmn/sim and @pkmn/mods passes the move in progress;
+ * `prover-helping-secondary-sweep.spec.ts` holds that), so nothing a later turn does depends on it.
  */
-const ROLL_FIELDS = new Set(['hp', 'lastDamage', 'hurtThisTurn', 'damage', 'damageValue', 'totalDamage']);
+const ROLL_FIELDS = new Set(['hp', 'lastDamage', 'hurtThisTurn', 'damage', 'damageValue', 'totalDamage', 'moveHitData']);
 /** What the memo key drops (endgame/key.ts), and the start-of-turn roll of Gens 2 and 3 (the dice of the next turn, drawn from the stream). */
 const STRIPPED_FIELDS = ['log', 'inputLog', 'messageLog', 'sentLogPos', 'sentRequests', 'prng', 'prngSeed', 'turn', 'lastMoveLine', 'hints', 'effectOrder', 'quickClawRoll'] as const;
 

@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { Battle, PRNG, State, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet, PRNGSeed } from '@pkmn/sim';
-import { proveForcedWin } from '../src/endgame/prover';
+import { proveCandidates, proveForcedWin } from '../src/endgame/prover';
 import { createRootPosition, legalChoices } from '../src/forward-model';
 import { deserializeBattleExact } from '../src/forward/serialize';
 import { MIN_FORCED_MASS, type TeraAllowance } from '../src/types';
@@ -100,9 +100,15 @@ describe('forced-win prover: every reply of the defending side (round 64, T118)'
     const root = createRootPosition(board.serialized);
     const replies = legalChoices(root, 'p1', { tera: board.tera });
     expect(replies).toHaveLength(42);
-    const proof = proveForcedWin(root, { side: 'p2', rootOrder: board.rootOrder, tera: board.tera, sleepClause: board.sleepClause });
-    expect(proof.mass).toBe(0);
-    expect(proof.cells).toBeGreaterThanOrEqual(replies.length);
+    const request = { side: 'p2' as const, rootOrder: board.rootOrder, tera: board.tera, sleepClause: board.sleepClause };
+    // The production call: the probe nominates a candidate only when its greedy line wins, and the cell's own dice (round 89, #60)
+    // decide whether the probe's one turn of plain children shows that win. This row holds the verdict, never the way in.
+    expect(proveForcedWin(root, request).mass).toBe(0);
+    // Round 89 (#148): the full proof over every legal reply is this row's subject, so it starts without the probe: the line is given.
+    const full = proveCandidates(root, request, [board.rootOrder[0]]);
+    expect(board.rootOrder[0]).toBe('move knockoff 1, move heatwave');
+    expect(full.mass).toBe(0);
+    expect(full.cells).toBeGreaterThanOrEqual(replies.length);
   });
 
   test('doubles: a one-turn win proves against every legal reply, and the cell budget counts them all', () => {
