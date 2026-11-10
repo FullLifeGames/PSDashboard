@@ -30,9 +30,14 @@ export interface ActionAsk {
 }
 
 /**
- * What a position's questions share, per battle object: the action speed of each body. A position's reader battle is
- * never written after it is built, so a number read once stays true; with the development check on, a hit is read
- * again and a battle that changed since its first question throws `AskLeak`.
+ * What the search's questions share, per battle object: the action speed of each body (only `actionsTie` reads it, on a
+ * position's reader battle). A reader battle is never written after it is built, so a number read once stays true; with the
+ * development check on, a hit is read again and a battle that changed since its first question throws `AskLeak`.
+ *
+ * Round 89 (M, fix 3 of #111): the rebuild's questions (`queuePlace`, `actionPriority`) never read this memo. The rebuild asks on
+ * its LIVE battle and plays it turn after turn, so a speed or a handler read in one turn is stale in the next (Trick Room, Tailwind,
+ * paralysis, a stat stage, a switch, an item knocked off). The memo has no key that the simulator's own state could make stale-proof,
+ * and the rebuild asks a handful of times per turn, so those two read the battle fresh every time.
  */
 const speeds = new WeakMap<Battle, Map<Pokemon, number>>();
 
@@ -58,13 +63,16 @@ const handlerFree = new WeakMap<Battle, Map<Pokemon, boolean>>();
  * No handler of a priority event reaches this body. The queue runs the events with the body as target and the move's
  * target as source (`onSource` handlers), so the discovery asks with no source and with every body on the field.
  */
+function readFreeOfPriorityHandlers(battle: Battle, pokemon: Pokemon): boolean {
+  const sources = [null, ...battle.getAllActive(true)];
+  return PRIORITY_EVENTS.every(event => sources.every(source => battle.findEventHandlers(pokemon, event, source).length === 0));
+}
+
+/** `readFreeOfPriorityHandlers` once per body of a reader battle (`actionsTie`'s). */
 function freeOfPriorityHandlers(battle: Battle, pokemon: Pokemon): boolean {
   let held = handlerFree.get(battle);
   if (!held) handlerFree.set(battle, held = new Map());
-  const read = () => {
-    const sources = [null, ...battle.getAllActive(true)];
-    return PRIORITY_EVENTS.every(event => sources.every(source => battle.findEventHandlers(pokemon, event, source).length === 0));
-  };
+  const read = () => readFreeOfPriorityHandlers(battle, pokemon);
   const known = held.get(pokemon);
   if (known === undefined) {
     const free = read();
@@ -139,12 +147,13 @@ function hasCustapEvent(battle: Battle, pokemon: Pokemon): boolean {
   return item.exists && item.onCustap !== undefined;
 }
 
+/** Read fresh on every call: the battle is the rebuild's live one, played between two questions (see `speeds`). */
 export function queuePlace(battle: Battle, pokemon: Pokemon, moveId: string, chance: boolean): QueuePlace {
   return guarded(battle, [], () => {
     const gain = chance && hasCustapEvent(battle, pokemon) ? CUSTAP_EVENT_GAIN : 0;
     const plain = plainPriority(battle, moveId);
-    if (plain !== null && battle.gen > 3 && freeOfPriorityHandlers(battle, pokemon)) {
-      return { priority: plain + gain, speed: speedOf(battle, pokemon) };
+    if (plain !== null && battle.gen > 3 && readFreeOfPriorityHandlers(battle, pokemon)) {
+      return { priority: plain + gain, speed: pokemon.getActionSpeed() };
     }
     const copy = copyOf(battle);
     copy.prng = new FixedDice({ chance });
