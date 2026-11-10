@@ -42,7 +42,18 @@ export interface EndgameChildren {
   events: CellEvent[];
 }
 
-const PLAIN_DRAWS = 3;
+/**
+ * Round 89 (A5f-5, ruling 20): the draws of the plain path for a damaging pair, one table for both game types. A proof books a plain
+ * cell only when every draw agrees, so the count is the proof's confidence in the cell's dice. Doubles take five: every doubles
+ * cell prices through this path, and A5f-3 measured five draws on the doubles holdouts (+0.1 to +0.2 % forks per family, 20 of 89
+ * sampled proofs gone, 1 added, 1 of the 3 proofs for the side that lost its game gone). Singles keep three because nobody has
+ * measured another count there, and a singles cell takes the plain path only where the class plan refuses it (a stalling move, an
+ * effect without a class). `cellSeeds` holds 16 seeds, so the table stays under that.
+ */
+export const PLAIN_DRAWS = { singles: 3, doubles: 5 } as const;
+
+/** The draws a damaging pair takes on this battle's plain path. */
+export const plainDrawCount = (battle: Battle): number => (battle.gameType === 'singles' ? PLAIN_DRAWS.singles : PLAIN_DRAWS.doubles);
 
 /** Whether either choice names a damaging move (base power, fixed damage, or OHKO). */
 function damagingPair(battle: Battle, p1Choice: string, p2Choice: string): boolean {
@@ -72,14 +83,14 @@ function doublesTie(root: SimPosition, battle: Battle, p1Choice: string, p2Choic
 }
 
 /**
- * The plain path: the median of three draws for damaging pairs, one draw
+ * The plain path: the median of `PLAIN_DRAWS` draws (three in singles, five in doubles) for damaging pairs, one draw
  * otherwise. Round 67 (T114): a doubles pair whose order a speed tie decides
  * prices each order as a child of half the weight (the scripted dice put one
  * side's move actions first): the fixed draws resolved doubles-ohko-tie
  * alike, and the prover proved a coin flip with mass 1.
  */
 function plainChildren(root: SimPosition, battle: Battle, rootHp: number, p1Choice: string, p2Choice: string): EndgameChildren {
-  const count = damagingPair(battle, p1Choice, p2Choice) ? PLAIN_DRAWS : 1;
+  const count = damagingPair(battle, p1Choice, p2Choice) ? plainDrawCount(battle) : 1;
   const seeds = cellSeeds(root, p1Choice, p2Choice).slice(0, count);
   if (doublesTie(root, battle, p1Choice, p2Choice)) {
     const orders = (['p1', 'p2'] as const).map(first => plainGroup(seeds.map(seed =>
