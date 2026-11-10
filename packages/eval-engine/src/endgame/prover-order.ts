@@ -7,6 +7,8 @@ import { boundaryEvent } from '../ko-odds.ts';
 import { leafValue } from '../search/leaf.ts';
 import type { ForcedWinCaveat, ForcedWinOpen, ForcedWinProof } from '../types.ts';
 import type { EndgameChildren } from './children.ts';
+import { splitOutcome } from '../search/secondary-classes.ts';
+import { splitClassKey } from './prover-helping.ts';
 
 /**
  * The forced-win prover's candidate order and its open-branch fields
@@ -53,11 +55,13 @@ export function orderByOdds(battle: Battle, side: Side, options: ChoiceOption[])
 }
 
 /** The own side's open class of a cell, read from the child's group key against the cell's event plan. */
-function openOf(root: Battle, cell: Cell, key: string | undefined, side: Side): ForcedWinOpen | undefined {
+export function openOf(root: Battle, cell: Cell, key: string | undefined, side: Side): ForcedWinOpen | undefined {
   const plan = planCellEvents(root, cell.p1Choice, cell.p2Choice);
   if (plan.kind !== 'events' || !key) return undefined;
-  const outcomes = key.split(':')[1]?.split('|') ?? [];
-  return plan.events.map((event: CellEvent, index: number) => ({ event, outcome: outcomes[index] }))
+  // Round 89 (#115): the class key splits at its first colon (an effect id holds one itself), and an outcome keeps its effects
+  // behind a plus (`hit-nokill+brn`); the open class is read by its base outcome, as the helping rule reads it.
+  const outcomes = splitClassKey(key)?.outcomes ?? [];
+  return plan.events.map((event: CellEvent, index: number) => ({ event, outcome: outcomes[index] && splitOutcome(outcomes[index], event.secondary).base }))
     .filter(({ event }) => event.side === side)
     .map(({ event, outcome }): ForcedWinOpen | undefined => {
       const label = root.dex.moves.get(event.moveId).name;

@@ -112,4 +112,18 @@ describe('LeadPanel', () => {
     await userEvent.click(screen.getByRole('button', { name: /^Latias/ }));
     expect(onPicksChange).toHaveBeenLastCalledWith({ p1: ['Latias'], p2: ['Weavile'] });
   });
+
+  // Round 89 (#113): the picker lists the near side first, as the dock's rows do (round 88, T316).
+  test.each([
+    ['singles', singles, 1],
+    ['doubles', doubles, 2],
+  ] as const)('%s: the near side p2 lists P2 first, p1 and the default keep P1 first', (_name, options, leadsPerSide) => {
+    const labels = () => screen.getAllByText(/^P[12] · /).map(el => el.textContent);
+    const { rerender } = render(<LeadPanel {...props({ ...options, leadsPerSide, nearSide: 'p2' })} />);
+    expect(labels()).toEqual(['P2 · Bob', 'P1 · Alice']);
+    rerender(<LeadPanel {...props({ ...options, leadsPerSide, nearSide: 'p1' })} />);
+    expect(labels()).toEqual(['P1 · Alice', 'P2 · Bob']);
+    rerender(<LeadPanel {...props({ ...options, leadsPerSide })} />);
+    expect(labels()).toEqual(['P1 · Alice', 'P2 · Bob']);
+  });
 });

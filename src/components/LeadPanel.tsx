@@ -3,6 +3,7 @@ import { useDockHeight } from '../hooks/useDockHeight';
 import { useLeadSelection } from '../hooks/useLeadSelection';
 import { LeadSide } from './LeadSide';
 import type { LeadOption } from '../lib/lead-options';
+import type { Side } from './dock/dock-model';
 
 interface Props {
   playerNames: [string, string];
@@ -21,6 +22,8 @@ interface Props {
   onStart: (leads: { p1: string[]; p2: string[] }) => void;
   /** The complete selection on screen, null while it is unfinished or the panel leaves (the play-out starts from it). */
   onPicksChange?: (leads: { p1: string[]; p2: string[] } | null) => void;
+  /** The side the replay frame shows near comes first, as in the turn dock's rows (round 89, #113). P1 until the frame is switched. */
+  nearSide?: Side;
 }
 
 function panelIntro(bringCount: number | null, leadsPerSide: number): string {
@@ -45,7 +48,7 @@ function startLabel({ executing, ready, maxPicks, p1Picked, p2Picked }: { execut
  * start as a variation. Round 84 (A7b, ruling 12b): it wears the dock's look and stands where the dock stands: the root is a dock
  * (`ps-dock ps-lead`), the intro is its status strip, P1 and P2 stand in rows of the bench's tiles, and Start takes Execute's place.
  */
-export function LeadPanel({ playerNames, p1Options, p2Options, leadsPerSide, bringCount, pickedLeads, executing, onStart, onPicksChange }: Props) {
+export function LeadPanel({ playerNames, p1Options, p2Options, leadsPerSide, bringCount, pickedLeads, executing, onStart, onPicksChange, nearSide = 'p1' }: Props) {
   const maxPicks = bringCount ?? leadsPerSide;
   const { p1Leads, p2Leads, toggleP1, toggleP2 } = useLeadSelection({ p1Options, p2Options, pickedLeads, maxPicks });
   const reportHeight = useDockHeight();
@@ -64,14 +67,16 @@ export function LeadPanel({ playerNames, p1Options, p2Options, leadsPerSide, bri
   }
 
   const idle = ready && !executing;
+  const sides: Side[] = nearSide === 'p2' ? ['p2', 'p1'] : ['p1', 'p2'];
   return (
     <div className="ps-dock ps-lead" ref={reportHeight}>
       <div className="ps-dock-status">{panelIntro(bringCount, leadsPerSide)}</div>
       <div className="ps-dock-anchor">
         <div className="ps-dock-bar">
           <div className="ps-lead-rows">
-            <LeadSide side="p1" label={`P1 · ${playerNames[0]}`} options={p1Options} selected={p1Leads} leadsPerSide={leadsPerSide} maxPicks={maxPicks} onToggle={toggleP1} />
-            <LeadSide side="p2" label={`P2 · ${playerNames[1]}`} options={p2Options} selected={p2Leads} leadsPerSide={leadsPerSide} maxPicks={maxPicks} onToggle={toggleP2} />
+            {sides.map(side => (
+              <LeadSide key={side} side={side} label={`${side === 'p1' ? 'P1' : 'P2'} · ${playerNames[side === 'p1' ? 0 : 1]}`} options={side === 'p1' ? p1Options : p2Options} selected={side === 'p1' ? p1Leads : p2Leads} leadsPerSide={leadsPerSide} maxPicks={maxPicks} onToggle={side === 'p1' ? toggleP1 : toggleP2} />
+            ))}
           </div>
           <button
             type="button"

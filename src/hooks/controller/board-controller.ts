@@ -79,6 +79,11 @@ export function useTimelineController(ctx: ReplayContext, transients: Transients
   const liveEvalStatus: typeof evaluation.status =
     evaluation.status === 'done' && !evalResultMatchesView ? 'stale' : evaluation.status;
 
+  // Round 89 (#112): the same reading against the live tip's position, for the play-out and the Auto evaluation of a run: the
+  // pointer may stand elsewhere (the frame reported another turn) while the run plays on at the tip.
+  const tipEvalStatus: typeof evaluation.status =
+    evaluation.status === 'done' && evaluation.resultTag !== null && evaluation.resultTag !== (timeline.tip?.key ?? null) ? 'stale' : evaluation.status;
+
   const deviation = useDeviationLayer(ctx, transients, timeline);
   const { setBranchDivergence } = deviation;
   const { maxTurn, setViewTurn, setViewLine, setVariationScores, resetPointer } = timeline;
@@ -111,7 +116,7 @@ export function useTimelineController(ctx: ReplayContext, transients: Transients
     stopBranch();
   }, [replayData?.id, stopBranch, resetPointer, setBranchDivergence, branchWindowOpenRef]);
 
-  return { timeline, deviation, evalResultMatchesView, liveEvalStatus, discardVariation };
+  return { timeline, deviation, evalResultMatchesView, liveEvalStatus, tipEvalStatus, discardVariation };
 }
 
 export type BoardController = ReturnType<typeof useTimelineController>;

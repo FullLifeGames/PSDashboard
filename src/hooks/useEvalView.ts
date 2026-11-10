@@ -38,6 +38,9 @@ export interface EvalViewInputs {
   evalViewKey: string;
   serializedAtView: string | null;
   liveEvalStatus: Evaluation['status'];
+  /** Round 89 (#112): the live sim's position (null outside a variation) and the status of the result against it. */
+  tip: { key: string; turn: number; variation: boolean } | null;
+  tipEvalStatus: Evaluation['status'];
   analysisTurn: number | null;
   analyzableTurns: number;
   branching: boolean;
@@ -98,15 +101,18 @@ export type EvaluateOptions = Pick<EvaluateParams, 'onResult'>;
 /** The Evaluate action for whatever position the pointer holds, and the
  *  variation-score recording of finished live evals. */
 function useEvaluateAction(inputs: EvalViewInputs, format: EvalFormat) {
-  const { replayData, snapshots, evalIsDoubles, evaluation, liveTip, viewingVariation, serializedAtView, viewTurn, setsFingerprint, evalViewKey, acquire, setVariationScores } = inputs;
+  const { replayData, snapshots, evalIsDoubles, evaluation, liveTip, viewingVariation, serializedAtView, viewTurn, setsFingerprint, evalViewKey, acquire, setVariationScores, tip, playOutActive } = inputs;
   const { effectiveTera, effectiveSleepClause, effectiveRuleset } = format;
+  // Round 89 (#112): while a run is active the live sim is what the user asked for, wherever the pointer stands (a frame
+  // report can move it): the evaluation, its tag and its score slot follow the tip. Outside a run the pointer decides.
+  const runAtTip = playOutActive && tip !== null ? tip : null;
   // Round 84: `onResult` is read by name, never spread: the Evaluate button hands its click event to this function. Evaluate
   // never sets `prefs.auto`; only the explore click of the engine walk does.
   const handleEvaluate = useCallback((options?: EvaluateOptions) => {
     if (!replayData) return;
     const onResult = typeof options?.onResult === 'function' ? options.onResult : undefined;
-    if (liveTip) {
-      evaluation.evaluate({ cacheKey: null, tera: effectiveTera, sleepClause: effectiveSleepClause, ruleset: effectiveRuleset, acquire: acquire.acquireBranchPosition, tag: evalViewKey, onResult });
+    if (liveTip || runAtTip) {
+      evaluation.evaluate({ cacheKey: null, tera: effectiveTera, sleepClause: effectiveSleepClause, ruleset: effectiveRuleset, acquire: acquire.acquireBranchPosition, tag: runAtTip?.key ?? evalViewKey, onResult });
     } else if (viewingVariation && serializedAtView) {
       // A recorded variation position: acquisition is instant — the search
       // itself still runs at the configured settings.
@@ -125,22 +131,23 @@ function useEvaluateAction(inputs: EvalViewInputs, format: EvalFormat) {
         keepPlayed: keptPlayed(playedOn(snapshots, viewTurn, evalIsDoubles, logRules(replayData.log))),
       });
     }
-  }, [replayData, snapshots, evalIsDoubles, liveTip, viewingVariation, serializedAtView, evaluation, effectiveTera, effectiveSleepClause, effectiveRuleset, acquire.acquireBranchPosition, acquire.acquireReplayPosition, viewTurn, setsFingerprint, evalViewKey]);
+  }, [replayData, snapshots, evalIsDoubles, liveTip, runAtTip, viewingVariation, serializedAtView, evaluation, effectiveTera, effectiveSleepClause, effectiveRuleset, acquire.acquireBranchPosition, acquire.acquireReplayPosition, viewTurn, setsFingerprint, evalViewKey]);
 
   // Every eval finishing while the pointer sits on the variation feeds the
   // graph overlay — auto-evals after executed turns included. The tag guard
   // keeps a run that finished after a navigation from landing in the wrong
   // turn's slot (the score belongs to the position it was STARTED at).
+  const scored = runAtTip ?? { key: evalViewKey, turn: viewTurn, variation: viewingVariation };
   useEffect(() => {
-    if (evaluation.status !== 'done' || !evaluation.result || !viewingVariation) return;
-    if (evaluation.resultTag !== null && evaluation.resultTag !== evalViewKey) return;
+    if (evaluation.status !== 'done' || !evaluation.result || !scored.variation) return;
+    if (evaluation.resultTag !== null && evaluation.resultTag !== scored.key) return;
     const score = evaluation.result.score;
     setVariationScores(previous => {
       const next = [...previous];
-      next[viewTurn - 1] = score;
+      next[scored.turn - 1] = score;
       return next;
     });
-  }, [evaluation.status, evaluation.result, evaluation.resultTag, evalViewKey, viewingVariation, viewTurn, setVariationScores]);
+  }, [evaluation.status, evaluation.result, evaluation.resultTag, scored.key, scored.turn, scored.variation, setVariationScores]);
 
   return handleEvaluate;
 }
@@ -230,7 +237,7 @@ function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
 
 /** Invalidations and the auto re-evaluations of live positions. */
 function useEvalHousekeeping(inputs: EvalViewInputs, format: EvalFormat, handleEvaluate: () => void) {
-  const { evaluation, historyLength, editedP1Info, editedP2Info, replayData, branching, liveEvalView, liveEvalStatus, executing, branchPreparing, playOutActive } = inputs;
+  const { evaluation, historyLength, editedP1Info, editedP2Info, replayData, branching, liveEvalView, liveEvalStatus, tip, tipEvalStatus, executing, branchPreparing, playOutActive } = inputs;
   // A change of the position itself (a turn executed, a set edited) invalidates a displayed result. Moving the
   // pointer does not (round 77, C6): the result's position tag decides whether it fits the screen, so the result
   // is current again when the pointer returns to the position it was computed for.
@@ -254,10 +261,14 @@ function useEvalHousekeeping(inputs: EvalViewInputs, format: EvalFormat, handleE
   // reconstruction — the "diverged before turn 68" error on a 67-turn game.
   useEffect(() => {
     // Round 77 (C1): not while the game sweep runs; a single evaluation would stop it. The effect fires again when it ends.
-    if (branching && evaluation.prefs.auto && liveEvalView && liveEvalStatus === 'stale' && !executing && !evaluation.graph.running) {
+    // Round 89 (#112): a run keeps the live tip fresh, whichever turn the pointer shows.
+    const atTip = playOutActive && tip !== null;
+    const view = atTip || liveEvalView;
+    const status = atTip ? tipEvalStatus : liveEvalStatus;
+    if (branching && evaluation.prefs.auto && view && status === 'stale' && !executing && !evaluation.graph.running) {
       handleEvaluate();
     }
-  }, [branching, evaluation.prefs.auto, liveEvalView, liveEvalStatus, executing, evaluation.graph.running, handleEvaluate]);
+  }, [branching, evaluation.prefs.auto, liveEvalView, liveEvalStatus, tipEvalStatus, playOutActive, tip, executing, evaluation.graph.running, handleEvaluate]);
   // "Always on" also covers the live sim: a freshly opened variation (or a
   // navigation back to its tip) evaluates without the Evaluate button. Never
   // while the game sweep runs — a single evaluation supersedes the run id

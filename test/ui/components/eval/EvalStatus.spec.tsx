@@ -47,4 +47,15 @@ describe('EvalStatus', () => {
     render(<EvalStatus {...base} status="searching" playOutProgress={{ startTurn: 0, turns: 0, atTurn: 1 }} />);
     expect(screen.getByRole('status')).toHaveTextContent('Engine is playing both sides from turn 0. 0 turns played, now at turn 1.');
   });
+
+  // Round 89 (#119): after Stop the status line says the engine finishes the turn in flight, as the bar does.
+  test('a stopping run says the engine finishes the turn in flight', () => {
+    const { rerender } = render(<EvalStatus {...base} status="searching" playOutProgress={{ startTurn: 5, turns: 3, atTurn: 8, stopping: true }} />);
+    const line = screen.getByRole('status');
+    expect(line).toHaveTextContent('Stopping: the engine finishes the turn in flight, then the play-out ends. 3 turns played, now at turn 8.');
+    expect(line).not.toHaveTextContent(/Engine is playing both sides/);
+    expect(line).not.toHaveTextContent(/The gold line below grows/);
+    rerender(<EvalStatus {...base} status="searching" playOutProgress={{ startTurn: 5, turns: 1, atTurn: null, stopping: false }} />);
+    expect(screen.getByRole('status')).toHaveTextContent('Engine is playing both sides from turn 5.');
+  });
 });
