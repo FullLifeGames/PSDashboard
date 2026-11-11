@@ -161,6 +161,32 @@ describe.each([RULES[8], CHAMPIONS])('what the facts keep, $name', rules => {
 });
 
 /**
+ * Round 89 (A6-2): a finished battle has no later turn, so nothing reads what it holds beyond the winner. A game that ends in the middle of a
+ * turn leaves the rest of the turn's actions in the queue (their nominal targets differ between draws), and the battle's last move is the
+ * move of whichever action ran last; the prover returns at `battle.ended` before it reads either (`prove`).
+ */
+describe.each([RULES[8], CHAMPIONS])('a finished battle, $name', rules => {
+  const finished = (winner: 'p1' | 'p2'): Battle => {
+    const board = battleOf(rules.singles, [mon(rules, { species: 'Pikachu', moves: winner === 'p1' ? ['quickattack'] : ['tackle'] })], [mon(rules, { species: 'Pikachu', moves: winner === 'p1' ? ['tackle'] : ['quickattack'] })]);
+    board.sides[winner === 'p1' ? 1 : 0].active[0].hp = 1;
+    playClicks(board, { p1: 'move 1', p2: 'move 1' });
+    return board;
+  };
+
+  test('the winner is a fact, the rest of the turn is not', () => {
+    const a = finished('p1');
+    const b = finished('p1');
+    expect(a.ended && b.ended).toBe(true);
+    // the queue holds the actions the game did not reach: a draw with other nominal targets leaves other leftovers
+    expect(a.queue.list.length, 'the finished turn left its queue').toBeGreaterThan(0);
+    b.queue.clear();
+    b.lastMove = null;
+    expect(boardFacts(b)).toBe(boardFacts(a));
+    expect(boardFacts(finished('p2'))).not.toBe(boardFacts(a));
+  });
+});
+
+/**
  * The source scan. A dropped key is safe only when no handler reads what a turn wrote in a later turn. The simulator ends every turn
  * with the resets (`Battle.endTurn`: `lastSuccessfulMoveThisTurn`, `moveThisTurn`, `statsRaisedThisTurn`, `statsLoweredThisTurn`), and
  * every read pinned here sits in a handler that runs while the turn runs: Burning Jealousy and Alluring Voice (stages raised this

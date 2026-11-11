@@ -1,6 +1,6 @@
 import type { Battle } from '@pkmn/sim';
 import { ForcedDicePRNG, RecordingPRNG } from './prng.ts';
-import { dieKey, type Answer, type DieKind, type DieName, type Draw, type NaturalRecord } from './types.ts';
+import { dieKey, type Answer, type DieKind, type DieName, type Draw, type ForcedDie, type NaturalRecord } from './types.ts';
 import { watchBattle } from './watch.ts';
 
 /**
@@ -18,6 +18,32 @@ import { watchBattle } from './watch.ts';
 export interface FlipTurn {
   fork(): Battle;
   play(battle: Battle): void;
+  /**
+   * Round 89 (A6-2): the speed ties the turn is held to, by pair (the forcing PRNG's tie die: `{ first }` puts one slot ahead of the other
+   * wherever both stand in a shuffle). The recording and every flip play that order; the endgame children's tie path plays each order apart.
+   */
+  ties?: readonly ForcedDie[];
+}
+
+/**
+ * The recorder of a turn that is held to a speed tie: the forcing PRNG with an empty record (every die answers the stream's own number),
+ * writing down what the recording PRNG writes down. The stream is called first on every draw, so the numbers are the natural turn's.
+ */
+class HeldRecordingPRNG extends ForcedDicePRNG {
+  readonly names = new Map<string, DieName>();
+  readonly shapes = new Map<string, Draw>();
+  readonly answers = new Map<string, Answer[]>();
+
+  protected override decide(name: DieName, draw: Draw, natural: number): number {
+    const key = dieKey(name);
+    this.names.set(key, name);
+    if (!this.shapes.has(key)) this.shapes.set(key, { ...draw });
+    const answer: Answer = { from: draw.from, to: draw.to, value: natural };
+    const list = this.answers.get(key);
+    if (list) list.push(answer);
+    else this.answers.set(key, [answer]);
+    return super.decide(name, draw, natural);
+  }
 }
 
 /**
@@ -48,6 +74,8 @@ export interface RecordedTurn {
   /** Every chance die the turn drew, in order of first draw, without the roll facts. */
   dice: FlipDie[];
   record: NaturalRecord;
+  /** The slots of every shuffle of the natural turn that held two or more move actions (a speed tie), in order; empty for a turn held to its ties. */
+  ties: string[][];
 }
 
 export interface FlippedTurn {
@@ -80,7 +108,8 @@ export function recordTurn(turn: FlipTurn): RecordedTurn {
   const logStart = battle.log.length;
   const inner = battle.prng;
   const watch = watchBattle(battle);
-  const recording = new RecordingPRNG(inner, watch);
+  const held = turn.ties && turn.ties.length > 0;
+  const recording = held ? new HeldRecordingPRNG({ inner, watch, forced: turn.ties!, record: new Map() }) : new RecordingPRNG(inner, watch);
   battle.prng = recording;
   try {
     turn.play(battle);
@@ -89,11 +118,13 @@ export function recordTurn(turn: FlipTurn): RecordedTurn {
     battle.prng = inner;
   }
   const dice: FlipDie[] = [];
-  for (const [key, name] of recording.names) {
-    const die = ROLL_FACT_KINDS.has(name.kind) ? null : chanceDie(key, name, recording.shapes.get(key), recording.record.get(key)?.[0]);
+  const record = recording instanceof HeldRecordingPRNG ? recording.answers : recording.record;
+  const { names, shapes } = recording;
+  for (const [key, name] of names) {
+    const die = ROLL_FACT_KINDS.has(name.kind) ? null : chanceDie(key, name, shapes.get(key), record.get(key)?.[0]);
     if (die) dice.push(die);
   }
-  return { battle, logStart, dice, record: recording.record };
+  return { battle, logStart, dice, record, ties: recording instanceof HeldRecordingPRNG ? [] : recording.ties };
 }
 
 /**
@@ -109,7 +140,7 @@ export function flipTurn(turn: FlipTurn, recorded: RecordedTurn, die: FlipDie): 
   const watch = watchBattle(battle);
   const forcing = new ForcedDicePRNG({
     inner, watch, record: recorded.record,
-    forced: [{ name: die.name, result: { happens: !die.drew } }],
+    forced: [{ name: die.name, result: { happens: !die.drew } }, ...(turn.ties ?? [])],
     // raw answers: "happens" is the draw's own true, for a status check too (its polarity is a question for the handler, not for us)
     actsOnTrue: new Map([[die.key, true]]),
   });

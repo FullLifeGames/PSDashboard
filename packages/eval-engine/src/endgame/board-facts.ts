@@ -77,6 +77,8 @@ export function stageReading(battle: Battle): StageReading {
 
 /** The board facts of a position as one string: two draws with equal facts are the same board for everything the next turns read. */
 export function boardFacts(battle: Battle): string {
+  // Round 89 (A6-2): a finished battle has no later turn; the actions the game did not reach stay in the queue, and the prover reads only the winner (`prove`)
+  if (battle.ended) return `ended|${battle.winner}`;
   const serialized = state(battle);
   for (const field of BOOKKEEPING_FIELDS) delete serialized[field];
   const keepFlags = battle.turn <= 1;

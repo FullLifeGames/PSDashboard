@@ -122,7 +122,8 @@ export function dominates(drawnKey: string, missingKey: string, events: CellEven
 /** Won by the side: battle.winner is the player's name ('' on a tie). */
 const wonBy = (battle: Battle, side: Side): boolean => battle.ended && battle.winner === battle.sides[sideIndex(side)].name;
 
-class ForcedWinProver {
+/** Round 89 (A6-2): the specs ask one root candidate by itself (`expand(root, 0, [own])`), the way a repeated-Protect scene reads its proving move. */
+export class ForcedWinProver {
   private readonly memo = new Map<string, Memo>();
   /** Cells drawn once per (position, pair): a position the proof reaches twice draws its cell once. */
   private readonly cellCache = new Map<string, EndgameChildren>();
