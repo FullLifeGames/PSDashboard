@@ -15,6 +15,7 @@ import { watchFieldEvidence } from './inference/field-evidence.ts';
 import { watchTriggerEvidence } from './inference/trigger-evidence.ts';
 import { attachHits, collectHits } from './inference/hits.ts';
 import { syncClientFacts } from './inference/client-facts.ts';
+import { watchBlockedEffects } from './inference/blocked-effects.ts';
 import { rocksMayMiss } from './inference/rocks-tell.ts';
 import { arg, fromEffect, identOf, readLine, type LogLine } from './inference/log-line.ts';
 import { toId } from './ids.ts';
@@ -191,6 +192,7 @@ export function inferOpponentTeam(rawLog: string, opponentSide: 'p1' | 'p2' = 'p
     watchTriggerEvidence(state, line);
     collectHits(state, line);
     syncClientFacts(state, line);
+    watchBlockedEffects(state, line);
   }
   attachHits(state);
 
