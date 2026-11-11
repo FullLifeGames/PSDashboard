@@ -46,6 +46,8 @@ function play(board: Battle, clicks: Clicks): Played {
   const flips = recorded.dice.map(die => ({ die, flipped: flipTurn(turn, recorded, die) }));
   const called = chancesCalled(board, clicks);
   expect(liveState(board), 'the live board').toBe(before);
+  // Round 89 (A6-3a): a die the turn drew more than once is listed apart and never flipped
+  for (const die of recorded.repeated) expect(recorded.dice.some(entry => entry.key === die.key), `${die.key} is listed once`).toBe(false);
   for (const { die, flipped } of flips) {
     expect(flipped.took, `${die.key} took`).toBe(true);
     expect(die.held + die.other).toBeCloseTo(1, 12);
@@ -58,7 +60,16 @@ function play(board: Battle, clicks: Clicks): Played {
 }
 
 const lines = (battle: Battle, start: number, pattern: RegExp): boolean => battle.log.slice(start).some(line => pattern.test(line));
+const slotOf = (ident: string | undefined): string | undefined => ident?.split(':')[0].trim();
+/** Whether the target's turn ends on a `|cant|` line of its own that is no flinch (frozen, asleep, fully paralyzed): a flinch behind it shows no line. */
+const stoppedByOther = (battle: Battle, start: number, slot: string): boolean =>
+  battle.log.slice(start).some(line => line.startsWith('|cant|') && slotOf(line.split('|')[2]) === slot && line.split('|')[3] !== 'flinch');
+/** Whether the target fell in the turn: a secondary behind the knockout shows no line (the simulator still rolls it in some generations). */
+const fainted = (battle: Battle, start: number, slot: string): boolean =>
+  battle.log.slice(start).some(line => line.startsWith('|faint|') && slotOf(line.split('|')[2]) === slot);
 const failedBy = (battle: Battle, start: number, slot: string): boolean => battle.log.slice(start).some(line => line.startsWith('|-fail|') && line.split('|')[2].startsWith(slot));
+
+const hitsOf = (battle: Battle, start: number): number => Math.max(0, ...battle.log.slice(start).filter(line => line.startsWith('|-hitcount|')).map(line => Number(line.split('|')[3])));
 
 const tallies = new Map<string, { cases: number; flips: number; yes: number; no: number }>();
 function tally(name: string, drew?: boolean): void {
@@ -187,6 +198,11 @@ describe.each(SWEEP_CASES)('the secondaries: $name', ({ rules, mode, name }) => 
       }
       if (!clicksAccepted(board, clicks)) return;
       const { recorded, flips } = play(board, clicks);
+      // a secondary rolled on every hit (Gens 3 and up, a move of two hits or more) is one name drawn twice: no price, no flip (the plain path calls the group unpriced)
+      for (const die of recorded.repeated.filter(entry => entry.name.kind === 'secondary')) {
+        expect(hitsOf(recorded.battle, recorded.logStart), `${name} ${move.id} ${seed} ${die.key} drawn once per hit`).toBeGreaterThanOrEqual(2);
+        tally(`repeated secondary ${name}`);
+      }
       for (const { die, flipped } of flips.filter(entry => entry.die.name.kind === 'secondary')) {
         const entry = entries.find(candidate => secondaryEffectId(candidate) === die.name.effectId);
         expect(entry, `${name} ${move.id} ${die.name.effectId} is an entry of the Dex`).toBeDefined();
@@ -196,7 +212,10 @@ describe.each(SWEEP_CASES)('the secondaries: $name', ({ rules, mode, name }) => 
         // an entry the protocol shows by a standard line: the draw's true is the effect
         const opaque = secondaryEffectId(entry!) === 'effect' || (!!entry!.volatileStatus && secondaryEffectId(entry!) !== 'flinch') || !!entry!.self;
         const target = die.name.targetSlot ?? 'p2a';
-        if (!opaque && missesOf(recorded.battle, recorded.logStart, target) === 0 && missesOf(flipped.battle, flipped.logStart, target) === 0) {
+        // the witness of a flinch is the target's `cant` line, which another status of the same move (Ice Fang's freeze) replaces; a knocked out target shows no effect at all
+        const hidden = [recorded, flipped].some(turn => fainted(turn.battle, turn.logStart, target)
+          || (secondaryEffectId(entry!) === 'flinch' && stoppedByOther(turn.battle, turn.logStart, target)));
+        if (!opaque && !hidden && missesOf(recorded.battle, recorded.logStart, target) === 0 && missesOf(flipped.battle, flipped.logStart, target) === 0) {
           expect(effectShown(recorded.battle, recorded.logStart, entry!, target, 'p1a'), `${name} ${move.id} ${seed} recorded effect`).toBe(die.drew);
           expect(effectShown(flipped.battle, flipped.logStart, entry!, target, 'p1a'), `${name} ${move.id} ${seed} flipped effect`).toBe(!die.drew);
         }

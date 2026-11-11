@@ -71,8 +71,14 @@ export interface RecordedTurn {
   battle: Battle;
   /** `battle.log.length` before the turn: the lines from here are the turn's. */
   logStart: number;
-  /** Every chance die the turn drew, in order of first draw, without the roll facts. */
+  /** Every chance die the turn drew once, in order of first draw, without the roll facts. */
   dice: FlipDie[];
+  /**
+   * Round 89 (A6-3a, ruling 27.2, #145): the chance dice the turn drew more than once under one name (a contact proc rolled on each hit
+   * of a two-hit move, a secondary rolled on each hit), priced by their first draw. The flip forces every draw of a name, so no single
+   * chance prices them: they are not in `dice`, and the caller treats a turn that holds one as unpriced.
+   */
+  repeated: FlipDie[];
   record: NaturalRecord;
   /** The slots of every shuffle of the natural turn that held two or more move actions (a speed tie), in order; empty for a turn held to its ties. */
   ties: string[][];
@@ -118,13 +124,14 @@ export function recordTurn(turn: FlipTurn): RecordedTurn {
     battle.prng = inner;
   }
   const dice: FlipDie[] = [];
+  const repeated: FlipDie[] = [];
   const record = recording instanceof HeldRecordingPRNG ? recording.answers : recording.record;
   const { names, shapes } = recording;
   for (const [key, name] of names) {
     const die = ROLL_FACT_KINDS.has(name.kind) ? null : chanceDie(key, name, shapes.get(key), record.get(key)?.[0]);
-    if (die) dice.push(die);
+    if (die) (record.get(key)!.length > 1 ? repeated : dice).push(die);
   }
-  return { battle, logStart, dice, record, ties: recording instanceof HeldRecordingPRNG ? [] : recording.ties };
+  return { battle, logStart, dice, repeated, record, ties: recording instanceof HeldRecordingPRNG ? [] : recording.ties };
 }
 
 /**

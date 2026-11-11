@@ -113,7 +113,8 @@ interface PricedGroup { children: { position: SimPosition; share: number; ended:
  * the chances it drew. Two dice turned together are not played: their share leaves the mass, as a missing class does on the class
  * path. A flip that changes nothing is dropped. Every draw of the group must land on the facts of one child: a draw that lands on
  * none (a damage roll that decides a Berry, Moody's pick, a sleep's length, a random target) leaves a die no child prices, and the
- * group is unpriced, as a split of the faints is.
+ * group is unpriced, as a split of the faints is. Round 89 (A6-3a): so is a group whose turn drew one die more than once (a contact
+ * proc on each hit of a two-hit move, a secondary on each hit): the recorder lists it under `repeated`, and no single chance prices it.
  */
 function pricedGroup(turn: FlipTurn, draws: Draw[], spread: boolean): PricedGroup {
   const recorded = recordTurn(turn);
@@ -127,7 +128,8 @@ function pricedGroup(turn: FlipTurn, draws: Draw[], spread: boolean): PricedGrou
   for (const { die, battle } of deciding) children.push({ position: toPosition(battle), share: (held / die.held) * die.other, ended: battle.ended });
   const facts = new Set([base, ...deciding.map(entry => boardFacts(entry.battle))]);
   const unexplained = draws.some(draw => !facts.has(boardFacts(positionBattle(draw.position))));
-  return { children, unpriced: unexplained, spread: spread || deciding.length > 0 };
+  // Round 89 (A6-3a, ruling 27.2): a die the turn drew more than once has no single price (the flip turns every draw of it), so no proof runs through the group
+  return { children, unpriced: unexplained || recorded.repeated.length > 0, spread: spread || deciding.length > 0 };
 }
 
 /** The pairs a speed tie holds to one side going first: every cross pair of the slots a natural turn tied. */
