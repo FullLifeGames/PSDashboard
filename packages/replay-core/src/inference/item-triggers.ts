@@ -5,6 +5,7 @@ import { possibleAbilities, ruleOutUnknown } from './item-evidence.ts';
 import { arg, hasKw, identOf, keyOf, namesEffect, type LogLine } from './log-line.ts';
 import { toId } from '../ids.ts';
 import { teamSizes } from '../replay-format.ts';
+import { spentToMax } from './pp-trigger.ts';
 
 /**
  * Four more items the protocol rules out by a trigger it shows without the
@@ -18,6 +19,8 @@ import { teamSizes } from '../replay-format.ts';
  *    Pokémon (onAfterMoveSecondary) while a teammate can come in;
  *  - Red Card sends the hit's attacker away (onAfterMoveSecondary) while the
  *    attacker's side can switch.
+ * Round 89 (#132) adds a fifth rule, in the same shape: a slot of an opponent Pokémon spent to its maximum PP and no berry line
+ * (Leppa Berry, Mystery Berry in Generation 2 eat at 0 PP), with the PP read in pp-trigger.ts.
  * Each condition is read by running the item's own handler on a stand-in
  * holder: the half-HP line, the status and confusion test, the switch and
  * the Commander guards are the simulator's, not typed here. The gates are the
@@ -31,7 +34,7 @@ import { teamSizes } from '../replay-format.ts';
  */
 
 type ItemHandler = (this: never, ...args: never[]) => unknown;
-type Rule = 'lumberry' | 'sitrusberry' | 'ejectbutton' | 'redcard';
+type Rule = 'lumberry' | 'sitrusberry' | 'ejectbutton' | 'redcard' | 'pp';
 
 /** What opens a rule: a status, a confusion, a shown HP, or a damaging hit by another Pokémon. */
 interface Trigger {
@@ -42,6 +45,8 @@ interface Trigger {
   hit?: { attacker: string; attackerIdent: string; move: string };
   /** What the status or confusion stand-in carries (Lum Berry). */
   kind?: 'status' | 'confusion';
+  /** The move the holder used (the PP rule). */
+  move?: string;
 }
 
 export interface ItemTriggerWatch {
@@ -125,6 +130,35 @@ function eats(handler: ItemHandler | undefined, holder: object): boolean {
     return false;
   }
   return ate;
+}
+
+/** A stand-in holder with HP and one slot at this PP: what an item's `onUpdate` reads of a Pokémon (Leppa Berry: any slot at 0 PP; Mystery Berry: the last move's slot). */
+function holderWithSlot(pp: number) {
+  const slot = { id: 'standin', move: 'Stand-in', pp, maxpp: 10 };
+  const volatiles: Record<string, object> = {};
+  return {
+    hp: 100, maxhp: 100, status: '', volatiles, moveSlots: [slot], lastMove: { id: slot.id }, hasAbility: () => false,
+    getMoveData: (id: string) => (id === slot.id ? slot : undefined), addVolatile: (id: string) => { volatiles[id] = {}; return true; },
+  };
+}
+
+const eatersByDex = new WeakMap<RulesDex, ReadonlySet<string>>();
+
+/**
+ * Round 89 (#132): the items of the Dex's generation that eat when a slot of the holder is at 0 PP (Leppa Berry; Mystery Berry in
+ * Generation 2): each item's `onUpdate` eats on the stand-in with its slot at 0 PP and not with it full, so Sitrus Berry at the
+ * stand-in's full HP does not count. pp-trigger-sweep.spec.ts holds the set to the simulator for every item of every generation and mod.
+ */
+export function ppEaters(dex: RulesDex): ReadonlySet<string> {
+  let found = eatersByDex.get(dex);
+  if (!found) {
+    found = new Set(dex.items.all().filter(item => {
+      const handler = (item as unknown as { onUpdate?: ItemHandler }).onUpdate;
+      return item.exists && item.gen <= dex.gen && eats(handler, holderWithSlot(0)) && !eats(handler, holderWithSlot(10));
+    }).map(item => item.id));
+    eatersByDex.set(dex, found);
+  }
+  return found;
 }
 
 /** Whether the item id is the Sitrus Berry, the berry sitrusEatsAt judges (round 73, T214: the rebuild asks it for the build's item). */
@@ -242,6 +276,12 @@ function wouldShow(state: InferrerState, watch: ItemTriggerWatch, gates: Trigger
   return !watch.fainted.has(attacker) && !sheerForced(state, trigger) && sends(state, watch, gates, trigger);
 }
 
+/** Round 89 (#132): the items that eat at 0 PP, when the log shows the move's last PP spent and no line of a berry came (pp-trigger.ts). */
+function ppItemsOut(state: InferrerState, watch: ItemTriggerWatch, trigger: Trigger): readonly string[] {
+  if (foeStopsBerry(state, watch, trigger.holder) || !spentToMax(state, trigger.ident, trigger.move ?? '')) return [];
+  return [...ppEaters(dexOf(state))];
+}
+
 /** The window's close: a trigger whose item would have fired and whose holder is still on the field rules the item out. */
 function judge(state: InferrerState, watch: ItemTriggerWatch, gates: TriggerGates) {
   const pending = watch.pending;
@@ -251,7 +291,8 @@ function judge(state: InferrerState, watch: ItemTriggerWatch, gates: TriggerGate
   const active = activeKeys(watch);
   for (const trigger of pending) {
     if (!active.has(trigger.holder) || (doubt && trigger.hit) || ignoresItem(state, gates, trigger)) continue;
-    if (wouldShow(state, watch, gates, trigger)) ruleOutUnknown(state, trigger.holder, trigger.rule);
+    if (trigger.rule === 'pp') for (const item of ppItemsOut(state, watch, trigger)) ruleOutUnknown(state, trigger.holder, item);
+    else if (wouldShow(state, watch, gates, trigger)) ruleOutUnknown(state, trigger.holder, trigger.rule);
   }
 }
 
@@ -297,6 +338,8 @@ function onOpponentLine(state: InferrerState, watch: ItemTriggerWatch, line: Log
     noteHp(state, watch, arg(line, 1), key, arg(line, 2));
     if (tag === '-damage') onHit(state, watch, line, key);
   } else if (tag === '-enditem') watch.pending = watch.pending.filter(trigger => trigger.holder !== key);
+  // A move of the holder's own (a move another move called spends no PP of its own): the window judges its slot at the next boundary.
+  else if (tag === 'move' && !hasKw(line, 'from')) open(watch, { rule: 'pp', holder: key, ident: arg(line, 1), move: arg(line, 2) });
 }
 
 /** Heal Block on a Pokémon, and an item that sent a Pokémon out in this window (it spent the switch the others would need). */

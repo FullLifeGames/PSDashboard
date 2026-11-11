@@ -48,7 +48,7 @@ const OWN_ITEM_EFFECTS = new Set(['', 'disturbed', 'frisked']);
 export const ATTACKER_PUNISH_ITEMS = new Set(['rockyhelmet', 'jabocaberry', 'rowapberry']);
 
 /** The client's Pokémon behind an ident, as the client stands now; null when it has none. */
-function clientPokemon(state: InferrerState, ident: string): ClientPokemon | null {
+export function clientPokemon(state: InferrerState, ident: string): ClientPokemon | null {
   try {
     return state.hitWalk?.battle.getPokemon(ident as ClientIdent) ?? null;
   } catch {
