@@ -47,8 +47,23 @@ function reverseBench(serialized: string): string {
   return JSON.stringify(State.serializeBattle(battle));
 }
 
-const tree = (serialized: string, position: Position): Promise<EvalResult> =>
-  searchTreesOrchestrated(createLocalTreeExecutor(serialized, position.ruleset), settingsOf(position, 'mcts'));
+/**
+ * Each tree's result per board, kept for the whole file: the rows below ask for
+ * the same boards (the singles g2 board, the VGC board with its bench reversed)
+ * and the search is the cost. A row run alone computes what it needs and
+ * caches it. The key holds the board and the settings it was asked with.
+ */
+const treeResults = new Map<string, Promise<EvalResult>>();
+const tree = (serialized: string, position: Position): Promise<EvalResult> => {
+  const settings = settingsOf(position, 'mcts');
+  const key = `${JSON.stringify(settings)}\u0000${serialized}`;
+  let result = treeResults.get(key);
+  if (!result) {
+    result = searchTreesOrchestrated(createLocalTreeExecutor(serialized, position.ruleset), settings);
+    treeResults.set(key, result);
+  }
+  return result;
+};
 const matrix = (serialized: string, position: Position): Promise<EvalResult> =>
   Promise.resolve(searchPosition(serialized, settingsOf(position, 'matrix')));
 
@@ -121,9 +136,10 @@ describe('one board in two bench orders (round 67, T129)', () => {
     expect(ranking(await matrix(reverseBench(position.serialized), position))).toEqual(ranking(await matrix(position.serialized, position)));
   });
 
-  test('2629703929 t6 (VGC tree): the board and its reversed bench read the same ranking', { timeout: 120_000 }, async () => {
+  test('2629703929 t6 (VGC tree): the board and its reversed bench read the same ranking', { timeout: 300_000 }, async () => {
     const position = fixture('gen9vgc2026regi-2629703929-t6');
     expect(ranking(await tree(reverseBench(position.serialized), position))).toEqual(ranking(await tree(position.serialized, position)));
+    // Two VGC trees took 122 to 144 s with the speed layer forced off on devbox, 70 s with it on (round 89, the merge's slow-mode timeouts).
   });
 
   test('every switch a ranking names brings in the species of its label on the board it was asked about', { timeout: 120_000 }, async () => {
