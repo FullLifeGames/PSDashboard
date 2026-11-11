@@ -3,7 +3,7 @@ import { revealedField, unknownEvs, unknownField } from '../team-info.ts';
 import { canHaveDancer, findPokemon, ruleOut, type InferrerState } from './inferrer-state.ts';
 import { revealMarkerForme, teamSpecies, unknownFormeMarkerFor } from './lookup.ts';
 import { abilityHolderIdent } from './ability-holder.ts';
-import { ATTACKER_PUNISH_ITEMS, ownMove } from './client-facts.ts';
+import { ATTACKER_PUNISH_ITEMS, bookingIdent, ownMove } from './client-facts.ts';
 import { arg, detailsOf, fromEffect, hasKw, identOf, kwText, ofIdent, type LogLine } from './log-line.ts';
 import { bookPowerMove, readPowerMove } from './power-moves.ts';
 import { toId } from '../ids.ts';
@@ -202,8 +202,11 @@ function blockedMoveLine(line: LogLine): LogLine | null {
 /** Move: |move|p2a: Nickname|Move Name|target, or the move of a |cant| line; the client's rule decides which move the line books (T108 step 2). */
 export function recordMove(state: InferrerState, line: LogLine) {
   const moveLine = line.cmd === 'cant' ? blockedMoveLine(line) : line;
-  const nickname = moveLine?.cmd === 'move' ? sideSubject(moveLine, state.opponentSide) : null;
-  if (!moveLine || nickname === null) return;
+  if (!moveLine || moveLine.cmd !== 'move') return;
+  // Round 89 (#139): a copy's move books to the body it copied, whichever side the copy stands on.
+  const booked = identOf(bookingIdent(state, arg(moveLine, 1)));
+  if (booked?.side !== state.opponentSide) return;
+  const nickname = booked.name;
   const moveName = ownMove(state, moveLine);
   if (!moveName) return;
 

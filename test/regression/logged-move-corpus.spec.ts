@@ -21,7 +21,7 @@ import games from './fixtures/logged-move-corpus-ids.json';
  * counted apart in the titles (singles, Doubles OU, VGC SV, Champions OU, Champions VGC).
  *
  * Gaps with an owner (the issues that fix them) stand in `OWNED`: each owner has one expected-fail row that passes while its gaps
- * exist and turns red once the fix leaves none, the moment to delete the row. Round 89 gaps: #139 (a transformed body's moves book
+ * exist and turns red once the fix leaves none, the moment to delete the row. Round 89 gaps: #139 (fixed in round 89: a transformed body's moves booked
  * nowhere), #140 (fixed in round 89: a Pledge combination booked the partner's Pledge, a wrong move and a slot a fifth move then lacked), #141 (a Zoroark's
  * moves book on the body it disguises as), and one finding without an issue (a gen 2 log whose four species share the nickname "???"). Any other gap is a red row and a finding.
  */
@@ -172,7 +172,8 @@ const gapsOf = (owner: string) => found.filter(row => row.gap.owner === owner).m
 describe.skipIf(!hasCorpus)('the gaps with an owner (expected failures until the owner is fixed)', () => {
   // Round 89 (#140) fixed its gaps: its games are a plain row now (a Pledge combination books the shown move, with no extra slot).
   test('#140: no gap is left of a Pledge combination that books the partner\'s Pledge', () => expect(gapsOf('#140')).toEqual([]));
-  test.fails('#139: a transformed body\'s moves book to the body it copied', () => expect(gapsOf('#139')).toEqual([]));
+  // Round 89 (#139) fixed its gaps: a copy's move line books to the body it copied (the inference follows the client's Transform volatile).
+  test('#139: no gap is left of a transformed body\'s move that books to the body it copied', () => expect(gapsOf('#139')).toEqual([]));
   test.fails('finding, no issue yet: bodies that share a nickname (smogtours-gen2ou-349774, "???" for four species) book to one body', () => expect(gapsOf('shared-nickname')).toEqual([]));
   test.fails('#141: a Zoroark\'s moves book on the Zoroark (milestone 1.3.0)', () => expect(gapsOf('#141')).toEqual([]));
   test('the sweep counted its games and moves', () => {
