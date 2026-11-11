@@ -33,6 +33,11 @@ interface EndgameChild {
   ended: boolean;
   /** Group key `${order}:${classKey}` on the class path; absent on the plain path. */
   key?: string;
+  /**
+   * Round 89 (A6-3b): the plain path's child of a chance die turned the other way for its price (`pricedGroup`), not the turn the draws
+   * showed. The prover's lazy pass leaves it aside, so the pass is a lower bound of the full proof; absent on the class path.
+   */
+  turned?: true;
 }
 export interface EndgameChildren {
   children: EndgameChild[];
@@ -102,7 +107,7 @@ function cellTurn(root: SimPosition, p1Choice: string, p2Choice: string, seed: P
 }
 
 /** What one group of plain draws prices as: children with the simulator's own chances, or nothing (unpriced). */
-interface PricedGroup { children: { position: SimPosition; share: number; ended: boolean }[]; unpriced: boolean; spread: boolean }
+interface PricedGroup { children: { position: SimPosition; share: number; ended: boolean; turned?: true }[]; unpriced: boolean; spread: boolean }
 
 /**
  * Round 89 (A6-2, ruling 24, #145): a plain group counts as certain only for the dice it cannot price, the roll facts (the damage roll,
@@ -124,8 +129,8 @@ function pricedGroup(turn: FlipTurn, draws: Draw[], spread: boolean): PricedGrou
     return flipped.took && boardFacts(flipped.battle) !== base ? [{ die, battle: flipped.battle }] : [];
   });
   const held = deciding.reduce((product, entry) => product * entry.die.held, 1);
-  const children = [{ position: toPosition(recorded.battle), share: held, ended: recorded.battle.ended }];
-  for (const { die, battle } of deciding) children.push({ position: toPosition(battle), share: (held / die.held) * die.other, ended: battle.ended });
+  const children: PricedGroup['children'] = [{ position: toPosition(recorded.battle), share: held, ended: recorded.battle.ended }];
+  for (const { die, battle } of deciding) children.push({ position: toPosition(battle), share: (held / die.held) * die.other, ended: battle.ended, turned: true });
   const facts = new Set([base, ...deciding.map(entry => boardFacts(entry.battle))]);
   const unexplained = draws.some(draw => !facts.has(boardFacts(positionBattle(draw.position))));
   // Round 89 (A6-3a, ruling 27.2): a die the turn drew more than once has no single price (the flip turns every draw of it), so no proof runs through the group
@@ -164,7 +169,7 @@ function plainChildren(root: SimPosition, battle: Battle, rootHp: number, p1Choi
     });
     const children = orders.flatMap(order => {
       const total = order.children.reduce((sum, child) => sum + child.share, 0);
-      return order.children.map(child => ({ position: child.position, weight: (0.5 * child.share) / total, share: 0.5 * child.share, ended: child.ended }));
+      return order.children.map(child => ({ position: child.position, weight: (0.5 * child.share) / total, share: 0.5 * child.share, ended: child.ended, ...(child.turned ? { turned: true as const } : {}) }));
     });
     return { children, unpriced: orders.some(order => order.unpriced), plain: true, spread: orders.some(order => order.spread), missing: [], events: [] };
   }
@@ -173,7 +178,7 @@ function plainChildren(root: SimPosition, battle: Battle, rootHp: number, p1Choi
   if (unpriced) return { children: [{ position: pick.position, weight: 1, share: 1, ended: pick.ended }], unpriced, plain: true, spread, missing: [], events: [] };
   const priced = pricedGroup(cellTurn(root, p1Choice, p2Choice, seeds[group.index]), group.draws, spread);
   const total = priced.children.reduce((sum, child) => sum + child.share, 0);
-  const children = priced.children.map(child => ({ position: child.position, weight: child.share / total, share: child.share, ended: child.ended }));
+  const children = priced.children.map(child => ({ position: child.position, weight: child.share / total, share: child.share, ended: child.ended, ...(child.turned ? { turned: true as const } : {}) }));
   return { children, unpriced: priced.unpriced, plain: true, spread: priced.spread, missing: [], events: [] };
 }
 
