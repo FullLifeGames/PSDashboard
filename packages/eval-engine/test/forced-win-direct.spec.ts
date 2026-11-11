@@ -12,7 +12,9 @@ import type { TeraAllowance } from '../src/types';
  * candidates and a doubles root has 6 to 16 replies; singles missed none. The four doubles scenes below are A5f-6's miss list at
  * the production budget: no proof before, mass 1 after. `rootOrder` is the three candidates the search ranked first (the probe's
  * record), so the call is the app's. The two singles scenes keep a singles proof as it was (the round 35 positions of
- * 749351 and 749828), so one rule serves both game types.
+ * 749351 and 749828), so one rule serves both game types. The four doubles scenes live in fixtures/forced-win/, outside
+ * fixtures/positions/, because the speed-layer sweeps (`loadPositions`) read every file there and the Champions scenes need
+ * their mod loaded first.
  */
 interface Scene {
   id: string;
@@ -24,8 +26,8 @@ interface Scene {
   side: 'p1' | 'p2';
   rootOrder: string[];
 }
-const scene = (name: string) =>
-  JSON.parse(readFileSync(new URL(`./fixtures/positions/${name}.json`, import.meta.url), 'utf-8')) as Scene;
+const scene = (name: string, folder: 'forced-win' | 'positions' = 'forced-win') =>
+  JSON.parse(readFileSync(new URL(`./fixtures/${folder}/${name}.json`, import.meta.url), 'utf-8')) as Scene;
 
 const prove = (board: Scene) =>
   proveForcedWin(board.serialized, { side: board.side, rootOrder: board.rootOrder ?? [], tera: board.tera ?? false, sleepClause: board.sleepClause, ruleset: board.ruleset });
@@ -50,7 +52,7 @@ describe('the forced-win proof without the greedy scout (round 89, A5f-7)', () =
     ['smogtours-gen9ou-749351-t10', 'p1', 1, 'none'],
     ['smogtours-gen9ou-749828-t23', 'p2', 1, 'barring-crit'],
   ] as const)('singles, %s: the proof for %s stays mass 1 in %i turn', (name, side, turns, caveat) => {
-    const proof = prove({ ...scene(name), side, rootOrder: [] });
+    const proof = prove({ ...scene(name, 'positions'), side, rootOrder: [] });
     expect(proof.mass).toBe(1);
     expect(proof.turns).toBe(turns);
     expect(proof.caveat).toBe(caveat);
