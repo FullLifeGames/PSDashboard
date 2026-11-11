@@ -68,7 +68,14 @@ export function ownMove(state: InferrerState, line: LogLine): string {
   if (toId(moveName) === 'struggle' || clientPokemon(state, arg(line, 1))?.volatiles.transform) return '';
   const from = fromEffect(line);
   if (!from.name || toId(from.name) === 'pursuit' || toId(from.name) === 'sleeptalk') return moveName;
-  return from.type === 'move' ? from.name : '';
+  // Round 89 (#140): a move line prints `[from] <effect.fullname>`, so a move effect is `move: X` and a condition its bare name. A move
+  // the Dex marks `callsMove` (Metronome, Copycat, Nature Power) names the called move on the line: the caller is the user's own move.
+  // Any other move effect pulled the user's own move forward (a Pledge combination, Round): the line's move is the user's, and the
+  // effect names the partner's. A bare name is a condition (Magic Coat and Snatch reflect or steal a move the user does not know), but
+  // older logs write a caller bare (`[from]Nature Power`): the caller still books.
+  const calls = !!dexOf(state).moves.get(from.name).callsMove;
+  if (from.type === 'move') return calls ? from.name : moveName;
+  return !from.type && calls ? from.name : '';
 }
 
 /** Same Pokémon by the Dex: the client's forme belongs to the team member's species. */
