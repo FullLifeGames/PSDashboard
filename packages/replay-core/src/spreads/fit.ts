@@ -1,6 +1,6 @@
 import { Pokemon, calculate } from '@smogon/calc';
 import { buildCalcPokemon, calcBaseStats, calcKnowsMove } from '../calc-build.ts';
-import { calcGenerationFor, calcModOf, type CalcGeneration } from '../calc-gen.ts';
+import { calcGenerationFor, calcModOf, CHAMPIONS_MOD, type CalcGeneration } from '../calc-gen.ts';
 import type { PokemonSet } from '@pkmn/sim';
 import { dexOfCalc, type RulesDex } from '../rules-dex.ts';
 import type { DamageObservation, PokemonEvs, SpeedOrderObservation } from '../types.ts';
@@ -63,6 +63,8 @@ export const secondOf = (order: ReadOrder): RaceSide => ({
 /** Everything one spread solve shares between its scoring functions. */
 export interface SolveContext {
   gen: CalcGeneration;
+  /** The battle plays the Champions mod (the format's own answer: the calculator's generation number is not the simulator's). */
+  champions: boolean;
   budget: EvBudget;
   sets: { p1: PokemonSet[]; p2: PokemonSet[] };
   solved: Map<string, SpreadCandidate>;
@@ -122,6 +124,7 @@ export function buildSolveContext(
   const budget = evBudget(formatid);
   const ctx: SolveContext = {
     gen: genOf(formatid),
+    champions: calcModOf(formatid) === CHAMPIONS_MOD,
     budget,
     sets: onScale(sets, budget),
     solved: new Map<string, SpreadCandidate>(),
@@ -266,7 +269,7 @@ export function observationError(ctx: SolveContext, obs: ReadObservation, candid
     // toward "bulkier defender, weaker attacker" (573756 p1 Toxapex).
     // Round 89 (#75): the least the hit did is read by the game's display, in HP points of the candidate's defender
     // (hp-display.ts); the game itself refutes a best roll below it, so that reading carries no slack.
-    const least = obs.lethal && obs.defenderShown ? leastDamageOf(obs.defenderShown, maxHp, ctx.gen.num === 0) : null;
+    const least = obs.lethal && obs.defenderShown ? leastDamageOf(obs.defenderShown, maxHp, ctx.champions) : null;
     if (least !== null) return Math.max(0, least / maxHp - max) ** 2;
     const distance = obs.lethal
       ? (obs.observedFraction > max ? obs.observedFraction - max : 0)

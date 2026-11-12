@@ -32,7 +32,7 @@ export type GameType = typeof FIXTURES[number]['type'];
 
 type Fixture = ReplayData & { formatid: string };
 
-const pinnedFetcher = (async (input: string | URL | Request) => {
+export const pinnedFetcher = (async (input: string | URL | Request) => {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
   const path = url.replace(/^https:\/\/(data\.pkmn\.cc|pkmn\.github\.io\/smogon\/data)/, '').replace(/\/{2,}/g, '/');
   const key = join('test', 'e2e-feedback', 'fixtures', 'smogon', path.replace(/[^a-z0-9.]+/gi, '_'));
