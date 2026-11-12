@@ -24,6 +24,9 @@ export interface ReplacementPoint {
   played: { p1: string[]; p2: string[] };
 }
 
+/** The dice seed every reconstruction and every new game starts on unless the caller names another. */
+export const DEFAULT_GAME_SEED = '1,2,3,4';
+
 export interface ReconstructParams {
   format: string;
   p1Team: PokemonSet[];
@@ -87,6 +90,11 @@ export interface ReconstructParams {
    * last party slots. Callers that pass none keep every name a known body.
    */
   bringOnly?: { p1: string[]; p2: string[]; guessed?: { p1: number; p2: number } } | null;
+  /**
+   * Round 89 (#105): the dice seed of a new game's simulator (the record keeps it). Absent means `DEFAULT_GAME_SEED`, the seed of
+   * every replay rebuild; a replay never sets it.
+   */
+  seed?: string;
 }
 
 /** Everything one reconstruction run shares between its stages. */
@@ -329,6 +337,9 @@ export async function advanceSimToTurn(session: ReconstructionSession, wantedTur
   return (battleStream.battle?.turn ?? 0) >= wantedTurn;
 }
 
+/** The dice seed a start uses: the caller's, else the fixed one. */
+const seedOf = (params: ReconstructParams): string => params.seed ?? DEFAULT_GAME_SEED;
+
 /**
  * Starts the battle on the FIXED seed: an unseeded battle rerolls
  * damage/secondary outcomes every reconstruction, so the same replay+turn
@@ -346,8 +357,9 @@ export async function startBattle(session: ReconstructionSession, orderedP1: Pok
   const p2Packed = Teams.pack(orderedP2);
   const p1Name = JSON.stringify(params.playerNames?.[0]?.trim() || 'Player 1');
   const p2Name = JSON.stringify(params.playerNames?.[1]?.trim() || 'Player 2');
+  const seed = seedOf(params);
   session.writeSim(
-    `>start {"formatid":"${params.format}","seed":"1,2,3,4"}\n>player p1 {"name":${p1Name},"team":${JSON.stringify(p1Packed)}}\n>player p2 {"name":${p2Name},"team":${JSON.stringify(p2Packed)}}`
+    `>start {"formatid":"${params.format}","seed":"${seed}"}\n>player p1 {"name":${p1Name},"team":${JSON.stringify(p1Packed)}}\n>player p2 {"name":${p2Name},"team":${JSON.stringify(p2Packed)}}`
   );
   await waitForBattle(session, battle => !!battle.sides[0] && !!battle.sides[1], 1000);
 

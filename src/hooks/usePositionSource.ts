@@ -92,6 +92,8 @@ interface ReconstructArgs {
   teams: Teams;
   bringOnly?: ReconstructJob['bringOnly'];
   leadOverride?: ReconstructJob['leadOverride'];
+  /** Round 89 (#105): the dice seed of a new game's lead job. */
+  seed?: string;
   /** Round 89 (#124): false for a pass over another world: its positions never enter the main line's exact store. */
   store?: boolean;
   onProgress?: Report;
@@ -124,6 +126,7 @@ function useWorkerReconstruct(args: {
       observations,
       bringOnly: run.bringOnly ?? null,
       leadOverride: run.leadOverride,
+      ...(run.seed ? { seed: run.seed } : {}),
       mode: run.mode,
       ...(run.onReplacement ? { replacements: true } : {}),
     };
@@ -332,7 +335,7 @@ function useRuntimeAcquire(args: { replayData: ReplayData | null; exact: ExactSt
     const outcome = await reconstruct({
       targetTurn: params.targetTurn, mode: plan.isT0 ? 'lead' : 'replay',
       teams: { p1Team: params.p1Team, p2Team: params.p2Team },
-      bringOnly: params.bringOnly, leadOverride: params.leadOverride,
+      bringOnly: params.bringOnly, leadOverride: params.leadOverride, ...(params.seed ? { seed: params.seed } : {}),
       onProgress: params.onProgress, signal: params.abort,
     });
     if (!outcome.serialized) return branchEngine.reconstructBranchRuntime(params);

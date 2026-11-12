@@ -2,7 +2,7 @@ import { TeamValidator, Teams } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import { dexOfFormat, simFormats, toId } from '@fulllifegames/replay-core';
 import { loadSimMods } from '../forward/sim-mods.ts';
-import { openStreams, type SessionStreams } from './runtime-session.ts';
+import { DEFAULT_GAME_SEED, openStreams, type SessionStreams } from './runtime-session.ts';
 import type { SimBattle } from './types.ts';
 import { sleep } from './execute.ts';
 
@@ -15,7 +15,7 @@ import { sleep } from './execute.ts';
  */
 
 /** The seed a game starts on when the caller names none: the one every reconstruction of the replay path uses (`startBattle`). */
-export const DEFAULT_GAME_SEED = '1,2,3,4';
+export { DEFAULT_GAME_SEED };
 
 /** One body as the chosen format's battle builds it. */
 export interface NewGameBody {
