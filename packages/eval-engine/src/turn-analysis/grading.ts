@@ -2,7 +2,7 @@ import { dexOf } from '@fulllifegames/replay-core';
 import type { RankedChoice } from '../types.ts';
 import type { PlayedAction, SackInfo } from '../played.ts';
 import {
-  DECIDED_SCORE, REGRET_THRESHOLD, RISK_PAYOFF_MARGIN, demoteTier, tierOf,
+  DECIDED_SCORE, REGRET_THRESHOLD, RISK_PAYOFF_MARGIN,
   TIER_THRESHOLDS, type AnalyzeTurnParams, type SensitivityProbe, type Side, type SideAnalysis, type VerdictTier,
 } from './types.ts';
 import { matchPlayedChoice, matchPlayedSlots, phantomStayIn, setupMoveClicked } from './played-match.ts';
@@ -79,6 +79,14 @@ function verifiedRegret(
   }
   return { regret, verifiedAtDepth };
 }
+
+const demoteTier = (current: VerdictTier | undefined): VerdictTier | undefined =>
+  current === 'blunder' ? 'mistake' : current === 'mistake' ? 'inaccuracy' : undefined;
+
+const tierOf = (regretValue: number): VerdictTier | undefined =>
+  regretValue >= TIER_THRESHOLDS.blunder ? 'blunder'
+    : regretValue >= TIER_THRESHOLDS.mistake ? 'mistake'
+      : regretValue >= TIER_THRESHOLDS.inaccuracy ? 'inaccuracy' : undefined;
 
 /** The regret's band, softened one tier in a decided position (own perspective). */
 function baseTier(regret: number | null, key: Side, scoreBefore: number): VerdictTier | undefined {

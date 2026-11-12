@@ -46,7 +46,7 @@ export const VERIFY_CELL_CAP = 12;
 /** Pooled visits from which a cell counts as rich for row completion. */
 const ROW_RICH_VISITS = 50;
 /** Mix weight from which an option counts as equilibrium support. */
-export const SUPPORT_MIX = 0.05;
+const SUPPORT_MIX = 0.05;
 
 /**
  * Round 63 (T78): what the verify step adds to the trees' own view — the
