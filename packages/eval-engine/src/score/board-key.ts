@@ -1,5 +1,5 @@
 import type { Battle, Pokemon } from '@pkmn/sim';
-import { methodsOf, readsOfEntries, type Consumer, type ReadSet } from '../dex-facts/state-readers.ts';
+import { methodsOf, readsOfEntries, type Consumer, type Methods, type ReadSet } from '../dex-facts/state-readers.ts';
 import { BOARD_FIELDS, type FieldClass, type Owner } from './board-key-table.ts';
 
 export { BOARD_FIELDS };
@@ -83,20 +83,64 @@ const PREDICATES: Record<string, (value: unknown) => string> = {
   activeTurns: value => (typeof value === 'number' && value > 0 ? '1' : valueKey(value)),
 };
 
-/** One own field of an object by its class: '' where the field is left out. */
-function fieldKey(owner: Owner, name: string, value: unknown, reads: ReadSet, consumer: Consumer, withHp = false): string {
-  if (owner === 'pokemon' && name === 'boosts' && consumer === 'hit') return `boosts=${stagesKey(value, reads)}`;
-  switch (classOf(owner, name, consumer)) {
-    case 'normalized':
-      return withHp ? `${name}=${valueKey(value)}` : '';
-    case 'inert':
-      return '';
-    case 'read':
-      return reads.has(name) ? `${name}=${owner === 'pokemon' && PREDICATES[name] ? PREDICATES[name](value) : valueKey(value)}` : '';
-    case 'effect':
-      return `${name}:${effectsOf(owner, name, value, reads, consumer)}`;
-    default:
-      return `${name}=${valueKey(value)}`;
+/** How one own field enters a key: a plain value, the stages of a body, a value read as a predicate, the state of an effect, or not at all. */
+type Kind = 'plain' | 'stages' | 'predicate' | 'effect' | 'none';
+interface Step { name: string; kind: Kind }
+
+/** The step of one own field by its class: what a board that names it reads, and nothing for a field the key leaves out. */
+function stepOf(owner: Owner, name: string, reads: ReadSet, consumer: Consumer, withHp: boolean): Step {
+  const kind = ((): Kind => {
+    if (owner === 'pokemon' && name === 'boosts' && consumer === 'hit') return 'stages';
+    switch (classOf(owner, name, consumer)) {
+      case 'normalized': return withHp ? 'plain' : 'none';
+      case 'inert': return 'none';
+      case 'read': return reads.has(name) ? (owner === 'pokemon' && PREDICATES[name] ? 'predicate' : 'plain') : 'none';
+      case 'effect': return 'effect';
+      default: return 'plain';
+    }
+  })();
+  return { name, kind };
+}
+
+/**
+ * What a board's key does with the own fields of one kind of object: which fields enter it, in the order of their names. The
+ * decision follows the object's own field names, the owner, the consumer and the read set, so it is made once for each
+ * shape and read set (the read set of a composition is shared by every board of it, see `readsFactory`) and the key then visits
+ * the fields that enter it and no other. `keepEmpty` keeps a place for the fields the key leaves out (the field's parts are joined by their own bars).
+ */
+interface Shape { names: readonly string[]; steps: readonly Step[] }
+const shapes = new WeakMap<ReadSet, Map<string, { last: Shape | undefined; byNames: Map<string, Shape> }>>();
+const SHAPES_PER_KIND = 64;
+
+function stepsOf(object: Record<string, unknown>, owner: Owner, reads: ReadSet, consumer: Consumer, withHp: boolean, keepEmpty = false): readonly Step[] {
+  const names = Object.getOwnPropertyNames(object);
+  let kinds = shapes.get(reads);
+  if (!kinds) shapes.set(reads, kinds = new Map());
+  const kindId = `${owner}${consumer}${withHp ? 'h' : ''}${keepEmpty ? 'e' : ''}`;
+  let bucket = kinds.get(kindId);
+  if (!bucket) kinds.set(kindId, bucket = { last: undefined, byNames: new Map() });
+  const last = bucket.last;
+  // The names of a body come in the same order from one build to the next: the last shape answers without a lookup.
+  if (last && last.names.length === names.length && last.names.every((name, index) => name === names[index])) return last.steps;
+  const joined = names.join(',');
+  let shape = bucket.byNames.get(joined);
+  if (!shape) {
+    if (bucket.byNames.size >= SHAPES_PER_KIND) bucket.byNames.clear();
+    const steps = [...names].sort().map(name => stepOf(owner, name, reads, consumer, withHp));
+    bucket.byNames.set(joined, shape = { names, steps: keepEmpty ? steps : steps.filter(step => step.kind !== 'none') });
+  }
+  bucket.last = shape;
+  return shape.steps;
+}
+
+/** One own field's part of a key, by its step: '' where the key leaves the field out. */
+function partOf(owner: Owner, step: Step, value: unknown, reads: ReadSet, consumer: Consumer): string {
+  switch (step.kind) {
+    case 'plain': return `${step.name}=${valueKey(value)}`;
+    case 'stages': return `boosts=${stagesKey(value, reads)}`;
+    case 'predicate': return `${step.name}=${PREDICATES[step.name](value)}`;
+    case 'effect': return `${step.name}:${effectsOf(owner, step.name, value, reads, consumer)}`;
+    default: return '';
   }
 }
 
@@ -108,79 +152,98 @@ function effectsOf(owner: Owner, name: string, value: unknown, reads: ReadSet, c
   return stateKey(value, reads, consumer, owner === 'pokemon');
 }
 
-/** The own fields of an object that hold data (a game mod puts methods on the instance: they follow the format, which the key carries), sorted. */
-const ownNames = (object: Record<string, unknown>): string[] => Object.getOwnPropertyNames(object).filter(name => typeof object[name] !== 'function').sort();
+/** The parts of an object's own fields that enter a key, in the order of their names. */
+function partsOf(object: unknown, owner: Owner, reads: ReadSet, consumer: Consumer, withHp = false, keepEmpty = false): string[] {
+  const own = object as Record<string, unknown>;
+  const parts: string[] = [];
+  for (const step of stepsOf(own, owner, reads, consumer, withHp, keepEmpty)) {
+    const value = own[step.name];
+    // A game mod puts methods on the instance: they follow the format, which the key carries.
+    if (typeof value === 'function') continue;
+    const part = partOf(owner, step, value, reads, consumer);
+    if (part || keepEmpty) parts.push(part);
+  }
+  return parts;
+}
 
 /** The key of one body: its own fields by class, and the state of its effects; `withHp` keys the HP too (a benched body, which no copy sets). */
 export function bodyStateKey(pokemon: Pokemon, reads: ReadSet, consumer: Consumer, withHp = false): string {
-  const body = pokemon as unknown as Record<string, unknown>;
+  // A field that the key leaves out adds nothing, not even a separator: a body that has grown an own field no rule reads (the simulator creates some on an event) keeps its key.
   let key = '';
-  for (const name of ownNames(body)) {
-    // A field that the key leaves out adds nothing, not even a separator: a body that has grown an own field no rule reads (the simulator creates some on an event) keeps its key.
-    const part = fieldKey('pokemon', name, body[name], reads, consumer, withHp);
-    if (part) key += `${part}~`;
-  }
+  for (const part of partsOf(pokemon, 'pokemon', reads, consumer, withHp)) key += `${part}~`;
   return key;
 }
 
 /** The key of everything on a board but its bodies: the field and its effects, each side's own fields and conditions, the battle's own fields. */
 export function boardStateKey(battle: Battle, reads: ReadSet, consumer: Consumer): string {
   const parts: string[] = [battle.format.id];
-  const field = battle.field as unknown as Record<string, unknown>;
-  for (const name of ownNames(field)) parts.push(fieldKey('field', name, field[name], reads, consumer));
-  for (const side of battle.sides) {
-    const own = side as unknown as Record<string, unknown>;
-    parts.push(ownNames(own).map(name => fieldKey('side', name, own[name], reads, consumer)).filter(Boolean).join('~'));
-  }
-  const own = battle as unknown as Record<string, unknown>;
-  parts.push(ownNames(own).map(name => fieldKey('battle', name, own[name], reads, consumer)).filter(Boolean).join('~'));
+  parts.push(...partsOf(battle.field, 'field', reads, consumer, false, true));
+  for (const side of battle.sides) parts.push(partsOf(side, 'side', reads, consumer).join('~'));
+  parts.push(partsOf(battle, 'battle', reads, consumer).join('~'));
   return parts.join('|');
 }
 
-/** The Dex entries standing on a body: its ability, its item, its status and its volatiles (the conditions the Dex resolves). */
-function entriesOfBody(battle: Battle, pokemon: Pokemon): object[] {
-  const { dex } = battle;
-  return [
-    dex.abilities.getByID(pokemon.ability), dex.items.getByID(pokemon.item), dex.conditions.get(pokemon.status),
-    ...Object.keys(pokemon.volatiles).map(id => dex.conditions.get(id)),
-  ];
-}
+/** The descriptor of a body's entries: its ability, its item, its status and its volatiles (the conditions the Dex resolves), as tokens. */
+const bodyTokens = (pokemon: Pokemon): string => `a${pokemon.ability}|i${pokemon.item}|c${pokemon.status}|${Object.keys(pokemon.volatiles).map(id => `c${id}`).join('|')}`;
 
-/** The Dex entries standing on the field and the sides: the weather, the terrain, the room effects, the side and slot conditions. */
-function entriesOfBoard(battle: Battle): object[] {
-  const { dex, field } = battle;
+/** The tokens of the entries on the field and the sides: the weather, the terrain, the room effects, the side and slot conditions. */
+function boardTokens(battle: Battle): string {
+  const { field } = battle;
   const ids = [field.weather, field.terrain, ...Object.keys(field.pseudoWeather)];
   for (const side of battle.sides) ids.push(...Object.keys(side.sideConditions), ...side.slotConditions.flatMap(slot => Object.keys(slot)));
-  return ids.map(id => dex.conditions.get(id));
+  return ids.map(id => `c${id}`).join('|');
+}
+
+/** The Dex entries a list of tokens names (`a` ability, `i` item, `c` condition, `m` move), by the Dex of the battle. */
+function entriesOf(dex: Battle['dex'], tokens: string): object[] {
+  const entries: object[] = [];
+  for (const token of tokens.split('|')) {
+    if (!token) continue;
+    const id = token.slice(1) as never;
+    entries.push(token[0] === 'a' ? dex.abilities.getByID(id) : token[0] === 'i' ? dex.items.getByID(id) : token[0] === 'm' ? dex.moves.getByID(id) : dex.conditions.get(id));
+  }
+  return entries;
+}
+
+/**
+ * What the scan found for a list of tokens, by Dex and method table: the handlers of the entries do not change within a process, so a
+ * composition of the board that has stood once reads its set from here, and every board of it shares the one set (which nothing may change).
+ */
+const found = new WeakMap<object, WeakMap<Methods, Map<string, ReadSet>>>();
+const FOUND_LIMIT = 5_000;
+
+function scanned(dex: Battle['dex'], methods: Methods, consumer: Consumer, tokens: string): ReadSet {
+  let byMethods = found.get(dex);
+  if (!byMethods) found.set(dex, byMethods = new WeakMap());
+  let byTokens = byMethods.get(methods);
+  if (!byTokens) byMethods.set(methods, byTokens = new Map());
+  const id = `${consumer}#${tokens}`;
+  let reads = byTokens.get(id);
+  if (!reads) {
+    if (byTokens.size >= FOUND_LIMIT) byTokens.clear();
+    byTokens.set(id, reads = readsOfEntries(dex, entriesOf(dex, tokens), consumer, methods));
+  }
+  return reads;
 }
 
 /**
  * The properties the handlers of everything on a board read for a consumer: the entries on the field, the sides and every
- * active body, and the move of a hit. `extra` names bodies that stand off the field (the benched attacker of a hit); the result is
- * cached by what it is made of, so a reader asks it once per pair at most.
+ * active body, and the move of a hit. `extra` names bodies that stand off the field (the benched attacker of a hit). Nothing is
+ * scanned until a reader asks, and the answer is cached by what the board is made of (the tokens of its entries), so a reader asks it
+ * once per pair at most and boards of one composition share one answer.
  */
 export function readsFactory(battle: Battle, consumer: Consumer): (extra: readonly Pokemon[], moveId?: string) => ReadSet {
-  const methods = methodsOf(battle);
-  const { dex } = battle;
   const actives = battle.sides.flatMap(side => side.active.filter((pokemon): pokemon is Pokemon => !!pokemon));
-  const base = readsOfEntries(dex, [...entriesOfBoard(battle), ...actives.flatMap(pokemon => entriesOfBody(battle, pokemon))], consumer, methods);
-  const parts = new Map<string, ReadSet>();
   const answers = new Map<string, ReadSet>();
-  const cached = (key: string, make: () => Iterable<object>): ReadSet => {
-    let found = parts.get(key);
-    if (!found) parts.set(key, found = readsOfEntries(dex, make(), consumer, methods));
-    return found;
-  };
+  let base: string | undefined;
   return (extra, moveId) => {
     const outside = extra.filter(pokemon => !actives.includes(pokemon));
-    if (outside.length === 0 && !moveId) return base;
     const key = `${moveId ?? ''}|${outside.map(pokemon => `${pokemon.side.id}${pokemon.position}`).join(',')}`;
     let answer = answers.get(key);
     if (!answer) {
-      const union = new Set(base);
-      if (moveId) for (const field of cached(`move:${moveId}`, () => [dex.moves.getByID(moveId as never)])) union.add(field);
-      for (const pokemon of outside) for (const field of cached(`body:${pokemon.side.id}${pokemon.position}`, () => entriesOfBody(battle, pokemon))) union.add(field);
-      answers.set(key, answer = union);
+      base ??= [boardTokens(battle), ...actives.map(bodyTokens)].join('|');
+      const tokens = [base, moveId ? `m${moveId}` : '', ...outside.map(bodyTokens)].join('|');
+      answers.set(key, answer = scanned(battle.dex, methodsOf(battle), consumer, tokens));
     }
     return answer;
   };
