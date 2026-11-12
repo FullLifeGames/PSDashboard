@@ -1,4 +1,5 @@
 import type { Battle } from '@pkmn/sim';
+import { idsOfStrings, lex, readsOfCode } from './handler-source';
 
 /**
  * Round 89 (#149, step A8): which fields of the board a Dex entry reads when one of its handlers runs. The memos of the
@@ -50,10 +51,6 @@ export const RESIDUAL_EVENTS: ReadonlySet<string> = new Set([
 /** `onResidual`, `onFoeBasePower`, `onSourceModifyDamage`: the event of a handler's key, with and without the prefix that says whose it is. */
 const HANDLER = /^on(Ally|Foe|Source|Any|Field|Side|Slot|Self)?([A-Z]\w*)$/;
 
-/** A property read: `.name` or `['name']`, not followed by an assignment. */
-const READ = /\.([A-Za-z_$][\w$]*)(?!\s*(?:=(?!=)|\+\+|--|[-+*/%|&^]=|\*\*=|<<=|>>=))|\[\s*['"]([\w$]+)['"]\s*\](?!\s*(?:=(?!=)|\+\+|--|[-+*/%|&^]=))/g;
-const LITERAL = /(['"`])([a-z][a-z0-9]{2,})\1/g;
-
 const SUB_EFFECTS = ['condition', 'self', 'secondary', 'secondaries'] as const;
 const CREATES = ['volatileStatus', 'sideCondition', 'slotCondition', 'status', 'weather', 'terrain', 'pseudoWeather'] as const;
 
@@ -63,11 +60,8 @@ export interface EntryReads { fields: ReadSet; names: ReadonlySet<string> }
 /** The reads of the simulator's own methods on a body, a side and the field: a handler that calls one of them reads what it reads. */
 export type Methods = ReadonlyMap<string, ReadSet>;
 
-const tokensOf = (source: string): Set<string> => {
-  const found = new Set<string>();
-  for (const match of source.matchAll(READ)) found.add(match[1] ?? match[2]);
-  return found;
-};
+/** The property names a source reads (comments and the text of strings never count). */
+export const tokensOf = (source: string): Set<string> => readsOfCode(lex(source).code);
 
 /** Whether the consumer fires the event of this handler key (a key that is no handler is a callback the move path calls: the hit reads it, the end of the turn does not). */
 function fires(key: string, consumer: Consumer): boolean {
@@ -80,11 +74,15 @@ function fires(key: string, consumer: Consumer): boolean {
   return RESIDUAL_EVENTS.has(event) || RESIDUAL_EVENTS.has(whole);
 }
 
-function collect(entry: Record<string, unknown>, consumer: Consumer, depth: number, out: { source: string; names: Set<string> }): void {
+function collect(entry: Record<string, unknown>, consumer: Consumer, depth: number, out: { code: string; ids: Set<string>; names: Set<string> }): void {
   for (const key of Object.keys(entry)) {
     const value = entry[key];
     if (typeof value === 'function') {
-      if (fires(key, consumer)) out.source += `${String(value)}\n`;
+      if (fires(key, consumer)) {
+        const lexed = lex(String(value));
+        out.code += `${lexed.code}\n`;
+        for (const id of idsOfStrings(lexed.strings)) out.ids.add(id);
+      }
     } else if (typeof value === 'string' && (CREATES as readonly string[]).includes(key)) {
       out.names.add(value.toLowerCase().replace(/[^a-z0-9]/g, ''));
     } else if (depth < 3 && value && typeof value === 'object' && (SUB_EFFECTS as readonly string[]).includes(key)) {
@@ -99,11 +97,13 @@ const scans = { hit: new WeakMap<object, EntryReads>(), residual: new WeakMap<ob
 export function entryReads(entry: object, consumer: Consumer, methods: Methods): EntryReads {
   let found = scans[consumer].get(entry);
   if (found) return found;
-  const out = { source: '', names: new Set<string>() };
+  const out = { code: '', ids: new Set<string>(), names: new Set<string>() };
   collect(entry as Record<string, unknown>, consumer, 0, out);
-  const fields = tokensOf(out.source);
+  const fields = readsOfCode(out.code);
   const names = new Set(out.names);
-  for (const match of out.source.matchAll(LITERAL)) names.add(match[2]);
+  for (const id of out.ids) names.add(id);
+  // A build writes `volatiles['substitute']` as `volatiles.substitute`: a property name that is the id of a condition is a name too.
+  for (const field of fields) names.add(field);
   // A call of a method of the body, the side or the field reads what the method reads (transitively: the methods are in the table closed already).
   for (const token of [...fields]) for (const read of methods.get(token) ?? []) fields.add(read);
   found = { fields, names };
