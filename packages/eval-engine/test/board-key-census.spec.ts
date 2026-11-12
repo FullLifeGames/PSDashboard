@@ -72,7 +72,7 @@ const NAMES = {
 
 /** Fields the simulator creates only when an event happens that the sample board lacks, with the event. */
 const AFTER_AN_EVENT: Record<string, string[]> = {
-  pokemon: ['terastallized' /* a Terastallization */, 'lastMoveTargetLoc' /* a move with a chosen target slot */],
+  pokemon: ['terastallized' /* a Terastallization */, 'lastMoveTargetLoc' /* a move with a chosen target slot */, 'pendingStaleness' /* an item given or taken */, 'staleness' /* a berry eaten after one was given */],
 };
 
 describe('the board key names every own field of the simulator', () => {

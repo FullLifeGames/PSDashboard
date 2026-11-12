@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { PRNG, type Battle } from '@pkmn/sim';
-import { BOARD_FIELDS, boardStateKey, bodyStateKey, type Consumer, type ReadSet } from '../src/score/board-key';
+import { BOARD_FIELDS, boardReads, boardStateKey, bodyStateKey, type Consumer, type ReadSet } from '../src/score/board-key';
 import { loadSimMods } from '../src/forward/sim-mods';
 import { SWEEP_CASES } from './dice-sweep-support';
 import { attackerOf, boardFor, defenderOf } from './board-key-support';
@@ -50,4 +50,28 @@ describe('the board key leaves the bookkeeping of the protocol out', () => {
       expect(boardStateKey(second, everyRead(), 'hit')).not.toBe(boardStateKey(first, everyRead(), 'hit'));
     }
   });
+});
+
+/**
+ * The display text of a body's type (`apparentType`, what the client shows after a type change; `types` carries the rule) and the
+ * Leppa Berry bookkeeping of the simulator (`pendingStaleness`, `staleness`, which only a tie-break of a stalled battle reads) are
+ * `read` fields: they enter the key where a handler of the board names them, and no hit and no end of the turn on a board without
+ * such a handler reads them. The sweeps of test/board-key-readers.spec.ts hold the field to the simulator on a bare board.
+ */
+describe('the display type and the Leppa bookkeeping split a key only where a handler reads them', () => {
+  for (const { rules, mode, name } of SWEEP_CASES) {
+    for (const consumer of ['hit', 'residual'] as Consumer[]) {
+      test(`${name}, ${consumer}: apparentType and pendingStaleness`, () => {
+        const first = boardFor(rules, mode, 'tackle');
+        const second = boardFor(rules, mode, 'tackle');
+        const body = attackerOf(second) as unknown as Record<string, unknown>;
+        body.apparentType = `${String(body.apparentType)}/Flying`;
+        body.pendingStaleness = 'external';
+        body.staleness = 'internal';
+        const reads = boardReads(first, consumer, consumer === 'hit' ? 'tackle' : undefined);
+        expect(reads.has('apparentType') || reads.has('pendingStaleness') || reads.has('staleness')).toBe(false);
+        expect(bodyStateKey(attackerOf(second), reads, consumer)).toBe(bodyStateKey(attackerOf(first), reads, consumer));
+      });
+    }
+  }
 });

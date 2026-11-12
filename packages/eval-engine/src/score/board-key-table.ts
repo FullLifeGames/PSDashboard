@@ -23,7 +23,7 @@ const split = (names: string, hit: FieldClass, residual: FieldClass): [string, F
 
 export const BOARD_FIELDS: Record<Owner, Record<string, FieldPair>> = {
   pokemon: Object.fromEntries([
-    ...same('inherit modifiedStats ability addedType apparentType baseAbility baseMaxhp baseSpecies baseTypes fainted isActive item level maxhp species speed status terastallized teraType transformed types', 'key'),
+    ...same('inherit modifiedStats ability addedType baseAbility baseMaxhp baseSpecies baseTypes fainted isActive item level maxhp species speed status terastallized teraType transformed types', 'key'),
     ...split('baseHpPower baseHpType boosts happiness hpPower hpType storedStats baseStoredStats weighthg', 'key', 'inert'),
     ...split('gender', 'key', 'read'),
     ...same('abilityState itemState speciesState statusState volatiles', 'effect'),
@@ -31,6 +31,8 @@ export const BOARD_FIELDS: Record<Owner, Record<string, FieldPair>> = {
     // eslint-disable-next-line names/no-new-dex-name -- `illusion` is the Pokemon field that holds the impersonated body, not the ability
     ...same('illusion', 'ref'),
     ...same('activeMoveActions activeTurns ateBerry attackedBy baseMoveSlots beingCalledBack bondTriggered canGigantamax canMegaEvo canMegaEvoX canMegaEvoY canTerastallize canUltraBurst duringMove dynamaxLevel faintQueued forceSwitchFlag formeRegression gigantamax heroMessageDisplayed hurtThisTurn isStarted itemKnockedOff knownType lastDamage lastItem lastMove lastMoveEncore lastMoveTargetLoc lastMoveUsed moveLastTurnResult moveSlots moveThisTurn moveThisTurnResult newlySwitched ppUps previouslySwitchedIn pursuitActivated shieldBoost skipPursuit statsLoweredThisTurn statsRaisedThisTurn stellarBoostedTypes subFainted switchFlag swordBoost syrupTriggered timesAttacked trapped truantTurn usedItemThisTurn volatileStaleness', 'read'),
+    // The display text of the type (`types` carries the rule) and the Leppa Berry bookkeeping (only the tie-break of a stalled battle reads `staleness`): read where a handler names them.
+    ...same('apparentType pendingStaleness staleness', 'read'),
     ...same('battle details fullname m maybeDisabled maybeLocked maybeTrapped name pokeball position set showCure side', 'inert'),
   ]),
   side: Object.fromEntries([

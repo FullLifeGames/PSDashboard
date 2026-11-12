@@ -53,6 +53,9 @@ const NAMED: Record<string, (battle: Battle) => Pair> = {
   stellarBoostedTypes: () => [[], ['Fire']],
   volatileStaleness: () => [undefined, 'external'],
   subFainted: () => [null, true],
+  apparentType: () => ['Normal', 'Normal/Flying'],
+  pendingStaleness: () => [undefined, 'external'],
+  staleness: () => [undefined, 'internal'],
 };
 
 interface Target { owner: 'pokemon' | 'side' | 'battle'; name: string; who: string; set: Setter; pair: Pair }

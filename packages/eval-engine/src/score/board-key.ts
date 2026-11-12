@@ -115,7 +115,11 @@ const ownNames = (object: Record<string, unknown>): string[] => Object.getOwnPro
 export function bodyStateKey(pokemon: Pokemon, reads: ReadSet, consumer: Consumer, withHp = false): string {
   const body = pokemon as unknown as Record<string, unknown>;
   let key = '';
-  for (const name of ownNames(body)) key += `${fieldKey('pokemon', name, body[name], reads, consumer, withHp)}~`;
+  for (const name of ownNames(body)) {
+    // A field that the key leaves out adds nothing, not even a separator: a body that has grown an own field no rule reads (the simulator creates some on an event) keeps its key.
+    const part = fieldKey('pokemon', name, body[name], reads, consumer, withHp);
+    if (part) key += `${part}~`;
+  }
   return key;
 }
 
@@ -126,10 +130,10 @@ export function boardStateKey(battle: Battle, reads: ReadSet, consumer: Consumer
   for (const name of ownNames(field)) parts.push(fieldKey('field', name, field[name], reads, consumer));
   for (const side of battle.sides) {
     const own = side as unknown as Record<string, unknown>;
-    parts.push(ownNames(own).map(name => fieldKey('side', name, own[name], reads, consumer)).join('~'));
+    parts.push(ownNames(own).map(name => fieldKey('side', name, own[name], reads, consumer)).filter(Boolean).join('~'));
   }
   const own = battle as unknown as Record<string, unknown>;
-  parts.push(ownNames(own).map(name => fieldKey('battle', name, own[name], reads, consumer)).join('~'));
+  parts.push(ownNames(own).map(name => fieldKey('battle', name, own[name], reads, consumer)).filter(Boolean).join('~'));
   return parts.join('|');
 }
 
