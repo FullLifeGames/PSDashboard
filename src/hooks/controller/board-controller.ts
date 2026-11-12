@@ -43,7 +43,7 @@ function useDeviationLayer(ctx: ReplayContext, transients: Transients, timeline:
     replayData, snapshots, observations, sources: teamSources, bringOnlyLists, bringCount,
     replayGameType, timeline: deviationTimeline, branch: deviationBranch, acquireRuntime,
     branchWindowOpenRef, setPendingConfirm, draftChoices, setDraftChoices,
-    onDeviate: clearPlayOutNotice,
+    onDeviate: clearPlayOutNotice, gameSeed: ctx.newGame.record?.seed,
   });
   useBranchRefresh({
     replayData, snapshots, observations, sources: teamSources, bringOnlyLists,
@@ -86,6 +86,12 @@ export function useTimelineController(ctx: ReplayContext, transients: Transients
 
   const deviation = useDeviationLayer(ctx, transients, timeline);
   const { setBranchDivergence } = deviation;
+  // Round 89 (#105): a turn that joined a new game's main line leaves the pointer on the new tip.
+  const { restorePointer } = timeline;
+  const { landRef } = ctx;
+  useEffect(() => {
+    landRef.current = turn => restorePointer({ turn, line: 'main' }, null);
+  }, [landRef, restorePointer]);
   const { maxTurn, setViewTurn, setViewLine, setVariationScores, resetPointer } = timeline;
 
   const discardVariation = useCallback(() => {

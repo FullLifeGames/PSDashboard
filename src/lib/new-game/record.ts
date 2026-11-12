@@ -43,6 +43,9 @@ export interface NewGameRecord {
 
 const ID_LENGTH = 10;
 
+/** Whether a replay id names a new game (the app's own record) and no Showdown replay. */
+export const isGameId = (id: string): boolean => id.startsWith('newgame-');
+
 /** A source of random bytes: `crypto.getRandomValues` of the browser and of Node. */
 export type RandomBytes = (length: number) => Uint8Array;
 const cryptoBytes: RandomBytes = length => globalThis.crypto.getRandomValues(new Uint8Array(length));
@@ -101,7 +104,7 @@ export interface FinishedTurn {
 }
 
 /** An entry as the record keeps it: the serialized position (tens of kilobytes) is left out, the exact store holds positions. */
-function withoutPosition(entry: BranchHistoryEntry): BranchHistoryEntry {
+export function withoutPosition(entry: BranchHistoryEntry): BranchHistoryEntry {
   const { serializedPosition: position, ...rest } = entry;
   void position;
   return rest;

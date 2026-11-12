@@ -83,3 +83,13 @@ export function gamePositions(entries: readonly BranchHistoryEntry[]): Map<numbe
 export function gameAdoptSnapshot(snapshots: TurnSnapshot[], turn: number): TurnSnapshot | null {
   return turn >= snapshots.length ? null : snapshotAt(snapshots, turn);
 }
+
+/** Replays the record onto a fresh runtime and hands every main-line position out; null for a record without a lead entry. */
+export async function restoreGamePositions(
+  branchEngine: BranchEngineModule, record: NewGameRecord, store: (turn: number, serialized: string) => void,
+): Promise<GameRebuild | null> {
+  const rebuilt = await rebuildGame(branchEngine, record);
+  if (!rebuilt) return null;
+  for (const [turn, serialized] of gamePositions(rebuilt.entries)) store(turn, serialized);
+  return rebuilt;
+}

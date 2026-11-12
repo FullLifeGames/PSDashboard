@@ -191,7 +191,7 @@ function useStartBranch(
   loadBranchEngine: () => Promise<BranchEngineModule>, updateState: (battleStream: BattleStream | null) => void,
   stopBranch: () => void,
 ) {
-  const { logRef, battleStreamRef, streamsRef, choiceErrorsRef, p1ChoicesRef, p2ChoicesRef } = refs;
+  const { logRef, battleStreamRef, streamsRef, choiceErrorsRef, p1ChoicesRef, p2ChoicesRef, startLogLengthRef } = refs;
   const { setExecuteError, setBranching, setHistory, setVariationStartTurn, setStartSerialized } = setters;
   return useCallback(async (
     format: string,
@@ -212,6 +212,7 @@ function useStartBranch(
     if (!runtime) return;
 
     logRef.current = runtime.log;
+    startLogLengthRef.current = runtime.log.length;
     battleStreamRef.current = runtime.battleStream;
     streamsRef.current = runtime.streams;
     choiceErrorsRef.current = runtime.choiceErrors;
@@ -235,7 +236,7 @@ function useStartBranch(
     updateState(runtime.battleStream);
     return { endedNotice: null };
   }, [clearChoices, loadBranchEngine, updateState, stopBranch, logRef, battleStreamRef, streamsRef, choiceErrorsRef,
-    p1ChoicesRef, p2ChoicesRef, setExecuteError, setBranching, setHistory, setVariationStartTurn, setStartSerialized]);
+    p1ChoicesRef, p2ChoicesRef, startLogLengthRef, setExecuteError, setBranching, setHistory, setVariationStartTurn, setStartSerialized]);
 }
 
 /** The session side of the branch: rebuilding a runtime at a turn, reading its battle, and tearing it down. */

@@ -1,3 +1,4 @@
+import { isGameId } from '../lib/new-game/record';
 import { useCallback, useEffect, useMemo, useRef, type Dispatch, type SetStateAction } from 'react';
 import type { BringWorld } from '@fulllifegames/eval-engine';
 import {
@@ -98,6 +99,13 @@ function useEvalFormat(inputs: EvalViewInputs) {
 
 type EvalFormat = ReturnType<typeof useEvalFormat>;
 
+/**
+ * Round 89 (#105): the position at a new game's tip, where nothing has been played yet, caches under its own key. Once the turn is
+ * played, the sweep's entry for it carries the played outcome, the verified round and the sensitivity, and an entry made before
+ * (none of those) must never serve it. A replay's keys stay as they were.
+ */
+const gameTipTag = (id: string, turn: number, snapshotCount: number): string => (isGameId(id) && turn >= snapshotCount ? 't' : '');
+
 /** What a caller may hand to Evaluate: the dock's engine fill acts on the result (round 84). */
 export type EvaluateOptions = Pick<EvaluateParams, 'onResult'>;
 
@@ -123,7 +131,7 @@ function useEvaluateAction(inputs: EvalViewInputs, format: EvalFormat) {
       evaluation.evaluate({ cacheKey: null, tera: effectiveTera, sleepClause: effectiveSleepClause, ruleset: effectiveRuleset, acquire: async () => stored, tag: evalViewKey, onResult });
     } else {
       evaluation.evaluate({
-        cacheKey: `${replayData.id}:${viewTurn}:${setsFingerprint}${engineCacheTag()}`,
+        cacheKey: `${replayData.id}:${viewTurn}${gameTipTag(replayData.id, viewTurn, snapshots.length)}:${setsFingerprint}${engineCacheTag()}`,
         tera: effectiveTera,
         sleepClause: effectiveSleepClause,
         ruleset: effectiveRuleset,

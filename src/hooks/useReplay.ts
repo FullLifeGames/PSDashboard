@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { fetchReplay } from '../lib/replay-fetcher';
 import { parseExportedReplay } from '../lib/replay-file';
 import { loadReplayMods } from '../lib/replay-mods';
+import { useGameReplay } from './useGameReplay';
 import type {
   DamageObservation, HiddenPowerEvidence, ItemDamageJudge, ReplayData, SpeedOrderObservation, TurnSnapshot, OpponentTeamInfo,
 } from '@fulllifegames/replay-core';
@@ -46,7 +47,7 @@ export function useReplay() {
     itemJudge: null,
   });
 
-  const runLoad = useCallback(async (task: () => Promise<ReplayData>): Promise<LoadReplayResult> => {
+  const runLoad = useCallback(async (task: () => Promise<ReplayData>, given?: { p1: OpponentTeamInfo; p2: OpponentTeamInfo }): Promise<LoadReplayResult> => {
     setState(prev => ({ ...prev, loading: true, error: null }));
     try {
       const data = await task();
@@ -57,8 +58,8 @@ export function useReplay() {
         import('../lib/lazy/opponent-inferrer'),
       ]);
       const { snapshots, observations, speedOrders, hpEvidence } = parseReplayLogWithObservations(data.log);
-      const p1Info = inferOpponentTeam(data.log, 'p1');
-      const opponentInfo = inferOpponentTeam(data.log, 'p2');
+      const p1Info = given ? given.p1 : inferOpponentTeam(data.log, 'p1');
+      const opponentInfo = given ? given.p2 : inferOpponentTeam(data.log, 'p2');
 
       setState({
         loading: false,
@@ -80,6 +81,8 @@ export function useReplay() {
     }
   }, []);
 
+  const { openGame, extendGame } = useGameReplay(runLoad, setState);
+
   const loadReplay = useCallback(
     (urlOrId: string) => runLoad(() => fetchReplay(urlOrId)),
     [runLoad],
@@ -90,5 +93,5 @@ export function useReplay() {
     [runLoad],
   );
 
-  return { ...state, loadReplay, loadReplayFile };
+  return { ...state, loadReplay, loadReplayFile, openGame, extendGame };
 }

@@ -42,6 +42,8 @@ export interface DeviationInputs {
   setDraftChoices: (draft: { p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] }) => void;
   /** A rebuild really starts (after any replace confirm): the notice of a finished play-out ends here (round 77, C7). */
   onDeviate?: () => void;
+  /** Round 89 (#105): a new game's dice seed; its lead start runs on it. */
+  gameSeed?: string;
 }
 
 /** One shared preparation session for rebuilds and refreshes: the progress
@@ -99,6 +101,8 @@ export interface RebuildContext {
   landPointer: (startTurn: number) => void;
   /** The rebuild kept no turn (round 77, D1); without it the notice goes to the divergence line. */
   reportEnded?: (notice: string) => void;
+  /** Round 89 (#105): the dice seed of a new game's lead start. */
+  seed?: string;
 }
 
 /** The async heart of rebuildAt, once the plan (start turn, kept history)
@@ -130,6 +134,7 @@ export async function executeRebuild(
         leadOverride,
         bringOnly: ctx.bringOnly,
         acquireRuntime: ctx.acquireRuntime,
+        ...(ctx.seed ? { seed: ctx.seed } : {}),
       });
       if (outcome?.endedNotice) {
         ctx.branchWindowOpenRef.current = false;
@@ -160,7 +165,7 @@ function replaceVariationMessage(leadIn: string, span: { startTurn: number; leng
 export function useDeviation(inputs: DeviationInputs) {
   const {
     replayData, snapshots, observations, sources, bringOnlyLists, bringCount, replayGameType,
-    timeline, branch, acquireRuntime, branchWindowOpenRef, setPendingConfirm, draftChoices, setDraftChoices, onDeviate,
+    timeline, branch, acquireRuntime, branchWindowOpenRef, setPendingConfirm, draftChoices, setDraftChoices, onDeviate, gameSeed,
   } = inputs;
   const { branchPreparing, branchProgress, branchSession, handles: session } = useBranchSession();
   const [branchDivergence, setBranchDivergence] = useState<string | null>(null);
@@ -196,7 +201,7 @@ export function useDeviation(inputs: DeviationInputs) {
       // selection; per-side fail-open when the protocol does not pin a side.
       bringOnly: startTurn > 0 ? bringOnlyLists ?? undefined : undefined,
       session, branch, acquireRuntime, branchWindowOpenRef, setBranchDivergence,
-      reportEnded: reportVariationEnded,
+      reportEnded: reportVariationEnded, seed: gameSeed,
       landPointer: (turn) => {
         timeline.setViewTurn(turn);
         timeline.setViewLine('main');
@@ -204,7 +209,7 @@ export function useDeviation(inputs: DeviationInputs) {
     }, startTurn, replayHistory, prefill, leadOverride);
   }, [
     replayData, session, variationSpan, branch, acquireRuntime, snapshots, observations, sources, bringOnlyLists,
-    branchWindowOpenRef, timeline, reportVariationEnded, onDeviate,
+    branchWindowOpenRef, timeline, reportVariationEnded, onDeviate, gameSeed,
   ]);
 
   const requests = useDeviationRequests({

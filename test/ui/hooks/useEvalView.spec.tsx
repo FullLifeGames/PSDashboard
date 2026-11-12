@@ -75,6 +75,20 @@ describe('useEvalView', () => {
     expect(renderHook(() => useEvalView(inputs(evaluation, { replayData: vgc }))).result.current.effectiveRuleset).toBe('vgc');
   });
 
+  test('a new game keys its tip apart from the turn once it is played; a replay keeps every key', () => {
+    const { evaluation, spies } = evaluationOf();
+    const game = { ...replayData, id: 'newgame-abcdefghij', formatid: 'gen9ou' };
+    const atTip = renderHook(() => useEvalView(inputs(evaluation, { replayData: game, viewTurn: snapshots.length, evalViewKey: `main:${snapshots.length}` })));
+    act(() => atTip.result.current.handleEvaluate());
+    expect(spies.evaluate.mock.calls.at(-1)![0]).toMatchObject({ cacheKey: `newgame-abcdefghij:${snapshots.length}t:fp1` });
+    const played = renderHook(() => useEvalView(inputs(evaluation, { replayData: game, viewTurn: 3, evalViewKey: 'main:3' })));
+    act(() => played.result.current.handleEvaluate());
+    expect(spies.evaluate.mock.calls.at(-1)![0]).toMatchObject({ cacheKey: 'newgame-abcdefghij:3:fp1' });
+    const replay = renderHook(() => useEvalView(inputs(evaluation, { viewTurn: snapshots.length, evalViewKey: `main:${snapshots.length}` })));
+    act(() => replay.result.current.handleEvaluate());
+    expect(spies.evaluate.mock.calls.at(-1)![0]).toMatchObject({ cacheKey: `${replayData.id}:${snapshots.length}:fp1` });
+  });
+
   test('Evaluate targets the position under the pointer: live sim, recorded variation, or cached main line', async () => {
     const { evaluation, spies } = evaluationOf();
     const wired = inputs(evaluation, { liveTip: true, liveEvalView: true, evalViewKey: 'variation:3' });

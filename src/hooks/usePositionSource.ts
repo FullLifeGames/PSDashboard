@@ -7,6 +7,8 @@ import { throttleLatest } from '../lib/eval/throttle-latest';
 import { registerWorldPositions, worldPositionsOf, type WorldPosition } from '../lib/eval/world-positions';
 import type { ReplayWorkerClient } from '../lib/replay-jobs/client';
 import type { ReconstructJob, ReconstructOutcome } from '../lib/replay-jobs/types';
+import type { NewGameRecord } from '../lib/new-game/record';
+import { useGamePositions, type GamePositions } from './useGamePositions';
 
 type Report = (turn: number, target: number) => void;
 type Teams = { p1Team: PokemonSet[]; p2Team: PokemonSet[] };
@@ -316,8 +318,8 @@ function useMainLineAcquire(args: Omit<MainLineArgs, 'worlds'> & { bringWorlds: 
  * arrival. Only a sim that could not even start falls back to the
  * main-thread reconstruction, which reports that case as it always did.
  */
-function useRuntimeAcquire(args: { replayData: ReplayData | null; exact: ExactStore; reconstruct: Reconstruct }) {
-  const { replayData, exact, reconstruct } = args;
+function useRuntimeAcquire(args: { replayData: ReplayData | null; exact: ExactStore; reconstruct: Reconstruct; game: GamePositions | null }) {
+  const { replayData, exact, reconstruct, game } = args;
   return useCallback(async (params: ReconstructParams, plan: { isT0: boolean }): Promise<BranchRuntime> => {
     const branchEngine = await import('../lib/lazy/branch-engine');
     if (!replayData) return branchEngine.reconstructBranchRuntime(params);
@@ -325,9 +327,11 @@ function useRuntimeAcquire(args: { replayData: ReplayData | null; exact: ExactSt
     await branchEngine.loadSimMods(params.format);
     const adopt = (serialized: string, outcome?: ReconstructOutcome) => branchEngine.adoptSerializedRuntime({
       serialized, replayLog: params.replayLog, targetTurn: params.targetTurn,
-      snapshot: plan.isT0 ? null : params.snapshot ?? null,
+      snapshot: plan.isT0 ? null : game ? game.adoptSnapshot(params.targetTurn) : params.snapshot ?? null,
       ...(outcome ? { log: outcome.log, haxAlignment: outcome.haxAlignment, timedOut: outcome.timedOut } : {}),
     });
+    // A game's positions are the record's: stored, else rebuilt from its entries; a miss never starts a 'replay' job (round 89, #105).
+    if (!plan.isT0 && game) return adopt(await game.acquireExact(params.targetTurn));
     if (!plan.isT0) {
       const stored = exact.getExact(params.targetTurn);
       if (stored) return adopt(stored);
@@ -341,7 +345,7 @@ function useRuntimeAcquire(args: { replayData: ReplayData | null; exact: ExactSt
     if (!outcome.serialized) return branchEngine.reconstructBranchRuntime(params);
     if (!plan.isT0 && outcome.reached && !outcome.invalid) exact.storeExactPosition(params.targetTurn, outcome.serialized);
     return adopt(outcome.serialized, outcome);
-  }, [replayData, exact, reconstruct]);
+  }, [replayData, exact, reconstruct, game]);
 }
 
 /**
@@ -362,20 +366,23 @@ export function usePositionSource(inputs: {
   bringWorlds?: BringWorld[] | null;
   smogonPending: boolean;
   replayWorker: ReplayWorkerClient;
+  /** Round 89 (#105): the record of a new game; its positions never come from a replay job. */
+  gameRecord?: NewGameRecord | null;
 }) {
-  const { replayData, snapshots, observations, sources, setsFingerprint, bringOnlyLists, bringWorlds = null, smogonPending, replayWorker } = inputs;
+  const { gameRecord = null, replayData, snapshots, observations, sources, setsFingerprint, bringOnlyLists, bringWorlds = null, smogonPending, replayWorker } = inputs;
   const worldsKey = useMemo(() => (bringWorlds ? JSON.stringify(bringWorlds) : ''), [bringWorlds]);
-  const { exact, exactPositionsVersion } = useExactPositions(replayData, setsFingerprint, smogonPending, worldsKey);
+  const { exact, exactPositionsVersion } = useExactPositions(replayData, setsFingerprint, smogonPending && !gameRecord, worldsKey);
   // The worker's bundle parses while the replay is still loading.
   useEffect(() => {
     if (replayData) replayWorker.warm();
   }, [replayData, replayWorker]);
   const { reconstruct, buildTeams } = useWorkerReconstruct({ replayData, snapshots, observations, sources, replayWorker, exact });
   const { sweepAlignment, acquireExact, acquireAll } = useMainLineAcquire({ exact, reconstruct, buildTeams, bringOnlyLists, bringWorlds });
-  const acquireRuntime = useRuntimeAcquire({ replayData, exact, reconstruct });
+  const game = useGamePositions({ record: gameRecord, snapshots, exact });
+  const acquireRuntime = useRuntimeAcquire({ replayData, exact, reconstruct, game });
   return useMemo(() => ({
-    ...exact, exactPositionsVersion, sweepAlignment, acquireExact, acquireAll, acquireRuntime,
-  }), [exact, exactPositionsVersion, sweepAlignment, acquireExact, acquireAll, acquireRuntime]);
+    ...exact, exactPositionsVersion, sweepAlignment, acquireExact: game?.acquireExact ?? acquireExact, acquireAll: game?.acquireAll ?? acquireAll, acquireRuntime,
+  }), [exact, exactPositionsVersion, sweepAlignment, acquireExact, acquireAll, acquireRuntime, game]);
 }
 
 export type PositionSource = ReturnType<typeof usePositionSource>;
