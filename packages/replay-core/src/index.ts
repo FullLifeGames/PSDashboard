@@ -66,7 +66,7 @@ export { enrichTeamInfos } from './team/damage-ruleouts.ts';
 export type { ItemDamageJudge } from './team/damage-ruleouts.ts';
 export { judgeItemsByDamage } from './team/item-damage.ts';
 export { parseTeamText } from './team-parser.ts';
-export { parsePastedTeam, applyPastedTeam, countMatchingSpecies } from './team-paste.ts';
+export { parsePastedTeam, applyPastedTeam, countMatchingSpecies, teamInfoOfSets } from './team-paste.ts';
 export type { PastedSet } from './team-paste.ts';
 export { applyTeamSheetToInfo } from './team-sheets.ts';
 export type {

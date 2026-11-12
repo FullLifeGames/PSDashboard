@@ -111,6 +111,9 @@ export type { RolledCopy, RollSelector } from './branch/rolled-copy.ts';
 // Round 89 (#124): the worlds of a bring-limited game, for the hosts that measure (the bank) and the app's world registry.
 export { BRING_WORLD_CAP, bringWorlds, blendValues, blendWorlds } from './branch/bring-worlds.ts';
 export type { BringWorld } from './branch/bring-worlds.ts';
+// Round 89 (#105): a new game from two teams starts the chosen format in the simulator and reports the simulator's team problems; the interface rules whether Start is allowed.
+export { startGameLog, checkGameTeams, DEFAULT_GAME_SEED } from './branch/new-game.ts';
+export type { NewGameBody, NewGameStart, StartGameParams, GameTeamProblems } from './branch/new-game.ts';
 export type { WinConversion, WinPath } from './win-reason.ts';
 export type { DeniedEnd } from './denied-end.ts';
 export { detectRolls, diceEventTurns } from './dice-events.ts';
