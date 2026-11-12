@@ -16,7 +16,11 @@ export interface SpreadCandidate {
   origin?: SpreadOrigin;
   /** An item the move-order evidence decided (round 37): 'Choice Scarf', or '' for "not the guessed Scarf". */
   item?: string;
-  itemReason?: 'moved-first' | 'moved-second' | 'no-boost';
+  /**
+   * Why the item is decided: the move order (round 37), the damage lines dropped a guessed boost item (round 69, T26), or, since round 89 (#75),
+   * a knockout no spread reaches and a usage-listed boost item does ('boost': `item` names it).
+   */
+  itemReason?: 'moved-first' | 'moved-second' | 'no-boost' | 'boost';
   /** IVs a seen move order needed (round 64: a Speed IV below 31 only when no other Speed keeps the order). */
   ivs?: PokemonEvs;
 }
@@ -24,7 +28,7 @@ export interface SpreadCandidate {
 export interface CandidateRung {
   evs: PokemonEvs;
   nature: string;
-  /** '' scores the rung without the set's guessed boost item (round 69, T26); undefined keeps the set's item. */
+  /** '' scores the rung without the set's guessed boost item (round 69, T26); a name scores it with that item (round 89, #75); undefined keeps the set's item. */
   item?: string;
 }
 
