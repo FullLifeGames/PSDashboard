@@ -507,12 +507,6 @@ export interface EvalCellJob {
    * row against an answer the tree did not list.
    */
   plain?: boolean;
-  /**
-   * Round 89 (T322, #59): a strand job. With `deepen` the executor samples the cell as the verify job does and prices the
-   * named classes (the keys of the verify cell's blend) through the full depth-1 sub-search of the class child, or of its
-   * states; the answer carries them in `EvalCellValue.strandValues` and no other deepening.
-   */
-  strands?: string[];
 }
 
 export interface EvalCellValue {
@@ -540,8 +534,6 @@ export interface EvalCellValue {
    * deeper, mixed by draw share; blended cells carry the depth per class.
    */
   deepened?: number;
-  /** Round 89 (T322, #59): the strand job's answer, the full depth-1 value of each named class (the class's own view, p1's side). */
-  strandValues?: Record<string, number>;
 }
 
 export interface EvalSubSearchJob {
