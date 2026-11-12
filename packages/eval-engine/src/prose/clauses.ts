@@ -223,6 +223,30 @@ export function sensitivityClause(name: string, side: SideAnalysis): string | nu
 }
 
 /**
+ * Round 89 (T322, #59), stage 5: a grade the strand round softened says so. The shallow-priced class the grade hung on (a die of
+ * a move: its miss, its knockout, a secondary effect) was searched in full, and the regret fell into a softer band: the sentence
+ * names the die, its chance and the opponent option it belongs to. A die of the played line (P) means the played line holds up
+ * better than it first read, a die of the better line (B) that the better line is worth less. The Dex names (the move, the
+ * effect) come with the strand (`SideAnalysis.strand.dice`); without the board context the sentence names the chance only.
+ */
+export function strandClause(name: string, side: SideAnalysis): string | null {
+  const strand = side.strand;
+  if (!strand) return null;
+  const share = `${Math.max(1, Math.round(strand.chance * 100))}%`;
+  const dice = strand.dice ?? [];
+  const words = dice.map(die => {
+    const subject = { effect: die.effect ?? 'effect', miss: 'miss', kill: 'knockout', hit: 'plain hit' }[die.kind];
+    const link = die.kind === 'effect' ? 'from' : 'by';
+    return die.move ? `${subject} ${link} ${die.move}` : subject;
+  });
+  const die = words.length === 0 ? `one outcome of ${share}` : words.length === 1 ? `the ${share} ${words[0]}` : `the ${share} case of ${words.join(' and ')}`;
+  const head = `${name}'s ${strand.from} ${strand.tier === 'none' ? 'clears' : `softens to ${strand.tier === 'inaccuracy' ? 'an' : 'a'} ${strand.tier}`}: against ${phrase(strand.column)}, `;
+  if (strand.role === 'P') return `${head}the engine first priced ${die} roughly; searched in full, the played line holds up better there.`;
+  const better = side.best ? phrase(displayBest(side).label) : 'the better line';
+  return `${head}${better} is worth less than it first read, because the engine searched ${die} in full.`;
+}
+
+/**
  * Entry-is-profit context (round 13): bringing in a mon the opponent has no
  * live race answer to is board logic worth naming, not a verdict (648453
  * t13: the Lopunny switch). The round-14 switch-in stage names the one

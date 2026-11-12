@@ -6,7 +6,7 @@ import { chanceRolled } from './turn-analysis/luck.ts';
 import { lostGround, shownAttribution, walkedInto } from './turn-analysis/risk.ts';
 import { percentBelowSure, phrase, phraseReplies, playedBest, rollText } from './prose/phrases.ts';
 import {
-  forcedClause, inaccuracyClause, readCreditClause, sackClause, sensitivityClause, sideClause, streakClause, unansweredClause,
+  forcedClause, inaccuracyClause, readCreditClause, sackClause, sensitivityClause, sideClause, strandClause, streakClause, unansweredClause,
 } from './prose/clauses.ts';
 
 /**
@@ -251,7 +251,8 @@ function attributionSentences(analysis: TurnAnalysis, playerNames: PlayerNames, 
  * and up; a sack replaces the inaccuracy note its demoted tier would
  * otherwise produce), forced equilibrium expectations (turn context, not
  * a verdict), entry-is-profit context (round 13), streak cumulation
- * (multi-turn expectation, never a verdict), and sensitivity hinges (the
+ * (multi-turn expectation, never a verdict), a grade the strand round softened (round 89, right after the decision note it
+ * qualifies), and sensitivity hinges (the
  * softened tier may have silenced the decision clause entirely, but the
  * hinge itself is the finding).
  */
@@ -263,6 +264,7 @@ function rideAlongSentences(analysis: TurnAnalysis, playerNames: PlayerNames): s
   const kinds: ((name: string, side: SideAnalysis, ownLuck: number | null, praised: boolean) => string | null)[] = [
     (name, side, ownLuck, praised) => sackClause(name, side) ??
       (praised ? readCreditClause(name, side, ownLuck, rolled) : null) ?? inaccuracyClause(name, side),
+    strandClause,
     forcedClause,
     (_name, side) => unansweredClause(side),
     streakClause,

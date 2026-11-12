@@ -53,7 +53,7 @@ describe('the strand acquittal', () => {
     const analysis = grade({ p2: strandOf(0.15) });
     expect(analysis.p2.tier).toBe('inaccuracy');
     expect(analysis.p2.regret).toBeCloseTo(0.25, 10); // the regret stays the engine's; only the verdict softens
-    expect(analysis.p2.strand).toEqual({ role: 'P', classKey: 'hit-nokill+flinch', chance: 0.3, column: 'Iron Head', tier: 'inaccuracy' });
+    expect(analysis.p2.strand).toEqual({ role: 'P', classKey: 'hit-nokill+flinch', chance: 0.3, column: 'Iron Head', tier: 'inaccuracy', from: 'mistake' });
   });
 
   test('a record that clears the band leaves no tier and says so', () => {

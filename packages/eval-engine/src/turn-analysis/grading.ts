@@ -7,6 +7,7 @@ import {
 } from './types.ts';
 import { matchPlayedChoice, matchPlayedSlots, phantomStayIn, setupMoveClicked } from './played-match.ts';
 import { rulesOfActives } from './rules.ts';
+import { strandDice } from './strand-die.ts';
 import { turnRolledFor } from './luck.ts';
 import { praisedSack, sackGate, type SackGate, type SackGrade } from './sack-gates.ts';
 
@@ -159,9 +160,14 @@ function strandAcquittal(
   const probed = sideVerdict(params, key, { ...g, regret: record.regret });
   if (TIER_RANK[probed.tier ?? 'none'] >= TIER_RANK[verdict.tier]) return { verdict, strand: undefined };
   const lead = leadingStrand(record);
+  const rules = rulesOfActives(params.actives);
+  const dice = rules ? strandDice(dexOf(rules), lead.classKey, { side: key, ownChoice: lead.role === 'P' ? record.played : record.best, column: lead.column }) : undefined;
   return {
     verdict: probed,
-    strand: { role: lead.role, classKey: lead.classKey, chance: lead.chance, column: lead.column, tier: probed.tier ?? 'none' },
+    strand: {
+      role: lead.role, classKey: lead.classKey, chance: lead.chance, column: lead.column, tier: probed.tier ?? 'none', from: verdict.tier,
+      ...(dice ? { dice } : {}),
+    },
   };
 }
 

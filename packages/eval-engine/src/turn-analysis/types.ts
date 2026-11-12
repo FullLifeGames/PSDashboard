@@ -37,6 +37,14 @@ export const TIER_THRESHOLDS: Record<VerdictTier, number> = {
  */
 export const DECIDED_SCORE = 0.7;
 
+/**
+ * Round 89 (T322, #59), stage 5: one die of a strand class as the card names it. `kind` miss (the move's accuracy), kill (the hit
+ * that knocks out), effect (a secondary that came true, `effect` its word: burn, paralysis, flinch), hit (a hit without a knockout
+ * or a side effect). `move` is the Dex name of the move that holds the die; absent where a singles key names no actor and the
+ * choices cannot decide.
+ */
+export interface StrandDie { kind: 'miss' | 'kill' | 'effect' | 'hit'; move?: string; effect?: string }
+
 /** One tier softer (a decided position, a sack, a strand): the lowest tier softens to none. */
 export const demoteTier = (current: VerdictTier | undefined): VerdictTier | undefined =>
   current === 'blunder' ? 'mistake' : current === 'mistake' ? 'inaccuracy' : undefined;
@@ -248,7 +256,13 @@ export interface SideAnalysis {
    * line falls short when its die goes wrong). `classKey` names the move and its die as the verify round keys it, `chance`
    * the class's weight in its cell, `column` the opponent option whose column holds the cell, `tier` the verdict after it.
    */
-  strand?: { role: 'P' | 'B'; classKey: string; chance: number; column: string; tier: VerdictTier | 'none' };
+  strand?: {
+    role: 'P' | 'B'; classKey: string; chance: number; column: string; tier: VerdictTier | 'none';
+    /** The tier before the strand round (stage 5: the sentence says what softened). */
+    from: VerdictTier;
+    /** The dice the class key names, read with the game's Dex (absent without the board context: the sentence then names no move). */
+    dice?: StrandDie[];
+  };
   /**
    * How many ranked options sit within an inaccuracy of best — the side's
    * real decision breadth. Both sides clearing BREADTH_MIN_OPTIONS turns a

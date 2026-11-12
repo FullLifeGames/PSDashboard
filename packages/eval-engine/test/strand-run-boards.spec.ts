@@ -4,6 +4,7 @@ import { loadSimMods } from '../src/forward/sim-mods';
 import { STRAND_CAP_DOUBLES, STRAND_CAP_SINGLES } from '../src/search/strand-round';
 import { createLocalTreeExecutor, searchTreesOrchestrated } from '../src/tree-orchestrator';
 import { analyzeTurn } from '../src/analysis';
+import { summarizeTurn } from '../src/summary';
 import type { PlayedTurn } from '../src/played';
 import { TIER_THRESHOLDS } from '../src/turn-analysis/types';
 import type { EvalCellJob, EvalResult, EvalSettings } from '../src/types';
@@ -53,10 +54,10 @@ async function run(name: string, over: { refuse?: boolean; played?: boolean; pro
 }
 
 /** The grade of the board's turn with and without the record: the acquittal reads the record the way the app's graph carries it (`scoreBefore` is the result's own score there). */
-function grades(name: string, result: EvalResult) {
+function grades(name: string, result: EvalResult, mod?: 'champions') {
   const at = (withRecord: boolean) => analyzeTurn({
     turn: 2, result: withRecord ? result : { ...result, strands: undefined }, played: fixture(name).keepPlayed as PlayedTurn,
-    playedOutcome: null, scoreBefore: result.score, scoreAfter: null,
+    playedOutcome: null, scoreBefore: result.score, scoreAfter: null, actives: { p1: null, p2: null, gen: 9, mod },
   });
   return { plain: at(false), graded: at(true) };
 }
@@ -84,13 +85,18 @@ describe('the strand round on real boards', () => {
     // The record belongs to the grade's pair: the played row is not the first one, the best row is.
     expect(result.perSide.p1[0].choice).toBe(record.best);
     // Stage 4: the grade reads the record. The mistake softens to an inaccuracy and names the burn; the score and the regret stay.
-    const { plain, graded } = grades('cv2688023429t2', result);
+    const { plain, graded } = grades('cv2688023429t2', result, 'champions');
     expect(plain.p1.tier).toBe('mistake');
     expect(plain.p1.strand).toBeUndefined();
     expect(graded.p1.tier).toBe('inaccuracy');
     expect(graded.p1.strand).toMatchObject({ role: 'P', classKey: FLARE, chance: 0.1, tier: 'inaccuracy' });
     expect(graded.p1.regret).toBe(plain.p1.regret);
     expect(graded.p2.tier).toBe(plain.p2.tier);
+    // Stage 5: the card says it, with the die from the class key and the Dex.
+    expect(graded.p1.strand?.dice).toEqual([{ kind: 'effect', move: 'Flare Blitz', effect: 'burn' }]);
+    expect(summarizeTurn(graded, ['P1', 'P2'])).toContain("P1's mistake softens to an inaccuracy: against Double-Edge→Espathra + Flare Blitz→Espathra, " +
+      'the engine first priced the 10% burn from Flare Blitz roughly; searched in full, the played line holds up better there.');
+    expect(summarizeTurn(plain, ['P1', 'P2'])).not.toMatch(/first priced/);
   });
 
   test('o1/o3: the round writes only the record; a lost worker leaves the run without one and otherwise equal, field by field', SLOW, async () => {
@@ -151,7 +157,7 @@ describe('the strand round on real boards', () => {
     expect(record.regret).toBeGreaterThanOrEqual(TIER_THRESHOLDS.inaccuracy);
     expect(result.perSide.p2[0].choice).toBe(record.best);
     // Stage 4, singles: the record softens nothing, so the inaccuracy stays and no strand is named.
-    const { plain, graded } = grades('singles6', result);
+    const { plain, graded } = grades('singles6', result, 'champions');
     expect(plain.p2.tier).toBe('inaccuracy');
     expect(graded.p2.tier).toBe('inaccuracy');
     expect(graded.p2.strand).toBeUndefined();
