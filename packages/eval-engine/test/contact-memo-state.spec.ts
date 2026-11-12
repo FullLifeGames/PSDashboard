@@ -40,6 +40,16 @@ interface Row {
   second: Tweak;
 }
 
+/**
+ * The happiness of the attacker, in the field and in its set. The simulator's own serialization (the copy of the slow
+ * mode, EVAL_SIM_FAST=0) leaves `happiness` out and builds it again from the set; the fast mode's copy takes the field.
+ * In a game the two are the same, so a row sets both.
+ */
+const happiness = (battle: Battle, value: number): void => {
+  attackerOf(battle).happiness = value;
+  attackerOf(battle).set.happiness = value;
+};
+
 const FLAME_BODY: Row['defender'] = ['Talonflame', 'Flame Body'];
 
 const ROWS: Row[] = [
@@ -67,7 +77,7 @@ const ROWS: Row[] = [
   { name: 'Heavy Slam at two weights, into Flame Body', attacker: ['Snorlax', 'Thick Fat'], defender: FLAME_BODY, move: 'heavyslam',
     first: battle => { attackerOf(battle).weighthg = 1000; }, second: battle => { attackerOf(battle).weighthg = 3000; } },
   { name: 'Return at happiness 255 and 50, into Flame Body', attacker: ['Snorlax', 'Thick Fat'], defender: FLAME_BODY, move: 'return',
-    first: battle => { attackerOf(battle).happiness = 255; }, second: battle => { attackerOf(battle).happiness = 50; } },
+    first: battle => happiness(battle, 255), second: battle => happiness(battle, 50) },
 ];
 
 const FORMATS = [
