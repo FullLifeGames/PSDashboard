@@ -206,6 +206,35 @@ function neutralRoom(
 }
 
 /**
+ * Round 89 (D9, gen9ou-2658671254): the fewest offense EVs, in the ladder's steps up to `room`, that make the mon reach every knockout the game refutes at `rung`
+ * (a lethal observation with its display text, read without slack), when that costs the mon's other lines nothing more than the rung's own misfit. A winning
+ * rung is a coarse one (the ladder knows an offense stat at 0 and 252), and its error is the knockouts' shortfall: measured from there, the top-up's "fits as
+ * well as at the rung" let a clean line on the same mon overshoot by as much, and the stat ran past where the lines fit best (Iron Valiant's Special Attack
+ * 180 where 32 to 56 reach the knockout and fit the hit on Moltres; the base reading's slack had hidden half of it). 0 when no knockout is refuted, none is
+ * within reach, or reaching it costs more than the rung's misfit: the top-up then measures from the rung as before.
+ */
+function knockoutReach(
+  ctx: SolveContext, key: string, rung: CandidateRung, offenseStat: keyof PokemonEvs, room: number, observations: DamageObservation[],
+): number {
+  const knockouts = observations.filter(obs => obs.lethal && obs.defenderShown && keyOf(obs.attackerSide, obs.attackerSpecies) === key);
+  const at = (add: number): CandidateRung => ({ ...rung, evs: { ...rung.evs, [offenseStat]: (rung.evs[offenseStat] ?? 0) + add } });
+  const short = (add: number) => knockouts.reduce((sum, obs) => sum + observationError(ctx, obs, key, at(add)), 0);
+  if (room <= 0 || !(short(0) > 0)) return 0;
+  const step = evStep(ctx.budget);
+  const adds = [...new Set([...Array.from({ length: Math.floor(room / step) }, (_, i) => (i + 1) * step), room])];
+  if (short(adds[adds.length - 1]) > 0) return 0;
+  // A hit's best roll never falls as the offense rises, so the reach is monotone: the first add that reaches it.
+  let low = 0;
+  let high = adds.length - 1;
+  while (low < high) {
+    const mid = (low + high) >> 1;
+    if (short(adds[mid]) === 0) high = mid;
+    else low = mid + 1;
+  }
+  return damageError(ctx, key, at(adds[low]), observations) <= damageError(ctx, key, rung, observations) + 1e-12 ? adds[low] : 0;
+}
+
+/**
  * Top up the leftover budget in the non-Speed stats: a winner like "252
  * HP only" would otherwise field a systematically under-statted sim mon.
  * An unmeasured stat takes what fits (it carries no observation evidence
@@ -231,6 +260,12 @@ function topUp(
     evs[stat] = (evs[stat] ?? 0) + add;
     remaining -= add;
   };
+  // A knockout the winning rung leaves refuted: the offense starts from the fewest EVs that reach it, and the plateau is measured from there (D9).
+  if (measured.has(offenseStat)) {
+    const reach = knockoutReach(ctx, key, { evs, nature: best.nature, item: best.item }, offenseStat, Math.min(ctx.budget.perStat - (evs[offenseStat] ?? 0), remaining), evidence.observations);
+    evs[offenseStat] = (evs[offenseStat] ?? 0) + reach;
+    remaining -= reach;
+  }
   const order = ([offenseStat, 'hp', 'def', 'spd', offenseStat === 'atk' ? 'spa' : 'atk'] as (keyof PokemonEvs)[])
     .filter(stat => stat !== 'hp' || evidence.fixedHp === undefined);
   for (const stat of order) give(stat, Math.min((prior.evs[stat] ?? 0) - (evs[stat] ?? 0), ctx.budget.perStat - (evs[stat] ?? 0), remaining));
