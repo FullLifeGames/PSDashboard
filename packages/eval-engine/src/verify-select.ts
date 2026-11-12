@@ -48,10 +48,6 @@ const ROW_RICH_VISITS = 50;
 /** Mix weight from which an option counts as equilibrium support. */
 export const SUPPORT_MIX = 0.05;
 
-/** The sub-search settings of a verify job: one ply deeper per outcome (the verify round, the answer round and the strand round share them). */
-export const verifyDeepen = (settings: EvalSettings): EvalSettings =>
-  ({ depth: 1, samples: 1, tera: settings.tera, sleepClause: settings.sleepClause, ruleset: settings.ruleset });
-
 /**
  * Round 63 (T78): what the verify step adds to the trees' own view — the
  * played option per side (it joins the support at the nominal mass of the

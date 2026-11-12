@@ -146,31 +146,19 @@ function verifiedValue(trees: MctsTreeStats[], key: number, cell: EvalCellValue,
       ? (cls.leafSum - blend.firstLeaf + cell.deepened) / cls.count
       : cls.leafSum / cls.count;
   };
+  const open = blend.classes.filter(cls => !cls.ended);
   let value = 0;
   for (const cls of blend.classes) {
     if (cls.ended) {
       value += cls.weight * classMean(cls);
       continue;
     }
+    const pool = poolContinuation(trees, key, cls.key, open.length === 1);
     // Round 89 (T322, #59): the class's trust rule (merge-pool.ts), without the depth floor and the endgame clause.
-    const trust = classTrust(trees, key, blend, cls.key);
+    const trust = classPoolTrust(pool.entries);
     value += cls.weight * (trust.deep ? trust.value : classMean(cls));
   }
   return value;
-}
-
-/** The trust of one open class of a verified cell's blend: the pool of the trees that drew it (unkeyed trees join in the one-open-class shape). */
-function classTrust(trees: MctsTreeStats[], key: number, blend: { classes: CellBlendClass[] }, classKey: string): ReturnType<typeof classPoolTrust> {
-  const open = blend.classes.filter(cls => !cls.ended).length;
-  return classPoolTrust(poolContinuation(trees, key, classKey, open === 1).entries);
-}
-
-/**
- * Round 89 (T322, #59), block 2: whether the trees carry an open class's own depth, the very test the merge applies when it
- * prices the class (`verifiedValue`): such a class is read from the trees and is no candidate for a strand search.
- */
-export function classTrusted(trees: MctsTreeStats[], key: number, blend: { classes: CellBlendClass[] }, classKey: string): boolean {
-  return classTrust(trees, key, blend, classKey).deep;
 }
 
 /**
