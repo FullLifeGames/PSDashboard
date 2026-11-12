@@ -148,6 +148,36 @@ export interface CellBlendClass {
 /** Round 89 (T322, #59): the depth a verify round gave one open class of a blend. */
 export type ClassPricing = 'full' | 'light' | 'shift';
 
+/** One strand the round searched: a class of a verified cell of the played row (`P`) or of the best row (`B`), values in the side's own view. */
+export interface StrandRecord {
+  role: 'P' | 'B';
+  classKey: string;
+  /** The class's chance in its cell. */
+  chance: number;
+  /** The label of the opponent's option whose column holds the cell. */
+  column: string;
+  /** The class value before the search (its deepened value, else its leaf mean). */
+  before: number;
+  /** Its full depth-1 value. */
+  searched: number;
+}
+
+/**
+ * Round 89 (T322, #59), block 2: what the strand searches did to one side's regret. `played` and `best` are the choices the
+ * record belongs to (the grade ignores a record whose pair differs from its own), the evs the rows' values against the side's
+ * equilibrium mix with each searched strand moved by `y w (searched - before)`, `regret` the new regret
+ * `max(bestEv, second row) - playedEv`, `regretBefore` the screen's regret before the searches.
+ */
+export interface StrandProbe {
+  played: string;
+  best: string;
+  playedEv: number;
+  bestEv: number;
+  regret: number;
+  regretBefore: number;
+  strands: StrandRecord[];
+}
+
 /**
  * A root boundary cell's analytic class blend. Deepening re-blends through
  * it (reblendValue) instead of overwriting the mixture with one branch.
@@ -259,6 +289,12 @@ export interface EvalResult {
   unanswered?: UnansweredProfile;
   /** Round 35: the forced win proven from this root, when one stands at or above MIN_FORCED_MASS; the score already carries its bar. */
   forcedWin?: ForcedWin;
+  /**
+   * Round 89 (T322, #59), block 2: the strand round's record per side, only for a side whose grade hangs on a shallow-priced
+   * class and for which at least one strand was searched (search/strand-run.ts). The result's scores, matrix and rankings are
+   * the round's own and stay as they are; the grade reads the record (`turn-analysis/grading.ts`).
+   */
+  strands?: { p1?: StrandProbe; p2?: StrandProbe };
   /** Round 77: the engine that answered, when another one than this package's own search (the engine protocol, ENGINES.md). */
   engine?: { id: string; name: string; version?: string };
   /**

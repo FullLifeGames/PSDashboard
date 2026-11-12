@@ -220,13 +220,18 @@ export function extensionJobs(view: AnswerSide, added: number[], deep: number[],
   return added.flatMap(answer => view.rows.map((_, row) => job(view, row, answer, deep.includes(row) ? deepen : undefined)));
 }
 
+/** What the answer round priced for one side: the added answers and the extension's values (the graded ranking and the strand round read both). */
+export interface SideGrade { view: AnswerSide; added: number[]; values: EvalCellValue[] }
+
 /**
- * The graded side's ranking over its listed rows against the listed and the
- * added answers (p1-perspective values: the result's matrix for the listed
- * cells, the extension's values for the added ones). Fields the solve does
- * not make (kill odds, the follow-up line) carry over by choice.
+ * The graded side's grid: its listed rows against the listed and the added answers, `grid[row][answer]` in p1's
+ * perspective (the result's matrix for the listed cells, the extension's values for the added ones; an added cell the
+ * extension did not price reads the answer's first listed value). Round 89 (T322, #59): split out of `gradedRanking`
+ * so the strand round screens the grid the grade reads.
  */
-export function gradedRanking(view: AnswerSide, result: EvalResult, tree: MctsTreeStats, added: number[], values: EvalCellValue[]): RankedChoice[] {
+export function gradedGrid(
+  view: AnswerSide, result: EvalResult, added: number[], values: EvalCellValue[],
+): { answers: EvalChoiceOption[]; grid: number[][] } {
   const matrix = result.matrix!;
   const extra = new Map(values.map(value => {
     const { row, answer } = at(view, value);
@@ -236,7 +241,17 @@ export function gradedRanking(view: AnswerSide, result: EvalResult, tree: MctsTr
   const cell = (row: number, column: number): number => (column < view.listed
     ? (view.side === 'p1' ? matrix.values[row][column] : matrix.values[column][row])
     : extra.get(`${row}:${added[column - view.listed]}`) ?? (view.side === 'p1' ? matrix.values[row][0] : matrix.values[0][row]));
-  const grid = view.rows.map((_, row) => answers.map((__, column) => cell(row, column)));
+  return { answers, grid: view.rows.map((_, row) => answers.map((__, column) => cell(row, column))) };
+}
+
+/**
+ * The graded side's ranking over its listed rows against the listed and the
+ * added answers (p1-perspective values: the result's matrix for the listed
+ * cells, the extension's values for the added ones). Fields the solve does
+ * not make (kill odds, the follow-up line) carry over by choice.
+ */
+export function gradedRanking(view: AnswerSide, result: EvalResult, tree: MctsTreeStats, added: number[], values: EvalCellValue[]): RankedChoice[] {
+  const { answers, grid } = gradedGrid(view, result, added, values);
   const ranked = view.side === 'p1'
     ? rankFromMatrix({ p1Options: view.rows, p2Options: answers, values: grid, ended: grid.map(line => line.map(() => false)) }, tree.rootValue).p1
     : rankFromMatrix({ p1Options: answers, p2Options: view.rows, values: answers.map((_, column) => view.rows.map((__, row) => grid[row][column])), ended: answers.map(() => view.rows.map(() => false)) }, tree.rootValue).p2;

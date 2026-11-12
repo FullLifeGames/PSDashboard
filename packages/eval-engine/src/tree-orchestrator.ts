@@ -8,11 +8,13 @@ import { applyForcedWin, forcedWinInput } from './search/forced-win-apply.ts';
 import { createLocalExecutor } from './search/position.ts';
 import type { EvalCellJob, EvalCellValue, EvalResult, EvalSettings, MctsTreeStats, SearchProgress } from './types.ts';
 import type { StaticRuleset } from './score/weights.ts';
-import { boundaryCheckCells, playedIndices, rowCompletedCells, starvedSupportCells, type VerifyFocus } from './verify-select.ts';
+import { boundaryCheckCells, playedIndices, rowCompletedCells, starvedSupportCells, verifyDeepen, type VerifyFocus } from './verify-select.ts';
 import {
   addedAnswers, answerSides, answersMode, confirmedAnswers, confirmedCells, confirmJobs, deepRows, detectionJobs, extensionJobs, gradedRanking, refutations, siblingJobs,
-  type AnswerSide, type AnswersMode,
+  type AnswerSide, type AnswersMode, type SideGrade,
 } from './search/answers.ts';
+import { strandRound } from './search/strand-run.ts';
+import type { SideId } from '@fulllifegames/replay-core';
 
 /**
  * Round 61: the tree search's orchestration, one place for the app and the
@@ -70,7 +72,7 @@ function runTrees(executor: TreeExecutor, settings: EvalSettings, callbacks?: Or
  * the span now holds the sampling as well.
  */
 async function verifyCells(executor: TreeExecutor, jobs: EvalCellJob[], settings: EvalSettings): Promise<EvalCellValue[]> {
-  const deepen: EvalSettings = { depth: 1, samples: 1, tera: settings.tera, sleepClause: settings.sleepClause, ruleset: settings.ruleset };
+  const deepen = verifyDeepen(settings);
   const started = Date.now();
   const values = await executor.evalCells(jobs.map(job => ({ ...job, deepen })));
   perfAdd('verify-deepen', Date.now() - started);
@@ -151,9 +153,6 @@ async function sideAnswers(
   return { added, known: confirmedCells(view, refuting, deep, added) };
 }
 
-/** What the answer round priced for one side: the added answers and the extension's values (the graded ranking reads both). */
-interface SideGrade { view: AnswerSide; added: number[]; values: EvalCellValue[] }
-
 /** Every listed row against the side's added answers: one plain draw, the deep rows one ply deeper, the confirmed cells as they are. */
 async function sideExtension(
   executor: TreeExecutor, view: AnswerSide, found: SideAnswers, merged: EvalResult, deepen: EvalSettings,
@@ -184,6 +183,14 @@ export async function recheckedRound(
   executor: TreeExecutor, trees: MctsTreeStats[], round: Verified, perSide: EvalResult['perSide'],
   regrade: (merged: EvalResult) => EvalResult['perSide'], settings: EvalSettings,
 ): Promise<EvalResult | null> {
+  return (await recheckedWithValues(executor, trees, round, perSide, regrade, settings))?.result ?? null;
+}
+
+/** `recheckedRound` with the verified cells of the new round beside the result (the strand round screens them). */
+async function recheckedWithValues(
+  executor: TreeExecutor, trees: MctsTreeStats[], round: Verified, perSide: EvalResult['perSide'],
+  regrade: (merged: EvalResult) => EvalResult['perSide'], settings: EvalSettings,
+): Promise<{ result: EvalResult; values: Map<number, EvalCellValue> } | null> {
   const merged = round.result;
   const changed = (['p1', 'p2'] as const).filter(side => perSide[side][0]?.choice !== merged.perSide[side][0]?.choice);
   if (changed.length === 0) return null;
@@ -196,7 +203,7 @@ export async function recheckedRound(
   const values = new Map(round.values);
   for (const value of await verifyCells(executor, jobs, settings)) values.set(cellKey(value.i, value.j), value);
   const remerged = perfSync('main:mcts-merge', () => mergeMctsTrees(trees, values));
-  return { ...remerged, perSide: regrade(remerged) };
+  return { result: { ...remerged, perSide: regrade(remerged) }, values };
 }
 
 /**
@@ -213,26 +220,38 @@ export async function recheckedRound(
 export async function answerRound(
   executor: TreeExecutor, trees: MctsTreeStats[], round: Verified, settings: EvalSettings, callbacks?: OrchestratorCallbacks,
 ): Promise<EvalResult> {
+  return (await answeredRound(executor, trees, round, settings, callbacks)).result;
+}
+
+/** The answer round's result with what it priced: the verified cells (the re-check's included) and, per re-ranked side, its grade (the strand round reads both). */
+interface Answered { result: EvalResult; values: Map<number, EvalCellValue>; answered: Partial<Record<SideId, SideGrade>> }
+
+async function answeredRound(
+  executor: TreeExecutor, trees: MctsTreeStats[], round: Verified, settings: EvalSettings, callbacks?: OrchestratorCallbacks,
+): Promise<Answered> {
   const merged = round.result;
+  const unchanged: Answered = { result: merged, values: round.values, answered: {} };
   const mode = answersMode();
   const sides = mode === 'off' ? null : answerSides(trees[0], merged);
-  if (!sides || stopped(callbacks)) return merged;
+  if (!sides || stopped(callbacks)) return unchanged;
   const started = Date.now();
   try {
-    const deepen: EvalSettings = { depth: 1, samples: 1, tera: settings.tera, sleepClause: settings.sleepClause, ruleset: settings.ruleset };
+    const deepen = verifyDeepen(settings);
     const found = await Promise.all(sides.map(view => sideAnswers(executor, view, merged, mode, deepen)));
-    if (stopped(callbacks) || found.every(side => side.added.length === 0)) return merged;
+    if (stopped(callbacks) || found.every(side => side.added.length === 0)) return unchanged;
     const extending = Date.now();
     perfCount('answer-added', found.reduce((sum, side) => sum + side.added.length, 0));
     const grades = await Promise.all(sides.map(async (view, index): Promise<SideGrade> =>
       ({ view, added: found[index].added, values: await sideExtension(executor, view, found[index], merged, deepen) })));
     perfAdd('answer-extend', Date.now() - extending);
-    if (stopped(callbacks)) return merged;
+    if (stopped(callbacks)) return unchanged;
     const perSide = gradedSides(grades, merged, trees[0]);
-    const rechecked = await recheckedRound(executor, trees, round, perSide, again => gradedSides(grades, again, trees[0]), settings).catch(() => null);
-    return stopped(callbacks) ? merged : rechecked ?? { ...merged, perSide };
+    const rechecked = await recheckedWithValues(executor, trees, round, perSide, again => gradedSides(grades, again, trees[0]), settings).catch(() => null);
+    if (stopped(callbacks)) return unchanged;
+    const answered = Object.fromEntries(grades.filter(grade => grade.added.length > 0).map(grade => [grade.view.side, grade]));
+    return { result: rechecked?.result ?? { ...merged, perSide }, values: rechecked?.values ?? round.values, answered };
   } catch {
-    return merged;
+    return unchanged;
   } finally {
     perfAdd('answer-round', Date.now() - started);
   }
@@ -242,7 +261,14 @@ export async function searchTreesOrchestrated(
   executor: TreeExecutor, settings: EvalSettings, callbacks?: OrchestratorCallbacks,
 ): Promise<EvalResult> {
   const trees = await runTrees(executor, settings, callbacks);
-  const result = await answerRound(executor, trees, await verifiedMerge(executor, trees, settings, callbacks), settings, callbacks);
+  const round = await answeredRound(executor, trees, await verifiedMerge(executor, trees, settings, callbacks), settings, callbacks);
+  const { result } = round;
+  // Round 89 (T322, #59), block 2: the grade's strands, searched once; the record is all the round writes. A sketch pass
+  // (prove false) is replaced by the full pass, which runs the round.
+  const played = playedIndices(trees, result, settings.keepPlayed);
+  const strands = settings.prove === false ? undefined
+    : await strandRound(executor, { trees, result, verified: round.values, answered: round.answered, played, settings }, callbacks);
+  if (strands) result.strands = strands;
   if (stopped(callbacks) || settings.prove === false) return result;
   const started = Date.now();
   const outcome = await executor.prove(forcedWinInput(result, settings));
