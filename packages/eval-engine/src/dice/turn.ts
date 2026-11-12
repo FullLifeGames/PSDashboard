@@ -142,8 +142,9 @@ export function loggedOptions(battle: Battle, logged: { p1: string; p2: string }
       // Round 86 (T306): the condition that makes a stalling move draw its chance to succeed again, as the offer names it
       const stall = offers.find(offer => offer.name.kind === 'stalling' && offer.name.effectId)?.name.effectId;
       if (stall) stalling.set(slot, stall);
-      // Round 86 (T306): the foes the click draws an accuracy for, for a move the log writes without an aim
-      accuracyTargets.set(slot, offers.filter(offer => offer.name.kind === 'accuracy' && offer.name.targetSlot).map(offer => offer.name.targetSlot!));
+      // Round 86 (T306): the foes the click draws an accuracy for, for a move the log writes without an aim. Round 89 (#114): the offer
+      // also names the die of each later hit; the list keeps one entry per target, as before, so the reconstruction's forced list does not move.
+      accuracyTargets.set(slot, offers.filter(offer => offer.name.kind === 'accuracy' && offer.name.hit === undefined && offer.name.targetSlot).map(offer => offer.name.targetSlot!));
     });
   }
   return { clicked, checks, stalling, accuracyTargets, secondariesOf: secondariesIn(battle.dex), selfOf: selfChanceIn(battle.dex), hitsOf: hitsIn(battle.dex) };

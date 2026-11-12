@@ -68,15 +68,15 @@ function exercise(rules: Rules, mode: Mode, move: DexMove, tally: Tally): string
   const problems: string[] = [];
   // every die the natural turn draws is offered
   const offered = new Set(offers.map(offer => dieKey(offer.name)));
-  for (const key of drawnKeys(board, clicks, move.id)) {
-    const [, , target, kind, ...rest] = key.split(':');
-    // round 88 (gate of 08.11.2026): since T337 the engine draws the accuracy of each hit as the simulator does (Triple Axel, Triple
-    // Kick, Population Bomb); the offer names the first hit's die, and the die of a later hit waits for its offer and chip (#114)
-    const laterHit = kind === 'accuracy' && Number(/^hit(\d+)$/.exec(rest.at(-1) ?? '')?.[1] ?? 1) >= 2;
+  // round 89 (#114): a multi-accuracy move draws the die of a later hit only when the earlier hits land, so it plays a few more seeds
+  const dexMove = move as unknown as { multiaccuracy?: boolean };
+  const extra = dexMove.multiaccuracy ? ['5,6,7,8', '9,10,11,12', '13,14,15,16', '17,18,19,20'].flatMap(seed => drawnKeys(sweepBoard(rules, move.id, mode, seed, false, FAST), clicks, move.id)) : [];
+  for (const key of new Set([...drawnKeys(board, clicks, move.id), ...extra])) {
+    const [, , target, kind] = key.split(':');
     // a die the state cannot name before the hit stays unoffered: a move that sets its self effect in its own hit handler
     // (`onTryHit`), and an accuracy aimed at the user (a move that works through its own condition: Bide, Nature Power)
     const lateSelf = kind === 'self-effect' && typeof (dexOfRules(rules).moves.get(move.id) as unknown as { onTryHit?: unknown }).onTryHit === 'function';
-    if (OFFERED_KINDS.has(kind) && !offered.has(key) && !lateSelf && !laterHit && target !== 'p1a') problems.push(`drawn but not offered: ${key}`);
+    if (OFFERED_KINDS.has(kind) && !offered.has(key) && !lateSelf && target !== 'p1a') problems.push(`drawn but not offered: ${key}`);
   }
   if (offers.length === 0) return problems;
   // every offered die, forced, is drawn (the accuracy forced to hit so the dice behind it run)

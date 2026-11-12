@@ -390,3 +390,20 @@ describe('the kinds the log may show and the reader does not name: the census of
     }
   });
 });
+
+// Round 89 (#114): the offer names a die per later hit of a multi-accuracy move, and `loggedOptions` reads the accuracy targets of a click
+// from the offer for a move the log writes with no target. The list stays one entry per target (the reconstruction plays it, ADR 0022).
+describe.each(SWEEP_CASES.filter(entry => entry.rules.generation >= 3))('the accuracy targets of a click are one per target for a multi-accuracy move: $name', ({ rules, mode }) => {
+  const { moves } = sweepMoves(rules, multiAccuracy);
+
+  test('every multi-accuracy move lists its aimed foe once', () => {
+    expect(moves.length).toBeGreaterThan(0);
+    for (const move of moves) {
+      const scene = moveScene(rules, mode, move, { channels: [], options: {} });
+      if (!scene) continue;
+      const clicks = sweepClicks(mode, move.target);
+      const { accuracyTargets } = loggedOptions(scene.board('1,2,3,4'), clicks);
+      expect(accuracyTargets.get('p1a'), `${move.id}: one accuracy target for the one foe`).toEqual(['p2a']);
+    }
+  });
+});

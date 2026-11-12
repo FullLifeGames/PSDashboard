@@ -1,12 +1,13 @@
 import { writeFileSync } from 'node:fs';
 import { afterAll, describe, expect, test } from 'vitest';
 import { loadSimMods } from '../src/forward/sim-mods';
+import { offeredDice } from '../src/dice/offer';
 import { RecordingPRNG } from '../src/dice/prng';
 import { reportOf } from '../src/dice/report';
-import type { ForcedDie } from '../src/dice/types';
+import { dieKey, type ForcedDie } from '../src/dice/types';
 import { watchBattle } from '../src/dice/watch';
 import { copyOf } from '../src/sim-ask/copy';
-import { playClicks, RULES, seedOf, sweepSelection, type Mode, type Rules } from './dice-fixtures';
+import { CHAMPIONS, playClicks, RULES, seedOf, standing, sweepSelection, type Mode, type Rules } from './dice-fixtures';
 import {
   clicksAccepted, dexOfRules, dieOf, forcedOn, missesOf, outfitBoard, sweepBoard, sweepClicks, sweepMoves, SWEEP_CASES, VGC_RULES,
   type DexMove,
@@ -188,6 +189,90 @@ describe.each(CASES.filter(entry => entry.rules.generation >= 3))('the accuracy 
       expect(forced.report.forced[0].reason, `${move.id} with ${label}`).toMatch(/rolls no accuracy for hit 2/);
       expect(forced.battle.log.slice(forced.start).filter(untimed), `${move.id} with ${label}: the log is the natural turn's`).toEqual(natural.lines.filter(untimed));
     }
+  });
+});
+
+// Round 89 (#114): the offer names the accuracy die of each later hit, so the panel can offer a chip for it. Read from the move after
+// `ModifyMove` (Skill Link and Loaded Dice have deleted the flag by then), from the Dex's own `multiaccuracy` and `multihit`.
+describe.each(CASES.filter(entry => entry.rules.generation >= 3))('the offer names a die per hit: $name', ({ rules, mode, vgc }) => {
+  const { moves } = sweepMoves(rules, multiAccuracy);
+  const choiceOf = (move: DexMove) => ({ kind: 'move' as const, moveId: move.id, moveName: move.name, ...(mode === 'doubles' ? { targetLoc: 1 } : {}) });
+  const hitKeysOf = (offers: ReturnType<typeof offeredDice>): string[] => offers.filter(offer => offer.name.hit !== undefined).map(offer => dieKey(offer.name));
+  const wanted = (move: DexMove): string[] => Array.from({ length: hitsOf(move) - 1 }, (_, index) => dieKey({ ...dieOf(move.id, 'p2a', 'accuracy'), hit: index + 2 }));
+  const has = (kind: 'items' | 'abilities', id: string): boolean => {
+    const entry = dexOfRules(rules)[kind].get(id);
+    return entry.exists && entry.gen <= dexOfRules(rules).gen && !entry.isNonstandard;
+  };
+
+  test('the hits 2 to N of the move are offered as the natural turn draws them, and every one, forced, is drawn', () => {
+    for (const move of moves) {
+      const board = sweepBoard(rules, move.id, mode, '1,2,3,4', vgc, FAST);
+      const clicks = sweepClicks(mode, move.target);
+      if (!clicksAccepted(board, clicks)) continue;
+      const before = standing(board);
+      const offers = offeredDice(board, 'p1a', choiceOf(move));
+      expect(standing(board), `${move.id}: the offer leaves the battle as it was`).toBe(before);
+      const offered = hitKeysOf(offers);
+      expect(offered, `${move.id}: one die per later hit, on the aimed foe`).toEqual(wanted(move));
+      expect(offers.filter(offer => offer.name.kind === 'accuracy' && offer.name.hit === undefined).map(offer => dieKey(offer.name)), move.id).toEqual([dieKey(dieOf(move.id, 'p2a', 'accuracy'))]);
+      // forced to land, the natural turn draws exactly the hits the offer names
+      const forced: ForcedDie[] = [yes(move.id), ...offers.filter(offer => offer.name.hit !== undefined).map(offer => ({ name: offer.name, result: { happens: true } }))];
+      const { report, battle, start } = forcedOn(board, clicks, forced);
+      expect(report.forced.map(shown => shown.took), `${move.id}: every offered hit is drawn`).toEqual(Array(hitsOf(move)).fill('applied'));
+      expect(hitcounts(battle.log.slice(start)), move.id).toEqual([hitsOf(move)]);
+    }
+  });
+
+  test.each([
+    ['abilities', 'skilllink', 'Skill Link'],
+    ['items', 'loadeddice', 'Loaded Dice'],
+  ] as const)('%s: %s deletes the flag, so no hit die is offered', (kind, id, label) => {
+    if (!has(kind, id)) return;
+    for (const move of moves.slice(0, 2)) {
+      const board = outfitBoard(rules, mode, { species: FAST, moves: [move.id], ...(kind === 'abilities' ? { ability: label } : { item: label }) }, { species: 'Vaporeon' });
+      if (!clicksAccepted(board, sweepClicks(mode, move.target))) continue;
+      const offers = offeredDice(board, 'p1a', choiceOf(move));
+      expect(hitKeysOf(offers), `${move.id} with ${label}`).toEqual([]);
+      expect(offers.some(offer => offer.name.kind === 'accuracy'), `${move.id} with ${label}: the plain die stays`).toBe(true);
+    }
+  });
+
+  test('a Parental Bond holder with a one-hit move is offered no hit die', () => {
+    if (!has('abilities', 'parentalbond')) return;
+    const board = outfitBoard(rules, mode, { species: FAST, moves: ['tackle'], ability: 'Parental Bond' }, { species: 'Vaporeon' });
+    expect(hitKeysOf(offeredDice(board, 'p1a', { kind: 'move', moveId: 'tackle', moveName: 'Tackle', ...(mode === 'doubles' ? { targetLoc: 1 } : {}) }))).toEqual([]);
+  });
+
+  test('a multi-hit move without the flag is offered no hit die', () => {
+    const { moves: controls } = sweepMoves(rules, move => multihitOf(move) !== undefined && !multiAccuracy(move) && move.category !== 'Status');
+    for (const move of controls) {
+      const board = boardOf(move);
+      if (!clicksAccepted(board, clicksOf(move))) continue;
+      expect(hitKeysOf(offeredDice(board, 'p1a', choiceOf(move))), move.id).toEqual([]);
+    }
+  });
+
+  function boardOf(move: DexMove) { return sweepBoard(rules, move.id, mode, '1,2,3,4', vgc, FAST); }
+  function clicksOf(move: DexMove) { return sweepClicks(mode, move.target); }
+});
+
+// Round 89 (#114), Champions OU 2692379905 turn 2: Meowscarada's Triple Axel hit Garchomp twice and the third hit missed. The panel
+// can set that hit: the offer names it, and forcing it plays the hit the game never rolled.
+describe('the scene of Champions OU 2692379905 turn 2: the third hit of Triple Axel', () => {
+  const board = () => outfitBoard(CHAMPIONS, 'singles', { species: 'Meowscarada', moves: ['tripleaxel'], ability: 'Protean' }, { species: 'Garchomp', ability: 'Rough Skin', item: 'Rocky Helmet' });
+  const clicks = { p1: 'move 1', p2: 'move 1' };
+  const axel = { kind: 'move' as const, moveId: 'tripleaxel', moveName: 'Triple Axel' };
+
+  test('the offer holds the plain die and the dice of hits 2 and 3', () => {
+    const keys = offeredDice(board(), 'p1a', axel).filter(offer => offer.name.kind === 'accuracy').map(offer => dieKey(offer.name));
+    expect(keys).toEqual(['p1a:tripleaxel:p2a:accuracy', 'p1a:tripleaxel:p2a:accuracy:hit2', 'p1a:tripleaxel:p2a:accuracy:hit3']);
+  });
+
+  test.each([[true, 3], [false, 2]] as const)('hit 3 forced to %s plays %i hits', (happens, count) => {
+    const turn = forcedOn(board(), clicks, [yes('tripleaxel'), hitDie('tripleaxel', 2, true), hitDie('tripleaxel', 3, happens)]);
+    expect(hitcounts(turn.battle.log.slice(turn.start))).toEqual([count]);
+    // the third hit takes the last of Garchomp's HP
+    expect(turn.battle.log.slice(turn.start).some(line => line.startsWith('|faint|p2a')), 'Garchomp faints on hit 3 only').toBe(happens);
   });
 });
 
