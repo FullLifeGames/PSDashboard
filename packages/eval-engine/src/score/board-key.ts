@@ -73,6 +73,16 @@ function stagesKey(stages: unknown, reads: ReadSet): string {
   return Object.keys(all).sort().filter(stat => DAMAGE_STAGES.includes(stat) || reads.has('boosts')).map(stat => `${stat}${all[stat]}`).join('/');
 }
 
+/**
+ * The own fields whose readers in the Dex all test them against zero: they are keyed as that predicate. The turns a body has
+ * stood (`activeTurns`) is read by Stakeout, Mountaineer, Rebound, Speed Boost, Slow Start, Truant, Electrify, Taunt, Octolock and
+ * a partial trap, each as "a foe that came in this turn", "past the first turn". test/board-key-predicate.spec.ts plays every
+ * reader the scan names at 1, 4 and 17 in every rule set and requires equal plays and keys.
+ */
+const PREDICATES: Record<string, (value: unknown) => string> = {
+  activeTurns: value => (typeof value === 'number' && value > 0 ? '1' : valueKey(value)),
+};
+
 /** One own field of an object by its class: '' where the field is left out. */
 function fieldKey(owner: Owner, name: string, value: unknown, reads: ReadSet, consumer: Consumer, withHp = false): string {
   if (owner === 'pokemon' && name === 'boosts' && consumer === 'hit') return `boosts=${stagesKey(value, reads)}`;
@@ -82,7 +92,7 @@ function fieldKey(owner: Owner, name: string, value: unknown, reads: ReadSet, co
     case 'inert':
       return '';
     case 'read':
-      return reads.has(name) ? `${name}=${valueKey(value)}` : '';
+      return reads.has(name) ? `${name}=${owner === 'pokemon' && PREDICATES[name] ? PREDICATES[name](value) : valueKey(value)}` : '';
     case 'effect':
       return `${name}:${effectsOf(owner, name, value, reads, consumer)}`;
     default:
