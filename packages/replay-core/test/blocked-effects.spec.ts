@@ -53,6 +53,36 @@ describe('Doubles OU 2663093831: the Intimidate and the Rock Slide flinch rule o
   });
 });
 
+describe('an Intimidate that a Transform copied: the log names the ability, so the drop still rules out the guards', () => {
+  // Doubles OU 2543203909 turn 5: Mew transforms into Incineroar and Intimidate lowers the Attack of Dragonite.
+  const copied = (target: PlayBody, format = DOUBLES) => play({
+    format, p1: [mon('Mew', 'Synchronize', ['Transform']), FILLER, FILLER, FILLER], p2: [mon('Incineroar', 'Intimidate'), target, FILLER, FILLER],
+    turns: [{ p1: 'move 1 1, move 1', p2: 'move 1, move 1' }],
+  });
+
+  test('Mew copies Intimidate and lowers Dragonite: Inner Focus is out (Doubles OU, VGC SV)', () => {
+    const log = copied(mon('Dragonite', 'Multiscale'));
+    expect(log).toContain('|-ability|p1a: Mew|Intimidate|boost');
+    expect(log).toContain('|-unboost|p2b: Dragonite|atk|1');
+    expect(ruledOut(log, 'p2', 'Dragonite')).toEqual(['innerfocus']);
+  });
+
+  test('the same copy under the Champions mod (Champions VGC)', () => {
+    expect(ruledOut(copied(mon('Dragonite', 'Multiscale'), CHAMPIONS), 'p2', 'Dragonite')).toEqual(['innerfocus']);
+  });
+
+  test('Trace copies Intimidate from a foe: the same drop on the foe\'s partner (the source is no Intimidate species)', () => {
+    const log = play({
+      format: DOUBLES, p1: [mon('Gardevoir', 'Trace'), FILLER, FILLER, FILLER], p2: [mon('Incineroar', 'Intimidate'), mon('Dragonite', 'Multiscale'), FILLER, FILLER],
+      turns: [{ p1: 'move 1, move 1', p2: 'move 1, move 1' }],
+    });
+    expect(log).toContain('|-unboost|p2b: Dragonite|atk|1');
+    expect(ruledOut(log, 'p2', 'Dragonite')).toEqual(['innerfocus']);
+  });
+
+  // Singles has no row: the foe of the copier is the body it copied from, and that body's Intimidate is on the log already.
+});
+
 describe('a landed flinch rules out the ability that refuses it', () => {
   test('singles: Mienshao keeps Regenerator and Reckless, loses Inner Focus', () => {
     expect(ruledOut(singles(mon('Smeargle', '', ['Fake Out']), mon('Mienshao', 'Regenerator')), 'p1', 'Mienshao')).toEqual([]);

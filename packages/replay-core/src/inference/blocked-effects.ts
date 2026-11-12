@@ -16,7 +16,8 @@ import { arg, fromEffect, hasKw, identOf, keyOf, type LogLine } from './log-line
  * The effect's source comes from the log: the Intimidate-like ability line just before a drop, the move resolving now (a status move's
  * own effect, or a secondary of a damaging move: read from the Dex move's own data), or, for a flinch, a move that hit the body this turn.
  * A body's candidates are the abilities of its species less the rule-outs (`possibleAbilities`); each is asked for every source the line
- * could name and every ability the source's species could hold (a Mold Breaker kin sets `ignoreAbility` on the twin's move event, and the
+ * could name and every ability the source's species could hold (a drop an ability line announced takes that ability, whatever copied it: Transform, Trace;
+ * a Mold Breaker kin sets `ignoreAbility` on the twin's move event, and the
  * battle's own `suppressingAbility` then skips the breakable handlers), and counts as blocked only when it refuses in all of them while
  * the same scene with no ability lets the effect land (a scene the log contradicts proves nothing). The ally of the body is asked too in
  * doubles: Flower Veil, Sweet Veil and the other guards of the `onAlly` kind refuse for their ally.
@@ -137,7 +138,8 @@ interface Holder { ident: string; species: string; role: 'self' | 'partner' }
 function refuses(state: InferrerState, weather: string, holder: Holder, partner: Holder | null, ability: string, causes: Cause[], effectTarget: Holder): boolean {
   const dex = dexOf(state);
   return causes.length > 0 && causes.every(cause => {
-    const abilities = sourceAbilities(state, cause.source);
+    // An ability the log announced (Intimidate) is the source's own at that moment, whatever its species or a Transform or Trace gave it.
+    const abilities = cause.route === 'ability' && cause.ability ? [dex.abilities.get(cause.ability).name] : sourceAbilities(state, cause.source);
     const species = state.identSpecies.get(cause.source) ?? clientPokemon(state, cause.source)?.speciesForme;
     if (!abilities || !species) return false;
     const scene = (given: string, sourceAbility: string): EffectScene => ({

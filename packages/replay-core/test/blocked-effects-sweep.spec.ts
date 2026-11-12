@@ -72,13 +72,22 @@ const SCENES: Scene[] = [
 ];
 
 const SEEDS = Array.from({ length: 60 }, (_, index) => `${index + 1},2,3,4`);
-const SOURCE: PlayBody = { species: 'Smeargle', ability: '' };
+/**
+ * The source of every scene: a species that learns every move the scenes use, holding an ability its species has. A source with no ability is
+ * a body the game never plays, and Trace copies it as nothing (the first full run read "Ralts confusion: trace" as a false rule-out: the
+ * only ability Smeargle has in Generation 3 is Own Tempo, which Trace copies, and which refuses confusion). The second ability is the
+ * one that touches no scene (Technician); the first stands where a generation has one.
+ */
+const sourceOf = (realm: Realm): PlayBody => {
+  const abilities = dexOf(realm).species.get('Smeargle').abilities as Record<string, string>;
+  return { species: 'Smeargle', ability: abilities['1'] ?? abilities['0'] };
+};
 const FILLER: PlayBody = { species: 'Chansey', ability: 'Natural Cure' };
 
 const aimOf = (dex: RulesDex, move: string, doubles: boolean) => (doubles && ['normal', 'any', 'adjacentFoe'].includes(dex.moves.get(move).target) ? ' 1' : '');
 
 /** One battle: the source (and a filler) against the target (and the ally, else a filler). */
-function battleOf(realm: Realm, doubles: boolean, scene: Scene, target: PlayBody, ally: PlayBody | null, seed: string, user: PlayBody = SOURCE): string {
+function battleOf(realm: Realm, doubles: boolean, scene: Scene, target: PlayBody, ally: PlayBody | null, seed: string, user: PlayBody = sourceOf(realm)): string {
   const dex = dexOf(realm);
   const source = { ...user, ability: scene.sourceAbility ?? user.ability, moves: scene.moves, name: 'Source' };
   return play({
@@ -91,7 +100,7 @@ function battleOf(realm: Realm, doubles: boolean, scene: Scene, target: PlayBody
 }
 
 /** The log of the scene with the first seed that shows the effect on a target with no ability, null when none does. */
-function baseline(realm: Realm, doubles: boolean, scene: Scene, target: PlayBody, ally: PlayBody | null, user: PlayBody = SOURCE): { log: string; seed: string } | null {
+function baseline(realm: Realm, doubles: boolean, scene: Scene, target: PlayBody, ally: PlayBody | null, user: PlayBody = sourceOf(realm)): { log: string; seed: string } | null {
   for (const seed of SEEDS) {
     const log = battleOf(realm, doubles, scene, target, ally, seed, user);
     if (scene.landed.test(log)) return { log, seed };
@@ -104,7 +113,7 @@ function baseline(realm: Realm, doubles: boolean, scene: Scene, target: PlayBody
  * effect needs many, an ability that halves a status move's accuracy needs a few). A target that transforms into the source (Imposter) is
  * no refusal: it copies the source's moves, and the scene then plays another battle.
  */
-function landsWith(realm: Realm, doubles: boolean, scene: Scene, target: PlayBody, ally: PlayBody | null, seed: string, user: PlayBody = SOURCE): boolean {
+function landsWith(realm: Realm, doubles: boolean, scene: Scene, target: PlayBody, ally: PlayBody | null, seed: string, user: PlayBody = sourceOf(realm)): boolean {
   const first = battleOf(realm, doubles, scene, target, ally, seed, user);
   if (scene.landed.test(first) || /\|-transform\|/.test(first)) return true;
   const others = SEEDS.slice(0, scene.chance ? SEEDS.length : 12).filter(other => other !== seed);
@@ -120,6 +129,12 @@ function ruledOutOf(log: string, species: string): string[] {
 }
 
 const GUARD = /^on(Try(AddVolatile|Boost|Hit)|SetStatus|Immunity|ModifySecondaries|Ally(Try|SetStatus))/;
+/**
+ * The abilities every run plays, one for each kind of row the full run's first reading found red (D6b; the sampled default run played
+ * none of them): an ability that copies the foe's (a source ability decides it), a weather guard (the ally's twin under sun), a redirect
+ * the move never gets past (the effect never reaches the target), a field the ability sets on entry (the move itself is stopped).
+ */
+const ALWAYS = ['trace', 'leafguard', 'lightningrod', 'psychicsurge'];
 /** Doubles take far longer than singles: the default run plays two generations of them (the oldest ally rules and the newest; the Champions mod in singles only). */
 const DOUBLES_DEFAULT = ['Generation 5', 'Generation 9'];
 const doublesRealms = (): Realm[] => REALMS.filter(realm => FULL || DOUBLES_DEFAULT.includes(realm.name));
@@ -132,7 +147,7 @@ function speciesPerAbility(dex: RulesDex): Map<string, { species: string; abilit
   let guards = 0;
   abilities.forEach((ability, index) => {
     const guard = Object.keys(ability).some(key => GUARD.test(key));
-    if (!FULL && (guard ? guards++ % 3 !== 0 : index % 24 !== 0)) return;
+    if (!FULL && !ALWAYS.includes(ability.id) && (guard ? guards++ % 3 !== 0 : index % 24 !== 0)) return;
     const holders = species.filter(entry => Object.values(entry.abilities).includes(ability.name));
     const holder = holders.find(entry => new Set(Object.values(entry.abilities)).size >= 2) ?? holders[0];
     if (holder) picks.set(holder.name, { species: holder.name, abilities: [...new Set(Object.values(holder.abilities) as string[])], guard });
@@ -147,10 +162,21 @@ function speciesPerAbility(dex: RulesDex): Map<string, { species: string; abilit
  * volatile). Each is a TODO proposal for the final gate (lanes/D/d6-todo-proposals.md); a pin the reader now reads turns the row red.
  */
 const UNREAD: Record<string, string[]> = {
-  'flinch (Fake Out)': ['armortail', 'dazzling', 'queenlymajesty'],
+  // Psychic Surge: the terrain it sets on entry (a line of the log of its own) stops the priority move before it lands.
+  'flinch (Fake Out)': ['armortail', 'dazzling', 'queenlymajesty', 'psychicsurge'],
   'secondary drop (Mud-Slap)': ['eartheater'],
   // The gas stops the activation of the source's Intimidate on the field; the log of a holder shows the gas itself, so the log without it is the absence read.
   Intimidate: ['neutralizinggas'],
+};
+
+/**
+ * The same for the ally sweep: an ally with Lightning Rod draws the Thunder Wave aimed at its partner (the redirect is the ability's own
+ * line on the log), so with the ability the effect never reaches the body the scene looks at; the redirect is no refusal of the effect.
+ * The target sweep reads the ability (the holder's own immunity is a `TryHit`), so the pin stands here only.
+ */
+const UNREAD_ALLY: Record<string, string[]> = {
+  'paralysis (Thunder Wave)': ['lightningrod'],
+  'paralysis under sun': ['lightningrod'],
 };
 
 interface Verdict { missed: string[]; falseRuleOuts: string[]; stalePins: string[]; played: number; skipped: number }
@@ -194,18 +220,19 @@ function sweepAllies(realm: Realm): Verdict {
   const dex = dexOf(realm);
   const verdict: Verdict = { missed: [], falseRuleOuts: [], stalePins: [], played: 0, skipped: 0 };
   const holders = dex.species.all().filter(entry => entry.exists && entry.gen <= dex.gen && !entry.battleOnly && !String(entry.isNonstandard ?? '').startsWith('Future'));
-  const grass = holders.find(entry => entry.types.length === 1 && entry.types[0] === 'Grass')!;
-  const other = holders.find(entry => entry.types.length === 1 && entry.types[0] === 'Normal')!;
+  // The inference keeps one team entry per species (a format with Species Clause, as every ladder and tournament one): a target of the ally's
+  // own species would share its entry, so the target's own rule-outs (Leaf Guard under sun) would read as the ally's. Targets are another species.
+  const targetsOf = (ally: string) => ['Grass', 'Normal'].map(type => holders.find(entry => entry.name !== ally && entry.types.length === 1 && entry.types[0] === type)!);
   const abilities = dex.abilities.all().filter(ability => ability.exists && ability.gen <= dex.gen && ability.id !== 'noability');
   const allyOf = (ability: (typeof abilities)[number]) => holders.find(entry => Object.values(entry.abilities).includes(ability.name));
   const picks = new Map<string, { species: string; abilities: string[] }>();
   abilities.forEach((ability, index) => {
     const ally = allyOf(ability);
-    if (ally && (Object.keys(ability).some(key => key.startsWith('onAlly')) || (FULL && index % 3 === 0))) picks.set(ally.name, { species: ally.name, abilities: [...new Set(Object.values(ally.abilities) as string[])] });
+    if (ally && (Object.keys(ability).some(key => key.startsWith('onAlly')) || ALWAYS.includes(ability.id) || (FULL && index % 3 === 0))) picks.set(ally.name, { species: ally.name, abilities: [...new Set(Object.values(ally.abilities) as string[])] });
   });
   for (const pick of picks.values()) {
     for (const scene of SCENES.filter(entry => entry.single && entry.minGen <= realm.gen)) {
-      for (const target of [grass, other]) {
+      for (const target of targetsOf(pick.species)) {
         const body = { species: target.name, ability: '' };
         const base = baseline(realm, true, scene, body, { species: pick.species, ability: '' });
         if (!base) { verdict.skipped++; continue; }
@@ -215,7 +242,7 @@ function sweepAllies(realm: Realm): Verdict {
         const got = ruledOutOf(base.log, pick.species);
         const label = `${pick.species} beside ${target.name}, ${scene.id}`;
         for (const id of got) if (!expected.includes(id) && !['levitate', 'magicguard'].includes(id)) verdict.falseRuleOuts.push(`${label}: ${id}`);
-        for (const id of expected) if (!got.includes(id) && !UNREAD[scene.id]?.includes(id)) verdict.missed.push(`${label}: ${id}`);
+        for (const id of expected) if (!got.includes(id) && !UNREAD[scene.id]?.includes(id) && !UNREAD_ALLY[scene.id]?.includes(id)) verdict.missed.push(`${label}: ${id}`);
       }
     }
   }
