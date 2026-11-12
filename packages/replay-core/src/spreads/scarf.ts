@@ -27,6 +27,13 @@ export interface SpeedKnowledge {
   spreadKnown: boolean;
   /** Usage spreads of the species in the format; empty without usage. */
   spreads: { nature: string; evs: PokemonEvs; probability: number }[];
+  /**
+   * The items the species' usage lists, in usage order, that the log does not refute (round 89, #75: the item rung swaps in the first damage-boost
+   * item among them that makes a refuted knockout reach). Absent or empty: nothing to offer.
+   */
+  itemOffers?: readonly string[];
+  /** The format's Item Clause: at most this many Pokémon of a team hold the same item. Absent: no clause (a Custom Game). */
+  itemLimit?: number;
 }
 /** Keyed `side:speciesId`. */
 export type SpeedKnowledgeMap = Map<string, SpeedKnowledge>;

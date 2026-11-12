@@ -11,6 +11,11 @@ import { CORPUS, rebuildThrough } from './rebuild-through';
  * Round 89 (lane M): a row that passes without a refusal due tests nothing, so every row that is not a guard also asserts that the click
  * the log shows is unplayable on the board at the start of the turn (the request lacks the move, or lists it disabled): without the
  * stand-in the simulator would refuse it. A row whose scene drifts away turns red there. A guard row asserts only what the turn adds.
+ *
+ * Round 89 (#139): the rows 902024 turn 24 and 2694097898 turn 6 showed a Ditto that copied a Darkrai or a Dragonite and played a move of
+ * the copied body. The inference now books such a move to its target, so the built copy holds it and the click is playable at the start
+ * of the turn: the two scenes moved to `transform-booking-corpus.spec.ts`. The singles and Doubles OU rows now read a reflected and a
+ * danced move (a click that names a move the body never knew), which the stand-in still replaces.
  */
 
 /**
@@ -22,8 +27,8 @@ interface Row { id: string; turn: number; type: string; what: string; side?: 'p1
 
 const ROWS: Row[] = [
   { id: 'gen9vgc2025regg-2318522075', turn: 7, type: 'VGC', what: 'Disable stops Dragonite and the log shows Struggle (a Choice item held it)', click: { slot: 'p2b', move: 'Struggle' } },
-  { id: 'smogtours-gen6ubers-902024', turn: 24, type: 'Gen 6 Ubers', what: 'a refused move in singles', click: { slot: 'p1a', move: 'Sludge Bomb' } },
-  { id: 'gen9doublesou-2694097898', turn: 6, type: 'Doubles OU', what: 'a refused move in doubles (the p1 side drifts: Chi-Yu enters a turn early)', side: 'p2', click: { slot: 'p1a', move: 'Protect' } },
+  { id: 'smogtours-gen7ubers-900749', turn: 79, type: 'Gen 7 Ubers', what: 'a refused move in singles: Magic Bounce shows Sableye playing Defog, which it never knew', click: { slot: 'p2a', move: 'Defog' } },
+  { id: 'gen9doublesou-2695384737', turn: 2, type: 'Doubles OU', what: 'a refused move in doubles: Dancer shows Oricorio playing Fiery Dance, a dance it copied', click: { slot: 'p2a', move: 'Fiery Dance' } },
   { id: 'gen9championsvgc2026regmc-2693006013', turn: 11, type: 'Champions VGC', what: 'Encore lands, then Disable stops Archaludon\'s Dragon Pulse', click: { slot: 'p2a', move: 'Dragon Pulse' } },
   { id: 'gen9championsvgc2026regmc-2693006013', turn: 12, type: 'Champions VGC', what: 'the turn after the Encore then Disable shape', guard: true },
   { id: 'gen9championsvgc2026regmb-2674079451', turn: 5, type: 'Champions VGC', what: 'Encore then Disable on Toxapex', click: { slot: 'p2b', move: 'Infestation' } },

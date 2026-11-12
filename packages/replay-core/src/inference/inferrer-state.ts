@@ -9,6 +9,7 @@ import type { TriggerWatch } from './trigger-evidence.ts';
 import type { ScreenWatch } from './screen-evidence.ts';
 import type { FieldWatch } from './field-evidence.ts';
 import type { HitWalk } from './hits.ts';
+import type { BlockedWatch } from './blocked-effects.ts';
 import { arg, type LogLine } from './log-line.ts';
 
 /** The scan state one team inference carries from line to line. */
@@ -60,6 +61,8 @@ export interface InferrerState {
   fieldWatch?: FieldWatch;
   /** The client walk that collects each opponent attacker's clean hits (round 67, T130); hits.ts creates it. */
   hitWalk?: HitWalk;
+  /** The abilities a landed effect rules out (round 89, #110); blocked-effects.ts creates it. */
+  blockedWatch?: BlockedWatch;
 }
 
 export function createInferrerState(lines: readonly LogLine[], opponentSide: 'p1' | 'p2'): InferrerState {

@@ -3,11 +3,12 @@ import { revealedField, unknownEvs, unknownField } from '../team-info.ts';
 import { canHaveDancer, findPokemon, ruleOut, type InferrerState } from './inferrer-state.ts';
 import { revealMarkerForme, teamSpecies, unknownFormeMarkerFor } from './lookup.ts';
 import { abilityHolderIdent } from './ability-holder.ts';
-import { ATTACKER_PUNISH_ITEMS, ownMove } from './client-facts.ts';
+import { ATTACKER_PUNISH_ITEMS, bookingIdent, ownMove } from './client-facts.ts';
 import { arg, detailsOf, fromEffect, hasKw, identOf, kwText, ofIdent, type LogLine } from './log-line.ts';
 import { bookPowerMove, readPowerMove } from './power-moves.ts';
 import { toId } from '../ids.ts';
 import { choiceItems } from '../dex-facts/index.ts';
+import { mayIgnoreAbility } from '../sim-ask/effect-refusal.ts';
 import type { PokemonFieldInfo } from '../types.ts';
 
 /** `|-item|` sources that mean the holder ACQUIRED the item mid-game — not its set item. */
@@ -26,8 +27,6 @@ export const SWAP_ITEM_SOURCES: Record<string, Set<string>> = {
 export const ITEM_HANDOVER_ACTIVATIONS: Record<string, Set<string>> = { ability: new Set(['Symbiosis']) };
 /** Swap moves whose resolving-move context pairs giver and receiver (no [of] emitted). */
 const SWAP_PAIR_MOVES = new Set(['trick', 'switcheroo', 'thief', 'covet']);
-/** A landed Ground move from a possible immunity-breaker proves nothing about Levitate. */
-const MOLD_BREAKER_ABILITIES = new Set(['moldbreaker', 'teravolt', 'turboblaze']);
 
 /**
  * The item is still open: nothing shown, or only the team preview's flag
@@ -106,7 +105,11 @@ export function noteEntry(state: InferrerState, line: LogLine) {
   state.plainMovesSince.delete(ident);
 }
 
-/** A landed Ground move rules out Levitate — unless the attacker may break immunities. */
+/**
+ * A landed Ground move rules out Levitate, unless the attacker may ignore the target's ability: the simulator's own `ModifyMove` event
+ * says which abilities of its species do (round 89, #110: the list of Mold Breaker, Teravolt and Turboblaze is gone, one reader
+ * serves blocked-effects.ts too).
+ */
 function ruleOutLevitate(state: InferrerState, nickname: string) {
   const { pendingMove } = state;
   if (!pendingMove) return;
@@ -114,11 +117,8 @@ function ruleOutLevitate(state: InferrerState, nickname: string) {
   const ignore = move.ignoreImmunity as boolean | Record<string, boolean> | undefined;
   const ignoresGround = ignore === true || (typeof ignore === 'object' && !!ignore?.Ground);
   const attackerSpecies = state.identSpecies.get(pendingMove.attacker);
-  const possiblyMoldBreaker = attackerSpecies
-    ? Object.values(dexOf(state).species.get(attackerSpecies).abilities ?? {})
-      .some(ability => MOLD_BREAKER_ABILITIES.has(toId(String(ability))))
-    : false;
-  if (move.type === 'Ground' && !ignoresGround && !possiblyMoldBreaker) {
+  const possiblyIgnoring = attackerSpecies ? mayIgnoreAbility(dexOf(state), attackerSpecies, pendingMove.moveName) !== false : false;
+  if (move.type === 'Ground' && !ignoresGround && !possiblyIgnoring) {
     ruleOut(state, nickname, 'abilities', 'levitate');
   }
 }
@@ -202,8 +202,11 @@ function blockedMoveLine(line: LogLine): LogLine | null {
 /** Move: |move|p2a: Nickname|Move Name|target, or the move of a |cant| line; the client's rule decides which move the line books (T108 step 2). */
 export function recordMove(state: InferrerState, line: LogLine) {
   const moveLine = line.cmd === 'cant' ? blockedMoveLine(line) : line;
-  const nickname = moveLine?.cmd === 'move' ? sideSubject(moveLine, state.opponentSide) : null;
-  if (!moveLine || nickname === null) return;
+  if (!moveLine || moveLine.cmd !== 'move') return;
+  // Round 89 (#139): a copy's move books to the body it copied, whichever side the copy stands on.
+  const booked = identOf(bookingIdent(state, arg(moveLine, 1)));
+  if (booked?.side !== state.opponentSide) return;
+  const nickname = booked.name;
   const moveName = ownMove(state, moveLine);
   if (!moveName) return;
 
