@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs';
 import { loadSimMods } from '../src/forward/sim-mods';
 import { STRAND_CAP_DOUBLES, STRAND_CAP_SINGLES } from '../src/search/strand-round';
 import { createLocalTreeExecutor, searchTreesOrchestrated } from '../src/tree-orchestrator';
+import { analyzeTurn } from '../src/analysis';
+import type { PlayedTurn } from '../src/played';
 import { TIER_THRESHOLDS } from '../src/turn-analysis/types';
 import type { EvalCellJob, EvalResult, EvalSettings } from '../src/types';
 import type { StaticRuleset } from '../src/eval-function';
@@ -50,6 +52,15 @@ async function run(name: string, over: { refuse?: boolean; played?: boolean; pro
   return out;
 }
 
+/** The grade of the board's turn with and without the record: the acquittal reads the record the way the app's graph carries it (`scoreBefore` is the result's own score there). */
+function grades(name: string, result: EvalResult) {
+  const at = (withRecord: boolean) => analyzeTurn({
+    turn: 2, result: withRecord ? result : { ...result, strands: undefined }, played: fixture(name).keepPlayed as PlayedTurn,
+    playedOutcome: null, scoreBefore: result.score, scoreAfter: null,
+  });
+  return { plain: at(false), graded: at(true) };
+}
+
 const classCount = (jobs: EvalCellJob[]) => jobs.reduce((sum, job) => sum + (job.strands?.length ?? 0), 0);
 const SLOW = { timeout: 900_000 };
 
@@ -72,6 +83,14 @@ describe('the strand round on real boards', () => {
     expect(record.regret).toBeLessThan(TIER_THRESHOLDS.mistake);
     // The record belongs to the grade's pair: the played row is not the first one, the best row is.
     expect(result.perSide.p1[0].choice).toBe(record.best);
+    // Stage 4: the grade reads the record. The mistake softens to an inaccuracy and names the burn; the score and the regret stay.
+    const { plain, graded } = grades('cv2688023429t2', result);
+    expect(plain.p1.tier).toBe('mistake');
+    expect(plain.p1.strand).toBeUndefined();
+    expect(graded.p1.tier).toBe('inaccuracy');
+    expect(graded.p1.strand).toMatchObject({ role: 'P', classKey: FLARE, chance: 0.1, tier: 'inaccuracy' });
+    expect(graded.p1.regret).toBe(plain.p1.regret);
+    expect(graded.p2.tier).toBe(plain.p2.tier);
   });
 
   test('o1/o3: the round writes only the record; a lost worker leaves the run without one and otherwise equal, field by field', SLOW, async () => {
@@ -103,6 +122,10 @@ describe('the strand round on real boards', () => {
     expect(record.strands.every(strand => strand.role === 'P' || strand.role === 'B')).toBe(true);
     expect(record.regret).toBeGreaterThan(record.regretBefore);
     expect(result.perSide.p2[0].choice).toBe(record.best);
+    // Stage 4: a record that raises the regret leaves the grade as it was.
+    const { plain, graded } = grades('vgc2629760324t4', result);
+    expect(graded.p2.tier).toBe(plain.p2.tier);
+    expect(graded.p2.strand).toBeUndefined();
   });
 
   test('Doubles OU 937928 t6: the answer round ran, no strand passes, nothing goes out', SLOW, async () => {
@@ -127,5 +150,10 @@ describe('the strand round on real boards', () => {
     expect(record.regret).toBeLessThan(record.regretBefore);
     expect(record.regret).toBeGreaterThanOrEqual(TIER_THRESHOLDS.inaccuracy);
     expect(result.perSide.p2[0].choice).toBe(record.best);
+    // Stage 4, singles: the record softens nothing, so the inaccuracy stays and no strand is named.
+    const { plain, graded } = grades('singles6', result);
+    expect(plain.p2.tier).toBe('inaccuracy');
+    expect(graded.p2.tier).toBe('inaccuracy');
+    expect(graded.p2.strand).toBeUndefined();
   });
 });

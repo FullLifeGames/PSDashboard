@@ -242,6 +242,14 @@ export interface SideAnalysis {
    */
   sensitivity?: { species: string; alternatives: { item: string; tier: VerdictTier | 'none' }[] };
   /**
+   * Round 89 (T322, #59), block 2: the strand round searched a shallow-priced class this verdict hung on, and the regret after
+   * the search lands in a softer band. The tier above is already that softer tier (acquit-only: a search never adds blame).
+   * `role` P: a class of the played row (the played line is better than it read); B: a class of the best row (the better
+   * line falls short when its die goes wrong). `classKey` names the move and its die as the verify round keys it, `chance`
+   * the class's weight in its cell, `column` the opponent option whose column holds the cell, `tier` the verdict after it.
+   */
+  strand?: { role: 'P' | 'B'; classKey: string; chance: number; column: string; tier: VerdictTier | 'none' };
+  /**
    * How many ranked options sit within an inaccuracy of best — the side's
    * real decision breadth. Both sides clearing BREADTH_MIN_OPTIONS turns a
    * culprit-free shift into an "open turn" in the narrative.

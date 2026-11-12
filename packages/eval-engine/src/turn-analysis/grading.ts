@@ -1,5 +1,5 @@
 import { dexOf } from '@fulllifegames/replay-core';
-import type { RankedChoice } from '../types.ts';
+import type { RankedChoice, StrandProbe } from '../types.ts';
 import type { PlayedAction, SackInfo } from '../played.ts';
 import {
   DECIDED_SCORE, REGRET_THRESHOLD, RISK_PAYOFF_MARGIN, demoteTier, tierOf,
@@ -128,6 +128,43 @@ function sideVerdict(
   return { sacrificed: praised, feedVerified: praised, tier: undefined };
 }
 
+const TIER_RANK: Record<VerdictTier | 'none', number> = { none: 0, inaccuracy: 1, mistake: 2, blunder: 3 };
+
+/** The strand the record owes its softer regret most: the largest chance times the move toward the played row, else the largest move. */
+function leadingStrand(record: StrandProbe): StrandProbe['strands'][number] {
+  const help = (strand: StrandProbe['strands'][number]) => (strand.role === 'P' ? 1 : -1) * (strand.searched - strand.before);
+  const weigh = (strand: StrandProbe['strands'][number]) => strand.chance * help(strand);
+  const helping = record.strands.filter(strand => help(strand) > 0);
+  const pool = helping.length > 0 ? helping : record.strands;
+  return pool.reduce((a, b) => (Math.abs(weigh(b)) > Math.abs(weigh(a)) ? b : a));
+}
+
+/**
+ * Round 89 (T322, #59), block 2: the strand acquittal. The strand round (search/strand-run.ts) searched the shallow-priced
+ * classes the grade hangs on and wrote the side's regret after them. The record belongs to the grade only when it names the
+ * grade's own played and best choices. The regret it gives goes through the same verdict as the plain one (decided position,
+ * sack leniency, `sideVerdict`), and the softer tier wins: a deeper read never adds blame. The score, the ranking and the
+ * regret field stay as the engine read them.
+ */
+function strandAcquittal(
+  params: AnalyzeTurnParams,
+  key: Side,
+  g: SackGrade,
+  verdict: SackVerdict,
+): { verdict: SackVerdict; strand: SideAnalysis['strand'] } {
+  const record = params.result.strands?.[key];
+  if (!record || !verdict.tier || !g.played || record.played !== g.played.choice || record.best !== params.result.perSide[key][0]?.choice) {
+    return { verdict, strand: undefined };
+  }
+  const probed = sideVerdict(params, key, { ...g, regret: record.regret });
+  if (TIER_RANK[probed.tier ?? 'none'] >= TIER_RANK[verdict.tier]) return { verdict, strand: undefined };
+  const lead = leadingStrand(record);
+  return {
+    verdict: probed,
+    strand: { role: lead.role, classKey: lead.classKey, chance: lead.chance, column: lead.column, tier: probed.tier ?? 'none' },
+  };
+}
+
 /**
  * Item-sensitivity: if the verdict changes band under a usage-plausible
  * alternative item for an opposing mon whose item is only a guess, the
@@ -141,13 +178,12 @@ function sensitivityAcquittal(
   let softened = tier;
   let sensitivity: SideAnalysis['sensitivity'];
   if (tier && probes && probes.length > 0) {
-    const rank: Record<VerdictTier | 'none', number> = { none: 0, inaccuracy: 1, mistake: 2, blunder: 3 };
     const probed = probes.map(probe => ({
       probe,
       tier: tierOf(Math.max(0, probe.bestEv - probe.playedEv)) ?? 'none' as const,
     }));
-    const charitable = probed.reduce((a, b) => (rank[b.tier] < rank[a.tier] ? b : a));
-    if (rank[charitable.tier] < rank[tier]) {
+    const charitable = probed.reduce((a, b) => (TIER_RANK[b.tier] < TIER_RANK[a.tier] ? b : a));
+    if (TIER_RANK[charitable.tier] < TIER_RANK[tier]) {
       sensitivity = {
         species: charitable.probe.species,
         alternatives: probed
@@ -180,6 +216,8 @@ export interface SideGrading {
   sacrificed: boolean;
   feedVerified: boolean;
   sensitivity: SideAnalysis['sensitivity'];
+  /** Block 2 of T322: the strand that softened the verdict (absent = the record changed nothing). */
+  strand: SideAnalysis['strand'];
 }
 
 /**
@@ -207,12 +245,13 @@ export function gradeSide(params: AnalyzeTurnParams, key: Side): SideGrading {
     : null;
   const { regret, verifiedAtDepth } = verifiedRegret(params, key, played, best);
   const sack = params.sacks?.[key];
-  const verdict = sideVerdict(params, key, { sack, played, safe, regret, neverActed, rolledFor: rolledForTurn(params, key, played) });
-  const acquittal = sensitivityAcquittal(verdict.tier, params.sensitivity?.[key]);
+  const graded: SackGrade = { sack, played, safe, regret, neverActed, rolledFor: rolledForTurn(params, key, played) };
+  const stranded = strandAcquittal(params, key, graded, sideVerdict(params, key, graded));
+  const acquittal = sensitivityAcquittal(stranded.verdict.tier, params.sensitivity?.[key]);
   return {
     playedRaw, playedSlots, played, playedPartial, neverActed, options, best, safe, regret, verifiedAtDepth,
-    tier: acquittal.tier, sack, sacrificed: verdict.sacrificed, feedVerified: verdict.feedVerified,
-    sensitivity: acquittal.sensitivity,
+    tier: acquittal.tier, sack, sacrificed: stranded.verdict.sacrificed, feedVerified: stranded.verdict.feedVerified,
+    sensitivity: acquittal.sensitivity, strand: stranded.strand,
   };
 }
 
@@ -241,5 +280,6 @@ export function gradingFields(params: AnalyzeTurnParams, key: Side, g: SideGradi
     ...(g.tier ? { tier: g.tier } : {}),
     ...(g.sacrificed && g.sack ? { sacrifice: g.feedVerified ? { ...g.sack, verified: true } : g.sack } : {}),
     ...(g.sensitivity ? { sensitivity: g.sensitivity } : {}),
+    ...(g.strand ? { strand: g.strand } : {}),
   };
 }
