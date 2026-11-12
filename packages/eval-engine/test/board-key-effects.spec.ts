@@ -140,6 +140,40 @@ describe.each(CASES)('the effect states are keyed on $name', ({ rules, mode, nam
     expect([...fired].filter(event => !RESIDUAL_EVENTS.has(event)).sort().join(' ')).toBe('');
   });
 
+  test('who set each condition: the source and the source slot of its state, at two bodies', () => {
+    // The fields the loop above leaves out (references and slots): a condition's source is the attacker on one board and the defender on the other.
+    const wrong: string[] = [];
+    const counts = { rows: 0, hitSplit: 0, residualSplit: 0 };
+    const fired = new Set<string>();
+    const ids = [...kinds.keys()].filter(id => dex.conditions.get(id).exists).filter((id, index) => SWEEPS_FULL || index % 2 === 0 || ALWAYS.includes(id));
+    for (const id of ids) {
+      for (const holder of holders) {
+        const probe = boardFor(rules, mode, move);
+        const state = place(probe, kinds.get(id)!, id, holder);
+        if (!state) continue;
+        for (const field of ['source', 'sourceSlot'].filter(name => name in state)) {
+          const boards = [0, 1].map(index => {
+            const battle = boardFor(rules, mode, move);
+            const placed = place(battle, kinds.get(id)!, id, holder)!;
+            placed[field] = field === 'source' ? (index === 0 ? attackerOf(battle) : defenderOf(battle)) : (index === 0 ? 'p1a' : 'p2a');
+            return battle;
+          });
+          counts.rows++;
+          const hit = verdictOf(boards[0], boards[1], move);
+          const residual = residualVerdict(boards[0], boards[1], fired);
+          if (hit === 'split') counts.hitSplit++;
+          if (residual === 'split') counts.residualSplit++;
+          if (hit === 'wrong') wrong.push(`${name} hit: ${id} (${kinds.get(id)}) on ${holder}, field ${field}`);
+          if (residual === 'wrong') wrong.push(`${name} end of turn: ${id} (${kinds.get(id)}) on ${holder}, field ${field}`);
+        }
+      }
+    }
+    expect(counts.rows).toBeGreaterThan(0);
+    expect(wrong).toEqual([]);
+    // Teeth: a Leech Seed's slot and a trap's source move the end of the turn.
+    if (rules.generation >= 4) expect(counts.hitSplit + counts.residualSplit).toBeGreaterThan(0);
+  });
+
   test('the state of every ability and item a body holds, at two values', () => {
     const wrong: string[] = [];
     let rows = 0;
