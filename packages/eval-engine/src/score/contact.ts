@@ -34,6 +34,14 @@ const memo = new Map<string, HitCost>();
 /** The numbers the memo's keys hold for the keys of the boards and bodies (score/memo-keys.ts); it starts over with the memo. */
 const interner = new Interner();
 
+/** For probes: what the memo and the interner of this process hold (entries and characters of the memo's keys, the interned texts). */
+export function hitMemoSize(): { entries: number; keyChars: number; interned: number; internedChars: number } {
+  let keyChars = 0;
+  for (const key of memo.keys()) keyChars += key.length;
+  const { entries, chars } = interner.held();
+  return { entries: memo.size, keyChars, interned: entries, internedChars: chars };
+}
+
 /** For tests and probes: forget the memo, so that the next reading plays its pair again. */
 export function resetHitMemo(): void {
   memo.clear();

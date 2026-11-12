@@ -19,6 +19,13 @@ export class Interner {
     return id;
   }
 
+  /** For probes: the texts held (a worker keeps them until the memo starts over) and their length in characters. */
+  held(): { entries: number; chars: number } {
+    let chars = 0;
+    for (const text of this.ids.keys()) chars += text.length;
+    return { entries: this.ids.size, chars };
+  }
+
   reset(): void {
     this.ids.clear();
     this.generation++;
