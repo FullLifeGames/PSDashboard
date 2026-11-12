@@ -1,5 +1,6 @@
 import { PRNG, type Battle, type Pokemon } from '@pkmn/sim';
 import { AskLeak, playOnCopy } from '../sim-ask/index.ts';
+import { Interner, residualKey } from './memo-keys.ts';
 
 /**
  * 13.10.2026 (the Swords Dance report on gen9draft-2058494320): the HP a body in
@@ -26,11 +27,13 @@ import { AskLeak, playOnCopy } from '../sim-ask/index.ts';
  *
  * A reading is the loss per turn as a fraction of the body's own max HP,
  * positive when the body loses HP and negative when it gains. It is kept in a
- * memo under a signature of everything the end of the turn reads (the format,
- * the field, the side conditions, and per active the types, the status, the
- * item, the ability, the volatiles and their state, the max HP), not under the
- * battle, so a search that visits thousands of leaves of one board plays it
- * once. Only the actives have a reading: the sim ignores the item and the
+ * memo under the key of score/board-key.ts (round 89, #149: everything the
+ * end of the turn reads, by the Dex's own handlers: the format, the field, the
+ * sides and their conditions with the state a handler reads, a pending move in
+ * a slot, the turn of the battle where a handler names it, and per active the
+ * types, the status, the item, the ability, the volatiles and their state, the
+ * max HP), not under the battle, so a search that visits thousands of leaves of
+ * one board plays it once. Only the actives have a reading: the sim ignores the item and the
  * ability of a benched body, and the races read the table for it. Generations
  * 1 and 2 have none either: their status damage comes after the body's own
  * move (burn, poison), so the end of the turn plays nothing for it.
@@ -52,10 +55,13 @@ export const residualStats = { plays: 0, hits: 0 };
 export type Residuals = (pokemon: Pokemon) => number | undefined;
 
 const memo = new Map<string, readonly number[] | null>();
+/** The numbers the memo's keys hold for the keys of the boards and bodies (score/memo-keys.ts); it starts over with the memo. */
+const interner = new Interner();
 
 /** For tests and probes: forget the memo, so that the next reading plays its board again. */
 export function resetResidualMemo(): void {
   memo.clear();
+  interner.reset();
 }
 
 /** The reading function of one battle: the end of the turn is played when the first reading is asked for. */
@@ -77,10 +83,13 @@ function tableOf(battle: Battle): Map<Pokemon, number> | null {
   if (battle.gen <= 2) return null;
   const slots = slotsOf(battle);
   if (slots.every(pokemon => pokemon === null)) return null;
-  const key = signature(battle, slots);
+  let key = residualKey(battle, slots, interner);
   let rates = memo.get(key);
   if (rates === undefined) {
-    if (memo.size >= MEMO_LIMIT) memo.clear();
+    if (memo.size >= MEMO_LIMIT) {
+      resetResidualMemo();
+      key = residualKey(battle, slots, interner);
+    }
     rates = play(battle);
     memo.set(key, rates);
     residualStats.plays++;
@@ -91,34 +100,6 @@ function tableOf(battle: Battle): Map<Pokemon, number> | null {
   const table = new Map<Pokemon, number>();
   slots.forEach((pokemon, index) => { if (pokemon) table.set(pokemon, rates[index]); });
   return table;
-}
-
-/** The numbers, strings and flags of an effect's state, without its clocks and its references to other bodies. */
-function stateKey(state: object | undefined): string {
-  if (!state) return '';
-  let key = '';
-  for (const [name, value] of Object.entries(state)) {
-    if (name === 'duration' || name === 'time' || name === 'startTime') continue;
-    if (typeof value === 'number' || typeof value === 'string' || typeof value === 'boolean') key += `${name}=${value};`;
-  }
-  return key;
-}
-
-/** Everything the end of the turn reads of the field, the sides and the actives; HP is not part of it. */
-function signature(battle: Battle, slots: (Pokemon | null)[]): string {
-  const { field } = battle;
-  const parts: string[] = [battle.format.id, `${field.weather}|${field.terrain}|${Object.keys(field.pseudoWeather).join(',')}`];
-  for (const side of battle.sides) parts.push(Object.keys(side.sideConditions).join(','));
-  for (const pokemon of slots) {
-    if (!pokemon) { parts.push('-'); continue; }
-    const volatiles = Object.entries(pokemon.volatiles).map(([id, state]) => `${id}:${stateKey(state as object)}`).join(',');
-    parts.push([
-      pokemon.species.id, pokemon.types.join('/'), pokemon.terastallized ?? '', pokemon.maxhp, pokemon.baseMaxhp,
-      pokemon.status, stateKey(pokemon.statusState), pokemon.item, stateKey(pokemon.itemState),
-      pokemon.ability, stateKey(pokemon.abilityState), volatiles,
-    ].join('~'));
-  }
-  return parts.join('||');
 }
 
 /** An effect state's clock set to lasting, so that nothing ends or fires during the played turns. */

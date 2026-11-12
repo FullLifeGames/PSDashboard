@@ -63,8 +63,18 @@ function statesKey(states: unknown, reads: ReadSet, consumer: Consumer, keepCloc
 const classOf = (owner: Owner, name: string, consumer: Consumer): FieldClass =>
   BOARD_FIELDS[owner][name]?.[consumer === 'hit' ? 0 : 1] ?? 'key';
 
+/** The stages the damage formula reads of the two bodies (their raised and lowered stats); the others (Speed, accuracy, evasion) are read by a few handlers. */
+const DAMAGE_STAGES = ['atk', 'def', 'spa', 'spd'];
+
+/** A body's stages for the hit: the damage stages always, the others where a handler on the board reads `boosts` (Gyro Ball, Power Trip and the like). */
+function stagesKey(stages: unknown, reads: ReadSet): string {
+  const all = stages as Record<string, number>;
+  return Object.keys(all).sort().filter(stat => DAMAGE_STAGES.includes(stat) || reads.has('boosts')).map(stat => `${stat}${all[stat]}`).join('/');
+}
+
 /** One own field of an object by its class: '' where the field is left out. */
 function fieldKey(owner: Owner, name: string, value: unknown, reads: ReadSet, consumer: Consumer, withHp = false): string {
+  if (owner === 'pokemon' && name === 'boosts' && consumer === 'hit') return `boosts=${stagesKey(value, reads)}`;
   switch (classOf(owner, name, consumer)) {
     case 'normalized':
       return withHp ? `${name}=${valueKey(value)}` : '';
