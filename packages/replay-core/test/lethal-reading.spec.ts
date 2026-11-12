@@ -165,3 +165,59 @@ describe('an attacker seen only in knockouts opens its offense when the game ref
     });
   }
 });
+
+/**
+ * Round 89 (D9, gen9ou-2658671254, Iron Valiant): the top-up spends the offense stat while the mon's lines "fit as well as at the winning rung". When the winning
+ * rung is a coarse one (Special Attack 0) that a knockout refutes, its own error is the knockout's shortfall, and the tolerance it gives lets a clean line on
+ * the same mon overshoot by as much: the stat ran to 180 where the lines fit best between 32 and 56 (a hit on Moltres that shows 74 beside a knockout that needs
+ * 301 HP). The rule: the top-up measures from the cheapest spread that reaches every knockout of the mon, so it never ends on a spread the lines fit worse than that one.
+ */
+describe('the top-up never ends on an offense the lines fit worse than the cheapest spread that reaches every knockout', () => {
+  for (const world of WORLDS) {
+    describe(world.name, () => {
+      const step = world.max === 252 ? 4 : 1;
+      // The prior carries Speed only and a neutral nature (a guess without a boost, the rest of the budget open), so the defender has nothing to absorb and the scene stays on the attacker.
+      const start = scene(world, 0);
+      const sets = { p1: start.sets.p1, p2: start.sets.p2.map(set => ({ ...set, nature: 'Hardy', evs: evs({ spe: world.max }) })) };
+      const { base, maxHp } = start;
+      const ctx = buildSolveContext([base, base], sets, world.formatid, []);
+      const prior = spreadFor(ctx, 'p2', 'Garchomp');
+      const foe = spreadFor(ctx, 'p1', 'Clefable');
+      const rollAt = (atk: number) => rollRange(ctx, base, { ...prior, evs: { ...prior.evs, atk } }, foe)!;
+      // The knockout needs the best roll of a quarter of the budget: the exact text of that HP (a player's own view), so no rounding hides it.
+      const quarter = Math.round(world.max / 4 / step) * step;
+      const knockout = lethalAt(base, Math.floor(rollAt(quarter).max * maxHp), maxHp);
+      // A clean line at the lowest roll of Atk 0: it fits every spread to the quarter and starts to overshoot above it.
+      const clean: DamageObservation = { ...base, lethal: false, observedFraction: rollAt(0).min };
+      const lines = [clean, clean, knockout];
+      // The defender's maximum HP is the log's (an exact text and switch line), so its HP EVs cannot drift into the hit the attacker answers.
+      const solved = inferSpreads(lines, sets, world.formatid, [], new Map(), new Map([['p1:clefable', { maxhp: maxHp, level: world.level }]]));
+      const mine = solved.get('p2:garchomp')!;
+      // The lines priced against the defender as the solve left it, the solved attacker's Atk swapped.
+      const priced = buildSolveContext(lines, sets, world.formatid, []);
+      priced.solved = new Map(solved);
+      const spread = (atk: number) => ({ ...mine, evs: { ...mine.evs, atk } });
+      const total = (atk: number) => lines.reduce((sum, obs) => sum + observationError(priced, obs, 'p2:garchomp', spread(atk)), 0);
+      const knockoutError = (atk: number) => observationError(priced, knockout, 'p2:garchomp', spread(atk));
+      const cheapest = Array.from({ length: world.max / step + 1 }, (_, i) => i * step).find(atk => knockoutError(atk) === 0);
+
+      test('the scene: Atk 0 is refuted by the knockout, the quarter of the budget reaches it, and the clean line beside it fits there', () => {
+        const builtError = (obs: DamageObservation, atk: number) => observationError(ctx, obs, 'p2:garchomp', { ...prior, evs: { ...prior.evs, atk } });
+        expect(builtError(knockout, 0)).toBeGreaterThan(0);
+        expect(builtError(knockout, quarter)).toBe(0);
+        expect(builtError(clean, quarter), "a hair of the slack at most").toBeLessThan(1e-5);
+        expect(builtError(clean, world.max)).toBeGreaterThan(builtError(knockout, 0));
+      });
+
+      test('the solve leaves the knockout reachable and its own spread on the reach', () => {
+        expect(cheapest).toBeDefined();
+        expect(cheapest!).toBeLessThanOrEqual(mine.evs.atk);
+      });
+
+      test('the solved spread reaches the knockout and fits the lines as well as the cheapest spread that does', () => {
+        expect(knockoutError(mine.evs.atk), 'the knockout is reached').toBe(0);
+        expect(total(mine.evs.atk), `Atk ${mine.evs.atk} (${mine.nature}) against the cheapest reach ${cheapest}`).toBeLessThanOrEqual(total(cheapest!) + 1e-12);
+      });
+    });
+  }
+});

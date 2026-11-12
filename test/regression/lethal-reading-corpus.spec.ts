@@ -79,3 +79,27 @@ describe('a knockout the game refutes opens the attacker\'s offense; one it allo
     }, 120_000);
   }
 });
+
+/**
+ * Round 89 (D9): gen9ou-2658671254, a bank game (a copy of its replay is tracked beside the spec; the row skips without `.smogon-cache`). p2 Iron Valiant takes
+ * Ogerpon from a shown 100/100 in turn 15 (a Moonblast that must do the whole 301 HP of a body without HP EVs) and hits Moltres from 100 to 74 in turn 8, a hit
+ * whose window of 100 to 103 HP sits low. On the project's calc, with the bodies of the build, a Special Attack of 28 EVs and more reaches the knockout, and the hit
+ * on Moltres stays inside its slack up to 60 EVs (64 overshoots it by 1.6e-6, 100 by 8e-5, 180 by 9e-4). The top-up measured its tolerance from the winning rung's
+ * refuted knockout and ran the stat to 180 (round 89, D7); the rule it now holds (`lethal-reading.spec.ts`, "never ends on an offense the lines fit worse than the
+ * cheapest spread that reaches every knockout") puts it on the reach: the built spread reaches the knockout and sits where the clean line still fits.
+ */
+describe('the offense of a mon with a knockout and a clean line sits where both fit (D9)', () => {
+  const FILE = join('test', 'regression', 'fixtures', 'bank-games', 'gen9ou-2658671254.json');
+  test.skipIf(!existsSync(FILE) || !existsSync('.smogon-cache'))('gen9ou-2658671254: Iron Valiant\'s Moonblast on Ogerpon (100/100) and on Moltres (100 to 74)', async () => {
+    const replay = JSON.parse(readFileSync(FILE, 'utf-8')) as Replay;
+    const formatId = replay.formatid ?? 'gen9ou';
+    const parsed = parseReplayLogWithObservations(replay.log);
+    const knockout = parsed.observations.find(obs => obs.lethal && obs.moveId === 'moonblast' && obs.defenderSpecies.startsWith('Ogerpon') && obs.attackerSpecies === 'Iron Valiant');
+    expect(knockout?.defenderShown?.before, 'the turn-15 knockout shows the full body').toEqual({ hp: 100, maxhp: 100 });
+    const built = await bankTeamsFor({ log: replay.log, formatId, parsed, fetcher: diskCachedSmogonFetcher() });
+    expect(built.teams).not.toBeNull();
+    const valiant = built.teams!.p2Team.find(entry => entry.species === 'Iron Valiant')!;
+    expect(valiant.evs.spa, 'reaches the knockout').toBeGreaterThanOrEqual(28);
+    expect(valiant.evs.spa, 'stays where the hit on Moltres fits (180 before)').toBeLessThanOrEqual(60);
+  }, 120_000);
+});
