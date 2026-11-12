@@ -1,6 +1,8 @@
 import { writeFileSync } from 'node:fs';
 import { afterAll, describe, expect, test } from 'vitest';
 import { loadSimMods } from '../src/forward/sim-mods';
+import { chainCount, chainDice, chainResults, hitsIn } from '../src/dice/chain';
+import type { LoggedAction } from '../src/dice/logged-results';
 import { offeredDice } from '../src/dice/offer';
 import { RecordingPRNG } from '../src/dice/prng';
 import { reportOf } from '../src/dice/report';
@@ -273,6 +275,58 @@ describe('the scene of Champions OU 2692379905 turn 2: the third hit of Triple A
     expect(hitcounts(turn.battle.log.slice(turn.start))).toEqual([count]);
     // the third hit takes the last of Garchomp's HP
     expect(turn.battle.log.slice(turn.start).some(line => line.startsWith('|faint|p2a')), 'Garchomp faints on hit 3 only').toBe(happens);
+  });
+});
+
+// Round 89 (#114, F2): the chain rule lives in `chain.ts` once. A count of k landed hits stands for hits 2 to k landing and, when the
+// move has a hit k + 1, that hit missing; `chainCount` reads the count back from the per-hit results (the panel's fold, F3).
+describe.each(RULES.filter(rules => rules.generation >= 3).map(rules => [rules.name, rules] as const))('the chain rule: %s', (_name, rules) => {
+  const { moves } = sweepMoves(rules, multiAccuracy);
+  const action = (moveId: string, count: number): LoggedAction => ({ slot: 'p1a', moveId, hitCounts: { p2a: count } }) as unknown as LoggedAction;
+  const hitsOfMove = hitsIn(dexOfRules(rules));
+
+  test('chainDice builds on chainResults, for every count of every multi-accuracy move', () => {
+    expect(moves.length).toBeGreaterThan(0);
+    for (const move of moves) {
+      const hits = hitsOf(move);
+      expect(hitsOfMove(move.id), move.id).toBe(hits);
+      for (let count = 1; count <= hits; count++) {
+        const dice = chainDice(action(move.id, count), 'p2a', ['p2a'], hitsOfMove);
+        expect(dice.map(die => ({ hit: die.name.hit, happens: 'happens' in die.result && die.result.happens })), `${move.id} count ${count}`).toEqual(chainResults(count, hits));
+        expect(dice.every(die => die.name.moveId === move.id && die.name.kind === 'accuracy' && die.name.targetSlot === 'p2a'), move.id).toBe(true);
+      }
+    }
+  });
+
+  test('chainCount is the inverse of chainResults', () => {
+    for (const move of moves) {
+      const hits = hitsOf(move);
+      for (let count = 1; count <= hits; count++) expect(chainCount(chainResults(count, hits)), `${move.id} count ${count}`).toBe(count);
+    }
+  });
+});
+
+describe('the chain rule on its own', () => {
+  test('chainResults: hits 2 to the count land, the next hit misses, a full chain has no miss', () => {
+    expect(chainResults(1, 3)).toEqual([{ hit: 2, happens: false }]);
+    expect(chainResults(2, 3)).toEqual([{ hit: 2, happens: true }, { hit: 3, happens: false }]);
+    expect(chainResults(3, 3)).toEqual([{ hit: 2, happens: true }, { hit: 3, happens: true }]);
+    expect(chainResults(10, 10)).toHaveLength(9);
+    expect(chainResults(1, 1)).toEqual([]);
+  });
+
+  test('chainResults caps a count above the hits and gives nothing for a count below one', () => {
+    expect(chainResults(5, 3)).toEqual(chainResults(3, 3));
+    expect(chainResults(0, 3)).toEqual([]);
+    expect(chainResults(Number.NaN, 3)).toEqual([]);
+  });
+
+  test('chainCount reads a partial list: the hits that landed in a row from hit 2, the rest unset', () => {
+    expect(chainCount([])).toBe(1);
+    expect(chainCount([{ hit: 2, happens: true }])).toBe(2);
+    expect(chainCount([{ hit: 2, happens: true }, { hit: 3, happens: false }])).toBe(2);
+    expect(chainCount([{ hit: 3, happens: true }])).toBe(1);
+    expect(chainCount([{ hit: 2, happens: false }, { hit: 3, happens: true }])).toBe(1);
   });
 });
 

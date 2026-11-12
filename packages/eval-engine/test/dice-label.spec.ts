@@ -44,6 +44,13 @@ describe('the label of a forced die', () => {
     expect(label({ name: { slot: 'p1a', moveId: 'tackle', kind: 'status-check', effectId: 'par' }, result: { happens: false } })).toBe('Move tackle: Effect par stops it');
   });
 
+  test('the accuracy die of a later hit names its hit, the first hit keeps the plain label', () => {
+    expect(label({ name: name('accuracy', { hit: 2 }), result: { happens: false } })).toBe('Move tackle hit 2: misses');
+    expect(label({ name: name('accuracy', { hit: 3 }), result: { happens: true } })).toBe('Move tackle hit 3: hits');
+    expect(label({ name: name('accuracy'), result: { happens: false } })).toBe('Move tackle: misses');
+    expect(dieLabel({ name: name('accuracy', { hit: 4 }), result: { happens: false } })).toBe('tackle hit 4: misses');
+  });
+
   test('without a reader the ids stand in for the names', () => {
     expect(dieLabel({ name: name('accuracy'), result: { happens: true } })).toBe('tackle: hits');
   });
