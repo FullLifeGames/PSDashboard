@@ -275,6 +275,8 @@ describe('the scene of Champions OU 2692379905 turn 2: the third hit of Triple A
     expect(hitcounts(turn.battle.log.slice(turn.start))).toEqual([count]);
     // the third hit takes the last of Garchomp's HP
     expect(turn.battle.log.slice(turn.start).some(line => line.startsWith('|faint|p2a')), 'Garchomp faints on hit 3 only').toBe(happens);
+    // a fainted target's `|-hitcount|` line names the side (`p2: Garchomp`), and the report still reads it: every hit die is applied
+    expect(turn.report.forced.map(shown => `${shown.took} ${shown.reason ?? ''}`.trim())).toEqual(['applied', 'applied', 'applied']);
   });
 });
 
@@ -343,6 +345,8 @@ describe('the report of a hit die reads the hit count of its target', () => {
     ['a no at a hit that landed is no chance', 2, false, '|-hitcount|p2a: Vaporeon|2', 'no-chance'],
     ['a yes at a hit that landed is applied', 2, true, '|-hitcount|p2a: Vaporeon|3', 'applied'],
     ['a yes at a hit the chain never reached is blocked', 3, true, '|-hitcount|p2a: Vaporeon|1', 'blocked'],
+    ['a yes at the hit that took the last HP is applied: the count names the side of a fainted target', 3, true, '|-hitcount|p2: Vaporeon|3', 'applied'],
+    ['a no at a hit the fainted target never saw is no chance', 2, false, '|-hitcount|p2: Vaporeon|3', 'no-chance'],
   ] as const)('%s', (_name, hit, happens, count, took) => {
     const shown = report(hit, happens, [damage, count]);
     expect(shown.took, shown.reason).toBe(took);
