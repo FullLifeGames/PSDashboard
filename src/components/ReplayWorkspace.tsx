@@ -1,4 +1,5 @@
 import { PSReplayFrame } from './PSReplayFrame';
+import { isGameId } from '../lib/new-game/record';
 import { DockRegion } from './dock/DockRegion';
 import { LeadPanel } from './LeadPanel';
 import { BranchHistoryPanel } from './BranchHistoryPanel';
@@ -121,7 +122,7 @@ function BattleFrame({ app, replayData, onSideChange }: WorkspaceProps & { onSid
           seekTurn={viewT0 ? 0 : viewTurn}
           autoPlay={false}
           viewpoint={replayData.viewpoint}
-          reloadKey={`${replayData.id}:original`}
+          reloadKey={mainFrameKey(replayData)}
           onTurnChange={handleReplayTurn}
           onSideChange={onSideChange}
           choosers={false}
@@ -130,6 +131,10 @@ function BattleFrame({ app, replayData, onSideChange }: WorkspaceProps & { onSid
     </div>
   );
 }
+
+/** The main frame's document key. A new game's log grows with every promoted turn, so its frame opens again on the longer log (round 89, #105); a replay's log never changes. */
+const mainFrameKey = (replayData: { id: string; log: string }) =>
+  isGameId(replayData.id) ? `${replayData.id}:original:${replayData.log.length}` : `${replayData.id}:original`;
 
 function LeadRegion({ app, replayData, nearSide }: WorkspaceProps & { nearSide: FrameSide }) {
   const { variationSpan } = app.board.timeline;

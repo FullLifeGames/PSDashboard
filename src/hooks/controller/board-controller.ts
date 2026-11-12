@@ -43,7 +43,7 @@ function useDeviationLayer(ctx: ReplayContext, transients: Transients, timeline:
     replayData, snapshots, observations, sources: teamSources, bringOnlyLists, bringCount,
     replayGameType, timeline: deviationTimeline, branch: deviationBranch, acquireRuntime,
     branchWindowOpenRef, setPendingConfirm, draftChoices, setDraftChoices,
-    onDeviate: clearPlayOutNotice, gameSeed: ctx.newGame.record?.seed,
+    onDeviate: clearPlayOutNotice, gameSeed: ctx.newGame.record?.seed, gameRecord: ctx.newGame.record,
   });
   useBranchRefresh({
     replayData, snapshots, observations, sources: teamSources, bringOnlyLists,

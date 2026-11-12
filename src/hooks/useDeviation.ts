@@ -2,6 +2,8 @@ import { useCallback, useMemo, useRef, useState, type MutableRefObject } from 'r
 import {
   type DamageObservation, type ReplayData, type TurnSnapshot, getBranchSimulatorFormat, replayRules,
 } from '@fulllifegames/replay-core';
+import { gameLeadOptions } from '../lib/new-game/lead-options';
+import type { NewGameRecord } from '../lib/new-game/record';
 import type { BranchSlotChoice } from '@fulllifegames/eval-engine';
 import { classifyDeviation, keptEntries, variationTip, type TimelinePosition } from '../lib/timeline';
 import { snapshotAt, type TeamBuildSources } from '../lib/eval-acquire';
@@ -44,6 +46,8 @@ export interface DeviationInputs {
   onDeviate?: () => void;
   /** Round 89 (#105): a new game's dice seed; its lead start runs on it. */
   gameSeed?: string;
+  /** Round 89 (#105): the new game's record; its lead options come from it. */
+  gameRecord?: NewGameRecord | null;
 }
 
 /** One shared preparation session for rebuilds and refreshes: the progress
@@ -165,7 +169,7 @@ function replaceVariationMessage(leadIn: string, span: { startTurn: number; leng
 export function useDeviation(inputs: DeviationInputs) {
   const {
     replayData, snapshots, observations, sources, bringOnlyLists, bringCount, replayGameType,
-    timeline, branch, acquireRuntime, branchWindowOpenRef, setPendingConfirm, draftChoices, setDraftChoices, onDeviate, gameSeed,
+    timeline, branch, acquireRuntime, branchWindowOpenRef, setPendingConfirm, draftChoices, setDraftChoices, onDeviate, gameSeed, gameRecord,
   } = inputs;
   const { branchPreparing, branchProgress, branchSession, handles: session } = useBranchSession();
   const [branchDivergence, setBranchDivergence] = useState<string | null>(null);
@@ -233,7 +237,7 @@ export function useDeviation(inputs: DeviationInputs) {
     requests.requestDeviation({ p1Choices: choices.p1, p2Choices: choices.p2 });
   }, [requests, draftChoices]);
 
-  const { leadOptions, defaultLeadSelection } = useLeadDefaults(snapshots, bringCount, replayGameType, replayData);
+  const { leadOptions, defaultLeadSelection } = useLeadDefaults(snapshots, bringCount, replayGameType, replayData, gameRecord);
 
   return {
     session, branchDivergence, setBranchDivergence, variationNotice, setVariationNotice, reportVariationEnded,
@@ -244,8 +248,12 @@ export function useDeviation(inputs: DeviationInputs) {
 }
 
 /** The lead picker's options and the real game's selection as its default. */
-function useLeadDefaults(snapshots: TurnSnapshot[], bringCount: number | null, replayGameType: string | null, replayData: ReplayData | null) {
-  const leadOptions = useMemo(() => buildLeadOptions(snapshots, replayData ? replayRules(replayData) : { gen: 9, mod: undefined }), [snapshots, replayData]);
+function useLeadDefaults(snapshots: TurnSnapshot[], bringCount: number | null, replayGameType: string | null, replayData: ReplayData | null, game: NewGameRecord | null | undefined) {
+  // Round 89 (#105): a new game offers its record's teams.
+  const leadOptions = useMemo(
+    () => (game ? gameLeadOptions(game) : buildLeadOptions(snapshots, replayData ? replayRules(replayData) : { gen: 9, mod: undefined })),
+    [snapshots, replayData, game],
+  );
   const defaultLeadSelection = useCallback(
     () => defaultLeadSelectionFor(leadOptions, bringCount, replayGameType),
     [leadOptions, bringCount, replayGameType],

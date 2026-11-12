@@ -103,11 +103,17 @@ export interface FinishedTurn {
   lines: string[];
 }
 
-/** An entry as the record keeps it: the serialized position (tens of kilobytes) is left out, the exact store holds positions. */
+/**
+ * An entry as the record keeps it: what a rebuild replays (the kind, the slot choices with their forced dice, the commands) and
+ * nothing the rebuild writes again. The serialized position (tens of kilobytes) is left out, the exact store holds positions; the
+ * board snapshots (both sides' bodies and actives, about 16 kilobytes a doubles turn) are left out too, so a 60-turn doubles
+ * record stays near 100 kilobytes instead of 960 (probe `h3-cost`). The rebuild's entry carries them again.
+ */
 export function withoutPosition(entry: BranchHistoryEntry): BranchHistoryEntry {
-  const { serializedPosition: position, ...rest } = entry;
-  void position;
-  return rest;
+  return {
+    ...entry, serializedPosition: undefined,
+    p1Active: null, p1ActiveSlots: [], p2Active: null, p2ActiveSlots: [], p1Pokemon: [], p2Pokemon: [],
+  };
 }
 
 /** The record with one more finished turn; the lead entry (turn 0) joins without counting as a turn. */
