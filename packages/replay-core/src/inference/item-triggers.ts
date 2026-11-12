@@ -1,3 +1,4 @@
+import { formOf } from '../hp-display.ts';
 import { dexOf, type RulesDex } from '../rules-dex.ts';
 import { Protocol } from '@pkmn/protocol';
 import { type InferrerState } from './inferrer-state.ts';
@@ -187,7 +188,8 @@ export function sitrusKeptAt(dex: RulesDex, shown: string): boolean {
   const health = Protocol.parseHealth(shown as Protocol.PokemonHPStatus);
   if (!health || health.fainted || !health.hp) return false;
   const item = dex.items.get('sitrusberry') as unknown as { exists: boolean; gen: number; onUpdate?: ItemHandler };
-  const lowest = health.maxhp === 100 || health.maxhp === 48 ? health.hp - 1 + 1e-6 : health.hp;
+  // The display forms are hp-display.ts's (a percentage or the pixel bar hides up to one unit); this reader judges at one unit below in every mode, the Champions floor included.
+  const lowest = formOf(health.maxhp, false) === 'exact' ? health.hp : health.hp - 1 + 1e-6;
   // A generation whose Update handler eats at no HP (the Dex moves the berry to another event) says nothing about the threshold.
   return item.exists && item.gen <= dex.gen && eats(item.onUpdate, { hp: 1, maxhp: health.maxhp }) && !eats(item.onUpdate, { hp: lowest, maxhp: health.maxhp });
 }

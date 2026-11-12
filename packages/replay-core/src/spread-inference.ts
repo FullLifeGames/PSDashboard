@@ -204,6 +204,8 @@ interface MonEvidence {
   observations: DamageObservation[];
   /** Clean (non-lethal) attacker lines exist: offense is measurable. */
   hasOffenseEvidence: boolean;
+  /** The offense rungs are open: clean lines measure it, or a knockout the game refutes the prior's offense for (offenseRefuted). */
+  offenseOpen: boolean;
   /** The mon attacked at all (knock-outs alone keep the prior's offense). */
   attacked: boolean;
   hasDefenderObs: boolean;
@@ -214,20 +216,40 @@ interface MonEvidence {
   paradoxBound: boolean;
 }
 
+/**
+ * Round 89 (#75): whether the game refutes the prior's offense and a rung repairs it. A knockout is a lower bound, which measures no ceiling, so an
+ * attacker seen only in knockouts keeps the prior's offense. But a knockout the prior's best roll cannot reach, read by the display the log shows
+ * (the lowest HP the shown text allows: hp-display.ts), is refuted by the game itself: when some offense rung reaches it with a lower error, the
+ * offense rungs open, and the tie-break toward the prior (`bestRung`) takes the nearest rung that reaches. The same test as `speedMeasured` asks
+ * of a move order: refuted, and repairable. Knockouts without the text (older caches) never open it.
+ */
+function offenseRefuted(ctx: SolveContext, key: string, prior: SpreadCandidate, evidence: Pick<MonEvidence, 'observations' | 'hasDefenderObs' | 'fixedHp'>): boolean {
+  const lethal = evidence.observations.filter(obs => obs.lethal && obs.defenderShown && keyOf(obs.attackerSide, obs.attackerSpecies) === key);
+  const refuted = lethal.reduce((sum, obs) => sum + observationError(ctx, obs, key, prior), 0);
+  if (!(refuted > 0)) return false;
+  const fixed: Partial<PokemonEvs> = evidence.fixedHp === undefined ? {} : { hp: evidence.fixedHp };
+  const rungs = candidateLadder(dexOfCalc(ctx.gen), prior, physicalAttackerFor(ctx, key), true, evidence.hasDefenderObs, false, ctx.budget, new Set(), fixed);
+  return rungs.some(rung => lethal.reduce((sum, obs) => sum + observationError(ctx, obs, key, rung), 0) < refuted);
+}
+
 function evidenceFor(ctx: SolveContext, key: string): MonEvidence {
   const observations = ctx.byMon.get(key) ?? [];
   const attackerObs = observations.filter(obs => keyOf(obs.attackerSide, obs.attackerSpecies) === key);
   const prior = ctx.priors.get(key);
+  const hasDefenderObs = observations.some(obs => keyOf(defenderSideOf(obs), obs.defenderSpecies) === key);
+  const fixedHp = measuredHpEvs(ctx, key);
+  const hasOffenseEvidence = attackerObs.some(obs => !obs.lethal);
   return {
     observations,
     // Knock-outs are lower bounds (fit.ts): they refute rungs whose best roll
     // falls short, but an attacker seen only in knock-outs has no measured
     // offense — the prior's investment stands instead of yielding to bulk.
-    hasOffenseEvidence: attackerObs.some(obs => !obs.lethal),
+    hasOffenseEvidence,
+    offenseOpen: hasOffenseEvidence || (attackerObs.length > 0 && prior !== undefined && offenseRefuted(ctx, key, prior, { observations, hasDefenderObs, fixedHp })),
     attacked: attackerObs.length > 0,
-    hasDefenderObs: observations.some(obs => keyOf(defenderSideOf(obs), obs.defenderSpecies) === key),
+    hasDefenderObs,
     hasSpeedObs: (ctx.speedByMon.get(key) ?? []).length > 0,
-    fixedHp: measuredHpEvs(ctx, key),
+    fixedHp,
     paradoxBound: prior !== undefined && paradoxError(ctx, key, prior) > 0,
   };
 }
@@ -242,7 +264,7 @@ function ladderFor(
 ): CandidateRung[] {
   const fixed: Partial<PokemonEvs> = evidence.fixedHp === undefined ? {} : { hp: evidence.fixedHp };
   const build = (hasSpeedObs: boolean) =>
-    candidateLadder(dexOfCalc(ctx.gen), prior, physicalAttacker, evidence.hasOffenseEvidence, evidence.hasDefenderObs, hasSpeedObs, ctx.budget, keep, fixed);
+    candidateLadder(dexOfCalc(ctx.gen), prior, physicalAttacker, evidence.offenseOpen, evidence.hasDefenderObs, hasSpeedObs, ctx.budget, keep, fixed);
   if (!evidence.hasSpeedObs && !evidence.paradoxBound) return build(false);
   const ladder = build(true);
   if (speedMeasured(ctx, key, ladder, prior)) return ladder;
@@ -276,7 +298,7 @@ function solveOne(ctx: SolveContext, key: string) {
   const physicalAttacker = physicalAttackerFor(ctx, key);
   const offenseStat: keyof PokemonEvs = physicalAttacker ? 'atk' : 'spa';
   const keep = new Set<keyof PokemonEvs>();
-  if (evidence.attacked && !evidence.hasOffenseEvidence) keep.add(offenseStat);
+  if (evidence.attacked && !evidence.offenseOpen) keep.add(offenseStat);
   const droppable = evidence.attacked && guessedBoostItem(ctx, key) !== undefined;
   const best = bestRung(ctx, key, ladderFor(ctx, key, prior, physicalAttacker, evidence, keep), evidence.observations, droppable);
   if (!best) return;

@@ -18,6 +18,7 @@ import { genNumOf, toId } from '../ids.ts';
 import { poweredMove } from './powered-move.ts';
 import { abilityStateAtHit } from './ability-state.ts';
 import { historyPower } from './hit-power.ts';
+import { leastDamageOf } from '../hp-display.ts';
 
 /**
  * A violated move-order constraint outweighs any damage-fit error: the log
@@ -219,7 +220,7 @@ function historyPowerOf(gen: CalcGeneration, moveId: string, obs: ReadObservatio
 }
 
 /** The calc's roll range for one observation under the candidate spread, as HP fractions. */
-export function rollRange(ctx: SolveContext, obs: ReadObservation, attackerSpread: SpreadCandidate, defenderSpread: SpreadCandidate): { min: number; max: number } | null {
+export function rollRange(ctx: SolveContext, obs: ReadObservation, attackerSpread: SpreadCandidate, defenderSpread: SpreadCandidate): { min: number; max: number; maxHp: number } | null {
   const { gen } = ctx;
   const defenderSide = defenderSideOf(obs);
   // The items the hit landed with: the client's at the line, not the set's (a popped Air Balloon, a Knock Off, a Trick).
@@ -245,7 +246,7 @@ export function rollRange(ctx: SolveContext, obs: ReadObservation, attackerSprea
   if (rolls.length === 0) return null;
   const maxHp = defender.maxHP();
   if (maxHp <= 0) return null;
-  return { min: Math.min(...rolls) / maxHp, max: Math.max(...rolls) / maxHp };
+  return { min: Math.min(...rolls) / maxHp, max: Math.max(...rolls) / maxHp, maxHp };
 }
 
 export function observationError(ctx: SolveContext, obs: ReadObservation, candidateKey: string, candidate: SpreadCandidate): number {
@@ -258,11 +259,15 @@ export function observationError(ctx: SolveContext, obs: ReadObservation, candid
   try {
     const range = rollRange(ctx, obs, attackerSpread, defenderSpread);
     if (!range) return 0;
-    const { min, max } = range;
+    const { min, max, maxHp } = range;
     // A lethal hit only says "at least this much": rungs whose best roll
     // could not reach the remaining HP are refuted, overkill rungs are
     // consistent. Read as a reading, every knock-out pulled the solve
     // toward "bulkier defender, weaker attacker" (573756 p1 Toxapex).
+    // Round 89 (#75): the least the hit did is read by the game's display, in HP points of the candidate's defender
+    // (hp-display.ts); the game itself refutes a best roll below it, so that reading carries no slack.
+    const least = obs.lethal && obs.defenderShown ? leastDamageOf(obs.defenderShown, maxHp, ctx.gen.num === 0) : null;
+    if (least !== null) return Math.max(0, least / maxHp - max) ** 2;
     const distance = obs.lethal
       ? (obs.observedFraction > max ? obs.observedFraction - max : 0)
       : obs.observedFraction < min
