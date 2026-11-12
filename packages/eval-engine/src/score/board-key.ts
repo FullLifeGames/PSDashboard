@@ -34,7 +34,8 @@ function valueKey(value: unknown, depth = 0): string {
   if (object.pokemon !== undefined && object.sideConditions !== undefined) return `side:${String(object.id)}`;
   if (object.side !== undefined && object.species !== undefined) return `@${(object.side as { id: string }).id}${String(object.position)}:${(object.species as { id: string }).id}`;
   if (typeof object.effectType === 'string' && typeof object.id === 'string') return `#${object.id}`;
-  return `{${Object.keys(object).sort().map(name => `${name}=${valueKey(object[name], depth + 1)}`).join(';')}}`;
+  // A back-reference to the battle (a battle queue holds one) is the whole battle again: its log, its PRNG, its rule table. No rule reads those through a field.
+  return `{${Object.keys(object).filter(name => name !== 'battle').sort().map(name => `${name}=${valueKey(object[name], depth + 1)}`).join(';')}}`;
 }
 
 /** The fields of one effect's state that the play reads (the state's own fields, read when a handler on the board names them), sorted. */
