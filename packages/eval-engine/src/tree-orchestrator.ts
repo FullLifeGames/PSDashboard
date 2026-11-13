@@ -5,6 +5,7 @@ import { perfAdd, perfCount, perfSync } from './perf-trace.ts';
 import { cellKey } from './rank.ts';
 import { searchBudget } from './search/budget.ts';
 import { applyForcedWin, forcedWinInput } from './search/forced-win-apply.ts';
+import { lineRequests } from './search/line-donors.ts';
 import { createLocalExecutor } from './search/position.ts';
 import type { EvalCellJob, EvalCellValue, EvalResult, EvalSettings, MctsTreeStats, SearchProgress } from './types.ts';
 import type { StaticRuleset } from './score/weights.ts';
@@ -238,6 +239,26 @@ export async function answerRound(
   }
 }
 
+/**
+ * Round 89 (#104): the lines of the turn, after the prover has had its say about the rows. A refinement like the verify round: an
+ * executor without the job, an empty list and a failed replay leave the result as it is. Nothing reads `lines` to score or rank.
+ */
+async function withLines(executor: TreeExecutor, trees: MctsTreeStats[], result: EvalResult, settings: EvalSettings): Promise<EvalResult> {
+  if (!executor.lines) return result;
+  const requests = lineRequests(trees, result, settings);
+  if (requests.length === 0) return result;
+  const started = Date.now();
+  try {
+    const lines = await executor.lines({ requests, tera: settings.tera, sleepClause: settings.sleepClause, keepPlayed: settings.keepPlayed });
+    if (lines.length > 0) result.lines = lines;
+  } catch {
+    // the lines are an extra: the turn reads without them
+  } finally {
+    perfAdd('lines', Date.now() - started);
+  }
+  return result;
+}
+
 export async function searchTreesOrchestrated(
   executor: TreeExecutor, settings: EvalSettings, callbacks?: OrchestratorCallbacks,
 ): Promise<EvalResult> {
@@ -248,5 +269,5 @@ export async function searchTreesOrchestrated(
   const outcome = await executor.prove(forcedWinInput(result, settings));
   perfAdd('prover', Date.now() - started);
   if (!stopped(callbacks)) applyForcedWin(result, outcome);
-  return result;
+  return stopped(callbacks) ? result : withLines(executor, trees, result, settings);
 }

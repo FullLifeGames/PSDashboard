@@ -23,6 +23,7 @@ import { applyForcedWin, forcedWinInput } from './forced-win-apply.ts';
 import { perfCount, perfSync } from '../perf-trace.ts';
 import { buildMatrix, cellValueMemo, maximinRows, minimaxColumns, type Matrix, type SearchCallbacks } from './matrix.ts';
 import { benchOrder, callbacksToGiven, executorToGiven, resultToGiven } from './bench-order.ts';
+import { playLines } from './lines.ts';
 
 /**
  * The sync search: the pruned depth-1 sub-search, the full root search with
@@ -302,8 +303,10 @@ function searchOn(
 export function createLocalExecutor(serializedBattle: string, ruleset: StaticRuleset = 'standard'): SearchExecutor {
   // Round 67 (T129): the executor serves the canonical bench and speaks the given board's slots.
   const order = benchOrder(serializedBattle);
-  if (!order) return localExecutorOn(serializedBattle, ruleset);
-  return executorToGiven(order, localExecutorOn(order.serialized, ruleset));
+  const lines: SearchExecutor['lines'] = async input => playLines(serializedBattle, ruleset, input);
+  if (!order) return { ...localExecutorOn(serializedBattle, ruleset), lines };
+  // Round 89 (#104): the lines replay on the given board (their choices and slot choices name its bench), not on the canonical one
+  return { ...executorToGiven(order, localExecutorOn(order.serialized, ruleset)), lines };
 }
 
 /**

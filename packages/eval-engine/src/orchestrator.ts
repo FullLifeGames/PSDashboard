@@ -4,8 +4,8 @@ import {
 } from './rank.ts';
 import { perfSpan, perfSync } from './perf-trace.ts';
 import type {
-  CellBlend, CellDraw, EvalCellJob, EvalCellValue, EvalChoiceOption, EvalChoicesInfo, EvalResult, EvalSettings,
-  EvalSubSearchJob, ForcedWinInput, ForcedWinOutcome, KoOddsMismatch, SearchProgress, TeraAllowance,
+  CellBlend, CellDraw, EvalCellJob, EvalCellValue, EvalChoiceOption, EvalChoicesInfo, EvalLine, EvalResult, EvalSettings,
+  EvalSubSearchJob, ForcedWinInput, ForcedWinOutcome, KoOddsMismatch, LinesInput, SearchProgress, TeraAllowance,
 } from './types.ts';
 import { applyForcedWin, forcedWinInput } from './search/forced-win-apply.ts';
 import { attachRootPayload, koOddsMapsFor, type RootPayload } from './search/root-payload.ts';
@@ -32,6 +32,8 @@ export interface SearchExecutor {
   subSearch(job: SubSearchJob): Promise<EvalResult>;
   /** Round 35: the forced-win prover on the root, given the finished result's input. */
   prove(input: ForcedWinInput): Promise<ForcedWinOutcome | null>;
+  /** Round 89 (#104): replays the trees' lines for the rows a turn shows, every die at its likeliest result (search/lines.ts). An executor without it sends no lines. */
+  lines?(input: LinesInput): Promise<EvalLine[]>;
 }
 
 export interface OrchestratorCallbacks {
