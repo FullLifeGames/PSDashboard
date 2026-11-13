@@ -153,6 +153,19 @@ describe('the shown log with the lines in it', () => {
     expect(withDieLines(['|a', '|b'], [{ at: 2, text: 'Forced x' }])).toEqual(['|a', '|b', `${DIE_LINE}Forced x`]);
   });
 
+  // Round 89 (F5, the wave-tester's finding 1): the replay client splits a protocol line at every pipe and prints its first field, so
+  // a reason that quotes a protocol line ("the protocol shows "|-activate|p1a: Glimmora|ability: Toxic Debris"") broke off at the quote.
+  test('a reason that quotes protocol lines reaches the frame whole: its pipes leave the line one field after the message type', () => {
+    const reason = 'Triple Axel drew no accuracy: the protocol shows "|-activate|p1a: Glimmora|ability: Toxic Debris" and "|-miss|p2a: Weavile|p1a: Glimmora"';
+    const shown = withDieLines(['|a'], [{ at: 1, text: `Forced 3 hits had no effect: ${reason}` }])[1];
+    expect(shown.startsWith(DIE_LINE)).toBe(true);
+    const text = shown.slice(DIE_LINE.length);
+    expect(text).not.toContain('|');
+    expect(text.replace(/\u00a6/g, '|')).toBe(`Forced 3 hits had no effect: ${reason}`);
+    expect(shown.split('|')).toEqual(['', '-message', text]);
+    expect(branchFrameLog(['|a'], [{ at: 1, text: 'Forced x: "|-miss|p1a: A"' }]).split('\n')[1]).toBe(`${DIE_LINE}Forced x: "\u00a6-miss\u00a6p1a: A"`);
+  });
+
   test('no lines leave the log as it is', () => {
     expect(withDieLines(SHOWN_LOG, [])).toBe(SHOWN_LOG);
   });

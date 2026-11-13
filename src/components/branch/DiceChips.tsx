@@ -1,5 +1,5 @@
-import { dieKey, dieLabel, type DieName, type DieOffer, type DieWords, type ForcedDie } from '@fulllifegames/eval-engine';
-import { TURN_KINDS, captionOf, resultWord, targetHeading } from '../../lib/branch-dice';
+import { dieKey, dieLabel, type DieName, type DieOffer, type DieResult, type DieWords, type ForcedDie } from '@fulllifegames/eval-engine';
+import { TURN_KINDS, captionOf, heldHits, isCountDie, resultWord, targetHeading } from '../../lib/branch-dice';
 import type { StepDamage } from '../../lib/branch-rolls';
 import { RollSelect } from './RollSelect';
 
@@ -50,6 +50,11 @@ export function DieRow({ offer, dice, logged, words, target, withMove, rollsOf, 
   const key = dieKey(offer.name);
   const held = dice.find(die => dieKey(die.name) === key);
   const seen = logged.find(die => dieKey(die.name) === key);
+  // the Hits row of a multi-accuracy move (round 89, #114): a chip is pressed for the count of the move's later hit dice, not for a die of its own
+  const counted = isCountDie(offer.name);
+  const heldCount = counted ? heldHits(dice, offer.name) : undefined;
+  const seenCount = counted ? heldHits(logged, offer.name) : undefined;
+  const isCount = (count: number | undefined, result: DieResult): boolean => count !== undefined && 'hits' in result && result.hits === count;
   const caption = captionOf(offer.name, words);
   const label = [
     caption,
@@ -65,8 +70,8 @@ export function DieRow({ offer, dice, logged, words, target, withMove, rollsOf, 
           <Chip
             key={JSON.stringify(result)}
             die={die}
-            set={!!held && sameResult(held.result, result)}
-            logMark={!!seen && sameResult(seen.result, result)}
+            set={counted ? isCount(heldCount, result) : !!held && sameResult(held.result, result)}
+            logMark={counted ? isCount(seenCount, result) : !!seen && sameResult(seen.result, result)}
             words={words}
             onToggle={onToggle}
           />
