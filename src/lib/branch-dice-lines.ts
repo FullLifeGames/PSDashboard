@@ -1,4 +1,4 @@
-import { dieLabel, type DiceReport, type DieReport, type DieWords, type LiveHit } from '@fulllifegames/eval-engine';
+import { dieLabel, type DiceReport, type DieName, type DieReport, type DieWords, type LiveHit } from '@fulllifegames/eval-engine';
 import { foldHitReports, resultWord, wordsOf } from './branch-dice';
 import { diceMarksOf, type DiceMarks } from './branch-dice-marks';
 
@@ -82,6 +82,26 @@ function firstFrom(log: readonly string[], from: number, match: (line: string) =
 }
 
 /**
+ * Round 89 (F5): the place after the `|-hitcount|` line of the move a count of hits belongs to, in the shown log of the turn. A count
+ * the game cut short is read there, next to "The Pokémon was hit 1 time!", and not behind the end-of-turn lines. Nothing when the
+ * move shows no hit count (it never ran, or it was blocked).
+ */
+function afterHitCount(window: TurnWindow, name: DieName): number | undefined {
+  if (name.kind !== 'hit-count') return undefined;
+  const { shownLog, shownStart } = window;
+  const idOf = (text: string | undefined): string => (text ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const move = shownLog.findIndex((line, index) => {
+    const fields = line.split('|');
+    return index >= shownStart && fields[1] === 'move' && !line.includes('|[from]') && (fields[2] ?? '').split(':')[0] === name.slot && idOf(fields[3]) === name.moveId;
+  });
+  if (move < 0) return undefined;
+  for (let index = move + 1; index < shownLog.length && !startsAction(shownLog[index]); index++) {
+    if (shownLog[index].split('|')[1] === '-hitcount') return index + 1;
+  }
+  return undefined;
+}
+
+/**
  * The display lines of one executed turn, from the report of the user's dice. A die drawn before this part of the turn (a turn that
  * paused for a switch reports every die in its last part) has its lines from the part that drew it; a die the simulator never
  * drew gets its line only once the turn is complete, since the rest of the turn may still draw it.
@@ -95,7 +115,7 @@ export function dieLines(report: DiceReport, window: TurnWindow, words: DieWords
     if (at !== undefined && (entry.took === 'applied' || entry.took === 'blocked')) lines.push({ at, text: dieText(entry, words) });
     if (entry.took === 'applied') continue;
     if (!drawn && !window.complete) continue;
-    const end = at === undefined ? firstFrom(window.shownLog, window.shownStart, endsTurn) : firstFrom(window.shownLog, at, startsAction);
+    const end = at === undefined ? (afterHitCount(window, entry.die.name) ?? firstFrom(window.shownLog, window.shownStart, endsTurn)) : firstFrom(window.shownLog, at, startsAction);
     lines.push({ at: end, text: noEffectText(entry, words) });
   }
   return lines;

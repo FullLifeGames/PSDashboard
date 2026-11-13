@@ -255,6 +255,21 @@ describe('the history and the share link read one entry per chain', () => {
     expect(dieLines(unplayed, WINDOW, words).map(line => line.text)).toEqual(['Forced 2 hits had no effect: p1a did not use Triple Axel this turn']);
   });
 
+  // Round 89 (F5, the wave-tester's finding 5): a count the game cut short stands with its hit count ("The Pokémon was hit 1 time!"),
+  // not behind the end-of-turn lines (the weather's upkeep line) that the turn's end puts after the last action.
+  test('the line of a count the target\'s faint cut short stands right after the hit count, before the weather line', () => {
+    const log = ['|old', '|move|p1a: Nova|Triple Axel|p2a: Wave', '|-damage|p2a: Wave|0 fnt', '|-hitcount|p2: Wave|1', '|faint|p2a: Wave', '|-weather|Snowscape|[upkeep]', '|upkeep', '|turn|2'];
+    const window: TurnWindow = { battleLog: log, battleStart: 1, shownLog: log, shownStart: 1, complete: true };
+    const ended = { took: 'no-draw' as const, reason: 'Triple Axel ended after 1 hit, so hit 2 was never rolled', landed: 1 };
+    const lines = dieLines(report(entry(later('tripleaxel', 2, true), ended), entry(later('tripleaxel', 3, false), ended)), window, words);
+    expect(lines.map(line => line.text)).toEqual(['Forced 2 hits, 1 played: Triple Axel ended after 1 hit, so hit 2 was never rolled']);
+    expect(lines[0].at).toBe(4);
+    // a count with no hit count in the log (the move never ran) keeps the end of the turn
+    const quiet = ['|old', '|-weather|Snowscape|[upkeep]', '|upkeep'];
+    const none = { took: 'no-draw' as const, reason: 'p1a did not use Triple Axel this turn' };
+    expect(dieLines(report(entry(later('tripleaxel', 2, true), none)), { battleLog: quiet, battleStart: 1, shownLog: quiet, shownStart: 1, complete: true }, words)[0].at).toBe(2);
+  });
+
   test('the frame says "Forced: Triple Axel 2 hits" once, before the second hit', () => {
     const lines = dieLines(report(
       entry(plain('tripleaxel'), { logIndex: 3 }), entry(later('tripleaxel', 2, true), { logIndex: 4 }), entry(later('tripleaxel', 3, false), { logIndex: 5 }),
