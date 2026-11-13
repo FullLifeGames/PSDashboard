@@ -1,6 +1,6 @@
 import { toID, type Battle } from '@pkmn/sim';
 import type { DieNote } from './prng.ts';
-import type { DieReport, ForcedDie } from './types.ts';
+import type { DieName, DieReport, ForcedDie } from './types.ts';
 import type { MoveSight } from './watch.ts';
 import { about, applied, otherwise, parts, shows, slotOfIdent, type Witness } from './report-lines.ts';
 import { moveNoDraw, moveWitness } from './report-moves.ts';
@@ -120,11 +120,22 @@ function noDraw(input: ReportInput): DieReport {
   return statusNoDraw(input, move.name, turn) ?? noDrawInAction(input, move, windowOf(turn, moveLine + 1));
 }
 
+/**
+ * The line that stopped the move before it did anything. For a later hit's die only a line before the first hit's effect on the
+ * target counts (round 89, F5): after that effect the chain's own lines say what happened (an ability answering the hit, a miss of
+ * a later hit, the faint), and `hitNoDraw` reads the count from `|-hitcount|`.
+ */
+function firstBlocker(action: readonly string[], name: DieName): string | undefined {
+  const later = name.kind === 'accuracy' && name.hit !== undefined;
+  const effect = later ? action.findIndex(line => about(line, name.targetSlot) && isEffect(line)) : -1;
+  return (effect < 0 ? action : action.slice(0, effect)).find(line => isBlocker(line, name.targetSlot));
+}
+
 /** The move ran and a hit followed: why the simulator drew no die for it, read from the lines of the action. */
 function noDrawInAction(input: ReportInput, move: ReturnType<Battle['dex']['moves']['get']>, action: string[]): DieReport {
   const { die } = input;
   const { targetSlot, kind } = die.name;
-  const blocker = action.find(line => isBlocker(line, targetSlot));
+  const blocker = firstBlocker(action, input.die.name);
   if (blocker) return { die, took: 'no-draw', reason: `${move.name} drew no ${kind}: ${shows(blocker)}` };
   // A future move draws in the end-of-turn residual two turns later, when no move is in flight.
   if (move.flags.futuremove) return { die, took: 'no-draw', reason: `${move.name} lands two turns later: its draws fall in the end-of-turn residual` };

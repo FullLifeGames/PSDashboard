@@ -354,6 +354,35 @@ describe('the report of a hit die reads the hit count of its target', () => {
   });
 });
 
+// Round 89 (F5, the wave-tester's finding 1): the die of a later hit the simulator never drew reads what the game did to the chain,
+// in the lines it wrote: an `-activate` of an ability that answers a hit (Toxic Debris, Rough Skin) is no blocker of the later hits.
+describe('the report of a later hit the simulator never drew reads the chain from the protocol', () => {
+  const board = sweepBoard(RULES[9], 'tripleaxel', 'singles', '1,2,3,4', false, FAST);
+  const move = '|move|p2a: Weavile|Triple Axel|p1a: Glimmora';
+  const never = (hit: number, lines: string[], slot = 'p1a') => reportOf({
+    die: { ...hitDie('tripleaxel', hit, true), name: { ...hitDie('tripleaxel', hit, true).name, slot: 'p2a', targetSlot: slot } },
+    battle: { log: [move, ...lines], dex: board.dex } as unknown as typeof board, start: 0,
+  });
+  const damage = '|-damage|p1a: Glimmora|60/100';
+  const toxic = '|-activate|p1a: Glimmora|ability: Toxic Debris';
+
+  test.each([
+    ['the target faints on hit 2 and an ability answers hit 1', [damage, toxic, '|-damage|p1a: Glimmora|0 fnt', '|-hitcount|p1: Glimmora|2', '|faint|p1a: Glimmora'], 3, 'Triple Axel ended after 2 hits, so hit 3 was never rolled'],
+    ['hit 2 misses after an ability answered hit 1', [damage, toxic, '|-miss|p2a: Weavile|p1a: Glimmora', '|-hitcount|p1a: Glimmora|1'], 3, 'Triple Axel ended after 1 hit, so hit 3 was never rolled'],
+    ['hit 2 misses and no ability answered', [damage, '|-miss|p2a: Weavile|p1a: Glimmora', '|-hitcount|p1a: Glimmora|1'], 3, 'Triple Axel ended after 1 hit, so hit 3 was never rolled'],
+    ['hit 3 after a chain that ended on hit 1', [damage, '|-hitcount|p1a: Glimmora|1'], 2, 'Triple Axel ended after 1 hit, so hit 2 was never rolled'],
+  ] as const)('%s', (_name, lines, hit, reason) => {
+    const shown = never(hit, [...lines]);
+    expect(shown.took).toBe('no-draw');
+    expect(shown.reason).toBe(reason);
+  });
+
+  test('a first hit a block stopped keeps the blocking line as its reason', () => {
+    const shown = never(2, ['|-activate|p1a: Glimmora|move: Protect']);
+    expect(shown.reason).toContain('|-activate|p1a: Glimmora|move: Protect');
+  });
+});
+
 describe('the sweep exercised the moves', () => {
   test('every case played a chain, a broken chain and a control', () => {
     expect(census.moves).toBeGreaterThan(0);
