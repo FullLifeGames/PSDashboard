@@ -96,13 +96,15 @@ export function supportStateProblem(value: unknown): string | null {
 }
 
 /** "T7 in the variation from turn 5 (2 turns)", "T28 on the main line (variation from turn 5, 2 turns)": the line once. */
-export function positionLabel(state: Pick<SupportState, 'view' | 'variation'>): string {
+export function positionLabel(state: Pick<SupportState, 'view' | 'variation' | 'game'>): string {
   const { view, variation } = state;
   const turns = turnEntryCount(variation.history);
   const length = `${turns} ${turns === 1 ? 'turn' : 'turns'}`;
   const hasVariation = variation.startTurn !== null && turns > 0;
   if (!view.t0 && view.viewingVariation && hasVariation) return `T${view.turn} in the variation from turn ${variation.startTurn} (${length})`;
-  const where = view.t0 ? 'T0, the team preview' : `T${view.turn} on the main line`;
+  // a finished game's last position is the timeline's End, not one more turn (the record's turns are the finished ones)
+  const atEnd = !!state.game && view.turn > state.game.turns && state.game.body.some(line => line.startsWith('|win|'));
+  const where = view.t0 ? 'T0, the team preview' : atEnd ? 'the End of the main line' : `T${view.turn} on the main line`;
   return hasVariation ? `${where} (variation from turn ${variation.startTurn}, ${length})` : where;
 }
 

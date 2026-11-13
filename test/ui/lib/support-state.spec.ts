@@ -58,6 +58,21 @@ describe('the support state file (round 77, user gate 28.10.2026)', () => {
     expect(supportFileName(state)).toBe('ps-dashboard-state-gen9draft-2058494320-2026-10-28T12-34-56Z.json');
   });
 
+  // Round 89 (#105, H7, tester finding 11): at the end of a finished game the position reads "End", as the timeline does, not "T34".
+  test('the end of a finished game reads End; a game at its tip and a replay keep their turn', async () => {
+    const started = await savedRecord(['Ann', 'Ben'], 33);
+    const finished = { ...started, turns: 33, body: ['|start', '|turn|33', '|win|Ann'] };
+    const noVariation = { startTurn: null, branching: false, history: [] };
+    const atEnd = buildSupportState(inputs({ game: finished, variation: noVariation, view: { turn: 34, line: 'main', t0: false, viewingVariation: false, liveTip: false } }));
+    expect(positionLabel(atEnd)).toBe('the End of the main line');
+    // the game that just finished stands on a live tip too
+    expect(positionLabel(buildSupportState(inputs({ game: finished, variation: noVariation, view: { turn: 34, line: 'main', t0: false, viewingVariation: false, liveTip: true } })))).toBe('the End of the main line');
+    const tip = buildSupportState(inputs({ game: { ...finished, body: ['|start', '|turn|33'] }, variation: noVariation, view: { turn: 34, line: 'main', t0: false, viewingVariation: false, liveTip: true } }));
+    expect(positionLabel(tip)).toBe('T34 on the main line');
+    const midGame = buildSupportState(inputs({ game: finished, variation: noVariation, view: { turn: 20, line: 'main', t0: false, viewingVariation: false, liveTip: false } }));
+    expect(positionLabel(midGame)).toBe('T20 on the main line');
+  });
+
   test('the issue link of a new game names the game and the format, not a Showdown replay that does not exist (H4h)', () => {
     const game = buildSupportState(inputs({ replay: { id: 'newgame-m7nj3hx23e', format: '[Gen 9] OU', formatid: 'gen9ou', players: ['Tidepool', 'Marrowkid'], log: '|turn|1', uploadtime: 1, rating: undefined, viewpoint: 'p1' } }));
     const url = new URL(issueUrl(game, 'state.json'));

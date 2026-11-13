@@ -129,7 +129,7 @@ function AppModals({ app }: { app: AppController }) {
         />
       )}
       {app.support.report && (
-        <ReportIssueDialog report={app.support.report} onDownload={() => void app.support.downloadState()} onClose={app.support.closeReport} />
+        <ReportIssueDialog report={app.support.report} game={app.ctx.newGame.record !== null} onDownload={() => void app.support.downloadState()} onClose={app.support.closeReport} />
       )}
     </>
   );
