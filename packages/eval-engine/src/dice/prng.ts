@@ -17,6 +17,12 @@ abstract class WatchedPRNG extends PRNG {
   protected readonly watch: BattleWatch;
   /** The high-level call in flight (chance, sample, shuffle): `PRNG` routes each through `random`. */
   private shape: Draw | null = null;
+  /**
+   * Round 89 (#104): the draws nothing names, outside a shuffle (a shuffle is a tie of bodies in an event order: the tie of move
+   * actions is a die of the module, the others change the order of the log lines and no outcome). A turn that has any follows the
+   * stream there (a duration, a target picked at random), so a line that forces every die still depends on the seed.
+   */
+  unnamed = 0;
 
   constructor(inner: PRNG, watch: BattleWatch) {
     super(inner.getSeed(), inner.startingSeed);
@@ -50,6 +56,7 @@ abstract class WatchedPRNG extends PRNG {
     const name = recognize(draw, this.watch, this.watch.battle.gen);
     this.watch.settle();
     this.saw?.(name);
+    if (!name && this.shape?.call !== 'shuffle') this.unnamed++;
     return name ? this.decide(name, draw, natural) : natural;
   }
 
