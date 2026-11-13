@@ -24,22 +24,27 @@ function shareUrl(encoded: string): string {
   return `${base}#branch=${encoded}`;
 }
 
-/** The share link of the current branch and whether the clipboard took it. */
+/**
+ * The share link of the current branch and whether the clipboard took it. Once the field is filled it follows the variation: the
+ * link is read from the payload in hand (round 89: a line that replaced the variation left the old link in the field), and a
+ * "Copied" belongs to the payload it copied, so a changed variation shows none until the next copy.
+ */
 function useShareLink(payload: BranchSharePayload) {
-  const [link, setLink] = useState('');
-  const [copied, setCopied] = useState(false);
+  const [shown, setShown] = useState(false);
+  const [copiedFor, setCopiedFor] = useState<BranchSharePayload | null>(null);
+  const link = useMemo(() => (shown ? shareUrl(encodeBranchShare(payload)) : ''), [shown, payload]);
   const createLink = async () => {
     const nextLink = shareUrl(encodeBranchShare(payload));
-    setLink(nextLink);
-    setCopied(false);
+    setShown(true);
+    setCopiedFor(null);
     try {
       await navigator.clipboard?.writeText(nextLink);
-      setCopied(true);
+      setCopiedFor(payload);
     } catch {
-      setCopied(false);
+      setCopiedFor(null);
     }
   };
-  return { link, copied, createLink };
+  return { link, copied: copiedFor === payload, createLink };
 }
 
 const SAVE_TITLE = 'Stores the replay id, branch turn, choices and final branch log in this browser.';

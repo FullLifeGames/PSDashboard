@@ -59,6 +59,28 @@ describe('the save and share buttons of the history panel', () => {
     expect(writeText).toHaveBeenCalledWith(link.value);
   });
 
+  test('a field that was filled follows the variation when it changes: the new link, and no "Copied" for the one the clipboard holds', async () => {
+    const writeText = vi.fn(async () => {});
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    const { rerender } = render(<Panel />);
+    await userEvent.click(screen.getByRole('button', { name: 'Copy Share Link' }));
+    await waitFor(() => expect(screen.getByText('Copied to clipboard.')).toBeVisible());
+    const first = (screen.getByLabelText('Branch share link') as HTMLInputElement).value;
+
+    // a line replaced the variation: another choice at the same turn
+    const replaced: BranchHistoryEntry[] = [{ ...history[0], p1Choice: 'move stealthrock', p2Choice: 'move shadowball' }];
+    rerender(<Panel branchHistory={replaced} />);
+    const link = (screen.getByLabelText('Branch share link') as HTMLInputElement).value;
+    expect(link).not.toBe(first);
+    expect(decodeBranchShare(link.split('#branch=')[1])).toMatchObject({ choices: [{ p1Choice: 'move stealthrock', p2Choice: 'move shadowball' }] });
+    expect(screen.queryByText('Copied to clipboard.')).toBeNull();
+
+    // a fresh copy puts the new link on the clipboard and says so again
+    await userEvent.click(screen.getByRole('button', { name: 'Copy Share Link' }));
+    await waitFor(() => expect(screen.getByText('Copied to clipboard.')).toBeVisible());
+    expect(writeText).toHaveBeenLastCalledWith(link);
+  });
+
   test('saving stores the branch per replay; a save while the history is closed says so in one line, and the list sits in the open body', async () => {
     render(<Panel />);
     await userEvent.click(screen.getByRole('button', { name: 'Save Branch' }));
