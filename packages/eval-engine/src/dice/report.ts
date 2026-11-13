@@ -4,6 +4,7 @@ import type { DieName, DieReport, ForcedDie } from './types.ts';
 import type { MoveSight } from './watch.ts';
 import { about, applied, otherwise, parts, shows, slotOfIdent, type Witness } from './report-lines.ts';
 import { moveNoDraw, moveWitness } from './report-moves.ts';
+import { pickNoDraw, pickReport } from './report-picks.ts';
 import { endNoDraw, procReport, SPAN_KINDS } from './report-procs.ts';
 import { moveFirstReport, orderNoDraw, startRollReport, statusNoDraw, statusReport, tieReport } from './report-turn.ts';
 
@@ -31,6 +32,7 @@ import { moveFirstReport, orderNoDraw, startRollReport, statusNoDraw, statusRepo
  * - status check: yes shows as the body's own `|move|` after the draw, no as a stop (report-turn.ts).
  * - speed tie: the order of the two bodies' first actions in the turn's lines.
  * - first mover: the activation line of the item or the ability after the draw; the start-of-turn roll of Gens 2 and 3 by the holder's place in the turn's order.
+ * - random target, drag (report-picks.ts): the `|move|` line after the draw names the foe, the `|drag|` line of the slot the body.
  * - proc, end of turn (report-procs.ts): a line between the die's draw and the next draw that shows the effect (the ability's or the item's
  *   label, a status line, a thaw), none for a no.
  */
@@ -98,7 +100,7 @@ const QUIET = new Set(['debug', '-nothing', '']);
 
 /** Why the simulator never drew the die, read from the protocol of the turn. */
 function noDraw(input: ReportInput): DieReport {
-  const early = orderNoDraw(input);
+  const early = orderNoDraw(input) ?? pickNoDraw(input);
   if (early) return early;
   if (input.die.name.kind === 'end-of-turn') return endNoDraw(input);
   const { die, battle, start } = input;
@@ -242,6 +244,7 @@ function witnessOf(witness: Witness, battle: Battle, start: number): DieReport {
   if (kind === 'damage-roll') return rollReport(witness);
   if (kind === 'status-check' && 'happens' in result) return statusReport(witness, result.happens, battle.log);
   if (kind === 'speed-tie') return tieReport(witness, battle.log, start);
+  if (kind === 'random-target' || kind === 'drag') return pickReport(witness, battle);
   if (kind === 'move-first' && 'happens' in result) return moveFirstReport(witness, result.happens, battle.log);
   if (SPAN_KINDS.has(kind)) return procReport(witness, battle);
   return moveWitness(witness, battle) ?? applied(witness);

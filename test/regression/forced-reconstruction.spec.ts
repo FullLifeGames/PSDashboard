@@ -204,7 +204,9 @@ describe.each(RESOLVED.map(row => [key(row), row] as const))('the arrival plays 
     const adopted = adoptSerializedRuntime({
       serialized: built.positions.get(row.turn)!, replayLog: built.replay.log, targetTurn: row.turn, snapshot: built.snapshotFor(row.turn),
     });
-    return { built, played: await playTurn(adopted, built.replay.log, row.turn) };
+    // Round 89 (#137): the app executes a branch's turn with `dice` (the first turn joins the log's dice: the random target and the drag the
+    // log shows); a plain stream write leaves the draws before the move in flight to the seed, which the rebuild forces
+    return { built, played: await playTurn(adopted, built.replay.log, row.turn, undefined, { p1: [], p2: [] }) };
   }
 
   test(`${typeOf(row.id)}: the played lines and HP equal the reconstruction's emitted block`, { timeout: 120_000 }, async () => {
