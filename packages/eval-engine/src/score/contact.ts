@@ -67,13 +67,15 @@ export type HitReader = (attacker: Pokemon, defender: Pokemon, moveId: string | 
 /** A reader for one evaluation: it keeps the keys of the bodies it has seen, the memo is the process's. */
 export function hitReader(battle: Battle): HitReader {
   const known = factsOf(battle);
-  const keyOf = hitKeyReader(battle, interner);
+  // Half of the readers never meet a pair that could cost: the key reader is made when the first one does.
+  let keyOf: ReturnType<typeof hitKeyReader> | undefined;
   return (attacker, defender, moveId) => {
     if (!moveId) return NO_COST;
     if (!mayCost(known, battle, attacker, defender, moveOf(known, battle, moveId), onProbe)) {
       hitStats.free++;
       return NO_COST;
     }
+    keyOf ??= hitKeyReader(battle, interner);
     let key = keyOf(attacker, defender, moveId);
     let cost = memo.get(key);
     if (cost !== undefined) {
