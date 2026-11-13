@@ -1,5 +1,5 @@
 /**
- * Round 89 (#105, H4h): the end of a new game's main line. The end is the game's, not a variation's: the dock names the winner as
+ * Round 89 (#105, H4h): the end of a new game's main line (H19a: a replay's too). The end is the game's, not a variation's: the dock names the winner as
  * "won the game" and offers no turn. Two positions are that end: the live tip whose simulator ended with no turn played from it
  * (the game just finished), and, after a reload or Open, the end position of the main line (no live sim, only the log).
  */
@@ -18,9 +18,24 @@ export interface GameEndArgs {
 /** The winner the log's win line names, else null. */
 export const logWinner = (log: string): string | null => log.match(/\|win\|(.+)/)?.[1]?.trim() || null;
 
-export function gameEnd(args: GameEndArgs): { winner: string | null } | undefined {
+/** The end of a main line: its winner (null for a tie), and `battle` for a replay (Showdown's own "won the battle!"), absent for a new game. */
+export interface MainLineEnd {
+  winner: string | null;
+  battle?: true;
+}
+
+/**
+ * Round 89, H19a (user ruling 13.11.2026): a replay at its end shows its result in the dock's place, as a game does, with no picker to
+ * play: the winner of its log, or a tie. A log cut off before any result shows no end (the picker stays). Only the main line has an
+ * end; a branch's end is the variation's.
+ */
+export function gameEnd(args: GameEndArgs): MainLineEnd | undefined {
   const { isGame, viewingVariation, liveTip, simState, atEndPosition, log } = args;
-  if (!isGame || viewingVariation) return undefined;
+  if (viewingVariation) return undefined;
+  if (!isGame) {
+    const winner = logWinner(log);
+    return atEndPosition && !liveTip && (winner || /\|tie(?:\||$)/m.test(log)) ? { winner, battle: true } : undefined;
+  }
   if (liveTip) return simState?.ended ? { winner: simState.winner } : undefined;
   return atEndPosition ? { winner: logWinner(log) } : undefined;
 }

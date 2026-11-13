@@ -225,6 +225,30 @@ describe('useNewGame', () => {
     expect(record!.turns).toBe(before.turns);
     expect(record!.body).toEqual(before.body);
   });
+  test.each([
+    ['gen9ou', { p1: ['Snorlax'], p2: ['Snorlax'] }],
+    ['gen9doublesou', { p1: ['Snorlax', 'Dragonite'], p2: ['Snorlax', 'Dragonite'] }],
+  ] as const)('planTeams (%s) reports how many turns a team edit keeps and changes nothing: no record, no save, no open (H14a)', async (format, leads) => {
+    const rendered = await startGame(format, { p1: [...leads.p1], p2: [...leads.p2] });
+    for (let turn = 0; turn < 3; turn += 1) await playTurn(rendered, turn);
+    const before = rendered.result.current.state.record!;
+    const saves = rendered.result.current.saved.current;
+    const opens = rendered.result.current.openCalls.current;
+    // a move a played turn used goes: the line ends before it (the first turn survives, the second played Protect)
+    const p1 = SIX.map(set => (set.species === 'Snorlax' ? { ...set, moves: ['Earthquake', 'Rest', 'Return', 'Substitute'] } : set));
+    let plan: Awaited<ReturnType<typeof rendered.result.current.game.planTeams>> = null;
+    await act(async () => { plan = await rendered.result.current.game.planTeams({ p1, p2: SIX }); });
+    expect(plan!.error).not.toBeNull();
+    expect(plan!.kept).toBeLessThan(before.turns);
+    expect(rendered.result.current.state.record).toBe(before);
+    expect(rendered.result.current.saved.current).toBe(saves);
+    expect(rendered.result.current.openCalls.current).toBe(opens);
+    // an edit nothing touches keeps every turn
+    await act(async () => { plan = await rendered.result.current.game.planTeams({ p1: SIX, p2: SIX }); });
+    expect(plan!.error).toBeNull();
+    expect(plan!.kept).toBe(before.turns);
+  }, 240_000);
+
   test('opening a game asks the pointer to land once: a saved game on its tip, a fresh game on turn 0 (team preview); the same game again and an edit ask nothing', async () => {
     const played = await startGame('gen9ou', { p1: ['Snorlax'], p2: ['Snorlax'] });
     for (let turn = 0; turn < 2; turn += 1) await playTurn(played, turn);

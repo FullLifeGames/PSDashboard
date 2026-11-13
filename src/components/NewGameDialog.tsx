@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
+import { ConfirmBanner } from './ConfirmBanner';
 import { ModalDialog } from './ModalDialog';
+import { useLeaveAsk } from '../hooks/useLeaveAsk';
 import { FormatPicker } from './new-game/FormatPicker';
 import { TeamBox } from './new-game/TeamBox';
 import { useTeamCheck } from './new-game/use-team-check';
@@ -23,6 +25,8 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   /** Opens a started game in the workspace. */
   onStart: (record: NewGameRecord) => Promise<unknown> | void;
+  /** H16a: whether a variation is open and not saved; Start asks first then (the game itself is saved after every turn). */
+  unsavedVariation?: () => boolean;
 }
 
 const DEFAULT_FORMAT = CALIBRATED_FORMATS[0];
@@ -51,6 +55,7 @@ function SeedRow({ seed, onSeed }: { seed: string; onSeed: (seed: string) => voi
         className="ps-input ps-newgame-seed-input"
         type="text"
         value={seed}
+        placeholder="Empty: a fresh seed"
         spellCheck={false}
         aria-invalid={problem !== null}
         onChange={event => onSeed(event.target.value)}
@@ -63,7 +68,8 @@ function SeedRow({ seed, onSeed }: { seed: string; onSeed: (seed: string) => voi
 }
 
 /** The draft the dialog keeps while it is closed, and what Start does with it. */
-function useNewGameDraft({ onOpenChange, onStart, open }: Pick<Props, 'onOpenChange' | 'onStart' | 'open'>) {
+function useNewGameDraft({ onOpenChange, onStart, open, unsavedVariation }: Pick<Props, 'onOpenChange' | 'onStart' | 'open' | 'unsavedVariation'>) {
+  const leave = useLeaveAsk(unsavedVariation, open);
   const groups = useFormatGroups(open);
   const [format, setFormat] = useState<string>(DEFAULT_FORMAT);
   const [names, setNames] = useState<[string, string]>(['', '']);
@@ -79,6 +85,7 @@ function useNewGameDraft({ onOpenChange, onStart, open }: Pick<Props, 'onOpenCha
   );
   const check = useTeamCheck(format, reads[0].sets, reads[1].sets, nonce);
   const hint = startProblem({ texts, seed });
+  const { ask, question } = leave;
 
   /** Runs Start: busy while it runs, its message when it fails, closed when it works. */
   const run = async (what: string, action: () => Promise<void>) => {
@@ -93,25 +100,28 @@ function useNewGameDraft({ onOpenChange, onStart, open }: Pick<Props, 'onOpenCha
       setBusy(false);
     }
   };
-  const start = () => {
-    if (!selected || hint) return;
+  const begin = (picked: FormatOption) => {
     void run('start', async () => {
-      const record = await startNewGame({ format, formatName: selected.name, names, texts, seed });
+      const record = await startNewGame({ format, formatName: picked.name, names, texts, seed });
       await onStart(record);
       // the next game draws its own dice; the teams stay for a rematch
       setSeed(newGameSeed('fresh'));
     });
   };
+  const start = () => {
+    if (!selected || hint) return;
+    ask('Starting a game', () => begin(selected));
+  };
   return {
     groups, format, setFormat, names, setNames, texts, setTexts, seed, setSeed, setNonce, busy, error,
-    reads, selected, check, hint, start,
+    reads, selected, check, hint, start, question,
   };
 }
 
 export function NewGameDialog(props: Props) {
   const { open, onOpenChange } = props;
   const draft = useNewGameDraft(props);
-  const { groups, format, names, texts, reads, selected, check, hint, busy, error } = draft;
+  const { groups, format, names, texts, reads, selected, check, hint, busy, error, question } = draft;
   if (!open) return null;
   return (
     <ModalDialog title="New game" closeLabel="Close new game" onClose={() => onOpenChange(false)} maxWidth={940}>
@@ -147,6 +157,7 @@ export function NewGameDialog(props: Props) {
         </div>
         {error && <div className="ps-newgame-error" role="alert">{error}</div>}
         {hint && <div className="ps-newgame-field">{hint}</div>}
+        {question && <ConfirmBanner message={question.message} proceedLabel="Discard variation" onProceed={question.proceed} onCancel={question.cancel} />}
         <div className="ps-newgame-actions">
           <button type="button" className="ps-btn ps-btn-red" disabled={!selected || hint !== null || busy} onClick={draft.start}>
             {busy ? 'Starting…' : 'Start'}

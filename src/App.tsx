@@ -1,6 +1,9 @@
 import { useState } from 'react';
+import { EvictedGameNotice } from './components/EvictedGameNotice';
 import { inferReplayFormatId } from '@fulllifegames/replay-core';
 import { LazyNewGameDialog } from './components/NewGameDialogLazy';
+import { GameEditNotices } from './components/GameEditNotices';
+import { unsavedVariation, variationOpen } from './components/game-tip';
 import { useGameTeamEdit } from './hooks/useGameTeamEdit';
 import { ReplayLoader } from './components/ReplayLoader';
 import { LandingGamesPanel } from './components/GameEntry';
@@ -77,16 +80,14 @@ function AppModals({ app }: { app: AppController }) {
   } = app.ctx.knowledge;
   const { replayGen } = app.ctx.meta;
   // Round 89 (#105): the editor of a new game changes the game's record, not the replay's overlay.
-  const { record, editTeams } = app.ctx.newGame;
-  const gameEdit = useGameTeamEdit({ record, editTeams, stopBranch: app.board.discardVariation, close: () => setEditorSide(null) });
+  const { record, editTeams, planTeams } = app.ctx.newGame;
+  const gameEdit = useGameTeamEdit({ record, planTeams, editTeams, variationOpen: variationOpen(app), stopBranch: app.board.discardVariation, close: () => setEditorSide(null) });
   const onSave = (side: 'p1' | 'p2', info: Parameters<typeof saveTeam>[1]) => { if (!gameEdit.edit(side, info)) saveTeam(side, info); };
   return (
     <>
-      {gameEdit.notice && (
-        <div className="ps-panel" role="alert" style={{ marginTop: 8, color: '#e6b36a', fontSize: 11 }}>
-          {gameEdit.notice}<button type="button" className="ps-btn" style={{ marginLeft: 8, padding: '2px 8px', fontSize: 10 }} onClick={gameEdit.dismiss}>Dismiss</button>
-        </div>
-      )}
+      <GameEditNotices edit={gameEdit} />
+      {/* H14a follow-up: while the cut question stands, the editor stays mounted under it (hidden), so Cancel returns to the text as typed. */}
+      <div hidden={gameEdit.hold}>
       {setsPanelOpen && replayData && (
         <SetsImportExportPanel
           game={record !== null}
@@ -100,9 +101,10 @@ function AppModals({ app }: { app: AppController }) {
             p2Info: statsP2Info,
           })}
           onImport={text => {
-            // a game's sets belong to its record: the import plays it again on them (editTeams), as the editor does
-            const importError = applySetsText(text, record ? next => { gameEdit.editSides(next); } : undefined);
-            if (!importError) setSetsPanelOpen(false);
+            // a game's sets belong to its record: the import plays it again on them (editTeams), as the editor does; the panel closes
+            // when the edit applies (after the cut question, if one is asked), not at the click
+            const importError = applySetsText(text, record ? next => { gameEdit.editSides(next, () => setSetsPanelOpen(false)); } : undefined);
+            if (!importError && !record) setSetsPanelOpen(false);
             return importError;
           }}
           onClose={() => setSetsPanelOpen(false)}
@@ -128,6 +130,7 @@ function AppModals({ app }: { app: AppController }) {
           onClose={() => setEditorSide(null)}
         />
       )}
+      </div>
       {app.support.report && (
         <ReportIssueDialog report={app.support.report} game={app.ctx.newGame.record !== null} onDownload={() => void app.support.downloadState()} onClose={app.support.closeReport} />
       )}
@@ -174,6 +177,7 @@ function App() {
 
       <MissingGameNotice app={app} />
       <SharedGameNotice app={app} />
+      <EvictedGameNotice />
 
       {!replayData && !sharedBranch && (embed ? (
         // The host page provides the replay — no loader chrome in embed mode.
@@ -190,6 +194,7 @@ function App() {
           open={newGameOpen}
           onOpenChange={setNewGameOpen}
           onStart={app.ctx.newGame.startGame}
+          unsavedVariation={() => unsavedVariation(app)}
         />
       )}
     </div>

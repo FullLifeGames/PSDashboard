@@ -183,6 +183,17 @@ describe('the states of a position', () => {
     expect(document.querySelector('.ps-dock-chip')).toBeNull();
   });
 
+  test.each([['singles'], ['doubles']] as const)('the end of a replay (%s) reads "<winner> won the battle!" with no dock to play (H19a)', kind => {
+    // the picker of a replay's last turn shows a position that cannot be played; the end replaces it
+    const { rerender } = render(<TurnDock {...props({ simState: simState(kind), endOfGame: { winner: 'Bene', battle: true } })} />);
+    expect(screen.getByRole('status')).toHaveTextContent('Bene won the battle! Go back a turn to play it another way.');
+    expect(screen.queryByText(/won the game|variation/)).toBeNull();
+    expect(screen.queryByRole('button', { name: /Select|Execute/ })).toBeNull();
+    expect(document.querySelector('.ps-dock-chip')).toBeNull();
+    rerender(<TurnDock {...props({ simState: simState(kind), endOfGame: { winner: null, battle: true } })} />);
+    expect(screen.getByRole('status')).toHaveTextContent('The battle ended in a tie. Go back a turn to play it another way.');
+  });
+
   test('a game\'s dock speaks of the game, not of a replay (H4h)', () => {
     const { rerender } = render(<TurnDock {...props({ source: 'stored', isGame: true })} />);
     expect(screen.getByText('Choices from the game\'s position')).toBeInTheDocument();

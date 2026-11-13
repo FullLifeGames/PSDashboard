@@ -22,9 +22,31 @@ describe('the end of a game\'s main line (H4h)', () => {
     expect(gameEnd({ ...base, atEndPosition: true })).toEqual({ winner: 'Alice' });
     expect(gameEnd({ ...base, atEndPosition: true, log: '|turn|3\n' })).toEqual({ winner: null });
     expect(gameEnd({ ...base, atEndPosition: false })).toBeUndefined();
-    expect(gameEnd({ ...base, atEndPosition: true, isGame: false })).toBeUndefined();
+    // a replay's end is the battle's (H19a)
+    expect(gameEnd({ ...base, atEndPosition: true, isGame: false })).toEqual({ winner: 'Alice', battle: true });
     expect(gameEnd({ ...base, atEndPosition: true, viewingVariation: true })).toBeUndefined();
     expect(logWinner(log)).toBe('Alice');
+  });
+});
+
+describe('a replay shows its result at its end (H19a)', () => {
+  const base = { isGame: false, viewingVariation: false, liveTip: false, simState: null };
+  const won = '|turn|9\n|move|p1a: A|Tackle|p2a: B\n|faint|p2a: B\n|\n|win|Alice\n';
+
+  test('the end position of a replay names the winner of its log and marks the end as a battle; any other turn shows none', () => {
+    expect(gameEnd({ ...base, atEndPosition: true, log: won })).toEqual({ winner: 'Alice', battle: true });
+    expect(gameEnd({ ...base, atEndPosition: false, log: won })).toBeUndefined();
+    // a branch of the replay keeps its own words (a variation wins, not the battle)
+    expect(gameEnd({ ...base, atEndPosition: true, viewingVariation: true, log: won })).toBeUndefined();
+  });
+
+  test('a tie names no winner; a log cut off before any result shows no end (the picker stays)', () => {
+    expect(gameEnd({ ...base, atEndPosition: true, log: '|turn|9\n|\n|tie\n' })).toEqual({ winner: null, battle: true });
+    expect(gameEnd({ ...base, atEndPosition: true, log: '|turn|9\n|move|p1a: A|Tackle|p2a: B\n' })).toBeUndefined();
+  });
+
+  test('a game keeps its own words at its end (no battle flag)', () => {
+    expect(gameEnd({ ...base, isGame: true, atEndPosition: true, log: won })).toEqual({ winner: 'Alice' });
   });
 });
 

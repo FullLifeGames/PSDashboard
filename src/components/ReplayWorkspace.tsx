@@ -1,6 +1,6 @@
 import { PSReplayFrame } from './PSReplayFrame';
 import { isGameId } from '../lib/new-game/record';
-import { gameShareLink, idleTip } from './game-tip';
+import { gameShareLink, idleTip, unsavedVariation } from './game-tip';
 import { DockRegion } from './dock/DockRegion';
 import { LeadPanel } from './LeadPanel';
 import { BranchHistoryPanel } from './BranchHistoryPanel';
@@ -59,6 +59,7 @@ function WorkspaceTopBar({ app, replayData, onNewGame }: WorkspaceProps) {
         onShareGame: app.ctx.newGame.record ? () => gameShareLink(app) : undefined,
         onOpenGame: app.ctx.newGame.openRecord,
         currentGameId: app.ctx.newGame.record?.id ?? null,
+        unsavedVariation: () => unsavedVariation(app),
       }}
       newGame={isGameId(replayData.id)}
       onReportIssue={app.support.reportIssue}

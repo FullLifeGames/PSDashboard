@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Dex } from '@pkmn/sim';
 import { NewGameDialog } from '../../../src/components/NewGameDialog';
 import { savedRecord } from '../fixtures/saved-game';
 
@@ -289,4 +290,104 @@ describe('the saved games', () => {
     expect(screen.queryByText('Saved games')).toBeNull();
     expect(document.querySelector('.ps-newgame-saved')).toBeNull();
   }, 60_000);
+});
+
+/**
+ * Round 89 (lane H, #105), H16a: Start asks first when an unsaved variation is open. The question stands in the dialog (the dialog is
+ * modal), keeps the pasted teams, and Cancel starts nothing. Singles and doubles start through the same line.
+ */
+describe('Start with an unsaved variation open (H16a)', () => {
+  for (const [label, search, name] of [['singles', 'gen9ou', '[Gen 9] OU'], ['doubles', 'doubles ou', '[Gen 9] Doubles OU']]) {
+    test(`${label}: the question comes before Start; Cancel starts nothing and keeps the teams, Discard variation starts the game`, async () => {
+      const wired = props({ unsavedVariation: () => true });
+      render(<NewGameDialog {...wired} />);
+      await pickFormat(search, name);
+      paste(1, FOUR);
+      paste(2, FOUR);
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Start' })).toBeEnabled(), { timeout: 30_000 });
+      await userEvent.click(screen.getByRole('button', { name: 'Start' }));
+      const question = screen.getByRole('alertdialog');
+      expect(question).toHaveTextContent('The open variation is not saved. Starting a game closes it.');
+      expect(wired.onStart).not.toHaveBeenCalled();
+      await userEvent.click(within(question).getByRole('button', { name: 'Cancel' }));
+      expect(screen.queryByRole('alertdialog')).toBeNull();
+      expect(wired.onStart).not.toHaveBeenCalled();
+      expect(box(1)).toHaveValue(FOUR);
+      await userEvent.click(screen.getByRole('button', { name: 'Start' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Discard variation' }));
+      await waitFor(() => expect(wired.onStart).toHaveBeenCalledTimes(1), { timeout: 30_000 });
+      expect(vi.mocked(wired.onStart).mock.calls[0][0].formatName).toBe(name);
+    }, 90_000);
+  }
+
+  test('no unsaved variation: Start goes straight on', async () => {
+    const wired = props({ unsavedVariation: () => false });
+    render(<NewGameDialog {...wired} />);
+    paste(1, FOUR);
+    paste(2, FOUR);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Start' })).toBeEnabled(), { timeout: 30_000 });
+    await userEvent.click(screen.getByRole('button', { name: 'Start' }));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    await waitFor(() => expect(wired.onStart).toHaveBeenCalledTimes(1), { timeout: 30_000 });
+  }, 60_000);
+
+  test('closing the dialog drops an open question', async () => {
+    const wired = props({ unsavedVariation: () => true });
+    const { rerender } = render(<NewGameDialog {...wired} />);
+    paste(1, FOUR);
+    paste(2, FOUR);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Start' })).toBeEnabled(), { timeout: 30_000 });
+    await userEvent.click(screen.getByRole('button', { name: 'Start' }));
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+    rerender(<NewGameDialog {...wired} open={false} />);
+    rerender(<NewGameDialog {...wired} open />);
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+  }, 60_000);
+});
+
+/**
+ * Round 89 (lane H, #105), H18a and H20a (user ruling 13.11.2026). An empty seed field means a fresh seed, and the placeholder says
+ * so. A pasted set without an ability starts with the species' first ability, written into the saved team; the team check names it
+ * before Start. Singles and doubles run both.
+ */
+describe('an empty seed field (H18a)', () => {
+  test('the placeholder names what an empty field does; an empty field starts the game on a fresh seed', async () => {
+    const wired = props();
+    render(<NewGameDialog {...wired} />);
+    const field = screen.getByRole('textbox', { name: 'Seed' });
+    expect(field).toHaveAttribute('placeholder', 'Empty: a fresh seed');
+    paste(1, GOOD);
+    paste(2, GOOD);
+    fireEvent.change(field, { target: { value: '' } });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Start' })).toBeEnabled());
+    expect(screen.queryByRole('alert')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Start' }));
+    await waitFor(() => expect(wired.onStart).toHaveBeenCalledTimes(1), { timeout: 30_000 });
+    expect(vi.mocked(wired.onStart).mock.calls[0][0].seed).toMatch(/^\d+,\d+,\d+,\d+$/);
+  }, 60_000);
+});
+
+describe('a pasted set without an ability (H20a)', () => {
+  const NO_ABILITY = 'Gengar\n- Shadow Ball\n\nGarchomp\n- Earthquake';
+  for (const [label, search, name, id] of [['singles', 'gen9ou', '[Gen 9] OU', 'gen9ou'], ['doubles', 'doubles ou', '[Gen 9] Doubles OU', 'gen9doublesou']]) {
+    test(`${label}: the check says which ability each set plays, and Start writes it into the saved team`, async () => {
+      const wired = props();
+      render(<NewGameDialog {...wired} />);
+      await pickFormat(search, name);
+      paste(1, NO_ABILITY);
+      paste(2, GOOD);
+      const abilityOf = (species: string) => Dex.forGen(9).species.get(species).abilities['0'];
+      expect(id).toBeTruthy();
+      expect(await screen.findByText(`Gengar has no ability: plays ${abilityOf('Gengar')}.`, undefined, { timeout: 30_000 })).toBeInTheDocument();
+      expect(screen.getByText(`Garchomp has no ability: plays ${abilityOf('Garchomp')}.`)).toBeInTheDocument();
+      // the other side pasted its abilities: no note under it
+      expect(screen.queryByText(/Gliscor has no ability/)).toBeNull();
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Start' })).toBeEnabled());
+      await userEvent.click(screen.getByRole('button', { name: 'Start' }));
+      await waitFor(() => expect(wired.onStart).toHaveBeenCalledTimes(1), { timeout: 30_000 });
+      const record = vi.mocked(wired.onStart).mock.calls[0][0];
+      expect(record.teams.p1.map(set => set.ability)).toEqual([abilityOf('Gengar'), abilityOf('Garchomp')]);
+      expect(record.teams.p2.map(set => set.ability)).toEqual(['Rough Skin', 'Poison Heal']);
+    }, 90_000);
+  }
 });

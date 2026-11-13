@@ -166,11 +166,11 @@ export function useNewGame(inputs: NewGameInputs) {
   const promote = usePromote({ recordRef, setRecord, replay, branch, storePosition, landRef, save, setSaveFailed });
 
   /**
-   * Plays the record's entries again on other teams (a set edit): the header and the teams follow the edit, every entry that still
-   * applies stays, and the main line ends before the first one that does not (a removed move), at a settled turn. The caller
-   * stops the live branch; its runtime stands on the old teams.
+   * Plays the record's entries again on other teams (a set edit) and says what the game would be: the header and the teams follow the
+   * edit, every entry that still applies stays, and the main line ends before the first one that does not (a removed move), at a
+   * settled turn. It changes nothing (no record, no save, no open): the caller asks before it commits (H14a).
    */
-  const editTeams = useCallback(async (teams: { p1: PokemonSet[]; p2: PokemonSet[] }): Promise<{ kept: number; error: string | null } | null> => {
+  const planTeams = useCallback(async (teams: { p1: PokemonSet[]; p2: PokemonSet[] }): Promise<{ kept: number; error: string | null; next: NewGameRecord } | null> => {
     const current = recordRef.current;
     if (!current) return null;
     const branchEngine = await import('../lib/lazy/branch-engine');
@@ -186,20 +186,26 @@ export function useNewGame(inputs: NewGameInputs) {
       entries = current.entries.slice(0, kept);
       rebuilt = await rebuildGame(branchEngine, { ...current, teams: start.teams, header: start.header, entries });
     }
-    const error = failure?.error ?? null;
     const played = rebuilt?.entries ?? [];
     const next: NewGameRecord = {
       ...current, teams: start.teams, header: start.header, teamPreview: start.teamPreview, bringCount: start.bringCount,
       entries: played.map(withoutPosition), pending: undefined, body: rebuilt ? bodyLines(rebuilt.runtime.log) : [],
       turns: Math.max(0, turnEntryCount(played) - 1), updatedAt: new Date().toISOString(),
     };
-    // the positions follow on the new sets: the store keys them by the sets' fingerprint, so the position source rebuilds them once from the record
-    await openRecord(next);
-    setSaveFailed(!save(next));
-    return { kept: next.turns, error };
-  }, [recordRef, openRecord, save]);
+    return { kept: next.turns, error: failure?.error ?? null, next };
+  }, [recordRef]);
 
-  return { record, openRecord, startGame, promote, editTeams, saveFailed, takeLanding };
+  /** Plays the record again on other teams and opens the result; the caller stops the live branch, its runtime stands on the old teams. */
+  const editTeams = useCallback(async (teams: { p1: PokemonSet[]; p2: PokemonSet[] }): Promise<{ kept: number; error: string | null } | null> => {
+    const plan = await planTeams(teams);
+    if (!plan) return null;
+    // the positions follow on the new sets: the store keys them by the sets' fingerprint, so the position source rebuilds them once from the record
+    await openRecord(plan.next);
+    setSaveFailed(!save(plan.next));
+    return { kept: plan.kept, error: plan.error };
+  }, [planTeams, openRecord, save]);
+
+  return { record, openRecord, startGame, promote, planTeams, editTeams, saveFailed, takeLanding };
 }
 
 /**
