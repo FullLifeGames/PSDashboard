@@ -51,6 +51,25 @@ describe('the saved games list', () => {
     expect(screen.queryByRole('button', { name: /Show all/ })).toBeNull();
   }, 60_000);
 
+  test('a double click on the inline Delete deletes one game and opens none: the next row\'s Open slides under the pointer (H4h)', async () => {
+    await savedRecord(['Ann', 'Ben'], 1);
+    await savedRecord(['Cleo', 'Dan'], 2);
+    const onOpen = vi.fn().mockResolvedValue(undefined);
+    render(<SavedGamesList {...props({ onOpen })} />);
+    expect(rows()[0]).toHaveTextContent('Cleo');
+    await userEvent.click(within(rows()[0]).getByRole('button', { name: 'Delete saved game' }));
+    await userEvent.click(within(rows()[0]).getByRole('button', { name: 'Delete' }));
+    // the second click of the double click lands on the Open that moved up
+    expect(rows()).toHaveLength(1);
+    await userEvent.click(within(rows()[0]).getByRole('button', { name: 'Open' }));
+    expect(onOpen).not.toHaveBeenCalled();
+    expect(listGames()).toHaveLength(1);
+    // a deliberate click after the double-click time opens it
+    await new Promise(resolve => setTimeout(resolve, 700));
+    await userEvent.click(within(rows()[0]).getByRole('button', { name: 'Open' }));
+    await waitFor(() => expect(onOpen).toHaveBeenCalledTimes(1));
+  }, 60_000);
+
   test('Open hands the loaded record over; a failing open says so in the list', async () => {
     const record = await savedRecord(['Ann', 'Ben'], 14, '3,4,5,6');
     await savedRecord(['Cleo', 'Dan'], 1, '7,8,9,10');

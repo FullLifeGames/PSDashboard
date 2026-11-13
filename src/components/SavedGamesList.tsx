@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { deleteGame, listGames, loadGame, type SavedGameRow } from '../lib/new-game/store';
 import type { NewGameRecord } from '../lib/new-game/record';
 
@@ -12,6 +12,12 @@ import type { NewGameRecord } from '../lib/new-game/record';
  */
 
 const SHOWN = 3;
+
+/**
+ * After a delete the rows below move up and the next row's Open lands under the pointer; the second click of a double click on the
+ * confirm's red Delete would open that game (round 89, H4h). An Open within this time of a delete is not a deliberate click.
+ */
+const AFTER_DELETE_MS = 600;
 
 interface Props {
   /** Opens a saved game in the workspace; a failure shows in the list. */
@@ -72,8 +78,10 @@ export function SavedGamesList({ onOpen, currentId, divider = false }: Props) {
   const [asking, setAsking] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const deletedAt = useRef(0);
   if (rows.length === 0) return null;
   const open = async (id: string) => {
+    if (Date.now() - deletedAt.current < AFTER_DELETE_MS) return;
     const record = loadGame(id);
     if (!record) {
       setError('That saved game could not be read.');
@@ -96,7 +104,7 @@ export function SavedGamesList({ onOpen, currentId, divider = false }: Props) {
     <div className="ps-newgame-saved">
       <div className="ps-entry-head">Saved games</div>
       {shown.map(row => (
-        <Row key={row.id} row={row} currentId={currentId} asking={asking} busy={busy} setAsking={setAsking} onOpen={id => void open(id)} onDelete={id => setRows(deleteGame(id))} />
+        <Row key={row.id} row={row} currentId={currentId} asking={asking} busy={busy} setAsking={setAsking} onOpen={id => void open(id)} onDelete={id => { deletedAt.current = Date.now(); setRows(deleteGame(id)); }} />
       ))}
       {error && <div className="ps-newgame-error" role="alert">{error}</div>}
       {!all && rows.length > SHOWN && (
