@@ -327,6 +327,7 @@ export function foldHitReports(forced: readonly DieReport[]): DieReport[] {
       die: { name: { ...plainName(entry.die.name), kind: 'hit-count' }, result: { hits: chainCount(group.map(held => hitResult(held.die))) } },
       took: !failed ? 'applied' : group.some(held => held.took === 'applied') ? 'blocked' : failed.took,
       ...(failed?.reason !== undefined ? { reason: failed.reason } : {}),
+      ...(failed?.landed !== undefined && failed.landed > 0 ? { landed: failed.landed } : {}),
       ...(logged.length > 0 ? { logIndex: Math.min(...logged) } : {}),
     }];
   });

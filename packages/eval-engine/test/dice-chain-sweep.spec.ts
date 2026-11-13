@@ -375,6 +375,8 @@ describe('the report of a later hit the simulator never drew reads the chain fro
     const shown = never(hit, [...lines]);
     expect(shown.took).toBe('no-draw');
     expect(shown.reason).toBe(reason);
+    // the hits the game played, for the panel's "(2 played)"
+    expect(shown.landed).toBe(Number(/after (\d+) hit/.exec(reason)![1]));
   });
 
   test('a first hit a block stopped keeps the blocking line as its reason', () => {

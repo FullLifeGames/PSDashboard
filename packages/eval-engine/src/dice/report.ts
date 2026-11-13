@@ -167,7 +167,7 @@ function hitNoDraw(input: ReportInput, move: string, action: readonly string[]):
   const count = hitCountIn(action, die.name.targetSlot);
   const hit = die.name.hit!;
   if (count !== undefined && count < hit) {
-    return { die, took: 'no-draw', reason: `${move} ended after ${count} hit${count === 1 ? '' : 's'}, so hit ${hit} was never rolled` };
+    return { die, took: 'no-draw', reason: `${move} ended after ${count} hit${count === 1 ? '' : 's'}, so hit ${hit} was never rolled`, landed: count };
   }
   return { die, took: 'no-draw', reason: `${move} rolls no accuracy for hit ${hit} here: one roll covers every hit` };
 }
@@ -178,7 +178,7 @@ function hitReport(w: Witness, happens: boolean): DieReport {
   const count = hitCountIn(w.action, w.targetSlot);
   if (happens) {
     if (count !== undefined && count >= hit) return applied(w);
-    return otherwise(w, 'blocked', `${w.name} stopped after ${count ?? 0} hit${count === 1 ? '' : 's'} although the die gave hit ${hit}`);
+    return { ...otherwise(w, 'blocked', `${w.name} stopped after ${count ?? 0} hit${count === 1 ? '' : 's'} although the die gave hit ${hit}`), landed: count ?? 0 };
   }
   if (count === hit - 1) return applied(w);
   return otherwise(w, 'no-chance', `${w.name} landed hit ${hit} although the die gave a miss (the protocol counts ${count ?? 'no'} hits)`);

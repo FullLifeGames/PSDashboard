@@ -13,6 +13,8 @@ export interface DieMark {
   label: string;
   /** Set when the die took no effect: the report's reason, empty when the report gave none. */
   noEffect?: string;
+  /** Round 89: the hits that landed when the game cut a forced count short (a die that did something, not "no effect"). */
+  played?: number;
 }
 
 export interface DiceMarks { p1: DieMark[]; p2: DieMark[] }
@@ -25,13 +27,14 @@ export function diceMarksOf(report: DiceReport | undefined, words: DieWords): Di
   const marks: DiceMarks = { p1: [], p2: [] };
   for (const entry of foldHitReports(report.forced)) {
     const label = notationDice([entry.die], words)[0];
-    marks[entry.die.name.slot.slice(0, 2) === 'p2' ? 'p2' : 'p1'].push(entry.took === 'applied' ? { label } : { label, noEffect: entry.reason ?? '' });
+    marks[entry.die.name.slot.slice(0, 2) === 'p2' ? 'p2' : 'p1'].push(entry.took === 'applied' ? { label } : { label, noEffect: entry.reason ?? '', ...(entry.landed === undefined ? {} : { played: entry.landed }) });
   }
   return marks;
 }
 
-/** The text of a mark in a row or a link: the label, and "(no effect)" for a die that took none. */
-export const markText = (mark: DieMark): string => (mark.noEffect === undefined ? mark.label : `${mark.label} (no effect)`);
+/** The text of a mark in a row or a link: the label, "(3 played)" for a count the game cut short after three hits, "(no effect)" for a die that took none. */
+export const markText = (mark: DieMark): string =>
+  mark.noEffect === undefined ? mark.label : `${mark.label} (${mark.played === undefined ? 'no effect' : `${mark.played} played`})`;
 
 export const sideMarkTexts = (marks: DiceMarks | undefined, side: Side): string[] => (marks?.[side] ?? []).map(markText);
 
