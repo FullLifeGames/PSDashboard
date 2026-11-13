@@ -24,7 +24,7 @@ export const TASK_VIEWPORT = { width: 1366, height: 768 };
 /** Loads a dock fixture by its id and waits for the exact pickers at `turn`. */
 export async function loadDockReplay(page: Page, id: string, turn: number): Promise<void> {
   await page.locator('input[type="text"]').fill(id);
-  await page.locator('button', { hasText: 'Load' }).click();
+  await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
   await waitForExactPickers(page, turn);
   await expect(page.locator('.ps-dock-chip').first()).toBeVisible({ timeout: 30_000 });
 }

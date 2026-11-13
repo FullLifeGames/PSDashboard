@@ -123,6 +123,26 @@ describe('useTeamKnowledge', () => {
     expect(restored.result.current.effectiveP1Info!.pokemon[0].item.value).toBe('Choice Band');
   });
 
+  test('a sets import that is routed (a game) hands the checked infos over and overlays, stores and refreshes nothing; a side the text leaves out is null', () => {
+    const wired = inputs();
+    const { result } = renderHook(() => useTeamKnowledge(wired));
+    const route = vi.fn();
+    let outcome: string | null = 'unset';
+    act(() => { outcome = result.current.applySetsText(setsText(p1Lead), route); });
+    expect(outcome).toBeNull();
+    expect(route).toHaveBeenCalledTimes(1);
+    const { p1, p2 } = route.mock.calls[0][0];
+    expect(p1.pokemon[0].item).toMatchObject({ value: 'Choice Band', source: 'manual' });
+    expect(p2).toBeNull();
+    expect(result.current.editedP1Info).toBeNull();
+    expect(wired.onTeamsEdited).not.toHaveBeenCalled();
+    expect(localStorage.getItem(`ps-replay-interceptor:sets:${replayData.id}`)).toBeNull();
+    // a refused text reaches nobody
+    act(() => { outcome = result.current.applySetsText('Garchomp @ Leftovers\n- Earthquake', route); });
+    expect(outcome).toMatch(/No side headers found/);
+    expect(route).toHaveBeenCalledTimes(1);
+  });
+
   test('an import without side headers is refused with the explanation', () => {
     const { result } = renderHook(() => useTeamKnowledge(inputs()));
     let outcome: string | null = null;

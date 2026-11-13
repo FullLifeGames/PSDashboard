@@ -1,7 +1,7 @@
 import { Teams } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import type { OpponentTeamInfo, PokemonEvs } from './types.ts';
-import { itemSetValue, manualEvs, manualField, manualMove } from './team-info.ts';
+import { itemSetValue, manualEvs, manualField, manualMove, unknownEvs, unknownField } from './team-info.ts';
 import { toId } from './ids.ts';
 import { normalizeLineEndings } from './line-endings.ts';
 
@@ -94,4 +94,27 @@ export function countMatchingSpecies(info: OpponentTeamInfo | null, sets: Pasted
   if (!info) return 0;
   const teamIds = new Set(info.pokemon.flatMap(entry => [toId(entry.species), toId(entry.species.split('-')[0])]));
   return sets.filter(set => teamIds.has(toId(set.species)) || teamIds.has(toId(set.species.split('-')[0]))).length;
+}
+
+/**
+ * Round 89 (#105): the stats panel's team info for a team the user typed himself (a new game): every field the paste gives is
+ * his own knowledge ("manual"), every field it leaves out stays unknown. It is the overlay of `applyPastedTeam` on an empty
+ * body per set, so reading the same paste again changes nothing.
+ */
+export function teamInfoOfSets(sets: PastedSet[]): OpponentTeamInfo {
+  const empty: OpponentTeamInfo = {
+    pokemon: sets.map(set => ({
+      species: set.species,
+      moves: [],
+      ability: unknownField(),
+      item: unknownField(),
+      teraType: unknownField(),
+      evs: unknownEvs(),
+      level: set.level ?? 100,
+      gender: '',
+      ...(set.nickname ? { nickname: set.nickname } : {}),
+    })),
+  };
+  // Two sets of one species (a Custom Game) would overlay each other by species: each body takes its own set.
+  return { pokemon: empty.pokemon.map((body, index) => applyPastedTeam({ pokemon: [body] }, [sets[index]]).info.pokemon[0]) };
 }

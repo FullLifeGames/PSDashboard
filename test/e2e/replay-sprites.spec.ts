@@ -24,7 +24,7 @@ test('the replay frame builds when jQuery arrives after graphics.js', async ({ p
     await route.continue();
   });
   await page.goto('/');
-  await page.locator('button', { hasText: 'Load' }).click();
+  await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
   const frame = await (await page.locator('iframe[title="PS Replay"]').elementHandle({ timeout: 30_000 }))?.contentFrame();
   expect(frame).toBeTruthy();
   await expect.poll(async () => frame!.evaluate(() => !!(window as ReplayWindow).Replays?.battle), { timeout: 45_000 }).toBe(true);
@@ -44,7 +44,7 @@ test('the effect sprites of a replay frame load: Stealth Rock at 562428 turn 12'
   await page.route('**/replay.pokemonshowdown.com/**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(replay) }));
   await page.goto('/');
   await page.locator('input[type="text"]').first().fill('smogtours-gen8ou-562428');
-  await page.locator('button', { hasText: 'Load' }).click();
+  await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
   await page.locator('.ps-branch-bar input[type="range"]').fill('12');
   await expect(page.getByText('T12/')).toBeVisible({ timeout: 30_000 });
   const frame = await (await page.locator('iframe[title="PS Replay"]').elementHandle({ timeout: 10_000 }))?.contentFrame();

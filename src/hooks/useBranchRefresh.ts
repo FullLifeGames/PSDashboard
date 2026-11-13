@@ -34,6 +34,8 @@ interface RefreshContext {
   clearRequest: () => void;
   /** The rebuild kept no turn: the variation is gone (round 77, D1). */
   reportEnded: (notice: string) => void;
+  /** A new game's dice seed (round 89, #105): a variation refreshed from turn 0 starts the game's own battle again. */
+  seed?: string;
 }
 
 /** The refresh run: rebuild the variation with the edited team knowledge,
@@ -58,6 +60,7 @@ async function runRefresh(ctx: RefreshContext, request: BranchRefreshRequest) {
         choiceLocks: inputs.choiceLocks,
         bringOnly: ctx.bringOnly,
         acquireRuntime: ctx.acquireRuntime,
+        ...(ctx.seed ? { seed: ctx.seed } : {}),
       });
       if (outcome?.endedNotice) {
         ctx.branchWindowOpenRef.current = false;
@@ -95,10 +98,12 @@ export function useBranchRefresh(args: {
   request: BranchRefreshRequest | null;
   clearRequest: () => void;
   reportEnded: (notice: string) => void;
+  /** A new game's dice seed (round 89, #105); a replay passes none. */
+  gameSeed?: string;
 }) {
   const {
     replayData, snapshots, observations, sources, bringOnlyLists, branching, variationStartTurn,
-    startBranch, acquireRuntime, viewTurn, session, branchWindowOpenRef, request, clearRequest, reportEnded,
+    startBranch, acquireRuntime, viewTurn, session, branchWindowOpenRef, request, clearRequest, reportEnded, gameSeed,
   } = args;
   useEffect(() => {
     if (!request || !replayData) return;
@@ -111,13 +116,13 @@ export function useBranchRefresh(args: {
       bringOnly: refreshTurn > 0 ? bringOnlyLists ?? undefined : undefined,
       session, startBranch, acquireRuntime, branchWindowOpenRef,
       isCancelled: () => cancelled,
-      clearRequest, reportEnded,
+      clearRequest, reportEnded, seed: gameSeed,
     }, request);
     return () => {
       cancelled = true;
     };
   }, [
     request, replayData, snapshots, observations, sources, bringOnlyLists, branching,
-    variationStartTurn, startBranch, acquireRuntime, viewTurn, session, branchWindowOpenRef, clearRequest, reportEnded,
+    variationStartTurn, startBranch, acquireRuntime, viewTurn, session, branchWindowOpenRef, clearRequest, reportEnded, gameSeed,
   ]);
 }

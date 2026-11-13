@@ -119,6 +119,7 @@ describe('the workspace feeds the variation board shares from the branch history
         smogon: { usageStats: { loading: false }, setAssumptions: { loading: false } },
         knowledge: { statsP1Info: null, statsP2Info: null },
         branch: { history },
+        newGame: { record: null },
       },
       board: {
         liveEvalStatus: 'done',

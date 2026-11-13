@@ -3,7 +3,9 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BranchHistoryPanel } from '../../../src/components/BranchHistoryPanel';
 import { useBranchSaveShare } from '../../../src/components/useBranchSaveShare';
-import { decodeBranchShare, savedBranchKey } from '../../../src/lib/branch-share';
+import { decodeBranchShare, readShare, savedBranchKey } from '../../../src/lib/branch-share';
+import type { GameSharePayload } from '../../../src/lib/new-game/share';
+import { savedRecord } from '../fixtures/saved-game';
 import type { BranchHistoryEntry } from '../../../src/hooks/useBranch';
 import { replayFixture, singlesReplay } from '../fixtures/replay';
 
@@ -11,8 +13,10 @@ const replayData = singlesReplay();
 const { snapshots } = replayFixture('singles');
 
 /** Round 84 (A7i, ruling 20a): the workspace wires the hook into the history panel; the spec does the same. */
-function Panel({ branchHistory = history, finalLog = '|turn|3' }: { branchHistory?: BranchHistoryEntry[]; finalLog?: string }) {
-  const slots = useBranchSaveShare({ replayData, branchTurn: 2, history: branchHistory, finalLog });
+function Panel({ branchHistory = history, finalLog = '|turn|3', data = replayData, game }: {
+  branchHistory?: BranchHistoryEntry[]; finalLog?: string; data?: typeof replayData; game?: Parameters<typeof useBranchSaveShare>[0]['game'];
+}) {
+  const slots = useBranchSaveShare({ replayData: data, branchTurn: 2, history: branchHistory, finalLog, game });
   return <BranchHistoryPanel branchStartTurn={2} history={branchHistory} snapshots={snapshots} slots={slots} />;
 }
 const toggle = () => screen.getByRole('button', { name: /Variation moves/ });
@@ -112,5 +116,52 @@ describe('the save and share buttons of the history panel', () => {
     expect(screen.queryByText(SAVED_NOTICE)).toBeNull();
     await openPanel();
     expect(screen.getByText(/Turn 4 branch, 0 choices/)).toBeVisible();
+  });
+});
+
+/** Round 89 (#105, H5): a game shares its own link (version 2), saves its branch as a row of that link, and has no replay to load. */
+describe('a new game in the history panel', () => {
+  const choice = (name: string) => [{ kind: 'move' as const, moveId: name.toLowerCase().replace(/\W/g, ''), moveName: name }];
+  const turn: BranchHistoryEntry = { ...history[0], kind: 'turn', p1SlotChoices: choice('Earthquake'), p2SlotChoices: choice('Protect') };
+  const stand = { turn: 3, line: 'variation' as const };
+
+  async function gamePanel() {
+    const record = await savedRecord(['Alice', 'Bob'], 2);
+    const data = { ...replayData, id: record.id, formatid: record.format, format: record.formatName };
+    render(<Panel data={data} branchHistory={[turn]} game={{ record, view: stand }} />);
+    return record;
+  }
+
+  test('Copy Share Link is there: the link is version 2 with the game, the open branch and the turn the sharer stands on, the clipboard gets it', async () => {
+    const writeText = vi.fn(async () => {});
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    const record = await gamePanel();
+    const share = screen.getByRole('button', { name: 'Copy Share Link' });
+    expect(share).toHaveAttribute('title', 'Copies a link that opens this game and its open branch at this turn.');
+    expect(screen.getByRole('button', { name: 'Save Branch' })).toHaveAttribute('title', "Stores this game's branch in this browser.");
+    await userEvent.click(share);
+    const link = (screen.getByLabelText('Branch share link') as HTMLInputElement).value;
+    const read = readShare(link.split('#branch=')[1]);
+    expect(read.kind).toBe('game');
+    const payload = (read as { payload: GameSharePayload }).payload;
+    expect(payload).toMatchObject({ gameId: record.id, format: record.format, seed: record.seed, view: stand, branchTurn: 2, variation: { startTurn: 2, entries: [[['Earthquake'], ['Protect']]] } });
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(link));
+  });
+
+  test('a saved branch is a row of the game: its words match a replay branch, Open goes through the version 2 link, Delete removes it', async () => {
+    const record = await gamePanel();
+    await userEvent.click(screen.getByRole('button', { name: 'Save Branch' }));
+    const stored = JSON.parse(localStorage.getItem(savedBranchKey(record.id))!) as GameSharePayload[];
+    expect(stored).toHaveLength(1);
+    expect(stored[0]).toMatchObject({ version: 2, gameId: record.id });
+    await openPanel();
+    expect(screen.getByText(/Turn 2 branch, 1 choices/)).toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: 'Open' }));
+    const hash = window.location.hash;
+    expect(hash).toMatch(/^#branch=/);
+    expect(readShare(hash.slice('#branch='.length)).kind).toBe('game');
+    window.history.replaceState(null, '', '/');
+    await userEvent.click(screen.getByRole('button', { name: 'Delete saved branch from turn 2' }));
+    expect(JSON.parse(localStorage.getItem(savedBranchKey(record.id)) ?? '[]')).toHaveLength(0);
   });
 });

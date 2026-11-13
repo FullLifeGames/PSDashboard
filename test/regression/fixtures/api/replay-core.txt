@@ -146,6 +146,7 @@ value speciesBaseId
 value speciesOverrides
 value splitReplayPassword
 value standingScreens
+value teamInfoOfSets
 value teamSizes
 value terrainConditions
 value toId

@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, render, renderHook, waitFor } from '@testing-library/react';
+import { useEffect, useState, type ReactElement } from 'react';
 import { doublesReplay, singlesReplay } from '../../fixtures/replay';
 import { stubReplayFetch } from '../../fixtures/network';
 import { realReplayWorkerClient } from '../../fixtures/worker';
+import { playedRecord } from '../../fixtures/played-game';
 
 const worker = vi.hoisted(() => ({ current: null as null | ReturnType<typeof import('../../fixtures/worker').realReplayWorkerClient> }));
 vi.mock('../../../../src/hooks/useReplayWorker', () => ({ useReplayWorker: () => worker.current!.client }));
@@ -118,4 +120,93 @@ describe('useTimelineController', () => {
     expect(result.current.board.timeline.maxTurn).toBe(result.current.ctx.replay.snapshots.length);
     expect(result.current.ctx.branch.branching).toBe(false);
   });
+  // Round 89 (#105, H4e): a saved game opens on its tip. The frame of a game that opens at start (a reload) is not there yet and
+  // reports turn 1 while it loads; the landing holds the pointer against that report like any selection of a turn does.
+  test('a saved game opened on its tip keeps the pointer there when the loading frame reports turn 1', async () => {
+    const record = await playedRecord(1);
+    const { result } = renderHook(() => useBoardHarness());
+    await act(async () => { await result.current.ctx.newGame.openRecord(record); });
+    await waitFor(() => expect(result.current.board.timeline.maxTurn).toBe(2));
+    expect(result.current.board.timeline.viewTurn).toBe(2);
+    act(() => result.current.board.timeline.handleReplayTurn(1));
+    expect(result.current.board.timeline.viewTurn).toBe(2);
+    // the frame that confirms the tip ends the guard, and its later reports move the pointer again
+    act(() => result.current.board.timeline.handleReplayTurn(2));
+    act(() => result.current.board.timeline.handleReplayTurn(1));
+    expect(result.current.board.timeline.viewTurn).toBe(1);
+  }, 90_000);
+
+  // Round 89 (#105, H4f): a slow load outran the four-second guard (the e2e reload on devbox), and the frame's report of turn 1 moved
+  // the pointer off the tip. The landing holds its turn until the frame confirms it, however long the load takes.
+  test('a saved game keeps its tip against a report of turn 1 that comes after the guard time of a selection', async () => {
+    const record = await playedRecord(1);
+    const { result } = renderHook(() => useBoardHarness());
+    await act(async () => { await result.current.ctx.newGame.openRecord(record); });
+    await waitFor(() => expect(result.current.board.timeline.maxTurn).toBe(2));
+    expect(result.current.board.timeline.viewTurn).toBe(2);
+    const now = Date.now();
+    vi.useFakeTimers({ toFake: ['Date'], now: now + 60_000 });
+    try {
+      act(() => result.current.board.timeline.handleReplayTurn(1));
+      expect(result.current.board.timeline.viewTurn).toBe(2);
+      act(() => result.current.board.timeline.handleReplayTurn(2));
+      act(() => result.current.board.timeline.handleReplayTurn(1));
+      expect(result.current.board.timeline.viewTurn).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  }, 90_000);
+
+  test('the user\'s own click on turn 1 after the landing wins over the held tip', async () => {
+    const record = await playedRecord(1);
+    const { result } = renderHook(() => useBoardHarness());
+    await act(async () => { await result.current.ctx.newGame.openRecord(record); });
+    await waitFor(() => expect(result.current.board.timeline.maxTurn).toBe(2));
+    expect(result.current.board.timeline.viewTurn).toBe(2);
+    act(() => result.current.board.timeline.handleGraphSelect(1));
+    expect(result.current.board.timeline.viewTurn).toBe(1);
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.now() + 60_000 });
+    try {
+      // the frame confirms the click, and its later reports move the pointer again
+      act(() => result.current.board.timeline.handleReplayTurn(1));
+      act(() => result.current.board.timeline.handleReplayTurn(2));
+      expect(result.current.board.timeline.viewTurn).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  }, 90_000);
+
+  // Round 89 (#105, H4g): the observed order of a reload on `?game=` (the browser log of the e2e row). The address opens the record
+  // first; the board mounts afterwards, while the new game's replay data has no id yet. Its reset effect ran then, took the landing and
+  // put the pointer on the tip, and the run for the new id (the document arriving) reset the pointer to turn 1 and found no landing
+  // left. The landing belongs to the game's id: a run for another id (none yet) leaves it, the run for the game's id takes it.
+  test('a saved game opened before the board mounts keeps its tip when the replay data arrives after the first run of the reset', async () => {
+    const record = await playedRecord(1);
+    const seen: { ctx?: ReturnType<typeof useReplayContext>; board?: ReturnType<typeof useTimelineController>; show?: (on: boolean) => void } = {};
+    function Board({ ctx, transients }: { ctx: ReturnType<typeof useReplayContext>; transients: ReturnType<typeof useTransients> }): null {
+      const board = useTimelineController(ctx, transients);
+      useEffect(() => { seen.board = board; });
+      return null;
+    }
+    function Host(): ReactElement | null {
+      const ctx = useReplayContext();
+      const transients = useTransients(ctx.replay.replayData?.id);
+      const [shown, setShown] = useState(false);
+      useEffect(() => { seen.ctx = ctx; seen.show = setShown; }, [ctx]);
+      return shown ? <Board ctx={ctx} transients={transients} /> : null;
+    }
+    render(<Host />);
+    expect(seen.board).toBeUndefined();
+    let opened: Promise<unknown> = Promise.resolve();
+    act(() => {
+      opened = seen.ctx!.newGame.openRecord(record) as Promise<unknown>;
+      seen.show!(true);
+    });
+    expect(seen.board).toBeDefined();
+    expect(seen.ctx!.replay.replayData?.id).toBeUndefined();
+    await act(async () => { await opened; });
+    await waitFor(() => expect(seen.board!.timeline.maxTurn).toBe(2));
+    expect(seen.ctx!.replay.replayData?.id).toBe(record.id);
+    expect(seen.board!.timeline.viewTurn).toBe(2);
+  }, 90_000);
 });

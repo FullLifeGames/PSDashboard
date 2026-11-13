@@ -43,18 +43,18 @@ function useDeviationLayer(ctx: ReplayContext, transients: Transients, timeline:
     replayData, snapshots, observations, sources: teamSources, bringOnlyLists, bringCount,
     replayGameType, timeline: deviationTimeline, branch: deviationBranch, acquireRuntime,
     branchWindowOpenRef, setPendingConfirm, draftChoices, setDraftChoices,
-    onDeviate: clearPlayOutNotice,
+    onDeviate: clearPlayOutNotice, gameSeed: ctx.newGame.record?.seed, gameRecord: ctx.newGame.record,
   });
   useBranchRefresh({
     replayData, snapshots, observations, sources: teamSources, bringOnlyLists,
     branching, variationStartTurn, startBranch, acquireRuntime, viewTurn, session: deviation.session, branchWindowOpenRef,
     request: ctx.refreshQueue.pendingBranchRefresh, clearRequest: ctx.refreshQueue.clearRefreshRequest,
-    reportEnded: deviation.reportVariationEnded,
+    reportEnded: deviation.reportVariationEnded, gameSeed: ctx.newGame.record?.seed,
   });
   const restoreVariation = useRestoreVariation({
     replayData, snapshots, observations, sources: teamSources, bringOnlyLists, session: deviation.session,
     branch: deviationBranch, acquireRuntime, branchWindowOpenRef, setBranchDivergence: deviation.setBranchDivergence,
-    setViewTurn, setViewLine,
+    setViewTurn, setViewLine, gameSeed: ctx.newGame.record?.seed,
   });
   return { ...deviation, restoreVariation };
 }
@@ -86,6 +86,12 @@ export function useTimelineController(ctx: ReplayContext, transients: Transients
 
   const deviation = useDeviationLayer(ctx, transients, timeline);
   const { setBranchDivergence } = deviation;
+  // Round 89 (#105): a turn that joined a new game's main line leaves the pointer on the new tip.
+  const { restorePointer } = timeline;
+  const { landRef } = ctx;
+  useEffect(() => {
+    landRef.current = turn => restorePointer({ turn, line: 'main' }, null);
+  }, [landRef, restorePointer]);
   const { maxTurn, setViewTurn, setViewLine, setVariationScores, resetPointer } = timeline;
 
   const discardVariation = useCallback(() => {
@@ -109,12 +115,20 @@ export function useTimelineController(ctx: ReplayContext, transients: Transients
   // branch, and no team edits carried over from the previous replay. Host
   // pages can inject replays repeatedly via ps-load-replay, so the previous
   // game's state must never leak into the next one.
+  const { takeLanding } = ctx.newGame;
+  const landOnTurn = timeline.landOnTurn;
   useEffect(() => {
     resetPointer();
     setBranchDivergence(null);
     branchWindowOpenRef.current = false;
     stopBranch();
-  }, [replayData?.id, stopBranch, resetPointer, setBranchDivergence, branchWindowOpenRef]);
+    // Round 89 (#105): a game opens on its tip, where the next turn is played from: turn 0 (the lead picker) before the lead is picked.
+    const tip = takeLanding(replayData?.id);
+    // The landing is the game's own id's: the run before its document arrives (a reload mounts the board first) takes none (H4g).
+    // A selection, not a restore: the frame of a game that opens at start (a reload) is not there yet and reports turn 1 while it
+    // loads; the guard of the landing drops that report until the frame confirms the tip, however long it loads (round 89, H4e, H4f).
+    if (tip !== null) landOnTurn(tip);
+  }, [replayData?.id, stopBranch, resetPointer, setBranchDivergence, branchWindowOpenRef, takeLanding, landOnTurn]);
 
   return { timeline, deviation, evalResultMatchesView, liveEvalStatus, tipEvalStatus, discardVariation };
 }

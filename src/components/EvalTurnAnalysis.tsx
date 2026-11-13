@@ -18,6 +18,8 @@ interface EvalTurnAnalysisProps {
   reads?: { p1?: ReadRecommendation | null; p2?: ReadRecommendation | null } | null;
   /** Click on an engine line: play it out in a branch at this turn, the other side answering with `reply`. */
   onExplore?: (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice | null) => void;
+  /** Round 89 (#105): the turn is a game's open tip: nobody has played it, so there is no played choice to grade, only the engine's lines. */
+  open?: boolean;
 }
 
 function ReadRows({ reads, playerNames, faintedFraction }: Pick<EvalTurnAnalysisProps, 'reads' | 'playerNames'> & { faintedFraction?: number }) {
@@ -79,8 +81,26 @@ function TurnSummary({ text }: { text: string }) {
   );
 }
 
+/** A game's tip: the position is open, so the card names it as such and shows each side's engine line (round 89, H4h). */
+function OpenTurnAnalysis({ analysis, playerNames, reads, onExplore }: Omit<EvalTurnAnalysisProps, 'open'>) {
+  const exploreFor = (side: 'p1' | 'p2') =>
+    onExplore && ((choice: RankedChoice) => onExplore(side, choice, side === 'p1' ? analysis.p2.best : analysis.p1.best));
+  return (
+    <div className="ps-eval-analysis">
+      <div className="ps-eval-analysis-row">
+        <span style={{ fontWeight: 'bold', fontSize: 11, color: '#cde' }}>Turn {analysis.turn}</span>
+        <span style={{ color: '#aab' }}>open position: nothing played yet</span>
+      </div>
+      <EngineRow name={playerNames[0]} side={analysis.p1} onExplore={exploreFor('p1')} />
+      <EngineRow name={playerNames[1]} side={analysis.p2} onExplore={exploreFor('p2')} />
+      <ReadRows reads={reads} playerNames={playerNames} faintedFraction={analysis.faintedFraction} />
+    </div>
+  );
+}
+
 /** Chess-style explanation of one analyzed turn: played vs best, and why the score moved. */
-export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore }: EvalTurnAnalysisProps) {
+export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore, open = false }: EvalTurnAnalysisProps) {
+  if (open) return <OpenTurnAnalysis analysis={analysis} playerNames={playerNames} reads={reads} onExplore={onExplore} />;
   const badge = attributionBadge(analysis, playerNames);
   const exploreFor = (side: 'p1' | 'p2') =>
     onExplore && ((choice: RankedChoice) =>

@@ -1,13 +1,13 @@
-import type { BranchSharePayload } from '../lib/branch-share';
+import { savedBranchChoices, type SavedBranch } from '../lib/branch-share';
 
 /** Round 84 (A7i): the parts of the save and share logic that draw something; `useBranchSaveShare` wires them to the history panel. */
 
-export function ShareLinkField({ link }: { link: string }) {
+export function ShareLinkField({ link, label = 'Branch share link' }: { link: string; label?: string }) {
   return (
     <input
       readOnly
       value={link}
-      aria-label="Branch share link"
+      aria-label={label}
       style={{
         width: '100%',
         marginTop: 8,
@@ -24,9 +24,9 @@ export function ShareLinkField({ link }: { link: string }) {
 }
 
 function SavedBranchRow({ entry, onOpen, onRemove }: {
-  entry: BranchSharePayload;
-  onOpen: (entry: BranchSharePayload) => void;
-  onRemove: (entry: BranchSharePayload) => void;
+  entry: SavedBranch;
+  onOpen: (entry: SavedBranch) => void;
+  onRemove: (entry: SavedBranch) => void;
 }) {
   return (
     <div
@@ -42,7 +42,7 @@ function SavedBranchRow({ entry, onOpen, onRemove }: {
       }}
     >
       <span style={{ flex: 1, minWidth: 0 }}>
-        Turn {entry.branchTurn} branch, {entry.choices.length} choices
+        Turn {entry.branchTurn} branch, {savedBranchChoices(entry)} choices
         <span style={{ marginLeft: 6, color: '#8899aa' }}>{new Date(entry.createdAt).toLocaleString()}</span>
       </span>
       <span style={{ display: 'flex', gap: 4, flex: '0 0 auto' }}>
@@ -70,9 +70,9 @@ function SavedBranchRow({ entry, onOpen, onRemove }: {
 
 /** The saved branches of this replay, one row each, for the body of the history panel. */
 export function SavedList({ saved, onOpen, onRemove }: {
-  saved: BranchSharePayload[];
-  onOpen: (entry: BranchSharePayload) => void;
-  onRemove: (entry: BranchSharePayload) => void;
+  saved: SavedBranch[];
+  onOpen: (entry: SavedBranch) => void;
+  onRemove: (entry: SavedBranch) => void;
 }) {
   if (saved.length === 0) return null;
   return (

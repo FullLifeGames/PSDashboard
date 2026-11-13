@@ -44,6 +44,16 @@ describe('ReplayLoader', () => {
     expect(wired.onLoadFile).toHaveBeenCalledTimes(2);
   });
 
+  test('the menu body names its part "Load replay"; the start page keeps its own title; the loader offers no New game of its own', () => {
+    const { rerender } = render(<ReplayLoader {...props()} variant="menu" />);
+    expect(screen.getByText('Load replay')).toBeInTheDocument();
+    expect(screen.queryByText('Load Replay')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'New game' })).toBeNull();
+    rerender(<ReplayLoader {...props()} />);
+    expect(screen.getByText('Load Replay')).toBeInTheDocument();
+    expect(screen.queryByText('Load replay')).toBeNull();
+  });
+
   test('errors, the team status, and the workflow guide render on demand', () => {
     render(<ReplayLoader {...props({ error: 'Double-check the replay id', teamStatus: 'Team loaded (2 Pokémon)', teamError: 'None match', showGuide: true })} />);
     const alerts = screen.getAllByRole('alert');

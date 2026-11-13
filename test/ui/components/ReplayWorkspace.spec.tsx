@@ -75,7 +75,7 @@ describe('ReplayWorkspace', () => {
     // Round 84 (Q20 a): the column holds no loader; the Load button in the top bar opens it with the loaded link.
     expect(document.querySelector('.ps-main-left .ps-panel input[aria-label="Replay URL or ID"]')).toBeNull();
     expect(screen.queryByRole('textbox', { name: 'Replay URL or ID' })).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: 'Load' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Game' }));
     expect((screen.getByRole('textbox', { name: 'Replay URL or ID' }) as HTMLInputElement).value).toContain(replay.id);
     expect(document.querySelector('.ps-topbar-actions .ps-loader-panel')).not.toBeNull();
     await userEvent.keyboard('{Escape}');

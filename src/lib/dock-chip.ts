@@ -44,14 +44,16 @@ export function chipOrigin(choice: BranchSlotChoice | null, seedChoice: BranchSl
 export type EngineWait = 'pending' | 'busy';
 
 /** The text of an empty chip. `hasRecord`: the position has a played record to seed from (a replay turn), so an empty slot is a slot nothing was logged for. */
-export function chipPlaceholder({ forceSwitch, nobodyLeft, played, hasRecord, engine, deferred, commanding }: {
+export function chipPlaceholder({ forceSwitch, nobodyLeft, partnerSwitching, played, hasRecord, engine, deferred, commanding }: {
   forceSwitch: boolean; nobodyLeft: boolean; played: Pick<PlayedPick, 'kind' | 'name'> | null; hasRecord: boolean; engine?: EngineWait | null;
   /** Round 84 (A7a): the engine's pick for this slot, held back while its tray is open. */
   deferred?: Pick<PlayedPick, 'kind' | 'name'> | null;
   /** Round 85 (T320): a Tatsugiri inside its Dondozo; the game asks the slot nothing this turn. */
   commanding?: boolean;
+  /** Round 89 (#105, H7): another slot of the side is asked to switch (a pivot move, Parting Shot), so the fainted slot's own replacement comes after it. */
+  partnerSwitching?: boolean;
 }): string {
-  if (nobodyLeft) return 'fainted · no one left';
+  if (nobodyLeft) return partnerSwitching ? 'fainted · waits for the switch' : 'fainted · no one left';
   if (commanding) return 'commanding · no choice';
   if (deferred) return `engine: ${deferred.kind === 'move' ? deferred.name : `→ ${deferred.name}`} · choose`;
   // A forced replacement is filled like any slot; while the analysis blocks the engine the user has to choose.

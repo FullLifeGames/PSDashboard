@@ -110,8 +110,12 @@ function useSetsIO(args: {
     }
   }, [replayData, effectiveP1Info, effectiveP2Info, replayGenNumber]);
 
-  /** Applies a sets-import text to both sides, or to none while a value is invalid; returns the error message or null. */
-  const applySetsText = useCallback((text: string): string | null => {
+  /**
+   * Applies a sets-import text to both sides, or to none while a value is invalid; returns the error message or null. A routed
+   * import (round 89, #105: the sets of a new game belong to its record) hands the checked infos to `route` and applies, stores
+   * and refreshes nothing itself; a side the text leaves out is null there.
+   */
+  const applySetsText = useCallback((text: string, route?: (next: { p1: OpponentTeamInfo | null; p2: OpponentTeamInfo | null }) => void): string | null => {
     if (!replayData || !effectiveP1Info || !effectiveP2Info) return 'Load a replay first.';
     const pools = poolsRef.current?.replayId === replayData.id ? poolsRef.current.pools : null;
     const checked = checkedImport(text, { p1: effectiveP1Info, p2: effectiveP2Info }, { gen: replayGenNumber, pools }, { p1: shownP1Info, p2: shownP2Info });
@@ -119,6 +123,7 @@ function useSetsIO(args: {
     const { parsed } = checked;
     const nextP1 = parsed.p1.length > 0 ? applyPastedTeam(effectiveP1Info, parsed.p1).info : effectiveP1Info;
     const nextP2 = parsed.p2.length > 0 ? applyPastedTeam(effectiveP2Info, parsed.p2).info : effectiveP2Info;
+    if (route) { route({ p1: parsed.p1.length > 0 ? nextP1 : null, p2: parsed.p2.length > 0 ? nextP2 : null }); return null; }
     setEditedP1Info(nextP1);
     setEditedP2Info(nextP2);
     try {

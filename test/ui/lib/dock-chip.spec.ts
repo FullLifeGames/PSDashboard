@@ -64,6 +64,11 @@ describe('chipPlaceholder', () => {
     expect(chipPlaceholder({ ...base, forceSwitch: true })).toBe('choose a replacement');
     expect(chipPlaceholder({ ...base, nobodyLeft: true })).toBe('fainted · no one left');
   });
+  // Round 89 (#105, H7, tester finding 9): Urshifu fainted while Incineroar's Parting Shot asked for a switch; the bench held four bodies.
+  test('a fainted slot that is not asked while its partner switches out waits for that switch; it does not claim an empty bench', () => {
+    expect(chipPlaceholder({ ...base, nobodyLeft: true, partnerSwitching: true })).toBe('fainted · waits for the switch');
+    expect(chipPlaceholder({ ...base, nobodyLeft: true, partnerSwitching: false })).toBe('fainted · no one left');
+  });
   test('a Tatsugiri that commands its Dondozo says it has no choice, also while the engine fills the side (round 85, T320)', () => {
     expect(chipPlaceholder({ ...base, commanding: true })).toBe('commanding · no choice');
     expect(chipPlaceholder({ ...base, hasRecord: false, commanding: true, engine: 'pending' })).toBe('commanding · no choice');

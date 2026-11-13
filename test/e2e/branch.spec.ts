@@ -31,7 +31,7 @@ test.describe('PS Dashboard', () => {
       contentType: 'application/json',
       body: JSON.stringify(draftReplay),
     }));
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     const slider = page.locator('input[type="range"]');
     await expect(slider).toBeVisible({ timeout: 10000 });
     await expect(page.getByText('puffelmaedchen', { exact: true }).first()).toBeVisible({ timeout: 15_000 });
@@ -95,7 +95,7 @@ test.describe('PS Dashboard', () => {
       contentType: 'application/json',
       body: JSON.stringify(draftReplay),
     }));
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     const slider = page.locator('input[type="range"]');
     await expect(slider).toBeVisible({ timeout: 10000 });
     await expect(page.getByText('puffelmaedchen', { exact: true }).first()).toBeVisible({ timeout: 15_000 });
@@ -133,7 +133,7 @@ test.describe('PS Dashboard', () => {
   });
 
   test('the branch sim iframe follows the played variation line', async ({ page }) => {
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await startVariationAt(page, 2);
 
     // After executing turn 2 the sim (and the pointer) stand one past it —
@@ -158,7 +158,7 @@ test.describe('PS Dashboard', () => {
       contentType: 'application/json',
       body: JSON.stringify(draftReplay),
     }));
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.getByText('puffelmaedchen', { exact: true }).first()).toBeVisible({ timeout: 15_000 });
     await page.locator('.ps-branch-bar button[title^="Turn 0"]').click();
     await page.locator('.ps-execute-btn', { hasText: 'Play from turn 0' }).click();
@@ -201,7 +201,7 @@ test.describe('PS Dashboard', () => {
   });
 
   test('an executed move replaces the replay iframe with the branch sim', async ({ page }) => {
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await startVariationAt(page, 1);
 
     await expect(page.getByText(/Branching · Turn/)).toBeVisible({ timeout: 15000 });
@@ -212,7 +212,7 @@ test.describe('PS Dashboard', () => {
   });
 
   test('executing a branch turn keeps the branch replay iframe mounted', async ({ page }) => {
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await startVariationAt(page, 1);
 
     // Swords Dance for P1 (no damage — a max-damage pick can crit-KO and
@@ -230,7 +230,7 @@ test.describe('PS Dashboard', () => {
   test('branch replay follows appended branch events and keeps iframe turn controls usable', async ({ page }) => {
     // T280: the frame plays turn 2 and the appended turn to their ends at normal speed, about 16 s more than before.
     test.setTimeout(150_000);
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.locator('iframe[title="PS Replay"]')).toBeVisible({ timeout: 10000 });
     await startVariationAt(page, 2);
 
@@ -274,7 +274,7 @@ test.describe('PS Dashboard', () => {
   });
 
   test('branch execution defaults to animating the appended turn', async ({ page }) => {
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await startVariationAt(page, 2);
 
     await page.getByRole('button', { name: 'Setup', exact: true }).click();
@@ -318,7 +318,7 @@ test.describe('PS Dashboard', () => {
     const pageErrors: string[] = [];
     page.on('pageerror', error => pageErrors.push(error.message));
 
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.locator('iframe[title="PS Replay"]')).toBeVisible({ timeout: 10000 });
     await startVariationAt(page, 2);
 
@@ -341,7 +341,7 @@ test.describe('PS Dashboard', () => {
   });
 
   test('branch replay iframe does not shrink as history grows', async ({ page }) => {
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     // P1 plays Swords Dance — a max-damage Earthquake can crit-KO Kingambit
     // on turn 1, which turns P2's controls into a forced-switch prompt.
     await startVariationAt(page, 1, { p1Move: 'Swords Dance' });
@@ -361,7 +361,7 @@ test.describe('PS Dashboard', () => {
 
   test('desktop branch controls keep both sides and Execute Turn in the first viewport', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 1000 });
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await page.locator('input[type="range"]').fill('2');
     await expect(page.getByText('T2/')).toBeVisible();
 
@@ -378,7 +378,7 @@ test.describe('PS Dashboard', () => {
     await page.setViewportSize({ width: 390, height: 900 });
     await page.reload();
 
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await startVariationAt(page, 1);
 
     const leftColumn = page.locator('.ps-main-left');
@@ -397,7 +397,7 @@ test.describe('PS Dashboard', () => {
   });
 
   test('an open variation exposes save and share controls', async ({ page }) => {
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await startVariationAt(page, 1);
 
     await expect(page.locator('button', { hasText: 'Save Branch' })).toBeVisible({ timeout: 5000 });
@@ -406,7 +406,7 @@ test.describe('PS Dashboard', () => {
   });
 
   test('Discard variation drops the variation and returns to the replay', async ({ page }) => {
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await startVariationAt(page, 1);
 
     await page.locator('button', { hasText: 'Discard variation' }).click();
@@ -425,7 +425,7 @@ test.describe('the branch frame plays executed turns', () => {
   test('the first turn of a new variation plays in from its start (round 77)', async ({ page }) => {
     // User report 28.10.2026: Iron Head into Recover opened a variation, and the frame showed the end of that turn at
     // once, while every later turn played out. The branch frame mounts after the turn ran; it opens on the turn's start.
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await page.locator('.ps-branch-bar input[type="range"]').fill('2');
     await expect(page.getByText('T2/')).toBeVisible();
     await pickMove(page, 'p1a', 'Swords Dance');
