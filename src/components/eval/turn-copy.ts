@@ -1,4 +1,4 @@
-import { TIER_THRESHOLDS, type SideAnalysis, type RankedChoice, winPctText } from '@fulllifegames/eval-engine';
+import { regretText, TIER_THRESHOLDS, type SideAnalysis, type RankedChoice, winDeltaText, winPctText } from '@fulllifegames/eval-engine';
 
 /**
  * Every displayed value is a WIN PROBABILITY for the named player — "52%"
@@ -88,4 +88,24 @@ export function resultPositionLabel(
   const turn = match ? Number(match[2]) : screen.viewTurn;
   const variation = match ? match[1] === 'variation' : screen.viewingVariation;
   return `Turn ${turn} · ${variation ? 'variation' : 'main line'}`;
+}
+
+/**
+ * Round 64 (T123): the regret as its chip shows it. Over 1 it reads as the two win chances it spans
+ * (regretText), and the title keeps the real number on the score scale.
+ */
+export function regretView(name: string, side: SideAnalysis, regret: number): { text: string; title: string } {
+  const from = side.bestNull?.alternative?.ev ?? side.best?.ev;
+  const to = side.played?.ev;
+  if (from === undefined || to === undefined) {
+    return { text: winDeltaText(-regret), title: `${name} gave up this much win probability vs the engine's best.` };
+  }
+  const text = regretText(regret, from, to, side.faintedFraction);
+  return text === winDeltaText(-regret)
+    ? { text, title: `${name} gave up this much win probability vs the engine's best.` }
+    : {
+      text,
+      title: `${name}'s win chance fell from ${winPctText(from, side.faintedFraction)} with the engine's line to ${winPctText(to, side.faintedFraction)} with the played choice ` +
+        `(regret ${regret.toFixed(2)} on the score scale from −1 to 1).`,
+    };
 }

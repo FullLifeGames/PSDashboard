@@ -1,8 +1,8 @@
 import {
-  diffChoices, formatLine, playedSetupMove, regretText, type SideAnalysis, type RankedChoice, winDeltaText, winPctText,
+  diffChoices, formatLine, playedSetupMove, type SideAnalysis, type RankedChoice, winDeltaText, winPctText,
 } from '@fulllifegames/eval-engine';
 import { ExplorableLabel, KoSuffix, MiniBar } from './analysis-bits';
-import { comparisonTarget, ENGINE_EQUIVALENT_EPSILON, evTitle, playedTextFor, RISK_DISPLAY_GAP } from './turn-copy';
+import { comparisonTarget, ENGINE_EQUIVALENT_EPSILON, evTitle, playedTextFor, regretView, RISK_DISPLAY_GAP } from './turn-copy';
 
 type Explore = ((choice: RankedChoice) => void) | undefined;
 
@@ -66,26 +66,6 @@ function EngineCell({ name, side, regretful, onExplore }: RowProps & { regretful
       )}
     </span>
   );
-}
-
-/**
- * Round 64 (T123): the regret as its chip shows it. Over 1 it reads as the two win chances it spans
- * (regretText), and the title keeps the real number on the score scale.
- */
-function regretView(name: string, side: SideAnalysis, regret: number): { text: string; title: string } {
-  const from = side.bestNull?.alternative?.ev ?? side.best?.ev;
-  const to = side.played?.ev;
-  if (from === undefined || to === undefined) {
-    return { text: winDeltaText(-regret), title: `${name} gave up this much win probability vs the engine's best.` };
-  }
-  const text = regretText(regret, from, to, side.faintedFraction);
-  return text === winDeltaText(-regret)
-    ? { text, title: `${name} gave up this much win probability vs the engine's best.` }
-    : {
-      text,
-      title: `${name}'s win chance fell from ${winPctText(from, side.faintedFraction)} with the engine's line to ${winPctText(to, side.faintedFraction)} with the played choice ` +
-        `(regret ${regret.toFixed(2)} on the score scale from −1 to 1).`,
-    };
 }
 
 /** The graded regret chip: setup caveat, unpunished risk, blunder, or mistake. */
