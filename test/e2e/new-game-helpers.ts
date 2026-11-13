@@ -34,3 +34,17 @@ export async function openInFreshContext(browser: Browser, link: string): Promis
   await page.goto(link);
   return { page, close: () => context.close() };
 }
+
+/**
+ * The link the Game menu's Copy Share Link writes into its field (a game's link at any position, with or without a variation), and the
+ * payload it holds (version 2 is base64url JSON).
+ */
+export async function copiedGameLink(page: Page): Promise<{ link: string; payload: { kind: string; gameId: string; entries: unknown[]; variation?: { startTurn: number }; view?: { turn: number; line: string; t0?: boolean } } }> {
+  await page.locator('.ps-loader-toggle').click();
+  await page.locator('.ps-loader-panel').getByRole('button', { name: 'Copy Share Link' }).click();
+  const field = page.getByLabel('Game share link');
+  await expect(field).toHaveValue(/#branch=/);
+  const link = await field.inputValue();
+  await page.keyboard.press('Escape');
+  return { link, payload: JSON.parse(Buffer.from(link.split('#branch=')[1], 'base64url').toString('utf8')) };
+}

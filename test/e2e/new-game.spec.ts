@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
-import { installReplayEmbedCache, routeOfflineFixtures, pickMove, fixtureReplay, fixturePath, openLoader, moveTimeline, startVariationAt, dockChip, type DockSlotKey } from './helpers';
+import { installReplayEmbedCache, routeOfflineFixtures, pickMove, pickSwitch, fixtureReplay, fixturePath, openLoader, moveTimeline, startVariationAt, dockChip, type DockSlotKey } from './helpers';
 import { lightEngine } from './dock-helpers';
-import { copiedLink, openInFreshContext, timelineState } from './new-game-helpers';
+import { copiedGameLink, copiedLink, openInFreshContext, timelineState } from './new-game-helpers';
 
 /**
  * Round 89 (lane H, #105), stage H4: the New game dialog in the browser. A draft-league player pastes two Showdown exports on the
@@ -18,7 +18,7 @@ test.beforeEach(async ({ page }) => {
 const SIX = ['Garchomp', 'Gengar', 'Dragonite', 'Tyranitar', 'Snorlax', 'Starmie'];
 const team = (species: string[]) => species.map(name => `${name}\nEVs: 4 HP\n- Protect\n- Earthquake\n- Return\n- Substitute`).join('\n\n');
 
-async function startGame(page: Page, format: { search: string; name: string } | null, names: [string, string]): Promise<void> {
+async function startGame(page: Page, format: { search: string; name: string } | null, names: [string, string], teams: [string, string] = [team(SIX), team(SIX)]): Promise<void> {
   await page.goto('/');
   await page.getByRole('button', { name: 'New game' }).click();
   const dialog = page.getByRole('dialog', { name: 'New game' });
@@ -30,8 +30,8 @@ async function startGame(page: Page, format: { search: string; name: string } | 
   }
   await dialog.getByRole('textbox', { name: 'Player 1 name' }).fill(names[0]);
   await dialog.getByRole('textbox', { name: 'Player 2 name' }).fill(names[1]);
-  await dialog.getByRole('textbox', { name: 'Player 1 team' }).fill(team(SIX));
-  await dialog.getByRole('textbox', { name: 'Player 2 team' }).fill(team(SIX));
+  await dialog.getByRole('textbox', { name: 'Player 1 team' }).fill(teams[0]);
+  await dialog.getByRole('textbox', { name: 'Player 2 team' }).fill(teams[1]);
   await expect(dialog.getByText('6 of 6 sets read')).toHaveCount(2);
   await expect(dialog.getByRole('button', { name: 'Start' })).toBeEnabled({ timeout: 60_000 });
   await dialog.getByRole('button', { name: 'Start' }).click();
@@ -213,6 +213,58 @@ test('390 px: the top bar keeps its lines with Game, the menu fits the screen, t
  * stays in view while two long problem lists scroll the dialog, the menu of 20 saved games scrolls inside the window, and the
  * title's "New game" tag keeps its words at 390 px while the format tag gives way.
  */
+test('the Game menu copies a game\'s link at Team Preview and on the main line; a knockout turn waiting for its replacement is no variation (H7)', async ({ page, browser }) => {
+  test.setTimeout(300_000);
+  await page.setViewportSize({ width: 1366, height: 768 });
+  // P2's bodies are level 1: P1's first move knocks out its lead, and the replacement is asked for before the turn is finished
+  const level1 = SIX.map(name => `${name}\nLevel: 1\nEVs: 4 HP\n- Protect\n- Earthquake\n- Return\n- Substitute`).join('\n\n');
+  await startGame(page, null, ['Tidepool', 'Marrowkid'], [team(SIX), level1]);
+  const lead = page.locator('.ps-lead');
+  await expect(lead).toBeVisible({ timeout: 60_000 });
+
+  // Team Preview: the link names the game, no entry, no branch; a fresh browser opens it at Team Preview
+  const preview = await copiedGameLink(page);
+  expect(preview.payload).toMatchObject({ kind: 'game', entries: [], view: { t0: true } });
+  expect(preview.payload.variation).toBeUndefined();
+  const fresh = await openInFreshContext(browser, preview.link);
+  await expect(fresh.page.locator('.ps-lead')).toBeVisible({ timeout: 90_000 });
+  await expect(fresh.page).toHaveURL(/[?&]game=newgame-/);
+  await fresh.close();
+
+  // leads, then a first turn that knocks out P2's lead
+  await lead.locator('.ps-lead-side').nth(0).locator('.ps-switchbtn').first().click();
+  await lead.locator('.ps-lead-side').nth(1).locator('.ps-switchbtn').first().click();
+  await lead.locator('.ps-execute-btn', { hasText: 'Play from turn 0' }).click();
+  await expect(page.locator('.ps-dock-chip').first()).toBeVisible({ timeout: 90_000 });
+  await pickMove(page, 'p1a', 'Earthquake');
+  await pickMove(page, 'p2a', 'Protect');
+  await page.locator('.ps-dock .ps-execute-btn').click();
+  await expect(page.getByText(/fainted! Choose who to send in/)).toBeVisible({ timeout: 90_000 });
+  // the turn waits for its replacement: no variation chrome, and a link copied now holds the main line without the pending turn
+  const noChrome = async () => {
+    await expect(page.getByRole('button', { name: 'Discard variation' })).toHaveCount(0);
+    await expect(page.getByRole('group', { name: 'Line selector' })).toHaveCount(0);
+    await expect(page.getByText('Variation moves')).toHaveCount(0);
+    await expect(page.getByText(/Branching · Turn/)).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Copy Share Link' })).toHaveCount(0);
+  };
+  await noChrome();
+  const pending = await copiedGameLink(page);
+  expect(pending.payload.variation).toBeUndefined();
+  expect(pending.payload.entries).toHaveLength(1);
+  expect(pending.payload.view).toMatchObject({ line: 'main' });
+
+  // the replacement joins the turn to the main line; the link now holds the turn and its replacement
+  await pickSwitch(page, 'p2a', 'Gengar');
+  await page.locator('.ps-dock .ps-execute-btn').click();
+  await expect(page.getByText('T2/')).toBeVisible({ timeout: 90_000 });
+  await noChrome();
+  const joined = await copiedGameLink(page);
+  expect(joined.payload.variation).toBeUndefined();
+  expect(joined.payload.entries.length).toBeGreaterThan(1);
+  expect(joined.payload.view).toMatchObject({ turn: 2, line: 'main' });
+});
+
 test('layout: the format list, Start under long problem lists, the 20-game menu and the New game tag at 390 px', async ({ page }) => {
   test.setTimeout(240_000);
   await page.setViewportSize({ width: 1400, height: 900 });
@@ -257,6 +309,15 @@ test('layout: the format list, Start under long problem lists, the 20-game menu 
   const panelBox = await panel.boundingBox();
   expect(panelBox!.y + panelBox!.height).toBeLessThanOrEqual(900);
   expect(await panel.evaluate(element => element.scrollHeight > element.clientHeight && getComputedStyle(element).overflowY === 'auto')).toBe(true);
+  // the last row's Open is under the pointer once the panel is scrolled to its end: the workspace column does not clip it (tester, H7)
+  await panel.evaluate(element => { element.scrollTop = element.scrollHeight; });
+  const lastOpen = panel.locator('.ps-newgame-saved-row').last().getByRole('button', { name: 'Open' });
+  await expect(lastOpen).toBeVisible();
+  expect(await lastOpen.evaluate(button => {
+    const box = button.getBoundingClientRect();
+    const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+    return hit === button || button.contains(hit);
+  })).toBe(true);
   await page.keyboard.press('Escape');
 
   // 390 px: the tag keeps its words beside a long format name (VGC's)

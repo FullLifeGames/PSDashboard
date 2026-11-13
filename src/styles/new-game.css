@@ -109,8 +109,9 @@
 /* The start page's second panel stands under the loader like the loader's own .ps-panel (ReplayLoader). */
 .ps-entry-landing .ps-newgame-saved { margin-top: 8px; }
 
-/* The menu's panel holds up to 20 saved rows: it scrolls inside the window instead of growing past it, so the top bar and the frame stay in view. */
-.ps-loader-panel.ps-entry-panel { max-height: calc(100 * var(--ps-vh) - 90px); overflow-y: auto; overscroll-behavior: contain; }
+/* The menu's panel holds up to 20 saved rows: it scrolls inside the workspace column instead of growing past it, so the top bar and the frame stay in view
+   and the last row stays under the pointer (the column clips what stands below its height, `--ps-layout-h`; the window's height stands in before it is measured). */
+.ps-loader-panel.ps-entry-panel { max-height: calc(var(--ps-layout-h, 100 * var(--ps-vh)) - 60px); overflow-y: auto; overscroll-behavior: contain; }
 
 /* The title row's "New game" tag: .ps-format-tag in the selection blue of the dock (dock.css .ps-movebtn-selected). */
 .ps-format-tag.ps-newgame-tag { background: linear-gradient(180deg, #3d6998 0%, #2d5078 100%); color: #ffffff; font-weight: bold; }
