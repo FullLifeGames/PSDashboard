@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { inferReplayFormatId } from '@fulllifegames/replay-core';
-import { NewGameDialog } from './components/NewGameDialog';
+import { LazyNewGameDialog } from './components/NewGameDialogLazy';
 import { useGameTeamEdit } from './hooks/useGameTeamEdit';
 import { ReplayLoader } from './components/ReplayLoader';
 import { LandingGamesPanel } from './components/GameEntry';
@@ -178,7 +178,7 @@ function App() {
 
       <AppModals app={app} />
       {!embed && (
-        <NewGameDialog
+        <LazyNewGameDialog
           open={newGameOpen}
           onOpenChange={setNewGameOpen}
           onStart={app.ctx.newGame.startGame}
