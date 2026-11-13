@@ -254,6 +254,18 @@ test('the Game menu copies a game\'s link at Team Preview and on the main line; 
   expect(pending.payload.entries).toHaveLength(1);
   expect(pending.payload.view).toMatchObject({ line: 'main' });
 
+  // a reload while the replacement is pending keeps the played turn (H8): the game stands where it stood, the replacement still to pick
+  const position = async () => (await page.locator('body').innerText()).match(/T\d+\/\d+/)?.[0];
+  const before = await position();
+  expect(before).toBeTruthy();
+  await page.reload();
+  await expect(page.getByText(/fainted! Choose who to send in/)).toBeVisible({ timeout: 90_000 });
+  expect(await position()).toBe(before);
+  await noChrome();
+  const reloaded = await copiedGameLink(page);
+  expect(reloaded.payload.variation).toBeUndefined();
+  expect(reloaded.payload.entries).toHaveLength(1);
+
   // the replacement joins the turn to the main line; the link now holds the turn and its replacement
   await pickSwitch(page, 'p2a', 'Gengar');
   await page.locator('.ps-dock .ps-execute-btn').click();

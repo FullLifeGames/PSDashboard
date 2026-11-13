@@ -37,6 +37,13 @@ export interface NewGameRecord {
   entries: BranchHistoryEntry[];
   /** Finished turns on the main line. */
   turns: number;
+  /**
+   * An optional field (round 89, H8, wave-tester finding 8; the record version stays 1, an old record has none): the turn the game's tip
+   * played whose replacement is not picked yet, as the entries the live branch holds (the turn, then the replacements already picked).
+   * It is no part of the main line (no body line, no turn); a reload plays it again on the branch, which asks for the replacement
+   * as before the reload. The finished turn that joins the main line takes it away.
+   */
+  pending?: BranchHistoryEntry[];
   createdAt: string;
   updatedAt: string;
 }
@@ -116,16 +123,28 @@ export function withoutPosition(entry: BranchHistoryEntry): BranchHistoryEntry {
   };
 }
 
+/** The record without its pending tip turn (no key at all, as an old record has none). */
+function withoutPending(record: NewGameRecord): NewGameRecord {
+  const copy = { ...record };
+  delete copy.pending;
+  return copy;
+}
+
 /** The record with one more finished turn; the lead entry (turn 0) joins without counting as a turn. */
 export function appendTurn(record: NewGameRecord, turn: FinishedTurn, now: Date = new Date()): NewGameRecord {
   const lead = turn.entries.length > 0 && turn.entries.every(entry => entry.leadChoices !== undefined);
   return {
-    ...record,
+    ...withoutPending(record),
     body: [...record.body, ...turn.lines],
     entries: [...record.entries, ...turn.entries.map(withoutPosition)],
     turns: record.turns + (lead ? 0 : 1),
     updatedAt: now.toISOString(),
   };
+}
+
+/** The record with the unfinished tip turn kept (`entries` empty clears it); the main line is untouched. */
+export function withPendingTurn(record: NewGameRecord, entries: readonly BranchHistoryEntry[], now: Date = new Date()): NewGameRecord {
+  return { ...withoutPending(record), ...(entries.length > 0 ? { pending: entries.map(withoutPosition) } : {}), updatedAt: now.toISOString() };
 }
 
 /** The replay data of a game: the explicit `formatid` first, because the id never feeds format inference. */

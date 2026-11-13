@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useEffect } from 'react';
 import type { PokemonSet } from '@pkmn/sim';
@@ -8,6 +8,7 @@ import { readShare } from '../../../src/lib/branch-share';
 import { stubReplayFetch } from '../fixtures/network';
 import { realReplayWorkerClient } from '../fixtures/worker';
 import { SIX, picks, startedRecord } from '../fixtures/new-game';
+import { loadGame } from '../../../src/lib/new-game/store';
 
 const worker = vi.hoisted(() => ({ current: null as null | ReturnType<typeof import('../fixtures/worker').realReplayWorkerClient> }));
 vi.mock('../../../src/hooks/useReplayWorker', () => ({ useReplayWorker: () => worker.current!.client }));
@@ -151,4 +152,39 @@ describe('a game tip whose knockout turn waits for its replacement is no variati
     expect(link.variation?.startTurn).toBe(1);
     await act(async () => {});
   }, 240_000);
+});
+
+describe('a reload while a replacement is pending keeps the played turn (finding 8)', () => {
+  test.each(CASES)('$name: the reopened game shows the turn played and asks for the replacement; picking it continues the game', async ({ format, leads }) => {
+    const first = await mountGame(format);
+    await playKnockoutTurn(first.app, leads);
+    expect(first.app().ctx.branch.simState!.p2ForceSwitch).toBe(true);
+    const viewBefore = first.app().board.timeline.viewTurn;
+    const entriesBefore = first.app().ctx.branch.history.length;
+    expect(entriesBefore).toBeGreaterThan(0);
+    // the reload: a fresh app over the saved game (the browser's storage is all that survives)
+    cleanup();
+    const saved = loadGame(first.record.id)!;
+    expect(saved.turns).toBe(0);
+    const latest = { current: null as AppController | null };
+    render(<Workspace latestRef={latest} />);
+    await act(async () => { await latest.current!.ctx.newGame.openRecord(saved); });
+    await waitFor(() => expect(latest.current!.ctx.replay.replayData?.id).toBe(saved.id), { timeout: 30_000 });
+    // the turn stands played: its entry is back on the live branch, the opponent's replacement is asked for
+    await waitFor(() => expect(latest.current!.ctx.branch.history.length).toBe(entriesBefore), { timeout: 60_000 });
+    await waitFor(() => expect(latest.current!.ctx.branch.executing).toBe(false));
+    await waitFor(() => expect(latest.current!.ctx.branch.simState?.p2ForceSwitch).toBe(true), { timeout: 30_000 });
+    expect(latest.current!.ctx.newGame.record!.turns).toBe(0);
+    expect(latest.current!.board.timeline.viewTurn).toBe(viewBefore);
+    expectNoVariationChrome();
+    // picking the replacement joins the turn to the main line, as before the reload
+    await act(async () => {
+      picks(latest.current!.ctx.branch.simState!, 'p2').forEach((choice, slot) => { if (choice) latest.current!.ctx.branch.setChoice('p2', choice, slot); });
+    });
+    await act(async () => { await latest.current!.ctx.branch.executeTurn(); });
+    await waitFor(() => expect(latest.current!.ctx.newGame.record!.turns).toBe(1), { timeout: 30_000 });
+    expect(loadGame(saved.id)!.turns).toBe(1);
+    expect(loadGame(saved.id)!.pending).toBeUndefined();
+    await act(async () => {});
+  }, 300_000);
 });

@@ -73,6 +73,22 @@ describe('the support state file (round 77, user gate 28.10.2026)', () => {
     expect(positionLabel(midGame)).toBe('T20 on the main line');
   });
 
+  // Round 89 (#105, H8, finding 8): the record's optional `pending` (a tip turn waiting for its replacement) rides in the state file; a file whose record has none still reads.
+  test('the state file of a game carries its pending tip turn and still reads a record without one; the version stays', async () => {
+    const record = await savedRecord(['Alice', 'Bob'], 2);
+    const waiting = { ...record, pending: [entry(3, { p2SlotChoices: [{ kind: 'move', moveId: 'icebeam', moveName: 'Ice Beam' }] })] };
+    const replay = { id: record.id, format: '[Gen 9] OU', formatid: 'gen9ou', players: record.players, log: '|turn|1', uploadtime: 1, rating: undefined, viewpoint: 'p1' as const };
+    const withPending = JSON.parse(JSON.stringify(buildSupportState(inputs({ replay, game: waiting })))) as ReturnType<typeof buildSupportState>;
+    expect(isSupportState(withPending)).toBe(true);
+    expect(withPending.version).toBe(SUPPORT_STATE_VERSION);
+    expect(withPending.game?.pending).toHaveLength(1);
+    expect(withPending.game?.pending?.[0].p2SlotChoices).toEqual([{ kind: 'move', moveId: 'icebeam', moveName: 'Ice Beam' }]);
+    const old = JSON.parse(JSON.stringify(buildSupportState(inputs({ replay, game: record })))) as ReturnType<typeof buildSupportState>;
+    expect(isSupportState(old)).toBe(true);
+    expect('pending' in (old.game ?? {})).toBe(false);
+    expect(supportStateProblem(old)).toBeNull();
+  });
+
   test('the issue link of a new game names the game and the format, not a Showdown replay that does not exist (H4h)', () => {
     const game = buildSupportState(inputs({ replay: { id: 'newgame-m7nj3hx23e', format: '[Gen 9] OU', formatid: 'gen9ou', players: ['Tidepool', 'Marrowkid'], log: '|turn|1', uploadtime: 1, rating: undefined, viewpoint: 'p1' } }));
     const url = new URL(issueUrl(game, 'state.json'));

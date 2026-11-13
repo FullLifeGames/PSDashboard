@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Teams } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import { parsePastedTeam, teamInfoOfSets, type OpponentTeamInfo, type ReplayData } from '@fulllifegames/replay-core';
-import { appendTurn, gameReplayData, withoutPosition, type NewGameRecord } from '../lib/new-game/record';
+import { appendTurn, gameReplayData, withoutPosition, withPendingTurn, type NewGameRecord } from '../lib/new-game/record';
 import { isInterlude, turnEntryCount } from '../lib/variation-turns';
 import { bodyLines, newLines } from '../lib/new-game/game-log';
 import { saveGame } from '../lib/new-game/store';
@@ -91,6 +91,59 @@ function useStartGame(openRecord: (next: NewGameRecord) => Promise<void>, save: 
   }, [save, openRecord, setSaveFailed]);
 }
 
+/** What a promotion reads and writes: the record (as ref and state), the replay state, the live branch, the exact store, the pointer and the save. */
+interface PromoteInputs extends Pick<NewGameInputs, 'replay' | 'branch' | 'landRef'> {
+  recordRef: React.RefObject<NewGameRecord | null>;
+  setRecord: (next: NewGameRecord | null) => void;
+  storePosition: NewGameInputs['storePosition'];
+  save: (record: NewGameRecord) => boolean;
+  setSaveFailed: (failed: boolean) => void;
+}
+
+function usePromote({ recordRef, setRecord, replay, branch, storePosition, landRef, save, setSaveFailed }: PromoteInputs) {
+  /**
+   * Called after a finished turn and after a lead start. A turn that started at the game's tip and is finished (no replacement
+   * pending) joins the main line; a turn played from any other position stays a variation.
+   */
+  return useCallback(async (): Promise<boolean> => {
+    const current = recordRef.current;
+    const history = branch.getHistory();
+    if (!current || history.length === 0) return false;
+    const start = branch.getStartTurn();
+    if (start === null || start !== gameTipTurn(current)) {
+      // a variation of an earlier turn replaces the live branch: the tip turn that waited for its replacement is given up
+      if (current.pending) {
+        const cleared = withPendingTurn(current, []);
+        recordRef.current = cleared;
+        setRecord(cleared);
+        setSaveFailed(!save(cleared));
+      }
+      return false;
+    }
+    if (replacementPending(branch.getStream())) {
+      // the turn is played and waits for its replacement: it stays out of the main line, and the record keeps it for a reload (H8)
+      const waiting = withPendingTurn(current, history);
+      recordRef.current = waiting;
+      setRecord(waiting);
+      setSaveFailed(!save(waiting));
+      return false;
+    }
+    const { log, since } = branch.getLog();
+    const lines = current.entries.length === 0 ? bodyLines(log) : newLines(log, since);
+    const next = appendTurn(current, { entries: history, lines });
+    const tip = next.turns + 1;
+    const positions = gamePositions(history);
+    for (const [turn, serialized] of positions) storePosition(start + turn, serialized);
+    recordRef.current = next;
+    setRecord(next);
+    await replay.extendGame(gameReplayData(next));
+    branch.rebaseAtTip(tip, history[history.length - 1].serializedPosition ?? null);
+    landRef?.current?.(tip);
+    setSaveFailed(!save(next));
+    return true;
+  }, [recordRef, setRecord, replay, branch, storePosition, landRef, save, setSaveFailed]);
+}
+
 export function useNewGame(inputs: NewGameInputs) {
   const { state, replay, branch, storePosition, landRef, save = saveGame } = inputs;
   const { record, recordRef, setRecord } = state;
@@ -110,31 +163,7 @@ export function useNewGame(inputs: NewGameInputs) {
 
   const startGame = useStartGame(openRecord, save, setSaveFailed);
 
-  /**
-   * Called after a finished turn and after a lead start. A turn that started at the game's tip and is finished (no replacement
-   * pending) joins the main line; a turn played from any other position stays a variation.
-   */
-  const promote = useCallback(async (): Promise<boolean> => {
-    const current = recordRef.current;
-    const history = branch.getHistory();
-    if (!current || history.length === 0) return false;
-    const start = branch.getStartTurn();
-    if (start === null || start !== gameTipTurn(current)) return false;
-    if (replacementPending(branch.getStream())) return false;
-    const { log, since } = branch.getLog();
-    const lines = current.entries.length === 0 ? bodyLines(log) : newLines(log, since);
-    const next = appendTurn(current, { entries: history, lines });
-    const tip = next.turns + 1;
-    const positions = gamePositions(history);
-    for (const [turn, serialized] of positions) storePosition(start + turn, serialized);
-    recordRef.current = next;
-    setRecord(next);
-    await replay.extendGame(gameReplayData(next));
-    branch.rebaseAtTip(tip, history[history.length - 1].serializedPosition ?? null);
-    landRef?.current?.(tip);
-    setSaveFailed(!save(next));
-    return true;
-  }, [recordRef, setRecord, replay, branch, storePosition, landRef, save]);
+  const promote = usePromote({ recordRef, setRecord, replay, branch, storePosition, landRef, save, setSaveFailed });
 
   /**
    * Plays the record's entries again on other teams (a set edit): the header and the teams follow the edit, every entry that still
@@ -161,7 +190,7 @@ export function useNewGame(inputs: NewGameInputs) {
     const played = rebuilt?.entries ?? [];
     const next: NewGameRecord = {
       ...current, teams: start.teams, header: start.header, teamPreview: start.teamPreview, bringCount: start.bringCount,
-      entries: played.map(withoutPosition), body: rebuilt ? bodyLines(rebuilt.runtime.log) : [],
+      entries: played.map(withoutPosition), pending: undefined, body: rebuilt ? bodyLines(rebuilt.runtime.log) : [],
       turns: Math.max(0, turnEntryCount(played) - 1), updatedAt: new Date().toISOString(),
     };
     // the positions follow on the new sets: the store keys them by the sets' fingerprint, so the position source rebuilds them once from the record

@@ -8,8 +8,9 @@ import { loadSimMods, startGameLog } from '@fulllifegames/eval-engine';
 import type { BranchHistoryEntry } from '../../src/lib/branch-history';
 import { assembleGameLog, bodyLines, newLines } from '../../src/lib/new-game/game-log';
 import {
-  appendTurn, gameReplayData, newGameId, newGameRecord, newGameSeed, type NewGameRecord,
+  appendTurn, gameReplayData, newGameId, newGameRecord, newGameSeed, withPendingTurn, type NewGameRecord,
 } from '../../src/lib/new-game/record';
+import { makeGameSharePayload, sameGameAsShare } from '../../src/lib/new-game/share';
 import {
   GAMES_INDEX_KEY, MAX_SAVED_GAMES, deleteGame, gameKey, listGames, loadGame, saveGame,
 } from '../../src/lib/new-game/store';
@@ -104,6 +105,40 @@ describe('the record', () => {
     expect(record.body).toEqual([]);
     expect(lead.updatedAt).toBe('2026-11-12T10:05:00.000Z');
     expect(lead.createdAt).toBe('2026-11-12T10:00:00.000Z');
+  });
+
+  // Round 89, H8 (wave-tester finding 8): the tip turn that waits for its replacement rides in the record's optional `pending`.
+  test('a pending tip turn is kept without positions, leaves the main line alone, and the finished turn takes it away', async () => {
+    const record = await recordOf('gen9ou');
+    const lead = appendTurn(record, { entries: [entry(0, { leadChoices: { p1: ['A'], p2: ['B'] } })], lines: ['|start', '|turn|1'] });
+    const waiting = withPendingTurn(lead, [entry(1)], new Date('2026-11-12T10:06:00Z'));
+    expect(waiting.pending).toHaveLength(1);
+    expect(waiting.pending![0].serializedPosition).toBeUndefined();
+    expect(waiting.entries).toEqual(lead.entries);
+    expect(waiting.body).toEqual(lead.body);
+    expect(waiting.turns).toBe(lead.turns);
+    expect(waiting.updatedAt).toBe('2026-11-12T10:06:00.000Z');
+    // a second entry (the replacement of one side of a doubles turn) replaces the list as the live branch holds it
+    expect(withPendingTurn(waiting, [entry(1), entry(1, { kind: 'forced', forcedSide: 'p2' })]).pending).toHaveLength(2);
+    // no entries: no key at all, as in an old record
+    expect('pending' in withPendingTurn(waiting, [])).toBe(false);
+    const joined = appendTurn(waiting, { entries: [entry(1), entry(1, { kind: 'forced', forcedSide: 'p2' })], lines: ['|faint|p2a: B', '|turn|2'] });
+    expect('pending' in joined).toBe(false);
+    expect(joined.turns).toBe(1);
+    // singles and doubles share the record: the entries differ only in their slot choices, which `withoutPosition` keeps
+    const doubles = withPendingTurn(lead, [entry(1, { p1SlotChoices: [null, null], p2SlotChoices: [null, null] })]);
+    expect(doubles.pending![0].p2SlotChoices).toEqual([null, null]);
+  });
+
+  test('a share link of a game with a pending turn reads as before: the main line only; an old record without the field is the same game', async () => {
+    const record = await recordOf('gen9ou');
+    const lead = appendTurn(record, { entries: [entry(0, { leadChoices: { p1: ['A'], p2: ['B'] } })], lines: ['|start', '|turn|1'] });
+    const waiting = withPendingTurn(lead, [entry(1)]);
+    const payload = makeGameSharePayload({ record: waiting });
+    expect(payload.entries).toHaveLength(lead.entries.length);
+    expect(JSON.stringify(payload)).not.toContain('pending');
+    expect(sameGameAsShare(waiting, payload)).toBe(true);
+    expect(sameGameAsShare(lead, payload)).toBe(true);
   });
 
   // Scene: id `newgame-x` with `gen9ou` plays as `gen9ou`, not as the rule-less custom game an unknown id falls back to.

@@ -157,6 +157,11 @@ describe('useNewGame', () => {
         // the knockout turn has run, its replacement waits: the main line has not moved
         expect(turnsOf(rendered)).toBe(before);
         expect(rendered.result.current.branch.history.length).toBeGreaterThan(0);
+        // ... but the record keeps the turn for a reload (H8, finding 8): its entries as the branch holds them, the main line as it was
+        const kept = rendered.result.current.state.record!;
+        expect(kept.pending).toHaveLength(rendered.result.current.branch.history.length);
+        expect(kept.pending!.every(row => row.serializedPosition === undefined)).toBe(true);
+        expect(rendered.result.current.saved.current).toBeGreaterThan(0);
       }
     }
     expect(paused).toBe(true);
@@ -164,7 +169,33 @@ describe('useNewGame', () => {
     await playRequest(rendered);
     await waitFor(() => expect(turnsOf(rendered)).toBe(before + 1));
     expect(rendered.result.current.branch.history).toEqual([]);
+    expect(rendered.result.current.state.record!.pending).toBeUndefined();
   });
+
+  test('a pending tip turn is given up when a variation of an earlier turn is played; the finished tip turns keep nothing pending (H8)', async () => {
+    const rendered = await startGame('gen9doublesou', { p1: ['Garchomp', 'Gengar'], p2: ['Garchomp', 'Gengar'] });
+    // play on until a knockout turn waits for its replacement after at least one finished turn
+    for (let turn = 0; turn < 20 && !(forcedNow(rendered) && turnsOf(rendered) >= 1); turn += 1) {
+      await playRequest(rendered, turn);
+    }
+    expect(forcedNow(rendered)).toBe(true);
+    expect(turnsOf(rendered)).toBeGreaterThanOrEqual(1);
+    const pending = rendered.result.current.state.record!;
+    expect(pending.pending!.length).toBeGreaterThan(0);
+    const { store } = rendered.result.current;
+    await act(async () => {
+      await rendered.result.current.branch.startBranch(getBranchSimulatorFormat(gameReplayData(pending)), pending.teams.p1, pending.teams.p2, gameReplayData(pending).log, 1, null, {
+        playerNames: ['Alice', 'Bob'],
+        acquireRuntime: async params => adoptSerializedRuntime({
+          serialized: store.get(params.targetTurn)!, replayLog: params.replayLog, targetTurn: params.targetTurn, snapshot: gameAdoptSnapshot(),
+        }),
+      });
+    });
+    await playTurn(rendered, 2);
+    await waitFor(() => expect(rendered.result.current.state.record!.pending).toBeUndefined());
+    expect(rendered.result.current.state.record!.turns).toBe(pending.turns);
+    expect(rendered.result.current.state.record!.entries).toEqual(pending.entries);
+  }, 240_000);
 
   test('a team edit plays the record again on the new sets: the entries that still apply stay, the line ends before the first that does not', async () => {
     const rendered = await startGame('gen9ou', { p1: ['Snorlax'], p2: ['Snorlax'] });
