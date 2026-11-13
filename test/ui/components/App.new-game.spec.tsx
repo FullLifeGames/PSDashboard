@@ -4,10 +4,10 @@ import userEvent from '@testing-library/user-event';
 import { replayData } from '../fixtures/replay';
 import { stubReplayFetch } from '../fixtures/network';
 import { realReplayWorkerClient } from '../fixtures/worker';
-import { listGames, saveGame } from '../../../src/lib/new-game/store';
+import { deleteGame, listGames, saveGame } from '../../../src/lib/new-game/store';
 import { savedRecord } from '../fixtures/saved-game';
 import { playedRecord } from '../fixtures/played-game';
-import { encodeBranchShare, encodeShareJson } from '../../../src/lib/branch-share';
+import { encodeBranchShare, encodeShareJson, readShare } from '../../../src/lib/branch-share';
 import { makeGameSharePayload, shareEntry } from '../../../src/lib/new-game/share';
 
 const worker = vi.hoisted(() => ({ current: null as null | ReturnType<typeof import('../fixtures/worker').realReplayWorkerClient> }));
@@ -153,20 +153,75 @@ describe('a new game in the app', () => {
     await act(async () => {});
   }, 120_000);
 
+  // Round 89 (#105, H7, finding 1): the Game menu copies the link of a game wherever it stands, with no variation open.
+  async function copiedLink() {
+    await userEvent.click(screen.getByRole('button', { name: 'Game' }));
+    await userEvent.click(within(document.querySelector('.ps-loader-panel') as HTMLElement).getByRole('button', { name: 'Copy Share Link' }));
+    const field = (await screen.findByRole('textbox', { name: 'Game share link' })) as HTMLInputElement;
+    const read = readShare(field.value.split('#branch=')[1]);
+    if (read.kind !== 'game') throw new Error(`the link is a ${read.kind} link`);
+    await userEvent.keyboard('{Escape}');
+    return read.payload;
+  }
+
+  test('a game at Team Preview copies its link: the game, no entry, no branch, the team preview as the view (H7)', async () => {
+    render(<App />);
+    await startOnLanding();
+    await waitFor(() => expect(document.querySelector('.ps-topbar')).not.toBeNull(), { timeout: 30_000 });
+    const link = await copiedLink();
+    expect(link).toMatchObject({ gameId: listGames()[0].id, entries: [], format: 'gen9ou', view: { t0: true, line: 'main' } });
+    expect(link.variation).toBeUndefined();
+    await act(async () => {});
+  }, 90_000);
+
+  test('a game with played turns copies its link on the main line and at the tip: every entry, no branch, the turn on screen (H7)', async () => {
+    const record = await playedRecord(2);
+    window.history.replaceState(null, '', `/?game=${record.id}`);
+    render(<App />);
+    await waitFor(() => expect(document.body.textContent).toMatch(/T3\/3/), { timeout: 60_000 });
+    const tip = await copiedLink();
+    expect(tip).toMatchObject({ gameId: record.id, view: { turn: 3, line: 'main' } });
+    expect(tip.entries).toHaveLength(record.entries.length);
+    expect(tip.variation).toBeUndefined();
+    await userEvent.click(screen.getByRole('button', { name: '◀' }));
+    await waitFor(() => expect(document.body.textContent).toMatch(/T2\/3/));
+    const back = await copiedLink();
+    expect(back).toMatchObject({ view: { turn: 2, line: 'main' } });
+    expect(back.entries).toHaveLength(record.entries.length);
+    expect(back.variation).toBeUndefined();
+    await act(async () => {});
+  }, 150_000);
+
+  test('a finished game copies its link at the end (H7)', async () => {
+    const played = await playedRecord(1);
+    const finished = { ...played, body: [...played.body.slice(0, played.body.findLastIndex(line => line.startsWith('|turn|'))), '|', '|win|Alice'] };
+    saveGame(finished);
+    window.history.replaceState(null, '', `/?game=${finished.id}`);
+    render(<App />);
+    await waitFor(() => expect(document.querySelector('.ps-dock')).toHaveTextContent('Alice won the game'), { timeout: 60_000 });
+    const link = await copiedLink();
+    expect(link).toMatchObject({ gameId: finished.id, view: { line: 'main' } });
+    expect(link.entries).toHaveLength(finished.entries.length);
+    expect(link.variation).toBeUndefined();
+    await act(async () => {});
+  }, 150_000);
+
   test('a ?game= this browser does not hold shows the start page with the notice and the saved games', async () => {
     await savedRecord(['Ann', 'Ben'], 0, '9,9,9,9');
     window.history.replaceState(null, '', '/?game=newgame-k3x9q0m2ab');
     render(<App />);
-    expect(screen.getByRole('alert')).toHaveTextContent('The game newgame-k3x9q0m2ab is not saved in this browser. A share link of the game (Copy Share Link) brings it along.');
+    expect(screen.getByRole('alert')).toHaveTextContent('The game newgame-k3x9q0m2ab is not saved in this browser. A share link of the game (Game menu, Copy Share Link) brings it along.');
     expect(screen.getByText('Load Replay')).toBeInTheDocument();
     expect(document.querySelectorAll('.ps-entry-landing .ps-newgame-saved-row')).toHaveLength(1);
     expect(document.querySelector('.ps-topbar')).toBeNull();
   });
 
   // Round 89 (#105, H5, ruling 31 H6a): a game's share link opens the game as a copy; the address names the copy.
-  test('a game link (version 2) opens the shared game as a copy on its tip, the hash goes and the address names the copy (H5)', async () => {
+  test('a game link (version 2) of a game this browser lacks opens it as a copy on its tip, the hash goes and the address names the copy (H5)', async () => {
     const played = await playedRecord(1);
     window.location.hash = `#branch=${encodeBranchShare(makeGameSharePayload({ record: played }))}`;
+    // the sharer's game is not in this browser: the link comes from elsewhere
+    deleteGame(played.id);
     render(<App />);
     await waitFor(() => expect(document.querySelector('.ps-topbar')).not.toBeNull(), { timeout: 60_000 });
     await waitFor(() => expect(document.body.textContent).toMatch(/T2\/2/), { timeout: 60_000 });
@@ -174,11 +229,62 @@ describe('a new game in the app', () => {
     const named = new URLSearchParams(window.location.search).get('game');
     expect(named).toMatch(/^newgame-/);
     expect(named).not.toBe(played.id);
-    expect(listGames().map(row => row.id)).toContain(named);
-    expect(listGames()).toHaveLength(2);
+    expect(listGames().map(row => row.id)).toEqual([named]);
     expect(screen.queryByRole('alert')).toBeNull();
     await act(async () => {});
   }, 120_000);
+
+  // Round 89 (#105, H7, finding 4): a second open of the same link finds the game it made before.
+  test('a link whose game equals a saved game opens that game and makes no copy; the same link opened again makes none either (H7)', async () => {
+    const played = await playedRecord(1);
+    const hash = `#branch=${encodeBranchShare(makeGameSharePayload({ record: played }))}`;
+    window.location.hash = hash;
+    const first = render(<App />);
+    await waitFor(() => expect(document.body.textContent).toMatch(/T2\/2/), { timeout: 60_000 });
+    expect(listGames().map(row => row.id)).toEqual([played.id]);
+    expect(new URLSearchParams(window.location.search).get('game')).toBe(played.id);
+    expect(window.location.hash).toBe('');
+    first.unmount();
+    window.history.replaceState(null, '', '/');
+    window.location.hash = hash;
+    render(<App />);
+    await waitFor(() => expect(document.body.textContent).toMatch(/T2\/2/), { timeout: 60_000 });
+    expect(listGames().map(row => row.id)).toEqual([played.id]);
+    await act(async () => {});
+  }, 180_000);
+
+  test('a foreign link opened twice makes one copy, and the saved games of the browser stay (H7)', async () => {
+    const played = await playedRecord(1);
+    const other = await savedRecord(['Ann', 'Ben'], 0, '9,9,9,9');
+    const hash = `#branch=${encodeBranchShare(makeGameSharePayload({ record: played }))}`;
+    deleteGame(played.id);
+    window.location.hash = hash;
+    const first = render(<App />);
+    await waitFor(() => expect(document.body.textContent).toMatch(/T2\/2/), { timeout: 60_000 });
+    const copy = new URLSearchParams(window.location.search).get('game');
+    expect(copy).toMatch(/^newgame-/);
+    first.unmount();
+    window.history.replaceState(null, '', '/');
+    window.location.hash = hash;
+    render(<App />);
+    await waitFor(() => expect(document.body.textContent).toMatch(/T2\/2/), { timeout: 60_000 });
+    expect(new URLSearchParams(window.location.search).get('game')).toBe(copy);
+    expect(listGames().map(row => row.id).sort()).toEqual([copy, other.id].sort());
+    await act(async () => {});
+  }, 240_000);
+
+  test('a link whose main line goes past the saved game makes a copy (H7)', async () => {
+    const played = await playedRecord(2);
+    const hash = `#branch=${encodeBranchShare(makeGameSharePayload({ record: played }))}`;
+    deleteGame(played.id);
+    saveGame({ ...played, entries: played.entries.slice(0, 2), turns: 1 });
+    window.location.hash = hash;
+    render(<App />);
+    await waitFor(() => expect(document.body.textContent).toMatch(/T3\/3/), { timeout: 60_000 });
+    expect(listGames()).toHaveLength(2);
+    expect(listGames().find(row => row.id !== played.id)?.turns).toBe(2);
+    await act(async () => {});
+  }, 240_000);
 
   test('a game link with an open branch restores the branch from the game and puts the pointer where the sharer stood (H5)', async () => {
     const played = await playedRecord(2);

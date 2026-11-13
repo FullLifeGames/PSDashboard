@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { Teams } from '@pkmn/sim';
 import * as branchEngine from '../../src/lib/lazy/branch-engine';
 import { encodeBranchShare, encodeShareJson, readShare } from '../../src/lib/branch-share';
-import { historyOfShare, makeGameSharePayload, shareEntry, type GameSharePayload } from '../../src/lib/new-game/share';
+import { historyOfShare, makeGameSharePayload, sameGameAsShare, shareEntry, type GameSharePayload } from '../../src/lib/new-game/share';
 import { recordOfShare } from '../../src/hooks/branch/share-open';
 import { withoutPosition } from '../../src/lib/new-game/record';
 import { V1_SHARE_LINK } from '../ui/fixtures/v1-share-link';
@@ -94,6 +94,26 @@ describe('a game link (version 2)', () => {
     const lead = bareEntry(0, { leadChoices: { p1: ['Garchomp'], p2: ['Gengar'], bring: true } });
     expect(historyOfShare([shareEntry(lead), shareEntry(forced)]).map(core)).toEqual([core(lead), core(forced)]);
   });
+});
+
+describe('a link that holds a game this browser has (H7, finding 4)', () => {
+  for (const family of [FAMILIES[0], FAMILIES[1]]) {
+    test(`${family.name}: only a link of the very same game equals the saved one`, async () => {
+      const record = await playRecord(family, 2);
+      const payload = makeGameSharePayload({ record });
+      expect(sameGameAsShare(record, payload)).toBe(true);
+      // the sharer's open branch and the pointer do not make another game
+      expect(sameGameAsShare(record, makeGameSharePayload({ record, view: { turn: 1, line: 'main' } }))).toBe(true);
+      // another seed, format, player, team, or main line is another game
+      expect(sameGameAsShare(record, { ...payload, seed: '1,2,3,4' })).toBe(false);
+      expect(sameGameAsShare(record, { ...payload, format: 'gen9customgame' })).toBe(false);
+      expect(sameGameAsShare(record, { ...payload, players: ['Alice', 'Carol'] })).toBe(false);
+      expect(sameGameAsShare(record, { ...payload, teams: { ...payload.teams, p2: payload.teams.p1.replace('Garchomp', 'Gengar') } })).toBe(false);
+      expect(sameGameAsShare(record, { ...payload, entries: payload.entries.slice(0, -1) })).toBe(false);
+      expect(sameGameAsShare({ ...record, entries: record.entries.slice(0, -1) }, payload)).toBe(false);
+      expect(sameGameAsShare(record, { ...payload, entries: [...payload.entries.slice(0, -1), payload.entries[0]] })).toBe(false);
+    }, 120_000);
+  }
 });
 
 describe('a game link measures', () => {

@@ -50,6 +50,16 @@ export function loadGame(id: string): NewGameRecord | null {
   }
 }
 
+/** The newest saved game that satisfies the test, else null (the index's seed spares loading a record whose seed cannot match). */
+export function findGame(matches: (record: NewGameRecord) => boolean, seed?: string): NewGameRecord | null {
+  for (const row of listGames()) {
+    if (seed !== undefined && row.seed !== undefined && row.seed !== seed) continue;
+    const record = loadGame(row.id);
+    if (record && matches(record)) return record;
+  }
+  return null;
+}
+
 /** Removes a game and what it owns; the other games stay. */
 export function deleteGame(id: string): SavedGameRow[] {
   for (const key of [gameKey(id), branchesKey(id), setsKey(id)]) localStorage.removeItem(key);

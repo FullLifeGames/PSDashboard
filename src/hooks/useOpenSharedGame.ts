@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { NewGameRecord } from '../lib/new-game/record';
-import { saveGame } from '../lib/new-game/store';
-import { historyOfShare, shareEntry, type GameSharePayload } from '../lib/new-game/share';
+import { findGame, saveGame } from '../lib/new-game/store';
+import { historyOfShare, sameGameAsShare, shareEntry, type GameSharePayload } from '../lib/new-game/share';
 import type { ViewLine } from '../lib/timeline';
 import type { SavedVariation } from './useRestoreVariation';
 
@@ -68,7 +68,13 @@ async function restoreView(latest: React.RefObject<SharedGameApp>, payload: Game
 async function openShared(latest: React.RefObject<SharedGameApp>, payload: GameSharePayload): Promise<string | null> {
   const { ctx } = latest.current;
   let game = holdsMainLine(payload, ctx.newGame.record) ? ctx.newGame.record : null;
-  if (!game) {
+  // a link that equals a game this browser holds (the copy an earlier open made, the sharer's own game) opens that game: no new copy
+  const held = game ? null : findGame(record => sameGameAsShare(record, payload), payload.seed);
+  if (held) {
+    ctx.shared.clearSharedBranch();
+    if (ctx.newGame.record?.id !== held.id) await ctx.newGame.openRecord(held);
+    game = held;
+  } else if (!game) {
     const { recordOfShare } = await import('./branch/share-open');
     const engine = await import('../lib/lazy/branch-engine');
     const made = await recordOfShare(engine, payload);

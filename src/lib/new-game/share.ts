@@ -134,6 +134,19 @@ export function makeGameSharePayload({ record, variation, view, now = new Date()
   };
 }
 
+/**
+ * Whether a saved game is the game a link holds: the same format, seed, players, teams (by their packed text), leads and entries,
+ * entry for entry. A link whose main line goes past the game, or differs anywhere, is another game (H7: opening a link twice made
+ * a copy each time, and the cap of saved games then dropped real games for them).
+ */
+export function sameGameAsShare(record: NewGameRecord, payload: GameSharePayload): boolean {
+  return record.format === payload.format && record.seed === payload.seed
+    && record.players[0] === payload.players[0] && record.players[1] === payload.players[1]
+    && record.entries.length === payload.entries.length
+    && Teams.pack(record.teams.p1) === payload.teams.p1 && Teams.pack(record.teams.p2) === payload.teams.p2
+    && record.entries.every((entry, index) => JSON.stringify(shareEntry(entry)) === JSON.stringify(payload.entries[index]));
+}
+
 const isStringList = (value: unknown): value is string[] => Array.isArray(value) && value.every(item => typeof item === 'string');
 const isEntryList = (value: unknown): value is ShareEntry[] => Array.isArray(value) && value.every(Array.isArray);
 
