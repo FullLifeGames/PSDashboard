@@ -1,6 +1,5 @@
 import type { BranchRuntime, ReconstructParams } from '@fulllifegames/eval-engine';
 import { getBranchSimulatorFormat, type TurnSnapshot } from '@fulllifegames/replay-core';
-import { snapshotAt } from '../../lib/eval-acquire';
 import { gameReplayData, type NewGameRecord } from '../../lib/new-game/record';
 import { assembleGameLog } from '../../lib/new-game/game-log';
 import { isInterlude } from '../../lib/variation-turns';
@@ -75,13 +74,16 @@ export function gamePositions(entries: readonly BranchHistoryEntry[]): Map<numbe
 }
 
 /**
- * The snapshot a game's adopted position corrects from. The game's tip has no block in its log yet, so the arrival's dice alignment
- * would find an empty block and put the position on a fresh seed instead of the game's own PRNG: at the tip the position is adopted
- * as stored (it is exact; no correction, no re-seed). A turn the game has played keeps the replay rule: the position takes the
- * seed that reproduces the log's rolls for the choices the user leaves as they were.
+ * The snapshot a game's adopted position corrects from: none, at the tip and at every turn the game has played. A stored position of
+ * a game is exact: the rebuild from the record made it on the game's own seed, so it carries the game's PRNG as the game had it at
+ * that turn, and no correction is due. A replay's position is a reconstruction, whose dice the arrival alignment puts on the seed
+ * that reproduces the log's rolls; for a game that re-seed would trade the true dice for a stream that only shows what the log
+ * names (crit, miss, secondary) and roll every damage roll and every roll before the user's change anew. "The same seed, teams and
+ * choices roll the same dice" (round 89, H7, wave-tester finding 3): a variation that repeats the game's choices plays the game's
+ * turn line for line.
  */
-export function gameAdoptSnapshot(snapshots: TurnSnapshot[], turn: number): TurnSnapshot | null {
-  return turn >= snapshots.length ? null : snapshotAt(snapshots, turn);
+export function gameAdoptSnapshot(): TurnSnapshot | null {
+  return null;
 }
 
 /** Replays the record onto a fresh runtime and hands every main-line position out; null for a record without a lead entry. */

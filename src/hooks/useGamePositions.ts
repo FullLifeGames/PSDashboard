@@ -1,5 +1,4 @@
 import { useCallback, useMemo, useRef } from 'react';
-import type { TurnSnapshot } from '@fulllifegames/replay-core';
 import type { NewGameRecord } from '../lib/new-game/record';
 import { gameAdoptSnapshot, restoreGamePositions } from './branch/game-rebuild';
 
@@ -10,10 +9,9 @@ import { gameAdoptSnapshot, restoreGamePositions } from './branch/game-rebuild';
  */
 export function useGamePositions(args: {
   record: NewGameRecord | null;
-  snapshots: TurnSnapshot[];
   exact: { getExact(turn: number): string | null; storeExactPosition(turn: number, serialized: string): void };
 }) {
-  const { record, snapshots, exact } = args;
+  const { record, exact } = args;
   const restoring = useRef<{ key: string; promise: Promise<void> } | null>(null);
 
   const restore = useCallback(async () => {
@@ -55,7 +53,7 @@ export function useGamePositions(args: {
     return positions;
   }, [acquireExact]);
 
-  const adoptSnapshot = useCallback((turn: number) => gameAdoptSnapshot(snapshots, turn), [snapshots]);
+  const adoptSnapshot = useCallback(() => gameAdoptSnapshot(), []);
 
   return useMemo(() => (record ? { acquireExact, acquireAll, adoptSnapshot } : null), [record, acquireExact, acquireAll, adoptSnapshot]);
 }

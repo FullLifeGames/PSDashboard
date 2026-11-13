@@ -327,7 +327,7 @@ function useRuntimeAcquire(args: { replayData: ReplayData | null; exact: ExactSt
     await branchEngine.loadSimMods(params.format);
     const adopt = (serialized: string, outcome?: ReconstructOutcome) => branchEngine.adoptSerializedRuntime({
       serialized, replayLog: params.replayLog, targetTurn: params.targetTurn,
-      snapshot: plan.isT0 ? null : game ? game.adoptSnapshot(params.targetTurn) : params.snapshot ?? null,
+      snapshot: plan.isT0 ? null : game ? game.adoptSnapshot() : params.snapshot ?? null,
       ...(outcome ? { log: outcome.log, haxAlignment: outcome.haxAlignment, timedOut: outcome.timedOut } : {}),
     });
     // A game's positions are the record's: stored, else rebuilt from its entries; a miss never starts a 'replay' job (round 89, #105).
@@ -378,7 +378,7 @@ export function usePositionSource(inputs: {
   }, [replayData, replayWorker]);
   const { reconstruct, buildTeams } = useWorkerReconstruct({ replayData, snapshots, observations, sources, replayWorker, exact });
   const { sweepAlignment, acquireExact, acquireAll } = useMainLineAcquire({ exact, reconstruct, buildTeams, bringOnlyLists, bringWorlds });
-  const game = useGamePositions({ record: gameRecord, snapshots, exact });
+  const game = useGamePositions({ record: gameRecord, exact });
   const acquireRuntime = useRuntimeAcquire({ replayData, exact, reconstruct, game });
   return useMemo(() => ({
     ...exact, exactPositionsVersion, sweepAlignment, acquireExact: game?.acquireExact ?? acquireExact, acquireAll: game?.acquireAll ?? acquireAll, acquireRuntime,

@@ -122,7 +122,7 @@ async function play(family: Family, adopt: boolean): Promise<Played> {
     if (adopt) {
       const text = gameReplayData(record).log;
       const targetTurn = runtime.battleStream.battle?.turn ?? turn;
-      const snapshot = gameAdoptSnapshot(parseReplayLog(text), targetTurn);
+      const snapshot = gameAdoptSnapshot();
       runtime = branchEngine.adoptSerializedRuntime({
         serialized: all[all.length - 1].serializedPosition as string, replayLog: text, targetTurn, snapshot,
       });

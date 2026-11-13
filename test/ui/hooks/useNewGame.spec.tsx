@@ -134,7 +134,7 @@ describe('useNewGame', () => {
         playerNames: ['Alice', 'Bob'],
         acquireRuntime: async params => adoptSerializedRuntime({
           serialized: store.get(params.targetTurn)!, replayLog: params.replayLog, targetTurn: params.targetTurn,
-          snapshot: gameAdoptSnapshot(parseReplayLog(params.replayLog), params.targetTurn),
+          snapshot: gameAdoptSnapshot(),
         }),
       });
     });
