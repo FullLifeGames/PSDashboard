@@ -52,7 +52,7 @@ async function readRows(review: Locator) {
 }
 
 /** A die's words without its chance or its knock-out count: what the history's mark says. */
-const bare = (text: string) => text.replace(/ \([^)]*\)/g, '').trim();
+const bare = (text: string) => text.replace(/ \([^)]*\)/g, '').replace(/ → [^:]+(?=:)/, '').trim();
 
 for (const game of GAMES) {
   test(`${game.kind}: the Game review lists the graded turns, the graph marks them, ▶ Play opens the line`, async ({ page }) => {
@@ -91,6 +91,8 @@ for (const game of GAMES) {
     const row = withLine.first();
     const turn = Number(((await row.getByRole('button').first().textContent()) ?? '').replace(/^T/, ''));
     const play = row.getByRole('button', { name: '▶ Play' }).first();
+    // the button stands inline in the row's 10 px text, not as a full-size button (round 89, G4b)
+    expect((await play.boundingBox())!.height, 'the play button is inline').toBeLessThan(26);
     const tooltip = (await play.getAttribute('title')) ?? '';
     await play.click();
     const history = variationPanel(page);
@@ -101,5 +103,15 @@ for (const game of GAMES) {
     const marked = (await page.getByRole('group', { name: 'Forced dice' }).allTextContents()).flatMap(text => text.replace(/^Forced dice/, '').split(/(?=P[12] )/)).map(text => bare(text.replace(/^P[12] /, '')));
     for (const mark of marked.filter(text => text !== '')) expect(named, `the tooltip lists ${mark}`).toContain(mark);
     await expect(page.getByRole('button', { name: /Let it play out/ })).toBeEnabled();
+
+    // a second ▶ Play over the open variation asks first, under the line that was clicked and on screen (G4b: it stood out of sight)
+    await panel.getByRole('button', { name: /Game report/ }).click();
+    await expect(review).toBeVisible();
+    await review.locator('.ps-eval-review-row').filter({ has: page.locator('.ps-eval-review-line button') }).first().getByRole('button', { name: '▶ Play' }).first().click();
+    const question = review.getByRole('alertdialog');
+    await expect(question).toContainText('replace the existing variation');
+    await expect(question).toBeInViewport();
+    await question.getByRole('button', { name: 'Cancel' }).click();
+    await expect(question).toHaveCount(0);
   });
 }

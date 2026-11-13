@@ -74,7 +74,7 @@ async function settleOnTurn(page: Page, panel: Locator, turn: number) {
 }
 
 /** A die's words without its chance or its knock-out count: what the history's mark says. */
-const bare = (text: string) => text.replace(/ \([^)]*\)/g, '').trim();
+const bare = (text: string) => text.replace(/ \([^)]*\)/g, '').replace(/ → [^:]+(?=:)/, '').trim();
 
 for (const game of GAMES) {
   test(`${game.kind}: ▶ Play plays the line's turns and dice`, async ({ page }) => {
