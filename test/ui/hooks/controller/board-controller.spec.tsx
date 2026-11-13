@@ -134,4 +134,44 @@ describe('useTimelineController', () => {
     act(() => result.current.board.timeline.handleReplayTurn(1));
     expect(result.current.board.timeline.viewTurn).toBe(1);
   }, 90_000);
+
+  // Round 89 (#105, H4f): a slow load outran the four-second guard (the e2e reload on devbox), and the frame's report of turn 1 moved
+  // the pointer off the tip. The landing holds its turn until the frame confirms it, however long the load takes.
+  test('a saved game keeps its tip against a report of turn 1 that comes after the guard time of a selection', async () => {
+    const record = await playedRecord(1);
+    const { result } = renderHook(() => useBoardHarness());
+    await act(async () => { await result.current.ctx.newGame.openRecord(record); });
+    await waitFor(() => expect(result.current.board.timeline.maxTurn).toBe(2));
+    expect(result.current.board.timeline.viewTurn).toBe(2);
+    const now = Date.now();
+    vi.useFakeTimers({ toFake: ['Date'], now: now + 60_000 });
+    try {
+      act(() => result.current.board.timeline.handleReplayTurn(1));
+      expect(result.current.board.timeline.viewTurn).toBe(2);
+      act(() => result.current.board.timeline.handleReplayTurn(2));
+      act(() => result.current.board.timeline.handleReplayTurn(1));
+      expect(result.current.board.timeline.viewTurn).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  }, 90_000);
+
+  test('the user\'s own click on turn 1 after the landing wins over the held tip', async () => {
+    const record = await playedRecord(1);
+    const { result } = renderHook(() => useBoardHarness());
+    await act(async () => { await result.current.ctx.newGame.openRecord(record); });
+    await waitFor(() => expect(result.current.board.timeline.maxTurn).toBe(2));
+    expect(result.current.board.timeline.viewTurn).toBe(2);
+    act(() => result.current.board.timeline.handleGraphSelect(1));
+    expect(result.current.board.timeline.viewTurn).toBe(1);
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.now() + 60_000 });
+    try {
+      // the frame confirms the click, and its later reports move the pointer again
+      act(() => result.current.board.timeline.handleReplayTurn(1));
+      act(() => result.current.board.timeline.handleReplayTurn(2));
+      expect(result.current.board.timeline.viewTurn).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  }, 90_000);
 });

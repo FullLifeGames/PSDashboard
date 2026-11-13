@@ -116,7 +116,7 @@ export function useTimelineController(ctx: ReplayContext, transients: Transients
   // pages can inject replays repeatedly via ps-load-replay, so the previous
   // game's state must never leak into the next one.
   const { takeLanding } = ctx.newGame;
-  const selectTurn = timeline.handleGraphSelect;
+  const landOnTurn = timeline.landOnTurn;
   useEffect(() => {
     resetPointer();
     setBranchDivergence(null);
@@ -125,9 +125,9 @@ export function useTimelineController(ctx: ReplayContext, transients: Transients
     // Round 89 (#105): a game opens on its tip, where the next turn is played from: turn 0 (the lead picker) before the lead is picked.
     const tip = takeLanding();
     // A selection, not a restore: the frame of a game that opens at start (a reload) is not there yet and reports turn 1 while it
-    // loads; the selection's guard drops that report (round 89, H4e).
-    if (tip !== null) selectTurn(tip);
-  }, [replayData?.id, stopBranch, resetPointer, setBranchDivergence, branchWindowOpenRef, takeLanding, selectTurn]);
+    // loads; the guard of the landing drops that report until the frame confirms the tip, however long it loads (round 89, H4e, H4f).
+    if (tip !== null) landOnTurn(tip);
+  }, [replayData?.id, stopBranch, resetPointer, setBranchDivergence, branchWindowOpenRef, takeLanding, landOnTurn]);
 
   return { timeline, deviation, evalResultMatchesView, liveEvalStatus, tipEvalStatus, discardVariation };
 }

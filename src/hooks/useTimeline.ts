@@ -289,6 +289,38 @@ function useTipFollow(args: NavArgs, seekIntentRef: SeekIntentRef, navigateTo: N
   return { restorePointer, holdTipFollow, followNextTip };
 }
 
+/**
+ * True when the frame's report is the echo of an older seek and must not move the pointer; a report that matches the intent
+ * ends the guard. A held landing (`landOnTurn`) also ends on the last turn of a finished game: its frame stops one turn before the end.
+ */
+function frameReportIsEcho(seekIntentRef: SeekIntentRef, turn: number, endSnapshotTurn: number | null): boolean {
+  const intent = seekIntentRef.current;
+  if (!intent || Date.now() >= intent.until) return false;
+  const endEcho = intent.until === Infinity && endSnapshotTurn !== null && intent.turn >= endSnapshotTurn && turn >= endSnapshotTurn - 1;
+  if (turn !== intent.turn && !endEcho) return true;
+  seekIntentRef.current = null;
+  return false;
+}
+
+/**
+ * An opened game's tip (round 89, #105, H4f). A selection like the graph's, but the guard has no time limit: the frame of a
+ * game opened at start loads its scripts from the network, and a report of turn 1 that comes after the four seconds of a
+ * selection moved the pointer off the tip. The guard ends when the frame reports the turn, or when the user selects another
+ * one (every selection sets its own intent). Turn 0 has no report to wait for and keeps the timed guard. A new document
+ * starts clean: a landing the old frame never confirmed must not hold back the next replay's reports.
+ */
+function useLanding(seekIntentRef: SeekIntentRef, handleGraphSelect: (turn: number) => void, resetPointerState: () => void) {
+  const landOnTurn = useCallback((turn: number) => {
+    handleGraphSelect(turn);
+    if (turn >= 1) seekIntentRef.current = { turn, until: Infinity };
+  }, [handleGraphSelect, seekIntentRef]);
+  const resetPointer = useCallback(() => {
+    seekIntentRef.current = null;
+    resetPointerState();
+  }, [resetPointerState, seekIntentRef]);
+  return { landOnTurn, resetPointer };
+}
+
 /** Embed echo guard and the graph's explicit line-addressed selections. */
 function useTimelineNav(args: NavArgs) {
   const { pointer, derived, atVariationEnd, interruptPlayOut, setAnalysisTurn } = args;
@@ -307,11 +339,7 @@ function useTimelineNav(args: NavArgs) {
     // again, and the finish of a play-out needs the turn the frame shows (round 88, T347).
     frameTurnRef.current = turn;
     if (turn < 1) return;
-    const intent = seekIntentRef.current;
-    if (intent && Date.now() < intent.until) {
-      if (turn !== intent.turn) return;
-      seekIntentRef.current = null;
-    }
+    if (frameReportIsEcho(seekIntentRef, turn, endSnapshotTurn)) return;
     if (derived.viewingVariation) {
       // The branch frame's own Last turn / Next turn. A turn the variation does not cover is the shared prefix: the
       // pointer leaves for the main line there, and the main frame that opens gets the same echo guard. The start turn
@@ -374,7 +402,7 @@ function useTimelineNav(args: NavArgs) {
     handleGraphSelect(turn);
   }, [navigateTo, handleGraphSelect, setViewLine]);
 
-  return { navigateTo, restorePointer, holdTipFollow, followNextTip, handleReplayTurn, handleGraphSelect, handleGraphSelectLine };
+  return { navigateTo, restorePointer, holdTipFollow, followNextTip, handleReplayTurn, handleGraphSelect, handleGraphSelectLine, seekIntentRef };
 }
 
 export function useTimeline(inputs: TimelineInputs) {
@@ -401,7 +429,9 @@ export function useTimeline(inputs: TimelineInputs) {
   }
 
   const nav = useTimelineNav({ pointer, derived, atVariationEnd, branching, interruptPlayOut, onNavigate, executing, variationEnded, setAnalysisTurn });
-  return { ...pointer, ...derived, ...nav, analysisTurn, atVariationEnd };
+  const { seekIntentRef, ...navRest } = nav;
+  const landing = useLanding(seekIntentRef, nav.handleGraphSelect, pointer.resetPointer);
+  return { ...pointer, ...derived, ...navRest, ...landing, analysisTurn, atVariationEnd };
 }
 
 export type Timeline = ReturnType<typeof useTimeline>;
