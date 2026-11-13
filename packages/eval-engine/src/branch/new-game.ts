@@ -1,4 +1,4 @@
-import { TeamValidator, Teams } from '@pkmn/sim';
+import { PRNG, TeamValidator, Teams } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import { dexOfFormat, simFormats, toId } from '@fulllifegames/replay-core';
 import { loadSimMods } from '../forward/sim-mods.ts';
@@ -46,6 +46,33 @@ export interface NewGameStart {
   /** The teams as the format's battle reads them: each set with the level the format gives its body. */
   teams: { p1: PokemonSet[]; p2: PokemonSet[] };
   bodies: { p1: NewGameBody[]; p2: NewGameBody[] };
+}
+
+/** A seed the simulator reads, or the problem that names the forms the dialog accepts. */
+export type GameSeedRead = { seed: string } | { problem: string };
+
+const SEED_PROBLEM = 'A seed is four whole numbers from 0 to 65535 with commas, like 1,2,3,4, or "sodium," and up to 64 hex digits (the form of a Showdown input log), or "gen5," and 16 hex digits.';
+
+/**
+ * Reads a seed a user typed or pasted (round 89, #105, stage H4b). The forms are the simulator's own (`PRNG`): four numbers, the form
+ * `PRNG.generateSeed()` draws, `sodium,` with hex digits (what a server writes into an input log) and `gen5,` with 16 hex digits.
+ * Stricter than the simulator on purpose: the numbers stay in 0 to 65535, the range the simulator itself draws, because it takes
+ * any number and a game with a wild seed could not be told from a typo. Spaces and capitals are dropped; the simulator has to take
+ * the normalized text without a throw. The result is the text the game starts on.
+ */
+export function readGameSeed(text: string): GameSeedRead {
+  const seed = text.replace(/\s+/g, '').toLowerCase();
+  const numbers = /^(\d{1,5}),(\d{1,5}),(\d{1,5}),(\d{1,5})$/.exec(seed);
+  const known = (numbers && numbers.slice(1).every(part => Number(part) <= 0xffff))
+    || /^sodium,[0-9a-f]{1,64}$/.test(seed)
+    || /^gen5,[0-9a-f]{16}$/.test(seed);
+  if (!known) return { problem: SEED_PROBLEM };
+  try {
+    new PRNG(seed as ConstructorParameters<typeof PRNG>[0]);
+  } catch {
+    return { problem: SEED_PROBLEM };
+  }
+  return { seed };
 }
 
 export interface StartGameParams {

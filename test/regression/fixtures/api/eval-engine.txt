@@ -63,6 +63,7 @@ type ForcedWinOpen
 type ForcedWinOutcome
 type ForcedWinProof
 type GameReport
+type GameSeedRead
 type GameTeamProblems
 type HpDisplayBody
 type HpSighting
@@ -250,6 +251,7 @@ value perfSync
 value phantomStayIn
 value playedSetupMove
 value proveForcedWin
+value readGameSeed
 value reconstructBranchRuntime
 value reconstructionReached
 value regretText

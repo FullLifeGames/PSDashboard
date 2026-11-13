@@ -1,12 +1,13 @@
-import { PRNG, Teams } from '@pkmn/sim';
+import { Teams } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import { parseTeamText } from '@fulllifegames/replay-core';
+import { readGameSeed } from '@fulllifegames/eval-engine';
 import { newGameRecord, newGameSeed, type NewGameRecord } from './record';
 
 /**
  * Round 89 (lane H, #105), stage H4: what the New game dialog does with its two text fields. A paste is read the way Showdown's
  * own import reads it (`Teams.import`, the library the other import paths use too); a block without a move line is no set, as in
- * `parsePastedTeam`, and the dialog names it. The seed is the simulator's own format, checked by the simulator's PRNG. Start reads
+ * `parsePastedTeam`, and the dialog names it. The seed is read by the engine (`readGameSeed`). Start reads
  * both pastes again, starts the format's battle (`startGameLog`) and returns the record the app opens.
  */
 
@@ -28,23 +29,10 @@ export function readTeamPaste(text: string): TeamRead {
   };
 }
 
-const SEED_MESSAGE = 'A seed is four whole numbers from 0 to 65535 with commas, like 1,2,3,4, or "gen5," and 16 hex digits.';
-
-/**
- * The simulator's seed formats the app plays: four 16-bit numbers (`1,2,3,4`, what `newGameSeed` draws) and `gen5,` with 16 hex
- * digits. The simulator's PRNG has to take the text and give the same seed back. Null for a seed that is fine, else the message.
- */
+/** Null for a seed the engine reads (`readGameSeed`: four numbers, sodium, gen5), else the message that names the forms. */
 export function seedProblem(text: string): string | null {
-  const seed = text.trim();
-  const numbers = /^(\d{1,5}),(\d{1,5}),(\d{1,5}),(\d{1,5})$/.exec(seed);
-  const gen5 = /^gen5,[0-9a-f]{16}$/i.test(seed);
-  if (!gen5 && !(numbers && numbers.slice(1).every(part => Number(part) <= 0xffff))) return SEED_MESSAGE;
-  try {
-    const prng = new PRNG(seed.toLowerCase() as ConstructorParameters<typeof PRNG>[0]);
-    return /^\d+,\d+,\d+,\d+$/.test(prng.getSeed()) ? null : SEED_MESSAGE;
-  } catch {
-    return SEED_MESSAGE;
-  }
+  const read = readGameSeed(text);
+  return 'problem' in read ? read.problem : null;
 }
 
 export interface StartParams {
@@ -74,7 +62,8 @@ export async function startNewGame(params: StartParams): Promise<NewGameRecord> 
   const problem = startProblem(params);
   if (problem) throw new Error(problem);
   const [p1, p2] = params.texts.map(readTeamPaste);
-  const seed = params.seed?.trim() ? params.seed.trim().toLowerCase() : newGameSeed('fresh');
+  const read = params.seed?.trim() ? readGameSeed(params.seed) : null;
+  const seed = read && 'seed' in read ? read.seed : newGameSeed('fresh');
   const players: [string, string] = [params.names[0].trim() || 'Player 1', params.names[1].trim() || 'Player 2'];
   const engine = await import('../lazy/branch-engine');
   await engine.loadSimMods(params.format);

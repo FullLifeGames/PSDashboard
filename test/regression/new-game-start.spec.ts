@@ -52,8 +52,8 @@ describe('the team paste', () => {
 
 describe('the seed field', () => {
   test('accepts the simulator\'s formats and refuses the rest', () => {
-    for (const good of ['1,2,3,4', ' 65535,0,7,300 ', 'gen5,0123456789abcdef', 'GEN5,0123456789ABCDEF']) expect(seedProblem(good), good).toBeNull();
-    for (const bad of ['', '1,2,3', '1,2,3,4,5', '1,2,3,65536', '1,2,3,x', 'abc', 'gen5,xyz', 'sodium,00', '-1,2,3,4']) expect(seedProblem(bad), bad).not.toBeNull();
+    for (const good of ['1,2,3,4', ' 65535,0,7,300 ', 'gen5,0123456789abcdef', 'GEN5,0123456789ABCDEF', 'sodium,00', 'SODIUM,0123 abcd']) expect(seedProblem(good), good).toBeNull();
+    for (const bad of ['', '1,2,3', '1,2,3,4,5', '1,2,3,65536', '1,2,3,x', 'abc', 'gen5,xyz', 'sodium,xyz', '-1,2,3,4']) expect(seedProblem(bad), bad).not.toBeNull();
   });
 
   test('the simulator takes every accepted seed and every drawn one: 200 fresh seeds, each valid', () => {
