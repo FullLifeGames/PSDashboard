@@ -48,6 +48,7 @@ type EvalCellJob
 type EvalCellValue
 type EvalChoiceOption
 type EvalChoicesInfo
+type EvalLine
 type EvalMatrix
 type EvalPreferences
 type EvalResult
@@ -72,6 +73,11 @@ type KoOddsMismatch
 type LeadAnalysis
 type LeadEvalData
 type LeadSideAnalysis
+type LineChoice
+type LineDie
+type LineRequest
+type LineStep
+type LinesInput
 type LiveHit
 type LoggedOptions
 type MatchupCache
@@ -103,6 +109,7 @@ type RollFlip
 type RollSelector
 type RolledCopy
 type RolledHit
+type RowLines
 type SackInfo
 type SearchBudget
 type SearchCallbacks
@@ -126,6 +133,7 @@ type StreakOdds
 type TeraAllowance
 type TeraPreference
 type TreeExecutor
+type TreeLineStep
 type TurnAlignmentRecord
 type TurnAnalysis
 type TurnAttribution

@@ -1,3 +1,5 @@
+import type { BranchSlotChoice } from './branch-choices.ts';
+import type { ForcedDie } from './dice/types.ts';
 import type { PlayedAction } from './played.ts';
 import type { SimFastLever, SimFastReport } from './forward/sim-fast/state.ts';
 import type { SearchBudget } from './search/budget.ts';
@@ -257,7 +259,61 @@ export interface EvalResult {
    * score minus the leaf of the draw's own child. Absent on every other search.
    */
   trend?: number;
+  /**
+   * Round 89 (#104): the lines over the next turns, from the tree search: for each side its best row's line and its played row's line
+   * (one line when the two are the row), each a replay of the tree's line with every die at its likeliest result. Absent on a matrix
+   * search, on an engine that sends none and when the tree holds no line for the row. No score, ranking or grade reads it.
+   */
+  lines?: EvalLine[];
 }
+
+/**
+ * Round 89 (#104): one die a line names, with the chance of the result the line takes (the draw's own, absent when the simulator's draw
+ * names none) and whether it could have gone the other way in a way the user wants to see (`shown`: ruling 33, question 3a). `ko`
+ * counts the damage rolls of a die whose roll decides a knock-out.
+ */
+export interface LineDie { die: ForcedDie; chance?: number; shown: boolean; ko?: { rolls: number; of: number } }
+
+/** One side's click of a step: the engine's choice string and label, and the slot choices the branch layer replays (the dice ride on their holders). */
+export interface LineChoice { choice: string; label: string; slots: (BranchSlotChoice | null)[] }
+
+/**
+ * One step of a line: a turn, or a replacement after a faint or a pivot (`replacement` names the side that picks, `both` when both do;
+ * the other side waits). `dice` are the dice the step names, each at its likeliest result.
+ */
+export interface LineStep { p1: LineChoice; p2: LineChoice; replacement?: 'p1' | 'p2' | 'both'; dice: LineDie[] }
+
+/**
+ * Round 89 (#104): the line of one row. `for` says which of the turn's two lines it is (the engine's best row, the row the player
+ * played; one line carries both when they are the same row). `end` is the static evaluation after the last step from `side`'s view
+ * (the value space of `RankedChoice.worstCase`), `endFainted` that position's fainted share. `cut` says why a line stops short of the
+ * tree's own (a step no longer legal after the likeliest dice); `unforced` lists what the replay left to the stream (a die the draw
+ * cannot name, a draw no die names), so the click depends on the seed there.
+ */
+export interface EvalLine {
+  side: 'p1' | 'p2';
+  label: string;
+  choice: string;
+  for: ('engine' | 'played')[];
+  steps: LineStep[];
+  end: number;
+  endFainted: number;
+  visits: number;
+  cut?: string;
+  unforced?: string[];
+}
+
+/** One step of a row's line as a tree carries it: both sides' choices by label and the visits of its cell. */
+export interface TreeLineStep { p1: string; p2: string; visits: number }
+
+/** A tree's line for each root row that holds one, by side and row label. */
+export interface RowLines { p1: Record<string, TreeLineStep[]>; p2: Record<string, TreeLineStep[]> }
+
+/** One line to replay: the row, the trees' lines for it best first (the next one stands in when a replay is cut) and the visits of the first. */
+export interface LineRequest { side: 'p1' | 'p2'; label: string; for: ('engine' | 'played')[]; donors: TreeLineStep[][]; visits: number }
+
+/** The lines job: the requests, and the settings the root's options need to resolve the first labels. */
+export interface LinesInput { requests: LineRequest[]; tera?: TeraAllowance; sleepClause?: boolean; keepPlayed?: EvalSettings['keepPlayed'] }
 
 /**
  * One switch-in-stage row (round 14): every BENCHED enemy loses the entry
@@ -618,6 +674,8 @@ export interface MctsTreeStats {
   }[];
   /** This tree's own ranked result (PV/punisher donor for the merge). */
   result: EvalResult;
+  /** Round 89 (#104): the tree's line for each root row that holds one, read by the lines job. Absent on trees from before. */
+  rowLines?: RowLines;
 }
 
 /** Round 59: the speed-layer levers; round 61: the search budget. Both ride on every request (several carry no EvalSettings). */
@@ -636,6 +694,7 @@ export type EvalWorkerRequest = (
   | { type: 'cells'; id: number; serializedBattle: string; jobs: EvalCellJob[] }
   | { type: 'subsearch'; id: number; serializedBattle: string; job: EvalSubSearchJob }
   | { type: 'prove'; id: number; serializedBattle: string; input: ForcedWinInput }
+  | { type: 'lines'; id: number; serializedBattle: string; input: LinesInput }
 ) & SimFastStamp & RulesetStamp;
 
 /** Final answers carry the worker's speed-layer status and its counters since the last one. */
@@ -647,5 +706,6 @@ export type EvalWorkerResponse = (
   | { type: 'choicesResult'; id: number; info: EvalChoicesInfo }
   | { type: 'cellsResult'; id: number; values: EvalCellValue[] }
   | { type: 'proveResult'; id: number; outcome: ForcedWinOutcome | null }
+  | { type: 'linesResult'; id: number; lines: EvalLine[] }
   | { type: 'error'; id: number; message: string }
 ) & { simFast?: SimFastReport };
