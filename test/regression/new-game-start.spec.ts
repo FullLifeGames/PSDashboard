@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { PRNG, Teams } from '@pkmn/sim';
+import { Dex, PRNG, Teams } from '@pkmn/sim';
 import { readTeamPaste, seedProblem, startNewGame, startProblem } from '../../src/lib/new-game/start';
 import { newGameSeed } from '../../src/lib/new-game/record';
 
@@ -118,4 +118,20 @@ describe('Start', () => {
     expect(record.id).toMatch(/^newgame-[0-9a-z]{10}$/);
     expect(record.body).toEqual([]);
   }, 60_000);
+
+  // H20a: a paste without an Ability line starts with the species' first ability written into the saved team (the simulator would play none)
+  for (const [label, format, formatName, gen] of [
+    ['singles', 'gen9ou', '[Gen 9] OU', 9], ['doubles', 'gen9doublesou', '[Gen 9] Doubles OU', 9], ['VGC', 'gen9vgc2025regi', '[Gen 9] VGC 2025 Reg I', 9],
+    ['Champions', 'gen9championsou', '[Gen 9 Champions] OU', 9], ['an older generation', 'gen4ou', '[Gen 4] OU', 4], ['a generation without abilities', 'gen2ou', '[Gen 2] OU', 2],
+  ] as const) {
+    test(`${label}: a set without an ability is saved with the species' first ability (${formatName})`, async () => {
+      const record = await startNewGame({ format, formatName, names: ['Ann', 'Bo'], texts: [FOUR, TEAM], seed: '1,2,3,4' });
+      const dex = Dex.forFormat(Dex.formats.get(format));
+      for (const set of record.teams.p1) {
+        expect(set.ability ?? '', `${set.species} in ${format}`).toBe(gen >= 3 ? dex.species.get(set.species).abilities['0'] : '');
+      }
+      // the other side pasted its abilities: they stay
+      expect(record.teams.p2.map(set => set.ability)).toEqual(readTeamPaste(TEAM).sets.map(set => set.ability));
+    }, 60_000);
+  }
 });

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Dex } from '@pkmn/sim';
 import { NewGameDialog } from '../../../src/components/NewGameDialog';
 import { savedRecord } from '../fixtures/saved-game';
 
@@ -345,8 +346,9 @@ describe('Start with an unsaved variation open (H16a)', () => {
 });
 
 /**
- * Round 89 (lane H, #105), H18a (user ruling 13.11.2026). An empty seed field means a fresh seed, and the placeholder says
- * so; Start gives the game a fresh seed. The dialog's rules are the same for singles and doubles (the seed is no game type's).
+ * Round 89 (lane H, #105), H18a and H20a (user ruling 13.11.2026). An empty seed field means a fresh seed, and the placeholder says
+ * so. A pasted set without an ability starts with the species' first ability, written into the saved team; the team check names it
+ * before Start. Singles and doubles run both.
  */
 describe('an empty seed field (H18a)', () => {
   test('the placeholder names what an empty field does; an empty field starts the game on a fresh seed', async () => {
@@ -363,4 +365,29 @@ describe('an empty seed field (H18a)', () => {
     await waitFor(() => expect(wired.onStart).toHaveBeenCalledTimes(1), { timeout: 30_000 });
     expect(vi.mocked(wired.onStart).mock.calls[0][0].seed).toMatch(/^\d+,\d+,\d+,\d+$/);
   }, 60_000);
+});
+
+describe('a pasted set without an ability (H20a)', () => {
+  const NO_ABILITY = 'Gengar\n- Shadow Ball\n\nGarchomp\n- Earthquake';
+  for (const [label, search, name, id] of [['singles', 'gen9ou', '[Gen 9] OU', 'gen9ou'], ['doubles', 'doubles ou', '[Gen 9] Doubles OU', 'gen9doublesou']]) {
+    test(`${label}: the check says which ability each set plays, and Start writes it into the saved team`, async () => {
+      const wired = props();
+      render(<NewGameDialog {...wired} />);
+      await pickFormat(search, name);
+      paste(1, NO_ABILITY);
+      paste(2, GOOD);
+      const abilityOf = (species: string) => Dex.forGen(9).species.get(species).abilities['0'];
+      expect(id).toBeTruthy();
+      expect(await screen.findByText(`Gengar has no ability: plays ${abilityOf('Gengar')}.`, undefined, { timeout: 30_000 })).toBeInTheDocument();
+      expect(screen.getByText(`Garchomp has no ability: plays ${abilityOf('Garchomp')}.`)).toBeInTheDocument();
+      // the other side pasted its abilities: no note under it
+      expect(screen.queryByText(/Gliscor has no ability/)).toBeNull();
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Start' })).toBeEnabled());
+      await userEvent.click(screen.getByRole('button', { name: 'Start' }));
+      await waitFor(() => expect(wired.onStart).toHaveBeenCalledTimes(1), { timeout: 30_000 });
+      const record = vi.mocked(wired.onStart).mock.calls[0][0];
+      expect(record.teams.p1.map(set => set.ability)).toEqual([abilityOf('Gengar'), abilityOf('Garchomp')]);
+      expect(record.teams.p2.map(set => set.ability)).toEqual(['Rough Skin', 'Poison Heal']);
+    }, 90_000);
+  }
 });

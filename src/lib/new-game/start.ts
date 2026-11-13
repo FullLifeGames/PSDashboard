@@ -56,7 +56,8 @@ export function startProblem(params: Pick<StartParams, 'texts' | 'seed'>): strin
 
 /**
  * Starts the game: reads both pastes, starts the format's battle with the seed and returns the record at Team Preview (no
- * turn played). The record keeps the teams `startGameLog` returns (the level the format gives), never the raw paste.
+ * turn played). The record keeps the teams `startGameLog` returns (the level the format gives, and the species' first ability for a set that
+ * pasted none, H20a), never the raw paste.
  */
 export async function startNewGame(params: StartParams): Promise<NewGameRecord> {
   const problem = startProblem(params);
@@ -67,6 +68,6 @@ export async function startNewGame(params: StartParams): Promise<NewGameRecord> 
   const players: [string, string] = [params.names[0].trim() || 'Player 1', params.names[1].trim() || 'Player 2'];
   const engine = await import('../lazy/branch-engine');
   await engine.loadSimMods(params.format);
-  const start = await engine.startGameLog({ format: params.format, p1Team: p1.sets, p2Team: p2.sets, playerNames: players, seed });
+  const start = await engine.startGameLog({ format: params.format, p1Team: p1.sets, p2Team: p2.sets, playerNames: players, seed, fillAbilities: true });
   return newGameRecord({ start, formatName: params.formatName, players, seed });
 }
