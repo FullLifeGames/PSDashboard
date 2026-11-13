@@ -67,6 +67,8 @@ interface EvalPanelProps {
   reportLeads?: LeadAnalysis | null;
   /** Game-level root-cause report, once a sweep covers enough turns. */
   report?: GameReport | null;
+  /** Round 89 (#104): the report's analysis of every turn; the Game review lists the graded ones and the graph marks them. */
+  reviewAnalyses?: (TurnAnalysis | null)[] | null;
   /** Doubles replay — selects the fitted win-probability curve for percents. */
   doubles?: boolean;
   /** Round 89 (#104): the host of the Lines section under a turn's rows (the game's rules, the turn's field, ▶ Play); absent: no section. */

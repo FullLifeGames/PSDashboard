@@ -238,3 +238,13 @@ button.ps-eval-choice:hover,
 .ps-eval-line-turn .t { color: #778; }
 .ps-eval-line-turn .side { color: #9fb2cc; }
 .ps-line-chip { border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(0, 0, 0, 0.2); color: #9fb2cc; font-size: 9px; padding: 0 6px; margin-left: 4px; white-space: nowrap; }
+
+/* Round 89 (#104), G4: the Game review under the game report. */
+.ps-eval-review { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; padding: 4px 0 2px; border-top: 1px solid rgba(190, 222, 255, 0.12); }
+.ps-eval-review-side { display: flex; flex-direction: column; gap: 3px; }
+.ps-eval-review-side .name { font-size: 11px; font-weight: bold; color: #cde; margin-top: 2px; }
+.ps-eval-review-row { display: flex; flex-direction: column; gap: 1px; padding: 2px 0; border-top: 1px solid rgba(190, 222, 255, 0.08); }
+.ps-eval-review-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; font-size: 10px; }
+.ps-eval-review-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; font-size: 10px; color: #bcd; padding-left: 8px; }
+.ps-eval-review-line .role { color: #778; }
+.ps-eval-review-line .text { min-width: 0; overflow-wrap: anywhere; }

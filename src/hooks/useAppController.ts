@@ -94,7 +94,7 @@ function useAnalysisSurface(ctx: ReplayContext, board: BoardController, engine: 
 
   // Per-turn and game-level analysis (reads, turn card, lead analysis,
   // game report, the feedback harness's window handle).
-  const { turnReads, turnAnalysis, faintedShares, leadAnalysisData, gameReport } = useGameAnalysis({
+  const { turnReads, turnAnalysis, faintedShares, leadAnalysisData, gameReport, gameAnalyses } = useGameAnalysis({
     replayData, snapshots, evaluation, analysisTurn, sweepAlignment, replayGen,
   });
 
@@ -112,7 +112,7 @@ function useAnalysisSurface(ctx: ReplayContext, board: BoardController, engine: 
   // sim iframe on every navigation and every executed turn (tip advance).
   const branchReloadKey = `${branchSession}:${variationStartTurn ?? 0}`;
 
-  return { turnReads, turnAnalysis, faintedShares, leadAnalysisData, gameReport, simLog, latestBranchHistoryEntry, showBranch, branchReloadKey };
+  return { turnReads, turnAnalysis, faintedShares, leadAnalysisData, gameReport, gameAnalyses, simLog, latestBranchHistoryEntry, showBranch, branchReloadKey };
 }
 
 /**

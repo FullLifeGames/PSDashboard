@@ -22,6 +22,7 @@ function analysisPropsFor(liveEvalView: boolean, analysisTurn: number | null, an
     leadAnalysis: !liveEvalView && analysisTurn === 0 ? analysis.leadAnalysisData : null,
     reportLeads: analysis.leadAnalysisData,
     report: !liveEvalView ? analysis.gameReport : null,
+    reviewAnalyses: !liveEvalView ? analysis.gameAnalyses : null,
   };
 }
 

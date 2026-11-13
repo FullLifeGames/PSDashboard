@@ -1,10 +1,12 @@
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import {
   autoTurnSettings, heldDecided,
   type EvalPreferences, type EvalResult, type RankedChoice, type ReadRecommendation, type TurnAnalysis, type GameReport, type LeadAnalysis,
 } from '@fulllifegames/eval-engine';
 import type { EvalGraphState } from '../../hooks/useEvaluation';
 import { EvalGameReport } from '../EvalGameReport';
+import { GameReviewPanel } from './GameReviewPanel';
+import { reviewMarks } from './game-review';
 import { EvalGraph } from '../EvalGraph';
 import { EvalLeadAnalysis, EvalTurnAnalysis } from '../EvalTurnAnalysis';
 import { EvalReplacementAnalysis } from './EvalReplacementAnalysis';
@@ -154,6 +156,8 @@ export interface GameGraphSectionProps extends TurnViewProps {
   variation?: VariationSeries | null;
   graphMaxTurn?: number;
   showReportView: boolean;
+  /** Round 89 (#104): the report's analysis of every turn: the Game review lists the graded ones, the graph marks them. */
+  reviewAnalyses?: (TurnAnalysis | null)[] | null;
   /** The card's fainted share per swept turn (any engine mode); the sweep's own record exists in auto only. */
   faintedShares?: (number | null)[];
 }
@@ -161,11 +165,56 @@ export interface GameGraphSectionProps extends TurnViewProps {
 /** The card's share per turn where the caller has it, else the sweep's own record (auto only). */
 const graphShares = ({ faintedShares, graph }: GameGraphSectionProps) => faintedShares ?? graph.faintedFractions;
 
+/** The game graph with the Game review's marks on it (round 89). */
+function GraphView(props: GameGraphSectionProps) {
+  const { graph, playerNames, currentTurn, currentLine, selectTurn, reportLeads, variation, graphMaxTurn, reviewAnalyses } = props;
+  const marks = useMemo(() => reviewMarks(reviewAnalyses), [reviewAnalyses]);
+  return (
+    <EvalGraph
+      scores={graph.scores}
+      playerNames={playerNames}
+      currentTurn={currentTurn}
+      currentLine={currentLine}
+      onSelectTurn={selectTurn}
+      leadScore={graph.lead?.result.score ?? null}
+      leadDetail={reportLeads ?? null}
+      evalErrors={graph.evalErrors}
+      faintedFractions={graphShares(props)}
+      decided={graph.results.map(result => (result ? heldDecided(result) ?? null : null))}
+      variation={variation}
+      maxTurn={graphMaxTurn}
+      reviewMarks={marks}
+    />
+  );
+}
+
+/** The report overview: the cards, then the Game review of the graded turns (round 89, #104). */
+function ReportOverview({ report, ...props }: GameGraphSectionProps & { report: GameReport }) {
+  const { graph, playerNames, selectTurn, reportLeads, reviewAnalyses, linesHost, doubles } = props;
+  return (
+    <>
+      <EvalGameReport
+        report={report}
+        playerNames={playerNames}
+        onSelectTurn={selectTurn}
+        leads={reportLeads}
+        settingsFor={turn => (turn >= 1 ? graph.settings[turn - 1] ?? null : null)}
+      />
+      {reviewAnalyses && linesHost && (
+        <GameReviewPanel
+          analyses={reviewAnalyses} results={graph.results} playerNames={playerNames} doubles={!!doubles}
+          host={linesHost} onSelectTurn={selectTurn}
+        />
+      )}
+    </>
+  );
+}
+
 /** The game graph with its controls, the report overview, or the selected turn's view. */
 export function GameGraphSection(props: GameGraphSectionProps) {
   const {
-    onAnalyzeGame, onCancel, running, smogonPending, hasGraph, prefs, graph, playerNames, currentTurn, currentLine,
-    selectTurn, reportLeads, variation, graphMaxTurn, showReportView, report, analysis, doubles,
+    onAnalyzeGame, onCancel, running, smogonPending, hasGraph, prefs, graph,
+    variation, showReportView, report, analysis, doubles,
   } = props;
   return (
     <div style={{ margin: '6px 0' }}>
@@ -178,22 +227,7 @@ export function GameGraphSection(props: GameGraphSectionProps) {
           ⚠ {graph.notice}
         </div>
       )}
-      {(hasGraph || variation) && (
-        <EvalGraph
-          scores={graph.scores}
-          playerNames={playerNames}
-          currentTurn={currentTurn}
-          currentLine={currentLine}
-          onSelectTurn={selectTurn}
-          leadScore={graph.lead?.result.score ?? null}
-          leadDetail={reportLeads ?? null}
-          evalErrors={graph.evalErrors}
-          faintedFractions={graphShares(props)}
-          decided={graph.results.map(result => (result ? heldDecided(result) ?? null : null))}
-          variation={variation}
-          maxTurn={graphMaxTurn}
-        />
-      )}
+      {(hasGraph || variation) && <GraphView {...props} />}
       {!hasGraph && variation && (
         <div style={{ fontSize: 10, color: '#778', marginTop: 2 }}>
           Gold = your variation. The main line has no curve yet; Analyze game fills it for comparison.
@@ -204,15 +238,7 @@ export function GameGraphSection(props: GameGraphSectionProps) {
           Click a point for that turn's analysis; its movement lights up on the line.
         </div>
       )}
-      {showReportView && report && (
-        <EvalGameReport
-          report={report}
-          playerNames={playerNames}
-          onSelectTurn={selectTurn}
-          leads={reportLeads}
-          settingsFor={turn => (turn >= 1 ? graph.settings[turn - 1] ?? null : null)}
-        />
-      )}
+      {showReportView && report && <ReportOverview {...props} report={report} />}
       {!showReportView && <TurnView {...props} />}
     </div>
   );
