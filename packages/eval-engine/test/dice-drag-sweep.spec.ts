@@ -6,6 +6,7 @@ import { dieLabel } from '../src/dice/die-label';
 import { copyOf } from '../src/sim-ask/copy';
 import { playClicks, standing, sweepSelection, SWEEPS_FULL, type Mode, type Rules } from './dice-fixtures';
 import { clicksAccepted, dexOfRules, forcedOn, SWEEP_CASES, VGC_RULES } from './dice-sweep-support';
+import { loggedDice } from '../src/dice/logged-results';
 import { draggedIn, ofKind, pickBoard, pickClicks, publicHalf, recorded, type Recorded } from './dice-pick-support';
 
 // Round 89 (#137): a drag (Roar, Whirlwind, Dragon Tail and Circle Throw by the Dex flag `forceSwitch`, and an item whose holder drags
@@ -45,9 +46,23 @@ function checkDragged(board: Battle, clicks: { p1: string; p2: string }, turn: R
       const shown = draggedIn(publicHalf(played.battle.log.slice(played.start))).find(entry => entry.slot === line.slot);
       if (played.report.forced[0]?.took !== 'applied') problems.push(`${line.slot} forced ${body}: ${played.report.forced[0]?.took} (${played.report.forced[0]?.reason})`);
       if (shown?.name !== body) problems.push(`${line.slot} forced ${body}: the drag line names ${shown?.name}`);
+      problems.push(...readBack(board, clicks, line.slot, body, publicHalf(played.battle.log.slice(played.start))));
     }
   }
   return problems;
+}
+
+/**
+ * Round 89 (G2): the log reader answers the draw. The lines of a turn that brought `body` into `slot` give the drag die of the slot with
+ * that body's name as the answer, and playing the board with the reader's die brings the same body in again.
+ */
+function readBack(board: Battle, clicks: { p1: string; p2: string }, slot: string, body: string, lines: readonly string[]): string[] {
+  const read = loggedDice(lines).find(die => dieKey(die.name) === dieKey(drag(slot)));
+  if (!read) return [`${slot} forced ${body}: the reader names no drag die`];
+  if (!('option' in read.result) || read.result.option !== body) return [`${slot} forced ${body}: the reader answers ${JSON.stringify(read.result)}`];
+  const again = forcedOn(board, clicks, [read]);
+  const shown = draggedIn(publicHalf(again.battle.log.slice(again.start))).find(entry => entry.slot === slot);
+  return shown?.name === body && again.report.forced[0]?.took === 'applied' ? [] : [`${slot}: the reader's die brings ${shown?.name} (${again.report.forced[0]?.took}), not ${body}`];
 }
 
 describe('the words of a drag', () => {

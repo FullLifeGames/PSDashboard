@@ -359,3 +359,43 @@ describe.each([
     }
   });
 });
+
+// Round 89 (#137): the log names the foe a move was aimed at and the body a drag brought in; the simulator draws both with a `sample`
+// (`getRandomTarget`, `getRandomSwitchable`), the reader hands the answers over as the dice of those draws.
+describe('the random target and the drag a log shows', () => {
+  // Champions VGC 2658911747 turn 6: Sableye's Encore bends Gallade's click to Taunt, and the game drew Corviknight
+  const ENCORE = lines(`
+|move|p2b: Sableye|Encore|p1a: Gallade
+|-start|p1a: Gallade|Encore
+|move|p1a: Gallade|Taunt|p2a: Corviknight
+|-start|p2a: Corviknight|move: Taunt
+`);
+  // Doubles OU 2553498001 turn 5: Roar drags Sableye in over Ogerpon
+  const ROAR = lines(`
+|move|p1a: Incineroar|Roar|p2a: Ogerpon-Wellspring
+|drag|p2a: Sableye|Sableye, L50, M|100/100
+|-damage|p2a: Sableye|88/100|[from] Stealth Rock
+`);
+  const picks = (dice: readonly ForcedDie[]): string[] => show(dice.filter(die => die.name.kind === 'random-target' || die.name.kind === 'drag'));
+
+  test('a move aimed at a foe names a random-target die of the user and the move, in a game that draws one', () => {
+    expect(picks(loggedDice(ENCORE, { randomTargets: true })).sort()).toEqual(['p1a:taunt::random-target {"option":"p2a"}', 'p2b:encore::random-target {"option":"p1a"}'].sort());
+  });
+  test('a reader that is not told of the draw (singles draws none) names no target die', () => {
+    expect(picks(loggedDice(ENCORE, {}))).toEqual([]);
+    expect(picks(loggedDice(ROAR, {}))).not.toContain('p1a:roar::random-target {"option":"p2a"}');
+  });
+  test('a move that names no target and a move on its own side name none', () => {
+    const lonely = lines('|move|p1a: Steve|Swords Dance|p1a: Steve\n|-boost|p1a: Steve|atk|2');
+    expect(picks(loggedDice(lonely, { randomTargets: true }))).toEqual([]);
+    expect(picks(loggedDice(lines('|move|p1a: Steve|Psycho Shift||[still]\n|-fail|p1a: Steve'), { randomTargets: true }))).toEqual([]);
+  });
+  test('a drag line names a drag die of the slot dragged out, answered by the body that came in', () => {
+    expect(picks(loggedDice(ROAR, {}))).toEqual(['p2a:::drag {"option":"Sableye"}']);
+    expect(picks(loggedDice(ROAR, { randomTargets: true }))).toEqual(['p1a:roar::random-target {"option":"p2a"}', 'p2a:::drag {"option":"Sableye"}']);
+  });
+  test('the drag line ends the action: the hazard damage of the body that came in stays out of the move', () => {
+    const [move] = loggedActions(ROAR);
+    expect(move.damaged).toEqual({});
+  });
+});

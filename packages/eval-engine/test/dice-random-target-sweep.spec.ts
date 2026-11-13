@@ -4,7 +4,9 @@ import { DIE_KINDS, dieKey, type DieName, type ForcedDie } from '../src/dice/typ
 import { dieLabel } from '../src/dice/die-label';
 import { playClicks, standing, sweepSelection, SWEEPS_FULL, type Mode, type Rules } from './dice-fixtures';
 import { clicksAccepted, dexOfRules, forcedOn, isCharge, SWEEP_CASES, sweepMoves, VGC_RULES, type DexMove } from './dice-sweep-support';
-import { aimOf, ofKind, pickBoard, pickClicks, recorded, type Recorded } from './dice-pick-support';
+import { loggedDice } from '../src/dice/logged-results';
+import { loggedOptions } from '../src/dice/turn';
+import { aimOf, ofKind, pickBoard, pickClicks, publicHalf, recorded, type Recorded } from './dice-pick-support';
 
 // Round 89 (#137): the simulator draws a random target in two places that the log shows and the rebuild does not read. A move
 // that picks its foe at random (the Dex target `randomNormal`: Outrage, Thrash, Petal Dance, Uproar, Raging Fury, Struggle) draws it
@@ -46,9 +48,33 @@ function checkPicked(board: ReturnType<typeof pickBoard>, clicks: { p1: string; 
     if (named && aimed !== foe) problems.push(`forcing ${foe}: the move line names ${aimed}`);
     if (named && took !== 'applied') problems.push(`forcing ${foe}: ${took} (${report.forced[0]?.reason}) although the line names ${aimed}`);
     if (!named && took !== 'blocked') problems.push(`forcing ${foe}: ${took} although the move line names ${aimed ?? 'no target'}`);
+    if (named) problems.push(...readBack(board, clicks, publicHalf(battle.log.slice(start)), moveId, foe));
   }
   return problems;
 }
+
+/**
+ * Round 89 (G2): the log reader answers the draw. The lines of a turn that forced `foe` give a die of the same key whose answer is that
+ * foe (a reader told that the game draws a random target, as `loggedOptions` tells it), and playing the board with the reader's die makes
+ * the move line name the foe again.
+ */
+function readBack(board: ReturnType<typeof pickBoard>, clicks: { p1: string; p2: string }, lines: readonly string[], moveId: string, foe: string): string[] {
+  const key = dieKey(pick('p1a', moveId));
+  const read = loggedDice(lines, { randomTargets: true }).find(die => dieKey(die.name) === key);
+  if (!read) return [`the reader names no die for ${key} in the turn that aimed at ${foe}`];
+  if (!('option' in read.result) || read.result.option !== foe) return [`the reader answers ${JSON.stringify(read.result)}, the line names ${foe}`];
+  const again = forcedOn(board, clicks, [read]);
+  const aimed = aimOf(again.battle.log.slice(again.start), 'p1a', moveId);
+  return aimed === foe && again.report.forced[0]?.took === 'applied' ? [] : [`the reader's die plays ${aimed} (${again.report.forced[0]?.took}), not ${foe}`];
+}
+
+describe('what the reconstruction reads: the game type decides whether the log names a random target', () => {
+  test.each(CASES)('loggedOptions in $name', ({ rules, mode, vgc }) => {
+    const board = pickBoard({ rules, mode, vgc, attacker: ['tackle'] });
+    const clicks = pickClicks(mode, mode === 'singles' ? 'move 1' : 'move 1 1');
+    expect(loggedOptions(board, clicks).randomTargets === true).toBe(mode !== 'singles');
+  });
+});
 
 describe('the kind of the die and its words', () => {
   test('both kinds are listed and read in words', () => {

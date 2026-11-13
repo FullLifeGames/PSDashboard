@@ -147,7 +147,7 @@ export function loggedOptions(battle: Battle, logged: { p1: string; p2: string }
       accuracyTargets.set(slot, offers.filter(offer => offer.name.kind === 'accuracy' && offer.name.hit === undefined && offer.name.targetSlot).map(offer => offer.name.targetSlot!));
     });
   }
-  return { clicked, checks, stalling, accuracyTargets, secondariesOf: secondariesIn(battle.dex), selfOf: selfChanceIn(battle.dex), hitsOf: hitsIn(battle.dex) };
+  return { clicked, checks, stalling, accuracyTargets, secondariesOf: secondariesIn(battle.dex), selfOf: selfChanceIn(battle.dex), hitsOf: hitsIn(battle.dex), randomTargets: battle.gameType !== 'singles' };
 }
 
 /** The forced list of a turn the user has just chosen: the user's dice, joined by the log's on the branch's first turn. */

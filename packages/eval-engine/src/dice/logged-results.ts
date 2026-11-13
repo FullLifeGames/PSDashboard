@@ -1,5 +1,6 @@
 import { toId } from '@fulllifegames/replay-core';
 import { chainDice } from './chain.ts';
+import { aimDice, dragDice } from './logged-picks.ts';
 import { dieKey, plainKey, tieName, type ForcedDie } from './types.ts';
 
 /**
@@ -49,6 +50,12 @@ export interface LoggedOptions {
    * the hit after them missed (or the chain ended with nothing to draw). A move without it names no hit die.
    */
   hitsOf?: (moveId: string) => number | undefined;
+  /**
+   * Round 89 (#137): whether the game draws a random target (a game with two or more actives per side: `getRandomTarget` samples the
+   * foes there and takes the one foe of singles without a draw). The log's `|move|` line names the foe the draw gave, and the module
+   * forces it. A click that named its target draws nothing, so its die is never drawn and forcing it changes nothing.
+   */
+  randomTargets?: boolean;
 }
 
 /** One stretch of the log: a body's `|move|` or `|cant|` line and the lines up to the next action, or the lines between actions. */
@@ -81,6 +88,10 @@ export interface LoggedAction {
   boosts: Record<string, string[]>;
   /** The `|-fail|` lines (no `[from]`) per slot: a stalling move that failed writes one for its user. */
   fails: Record<string, number>;
+  /** Round 89 (#137): the ident of the body a `|drag|` line brought in (the stretch after it is an `other` action), empty elsewhere. */
+  dragged?: string;
+  /** Round 89 (#137): the slot the `|move|` line names as the aim (a `[spread]` list names the others), unset when the line names none. */
+  aim?: string;
 }
 
 const SLOT = /^(p[12][a-d])(?::|$)/;
@@ -175,13 +186,29 @@ function readLine(action: LoggedAction, parts: string[], line: string): void {
   else if (EFFECT_TAGS.has(tag) && ownEffect(action, line)) readEffect(action, parts, key);
 }
 
+/** The action a line of `BREAKS` opens. */
+function startOf(tag: string, parts: string[], line: string): LoggedAction {
+  if (tag === 'cant') return blank('cant', field(parts, 2), '', toId(field(parts, 3)));
+  if (tag !== 'move') return Object.assign(blank('other'), tag === 'drag' ? { dragged: field(parts, 2) } : {});
+  const action = blank('move', field(parts, 2), toId(field(parts, 3)));
+  action.targets = aimOf(parts);
+  action.queued = !line.includes('[from]') || line.includes('[from]lockedmove');
+  const aimed = slotOf(field(parts, 4));
+  if (aimed) { action.idents[aimed] = field(parts, 4); action.aim = aimed; }
+  if (line.includes('[miss]')) { action.misses += 1; if (aimed && !action.missed.includes(aimed)) action.missed.push(aimed); }
+  return action;
+}
+
+/** Whether a stretch of the log carries something to read (an action, an ident, a miss, a drag). */
+const carries = (action: LoggedAction): boolean => action.type !== 'other' || Object.keys(action.idents).length > 0 || action.misses > 0 || !!action.dragged;
+
 /** The log of a turn cut into actions; the lines before the first action and between actions form `other` stretches. */
 export function loggedActions(turnLines: readonly string[]): LoggedAction[] {
   const actions: LoggedAction[] = [];
   let current = blank('other');
   let skipSecret = false;
   const open = (next: LoggedAction): void => {
-    if (current.type !== 'other' || Object.keys(current.idents).length > 0 || current.misses > 0) actions.push(current);
+    if (carries(current)) actions.push(current);
     current = next;
   };
   for (const line of turnLines) {
@@ -191,27 +218,12 @@ export function loggedActions(turnLines: readonly string[]): LoggedAction[] {
     if (tag === 'split') { skipSecret = true; continue; }
     if (skipSecret) { skipSecret = false; continue; }
     if (BREAKS.has(tag)) {
-      if (tag === 'move') {
-        const action = blank('move', field(parts, 2), toId(field(parts, 3)));
-        action.targets = aimOf(parts);
-        action.queued = !line.includes('[from]') || line.includes('[from]lockedmove');
-        const aimed = slotOf(field(parts, 4));
-        if (aimed) action.idents[aimed] = field(parts, 4);
-        if (line.includes('[miss]')) {
-          action.misses += 1;
-          if (aimed && !action.missed.includes(aimed)) action.missed.push(aimed);
-        }
-        open(action);
-      } else if (tag === 'cant') {
-        open(blank('cant', field(parts, 2), '', toId(field(parts, 3))));
-      } else {
-        open(blank('other'));
-      }
+      open(startOf(tag, parts, line));
       continue;
     }
     readLine(current, parts, line);
   }
-  if (current.type !== 'other' || Object.keys(current.idents).length > 0 || current.misses > 0) actions.push(current);
+  if (carries(current)) actions.push(current);
   return actions;
 }
 
@@ -320,6 +332,7 @@ function moveDice(
       dice.push({ name: { ...ofMove(action), targetSlot: target, kind: 'accuracy' }, result: happens(true) });
     }
   }
+  dice.push(...aimDice(action, options));
   let drawn = 0;
   for (const target of foes) {
     const missed = action.missed.includes(target);
@@ -373,7 +386,7 @@ export function loggedDice(turnLines: readonly string[], options: LoggedOptions 
   actions.forEach((action, index) => {
     if (action.type === 'move') dice.push(...moveDice(actions, index, flinched.get(index) ?? new Set(), options));
   });
-  dice.push(...checkDice(actions, options), ...stallingDice(actions, options), ...orderDice(actions));
+  dice.push(...checkDice(actions, options), ...stallingDice(actions, options), ...orderDice(actions), ...dragDice(actions));
   const seen = new Set<string>();
   return dice.filter(die => {
     const key = dieKey(die.name);
