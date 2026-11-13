@@ -258,8 +258,9 @@ test('layout: the format list, Start under long problem lists, the 20-game menu 
   expect(await panel.evaluate(element => element.scrollHeight > element.clientHeight && getComputedStyle(element).overflowY === 'auto')).toBe(true);
   await page.keyboard.press('Escape');
 
-  // 390 px: the tag keeps its words
+  // 390 px: the tag keeps its words beside a long format name (VGC's)
   await page.setViewportSize({ width: 390, height: 844 });
+  await startGame(page, { search: 'VGC 2025 Reg I', name: '[Gen 9] VGC 2025 Reg I' }, ['Tidepool', 'Marrowkid']);
   const tag = page.locator('.ps-topbar .ps-newgame-tag');
   await expect(tag).toBeVisible();
   expect(await tag.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
