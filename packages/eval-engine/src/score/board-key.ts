@@ -23,63 +23,18 @@ export type { Consumer, FieldClass, ReadSet };
 
 type EffectState = Record<string, unknown>;
 
-/**
- * The key is written into one list of pieces and joined once, so that a body's key costs one allocation of its text and none for
- * the parts between (a field's part is its name, a sign, its value, a separator). The list is the module's own: a key is made
- * to the end before the next one starts, and the entry points empty it first.
- */
-type Piece = string | number | boolean;
-let out: Piece[] = [];
-
-/** A body, a side or a Dex object into the pieces by its place or its id; false for anything else. */
-function referenceInto(object: Record<string, unknown>): boolean {
-  if (object.pokemon !== undefined && object.sideConditions !== undefined) out.push('side:', String(object.id));
-  else if (object.side !== undefined && object.species !== undefined) out.push('@', (object.side as { id: string }).id, String(object.position), ':', (object.species as { id: string }).id);
-  else if (typeof object.effectType === 'string' && typeof object.id === 'string') out.push('#', object.id);
-  else return false;
-  return true;
-}
-
-/** A value into the pieces: a body or a side by its place, a Dex object by its id, anything else by its content. */
-function valueInto(value: unknown, depth: number): void {
-  if (value === null || value === undefined) return;
-  if (typeof value !== 'object') {
-    if (typeof value !== 'function') out.push(typeof value === 'symbol' ? String(value) : value as Piece);
-    return;
-  }
-  if (depth > 3) { out.push('~'); return; }
+/** A value as a string: a body or a side by its place, a Dex object by its id, anything else by its content. */
+function valueKey(value: unknown, depth = 0): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value !== 'object') return typeof value === 'function' ? '' : String(value);
+  if (depth > 3) return '~';
   const object = value as Record<string, unknown>;
-  if (Array.isArray(value)) {
-    out.push('[');
-    for (let index = 0; index < value.length; index++) {
-      if (index > 0) out.push(',');
-      valueInto(value[index], depth + 1);
-    }
-    out.push(']');
-    return;
-  }
-  if (referenceInto(object)) return;
+  if (Array.isArray(value)) return `[${value.map(entry => valueKey(entry, depth + 1)).join(',')}]`;
+  if (object.pokemon !== undefined && object.sideConditions !== undefined) return `side:${String(object.id)}`;
+  if (object.side !== undefined && object.species !== undefined) return `@${(object.side as { id: string }).id}${String(object.position)}:${(object.species as { id: string }).id}`;
+  if (typeof object.effectType === 'string' && typeof object.id === 'string') return `#${object.id}`;
   // A back-reference to the battle (a battle queue holds one) is the whole battle again: its log, its PRNG, its rule table. No rule reads those through a field.
-  out.push('{');
-  let first = true;
-  for (const name of sortedKeys(object)) {
-    if (name === 'battle') continue;
-    if (!first) out.push(';');
-    first = false;
-    out.push(name, '=');
-    valueInto(object[name], depth + 1);
-  }
-  out.push('}');
-}
-
-/** A value as a string, on a list of its own. */
-function valueText(value: unknown): string {
-  const saved = out;
-  out = [];
-  valueInto(value, 0);
-  const text = out.join('');
-  out = saved;
-  return text;
+  return `{${Object.keys(object).filter(name => name !== 'battle').sort().map(name => `${name}=${valueKey(object[name], depth + 1)}`).join(';')}}`;
 }
 
 /** An object's own names in order; a short list needs no sort. */
@@ -90,48 +45,43 @@ function sortedKeys(object: object): string[] {
 }
 
 /** The fields of one effect's state that the play reads (the state's own fields, read when a handler on the board names them), sorted. */
-function stateInto(state: unknown, reads: ReadSet, consumer: Consumer, keepClock: boolean): void {
-  if (!state || typeof state !== 'object') return;
+function stateKey(state: unknown, reads: ReadSet, consumer: Consumer, keepClock: boolean): string {
+  if (!state || typeof state !== 'object') return '';
   const fields = state as EffectState;
+  let key = '';
   for (const name of sortedKeys(fields)) {
     const value = fields[name];
     if (name === 'target' || name === 'effectOrder' || typeof value === 'function') continue;
     // The end of the turn sets the clocks of the volatiles and of the field's and the sides' conditions to lasting; the others it reads as they stand.
     if (consumer === 'residual' && name === 'duration') {
-      if (keepClock) { out.push(name, '='); valueInto(value, 0); out.push(';'); }
+      if (keepClock) key += `${name}=${valueKey(value)};`;
       continue;
     }
-    if (name === 'id' || reads.has(name)) { out.push(name, '='); valueInto(value, 0); out.push(';'); }
+    if (name === 'id' || reads.has(name)) key += `${name}=${valueKey(value)};`;
   }
+  return key;
 }
 
 /** A set of effects by id: `volatiles`, `sideConditions`, `pseudoWeather`, one slot's conditions. */
-function statesInto(states: unknown, reads: ReadSet, consumer: Consumer, keepClock: boolean): void {
-  if (!states || typeof states !== 'object') return;
+function statesKey(states: unknown, reads: ReadSet, consumer: Consumer, keepClock: boolean): string {
+  if (!states || typeof states !== 'object') return '';
   const byId = states as Record<string, unknown>;
-  let first = true;
-  for (const id of sortedKeys(byId)) {
-    if (!first) out.push(',');
-    first = false;
-    out.push(id, '{');
-    stateInto(byId[id], reads, consumer, keepClock);
-    out.push('}');
-  }
+  let key = '';
+  for (const id of sortedKeys(byId)) key += `${key ? ',' : ''}${id}{${stateKey(byId[id], reads, consumer, keepClock)}}`;
+  return key;
 }
 
 /** The stages the damage formula reads of the two bodies (their raised and lowered stats); the others (Speed, accuracy, evasion) are read by a few handlers. */
 const DAMAGE_STAGES = ['atk', 'def', 'spa', 'spd'];
 
 /** A body's stages for the hit: the damage stages always, the others where a handler on the board reads `boosts` (Gyro Ball, Power Trip and the like). */
-function stagesInto(stages: unknown, reads: ReadSet): void {
+function stagesKey(stages: unknown, reads: ReadSet): string {
   const all = stages as Record<string, number>;
-  let first = true;
+  let key = '';
   for (const stat of sortedKeys(all)) {
-    if (!DAMAGE_STAGES.includes(stat) && !reads.has('boosts')) continue;
-    if (!first) out.push('/');
-    first = false;
-    out.push(stat, all[stat]);
+    if (DAMAGE_STAGES.includes(stat) || reads.has('boosts')) key += `${key ? '/' : ''}${stat}${all[stat]}`;
   }
+  return key;
 }
 
 /**
@@ -141,7 +91,7 @@ function stagesInto(stages: unknown, reads: ReadSet): void {
  * reader the scan names at 1, 4 and 17 in every rule set and requires equal plays and keys.
  */
 const PREDICATES: Record<string, (value: unknown) => string> = {
-  activeTurns: value => (typeof value === 'number' && value > 0 ? '1' : valueText(value)),
+  activeTurns: value => (typeof value === 'number' && value > 0 ? '1' : valueKey(value)),
 };
 
 /** How one own field enters a key: a plain value, the stages of a body, a value read as a predicate, the state of an effect, or not at all. */
@@ -234,77 +184,62 @@ function stepsOf(object: Record<string, unknown>, owner: Owner, reads: ReadSet, 
   return steps;
 }
 
-/** One own field's part of a key into the pieces, by its step (a step of a field the key leaves out writes nothing). */
-function partInto(owner: Owner, step: Step, value: unknown, reads: ReadSet, consumer: Consumer): void {
-  out.push(step.prefix);
+/** One own field's part of a key, by its step: '' where the key leaves the field out. */
+function partOf(owner: Owner, step: Step, value: unknown, reads: ReadSet, consumer: Consumer): string {
   switch (step.kind) {
-    case 'plain': valueInto(value, 0); break;
-    case 'stages': stagesInto(value, reads); break;
-    case 'predicate': out.push(PREDICATES[step.name](value)); break;
-    case 'effect': effectsInto(owner, step.name, value, reads, consumer); break;
-    default: break;
+    case 'plain': return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' ? step.prefix + value : step.prefix + valueKey(value);
+    case 'stages': return `${step.prefix}${stagesKey(value, reads)}`;
+    case 'predicate': return `${step.prefix}${PREDICATES[step.name](value)}`;
+    case 'effect': return `${step.prefix}${effectsOf(owner, step.name, value, reads, consumer)}`;
+    default: return '';
   }
 }
 
 /** The effect states a field holds: a body's state objects, a side's conditions, a slot's, the field's. */
-function effectsInto(owner: Owner, name: string, value: unknown, reads: ReadSet, consumer: Consumer): void {
-  if (name === 'volatiles' || name === 'sideConditions' || name === 'pseudoWeather') statesInto(value, reads, consumer, false);
-  else if (name === 'slotConditions') {
-    const slots = value as unknown[];
-    for (let index = 0; index < slots.length; index++) {
-      if (index > 0) out.push('|');
-      statesInto(slots[index], reads, consumer, true);
-    }
-  } else if (name === 'weatherState' || name === 'terrainState') stateInto(value, reads, consumer, false);
-  else stateInto(value, reads, consumer, owner === 'pokemon');
+function effectsOf(owner: Owner, name: string, value: unknown, reads: ReadSet, consumer: Consumer): string {
+  if (name === 'volatiles' || name === 'sideConditions' || name === 'pseudoWeather') return statesKey(value, reads, consumer, false);
+  if (name === 'slotConditions') return (value as unknown[]).map(slot => statesKey(slot, reads, consumer, true)).join('|');
+  if (name === 'weatherState' || name === 'terrainState') return stateKey(value, reads, consumer, false);
+  return stateKey(value, reads, consumer, owner === 'pokemon');
 }
 
 /** How the parts of an object join: each followed by a tilde (a body), between tildes (a side, the battle), each after a bar (the field). */
 type Join = 'after' | 'between' | 'before';
 
 /**
- * The parts of an object's own fields that enter a key, in the order of their names, into the pieces. A game mod puts methods on
- * the instance: they follow the format, which the key carries, so a function is no part. A field the key leaves out adds nothing
+ * The parts of an object's own fields that enter a key, in the order of their names, as one text. A game mod puts methods on the
+ * instance: they follow the format, which the key carries, so a function is no part. A field the key leaves out adds nothing
  * (`keepEmpty` keeps its place, for the field's parts, which each follow a bar of their own).
  */
-function partsInto(object: unknown, owner: Owner, reads: ReadSet, consumer: Consumer, join: Join, withHp = false, keepEmpty = false): void {
+function partsText(object: unknown, owner: Owner, reads: ReadSet, consumer: Consumer, join: Join, withHp = false, keepEmpty = false): string {
   const own = object as Record<string, unknown>;
   const steps = stepsOf(own, owner, reads, consumer, withHp, keepEmpty);
+  let text = '';
   let first = true;
   for (let index = 0; index < steps.length; index++) {
     const step = steps[index];
     const value = own[step.name];
     if (typeof value === 'function') continue;
-    const empty = step.kind === 'none';
-    if (empty && !keepEmpty) continue;
-    if (join === 'before') out.push('|');
-    else if (join === 'between' && !first) out.push('~');
-    first = false;
-    if (!empty) partInto(owner, step, value, reads, consumer);
-    if (join === 'after') out.push('~');
+    const part = partOf(owner, step, value, reads, consumer);
+    if (!part && !keepEmpty) continue;
+    if (join === 'after') text += `${part}~`;
+    else if (join === 'before') text += `|${part}`;
+    else { text += first ? part : `~${part}`; first = false; }
   }
+  return text;
 }
 
 /** The key of one body: its own fields by class, and the state of its effects; `withHp` keys the HP too (a benched body, which no copy sets). */
 export function bodyStateKey(pokemon: Pokemon, reads: ReadSet, consumer: Consumer, withHp = false): string {
   // A field that the key leaves out adds nothing, not even a separator: a body that has grown an own field no rule reads (the simulator creates some on an event) keeps its key.
-  out.length = 0;
-  partsInto(pokemon, 'pokemon', reads, consumer, 'after', withHp);
-  return out.join('');
+  return partsText(pokemon, 'pokemon', reads, consumer, 'after', withHp);
 }
 
 /** The key of everything on a board but its bodies: the field and its effects, each side's own fields and conditions, the battle's own fields. */
 export function boardStateKey(battle: Battle, reads: ReadSet, consumer: Consumer): string {
-  out.length = 0;
-  out.push(battle.format.id);
-  partsInto(battle.field, 'field', reads, consumer, 'before', false, true);
-  for (const side of battle.sides) {
-    out.push('|');
-    partsInto(side, 'side', reads, consumer, 'between');
-  }
-  out.push('|');
-  partsInto(battle, 'battle', reads, consumer, 'between');
-  return out.join('');
+  let key = battle.format.id + partsText(battle.field, 'field', reads, consumer, 'before', false, true);
+  for (const side of battle.sides) key += `|${partsText(side, 'side', reads, consumer, 'between')}`;
+  return `${key}|${partsText(battle, 'battle', reads, consumer, 'between')}`;
 }
 
 /** The descriptor of a body's entries: its ability, its item, its status and its volatiles (the conditions the Dex resolves), as tokens. */
