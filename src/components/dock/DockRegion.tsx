@@ -19,7 +19,7 @@ function dockProps(app: AppController, replayId: string): TurnDockProps {
     isGame: isGame(app),
     endOfGame: gameEnd({
       isGame: isGame(app), viewingVariation: app.board.timeline.viewingVariation, liveTip, simState,
-      atEndPosition: app.board.timeline.atEndPosition, log: isGame(app) ? app.ctx.replay.replayData?.log ?? '' : '',
+      atEndPosition: app.board.timeline.atEndPosition, log: app.ctx.replay.replayData?.log ?? '',
     }),
     stale: !liveTip && pickerStale,
     source: liveTip ? 'live' : positionPicker?.source,

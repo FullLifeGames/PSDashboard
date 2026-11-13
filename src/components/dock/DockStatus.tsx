@@ -6,10 +6,13 @@ import type { DockModel, DockSlotModel } from './dock-model';
  * Round 77 (user request 28.10.2026): the winner left the top bar for the place of the pickers. Round 89 (#105, H4h): the end of a
  * game's main line is the game's end, not a variation's: `game` names it that way.
  */
-export function EndedNotice({ winner, game = false }: { winner: string | null; game?: boolean }) {
-  const text = game
-    ? (winner ? `${winner} won the game.` : 'The game ended without a winner.')
-    : (winner ? `${winner} wins this variation.` : 'The variation ended without a winner.');
+export function EndedNotice({ winner, game = false, battle = false }: { winner: string | null; game?: boolean; battle?: boolean }) {
+  // a replay's end speaks as Showdown's battle log does (H19a): "<winner> won the battle!"
+  const text = battle
+    ? (winner ? `${winner} won the battle!` : 'The battle ended in a tie.')
+    : game
+      ? (winner ? `${winner} won the game.` : 'The game ended without a winner.')
+      : (winner ? `${winner} wins this variation.` : 'The variation ended without a winner.');
   return (
     <div className="ps-branch-ended" role="status">
       {text} Go back a turn to play it another way.

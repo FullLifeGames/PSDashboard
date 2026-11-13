@@ -12,6 +12,7 @@ import { useTrayState, type TrayOpen } from '../../hooks/useTrayState';
 import { buildDockModel, type Side } from './dock-model';
 import { DockRows } from './DockRows';
 import { DockStatus, EndedNotice } from './DockStatus';
+import type { MainLineEnd } from '../../lib/game-end';
 import { ExecuteButton } from './ExecuteButton';
 import { SlotTray } from './SlotTray';
 
@@ -20,7 +21,7 @@ type LiveBattle = LiveHit['battle'];
 export interface TurnDockProps {
   simState: BranchSimState | null;
   /** Round 89 (#105): the position is the end of a game's main line (the winner's name, null when the log names none): the dock says so instead of offering a turn. */
-  endOfGame?: { winner: string | null };
+  endOfGame?: MainLineEnd;
   /** Round 89 (#105): a new game is open: the strip names the game where it would name the replay. */
   isGame?: boolean;
   /** The state shown is the last resolved position's while the viewed one resolves: the dock keeps its height and takes no input. */
@@ -139,7 +140,7 @@ export function TurnDock(props: TurnDockProps) {
   useHeldTray(fill, open);
   const attachDock = useDockElement(attachRoot);
   const diceViews = useDiceViews({ diceOpen: open?.more ?? false, stale, simState, getBattle, replayLog, onSetChoice: setChoice });
-  if (endOfGame) return <div className="ps-dock" ref={attachDock}><EndedNotice winner={endOfGame.winner} game /></div>;
+  if (endOfGame) return <div className="ps-dock" ref={attachDock}><EndedNotice winner={endOfGame.winner} game={!endOfGame.battle} battle={endOfGame.battle} /></div>;
   if (!simState) return null;
   if (simState.ended) return <div className="ps-dock" ref={attachDock}><EndedNotice winner={simState.winner} /></div>;
 
