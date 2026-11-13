@@ -343,3 +343,24 @@ describe('Start with an unsaved variation open (H16a)', () => {
     expect(screen.queryByRole('alertdialog')).toBeNull();
   }, 60_000);
 });
+
+/**
+ * Round 89 (lane H, #105), H18a (user ruling 13.11.2026). An empty seed field means a fresh seed, and the placeholder says
+ * so; Start gives the game a fresh seed. The dialog's rules are the same for singles and doubles (the seed is no game type's).
+ */
+describe('an empty seed field (H18a)', () => {
+  test('the placeholder names what an empty field does; an empty field starts the game on a fresh seed', async () => {
+    const wired = props();
+    render(<NewGameDialog {...wired} />);
+    const field = screen.getByRole('textbox', { name: 'Seed' });
+    expect(field).toHaveAttribute('placeholder', 'Empty: a fresh seed');
+    paste(1, GOOD);
+    paste(2, GOOD);
+    fireEvent.change(field, { target: { value: '' } });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Start' })).toBeEnabled());
+    expect(screen.queryByRole('alert')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Start' }));
+    await waitFor(() => expect(wired.onStart).toHaveBeenCalledTimes(1), { timeout: 30_000 });
+    expect(vi.mocked(wired.onStart).mock.calls[0][0].seed).toMatch(/^\d+,\d+,\d+,\d+$/);
+  }, 60_000);
+});

@@ -55,6 +55,7 @@ function SeedRow({ seed, onSeed }: { seed: string; onSeed: (seed: string) => voi
         className="ps-input ps-newgame-seed-input"
         type="text"
         value={seed}
+        placeholder="Empty: a fresh seed"
         spellCheck={false}
         aria-invalid={problem !== null}
         onChange={event => onSeed(event.target.value)}
