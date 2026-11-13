@@ -9,7 +9,8 @@ import {
 import { koOddsForOptions } from '../cell-blend.ts';
 import type { CellValue, SearchExecutor } from '../orchestrator.ts';
 import type { CellDraw, EvalCellJob, EvalResult, EvalSettings, RankedChoice } from '../types.ts';
-import { countFainted, leafValue, SEARCH_SEEDS } from './leaf.ts';
+import { countFainted, leafValue } from './leaf.ts';
+import { cellSeeds } from './root-quantile.ts';
 import { sampleCell, type CellSample } from './cell-sampler.ts';
 import { probeDraw } from './trend-probe.ts';
 import { deepenVerifiedCell, lightOptions, VERIFY_CHEAP, VERIFY_DEEPEN_COVER, VERIFY_LIGHT, VERIFY_PLAIN_DRAWS, type CheapDeepening } from './verify-cell.ts';
@@ -361,10 +362,11 @@ function localExecutorOn(serializedBattle: string, ruleset: StaticRuleset): Sear
       let completed = 0;
       for (const job of jobs) {
         if (job.plain) {
+          // Round 89 (#60): the seed is slot 0 of the cell's list, the matrix's first draw of the same cell.
           // Round 67 (T128): the answer round's cheap price of a cell, one natural draw and its leaf. Round 69 (T149):
           // with `deepen` the draw's child goes through the light depth-1 sub-search of the verify round's small outcomes,
           // so the cell is priced one ply deeper at a fraction of a verify cell.
-          const child = advancePosition(root, job.p1Choice, job.p2Choice, SEARCH_SEEDS[0]);
+          const child = advancePosition(root, job.p1Choice, job.p2Choice, cellSeeds(root, job.p1Choice, job.p2Choice)[0]);
           const battle = positionBattle(child);
           const deeper = job.deepen !== undefined && !battle.ended;
           if (deeper) perfCount('answer-sub-light');
@@ -390,7 +392,7 @@ function localExecutorOn(serializedBattle: string, ruleset: StaticRuleset): Sear
     async subSearch(job) {
       // Round 70: a trend probe names the base draw whose child it searches and answers with that child's trend.
       if (job.draw) return probeDraw(root, job.p1Choice, job.p2Choice, job.draw, serialized => subSearch(serialized, job.settings, matchupCache), matchupCache);
-      const child = advancePosition(root, job.p1Choice, job.p2Choice, SEARCH_SEEDS[0]);
+      const child = advancePosition(root, job.p1Choice, job.p2Choice, cellSeeds(root, job.p1Choice, job.p2Choice)[0]);
       return subSearch(child.serialized, job.settings, matchupCache);
     },
     async prove(input) {

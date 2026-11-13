@@ -39,7 +39,11 @@ import { leafValue, SEARCH_SEEDS } from './leaf.ts';
 
 /** Natural draws of a plain verify cell wherever the sampler wants more than one. */
 export const VERIFY_PLAIN_DRAWS = 16;
-/** Their seeds, fixed and never randomized: the search seeds, then the probe seeds (the doubles fallback's eight first). */
+/**
+ * Their seeds, fixed and never randomized: the search seeds, then the probe seeds (the doubles fallback's eight first). Round 89 (#60,
+ * T324): no path reads this list any more; each cell reads `cellSeeds` (search/root-quantile.ts) with the same slots. It stays for
+ * the specs that name the old streams.
+ */
 export const VERIFY_PLAIN_SEEDS: readonly PRNGSeed[] = [...SEARCH_SEEDS, ...PROBE_SEEDS];
 /**
  * Outcomes go deeper by descending weight until this share of the cell's

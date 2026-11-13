@@ -151,7 +151,7 @@ export interface CellBlend {
 
 /**
  * Round 70: one of the base draws that priced a root cell, the draws the
- * horizon-trend probe replays: the index of its search seed (SEARCH_SEEDS)
+ * horizon-trend probe replays: the slot of its seed in the cell's list (round 89: `cellSeeds`; before, SEARCH_SEEDS)
  * and, for a speed-tied singles cell, the move order scripted into it.
  */
 export interface CellDraw {
@@ -603,6 +603,11 @@ export interface MctsTreeStats {
      * class instead of trusting one open class only.
      */
     classKey?: string;
+    /**
+     * Round 89 (#59, T322 block 1): the plan's chance of the drawn class (the Dex weight the sampler gives it, half of it in a tied
+     * singles cell), booked beside `classKey`. Absent on an unkeyed cell and on a class the fold names no weight for.
+     */
+    classWeight?: number;
     /**
      * Round 43: a root chance cell's outcome classes with their subtree
      * stats (`total` = leaves backed through the class, `value` = the

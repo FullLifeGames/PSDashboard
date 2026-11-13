@@ -4,7 +4,7 @@ import { forcedWinSpeaks } from './turn-analysis/forced-speech.ts';
 import { splitCombinedLabel } from './turn-analysis/played-match.ts';
 import { chanceRolled } from './turn-analysis/luck.ts';
 import { lostGround, shownAttribution, walkedInto } from './turn-analysis/risk.ts';
-import { percentBelowSure, phrase, phraseReplies, playedBest, rollText } from './prose/phrases.ts';
+import { caveatWords, forcedQualifier, percentBelowSure, phrase, phraseReplies, playedBest, rollText } from './prose/phrases.ts';
 import {
   forcedClause, inaccuracyClause, readCreditClause, sackClause, sensitivityClause, sideClause, streakClause, unansweredClause,
 } from './prose/clauses.ts';
@@ -52,18 +52,13 @@ function estimateSentence(analysis: TurnAnalysis, playerNames: PlayerNames): str
 function forcedWinSentence(side: SideAnalysis, player: string, ownBar: number): string | null {
   const forced = side.forcedWin;
   if (!forced || !forcedWinSpeaks(forced, ownBar)) return null;
-  const tail = forced.caveat === 'barring-crit' ? ', barring a crit' : forced.caveat === 'sampled-rolls' ? ' on the sampled rolls' : '';
   // Round 64 (T123): `turns` is the deepest proven line in own moves, so the win comes within it.
   const head = `${player} wins within ${forced.turns} turn${forced.turns === 1 ? '' : 's'} against every reply`;
-  if (forced.mass >= 1) return `${head}${tail}.`;
-  if (forced.open) {
+  if (forced.open && forced.mass < 1) {
     const verb = forced.open.kind === 'hit' ? 'lands' : 'knocks out';
-    return `${head} if the ${percentBelowSure(forced.open.odds)}% ${forced.open.label} ${verb}${tail}.`;
+    return `${head} if the ${percentBelowSure(forced.open.odds)}% ${forced.open.label} ${verb}${caveatWords(forced.caveat)}.`;
   }
-  const share = percentBelowSure(forced.mass);
-  return forced.caveat === 'sampled-rolls'
-    ? `${head} in ${share}% of the sampled rolls.`
-    : `${head} in ${share}% of the rolls${tail}.`;
+  return `${head}${forcedQualifier(forced)}.`;
 }
 
 /**

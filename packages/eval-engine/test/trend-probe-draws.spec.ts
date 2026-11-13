@@ -6,6 +6,7 @@ import { advancePosition, createRootPosition, positionBattle } from '../src/forw
 import { createLocalExecutor, searchPosition, subSearchDepth1 } from '../src/search/position';
 import { drawChild } from '../src/search/trend-probe';
 import { benchOrder } from '../src/search/bench-order';
+import { cellSeeds } from '../src/search/root-quantile';
 import { buildMatrix } from '../src/search/matrix';
 import { sampleCell } from '../src/search/cell-sampler';
 import { countFainted, leafValue, SEARCH_SEEDS } from '../src/search/leaf';
@@ -45,7 +46,8 @@ type Trend = (ctx: { root: ReturnType<typeof createRootPosition>; cache: ReturnT
 const todaysProbe: Trend = ({ cache, value, first }) => subSearchDepth1(first.serialized, PROBE_SETTINGS, cache).score - value;
 /** The mean over the cell's first three search seeds of (the child searched one ply) - (the child's own leaf). */
 const drawsProbe: Trend = ({ root, cache, p1Choice, p2Choice }) => {
-  const trends = SEARCH_SEEDS.slice(0, 3).map(seed => {
+  // r89 A5 gate: the cell's first three seeds (T324), where it read SEARCH_SEEDS.slice(0, 3).
+  const trends = cellSeeds(root, p1Choice, p2Choice).slice(0, 3).map(seed => {
     const child = advancePosition(root, p1Choice, p2Choice, seed);
     return subSearchDepth1(child.serialized, PROBE_SETTINGS, cache).score - leafValue(positionBattle(child), cache);
   });
@@ -158,7 +160,7 @@ describe('the trend probe reads the cell from its base draws (round 70)', () => 
     });
     const trends: number[] = [];
     for (const index of [0, 1, 2]) {
-      const child = advancePosition(root, 'move focusblast', 'move splash', SEARCH_SEEDS[index]);
+      const child = advancePosition(root, 'move focusblast', 'move splash', cellSeeds(root, 'move focusblast', 'move splash')[index]); // r89 A5 gate: the cell's slot
       const expected = subSearchDepth1(child.serialized, PROBE_SETTINGS, cache).score - leafValue(positionBattle(child), cache);
       const answer = await executor.subSearch(job(index));
       expect(answer.trend, `draw ${index}`).toBeCloseTo(expected, 12);

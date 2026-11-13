@@ -367,6 +367,15 @@ export function foldClassWeights(events: CellEvent[], first: 'p1' | 'p2'): Map<s
 }
 
 /**
+ * Round 89 (#59): the analytic weight of the class one draw showed, for the merge that weighs a keyed cell by the Dex. `first` is
+ * the side whose move the log shows first (the order the fold needs for two events); null when the fold names no such class.
+ */
+export function drawnClassWeight(events: CellEvent[], classKey: string, first: 'p1' | 'p2'): number | null {
+  const weight = foldClassWeights(events, first).get(classKey);
+  return weight === undefined ? null : weight;
+}
+
+/**
  * Per-option kill odds vs the opposing PRE-TURN active (the stay-column
  * headline) for the ranked-row payload. Emitted only when the odds carry
  * real information: a kill exists and is not guaranteed. Round 56: doubles
