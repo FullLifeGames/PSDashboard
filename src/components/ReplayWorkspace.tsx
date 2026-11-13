@@ -165,6 +165,7 @@ function LeadRegion({ app, replayData, nearSide }: WorkspaceProps & { nearSide: 
       onStart={leads => startLeadVariation(withBring(leads))}
       onPicksChange={picks => setLeadPicks(picks && withBring(picks))}
       nearSide={nearSide}
+      teamPreview={app.ctx.newGame.record?.teamPreview}
     />
   );
 }

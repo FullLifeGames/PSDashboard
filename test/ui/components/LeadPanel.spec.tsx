@@ -56,6 +56,19 @@ describe('LeadPanel', () => {
     expect(wired.onStart).toHaveBeenCalledWith({ p1: ['Amoonguss', 'Urshifu'], p2: ['Tornadus', 'Kingambit'] });
   });
 
+  // Round 89 (#105, H7, tester finding 10): Gen 4 has no Team Preview; the free pick of a lead is a tool of the app, not the format's step.
+  test('a format without Team Preview does not say "team preview", and says the pick moves the lead to the front', () => {
+    const { rerender } = render(<LeadPanel {...props({ teamPreview: false })} />);
+    expect(screen.queryByText(/^Turn 0 · team preview/)).toBeNull();
+    expect(screen.getByText('Turn 0 · this format has no team preview: pick each side’s lead, it moves to the front of its team. Then play the game from the start.')).toBeInTheDocument();
+    rerender(<LeadPanel {...props({ ...doubles, leadsPerSide: 2, teamPreview: false })} />);
+    expect(screen.queryByText(/^Turn 0 · team preview/)).toBeNull();
+    expect(screen.getByText('Turn 0 · this format has no team preview: pick both leads per side (selection order is the slot order), they move to the front of their teams. Then play the game from the start.')).toBeInTheDocument();
+    // the default is the format with a preview, and a replay's words stay
+    rerender(<LeadPanel {...props()} />);
+    expect(screen.getByText(/Turn 0 · team preview: pick each side’s lead/)).toBeInTheDocument();
+  });
+
   test('a bring-four format asks for four per side, leads first, and the back gets numbered', () => {
     render(<LeadPanel {...props({ ...doubles, leadsPerSide: 2, bringCount: 4 })} />);
     expect(screen.getByText('Turn 0 · team preview: pick the 4 each side brings. The first 2 lead, then play the game from the start.')).toBeInTheDocument();

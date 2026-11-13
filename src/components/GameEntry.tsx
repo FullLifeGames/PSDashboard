@@ -74,7 +74,7 @@ export function LandingGamesPanel({ onNewGame, onOpenGame, currentGameId }: Game
   return (
     <div className="ps-panel ps-entry-landing" style={{ marginBottom: 8 }}>
       <div style={{ fontSize: 13, fontWeight: 'bold', marginBottom: 8 }}>New game</div>
-      <NewGameRow onNewGame={onNewGame} text="Play both sides of a game from two team sheets. Paste both teams, pick the format, and the game starts at Team Preview." />
+      <NewGameRow onNewGame={onNewGame} text="Play both sides of a game from two team sheets. Paste both teams, pick the format, and the game starts at its first step: Team Preview, or turn 0 where the format has none." />
       <SavedGamesList onOpen={onOpenGame} currentId={currentGameId} />
     </div>
   );

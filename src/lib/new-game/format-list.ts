@@ -41,6 +41,16 @@ export function searchGroups(groups: readonly FormatGroup[], query: string): For
     .filter(group => group.options.length > 0);
 }
 
+/** Whether the format has a Team Preview step: the simulator's rule table says so (Gen 1 to 4 formats have none), never a list of generations. */
+export function formatHasTeamPreview(formatId: string): boolean {
+  try {
+    return simFormats().getRuleTable(simFormats().get(formatId)).has('teampreview');
+  } catch {
+    // a rule table the registry refuses: read as the usual format
+    return true;
+  }
+}
+
 /** One line about a format, from the simulator's own rule table: its game type, the bring count at Team Preview, a Custom Game's freedom. */
 export function formatNote(option: FormatOption): string {
   const parts: string[] = [option.gameType];
@@ -49,6 +59,7 @@ export function formatNote(option: FormatOption): string {
     const rules = simFormats().getRuleTable(format);
     const picked = rules.pickedTeamSize;
     if (rules.has('teampreview') && typeof picked === 'number' && picked > 0) parts.push(`bring ${picked}`);
+    if (!rules.has('teampreview')) parts.push('no Team Preview');
   } catch {
     // a rule table the registry refuses: the game type alone
   }

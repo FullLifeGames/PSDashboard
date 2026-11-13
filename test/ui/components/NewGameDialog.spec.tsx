@@ -121,6 +121,19 @@ describe('the format list', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   }, 60_000);
 
+  // Round 89 (#105, H7, tester finding 10): the dialog reads the format's rules from the Dex, never a list of generations.
+  test('the intro says Team Preview only for a format that has one; Gen 4 OU and Gen 9 OU read from the Dex', async () => {
+    render(<NewGameDialog {...props()} />);
+    expect(screen.getByText(/Start opens the game at Team Preview/)).toBeInTheDocument();
+    await pickFormat('gen4ou', '[Gen 4] OU');
+    expect(screen.queryByText(/Start opens the game at Team Preview/)).toBeNull();
+    expect(screen.getByText(/this format has no Team Preview/)).toBeInTheDocument();
+    expect(screen.getByText('singles · no Team Preview')).toBeInTheDocument();
+    await pickFormat('gen9ou', '[Gen 9] OU');
+    expect(screen.getByText(/Start opens the game at Team Preview/)).toBeInTheDocument();
+    expect(screen.getByText('singles')).toBeInTheDocument();
+  }, 60_000);
+
   test('the arrow keys and Enter pick a format from the search field', async () => {
     const user = userEvent.setup();
     render(<NewGameDialog {...props()} />);

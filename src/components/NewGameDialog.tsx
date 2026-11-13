@@ -3,7 +3,7 @@ import { ModalDialog } from './ModalDialog';
 import { FormatPicker } from './new-game/FormatPicker';
 import { TeamBox } from './new-game/TeamBox';
 import { useTeamCheck } from './new-game/use-team-check';
-import { CALIBRATED_FORMATS, formatNote, loadPanelGroups } from '../lib/new-game/format-list';
+import { CALIBRATED_FORMATS, formatHasTeamPreview, formatNote, loadPanelGroups } from '../lib/new-game/format-list';
 import type { FormatGroup, FormatOption } from '../lib/new-game/format-options';
 import { newGameSeed, type NewGameRecord } from '../lib/new-game/record';
 import { readTeamPaste, seedProblem, startNewGame, startProblem } from '../lib/new-game/start';
@@ -117,8 +117,10 @@ export function NewGameDialog(props: Props) {
     <ModalDialog title="New game" closeLabel="Close new game" onClose={() => onOpenChange(false)} maxWidth={940}>
       <div className="ps-newgame">
         <div className="ps-newgame-intro">
-          Paste both teams in Showdown&apos;s export format and pick the format. Start opens the game at Team Preview with both teams
-          in full view, as with open team sheets; you play both sides.
+          Paste both teams in Showdown&apos;s export format and pick the format.{' '}
+          {selected && !formatHasTeamPreview(selected.id)
+            ? 'Start opens the game at turn 0: this format has no Team Preview, so you pick each side\u2019s lead there, and both teams are in full view, as with open team sheets; you play both sides.'
+            : 'Start opens the game at Team Preview with both teams in full view, as with open team sheets; you play both sides.'}
         </div>
         <div className="ps-newgame-format">
           <span className="ps-newgame-label" id="ps-newgame-format-label">Format</span>
