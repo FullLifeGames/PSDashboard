@@ -49,7 +49,7 @@ function useDeviationLayer(ctx: ReplayContext, transients: Transients, timeline:
     replayData, snapshots, observations, sources: teamSources, bringOnlyLists,
     branching, variationStartTurn, startBranch, acquireRuntime, viewTurn, session: deviation.session, branchWindowOpenRef,
     request: ctx.refreshQueue.pendingBranchRefresh, clearRequest: ctx.refreshQueue.clearRefreshRequest,
-    reportEnded: deviation.reportVariationEnded,
+    reportEnded: deviation.reportVariationEnded, gameSeed: ctx.newGame.record?.seed,
   });
   const restoreVariation = useRestoreVariation({
     replayData, snapshots, observations, sources: teamSources, bringOnlyLists, session: deviation.session,

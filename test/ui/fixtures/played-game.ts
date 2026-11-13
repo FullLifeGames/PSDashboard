@@ -6,6 +6,7 @@ import { useBranch } from '../../../src/hooks/useBranch';
 import { useGameState, useNewGame } from '../../../src/hooks/useNewGame';
 import { gameReplayData, type NewGameRecord } from '../../../src/lib/new-game/record';
 import { saveGame } from '../../../src/lib/new-game/store';
+import type { PokemonSet } from '@pkmn/sim';
 import { picks, startedRecord } from './new-game';
 
 /**
@@ -13,7 +14,7 @@ import { picks, startedRecord } from './new-game';
  * the real branch simulator and the game hook as the app composes them (the replay state is a fake, the save is the store's own).
  * The record has entries, so the app opens it on its tip (turn `turns + 1`), not at Team Preview.
  */
-export async function playedRecord(turns = 1, format = 'gen9ou'): Promise<NewGameRecord> {
+export async function playedRecord(turns = 1, format = 'gen9ou', team?: PokemonSet[]): Promise<NewGameRecord> {
   const rendered = renderHook(() => {
     const state = useGameState();
     const afterTurnRef = useRef<(() => Promise<void>) | null>(null);
@@ -28,7 +29,7 @@ export async function playedRecord(turns = 1, format = 'gen9ou'): Promise<NewGam
     useEffect(() => { afterTurnRef.current = async () => { await promote(); }; }, [promote]);
     return { state, branch, game };
   });
-  const record = await startedRecord(format);
+  const record = await startedRecord(format, team);
   await act(async () => { await rendered.result.current.game.openRecord(record); });
   await act(async () => {
     await rendered.result.current.branch.startBranch(getBranchSimulatorFormat(gameReplayData(record)), record.teams.p1, record.teams.p2, gameReplayData(record).log, 0, null, {

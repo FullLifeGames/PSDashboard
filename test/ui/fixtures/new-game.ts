@@ -15,6 +15,11 @@ export async function startedRecord(format: string, team: PokemonSet[] = SIX): P
   return newGameRecord({ start, formatName: format, players: ['Alice', 'Bob'], seed: '7,8,9,10', now: new Date('2026-11-12T10:00:00Z') });
 }
 
+/** `SIX` with every ability and nature written out: what a pasted Showdown export carries, so the sets read the same through the team knowledge as in the record. */
+export const SIX_FULL: PokemonSet[] = SIX.map((set, at) => ({
+  ...set, nature: 'Hardy', ability: ['Sand Veil', 'Cursed Body', 'Inner Focus', 'Sand Stream', 'Thick Fat', 'Natural Cure'][at],
+}));
+
 type Side = 'p1' | 'p2';
 const id = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '');
 
