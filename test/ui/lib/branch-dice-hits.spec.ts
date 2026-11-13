@@ -66,6 +66,30 @@ describe('the table folds the later hits into one Hits row (singles and doubles)
     }
   });
 
+  // Round 89 (F5, the wave-tester's finding 3): Tail Slap, Bullet Seed and the other moves of a random count (`multihit` as a range)
+  // offer the engine's own hit count, which the engine lists last; it belongs under the move's "Hit" row, where the folded Hits row of
+  // Triple Axel stands, so a user finds the counts in one place.
+  test.each([['singles: slot p1a', 'p1a'], ['doubles: slot p1b of a four-slot dock', 'p1b']])('%s: the hit count of a random-count move stands right under the Hit row', (_label, slot) => {
+    const realCount: DieOffer = { name: { slot, moveId: 'tailslap', kind: 'hit-count' }, results: [2, 3, 4, 5].map(hits => ({ hits })) };
+    const offers = [...offersOf('tailslap', 1, { slot }), { name: nameOf('tailslap', 'damage-roll', { slot }), results: [{ roll: 0 }] } as unknown as DieOffer, realCount];
+    const table = diceTable(offers);
+    expect(table.rows.map(row => row.cells[0]!.name.kind)).toEqual(['accuracy', 'hit-count', 'crit', 'damage-roll']);
+    expect(table.rows[1].cells[0]).toBe(realCount);
+  });
+
+  test('two moves of one dock keep the hit count of each under its own Hit row', () => {
+    const second = (name: Partial<DieName>) => ({ slot: 'p1a', moveId: 'bulletseed', targetSlot: 'p2a', ...name }) as DieName;
+    const offers: DieOffer[] = [
+      ...offersOf('tailslap', 1),
+      { name: { slot: 'p1a', moveId: 'tailslap', kind: 'hit-count' }, results: [{ hits: 2 }, { hits: 5 }] },
+      { name: second({ kind: 'accuracy' }), results: YES_NO },
+      { name: { slot: 'p1a', moveId: 'bulletseed', kind: 'hit-count' }, results: [{ hits: 2 }, { hits: 5 }] },
+    ];
+    expect(diceTable(offers).rows.map(row => `${row.cells[0]!.name.moveId}:${row.cells[0]!.name.kind}`)).toEqual([
+      'tailslap:accuracy', 'tailslap:hit-count', 'tailslap:crit', 'bulletseed:accuracy', 'bulletseed:hit-count',
+    ]);
+  });
+
   test('a target column each (a spread dock) gets the counts in the cell of its own target, right under the Hit row', () => {
     const offers = [...offersOf('tripleaxel', 3), ...offersOf('tripleaxel', 3, { targetSlot: 'p2b' })];
     const table = diceTable(offers);
@@ -81,11 +105,11 @@ describe('the table folds the later hits into one Hits row (singles and doubles)
     expect(table.rows.map(row => row.cells[0]!.name.kind)).toEqual(['accuracy', 'crit']);
   });
 
-  test('the hit count die of Bullet Seed stays a row of its own, as before', () => {
+  test('the hit count die of Bullet Seed stays a row of its own, now under the Hit row (F5)', () => {
     const bullet: DieOffer = { name: { slot: 'p1a', moveId: 'bulletseed', kind: 'hit-count' }, results: [{ hits: 2 }, { hits: 3 }, { hits: 4 }, { hits: 5 }] };
     const table = diceTable([...offersOf('bulletseed', 1), bullet]);
-    expect(table.rows.map(row => row.cells[0]!.name.kind)).toEqual(['accuracy', 'crit', 'hit-count']);
-    expect(table.rows[2].cells[0]).toBe(bullet);
+    expect(table.rows.map(row => row.cells[0]!.name.kind)).toEqual(['accuracy', 'hit-count', 'crit']);
+    expect(table.rows[1].cells[0]).toBe(bullet);
   });
 
   test('a count die names its target; the real hit count names none, and a click on it sets the first hit as before', () => {

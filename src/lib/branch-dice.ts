@@ -176,7 +176,7 @@ function countOffers(later: readonly DieOffer[]): DieOffer[] {
 export function diceTable(offers: readonly DieOffer[]): DiceTableModel {
   const table = plainTable(offers.filter(offer => !isLaterHit(offer.name)));
   const counts = countOffers(offers.filter(offer => isLaterHit(offer.name)));
-  if (counts.length === 0) return table;
+  if (counts.length === 0) return { ...table, rows: countsUnderHit(table.rows) };
   const rows = [...table.rows];
   const aimed = (row: DiceRow, count: DieOffer) => row.cells.some(cell => cell?.name.kind === 'accuracy' && cell.name.slot === count.name.slot && cell.name.moveId === count.name.moveId);
   const spots = new Map<string, DieOffer[]>();
@@ -188,7 +188,23 @@ export function diceTable(offers: readonly DieOffer[]): DiceTableModel {
     const after = rows.findIndex(held => aimed(held, group[0]));
     rows.splice(after < 0 ? rows.length : after + 1, 0, row);
   }
-  return { ...table, rows };
+  return { ...table, rows: countsUnderHit(rows) };
+}
+
+/**
+ * Round 89 (F5): the engine's own hit count (a move of a random count: Tail Slap, Bullet Seed) names no target and comes last in the
+ * offers. Its row stands right under the move's "Hit" row, the place of the folded Hits row of a multi-accuracy move, so one move
+ * has its counts in one place. A row without a "Hit" row of its move stays where it is.
+ */
+function countsUnderHit(rows: readonly DiceRow[]): DiceRow[] {
+  const isHitCount = (row: DiceRow) => row.cells.length === 1 && row.cells[0]?.name.kind === 'hit-count' && row.cells[0].name.targetSlot === undefined;
+  const out = rows.filter(row => !isHitCount(row));
+  for (const row of rows.filter(isHitCount)) {
+    const name = row.cells[0]!.name;
+    const hit = out.findIndex(held => held.cells.some(cell => cell?.name.kind === 'accuracy' && cell.name.hit === undefined && cell.name.slot === name.slot && cell.name.moveId === name.moveId));
+    out.splice(hit < 0 ? out.length : hit + 1, 0, row);
+  }
+  return out;
 }
 
 function plainTable(offers: readonly DieOffer[]): DiceTableModel {
