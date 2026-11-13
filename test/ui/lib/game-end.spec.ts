@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { gameEnd, logWinner } from '../../../src/lib/game-end';
+import { gameEnd, idleGameTip, logWinner } from '../../../src/lib/game-end';
 
 const ended = { ended: true, winner: 'Bene' };
 
@@ -25,5 +25,22 @@ describe('the end of a game\'s main line (H4h)', () => {
     expect(gameEnd({ ...base, atEndPosition: true, isGame: false })).toBeUndefined();
     expect(gameEnd({ ...base, atEndPosition: true, viewingVariation: true })).toBeUndefined();
     expect(logWinner(log)).toBe('Alice');
+  });
+});
+
+describe('the live tip of a game is no variation (H4h)', () => {
+  const tip = { gameTip: 5, startTurn: 5, history: [] as object[], turnEntries: 0, replacementPending: false };
+  const koTurn = { ...tip, history: [{}], turnEntries: 1, replacementPending: true };
+
+  test('no turn played from the tip: idle; a replacement still pending after the first turn: idle until it is chosen (a knockout, singles or doubles)', () => {
+    expect(idleGameTip(tip)).toBe(true);
+    expect(idleGameTip(koTurn)).toBe(true);
+  });
+
+  test('a played turn, a variation from an earlier turn and a replay show their variation chrome', () => {
+    expect(idleGameTip({ ...tip, history: [{}], turnEntries: 1 })).toBe(false);
+    expect(idleGameTip({ ...koTurn, startTurn: 3 })).toBe(false);
+    expect(idleGameTip({ ...koTurn, turnEntries: 2, history: [{}, {}] })).toBe(false);
+    expect(idleGameTip({ ...tip, gameTip: null })).toBe(false);
   });
 });

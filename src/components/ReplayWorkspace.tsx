@@ -1,6 +1,8 @@
 import { PSReplayFrame } from './PSReplayFrame';
 import { isGameId } from '../lib/new-game/record';
 import { gameTipTurn } from '../hooks/useNewGame';
+import { idleGameTip } from '../lib/game-end';
+import { turnEntryCount } from '../lib/variation-turns';
 import { DockRegion } from './dock/DockRegion';
 import { LeadPanel } from './LeadPanel';
 import { BranchHistoryPanel } from './BranchHistoryPanel';
@@ -26,13 +28,16 @@ interface WorkspaceProps {
 }
 
 /**
- * Round 89 (#105): a new game's live tip is the main line's next turn, no variation: while no turn was played from it, the top
- * bar, the timeline and the side panels show none of a variation's chrome ("Branching", Discard variation, Variation moves).
+ * Round 89 (#105): a new game's live tip is the main line's next turn, no variation (`idleGameTip`): while no turn was played from
+ * it, or its first turn waits for a replacement, the top bar, the timeline and the side panels show none of a variation's chrome.
  */
-function idleGameTip(app: AppController): boolean {
+function idleTip(app: AppController): boolean {
   const record = app.ctx.newGame.record;
-  const { history, variationStartTurn } = app.ctx.branch;
-  return record !== null && history.length === 0 && variationStartTurn === gameTipTurn(record);
+  const { history, variationStartTurn, simState } = app.ctx.branch;
+  return idleGameTip({
+    gameTip: record ? gameTipTurn(record) : null, startTurn: variationStartTurn, history, turnEntries: turnEntryCount(history),
+    replacementPending: !!simState && (simState.p1ForceSwitch || simState.p2ForceSwitch),
+  });
 }
 
 function WorkspaceTopBar({ app, replayData, onNewGame }: WorkspaceProps) {
@@ -46,7 +51,7 @@ function WorkspaceTopBar({ app, replayData, onNewGame }: WorkspaceProps) {
       setAssumptions={app.ctx.smogon.setAssumptions}
       branchPreparing={branchPreparing}
       branchProgress={branchProgress}
-      showBranch={app.analysis.showBranch && !idleGameTip(app)}
+      showBranch={app.analysis.showBranch && !idleTip(app)}
       simState={app.ctx.branch.simState}
       animateBranchTurns={app.ctx.animateBranchTurns}
       branchDivergence={branchDivergence}
@@ -227,7 +232,7 @@ function WorkspaceAlert({ text }: { text: string }) {
 function WorkspaceLeft({ app, replayData, onNewGame }: WorkspaceProps) {
   const { branchDivergence, variationNotice } = app.board.deviation;
   const { variationSpan } = app.board.timeline;
-  const branching = app.ctx.branch.branching && !idleGameTip(app);
+  const branching = app.ctx.branch.branching && !idleTip(app);
   const { nearSide, onSideChange } = useNearSide(frameIdentity(app, replayData), replayData.viewpoint);
   return (
     <div className="ps-main-left">
