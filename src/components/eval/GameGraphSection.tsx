@@ -95,9 +95,11 @@ interface TurnViewProps {
   playerNames: [string, string];
   reads?: { p1?: ReadRecommendation | null; p2?: ReadRecommendation | null } | null;
   onPickChoice?: (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice | null) => void;
+  /** Round 89 (#105): the open tip of a new game (nobody has played it yet), else null or absent. */
+  openTurn?: number | null;
 }
 
-function TurnView({ report, onBackToReport, result, currentTurn, graph, analyzeTurn, hasAnalyzeTurn, leadAnalysis, analysis, playerNames, reads, onPickChoice }: TurnViewProps) {
+function TurnView({ report, onBackToReport, result, currentTurn, graph, analyzeTurn, hasAnalyzeTurn, leadAnalysis, analysis, playerNames, reads, onPickChoice, openTurn }: TurnViewProps) {
   return (
     <>
       {report && (
@@ -126,7 +128,7 @@ function TurnView({ report, onBackToReport, result, currentTurn, graph, analyzeT
       {leadAnalysis && <EvalLeadAnalysis leads={leadAnalysis} playerNames={playerNames} />}
       {/* Round 79 (T290): the replacement after a knockout sits above the card of the turn that follows it. */}
       {!leadAnalysis && analysis && <ReplacementNote analysis={analysis} graph={graph} playerNames={playerNames} />}
-      {!leadAnalysis && analysis && <EvalTurnAnalysis analysis={analysis} playerNames={playerNames} reads={reads} onExplore={onPickChoice} />}
+      {!leadAnalysis && analysis && <EvalTurnAnalysis analysis={analysis} playerNames={playerNames} reads={reads} onExplore={onPickChoice} open={analysis.turn === openTurn} />}
     </>
   );
 }

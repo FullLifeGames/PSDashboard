@@ -22,7 +22,7 @@ interface EvalShape {
 
 /** The evaluation surface as the view hook reads it, every action a spy. */
 function evaluationOf(shape: EvalShape = {}) {
-  const spies = { evaluate: vi.fn(), runGraphSweep: vi.fn(), markStale: vi.fn(), reset: vi.fn(), clearGraph: vi.fn(), setPrefs: vi.fn() };
+  const spies = { evaluate: vi.fn(), runGraphSweep: vi.fn(), markStale: vi.fn(), reset: vi.fn(), clearGraph: vi.fn(), dropGraphFrom: vi.fn(), setPrefs: vi.fn() };
   const prefs = { depth: 1, samples: 1, mode: 'matrix', auto: false, autoAnalyze: false, tera: 'auto', ...shape.prefs } as Evaluation['prefs'];
   const evaluation = {
     ...spies, prefs, status: shape.status ?? 'idle', result: shape.result ?? null, resultTag: shape.resultTag ?? null,
@@ -87,6 +87,40 @@ describe('useEvalView', () => {
     const replay = renderHook(() => useEvalView(inputs(evaluation, { viewTurn: snapshots.length, evalViewKey: `main:${snapshots.length}` })));
     act(() => replay.result.current.handleEvaluate());
     expect(spies.evaluate.mock.calls.at(-1)![0]).toMatchObject({ cacheKey: `${replayData.id}:${snapshots.length}:fp1` });
+  });
+
+  test('the sweeps of a game key its open tip apart too, so an analysis made before the turn was played never serves the played turn (H4h)', () => {
+    const { evaluation, spies } = evaluationOf();
+    const game = { ...replayData, id: 'newgame-abcdefghij', formatid: 'gen9ou' };
+    const tip = snapshots.length;
+    const view = renderHook(() => useEvalView(inputs(evaluation, { replayData: game, viewTurn: tip, evalViewKey: `main:${tip}` })));
+    act(() => view.result.current.handleAnalyzeGame());
+    const sweep = spies.runGraphSweep.mock.calls.at(-1)![0] as { cacheKeyFor: (turn: number) => string };
+    expect(sweep.cacheKeyFor(tip)).toBe(`newgame-abcdefghij:${tip}t:fp1`);
+    expect(sweep.cacheKeyFor(tip - 1)).toBe(`newgame-abcdefghij:${tip - 1}:fp1`);
+    act(() => view.result.current.analyzeTurnNow(tip));
+    expect((spies.runGraphSweep.mock.calls.at(-1)![0] as { cacheKeyFor: (turn: number) => string }).cacheKeyFor(tip)).toBe(`newgame-abcdefghij:${tip}t:fp1`);
+    // a replay's sweep keys stay as they were
+    const replay = renderHook(() => useEvalView(inputs(evaluation, { viewTurn: tip, evalViewKey: `main:${tip}` })));
+    act(() => replay.result.current.handleAnalyzeGame());
+    expect((spies.runGraphSweep.mock.calls.at(-1)![0] as { cacheKeyFor: (turn: number) => string }).cacheKeyFor(tip)).toBe(`${replayData.id}:${tip}:fp1`);
+  });
+
+  test('a game that grows drops the graph entry of its old tip, which was swept before the turn was played; a replay and a shrinking record keep theirs (H4h)', () => {
+    const { evaluation, spies } = evaluationOf();
+    const game = { ...replayData, id: 'newgame-abcdefghij', formatid: 'gen9ou' };
+    const tip = snapshots.length;
+    const grown = [...snapshots, { ...snapshots[snapshots.length - 1], turn: tip + 1 }];
+    const { rerender } = renderHook((props: EvalViewInputs) => useEvalView(props), { initialProps: inputs(evaluation, { replayData: game }) });
+    expect(spies.dropGraphFrom).not.toHaveBeenCalled();
+    rerender(inputs(evaluation, { replayData: game, snapshots: grown }));
+    expect(spies.dropGraphFrom).toHaveBeenCalledTimes(1);
+    expect(spies.dropGraphFrom).toHaveBeenCalledWith(tip);
+    rerender(inputs(evaluation, { replayData: game, snapshots: grown }));
+    expect(spies.dropGraphFrom).toHaveBeenCalledTimes(1);
+    const replay = renderHook((props: EvalViewInputs) => useEvalView(props), { initialProps: inputs(evaluation) });
+    replay.rerender(inputs(evaluation, { snapshots: grown }));
+    expect(spies.dropGraphFrom).toHaveBeenCalledTimes(1);
   });
 
   test('Evaluate targets the position under the pointer: live sim, recorded variation, or cached main line', async () => {

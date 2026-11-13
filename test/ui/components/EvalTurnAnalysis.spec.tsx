@@ -20,6 +20,22 @@ describe('EvalTurnAnalysis', () => {
     expect(screen.getByText(`mistake · ${winDeltaText(-0.25)}`)).toBeInTheDocument();
   });
 
+  test.each([['singles', {}], ['doubles', { playedSlots: [null, null] }]] as const)('the open turn of a game, %s, reads as an open position: the engine lines, no played choice, no verdict (H4h)', (_kind, slots) => {
+    const open = { playedRaw: undefined, played: null, regret: null, ...slots };
+    const analysis = turnAnalysis(4, { attribution: 'unclear', swing: null, scoreAfter: null, playedOutcome: null, decisionDelta: null, chanceDelta: null, p1: sideAnalysis(open), p2: sideAnalysis(open) });
+    render(<EvalTurnAnalysis analysis={analysis} playerNames={names} open />);
+    expect(screen.getByText('Turn 4')).toBeInTheDocument();
+    expect(screen.getByText('open position: nothing played yet')).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/never surfaced/);
+    expect(screen.queryByRole('button', { name: /Explanation/ })).toBeNull();
+    // both sides show the engine's line to play
+    expect(screen.getAllByText(/engine:/)).toHaveLength(2);
+    expect(document.body.textContent).not.toMatch(/played (?!yet)/);
+    // the same analysis of a replay keeps its wording
+    const replay = render(<EvalTurnAnalysis analysis={analysis} playerNames={names} />);
+    expect(replay.container.textContent).toMatch(/choice never surfaced/);
+  });
+
   test('the summary sits closed under its toggle; a click or the keyboard opens it, and every turn starts closed (T294)', async () => {
     const analysis = turnAnalysis(4, { attribution: 'p1-decision', p1: misplayedSide(), swing: -0.2, decisionDelta: -0.15, chanceDelta: -0.05 });
     const { rerender } = render(<EvalTurnAnalysis analysis={analysis} playerNames={names} />);

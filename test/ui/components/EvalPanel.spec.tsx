@@ -105,6 +105,17 @@ describe('EvalPanel', () => {
     expect(onAnalyzeGame).toHaveBeenCalledTimes(1);
   });
 
+  test('the open tip of a game names an open position in the turn view; the same turn of a replay keeps its card (H4h)', () => {
+    const graph = evalGraph();
+    const base = props({ graph, analysis: turnAnalysis(4), result: graph.results[3], resultSettings: graph.settings[3], currentTurn: 4, analysisTurn: 4, graphMaxTurn: 12, onSelectTurn: vi.fn(), onAnalyzeGame: vi.fn() });
+    const { rerender } = render(<EvalPanel {...base} />);
+    expect(screen.queryByText('open position: nothing played yet')).toBeNull();
+    rerender(<EvalPanel {...base} openTurn={4} />);
+    expect(screen.getByText('open position: nothing played yet')).toBeInTheDocument();
+    rerender(<EvalPanel {...base} openTurn={5} />);
+    expect(screen.queryByText('open position: nothing played yet')).toBeNull();
+  });
+
   test('a gap turn of the replay view offers its analysis at the named settings', async () => {
     const onAnalyzeTurn = vi.fn();
     const graph = evalGraph('singles', { scores: [0.1, null, 0.2], results: [evalResult(), null, evalResult()], settings: [null, null, null], faintedFractions: [0, null, 0.1] });

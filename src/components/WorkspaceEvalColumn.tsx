@@ -4,6 +4,7 @@ import { PlayOutBar } from './PlayOutBar';
 import { resultPositionLabel } from './eval/turn-copy';
 import { BattleStatsPanel } from './BattleStatsPanel';
 import type { AppController } from '../hooks/useAppController';
+import { gameTipTurn } from '../hooks/useNewGame';
 import { variationBoardShares } from '../lib/variation-shares';
 import type { ReplayData } from '@fulllifegames/replay-core';
 
@@ -90,6 +91,7 @@ function EvalSection({ app, replayData }: WorkspaceColumnProps) {
       variation={variationSpan ? { startTurn: variationSpan.startTurn, scores: variationScores, shares: variationShares } : null}
       {...analysisPropsFor(liveEvalView, analysisTurn, app.analysis)}
       doubles={replayGameType === 'doubles'}
+      openTurn={app.ctx.newGame.record ? gameTipTurn(app.ctx.newGame.record) : null}
     />
   );
 }

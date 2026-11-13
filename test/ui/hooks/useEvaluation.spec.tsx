@@ -294,6 +294,23 @@ describe('useEvaluation whole-game sweep', () => {
     expect(result.current.graph.notice).toBeNull();
   });
 
+  test('dropGraphFrom keeps the turns before the old tip of a game and drops the tip and everything the report built on it (H4h)', async () => {
+    const { result } = renderHook(() => useEvaluation());
+    act(() => result.current.setPrefs(matrixPrefs));
+    act(() => result.current.runGraphSweep(sweepParams(turn => async () => position(turn - 1))));
+    await waitFor(() => expect(result.current.graph.running).toBe(false), { timeout: 10_000 });
+    expect(result.current.graph.scores).toEqual([0, 0.1, 0.2]);
+    act(() => result.current.dropGraphFrom(3));
+    expect(result.current.graph.scores).toEqual([0, 0.1]);
+    expect(result.current.graph.results).toHaveLength(2);
+    expect(result.current.graph.played).toHaveLength(2);
+    expect(result.current.graph.rollFlip ?? null).toBeNull();
+    // a later sweep of the grown game starts from the kept turns' length, not from the stale tip
+    act(() => result.current.runGraphSweep({ ...sweepParams(turn => async () => position(turn - 1)), turns: 4 }));
+    await waitFor(() => expect(result.current.graph.running).toBe(false), { timeout: 10_000 });
+    expect(result.current.graph.scores).toHaveLength(4);
+  });
+
   test('a streamed acquisition feeds the turns as their positions arrive and the coverage notice names missing turns', async () => {
     const { result } = renderHook(() => useEvaluation());
     act(() => result.current.setPrefs(matrixPrefs));
