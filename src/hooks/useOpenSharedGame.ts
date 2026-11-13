@@ -38,7 +38,7 @@ export function holdsMainLine(payload: GameSharePayload, record: NewGameRecord |
 const tick = (ms: number) => new Promise<void>(resolve => window.setTimeout(resolve, ms));
 
 /** Waits until the game's data is on screen and no branch is being prepared; false after a minute. */
-async function waitForGame(latest: React.RefObject<SharedGameApp>, id: string): Promise<boolean> {
+export async function waitForGame(latest: React.RefObject<SharedGameApp>, id: string): Promise<boolean> {
   for (let waited = 0; waited < WAIT_MS; waited += POLL_MS) {
     const { ctx, board } = latest.current;
     if (ctx.replay.replayData?.id === id && !board.deviation.branchPreparing) return true;

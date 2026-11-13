@@ -2,9 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { APP_COMMIT, APP_VERSION } from '../lib/app-version';
 import { buildReplayTeams } from '../lib/eval-acquire';
 import {
-  buildSupportState, isSupportState, issueUrl, supportFileName,
+  buildSupportState, issueUrl, supportFileName, supportStateProblem,
   type IssueReport, type SupportState, type SupportStateInputs,
 } from '../lib/support-state';
+import { GAME_RECORD_VERSION } from '../lib/new-game/record';
+import { saveGame } from '../lib/new-game/store';
+import { waitForGame } from './useOpenSharedGame';
 import type { ReplayContext } from './controller/replay-context';
 import type { Transients } from './controller/transients';
 import type { BoardController } from './controller/board-controller';
@@ -25,6 +28,8 @@ function gatherInputs(app: SupportApp, createdAt: string): Omit<SupportStateInpu
     app: { version: APP_VERSION, commit: APP_COMMIT, url: window.location.href, embed: replay.embed },
     browser: { userAgent: navigator.userAgent, width: window.innerWidth, height: window.innerHeight, pixelRatio: window.devicePixelRatio },
     replay: replay.replayData,
+    // Round 89 (#105, H5): a game's file carries its record (no key for a replay)
+    game: app.ctx.newGame.record,
     knowledge: { teamText: knowledge.teamText, editedP1Info: knowledge.editedP1Info, editedP2Info: knowledge.editedP2Info },
     variation: { startTurn: branch.variationStartTurn, branching: branch.branching, history: branch.history },
     view: {
@@ -75,9 +80,24 @@ function downloadJson(value: unknown, fileName: string): void {
 /** One macrotask: the state set before it has rendered, and the latest controller holds it. */
 const settle = () => new Promise(resolve => window.setTimeout(resolve, 0));
 
-/** Sets, variation, pointer and drafts of a saved state, onto the loaded replay of that state. */
-async function restoreState(latest: React.RefObject<SupportApp>, state: unknown): Promise<void> {
-  if (!isSupportState(state)) throw new Error('Not a PS Dashboard state file (kind ps-dashboard-state, version 1).');
+/** A game's file opens the game from its record first (round 89, #105, H5): the record is saved in this browser and shown at its tip. */
+async function openStateGame(latest: React.RefObject<SupportApp>, state: SupportState): Promise<void> {
+  const record = state.game;
+  if (!record) return;
+  if (record.recordVersion !== GAME_RECORD_VERSION || record.id !== state.replay?.id) {
+    throw new Error(`The state file holds a game this app cannot read (game ${record.id}, record version ${String(record.recordVersion)}).`);
+  }
+  saveGame(record);
+  await latest.current.ctx.newGame.openRecord(record);
+  if (!(await waitForGame(latest, record.id))) throw new Error(`The game ${record.id} did not open.`);
+}
+
+/** Sets, variation, pointer and drafts of a saved state, onto the loaded replay of that state (a game's file opens its game first). */
+async function restoreState(latest: React.RefObject<SupportApp>, file: unknown): Promise<void> {
+  const problem = supportStateProblem(file);
+  if (problem) throw new Error(problem);
+  const state = file as SupportState;
+  await openStateGame(latest, state);
   const loaded = latest.current.ctx.replay.replayData;
   if (!loaded || loaded.id !== state.replay?.id) throw new Error(`Load the replay ${state.replay?.id ?? '(none)'} first.`);
   const { knowledge } = latest.current.ctx;

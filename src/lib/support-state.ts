@@ -4,7 +4,7 @@ import type { BranchSlotChoice, EvalPreferences } from '@fulllifegames/eval-engi
 import type { BranchHistoryEntry } from './branch-history';
 import type { ViewLine } from './timeline';
 import { turnEntryCount } from './variation-turns';
-import { isGameId } from './new-game/record';
+import { isGameId, type NewGameRecord } from './new-game/record';
 
 /**
  * Round 77 (user gate 28.10.2026, "1a 2a 3a 4a 5a"): the app's state as one readable file for a bug
@@ -12,6 +12,11 @@ import { isGameId } from './new-game/record';
  * with every slot choice, the viewed position, the messages on screen) and nothing beyond what the user
  * gave the app. The recorded positions of the variation stay out: they are large, and the rebuild
  * recomputes them from the choices.
+ *
+ * Round 89 (#105, H5): a new game has no replay to load, so its file carries the game's record in the optional `game` (the format,
+ * both teams, the seed and every turn; its log is `replay.log`), and the restore opens the game from it. The version stays 1: a
+ * new optional field is no break, a replay's file is the file of before to the byte, and an app that reads version 1 only meets a
+ * game file at "Load the replay newgame-... first", a refusal and no misreading.
  */
 export const SUPPORT_STATE_KIND = 'ps-dashboard-state';
 export const SUPPORT_STATE_VERSION = 1;
@@ -34,6 +39,8 @@ export interface SupportState {
   variation: { startTurn: number | null; branching: boolean; history: SupportHistoryEntry[] };
   view: { turn: number; line: ViewLine; t0: boolean; viewingVariation: boolean; liveTip: boolean };
   choices: { draft: Choices; live: Choices };
+  /** Round 89 (#105, H5): the record of the open new game; absent for a replay (no key at all). */
+  game?: NewGameRecord;
   /** The messages on screen when the file was written, by where they show. */
   messages: Record<string, string | null>;
   engine: { prefs: EvalPreferences; fastPlayOut: boolean; animateBranchTurns: boolean; playOutActive: boolean };
@@ -46,11 +53,12 @@ export interface IssueReport {
   downloaded: boolean;
 }
 
-export type SupportStateInputs = Omit<SupportState, 'kind' | 'version' | 'variation'> & {
+export type SupportStateInputs = Omit<SupportState, 'kind' | 'version' | 'variation' | 'game'> & {
   variation: { startTurn: number | null; branching: boolean; history: BranchHistoryEntry[] };
+  game?: NewGameRecord | null;
 };
 
-export function buildSupportState(inputs: SupportStateInputs): SupportState {
+export function buildSupportState({ game, ...inputs }: SupportStateInputs): SupportState {
   const history = inputs.variation.history.map(entry => {
     const kept: Partial<BranchHistoryEntry> = { ...entry };
     delete kept.serializedPosition;
@@ -65,6 +73,7 @@ export function buildSupportState(inputs: SupportStateInputs): SupportState {
       log: inputs.replay.log, uploadtime: inputs.replay.uploadtime, rating: inputs.replay.rating, viewpoint: inputs.replay.viewpoint,
     },
     variation: { ...inputs.variation, history },
+    ...(game ? { game } : {}),
   };
 }
 
@@ -72,6 +81,18 @@ export function buildSupportState(inputs: SupportStateInputs): SupportState {
 export function isSupportState(value: unknown): value is SupportState {
   return !!value && typeof value === 'object' && (value as { kind?: unknown }).kind === SUPPORT_STATE_KIND
     && (value as { version?: unknown }).version === SUPPORT_STATE_VERSION;
+}
+
+const NOT_A_STATE = `Not a PS Dashboard state file (kind ${SUPPORT_STATE_KIND}, version ${SUPPORT_STATE_VERSION}).`;
+
+/** Why a value is no file this app reads, in words for the restore's error; null for a file it reads. */
+export function supportStateProblem(value: unknown): string | null {
+  if (isSupportState(value)) return null;
+  const file = value as { kind?: unknown; version?: unknown } | null;
+  if (file && typeof file === 'object' && file.kind === SUPPORT_STATE_KIND && typeof file.version === 'number' && file.version > SUPPORT_STATE_VERSION) {
+    return `This state file has version ${file.version}; this app reads version ${SUPPORT_STATE_VERSION}. Open it in a newer PS Dashboard.`;
+  }
+  return NOT_A_STATE;
 }
 
 /** "T7 in the variation from turn 5 (2 turns)", "T28 on the main line (variation from turn 5, 2 turns)": the line once. */
@@ -109,9 +130,10 @@ const clip = (text: string) => (text.length > FIELD_MAX ? `${text.slice(0, FIELD
  */
 export function issueUrl(state: SupportState, fileName: string): string {
   const message = screenMessage(state);
-  // a new game has no Showdown page: its id and format stand in the field (the state file carries its log)
+  // a new game has no Showdown page: its id, format, seed and turns stand in the field (the state file carries the record)
+  const played = state.game ? `, seed ${state.game.seed}, ${state.game.turns} ${state.game.turns === 1 ? 'turn' : 'turns'} played` : '';
   const replay = !state.replay ? 'none loaded'
-    : isGameId(state.replay.id) ? `New game ${state.replay.id}, ${state.replay.format} (no Showdown replay)`
+    : isGameId(state.replay.id) ? `New game ${state.replay.id}, ${state.replay.format}${played} (no Showdown replay)`
       : `https://replay.pokemonshowdown.com/${state.replay.id}`;
   const version = `${state.app.version} (${state.app.commit})`;
   const position = positionLabel(state);
