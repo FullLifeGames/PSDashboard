@@ -109,19 +109,34 @@ function stepOf(owner: Owner, name: string, reads: ReadSet, consumer: Consumer, 
  * the fields that enter it and no other. `keepEmpty` keeps a place for the fields the key leaves out (the field's parts are joined by their own bars).
  */
 interface Shape { names: readonly string[]; steps: readonly Step[] }
-const shapes = new WeakMap<ReadSet, Map<string, { last: Shape | undefined; byNames: Map<string, Shape> }>>();
+interface Bucket { recent: Shape[]; byNames: Map<string, Shape> }
+const OWNERS: readonly Owner[] = ['pokemon', 'side', 'field', 'battle'];
+const shapes = new WeakMap<ReadSet, (Bucket | undefined)[]>();
 const SHAPES_PER_KIND = 64;
+const RECENT = 4;
+
+const sameNames = (shape: Shape, names: readonly string[]): boolean => {
+  if (shape.names.length !== names.length) return false;
+  for (let index = 0; index < names.length; index++) if (shape.names[index] !== names[index]) return false;
+  return true;
+};
 
 function stepsOf(object: Record<string, unknown>, owner: Owner, reads: ReadSet, consumer: Consumer, withHp: boolean, keepEmpty = false): readonly Step[] {
   const names = Object.getOwnPropertyNames(object);
-  let kinds = shapes.get(reads);
-  if (!kinds) shapes.set(reads, kinds = new Map());
-  const kindId = `${owner}${consumer}${withHp ? 'h' : ''}${keepEmpty ? 'e' : ''}`;
-  let bucket = kinds.get(kindId);
-  if (!bucket) kinds.set(kindId, bucket = { last: undefined, byNames: new Map() });
-  const last = bucket.last;
-  // The names of a body come in the same order from one build to the next: the last shape answers without a lookup.
-  if (last && last.names.length === names.length && last.names.every((name, index) => name === names[index])) return last.steps;
+  let buckets = shapes.get(reads);
+  if (!buckets) shapes.set(reads, buckets = []);
+  const slot = OWNERS.indexOf(owner) * 8 + (consumer === 'hit' ? 0 : 4) + (withHp ? 2 : 0) + (keepEmpty ? 1 : 0);
+  let bucket = buckets[slot];
+  if (!bucket) buckets[slot] = bucket = { recent: [], byNames: new Map() };
+  // The names of a body come in the same order from one build to the next: a shape seen lately answers without a lookup.
+  const { recent } = bucket;
+  for (let index = 0; index < recent.length; index++) {
+    if (sameNames(recent[index], names)) {
+      const found = recent[index];
+      if (index > 0) { recent.splice(index, 1); recent.unshift(found); }
+      return found.steps;
+    }
+  }
   const joined = names.join(',');
   let shape = bucket.byNames.get(joined);
   if (!shape) {
@@ -129,7 +144,8 @@ function stepsOf(object: Record<string, unknown>, owner: Owner, reads: ReadSet, 
     const steps = [...names].sort().map(name => stepOf(owner, name, reads, consumer, withHp));
     bucket.byNames.set(joined, shape = { names, steps: keepEmpty ? steps : steps.filter(step => step.kind !== 'none') });
   }
-  bucket.last = shape;
+  recent.unshift(shape);
+  if (recent.length > RECENT) recent.pop();
   return shape.steps;
 }
 
