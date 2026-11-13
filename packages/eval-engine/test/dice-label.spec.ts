@@ -31,6 +31,8 @@ describe('the label of a forced die', () => {
     expect(label({ name: name('crit'), result: { happens: false } })).toBe('Move tackle: no crit');
     expect(label({ name: name('secondary', { effectId: 'flinch' }), result: { happens: false } })).toBe('Move tackle: no Effect flinch');
     expect(label({ name: name('hit-count', { targetSlot: undefined }), result: { hits: 4 } })).toBe('Move tackle: 4 hits');
+    // the count of a multi-accuracy move (round 89, #114) can be one
+    expect(label({ name: name('hit-count'), result: { hits: 1 } })).toBe('Move tackle: 1 hit');
     expect(label({ name: name('damage-roll'), result: { step: 0 } })).toBe('Move tackle: damage roll 1');
     expect(label({ name: { slot: 'p1a', moveId: '', targetSlot: 'p2a', kind: 'speed-tie' }, result: { first: 'p2a' } })).toBe('Speed tie: Body p2a first');
   });

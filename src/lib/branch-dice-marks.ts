@@ -1,4 +1,5 @@
 import { notationDice, type DiceReport, type DieWords } from '@fulllifegames/eval-engine';
+import { foldHitReports } from './branch-dice';
 import { isInterlude } from './variation-turns';
 
 /**
@@ -22,7 +23,7 @@ type Side = keyof DiceMarks;
 export function diceMarksOf(report: DiceReport | undefined, words: DieWords): DiceMarks | undefined {
   if (!report || report.forced.length === 0) return undefined;
   const marks: DiceMarks = { p1: [], p2: [] };
-  for (const entry of report.forced) {
+  for (const entry of foldHitReports(report.forced)) {
     const label = notationDice([entry.die], words)[0];
     marks[entry.die.name.slot.slice(0, 2) === 'p2' ? 'p2' : 'p1'].push(entry.took === 'applied' ? { label } : { label, noEffect: entry.reason ?? '' });
   }

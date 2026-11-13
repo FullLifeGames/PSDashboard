@@ -48,7 +48,7 @@ function chanceText(name: DieName, words: DieWords): [string, string] {
 }
 
 function resultText(name: DieName, result: DieResult, words: DieWords): string {
-  if ('hits' in result) return `${result.hits} hits`;
+  if ('hits' in result) return result.hits === 1 ? '1 hit' : `${result.hits} hits`;
   if ('step' in result) return `damage roll ${result.step + 1}`;
   if ('option' in result) return result.option;
   if ('first' in result) return `${words.slot(result.first)} first`;

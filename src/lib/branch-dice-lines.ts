@@ -1,5 +1,5 @@
 import { dieLabel, type DiceReport, type DieReport, type DieWords, type LiveHit } from '@fulllifegames/eval-engine';
-import { resultWord, wordsOf } from './branch-dice';
+import { foldHitReports, resultWord, wordsOf } from './branch-dice';
 import { diceMarksOf, type DiceMarks } from './branch-dice-marks';
 
 /**
@@ -87,7 +87,7 @@ function firstFrom(log: readonly string[], from: number, match: (line: string) =
  */
 export function dieLines(report: DiceReport, window: TurnWindow, words: DieWords): DieLine[] {
   const lines: DieLine[] = [];
-  for (const entry of report.forced) {
+  for (const entry of foldHitReports(report.forced)) {
     const drawn = entry.logIndex !== undefined;
     if (drawn && entry.logIndex! < window.battleStart) continue;
     const at = drawn ? shownIndex(window, entry.logIndex!) : undefined;
