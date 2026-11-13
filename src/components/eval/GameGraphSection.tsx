@@ -8,6 +8,7 @@ import { EvalGameReport } from '../EvalGameReport';
 import { EvalGraph } from '../EvalGraph';
 import { EvalLeadAnalysis, EvalTurnAnalysis } from '../EvalTurnAnalysis';
 import { EvalReplacementAnalysis } from './EvalReplacementAnalysis';
+import type { LinesHost } from '../../lib/line-view';
 import type { VariationSeries } from '../../lib/eval-graph-view';
 
 type SelectTurn = ((turn: number, line?: 'main' | 'variation') => void) | undefined;
@@ -95,9 +96,13 @@ interface TurnViewProps {
   playerNames: [string, string];
   reads?: { p1?: ReadRecommendation | null; p2?: ReadRecommendation | null } | null;
   onPickChoice?: (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice | null) => void;
+  /** Round 89 (#104): what the Lines section under the turn's rows needs of its host (absent: no section). */
+  linesHost?: LinesHost;
+  /** Doubles replay: auto routes per game type, and the Lines section writes one row per player (EvalPanel passes its own prop through). */
+  doubles?: boolean;
 }
 
-function TurnView({ report, onBackToReport, result, currentTurn, graph, analyzeTurn, hasAnalyzeTurn, leadAnalysis, analysis, playerNames, reads, onPickChoice }: TurnViewProps) {
+function TurnView({ report, onBackToReport, result, currentTurn, graph, analyzeTurn, hasAnalyzeTurn, leadAnalysis, analysis, playerNames, reads, onPickChoice, linesHost, doubles }: TurnViewProps) {
   return (
     <>
       {report && (
@@ -126,7 +131,12 @@ function TurnView({ report, onBackToReport, result, currentTurn, graph, analyzeT
       {leadAnalysis && <EvalLeadAnalysis leads={leadAnalysis} playerNames={playerNames} />}
       {/* Round 79 (T290): the replacement after a knockout sits above the card of the turn that follows it. */}
       {!leadAnalysis && analysis && <ReplacementNote analysis={analysis} graph={graph} playerNames={playerNames} />}
-      {!leadAnalysis && analysis && <EvalTurnAnalysis analysis={analysis} playerNames={playerNames} reads={reads} onExplore={onPickChoice} />}
+      {!leadAnalysis && analysis && (
+        <EvalTurnAnalysis
+          analysis={analysis} playerNames={playerNames} reads={reads} onExplore={onPickChoice}
+          result={graph.results[analysis.turn - 1] ?? null} linesHost={linesHost} doubles={doubles}
+        />
+      )}
     </>
   );
 }
@@ -146,8 +156,6 @@ export interface GameGraphSectionProps extends TurnViewProps {
   showReportView: boolean;
   /** The card's fainted share per swept turn (any engine mode); the sweep's own record exists in auto only. */
   faintedShares?: (number | null)[];
-  /** Doubles replay — auto routes per game type (EvalPanel passes its own prop through). */
-  doubles?: boolean;
 }
 
 /** The card's share per turn where the caller has it, else the sweep's own record (auto only). */

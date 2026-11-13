@@ -6,6 +6,7 @@ import { BattleStatsPanel } from './BattleStatsPanel';
 import type { AppController } from '../hooks/useAppController';
 import { variationBoardShares } from '../lib/variation-shares';
 import type { ReplayData } from '@fulllifegames/replay-core';
+import { useLinesHost } from '../hooks/usePlayLine';
 
 interface WorkspaceColumnProps {
   app: AppController;
@@ -56,8 +57,10 @@ function EvalSection({ app, replayData }: WorkspaceColumnProps) {
     () => (variationSpan ? variationBoardShares(history, variationSpan.startTurn) : []),
     [history, variationSpan],
   );
+  const linesHost = useLinesHost(app, replayData);
   return (
     <EvalPanel
+      linesHost={linesHost}
       playerNames={[replayData.players[0], replayData.players[1]]}
       status={liveEvalView ? liveEvalStatus : 'idle'}
       result={analyzedResult}

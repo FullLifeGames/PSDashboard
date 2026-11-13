@@ -6,6 +6,7 @@ import type {
 } from '@fulllifegames/eval-engine';
 import type { EvalGraphState, EvalStatus, TurnEvalSettings } from '../hooks/useEvaluation';
 import type { VariationSeries } from '../lib/eval-graph-view';
+import type { LinesHost } from '../lib/line-view';
 import { EvalControls } from './eval/EvalControls';
 import { EvalStatus as EvalStatusBlock, type PlayOutProgress } from './eval/EvalStatus';
 import { GameGraphSection } from './eval/GameGraphSection';
@@ -68,6 +69,8 @@ interface EvalPanelProps {
   report?: GameReport | null;
   /** Doubles replay — selects the fitted win-probability curve for percents. */
   doubles?: boolean;
+  /** Round 89 (#104): the host of the Lines section under a turn's rows (the game's rules, the turn's field, ▶ Play); absent: no section. */
+  linesHost?: LinesHost;
   /** Which position the shown single result belongs to (e.g. "Turn 5 · variation"). */
   positionLabel?: string | null;
   /** Round 77 (C7): the pointer sits on the finished end of a variation: there is nothing to evaluate, the panel says who won. */
