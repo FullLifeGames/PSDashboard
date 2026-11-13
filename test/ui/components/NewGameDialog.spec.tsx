@@ -197,6 +197,19 @@ describe('Start', () => {
     expect(box(1)).toHaveValue(GOOD);
   }, 60_000);
 
+  test('a species the format\'s Dex does not know is a problem under its box and Start says why it cannot start, in plain words (H4h)', async () => {
+    const wired = props();
+    render(<NewGameDialog {...wired} />);
+    paste(1, `Zzqxvwk @ Leftovers\nAbility: Pressure\n- Tackle\n\n${GOOD}`);
+    paste(2, GOOD);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Start' })).toBeEnabled());
+    await waitFor(() => expect(screen.getByText(/does not exist/)).toBeInTheDocument(), { timeout: 30_000 });
+    await userEvent.click(screen.getByRole('button', { name: 'Start' }));
+    expect(await screen.findByText('The game could not start: zzqxvwk is no Pokémon of [Gen 9] OU. Fix the set to start.', undefined, { timeout: 30_000 })).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/Cannot read properties/);
+    expect(wired.onStart).not.toHaveBeenCalled();
+  }, 60_000);
+
   test('a failure shows its message and keeps the dialog open', async () => {
     const wired = props({ onStart: vi.fn().mockRejectedValue(new Error('boom')) });
     render(<NewGameDialog {...wired} />);

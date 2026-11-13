@@ -102,6 +102,20 @@ function levelOfSet(rules: ReturnType<ReturnType<typeof simFormats>['getRuleTabl
 }
 
 /**
+ * The simulator cannot start a battle with a species its Dex does not know: the stream throws "Cannot read properties of null". The
+ * start says so in the game's words, naming the species and the format (round 89, H4h); `checkGameTeams` reports the same set in the
+ * simulator's words, and a move, an item or an ability the Dex does not know starts as given.
+ */
+function refuseUnknownSpecies(format: ReturnType<ReturnType<typeof simFormats>['get']>, team: PokemonSet[]): void {
+  const dex = dexOfFormat(format);
+  for (const set of team) {
+    if (dex.species.get(set.species).exists) continue;
+    const name = (set.species || set.name || '').trim();
+    throw new Error(name ? `${name} is no Pokémon of ${format.name}. Fix the set to start.` : `A set has no Pokémon. Fix the set to start.`);
+  }
+}
+
+/**
  * Starts the chosen format's battle on the omniscient stream, the one a game's log is written from, and reads its header (the
  * lines before `|start|`) and bodies. The Champions mod loads here, in whatever realm the caller runs. A battle that does not
  * come up (a species the Dex does not know) throws: `checkGameTeams` names such a team before Start.
@@ -111,6 +125,7 @@ export async function startGameLog(params: StartGameParams): Promise<NewGameStar
   await loadSimMods(formatId);
   const format = simFormats().get(formatId);
   if (!format.exists) throw new Error(`Unknown format ${formatId}`);
+  refuseUnknownSpecies(format, [...params.p1Team, ...params.p2Team]);
   const rules = simFormats().getRuleTable(format);
   const leveled = (team: PokemonSet[]): PokemonSet[] => team.map(set => ({ ...set, level: levelOfSet(rules, set) }));
   const p1Team = leveled(params.p1Team);
