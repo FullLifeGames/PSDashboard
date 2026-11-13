@@ -28,7 +28,9 @@ function Sprites({ sets, format }: { sets: PokemonSet[]; format: string }) {
   return (
     <>
       {sets.map((set, index) => (
-        <img key={`${set.species}-${index}`} src={spriteUrl(set.species, rules)} alt={set.species} title={set.species} />
+        <img key={`${set.species}-${index}`} src={spriteUrl(set.species, rules)} alt={set.species} title={set.species}
+          // a species the sprite sheet does not hold: the problem list names it, the empty image box (alt text) goes
+          onError={event => { event.currentTarget.hidden = true; }} />
       ))}
     </>
   );

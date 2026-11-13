@@ -74,6 +74,19 @@ describe('the dialog', () => {
 });
 
 describe('the format list', () => {
+  test('the open list scrolls into the dialog, so its footnote is not cut by the dialog\'s bottom edge (H4h)', async () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    try {
+      render(<NewGameDialog {...props()} />);
+      await userEvent.click(await screen.findByRole('button', { name: /^Format \[Gen 9\] OU/ }));
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' });
+      expect(scrollIntoView.mock.contexts.some(element => (element as HTMLElement).classList?.contains('ps-format-pop'))).toBe(true);
+    } finally {
+      delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+    }
+  });
+
   test('opens on the simulator\'s whole list: Calibrated and Custom Game on top, a group per generation, 178 formats to search', async () => {
     const user = userEvent.setup();
     render(<NewGameDialog {...props()} />);
@@ -118,6 +131,17 @@ describe('the format list', () => {
 });
 
 describe('a team box', () => {
+  test('a sprite that does not load (a species no sprite sheet holds) drops out instead of showing its alt text (H4h)', () => {
+    render(<NewGameDialog {...props()} />);
+    paste(1, `Zzqxvwk\n- Tackle\n\n${GOOD}`);
+    const read = document.querySelectorAll('.ps-newgame-read')[0] as HTMLElement;
+    const broken = Array.from(read.querySelectorAll('img')).find(image => image.getAttribute('alt') === 'zzqxvwk')!;
+    expect(broken).toBeDefined();
+    fireEvent.error(broken);
+    expect(broken).not.toBeVisible();
+    expect(Array.from(read.querySelectorAll('img')).filter(image => !image.hidden)).toHaveLength(2);
+  });
+
   test('shows the sprites of the sets it read and how many, and names a block without a move', async () => {
     render(<NewGameDialog {...props()} />);
     paste(1, `${GOOD}\n\nasdf asdf`);
