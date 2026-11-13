@@ -1,0 +1,100 @@
+/* Round 89 (lane H, #105), stage H4: the New game dialog. Each rule copies an existing one (named in its comment): no color, radius,
+   shadow or font the app does not use already. The overlay and the box are ModalDialog's. */
+
+/* The dialog's body */
+.ps-newgame { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; min-width: 0; }
+.ps-newgame-intro { font-size: 10px; line-height: 1.45; color: #8899aa; }     /* SetsImportExportPanel intro */
+
+/* Format row: label, the picker button, the format's facts. */
+.ps-newgame-format { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.ps-newgame-label { font-size: 11px; font-weight: bold; color: #ccddee; }     /* "Timeline" label of the branch bar */
+.ps-newgame-picker { position: relative; }
+.ps-format-btn {                                                               /* a .ps-input that opens the list */
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  min-width: 290px; text-align: left; cursor: pointer;
+}
+.ps-format-btn[aria-expanded="true"] { border-color: var(--ps-accent); }      /* .ps-input:focus */
+.ps-format-facts { font-size: 10px; color: var(--ps-muted); }
+
+/* The open list: .ps-combobox-pop with a search field on top and Showdown-style group headings. */
+.ps-combobox-pop.ps-format-pop { right: auto; width: 410px; max-height: none; overflow: hidden; padding: 4px; }
+.ps-format-pop > .ps-input { width: 100%; margin-bottom: 4px; padding: 5px 8px; font-size: 11px; border-color: var(--ps-accent); }
+.ps-format-list { max-height: 340px; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
+.ps-combobox-group {                                                           /* .ps-tray-label */
+  padding: 7px 8px 3px; color: var(--ps-switch-sub);
+  font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase;
+}
+.ps-format-list .ps-combobox-option { display: flex; justify-content: space-between; gap: 0 8px; }
+.ps-format-list .ps-combobox-note { margin-left: auto; }
+.ps-format-list .ps-combobox-option[aria-selected="true"] { font-weight: bold; }
+.ps-format-count { padding: 5px 8px 2px; border-top: 1px solid rgba(255,255,255,0.08); color: #8899aa; font-size: 10px; }
+
+/* Two team boxes, the guide steps' inner box (loader.css .ps-guide-step). */
+.ps-newgame-teams { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.ps-newgame-team {
+  display: grid; align-content: start; gap: 6px; min-width: 0; padding: 9px;
+  background: rgba(0,0,0,0.16); border: 1px solid rgba(255,255,255,0.09); border-radius: 7px;
+}
+.ps-newgame-team-head { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ps-newgame-team-head .ps-stats-label { margin-right: 0; }                     /* the stats panel's P1/P2 tag */
+.ps-newgame-name { flex: 1 1 auto; min-width: 0; padding: 4px 8px; font-size: 11px; }
+.ps-btn.ps-newgame-small { padding: 2px 8px; font-size: 10px; }               /* Browse file, Open, Delete */
+.ps-newgame-field { font-size: 10px; color: #8899aa; }
+.ps-newgame-paste {                                                            /* the team paste of ReplayLoader */
+  width: 100%; font-family: Consolas, monospace; font-size: 11px; line-height: 1.35; resize: vertical;
+}
+.ps-newgame-read { display: flex; flex-wrap: wrap; align-items: center; gap: 0 2px; font-size: 10px; color: var(--ps-muted); }
+.ps-newgame-read img { width: 32px; height: 32px; image-rendering: pixelated; object-fit: contain; }  /* .ps-switchbtn img */
+.ps-newgame-read .ps-newgame-count { margin-left: 6px; }
+.ps-newgame-valid { font-size: 10px; color: #66cc66; }                         /* the team paste's status (#6c6) */
+.ps-newgame-problems {                                                         /* .ps-force-switch-note, regular weight */
+  padding: 6px 8px; font-size: 11px; line-height: 1.4; color: #ffdc80;
+  background: rgba(240,199,107,0.11); border: 1px solid rgba(240,199,107,0.28); border-radius: 5px;
+}
+.ps-newgame-problems ul { margin: 2px 0 3px; padding-left: 16px; list-style: disc; }
+.ps-newgame-problems .ps-newgame-note { color: #d8c8a0; font-size: 10px; }
+
+/* The dice seed: a field for the simulator's seed and a button that draws a new one. */
+.ps-newgame-seed { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.ps-newgame-seed-input { width: 190px; font-family: Consolas, monospace; font-size: 11px; padding: 4px 8px; }
+.ps-newgame-seed-hint { flex: 1 1 100%; font-size: 10px; color: #8899aa; }
+
+.ps-newgame-actions { display: flex; gap: 8px; }
+.ps-newgame-actions .ps-btn-red { flex: 1; }                                   /* Import of the sets dialog */
+.ps-newgame-error { font-size: 11px; color: #f3a6a6; }                         /* the loader's error color (App EmbedLoadStatus) */
+
+/* Saved games: the saved branches' rows (BranchSaveSharePanel SavedBranchRow). */
+.ps-newgame-saved { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.ps-newgame-saved-title { font-size: 10px; color: #8899aa; }
+.ps-newgame-saved-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding-top: 4px;
+  border-top: 1px solid rgba(255,255,255,0.08); font-size: 10px; color: #b8c7dc;
+}
+.ps-newgame-saved-match { display: flex; align-items: center; gap: 6px; flex: 1 1 260px; min-width: 0; overflow: hidden; }
+.ps-newgame-saved-match > .ps-format-tag { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* The names clip like the top bar's (.ps-topbar-match), the pair wraps as one. */
+.ps-newgame-saved-players { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; }
+.ps-newgame-saved-players > .ps-player { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ps-newgame-saved-meta { display: flex; align-items: center; gap: 8px; margin-left: auto; white-space: nowrap; }
+.ps-newgame-saved-meta .ps-newgame-date { color: #8899aa; }
+.ps-newgame-saved-meta .ps-btn + .ps-btn { margin-left: -4px; }
+.ps-newgame-saved-confirm { color: #f3a6a6; }                                  /* ConfirmBanner's red border, as text */
+.ps-newgame-seed-tag { font-family: Consolas, monospace; color: #8899aa; }
+
+/* The title row's "New game" tag: .ps-format-tag in the selection blue of the dock (dock.css .ps-movebtn-selected). */
+.ps-format-tag.ps-newgame-tag { background: linear-gradient(180deg, #3d6998 0%, #2d5078 100%); color: #ffffff; font-weight: bold; }
+
+@media (max-width: 640px) {
+  .ps-newgame-teams { grid-template-columns: minmax(0, 1fr); }
+  .ps-newgame-picker { flex: 1 1 100%; }
+  .ps-format-btn { min-width: 0; width: 100%; }
+  .ps-combobox-pop.ps-format-pop { left: 0; right: 0; width: auto; }
+  .ps-format-list { max-height: 260px; }
+  /* A long name and its note share two lines instead of running past the list's edge. */
+  .ps-format-list .ps-combobox-option { flex-wrap: wrap; white-space: normal; }
+  .ps-newgame-saved-meta { margin-left: 0; }
+  .ps-newgame-saved-match { flex-wrap: wrap; row-gap: 3px; }
+  /* The app's 640 px control sizes (layout.css gives the branch bar's buttons 40 px). */
+  .ps-newgame-actions .ps-btn { min-height: 40px; }
+  .ps-newgame-paste { height: 150px; }
+}
