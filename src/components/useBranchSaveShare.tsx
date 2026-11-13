@@ -23,7 +23,7 @@ interface Props {
   game?: { record: NewGameRecord; view: GameSharePayload['view'] } | null;
 }
 
-function shareUrl(encoded: string): string {
+export function shareUrl(encoded: string): string {
   const base = `${window.location.origin}${window.location.pathname}`;
   return `${base}#branch=${encoded}`;
 }

@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { SavedGamesList } from './SavedGamesList';
+import { ShareLinkField } from './BranchSaveSharePanel';
 import type { NewGameRecord } from '../lib/new-game/record';
 
 /**
@@ -14,6 +16,8 @@ export interface GameEntryProps {
   onOpenGame: (record: NewGameRecord) => Promise<unknown> | void;
   /** The id of the game that is open now, if any. */
   currentGameId: string | null;
+  /** The Game menu's share row: the link of the open game as it stands (its main line, the open variation, the turn on screen). Absent where no game is open. */
+  onShareGame?: () => string | null;
 }
 
 function NewGameRow({ onNewGame, text }: { onNewGame: () => void; text: string }) {
@@ -25,12 +29,41 @@ function NewGameRow({ onNewGame, text }: { onNewGame: () => void; text: string }
   );
 }
 
+/** Copy Share Link for the open game, at every position of it: Team Preview, the main line, the tip, the end (ruling 31 H6a). */
+function GameShareRow({ onShare }: { onShare: () => string | null }) {
+  const [link, setLink] = useState('');
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    const next = onShare();
+    if (!next) return;
+    setLink(next);
+    setCopied(false);
+    try {
+      await navigator.clipboard?.writeText(next);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
+  };
+  return (
+    <>
+      <div className="ps-entry-row">
+        <span>Share this game: a link that opens it at the turn on screen, with the open variation.</span>
+        <button type="button" className="ps-btn" onClick={() => void copy()} title="Copies a link that opens this game and its open variation at this turn.">Copy Share Link</button>
+      </div>
+      {link && <ShareLinkField link={link} label="Game share link" />}
+      {copied && <div style={{ marginTop: 4, fontSize: 10, color: '#8fd19e' }}>Copied to clipboard.</div>}
+    </>
+  );
+}
+
 /** The Game menu's second and third part, each behind a divider; the saved games leave out theirs when there are none. */
-export function MenuGameParts({ onNewGame, onOpenGame, currentGameId }: GameEntryProps) {
+export function MenuGameParts({ onNewGame, onOpenGame, currentGameId, onShareGame }: GameEntryProps) {
   return (
     <>
       <div className="ps-entry-sep" />
       <NewGameRow onNewGame={onNewGame} text="Play both sides of a game from two team sheets." />
+      {onShareGame && <GameShareRow onShare={onShareGame} />}
       <SavedGamesList onOpen={onOpenGame} currentId={currentGameId} divider />
     </>
   );

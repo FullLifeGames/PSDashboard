@@ -2,12 +2,12 @@ import { savedBranchChoices, type SavedBranch } from '../lib/branch-share';
 
 /** Round 84 (A7i): the parts of the save and share logic that draw something; `useBranchSaveShare` wires them to the history panel. */
 
-export function ShareLinkField({ link }: { link: string }) {
+export function ShareLinkField({ link, label = 'Branch share link' }: { link: string; label?: string }) {
   return (
     <input
       readOnly
       value={link}
-      aria-label="Branch share link"
+      aria-label={label}
       style={{
         width: '100%',
         marginTop: 8,

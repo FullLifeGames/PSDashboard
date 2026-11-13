@@ -1,8 +1,6 @@
 import { PSReplayFrame } from './PSReplayFrame';
 import { isGameId } from '../lib/new-game/record';
-import { gameTipTurn } from '../hooks/useNewGame';
-import { idleGameTip } from '../lib/game-end';
-import { turnEntryCount } from '../lib/variation-turns';
+import { gameShareLink, idleTip } from './game-tip';
 import { DockRegion } from './dock/DockRegion';
 import { LeadPanel } from './LeadPanel';
 import { BranchHistoryPanel } from './BranchHistoryPanel';
@@ -25,19 +23,6 @@ interface WorkspaceProps {
   replayData: ReplayData;
   /** Round 89 (#105): opens the New game dialog (a part of the Game menu). */
   onNewGame?: () => void;
-}
-
-/**
- * Round 89 (#105): a new game's live tip is the main line's next turn, no variation (`idleGameTip`): while no turn was played from
- * it, or its first turn waits for a replacement, the top bar, the timeline and the side panels show none of a variation's chrome.
- */
-function idleTip(app: AppController): boolean {
-  const record = app.ctx.newGame.record;
-  const { history, variationStartTurn, simState } = app.ctx.branch;
-  return idleGameTip({
-    gameTip: record ? gameTipTurn(record) : null, startTurn: variationStartTurn, history, turnEntries: turnEntryCount(history),
-    replacementPending: !!simState && (simState.p1ForceSwitch || simState.p2ForceSwitch),
-  });
 }
 
 function WorkspaceTopBar({ app, replayData, onNewGame }: WorkspaceProps) {
@@ -71,6 +56,7 @@ function WorkspaceTopBar({ app, replayData, onNewGame }: WorkspaceProps) {
         teamStatus: teamPasteStatus,
         teamError: teamPasteError,
         onNewGame,
+        onShareGame: app.ctx.newGame.record ? () => gameShareLink(app) : undefined,
         onOpenGame: app.ctx.newGame.openRecord,
         currentGameId: app.ctx.newGame.record?.id ?? null,
       }}
@@ -255,13 +241,14 @@ function WorkspaceLeft({ app, replayData, onNewGame }: WorkspaceProps) {
         viewingVariation={app.board.timeline.viewingVariation}
         variationEnded={app.ctx.branch.simState?.ended ?? false}
         branching={branching}
+        idle={idleTip(app)}
         onNavigate={app.board.timeline.navigateTo}
         onGraphSelectLine={app.board.timeline.handleGraphSelectLine}
         onDiscard={app.board.discardVariation}
       />
       {branchDivergence && !app.analysis.showBranch && <WorkspaceAlert text={`⚠ ${branchDivergence}`} />}
       {variationNotice && <WorkspaceAlert text={variationNotice} />}
-      {(branching || variationSpan !== null) && <BranchSidePanels app={app} replayData={replayData} />}
+      {(branching || variationSpan !== null) && !idleTip(app) && <BranchSidePanels app={app} replayData={replayData} />}
       {/* Round 84 (A7b): at turn 0 the lead picker stands where the dock stands, as the column's last child. */}
       <LeadSlot app={app} replayData={replayData} nearSide={nearSide} />
       <DockRegion app={app} replayId={replayData.id} nearSide={nearSide} />

@@ -49,7 +49,7 @@ function usePageFileDrop(onFile: (file: File) => void): boolean {
  * loads at once.
  */
 export function LoaderMenu(props: Omit<ReplayLoaderProps, 'variant' | 'showGuide'> & Partial<GameEntryProps>) {
-  const { loading, error, onLoadFile, onNewGame, onOpenGame, currentGameId = null, ...loader } = props;
+  const { loading, error, onLoadFile, onNewGame, onOpenGame, currentGameId = null, onShareGame, ...loader } = props;
   const [open, setOpen] = useState(false);
   // A load that ends without an error closes the panel; the check runs in render, where the loading flag changes.
   const [wasLoading, setWasLoading] = useState(false);
@@ -96,6 +96,7 @@ export function LoaderMenu(props: Omit<ReplayLoaderProps, 'variant' | 'showGuide
           {onNewGame && onOpenGame && (
             <MenuGameParts
               currentGameId={currentGameId}
+              onShareGame={onShareGame}
               // the dialog takes over: the panel folds away behind it
               onNewGame={() => { setOpen(false); onNewGame(); }}
               // a game that opened closes the panel; one that failed keeps it open with the list's message

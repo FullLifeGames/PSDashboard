@@ -9,9 +9,9 @@ export const SIX: PokemonSet[] = ['Garchomp', 'Gengar', 'Dragonite', 'Tyranitar'
   evs: { hp: 4, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, level: 100,
 }));
 
-export async function startedRecord(format: string, team: PokemonSet[] = SIX): Promise<NewGameRecord> {
+export async function startedRecord(format: string, team: PokemonSet[] = SIX, p2Team: PokemonSet[] = team): Promise<NewGameRecord> {
   await loadSimMods(format);
-  const start = await startGameLog({ format, p1Team: team, p2Team: team, playerNames: ['Alice', 'Bob'], seed: '7,8,9,10' });
+  const start = await startGameLog({ format, p1Team: team, p2Team, playerNames: ['Alice', 'Bob'], seed: '7,8,9,10' });
   return newGameRecord({ start, formatName: format, players: ['Alice', 'Bob'], seed: '7,8,9,10', now: new Date('2026-11-12T10:00:00Z') });
 }
 
