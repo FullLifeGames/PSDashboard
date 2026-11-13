@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
-import { usePlayLine } from '../../../src/hooks/usePlayLine';
+import { useLinesHost, usePlayLine } from '../../../src/hooks/usePlayLine';
 import type { AppController } from '../../../src/hooks/useAppController';
 import { lineHistory } from '../../../src/lib/line-history';
 import { doublesLine, singlesLine } from '../fixtures/lines';
@@ -65,5 +65,23 @@ describe('usePlayLine', () => {
     const { result } = renderHook(() => usePlayLine(stub.app));
     result.current(singlesLine, 20);
     expect(stub.setPrefs).toHaveBeenCalledWith(expect.objectContaining({ auto: true }));
+  });
+});
+
+describe('useLinesHost', () => {
+  test('the host reads the start snapshot of any turn, so the Game review words the dice of a turn that is not the selected one', () => {
+    const stub = appWith(null);
+    const snapshots = [{ turn: 1 }, { turn: 2 }, { turn: 3 }];
+    const app = {
+      ...stub.app,
+      ctx: { ...stub.app.ctx, replay: { snapshots } },
+      board: { ...stub.app.board, timeline: { ...stub.app.board.timeline, analysisTurn: 2 } },
+    } as unknown as AppController;
+    const replay = { log: '|gen|9\n|gametype|singles', players: ['a', 'b'] } as unknown as Parameters<typeof useLinesHost>[1];
+    const { result } = renderHook(() => useLinesHost(app, replay));
+    expect(result.current.snapshot).toBe(snapshots[1]);
+    expect(result.current.snapshotAt?.(3)).toBe(snapshots[2]);
+    expect(result.current.snapshotAt?.(9)).toBe(snapshots[2]);
+    expect(result.current.onPlay).toBeTypeOf('function');
   });
 });

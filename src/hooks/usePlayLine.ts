@@ -50,6 +50,7 @@ export function useLinesHost(app: AppController, replayData: ReplayData): LinesH
   return useMemo(() => ({
     rules: replayRules(replayData),
     snapshot: analysisTurn !== null && analysisTurn >= 1 ? snapshotAt(snapshots, analysisTurn) : null,
+    snapshotAt: (turn: number) => snapshotAt(snapshots, turn),
     onPlay: playLine,
   }), [replayData, snapshots, analysisTurn, playLine]);
 }

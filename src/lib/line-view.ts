@@ -34,6 +34,8 @@ export interface LinesHost {
   rules: GameRules;
   /** The turn's start snapshot (the names the dice speak of); optional. */
   snapshot?: TurnSnapshot | null;
+  /** The start snapshot of any turn: the Game review words the dice of a turn that is not the selected one (round 89, G4). */
+  snapshotAt?: (turn: number) => TurnSnapshot | null;
   /** ▶ Play: the line from the start of the graded turn. */
   onPlay?: (line: EvalLine, turn: number) => void;
 }
