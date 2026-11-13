@@ -5,7 +5,7 @@ import type { EvalLine, EvalResult } from '@fulllifegames/eval-engine';
 import { LinesSection } from '../../../src/components/eval/LinesSection';
 import type { LinesHost } from '../../../src/lib/line-view';
 import { EvalTurnAnalysis } from '../../../src/components/EvalTurnAnalysis';
-import { evalResult } from '../fixtures/eval-result';
+import { evalResult, rankedChoice } from '../fixtures/eval-result';
 import { turnAnalysis } from '../fixtures/analysis';
 import { bothRolesLine, doublesLine, DOUBLES_NAMES, playedLine, singlesLine, SINGLES_NAMES } from '../fixtures/lines';
 
@@ -66,6 +66,19 @@ describe('LinesSection', () => {
     expect(screen.getByText('No line: Other engine sends none.')).toBeInTheDocument();
   });
 
+  test('with the card\'s analysis the engine line is the line of the card\'s engine choice (singles and doubles)', () => {
+    const stale: EvalLine = { ...singlesLine, label: 'Surf', choice: 'move 4' };
+    const analysis = turnAnalysis(20, { p2: { ...turnAnalysis(20).p2, best: rankedChoice('move 1', 'Hydro Pump', 0.1) } });
+    const { unmount } = render(<LinesSection turn={20} result={withLines([stale, playedLine])} playerNames={SINGLES_NAMES} doubles={false} host={host()} analysis={analysis} />);
+    expect(screen.queryByText(/engine: Surf/)).toBeNull();
+    expect(screen.getByText('Pepitopalotin · played: Hyper Voice')).toBeInTheDocument();
+    unmount();
+    const pair = turnAnalysis(4, { p1: { ...turnAnalysis(4).p1, best: rankedChoice('move 1, move 2', doublesLine.label, 0.37) } });
+    render(<LinesSection turn={4} result={withLines([doublesLine, { ...doublesLine, label: 'Other pair', for: ['engine'] }])} playerNames={DOUBLES_NAMES} doubles host={host()} analysis={pair} />);
+    expect(screen.getAllByText(/^pixelfrost · engine: /)).toHaveLength(1);
+    expect(screen.queryByText(/Other pair/)).toBeNull();
+  });
+
   test('a turn without a result shows nothing', () => {
     const { container } = render(<LinesSection turn={3} result={null} playerNames={SINGLES_NAMES} doubles={false} host={host()} />);
     expect(container).toBeEmptyDOMElement();
@@ -74,7 +87,7 @@ describe('LinesSection', () => {
 
 describe('the Lines section in the turn card', () => {
   test('the card mounts it under the rows when its host hands one over, and not otherwise', () => {
-    const analysis = turnAnalysis(20, {});
+    const analysis = turnAnalysis(20, { p2: { ...turnAnalysis(20).p2, best: rankedChoice('move 1', 'Hydro Pump', 0.1) } });
     const { rerender } = render(<EvalTurnAnalysis analysis={analysis} playerNames={SINGLES_NAMES} result={withLines([singlesLine])} linesHost={host()} />);
     expect(screen.getByText('Pepitopalotin · engine: Hydro Pump')).toBeInTheDocument();
     rerender(<EvalTurnAnalysis analysis={analysis} playerNames={SINGLES_NAMES} result={withLines([singlesLine])} />);

@@ -114,7 +114,7 @@ export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore, resu
         </>
       )}
       <ReadRows reads={reads} playerNames={playerNames} faintedFraction={analysis.faintedFraction} />
-      {linesHost && <LinesSection turn={analysis.turn} result={result} playerNames={playerNames} doubles={!!doubles} host={linesHost} />}
+      {linesHost && <LinesSection turn={analysis.turn} result={result} playerNames={playerNames} doubles={!!doubles} host={linesHost} analysis={analysis} />}
     </div>
   );
 }

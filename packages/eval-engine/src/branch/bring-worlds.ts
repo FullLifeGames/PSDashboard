@@ -1,5 +1,5 @@
 import type { BringList, BringSide } from '@fulllifegames/replay-core';
-import type { EvalMatrix, EvalResult, MatrixCell, RankedChoice } from '../types.ts';
+import type { EvalLine, EvalMatrix, EvalResult, MatrixCell, RankedChoice } from '../types.ts';
 
 /**
  * Round 89 (#124): the worlds of a bring-limited game. A side that brought more bodies than it fielded still holds unknown
@@ -155,12 +155,34 @@ function blendMatrix(frame: EvalMatrix, others: { matrix: EvalMatrix | undefined
 }
 
 /**
+ * Round 89 (#104): the lines of a blended result. Every world's search kept the line of its own best row and of the played row, but
+ * the blend ranks the frame's rows again, so its best row need not be the frame's. A line is the engine's when its row is the blend's
+ * best row of its side, whichever world holds it (the heaviest first); a played line stays, and a line that is neither goes.
+ * Nothing reads `lines` to score or rank.
+ */
+function blendLines(entries: { entry: EvalResult }[], perSide: EvalResult['perSide']): EvalLine[] | undefined {
+  const merged = new Map<string, EvalLine>();
+  for (const { entry } of entries) {
+    for (const line of entry.lines ?? []) {
+      const roles = line.for.filter(role => role === 'played' || line.label === perSide[line.side][0]?.label);
+      if (roles.length === 0) continue;
+      const key = `${line.side}\u0000${line.label}`;
+      const held = merged.get(key);
+      if (!held) merged.set(key, roles.length === line.for.length ? line : { ...line, for: roles });
+      else if (roles.some(role => !held.for.includes(role))) merged.set(key, { ...held, for: [...held.for, ...roles.filter(role => !held.for.includes(role))] });
+    }
+  }
+  return merged.size === 0 ? undefined : [...merged.values()];
+}
+
+/**
  * Round 89 (#124): one result for a game with several worlds. Each world is solved under perfect information (ADR 0013); the
  * blend is the weighted mean over them. One world returns its result as it came (pinned and bring-all games stay byte-identical).
- * Several: the heaviest world's result is the frame (labels, lines, punishers, kill odds, unanswered bodies, diagnostics, engine);
+ * Several: the heaviest world's result is the frame (labels, punishers, kill odds, unanswered bodies, diagnostics, engine);
  * score, interval and, when every world has them, gameValue and trend are weighted means; depthCompleted is the minimum; the frame's rows
  * take the weighted mean of their numbers over the worlds that hold their choice and sort by blended ev; the matrix keeps the frame's
- * rows and columns with cells blended by choice id; a forced win stays only when every world proves one for the same side.
+ * rows and columns with cells blended by choice id; a forced win stays only when every world proves one for the same side; the lines follow
+ * the blended best row (`blendLines`).
  * `results` and `weights` are index-aligned.
  */
 export function blendWorlds(results: EvalResult[], weights: number[]): EvalResult {
@@ -181,6 +203,9 @@ export function blendWorlds(results: EvalResult[], weights: number[]): EvalResul
   };
   delete blended.gameValue;
   delete blended.trend;
+  delete blended.lines;
+  const lines = blendLines(entries, blended.perSide);
+  if (lines) blended.lines = lines;
   if (results.every(result => result.gameValue !== undefined)) blended.gameValue = blendValues(results.map(result => result.gameValue!), weights);
   if (results.every(result => result.trend !== undefined)) blended.trend = blendValues(results.map(result => result.trend!), weights);
   if (frame.matrix) blended.matrix = blendMatrix(frame.matrix, entries.map(({ entry, weight }) => ({ matrix: entry.matrix, weight })));

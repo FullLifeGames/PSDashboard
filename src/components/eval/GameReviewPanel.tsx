@@ -43,7 +43,7 @@ function ReviewRow({ row, onPlay, confirm, onSelectTurn }: { row: ReviewRowView;
         </button>
         <span style={{ color: GRADE_COLORS[row.grade] }} title={row.lossTitle}>{row.grade} · {row.loss}</span>
         <span style={{ color: '#aab' }}>played {row.played}</span>
-        <span style={{ color: '#778' }}>engine {row.engine}</span>
+        <span style={{ color: '#778' }}>{row.engineWord} {row.engine}</span>
       </div>
       {row.lines.length === 0
         ? <div className="ps-eval-review-line"><span className="text" style={{ color: '#667' }}>no line</span></div>

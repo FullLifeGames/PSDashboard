@@ -2,7 +2,7 @@ import {
   diffChoices, formatLine, playedSetupMove, type SideAnalysis, type RankedChoice, winDeltaText, winPctText,
 } from '@fulllifegames/eval-engine';
 import { ExplorableLabel, KoSuffix, MiniBar } from './analysis-bits';
-import { comparisonTarget, ENGINE_EQUIVALENT_EPSILON, evTitle, playedTextFor, regretView, RISK_DISPLAY_GAP } from './turn-copy';
+import { comparisonTarget, ENGINE_EQUIVALENT_EPSILON, engineChoice, evTitle, playedTextFor, regretView, RISK_DISPLAY_GAP } from './turn-copy';
 
 type Explore = ((choice: RankedChoice) => void) | undefined;
 
@@ -42,14 +42,15 @@ function PlayedCell({ name, side }: Pick<RowProps, 'name' | 'side'>) {
 
 /** The engine's line next to the played one: agreement, a better line, or the line when nothing was played. */
 function EngineCell({ name, side, regretful, onExplore }: RowProps & { regretful: boolean }) {
-  if (!side.best) return null;
+  const engine = engineChoice(side);
+  if (!side.best || !engine) return null;
   const best = side.best;
   const explore = onExplore && (() => onExplore(best));
   if (!side.played) {
     return (
       <span style={{ color: '#778' }} title={evTitle(name)}>
-        engine: <ExplorableLabel label={best.label} color="#778" onClick={explore} />
-        {' '}({winPctText(best.ev, side.faintedFraction)})
+        engine: <ExplorableLabel label={engine.label} color="#778" onClick={explore} />
+        {' '}({winPctText(engine.value, side.faintedFraction)})
       </span>
     );
   }
@@ -59,8 +60,8 @@ function EngineCell({ name, side, regretful, onExplore }: RowProps & { regretful
   }
   return (
     <span style={{ color: '#778' }} title={evTitle(name)}>
-      engine: <ExplorableLabel label={best.label} color="#778" onClick={explore} />
-      {' '}({winPctText(best.ev, side.faintedFraction)})
+      engine: <ExplorableLabel label={engine.label} color="#778" onClick={explore} />
+      {' '}({winPctText(engine.value, side.faintedFraction)})
       {best.ev - side.played.ev < ENGINE_EQUIVALENT_EPSILON && (
         <span title="The win-probability gap is inside noise: the engine considers both picks equally good."> · equivalent</span>
       )}

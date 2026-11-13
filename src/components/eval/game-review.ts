@@ -1,6 +1,6 @@
 import { winDeltaText, winPctText, type EvalLine, type EvalResult, type SideAnalysis, type TurnAnalysis, type VerdictTier } from '@fulllifegames/eval-engine';
 import { activeNamesAt, lineBlocks, type LineBlockView, type LinesHost } from '../../lib/line-view';
-import { comparisonTarget, regretView } from './turn-copy';
+import { cardLines, engineChoice, regretView } from './turn-copy';
 
 /**
  * Round 89 (#104), step G4: what the Game review lists, as plain data. Ruling 33 (4a): only the turns the cards grade (inaccuracy,
@@ -26,8 +26,10 @@ export interface ReviewRowView {
   grade: ReviewGrade;
   /** "Hyper Voice 42%". */
   played: string;
-  /** "Surf 51%": the card's comparison target. */
+  /** "Surf 51%": the engine's choice as the turn card names it (`engineChoice`). */
   engine: string;
+  /** "engine", or "safe" where the card's reference is the safe line. */
+  engineWord: 'engine' | 'safe';
   loss: string;
   lossTitle: string;
   lines: ReviewLineView[];
@@ -88,8 +90,10 @@ interface ReviewArgs {
   host: LinesHost;
 }
 
-function rowLines(args: ReviewArgs, turn: number, side: Side): ReviewLineView[] {
-  const lines = args.results[turn - 1]?.lines?.filter(line => line.side === side) ?? [];
+function rowLines(args: ReviewArgs, analysis: TurnAnalysis, side: Side): ReviewLineView[] {
+  const { turn } = analysis;
+  // only the card's own engine choice has an engine line
+  const lines = cardLines(args.results[turn - 1]?.lines?.filter(line => line.side === side) ?? [], analysis);
   if (lines.length === 0) return [];
   const ctx = {
     turn, playerNames: args.playerNames, doubles: args.doubles, rules: args.host.rules,
@@ -105,17 +109,17 @@ function reviewRow(args: ReviewArgs, analysis: TurnAnalysis, side: Side, grade: 
   const sideAnalysis = analysis[side];
   const name = args.playerNames[SIDE_INDEX[side]];
   const played = sideAnalysis.played!;
-  const best = sideAnalysis.best!;
-  const { target, swapped, value } = comparisonTarget(sideAnalysis, best);
+  const engine = engineChoice(sideAnalysis)!;
   const loss = regretView(name, sideAnalysis, sideAnalysis.regret ?? 0);
   const share = sideAnalysis.faintedFraction;
   return {
     key: `${analysis.turn}-${side}`, turn: analysis.turn, side, grade,
     played: `${played.label} ${winPctText(played.ev, share)}`,
-    engine: `${swapped ? swapped.label : target.label} ${winPctText(value, share)}`,
+    engine: `${engine.label} ${winPctText(engine.value, share)}`,
+    engineWord: engine.word,
     loss: grade === 'inaccuracy' ? winDeltaText(-(sideAnalysis.regret ?? 0)) : loss.text,
     lossTitle: loss.title,
-    lines: rowLines(args, analysis.turn, side),
+    lines: rowLines(args, analysis, side),
   };
 }
 

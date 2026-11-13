@@ -1,6 +1,7 @@
 import { Fragment } from 'react';
-import type { EvalResult } from '@fulllifegames/eval-engine';
+import type { EvalResult, TurnAnalysis } from '@fulllifegames/eval-engine';
 import { LineConfirm } from './LineConfirm';
+import { cardLines } from './turn-copy';
 import { activeNamesAt, lineAnchor, lineBlocks, type LineBlockView, type LinesHost, type LineSideView } from '../../lib/line-view';
 
 interface LinesSectionProps {
@@ -9,6 +10,8 @@ interface LinesSectionProps {
   playerNames: [string, string];
   doubles: boolean;
   host: LinesHost;
+  /** The turn card's analysis: the engine's line is the line of the engine choice the card names. */
+  analysis?: Pick<TurnAnalysis, 'p1' | 'p2'> | null;
 }
 
 function SideText({ view }: { view: LineSideView }) {
@@ -53,9 +56,9 @@ function LineBlock({ block, turn, onPlay, confirm }: { block: LineBlockView; tur
  * player who played the engine's move), each with ▶ Play, the end value and the dice that could have gone the other way. A turn
  * that holds no line says why in one muted sentence; a turn without a result shows nothing.
  */
-export function LinesSection({ turn, result, playerNames, doubles, host }: LinesSectionProps) {
+export function LinesSection({ turn, result, playerNames, doubles, host, analysis }: LinesSectionProps) {
   if (!result) return null;
-  const lines = result.lines ?? [];
+  const lines = cardLines(result.lines ?? [], analysis);
   if (lines.length === 0) {
     return (
       <div className="ps-eval-lines">

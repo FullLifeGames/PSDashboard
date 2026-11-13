@@ -102,6 +102,40 @@ describe('gameReview, singles', () => {
   });
 });
 
+describe('gameReview: the engine of a row is the turn card\'s engine choice, and its line is that choice\'s line (G4b)', () => {
+  const rowOf = (side: SideAnalysis, lines: EvalLine[]) => {
+    const analyses: (TurnAnalysis | null)[] = [turnAnalysis(1, { p2: side })];
+    const view = gameReview({ analyses, results: [withLines(lines)], playerNames: SINGLES_NAMES, doubles: false, host });
+    return view[1].rows[0];
+  };
+
+  test('an inaccuracy beside a read that paid off names the best row at its value, as the card\'s head row does, not the safe line', () => {
+    const safe = rankedChoice('move 3', 'Surf', 0.02);
+    const row = rowOf(gradedP2('inaccuracy', { riskPaidOff: true, safe }), [singlesLine, playedLine]);
+    expect(row.engine).toBe(`Hydro Pump ${winPctText(0.1)}`);
+    expect(row.engineWord).toBe('engine');
+    expect(row.lines.map(line => line.block.line.label)).toEqual(['Hydro Pump', 'Hyper Voice']);
+  });
+
+  test('a mistake with a read that stands unpunished says "safe", as the card does, and has no line for the safe choice', () => {
+    const safe = rankedChoice('move 3', 'Surf', 0.02);
+    const row = rowOf(gradedP2('mistake', { riskUnpunished: true, safe }), [singlesLine, playedLine]);
+    expect(row.engineWord).toBe('safe');
+    expect(row.engine).toBe(`Surf ${winPctText(0.02 - 0.2)}`);
+    // the engine's own line belongs to Hydro Pump, which is not the card's choice here
+    expect(row.lines.map(line => line.role)).toEqual(['played']);
+  });
+
+  test('a line whose label is no longer the best row is not the engine line; one that was both reads as the played line', () => {
+    const stale: EvalLine = { ...singlesLine, label: 'Surf', choice: 'move 4' };
+    expect(rowOf(gradedP2('blunder'), [stale, playedLine]).lines.map(line => line.role)).toEqual(['played']);
+    const both: EvalLine = { ...playedLine, label: 'Hyper Voice', for: ['engine', 'played'] };
+    const [only] = rowOf(gradedP2('blunder'), [both]).lines;
+    expect(only.role).toBe('played');
+    expect(only.block.role).toBe('played: Hyper Voice');
+  });
+});
+
 describe('gameReview, doubles', () => {
   const analyses: (TurnAnalysis | null)[] = [null, null, null, turnAnalysis(4, { p1: { ...misplayedSide('mistake'), best: rankedChoice('move 1, move 2', doublesLine.label, 0.37) } })];
   const results: (EvalResult | null)[] = [null, null, null, { ...evalResult('doubles'), lines: [doublesLine] }];
@@ -119,6 +153,13 @@ describe('gameReview, doubles', () => {
     );
     // the block is the section's own: doubles rows, one per player
     expect(line.block.rows.length).toBeGreaterThan(3);
+  });
+
+  test('doubles: the engine line is the line of the card\'s engine pair, and another pair\'s line is dropped', () => {
+    const stale: EvalLine = { ...doublesLine, label: 'Fake Out → Rillaboom + Protect', choice: 'move 1, move 3' };
+    const view = gameReview({ analyses, results: [null, null, null, { ...evalResult('doubles'), lines: [stale] }], playerNames: DOUBLES_NAMES, doubles: true, host });
+    expect(view[0].rows[0].lines).toEqual([]);
+    expect(view[0].rows[0].engine).toContain(doublesLine.label);
   });
 
   test('a replacement of both sides names both players', () => {

@@ -1,4 +1,4 @@
-import { regretText, TIER_THRESHOLDS, type SideAnalysis, type RankedChoice, winDeltaText, winPctText } from '@fulllifegames/eval-engine';
+import { regretText, TIER_THRESHOLDS, type EvalLine, type SideAnalysis, type TurnAnalysis, type RankedChoice, winDeltaText, winPctText } from '@fulllifegames/eval-engine';
 
 /**
  * Every displayed value is a WIN PROBABILITY for the named player — "52%"
@@ -74,6 +74,35 @@ export function comparisonTarget(side: SideAnalysis, best: RankedChoice) {
   const swapped = !asSafe ? side.bestNull?.alternative ?? null : null;
   const value = asSafe ? target.worstCase : swapped?.ev ?? target.ev;
   return { asSafe, target, swapped, value };
+}
+
+/**
+ * Round 89 (#104), step G4b: the engine's choice of a side as the turn card names it, and the one place that says so: a graded
+ * mistake or blunder shows its reference line (`comparisonTarget`: the safe line for a read, the co-optimal alternative for a null
+ * best, else the best), every other row its best row at the row's own value. The Game review reads the same choice, value and word
+ * ("safe" where the card says "safe:"), and takes as the engine's line only the line of this choice.
+ */
+export function engineChoice(side: SideAnalysis): { label: string; value: number; word: 'engine' | 'safe' } | null {
+  const best = side.best;
+  if (!best) return null;
+  if (side.tier !== 'mistake' && side.tier !== 'blunder') return { label: best.label, value: best.ev, word: 'engine' };
+  const { asSafe, target, swapped, value } = comparisonTarget(side, best);
+  return { label: swapped ? swapped.label : target.label, value, word: asSafe ? 'safe' : 'engine' };
+}
+
+/**
+ * The lines a card shows: a line is the engine's only when it is the line of the card's engine choice (a result blended over
+ * several worlds keeps the heaviest world's lines, whose best row need not be the blend's), and a line that was both the engine's
+ * and the played one but is no longer the engine's reads as the played line alone.
+ */
+export function cardLines(lines: readonly EvalLine[], analysis: Pick<TurnAnalysis, 'p1' | 'p2'> | null | undefined): EvalLine[] {
+  if (!analysis) return [...lines];
+  return lines.flatMap((line): EvalLine[] => {
+    const engine = engineChoice(analysis[line.side]);
+    const roles = line.for.filter(role => role !== 'engine' || engine === null || engine.label === line.label);
+    if (roles.length === 0) return [];
+    return [roles.length === line.for.length ? line : { ...line, for: roles }];
+  });
 }
 
 /**
