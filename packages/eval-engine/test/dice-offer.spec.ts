@@ -144,11 +144,13 @@ describe.each(SWEEP_CASES)('the offer follows the state: $name', ({ rules, mode 
     expect(kindsOf(offerOn('thunderbolt', { ability: 'Sheer Force' }))).not.toContain('secondary:par');
   });
 
-  test('Skill Link fixes the hit count: no hit count die', () => {
+  test('Skill Link fixes the hit count: no hit count die to choose, one row without a choice that names the count and the ability (round 89, F4a)', () => {
     if (!has(rules, 'abilities', 'skilllink')) return;
     play('skilllink');
     expect(kindsOf(offerOn('furyattack'))).toContain('hit-count');
-    expect(kindsOf(offerOn('furyattack', { ability: 'Skill Link' }))).not.toContain('hit-count');
+    expect(offerOn('furyattack').some(offer => offer.fixedBy !== undefined)).toBe(false);
+    const fixed = offerOn('furyattack', { ability: 'Skill Link' }).filter(offer => offer.name.kind === 'hit-count');
+    expect(fixed).toEqual([{ name: { slot: 'p1a', moveId: 'furyattack', kind: 'hit-count' }, results: [{ hits: 5 }], fixedBy: dexOfRules(rules).abilities.get('skilllink').name }]);
   });
 
   test('a stalling die exists on the second use only', () => {

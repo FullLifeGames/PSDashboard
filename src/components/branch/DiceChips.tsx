@@ -64,7 +64,10 @@ export function DieRow({ offer, dice, logged, words, target, withMove, rollsOf, 
   return (
     <div className={`ps-dice-row${cell ? ` ps-dice-cell${cell === 'shared' ? ' ps-dice-cell-shared' : ''}` : ''}`} role="group" aria-label={label}>
       {!cell && <span className="ps-dice-caption">{caption}</span>}
-      {offer.name.kind === 'damage-roll' ? <RollSelect offer={offer} held={held} label={label} words={words} rolls={rollsOf?.(offer.name)} crit={critForced(dice, offer.name)} onToggle={onToggle} /> : offer.results.map(result => {
+      {offer.fixedBy !== undefined ? (
+        // Round 89 (ruling 34 F4a): an ability or item fixed the count; the simulator draws no die, so the row names the count and its source and offers no chip
+        <span className="ps-dice-note">{'hits' in offer.results[0] ? offer.results[0].hits : ''} ({offer.fixedBy})</span>
+      ) : offer.name.kind === 'damage-roll' ? <RollSelect offer={offer} held={held} label={label} words={words} rolls={rollsOf?.(offer.name)} crit={critForced(dice, offer.name)} onToggle={onToggle} /> : offer.results.map(result => {
         const die: ForcedDie = { name: offer.name, result };
         return (
           <Chip
