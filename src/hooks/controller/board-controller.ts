@@ -115,12 +115,18 @@ export function useTimelineController(ctx: ReplayContext, transients: Transients
   // branch, and no team edits carried over from the previous replay. Host
   // pages can inject replays repeatedly via ps-load-replay, so the previous
   // game's state must never leak into the next one.
+  const { takeLanding } = ctx.newGame;
+  const selectTurn = timeline.handleGraphSelect;
   useEffect(() => {
     resetPointer();
     setBranchDivergence(null);
     branchWindowOpenRef.current = false;
     stopBranch();
-  }, [replayData?.id, stopBranch, resetPointer, setBranchDivergence, branchWindowOpenRef]);
+    // Round 89 (#105): a game opens on its tip, where the next turn is played from: turn 0 (the lead picker) before the lead is picked.
+    const tip = takeLanding();
+    if (tip === 0) selectTurn(0);
+    else if (tip !== null) landRef.current?.(tip);
+  }, [replayData?.id, stopBranch, resetPointer, setBranchDivergence, branchWindowOpenRef, takeLanding, landRef, selectTurn]);
 
   return { timeline, deviation, evalResultMatchesView, liveEvalStatus, tipEvalStatus, discardVariation };
 }

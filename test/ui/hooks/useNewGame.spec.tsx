@@ -194,4 +194,22 @@ describe('useNewGame', () => {
     expect(record!.turns).toBe(before.turns);
     expect(record!.body).toEqual(before.body);
   });
+  test('opening a game asks the pointer to land once: a saved game on its tip, a fresh game on turn 0 (team preview); the same game again and an edit ask nothing', async () => {
+    const played = await startGame('gen9ou', { p1: ['Snorlax'], p2: ['Snorlax'] });
+    for (let turn = 0; turn < 2; turn += 1) await playTurn(played, turn);
+    const saved = played.result.current.state.record!;
+    const reopened = renderHook(() => useGame(newProbe()));
+    expect(reopened.result.current.game.takeLanding()).toBeNull();
+    await act(async () => { await reopened.result.current.game.openRecord(saved); });
+    expect(reopened.result.current.game.takeLanding()).toBe(saved.turns + 1);
+    expect(reopened.result.current.game.takeLanding()).toBeNull();
+    await act(async () => { await reopened.result.current.game.openRecord(saved); });
+    expect(reopened.result.current.game.takeLanding()).toBeNull();
+    await act(async () => { await reopened.result.current.game.editTeams({ p1: SIX, p2: SIX }); });
+    expect(reopened.result.current.game.takeLanding()).toBeNull();
+    const fresh = renderHook(() => useGame(newProbe()));
+    await act(async () => { await fresh.result.current.game.openRecord(await startedRecord('gen9ou')); });
+    expect(fresh.result.current.game.takeLanding()).toBe(0);
+    expect(fresh.result.current.game.takeLanding()).toBeNull();
+  });
 });

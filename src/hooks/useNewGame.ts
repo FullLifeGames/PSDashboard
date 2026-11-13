@@ -17,13 +17,16 @@ import type { BranchHistoryEntry, BattleStream } from './branch/shared';
  */
 
 /** The record as state and as a ref the async promotion reads (a render's copy is stale by then). */
-export function useGameState() {
-  const [record, setState] = useState<NewGameRecord | null>(null);
+export function useGameState(replayId?: string | null) {
+  const [held, setState] = useState<NewGameRecord | null>(null);
   const recordRef = useRef<NewGameRecord | null>(null);
   const setRecord = useCallback((next: NewGameRecord | null) => {
     recordRef.current = next;
     setState(next);
   }, []);
+  // The record is the game of the replay data that carries its id: while another replay is on screen (or the game's own data is
+  // still on its way) the app reads no game. Without an id to compare (the hook specs) the record stands as set.
+  const record = held && (replayId === undefined || held.id === replayId) ? held : null;
   return { record, recordRef, setRecord };
 }
 
@@ -42,6 +45,18 @@ function replacementPending(stream: BattleStream | null): boolean {
   const battle = stream?.battle;
   if (!battle) return false;
   return (['p1', 'p2'] as const).some(side => forceSwitches(battle, side).some(Boolean));
+}
+
+/** The turn the pointer should land on once an opened game's replay state has reset it (a saved game's tip, turn 0 for a game at Team Preview), else null. */
+function useLanding() {
+  const landing = useRef<number | null>(null);
+  const askLanding = useCallback((turn: number | null) => { landing.current = turn; }, []);
+  const takeLanding = useCallback((): number | null => {
+    const turn = landing.current;
+    landing.current = null;
+    return turn;
+  }, []);
+  return { askLanding, takeLanding };
 }
 
 export interface NewGameInputs {
@@ -64,12 +79,18 @@ export function useNewGame(inputs: NewGameInputs) {
   const { state, replay, branch, storePosition, landRef, save = saveGame } = inputs;
   const { record, recordRef, setRecord } = state;
   const [saveFailed, setSaveFailed] = useState(false);
+  const { askLanding, takeLanding } = useLanding();
 
-  /** Opens a record (a fresh Start or a saved game) as the app's current game. */
+  /**
+   * Opens a record (a fresh Start or a saved game) as the app's current game. A game asks the pointer for its tip (turn 0, the lead picker, while no lead is picked),
+   * which the timeline controller hands over after the new id has reset the pointer (`takeLanding`); the same game opened again
+   * (a team edit) leaves the pointer where it stands.
+   */
   const openRecord = useCallback(async (next: NewGameRecord) => {
+    askLanding(recordRef.current?.id !== next.id ? (next.entries.length > 0 ? next.turns + 1 : 0) : null);
     setRecord(next);
     await replay.openGame(gameReplayData(next), { p1: infoOfTeam(next.teams.p1), p2: infoOfTeam(next.teams.p2) });
-  }, [replay, setRecord]);
+  }, [replay, recordRef, setRecord, askLanding]);
 
   /**
    * Called after a finished turn and after a lead start. A turn that started at the game's tip and is finished (no replacement
@@ -131,7 +152,7 @@ export function useNewGame(inputs: NewGameInputs) {
     return { kept: next.turns, error };
   }, [recordRef, openRecord, save]);
 
-  return { record, openRecord, promote, editTeams, saveFailed };
+  return { record, openRecord, promote, editTeams, saveFailed, takeLanding };
 }
 
 /**

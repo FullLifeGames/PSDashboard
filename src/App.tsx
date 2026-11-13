@@ -1,4 +1,7 @@
+import { useState } from 'react';
 import { inferReplayFormatId } from '@fulllifegames/replay-core';
+import { NewGameDialog } from './components/NewGameDialog';
+import { useGameTeamEdit } from './hooks/useGameTeamEdit';
 import { ReplayLoader } from './components/ReplayLoader';
 import { TeamEditor } from './components/TeamEditor';
 import { SetsImportExportPanel } from './components/SetsImportExportPanel';
@@ -25,7 +28,7 @@ function EmbedLoadStatus({ app }: { app: AppController }) {
   );
 }
 
-function LoaderScreen({ app }: { app: AppController }) {
+function LoaderScreen({ app, onNewGame }: { app: AppController; onNewGame: () => void }) {
   const { loading, error, loadReplay, loadReplayFile, loadedReplayUrl } = app.ctx.replay;
   const { handleTeamLoad, teamPasteStatus, teamPasteError } = app.ctx.knowledge;
   return (
@@ -40,6 +43,7 @@ function LoaderScreen({ app }: { app: AppController }) {
         teamStatus={teamPasteStatus}
         teamError={teamPasteError}
         showGuide
+        onNewGame={onNewGame}
       />
     </div>
   );
@@ -52,8 +56,18 @@ function AppModals({ app }: { app: AppController }) {
     editorSide, setEditorSide, saveTeam,
   } = app.ctx.knowledge;
   const { replayGen } = app.ctx.meta;
+  // Round 89 (#105): the editor of a new game changes the game's record, not the replay's overlay.
+  const { record, editTeams } = app.ctx.newGame;
+  const gameEdit = useGameTeamEdit({ record, editTeams, stopBranch: app.board.discardVariation, close: () => setEditorSide(null) });
+  const onSave = (side: 'p1' | 'p2', info: Parameters<typeof saveTeam>[1]) => { if (!gameEdit.edit(side, info)) saveTeam(side, info); };
   return (
     <>
+      {gameEdit.notice && (
+        <div className="ps-panel" role="alert" style={{ marginTop: 8, color: '#e6b36a', fontSize: 11 }}>
+          {gameEdit.notice}
+          <button type="button" className="ps-btn" style={{ marginLeft: 8, padding: '2px 8px', fontSize: 10 }} onClick={gameEdit.dismiss}>Dismiss</button>
+        </div>
+      )}
       {setsPanelOpen && replayData && (
         <SetsImportExportPanel
           // Round 70 (T205): the export reads what the stats panel shows (the solved spreads, the posted sheet), not the
@@ -79,7 +93,7 @@ function AppModals({ app }: { app: AppController }) {
           teamInfo={statsP1Info}
           gen={replayGen}
           format={replayData ? inferReplayFormatId(replayData) : ''}
-          onSave={(info) => saveTeam('p1', info)}
+          onSave={(info) => onSave('p1', info)}
           onClose={() => setEditorSide(null)}
         />
       )}
@@ -89,7 +103,7 @@ function AppModals({ app }: { app: AppController }) {
           teamInfo={statsP2Info}
           gen={replayGen}
           format={replayData ? inferReplayFormatId(replayData) : ''}
-          onSave={(info) => saveTeam('p2', info)}
+          onSave={(info) => onSave('p2', info)}
           onClose={() => setEditorSide(null)}
         />
       )}
@@ -104,6 +118,9 @@ function App() {
   const app = useAppController();
   const { embed, replayData } = app.ctx.replay;
   const { sharedBranch, sharedBranchError, clearSharedBranch, handleLoadSharedOriginal } = app.ctx.shared;
+  // Round 89 (#105): the New game dialog opens from the loader (an item of the Load menu, the start page's loader).
+  const [newGameOpen, setNewGameOpen] = useState(false);
+  const openNewGame = () => setNewGameOpen(true);
 
   return (
     <div className="ps-app-root">
@@ -138,12 +155,21 @@ function App() {
         // The host page provides the replay — no loader chrome in embed mode.
         <EmbedLoadStatus app={app} />
       ) : (
-        <LoaderScreen app={app} />
+        <LoaderScreen app={app} onNewGame={openNewGame} />
       ))}
 
-      {replayData && !sharedBranch && <ReplayWorkspace app={app} replayData={replayData} />}
+      {replayData && !sharedBranch && <ReplayWorkspace app={app} replayData={replayData} onNewGame={embed ? undefined : openNewGame} />}
 
       <AppModals app={app} />
+      {!embed && (
+        <NewGameDialog
+          open={newGameOpen}
+          onOpenChange={setNewGameOpen}
+          onStart={app.ctx.newGame.openRecord}
+          onOpenSaved={app.ctx.newGame.openRecord}
+          currentGameId={app.ctx.newGame.record?.id ?? null}
+        />
+      )}
     </div>
   );
 }

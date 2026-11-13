@@ -15,6 +15,8 @@ export interface ReplayLoaderProps {
   showGuide?: boolean;
   /** Round 84: 'menu' is the body in the top bar's Load panel: no frame, no title, and the page takes the dropped file. */
   variant?: 'panel' | 'menu';
+  /** Round 89 (#105): opens the New game dialog; the loader offers the entry when it is given. */
+  onNewGame?: () => void;
 }
 
 type Props = ReplayLoaderProps;
@@ -74,6 +76,22 @@ function FileRow({ loading, onFile, dropHint }: { loading: boolean; onFile: (fil
           event.target.value = '';
         }}
       />
+    </div>
+  );
+}
+
+/**
+ * PROVISIONAL (round 89, lane H, H4): the entry to the New game dialog sits in the loader, so the Load menu and the start page offer
+ * it from one place. Where it is opened from and what it is called are the user's open question (ruling 31, H8): the wording is
+ * this row's text and the button's name, nothing else reads them.
+ */
+function NewGameRow({ onNewGame }: { onNewGame: () => void }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, fontSize: 11, color: '#8899aa' }}>
+      <span>… or play a game from two pasted teams</span>
+      <button type="button" className="ps-btn" onClick={onNewGame} style={{ padding: '2px 8px', fontSize: 10 }}>
+        New game
+      </button>
     </div>
   );
 }
@@ -139,7 +157,7 @@ function TeamPasteDetails({ teamStatus, teamError, onTeamLoad }: Pick<Props, 'te
   );
 }
 
-export function ReplayLoader({ onLoad, onLoadFile, onTeamLoad, loading, error, loadedUrl = null, teamStatus = null, teamError = null, showGuide = false, variant = 'panel' }: Props) {
+export function ReplayLoader({ onLoad, onLoadFile, onTeamLoad, loading, error, loadedUrl = null, teamStatus = null, teamError = null, showGuide = false, variant = 'panel', onNewGame }: Props) {
   const [url, setUrl] = useState('https://replay.pokemonshowdown.com/gen9draft-2058494320');
 
   // Once a replay is loaded the input shows ITS link, not the default or a
@@ -171,6 +189,8 @@ export function ReplayLoader({ onLoad, onLoadFile, onTeamLoad, loading, error, l
         onFile={readReplayFile}
         dropHint={inMenu ? '… or drop an exported replay (.html) anywhere on the page' : '… or drop an exported replay (.html) anywhere in this panel'}
       />
+
+      {onNewGame && <NewGameRow onNewGame={onNewGame} />}
 
       {error && (
         <AlertBox style={{ marginBottom: 8, fontSize: 12, padding: '6px 10px' }}>

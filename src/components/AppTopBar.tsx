@@ -23,12 +23,14 @@ interface AppTopBarProps {
   /** Round 84: the replay loader's props; the Load button sits beside Setup. Left out in the embedded view, which keeps no loader. */
   loader?: Parameters<typeof LoaderMenu>[0];
   onReportIssue: () => void;
+  /** Round 89 (#105): the loaded game is a new game of the app's own, not a Showdown replay. */
+  newGame?: boolean;
 }
 
-function TopBarMatchInfo({ replayData, usageStats, setAssumptions }: Pick<AppTopBarProps, 'replayData' | 'usageStats' | 'setAssumptions'>) {
+function TopBarMatchInfo({ replayData, usageStats, setAssumptions, newGame }: Pick<AppTopBarProps, 'replayData' | 'usageStats' | 'setAssumptions' | 'newGame'>) {
   return (
     <div className="ps-topbar-match" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      <MatchTitle format={replayData.format} players={replayData.players} />
+      <MatchTitle format={replayData.format} players={replayData.players} newGame={newGame} />
       {usageStats.loading && (
         <span style={{ fontSize: 10, color: '#b6a46a' }}>Smogon stats loading...</span>
       )}
@@ -90,7 +92,7 @@ export function AppTopBar(props: AppTopBarProps) {
   const { replayData, usageStats, setAssumptions } = props;
   return (
     <div className="ps-topbar">
-      <TopBarMatchInfo replayData={replayData} usageStats={usageStats} setAssumptions={setAssumptions} />
+      <TopBarMatchInfo replayData={replayData} usageStats={usageStats} setAssumptions={setAssumptions} newGame={props.newGame} />
       <div className="ps-topbar-actions">
         <TopBarBranchStatus
           branchPreparing={props.branchPreparing}

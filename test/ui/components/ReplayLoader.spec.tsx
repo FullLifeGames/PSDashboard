@@ -44,6 +44,17 @@ describe('ReplayLoader', () => {
     expect(wired.onLoadFile).toHaveBeenCalledTimes(2);
   });
 
+  test('a loader that is given onNewGame offers New game under the file row, on the start page and in the menu; without it none', async () => {
+    const wired = props({ onNewGame: vi.fn() });
+    const { rerender } = render(<ReplayLoader {...wired} showGuide />);
+    await userEvent.click(screen.getByRole('button', { name: 'New game' }));
+    expect(wired.onNewGame).toHaveBeenCalledTimes(1);
+    rerender(<ReplayLoader {...wired} variant="menu" />);
+    expect(screen.getByRole('button', { name: 'New game' })).toBeInTheDocument();
+    rerender(<ReplayLoader {...props()} />);
+    expect(screen.queryByRole('button', { name: 'New game' })).toBeNull();
+  });
+
   test('errors, the team status, and the workflow guide render on demand', () => {
     render(<ReplayLoader {...props({ error: 'Double-check the replay id', teamStatus: 'Team loaded (2 Pokémon)', teamError: 'None match', showGuide: true })} />);
     const alerts = screen.getAllByRole('alert');

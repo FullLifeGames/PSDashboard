@@ -90,6 +90,30 @@ describe('AppTopBar', () => {
     expect(loader.onLoad).toHaveBeenCalledTimes(1);
   });
 
+  test('New game is an item of the Load menu at every width, no button of the bar; the menu closes when it opens the dialog; the embedded view has none', async () => {
+    // Round 89 (lane H, #105, user ruling 13.11.2026): the entry sits in the Load menu; its wording is provisional.
+    const onNewGame = vi.fn();
+    const loader = { onLoad: vi.fn(), onLoadFile: vi.fn(), onTeamLoad: vi.fn(), loading: false, error: null, onNewGame };
+    const { rerender } = render(<AppTopBar {...props({ loader })} />);
+    expect(screen.queryByRole('button', { name: 'New game' })).toBeNull();
+    const load = screen.getByRole('button', { name: 'Load' });
+    await userEvent.click(load);
+    await userEvent.click(screen.getByRole('button', { name: 'New game' }));
+    expect(onNewGame).toHaveBeenCalledTimes(1);
+    expect(load).toHaveAttribute('aria-expanded', 'false');
+    rerender(<AppTopBar {...props()} />);
+    expect(screen.queryByRole('button', { name: 'Load' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'New game' })).toBeNull();
+  });
+
+  test('a new game carries a New game tag beside its format in the title row', () => {
+    const { rerender } = render(<AppTopBar {...props()} />);
+    expect(screen.queryByText('New game')).toBeNull();
+    rerender(<AppTopBar {...props({ newGame: true })} />);
+    expect(screen.getByText('New game')).toHaveClass('ps-newgame-tag');
+    expect(screen.getByText('[Gen 9] OU')).toBeInTheDocument();
+  });
+
   test('the Smogon states read as loading or unavailable', () => {
     render(<AppTopBar {...props({ usageStats: { loading: true, error: null }, setAssumptions: { loading: false, error: 'gone' } })} />);
     expect(screen.getByText('Smogon stats loading...')).toBeInTheDocument();

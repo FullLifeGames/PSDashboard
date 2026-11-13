@@ -20,9 +20,11 @@ import { REPLAY_FRAME_HEIGHT } from '../lib/replay-html';
 interface WorkspaceProps {
   app: AppController;
   replayData: ReplayData;
+  /** Round 89 (#105): opens the New game dialog (an item of the Load menu). */
+  onNewGame?: () => void;
 }
 
-function WorkspaceTopBar({ app, replayData }: WorkspaceProps) {
+function WorkspaceTopBar({ app, replayData, onNewGame }: WorkspaceProps) {
   const { branchPreparing, branchProgress, cancelPreparation, branchDivergence } = app.board.deviation;
   const { setEditorSide, setSetsPanelOpen, handleTeamLoad, teamPasteStatus, teamPasteError } = app.ctx.knowledge;
   const { loading, error, embed, loadReplay, loadReplayFile, loadedReplayUrl } = app.ctx.replay;
@@ -52,7 +54,9 @@ function WorkspaceTopBar({ app, replayData }: WorkspaceProps) {
         loadedUrl: loadedReplayUrl,
         teamStatus: teamPasteStatus,
         teamError: teamPasteError,
+        onNewGame,
       }}
+      newGame={isGameId(replayData.id)}
       onReportIssue={app.support.reportIssue}
     />
   );
@@ -207,7 +211,7 @@ function WorkspaceAlert({ text }: { text: string }) {
   );
 }
 
-function WorkspaceLeft({ app, replayData }: WorkspaceProps) {
+function WorkspaceLeft({ app, replayData, onNewGame }: WorkspaceProps) {
   const { branchDivergence, variationNotice } = app.board.deviation;
   const { variationSpan } = app.board.timeline;
   const { branching } = app.ctx.branch;
@@ -215,7 +219,7 @@ function WorkspaceLeft({ app, replayData }: WorkspaceProps) {
   return (
     <div className="ps-main-left">
       {/* Match info, the Load and Setup menus in one bar */}
-      <WorkspaceTopBar app={app} replayData={replayData} />
+      <WorkspaceTopBar app={app} replayData={replayData} onNewGame={onNewGame} />
       {/* Single iframe */}
       <BattleFrame app={app} replayData={replayData} onSideChange={onSideChange} />
       {/* Timeline bar: always visible — one slider over main line and variation */}
@@ -245,7 +249,7 @@ function WorkspaceLeft({ app, replayData }: WorkspaceProps) {
 }
 
 /** The loaded-replay layout: battle iframe and panels beside the evaluation column. */
-export function ReplayWorkspace({ app, replayData }: WorkspaceProps) {
+export function ReplayWorkspace({ app, replayData, onNewGame }: WorkspaceProps) {
   const rules = useMemo(() => logRules(replayData.log), [replayData]);
   // Round 88 (F, #101): the bodies the log never showed wear the stats panel's marker wherever the What-if offers them.
   const { statsP1Info, statsP2Info } = app.ctx.knowledge;
@@ -259,7 +263,7 @@ export function ReplayWorkspace({ app, replayData }: WorkspaceProps) {
       <GuessedBodiesContext.Provider value={isGuessed}>
         <div className="ps-main-layout" ref={layoutRef}>
           {/* Left column: iframe */}
-          <WorkspaceLeft app={app} replayData={replayData} />
+          <WorkspaceLeft app={app} replayData={replayData} onNewGame={onNewGame} />
           {/* Right column: evaluation beside the battle (chess-style), then stats */}
           <WorkspaceEvalColumn app={app} replayData={replayData} />
         </div>

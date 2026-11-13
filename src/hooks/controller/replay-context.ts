@@ -163,6 +163,22 @@ function withPinnedTeams(knowledge: TeamKnowledge, pins: ReturnType<typeof usePi
 
 type PinnedKnowledge = ReturnType<typeof withPinnedTeams>;
 
+/** A replay loaded after a game ends the game (a failed load leaves it as it was). */
+function useLoadsThatEndTheGame(replay: ReturnType<typeof useReplaySurface>, setRecord: (record: null) => void) {
+  const { loadReplay: loadRaw, loadReplayFile: loadFileRaw } = replay;
+  const loadReplay = useCallback(async (urlOrId: string) => {
+    const result = await loadRaw(urlOrId);
+    if (result.data) setRecord(null);
+    return result;
+  }, [loadRaw, setRecord]);
+  const loadReplayFile = useCallback(async (content: string, fileName?: string) => {
+    const result = await loadFileRaw(content, fileName);
+    if (result.data) setRecord(null);
+    return result;
+  }, [loadFileRaw, setRecord]);
+  return { loadReplay, loadReplayFile };
+}
+
 /**
  * Foundation layer: the loaded replay, the branch simulator, the evaluation
  * engine handle, Smogon knowledge, team knowledge, and format metadata.
@@ -174,7 +190,7 @@ export function useReplayContext() {
   // Round 88 (T314, #55): the branch filters its bench by the bring lists, so the format meta is read before it. Round 89 (#124):
   // the worlds of a short side weigh by the usage statistics, so the Smogon bundle is read first.
   const smogon = useSmogonBundle(replay.replayData, replay.p1Info, replay.opponentInfo);
-  const gameState = useGameState();
+  const gameState = useGameState(replay.replayData?.id ?? null);
   const meta = useFormatMeta(replay.replayData, replay.snapshots, smogon.usageStats.stats, gameState.record);
   /** Set by the new-game hook below: the branch calls it after every finished turn and every lead start (round 89, #105). */
   const afterTurnRef = useRef<(() => Promise<void>) | null>(null);
@@ -213,13 +229,13 @@ export function useReplayContext() {
     gameRecord: gameState.record,
   });
   const { newGame, landRef } = useNewGameAt({ state: gameState, replay, branch, positions, afterTurnRef });
-  const { loadReplay } = replay;
+  const { loadReplay, loadReplayFile } = useLoadsThatEndTheGame(replay, gameState.setRecord);
   const handleLoadSharedOriginal = useCallback((replayId: string) => {
     clearSharedBranch();
     void loadReplay(replayId);
   }, [clearSharedBranch, loadReplay]);
   return {
-    replay: gameState.record ? { ...replay, loadedReplayUrl: null } : replay,
+    replay: { ...replay, loadReplay, loadReplayFile, ...(gameState.record ? { loadedReplayUrl: null } : {}) },
     newGame, landRef, branch, evaluation, engines, branchWindowOpenRef, smogon,
     animateBranchTurns, setAnimateBranchTurns,
     shared: { sharedBranch, sharedBranchError, clearSharedBranch, handleLoadSharedOriginal },

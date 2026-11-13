@@ -89,7 +89,12 @@ export function LoaderMenu(props: Omit<ReplayLoaderProps, 'variant' | 'showGuide
       </button>
       {open && (
         <div id={panelId} className="ps-loader-panel">
-          <ReplayLoader {...props} variant="menu" />
+          <ReplayLoader
+            {...props}
+            variant="menu"
+            // the dialog takes over: the panel folds away behind it
+            onNewGame={props.onNewGame && (() => { setOpen(false); props.onNewGame?.(); })}
+          />
         </div>
       )}
     </div>

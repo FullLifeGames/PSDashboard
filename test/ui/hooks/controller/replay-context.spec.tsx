@@ -6,6 +6,7 @@ import type { ReplayData } from '@fulllifegames/replay-core';
 import { doublesReplay, singlesReplay } from '../../fixtures/replay';
 import { stubReplayFetch } from '../../fixtures/network';
 import { realReplayWorkerClient } from '../../fixtures/worker';
+import { startedRecord } from '../../fixtures/new-game';
 
 // The context runs its real hooks; the replay worker is the real job handler
 // on this thread, and the network serves the fixture replays only.
@@ -44,6 +45,29 @@ describe('useReplayContext', () => {
     expect(ctx.animateBranchTurns).toBe(true);
     expect(ctx.branchWindowOpenRef.current).toBe(false);
     expect(ctx.positions.getExact(1)).toBeNull();
+  });
+
+  // Round 89 (#105, stage H4): the Load menu offers both a replay and a new game, in either order.
+  test('a game opens as the context\'s game; a replay loaded after it is a replay again: no record, its own link, its own positions', async () => {
+    const { result } = renderHook(() => useReplayContext());
+    const record = await startedRecord('gen9ou');
+    await act(async () => { await result.current.newGame.openRecord(record); });
+    await waitFor(() => expect(result.current.replay.replayData?.id).toBe(record.id));
+    expect(result.current.newGame.record?.id).toBe(record.id);
+    expect(result.current.replay.loadedReplayUrl).toBeNull();
+
+    const replay = singlesReplay();
+    await act(async () => { await result.current.replay.loadReplay(replay.id); });
+    expect(result.current.replay.replayData?.id).toBe(replay.id);
+    expect(result.current.newGame.record).toBeNull();
+    expect(result.current.replay.loadedReplayUrl).toBe(`https://replay.pokemonshowdown.com/${replay.id}`);
+    expect(result.current.positions.exactKeyFor(2)).toBe(`${replay.id}:2:${result.current.knowledge.setsFingerprint}`);
+
+    // a game opened once more after the replay works the same way (a failed load leaves the game as it was)
+    await act(async () => { await result.current.newGame.openRecord(record); });
+    await waitFor(() => expect(result.current.replay.replayData?.id).toBe(record.id));
+    await act(async () => { await result.current.replay.loadReplay('no-such-replay-at-all'); });
+    expect(result.current.newGame.record?.id).toBe(record.id);
   });
 
   test('a loaded replay fills the meta, the team knowledge, and the sources; the Smogon data settles as absent', async () => {
