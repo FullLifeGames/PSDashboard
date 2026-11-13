@@ -196,7 +196,16 @@ describe('the history and the share link read one entry per chain', () => {
 
   test('hit dice of one move and target fold into "Triple Axel: 2 hits" beside the first hit\'s mark', () => {
     const marks = diceMarksOf(report(entry(plain('tripleaxel')), entry(later('tripleaxel', 2, true)), entry(later('tripleaxel', 3, false))), words)!;
-    expect(sideMarkTexts(marks, 'p1')).toEqual(['Triple Axel: hits', 'Triple Axel: 2 hits']);
+    // round 89 (F5): a count already says the first hit lands, so the plain "Triple Axel: hits" mark does not stand beside it
+    expect(sideMarkTexts(marks, 'p1')).toEqual(['Triple Axel: 2 hits']);
+  });
+
+  test('the first hit alone, a first hit that took no effect, and another move\'s hit keep their marks', () => {
+    expect(sideMarkTexts(diceMarksOf(report(entry(plain('tripleaxel'))), words), 'p1')).toEqual(['Triple Axel: hits']);
+    const blocked = diceMarksOf(report(entry(plain('tripleaxel'), { took: 'blocked', reason: 'it missed' }), entry(later('tripleaxel', 2, true), { took: 'no-draw' })), words)!;
+    expect(sideMarkTexts(blocked, 'p1')).toEqual(['Triple Axel: hits (no effect)', 'Triple Axel: 2 hits (no effect)']);
+    const two = diceMarksOf(report(entry(plain('tripleaxel')), entry(later('tripleaxel', 2, true)), entry(plain('populationbomb', true, { slot: 'p1b' }))), words)!;
+    expect(sideMarkTexts(two, 'p1')).toEqual(['Triple Axel: 2 hits', 'Population Bomb: hits']);
   });
 
   test('count 1 reads in the singular, count N has no miss die', () => {

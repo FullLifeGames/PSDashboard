@@ -66,13 +66,13 @@ describe.each(SCENES)('a count of hits forced on $moveName, $kind', scene => {
     expect(current.history).toHaveLength(1);
 
     expect(current.simState!.log.filter(line => line.startsWith('|-hitcount|p2a')).map(line => line.split('|')[3])).toEqual([String(scene.count)]);
-    expect(sideMarkTexts(turnDiceMarks(current.history, 0), 'p1')).toEqual([`${scene.moveName}: hits`, `${scene.moveName}: ${scene.count} hits`]);
+    expect(sideMarkTexts(turnDiceMarks(current.history, 0), 'p1')).toEqual([`${scene.moveName}: ${scene.count} hits`]);
 
     const lines = branchFrameLog(current.simState!.log, current.history.flatMap(entry => entry.dieLines ?? [])).split('\n').filter(line => line.startsWith('|-message|Forced'));
     expect(lines.map(line => line.replace(/, [\d.]+ %$/, ''))).toEqual([`|-message|Forced: ${scene.moveName} hits`, `|-message|Forced: ${scene.moveName} ${scene.count} hits`]);
 
     const replay = { id: 'gen9test-1', format: scene.format, formatid: scene.format, players: ['A', 'B'], log: '', uploadtime: 0, views: 0 };
     const payload = decodeBranchShare(encodeBranchShare(makeBranchSharePayload({ replay, branchTurn: 1, history: current.history, finalLog: '' })));
-    expect(payload.choices[0].p1DiceLabels).toEqual([`${scene.moveName}: hits`, `${scene.moveName}: ${scene.count} hits`]);
+    expect(payload.choices[0].p1DiceLabels).toEqual([`${scene.moveName}: ${scene.count} hits`]);
   }, 180_000);
 });
