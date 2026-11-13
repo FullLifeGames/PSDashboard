@@ -7,6 +7,8 @@ import { realReplayWorkerClient } from '../fixtures/worker';
 import { listGames, saveGame } from '../../../src/lib/new-game/store';
 import { savedRecord } from '../fixtures/saved-game';
 import { playedRecord } from '../fixtures/played-game';
+import { encodeBranchShare, encodeShareJson } from '../../../src/lib/branch-share';
+import { makeGameSharePayload } from '../../../src/lib/new-game/share';
 
 const worker = vi.hoisted(() => ({ current: null as null | ReturnType<typeof import('../fixtures/worker').realReplayWorkerClient> }));
 vi.mock('../../../src/hooks/useReplayWorker', () => ({ useReplayWorker: () => worker.current!.client }));
@@ -155,10 +157,44 @@ describe('a new game in the app', () => {
     await savedRecord(['Ann', 'Ben'], 0, '9,9,9,9');
     window.history.replaceState(null, '', '/?game=newgame-k3x9q0m2ab');
     render(<App />);
-    expect(screen.getByRole('alert')).toHaveTextContent(/^The game newgame-k3x9q0m2ab is not saved in this browser\.$/);
+    expect(screen.getByRole('alert')).toHaveTextContent('The game newgame-k3x9q0m2ab is not saved in this browser. A share link of the game (Copy Share Link) brings it along.');
     expect(screen.getByText('Load Replay')).toBeInTheDocument();
     expect(document.querySelectorAll('.ps-entry-landing .ps-newgame-saved-row')).toHaveLength(1);
     expect(document.querySelector('.ps-topbar')).toBeNull();
+  });
+
+  // Round 89 (#105, H5, ruling 31 H6a): a game's share link opens the game as a copy; the address names the copy.
+  test('a game link (version 2) opens the shared game as a copy on its tip, the hash goes and the address names the copy (H5)', async () => {
+    const played = await playedRecord(1);
+    window.location.hash = `#branch=${encodeBranchShare(makeGameSharePayload({ record: played }))}`;
+    render(<App />);
+    await waitFor(() => expect(document.querySelector('.ps-topbar')).not.toBeNull(), { timeout: 60_000 });
+    await waitFor(() => expect(document.body.textContent).toMatch(/T2\/2/), { timeout: 60_000 });
+    expect(window.location.hash).toBe('');
+    const named = new URLSearchParams(window.location.search).get('game');
+    expect(named).toMatch(/^newgame-/);
+    expect(named).not.toBe(played.id);
+    expect(listGames().map(row => row.id)).toContain(named);
+    expect(listGames()).toHaveLength(2);
+    expect(screen.queryByRole('alert')).toBeNull();
+    await act(async () => {});
+  }, 120_000);
+
+  test('a game link the reader cannot start says why on the start page and leaves the hash (H5)', async () => {
+    const played = await playedRecord(0);
+    window.location.hash = `#branch=${encodeBranchShare({ ...makeGameSharePayload({ record: played }), teams: { p1: '', p2: '' } })}`;
+    render(<App />);
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Unable to open the shared game: This game link holds no team for Alice.'), { timeout: 30_000 });
+    expect(window.location.hash).toBe('');
+    expect(document.querySelector('.ps-topbar')).toBeNull();
+    expect(screen.getByText('Load Replay')).toBeInTheDocument();
+  }, 60_000);
+
+  test('a link of a newer version names its version on the start page (H5)', async () => {
+    window.location.hash = `#branch=${encodeShareJson({ version: 3, kind: 'game' })}`;
+    render(<App />);
+    expect(screen.getByRole('alert')).toHaveTextContent('This share link comes from a newer PS Dashboard (link version 3).');
+    expect(screen.getByText('Load Replay')).toBeInTheDocument();
   });
 
   test('a replay loaded by id writes ?replay=<id>; a ?replay= link still loads and stays as written', async () => {

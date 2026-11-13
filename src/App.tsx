@@ -36,9 +36,16 @@ function MissingGameNotice({ app }: { app: AppController }) {
   if (!id || app.ctx.replay.replayData || app.ctx.shared.sharedBranch || app.ctx.replay.embed) return null;
   return (
     <div className="ps-entry-notice" role="alert">
-      The game {id} is not saved in this browser.
+      The game {id} is not saved in this browser. A share link of the game (Copy Share Link) brings it along.
     </div>
   );
+}
+
+/** Round 89 (#105, H5): a game's share link on its way, or the reason it did not open. */
+function SharedGameNotice({ app }: { app: AppController }) {
+  const { opening, error } = app.sharedGame;
+  if (error) return <div className="ps-panel" role="alert" style={{ marginTop: 8, color: '#f3a6a6', fontSize: 11 }}>Unable to open the shared game: {error}</div>;
+  return opening ? <div className="ps-entry-notice" role="status">Opening the shared game</div> : null;
 }
 
 function LoaderScreen({ app, onNewGame }: { app: AppController; onNewGame: () => void }) {
@@ -166,6 +173,7 @@ function App() {
       )}
 
       <MissingGameNotice app={app} />
+      <SharedGameNotice app={app} />
 
       {!replayData && !sharedBranch && (embed ? (
         // The host page provides the replay — no loader chrome in embed mode.

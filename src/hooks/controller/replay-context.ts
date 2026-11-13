@@ -209,7 +209,7 @@ export function useReplayContext() {
   }, [replayFormat]);
   const branchWindowOpenRef = useRef(false);
   const [animateBranchTurns, setAnimateBranchTurns] = useState(true);
-  const { sharedBranch, sharedBranchError, clearSharedBranch } = useSharedBranch();
+  const { sharedBranch, sharedGame, sharedBranchError, clearSharedBranch } = useSharedBranch();
   const refreshQueue = useTeamRefreshQueue(branch.history, branch.simState, branchWindowOpenRef);
   const recordTeams = gameState.record?.teams ?? null;
   const gameTeams = useMemo(() => (recordTeams ? { p1Team: recordTeams.p1, p2Team: recordTeams.p2 } : null), [recordTeams]);
@@ -244,7 +244,7 @@ export function useReplayContext() {
     replay: { ...replay, loadReplay, loadReplayFile, ...(gameState.record ? { loadedReplayUrl: null } : {}) },
     newGame, landRef, address, branch, evaluation, engines, branchWindowOpenRef, smogon,
     animateBranchTurns, setAnimateBranchTurns,
-    shared: { sharedBranch, sharedBranchError, clearSharedBranch, handleLoadSharedOriginal },
+    shared: { sharedBranch, sharedGame, sharedBranchError, clearSharedBranch, handleLoadSharedOriginal },
     refreshQueue, knowledge, meta, teamSources, positions,
   };
 }

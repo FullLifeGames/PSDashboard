@@ -54,7 +54,7 @@ function useDeviationLayer(ctx: ReplayContext, transients: Transients, timeline:
   const restoreVariation = useRestoreVariation({
     replayData, snapshots, observations, sources: teamSources, bringOnlyLists, session: deviation.session,
     branch: deviationBranch, acquireRuntime, branchWindowOpenRef, setBranchDivergence: deviation.setBranchDivergence,
-    setViewTurn, setViewLine,
+    setViewTurn, setViewLine, gameSeed: ctx.newGame.record?.seed,
   });
   return { ...deviation, restoreVariation };
 }

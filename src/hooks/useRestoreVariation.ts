@@ -24,10 +24,12 @@ export function useRestoreVariation(inputs: Omit<RebuildContext, 'bringOnly' | '
   bringOnlyLists: { p1: string[]; p2: string[] } | null;
   setViewTurn: (turn: number) => void;
   setViewLine: (line: 'main' | 'variation') => void;
+  /** A new game's dice seed (round 89, #105): a variation that starts at turn 0 starts the game's own battle again. */
+  gameSeed?: string;
 }) {
   const {
     replayData, snapshots, observations, sources, bringOnlyLists, session, branch, acquireRuntime, branchWindowOpenRef,
-    setBranchDivergence, setViewTurn, setViewLine,
+    setBranchDivergence, setViewTurn, setViewLine, gameSeed,
   } = inputs;
   return useCallback(async (saved: SavedVariation) => {
     if (!replayData || session.isPreparing()) return;
@@ -35,7 +37,7 @@ export function useRestoreVariation(inputs: Omit<RebuildContext, 'bringOnly' | '
       replayData, snapshots, observations,
       sources: saved.pinnedTeams ? { ...sources, pinnedTeams: saved.pinnedTeams } : sources,
       bringOnly: saved.startTurn > 0 ? bringOnlyLists ?? undefined : undefined,
-      session, branch, acquireRuntime, branchWindowOpenRef, setBranchDivergence,
+      session, branch, acquireRuntime, branchWindowOpenRef, setBranchDivergence, seed: gameSeed,
       landPointer: turn => {
         setViewTurn(turn);
         setViewLine('main');
@@ -43,6 +45,6 @@ export function useRestoreVariation(inputs: Omit<RebuildContext, 'bringOnly' | '
     }, saved.startTurn, saved.history, saved.prefill);
   }, [
     replayData, snapshots, observations, sources, bringOnlyLists, session, branch, acquireRuntime, branchWindowOpenRef,
-    setBranchDivergence, setViewTurn, setViewLine,
+    setBranchDivergence, setViewTurn, setViewLine, gameSeed,
   ]);
 }
