@@ -11,6 +11,7 @@ import {
   makeBranchSharePayload,
   saveBranchPayload,
   type BranchSharePayload,
+  type SavedBranch,
 } from '../lib/branch-share';
 
 interface Props {
@@ -55,7 +56,7 @@ const buttonStyle = { padding: '3px 8px', fontSize: 10 };
  * stay here; the panel imports no branch-share module.
  */
 export function useBranchSaveShare({ replayData, branchTurn, history, finalLog }: Props): BranchHistorySlots {
-  const [saved, setSaved] = useState<BranchSharePayload[]>(() => loadSavedBranches(replayData.id));
+  const [saved, setSaved] = useState<SavedBranch[]>(() => loadSavedBranches(replayData.id));
   const [justSaved, setJustSaved] = useState(false);
 
   const payload = useMemo(() => makeBranchSharePayload({
@@ -73,11 +74,11 @@ export function useBranchSaveShare({ replayData, branchTurn, history, finalLog }
 
   // Opening a saved branch reuses the share-link flow: setting the hash
   // triggers the app's hashchange handler and shows the read-only view (G16).
-  const openSaved = (entry: BranchSharePayload) => {
+  const openSaved = (entry: SavedBranch) => {
     window.location.assign(`#branch=${encodeBranchShare(entry)}`);
   };
 
-  const removeSaved = (entry: BranchSharePayload) => {
+  const removeSaved = (entry: SavedBranch) => {
     setSaved(deleteSavedBranch(entry));
   };
 
