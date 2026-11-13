@@ -101,7 +101,6 @@ test('Gen 9 OU: the link of a game in the middle of a variation opens the same m
   await playProtectTurn(page, ['p1a', 'p2a'], 2);
   await playProtectTurn(page, ['p1a', 'p2a'], 3);
   // a variation from turn 2: another move than the game's own
-  await moveTimeline(page, 2);
   await startVariationAt(page, 2, { p1Move: 'Earthquake' });
   await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 2');
   const sharer = await timelineState(page);

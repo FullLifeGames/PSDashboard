@@ -49,6 +49,8 @@ export async function waitForGame(latest: React.RefObject<SharedGameApp>, id: st
 
 async function restoreView(latest: React.RefObject<SharedGameApp>, payload: GameSharePayload): Promise<void> {
   const { variation, view } = payload;
+  // one more render after the game's data: the restore reads the snapshots and sources of the latest render
+  await tick(0);
   if (variation && variation.entries.length > 0) {
     await latest.current.board.deviation.restoreVariation({
       startTurn: variation.startTurn, history: historyOfShare(variation.entries, variation.startTurn + 1),
