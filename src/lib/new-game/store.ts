@@ -68,18 +68,44 @@ export function deleteGame(id: string): SavedGameRow[] {
   return next;
 }
 
+const evictionListeners = new Set<(rows: SavedGameRow[]) => void>();
+
+/** Calls the listener with the rows a save pushed out of the store (the notice names them); returns the function that stops it. */
+export function onGameEvicted(listener: (rows: SavedGameRow[]) => void): () => void {
+  evictionListeners.add(listener);
+  return () => { evictionListeners.delete(listener); };
+}
+
 /**
- * Saves the record and moves its row to the front of the index; a 21st game pushes the oldest out with everything it owns.
- * Returns false when the browser refuses the write (a full store): the game stays in memory and the caller may say so.
+ * The rows that stay: the newest first, at most 20. A game over the limit that has no played turn goes first (the oldest of them), then the oldest game;
+ * the game just saved (the first row) never goes (round 89, H15a).
+ */
+function keepNewest(rows: SavedGameRow[]): { kept: SavedGameRow[]; evicted: SavedGameRow[] } {
+  const kept = [...rows];
+  const evicted: SavedGameRow[] = [];
+  while (kept.length > MAX_SAVED_GAMES) {
+    let at = -1;
+    for (let index = kept.length - 1; index > 0; index -= 1) if (kept[index].turns === 0) { at = index; break; }
+    if (at < 0) at = kept.length - 1;
+    evicted.push(...kept.splice(at, 1));
+  }
+  return { kept, evicted };
+}
+
+/**
+ * Saves the record and moves its row to the front of the index; a 21st game pushes one game out with everything it owns (the oldest
+ * without a played turn, else the oldest) and tells the listeners which. Returns false when the browser refuses the write (a full
+ * store): the game stays in memory and the caller may say so.
  */
 export function saveGame(record: NewGameRecord): boolean {
   try {
     localStorage.setItem(gameKey(record.id), JSON.stringify(record));
-    const rows = [rowOf(record), ...listGames().filter(row => row.id !== record.id)];
-    for (const evicted of rows.slice(MAX_SAVED_GAMES)) {
-      for (const key of [gameKey(evicted.id), branchesKey(evicted.id), setsKey(evicted.id)]) localStorage.removeItem(key);
+    const { kept, evicted } = keepNewest([rowOf(record), ...listGames().filter(row => row.id !== record.id)]);
+    for (const gone of evicted) {
+      for (const key of [gameKey(gone.id), branchesKey(gone.id), setsKey(gone.id)]) localStorage.removeItem(key);
     }
-    localStorage.setItem(GAMES_INDEX_KEY, JSON.stringify(rows.slice(0, MAX_SAVED_GAMES)));
+    localStorage.setItem(GAMES_INDEX_KEY, JSON.stringify(kept));
+    if (evicted.length > 0) for (const listener of evictionListeners) listener(evicted);
     return true;
   } catch {
     return false;

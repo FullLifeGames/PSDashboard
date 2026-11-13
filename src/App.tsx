@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { EvictedGameNotice } from './components/EvictedGameNotice';
 import { inferReplayFormatId } from '@fulllifegames/replay-core';
 import { LazyNewGameDialog } from './components/NewGameDialogLazy';
 import { useGameTeamEdit } from './hooks/useGameTeamEdit';
@@ -174,6 +175,7 @@ function App() {
 
       <MissingGameNotice app={app} />
       <SharedGameNotice app={app} />
+      <EvictedGameNotice />
 
       {!replayData && !sharedBranch && (embed ? (
         // The host page provides the replay — no loader chrome in embed mode.
