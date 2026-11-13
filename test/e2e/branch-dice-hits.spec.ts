@@ -81,3 +81,27 @@ test('VGC: "5 hits" for Population Bomb plays five hits and Dondozo faints', asy
   await openVariationHistory(page);
   await expect(page.getByRole('group', { name: 'Forced dice' })).toContainText('Population Bomb: 5 hits');
 });
+
+// Round 89 (F5, the wave-tester's finding 1): Glimmora's Toxic Debris answers hit 1 and Glimmora faints on hit 2, so a forced
+// "3 hits" plays two. The frame line reads what the game did, whole, and the history row says how many hits played.
+test('singles: "3 hits" on Glimmora reads "2 played" with the whole reason, not Toxic Debris and a cut at the quote', async ({ page }) => {
+  test.setTimeout(240_000);
+  await load(page, 'interlude-singles-752301.json', 12);
+  await pickMove(page, 'p2a', 'Triple Axel');
+  const tray = await openTrayMore(page, 'p2a');
+  const row = hitsRow(tray);
+  await expect(row).toBeVisible({ timeout: 30_000 });
+  await row.getByRole('button', { name: '3 hits', exact: true }).click();
+  await page.locator('.ps-execute-btn').click();
+  await expect(variationPanel(page)).toContainText('Turn 12', { timeout: 90_000 });
+
+  const entries = await branchFrameEntries(page);
+  const line = 'Forced 3 hits, 2 played: Triple Axel ended after 2 hits, so hit 3 was never rolled';
+  await expect.poll(async () => (await entries()).some(entry => entry === line), { timeout: 60_000 }).toBe(true);
+  const shown = await entries();
+  expect(shown.some(entry => /Toxic Debris"|the protocol shows/.test(entry))).toBe(false);
+  // the line stands next to the game's own count of two hits
+  expect(shown.indexOf(line) - shown.findIndex(entry => /was hit 2 times/.test(entry))).toBeLessThanOrEqual(2);
+  await openVariationHistory(page);
+  await expect(page.getByRole('group', { name: 'Forced dice' })).toContainText('Triple Axel: 3 hits (2 played)');
+});
