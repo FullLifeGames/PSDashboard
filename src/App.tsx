@@ -3,7 +3,7 @@ import { EvictedGameNotice } from './components/EvictedGameNotice';
 import { inferReplayFormatId } from '@fulllifegames/replay-core';
 import { LazyNewGameDialog } from './components/NewGameDialogLazy';
 import { GameEditNotices } from './components/GameEditNotices';
-import { variationOpen } from './components/game-tip';
+import { unsavedVariation, variationOpen } from './components/game-tip';
 import { useGameTeamEdit } from './hooks/useGameTeamEdit';
 import { ReplayLoader } from './components/ReplayLoader';
 import { LandingGamesPanel } from './components/GameEntry';
@@ -190,6 +190,7 @@ function App() {
           open={newGameOpen}
           onOpenChange={setNewGameOpen}
           onStart={app.ctx.newGame.startGame}
+          unsavedVariation={() => unsavedVariation(app)}
         />
       )}
     </div>

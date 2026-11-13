@@ -290,3 +290,56 @@ describe('the saved games', () => {
     expect(document.querySelector('.ps-newgame-saved')).toBeNull();
   }, 60_000);
 });
+
+/**
+ * Round 89 (lane H, #105), H16a: Start asks first when an unsaved variation is open. The question stands in the dialog (the dialog is
+ * modal), keeps the pasted teams, and Cancel starts nothing. Singles and doubles start through the same line.
+ */
+describe('Start with an unsaved variation open (H16a)', () => {
+  for (const [label, search, name] of [['singles', 'gen9ou', '[Gen 9] OU'], ['doubles', 'doubles ou', '[Gen 9] Doubles OU']]) {
+    test(`${label}: the question comes before Start; Cancel starts nothing and keeps the teams, Discard variation starts the game`, async () => {
+      const wired = props({ unsavedVariation: () => true });
+      render(<NewGameDialog {...wired} />);
+      await pickFormat(search, name);
+      paste(1, FOUR);
+      paste(2, FOUR);
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Start' })).toBeEnabled(), { timeout: 30_000 });
+      await userEvent.click(screen.getByRole('button', { name: 'Start' }));
+      const question = screen.getByRole('alertdialog');
+      expect(question).toHaveTextContent('The open variation is not saved. Starting a game closes it.');
+      expect(wired.onStart).not.toHaveBeenCalled();
+      await userEvent.click(within(question).getByRole('button', { name: 'Cancel' }));
+      expect(screen.queryByRole('alertdialog')).toBeNull();
+      expect(wired.onStart).not.toHaveBeenCalled();
+      expect(box(1)).toHaveValue(FOUR);
+      await userEvent.click(screen.getByRole('button', { name: 'Start' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Discard variation' }));
+      await waitFor(() => expect(wired.onStart).toHaveBeenCalledTimes(1), { timeout: 30_000 });
+      expect(vi.mocked(wired.onStart).mock.calls[0][0].formatName).toBe(name);
+    }, 90_000);
+  }
+
+  test('no unsaved variation: Start goes straight on', async () => {
+    const wired = props({ unsavedVariation: () => false });
+    render(<NewGameDialog {...wired} />);
+    paste(1, FOUR);
+    paste(2, FOUR);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Start' })).toBeEnabled(), { timeout: 30_000 });
+    await userEvent.click(screen.getByRole('button', { name: 'Start' }));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    await waitFor(() => expect(wired.onStart).toHaveBeenCalledTimes(1), { timeout: 30_000 });
+  }, 60_000);
+
+  test('closing the dialog drops an open question', async () => {
+    const wired = props({ unsavedVariation: () => true });
+    const { rerender } = render(<NewGameDialog {...wired} />);
+    paste(1, FOUR);
+    paste(2, FOUR);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Start' })).toBeEnabled(), { timeout: 30_000 });
+    await userEvent.click(screen.getByRole('button', { name: 'Start' }));
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+    rerender(<NewGameDialog {...wired} open={false} />);
+    rerender(<NewGameDialog {...wired} open />);
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+  }, 60_000);
+});

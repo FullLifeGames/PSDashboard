@@ -1,6 +1,7 @@
 import type { AppController } from '../hooks/useAppController';
 import { gameTipTurn } from '../hooks/useNewGame';
-import { encodeBranchShare } from '../lib/branch-share';
+import { encodeBranchShare, makeBranchSharePayload } from '../lib/branch-share';
+import { variationSaved } from '../lib/variation-saved';
 import { idleGameTip } from '../lib/game-end';
 import { makeGameSharePayload, type GameSharePayload } from '../lib/new-game/share';
 import { turnEntryCount } from '../lib/variation-turns';
@@ -23,6 +24,22 @@ export function idleTip(app: AppController): boolean {
 /** Whether a variation is open: a branch with a played turn that is no idle tip of a game (a replay's branch always counts). */
 export function variationOpen(app: AppController): boolean {
   return app.ctx.branch.history.length > 0 && !idleTip(app);
+}
+
+/**
+ * H16a: an open variation that no saved branch holds (Save Branch writes the row the comparison reads). It asks before Start, a load
+ * or an open of a saved game closes it. A replay's branch and a game's variation read the same way.
+ */
+export function unsavedVariation(app: AppController): boolean {
+  if (!variationOpen(app)) return false;
+  const { history, variationStartTurn } = app.ctx.branch;
+  const replay = app.ctx.replay.replayData;
+  if (!replay) return false;
+  const record = app.ctx.newGame.record;
+  const startTurn = variationStartTurn ?? app.board.timeline.viewTurn;
+  return !variationSaved(record
+    ? makeGameSharePayload({ record, variation: { startTurn, history }, view: gameView(app, false) })
+    : makeBranchSharePayload({ replay, branchTurn: startTurn, history, finalLog: app.analysis.simLog }));
 }
 
 /** Where the sharer stands: on the main line's tip while the tip turn is idle, else where the pointer is. */
