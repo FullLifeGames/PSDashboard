@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, render, renderHook, waitFor } from '@testing-library/react';
+import { useEffect, useState, type ReactElement } from 'react';
 import { doublesReplay, singlesReplay } from '../../fixtures/replay';
 import { stubReplayFetch } from '../../fixtures/network';
 import { realReplayWorkerClient } from '../../fixtures/worker';
@@ -173,5 +174,39 @@ describe('useTimelineController', () => {
     } finally {
       vi.useRealTimers();
     }
+  }, 90_000);
+
+  // Round 89 (#105, H4g): the observed order of a reload on `?game=` (the browser log of the e2e row). The address opens the record
+  // first; the board mounts afterwards, while the new game's replay data has no id yet. Its reset effect ran then, took the landing and
+  // put the pointer on the tip, and the run for the new id (the document arriving) reset the pointer to turn 1 and found no landing
+  // left. The landing belongs to the game's id: a run for another id (none yet) leaves it, the run for the game's id takes it.
+  test('a saved game opened before the board mounts keeps its tip when the replay data arrives after the first run of the reset', async () => {
+    const record = await playedRecord(1);
+    const seen: { ctx?: ReturnType<typeof useReplayContext>; board?: ReturnType<typeof useTimelineController>; show?: (on: boolean) => void } = {};
+    function Board({ ctx, transients }: { ctx: ReturnType<typeof useReplayContext>; transients: ReturnType<typeof useTransients> }): null {
+      const board = useTimelineController(ctx, transients);
+      useEffect(() => { seen.board = board; });
+      return null;
+    }
+    function Host(): ReactElement | null {
+      const ctx = useReplayContext();
+      const transients = useTransients(ctx.replay.replayData?.id);
+      const [shown, setShown] = useState(false);
+      useEffect(() => { seen.ctx = ctx; seen.show = setShown; }, [ctx]);
+      return shown ? <Board ctx={ctx} transients={transients} /> : null;
+    }
+    render(<Host />);
+    expect(seen.board).toBeUndefined();
+    let opened: Promise<unknown> = Promise.resolve();
+    act(() => {
+      opened = seen.ctx!.newGame.openRecord(record) as Promise<unknown>;
+      seen.show!(true);
+    });
+    expect(seen.board).toBeDefined();
+    expect(seen.ctx!.replay.replayData?.id).toBeUndefined();
+    await act(async () => { await opened; });
+    await waitFor(() => expect(seen.board!.timeline.maxTurn).toBe(2));
+    expect(seen.ctx!.replay.replayData?.id).toBe(record.id);
+    expect(seen.board!.timeline.viewTurn).toBe(2);
   }, 90_000);
 });

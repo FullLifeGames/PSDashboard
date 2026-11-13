@@ -199,18 +199,24 @@ describe('useNewGame', () => {
     for (let turn = 0; turn < 2; turn += 1) await playTurn(played, turn);
     const saved = played.result.current.state.record!;
     const reopened = renderHook(() => useGame(newProbe()));
-    expect(reopened.result.current.game.takeLanding()).toBeNull();
+    expect(reopened.result.current.game.takeLanding(saved.id)).toBeNull();
     await act(async () => { await reopened.result.current.game.openRecord(saved); });
-    expect(reopened.result.current.game.takeLanding()).toBe(saved.turns + 1);
-    expect(reopened.result.current.game.takeLanding()).toBeNull();
+    // The landing belongs to the game's id (round 89, H4g): the reset runs of the board before the document arrives (no id, or the
+    // id of another replay) leave it, and the run for the game's own id takes it, once.
+    expect(reopened.result.current.game.takeLanding(undefined)).toBeNull();
+    expect(reopened.result.current.game.takeLanding('someothergame')).toBeNull();
+    expect(reopened.result.current.game.takeLanding(saved.id)).toBe(saved.turns + 1);
+    expect(reopened.result.current.game.takeLanding(saved.id)).toBeNull();
     await act(async () => { await reopened.result.current.game.openRecord(saved); });
-    expect(reopened.result.current.game.takeLanding()).toBeNull();
+    expect(reopened.result.current.game.takeLanding(saved.id)).toBeNull();
     await act(async () => { await reopened.result.current.game.editTeams({ p1: SIX, p2: SIX }); });
-    expect(reopened.result.current.game.takeLanding()).toBeNull();
+    expect(reopened.result.current.game.takeLanding(saved.id)).toBeNull();
     const fresh = renderHook(() => useGame(newProbe()));
     await act(async () => { await fresh.result.current.game.openRecord(await startedRecord('gen9ou')); });
-    expect(fresh.result.current.game.takeLanding()).toBe(0);
-    expect(fresh.result.current.game.takeLanding()).toBeNull();
+    const freshId = fresh.result.current.state.record!.id;
+    expect(fresh.result.current.game.takeLanding(undefined)).toBeNull();
+    expect(fresh.result.current.game.takeLanding(freshId)).toBe(0);
+    expect(fresh.result.current.game.takeLanding(freshId)).toBeNull();
   });
 
   test('Start saves the record at once, with no entry played, so the address and the lists find a game still at team preview (D-E1)', async () => {
@@ -222,7 +228,7 @@ describe('useNewGame', () => {
     expect(probe.saved.current).toBe(1);
     expect(probe.openCalls.current).toBe(1);
     expect(rendered.result.current.state.record?.entries).toEqual([]);
-    expect(rendered.result.current.game.takeLanding()).toBe(0);
+    expect(rendered.result.current.game.takeLanding(record.id)).toBe(0);
     // opening a saved game saves nothing: its row keeps its place in the list
     await act(async () => { await rendered.result.current.game.openRecord(record); });
     expect(probe.saved.current).toBe(1);

@@ -123,7 +123,8 @@ export function useTimelineController(ctx: ReplayContext, transients: Transients
     branchWindowOpenRef.current = false;
     stopBranch();
     // Round 89 (#105): a game opens on its tip, where the next turn is played from: turn 0 (the lead picker) before the lead is picked.
-    const tip = takeLanding();
+    const tip = takeLanding(replayData?.id);
+    // The landing is the game's own id's: the run before its document arrives (a reload mounts the board first) takes none (H4g).
     // A selection, not a restore: the frame of a game that opens at start (a reload) is not there yet and reports turn 1 while it
     // loads; the guard of the landing drops that report until the frame confirms the tip, however long it loads (round 89, H4e, H4f).
     if (tip !== null) landOnTurn(tip);

@@ -47,14 +47,19 @@ function replacementPending(stream: BattleStream | null): boolean {
   return (['p1', 'p2'] as const).some(side => forceSwitches(battle, side).some(Boolean));
 }
 
-/** The turn the pointer should land on once an opened game's replay state has reset it (a saved game's tip, turn 0 for a game at Team Preview), else null. */
+/**
+ * The turn the pointer should land on once an opened game's replay state has reset it (a saved game's tip, turn 0 for a game at Team Preview), else null.
+ * The landing belongs to the game's id (round 89, H4g): the board's reset runs once for the replay data that has no id yet (a reload on `?game=` mounts
+ * it while the document is on its way) and a second time for the new id, which resets the pointer again; only the run for the game's own id takes it.
+ */
 function useLanding() {
-  const landing = useRef<number | null>(null);
-  const askLanding = useCallback((turn: number | null) => { landing.current = turn; }, []);
-  const takeLanding = useCallback((): number | null => {
-    const turn = landing.current;
+  const landing = useRef<{ id: string; turn: number } | null>(null);
+  const askLanding = useCallback((next: { id: string; turn: number } | null) => { landing.current = next; }, []);
+  const takeLanding = useCallback((replayId: string | undefined): number | null => {
+    const held = landing.current;
+    if (!held || held.id !== replayId) return null;
     landing.current = null;
-    return turn;
+    return held.turn;
   }, []);
   return { askLanding, takeLanding };
 }
@@ -98,7 +103,7 @@ export function useNewGame(inputs: NewGameInputs) {
    * (a team edit) leaves the pointer where it stands.
    */
   const openRecord = useCallback(async (next: NewGameRecord) => {
-    askLanding(recordRef.current?.id !== next.id ? (next.entries.length > 0 ? next.turns + 1 : 0) : null);
+    askLanding(recordRef.current?.id !== next.id ? { id: next.id, turn: next.entries.length > 0 ? next.turns + 1 : 0 } : null);
     setRecord(next);
     await replay.openGame(gameReplayData(next), { p1: infoOfTeam(next.teams.p1), p2: infoOfTeam(next.teams.p2) });
   }, [replay, recordRef, setRecord, askLanding]);
