@@ -53,6 +53,14 @@ describe('the requests of the lines job', () => {
     expect(request.visits).toBe(31);
   });
 
+  test('a host that graded the turn elsewhere names the rows whose lines it wants (lineRows), the played row still comes along', () => {
+    const trees = [tree({ Surf: [step('Surf', 'Draining Kiss', 30)], 'Ice Beam': [step('Ice Beam', 'Draining Kiss', 12)] })];
+    const asked = { ...settings({ p1: { kind: 'move', name: 'Surf' } }), lineRows: { p1: ['Ice Beam'] } };
+    expect(lineRequests(trees, result(), asked).map(request => [request.side, request.label, request.for])).toEqual([
+      ['p1', 'Ice Beam', ['engine']], ['p1', 'Surf', ['played']],
+    ]);
+  });
+
   test('trees without rowLines (an older tree) ask for nothing', () => {
     expect(lineRequests([{ p1Options: [], p2Options: [] } as unknown as MctsTreeStats], result(), settings(null))).toEqual([]);
   });

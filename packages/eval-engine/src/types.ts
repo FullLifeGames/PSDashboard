@@ -48,6 +48,12 @@ export interface EvalSettings {
    */
   prove?: boolean;
   /**
+   * Round 89 (#104): the rows whose lines the search should replay as the engine's lines, by label per side, instead of the merged
+   * result's best row. A host that grades a turn with another search (the matrix of an early singles turn) asks the tree for the lines
+   * of the rows that grade named. Absent: each side's best row. Part of the settings key only when present.
+   */
+  lineRows?: { p1?: string[]; p2?: string[] };
+  /**
    * Round 65: the rule set the replay runs under (Pokémon Champions or the
    * standard games), named by the host from the replay's format: the
    * simulator reconstructs every doubles game as Doubles OU and knows no

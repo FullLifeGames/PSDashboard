@@ -14,22 +14,23 @@ import { playedIndices } from '../verify-select.ts';
 export function lineRequests(trees: readonly MctsTreeStats[], result: EvalResult, settings: EvalSettings): LineRequest[] {
   if (trees.length === 0 || !trees.some(tree => tree.rowLines)) return [];
   const played = playedIndices([...trees], result, settings.keepPlayed);
-  const requests: LineRequest[] = [];
-  for (const side of ['p1', 'p2'] as const) {
-    const other = side === 'p1' ? 'p2' : 'p1';
-    const top = result.perSide[side][0]?.label;
-    const reply = result.perSide[other][0]?.label;
-    const options = side === 'p1' ? trees[0].p1Options : trees[0].p2Options;
-    const playedLabel = played[side] === undefined ? undefined : options[played[side]!]?.label;
-    const wanted = new Map<string, LineRequest['for']>();
-    if (top !== undefined) wanted.set(top, ['engine']);
-    if (playedLabel !== undefined) wanted.set(playedLabel, [...(wanted.get(playedLabel) ?? []), 'played']);
-    for (const [label, roles] of wanted) {
-      const donors = donorsOf(trees, side, label, reply);
-      if (donors.length > 0) requests.push({ side, label, for: roles, donors, visits: donors[0][0].visits });
-    }
-  }
-  return requests;
+  return (['p1', 'p2'] as const).flatMap(side => requestsOf(trees, result, settings, side, played[side]));
+}
+
+/** One side's requests: the rows it wants the engine's line for, and the row it played, in that order. */
+function requestsOf(trees: readonly MctsTreeStats[], result: EvalResult, settings: EvalSettings, side: 'p1' | 'p2', playedIndex: number | undefined): LineRequest[] {
+  const top = result.perSide[side][0]?.label;
+  const reply = result.perSide[side === 'p1' ? 'p2' : 'p1'][0]?.label;
+  const options = side === 'p1' ? trees[0].p1Options : trees[0].p2Options;
+  const wanted = new Map<string, LineRequest['for']>();
+  // a host that graded the turn with another search names the rows it graded against (settings.lineRows)
+  for (const label of settings.lineRows?.[side] ?? (top === undefined ? [] : [top])) wanted.set(label, ['engine']);
+  const playedLabel = playedIndex === undefined ? undefined : options[playedIndex]?.label;
+  if (playedLabel !== undefined) wanted.set(playedLabel, [...(wanted.get(playedLabel) ?? []), 'played']);
+  return [...wanted].flatMap(([label, roles]) => {
+    const donors = donorsOf(trees, side, label, reply);
+    return donors.length > 0 ? [{ side, label, for: roles, donors, visits: donors[0][0].visits }] : [];
+  });
 }
 
 /** The lines the trees hold for one row, best donor first: the reply the opponent's best row names first, then the heavier first step, then the lower tree. */
