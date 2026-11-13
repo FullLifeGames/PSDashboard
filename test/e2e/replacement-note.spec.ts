@@ -32,7 +32,7 @@ async function loadReplay(page: Page, replay: ReplayData) {
     status: 200, contentType: 'application/json', body: JSON.stringify(replay),
   }));
   await page.locator('input[type="text"]').first().fill(replay.id);
-  await page.locator('button', { hasText: 'Load' }).click();
+  await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
   await expect(page.getByText(replay.players[0], { exact: true }).first()).toBeVisible({ timeout: 15_000 });
 }
 
@@ -65,7 +65,7 @@ test.describe('the replacement note', () => {
     // A reload serves the note from the stored sweep.
     await page.reload();
     await page.locator('input[type="text"]').first().fill('gen9ou-2658662321');
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.getByText(fixture('gen9ou-2658662321').players[0], { exact: true }).first()).toBeVisible({ timeout: 15_000 });
     await analyzeGame(page, 90_000);
     await page.locator('input[type="range"]').fill('7');

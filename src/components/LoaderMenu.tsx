@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { ReplayLoader, type ReplayLoaderProps } from './ReplayLoader';
+import { MenuGameParts, type GameEntryProps } from './GameEntry';
 
 /**
  * Round 84 (turn dock, user answer Q20 a, 02.11.2026): a dropped file lands anywhere on the page while a replay is loaded, because
@@ -41,12 +42,14 @@ function usePageFileDrop(onFile: (file: File) => void): boolean {
 }
 
 /**
- * Round 84 (turn dock, Q20 a): with a replay loaded the loader folds into a "Load" button beside "Setup" in the top bar. The panel
- * holds the loader's parts (URL form, file picker, team paste) and closes on Escape, on a click beside it and when a load
- * succeeds; a failed load keeps it open with the error. A file dropped on the page opens it and loads at once.
+ * Round 84 (turn dock, Q20 a): with a replay loaded the loader folds into a button beside "Setup" in the top bar. Round 89 (#105,
+ * user ruling 13.11.2026, H10b): the button is "Game" and the panel has three parts: "Load replay" (URL form, file picker, team
+ * paste), "New game" and "Saved games". It closes on Escape, on a click beside it, when a load succeeds, when New game opens its
+ * dialog and when a saved game has opened; a failed load keeps it open with the error. A file dropped on the page opens it and
+ * loads at once.
  */
-export function LoaderMenu(props: Omit<ReplayLoaderProps, 'variant' | 'showGuide'>) {
-  const { loading, error, onLoadFile } = props;
+export function LoaderMenu(props: Omit<ReplayLoaderProps, 'variant' | 'showGuide'> & Partial<GameEntryProps>) {
+  const { loading, error, onLoadFile, onNewGame, onOpenGame, currentGameId = null, ...loader } = props;
   const [open, setOpen] = useState(false);
   // A load that ends without an error closes the panel; the check runs in render, where the loading flag changes.
   const [wasLoading, setWasLoading] = useState(false);
@@ -85,16 +88,20 @@ export function LoaderMenu(props: Omit<ReplayLoaderProps, 'variant' | 'showGuide
         aria-controls={panelId}
         onClick={() => setOpen(value => !value)}
       >
-        Load <span aria-hidden="true">▾</span>
+        Game <span aria-hidden="true">▾</span>
       </button>
       {open && (
-        <div id={panelId} className="ps-loader-panel">
-          <ReplayLoader
-            {...props}
-            variant="menu"
-            // the dialog takes over: the panel folds away behind it
-            onNewGame={props.onNewGame && (() => { setOpen(false); props.onNewGame?.(); })}
-          />
+        <div id={panelId} className="ps-loader-panel ps-entry-panel">
+          <ReplayLoader {...loader} loading={loading} error={error} onLoadFile={onLoadFile} variant="menu" />
+          {onNewGame && onOpenGame && (
+            <MenuGameParts
+              currentGameId={currentGameId}
+              // the dialog takes over: the panel folds away behind it
+              onNewGame={() => { setOpen(false); onNewGame(); }}
+              // a game that opened closes the panel; one that failed keeps it open with the list's message
+              onOpenGame={async record => { await onOpenGame(record); setOpen(false); }}
+            />
+          )}
         </div>
       )}
     </div>

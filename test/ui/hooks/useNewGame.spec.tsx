@@ -212,4 +212,19 @@ describe('useNewGame', () => {
     expect(fresh.result.current.game.takeLanding()).toBe(0);
     expect(fresh.result.current.game.takeLanding()).toBeNull();
   });
+
+  test('Start saves the record at once, with no entry played, so the address and the lists find a game still at team preview (D-E1)', async () => {
+    const probe = newProbe();
+    const rendered = renderHook(() => useGame(probe));
+    const record = await startedRecord('gen9ou');
+    expect(probe.saved.current).toBe(0);
+    await act(async () => { await rendered.result.current.game.startGame(record); });
+    expect(probe.saved.current).toBe(1);
+    expect(probe.openCalls.current).toBe(1);
+    expect(rendered.result.current.state.record?.entries).toEqual([]);
+    expect(rendered.result.current.game.takeLanding()).toBe(0);
+    // opening a saved game saves nothing: its row keeps its place in the list
+    await act(async () => { await rendered.result.current.game.openRecord(record); });
+    expect(probe.saved.current).toBe(1);
+  });
 });

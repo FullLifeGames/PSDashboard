@@ -5,6 +5,7 @@ import { replayData } from '../fixtures/replay';
 import { stubReplayFetch } from '../fixtures/network';
 import { realReplayWorkerClient } from '../fixtures/worker';
 import { listGames } from '../../../src/lib/new-game/store';
+import { savedRecord } from '../fixtures/saved-game';
 
 const worker = vi.hoisted(() => ({ current: null as null | ReturnType<typeof import('../fixtures/worker').realReplayWorkerClient> }));
 vi.mock('../../../src/hooks/useReplayWorker', () => ({ useReplayWorker: () => worker.current!.client }));
@@ -47,6 +48,9 @@ describe('a new game in the app', () => {
     render(<App />);
     await startOnLanding();
     await waitFor(() => expect(document.querySelector('.ps-topbar')).not.toBeNull(), { timeout: 30_000 });
+    // Start saved the record at once (D-E1): no lead is played yet
+    expect(listGames()).toHaveLength(1);
+    expect(listGames()[0].players).toEqual(['Alice', 'Bob']);
     expect(screen.queryByRole('dialog', { name: 'New game' })).toBeNull();
     const bar = document.querySelector('.ps-topbar') as HTMLElement;
     expect(within(bar).getByText('New game')).toHaveClass('ps-newgame-tag');
@@ -58,24 +62,52 @@ describe('a new game in the app', () => {
     expect(screen.getByText(/Pick 1 per side|Play from turn 0/)).toBeInTheDocument();
   }, 90_000);
 
-  test('the Load menu offers New game once a game is open; the dialog lists the open game as open now and keeps a saved one; a replay loaded after the game is a replay again', async () => {
+  test('the Game menu offers New game and the saved games once a game is open, the open game as open now; the dialog holds none; a replay loaded after the game is a replay again', async () => {
     const replay = replayData('singles');
     stubReplayFetch([replay]);
     render(<App />);
     await startOnLanding();
     await waitFor(() => expect(document.querySelector('.ps-topbar')).not.toBeNull(), { timeout: 30_000 });
-    await userEvent.click(screen.getByRole('button', { name: 'Load' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Game' }));
+    expect(screen.getByText('Saved games')).toBeInTheDocument();
+    expect(document.querySelector('.ps-loader-panel')).toHaveTextContent('open now');
     await userEvent.click(screen.getByRole('button', { name: 'New game' }));
     const dialog = await screen.findByRole('dialog', { name: 'New game' });
-    // the Load panel folded away behind the dialog
+    // the Game panel folded away behind the dialog
     expect(screen.queryByRole('textbox', { name: 'Replay URL or ID' })).toBeNull();
-    expect(listGames()).toHaveLength(0);
+    expect(within(dialog).queryByText('Saved games')).toBeNull();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Load' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Game' }));
     const input = screen.getByRole('textbox', { name: 'Replay URL or ID' });
     await userEvent.clear(input);
     await userEvent.type(input, `${replay.id}{Enter}`);
     await waitFor(() => expect(within(document.querySelector('.ps-topbar') as HTMLElement).queryByText('New game')).toBeNull(), { timeout: 30_000 });
     await act(async () => {});
   }, 90_000);
+
+  test('the start page names both ways in and lists the saved games under the loader; Open plays the saved game', async () => {
+    const record = await savedRecord(['Ann', 'Ben'], 0, '9,9,9,9');
+    render(<App />);
+    expect(screen.getByText('Load a replay or start a new game · branch off with different moves')).toBeInTheDocument();
+    expect(screen.getByText('Load Replay')).toBeInTheDocument();
+    const panel = document.querySelector('.ps-entry-landing') as HTMLElement;
+    expect(within(panel).getByRole('button', { name: 'New game' })).toBeInTheDocument();
+    expect(within(panel).getByText('Saved games')).toBeInTheDocument();
+    expect(panel.querySelectorAll('.ps-newgame-saved-row')).toHaveLength(1);
+    expect(panel).toHaveTextContent('Seed 9,9,9,9');
+    await userEvent.click(within(panel).getByRole('button', { name: 'Open' }));
+    await waitFor(() => expect(document.querySelector('.ps-topbar')).not.toBeNull(), { timeout: 30_000 });
+    const bar = document.querySelector('.ps-topbar') as HTMLElement;
+    expect(within(bar).getByText('New game')).toHaveClass('ps-newgame-tag');
+    expect(within(bar).getByText('Ann')).toBeInTheDocument();
+    expect(listGames()[0].id).toBe(record.id);
+    await act(async () => {});
+  }, 90_000);
+
+  test('a start page with no saved game shows the New game button and no Saved games part', () => {
+    render(<App />);
+    const panel = document.querySelector('.ps-entry-landing') as HTMLElement;
+    expect(within(panel).getByRole('button', { name: 'New game' })).toBeInTheDocument();
+    expect(within(panel).queryByText('Saved games')).toBeNull();
+  });
 });

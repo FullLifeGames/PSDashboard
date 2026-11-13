@@ -10,7 +10,7 @@ test.describe('PS Dashboard', () => {
   });
 
   test('shows the always-visible timeline bar with slider', async ({ page }) => {
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.locator('input[type="range"]')).toBeVisible({ timeout: 10000 });
     // "Branch Here" is gone as a concept — the pickers are always live.
     await expect(page.locator('button', { hasText: 'Branch Here' })).toHaveCount(0);
@@ -18,7 +18,7 @@ test.describe('PS Dashboard', () => {
   });
 
   test('branch turn slider updates turn display', async ({ page }) => {
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     const slider = page.locator('input[type="range"]');
     await expect(slider).toBeVisible({ timeout: 10000 });
     await expect(slider).toHaveAttribute('min', '1');
@@ -27,7 +27,7 @@ test.describe('PS Dashboard', () => {
   });
 
   test('branch turn slider seeks without rebuilding the replay iframe', async ({ page }) => {
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     const iframe = page.locator('iframe[title="PS Replay"]');
     await expect(iframe).toBeVisible({ timeout: 10000 });
     const initialSrc = await iframe.getAttribute('src');
@@ -37,7 +37,7 @@ test.describe('PS Dashboard', () => {
   });
 
   test('branch turn slider moves the replay viewer to the selected turn', async ({ page }) => {
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     const iframeHandle = await page.locator('iframe[title="PS Replay"]').elementHandle({ timeout: 10000 });
     const frame = await iframeHandle?.contentFrame();
     expect(frame).toBeTruthy();
@@ -92,7 +92,7 @@ test.describe('PS Dashboard', () => {
         body: JSON.stringify(seekReplay),
       });
     });
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     const iframeHandle = await page.locator('iframe[title="PS Replay"]').elementHandle({ timeout: 10000 });
     const frame = await iframeHandle?.contentFrame();
     expect(frame).toBeTruthy();
@@ -122,7 +122,7 @@ test.describe('PS Dashboard', () => {
   });
 
   test('replay iframe keeps a fixed visible height without negative offset', async ({ page }) => {
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     const iframe = page.locator('iframe[title="PS Replay"]');
     await expect(iframe).toBeVisible({ timeout: 10000 });
     await expect(iframe).toHaveCSS('height', '456px');
@@ -130,7 +130,7 @@ test.describe('PS Dashboard', () => {
   });
 
   test('branch replay iframe keeps the same fixed visible height', async ({ page }) => {
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await startVariationAt(page, 1);
 
     const branchIframe = page.locator('iframe[title="Branch Simulation"]');
@@ -141,7 +141,7 @@ test.describe('PS Dashboard', () => {
   });
 
   test('a move executed at the selected slider turn opens the variation there', async ({ page }) => {
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await startVariationAt(page, 2);
 
     // The executed turn is entry "Turn 2"; the sim continues one past it.
@@ -152,7 +152,7 @@ test.describe('PS Dashboard', () => {
   test.describe('unified timeline', () => {
     test('navigate back inside the variation and silently truncate on a new move', async ({ page }) => {
       test.setTimeout(120_000);
-      await page.locator('button', { hasText: 'Load' }).click();
+      await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
       // Two turns of variation: Swords Dance keeps turn 1 KO-free.
       await startVariationAt(page, 1, { p1Move: 'Swords Dance' });
       await pickMove(page, 'p1a');
@@ -180,7 +180,7 @@ test.describe('PS Dashboard', () => {
       // "variation" across the uncovered turns, the move extended the variation instead, ran at its tip against Kyurem
       // ("no longer knows Brave Bird") and pulled the pointer back. Here: a one-turn variation at turn 1, ▶ to turn 3.
       test.setTimeout(120_000);
-      await page.locator('button', { hasText: 'Load' }).click();
+      await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
       await startVariationAt(page, 1, { p1Move: 'Swords Dance' });
       const history = page.locator('.ps-panel', { hasText: 'Variation moves' });
       await expect(history).not.toContainText('Turn 2');
@@ -201,7 +201,7 @@ test.describe('PS Dashboard', () => {
 
     test('main line stays one click away and replacing from it asks first', async ({ page }) => {
       test.setTimeout(120_000);
-      await page.locator('button', { hasText: 'Load' }).click();
+      await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
       await startVariationAt(page, 2);
 
       // One click back to the main line — view only, nothing destroyed.
@@ -228,7 +228,7 @@ test.describe('PS Dashboard', () => {
 
     test('Let it play out from a main-line turn arms and actually plays', async ({ page }) => {
       test.setTimeout(180_000);
-      await page.locator('button', { hasText: 'Load' }).click();
+      await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
       await expect(page.locator('.ps-branch-bar input[type="range"]')).toBeVisible();
 
       // Straight from the freshly loaded replay (main line, no variation):
@@ -250,7 +250,7 @@ test.describe('PS Dashboard', () => {
 
     test('T0 opens the lead picker and a lead variation plays from turn 0', async ({ page }) => {
       test.setTimeout(120_000);
-      await page.locator('button', { hasText: 'Load' }).click();
+      await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
       await expect(page.locator('.ps-branch-bar input[type="range"]')).toBeVisible();
 
       // T0 sits on the timeline whether or not a game graph exists; the view
@@ -275,7 +275,7 @@ test.describe('PS Dashboard', () => {
 
     test('Let it play out from the T0 view seeds the lead variation', async ({ page }) => {
       test.setTimeout(180_000);
-      await page.locator('button', { hasText: 'Load' }).click();
+      await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
       await expect(page.locator('.ps-branch-bar input[type="range"]')).toBeVisible();
       await page.locator('.ps-branch-bar button[title^="Turn 0"]').click();
       await expect(page.getByText('team preview: pick each side')).toBeVisible();
@@ -301,7 +301,7 @@ test.describe('PS Dashboard', () => {
     test('doubles T0 picks two leads per side and plays from turn 0', async ({ page }) => {
       test.setTimeout(120_000);
       await page.locator('input[type="text"]').fill('gen9doubles-test');
-      await page.locator('button', { hasText: 'Load' }).click();
+      await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
       await expect(page.getByText('Alice', { exact: true }).first()).toBeVisible({ timeout: 10000 });
 
       await page.locator('.ps-branch-bar button[title^="Turn 0"]').click();
@@ -326,7 +326,7 @@ test.describe('PS Dashboard', () => {
     test('VGC T0 picks the brought four and the branch fields only them', async ({ page }) => {
       test.setTimeout(120_000);
       await page.locator('input[type="text"]').fill('gen9vgc-test');
-      await page.locator('button', { hasText: 'Load' }).click();
+      await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
       await expect(page.getByText('Alice', { exact: true }).first()).toBeVisible({ timeout: 10000 });
 
       // Bring-four preview: six chips per side, the real brought four
@@ -354,7 +354,7 @@ test.describe('PS Dashboard', () => {
     test('VGC T0 starts again over a standing turn-0 variation once the replace is confirmed', async ({ page }) => {
       test.setTimeout(180_000);
       await page.locator('input[type="text"]').fill('gen9vgc-test');
-      await page.locator('button', { hasText: 'Load' }).click();
+      await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
       await expect(page.getByText('Alice', { exact: true }).first()).toBeVisible({ timeout: 10000 });
       await page.locator('.ps-branch-bar button[title^="Turn 0"]').click();
       await expect(page.getByText('pick the 4 each side brings')).toBeVisible();

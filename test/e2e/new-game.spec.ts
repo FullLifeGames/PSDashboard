@@ -4,8 +4,8 @@ import { lightEngine } from './dock-helpers';
 
 /**
  * Round 89 (lane H, #105), stage H4: the New game dialog in the browser. A draft-league player pastes two Showdown exports on the
- * start page, picks the format, starts, picks leads (four of six in VGC), plays a turn by hand, reloads the page and opens the game
- * again from the saved list, on its tip. Gen 9 OU and Scarlet/Violet VGC; the engine's turns and the grading are the later stages'.
+ * start page, picks the format, starts, picks leads (four of six in VGC), plays a turn by hand, opens the game
+ * again from the start page's saved list, on its tip. Gen 9 OU and Scarlet/Violet VGC; the engine's turns and the grading are the later stages'.
  */
 test.beforeAll(installReplayEmbedCache);
 
@@ -66,16 +66,25 @@ test('Gen 9 OU: paste, Start at Team Preview, pick leads, play a turn by hand, r
   // the game is saved after the finished turn
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('ps-replay-interceptor:games') ?? '[]').length)).toBe(1);
 
-  await page.reload();
-  await page.getByRole('button', { name: 'New game' }).click();
-  const dialog = page.getByRole('dialog', { name: 'New game' });
-  const row = dialog.locator('.ps-newgame-saved-row');
+  // the Game menu lists it (third part) and says it is open now; the dialog holds no list
+  await page.locator('.ps-loader-toggle').click();
+  const menu = page.locator('.ps-loader-panel');
+  await expect(menu.getByText('Load replay')).toBeVisible();
+  await expect(menu.getByRole('button', { name: 'New game' })).toBeVisible();
+  await expect(menu.locator('.ps-newgame-saved-row')).toHaveCount(1);
+  await expect(menu.locator('.ps-newgame-saved-row')).toContainText('open now');
+
+  // a fresh visit without a parameter: the start page lists the saved game under the loader, and Open plays it on its tip
+  await page.goto('/');
+  const landing = page.locator('.ps-entry-landing');
+  await expect(landing.getByText('Saved games')).toBeVisible();
+  const row = landing.locator('.ps-newgame-saved-row');
   await expect(row).toHaveCount(1);
   await expect(row).toContainText('Tidepool');
   await expect(row).toContainText('1 turn played');
+  await expect(row).toContainText(/Seed \d+,\d+,\d+,\d+/);
   await row.getByRole('button', { name: 'Open' }).click();
-  await expect(dialog).toBeHidden();
-  await expect(bar.getByText('New game', { exact: true })).toBeVisible();
+  await expect(page.locator('.ps-topbar').getByText('New game', { exact: true })).toBeVisible({ timeout: 90_000 });
   await expect(page.getByText('T2/')).toBeVisible({ timeout: 90_000 });
   await expect(page.locator('.ps-dock-chip').first()).toBeVisible({ timeout: 90_000 });
 });

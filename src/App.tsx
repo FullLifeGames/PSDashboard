@@ -3,6 +3,7 @@ import { inferReplayFormatId } from '@fulllifegames/replay-core';
 import { NewGameDialog } from './components/NewGameDialog';
 import { useGameTeamEdit } from './hooks/useGameTeamEdit';
 import { ReplayLoader } from './components/ReplayLoader';
+import { LandingGamesPanel } from './components/GameEntry';
 import { TeamEditor } from './components/TeamEditor';
 import { SetsImportExportPanel } from './components/SetsImportExportPanel';
 import { SharedBranchView } from './components/SharedBranchView';
@@ -43,8 +44,8 @@ function LoaderScreen({ app, onNewGame }: { app: AppController; onNewGame: () =>
         teamStatus={teamPasteStatus}
         teamError={teamPasteError}
         showGuide
-        onNewGame={onNewGame}
       />
+      <LandingGamesPanel onNewGame={onNewGame} onOpenGame={app.ctx.newGame.openRecord} currentGameId={app.ctx.newGame.record?.id ?? null} />
     </div>
   );
 }
@@ -80,7 +81,8 @@ function AppModals({ app }: { app: AppController }) {
             p2Info: statsP2Info,
           })}
           onImport={text => {
-            const importError = applySetsText(text);
+            // a game's sets belong to its record: the import plays it again on them (editTeams), as the editor does
+            const importError = applySetsText(text, record ? next => { gameEdit.editSides(next); } : undefined);
             if (!importError) setSetsPanelOpen(false);
             return importError;
           }}
@@ -118,7 +120,7 @@ function App() {
   const app = useAppController();
   const { embed, replayData } = app.ctx.replay;
   const { sharedBranch, sharedBranchError, clearSharedBranch, handleLoadSharedOriginal } = app.ctx.shared;
-  // Round 89 (#105): the New game dialog opens from the loader (an item of the Load menu, the start page's loader).
+  // Round 89 (#105): the New game dialog opens from the Game menu and from the start page's New game panel.
   const [newGameOpen, setNewGameOpen] = useState(false);
   const openNewGame = () => setNewGameOpen(true);
 
@@ -131,7 +133,7 @@ function App() {
           <h1>PS Dashboard</h1>
           <BetaMark />
           <span style={{ fontSize: 10, color: '#aabbcc' }}>
-            Load a replay · branch off with different moves
+            Load a replay or start a new game · branch off with different moves
           </span>
           <SupportLinks embed={false} onReportIssue={app.support.reportIssue} />
         </div>
@@ -165,9 +167,7 @@ function App() {
         <NewGameDialog
           open={newGameOpen}
           onOpenChange={setNewGameOpen}
-          onStart={app.ctx.newGame.openRecord}
-          onOpenSaved={app.ctx.newGame.openRecord}
-          currentGameId={app.ctx.newGame.record?.id ?? null}
+          onStart={app.ctx.newGame.startGame}
         />
       )}
     </div>

@@ -22,7 +22,7 @@ const dropOnPage = (dropped: File) =>
 describe('LoaderMenu', () => {
   test('a closed menu shows only the button; a click opens the URL form, the file picker and the team paste', async () => {
     render(<LoaderMenu {...props()} />);
-    const toggle = screen.getByRole('button', { name: 'Load' });
+    const toggle = screen.getByRole('button', { name: 'Game' });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByRole('textbox', { name: 'Replay URL or ID' })).toBeNull();
     expect(screen.queryByLabelText('Load exported replay file')).toBeNull();
@@ -41,7 +41,7 @@ describe('LoaderMenu', () => {
   test('the URL form in the panel loads what was typed and mirrors the loaded link', async () => {
     const wired = props({ loadedUrl: 'https://replay.pokemonshowdown.com/gen9ou-1' });
     render(<LoaderMenu {...wired} />);
-    await userEvent.click(screen.getByRole('button', { name: 'Load' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Game' }));
     const input = screen.getByRole('textbox', { name: 'Replay URL or ID' });
     expect(input).toHaveValue('https://replay.pokemonshowdown.com/gen9ou-1');
     await userEvent.clear(input);
@@ -51,7 +51,7 @@ describe('LoaderMenu', () => {
 
   test('the panel closes on Escape and on a click beside it, and stays open for a click inside', async () => {
     render(<><p>beside</p><LoaderMenu {...props()} /></>);
-    const toggle = screen.getByRole('button', { name: 'Load' });
+    const toggle = screen.getByRole('button', { name: 'Game' });
     await userEvent.click(toggle);
     await userEvent.click(screen.getByRole('textbox', { name: 'Replay URL or ID' }));
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
@@ -67,7 +67,7 @@ describe('LoaderMenu', () => {
   test('a load that succeeds closes the panel; a load that fails keeps it open with the error', async () => {
     const wired = props();
     const { rerender } = render(<LoaderMenu {...wired} />);
-    const toggle = screen.getByRole('button', { name: 'Load' });
+    const toggle = screen.getByRole('button', { name: 'Game' });
     await userEvent.click(toggle);
     rerender(<LoaderMenu {...wired} loading />);
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
@@ -85,7 +85,7 @@ describe('LoaderMenu', () => {
   test('a picked file loads through the panel', async () => {
     const wired = props();
     render(<LoaderMenu {...wired} />);
-    await userEvent.click(screen.getByRole('button', { name: 'Load' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Game' }));
     await userEvent.upload(screen.getByLabelText('Load exported replay file'), file('game.log'));
     await waitFor(() => expect(wired.onLoadFile).toHaveBeenCalledWith('<html>x</html>', 'game.log'));
   });

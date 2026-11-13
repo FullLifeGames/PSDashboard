@@ -18,7 +18,7 @@ test('U-turn against Chilly Reception from the viewed turn 1: both sides send th
   await page.route('**/replay.pokemonshowdown.com/**', route => route.fulfill({ status: 200, contentType: 'application/json', body: draftReplay }));
   await page.goto('/');
   await routeSmogon(page, emptySmogon);
-  await page.locator('button', { hasText: 'Load' }).click();
+  await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
   await expect(page.locator('.ps-branch-bar input[type="range"]')).toBeVisible({ timeout: 30_000 });
   await page.locator('.ps-branch-bar input[type="range"]').fill('1');
   await expect(page.getByText('T1/')).toBeVisible();

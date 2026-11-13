@@ -30,7 +30,7 @@ test.describe('support', () => {
     await expect(header.getByRole('link', { name: 'by Bene (FullLifeGames)' })).toHaveAttribute('href', 'https://fulllifegames.com');
     await expect(page.locator('h1')).toHaveCount(1);
 
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     const links = page.locator('.ps-topbar .ps-support-links');
     await expect(links).toContainText('PS Dashboard');
     await expect(links).toContainText('Beta');
@@ -42,7 +42,7 @@ test.describe('support', () => {
     // User request 28.10.2026: a dialog with a download button and a link replaces the tab and the download that the
     // click started by itself.
     await context.route('https://github.com/**', route => route.fulfill({ status: 200, contentType: 'text/html', body: '<p>issue form</p>' }));
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await startVariationAt(page, 1);
 
     let opened = 0;
@@ -79,7 +79,7 @@ test.describe('support', () => {
 
   test('a captured state restores on a fresh page: the same variation, pointer, drafts and sets', async ({ page }) => {
     test.setTimeout(180_000);
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await startVariationAt(page, 1, { p1Move: 'Swords Dance' });
     await pickMove(page, 'p1a');
     await pickMove(page, 'p2a');
@@ -96,7 +96,7 @@ test.describe('support', () => {
     expect(saved.choices.draft.p1.length).toBe(1);
 
     await page.reload();
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.locator('.ps-branch-bar input[type="range"]')).toBeVisible();
     await page.evaluate(state => (window as unknown as { __psState: StateHandle }).__psState.restore(state), saved);
     await expect(history).toContainText('Turn 2', { timeout: 60_000 });

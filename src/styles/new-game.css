@@ -54,10 +54,13 @@
 .ps-newgame-problems ul { margin: 2px 0 3px; padding-left: 16px; list-style: disc; max-height: 220px; overflow-y: auto; }
 .ps-newgame-problems .ps-newgame-note { color: #d8c8a0; font-size: 10px; }
 
-/* The dice seed: a field for the simulator's seed and a button that draws a new one. */
+/* The dice seed row stands under the format row and has its layout (.ps-newgame-format): the label, a field for the simulator's
+   seed, the button that draws a new one and the hint. A seed the check refuses marks the field and names the forms below it. */
 .ps-newgame-seed { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
-.ps-newgame-seed-input { width: 190px; font-family: Consolas, monospace; font-size: 11px; padding: 4px 8px; }
-.ps-newgame-seed-hint { flex: 1 1 100%; font-size: 10px; color: #8899aa; }
+.ps-newgame-seed-input { width: 230px; font-family: Consolas, monospace; font-size: 11px; }
+.ps-newgame-seed-input[aria-invalid="true"] { border-color: #c44; }            /* .ps-btn-red's border */
+.ps-newgame-seed-hint { font-size: 10px; color: #8899aa; }
+.ps-newgame-seed-problem { flex: 1 0 100%; font-size: 10px; }
 
 .ps-newgame-actions { display: flex; gap: 8px; }
 .ps-newgame-actions .ps-btn-red { flex: 1; }                                   /* Import of the sets dialog */
@@ -65,7 +68,6 @@
 
 /* Saved games: the saved branches' rows (BranchSaveSharePanel SavedBranchRow). */
 .ps-newgame-saved { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
-.ps-newgame-saved-title { font-size: 10px; color: #8899aa; }
 .ps-newgame-saved-row {
   display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding-top: 4px;
   border-top: 1px solid rgba(255,255,255,0.08); font-size: 10px; color: #b8c7dc;
@@ -79,12 +81,32 @@
 .ps-newgame-saved-meta .ps-newgame-date { color: #8899aa; }
 .ps-newgame-saved-meta .ps-btn + .ps-btn { margin-left: -4px; }
 .ps-newgame-saved-confirm { color: #f3a6a6; }                                  /* ConfirmBanner's red border, as text */
-.ps-newgame-seed-tag { font-family: Consolas, monospace; color: #8899aa; }
+
+/* The entry to a game besides a replay: the Game menu's parts and the start page's second panel (round 89, H4b). */
+/* The menu is the Load panel (loader.css .ps-loader-panel), a little wider for the saved rows: SetupMenu's panel is 440 px too. */
+.ps-loader-panel.ps-entry-panel { width: min(480px, calc(100 * var(--ps-vw) - 14px)); }
+/* A part's heading: the "Saved branches" label (BranchSaveSharePanel inline style), bold like the branch bar's "Timeline" label. */
+.ps-entry-head { font-size: 11px; font-weight: bold; color: #ccddee; margin: 0 0 6px; }
+.ps-newgame-saved > .ps-entry-head { margin: 0; }
+/* A divider between the parts: the saved rows' top border (BranchSaveSharePanel SavedBranchRow). */
+.ps-entry-sep { border-top: 1px solid rgba(255,255,255,0.08); margin: 10px 0; }
+/* The New game row: the FileRow's hint and button (ReplayLoader FileRow inline style). */
+.ps-entry-row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #8899aa; }
+.ps-entry-row .ps-btn { margin-left: auto; white-space: nowrap; }
+/* "Show all": a support link (SupportLinks .ps-support-link). */
+.ps-entry-more { font-size: 10px; margin-top: 2px; }
+/* The seed of a saved game, under its row: the date's muted color (.ps-newgame-date), monospace like the team paste. */
+.ps-entry-seed { flex: 1 0 100%; font-size: 10px; color: #8899aa; }
+.ps-entry-seed code { font-family: Consolas, monospace; }
+/* The start page's second panel stands under the loader like the loader's own .ps-panel (ReplayLoader). */
+.ps-entry-landing .ps-newgame-saved { margin-top: 8px; }
 
 /* The title row's "New game" tag: .ps-format-tag in the selection blue of the dock (dock.css .ps-movebtn-selected). */
 .ps-format-tag.ps-newgame-tag { background: linear-gradient(180deg, #3d6998 0%, #2d5078 100%); color: #ffffff; font-weight: bold; }
 
 @media (max-width: 640px) {
+  .ps-newgame-seed-input { flex: 1 1 160px; width: auto; }
+  .ps-entry-row { flex-wrap: wrap; }
   .ps-newgame-teams { grid-template-columns: minmax(0, 1fr); }
   .ps-newgame-picker { flex: 1 1 100%; }
   .ps-format-btn { min-width: 0; width: 100%; }

@@ -56,6 +56,24 @@ describe('useGameTeamEdit', () => {
     expect(result.current.notice).toBeNull();
   });
 
+  test('a sets import on a game goes through the same path: both sides, a side the import left out keeps the record\'s own sets', async () => {
+    const record = await startedRecord('gen9ou');
+    const order: string[] = [];
+    const editTeams = vi.fn().mockImplementation(async () => { order.push('edit'); return { kept: 0, error: null }; });
+    const { result } = renderHook(() => useGameTeamEdit({ record, editTeams, stopBranch: () => order.push('stop'), close: () => order.push('close') }));
+    let handled = false;
+    act(() => { handled = result.current.editSides({ p1: edited(0, 'Outrage'), p2: edited(2, 'Outrage') }); });
+    expect(handled).toBe(true);
+    expect(order).toEqual(['stop', 'close', 'edit']);
+    const both = editTeams.mock.calls[0][0];
+    expect(both.p1[0].moves[0]).toBe('Outrage');
+    expect(both.p2[2].moves[0]).toBe('Outrage');
+    act(() => { result.current.editSides({ p1: null, p2: edited(1, 'Outrage') }); });
+    const one = editTeams.mock.calls[1][0];
+    expect(one.p1).toBe(record.teams.p1);
+    expect(one.p2[1].moves[0]).toBe('Outrage');
+  });
+
   test('without a game the edit is not handled, so the replay\'s own save runs', () => {
     const editTeams = vi.fn();
     const { result } = renderHook(() => useGameTeamEdit({ record: null, editTeams, stopBranch: vi.fn(), close: vi.fn() }));

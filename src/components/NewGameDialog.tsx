@@ -1,22 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ModalDialog } from './ModalDialog';
 import { FormatPicker } from './new-game/FormatPicker';
-import { SavedGames } from './new-game/SavedGames';
 import { TeamBox } from './new-game/TeamBox';
 import { useTeamCheck } from './new-game/use-team-check';
 import { CALIBRATED_FORMATS, formatNote, loadPanelGroups } from '../lib/new-game/format-list';
 import type { FormatGroup, FormatOption } from '../lib/new-game/format-options';
 import { newGameSeed, type NewGameRecord } from '../lib/new-game/record';
 import { readTeamPaste, seedProblem, startNewGame, startProblem } from '../lib/new-game/start';
-import { deleteGame, listGames, loadGame } from '../lib/new-game/store';
 
 /**
  * Round 89 (lane H, #105), stage H4: the New game dialog (user ruling 13.11.2026, variant A of the mocks: a modal built from the
- * app's own dialog). Two team fields with the player names, the format list, the dice seed and the saved games; Start reads both
+ * app's own dialog). Two team fields with the player names, the format list and the dice seed; Start reads both
  * pastes, starts the format's battle and hands the record to `onStart`, which opens the game at Team Preview.
  *
  * The dialog stays mounted while it is closed, so the pasted teams survive a click beside it or Cancel. Where it is opened from
- * is the caller's (the Load menu for now); the dialog knows only `open` and `onOpenChange`.
+ * is the caller's (the Game menu and the start page); the dialog knows only `open` and `onOpenChange`. The saved games are
+listed in the menu and on the start page, never here (user ruling 13.11.2026, H11a).
  */
 
 interface Props {
@@ -24,10 +23,6 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   /** Opens a started game in the workspace. */
   onStart: (record: NewGameRecord) => Promise<unknown> | void;
-  /** Opens a saved game in the workspace. */
-  onOpenSaved: (record: NewGameRecord) => Promise<unknown> | void;
-  /** The game that is open in the workspace, if any: its saved row cannot be deleted or opened again. */
-  currentGameId?: string | null;
 }
 
 const DEFAULT_FORMAT = CALIBRATED_FORMATS[0];
@@ -46,22 +41,11 @@ function useFormatGroups(open: boolean): FormatGroup[] | null {
   return groups;
 }
 
-/** The saved games, read again each time the dialog opens (state that follows a prop is reconciled during render). */
-function useSavedGames(open: boolean) {
-  const [rows, setRows] = useState(listGames);
-  const [wasOpen, setWasOpen] = useState(open);
-  if (wasOpen !== open) {
-    setWasOpen(open);
-    if (open) setRows(listGames());
-  }
-  return [rows, setRows] as const;
-}
-
 function SeedRow({ seed, onSeed }: { seed: string; onSeed: (seed: string) => void }) {
   const problem = seed.trim() ? seedProblem(seed) : null;
   return (
     <div className="ps-newgame-seed">
-      <label className="ps-newgame-label" htmlFor="ps-newgame-seed">Dice seed</label>
+      <label className="ps-newgame-label" htmlFor="ps-newgame-seed">Seed</label>
       <input
         id="ps-newgame-seed"
         className="ps-input ps-newgame-seed-input"
@@ -69,20 +53,17 @@ function SeedRow({ seed, onSeed }: { seed: string; onSeed: (seed: string) => voi
         value={seed}
         spellCheck={false}
         aria-invalid={problem !== null}
-        aria-label="Dice seed"
         onChange={event => onSeed(event.target.value)}
       />
       <button type="button" className="ps-btn ps-newgame-small" onClick={() => onSeed(newGameSeed('fresh'))}>New seed</button>
-      <span className="ps-newgame-seed-hint">
-        Each game draws its own dice. Type a seed to roll the same dice again; the game saves it.
-      </span>
-      {problem && <span className="ps-newgame-error" role="alert">{problem}</span>}
+      <span className="ps-newgame-seed-hint">The same seed, teams and choices roll the same dice.</span>
+      {problem && <span className="ps-newgame-error ps-newgame-seed-problem" role="alert">{problem}</span>}
     </div>
   );
 }
 
-/** The draft the dialog keeps while it is closed, and what Start and Open do with it. */
-function useNewGameDraft({ onOpenChange, onStart, onOpenSaved, open }: Pick<Props, 'onOpenChange' | 'onStart' | 'onOpenSaved' | 'open'>) {
+/** The draft the dialog keeps while it is closed, and what Start does with it. */
+function useNewGameDraft({ onOpenChange, onStart, open }: Pick<Props, 'onOpenChange' | 'onStart' | 'open'>) {
   const groups = useFormatGroups(open);
   const [format, setFormat] = useState<string>(DEFAULT_FORMAT);
   const [names, setNames] = useState<[string, string]>(['', '']);
@@ -91,7 +72,6 @@ function useNewGameDraft({ onOpenChange, onStart, onOpenSaved, open }: Pick<Prop
   const [nonce, setNonce] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useSavedGames(open);
   const reads = useMemo(() => [readTeamPaste(texts[0]), readTeamPaste(texts[1])] as const, [texts]);
   const selected: FormatOption | null = useMemo(
     () => groups?.flatMap(group => group.options).find(option => option.id === format) ?? null,
@@ -100,7 +80,7 @@ function useNewGameDraft({ onOpenChange, onStart, onOpenSaved, open }: Pick<Prop
   const check = useTeamCheck(format, reads[0].sets, reads[1].sets, nonce);
   const hint = startProblem({ texts, seed });
 
-  /** Runs one of the dialog's two actions: busy while it runs, its message when it fails, closed when it works. */
+  /** Runs Start: busy while it runs, its message when it fails, closed when it works. */
   const run = async (what: string, action: () => Promise<void>) => {
     setBusy(true);
     setError(null);
@@ -122,24 +102,16 @@ function useNewGameDraft({ onOpenChange, onStart, onOpenSaved, open }: Pick<Prop
       setSeed(newGameSeed('fresh'));
     });
   };
-  const openSaved = (id: string) => {
-    const record = loadGame(id);
-    if (!record) {
-      setError('That saved game could not be read.');
-      return;
-    }
-    void run('open', async () => { await onOpenSaved(record); });
-  };
   return {
-    groups, format, setFormat, names, setNames, texts, setTexts, seed, setSeed, setNonce, busy, error, saved, setSaved,
-    reads, selected, check, hint, start, openSaved,
+    groups, format, setFormat, names, setNames, texts, setTexts, seed, setSeed, setNonce, busy, error,
+    reads, selected, check, hint, start,
   };
 }
 
 export function NewGameDialog(props: Props) {
-  const { open, onOpenChange, currentGameId = null } = props;
+  const { open, onOpenChange } = props;
   const draft = useNewGameDraft(props);
-  const { groups, format, names, texts, reads, selected, check, hint, busy, error, saved } = draft;
+  const { groups, format, names, texts, reads, selected, check, hint, busy, error } = draft;
   if (!open) return null;
   return (
     <ModalDialog title="New game" closeLabel="Close new game" onClose={() => onOpenChange(false)} maxWidth={940}>
@@ -153,6 +125,7 @@ export function NewGameDialog(props: Props) {
           <FormatPicker groups={groups ?? []} value={format} onSelect={option => draft.setFormat(option.id)} disabled={!groups} />
           {selected && <span className="ps-format-facts">{formatNote(selected)}</span>}
         </div>
+        <SeedRow seed={draft.seed} onSeed={draft.setSeed} />
         <div className="ps-newgame-teams">
           {(['p1', 'p2'] as const).map((side, index) => (
             <TeamBox
@@ -170,7 +143,6 @@ export function NewGameDialog(props: Props) {
             />
           ))}
         </div>
-        <SeedRow seed={draft.seed} onSeed={draft.setSeed} />
         {error && <div className="ps-newgame-error" role="alert">{error}</div>}
         {hint && <div className="ps-newgame-field">{hint}</div>}
         <div className="ps-newgame-actions">
@@ -179,7 +151,6 @@ export function NewGameDialog(props: Props) {
           </button>
           <button type="button" className="ps-btn" onClick={() => onOpenChange(false)}>Cancel</button>
         </div>
-        <SavedGames rows={saved} currentId={currentGameId} busy={busy} onOpen={draft.openSaved} onDelete={id => draft.setSaved(deleteGame(id))} />
       </div>
     </ModalDialog>
   );

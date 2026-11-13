@@ -23,7 +23,7 @@ async function load(page: Page, file: string) {
   }));
   await page.goto('/');
   await page.locator('input[type="text"]').first().fill(replay.id);
-  await page.locator('button', { hasText: 'Load' }).first().click();
+  await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).first().click();
   await expect(page.locator('.ps-branch-bar input[type="range"]')).toBeVisible({ timeout: 60_000 });
 }
 

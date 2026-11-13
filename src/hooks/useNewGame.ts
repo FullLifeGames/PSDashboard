@@ -75,6 +75,17 @@ export interface NewGameInputs {
   save?: (record: NewGameRecord) => boolean;
 }
 
+/**
+ * Start: saves the record before the game opens (round 89, D-E1), with no entry played, so the address and the saved lists find a
+ * game that is still at Team Preview. A saved game that opens again saves nothing (its row keeps its place).
+ */
+function useStartGame(openRecord: (next: NewGameRecord) => Promise<void>, save: (record: NewGameRecord) => boolean, setSaveFailed: (failed: boolean) => void) {
+  return useCallback(async (next: NewGameRecord) => {
+    setSaveFailed(!save(next));
+    await openRecord(next);
+  }, [save, openRecord, setSaveFailed]);
+}
+
 export function useNewGame(inputs: NewGameInputs) {
   const { state, replay, branch, storePosition, landRef, save = saveGame } = inputs;
   const { record, recordRef, setRecord } = state;
@@ -91,6 +102,8 @@ export function useNewGame(inputs: NewGameInputs) {
     setRecord(next);
     await replay.openGame(gameReplayData(next), { p1: infoOfTeam(next.teams.p1), p2: infoOfTeam(next.teams.p2) });
   }, [replay, recordRef, setRecord, askLanding]);
+
+  const startGame = useStartGame(openRecord, save, setSaveFailed);
 
   /**
    * Called after a finished turn and after a lead start. A turn that started at the game's tip and is finished (no replacement
@@ -152,7 +165,7 @@ export function useNewGame(inputs: NewGameInputs) {
     return { kept: next.turns, error };
   }, [recordRef, openRecord, save]);
 
-  return { record, openRecord, promote, editTeams, saveFailed, takeLanding };
+  return { record, openRecord, startGame, promote, editTeams, saveFailed, takeLanding };
 }
 
 /**

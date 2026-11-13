@@ -44,15 +44,14 @@ describe('ReplayLoader', () => {
     expect(wired.onLoadFile).toHaveBeenCalledTimes(2);
   });
 
-  test('a loader that is given onNewGame offers New game under the file row, on the start page and in the menu; without it none', async () => {
-    const wired = props({ onNewGame: vi.fn() });
-    const { rerender } = render(<ReplayLoader {...wired} showGuide />);
-    await userEvent.click(screen.getByRole('button', { name: 'New game' }));
-    expect(wired.onNewGame).toHaveBeenCalledTimes(1);
-    rerender(<ReplayLoader {...wired} variant="menu" />);
-    expect(screen.getByRole('button', { name: 'New game' })).toBeInTheDocument();
-    rerender(<ReplayLoader {...props()} />);
+  test('the menu body names its part "Load replay"; the start page keeps its own title; the loader offers no New game of its own', () => {
+    const { rerender } = render(<ReplayLoader {...props()} variant="menu" />);
+    expect(screen.getByText('Load replay')).toBeInTheDocument();
+    expect(screen.queryByText('Load Replay')).toBeNull();
     expect(screen.queryByRole('button', { name: 'New game' })).toBeNull();
+    rerender(<ReplayLoader {...props()} />);
+    expect(screen.getByText('Load Replay')).toBeInTheDocument();
+    expect(screen.queryByText('Load replay')).toBeNull();
   });
 
   test('errors, the team status, and the workflow guide render on demand', () => {

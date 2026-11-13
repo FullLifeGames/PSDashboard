@@ -18,7 +18,7 @@ test.describe('PS Dashboard', () => {
       localStorage.setItem('ps-replay-interceptor:eval-prefs', JSON.stringify({ depth: 1, samples: 1, auto: false, tera: 'auto' }));
     });
     await page.reload();
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
 
     const panel = page.locator('.ps-main-right .ps-eval-panel');
@@ -72,7 +72,7 @@ test.describe('PS Dashboard', () => {
 
     // …so after a reload the graph re-analyzes from the store.
     await page.reload();
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
     await panel.locator('button', { hasText: 'Analyze game' }).click();
     await expect(panel.locator('.ps-eval-graph')).toBeVisible({ timeout: 30_000 });
@@ -87,7 +87,7 @@ test.describe('PS Dashboard', () => {
         JSON.stringify({ depth: 1, samples: 1, auto: false, tera: 'auto' }));
     });
     await page.reload();
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
 
     const panel = page.locator('.ps-main-right .ps-eval-panel');
@@ -112,7 +112,7 @@ test.describe('PS Dashboard', () => {
         JSON.stringify({ depth: 2, samples: 1, auto: false, tera: 'auto' }));
     });
     await page.reload();
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
 
     const panel = page.locator('.ps-main-right .ps-eval-panel');
@@ -143,7 +143,7 @@ test.describe('PS Dashboard', () => {
         JSON.stringify({ depth: 1, samples: 1, mode: 'mcts', auto: false, tera: 'auto' }));
     });
     await page.reload();
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
 
     const panel = page.locator('.ps-main-right .ps-eval-panel');
@@ -227,7 +227,7 @@ test.describe('PS Dashboard', () => {
     });
     await page.reload();
     await page.locator('input[type="text"]').fill('gen9vgc-test');
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.getByText('Alice', { exact: true }).first()).toBeVisible({ timeout: 10000 });
     // Auto runs the tree from the first doubles turn, VGC counted as doubles.
     await expectReanalyzeReplaces(page, 'auto');
@@ -241,7 +241,7 @@ test.describe('PS Dashboard', () => {
         JSON.stringify({ depth: 2, samples: 1, mode: 'matrix', auto: false, tera: 'auto' }));
     });
     await page.reload();
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
     await expectReanalyzeReplaces(page, 'mcts');
   });
@@ -261,7 +261,7 @@ test.describe('PS Dashboard', () => {
       });
       await page.reload();
       if (replayId) await page.locator('input[type="text"]').fill(replayId);
-      await page.locator('button', { hasText: 'Load' }).click();
+      await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
       await expect(page.getByText(player, { exact: true }).first()).toBeVisible({ timeout: 10000 });
 
       // No sweep ran: step back from the end to turn 2, a turn with a later turn after it.

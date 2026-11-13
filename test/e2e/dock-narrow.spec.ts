@@ -15,7 +15,7 @@ for (const width of [1000, 390]) {
     await page.setViewportSize({ width, height: 800 });
     await page.reload();
     await page.locator('input[type="text"]').fill('gen9doubles-test');
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await startVariationAt(page, 1);
 
     const dock = page.locator('.ps-dock');

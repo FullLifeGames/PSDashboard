@@ -27,7 +27,7 @@ test('reproduce a reported state', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: state.browser?.width ?? 1280, height: state.browser?.height ?? 720 });
   await page.goto('/');
   await page.locator('input[type="text"]').first().fill(replay.id);
-  await page.locator('button', { hasText: 'Load' }).click();
+  await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
   await expect(page.locator('.ps-branch-bar input[type="range"]')).toBeVisible({ timeout: 30_000 });
   await page.evaluate(saved => (window as unknown as { __psState: StateHandle }).__psState.restore(saved), state);
   await page.waitForTimeout(3000);

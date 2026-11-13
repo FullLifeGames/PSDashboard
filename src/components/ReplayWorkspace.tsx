@@ -21,7 +21,7 @@ import { REPLAY_FRAME_HEIGHT } from '../lib/replay-html';
 interface WorkspaceProps {
   app: AppController;
   replayData: ReplayData;
-  /** Round 89 (#105): opens the New game dialog (an item of the Load menu). */
+  /** Round 89 (#105): opens the New game dialog (a part of the Game menu). */
   onNewGame?: () => void;
 }
 
@@ -66,6 +66,8 @@ function WorkspaceTopBar({ app, replayData, onNewGame }: WorkspaceProps) {
         teamStatus: teamPasteStatus,
         teamError: teamPasteError,
         onNewGame,
+        onOpenGame: app.ctx.newGame.openRecord,
+        currentGameId: app.ctx.newGame.record?.id ?? null,
       }}
       newGame={isGameId(replayData.id)}
       onReportIssue={app.support.reportIssue}

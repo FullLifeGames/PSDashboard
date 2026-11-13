@@ -53,7 +53,7 @@ const nearRow = (near: 'p1' | 'p2', slots: number) => {
 };
 
 async function loadSingles(page: Page) {
-  await page.locator('button', { hasText: 'Load' }).click();
+  await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
   await expect(page.locator('iframe[title="PS Replay"]')).toBeVisible({ timeout: 10_000 });
 }
 
@@ -191,7 +191,7 @@ test.describe('a replay opened from the second player\'s side (?p2)', () => {
       });
       await page.goto('/');
       await page.locator('input[type="text"]').fill(`https://replay.pokemonshowdown.com/${id}?p2`);
-      await page.locator('button', { hasText: 'Load' }).click();
+      await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
       await waitForExactPickers(page, turn);
       const frame = await frameOf(page);
       await expect.poll(() => nearSide(frame)).toBe('p2');
