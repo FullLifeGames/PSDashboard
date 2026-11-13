@@ -20,17 +20,22 @@ test('reproduce a reported state', async ({ page }, testInfo) => {
   expect(state.kind, 'a PS Dashboard state file').toBe('ps-dashboard-state');
 
   await routeOfflineFixtures(page);
+  // Round 89 (#105, H5): a game's file carries its record; the restore opens the game, no replay is loaded first.
+  const game = typeof state.game?.id === 'string';
   const replay = { views: 0, ...state.replay };
   await page.route('**/replay.pokemonshowdown.com/**', route => route.fulfill({
     status: 200, contentType: 'application/json', body: JSON.stringify(replay),
   }));
   await page.setViewportSize({ width: state.browser?.width ?? 1280, height: state.browser?.height ?? 720 });
   await page.goto('/');
-  await page.locator('input[type="text"]').first().fill(replay.id);
-  await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
-  await expect(page.locator('.ps-branch-bar input[type="range"]')).toBeVisible({ timeout: 30_000 });
+  if (!game) {
+    await page.locator('input[type="text"]').first().fill(replay.id);
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
+    await expect(page.locator('.ps-branch-bar input[type="range"]')).toBeVisible({ timeout: 30_000 });
+  }
   await page.evaluate(saved => (window as unknown as { __psState: StateHandle }).__psState.restore(saved), state);
   await page.waitForTimeout(3000);
+  if (game) await expect(page.locator('.ps-branch-bar input[type="range"]')).toBeVisible({ timeout: 30_000 });
 
   const bar = await page.locator('.ps-branch-bar').innerText();
   console.log(`reported: ${state.app.version} (${state.app.commit}), ${state.replay.id}`);
