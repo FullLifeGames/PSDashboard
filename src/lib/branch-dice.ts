@@ -308,9 +308,10 @@ export function pullNotes(dice: readonly ForcedDie[], offers: readonly DieOffer[
 /**
  * Round 89 (#114): the report of the dice the user forced, with the later hits of one move and target as one die of the count they
  * set ("Triple Axel: 2 hits"), so the history row, the share link and the frame's lines say it once. The count is the engine's
- * `chainCount` of the hit dice; the entry takes the place of the first hit die, its log index, and the report of the first die that
- * did not apply (a miss that ended the chain in advance, a die the simulator never drew, does not count against the hits that landed:
- * the chain ended at or before it).
+ * `chainCount` of the hit dice; the entry takes the place of the first hit die and its log index. The report is that of the first die
+ * that did not apply, except for a miss that ended the chain in advance and was never drawn (the chain ended at or before it). A
+ * count that played in part (the target fainted on hit 5 of a forced 10) reads `blocked`: the line of the forced count stands and
+ * the reason follows it.
  */
 export function foldHitReports(forced: readonly DieReport[]): DieReport[] {
   const keyOf = (name: DieName) => `${name.slot}:${name.moveId}:${name.targetSlot ?? ''}`;
@@ -324,7 +325,7 @@ export function foldHitReports(forced: readonly DieReport[]): DieReport[] {
     const logged = group.map(held => held.logIndex).filter((index): index is number => index !== undefined);
     return [{
       die: { name: { ...plainName(entry.die.name), kind: 'hit-count' }, result: { hits: chainCount(group.map(held => hitResult(held.die))) } },
-      took: failed?.took ?? 'applied',
+      took: !failed ? 'applied' : group.some(held => held.took === 'applied') ? 'blocked' : failed.took,
       ...(failed?.reason !== undefined ? { reason: failed.reason } : {}),
       ...(logged.length > 0 ? { logIndex: Math.min(...logged) } : {}),
     }];

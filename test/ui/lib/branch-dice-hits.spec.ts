@@ -200,6 +200,15 @@ describe('the history and the share link read one entry per chain', () => {
     shownStart: 2, complete: true,
   };
 
+  test('a count that played in part (the target fainted on hit 3 of a forced 4) says so with the report\'s reason', () => {
+    const stopped = { took: 'no-draw' as const, reason: 'Triple Axel ended after 3 hits' };
+    const forced = report(entry(later('populationbomb', 2, true), { logIndex: 4 }), entry(later('populationbomb', 3, true), { logIndex: 5 }), entry(later('populationbomb', 4, true), stopped), entry(later('populationbomb', 5, false), stopped));
+    expect(diceMarksOf(forced, words)!.p1).toEqual([{ label: 'Population Bomb: 4 hits', noEffect: 'Triple Axel ended after 3 hits' }]);
+    const lines = dieLines(forced, WINDOW, words);
+    expect(lines.map(line => line.text)).toEqual(['Forced: Population Bomb 4 hits', 'Forced 4 hits had no effect: Triple Axel ended after 3 hits']);
+    expect(lines[0].at).toBe(4);
+  });
+
   test('the frame says "Forced: Triple Axel 2 hits" once, before the second hit', () => {
     const lines = dieLines(report(
       entry(plain('tripleaxel'), { logIndex: 3 }), entry(later('tripleaxel', 2, true), { logIndex: 4 }), entry(later('tripleaxel', 3, false), { logIndex: 5 }),
