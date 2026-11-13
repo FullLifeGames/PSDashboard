@@ -202,11 +202,14 @@ function LeadSlot({ app, replayData, nearSide }: WorkspaceProps & { nearSide: Fr
 }
 
 function BranchSidePanels({ app, replayData }: WorkspaceProps) {
-  const { viewTurn, viewingVariation, variationSpan, navigateTo } = app.board.timeline;
+  const { viewTurn, viewT0, viewingVariation, variationSpan, navigateTo } = app.board.timeline;
   const { history } = app.ctx.branch;
   const { snapshots } = app.ctx.replay;
   const branchStartTurn = variationSpan?.startTurn ?? viewTurn;
-  const slots = useBranchSaveShare({ replayData, branchTurn: branchStartTurn, history, finalLog: app.analysis.simLog });
+  // Round 89 (#105, H5): a game shares as a game, with the turn the user stands on.
+  const record = app.ctx.newGame.record;
+  const game = record ? { record, view: { turn: viewTurn, line: viewingVariation ? 'variation' as const : 'main' as const, ...(viewT0 ? { t0: true } : {}) } } : null;
+  const slots = useBranchSaveShare({ replayData, branchTurn: branchStartTurn, history, finalLog: app.analysis.simLog, game });
   return (
     <BranchHistoryPanel
       key={branchStartTurn}
