@@ -57,6 +57,14 @@ describe('the support state file (round 77, user gate 28.10.2026)', () => {
     expect(supportFileName(state)).toBe('ps-dashboard-state-gen9draft-2058494320-2026-10-28T12-34-56Z.json');
   });
 
+  test('the issue link of a new game names the game and the format, not a Showdown replay that does not exist (H4h)', () => {
+    const game = buildSupportState(inputs({ replay: { id: 'newgame-m7nj3hx23e', format: '[Gen 9] OU', formatid: 'gen9ou', players: ['Tidepool', 'Marrowkid'], log: '|turn|1', uploadtime: 1, rating: undefined, viewpoint: 'p1' } }));
+    const url = new URL(issueUrl(game, 'state.json'));
+    expect(url.searchParams.get('replay')).toBe('New game newgame-m7nj3hx23e, [Gen 9] OU (no Showdown replay)');
+    expect(url.searchParams.get('body')).not.toContain('replay.pokemonshowdown.com');
+    expect(url.searchParams.get('body')).toContain('**Replay:** New game newgame-m7nj3hx23e, [Gen 9] OU (no Showdown replay)');
+  });
+
   test('the issue link fills the form fields by their ids, carries the same facts as a description, and clips long text', () => {
     const state = buildSupportState(inputs());
     const url = new URL(issueUrl(state, 'state.json'));

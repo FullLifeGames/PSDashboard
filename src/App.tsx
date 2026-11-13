@@ -36,7 +36,7 @@ function MissingGameNotice({ app }: { app: AppController }) {
   if (!id || app.ctx.replay.replayData || app.ctx.shared.sharedBranch || app.ctx.replay.embed) return null;
   return (
     <div className="ps-entry-notice" role="alert">
-      The game {id} is not saved in this browser. A share link of the game (Copy Share Link) brings it along.
+      The game {id} is not saved in this browser.
     </div>
   );
 }

@@ -3,6 +3,7 @@ import type { ReplayData } from '@fulllifegames/replay-core';
 import type { BranchHistoryEntry } from '../hooks/useBranch';
 import type { BranchHistorySlots } from './BranchHistoryPanel';
 import { SavedList, ShareLinkField } from './BranchSaveSharePanel';
+import { isGameId } from '../lib/new-game/record';
 import {
   deleteSavedBranch,
   encodeBranchShare,
@@ -84,7 +85,8 @@ export function useBranchSaveShare({ replayData, branchTurn, history, finalLog }
     actions: (
       <>
         <button type="button" className="ps-btn" onClick={saveBranch} title={SAVE_TITLE} style={buttonStyle}>Save Branch</button>
-        <button type="button" className="ps-btn" onClick={createLink} title={SHARE_TITLE} style={buttonStyle}>Copy Share Link</button>
+        {/* a version 1 link names a Showdown replay: a new game has none until its own link format exists (H5) */}
+        {!isGameId(replayData.id) && <button type="button" className="ps-btn" onClick={createLink} title={SHARE_TITLE} style={buttonStyle}>Copy Share Link</button>}
       </>
     ),
     status: open => (

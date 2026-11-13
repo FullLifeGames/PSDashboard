@@ -11,8 +11,8 @@ const replayData = singlesReplay();
 const { snapshots } = replayFixture('singles');
 
 /** Round 84 (A7i, ruling 20a): the workspace wires the hook into the history panel; the spec does the same. */
-function Panel({ branchHistory = history, finalLog = '|turn|3' }: { branchHistory?: BranchHistoryEntry[]; finalLog?: string }) {
-  const slots = useBranchSaveShare({ replayData, branchTurn: 2, history: branchHistory, finalLog });
+function Panel({ branchHistory = history, finalLog = '|turn|3', data = replayData }: { branchHistory?: BranchHistoryEntry[]; finalLog?: string; data?: typeof replayData }) {
+  const slots = useBranchSaveShare({ replayData: data, branchTurn: 2, history: branchHistory, finalLog });
   return <BranchHistoryPanel branchStartTurn={2} history={branchHistory} snapshots={snapshots} slots={slots} />;
 }
 const toggle = () => screen.getByRole('button', { name: /Variation moves/ });
@@ -40,6 +40,12 @@ describe('the save and share buttons of the history panel', () => {
     expect(save).toHaveAttribute('title', 'Stores the replay id, branch turn, choices and final branch log in this browser.');
     expect(share).toHaveAttribute('title', 'Copies a link that opens this branch read-only.');
     expect(screen.queryByText('Save / Share Branch')).toBeNull();
+  });
+
+  test('a new game offers Save Branch and no share link until the game has its own link (a version 1 link needs a Showdown replay id; H4h)', () => {
+    render(<Panel data={{ ...replayData, id: 'newgame-m7nj3hx23e', formatid: 'gen9ou' }} />);
+    expect(screen.getByRole('button', { name: 'Save Branch' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Copy Share Link' })).toBeNull();
   });
 
   test('a share link encodes the branch and lands in the clipboard; the field shows under the line while the history is closed', async () => {

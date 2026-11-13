@@ -155,7 +155,7 @@ describe('a new game in the app', () => {
     await savedRecord(['Ann', 'Ben'], 0, '9,9,9,9');
     window.history.replaceState(null, '', '/?game=newgame-k3x9q0m2ab');
     render(<App />);
-    expect(screen.getByRole('alert')).toHaveTextContent('The game newgame-k3x9q0m2ab is not saved in this browser. A share link of the game (Copy Share Link) brings it along.');
+    expect(screen.getByRole('alert')).toHaveTextContent(/^The game newgame-k3x9q0m2ab is not saved in this browser\.$/);
     expect(screen.getByText('Load Replay')).toBeInTheDocument();
     expect(document.querySelectorAll('.ps-entry-landing .ps-newgame-saved-row')).toHaveLength(1);
     expect(document.querySelector('.ps-topbar')).toBeNull();

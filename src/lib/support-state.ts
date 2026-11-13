@@ -4,6 +4,7 @@ import type { BranchSlotChoice, EvalPreferences } from '@fulllifegames/eval-engi
 import type { BranchHistoryEntry } from './branch-history';
 import type { ViewLine } from './timeline';
 import { turnEntryCount } from './variation-turns';
+import { isGameId } from './new-game/record';
 
 /**
  * Round 77 (user gate 28.10.2026, "1a 2a 3a 4a 5a"): the app's state as one readable file for a bug
@@ -108,7 +109,10 @@ const clip = (text: string) => (text.length > FIELD_MAX ? `${text.slice(0, FIELD
  */
 export function issueUrl(state: SupportState, fileName: string): string {
   const message = screenMessage(state);
-  const replay = state.replay ? `https://replay.pokemonshowdown.com/${state.replay.id}` : 'none loaded';
+  // a new game has no Showdown page: its id and format stand in the field (the state file carries its log)
+  const replay = !state.replay ? 'none loaded'
+    : isGameId(state.replay.id) ? `New game ${state.replay.id}, ${state.replay.format} (no Showdown replay)`
+      : `https://replay.pokemonshowdown.com/${state.replay.id}`;
   const version = `${state.app.version} (${state.app.commit})`;
   const position = positionLabel(state);
   const stateFile = `Attach ${fileName} (downloaded by "Report issue") to this issue.`;
