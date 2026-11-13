@@ -1,0 +1,90 @@
+import { describe, expect, test } from 'vitest';
+import { lineBlocks, type LineViewContext } from '../../../src/lib/line-view';
+import { bothRolesLine, doublesLine, DOUBLES_NAMES, playedLine, singlesLine, SINGLES_NAMES } from '../fixtures/lines';
+
+/**
+ * Round 89 (#104), step G3: the data under the Lines section. Ruling 33: per player the engine's line and the played line (one
+ * line for a player who played the engine's move); chips only for dice that could have gone the other way (question 3a); the
+ * tooltip of ▶ Play lists every forced die.
+ */
+const singles: LineViewContext = { turn: 20, playerNames: SINGLES_NAMES, doubles: false, rules: { gen: 9, mod: undefined } };
+const doubles: LineViewContext = {
+  turn: 4, playerNames: DOUBLES_NAMES, doubles: true, rules: { gen: 9, mod: undefined },
+  actives: { p1: ['Incineroar', 'Amoonguss'], p2: ['Urshifu', 'Rillaboom'] },
+};
+
+describe('lineBlocks', () => {
+  test('a singles line is one row per step with both players, numbered from the graded turn', () => {
+    const [block] = lineBlocks([singlesLine], singles);
+    expect(block.player).toBe('Pepitopalotin');
+    expect(block.role).toBe('engine: Hydro Pump');
+    expect(block.rows.map(row => [row.turn, row.sides.map(side => `${side.player} ${side.text}`)])).toEqual([
+      ['T20', ['Tzon Draining Kiss', 'Pepitopalotin Hydro Pump']],
+      ['T21', ['Tzon → Corviknight', 'Pepitopalotin Moonblast']],
+      ['T22', ['Tzon Brave Bird', 'Pepitopalotin Moonblast']],
+    ]);
+  });
+
+  test('chips name the dice that could have gone the other way and nothing quiet (3a)', () => {
+    const [block] = lineBlocks([singlesLine], singles);
+    const chips = block.rows.map(row => row.sides.map(side => side.chips));
+    // Hydro Pump hits at 80 percent shows; its crit that does not come and Moonblast's unlanded drop stay quiet
+    expect(chips[0]).toEqual([[], ['Hydro Pump: hits (80%)']]);
+    expect(chips[1]).toEqual([[], []]);
+    // the knock-out that depends on the roll shows, with the rolls that hold it, on the player who rolls it
+    expect(chips[2]).toEqual([['Brave Bird: KO (10 of 16 rolls)'], []]);
+  });
+
+  test('the tooltip of the play button lists every forced die, the quiet ones too', () => {
+    const [block] = lineBlocks([singlesLine], singles);
+    expect(block.tooltip).toContain('Play this line as a variation');
+    expect(block.tooltip.split('\n').slice(1)).toEqual([
+      'T20: Hydro Pump: hits (80%)',
+      'T20: Hydro Pump: no crit (96%)',
+      'T21: Moonblast: no Special Attack change (70%)',
+      'T22: Brave Bird: damage roll 8 (KO in 10 of 16 rolls)',
+    ]);
+  });
+
+  test('a line that forces no die says so in its tooltip', () => {
+    expect(lineBlocks([playedLine], singles)[0].tooltip).toBe('Play this line as a variation, with these dice: none to force.');
+  });
+
+  test('the end value reads as the turn card writes a win chance, for the line\'s own player', () => {
+    expect(lineBlocks([singlesLine], singles)[0].end).toMatch(/^ends at \d+% for Pepitopalotin$/);
+    expect(lineBlocks([bothRolesLine], singles)[0].end).toMatch(/ for Tzon$/);
+  });
+
+  test('player 1 first, each player\'s engine line before the played line; a player who played the engine\'s move has one line', () => {
+    const blocks = lineBlocks([playedLine, singlesLine, bothRolesLine], singles);
+    expect(blocks.map(block => `${block.player} · ${block.role}`)).toEqual([
+      'Tzon · played the engine\'s move: Draining Kiss',
+      'Pepitopalotin · engine: Hydro Pump',
+      'Pepitopalotin · played: Hyper Voice',
+    ]);
+  });
+
+  test('doubles: one row per player and step, the turn number on the first row of a step, a replacement as its own row', () => {
+    const [block] = lineBlocks([doublesLine], doubles);
+    expect(block.rows.map(row => [row.turn, row.sides.map(side => `${side.player} ${side.text}`)])).toEqual([
+      ['T4', ['pixelfrost Fake Out → Rillaboom + Spore → Zamazenta']],
+      ['', ['Mstr_Hawk Sucker Punch → Terapagos + Protect']],
+      ['', ['Mstr_Hawk replaces: → Zamazenta-Crowned']],
+      ['T5', ['pixelfrost Fake Out → Zamazenta-Crowned + Protect']],
+      ['', ['Mstr_Hawk Behemoth Bash → Rillaboom + Protect']],
+    ]);
+  });
+
+  test('doubles chips ride on the player whose slot holds the die: a speed tie by the name of the body, a roll by the move', () => {
+    const [block] = lineBlocks([doublesLine], doubles);
+    expect(block.rows[0].sides[0].chips).toEqual(['Speed tie: Urshifu first (50%)', 'Spore: hits (75%)']);
+    expect(block.rows[1].sides[0].chips).toEqual([]);
+    expect(block.rows[4].sides[0].chips).toEqual(['Behemoth Bash: KO (12 of 16 rolls)']);
+  });
+
+  test('a line that leaves a draw to the seed says what the click cannot force', () => {
+    const [block] = lineBlocks([{ ...singlesLine, unforced: ['hit-count', 'unnamed draw'] }], singles);
+    expect(block.note).toBe('The click cannot force the number of hits of a multi-hit move, sleep turns, random targets and similar draws. The seed decides them.');
+    expect(lineBlocks([singlesLine], singles)[0].note).toBeNull();
+  });
+});
