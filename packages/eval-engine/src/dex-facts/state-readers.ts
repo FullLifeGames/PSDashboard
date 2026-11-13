@@ -1,5 +1,5 @@
 import type { Battle } from '@pkmn/sim';
-import { idsOfStrings, lex, readsOfCode } from './handler-source';
+import { idsOfStrings, lex, readsOfCode } from './handler-source.ts';
 
 /**
  * Round 89 (#149, step A8): which fields of the board a Dex entry reads when one of its handlers runs. The memos of the
