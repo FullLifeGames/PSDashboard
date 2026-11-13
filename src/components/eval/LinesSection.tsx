@@ -1,6 +1,7 @@
 import { Fragment } from 'react';
 import type { EvalResult } from '@fulllifegames/eval-engine';
-import { activeNamesAt, lineBlocks, type LineBlockView, type LinesHost, type LineSideView } from '../../lib/line-view';
+import { LineConfirm } from './LineConfirm';
+import { activeNamesAt, lineAnchor, lineBlocks, type LineBlockView, type LinesHost, type LineSideView } from '../../lib/line-view';
 
 interface LinesSectionProps {
   turn: number;
@@ -19,7 +20,7 @@ function SideText({ view }: { view: LineSideView }) {
   );
 }
 
-function LineBlock({ block, turn, onPlay }: { block: LineBlockView; turn: number; onPlay?: LinesHost['onPlay'] }) {
+function LineBlock({ block, turn, onPlay, confirm }: { block: LineBlockView; turn: number; onPlay?: LinesHost['onPlay']; confirm?: LinesHost['confirm'] }) {
   return (
     <div className="ps-eval-line-block">
       <div className="ps-eval-line-head">
@@ -31,6 +32,7 @@ function LineBlock({ block, turn, onPlay }: { block: LineBlockView; turn: number
         )}
         <span style={{ color: '#778' }}>{block.end}</span>
       </div>
+      {confirm && confirm.anchor === lineAnchor(block.line, turn) && <LineConfirm confirm={confirm} />}
       {block.rows.map(row => (
         <div key={row.key} className="ps-eval-line-turn">
           <span className="t">{row.turn}</span>
@@ -70,7 +72,7 @@ export function LinesSection({ turn, result, playerNames, doubles, host }: Lines
   return (
     <div className="ps-eval-lines">
       <span className="ps-eval-lines-title">Lines</span>
-      {blocks.map(block => <LineBlock key={block.key} block={block} turn={turn} onPlay={host.onPlay} />)}
+      {blocks.map(block => <LineBlock key={block.key} block={block} turn={turn} onPlay={host.onPlay} confirm={host.confirm} />)}
     </div>
   );
 }

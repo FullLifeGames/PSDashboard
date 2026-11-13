@@ -29,6 +29,18 @@ export interface LineBlockView {
   note: string | null;
 }
 
+/** The question after ▶ Play on a line when a variation stands: it names the clicked line, so that line's block shows it (round 89, G4b). */
+export interface LineConfirm {
+  /** `lineAnchor` of the clicked line and its turn. */
+  anchor: string;
+  message: string;
+  proceed: () => void;
+  cancel: () => void;
+}
+
+/** One line of one graded turn: a side's engine line and played line differ in their label and roles. */
+export const lineAnchor = (line: EvalLine, turn: number): string => `${turn}|${line.side}|${line.label}|${line.for.join('+')}`;
+
 /** What the host of the turn card hands the Lines section: the game's rules, the field at the turn's start and the click. */
 export interface LinesHost {
   rules: GameRules;
@@ -38,6 +50,8 @@ export interface LinesHost {
   snapshotAt?: (turn: number) => TurnSnapshot | null;
   /** ▶ Play: the line from the start of the graded turn. */
   onPlay?: (line: EvalLine, turn: number) => void;
+  /** The replace question a click raised; the block of its line shows it, so it stands where the user clicked. */
+  confirm?: LineConfirm | null;
 }
 
 export interface LineViewContext {

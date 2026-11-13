@@ -1,8 +1,9 @@
 import { describe, expect, test, vi } from 'vitest';
-import { renderHook } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 import { useLinesHost, usePlayLine } from '../../../src/hooks/usePlayLine';
 import type { AppController } from '../../../src/hooks/useAppController';
 import { lineHistory } from '../../../src/lib/line-history';
+import { lineAnchor } from '../../../src/lib/line-view';
 import { doublesLine, singlesLine } from '../fixtures/lines';
 
 /**
@@ -28,7 +29,7 @@ describe('usePlayLine', () => {
   test('with no variation the click restores the line at once, from the graded turn, and follows the tip', () => {
     const stub = appWith(null);
     const { result } = renderHook(() => usePlayLine(stub.app));
-    result.current(singlesLine, 20);
+    result.current.onPlay(singlesLine, 20);
     expect(stub.setPendingConfirm).not.toHaveBeenCalled();
     expect(stub.restoreVariation).toHaveBeenCalledTimes(1);
     expect(stub.restoreVariation).toHaveBeenCalledWith({
@@ -43,27 +44,52 @@ describe('usePlayLine', () => {
   test('a doubles line restores with its replacement entry', () => {
     const stub = appWith(null);
     const { result } = renderHook(() => usePlayLine(stub.app));
-    result.current(doublesLine, 4);
+    result.current.onPlay(doublesLine, 4);
     const [{ history }] = stub.restoreVariation.mock.calls[0];
     expect(history.map((entry: { kind: string }) => entry.kind)).toEqual(['turn', 'forced', 'turn']);
   });
 
-  test('an existing variation is replaced only after the confirm, which names it', () => {
+  test('an existing variation is replaced only after the confirm, which the click\'s own line holds and the dock does not', () => {
     const stub = appWith({ startTurn: 12, length: 3 });
     const { result } = renderHook(() => usePlayLine(stub.app));
-    result.current(singlesLine, 20);
+    expect(result.current.confirm).toBeNull();
+    act(() => result.current.onPlay(singlesLine, 20));
     expect(stub.restoreVariation).not.toHaveBeenCalled();
-    const [confirm] = stub.setPendingConfirm.mock.calls[0];
+    // the question stands at the clicked line (the host's `confirm`), not in the dock's banner (`pendingConfirm`)
+    expect(stub.setPendingConfirm).not.toHaveBeenCalled();
+    const confirm = result.current.confirm!;
+    expect(confirm.anchor).toBe(lineAnchor(singlesLine, 20));
     expect(confirm.message).toBe('Play this line from turn 20: replace the existing variation from turn 12 (3 turns)?');
-    confirm.proceed();
-    expect(stub.setPendingConfirm).toHaveBeenLastCalledWith(null);
+    act(() => confirm.proceed());
     expect(stub.restoreVariation).toHaveBeenCalledTimes(1);
+    expect(result.current.confirm).toBeNull();
+  });
+
+  test('Cancel closes the question and leaves the variation; a second click moves the question to its line', () => {
+    const stub = appWith({ startTurn: 12, length: 3 });
+    const { result } = renderHook(() => usePlayLine(stub.app));
+    act(() => result.current.onPlay(singlesLine, 20));
+    act(() => result.current.onPlay(doublesLine, 4));
+    expect(result.current.confirm?.anchor).toBe(lineAnchor(doublesLine, 4));
+    act(() => result.current.confirm!.cancel());
+    expect(result.current.confirm).toBeNull();
+    expect(stub.restoreVariation).not.toHaveBeenCalled();
+  });
+
+  test('a question about a variation that has since changed is stale and shows no more', () => {
+    const stub = appWith({ startTurn: 12, length: 3 });
+    const { result, rerender } = renderHook(({ app }) => usePlayLine(app), { initialProps: { app: stub.app } });
+    act(() => result.current.onPlay(singlesLine, 20));
+    expect(result.current.confirm).not.toBeNull();
+    const longer = appWith({ startTurn: 12, length: 4 });
+    rerender({ app: longer.app });
+    expect(result.current.confirm).toBeNull();
   });
 
   test('the engine view switches Auto on, as a click on an engine row does', () => {
     const stub = appWith(null, false);
     const { result } = renderHook(() => usePlayLine(stub.app));
-    result.current(singlesLine, 20);
+    result.current.onPlay(singlesLine, 20);
     expect(stub.setPrefs).toHaveBeenCalledWith(expect.objectContaining({ auto: true }));
   });
 });
@@ -83,5 +109,6 @@ describe('useLinesHost', () => {
     expect(result.current.snapshotAt?.(3)).toBe(snapshots[2]);
     expect(result.current.snapshotAt?.(9)).toBe(snapshots[2]);
     expect(result.current.onPlay).toBeTypeOf('function');
+    expect(result.current.confirm).toBeNull();
   });
 });
