@@ -53,9 +53,9 @@ function noun(report: DieReport, words: DieWords): string {
   return lowerFirst(resultWord(report.die, words));
 }
 
-/** "Forced 10 hits had no effect: ...", or "Forced 10 hits, 5 played: ..." for a count the game cut short after hits that landed (round 89). */
+/** "Forced 10 hits had no effect: ...", or "Forced 10 hits, 5 landed: ..." for a count the game cut short after hits that landed (round 89). */
 const noEffectText = (report: DieReport, words: DieWords): string =>
-  `Forced ${noun(report, words)}${report.landed === undefined ? ' had no effect' : `, ${report.landed} played`}${report.reason ? `: ${report.reason}` : ''}`;
+  `Forced ${noun(report, words)}${report.landed === undefined ? ' had no effect' : `, ${report.landed} landed`}${report.reason ? `: ${report.reason}` : ''}`;
 
 /** The lines that open the next action or end the turn (the simulator's protocol; the dice module's reports read the same ones). */
 function startsAction(line: string): boolean {
