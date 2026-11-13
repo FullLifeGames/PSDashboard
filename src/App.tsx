@@ -77,12 +77,12 @@ function AppModals({ app }: { app: AppController }) {
     <>
       {gameEdit.notice && (
         <div className="ps-panel" role="alert" style={{ marginTop: 8, color: '#e6b36a', fontSize: 11 }}>
-          {gameEdit.notice}
-          <button type="button" className="ps-btn" style={{ marginLeft: 8, padding: '2px 8px', fontSize: 10 }} onClick={gameEdit.dismiss}>Dismiss</button>
+          {gameEdit.notice}<button type="button" className="ps-btn" style={{ marginLeft: 8, padding: '2px 8px', fontSize: 10 }} onClick={gameEdit.dismiss}>Dismiss</button>
         </div>
       )}
       {setsPanelOpen && replayData && (
         <SetsImportExportPanel
+          game={record !== null}
           // Round 70 (T205): the export reads what the stats panel shows (the solved spreads, the posted sheet), not the
           // enriched infos: those hold the usage guesses and the published IVs, and an import takes every value it reads
           // as the user's own input over the solver.
@@ -92,7 +92,6 @@ function AppModals({ app }: { app: AppController }) {
             p1Info: statsP1Info,
             p2Info: statsP2Info,
           })}
-          game={record !== null}
           onImport={text => {
             // a game's sets belong to its record: the import plays it again on them (editTeams), as the editor does
             const importError = applySetsText(text, record ? next => { gameEdit.editSides(next); } : undefined);
