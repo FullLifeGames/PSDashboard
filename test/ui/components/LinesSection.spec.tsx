@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { EvalLine, EvalResult } from '@fulllifegames/eval-engine';
 import { LinesSection } from '../../../src/components/eval/LinesSection';
@@ -60,8 +60,13 @@ describe('LinesSection', () => {
 
   test('a turn whose result holds no line says so, and an external engine says that it sends none', () => {
     const { unmount } = render(<LinesSection turn={3} result={withLines()} playerNames={SINGLES_NAMES} doubles={false} host={host()} />);
-    expect(screen.getByText('No line on this turn: the search kept none for these choices.')).toBeInTheDocument();
+    expect(screen.getByText('No line on this turn: the matrix pass keeps none. Analyze the position with MCTS to get lines.')).toBeInTheDocument();
     unmount();
+    // a tree search that kept none says so of the search
+    const tree = withLines();
+    render(<LinesSection turn={3} result={{ ...tree, matrix: { ...tree.matrix!, cells: [[{ visits: 9, verified: false }]] } }} playerNames={SINGLES_NAMES} doubles={false} host={host()} />);
+    expect(screen.getByText('No line on this turn: the search kept none for these choices.')).toBeInTheDocument();
+    cleanup();
     render(<LinesSection turn={3} result={withLines(undefined, { engine: { id: 'ext', name: 'Other engine' } })} playerNames={SINGLES_NAMES} doubles={false} host={host()} />);
     expect(screen.getByText('No line: Other engine sends none.')).toBeInTheDocument();
   });
@@ -77,6 +82,18 @@ describe('LinesSection', () => {
     render(<LinesSection turn={4} result={withLines([doublesLine, { ...doublesLine, label: 'Other pair', for: ['engine'] }])} playerNames={DOUBLES_NAMES} doubles host={host()} analysis={pair} />);
     expect(screen.getAllByText(/^pixelfrost · engine: /)).toHaveLength(1);
     expect(screen.queryByText(/Other pair/)).toBeNull();
+  });
+
+  test('two chips with the same words do not collide as React keys', () => {
+    // one die listed twice on a slot: two chips with the same words
+    const [first, ...rest] = doublesLine.steps;
+    const slots = first.p1.slots.map((slot, index) => (index === 0 && slot?.kind === 'move' && slot.dice ? { ...slot, dice: [...slot.dice, ...slot.dice] } : slot));
+    const twice = { ...doublesLine, steps: [{ ...first, p1: { ...first.p1, slots } }, ...rest] };
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    render(<LinesSection turn={4} result={withLines([twice])} playerNames={DOUBLES_NAMES} doubles host={host()} />);
+    expect(screen.getAllByText(/^Speed tie: .* first \(50%\)$/)).toHaveLength(2);
+    expect(spy.mock.calls.filter(call => String(call[0]).includes('same key'))).toEqual([]);
+    spy.mockRestore();
   });
 
   test('a turn without a result shows nothing', () => {

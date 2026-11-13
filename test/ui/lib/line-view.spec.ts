@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import type { EvalLine, ForcedDie, LineDie, LineStep } from '@fulllifegames/eval-engine';
 import { lineBlocks, type LineViewContext } from '../../../src/lib/line-view';
 import { bothRolesLine, doublesLine, DOUBLES_NAMES, playedLine, singlesLine, SINGLES_NAMES } from '../fixtures/lines';
 
@@ -86,5 +87,49 @@ describe('lineBlocks', () => {
     const [block] = lineBlocks([{ ...singlesLine, unforced: ['hit-count', 'unnamed draw'] }], singles);
     expect(block.note).toBe('The click cannot force the number of hits of a multi-hit move, sleep turns, random targets and similar draws. The seed decides them.');
     expect(lineBlocks([singlesLine], singles)[0].note).toBeNull();
+  });
+});
+
+/** Round 89 (#104), step G4b: the smaller faults of the first tester pass. */
+describe('lineBlocks: the tester\'s smaller items', () => {
+  const hitDie = (slot: string, moveId: string, targetSlot: string): ForcedDie => ({ name: { slot, moveId, targetSlot, kind: 'accuracy' }, result: { happens: true } });
+  const shown = (die: ForcedDie, chance: number): LineDie => ({ die, chance, shown: true });
+  const stepWith = (dice: LineDie[], over: Partial<LineStep> = {}): LineStep => ({
+    p1: { choice: 'move 1, move 2', label: 'Rock Slide + Protect', slots: [{ kind: 'move', moveId: 'rockslide', moveName: 'Rock Slide', dice: dice.map(entry => entry.die) }, { kind: 'move', moveId: 'protect', moveName: 'Protect' }] },
+    p2: { choice: 'move 1, move 2', label: 'Protect + Protect', slots: [{ kind: 'move', moveId: 'protect', moveName: 'Protect' }, { kind: 'move', moveId: 'protect', moveName: 'Protect' }] },
+    dice, ...over,
+  });
+  const lineOf = (steps: LineStep[], over: Partial<EvalLine> = {}): EvalLine => ({ ...doublesLine, steps, ...over });
+
+  test('a spread move\'s one die per target names its target, in the chips and in the tooltip (Rock Slide hits twice)', () => {
+    const dice = [shown(hitDie('p1a', 'rockslide', 'p2a'), 0.9), shown(hitDie('p1a', 'rockslide', 'p2b'), 0.9)];
+    const [block] = lineBlocks([lineOf([stepWith(dice)])], doubles);
+    expect(block.rows[0].sides[0].chips).toEqual(['Rock Slide → Urshifu: hits (90%)', 'Rock Slide → Rillaboom: hits (90%)']);
+    expect(block.tooltip.split('\n').slice(1)).toEqual(['T4: Rock Slide → Urshifu: hits (90%)', 'T4: Rock Slide → Rillaboom: hits (90%)']);
+    // a move with one target keeps its plain subject
+    const single = lineBlocks([lineOf([stepWith([dice[0]])])], doubles)[0];
+    expect(single.rows[0].sides[0].chips).toEqual(['Rock Slide: hits (90%)']);
+  });
+
+  test('the dice of a replacement inside a turn are filed under that turn, not under "Replacement:"', () => {
+    const roll = shown({ name: { slot: 'p1a', moveId: 'woodhammer', targetSlot: 'p2a', kind: 'crit' }, result: { happens: false } }, 0.96);
+    const pivot = stepWith([]);
+    const replacement: LineStep = { ...stepWith([roll]), replacement: 'p1' };
+    const [block] = lineBlocks([lineOf([pivot, replacement])], doubles);
+    expect(block.tooltip.split('\n').slice(1)).toEqual(['T4: Wood Hammer: no crit (96%)']);
+    // a line that opens with a replacement files it under the graded turn
+    const [opening] = lineBlocks([lineOf([replacement])], doubles);
+    expect(opening.tooltip.split('\n').slice(1)).toEqual(['T4: Wood Hammer: no crit (96%)']);
+  });
+
+  test('a damage roll that decides a knock-out says its chance once: the rolls say the same thing', () => {
+    const roll: ForcedDie = { name: { slot: 'p1a', moveId: 'weatherball', targetSlot: 'p2a', kind: 'damage-roll' }, result: { step: 8 } };
+    const [block] = lineBlocks([lineOf([stepWith([{ die: roll, chance: 0.5625, shown: true, ko: { rolls: 9, of: 16 } }])])], doubles);
+    expect(block.tooltip.split('\n')[1]).toBe('T4: Weather Ball: damage roll 9 (KO in 9 of 16 rolls)');
+  });
+
+  test('the note\'s last sentence agrees with its noun: one hit count is "it", draws are "them"', () => {
+    expect(lineBlocks([{ ...singlesLine, unforced: ['hit-count'] }], singles)[0].note).toMatch(/The seed decides it\.$/);
+    expect(lineBlocks([{ ...singlesLine, unforced: ['unnamed draw'] }], singles)[0].note).toMatch(/The seed decides them\.$/);
   });
 });

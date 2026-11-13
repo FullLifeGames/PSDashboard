@@ -103,9 +103,26 @@ export function chipText(entry: LineDie, words: DieWords): string {
   return dieText(entry, words);
 }
 
-/** The tooltip's line of one die: the roll the click forces, and when it decides a knock-out, in how many rolls. */
+/**
+ * The tooltip's line of one die: the roll the click forces, and when it decides a knock-out, in how many rolls (those say the
+ * roll's chance, so the percentage stays out).
+ */
 const tooltipText = (entry: LineDie, words: DieWords): string =>
-  `${dieText(entry, words)}${entry.ko ? ` (KO in ${entry.ko.rolls} of ${entry.ko.of} rolls)` : ''}`;
+  entry.ko ? `${dieLabel(entry.die, words)} (KO in ${entry.ko.rolls} of ${entry.ko.of} rolls)` : dieText(entry, words);
+
+/**
+ * The words for one die of a step. A spread move draws one die per target; when a step holds several dice that differ only in their
+ * target, the move's name carries the target ("Rock Slide → Urshifu"), so the reader can tell them apart.
+ */
+function wordsOfDie(entry: LineDie, step: LineStep, words: DieWords): DieWords {
+  const { name } = entry.die;
+  if (!name.targetSlot || !name.moveId) return words;
+  const sameDie = (other: LineDie) => other.die.name.slot === name.slot && other.die.name.moveId === name.moveId
+    && other.die.name.kind === name.kind && other.die.name.effectId === name.effectId && other.die.name.hit === name.hit;
+  const targets = new Set(step.dice.filter(sameDie).map(other => other.die.name.targetSlot));
+  if (targets.size < 2) return words;
+  return { ...words, move: id => (id === name.moveId ? `${words.move(id)} → ${words.slot(name.targetSlot!)}` : words.move(id)) };
+}
 
 /** The bodies on the field after a step: a switch puts its Pokémon in the slot. */
 function actAfter(actives: Actives, step: LineStep): Actives {
@@ -118,16 +135,18 @@ function actAfter(actives: Actives, step: LineStep): Actives {
   return next;
 }
 
-const DRAW_WORDS: Record<string, string> = {
-  'hit-count': 'the number of hits of a multi-hit move',
-  'unnamed draw': 'sleep turns, random targets and similar draws',
+/** What the replay left to the stream, in words, and whether the words are plural. */
+const DRAW_WORDS: Record<string, { words: string; plural: boolean }> = {
+  'hit-count': { words: 'the number of hits of a multi-hit move', plural: false },
+  'unnamed draw': { words: 'sleep turns, random targets and similar draws', plural: true },
 };
 
 /** What the replay left to the stream, in words; null when it left nothing. */
 function unforcedNote(line: EvalLine): string | null {
   if (!line.unforced || line.unforced.length === 0) return null;
-  const parts = line.unforced.map(kind => DRAW_WORDS[kind] ?? kind.replace(/-/g, ' '));
-  return `The click cannot force ${parts.join(', ')}. The seed decides ${parts.length === 1 ? 'it' : 'them'}.`;
+  const parts = line.unforced.map(kind => DRAW_WORDS[kind] ?? { words: kind.replace(/-/g, ' '), plural: false });
+  const several = parts.length > 1 || parts[0].plural;
+  return `The click cannot force ${parts.map(part => part.words).join(', ')}. The seed decides ${several ? 'them' : 'it'}.`;
 }
 
 const roleText = (line: EvalLine): string => {
@@ -150,11 +169,12 @@ function stepViews(line: EvalLine, ctx: LineViewContext): { rows: LineRowView[];
       const choice = side === 'p1' ? step.p1 : step.p2;
       const chips = choice.slots.flatMap(slot => slot?.dice ?? []).flatMap(die => {
         const entry = step.dice.find(candidate => dieKey(candidate.die.name) === dieKey(die.name));
-        return entry?.shown ? [chipText(entry, words)] : [];
+        return entry?.shown ? [chipText(entry, wordsOfDie(entry, step, words))] : [];
       });
       return { side, player: ctx.playerNames[SIDE_INDEX[side]], text: step.replacement ? `replaces: ${choice.label}` : choice.label, chips };
     });
-    for (const entry of step.dice) every.push(`${label || 'Replacement'}: ${tooltipText(entry, words)}`);
+    // a replacement inside a turn (a pivot's switch, a faint's) plays on in the turn before it: its dice belong to that turn's number
+    for (const entry of step.dice) every.push(`${label || `T${turn - 1}`}: ${tooltipText(entry, wordsOfDie(entry, step, words))}`);
     if (ctx.doubles) views.forEach((view, at) => rows.push({ key: `${index}-${view.side}`, turn: at === 0 ? label : '', sides: [view] }));
     else rows.push({ key: String(index), turn: label, sides: views });
     actives = actAfter(actives, step);

@@ -237,6 +237,8 @@ button.ps-eval-choice:hover,
 .ps-eval-line-turn { display: grid; grid-template-columns: 30px 1fr; column-gap: 6px; font-size: 10px; color: #bcd; }
 .ps-eval-line-turn .t { color: #778; }
 .ps-eval-line-turn .side { color: #9fb2cc; }
+/* Round 89 (#104), G4b: the buttons stand inline in 10 px text, as ExplorableLabel's do; the full-size .ps-btn doubled every row. */
+.ps-eval-lines .ps-eval-inline-btn, .ps-eval-review .ps-eval-inline-btn { padding: 0 5px; font-size: 10px; line-height: 1.5; }
 .ps-line-chip { border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(0, 0, 0, 0.2); color: #9fb2cc; font-size: 9px; padding: 0 6px; margin-left: 4px; white-space: nowrap; }
 
 /* Round 89 (#104), G4: the Game review under the game report. */

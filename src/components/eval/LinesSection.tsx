@@ -18,7 +18,7 @@ function SideText({ view }: { view: LineSideView }) {
   return (
     <>
       <span className="side">{view.player}</span> {view.text}
-      {view.chips.map(chip => <span key={chip} className="ps-line-chip">{chip}</span>)}
+      {view.chips.map((chip, index) => <span key={`${index}-${chip}`} className="ps-line-chip">{chip}</span>)}
     </>
   );
 }
@@ -52,6 +52,16 @@ function LineBlock({ block, turn, onPlay, confirm }: { block: LineBlockView; tur
 }
 
 /**
+ * Why a turn holds no line. A matrix turn (a result with a matrix and no tree cells) ran no tree, so it cannot have kept lines;
+ * a tree search that kept none says so of the search.
+ */
+function noLineSentence(result: EvalResult): string {
+  if (result.engine) return `No line: ${result.engine.name} sends none.`;
+  if (result.matrix && !result.matrix.cells) return 'No line on this turn: the matrix pass keeps none. Analyze the position with MCTS to get lines.';
+  return 'No line on this turn: the search kept none for these choices.';
+}
+
+/**
  * Round 89 (#104), step G3: the Lines section under a turn's rows. Per player the engine's line and the played line (one line for a
  * player who played the engine's move), each with ▶ Play, the end value and the dice that could have gone the other way. A turn
  * that holds no line says why in one muted sentence; a turn without a result shows nothing.
@@ -64,9 +74,7 @@ export function LinesSection({ turn, result, playerNames, doubles, host, analysi
       <div className="ps-eval-lines">
         <span className="ps-eval-lines-title">Lines</span>
         <span className="ps-eval-line" style={{ marginTop: 0 }}>
-          {result.engine
-            ? `No line: ${result.engine.name} sends none.`
-            : 'No line on this turn: the search kept none for these choices.'}
+          {noLineSentence(result)}
         </span>
       </div>
     );
