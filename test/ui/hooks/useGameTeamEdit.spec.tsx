@@ -47,7 +47,7 @@ describe('useGameTeamEdit', () => {
     const editTeams = vi.fn().mockResolvedValueOnce({ kept: 1, error: 'Snorlax can\'t use Protect.' }).mockResolvedValueOnce({ kept: 3, error: 'x' }).mockRejectedValueOnce(new Error('boom'));
     const { result } = renderHook(() => useGameTeamEdit({ record, editTeams, stopBranch: vi.fn(), close: vi.fn() }));
     act(() => { result.current.edit('p1', edited(0, 'Outrage')); });
-    await waitFor(() => expect(result.current.notice).toBe('The edited team cannot play every turn. The game keeps its first 1 turn: Snorlax can\'t use Protect.'));
+    await waitFor(() => expect(result.current.notice).toBe('The edited team cannot play every turn. The game keeps its first turn: Snorlax can\'t use Protect.'));
     act(() => { result.current.edit('p1', edited(0, 'Outrage')); });
     await waitFor(() => expect(result.current.notice).toMatch(/first 3 turns/));
     act(() => { result.current.edit('p1', edited(0, 'Outrage')); });

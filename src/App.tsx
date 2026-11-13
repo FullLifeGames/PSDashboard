@@ -92,6 +92,7 @@ function AppModals({ app }: { app: AppController }) {
             p1Info: statsP1Info,
             p2Info: statsP2Info,
           })}
+          game={record !== null}
           onImport={text => {
             // a game's sets belong to its record: the import plays it again on them (editTeams), as the editor does
             const importError = applySetsText(text, record ? next => { gameEdit.editSides(next); } : undefined);

@@ -17,6 +17,9 @@ interface Inputs {
   close: () => void;
 }
 
+/** "its first turn", "its first 3 turns", "no turn" (an edit that ends the line before its first turn). */
+const keptTurns = (kept: number): string => (kept === 0 ? 'no turn' : kept === 1 ? 'its first turn' : `its first ${kept} turns`);
+
 export function useGameTeamEdit({ record, editTeams, stopBranch, close }: Inputs) {
   const [notice, setNotice] = useState<string | null>(null);
   /** Plays the record again on the sides given (a side that is null keeps the record's own sets); false when no game is open. */
@@ -31,7 +34,7 @@ export function useGameTeamEdit({ record, editTeams, stopBranch, close }: Inputs
     setNotice(null);
     void editTeams(teams).then(outcome => {
       if (outcome?.error) {
-        setNotice(`The edited team cannot play every turn. The game keeps its first ${outcome.kept} ${outcome.kept === 1 ? 'turn' : 'turns'}: ${outcome.error}`);
+        setNotice(`The edited team cannot play every turn. The game keeps ${keptTurns(outcome.kept)}: ${outcome.error}`);
       }
     }, (failure: unknown) => setNotice(`The edit could not be applied: ${failure instanceof Error ? failure.message : String(failure)}`));
     return true;

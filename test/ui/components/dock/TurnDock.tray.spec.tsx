@@ -183,6 +183,14 @@ describe('the states of a position', () => {
     expect(document.querySelector('.ps-dock-chip')).toBeNull();
   });
 
+  test('a game\'s dock speaks of the game, not of a replay (H4h)', () => {
+    const { rerender } = render(<TurnDock {...props({ source: 'stored', isGame: true })} />);
+    expect(screen.getByText('Choices from the game\'s position')).toBeInTheDocument();
+    rerender(<TurnDock {...props({ source: 'snapshot', isGame: true })} />);
+    expect(screen.getByText('Choices approximated from the game\'s log; the sim checks legality when you play a move')).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/replay|reconstructed/);
+  });
+
   test('the strip shows the source, the dice wait note, the execute error and the running turn', async () => {
     const { rerender } = render(<TurnDock {...props({ source: 'stored' })} />);
     expect(screen.getByText('Choices from the reconstructed position')).toBeInTheDocument();

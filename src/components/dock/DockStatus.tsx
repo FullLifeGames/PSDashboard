@@ -26,25 +26,27 @@ function forcePrompt(slot: DockSlotModel): string {
  * Round 84 (turn dock): the strip above the chips: where the choices come from, what a forced replacement asks, which side
  * waits for the other's replacement, the note that dice need the exact position, and the error of the last Execute.
  */
-export function DockStatus({ source, acquiringExact, executeError, model, diceOpen }: {
+export function DockStatus({ source, acquiringExact, executeError, model, diceOpen, game = false }: {
   source?: PickerSource;
   acquiringExact?: boolean;
   executeError: string | null;
   model: DockModel;
   /** The tray's "Dice · What if" section is open. */
   diceOpen: boolean;
+  /** Round 89 (#105): the position belongs to a new game, so the words name the game, not a replay. */
+  game?: boolean;
 }) {
   const slots = [...model.p1, ...model.p2];
   // The side that does not replace waits; the note names the side that does.
   const waitingFor = [...(model.flags.p1Waits ? ['P2'] : []), ...(model.flags.p2Waits ? ['P1'] : [])];
   return (
     <div className="ps-dock-status">
-      {source === 'stored' && <span className="ps-dock-source">Choices from the reconstructed position</span>}
+      {source === 'stored' && <span className="ps-dock-source">{game ? 'Choices from the game\'s position' : 'Choices from the reconstructed position'}</span>}
       {source === 'snapshot' && (
         <span className="ps-dock-source">
           {acquiringExact
             ? 'Choices approximated · reconstructing the exact position…'
-            : 'Choices approximated from the replay; the sim checks legality when you play a move'}
+            : `Choices approximated from the ${game ? 'game\'s log' : 'replay'}; the sim checks legality when you play a move`}
         </span>
       )}
       {diceOpen && source === 'snapshot' && <span className="ps-dice-note" role="note">{DICE_WAIT_NOTE}</span>}

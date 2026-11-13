@@ -9,6 +9,8 @@ export interface PlayOutProgress {
   fast?: boolean;
   /** Stop was pressed with a turn in flight (round 89, #119): the run ends when that turn landed. */
   stopping?: boolean;
+  /** Round 89 (#105): the run plays a new game; its line is the main line, not a gold variation. */
+  game?: boolean;
 }
 
 function PlayOutProgressLine({ playOutProgress }: { playOutProgress: PlayOutProgress }) {
@@ -22,7 +24,7 @@ function PlayOutProgressLine({ playOutProgress }: { playOutProgress: PlayOutProg
         {playOutProgress.turns} turn{playOutProgress.turns === 1 ? '' : 's'} played
         {playOutProgress.atTurn !== null && playOutProgress.atTurn > playOutProgress.startTurn
           ? `, now at turn ${playOutProgress.atTurn}` : ''}.
-        {playOutProgress.stopping ? '' : ' The gold line below grows as it plays.'}
+        {playOutProgress.stopping ? '' : playOutProgress.game ? ' The line below grows as it plays.' : ' The gold line below grows as it plays.'}
         {playOutProgress.fast && !playOutProgress.stopping ? ' Fast mode: every turn is a depth-1 matrix search.' : ''}
       </span>
     </div>
