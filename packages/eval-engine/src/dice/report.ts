@@ -1,6 +1,6 @@
 import { toID, type Battle } from '@pkmn/sim';
 import type { DieNote } from './prng.ts';
-import type { DieReport, ForcedDie } from './types.ts';
+import type { DieName, DieReport, ForcedDie } from './types.ts';
 import type { MoveSight } from './watch.ts';
 import { about, applied, otherwise, parts, shows, slotOfIdent, type Witness } from './report-lines.ts';
 import { moveNoDraw, moveWitness } from './report-moves.ts';
@@ -120,11 +120,22 @@ function noDraw(input: ReportInput): DieReport {
   return statusNoDraw(input, move.name, turn) ?? noDrawInAction(input, move, windowOf(turn, moveLine + 1));
 }
 
+/**
+ * The line that stopped the move before it did anything. For a later hit's die only a line before the first hit's effect on the
+ * target counts (round 89, F5): after that effect the chain's own lines say what happened (an ability answering the hit, a miss of
+ * a later hit, the faint), and `hitNoDraw` reads the count from `|-hitcount|`.
+ */
+function firstBlocker(action: readonly string[], name: DieName): string | undefined {
+  const later = name.kind === 'accuracy' && name.hit !== undefined;
+  const effect = later ? action.findIndex(line => about(line, name.targetSlot) && isEffect(line)) : -1;
+  return (effect < 0 ? action : action.slice(0, effect)).find(line => isBlocker(line, name.targetSlot));
+}
+
 /** The move ran and a hit followed: why the simulator drew no die for it, read from the lines of the action. */
 function noDrawInAction(input: ReportInput, move: ReturnType<Battle['dex']['moves']['get']>, action: string[]): DieReport {
   const { die } = input;
   const { targetSlot, kind } = die.name;
-  const blocker = action.find(line => isBlocker(line, targetSlot));
+  const blocker = firstBlocker(action, input.die.name);
   if (blocker) return { die, took: 'no-draw', reason: `${move.name} drew no ${kind}: ${shows(blocker)}` };
   // A future move draws in the end-of-turn residual two turns later, when no move is in flight.
   if (move.flags.futuremove) return { die, took: 'no-draw', reason: `${move.name} lands two turns later: its draws fall in the end-of-turn residual` };
@@ -141,9 +152,12 @@ function noDrawInAction(input: ReportInput, move: ReturnType<Battle['dex']['move
   return { die, took: 'no-draw', reason: `the simulator drew no ${kind} for ${move.name} this turn` };
 }
 
-/** The hits the target's `|-hitcount|` line counts in the lines of a move's action, or nothing when it shows none. */
+/**
+ * The hits the target's `|-hitcount|` line counts in the lines of a move's action, or nothing when it shows none. A target that
+ * fainted in the chain gets the line with its side (`|-hitcount|p2: Garchomp|3`), so the side of the slot reads as the target too.
+ */
 function hitCountIn(action: readonly string[], targetSlot: string | undefined): number | undefined {
-  const line = action.find(entry => parts(entry)[1] === '-hitcount' && about(entry, targetSlot));
+  const line = action.find(entry => parts(entry)[1] === '-hitcount' && (about(entry, targetSlot) || slotOfIdent(parts(entry)[2]) === targetSlot?.slice(0, 2)));
   return line === undefined ? undefined : Number(parts(line)[3]);
 }
 
@@ -153,7 +167,7 @@ function hitNoDraw(input: ReportInput, move: string, action: readonly string[]):
   const count = hitCountIn(action, die.name.targetSlot);
   const hit = die.name.hit!;
   if (count !== undefined && count < hit) {
-    return { die, took: 'no-draw', reason: `${move} ended after ${count} hit${count === 1 ? '' : 's'}, so hit ${hit} was never rolled` };
+    return { die, took: 'no-draw', reason: `${move} ended after ${count} hit${count === 1 ? '' : 's'}, so hit ${hit} was never rolled`, landed: count };
   }
   return { die, took: 'no-draw', reason: `${move} rolls no accuracy for hit ${hit} here: one roll covers every hit` };
 }
@@ -164,7 +178,7 @@ function hitReport(w: Witness, happens: boolean): DieReport {
   const count = hitCountIn(w.action, w.targetSlot);
   if (happens) {
     if (count !== undefined && count >= hit) return applied(w);
-    return otherwise(w, 'blocked', `${w.name} stopped after ${count ?? 0} hit${count === 1 ? '' : 's'} although the die gave hit ${hit}`);
+    return { ...otherwise(w, 'blocked', `${w.name} stopped after ${count ?? 0} hit${count === 1 ? '' : 's'} although the die gave hit ${hit}`), landed: count ?? 0 };
   }
   if (count === hit - 1) return applied(w);
   return otherwise(w, 'no-chance', `${w.name} landed hit ${hit} although the die gave a miss (the protocol counts ${count ?? 'no'} hits)`);

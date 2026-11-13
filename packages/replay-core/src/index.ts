@@ -59,7 +59,7 @@ export type { EvBudget } from './spreads/ev-budget.ts';
 export { buildTeamsFromReplay, solveReplaySpreads, extractTeamSheets } from './team-builder.ts';
 export {
   manualField, manualEvs, manualMove, applyInferredSpreads, itemSetValue, enrichTeamInfo, enrichPokemonInfo,
-  unknownEvs, EMPTY_EVS, INFERRED_SPREAD_DETAIL, INFERRED_ITEM_DETAIL, RULED_OUT_ITEM_DETAIL, NO_BOOST_ITEM_DETAIL,
+  unknownEvs, EMPTY_EVS, INFERRED_SPREAD_DETAIL, INFERRED_ITEM_DETAIL, RULED_OUT_ITEM_DETAIL, NO_BOOST_ITEM_DETAIL, KNOCKOUT_BOOST_ITEM_DETAIL,
   ORDER_SPREAD_DETAIL, MEASURED_HP_SPREAD_DETAIL,
 } from './team-info.ts';
 export { enrichTeamInfos } from './team/damage-ruleouts.ts';

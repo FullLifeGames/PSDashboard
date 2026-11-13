@@ -34,7 +34,8 @@ export interface ForcedDie { name: DieName; result: DieResult }
 /** `applied`: the draw ran and took the answer. `no-draw`: the simulator never drew it. `no-chance`: the draw has no way to give the answer. `blocked`: drew and forced, the effect did not land. */
 export type DieTook = 'applied' | 'no-draw' | 'no-chance' | 'blocked';
 
-export interface DieReport { die: ForcedDie; took: DieTook; chance?: number; logIndex?: number; reason?: string }
+/** `landed` (round 89): on the die of a later hit that the chain never reached, the hits the protocol counts for the target. */
+export interface DieReport { die: ForcedDie; took: DieTook; chance?: number; logIndex?: number; reason?: string; landed?: number }
 
 export interface DiceReport { forced: DieReport[]; naturalEndSeed: string }
 

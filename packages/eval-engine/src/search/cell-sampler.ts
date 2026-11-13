@@ -2,7 +2,7 @@ import type { PRNGSeed } from '@pkmn/sim';
 import type { MatchupCache } from '../eval-function.ts';
 import { advancePosition, advancePositionWithLog, positionBattle, type SimPosition } from '../forward-model.ts';
 import {
-  BOUNDARY_DRAW_BUDGET, classifyChild, foldClassWeights, observeOrder, planCellEvents, PROBE_SEEDS, type CellEvent,
+  BOUNDARY_DRAW_BUDGET, classifyChild, foldClassWeights, observeOrder, planCellEvents, type CellEvent,
 } from '../cell-blend.ts';
 import type { CellBlend, CellBlendClass, CellDraw, KoOddsMismatch } from '../types.ts';
 import { DiceSink, type RollScripts, type SecondaryRecord } from '../forward/scripted-prng.ts';
@@ -10,8 +10,9 @@ import { mergeScripts, scriptsFor } from './outcome-children.ts';
 import { hasSecondary, worthForcing } from './secondary-classes.ts';
 import { countFainted, leafValue, rollSensitivePair, SEARCH_SEEDS, speedTie, tieOrderScripts } from './leaf.ts';
 import { pairCellSample, type FirstDraw } from '../pair/sampler.ts';
+import { cellSeeds } from './root-quantile.ts';
 import {
-  drawPlain, firstDraw, outcomeGroups, stateGroups, stateRuleFor, VERIFY_PLAIN_SEEDS, type PlainDraw, type StateGroup, type VerifyDraws,
+  drawPlain, firstDraw, outcomeGroups, stateGroups, stateRuleFor, type PlainDraw, type StateGroup, type VerifyDraws,
 } from './verify-cell.ts';
 
 /**
@@ -53,7 +54,7 @@ const blendBaseDraws = (samples: number): number => Math.max(1, Math.min(samples
 export function plainVerifySample(
   root: SimPosition, p1Choice: string, p2Choice: string, plainDraws: number, matchupCache: MatchupCache, first?: PlainDraw,
 ): CellSample {
-  const draws = VERIFY_PLAIN_SEEDS.slice(0, plainDraws).map((seed, index) =>
+  const draws = cellSeeds(root, p1Choice, p2Choice).slice(0, plainDraws).map((seed, index) =>
     (index === 0 && first ? first : drawPlain(root, p1Choice, p2Choice, seed, matchupCache)));
   const value = draws.reduce((sum, draw) => sum + draw.leaf, 0) / draws.length;
   return { value, ended: draws[0].ended, firstChild: draws[0].child, outcomes: outcomeGroups(draws) };
@@ -100,7 +101,8 @@ function plainCellSample(
   plainDraws?: number,
   scripts?: RollScripts,
 ): CellSample {
-  const firstChild = first?.child ?? advanceChild(root, p1Choice, p2Choice, SEARCH_SEEDS[0], scripts);
+  const seeds = cellSeeds(root, p1Choice, p2Choice);
+  const firstChild = first?.child ?? advanceChild(root, p1Choice, p2Choice, seeds[0], scripts);
   const firstBattle = positionBattle(firstChild);
   const ended = firstBattle.ended;
   // Averaging wp-units = averaging win probabilities across rolls: the
@@ -112,12 +114,12 @@ function plainCellSample(
     ? (rollMoves ? Math.max(samples, 3) : 1)
     : (countFainted(firstBattle) > rootFainted || rollMoves ? samples : 1);
   if (plainDraws) {
-    const log = first?.log ?? advancePositionWithLog(root, p1Choice, p2Choice, SEARCH_SEEDS[0]).log;
+    const log = first?.log ?? advancePositionWithLog(root, p1Choice, p2Choice, seeds[0]).log;
     const pool = verifyPool(root, p1Choice, p2Choice, plainDraws, matchupCache, { child: firstChild, log, leaf: sum, ended }, draws > 1);
     if (pool) return pool;
   }
   for (let s = 1; s < draws; s++) {
-    const child = advanceChild(root, p1Choice, p2Choice, SEARCH_SEEDS[s], scripts);
+    const child = advanceChild(root, p1Choice, p2Choice, seeds[s], scripts);
     sum += leafValue(positionBattle(child), matchupCache);
   }
   return { value: sum / draws, ended, firstChild, ...leadingDraws(draws) };
@@ -240,7 +242,7 @@ function classPools(
 ): Map<string, Draw[]> {
   const record = hasSecondary(events);
   const pools = new Map([...classes].map(([key, cls]) => [key, [...cls.draws]]));
-  for (const seed of VERIFY_PLAIN_SEEDS.slice(0, plainDraws)) {
+  for (const seed of cellSeeds(root, p1Choice, p2Choice).slice(0, plainDraws)) {
     if (drawnBySeed.has(String(seed))) continue;
     const draw = drawCell(root, p1Choice, p2Choice, seed, matchupCache, undefined, record);
     const key = classifyChild(draw.log, events, draw.dice);
@@ -262,7 +264,7 @@ function forceMissingClasses(
   for (const [key, share] of expected) {
     if (classes.has(key) || !worthForcing(key, share)) continue;
     for (const aimed of scriptsFor(`${first}:${key}`, events, null)) {
-      const draw = drawCell(root, p1Choice, p2Choice, SEARCH_SEEDS[0], matchupCache, mergeScripts(scripts, aimed), true);
+      const draw = drawCell(root, p1Choice, p2Choice, cellSeeds(root, p1Choice, p2Choice)[0], matchupCache, mergeScripts(scripts, aimed), true);
       const landed = classifyChild(draw.log, events, draw.dice);
       if (landed === null || !expected.has(landed) || classes.has(landed)) continue;
       draws.push(draw);
@@ -274,14 +276,15 @@ function forceMissingClasses(
 
 /** Probe seeds for the classes the base draws missed (a cell without a secondary die); false when a draw fits no expected class. */
 function chaseMissingClasses(
-  expected: Map<string, number>, classes: Map<string, ClassEntry>, draws: Draw[], drawSeed: (seed: PRNGSeed) => void, events: CellEvent[],
+  expected: Map<string, number>, classes: Map<string, ClassEntry>, draws: Draw[], drawSeed: (seed: PRNGSeed) => void, events: CellEvent[], seeds: readonly PRNGSeed[],
 ): boolean {
-  let probeIndex = 0;
-  while (
-    [...expected.keys()].some(key => !classes.has(key)) &&
-    draws.length < BOUNDARY_DRAW_BUDGET && probeIndex < PROBE_SEEDS.length
+  // The probe seeds are slots 5 on of the cell's list (round 89, T324).
+  for (
+    let slot = SEARCH_SEEDS.length;
+    [...expected.keys()].some(key => !classes.has(key)) && draws.length < BOUNDARY_DRAW_BUDGET && slot < seeds.length;
+    slot++
   ) {
-    drawSeed(PROBE_SEEDS[probeIndex++]);
+    drawSeed(seeds[slot]);
     if (!classifyDraw(classes, expected, events, draws[draws.length - 1], false)) return false;
   }
   return true;
@@ -310,8 +313,8 @@ function blendCellSample(
     draws.push(drawCell(root, p1Choice, p2Choice, seed, matchupCache, scripts, record));
     drawnBySeed.set(String(seed), draws[draws.length - 1]);
   };
-  const baseDraws = blendBaseDraws(samples);
-  for (let s = 0; s < baseDraws; s++) drawSeed(SEARCH_SEEDS[s]);
+  const baseDraws = blendBaseDraws(samples), seeds = cellSeeds(root, p1Choice, p2Choice);
+  for (let s = 0; s < baseDraws; s++) drawSeed(seeds[s]);
 
   const fallback = (): CellSample => (plainDraws
     ? plainVerifySample(root, p1Choice, p2Choice, plainDraws, matchupCache, draws[0])
@@ -330,7 +333,7 @@ function blendCellSample(
   }
   // Chase analytically-expected classes the base draws missed; a cell with a secondary die forces them by script instead.
   if (record) forceMissingClasses(root, events, first, expected, classes, draws, p1Choice, p2Choice, matchupCache, scripts);
-  else if (!chaseMissingClasses(expected, classes, draws, drawSeed, events)) return fallback();
+  else if (!chaseMissingClasses(expected, classes, draws, drawSeed, events, seeds)) return fallback();
 
   const missing = [...expected.keys()].filter(key => !classes.has(key));
   let weightTotal = 0;

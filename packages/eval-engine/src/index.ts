@@ -34,6 +34,8 @@ export type {
 export { DIE_KINDS, dieKey, tieName } from './dice/types.ts';
 export type { DiceReport, DieKind, DieName, DieReport, DieResult, DieTook, ForcedDie } from './dice/types.ts';
 export { dieLabel } from './dice/die-label.ts';
+export { chainCount, chainResults } from './dice/chain.ts';
+export type { HitResult } from './dice/chain.ts';
 export type { DieWords } from './dice/die-label.ts';
 export { loggedDice, mergeLoggedDice } from './dice/logged-results.ts';
 export type { LoggedOptions } from './dice/logged-results.ts';

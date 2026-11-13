@@ -69,6 +69,24 @@ export const playedVerb = (label: string): string =>
  */
 export const percentBelowSure = (odds: number): number => (odds >= 1 ? 100 : Math.min(99, Math.round(odds * 100)));
 
+type ForcedCaveat = 'none' | 'barring-crit' | 'sampled-rolls';
+
+/** The caveat of a forced-win proof in words. */
+export const caveatWords = (caveat: ForcedCaveat): string =>
+  caveat === 'barring-crit' ? ', barring a crit' : caveat === 'sampled-rolls' ? ' on the sampled rolls' : '';
+
+/**
+ * The words a forced-win proof adds to its sentence, in one place for the turn card and the game report (round 89, ruling
+ * 30.2): empty for a full proof, the crit caveat for a full proof that carries it, and below mass 1 the share of the rolls
+ * the proof covers ("in 98% of the sampled rolls", "in 98% of the rolls, barring a crit"). The share stops at 99%.
+ */
+export function forcedQualifier(forced: { mass: number; caveat: ForcedCaveat }): string {
+  const tail = caveatWords(forced.caveat);
+  if (forced.mass >= 1) return tail;
+  const share = percentBelowSure(forced.mass);
+  return forced.caveat === 'sampled-rolls' ? ` in ${share}% of the sampled rolls` : ` in ${share}% of the rolls${tail}`;
+}
+
 /** The near-decided click: a "sure KO" only at odds 1, else an "N% roll" (T123: 99.5% is no sure KO). */
 export const rollText = (odds: number): string => (odds >= 1 ? 'sure KO' : `${percentBelowSure(odds)}% roll`);
 

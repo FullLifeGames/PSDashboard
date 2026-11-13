@@ -9,7 +9,14 @@ import { itemFieldsOf } from './item-reading.ts';
 import { paradoxFieldsOf } from './paradox-reading.ts';
 import { forgetAbilityEnd, hitFactsOf } from './hit-facts.ts';
 import { survivedAtOne } from './survival-marker.ts';
+import type { HpText } from '../hp-display.ts';
 
+
+/** The two numbers of an HP text (`75/100`, `24/48g`), null for a faint or no text. */
+function hpTextOf(text: string): HpText | null {
+  const match = text.match(/^(\d+)\/(\d+)/);
+  return match && parseInt(match[1], 10) > 0 && parseInt(match[2], 10) > 0 ? { hp: parseInt(match[1], 10), maxhp: parseInt(match[2], 10) } : null;
+}
 
 function hpFractionOf(text: string): number | null {
   if (!text) return null;
@@ -248,6 +255,13 @@ function recordHiddenPowerHit(state: ParserState, defenderIdent: string, count: 
   }
 }
 
+/** The HP texts of a knockout: the defender's before it (the client still holds them) and the one the line shows, kept only when the defender stands after it (a survivor). */
+function shownFieldOf(defender: Pokemon, lineText: string, lethal: boolean): { defenderShown?: DamageObservation['defenderShown'] } {
+  if (!lethal || !(defender.hp > 0 && defender.maxhp > 0)) return {};
+  const after = hpTextOf(lineText);
+  return { defenderShown: { before: { hp: defender.hp, maxhp: defender.maxhp }, ...(after ? { after } : {}) } };
+}
+
 /** Read the defender BEFORE battle.add applies the line — its current
  *  client HP is the pre-hit value. Null when the line is no reading. */
 function recordDamageObservation(state: ParserState, parts: string[], defenderIdent: string): DamageObservation | null {
@@ -262,13 +276,14 @@ function recordDamageObservation(state: ParserState, parts: string[], defenderId
   const observedFraction = preFraction - newFraction;
   if (!(observedFraction > 0)) return null;
   const defenderSide = defenderIdent.startsWith('p1') ? battle.p1 : battle.p2;
+  const lethal = newFraction === 0 || survivedAtOne(lastMove, defenderIdent, newFraction);
   const observation: DamageObservation = {
     attackerSpecies: attacker.speciesForme,
     defenderSpecies: defender.speciesForme,
     attackerSide: lastMove.attacker.startsWith('p1') ? 'p1' : 'p2',
     moveId: lastMove.moveId,
     observedFraction,
-    lethal: newFraction === 0 || survivedAtOne(lastMove, defenderIdent, newFraction),
+    lethal,
     attackerBoosts: { ...attacker.boosts },
     defenderBoosts: { ...defender.boosts },
     attackerStatus: attacker.status || '',
@@ -277,6 +292,7 @@ function recordDamageObservation(state: ParserState, parts: string[], defenderId
     doubles: !state.singles,
     spread: lastMove.spread,
     defenderSide: defenderIdent.startsWith('p1') ? 'p1' : 'p2',
+    ...shownFieldOf(defender, parts[3] ?? '', lethal),
     ...itemFieldsOf(lastMove, attacker, defender, defenderIdent),
     ...hitFactsOf(state, lastMove, attacker, defender),
     ...paradoxFieldsOf(state, attacker, defender),

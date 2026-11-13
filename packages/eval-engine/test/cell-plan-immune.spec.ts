@@ -63,7 +63,10 @@ describe('status events whose accuracy roll is never reached (T146 c3)', () => {
       const plan = planCellEvents(positionBattle(root), p1, P2);
       expect(plan.kind).toBe(reachable ? 'events' : 'none');
       const sample = sampleCell(root, 0, p1, P2, 3, createMatchupCache(), true);
-      expect(sample.diagnostic).toBeUndefined();
+      // r89 A5 gate: was `expect(sample.diagnostic).toBeUndefined()` on the fixed seeds. A cell's own seeds can all hit a 90 percent
+      // move (0.9^14 = 23 percent, the Water control reads 14 hits): the miss class is then unreached and booked as a diagnostic.
+      if (reachable) expect(sample.diagnostic?.missing ?? ['miss']).toEqual(['miss']);
+      else expect(sample.diagnostic).toBeUndefined();
       expect(sample.blend !== undefined).toBe(reachable);
       const children = classChildren(root, p1, P2, { baseSeeds: SEARCH_SEEDS.slice(0, 1), forcedCap: 4 });
       if (reachable) {

@@ -48,7 +48,7 @@ const OWN_ITEM_EFFECTS = new Set(['', 'disturbed', 'frisked']);
 export const ATTACKER_PUNISH_ITEMS = new Set(['rockyhelmet', 'jabocaberry', 'rowapberry']);
 
 /** The client's Pokémon behind an ident, as the client stands now; null when it has none. */
-function clientPokemon(state: InferrerState, ident: string): ClientPokemon | null {
+export function clientPokemon(state: InferrerState, ident: string): ClientPokemon | null {
   try {
     return state.hitWalk?.battle.getPokemon(ident as ClientIdent) ?? null;
   } catch {
@@ -57,18 +57,45 @@ function clientPokemon(state: InferrerState, ident: string): ClientPokemon | nul
 }
 
 /**
+ * Round 89 (#139): the ident of the body a move line's move books to. A body under Transform uses the moves of its target, so its
+ * line shows that the target knows the move: the client hands `rememberMove` on to `volatiles.transform.pokemon`, and again when that
+ * body is itself a copy (Generation 1 lets a body copy a copy), so the move lands on the original. A body that is no copy books its
+ * own move: the line's ident, as the line spells it. '' when the client has no body for the ident or the copies lead back to the line's
+ * own body (nothing to book).
+ */
+export function bookingIdent(state: InferrerState, ident: string): string {
+  let mon = clientPokemon(state, ident);
+  const seen = new Set<ClientPokemon>();
+  while (mon?.volatiles.transform) {
+    if (seen.has(mon)) return '';
+    seen.add(mon);
+    const target = (mon.volatiles.transform as { pokemon?: ClientPokemon }).pokemon;
+    if (!target) return '';
+    mon = target;
+  }
+  return seen.size && mon ? mon.originalIdent : ident;
+}
+
+/**
  * Whether the move line's move belongs to its user's set, as the client books
- * moves: not Struggle, not while transformed (the client reads the
- * transformation before this line), not one an ability called or reflected;
- * a move another move called books the caller instead (Sleep Talk's calls
- * are the user's own moves). Returns the move to book, or '' for none.
+ * moves: not Struggle, not one an ability called or reflected; a move another
+ * move called books the caller instead (Sleep Talk's calls are the user's
+ * own moves). Returns the move to book, or '' for none. The body it books to
+ * is `bookingIdent`'s: a copy's move belongs to its target.
  */
 export function ownMove(state: InferrerState, line: LogLine): string {
   const moveName = arg(line, 2);
-  if (toId(moveName) === 'struggle' || clientPokemon(state, arg(line, 1))?.volatiles.transform) return '';
+  if (toId(moveName) === 'struggle') return '';
   const from = fromEffect(line);
   if (!from.name || toId(from.name) === 'pursuit' || toId(from.name) === 'sleeptalk') return moveName;
-  return from.type === 'move' ? from.name : '';
+  // Round 89 (#140): a move line prints `[from] <effect.fullname>`, so a move effect is `move: X` and a condition its bare name. A move
+  // the Dex marks `callsMove` (Metronome, Copycat, Nature Power) names the called move on the line: the caller is the user's own move.
+  // Any other move effect pulled the user's own move forward (a Pledge combination, Round): the line's move is the user's, and the
+  // effect names the partner's. A bare name is a condition (Magic Coat and Snatch reflect or steal a move the user does not know), but
+  // older logs write a caller bare (`[from]Nature Power`): the caller still books.
+  const calls = !!dexOf(state).moves.get(from.name).callsMove;
+  if (from.type === 'move') return calls ? from.name : moveName;
+  return !from.type && calls ? from.name : '';
 }
 
 /** Same Pokémon by the Dex: the client's forme belongs to the team member's species. */

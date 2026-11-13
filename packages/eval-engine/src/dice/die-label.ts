@@ -27,7 +27,8 @@ const idOf = (name: DieName): string => (name.effectId ?? '').split(':option')[0
 function subjectOf(name: DieName, words: DieWords): string {
   if (name.kind === 'speed-tie') return 'Speed tie';
   if (EFFECT_SUBJECT.has(name.kind) && name.effectId) return words.effect(idOf(name));
-  return name.moveId ? words.move(name.moveId) : words.slot(name.slot);
+  // the accuracy die of a later hit of a multi-hit move names its hit (round 89, #114); the first hit's die keeps the plain subject
+  return name.moveId ? `${words.move(name.moveId)}${name.hit ? ` hit ${name.hit}` : ''}` : words.slot(name.slot);
 }
 
 /** The two words of a chance, by what the die decides: yes and no. */
@@ -47,7 +48,7 @@ function chanceText(name: DieName, words: DieWords): [string, string] {
 }
 
 function resultText(name: DieName, result: DieResult, words: DieWords): string {
-  if ('hits' in result) return `${result.hits} hits`;
+  if ('hits' in result) return result.hits === 1 ? '1 hit' : `${result.hits} hits`;
   if ('step' in result) return `damage roll ${result.step + 1}`;
   if ('option' in result) return result.option;
   if ('first' in result) return `${words.slot(result.first)} first`;

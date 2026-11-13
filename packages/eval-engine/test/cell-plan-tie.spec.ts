@@ -141,6 +141,7 @@ describe('singles speed tie (T146 c4)', () => {
     const { mean, se } = plainMean(root, p1, p2);
     const cell = sampleCell(root, 0, p1, p2, 3, cache, true);
     expect(Math.abs(cell.value - mean)).toBeLessThanOrEqual(2.5 * se);
-    expect(cell.value).toBeCloseTo(0, 9);
+    // r89 A5 gate: was toBeCloseTo(0, 9) on the fixed seeds; the cell's own seeds (T324) draw 0.25 (inside 2.5 SE of the mean above).
+    expect(cell.value).toBeCloseTo(0.25, 9);
   });
 });

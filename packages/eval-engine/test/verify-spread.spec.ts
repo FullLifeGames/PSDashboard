@@ -7,7 +7,8 @@ import { advancePosition, advancePositionWithLog, createRootPosition, positionBa
 import { createLocalExecutor, subSearchDepth1 } from '../src/search';
 import { countFainted, leafValue, SEARCH_SEEDS } from '../src/search/leaf';
 import { sampleCell } from '../src/search/cell-sampler';
-import { deepenVerifiedCell, stateKey, stateRuleFor, VERIFY_DEEPEN_COVER, VERIFY_PLAIN_DRAWS, VERIFY_PLAIN_SEEDS } from '../src/search/verify-cell';
+import { deepenVerifiedCell, stateKey, stateRuleFor, VERIFY_DEEPEN_COVER, VERIFY_PLAIN_DRAWS } from '../src/search/verify-cell';
+import { cellSeeds } from '../src/search/root-quantile';
 import { VERIFY_SAMPLES } from '../src/verify-select';
 import type { EvalCellValue, EvalSettings } from '../src/types';
 import { doublesRoot, pairSet } from './pair-battles';
@@ -75,7 +76,8 @@ function deepenWith(root: SimPosition, p1: string, p2: string, deeper: (child: S
 
 /** The natural verify draws of the game type's pool (singles sixteen fixed seeds, doubles eight) that pass `keep`. */
 const naturalDraws = (root: SimPosition, p1: string, p2: string, keep: (log: string[]) => boolean = () => true) =>
-  VERIFY_PLAIN_SEEDS.slice(0, stateRuleFor(root).pool).map(seed => advancePositionWithLog(root, p1, p2, seed)).filter(draw => keep(draw.log));
+  // r89 A5 gate: the cell's own seeds (T324), where the pool read VERIFY_PLAIN_SEEDS.
+  cellSeeds(root, p1, p2).slice(0, stateRuleFor(root).pool).map(seed => advancePositionWithLog(root, p1, p2, seed)).filter(draw => keep(draw.log));
 const shareOf = (children: SimPosition[], f: (child: SimPosition) => number) =>
   children.reduce((sum, child) => sum + f(child), 0) / children.length;
 

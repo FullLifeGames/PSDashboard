@@ -25,24 +25,25 @@ import { firstMoveId, openFields, orderByOdds, orderByRanking, other, type Cell,
  * cells drawn, the cost that scales with the reply count) and a states cap
  * keep it cheap and deterministic; no wall clock.
  *
- * Finding the line is cheap, refuting every reply is not: before the tree
- * search a GREEDY PROBE follows each root candidate against the reply that
- * is worst for the side, one line, no branching, a few cells per turn. Only
- * a candidate whose line ends in a win within probeDepth turns gets the
- * full budget; a position without such a line costs the probe and nothing
- * more (the sweep's decided turns far from the end).
+ * The root tries the ranking's first three own candidates (the odds order
+ * when no ranking is given) with the full budget, singles and doubles alike.
+ * Round 89 (A5f-7) dropped the greedy scout that once gated them: it followed
+ * one reply per turn under a 16-cell allowance shared by the three candidates,
+ * which a doubles root with 6 to 16 replies spends in about one turn, and it
+ * missed 8 to 20 % of the doubles proofs the full proof finds (A5f-6).
+ * Round 89 (A6-3b, #145): the three candidates still share one cell budget, and
+ * each tries a lazy pass first, with the dice the plain path turned for their
+ * price left aside (`turned` children count mass 0): a candidate that fails the
+ * pass is set aside after the cells of the pass, and only a candidate that
+ * passes it gets the full proof (see `ForcedWinProver.rootLoop`).
  */
 export interface ProverBudget {
   states: number;
-  /** Matrix cells drawn per position, probe included. */
+  /** Matrix cells drawn per position. */
   cells: number;
   depth: number;
-  /** Cells the greedy probe may draw per side attempt before a full proof starts. */
-  probeCells: number;
-  /** Turns the greedy probe follows a line before giving up on it. */
-  probeDepth: number;
 }
-export const PROVER_BUDGET: ProverBudget = { states: 200, cells: 100, depth: 12, probeCells: 16, probeDepth: 5 };
+export const PROVER_BUDGET: ProverBudget = { states: 200, cells: 100, depth: 12 };
 /**
  * Forced draws per class cell (round 43): a class the five base seeds
  * never showed is drawn on demand; the cap bounds those draws, retries
@@ -123,16 +124,16 @@ export function dominates(drawnKey: string, missingKey: string, events: CellEven
   return missing[differing] === 'hit-kill' && drawn[differing] === 'hit-nokill';
 }
 
-/** The opponent's living HP after a cell, the probe's measure of a stalling reply. */
-const opponentHp = (battle: Battle, side: Side): number =>
-  battle.sides[sideIndex(other(side))].pokemon.reduce((sum, mon) => sum + mon.hp, 0);
-
 /** Won by the side: battle.winner is the player's name ('' on a tie). */
 const wonBy = (battle: Battle, side: Side): boolean => battle.ended && battle.winner === battle.sides[sideIndex(side)].name;
 
-class ForcedWinProver {
-  private readonly memo = new Map<string, Memo>();
-  /** Cells drawn once per (position, pair): the probe's cells serve the proof. */
+/** Round 89 (A6-2): the specs ask one root candidate by itself (`expand(root, 0, [own])`), the way a repeated-Protect scene reads its proving move. */
+export class ForcedWinProver {
+  /** Swapped for a fresh map during a lazy pass: a lazy mass must never answer the full pass. */
+  private memo = new Map<string, Memo>();
+  /** Round 89 (A6-3b): the lazy pass leaves the turned children aside (mass 0), so its mass is a lower bound of the full proof's. */
+  private lazy = false;
+  /** Cells drawn once per (position, pair): a position the proof reaches twice draws its cell once. */
   private readonly cellCache = new Map<string, EndgameChildren>();
   private readonly inProgress = new Set<string>();
   private readonly cache: MatchupCache;
@@ -166,7 +167,7 @@ class ForcedWinProver {
     return proven;
   }
 
-  /** The children of one cell, drawn once per proof run and counted once; root cells take the probe draws, inner cells the base draws. */
+  /** The children of one cell, drawn once per proof run and counted once; root cells may force six draws, inner cells three. */
   private cellsFor(position: SimPosition, p1Choice: string, p2Choice: string, ply: number): EndgameChildren {
     const drawBudget = ply === 0 ? PROVER_DRAW_BUDGET : PROVER_INNER_DRAW_BUDGET;
     const key = `${endgameKey(positionBattle(position))}|${p1Choice}|${p2Choice}|${drawBudget}`;
@@ -183,54 +184,13 @@ class ForcedWinProver {
   }
 
   /**
-   * The greedy probe: one line per root candidate (the ranking's order),
-   * the own move by kill odds after the root, at every turn the reply
-   * that leaves the opponent the most HP (the heal or the switch that
-   * stalls a line; the static under-reads healing), the heaviest child of
-   * that cell. Returns the candidates whose line ends in a win within
-   * probeDepth turns, best first; an empty list means no full proof is
-   * attempted. The probe reads the engine's reply list (the doubles cut
-   * included): it only picks the candidates the full proof tries, so it
-   * can miss a proof and never make one.
+   * The root candidates the full proof tries: the ranking's order (the kill odds when no ranking is given), the first
+   * ROOT_CANDIDATES. The proof proves or refutes every one of them against every legal reply; nothing gates them first.
    */
-  probe(root: SimPosition, rootOrder: string[]): string[] {
-    const battle = positionBattle(root);
+  rootCandidates(root: SimPosition, rootOrder: string[]): string[] {
     const own = searchOptions(root, this.side, this.opts);
-    const ordered = rootOrder.length > 0 ? orderByRanking(own, rootOrder) : orderByOdds(battle, this.side, own);
-    const start = this.cells;
-    const winners: string[] = [];
-    for (const candidate of ordered.slice(0, ROOT_CANDIDATES)) {
-      if (this.followsToWin(root, candidate.choice, start) > 0) winners.push(candidate.choice);
-    }
-    return winners;
-  }
-
-  /** One greedy line from `position` opening with `choice`: the turns to the side's win inside the probe budget, 0 when it fails. */
-  private followsToWin(position: SimPosition, choice: string, start: number): number {
-    let at = position;
-    let move = choice;
-    for (let turn = 1; turn <= this.budget.probeDepth; turn++) {
-      const replies = searchOptions(at, other(this.side), this.opts);
-      if (replies.length === 0 || this.cells - start + replies.length > this.budget.probeCells) return 0;
-      const cells = replies.map(reply => {
-        const [p1Choice, p2Choice] = this.pair(move, reply.choice);
-        return { reply, p1Choice, p2Choice, ...this.cellsFor(at, p1Choice, p2Choice, turn - 1) };
-      });
-      const lines = cells.map(cell => {
-        const child = cell.children.reduce((heaviest, candidate) => (candidate.share > heaviest.share ? candidate : heaviest), cell.children[0]);
-        return { cell, child, hp: opponentHp(positionBattle(child.position), this.side), value: this.ownStatic(cell) };
-      });
-      lines.sort((a, b) => b.hp - a.hp || a.value - b.value);
-      const { cell: worst, child } = lines[0];
-      if (worst.unpriced && worst.plain) return 0;
-      const next = positionBattle(child.position);
-      if (next.ended) return wonBy(next, this.side) ? turn : 0;
-      const own = searchOptions(child.position, this.side, this.opts);
-      if (own.length === 0) return 0;
-      move = orderByOdds(next, this.side, own)[0].choice;
-      at = child.position;
-    }
-    return 0;
+    const ordered = rootOrder.length > 0 ? orderByRanking(own, rootOrder) : orderByOdds(positionBattle(root), this.side, own);
+    return ordered.slice(0, ROOT_CANDIDATES).map(candidate => candidate.choice);
   }
 
   /**
@@ -246,11 +206,11 @@ class ForcedWinProver {
   expand(position: SimPosition, ply: number, rootOrder: string[] | null): ReplyProof {
     const battle = positionBattle(position);
     const own = searchOptions(position, this.side, this.opts);
-    const legal = legalChoices(position, other(this.side), { tera: this.opts.tera });
-    const replies = isCombined(legal) ? legal : searchOptions(position, other(this.side), this.opts);
+    const replies = this.replyChoices(position);
     if (own.length === 0 || replies.length === 0) return { proven: NONE, cells: [] };
     const ordered = rootOrder && rootOrder.length > 0 ? orderByRanking(own, rootOrder) : orderByOdds(battle, this.side, own);
     const candidates = ordered.slice(0, rootOrder ? ROOT_CANDIDATES : INNER_CANDIDATES);
+    if (rootOrder) return this.rootLoop(position, ply, candidates, replies);
     let best: ReplyProof = { proven: NONE, cells: [] };
     for (const candidate of candidates) {
       const attempt = this.replies(position, candidate.choice, replies, ply);
@@ -258,6 +218,60 @@ class ForcedWinProver {
       if (best.proven.mass >= 1) break;
     }
     return best;
+  }
+
+  /** The replies the AND node answers: every legal choice of a doubles side, the engine's list for a single slot (see `expand`). */
+  private replyChoices(position: SimPosition): ChoiceOption[] {
+    const legal = legalChoices(position, other(this.side), { tera: this.opts.tera });
+    return isCombined(legal) ? legal : searchOptions(position, other(this.side), this.opts);
+  }
+
+  /**
+   * Round 89 (A6-3b, #145): the root candidates, candidate by candidate in the ranking's order. A6-2 priced the dice of the plain
+   * path, so a failing candidate spent the shared cell budget on the children of its dice and the next one found none left. Each
+   * candidate now runs a lazy pass first (`pass`: the turned children left aside, a lower bound of its full mass without a game
+   * rule). A candidate below `MIN_FORCED_MASS` in the pass is set aside, at the cost of the cells of the pass. A candidate that
+   * passes gets the full proof at once and the better of the two masses stands; a mass of 1 ends the root. If no candidate passed,
+   * the full proof runs over them in order with what is left, as before A6-3b.
+   */
+  private rootLoop(position: SimPosition, ply: number, candidates: ChoiceOption[], replies: ChoiceOption[]): ReplyProof {
+    let best: ReplyProof = { proven: NONE, cells: [] };
+    let passed = false;
+    for (const candidate of candidates) {
+      const lazy = this.pass(position, candidate.choice, replies, ply, true);
+      if (lazy.proven.mass < MIN_FORCED_MASS) continue;
+      passed = true;
+      const attempt = lazy.proven.mass < 1 ? this.pass(position, candidate.choice, replies, ply, false) : lazy;
+      const better = attempt.proven.mass > lazy.proven.mass ? attempt : lazy;
+      if (better.proven.mass > best.proven.mass) best = better;
+      if (best.proven.mass >= 1) return best;
+    }
+    if (passed) return best;
+    for (const candidate of candidates) {
+      const attempt = this.replies(position, candidate.choice, replies, ply);
+      if (attempt.proven.mass > best.proven.mass) best = attempt;
+      if (best.proven.mass >= 1) break;
+    }
+    return best;
+  }
+
+  /** One candidate's AND node, lazily (the turned children left aside, a memo of its own) or in full. */
+  private pass(position: SimPosition, ownChoice: string, replies: ChoiceOption[], ply: number, lazy: boolean): ReplyProof {
+    if (!lazy) return this.replies(position, ownChoice, replies, ply);
+    const fullMemo = this.memo;
+    this.memo = new Map();
+    this.lazy = true;
+    try {
+      return this.replies(position, ownChoice, replies, ply);
+    } finally {
+      this.lazy = false;
+      this.memo = fullMemo;
+    }
+  }
+
+  /** Round 89 (A6-3b): the specs read one root candidate's lazy and its full mass on one prover (the lazy mass never exceeds the full one). */
+  candidateMass(position: SimPosition, ownChoice: string, lazy: boolean): Proven {
+    return this.pass(position, ownChoice, this.replyChoices(position), 0, lazy).proven;
   }
 
   /** The AND node: every reply, worst static first; the running minimum stops at the first escape. */
@@ -299,7 +313,8 @@ class ForcedWinProver {
     // Round 88 (T336, #72): a child in which a secondary that only helps this side fired takes the proof of the child in which it
     // did not (prover-helping.ts); only the sources are proven, so the positions behind the effect cost no cells.
     const sources = helpedSources(cell, this.side);
-    const proofs: Proven[] = cell.children.map((child, index) => (sources[index] < 0 ? this.prove(child.position, ply + 1) : NONE));
+    // Round 89 (A6-3b): the lazy pass leaves a turned child aside, so what it proves is a lower bound of the full proof.
+    const proofs: Proven[] = cell.children.map((child, index) => (sources[index] < 0 && !(this.lazy && child.turned) ? this.prove(child.position, ply + 1) : NONE));
     sources.forEach((source, index) => { if (source >= 0) proofs[index] = proofs[source]; });
     let mass = 0;
     let turns = 0;
@@ -344,10 +359,10 @@ export function proveForcedWin(rootOrSerialized: string | SimPosition, request: 
   const spent = request.spent ?? { states: 0, cells: 0 };
   const prover = new ForcedWinProver(request.side, { tera: request.tera, sleepClause: request.sleepClause, ruleset: request.ruleset }, budget, spent);
   if (battle.ended || prover.states >= budget.states) return { ...NONE, openValue: null, states: prover.states, cells: prover.cells };
-  const winners = prover.probe(root, request.rootOrder);
-  if (winners.length === 0) return { ...NONE, openValue: null, states: prover.states, cells: prover.cells };
+  const candidates = prover.rootCandidates(root, request.rootOrder);
+  if (candidates.length === 0) return { ...NONE, openValue: null, states: prover.states, cells: prover.cells };
   prover.states += 1;
-  const { proven, cells } = prover.expand(root, 0, winners);
+  const { proven, cells } = prover.expand(root, 0, candidates);
   const fields = openFields(battle, request.side, cells, createMatchupCache(request.ruleset));
   return { ...proven, ...fields, states: prover.states, cells: prover.cells };
 }

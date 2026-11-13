@@ -51,16 +51,24 @@ describe('forced-win prover (round 35)', () => {
     expect(proof.openValue).toBeNull();
   });
 
-  test('a failing first candidate does not stop the proof', () => {
-    // Splash first: the Chansey out-heals Seismic Toss for longer than the
-    // depth cap allows (sixteen heals), so the Splash line proves nothing.
+  test('a stalling first candidate spends the cells the second one needs; the winning line first, or room, proves', () => {
+    // Splash first: the Chansey out-heals Splash for as long as the depth cap allows, so the Splash line refutes nothing and
+    // proves nothing, and its search takes the whole cell budget (100 cells, 44 states) before the Seismic Toss line is tried.
+    // Round 89 (A5f-7): no greedy scout filters the stalling line out any more, so the budget is the whole defence here. The
+    // ranking's first line is the search's best move, and A5f-6 found no corpus position (singles or doubles) where this
+    // starves a proof the scout found.
     const serialized = serializeAt(makeBattle(
       [makeSet('Champ', 'Machamp', ['Seismic Toss', 'Splash'])],
       [makeSet('Egg', 'Chansey', ['Soft-Boiled', 'Recover'])],
     ), { p2: [1] });
-    const proof = proveForcedWin(serialized, { side: 'p1', rootOrder: ['move splash', 'move seismictoss'], tera: false });
-    expect(proof.mass).toBe(1);
-    expect(proof.turns).toBe(1);
+    const stalling = proveForcedWin(serialized, { side: 'p1', rootOrder: ['move splash', 'move seismictoss'], tera: false });
+    expect(stalling.mass).toBe(0);
+    expect(stalling.cells).toBe(PROVER_BUDGET.cells);
+    const winning = proveForcedWin(serialized, { side: 'p1', rootOrder: ['move seismictoss', 'move splash'], tera: false });
+    expect(winning.mass).toBe(1);
+    expect(winning.turns).toBe(1);
+    expect(winning.cells).toBeLessThan(PROVER_BUDGET.cells);
+    expect(proveForcedWin(serialized, { side: 'p1', rootOrder: ['move splash', 'move seismictoss'], tera: false, budget: { cells: 1000, states: 1000 } }).mass).toBe(1);
   });
 
   test('the losing side proves nothing', () => {
@@ -93,20 +101,20 @@ describe('forced-win prover (round 35)', () => {
     expect(proof.openValue).toBe(-1);
   });
 
-  test('the greedy probe spends a few cells on a hopeless position and no full proof', () => {
-    // Protect and Substitute on both sides: no line ends, so the probe fails
-    // every candidate inside its own budget and the tree search never starts.
+  test('a position without a line costs the proof its budget and no more', () => {
+    // Protect and Substitute on both sides: no line ends, so the full proof refutes the candidates inside the cell and state
+    // budgets and proves nothing (round 89, A5f-7: no greedy scout stops it first).
     const serialized = serializeAt(makeBattle(
       [makeSet('A', 'Snorlax', ['Protect', 'Substitute'])],
       [makeSet('B', 'Chansey', ['Protect', 'Substitute'])],
     ), {});
     const proof = proveForcedWin(serialized, { side: 'p1', rootOrder: ['move protect', 'move substitute'], tera: false });
     expect(proof.mass).toBe(0);
-    expect(proof.states).toBe(0);
-    expect(proof.cells).toBeLessThanOrEqual(PROVER_BUDGET.probeCells);
+    expect(proof.cells).toBeLessThanOrEqual(PROVER_BUDGET.cells);
+    expect(proof.states).toBeLessThanOrEqual(PROVER_BUDGET.states);
   });
 
-  test('a two-turn proof against four replies fits the budget after the probe', () => {
+  test('a two-turn proof against four replies fits the budget', () => {
     // Seismic Toss twice against a 150-HP Chansey with four harmless moves:
     // four replies at the root, four children each proving in one more turn.
     const serialized = serializeAt(makeBattle(

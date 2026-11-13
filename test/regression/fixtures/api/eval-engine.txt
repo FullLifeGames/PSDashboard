@@ -65,6 +65,7 @@ type ForcedWinProof
 type GameReport
 type GameSeedRead
 type GameTeamProblems
+type HitResult
 type HpDisplayBody
 type HpSighting
 type ItemLike
@@ -180,6 +181,8 @@ value buildGameReport
 value calcSingleDamageRange
 value captureSerializedPosition
 value cellKey
+value chainCount
+value chainResults
 value chanceRolled
 value checkEngine
 value checkGameTeams

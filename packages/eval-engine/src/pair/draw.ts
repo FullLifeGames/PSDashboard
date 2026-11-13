@@ -4,6 +4,7 @@ import type { MatchupCache } from '../eval-function.ts';
 import { forkBattleWithPrng, positionBattle, toPosition, type SimPosition } from '../forward/position.ts';
 import { answerFollowUps, applyChoice, resolveForcedSwitches } from '../forward/switches.ts';
 import { leafValue } from '../search/leaf.ts';
+import type { DieQuantiles } from '../search/root-quantile.ts';
 import { PairPRNG, type PairRecord, type PairScripts } from './prng.ts';
 
 /**
@@ -48,12 +49,13 @@ const NO_SCRIPTS: PairScripts = new Map();
 /**
  * Round 86 (A9b): the tree's root draw under the pair recorder. The advance is `advancePositionWithLog`'s (the same natural stream,
  * the same forced-switch rule, a plain PRNG on the child) with the dice written down, so `readPattern` can name the draw's class
- * the way it names the sampler's. `logIndex` in the records counts from the first line of this draw.
+ * the way it names the sampler's. `logIndex` in the records counts from the first line of this draw. Round 89 (#59): `quantiles`
+ * (a tree's root quantiles) answer the named dice after the natural draw; without them the draw is as before.
  */
 export function drawKeyed(
-  root: SimPosition, p1Choice: string, p2Choice: string, seed: PRNGSeed, stopAtForcedSwitch: boolean,
+  root: SimPosition, p1Choice: string, p2Choice: string, seed: PRNGSeed, stopAtForcedSwitch: boolean, quantiles?: DieQuantiles,
 ): { child: SimPosition; log: string[]; pendingSwitch: boolean; records: PairRecord[] } {
-  const prng = new PairPRNG(seed, NO_SCRIPTS);
+  const prng = new PairPRNG(seed, NO_SCRIPTS, quantiles);
   const battle = forkBattleWithPrng(root, prng);
   const logStart = battle.log.length;
   applyChoice(battle, 'p1', p1Choice);

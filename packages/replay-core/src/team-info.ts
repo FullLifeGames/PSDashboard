@@ -3,7 +3,11 @@ import type { SmogonUsageStats, UsageProbability, UsageSpread } from './smogon/s
 import { getSpeciesSetAssumption, type SetAssumption, type SetSpreadAssumption, type SmogonSetAssumptions } from './smogon/sets-lookup.ts';
 import { applyCoherenceVetoes, itemFromChosenSet, publishedIvs, selectCuratedSet, type MoveCandidate } from './set-coherence.ts';
 import { isChampionsFormat } from './champions-format.ts';
-import type { SpreadCandidate, SpreadOrigin } from './spreads/ladder.ts';
+import type { SpreadCandidate } from './spreads/ladder.ts';
+import {
+  INFERRED_SPREAD_DETAIL, ORDER_SPREAD_DETAIL, MEASURED_HP_SPREAD_DETAIL, INFERRED_ITEM_DETAIL, RULED_OUT_ITEM_DETAIL, NO_BOOST_ITEM_DETAIL, KNOCKOUT_BOOST_ITEM_DETAIL,
+  ITEM_DETAIL, ORIGIN_DETAIL,
+} from './team/provenance-details.ts';
 import { settleOpenMoves, unfilledOpenMoves } from './team/open-moves.ts';
 import type {
   OpenMove, OpponentTeamInfo, PokemonEvs, PokemonEvsInfo, PokemonFieldInfo, PokemonMoveInfo, RevealedPokemonInfo,
@@ -45,19 +49,9 @@ export function manualMove(name: string): PokemonMoveInfo {
   return { name, source: 'manual' };
 }
 
-/** Provenance label the stats panel shows for damage-solved spreads. */
-export const INFERRED_SPREAD_DETAIL = 'fits observed damage';
-/** A spread only a proven move order checked (round 69, T69). */
-export const ORDER_SPREAD_DETAIL = 'fits the observed move order';
-/** A spread whose HP the log's maximum HP set inside the guess (round 69, T69). */
-export const MEASURED_HP_SPREAD_DETAIL = 'HP read from the log, the rest kept from the guess';
-/** Provenance details for items the move-order evidence decided (round 37). */
-export const INFERRED_ITEM_DETAIL = 'moved first, Choice Scarf inferred';
-export const RULED_OUT_ITEM_DETAIL = 'moved second, Choice Scarf ruled out';
-/** The damage lines dropped a guessed boost item (round 69, T26). */
-export const NO_BOOST_ITEM_DETAIL = 'damage rules out a boost item';
-
-const ITEM_DETAIL = { 'moved-first': INFERRED_ITEM_DETAIL, 'moved-second': RULED_OUT_ITEM_DETAIL, 'no-boost': NO_BOOST_ITEM_DETAIL } as const;
+export {
+  INFERRED_SPREAD_DETAIL, ORDER_SPREAD_DETAIL, MEASURED_HP_SPREAD_DETAIL, INFERRED_ITEM_DETAIL, RULED_OUT_ITEM_DETAIL, NO_BOOST_ITEM_DETAIL, KNOCKOUT_BOOST_ITEM_DETAIL,
+};
 
 /** A guessed or unknown item gives way to the item the solver decided. */
 function overlayItem(pokemon: RevealedPokemonInfo, candidate: SpreadCandidate): PokemonFieldInfo {
@@ -69,9 +63,6 @@ function overlayItem(pokemon: RevealedPokemonInfo, candidate: SpreadCandidate): 
   return guessedField(candidate.item, undefined, ITEM_DETAIL[candidate.itemReason ?? 'moved-second']);
 }
 
-const ORIGIN_DETAIL: Record<Exclude<SpreadOrigin, 'prior'>, string> = {
-  damage: INFERRED_SPREAD_DETAIL, order: ORDER_SPREAD_DETAIL, hp: MEASURED_HP_SPREAD_DETAIL,
-};
 const STAT_IDS = ['hp', 'atk', 'def', 'spa', 'spd', 'spe'] as const;
 const sameStats = (a: Partial<PokemonEvs>, b: Partial<PokemonEvs>, fallback: number) =>
   STAT_IDS.every(stat => (a[stat] ?? fallback) === (b[stat] ?? fallback));

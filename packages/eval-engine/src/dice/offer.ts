@@ -111,10 +111,25 @@ function stallCondition(user: Pokemon, battle: Battle): string | undefined {
 
 const fixedDamage = (move: ActiveMove): boolean => !!move.damage || !!move.ohko || !!move.damageCallback;
 
+/**
+ * Round 89 (#114): the accuracy die of a later hit of a move whose every hit rolls its own accuracy (the Dex's `multiaccuracy` with a
+ * fixed `multihit`, read after `ModifyMove`: Skill Link and Loaded Dice have cleared the flag by then and the simulator draws one die
+ * only). The die of hit N is named as `recognize.ts` names the draw (`hit` N, 2 and up), so a forced hit die finds its draw.
+ */
+function laterHitsOf(move: ActiveMove): number[] {
+  const { multiaccuracy, multihit } = move as ActiveMove & { multiaccuracy?: boolean };
+  return multiaccuracy && typeof multihit === 'number' ? Array.from({ length: Math.max(0, Math.floor(multihit) - 1) }, (_, index) => index + 2) : [];
+}
+
 function accuracyOffers(battle: Battle, move: ActiveMove, base: Base, targets: string[]): DieOffer[] {
   // Gen 2 draws no accuracy for a move of 100 percent (accuracy 255), whatever the answer
   const draws = typeof move.accuracy === 'number' && !move.alwaysHit && !(battle.gen === 2 && move.accuracy >= 100);
-  return draws ? targets.map(targetSlot => ({ name: { ...base, targetSlot, kind: 'accuracy' }, results: YES_NO })) : [];
+  if (!draws) return [];
+  const later = laterHitsOf(move);
+  return targets.flatMap((targetSlot): DieOffer[] => [
+    { name: { ...base, targetSlot, kind: 'accuracy' }, results: YES_NO },
+    ...later.map((hit): DieOffer => ({ name: { ...base, targetSlot, kind: 'accuracy', hit }, results: YES_NO })),
+  ]);
 }
 
 function damageOffers(battle: Battle, move: ActiveMove, base: Base, targets: string[]): DieOffer[] {

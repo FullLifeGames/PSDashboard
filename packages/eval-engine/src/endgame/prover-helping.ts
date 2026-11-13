@@ -1,4 +1,4 @@
-import { State, type Battle } from '@pkmn/sim';
+import type { Battle } from '@pkmn/sim';
 import { sideIndex } from '@fulllifegames/replay-core';
 import type { CellEvent } from '../cell-blend.ts';
 import { splitOutcome } from '../search/secondary-classes.ts';
@@ -6,6 +6,7 @@ import type { EndgameChildren } from './children.ts';
 import { positionBattle } from '../forward-model.ts';
 import type { Side } from './prover-order.ts';
 import { foeReadsStages } from './stage-readers.ts';
+import { stageReading } from './board-facts.ts';
 
 /**
  * Round 88 (T336, #72): a class in which a secondary effect fired inherits the proof of the class in which it did not, when the
@@ -32,35 +33,12 @@ export function splitClassKey(key: string): { order: string; outcomes: string[] 
 }
 
 /**
- * The fields of a serialized position that follow the damage a roll dealt, never the class (the classes already average over rolls):
- * the HP, the last damage, the damage a body took and the totals a move line keeps. They sit at several depths, so the drop is deep.
- */
-const ROLL_FIELDS = new Set(['hp', 'lastDamage', 'hurtThisTurn', 'damage', 'damageValue', 'totalDamage']);
-/** What the memo key drops (endgame/key.ts), and the start-of-turn roll of Gens 2 and 3 (the dice of the next turn, drawn from the stream). */
-const STRIPPED_FIELDS = ['log', 'inputLog', 'messageLog', 'sentLogPos', 'sentRequests', 'prng', 'prngSeed', 'turn', 'lastMoveLine', 'hints', 'effectOrder', 'quickClawRoll'] as const;
-
-type Boosts = Record<string, number>;
-interface Reading { rest: string; boosts: Boosts[][] }
-
-/** The position with the roll fields and the stat stages taken out: the rest as one string, the stages by side and body. */
-function reading(battle: Battle): Reading {
-  const state = State.serializeBattle(battle) as unknown as { sides: { pokemon: Record<string, unknown>[] }[] } & Record<string, unknown>;
-  for (const field of STRIPPED_FIELDS) delete state[field];
-  const boosts = state.sides.map(side => side.pokemon.map(body => {
-    const own = (body.boosts ?? {}) as Boosts;
-    delete body.boosts;
-    return own;
-  }));
-  return { rest: JSON.stringify(state, (key, value: unknown) => (ROLL_FIELDS.has(key) ? undefined : value)), boosts };
-}
-
-/**
  * Whether the fired position is the unfired one with the mover's stat stages up and the foe's down and nothing else changed, no
  * Speed stage among them. Reads two battles, writes neither (the specs hold it with `fingerprint`).
  */
 export function onlyHelpsMover(unfired: Battle, fired: Battle, mover: Side): boolean {
-  const before = reading(unfired);
-  const after = reading(fired);
+  const before = stageReading(unfired);
+  const after = stageReading(fired);
   if (before.rest !== after.rest) return false;
   const own = sideIndex(mover);
   return before.boosts.every((bodies, side) => bodies.every((was, body) => {

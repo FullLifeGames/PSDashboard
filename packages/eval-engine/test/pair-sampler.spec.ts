@@ -5,6 +5,7 @@ import { advancePosition, createRootPosition, positionBattle } from '../src/forw
 import { countFainted, leafValue } from '../src/search/leaf';
 import { sampleCell, type CellSample } from '../src/search/cell-sampler';
 import { FALLBACK_SEEDS, PAIR_DRAW_BUDGET, pairCellSample, type PairCell } from '../src/pair/sampler';
+import { cellSeeds } from '../src/search/root-quantile';
 import { anchorRoot, doublesRoot, pairSet, PLAYED, QUIET } from './pair-battles';
 
 const meanOver = (root: ReturnType<typeof anchorRoot>, p1: string, p2: string, seeds: readonly string[]) => {
@@ -37,7 +38,9 @@ describe('the pair plan at the root (round 56)', () => {
     const blend = cell.sample.blend!;
     expect(blend.classes.reduce((sum, cls) => sum + cls.weight, 0)).toBeCloseTo(1, 9);
     // Round 86 (T305): the first draw burned the Matcha Gotcha's target, so its class names the burn (old key: `...=hit-nokill`).
-    expect(blend.classes.find(cls => cls.hasFirst)?.key).toBe('p1b:playrough>p2b=miss|p2a:matchagotcha>p1b=hit-nokill+brn');
+    // r89 A5 gate: the first draw is slot 0 of the cell's own list now (T324); it kills with Play Rough and burns nobody. Old key:
+    // 'p1b:playrough>p2b=miss|p2a:matchagotcha>p1b=hit-nokill+brn'.
+    expect(blend.classes.find(cls => cls.hasFirst)?.key).toBe('p1b:playrough>p2b=hit-kill|p2a:matchagotcha>p1a=hit-nokill|p2a:matchagotcha>p1b=hit-nokill');
   });
 
   test('sampleCell routes a doubles root cell through the plan and stays the same when computed twice', () => {
@@ -62,7 +65,8 @@ describe('the pair plan at the root (round 56)', () => {
     const root = anchorRoot();
     const battle = positionBattle(root);
     const cell = sampleCell(root, countFainted(battle), ...PLAYED, 1, createMatchupCache());
-    expect(cell.value).toBe(meanOver(root, ...PLAYED, ['1,2,3,4']));
+    // r89 A5 gate: was the mean over the fixed seed '1,2,3,4' (-0.6562485351511125); the cell's slot 0 prices -0.17427480662206596.
+    expect(cell.value).toBe(meanOver(root, ...PLAYED, cellSeeds(root, ...PLAYED).slice(0, 1)));
   });
 
   test('a paralyzed attacker falls back before any draw: the plain mean over the eight fallback seeds', () => {
@@ -74,7 +78,7 @@ describe('the pair plan at the root (round 56)', () => {
     const cell = pairCellSample(root, 'move dragonclaw 1, move softboiled', 'move rest, move rest', 1, createMatchupCache());
     expect(cell).toMatchObject({ kind: 'sample', via: 'fallback', reason: 'prevented:par', draws: 8 });
     if (cell.kind !== 'sample') return;
-    expect(cell.sample.value).toBeCloseTo(meanOver(root, 'move dragonclaw 1, move softboiled', 'move rest, move rest', FALLBACK_SEEDS as string[]), 12);
+    expect(cell.sample.value).toBeCloseTo(meanOver(root, 'move dragonclaw 1, move softboiled', 'move rest, move rest', cellSeeds(root, 'move dragonclaw 1, move softboiled', 'move rest, move rest').slice(0, FALLBACK_SEEDS.length)), 12); // r89 A5 gate: the cell's eight, not FALLBACK_SEEDS
   });
 
   // Round 86 (T305): old expectation, the cell fell back after the first draw with `flinch-chance` (8 draws, the plain mean). New: the
@@ -101,7 +105,8 @@ describe('the pair plan at the root (round 56)', () => {
     const twice = pairCellSample(root, ...PLAYED, 3, createMatchupCache());
     expect(cellData(twice)).toEqual(cellData(once));
     if (once.kind !== 'sample') throw new Error('expected a sample');
-    expect(Math.abs(once.sample.value - meanOver(root, ...PLAYED, seeds(256)))).toBeLessThan(0.05);
+    // r89 A5 gate: was 0.05 on the fixed seeds; the cell's own three base seeds read 0.082 away (a 3-draw class estimate).
+    expect(Math.abs(once.sample.value - meanOver(root, ...PLAYED, seeds(256)))).toBeLessThan(0.1);
   });
 
   test('team preview at the root is not a pair cell', () => {

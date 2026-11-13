@@ -71,11 +71,12 @@ export const chanceValue = (node: ChanceNode): number => node.classes.reduce((su
 export const chanceEnded = (node: ChanceNode): boolean => node.classes.every(cls => cls.child.ended);
 
 /** One root cell's tree stats for the merge: a decision child as before, a chance child with its classes and a visit-mean-shaped total. */
-export function cellStats(key: number, child: TreeChild, classKey?: string): MctsTreeStats['cells'][number] {
+export function cellStats(key: number, child: TreeChild, classKey?: string, classWeight?: number): MctsTreeStats['cells'][number] {
   if (!isChanceNode(child)) {
     return {
       key, visits: child.visits, total: sumW(child) + child.value, value: child.value, ended: child.ended,
       ...(classKey !== undefined ? { classKey } : {}),
+      ...(classKey !== undefined && classWeight !== undefined ? { classWeight } : {}),
     };
   }
   return {
