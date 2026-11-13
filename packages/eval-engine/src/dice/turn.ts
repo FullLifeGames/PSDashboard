@@ -124,6 +124,20 @@ function selfChanceIn(dex: Battle['dex']): (moveId: string) => string | undefine
   };
 }
 
+/**
+ * Round 89 (#104, G4b): the stall conditions of the stalling moves a body knows but did not click, keyed `slot:move`. One of them can
+ * still be the move the log shows: Encore makes the body repeat its last move after the click. Read from the same offers as the click's own.
+ */
+function redirectedStalls(battle: Battle, slot: string, body: Battle['sides'][number]['active'][number] | undefined, clickedId: string): Map<string, string> {
+  const found = new Map<string, string>();
+  for (const known of body?.moveSlots ?? []) {
+    if (known.id === clickedId || !(battle.dex.moves.get(known.id) as unknown as { stallingMove?: boolean }).stallingMove) continue;
+    const effectId = offeredDice(battle, slot, { kind: 'move', moveId: known.id, moveName: known.id }).find(offer => offer.name.kind === 'stalling' && offer.name.effectId)?.name.effectId;
+    if (effectId) found.set(`${slot}:${known.id}`, effectId);
+  }
+  return found;
+}
+
 /** What the log cannot name (`LoggedOptions`): the move each body clicked, the checks each body stood under, the secondaries of every move. */
 export function loggedOptions(battle: Battle, logged: { p1: string; p2: string }): LoggedOptions {
   const clicked = new Map<string, string>();
@@ -142,13 +156,7 @@ export function loggedOptions(battle: Battle, logged: { p1: string; p2: string }
       // Round 86 (T306): the condition that makes a stalling move draw its chance to succeed again, as the offer names it
       const stall = offers.find(offer => offer.name.kind === 'stalling' && offer.name.effectId)?.name.effectId;
       if (stall) stalling.set(slot, stall);
-      // Round 89 (#104, G4b): a stalling move the body knows but did not click can still be the move the log shows (Encore makes the body
-      // repeat its last move after the click): its condition is keyed `slot:move`, read from the same offers.
-      for (const known of body?.moveSlots ?? []) {
-        if (known.id === moveId || !(battle.dex.moves.get(known.id) as unknown as { stallingMove?: boolean }).stallingMove) continue;
-        const redirected = offeredDice(battle, slot, { kind: 'move', moveId: known.id, moveName: known.id }).find(offer => offer.name.kind === 'stalling' && offer.name.effectId)?.name.effectId;
-        if (redirected) stalling.set(`${slot}:${known.id}`, redirected);
-      }
+      redirectedStalls(battle, slot, body, moveId).forEach((effectId, key) => stalling.set(key, effectId));
       // Round 86 (T306): the foes the click draws an accuracy for, for a move the log writes without an aim. Round 89 (#114): the offer
       // also names the die of each later hit; the list keeps one entry per target, as before, so the reconstruction's forced list does not move.
       accuracyTargets.set(slot, offers.filter(offer => offer.name.kind === 'accuracy' && offer.name.hit === undefined && offer.name.targetSlot).map(offer => offer.name.targetSlot!));
