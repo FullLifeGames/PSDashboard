@@ -30,7 +30,8 @@ export interface LoggedOptions {
   /**
    * Round 86 (the log's dice, T306): the condition each body stands under that makes its clicked move draw the chance to succeed again
    * (a stalling move used twice in a row), by slot. The die's name carries it (`stall`), and only the simulator's own hook knows it. With
-   * it a stalling move the log shows as `|-fail|` is a logged failure, and one without is a logged success.
+   * it a stalling move the log shows as `|-fail|` is a logged failure, and one without is a logged success. Round 89 (G4b): a stalling
+   * move the body knows but did not click is keyed `slot:move`, for the move Encore makes it repeat.
    */
   stalling?: ReadonlyMap<string, string>;
   /**
@@ -391,8 +392,10 @@ export function loggedDice(turnLines: readonly string[], options: LoggedOptions 
 function stallingDice(actions: readonly LoggedAction[], options: LoggedOptions): ForcedDie[] {
   const dice: ForcedDie[] = [];
   for (const action of actions) {
-    const effectId = options.stalling?.get(action.slot);
-    if (action.type !== 'move' || !action.queued || !effectId || options.clicked?.get(action.slot) !== action.moveId) continue;
+    if (action.type !== 'move' || !action.queued) continue;
+    // the click's own move, or one the body repeated instead of its click (Encore: the caller keys it `slot:move`)
+    const effectId = options.clicked?.get(action.slot) === action.moveId ? options.stalling?.get(action.slot) : options.stalling?.get(`${action.slot}:${action.moveId}`);
+    if (!effectId) continue;
     dice.push({ name: { slot: action.slot, moveId: action.moveId, kind: 'stalling', effectId }, result: happens((action.fails[action.slot] ?? 0) === 0) });
   }
   return dice;
