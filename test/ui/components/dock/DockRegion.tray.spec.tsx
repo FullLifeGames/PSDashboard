@@ -25,6 +25,7 @@ function appAt({ sim, historyLength, liveTip = true }: Where): AppController {
     ctx: {
       branch: { simState: sim, executing: false, executeError: null, recordChoice: noop, getBattle: undefined, history: new Array(historyLength).fill({}) },
       meta: { replayGen: 9 },
+      replay: { replayData: undefined },
       newGame: { record: null },
     },
     engine: {
