@@ -23,7 +23,7 @@ const GAMES = [
   { kind: 'Doubles OU', id: 'smogtours-gen9doublesou-912884', turns: [5, 8, 11] },
   { kind: 'VGC (Scarlet/Violet)', id: 'gen9vgc2026regi-2630452654', turns: [4, 6] },
   { kind: 'Champions OU', id: 'gen9championsou-2691703002', turns: [8, 12] },
-  { kind: 'Champions VGC', id: 'gen9championsvgc2026regma-2625939941', turns: [3, 5, 4] },
+  { kind: 'Champions VGC', id: 'gen9championsvgc2026regma-2625939941', turns: [3, 5] },
 ];
 
 async function loadReplay(page: Page, replay: ReplayData) {
