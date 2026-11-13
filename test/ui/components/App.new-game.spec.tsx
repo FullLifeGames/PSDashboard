@@ -8,7 +8,7 @@ import { listGames, saveGame } from '../../../src/lib/new-game/store';
 import { savedRecord } from '../fixtures/saved-game';
 import { playedRecord } from '../fixtures/played-game';
 import { encodeBranchShare, encodeShareJson } from '../../../src/lib/branch-share';
-import { makeGameSharePayload } from '../../../src/lib/new-game/share';
+import { makeGameSharePayload, shareEntry } from '../../../src/lib/new-game/share';
 
 const worker = vi.hoisted(() => ({ current: null as null | ReturnType<typeof import('../fixtures/worker').realReplayWorkerClient> }));
 vi.mock('../../../src/hooks/useReplayWorker', () => ({ useReplayWorker: () => worker.current!.client }));
@@ -179,6 +179,24 @@ describe('a new game in the app', () => {
     expect(screen.queryByRole('alert')).toBeNull();
     await act(async () => {});
   }, 120_000);
+
+  test('a game link with an open branch restores the branch from the game and puts the pointer where the sharer stood (H5)', async () => {
+    const played = await playedRecord(2);
+    // the main line holds the lead and turn 1; the sharer's branch replays turn 2 from turn 1 and he stands on its tip
+    const main = { ...played, entries: played.entries.slice(0, 2), turns: 1 };
+    const payload = makeGameSharePayload({
+      record: main, variation: { startTurn: 1, history: played.entries.slice(2) }, view: { turn: 2, line: 'variation' },
+    });
+    expect(payload.variation?.entries).toEqual(played.entries.slice(2).map(shareEntry));
+    window.location.hash = `#branch=${encodeBranchShare(payload)}`;
+    render(<App />);
+    await waitFor(() => expect(document.querySelector('.ps-topbar')).not.toBeNull(), { timeout: 60_000 });
+    await waitFor(() => expect(document.body.textContent).toMatch(/Variation moves/), { timeout: 90_000 });
+    expect(document.body.textContent).toMatch(/Turn 1/);
+    expect(window.location.hash).toBe('');
+    expect(screen.queryByRole('alert')).toBeNull();
+    await act(async () => {});
+  }, 150_000);
 
   test('a game link the reader cannot start says why on the start page and leaves the hash (H5)', async () => {
     const played = await playedRecord(0);
