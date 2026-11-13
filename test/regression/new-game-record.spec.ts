@@ -137,7 +137,7 @@ describe('the store', () => {
     expect(listGames()).toEqual([]);
     expect(saveGame(record(3))).toBe(true);
     expect(loadGame(record(3).id)).toEqual(record(3));
-    expect(listGames()).toEqual([{ id: record(3).id, formatName: '[Gen 9] OU', players: ['Alice', 'Bob'], turns: 3, updatedAt: record(3).updatedAt }]);
+    expect(listGames()).toEqual([{ id: record(3).id, formatName: '[Gen 9] OU', players: ['Alice', 'Bob'], turns: 3, updatedAt: record(3).updatedAt, seed: record(3).seed }]);
     expect(kept.has(gameKey(record(3).id))).toBe(true);
   });
 

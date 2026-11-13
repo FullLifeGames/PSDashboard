@@ -20,10 +20,12 @@ export interface SavedGameRow {
   players: [string, string];
   turns: number;
   updatedAt: string;
+  /** The dice seed (shown in the saved list); a row written before the seed was listed has none. */
+  seed?: string;
 }
 
 function rowOf(record: NewGameRecord): SavedGameRow {
-  return { id: record.id, formatName: record.formatName, players: record.players, turns: record.turns, updatedAt: record.updatedAt };
+  return { id: record.id, formatName: record.formatName, players: record.players, turns: record.turns, updatedAt: record.updatedAt, seed: record.seed };
 }
 
 /** The saved games, newest first; an unreadable index reads as empty. */
