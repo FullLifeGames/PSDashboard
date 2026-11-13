@@ -135,7 +135,7 @@ export function gameReplayData(record: NewGameRecord): ReplayData {
     format: record.formatName,
     formatid: record.format,
     players: [...record.players],
-    log: assembleGameLog(record.header, record.body),
+    log: assembleGameLog(record.header, record.body, record.format),
     uploadtime: Math.floor(Date.parse(record.createdAt) / 1000),
     views: 0,
   };

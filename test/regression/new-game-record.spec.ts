@@ -53,6 +53,21 @@ describe('the log of a game', () => {
   test('the assembled log is header then body, one line each, without a clock line', () => {
     expect(assembleGameLog(['|t:|0', '|gametype|singles'], ['|start', '|t:|5', '|turn|1'])).toBe('|gametype|singles\n|start\n|turn|1');
   });
+
+  // Round 89 (#105, H7, tester finding 5): the Champions formats play on a Custom Game stand-in, whose debug flag writes "|debug|" lines
+  // that Showdown prints only in a Custom Game. The frame shows what Showdown shows: the chosen format decides.
+  test.each([
+    ['Gen 9 OU', 'gen9ou'], ['Doubles OU', 'gen9doublesou'], ['Scarlet/Violet VGC', 'gen9vgc2025regi'],
+    ['Champions VGC', 'gen9championsvgc2026regmc'], ['Champions OU', 'gen9championsou'],
+  ])('%s: the log of a game holds no debug line', async (_name, format) => {
+    await loadSimMods(format);
+    expect(assembleGameLog(['|gametype|singles'], ['|start', '|debug|natural status immunity.', '|turn|1'], format)).toBe('|gametype|singles\n|start\n|turn|1');
+  });
+
+  test.each(['gen9customgame', 'gen9doublescustomgame', 'gen9championscustomgame'])('%s: a Custom Game keeps its debug lines, as Showdown prints them', async format => {
+    await loadSimMods(format);
+    expect(assembleGameLog(['|gametype|singles'], ['|start', '|debug|natural status immunity.', '|turn|1'], format)).toContain('|debug|natural status immunity.');
+  });
 });
 
 describe('the record', () => {
