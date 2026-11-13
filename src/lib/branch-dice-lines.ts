@@ -100,6 +100,13 @@ export function dieLines(report: DiceReport, window: TurnWindow, words: DieWords
   return lines;
 }
 
+/**
+ * The text of a display line as one protocol field: the client splits a line at every pipe and prints its first field, so a reason
+ * that quotes a protocol line ("the protocol shows "|-miss|p2a: ..."") would break off at the quote. A broken bar (U+00A6) stands in
+ * for the pipe and keeps the quoted line readable.
+ */
+const asField = (text: string): string => text.replaceAll('|', '\u00a6');
+
 /** The shown log with the display lines in it, each before the line at its index (several lines at one index keep their order). */
 export function withDieLines(log: readonly string[], lines: readonly DieLine[]): readonly string[] {
   if (lines.length === 0) return log;
@@ -107,10 +114,10 @@ export function withDieLines(log: readonly string[], lines: readonly DieLine[]):
   const out: string[] = [];
   let next = 0;
   log.forEach((line, index) => {
-    while (next < sorted.length && sorted[next].at <= index) out.push(`${DIE_LINE}${sorted[next++].text}`);
+    while (next < sorted.length && sorted[next].at <= index) out.push(`${DIE_LINE}${asField(sorted[next++].text)}`);
     out.push(line);
   });
-  while (next < sorted.length) out.push(`${DIE_LINE}${sorted[next++].text}`);
+  while (next < sorted.length) out.push(`${DIE_LINE}${asField(sorted[next++].text)}`);
   return out;
 }
 
