@@ -1,6 +1,6 @@
-import { test, expect, type Browser, type Page } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { installReplayEmbedCache, routeOfflineFixtures, pickMove, moveTimeline, startVariationAt } from './helpers';
-import { lightEngine } from './dock-helpers';
+import { copiedLink, openInFreshContext, prepare, timelineState } from './new-game-helpers';
 import { encodeBranchShare } from '../../src/lib/branch-share';
 import { sharedBranchPayload } from './fixtures/shared-branch';
 
@@ -14,11 +14,6 @@ test.beforeAll(installReplayEmbedCache);
 
 const SIX = ['Garchomp', 'Gengar', 'Dragonite', 'Tyranitar', 'Snorlax', 'Starmie'];
 const team = (species: string[]) => species.map(name => `${name}\nEVs: 4 HP\n- Protect\n- Earthquake\n- Return\n- Substitute`).join('\n\n');
-
-async function prepare(page: Page): Promise<void> {
-  await lightEngine(page);
-  await routeOfflineFixtures(page);
-}
 
 async function startGame(page: Page, format: { search: string; name: string } | null): Promise<void> {
   await page.goto('/');
@@ -55,28 +50,6 @@ async function playProtectTurn(page: Page, slots: ('p1a' | 'p1b' | 'p2a' | 'p2b'
   for (const slot of slots) await pickMove(page, slot, 'Protect');
   await page.locator('.ps-dock .ps-execute-btn').click();
   await expect(page.getByText(`T${reaches}/`)).toBeVisible({ timeout: 90_000 });
-}
-
-/** The link the Copy Share Link button writes into its field. */
-async function copiedLink(page: Page): Promise<string> {
-  await page.getByRole('button', { name: 'Copy Share Link' }).click();
-  const field = page.getByLabel('Branch share link');
-  await expect(field).toHaveValue(/#branch=/);
-  return field.inputValue();
-}
-
-const timelineState = (page: Page) => page.locator('.ps-branch-bar input[type="range"]').evaluate(input => {
-  const range = input as HTMLInputElement;
-  return { value: range.value, max: range.max };
-});
-
-/** A fresh browser context (no storage of the sharer) that opens the link. */
-async function openInFreshContext(browser: Browser, link: string): Promise<{ page: Page; close: () => Promise<void> }> {
-  const context = await browser.newContext({ viewport: { width: 1366, height: 768 } });
-  const page = await context.newPage();
-  await prepare(page);
-  await page.goto(link);
-  return { page, close: () => context.close() };
 }
 
 async function expectOpenedLikeTheSharer(page: Page, sharer: Awaited<ReturnType<typeof timelineState>>, seed: string): Promise<void> {
@@ -162,8 +135,9 @@ test('a link of a newer version names its version; a damaged game link says so',
   await page.goto(`/#branch=${Buffer.from(JSON.stringify({ version: 3 })).toString('base64url')}`);
   await expect(page.getByRole('alert')).toContainText('newer PS Dashboard (link version 3)');
   await page.goto(`/#branch=${Buffer.from(JSON.stringify({ version: 2, kind: 'game' })).toString('base64url')}`);
-  await page.reload();
+  // The hashchange reads the damaged link and drops it from the address (G18), so a reload would show the start page and no notice.
   await expect(page.getByRole('alert')).toContainText('invalid or damaged');
+  await expect.poll(() => new URL(page.url()).hash).toBe('');
 });
 
 type StateHandle = { capture: () => Promise<Record<string, unknown>>; restore: (state: unknown) => Promise<void> };
