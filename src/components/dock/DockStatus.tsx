@@ -2,11 +2,17 @@ import type { PickerSource } from '../../lib/picker-state';
 import { DICE_WAIT_NOTE } from '../branch/DiceChips';
 import type { DockModel, DockSlotModel } from './dock-model';
 
-/** Round 77 (user request 28.10.2026): the winner left the top bar for the place of the pickers. */
-export function EndedNotice({ winner }: { winner: string | null }) {
+/**
+ * Round 77 (user request 28.10.2026): the winner left the top bar for the place of the pickers. Round 89 (#105, H4h): the end of a
+ * game's main line is the game's end, not a variation's: `game` names it that way.
+ */
+export function EndedNotice({ winner, game = false }: { winner: string | null; game?: boolean }) {
+  const text = game
+    ? (winner ? `${winner} won the game.` : 'The game ended without a winner.')
+    : (winner ? `${winner} wins this variation.` : 'The variation ended without a winner.');
   return (
     <div className="ps-branch-ended" role="status">
-      {winner ? `${winner} wins this variation.` : 'The variation ended without a winner.'} Go back a turn to play it another way.
+      {text} Go back a turn to play it another way.
     </div>
   );
 }

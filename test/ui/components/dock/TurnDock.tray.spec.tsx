@@ -171,6 +171,18 @@ describe('the states of a position', () => {
     expect(screen.queryByRole('button', { name: /Select|Execute/ })).toBeNull();
   });
 
+  test('the end of a game is the game\'s own: it names the winner as won the game, not as a variation (H4h)', () => {
+    const live = simState('singles', { ended: true, winner: 'Bene' });
+    const { rerender } = render(<TurnDock {...props({ simState: live, endOfGame: { winner: 'Bene' } })} />);
+    expect(screen.getByRole('status')).toHaveTextContent('Bene won the game. Go back a turn to play it another way.');
+    expect(screen.queryByText(/variation/)).toBeNull();
+    // the reopened game has no live sim at its end: the picker shows a position that cannot be played
+    rerender(<TurnDock {...props({ simState: simState('doubles'), endOfGame: { winner: null } })} />);
+    expect(screen.getByRole('status')).toHaveTextContent('The game ended without a winner. Go back a turn to play it another way.');
+    expect(screen.queryByRole('button', { name: /Select|Execute/ })).toBeNull();
+    expect(document.querySelector('.ps-dock-chip')).toBeNull();
+  });
+
   test('the strip shows the source, the dice wait note, the execute error and the running turn', async () => {
     const { rerender } = render(<TurnDock {...props({ source: 'stored' })} />);
     expect(screen.getByText('Choices from the reconstructed position')).toBeInTheDocument();
