@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
-import { installReplayEmbedCache, routeOfflineFixtures, pickMove, fixtureReplay, fixturePath, openLoader } from './helpers';
+import { installReplayEmbedCache, routeOfflineFixtures, pickMove, fixtureReplay, fixturePath, openLoader, moveTimeline, startVariationAt, dockChip, type DockSlotKey } from './helpers';
 import { lightEngine } from './dock-helpers';
+import { copiedLink, openInFreshContext, timelineState } from './new-game-helpers';
 
 /**
  * Round 89 (lane H, #105), stage H4: the New game dialog in the browser. A draft-league player pastes two Showdown exports on the
@@ -265,3 +266,129 @@ test('layout: the format list, Start under long problem lists, the 20-game menu 
   await expect(tag).toBeVisible();
   expect(await tag.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
 });
+
+/**
+ * H6: one whole game per family, the way a draft-league player plays it: paste both teams, Start, pick the leads (four of six in VGC),
+ * a turn by hand, a turn the engine fills (the dock's own fill, light engine settings), the slider's end growing by one per turn, a
+ * variation at turn 1 whose link a fresh browser opens, the way back to the main line with the replace confirm, Analyze game on the
+ * result, the save, and the reload and the saved list that bring the game back on the same turn.
+ */
+interface GameKind {
+  name: string;
+  format: { search: string; name: string } | null;
+  formatName: string;
+  brings: number | null;
+  slots: DockSlotKey[];
+}
+
+const DOUBLES_SLOTS_OF_GAME: DockSlotKey[] = ['p1a', 'p1b', 'p2a', 'p2b'];
+const GAME_KINDS: GameKind[] = [
+  { name: 'Gen 9 OU', format: null, formatName: '[Gen 9] OU', brings: null, slots: ['p1a', 'p2a'] },
+  { name: 'Doubles OU', format: { search: 'doubles ou', name: '[Gen 9] Doubles OU' }, formatName: '[Gen 9] Doubles OU', brings: 2, slots: DOUBLES_SLOTS_OF_GAME },
+  { name: 'VGC, four of six', format: { search: 'vgc 2025', name: '[Gen 9] VGC 2025 Reg I' }, formatName: '[Gen 9] VGC 2025 Reg I', brings: 4, slots: DOUBLES_SLOTS_OF_GAME },
+  {
+    name: 'Champions VGC, four of six', format: { search: 'champions vgc', name: '[Gen 9 Champions] VGC 2026 Reg M-C' },
+    formatName: '[Gen 9 Champions] VGC 2026 Reg M-C', brings: 4, slots: DOUBLES_SLOTS_OF_GAME,
+  },
+];
+
+const sliderOf = async (page: Page) => {
+  const state = await timelineState(page);
+  return { value: Number(state.value), max: Number(state.max) };
+};
+
+for (const kind of GAME_KINDS) {
+  test(`whole game, ${kind.name}: paste, leads, a turn by hand and one by the engine, a variation and the way back, Analyze game, save, reload, the saved list and a shared link`, async ({ page, browser }) => {
+    test.setTimeout(1_200_000);
+    await page.setViewportSize({ width: 1366, height: 768 });
+    await startGame(page, kind.format, ['Tidepool', 'Marrowkid']);
+    await expect(page.locator('.ps-topbar').getByText(kind.formatName)).toBeVisible();
+    await playLeads(page, kind.brings);
+    const atStart = await sliderOf(page);
+    expect(atStart.value).toBe(atStart.max);
+
+    // turn 1 by hand: every slot protects, so the turn cannot end the game
+    for (const slot of kind.slots) await pickMove(page, slot, 'Protect');
+    await page.locator('.ps-dock .ps-execute-btn').click();
+    await expect(page.getByText('T2/')).toBeVisible({ timeout: 120_000 });
+    await expect(page.getByRole('button', { name: 'Discard variation' })).toHaveCount(0);
+    expect(await sliderOf(page)).toEqual({ value: atStart.max + 1, max: atStart.max + 1 });
+
+    // turn 2 by the engine: the dock fills the untouched chips, Execute plays them
+    for (const slot of kind.slots) await expect(dockChip(page, slot)).toHaveAttribute('data-origin', 'engine', { timeout: 300_000 });
+    await page.locator('.ps-dock .ps-execute-btn').click();
+    await expect(page.getByText('T3/')).toBeVisible({ timeout: 300_000 });
+    await expect(page.getByRole('button', { name: 'Discard variation' })).toHaveCount(0);
+    expect(await sliderOf(page)).toEqual({ value: atStart.max + 2, max: atStart.max + 2 });
+    const mainTip = atStart.max + 2;
+    await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('ps-replay-interceptor:games') ?? '[]')[0]?.turns)).toBe(2);
+
+    // a variation at turn 1: the main line keeps its length
+    await moveTimeline(page, 1);
+    await startVariationAt(page, 1);
+    const history = page.locator('.ps-panel', { hasText: 'Variation moves' });
+    await expect(history).toContainText('Turn 1');
+    await expect(page.getByRole('button', { name: 'Discard variation' })).toBeVisible();
+    expect((await sliderOf(page)).max).toBe(mainTip);
+
+    // its link opens the same main line and branch in a fresh browser
+    const sharer = await timelineState(page);
+    const link = await copiedLink(page);
+    const fresh = await openInFreshContext(browser, link);
+    try {
+      await expect(fresh.page.locator('.ps-topbar').getByText('New game', { exact: true })).toBeVisible({ timeout: 180_000 });
+      await expect(fresh.page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 1', { timeout: 180_000 });
+      await expect.poll(() => timelineState(fresh.page), { timeout: 60_000 }).toEqual(sharer);
+      await expect.poll(() => new URL(fresh.page.url()).hash).toBe('');
+    } finally {
+      await fresh.close();
+    }
+
+    // back to the main line and its tip; a turn played there replaces the variation after the confirm and joins the main line
+    await page.locator('.ps-line-chip button', { hasText: 'Main line' }).click();
+    await moveTimeline(page, mainTip);
+    await expect(page.getByText(`T${mainTip}/`)).toBeVisible();
+    for (const slot of kind.slots) await pickMove(page, slot, 'Protect');
+    await page.locator('.ps-dock .ps-execute-btn').click();
+    const confirm = page.locator('[role="alertdialog"]');
+    await expect(confirm).toContainText('replace the existing variation from turn 1');
+    await confirm.locator('button', { hasText: 'Replace' }).click();
+    await expect(page.getByText(`T${mainTip + 1}/`)).toBeVisible({ timeout: 300_000 });
+    await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Discard variation' })).toHaveCount(0);
+    expect(await sliderOf(page)).toEqual({ value: mainTip + 1, max: mainTip + 1 });
+
+    // Analyze game grades the played turns
+    const panel = page.locator('.ps-main-right .ps-eval-panel');
+    await panel.locator('button', { hasText: 'Analyze game' }).click();
+    await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 600_000 });
+    const swept = await page.evaluate(() => {
+      const debug = (window as unknown as { __psDebug?: { graph: { scores: unknown[]; evalErrors: unknown[] } } }).__psDebug;
+      return { scores: debug?.graph.scores.filter(score => score !== null).length ?? 0, errors: debug?.graph.evalErrors.filter(message => message !== null).length ?? -1 };
+    });
+    expect(swept.scores).toBeGreaterThanOrEqual(3);
+    expect(swept.errors).toBe(0);
+    await panel.locator('.ps-eval-graph rect[data-turn="1"]').click();
+    await expect(panel.locator('.ps-eval-bar')).toBeVisible({ timeout: 120_000 });
+
+    // saved after every finished turn, three of them; the address names the game and a reload brings it back on its tip
+    await expect.poll(() => page.evaluate(() => {
+      const row = JSON.parse(localStorage.getItem('ps-replay-interceptor:games') ?? '[]')[0];
+      return row ? `${row.turns} ${row.formatName}` : null;
+    })).toBe(`3 ${kind.formatName}`);
+    await moveTimeline(page, mainTip + 1);
+    await page.reload();
+    await expect(page.locator('.ps-topbar').getByText('New game', { exact: true })).toBeVisible({ timeout: 120_000 });
+    await expect(page.getByText(`T${mainTip + 1}/`)).toBeVisible({ timeout: 120_000 });
+    expect(await sliderOf(page)).toEqual({ value: mainTip + 1, max: mainTip + 1 });
+
+    // and the start page's saved list opens it on the same turn
+    await page.goto('/');
+    const row = page.locator('.ps-entry-landing .ps-newgame-saved-row');
+    await expect(row).toHaveCount(1);
+    await expect(row).toContainText('3 turns played');
+    await row.getByRole('button', { name: 'Open' }).click();
+    await expect(page.getByText(`T${mainTip + 1}/`)).toBeVisible({ timeout: 120_000 });
+    expect(await sliderOf(page)).toEqual({ value: mainTip + 1, max: mainTip + 1 });
+  });
+}
