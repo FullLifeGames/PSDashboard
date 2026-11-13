@@ -98,6 +98,8 @@
 /* The seed of a saved game, under its row: the date's muted color (.ps-newgame-date), monospace like the team paste. */
 .ps-entry-seed { flex: 1 0 100%; font-size: 10px; color: #8899aa; }
 .ps-entry-seed code { font-family: Consolas, monospace; }
+/* The notice above the loader when the address names a game this browser does not hold. */
+.ps-entry-notice { margin-top: 8px; font-size: 11px; color: #f3a6a6; }   /* the shared-branch error (App.tsx inline style) */
 /* The start page's second panel stands under the loader like the loader's own .ps-panel (ReplayLoader). */
 .ps-entry-landing .ps-newgame-saved { margin-top: 8px; }
 

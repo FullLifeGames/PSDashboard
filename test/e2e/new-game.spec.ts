@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { installReplayEmbedCache, routeOfflineFixtures, pickMove } from './helpers';
+import { installReplayEmbedCache, routeOfflineFixtures, pickMove, fixtureReplay, fixturePath, openLoader } from './helpers';
 import { lightEngine } from './dock-helpers';
 
 /**
@@ -66,6 +66,16 @@ test('Gen 9 OU: paste, Start at Team Preview, pick leads, play a turn by hand, r
   // the game is saved after the finished turn
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('ps-replay-interceptor:games') ?? '[]').length)).toBe(1);
 
+  // the address names the game, so a reload brings it back on its tip (H12a)
+  await expect(page).toHaveURL(/[?&]game=newgame-/);
+  const gameUrl = page.url();
+  await page.reload();
+  expect(page.url()).toBe(gameUrl);
+  await expect(bar.getByText('New game', { exact: true })).toBeVisible({ timeout: 90_000 });
+  await expect(bar.getByText('Tidepool')).toBeVisible();
+  await expect(page.getByText('T2/')).toBeVisible({ timeout: 90_000 });
+  await expect(page.locator('.ps-dock-chip').first()).toBeVisible({ timeout: 90_000 });
+
   // the Game menu lists it (third part) and says it is open now; the dialog holds no list
   await page.locator('.ps-loader-toggle').click();
   const menu = page.locator('.ps-loader-panel');
@@ -110,4 +120,89 @@ test('Scarlet/Violet VGC: the picker asks for four of six, the first two lead, t
   await expect(page.getByText('T2/')).toBeVisible({ timeout: 90_000 });
   await expect(page.getByRole('button', { name: 'Discard variation' })).toHaveCount(0);
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('ps-replay-interceptor:games') ?? '[]')[0]?.formatName)).toBe('[Gen 9] VGC 2025 Reg I');
+});
+
+/** Picks the leads (and the brought bodies) of a game that asks for them; a format without a team preview starts at turn 1. */
+async function playLeads(page: Page, brings: number | null): Promise<void> {
+  const lead = page.locator('.ps-lead');
+  await expect(lead.or(page.locator('.ps-dock-chip').first()).first()).toBeVisible({ timeout: 90_000 });
+  if (await lead.isVisible()) {
+    for (const side of [0, 1]) {
+      const tiles = lead.locator('.ps-lead-side').nth(side).locator('.ps-switchbtn');
+      for (let pick = 0; pick < (brings ?? 1); pick += 1) await tiles.nth(pick).click();
+    }
+    await lead.locator('.ps-execute-btn', { hasText: 'Play from turn 0' }).click();
+  }
+  await expect(page.locator('.ps-dock-chip').first()).toBeVisible({ timeout: 90_000 });
+}
+
+test('Champions VGC: Start, the leads, a turn by hand joins the main line; the saved row names the format', async ({ page }) => {
+  test.setTimeout(240_000);
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await startGame(page, { search: 'champions vgc', name: '[Gen 9 Champions] VGC 2026 Reg M-C' }, ['Lucario Lab', 'Ferrothorn Fan']);
+  await expect(page.locator('.ps-topbar').getByText('[Gen 9 Champions] VGC 2026 Reg M-C')).toBeVisible();
+  await playLeads(page, 4);
+  for (const slot of ['p1a', 'p1b', 'p2a', 'p2b'] as const) await pickMove(page, slot, 'Protect');
+  await page.locator('.ps-dock .ps-execute-btn').click();
+  await expect(page.getByText('T2/')).toBeVisible({ timeout: 90_000 });
+  await expect(page.getByRole('button', { name: 'Discard variation' })).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('ps-replay-interceptor:games') ?? '[]')[0]?.formatName)).toBe('[Gen 9 Champions] VGC 2026 Reg M-C');
+});
+
+test('a replay loaded by id names itself in the address and a reload opens it again; a file has no address', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await page.goto('/');
+  await page.getByRole('textbox', { name: 'Replay URL or ID' }).fill('gen9ou-test-123');
+  await page.getByRole('button', { name: 'Load', exact: true }).click();
+  await expect(page.locator('.ps-topbar')).toBeVisible({ timeout: 60_000 });
+  await expect.poll(() => new URL(page.url()).searchParams.get('replay')).toBe(fixtureReplay.id);
+  const replayUrl = page.url();
+  await page.reload();
+  expect(page.url()).toBe(replayUrl);
+  await expect(page.locator('.ps-topbar')).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator('.ps-topbar').getByText(fixtureReplay.players[0], { exact: true })).toBeVisible();
+  // a file load leaves no address behind
+  const panel = await openLoader(page);
+  await panel.locator('input[aria-label="Load exported replay file"]').setInputFiles(fixturePath('gpl-replay.html'));
+  await expect.poll(() => new URL(page.url()).searchParams.has('replay')).toBe(false);
+  expect(new URL(page.url()).searchParams.has('game')).toBe(false);
+});
+
+test('an old ?replay= link still loads, and a ?game= this browser does not hold shows the start page with its notice', async ({ page }) => {
+  await page.goto('/?replay=gen9ou-test-123');
+  await expect(page.locator('.ps-topbar')).toBeVisible({ timeout: 60_000 });
+  await page.goto('/?game=newgame-k3x9q0m2ab');
+  await expect(page.getByRole('alert').filter({ hasText: 'newgame-k3x9q0m2ab is not saved in this browser' })).toBeVisible();
+  await expect(page.getByText('Load Replay')).toBeVisible();
+  await expect(page.locator('.ps-topbar')).toHaveCount(0);
+});
+
+test('390 px: the top bar keeps its lines with Game, the menu fits the screen, the start page lists the saved game; Start saved it before any lead was played', async ({ page }) => {
+  test.setTimeout(240_000);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await startGame(page, null, ['Tidepool', 'Marrowkid']);
+  // saved at once (D-E1) and named in the address, with no lead played
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('ps-replay-interceptor:games') ?? '[]').length)).toBe(1);
+  await expect(page).toHaveURL(/[?&]game=newgame-/);
+  await page.reload();
+  const bar = page.locator('.ps-topbar');
+  await expect(bar.getByText('New game', { exact: true })).toBeVisible({ timeout: 90_000 });
+  const toggle = page.locator('.ps-loader-toggle');
+  await expect(toggle).toHaveText(/Game/);
+  const noSideways = () => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
+  expect(await noSideways()).toBe(true);
+  await toggle.click();
+  const panel = page.locator('.ps-loader-panel');
+  await expect(panel.getByRole('button', { name: 'New game' })).toBeVisible();
+  const box = await panel.boundingBox();
+  expect(box!.x).toBeGreaterThanOrEqual(0);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(390);
+  await expect(panel.locator('.ps-newgame-saved-row')).toContainText('open now');
+  await page.keyboard.press('Escape');
+  // a fresh visit: the saved game stands on the start page
+  await page.goto('/');
+  const landing = page.locator('.ps-entry-landing');
+  await expect(landing.locator('.ps-newgame-saved-row')).toHaveCount(1);
+  expect(await noSideways()).toBe(true);
 });

@@ -51,6 +51,8 @@ describe('a new game in the app', () => {
     // Start saved the record at once (D-E1): no lead is played yet
     expect(listGames()).toHaveLength(1);
     expect(listGames()[0].players).toEqual(['Alice', 'Bob']);
+    // the address names the game (H12a), so a reload brings it back
+    expect(window.location.search).toBe(`?game=${listGames()[0].id}`);
     expect(screen.queryByRole('dialog', { name: 'New game' })).toBeNull();
     const bar = document.querySelector('.ps-topbar') as HTMLElement;
     expect(within(bar).getByText('New game')).toHaveClass('ps-newgame-tag');
@@ -110,4 +112,49 @@ describe('a new game in the app', () => {
     expect(within(panel).getByRole('button', { name: 'New game' })).toBeInTheDocument();
     expect(within(panel).queryByText('Saved games')).toBeNull();
   });
+
+  test('a start with ?game=<id> of a saved game opens it without a click, and the address keeps naming it', async () => {
+    const record = await savedRecord(['Ann', 'Ben'], 0, '9,9,9,9');
+    window.history.replaceState(null, '', `/?game=${record.id}`);
+    render(<App />);
+    await waitFor(() => expect(document.querySelector('.ps-topbar')).not.toBeNull(), { timeout: 30_000 });
+    const bar = document.querySelector('.ps-topbar') as HTMLElement;
+    expect(within(bar).getByText('New game')).toHaveClass('ps-newgame-tag');
+    expect(within(bar).getByText('Ann')).toBeInTheDocument();
+    expect(window.location.search).toBe(`?game=${record.id}`);
+    await act(async () => {});
+  }, 90_000);
+
+  test('a ?game= this browser does not hold shows the start page with the notice and the saved games', async () => {
+    await savedRecord(['Ann', 'Ben'], 0, '9,9,9,9');
+    window.history.replaceState(null, '', '/?game=newgame-k3x9q0m2ab');
+    render(<App />);
+    expect(screen.getByRole('alert')).toHaveTextContent('The game newgame-k3x9q0m2ab is not saved in this browser. A share link of the game (Copy Share Link) brings it along.');
+    expect(screen.getByText('Load Replay')).toBeInTheDocument();
+    expect(document.querySelectorAll('.ps-entry-landing .ps-newgame-saved-row')).toHaveLength(1);
+    expect(document.querySelector('.ps-topbar')).toBeNull();
+  });
+
+  test('a replay loaded by id writes ?replay=<id>; a ?replay= link still loads and stays as written', async () => {
+    const replay = replayData('singles');
+    stubReplayFetch([replay]);
+    render(<App />);
+    const input = screen.getByRole('textbox', { name: 'Replay URL or ID' });
+    await userEvent.clear(input);
+    await userEvent.type(input, `${replay.id}{Enter}`);
+    await waitFor(() => expect(document.querySelector('.ps-topbar')).not.toBeNull(), { timeout: 30_000 });
+    expect(new URLSearchParams(window.location.search).get('replay')).toBe(replay.id);
+    await act(async () => {});
+  }, 90_000);
+
+  test('an old ?replay= link loads its replay and the address stays as the link wrote it', async () => {
+    const replay = replayData('singles');
+    stubReplayFetch([replay]);
+    const written = `https://replay.pokemonshowdown.com/${replay.id}`;
+    window.history.replaceState(null, '', `/?replay=${written}`);
+    render(<App />);
+    await waitFor(() => expect(document.querySelector('.ps-topbar')).not.toBeNull(), { timeout: 30_000 });
+    expect(window.location.search).toBe(`?replay=${written}`);
+    await act(async () => {});
+  }, 90_000);
 });

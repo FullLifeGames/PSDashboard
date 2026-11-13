@@ -25,6 +25,8 @@ export interface ReplayState {
    * reads the infos' logged hits with it, so both arrive in one render.
    */
   itemJudge: ItemDamageJudge | null;
+  /** Round 89 (#105): the replay came by link or id, so the address can name it (`?replay=`); a file or a game has no such address. */
+  byLink: boolean;
 }
 
 /** Load outcome for callers that need to react (embed host responses). */
@@ -45,9 +47,10 @@ export function useReplay() {
     p1Info: null,
     opponentInfo: null,
     itemJudge: null,
+    byLink: false,
   });
 
-  const runLoad = useCallback(async (task: () => Promise<ReplayData>, given?: { p1: OpponentTeamInfo; p2: OpponentTeamInfo }): Promise<LoadReplayResult> => {
+  const runLoad = useCallback(async (task: () => Promise<ReplayData>, given?: { p1: OpponentTeamInfo; p2: OpponentTeamInfo }, byLink = false): Promise<LoadReplayResult> => {
     setState(prev => ({ ...prev, loading: true, error: null }));
     try {
       const data = await task();
@@ -72,6 +75,7 @@ export function useReplay() {
         p1Info,
         opponentInfo,
         itemJudge: judgeItemsByDamage,
+        byLink,
       });
       return { data, error: null };
     } catch (err) {
@@ -84,7 +88,7 @@ export function useReplay() {
   const { openGame, extendGame } = useGameReplay(runLoad, setState);
 
   const loadReplay = useCallback(
-    (urlOrId: string) => runLoad(() => fetchReplay(urlOrId)),
+    (urlOrId: string) => runLoad(() => fetchReplay(urlOrId), undefined, true),
     [runLoad],
   );
 

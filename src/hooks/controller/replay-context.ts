@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useReplay } from '../useReplay';
 import { useEmbedHost } from '../useEmbedHost';
+import { useOpenAddress } from '../useOpenAddress';
 import { useBranch } from '../useBranch';
 import { useGameState, useNewGameAt } from '../useNewGame';
 import type { NewGameRecord } from '../../lib/new-game/record';
@@ -35,9 +36,9 @@ interface PendingBranchRefresh {
 function useReplaySurface() {
   const {
     loading, error, replayData, snapshots, observations, speedOrders, hpEvidence, opponentInfo, p1Info, itemJudge, loadReplay, loadReplayFile,
-    openGame, extendGame,
+    openGame, extendGame, byLink,
   } = useReplay();
-  const { embed, requestedReplay } = useEmbedHost({ loadReplay, loadReplayFile });
+  const { embed, requestedReplay, requestedGame } = useEmbedHost({ loadReplay, loadReplayFile });
   // Canonical link of whatever is loaded — mirrored into the loader input,
   // whichever path (typed URL, file, share link, embed message) loaded it.
   const loadedReplayUrl = replayData
@@ -45,7 +46,7 @@ function useReplaySurface() {
     : null;
   return {
     loading, error, replayData, snapshots, observations, speedOrders, hpEvidence,
-    opponentInfo, p1Info, itemJudge, loadReplay, loadReplayFile, openGame, extendGame, embed, requestedReplay, loadedReplayUrl,
+    opponentInfo, p1Info, itemJudge, loadReplay, loadReplayFile, openGame, extendGame, embed, requestedReplay, requestedGame, loadedReplayUrl, byLink,
   };
 }
 
@@ -230,13 +231,18 @@ export function useReplayContext() {
   });
   const { newGame, landRef } = useNewGameAt({ state: gameState, replay, branch, positions, afterTurnRef });
   const { loadReplay, loadReplayFile } = useLoadsThatEndTheGame(replay, gameState.setRecord);
+  // Round 89 (#105, H4c): the address names what is open, and a game it names opens at start.
+  const address = useOpenAddress({
+    embed: replay.embed, requestedGame: replay.requestedGame, replayId: replay.replayData?.id ?? null,
+    viewpoint: replay.replayData?.viewpoint, byLink: replay.byLink, openRecord: newGame.openRecord,
+  });
   const handleLoadSharedOriginal = useCallback((replayId: string) => {
     clearSharedBranch();
     void loadReplay(replayId);
   }, [clearSharedBranch, loadReplay]);
   return {
     replay: { ...replay, loadReplay, loadReplayFile, ...(gameState.record ? { loadedReplayUrl: null } : {}) },
-    newGame, landRef, branch, evaluation, engines, branchWindowOpenRef, smogon,
+    newGame, landRef, address, branch, evaluation, engines, branchWindowOpenRef, smogon,
     animateBranchTurns, setAnimateBranchTurns,
     shared: { sharedBranch, sharedBranchError, clearSharedBranch, handleLoadSharedOriginal },
     refreshQueue, knowledge, meta, teamSources, positions,

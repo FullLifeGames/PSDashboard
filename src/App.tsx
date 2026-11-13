@@ -29,6 +29,18 @@ function EmbedLoadStatus({ app }: { app: AppController }) {
   );
 }
 
+/** Round 89 (#105, H4c): the address names a game this browser does not hold. */
+function MissingGameNotice({ app }: { app: AppController }) {
+  const id = app.ctx.address.missingGame;
+  // it stands on the start page only: nothing is open, no shared branch owns the view, no host owns the page
+  if (!id || app.ctx.replay.replayData || app.ctx.shared.sharedBranch || app.ctx.replay.embed) return null;
+  return (
+    <div className="ps-entry-notice" role="alert">
+      The game {id} is not saved in this browser. A share link of the game (Copy Share Link) brings it along.
+    </div>
+  );
+}
+
 function LoaderScreen({ app, onNewGame }: { app: AppController; onNewGame: () => void }) {
   const { loading, error, loadReplay, loadReplayFile, loadedReplayUrl } = app.ctx.replay;
   const { handleTeamLoad, teamPasteStatus, teamPasteError } = app.ctx.knowledge;
@@ -152,6 +164,8 @@ function App() {
           onClear={clearSharedBranch}
         />
       )}
+
+      <MissingGameNotice app={app} />
 
       {!replayData && !sharedBranch && (embed ? (
         // The host page provides the replay — no loader chrome in embed mode.
