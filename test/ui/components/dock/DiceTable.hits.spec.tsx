@@ -78,6 +78,18 @@ describe('the Hits row of a multi-accuracy move', () => {
     expect(screen.queryByRole('group', { name: 'Hits' })).toBeNull();
   });
 
+  // Round 89 (ruling 34 F4a): a holder whose ability or item fixes the count gets the row without a choice
+  test.each([['p1a', 'Skill Link', 3], ['p1b', 'Loaded Dice', 3], ['p1a', 'Skill Link', 10]] as const)('a fixed count (%s, %s, %i hits) reads "Hits: N (name)" under the Hit row, with no chip to click', (slot, fixedBy, hits) => {
+    const fixed: DieOffer = { name: { slot, moveId: 'tripleaxel', kind: 'hit-count' }, results: [{ hits }], fixedBy };
+    const onToggle = vi.fn();
+    table({ offers: [...offers({ slot }).filter(offer => offer.name.hit === undefined), fixed], label: slot.toUpperCase(), onToggle });
+    const dice = screen.getByRole('group', { name: `Dice for ${slot.toUpperCase()}` });
+    expect([...dice.querySelectorAll('.ps-dice-caption')].map(caption => caption.textContent)).toEqual(['Hit', 'Hits', 'Crit']);
+    expect(within(hitsRow()).queryAllByRole('button')).toEqual([]);
+    expect(hitsRow()).toHaveTextContent(`${hits} (${fixedBy})`);
+    expect(onToggle).not.toHaveBeenCalled();
+  });
+
   test('a later hit die the move does not offer stays a set chip below the table, with its hit in the label', () => {
     table({ offers: offers().filter(offer => offer.name.hit === undefined), dice: [die(2, false)] });
     const stray = screen.getByRole('group', { name: 'Forced dice the move no longer offers' });
