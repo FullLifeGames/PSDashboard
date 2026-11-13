@@ -112,6 +112,9 @@
 /* The menu's panel holds up to 20 saved rows: it scrolls inside the workspace column instead of growing past it, so the top bar and the frame stay in view
    and the last row stays under the pointer (the column clips what stands below its height, `--ps-layout-h`; the window's height stands in before it is measured). */
 .ps-loader-panel.ps-entry-panel { max-height: calc(var(--ps-layout-h, 100 * var(--ps-vh)) - 60px); overflow-y: auto; overscroll-behavior: contain; }
+/* The left column is as tall as its content (a game at Team Preview is short), and it clips what hangs below it: while the menu is open the column
+   is at least the layout's height, so the panel's cap (layout minus 60 px) always ends inside it (CI run 43440698616: the last of 20 rows stood under the clip). */
+.ps-main-left:has(.ps-loader-panel.ps-entry-panel) { min-height: var(--ps-layout-h, 0); }
 
 /* The title row's "New game" tag: .ps-format-tag in the selection blue of the dock (dock.css .ps-movebtn-selected). */
 .ps-format-tag.ps-newgame-tag { background: linear-gradient(180deg, #3d6998 0%, #2d5078 100%); color: #ffffff; font-weight: bold; }

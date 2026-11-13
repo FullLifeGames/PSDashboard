@@ -237,7 +237,8 @@ test('the Game menu copies a game\'s link at Team Preview and on the main line; 
   await lead.locator('.ps-execute-btn', { hasText: 'Play from turn 0' }).click();
   await expect(page.locator('.ps-dock-chip').first()).toBeVisible({ timeout: 90_000 });
   await pickMove(page, 'p1a', 'Earthquake');
-  await pickMove(page, 'p2a', 'Protect');
+  // not Protect: it would stop the Earthquake, and no one would faint (CI run 43440698616 read that turn: both Garchomps at 100 %)
+  await pickMove(page, 'p2a', 'Return');
   await page.locator('.ps-dock .ps-execute-btn').click();
   await expect(page.getByText(/fainted! Choose who to send in/)).toBeVisible({ timeout: 90_000 });
   // the turn waits for its replacement: no variation chrome, and a link copied now holds the main line without the pending turn
