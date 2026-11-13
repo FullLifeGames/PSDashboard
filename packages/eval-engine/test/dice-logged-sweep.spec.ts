@@ -361,7 +361,8 @@ describe.each(SWEEP_CASES)('the logged stalling die gives the turn of the log: $
 describe('the kinds the log may show and the reader does not name: the census of the ledger', () => {
   const named: readonly DieKind[] = ['accuracy', 'crit', 'secondary', 'self-effect', 'hit-count', 'status-check', 'speed-tie', 'stalling'];
   // damage-roll is no reader kind: the faint step (B4) forces it from a search, the log shows the HP only
-  const unnamed = DIE_KINDS.filter(kind => !named.includes(kind) && kind !== 'damage-roll');
+  // round 89 (#137): the two kinds that sample a body (`random-target`, `drag`) carry no Dex entry of a class table; the reader names them in step G2
+  const unnamed = DIE_KINDS.filter(kind => !named.includes(kind) && kind !== 'damage-roll' && kind !== 'random-target' && kind !== 'drag');
 
   test('the kinds that stay unnamed, with their Dex entries and the corpus turns that carry the event', () => {
     expect(unnamed).toEqual(['power', 'ability-proc', 'item-proc', 'move-first', 'end-of-turn']);
