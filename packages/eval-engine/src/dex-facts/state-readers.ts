@@ -113,9 +113,37 @@ export function entryReads(entry: object, consumer: Consumer, methods: Methods):
 
 const methodTables = new WeakMap<object, Methods>();
 
+/** The closure of every method's reads over their calls of each other, and the methods each one reaches. */
+function closeOver(direct: ReadonlyMap<string, ReadonlySet<string>>): { reads: Map<string, Set<string>>; reach: Map<string, Set<string>> } {
+  const reads = new Map<string, Set<string>>();
+  const reach = new Map<string, Set<string>>();
+  for (const name of direct.keys()) {
+    const seen = new Set<string>([name]);
+    const found = new Set<string>();
+    const queue = [name];
+    while (queue.length > 0) {
+      const next = queue.pop()!;
+      for (const token of direct.get(next) ?? []) {
+        found.add(token);
+        if (direct.has(token) && !seen.has(token)) { seen.add(token); queue.push(token); }
+      }
+    }
+    reads.set(name, found);
+    reach.set(name, seen);
+  }
+  return { reads, reach };
+}
+
+/** The method of the battle that finds the handlers of an event in the Dex entries on the board: what reaches it runs those handlers, which the scan reads on their own. */
+const DISPATCH = 'getCallback';
+
 /**
- * The reads of the methods of the simulator's `Pokemon`, `Side` and `Field`, closed over their calls of each other: found from
- * the prototypes of instances of the battle (a clone of the speed layer carries the same sources).
+ * The reads of the methods of the simulator's `Pokemon`, `Side` and `Field`, and of the `Battle` methods that never reach its event
+ * dispatch, closed over their calls of each other: found from the prototypes of instances of the battle (a clone of the speed layer
+ * carries the same sources). A handler that calls `this.getOverflowedTurnCount()` (a Future Sight, a Wish) reads the battle's `turn`.
+ * A `Battle` method that reaches the dispatch (`runEvent`, `damage`, `heal`) runs the handlers of the entries on the board, whose reads the
+ * scan already holds, and reads bookkeeping of the dispatch itself (`event`, `effect`, `activeMove`): its reads stay out, as before, because
+ * with them every board would read the whole battle (a probe on the cost sample: the hit memo plays five times as often).
  */
 export function methodsOf(battle: Battle): Methods {
   const side = battle.sides[0];
@@ -124,26 +152,24 @@ export function methodsOf(battle: Battle): Methods {
   const known = methodTables.get(prototypes[0]);
   if (known) return known;
   const direct = new Map<string, Set<string>>();
-  for (const proto of prototypes) {
+  const add = (proto: object, replace: boolean): string[] => {
+    const names: string[] = [];
     for (const name of Object.getOwnPropertyNames(proto)) {
       const descriptor = Object.getOwnPropertyDescriptor(proto, name);
-      if (name !== 'constructor' && typeof descriptor?.value === 'function') direct.set(name, tokensOf(String(descriptor.value)));
+      if (name === 'constructor' || typeof descriptor?.value !== 'function' || (!replace && direct.has(name))) continue;
+      direct.set(name, tokensOf(String(descriptor.value)));
+      names.push(name);
     }
+    return names;
+  };
+  for (const proto of prototypes) add(proto, true);
+  // The battle's own methods join under their own names (a name the body, the side or the field has keeps its reads), minus the ones that reach the dispatch.
+  const ofBattle = add(Object.getPrototypeOf(battle) as object, false);
+  const dispatching = closeOver(direct).reach;
+  for (const name of ofBattle) {
+    if (name === DISPATCH || dispatching.get(name)?.has(DISPATCH)) direct.delete(name);
   }
-  const closed = new Map<string, Set<string>>();
-  for (const name of direct.keys()) {
-    const seen = new Set<string>([name]);
-    const reads = new Set<string>();
-    const queue = [name];
-    while (queue.length > 0) {
-      const next = queue.pop()!;
-      for (const token of direct.get(next) ?? []) {
-        reads.add(token);
-        if (direct.has(token) && !seen.has(token)) { seen.add(token); queue.push(token); }
-      }
-    }
-    closed.set(name, reads);
-  }
+  const closed = closeOver(direct).reads;
   methodTables.set(prototypes[0], closed);
   return closed;
 }

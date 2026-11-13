@@ -36,6 +36,26 @@ const futureSight: Tweak = battle => {
   });
 };
 
+/**
+ * The Future Sight the simulator makes (data/conditions.ts `futuremove`): it lands when the battle's turn count has reached its `endingTurn`
+ * (`getOverflowedTurnCount`, a method of the battle that reads `turn`). Round 89 (#149, A8-7): the cost probe's third singles search
+ * (gen9ou-2658660641#44, turn 47) answered a board whose Future Sight lands from the memo's entry of the turn before, where it does not.
+ */
+const futureSightEnding = (turn: number, endingTurn: number): Tweak => battle => {
+  futureSight(battle);
+  battle.turn = turn;
+  const state = battle.sides[1].slotConditions[foe(battle).position].futuremove as unknown as { duration?: number; endingTurn: number };
+  delete state.duration;
+  state.endingTurn = endingTurn;
+};
+
+/** A Wish made at turn 10 and read at turn 10 + `later`: it heals once the turn count has passed the one it was made on (`getOverflowedTurnCount` again). */
+const wishAfter = (later: number): Tweak => battle => {
+  battle.turn = 10;
+  battle.sides[0].addSlotCondition(mine(battle), 'Wish', mine(battle));
+  battle.turn += later;
+};
+
 const toxic = (stage: number): Tweak => battle => {
   mine(battle).setStatus('tox');
   mine(battle).statusState.stage = stage;
@@ -43,6 +63,9 @@ const toxic = (stage: number): Tweak => battle => {
 
 const ROWS: Row[] = [
   { name: 'a Future Sight pending in the foe slot against none', first: none, second: futureSight },
+  { name: 'a Future Sight that lands this turn against the same one a turn early (its ending turn, the battle turn)', first: futureSightEnding(47, 46), second: futureSightEnding(46, 46) },
+  { name: 'a Future Sight that lands this turn against one two turns away', first: futureSightEnding(47, 46), second: futureSightEnding(47, 48) },
+  { name: 'a Wish made this turn against the same Wish a turn later (the battle turn)', first: wishAfter(0), second: wishAfter(1) },
   { name: 'a Wish in the own slot against none (control)', first: none, second: battle => { battle.sides[0].addSlotCondition(mine(battle), 'Wish', mine(battle)); } },
   { name: 'a Leech Seed from the first slot against the second', doublesOnly: true,
     first: battle => { foe(battle).addVolatile('leechseed', mine(battle, 0)); }, second: battle => { foe(battle).addVolatile('leechseed', mine(battle, 1)); } },
@@ -95,6 +118,6 @@ describe.each(FORMATS)('the end-of-turn memo reads the state of the board (%s)',
   });
 
   test('the Future Sight and Leech Seed rows have teeth', () => {
-    expect(toothless.filter(name => /Future Sight|Leech Seed/.test(name))).toEqual([]);
+    expect(toothless.filter(name => /Future Sight|Leech Seed|Wish made/.test(name))).toEqual([]);
   });
 });
