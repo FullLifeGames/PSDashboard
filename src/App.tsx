@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { EvictedGameNotice } from './components/EvictedGameNotice';
 import { inferReplayFormatId } from '@fulllifegames/replay-core';
 import { LazyNewGameDialog } from './components/NewGameDialogLazy';
+import { GameEditNotices } from './components/GameEditNotices';
+import { variationOpen } from './components/game-tip';
 import { useGameTeamEdit } from './hooks/useGameTeamEdit';
 import { ReplayLoader } from './components/ReplayLoader';
 import { LandingGamesPanel } from './components/GameEntry';
@@ -78,16 +80,12 @@ function AppModals({ app }: { app: AppController }) {
   } = app.ctx.knowledge;
   const { replayGen } = app.ctx.meta;
   // Round 89 (#105): the editor of a new game changes the game's record, not the replay's overlay.
-  const { record, editTeams } = app.ctx.newGame;
-  const gameEdit = useGameTeamEdit({ record, editTeams, stopBranch: app.board.discardVariation, close: () => setEditorSide(null) });
+  const { record, editTeams, planTeams } = app.ctx.newGame;
+  const gameEdit = useGameTeamEdit({ record, planTeams, editTeams, variationOpen: variationOpen(app), stopBranch: app.board.discardVariation, close: () => setEditorSide(null) });
   const onSave = (side: 'p1' | 'p2', info: Parameters<typeof saveTeam>[1]) => { if (!gameEdit.edit(side, info)) saveTeam(side, info); };
   return (
     <>
-      {gameEdit.notice && (
-        <div className="ps-panel" role="alert" style={{ marginTop: 8, color: '#e6b36a', fontSize: 11 }}>
-          {gameEdit.notice}<button type="button" className="ps-btn" style={{ marginLeft: 8, padding: '2px 8px', fontSize: 10 }} onClick={gameEdit.dismiss}>Dismiss</button>
-        </div>
-      )}
+      <GameEditNotices edit={gameEdit} />
       {setsPanelOpen && replayData && (
         <SetsImportExportPanel
           game={record !== null}

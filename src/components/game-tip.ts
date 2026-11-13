@@ -20,6 +20,11 @@ export function idleTip(app: AppController): boolean {
   });
 }
 
+/** Whether a variation is open: a branch with a played turn that is no idle tip of a game (a replay's branch always counts). */
+export function variationOpen(app: AppController): boolean {
+  return app.ctx.branch.history.length > 0 && !idleTip(app);
+}
+
 /** Where the sharer stands: on the main line's tip while the tip turn is idle, else where the pointer is. */
 function gameView(app: AppController, idle: boolean): NonNullable<GameSharePayload['view']> {
   const record = app.ctx.newGame.record!;
