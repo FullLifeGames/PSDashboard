@@ -16,7 +16,9 @@ export const CUSTOM_LABEL = 'Custom Game';
 export function panelGroups(): FormatGroup[] {
   const groups = formatGroups(CALIBRATED_FORMATS).map(group => (group.label === 'Featured' ? { ...group, label: CALIBRATED_LABEL } : group));
   const isCustom = (option: FormatOption) => option.custom && option.generation === 9;
-  const customs = groups.flatMap(group => group.options).filter(option => isCustom(option) && !CALIBRATED_FORMATS.includes(option.id as never));
+  // Generation 9 before Champions, singles before doubles
+  const customs = groups.flatMap(group => group.options).filter(option => isCustom(option) && !CALIBRATED_FORMATS.includes(option.id as never))
+    .sort((a, b) => Number(a.champions) - Number(b.champions) || Number(a.gameType === 'doubles') - Number(b.gameType === 'doubles'));
   if (customs.length === 0) return groups;
   const rest = groups.map(group => ({ ...group, options: group.options.filter(option => !customs.includes(option)) })).filter(group => group.options.length > 0);
   const at = rest.findIndex(group => group.label !== CALIBRATED_LABEL);

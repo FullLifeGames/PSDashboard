@@ -1,5 +1,6 @@
 import { PSReplayFrame } from './PSReplayFrame';
 import { isGameId } from '../lib/new-game/record';
+import { gameTipTurn } from '../hooks/useNewGame';
 import { DockRegion } from './dock/DockRegion';
 import { LeadPanel } from './LeadPanel';
 import { BranchHistoryPanel } from './BranchHistoryPanel';
@@ -24,6 +25,16 @@ interface WorkspaceProps {
   onNewGame?: () => void;
 }
 
+/**
+ * Round 89 (#105): a new game's live tip is the main line's next turn, no variation: while no turn was played from it, the top
+ * bar, the timeline and the side panels show none of a variation's chrome ("Branching", Discard variation, Variation moves).
+ */
+function idleGameTip(app: AppController): boolean {
+  const record = app.ctx.newGame.record;
+  const { history, variationStartTurn } = app.ctx.branch;
+  return record !== null && history.length === 0 && variationStartTurn === gameTipTurn(record);
+}
+
 function WorkspaceTopBar({ app, replayData, onNewGame }: WorkspaceProps) {
   const { branchPreparing, branchProgress, cancelPreparation, branchDivergence } = app.board.deviation;
   const { setEditorSide, setSetsPanelOpen, handleTeamLoad, teamPasteStatus, teamPasteError } = app.ctx.knowledge;
@@ -35,7 +46,7 @@ function WorkspaceTopBar({ app, replayData, onNewGame }: WorkspaceProps) {
       setAssumptions={app.ctx.smogon.setAssumptions}
       branchPreparing={branchPreparing}
       branchProgress={branchProgress}
-      showBranch={app.analysis.showBranch}
+      showBranch={app.analysis.showBranch && !idleGameTip(app)}
       simState={app.ctx.branch.simState}
       animateBranchTurns={app.ctx.animateBranchTurns}
       branchDivergence={branchDivergence}
@@ -214,7 +225,7 @@ function WorkspaceAlert({ text }: { text: string }) {
 function WorkspaceLeft({ app, replayData, onNewGame }: WorkspaceProps) {
   const { branchDivergence, variationNotice } = app.board.deviation;
   const { variationSpan } = app.board.timeline;
-  const { branching } = app.ctx.branch;
+  const branching = app.ctx.branch.branching && !idleGameTip(app);
   const { nearSide, onSideChange } = useNearSide(frameIdentity(app, replayData), replayData.viewpoint);
   return (
     <div className="ps-main-left">

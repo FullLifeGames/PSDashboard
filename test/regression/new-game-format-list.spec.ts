@@ -16,7 +16,8 @@ describe('the dialog\'s format list', () => {
     expect(groups[0].label).toBe('Calibrated');
     expect(groups[0].options.map(option => option.id)).toEqual([...CALIBRATED_FORMATS]);
     expect(groups[1].label).toBe('Custom Game');
-    expect(groups[1].options.map(option => option.id).sort()).toEqual(['gen9championscustomgame', 'gen9championsdoublescustomgame', 'gen9customgame', 'gen9doublescustomgame']);
+    // Generation 9 first, singles before doubles; then the Champions ones
+    expect(groups[1].options.map(option => option.id)).toEqual(['gen9customgame', 'gen9doublescustomgame', 'gen9championscustomgame', 'gen9championsdoublescustomgame']);
     expect(groups.slice(2).map(group => group.label)).toEqual(['Champions', 'Gen 9', 'Gen 8', 'Gen 7', 'Gen 6', 'Gen 5', 'Gen 4', 'Gen 3', 'Gen 2', 'Gen 1']);
   });
 
