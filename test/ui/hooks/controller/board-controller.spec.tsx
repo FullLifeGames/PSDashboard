@@ -3,6 +3,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { doublesReplay, singlesReplay } from '../../fixtures/replay';
 import { stubReplayFetch } from '../../fixtures/network';
 import { realReplayWorkerClient } from '../../fixtures/worker';
+import { playedRecord } from '../../fixtures/played-game';
 
 const worker = vi.hoisted(() => ({ current: null as null | ReturnType<typeof import('../../fixtures/worker').realReplayWorkerClient> }));
 vi.mock('../../../../src/hooks/useReplayWorker', () => ({ useReplayWorker: () => worker.current!.client }));
@@ -118,4 +119,19 @@ describe('useTimelineController', () => {
     expect(result.current.board.timeline.maxTurn).toBe(result.current.ctx.replay.snapshots.length);
     expect(result.current.ctx.branch.branching).toBe(false);
   });
+  // Round 89 (#105, H4e): a saved game opens on its tip. The frame of a game that opens at start (a reload) is not there yet and
+  // reports turn 1 while it loads; the landing holds the pointer against that report like any selection of a turn does.
+  test('a saved game opened on its tip keeps the pointer there when the loading frame reports turn 1', async () => {
+    const record = await playedRecord(1);
+    const { result } = renderHook(() => useBoardHarness());
+    await act(async () => { await result.current.ctx.newGame.openRecord(record); });
+    await waitFor(() => expect(result.current.board.timeline.maxTurn).toBe(2));
+    expect(result.current.board.timeline.viewTurn).toBe(2);
+    act(() => result.current.board.timeline.handleReplayTurn(1));
+    expect(result.current.board.timeline.viewTurn).toBe(2);
+    // the frame that confirms the tip ends the guard, and its later reports move the pointer again
+    act(() => result.current.board.timeline.handleReplayTurn(2));
+    act(() => result.current.board.timeline.handleReplayTurn(1));
+    expect(result.current.board.timeline.viewTurn).toBe(1);
+  }, 90_000);
 });

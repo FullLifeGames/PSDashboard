@@ -124,9 +124,10 @@ export function useTimelineController(ctx: ReplayContext, transients: Transients
     stopBranch();
     // Round 89 (#105): a game opens on its tip, where the next turn is played from: turn 0 (the lead picker) before the lead is picked.
     const tip = takeLanding();
-    if (tip === 0) selectTurn(0);
-    else if (tip !== null) landRef.current?.(tip);
-  }, [replayData?.id, stopBranch, resetPointer, setBranchDivergence, branchWindowOpenRef, takeLanding, landRef, selectTurn]);
+    // A selection, not a restore: the frame of a game that opens at start (a reload) is not there yet and reports turn 1 while it
+    // loads; the selection's guard drops that report (round 89, H4e).
+    if (tip !== null) selectTurn(tip);
+  }, [replayData?.id, stopBranch, resetPointer, setBranchDivergence, branchWindowOpenRef, takeLanding, selectTurn]);
 
   return { timeline, deviation, evalResultMatchesView, liveEvalStatus, tipEvalStatus, discardVariation };
 }

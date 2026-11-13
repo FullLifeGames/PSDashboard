@@ -6,6 +6,7 @@ import { stubReplayFetch } from '../fixtures/network';
 import { realReplayWorkerClient } from '../fixtures/worker';
 import { listGames } from '../../../src/lib/new-game/store';
 import { savedRecord } from '../fixtures/saved-game';
+import { playedRecord } from '../fixtures/played-game';
 
 const worker = vi.hoisted(() => ({ current: null as null | ReturnType<typeof import('../fixtures/worker').realReplayWorkerClient> }));
 vi.mock('../../../src/hooks/useReplayWorker', () => ({ useReplayWorker: () => worker.current!.client }));
@@ -124,6 +125,16 @@ describe('a new game in the app', () => {
     expect(window.location.search).toBe(`?game=${record.id}`);
     await act(async () => {});
   }, 90_000);
+
+  test('a start with ?game=<id> of a game with one played turn opens it on its tip, turn 2, with the dock there (H4e)', async () => {
+    const record = await playedRecord(1);
+    window.history.replaceState(null, '', `/?game=${record.id}`);
+    render(<App />);
+    await waitFor(() => expect(document.querySelector('.ps-topbar')).not.toBeNull(), { timeout: 30_000 });
+    await waitFor(() => expect(document.body.textContent).toMatch(/T2\/2/), { timeout: 30_000 });
+    await waitFor(() => expect(document.querySelector('.ps-dock')).not.toBeNull(), { timeout: 30_000 });
+    await act(async () => {});
+  }, 120_000);
 
   test('a ?game= this browser does not hold shows the start page with the notice and the saved games', async () => {
     await savedRecord(['Ann', 'Ben'], 0, '9,9,9,9');
