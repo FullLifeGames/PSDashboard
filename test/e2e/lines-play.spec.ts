@@ -57,14 +57,13 @@ async function readBlock(block: Locator) {
 /**
  * The panel lands on the game report when the first report of a game appears (`useReportView`, since before this lane), which can
  * happen right after the analysis of a turn finishes: the turn's view then closes under the test (round 89 G3: Champions OU read
- * "element is not visible" for the whole timeout). Moving the slider off the turn and back opens the turn's view again; the loop
+ * "element is not visible" for the whole timeout). A click on the turn's column in the graph opens the turn's view again; the loop
  * accepts the view only when it stays for a moment.
  */
 async function settleOnTurn(page: Page, panel: Locator, turn: number) {
-  const slider = page.locator('input[type="range"]');
   for (let attempt = 0; attempt < 4; attempt += 1) {
-    await slider.fill(String(turn - 1));
-    await slider.fill(String(turn));
+    // a click on the turn's column of the graph opens the turn's view whatever the panel shows
+    await panel.locator(`svg rect[data-turn="${turn}"]`).first().click({ force: true });
     await expect(panel.locator('.ps-eval-analysis')).toContainText(`Turn ${turn}`, { timeout: 60_000 });
     if (await panel.locator('.ps-eval-lines').isVisible()) {
       await page.waitForTimeout(1500);
@@ -89,10 +88,15 @@ for (const game of GAMES) {
     let longest = -1;
     for (const candidate of game.turns) {
       await slider.fill(String(candidate));
+      // after the first report of the game the panel shows the overview: the graph's column opens the turn's own view
+      const column = panel.locator(`svg rect[data-turn="${candidate}"]`).first();
+      if (await column.count() > 0) await column.click({ force: true });
       const analyze = panel.getByRole('button', { name: 'Analyze this position (MCTS)' });
       await expect(analyze).toBeEnabled({ timeout: 60_000 });
       await analyze.click();
-      await expect(panel.locator('.ps-eval-analysis')).toContainText(`Turn ${candidate}`, { timeout: 400_000 });
+      // the graph names the turn's result once the search has finished (the turn's own view may have closed by then, see below)
+      const produced = panel.locator('svg title').filter({ hasText: new RegExp(`\\(what turn ${candidate} produced\\)`) });
+      await expect(produced.or(panel.locator('.ps-eval-analysis').filter({ hasText: `Turn ${candidate}` })).first()).toBeAttached({ timeout: 400_000 });
       await settleOnTurn(page, panel, candidate);
       turn = candidate;
       // the longest line of the turn (steps counted as the rows that carry a turn number); a turn with no line tries the next candidate
