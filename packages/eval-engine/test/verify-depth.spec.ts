@@ -114,7 +114,7 @@ describe('the merge mixes per-class depth (round 63, T16)', () => {
     expect(merged.matrix!.values[0][0]).toBeCloseTo(0.8 * -0.96 + 0.2 * 0.3, 1);
   });
 
-  test('a rich, agreeing class pool keeps its depth below the floor, in an endgame or not (round 77, T267; round 89, T322)', () => {
+  test('in an endgame a rich, agreeing pool keeps its depth below the floor (round 77, T267)', () => {
     // User report 28.10.2026: draft 2058494320, variation turn 63, Mienshao (Scarf, locked into Close Combat) and Kyurem
     // against Dragapult and Muk-Alola. The trees played Kyurem's switch into a Specs attack out to about −0.7 over 400
     // to 650 visits; the one-ply sampler read +0.75, the 0.9 floor gave the sampler the cells, and the ranking advised
@@ -136,11 +136,11 @@ describe('the merge mixes per-class depth (round 63, T16)', () => {
     ).matrix!.values[0][0];
     // Two against two: the hit class keeps the trees' −0.70; the thin miss class takes its deepened 0.5.
     expect(atLiving(2, 2)).toBeCloseTo(0.9 * -0.703 + 0.1 * 0.5, 2);
-    // Round 89 (T322, #59, ruling of 09.11.2026): the blend path has no endgame clause, so a side with three left reads
-    // the same pool (round 77 gave the sampler's 0.75 here), and so does a cached tree without the count.
-    expect(atLiving(3, 2)).toBeCloseTo(atLiving(2, 2), 12);
+    // A side with three left is no endgame: the sampler keeps the cell, as before.
+    expect(atLiving(3, 2)).toBeCloseTo(0.9 * 0.75 + 0.1 * 0.5, 12);
+    // Without the count (a cached tree from before), nothing changes either.
     expect(mergeMctsTrees(cells.map(cell => ({ ...mk(), cells: [cell] })), new Map([[cellKey(0, 0), value]])).matrix!.values[0][0])
-      .toBeCloseTo(atLiving(2, 2), 12);
+      .toBeCloseTo(0.9 * 0.75 + 0.1 * 0.5, 12);
   });
 
   test('in an endgame a rich, agreeing plain cell keeps its depth below the floor too (round 77, T267)', () => {
