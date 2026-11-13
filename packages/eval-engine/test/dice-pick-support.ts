@@ -3,7 +3,8 @@ import { RecordingPRNG } from '../src/dice/prng';
 import type { DieName, Draw } from '../src/dice/types';
 import { watchBattle } from '../src/dice/watch';
 import { copyOf } from '../src/sim-ask/copy';
-import { mon, playClicks, type Mode, type Rules } from './dice-fixtures';
+import { dexOfRules } from './dice-sweep-support';
+import { mon, playClicks, sweepSelection, SWEEPS_FULL, type Mode, type Rules } from './dice-fixtures';
 import { battleOf } from './power-oracle';
 
 /**
@@ -103,4 +104,11 @@ export function aimOf(lines: readonly string[], userSlot: string, moveId: string
 /** The bodies a `|drag|` line brought in, by the slot they took. */
 export function draggedIn(lines: readonly string[]): { slot: string; name: string }[] {
   return lines.map(line => line.split('|')).filter(fields => fields[1] === 'drag').map(fields => ({ slot: slotIn(fields[2])!, name: nameIn(fields[2])! }));
+}
+
+/** The items a rule set plays (the Dex's own list, past items stay) that the sweep walks: the plain run takes a fixed sample, the full run every one. */
+export function sweepItems(rules: Rules) {
+  const dex = dexOfRules(rules);
+  const legal = dex.items.all().filter(item => item.exists && item.gen <= dex.gen && (item.isNonstandard === null || item.isNonstandard === undefined || item.isNonstandard === 'Past'));
+  return sweepSelection(legal, SWEEPS_FULL ? undefined : 'pool');
 }

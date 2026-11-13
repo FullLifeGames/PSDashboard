@@ -4,10 +4,10 @@ import { loadSimMods } from '../src/forward/sim-mods';
 import { dieKey, type DieName, type ForcedDie } from '../src/dice/types';
 import { dieLabel } from '../src/dice/die-label';
 import { copyOf } from '../src/sim-ask/copy';
-import { playClicks, standing, sweepSelection, SWEEPS_FULL, type Mode, type Rules } from './dice-fixtures';
-import { clicksAccepted, dexOfRules, forcedOn, SWEEP_CASES, VGC_RULES } from './dice-sweep-support';
+import { playClicks, standing, SWEEPS_FULL, type Mode, type Rules } from './dice-fixtures';
+import { clicksAccepted, dexOfRules, forcedOn, SWEEP_CASES, sweepMoves, VGC_RULES } from './dice-sweep-support';
 import { loggedDice } from '../src/dice/logged-results';
-import { draggedIn, ofKind, pickBoard, pickClicks, publicHalf, recorded, type Recorded } from './dice-pick-support';
+import { draggedIn, ofKind, pickBoard, pickClicks, publicHalf, recorded, sweepItems, type Recorded } from './dice-pick-support';
 
 // Round 89 (#137): a drag (Roar, Whirlwind, Dragon Tail and Circle Throw by the Dex flag `forceSwitch`, and an item whose holder drags
 // the attacker out when it is hit: found below by playing every Dex item on a hit and keeping those under which `dragIn` ran) brings
@@ -88,9 +88,7 @@ function dragsIn(board: Battle, clicks: { p1: string; p2: string }): boolean {
 
 describe.each(CASES)('a drag draws a die: $name', ({ rules, mode, vgc }) => {
   const dex = dexOfRules(rules);
-  const legal = (entry: { exists: boolean; gen: number; isNonstandard?: string | null }): boolean =>
-    entry.exists && entry.gen <= dex.gen && (entry.isNonstandard === null || entry.isNonstandard === undefined || entry.isNonstandard === 'Past');
-  const moves = dex.moves.all().filter(move => legal(move) && !move.isZ && !move.isMax && !!move.forceSwitch);
+  const { moves } = sweepMoves(rules, move => !!move.forceSwitch);
   const aim = mode === 'singles' ? 'move 1' : 'move 1 1';
 
   test('the Dex has drag moves', () => {
@@ -110,7 +108,7 @@ describe.each(CASES)('a drag draws a die: $name', ({ rules, mode, vgc }) => {
   });
 
   // an item whose holder drags the attacker out: no item is named, the spy finds them by the hit that runs `dragIn`
-  const items = sweepSelection(dex.items.all().filter(item => legal(item)), SWEEPS_FULL ? undefined : 'pool');
+  const items = sweepItems(rules);
   test('the items that drag the attacker out', () => {
     const problems: string[] = [];
     const found: string[] = [];
