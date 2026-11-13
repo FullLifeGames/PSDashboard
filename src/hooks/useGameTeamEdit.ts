@@ -8,7 +8,8 @@ import type { NewGameRecord } from '../lib/new-game/record';
  * the game takes it as sets (`teamOfInfo`), stops the live branch (its runtime stands on the old teams), plays the record again on
  * the new teams (`editTeams`) and says where the main line ends when an entry no longer applies. A replay keeps its own path.
  * Round 89, H14a (user ruling 13.11.2026): a dry run (`planTeams`) comes first; an edit that makes played turns invalid asks before it
- * cuts, naming the turns that fall away and the variation that goes, and Cancel changes nothing.
+ * cuts, naming the turns that fall away and the variation that goes, and Cancel changes nothing. The editor (or the sets panel) stays
+ * mounted under the question, hidden while `hold` is true, so Cancel returns to it with the text as typed; it closes only when the edit applies.
  */
 
 type Teams = { p1: ReturnType<typeof teamOfInfo>; p2: ReturnType<typeof teamOfInfo> };
@@ -42,9 +43,13 @@ export interface TeamEditConfirm {
 
 export function useGameTeamEdit({ record, planTeams, editTeams, variationOpen, stopBranch, close }: Inputs) {
   const [notice, setNotice] = useState<string | null>(null);
-  const [asked, setAsked] = useState<{ teams: Teams; message: string } | null>(null);
-  /** Stops the branch and plays the record again on the teams; says where the line ends when an entry no longer applies. */
-  const apply = useCallback((teams: Teams) => {
+  const [asked, setAsked] = useState<{ teams: Teams; message: string; close: () => void } | null>(null);
+  /** True from the click until the edit applies, fails or is cancelled: the editor stays open but hidden. */
+  const [hold, setHold] = useState(false);
+  /** Closes the editor, stops the branch and plays the record again on the teams; says where the line ends when an entry no longer applies. */
+  const apply = useCallback((teams: Teams, closeEditor: () => void) => {
+    setHold(false);
+    closeEditor();
     stopBranch();
     setNotice(null);
     void editTeams(teams).then(outcome => {
@@ -54,30 +59,35 @@ export function useGameTeamEdit({ record, planTeams, editTeams, variationOpen, s
     }, (failure: unknown) => setNotice(`The edit could not be applied: ${failure instanceof Error ? failure.message : String(failure)}`));
   }, [editTeams, stopBranch]);
   /**
-   * Plays the record again on the sides given (a side that is null keeps the record's own sets); false when no game is open. The editor
-   * closes at once; a plan that cuts played turns asks first (nothing changes until the answer), any other edit applies.
+   * Plays the record again on the sides given (a side that is null keeps the record's own sets); false when no game is open. A plan
+   * that cuts played turns asks first (nothing changes until the answer, the editor stays open under it), any other edit applies and
+   * closes the editor (`closeEditor`, default the hook's own `close`).
    */
-  const editSides = useCallback((next: { p1: OpponentTeamInfo | null; p2: OpponentTeamInfo | null }): boolean => {
+  const editSides = useCallback((next: { p1: OpponentTeamInfo | null; p2: OpponentTeamInfo | null }, closeEditor: () => void = close): boolean => {
     if (!record) return false;
     const teams = {
       p1: next.p1 ? teamOfInfo(next.p1, record.teams.p1) : record.teams.p1,
       p2: next.p2 ? teamOfInfo(next.p2, record.teams.p2) : record.teams.p2,
     };
-    close();
     setNotice(null);
     setAsked(null);
+    setHold(true);
     void planTeams(teams).then(plan => {
       const falling = plan ? record.turns - plan.kept : 0;
-      if (plan && falling > 0) setAsked({ teams, message: cutQuestion(falling, plan.kept, variationOpen) });
-      else apply(teams);
-    }, (failure: unknown) => setNotice(`The edit could not be applied: ${failure instanceof Error ? failure.message : String(failure)}`));
+      if (plan && falling > 0) setAsked({ teams, message: cutQuestion(falling, plan.kept, variationOpen), close: closeEditor });
+      else apply(teams, closeEditor);
+    }, (failure: unknown) => {
+      setHold(false);
+      closeEditor();
+      setNotice(`The edit could not be applied: ${failure instanceof Error ? failure.message : String(failure)}`);
+    });
     return true;
   }, [record, planTeams, apply, close, variationOpen]);
   const edit = useCallback((side: 'p1' | 'p2', info: OpponentTeamInfo): boolean => editSides({ p1: null, p2: null, [side]: info }), [editSides]);
   const confirm: TeamEditConfirm | null = asked && {
     message: asked.message,
-    proceed: () => { setAsked(null); apply(asked.teams); },
-    cancel: () => setAsked(null),
+    proceed: () => { setAsked(null); apply(asked.teams, asked.close); },
+    cancel: () => { setAsked(null); setHold(false); },
   };
-  return { edit, editSides, notice, confirm, dismiss: () => setNotice(null) };
+  return { edit, editSides, notice, confirm, hold, dismiss: () => setNotice(null) };
 }

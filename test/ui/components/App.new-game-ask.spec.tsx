@@ -29,13 +29,15 @@ async function openGame(turns: number) {
 }
 
 /** Setup, Import/Export Sets: every Protect becomes Rest, so the second turn (both sides played Protect) no longer plays. */
-async function importWithoutProtect() {
+async function importWithoutProtect(): Promise<string> {
   await userEvent.click(screen.getByRole('button', { name: 'Setup' }));
   await userEvent.click(screen.getByRole('button', { name: 'Import/Export Sets' }));
   const dialog = await screen.findByRole('dialog', { name: 'Import / Export Sets' }, { timeout: 60_000 });
   const field = dialog.querySelector('textarea') as HTMLTextAreaElement;
-  fireEvent.change(field, { target: { value: field.value.replace(/- Protect/g, '- Rest') } });
+  const typed = field.value.replace(/- Protect/g, '- Rest');
+  fireEvent.change(field, { target: { value: typed } });
   await userEvent.click(within(dialog).getByRole('button', { name: 'Import' }));
+  return typed;
 }
 
 /**
@@ -46,10 +48,11 @@ describe('a team edit that cuts played turns asks first (H14a)', () => {
   test('Cancel leaves the game and its saved record as they were; Apply edit cuts it and says where the line ends', async () => {
     const record = await openGame(3);
     expect(record.turns).toBe(3);
-    await importWithoutProtect();
+    const typed = await importWithoutProtect();
     const question = await screen.findByRole('alertdialog', undefined, { timeout: 120_000 });
     expect(question).toHaveTextContent(/This edit makes \d+ played turns? invalid\./);
     expect(question).toHaveTextContent('the game keeps its first turn');
+    // the panel waits under the question, out of sight
     expect(screen.queryByRole('dialog', { name: 'Import / Export Sets' })).toBeNull();
     // nothing is cut before the answer
     expect(loadGame(record.id)!.turns).toBe(3);
@@ -58,11 +61,14 @@ describe('a team edit that cuts played turns asks first (H14a)', () => {
     expect(loadGame(record.id)!.turns).toBe(3);
     expect(listGames()[0].turns).toBe(3);
     expect(loadGame(record.id)!.teams).toEqual(record.teams);
-
-    await importWithoutProtect();
+    // Cancel returns to the open panel with the text as typed (user, 13.11.2026), and Import asks again
+    const back = screen.getByRole('dialog', { name: 'Import / Export Sets' });
+    expect((back.querySelector('textarea') as HTMLTextAreaElement).value).toBe(typed);
+    await userEvent.click(within(back).getByRole('button', { name: 'Import' }));
     const again = await screen.findByRole('alertdialog', undefined, { timeout: 120_000 });
     await userEvent.click(within(again).getByRole('button', { name: 'Apply edit' }));
     await waitFor(() => expect(loadGame(record.id)!.turns).toBe(1), { timeout: 120_000 });
+    expect(screen.queryByRole('dialog', { name: 'Import / Export Sets' })).toBeNull();
     await waitFor(() => expect(screen.getByText(/The edited team cannot play every turn\. The game keeps its first turn/)).toBeInTheDocument());
   }, 360_000);
 });

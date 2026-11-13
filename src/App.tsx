@@ -86,6 +86,8 @@ function AppModals({ app }: { app: AppController }) {
   return (
     <>
       <GameEditNotices edit={gameEdit} />
+      {/* H14a follow-up: while the cut question stands, the editor stays mounted under it (hidden), so Cancel returns to the text as typed. */}
+      <div hidden={gameEdit.hold}>
       {setsPanelOpen && replayData && (
         <SetsImportExportPanel
           game={record !== null}
@@ -99,9 +101,10 @@ function AppModals({ app }: { app: AppController }) {
             p2Info: statsP2Info,
           })}
           onImport={text => {
-            // a game's sets belong to its record: the import plays it again on them (editTeams), as the editor does
-            const importError = applySetsText(text, record ? next => { gameEdit.editSides(next); } : undefined);
-            if (!importError) setSetsPanelOpen(false);
+            // a game's sets belong to its record: the import plays it again on them (editTeams), as the editor does; the panel closes
+            // when the edit applies (after the cut question, if one is asked), not at the click
+            const importError = applySetsText(text, record ? next => { gameEdit.editSides(next, () => setSetsPanelOpen(false)); } : undefined);
+            if (!importError && !record) setSetsPanelOpen(false);
             return importError;
           }}
           onClose={() => setSetsPanelOpen(false)}
@@ -127,6 +130,7 @@ function AppModals({ app }: { app: AppController }) {
           onClose={() => setEditorSide(null)}
         />
       )}
+      </div>
       {app.support.report && (
         <ReportIssueDialog report={app.support.report} game={app.ctx.newGame.record !== null} onDownload={() => void app.support.downloadState()} onClose={app.support.closeReport} />
       )}

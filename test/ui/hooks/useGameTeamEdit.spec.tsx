@@ -9,7 +9,7 @@ import { SIX, startedRecord } from '../fixtures/new-game';
  * Round 89 (lane H, #105), stage H4: Edit Player and Edit Opp on a new game. The editor's team info becomes the side's sets, the
  * other side stays as the record holds it, the live branch stops and the editor closes before the record plays again; a line that
  * ends early says where. Round 89, H14a: an edit that makes played turns invalid asks first: the question names how many turns fall away
- * and that the open variation goes; Cancel changes nothing (no stop, no edit, the editor already closed).
+ * and that the open variation goes; Cancel changes nothing (no stop, no edit) and returns to the editor, which stayed open (hidden) with the text as typed.
  */
 describe('useGameTeamEdit', () => {
   type Inputs = Parameters<typeof useGameTeamEdit>[0];
@@ -107,8 +107,9 @@ describe('useGameTeamEdit', () => {
       await waitFor(() => expect(result.current.confirm).not.toBeNull());
       expect(planTeams).toHaveBeenCalledTimes(1);
       expect(result.current.confirm!.message).toBe('This edit makes 3 played turns invalid. They fall away: the game keeps its first 2 turns, and the open variation goes.');
-      // the editor closed with the click; the branch, the record and the game stay as they were
-      expect(order).toEqual(['close']);
+      // the editor stays open under the question (hidden: `hold`); the branch, the record and the game stay as they were
+      expect(order).toEqual([]);
+      expect(result.current.hold).toBe(true);
       expect(editTeams).not.toHaveBeenCalled();
       expect(result.current.notice).toBeNull();
     });
@@ -120,13 +121,16 @@ describe('useGameTeamEdit', () => {
       expect(result.current.confirm!.message).toBe('This edit makes 1 played turn invalid. It falls away: the game keeps its first 4 turns.');
     });
 
-    test('Cancel leaves team and game as they were: no stop, no edit, no notice', async () => {
-      const { result, order, editTeams } = await setup('gen9ou', true);
+    test.each([['gen9ou'], ['gen9doublesou']])('%s: Cancel leaves team and game as they were and returns to the open editor: no close, no stop, no edit, no notice', async format => {
+      const { result, order, editTeams } = await setup(format, true);
+      expect(result.current.hold).toBe(false);
       act(() => { result.current.editSides({ p1: edited(0, 'Outrage'), p2: null }); });
+      expect(result.current.hold).toBe(true);
       await waitFor(() => expect(result.current.confirm).not.toBeNull());
       act(() => result.current.confirm!.cancel());
       expect(result.current.confirm).toBeNull();
-      expect(order).toEqual(['close']);
+      expect(result.current.hold).toBe(false);
+      expect(order).toEqual([]);
       expect(editTeams).not.toHaveBeenCalled();
       expect(result.current.notice).toBeNull();
     });
@@ -139,8 +143,20 @@ describe('useGameTeamEdit', () => {
       expect(result.current.confirm).toBeNull();
       await waitFor(() => expect(result.current.notice).toBe('The edited team cannot play every turn. The game keeps its first 2 turns: Snorlax can\'t use Protect.'));
       expect(order).toEqual(['close', 'stop', 'edit']);
+      expect(result.current.hold).toBe(false);
       const teams: { p2: PokemonSet[] } = editTeams.mock.calls[0][0];
       expect(teams.p2[1].moves[0]).toBe('Outrage');
+    });
+
+    test('an edit routed with its own close (the sets panel) closes that one, at Apply edit and not before', async () => {
+      const { result, order } = await setup('gen9ou', false);
+      const own = vi.fn();
+      act(() => { result.current.editSides({ p1: edited(0, 'Outrage'), p2: null }, own); });
+      await waitFor(() => expect(result.current.confirm).not.toBeNull());
+      expect(own).not.toHaveBeenCalled();
+      act(() => result.current.confirm!.proceed());
+      expect(own).toHaveBeenCalledTimes(1);
+      expect(order).not.toContain('close');
     });
 
     test('an edit that keeps every played turn applies at once and asks nothing, even with a variation open', async () => {
@@ -160,6 +176,7 @@ describe('useGameTeamEdit', () => {
       const { result } = renderHook(() => useGameTeamEdit({ record, planTeams, editTeams, variationOpen: false, stopBranch: vi.fn(), close: vi.fn() }));
       act(() => { result.current.edit('p1', edited(0, 'Outrage')); });
       await waitFor(() => expect(result.current.notice).toBe('The edit could not be applied: boom'));
+      expect(result.current.hold).toBe(false);
       expect(editTeams).not.toHaveBeenCalled();
     });
   });
