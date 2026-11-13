@@ -5,6 +5,8 @@ import { RawLogToggle } from './RawLogToggle';
 import type { Side } from './dock-model';
 import { TurnDock, type TurnDockProps } from './TurnDock';
 
+const isGame = (app: AppController): boolean => app.ctx.newGame.record !== null;
+
 /** What the dock reads from the app: the live branch at its tip, the resolved picker (with its seed) at every other position. */
 function dockProps(app: AppController, replayId: string): TurnDockProps {
   const { viewTurn, liveTip, evalViewKey } = app.board.timeline;
@@ -14,10 +16,10 @@ function dockProps(app: AppController, replayId: string): TurnDockProps {
   return {
     // A replay turn shows the picker's state with the engine's fill laid over its empty slots (Q19 b).
     simState: liveTip ? simState : dockSimState,
-    isGame: app.ctx.newGame.record !== null,
+    isGame: isGame(app),
     endOfGame: gameEnd({
-      isGame: app.ctx.newGame.record !== null, viewingVariation: app.board.timeline.viewingVariation, liveTip, simState,
-      atEndPosition: app.board.timeline.atEndPosition, log: app.ctx.replay.replayData?.log ?? '',
+      isGame: isGame(app), viewingVariation: app.board.timeline.viewingVariation, liveTip, simState,
+      atEndPosition: app.board.timeline.atEndPosition, log: isGame(app) ? app.ctx.replay.replayData?.log ?? '' : '',
     }),
     stale: !liveTip && pickerStale,
     source: liveTip ? 'live' : positionPicker?.source,
