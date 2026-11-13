@@ -10,6 +10,7 @@ import { hasForceSwitch } from './corrections.ts';
 import { recordVolatilesAtExit } from './exit-volatiles.ts';
 import { safeStreamWrite, sleep } from './execute.ts';
 import { loadSimMods, simModsReady } from '../forward/sim-mods.ts';
+import { DEFAULT_GAME_SEED } from './game-seed.ts';
 
 /**
  * Round 79 (T290): one open replacement request of a knockout. `turn` is the block's turn (the knockout turn; the replacement
@@ -23,9 +24,6 @@ export interface ReplacementPoint {
   forced: { p1: number[]; p2: number[] };
   played: { p1: string[]; p2: string[] };
 }
-
-/** The dice seed every reconstruction and every new game starts on unless the caller names another. */
-export const DEFAULT_GAME_SEED = '1,2,3,4';
 
 export interface ReconstructParams {
   format: string;
