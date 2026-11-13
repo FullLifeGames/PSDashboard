@@ -185,3 +185,15 @@ describe.each(SWEEP_CASES)('the likeliest dice of procs, the end of the turn and
     expect(order[0]).toBe(ties[0].die.name.slot);
   });
 });
+
+describe('a draw no die names is counted', () => {
+  const gen9 = SWEEP_CASES.find(item => item.rules.generation === 9 && item.mode === 'singles')!;
+
+  test('a plain hit draws none; a sleep move leaves the sleep duration to the stream and says so', () => {
+    for (const [moveId, unnamed] of [['tackle', false], ['spore', true]] as const) {
+      const board = sweepBoard(gen9.rules, moveId, 'singles', '1,2,3,4', false, 'Pikachu');
+      const turn = playLikeliestTurn(board, battle => playClicks(battle, sweepClicks('singles', 'normal')));
+      expect(turn.unnamed > 0, `${moveId}: draws no die names`).toBe(unnamed);
+    }
+  });
+});
