@@ -232,7 +232,7 @@ export function highlightEdge(args: {
   const turns = scores.length;
   const edgeFrom = currentTurn >= 1 ? scores[currentTurn - 1] : (hasLead ? leadScore! : null);
   const edgeTo = currentTurn >= 0 && currentTurn < turns ? scores[currentTurn] : null;
-  return edgeFrom !== null && edgeFrom !== undefined && edgeTo !== null && currentTurn >= first
+  return edgeFrom !== null && edgeFrom !== undefined && edgeTo !== null && edgeTo !== undefined && currentTurn >= first
     ? { x1: x(currentTurn), y1: y(edgeFrom), x2: x(currentTurn + 1), y2: y(edgeTo) }
     : null;
 }

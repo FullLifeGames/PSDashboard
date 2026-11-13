@@ -35,6 +35,26 @@ describe('EvalGraph', () => {
     expect(onSelectTurn).toHaveBeenLastCalledWith(5, 'main');
   });
 
+  // Round 89 (#105, H7, tester finding 15): React logged `Received NaN for the y2 attribute` while a game's graph filled (Champions VGC).
+  // A score the sweep has not written yet reads undefined, and only `null` meant "no point" in the line from the lead and in the edge's highlight.
+  test('a lead score before any turn score, and a turn whose next score is not there yet, draw no line with a NaN end', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const unfilled = (turns: number, filled: Record<number, number>) => {
+      const scores = new Array(turns) as (number | null)[];
+      for (const [index, value] of Object.entries(filled)) scores[Number(index)] = value;
+      return scores;
+    };
+    const { rerender } = render(<EvalGraph scores={[]} maxTurn={5} leadScore={0.1} playerNames={names} currentTurn={0} />);
+    const finite = () => [...document.querySelectorAll('svg line')].every(line => ['x1', 'y1', 'x2', 'y2'].every(name => Number.isFinite(Number(line.getAttribute(name)))));
+    expect(finite()).toBe(true);
+    rerender(<EvalGraph scores={unfilled(3, { 0: 0.2 })} maxTurn={5} leadScore={0.1} playerNames={names} currentTurn={1} />);
+    expect(finite()).toBe(true);
+    rerender(<EvalGraph scores={unfilled(3, { 1: 0.2 })} maxTurn={5} leadScore={0.1} playerNames={names} currentTurn={0} />);
+    expect(finite()).toBe(true);
+    expect(error.mock.calls.filter(call => /NaN/.test(String(call[0]) + String(call[1])))).toEqual([]);
+    error.mockRestore();
+  });
+
   test('a blunder swing rings the node whose play caused it and names it in the tooltip; without a handler nothing is clickable', () => {
     render(<EvalGraph scores={[0.3, 0.3 - BLUNDER_SWING - 0.05]} playerNames={names} currentTurn={1} />);
     const svg = screen.getByRole('img');
