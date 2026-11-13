@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   # Job limits (round 89, step M4). Measured on 13.11.2026 on a 4-vCPU runner (the repository is public): healthy
-  # Node suites 22 to 28 min, Browser flows 21 to 24 min, engine suite 18 to 35 min (the same job ran 1.8 times
+  # Node suites 22 to 28 min (34 on a slow runner), Browser flows 21 to 24 min, engine suite 14 to 35 min (the same job ran 1.8 times
   # slower on a slower runner), dice sweeps 12 to 24 min, build smoke 1 min; setup (checkout, Node, npm ci,
   # Chromium) takes under one minute in every job. A runner that is 1.6 times slower cancelled Node suites and
   # Browser flows at 30 min and hid their red rows, so the limits stand at about twice the healthy time.
@@ -40,9 +40,8 @@ jobs:
         run: nproc && free -m
 
       # The four Vitest projects: the root specs, each package's suite, and the app suite under test/ui/.
-      # Vitest's default is one worker fewer than the cores (3 on this runner, 2.7 busy on average): all cores work.
       - name: Run the Node suites
-        run: npm run test:regression -- --maxWorkers=100%
+        run: npm run test:regression
 
   # Round 59: the Node suites cover the adopted speed layer; one more run forces it off (the kill
   # switch) and one forces it on (a break throws instead of falling back). Release 1.0.0: both ran
@@ -75,7 +74,7 @@ jobs:
         run: npm ci
 
       - name: Run the engine suite
-        run: npx vitest run --project eval-engine --maxWorkers=100%
+        run: npx vitest run --project eval-engine
         env:
           EVAL_SIM_FAST: ${{ matrix.sim-fast }}
 
@@ -99,7 +98,7 @@ jobs:
         run: npm ci
 
       - name: Run the dice sweeps
-        run: npx vitest run --project eval-engine --maxWorkers=100% packages/eval-engine/test/dice-
+        run: npx vitest run --project eval-engine packages/eval-engine/test/dice-
         env:
           DICE_SWEEPS: full
 
@@ -126,10 +125,12 @@ jobs:
       - name: Show the runner
         run: nproc && free -m
 
-      # Playwright's default is half the cores (2 on this runner); the dev server, Chromium and the app's engine
-      # workers leave the other half idle, so the flows run on 3 workers. The JSON report feeds the next step.
+      # Playwright runs 2 workers here (half of the 4 vCPUs). Tried on 13.11.2026: 3 workers took 28 min instead
+      # of 21 to 24 and turned play-out-finish.spec.ts:65 red (its 10 s predicate); Vitest with --maxWorkers=100%
+      # (4 workers instead of 3) took 34 min instead of 28 on Node suites. More workers did not
+      # make a run faster. The JSON report feeds the next step.
       - name: Run the browser flows
-        run: npm run test:e2e -- --workers=3 --reporter=dot,json
+        run: npm run test:e2e -- --reporter=dot,json
         env:
           PLAYWRIGHT_JSON_OUTPUT_FILE: ${{ github.workspace }}/playwright-report.json
 
