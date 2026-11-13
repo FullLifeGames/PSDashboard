@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { replayData } from '../fixtures/replay';
 import { stubReplayFetch } from '../fixtures/network';
 import { realReplayWorkerClient } from '../fixtures/worker';
-import { listGames } from '../../../src/lib/new-game/store';
+import { listGames, saveGame } from '../../../src/lib/new-game/store';
 import { savedRecord } from '../fixtures/saved-game';
 import { playedRecord } from '../fixtures/played-game';
 
@@ -133,6 +133,21 @@ describe('a new game in the app', () => {
     await waitFor(() => expect(document.querySelector('.ps-topbar')).not.toBeNull(), { timeout: 30_000 });
     await waitFor(() => expect(document.body.textContent).toMatch(/T2\/2/), { timeout: 30_000 });
     await waitFor(() => expect(document.querySelector('.ps-dock')).not.toBeNull(), { timeout: 30_000 });
+    await act(async () => {});
+  }, 120_000);
+
+  test('a finished game opened again shows its end as the live game did: the winner, no dock to play (H4h)', async () => {
+    const played = await playedRecord(1);
+    // the last turn ends with the win instead of the next `|turn|` line: the game's end snapshot is its tip
+    const finished = { ...played, body: [...played.body.slice(0, played.body.findLastIndex(line => line.startsWith('|turn|'))), '|', '|win|Alice'] };
+    saveGame(finished);
+    window.history.replaceState(null, '', `/?game=${finished.id}`);
+    render(<App />);
+    await waitFor(() => expect(document.querySelector('.ps-topbar')).not.toBeNull(), { timeout: 30_000 });
+    await waitFor(() => expect(document.querySelector('.ps-dock')).not.toBeNull(), { timeout: 30_000 });
+    await waitFor(() => expect(document.querySelector('.ps-dock')).toHaveTextContent('Alice won the game. Go back a turn to play it another way.'), { timeout: 30_000 });
+    expect(screen.queryByRole('button', { name: /Select P1|Execute/ })).toBeNull();
+    expect(document.querySelector('.ps-dock-chip')).toBeNull();
     await act(async () => {});
   }, 120_000);
 

@@ -9,10 +9,18 @@ export interface GameEndArgs {
   viewingVariation: boolean;
   liveTip: boolean;
   simState: { ended: boolean; winner: string | null } | null;
+  /** The pointer stands on the main line's end snapshot. */
+  atEndPosition: boolean;
+  /** The game's log, which names the winner at its end. */
+  log: string;
 }
 
+/** The winner the log's win line names, else null. */
+export const logWinner = (log: string): string | null => log.match(/\|win\|(.+)/)?.[1]?.trim() || null;
+
 export function gameEnd(args: GameEndArgs): { winner: string | null } | undefined {
-  const { isGame, viewingVariation, liveTip, simState } = args;
+  const { isGame, viewingVariation, liveTip, simState, atEndPosition, log } = args;
   if (!isGame || viewingVariation) return undefined;
-  return liveTip && simState?.ended ? { winner: simState.winner } : undefined;
+  if (liveTip) return simState?.ended ? { winner: simState.winner } : undefined;
+  return atEndPosition ? { winner: logWinner(log) } : undefined;
 }

@@ -14,7 +14,10 @@ function dockProps(app: AppController, replayId: string): TurnDockProps {
   return {
     // A replay turn shows the picker's state with the engine's fill laid over its empty slots (Q19 b).
     simState: liveTip ? simState : dockSimState,
-    endOfGame: gameEnd({ isGame: app.ctx.newGame.record !== null, viewingVariation: app.board.timeline.viewingVariation, liveTip, simState }),
+    endOfGame: gameEnd({
+      isGame: app.ctx.newGame.record !== null, viewingVariation: app.board.timeline.viewingVariation, liveTip, simState,
+      atEndPosition: app.board.timeline.atEndPosition, log: app.ctx.replay.replayData?.log ?? '',
+    }),
     stale: !liveTip && pickerStale,
     source: liveTip ? 'live' : positionPicker?.source,
     acquiringExact: !liveTip && app.engine.acquire.exactAcquiringTurn === viewTurn,
