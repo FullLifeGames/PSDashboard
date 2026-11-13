@@ -63,6 +63,12 @@
 .ps-newgame-seed-problem { flex: 1 0 100%; font-size: 10px; }
 
 .ps-newgame-actions { display: flex; gap: 8px; }
+/* Start stays in view while two long problem lists scroll the dialog (ModalDialog's box pads 20 px and scrolls): the row sticks to
+   the box's bottom edge on the box's own background and border color. */
+.ps-newgame > .ps-newgame-actions {
+  position: sticky; bottom: -20px; z-index: 1; margin: 0 -20px -20px; padding: 10px 20px 20px;
+  background: #2a3a5c; border-top: 1px solid rgba(255,255,255,0.09);
+}
 .ps-newgame-actions .ps-btn-red { flex: 1; }                                   /* Import of the sets dialog */
 .ps-newgame-error { font-size: 11px; color: #f3a6a6; }                         /* the loader's error color (App EmbedLoadStatus) */
 
@@ -103,8 +109,13 @@
 /* The start page's second panel stands under the loader like the loader's own .ps-panel (ReplayLoader). */
 .ps-entry-landing .ps-newgame-saved { margin-top: 8px; }
 
+/* The menu's panel holds up to 20 saved rows: it scrolls inside the window instead of growing past it, so the top bar and the frame stay in view. */
+.ps-loader-panel.ps-entry-panel { max-height: calc(100 * var(--ps-vh) - 90px); overflow-y: auto; overscroll-behavior: contain; }
+
 /* The title row's "New game" tag: .ps-format-tag in the selection blue of the dock (dock.css .ps-movebtn-selected). */
 .ps-format-tag.ps-newgame-tag { background: linear-gradient(180deg, #3d6998 0%, #2d5078 100%); color: #ffffff; font-weight: bold; }
+/* The bar's shrinking order (layout.css) clips the format tags first; the "New game" tag keeps its words and the format tag gives way. */
+.ps-topbar-match > .ps-format-tag.ps-newgame-tag { flex: 0 0 auto; min-width: auto; }
 
 @media (max-width: 640px) {
   .ps-newgame-seed-input { flex: 1 1 160px; width: auto; }

@@ -82,11 +82,18 @@ function useFormatPicker(groups: readonly FormatGroup[], value: string, onSelect
 
 type PickerState = ReturnType<typeof useFormatPicker>;
 
+/** A stable ref callback: it runs once when the list mounts, not on every hover. */
+const bringIntoView = (element: HTMLDivElement | null): void => element?.scrollIntoView?.({ block: 'nearest' });
+
 function FormatList({ picker, idBase, value, total, note }: { picker: PickerState; idBase: string; value: string; total: number; note: (option: FormatOption) => string }) {
   const { rows, options, highlight, query } = picker;
   return (
     // the search field keeps focus while the list is used (a click on a scroll bar or a heading must not blur it)
-    <div className="ps-combobox-pop ps-format-pop" onMouseDown={event => { if (event.target !== event.currentTarget.firstChild) event.preventDefault(); }}>
+    <div
+      className="ps-combobox-pop ps-format-pop"
+      // the dialog scrolls and the list hangs below the button: bring the whole list, its footnote included, into the dialog's view
+      ref={bringIntoView}
+      onMouseDown={event => { if (event.target !== event.currentTarget.firstChild) event.preventDefault(); }}>
       <input
         className="ps-input"
         type="text"

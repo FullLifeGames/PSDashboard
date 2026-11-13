@@ -206,3 +206,61 @@ test('390 px: the top bar keeps its lines with Game, the menu fits the screen, t
   await expect(landing.locator('.ps-newgame-saved-row')).toHaveCount(1);
   expect(await noSideways()).toBe(true);
 });
+
+/**
+ * Round 89 (H4h), the layout findings of the wave-tester: the open format list brings its footnote into the dialog's view, Start
+ * stays in view while two long problem lists scroll the dialog, the menu of 20 saved games scrolls inside the window, and the
+ * title's "New game" tag keeps its words at 390 px while the format tag gives way.
+ */
+test('layout: the format list, Start under long problem lists, the 20-game menu and the New game tag at 390 px', async ({ page }) => {
+  test.setTimeout(240_000);
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'New game' }).click();
+  const dialog = page.getByRole('dialog', { name: 'New game' });
+  await dialog.getByRole('button', { name: /^Format / }).click();
+  const footnote = dialog.locator('.ps-format-count');
+  await expect(footnote).toBeVisible();
+  const within = async () => {
+    const box = await footnote.boundingBox();
+    const frame = await dialog.boundingBox();
+    return box!.y + box!.height <= frame!.y + frame!.height + 1;
+  };
+  await expect.poll(within).toBe(true);
+  await page.keyboard.press('Escape');
+
+  // two teams of banned bodies: each box lists many problems, and the window is short
+  await page.setViewportSize({ width: 1400, height: 560 });
+  const banned = ['Mewtwo', 'Koraidon', 'Miraidon', 'Zacian', 'Eternatus', 'Arceus'].map(name => `${name}\n- Protect\n- Earthquake\n- Return\n- Substitute`).join('\n\n');
+  await dialog.getByRole('textbox', { name: 'Player 1 team' }).fill(banned);
+  await dialog.getByRole('textbox', { name: 'Player 2 team' }).fill(banned);
+  await expect(dialog.locator('.ps-newgame-problems').first()).toBeVisible({ timeout: 60_000 });
+  await expect(dialog.getByRole('button', { name: 'Start' })).toBeInViewport();
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+
+  // the menu of 20 saved games
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await startGame(page, null, ['Tidepool', 'Marrowkid']);
+  await page.evaluate(() => {
+    const key = 'ps-replay-interceptor:games';
+    const rows = JSON.parse(localStorage.getItem(key) ?? '[]') as unknown[];
+    for (let index = 0; rows.length < 20; index += 1) {
+      rows.push({ id: `newgame-filler${index}`, formatName: '[Gen 9] OU', players: [`Ann${index}`, `Ben${index}`], turns: index, updatedAt: new Date(2026, 10, 1, 12, index).toISOString(), seed: '1,2,3,4' });
+    }
+    localStorage.setItem(key, JSON.stringify(rows));
+  });
+  await page.locator('.ps-loader-toggle').click();
+  const panel = page.locator('.ps-loader-panel');
+  await panel.getByRole('button', { name: 'Show all 20 saved games' }).click();
+  await expect(panel.locator('.ps-newgame-saved-row')).toHaveCount(20);
+  const panelBox = await panel.boundingBox();
+  expect(panelBox!.y + panelBox!.height).toBeLessThanOrEqual(900);
+  expect(await panel.evaluate(element => element.scrollHeight > element.clientHeight && getComputedStyle(element).overflowY === 'auto')).toBe(true);
+  await page.keyboard.press('Escape');
+
+  // 390 px: the tag keeps its words
+  await page.setViewportSize({ width: 390, height: 844 });
+  const tag = page.locator('.ps-topbar .ps-newgame-tag');
+  await expect(tag).toBeVisible();
+  expect(await tag.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+});
