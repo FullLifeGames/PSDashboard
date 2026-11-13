@@ -79,3 +79,26 @@ test('Gen 9 OU: paste, Start at Team Preview, pick leads, play a turn by hand, r
   await expect(page.getByText('T2/')).toBeVisible({ timeout: 90_000 });
   await expect(page.locator('.ps-dock-chip').first()).toBeVisible({ timeout: 90_000 });
 });
+
+test('Scarlet/Violet VGC: the picker asks for four of six, the first two lead, the bench holds the two brought; a turn by hand joins the main line', async ({ page }) => {
+  test.setTimeout(240_000);
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await startGame(page, { search: 'vgc 2025', name: '[Gen 9] VGC 2025 Reg I' }, ['Lucario Lab', 'Ferrothorn Fan']);
+  const bar = page.locator('.ps-topbar');
+  await expect(bar.getByText('[Gen 9] VGC 2025 Reg I')).toBeVisible();
+  const lead = page.locator('.ps-lead');
+  await expect(lead).toBeVisible({ timeout: 60_000 });
+  await expect(lead).toContainText(/pick the 4 each side brings/);
+  for (const side of [0, 1]) {
+    const tiles = lead.locator('.ps-lead-side').nth(side).locator('.ps-switchbtn');
+    await expect(tiles).toHaveCount(6);
+    for (let pick = 0; pick < 4; pick += 1) await tiles.nth(pick).click();
+  }
+  await lead.locator('.ps-execute-btn', { hasText: 'Play from turn 0' }).click();
+  await expect(page.locator('.ps-dock-chip').first()).toBeVisible({ timeout: 90_000 });
+  for (const slot of ['p1a', 'p1b', 'p2a', 'p2b'] as const) await pickMove(page, slot, 'Protect');
+  await page.locator('.ps-dock .ps-execute-btn').click();
+  await expect(page.getByText('T2/')).toBeVisible({ timeout: 90_000 });
+  await expect(page.getByRole('button', { name: 'Discard variation' })).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('ps-replay-interceptor:games') ?? '[]')[0]?.formatName)).toBe('[Gen 9] VGC 2025 Reg I');
+});
