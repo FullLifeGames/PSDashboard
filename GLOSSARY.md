@@ -115,7 +115,13 @@ A line that starts with the engine's best choice for a player, the opponent answ
 A line that starts with the choice the player made. A player who played the engine's choice gets one line.
 
 **Game review**:
-The panel under the game report that lists, per player, the graded turns (inaccuracy, mistake or blunder) with the played value, the engine's value, the loss, and the engine line and the played line with a ▶ Play button each. The graph marks the same turns, a circle for player 1 and a square for player 2.
+The panel under the game report that lists, per player, the graded turns (inaccuracy, mistake or blunder) with the played value, the engine's value, the loss, and the engine line and the played line with a ▶ Play button each. The graph marks the same turns, a circle for player 1 and a square for player 2. A game that reached its endgame adds an Endgame row for the player who lost.
+
+**Endgame**:
+A position with at most three Pokémon standing in total, both sides together (`ENDGAME_MAX_BODIES` in the code). A side counts the bodies it brought, so a VGC player who brought four and lost one has three. The forced-win prover runs there, and the Game review's Endgame row opens at the first turn of the game that has this few left.
+
+**Win path**:
+A way the player who lost an endgame could have won, found from a turn of the endgame by a search that the user starts (the Endgame row in the Game review, or `How could <player> have won from here?` on the turn's card). It has three steps, named in the panel: `1 · A stronger play` (a choice that wins within three turns in a share of the dice whatever the opponent answers), `2 · Luck` (the likeliest dice that give the player the win, with the chance of that sequence) and `3 · A mistake by <opponent>` (the smallest slip by the opponent that hands the player the win, with the chance of the dice it needs). Each step shows its line with ▶ Play. Every number is a lower bound: it holds within three turns and within the search limit, so a path the search did not reach may add to it.
 
 **New game**:
 A game that starts in the app from two pasted teams and a format (a listed format or a Custom Game), not from a Showdown replay. The `Game` menu opens its dialog. Both sides know both teams in full, as with open team sheets, and the user plays both sides or lets the engine play; the turns played become the game's main line, graded, reported and branched like a replay's.

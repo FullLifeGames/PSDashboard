@@ -114,3 +114,5 @@ The address must be a hosted https endpoint that passes `check-engine` with the 
 ## Versions
 
 The protocol string names the version. A change that breaks an engine gets a new version, and the dashboard keeps talking to engines that speak the old one.
+
+The protocol covers the ranking of a position and nothing else. The win-path search of a lost endgame (`How could <player> have won?`) is a job of the dashboard's own worker: no engine receives or sends it, an external engine does not change it, and its worker messages are internal, so `ps-dashboard-engine/1` stays as it is.
