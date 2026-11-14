@@ -17,6 +17,10 @@ export interface WinPathsRequest {
   turn?: number;
   /** The turns a path may take (default 3); a replacement after a faint or a pivot is a step of the line and no turn. */
   turns?: number;
+  /** The turn's ranking of the side, best first (choice strings): the order a stronger play tries its candidates in. */
+  rootOrder?: string[];
+  /** The choice the side played at the turn (a choice string), when the log shows it: the mass of a stronger play is read beside its own. */
+  played?: string;
   /** The engine's first choice at the root by side (the turn's ranking's best row); a side without one takes the one-turn matrix's. */
   first?: { p1?: string; p2?: string };
   tera?: TeraAllowance;

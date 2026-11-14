@@ -108,24 +108,43 @@ function rootChoice(root: SimPosition, request: WinPathsRequest, side: 'p1' | 'p
 /** The product of the chances of a step's dice before position `to` (dice with no chance count one). */
 const productBefore = (dice: readonly LikeliestDie[], to: number): number => dice.slice(0, to).reduce((product, entry) => product * (entry.chance ?? 1), 1);
 
+/** What picks both sides' choices at a step of the search: the engine's first choice (luck), or the choices of a proof (a stronger play). */
+export interface Chooser {
+  at(position: SimPosition, node: { turnsDone: number; atRoot: boolean; start: Battle }): { p1: ChoiceOption; p2: ChoiceOption } | null;
+}
+
+/** The engine's first choice: the request's ranking at the root, the one-turn matrix everywhere else (see first-choice.ts). */
+export function firstChoiceChooser(root: SimPosition, request: WinPathsRequest, meter: WinMeter): Chooser {
+  const first = new FirstChoice(meter, request);
+  return {
+    at: (position, node) => {
+      const given = node.atRoot ? { p1: rootChoice(root, request, 'p1'), p2: rootChoice(root, request, 'p2') } : { p1: undefined, p2: undefined };
+      const picked = given.p1 && given.p2 ? null : first.at(position);
+      const p1 = given.p1 ?? picked?.p1;
+      const p2 = given.p2 ?? picked?.p2;
+      return p1 && p2 ? { p1, p2 } : null;
+    },
+  };
+}
+
 class LuckSearch {
   private readonly request: WinPathsRequest;
   private readonly meter: WinMeter;
   private readonly floor: number;
   private readonly turnsAllowed: number;
   private readonly root: SimPosition;
-  private readonly first: FirstChoice;
+  private readonly chooser: Chooser;
   private readonly queue = new Queue();
   /** The best bound a turn boundary was reached with, by turns taken and position: a later arrival with less is dropped. */
   private readonly arrived = new Map<string, number>();
 
-  constructor(serialized: string, request: WinPathsRequest, meter: WinMeter) {
+  constructor(serialized: string, request: WinPathsRequest, meter: WinMeter, chooser?: (root: SimPosition) => Chooser) {
     this.request = request;
     this.meter = meter;
     this.floor = request.floor ?? LUCK_FLOOR;
     this.turnsAllowed = request.turns ?? 3;
     this.root = createRootPosition(serialized, request.ruleset);
-    this.first = new FirstChoice(meter, request);
+    this.chooser = chooser ? chooser(this.root) : firstChoiceChooser(this.root, request, meter);
     const start = forkBattle(this.root, '1,2,3,4');
     if (!start.ended) this.queue.push({ bound: 1, final: false, path: [], next: { start, turnsDone: 0, pinned: [], before: 1 } });
   }
@@ -147,15 +166,11 @@ class LuckSearch {
     return done({ status: 'none' });
   }
 
-  /** Both sides' choices for the node's step: the request's at the root, else the engine's first choice at the position. */
+  /** Both sides' choices for the node's step. */
   private choicesAt(entry: Entry): { p1: ChoiceOption; p2: ChoiceOption } | null {
     const node = entry.next!;
     const atRoot = entry.path.length === 0;
-    const given = atRoot ? { p1: rootChoice(this.root, this.request, 'p1'), p2: rootChoice(this.root, this.request, 'p2') } : { p1: undefined, p2: undefined };
-    const picked = given.p1 && given.p2 ? null : this.first.at(atRoot ? this.root : positionOf(node.start));
-    const p1 = given.p1 ?? picked?.p1;
-    const p2 = given.p2 ?? picked?.p2;
-    return p1 && p2 ? { p1, p2 } : null;
+    return this.chooser.at(atRoot ? this.root : positionOf(node.start), { turnsDone: node.turnsDone, atRoot, start: node.start });
   }
 
   /** Plays the node's step and queues its successors: the outcome's next step, and each die after the last pinned one turned the other way. */
@@ -220,4 +235,12 @@ class LuckSearch {
 /** The likeliest sequence of dice that wins the game for `request.side` within the turns asked; see the module's header. */
 export function luckPath(serialized: string, request: WinPathsRequest, meter = new WinMeter(request.budget)): WinStep {
   return new LuckSearch(serialized, request, meter).run();
+}
+
+/**
+ * The same search with the choices of the caller's chooser (a stronger play's proof): the likeliest dice under which those choices win,
+ * as a `luck` step; the caller keeps what it needs of it (the line, the chance of the dice).
+ */
+export function luckUnder(serialized: string, request: WinPathsRequest, meter: WinMeter, chooser: (root: SimPosition) => Chooser): WinStep {
+  return new LuckSearch(serialized, request, meter, chooser).run();
 }
