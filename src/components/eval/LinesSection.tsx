@@ -2,7 +2,7 @@ import { Fragment } from 'react';
 import type { EvalResult, TurnAnalysis } from '@fulllifegames/eval-engine';
 import { LineConfirm } from './LineConfirm';
 import { cardLines, rowValueTexts } from './turn-copy';
-import { activeNamesAt, LINE_DIFFERS_SENTENCE, lineAnchor, lineBlocks, type LineBlockView, type LinesHost, type LineSideView } from '../../lib/line-view';
+import { activeNamesAt, LINE_DIFFERS_SENTENCE, lineAnchor, lineBlocks, ranksOf, REPLY_OFF_TOP_TITLE, type LineBlockView, type LinesHost, type LineSideView } from '../../lib/line-view';
 
 interface LinesSectionProps {
   turn: number;
@@ -46,6 +46,9 @@ function LineBlock({ block, turn, onPlay, confirm }: { block: LineBlockView; tur
     <div className="ps-eval-line-block">
       <div className="ps-eval-line-head">
         <span style={{ color: '#cde' }}>{block.player} · {block.role}</span>
+        {block.reply && (
+          <span style={{ color: '#9ab' }} title={block.reply.off ? REPLY_OFF_TOP_TITLE : undefined}>{`vs ${block.reply.label} (${block.reply.rank})`}</span>
+        )}
         {onPlay && (
           <button type="button" className="ps-btn ps-eval-inline-btn" title={block.tooltip} onClick={() => onPlay(block.line, turn)}>
             ▶ Play
@@ -89,7 +92,7 @@ export function LinesSection({ turn, result, playerNames, doubles, host, analysi
       </div>
     );
   }
-  const blocks = lineBlocks(lines, { turn, playerNames, doubles, rules: host.rules, actives: activeNamesAt(host.snapshot), rowValues: rowValueTexts(analysis) });
+  const blocks = lineBlocks(lines, { turn, playerNames, doubles, rules: host.rules, actives: activeNamesAt(host.snapshot), rowValues: rowValueTexts(analysis), ranks: ranksOf(result) });
   return (
     <div className="ps-eval-lines">
       <span className="ps-eval-lines-title">Lines</span>

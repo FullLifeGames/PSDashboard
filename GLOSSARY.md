@@ -109,7 +109,7 @@ The turns the engine expects after a choice, for the choices that the search rat
 _Avoid_: principal variation, PV (code names such as `PV_MAX_STEPS` keep them)
 
 **Engine line**:
-A line that starts with the engine's best choice for a player, the opponent answering with the reply that the search rated best. The Lines section shows it before the played line.
+A line that starts with the engine's best choice for a player, the opponent answering with a reply that the search ranked; the line's head names the reply and its rank ("vs Draining Kiss (Tzon's top choice)"), and the best reply means the best one overall by the merged ranking. The Lines section shows it before the played line.
 
 **Played line**:
 A line that starts with the choice the player made. A player who played the engine's choice gets one line.

@@ -163,3 +163,31 @@ describe('both numbers on a line', () => {
     expect(screen.queryByText(SENTENCE)).toBeNull();
   });
 });
+
+/** Round 89 (#104), step G11 (ruling G8a): the head names the answer the line meets and its rank in this search. */
+describe('the answer a line meets', () => {
+  const ranked = (kind: 'singles' | 'doubles', rows: { p1: string[]; p2: string[] }): EvalResult => {
+    const base = withLines([], {});
+    const labelled = (labels: string[]) => labels.map((label, index) => rankedChoice(`move ${index}`, label, 0.1 - index * 0.05));
+    return { ...base, ...(kind === 'doubles' ? { kind: 'doubles' as const } : {}), perSide: { p1: labelled(rows.p1), p2: labelled(rows.p2) } };
+  };
+
+  test('singles: the top answer reads plain, an answer further down carries the explanation as its title', () => {
+    const top = { ...ranked('singles', { p1: ['Draining Kiss', 'Surf'], p2: ['Hydro Pump'] }), lines: [singlesLine] };
+    const { unmount } = render(<LinesSection turn={20} result={top} playerNames={SINGLES_NAMES} doubles={false} host={host()} />);
+    const plain = screen.getByText("vs Draining Kiss (Tzon's top choice)");
+    expect(plain).not.toHaveAttribute('title');
+    unmount();
+    const second = { ...ranked('singles', { p1: ['Surf', 'Draining Kiss'], p2: ['Hydro Pump'] }), lines: [singlesLine] };
+    render(<LinesSection turn={20} result={second} playerNames={SINGLES_NAMES} doubles={false} host={host()} />);
+    const off = screen.getByText("vs Draining Kiss (Tzon's second choice in this search)");
+    expect(off).toHaveAttribute('title', expect.stringContaining('another answer'));
+  });
+
+  test('doubles: the pair of the other player is named with its rank', () => {
+    const pair = 'Sucker Punch → Terapagos + Protect';
+    const result = { ...ranked('doubles', { p1: ['Fake Out → Rillaboom + Spore → Zamazenta'], p2: ['Other pair', pair] }), lines: [doublesLine] };
+    render(<LinesSection turn={4} result={result} playerNames={DOUBLES_NAMES} doubles host={host()} />);
+    expect(screen.getByText(`vs ${pair} (Mstr_Hawk's second choice in this search)`)).toBeInTheDocument();
+  });
+});

@@ -1,5 +1,5 @@
 import { lostGround, winDeltaText, winPctText, type EvalLine, type EvalResult, type SideAnalysis, type TurnAnalysis, type VerdictTier } from '@fulllifegames/eval-engine';
-import { activeNamesAt, lineBlocks, type LineBlockView, type LinesHost } from '../../lib/line-view';
+import { activeNamesAt, lineBlocks, ranksOf, type LineBlockView, type LineReply, type LinesHost } from '../../lib/line-view';
 import { cardLines, engineChoice, regretView, rowValueTexts } from './turn-copy';
 
 /**
@@ -81,15 +81,17 @@ export function reviewMarks(analyses: readonly (TurnAnalysis | null)[] | null | 
  * holds two moves for each player, so each pair stands behind its player's name (round 89, G4d: "A + B vs C + D" read as one
  * run-on list of four moves).
  */
-function lineText(line: EvalLine, playerNames: [string, string], doubles: boolean): string {
+function lineText(line: EvalLine, playerNames: [string, string], doubles: boolean, reply: LineReply | null): string {
   const other: Side = line.side === 'p1' ? 'p2' : 'p1';
-  return line.steps.map(step => {
+  // the first answer carries its rank in the search's ranking (round 89, G11); a replacement-first line has none
+  const ranked = (label: string, index: number): string => (index === 0 && reply ? `${label} (${reply.rank})` : label);
+  return line.steps.map((step, index) => {
     if (step.replacement) {
       const replacing: Side[] = step.replacement === 'both' ? ['p1', 'p2'] : [step.replacement];
       return replacing.map(side => `${playerNames[SIDE_INDEX[side]]} replaces: ${step[side].label}`).join(' and ');
     }
-    if (doubles) return `${playerNames[SIDE_INDEX[line.side]]}: ${step[line.side].label}; ${playerNames[SIDE_INDEX[other]]}: ${step[other].label}`;
-    return `${step[line.side].label} vs ${step[other].label}`;
+    if (doubles) return `${playerNames[SIDE_INDEX[line.side]]}: ${step[line.side].label}; ${playerNames[SIDE_INDEX[other]]}: ${ranked(step[other].label, index)}`;
+    return `${step[line.side].label} vs ${ranked(step[other].label, index)}`;
   }).join(', then ');
 }
 
@@ -110,10 +112,11 @@ function rowLines(args: ReviewArgs, analysis: TurnAnalysis, side: Side): ReviewL
     turn, playerNames: args.playerNames, doubles: args.doubles, rules: args.host.rules,
     actives: activeNamesAt(args.host.snapshotAt?.(turn) ?? args.host.snapshot),
     rowValues: rowValueTexts(analysis),
+    ranks: args.results[turn - 1] ? ranksOf(args.results[turn - 1]!) : undefined,
   };
   // `lineBlocks` puts the engine's line before the played line; a line that holds both roles reads as the engine's
   return lineBlocks(lines, ctx).map((block): ReviewLineView => ({
-    key: block.key, role: block.line.for.includes('engine') ? 'engine' : 'played', text: lineText(block.line, args.playerNames, args.doubles), end: `ends at ${block.endPct}`, block,
+    key: block.key, role: block.line.for.includes('engine') ? 'engine' : 'played', text: lineText(block.line, args.playerNames, args.doubles, block.reply), end: `ends at ${block.endPct}`, block,
   }));
 }
 

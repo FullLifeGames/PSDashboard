@@ -219,3 +219,42 @@ describe('both numbers on a line', () => {
     expect(LINE_DIFFERS_SENTENCE).toBe("A row's value averages every answer and die the search tried; a line follows one answer with each die at its likeliest result.");
   });
 });
+
+/** Round 89 (#104), step G11 (ruling G8a): a line names the rank of the answer it meets in the search's merged ranking. */
+describe('the answer a line meets', () => {
+  const ranked = (...p1: string[]) => ({ p1, p2: ['Hydro Pump', 'Hyper Voice'] });
+
+  test('singles: the first answer reads as the opponent\'s top, second or third choice, or by its number', () => {
+    const replyOf = (...order: string[]) => lineBlocks([singlesLine], { ...singles, ranks: ranked(...order) })[0].reply;
+    expect(replyOf('Draining Kiss', 'Surf')).toEqual({ label: 'Draining Kiss', rank: "Tzon's top choice", off: false });
+    expect(replyOf('Surf', 'Draining Kiss')).toEqual({ label: 'Draining Kiss', rank: "Tzon's second choice in this search", off: true });
+    expect(replyOf('Surf', 'Earthquake', 'Draining Kiss')).toEqual({ label: 'Draining Kiss', rank: "Tzon's third choice in this search", off: true });
+    expect(replyOf('A', 'B', 'C', 'Draining Kiss')).toEqual({ label: 'Draining Kiss', rank: "Tzon's choice 4 in this search", off: true });
+  });
+
+  test('an answer the ranking does not hold is named as such', () => {
+    expect(lineBlocks([singlesLine], { ...singles, ranks: ranked('Surf') })[0].reply).toEqual({ label: 'Draining Kiss', rank: "not among Tzon's ranked choices", off: true });
+  });
+
+  test('the answer of the other side is read for either side\'s line: player 1\'s line meets player 2\'s answer', () => {
+    // bothRolesLine is Tzon's line; its answer is Pepitopalotin's Hydro Pump
+    expect(lineBlocks([bothRolesLine], { ...singles, ranks: ranked('Surf') })[0].reply).toEqual({ label: 'Hydro Pump', rank: "Pepitopalotin's top choice", off: false });
+    expect(lineBlocks([bothRolesLine], { ...singles, ranks: { p1: [], p2: ['Surf', 'Hydro Pump'] } })[0].reply?.rank).toBe("Pepitopalotin's second choice in this search");
+  });
+
+  test('doubles: the pair of the other player is the answer, ranked by its combined label', () => {
+    const pair = 'Sucker Punch → Terapagos + Protect';
+    const [top] = lineBlocks([doublesLine], { ...doubles, ranks: { p1: [], p2: [pair, 'Other'] } });
+    expect(top.reply).toEqual({ label: pair, rank: "Mstr_Hawk's top choice", off: false });
+    const [second] = lineBlocks([doublesLine], { ...doubles, ranks: { p1: [], p2: ['Other', pair] } });
+    expect(second.reply).toEqual({ label: pair, rank: "Mstr_Hawk's second choice in this search", off: true });
+    expect(lineBlocks([doublesLine], { ...doubles, ranks: { p1: [], p2: ['Other'] } })[0].reply?.rank).toBe("not among Mstr_Hawk's ranked choices");
+  });
+
+  test('a line that opens with a replacement meets no answer, and a context without ranks names none', () => {
+    const opening: EvalLine = { ...doublesLine, steps: [doublesLine.steps[1], ...doublesLine.steps.slice(2)] };
+    expect(lineBlocks([opening], { ...doubles, ranks: { p1: [], p2: ['x'] } })[0].reply).toBeNull();
+    expect(lineBlocks([singlesLine], singles)[0].reply).toBeNull();
+    expect(lineBlocks([doublesLine], doubles)[0].reply).toBeNull();
+  });
+});

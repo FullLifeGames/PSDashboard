@@ -1,4 +1,4 @@
-import { dieKey, dieLabel, winPctText, type DieKind, type DieWords, type EvalLine, type LineDie, type LineStep } from '@fulllifegames/eval-engine';
+import { dieKey, dieLabel, winPctText, type DieKind, type DieWords, type EvalLine, type EvalResult, type LineDie, type LineStep } from '@fulllifegames/eval-engine';
 import { rulesDex, type GameRules, type TurnSnapshot } from '@fulllifegames/replay-core';
 import { wordsOf } from './branch-dice';
 import type { WinPathsHost } from './win-paths-host';
@@ -28,6 +28,8 @@ export interface LineBlockView {
   endPct: string;
   /** The percentage the line's own row shows on the card ("23%"); null when the context holds none (a win-path line has none). */
   row: string | null;
+  /** The answer the line meets and where the search ranks it; null when the context holds no ranking or the line opens with a replacement. */
+  reply: LineReply | null;
   /** The row and the end print differently: the one sentence on why (`LINE_DIFFERS_SENTENCE`) belongs to the section. */
   differs: boolean;
   rows: LineRowView[];
@@ -66,6 +68,21 @@ export interface LinesHost {
   winPaths?: WinPathsHost;
 }
 
+/**
+ * Round 89 (#104), G11 (ruling G8a): the answer a line meets, named by its rank in the merged ranking of the search that holds the
+ * lines. `rank` is the words inside the brackets ("Tzon's top choice", "Tzon's second choice in this search"); `off` marks an
+ * answer that is not the top one, which the head explains in its title.
+ */
+export interface LineReply { label: string; rank: string; off: boolean }
+
+/** The title on an answer that is not the top choice (G8a: the line meets what its tree explored most). */
+export const REPLY_OFF_TOP_TITLE = "Each of the search's trees follows the answer it explored most, so a line can meet another answer than the top one.";
+
+/** The labels of each side's ranked choices, best first, from the result that holds the lines. */
+export const ranksOf = (result: Pick<EvalResult, 'perSide'>): { p1: string[]; p2: string[] } => ({
+  p1: result.perSide.p1.map(choice => choice.label), p2: result.perSide.p2.map(choice => choice.label),
+});
+
 /** The percentages a side's rows show on the card, already printed ("23%"): the engine's row and the played row. */
 export interface RowValues { engine?: string; played?: string }
 
@@ -80,6 +97,8 @@ export interface LineViewContext {
   turn: number;
   /** The card's own row values by side (`rowValueTexts`): a line shows its row beside its end. Absent: the end alone. */
   rowValues?: { p1?: RowValues; p2?: RowValues };
+  /** The labels of each side's ranked choices, best first (`ranksOf`): a line names the rank of the answer it meets. Absent: no rank. */
+  ranks?: { p1: readonly string[]; p2: readonly string[] };
   playerNames: [string, string];
   doubles: boolean;
   rules: GameRules;
@@ -230,6 +249,24 @@ function stepViews(line: EvalLine, ctx: LineViewContext): { rows: LineRowView[];
   return { rows, every };
 }
 
+const RANK_WORDS = ['top choice', 'second choice', 'third choice'];
+
+/**
+ * The answer a line meets: the other side's choice in the line's first step, by its place in the ranking. A line that opens with a
+ * replacement (the other side waits) meets no answer. A doubles answer is the pair's combined label.
+ */
+export function replyOf(line: EvalLine, ctx: Pick<LineViewContext, 'ranks' | 'playerNames'>): LineReply | null {
+  const first = line.steps[0];
+  if (!ctx.ranks || !first || first.replacement) return null;
+  const other: Side = line.side === 'p1' ? 'p2' : 'p1';
+  const label = first[other].label;
+  const name = ctx.playerNames[SIDE_INDEX[other]];
+  const at = ctx.ranks[other].indexOf(label);
+  if (at < 0) return { label, rank: `not among ${name}'s ranked choices`, off: true };
+  if (at === 0) return { label, rank: `${name}'s ${RANK_WORDS[0]}`, off: false };
+  return { label, rank: `${name}'s ${RANK_WORDS[at] ?? `choice ${at + 1}`} in this search`, off: true };
+}
+
 /** The tooltip of ▶ Play: what the click does and every die it forces. */
 function tooltipOf(every: string[]): string {
   const head = 'Play this line as a variation, with these dice';
@@ -250,7 +287,7 @@ export function lineBlocks(lines: readonly EvalLine[], ctx: LineViewContext): Li
     const row = ctx.rowValues?.[line.side]?.[line.for.includes('engine') ? 'engine' : 'played'] ?? null;
     return {
       key: `${line.side}-${line.label}-${index}`, line, player, role: roleText(line),
-      end: row === null ? `ends at ${endPct} for ${player}` : `row ${row}, this line ends at ${endPct}`, endPct, row, differs: row !== null && row !== endPct,
+      end: row === null ? `ends at ${endPct} for ${player}` : `row ${row}, this line ends at ${endPct}`, endPct, row, differs: row !== null && row !== endPct, reply: replyOf(line, ctx),
       rows, tooltip: tooltipOf(every), note: unforcedNote(line), endNote: endNote(line, ctx.playerNames),
     };
   });

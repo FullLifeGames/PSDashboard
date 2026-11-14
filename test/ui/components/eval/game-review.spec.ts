@@ -8,7 +8,11 @@ import { bothRolesLine, doublesLine, DOUBLES_NAMES, playedLine, singlesLine, SIN
 
 /** Round 89 (#104), step G4, ruling 33 (4a): the Game review lists the graded turns only, as the turn cards grade them. */
 const host: LinesHost = { rules: { gen: 9, mod: undefined } };
-const withLines = (lines?: EvalLine[]): EvalResult => ({ ...evalResult('singles'), ...(lines ? { lines } : {}) });
+/** The ranking that holds the fixtures' answers: Tzon's Draining Kiss and Pepitopalotin's Hydro Pump are each side's top choice. */
+const topped = (labels: string[]) => labels.map((label, index) => rankedChoice(`move ${index + 1}`, label, 0.2 - index * 0.05));
+const withLines = (lines?: EvalLine[]): EvalResult => ({
+  ...evalResult('singles'), ...(lines ? { lines } : {}), perSide: { p1: topped(['Draining Kiss', 'Surf']), p2: topped(['Hydro Pump', 'Hyper Voice']) },
+});
 
 /** A side that played Hyper Voice where the engine's best was Hydro Pump (the labels of the line fixtures). */
 const gradedP2 = (tier: 'inaccuracy' | 'mistake' | 'blunder', overrides: Partial<SideAnalysis> = {}): SideAnalysis => {
@@ -95,8 +99,8 @@ describe('gameReview, singles', () => {
   test('the lines of the row: the engine\'s line and the played line, each with its own text and block', () => {
     const lines = view[1].rows[0].lines;
     expect(lines.map(line => line.role)).toEqual(['engine', 'played']);
-    expect(lines[0].text).toBe('Hydro Pump vs Draining Kiss, then Moonblast vs → Corviknight, then Moonblast vs Brave Bird');
-    expect(lines[1].text).toBe('Hyper Voice vs Draining Kiss');
+    expect(lines[0].text).toBe("Hydro Pump vs Draining Kiss (Tzon's top choice), then Moonblast vs → Corviknight, then Moonblast vs Brave Bird");
+    expect(lines[1].text).toBe("Hyper Voice vs Draining Kiss (Tzon's top choice)");
     expect(lines[0].block.line).toBe(singlesLine);
     expect(lines[0].block.tooltip).toContain('Hydro Pump: no crit (96%)');
   });
@@ -144,7 +148,7 @@ describe('gameReview: the engine of a row is the turn card\'s engine choice, and
 
 describe('gameReview, doubles', () => {
   const analyses: (TurnAnalysis | null)[] = [null, null, null, turnAnalysis(4, { p1: { ...misplayedSide('mistake'), best: rankedChoice('move 1, move 2', doublesLine.label, 0.37) } })];
-  const results: (EvalResult | null)[] = [null, null, null, { ...evalResult('doubles'), lines: [doublesLine] }];
+  const results: (EvalResult | null)[] = [null, null, null, { ...evalResult('doubles'), lines: [doublesLine], perSide: { p1: topped([doublesLine.label]), p2: topped(['Sucker Punch → Terapagos + Protect']) } }];
 
   test('a row keeps the pair\'s combined labels and its line text names the replacement', () => {
     const view = gameReview({ analyses, results, playerNames: DOUBLES_NAMES, doubles: true, host });
@@ -153,7 +157,7 @@ describe('gameReview, doubles', () => {
     const [line] = view[0].rows[0].lines;
     expect(line.role).toBe('engine');
     expect(line.text).toBe(
-      'pixelfrost: Fake Out → Rillaboom + Spore → Zamazenta; Mstr_Hawk: Sucker Punch → Terapagos + Protect, ' +
+      'pixelfrost: Fake Out → Rillaboom + Spore → Zamazenta; Mstr_Hawk: Sucker Punch → Terapagos + Protect (Mstr_Hawk\'s top choice), ' +
       'then Mstr_Hawk replaces: → Zamazenta-Crowned, ' +
       'then pixelfrost: Fake Out → Zamazenta-Crowned + Protect; Mstr_Hawk: Behemoth Bash → Rillaboom + Protect',
     );
@@ -253,5 +257,37 @@ describe('gameReview: the end of each line beside its row (G10)', () => {
 
   test('a review without lines has nothing to explain', () => {
     expect(reviewDiffers(gameReview({ analyses: [], results: [], playerNames: SINGLES_NAMES, doubles: false, host }))).toBe(false);
+  });
+});
+
+/** Round 89 (#104), step G11 (ruling G8a): the review's line text names the rank of the first answer. */
+describe('gameReview: the answer of each line (G11)', () => {
+  const ranking = (labels: string[]) => labels.map((label, index) => rankedChoice(`move ${index}`, label, 0.2 - index * 0.05));
+
+  test('singles: the first answer carries its rank in the result\'s ranking, a later answer does not', () => {
+    const analyses: (TurnAnalysis | null)[] = Array.from({ length: 20 }, () => null);
+    analyses[19] = turnAnalysis(20, { p2: gradedP2('inaccuracy') });
+    const results: (EvalResult | null)[] = analyses.map(() => null);
+    results[19] = { ...withLines([singlesLine, playedLine]), perSide: { p1: ranking(['Surf', 'Draining Kiss']), p2: ranking(['Hydro Pump']) } };
+    const view = gameReview({ analyses, results, playerNames: SINGLES_NAMES, doubles: false, host });
+    const [engine, played] = view[1].rows[0].lines;
+    expect(engine.text).toBe("Hydro Pump vs Draining Kiss (Tzon's second choice in this search), then Moonblast vs → Corviknight, then Moonblast vs Brave Bird");
+    expect(played.text).toBe("Hyper Voice vs Draining Kiss (Tzon's second choice in this search)");
+    // a result without a ranking names no rank
+    results[19] = { ...withLines([singlesLine]), perSide: { p1: [], p2: [] } };
+    const bare = gameReview({ analyses, results, playerNames: SINGLES_NAMES, doubles: false, host });
+    expect(bare[1].rows[0].lines[0].text).toBe("Hydro Pump vs Draining Kiss (not among Tzon's ranked choices), then Moonblast vs → Corviknight, then Moonblast vs Brave Bird");
+  });
+
+  test('doubles: the pair of the other player carries its rank, and a replacement carries none', () => {
+    const analyses: (TurnAnalysis | null)[] = [null, null, null, turnAnalysis(4, { p1: { ...misplayedSide('mistake'), best: rankedChoice('move 1, move 2', doublesLine.label, 0.6) } })];
+    const results: (EvalResult | null)[] = [null, null, null, { ...evalResult('doubles'), lines: [doublesLine], perSide: { p1: ranking([doublesLine.label]), p2: ranking(['Other', 'Sucker Punch → Terapagos + Protect']) } }];
+    const view = gameReview({ analyses, results, playerNames: DOUBLES_NAMES, doubles: true, host });
+    const [line] = view[0].rows[0].lines;
+    expect(line.text).toBe(
+      "pixelfrost: Fake Out → Rillaboom + Spore → Zamazenta; Mstr_Hawk: Sucker Punch → Terapagos + Protect (Mstr_Hawk's second choice in this search), " +
+      'then Mstr_Hawk replaces: → Zamazenta-Crowned, ' +
+      'then pixelfrost: Fake Out → Zamazenta-Crowned + Protect; Mstr_Hawk: Behemoth Bash → Rillaboom + Protect',
+    );
   });
 });

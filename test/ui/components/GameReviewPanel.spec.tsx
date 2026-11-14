@@ -11,7 +11,14 @@ import { doublesLine, DOUBLES_NAMES, playedLine, singlesLine, SINGLES_NAMES } fr
 
 /** Round 89 (#104), step G4: the Game review panel, singles and doubles. */
 const host = (onPlay = vi.fn()): LinesHost => ({ rules: { gen: 9, mod: undefined }, onPlay });
-const withLines = (kind: 'singles' | 'doubles', lines: EvalLine[]): EvalResult => ({ ...evalResult(kind), lines });
+/** The ranking that holds the fixtures' answers: Tzon's Draining Kiss and pixelfrost's opponent pair are each side's top choice. */
+const topped = (labels: string[]) => labels.map((label, index) => rankedChoice(`move ${index + 1}`, label, 0.2 - index * 0.05));
+const withLines = (kind: 'singles' | 'doubles', lines: EvalLine[]): EvalResult => ({
+  ...evalResult(kind), lines,
+  perSide: kind === 'singles'
+    ? { p1: topped(['Draining Kiss', 'Surf']), p2: topped(['Hydro Pump', 'Hyper Voice']) }
+    : { p1: topped([doublesLine.label]), p2: topped(['Sucker Punch → Terapagos + Protect']) },
+});
 
 const gradedP2 = (tier: 'inaccuracy' | 'mistake' | 'blunder'): SideAnalysis => {
   const best = rankedChoice('move 1', 'Hydro Pump', 0.1);
@@ -52,8 +59,8 @@ describe('GameReviewPanel, singles', () => {
     const pepito = screen.getByRole('group', { name: 'Pepitopalotin' });
     expect(within(pepito).getByText('played Hyper Voice 53%')).toBeInTheDocument();
     expect(within(pepito).getAllByText('engine Hydro Pump 55%')).toHaveLength(2);
-    expect(within(pepito).getByText('Hydro Pump vs Draining Kiss, then Moonblast vs → Corviknight, then Moonblast vs Brave Bird')).toBeInTheDocument();
-    expect(within(pepito).getByText('Hyper Voice vs Draining Kiss')).toBeInTheDocument();
+    expect(within(pepito).getByText("Hydro Pump vs Draining Kiss (Tzon's top choice), then Moonblast vs → Corviknight, then Moonblast vs Brave Bird")).toBeInTheDocument();
+    expect(within(pepito).getByText("Hyper Voice vs Draining Kiss (Tzon's top choice)")).toBeInTheDocument();
     const plays = within(pepito).getAllByRole('button', { name: '▶ Play' });
     expect(plays).toHaveLength(2);
     expect(plays[0]).toHaveAttribute('title', expect.stringContaining('Hydro Pump: no crit (96%)'));
@@ -79,7 +86,7 @@ describe('GameReviewPanel, singles', () => {
     expect(within(t21).queryByRole('button', { name: '▶ Play' })).toBeNull();
     rerender(<GameReviewPanel analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={{ rules: { gen: 9, mod: undefined } }} />);
     expect(screen.queryByRole('button', { name: '▶ Play' })).toBeNull();
-    expect(screen.getByText('Hyper Voice vs Draining Kiss')).toBeInTheDocument();
+    expect(screen.getByText("Hyper Voice vs Draining Kiss (Tzon's top choice)")).toBeInTheDocument();
   });
 
   test('a player with no graded turn says so; a game with none says it once per player', () => {
