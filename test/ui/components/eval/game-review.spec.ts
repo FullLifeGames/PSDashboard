@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { winDeltaText, winPctText, type EvalLine, type EvalResult, type SideAnalysis, type TurnAnalysis } from '@fulllifegames/eval-engine';
+import { buildGameReport, winDeltaText, winPctText, type EvalLine, type EvalResult, type SideAnalysis, type TurnAnalysis } from '@fulllifegames/eval-engine';
 import { gameReview, gradedTier, reviewMarks } from '../../../../src/components/eval/game-review';
 import type { LinesHost } from '../../../../src/lib/line-view';
 import { misplayedSide, sideAnalysis, turnAnalysis } from '../../fixtures/analysis';
@@ -29,7 +29,13 @@ describe('gradedTier: the turn card\'s own reading of "graded"', () => {
     expect(gradedTier(gradedP2('mistake', { sacrifice: { name: 'Kingambit', hpFraction: 0.1, healthy: false } as SideAnalysis['sacrifice'] }))).toBeNull();
     expect(gradedTier(gradedP2('blunder', { riskPaidOff: true }))).toBeNull();
     // an inaccuracy keeps its chip beside the sack, as the card shows it
-    expect(gradedTier(gradedP2('inaccuracy', { riskPaidOff: true }))).toBe('inaccuracy');
+    expect(gradedTier(gradedP2('inaccuracy', { riskPaidOff: true, sacrifice: { name: 'Kingambit', hpFraction: 0.1, healthy: false } as SideAnalysis['sacrifice'] }))).toBe('inaccuracy');
+  });
+
+  test('a read that paid off speaks for an inaccuracy too, unless the side lost ground (round 89, G4d: the report lists the read)', () => {
+    expect(gradedTier(gradedP2('inaccuracy', { riskPaidOff: true }))).toBeNull();
+    expect(gradedTier(gradedP2('inaccuracy', { riskPaidOff: true }), true)).toBe('inaccuracy');
+    expect(gradedTier(gradedP2('inaccuracy'), true)).toBe('inaccuracy');
   });
 
   test('a side without a played or an engine row has nothing to compare', () => {
@@ -103,15 +109,15 @@ describe('gameReview, singles', () => {
 });
 
 describe('gameReview: the engine of a row is the turn card\'s engine choice, and its line is that choice\'s line (G4b)', () => {
-  const rowOf = (side: SideAnalysis, lines: EvalLine[]) => {
-    const analyses: (TurnAnalysis | null)[] = [turnAnalysis(1, { p2: side })];
+  const rowOf = (side: SideAnalysis, lines: EvalLine[], swing = 0.05) => {
+    const analyses: (TurnAnalysis | null)[] = [turnAnalysis(1, { p2: side, swing })];
     const view = gameReview({ analyses, results: [withLines(lines)], playerNames: SINGLES_NAMES, doubles: false, host });
     return view[1].rows[0];
   };
 
-  test('an inaccuracy beside a read that paid off names the best row at its value, as the card\'s head row does, not the safe line', () => {
+  test('an inaccuracy beside a read that paid off (player 2 lost ground, so the report lists no read) names the best row at its value, as the card\'s head row does, not the safe line', () => {
     const safe = rankedChoice('move 3', 'Surf', 0.02);
-    const row = rowOf(gradedP2('inaccuracy', { riskPaidOff: true, safe }), [singlesLine, playedLine]);
+    const row = rowOf(gradedP2('inaccuracy', { riskPaidOff: true, safe }), [singlesLine, playedLine], 0.3);
     expect(row.engine).toBe(`Hydro Pump ${winPctText(0.1)}`);
     expect(row.engineWord).toBe('engine');
     expect(row.lines.map(line => line.block.line.label)).toEqual(['Hydro Pump', 'Hyper Voice']);
@@ -167,5 +173,39 @@ describe('gameReview, doubles', () => {
     const both: EvalLine = { ...doublesLine, steps: [{ ...step, replacement: 'both', p1: step.p2 }] };
     const view = gameReview({ analyses, results: [null, null, null, { ...evalResult('doubles'), lines: [both] }], playerNames: DOUBLES_NAMES, doubles: true, host });
     expect(view[0].rows[0].lines[0].text).toBe('pixelfrost replaces: → Zamazenta-Crowned and Mstr_Hawk replaces: → Zamazenta-Crowned');
+  });
+});
+
+/**
+ * Round 89 (#104), G4d: the report page said "read paid off +9%" and, one list below, "inaccuracy −9%" for the same click. The
+ * report lists a read from `riskPaidOff` unless the side lost ground, and keeps it off its misplays; the review and the marks
+ * read the same two facts through `gradedTier`. The real report is built for every combination, singles (p2) and doubles (both
+ * sides graded on one turn).
+ */
+describe('the review and the report list one verdict per side', () => {
+  const combos = [
+    { tier: 'inaccuracy', paid: false }, { tier: 'inaccuracy', paid: true },
+    { tier: 'mistake', paid: false }, { tier: 'mistake', paid: true },
+    { tier: 'blunder', paid: true },
+  ] as const;
+  // the swing is player 1's view: -0.2 is player 2 gaining, 0.2 is player 2 losing ground
+  const swings = [{ name: 'gained', swing: -0.2 }, { name: 'lost ground', swing: 0.2 }];
+
+  test.each(combos.flatMap(combo => swings.map(swing => ({ ...combo, ...swing }))))('$tier, riskPaidOff $paid, p2 $name: no turn is a read and a grade at once', ({ tier, paid, swing }) => {
+    const analysis = turnAnalysis(2, { swing, p2: gradedP2(tier, paid ? { riskPaidOff: true, riskPayoff: 0.09 } : {}) });
+    const report = buildGameReport([analysis], SINGLES_NAMES, 'p2');
+    const listedRead = report.reads.some(read => read.turn === 2 && read.side === 'p2');
+    const marked = reviewMarks([analysis]).some(mark => mark.turn === 2 && mark.side === 'p2');
+    const reviewed = gameReview({ analyses: [null, analysis], results: [], playerNames: SINGLES_NAMES, doubles: false, host })
+      .flatMap(view => view.rows).some(row => row.turn === 2 && row.side === 'p2');
+    expect(reviewed, 'rows and marks agree').toBe(marked);
+    expect(listedRead && marked, 'a listed read is not graded').toBe(false);
+    // a paid-off read the side did not lose ground on is listed; a graded side is a misplay or an inaccuracy the report does not list as a read
+    if (paid && swing < 0) expect(listedRead).toBe(true);
+  });
+
+  test('doubles: both sides of one turn, a read on one and an inaccuracy on the other', () => {
+    const analysis = turnAnalysis(4, { swing: 0, p1: gradedP2('inaccuracy', { riskPaidOff: true }), p2: gradedP2('inaccuracy') });
+    expect(reviewMarks([analysis])).toEqual([{ turn: 4, side: 'p2' }]);
   });
 });

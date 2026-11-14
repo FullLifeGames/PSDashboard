@@ -1,6 +1,7 @@
 import {
   diffChoices, formatLine, playedSetupMove, type SideAnalysis, type RankedChoice, winDeltaText, winPctText,
 } from '@fulllifegames/eval-engine';
+import { gradedTier } from './game-review';
 import { ExplorableLabel, KoSuffix, MiniBar } from './analysis-bits';
 import { comparisonTarget, ENGINE_EQUIVALENT_EPSILON, engineChoice, evTitle, playedTextFor, regretView, RISK_DISPLAY_GAP } from './turn-copy';
 
@@ -147,7 +148,7 @@ function VerdictCell({ name, side, regretful, setupMove, lostGround }: Pick<RowP
       )}
       {side.riskPaidOff && !side.sacrifice && !lostGround && <ReadPaidOffCell side={side} />}
       {regretful && !side.sacrifice && !side.riskPaidOff && <RegretCell name={name} side={side} setupMove={setupMove} />}
-      {side.tier === 'inaccuracy' && side.best && (
+      {gradedTier(side, lostGround) === 'inaccuracy' && side.best && (
         <span
           style={{ color: '#b6a46a' }}
           title={`${side.best.label} was a touch better: a minor imprecision, not a mistake.`}

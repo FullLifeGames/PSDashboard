@@ -1,4 +1,4 @@
-import { winDeltaText, winPctText, type EvalLine, type EvalResult, type SideAnalysis, type TurnAnalysis, type VerdictTier } from '@fulllifegames/eval-engine';
+import { lostGround, winDeltaText, winPctText, type EvalLine, type EvalResult, type SideAnalysis, type TurnAnalysis, type VerdictTier } from '@fulllifegames/eval-engine';
 import { activeNamesAt, lineBlocks, type LineBlockView, type LinesHost } from '../../lib/line-view';
 import { cardLines, engineChoice, regretView } from './turn-copy';
 
@@ -40,14 +40,18 @@ const SIDES: readonly Side[] = ['p1', 'p2'];
 const SIDE_INDEX: Record<Side, 0 | 1> = { p1: 0, p2: 1 };
 
 /**
- * The grade the turn card prints for a side, or null. A mistake or blunder that the card replaces by a sack or a read that paid
- * off is not graded; an inaccuracy keeps its chip beside them. A side without its played or its engine row has nothing to compare.
+ * The grade the turn card prints for a side, or null (the turn card, the review and the graph marks read it). A mistake or blunder
+ * that the card replaces by a sack or a read that paid off is not graded. A read that paid off speaks for an inaccuracy too, as it
+ * does in the report, whose list of reads takes it unless the side lost ground on the turn (`lostGround`, round 89 G4d: the report
+ * page said "read paid off +9%" and "inaccuracy -9%" for one click); an inaccuracy keeps its chip beside a sack. A side without its
+ * played or its engine row has nothing to compare.
  */
-export function gradedTier(side: SideAnalysis): ReviewGrade | null {
+export function gradedTier(side: SideAnalysis, lostGroundOnTurn = false): ReviewGrade | null {
   const tier = side.tier;
   if (tier !== 'inaccuracy' && tier !== 'mistake' && tier !== 'blunder') return null;
   if (!side.played || !side.best) return null;
   if (tier !== 'inaccuracy' && (side.sacrifice || side.riskPaidOff)) return null;
+  if (tier === 'inaccuracy' && side.riskPaidOff && !side.sacrifice && !lostGroundOnTurn) return null;
   return tier;
 }
 
@@ -58,7 +62,7 @@ function gradedSides(analyses: readonly (TurnAnalysis | null)[] | null | undefin
     // a turn whose played actions were never parsed has no grade on its card
     if (!analysis || analysis.playedTracking === false) continue;
     for (const side of SIDES) {
-      const grade = gradedTier(analysis[side]);
+      const grade = gradedTier(analysis[side], lostGround(analysis, side));
       if (grade) found.push({ analysis, side, grade });
     }
   }
