@@ -1,8 +1,9 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignore": [
-    ".remember/**"
-  ],
+  "ignoreExportsUsedInFile": true,
+  "ignoreIssues": {
+    "src/lib/lazy/hidden-power.ts": ["exports"]
+  },
   "workspaces": {
     ".": {
       "entry": [
