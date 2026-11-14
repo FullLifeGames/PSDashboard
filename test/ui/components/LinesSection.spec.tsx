@@ -71,6 +71,20 @@ describe('LinesSection', () => {
     expect(screen.getByText('No line: Other engine sends none.')).toBeInTheDocument();
   });
 
+  // Round 89 (G13b): a turn that is about to get lines does not tell the user to analyze it again.
+  test.each([['singles', false], ['doubles', true]])('%s: a turn whose lines are coming says when, and a turn that waits for nothing keeps the matrix sentence', (_kind, doubles) => {
+    const names = doubles ? DOUBLES_NAMES : SINGLES_NAMES;
+    const { unmount } = render(<LinesSection turn={3} result={withLines()} playerNames={names} doubles={doubles} host={{ ...host(), lineComing: () => 'stage' }} />);
+    expect(screen.getByText('No line yet: the app searches this turn after the game report (the review shows the progress).')).toBeInTheDocument();
+    expect(screen.queryByText(/Analyze the position with MCTS/)).toBeNull();
+    unmount();
+    const sweep = render(<LinesSection turn={3} result={withLines()} playerNames={names} doubles={doubles} host={{ ...host(), lineComing: () => 'sweep' }} />);
+    expect(screen.getByText('No line yet: the game analysis is still running. If the report grades this turn, its lines follow the report.')).toBeInTheDocument();
+    sweep.unmount();
+    render(<LinesSection turn={3} result={withLines()} playerNames={names} doubles={doubles} host={{ ...host(), lineComing: () => null }} />);
+    expect(screen.getByText('No line on this turn: the matrix pass keeps none. Analyze the position with MCTS to get lines.')).toBeInTheDocument();
+  });
+
   test('with the card\'s analysis the engine line is the line of the card\'s engine choice (singles and doubles)', () => {
     const stale: EvalLine = { ...singlesLine, label: 'Surf', choice: 'move 4' };
     const analysis = turnAnalysis(20, { p2: { ...turnAnalysis(20).p2, best: rankedChoice('move 1', 'Hydro Pump', 0.1) } });

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { EvalLine, EvalPreferences, EvalResult, EvalSettings, StaticRuleset, TeraAllowance, TurnAnalysis } from '@fulllifegames/eval-engine';
 import { earlyLineJobs, earlyLineProgress, earlyLineSettings } from '../components/eval/early-lines';
 import type { EvalGraphState } from './evaluation/graph-sweep';
@@ -28,6 +28,9 @@ export interface EarlyLinesInputs {
 }
 
 export interface EarlyLinesProgress { done: number; total: number; stop(): void }
+
+/** What a turn without lines waits for: the stage that searches it after the report, or the sweep that has not ended (lines may follow). */
+export type LineComing = 'stage' | 'sweep' | null;
 
 const isCancelled = (error: unknown): boolean => error instanceof Error && error.message === 'cancelled';
 
@@ -61,7 +64,7 @@ async function searchTurns(inputs: { current: EarlyLinesInputs }, signal: AbortS
  * and singles only; an explicit matrix mode keeps the user's choice and doubles already hold lines. A new sweep, a new replay and
  * a Stop end the stage; the next analysis picks up the turns still without lines.
  */
-export function useEarlyLines(inputs: EarlyLinesInputs): { progress: EarlyLinesProgress | null } {
+export function useEarlyLines(inputs: EarlyLinesInputs): { progress: EarlyLinesProgress | null; lineComing: (turn: number) => LineComing } {
   const { replayId, doubles, analyses, graph, prefsMode } = inputs;
   const latest = useRef(inputs);
   useEffect(() => {
@@ -103,5 +106,15 @@ export function useEarlyLines(inputs: EarlyLinesInputs): { progress: EarlyLinesP
   }, [active, counts.done, counts.total]);
   const stop = inputs.cancel;
   const progress = useMemo(() => (pending && running ? { ...counts, stop } : null), [pending, running, counts, stop]);
-  return { progress };
+  // Round 89 (G13b): the card of a turn the stage is about to search says so instead of sending the user to analyze it again.
+  const searching = useMemo(
+    () => (active ? new Set(earlyLineJobs({ analyses, results: graph.results, settings: graph.settings }).map(job => job.turn)) : null),
+    [active, analyses, graph.results, graph.settings],
+  );
+  const sweeping = replayId !== null && !doubles && prefsMode === 'auto' && graph.running;
+  const lineComing = useCallback((turn: number): LineComing => {
+    if (searching?.has(turn)) return 'stage';
+    return sweeping && graph.settings[turn - 1]?.mode === 'matrix' ? 'sweep' : null;
+  }, [searching, sweeping, graph.settings]);
+  return { progress, lineComing };
 }

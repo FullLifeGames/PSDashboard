@@ -68,6 +68,8 @@ export interface LinesHost {
   winPaths?: WinPathsHost;
   /** Round 89 (G13): the early-lines stage while it searches the graded matrix turns (how many hold lines, and Stop); absent or null: not running. */
   earlyLines?: { done: number; total: number; stop: () => void } | null;
+  /** Round 89 (G13b): what a turn that holds no lines waits for ("stage": the early-lines stage will search it; "sweep": the game analysis still runs); null or absent: nothing. */
+  lineComing?: (turn: number) => 'stage' | 'sweep' | null;
 }
 
 /**

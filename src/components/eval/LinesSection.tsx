@@ -68,8 +68,10 @@ function LineBlock({ block, turn, onPlay, confirm }: { block: LineBlockView; tur
  * Why a turn holds no line. A matrix turn (a result with a matrix and no tree cells) ran no tree, so it cannot have kept lines;
  * a tree search that kept none says so of the search.
  */
-function noLineSentence(result: EvalResult): string {
+function noLineSentence(result: EvalResult, coming: ReturnType<NonNullable<LinesHost['lineComing']>> = null): string {
   if (result.engine) return `No line: ${result.engine.name} sends none.`;
+  if (coming === 'stage') return 'No line yet: the app searches this turn after the game report (the review shows the progress).';
+  if (coming === 'sweep') return 'No line yet: the game analysis is still running. If the report grades this turn, its lines follow the report.';
   if (result.matrix && !result.matrix.cells) return 'No line on this turn: the matrix pass keeps none. Analyze the position with MCTS to get lines.';
   return 'No line on this turn: the search kept none for these choices.';
 }
@@ -87,7 +89,7 @@ export function LinesSection({ turn, result, playerNames, doubles, host, analysi
       <div className="ps-eval-lines">
         <span className="ps-eval-lines-title">Lines</span>
         <span className="ps-eval-line" style={{ marginTop: 0 }}>
-          {noLineSentence(result)}
+          {noLineSentence(result, host.lineComing?.(turn))}
         </span>
       </div>
     );

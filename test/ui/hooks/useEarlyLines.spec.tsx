@@ -224,4 +224,40 @@ describe('useEarlyLines', () => {
       expect(handle()?.active).toBe(true);
     });
   });
+
+  // Round 89 (G13b, tester, third pass): the card of a turn that was about to get its lines said "the matrix pass keeps none. Analyze the
+  // position with MCTS". The stage names the turns it will search and the sweep says lines may follow.
+  describe('lineComing: what a turn without lines waits for', () => {
+    test('a graded matrix turn the stage has not reached waits for the stage; one it has searched, or one nobody grades, waits for nothing', async () => {
+      let release: (() => void) | undefined;
+      const gate = new Promise<void>(resolve => { release = resolve; });
+      const run = setup({}, async () => { await gate; return LINES; });
+      await waitFor(() => expect(run.searchLines).toHaveBeenCalledTimes(1));
+      expect(run.hook.result.current.lineComing(3)).toBe('stage');
+      expect(run.hook.result.current.lineComing(7)).toBe('stage');
+      expect(run.hook.result.current.lineComing(5)).toBeNull();
+      expect(run.hook.result.current.lineComing(12)).toBeNull();
+      release?.();
+      await waitFor(() => expect(run.attachLines).toHaveBeenCalledTimes(2));
+      run.refresh();
+      await waitFor(() => expect(run.hook.result.current.lineComing(3)).toBeNull());
+      expect(run.hook.result.current.lineComing(7)).toBeNull();
+    });
+
+    test('while the sweep runs in Auto, a matrix turn may get lines after the report; a tree turn and the other modes wait for nothing', async () => {
+      const running = { ...graphOfGame().graph, running: true };
+      const auto = setup({ graph: running });
+      expect(auto.hook.result.current.lineComing(5)).toBe('sweep');
+      expect(auto.hook.result.current.lineComing(12)).toBeNull();
+      expect(setup({ graph: running, prefsMode: 'matrix' }).hook.result.current.lineComing(5)).toBeNull();
+      expect(setup({ graph: running, doubles: true }).hook.result.current.lineComing(5)).toBeNull();
+      expect(setup({ graph: running, replayId: null }).hook.result.current.lineComing(5)).toBeNull();
+    });
+
+    test('a stage that ended (a failed turn, a Stop) leaves its turns waiting for the next analysis, not for the stage', async () => {
+      const run = setup({}, async () => { throw new Error('worker crashed'); });
+      await waitFor(() => expect(run.searchLines).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(run.hook.result.current.lineComing(3)).toBeNull());
+    });
+  });
 });

@@ -103,7 +103,7 @@ function useEarlyLinesStage(ctx: ReplayContext, engine: EngineController, analys
     replayId, doubles: ctx.meta.evalIsDoubles, analyses, graph: evaluation.graph, prefsMode: evaluation.prefs.mode,
     tera: effectiveTera, sleepClause: effectiveSleepClause, ruleset: effectiveRuleset,
     searchLines: evaluation.searchLines, attachLines: evaluation.attachLines, cancel: evaluation.cancel, positionFor, cacheKeyFor,
-  }).progress;
+  });
 }
 
 /** Per-turn and game-level analysis plus the branch iframe's derived log. */
@@ -122,7 +122,7 @@ function useAnalysisSurface(ctx: ReplayContext, board: BoardController, engine: 
     replayData, snapshots, evaluation, analysisTurn, sweepAlignment, replayGen,
   });
 
-  const earlyLines = useEarlyLinesStage(ctx, engine, gameAnalyses);
+  const { progress: earlyLines, lineComing } = useEarlyLinesStage(ctx, engine, gameAnalyses);
 
   const simLines = simState?.log;
   // Round 82 (forced dice), step A7b: the display lines of the forced dice join the frame's log, never the battle's own.
@@ -138,7 +138,7 @@ function useAnalysisSurface(ctx: ReplayContext, board: BoardController, engine: 
   // sim iframe on every navigation and every executed turn (tip advance).
   const branchReloadKey = `${branchSession}:${variationStartTurn ?? 0}`;
 
-  return { turnReads, turnAnalysis, faintedShares, leadAnalysisData, gameReport, gameAnalyses, earlyLines, simLog, latestBranchHistoryEntry, showBranch, branchReloadKey };
+  return { turnReads, turnAnalysis, faintedShares, leadAnalysisData, gameReport, gameAnalyses, earlyLines, lineComing, simLog, latestBranchHistoryEntry, showBranch, branchReloadKey };
 }
 
 /**
