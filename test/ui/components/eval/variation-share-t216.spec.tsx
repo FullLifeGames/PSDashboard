@@ -132,7 +132,10 @@ describe('the workspace feeds the variation board shares from the branch history
       },
       engine: {
         smogonPending: false,
+        // round 89 (#130, G8b): the Lines host mounts the win-path hook, which reads the position source and the effective rules
+        acquire: { makeReplayAcquire: vi.fn() },
         evalView: {
+          effectiveTera: false, effectiveSleepClause: true, effectiveRuleset: undefined,
           handleEvaluate: vi.fn(), handleAnalyzeGame: vi.fn(), analyzedResult: evalResult(kind, { score: SCORE }), analyzedSettings: null,
           analyzeTarget: null, handleAnalyzeTurn: vi.fn(), evalAvailable: true,
         },
@@ -140,13 +143,13 @@ describe('the workspace feeds the variation board shares from the branch history
         playOutControls: { startPlayOut: vi.fn(), stopPlayOut: vi.fn(), watchFrom: vi.fn() },
       },
       transients: { playOut: null, playOutNotice: null, fastPlayOut: false, setFastPlayOut: vi.fn() },
-      analysis: { turnAnalysis: null, faintedShares: mainShares(), turnReads: null, leadAnalysisData: null, gameReport: null },
+      analysis: { gameAnalyses: null, turnAnalysis: null, faintedShares: mainShares(), turnReads: null, leadAnalysisData: null, gameReport: null },
     } as unknown as AppController;
   }
 
   test.each(MODES.flatMap(mode => (['singles', 'doubles'] as const).map(kind => [kind, mode] as const)))(
     '%s, engine %s: the gold point and the bar show the variation board, not the main line of turn 7', (kind, mode) => {
-      const replayData = { players: names } as unknown as Parameters<typeof WorkspaceEvalColumn>[0]['replayData'];
+      const replayData = { players: names, log: '' } as unknown as Parameters<typeof WorkspaceEvalColumn>[0]['replayData'];
       render(<WorkspaceEvalColumn app={workspace(kind, mode)} replayData={replayData} />);
       const p1 = pct(SCORE, BOARD_SHARE);
       expect(variationTooltip()).toContain(`Alice ${p1}% · Bob ${100 - p1}%`);
