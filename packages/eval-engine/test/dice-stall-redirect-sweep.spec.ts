@@ -2,7 +2,7 @@ import { describe, expect, test, vi } from 'vitest';
 import { loadSimMods } from '../src/forward/sim-mods';
 import { loggedOptions } from '../src/dice/turn';
 import { loggedDice } from '../src/dice/logged-results';
-import { mon, playClicks } from './dice-fixtures';
+import { mon, playClicks, sweepSelection } from './dice-fixtures';
 import { sweepClicks, sweepMoves, SWEEP_CASES, type DexMove } from './dice-sweep-support';
 import { battleOf } from './power-oracle';
 
@@ -53,7 +53,7 @@ describe.each(SWEEP_CASES)('a stalling move the log shows and the body did not c
     const failures: string[] = [];
     let failedUses = 0;
     for (const move of moves) {
-      for (const seed of SEEDS) {
+      for (const seed of sweepSelection(SEEDS, 'seeds')) {
         const { named, clicked, redirected } = run(move, seed);
         // the simulator draws nothing for this second use (no condition offered): nothing to compare
         if (!named) continue;
