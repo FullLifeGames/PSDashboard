@@ -58,6 +58,16 @@ describe('the label of a forced die', () => {
     expect(label({ name: { slot: 'p2a', moveId: '', kind: 'drag' }, result: { option: 'Chansey' } })).toBe('Body p2a: dragged out for Chansey');
   });
 
+  // Round 89 (G13b, tester, third pass): "no Burn" beside "no crit". A reader that names a plain form writes a status as a common noun.
+  test('a reader with a plain form writes a status or a volatile as a common noun inside the result', () => {
+    const words: DieWords = { ...WORDS, effect: id => `Effect ${id}`, plain: id => (id === 'brn' ? 'burn' : `Effect ${id}`) };
+    expect(dieLabel({ name: name('secondary', { effectId: 'brn' }), result: { happens: false } }, words)).toBe('Move tackle: no burn');
+    expect(dieLabel({ name: name('secondary', { effectId: 'brn' }), result: { happens: true } }, words)).toBe('Move tackle: burn');
+    expect(dieLabel({ name: { slot: 'p1a', moveId: 'tackle', kind: 'status-check', effectId: 'brn' }, result: { happens: false } }, words)).toBe('Move tackle: burn stops it');
+    // a reader without the form keeps the effect's own words
+    expect(dieLabel({ name: name('secondary', { effectId: 'brn' }), result: { happens: false } }, WORDS)).toBe('Move tackle: no Effect brn');
+  });
+
   test('without a reader the ids stand in for the names', () => {
     expect(dieLabel({ name: name('accuracy'), result: { happens: true } })).toBe('tackle: hits');
   });

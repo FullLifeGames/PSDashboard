@@ -27,6 +27,16 @@ describe('words of a die', () => {
     expect(words.effect('self:spa')).toBe('Own Special Attack change');
   });
 
+  // Round 89 (G13b): inside a result a status reads as "no burn" beside "no crit"; stat changes, abilities and items keep their names.
+  test('the plain form writes a status or a volatile as a common noun and nothing else', () => {
+    for (const [id, word] of Object.entries(STATUS_WORDS)) expect(words.plain?.(id)).toBe(word.toLowerCase());
+    expect(words.plain?.('flinch')).toBe('flinch');
+    expect(words.plain?.('static')).toBe('Static');
+    expect(words.plain?.('leftovers')).toBe('Leftovers');
+    expect(words.plain?.('boosts:spd')).toBe('Special Defense change');
+    expect(words.plain?.('self:spa')).toBe('Own Special Attack change');
+  });
+
   test('the status words cover every status condition of the Dex and no other', () => {
     const statuses = Object.keys(Dex.data.Conditions).filter(id => Dex.conditions.get(id).effectType === 'Status');
     expect(Object.keys(STATUS_WORDS).sort()).toEqual([...statuses].sort());
@@ -39,7 +49,7 @@ describe('words of a die', () => {
     expect(resultWord(die('crit', { happens: true }), words)).toBe('Crit');
     expect(resultWord(die('crit', { happens: false }), words)).toBe('No crit');
     expect(resultWord(die('secondary', { happens: true }, { effectId: 'flinch' }), words)).toBe('Flinch');
-    expect(resultWord(die('secondary', { happens: false }, { effectId: 'brn' }), words)).toBe('No Burn');
+    expect(resultWord(die('secondary', { happens: false }, { effectId: 'brn' }), words)).toBe('No burn');
     expect(resultWord(die('hit-count', { hits: 3 }), words)).toBe('3 hits');
     expect(resultWord(die('ability-proc', { option: 'slp' }, { effectId: 'effectspore:option' }), words)).toBe('Sleep');
     expect(resultWord(die('speed-tie', { first: 'p2a' }, { moveId: '' }), words)).toBe('Snorlax first');
