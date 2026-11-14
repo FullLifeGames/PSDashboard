@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { EvalLine, WinStep } from '@fulllifegames/eval-engine';
-import { chanceText, ordinal, winStepViews, type WinPathsViewContext } from '../../../src/lib/win-paths-view';
+import { chanceText, rankWords, winStepViews, type WinPathsViewContext } from '../../../src/lib/win-paths-view';
 import { doublesLine, DOUBLES_NAMES, singlesLine, SINGLES_NAMES } from '../fixtures/lines';
 
 /**
@@ -72,12 +72,13 @@ describe('the win-path words', () => {
 
   test('step 3 names the slip by its rank and turn, then the chance of the dice (W3a)', () => {
     const [view] = winStepViews([step('mistake', 'found', { chance: 0.84375, deviation: { turn: 24, label: 'Scald', rank: 2 }, line: line() })], ctx());
-    expect(view.headline).toBe('If Tzon had played Scald (its 2nd choice) on turn 24. This sequence: 84 %.');
+    expect(view.headline).toBe('If Tzon had played Scald (its second choice) on turn 24. This sequence: 84 %.');
   });
 
   test('chances and ordinals', () => {
     expect([0.0005, 0.004, 0.108, 0.19, 0.2, 0.5175, 1].map(chanceText)).toEqual(['0.1 %', '0.4 %', '10.8 %', '19 %', '20 %', '52 %', '100 %']);
-    expect([2, 3, 4, 11].map(ordinal)).toEqual(['2nd', '3rd', '4th', '11th']);
+    // the rank reads as the line heads of the Lines section read it (G13b): "second choice", "third choice", then "choice 4"
+    expect([2, 3, 4, 11].map(rankWords)).toEqual(['second choice', 'third choice', 'choice 4', 'choice 11']);
   });
 
   test('a found step with no line (the witness search found none) keeps its sentence and shows no play button data', () => {

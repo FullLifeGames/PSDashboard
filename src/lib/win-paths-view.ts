@@ -40,8 +40,9 @@ export interface WinPathsViewContext {
   playedNeverActed?: boolean;
 }
 
-const ORDINALS: Record<number, string> = { 2: '2nd', 3: '3rd' };
-export const ordinal = (rank: number): string => ORDINALS[rank] ?? `${rank}th`;
+const RANK_NAMES: Record<number, string> = { 2: 'second choice', 3: 'third choice' };
+/** A choice's place in the ranking (1 is the top) in the words of the line heads ("second choice", "choice 4"; round 89, G13b). */
+export const rankWords = (rank: number): string => RANK_NAMES[rank] ?? `choice ${rank}`;
 
 /** A chance as the panel prints it: one decimal under 20 %, whole percent above ("52 %", "10.8 %"). */
 export function chanceText(chance: number): string {
@@ -65,7 +66,7 @@ const sequenceOf = (step: WinStep): string => (step.chance === undefined ? '' : 
 
 function mistakeHeadline(step: WinStep, opponent: string): string | null {
   const { deviation } = step;
-  const slip = deviation ? `If ${opponent} had played ${deviation.label} (its ${ordinal(deviation.rank)} choice) on turn ${deviation.turn}.` : '';
+  const slip = deviation ? `If ${opponent} had played ${deviation.label} (its ${rankWords(deviation.rank)}) on turn ${deviation.turn}.` : '';
   return [slip, sequenceOf(step)].filter(Boolean).join(' ') || null;
 }
 
