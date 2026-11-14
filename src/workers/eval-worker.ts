@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 import {
-  mctsSearch, mctsTreeSearch, type SearchExecutor, createLocalExecutor, searchPosition, takeSimFastReport,
+  mctsSearch, mctsTreeSearch, runOnRequestJob, type SearchExecutor, createLocalExecutor, searchPosition, takeSimFastReport,
   type EvalWorkerRequest, type EvalWorkerResponse, type StaticRuleset, loadSimModsFor,
 } from '@fulllifegames/eval-engine';
 import { adoptSearchBudgetStamp } from '../lib/eval/search-budget-setting';
@@ -98,6 +98,10 @@ scope.onmessage = async (event: MessageEvent<EvalWorkerRequest | ReplayJobReques
     } else if (message.type === 'lines') {
       const lines = await executorFor(message.serializedBattle, message.ruleset).lines!(message.input);
       settle({ type: 'linesResult', id: message.id, lines });
+    } else if (message.type === 'job') {
+      // Round 89 (#130): a job the user asked for runs on a worker of its own and streams each step the moment it is done.
+      const result = runOnRequestJob(message.serializedBattle, requireRuleset(message.ruleset), message.job, step => post({ type: 'jobStep', id: message.id, step }));
+      settle({ type: 'jobResult', id: message.id, result });
     }
   } catch (error) {
     settle({ type: 'error', id: message.id, message: error instanceof Error ? error.message : String(error) });

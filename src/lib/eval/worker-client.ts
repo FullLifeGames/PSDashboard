@@ -1,12 +1,14 @@
 import {
-  perfCount, blendValues, blendWorlds, searchOrchestrated, searchTreesOrchestrated, forcedWinPossible,
+  blendValues, blendWorlds, searchOrchestrated, searchTreesOrchestrated, forcedWinPossible,
   type SearchExecutor, type TreeExecutor, type EvalCellValue, type EvalResult, type EvalSettings, type EvalWorkerRequest,
-  type EvalWorkerResponse, type MctsTreeStats, type SearchProgress, type StaticRuleset,
+  type EvalWorkerResponse, type MctsTreeStats, type SearchProgress, type StaticRuleset, type WinPaths, type WinPathsRequest,
 } from '@fulllifegames/eval-engine';
 import { evalPoolSize } from './pool-size';
 import { selectedEngine } from './engine-setting';
 import { searchBudgetStamp } from './search-budget-setting';
-import { recordSimFastReport, simFastLevers } from './sim-fast-setting';
+import { simFastLevers } from './sim-fast-setting';
+import { OnRequestJobs, type WinPathsHandlers } from './on-request-jobs';
+import { spawnWorker, type WorkerHandle } from './worker-handle';
 import { worldPositionsOf, type WorldPosition } from './world-positions';
 
 /**
@@ -18,18 +20,6 @@ const engineEvaluate = () => import('./engine-evaluate');
 export interface EvalRunHandlers {
   onProgress?(progress: SearchProgress): void;
   onPartial?(result: EvalResult): void;
-}
-
-interface PendingEntry {
-  resolve(response: EvalWorkerResponse): void;
-  reject(error: Error): void;
-  /** Streaming responses (progress/partial) that must not settle the RPC. */
-  onStream?(response: EvalWorkerResponse): void;
-}
-
-interface WorkerHandle {
-  worker: Worker;
-  pending: Map<number, PendingEntry>;
 }
 
 /** Omit that distributes over a discriminated union (plain Omit collapses it). */
@@ -81,36 +71,11 @@ export class EvalWorkerClient {
   private workers: WorkerHandle[] = [];
   private nextId = 1;
   private generation = 0;
+  private jobs = new OnRequestJobs();
 
   private ensureWorkers(): WorkerHandle[] {
     while (this.workers.length < evalPoolSize()) {
-      perfCount('workerSpawn');
-      const worker = new Worker(new URL('../../workers/eval-worker.ts', import.meta.url), { type: 'module' });
-      const handle: WorkerHandle = { worker, pending: new Map() };
-      worker.onmessage = (event: MessageEvent<EvalWorkerResponse>) => {
-        const response = event.data;
-        if (response.simFast) recordSimFastReport(response.simFast);
-        const entry = handle.pending.get(response.id);
-        if (!entry) return;
-        if ((response.type === 'progress' || response.type === 'partial') && entry.onStream) {
-          entry.onStream(response);
-          return;
-        }
-        handle.pending.delete(response.id);
-        if (response.type === 'error') entry.reject(new Error(response.message));
-        else entry.resolve(response);
-      };
-      worker.onerror = event => {
-        const error = new Error(event.message || 'evaluation worker crashed');
-        for (const entry of handle.pending.values()) entry.reject(error);
-        handle.pending.clear();
-        // A crashed worker leaves the pool — the pool outlives single
-        // evaluations now, and a dead worker would swallow the next RPC
-        // without ever answering it.
-        handle.worker.terminate();
-        this.workers = this.workers.filter(other => other !== handle);
-      };
-      this.workers.push(handle);
+      this.workers.push(spawnWorker(crashed => { this.workers = this.workers.filter(other => other !== crashed); }));
     }
     return this.workers;
   }
@@ -385,6 +350,14 @@ export class EvalWorkerClient {
     return response.values[0].value;
   }
 
+  /**
+   * Round 89 (#130): the win paths of a lost endgame, searched on request, on a worker of its own (see `OnRequestJobs`): a sweep's
+   * `cancel` leaves it, and its `signal` leaves the sweep.
+   */
+  winPaths(serializedBattle: string, request: WinPathsRequest, ruleset: StaticRuleset, handlers?: WinPathsHandlers): Promise<WinPaths> {
+    return this.jobs.winPaths(serializedBattle, request, ruleset, handlers);
+  }
+
   cancel(): void {
     this.generation += 1;
     if (this.workers.length === 0) return;
@@ -407,5 +380,6 @@ export class EvalWorkerClient {
     this.cancel();
     for (const handle of this.workers) handle.worker.terminate();
     this.workers = [];
+    this.jobs.dispose();
   }
 }

@@ -1,5 +1,6 @@
 import type { BranchSlotChoice } from './branch-choices.ts';
 import type { ForcedDie } from './dice/types.ts';
+import type { OnRequestJob, OnRequestResult, OnRequestStep } from './on-request.ts';
 import type { PlayedAction } from './played.ts';
 import type { SimFastLever, SimFastReport } from './forward/sim-fast/state.ts';
 import type { SearchBudget } from './search/budget.ts';
@@ -703,6 +704,7 @@ export type EvalWorkerRequest = (
   | { type: 'subsearch'; id: number; serializedBattle: string; job: EvalSubSearchJob }
   | { type: 'prove'; id: number; serializedBattle: string; input: ForcedWinInput }
   | { type: 'lines'; id: number; serializedBattle: string; input: LinesInput }
+  | { type: 'job'; id: number; serializedBattle: string; job: OnRequestJob }
 ) & SimFastStamp & RulesetStamp;
 
 /** Final answers carry the worker's speed-layer status and its counters since the last one. */
@@ -715,5 +717,7 @@ export type EvalWorkerResponse = (
   | { type: 'cellsResult'; id: number; values: EvalCellValue[] }
   | { type: 'proveResult'; id: number; outcome: ForcedWinOutcome | null }
   | { type: 'linesResult'; id: number; lines: EvalLine[] }
+  | { type: 'jobStep'; id: number; step: OnRequestStep }
+  | { type: 'jobResult'; id: number; result: OnRequestResult }
   | { type: 'error'; id: number; message: string }
 ) & { simFast?: SimFastReport };

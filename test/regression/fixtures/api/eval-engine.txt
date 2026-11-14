@@ -92,6 +92,9 @@ type MoveUser
 type NearDecidedSweep
 type NewGameBody
 type NewGameStart
+type OnRequestJob
+type OnRequestResult
+type OnRequestStep
 type OrchestratorCallbacks
 type PairThreat
 type PlayedAction
@@ -147,8 +150,12 @@ type TurnSensitivity
 type TurnVerification
 type UnansweredProfile
 type VerdictTier
+type WinBudget
 type WinConversion
 type WinPath
+type WinPaths
+type WinPathsRequest
+type WinStep
 value AUTO_MCTS_FAINTED_FRACTION
 value BLUNDER_SWING
 value BRING_WORLD_CAP
@@ -169,6 +176,7 @@ value SIM_FAST_DEFAULT
 value SIM_FAST_LEVERS
 value SPOKEN_MASS
 value TIER_THRESHOLDS
+value WIN_BUDGET
 value adoptSerializedRuntime
 value allTurnEvents
 value analyzeLeads
@@ -276,6 +284,7 @@ value rollText
 value rollToCopy
 value rolledCopy
 value rowCompletedCells
+value runOnRequestJob
 value searchBudget
 value searchBudgetTag
 value searchOrchestrated
@@ -308,6 +317,7 @@ value unansweredSeenKey
 value validateBranchRuntime
 value validateEngineResponse
 value winDeltaText
+value winPaths
 value winPctText
 value winPercent
 value winProbability

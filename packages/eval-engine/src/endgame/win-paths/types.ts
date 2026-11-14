@@ -34,15 +34,18 @@ export interface WinPathsRequest {
 /**
  * One answer of #130. `found`: the line ends in the side's win within the turns asked, with the chance of its dice (`luck`) or the
  * mass a proof gives (`stronger`); `none`: the search covered every path above the floor and found no win; `stopped`: the budget ran
- * out first (the line, if any, is the best partial path and no win). `spent` is the work the step took.
+ * out first (the line, if any, is the best partial path and no win). `spent` is the work the step took. The job adds two more: `failed`
+ * (the step threw; `error` is the technical message, for logs, never a line of the app) and `unbuilt` (the step's runner is a seam that
+ * waits for a user answer: step 3, a mistake by the opponent).
  */
 export interface WinStep {
   kind: 'stronger' | 'luck' | 'mistake';
-  status: 'found' | 'none' | 'stopped';
+  status: 'found' | 'none' | 'stopped' | 'failed' | 'unbuilt';
   line?: EvalLine;
   chance?: number;
   played?: number;
   deviation?: { turn: number; label: string; rank: number };
+  error?: string;
   spent: { cells: number; turns: number };
 }
 
