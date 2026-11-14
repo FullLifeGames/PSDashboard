@@ -1,9 +1,9 @@
 import { useMemo } from 'react';
 import type { EvalResult, TurnAnalysis } from '@fulllifegames/eval-engine';
-import { LINE_DIFFERS_SENTENCE, lineAnchor, type LinesHost } from '../../lib/line-view';
+import { differsSentences, lineAnchor, type LinesHost } from '../../lib/line-view';
 import { LineConfirm } from './LineConfirm';
 import { WinPathsPanel } from './WinPathsPanel';
-import { endgameRow, gameReview, reviewDiffers, type EndgameRowView, type ReviewGrade, type ReviewLineView, type ReviewRowView, type ReviewSideView } from './game-review';
+import { endgameRow, gameReview, reviewBlocks, type EndgameRowView, type ReviewGrade, type ReviewLineView, type ReviewRowView, type ReviewSideView } from './game-review';
 
 interface GameReviewPanelProps {
   analyses: readonly (TurnAnalysis | null)[];
@@ -116,7 +116,7 @@ export function GameReviewPanel({ analyses, results, playerNames, doubles, host,
       <span className="ps-eval-lines-title">Game review · what the engine would have played</span>
       {host.earlyLines && <EarlyLinesProgress progress={host.earlyLines} />}
       {sides.map(view => <ReviewSide key={view.side} view={view} onPlay={host.onPlay} confirm={host.confirm} onSelectTurn={onSelectTurn} />)}
-      {reviewDiffers(sides) && <span className="ps-eval-line">{LINE_DIFFERS_SENTENCE}</span>}
+      {differsSentences(reviewBlocks(sides)).map(sentence => <span key={sentence} className="ps-eval-line">{sentence}</span>)}
       {endgame && <EndgameEntry row={endgame} host={host} playerNames={playerNames} doubles={doubles} />}
     </div>
   );

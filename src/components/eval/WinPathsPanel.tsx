@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { lineAnchor, type LinesHost } from '../../lib/line-view';
-import { winStepViews, type WinStepView } from '../../lib/win-paths-view';
+import { sequenceNote, winStepViews, type WinStepView } from '../../lib/win-paths-view';
 import { LineConfirm } from './LineConfirm';
 import { LineRows } from './LinesSection';
 
@@ -58,6 +58,7 @@ export function WinPathsPanel({ host, playerNames, doubles, picker = true }: Win
   const { turns } = winPaths.endgame;
   const player = playerNames[run.side === 'p1' ? 0 : 1];
   const views = winStepViews(run.steps, { turn: run.turn, playerNames, doubles, host, side: run.side, playedLabel: winPaths.playedLabel(run.turn), playedNeverActed: winPaths.playedNeverActed?.(run.turn) });
+  const note = sequenceNote(views);
   const status = statusLine(run.status, run.turn, run.steps.length);
   return (
     <div className="ps-winpaths" role="region" aria-label={`How could ${player} have won?`}>
@@ -76,6 +77,7 @@ export function WinPathsPanel({ host, playerNames, doubles, picker = true }: Win
       )}
       {status && <span className="ps-eval-line ps-winpaths-status" role="status">{status}</span>}
       {views.map(view => <StepView key={view.kind} view={view} turn={run.turn} host={host} clicked={clicked === view.kind} onClick={() => setClicked(view.kind)} />)}
+      {note && <span className="ps-eval-line">{note}</span>}
     </div>
   );
 }

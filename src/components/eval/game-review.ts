@@ -161,6 +161,9 @@ export function gameReview(args: ReviewArgs): ReviewSideView[] {
   }));
 }
 
+/** The line blocks of the whole review, for the sentences under it. */
+export const reviewBlocks = (view: readonly ReviewSideView[]): LineBlockView[] => view.flatMap(side => side.rows.flatMap(row => row.lines.map(line => line.block)));
+
 /** Whether any line of the review ends at another number than its row shows: the one sentence under the review then says why (G10). */
 export function reviewDiffers(view: readonly ReviewSideView[]): boolean {
   return view.some(side => side.rows.some(row => row.lines.some(line => line.block.differs)));

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { DIE_KINDS, winPctText, type EvalLine, type ForcedDie, type LineDie, type LineStep } from '@fulllifegames/eval-engine';
-import { LINE_DIFFERS_SENTENCE, lineBlocks, type LineViewContext } from '../../../src/lib/line-view';
+import { LINE_DIFFERS_SENTENCE, LINE_PROVEN_SENTENCE, differsSentences, lineBlocks, type LineViewContext } from '../../../src/lib/line-view';
 import { bothRolesLine, doublesLine, DOUBLES_NAMES, playedLine, singlesLine, SINGLES_NAMES } from '../fixtures/lines';
 
 /**
@@ -233,6 +233,34 @@ describe('both numbers on a line', () => {
 
   test('the sentence says why in one muted sentence with no dash', () => {
     expect(LINE_DIFFERS_SENTENCE).toBe("A row's value averages every answer and die the search tried; a line follows one answer with each die at its likeliest result.");
+  });
+});
+
+/**
+ * Round 89 (G13b, tester question 10): "row 100%, this line ends at 81%" sat under a sentence about averages. A row at 100% (or 0%) is
+ * one where every answer and die ends the game (`winPercent` shows exactly 100 only for an ended evaluation); the line stops before
+ * the game ends, so its end is the estimate of the position it stops at. The sentence is added only where such a row stands.
+ */
+describe('the sentences under a section of lines', () => {
+  const block = (row: string | null, endPct: string) => lineBlocks([singlesLine], { ...singles, ...(row ? { rowValues: { p2: { engine: row } } } : {}) })
+    .map(item => ({ ...item, endPct }))[0];
+  const rowOf = (row: string) => { const item = block(row, '50%'); return { differs: item.differs, row: item.row }; };
+
+  test.each([['singles', singles], ['doubles', doubles]])('%s: a differing row gets the averages sentence, and a proven row the second one too', (_kind, ctx) => {
+    const line = ctx === singles ? singlesLine : doublesLine;
+    const at = (row: string) => lineBlocks([line], { ...ctx, rowValues: { p1: { engine: row }, p2: { engine: row } } });
+    const rows = (blocks: ReturnType<typeof at>) => differsSentences(blocks);
+    expect(rows(at('23%'))).toEqual([LINE_DIFFERS_SENTENCE]);
+    expect(rows(at('100%'))).toEqual([LINE_DIFFERS_SENTENCE, LINE_PROVEN_SENTENCE]);
+    expect(rows(at('0%'))).toEqual([LINE_DIFFERS_SENTENCE, LINE_PROVEN_SENTENCE]);
+    // a row that prints as its line's end has nothing to explain, whatever the number
+    const same = lineBlocks([line], { ...ctx, rowValues: { p1: { engine: lineBlocks([line], ctx)[0].endPct }, p2: { engine: lineBlocks([line], ctx)[0].endPct } } });
+    expect(rows(same)).toEqual([]);
+  });
+
+  test('the proven sentence says what the row is and why the line differs, with no dash', () => {
+    expect(LINE_PROVEN_SENTENCE).toBe('A row at 100% (or 0%) is one where every answer and die ends the game; its line stops before the game ends, so its end is the estimate of the position it stops at.');
+    expect(rowOf('100%').row).toBe('100%');
   });
 });
 

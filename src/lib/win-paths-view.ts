@@ -122,6 +122,16 @@ const TITLES: Record<WinStepKind, (opponent: string) => string> = {
   mistake: opponent => `3 · A mistake by ${opponent}`,
 };
 
+/**
+ * What the number of a luck or a mistake step counts (round 89, G13b, the tester's questions 8 and 9): the exact chance of the dice it
+ * needs, which are the dice whose other result would change who faints. A chip also shows a die that changes nothing (a 95 percent hit
+ * whose miss leaves the same bodies standing), and the stronger play's share adds every sequence that wins, so the two never read as
+ * one sum. Null when no luck or mistake step found a path.
+ */
+export const SEQUENCE_NOTE = 'A sequence\'s chance multiplies the dice whose other result would change who faints; a die that changes nothing counts as certain, and other sequences that also win are not added.';
+export const sequenceNote = (views: readonly WinStepView[]): string | null =>
+  views.some(view => view.kind !== 'stronger' && view.headline !== null) ? SEQUENCE_NOTE : null;
+
 /** The views of the steps that arrived, in the order of the job. */
 export function winStepViews(steps: readonly WinStep[], ctx: WinPathsViewContext): WinStepView[] {
   const opponent = ctx.playerNames[ctx.side === 'p1' ? 1 : 0];

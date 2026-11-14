@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { EvalLine, WinStep } from '@fulllifegames/eval-engine';
-import { chanceText, rankWords, winStepViews, type WinPathsViewContext } from '../../../src/lib/win-paths-view';
+import { chanceText, rankWords, sequenceNote, winStepViews, type WinPathsViewContext } from '../../../src/lib/win-paths-view';
 import { doublesLine, DOUBLES_NAMES, singlesLine, SINGLES_NAMES } from '../fixtures/lines';
 
 /**
@@ -73,6 +73,18 @@ describe('the win-path words', () => {
   test('step 3 names the slip by its rank and turn, then the chance of the dice (W3a)', () => {
     const [view] = winStepViews([step('mistake', 'found', { chance: 0.84375, deviation: { turn: 24, label: 'Scald', rank: 2 }, line: line() })], ctx());
     expect(view.headline).toBe('If Tzon had played Scald (its second choice) on turn 24. This sequence: 84 %.');
+  });
+
+  // Round 89 (G13b, tester questions 8 and 9): a sequence's number multiplies the dice whose other result would change who faints, and
+  // it prices one sequence; a chip also shows a die that changes nothing, and the stronger play's share adds every winning sequence.
+  test('a luck or mistake step that found a path carries the note on what its number counts; the other steps do not', () => {
+    const found = (kind: WinStep['kind']) => winStepViews([step(kind, 'found', { chance: 0.5, line: line() })], ctx());
+    expect(sequenceNote(found('luck'))).toBe('A sequence\'s chance multiplies the dice whose other result would change who faints; a die that changes nothing counts as certain, and other sequences that also win are not added.');
+    expect(sequenceNote(found('mistake'))).not.toBeNull();
+    expect(sequenceNote(found('stronger'))).toBeNull();
+    expect(sequenceNote(winStepViews([step('luck', 'none'), step('mistake', 'stopped')], ctx()))).toBeNull();
+    // singles and doubles read the same words
+    expect(sequenceNote(winStepViews([step('luck', 'found', { chance: 0.25, line: { ...doublesLine, for: [] } })], ctx({ playerNames: DOUBLES_NAMES, doubles: true, side: 'p1' })))).not.toBeNull();
   });
 
   test('chances and ordinals', () => {

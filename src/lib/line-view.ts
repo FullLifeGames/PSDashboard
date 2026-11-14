@@ -96,6 +96,20 @@ export interface RowValues { engine?: string; played?: string }
  */
 export const LINE_DIFFERS_SENTENCE = "A row's value averages every answer and die the search tried; a line follows one answer with each die at its likeliest result.";
 
+/**
+ * Round 89 (G13b): a row that reads 100% or 0% is one where every answer and die ends the game (`winPercent` shows exactly 100 only
+ * for an ended evaluation), so "averages" does not describe it; its line stops before the game ends. Said once, after the averages
+ * sentence, only where such a row stands beside a line that ends elsewhere.
+ */
+export const LINE_PROVEN_SENTENCE = 'A row at 100% (or 0%) is one where every answer and die ends the game; its line stops before the game ends, so its end is the estimate of the position it stops at.';
+
+/** The sentences under a section of lines or under the review: none when no line differs from its row. */
+export function differsSentences(blocks: readonly Pick<LineBlockView, 'differs' | 'row'>[]): string[] {
+  const differing = blocks.filter(block => block.differs);
+  if (differing.length === 0) return [];
+  return differing.some(block => block.row === '100%' || block.row === '0%') ? [LINE_DIFFERS_SENTENCE, LINE_PROVEN_SENTENCE] : [LINE_DIFFERS_SENTENCE];
+}
+
 export interface LineViewContext {
   /** The graded turn: the line's first step plays it. */
   turn: number;
