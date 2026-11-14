@@ -17,6 +17,8 @@ const fixture = (name: string) =>
   JSON.parse(readFileSync(join(here, '../../packages/eval-engine/test/fixtures', `${name}.json`), 'utf-8')) as ReplayData;
 
 test.beforeAll(installReplayEmbedCache);
+// A red row fails in minutes, not after the test's whole budget: no single click or assertion waits longer than this (G4c).
+test.use({ actionTimeout: 60_000 });
 
 /** Singles runs the matrix on its early turns in auto, and a matrix turn holds no line: that row sweeps with the tree on every turn. */
 const GAMES = [
@@ -56,12 +58,12 @@ const bare = (text: string) => text.replace(/ \([^)]*\)/g, '').replace(/ → [^:
 
 for (const game of GAMES) {
   test(`${game.kind}: the Game review lists the graded turns, the graph marks them, ▶ Play opens the line`, async ({ page }) => {
-    test.setTimeout(1_500_000);
+    test.setTimeout(900_000);
     const replay = fixture(game.id);
     await loadReplay(page, replay, game.mode);
     const panel = page.locator('.ps-main-right .ps-eval-panel');
     await panel.getByRole('button', { name: 'Analyze game' }).click();
-    await expect(panel.getByRole('button', { name: 'Re-analyze' })).toBeVisible({ timeout: 1_200_000 });
+    await expect(panel.getByRole('button', { name: 'Re-analyze' })).toBeVisible({ timeout: 600_000 });
     const review = panel.locator('.ps-eval-review');
     await expect(review).toBeVisible({ timeout: 60_000 });
     await expect(review).toContainText('Game review · what the engine would have played');
@@ -104,8 +106,12 @@ for (const game of GAMES) {
     for (const mark of marked.filter(text => text !== '')) expect(named, `the tooltip lists ${mark}`).toContain(mark);
     await expect(page.getByRole('button', { name: /Let it play out/ })).toBeEnabled();
 
-    // a second ▶ Play over the open variation asks first, under the line that was clicked and on screen (G4b: it stood out of sight)
-    await panel.getByRole('button', { name: /Game report/ }).click();
+    // a second ▶ Play over the open variation asks first, under the line that was clicked and on screen (G4b: it stood out of sight).
+    // While the variation is on screen the panel shows its evaluation, never the report: back to the main line, then to the report.
+    await page.getByRole('group', { name: 'Line selector' }).getByRole('button', { name: 'Main line' }).click();
+    const back = panel.getByRole('button', { name: /Game report/ });
+    await expect(review.or(back)).toBeVisible();
+    if (await back.count()) await back.click();
     await expect(review).toBeVisible();
     await review.locator('.ps-eval-review-row').filter({ has: page.locator('.ps-eval-review-line button') }).first().getByRole('button', { name: '▶ Play' }).first().click();
     const question = review.getByRole('alertdialog');
