@@ -140,19 +140,33 @@ export function dieText(entry: LineDie, words: DieWords): string {
   return entry.chance !== undefined && entry.chance < 1 ? `${base} (${Math.round(entry.chance * 100)}%)` : base;
 }
 
-/** The chip text of one die: `dieText`, a knock-out by the move that rolls it with the rolls that hold it. */
+/**
+ * What a damage roll the line forces does, read against the boundary the simulator found (`ko`: the rolls from `of - rolls` up knock
+ * out); null for a die that carries no boundary. The chip never takes it from the class of the die: a forced roll on the quiet side of
+ * the boundary does not knock out (round 89, G13b: "Vacuum Wave: KO (1 of 16 rolls)" on roll 9).
+ */
+function rollOutcome(entry: LineDie): { text: string; rolls: number } | null {
+  const { die, ko } = entry;
+  if (die.name.kind !== 'damage-roll' || !ko || !('step' in die.result)) return null;
+  const knocks = die.result.step >= ko.of - ko.rolls;
+  return { text: knocks ? 'KO' : 'no KO', rolls: knocks ? ko.rolls : ko.of - ko.rolls };
+}
+
+/** The chip text of one die: `dieText`, a damage roll that decides a knock-out as what the forced roll does with the rolls that give it. */
 export function chipText(entry: LineDie, words: DieWords): string {
-  const { die } = entry;
-  if (die.name.kind === 'damage-roll' && entry.ko) return `${words.move(die.name.moveId)}: KO (${entry.ko.rolls} of ${entry.ko.of} rolls)`;
+  const outcome = rollOutcome(entry);
+  if (outcome && entry.die.name.kind === 'damage-roll') return `${words.move(entry.die.name.moveId)}: ${outcome.text} (${outcome.rolls} of ${entry.ko!.of} rolls)`;
   return dieText(entry, words);
 }
 
 /**
- * The tooltip's line of one die: the roll the click forces, and when it decides a knock-out, in how many rolls (those say the
- * roll's chance, so the percentage stays out).
+ * The tooltip's line of one die: the roll the click forces, and when it decides a knock-out, whether it knocks out and in how many
+ * rolls (those say the roll's chance, so the percentage stays out).
  */
-const tooltipText = (entry: LineDie, words: DieWords): string =>
-  entry.ko ? `${dieLabel(entry.die, words)} (KO in ${entry.ko.rolls} of ${entry.ko.of} rolls)` : dieText(entry, words);
+const tooltipText = (entry: LineDie, words: DieWords): string => {
+  const outcome = rollOutcome(entry);
+  return outcome ? `${dieLabel(entry.die, words)} (${outcome.text} in ${outcome.rolls} of ${entry.ko!.of} rolls)` : dieText(entry, words);
+};
 
 /**
  * The words for one die of a step. A spread move draws one die per target; when a step holds several dice that differ only in their

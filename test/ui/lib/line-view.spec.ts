@@ -128,6 +128,22 @@ describe('lineBlocks: the tester\'s smaller items', () => {
     expect(block.tooltip.split('\n')[1]).toBe('T4: Weather Ball: damage roll 9 (KO in 9 of 16 rolls)');
   });
 
+  // Round 89 (#104), G13b (tester, third pass): a forced roll on the side that does not knock out read "KO (1 of 16 rolls)". The chip
+  // says what the forced roll does, read against the boundary the simulator found (`ko`): rolls from `of - rolls` up knock out.
+  test.each([
+    ['roll 9 of a move that knocks out in 1 of 16 rolls', 8, 1, 'Vacuum Wave: no KO (15 of 16 rolls)', 'T4: Vacuum Wave: damage roll 9 (no KO in 15 of 16 rolls)'],
+    ['the highest roll of that move', 15, 1, 'Vacuum Wave: KO (1 of 16 rolls)', 'T4: Vacuum Wave: damage roll 16 (KO in 1 of 16 rolls)'],
+    ['the lowest roll that knocks out', 6, 10, 'Vacuum Wave: KO (10 of 16 rolls)', 'T4: Vacuum Wave: damage roll 7 (KO in 10 of 16 rolls)'],
+    ['the roll just under the boundary', 5, 10, 'Vacuum Wave: no KO (6 of 16 rolls)', 'T4: Vacuum Wave: damage roll 6 (no KO in 6 of 16 rolls)'],
+  ])('%s: the chip and the tooltip say what the forced roll does', (_name, step, rolls, chip, tooltip) => {
+    for (const ctx of [singles, doubles]) {
+      const roll: ForcedDie = { name: { slot: 'p1a', moveId: 'vacuumwave', targetSlot: 'p2a', kind: 'damage-roll' }, result: { step } };
+      const [block] = lineBlocks([lineOf([stepWith([{ die: roll, chance: step >= 16 - rolls ? rolls / 16 : (16 - rolls) / 16, shown: true, ko: { rolls, of: 16 } }])])], { ...ctx, turn: 4 });
+      expect(block.rows[0].sides.flatMap(side => side.chips)).toEqual([chip]);
+      expect(block.tooltip.split('\n')[1]).toBe(tooltip);
+    }
+  });
+
   test('the note\'s last sentence agrees with its noun: one hit count is "it", draws are "them"', () => {
     expect(lineBlocks([{ ...singlesLine, unforced: ['hit-count'] }], singles)[0].note).toMatch(/The seed decides it\.$/);
     expect(lineBlocks([{ ...singlesLine, unforced: ['unnamed draw'] }], singles)[0].note).toMatch(/The seed decides them\.$/);
