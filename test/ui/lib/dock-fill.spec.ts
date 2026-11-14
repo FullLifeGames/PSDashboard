@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { BranchSlotChoice, RankedChoice } from '@fulllifegames/eval-engine';
-import { engineHoldsForcedBeside, fitsBeside, overlayFill, pickFill, pickFillParts, slotChoicesOf } from '../../../src/lib/dock-fill';
+import { engineHoldsForcedBeside, fitsBeside, overlayFill, pickFill, pickFillParts, rowOfChoices, slotChoicesOf } from '../../../src/lib/dock-fill';
 import { rankedChoice } from '../fixtures/eval-result';
 import { simState } from '../fixtures/sim-state';
 
@@ -296,5 +296,36 @@ describe('engineHoldsForcedBeside', () => {
     expect(engineHoldsForcedBeside(singles, marks([false], [false]), 'p1', 0)).toBe(false);
     const doubles = simState('doubles', { p1ForceSwitch: true, p1ForceSwitches: [true, false], p2ForceSwitch: true, p2ForceSwitches: [false, true] });
     expect(engineHoldsForcedBeside(doubles, marks([false, false], [false, true]), 'p1', 0)).toBe(true);
+  });
+});
+
+/**
+ * Round 89 (#153, Hard mode): the ranked row the picks of a side stand for, which the worst reply is read for. The picks as they stand
+ * (the user's slots and the slots the fill wrote) when one row has them all; else the row the fill itself would take beside the user's
+ * slots alone, so a pick that broke the joint choice still has a row; null when no row agrees.
+ */
+describe('rowOfChoices', () => {
+  const doubles = simState('doubles');
+  const slot = (choices: (BranchSlotChoice | null)[]) => choices;
+  const spore: BranchSlotChoice = { kind: 'move', moveId: 'spore', moveName: 'Spore', targetLoc: 2 };
+  const ragePowder: BranchSlotChoice = { kind: 'move', moveId: 'ragepowder', moveName: 'Rage Powder' };
+
+  test('singles: the row of the pick', () => {
+    const ranked = [rankedChoice('move earthquake', 'Earthquake', 0.3), rankedChoice('move swordsdance', 'Swords Dance', 0.2)];
+    const pick: BranchSlotChoice = { kind: 'move', moveId: 'swordsdance', moveName: 'Swords Dance' };
+    expect(rowOfChoices('p1', ranked, simState('singles'), slot([pick]), slot([pick]))).toBe(ranked[1]);
+    expect(rowOfChoices('p1', ranked, simState('singles'), slot([{ kind: 'move', moveId: 'scaleshot', moveName: 'Scale Shot' }]), slot([null]))).toBeNull();
+  });
+
+  test('doubles: both slots read as one joint row, the target stays the user\'s', () => {
+    expect(rowOfChoices('p1', doublesRanked, doubles, slot([flareBlitz, ragePowder]), slot([flareBlitz, ragePowder]))).toBe(doublesRanked[1]);
+    expect(rowOfChoices('p1', doublesRanked, doubles, slot([fakeOut, spore]), slot([fakeOut, null]))).toBe(doublesRanked[0]);
+  });
+
+  test('doubles: a pick that broke the joint choice falls back to the row beside the user\'s own slots', () => {
+    // the fill wrote Spore beside the touched Fake Out; the user then picked Protect in slot 1: Fake Out + Protect is no ranked row,
+    // and the row the fill takes beside Protect... is none that opens with Fake Out, so only the user's slot 1 decides
+    const row = rowOfChoices('p1', doublesRanked, doubles, slot([fakeOut, protect]), slot([null, protect]));
+    expect(row).toBe(doublesRanked[2]);
   });
 });

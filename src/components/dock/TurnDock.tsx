@@ -69,7 +69,7 @@ function useUserChoice(
   const onUserChoice = fill?.onUserChoice;
   const engine = fill?.engine;
   return useCallback((side: Side, choice: BranchSlotChoice, slot?: number) => {
-    onUserChoice?.(side, slot ?? 0);
+    onUserChoice?.(side, slot ?? 0, choice);
     const holdBack = !!onRecordChoice && !!simState && !!engine && engineHoldsForcedBeside(simState, engine, side, slot ?? 0);
     (holdBack ? onRecordChoice : onSetChoice)(side, choice, slot);
   }, [onUserChoice, onSetChoice, onRecordChoice, simState, engine]);

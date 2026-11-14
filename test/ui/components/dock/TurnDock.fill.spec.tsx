@@ -107,7 +107,8 @@ describe('TurnDock fill, marks', () => {
     const props = renderDock('singles', fill, { onSetChoice: vi.fn(() => { order.push('set'); }) }, state);
     await userEvent.click(chip('P1'));
     await userEvent.click(within(document.querySelector('.ps-tray') as HTMLElement).getByRole('button', { name: /Stone Edge/ }));
-    expect(fill.onUserChoice).toHaveBeenCalledWith('p1', 0);
+    // round 89 (#153): the pick goes along, for Hard mode
+    expect(fill.onUserChoice).toHaveBeenCalledWith('p1', 0, expect.objectContaining({ moveId: 'stoneedge' }));
     expect(props.onSetChoice).toHaveBeenCalledWith('p1', expect.objectContaining({ moveId: 'stoneedge' }), 0);
     expect(order).toEqual(['user', 'set']);
   });
@@ -333,7 +334,7 @@ describe.each(['singles', 'doubles'] as const)('TurnDock fill, a forced replacem
     await userEvent.click(chip(forcedChip));
     const other = kind === 'doubles' ? 'Urshifu' : 'Latias';
     await userEvent.click(within(document.querySelector('.ps-tray') as HTMLElement).getByRole('button', { name: new RegExp(other) }));
-    expect(fill.onUserChoice).toHaveBeenCalledWith('p1', slot);
+    expect(fill.onUserChoice).toHaveBeenCalledWith('p1', slot, expect.objectContaining({ kind: 'switch', pokemonName: other }));
     expect(props.onSetChoice).toHaveBeenCalledWith('p1', expect.objectContaining({ kind: 'switch', pokemonName: other }), slot);
   });
 });
@@ -354,7 +355,7 @@ describe('TurnDock fill, two forced slots of one side (ruling 16a, doubles)', ()
     const fill = fillOf({ engine: { p1: [true, false], p2: [false, false] } });
     const props = renderDock('doubles', fill, { onRecordChoice }, withOnlyA());
     await clickUrshifuInB();
-    expect(fill.onUserChoice).toHaveBeenCalledWith('p1', 1);
+    expect(fill.onUserChoice).toHaveBeenCalledWith('p1', 1, urshifu);
     expect(onRecordChoice).toHaveBeenCalledWith('p1', urshifu, 1);
     expect(props.onSetChoice).not.toHaveBeenCalled();
   });
