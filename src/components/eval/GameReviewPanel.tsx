@@ -32,6 +32,7 @@ function ReviewLine({ line, turn, onPlay, confirm }: { line: ReviewLineView; tur
         )}
       </div>
       {line.block.endNote && <div className="ps-eval-review-line"><span className="text" style={{ color: '#778' }}>{line.block.endNote}</span></div>}
+      {line.block.worstNote && <div className="ps-eval-review-line"><span className="text" style={{ color: '#778' }}>{line.block.worstNote}</span></div>}
       {confirm && confirm.anchor === lineAnchor(line.block.line, turn) && <LineConfirm confirm={confirm} />}
     </>
   );

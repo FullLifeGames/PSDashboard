@@ -1,4 +1,5 @@
 import { lostGround, winDeltaText, winPctText, type EvalLine, type EvalResult, type SideAnalysis, type TurnAnalysis, type VerdictTier } from '@fulllifegames/eval-engine';
+import { linesForMode, worstLookup } from '../../lib/worst-reply';
 import { activeNamesAt, lineBlocks, ranksOf, type LineBlockView, type LineReply, type LinesHost } from '../../lib/line-view';
 import { cardLines, engineChoice, regretView, rowValueTexts } from './turn-copy';
 
@@ -106,13 +107,15 @@ interface ReviewArgs {
 function rowLines(args: ReviewArgs, analysis: TurnAnalysis, side: Side): ReviewLineView[] {
   const { turn } = analysis;
   // only the card's own engine choice has an engine line
-  const lines = cardLines(args.results[turn - 1]?.lines?.filter(line => line.side === side) ?? [], analysis);
+  const result = args.results[turn - 1];
+  const lines = linesForMode(cardLines(result?.lines?.filter(line => line.side === side) ?? [], analysis), !!args.host.hardMode);
   if (lines.length === 0) return [];
   const ctx = {
     turn, playerNames: args.playerNames, doubles: args.doubles, rules: args.host.rules,
     actives: activeNamesAt(args.host.snapshotAt?.(turn) ?? args.host.snapshot),
     rowValues: rowValueTexts(analysis),
-    ranks: args.results[turn - 1] ? ranksOf(args.results[turn - 1]!) : undefined,
+    ranks: result ? ranksOf(result) : undefined,
+    ...(args.host.hardMode && result ? { worst: worstLookup(result) } : {}),
   };
   // `lineBlocks` puts the engine's line before the played line; a line that holds both roles reads as the engine's
   return lineBlocks(lines, ctx).map((block): ReviewLineView => ({

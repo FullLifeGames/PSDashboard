@@ -205,3 +205,74 @@ describe('the answer a line meets', () => {
     expect(screen.getByText(`vs ${pair} (Mstr_Hawk's second choice in this search)`)).toBeInTheDocument();
   });
 });
+
+/**
+ * Round 89 (#153, Hard mode): with the setting on, a row's line is the one that meets the reply that hurts the row most, named by what
+ * stands behind it; a row whose search holds no such line shows today's line and says so; with the setting off the worst lines are
+ * not shown at all. Singles and doubles.
+ */
+describe('Hard mode in the Lines section', () => {
+  /** Pepitopalotin (p2) plays Hydro Pump or Hyper Voice against Tzon's Draining Kiss or Surf; Surf hurts Hydro Pump most (p1's highest cell of its column). */
+  const hurtBy = (lines: EvalLine[]): EvalResult => {
+    const base = withLines(lines);
+    const p1 = [rankedChoice('move 0', 'Draining Kiss', 0.1), rankedChoice('move 1', 'Surf', 0.05)];
+    const p2 = [rankedChoice('move 0', 'Hydro Pump', -0.1), rankedChoice('move 1', 'Hyper Voice', -0.15)];
+    return {
+      ...base, perSide: { p1, p2 },
+      matrix: { p1Labels: ['Draining Kiss', 'Surf'], p2Labels: ['Hydro Pump', 'Hyper Voice'], p1Choices: ['move 0', 'move 1'], p2Choices: ['move 0', 'move 1'], values: [[0.1, 0], [0.4, -0.1]], mixes: { p1: [1, 0], p2: [1, 0] } },
+    };
+  };
+  const meetsSurf: EvalLine = {
+    ...singlesLine, versus: 'worst', steps: [{ ...singlesLine.steps[0], p1: { choice: 'move 1', label: 'Surf', slots: [] } }, ...singlesLine.steps.slice(1)],
+  };
+  const hard = (): LinesHost => ({ ...host(), hardMode: true });
+
+  test('singles, on: the worst line stands where the usual line stood, and its head names the reply', () => {
+    render(<LinesSection turn={20} result={hurtBy([singlesLine, meetsSurf])} playerNames={SINGLES_NAMES} doubles={false} host={hard()} />);
+    expect(screen.getByText('vs Surf (the reply that hurts Hydro Pump most)')).toBeInTheDocument();
+    expect(screen.queryByText(/Tzon's top choice/)).toBeNull();
+    expect(screen.getAllByRole('button', { name: '▶ Play' })).toHaveLength(1);
+    expect(screen.queryByText(/No line against/)).toBeNull();
+  });
+
+  test('singles, on, and no tree holds a line against the reply: today\'s line, with the sentence that says so', () => {
+    render(<LinesSection turn={20} result={hurtBy([singlesLine])} playerNames={SINGLES_NAMES} doubles={false} host={hard()} />);
+    expect(screen.getByText("vs Draining Kiss (Tzon's top choice)")).toBeInTheDocument();
+    expect(screen.getByText('No line against Surf, the reply that hurts Hydro Pump most. This line meets Draining Kiss.')).toBeInTheDocument();
+  });
+
+  test('singles, off: the usual line and no worst line, no sentence', () => {
+    render(<LinesSection turn={20} result={hurtBy([singlesLine, meetsSurf])} playerNames={SINGLES_NAMES} doubles={false} host={host()} />);
+    expect(screen.getByText("vs Draining Kiss (Tzon's top choice)")).toBeInTheDocument();
+    expect(screen.queryByText(/hurts Hydro Pump most/)).toBeNull();
+    expect(screen.getAllByRole('button', { name: '▶ Play' })).toHaveLength(1);
+  });
+
+  test('a usual line that already meets the reply reads as the worst line; a thin cell says so', () => {
+    const asTop = { ...hurtBy([{ ...singlesLine, steps: meetsSurf.steps }]) };
+    render(<LinesSection turn={20} result={asTop} playerNames={SINGLES_NAMES} doubles={false} host={hard()} />);
+    expect(screen.getByText('vs Surf (the reply that hurts Hydro Pump most)')).toBeInTheDocument();
+    cleanup();
+    const thinCells = { ...hurtBy([{ ...singlesLine, steps: meetsSurf.steps }]) };
+    thinCells.matrix = { ...thinCells.matrix!, cells: [[{ visits: 2, verified: false }, { visits: 2, verified: false }], [{ visits: 2, verified: false }, { visits: 2, verified: false }]] };
+    thinCells.perSide.p1[1] = { ...thinCells.perSide.p1[1] };
+    thinCells.perSide.p2[0] = { ...thinCells.perSide.p2[0], punishedBy: 'Surf' };
+    render(<LinesSection turn={20} result={thinCells} playerNames={SINGLES_NAMES} doubles={false} host={hard()} />);
+    expect(screen.getByText('vs Surf (the reply that hurts Hydro Pump most, from a thinly searched cell)')).toBeInTheDocument();
+  });
+
+  test('doubles, on: the joint answer is named like a single one', () => {
+    const pair = 'Sucker Punch → Terapagos + Protect';
+    const other = 'Other pair';
+    const base = withLines([], {});
+    const p1 = [rankedChoice('a', 'Fake Out → Rillaboom + Spore → Zamazenta', 0.3)];
+    const p2 = [rankedChoice('b', other, -0.3), rankedChoice('c', pair, -0.35)];
+    const result: EvalResult = {
+      ...base, perSide: { p1, p2 },
+      matrix: { p1Labels: [p1[0].label], p2Labels: [other, pair], p1Choices: ['a'], p2Choices: ['b', 'c'], values: [[0.4, 0.2]], mixes: { p1: [1], p2: [1, 0] } },
+      lines: [{ ...doublesLine, versus: 'worst' }, { ...doublesLine, steps: [{ ...doublesLine.steps[0], p2: { choice: 'b', label: other, slots: [] } }, ...doublesLine.steps.slice(1)] }],
+    };
+    render(<LinesSection turn={4} result={result} playerNames={DOUBLES_NAMES} doubles host={hard()} />);
+    expect(screen.getByText(`vs ${pair} (the reply that hurts Fake Out → Rillaboom + Spore → Zamazenta most)`)).toBeInTheDocument();
+  });
+});

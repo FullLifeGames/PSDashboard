@@ -2,6 +2,7 @@ import { Fragment } from 'react';
 import type { EvalResult, TurnAnalysis } from '@fulllifegames/eval-engine';
 import { LineConfirm } from './LineConfirm';
 import { cardLines, rowValueTexts } from './turn-copy';
+import { linesForMode, worstLookup } from '../../lib/worst-reply';
 import { activeNamesAt, differsSentences, lineAnchor, lineBlocks, ranksOf, REPLY_OFF_TOP_TITLE, type LineBlockView, type LinesHost, type LineSideView } from '../../lib/line-view';
 
 interface LinesSectionProps {
@@ -60,6 +61,7 @@ function LineBlock({ block, turn, onPlay, confirm }: { block: LineBlockView; tur
       <LineRows block={block} />
       {block.note && <span className="ps-eval-line">{block.note}</span>}
       {block.endNote && <span className="ps-eval-line">{block.endNote}</span>}
+      {block.worstNote && <span className="ps-eval-line">{block.worstNote}</span>}
     </div>
   );
 }
@@ -83,7 +85,7 @@ function noLineSentence(result: EvalResult, coming: ReturnType<NonNullable<Lines
  */
 export function LinesSection({ turn, result, playerNames, doubles, host, analysis }: LinesSectionProps) {
   if (!result) return null;
-  const lines = cardLines(result.lines ?? [], analysis);
+  const lines = linesForMode(cardLines(result.lines ?? [], analysis), !!host.hardMode);
   if (lines.length === 0) {
     return (
       <div className="ps-eval-lines">
@@ -94,7 +96,7 @@ export function LinesSection({ turn, result, playerNames, doubles, host, analysi
       </div>
     );
   }
-  const blocks = lineBlocks(lines, { turn, playerNames, doubles, rules: host.rules, actives: activeNamesAt(host.snapshot), rowValues: rowValueTexts(analysis), ranks: ranksOf(result) });
+  const blocks = lineBlocks(lines, { turn, playerNames, doubles, rules: host.rules, actives: activeNamesAt(host.snapshot), rowValues: rowValueTexts(analysis), ranks: ranksOf(result), ...(host.hardMode ? { worst: worstLookup(result) } : {}) });
   return (
     <div className="ps-eval-lines">
       <span className="ps-eval-lines-title">Lines</span>

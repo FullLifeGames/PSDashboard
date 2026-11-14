@@ -65,6 +65,7 @@ export function useLinesHost(app: AppController, replayData: ReplayData): LinesH
   const { analysisTurn } = app.board.timeline;
   const earlyLines = app.analysis.earlyLines ?? null;
   const lineComing = app.analysis.lineComing;
+  const hardMode = !!app.ctx.evaluation.prefs.hardMode;
   return useMemo(() => ({
     rules: replayRules(replayData),
     snapshot: analysisTurn !== null && analysisTurn >= 1 ? snapshotAt(snapshots, analysisTurn) : null,
@@ -74,5 +75,6 @@ export function useLinesHost(app: AppController, replayData: ReplayData): LinesH
     winPaths,
     earlyLines,
     lineComing,
-  }), [replayData, snapshots, analysisTurn, onPlay, confirm, winPaths, earlyLines, lineComing]);
+    ...(hardMode ? { hardMode } : {}),
+  }), [replayData, snapshots, analysisTurn, onPlay, confirm, winPaths, earlyLines, lineComing, hardMode]);
 }

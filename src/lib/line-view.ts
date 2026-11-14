@@ -2,6 +2,7 @@ import { dieKey, dieLabel, winPctText, type DieKind, type DieWords, type EvalLin
 import { rulesDex, type GameRules, type TurnSnapshot } from '@fulllifegames/replay-core';
 import { wordsOf } from './branch-dice';
 import type { WinPathsHost } from './win-paths-host';
+import type { ReplyBasis } from './worst-reply';
 
 /**
  * Round 89 (#104), step G3: what the "Lines" section of the turn card shows, as plain data. One block per line (head, end value,
@@ -39,6 +40,8 @@ export interface LineBlockView {
   note: string | null;
   /** Why the line stops where it does, when its last position asks a player who to send in (a choice the tree did not make); else null. */
   endNote: string | null;
+  /** Round 89 (#153, Hard mode): the row holds no line against the reply that hurts it most, so this line meets another answer; else null. */
+  worstNote: string | null;
 }
 
 /** The question after ▶ Play on a line when a variation stands: it names the clicked line, so that line's block shows it (round 89, G4b). */
@@ -51,7 +54,7 @@ export interface LineConfirm {
 }
 
 /** One line of one graded turn: a side's engine line and played line differ in their label and roles. */
-export const lineAnchor = (line: EvalLine, turn: number): string => `${turn}|${line.side}|${line.label}|${line.for.join('+')}`;
+export const lineAnchor = (line: EvalLine, turn: number): string => `${turn}|${line.side}|${line.label}|${line.for.join('+')}${line.versus ? `|${line.versus}` : ''}`;
 
 /** What the host of the turn card hands the Lines section: the game's rules, the field at the turn's start and the click. */
 export interface LinesHost {
@@ -68,6 +71,8 @@ export interface LinesHost {
   winPaths?: WinPathsHost;
   /** Round 89 (G13): the early-lines stage while it searches the graded matrix turns (how many hold lines, and Stop); absent or null: not running. */
   earlyLines?: { done: number; total: number; stop: () => void } | null;
+  /** Round 89 (#153): the Hard mode setting: the lines show the reply that hurts each row most, and the opponent plays it. */
+  hardMode?: boolean;
   /** Round 89 (G13b): what a turn that holds no lines waits for ("stage": the early-lines stage will search it; "sweep": the game analysis still runs); null or absent: nothing. */
   lineComing?: (turn: number) => 'stage' | 'sweep' | null;
 }
@@ -122,6 +127,8 @@ export interface LineViewContext {
   rules: GameRules;
   /** The bodies on the field at the turn's start, by side and slot, for the names a die speaks of. */
   actives?: Actives;
+  /** Round 89 (#153, Hard mode): the reply that hurts a line's row most (`worstLookup`); present only with the setting on. */
+  worst?: (side: Side, row: Pick<EvalLine, 'label' | 'choice'>) => { label: string; basis: ReplyBasis } | null;
 }
 
 const SIDE_INDEX: Record<Side, 0 | 1> = { p1: 0, p2: 1 };
@@ -287,16 +294,28 @@ const RANK_WORDS = ['top choice', 'second choice', 'third choice'];
  * The answer a line meets: the other side's choice in the line's first step, by its place in the ranking. A line that opens with a
  * replacement (the other side waits) meets no answer. A doubles answer is the pair's combined label.
  */
-export function replyOf(line: EvalLine, ctx: Pick<LineViewContext, 'ranks' | 'playerNames'>): LineReply | null {
+export function replyOf(line: EvalLine, ctx: Pick<LineViewContext, 'ranks' | 'playerNames' | 'worst'>): LineReply | null {
   const first = line.steps[0];
   if (!ctx.ranks || !first || first.replacement) return null;
   const other: Side = line.side === 'p1' ? 'p2' : 'p1';
   const label = first[other].label;
   const name = ctx.playerNames[SIDE_INDEX[other]];
+  // Hard mode: a line that meets the reply that hurts its row most says so, by what the reply stands on
+  const hurt = ctx.worst?.(line.side, line);
+  if (hurt && hurt.basis !== 'best' && hurt.label === label) {
+    return { label, rank: `the reply that hurts ${line.label} most${hurt.basis === 'punisher' ? ', from a thinly searched cell' : ''}`, off: false };
+  }
   const at = ctx.ranks[other].indexOf(label);
   if (at < 0) return { label, rank: `not among ${name}'s ranked choices`, off: true };
   if (at === 0) return { label, rank: `${name}'s ${RANK_WORDS[0]}`, off: false };
   return { label, rank: `${name}'s ${RANK_WORDS[at] ?? `choice ${at + 1}`} in this search`, off: true };
+}
+
+/** Round 89 (#153): the sentence for a row whose search holds no line against the reply that hurts it most; null when the line meets it or none is known. */
+function worstNote(line: EvalLine, reply: LineReply | null, ctx: Pick<LineViewContext, 'worst'>): string | null {
+  const hurt = ctx.worst?.(line.side, line);
+  if (!hurt || hurt.basis === 'best' || !reply || reply.label === hurt.label) return null;
+  return `No line against ${hurt.label}, the reply that hurts ${line.label} most. This line meets ${reply.label}.`;
 }
 
 /** The tooltip of ▶ Play: what the click does and every die it forces. */
@@ -317,10 +336,11 @@ export function lineBlocks(lines: readonly EvalLine[], ctx: LineViewContext): Li
     const endPct = winPctText(line.end, line.endFainted);
     // a line that holds the engine's role is the engine's row; a played-only line is the row the player played
     const row = ctx.rowValues?.[line.side]?.[line.for.includes('engine') ? 'engine' : 'played'] ?? null;
+    const reply = replyOf(line, ctx);
     return {
       key: `${line.side}-${line.label}-${index}`, line, player, role: roleText(line),
-      end: row === null ? `ends at ${endPct} for ${player}` : `row ${row}, this line ends at ${endPct}`, endPct, row, differs: row !== null && row !== endPct, reply: replyOf(line, ctx),
-      rows, tooltip: tooltipOf(every), note: unforcedNote(line), endNote: endNote(line, ctx.playerNames),
+      end: row === null ? `ends at ${endPct} for ${player}` : `row ${row}, this line ends at ${endPct}`, endPct, row, differs: row !== null && row !== endPct, reply,
+      rows, tooltip: tooltipOf(every), note: unforcedNote(line), endNote: endNote(line, ctx.playerNames), worstNote: worstNote(line, reply, ctx),
     };
   });
 }

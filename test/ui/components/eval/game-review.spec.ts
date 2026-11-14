@@ -291,3 +291,35 @@ describe('gameReview: the answer of each line (G11)', () => {
     );
   });
 });
+
+describe('gameReview: Hard mode (round 89, #153)', () => {
+  const ranking = (labels: string[]) => labels.map((label, index) => rankedChoice(`move ${index}`, label, 0.2 - index * 0.05));
+  const hard: LinesHost = { ...host, hardMode: true };
+  const meetsSurf: EvalLine = { ...singlesLine, versus: 'worst', steps: [{ ...singlesLine.steps[0], p1: { choice: 'move 1', label: 'Surf', slots: [] } }, ...singlesLine.steps.slice(1)] };
+  /** Surf is the reply that hurts Hydro Pump most: the highest cell of its column in p1's view. */
+  const withMatrix = (lines: EvalLine[]): EvalResult => ({
+    ...withLines(lines), perSide: { p1: ranking(['Draining Kiss', 'Surf']), p2: ranking(['Hydro Pump', 'Hyper Voice']) },
+    matrix: { p1Labels: ['Draining Kiss', 'Surf'], p2Labels: ['Hydro Pump', 'Hyper Voice'], p1Choices: ['move 0', 'move 1'], p2Choices: ['move 0', 'move 1'], values: [[0.1, 0], [0.4, -0.1]], mixes: { p1: [1, 0], p2: [1, 0] } },
+  });
+  const review = (lines: EvalLine[], on: LinesHost) => {
+    const analyses: (TurnAnalysis | null)[] = Array.from({ length: 20 }, () => null);
+    analyses[19] = turnAnalysis(20, { p2: gradedP2('inaccuracy') });
+    const results: (EvalResult | null)[] = analyses.map(() => null);
+    results[19] = withMatrix(lines);
+    return gameReview({ analyses, results, playerNames: SINGLES_NAMES, doubles: false, host: on })[1].rows[0].lines;
+  };
+
+  test('singles, on: the engine line is the worst line and its answer says why; off: the usual line, whatever the result holds', () => {
+    const [engine] = review([singlesLine, meetsSurf], hard);
+    expect(engine.text).toBe('Hydro Pump vs Surf (the reply that hurts Hydro Pump most), then Moonblast vs → Corviknight, then Moonblast vs Brave Bird');
+    const [usual] = review([singlesLine, meetsSurf], host);
+    expect(usual.text).toBe("Hydro Pump vs Draining Kiss (Tzon's top choice), then Moonblast vs → Corviknight, then Moonblast vs Brave Bird");
+  });
+
+  test('singles, on, with no line against the reply: today\'s line and the sentence on the block', () => {
+    const lines = review([singlesLine], hard);
+    expect(lines).toHaveLength(1);
+    expect(lines[0].text).toContain("vs Draining Kiss (Tzon's top choice)");
+    expect(lines[0].block.worstNote).toBe('No line against Surf, the reply that hurts Hydro Pump most. This line meets Draining Kiss.');
+  });
+});
