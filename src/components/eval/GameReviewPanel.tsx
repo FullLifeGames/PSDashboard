@@ -21,7 +21,7 @@ function ReviewLine({ line, turn, onPlay, confirm }: { line: ReviewLineView; tur
   return (
     <>
       <div className="ps-eval-review-line">
-        <span className="role">{line.role}:</span>
+        <span className="role">{line.role} line:</span>
         <span className="text">{line.text}</span>
         {onPlay && (
           <button type="button" className="ps-btn ps-eval-inline-btn" title={line.block.tooltip} onClick={() => onPlay(line.block.line, turn)}>

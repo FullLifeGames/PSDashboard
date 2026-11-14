@@ -74,14 +74,19 @@ export function reviewMarks(analyses: readonly (TurnAnalysis | null)[] | null | 
   return gradedSides(analyses).map(({ analysis, side }) => ({ turn: analysis.turn, side }));
 }
 
-/** One line on one row: the listed player's choice against the answer, a replacement by the player who replaces. */
-function lineText(line: EvalLine, playerNames: [string, string]): string {
+/**
+ * One line on one row: the listed player's choice against the answer, a replacement by the player who replaces. A doubles step
+ * holds two moves for each player, so each pair stands behind its player's name (round 89, G4d: "A + B vs C + D" read as one
+ * run-on list of four moves).
+ */
+function lineText(line: EvalLine, playerNames: [string, string], doubles: boolean): string {
   const other: Side = line.side === 'p1' ? 'p2' : 'p1';
   return line.steps.map(step => {
     if (step.replacement) {
       const replacing: Side[] = step.replacement === 'both' ? ['p1', 'p2'] : [step.replacement];
       return replacing.map(side => `${playerNames[SIDE_INDEX[side]]} replaces: ${step[side].label}`).join(' and ');
     }
+    if (doubles) return `${playerNames[SIDE_INDEX[line.side]]}: ${step[line.side].label}; ${playerNames[SIDE_INDEX[other]]}: ${step[other].label}`;
     return `${step[line.side].label} vs ${step[other].label}`;
   }).join(', then ');
 }
@@ -105,7 +110,7 @@ function rowLines(args: ReviewArgs, analysis: TurnAnalysis, side: Side): ReviewL
   };
   // `lineBlocks` puts the engine's line before the played line; a line that holds both roles reads as the engine's
   return lineBlocks(lines, ctx).map((block): ReviewLineView => ({
-    key: block.key, role: block.line.for.includes('engine') ? 'engine' : 'played', text: lineText(block.line, args.playerNames), block,
+    key: block.key, role: block.line.for.includes('engine') ? 'engine' : 'played', text: lineText(block.line, args.playerNames, args.doubles), block,
   }));
 }
 

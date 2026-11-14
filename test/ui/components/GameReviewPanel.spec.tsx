@@ -96,9 +96,15 @@ describe('GameReviewPanel, doubles', () => {
     const onPlay = vi.fn();
     render(<GameReviewPanel analyses={analyses} results={results} playerNames={DOUBLES_NAMES} doubles host={host(onPlay)} />);
     const group = screen.getByRole('group', { name: 'pixelfrost' });
-    expect(within(group).getByText(/then Mstr_Hawk replaces: → Zamazenta-Crowned, then Fake Out → Zamazenta-Crowned \+ Protect/)).toBeInTheDocument();
+    expect(within(group).getByText(/then Mstr_Hawk replaces: → Zamazenta-Crowned, then pixelfrost: Fake Out → Zamazenta-Crowned \+ Protect/)).toBeInTheDocument();
     await userEvent.click(within(group).getByRole('button', { name: '▶ Play' }));
     expect(onPlay).toHaveBeenCalledWith(doublesLine, 4);
     expect(screen.getByText('Mstr_Hawk: no inaccuracy, mistake or blunder.')).toBeInTheDocument();
+  });
+
+  test('a line is labelled "engine line:" or "played line:", so the head\'s "engine" is not repeated by its line', () => {
+    const analyses: (TurnAnalysis | null)[] = [null, null, null, turnAnalysis(4, { p1: { ...misplayedSide('mistake'), best: rankedChoice('move 1, move 2', doublesLine.label, 0.37) } })];
+    render(<GameReviewPanel analyses={analyses} results={[null, null, null, withLines('doubles', [doublesLine])]} playerNames={DOUBLES_NAMES} doubles host={host(vi.fn())} />);
+    expect(screen.getByText('engine line:')).toBeInTheDocument();
   });
 });

@@ -153,9 +153,9 @@ describe('gameReview, doubles', () => {
     const [line] = view[0].rows[0].lines;
     expect(line.role).toBe('engine');
     expect(line.text).toBe(
-      'Fake Out → Rillaboom + Spore → Zamazenta vs Sucker Punch → Terapagos + Protect, ' +
+      'pixelfrost: Fake Out → Rillaboom + Spore → Zamazenta; Mstr_Hawk: Sucker Punch → Terapagos + Protect, ' +
       'then Mstr_Hawk replaces: → Zamazenta-Crowned, ' +
-      'then Fake Out → Zamazenta-Crowned + Protect vs Behemoth Bash → Rillaboom + Protect',
+      'then pixelfrost: Fake Out → Zamazenta-Crowned + Protect; Mstr_Hawk: Behemoth Bash → Rillaboom + Protect',
     );
     // the block is the section's own: doubles rows, one per player
     expect(line.block.rows.length).toBeGreaterThan(3);

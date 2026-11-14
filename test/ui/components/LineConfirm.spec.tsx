@@ -59,7 +59,7 @@ describe('the replace question of ▶ Play', () => {
     expect(within(row).getByRole('button', { name: 'T20' })).toBeInTheDocument();
     expect(screen.getAllByRole('alertdialog')).toHaveLength(1);
     // it follows the clicked line: the engine's, not the played one
-    expect(banner.parentElement!.previousElementSibling).toHaveTextContent('engine:');
+    expect(banner.parentElement!.previousElementSibling).toHaveTextContent('engine line:');
   });
 
   test('Game review, doubles: the same under the doubles row', () => {
