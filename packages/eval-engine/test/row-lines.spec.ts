@@ -3,7 +3,7 @@ import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import { mctsTreeSearch } from '../src/mcts';
 import { cellKey } from '../src/rank';
-import { lineFrom, principalVariation, rowLines, type Node } from '../src/search/mcts-node';
+import { LINE_MIN_VISITS, lineFrom, principalVariation, rowLines as rowLinesAt, type Node } from '../src/search/mcts-node';
 import type { EvalSettings, RowLines, TreeLineStep } from '../src/types';
 
 /**
@@ -18,6 +18,9 @@ interface Cell { i: number; j: number; visits: number; child?: Node }
 
 /** The tops a tree reports: each side's best rows by label, best first (one name each in the older fixtures). */
 const tops = (p1: string, p2: string, ...more: string[]): { p1: string[]; p2: string[] } => ({ p1: [p1], p2: [p2, ...more] });
+
+/** The walk at the threshold of 8 visits, which the fixtures below were written for (G14b: the line walk's own default is 4). */
+const rowLines = (root: Node, tops: { p1: readonly string[]; p2: readonly string[] }): RowLines => rowLinesAt(root, tops, 8);
 
 const options = (labels: string[]) => labels.map((label, index) => ({ choice: `move ${index + 1}`, label }));
 
@@ -104,7 +107,7 @@ describe('the line of a root row', () => {
       i: 0, j: 0, visits: 30,
       child: Object.assign(node(['(waiting)'], ['→ Mew', '→ Gyarados'], [{ i: 0, j: 1, visits: 14 }]), { boundary: false }),
     }]);
-    expect(lineFrom(root, 0).map(step => [step.p1, step.p2])).toEqual([['Surf', 'Moonblast'], ['(waiting)', '→ Gyarados']]);
+    expect(lineFrom(root, 0, 8).map(step => [step.p1, step.p2])).toEqual([['Surf', 'Moonblast'], ['(waiting)', '→ Gyarados']]);
   });
 
   test('principalVariation is the walk it was: the same steps on the same nodes', () => {
@@ -195,7 +198,7 @@ function referenceRowLines(root: Node, tops: { p1?: string; p2?: string }): Reco
   for (const side of ['p1', 'p2'] as const) {
     const options = side === 'p1' ? root.p1Options : root.p2Options;
     for (const [row, { key }] of held[side]) {
-      const line = lineFrom(root, key);
+      const line = lineFrom(root, key, 8);
       if (line.length > 0 && !(options[row].label in out[side])) out[side][options[row].label] = line;
     }
   }
@@ -270,6 +273,51 @@ describe('lines against the tree\'s top three answers', () => {
     const root = wide();
     const before = JSON.stringify([...root.children].map(([key, child]) => [key, child.visits]));
     rowLines(root, { p1: ['A', 'B'], p2: ['X', 'Y', 'Z'] });
+    expect(JSON.stringify([...root.children].map(([key, child]) => [key, child.visits]))).toBe(before);
+  });
+});
+
+/**
+ * Round 89 (#104), step G14b (ruling G9a, option T): a line may stand on a cell with 4 visits, on every turn. The walk of the rows asks
+ * `LINE_MIN_VISITS` (4); the principal variation, which the summary's ", then ..." prose reads, keeps its 8. Nothing in the search
+ * changes, only what the walk calls a line.
+ */
+describe('the line threshold of the rows is 4 visits, the principal variation keeps 8', () => {
+  const thin = (): Node => node(['Surf', 'Ice Beam'], ['Draining Kiss', '→ Mew'], [
+    { i: 0, j: 0, visits: 30, child: node(['Surf'], ['Moonblast'], [
+      { i: 0, j: 0, visits: 5, child: node(['x'], ['y'], [{ i: 0, j: 0, visits: 4 }, { i: 0, j: 1, visits: 3 }]) },
+    ]) },
+    { i: 1, j: 0, visits: 4 },
+    { i: 1, j: 1, visits: 3 },
+  ]);
+
+  test('the constant is 4 and the default of rowLines reads it', () => {
+    expect(LINE_MIN_VISITS).toBe(4);
+    const lines = rowLinesAt(thin(), tops('Surf', 'Draining Kiss'));
+    expect(lines.p1.Surf[0].map(step => [step.p1, step.p2, step.visits])).toEqual([
+      ['Surf', 'Draining Kiss', 30], ['Surf', 'Moonblast', 5], ['x', 'y', 4],
+    ]);
+  });
+
+  test('a row\'s only cell with 4 visits is a line, one with 3 is none', () => {
+    const lines = rowLinesAt(thin(), tops('Surf', 'Draining Kiss'));
+    expect(lines.p1['Ice Beam'][0].map(step => step.visits)).toEqual([4]);
+    // the only cell of the opponent's row → Mew has 3 visits: no line
+    expect(Object.keys(lines.p2)).toEqual(['Draining Kiss']);
+  });
+
+  test('the same fixture at the old threshold holds a shorter line, and the walk of the rows is the principal variation\'s at 8', () => {
+    const old = rowLinesAt(thin(), tops('Surf', 'Draining Kiss'), 8);
+    expect(old.p1.Surf[0].map(step => step.visits)).toEqual([30]);
+    expect(old.p1['Ice Beam']).toBeUndefined();
+    expect(principalVariation(thin())).toEqual(referenceVariation(thin()));
+    expect(principalVariation(thin())).toHaveLength(1);
+  });
+
+  test('the walk at 4 reads the tree and changes nothing in it', () => {
+    const root = thin();
+    const before = JSON.stringify([...root.children].map(([key, child]) => [key, child.visits]));
+    rowLinesAt(root, tops('Surf', 'Draining Kiss'));
     expect(JSON.stringify([...root.children].map(([key, child]) => [key, child.visits]))).toBe(before);
   });
 });

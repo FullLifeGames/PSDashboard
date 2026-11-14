@@ -13,7 +13,13 @@ import { searchOptions } from './options.ts';
  */
 
 const EXPLORATION = 0.8;
+/** The visits a cell needs for the principal variation (the summary's ", then ..." prose reads it, and the corpus pins that prose). */
 const PV_MIN_VISITS = 8;
+/**
+ * Round 89 (#104, G14b, ruling G9a option T): the visits a cell needs for a row's line. A thinner read of the tree than the principal
+ * variation's, shown on every turn; the search itself is the same.
+ */
+export const LINE_MIN_VISITS = 4;
 const PV_MAX_STEPS = 3;
 
 /**
@@ -122,8 +128,8 @@ export function pick(n: number[], w: number[], visits: number, maximize: boolean
   return best;
 }
 
-/** The most visited cell of a node (the first of equals): its key and child, null below the visits a line needs. */
-function heaviestCell(node: Node): { key: number; child: Node } | null {
+/** The most visited cell of a node (the first of equals): its key and child, null below the visits a line needs (`min`). */
+function heaviestCell(node: Node, min: number): { key: number; child: Node } | null {
   let best: Node | undefined;
   let bestVisits = 0;
   let bestKey = 0;
@@ -134,7 +140,7 @@ function heaviestCell(node: Node): { key: number; child: Node } | null {
       bestKey = key;
     }
   }
-  return best && bestVisits >= PV_MIN_VISITS ? { key: bestKey, child: best } : null;
+  return best && bestVisits >= min ? { key: bestKey, child: best } : null;
 }
 
 const hasChoices = (node: Node): boolean => !node.ended && node.p1Options.length > 0 && node.p2Options.length > 0;
@@ -145,22 +151,22 @@ const stepAt = (node: Node, key: number, child: Node): TreeLineStep => ({
 
 /**
  * Round 89 (#104): the line the tree holds from one cell of `root` on: the cell itself, then each node's most visited cell while it has
- * `PV_MIN_VISITS` visits, at most `PV_MAX_STEPS` steps in all. Each step names both sides' choices by label (the labels survive the
+ * `min` visits (the principal variation's 8 unless a caller asks for the lines' own), at most `PV_MAX_STEPS` steps in all. Each step names both sides' choices by label (the labels survive the
  * bench order, the choice strings below the root do not translate) and the visits of its cell. Without a first cell the line starts
  * at `root`'s own most visited cell, the principal variation.
  */
-export function lineFrom(root: Node, first?: number): TreeLineStep[] {
+export function lineFrom(root: Node, first?: number, min: number = PV_MIN_VISITS): TreeLineStep[] {
   const steps: TreeLineStep[] = [];
   let current: Node = root;
   let pick: { key: number; child: Node } | null = null;
   if (first !== undefined) {
     const child = root.children.get(first);
-    if (!child || child.visits < PV_MIN_VISITS) return steps;
+    if (!child || child.visits < min) return steps;
     pick = { key: first, child };
   }
   for (let step = 0; step < PV_MAX_STEPS; step++) {
     if (!hasChoices(current)) break;
-    pick ??= heaviestCell(current);
+    pick ??= heaviestCell(current, min);
     if (!pick) break;
     steps.push(stepAt(current, pick.key, pick.child));
     current = pick.child;
@@ -189,13 +195,13 @@ const answerColumns = (labels: readonly string[], options: { label: string }[]):
  * Each side's rows read from the root's cells: the first cell of a row is the one against the opponent's top row once it has the
  * visits a line needs, else the row's heavier cell (the first of equals).
  */
-function sideCells(root: Node, against: Record<Side, number[]>): Record<Side, SideCells> {
+function sideCells(root: Node, against: Record<Side, number[]>, min: number): Record<Side, SideCells> {
   const out: Record<Side, SideCells> = { p1: { first: new Map(), byColumn: new Map() }, p2: { first: new Map(), byColumn: new Map() } };
   for (const [key, child] of root.children) {
     const i = Math.floor(key / 10_000);
     const j = key % 10_000;
     for (const [side, row, column] of [['p1', i, j], ['p2', j, i]] as const) {
-      const cell = { key, visits: child.visits, top: column === against[side][0] && child.visits >= PV_MIN_VISITS };
+      const cell = { key, visits: child.visits, top: column === against[side][0] && child.visits >= min };
       const was = out[side].first.get(row);
       if (!was || (cell.top && !was.top) || (cell.top === was.top && cell.visits > was.visits)) out[side].first.set(row, cell);
       if (!out[side].byColumn.has(row)) out[side].byColumn.set(row, new Map());
@@ -209,16 +215,16 @@ function sideCells(root: Node, against: Record<Side, number[]>): Record<Side, Si
  * The lines of one row: the first line, then the line against each lower answer whose cell holds the visits a line needs and is not a
  * cell the row already holds a line from. Empty when the first cell gives no line.
  */
-function linesOfRow(root: Node, first: RowCell, byColumn: Map<number, RowCell> | undefined, lower: number[]): TreeLineStep[][] {
-  const head = lineFrom(root, first.key);
+function linesOfRow(root: Node, first: RowCell, byColumn: Map<number, RowCell> | undefined, lower: number[], min: number): TreeLineStep[][] {
+  const head = lineFrom(root, first.key, min);
   if (head.length === 0) return [];
   const lines = [head];
   const taken = new Set([first.key]);
   for (const column of lower) {
     const cell = column < 0 ? undefined : byColumn?.get(column);
-    if (!cell || cell.visits < PV_MIN_VISITS || taken.has(cell.key)) continue;
+    if (!cell || cell.visits < min || taken.has(cell.key)) continue;
     taken.add(cell.key);
-    const line = lineFrom(root, cell.key);
+    const line = lineFrom(root, cell.key, min);
     if (line.length > 0) lines.push(line);
   }
   return lines;
@@ -230,17 +236,17 @@ function linesOfRow(root: Node, first: RowCell, byColumn: Map<number, RowCell> |
  * visits a line needs, else at the row's most visited cell. Round 89 (G12): the row also keeps a line against the tree's second and
  * third top answer when its cell there holds the visits, so the donors of a row can choose the answer the merged ranking puts first.
  * The first entry of a row is the line the tree always kept; a cell that is already a line of the row is not kept twice. A row whose
- * cells all lack the visits has no line. The walk reads the tree and changes nothing in it.
+ * cells all lack the visits (`LINE_MIN_VISITS`, 4 since G14b) has no line. The walk reads the tree and changes nothing in it.
  */
-export function rowLines(root: Node, tops: { p1: readonly string[]; p2: readonly string[] }): RowLines {
+export function rowLines(root: Node, tops: { p1: readonly string[]; p2: readonly string[] }, min: number = LINE_MIN_VISITS): RowLines {
   const out: RowLines = { p1: {}, p2: {} };
   if (!hasChoices(root)) return out;
   const against = { p1: answerColumns(tops.p2, root.p2Options), p2: answerColumns(tops.p1, root.p1Options) };
-  const cells = sideCells(root, against);
+  const cells = sideCells(root, against, min);
   for (const side of ['p1', 'p2'] as const) {
     const options = side === 'p1' ? root.p1Options : root.p2Options;
     for (const [row, first] of cells[side].first) {
-      const lines = linesOfRow(root, first, cells[side].byColumn.get(row), against[side].slice(1));
+      const lines = linesOfRow(root, first, cells[side].byColumn.get(row), against[side].slice(1), min);
       if (lines.length > 0 && !(options[row].label in out[side])) out[side][options[row].label] = lines;
     }
   }
