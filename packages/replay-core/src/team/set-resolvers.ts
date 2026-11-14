@@ -35,7 +35,16 @@ export function usageMoveTail(usageStats: SmogonUsageStats | null | undefined, s
 export interface EditedFields {
   editedEvs: PokemonEvs | null;
   editedNature: PokemonSet['nature'] | null;
+  /**
+   * The nature the info shows beside EVs the user set (issue 150, round 89). The panel keeps it (`applyInferredSpreads`
+   * leaves a body with set EVs alone), so the build plays it: the solver's nature is fitted to the solver's own EVs.
+   */
+  shownNature: PokemonSet['nature'] | null;
   editedIvs: PokemonSet['ivs'] | null;
+}
+
+function shownNatureOf(info: RevealedPokemonInfo, editedEvs: PokemonEvs | null): PokemonSet['nature'] | null {
+  return editedEvs && info.nature?.value ? (info.nature.value as PokemonSet['nature']) : null;
 }
 
 export function editedFields(info: RevealedPokemonInfo): EditedFields {
@@ -48,7 +57,7 @@ export function editedFields(info: RevealedPokemonInfo): EditedFields {
   const editedIvs = info.ivs?.source === 'manual' || info.ivs?.source === 'revealed'
     ? info.ivs.value
     : null;
-  return { editedEvs, editedNature, editedIvs };
+  return { editedEvs, editedNature, shownNature: shownNatureOf(info, editedEvs), editedIvs };
 }
 
 /**
@@ -246,7 +255,7 @@ function spreadNature(
   edited: EditedFields, inferred: SpreadCandidate | undefined, curated: CuratedSet | null,
   spread: UsageSpreadLike, setSpread: UsageSpreadLike,
 ): PokemonSet['nature'] {
-  return (edited.editedNature || inferred?.nature || curated?.spread?.nature || spread?.nature || setSpread?.nature || 'Hardy') as PokemonSet['nature'];
+  return (edited.editedNature || edited.shownNature || inferred?.nature || curated?.spread?.nature || spread?.nature || setSpread?.nature || 'Hardy') as PokemonSet['nature'];
 }
 
 function spreadEvs(

@@ -1,0 +1,496 @@
+|j|☆Nailec
+|j|☆frol1
+|t:|1794506744
+|gametype|singles
+|player|p1|Nailec|archer|
+|player|p2|frol1|#ndwcvfrance|
+|gen|9
+|tier|[Gen 9] NatDex Draft
+|rule|Sleep Clause Mod: Limit one foe put to sleep
+|rule|OHKO Clause: OHKO moves are banned
+|rule|Evasion Clause: Evasion abilities, items, and moves are banned
+|rule|Evasion Abilities Clause: Evasion abilities are banned
+|rule|Evasion Items Clause: Evasion items are banned
+|rule|Evasion Moves Clause: Evasion moves are banned
+|rule|Endless Battle Clause: Forcing endless battles is banned
+|rule|HP Percentage Mod: HP is shown in percentages
+|rule|Terastal Clause: You cannot Terastallize
+|raw|<div class="infobox"><details class="readmore" open><summary><strong>3 custom rules:</strong></summary> +Nonexistent, ! Obtainable Moves, Terastal Clause</details></div>
+|clearpoke
+|poke|p1|Quaquaval, F|
+|poke|p1|Audino, M|
+|poke|p1|Mesprit|
+|poke|p1|Landorus, M|
+|poke|p1|Dragalge, M|
+|poke|p1|Tauros, M|
+|poke|p2|Cramorant, M|
+|poke|p2|Gouging Fire|
+|poke|p2|Golisopod, M|
+|poke|p2|Zygarde|
+|poke|p2|Blissey, F|
+|poke|p2|Dracovish|
+|teampreview
+|c|☆Nailec|hf
+|c|☆frol1|hf
+|j| Xyjen
+|j| Herosabis
+|j| Xeltal
+|j| Ereshkigal
+|l| Ereshkigal
+|j| Ereshkigal
+|j| Eliisa
+|j| Des Teto
+|j| akotelette
+|j| AyoLx
+|j| sir. dee
+|j| kyyyroooo
+|j| Paris Ampharos
+|j| extinct
+|
+|t:|1794506851
+|teamsize|p1|6
+|teamsize|p2|6
+|start
+|switch|p1a: Landorus|Landorus, M|100/100
+|switch|p2a: Golisopod|Golisopod, M|100/100
+|turn|1
+|
+|t:|1794506883
+|detailschange|p2a: Golisopod|Golisopod-Mega, M
+|-mega|p2a: Golisopod|Golisopod|Golisopite
+|move|p1a: Landorus|Rock Slide|p2a: Golisopod
+|-damage|p2a: Golisopod|79/100
+|move|p2a: Golisopod|Iron Head|p1a: Landorus
+|-damage|p1a: Landorus|30/100
+|
+|upkeep
+|turn|2
+|
+|t:|1794506901
+|move|p2a: Golisopod|Aqua Jet|p1a: Landorus
+|-supereffective|p1a: Landorus
+|-damage|p1a: Landorus|0 fnt
+|faint|p1a: Landorus
+|
+|upkeep
+|
+|t:|1794506904
+|switch|p1a: Audino|Audino, M|100/100
+|turn|3
+|j| Roaringmoonlight2
+|j| MP555
+|j| quentinteug
+|
+|t:|1794506957
+|move|p1a: Audino|Yawn|p2a: Golisopod
+|-start|p2a: Golisopod|move: Yawn|[of] p1a: Audino
+|move|p2a: Golisopod|Leech Life|p1a: Audino
+|-damage|p1a: Audino|54/100
+|-heal|p2a: Golisopod|100/100|[from] drain|[of] p1a: Audino
+|
+|upkeep
+|turn|4
+|l| quentinteug
+|
+|t:|1794506972
+|switch|p1a: Quaquaval|Quaquaval, F|100/100
+|switch|p2a: Zygarde|Zygarde|100/100
+|-ability|p2a: Zygarde|Aura Break
+|
+|upkeep
+|turn|5
+|
+|t:|1794506985
+|switch|p1a: Mesprit|Mesprit|100/100
+|switch|p2a: Gouging Fire|Gouging Fire|100/100
+|
+|upkeep
+|turn|6
+|j| Yumi78
+|
+|t:|1794506990
+|-end|p2a: Gouging Fire|Protosynthesis|[silent]
+|switch|p2a: Blissey|Blissey, F|100/100
+|move|p1a: Mesprit|Reflect|p1a: Mesprit
+|-sidestart|p1: Nailec|Reflect
+|
+|upkeep
+|turn|7
+|
+|t:|1794507012
+|move|p1a: Mesprit|Light Screen|p1a: Mesprit
+|-sidestart|p1: Nailec|move: Light Screen
+|move|p2a: Blissey|Ice Beam|p1a: Mesprit
+|-damage|p1a: Mesprit|91/100
+|
+|upkeep
+|turn|8
+|
+|t:|1794507016
+|switch|p2a: Cramorant|Cramorant, M|100/100
+|move|p1a: Mesprit|U-turn|p2a: Cramorant
+|-resisted|p2a: Cramorant
+|-damage|p2a: Cramorant|93/100
+|
+|t:|1794507031
+|switch|p1a: Quaquaval|Quaquaval, F|100/100|[from] U-turn
+|
+|upkeep
+|turn|9
+|
+|t:|1794507039
+|move|p1a: Quaquaval|Swords Dance|p1a: Quaquaval
+|-boost|p1a: Quaquaval|atk|2
+|move|p2a: Cramorant|Defog|p1a: Quaquaval
+|-unboost|p1a: Quaquaval|evasion|1
+|-sideend|p1: Nailec|Reflect
+|-sideend|p1: Nailec|move: Light Screen
+|
+|upkeep
+|turn|10
+|l| Yumi78
+|
+|t:|1794507068
+|move|p1a: Quaquaval|Encore|p2a: Cramorant
+|-start|p2a: Cramorant|Encore
+|move|p2a: Cramorant|Defog|p1a: Quaquaval
+|-unboost|p1a: Quaquaval|evasion|1
+|
+|upkeep
+|turn|11
+|
+|t:|1794507089
+|switch|p2a: Dracovish|Dracovish|100/100
+|move|p1a: Quaquaval|Aqua Step|p2a: Dracovish
+|-resisted|p2a: Dracovish
+|-damage|p2a: Dracovish|79/100
+|-boost|p1a: Quaquaval|spe|1
+|
+|upkeep
+|turn|12
+|
+|t:|1794507115
+|move|p1a: Quaquaval|Triple Axel|p2a: Dracovish
+|-damage|p2a: Dracovish|64/100
+|-damage|p2a: Dracovish|37/100
+|-crit|p2a: Dracovish
+|-damage|p2a: Dracovish|0 fnt
+|faint|p2a: Dracovish
+|-ability|p1a: Quaquaval|Moxie|boost
+|-boost|p1a: Quaquaval|atk|1
+|-hitcount|p2: Dracovish|3
+|
+|upkeep
+|
+|t:|1794507124
+|switch|p2a: Gouging Fire|Gouging Fire|100/100
+|turn|13
+|
+|t:|1794507130
+|move|p1a: Quaquaval|Aqua Step|p2a: Gouging Fire
+|-damage|p2a: Gouging Fire|45/100
+|-boost|p1a: Quaquaval|spe|1
+|move|p2a: Gouging Fire|Breaking Swipe|p1a: Quaquaval
+|-damage|p1a: Quaquaval|70/100
+|-unboost|p1a: Quaquaval|atk|1
+|
+|upkeep
+|turn|14
+|j| goollld
+|
+|t:|1794507170
+|move|p1a: Quaquaval|Swords Dance|p1a: Quaquaval
+|-boost|p1a: Quaquaval|atk|2
+|move|p2a: Gouging Fire|Breaking Swipe|p1a: Quaquaval
+|-damage|p1a: Quaquaval|39/100
+|-unboost|p1a: Quaquaval|atk|1
+|
+|upkeep
+|turn|15
+|j| bad hareng
+|
+|t:|1794507200
+|-end|p2a: Gouging Fire|Protosynthesis|[silent]
+|switch|p2a: Zygarde|Zygarde|100/100
+|-ability|p2a: Zygarde|Aura Break
+|move|p1a: Quaquaval|Aqua Step|p2a: Zygarde
+|-damage|p2a: Zygarde|30/100
+|-boost|p1a: Quaquaval|spe|1
+|
+|-heal|p2a: Zygarde|36/100|[from] item: Leftovers
+|upkeep
+|turn|16
+|j| Mdraa
+|
+|t:|1794507224
+|move|p1a: Quaquaval|Aqua Step|p2a: Zygarde
+|-damage|p2a: Zygarde|0 fnt
+|-boost|p1a: Quaquaval|spe|1
+|faint|p2a: Zygarde
+|-ability|p1a: Quaquaval|Moxie|boost
+|-boost|p1a: Quaquaval|atk|1
+|
+|upkeep
+|
+|t:|1794507227
+|switch|p2a: Golisopod|Golisopod-Mega, M|100/100
+|turn|17
+|
+|t:|1794507263
+|switch|p1a: Dragalge|Dragalge, M|100/100
+|move|p2a: Golisopod|Leech Life|p1a: Dragalge
+|-resisted|p1a: Dragalge
+|-damage|p1a: Dragalge|76/100
+|
+|upkeep
+|turn|18
+|
+|t:|1794507303
+|detailschange|p1a: Dragalge|Dragalge-Mega, M
+|-mega|p1a: Dragalge|Dragalge|Dragalgite
+|move|p1a: Dragalge|Flip Turn|p2a: Golisopod
+|-damage|p2a: Golisopod|94/100
+|
+|t:|1794507308
+|switch|p1a: Audino|Audino, M|87/100|[from] Flip Turn
+|move|p2a: Golisopod|Iron Head|p1a: Audino
+|-damage|p1a: Audino|45/100
+|
+|upkeep
+|turn|19
+|j| Kai_Kitt
+|j| iamqc
+|
+|t:|1794507444
+|move|p1a: Audino|Healing Wish|p1a: Audino
+|faint|p1a: Audino
+|move|p2a: Golisopod|Leech Life|p1: Audino|[notarget]
+|-fail|p2a: Golisopod
+|
+|upkeep
+|
+|t:|1794507448
+|switch|p1a: Quaquaval|Quaquaval, F|39/100
+|-heal|p1a: Quaquaval|100/100|[from] move: Healing Wish
+|turn|20
+|j| zizi festif
+|
+|t:|1794507502
+|switch|p1a: Dragalge|Dragalge-Mega, M|100/100
+|move|p2a: Golisopod|Leech Life|p1a: Dragalge
+|-resisted|p1a: Dragalge
+|-damage|p1a: Dragalge|76/100
+|-heal|p2a: Golisopod|100/100|[from] drain|[of] p1a: Dragalge
+|
+|upkeep
+|turn|21
+|
+|t:|1794507517
+|move|p1a: Dragalge|Toxic Spikes|p2a: Golisopod
+|-sidestart|p2: frol1|move: Toxic Spikes
+|move|p2a: Golisopod|Leech Life|p1a: Dragalge
+|-resisted|p1a: Dragalge
+|-damage|p1a: Dragalge|54/100
+|
+|upkeep
+|turn|22
+|
+|t:|1794507526
+|move|p1a: Dragalge|Dragon Pulse|p2a: Golisopod
+|-resisted|p2a: Golisopod
+|-damage|p2a: Golisopod|86/100
+|move|p2a: Golisopod|Leech Life|p1a: Dragalge
+|-resisted|p1a: Dragalge
+|-damage|p1a: Dragalge|32/100
+|-heal|p2a: Golisopod|97/100|[from] drain|[of] p1a: Dragalge
+|
+|upkeep
+|turn|23
+|
+|t:|1794507539
+|move|p1a: Dragalge|Dragon Pulse|p2a: Golisopod
+|-resisted|p2a: Golisopod
+|-damage|p2a: Golisopod|80/100
+|move|p2a: Golisopod|Leech Life|p1a: Dragalge
+|-resisted|p1a: Dragalge
+|-damage|p1a: Dragalge|6/100
+|-heal|p2a: Golisopod|92/100|[from] drain|[of] p1a: Dragalge
+|
+|upkeep
+|turn|24
+|
+|t:|1794507547
+|switch|p2a: Cramorant|Cramorant, M|93/100
+|move|p1a: Dragalge|Dragon Pulse|p2a: Cramorant
+|-damage|p2a: Cramorant|52/100
+|
+|upkeep
+|turn|25
+|
+|t:|1794507571
+|move|p2a: Cramorant|Defog|p1a: Dragalge
+|-unboost|p1a: Dragalge|evasion|1
+|-sideend|p2: frol1|Toxic Spikes|[from] move: Defog|[of] p2a: Cramorant
+|move|p1a: Dragalge|Sludge Bomb|p2a: Cramorant
+|-damage|p2a: Cramorant|8/100
+|
+|upkeep
+|turn|26
+|
+|t:|1794507581
+|move|p2a: Cramorant|Surf|p1a: Dragalge
+|-formechange|p2a: Cramorant|Cramorant-Gorging|
+|-resisted|p1a: Dragalge
+|-damage|p1a: Dragalge|0 fnt
+|faint|p1a: Dragalge
+|detailschange|p1: Dragalge|Dragalge, M|[silent]
+|
+|upkeep
+|
+|t:|1794507608
+|switch|p1a: Tauros|Tauros, M|100/100
+|turn|27
+|
+|t:|1794507613
+|move|p1a: Tauros|Close Combat|p2a: Cramorant
+|-resisted|p2a: Cramorant
+|-damage|p2a: Cramorant|0 fnt
+|-unboost|p1a: Tauros|def|1
+|-unboost|p1a: Tauros|spd|1
+|-damage|p1a: Tauros|76/100|[from] ability: Gulp Missile|[of] p2a: Cramorant
+|-status|p1a: Tauros|par
+|-formechange|p2a: Cramorant|Cramorant|
+|faint|p2a: Cramorant
+|
+|upkeep
+|
+|t:|1794507623
+|switch|p2a: Gouging Fire|Gouging Fire|45/100
+|turn|28
+|
+|t:|1794507632
+|switch|p1a: Mesprit|Mesprit|91/100
+|move|p2a: Gouging Fire|Dragon Dance|p2a: Gouging Fire
+|-boost|p2a: Gouging Fire|atk|1
+|-boost|p2a: Gouging Fire|spe|1
+|
+|upkeep
+|turn|29
+|
+|t:|1794507643
+|move|p2a: Gouging Fire|Heat Crash|p1a: Mesprit
+|-damage|p1a: Mesprit|48/100
+|move|p1a: Mesprit|Reflect|p1a: Mesprit
+|-sidestart|p1: Nailec|Reflect
+|
+|upkeep
+|turn|30
+|
+|t:|1794507649
+|move|p2a: Gouging Fire|Morning Sun|p2a: Gouging Fire
+|-heal|p2a: Gouging Fire|95/100
+|move|p1a: Mesprit|Healing Wish|p1a: Mesprit
+|faint|p1a: Mesprit
+|
+|upkeep
+|
+|t:|1794507655
+|switch|p1a: Tauros|Tauros, M|76/100 par
+|-heal|p1a: Tauros|100/100|[from] move: Healing Wish
+|turn|31
+|
+|t:|1794507663
+|move|p1a: Tauros|Outrage|p2a: Gouging Fire
+|-supereffective|p2a: Gouging Fire
+|-damage|p2a: Gouging Fire|59/100
+|-damage|p1a: Tauros|84/100|[from] item: Rocky Helmet|[of] p2a: Gouging Fire
+|move|p2a: Gouging Fire|Breaking Swipe|p1a: Tauros
+|-damage|p1a: Tauros|65/100
+|-unboost|p1a: Tauros|atk|1
+|
+|upkeep
+|turn|32
+|
+|t:|1794507670
+|move|p1a: Tauros|Outrage|p2a: Gouging Fire|[from] lockedmove
+|-supereffective|p2a: Gouging Fire
+|-damage|p2a: Gouging Fire|33/100
+|-damage|p1a: Tauros|48/100|[from] item: Rocky Helmet|[of] p2a: Gouging Fire
+|move|p2a: Gouging Fire|Morning Sun|p2a: Gouging Fire
+|-heal|p2a: Gouging Fire|83/100
+|
+|upkeep
+|turn|33
+|
+|t:|1794507673
+|move|p1a: Tauros|Outrage|p2a: Gouging Fire|[from] lockedmove
+|-supereffective|p2a: Gouging Fire
+|-damage|p2a: Gouging Fire|59/100
+|-damage|p1a: Tauros|32/100|[from] item: Rocky Helmet|[of] p2a: Gouging Fire
+|-start|p1a: Tauros|confusion|[fatigue]
+|move|p2a: Gouging Fire|Dragon Dance|p2a: Gouging Fire
+|-boost|p2a: Gouging Fire|atk|1
+|-boost|p2a: Gouging Fire|spe|1
+|
+|upkeep
+|turn|34
+|
+|t:|1794507677
+|-activate|p1a: Tauros|confusion
+|move|p1a: Tauros|Outrage|p2a: Gouging Fire
+|-supereffective|p2a: Gouging Fire
+|-damage|p2a: Gouging Fire|34/100
+|-damage|p1a: Tauros|15/100|[from] item: Rocky Helmet|[of] p2a: Gouging Fire
+|move|p2a: Gouging Fire|Morning Sun|p2a: Gouging Fire
+|-heal|p2a: Gouging Fire|84/100
+|
+|upkeep
+|turn|35
+|
+|t:|1794507682
+|-end|p1a: Tauros|confusion
+|move|p1a: Tauros|Outrage|p2a: Gouging Fire|[from] lockedmove
+|-supereffective|p2a: Gouging Fire
+|-damage|p2a: Gouging Fire|61/100
+|-damage|p1a: Tauros|0 fnt|[from] item: Rocky Helmet|[of] p2a: Gouging Fire
+|faint|p1a: Tauros
+|move|p2a: Gouging Fire|Morning Sun|p2a: Gouging Fire
+|-heal|p2a: Gouging Fire|100/100
+|
+|upkeep
+|
+|t:|1794507686
+|switch|p1a: Quaquaval|Quaquaval, F|100/100
+|turn|36
+|
+|t:|1794507694
+|move|p2a: Gouging Fire|Breaking Swipe|p1a: Quaquaval
+|-damage|p1a: Quaquaval|70/100
+|-unboost|p1a: Quaquaval|atk|1
+|move|p1a: Quaquaval|Swords Dance|p1a: Quaquaval
+|-boost|p1a: Quaquaval|atk|2
+|
+|-sideend|p1: Nailec|Reflect
+|upkeep
+|turn|37
+|c|☆Nailec|gg
+|
+|t:|1794507700
+|move|p2a: Gouging Fire|Breaking Swipe|p1a: Quaquaval
+|-damage|p1a: Quaquaval|13/100
+|-unboost|p1a: Quaquaval|atk|1
+|move|p1a: Quaquaval|Aqua Step|p2a: Gouging Fire
+|-damage|p2a: Gouging Fire|79/100
+|-boost|p1a: Quaquaval|spe|1
+|
+|upkeep
+|turn|38
+|c|☆frol1|gg
+|
+|t:|1794507703
+|move|p2a: Gouging Fire|Breaking Swipe|p1a: Quaquaval
+|-damage|p1a: Quaquaval|0 fnt
+|faint|p1a: Quaquaval
+|
+|win|frol1
+|l| Mdraa
