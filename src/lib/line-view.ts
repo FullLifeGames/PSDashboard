@@ -22,7 +22,14 @@ export interface LineBlockView {
   player: string;
   /** "engine: Surf", "played: Hyper Voice" or "played the engine's move: Draining Kiss". */
   role: string;
+  /** "row 23%, this line ends at 19%" when the card's row value is known, else "ends at 19% for <player>". */
   end: string;
+  /** The win chance at the line's end, as the card prints one ("19%"). */
+  endPct: string;
+  /** The percentage the line's own row shows on the card ("23%"); null when the context holds none (a win-path line has none). */
+  row: string | null;
+  /** The row and the end print differently: the one sentence on why (`LINE_DIFFERS_SENTENCE`) belongs to the section. */
+  differs: boolean;
   rows: LineRowView[];
   /** The title of the play button: every die the click forces. */
   tooltip: string;
@@ -59,9 +66,20 @@ export interface LinesHost {
   winPaths?: WinPathsHost;
 }
 
+/** The percentages a side's rows show on the card, already printed ("23%"): the engine's row and the played row. */
+export interface RowValues { engine?: string; played?: string }
+
+/**
+ * Round 89 (#104), G10 (ruling G5a): why a row's number and its line's end number differ. Shown once under the Lines section and once
+ * under the Game review, and only when a line differs.
+ */
+export const LINE_DIFFERS_SENTENCE = "A row's value averages every answer and die the search tried; a line follows one answer with each die at its likeliest result.";
+
 export interface LineViewContext {
   /** The graded turn: the line's first step plays it. */
   turn: number;
+  /** The card's own row values by side (`rowValueTexts`): a line shows its row beside its end. Absent: the end alone. */
+  rowValues?: { p1?: RowValues; p2?: RowValues };
   playerNames: [string, string];
   doubles: boolean;
   rules: GameRules;
@@ -226,9 +244,13 @@ export function lineBlocks(lines: readonly EvalLine[], ctx: LineViewContext): Li
   const order = (line: EvalLine) => (line.side === 'p1' ? 0 : 2) + (line.for.includes('engine') ? 0 : 1);
   return [...lines].sort((a, b) => order(a) - order(b)).map((line, index) => {
     const { rows, every } = stepViews(line, ctx);
+    const player = ctx.playerNames[SIDE_INDEX[line.side]];
+    const endPct = winPctText(line.end, line.endFainted);
+    // a line that holds the engine's role is the engine's row; a played-only line is the row the player played
+    const row = ctx.rowValues?.[line.side]?.[line.for.includes('engine') ? 'engine' : 'played'] ?? null;
     return {
-      key: `${line.side}-${line.label}-${index}`, line, player: ctx.playerNames[SIDE_INDEX[line.side]], role: roleText(line),
-      end: `ends at ${winPctText(line.end, line.endFainted)} for ${ctx.playerNames[SIDE_INDEX[line.side]]}`,
+      key: `${line.side}-${line.label}-${index}`, line, player, role: roleText(line),
+      end: row === null ? `ends at ${endPct} for ${player}` : `row ${row}, this line ends at ${endPct}`, endPct, row, differs: row !== null && row !== endPct,
       rows, tooltip: tooltipOf(every), note: unforcedNote(line), endNote: endNote(line, ctx.playerNames),
     };
   });

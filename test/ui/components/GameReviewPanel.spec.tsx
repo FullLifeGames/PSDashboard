@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { EvalLine, EvalResult, SideAnalysis, TurnAnalysis } from '@fulllifegames/eval-engine';
+import { winPctText, type EvalLine, type EvalResult, type SideAnalysis, type TurnAnalysis } from '@fulllifegames/eval-engine';
 import { GameReviewPanel } from '../../../src/components/eval/GameReviewPanel';
 import type { LinesHost } from '../../../src/lib/line-view';
 import { misplayedSide, turnAnalysis } from '../fixtures/analysis';
@@ -166,5 +166,41 @@ describe('GameReviewPanel, the Endgame row', () => {
     const button = screen.getByRole('button', { name: /^Endgame/ });
     expect(button).toBeDisabled();
     expect(button).toHaveAttribute('title', 'Waiting for Smogon data.');
+  });
+});
+
+/** Round 89 (#104), step G10 (ruling G5a): each review line ends with its own number, and one sentence stands under the review when a line differs. */
+describe('GameReviewPanel, both numbers', () => {
+  const SENTENCE = "A row's value averages every answer and die the search tried; a line follows one answer with each die at its likeliest result.";
+
+  test('singles: every line ends at its value, and the sentence stands once under the review', () => {
+    const { analyses, results } = singlesGame();
+    render(<GameReviewPanel analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={host()} />);
+    const pepito = screen.getByRole('group', { name: 'Pepitopalotin' });
+    expect(within(pepito).getByText(`ends at ${winPctText(singlesLine.end, singlesLine.endFainted)}`)).toBeInTheDocument();
+    expect(within(pepito).getByText(`ends at ${winPctText(playedLine.end, playedLine.endFainted)}`)).toBeInTheDocument();
+    expect(screen.getAllByText(SENTENCE)).toHaveLength(1);
+    expect(within(pepito).queryByText(SENTENCE)).toBeNull();
+  });
+
+  test('doubles: the pair line ends at its value, with the same sentence once', () => {
+    const analyses: (TurnAnalysis | null)[] = [null, null, null, turnAnalysis(4, { p1: { ...misplayedSide('mistake'), best: rankedChoice('move 1, move 2', doublesLine.label, 0.6) } })];
+    render(<GameReviewPanel analyses={analyses} results={[null, null, null, withLines('doubles', [doublesLine])]} playerNames={DOUBLES_NAMES} doubles host={host()} />);
+    expect(screen.getByText(`ends at ${winPctText(doublesLine.end, doublesLine.endFainted)}`)).toBeInTheDocument();
+    expect(screen.getAllByText(SENTENCE)).toHaveLength(1);
+  });
+
+  test('no sentence when no line differs from its row, and none without a line', () => {
+    const share = 0.1;
+    const side = gradedP2('inaccuracy');
+    const same: SideAnalysis = { ...side, faintedFraction: share, best: rankedChoice('move 1', 'Hydro Pump', singlesLine.end), played: rankedChoice('move 2', 'Hyper Voice', playedLine.end) };
+    const analyses: (TurnAnalysis | null)[] = Array.from({ length: 20 }, () => null);
+    analyses[19] = turnAnalysis(20, { p2: same });
+    const results: (EvalResult | null)[] = analyses.map(() => null);
+    results[19] = withLines('singles', [singlesLine, playedLine]);
+    const { rerender } = render(<GameReviewPanel analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={host()} />);
+    expect(screen.queryByText(SENTENCE)).toBeNull();
+    rerender(<GameReviewPanel analyses={analyses} results={[]} playerNames={SINGLES_NAMES} doubles={false} host={host()} />);
+    expect(screen.queryByText(SENTENCE)).toBeNull();
   });
 });

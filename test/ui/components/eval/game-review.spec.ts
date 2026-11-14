@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { buildGameReport, winDeltaText, winPctText, type EvalLine, type EvalResult, type SideAnalysis, type TurnAnalysis } from '@fulllifegames/eval-engine';
-import { gameReview, gradedTier, reviewMarks } from '../../../../src/components/eval/game-review';
+import { gameReview, gradedTier, reviewDiffers, reviewMarks } from '../../../../src/components/eval/game-review';
 import type { LinesHost } from '../../../../src/lib/line-view';
 import { misplayedSide, sideAnalysis, turnAnalysis } from '../../fixtures/analysis';
 import { evalResult, rankedChoice } from '../../fixtures/eval-result';
@@ -207,5 +207,51 @@ describe('the review and the report list one verdict per side', () => {
   test('doubles: both sides of one turn, a read on one and an inaccuracy on the other', () => {
     const analysis = turnAnalysis(4, { swing: 0, p1: gradedP2('inaccuracy', { riskPaidOff: true }), p2: gradedP2('inaccuracy') });
     expect(reviewMarks([analysis])).toEqual([{ turn: 4, side: 'p2' }]);
+  });
+});
+
+/** Round 89 (#104), step G10 (ruling G5a): each review line ends with its own number; a line that differs from its row is told apart. */
+describe('gameReview: the end of each line beside its row (G10)', () => {
+  test('singles: each line ends at its own value and knows whether it differs from the row the head prints', () => {
+    const analyses: (TurnAnalysis | null)[] = Array.from({ length: 20 }, () => null);
+    analyses[19] = turnAnalysis(20, { p2: gradedP2('inaccuracy') });
+    const results: (EvalResult | null)[] = analyses.map(() => null);
+    results[19] = withLines([singlesLine, playedLine]);
+    const view = gameReview({ analyses, results, playerNames: SINGLES_NAMES, doubles: false, host });
+    const [engine, played] = view[1].rows[0].lines;
+    expect(engine.end).toBe(`ends at ${winPctText(singlesLine.end, singlesLine.endFainted)}`);
+    expect(played.end).toBe(`ends at ${winPctText(playedLine.end, playedLine.endFainted)}`);
+    // the engine row prints 0.1 and the line ends at 0.06 (a different print), the played row 0.06 against a line at -0.24
+    expect(engine.block.row).toBe(winPctText(0.1));
+    expect(played.block.row).toBe(winPctText(0.06));
+    expect(engine.block.differs).toBe(true);
+    expect(played.block.differs).toBe(true);
+    expect(reviewDiffers(view)).toBe(true);
+  });
+
+  test('singles: no line differs when every line ends where its row stands', () => {
+    const share = 0.1;
+    const analyses: (TurnAnalysis | null)[] = Array.from({ length: 20 }, () => null);
+    const side = gradedP2('inaccuracy', { faintedFraction: share, best: rankedChoice('move 1', 'Hydro Pump', singlesLine.end), played: rankedChoice('move 2', 'Hyper Voice', playedLine.end) });
+    analyses[19] = turnAnalysis(20, { p2: side });
+    const results: (EvalResult | null)[] = analyses.map(() => null);
+    results[19] = withLines([singlesLine, playedLine]);
+    const view = gameReview({ analyses, results, playerNames: SINGLES_NAMES, doubles: false, host });
+    expect(view[1].rows[0].lines.map(line => line.block.differs)).toEqual([false, false]);
+    expect(reviewDiffers(view)).toBe(false);
+  });
+
+  test('doubles: the pair line ends at its value and differs from the row the head prints', () => {
+    const analyses: (TurnAnalysis | null)[] = [null, null, null, turnAnalysis(4, { p1: { ...misplayedSide('mistake'), best: rankedChoice('move 1, move 2', doublesLine.label, 0.6) } })];
+    const results: (EvalResult | null)[] = [null, null, null, { ...evalResult('doubles'), lines: [doublesLine] }];
+    const view = gameReview({ analyses, results, playerNames: DOUBLES_NAMES, doubles: true, host });
+    const [line] = view[0].rows[0].lines;
+    expect(line.end).toBe(`ends at ${winPctText(doublesLine.end, doublesLine.endFainted)}`);
+    expect(line.block.differs).toBe(true);
+    expect(reviewDiffers(view)).toBe(true);
+  });
+
+  test('a review without lines has nothing to explain', () => {
+    expect(reviewDiffers(gameReview({ analyses: [], results: [], playerNames: SINGLES_NAMES, doubles: false, host }))).toBe(false);
   });
 });

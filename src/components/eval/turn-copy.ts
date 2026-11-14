@@ -1,4 +1,5 @@
 import { regretText, TIER_THRESHOLDS, type EvalLine, type SideAnalysis, type TurnAnalysis, type RankedChoice, winDeltaText, winPctText } from '@fulllifegames/eval-engine';
+import type { RowValues } from '../../lib/line-view';
 
 /**
  * Every displayed value is a WIN PROBABILITY for the named player — "52%"
@@ -103,6 +104,23 @@ export function cardLines(lines: readonly EvalLine[], analysis: Pick<TurnAnalysi
     if (roles.length === 0) return [];
     return [roles.length === line.for.length ? line : { ...line, for: roles }];
   });
+}
+
+/**
+ * Round 89 (#104), G10: the percentages the card's rows show for each side, printed as the card prints them: the engine's row (the
+ * value `engineChoice` names) and the played row. A line reads its own row's number from here, so the Lines section and the Game
+ * review put the same two numbers side by side.
+ */
+export function rowValueTexts(analysis: Pick<TurnAnalysis, 'p1' | 'p2'> | null | undefined): { p1?: RowValues; p2?: RowValues } | undefined {
+  if (!analysis) return undefined;
+  const of = (side: SideAnalysis): RowValues => {
+    const engine = engineChoice(side);
+    return {
+      ...(engine ? { engine: winPctText(engine.value, side.faintedFraction) } : {}),
+      ...(side.played ? { played: winPctText(side.played.ev, side.faintedFraction) } : {}),
+    };
+  };
+  return { p1: of(analysis.p1), p2: of(analysis.p2) };
 }
 
 /**

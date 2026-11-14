@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
-import { DIE_KINDS, type EvalLine, type ForcedDie, type LineDie, type LineStep } from '@fulllifegames/eval-engine';
-import { lineBlocks, type LineViewContext } from '../../../src/lib/line-view';
+import { DIE_KINDS, winPctText, type EvalLine, type ForcedDie, type LineDie, type LineStep } from '@fulllifegames/eval-engine';
+import { LINE_DIFFERS_SENTENCE, lineBlocks, type LineViewContext } from '../../../src/lib/line-view';
 import { bothRolesLine, doublesLine, DOUBLES_NAMES, playedLine, singlesLine, SINGLES_NAMES } from '../fixtures/lines';
 
 /**
@@ -168,5 +168,54 @@ describe('why a line ends', () => {
   test('a line that ends for another reason has no such note', () => {
     expect(lineBlocks([singlesLine], singles)[0].endNote).toBeNull();
     expect(lineBlocks([doublesLine], doubles)[0].endNote).toBeNull();
+  });
+});
+
+/** Round 89 (#104), step G10 (ruling G5a): a line that has a row value shows both numbers; the sentence comes only when they differ. */
+describe('both numbers on a line', () => {
+  const endOf = (line: EvalLine) => winPctText(line.end, line.endFainted);
+
+  test('singles: the engine line carries its row value and the end value, and differs when the two print differently', () => {
+    expect(endOf(singlesLine)).not.toBe('23%');
+    const [block] = lineBlocks([singlesLine], { ...singles, rowValues: { p2: { engine: '23%', played: '40%' } } });
+    expect(block.row).toBe('23%');
+    expect(block.end).toBe(`row 23%, this line ends at ${endOf(singlesLine)}`);
+    expect(block.differs).toBe(true);
+    // the played line reads the played row, not the engine's
+    const [played] = lineBlocks([playedLine], { ...singles, rowValues: { p2: { engine: '23%', played: '40%' } } });
+    expect(played.row).toBe('40%');
+    expect(played.end).toBe(`row 40%, this line ends at ${endOf(playedLine)}`);
+    // a line that holds both roles is the engine's row
+    const [both] = lineBlocks([bothRolesLine], { ...singles, rowValues: { p1: { engine: '11%', played: '12%' } } });
+    expect(both.row).toBe('11%');
+  });
+
+  test('doubles: the pair\'s line reads its side\'s row value', () => {
+    const [block] = lineBlocks([doublesLine], { ...doubles, rowValues: { p1: { engine: '61%' }, p2: { engine: '5%' } } });
+    expect(block.end).toBe(`row 61%, this line ends at ${endOf(doublesLine)}`);
+    expect(block.differs).toBe(true);
+  });
+
+  test('a line whose end prints as its row has both numbers and no difference to explain', () => {
+    const [block] = lineBlocks([singlesLine], { ...singles, rowValues: { p2: { engine: endOf(singlesLine) } } });
+    expect(block.end).toBe(`row ${endOf(singlesLine)}, this line ends at ${endOf(singlesLine)}`);
+    expect(block.differs).toBe(false);
+  });
+
+  test('without a row value the block keeps today\'s words and never differs (the win-path lines have none)', () => {
+    for (const rowValues of [undefined, {}, { p1: { engine: '50%' } }]) {
+      const [block] = lineBlocks([singlesLine], { ...singles, ...(rowValues ? { rowValues } : {}) });
+      expect(block.end).toBe(`ends at ${endOf(singlesLine)} for Pepitopalotin`);
+      expect(block.row).toBeNull();
+      expect(block.differs).toBe(false);
+    }
+  });
+
+  test('the end value alone is on the block, for the Game review', () => {
+    expect(lineBlocks([singlesLine], singles)[0].endPct).toBe(endOf(singlesLine));
+  });
+
+  test('the sentence says why in one muted sentence with no dash', () => {
+    expect(LINE_DIFFERS_SENTENCE).toBe("A row's value averages every answer and die the search tried; a line follows one answer with each die at its likeliest result.");
   });
 });

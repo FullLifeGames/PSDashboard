@@ -1,6 +1,6 @@
 import { lostGround, winDeltaText, winPctText, type EvalLine, type EvalResult, type SideAnalysis, type TurnAnalysis, type VerdictTier } from '@fulllifegames/eval-engine';
 import { activeNamesAt, lineBlocks, type LineBlockView, type LinesHost } from '../../lib/line-view';
-import { cardLines, engineChoice, regretView } from './turn-copy';
+import { cardLines, engineChoice, regretView, rowValueTexts } from './turn-copy';
 
 /**
  * Round 89 (#104), step G4: what the Game review lists, as plain data. Ruling 33 (4a): only the turns the cards grade (inaccuracy,
@@ -17,6 +17,8 @@ export interface ReviewLineView {
   role: 'engine' | 'played';
   /** The whole line on one row: "<own choice> vs <the answer>, then …". */
   text: string;
+  /** "ends at 19%": the line's own number; the head of the row prints the row's (round 89, G10). */
+  end: string;
   block: LineBlockView;
 }
 export interface ReviewRowView {
@@ -107,10 +109,11 @@ function rowLines(args: ReviewArgs, analysis: TurnAnalysis, side: Side): ReviewL
   const ctx = {
     turn, playerNames: args.playerNames, doubles: args.doubles, rules: args.host.rules,
     actives: activeNamesAt(args.host.snapshotAt?.(turn) ?? args.host.snapshot),
+    rowValues: rowValueTexts(analysis),
   };
   // `lineBlocks` puts the engine's line before the played line; a line that holds both roles reads as the engine's
   return lineBlocks(lines, ctx).map((block): ReviewLineView => ({
-    key: block.key, role: block.line.for.includes('engine') ? 'engine' : 'played', text: lineText(block.line, args.playerNames, args.doubles), block,
+    key: block.key, role: block.line.for.includes('engine') ? 'engine' : 'played', text: lineText(block.line, args.playerNames, args.doubles), end: `ends at ${block.endPct}`, block,
   }));
 }
 
@@ -153,4 +156,9 @@ export function gameReview(args: ReviewArgs): ReviewSideView[] {
     side, player: args.playerNames[SIDE_INDEX[side]],
     rows: graded.filter(entry => entry.side === side).map(entry => reviewRow(args, entry.analysis, side, entry.grade)),
   }));
+}
+
+/** Whether any line of the review ends at another number than its row shows: the one sentence under the review then says why (G10). */
+export function reviewDiffers(view: readonly ReviewSideView[]): boolean {
+  return view.some(side => side.rows.some(row => row.lines.some(line => line.block.differs)));
 }

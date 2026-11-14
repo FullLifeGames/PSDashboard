@@ -1,8 +1,8 @@
 import { Fragment } from 'react';
 import type { EvalResult, TurnAnalysis } from '@fulllifegames/eval-engine';
 import { LineConfirm } from './LineConfirm';
-import { cardLines } from './turn-copy';
-import { activeNamesAt, lineAnchor, lineBlocks, type LineBlockView, type LinesHost, type LineSideView } from '../../lib/line-view';
+import { cardLines, rowValueTexts } from './turn-copy';
+import { activeNamesAt, LINE_DIFFERS_SENTENCE, lineAnchor, lineBlocks, type LineBlockView, type LinesHost, type LineSideView } from '../../lib/line-view';
 
 interface LinesSectionProps {
   turn: number;
@@ -89,11 +89,12 @@ export function LinesSection({ turn, result, playerNames, doubles, host, analysi
       </div>
     );
   }
-  const blocks = lineBlocks(lines, { turn, playerNames, doubles, rules: host.rules, actives: activeNamesAt(host.snapshot) });
+  const blocks = lineBlocks(lines, { turn, playerNames, doubles, rules: host.rules, actives: activeNamesAt(host.snapshot), rowValues: rowValueTexts(analysis) });
   return (
     <div className="ps-eval-lines">
       <span className="ps-eval-lines-title">Lines</span>
       {blocks.map(block => <LineBlock key={block.key} block={block} turn={turn} onPlay={host.onPlay} confirm={host.confirm} />)}
+      {blocks.some(block => block.differs) && <span className="ps-eval-line">{LINE_DIFFERS_SENTENCE}</span>}
     </div>
   );
 }

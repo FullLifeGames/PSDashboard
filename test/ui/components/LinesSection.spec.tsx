@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from 'vitest';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { EvalLine, EvalResult } from '@fulllifegames/eval-engine';
+import { winPctText, type EvalLine, type EvalResult } from '@fulllifegames/eval-engine';
 import { LinesSection } from '../../../src/components/eval/LinesSection';
 import type { LinesHost } from '../../../src/lib/line-view';
 import { EvalTurnAnalysis } from '../../../src/components/EvalTurnAnalysis';
@@ -116,5 +116,50 @@ describe('the Lines section in the turn card', () => {
     expect(screen.getByText('Pepitopalotin · engine: Hydro Pump')).toBeInTheDocument();
     rerender(<EvalTurnAnalysis analysis={analysis} playerNames={SINGLES_NAMES} result={withLines([singlesLine])} />);
     expect(screen.queryByText('Lines')).toBeNull();
+  });
+});
+
+/** Round 89 (#104), step G10 (ruling G5a): both numbers on a line, and one sentence on why they differ when a line does. */
+describe('both numbers on a line', () => {
+  const SENTENCE = "A row's value averages every answer and die the search tried; a line follows one answer with each die at its likeliest result.";
+  const p2Rows = (engineEv: number, playedEv: number, faintedFraction?: number) => {
+    const base = turnAnalysis(20).p2;
+    return { ...base, best: rankedChoice('move 1', 'Hydro Pump', engineEv), played: rankedChoice('move 2', 'Hyper Voice', playedEv), ...(faintedFraction === undefined ? {} : { faintedFraction }) };
+  };
+
+  test('singles: the engine line and the played line each show their row and their end, and the sentence stands once under the section', () => {
+    const analysis = turnAnalysis(20, { p2: p2Rows(0.1, 0.3) });
+    render(<LinesSection turn={20} result={withLines([singlesLine, playedLine])} playerNames={SINGLES_NAMES} doubles={false} host={host()} analysis={analysis} />);
+    const engineEnd = `row ${winPctText(0.1)}, this line ends at ${winPctText(singlesLine.end, singlesLine.endFainted)}`;
+    const playedEnd = `row ${winPctText(0.3)}, this line ends at ${winPctText(playedLine.end, playedLine.endFainted)}`;
+    expect(screen.getByText(engineEnd)).toBeInTheDocument();
+    expect(screen.getByText(playedEnd)).toBeInTheDocument();
+    expect(screen.getAllByText(SENTENCE)).toHaveLength(1);
+  });
+
+  test('singles: a line that ends where its row stands needs no sentence', () => {
+    const share = 0.1;
+    const analysis = turnAnalysis(20, { p2: p2Rows(singlesLine.end, playedLine.end, share) });
+    render(<LinesSection turn={20} result={withLines([singlesLine, playedLine])} playerNames={SINGLES_NAMES} doubles={false} host={host()} analysis={analysis} />);
+    const same = (line: EvalLine) => `row ${winPctText(line.end, share)}, this line ends at ${winPctText(line.end, line.endFainted)}`;
+    expect(screen.getByText(same(singlesLine))).toBeInTheDocument();
+    expect(screen.getByText(same(playedLine))).toBeInTheDocument();
+    expect(screen.queryByText(SENTENCE)).toBeNull();
+  });
+
+  test('doubles: the pair line and the played pair line show both numbers, with the sentence once', () => {
+    const otherPair: EvalLine = { ...doublesLine, label: 'Other pair', choice: 'move 3, move 4', for: ['played'], end: 0.2, endFainted: 0.3 };
+    const base = turnAnalysis(4).p1;
+    const analysis = turnAnalysis(4, { p1: { ...base, best: rankedChoice('move 1, move 2', doublesLine.label, 0.6), played: rankedChoice('move 3, move 4', 'Other pair', 0.1) } });
+    render(<LinesSection turn={4} result={withLines([doublesLine, otherPair])} playerNames={DOUBLES_NAMES} doubles host={host()} analysis={analysis} />);
+    expect(screen.getByText(`row ${winPctText(0.6)}, this line ends at ${winPctText(doublesLine.end, doublesLine.endFainted)}`)).toBeInTheDocument();
+    expect(screen.getByText(`row ${winPctText(0.1)}, this line ends at ${winPctText(0.2, 0.3)}`)).toBeInTheDocument();
+    expect(screen.getAllByText(SENTENCE)).toHaveLength(1);
+  });
+
+  test('without the card\'s analysis the section keeps its old end text and says nothing of rows', () => {
+    render(<LinesSection turn={20} result={withLines([singlesLine])} playerNames={SINGLES_NAMES} doubles={false} host={host()} />);
+    expect(screen.getByText(/^ends at \d+% for Pepitopalotin$/)).toBeInTheDocument();
+    expect(screen.queryByText(SENTENCE)).toBeNull();
   });
 });
