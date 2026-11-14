@@ -71,6 +71,22 @@ export function isRendererDead(error: unknown): boolean {
 }
 
 /**
+ * What one poll says. Round 89 (G13b): the sweep's end is not the report's end. The early-lines stage starts the moment the sweep
+ * ends and writes lines into the graph turn by turn; a dump taken while it runs holds however many turns it had reached, so two
+ * runs differed. The end is the stage's end (it names itself inactive when every turn holds lines, one failed or Stop).
+ */
+function judgePoll(state: SweepPoll, now: { settled: boolean; stalled: boolean }): { ok: true } | { ok: false; reason: string } | null {
+  const stageActive = state.stage?.active === true;
+  if (!state.running && !stageActive && now.settled) return { ok: true };
+  const stalledFor = `no progress for ${Math.round(STALL_MS / 1000)}s`;
+  if (state.running && now.stalled) return { ok: false, reason: `sweep wedged at ${state.done}/${state.total} — ${stalledFor}` };
+  if (!state.running && stageActive && now.stalled) {
+    return { ok: false, reason: `early lines wedged at ${state.stage?.done}/${state.stage?.total} — ${stalledFor}` };
+  }
+  return null;
+}
+
+/**
  * Waits for the sweep to TERMINATE (running false), with a stall detector:
  * the 653785 baseline wedged mid-sweep at "10/26" and burned the full
  * 35-minute wait — running stayed true with frozen progress (the registered
@@ -118,28 +134,13 @@ export async function waitForSweepEnd(
     const elapsed = Date.now() - startedAt;
     if (state) {
       if (state.running) sawRunning = true;
-      const stageActive = state.stage?.active === true;
       const tick = `${state.done}/${state.stage?.done ?? -1}`;
       if (tick !== lastDone) {
         lastDone = tick;
         lastProgressAt = Date.now();
       }
-      // Round 89 (G13b): the sweep's end is not the report's end. The early-lines stage starts the moment the sweep ends and
-      // writes lines into the graph turn by turn; a dump taken while it runs holds however many turns it had reached, so two
-      // runs differed. The end is the stage's end (it names itself inactive when every turn holds lines, one failed or Stop).
-      if (!state.running && !stageActive && (sawRunning || elapsed > 30_000)) return { ok: true };
-      if (state.running && Date.now() - lastProgressAt > STALL_MS) {
-        return {
-          ok: false,
-          reason: `sweep wedged at ${state.done}/${state.total} — no progress for ${Math.round(STALL_MS / 1000)}s`,
-        };
-      }
-      if (!state.running && stageActive && Date.now() - lastProgressAt > STALL_MS) {
-        return {
-          ok: false,
-          reason: `early lines wedged at ${state.stage?.done}/${state.stage?.total} — no progress for ${Math.round(STALL_MS / 1000)}s`,
-        };
-      }
+      const verdict = judgePoll(state, { settled: sawRunning || elapsed > 30_000, stalled: Date.now() - lastProgressAt > STALL_MS });
+      if (verdict) return verdict;
     }
     if (elapsed > CAP_MS) return { ok: false, reason: `sweep did not finish within ${Math.round(CAP_MS / 1000)}s` };
     // The pause is the harness's own timer, not `page.waitForTimeout`: a dead page may never answer that call either.
