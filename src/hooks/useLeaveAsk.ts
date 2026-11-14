@@ -25,5 +25,3 @@ export function useLeaveAsk(unsaved: (() => boolean) | undefined, active = true)
   };
   return { ask, question };
 }
-
-export type LeaveQuestion = NonNullable<ReturnType<typeof useLeaveAsk>['question']>;
