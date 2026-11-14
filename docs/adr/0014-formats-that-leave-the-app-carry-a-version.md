@@ -6,4 +6,14 @@ Three formats leave the app and meet a reader we do not control: the engine prot
 
 Old share links and support states keep working only as long as the reader keeps the old parser, and every version bump adds a parser to maintain. The packages' own exports are a fourth surface, guarded by the API snapshot (`test/regression/package-api.spec.ts`) and the package versions (see ADR 0017). The embed `postMessage` protocol of July 2026 (`ps-embed-ready`, `ps-load-replay`) carries no version; the sources do not say whether the rule is meant to cover it.
 
+
+## Amended (round 89)
+
+Round 89 used both halves of the rule on the shared link and the state file (#105, "New game").
+
+- **The share link has two versions.** A link of a game (`GAME_SHARE_VERSION = 2`, `GameSharePayload` in `src/lib/new-game/share.ts`) holds the format, both teams as Showdown text, the seed, the main line's entries, the open variation and where the sharer stood, in place of a replay id and a final log. The reader of version 1 stays: it requires a replay id (`useSharedBranch`), and `readSharePayload` in `src/lib/branch-share.ts` hands a number above 2 back as `newer`, so the page says the link comes from a newer app. Anything else, a version 1 link without its log, is damaged. A saved row is either version, and the rows of one replay or one game share a store key.
+- **The reader plays the link.** A version 2 link carries no log: the reader rebuilds the game on its own `@pkmn/sim` from the teams and the seed and plays the entries (`hooks/branch/share-open.ts`). A link made on another simulator version may fail on a late entry; the failure names the turn ("cannot be played from turn N"), and the link carries no simulator version. A `sim` field would be a new optional field and keep the version. A link of the game that is open, whose main line is a prefix of the game's, opens its branch in that game; any other link opens a copy under a new id.
+- **The state file keeps version 1.** `SupportState.game` is optional and holds the game's record (`NewGameRecord`); a file of a replay has no such key, and an older app reads a game file as a missing replay and refuses it. `SUPPORT_STATE_VERSION` stays 1 for that reason.
+- **Optional fields since round 88.** `DieMark.played` (the hits a cut-short count played) and `EvalResult.lines` (the lines of a turn) are optional and move no version. The engine protocol (`ENGINE_PROTOCOL`) is unchanged.
+
 Sources: `AGENTS.md` (Rules for the code, "Formats that leave the app carry a version"), `ENGINES.md` (Versions, Hosting), `docs/adr/0001-forced-dice-ride-on-the-slot-choice.md`, `docs/completed/eval-quality.md` (rounds 77 and 82; gates 28.10.2026: one for the engine protocol, one for the report file), `docs/superpowers/specs/2026-07-20-file-replays-and-embed-design-old.md`; reason for HTTP: not recorded (user, 03.11.2026).
