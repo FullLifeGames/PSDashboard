@@ -20,6 +20,8 @@ function loadPrefs(): EvalPreferences {
       auto: !!parsed.auto,
       autoAnalyze: !!parsed.autoAnalyze,
       tera: parsed.tera === 'on' || parsed.tera === 'off' || parsed.tera === 'revealed' ? parsed.tera : 'auto',
+      // Round 89 (#153): Hard mode restores only from a stored true; off leaves the preferences as they were before it existed
+      ...(parsed.hardMode === true ? { hardMode: true } : {}),
     };
   } catch {
     return DEFAULT_PREFS;
@@ -30,7 +32,7 @@ function loadPrefs(): EvalPreferences {
  * The panel preferences with their synchronous ref (evaluate and the sweep
  * are stable callbacks and read the CURRENT prefs through it) and the
  * localStorage persistence. `persistPrefs` returns whether an
- * engine-relevant setting changed — the caller marks a done result stale.
+ * engine-relevant setting changed — the caller marks a done result stale. Hard mode (round 89, #153) is not one of them: no search reads it.
  */
 export function usePrefsState() {
   const [prefs, setPrefsState] = useState<EvalPreferences>(loadPrefs);
