@@ -107,8 +107,9 @@ for (const game of GAMES) {
     await expect(page.getByRole('button', { name: /Let it play out/ })).toBeEnabled();
 
     // a second ▶ Play over the open variation asks first, under the line that was clicked and on screen (G4b: it stood out of sight).
-    // While the variation is on screen the panel shows its evaluation, never the report: back to the main line, then to the report.
-    await page.getByRole('group', { name: 'Line selector' }).getByRole('button', { name: 'Main line' }).click();
+    // While the variation is on screen the panel shows its evaluation, never the report: its button goes back to the main line (G4d,
+    // as "Main line" of the Line selector does), then to the report.
+    await panel.getByRole('button', { name: 'Back to the main line' }).click();
     const back = panel.getByRole('button', { name: /Game report/ });
     await expect(review.or(back)).toBeVisible();
     if (await back.count()) await back.click();
@@ -117,6 +118,11 @@ for (const game of GAMES) {
     const question = review.getByRole('alertdialog');
     await expect(question).toContainText('replace the existing variation');
     await expect(question).toBeInViewport();
+    // both buttons keep their words whole on one line, as the same height (G4d: they broke into letters in the right column)
+    const replaceBox = (await question.getByRole('button', { name: 'Replace' }).boundingBox())!;
+    const cancelBox = (await question.getByRole('button', { name: 'Cancel' }).boundingBox())!;
+    expect(replaceBox.height, 'Replace on one line').toBeLessThan(40);
+    expect(Math.abs(replaceBox.height - cancelBox.height), 'the buttons share a height').toBeLessThan(4);
     await question.getByRole('button', { name: 'Cancel' }).click();
     await expect(question).toHaveCount(0);
   });

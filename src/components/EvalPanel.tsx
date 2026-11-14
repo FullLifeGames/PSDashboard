@@ -59,6 +59,8 @@ interface EvalPanelProps {
   analysis: TurnAnalysis | null;
   /** Round 89 (#105): the open tip of a new game, whose analysis names an open position instead of a played choice. */
   openTurn?: number | null;
+  /** Round 89 (#104, G4d): with a variation open and a game report held, the way back to the main line (see GameGraphSection). */
+  onBackToMain?: () => void;
   /** Exploitative Read recommendations for the selected turn (advisory). */
   reads?: { p1?: ReadRecommendation | null; p2?: ReadRecommendation | null } | null;
   /** The fainted share per swept turn as the card takes it (any engine mode): the graph tooltips print at it. */

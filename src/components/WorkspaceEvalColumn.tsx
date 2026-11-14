@@ -9,6 +9,7 @@ import { idleTip } from './game-tip';
 import { variationBoardShares } from '../lib/variation-shares';
 import type { ReplayData } from '@fulllifegames/replay-core';
 import { useLinesHost } from '../hooks/usePlayLine';
+import { mainLineTarget } from './timeline-target';
 
 interface WorkspaceColumnProps {
   app: AppController;
@@ -50,6 +51,13 @@ function idleReads(app: AppController, viewingVariation: boolean, resultTag: str
  */
 function useVariationShares(history: AppController['ctx']['branch']['history'], variationSpan: { startTurn: number } | null) {
   return useMemo(() => (variationSpan ? variationBoardShares(history, variationSpan.startTurn) : []), [history, variationSpan]);
+}
+
+/** Round 89 (#104, G4d): with a variation open and a game report held, the way back to the report, as "Main line" of the Line selector. */
+function backToMain(app: AppController, viewingVariation: boolean): (() => void) | undefined {
+  if (!viewingVariation || !app.analysis.gameReport) return undefined;
+  const { viewTurn, maxTurn, navigateTo } = app.board.timeline;
+  return () => navigateTo(mainLineTarget(viewTurn, maxTurn));
 }
 
 function EvalSection({ app, replayData }: WorkspaceColumnProps) {
@@ -106,6 +114,7 @@ function EvalSection({ app, replayData }: WorkspaceColumnProps) {
       {...analysisPropsFor(liveEvalView, analysisTurn, app.analysis)}
       doubles={replayGameType === 'doubles'}
       openTurn={app.ctx.newGame.record ? gameTipTurn(app.ctx.newGame.record) : null}
+      onBackToMain={backToMain(app, reads.viewingVariation)}
     />
   );
 }

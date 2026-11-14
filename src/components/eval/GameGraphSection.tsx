@@ -87,6 +87,8 @@ function ReplacementNote({ analysis, graph, playerNames }: { analysis: TurnAnaly
 interface TurnViewProps {
   report?: GameReport | null;
   onBackToReport: () => void;
+  /** Round 89 (#104, G4d): with a variation open the report is out of reach; this goes back to the main line, where it stands (the Line selector's "Main line"). Absent: nothing to return to. */
+  onBackToMain?: () => void;
   result: EvalResult | null;
   currentTurn: number;
   graph: EvalGraphState;
@@ -106,7 +108,7 @@ interface TurnViewProps {
   openTurn?: number | null;
 }
 
-function TurnView({ report, onBackToReport, result, currentTurn, graph, analyzeTurn, hasAnalyzeTurn, leadAnalysis, analysis, playerNames, reads, onPickChoice, linesHost, doubles, openTurn }: TurnViewProps) {
+function TurnView({ report, onBackToReport, onBackToMain, result, currentTurn, graph, analyzeTurn, hasAnalyzeTurn, leadAnalysis, analysis, playerNames, reads, onPickChoice, linesHost, doubles, openTurn }: TurnViewProps) {
   return (
     <>
       {report && (
@@ -118,6 +120,17 @@ function TurnView({ report, onBackToReport, result, currentTurn, graph, analyzeT
           title="Back to the game report's cards"
         >
           ← Game report
+        </button>
+      )}
+      {!report && onBackToMain && (
+        <button
+          type="button"
+          className="ps-btn"
+          style={{ padding: '1px 6px', fontSize: 10, marginTop: 4 }}
+          onClick={onBackToMain}
+          title="The game report and the Game review show on the main line. Same as Main line in the Line selector"
+        >
+          Back to the main line
         </button>
       )}
       {/* The sweep's recorded reason this turn is a hole — without

@@ -49,3 +49,27 @@ describe('GameGraphSection: the Game review', () => {
     expect(screen.queryByText('Game review · what the engine would have played')).toBeNull();
   });
 });
+
+/**
+ * Round 89 (#104), G4d: with a variation open the panel shows the variation's evaluation and neither the report nor the review, and
+ * nothing said where they went (the tester, both game types). Where the report's button stands, a button names the way back and
+ * does what "Main line" of the Line selector does; no report to return to, no button.
+ */
+describe('GameGraphSection: the way back from a variation', () => {
+  const inVariation = (overrides: Partial<GameGraphSectionProps> = {}) => props({ showReportView: false, report: null, reviewAnalyses: null, currentLine: 'variation', ...overrides });
+
+  test.each([['singles', false], ['doubles', true]])('%s: "Back to the main line" calls the Main line handler', async (_kind, doubles) => {
+    const back = vi.fn();
+    render(<GameGraphSection {...inVariation({ onBackToMain: back, doubles })} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Back to the main line' }));
+    expect(back).toHaveBeenCalledTimes(1);
+  });
+
+  test('no handler, no button; the report view and the report\'s own button leave it out', () => {
+    const { rerender } = render(<GameGraphSection {...inVariation()} />);
+    expect(screen.queryByRole('button', { name: 'Back to the main line' })).toBeNull();
+    rerender(<GameGraphSection {...props({ showReportView: false, analysis: turnAnalysis(3), onBackToMain: vi.fn() })} />);
+    expect(screen.getByRole('button', { name: /Game report/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Back to the main line' })).toBeNull();
+  });
+});
