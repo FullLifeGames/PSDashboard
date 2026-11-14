@@ -105,6 +105,48 @@ describe('EvalPanel', () => {
     expect(onAnalyzeGame).toHaveBeenCalledTimes(1);
   });
 
+  // Round 89 (#104), G13b (tester, third pass): "Back to the main line" from a played win path opened the last turn's card, not the
+  // Game review the click came from. The panel returns to where the line was started: the review when it started from the review or
+  // the win-path panel, the card of its turn when it started from a card.
+  describe.each([['singles', false], ['doubles', true]])('%s: back from a variation', (_kind, doubles) => {
+    const graph = evalGraph(doubles ? 'doubles' : 'singles');
+    const report = gameReport({ keyMoments: [turnAnalysis(6, { attribution: 'chance', swing: -0.4 })] });
+    const replay = (extra: Partial<Props> = {}) => props({
+      graph, report, analysis: turnAnalysis(3), onSelectTurn: vi.fn(), onAnalyzeGame: vi.fn(), result: graph.results[2], resultSettings: graph.settings[2],
+      currentTurn: 3, analysisTurn: 3, graphMaxTurn: 12, doubles, ...extra,
+    });
+    const inLine = (extra: Partial<Props> = {}) => replay({ report: null, currentLine: 'variation', variation: { startTurn: 3, scores: [null, 0.4] }, ...extra });
+
+    test('a line started from the review returns to the review, although the main line moves to another turn on the way back', async () => {
+      const back = vi.fn();
+      const { rerender } = render(<EvalPanel {...replay()} />);
+      expect(screen.getByText('Game report', { selector: 'span' })).toBeInTheDocument();
+      rerender(<EvalPanel {...inLine({ onBackToMain: back })} />);
+      await userEvent.click(screen.getByRole('button', { name: 'Back to the main line' }));
+      expect(back).toHaveBeenCalledWith(null);
+      // the report is back and the analysis turn moved in the same render (the main line's last turn)
+      rerender(<EvalPanel {...replay({ analysisTurn: 12, currentTurn: 12, analysis: turnAnalysis(12) })} />);
+      expect(screen.getByText('Game report', { selector: 'span' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '← Game report' })).toBeNull();
+      // a later move of the analysis turn opens the card as before
+      rerender(<EvalPanel {...replay({ analysisTurn: 4, currentTurn: 4, analysis: turnAnalysis(4) })} />);
+      expect(screen.getByRole('button', { name: '← Game report' })).toBeInTheDocument();
+    });
+
+    test('a line started from a card returns to the card of its turn', async () => {
+      const back = vi.fn();
+      const { rerender } = render(<EvalPanel {...replay()} />);
+      await userEvent.click(screen.getByRole('button', { name: /^T6(?!\d)/ }));
+      expect(screen.getByRole('button', { name: '← Game report' })).toBeInTheDocument();
+      rerender(<EvalPanel {...inLine({ onBackToMain: back })} />);
+      await userEvent.click(screen.getByRole('button', { name: 'Back to the main line' }));
+      expect(back).toHaveBeenCalledWith(3);
+      rerender(<EvalPanel {...replay()} />);
+      expect(screen.getByRole('button', { name: '← Game report' })).toBeInTheDocument();
+      expect(screen.getByText('Turn 3')).toBeInTheDocument();
+    });
+  });
+
   test('the open tip of a game names an open position in the turn view; the same turn of a replay keeps its card (H4h)', () => {
     const graph = evalGraph();
     const base = props({ graph, analysis: turnAnalysis(4), result: graph.results[3], resultSettings: graph.settings[3], currentTurn: 4, analysisTurn: 4, graphMaxTurn: 12, onSelectTurn: vi.fn(), onAnalyzeGame: vi.fn() });

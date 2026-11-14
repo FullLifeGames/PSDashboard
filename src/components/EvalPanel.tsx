@@ -60,7 +60,7 @@ interface EvalPanelProps {
   /** Round 89 (#105): the open tip of a new game, whose analysis names an open position instead of a played choice. */
   openTurn?: number | null;
   /** Round 89 (#104, G4d): with a variation open and a game report held, the way back to the main line (see GameGraphSection). */
-  onBackToMain?: () => void;
+  onBackToMain?: (cardTurn: number | null) => void;
   /** Exploitative Read recommendations for the selected turn (advisory). */
   reads?: { p1?: ReadRecommendation | null; p2?: ReadRecommendation | null } | null;
   /** The fainted share per swept turn as the card takes it (any engine mode): the graph tooltips print at it. */
@@ -102,9 +102,19 @@ function useReportView(report: GameReport | null | undefined, analysisTurn: numb
   // Render-time adjustment (not an effect): when a report first APPEARS —
   // initial sweep done, or a new replay's sweep — land on the overview.
   const [hadReport, setHadReport] = useState(false);
+  // Round 89 (G13b): a variation takes the report away; the way back leads to where the line was started (the review, or the card of
+  // its turn). The analysis turn does not follow a variation, so it still names that card.
+  const [startedFrom, setStartedFrom] = useState<{ view: 'report' | 'turn'; turn: number | null } | null>(null);
+  let returned = false;
   if (!!report !== hadReport) {
     setHadReport(!!report);
-    if (report) setView('report');
+    if (report) {
+      setView(startedFrom?.view ?? 'report');
+      returned = startedFrom !== null;
+      setStartedFrom(null);
+    } else if (hadReport) {
+      setStartedFrom({ view, turn: analysisTurn ?? null });
+    }
   }
   // Same pattern for navigation: moving to another turn (slider, arrows,
   // graph, the timeline's T0 button) IS the request to see that turn's
@@ -112,9 +122,10 @@ function useReportView(report: GameReport | null | undefined, analysisTurn: numb
   const [seenAnalysisTurn, setSeenAnalysisTurn] = useState<number | null>(analysisTurn ?? null);
   if ((analysisTurn ?? null) !== seenAnalysisTurn) {
     setSeenAnalysisTurn(analysisTurn ?? null);
-    if (analysisTurn !== null && analysisTurn !== undefined && report) setView('turn');
+    // the main line's turn that the way back lands on is no request to open its card
+    if (analysisTurn !== null && analysisTurn !== undefined && report && !returned) setView('turn');
   }
-  return { view, setView };
+  return { view, setView, startedFrom };
 }
 
 /** Round 77 (C7): the finished end of a variation has no lines to rank; it names the winner as the branch panel does. */
@@ -201,7 +212,7 @@ export function EvalPanel(props: EvalPanelProps) {
   const running = status === 'searching' || status === 'reconstructing';
   const hasGraph = graph.scores.some(score => score !== null);
 
-  const { view, setView } = useReportView(report, analysisTurn);
+  const { view, setView, startedFrom } = useReportView(report, analysisTurn);
   const selectTurn = onSelectTurn
     ? (turn: number, line?: 'main' | 'variation') => {
       onSelectTurn(turn, line);
@@ -229,6 +240,7 @@ export function EvalPanel(props: EvalPanelProps) {
           selectTurn={selectTurn}
           showReportView={showReportView}
           onBackToReport={() => setView('report')}
+          onBackToMain={props.onBackToMain && (() => props.onBackToMain?.(startedFrom?.view === 'turn' ? startedFrom.turn : null))}
           analyzeTurn={analyzeTurn}
           hasAnalyzeTurn={!!(onAnalyzeTurn && analyzeTarget)}
         />

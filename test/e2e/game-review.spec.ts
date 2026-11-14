@@ -108,12 +108,10 @@ for (const game of GAMES) {
 
     // a second ▶ Play over the open variation asks first, under the line that was clicked and on screen (G4b: it stood out of sight).
     // While the variation is on screen the panel shows its evaluation, never the report: its button goes back to the main line (G4d,
-    // as "Main line" of the Line selector does), then to the report.
+    // as "Main line" of the Line selector does) and lands on the Game review the line was played from (G13b).
     await panel.getByRole('button', { name: 'Back to the main line' }).click();
-    const back = panel.getByRole('button', { name: /Game report/ });
-    await expect(review.or(back)).toBeVisible();
-    if (await back.count()) await back.click();
     await expect(review).toBeVisible();
+    await expect(panel.getByRole('button', { name: /← Game report/ })).toHaveCount(0);
     await review.locator('.ps-eval-review-row').filter({ has: page.locator('.ps-eval-review-line button') }).first().getByRole('button', { name: '▶ Play' }).first().click();
     const question = review.getByRole('alertdialog');
     await expect(question).toContainText('replace the existing variation');
