@@ -69,3 +69,23 @@ describe('the replace question of ▶ Play', () => {
     expect(screen.getByRole('alertdialog').closest('.ps-eval-review-row')).toHaveTextContent('T4');
   });
 });
+
+/**
+ * Round 89 (#104), step G4d: in the 354 px right column the message took the width and the two buttons broke into letters
+ * ("Rep/lace", "Ca/nc/el"; the tester saw it at every width). The buttons keep their words whole and the question wraps instead.
+ * jsdom has no layout, so the row reads the styles that decide it.
+ */
+describe('the replace question in a narrow column', () => {
+  test.each(['singles', 'doubles'] as const)('%s: the row wraps and both buttons keep their words whole', kind => {
+    const line = kind === 'singles' ? singlesLine : doublesLine;
+    const names = kind === 'singles' ? SINGLES_NAMES : DOUBLES_NAMES;
+    render(<LinesSection turn={4} result={withLines(kind, [line])} playerNames={names} doubles={kind === 'doubles'} host={hostWith(line, 4)} />);
+    const banner = screen.getByRole('alertdialog');
+    expect(banner.style.flexWrap).toBe('wrap');
+    for (const name of ['Replace', 'Cancel']) {
+      const button = within(banner).getByRole('button', { name });
+      expect(button.style.whiteSpace, name).toBe('nowrap');
+      expect(button.style.flexShrink, name).toBe('0');
+    }
+  });
+});
