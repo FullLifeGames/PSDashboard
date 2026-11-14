@@ -3,7 +3,7 @@ import { methodsOf, readsOfEntries, type Consumer, type Methods, type ReadSet } 
 import { BOARD_FIELDS, type FieldClass, type Owner } from './board-key-table.ts';
 
 export { BOARD_FIELDS };
-export type { Consumer, FieldClass, ReadSet };
+export type { Consumer, ReadSet };
 
 /**
  * Round 89 (#149, step A8): the key of a board for the memos that play it (the hit cost of score/contact.ts, the end of the

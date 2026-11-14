@@ -19,19 +19,12 @@ import { dieKey, plainKey, type DiceReport, type DieReport, type DieTook, type F
  * - The user's dice come from the slot choices of both sides (`BranchSlotChoice.dice`, ADR 0001).
  * - On the first turn of a branch (the live PRNG is a `LoggedRollPRNG` that knows the logged turn) the dice the log shows for the
  *   actions the user leaves as logged join the user's dice, with or without a die of the user's (gate answers 19a and 2a). The
- *   turn after the first plays as without the module when the user forces nothing. One place holds this choice:
- *   `FIRST_TURN_JOINS_LOG`.
+ *   turn after the first plays as without the module when the user forces nothing.
  * - A turn can pause for a switch in the middle (U-turn, Volt Switch, Flip Turn, Parting Shot, Eject Button, Eject Pack, Emergency
  *   Exit, Wimp Out) and go on in a later `choose`. The forced dice span the whole turn: the pause leaves a `PendingTurn` that the
  *   next call picks up. Each call plays its part through `playForcedTurn`, so the natural copy plays the same switch choice, and
  *   each part ends the stream on the natural turn's seed at that place (decision D8): the parts chain into the whole turn.
  */
-
-/**
- * Gates 19a and 2a: the log's results join the user's dice on the first turn, always (before 2a: once the user forced a die). The
- * first turn of a branch that has no logged turn (a position without one) has nothing to join.
- */
-export const FIRST_TURN_JOINS_LOG = true;
 
 /** What a turn that paused for a switch hands to the next call. */
 export interface PendingTurn {
@@ -165,10 +158,13 @@ export function loggedOptions(battle: Battle, logged: { p1: string; p2: string }
   return { clicked, checks, stalling, accuracyTargets, secondariesOf: secondariesIn(battle.dex), selfOf: selfChanceIn(battle.dex), hitsOf: hitsIn(battle.dex), randomTargets: battle.gameType !== 'singles' };
 }
 
-/** The forced list of a turn the user has just chosen: the user's dice, joined by the log's on the branch's first turn. */
+/**
+ * The forced list of a turn the user has just chosen: the user's dice, joined by the log's on the branch's first turn, always
+ * (gates 19a and 2a; before 2a: once the user forced a die). A branch whose first turn has no logged turn has nothing to join.
+ */
 function firstTurnDice(input: BranchTurnInput, mine: readonly ForcedDie[]): ForcedDie[] {
   const logged = battleLoggedTurn(input.battle);
-  if (!FIRST_TURN_JOINS_LOG || !logged) return [...mine];
+  if (!logged) return [...mine];
   const { changed, switched } = turnChanges(logged.choices, input.commands);
   return mergeLoggedDice({
     logged: loggedDice(logged.lines, loggedOptions(input.battle, logged.choices)), forced: mine, changed, switched,

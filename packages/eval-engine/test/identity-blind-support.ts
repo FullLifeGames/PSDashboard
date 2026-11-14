@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { expect } from 'vitest';
 import { Dex, State } from '@pkmn/sim';
 import {
-  buildTeamsFromReplay, formatEnforcesSleepClause, getBranchSimulatorFormat, inferOpponentTeam, logRules, parseReplayLogWithObservations,
+  buildTeamsFromReplay, formatEnforcesSleepClause, getBranchSimulatorFormat, logRules, parseReplayLogWithObservations,
   type ReplayData,
 } from '@fulllifegames/replay-core';
 import { reconstructBranchRuntime } from '../src/branch-engine';
@@ -43,11 +43,6 @@ export function replays(): Array<{ tag: string; replay: ReplayData }> {
     }
   }
   return found;
-}
-
-/** Whether the replay shows a nicknamed or a shiny body on either side (the others cannot differ). */
-export function hasIdentity(replay: ReplayData): boolean {
-  return (['p1', 'p2'] as const).some(side => inferOpponentTeam(replay.log, side).pokemon.some(mon => mon.nickname !== undefined || mon.shiny === true));
 }
 
 /** The first path at which two values differ, or null. */

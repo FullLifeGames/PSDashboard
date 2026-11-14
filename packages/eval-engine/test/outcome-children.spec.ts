@@ -3,7 +3,7 @@ import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import { createRootPosition, positionBattle } from '../src/forward-model';
 import { boundaryEvent } from '../src/ko-odds';
-import { classChildren, groupedChildren, speedTie } from '../src/search/outcome-children';
+import { classChildren, speedTie } from '../src/search/outcome-children';
 import { SEARCH_SEEDS } from '../src/search/leaf';
 
 /**
@@ -147,45 +147,5 @@ describe('classChildren (round 43)', () => {
     const doubles = createRootPosition(serializeAt(makeBattle('gen9doublescustomgame',
       [jolt(), champ()], [champ(), makeSet('Chu', 'Pikachu', ['Tackle'], 30)]), [null, null]));
     expect(classChildren(doubles, 'move thunder 1, move closecombat 1', 'move closecombat 1, move tackle 1', TREE_OPTS)).toBeNull();
-  });
-});
-
-describe('groupedChildren (round 43)', () => {
-  const DOUBLES_OPTS = { seeds: SEARCH_SEEDS.slice(0, 3) };
-
-  test('a pair without a knock-out or a roll draws one seed and one child', () => {
-    const root = createRootPosition(serializeAt(makeBattle('gen9doublescustomgame',
-      [makeSet('Champ', 'Machamp', ['Seismic Toss']), makeSet('Lax', 'Snorlax', ['Seismic Toss'])],
-      [makeSet('Egg', 'Chansey', ['Soft-Boiled']), makeSet('Bliss', 'Blissey', ['Soft-Boiled'])]), [null, null]));
-    const drawn = groupedChildren(root, 'move seismictoss 1, move seismictoss 2', 'move softboiled, move softboiled', DOUBLES_OPTS);
-    expect(drawn.children).toHaveLength(1);
-    expect(drawn.children[0].weight).toBe(1);
-    expect(drawn.children[0].key).toBe('');
-    expect(drawn.events).toEqual([]);
-  });
-
-  test('a knock-out range in doubles groups three seeds by who fell', () => {
-    // Thunder (70 %) on a one-HP Machamp: the three seeds split into "Champ fell" and "nobody fell".
-    const root = createRootPosition(serializeAt(makeBattle('gen9doublescustomgame',
-      [jolt(), makeSet('Lax', 'Snorlax', ['Protect'])],
-      [champ(), makeSet('Egg', 'Chansey', ['Soft-Boiled'])]), [null, 1]));
-    const drawn = groupedChildren(root, 'move thunder 1, move protect', 'move closecombat 1, move softboiled', DOUBLES_OPTS);
-    const totalWeight = drawn.children.reduce((sum, child) => sum + child.weight, 0);
-    expect(totalWeight).toBeCloseTo(1, 9);
-    expect(drawn.children.every(child => Number.isInteger(Math.round(child.weight * 3 * 1e6) / 1e6))).toBe(true);
-    for (const child of drawn.children) {
-      const fell = positionBattle(child.position).sides[1].pokemon[0].fainted;
-      expect(child.key.includes('p2a: Champ')).toBe(fell);
-    }
-    const again = groupedChildren(root, 'move thunder 1, move protect', 'move closecombat 1, move softboiled', DOUBLES_OPTS);
-    expect(again.children.map(child => child.key)).toEqual(drawn.children.map(child => child.key));
-  });
-
-  test('singles guard cells (Substitute) take the empirical path too', () => {
-    const root = createRootPosition(serializeAt(makeBattle('gen9customgame',
-      [jolt()], [makeSet('Lax', 'Snorlax', ['Substitute', 'Body Slam'])]), [null, 1]));
-    const drawn = groupedChildren(root, 'move thunder', 'move substitute', { seeds: SEARCH_SEEDS.slice(0, 3), stopAtForcedSwitch: true });
-    expect(drawn.children.length).toBeGreaterThanOrEqual(1);
-    expect(drawn.children.reduce((sum, child) => sum + child.weight, 0)).toBeCloseTo(1, 9);
   });
 });

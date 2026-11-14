@@ -4,8 +4,7 @@ import { foldClassWeights, koOddsForOptions, observeOrder, planCellEvents, type 
 import { cellKey, rankFromMatrix, toResult as rankedToResult } from './rank.ts';
 import { attachKoOdds, hasUnansweredContent, koOddsMapsFor } from './search/root-payload.ts';
 import { matrixCells, topVisitedIndex, treeScore } from './mcts-merge.ts';
-import { makeNode, pick, principalVariation, rowLines, treeMatrix, type Node } from './search/mcts-node.ts';
-import { cellStats, isChanceNode, pickClass } from './search/chance-node.ts';
+import { cellStats, makeNode, pick, principalVariation, rowLines, treeMatrix, type Node } from './search/mcts-node.ts';
 import { cellSeeds, positionSalt } from './search/root-quantile.ts';
 import { expandCell, type ExpansionContext, type RootClassBook } from './search/expansion.ts';
 import { forcedWinFor } from './search/forced-win.ts';
@@ -35,13 +34,6 @@ import type {
 /** Iterations per tree at the default budget; the budget in force sets them (round 61, search/budget.ts). */
 export const MCTS_ITERATIONS = SEARCH_BUDGET_DEFAULT.iterations;
 const PARTIAL_EVERY = 150;
-/**
- * Round 42: forced switches are decision nodes. The fallback the roadmap
- * pre-registered for a failed gate is this constant at false (greedy
- * resolution inside the tree, everything else unchanged).
- */
-const FORCED_SWITCH_NODES = true;
-
 export { WIDENING_BASE, WIDENING_VISITS_PER_SLOT, wideningWindow } from './search/mcts-node.ts';
 
 export interface MctsCallbacks {
@@ -128,18 +120,15 @@ function selectAndExpand(
     const key = cellKey(i, j);
     const existing = node.children.get(key);
     if (!existing) {
-      // Expansion (search/expansion.ts): the first two plies draw fixed
-      // worlds and may open a chance node; deeper cells fix one outcome
-      // from the iteration-rotated seed as before.
-      const expanded = expandCell(node, i, j, depth, iteration, seedOffset, ctx, node === root ? book : undefined);
+      // Expansion (search/expansion.ts): one outcome per cell, from the iteration-rotated seed.
+      const expanded = expandCell(node, i, j, iteration, seedOffset, ctx, node === root ? book : undefined);
       node.children.set(key, expanded.child);
-      if (!isChanceNode(expanded.child)) expanded.child.visits += 1;
+      expanded.child.visits += 1;
       leaf = expanded.leaf;
       if (expanded.boundary) depth += 1;
       break;
     }
-    // Round 43: a chance node hands the descent to the class with the largest deficit.
-    node = isChanceNode(existing) ? pickClass(existing).child : existing;
+    node = existing;
     if (node.boundary) depth += 1;
   }
   return { path, leaf, depth };
@@ -208,7 +197,11 @@ function runMcts(
   };
   // Round 13: root unanswered-mon profile, once per root like the ko odds.
   const unanswered = unansweredMons(rootBattle, matchupCache);
-  const ctx: ExpansionContext = { tera, matchupCache, sleepClause: settings.sleepClause, stopAtForcedSwitch: FORCED_SWITCH_NODES };
+  const ctx: ExpansionContext = {
+    tera, matchupCache, sleepClause: settings.sleepClause,
+    // Round 42: a forced switch after a knock-out is a decision node of the tree; the matrix, verify, play-out and prover resolve it greedily.
+    stopAtForcedSwitch: true,
+  };
   const book: RootClassBook = { battle: rootBattle, events: new Map(), keys: new Map(), weights: new Map() };
   // Round 89 (#59, ruling D2): only a tree inside the budget's tree count spreads its root dice; a lone tree has no strata to spread.
   book.quantiles = treeQuantiles(serializedBattle, seedOffset, trees);

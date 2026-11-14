@@ -43,6 +43,8 @@ A pivot move carries its switch-in in `then`, which a client sends when the simu
 
 A bot finds what it reads in a live battle in `log` and `requests`. An engine on the simulator restores `state`. The teams in `state` hold what the replay revealed plus the dashboard's guesses for the rest (usage stats, Smogon sets, fitted spreads), and the user can correct them in the app.
 
+In a game that starts from two pasted teams (`New game` in the app) the teams in `state` are the pasted sets, and `format` names the format the user picked. In a bring-limited game where a side's log shows fewer bodies than it brought, the dashboard's own search blends several guesses for the missing bodies, and your engine gets the position of the likeliest set alone. The lines that the app shows under a turn come from the dashboard's own search; an answer from your engine carries none, and the turn says so.
+
 ## The response
 
 | Field | What it holds |

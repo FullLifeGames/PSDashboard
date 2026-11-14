@@ -1,9 +1,8 @@
 import type { MatchupCache } from '../eval-function.ts';
 import { positionBattle, type ChoiceOption, type SimPosition } from '../forward-model.ts';
 import { cellKey } from '../rank.ts';
-import type { EvalSettings, RowLines, TeraAllowance, TreeLineStep } from '../types.ts';
+import type { EvalSettings, MctsTreeStats, RowLines, TeraAllowance, TreeLineStep } from '../types.ts';
 import { leafValue } from './leaf.ts';
-import { chanceEnded, chanceValue, isChanceNode, type TreeChild } from './chance-node.ts';
 import { optionHints } from './hints.ts';
 import { searchOptions } from './options.ts';
 
@@ -38,7 +37,7 @@ const hintOrder = (hints: number[]): number[] =>
     .map(entry => entry.index);
 
 export interface Node {
-  /** Round 43: tells a decision node from a chance node in the children map. */
+  /** Names the node as a decision node (the tree holds no other kind). */
   kind: 'decision';
   position: SimPosition;
   ended: boolean;
@@ -60,7 +59,7 @@ export interface Node {
   p1Order: number[];
   p2Order: number[];
   visits: number;
-  children: Map<number, TreeChild>;
+  children: Map<number, Node>;
 }
 
 export function makeNode(
@@ -124,8 +123,8 @@ export function pick(n: number[], w: number[], visits: number, maximize: boolean
 }
 
 /** The most visited cell of a node (the first of equals): its key and child, null below the visits a line needs. */
-function heaviestCell(node: Node): { key: number; child: TreeChild } | null {
-  let best: TreeChild | undefined;
+function heaviestCell(node: Node): { key: number; child: Node } | null {
+  let best: Node | undefined;
   let bestVisits = 0;
   let bestKey = 0;
   for (const [key, child] of node.children) {
@@ -140,10 +139,7 @@ function heaviestCell(node: Node): { key: number; child: TreeChild } | null {
 
 const hasChoices = (node: Node): boolean => !node.ended && node.p1Options.length > 0 && node.p2Options.length > 0;
 
-/** Round 43: a chance node passes the line on through its heaviest class (the tree's chance nodes are off, CHANCE_NODES). */
-const nextNode = (child: TreeChild): Node => (isChanceNode(child) ? child.classes[0].child : child);
-
-const stepAt = (node: Node, key: number, child: TreeChild): TreeLineStep => ({
+const stepAt = (node: Node, key: number, child: Node): TreeLineStep => ({
   p1: node.p1Options[Math.floor(key / 10_000)].label, p2: node.p2Options[key % 10_000].label, visits: child.visits,
 });
 
@@ -156,7 +152,7 @@ const stepAt = (node: Node, key: number, child: TreeChild): TreeLineStep => ({
 export function lineFrom(root: Node, first?: number): TreeLineStep[] {
   const steps: TreeLineStep[] = [];
   let current: Node = root;
-  let pick: { key: number; child: TreeChild } | null = null;
+  let pick: { key: number; child: Node } | null = null;
   if (first !== undefined) {
     const child = root.children.get(first);
     if (!child || child.visits < PV_MIN_VISITS) return steps;
@@ -167,7 +163,7 @@ export function lineFrom(root: Node, first?: number): TreeLineStep[] {
     pick ??= heaviestCell(current);
     if (!pick) break;
     steps.push(stepAt(current, pick.key, pick.child));
-    current = nextNode(pick.child);
+    current = pick.child;
     pick = null;
   }
   return steps;
@@ -219,13 +215,11 @@ export function rowLines(root: Node, tops: { p1?: string; p2?: string }): RowLin
 function treeCellValue(root: Node, i: number, j: number): number {
   const child = root.children.get(cellKey(i, j));
   if (!child) return root.value;
-  // Round 43: a chance cell reads as the weighted blend of its class means.
-  if (isChanceNode(child)) return chanceValue(child);
-  const total = child.p1W.reduce((sum, w) => sum + w, 0) + child.value;
+  const total = leavesBacked(child) + child.value;
   return (total + child.value) / (child.visits + 1);
 }
 
-const childEnded = (child: TreeChild | undefined): boolean => (child ? (isChanceNode(child) ? chanceEnded(child) : child.ended) : false);
+const childEnded = (child: Node | undefined): boolean => child?.ended ?? false;
 
 /** The tree-informed root matrix: cell values from the tree, ended flags from the expanded children. */
 export function treeMatrix(root: Node): { values: number[][]; ended: boolean[][] } {
@@ -234,4 +228,15 @@ export function treeMatrix(root: Node): { values: number[][]; ended: boolean[][]
   const ended = root.p1Options.map((_, i) =>
     root.p2Options.map((_, j) => childEnded(root.children.get(cellKey(i, j)))));
   return { values, ended };
+}
+
+const leavesBacked = (child: Node): number => child.p1W.reduce((sum, w) => sum + w, 0);
+
+/** One root cell's tree stats for the merge: its visits, the leaves backed through it plus its static prior, and the class the draw showed. */
+export function cellStats(key: number, child: Node, classKey?: string, classWeight?: number): MctsTreeStats['cells'][number] {
+  return {
+    key, visits: child.visits, total: leavesBacked(child) + child.value, value: child.value, ended: child.ended,
+    ...(classKey !== undefined ? { classKey } : {}),
+    ...(classKey !== undefined && classWeight !== undefined ? { classWeight } : {}),
+  };
 }

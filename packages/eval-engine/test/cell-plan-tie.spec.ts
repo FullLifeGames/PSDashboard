@@ -2,9 +2,9 @@ import { describe, expect, test } from 'vitest';
 import { Battle, State, Teams, toID, type PokemonSet } from '@pkmn/sim';
 import { advancePositionWithLog, createRootPosition, legalChoices, positionBattle, type SimPosition } from '../src/forward-model';
 import { createMatchupCache } from '../src/eval-function';
-import { leafValue, rollSensitivePair, SEARCH_SEEDS } from '../src/search/leaf';
+import { leafValue, rollSensitivePair } from '../src/search/leaf';
 import { sampleCell } from '../src/search/cell-sampler';
-import { groupedChildren, speedTie } from '../src/search/outcome-children';
+import { speedTie } from '../src/search/outcome-children';
 import { doublesRoot, pairSet } from './pair-battles';
 
 /**
@@ -117,12 +117,6 @@ describe('singles speed tie (T146 c4)', () => {
     expect(classes.find(cls => cls.key === 'p2:none|hit-kill')!.weight).toBeCloseTo(0.5 * accuracy, 9);
     expect(classes.filter(cls => cls.hasFirst)).toHaveLength(1);
     expect(cell.value).toBeCloseTo(classes.reduce((sum, cls) => sum + cls.weight * cls.leafSum / cls.count, 0), 9);
-  });
-
-  test('groupedChildren of a tied pair returns the two orders at one half each', () => {
-    const root = ohkoTie();
-    const out = groupedChildren(root, 'move closecombat', 'move closecombat', { seeds: SEARCH_SEEDS });
-    expect(out.children.map(child => child.weight).sort()).toEqual([0.5, 0.5]);
   });
 
   test('a tied pair is roll-sensitive; the same pair without a tie is not', () => {

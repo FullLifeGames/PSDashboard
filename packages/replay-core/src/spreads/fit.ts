@@ -19,6 +19,7 @@ import { poweredMove } from './powered-move.ts';
 import { abilityStateAtHit } from './ability-state.ts';
 import { historyPower } from './hit-power.ts';
 import { leastDamageOf } from '../hp-display.ts';
+import { OBSERVATION_SLACK } from '../team/item-damage-shared.ts';
 
 /**
  * A violated move-order constraint outweighs any damage-fit error: the log
@@ -27,9 +28,6 @@ import { leastDamageOf } from '../hp-display.ts';
  * (conflicting evidence), damage fit still decides among them.
  */
 export const SPEED_VIOLATION_PENALTY = 1000;
-
-/** HP-bar reading noise (the GPL pipeline is ±1–2%): error inside this slack is free. */
-const OBSERVATION_SLACK = 0.02;
 
 /**
  * An order as the solver reads it (round 64): each mover named by its set,

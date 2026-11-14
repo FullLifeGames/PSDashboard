@@ -6,8 +6,6 @@ import { arg, fromEffect, hasKw, keyOf, ofIdent, type LogLine } from './log-line
 import type { RevealedPokemonInfo } from '../types.ts';
 import { toId } from '../ids.ts';
 
-export { keyOf } from './log-line.ts';
-
 /**
  * Items the protocol rules out by a line it does NOT show (round 63, T80):
  * a Life Orb holder's damaging hit always shows its recoil, Leftovers and

@@ -353,7 +353,7 @@ function blendCellSample(
 /**
  * Round 69 (T146 c4): the two move orders of a tied cell, each priced with its own order scripted, as one cell at
  * one half each. Class keys carry the order prefix (`p1:hit-kill`), as the pair plan's tie cells and the tree's
- * chance nodes write them; a cell whose order priced without a blend keeps the mean alone.
+ * booked root keys write them; a cell whose order priced without a blend keeps the mean alone.
  */
 function mixOrders(first: CellSample, second: CellSample): CellSample {
   const mixed: CellSample = { value: (first.value + second.value) / 2, ended: first.ended && second.ended, firstChild: first.firstChild };

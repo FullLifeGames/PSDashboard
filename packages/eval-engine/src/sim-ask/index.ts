@@ -6,13 +6,9 @@
  */
 export { askCheckOn, AskLeak, fingerprint, guarded, setAskCheck } from './guard.ts';
 export { copyOf, FixedDice, playOnCopy } from './copy.ts';
-export type { DiceSpec } from './copy.ts';
 export { queuePlace, actionPriority, actionsTie, activated } from './action-order.ts';
-export type { ActionAsk, QueuePlace } from './action-order.ts';
 export { aimThatFailsAsLogged, hidesItsTarget } from './hidden-aim.ts';
-export type { HiddenAimAsk } from './hidden-aim.ts';
 export { callHandler } from './handler.ts';
-export type { HandlerResult } from './handler.ts';
-export { bodyInView, isolated, NeedsMore } from './isolated.ts';
+export { bodyInView, isolated } from './isolated.ts';
 export { protectorStops } from './protector.ts';
 export { twinBattle, twinFormat } from './twin.ts';

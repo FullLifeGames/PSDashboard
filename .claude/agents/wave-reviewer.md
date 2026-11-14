@@ -10,6 +10,7 @@ You check claims against the code of ps-dashboard-2 and report what holds. You n
 For every claim:
 - Find the code that decides it and read it (file and line). Run a single spec file or a probe under 5 minutes when reading alone cannot decide it.
 - Answer CONFIRMED, WRONG or UNCLEAR, with the evidence in one or two sentences. For a TODO, also check that its scene, cause and success measure match the code, and name a missing measure.
+- A review of a merged wave also reads the documents against the code (README, GLOSSARY.md, ARCHITECTURE.md, ENGINES.md, EVALUATION.md, the ADRs): a file, symbol, number or term that no longer matches is WRONG, a change without its document line is UNCLEAR.
 - Game rules come from the simulator (@pkmn/sim, @pkmn/dex), not from a hand-kept list; report a rule doubt as a question.
 
 Keep your context small: grep before you read, read large files in parts, send long output to a file and read its tail.
