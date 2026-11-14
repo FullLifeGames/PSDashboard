@@ -51,7 +51,7 @@ describe('the win-paths job in the client', () => {
     expect(seen.map(item => item.kind)).toEqual(['stronger']);
     worker.say({ type: 'jobStep', id, step: { kind: 'winPaths', step: step('luck', 'none') } });
     expect(seen.map(item => item.kind)).toEqual(['stronger', 'luck']);
-    const all = paths([step('stronger'), step('luck', 'none'), step('mistake', 'unbuilt')]);
+    const all = paths([step('stronger'), step('luck', 'none'), step('mistake', 'none')]);
     worker.say({ type: 'jobResult', id, result: { kind: 'winPaths', paths: all } });
     await expect(run).resolves.toEqual(all);
     client.dispose();
@@ -133,7 +133,7 @@ describe('the win-paths job in the client', () => {
     const client = new EvalWorkerClient();
     const run = client.winPaths('{"position":1}', REQUEST, 'standard');
     const job = jobWorkers()[0];
-    const all = paths([step('stronger'), step('luck'), step('mistake', 'unbuilt')]);
+    const all = paths([step('stronger'), step('luck'), step('mistake', 'none')]);
     job.say({ type: 'jobResult', id: job.posted[0].id, result: { kind: 'winPaths', paths: all } });
     await run;
     const seen: WinStep[] = [];
@@ -222,7 +222,8 @@ describe('the win-paths job through the worker module', () => {
     try {
       const result = await client.winPaths(serialized, { side: 'p1', budget: { cells: 40, turns: 60 } }, 'standard', { onStep: item => seen.push(`${item.kind} ${item.status}`) });
       expect(result.steps.map(item => item.kind)).toEqual(['stronger', 'luck', 'mistake']);
-      expect(result.steps[2]).toMatchObject({ status: 'unbuilt' });
+      expect(result.steps[2]).toMatchObject({ kind: 'mistake' });
+      expect(['found', 'none', 'stopped']).toContain(result.steps[2].status);
       expect(seen).toHaveLength(3);
       expect(answered.map(message => message.type)).toEqual(['jobStep', 'jobStep', 'jobStep', 'jobResult']);
     } finally {

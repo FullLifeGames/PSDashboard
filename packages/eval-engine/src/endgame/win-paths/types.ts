@@ -23,6 +23,8 @@ export interface WinPathsRequest {
   played?: string;
   /** The engine's first choice at the root by side (the turn's ranking's best row); a side without one takes the one-turn matrix's. */
   first?: { p1?: string; p2?: string };
+  /** The opponent's ranking at the root, best first (choice string and its value from the opponent's own view): the order and the size of its mistakes. A mistake step without it reads the one-turn matrix. */
+  foeRanking?: { choice: string; ev: number }[];
   tera?: TeraAllowance;
   sleepClause?: boolean;
   ruleset?: StaticRuleset;
@@ -34,13 +36,12 @@ export interface WinPathsRequest {
 /**
  * One answer of #130. `found`: the line ends in the side's win within the turns asked, with the chance of its dice (`luck`) or the
  * mass a proof gives (`stronger`); `none`: the search covered every path above the floor and found no win; `stopped`: the budget ran
- * out first (the line, if any, is the best partial path and no win). `spent` is the work the step took. The job adds two more: `failed`
- * (the step threw; `error` is the technical message, for logs, never a line of the app) and `unbuilt` (the step's runner is a seam that
- * waits for a user answer: step 3, a mistake by the opponent).
+ * out first (the line, if any, is the best partial path and no win). `spent` is the work the step took. The job adds `failed` (the step
+ * threw; `error` is the technical message, for logs, never a line of the app).
  */
 export interface WinStep {
   kind: 'stronger' | 'luck' | 'mistake';
-  status: 'found' | 'none' | 'stopped' | 'failed' | 'unbuilt';
+  status: 'found' | 'none' | 'stopped' | 'failed';
   line?: EvalLine;
   chance?: number;
   played?: number;

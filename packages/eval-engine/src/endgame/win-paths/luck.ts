@@ -86,7 +86,7 @@ class Queue {
 const positions = new WeakMap<Battle, SimPosition>();
 
 /** The position of a battle the search holds (read once: a battle is never written). */
-function positionOf(battle: Battle): SimPosition {
+export function positionOf(battle: Battle): SimPosition {
   let position = positions.get(battle);
   if (!position) {
     const copy = copyOf(battle);
@@ -98,7 +98,7 @@ function positionOf(battle: Battle): SimPosition {
 }
 
 /** The root's options of a side by the request: the ranking's choice when it names one that is legal, else undefined (the matrix's). */
-function rootChoice(root: SimPosition, request: WinPathsRequest, side: 'p1' | 'p2'): ChoiceOption | undefined {
+export function rootChoice(root: SimPosition, request: WinPathsRequest, side: 'p1' | 'p2'): ChoiceOption | undefined {
   const choice = request.first?.[side];
   if (!choice) return undefined;
   const found = searchOptions(root, side, { tera: request.tera, sleepClause: request.sleepClause }).find(option => option.choice === choice);
@@ -114,8 +114,7 @@ export interface Chooser {
 }
 
 /** The engine's first choice: the request's ranking at the root, the one-turn matrix everywhere else (see first-choice.ts). */
-export function firstChoiceChooser(root: SimPosition, request: WinPathsRequest, meter: WinMeter): Chooser {
-  const first = new FirstChoice(meter, request);
+export function firstChoiceChooser(root: SimPosition, request: WinPathsRequest, meter: WinMeter, first = new FirstChoice(meter, request)): Chooser {
   return {
     at: (position, node) => {
       const given = node.atRoot ? { p1: rootChoice(root, request, 'p1'), p2: rootChoice(root, request, 'p2') } : { p1: undefined, p2: undefined };

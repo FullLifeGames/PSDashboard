@@ -1,5 +1,6 @@
 import { WinMeter } from './budget.ts';
 import { luckPath } from './luck.ts';
+import { mistakeStep } from './mistake.ts';
 import { strongerStep } from './stronger.ts';
 import type { WinPaths, WinPathsRequest, WinStep } from './types.ts';
 
@@ -9,21 +10,17 @@ import type { WinPaths, WinPathsRequest, WinStep } from './types.ts';
  * reports each step the moment it is done. It runs only when the app asks, never in a sweep, and it reads the serialized position and
  * writes nothing into any result.
  *
- * A step that throws is a `failed` step with the message and the others still run. The third step waits for a user answer (gate
- * question 3): its runner answers `unbuilt` until `mistakeStep` replaces it (G7b).
+ * A step that throws is a `failed` step with the message and the others still run. The third step is `mistakeStep` (ruling W3a).
  */
 export interface WinStepRunner {
   kind: WinStep['kind'];
   run(serialized: string, request: WinPathsRequest, meter: WinMeter): WinStep;
 }
 
-/** The seam of step 3: no search, nothing to show. G7b replaces this runner with `mistakeStep`. */
-const unbuiltStep = (kind: WinStep['kind']): WinStep => ({ kind, status: 'unbuilt', spent: { cells: 0, turns: 0 } });
-
 export const WIN_STEPS: readonly WinStepRunner[] = [
   { kind: 'stronger', run: strongerStep },
   { kind: 'luck', run: luckPath },
-  { kind: 'mistake', run: () => unbuiltStep('mistake') },
+  { kind: 'mistake', run: mistakeStep },
 ];
 
 export function winPaths(

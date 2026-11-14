@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { searchPosition } from '../src/search/position';
 import { luckPath } from '../src/endgame/win-paths/luck';
+import { mistakeStep } from '../src/endgame/win-paths/mistake';
 import { strongerStep } from '../src/endgame/win-paths/stronger';
 import { WIN_STEPS, winPaths } from '../src/endgame/win-paths/index';
 import type { WinStep } from '../src/endgame/win-paths/types';
@@ -8,8 +9,7 @@ import { mon, REQUEST, serializedBoard, won, playLine, type Board } from './win-
 
 /**
  * Round 89 (#130), step G8a: the job. `winPaths` runs the steps in their ruled order (a stronger play, luck, a mistake by the opponent),
- * each with a meter of its own, and reports each step the moment it is done. The third step waits for a user answer: its seam is a runner
- * that answers `unbuilt`. A step that throws leaves the others; the job writes into nothing it was not handed (the serialized position is
+ * each with a meter of its own, and reports each step the moment it is done. A step that throws leaves the others; the job writes into nothing it was not handed (the serialized position is
  * a string, a result of the search is equal with and without a job between two runs).
  */
 
@@ -39,7 +39,7 @@ describe('the win-paths job', () => {
     expect(WIN_STEPS.map(runner => runner.kind)).toEqual(['stronger', 'luck', 'mistake']);
     expect(result.steps.map(step => step.kind)).toEqual(['stronger', 'luck', 'mistake']);
     // a step is reported before the next one starts
-    expect(log).toEqual(['run stronger', 'step stronger found', 'run luck', 'step luck found', 'run mistake', 'step mistake unbuilt']);
+    expect(log).toEqual(['run stronger', 'step stronger found', 'run luck', 'step luck found', 'run mistake', 'step mistake none']);
     expect(result.side).toBe('p1');
     expect(result.turn).toBe(7);
   }, 240_000);
@@ -50,12 +50,14 @@ describe('the win-paths job', () => {
     const result = winPaths(serialized, request);
     expect(result.steps[0]).toEqual(strongerStep(serialized, request));
     expect(result.steps[1]).toEqual(luckPath(serialized, request));
+    expect(result.steps[2]).toEqual(mistakeStep(serialized, request));
   }, 240_000);
 
-  test('the third step is not built: no search, no line, nothing for the user to read', async () => {
+  test('the third step is the mistake step: an opponent with one choice has no slip to make', async () => {
     const { serialized } = await serializedBoard(COIN);
     const third = winPaths(serialized, REQUEST('p1')).steps[2];
-    expect(third).toEqual({ kind: 'mistake', status: 'unbuilt', spent: { cells: 0, turns: 0 } });
+    expect(third).toMatchObject({ kind: 'mistake', status: 'none' });
+    expect(third.line).toBeUndefined();
   }, 240_000);
 
   test('a step that throws leaves the others: it reads failed with the message, the rest run', async () => {
@@ -63,7 +65,7 @@ describe('the win-paths job', () => {
     const seen: WinStep[] = [];
     const runners = WIN_STEPS.map(runner => runner.kind === 'stronger' ? { ...runner, run: () => { throw new Error('the prover broke'); } } : runner);
     const result = winPaths(serialized, REQUEST('p1'), step => seen.push(step), runners);
-    expect(result.steps.map(step => step.status)).toEqual(['failed', 'found', 'unbuilt']);
+    expect(result.steps.map(step => step.status)).toEqual(['failed', 'found', 'none']);
     expect(result.steps[0]).toMatchObject({ kind: 'stronger', error: 'the prover broke', spent: { cells: 0, turns: 0 } });
     expect(seen).toEqual(result.steps);
   }, 240_000);
@@ -95,6 +97,6 @@ describe('the win-paths job, doubles', () => {
     expect(stronger.line!.choice).toBe('move earthquake, move splash');
     for (const seed of ['1,2,3,4', '905,17,333,4096']) expect(won(await playLine(DOUBLES, stronger.line!, seed), 'p1')).toBe(true);
     expect(result.steps[1]).toEqual(luckPath(serialized, REQUEST('p1', { rootOrder: DOUBLES_ORDER, played: DOUBLES_ORDER[0] })));
-    expect(result.steps[2].status).toBe('unbuilt');
+    expect(result.steps[2]).toEqual(mistakeStep(serialized, REQUEST('p1', { rootOrder: DOUBLES_ORDER, played: DOUBLES_ORDER[0] })));
   }, 240_000);
 });
