@@ -26,7 +26,7 @@ interface EvalPanelProps {
   onEvaluate?: () => void;
   onCancel: () => void;
   /** Click on an engine line: plays it out in a branch (entering one first when needed), the other side answering with `reply`. */
-  onPickChoice?: (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice | null) => void;
+  onPickChoice?: (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice | null, from?: EvalResult | null) => void;
   /** Click on a matrix cell: plays EXACTLY that pair out in a branch. */
   onPickPair?: (p1: { choice: string; label: string }, p2: { choice: string; label: string }) => void;
   /** Replay view: the settings that produced the shown result (fast scan vs configured). */

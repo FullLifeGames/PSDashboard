@@ -92,9 +92,10 @@ describe('EvalTurnAnalysis', () => {
     const rows = screen.getAllByRole('button', { name: '✓ the engine\'s move ↗' });
     expect(rows).toHaveLength(2);
     await userEvent.click(rows[0]);
-    expect(onExplore).toHaveBeenCalledWith('p1', analysis.p1.best, analysis.p2.best);
+    // round 89 (#153): the click also hands the result the card reads (none here), for Hard mode
+    expect(onExplore).toHaveBeenCalledWith('p1', analysis.p1.best, analysis.p2.best, undefined);
     await userEvent.click(rows[1]);
-    expect(onExplore).toHaveBeenLastCalledWith('p2', analysis.p2.best, analysis.p1.best);
+    expect(onExplore).toHaveBeenLastCalledWith('p2', analysis.p2.best, analysis.p1.best, undefined);
   });
 
   test('doubles without played tracking show only the engine rows; read recommendations render per side', () => {

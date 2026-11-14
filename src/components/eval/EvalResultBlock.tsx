@@ -5,7 +5,7 @@ import { MiniBar } from '../EvalTurnAnalysis';
 
 // Displayed values are win probabilities ("52%") and point deltas ("−8%").
 
-type PickChoice = (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice | null) => void;
+type PickChoice = (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice | null, from?: EvalResult | null) => void;
 
 function ChoiceDetail({ choice, index, best, faintedFraction }: {
   choice: RankedChoice; index: number; best: RankedChoice | undefined; faintedFraction?: number | null;
@@ -44,12 +44,14 @@ function choiceTooltip(choice: RankedChoice, clickable: boolean, faintedFraction
 }
 
 function ChoiceList({
-  side, choices, reply, onPickChoice, faintedFraction,
+  side, choices, reply, result, onPickChoice, faintedFraction,
 }: {
   side: 'p1' | 'p2';
   choices: RankedChoice[];
   /** The other side's engine answer, committed alongside a clicked line. */
   reply: RankedChoice | null;
+  /** The result these rows are from: a click hands it on, so Hard mode can read the reply that hurts the clicked move most. */
+  result: EvalResult;
   onPickChoice?: PickChoice;
   doubles?: boolean;
   faintedFraction?: number | null;
@@ -66,7 +68,7 @@ function ChoiceList({
             type="button"
             className="ps-btn ps-eval-choice"
             title={tooltip}
-            onClick={() => onPickChoice(side, choice, reply)}
+            onClick={() => onPickChoice(side, choice, reply, result)}
           >
             {detail}
           </button>
@@ -133,8 +135,8 @@ export function EvalResultBlock({ result, status, playerNames, positionLabel, re
       <div className="ps-eval-columns">
         {/* Stale results describe the PREVIOUS position — clicking them
             would map old choices onto the new state (wrong switches). */}
-        <ChoiceList side="p1" choices={result.perSide.p1} reply={result.perSide.p2[0] ?? null} onPickChoice={status === 'stale' ? undefined : onPickChoice} doubles={doubles} faintedFraction={faintedFraction} />
-        <ChoiceList side="p2" choices={result.perSide.p2} reply={result.perSide.p1[0] ?? null} onPickChoice={status === 'stale' ? undefined : onPickChoice} doubles={doubles} faintedFraction={faintedFraction} />
+        <ChoiceList side="p1" choices={result.perSide.p1} reply={result.perSide.p2[0] ?? null} result={result} onPickChoice={status === 'stale' ? undefined : onPickChoice} doubles={doubles} faintedFraction={faintedFraction} />
+        <ChoiceList side="p2" choices={result.perSide.p2} reply={result.perSide.p1[0] ?? null} result={result} onPickChoice={status === 'stale' ? undefined : onPickChoice} doubles={doubles} faintedFraction={faintedFraction} />
       </div>
       {result.matrix && (
         <EvalMatrixView

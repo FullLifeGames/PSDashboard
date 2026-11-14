@@ -35,7 +35,8 @@ describe('EvalPanel', () => {
     expect(screen.getByRole('checkbox', { name: 'Auto' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Re-evaluate' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /Earthquake/ }));
-    expect(onPickChoice).toHaveBeenCalledWith('p1', result.perSide.p1[0], result.perSide.p2[0]);
+    // round 89 (#153): the click hands the result along, for Hard mode
+    expect(onPickChoice).toHaveBeenCalledWith('p1', result.perSide.p1[0], result.perSide.p2[0], result);
     await userEvent.selectOptions(within(screen.getByText('Depth')).getByRole('combobox'), '2');
     expect(wired.onPrefsChange).toHaveBeenCalledWith({ ...prefs, mode: 'matrix', depth: 2 });
   });

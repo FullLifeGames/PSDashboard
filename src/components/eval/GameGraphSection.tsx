@@ -99,7 +99,7 @@ interface TurnViewProps {
   analysis: TurnAnalysis | null;
   playerNames: [string, string];
   reads?: { p1?: ReadRecommendation | null; p2?: ReadRecommendation | null } | null;
-  onPickChoice?: (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice | null) => void;
+  onPickChoice?: (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice | null, from?: EvalResult | null) => void;
   /** Round 89 (#104): what the Lines section under the turn's rows needs of its host (absent: no section). */
   linesHost?: LinesHost;
   /** Doubles replay: auto routes per game type, and the Lines section writes one row per player (EvalPanel passes its own prop through). */
