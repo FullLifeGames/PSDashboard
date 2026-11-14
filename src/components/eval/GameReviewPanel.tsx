@@ -2,7 +2,8 @@ import { useMemo } from 'react';
 import type { EvalResult, TurnAnalysis } from '@fulllifegames/eval-engine';
 import { lineAnchor, type LinesHost } from '../../lib/line-view';
 import { LineConfirm } from './LineConfirm';
-import { gameReview, type ReviewGrade, type ReviewLineView, type ReviewRowView, type ReviewSideView } from './game-review';
+import { WinPathsPanel } from './WinPathsPanel';
+import { endgameRow, gameReview, type EndgameRowView, type ReviewGrade, type ReviewLineView, type ReviewRowView, type ReviewSideView } from './game-review';
 
 interface GameReviewPanelProps {
   analyses: readonly (TurnAnalysis | null)[];
@@ -64,6 +65,29 @@ function ReviewSide({ view, onPlay, confirm, onSelectTurn }: { view: ReviewSideV
   );
 }
 
+/** The Endgame row of the player who lost (round 89, #130): one click searches the endgame's first turn; the panel opens under it. */
+function EndgameEntry({ row, host, playerNames, doubles }: { row: EndgameRowView; host: LinesHost; playerNames: [string, string]; doubles: boolean }) {
+  const { winPaths } = host;
+  if (!winPaths) return null;
+  const open = winPaths.run !== null;
+  return (
+    <div className="ps-eval-review-side" role="group" aria-label="Endgame">
+      <div className="ps-eval-review-row">
+        <div className="ps-eval-review-head">
+          <button
+            type="button" className="ps-btn ps-eval-inline-btn" aria-expanded={open} disabled={!!winPaths.unavailable && !open}
+            title={winPaths.unavailable ?? 'Search the endgame for a way the player could have won'}
+            onClick={() => (open ? winPaths.hide() : winPaths.show(row.turn))}
+          >
+            {row.text}
+          </button>
+        </div>
+        <WinPathsPanel host={host} playerNames={playerNames} doubles={doubles} />
+      </div>
+    </div>
+  );
+}
+
 /**
  * Round 89 (#104), step G4 (ruling 33, 4a): the Game review under the game report. One list per player of the turns the cards
  * grade, with the played and the engine's value, the loss, the engine's line and the played line, each with ▶ Play, and a
@@ -74,10 +98,12 @@ export function GameReviewPanel({ analyses, results, playerNames, doubles, host,
     () => gameReview({ analyses, results, playerNames, doubles, host }),
     [analyses, results, playerNames, doubles, host],
   );
+  const endgame = useMemo(() => endgameRow(host.winPaths?.endgame, playerNames), [host.winPaths?.endgame, playerNames]);
   return (
     <div className="ps-eval-review">
       <span className="ps-eval-lines-title">Game review · what the engine would have played</span>
       {sides.map(view => <ReviewSide key={view.side} view={view} onPlay={host.onPlay} confirm={host.confirm} onSelectTurn={onSelectTurn} />)}
+      {endgame && <EndgameEntry row={endgame} host={host} playerNames={playerNames} doubles={doubles} />}
     </div>
   );
 }

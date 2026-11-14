@@ -5,6 +5,7 @@ import type { AppController } from './useAppController';
 import { lineHistory } from '../lib/line-history';
 import { snapshotAt } from '../lib/eval-acquire';
 import { lineAnchor, type LineConfirm, type LinesHost } from '../lib/line-view';
+import { useWinPaths } from './useWinPaths';
 
 /** The replace-confirm text, as every other way into a variation words it. */
 const replaceMessage = (turn: number, span: { startTurn: number; length: number }) =>
@@ -59,6 +60,7 @@ export function usePlayLine(app: AppController): { onPlay: (line: EvalLine, turn
 /** The host of the Lines section: the game's rules, the field at the graded turn's start and ▶ Play. */
 export function useLinesHost(app: AppController, replayData: ReplayData): LinesHost {
   const { onPlay, confirm } = usePlayLine(app);
+  const winPaths = useWinPaths(app, replayData);
   const { snapshots } = app.ctx.replay;
   const { analysisTurn } = app.board.timeline;
   return useMemo(() => ({
@@ -67,5 +69,6 @@ export function useLinesHost(app: AppController, replayData: ReplayData): LinesH
     snapshotAt: (turn: number) => snapshotAt(snapshots, turn),
     onPlay,
     confirm,
-  }), [replayData, snapshots, analysisTurn, onPlay, confirm]);
+    winPaths,
+  }), [replayData, snapshots, analysisTurn, onPlay, confirm, winPaths]);
 }

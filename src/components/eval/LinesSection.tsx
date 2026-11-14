@@ -23,6 +23,24 @@ function SideText({ view }: { view: LineSideView }) {
   );
 }
 
+/** The numbered rows of a line with their chips (the Lines section's and the win-path panel's). */
+export function LineRows({ block }: { block: LineBlockView }) {
+  return (
+    <>
+      {block.rows.map(row => (
+        <div key={row.key} className="ps-eval-line-turn">
+          <span className="t">{row.turn}</span>
+          <span>
+            {row.sides.map((view, index) => (
+              <Fragment key={view.side}>{index > 0 && ' · '}<SideText view={view} /></Fragment>
+            ))}
+          </span>
+        </div>
+      ))}
+    </>
+  );
+}
+
 function LineBlock({ block, turn, onPlay, confirm }: { block: LineBlockView; turn: number; onPlay?: LinesHost['onPlay']; confirm?: LinesHost['confirm'] }) {
   return (
     <div className="ps-eval-line-block">
@@ -36,16 +54,7 @@ function LineBlock({ block, turn, onPlay, confirm }: { block: LineBlockView; tur
         <span style={{ color: '#778' }}>{block.end}</span>
       </div>
       {confirm && confirm.anchor === lineAnchor(block.line, turn) && <LineConfirm confirm={confirm} />}
-      {block.rows.map(row => (
-        <div key={row.key} className="ps-eval-line-turn">
-          <span className="t">{row.turn}</span>
-          <span>
-            {row.sides.map((view, index) => (
-              <Fragment key={view.side}>{index > 0 && ' · '}<SideText view={view} /></Fragment>
-            ))}
-          </span>
-        </div>
-      ))}
+      <LineRows block={block} />
       {block.note && <span className="ps-eval-line">{block.note}</span>}
       {block.endNote && <span className="ps-eval-line">{block.endNote}</span>}
     </div>

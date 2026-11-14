@@ -6,6 +6,7 @@ import { GameReviewPanel } from '../../../src/components/eval/GameReviewPanel';
 import type { LinesHost } from '../../../src/lib/line-view';
 import { misplayedSide, turnAnalysis } from '../fixtures/analysis';
 import { evalResult, rankedChoice } from '../fixtures/eval-result';
+import type { WinPathsHost } from '../../../src/lib/win-paths-host';
 import { doublesLine, DOUBLES_NAMES, playedLine, singlesLine, SINGLES_NAMES } from '../fixtures/lines';
 
 /** Round 89 (#104), step G4: the Game review panel, singles and doubles. */
@@ -112,5 +113,58 @@ describe('GameReviewPanel, doubles', () => {
     const analyses: (TurnAnalysis | null)[] = [null, null, null, turnAnalysis(4, { p1: { ...misplayedSide('mistake'), best: rankedChoice('move 1, move 2', doublesLine.label, 0.37) } })];
     render(<GameReviewPanel analyses={analyses} results={[null, null, null, withLines('doubles', [{ ...doublesLine, awaits: 'p1' }])]} playerNames={DOUBLES_NAMES} doubles host={host(vi.fn())} />);
     expect(screen.getByText(`The line ends where ${DOUBLES_NAMES[0]} must choose who to send in; the search made no choice there.`)).toBeInTheDocument();
+  });
+});
+
+/** Round 89 (#130), step G8b: the Endgame row of the player who lost. */
+const endgameHost = (extra: Partial<WinPathsHost> = {}): LinesHost & { winPaths: WinPathsHost } => ({
+  rules: { gen: 9, mod: undefined },
+  winPaths: { endgame: { loser: 'p2', turns: [23, 24] }, run: null, unavailable: null, playedLabel: () => null, show: vi.fn(), hide: vi.fn(), ...extra },
+});
+
+describe('GameReviewPanel, the Endgame row', () => {
+  test('singles: one row for the player who lost, named by the first turn of the endgame; a click searches that turn', async () => {
+    const { analyses, results } = singlesGame();
+    const lined = endgameHost();
+    render(<GameReviewPanel analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={lined} />);
+    const group = screen.getByRole('group', { name: 'Endgame' });
+    const button = within(group).getByRole('button', { name: 'Endgame · T23 · How could Pepitopalotin have won?' });
+    await userEvent.click(button);
+    expect(lined.winPaths.show).toHaveBeenCalledWith(23);
+    // only for the loser: the winner has no such row
+    expect(screen.queryByRole('button', { name: /How could Tzon have won/ })).toBeNull();
+  });
+
+  test('doubles: the same row for the loser of a doubles game', () => {
+    render(<GameReviewPanel analyses={[null, null, null, null]} results={[null, null, null, null]} playerNames={DOUBLES_NAMES} doubles host={endgameHost({ endgame: { loser: 'p1', turns: [8] } })} />);
+    expect(screen.getByRole('button', { name: 'Endgame · T8 · How could pixelfrost have won?' })).toBeInTheDocument();
+  });
+
+  test('no row for a game that never reached its endgame, one without a loser or a host without the job', () => {
+    const { analyses, results } = singlesGame();
+    const { rerender } = render(<GameReviewPanel analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={endgameHost({ endgame: null })} />);
+    expect(screen.queryByRole('group', { name: 'Endgame' })).toBeNull();
+    rerender(<GameReviewPanel analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={host()} />);
+    expect(screen.queryByRole('group', { name: 'Endgame' })).toBeNull();
+  });
+
+  test('with a search open the row closes it, and the panel stands under the row', async () => {
+    const { analyses, results } = singlesGame();
+    const lined = endgameHost({ run: { turn: 23, side: 'p2', steps: [], status: 'searching' } });
+    render(<GameReviewPanel analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={lined} />);
+    const group = screen.getByRole('group', { name: 'Endgame' });
+    expect(within(group).getByRole('region', { name: 'How could Pepitopalotin have won?' })).toBeInTheDocument();
+    const button = within(group).getByRole('button', { name: 'Endgame · T23 · How could Pepitopalotin have won?' });
+    expect(button).toHaveAttribute('aria-expanded', 'true');
+    await userEvent.click(button);
+    expect(lined.winPaths.hide).toHaveBeenCalled();
+  });
+
+  test('while the sets load the row is disabled and says why', () => {
+    const { analyses, results } = singlesGame();
+    render(<GameReviewPanel analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={endgameHost({ unavailable: 'Waiting for Smogon data.' })} />);
+    const button = screen.getByRole('button', { name: /^Endgame/ });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('title', 'Waiting for Smogon data.');
   });
 });

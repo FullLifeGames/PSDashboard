@@ -1,6 +1,7 @@
 import { dieKey, dieLabel, winPctText, type DieKind, type DieWords, type EvalLine, type LineDie, type LineStep } from '@fulllifegames/eval-engine';
 import { rulesDex, type GameRules, type TurnSnapshot } from '@fulllifegames/replay-core';
 import { wordsOf } from './branch-dice';
+import type { WinPathsHost } from './win-paths-host';
 
 /**
  * Round 89 (#104), step G3: what the "Lines" section of the turn card shows, as plain data. One block per line (head, end value,
@@ -54,6 +55,8 @@ export interface LinesHost {
   onPlay?: (line: EvalLine, turn: number) => void;
   /** The replace question a click raised; the block of its line shows it, so it stands where the user clicked. */
   confirm?: LineConfirm | null;
+  /** Round 89 (#130): the win paths of a lost endgame (the Game review's Endgame row, the turn card's entry); absent: none. */
+  winPaths?: WinPathsHost;
 }
 
 export interface LineViewContext {

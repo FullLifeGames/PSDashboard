@@ -132,6 +132,20 @@ function reviewRow(args: ReviewArgs, analysis: TurnAnalysis, side: Side, grade: 
   };
 }
 
+export interface EndgameRowView { side: Side; player: string; /** The first turn of the endgame: the row's click searches it. */ turn: number; text: string }
+
+/**
+ * Round 89 (#130), step G8b: the Endgame row, for the player who lost a game that reached its endgame (the host's `endgame`: three
+ * bodies or fewer standing at the turn's start, the loser, every such turn). The click searches from the endgame's first turn; the
+ * panel's picker holds the later ones (ruling W2b).
+ */
+export function endgameRow(endgame: { loser: Side; turns: readonly number[] } | null | undefined, playerNames: [string, string]): EndgameRowView | null {
+  if (!endgame || endgame.turns.length === 0) return null;
+  const player = playerNames[SIDE_INDEX[endgame.loser]];
+  const turn = endgame.turns[0];
+  return { side: endgame.loser, player, turn, text: `Endgame · T${turn} · How could ${player} have won?` };
+}
+
 /** The lists of the Game review: one per player, player 1 first, the graded turns in turn order. */
 export function gameReview(args: ReviewArgs): ReviewSideView[] {
   const graded = gradedSides(args.analyses);

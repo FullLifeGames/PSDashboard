@@ -6,6 +6,7 @@ import {
 import { attributionBadge, isPairLead, leadTier } from './eval-badges';
 import { EngineRow } from './eval/analysis-bits';
 import { LinesSection } from './eval/LinesSection';
+import { WinPathsEntry } from './eval/WinPathsEntry';
 import type { LinesHost } from '../lib/line-view';
 import { SideRow } from './eval/SideRow';
 import { evTitle } from './eval/turn-copy';
@@ -135,6 +136,7 @@ export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore, resu
       )}
       <ReadRows reads={reads} playerNames={playerNames} faintedFraction={analysis.faintedFraction} />
       {linesHost && <LinesSection turn={analysis.turn} result={result} playerNames={playerNames} doubles={!!doubles} host={linesHost} analysis={analysis} />}
+      {linesHost && <WinPathsEntry turn={analysis.turn} host={linesHost} playerNames={playerNames} doubles={!!doubles} />}
     </div>
   );
 }

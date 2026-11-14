@@ -128,6 +128,17 @@ describe('the win-paths job in the client', () => {
     client.dispose();
   });
 
+  test('the sweep\'s own calls post no job message: only winPaths starts one', () => {
+    vi.stubGlobal('Worker', FakeWorker);
+    const client = new EvalWorkerClient();
+    client.evalPair('{"position":1}', 'move a', 'move b', { depth: 1, samples: 1, tera: false, ruleset: 'standard' }).catch(() => undefined);
+    client.cancel();
+    const everything = workers.flatMap(worker => worker.posted.map(request => request.type));
+    expect(everything.length).toBeGreaterThan(0);
+    expect(everything).not.toContain('job');
+    client.dispose();
+  });
+
   test('a finished job is kept: the second open answers from the memo, step by step, with no message', async () => {
     vi.stubGlobal('Worker', FakeWorker);
     const client = new EvalWorkerClient();
