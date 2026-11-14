@@ -6,10 +6,10 @@ import { registerChampionsDex } from '../src/rules-dex';
 
 if (!Dex.formats.get('gen9championscustomgame').exists) registerChampionsDex(championsMod as never, championsMod.Formats as never);
 
-export interface PlayBody { species: string; ability: string; moves?: string[]; level?: number; /** The nickname the log shows (the species by default). */ name?: string }
+export interface PlayBody { species: string; ability: string; moves?: string[]; level?: number; item?: string; /** The nickname the log shows (the species by default). */ name?: string }
 
 export const setOf = (body: PlayBody): PokemonSet => ({
-  name: body.name ?? body.species, species: body.species, item: '', ability: body.ability, moves: body.moves ?? ['Splash'], nature: 'Hardy', gender: '',
+  name: body.name ?? body.species, species: body.species, item: body.item ?? '', ability: body.ability, moves: body.moves ?? ['Splash'], nature: 'Hardy', gender: '',
   level: body.level ?? 100, evs: { hp: 252, atk: 0, def: 252, spa: 0, spd: 4, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
 });
 

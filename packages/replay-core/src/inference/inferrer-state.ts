@@ -44,7 +44,6 @@ export interface InferrerState {
   // the SAME action the counterpart line may still credit the giver's
   // original; from a later action the ident only gives away acquired items.
   swappedIdents: Map<string, object | null>;
-  gravityActive: boolean;
   /** The replay's generation (|gen| line): the dex that decides who may hold an ability (round 60, T104). */
   gen: number;
   /** The replay's mod, read from its tier line ('champions' for a Pokémon Champions format; round 75, T160): the Dex of the game is `rulesDex(gen, mod)`. */
@@ -80,7 +79,6 @@ export function createInferrerState(lines: readonly LogLine[], opponentSide: 'p1
     plainMovesSince: new Map<string, Set<string>>(),
     nicknameSpecies: new Map<string, string>(),
     swappedIdents: new Map<string, object | null>(),
-    gravityActive: false,
   };
 }
 
