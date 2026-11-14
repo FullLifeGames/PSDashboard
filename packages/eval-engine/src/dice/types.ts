@@ -41,7 +41,11 @@ export type DieTook = 'applied' | 'no-draw' | 'no-chance' | 'blocked';
 /** `landed` (round 89): on the die of a later hit that the chain never reached, the hits the protocol counts for the target. */
 export interface DieReport { die: ForcedDie; took: DieTook; chance?: number; logIndex?: number; reason?: string; landed?: number }
 
-export interface DiceReport { forced: DieReport[]; naturalEndSeed: string }
+/**
+ * `unnamed` (round 89, #104): how many draws of the real turn no die names and no forced tie covers (a duration, a random target, a
+ * tie of bodies that are not move actions); the seed decides them. Absent when the turn drew none.
+ */
+export interface DiceReport { forced: DieReport[]; naturalEndSeed: string; unnamed?: number }
 
 /**
  * The key of a die: its name without the index of a repeat (the second secondary, the next hit of a move that draws no accuracy

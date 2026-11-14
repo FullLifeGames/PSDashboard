@@ -8,6 +8,9 @@ interface ConfirmBannerProps {
   proceedLabel?: string;
 }
 
+/** Round 89 (#104), G4d: in a narrow column the message wraps; the buttons never break a word. */
+const KEEP_WORDS = { whiteSpace: 'nowrap', flexShrink: 0 } as const;
+
 /**
  * Inline confirm for main-line deviations that would replace the variation, and for the other questions that ask before they throw
  * something away (round 89: a team edit that cuts played turns, Start or a load that closes an unsaved variation). It scrolls into view
@@ -22,17 +25,18 @@ export function ConfirmBanner({ message, onProceed, onCancel, proceedLabel = 'Re
       className="ps-panel"
       role="alertdialog"
       style={{
-        marginTop: 6, padding: '7px 10px', display: 'flex', gap: 10, alignItems: 'center',
+        marginTop: 6, padding: '7px 10px', display: 'flex', flexWrap: 'wrap', gap: 6, rowGap: 6, alignItems: 'center',
         fontSize: 11, borderColor: 'rgba(204,68,85,0.5)',
       }}
     >
-      <span>{message}</span>
-      <button type="button" className="ps-btn ps-btn-red" onClick={onProceed}>
+      <span style={{ flex: '1 1 12em' }}>{message}</span>
+      <button type="button" className="ps-btn ps-btn-red" style={KEEP_WORDS} onClick={onProceed}>
         {proceedLabel}
       </button>
       <button
         type="button"
         className="ps-btn"
+        style={KEEP_WORDS}
         onClick={onCancel}
       >
         Cancel

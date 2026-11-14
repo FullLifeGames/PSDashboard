@@ -1,4 +1,4 @@
-import { TIER_THRESHOLDS, type SideAnalysis, type RankedChoice, winPctText } from '@fulllifegames/eval-engine';
+import { regretText, TIER_THRESHOLDS, type EvalLine, type SideAnalysis, type TurnAnalysis, type RankedChoice, winDeltaText, winPctText } from '@fulllifegames/eval-engine';
 
 /**
  * Every displayed value is a WIN PROBABILITY for the named player — "52%"
@@ -77,6 +77,35 @@ export function comparisonTarget(side: SideAnalysis, best: RankedChoice) {
 }
 
 /**
+ * Round 89 (#104), step G4b: the engine's choice of a side as the turn card names it, and the one place that says so: a graded
+ * mistake or blunder shows its reference line (`comparisonTarget`: the safe line for a read, the co-optimal alternative for a null
+ * best, else the best), every other row its best row at the row's own value. The Game review reads the same choice, value and word
+ * ("safe" where the card says "safe:"), and takes as the engine's line only the line of this choice.
+ */
+export function engineChoice(side: SideAnalysis): { label: string; value: number; word: 'engine' | 'safe' } | null {
+  const best = side.best;
+  if (!best) return null;
+  if (side.tier !== 'mistake' && side.tier !== 'blunder') return { label: best.label, value: best.ev, word: 'engine' };
+  const { asSafe, target, swapped, value } = comparisonTarget(side, best);
+  return { label: swapped ? swapped.label : target.label, value, word: asSafe ? 'safe' : 'engine' };
+}
+
+/**
+ * The lines a card shows: a line is the engine's only when it is the line of the card's engine choice (a result blended over
+ * several worlds keeps the heaviest world's lines, whose best row need not be the blend's), and a line that was both the engine's
+ * and the played one but is no longer the engine's reads as the played line alone.
+ */
+export function cardLines(lines: readonly EvalLine[], analysis: Pick<TurnAnalysis, 'p1' | 'p2'> | null | undefined): EvalLine[] {
+  if (!analysis) return [...lines];
+  return lines.flatMap((line): EvalLine[] => {
+    const engine = engineChoice(analysis[line.side]);
+    const roles = line.for.filter(role => role !== 'engine' || engine === null || engine.label === line.label);
+    if (roles.length === 0) return [];
+    return [roles.length === line.for.length ? line : { ...line, for: roles }];
+  });
+}
+
+/**
  * The heading over the live evaluation (round 77, C6): it names the position the shown result was computed for,
  * read from the run's position tag (`main:10`, `variation:10`), never the position the pointer holds now. A result
  * without a tag falls back to the position on screen.
@@ -88,4 +117,24 @@ export function resultPositionLabel(
   const turn = match ? Number(match[2]) : screen.viewTurn;
   const variation = match ? match[1] === 'variation' : screen.viewingVariation;
   return `Turn ${turn} · ${variation ? 'variation' : 'main line'}`;
+}
+
+/**
+ * Round 64 (T123): the regret as its chip shows it. Over 1 it reads as the two win chances it spans
+ * (regretText), and the title keeps the real number on the score scale.
+ */
+export function regretView(name: string, side: SideAnalysis, regret: number): { text: string; title: string } {
+  const from = side.bestNull?.alternative?.ev ?? side.best?.ev;
+  const to = side.played?.ev;
+  if (from === undefined || to === undefined) {
+    return { text: winDeltaText(-regret), title: `${name} gave up this much win probability vs the engine's best.` };
+  }
+  const text = regretText(regret, from, to, side.faintedFraction);
+  return text === winDeltaText(-regret)
+    ? { text, title: `${name} gave up this much win probability vs the engine's best.` }
+    : {
+      text,
+      title: `${name}'s win chance fell from ${winPctText(from, side.faintedFraction)} with the engine's line to ${winPctText(to, side.faintedFraction)} with the played choice ` +
+        `(regret ${regret.toFixed(2)} on the score scale from −1 to 1).`,
+    };
 }

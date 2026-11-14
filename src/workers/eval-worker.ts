@@ -95,6 +95,9 @@ scope.onmessage = async (event: MessageEvent<EvalWorkerRequest | ReplayJobReques
     } else if (message.type === 'prove') {
       const outcome = await executorFor(message.serializedBattle, message.ruleset).prove(message.input);
       settle({ type: 'proveResult', id: message.id, outcome });
+    } else if (message.type === 'lines') {
+      const lines = await executorFor(message.serializedBattle, message.ruleset).lines!(message.input);
+      settle({ type: 'linesResult', id: message.id, lines });
     }
   } catch (error) {
     settle({ type: 'error', id: message.id, message: error instanceof Error ? error.message : String(error) });

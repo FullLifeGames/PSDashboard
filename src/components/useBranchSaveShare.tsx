@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import type { ReplayData } from '@fulllifegames/replay-core';
 import type { BranchHistoryEntry } from '../hooks/useBranch';
 import type { BranchHistorySlots } from './BranchHistoryPanel';
@@ -28,22 +28,29 @@ export function shareUrl(encoded: string): string {
   return `${base}#branch=${encoded}`;
 }
 
-/** The share link of the current branch and whether the clipboard took it. */
+/**
+ * The share link of the current branch and whether the clipboard took it. Once the field is filled it follows the variation: when
+ * the inputs change (`build` is a new function), the link is built again during render (round 89: a line that replaced the
+ * variation left the old link in the field), and a "Copied" belongs to the build it copied, so a changed variation shows none
+ * until the next copy. The link in the field is the one the click built, so the clipboard and the field carry one timestamp, and
+ * nothing is built before the first click (a game's link packs both teams).
+ */
 function useShareLink(build: () => SavedBranch) {
-  const [link, setLink] = useState('');
-  const [copied, setCopied] = useState(false);
+  const [built, setBuilt] = useState<{ build: () => SavedBranch; link: string } | null>(null);
+  const [copiedFor, setCopiedFor] = useState<(() => SavedBranch) | null>(null);
+  if (built && built.build !== build) setBuilt({ build, link: shareUrl(encodeBranchShare(build())) });
   const createLink = async () => {
     const nextLink = shareUrl(encodeBranchShare(build()));
-    setLink(nextLink);
-    setCopied(false);
+    setBuilt({ build, link: nextLink });
+    setCopiedFor(null);
     try {
       await navigator.clipboard?.writeText(nextLink);
-      setCopied(true);
+      setCopiedFor(() => build);
     } catch {
-      setCopied(false);
+      setCopiedFor(null);
     }
   };
-  return { link, copied, createLink };
+  return { link: built?.link ?? '', copied: copiedFor === build, createLink };
 }
 
 const SAVE_TITLE = 'Stores the replay id, branch turn, choices and final branch log in this browser.';
@@ -63,10 +70,19 @@ export function useBranchSaveShare({ replayData, branchTurn, history, finalLog, 
   const [saved, setSaved] = useState<SavedBranch[]>(() => loadSavedBranches(replayData.id));
   const [justSaved, setJustSaved] = useState(false);
 
-  // Built when the user asks (a click), never per render: a game's link packs both teams.
-  const build = (): SavedBranch => (game
-    ? makeGameSharePayload({ record: game.record, variation: { startTurn: branchTurn, history }, view: game.view })
-    : makeBranchSharePayload({ replay: replayData, branchTurn, history, finalLog }));
+  // Built when the user asks (a click) or, once a link is shown, when its inputs change; never per render before that. `game` is a
+  // fresh object each render, so the build depends on its fields.
+  const gameRecord = game?.record ?? null;
+  const viewTurn = game?.view?.turn ?? 0;
+  const viewLine = game?.view?.line ?? 'main';
+  const viewT0 = game?.view?.t0 ?? false;
+  const build = useCallback((): SavedBranch => (gameRecord
+    ? makeGameSharePayload({
+      record: gameRecord, variation: { startTurn: branchTurn, history },
+      view: { turn: viewTurn, line: viewLine, ...(viewT0 ? { t0: true } : {}) },
+    })
+    : makeBranchSharePayload({ replay: replayData, branchTurn, history, finalLog })),
+  [gameRecord, viewTurn, viewLine, viewT0, replayData, branchTurn, history, finalLog]);
   const { link, copied, createLink } = useShareLink(build);
 
   const saveBranch = () => {

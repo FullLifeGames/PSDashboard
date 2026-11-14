@@ -4,7 +4,7 @@ import { foldClassWeights, koOddsForOptions, observeOrder, planCellEvents, type 
 import { cellKey, rankFromMatrix, toResult as rankedToResult } from './rank.ts';
 import { attachKoOdds, hasUnansweredContent, koOddsMapsFor } from './search/root-payload.ts';
 import { matrixCells, topVisitedIndex, treeScore } from './mcts-merge.ts';
-import { makeNode, pick, principalVariation, treeMatrix, type Node } from './search/mcts-node.ts';
+import { makeNode, pick, principalVariation, rowLines, treeMatrix, type Node } from './search/mcts-node.ts';
 import { cellStats, isChanceNode, pickClass } from './search/chance-node.ts';
 import { cellSeeds, positionSalt } from './search/root-quantile.ts';
 import { expandCell, type ExpansionContext, type RootClassBook } from './search/expansion.ts';
@@ -377,6 +377,8 @@ function treeSearchOn(
     ...(doubles ? {} : { boundaryCells }),
     ...(plannedCells ? { plannedCells } : {}),
     ...legal,
+    // Round 89 (#104): every root row's line, against this tree's own top row of the other side
+    rowLines: rowLines(root, { p1: result.perSide.p1[0]?.label, p2: result.perSide.p2[0]?.label }),
     // Root-cell stats for the merged equilibrium (Map order is insertion
     // order — deterministic under the fixed seed schedule).
     cells,

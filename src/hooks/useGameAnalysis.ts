@@ -114,5 +114,9 @@ export function useGameAnalysis(inputs: {
     };
   }, [evaluation.graph, gameReportData, sweepAlignment]);
 
-  return { turnReads, turnAnalysis, faintedShares, leadAnalysisData, gameReport: gameReportData?.report ?? null };
+  return {
+    turnReads, turnAnalysis, faintedShares, leadAnalysisData, gameReport: gameReportData?.report ?? null,
+    // Round 89 (#104): the report's own per-turn analyses, for the Game review and the graph's marks.
+    gameAnalyses: gameReportData?.analyses ?? null,
+  };
 }

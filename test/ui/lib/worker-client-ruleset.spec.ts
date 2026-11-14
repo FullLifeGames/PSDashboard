@@ -129,7 +129,7 @@ describe('worker client rule set', () => {
   });
 
   test('a tree evaluation names the rule set on its trees and its other messages, and a message that drops it is refused', async () => {
-    localStorage.setItem('ps-replay-interceptor:search-budget', 'trees=2,iterations=50');
+    localStorage.setItem('ps-replay-interceptor:search-budget', 'trees=2,iterations=200');
     onTestFinished(() => localStorage.removeItem('ps-replay-interceptor:search-budget'));
     const types = await expectEveryPathGuarded({ depth: 1, samples: 1, mode: 'mcts', tera: false, ruleset: 'champions' });
     expect(types).toContain('mctstree');

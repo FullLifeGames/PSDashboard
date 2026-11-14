@@ -1,7 +1,7 @@
 import type { MatchupCache } from '../eval-function.ts';
 import { positionBattle, type ChoiceOption, type SimPosition } from '../forward-model.ts';
 import { cellKey } from '../rank.ts';
-import type { EvalSettings, TeraAllowance } from '../types.ts';
+import type { EvalSettings, RowLines, TeraAllowance, TreeLineStep } from '../types.ts';
 import { leafValue } from './leaf.ts';
 import { chanceEnded, chanceValue, isChanceNode, type TreeChild } from './chance-node.ts';
 import { optionHints } from './hints.ts';
@@ -123,29 +123,90 @@ export function pick(n: number[], w: number[], visits: number, maximize: boolean
   return best;
 }
 
-export function principalVariation(node: Node): { p1: string; p2: string }[] {
-  const steps: { p1: string; p2: string }[] = [];
-  let current = node;
-  for (let step = 0; step < PV_MAX_STEPS; step++) {
-    if (current.ended || current.p1Options.length === 0 || current.p2Options.length === 0) break;
-    let best: TreeChild | undefined;
-    let bestVisits = 0;
-    let bestI = 0;
-    let bestJ = 0;
-    for (const [key, child] of current.children) {
-      if (child.visits > bestVisits) {
-        bestVisits = child.visits;
-        best = child;
-        bestI = Math.floor(key / 10_000);
-        bestJ = key % 10_000;
-      }
+/** The most visited cell of a node (the first of equals): its key and child, null below the visits a line needs. */
+function heaviestCell(node: Node): { key: number; child: TreeChild } | null {
+  let best: TreeChild | undefined;
+  let bestVisits = 0;
+  let bestKey = 0;
+  for (const [key, child] of node.children) {
+    if (child.visits > bestVisits) {
+      bestVisits = child.visits;
+      best = child;
+      bestKey = key;
     }
-    if (!best || bestVisits < PV_MIN_VISITS) break;
-    steps.push({ p1: current.p1Options[bestI].label, p2: current.p2Options[bestJ].label });
-    // Round 43: a chance node passes the line on through its heaviest class.
-    current = isChanceNode(best) ? best.classes[0].child : best;
+  }
+  return best && bestVisits >= PV_MIN_VISITS ? { key: bestKey, child: best } : null;
+}
+
+const hasChoices = (node: Node): boolean => !node.ended && node.p1Options.length > 0 && node.p2Options.length > 0;
+
+/** Round 43: a chance node passes the line on through its heaviest class (the tree's chance nodes are off, CHANCE_NODES). */
+const nextNode = (child: TreeChild): Node => (isChanceNode(child) ? child.classes[0].child : child);
+
+const stepAt = (node: Node, key: number, child: TreeChild): TreeLineStep => ({
+  p1: node.p1Options[Math.floor(key / 10_000)].label, p2: node.p2Options[key % 10_000].label, visits: child.visits,
+});
+
+/**
+ * Round 89 (#104): the line the tree holds from one cell of `root` on: the cell itself, then each node's most visited cell while it has
+ * `PV_MIN_VISITS` visits, at most `PV_MAX_STEPS` steps in all. Each step names both sides' choices by label (the labels survive the
+ * bench order, the choice strings below the root do not translate) and the visits of its cell. Without a first cell the line starts
+ * at `root`'s own most visited cell, the principal variation.
+ */
+export function lineFrom(root: Node, first?: number): TreeLineStep[] {
+  const steps: TreeLineStep[] = [];
+  let current: Node = root;
+  let pick: { key: number; child: TreeChild } | null = null;
+  if (first !== undefined) {
+    const child = root.children.get(first);
+    if (!child || child.visits < PV_MIN_VISITS) return steps;
+    pick = { key: first, child };
+  }
+  for (let step = 0; step < PV_MAX_STEPS; step++) {
+    if (!hasChoices(current)) break;
+    pick ??= heaviestCell(current);
+    if (!pick) break;
+    steps.push(stepAt(current, pick.key, pick.child));
+    current = nextNode(pick.child);
+    pick = null;
   }
   return steps;
+}
+
+export function principalVariation(node: Node): { p1: string; p2: string }[] {
+  return lineFrom(node).map(({ p1, p2 }) => ({ p1, p2 }));
+}
+
+/**
+ * Round 89 (#104): the line of every root row that holds one, by side and row label. A row's first cell is the one against the
+ * opponent's top row (`tops`, the labels of each side's best row in this tree's own ranking) when that cell has the visits a line
+ * needs, else the row's most visited cell. A row whose cells all lack the visits has no line.
+ */
+export function rowLines(root: Node, tops: { p1?: string; p2?: string }): RowLines {
+  const out: RowLines = { p1: {}, p2: {} };
+  if (!hasChoices(root)) return out;
+  // the column each side's rows meet: the opponent's top row
+  const against = { p1: root.p2Options.findIndex(option => option.label === tops.p2), p2: root.p1Options.findIndex(option => option.label === tops.p1) };
+  interface Held { key: number; visits: number; top: boolean }
+  const held = { p1: new Map<number, Held>(), p2: new Map<number, Held>() };
+  for (const [key, child] of root.children) {
+    const i = Math.floor(key / 10_000);
+    const j = key % 10_000;
+    for (const [side, row, column] of [['p1', i, j], ['p2', j, i]] as const) {
+      const cell: Held = { key, visits: child.visits, top: column === against[side] && child.visits >= PV_MIN_VISITS };
+      const was = held[side].get(row);
+      // the cell against the top row wins once it has the visits; else the heavier cell (the first of equals)
+      if (!was || (cell.top && !was.top) || (cell.top === was.top && cell.visits > was.visits)) held[side].set(row, cell);
+    }
+  }
+  for (const side of ['p1', 'p2'] as const) {
+    const options = side === 'p1' ? root.p1Options : root.p2Options;
+    for (const [row, { key }] of held[side]) {
+      const line = lineFrom(root, key);
+      if (line.length > 0 && !(options[row].label in out[side])) out[side][options[row].label] = line;
+    }
+  }
+  return out;
 }
 
 /**

@@ -139,4 +139,15 @@ describe('SideRow', () => {
     rerender(<SideRow name="Alice" side={misplayedSide('mistake', { hindsightRead: { ...read, shown: true, line } })} />);
     expect(screen.getByText(line)).toBeInTheDocument();
   });
+
+  test('an inaccuracy whose read paid off shows the read alone; the review and the report list it the same way (round 89, G4d)', () => {
+    const paid = sideAnalysis({ tier: 'inaccuracy', regret: 0.09, riskPaidOff: true, riskPayoff: 0.09 });
+    const { rerender } = render(<SideRow name="Alice" side={paid} />);
+    expect(screen.getByText(`read paid off · ${winDeltaText(0.09)}`)).toBeInTheDocument();
+    expect(screen.queryByText(/· inaccuracy/)).toBeNull();
+    // the side lost ground: the read is not praised, so the inaccuracy stays
+    rerender(<SideRow name="Alice" side={paid} lostGround />);
+    expect(screen.queryByText(/read paid off/)).toBeNull();
+    expect(screen.getByText(`· inaccuracy (${winDeltaText(-0.09)})`)).toBeInTheDocument();
+  });
 });

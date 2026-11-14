@@ -6,6 +6,7 @@ import type {
 } from '@fulllifegames/eval-engine';
 import type { EvalGraphState, EvalStatus, TurnEvalSettings } from '../hooks/useEvaluation';
 import type { VariationSeries } from '../lib/eval-graph-view';
+import type { LinesHost } from '../lib/line-view';
 import { EvalControls } from './eval/EvalControls';
 import { EvalStatus as EvalStatusBlock, type PlayOutProgress } from './eval/EvalStatus';
 import { GameGraphSection } from './eval/GameGraphSection';
@@ -58,6 +59,8 @@ interface EvalPanelProps {
   analysis: TurnAnalysis | null;
   /** Round 89 (#105): the open tip of a new game, whose analysis names an open position instead of a played choice. */
   openTurn?: number | null;
+  /** Round 89 (#104, G4d): with a variation open and a game report held, the way back to the main line (see GameGraphSection). */
+  onBackToMain?: () => void;
   /** Exploitative Read recommendations for the selected turn (advisory). */
   reads?: { p1?: ReadRecommendation | null; p2?: ReadRecommendation | null } | null;
   /** The fainted share per swept turn as the card takes it (any engine mode): the graph tooltips print at it. */
@@ -68,8 +71,12 @@ interface EvalPanelProps {
   reportLeads?: LeadAnalysis | null;
   /** Game-level root-cause report, once a sweep covers enough turns. */
   report?: GameReport | null;
+  /** Round 89 (#104): the report's analysis of every turn; the Game review lists the graded ones and the graph marks them. */
+  reviewAnalyses?: (TurnAnalysis | null)[] | null;
   /** Doubles replay — selects the fitted win-probability curve for percents. */
   doubles?: boolean;
+  /** Round 89 (#104): the host of the Lines section under a turn's rows (the game's rules, the turn's field, ▶ Play); absent: no section. */
+  linesHost?: LinesHost;
   /** Which position the shown single result belongs to (e.g. "Turn 5 · variation"). */
   positionLabel?: string | null;
   /** Round 77 (C7): the pointer sits on the finished end of a variation: there is nothing to evaluate, the panel says who won. */

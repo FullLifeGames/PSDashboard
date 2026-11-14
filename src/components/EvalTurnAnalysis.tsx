@@ -1,10 +1,12 @@
 import { useId, useState } from 'react';
 import {
-  type TurnAnalysis, type LeadAnalysis, type LeadSideAnalysis, type RankedChoice, type ReadRecommendation,
+  type TurnAnalysis, type LeadAnalysis, type EvalResult, type LeadSideAnalysis, type RankedChoice, type ReadRecommendation,
   chanceRolled, formatRead, lostGround, summarizeTurn, winDeltaText, winPctText,
 } from '@fulllifegames/eval-engine';
 import { attributionBadge, isPairLead, leadTier } from './eval-badges';
 import { EngineRow } from './eval/analysis-bits';
+import { LinesSection } from './eval/LinesSection';
+import type { LinesHost } from '../lib/line-view';
 import { SideRow } from './eval/SideRow';
 import { evTitle } from './eval/turn-copy';
 import { sideIndex } from '@fulllifegames/replay-core';
@@ -18,6 +20,10 @@ interface EvalTurnAnalysisProps {
   reads?: { p1?: ReadRecommendation | null; p2?: ReadRecommendation | null } | null;
   /** Click on an engine line: play it out in a branch at this turn, the other side answering with `reply`. */
   onExplore?: (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice | null) => void;
+  /** Round 89 (#104): the turn's own result (its `lines`) and what the Lines section needs of the host; without them the section is absent. */
+  result?: EvalResult | null;
+  linesHost?: LinesHost;
+  doubles?: boolean;
   /** Round 89 (#105): the turn is a game's open tip: nobody has played it, so there is no played choice to grade, only the engine's lines. */
   open?: boolean;
 }
@@ -99,7 +105,7 @@ function OpenTurnAnalysis({ analysis, playerNames, reads, onExplore }: Omit<Eval
 }
 
 /** Chess-style explanation of one analyzed turn: played vs best, and why the score moved. */
-export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore, open = false }: EvalTurnAnalysisProps) {
+export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore, result, linesHost, doubles, open = false }: EvalTurnAnalysisProps) {
   if (open) return <OpenTurnAnalysis analysis={analysis} playerNames={playerNames} reads={reads} onExplore={onExplore} />;
   const badge = attributionBadge(analysis, playerNames);
   const exploreFor = (side: 'p1' | 'p2') =>
@@ -128,6 +134,7 @@ export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore, open
         </>
       )}
       <ReadRows reads={reads} playerNames={playerNames} faintedFraction={analysis.faintedFraction} />
+      {linesHost && <LinesSection turn={analysis.turn} result={result} playerNames={playerNames} doubles={!!doubles} host={linesHost} analysis={analysis} />}
     </div>
   );
 }

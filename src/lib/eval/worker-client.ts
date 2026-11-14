@@ -186,6 +186,12 @@ export class EvalWorkerClient {
         if (response.type !== 'proveResult') throw new Error('unexpected worker response');
         return response.outcome;
       },
+      // Round 89 (#104): the lines replay on one worker; the answer is a list of plain lines
+      lines: async input => {
+        const response = await this.rpc(this.pickWorker(), { type: 'lines', serializedBattle, input, ruleset });
+        if (response.type !== 'linesResult') throw new Error('unexpected worker response');
+        return response.lines;
+      },
     };
   }
 

@@ -5,6 +5,7 @@ import {
   lastVariationTurnOf, leadTooltip, mainLinePaths, ringScore, sharedHitBands, variationHitTitle, variationOverlay,
   type DecidedSignal, type DecidedSpan, type GapLink, type GraphScales, type HitBand, type VariationPoint, type VariationSeries,
 } from '../lib/eval-graph-view';
+import type { ReviewMark } from './eval/game-review';
 
 interface EvalGraphProps {
   /** scores[t-1] = score at turn t (p1 perspective, [-1,1]); null = gap. */
@@ -43,6 +44,11 @@ interface EvalGraphProps {
    * few turns and rendered at the far right of an empty box.
    */
   maxTurn?: number;
+  /**
+   * Round 89 (#104): the turns the Game review lists. A circle marks a graded turn of player 1 and a square one of player 2,
+   * in the player's colour, around the turn's point; a turn graded on both sides carries both.
+   */
+  reviewMarks?: ReviewMark[];
 }
 
 const MAIN_COLOR = '#7cb7e8';
@@ -204,6 +210,29 @@ function MainPoints({ scores, blunders, scales: { x, y } }: { scores: (number | 
   );
 }
 
+const REVIEW_COLORS = { p1: '#8ac', p2: '#c8a' } as const;
+const REVIEW_CIRCLE_R = 5.6;
+const REVIEW_SQUARE = 11.2;
+
+/** The Game review's marks (round 89): a circle for player 1, a square for player 2, centred on the turn's point. */
+function ReviewMarks({ marks, scores, scales: { x, y } }: { marks: ReviewMark[]; scores: (number | null)[]; scales: GraphScales }) {
+  return (
+    <>
+      {marks.map(({ turn, side }) => {
+        const score = scores[turn - 1];
+        if (score === null || score === undefined) return null;
+        const common = {
+          'data-review-mark': side, 'data-turn-mark': turn, fill: 'none', stroke: REVIEW_COLORS[side], strokeWidth: 1.4,
+          style: { pointerEvents: 'none' as const },
+        };
+        return side === 'p1'
+          ? <circle key={`m${turn}${side}`} cx={x(turn)} cy={y(score)} r={REVIEW_CIRCLE_R} {...common} />
+          : <rect key={`m${turn}${side}`} x={x(turn) - REVIEW_SQUARE / 2} y={y(score) - REVIEW_SQUARE / 2} width={REVIEW_SQUARE} height={REVIEW_SQUARE} {...common} />;
+      })}
+    </>
+  );
+}
+
 function MainHits({ scores, hitWidth, x, bands, onSelectTurn, titleArgs }: {
   scores: (number | null)[]; hitWidth: number; x: GraphScales['x']; onSelectTurn: SelectTurn;
   /** Turns where a variation point shares the column: the band of the column the main point owns. */
@@ -268,7 +297,7 @@ function VariationHits({ points, hitWidth, playerNames, bands, onSelectTurn }: {
  * needed); point color carries the polarity via the app's player colors;
  * blunder markers add a shape ring plus tooltip text, never color alone.
  */
-export function EvalGraph({ scores, playerNames, currentTurn, currentLine, onSelectTurn, leadScore, leadDetail, evalErrors, faintedFractions, decided, variation, maxTurn }: EvalGraphProps) {
+export function EvalGraph({ scores, playerNames, currentTurn, currentLine, onSelectTurn, leadScore, leadDetail, evalErrors, faintedFractions, decided, variation, maxTurn, reviewMarks }: EvalGraphProps) {
   const { svgRef, width } = useMeasuredWidth();
 
   const turns = scores.length;
@@ -317,6 +346,7 @@ export function EvalGraph({ scores, playerNames, currentTurn, currentLine, onSel
         <LeadPoint scores={scores} leadScore={leadScore} leadDetail={leadDetail} playerNames={playerNames} hitWidth={hitWidth} scales={scales} onSelectTurn={onSelectTurn} />
       )}
       <MainPoints scores={scores} blunders={blunders} scales={scales} />
+      {reviewMarks && reviewMarks.length > 0 && <ReviewMarks marks={reviewMarks} scores={scores} scales={scales} />}
       <MainHits scores={scores} hitWidth={hitWidth} x={x} bands={bands.main} onSelectTurn={onSelectTurn} titleArgs={titleArgs} />
       <VariationHits points={overlay.points} hitWidth={hitWidth} playerNames={playerNames} bands={bands.gold} onSelectTurn={onSelectTurn} />
       {/* Ring marker: the pointer's position on ITS line. */}

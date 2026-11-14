@@ -8,6 +8,8 @@ import { gameTipTurn } from '../hooks/useNewGame';
 import { idleTip } from './game-tip';
 import { variationBoardShares } from '../lib/variation-shares';
 import type { ReplayData } from '@fulllifegames/replay-core';
+import { useLinesHost } from '../hooks/usePlayLine';
+import { mainLineTarget } from './timeline-target';
 
 interface WorkspaceColumnProps {
   app: AppController;
@@ -23,6 +25,7 @@ function analysisPropsFor(liveEvalView: boolean, analysisTurn: number | null, an
     leadAnalysis: !liveEvalView && analysisTurn === 0 ? analysis.leadAnalysisData : null,
     reportLeads: analysis.leadAnalysisData,
     report: !liveEvalView ? analysis.gameReport : null,
+    reviewAnalyses: !liveEvalView ? analysis.gameAnalyses : null,
   };
 }
 
@@ -42,6 +45,21 @@ function idleReads(app: AppController, viewingVariation: boolean, resultTag: str
   return { idle, viewingVariation: viewingVariation && !idle, resultTag: idle ? resultTag?.replace(/^variation:/, 'main:') ?? null : resultTag };
 }
 
+/**
+ * Round 70 (T216): the gold points and the panel's bar print at the share of the variation's own board, read from the rosters the
+ * branch recorded after each executed turn; the main line's share of the same turn number is another board.
+ */
+function useVariationShares(history: AppController['ctx']['branch']['history'], variationSpan: { startTurn: number } | null) {
+  return useMemo(() => (variationSpan ? variationBoardShares(history, variationSpan.startTurn) : []), [history, variationSpan]);
+}
+
+/** Round 89 (#104, G4d): with a variation open and a game report held, the way back to the report, as "Main line" of the Line selector. */
+function backToMain(app: AppController, viewingVariation: boolean): (() => void) | undefined {
+  if (!viewingVariation || !app.analysis.gameReport) return undefined;
+  const { viewTurn, maxTurn, navigateTo } = app.board.timeline;
+  return () => navigateTo(mainLineTarget(viewTurn, maxTurn));
+}
+
 function EvalSection({ app, replayData }: WorkspaceColumnProps) {
   const { evaluation } = app.ctx;
   const { replayGen, replayGameType } = app.ctx.meta;
@@ -58,15 +76,11 @@ function EvalSection({ app, replayData }: WorkspaceColumnProps) {
   const { playOut, fastPlayOut } = app.transients;
   const clickable = linesClickable(liveEvalView, evalResultMatchesView);
   const reads = idleReads(app, viewingVariation, evaluation.resultTag);
-  // Round 70 (T216): the gold points and the panel's bar print at the share of the variation's own board, read from the
-  // rosters the branch recorded after each executed turn; the main line's share of the same turn number is another board.
-  const { history } = app.ctx.branch;
-  const variationShares = useMemo(
-    () => (variationSpan ? variationBoardShares(history, variationSpan.startTurn) : []),
-    [history, variationSpan],
-  );
+  const variationShares = useVariationShares(app.ctx.branch.history, variationSpan);
+  const linesHost = useLinesHost(app, replayData);
   return (
     <EvalPanel
+      linesHost={linesHost}
       playerNames={[replayData.players[0], replayData.players[1]]}
       status={liveEvalView ? liveEvalStatus : 'idle'}
       result={analyzedResult}
@@ -100,6 +114,7 @@ function EvalSection({ app, replayData }: WorkspaceColumnProps) {
       {...analysisPropsFor(liveEvalView, analysisTurn, app.analysis)}
       doubles={replayGameType === 'doubles'}
       openTurn={app.ctx.newGame.record ? gameTipTurn(app.ctx.newGame.record) : null}
+      onBackToMain={backToMain(app, reads.viewingVariation)}
     />
   );
 }

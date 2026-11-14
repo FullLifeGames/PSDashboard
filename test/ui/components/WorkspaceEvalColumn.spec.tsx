@@ -118,5 +118,8 @@ describe('WorkspaceEvalColumn', () => {
     expect(screen.queryByText('Game report', { selector: 'span' })).toBeNull();
     expect(screen.queryByRole('button', { name: /Think deeper/ })).toBeNull();
     expect(screen.queryByText(/^Turn \d$/)).toBeNull();
+    // Round 89 (#104, G4d): a deviation that has played no turn is no variation to leave: no way back to offer (the e2e specs of the
+    // Lines section and the review click the button on a played line's variation).
+    expect(screen.queryByRole('button', { name: 'Back to the main line' })).toBeNull();
   }, 240_000);
 });

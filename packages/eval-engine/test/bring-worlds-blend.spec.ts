@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import type { EvalMatrix, EvalResult, ForcedWin, RankedChoice } from '../src/types';
+import type { EvalLine, EvalMatrix, EvalResult, ForcedWin, RankedChoice } from '../src/types';
 import { blendValues, blendWorlds } from '../src/branch/bring-worlds';
 
 /**
@@ -83,6 +83,32 @@ describe('blendWorlds', () => {
     // a: 0.12, b: 0.06 + 0.36 = 0.42, c: only the heavy world holds it, so its own 0.05; d: only the light world, dropped.
     expect(blended.perSide.p1.map(entry => entry.choice)).toEqual(['b', 'a', 'c']);
     expect(blended.perSide.p1.map(entry => entry.ev)).toEqual([expect.closeTo(0.42, 12), expect.closeTo(0.12, 12), expect.closeTo(0.05, 12)]);
+  });
+
+  test('lines (round 89, #104): the engine line is the line of the blended best row, from whichever world holds it; the played line stays', () => {
+    const line = (side: 'p1' | 'p2', label: string, roles: EvalLine['for'], end: number): EvalLine =>
+      ({ side, label, choice: label.toLowerCase(), for: roles, visits: 10, end, endFainted: 0, steps: [] });
+    const heavy = result({
+      perSide: { p1: [row('a', 0.3), row('b', 0.25)], p2: [row('x', -0.2), row('y', -0.4)] },
+      lines: [line('p1', 'A', ['engine'], 0.31), line('p2', 'X', ['engine', 'played'], -0.2)],
+    });
+    const light = result({
+      perSide: { p1: [row('b', 0.6), row('a', 0)], p2: [row('x', -0.2), row('y', -0.4)] },
+      lines: [line('p1', 'B', ['engine'], 0.61), line('p1', 'A', ['played'], 0.01), line('p2', 'X', ['engine'], -0.19)],
+    });
+    const blended = blendWorlds([heavy, light], [0.6, 0.4]);
+    expect(blended.perSide.p1[0].label).toBe('B');
+    // p1: the blended best row B has its line from the light world; the heavy world's line of A (its own best) is not the engine's any more
+    // and it was not played, so it goes; the light world's played line of A stays. p2: the engine row X keeps the heavy world's line.
+    const seen = [...(blended.lines ?? [])].sort((a, b) => a.side.localeCompare(b.side) || a.label.localeCompare(b.label));
+    expect(seen.map(entry => [entry.side, entry.label, entry.for, entry.end])).toEqual([
+      ['p1', 'A', ['played'], 0.01], ['p1', 'B', ['engine'], 0.61], ['p2', 'X', ['engine', 'played'], -0.2],
+    ]);
+    // no world held a line: none appears
+    expect(blendWorlds([result(), result()], [0.6, 0.4]).lines).toBeUndefined();
+    // the worlds that hold a line but none of the blended best row's: the result has the played lines only, or none
+    const onlyHeavy = blendWorlds([heavy, result({ perSide: light.perSide })], [0.6, 0.4]);
+    expect(onlyHeavy.lines?.every(entry => entry.for.includes('played') || entry.label === onlyHeavy.perSide[entry.side][0].label)).toBe(true);
   });
 
   test('equal blended evs keep the heaviest world\'s order', () => {

@@ -146,6 +146,7 @@ export type {
   ForcedWin, ForcedWinCaveat, ForcedWinOpen, ForcedWinInput, ForcedWinOutcome, ForcedWinProof,
   ReadRecommendation, SearchProgress, EvalChoiceOption, EvalChoicesInfo, EvalCellJob, EvalCellValue,
   EvalSubSearchJob, MctsTreeStats, EvalWorkerRequest, EvalWorkerResponse,
+  EvalLine, LineChoice, LineDie, LineRequest, LinesInput, LineStep, RowLines, TreeLineStep,
 } from './types.ts';
 export type { StaticRuleset } from './score/weights.ts';
 export { winProbability, winPercent, winPctText, winDeltaText } from './winprob.ts';

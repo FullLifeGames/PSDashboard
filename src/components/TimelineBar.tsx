@@ -1,5 +1,6 @@
 import { sliderMax, variationTip } from '../lib/timeline';
 import type { TimelinePosition, VariationSpan, ViewLine } from '../lib/timeline';
+import { mainLineTarget } from './timeline-target';
 
 interface TimelineBarProps {
   viewT0: boolean;
@@ -67,7 +68,7 @@ function TimelineLineChip({ viewTurn, variationSpan, maxTurn, viewingVariation, 
       <button
         type="button"
         className={!viewingVariation ? 'on-main' : ''}
-        onClick={() => onNavigate({ turn: Math.min(viewTurn, maxTurn), line: 'main' })}
+        onClick={() => onNavigate(mainLineTarget(viewTurn, maxTurn))}
       >Main line</button>
       <button
         type="button"
