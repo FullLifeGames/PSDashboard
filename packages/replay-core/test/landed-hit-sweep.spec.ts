@@ -16,7 +16,8 @@ import { play, type PlayBody } from './blocked-effects-play';
  *  - a false rule-out (the inference rules out an ability under which the simulator let the hit land): never allowed;
  *  - a miss (the simulator refused the hit and the inference did not rule the ability out): allowed only for the scenes in `UNREAD`, each
  *    pinned with its reason.
- * A second sweep gives the ability to the ally of the target (a redirect: Lightning Rod, Storm Drain; the guards of the `onAlly` kind):
+ * A second sweep gives the ability to the ally of the target (a redirect: Lightning Rod, Storm Drain; the guards of the `onAlly` kind), with the
+ * single-target moves only (a spread move hits the ally too, and the ally is then asked as a target):
  * the hit aims at the target, and the ally's candidates are ruled out by what landed on the body next to it. A third pass holds the twin's
  * own reading to the whole battle: for every scene, `effectLands` on the twin answers what the played battle answered (the twin is
  * the oracle of the reader; the battle is the oracle of the twin). The default run plays the abilities with a hit guard handler (every
@@ -34,10 +35,10 @@ const REALMS: Realm[] = [
 const DOUBLES_DEFAULT = ['Generation 5', 'Generation 9'];
 const dexOf = (realm: Realm): RulesDex => (realm.champions ? Dex.dexes.champions : Dex.forGen(realm.gen)) as RulesDex;
 const formatOf = (realm: Realm, doubles: boolean) => `gen${realm.gen}${realm.champions ? 'champions' : ''}${doubles ? 'doubles' : ''}customgame`;
-const SEEDS = ['1,2,3,4', '2,2,3,4', '3,2,3,4'];
+const SEEDS = Array.from({ length: 12 }, (_, index) => `${index + 1},2,3,4`);
 
 /** A move of the sweep: the Dex move, and why it stands (a type, a flag). */
-interface HitScene { label: string; move: string }
+interface HitScene { label: string; move: string; /** Hits every foe: the ally is a target too (the ally sweep leaves these out). */ spread: boolean }
 
 /** The reference body: no type immunity of its own except by the move, and no ability. */
 const REFERENCE = 'Magikarp';
@@ -59,6 +60,8 @@ function battleOf(realm: Realm, doubles: boolean, move: string, target: PlayBody
 /** What the reader looks at: the damage line of the hit on the target, without a `[from]`. */
 const LANDED = /\|-damage\|p2a: Target\|[^|\n]*(\n|$)/;
 const landed = (log: string): boolean => LANDED.test(log);
+/** A log with the hit and no other effect on the target (a secondary of the move would be read by #110's rules, which the sweep of blocked-effects holds). */
+const clean = (log: string): boolean => landed(log) && !/\|(-status|-unboost|-boost|-start|cant)\|p2a: Target/.test(log);
 
 /** The abilities of the sweep's source: Smeargle holds an ability that touches no move of the sweep (the first of the generation's). */
 const sourceOf = (realm: Realm): PlayBody => {
@@ -67,13 +70,13 @@ const sourceOf = (realm: Realm): PlayBody => {
 };
 
 type DexMove = ReturnType<RulesDex['moves']['all']>[number];
-/** A damaging single-target move of full accuracy with no effect line of its own: nothing but the hit stands in its log. */
-const hasEffect = (move: DexMove): boolean => !!(move.volatileStatus || move.self || move.secondary || move.secondaries || move.recoil || move.drain || move.struggleRecoil || move.mindBlownRecoil);
+/** A damaging move of full accuracy that hits one foe or all of them and adds no volatile of its own (a secondary may land: the seeds below pick a log without it). */
+const hasEffect = (move: DexMove): boolean => !!move.volatileStatus;
 const hasTiming = (move: DexMove): boolean => !!(move.flags.charge || move.flags.recharge || move.flags.futuremove);
 const isSpecial = (move: DexMove): boolean => !!(move.isNonstandard || move.multihit || move.selfdestruct || move.isZ || move.isMax || toId(move.name) !== move.id);
 const hasHandler = (move: DexMove): boolean => Object.keys(move).some(key => /^on(\w*ModifyType|Try|Hit|AfterMove|Prepare)/.test(key));
 function isCleanHit(move: DexMove): boolean {
-  const plain = move.category !== 'Status' && move.basePower >= 40 && move.accuracy === 100 && move.target === 'normal';
+  const plain = move.category !== 'Status' && move.basePower >= 40 && move.accuracy === 100 && ['normal', 'allAdjacent', 'allAdjacentFoes'].includes(move.target);
   return plain && !isSpecial(move) && !hasHandler(move) && !hasEffect(move) && !hasTiming(move);
 }
 
@@ -87,9 +90,9 @@ function hitScenes(realm: Realm): HitScene[] {
   const dex = dexOf(realm);
   const source = sourceOf(realm);
   const candidates = dex.moves.all().filter(move => move.exists && move.gen <= dex.gen && isCleanHit(move)).sort((a, b) => (a.id < b.id ? -1 : 1));
-  const lands = (move: string) => landed(battleOf(realm, false, move, { species: REFERENCE, ability: '' }, null, SEEDS[0], source));
+  const lands = (move: string) => SEEDS.some(seed => clean(battleOf(realm, false, move, { species: REFERENCE, ability: '' }, null, seed, source)));
   const pick = (label: string, filter: (move: (typeof candidates)[number]) => boolean): HitScene | null => {
-    for (const move of candidates.filter(filter)) if (lands(move.name)) return { label, move: move.name };
+    for (const move of candidates.filter(filter)) if (lands(move.name)) return { label, move: move.name, spread: move.target !== 'normal' };
     return null;
   };
   const scenes: (HitScene | null)[] = [...new Set(candidates.map(move => move.type))].map(type => pick(`type ${type}`, move => move.type === type));
@@ -161,7 +164,7 @@ function sweepTargets(realm: Realm, doubles: boolean): Verdict {
   const source = sourceOf(realm);
   for (const pick of speciesPerAbility(dex, sampled({ n: 0 })).values()) {
     for (const scene of scenesOf(realm)) {
-      const base = SEEDS.map(seed => ({ seed, log: battleOf(realm, doubles, scene.move, { species: pick.species, ability: '' }, null, seed, source) })).find(entry => landed(entry.log));
+      const base = SEEDS.map(seed => ({ seed, log: battleOf(realm, doubles, scene.move, { species: pick.species, ability: '' }, null, seed, source) })).find(entry => clean(entry.log));
       if (!base) { verdict.skipped++; continue; }
       verdict.played++;
       const blocked = pick.abilities.filter(ability => !landsWith(realm, doubles, scene.move, { species: pick.species, ability }, null, source));
@@ -201,8 +204,8 @@ function sweepAllies(realm: Realm): Verdict {
   const picks = speciesPerAbility(dex, (ability, index) => FULL ? index % 3 === 0 || Object.keys(ability).some(key => ALLY_GUARD.test(key)) : ALWAYS.includes(ability.id) || Object.keys(ability).some(key => /^on(AnyRedirectTarget|FoeTryMove|AllyTryHitSide)/.test(key)));
   const target: PlayBody = { species: REFERENCE, ability: '' };
   for (const pick of picks.values()) {
-    for (const scene of scenesOf(realm)) {
-      const base = SEEDS.map(seed => ({ seed, log: battleOf(realm, true, scene.move, target, { species: pick.species, ability: '' }, seed, source) })).find(entry => landed(entry.log));
+    for (const scene of scenesOf(realm).filter(entry => !entry.spread)) {
+      const base = SEEDS.map(seed => ({ seed, log: battleOf(realm, true, scene.move, target, { species: pick.species, ability: '' }, seed, source) })).find(entry => clean(entry.log));
       if (!base) { verdict.skipped++; continue; }
       verdict.played++;
       const blocked = pick.abilities.filter(ability => !landsWith(realm, true, scene.move, target, { species: pick.species, ability }, source));
