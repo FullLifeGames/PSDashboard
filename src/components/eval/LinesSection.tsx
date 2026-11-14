@@ -47,6 +47,7 @@ function LineBlock({ block, turn, onPlay, confirm }: { block: LineBlockView; tur
         </div>
       ))}
       {block.note && <span className="ps-eval-line">{block.note}</span>}
+      {block.endNote && <span className="ps-eval-line">{block.endNote}</span>}
     </div>
   );
 }

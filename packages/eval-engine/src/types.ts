@@ -293,7 +293,7 @@ export interface LineStep { p1: LineChoice; p2: LineChoice; replacement?: 'p1' |
  * Round 89 (#104): the line of one row. `for` says which of the turn's two lines it is (the engine's best row, the row the player
  * played; one line carries both when they are the same row). `end` is the static evaluation after the last step from `side`'s view
  * (the value space of `RankedChoice.worstCase`), `endFainted` that position's fainted share. `cut` says why a line stops short of the
- * tree's own (a step no longer legal after the likeliest dice); `unforced` lists what the replay left to the stream (a die the draw
+ * tree's own (a step no longer legal after the likeliest dice), `awaits` who the last position asks to send a body in (a pivot's or a faint's switch the tree made no choice for); `unforced` lists what the replay left to the stream (a die the draw
  * cannot name, a draw no die names), so the click depends on the seed there.
  */
 export interface EvalLine {
@@ -306,6 +306,8 @@ export interface EvalLine {
   endFainted: number;
   visits: number;
   cut?: string;
+  /** The side (or both) the position after the last step asks to send a body in: a line ends when a choice is needed that the tree did not make. */
+  awaits?: 'p1' | 'p2' | 'both';
   unforced?: string[];
 }
 

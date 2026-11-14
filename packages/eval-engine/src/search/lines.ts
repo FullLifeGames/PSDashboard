@@ -129,9 +129,17 @@ function lineDie(battle: Battle, play: (b: Battle) => void, forced: readonly For
   };
 }
 
+/** Who the position after the last step asks to send a body in (a pivot's switch, a faint's): the tree made no choice for it. */
+function awaitsOf(battle: Battle): 'p1' | 'p2' | 'both' | undefined {
+  if (battle.ended) return undefined;
+  const asked = battle.sides.map(side => side.requestState === 'switch');
+  return asked[0] && asked[1] ? 'both' : asked[0] ? 'p1' : asked[1] ? 'p2' : undefined;
+}
+
 function lineOf(request: LineRequest, replay: Replay, perspective: 1 | -1, matchupCache: MatchupCache): EvalLine {
   const first = replay.steps[0];
   const own = request.side === 'p1' ? first.p1 : first.p2;
+  const awaits = awaitsOf(replay.battle);
   return {
     side: request.side,
     label: request.label,
@@ -142,6 +150,7 @@ function lineOf(request: LineRequest, replay: Replay, perspective: 1 | -1, match
     endFainted: battleFaintedFraction(replay.battle),
     visits: request.visits,
     ...(replay.cut ? { cut: replay.cut } : {}),
+    ...(awaits ? { awaits } : {}),
     ...(replay.unforced.size > 0 ? { unforced: [...replay.unforced] } : {}),
   };
 }

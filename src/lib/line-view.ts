@@ -27,6 +27,8 @@ export interface LineBlockView {
   tooltip: string;
   /** What the click leaves to the seed, in the words a player reads; null when it forces everything. */
   note: string | null;
+  /** Why the line stops where it does, when its last position asks a player who to send in (a choice the tree did not make); else null. */
+  endNote: string | null;
 }
 
 /** The question after ▶ Play on a line when a variation stands: it names the clicked line, so that line's block shows it (round 89, G4b). */
@@ -167,6 +169,13 @@ function unforcedNote(line: EvalLine): string | null {
   return `The click cannot force ${parts.map(part => part.words).join(', ')}. The seed decides ${several ? 'them' : 'it'}.`;
 }
 
+/** "The line ends where Alice must choose who to send in": the position after the last step waits for a switch the tree never chose. */
+function endNote(line: EvalLine, playerNames: [string, string]): string | null {
+  if (!line.awaits) return null;
+  const who = line.awaits === 'both' ? `${playerNames[0]} and ${playerNames[1]}` : playerNames[SIDE_INDEX[line.awaits]];
+  return `The line ends where ${who} must choose who to send in; the search made no choice there.`;
+}
+
 const roleText = (line: EvalLine): string => {
   if (line.for.includes('engine') && line.for.includes('played')) return `played the engine's move: ${line.label}`;
   return `${line.for.includes('engine') ? 'engine' : 'played'}: ${line.label}`;
@@ -217,7 +226,7 @@ export function lineBlocks(lines: readonly EvalLine[], ctx: LineViewContext): Li
     return {
       key: `${line.side}-${line.label}-${index}`, line, player: ctx.playerNames[SIDE_INDEX[line.side]], role: roleText(line),
       end: `ends at ${winPctText(line.end, line.endFainted)} for ${ctx.playerNames[SIDE_INDEX[line.side]]}`,
-      rows, tooltip: tooltipOf(every), note: unforcedNote(line),
+      rows, tooltip: tooltipOf(every), note: unforcedNote(line), endNote: endNote(line, ctx.playerNames),
     };
   });
 }
