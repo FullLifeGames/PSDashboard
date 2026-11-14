@@ -106,6 +106,10 @@ type EvalFormat = ReturnType<typeof useEvalFormat>;
  */
 const gameTipTag = (id: string, turn: number, snapshotCount: number): string => (isGameId(id) && turn >= snapshotCount ? 't' : '');
 
+/** The cache key of a replay turn's evaluation: the sweep's, and the early-lines stage's (it re-saves a turn's own entry). */
+export const turnCacheKey = (replayId: string, turn: number, snapshotCount: number, setsFingerprint: string): string =>
+  `${replayId}:${turn}${gameTipTag(replayId, turn, snapshotCount)}:${setsFingerprint}${engineCacheTag()}`;
+
 /** What a caller may hand to Evaluate: the dock's engine fill acts on the result (round 84). */
 export type EvaluateOptions = Pick<EvaluateParams, 'onResult'>;
 
@@ -182,7 +186,7 @@ function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
       rules,
       ruleset: effectiveRuleset,
       doubles: evalIsDoubles,
-      cacheKeyFor: turn => `${replayData.id}:${turn}${gameTipTag(replayData.id, turn, snapshots.length)}:${setsFingerprint}${engineCacheTag()}`,
+      cacheKeyFor: turn => turnCacheKey(replayData.id, turn, snapshots.length, setsFingerprint),
       // Round 79 (T290): the replacement points of the knockouts, each under its own key beside the turn keys.
       replacementRounds: replacementRounds(replayData.log),
       replacementKeyFor: (turn, ordinal) => `${replayData.id}:${turn}r${ordinal}:${setsFingerprint}${engineCacheTag()}`,
@@ -214,7 +218,7 @@ function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
       rules,
       ruleset: effectiveRuleset,
       doubles: evalIsDoubles,
-      cacheKeyFor: sweepTurn => `${replayData.id}:${sweepTurn}${gameTipTag(replayData.id, sweepTurn, snapshots.length)}:${setsFingerprint}${engineCacheTag()}`,
+      cacheKeyFor: sweepTurn => turnCacheKey(replayData.id, sweepTurn, snapshots.length, setsFingerprint),
       storePrefix: evalStorePrefix(replayData.id),
       acquireFor: acquire.makeReplayAcquire,
       playedFor,

@@ -211,3 +211,29 @@ describe('GameReviewPanel, both numbers', () => {
     expect(screen.queryByText(SENTENCE)).toBeNull();
   });
 });
+
+/**
+ * Round 89 (#104), step G13: while the early-lines stage searches the graded matrix turns, the review's header says how far it is
+ * and offers a Stop. Singles only in practice; the panel draws what the host hands it for either game type.
+ */
+describe('GameReviewPanel, the early-lines progress line', () => {
+  const PROGRESS = 'Finding lines for graded turns: 2 of 6';
+
+  test.each([['singles', false, SINGLES_NAMES], ['doubles', true, DOUBLES_NAMES]] as const)('%s: the line and its Stop stand under the title while the stage runs', async (_kind, doubles, names) => {
+    const { analyses, results } = singlesGame();
+    const stop = vi.fn();
+    render(<GameReviewPanel analyses={analyses} results={results} playerNames={names} doubles={doubles} host={{ ...host(), earlyLines: { done: 2, total: 6, stop } }} />);
+    expect(screen.getByText(PROGRESS)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Stop' }));
+    expect(stop).toHaveBeenCalledTimes(1);
+  });
+
+  test('no line and no button when the stage is not running', () => {
+    const { analyses, results } = singlesGame();
+    const { rerender } = render(<GameReviewPanel analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={host()} />);
+    expect(screen.queryByText(/Finding lines/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Stop' })).toBeNull();
+    rerender(<GameReviewPanel analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={{ ...host(), earlyLines: null }} />);
+    expect(screen.queryByText(/Finding lines/)).toBeNull();
+  });
+});

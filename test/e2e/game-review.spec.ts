@@ -127,3 +127,46 @@ for (const game of GAMES) {
     await expect(question).toHaveCount(0);
   });
 }
+
+/**
+ * Round 89 (#104), step G13 (ruling G2b, kept by G7a): singles in Auto run the matrix on the early turns, which keeps no lines. After
+ * the report the app searches every graded matrix turn with the trees and keeps only the lines: the review's header shows the stage,
+ * every graded early row then holds its lines in the stored result, and ▶ Play on one opens a variation that starts at its turn.
+ */
+test('singles in Auto: the graded early turns get their lines after the report, ▶ Play opens one', async ({ page }) => {
+  test.setTimeout(1_500_000);
+  const replay = fixture('gen9ou-2658662321');
+  await loadReplay(page, replay, 'auto');
+  const panel = page.locator('.ps-main-right .ps-eval-panel');
+  await panel.getByRole('button', { name: 'Analyze game' }).click();
+  await expect(panel.getByRole('button', { name: 'Re-analyze' })).toBeVisible({ timeout: 600_000 });
+  const review = panel.locator('.ps-eval-review');
+  await expect(review).toBeVisible({ timeout: 60_000 });
+  const progress = review.getByText(/Finding lines for graded turns: \d+ of \d+/);
+  await expect(progress).toBeVisible({ timeout: 60_000 });
+  await expect(progress).toBeHidden({ timeout: 900_000 });
+
+  const rows = await review.locator('.ps-eval-review-row').evaluateAll(entries => entries.map(row => ({
+    turn: Number((row.querySelector('button')?.textContent ?? '').replace(/^T/, '')),
+    plays: row.querySelectorAll('.ps-eval-review-line button').length,
+  })));
+  const held = await page.evaluate(turns => {
+    const graph = (window as Window & { __psDebug?: { graph: { settings: ({ mode: string } | null)[]; results: ({ lines?: unknown[] } | null)[] } } }).__psDebug!.graph;
+    return turns.map(turn => ({ turn, mode: graph.settings[turn - 1]?.mode ?? null, lines: graph.results[turn - 1]?.lines?.length ?? null }));
+  }, rows.map(row => row.turn));
+  const early = held.filter(entry => entry.mode === 'matrix');
+  const summary = `${rows.length} graded rows, ${early.length} on the matrix (${early.map(entry => `T${entry.turn}: ${entry.lines} lines`).join(', ')})`;
+  test.info().annotations.push({ type: 'rows', description: summary });
+  console.log(`${replay.id}: ${summary}`);
+  expect(early.length, 'the game grades an early matrix turn').toBeGreaterThanOrEqual(1);
+  for (const entry of early) expect(entry.lines, `T${entry.turn} was searched`).not.toBeNull();
+
+  const playable = rows.find(row => early.some(entry => entry.turn === row.turn && (entry.lines ?? 0) > 0) && row.plays > 0);
+  expect(playable, 'an early graded turn shows a line with ▶ Play').toBeDefined();
+  const row = review.locator('.ps-eval-review-row').filter({ has: page.getByRole('button', { name: `T${playable!.turn}`, exact: true }) }).first();
+  await row.getByRole('button', { name: '▶ Play' }).first().click();
+  const history = variationPanel(page);
+  await expect(history).toContainText(/\d+ turns?/, { timeout: 240_000 });
+  await openVariationHistory(page);
+  expect(await history.locator('strong').allTextContents(), `the history starts at turn ${playable!.turn}`).toContain(`Turn ${playable!.turn}`);
+});

@@ -89,6 +89,17 @@ function EndgameEntry({ row, host, playerNames, doubles }: { row: EndgameRowView
   );
 }
 
+/** Round 89 (G13): the stage that gives the graded early singles turns their lines is searching; it can be stopped. */
+function EarlyLinesProgress({ progress }: { progress: NonNullable<LinesHost['earlyLines']> }) {
+  return (
+    <span className="ps-eval-line" role="status" style={{ marginTop: 0 }}>
+      {`Finding lines for graded turns: ${progress.done} of ${progress.total}`}
+      {' '}
+      <button type="button" className="ps-btn ps-eval-inline-btn" title="Stop searching for lines; the next analysis finishes the turns that are left" onClick={progress.stop}>Stop</button>
+    </span>
+  );
+}
+
 /**
  * Round 89 (#104), step G4 (ruling 33, 4a): the Game review under the game report. One list per player of the turns the cards
  * grade, with the played and the engine's value, the loss, the engine's line and the played line, each with ▶ Play, and a
@@ -103,6 +114,7 @@ export function GameReviewPanel({ analyses, results, playerNames, doubles, host,
   return (
     <div className="ps-eval-review">
       <span className="ps-eval-lines-title">Game review · what the engine would have played</span>
+      {host.earlyLines && <EarlyLinesProgress progress={host.earlyLines} />}
       {sides.map(view => <ReviewSide key={view.side} view={view} onPlay={host.onPlay} confirm={host.confirm} onSelectTurn={onSelectTurn} />)}
       {reviewDiffers(sides) && <span className="ps-eval-line">{LINE_DIFFERS_SENTENCE}</span>}
       {endgame && <EndgameEntry row={endgame} host={host} playerNames={playerNames} doubles={doubles} />}

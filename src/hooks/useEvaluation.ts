@@ -4,6 +4,7 @@ import type { EvalPreferences } from '@fulllifegames/eval-engine';
 import { usePrefsState, type TurnEvalSettings } from './evaluation/prefs';
 import { useSingleEval, type CachedEval } from './evaluation/single-eval';
 import { useGraphState, useGraphSweepRunner } from './evaluation/graph-sweep';
+import { useEarlyLinesIO } from './evaluation/early-lines-io';
 
 export { resolveAutoTurnSettings, serializedFaintedFraction, supersedesStored } from './evaluation/prefs';
 export type { TurnEvalSettings } from './evaluation/prefs';
@@ -51,8 +52,11 @@ export function useEvaluation() {
 
   const runGraphSweep = useGraphSweepRunner({ runRef, clientRef, cacheRef, prefsRef, cancel, setGraph, graphDataRef });
 
+  // Round 89 (#104, G13): the early-lines stage's search and its write into a turn's stored result.
+  const { searchLines, attachLines } = useEarlyLinesIO({ clientRef, cacheRef, graphDataRef, setGraph });
+
   return {
-    prefs, setPrefs, setEngineOverride,
+    prefs, setPrefs, setEngineOverride, searchLines, attachLines,
     status, result, resultTag, progress, error, reconstructProgress,
     evaluate, markStale, reset, cancel,
     graph, runGraphSweep, clearGraph, dropGraphFrom,

@@ -57,8 +57,8 @@ export function gradedTier(side: SideAnalysis, lostGroundOnTurn = false): Review
   return tier;
 }
 
-/** Turns the cards grade in the order the review lists them: turn by turn, player 1 before player 2. */
-function gradedSides(analyses: readonly (TurnAnalysis | null)[] | null | undefined): { analysis: TurnAnalysis; side: Side; grade: ReviewGrade }[] {
+/** Turns the cards grade in the order the review lists them: turn by turn, player 1 before player 2 (round 89, G13: the early-lines stage reads the same rule). */
+export function gradedSides(analyses: readonly (TurnAnalysis | null)[] | null | undefined): { analysis: TurnAnalysis; side: Side; grade: ReviewGrade }[] {
   const found: { analysis: TurnAnalysis; side: Side; grade: ReviewGrade }[] = [];
   for (const analysis of analyses ?? []) {
     // a turn whose played actions were never parsed has no grade on its card

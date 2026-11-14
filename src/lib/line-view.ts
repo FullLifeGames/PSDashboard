@@ -66,6 +66,8 @@ export interface LinesHost {
   confirm?: LineConfirm | null;
   /** Round 89 (#130): the win paths of a lost endgame (the Game review's Endgame row, the turn card's entry); absent: none. */
   winPaths?: WinPathsHost;
+  /** Round 89 (G13): the early-lines stage while it searches the graded matrix turns (how many hold lines, and Stop); absent or null: not running. */
+  earlyLines?: { done: number; total: number; stop: () => void } | null;
 }
 
 /**
