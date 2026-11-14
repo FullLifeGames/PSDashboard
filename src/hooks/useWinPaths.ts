@@ -90,6 +90,7 @@ export function useWinPaths(app: AppController, replayData: ReplayData): WinPath
   }, [endgame, replayId, graph.results, analyses, effectiveTera, effectiveSleepClause, effectiveRuleset, makeReplayAcquire]);
 
   const playedLabel = useCallback((turn: number) => (endgame ? analyses?.[turn - 1]?.[endgame.loser].played?.label ?? null : null), [endgame, analyses]);
+  const playedNeverActed = useCallback((turn: number) => (endgame ? analyses?.[turn - 1]?.[endgame.loser].neverActed === true : false), [endgame, analyses]);
   const run = held && held.replayId === replayId ? held.run : null;
-  return useMemo(() => ({ endgame, run, unavailable, playedLabel, show, hide }), [endgame, run, unavailable, playedLabel, show, hide]);
+  return useMemo(() => ({ endgame, run, unavailable, playedLabel, playedNeverActed, show, hide }), [endgame, run, unavailable, playedLabel, playedNeverActed, show, hide]);
 }

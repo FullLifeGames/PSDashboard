@@ -57,7 +57,7 @@ export function WinPathsPanel({ host, playerNames, doubles, picker = true }: Win
   if (!winPaths || !run || !winPaths.endgame) return null;
   const { turns } = winPaths.endgame;
   const player = playerNames[run.side === 'p1' ? 0 : 1];
-  const views = winStepViews(run.steps, { turn: run.turn, playerNames, doubles, host, side: run.side, playedLabel: winPaths.playedLabel(run.turn) });
+  const views = winStepViews(run.steps, { turn: run.turn, playerNames, doubles, host, side: run.side, playedLabel: winPaths.playedLabel(run.turn), playedNeverActed: winPaths.playedNeverActed?.(run.turn) });
   const status = statusLine(run.status, run.turn, run.steps.length);
   return (
     <div className="ps-winpaths" role="region" aria-label={`How could ${player} have won?`}>

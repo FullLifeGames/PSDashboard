@@ -24,6 +24,8 @@ export interface WinPathsHost {
   unavailable: string | null;
   /** The label of the choice the loser played at a turn, when the log shows it. */
   playedLabel(turn: number): string | null;
+  /** The loser was knocked out before it moved at a turn: its `playedLabel` is a stand-in, not a choice the log shows. */
+  playedNeverActed?(turn: number): boolean;
   /** Search the turn for the loser (a turn of the endgame). */
   show(turn: number): void;
   /** Close the panel and stop the search. */

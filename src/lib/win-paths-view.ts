@@ -36,6 +36,8 @@ export interface WinPathsViewContext {
   side: Side;
   /** The label of the choice the loser played at the turn, when the log shows it. */
   playedLabel: string | null;
+  /** The loser was knocked out before it moved: `playedLabel` stands in for a choice the log does not show. */
+  playedNeverActed?: boolean;
 }
 
 const ORDINALS: Record<number, string> = { 2: '2nd', 3: '3rd' };
@@ -67,12 +69,43 @@ function mistakeHeadline(step: WinStep, opponent: string): string | null {
   return [slip, sequenceOf(step)].filter(Boolean).join(' ') || null;
 }
 
+const PREFIXES: Record<string, string> = { Tera: 'Terastallize', Mega: 'Mega Evolve', Ultra: 'Ultra Burst' };
+
+/** An engine label ("Tera + Heat Wave→Ursaluna", "→ Corviknight") in the words of the game's own buttons and log. */
+export function showdownWords(label: string): string {
+  const words = (part: string): string => {
+    const switched = /^→ (.+)$/.exec(part);
+    return switched ? `a switch to ${switched[1]}` : part.replace('→', ' on ');
+  };
+  const parts = label.split(' + ');
+  const out: string[] = [];
+  for (let at = 0; at < parts.length; at += 1) {
+    const prefix = PREFIXES[parts[at]];
+    if (prefix && at + 1 < parts.length) {
+      out.push(`${prefix} and ${words(parts[at + 1])}`);
+      at += 1;
+    } else out.push(words(parts[at]));
+  }
+  return out.join(' + ');
+}
+
+/** The sentence beside step 1's number: what the loser's own choice wins in, or that the log shows none. */
+function playedSentence(step: WinStep, ctx: WinPathsViewContext): string {
+  if (step.played === undefined) return '';
+  const loser = ctx.playerNames[ctx.side === 'p1' ? 0 : 1];
+  const chance = chanceText(step.played);
+  if (ctx.playedNeverActed) {
+    const body = activeNamesAt(ctx.host.snapshotAt?.(ctx.turn) ?? ctx.host.snapshot)?.[ctx.side][0] || 'The Pokémon';
+    return `${body} was knocked out before it moved, so the log shows no choice; staying in wins in ${chance} of the dice.`;
+  }
+  return `What ${loser} played${ctx.playedLabel ? `, ${showdownWords(ctx.playedLabel)},` : ''} wins in ${chance} of the dice.`;
+}
+
 function strongerHeadline(step: WinStep, ctx: WinPathsViewContext, opponent: string): string | null {
   const own = step.line?.label ?? 'This choice';
   const sampled = ctx.doubles ? ' (over sampled rolls)' : '';
   const wins = step.chance === undefined ? '' : `${own} wins within ${TURNS} turns in ${chanceText(step.chance)} of the dice whatever ${opponent} plays${sampled}.`;
-  const beside = step.played === undefined ? '' : `${ctx.playedLabel ? `Played ${ctx.playedLabel}` : 'The played choice'}: ${chanceText(step.played)}.`;
-  return [wins, beside].filter(Boolean).join(' ') || null;
+  return [wins, playedSentence(step, ctx)].filter(Boolean).join(' ') || null;
 }
 
 function headlineOf(step: WinStep, ctx: WinPathsViewContext): string | null {

@@ -39,7 +39,7 @@ describe('WinPathsPanel, singles', () => {
     const panel = screen.getByRole('region', { name: 'How could Pepitopalotin have won?' });
     expect(within(panel).getByText('How could Pepitopalotin have won?')).toBeInTheDocument();
     expect(within(panel).getAllByText(/^[123] · /).map(node => node.textContent)).toEqual(['1 · A stronger play', '2 · Luck', '3 · A mistake by Tzon']);
-    expect(within(panel).getByText('Hydro Pump wins within 3 turns in 52 % of the dice whatever Tzon plays. Played Hydro Pump: 0 %.')).toBeInTheDocument();
+    expect(within(panel).getByText('Hydro Pump wins within 3 turns in 52 % of the dice whatever Tzon plays. What Pepitopalotin played, Hydro Pump, wins in 0 % of the dice.')).toBeInTheDocument();
     expect(within(panel).getByText('This sequence: 10.8 %.')).toBeInTheDocument();
     expect(within(panel).getByText('If Tzon had played Scald (its 2nd choice) on turn 24. This sequence: 84 %.')).toBeInTheDocument();
     const plays = within(panel).getAllByRole('button', { name: '▶ Play' });

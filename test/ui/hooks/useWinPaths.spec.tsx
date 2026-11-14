@@ -38,8 +38,8 @@ const result: EvalResult = { ...evalResult('singles'), perSide: {
   p2: [rankedChoice('move bulletpunch', 'Bullet Punch', -0.2), rankedChoice('move highjumpkick', 'High Jump Kick', -0.4)],
 } };
 
-function app(extra: { smogonPending?: boolean; snapshots?: TurnSnapshot[]; acquire?: () => Promise<string> } = {}): AppController {
-  const analyses = [null, null, turnAnalysis(3, { p2: { ...misplayedSide('mistake'), played: rankedChoice('move highjumpkick', 'High Jump Kick', -0.4) } }), null];
+function app(extra: { neverActed?: boolean; smogonPending?: boolean; snapshots?: TurnSnapshot[]; acquire?: () => Promise<string> } = {}): AppController {
+  const analyses = [null, null, turnAnalysis(3, { p2: { ...misplayedSide('mistake'), played: rankedChoice('move highjumpkick', 'High Jump Kick', -0.4), ...(extra.neverActed ? { neverActed: true } : {}) } }), null];
   return {
     ctx: { replay: { snapshots: extra.snapshots ?? SNAPSHOTS }, evaluation: { graph: { results: [null, null, result, null] } } },
     board: { timeline: { analyzableTurns: 4 } },
@@ -64,6 +64,11 @@ describe('useWinPaths', () => {
     expect(hook.current.endgame).toEqual({ loser: 'p1', turns: [3, 4] });
     expect(hook.current.run).toBeNull();
     expect(hook.current.unavailable).toBeNull();
+  });
+
+  test('a loser knocked out before it moved is named so: its played choice is a stand-in', () => {
+    const { result: hook } = renderHook(() => useWinPaths(app({ neverActed: true }), REPLAY('g5', 'BKC')));
+    expect(hook.current.playedNeverActed?.(3)).toBe(true);
   });
 
   test('a game with no winner, or one that never reached its endgame, has no endgame and show starts nothing', async () => {
@@ -93,6 +98,8 @@ describe('useWinPaths', () => {
       foeRanking: [{ choice: 'move scald', ev: 0.3 }, { choice: 'move hydropump', ev: 0.2 }], played: 'move highjumpkick', tera: true, sleepClause: true, ruleset: 'standard',
     });
     expect(hook.current.playedLabel(3)).toBe('High Jump Kick');
+    // a choice the log shows is no stand-in; the stand-in of a body knocked out before it moved is named so (G13b)
+    expect(hook.current.playedNeverActed?.(3)).toBe(false);
     act(() => calls[0].onStep(step('stronger')));
     expect(hook.current.run?.steps.map(item => item.kind)).toEqual(['stronger']);
     act(() => calls[0].onStep(step('luck', 'none')));

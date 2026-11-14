@@ -29,7 +29,7 @@ describe('the win-path words', () => {
 
   test('step 1 names the chance whatever the opponent answers, beside the played choice (W1a)', () => {
     const [view] = winStepViews([step('stronger', 'found', { chance: 0.5175, played: 0, line: line() })], ctx({ playedLabel: 'Hydro Pump' }));
-    expect(view.headline).toBe('Hydro Pump wins within 3 turns in 52 % of the dice whatever Tzon plays. Played Hydro Pump: 0 %.');
+    expect(view.headline).toBe('Hydro Pump wins within 3 turns in 52 % of the dice whatever Tzon plays. What Pepitopalotin played, Hydro Pump, wins in 0 % of the dice.');
     expect(view.empty).toBeNull();
     expect(view.block?.line.label).toBe('Hydro Pump');
     expect(view.block?.tooltip).toContain('Play this line as a variation');
@@ -39,9 +39,29 @@ describe('the win-path words', () => {
     const [single] = winStepViews([step('stronger', 'found', { chance: 1, line: line() })], ctx());
     expect(single.headline).toBe('Hydro Pump wins within 3 turns in 100 % of the dice whatever Tzon plays.');
     const [pair] = winStepViews([step('stronger', 'found', { chance: 0.25, played: 0.1, line: { ...doublesLine, for: [] } })], ctx({ playerNames: DOUBLES_NAMES, doubles: true, side: 'p1', playedLabel: 'Protect + Protect' }));
-    expect(pair.headline).toBe('Fake Out → Rillaboom + Spore → Zamazenta wins within 3 turns in 25 % of the dice whatever Mstr_Hawk plays (over sampled rolls). Played Protect + Protect: 10 %.');
+    expect(pair.headline).toBe('Fake Out → Rillaboom + Spore → Zamazenta wins within 3 turns in 25 % of the dice whatever Mstr_Hawk plays (over sampled rolls). What pixelfrost played, Protect + Protect, wins in 10 % of the dice.');
     // one row per player and step, the chips of the dice that could have gone the other way
     expect(pair.block?.rows.length).toBeGreaterThan(3);
+  });
+
+  // Round 89 (#130), G13b (tester, third pass): "Played stayed in (KO’d before acting): 4 %." printed the card's description as a choice
+  // and a number nobody could relate to a move. The panel names the played choice in Showdown's words and says what the number is.
+  test('step 1 on a body that was knocked out before it moved says so instead of naming a choice', () => {
+    const host = { rules: { gen: 9, mod: undefined }, snapshot: { p1: { pokemon: [{ name: 'Tentacruel', isActive: true }] }, p2: { pokemon: [{ name: 'Rotom-Wash', isActive: true }] } } } as unknown as WinPathsViewContext['host'];
+    const [view] = winStepViews([step('stronger', 'found', { chance: 0.106, played: 0.04, line: line() })], ctx({ host, playedLabel: 'stayed in (KO’d before acting)', playedNeverActed: true }));
+    expect(view.headline).toBe('Hydro Pump wins within 3 turns in 10.6 % of the dice whatever Tzon plays. Rotom-Wash was knocked out before it moved, so the log shows no choice; staying in wins in 4 % of the dice.');
+    expect(view.headline).not.toContain('Played');
+  });
+
+  test.each([
+    ['a switch', '→ Corviknight', 'a switch to Corviknight'],
+    ['a move with a target', 'Heat Wave→Ursaluna', 'Heat Wave on Ursaluna'],
+    ['a Tera move', 'Tera + Hydro Pump', 'Terastallize and Hydro Pump'],
+    ['a doubles pair', 'Fake Out→Rillaboom + Protect', 'Fake Out on Rillaboom + Protect'],
+    ['a Mega move', 'Mega + Flare Blitz', 'Mega Evolve and Flare Blitz'],
+  ])('the played choice is written in Showdown\'s words: %s', (_name, label, words) => {
+    const [view] = winStepViews([step('stronger', 'found', { chance: 0.5, played: 0.25, line: line() })], ctx({ playedLabel: label }));
+    expect(view.headline).toContain(`What Pepitopalotin played, ${words}, wins in 25 % of the dice.`);
   });
 
   test('step 2 names the chance of the dice, with its chips on the rows', () => {
