@@ -4,7 +4,6 @@ import type { PokemonSet } from '@pkmn/sim';
 import { mctsTreeSearch } from '../src/mcts';
 import { cellKey } from '../src/rank';
 import { lineFrom, principalVariation, rowLines, type Node } from '../src/search/mcts-node';
-import type { TreeChild } from '../src/search/chance-node';
 import type { EvalSettings } from '../src/types';
 
 /**
@@ -20,7 +19,7 @@ interface Cell { i: number; j: number; visits: number; child?: Node }
 const options = (labels: string[]) => labels.map((label, index) => ({ choice: `move ${index + 1}`, label }));
 
 function node(p1: string[], p2: string[], cells: Cell[], extra: Partial<Node> = {}): Node {
-  const children = new Map<number, TreeChild>();
+  const children = new Map<number, Node>();
   for (const cell of cells) {
     const child = cell.child ?? node([], [], []);
     child.visits = cell.visits;
@@ -37,7 +36,7 @@ function referenceVariation(start: Node): { p1: string; p2: string }[] {
   let current = start;
   for (let step = 0; step < 3; step++) {
     if (current.ended || current.p1Options.length === 0 || current.p2Options.length === 0) break;
-    let best: TreeChild | undefined;
+    let best: Node | undefined;
     let bestVisits = 0;
     let bestI = 0;
     let bestJ = 0;
@@ -51,7 +50,7 @@ function referenceVariation(start: Node): { p1: string; p2: string }[] {
     }
     if (!best || bestVisits < 8) break;
     steps.push({ p1: current.p1Options[bestI].label, p2: current.p2Options[bestJ].label });
-    current = best.kind === 'chance' ? best.classes[0].child : best;
+    current = best;
   }
   return steps;
 }

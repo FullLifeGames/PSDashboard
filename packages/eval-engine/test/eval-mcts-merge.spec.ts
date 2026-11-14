@@ -416,7 +416,7 @@ describe('chance cells pool per class (round 43)', () => {
     p1N: [10, 0], p1W: [5, 0], p2N: [10, 0], p2W: [5, 0], visits: 10, depth: 2,
     rootValue: 0.1, cells, result: emptyResult,
   });
-  // Two trees, the Thunder×X cell a chance node: hit-kill 0.7 (deep, +0.9 leaves), miss 0.3 (thin, −0.5 leaves).
+  // Two trees, the Thunder×X cell with its classes (the shape the merge reads): hit-kill 0.7 (deep, +0.9 leaves), miss 0.3 (thin, −0.5 leaves).
   const classes = (killTotal: number, killVisits: number, missTotal: number, missVisits: number) => [
     { key: 'hit-kill', weight: 0.7, visits: killVisits, total: killTotal, value: 0.8, ended: false },
     { key: 'miss', weight: 0.3, visits: missVisits, total: missTotal, value: -0.4, ended: false },

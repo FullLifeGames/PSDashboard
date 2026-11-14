@@ -4,8 +4,7 @@ import { foldClassWeights, koOddsForOptions, observeOrder, planCellEvents, type 
 import { cellKey, rankFromMatrix, toResult as rankedToResult } from './rank.ts';
 import { attachKoOdds, hasUnansweredContent, koOddsMapsFor } from './search/root-payload.ts';
 import { matrixCells, topVisitedIndex, treeScore } from './mcts-merge.ts';
-import { makeNode, pick, principalVariation, rowLines, treeMatrix, type Node } from './search/mcts-node.ts';
-import { cellStats, isChanceNode, pickClass } from './search/chance-node.ts';
+import { cellStats, makeNode, pick, principalVariation, rowLines, treeMatrix, type Node } from './search/mcts-node.ts';
 import { cellSeeds, positionSalt } from './search/root-quantile.ts';
 import { expandCell, type ExpansionContext, type RootClassBook } from './search/expansion.ts';
 import { forcedWinFor } from './search/forced-win.ts';
@@ -128,18 +127,15 @@ function selectAndExpand(
     const key = cellKey(i, j);
     const existing = node.children.get(key);
     if (!existing) {
-      // Expansion (search/expansion.ts): the first two plies draw fixed
-      // worlds and may open a chance node; deeper cells fix one outcome
-      // from the iteration-rotated seed as before.
-      const expanded = expandCell(node, i, j, depth, iteration, seedOffset, ctx, node === root ? book : undefined);
+      // Expansion (search/expansion.ts): one outcome per cell, from the iteration-rotated seed.
+      const expanded = expandCell(node, i, j, iteration, seedOffset, ctx, node === root ? book : undefined);
       node.children.set(key, expanded.child);
-      if (!isChanceNode(expanded.child)) expanded.child.visits += 1;
+      expanded.child.visits += 1;
       leaf = expanded.leaf;
       if (expanded.boundary) depth += 1;
       break;
     }
-    // Round 43: a chance node hands the descent to the class with the largest deficit.
-    node = isChanceNode(existing) ? pickClass(existing).child : existing;
+    node = existing;
     if (node.boundary) depth += 1;
   }
   return { path, leaf, depth };
