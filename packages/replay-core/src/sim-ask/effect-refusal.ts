@@ -1,4 +1,4 @@
-import { toID, type ActiveMove, type Battle, type PokemonSet } from '@pkmn/sim';
+import type { ActiveMove, Battle, PokemonSet } from '@pkmn/sim';
 import { CHAMPIONS_MOD } from '../calc-gen.ts';
 import type { RulesDex } from '../rules-dex.ts';
 import { twinBattle } from './twin.ts';
@@ -19,7 +19,10 @@ import { twinBattle } from './twin.ts';
  * Round 89 (#150): a fourth kind of effect, the hit itself. The twin plays the move through the simulator's own turn (`choose` with the
  * dice forced lucky: `ModifyMove`, `ModifyType`, the redirect of a doubles ally, `TryHit`, the immunity checks, `onFoeTryMove`), under the
  * weather, terrain and field conditions the log shows and with the target's item, types and volatile conditions, and answers whether the
- * damage line of the hit (`|-damage|` without `[from]`) came out. landed-hit-sweep.spec.ts holds it to whole battles the same way.
+ * damage line of the hit (`|-damage|` without `[from]`) came out. landed-hit-sweep.spec.ts holds it to whole battles the same way. The target does not act in
+ * that turn (the log shows the hit before the target's own action, and Protean or Libero would change its type with its first move), and a scene in which a
+ * body transforms (Imposter copies the foe on entry) answers null. `mayRefuseHit` names the abilities that could refuse a hit at all, so the reader asks the
+ * simulator about no others.
  */
 
 /**
@@ -124,38 +127,58 @@ function aimOf(dex: RulesDex, move: string, doubles: boolean): string {
 }
 
 /**
- * Plays the move on the twin through the simulator's own turn (its `ModifyMove`, `ModifyType`, `RedirectTarget`, `TryHit`, immunity and
- * `onFoeTryMove` steps, whatever the generation's mod changes) with the dice forced to their lucky side, so that a miss never reads as a
- * refusal, and answers whether the log shows the damage of the hit on the target: the line the reader looked at, `|-damage|` without `[from]`.
- * The field the log shows (weather, terrain, Gravity and the other pseudo-weathers) stands before the move, the target's types, item and
- * volatile conditions as the client knows them.
+ * The field the log shows (weather, terrain, Gravity and the other pseudo-weathers) stands before the move. A field the twin cannot stand under (a
+ * condition it refuses to start) is a scene it cannot play: the caller then rules nothing out. A field that already stands (an ability of the twin's own
+ * bodies sets it on entry, as in the game) is the field of the scene.
  */
-function hitLands(dex: RulesDex, scene: EffectScene): boolean {
-  const battle = twinOf(dex, scene);
-  const doubles = !!scene.partner;
+function standUnderField(battle: Battle, scene: EffectScene) {
   const source = battle.p1.active[0];
-  const target = battle.p2.active[0];
-  // A field the twin cannot stand under (a condition it refuses to start) is a scene it cannot play: the caller then rules nothing out.
-  // A field that already stands (an ability of the twin's own bodies set it on entry, as in the game) is the field of the scene.
   if (scene.weather) battle.field.setWeather(scene.weather, source);
   if (scene.terrain) battle.field.setTerrain(scene.terrain, source);
   for (const id of scene.fields ?? []) battle.field.addPseudoWeather(id, source);
   const standing = (scene.weather ? battle.field.isWeather(scene.weather) : true) && (scene.terrain ? battle.field.isTerrain(scene.terrain) : true)
     && (scene.fields ?? []).every(id => !!battle.field.pseudoWeather[id]);
   if (!standing) throw new Error('the twin cannot stand under the field of the scene');
+}
+
+/** The target has the types now and the volatile conditions the client knows (the item is in its set already). */
+function giveTargetState(battle: Battle, scene: EffectScene) {
+  const source = battle.p1.active[0];
+  const target = battle.p2.active[0];
   if (scene.target.types?.length) target.setType(scene.target.types as never);
   for (const id of scene.target.volatiles ?? []) {
     if (!battle.dex.conditions.get(id).exists) continue;
     if (!target.addVolatile(id, source) && !target.volatiles[id]) throw new Error(`the twin cannot give ${id}`);
   }
+}
+
+/**
+ * Plays the move on the twin through the simulator's own turn (its `ModifyMove`, `ModifyType`, `RedirectTarget`, `TryHit`, immunity and
+ * `onFoeTryMove` steps, whatever the generation's mod changes) with the dice forced to their lucky side, so that a miss never reads as a
+ * refusal, and answers whether the log shows the damage of the hit on the target: the line the reader looked at, `|-damage|` without `[from]`.
+ * A body that transforms (Imposter copies the foe on entry) plays another battle than the one the log shows, so the scene answers null.
+ */
+function hitLands(dex: RulesDex, scene: EffectScene): boolean {
+  const battle = twinOf(dex, scene);
+  const doubles = !!scene.partner;
+  standUnderField(battle, scene);
+  giveTargetState(battle, scene);
   battle.randomChance = () => true;
+  // The log shows the hit before the target's own action of that turn (an action before it shows as a line of its own): the target does not act on the twin,
+  // or Protean and Libero would change its type with the move it uses first.
+  battle.onEvent('BeforeMove', battle.format, (pokemon: { side: unknown }) => (pokemon.side === battle.p2 ? false : undefined));
   const mark = battle.log.length;
   const move = scene.move ?? NO_MOVE;
   battle.makeChoices(doubles ? `move 1${aimOf(dex, move, doubles)}, move 1` : 'move 1', doubles ? 'move 1, move 1' : 'move 1');
+  if (battle.log.some(line => line.startsWith('|-transform|'))) throw new Error('a transform plays another battle');
   return battle.log.slice(mark).some(line => line.startsWith('|-damage|p2a: ') && !line.includes('[from]'));
 }
 
 const memoByDex = new WeakMap<RulesDex, Map<string, boolean | null>>();
+
+/** Twin battles played so far in this process, memo hits not counted (the cost probe and the specs read it). */
+let plays = 0;
+export const twinPlays = (): number => plays;
 
 /** Asked once per Dex and scene. */
 function remembered(dex: RulesDex, key: string, ask: () => boolean | null): boolean | null {
@@ -171,6 +194,7 @@ function remembered(dex: RulesDex, key: string, ask: () => boolean | null): bool
  */
 export function effectLands(dex: RulesDex, scene: EffectScene): boolean | null {
   return remembered(dex, JSON.stringify(scene), () => {
+    plays++;
     try {
       return play(dex, scene);
     } catch {
@@ -179,35 +203,65 @@ export function effectLands(dex: RulesDex, scene: EffectScene): boolean | null {
   });
 }
 
-/** Whether a user holding the ability sets `ignoreAbility` on the move in its own `ModifyMove` event (asked once per Dex, ability and move). */
-function ignores(dex: RulesDex, ability: string, move: string): boolean | null {
-  return remembered(dex, `ignore|${toID(ability)}|${toID(move)}`, () => {
-    try {
-      // The event reads the user's ability and the move, no species: the first one the Dex holds in the generation stands in.
-      const species = dex.species.all().find(entry => entry.exists && entry.gen <= dex.gen && !entry.isNonstandard)!.name;
-      const battle = twinBattle(formatOf(dex, false), {
-        p1: { name: 'Source', team: [body({ species, ability }, [NO_MOVE])] }, p2: { name: 'Target', team: [body({ species, ability: '' }, [NO_MOVE])] },
-      });
-      const active = battle.dex.getActiveMove(move);
-      battle.activePokemon = battle.p1.active[0];
-      battle.activeMove = active;
-      battle.runEvent('ModifyMove', battle.p1.active[0], battle.p2.active[0], active, active);
-      return !!active.ignoreAbility;
-    } catch {
-      return null;
-    }
-  });
+/**
+ * The handlers of an ability that run in the steps of a hit, as the simulator names them (the `onAlly`, `onFoe`, `onAny` and `onSource` twins of a
+ * target's own events included): `TryHit` and `TryHitSide` (the absorbers, Wonder Guard, the category guards), `TryMove` (the priority guards, Damp),
+ * `RedirectTarget` (Lightning Rod, Storm Drain), `TryPrimaryHit`, `Damage` (Disguise, Ice Face, Sturdy) and `Effectiveness`. `Immunity` is left out: the
+ * simulator runs it for powder, statuses and weather damage, and no damaging move of any generation is a powder move (landed-hit-sweep.spec.ts holds that).
+ * The sweep holds the list to the Dex: no ability the twin refuses a hit with in any realm may fall outside `mayRefuseHit`.
+ */
+const HIT_HANDLER = /^on(Ally|Foe|Any|Source)?(TryHit|TryHitSide|TryMove|RedirectTarget|TryPrimaryHit|Damage|Effectiveness)(Priority|Order|SubOrder)?$/;
+/** An ability that reacts to the weather or the terrain may change the body's types under it (Forecast, Mimicry): asked of the simulator under each. */
+const FIELD_HANDLER = /^on(Weather|Terrain)Change(Priority|Order|SubOrder)?$/;
+
+/**
+ * Whether a body with the ability on the field can change what stands in a hit's way with no handler of a hit's steps: it grounds or lifts the body
+ * (Levitate: the simulator reads it inside `isGrounded`, no handler), it starts a weather, a terrain or a pseudo-weather when it enters (Psychic Surge
+ * stops a priority move), or it changes the body's types, at entry or under a weather or terrain when it reacts to one. Asked of the simulator on a bare
+ * twin, once per ability.
+ */
+function changesTheScene(dex: RulesDex, ability: string, reactsToField: boolean): boolean | null {
+  try {
+    // A species that can hold the ability (a forme-changing ability reads the species), a grounded one first (a Flying body shows no Levitate).
+    const standard = dex.species.all().filter(entry => entry.exists && entry.gen <= dex.gen && !entry.battleOnly && !String(entry.isNonstandard ?? '').startsWith('Future'));
+    const holders = standard.filter(entry => Object.values(entry.abilities).includes(ability));
+    const species = (holders.find(entry => !entry.types.includes('Flying')) ?? holders[0] ?? standard.find(entry => !entry.types.includes('Flying'))!).name;
+    const battle = twinBattle(formatOf(dex, false), {
+      p1: { name: 'Plain', team: [body({ species, ability: '' }, [NO_MOVE])] }, p2: { name: 'Holder', team: [body({ species, ability }, [NO_MOVE])] },
+    });
+    const plain = battle.p1.active[0];
+    const holder = battle.p2.active[0];
+    const field = battle.field;
+    const typesOf = () => holder.getTypes().join('/');
+    if (holder.isGrounded() !== plain.isGrounded() || typesOf() !== plain.getTypes().join('/')) return true;
+    if (field.weather || field.terrain || Object.keys(field.pseudoWeather).length > 0) return true;
+    if (!reactsToField) return false;
+    // The weathers are conditions of their own; the terrains live in the data of the moves that start them.
+    const fields = [...Object.keys(dex.data.Conditions), ...dex.moves.all().map(move => move.terrain ?? '')].filter(Boolean);
+    return [...new Set(fields)].map(id => dex.conditions.get(id)).some(condition => {
+      if (condition.effectType === 'Weather') field.setWeather(condition.id, holder);
+      else if (condition.effectType === 'Terrain') field.setTerrain(condition.id, holder);
+      else return false;
+      const changed = typesOf() !== plain.getTypes().join('/');
+      field.clearWeather();
+      field.clearTerrain();
+      return changed;
+    });
+  } catch {
+    return null;
+  }
 }
 
 /**
- * Whether the move's user may ignore the target's ability: the move's own `ignoreAbility` (Sunsteel Strike, Moongeist Beam), or one
- * of the abilities its species can hold sets it in the move's `ModifyMove` event (Mold Breaker, Teravolt, Turboblaze; Mycelium Might
- * for a status move), asked of the simulator. Null when the species is unknown or a question cannot be played.
+ * Whether an ability could have refused the hit of some move: it has a handler in a hit's steps (`HIT_HANDLER`), or it changes the scene by entering or by
+ * what it is (`changesTheScene`). An ability that cannot is no candidate for the hit rule, and the reader asks the simulator nothing about it. An ability
+ * the Dex lacks or a probe that cannot be played counts as a candidate.
  */
-export function mayIgnoreAbility(dex: RulesDex, species: string, move: string): boolean | null {
-  const entry = dex.species.get(species);
-  if (!entry.exists) return null;
-  const abilities = [...new Set(Object.values(entry.abilities ?? {}) as string[])];
-  const verdicts = (abilities.length ? abilities : ['']).map(ability => ignores(dex, ability, move));
-  return verdicts.some(verdict => verdict === true) ? true : verdicts.some(verdict => verdict === null) ? null : false;
+export function mayRefuseHit(dex: RulesDex, ability: string): boolean {
+  const entry = dex.abilities.get(ability);
+  if (!entry.exists) return true;
+  return remembered(dex, `hitguard|${entry.id}`, () => {
+    const keys = Object.keys(entry);
+    return keys.some(key => HIT_HANDLER.test(key)) || changesTheScene(dex, entry.name, keys.some(key => FIELD_HANDLER.test(key))) !== false;
+  }) !== false;
 }

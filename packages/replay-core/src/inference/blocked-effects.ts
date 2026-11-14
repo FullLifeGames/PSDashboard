@@ -1,6 +1,6 @@
 import { toId } from '../ids.ts';
 import { dexOf, type RulesDex } from '../rules-dex.ts';
-import { effectLands, type EffectScene, type SceneBody, type SceneEffect } from '../sim-ask/effect-refusal.ts';
+import { effectLands, mayRefuseHit, type EffectScene, type SceneBody, type SceneEffect } from '../sim-ask/effect-refusal.ts';
 import { clientPokemon } from './client-facts.ts';
 import { illusionPossible, possibleAbilities } from './item-evidence.ts';
 import { findPokemon, ruleOut, type InferrerState } from './inferrer-state.ts';
@@ -31,7 +31,9 @@ import { arg, fromEffect, hasKw, identOf, keyOf, type LogLine } from './log-line
  * sets its own type (an `onModifyType` handler), a Z-move or a Max move, and a move used under Electrify or Ion Deluge are not asked
  * (`blockedSkips()` counts them): the log does not show their type. The twin stands under the weather, terrain and field conditions
  * of the log (Gravity), and the target keeps the item, the types and the volatile conditions (Ingrain, Smack Down) the client shows.
- * The one known hole: a hidden Iron Ball grounds a Levitate holder and the log shows nothing of it.
+ * The one known hole: a hidden Iron Ball grounds a Levitate holder and the log shows nothing of it. Cost: a hit asks the simulator only about the candidates
+ * that could refuse a hit (`mayRefuseHit`: a handler in a hit's steps, grounding, a field set on entry, a type change), one scene for a candidate that lets
+ * the hit land, and the scenes of one body's hits share their answers (the partner stands for its species' sake only).
  */
 
 interface Hit { attacker: string; move: string }
@@ -187,6 +189,8 @@ function sourceAbilities(state: InferrerState, ident: string): string[] | null {
   return names.length ? names : [''];
 }
 
+type HitState = Pick<SceneBody, 'item' | 'types' | 'volatiles'>;
+
 /** What stands in a scene: the species the client shows, the ability the scene names. */
 interface Holder { ident: string; species: string; role: 'self' | 'partner' }
 
@@ -194,7 +198,7 @@ interface Holder { ident: string; species: string; role: 'self' | 'partner' }
  * What the log shows of the body a hit lands on, which the simulator's hit steps read: its item (Iron Ball grounds a Levitate holder), its
  * types now (Wonder Guard reads them after a Tera or a type change) and its volatile conditions (Ingrain and Smack Down ground it).
  */
-function hitStateOf(state: InferrerState, ident: string): Pick<SceneBody, 'item' | 'types' | 'volatiles'> {
+function hitStateOf(state: InferrerState, ident: string): HitState {
   const dex = dexOf(state);
   const mon = clientPokemon(state, ident);
   if (!mon) return {};
@@ -211,24 +215,36 @@ function hitStateOf(state: InferrerState, ident: string): Pick<SceneBody, 'item'
   };
 }
 
-/** Whether the ability would have refused the effect in every way the line could have come about, and the scene with none lets it land. */
-function refuses(state: InferrerState, watch: BlockedWatch, holder: Holder, partner: Holder | null, ability: string, causes: Cause[], effectTarget: Holder): boolean {
+/**
+ * Whether the ability refuses the effect for one cause: with every ability of the source it refuses it, and for one of them the scene with no ability lets the
+ * effect land (a scene the log contradicts proves nothing). The abilities of the source are asked one at a time, the candidate first: the first that lets the
+ * effect land with the candidate ends the question, and the scene with no ability is asked only for a candidate that refuses. A candidate that does not refuse
+ * costs one scene of the simulator; the partner of a body with an open ability stands for its species' sake only (no ability, no move), so the scene names the
+ * target's own species for it, which lets the scenes of one body's hits share their answers.
+ */
+function refusedFor(state: InferrerState, watch: BlockedWatch, holder: Holder, partner: Holder | null, ability: string, cause: Cause, effectTarget: Holder, hitState: HitState | undefined): boolean {
   const dex = dexOf(state);
-  return causes.length > 0 && causes.every(cause => {
-    // An ability the log announced (Intimidate) is the source's own at that moment, whatever its species or a Transform or Trace gave it.
-    const abilities = cause.route === 'ability' && cause.ability ? [dex.abilities.get(cause.ability).name] : sourceAbilities(state, cause.source);
-    const species = clientPokemon(state, cause.source)?.speciesForme || state.identSpecies.get(cause.source);
-    if (!abilities || !species) return false;
-    const hit = cause.effect.kind === 'hit';
-    const scene = (given: string, sourceAbility: string): EffectScene => ({
-      target: { species: effectTarget.species, ability: holder.role === 'self' ? given : '', ...(hit ? hitStateOf(state, effectTarget.ident) : {}) },
-      partner: partner ? { species: partner.species, ability: holder.role === 'partner' ? given : '' } : undefined,
-      source: { species, ability: sourceAbility }, effect: cause.effect, route: cause.route, move: cause.move, ability: cause.ability, weather: watch.weather,
-      ...(hit ? { terrain: watch.terrain, fields: [...watch.fields].sort() } : {}),
-    });
-    const consistent = abilities.filter(sourceAbility => effectLands(dex, scene('', sourceAbility)) === true);
-    return consistent.length > 0 && consistent.every(sourceAbility => effectLands(dex, scene(ability, sourceAbility)) === false);
+  // An ability the log announced (Intimidate) is the source's own at that moment, whatever its species or a Transform or Trace gave it.
+  const abilities = cause.route === 'ability' && cause.ability ? [dex.abilities.get(cause.ability).name] : sourceAbilities(state, cause.source);
+  const species = clientPokemon(state, cause.source)?.speciesForme || state.identSpecies.get(cause.source);
+  if (!abilities || !species) return false;
+  const scene = (given: string, sourceAbility: string): EffectScene => ({
+    target: { species: effectTarget.species, ability: holder.role === 'self' ? given : '', ...hitState },
+    partner: partner ? { species: holder.role === 'self' ? effectTarget.species : partner.species, ability: holder.role === 'partner' ? given : '' } : undefined,
+    source: { species, ability: sourceAbility }, effect: cause.effect, route: cause.route, move: cause.move, ability: cause.ability, weather: watch.weather,
+    ...(hitState ? { terrain: watch.terrain, fields: [...watch.fields].sort() } : {}),
   });
+  let consistent = false;
+  for (const sourceAbility of abilities) {
+    if (effectLands(dex, scene(ability, sourceAbility)) !== false) return false;
+    if (effectLands(dex, scene('', sourceAbility)) === true) consistent = true;
+  }
+  return consistent;
+}
+
+/** Whether the ability would have refused the effect in every way the line could have come about, and the scene with none lets it land. */
+function refuses(state: InferrerState, watch: BlockedWatch, holder: Holder, partner: Holder | null, ability: string, causes: Cause[], effectTarget: Holder, hitState: HitState | undefined): boolean {
+  return causes.length > 0 && causes.every(cause => refusedFor(state, watch, holder, partner, ability, cause, effectTarget, hitState));
 }
 
 /** The body the log's ident stands for in the client and the team: its species now, and whether its ability may be the team entry's. */
@@ -251,12 +267,19 @@ function allyOf(state: InferrerState, ident: string): string | null {
   return ally ? `${identOf(ident)?.side}${String.fromCharCode(97 + ally.slot)}: ${ally.name}` : null;
 }
 
-/** Rules out, for one holder, every candidate ability the simulator refuses the effect with (never the last legal one). */
+/**
+ * Rules out, for one holder, every candidate ability the simulator refuses the effect with (never the last legal one). For a hit only the candidates
+ * that could refuse a hit at all are asked (`mayRefuseHit`); a body none of whose candidates could costs the simulator nothing.
+ */
 function ruleOutRefusers(state: InferrerState, watch: BlockedWatch, effectTarget: Holder, found: { holder: Holder; nickname: string }, partner: Holder | null, causes: Cause[]) {
   const candidates = possibleAbilities(state, found.holder.ident);
   if (!candidates || candidates.size === 0) return;
   const dex = dexOf(state);
-  const refused = [...candidates].filter(id => refuses(state, watch, found.holder, partner, dex.abilities.get(id).name, causes, effectTarget));
+  const hit = causes.some(cause => cause.effect.kind === 'hit');
+  const asked = [...candidates].filter(id => !hit || mayRefuseHit(dex, id));
+  if (asked.length === 0) return;
+  const hitState = hit ? hitStateOf(state, effectTarget.ident) : undefined;
+  const refused = asked.filter(id => refuses(state, watch, found.holder, partner, dex.abilities.get(id).name, causes, effectTarget, hitState));
   if (refused.length === 0) return;
   if (refused.length >= candidates.size) {
     contradictionCount++;

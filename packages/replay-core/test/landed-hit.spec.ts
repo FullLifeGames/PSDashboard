@@ -3,6 +3,9 @@ import { describe, expect, test } from 'vitest';
 import { buildTeamsFromReplay } from '../src/team-builder';
 import { inferOpponentTeam } from '../src/opponent-inferrer';
 import { blockedContradictions, blockedSkips } from '../src/inference/blocked-effects';
+import { Dex } from '@pkmn/sim';
+import type { RulesDex } from '../src/rules-dex';
+import { effectLands, mayRefuseHit, twinPlays } from '../src/sim-ask/effect-refusal';
 import { play, type PlayBody } from './blocked-effects-play';
 
 /**
@@ -126,6 +129,32 @@ describe('where the log proves nothing, nothing is ruled out', () => {
     expect(blockedContradictions()).toBeGreaterThanOrEqual(before);
   });
 
+  test('a Ditto that takes a hit with no transform on the log keeps Imposter: the twin with Imposter plays another battle (a transform), so there is no verdict (singles and doubles)', () => {
+    // Round 89 (#150), the first full run of the sweep: "Ditto type Fighting (Close Combat): imposter" was a false rule-out in Generation 5. With Imposter the
+    // Ditto copies the attacker on entry and moves as a copy of it, so the scene is not the one the log shows; the played battle counts such a scene as landed.
+    for (const [format, aim, ally] of [['gen5customgame', '', false], ['gen5doublescustomgame', ' 1', true]] as const) {
+      const source = mon('Smeargle', 'Technician', ['Close Combat']);
+      const log = ally ? doubles(source, mon('Ditto', 'Limber'), FILLER, aim, format) : singles(source, mon('Ditto', 'Limber'), format);
+      expect(log).toMatch(/\|-damage\|p2a: Ditto\|/);
+      expect(log).not.toMatch(/\|-transform\|/);
+      expect(ruledOut(log, 'Ditto')).toEqual([]);
+    }
+  });
+
+  test('the twin\'s target acts after the hit, never before: a Protean body under Water type takes Hex on the twin (singles and doubles)', () => {
+    // The first full run of the prefilter sweep (Champions mod): "Greninja target Protean type Ghost (Hex)" was refused on the twin because the target's own
+    // move came first in the twin's turn and Protean made it Normal. The log shows the hit after the target's own move and its type change (Water here), so
+    // the twin's turn must not let the target act before the hit. (The reader asks no Protean in practice: it has no handler in a hit's steps.)
+    const dex = Dex.forGen(9) as RulesDex;
+    for (const partner of [undefined, { species: 'Chansey', ability: '' }]) {
+      const scene = {
+        target: { species: 'Greninja', ability: 'Protean', types: ['Water'] }, partner, source: { species: 'Smeargle', ability: 'Technician' },
+        effect: { kind: 'hit' as const, id: 'hit' }, route: 'primary' as const, move: 'hex',
+      };
+      expect(effectLands(dex, scene)).toBe(true);
+    }
+  });
+
   test('known limit: a hidden Iron Ball grounds a Levitate holder, and the log does not show it (the rule rules Levitate out)', () => {
     const log = play({ format: SINGLES, p1: [mon('Smeargle', '', ['Earthquake']), FILLER], p2: [mon('Bronzong', 'Levitate', ['Splash'], 'Iron Ball'), FILLER], turns: [{ p1: 'move 1', p2: 'move 1' }] });
     expect(log).toMatch(/\|-damage\|p2a: Bronzong\|/);
@@ -141,5 +170,31 @@ describe('the attacker as it stands now', () => {
     expect(log).toMatch(/\|detailschange\|p1a: Gyarados\|Gyarados-Mega/);
     expect(log).toMatch(/\|-damage\|p2a: Poliwrath\|/);
     expect(ruledOut(log, 'Poliwrath')).toEqual([]);
+  });
+});
+
+describe('what the simulator is asked: only the candidates that could refuse a hit', () => {
+  const dex = Dex.forGen(9) as RulesDex;
+
+  test('an ability with a handler in a hit\'s steps, one that grounds or lifts the body and one that starts a field when it enters could refuse a hit; a bare one could not', () => {
+    for (const ability of ['Water Absorb', 'Storm Drain', 'Wonder Guard', 'Bulletproof', 'Soundproof', 'Dazzling', 'Disguise', 'Levitate', 'Psychic Surge', 'Desolate Land', 'Damp', 'Forecast', 'Mimicry']) {
+      expect(mayRefuseHit(dex, ability), ability).toBe(true);
+    }
+    for (const ability of ['Technician', 'Rough Skin', 'Solar Power', 'Intimidate', 'Natural Cure', 'Pressure', 'Inner Focus', 'Blaze', 'Protosynthesis', 'Sand Veil']) {
+      expect(mayRefuseHit(dex, ability), ability).toBe(false);
+    }
+  });
+
+  test('a hit on a body whose candidates cannot refuse it plays no scene on the twin (singles and doubles); a Storm Drain candidate does', () => {
+    const asked = (log: string, species: string) => {
+      const before = twinPlays();
+      ruledOut(log, species);
+      return twinPlays() - before;
+    };
+    const source = mon('Smeargle', 'Technician', ['Water Gun']);
+    expect(asked(singles(source, mon('Charizard', 'Blaze')), 'Charizard')).toBe(0);
+    expect(asked(doubles(source, mon('Charizard', 'Blaze')), 'Charizard')).toBe(0);
+    expect(asked(singles(mon('Smeargle', 'Technician', ['Aqua Jet']), mon('Gastrodon', 'Sticky Hold')), 'Gastrodon')).toBeGreaterThan(0);
+    expect(asked(doubles(mon('Smeargle', 'Technician', ['Aqua Tail']), mon('Gastrodon', 'Sand Force')), 'Gastrodon')).toBeGreaterThan(0);
   });
 });

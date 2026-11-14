@@ -21,6 +21,8 @@ export interface PlayOptions {
   /** One entry per turn: the raw `choose` text of each side. */
   turns: { p1: string; p2: string }[];
   seed?: string;
+  /** Side p2 never acts: its moves abort before they start (the landed-hit sweep plays the hit before the target's own action, as the twin does). */
+  idle?: boolean;
 }
 
 /** The public log of a battle played through `choose` (the `|split|` pairs reduced to the spectator's line). */
@@ -30,6 +32,7 @@ export function play(options: PlayOptions): string {
     formatid: toID(options.format), seed: (options.seed ?? '1,2,3,4') as never,
     p1: { name: 'Alpha', team: Teams.pack(teams.p1) }, p2: { name: 'Beta', team: Teams.pack(teams.p2) },
   });
+  if (options.idle) battle.onEvent('BeforeMove', battle.format, (pokemon: { side: unknown }) => (pokemon.side === battle.p2 ? false : undefined));
   if (battle.requestState === 'teampreview') {
     battle.choose('p1', `team ${teams.p1.map((_, index) => index + 1).join('')}`);
     battle.choose('p2', `team ${teams.p2.map((_, index) => index + 1).join('')}`);

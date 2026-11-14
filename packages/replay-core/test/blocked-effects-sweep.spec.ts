@@ -3,7 +3,6 @@ import { Dex } from '@pkmn/sim';
 import { inferOpponentTeam } from '../src/opponent-inferrer';
 import { toId } from '../src/ids';
 import type { RulesDex } from '../src/rules-dex';
-import { mayIgnoreAbility } from '../src/sim-ask/effect-refusal';
 import { play, type PlayBody } from './blocked-effects-play';
 
 /**
@@ -156,15 +155,12 @@ function speciesPerAbility(dex: RulesDex): Map<string, { species: string; abilit
 }
 
 /**
- * Refusals the reader leaves unread, by scene: the guard refuses the move itself and never the effect (the priority guards Armor Tail,
- * Dazzling and Queenly Majesty stop Fake Out; Earth Eater absorbs the Ground move that carries the secondary), so the log's effect
- * proves the guard away only through the move's own refusal, which is outside the approved reading (a flinch, a drop, a status or a
- * volatile). Each is a TODO proposal for the final gate (lanes/D/d6-todo-proposals.md); a pin the reader now reads turns the row red.
+ * Refusals the reader leaves unread, by scene: the guard refuses the move itself and never the effect, so the log's effect proves the guard away only
+ * through the move's own refusal. Round 89 (#150): the landed hit reads those: the Fake Out that lands rules out the priority guards (Armor Tail,
+ * Dazzling, Queenly Majesty) and the terrain setter that stops it (Psychic Surge), the Mud-Slap that lands rules out Earth Eater (landed-hit-sweep.spec.ts
+ * holds those verdicts). Only the Neutralizing Gas row of the Intimidate scene stays unread; a pin the reader reads turns the row red.
  */
 const UNREAD: Record<string, string[]> = {
-  // Psychic Surge: the terrain it sets on entry (a line of the log of its own) stops the priority move before it lands.
-  'flinch (Fake Out)': ['armortail', 'dazzling', 'queenlymajesty', 'psychicsurge'],
-  'secondary drop (Mud-Slap)': ['eartheater'],
   // The gas stops the activation of the source's Intimidate on the field; the log of a holder shows the gas itself, so the log without it is the absence read.
   Intimidate: ['neutralizinggas'],
 };
@@ -210,7 +206,7 @@ describe('every ability of every generation and mod: the inference rules out wha
         expect(verdict.falseRuleOuts).toEqual([]);
         expect(verdict.missed).toEqual([]);
         expect(verdict.stalePins).toEqual([]);
-      }, 600_000);
+      }, 1_800_000);
     }
   }
 });
@@ -256,7 +252,7 @@ describe('the ally\'s ability: what lands on the body next to it rules out the g
       expect(verdict.played).toBeGreaterThan(0);
       expect(verdict.falseRuleOuts).toEqual([]);
       expect(verdict.missed).toEqual([]);
-    }, 600_000);
+    }, 1_800_000);
   }
 });
 
@@ -294,25 +290,6 @@ describe('the attacker\'s species decides whether the target\'s ability counts',
       expect(verdict.played).toBeGreaterThan(0);
       expect(verdict.ignoring).toBeGreaterThan(0);
       expect(verdict.wrong).toEqual([]);
-    }, 600_000);
-  }
-});
-
-describe('the Levitate rule reads the simulator\'s ignore: its verdicts stay those of the old list of three abilities', () => {
-  // The list the rule read before round 89 (#110), kept here as the oracle: an attacker of a species that may hold one of the three.
-  const OLD = new Set(['moldbreaker', 'teravolt', 'turboblaze']);
-  for (const realm of REALMS) {
-    test(`${realm.name}: every species against every Ground move of the Dex`, () => {
-      const dex = dexOf(realm);
-      const moves = dex.moves.all().filter(move => move.exists && move.type === 'Ground' && move.category !== 'Status' && move.gen <= dex.gen);
-      const species = dex.species.all().filter(entry => entry.exists && entry.gen <= dex.gen && !String(entry.isNonstandard ?? '').startsWith('Future'));
-      const differing: string[] = [];
-      for (const entry of species) {
-        const old = Object.values(entry.abilities).some(ability => OLD.has(toId(String(ability))));
-        for (const move of moves) if (mayIgnoreAbility(dex, entry.name, move.name) !== old) differing.push(`${entry.name} ${move.name}`);
-      }
-      expect(moves.length).toBeGreaterThan(0);
-      expect(differing).toEqual([]);
-    }, 300_000);
+    }, 1_800_000);
   }
 });

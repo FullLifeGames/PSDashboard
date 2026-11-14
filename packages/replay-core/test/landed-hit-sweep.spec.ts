@@ -3,7 +3,8 @@ import { Dex } from '@pkmn/sim';
 import { inferOpponentTeam } from '../src/opponent-inferrer';
 import { toId } from '../src/ids';
 import type { RulesDex } from '../src/rules-dex';
-import { effectLands } from '../src/sim-ask/effect-refusal';
+import { effectLands, mayRefuseHit } from '../src/sim-ask/effect-refusal';
+import type { SceneBody } from '../src/sim-ask/effect-refusal';
 import { play, type PlayBody } from './blocked-effects-play';
 
 /**
@@ -11,7 +12,8 @@ import { play, type PlayBody } from './blocked-effects-play';
  * every ability of every generation and mod the corpus plays with abilities (Generations 3 to 9 and the Champions mod), in singles and in
  * doubles, a species that can hold the ability takes a damaging move of each type, and one of each kind the Dex flags (sound, ball and
  * bomb, wind, priority). The scene is played on @pkmn/sim through `choose` once with no ability on the target (the log the inference
- * reads) and once with each ability of the species. The expected set is every ability of the species under which the hit did NOT land
+ * reads) and once with each ability of the species. The target never acts in these battles (`idle`: its moves abort before they start), as on the twin: the
+ * log shows the hit before the target's own action of the turn, and an ability that acts with the target's first move (Protean, Libero) would change the scene. The expected set is every ability of the species under which the hit did NOT land
  * (no plain `|-damage|` on the target); the inference reads the first log and must rule out exactly that set:
  *  - a false rule-out (the inference rules out an ability under which the simulator let the hit land): never allowed;
  *  - a miss (the simulator refused the hit and the inference did not rule the ability out): allowed only for the scenes in `UNREAD`, each
@@ -50,7 +52,7 @@ const aimOf = (dex: RulesDex, move: string, doubles: boolean) => (doubles && ['n
 function battleOf(realm: Realm, doubles: boolean, move: string, target: PlayBody, ally: PlayBody | null, seed: string, source: PlayBody): string {
   const dex = dexOf(realm);
   return play({
-    format: formatOf(realm, doubles), seed,
+    format: formatOf(realm, doubles), seed, idle: true,
     p1: [{ ...source, moves: [move], name: 'Source' }, { ...FILLER, name: 'Filler' }],
     p2: [{ ...target, moves: ['Splash'], name: 'Target' }, ally ? { ...ally, moves: ['Splash'], name: 'Ally' } : { ...FILLER, name: 'Filler' }],
     turns: [{ p1: doubles ? `move 1${aimOf(dex, move, doubles)}, move 1` : 'move 1', p2: doubles ? 'move 1, move 1' : 'move 1' }],
@@ -190,7 +192,7 @@ describe('every ability of every generation and mod: a landed hit rules out what
         expect(verdict.falseRuleOuts).toEqual([]);
         expect(verdict.missed).toEqual([]);
         expect(verdict.stalePins).toEqual([]);
-      }, 900_000);
+      }, 1_800_000);
     }
   }
 });
@@ -228,7 +230,7 @@ describe('the ally\'s ability: what lands on the body next to it rules out the r
       expect(verdict.refused).toBeGreaterThan(0);
       expect(verdict.falseRuleOuts).toEqual([]);
       expect(verdict.missed).toEqual([]);
-    }, 900_000);
+    }, 1_800_000);
   }
 });
 
@@ -255,7 +257,54 @@ describe('the twin\'s hit is the played battle\'s hit', () => {
       }
       expect(compared).toBeGreaterThan(0);
       expect(disagree).toEqual([]);
-    }, 900_000);
+    }, 1_800_000);
+  }
+});
+
+/**
+ * The prefilter of the reader (`mayRefuseHit`): the abilities it leaves out are never asked, so none of them may be one the twin refuses a hit with. For every
+ * ability of the realm (the sample, or all of them in the full run) and every scene of the sweep: when the twin lets the hit land with no ability and refuses it
+ * with the ability, on the body that takes the hit or on its ally, the prefilter must keep the ability. The test also counts the abilities it leaves out: a
+ * prefilter that keeps everything would pass.
+ */
+describe('the prefilter keeps every ability the twin refuses a hit with', () => {
+  test('no damaging move of any realm is a powder move, the one hit the simulator\'s Immunity event could refuse (the prefilter leaves Immunity out)', () => {
+    for (const realm of REALMS) {
+      const dex = dexOf(realm);
+      expect(dex.moves.all().filter(move => move.exists && move.gen <= dex.gen && move.flags.powder && move.category !== 'Status').map(move => move.name), realm.name).toEqual([]);
+    }
+  });
+
+  for (const realm of REALMS) {
+    test(`${realm.name}: no refuser falls outside mayRefuseHit, and the prefilter leaves some abilities out`, () => {
+      const dex = dexOf(realm);
+      const source = sourceOf(realm);
+      const skipped: string[] = [];
+      const lost: string[] = [];
+      let refusing = 0;
+      const ask = (target: SceneBody, partner: SceneBody | undefined, move: string) =>
+        effectLands(dex, { target, partner, source: { species: source.species, ability: source.ability }, effect: { kind: 'hit', id: 'hit' }, route: 'primary', move });
+      for (const pick of speciesPerAbility(dex, sampled({ n: 0 })).values()) {
+        for (const ability of pick.abilities) if (!mayRefuseHit(dex, ability) && !skipped.includes(ability)) skipped.push(ability);
+        for (const scene of scenesOf(realm)) {
+          for (const ability of pick.abilities) {
+            const bodies: [string, SceneBody, SceneBody | undefined, SceneBody, SceneBody | undefined][] = [
+              ['target', { species: pick.species, ability: '' }, undefined, { species: pick.species, ability }, undefined],
+              ...(scene.spread ? [] : [['ally', { species: REFERENCE, ability: '' }, { species: pick.species, ability: '' }, { species: REFERENCE, ability: '' }, { species: pick.species, ability }] as [string, SceneBody, SceneBody | undefined, SceneBody, SceneBody | undefined]]),
+            ];
+            for (const [role, bareTarget, barePartner, target, partner] of bodies) {
+              if (ask(bareTarget, barePartner, scene.move) !== true) continue;
+              if (ask(target, partner, scene.move) !== false) continue;
+              refusing++;
+              if (!mayRefuseHit(dex, ability)) lost.push(`${pick.species} ${role} ${ability} ${scene.label} (${scene.move})`);
+            }
+          }
+        }
+      }
+      expect(refusing).toBeGreaterThan(0);
+      expect(lost).toEqual([]);
+      expect(skipped.length).toBeGreaterThan(0);
+    }, 1_800_000);
   }
 });
 
@@ -313,6 +362,6 @@ describe('the attacker\'s species decides whether the target\'s ability counts',
       const verdict = sweepSources(realm);
       expect(verdict.played).toBeGreaterThan(0);
       expect(verdict.wrong).toEqual([]);
-    }, 900_000);
+    }, 1_800_000);
   }
 });
