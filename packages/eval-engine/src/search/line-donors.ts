@@ -1,5 +1,6 @@
 import type { EvalResult, EvalSettings, LineRequest, MctsTreeStats, TreeLineStep } from '../types.ts';
 import { playedIndices } from '../verify-select.ts';
+import { worstAnswer } from '../turn-analysis/worst-answer.ts';
 
 /**
  * Round 89 (#104): which lines of a search get replayed, and from which trees. Sim-free (the orchestrator reads it): the replay runs
@@ -10,6 +11,10 @@ import { playedIndices } from '../verify-select.ts';
  * trees hold for it, the ones whose first step answers with the best row of the other side by the merged ranking first (the opponent
  * answers with its best choice overall), then by the visits of the first step. The replay takes the first donor whose line survives the likeliest
  * dice and the next one otherwise.
+ *
+ * Round 89 (#153, Hard mode): beside a row's request the job asks for the row's line against the reply that hurts it most
+ * (`worstAnswer` of the merged result), `versus: 'worst'`, from the lines the trees hold against that answer (their lists and their
+ * floor lines); a row whose usual line already meets that answer, and a row no tree holds such a line for, ask nothing more.
  */
 export function lineRequests(trees: readonly MctsTreeStats[], result: EvalResult, settings: EvalSettings): LineRequest[] {
   if (trees.length === 0 || !trees.some(tree => tree.rowLines)) return [];
@@ -30,8 +35,24 @@ function requestsOf(trees: readonly MctsTreeStats[], result: EvalResult, setting
   if (playedLabel !== undefined) wanted.set(playedLabel, [...(wanted.get(playedLabel) ?? []), 'played']);
   return [...wanted].flatMap(([label, roles]) => {
     const donors = donorsOf(trees, side, label, ranking);
-    return donors.length > 0 ? [{ side, label, for: roles, donors, visits: donors[0][0].visits }] : [];
+    if (donors.length === 0) return [];
+    const usual: LineRequest = { side, label, for: roles, donors, visits: donors[0][0].visits };
+    const worst = worstRequest(trees, result, side, label, roles, donors[0][0]);
+    return worst ? [usual, worst] : [usual];
   });
+}
+
+/** The request for the row's line against the reply that hurts it most, when a tree holds one and the usual line does not meet it. */
+function worstRequest(trees: readonly MctsTreeStats[], result: EvalResult, side: 'p1' | 'p2', label: string, roles: LineRequest['for'], usualFirst: TreeLineStep): LineRequest | null {
+  const row = result.perSide[side].find(entry => entry.label === label);
+  const answer = row ? worstAnswer(result, side, row)?.label : undefined;
+  const answered = (step: TreeLineStep): string => (side === 'p1' ? step.p2 : step.p1);
+  if (answer === undefined || answered(usualFirst) === answer) return null;
+  const held = trees.flatMap((tree, index) => [...(tree.rowLines?.[side][label] ?? []), ...(tree.rowLines?.floor?.[side][label] ? [tree.rowLines.floor[side][label]] : [])]
+    .flatMap((line, order) => (line.length > 0 && answered(line[0]) === answer ? [{ line, index, order }] : [])));
+  if (held.length === 0) return null;
+  const donors = held.sort((a, b) => b.line[0].visits - a.line[0].visits || a.index - b.index || a.order - b.order).map(entry => entry.line);
+  return { side, label, for: roles, donors, visits: donors[0][0].visits, versus: 'worst' };
 }
 
 /**

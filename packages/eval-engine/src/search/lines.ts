@@ -149,6 +149,7 @@ function lineOf(request: LineRequest, replay: Replay, perspective: 1 | -1, match
     end: perspective * leafValue(replay.battle, matchupCache),
     endFainted: battleFaintedFraction(replay.battle),
     visits: request.visits,
+    ...(request.versus ? { versus: request.versus } : {}),
     ...(replay.cut ? { cut: replay.cut } : {}),
     ...(awaits ? { awaits } : {}),
     ...(replay.unforced.size > 0 ? { unforced: [...replay.unforced] } : {}),

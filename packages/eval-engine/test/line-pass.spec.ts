@@ -4,7 +4,7 @@ import type { PokemonSet } from '@pkmn/sim';
 import { configureSearchBudget, parseSearchBudget } from '../src/search/budget';
 import { createMatchupCache } from '../src/eval-function';
 import { mctsRoot, mctsTreeSearch } from '../src/mcts';
-import { linePass, linePassQuota, wantedCells, LINE_PASS_MAX } from '../src/search/line-pass';
+import { floorCells, linePass, linePassQuota, wantedCells, LINE_PASS_MAX } from '../src/search/line-pass';
 import { LINE_MIN_VISITS, lineFrom, type Node } from '../src/search/mcts-node';
 import type { EvalSettings, MctsTreeStats } from '../src/types';
 
@@ -150,5 +150,33 @@ describe('the pass on a searched root', () => {
     // naming rows by label replaces the best row
     const named = wantedCells(root, stats.result, { ...BASE, lineRows: { p1: [stats.p1Options[stats.p1Options.length - 1].label], p2: [] } });
     expect(named.length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * Round 89 (#153, Hard mode): after the cells above the pass also aims at the cell of each wanted row's worst answer, with what is left
+ * of the quota. Those cells are never ones the first phase wants, so the lines of the plain rows read what they read before.
+ */
+describe.each(BOARDS)('the floor cells of a %s tree', (_name, serialized) => {
+  const root = mctsRoot(serialized, BASE);
+  const stats = mctsTreeSearch(serialized, { ...BASE, keepPlayed: { p1: { kind: 'move', name: 'Bulk Up' } } }, 0);
+
+  test('they are cells the root holds, in key order, and none of the plain wanted cells', () => {
+    const plain = wantedCells(root, stats.result, BASE);
+    const floor = floorCells(root, stats.result, BASE, plain);
+    expect(floor).toEqual([...floor].sort((a, b) => a - b));
+    for (const key of floor) {
+      expect(root.children.has(key)).toBe(true);
+      expect(plain).not.toContain(key);
+    }
+  });
+
+  test('a wanted row\'s worst answer is a floor cell unless the plain cells already hold it', () => {
+    const plain = wantedCells(root, stats.result, BASE);
+    const floor = floorCells(root, stats.result, BASE, plain);
+    const row = stats.result.perSide.p1[0];
+    expect(row.punishedBy, 'the best row has a floor').not.toBeNull();
+    expect(plain.length + floor.length).toBeGreaterThanOrEqual(plain.length);
+    expect(floorCells(root, stats.result, BASE, [...plain, ...floor])).toEqual([]);
   });
 });

@@ -321,3 +321,29 @@ describe('the line threshold of the rows is 4 visits, the principal variation ke
     expect(JSON.stringify([...root.children].map(([key, child]) => [key, child.visits]))).toBe(before);
   });
 });
+
+/**
+ * Round 89 (#153, Hard mode): beside the lines against its top three answers a row keeps the line through the cell of the answer the
+ * caller names as the row's floor (`floors`, by row label), when that cell holds the visits a line needs. The rows' own lists stay
+ * what they were: the donors of the plain request read them, and the setting's lines must not move them.
+ */
+describe('the line through a row\'s floor cell', () => {
+  const deep = (): Node => node(['Surf', 'Ice Beam'], ['Draining Kiss', '→ Mew'], [
+    { i: 0, j: 0, visits: 40 }, { i: 0, j: 1, visits: 12 }, { i: 1, j: 0, visits: 25 }, { i: 1, j: 1, visits: 5 },
+  ]);
+
+  test('a floor cell with the visits is kept as the row\'s floor line, on both sides, the rows\' own lists unchanged', () => {
+    const plain = rowLinesAt(deep(), tops('Surf', 'Draining Kiss'), 8);
+    const lines = rowLinesAt(deep(), tops('Surf', 'Draining Kiss'), 8, { p1: { Surf: '→ Mew' }, p2: { 'Draining Kiss': 'Ice Beam' } });
+    expect(lines.floor?.p1.Surf.map(step => [step.p1, step.p2, step.visits])).toEqual([['Surf', '→ Mew', 12]]);
+    expect(lines.floor?.p2['Draining Kiss'].map(step => [step.p1, step.p2, step.visits])).toEqual([['Ice Beam', 'Draining Kiss', 25]]);
+    expect({ p1: lines.p1, p2: lines.p2 }).toEqual(plain);
+  });
+
+  test('a floor cell under the visits, an unknown answer and no floors keep nothing: the result has no floor key', () => {
+    const thinFloor = rowLinesAt(deep(), tops('Surf', 'Draining Kiss'), 8, { p1: { 'Ice Beam': '→ Mew' } });
+    expect(thinFloor.floor).toBeUndefined();
+    expect(rowLinesAt(deep(), tops('Surf', 'Draining Kiss'), 8, { p1: { Surf: 'Moonblast' } }).floor).toBeUndefined();
+    expect(Object.keys(rowLinesAt(deep(), tops('Surf', 'Draining Kiss'), 8))).toEqual(['p1', 'p2']);
+  });
+});

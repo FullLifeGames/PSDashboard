@@ -156,6 +156,7 @@ type WinPath
 type WinPaths
 type WinPathsRequest
 type WinStep
+type WorstAnswer
 value AUTO_MCTS_FAINTED_FRACTION
 value BLUNDER_SWING
 value BRING_WORLD_CAP
@@ -321,3 +322,4 @@ value winPaths
 value winPctText
 value winPercent
 value winProbability
+value worstAnswer

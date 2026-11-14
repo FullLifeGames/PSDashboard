@@ -1,6 +1,7 @@
 import { cellKey } from '../rank.ts';
 import type { EvalResult, EvalSettings, MctsTreeStats } from '../types.ts';
 import { playedIndices } from '../verify-select.ts';
+import { worstAnswer } from '../turn-analysis/worst-answer.ts';
 import { backpropagate, selectAndExpand } from './descent.ts';
 import type { ExpansionContext } from './expansion.ts';
 import { LINE_MIN_VISITS, lineFrom, type Node } from './mcts-node.ts';
@@ -33,22 +34,48 @@ const indexOfLabel = (options: { label: string }[], label: string | undefined): 
  * tree already expanded; keys in ascending order, so the pass is deterministic.
  */
 export function wantedCells(root: Node, result: EvalResult, settings: EvalSettings): number[] {
-  // playedIndices reads the option lists of the first tree only
-  const played = playedIndices([{ p1Options: root.p1Options, p2Options: root.p2Options } as MctsTreeStats], result, settings.keepPlayed);
   const keys = new Set<number>();
   for (const side of ['p1', 'p2'] as const) {
     const other = side === 'p1' ? 'p2' : 'p1';
-    const own = side === 'p1' ? root.p1Options : root.p2Options;
     const against = side === 'p1' ? root.p2Options : root.p1Options;
-    const named = settings.lineRows?.[side] ?? [result.perSide[side][0]?.label];
-    const rows = named.map(label => indexOfLabel(own, label)).filter(row => row >= 0);
-    if (played[side] !== undefined) rows.push(played[side]!);
     const columns = result.perSide[other].slice(0, 3).map(row => indexOfLabel(against, row.label)).filter(column => column >= 0);
-    for (const row of rows) {
+    for (const row of wantedRows(root, result, settings, side)) {
       for (const column of columns) {
         const key = side === 'p1' ? cellKey(row, column) : cellKey(column, row);
         if (root.children.has(key)) keys.add(key);
       }
+    }
+  }
+  return [...keys].sort((a, b) => a - b);
+}
+
+/** The rows of one side the donors will ask a line for: the named rows (else the tree's best row) and the row the side played. */
+function wantedRows(root: Node, result: EvalResult, settings: EvalSettings, side: 'p1' | 'p2'): number[] {
+  // playedIndices reads the option lists of the first tree only
+  const played = playedIndices([{ p1Options: root.p1Options, p2Options: root.p2Options } as MctsTreeStats], result, settings.keepPlayed);
+  const own = side === 'p1' ? root.p1Options : root.p2Options;
+  const named = settings.lineRows?.[side] ?? [result.perSide[side][0]?.label];
+  const rows = named.map(label => indexOfLabel(own, label)).filter(row => row >= 0);
+  if (played[side] !== undefined) rows.push(played[side]!);
+  return rows;
+}
+
+/**
+ * Round 89 (#153, Hard mode): the cell of each wanted row against its worst answer (`worstAnswer` of the tree's own result), when the
+ * root holds it and `taken` (the plain wanted cells) does not. Keys in ascending order.
+ */
+export function floorCells(root: Node, result: EvalResult, settings: EvalSettings, taken: readonly number[]): number[] {
+  const keys = new Set<number>();
+  for (const side of ['p1', 'p2'] as const) {
+    const own = side === 'p1' ? root.p1Options : root.p2Options;
+    const against = side === 'p1' ? root.p2Options : root.p1Options;
+    for (const row of wantedRows(root, result, settings, side)) {
+      const ranked = result.perSide[side].find(entry => entry.label === own[row].label);
+      const answer = ranked ? worstAnswer(result, side, ranked) : null;
+      const column = answer ? indexOfLabel(against, answer.label) : -1;
+      if (column < 0) continue;
+      const key = side === 'p1' ? cellKey(row, column) : cellKey(column, row);
+      if (root.children.has(key) && !taken.includes(key)) keys.add(key);
     }
   }
   return [...keys].sort((a, b) => a - b);
@@ -90,5 +117,8 @@ export function passAfterResult(
 ): void {
   const quota = linePassQuota(settings);
   if (quota === 0 || !ctx || shouldStop?.()) return;
-  linePass(root, wantedCells(root, result, settings), quota, ctx, seedOffset, iterations, shouldStop);
+  const plain = wantedCells(root, result, settings);
+  const used = linePass(root, plain, quota, ctx, seedOffset, iterations, shouldStop);
+  // Round 89 (#153): what the plain cells left of the quota goes to the floor cells; their seeds follow the plain pass's
+  if (used < quota) linePass(root, floorCells(root, result, settings, plain), quota - used, ctx, seedOffset, iterations + used, shouldStop);
 }

@@ -146,3 +146,58 @@ describe('a host names the answers its card ranks first (lineReplies)', () => {
     expect(second.donors.map(donor => donor[0].p1)).toEqual(['Ice Beam', 'Surf']);
   });
 });
+
+/**
+ * Round 89 (#153, Hard mode): beside a row's usual request the job asks for the row's line against the reply that hurts it most
+ * (`worstAnswer` of the merged result), from the lines the trees hold against that answer: their lists and their floor lines. Only
+ * when a tree holds one, and only when the usual line does not already meet that answer. The usual request stays what it was.
+ */
+describe('the line against the reply that hurts a row most (versus worst)', () => {
+  /** Surf is hurt most by → Mew (its floor); Ice Beam by Draining Kiss; the best answer overall is Draining Kiss. */
+  const hurt = (): EvalResult => ({
+    ...result(),
+    perSide: {
+      p1: [{ ...row('move surf', 'Surf'), punishedBy: '→ Mew' }, { ...row('move icebeam', 'Ice Beam'), punishedBy: 'Draining Kiss' }],
+      p2: [{ ...row('move drainingkiss', 'Draining Kiss'), punishedBy: 'Surf' }, { ...row('switch 2', '→ Mew'), punishedBy: 'Surf' }],
+    },
+  });
+  const withFloor = (base: MctsTreeStats, floor: NonNullable<MctsTreeStats['rowLines']>['floor']): MctsTreeStats => ({ ...base, rowLines: { ...base.rowLines!, floor } });
+
+  test('the row asks twice: the usual line first, then the line against its floor answer, with the same roles', () => {
+    const trees = [tree({ Surf: [[step('Surf', 'Draining Kiss', 30)], [step('Surf', '→ Mew', 12)]] })];
+    const requests = lineRequests(trees, hurt(), settings(null));
+    expect(requests.map(request => [request.side, request.label, request.for, request.versus])).toEqual([['p1', 'Surf', ['engine'], undefined], ['p1', 'Surf', ['engine'], 'worst']]);
+    expect(requests[0].donors.map(donor => donor[0].p2)).toEqual(['Draining Kiss', '→ Mew']);
+    expect(requests[1].donors).toEqual([[step('Surf', '→ Mew', 12)]]);
+    expect(requests[1].visits).toBe(12);
+  });
+
+  test('a tree\'s floor line is a donor of the worst request and never of the usual one', () => {
+    const trees = [withFloor(tree({ Surf: [step('Surf', 'Draining Kiss', 30)] }), { p1: { Surf: [step('Surf', '→ Mew', 9)] }, p2: {} })];
+    const requests = lineRequests(trees, hurt(), settings(null));
+    expect(requests[0].donors.map(donor => donor[0].p2)).toEqual(['Draining Kiss']);
+    expect(requests[1].versus).toBe('worst');
+    expect(requests[1].donors).toEqual([[step('Surf', '→ Mew', 9)]]);
+  });
+
+  test('no request when no tree holds a line against the floor answer, or when the usual line already meets it', () => {
+    const none = lineRequests([tree({ Surf: [step('Surf', 'Draining Kiss', 30)] })], hurt(), settings(null));
+    expect(none.map(request => request.versus)).toEqual([undefined]);
+    // Ice Beam's floor is Draining Kiss, the answer its usual line meets
+    const same = lineRequests([tree({ 'Ice Beam': [step('Ice Beam', 'Draining Kiss', 12)] })], { ...hurt(), perSide: { ...hurt().perSide, p1: [hurt().perSide.p1[1], hurt().perSide.p1[0]] } }, settings(null));
+    expect(same.map(request => [request.label, request.versus])).toEqual([['Ice Beam', undefined]]);
+  });
+
+  test('the played row gets its own worst request, and the opponent\'s rows read their own floor (doubles read the joint labels the same way)', () => {
+    const trees = [tree(
+      { Surf: [[step('Surf', 'Draining Kiss', 30)], [step('Surf', '→ Mew', 12)]], 'Ice Beam': [[step('Ice Beam', '→ Mew', 8)], [step('Ice Beam', 'Draining Kiss', 6)]] },
+      { 'Draining Kiss': [[step('Surf', 'Draining Kiss', 30)], [step('Ice Beam', 'Draining Kiss', 12)]] },
+    )];
+    const requests = lineRequests(trees, hurt(), settings({ p1: { kind: 'move', name: 'Ice Beam' }, p2: { kind: 'move', name: 'Draining Kiss' } }));
+    expect(requests.map(request => [request.side, request.label, request.for, request.versus])).toEqual([
+      ['p1', 'Surf', ['engine'], undefined], ['p1', 'Surf', ['engine'], 'worst'],
+      ['p1', 'Ice Beam', ['played'], undefined],
+      ['p2', 'Draining Kiss', ['engine', 'played'], undefined],
+    ]);
+  });
+});

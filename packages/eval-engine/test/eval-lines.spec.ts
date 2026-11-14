@@ -7,6 +7,7 @@ import { dieKey } from '../src/dice/types';
 import { createMatchupCache } from '../src/eval-function';
 import { createLocalTreeExecutor, searchTreesOrchestrated, type TreeExecutor } from '../src/tree-orchestrator';
 import { leafValue } from '../src/search/leaf';
+import { worstAnswer } from '../src/turn-analysis/worst-answer';
 import type { EvalLine, EvalResult, EvalSettings } from '../src/types';
 import { branchOf, runTurn, type Commands } from './branch-dice-support';
 import { set } from './move-oracle';
@@ -148,7 +149,7 @@ describe.each(SCENES)('the lines of a tree search: $name', scene => {
 
   test('an engine line meets the answer that the merged ranking puts first, as far as a tree holds a line against it (G12)', async () => {
     const result = await search(scene, 'lines');
-    for (const line of result.lines!.filter(entry => entry.for.includes('engine'))) {
+    for (const line of result.lines!.filter(entry => entry.for.includes('engine') && !entry.versus)) {
       const other = line.side === 'p1' ? 'p2' : 'p1';
       const first = line.steps[0];
       if (first.replacement) continue;
@@ -173,4 +174,39 @@ describe.each(SCENES)('the lines of a tree search: $name', scene => {
       }
     }
   }, 180_000);
+});
+
+/**
+ * Round 89 (#153, Hard mode): a turn holds, beside a row's usual line, the line against the reply that hurts the row most
+ * (`versus: 'worst'`) where a tree holds one. Its first answer is the row's `worstAnswer` of the result, it belongs to a row that also
+ * has its usual line (same side, label and roles), and the result outside `lines` equals the run without the job.
+ */
+describe.each(SCENES)('the line against the reply that hurts most: $name', scene => {
+  test.each(['lines', 'pass'] as const)('a worst line meets the row\'s worst answer and sits beside the row\'s usual line (%s)', async kind => {
+    const result = await search(scene, kind);
+    const plain = await search(scene, 'plain');
+    const { lines, ...rest } = result;
+    expect(rest, 'nothing outside the lines moves').toEqual(plain);
+    const worst = lines!.filter(line => line.versus === 'worst');
+    for (const line of worst) {
+      const row = result.perSide[line.side].find(entry => entry.label === line.label)!;
+      const answer = worstAnswer(result, line.side, row);
+      const other = line.side === 'p1' ? 'p2' : 'p1';
+      expect(answer, `${line.side} ${line.label}: the result names a worst answer`).not.toBeNull();
+      expect(line.steps[0][other].label, `${line.side} ${line.label}: the line meets the worst answer`).toBe(answer!.label);
+      const usual = lines!.find(entry => entry.side === line.side && entry.label === line.label && !entry.versus && entry.for.join() === line.for.join());
+      expect(usual, `${line.side} ${line.label}: the usual line stands beside it`).toBeDefined();
+      expect(usual!.steps[0][other].label, 'the worst line is asked for only when the usual one meets another answer').not.toBe(answer!.label);
+    }
+    // the usual lines are exactly the lines the job made before the setting existed: one per row and role, none of them marked
+    const usual = lines!.filter(line => !line.versus);
+    expect(new Set(usual.map(line => `${line.side}|${line.label}|${line.for.join()}`)).size).toBe(usual.length);
+  }, 120_000);
+
+  test('the line pass finds a worst line on a singles scene; a doubles tree is thinner and may hold none (its best rows already meet their worst answer)', async () => {
+    const result = await search(scene, 'pass');
+    const worst = result.lines!.filter(line => line.versus === 'worst');
+    if (scene.name.startsWith('singles')) expect(worst.length, 'at least one row holds its worst line').toBeGreaterThanOrEqual(1);
+    else expect(worst.length).toBeGreaterThanOrEqual(0);
+  }, 120_000);
 });

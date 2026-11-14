@@ -238,7 +238,9 @@ function linesOfRow(root: Node, first: RowCell, byColumn: Map<number, RowCell> |
  * The first entry of a row is the line the tree always kept; a cell that is already a line of the row is not kept twice. A row whose
  * cells all lack the visits (`LINE_MIN_VISITS`, 4 since G14b) has no line. The walk reads the tree and changes nothing in it.
  */
-export function rowLines(root: Node, tops: { p1: readonly string[]; p2: readonly string[] }, min: number = LINE_MIN_VISITS): RowLines {
+export function rowLines(
+  root: Node, tops: { p1: readonly string[]; p2: readonly string[] }, min: number = LINE_MIN_VISITS, floors?: Partial<Record<Side, Record<string, string>>>,
+): RowLines {
   const out: RowLines = { p1: {}, p2: {} };
   if (!hasChoices(root)) return out;
   const against = { p1: answerColumns(tops.p2, root.p2Options), p2: answerColumns(tops.p1, root.p1Options) };
@@ -250,7 +252,33 @@ export function rowLines(root: Node, tops: { p1: readonly string[]; p2: readonly
       if (lines.length > 0 && !(options[row].label in out[side])) out[side][options[row].label] = lines;
     }
   }
-  return out;
+  return withFloorLines(root, out, cells, floors, min);
+}
+
+/**
+ * Round 89 (#153): the line through each named floor cell of a row, kept in `floor` beside the lists above. `floors` names, by side and
+ * row label, the answer to look at (the caller's own reading of the row's floor); a row the tree does not hold, an answer it does not
+ * hold and a cell under `min` visits keep nothing, and `floor` stays absent when nothing is kept.
+ */
+function withFloorLines(root: Node, out: RowLines, cells: Record<Side, SideCells>, floors: Partial<Record<Side, Record<string, string>>> | undefined, min: number): RowLines {
+  if (!floors) return out;
+  const floor: NonNullable<RowLines['floor']> = { p1: {}, p2: {} };
+  let kept = false;
+  for (const side of ['p1', 'p2'] as const) {
+    const own = side === 'p1' ? root.p1Options : root.p2Options;
+    const against = side === 'p1' ? root.p2Options : root.p1Options;
+    for (const [label, answer] of Object.entries(floors[side] ?? {})) {
+      const row = own.findIndex(option => option.label === label);
+      const column = against.findIndex(option => option.label === answer);
+      const cell = row < 0 || column < 0 ? undefined : cells[side].byColumn.get(row)?.get(column);
+      const line = cell && cell.visits >= min ? lineFrom(root, cell.key, min) : [];
+      if (line.length > 0) {
+        floor[side][label] = line;
+        kept = true;
+      }
+    }
+  }
+  return kept ? { ...out, floor } : out;
 }
 
 /**
