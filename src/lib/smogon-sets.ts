@@ -8,10 +8,8 @@ import { fetcherKey } from './smogon/fetcher-key';
 import { withSmogonFallback, type SmogonFetch } from './smogon/hosts';
 import { fetchRandomSets, generatesTeam, type RandomSetFile } from './random-sets';
 
-export type { PokemonSetAssumption, SetAssumption, SetSpreadAssumption } from '@fulllifegames/replay-core';
 /** The published sets of a request; round 89 (#117): a generated-team format carries its random-set file beside them. */
 export type SmogonSetAssumptions = PublishedSets & { randomSets?: RandomSetFile };
-export { getSpeciesSetAssumption } from '@fulllifegames/replay-core';
 
 type SmogonFetcher = ConstructorParameters<typeof Smogon>[0];
 type AssumptionSet = {
