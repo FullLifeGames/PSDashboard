@@ -2,10 +2,10 @@ import { writeFileSync } from 'node:fs';
 import { afterAll, describe, expect, test } from 'vitest';
 import { PRNG, type Battle } from '@pkmn/sim';
 import { loadSimMods } from '../src/forward/sim-mods';
-import { playLikeliestTurn, type LikeliestTurn } from '../src/dice/likeliest';
+import { fallen, otherResults, otherRollGroup, playLikeliestTurn, playTurnWith, rollBoundary, rollDecides, type LikeliestTurn } from '../src/dice/likeliest';
 import { offeredDice } from '../src/dice/offer';
 import { playForcedTurn } from '../src/dice/play';
-import { dieKey, type ForcedDie } from '../src/dice/types';
+import { dieKey, type Draw, type ForcedDie } from '../src/dice/types';
 import { copyOf } from '../src/sim-ask/copy';
 import { EFFECT_SPORE, END_ROWS, endBoard, present, PROCS, procBoard } from './dice-ability-support';
 import { moverBoard, moverClicks, moversOf, tieBoard, tieClicks } from './dice-order-support';
@@ -62,7 +62,64 @@ function pass(board: Battle, play: (battle: Battle) => void, row: string): Likel
       expect(turn.unnamed + turn.unforced.length, `${row}: the log depends on seed ${seed}, so the pass must say that a draw stays with the stream`).toBeGreaterThan(0);
     }
   }
+  checkOthers(board, play, row);
   return turn;
+}
+
+/** The dice of one row whose other results the pass tries (a row has a handful; the sweep plays every row, so a few per row cover the kinds). */
+const OTHERS_PER_ROW = 4;
+
+/**
+ * Round 89 (#130, step 2): the other-result column. For the dice of a row the pass can turn (`otherResults`: a chance die, a status
+ * check, a speed tie, a hit count or a pick; a damage roll through its knock-out boundary): the pinned other result takes (the
+ * die is drawn in the likeliest turn and keeps it), and its chance is the simulator's: the chosen result and
+ * its others share the draw's own chance or items and sum to one; a roll group's share is the share of rolls on its side of the boundary
+ * and its middle step gives the other outcome.
+ */
+function checkOthers(board: Battle, play: (battle: Battle) => void, row: string): void {
+  const turn = playTurnWith(board, play, []);
+  let tried = 0;
+  for (const [index, entry] of turn.dice.entries()) {
+    if (tried >= OTHERS_PER_ROW) break;
+    const draw = turn.draws.get(dieKey(entry.die.name));
+    const label = `${row}: ${entry.die.name.kind} ${JSON.stringify(entry.die.result)}`;
+    if (entry.die.name.kind === 'damage-roll') {
+      const boundary = rollBoundary(board, play, turn.dice.map(item => item.die), index);
+      if (!boundary) continue;
+      tried++;
+      const other = otherRollGroup(entry, boundary)!;
+      const decides = rollDecides(board, play, turn.dice.map(item => item.die), index)!;
+      expect(other.chance! + decides.chance, `${label}: the two groups of rolls share all of them`).toBeCloseTo(1, 12);
+      const pinned = playTurnWith(board, play, [other]);
+      expect(fallen(pinned.battle), `${label}: the other group's roll gives the other outcome`).not.toBe(fallen(turn.battle));
+      continue;
+    }
+    for (const other of otherResults(entry, draw).slice(0, 2)) {
+      tried++;
+      checkOther(board, play, entry, other, draw, label);
+    }
+  }
+}
+
+/** One other result of a die: it takes when forced, and its chance is the simulator's (see `checkOthers`). */
+function checkOther(board: Battle, play: (battle: Battle) => void, entry: LikeliestTurn['dice'][number], other: LikeliestTurn['dice'][number], draw: Draw | undefined, label: string): void {
+  // pinned inside the likeliest turn, as the search pins it: the die is drawn there and keeps the result (`dice` lists only dice the turn drew)
+  const pinned = playTurnWith(board, play, [other]).dice.find(item => dieKey(item.die.name) === dieKey(other.die.name));
+  expect(pinned?.die.result, `${label}: the other result ${JSON.stringify(other.die.result)} takes`).toEqual(other.die.result);
+  expect(other.chance, `${label}: the other result has a chance`).toBeGreaterThan(0);
+  expect(other.chance).toBeLessThan(1);
+  if ('first' in other.die.result) {
+    expect(other.chance).toBe(0.5);
+  } else if ('hits' in other.die.result && draw?.call === 'sample' && draw.items) {
+    const hits = other.die.result.hits;
+    expect(other.chance, `${label}: the item share of the draw`).toBeCloseTo(draw.items.filter(item => item === hits).length / draw.items.length, 12);
+  } else if ('happens' in other.die.result && entry.chance !== undefined) {
+    expect(entry.chance + other.chance!, `${label}: the chance of the result and of its other add up to one`).toBeCloseTo(1, 12);
+    const asked = draw?.call === 'chance' ? (draw.numerator ?? 0) / (draw.from ?? 1) : draw?.chance;
+    if (asked !== undefined && entry.die.name.kind !== 'status-check') {
+      expect([asked, 1 - asked].some(value => Math.abs(value - other.chance!) < 1e-9), `${label}: the chance is the draw's own (${asked})`).toBe(true);
+    }
+  }
 }
 
 const byKind = (turn: LikeliestTurn, kind: string) => turn.dice.filter(entry => entry.die.name.kind === kind);

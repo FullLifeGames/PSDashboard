@@ -30,7 +30,7 @@ import { searchOptions } from './options.ts';
 const REPLAY_SEED = '1,2,3,4';
 
 /** One side's slot choices for the engine's choice string, aligned with the slots the simulator asks. */
-function slotChoicesOf(battle: Battle, side: 'p1' | 'p2', choice: string, label: string): (BranchSlotChoice | null)[] | null {
+export function slotChoicesOf(battle: Battle, side: 'p1' | 'p2', choice: string, label: string): (BranchSlotChoice | null)[] | null {
   const state = createBranchStateFromBattle(battle as unknown as SimBattle, [], {});
   const actives = side === 'p1' ? state.p1ActiveSlots : state.p2ActiveSlots;
   if (choice === 'wait') return actives.map(() => null);
@@ -42,7 +42,7 @@ function slotChoicesOf(battle: Battle, side: 'p1' | 'p2', choice: string, label:
 }
 
 /** The dice put on the slot choice of the body that holds them (a pair's die on its first slot); a die whose holder has no choice goes on the first choice of its side, else of the other. */
-function withDice(p1: (BranchSlotChoice | null)[], p2: (BranchSlotChoice | null)[], dice: readonly ForcedDie[]): void {
+export function withDice(p1: (BranchSlotChoice | null)[], p2: (BranchSlotChoice | null)[], dice: readonly ForcedDie[]): void {
   for (const die of dice) {
     const own = die.name.slot[1] === '1' ? p1 : p2;
     const lists = [own, own === p1 ? p2 : p1];
@@ -118,7 +118,7 @@ function replayDonor(root: SimPosition, donor: readonly TreeLineStep[], input: L
 }
 
 /** One die as the line shows it: its chance, whether it earns a chip, and, for a roll, whether the roll decides a knock-out. */
-function lineDie(battle: Battle, play: (b: Battle) => void, forced: readonly ForcedDie[], entry: LikeliestDie, at: number): LineDie {
+export function lineDie(battle: Battle, play: (b: Battle) => void, forced: readonly ForcedDie[], entry: LikeliestDie, at: number): LineDie {
   const decides = entry.die.name.kind === 'damage-roll' ? rollDecides(battle, play, forced, at) : null;
   const chance = decides ? decides.chance : entry.chance;
   return {
