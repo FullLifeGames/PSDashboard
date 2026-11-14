@@ -14,8 +14,11 @@ Chess-style analysis for Pokémon Showdown replays. Load a replay, scrub to any 
 - **Load any replay.** A Showdown URL, a `psim.us/r/<id>` short link, or an id (private `-…pw` links and smogtours ids included), or a downloaded replay `.html` or raw protocol log dropped onto the page.
 - **See both teams.** Revealed facts come from the protocol, the rest from usage stats and Smogon sets, and EV spreads are fitted to the damage the replay showed. Every field is labeled revealed, sheet, guessed, or manual. In a game without Team Preview (Gen 1 to 4) a side that never showed its whole team gets stand-ins for the missing Pokémon, guessed from the format's teammate statistics and marked as not revealed, with the badge `guessed`. A Random Battle has no such statistics, so its stand-ins come from the format's random-set data and the mark says so.
 - **Read the position like a chess engine.** A search on the real simulator plays out every legal choice pair, solves the result as a matrix game, and reports a win probability calibrated on real game outcomes. It covers singles, doubles, VGC bring-four, and Pokémon Champions.
-- **Grade the whole game.** `Analyze game` draws the win-probability graph, bands every turn as inaccuracy, mistake, or blunder, splits each swing into decision and luck, and writes a report with accuracy scores, key moments, paid-off reads, and, when a sure kill missed, the die that swung the game with the winner's chance after a hit and after the miss.
+- **Grade the whole game.** `Analyze game` draws the win-probability graph, bands every turn as inaccuracy, mistake, or blunder, splits each swing into decision and luck, and writes a report with accuracy scores, key moments, paid-off reads, and, when a sure kill missed, the die that swung the game with the winner's chance after a hit and after the miss. Below the report, the Game review lists each player's graded turns with the engine's line and the played line, and the graph marks them: a circle for player 1, a square for player 2.
 - **Play your own line.** Execute a different move at any turn, turn 0 included, and the variation opens right there. Step back, try another move, or let the engine finish the game for both sides.
+- **Read the lines.** Under a turn's analysis the Lines section shows, for each player, the engine's line and the line that was played: up to three turns of both players' choices with every die at its likeliest result, and the win chance at the end. `▶ Play` opens the line as a variation with those dice forced. A row's percentage averages many outcomes and a line follows one of them, and the section says why the two numbers differ.
+- **Set the dice.** The dice panel shows the dice of a turn (accuracy, crits, damage rolls, secondary effects, hit counts) and forces any of them in the variation. A multi-hit move gets one `Hits` row of counts; a count the game cut short reads, for example, "5 landed".
+- **Start a game from two teams.** `Game`, then `New game`, takes two teams as Showdown text and a format (a listed one or a Custom Game). The game opens at Team Preview with both teams in full view, and you play both sides or let the engine play. The dice seed is shown and can be set before Start. Every finished turn saves the game: `Game` and the start page list the saved games, a reload opens the one in the address (`?game=<id>`), and `Copy Share Link` in the `Game` menu shares the game and its open variation. Grading, the report, the lines and variations work as on a replay.
 - **Fix the hidden information.** Edit sets in place or import both teams as text; edits rebuild the variation and persist per replay.
 - **Embed it.** A deep link loads a replay on startup, embed mode hides the chrome, and a `postMessage` handoff feeds in replays you host yourself.
 - **Bring your own engine.** A bot or model of yours evaluates in place of the built-in search: it answers the engine protocol over HTTP ([ENGINES.md](./ENGINES.md)), and `+ engine` in the Evaluation panel adds it.
@@ -23,24 +26,24 @@ Chess-style analysis for Pokémon Showdown replays. Load a replay, scrub to any 
 
 ## Quick start
 
-1. Paste a replay URL or id, or drop an exported replay file onto the loader.
+1. Paste a replay URL or id, or drop an exported replay file onto the loader. To play without a replay, open `Game` and choose `New game`.
 2. Scrub to a turn. Pause there for a second and the app rebuilds the exact position: PP, disabled moves, doubles targets.
 3. Read the evaluation column: the score, the ranked lines, the safe line, and the punishing reply.
 4. Click an engine line, or pick a move for each side and execute. The variation opens and the timeline marks it in gold.
-5. `Analyze game` grades every turn. Click a graph point to jump to that turn's analysis.
+5. `Analyze game` grades every turn. Click a graph point to jump to that turn's analysis, or a row of the Game review under the report.
 6. The `Setup` menu in the top bar holds `Edit Player`, `Edit Opp`, and `Import/Export Sets`, which fix the hidden information when a guess is wrong, and the switch for animating branch turns.
 
 The score is an estimate for spotting swings and blunders, not an oracle. The app needs the network: replays come from replay.pokemonshowdown.com (file drops work offline), the viewer script and sprites from play.pokemonshowdown.com, and usage stats from data.pkmn.cc with a GitHub Pages mirror. A Random Battle also reads its random-set data from data.pkmn.cc/random, mirrored by the randbats pages.
 
 ## Reporting a problem
 
-The header names the app, marks it as a beta, and carries `Report issue` and the creator link. `Report issue` opens a dialog with two steps: download `ps-dashboard-state-<replay>-<time>.json`, then open the GitHub issue form, which comes with the app version, the replay, the position and the message on screen filled in. Drop the file into the form's State file field: it holds the replay log, the sets the app played with, the variation and its choices, the position on screen, unsent drafts, the messages, the engine settings and the window size, enough to replay the report exactly. A GitHub issue is public, and the file shows the replay and any team you pasted.
+The header names the app, marks it as a beta, and carries `Report issue` and the creator link. `Report issue` opens a dialog with two steps: download `ps-dashboard-state-<replay>-<time>.json`, then open the GitHub issue form, which comes with the app version, the replay, the position and the message on screen filled in. Drop the file into the form's State file field: it holds the replay log (for a new game, the game's record with its teams, seed and turns), the sets the app played with, the variation and its choices, the position on screen, unsent drafts, the messages, the engine settings and the window size, enough to replay the report exactly. A GitHub issue is public, and the file shows the replay and any team you pasted.
 
 To reproduce a report, run `REPRO_STATE=<state file> npm run test:e2e -- test/e2e/repro-state.spec.ts`: the test loads the file's replay, restores the state, prints what the reporter saw, and stops with a screenshot. In the browser console, `await window.__psState.capture()` returns the current state, and `await window.__psState.restore(state)` restores one onto the loaded replay.
 
 ## Embedding
 
-- **Deep link:** `?replay=gen3customgame-2115579570` loads that replay on startup, standalone or inside an iframe.
+- **Deep link:** `?replay=gen3customgame-2115579570` loads that replay on startup, standalone or inside an iframe. The app writes the address of what is open: `?replay=<id>` for a replay loaded by link or id, `?game=<id>` for a game it saved in your browser.
 - **Embed mode:** `?embed=1` hides the header and the loader; the top bar keeps `Report issue` and leaves the creator link to the host page. Combine both: `?embed=1&replay=<id>`.
 - **postMessage** for replays you host yourself (exported HTML files, raw logs):
 
@@ -96,7 +99,7 @@ npm run dev              # local Vite server
 | `npm run pack:smoke` | packs both packages and runs their README examples from the tarballs |
 | `npx @fulllifegames/eval-engine check-engine <url>` | an engine endpoint against the engine protocol ([ENGINES.md](./ENGINES.md)) |
 
-CI ([test.yml](./.github/workflows/test.yml)) runs on every push to master and on pull requests, in five jobs: the Node suites, the eval-engine project twice more with the simulator speed layer forced off and on (`EVAL_SIM_FAST=0` and `1`), the browser flows, and a smoke test of the production build. The pages workflow lints before it deploys.
+CI ([test.yml](./.github/workflows/test.yml)) runs on every push to master and on pull requests, in six jobs: the Node suites, the eval-engine project twice more with the simulator speed layer forced off and on (`EVAL_SIM_FAST=0` and `1`), the dice sweeps over every move of the Dex (`DICE_SWEEPS=full`), the browser flows, and a smoke test of the production build with `npm run pack:smoke`. A branch can run the same jobs by hand with `workflow_dispatch`. The pages workflow lints before it deploys.
 
 ### Contributing
 
