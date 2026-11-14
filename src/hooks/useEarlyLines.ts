@@ -68,8 +68,13 @@ export function useEarlyLines(inputs: EarlyLinesInputs): { progress: EarlyLinesP
     latest.current = inputs;
   });
   const [running, setRunning] = useState(false);
+  // The turn loop has ended for this replay (all turns done, a failed turn skipped, a Stop): `pending` may stay true for the turns left.
+  const [finishedFor, setFinishedFor] = useState<string | null>(null);
   const enabled = replayId !== null && !doubles && prefsMode === 'auto' && analyses !== null && !graph.running;
   const pending = enabled && earlyLineJobs({ analyses, results: graph.results, settings: graph.settings }).length > 0;
+  // A new sweep or a new analysis starts the stage afresh: reconciled during render, never in an effect.
+  if (!pending && finishedFor !== null) setFinishedFor(null);
+  const active = pending && finishedFor !== replayId;
 
   useEffect(() => {
     if (!pending) return;
@@ -80,12 +85,22 @@ export function useEarlyLines(inputs: EarlyLinesInputs): { progress: EarlyLinesP
       if (controller.signal.aborted) return;
       setRunning(true);
       await searchTurns(latest, controller.signal);
-      if (!controller.signal.aborted) setRunning(false);
+      if (!controller.signal.aborted) {
+        setRunning(false);
+        setFinishedFor(replayId);
+      }
     })();
     return () => controller.abort();
   }, [pending, replayId]);
 
   const counts = useMemo(() => earlyLineProgress({ analyses, results: graph.results, settings: graph.settings }), [analyses, graph.results, graph.settings]);
+  // The feedback harness waits for the stage before it takes its dump (`test/e2e-feedback/sweep-wait.ts`): the stage starts the moment
+  // the sweep ends, so a dump taken at any other point holds the lines of however many turns the stage had reached (round 89, G13b).
+  // Written in the same commit as the debug handle (`useGameAnalysis`), so the two never disagree. Singles and doubles alike: doubles
+  // report `active: false`.
+  useEffect(() => {
+    (window as Window & { __psEarlyLines?: unknown }).__psEarlyLines = { active, done: counts.done, total: counts.total };
+  }, [active, counts.done, counts.total]);
   const stop = inputs.cancel;
   const progress = useMemo(() => (pending && running ? { ...counts, stop } : null), [pending, running, counts, stop]);
   return { progress };

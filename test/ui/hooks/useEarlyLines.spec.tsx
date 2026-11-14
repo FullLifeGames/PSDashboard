@@ -167,4 +167,61 @@ describe('useEarlyLines', () => {
     expect(run.cancel).toHaveBeenCalledTimes(1);
     release?.();
   });
+
+  describe('the window handle of the feedback harness (`__psEarlyLines`)', () => {
+    type Handle = { active: boolean; done: number; total: number } | undefined;
+    const handle = () => (window as Window & { __psEarlyLines?: Handle }).__psEarlyLines;
+
+    test('active from the render that ends the sweep until the last turn holds its lines, so a dump taken then is the same every run', async () => {
+      let release: (() => void) | undefined;
+      const gate = new Promise<void>(resolve => { release = resolve; });
+      const run = setup({}, async () => { await gate; return LINES; });
+      // before the first search even starts (the effect's own await): the stage is already named active
+      expect(handle()).toMatchObject({ active: true, done: 0, total: 2 });
+      await waitFor(() => expect(run.searchLines).toHaveBeenCalledTimes(1));
+      expect(handle()?.active).toBe(true);
+      release?.();
+      await waitFor(() => expect(run.attachLines).toHaveBeenCalledTimes(2));
+      run.refresh();
+      await waitFor(() => expect(handle()).toMatchObject({ active: false, done: 2, total: 2 }));
+    });
+
+    test('inactive while a sweep runs (the sweep is waited for by its own flag)', async () => {
+      const run = setup({ graph: { ...graphOfGame().graph, running: true } });
+      await new Promise(resolve => setTimeout(resolve, 30));
+      expect(run.searchLines).not.toHaveBeenCalled();
+      expect(handle()?.active).toBe(false);
+    });
+
+    test('a turn whose search failed ends the stage: inactive although that turn holds no lines', async () => {
+      const run = setup({}, async () => { throw new Error('worker crashed'); });
+      await waitFor(() => expect(run.searchLines).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(handle()?.active).toBe(false));
+      expect(run.attachLines).not.toHaveBeenCalled();
+    });
+
+    test('a cancelled search (Stop) ends the stage: inactive with the turns left', async () => {
+      const run = setup({}, async () => { throw new Error('cancelled'); });
+      await waitFor(() => expect(run.searchLines).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(handle()?.active).toBe(false));
+    });
+
+    test.each([
+      ['doubles', { doubles: true }],
+      ['an explicit matrix mode', { prefsMode: 'matrix' as const }],
+      ['no report yet', { analyses: null }],
+    ])('%s: never active', async (_name, overrides) => {
+      setup(overrides);
+      await new Promise(resolve => setTimeout(resolve, 30));
+      expect(handle()?.active).toBe(false);
+    });
+
+    test('a new sweep that ends starts the stage again: active once more', async () => {
+      const run = setup({}, async () => { throw new Error('worker crashed'); });
+      await waitFor(() => expect(handle()?.active).toBe(false));
+      run.setRunning(true);
+      run.setRunning(false);
+      expect(handle()?.active).toBe(true);
+    });
+  });
 });

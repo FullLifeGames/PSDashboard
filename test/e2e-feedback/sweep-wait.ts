@@ -21,6 +21,8 @@ interface SweepPoll {
   running: boolean;
   done: number;
   total: number;
+  /** The early-lines stage (`useEarlyLines` writes `__psEarlyLines`); null on a page that mounts none. */
+  stage: { active: boolean; done: number; total: number } | null;
 }
 
 const POLL_MS = 10_000;
@@ -87,21 +89,24 @@ export async function waitForSweepEnd(
   const evalTimeoutMs = options.evalTimeoutMs ?? pollMs * DEAD_AFTER;
   const startedAt = Date.now();
   let sawRunning = false;
-  let lastDone = -2;
+  let lastDone = '-2';
   let lastProgressAt = Date.now();
   let timeouts = 0;
   for (;;) {
     let state: SweepPoll | null = null;
     try {
       state = await raceEvaluate(page, (): SweepPoll | null => {
-        const dbg = (window as unknown as {
+        const win = window as unknown as {
           __psDebug?: { graph: { running: boolean; progress: { done: number; total: number } | null } };
-        }).__psDebug;
+          __psEarlyLines?: { active: boolean; done: number; total: number };
+        };
+        const dbg = win.__psDebug;
         if (!dbg) return null;
         return {
           running: dbg.graph.running,
           done: dbg.graph.progress?.done ?? -1,
           total: dbg.graph.progress?.total ?? -1,
+          stage: win.__psEarlyLines ?? null,
         };
       }, evalTimeoutMs);
       timeouts = 0;
@@ -113,15 +118,26 @@ export async function waitForSweepEnd(
     const elapsed = Date.now() - startedAt;
     if (state) {
       if (state.running) sawRunning = true;
-      if (state.done !== lastDone) {
-        lastDone = state.done;
+      const stageActive = state.stage?.active === true;
+      const tick = `${state.done}/${state.stage?.done ?? -1}`;
+      if (tick !== lastDone) {
+        lastDone = tick;
         lastProgressAt = Date.now();
       }
-      if (!state.running && (sawRunning || elapsed > 30_000)) return { ok: true };
+      // Round 89 (G13b): the sweep's end is not the report's end. The early-lines stage starts the moment the sweep ends and
+      // writes lines into the graph turn by turn; a dump taken while it runs holds however many turns it had reached, so two
+      // runs differed. The end is the stage's end (it names itself inactive when every turn holds lines, one failed or Stop).
+      if (!state.running && !stageActive && (sawRunning || elapsed > 30_000)) return { ok: true };
       if (state.running && Date.now() - lastProgressAt > STALL_MS) {
         return {
           ok: false,
           reason: `sweep wedged at ${state.done}/${state.total} — no progress for ${Math.round(STALL_MS / 1000)}s`,
+        };
+      }
+      if (!state.running && stageActive && Date.now() - lastProgressAt > STALL_MS) {
+        return {
+          ok: false,
+          reason: `early lines wedged at ${state.stage?.done}/${state.stage?.total} — no progress for ${Math.round(STALL_MS / 1000)}s`,
         };
       }
     }
