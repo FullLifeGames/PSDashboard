@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { EvalLine, EvalResult, PlayedTurn, TurnAnalysis } from '@fulllifegames/eval-engine';
-import { earlyLineJobs, earlyLineProgress, earlyLineSettings } from '../../../../src/components/eval/early-lines';
+import { earlyLineJobs, earlyLineProgress, earlyLineSettings, LINE_PASS } from '../../../../src/components/eval/early-lines';
 import type { TurnEvalSettings } from '../../../../src/hooks/useEvaluation';
 import { misplayedSide, turnAnalysis } from '../../fixtures/analysis';
 import { evalResult } from '../../fixtures/eval-result';
@@ -8,7 +8,10 @@ import { singlesLine } from '../../fixtures/lines';
 
 /**
  * Round 89 (#104), step G13 (ruling G2b, kept by G7a): which graded singles turns the game analysis searches once more with the
- * trees, and what that search is told. The rule is the report's own graded rule (`gradedSides`), a matrix result without lines.
+ * trees, and what that search is told. The rule is the report's own graded rule (`gradedSides`). Step G14b (ruling G9a, option L):
+ * the stage covers every graded turn in Auto, singles and doubles, and asks the search for the line pass (`LINE_PASS` extra iterations
+ * per tree); a result is done when it carries the pass (`linePass`), not when it holds lines, since a tree turn holds lines from the
+ * sweep already.
  */
 const MATRIX: TurnEvalSettings = { depth: 1, samples: 3, mode: 'matrix' };
 const TREE: TurnEvalSettings = { depth: 1, samples: 1, mode: 'mcts' };
@@ -31,23 +34,40 @@ function game() {
   return { analyses, results, settings, playedTurns };
 }
 
-describe('earlyLineJobs: the graded matrix turns that hold no lines yet', () => {
-  test('graded matrix turns only: 3 and 7, in turn order; 5 is not graded, 12 ran the tree', () => {
+describe('earlyLineJobs: the graded turns whose lines have not had the pass yet', () => {
+  test('every graded turn, matrix or tree, in turn order: 3, 7 and 12; 5 is not graded', () => {
     const { analyses, results, settings } = game();
-    expect(earlyLineJobs({ analyses, results, settings }).map(job => job.turn)).toEqual([3, 7]);
+    expect(earlyLineJobs({ analyses, results, settings }).map(job => job.turn)).toEqual([3, 7, 12]);
   });
 
-  test('a result that already holds lines, even an empty list, is not searched again', () => {
+  test('a result that carries the pass, even with an empty list of lines, is not searched again', () => {
+    const { analyses, results, settings } = game();
+    results[2] = matrixResult({ lines: [singlesLine as EvalLine], linePass: LINE_PASS });
+    results[6] = matrixResult({ lines: [], linePass: LINE_PASS });
+    results[11] = matrixResult({ lines: [], linePass: LINE_PASS });
+    expect(earlyLineJobs({ analyses, results, settings })).toEqual([]);
+  });
+
+  test('lines the sweep or an earlier stage made, without the pass, are searched again (a tree turn holds lines from the sweep)', () => {
     const { analyses, results, settings } = game();
     results[2] = matrixResult({ lines: [singlesLine as EvalLine] });
-    results[6] = matrixResult({ lines: [] });
-    expect(earlyLineJobs({ analyses, results, settings })).toEqual([]);
+    results[11] = matrixResult({ lines: [singlesLine as EvalLine], linePass: LINE_PASS - 1 });
+    results[6] = matrixResult({ lines: [], linePass: LINE_PASS });
+    expect(earlyLineJobs({ analyses, results, settings }).map(job => job.turn)).toEqual([3, 12]);
+  });
+
+  test('a doubles game: every turn is a tree turn, and the graded ones are jobs', () => {
+    const { analyses, results } = game();
+    const doubles = results.map(result => result && evalResult('doubles', { lines: [singlesLine as EvalLine] }));
+    const settings: (TurnEvalSettings | null)[] = results.map(result => (result ? TREE : null));
+    expect(earlyLineJobs({ analyses, results: doubles, settings }).map(job => job.turn)).toEqual([3, 7, 12]);
   });
 
   test('a turn another engine evaluated, a gap and a turn without a stored result are left out', () => {
     const { analyses, results, settings } = game();
     results[2] = matrixResult({ engine: { name: 'Foul Play' } as EvalResult['engine'] });
     results[6] = null;
+    results[11] = null;
     expect(earlyLineJobs({ analyses, results, settings })).toEqual([]);
   });
 
@@ -65,6 +85,11 @@ describe('earlyLineSettings: the tree search that only keeps lines', () => {
     expect(asked).toMatchObject({ mode: 'mcts', depth: 1, samples: 1, tera: false, sleepClause: true, ruleset: 'standard', keepPlayed: played });
   });
 
+  test('it asks for the line pass: 300 extra iterations per tree, the user\'s quota', () => {
+    expect(LINE_PASS).toBe(300);
+    expect(asked.linePass).toBe(300);
+  });
+
   test('each side\'s lines come from the card\'s engine row and meet the answer the card ranks first', () => {
     // turn 7: p1 and p2 both misplayed; the fixtures' best rows are Earthquake (p1) and Earthquake again (misplayedSide)
     expect(asked.lineRows).toEqual({ p1: ['Earthquake'], p2: ['Earthquake'] });
@@ -76,11 +101,11 @@ describe('earlyLineSettings: the tree search that only keeps lines', () => {
   });
 });
 
-describe('earlyLineProgress: how many of the graded matrix turns hold lines', () => {
-  test('two of two pending, then one done', () => {
+describe('earlyLineProgress: how many of the graded turns have had the pass', () => {
+  test('three of three pending, then one done', () => {
     const { analyses, results, settings } = game();
-    expect(earlyLineProgress({ analyses, results, settings })).toEqual({ done: 0, total: 2 });
-    results[2] = matrixResult({ lines: [singlesLine as EvalLine] });
-    expect(earlyLineProgress({ analyses, results, settings })).toEqual({ done: 1, total: 2 });
+    expect(earlyLineProgress({ analyses, results, settings })).toEqual({ done: 0, total: 3 });
+    results[2] = matrixResult({ lines: [singlesLine as EvalLine], linePass: LINE_PASS });
+    expect(earlyLineProgress({ analyses, results, settings })).toEqual({ done: 1, total: 3 });
   });
 });

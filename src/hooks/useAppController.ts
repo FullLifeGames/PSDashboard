@@ -100,7 +100,7 @@ function useEarlyLinesStage(ctx: ReplayContext, engine: EngineController, analys
     [replayId, snapshots.length, setsFingerprint],
   );
   return useEarlyLines({
-    replayId, doubles: ctx.meta.evalIsDoubles, analyses, graph: evaluation.graph, prefsMode: evaluation.prefs.mode,
+    replayId, analyses, graph: evaluation.graph, prefsMode: evaluation.prefs.mode,
     tera: effectiveTera, sleepClause: effectiveSleepClause, ruleset: effectiveRuleset,
     searchLines: evaluation.searchLines, attachLines: evaluation.attachLines, cancel: evaluation.cancel, positionFor, cacheKeyFor,
   });

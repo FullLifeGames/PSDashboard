@@ -88,7 +88,7 @@ describe('attachLines', () => {
     act(() => { written = hook.result.current.attachLines(1, base, LINES, 'lines-c:1'); });
     expect(written).toBe(true);
     const after = hook.result.current.graph;
-    expect(after.results[0]).toEqual({ ...base, lines: LINES });
+    expect(after.results[0]).toEqual({ ...base, lines: LINES, linePass: 300 });
     expect(after.results[1]).toBe(before.results[1]);
     expect({ ...after, results: [] }).toEqual({ ...before, results: [] });
   });
@@ -98,9 +98,21 @@ describe('attachLines', () => {
     const base = hook.result.current.graph.results[0]!;
     act(() => { hook.result.current.attachLines(1, base, LINES, 'lines-d:1'); });
     expect(script.saved).toHaveLength(1);
-    expect(script.saved[0]).toMatchObject({ depth: 1, samples: 1, mode: 'matrix', result: { ...base, lines: LINES } });
+    expect(script.saved[0]).toMatchObject({ depth: 1, samples: 1, mode: 'matrix', result: { ...base, lines: LINES, linePass: 300 } });
     expect(String(script.saved[0].key)).toContain('lines-d:1');
     expect(script.saved[0]).toHaveProperty('playedOutcome');
+  });
+
+  test('a search that kept no line leaves the lines the sweep made and still marks the pass (a tree turn)', async () => {
+    const hook = await swept('lines-g');
+    const base = hook.result.current.graph.results[0]!;
+    act(() => { hook.result.current.attachLines(1, base, LINES, 'lines-g:1'); });
+    const held = hook.result.current.graph.results[0]!;
+    act(() => { hook.result.current.attachLines(1, held, [], 'lines-g:1'); });
+    expect(hook.result.current.graph.results[0]).toEqual({ ...base, lines: LINES, linePass: 300 });
+    const bare = await swept('lines-h');
+    act(() => { bare.result.current.attachLines(1, bare.result.current.graph.results[0]!, [], 'lines-h:1'); });
+    expect(bare.result.current.graph.results[0]).toMatchObject({ lines: [], linePass: 300 });
   });
 
   test('a result that moved on since the search started is left alone', async () => {

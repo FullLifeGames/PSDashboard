@@ -7,8 +7,6 @@ import { keptPlayed } from './evaluation/sweep-core';
 /** What the stage reads of the app: the report's analyses, the graph, the evaluation's two calls and the position of a turn. */
 export interface EarlyLinesInputs {
   replayId: string | null;
-  /** Doubles and VGC run the tree from turn 1, so every turn already holds lines: only singles have early matrix turns. */
-  doubles: boolean;
   /** The report's own per-turn analyses (`gameAnalyses`); null until the report exists. */
   analyses: readonly (TurnAnalysis | null)[] | null;
   graph: EvalGraphState;
@@ -59,13 +57,15 @@ async function searchTurns(inputs: { current: EarlyLinesInputs }, signal: AbortS
 
 /**
  * Round 89 (#104), step G13 (ruling G2b, kept by G7a): the early singles turns run the matrix, which keeps no lines. After the game
- * report (the sweep is over, the analyses exist) this stage runs one tree search per graded matrix turn and keeps only `lines` (the
- * score, the grade and the ranking of the turn stay the matrix's), so every graded turn of the Game review has its lines. Auto mode
- * and singles only; an explicit matrix mode keeps the user's choice and doubles already hold lines. A new sweep, a new replay and
- * a Stop end the stage; the next analysis picks up the turns still without lines.
+ * report (the sweep is over, the analyses exist) this stage runs one tree search per graded turn and keeps only `lines` (the
+ * score, the grade and the ranking of the turn stay the sweep's), so every graded turn of the Game review has its lines. Step G14b
+ * (ruling G9a, option L): the search carries the line pass (extra iterations aimed at the rows the card shows), and the stage covers
+ * the tree turns of singles and every turn of doubles and VGC as well, since their lines from the sweep stand on thin second turns.
+ * Auto mode only; an explicit mode keeps the user's choice. A new sweep, a new replay and a Stop end the stage; the next analysis
+ * picks up the turns that have not had the pass.
  */
 export function useEarlyLines(inputs: EarlyLinesInputs): { progress: EarlyLinesProgress | null; lineComing: (turn: number) => LineComing } {
-  const { replayId, doubles, analyses, graph, prefsMode } = inputs;
+  const { replayId, analyses, graph, prefsMode } = inputs;
   const latest = useRef(inputs);
   useEffect(() => {
     latest.current = inputs;
@@ -73,7 +73,7 @@ export function useEarlyLines(inputs: EarlyLinesInputs): { progress: EarlyLinesP
   const [running, setRunning] = useState(false);
   // The turn loop has ended for this replay (all turns done, a failed turn skipped, a Stop): `pending` may stay true for the turns left.
   const [finishedFor, setFinishedFor] = useState<string | null>(null);
-  const enabled = replayId !== null && !doubles && prefsMode === 'auto' && analyses !== null && !graph.running;
+  const enabled = replayId !== null && prefsMode === 'auto' && analyses !== null && !graph.running;
   const pending = enabled && earlyLineJobs({ analyses, results: graph.results, settings: graph.settings }).length > 0;
   // A new sweep or a new analysis starts the stage afresh: reconciled during render, never in an effect.
   if (!pending && finishedFor !== null) setFinishedFor(null);
@@ -99,8 +99,8 @@ export function useEarlyLines(inputs: EarlyLinesInputs): { progress: EarlyLinesP
   const counts = useMemo(() => earlyLineProgress({ analyses, results: graph.results, settings: graph.settings }), [analyses, graph.results, graph.settings]);
   // The feedback harness waits for the stage before it takes its dump (`test/e2e-feedback/sweep-wait.ts`): the stage starts the moment
   // the sweep ends, so a dump taken at any other point holds the lines of however many turns the stage had reached (round 89, G13b).
-  // Written in the same commit as the debug handle (`useGameAnalysis`), so the two never disagree. Singles and doubles alike: doubles
-  // report `active: false`.
+  // Written in the same commit as the debug handle (`useGameAnalysis`), so the two never disagree. Singles and doubles alike (G14b:
+  // the pass covers every graded turn of a game in Auto).
   useEffect(() => {
     (window as Window & { __psEarlyLines?: unknown }).__psEarlyLines = { active, done: counts.done, total: counts.total };
   }, [active, counts.done, counts.total]);
@@ -111,7 +111,7 @@ export function useEarlyLines(inputs: EarlyLinesInputs): { progress: EarlyLinesP
     () => (active ? new Set(earlyLineJobs({ analyses, results: graph.results, settings: graph.settings }).map(job => job.turn)) : null),
     [active, analyses, graph.results, graph.settings],
   );
-  const sweeping = replayId !== null && !doubles && prefsMode === 'auto' && graph.running;
+  const sweeping = replayId !== null && prefsMode === 'auto' && graph.running;
   const lineComing = useCallback((turn: number): LineComing => {
     if (searching?.has(turn)) return 'stage';
     return sweeping && graph.settings[turn - 1]?.mode === 'matrix' ? 'sweep' : null;
