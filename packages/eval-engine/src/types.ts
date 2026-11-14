@@ -60,6 +60,13 @@ export interface EvalSettings {
    */
   lineReplies?: { p1?: string[]; p2?: string[] };
   /**
+   * Round 89 (#104, G14b, ruling G9a option L): extra tree iterations per tree, run after the tree's result, cell statistics and
+   * ranking are final, aimed at the rows whose lines the card shows (the tree's best row and the played row, against the tree's top three
+   * answers) until each line holds two turns or the quota is spent. They descend below the root cells and never write the root's own statistics, so no score, rank or grade
+   * moves; only the visits a line reads grow. Absent or 0: no pass. A search that is stopped runs none. Part of the settings key only when present.
+   */
+  linePass?: number;
+  /**
    * Round 65: the rule set the replay runs under (Pokémon Champions or the
    * standard games), named by the host from the replay's format: the
    * simulator reconstructs every doubles game as Doubles OU and knows no
@@ -277,6 +284,11 @@ export interface EvalResult {
    * search, on an engine that sends none and when the tree holds no line for the row. No score, ranking or grade reads it.
    */
   lines?: EvalLine[];
+  /**
+   * Round 89 (#104, G14b): the extra iterations per tree (`EvalSettings.linePass`) that made `lines`, written by the host that asked
+   * for them when it stores the lines. Absent: the lines come from the tree's own iterations alone. Nothing in the engine reads it.
+   */
+  linePass?: number;
 }
 
 /**

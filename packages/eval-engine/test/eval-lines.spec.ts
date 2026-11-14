@@ -86,18 +86,18 @@ const SCENES: Scene[] = [
 const searched = new Map<string, Promise<EvalResult>>();
 
 /** One search per scene and executor: the tests of a scene read the same result. `plain` is the executor without the lines job. */
-function search(scene: Scene, kind: 'lines' | 'plain'): Promise<EvalResult> {
+function search(scene: Scene, kind: 'lines' | 'plain' | 'pass'): Promise<EvalResult> {
   const key = `${scene.name}|${kind}`;
   if (!searched.has(key)) searched.set(key, searchOnce(scene, kind));
   return searched.get(key)!;
 }
 
-async function searchOnce(scene: Scene, kind: 'lines' | 'plain'): Promise<EvalResult> {
+async function searchOnce(scene: Scene, kind: 'lines' | 'plain' | 'pass'): Promise<EvalResult> {
   const runtime = await branchOf(scene.format, scene.p1, scene.p2, '1,2,3,4');
   scene.prepare?.(runtime.battleStream.battle!);
   const serialized = JSON.stringify(State.serializeBattle(runtime.battleStream.battle!));
-  const executor: TreeExecutor = kind === 'lines' ? createLocalTreeExecutor(serialized) : { ...createLocalTreeExecutor(serialized), lines: undefined };
-  return searchTreesOrchestrated(executor, { ...SETTINGS, keepPlayed: scene.played });
+  const executor: TreeExecutor = kind !== 'plain' ? createLocalTreeExecutor(serialized) : { ...createLocalTreeExecutor(serialized), lines: undefined };
+  return searchTreesOrchestrated(executor, { ...SETTINGS, keepPlayed: scene.played, ...(kind === 'pass' ? { linePass: 300 } : {}) });
 }
 
 describe.each(SCENES)('the lines of a tree search: $name', scene => {
@@ -120,6 +120,18 @@ describe.each(SCENES)('the lines of a tree search: $name', scene => {
         expect(Number.isFinite(line.end)).toBe(true);
       }
     }
+  }, 120_000);
+
+  test('the line pass (G14b) changes no score, rank or grade, and the lines hold at least the turns they held', async () => {
+    const passed = await search(scene, 'pass');
+    const plain = await search(scene, 'plain');
+    const lined = await search(scene, 'lines');
+    const { lines, ...rest } = passed;
+    expect(rest, 'the result outside the lines equals the run without the lines job').toEqual(plain);
+    expect(lines, 'the passed search carries lines').toBeDefined();
+    const turns = (list: EvalLine[] | undefined): number => (list ?? []).reduce((sum, line) => sum + line.steps.length, 0);
+    expect(turns(lines)).toBeGreaterThanOrEqual(turns(lined.lines));
+    for (const line of lines!) expect(line.steps.length).toBeLessThanOrEqual(3);
   }, 120_000);
 
   test('a step\'s dice ride on their holders, and the waiting side of a replacement holds no choice', async () => {

@@ -4,9 +4,11 @@ import { foldClassWeights, koOddsForOptions, observeOrder, planCellEvents, type 
 import { cellKey, rankFromMatrix, toResult as rankedToResult } from './rank.ts';
 import { attachKoOdds, hasUnansweredContent, koOddsMapsFor } from './search/root-payload.ts';
 import { matrixCells, topVisitedIndex, treeScore } from './mcts-merge.ts';
-import { cellStats, makeNode, pick, principalVariation, rowLines, treeMatrix, type Node } from './search/mcts-node.ts';
+import { cellStats, makeNode, principalVariation, rowLines, treeMatrix, type Node } from './search/mcts-node.ts';
+import { backpropagate, selectAndExpand } from './search/descent.ts';
+import { passAfterResult } from './search/line-pass.ts';
 import { cellSeeds, positionSalt } from './search/root-quantile.ts';
-import { expandCell, type ExpansionContext, type RootClassBook } from './search/expansion.ts';
+import type { ExpansionContext, RootClassBook } from './search/expansion.ts';
 import { forcedWinFor } from './search/forced-win.ts';
 import { applyForcedWin, forcedWinInput } from './search/forced-win-apply.ts';
 import { perfSync } from './perf-trace.ts';
@@ -91,60 +93,6 @@ function toResult(
   return result;
 }
 
-interface PathStep {
-  node: Node;
-  i: number;
-  j: number;
-}
-
-/**
- * Selection: descend through existing children via decoupled UCB, expanding
- * at most one child. Returns the joint path, the leaf value the descent
- * ended on, and the depth it reached.
- */
-function selectAndExpand(
-  root: Node, iteration: number, seedOffset: number, ctx: ExpansionContext, book: RootClassBook,
-): { path: PathStep[]; leaf: number; depth: number } {
-  const path: PathStep[] = [];
-  let node = root;
-  let leaf: number;
-  let depth = 1;
-  for (;;) {
-    if (node.ended || node.p1Options.length === 0 || node.p2Options.length === 0) {
-      leaf = node.value;
-      break;
-    }
-    const i = pick(node.p1N, node.p1W, node.visits, true, node.p1Order);
-    const j = pick(node.p2N, node.p2W, node.visits, false, node.p2Order);
-    path.push({ node, i, j });
-    const key = cellKey(i, j);
-    const existing = node.children.get(key);
-    if (!existing) {
-      // Expansion (search/expansion.ts): one outcome per cell, from the iteration-rotated seed.
-      const expanded = expandCell(node, i, j, iteration, seedOffset, ctx, node === root ? book : undefined);
-      node.children.set(key, expanded.child);
-      expanded.child.visits += 1;
-      leaf = expanded.leaf;
-      if (expanded.boundary) depth += 1;
-      break;
-    }
-    node = existing;
-    if (node.boundary) depth += 1;
-  }
-  return { path, leaf, depth };
-}
-
-/** Backpropagation along the joint path. */
-function backpropagate(path: PathStep[], leaf: number): void {
-  for (const step of path) {
-    step.node.visits += 1;
-    step.node.p1N[step.i] += 1;
-    step.node.p1W[step.i] += leaf;
-    step.node.p2N[step.j] += 1;
-    step.node.p2W[step.j] += leaf;
-  }
-}
-
 /** Progress after every iteration; a partial result every PARTIAL_EVERY iterations before the last. */
 function reportIteration(
   callbacks: MctsCallbacks | undefined,
@@ -173,7 +121,7 @@ function runMcts(
   callbacks?: MctsCallbacks,
   seedOffset = 0,
   trees?: number,
-): { root: Node; maxDepth: number; result: EvalResult; koOdds?: RootKoOdds; rootClassKeys: Map<number, string>; rootClassWeights: Map<number, number> } {
+): { root: Node; maxDepth: number; result: EvalResult; koOdds?: RootKoOdds; rootClassKeys: Map<number, string>; rootClassWeights: Map<number, number>; ctx?: ExpansionContext } {
   const matchupCache = createMatchupCache(settings.ruleset);
   const tera = settings.tera ?? true;
   // keepPlayed applies to the root only — children have their own spaces.
@@ -218,7 +166,7 @@ function runMcts(
 
   const result = toResult(root, maxDepth, koOdds, unanswered);
   callbacks?.onPartial?.(result);
-  return { root, maxDepth, result, koOdds, rootClassKeys: book.keys, rootClassWeights: book.weights };
+  return { root, maxDepth, result, koOdds, rootClassKeys: book.keys, rootClassWeights: book.weights, ctx };
 }
 
 /** Round 67 (T129): the tree runs on the board with its bench in canonical order and names its choices in the given board's slots. */
@@ -334,7 +282,7 @@ function treeSearchOn(
   seedOffset: number,
   callbacks?: MctsCallbacks,
 ): MctsTreeStats {
-  const { root, maxDepth, result, koOdds, rootClassKeys, rootClassWeights } = runMcts(serializedBattle, settings, callbacks, seedOffset, searchBudget().trees);
+  const { root, maxDepth, result, koOdds, rootClassKeys, rootClassWeights, ctx } = runMcts(serializedBattle, settings, callbacks, seedOffset, searchBudget().trees);
   // Boundary flags for the merge's verify selection. Analytic only (one
   // calc per damaging pair, no sim advances) and identical across trees,
   // and the merge reads trees[0] alone — so only the offset-0 tree pays
@@ -355,6 +303,8 @@ function treeSearchOn(
     const visits = new Map(cells.map(cell => [cell.key, cell.visits]));
     result.matrix.cells = matrixCells(root.p1Options.length, root.p2Options.length, key => visits.get(key) ?? 0, undefined, plannedCells);
   }
+  // Round 89 (#104, G14b, option L): everything the result and the merge read is final above; the pass writes below the root only.
+  passAfterResult(root, result, settings, ctx, seedOffset, searchBudget().iterations, callbacks?.shouldStop);
   return {
     p1Options: root.p1Options.map(option => ({ choice: option.choice, label: option.label })),
     p2Options: root.p2Options.map(option => ({ choice: option.choice, label: option.label })),
