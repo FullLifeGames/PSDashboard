@@ -13,10 +13,14 @@ const step = (p1: string, p2: string, visits: number): TreeLineStep => ({ p1, p2
 
 const options = (labels: [string, string][]) => labels.map(([choice, label]) => ({ choice, label }));
 
-function tree(p1Lines: Record<string, TreeLineStep[]>, p2Lines: Record<string, TreeLineStep[]> = {}): MctsTreeStats {
+/** The lines a tree holds for a row: one list per row, the tree's own line first (a bare line is a list of one). */
+type Held = Record<string, TreeLineStep[] | TreeLineStep[][]>;
+const listed = (held: Held): Record<string, TreeLineStep[][]> => Object.fromEntries(Object.entries(held).map(([label, value]) => [label, Array.isArray(value[0]) ? (value as TreeLineStep[][]) : [value as TreeLineStep[]]]));
+
+function tree(p1Lines: Held, p2Lines: Held = {}): MctsTreeStats {
   return {
     p1Options: options([['move surf', 'Surf'], ['move icebeam', 'Ice Beam']]), p2Options: options([['move drainingkiss', 'Draining Kiss'], ['switch 2', '→ Mew']]),
-    rowLines: { p1: p1Lines, p2: p2Lines },
+    rowLines: { p1: listed(p1Lines), p2: listed(p2Lines) },
   } as unknown as MctsTreeStats;
 }
 
@@ -63,5 +67,56 @@ describe('the requests of the lines job', () => {
 
   test('trees without rowLines (an older tree) ask for nothing', () => {
     expect(lineRequests([{ p1Options: [], p2Options: [] } as unknown as MctsTreeStats], result(), settings(null))).toEqual([]);
+  });
+});
+
+/**
+ * Round 89 (#104), step G12 (ruling G8a): a tree ships up to three lines for a row, against its own top answers. The donors of a row are
+ * every tree's lines, ordered by the rank of the first answer in the merged ranking of the other side (the best answer overall comes
+ * first, an answer the ranking does not hold comes last), then by the first step's visits, then by the lower tree.
+ */
+describe('the donors follow the merged ranking of the answers', () => {
+  const ranking = (answers: [string, string][]): EvalResult => ({
+    ...result(),
+    perSide: { p1: result().perSide.p1, p2: answers.map(([choice, label]) => row(choice, label)) },
+  });
+
+  test('the merged top answer wins over a heavier line against another answer, in any tree', () => {
+    const trees = [
+      tree({ Surf: [step('Surf', '→ Mew', 90)] }),
+      tree({ Surf: [step('Surf', 'Draining Kiss', 8)] }),
+    ];
+    const [request] = lineRequests(trees, result(), settings(null));
+    expect(request.donors.map(donor => donor[0].p2)).toEqual(['Draining Kiss', '→ Mew']);
+  });
+
+  test('a tree that holds three lines for the row offers them in the order of the merged ranking', () => {
+    const trees = [tree({ Surf: [[step('Surf', '→ Mew', 40)], [step('Surf', 'Draining Kiss', 12)], [step('Surf', 'Surf Pair', 9)]] })];
+    const merged = ranking([['switch 2', '→ Mew'], ['move drainingkiss', 'Draining Kiss'], ['move x', 'Surf Pair']]);
+    const [request] = lineRequests(trees, merged, settings(null));
+    // the merged ranking puts → Mew first, so the tree's own first line stays first and the rest follow by rank
+    expect(request.donors.map(donor => donor[0].p2)).toEqual(['→ Mew', 'Draining Kiss', 'Surf Pair']);
+    const swapped = ranking([['move drainingkiss', 'Draining Kiss'], ['move x', 'Surf Pair'], ['switch 2', '→ Mew']]);
+    expect(lineRequests(trees, swapped, settings(null))[0].donors.map(donor => donor[0].p2)).toEqual(['Draining Kiss', 'Surf Pair', '→ Mew']);
+    expect(lineRequests(trees, swapped, settings(null))[0].visits).toBe(12);
+  });
+
+  test('when no tree holds the top answer the merged second comes first, and an answer the ranking does not hold comes last', () => {
+    const trees = [
+      tree({ Surf: [step('Surf', 'Unranked', 99)] }),
+      tree({ Surf: [step('Surf', '→ Mew', 10)] }),
+      tree({ Surf: [step('Surf', 'Draining Kiss', 9), ] }),
+    ];
+    const merged = ranking([['move top', 'Top'], ['switch 2', '→ Mew'], ['move drainingkiss', 'Draining Kiss']]);
+    const [request] = lineRequests(trees, merged, settings(null));
+    expect(request.donors.map(donor => donor[0].p2)).toEqual(['→ Mew', 'Draining Kiss', 'Unranked']);
+  });
+
+  test('the opponent\'s rows are ordered by the merged ranking of the first side', () => {
+    const trees = [tree({}, { 'Draining Kiss': [[step('Ice Beam', 'Draining Kiss', 50)], [step('Surf', 'Draining Kiss', 10)]] })];
+    const [request] = lineRequests(trees, result(), settings(null));
+    // the merged top of player 1 is Surf: its line comes first although Ice Beam's holds more visits
+    expect(request.side).toBe('p2');
+    expect(request.donors.map(donor => donor[0].p1)).toEqual(['Surf', 'Ice Beam']);
   });
 });

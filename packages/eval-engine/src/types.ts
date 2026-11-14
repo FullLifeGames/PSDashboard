@@ -315,8 +315,8 @@ export interface EvalLine {
 /** One step of a row's line as a tree carries it: both sides' choices by label and the visits of its cell. */
 export interface TreeLineStep { p1: string; p2: string; visits: number }
 
-/** A tree's line for each root row that holds one, by side and row label. */
-export interface RowLines { p1: Record<string, TreeLineStep[]>; p2: Record<string, TreeLineStep[]> }
+/** A tree's lines for each root row that holds one, by side and row label: up to three per row, the tree's own first (round 89, G12). */
+export interface RowLines { p1: Record<string, TreeLineStep[][]>; p2: Record<string, TreeLineStep[][]> }
 
 /** One line to replay: the row, the trees' lines for it best first (the next one stands in when a replay is cut) and the visits of the first. */
 export interface LineRequest { side: 'p1' | 'p2'; label: string; for: ('engine' | 'played')[]; donors: TreeLineStep[][]; visits: number }

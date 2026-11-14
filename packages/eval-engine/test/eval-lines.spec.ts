@@ -134,6 +134,20 @@ describe.each(SCENES)('the lines of a tree search: $name', scene => {
     }
   }, 120_000);
 
+  test('an engine line meets the answer that the merged ranking puts first, as far as a tree holds a line against it (G12)', async () => {
+    const result = await search(scene, 'lines');
+    for (const line of result.lines!.filter(entry => entry.for.includes('engine'))) {
+      const other = line.side === 'p1' ? 'p2' : 'p1';
+      const first = line.steps[0];
+      if (first.replacement) continue;
+      const ranking = result.perSide[other].map(row => row.label);
+      const at = ranking.indexOf(first[other].label);
+      // a tree keeps lines against its own top three answers, so the merged top three are the answers a line can meet
+      expect(at, `${line.side} ${line.label}: the answer ${first[other].label} is among the merged top three`).toBeGreaterThanOrEqual(0);
+      expect(at, `${line.side} ${line.label}: the answer ${first[other].label} is among the merged top three`).toBeLessThanOrEqual(2);
+    }
+  }, 120_000);
+
   test('a line plays as a variation under two seeds and ends at its value', async () => {
     const result = await search(scene, 'lines');
     for (const line of result.lines!) {

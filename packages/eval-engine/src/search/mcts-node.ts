@@ -173,33 +173,75 @@ export function principalVariation(node: Node): { p1: string; p2: string }[] {
   return lineFrom(node).map(({ p1, p2 }) => ({ p1, p2 }));
 }
 
+/** The answers a row keeps a line against: the tree's own top three of the other side. */
+const LINE_ANSWERS = 3;
+
+interface RowCell { key: number; visits: number }
+type Side = 'p1' | 'p2';
+/** What the walk knows of one side's rows: each row's first cell, and each row's cells by the column (the other side's row) they meet. */
+interface SideCells { first: Map<number, RowCell & { top: boolean }>; byColumn: Map<number, Map<number, RowCell>> }
+
+/** The columns each side's rows meet: the opponent's top answers, in rank order (-1 where the tree holds no such row). */
+const answerColumns = (labels: readonly string[], options: { label: string }[]): number[] =>
+  labels.slice(0, LINE_ANSWERS).map(label => options.findIndex(option => option.label === label));
+
 /**
- * Round 89 (#104): the line of every root row that holds one, by side and row label. A row's first cell is the one against the
- * opponent's top row (`tops`, the labels of each side's best row in this tree's own ranking) when that cell has the visits a line
- * needs, else the row's most visited cell. A row whose cells all lack the visits has no line.
+ * Each side's rows read from the root's cells: the first cell of a row is the one against the opponent's top row once it has the
+ * visits a line needs, else the row's heavier cell (the first of equals).
  */
-export function rowLines(root: Node, tops: { p1?: string; p2?: string }): RowLines {
-  const out: RowLines = { p1: {}, p2: {} };
-  if (!hasChoices(root)) return out;
-  // the column each side's rows meet: the opponent's top row
-  const against = { p1: root.p2Options.findIndex(option => option.label === tops.p2), p2: root.p1Options.findIndex(option => option.label === tops.p1) };
-  interface Held { key: number; visits: number; top: boolean }
-  const held = { p1: new Map<number, Held>(), p2: new Map<number, Held>() };
+function sideCells(root: Node, against: Record<Side, number[]>): Record<Side, SideCells> {
+  const out: Record<Side, SideCells> = { p1: { first: new Map(), byColumn: new Map() }, p2: { first: new Map(), byColumn: new Map() } };
   for (const [key, child] of root.children) {
     const i = Math.floor(key / 10_000);
     const j = key % 10_000;
     for (const [side, row, column] of [['p1', i, j], ['p2', j, i]] as const) {
-      const cell: Held = { key, visits: child.visits, top: column === against[side] && child.visits >= PV_MIN_VISITS };
-      const was = held[side].get(row);
-      // the cell against the top row wins once it has the visits; else the heavier cell (the first of equals)
-      if (!was || (cell.top && !was.top) || (cell.top === was.top && cell.visits > was.visits)) held[side].set(row, cell);
+      const cell = { key, visits: child.visits, top: column === against[side][0] && child.visits >= PV_MIN_VISITS };
+      const was = out[side].first.get(row);
+      if (!was || (cell.top && !was.top) || (cell.top === was.top && cell.visits > was.visits)) out[side].first.set(row, cell);
+      if (!out[side].byColumn.has(row)) out[side].byColumn.set(row, new Map());
+      out[side].byColumn.get(row)!.set(column, cell);
     }
   }
+  return out;
+}
+
+/**
+ * The lines of one row: the first line, then the line against each lower answer whose cell holds the visits a line needs and is not a
+ * cell the row already holds a line from. Empty when the first cell gives no line.
+ */
+function linesOfRow(root: Node, first: RowCell, byColumn: Map<number, RowCell> | undefined, lower: number[]): TreeLineStep[][] {
+  const head = lineFrom(root, first.key);
+  if (head.length === 0) return [];
+  const lines = [head];
+  const taken = new Set([first.key]);
+  for (const column of lower) {
+    const cell = column < 0 ? undefined : byColumn?.get(column);
+    if (!cell || cell.visits < PV_MIN_VISITS || taken.has(cell.key)) continue;
+    taken.add(cell.key);
+    const line = lineFrom(root, cell.key);
+    if (line.length > 0) lines.push(line);
+  }
+  return lines;
+}
+
+/**
+ * Round 89 (#104): the lines of every root row that holds one, by side and row label. A row's first line starts at the cell against
+ * the opponent's top row (`tops`: the labels of each side's best rows in this tree's own ranking, best first) when that cell has the
+ * visits a line needs, else at the row's most visited cell. Round 89 (G12): the row also keeps a line against the tree's second and
+ * third top answer when its cell there holds the visits, so the donors of a row can choose the answer the merged ranking puts first.
+ * The first entry of a row is the line the tree always kept; a cell that is already a line of the row is not kept twice. A row whose
+ * cells all lack the visits has no line. The walk reads the tree and changes nothing in it.
+ */
+export function rowLines(root: Node, tops: { p1: readonly string[]; p2: readonly string[] }): RowLines {
+  const out: RowLines = { p1: {}, p2: {} };
+  if (!hasChoices(root)) return out;
+  const against = { p1: answerColumns(tops.p2, root.p2Options), p2: answerColumns(tops.p1, root.p1Options) };
+  const cells = sideCells(root, against);
   for (const side of ['p1', 'p2'] as const) {
     const options = side === 'p1' ? root.p1Options : root.p2Options;
-    for (const [row, { key }] of held[side]) {
-      const line = lineFrom(root, key);
-      if (line.length > 0 && !(options[row].label in out[side])) out[side][options[row].label] = line;
+    for (const [row, first] of cells[side].first) {
+      const lines = linesOfRow(root, first, cells[side].byColumn.get(row), against[side].slice(1));
+      if (lines.length > 0 && !(options[row].label in out[side])) out[side][options[row].label] = lines;
     }
   }
   return out;

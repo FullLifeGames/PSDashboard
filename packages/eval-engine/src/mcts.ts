@@ -370,8 +370,8 @@ function treeSearchOn(
     ...(doubles ? {} : { boundaryCells }),
     ...(plannedCells ? { plannedCells } : {}),
     ...legal,
-    // Round 89 (#104): every root row's line, against this tree's own top row of the other side
-    rowLines: rowLines(root, { p1: result.perSide.p1[0]?.label, p2: result.perSide.p2[0]?.label }),
+    // Round 89 (#104, G12): every root row's lines, against this tree's own top three rows of the other side
+    rowLines: rowLines(root, { p1: result.perSide.p1.slice(0, 3).map(row => row.label), p2: result.perSide.p2.slice(0, 3).map(row => row.label) }),
     // Root-cell stats for the merged equilibrium (Map order is insertion
     // order — deterministic under the fixed seed schedule).
     cells,
