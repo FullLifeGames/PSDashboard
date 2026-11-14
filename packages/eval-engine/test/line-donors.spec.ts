@@ -120,3 +120,29 @@ describe('the donors follow the merged ranking of the answers', () => {
     expect(request.donors.map(donor => donor[0].p1)).toEqual(['Surf', 'Ice Beam']);
   });
 });
+
+/**
+ * Round 89 (#104), step G13 (ruling G2b): a host that graded the turn with the matrix names the answers its card ranks first
+ * (settings.lineReplies, by the side whose lines they are). The donors then meet those answers before the tree's merged ranking.
+ */
+describe('a host names the answers its card ranks first (lineReplies)', () => {
+  const two = [tree({ Surf: [step('Surf', 'Draining Kiss', 8)], 'Ice Beam': [step('Ice Beam', '→ Mew', 40)] }, { 'Draining Kiss': [[step('Surf', 'Draining Kiss', 30)], [step('Ice Beam', 'Draining Kiss', 12)]] })];
+
+  test('the named answer comes before the merged top answer, singles', () => {
+    const asked = { ...settings(null), lineReplies: { p1: ['→ Mew'] } };
+    const [request] = lineRequests([tree({ Surf: [[step('Surf', 'Draining Kiss', 30)], [step('Surf', '→ Mew', 9)]] })], result(), asked);
+    expect(request.donors.map(donor => donor[0].p2)).toEqual(['→ Mew', 'Draining Kiss']);
+  });
+
+  test('without lineReplies the merged ranking decides, as before', () => {
+    const [request] = lineRequests([tree({ Surf: [[step('Surf', 'Draining Kiss', 30)], [step('Surf', '→ Mew', 9)]] })], result(), settings(null));
+    expect(request.donors.map(donor => donor[0].p2)).toEqual(['Draining Kiss', '→ Mew']);
+  });
+
+  test('each side reads its own entry: the opponent\'s lines meet the answer named for player 2', () => {
+    const asked = { ...settings(null), lineReplies: { p2: ['Ice Beam'] } };
+    const requests = lineRequests(two, result(), asked);
+    const second = requests.find(request => request.side === 'p2')!;
+    expect(second.donors.map(donor => donor[0].p1)).toEqual(['Ice Beam', 'Surf']);
+  });
+});

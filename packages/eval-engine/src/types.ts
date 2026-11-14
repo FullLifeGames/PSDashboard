@@ -55,6 +55,11 @@ export interface EvalSettings {
    */
   lineRows?: { p1?: string[]; p2?: string[] };
   /**
+   * Round 89 (#104, ruling G2b): the answers the host's card ranks first, by label and by the side whose lines they are (`p1` holds the
+   * labels of player 2's rows that player 1's lines should meet, best first). The donors meet them before the search's merged ranking.
+   */
+  lineReplies?: { p1?: string[]; p2?: string[] };
+  /**
    * Round 65: the rule set the replay runs under (Pokémon Champions or the
    * standard games), named by the host from the replay's format: the
    * simulator reconstructs every doubles game as Doubles OU and knows no

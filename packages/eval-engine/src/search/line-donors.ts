@@ -20,7 +20,8 @@ export function lineRequests(trees: readonly MctsTreeStats[], result: EvalResult
 /** One side's requests: the rows it wants the engine's line for, and the row it played, in that order. */
 function requestsOf(trees: readonly MctsTreeStats[], result: EvalResult, settings: EvalSettings, side: 'p1' | 'p2', playedIndex: number | undefined): LineRequest[] {
   const top = result.perSide[side][0]?.label;
-  const ranking = result.perSide[side === 'p1' ? 'p2' : 'p1'].map(row => row.label);
+  // the answers a host's card ranks first lead the search's own ranking (settings.lineReplies)
+  const ranking = [...(settings.lineReplies?.[side] ?? []), ...result.perSide[side === 'p1' ? 'p2' : 'p1'].map(row => row.label)];
   const options = side === 'p1' ? trees[0].p1Options : trees[0].p2Options;
   const wanted = new Map<string, LineRequest['for']>();
   // a host that graded the turn with another search names the rows it graded against (settings.lineRows)
