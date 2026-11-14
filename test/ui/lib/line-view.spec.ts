@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import type { EvalLine, ForcedDie, LineDie, LineStep } from '@fulllifegames/eval-engine';
+import { DIE_KINDS, type EvalLine, type ForcedDie, type LineDie, type LineStep } from '@fulllifegames/eval-engine';
 import { lineBlocks, type LineViewContext } from '../../../src/lib/line-view';
 import { bothRolesLine, doublesLine, DOUBLES_NAMES, playedLine, singlesLine, SINGLES_NAMES } from '../fixtures/lines';
 
@@ -131,5 +131,27 @@ describe('lineBlocks: the tester\'s smaller items', () => {
   test('the note\'s last sentence agrees with its noun: one hit count is "it", draws are "them"', () => {
     expect(lineBlocks([{ ...singlesLine, unforced: ['hit-count'] }], singles)[0].note).toMatch(/The seed decides it\.$/);
     expect(lineBlocks([{ ...singlesLine, unforced: ['unnamed draw'] }], singles)[0].note).toMatch(/The seed decides them\.$/);
+  });
+});
+
+describe('the note under a line names what the click cannot force', () => {
+  const noteOf = (...unforced: string[]) => lineBlocks([{ ...singlesLine, unforced }], singles)[0].note;
+
+  test('a random target reads as plain English, with its article and its plural (tester, round 89 G4c)', () => {
+    expect(noteOf('random-target')).toBe('The click cannot force random targets. The seed decides them.');
+    expect(noteOf('hit-count', 'random-target')).toBe('The click cannot force the number of hits of a multi-hit move, random targets. The seed decides them.');
+  });
+
+  test.each([...DIE_KINDS, 'unnamed draw'])('the kind "%s" has words of its own, not its name with the hyphens taken out', kind => {
+    const note = noteOf(kind)!;
+    const slug = `The click cannot force ${kind.replace(/-/g, ' ')}. The seed decides it.`;
+    expect(note).toMatch(/^The click cannot force .+\. The seed decides (it|them)\.$/);
+    expect(note, kind).not.toBe(slug);
+    expect(note.slice('The click cannot force '.length), kind).not.toContain(':');
+  });
+
+  test('every kind reads differently from every other', () => {
+    const notes = [...DIE_KINDS, 'unnamed draw'].map(kind => noteOf(kind));
+    expect(new Set(notes).size).toBe(notes.length);
   });
 });

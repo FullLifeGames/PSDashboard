@@ -1,4 +1,4 @@
-import { dieKey, dieLabel, winPctText, type DieWords, type EvalLine, type LineDie, type LineStep } from '@fulllifegames/eval-engine';
+import { dieKey, dieLabel, winPctText, type DieKind, type DieWords, type EvalLine, type LineDie, type LineStep } from '@fulllifegames/eval-engine';
 import { rulesDex, type GameRules, type TurnSnapshot } from '@fulllifegames/replay-core';
 import { wordsOf } from './branch-dice';
 
@@ -135,16 +135,34 @@ function actAfter(actives: Actives, step: LineStep): Actives {
   return next;
 }
 
-/** What the replay left to the stream, in words, and whether the words are plural. */
-const DRAW_WORDS: Record<string, { words: string; plural: boolean }> = {
+/**
+ * What the replay left to the stream, in words, and whether the words are plural. Every die kind of the engine has its entry (the
+ * type holds it, and a spec walks `DIE_KINDS`): a kind without words printed its own name ("random target"; round 89, G4d).
+ */
+const DRAW_WORDS: Record<DieKind | 'unnamed draw', { words: string; plural: boolean }> = {
+  'accuracy': { words: 'whether a move hits', plural: false },
+  'crit': { words: 'critical hits', plural: true },
+  'damage-roll': { words: 'the damage roll', plural: false },
+  'secondary': { words: 'secondary effects', plural: true },
+  'self-effect': { words: 'what a move does to its user', plural: false },
   'hit-count': { words: 'the number of hits of a multi-hit move', plural: false },
+  'status-check': { words: 'whether a status stops a Pokémon from moving', plural: false },
+  'stalling': { words: 'whether a stalling move works again', plural: false },
+  'power': { words: 'a chance that changes a move\'s power', plural: false },
+  'speed-tie': { words: 'speed ties', plural: true },
+  'ability-proc': { words: 'abilities that trigger by chance', plural: true },
+  'item-proc': { words: 'items that trigger by chance', plural: true },
+  'move-first': { words: 'who moves first within a priority bracket', plural: false },
+  'end-of-turn': { words: 'chances at the end of the turn', plural: true },
+  'random-target': { words: 'random targets', plural: true },
+  'drag': { words: 'which Pokémon a move drags in', plural: false },
   'unnamed draw': { words: 'sleep turns, random targets and similar draws', plural: true },
 };
 
 /** What the replay left to the stream, in words; null when it left nothing. */
 function unforcedNote(line: EvalLine): string | null {
   if (!line.unforced || line.unforced.length === 0) return null;
-  const parts = line.unforced.map(kind => DRAW_WORDS[kind] ?? { words: kind.replace(/-/g, ' '), plural: false });
+  const parts = line.unforced.map(kind => (DRAW_WORDS as Record<string, { words: string; plural: boolean }>)[kind] ?? { words: kind.replace(/-/g, ' '), plural: false });
   const several = parts.length > 1 || parts[0].plural;
   return `The click cannot force ${parts.map(part => part.words).join(', ')}. The seed decides ${several ? 'them' : 'it'}.`;
 }
