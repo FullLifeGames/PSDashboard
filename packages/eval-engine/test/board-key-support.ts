@@ -11,7 +11,6 @@ import { battleOf } from './power-oracle';
  * keys (one interner for both, so the numbers in the keys mean the same strings).
  */
 
-export type Tweak = (battle: Battle) => void;
 export const attackerOf = (battle: Battle): Pokemon => battle.sides[0].active[0]!;
 export const defenderOf = (battle: Battle): Pokemon => battle.sides[1].active[0]!;
 export const partnerOf = (battle: Battle): Pokemon | undefined => battle.sides[0].active[1] ?? undefined;

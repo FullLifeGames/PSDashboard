@@ -136,9 +136,6 @@ export const rootSubject = (entry: ManifestEntry): RelationSubject => ({
 
 const HP_STEPS = [0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1] as const;
 
-/** The labels of the bodies on a side that can take damage: the ones still standing. */
-const standing = (battle: Battle, side: 0 | 1) => battle.sides[side].pokemon.filter(mon => mon.hp > 0);
-
 /**
  * The largest wrong-way change of the score at one HP point when the body goes down from `fromHp` to `toHp` one point at
  * a time (the score of p1 rises as p1's body loses HP, or falls as p2's body loses HP). The body ends at `toHp`.
@@ -341,6 +338,3 @@ export function swapNegates(subject: RelationSubject, evaluate: Evaluator): Viol
 
 export const RELATIONS = { ownHpDown, foeHpDown, idleStage, idleStageActive, swapNegates } as const;
 export type RelationName = keyof typeof RELATIONS;
-
-/** Counts the standing bodies of a side (the manifest guard reads it). */
-export const standingCount = (battle: Battle, side: 0 | 1): number => standing(battle, side).length;
