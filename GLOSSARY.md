@@ -25,6 +25,9 @@ The dice a replay's log does not show, such as damage rolls and sleep turns. The
 A die whose result comes from outside the simulator's draw: the user sets it in a branch turn, or the reconstruction takes it from the log (logged dice). The simulator decides whether that result can take effect.
 _Avoid_: forced hax, forced outcome
 
+**Hard mode**:
+A setting beside "Always on" (`EvalPreferences.hardMode`, off by default). With it on, the opponent answers the move in hand with the reply that hurts it most, instead of its own best row: in a click on an engine move, in the turn dock once one side's slots are set by the user, and in the Lines section and the Game review. The reply is the lowest value of the move's row among the cells the search trusts (verified, or with 8 visits; every cell of a matrix pass), else the row's own floor, else the opponent's best row (`worstReply` in `src/lib/worst-reply.ts`). The setting changes no grade, score or report, and a click on a matrix cell plays the pair as clicked.
+
 **Hax**:
 The players' word for a die that decided something, such as a critical hit or a miss.
 
