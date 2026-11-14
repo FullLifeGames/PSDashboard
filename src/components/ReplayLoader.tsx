@@ -162,7 +162,8 @@ export function ReplayLoader({ onLoad, onLoadFile, onTeamLoad, loading, error, l
 
   const body = (
     <>
-      {!inMenu && <div style={{ fontSize: 13, fontWeight: 'bold', marginBottom: 8 }}>Load Replay</div>}
+      {/* the Game menu's first part is headed as its two other parts are (H10b); the start page keeps its panel title */}
+      {inMenu ? <div className="ps-entry-head">Load replay</div> : <div style={{ fontSize: 13, fontWeight: 'bold', marginBottom: 8 }}>Load Replay</div>}
 
       <UrlForm url={url} setUrl={setUrl} loading={loading} onLoad={onLoad} />
 

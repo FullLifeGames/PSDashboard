@@ -1,8 +1,9 @@
-import { afterEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { useEmbedHost } from '../../../src/hooks/useEmbedHost';
 import type { LoadReplayResult } from '../../../src/hooks/useReplay';
 import { singlesReplay } from '../fixtures/replay';
+import { savedRecord } from '../fixtures/saved-game';
 
 const loaded = (): LoadReplayResult => ({ data: singlesReplay(), error: null });
 const failed = (): LoadReplayResult => ({ data: null, error: 'Double-check the replay id' });
@@ -20,6 +21,8 @@ function postFromHost(replay: string) {
   window.dispatchEvent(new MessageEvent('message', { data: { type: 'ps-load-replay', replay }, source: window }));
 }
 
+beforeEach(() => localStorage.clear());
+
 afterEach(() => {
   window.history.replaceState(null, '', '/');
   vi.restoreAllMocks();
@@ -28,15 +31,25 @@ afterEach(() => {
 describe('useEmbedHost', () => {
   test('reads the embed flag and the requested replay off the query and loads it once', async () => {
     const { result, loadReplay, rerender } = setup('?embed=1&replay=gen9ou-1');
-    expect(result.current).toEqual({ embed: true, requestedReplay: 'gen9ou-1' });
+    expect(result.current).toEqual({ embed: true, requestedReplay: 'gen9ou-1', requestedGame: null });
     await waitFor(() => expect(loadReplay).toHaveBeenCalledWith('gen9ou-1'));
     rerender();
     expect(loadReplay).toHaveBeenCalledTimes(1);
   });
 
+  test('a ?game= the browser holds wins over a ?replay= beside it; one it does not hold leaves the replay link its way (round 89, #105)', async () => {
+    const record = await savedRecord();
+    const held = setup(`?game=${record.id}&replay=gen9ou-1`);
+    expect(held.result.current).toEqual({ embed: false, requestedReplay: null, requestedGame: record.id });
+    expect(held.loadReplay).not.toHaveBeenCalled();
+    const unknown = setup('?game=newgame-zzzz&replay=gen9ou-1');
+    expect(unknown.result.current).toEqual({ embed: false, requestedReplay: 'gen9ou-1', requestedGame: 'newgame-zzzz' });
+    await waitFor(() => expect(unknown.loadReplay).toHaveBeenCalledWith('gen9ou-1'));
+  }, 60_000);
+
   test('a share link owns the view: the requested replay is not fetched behind a #branch= hash', () => {
     const { result, loadReplay } = setup('?replay=gen9ou-1', '#branch=abc');
-    expect(result.current).toEqual({ embed: false, requestedReplay: 'gen9ou-1' });
+    expect(result.current).toEqual({ embed: false, requestedReplay: 'gen9ou-1', requestedGame: null });
     expect(loadReplay).not.toHaveBeenCalled();
   });
 

@@ -50,6 +50,8 @@ function chanceText(name: DieName, words: DieWords): [string, string] {
 function resultText(name: DieName, result: DieResult, words: DieWords): string {
   if ('hits' in result) return result.hits === 1 ? '1 hit' : `${result.hits} hits`;
   if ('step' in result) return `damage roll ${result.step + 1}`;
+  if (name.kind === 'random-target' && 'option' in result) return `aims at ${words.slot(result.option)}`;
+  if (name.kind === 'drag' && 'option' in result) return `dragged out for ${result.option}`;
   if ('option' in result) return result.option;
   if ('first' in result) return `${words.slot(result.first)} first`;
   return chanceText(name, words)[result.happens ? 0 : 1];

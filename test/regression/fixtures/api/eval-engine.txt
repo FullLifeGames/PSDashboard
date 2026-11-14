@@ -64,6 +64,8 @@ type ForcedWinOpen
 type ForcedWinOutcome
 type ForcedWinProof
 type GameReport
+type GameSeedRead
+type GameTeamProblems
 type HitResult
 type HpDisplayBody
 type HpSighting
@@ -88,6 +90,8 @@ type MoveField
 type MoveLike
 type MoveUser
 type NearDecidedSweep
+type NewGameBody
+type NewGameStart
 type OrchestratorCallbacks
 type PairThreat
 type PlayedAction
@@ -127,6 +131,7 @@ type SimPokemonInfo
 type SnapshotMoveType
 type SnapshotTypeBody
 type SnapshotTypeQuery
+type StartGameParams
 type StaticRuleset
 type StreakHistoryEntry
 type StreakOdds
@@ -148,6 +153,7 @@ value AUTO_MCTS_FAINTED_FRACTION
 value BLUNDER_SWING
 value BRING_WORLD_CAP
 value DASHBOARD_ORIGINS
+value DEFAULT_GAME_SEED
 value DIE_KINDS
 value ENDGAME_CAPS
 value ENDGAME_MAX_BODIES
@@ -187,6 +193,7 @@ value chainCount
 value chainResults
 value chanceRolled
 value checkEngine
+value checkGameTeams
 value computeBlunders
 value computeRead
 value configureSearchBudget
@@ -255,6 +262,7 @@ value perfSync
 value phantomStayIn
 value playedSetupMove
 value proveForcedWin
+value readGameSeed
 value reconstructBranchRuntime
 value reconstructionReached
 value regretText
@@ -287,6 +295,7 @@ value snapshotMoveTypes
 value snapshotSimFacts
 value solveEndgame
 value speciesAfterTeraClick
+value startGameLog
 value starvedSupportCells
 value summarizeAlignment
 value summarizeTurn

@@ -6,17 +6,21 @@
 
 /**
  * What a die decides, never a Dex entry (AGENTS.md): `stalling` is a stalling move that succeeds again, `power` a chance that
- * changes a move's power, `move-first` a die that lets its holder act first in its priority bracket. A text that names the
- * move or the item reads it from the Dex at run time.
+ * changes a move's power, `move-first` a die that lets its holder act first in its priority bracket. Round 89 (#137):
+ * `random-target` is the foe the simulator samples for a move aimed at none (a move that picks its foe, a click an Encore bent;
+ * doubles only) and `drag` the bench body it samples to come in when a move or an item drags a body out; both are a `sample`
+ * over bodies and answer `{ option }` with the slot of the foe or the name of the body. A text that names the move or the item
+ * reads it from the Dex at run time.
  */
 export const DIE_KINDS = [
   'accuracy', 'crit', 'damage-roll', 'secondary', 'self-effect', 'hit-count', 'status-check', 'stalling', 'power',
-  'speed-tie', 'ability-proc', 'item-proc', 'move-first', 'end-of-turn',
+  'speed-tie', 'ability-proc', 'item-proc', 'move-first', 'end-of-turn', 'random-target', 'drag',
 ] as const;
 export type DieKind = typeof DIE_KINDS[number];
 
 /**
- * `slot` is the body that holds the draw (the user of the move; the holder for end-of-turn dice), `moveId` is empty outside a move.
+ * `slot` is the body that holds the draw (the user of the move; the holder for end-of-turn dice; the body dragged out for a `drag`
+ * die, so a turn that drags one slot twice gives one die the two draws share), `moveId` is empty outside a move.
  * `hit` (round 88, T337): the accuracy die of a later hit of a move whose every hit rolls its own accuracy (`multiaccuracy`), the
  * simulator's own `move.hit`, 2 and up. The first hit keeps the name without it.
  */

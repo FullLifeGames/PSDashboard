@@ -14,10 +14,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Job limits (round 89, step M4). Measured on 13.11.2026 on a 4-vCPU runner (the repository is public): healthy
+  # Node suites 22 to 28 min (34 on a slow runner), Browser flows 21 to 24 min, engine suite 14 to 35 min (the same job ran 1.8 times
+  # slower on a slower runner), dice sweeps 12 to 24 min, build smoke 1 min; setup (checkout, Node, npm ci,
+  # Chromium) takes under one minute in every job. A runner that is 1.6 times slower cancelled Node suites and
+  # Browser flows at 30 min and hid their red rows, so the limits stand at about twice the healthy time.
   node:
     name: Node suites
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -31,6 +36,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Show the runner
+        run: nproc && free -m
+
       # The four Vitest projects: the root specs, each package's suite, and the app suite under test/ui/.
       - name: Run the Node suites
         run: npm run test:regression
@@ -43,7 +51,7 @@ jobs:
   engine-speed-layer:
     name: Engine suite, speed layer ${{ matrix.speed-layer }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -75,7 +83,7 @@ jobs:
   dice-sweeps:
     name: Dice sweeps, every move
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -97,7 +105,7 @@ jobs:
   browser:
     name: Browser flows
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 50
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -114,8 +122,36 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
+      - name: Show the runner
+        run: nproc && free -m
+
+      # Playwright runs 2 workers here (half of the 4 vCPUs). Tried on 13.11.2026: 3 workers took 28 min instead
+      # of 21 to 24 and turned play-out-finish.spec.ts:65 red (its 10 s predicate); Vitest with --maxWorkers=100%
+      # (4 workers instead of 3) took 34 min instead of 28 on Node suites. More workers did not
+      # make a run faster. The JSON report feeds the next step.
       - name: Run the browser flows
-        run: npm run test:e2e
+        run: npm run test:e2e -- --reporter=dot,json
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_FILE: ${{ github.workspace }}/playwright-report.json
+
+      # The 15 slowest spec files, summed over their tests, so the next limit review reads numbers from the log.
+      - name: List the slowest browser specs
+        if: always()
+        run: |
+          node - <<'EOF'
+          const fs = require('node:fs');
+          if (!fs.existsSync('playwright-report.json')) process.exit(0);
+          const report = JSON.parse(fs.readFileSync('playwright-report.json', 'utf8'));
+          const per = new Map();
+          const walk = suite => {
+            for (const spec of suite.specs ?? []) for (const t of spec.tests) for (const r of t.results) per.set(spec.file, (per.get(spec.file) ?? 0) + r.duration);
+            for (const child of suite.suites ?? []) walk(child);
+          };
+          for (const suite of report.suites) walk(suite);
+          const rows = [...per].sort((a, b) => b[1] - a[1]);
+          console.log(`${rows.length} spec files, ${(rows.reduce((n, r) => n + r[1], 0) / 1000).toFixed(0)} s summed over ${report.config.workers} workers`);
+          for (const [file, ms] of rows.slice(0, 15)) console.log(`${(ms / 1000).toFixed(1).padStart(7)} s  ${file}`);
+          EOF
 
       - name: Keep the failure traces
         uses: actions/upload-artifact@v4
@@ -144,6 +180,11 @@ jobs:
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
+
+      # Round 89 (step M4): the packed packages install and run in a throwaway consumer project; a pack that
+      # breaks (an import without its extension, a missing export) fails this job. It takes under a minute.
+      - name: Pack the packages and run the consumer smoke
+        run: npm run pack:smoke
 
       # The minified bundle with the speed layer off and on: same analysis, every worker reports active.
       - name: Run the build smoke

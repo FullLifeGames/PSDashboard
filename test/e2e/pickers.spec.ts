@@ -14,7 +14,7 @@ test.describe('PS Dashboard', () => {
   });
 
   test('the loaded replay shows P1 and P2 chips whose trays list moves and switches', async ({ page }) => {
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
 
     // Round 80 (T297): the pickers themselves carry the load wait. The Battle Statistics panel shows its "P1" first, and
     // under the full suite the pickers came more than five seconds after it.
@@ -29,7 +29,7 @@ test.describe('PS Dashboard', () => {
   });
 
   test('the move tiles show type and damage', async ({ page }) => {
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(dockChip(page, 'p1a')).toBeVisible({ timeout: 15000 });
     const tray = await openTray(page, 'p1a');
     const earthquake = tray.locator('.ps-movebtn', { hasText: 'Earthquake' });
@@ -46,7 +46,7 @@ test.describe('PS Dashboard', () => {
   });
 
   test('the dock picks moves without Smogon stats', async ({ page }) => {
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(dockChip(page, 'p1a')).toBeVisible({ timeout: 15000 });
 
     // The chip reads the pick as notation: the bare move name, no raw command (pickMove waits for the name on the chip).
@@ -55,7 +55,7 @@ test.describe('PS Dashboard', () => {
   });
 
   test('the dock accepts custom move choices from the tray\'s choice picker', async ({ page }) => {
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(dockChip(page, 'p1a')).toBeVisible({ timeout: 15000 });
 
     // The free-choice dropdown lives behind "Dice · What if".
@@ -70,7 +70,7 @@ test.describe('PS Dashboard', () => {
   });
 
   test('saving player edits refreshes the pickers and exposes EV controls', async ({ page }) => {
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(dockChip(page, 'p1a')).toBeVisible({ timeout: 15000 });
 
     await fromSetup(page, 'Edit Player');
@@ -103,7 +103,7 @@ test.describe('PS Dashboard', () => {
   });
 
   test('saving player edits mid-branch preserves branch progress and pending choices', async ({ page }) => {
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await startVariationAt(page, 1, { p1Move: 'Swords Dance' });
     await expect(page.getByText(/Branching · Turn 2/)).toBeVisible({ timeout: 15000 });
     await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 1');
@@ -138,7 +138,7 @@ test.describe('PS Dashboard', () => {
   });
 
   test('snapshot pickers upgrade to the exact position on dwell — no button', async ({ page }) => {
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     // The approximation renders first (PP unknown = dash) …
     await expect(page.getByText(/Choices approximated/)).toBeVisible({ timeout: 15000 });
     await expect(page.locator('button', { hasText: 'Rebuild exact position' })).toHaveCount(0);
@@ -150,7 +150,7 @@ test.describe('PS Dashboard', () => {
   });
 
   test('selecting moves for both sides enables Execute Turn', async ({ page }) => {
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(dockChip(page, 'p1a')).toBeVisible({ timeout: 15000 });
 
     await pickMove(page, 'p1a');
@@ -162,7 +162,7 @@ test.describe('PS Dashboard', () => {
   });
 
   test('branching can load a hypothetical move from the legal pool', async ({ page }) => {
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     // The what-if controls live behind "Dice · What if" — open it,
     // then loading the move rebuilds the sim with the choice pre-seeded.
     const tray = await openTrayMore(page, 'p1a');
@@ -203,7 +203,7 @@ test.describe('PS Dashboard', () => {
 
   test('doubles branch shows slot chips and blocks duplicate simultaneous switches', async ({ page }) => {
     await page.locator('input[type="text"]').fill('gen9doubles-test');
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.getByText('Alice', { exact: true }).first()).toBeVisible({ timeout: 10000 });
     // Doubles targeting needs the real request — the dwell upgrade delivers it.
     await waitForExactPickers(page);
@@ -226,7 +226,7 @@ test.describe('PS Dashboard', () => {
 
   test('doubles target buttons identify and highlight the selected target', async ({ page }) => {
     await page.locator('input[type="text"]').fill('gen9doubles-test');
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.getByText('Alice', { exact: true }).first()).toBeVisible({ timeout: 10000 });
     // Doubles targeting needs the real request — the dwell upgrade delivers it.
     await waitForExactPickers(page);
@@ -248,7 +248,7 @@ test.describe('PS Dashboard', () => {
 
   test('picking a doubles move or target leaves every move button in place', async ({ page }) => {
     await page.locator('input[type="text"]').fill('gen9doubles-test');
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.getByText('Alice', { exact: true }).first()).toBeVisible({ timeout: 10000 });
     await waitForExactPickers(page);
 
@@ -293,7 +293,7 @@ test.describe('PS Dashboard', () => {
 
   test('a spread move lists its partner, its dice name each target, and the tiles and chips line up (round 83)', async ({ page }) => {
     await page.locator('input[type="text"]').fill('gen9doubles-spread-test');
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.getByText('Alice', { exact: true }).first()).toBeVisible({ timeout: 10000 });
     await waitForExactPickers(page);
     const tray = await openTray(page, 'p1a');

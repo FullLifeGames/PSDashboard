@@ -24,9 +24,16 @@ interface Props {
   onPicksChange?: (leads: { p1: string[]; p2: string[] } | null) => void;
   /** The side the replay frame shows near comes first, as in the turn dock's rows (round 89, #113). P1 until the frame is switched. */
   nearSide?: Side;
+  /** Round 89 (#105, H7): false for a game whose format has no Team Preview (Gen 1 to 4): the pick is the app's tool, and the words say so. A replay keeps the default. */
+  teamPreview?: boolean;
 }
 
-function panelIntro(bringCount: number | null, leadsPerSide: number): string {
+function panelIntro(bringCount: number | null, leadsPerSide: number, teamPreview: boolean): string {
+  if (!teamPreview) {
+    return leadsPerSide > 1
+      ? 'Turn 0 · this format has no team preview: pick both leads per side (selection order is the slot order), they move to the front of their teams. Then play the game from the start.'
+      : 'Turn 0 · this format has no team preview: pick each side’s lead, it moves to the front of its team. Then play the game from the start.';
+  }
   return bringCount !== null
     ? `Turn 0 · team preview: pick the ${bringCount} each side brings. The first ${leadsPerSide > 1 ? `${leadsPerSide} lead` : 'one leads'}, then play the game from the start.`
     : leadsPerSide > 1
@@ -48,7 +55,7 @@ function startLabel({ executing, ready, maxPicks, p1Picked, p2Picked }: { execut
  * start as a variation. Round 84 (A7b, ruling 12b): it wears the dock's look and stands where the dock stands: the root is a dock
  * (`ps-dock ps-lead`), the intro is its status strip, P1 and P2 stand in rows of the bench's tiles, and Start takes Execute's place.
  */
-export function LeadPanel({ playerNames, p1Options, p2Options, leadsPerSide, bringCount, pickedLeads, executing, onStart, onPicksChange, nearSide = 'p1' }: Props) {
+export function LeadPanel({ playerNames, p1Options, p2Options, leadsPerSide, bringCount, pickedLeads, executing, onStart, onPicksChange, nearSide = 'p1', teamPreview = true }: Props) {
   const maxPicks = bringCount ?? leadsPerSide;
   const { p1Leads, p2Leads, toggleP1, toggleP2 } = useLeadSelection({ p1Options, p2Options, pickedLeads, maxPicks });
   const reportHeight = useDockHeight();
@@ -70,7 +77,7 @@ export function LeadPanel({ playerNames, p1Options, p2Options, leadsPerSide, bri
   const sides: Side[] = nearSide === 'p2' ? ['p2', 'p1'] : ['p1', 'p2'];
   return (
     <div className="ps-dock ps-lead" ref={reportHeight}>
-      <div className="ps-dock-status">{panelIntro(bringCount, leadsPerSide)}</div>
+      <div className="ps-dock-status">{panelIntro(bringCount, leadsPerSide, teamPreview)}</div>
       <div className="ps-dock-anchor">
         <div className="ps-dock-bar">
           <div className="ps-lead-rows">

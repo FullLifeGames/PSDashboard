@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { looksLikeReplayFileContent } from '../lib/replay-file';
+import { loadGame } from '../lib/new-game/store';
 import type { LoadReplayResult } from './useReplay';
 
 interface EmbedHostOptions {
@@ -12,6 +13,8 @@ export interface EmbedHostState {
   embed: boolean;
   /** `?replay=<id|url>` — replay to load on startup. */
   requestedReplay: string | null;
+  /** `?game=<id>` — the saved game the address names (opened by `useOpenAddress`; round 89, #105). */
+  requestedGame: string | null;
 }
 
 /**
@@ -28,9 +31,12 @@ export interface EmbedHostState {
 export function useEmbedHost({ loadReplay, loadReplayFile }: EmbedHostOptions): EmbedHostState {
   const [config] = useState<EmbedHostState>(() => {
     const params = new URLSearchParams(window.location.search);
+    const requestedGame = params.get('game');
     return {
       embed: params.get('embed') === '1',
-      requestedReplay: params.get('replay'),
+      // a saved game the address names is the game to open; a game this browser does not hold leaves the replay link its way
+      requestedReplay: requestedGame && loadGame(requestedGame) ? null : params.get('replay'),
+      requestedGame,
     };
   });
   const autoLoadedRef = useRef(false);

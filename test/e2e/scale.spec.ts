@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { dockChip, dockTray, installReplayEmbedCache, routeOfflineFixtures } from './helpers';
+import { dockChip, dockTray, installReplayEmbedCache, routeOfflineFixtures, waitForExactPickers } from './helpers';
 import { Clicks, failOnResizeLoops, lightEngine, loadDockReplay, variationPanel } from './dock-helpers';
 
 /**
@@ -162,7 +162,9 @@ test('the Size setting overrides Auto, persists across a reload, and disables a 
   // The choice persists across a reload: the root carries it before anything renders, and the select shows it.
   await page.reload();
   expect(await rootScale(page)).toBe('2');
-  await loadDockReplay(page, DOUBLES, TURN);
+  // The address names the replay (round 89, H12a): the reload opens it again, so the loader field is gone and the page needs no second load.
+  await waitForExactPickers(page, TURN);
+  await expect(page.locator('.ps-dock-chip').first()).toBeVisible({ timeout: 30_000 });
   size = await openSetup(page);
   await expect(size).toHaveValue('2');
 

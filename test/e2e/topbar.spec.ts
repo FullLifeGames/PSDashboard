@@ -73,6 +73,11 @@ async function openSetupPanel(page: Page, viewport: { width: number; height: num
   await button.click();
   const panel = page.locator('.ps-setup-panel');
   await expect(panel).toBeVisible();
+  // `.ps-btn:hover` lifts the button by 1 px over 0.1 s, and the click leaves the pointer on it: a box read during that
+  // transition is up to 1 px off the panel's anchor (0.58 px in the CI run of D9, 0.93 px in the merge of lane H), and one read after
+  // it is 1 px off for good. The spec means the layout boxes, so the pointer leaves and the lift settles before the read.
+  await page.mouse.move(2, viewport.height - 2);
+  await expect(button).toHaveCSS('transform', 'none');
   const boxes = await page.evaluate(() => {
     const rect = (selector: string) => {
       const box = document.querySelector(selector)!.getBoundingClientRect();

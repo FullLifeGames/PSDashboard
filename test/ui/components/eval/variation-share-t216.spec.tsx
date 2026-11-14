@@ -120,6 +120,7 @@ describe('the workspace feeds the variation board shares from the branch history
         knowledge: { statsP1Info: null, statsP2Info: null },
         branch: { history },
         replay: { snapshots: [] },
+        newGame: { record: null },
       },
       board: {
         liveEvalStatus: 'done',

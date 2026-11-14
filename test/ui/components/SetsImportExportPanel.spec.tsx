@@ -27,6 +27,14 @@ describe('SetsImportExportPanel', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  test('the panel of a game says the sets are remembered for the game', () => {
+    const { rerender } = render(<SetsImportExportPanel exportText={EXPORT} onImport={vi.fn()} onClose={vi.fn()} />);
+    expect(screen.getByText(/remembered for this replay/)).toBeInTheDocument();
+    rerender(<SetsImportExportPanel exportText={EXPORT} onImport={vi.fn()} onClose={vi.fn()} game />);
+    expect(screen.getByText(/remembered for this game/)).toBeInTheDocument();
+    expect(screen.queryByText(/this replay/)).toBeNull();
+  });
+
   test('copy writes the text to the clipboard and confirms', async () => {
     const writeText = vi.fn(async () => {});
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });

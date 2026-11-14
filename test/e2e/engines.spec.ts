@@ -21,7 +21,7 @@ test('an engine added by address evaluates the position, and the dropdown and th
     });
   });
   await page.goto('/');
-  await page.locator('button', { hasText: 'Load' }).click();
+  await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
   await startVariationAt(page, 1);
 
   await expect(page.getByRole('combobox', { name: 'Engine' })).toHaveCount(0);

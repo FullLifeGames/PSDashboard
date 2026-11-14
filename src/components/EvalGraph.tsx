@@ -164,7 +164,7 @@ function LeadPoint({ scores, leadScore, leadDetail, playerNames, hitWidth, scale
 }) {
   return (
     <>
-      {scores[0] !== null && (
+      {typeof scores[0] === 'number' && (
         <line
           x1={x(0)} y1={y(leadScore)} x2={x(1)} y2={y(scores[0])}
           stroke="#cde" strokeOpacity={0.5} strokeDasharray="3 2"

@@ -27,6 +27,10 @@ export interface BranchRefs {
   choiceErrorsRef: React.RefObject<BranchChoiceErrorLog | null>;
   p1ChoicesRef: React.RefObject<(BranchSlotChoice | null)[]>;
   p2ChoicesRef: React.RefObject<(BranchSlotChoice | null)[]>;
+  /** Round 89 (#105): the length of the runtime's log when the branch stood at its start (before any entry of its own); a new game's promotion reads the lines after it. */
+  startLogLengthRef: React.RefObject<number>;
+  /** Round 89 (#105): called once an entry has landed in the history (a turn, or a replacement that finishes one); a new game promotes its tip turn there. */
+  afterTurnRef?: React.RefObject<(() => Promise<void>) | null>;
 }
 
 /** The state cells the execute and session sides write. */

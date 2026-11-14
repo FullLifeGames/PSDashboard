@@ -44,6 +44,8 @@ export interface ReconstructJob {
    */
   mode: 'replay' | 'lead';
   leadOverride?: { p1: string[] | null; p2: string[] | null };
+  /** Round 89 (#105): the dice seed of a new game's lead job; absent for every replay (the default seed). */
+  seed?: string;
   deadlineMs?: number;
   /** Round 79 (T290): hand out the open replacement requests of the knockouts too (the sweep asks; other jobs skip the cost). */
   replacements?: boolean;

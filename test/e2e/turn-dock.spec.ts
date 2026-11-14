@@ -129,7 +129,7 @@ test.describe('Doubles OU, turn 5, no variation standing', () => {
 
 test.describe('singles, turn 1, no variation standing', () => {
   test.beforeEach(async ({ page }) => {
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await waitForExactPickers(page);
     await expect(dockChip(page, 'p1a')).toBeVisible({ timeout: 30_000 });
     await expectDockLayout(page);

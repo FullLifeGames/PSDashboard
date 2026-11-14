@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, test, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useMemo, useState } from 'react';
 import type { Battle } from '@pkmn/sim';
@@ -131,5 +131,37 @@ describe.each(CASES)('the dock Hits row: %s', (_label, format, champions, double
     } finally {
       shown.logged = [];
     }
+  });
+});
+
+// Round 89 (ruling 34 F4a): a holder whose ability or item fixes the count gets one row without a choice, "Hits: 5 (Skill Link)".
+describe.each(CASES)('the dock Hits row of a holder that fixes the count: %s', (_label, format, champions, doubles) => {
+  const chip = doubles ? 'P1B' : 'P1';
+  const holderBoard = (extra: { ability?: string; item?: string }): Battle => diceBattle({
+    format,
+    p1: doubles
+      ? [mon(champions, ['splash']), setOf('Snorlax', ['tripleaxel', 'populationbomb', 'bulletseed'], { name: 'Bomber', ...(champions ? { level: 50, evs: CHAMPIONS_EVS } : {}), ...extra })]
+      : [setOf('Snorlax', ['tripleaxel', 'populationbomb', 'bulletseed'], { name: 'Bomber', ...(champions ? { level: 50, evs: CHAMPIONS_EVS } : {}), ...extra })],
+    p2: doubles ? [mon(champions, ['splash']), mon(champions, ['splash'])] : [mon(champions, ['splash'])],
+  });
+  const rowOf = async (battle: Battle, move: RegExp) => {
+    renderDock(battle);
+    const dice = await pick(chip, move);
+    return { dice };
+  };
+
+  test.each([{ move: 'Triple Axel', hits: 3 }, { move: 'Population Bomb', hits: 10 }, { move: 'Bullet Seed', hits: 5 }])('Skill Link on $move reads "$hits (Skill Link)" with no chip', async ({ move, hits }) => {
+    const { dice } = await rowOf(holderBoard({ ability: 'Skill Link' }), new RegExp(move));
+    await waitFor(() => expect(within(dice).getByRole('group', { name: 'Hits' })).toHaveTextContent(`${hits} (Skill Link)`));
+    expect(within(within(dice).getByRole('group', { name: 'Hits' })).queryAllByRole('button')).toEqual([]);
+    expect([...dice.querySelectorAll('.ps-dice-caption')].map(caption => caption.textContent).slice(0, 2)).toEqual(['Hit', 'Hits']);
+  });
+
+  test('Loaded Dice reads "3 (Loaded Dice)" on Triple Axel and shows no fixed row on Population Bomb, whose count the game still draws', async () => {
+    const axe = await rowOf(holderBoard({ item: 'Loaded Dice' }), /Triple Axel/);
+    await waitFor(() => expect(within(axe.dice).getByRole('group', { name: 'Hits' })).toHaveTextContent('3 (Loaded Dice)'));
+    cleanup();
+    const bomb = await rowOf(holderBoard({ item: 'Loaded Dice' }), /Population Bomb/);
+    expect(within(bomb.dice).queryAllByRole('group').map(group => group.getAttribute('aria-label'))).not.toContain('Hits');
   });
 });

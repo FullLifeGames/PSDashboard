@@ -61,11 +61,11 @@ test('a lazy chunk missing after a deploy reloads the page once, and the next lo
   });
   await page.goto('/');
   const reloaded = page.waitForEvent('load');
-  await page.locator('button', { hasText: 'Load' }).click();
+  await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
   await reloaded;
   expect(refused).toBe(1);
   expect(await page.evaluate(() => sessionStorage.getItem('ps-replay-interceptor:stale-chunk-reload'))).not.toBeNull();
-  await page.locator('button', { hasText: 'Load' }).click();
+  await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
   await expect(page.locator('.ps-branch-bar input[type="range"]')).toBeVisible({ timeout: 60_000 });
 });
 
@@ -125,7 +125,7 @@ test.describe.serial('production build', () => {
       });
       await page.reload();
 
-      await page.locator('button', { hasText: 'Load' }).click();
+      await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
       await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 30_000 });
 
       const panel = page.locator('.ps-main-right .ps-eval-panel');

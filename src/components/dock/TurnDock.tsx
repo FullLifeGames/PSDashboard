@@ -12,6 +12,7 @@ import { useTrayState, type TrayOpen } from '../../hooks/useTrayState';
 import { buildDockModel, type Side } from './dock-model';
 import { DockRows } from './DockRows';
 import { DockStatus, EndedNotice } from './DockStatus';
+import type { MainLineEnd } from '../../lib/game-end';
 import { ExecuteButton } from './ExecuteButton';
 import { SlotTray } from './SlotTray';
 
@@ -19,6 +20,10 @@ type LiveBattle = LiveHit['battle'];
 
 export interface TurnDockProps {
   simState: BranchSimState | null;
+  /** Round 89 (#105): the position is the end of a game's main line (the winner's name, null when the log names none): the dock says so instead of offering a turn. */
+  endOfGame?: MainLineEnd;
+  /** Round 89 (#105): a new game is open: the strip names the game where it would name the replay. */
+  isGame?: boolean;
   /** The state shown is the last resolved position's while the viewed one resolves: the dock keeps its height and takes no input. */
   stale?: boolean;
   /** Where this position's choices come from: 'live' (the branch sim), 'stored' (rebuilt exact position) or 'snapshot' (approximated). */
@@ -124,7 +129,7 @@ function DockExecute({ model, fill, executing, onRun, onClose }: {
 export function TurnDock(props: TurnDockProps) {
   const {
     simState, stale, source, acquiringExact, executeError, executing, gen, onSetChoice, onRecordChoice, onHypotheticalMove, onExecuteTurn,
-    played, positionKey, getBattle, replayLog, seed, fill, nearSide,
+    played, positionKey, getBattle, replayLog, seed, fill, nearSide, endOfGame, isGame,
   } = props;
   const setChoice = useUserChoice(simState, fill, onSetChoice, onRecordChoice);
   const onEdit = useCallback((side: Side, slot: number, choice: BranchSlotChoice) => setChoice(side, choice, slot), [setChoice]);
@@ -135,6 +140,7 @@ export function TurnDock(props: TurnDockProps) {
   useHeldTray(fill, open);
   const attachDock = useDockElement(attachRoot);
   const diceViews = useDiceViews({ diceOpen: open?.more ?? false, stale, simState, getBattle, replayLog, onSetChoice: setChoice });
+  if (endOfGame) return <div className="ps-dock" ref={attachDock}><EndedNotice winner={endOfGame.winner} game={!endOfGame.battle} battle={endOfGame.battle} /></div>;
   if (!simState) return null;
   if (simState.ended) return <div className="ps-dock" ref={attachDock}><EndedNotice winner={simState.winner} /></div>;
 
@@ -142,7 +148,7 @@ export function TurnDock(props: TurnDockProps) {
   const openSlot = open ? model[open.side][open.slot] : undefined;
   return (
     <div className="ps-dock" ref={attachDock} onKeyDown={onKeyDown} inert={stale} aria-busy={stale || undefined}>
-      <DockStatus source={source} acquiringExact={acquiringExact} executeError={executeError} model={model} diceOpen={!!open?.more} />
+      <DockStatus source={source} acquiringExact={acquiringExact} executeError={executeError} model={model} diceOpen={!!open?.more} game={isGame} />
       <div className="ps-dock-anchor">
         {open && openSlot && (
           <SlotTray

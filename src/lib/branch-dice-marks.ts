@@ -36,9 +36,9 @@ export function diceMarksOf(report: DiceReport | undefined, words: DieWords): Di
   return marks;
 }
 
-/** The text of a mark in a row or a link: the label, "(3 played)" for a count the game cut short after three hits, "(no effect)" for a die that took none. */
+/** The text of a mark in a row or a link: the label, "(3 landed)" for a count the game cut short after three hits, "(no effect)" for a die that took none. */
 export const markText = (mark: DieMark): string =>
-  mark.noEffect === undefined ? mark.label : `${mark.label} (${mark.played === undefined ? 'no effect' : `${mark.played} played`})`;
+  mark.noEffect === undefined ? mark.label : `${mark.label} (${mark.played === undefined ? 'no effect' : `${mark.played} landed`})`;
 
 export const sideMarkTexts = (marks: DiceMarks | undefined, side: Side): string[] => (marks?.[side] ?? []).map(markText);
 

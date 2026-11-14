@@ -8,6 +8,8 @@ import { useEngineController } from './controller/engine-controller';
 import type { EngineController } from './controller/engine-controller';
 import { useGameAnalysis } from './useGameAnalysis';
 import { useSupport } from './useSupport';
+import { useOpenSharedGame } from './useOpenSharedGame';
+import { useRestorePendingTurn } from './useRestorePendingTurn';
 import { branchFrameLog } from '../lib/branch-log';
 import { manualMove, toId } from '@fulllifegames/replay-core';
 import type { BranchSlotChoice } from '@fulllifegames/eval-engine';
@@ -132,7 +134,11 @@ export function useAppController() {
   }, [executePending]);
   const analysis = useAnalysisSurface(ctx, board, engine);
   const support = useSupport({ ctx, transients, board });
-  return { ctx, transients, board, engine, handleHypotheticalMove, handleExecuteTurn, analysis, support };
+  // Round 89 (#105, H5): a game's share link opens the game, its branch and the sharer's turn.
+  const sharedGame = useOpenSharedGame({ ctx, board });
+  // Round 89 (#105, H8): a reload while the tip turn waits for its replacement plays that turn again.
+  useRestorePendingTurn({ ctx, board }, sharedGame.opening || ctx.shared.sharedGame !== null);
+  return { ctx, transients, board, engine, handleHypotheticalMove, handleExecuteTurn, analysis, support, sharedGame };
 }
 
 export type AppController = ReturnType<typeof useAppController>;

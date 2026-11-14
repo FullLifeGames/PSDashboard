@@ -193,6 +193,20 @@ describe('the states of a slot', () => {
     expect(chip('P1A')).toHaveTextContent('fainted · no one left');
     expect(chip('P1B')).toBeEnabled();
   });
+
+  // Round 89 (#105, H7, tester finding 9): Urshifu fainted and Incineroar's Parting Shot asks for a switch in the same turn.
+  test('doubles: a fainted slot that is not asked, beside a partner that must switch out, waits for the switch instead of claiming an empty bench', () => {
+    const base: BranchSimState = simState('doubles');
+    const downed = pokemon('Urshifu', { fainted: true, hp: 0, hpPercent: 0, isActive: true, activeSlot: 0 });
+    const state: BranchSimState = {
+      ...base, p1ForceSwitch: true, p1ForceSwitches: [false, true], p1ActiveSlots: [downed, base.p1ActiveSlots[1]], p1MovesBySlot: [[], base.p1MovesBySlot[1]],
+      p1SwitchesBySlot: [[], base.p1SwitchesBySlot[1]],
+    };
+    render(<TurnDock {...props({ simState: state })} />);
+    expect(chip('P1A')).toBeDisabled();
+    expect(chip('P1A')).toHaveTextContent('fainted · waits for the switch');
+    expect(chip('P1A')).not.toHaveTextContent('no one left');
+  });
 });
 
 // Round 77, B5: P1 clicked Tailwind while P2 had to replace a Chien-Pao, and the pick rode into the next turn.

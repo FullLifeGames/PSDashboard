@@ -32,7 +32,7 @@ async function loadReplay(page: Page, replay: ReplayData) {
     status: 200, contentType: 'application/json', body: JSON.stringify(replay),
   }));
   await page.locator('input[type="text"]').first().fill(replay.id);
-  await page.locator('button', { hasText: 'Load' }).click();
+  await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
   await expect(page.getByText(replay.players[0], { exact: true }).first()).toBeVisible({ timeout: 15_000 });
 }
 
@@ -62,10 +62,10 @@ test.describe('the replacement note', () => {
     await expect(panel.locator('.ps-eval-analysis')).toContainText('Turn 7');
     await expect(note).not.toContainText(/blunder|mistake|inaccuracy/i);
 
-    // A reload serves the note from the stored sweep.
+    // A reload serves the note from the stored sweep. Round 89 (lane H, H4c): the address names the open replay, so the reload
+    // brings the game back by itself; typing the id into the start page's loader would race the page that is replacing it.
+    await expect(page).toHaveURL(/[?&]replay=gen9ou-2658662321/);
     await page.reload();
-    await page.locator('input[type="text"]').first().fill('gen9ou-2658662321');
-    await page.locator('button', { hasText: 'Load' }).click();
     await expect(page.getByText(fixture('gen9ou-2658662321').players[0], { exact: true }).first()).toBeVisible({ timeout: 15_000 });
     await analyzeGame(page, 90_000);
     await page.locator('input[type="range"]').fill('7');

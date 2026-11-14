@@ -8,16 +8,20 @@ const ACTION_STYLE = { display: 'inline-block', textDecoration: 'none', marginBo
  * Round 77 (user request 28.10.2026): "Report issue" opens this dialog instead of a tab and a download
  * of its own. The user downloads the state file and opens the filled issue form, each with one click.
  */
-export function ReportIssueDialog({ report, onDownload, onClose }: {
+export function ReportIssueDialog({ report, game = false, onDownload, onClose }: {
   report: IssueReport;
+  /** Round 89 (#105, H7): a new game has no Showdown replay; the file holds the game. */
+  game?: boolean;
   onDownload: () => void;
   onClose: () => void;
 }) {
   return (
     <ModalDialog title="Report an issue" closeLabel="Close" onClose={onClose}>
       <p style={STEP_STYLE}>
-        1. Download the state file <code>{report.fileName}</code>. It holds the replay, the sets the app played
-        with, the variation and the position on screen, so the problem replays exactly.
+        1. Download the state file <code>{report.fileName}</code>.{' '}
+        {game
+          ? 'It holds the game (both teams, the seed and every turn), the sets the app played with, the variation and the position on screen, so the problem plays out the same.'
+          : 'It holds the replay, the sets the app played with, the variation and the position on screen, so the problem replays exactly.'}
       </p>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
         <button type="button" className="ps-btn" style={ACTION_STYLE} onClick={onDownload}>Download state file</button>
@@ -30,7 +34,7 @@ export function ReportIssueDialog({ report, onDownload, onClose }: {
         Open the issue on GitHub
       </a>
       <p style={{ fontSize: 11, color: '#99a', margin: 0 }}>
-        GitHub issues are public: the issue and the file show the replay and any team you pasted.
+        GitHub issues are public: the issue and the file show the {game ? 'game' : 'replay'} and any team you pasted.
       </p>
     </ModalDialog>
   );

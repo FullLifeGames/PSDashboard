@@ -238,17 +238,17 @@ describe('the history and the share link read one entry per chain', () => {
     const forced = report(entry(later('populationbomb', 2, true), { logIndex: 4 }), entry(later('populationbomb', 3, true), { logIndex: 5 }), entry(later('populationbomb', 4, true), stopped), entry(later('populationbomb', 5, false), stopped));
     // round 89 (F5): the hits that landed are named; "(no effect)" is false for a chain that played three hits
     expect(diceMarksOf(forced, words)!.p1).toEqual([{ label: 'Population Bomb: 4 hits', noEffect: 'Triple Axel ended after 3 hits', played: 3 }]);
-    expect(sideMarkTexts(diceMarksOf(forced, words), 'p1')).toEqual(['Population Bomb: 4 hits (3 played)']);
+    expect(sideMarkTexts(diceMarksOf(forced, words), 'p1')).toEqual(['Population Bomb: 4 hits (3 landed)']);
     const lines = dieLines(forced, WINDOW, words);
-    expect(lines.map(line => line.text)).toEqual(['Forced: Population Bomb 4 hits', 'Forced 4 hits, 3 played: Triple Axel ended after 3 hits']);
+    expect(lines.map(line => line.text)).toEqual(['Forced: Population Bomb 4 hits', 'Forced 4 hits, 3 landed: Triple Axel ended after 3 hits']);
     expect(lines[0].at).toBe(4);
   });
 
   test('a count the first hit already cut short names the one hit that landed; a count with no hit played keeps "no effect"', () => {
     const ended = { took: 'no-draw' as const, reason: 'Triple Axel ended after 1 hit, so hit 2 was never rolled', landed: 1 };
     const forced = report(entry(later('tripleaxel', 2, true), ended), entry(later('tripleaxel', 3, false), ended));
-    expect(sideMarkTexts(diceMarksOf(forced, words), 'p1')).toEqual(['Triple Axel: 2 hits (1 played)']);
-    expect(dieLines(forced, WINDOW, words).map(line => line.text)).toEqual(['Forced 2 hits, 1 played: Triple Axel ended after 1 hit, so hit 2 was never rolled']);
+    expect(sideMarkTexts(diceMarksOf(forced, words), 'p1')).toEqual(['Triple Axel: 2 hits (1 landed)']);
+    expect(dieLines(forced, WINDOW, words).map(line => line.text)).toEqual(['Forced 2 hits, 1 landed: Triple Axel ended after 1 hit, so hit 2 was never rolled']);
     const none = { took: 'no-draw' as const, reason: 'p1a did not use Triple Axel this turn' };
     const unplayed = report(entry(later('tripleaxel', 2, true), none), entry(later('tripleaxel', 3, false), none));
     expect(sideMarkTexts(diceMarksOf(unplayed, words), 'p1')).toEqual(['Triple Axel: 2 hits (no effect)']);
@@ -262,7 +262,7 @@ describe('the history and the share link read one entry per chain', () => {
     const window: TurnWindow = { battleLog: log, battleStart: 1, shownLog: log, shownStart: 1, complete: true };
     const ended = { took: 'no-draw' as const, reason: 'Triple Axel ended after 1 hit, so hit 2 was never rolled', landed: 1 };
     const lines = dieLines(report(entry(later('tripleaxel', 2, true), ended), entry(later('tripleaxel', 3, false), ended)), window, words);
-    expect(lines.map(line => line.text)).toEqual(['Forced 2 hits, 1 played: Triple Axel ended after 1 hit, so hit 2 was never rolled']);
+    expect(lines.map(line => line.text)).toEqual(['Forced 2 hits, 1 landed: Triple Axel ended after 1 hit, so hit 2 was never rolled']);
     expect(lines[0].at).toBe(4);
     // a count with no hit count in the log (the move never ran) keeps the end of the turn
     const quiet = ['|old', '|-weather|Snowscape|[upkeep]', '|upkeep'];

@@ -37,6 +37,13 @@ describe('SharedBranchView', () => {
     expect(onClear).toHaveBeenCalledTimes(1);
   });
 
+  // Round 89 (#105, H5): a branch saved from a game before the game link existed names a game id; Showdown has no replay of it.
+  test('a version 1 branch of a new game offers no Load Original Replay (its id is no Showdown replay)', () => {
+    render(<SharedBranchView branch={{ ...branch, replayId: 'newgame-m7nj3hx23e' }} onLoadOriginal={vi.fn()} onClear={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: 'Load Original Replay' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'New Replay' })).toBeInTheDocument();
+  });
+
   // Round 84 (A7b, ruling 9a): the shared view uses the same two columns, so the layout is measured too and the right column keeps its panel.
   test('keeps the two-column layout of the workspace, with its source panel in the right column', () => {
     const { container } = render(<SharedBranchView branch={branch} onLoadOriginal={vi.fn()} onClear={vi.fn()} />);

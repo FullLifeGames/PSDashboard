@@ -21,7 +21,7 @@ export type { EvalGraphState } from './evaluation/graph-sweep';
  */
 export function useEvaluation() {
   const { prefs, prefsRef, persistPrefs } = usePrefsState();
-  const { graph, setGraph, graphDataRef, stopGraphPaint, clearGraph } = useGraphState();
+  const { graph, setGraph, graphDataRef, stopGraphPaint, clearGraph, dropGraphFrom } = useGraphState();
 
   const clientRef = useRef<EvalWorkerClient | null>(null);
   const cacheRef = useRef(new Map<string, CachedEval>());
@@ -55,6 +55,6 @@ export function useEvaluation() {
     prefs, setPrefs, setEngineOverride,
     status, result, resultTag, progress, error, reconstructProgress,
     evaluate, markStale, reset, cancel,
-    graph, runGraphSweep, clearGraph,
+    graph, runGraphSweep, clearGraph, dropGraphFrom,
   };
 }

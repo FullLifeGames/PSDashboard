@@ -102,9 +102,11 @@ interface TurnViewProps {
   linesHost?: LinesHost;
   /** Doubles replay: auto routes per game type, and the Lines section writes one row per player (EvalPanel passes its own prop through). */
   doubles?: boolean;
+  /** Round 89 (#105): the open tip of a new game (nobody has played it yet), else null or absent. */
+  openTurn?: number | null;
 }
 
-function TurnView({ report, onBackToReport, result, currentTurn, graph, analyzeTurn, hasAnalyzeTurn, leadAnalysis, analysis, playerNames, reads, onPickChoice, linesHost, doubles }: TurnViewProps) {
+function TurnView({ report, onBackToReport, result, currentTurn, graph, analyzeTurn, hasAnalyzeTurn, leadAnalysis, analysis, playerNames, reads, onPickChoice, linesHost, doubles, openTurn }: TurnViewProps) {
   return (
     <>
       {report && (
@@ -137,6 +139,7 @@ function TurnView({ report, onBackToReport, result, currentTurn, graph, analyzeT
         <EvalTurnAnalysis
           analysis={analysis} playerNames={playerNames} reads={reads} onExplore={onPickChoice}
           result={graph.results[analysis.turn - 1] ?? null} linesHost={linesHost} doubles={doubles}
+          open={analysis.turn === openTurn}
         />
       )}
     </>

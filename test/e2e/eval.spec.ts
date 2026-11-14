@@ -20,7 +20,7 @@ test.describe('PS Dashboard', () => {
         JSON.stringify({ depth: 1, samples: 1, auto: false, tera: 'auto' }));
     });
     await page.reload();
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
 
     // The panel lives beside the battle in the right column (chess-style).
@@ -87,7 +87,7 @@ test.describe('PS Dashboard', () => {
       localStorage.setItem('ps-replay-interceptor:eval-prefs', JSON.stringify({ depth: 1, samples: 1, auto: false, tera: 'auto' }));
     });
     await page.reload();
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
 
     const panel = page.locator('.ps-main-right .ps-eval-panel');
@@ -117,7 +117,7 @@ test.describe('PS Dashboard', () => {
       localStorage.setItem('ps-replay-interceptor:eval-prefs', JSON.stringify({ depth: 1, samples: 1, auto: false, tera: 'auto' }));
     });
     await page.reload();
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
 
     const panel = page.locator('.ps-main-right .ps-eval-panel');
@@ -142,7 +142,7 @@ test.describe('PS Dashboard', () => {
         JSON.stringify({ depth: 1, samples: 1, mode: 'mcts', auto: false, tera: 'auto' }));
     });
     await page.reload();
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
 
     const panel = page.locator('.ps-main-right .ps-eval-panel');
@@ -162,7 +162,7 @@ test.describe('PS Dashboard', () => {
         JSON.stringify({ depth: 1, samples: 1, auto: false, tera: 'auto' }));
     });
     await page.reload();
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     // Unified timeline: playing a move puts the live sim at the tip — the
     // Evaluate button and choice clicks work from there.
     await startVariationAt(page, 1);
@@ -187,7 +187,7 @@ test.describe('PS Dashboard', () => {
     });
     await page.reload();
     await page.locator('input[type="text"]').fill('gen9doubles-test');
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.getByText('Alice', { exact: true }).first()).toBeVisible({ timeout: 10000 });
 
     const panel = page.locator('.ps-main-right .ps-eval-panel');

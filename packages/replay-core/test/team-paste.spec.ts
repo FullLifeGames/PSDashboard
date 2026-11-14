@@ -1,5 +1,5 @@
 import { test, expect, describe } from 'vitest';
-import { applyPastedTeam, countMatchingSpecies, parsePastedTeam } from '../src/team-paste';
+import { applyPastedTeam, countMatchingSpecies, parsePastedTeam, teamInfoOfSets } from '../src/team-paste';
 import { parseTeamText } from '../src/team-parser';
 import type { OpponentTeamInfo } from '../src/types';
 
@@ -161,5 +161,55 @@ describe('team paste pipeline (G15)', () => {
     // Unmatched species stay untouched.
     const garchomp = info.pokemon.find(pokemon => pokemon.species === 'Garchomp');
     expect(garchomp?.item.source).toBe('unknown');
+  });
+});
+
+describe('teamInfoOfSets (round 89, #105: a new game\'s teams)', () => {
+  const paste = [
+    'Zed (Garchomp) @ Rocky Helmet',
+    'Ability: Rough Skin',
+    'Level: 50',
+    'Tera Type: Steel',
+    'EVs: 252 HP / 4 Atk / 252 Def',
+    'Impish Nature',
+    'IVs: 0 SpA',
+    '- Earthquake',
+    '- Protect',
+    '',
+    'Garchomp',
+    '- Tackle',
+    '',
+    'Skarmory @ Leftovers',
+    '- Roost',
+  ].join('\n');
+
+  test('every field the paste gives is the user\'s own, every other field stays unknown', () => {
+    const info = teamInfoOfSets(parsePastedTeam(paste));
+    expect(info.pokemon).toHaveLength(3);
+    const [first, second, third] = info.pokemon;
+    expect(first).toMatchObject({ species: 'Garchomp', nickname: 'Zed', level: 50 });
+    expect(first.moves).toEqual([{ name: 'Earthquake', source: 'manual' }, { name: 'Protect', source: 'manual' }]);
+    expect(first.ability).toEqual({ value: 'Rough Skin', source: 'manual' });
+    expect(first.item).toEqual({ value: 'Rocky Helmet', source: 'manual' });
+    expect(first.teraType).toEqual({ value: 'Steel', source: 'manual' });
+    expect(first.nature).toEqual({ value: 'Impish', source: 'manual' });
+    expect(first.evs).toEqual({ value: { hp: 252, atk: 4, def: 252, spa: 0, spd: 0, spe: 0 }, source: 'manual' });
+    expect(first.ivs?.source).toBe('manual');
+    // A second Garchomp keeps its own set: the species-keyed overlay would have given it the first one's.
+    expect(second.moves).toEqual([{ name: 'Tackle', source: 'manual' }]);
+    expect(second.ability.source).toBe('unknown');
+    expect(second.level).toBe(100);
+    expect(third.item).toEqual({ value: 'Leftovers', source: 'manual' });
+  });
+
+  test('reading the same paste over the info changes nothing (the round trip through applyPastedTeam)', () => {
+    const sets = parsePastedTeam(paste);
+    const info = teamInfoOfSets(sets);
+    expect(applyPastedTeam(info, sets.slice(2, 3)).info.pokemon[2]).toEqual(info.pokemon[2]);
+    expect(applyPastedTeam({ pokemon: [info.pokemon[0]] }, sets.slice(0, 1)).info).toEqual({ pokemon: [info.pokemon[0]] });
+  });
+
+  test('no paste gives an empty team', () => {
+    expect(teamInfoOfSets([])).toEqual({ pokemon: [] });
   });
 });

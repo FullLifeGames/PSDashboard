@@ -57,15 +57,22 @@ function answerHits(hits: number, draw: Draw): Answered | null {
  * `random(100)` that the script compares against thresholds holds a result the draw alone does not name: the learner (learn.ts)
  * plays it out on copies.
  */
-function answerOption(option: string, draw: Draw): Answered | null {
+function answerOption(option: string, draw: Draw, word: (item: unknown) => unknown = item => item): Answered | null {
   if (draw.call !== 'sample') return null;
-  const index = draw.items?.indexOf(option) ?? -1;
+  const index = draw.items?.findIndex(item => word(item) === option) ?? -1;
   return index < 0 ? { noChance: true } : { value: index };
 }
+
+/** Round 89 (#137): a sample over bodies: the foe a move is aimed at by its slot, the body a drag brings in by its name. */
+const BODY_WORDS: Partial<Record<DieKind, (item: unknown) => unknown>> = {
+  'random-target': item => (item as { getSlot?: () => string } | null)?.getSlot?.(),
+  drag: item => (item as { name?: string } | null)?.name,
+};
 
 export function answerDie(kind: DieKind, result: DieResult, draw: Draw, gen: number): Answered | null {
   if (CHANCE_KINDS.has(kind) && 'happens' in result) return answerChance(result.happens, draw);
   if (kind === 'ability-proc' && 'option' in result) return answerOption(result.option, draw);
+  if ((kind === 'random-target' || kind === 'drag') && 'option' in result) return answerOption(result.option, draw, BODY_WORDS[kind]);
   if (kind === 'hit-count' && 'hits' in result) return answerHits(result.hits, draw);
   if (kind === 'damage-roll' && 'step' in result) {
     const shape = genShape(gen).roll;

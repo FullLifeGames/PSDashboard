@@ -61,6 +61,10 @@ export interface AllyList {
 
 export interface BattleWatch {
   readonly battle: Battle;
+  /** Round 89 (#137): the user and the move id `getRandomTarget` in flight was called with, or null. */
+  aim: { slot: string; moveId: string } | null;
+  /** Round 89 (#137): the slot the `dragIn` in flight drags a body out of, or null. */
+  dragged: { slot: string } | null;
   /** The allies of the last `adjacentAllies()` call, or null. */
   allies: AllyList | null;
   /** One entry per move id that dealt damage or met the secondary hook in the watched turn. */
@@ -130,6 +134,8 @@ export function watchBattle(battle: Battle): BattleWatch {
   const scopes: string[] = [];
   const watch: BattleWatch = {
     battle,
+    aim: null,
+    dragged: null,
     moves: new Map<string, MoveSight>(),
     secondaries: null,
     allies: null,
@@ -157,7 +163,7 @@ export function watchBattle(battle: Battle): BattleWatch {
     return result;
   });
 
-  const scoped = (name: string) => (original: AnyFn): AnyFn => function (this: unknown, ...args: unknown[]) {
+  const scoped = (name: string, note?: (args: unknown[]) => () => void) => (original: AnyFn): AnyFn => function (this: unknown, ...args: unknown[]) {
     if (name === 'getDamage' && typeof args[2] === 'object' && args[2]) {
       const move = args[2] as { secondaries?: unknown[]; hasSheerForce?: boolean };
       const sight = sightOf(watch, move);
@@ -166,9 +172,11 @@ export function watchBattle(battle: Battle): BattleWatch {
     }
     scopes.push(name);
     watch.armed = null;
+    const restore = note?.(args);
     try {
       return original.apply(this, args);
     } finally {
+      restore?.();
       scopes.pop();
       if (name === 'secondaries') watch.secondaries = null;
     }
@@ -176,8 +184,42 @@ export function watchBattle(battle: Battle): BattleWatch {
   wrap(battle, 'randomizer', scoped('randomizer'));
   const actions = (battle as unknown as { actions: object }).actions;
   for (const name of ACTION_SCOPES) wrap(actions, name, scoped(name));
+  watchPicks(watch, wrap, scoped, actions);
   watchAllies(watch, wrap);
   return watch;
+}
+
+/** The id of a move argument of the simulator: a name, a Dex move or an active move. */
+const moveIdOf = (move: unknown): string => String(typeof move === 'string' ? move : (move as { id?: string } | null)?.id ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+/**
+ * Round 89 (#137): the two calls that sample a body keep their arguments for the draw. `getRandomTarget(user, move)` runs before the
+ * move is in flight; `dragIn(side, position)` hands the bench to `getRandomSwitchable`, whose own call is the scope of the draw
+ * (the switch-in that follows runs handlers of its own, and a draw there is not the drag's). Each wrapper puts back what it found,
+ * so a drag inside a drag's switch-in (a Red Card holder coming in) keeps its own slot.
+ */
+function watchPicks(
+  watch: BattleWatch, wrap: (owner: object, name: string, make: (original: AnyFn) => AnyFn) => void,
+  scoped: (name: string, note?: (args: unknown[]) => () => void) => (original: AnyFn) => AnyFn, actions: object,
+): void {
+  wrap(watch.battle, 'getRandomTarget', scoped('getRandomTarget', args => {
+    const before = watch.aim;
+    const slot = slotOf(args[0]);
+    watch.aim = slot === undefined ? null : { slot, moveId: moveIdOf(args[1]) };
+    return () => { watch.aim = before; };
+  }));
+  wrap(watch.battle, 'getRandomSwitchable', scoped('getRandomSwitchable'));
+  wrap(actions, 'dragIn', original => function (this: unknown, ...args: unknown[]) {
+    const before = watch.dragged;
+    const side = args[0] as { active?: unknown[] } | undefined;
+    const slot = slotOf(side?.active?.[args[1] as number]);
+    watch.dragged = slot === undefined ? null : { slot };
+    try {
+      return original.apply(this, args);
+    } finally {
+      watch.dragged = before;
+    }
+  });
 }
 
 /** A handler that looks at the holder's allies (Healer) draws once for each: the watch remembers what it was given and under which effect. */

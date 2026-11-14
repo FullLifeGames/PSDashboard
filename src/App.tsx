@@ -1,5 +1,12 @@
+import { useState } from 'react';
+import { EvictedGameNotice } from './components/EvictedGameNotice';
 import { inferReplayFormatId } from '@fulllifegames/replay-core';
+import { LazyNewGameDialog } from './components/NewGameDialogLazy';
+import { GameEditNotices } from './components/GameEditNotices';
+import { unsavedVariation, variationOpen } from './components/game-tip';
+import { useGameTeamEdit } from './hooks/useGameTeamEdit';
 import { ReplayLoader } from './components/ReplayLoader';
+import { LandingGamesPanel } from './components/GameEntry';
 import { TeamEditor } from './components/TeamEditor';
 import { SetsImportExportPanel } from './components/SetsImportExportPanel';
 import { SharedBranchView } from './components/SharedBranchView';
@@ -25,7 +32,26 @@ function EmbedLoadStatus({ app }: { app: AppController }) {
   );
 }
 
-function LoaderScreen({ app }: { app: AppController }) {
+/** Round 89 (#105, H4c): the address names a game this browser does not hold. */
+function MissingGameNotice({ app }: { app: AppController }) {
+  const id = app.ctx.address.missingGame;
+  // it stands on the start page only: nothing is open, no shared branch owns the view, no host owns the page
+  if (!id || app.ctx.replay.replayData || app.ctx.shared.sharedBranch || app.ctx.replay.embed) return null;
+  return (
+    <div className="ps-entry-notice" role="alert">
+      The game {id} is not saved in this browser. A share link of the game (Game menu, Copy Share Link) brings it along.
+    </div>
+  );
+}
+
+/** Round 89 (#105, H5): a game's share link on its way, or the reason it did not open. */
+function SharedGameNotice({ app }: { app: AppController }) {
+  const { opening, error } = app.sharedGame;
+  if (error) return <div className="ps-panel" role="alert" style={{ marginTop: 8, color: '#f3a6a6', fontSize: 11 }}>Unable to open the shared game: {error}</div>;
+  return opening ? <div className="ps-entry-notice" role="status">Opening the shared game</div> : null;
+}
+
+function LoaderScreen({ app, onNewGame }: { app: AppController; onNewGame: () => void }) {
   const { loading, error, loadReplay, loadReplayFile, loadedReplayUrl } = app.ctx.replay;
   const { handleTeamLoad, teamPasteStatus, teamPasteError } = app.ctx.knowledge;
   return (
@@ -41,6 +67,7 @@ function LoaderScreen({ app }: { app: AppController }) {
         teamError={teamPasteError}
         showGuide
       />
+      <LandingGamesPanel onNewGame={onNewGame} onOpenGame={app.ctx.newGame.openRecord} currentGameId={app.ctx.newGame.record?.id ?? null} />
     </div>
   );
 }
@@ -52,10 +79,18 @@ function AppModals({ app }: { app: AppController }) {
     editorSide, setEditorSide, saveTeam,
   } = app.ctx.knowledge;
   const { replayGen } = app.ctx.meta;
+  // Round 89 (#105): the editor of a new game changes the game's record, not the replay's overlay.
+  const { record, editTeams, planTeams } = app.ctx.newGame;
+  const gameEdit = useGameTeamEdit({ record, planTeams, editTeams, variationOpen: variationOpen(app), stopBranch: app.board.discardVariation, close: () => setEditorSide(null) });
+  const onSave = (side: 'p1' | 'p2', info: Parameters<typeof saveTeam>[1]) => { if (!gameEdit.edit(side, info)) saveTeam(side, info); };
   return (
     <>
+      <GameEditNotices edit={gameEdit} />
+      {/* H14a follow-up: while the cut question stands, the editor stays mounted under it (hidden), so Cancel returns to the text as typed. */}
+      <div hidden={gameEdit.hold}>
       {setsPanelOpen && replayData && (
         <SetsImportExportPanel
+          game={record !== null}
           // Round 70 (T205): the export reads what the stats panel shows (the solved spreads, the posted sheet), not the
           // enriched infos: those hold the usage guesses and the published IVs, and an import takes every value it reads
           // as the user's own input over the solver.
@@ -66,8 +101,10 @@ function AppModals({ app }: { app: AppController }) {
             p2Info: statsP2Info,
           })}
           onImport={text => {
-            const importError = applySetsText(text);
-            if (!importError) setSetsPanelOpen(false);
+            // a game's sets belong to its record: the import plays it again on them (editTeams), as the editor does; the panel closes
+            // when the edit applies (after the cut question, if one is asked), not at the click
+            const importError = applySetsText(text, record ? next => { gameEdit.editSides(next, () => setSetsPanelOpen(false)); } : undefined);
+            if (!importError && !record) setSetsPanelOpen(false);
             return importError;
           }}
           onClose={() => setSetsPanelOpen(false)}
@@ -79,7 +116,7 @@ function AppModals({ app }: { app: AppController }) {
           teamInfo={statsP1Info}
           gen={replayGen}
           format={replayData ? inferReplayFormatId(replayData) : ''}
-          onSave={(info) => saveTeam('p1', info)}
+          onSave={(info) => onSave('p1', info)}
           onClose={() => setEditorSide(null)}
         />
       )}
@@ -89,12 +126,13 @@ function AppModals({ app }: { app: AppController }) {
           teamInfo={statsP2Info}
           gen={replayGen}
           format={replayData ? inferReplayFormatId(replayData) : ''}
-          onSave={(info) => saveTeam('p2', info)}
+          onSave={(info) => onSave('p2', info)}
           onClose={() => setEditorSide(null)}
         />
       )}
+      </div>
       {app.support.report && (
-        <ReportIssueDialog report={app.support.report} onDownload={() => void app.support.downloadState()} onClose={app.support.closeReport} />
+        <ReportIssueDialog report={app.support.report} game={app.ctx.newGame.record !== null} onDownload={() => void app.support.downloadState()} onClose={app.support.closeReport} />
       )}
     </>
   );
@@ -104,6 +142,9 @@ function App() {
   const app = useAppController();
   const { embed, replayData } = app.ctx.replay;
   const { sharedBranch, sharedBranchError, clearSharedBranch, handleLoadSharedOriginal } = app.ctx.shared;
+  // Round 89 (#105): the New game dialog opens from the Game menu and from the start page's New game panel.
+  const [newGameOpen, setNewGameOpen] = useState(false);
+  const openNewGame = () => setNewGameOpen(true);
 
   return (
     <div className="ps-app-root">
@@ -114,7 +155,7 @@ function App() {
           <h1>PS Dashboard</h1>
           <BetaMark />
           <span style={{ fontSize: 10, color: '#aabbcc' }}>
-            Load a replay · branch off with different moves
+            Load a replay or start a new game · branch off with different moves
           </span>
           <SupportLinks embed={false} onReportIssue={app.support.reportIssue} />
         </div>
@@ -134,16 +175,28 @@ function App() {
         />
       )}
 
+      <MissingGameNotice app={app} />
+      <SharedGameNotice app={app} />
+      <EvictedGameNotice />
+
       {!replayData && !sharedBranch && (embed ? (
         // The host page provides the replay — no loader chrome in embed mode.
         <EmbedLoadStatus app={app} />
       ) : (
-        <LoaderScreen app={app} />
+        <LoaderScreen app={app} onNewGame={openNewGame} />
       ))}
 
-      {replayData && !sharedBranch && <ReplayWorkspace app={app} replayData={replayData} />}
+      {replayData && !sharedBranch && <ReplayWorkspace app={app} replayData={replayData} onNewGame={embed ? undefined : openNewGame} />}
 
       <AppModals app={app} />
+      {!embed && (
+        <LazyNewGameDialog
+          open={newGameOpen}
+          onOpenChange={setNewGameOpen}
+          onStart={app.ctx.newGame.startGame}
+          unsavedVariation={() => unsavedVariation(app)}
+        />
+      )}
     </div>
   );
 }
