@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import { test, expect, type BrowserContext, type Locator, type Page } from '@playwright/test';
+import { test, expect, type Browser, type BrowserContext, type Locator, type Page } from '@playwright/test';
 import type { ReplayData } from '@fulllifegames/replay-core';
 import { installReplayEmbedCache, routeOfflineFixtures } from './helpers';
 import { variationPanel } from './dock-helpers';
@@ -128,11 +128,16 @@ async function clickEngineMove(page: Page, turn: number): Promise<string> {
 }
 
 /** Both arms on one turn: Hard mode on reads the matrix and the history, Hard mode off the opponent's best row. */
-async function runGame(context: BrowserContext, replay: ReplayData, turns: number[]): Promise<void> {
+async function runGame(contexts: BrowserContext[], browser: Browser, replay: ReplayData, turns: number[]): Promise<void> {
   const names = namesOf(replay);
   const partsIn = (label: string): string[] => partsOf(label, names);
   // arm one: Hard mode on, on the first turn whose worst reply is not the opponent's best row (the last candidate otherwise)
-  const on = await context.newPage();
+  // each arm gets its own browser context: the preferences live in localStorage, which pages of one context share, and a page that
+  // persists them after the other page's init script ran would hand its setting over (CI run 43662351755: the "off" page read the
+  // "on" page's Hard mode). Two tabs of one user do share the stored value in the app; each keeps its own until the next load.
+  const onContext = await browser.newContext();
+  contexts.push(onContext);
+  const on = await onContext.newPage();
   await openPage(on, replay, true);
   await expect(on.getByRole('checkbox', { name: 'Hard mode' })).toBeChecked();
   let turn = turns[0];
@@ -151,7 +156,9 @@ async function runGame(context: BrowserContext, replay: ReplayData, turns: numbe
   for (const part of bestOnly) expect(hardText, `the best row's ${part} is not played`).not.toContain(part);
 
   // arm two: the same turn with the setting off: the opponent's best row
-  const off = await context.newPage();
+  const offContext = await browser.newContext();
+  contexts.push(offContext);
+  const off = await offContext.newPage();
   await openPage(off, replay, false);
   await expect(off.getByRole('checkbox', { name: 'Hard mode' })).not.toBeChecked();
   const second = await evaluateTurn(off, turn);
@@ -164,15 +171,15 @@ for (const game of GAMES) {
   test(`${game.kind}: the opponent answers an engine click with the reply that hurts most (on) or its best row (off)`, async ({ browser }, testInfo) => {
     test.setTimeout(600_000);
     const replay = fixture(game.id);
-    const context = await browser.newContext();
+    const contexts: BrowserContext[] = [];
     try {
-      await runGame(context, replay, game.turns);
+      await runGame(contexts, browser, replay, game.turns);
     } catch (error) {
       // the pages of a self-made context are not in Playwright's failure screenshots
-      for (const [index, page] of context.pages().entries()) await page.screenshot({ path: testInfo.outputPath(`page-${index}.png`) }).catch(() => {});
+      for (const [index, page] of contexts.flatMap(context => context.pages()).entries()) await page.screenshot({ path: testInfo.outputPath(`page-${index}.png`) }).catch(() => {});
       throw error;
     } finally {
-      await context.close();
+      for (const context of contexts) await context.close();
     }
   });
 }
