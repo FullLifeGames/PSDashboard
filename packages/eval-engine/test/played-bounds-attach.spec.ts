@@ -59,7 +59,7 @@ function constructed(doubles: boolean): Scene {
 
 const champions = (): Scene => ({
   name: 'Champions VGC 2710981835 turn 7', doubles: true,
-  serialized: (JSON.parse(readFileSync(new URL('./fixtures/positions/gen9championsvgc2026regmc-2710981835-t7.json', import.meta.url), 'utf-8')) as { serialized: string }).serialized,
+  serialized: (JSON.parse(readFileSync(new URL('./fixtures/played-bounds/gen9championsvgc2026regmc-2710981835-t7.json', import.meta.url), 'utf-8')) as { serialized: string }).serialized,
   ruleset: replayRuleset(replay), played: parsePlayedActionsDoubles(turnEvents(replay.log, 7)),
 });
 
