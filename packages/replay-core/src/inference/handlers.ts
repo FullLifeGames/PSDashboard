@@ -8,7 +8,6 @@ import { arg, detailsOf, fromEffect, hasKw, identOf, kwText, ofIdent, type LogLi
 import { bookPowerMove, readPowerMove } from './power-moves.ts';
 import { toId } from '../ids.ts';
 import { choiceItems } from '../dex-facts/index.ts';
-import { mayIgnoreAbility } from '../sim-ask/effect-refusal.ts';
 import type { PokemonFieldInfo } from '../types.ts';
 
 /** `|-item|` sources that mean the holder ACQUIRED the item mid-game — not its set item. */
@@ -84,11 +83,6 @@ export function noteMoveOrBoundary(state: InferrerState, line: LogLine) {
   }
 }
 
-export function noteGravity(state: InferrerState, line: LogLine) {
-  if (line.cmd === '-fieldstart' && arg(line, 1).includes('Gravity')) state.gravityActive = true;
-  if (line.cmd === '-fieldend' && arg(line, 1).includes('Gravity')) state.gravityActive = false;
-}
-
 /** Entries reset the plain-move count and map idents (both sides) and opponent nicknames to species. */
 export function noteEntry(state: InferrerState, line: LogLine) {
   if (line.cmd !== 'switch' && line.cmd !== 'drag') return;
@@ -106,28 +100,11 @@ export function noteEntry(state: InferrerState, line: LogLine) {
 }
 
 /**
- * A landed Ground move rules out Levitate, unless the attacker may ignore the target's ability: the simulator's own `ModifyMove` event
- * says which abilities of its species do (round 89, #110: the list of Mold Breaker, Teravolt and Turboblaze is gone, one reader
- * serves blocked-effects.ts too).
- */
-function ruleOutLevitate(state: InferrerState, nickname: string) {
-  const { pendingMove } = state;
-  if (!pendingMove) return;
-  const move = dexOf(state).moves.get(pendingMove.moveName);
-  const ignore = move.ignoreImmunity as boolean | Record<string, boolean> | undefined;
-  const ignoresGround = ignore === true || (typeof ignore === 'object' && !!ignore?.Ground);
-  const attackerSpecies = state.identSpecies.get(pendingMove.attacker);
-  const possiblyIgnoring = attackerSpecies ? mayIgnoreAbility(dexOf(state), attackerSpecies, pendingMove.moveName) !== false : false;
-  if (move.type === 'Ground' && !ignoresGround && !possiblyIgnoring) {
-    ruleOut(state, nickname, 'abilities', 'levitate');
-  }
-}
-
-/**
  * Disproving evidence: a Pokémon that TAKES hazard/status/weather/recoil
- * damage cannot be Magic Guard; rocks chip rules out Heavy-Duty Boots; a
- * landed Ground move rules out Levitate (T25 — Clefable was simmed with
- * Magic Guard while visibly taking Stealth Rock damage).
+ * damage cannot be Magic Guard; rocks chip rules out Heavy-Duty Boots (T25 —
+ * Clefable was simmed with Magic Guard while visibly taking Stealth Rock
+ * damage). A landed move hit rules out the abilities that would have refused
+ * it (round 89, #150): the simulator answers, in inference/blocked-effects.ts.
  */
 const HAZARDS = new Set(['Stealth Rock', 'Spikes']);
 const INDIRECT = new Set(['psn', 'tox', 'brn', 'Sandstorm', 'Hail']);
@@ -142,8 +119,6 @@ export function ruleOutFromDamage(state: InferrerState, line: LogLine) {
     ruleOut(state, nickname, 'items', 'heavydutyboots');
   } else if ((!from.type && INDIRECT.has(from.name)) || (from.type === 'item' && from.name === 'Life Orb')) {
     ruleOut(state, nickname, 'abilities', 'magicguard');
-  } else if (!hasKw(line, 'from') && state.pendingMove && !state.gravityActive) {
-    ruleOutLevitate(state, nickname);
   }
 }
 

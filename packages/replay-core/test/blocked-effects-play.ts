@@ -6,10 +6,10 @@ import { registerChampionsDex } from '../src/rules-dex';
 
 if (!Dex.formats.get('gen9championscustomgame').exists) registerChampionsDex(championsMod as never, championsMod.Formats as never);
 
-export interface PlayBody { species: string; ability: string; moves?: string[]; level?: number; /** The nickname the log shows (the species by default). */ name?: string }
+export interface PlayBody { species: string; ability: string; moves?: string[]; level?: number; item?: string; /** The nickname the log shows (the species by default). */ name?: string }
 
 export const setOf = (body: PlayBody): PokemonSet => ({
-  name: body.name ?? body.species, species: body.species, item: '', ability: body.ability, moves: body.moves ?? ['Splash'], nature: 'Hardy', gender: '',
+  name: body.name ?? body.species, species: body.species, item: body.item ?? '', ability: body.ability, moves: body.moves ?? ['Splash'], nature: 'Hardy', gender: '',
   level: body.level ?? 100, evs: { hp: 252, atk: 0, def: 252, spa: 0, spd: 4, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
 });
 
@@ -21,6 +21,8 @@ export interface PlayOptions {
   /** One entry per turn: the raw `choose` text of each side. */
   turns: { p1: string; p2: string }[];
   seed?: string;
+  /** Side p2 never acts: its moves abort before they start (the landed-hit sweep plays the hit before the target's own action, as the twin does). */
+  idle?: boolean;
 }
 
 /** The public log of a battle played through `choose` (the `|split|` pairs reduced to the spectator's line). */
@@ -30,6 +32,7 @@ export function play(options: PlayOptions): string {
     formatid: toID(options.format), seed: (options.seed ?? '1,2,3,4') as never,
     p1: { name: 'Alpha', team: Teams.pack(teams.p1) }, p2: { name: 'Beta', team: Teams.pack(teams.p2) },
   });
+  if (options.idle) battle.onEvent('BeforeMove', battle.format, (pokemon: { side: unknown }) => (pokemon.side === battle.p2 ? false : undefined));
   if (battle.requestState === 'teampreview') {
     battle.choose('p1', `team ${teams.p1.map((_, index) => index + 1).join('')}`);
     battle.choose('p2', `team ${teams.p2.map((_, index) => index + 1).join('')}`);

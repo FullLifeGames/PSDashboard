@@ -122,6 +122,22 @@ export function illusionPossible(state: InferrerState): boolean {
   });
 }
 
+const hiddenParty = new WeakMap<InferrerState, boolean>();
+
+/**
+ * Whether the opponent's party may hold an Illusion user the log has not shown. Team preview lists the whole party (`illusionPossible` reads it); a format
+ * without it (Random Battle) shows only the bodies that entered, and a disguised Zoroark enters as another species: the log then names the disguise on the
+ * hit and the damage breaks it a line later (`|replace|`), so the rule-out would land on the disguise's species. From Generation 5, where the Dex has
+ * Illusion, such a party gives no verdict.
+ */
+export function partyMayHideIllusion(state: InferrerState): boolean {
+  const known = hiddenParty.get(state);
+  if (known !== undefined) return known;
+  const illusion = dexOf(state).abilities.get('illusion');
+  const hidden = illusion.exists && illusion.gen <= dexOf(state).gen && !state.lines.some(line => line.cmd === 'poke' && arg(line, 1) === state.opponentSide);
+  hiddenParty.set(state, hidden);
+  return hidden;
+}
 /** Rules an item out for an opponent Pokémon whose item the log has not shown and no swap replaced. */
 export function ruleOutUnknown(state: InferrerState, key: string, itemId: string) {
   if (!key.startsWith(state.opponentSide) || illusionPossible(state)) return;

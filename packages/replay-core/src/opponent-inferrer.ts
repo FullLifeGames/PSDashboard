@@ -5,7 +5,7 @@ import { guessedField, revealedField, unknownEvs, unknownField } from './team-in
 import { createInferrerState } from './inference/inferrer-state.ts';
 import { findPokemonByNickname } from './inference/lookup.ts';
 import {
-  addFromPreview, addFromSwitch, noteEntry, noteGravity, noteMoveOrBoundary, recordAbilityAttribution, recordItem,
+  addFromPreview, addFromSwitch, noteEntry, noteMoveOrBoundary, recordAbilityAttribution, recordItem,
   recordItemDamage, recordMove, recordTera, ruleOutFromDamage,
 } from './inference/handlers.ts';
 import { recordGigantamax } from './inference/power-moves.ts';
@@ -178,7 +178,6 @@ export function inferOpponentTeam(rawLog: string, opponentSide: 'p1' | 'p2' = 'p
     watchScreenEvidence(state, line);
     watchFieldEvidence(state, line);
     noteMoveOrBoundary(state, line);
-    noteGravity(state, line);
     noteEntry(state, line);
     ruleOutFromDamage(state, line);
     addFromPreview(state, line);
