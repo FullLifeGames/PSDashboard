@@ -75,7 +75,7 @@ describe('EvalControls', () => {
     const { rerender } = render(<EvalControls {...wired} />);
     const box = screen.getByRole('checkbox', { name: 'Hard mode' });
     expect(box).not.toBeChecked();
-    expect(box.closest('label')).toHaveAttribute('title', expect.stringMatching(/hurts it most.*engine move.*turn dock.*lines.*Grades stay/s));
+    expect(box.closest('label')).toHaveAttribute('title', expect.stringMatching(/rates lowest for it.*engine move.*turn dock.*lines.*Grades stay/s));
     await userEvent.click(box);
     expect(wired.onPrefsChange).toHaveBeenLastCalledWith({ ...prefs, hardMode: true });
     rerender(<EvalControls {...wired} prefs={{ ...prefs, hardMode: true }} showAuto={false} />);

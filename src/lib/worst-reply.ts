@@ -1,4 +1,4 @@
-import { worstAnswer, type EvalLine, type EvalResult, type RankedChoice } from '@fulllifegames/eval-engine';
+import { winPctText, worstAnswer, type EvalLine, type EvalResult, type RankedChoice } from '@fulllifegames/eval-engine';
 
 /**
  * Round 89 (#153, "Hard mode"): the one rule of the reply that hurts a move most, which the click walk, the turn dock and the lines
@@ -15,7 +15,8 @@ type Side = 'p1' | 'p2';
  */
 export type ReplyBasis = 'cell' | 'punisher' | 'best';
 
-export interface WorstReply { reply: RankedChoice; basis: ReplyBasis }
+/** `value` is the lowest cell's value from the row's own side (wp-units), the number the line's bracket prints; null for a floor or a best row. */
+export interface WorstReply { reply: RankedChoice; basis: ReplyBasis; value: number | null }
 
 /**
  * The opponent's reply to `row` of `side` in `result`: the worst answer by the rule above, else the row's floor, else the opponent's
@@ -27,9 +28,24 @@ export function worstReply(result: EvalResult, side: Side, row: Pick<RankedChoic
   const other: Side = side === 'p1' ? 'p2' : 'p1';
   const answer = worstAnswer(result, side, own);
   const found = answer ? result.perSide[other].find(entry => entry.choice === answer.choice) : undefined;
-  if (answer && found) return { reply: found, basis: answer.basis };
+  if (answer && found) return { reply: found, basis: answer.basis, value: answer.basis === 'cell' ? cellValue(result, side, own.choice, found.choice) : null };
   const best = result.perSide[other].find(entry => entry.choice !== 'wait');
-  return best ? { reply: best, basis: 'best' } : null;
+  return best ? { reply: best, basis: 'best', value: null } : null;
+}
+
+/**
+ * Round 89 (HM2c): the value the card's matrix holds for the pair of a row and a reply, from the row's own side (p1 reads the cell,
+ * p2 its negative); null where the matrix has no such pair. Reads `result.matrix` only.
+ */
+function cellValue(result: EvalResult, side: Side, rowChoice: string, replyChoice: string): number | null {
+  const matrix = result.matrix;
+  if (!matrix?.p1Choices || !matrix.p2Choices) return null;
+  const [i, j] = side === 'p1'
+    ? [matrix.p1Choices.indexOf(rowChoice), matrix.p2Choices.indexOf(replyChoice)]
+    : [matrix.p1Choices.indexOf(replyChoice), matrix.p2Choices.indexOf(rowChoice)];
+  const value = matrix.values[i]?.[j];
+  if (i < 0 || j < 0 || value === undefined || !Number.isFinite(value)) return null;
+  return side === 'p1' ? value : -value;
 }
 
 /**
@@ -43,17 +59,20 @@ export const pivotMove = (label: string): string => (/^((Tera|Mega|Ultra) \+ )?[
 /** Whether a ranked label and a line's step label name the same answer: equal, or the step is the bare move of the ranked pivot pair. */
 export const sameAnswer = (ranked: string, step: string): boolean => ranked === step || pivotMove(ranked) === step;
 
+/** What a line's view reads of the reply that hurts its row: the reply, what it stands on, and the cell's win percent as the card prints it ("49%"; null for a floor or a best row). */
+export type WorstLookup = (side: Side, row: Pick<EvalLine, 'label' | 'choice'>) => { label: string; basis: ReplyBasis; cell: string | null } | null;
+
 /**
  * The answer a line's row meets in Hard mode, by side and the row the line belongs to (its label, its choice string, then the pair rows of its move): the reply's
- * label and its basis; null for a row the result lacks.
+ * label, its basis and the cell's percent (`fainted` is each side's fainted share, as the card prints its rows); null for a row the result lacks.
  */
-export function worstLookup(result: EvalResult): (side: Side, row: Pick<EvalLine, 'label' | 'choice'>) => { label: string; basis: ReplyBasis } | null {
+export function worstLookup(result: EvalResult, fainted?: Partial<Record<Side, number | null | undefined>>): WorstLookup {
   return (side, line) => {
     // a line's label may be the bare move of a pivot whose rows are pairs: the best ranked pair stands for it (the line's follow-up is the greedy one)
     const row = result.perSide[side].find(entry => entry.label === line.label) ?? result.perSide[side].find(entry => entry.choice === line.choice)
       ?? result.perSide[side].find(entry => pivotMove(entry.label) === line.label);
     const found = row ? worstReply(result, side, row) : null;
-    return found ? { label: found.reply.label, basis: found.basis } : null;
+    return found ? { label: found.reply.label, basis: found.basis, cell: found.value === null ? null : winPctText(found.value, fainted?.[side]) } : null;
   };
 }
 

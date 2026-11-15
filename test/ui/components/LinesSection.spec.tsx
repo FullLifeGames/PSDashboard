@@ -207,12 +207,12 @@ describe('the answer a line meets', () => {
 });
 
 /**
- * Round 89 (#153, Hard mode): with the setting on, a row's line is the one that meets the reply that hurts the row most, named by what
+ * Round 89 (#153, Hard mode): with the setting on, a row's line is the one that meets the reply the search rates lowest for the row, named by what
  * stands behind it; a row whose search holds no such line shows today's line and says so; with the setting off the worst lines are
  * not shown at all. Singles and doubles.
  */
 describe('Hard mode in the Lines section', () => {
-  /** Pepitopalotin (p2) plays Hydro Pump or Hyper Voice against Tzon's Draining Kiss or Surf; Surf hurts Hydro Pump most (p1's highest cell of its column). */
+  /** Pepitopalotin (p2) plays Hydro Pump or Hyper Voice against Tzon's Draining Kiss or Surf; Surf is the lowest cell of Hydro Pump's row (p1's highest cell of its column, 0.4). */
   const hurtBy = (lines: EvalLine[]): EvalResult => {
     const base = withLines(lines);
     const p1 = [rankedChoice('move 0', 'Draining Kiss', 0.1), rankedChoice('move 1', 'Surf', 0.05)];
@@ -229,36 +229,42 @@ describe('Hard mode in the Lines section', () => {
 
   test('singles, on: the worst line stands where the usual line stood, and its head names the reply', () => {
     render(<LinesSection turn={20} result={hurtBy([singlesLine, meetsSurf])} playerNames={SINGLES_NAMES} doubles={false} host={hard()} />);
-    expect(screen.getByText('vs Surf (the reply that hurts this choice most)')).toBeInTheDocument();
+    expect(screen.getByText('vs Surf (the reply the search rates lowest for this choice, 32% in its cell)')).toBeInTheDocument();
     expect(screen.queryByText(/Tzon's top choice/)).toBeNull();
     expect(screen.getAllByRole('button', { name: '▶ Play' })).toHaveLength(1);
     expect(screen.queryByText(/No line against/)).toBeNull();
   });
 
+  test('the cell is printed with the card\'s fainted share', () => {
+    const analysis = turnAnalysis(20, { p2: { ...turnAnalysis(20).p2, faintedFraction: 0.5, best: rankedChoice('move 1', 'Hydro Pump', 0.1) } });
+    render(<LinesSection turn={20} result={hurtBy([singlesLine, meetsSurf])} playerNames={SINGLES_NAMES} doubles={false} host={hard()} analysis={analysis} />);
+    expect(screen.getByText(`vs Surf (the reply the search rates lowest for this choice, ${winPctText(-0.4, 0.5)} in its cell)`)).toBeInTheDocument();
+  });
+
   test('singles, on, and no tree holds a line against the reply: today\'s line, with the sentence that says so', () => {
     render(<LinesSection turn={20} result={hurtBy([singlesLine])} playerNames={SINGLES_NAMES} doubles={false} host={hard()} />);
     expect(screen.getByText("vs Draining Kiss (Tzon's top choice)")).toBeInTheDocument();
-    expect(screen.getByText('No line against Surf, the reply that hurts this choice most. This line meets Draining Kiss.')).toBeInTheDocument();
+    expect(screen.getByText('No line against Surf, the reply the search rates lowest for this choice. This line meets Draining Kiss.')).toBeInTheDocument();
   });
 
   test('singles, off: the usual line and no worst line, no sentence', () => {
     render(<LinesSection turn={20} result={hurtBy([singlesLine, meetsSurf])} playerNames={SINGLES_NAMES} doubles={false} host={host()} />);
     expect(screen.getByText("vs Draining Kiss (Tzon's top choice)")).toBeInTheDocument();
-    expect(screen.queryByText(/hurts this choice most/)).toBeNull();
+    expect(screen.queryByText(/rates lowest/)).toBeNull();
     expect(screen.getAllByRole('button', { name: '▶ Play' })).toHaveLength(1);
   });
 
   test('a usual line that already meets the reply reads as the worst line; a thin cell says so', () => {
     const asTop = { ...hurtBy([{ ...singlesLine, steps: meetsSurf.steps }]) };
     render(<LinesSection turn={20} result={asTop} playerNames={SINGLES_NAMES} doubles={false} host={hard()} />);
-    expect(screen.getByText('vs Surf (the reply that hurts this choice most)')).toBeInTheDocument();
+    expect(screen.getByText('vs Surf (the reply the search rates lowest for this choice, 32% in its cell)')).toBeInTheDocument();
     cleanup();
     const thinCells = { ...hurtBy([{ ...singlesLine, steps: meetsSurf.steps }]) };
     thinCells.matrix = { ...thinCells.matrix!, cells: [[{ visits: 2, verified: false }, { visits: 2, verified: false }], [{ visits: 2, verified: false }, { visits: 2, verified: false }]] };
     thinCells.perSide.p1[1] = { ...thinCells.perSide.p1[1] };
     thinCells.perSide.p2[0] = { ...thinCells.perSide.p2[0], punishedBy: 'Surf' };
     render(<LinesSection turn={20} result={thinCells} playerNames={SINGLES_NAMES} doubles={false} host={hard()} />);
-    expect(screen.getByText('vs Surf (the reply that hurts this choice most, from a thinly searched cell)')).toBeInTheDocument();
+    expect(screen.getByText('vs Surf (the reply the search rates lowest for this choice, from a thinly searched cell)')).toBeInTheDocument();
   });
 
   test('doubles, on: the joint answer is named like a single one', () => {
@@ -273,6 +279,6 @@ describe('Hard mode in the Lines section', () => {
       lines: [{ ...doublesLine, versus: 'worst' }, { ...doublesLine, steps: [{ ...doublesLine.steps[0], p2: { choice: 'b', label: other, slots: [] } }, ...doublesLine.steps.slice(1)] }],
     };
     render(<LinesSection turn={4} result={result} playerNames={DOUBLES_NAMES} doubles host={hard()} />);
-    expect(screen.getByText(`vs ${pair} (the reply that hurts this choice most)`)).toBeInTheDocument();
+    expect(screen.getByText(`vs ${pair} (the reply the search rates lowest for this choice, ${winPctText(0.2)} in its cell)`)).toBeInTheDocument();
   });
 });

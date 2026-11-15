@@ -325,33 +325,37 @@ describe('the answer a line meets', () => {
  * (not by the choice's own label, which the line printed a few words before: a switch read as "hurts → Clefable", a joint choice ran
  * to fifty characters), and a reply that is a pivot's pair ("Draining Kiss → Mew") is the bare move the line meets.
  */
-describe('the reply that hurts most, in the bracket', () => {
+describe('the reply the search rates lowest, in the bracket', () => {
   const ranks = { p1: ['Draining Kiss', 'Surf'], p2: ['Hydro Pump', 'Hyper Voice'] };
-  const worst = (label: string, basis: 'cell' | 'punisher' = 'cell') => () => ({ label, basis });
+  const worst = (label: string, basis: 'cell' | 'punisher' = 'cell', cell: string | null = basis === 'cell' ? '49%' : null) => () => ({ label, basis, cell });
 
   test('singles: a move, a switch and a thin cell', () => {
     expect(lineBlocks([bothRolesLine], { ...singles, ranks, worst: worst('Hydro Pump') })[0].reply)
-      .toEqual({ label: 'Hydro Pump', rank: 'the reply that hurts this choice most', off: false });
+      .toEqual({ label: 'Hydro Pump', rank: 'the reply the search rates lowest for this choice, 49% in its cell', off: false });
     expect(lineBlocks([bothRolesLine], { ...singles, ranks, worst: worst('Hydro Pump', 'punisher') })[0].reply?.rank)
-      .toBe('the reply that hurts this choice most, from a thinly searched cell');
+      .toBe('the reply the search rates lowest for this choice, from a thinly searched cell');
+  });
+
+  test('a cell the matrix cannot price leaves the value out of the bracket', () => {
+    expect(lineBlocks([bothRolesLine], { ...singles, ranks, worst: worst('Hydro Pump', 'cell', null) })[0].reply?.rank).toBe('the reply the search rates lowest for this choice');
   });
 
   test('a pair row of the card is the bare move the line meets: no "No line against" sentence, the bracket names the reply', () => {
     const [block] = lineBlocks([bothRolesLine], { ...singles, ranks, worst: worst('Hydro Pump → Mew') });
-    expect(block.reply).toEqual({ label: 'Hydro Pump', rank: 'the reply that hurts this choice most', off: false });
+    expect(block.reply).toEqual({ label: 'Hydro Pump', rank: 'the reply the search rates lowest for this choice, 49% in its cell', off: false });
     expect(block.worstNote).toBeNull();
   });
 
   test('a line that meets another reply keeps its rank words and gets the sentence, which names the choice by those words too', () => {
     const [block] = lineBlocks([bothRolesLine], { ...singles, ranks, worst: worst('Hyper Voice') });
     expect(block.reply?.rank).toBe("Pepitopalotin's top choice");
-    expect(block.worstNote).toBe('No line against Hyper Voice, the reply that hurts this choice most. This line meets Hydro Pump.');
+    expect(block.worstNote).toBe('No line against Hyper Voice, the reply the search rates lowest for this choice. This line meets Hydro Pump.');
   });
 
   test('doubles: the joint choice is not repeated', () => {
     const joint = 'Sucker Punch → Terapagos + Protect';
     const [block] = lineBlocks([doublesLine], { turn: 4, playerNames: DOUBLES_NAMES, doubles: true, rules: { gen: 9, mod: undefined }, ranks: { p1: [], p2: [joint] }, worst: worst(joint) });
-    expect(block.reply?.rank).toBe('the reply that hurts this choice most');
+    expect(block.reply?.rank).toBe('the reply the search rates lowest for this choice, 49% in its cell');
   });
 });
 

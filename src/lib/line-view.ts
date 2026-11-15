@@ -2,7 +2,7 @@ import { dieKey, dieLabel, winPctText, type DieKind, type DieWords, type EvalLin
 import { rulesDex, type GameRules, type TurnSnapshot } from '@fulllifegames/replay-core';
 import { wordsOf } from './branch-dice';
 import type { WinPathsHost } from './win-paths-host';
-import { sameAnswer, type ReplyBasis } from './worst-reply';
+import { sameAnswer, type WorstLookup } from './worst-reply';
 
 /**
  * Round 89 (#104), step G3: what the "Lines" section of the turn card shows, as plain data. One block per line (head, end value,
@@ -40,7 +40,7 @@ export interface LineBlockView {
   note: string | null;
   /** Why the line stops where it does, when its last position asks a player who to send in (a choice the tree did not make); else null. */
   endNote: string | null;
-  /** Round 89 (#153, Hard mode): the row holds no line against the reply that hurts it most, so this line meets another answer; else null. */
+  /** Round 89 (#153, Hard mode): the row holds no line against the reply the search rates lowest for it, so this line meets another answer; else null. */
   worstNote: string | null;
 }
 
@@ -71,7 +71,7 @@ export interface LinesHost {
   winPaths?: WinPathsHost;
   /** Round 89 (G13): the early-lines stage while it searches the graded matrix turns (how many hold lines, and Stop); absent or null: not running. */
   earlyLines?: { done: number; total: number; stop: () => void } | null;
-  /** Round 89 (#153): the Hard mode setting: the lines show the reply that hurts each row most, and the opponent plays it. */
+  /** Round 89 (#153): the Hard mode setting: the lines show the reply the search rates lowest for each row, and the opponent plays it. */
   hardMode?: boolean;
   /** Round 89 (G13b): what a turn that holds no lines waits for ("stage": the early-lines stage will search it; "sweep": the game analysis still runs); null or absent: nothing. */
   lineComing?: (turn: number) => 'stage' | 'sweep' | null;
@@ -127,8 +127,8 @@ export interface LineViewContext {
   rules: GameRules;
   /** The bodies on the field at the turn's start, by side and slot, for the names a die speaks of. */
   actives?: Actives;
-  /** Round 89 (#153, Hard mode): the reply that hurts a line's row most (`worstLookup`); present only with the setting on. */
-  worst?: (side: Side, row: Pick<EvalLine, 'label' | 'choice'>) => { label: string; basis: ReplyBasis } | null;
+  /** Round 89 (#153, Hard mode): the reply the search rates lowest for a line's row (`worstLookup`); present only with the setting on. */
+  worst?: WorstLookup;
 }
 
 const SIDE_INDEX: Record<Side, 0 | 1> = { p1: 0, p2: 1 };
@@ -305,8 +305,11 @@ export function rankWords(rank: number): string {
   return `${rank}${suffix} choice`;
 }
 
-/** What a hurt-most bracket calls the choice of the line it stands on: the line printed the choice a few words before. */
-const HURTS_WHAT = 'this choice';
+/**
+ * Round 89 (HM2c, user gate 15.11.2026): what a Hard mode bracket says of the reply, by what holds: the search rates it lowest among the
+ * cells of the line's choice, which the line printed a few words before ("this choice"). The cell's value follows when the matrix has one.
+ */
+const RATES_LOWEST = 'the reply the search rates lowest for this choice';
 
 /**
  * The answer a line meets: the other side's choice in the line's first step, by its place in the ranking. A line that opens with a
@@ -318,10 +321,11 @@ export function replyOf(line: EvalLine, ctx: Pick<LineViewContext, 'ranks' | 'pl
   const other: Side = line.side === 'p1' ? 'p2' : 'p1';
   const label = first[other].label;
   const name = ctx.playerNames[SIDE_INDEX[other]];
-  // Hard mode: a line that meets the reply that hurts its row most says so, by what the reply stands on
+  // Hard mode: a line that meets the reply the search rates lowest for its row says so, by what the reply stands on
   const hurt = ctx.worst?.(line.side, line);
   if (hurt && hurt.basis !== 'best' && sameAnswer(hurt.label, label)) {
-    return { label, rank: `the reply that hurts ${HURTS_WHAT} most${hurt.basis === 'punisher' ? ', from a thinly searched cell' : ''}`, off: false };
+    const stands = hurt.basis === 'punisher' ? ', from a thinly searched cell' : hurt.cell === null ? '' : `, ${hurt.cell} in its cell`;
+    return { label, rank: `${RATES_LOWEST}${stands}`, off: false };
   }
   // a pivot's pair rows ("U-turn → Keldeo") stand in the ranking for the bare move the line's step names
   const at = ctx.ranks[other].findIndex(ranked => sameAnswer(ranked, label));
@@ -330,11 +334,11 @@ export function replyOf(line: EvalLine, ctx: Pick<LineViewContext, 'ranks' | 'pl
   return { label, rank: `${name}'s ${rankWords(at + 1)} in this search`, off: true };
 }
 
-/** Round 89 (#153): the sentence for a row whose search holds no line against the reply that hurts it most; null when the line meets it or none is known. */
+/** Round 89 (#153): the sentence for a row whose search holds no line against the reply the search rates lowest for it; null when the line meets it or none is known. */
 function worstNote(line: EvalLine, reply: LineReply | null, ctx: Pick<LineViewContext, 'worst'>): string | null {
   const hurt = ctx.worst?.(line.side, line);
   if (!hurt || hurt.basis === 'best' || !reply || sameAnswer(hurt.label, reply.label)) return null;
-  return `No line against ${hurt.label}, the reply that hurts ${HURTS_WHAT} most. This line meets ${reply.label}.`;
+  return `No line against ${hurt.label}, ${RATES_LOWEST}. This line meets ${reply.label}.`;
 }
 
 /** The tooltip of ▶ Play: what the click does and every die it forces. */

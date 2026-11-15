@@ -96,7 +96,7 @@ export function LinesSection({ turn, result, playerNames, doubles, host, analysi
       </div>
     );
   }
-  const blocks = lineBlocks(lines, { turn, playerNames, doubles, rules: host.rules, actives: activeNamesAt(host.snapshot), rowValues: rowValueTexts(analysis), ranks: ranksOf(result), ...(host.hardMode ? { worst: worstLookup(result) } : {}) });
+  const blocks = lineBlocks(lines, { turn, playerNames, doubles, rules: host.rules, actives: activeNamesAt(host.snapshot), rowValues: rowValueTexts(analysis), ranks: ranksOf(result), ...(host.hardMode ? { worst: worstLookup(result, { p1: analysis?.p1.faintedFraction, p2: analysis?.p2.faintedFraction }) } : {}) });
   return (
     <div className="ps-eval-lines">
       <span className="ps-eval-lines-title">Lines</span>

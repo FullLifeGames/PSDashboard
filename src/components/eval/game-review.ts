@@ -115,7 +115,7 @@ function rowLines(args: ReviewArgs, analysis: TurnAnalysis, side: Side): ReviewL
     actives: activeNamesAt(args.host.snapshotAt?.(turn) ?? args.host.snapshot),
     rowValues: rowValueTexts(analysis),
     ranks: result ? ranksOf(result) : undefined,
-    ...(args.host.hardMode && result ? { worst: worstLookup(result) } : {}),
+    ...(args.host.hardMode && result ? { worst: worstLookup(result, { p1: analysis.p1.faintedFraction, p2: analysis.p2.faintedFraction }) } : {}),
   };
   // `lineBlocks` puts the engine's line before the played line; a line that holds both roles reads as the engine's
   return lineBlocks(lines, ctx).map((block): ReviewLineView => ({

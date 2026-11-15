@@ -300,14 +300,14 @@ describe('gameReview: Hard mode (round 89, #153)', () => {
   const ranking = (labels: string[]) => labels.map((label, index) => rankedChoice(`move ${index}`, label, 0.2 - index * 0.05));
   const hard: LinesHost = { ...host, hardMode: true };
   const meetsSurf: EvalLine = { ...singlesLine, versus: 'worst', steps: [{ ...singlesLine.steps[0], p1: { choice: 'move 1', label: 'Surf', slots: [] } }, ...singlesLine.steps.slice(1)] };
-  /** Surf is the reply that hurts Hydro Pump most: the highest cell of its column in p1's view. */
+  /** Surf is the reply the search rates lowest for Hydro Pump: the highest cell of its column in p1's view (0.4, so p2's row reads -0.4). */
   const withMatrix = (lines: EvalLine[]): EvalResult => ({
     ...withLines(lines), perSide: { p1: ranking(['Draining Kiss', 'Surf']), p2: ranking(['Hydro Pump', 'Hyper Voice']) },
     matrix: { p1Labels: ['Draining Kiss', 'Surf'], p2Labels: ['Hydro Pump', 'Hyper Voice'], p1Choices: ['move 0', 'move 1'], p2Choices: ['move 0', 'move 1'], values: [[0.1, 0], [0.4, -0.1]], mixes: { p1: [1, 0], p2: [1, 0] } },
   });
-  const review = (lines: EvalLine[], on: LinesHost) => {
+  const review = (lines: EvalLine[], on: LinesHost, share?: number) => {
     const analyses: (TurnAnalysis | null)[] = Array.from({ length: 20 }, () => null);
-    analyses[19] = turnAnalysis(20, { p2: gradedP2('inaccuracy') });
+    analyses[19] = turnAnalysis(20, { p2: gradedP2('inaccuracy', share === undefined ? {} : { faintedFraction: share }) });
     const results: (EvalResult | null)[] = analyses.map(() => null);
     results[19] = withMatrix(lines);
     return gameReview({ analyses, results, playerNames: SINGLES_NAMES, doubles: false, host: on })[1].rows[0].lines;
@@ -315,15 +315,21 @@ describe('gameReview: Hard mode (round 89, #153)', () => {
 
   test('singles, on: the engine line is the worst line and its answer says why; off: the usual line, whatever the result holds', () => {
     const [engine] = review([singlesLine, meetsSurf], hard);
-    expect(engine.text).toBe('Hydro Pump vs Surf (the reply that hurts this choice most), then Moonblast vs → Corviknight, then Moonblast vs Brave Bird');
+    expect(engine.text).toBe('Hydro Pump vs Surf (the reply the search rates lowest for this choice, 32% in its cell), then Moonblast vs → Corviknight, then Moonblast vs Brave Bird');
     const [usual] = review([singlesLine, meetsSurf], host);
     expect(usual.text).toBe("Hydro Pump vs Draining Kiss (Tzon's top choice), then Moonblast vs → Corviknight, then Moonblast vs Brave Bird");
+  });
+
+  test('the cell in the bracket is printed with the turn\'s fainted share, as the card prints its rows', () => {
+    const [engine] = review([singlesLine, meetsSurf], hard, 0.5);
+    expect(engine.text).toContain(`the reply the search rates lowest for this choice, ${winPctText(-0.4, 0.5)} in its cell)`);
+    expect(winPctText(-0.4, 0.5)).not.toBe(winPctText(-0.4));
   });
 
   test('singles, on, with no line against the reply: today\'s line and the sentence on the block', () => {
     const lines = review([singlesLine], hard);
     expect(lines).toHaveLength(1);
     expect(lines[0].text).toContain("vs Draining Kiss (Tzon's top choice)");
-    expect(lines[0].block.worstNote).toBe('No line against Surf, the reply that hurts this choice most. This line meets Draining Kiss.');
+    expect(lines[0].block.worstNote).toBe('No line against Surf, the reply the search rates lowest for this choice. This line meets Draining Kiss.');
   });
 });

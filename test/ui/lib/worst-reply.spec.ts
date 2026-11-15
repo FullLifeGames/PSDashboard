@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { EvalLine, EvalMatrix, EvalResult, MatrixCell, RankedChoice } from '@fulllifegames/eval-engine';
+import { winPctText } from '@fulllifegames/eval-engine';
 import { linesForMode, worstLookup, worstReply } from '../../../src/lib/worst-reply';
 
 /**
@@ -27,8 +28,21 @@ describe('worstReply', () => {
   const single = result(['Surf', 'Ice Beam'], ['Draining Kiss', 'Moonblast', 'Mew'], [[0.2, -0.4, 0.1], [0.5, 0.3, -0.1]], [[solid, solid, solid], [solid, solid, solid]]);
 
   test('singles: the reply is the opponent\'s ranked row of the lowest trusted cell, for either side', () => {
-    expect(worstReply(single, 'p1', single.perSide.p1[0])).toEqual({ reply: single.perSide.p2[1], basis: 'cell' });
-    expect(worstReply(single, 'p2', single.perSide.p2[2])).toEqual({ reply: single.perSide.p1[0], basis: 'cell' });
+    expect(worstReply(single, 'p1', single.perSide.p1[0])).toMatchObject({ reply: single.perSide.p2[1], basis: 'cell' });
+    expect(worstReply(single, 'p2', single.perSide.p2[2])).toMatchObject({ reply: single.perSide.p1[0], basis: 'cell' });
+  });
+
+  test('the reply carries the value of its cell from the row\'s own side (wp-units): p1 reads the cell, p2 its negative', () => {
+    expect(worstReply(single, 'p1', single.perSide.p1[0])?.value).toBeCloseTo(-0.4);
+    // p2's Mew row: the cells of its column are 0.1 and -0.1 in p1's view, so p1's Surf (0.1) is the lowest for p2 at -0.1
+    expect(worstReply(single, 'p2', single.perSide.p2[2])?.value).toBeCloseTo(-0.1);
+  });
+
+  test('a floor or a best-row reply has no cell value', () => {
+    const none = result(['Surf'], ['Draining Kiss', 'Moonblast'], [[0.2, -0.4]], [[thin, thin]], ['Draining Kiss', null]);
+    expect(worstReply(none, 'p1', none.perSide.p1[0])?.value).toBeNull();
+    const bare = result(['Surf'], ['Draining Kiss', 'Moonblast'], [[0.2, -0.4]], [[thin, thin]]);
+    expect(worstReply(bare, 'p1', bare.perSide.p1[0])?.value).toBeNull();
   });
 
   test('an untrusted lower cell is skipped and a matrix pass counts every cell', () => {
@@ -45,9 +59,9 @@ describe('worstReply', () => {
 
   test('no trusted cell: the row\'s own floor, marked; no floor: the opponent\'s best row, marked', () => {
     const none = result(['Surf'], ['Draining Kiss', 'Moonblast'], [[0.2, -0.4]], [[thin, thin]], ['Draining Kiss', null]);
-    expect(worstReply(none, 'p1', none.perSide.p1[0])).toEqual({ reply: none.perSide.p2[0], basis: 'punisher' });
+    expect(worstReply(none, 'p1', none.perSide.p1[0])).toMatchObject({ reply: none.perSide.p2[0], basis: 'punisher' });
     const bare = result(['Surf'], ['Draining Kiss', 'Moonblast'], [[0.2, -0.4]], [[thin, thin]]);
-    expect(worstReply(bare, 'p1', bare.perSide.p1[0])).toEqual({ reply: bare.perSide.p2[0], basis: 'best' });
+    expect(worstReply(bare, 'p1', bare.perSide.p1[0])).toMatchObject({ reply: bare.perSide.p2[0], basis: 'best' });
   });
 
   test('a side that only waits has no reply', () => {
@@ -70,9 +84,20 @@ describe('worstLookup', () => {
   test('answers by side and the row of a line (its label, then its choice string), for the lines', () => {
     const doubles = result(['A + B', 'C + D'], ['E + F', 'G + H'], [[0.3, -0.2], [0.1, 0.0]], [[solid, solid], [solid, solid]]);
     const lookup = worstLookup(doubles);
-    expect(lookup('p1', { label: 'A + B', choice: 'x' })).toEqual({ label: 'G + H', basis: 'cell' });
+    expect(lookup('p1', { label: 'A + B', choice: 'x' })).toEqual({ label: 'G + H', basis: 'cell', cell: expect.stringMatching(/^\d+%$/) });
     expect(lookup('p2', { label: 'nope', choice: 'move G + H' })?.label).toBe('C + D');
     expect(lookup('p1', { label: 'nothing', choice: 'move nothing' })).toBeNull();
+  });
+
+  test('the cell reads as the card prints it: the row side\'s win percent of the lowest cell, with the side\'s fainted share; none for a floor', () => {
+    const one = result(['Surf'], ['Draining Kiss', 'Moonblast'], [[0.2, -0.4]], [[solid, solid]]);
+    const plain = worstLookup(one)('p1', { label: 'Surf', choice: 'move Surf' });
+    expect(plain?.cell).toBe(winPctText(-0.4));
+    expect(worstLookup(one, { p1: 0.5 })('p1', { label: 'Surf', choice: 'move Surf' })?.cell).toBe(winPctText(-0.4, 0.5));
+    // p2's view: the negative of the p1 value of the one cell in the Moonblast column's row
+    expect(worstLookup(one)('p2', { label: 'Moonblast', choice: 'move Moonblast' })?.cell).toBe(winPctText(0.4));
+    const thinOnly = result(['Surf'], ['Draining Kiss', 'Moonblast'], [[0.2, -0.4]], [[thin, thin]], ['Draining Kiss', null]);
+    expect(worstLookup(thinOnly)('p1', { label: 'Surf', choice: 'move Surf' })).toEqual({ label: 'Draining Kiss', basis: 'punisher', cell: null });
   });
 });
 
@@ -86,11 +111,11 @@ describe('worstLookup with a pivot\'s pair rows (singles)', () => {
   const lookup = worstLookup(pairs);
 
   test('a line whose label is the bare move finds its pair rows; the reply is the answer of the best ranked pair', () => {
-    expect(lookup('p2', { label: 'U-turn', choice: 'move uturn' })).toEqual({ label: 'Knock Off', basis: 'cell' });
+    expect(lookup('p2', { label: 'U-turn', choice: 'move uturn' })).toMatchObject({ label: 'Knock Off', basis: 'cell' });
   });
 
   test('a row of the other side still answers with the pair that hurts it most', () => {
-    expect(lookup('p1', { label: 'Pursuit', choice: 'move Pursuit' })).toEqual({ label: 'U-turn → Keldeo', basis: 'cell' });
+    expect(lookup('p1', { label: 'Pursuit', choice: 'move Pursuit' })).toMatchObject({ label: 'U-turn → Keldeo', basis: 'cell' });
   });
 
   test('a doubles joint choice with a switch part is no pair row', () => {
