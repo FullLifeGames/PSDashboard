@@ -92,9 +92,10 @@ describe('EvalTurnAnalysis', () => {
     const rows = screen.getAllByRole('button', { name: '✓ the engine\'s move ↗' });
     expect(rows).toHaveLength(2);
     await userEvent.click(rows[0]);
-    expect(onExplore).toHaveBeenCalledWith('p1', analysis.p1.best, analysis.p2.best);
+    // round 89 (#153): the click also hands the result the card reads (none here), for Hard mode
+    expect(onExplore).toHaveBeenCalledWith('p1', analysis.p1.best, analysis.p2.best, undefined);
     await userEvent.click(rows[1]);
-    expect(onExplore).toHaveBeenLastCalledWith('p2', analysis.p2.best, analysis.p1.best);
+    expect(onExplore).toHaveBeenLastCalledWith('p2', analysis.p2.best, analysis.p1.best, undefined);
   });
 
   test('doubles without played tracking show only the engine rows; read recommendations render per side', () => {
@@ -151,3 +152,21 @@ describe('EvalLeadAnalysis', () => {
     expect(screen.queryByText(/inaccuracy/)).toBeNull();
   });
 });
+
+describe('EvalTurnAnalysis, the endgame entry (round 89, #130)', () => {
+  const winPaths = (turns: number[]) => ({ endgame: { loser: 'p2' as const, turns }, run: null, unavailable: null, playedLabel: () => null, show: vi.fn(), hide: vi.fn() });
+
+  test.each([false, true])('an endgame turn of the card (doubles %s) asks how the player who lost could have won from here', async doubles => {
+    const host = { rules: { gen: 9, mod: undefined }, winPaths: winPaths([4, 5]) };
+    render(<EvalTurnAnalysis analysis={turnAnalysis(4)} playerNames={names} linesHost={host} doubles={doubles} />);
+    await userEvent.click(screen.getByRole('button', { name: 'How could Bob have won from here?' }));
+    expect(host.winPaths.show).toHaveBeenCalledWith(4);
+  });
+
+  test('a turn before the endgame has no such question', () => {
+    const host = { rules: { gen: 9, mod: undefined }, winPaths: winPaths([7, 8]) };
+    render(<EvalTurnAnalysis analysis={turnAnalysis(4)} playerNames={names} linesHost={host} />);
+    expect(screen.queryByRole('button', { name: /have won from here/ })).toBeNull();
+  });
+});
+

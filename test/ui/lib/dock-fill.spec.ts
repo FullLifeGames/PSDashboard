@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { BranchSlotChoice, RankedChoice } from '@fulllifegames/eval-engine';
-import { engineHoldsForcedBeside, fitsBeside, overlayFill, pickFill, pickFillParts, slotChoicesOf } from '../../../src/lib/dock-fill';
+import { engineHoldsForcedBeside, fitsBeside, overlayFill, pickFill, pickFillParts, rowOfChoices, sameChoice, slotChoicesOf } from '../../../src/lib/dock-fill';
 import { rankedChoice } from '../fixtures/eval-result';
 import { simState } from '../fixtures/sim-state';
 
@@ -296,5 +296,61 @@ describe('engineHoldsForcedBeside', () => {
     expect(engineHoldsForcedBeside(singles, marks([false], [false]), 'p1', 0)).toBe(false);
     const doubles = simState('doubles', { p1ForceSwitch: true, p1ForceSwitches: [true, false], p2ForceSwitch: true, p2ForceSwitches: [false, true] });
     expect(engineHoldsForcedBeside(doubles, marks([false, false], [false, true]), 'p1', 0)).toBe(true);
+  });
+});
+
+/**
+ * Round 89 (#153, Hard mode): the ranked row the picks of a side stand for, which the worst reply is read for. The picks as they stand
+ * (the user's slots and the slots the fill wrote) when one row has them all; else the row the fill itself would take beside the user's
+ * slots alone, so a pick that broke the joint choice still has a row; null when no row agrees.
+ */
+describe('rowOfChoices', () => {
+  const doubles = simState('doubles');
+  const slot = (choices: (BranchSlotChoice | null)[]) => choices;
+  const spore: BranchSlotChoice = { kind: 'move', moveId: 'spore', moveName: 'Spore', targetLoc: 2 };
+  const ragePowder: BranchSlotChoice = { kind: 'move', moveId: 'ragepowder', moveName: 'Rage Powder' };
+
+  test('singles: the row of the pick', () => {
+    const ranked = [rankedChoice('move earthquake', 'Earthquake', 0.3), rankedChoice('move swordsdance', 'Swords Dance', 0.2)];
+    const pick: BranchSlotChoice = { kind: 'move', moveId: 'swordsdance', moveName: 'Swords Dance' };
+    expect(rowOfChoices('p1', ranked, simState('singles'), slot([pick]), slot([pick]))).toBe(ranked[1]);
+    expect(rowOfChoices('p1', ranked, simState('singles'), slot([{ kind: 'move', moveId: 'scaleshot', moveName: 'Scale Shot' }]), slot([null]))).toBeNull();
+  });
+
+  test('doubles: both slots read as one joint row, the target stays the user\'s', () => {
+    expect(rowOfChoices('p1', doublesRanked, doubles, slot([flareBlitz, ragePowder]), slot([flareBlitz, ragePowder]))).toBe(doublesRanked[1]);
+    expect(rowOfChoices('p1', doublesRanked, doubles, slot([fakeOut, spore]), slot([fakeOut, null]))).toBe(doublesRanked[0]);
+  });
+
+  test('doubles: a pick that broke the joint choice falls back to the row beside the user\'s own slots', () => {
+    // the fill wrote Spore beside the touched Fake Out; the user then picked Protect in slot 1: Fake Out + Protect is no ranked row,
+    // and the row the fill takes beside Protect... is none that opens with Fake Out, so only the user's slot 1 decides
+    const row = rowOfChoices('p1', doublesRanked, doubles, slot([fakeOut, protect]), slot([null, protect]));
+    expect(row).toBe(doublesRanked[2]);
+  });
+});
+
+/** Round 89 (#153, HM3b): the test of "Back to the engine's pick": a pick that is the engine's own needs no button. */
+describe('sameChoice', () => {
+  test('the same move, target and gimmick are one pick, however the object was built', () => {
+    expect(sameChoice(fakeOut, { targetLoc: 2, moveName: 'Fake Out', moveId: 'fakeout', kind: 'move' })).toBe(true);
+    expect(sameChoice(fakeOut, { ...fakeOut, targetLoc: undefined } as BranchSlotChoice)).toBe(false);
+    expect(sameChoice(fakeOut, { ...fakeOut, targetLoc: 1 })).toBe(false);
+    expect(sameChoice(fakeOut, flareBlitz)).toBe(false);
+  });
+
+  test('forced dice and a gimmick make another pick; two switches name the body', () => {
+    const forced = { ...flareBlitz, dice: [{ kind: 'crit' }] } as unknown as BranchSlotChoice;
+    expect(sameChoice(flareBlitz, forced)).toBe(false);
+    const heatran: BranchSlotChoice = { kind: 'switch', speciesId: 'heatran', pokemonName: 'Heatran' };
+    expect(sameChoice(heatran, { ...heatran })).toBe(true);
+    expect(sameChoice(heatran, { kind: 'switch', speciesId: 'latias', pokemonName: 'Latias' })).toBe(false);
+    expect(sameChoice(heatran, fakeOut)).toBe(false);
+  });
+
+  test('an empty slot is the same as an empty slot and as nothing else', () => {
+    expect(sameChoice(null, undefined)).toBe(true);
+    expect(sameChoice(null, fakeOut)).toBe(false);
+    expect(sameChoice(protect, null)).toBe(false);
   });
 });

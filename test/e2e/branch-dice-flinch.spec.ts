@@ -45,5 +45,5 @@ test('Air Slash with the chip "Flinch": the branch frame shows Cobalion flinchin
   expect(shown.filter(entry => entry.startsWith('Forced: Air Slash flinch'))).toHaveLength(1);
   // the history row lists the die as well (round 84, ruling 18a: the closed history opens first, a role query skips hidden rows)
   await openVariationHistory(page);
-  await expect(page.getByRole('group', { name: 'Forced dice' })).toContainText('P1 Air Slash: Flinch');
+  await expect(page.getByRole('group', { name: 'Forced dice' })).toContainText('P1 Air Slash: flinch');
 });

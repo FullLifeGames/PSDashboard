@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 import type { EvalResult, TurnAnalysis } from '@fulllifegames/eval-engine';
-import { lineAnchor, type LinesHost } from '../../lib/line-view';
+import { differsSentences, lineAnchor, type LinesHost } from '../../lib/line-view';
 import { LineConfirm } from './LineConfirm';
-import { gameReview, type ReviewGrade, type ReviewLineView, type ReviewRowView, type ReviewSideView } from './game-review';
+import { WinPathsPanel } from './WinPathsPanel';
+import { endgameRow, gameReview, reviewBlocks, type EndgameRowView, type ReviewGrade, type ReviewLineView, type ReviewRowView, type ReviewSideView } from './game-review';
 
 interface GameReviewPanelProps {
   analyses: readonly (TurnAnalysis | null)[];
@@ -23,6 +24,7 @@ function ReviewLine({ line, turn, onPlay, confirm }: { line: ReviewLineView; tur
       <div className="ps-eval-review-line">
         <span className="role">{line.role} line:</span>
         <span className="text">{line.text}</span>
+        <span className="text" style={{ color: '#778' }}>{line.end}</span>
         {onPlay && (
           <button type="button" className="ps-btn ps-eval-inline-btn" title={line.block.tooltip} onClick={() => onPlay(line.block.line, turn)}>
             ▶ Play
@@ -30,6 +32,7 @@ function ReviewLine({ line, turn, onPlay, confirm }: { line: ReviewLineView; tur
         )}
       </div>
       {line.block.endNote && <div className="ps-eval-review-line"><span className="text" style={{ color: '#778' }}>{line.block.endNote}</span></div>}
+      {line.block.worstNote && <div className="ps-eval-review-line"><span className="text" style={{ color: '#778' }}>{line.block.worstNote}</span></div>}
       {confirm && confirm.anchor === lineAnchor(line.block.line, turn) && <LineConfirm confirm={confirm} />}
     </>
   );
@@ -64,6 +67,40 @@ function ReviewSide({ view, onPlay, confirm, onSelectTurn }: { view: ReviewSideV
   );
 }
 
+/** The Endgame row of the player who lost (round 89, #130): one click searches the endgame's first turn; the panel opens under it. */
+function EndgameEntry({ row, host, playerNames, doubles }: { row: EndgameRowView; host: LinesHost; playerNames: [string, string]; doubles: boolean }) {
+  const { winPaths } = host;
+  if (!winPaths) return null;
+  const open = winPaths.run !== null;
+  return (
+    <div className="ps-eval-review-side" role="group" aria-label="Endgame">
+      <div className="ps-eval-review-row">
+        <div className="ps-eval-review-head">
+          <button
+            type="button" className="ps-btn ps-eval-inline-btn" aria-expanded={open} disabled={!!winPaths.unavailable && !open}
+            title={winPaths.unavailable ?? 'Search the endgame for a way the player could have won'}
+            onClick={() => (open ? winPaths.hide() : winPaths.show(row.turn))}
+          >
+            {row.text}
+          </button>
+        </div>
+        <WinPathsPanel host={host} playerNames={playerNames} doubles={doubles} />
+      </div>
+    </div>
+  );
+}
+
+/** Round 89 (G13): the stage that gives the graded early singles turns their lines is searching; it can be stopped. */
+function EarlyLinesProgress({ progress }: { progress: NonNullable<LinesHost['earlyLines']> }) {
+  return (
+    <span className="ps-eval-line" role="status" style={{ marginTop: 0 }}>
+      {`Finding lines for graded turns: ${progress.done} of ${progress.total}`}
+      {' '}
+      <button type="button" className="ps-btn ps-eval-inline-btn" title="Stop searching for lines; the next analysis finishes the turns that are left" onClick={progress.stop}>Stop</button>
+    </span>
+  );
+}
+
 /**
  * Round 89 (#104), step G4 (ruling 33, 4a): the Game review under the game report. One list per player of the turns the cards
  * grade, with the played and the engine's value, the loss, the engine's line and the played line, each with ▶ Play, and a
@@ -74,10 +111,14 @@ export function GameReviewPanel({ analyses, results, playerNames, doubles, host,
     () => gameReview({ analyses, results, playerNames, doubles, host }),
     [analyses, results, playerNames, doubles, host],
   );
+  const endgame = useMemo(() => endgameRow(host.winPaths?.endgame, playerNames), [host.winPaths?.endgame, playerNames]);
   return (
     <div className="ps-eval-review">
       <span className="ps-eval-lines-title">Game review · what the engine would have played</span>
+      {host.earlyLines && <EarlyLinesProgress progress={host.earlyLines} />}
       {sides.map(view => <ReviewSide key={view.side} view={view} onPlay={host.onPlay} confirm={host.confirm} onSelectTurn={onSelectTurn} />)}
+      {differsSentences(reviewBlocks(sides)).map(sentence => <span key={sentence} className="ps-eval-line">{sentence}</span>)}
+      {endgame && <EndgameEntry row={endgame} host={host} playerNames={playerNames} doubles={doubles} />}
     </div>
   );
 }

@@ -250,3 +250,13 @@ button.ps-eval-choice:hover,
 .ps-eval-review-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; font-size: 10px; color: #bcd; padding-left: 8px; }
 .ps-eval-review-line .role { color: #778; }
 .ps-eval-review-line .text { min-width: 0; overflow-wrap: anywhere; }
+
+/* Round 89 (#130): the win-path panel under the Game review's Endgame row and under an endgame turn's card. */
+.ps-winpaths { display: flex; flex-direction: column; gap: 4px; margin: 4px 0 2px 8px; padding: 4px 0 2px 8px; border-left: 2px solid rgba(190, 222, 255, 0.25); }
+.ps-winpaths-turns { display: flex; flex-wrap: wrap; gap: 4px; }
+.ps-winpaths-turns .ps-btn[aria-pressed="true"] { border-color: #8db2e0; color: #fff; }
+.ps-winpaths-step { padding-top: 3px; border-top: 1px solid rgba(190, 222, 255, 0.08); }
+.ps-winpaths-step-title { font-weight: bold; color: #cde; }
+.ps-winpaths-headline { color: #bcd; overflow-wrap: anywhere; }
+.ps-winpaths-empty, .ps-winpaths-status { color: #778; }
+.ps-winpaths-entry .ps-btn { align-self: flex-start; }

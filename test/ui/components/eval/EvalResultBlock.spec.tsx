@@ -37,9 +37,10 @@ describe('EvalResultBlock', () => {
     const shared = { result, playerNames: names, onPickChoice, onPickPair };
     const { rerender } = render(<EvalResultBlock {...shared} status="done" />);
     await userEvent.click(screen.getByRole('button', { name: /Swords Dance/ }));
-    expect(onPickChoice).toHaveBeenCalledWith('p1', result.perSide.p1[1], result.perSide.p2[0]);
+    // the result the rows are from is the 4th argument (Hard mode reads the reply that hurts the clicked move most from it)
+    expect(onPickChoice).toHaveBeenCalledWith('p1', result.perSide.p1[1], result.perSide.p2[0], result);
     await userEvent.click(screen.getByRole('button', { name: /Body Press/ }));
-    expect(onPickChoice).toHaveBeenLastCalledWith('p2', result.perSide.p2[1], result.perSide.p1[0]);
+    expect(onPickChoice).toHaveBeenLastCalledWith('p2', result.perSide.p2[1], result.perSide.p1[0], result);
     expect(screen.getByRole('button', { name: /Earthquake/ })).toHaveAttribute('title', expect.stringContaining('Click to play this turn out'));
     expect(screen.getByText('depth 1')).toBeInTheDocument();
 

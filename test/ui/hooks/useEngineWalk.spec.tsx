@@ -8,9 +8,9 @@ import { simState } from '../fixtures/sim-state';
 
 type Evaluation = ReturnType<typeof useEvaluation>;
 
-function evaluationOf(shape: { auto?: boolean; status?: Evaluation['status']; result?: EvalResult | null; resultTag?: string | null } = {}) {
+function evaluationOf(shape: { auto?: boolean; hardMode?: boolean; status?: Evaluation['status']; result?: EvalResult | null; resultTag?: string | null } = {}) {
   const setPrefs = vi.fn();
-  const prefs = { depth: 1 as const, samples: 1 as const, mode: 'matrix' as const, auto: shape.auto ?? true, autoAnalyze: false, tera: 'auto' as const };
+  const prefs = { depth: 1 as const, samples: 1 as const, mode: 'matrix' as const, auto: shape.auto ?? true, autoAnalyze: false, tera: 'auto' as const, ...(shape.hardMode === undefined ? {} : { hardMode: shape.hardMode }) };
   const evaluation = {
     prefs, setPrefs, status: shape.status ?? 'idle', result: shape.result ?? null, resultTag: shape.resultTag ?? null,
   } as unknown as Evaluation;
@@ -160,5 +160,79 @@ describe('useEngineWalk', () => {
     // Disarmed: another forced position now waits for the user.
     rerender({ ...wired, evaluation: evaluationOf({ status: 'done', result: evalResult('singles', { perSide: forced.perSide }), resultTag: 'variation:3' }).evaluation });
     expect(wired.handleSetChoice).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Round 89 (#153, Hard mode): a click on an engine move in a card or the live panel hands the result the card reads; with the setting on
+ * the opponent answers with the reply that hurts the clicked move most (`worstReply`), else with the reply the card names (the best
+ * row). A matrix cell names its pair and is played as clicked. Singles and doubles.
+ */
+describe('useEngineWalk, Hard mode', () => {
+  const clicked = (kind: 'singles' | 'doubles', hardMode: boolean | undefined, result: EvalResult = evalResult(kind)) => {
+    const wired = inputs({ simState: simState(kind), evaluation: evaluationOf({ status: 'done', result, hardMode }).evaluation });
+    const walk = renderHook(() => useEngineWalk(wired));
+    act(() => walk.result.current.handleExploreChoice('p1', result.perSide.p1[0], result.perSide.p2[0], result));
+    return wired;
+  };
+
+  test('singles, on: the opponent answers with the reply that hurts the move most, not with its best row', () => {
+    const wired = clicked('singles', true);
+    expect(wired.handleSetChoice).toHaveBeenCalledWith('p1', expect.objectContaining({ moveId: 'earthquake' }), 0);
+    expect(wired.handleSetChoice).toHaveBeenCalledWith('p2', { kind: 'switch', speciesId: 'rotomwash', pokemonName: 'Rotom-Wash' }, 0);
+    expect(wired.handleSetChoice).not.toHaveBeenCalledWith('p2', expect.objectContaining({ moveId: 'leechseed' }), 0);
+    expect(wired.executeTurn).toHaveBeenCalledTimes(1);
+  });
+
+  test('singles, off or unset: the reply the card names, as before', () => {
+    for (const hardMode of [false, undefined]) {
+      const wired = clicked('singles', hardMode);
+      expect(wired.handleSetChoice).toHaveBeenCalledWith('p2', expect.objectContaining({ moveId: 'leechseed' }), 0);
+      expect(wired.handleSetChoice).not.toHaveBeenCalledWith('p2', expect.objectContaining({ speciesId: 'rotomwash' }), 0);
+    }
+  });
+
+  test('doubles, on: the joint worst answer fills both slots of the opponent with their targets', () => {
+    // the fixture's own pickers: Rillaboom (slot 0) and Tornadus (slot 1) answer; the clicked row is hurt most by the second reply
+    const base = evalResult('doubles');
+    const replies = [rankedChoice('move grassyglide 1, move tailwind', 'A', -0.2), rankedChoice('move woodhammer 1, move taunt 1', 'B', -0.3)];
+    const result: EvalResult = {
+      ...base, perSide: { p1: base.perSide.p1, p2: replies },
+      matrix: { ...base.matrix!, p2Labels: ['A', 'B'], p2Choices: replies.map(row => row.choice), values: [[0.3, 0.1], [0.2, 0.25]] },
+    };
+    const wired = clicked('doubles', true, result);
+    expect(wired.handleSetChoice).toHaveBeenCalledWith('p2', expect.objectContaining({ moveId: 'woodhammer', targetLoc: 1 }), 0);
+    expect(wired.handleSetChoice).toHaveBeenCalledWith('p2', expect.objectContaining({ moveId: 'taunt', targetLoc: 1 }), 1);
+    expect(wired.handleSetChoice).not.toHaveBeenCalledWith('p2', expect.objectContaining({ moveId: 'grassyglide' }), 0);
+  });
+
+  test('a worst answer no picker maps falls back down the ranked list: the turn still plays', () => {
+    const base = evalResult('singles');
+    const unmapped = rankedChoice('move hyperbeam', 'Hyper Beam', -0.5);
+    const result = {
+      ...base, perSide: { ...base.perSide, p2: [...base.perSide.p2, unmapped] },
+      matrix: { ...base.matrix!, p2Labels: [...base.matrix!.p2Labels, 'Hyper Beam'], p2Choices: [...base.matrix!.p2Choices!, 'move hyperbeam'], values: base.matrix!.values.map(row => [...row, -0.9]) },
+    };
+    const wired = clicked('singles', true, result);
+    expect(wired.handleSetChoice).toHaveBeenCalledWith('p2', expect.objectContaining({ moveId: 'leechseed' }), 0);
+    expect(wired.executeTurn).toHaveBeenCalledTimes(1);
+  });
+
+  test('a matrix cell is played as clicked with the setting on', () => {
+    const wired = inputs({ evaluation: evaluationOf({ status: 'done', result: evalResult('singles'), hardMode: true }).evaluation });
+    const { result } = renderHook(() => useEngineWalk(wired));
+    act(() => result.current.handlePickPair({ choice: 'move swordsdance', label: 'Swords Dance' }, { choice: 'move bodypress', label: 'Body Press' }));
+    expect(wired.handleSetChoice).toHaveBeenCalledWith('p2', expect.objectContaining({ moveId: 'bodypress' }), 0);
+    expect(wired.handleSetChoice).not.toHaveBeenCalledWith('p2', expect.objectContaining({ speciesId: 'rotomwash' }), 0);
+  });
+
+  test('off the live tip the worst answer is read at the click and kept for the pick that waits', () => {
+    const result = evalResult('singles');
+    const wired = inputs({ liveTip: false, evaluation: evaluationOf({ status: 'done', result, hardMode: true }).evaluation });
+    const { result: walk, rerender } = renderHook((props: EngineWalkInputs) => useEngineWalk(props), { initialProps: wired });
+    act(() => walk.current.handleExploreChoice('p1', result.perSide.p1[0], result.perSide.p2[0], result));
+    // the position the deviation flow rebuilds carries another result: the pick still plays the reply read at the click
+    rerender({ ...wired, liveTip: true, evaluation: evaluationOf({ status: 'done', result: evalResult('singles', { score: 0.9 }), hardMode: true }).evaluation });
+    expect(wired.handleSetChoice).toHaveBeenCalledWith('p2', expect.objectContaining({ speciesId: 'rotomwash' }), 0);
   });
 });

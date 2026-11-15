@@ -109,6 +109,9 @@ function EvaluateButton({ running, onEvaluate, onCancel, result, status }: {
 }
 
 /** The panel header: title, the engine preferences, and the Evaluate/Cancel entry. */
+/** Round 89 (#153): what the setting changes and where; the grades stay as they are. */
+export const HARD_MODE_TITLE = 'The opponent answers each move you play with the reply the search rates lowest for it: when you click an engine move, in the turn dock, and in the lines. Grades stay as they are. A change applies from your next pick.';
+
 export function EvalControls({ prefs, onPrefsChange, running, showAuto, showTera, onEvaluate, onCancel, result, status, engines }: PrefsProps & {
   showAuto: boolean;
   /** Round 77: the engines on offer; another engine than the own search decides its own depth. */
@@ -149,6 +152,14 @@ export function EvalControls({ prefs, onPrefsChange, running, showAuto, showTera
           onChange={event => onPrefsChange({ ...prefs, autoAnalyze: event.target.checked })}
         />
         Always on
+      </label>
+      <label title={HARD_MODE_TITLE} style={LABEL_STYLE}>
+        <input
+          type="checkbox"
+          checked={!!prefs.hardMode}
+          onChange={event => onPrefsChange({ ...prefs, hardMode: event.target.checked })}
+        />
+        Hard mode
       </label>
       {onEvaluate && <EvaluateButton running={running} onEvaluate={onEvaluate} onCancel={onCancel} result={result} status={status} />}
     </div>

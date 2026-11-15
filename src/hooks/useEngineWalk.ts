@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import type { EvalResult, RankedChoice, BranchSlotChoice } from '@fulllifegames/eval-engine';
 import { slotChoicesOf } from '../lib/dock-fill';
+import { worstReply } from '../lib/worst-reply';
 import type { BranchSimState, useBranch } from './useBranch';
 import type { useEvaluation } from './useEvaluation';
 
@@ -104,18 +105,23 @@ function useChessWalk(args: EngineWalkInputs & WalkRefs & {
   const pendingPickRef = useRef<{ side: 'p1' | 'p2'; ranked: RankedChoice; reply: RankedChoice | null } | null>(null);
   const [pickVersion, setPickVersion] = useState(0);
 
-  const handleExploreChoice = useCallback((side: 'p1' | 'p2', ranked: RankedChoice, reply?: RankedChoice | null) => {
-    // The walk re-evaluates after every executed turn — surface that as the
-    // visible Auto setting rather than a hidden mode.
+  /**
+   * `reply` is the answer the card names (the best row). Round 89 (#153, Hard mode): a click on an engine move also hands `from`, the
+   * result the card reads; with the setting on the opponent answers with the reply that hurts the clicked move most (`worstReply`),
+   * read here, at the click, so a pick that waits for the deviation flow keeps it. A matrix pair passes no `from`: it is played as clicked.
+   */
+  const handleExploreChoice = useCallback((side: 'p1' | 'p2', ranked: RankedChoice, named?: RankedChoice | null, from?: EvalResult | null) => {
+    // The walk re-evaluates after every executed turn — surface that as the visible Auto setting rather than a hidden mode.
     if (!evaluation.prefs.auto) evaluation.setPrefs({ ...evaluation.prefs, auto: true });
+    const reply = evaluation.prefs.hardMode && from ? worstReply(from, side, ranked)?.reply ?? named ?? null : named ?? null;
     if (liveTip && simState) {
-      playOutEvalChoice(side, ranked, reply ?? null);
+      playOutEvalChoice(side, ranked, reply);
       return;
     }
     // Any other position: the deviation flow rebuilds the sim there (chess
     // rules incl. the replace confirm) and the pending pick plays out once
     // the pointer sits on the live tip again.
-    pendingPickRef.current = { side, ranked, reply: reply ?? null };
+    pendingPickRef.current = { side, ranked, reply };
     setPickVersion(version => version + 1);
     requestDeviation(null);
   }, [liveTip, simState, playOutEvalChoice, requestDeviation, evaluation]);

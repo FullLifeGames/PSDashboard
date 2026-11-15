@@ -1,6 +1,7 @@
 import { lostGround, winDeltaText, winPctText, type EvalLine, type EvalResult, type SideAnalysis, type TurnAnalysis, type VerdictTier } from '@fulllifegames/eval-engine';
-import { activeNamesAt, lineBlocks, type LineBlockView, type LinesHost } from '../../lib/line-view';
-import { cardLines, engineChoice, regretView } from './turn-copy';
+import { linesForMode, worstLookup } from '../../lib/worst-reply';
+import { activeNamesAt, lineBlocks, ranksOf, replacementWords, type LineBlockView, type LineReply, type LinesHost } from '../../lib/line-view';
+import { cardLines, engineChoice, regretView, rowValueTexts } from './turn-copy';
 
 /**
  * Round 89 (#104), step G4: what the Game review lists, as plain data. Ruling 33 (4a): only the turns the cards grade (inaccuracy,
@@ -17,6 +18,8 @@ export interface ReviewLineView {
   role: 'engine' | 'played';
   /** The whole line on one row: "<own choice> vs <the answer>, then …". */
   text: string;
+  /** "ends at 19%": the line's own number; the head of the row prints the row's (round 89, G10). */
+  end: string;
   block: LineBlockView;
 }
 export interface ReviewRowView {
@@ -55,8 +58,8 @@ export function gradedTier(side: SideAnalysis, lostGroundOnTurn = false): Review
   return tier;
 }
 
-/** Turns the cards grade in the order the review lists them: turn by turn, player 1 before player 2. */
-function gradedSides(analyses: readonly (TurnAnalysis | null)[] | null | undefined): { analysis: TurnAnalysis; side: Side; grade: ReviewGrade }[] {
+/** Turns the cards grade in the order the review lists them: turn by turn, player 1 before player 2 (round 89, G13: the early-lines stage reads the same rule). */
+export function gradedSides(analyses: readonly (TurnAnalysis | null)[] | null | undefined): { analysis: TurnAnalysis; side: Side; grade: ReviewGrade }[] {
   const found: { analysis: TurnAnalysis; side: Side; grade: ReviewGrade }[] = [];
   for (const analysis of analyses ?? []) {
     // a turn whose played actions were never parsed has no grade on its card
@@ -79,15 +82,17 @@ export function reviewMarks(analyses: readonly (TurnAnalysis | null)[] | null | 
  * holds two moves for each player, so each pair stands behind its player's name (round 89, G4d: "A + B vs C + D" read as one
  * run-on list of four moves).
  */
-function lineText(line: EvalLine, playerNames: [string, string], doubles: boolean): string {
+function lineText(line: EvalLine, playerNames: [string, string], doubles: boolean, reply: LineReply | null): string {
   const other: Side = line.side === 'p1' ? 'p2' : 'p1';
-  return line.steps.map(step => {
+  // the first answer carries its rank in the search's ranking (round 89, G11); a replacement-first line has none
+  const ranked = (label: string, index: number): string => (index === 0 && reply ? `${label} (${reply.rank})` : label);
+  return line.steps.map((step, index) => {
     if (step.replacement) {
       const replacing: Side[] = step.replacement === 'both' ? ['p1', 'p2'] : [step.replacement];
-      return replacing.map(side => `${playerNames[SIDE_INDEX[side]]} replaces: ${step[side].label}`).join(' and ');
+      return replacing.map(side => `${playerNames[SIDE_INDEX[side]]} replaces: ${replacementWords(step[side].label)}`).join(' and ');
     }
-    if (doubles) return `${playerNames[SIDE_INDEX[line.side]]}: ${step[line.side].label}; ${playerNames[SIDE_INDEX[other]]}: ${step[other].label}`;
-    return `${step[line.side].label} vs ${step[other].label}`;
+    if (doubles) return `${playerNames[SIDE_INDEX[line.side]]}: ${step[line.side].label}; ${playerNames[SIDE_INDEX[other]]}: ${ranked(step[other].label, index)}`;
+    return `${step[line.side].label} vs ${ranked(step[other].label, index)}`;
   }).join(', then ');
 }
 
@@ -102,15 +107,19 @@ interface ReviewArgs {
 function rowLines(args: ReviewArgs, analysis: TurnAnalysis, side: Side): ReviewLineView[] {
   const { turn } = analysis;
   // only the card's own engine choice has an engine line
-  const lines = cardLines(args.results[turn - 1]?.lines?.filter(line => line.side === side) ?? [], analysis);
+  const result = args.results[turn - 1];
+  const lines = linesForMode(cardLines(result?.lines?.filter(line => line.side === side) ?? [], analysis), !!args.host.hardMode);
   if (lines.length === 0) return [];
   const ctx = {
     turn, playerNames: args.playerNames, doubles: args.doubles, rules: args.host.rules,
     actives: activeNamesAt(args.host.snapshotAt?.(turn) ?? args.host.snapshot),
+    rowValues: rowValueTexts(analysis),
+    ranks: result ? ranksOf(result) : undefined,
+    ...(args.host.hardMode && result ? { worst: worstLookup(result, { p1: analysis.p1.faintedFraction, p2: analysis.p2.faintedFraction }) } : {}),
   };
   // `lineBlocks` puts the engine's line before the played line; a line that holds both roles reads as the engine's
   return lineBlocks(lines, ctx).map((block): ReviewLineView => ({
-    key: block.key, role: block.line.for.includes('engine') ? 'engine' : 'played', text: lineText(block.line, args.playerNames, args.doubles), block,
+    key: block.key, role: block.line.for.includes('engine') ? 'engine' : 'played', text: lineText(block.line, args.playerNames, args.doubles, block.reply), end: `ends at ${block.endPct}`, block,
   }));
 }
 
@@ -132,6 +141,20 @@ function reviewRow(args: ReviewArgs, analysis: TurnAnalysis, side: Side, grade: 
   };
 }
 
+export interface EndgameRowView { side: Side; player: string; /** The first turn of the endgame: the row's click searches it. */ turn: number; text: string }
+
+/**
+ * Round 89 (#130), step G8b: the Endgame row, for the player who lost a game that reached its endgame (the host's `endgame`: three
+ * bodies or fewer standing at the turn's start, the loser, every such turn). The click searches from the endgame's first turn; the
+ * panel's picker holds the later ones (ruling W2b).
+ */
+export function endgameRow(endgame: { loser: Side; turns: readonly number[] } | null | undefined, playerNames: [string, string]): EndgameRowView | null {
+  if (!endgame || endgame.turns.length === 0) return null;
+  const player = playerNames[SIDE_INDEX[endgame.loser]];
+  const turn = endgame.turns[0];
+  return { side: endgame.loser, player, turn, text: `Endgame · T${turn} · How could ${player} have won?` };
+}
+
 /** The lists of the Game review: one per player, player 1 first, the graded turns in turn order. */
 export function gameReview(args: ReviewArgs): ReviewSideView[] {
   const graded = gradedSides(args.analyses);
@@ -139,4 +162,12 @@ export function gameReview(args: ReviewArgs): ReviewSideView[] {
     side, player: args.playerNames[SIDE_INDEX[side]],
     rows: graded.filter(entry => entry.side === side).map(entry => reviewRow(args, entry.analysis, side, entry.grade)),
   }));
+}
+
+/** The line blocks of the whole review, for the sentences under it. */
+export const reviewBlocks = (view: readonly ReviewSideView[]): LineBlockView[] => view.flatMap(side => side.rows.flatMap(row => row.lines.map(line => line.block)));
+
+/** Whether any line of the review ends at another number than its row shows: the one sentence under the review then says why (G10). */
+export function reviewDiffers(view: readonly ReviewSideView[]): boolean {
+  return view.some(side => side.rows.some(row => row.lines.some(line => line.block.differs)));
 }

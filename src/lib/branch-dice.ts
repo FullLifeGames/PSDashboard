@@ -54,6 +54,14 @@ function effectWord(battle: Battle, id: string): string {
   return dexName(battle, id);
 }
 
+/** A status or a volatile as a common noun ("burn", "flinch"); a stat change and the names of abilities and items keep their capitals. */
+function plainWord(battle: Battle, id: string): string {
+  const word = effectWord(battle, id);
+  const dex = battle.dex as unknown as Record<'abilities' | 'items' | 'moves' | 'conditions', Namer>;
+  const condition = STATUS_WORDS[id] !== undefined || (dex.conditions.get(id).exists && ![dex.abilities, dex.items, dex.moves].some(table => table.get(id).exists));
+  return condition ? word.charAt(0).toLowerCase() + word.slice(1) : word;
+}
+
 const bodyAt = (battle: Battle, slot: string) => battle.sides[slot[1] === '1' ? 0 : 1]?.active[slot[2] === 'a' ? 0 : 1];
 
 /** The reader of names for `dieLabel` and the chips: moves and effects from the battle's Dex, bodies by their names in the battle. */
@@ -61,6 +69,7 @@ export function wordsOf(battle: Battle): DieWords {
   return {
     move: id => dexName(battle, id),
     effect: id => effectWord(battle, id),
+    plain: id => plainWord(battle, id),
     slot: slot => bodyAt(battle, slot)?.name ?? slot,
   };
 }

@@ -84,6 +84,40 @@ export function pickFillParts(side: Side, ranked: RankedChoice[], state: BranchS
   return { filled: none(), deferred: none() };
 }
 
+/**
+ * Round 89 (#153, Hard mode): the ranked row the picks of one side stand for, the row whose worst reply the opponent plays. `picks` are
+ * the side's choices as they stand (the user's slots and the slots the fill wrote), `touched` the user's own slots alone. The first row
+ * that has every pick, gimmick included, then the first that has every pick's action, then the first that agrees with the touched slots
+ * alone, which is where the fill takes the partner slot from, so a pick that broke the joint choice still has a row. Targets stay the
+ * user's. Null when no row agrees (the pick is outside the ranked rows).
+ */
+export function rowOfChoices(side: Side, ranked: RankedChoice[], state: BranchSimState, picks: Choices, touched: Choices): RankedChoice | null {
+  const candidates = ranked.flatMap(row => {
+    const parts = row.choice === 'wait' ? null : slotChoicesOf(state, side, row);
+    return parts ? [{ row, parts }] : [];
+  });
+  const has = (parts: Choices, against: Choices, strict: boolean): boolean => against.every((pick, slot) => {
+    if (!pick) return true;
+    const part = parts[slot];
+    return !!part && sameAction(part, pick) && (!strict || modifierOf(part) === modifierOf(pick));
+  });
+  const found = candidates.find(entry => has(entry.parts, picks, true)) ?? candidates.find(entry => has(entry.parts, picks, false))
+    ?? (touched.some(Boolean) ? candidates.find(entry => has(entry.parts, touched, false)) : undefined);
+  return found?.row ?? null;
+}
+
+/**
+ * Round 89 (#153, HM3b): whether two choices of one slot are the same pick (the same move, target, gimmick and forced dice, or the same
+ * body to switch in). Keys are read in order of name, so the way a choice was built does not matter.
+ */
+export function sameChoice(a: BranchSlotChoice | null | undefined, b: BranchSlotChoice | null | undefined): boolean {
+  if (!a || !b) return !a && !b;
+  const keys = (choice: BranchSlotChoice) => JSON.stringify(choice, (_key, value: unknown) => (
+    value && typeof value === 'object' && !Array.isArray(value) ? Object.fromEntries(Object.entries(value).sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0))) : value
+  ));
+  return keys(a) === keys(b);
+}
+
 /** The choices to write now (see `pickFillParts`). */
 export function pickFill(side: Side, ranked: RankedChoice[], state: BranchSimState, touched: Choices, held: readonly boolean[] = []): Choices {
   return pickFillParts(side, ranked, state, touched, held).filled;

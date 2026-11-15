@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { buildGameReport, winDeltaText, winPctText, type EvalLine, type EvalResult, type SideAnalysis, type TurnAnalysis } from '@fulllifegames/eval-engine';
-import { gameReview, gradedTier, reviewMarks } from '../../../../src/components/eval/game-review';
+import { gameReview, gradedTier, reviewDiffers, reviewMarks } from '../../../../src/components/eval/game-review';
 import type { LinesHost } from '../../../../src/lib/line-view';
 import { misplayedSide, sideAnalysis, turnAnalysis } from '../../fixtures/analysis';
 import { evalResult, rankedChoice } from '../../fixtures/eval-result';
@@ -8,7 +8,11 @@ import { bothRolesLine, doublesLine, DOUBLES_NAMES, playedLine, singlesLine, SIN
 
 /** Round 89 (#104), step G4, ruling 33 (4a): the Game review lists the graded turns only, as the turn cards grade them. */
 const host: LinesHost = { rules: { gen: 9, mod: undefined } };
-const withLines = (lines?: EvalLine[]): EvalResult => ({ ...evalResult('singles'), ...(lines ? { lines } : {}) });
+/** The ranking that holds the fixtures' answers: Tzon's Draining Kiss and Pepitopalotin's Hydro Pump are each side's top choice. */
+const topped = (labels: string[]) => labels.map((label, index) => rankedChoice(`move ${index + 1}`, label, 0.2 - index * 0.05));
+const withLines = (lines?: EvalLine[]): EvalResult => ({
+  ...evalResult('singles'), ...(lines ? { lines } : {}), perSide: { p1: topped(['Draining Kiss', 'Surf']), p2: topped(['Hydro Pump', 'Hyper Voice']) },
+});
 
 /** A side that played Hyper Voice where the engine's best was Hydro Pump (the labels of the line fixtures). */
 const gradedP2 = (tier: 'inaccuracy' | 'mistake' | 'blunder', overrides: Partial<SideAnalysis> = {}): SideAnalysis => {
@@ -95,8 +99,8 @@ describe('gameReview, singles', () => {
   test('the lines of the row: the engine\'s line and the played line, each with its own text and block', () => {
     const lines = view[1].rows[0].lines;
     expect(lines.map(line => line.role)).toEqual(['engine', 'played']);
-    expect(lines[0].text).toBe('Hydro Pump vs Draining Kiss, then Moonblast vs → Corviknight, then Moonblast vs Brave Bird');
-    expect(lines[1].text).toBe('Hyper Voice vs Draining Kiss');
+    expect(lines[0].text).toBe("Hydro Pump vs Draining Kiss (Tzon's top choice), then Moonblast vs → Corviknight, then Moonblast vs Brave Bird");
+    expect(lines[1].text).toBe("Hyper Voice vs Draining Kiss (Tzon's top choice)");
     expect(lines[0].block.line).toBe(singlesLine);
     expect(lines[0].block.tooltip).toContain('Hydro Pump: no crit (96%)');
   });
@@ -144,7 +148,7 @@ describe('gameReview: the engine of a row is the turn card\'s engine choice, and
 
 describe('gameReview, doubles', () => {
   const analyses: (TurnAnalysis | null)[] = [null, null, null, turnAnalysis(4, { p1: { ...misplayedSide('mistake'), best: rankedChoice('move 1, move 2', doublesLine.label, 0.37) } })];
-  const results: (EvalResult | null)[] = [null, null, null, { ...evalResult('doubles'), lines: [doublesLine] }];
+  const results: (EvalResult | null)[] = [null, null, null, { ...evalResult('doubles'), lines: [doublesLine], perSide: { p1: topped([doublesLine.label]), p2: topped(['Sucker Punch → Terapagos + Protect']) } }];
 
   test('a row keeps the pair\'s combined labels and its line text names the replacement', () => {
     const view = gameReview({ analyses, results, playerNames: DOUBLES_NAMES, doubles: true, host });
@@ -153,12 +157,16 @@ describe('gameReview, doubles', () => {
     const [line] = view[0].rows[0].lines;
     expect(line.role).toBe('engine');
     expect(line.text).toBe(
-      'pixelfrost: Fake Out → Rillaboom + Spore → Zamazenta; Mstr_Hawk: Sucker Punch → Terapagos + Protect, ' +
+      'pixelfrost: Fake Out → Rillaboom + Spore → Zamazenta; Mstr_Hawk: Sucker Punch → Terapagos + Protect (Mstr_Hawk\'s top choice), ' +
       'then Mstr_Hawk replaces: → Zamazenta-Crowned, ' +
       'then pixelfrost: Fake Out → Zamazenta-Crowned + Protect; Mstr_Hawk: Behemoth Bash → Rillaboom + Protect',
     );
     // the block is the section's own: doubles rows, one per player
     expect(line.block.rows.length).toBeGreaterThan(3);
+    // the engine's label of a replacement with a slot that passes ends in "+ pass"; the line's words leave it out (round 89, G16)
+    const passing = { ...doublesLine, steps: doublesLine.steps.map(step => (step.replacement ? { ...step, p2: { ...step.p2, label: '→ Zamazenta-Crowned + pass' } } : step)) };
+    const again = gameReview({ analyses, results: [null, null, null, { ...results[3]!, lines: [passing] }], playerNames: DOUBLES_NAMES, doubles: true, host });
+    expect(again[0].rows[0].lines[0].text).toContain('then Mstr_Hawk replaces: → Zamazenta-Crowned, then pixelfrost');
   });
 
   test('doubles: the engine line is the line of the card\'s engine pair, and another pair\'s line is dropped', () => {
@@ -207,5 +215,121 @@ describe('the review and the report list one verdict per side', () => {
   test('doubles: both sides of one turn, a read on one and an inaccuracy on the other', () => {
     const analysis = turnAnalysis(4, { swing: 0, p1: gradedP2('inaccuracy', { riskPaidOff: true }), p2: gradedP2('inaccuracy') });
     expect(reviewMarks([analysis])).toEqual([{ turn: 4, side: 'p2' }]);
+  });
+});
+
+/** Round 89 (#104), step G10 (ruling G5a): each review line ends with its own number; a line that differs from its row is told apart. */
+describe('gameReview: the end of each line beside its row (G10)', () => {
+  test('singles: each line ends at its own value and knows whether it differs from the row the head prints', () => {
+    const analyses: (TurnAnalysis | null)[] = Array.from({ length: 20 }, () => null);
+    analyses[19] = turnAnalysis(20, { p2: gradedP2('inaccuracy') });
+    const results: (EvalResult | null)[] = analyses.map(() => null);
+    results[19] = withLines([singlesLine, playedLine]);
+    const view = gameReview({ analyses, results, playerNames: SINGLES_NAMES, doubles: false, host });
+    const [engine, played] = view[1].rows[0].lines;
+    expect(engine.end).toBe(`ends at ${winPctText(singlesLine.end, singlesLine.endFainted)}`);
+    expect(played.end).toBe(`ends at ${winPctText(playedLine.end, playedLine.endFainted)}`);
+    // the engine row prints 0.1 and the line ends at 0.06 (a different print), the played row 0.06 against a line at -0.24
+    expect(engine.block.row).toBe(winPctText(0.1));
+    expect(played.block.row).toBe(winPctText(0.06));
+    expect(engine.block.differs).toBe(true);
+    expect(played.block.differs).toBe(true);
+    expect(reviewDiffers(view)).toBe(true);
+  });
+
+  test('singles: no line differs when every line ends where its row stands', () => {
+    const share = 0.1;
+    const analyses: (TurnAnalysis | null)[] = Array.from({ length: 20 }, () => null);
+    const side = gradedP2('inaccuracy', { faintedFraction: share, best: rankedChoice('move 1', 'Hydro Pump', singlesLine.end), played: rankedChoice('move 2', 'Hyper Voice', playedLine.end) });
+    analyses[19] = turnAnalysis(20, { p2: side });
+    const results: (EvalResult | null)[] = analyses.map(() => null);
+    results[19] = withLines([singlesLine, playedLine]);
+    const view = gameReview({ analyses, results, playerNames: SINGLES_NAMES, doubles: false, host });
+    expect(view[1].rows[0].lines.map(line => line.block.differs)).toEqual([false, false]);
+    expect(reviewDiffers(view)).toBe(false);
+  });
+
+  test('doubles: the pair line ends at its value and differs from the row the head prints', () => {
+    const analyses: (TurnAnalysis | null)[] = [null, null, null, turnAnalysis(4, { p1: { ...misplayedSide('mistake'), best: rankedChoice('move 1, move 2', doublesLine.label, 0.6) } })];
+    const results: (EvalResult | null)[] = [null, null, null, { ...evalResult('doubles'), lines: [doublesLine] }];
+    const view = gameReview({ analyses, results, playerNames: DOUBLES_NAMES, doubles: true, host });
+    const [line] = view[0].rows[0].lines;
+    expect(line.end).toBe(`ends at ${winPctText(doublesLine.end, doublesLine.endFainted)}`);
+    expect(line.block.differs).toBe(true);
+    expect(reviewDiffers(view)).toBe(true);
+  });
+
+  test('a review without lines has nothing to explain', () => {
+    expect(reviewDiffers(gameReview({ analyses: [], results: [], playerNames: SINGLES_NAMES, doubles: false, host }))).toBe(false);
+  });
+});
+
+/** Round 89 (#104), step G11 (ruling G8a): the review's line text names the rank of the first answer. */
+describe('gameReview: the answer of each line (G11)', () => {
+  const ranking = (labels: string[]) => labels.map((label, index) => rankedChoice(`move ${index}`, label, 0.2 - index * 0.05));
+
+  test('singles: the first answer carries its rank in the result\'s ranking, a later answer does not', () => {
+    const analyses: (TurnAnalysis | null)[] = Array.from({ length: 20 }, () => null);
+    analyses[19] = turnAnalysis(20, { p2: gradedP2('inaccuracy') });
+    const results: (EvalResult | null)[] = analyses.map(() => null);
+    results[19] = { ...withLines([singlesLine, playedLine]), perSide: { p1: ranking(['Surf', 'Draining Kiss']), p2: ranking(['Hydro Pump']) } };
+    const view = gameReview({ analyses, results, playerNames: SINGLES_NAMES, doubles: false, host });
+    const [engine, played] = view[1].rows[0].lines;
+    expect(engine.text).toBe("Hydro Pump vs Draining Kiss (Tzon's second choice in this search), then Moonblast vs → Corviknight, then Moonblast vs Brave Bird");
+    expect(played.text).toBe("Hyper Voice vs Draining Kiss (Tzon's second choice in this search)");
+    // a result without a ranking names no rank
+    results[19] = { ...withLines([singlesLine]), perSide: { p1: [], p2: [] } };
+    const bare = gameReview({ analyses, results, playerNames: SINGLES_NAMES, doubles: false, host });
+    expect(bare[1].rows[0].lines[0].text).toBe("Hydro Pump vs Draining Kiss (not among Tzon's ranked choices), then Moonblast vs → Corviknight, then Moonblast vs Brave Bird");
+  });
+
+  test('doubles: the pair of the other player carries its rank, and a replacement carries none', () => {
+    const analyses: (TurnAnalysis | null)[] = [null, null, null, turnAnalysis(4, { p1: { ...misplayedSide('mistake'), best: rankedChoice('move 1, move 2', doublesLine.label, 0.6) } })];
+    const results: (EvalResult | null)[] = [null, null, null, { ...evalResult('doubles'), lines: [doublesLine], perSide: { p1: ranking([doublesLine.label]), p2: ranking(['Other', 'Sucker Punch → Terapagos + Protect']) } }];
+    const view = gameReview({ analyses, results, playerNames: DOUBLES_NAMES, doubles: true, host });
+    const [line] = view[0].rows[0].lines;
+    expect(line.text).toBe(
+      "pixelfrost: Fake Out → Rillaboom + Spore → Zamazenta; Mstr_Hawk: Sucker Punch → Terapagos + Protect (Mstr_Hawk's second choice in this search), " +
+      'then Mstr_Hawk replaces: → Zamazenta-Crowned, ' +
+      'then pixelfrost: Fake Out → Zamazenta-Crowned + Protect; Mstr_Hawk: Behemoth Bash → Rillaboom + Protect',
+    );
+  });
+});
+
+describe('gameReview: Hard mode (round 89, #153)', () => {
+  const ranking = (labels: string[]) => labels.map((label, index) => rankedChoice(`move ${index}`, label, 0.2 - index * 0.05));
+  const hard: LinesHost = { ...host, hardMode: true };
+  const meetsSurf: EvalLine = { ...singlesLine, versus: 'worst', steps: [{ ...singlesLine.steps[0], p1: { choice: 'move 1', label: 'Surf', slots: [] } }, ...singlesLine.steps.slice(1)] };
+  /** Surf is the reply the search rates lowest for Hydro Pump: the highest cell of its column in p1's view (0.4, so p2's row reads -0.4). */
+  const withMatrix = (lines: EvalLine[]): EvalResult => ({
+    ...withLines(lines), perSide: { p1: ranking(['Draining Kiss', 'Surf']), p2: ranking(['Hydro Pump', 'Hyper Voice']) },
+    matrix: { p1Labels: ['Draining Kiss', 'Surf'], p2Labels: ['Hydro Pump', 'Hyper Voice'], p1Choices: ['move 0', 'move 1'], p2Choices: ['move 0', 'move 1'], values: [[0.1, 0], [0.4, -0.1]], mixes: { p1: [1, 0], p2: [1, 0] } },
+  });
+  const review = (lines: EvalLine[], on: LinesHost, share?: number) => {
+    const analyses: (TurnAnalysis | null)[] = Array.from({ length: 20 }, () => null);
+    analyses[19] = turnAnalysis(20, { p2: gradedP2('inaccuracy', share === undefined ? {} : { faintedFraction: share }) });
+    const results: (EvalResult | null)[] = analyses.map(() => null);
+    results[19] = withMatrix(lines);
+    return gameReview({ analyses, results, playerNames: SINGLES_NAMES, doubles: false, host: on })[1].rows[0].lines;
+  };
+
+  test('singles, on: the engine line is the worst line and its answer says why; off: the usual line, whatever the result holds', () => {
+    const [engine] = review([singlesLine, meetsSurf], hard);
+    expect(engine.text).toBe('Hydro Pump vs Surf (the reply the search rates lowest for this choice, 32% in its cell), then Moonblast vs → Corviknight, then Moonblast vs Brave Bird');
+    const [usual] = review([singlesLine, meetsSurf], host);
+    expect(usual.text).toBe("Hydro Pump vs Draining Kiss (Tzon's top choice), then Moonblast vs → Corviknight, then Moonblast vs Brave Bird");
+  });
+
+  test('the cell in the bracket is printed with the turn\'s fainted share, as the card prints its rows', () => {
+    const [engine] = review([singlesLine, meetsSurf], hard, 0.5);
+    expect(engine.text).toContain(`the reply the search rates lowest for this choice, ${winPctText(-0.4, 0.5)} in its cell)`);
+    expect(winPctText(-0.4, 0.5)).not.toBe(winPctText(-0.4));
+  });
+
+  test('singles, on, with no line against the reply: today\'s line and the sentence on the block', () => {
+    const lines = review([singlesLine], hard);
+    expect(lines).toHaveLength(1);
+    expect(lines[0].text).toContain("vs Draining Kiss (Tzon's top choice)");
+    expect(lines[0].block.worstNote).toBe('No line against Surf, the reply the search rates lowest for this choice. This line meets Draining Kiss.');
   });
 });

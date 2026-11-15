@@ -1,5 +1,6 @@
 import type { BranchSlotChoice } from './branch-choices.ts';
 import type { ForcedDie } from './dice/types.ts';
+import type { OnRequestJob, OnRequestResult, OnRequestStep } from './on-request.ts';
 import type { PlayedAction } from './played.ts';
 import type { SimFastLever, SimFastReport } from './forward/sim-fast/state.ts';
 import type { SearchBudget } from './search/budget.ts';
@@ -54,6 +55,18 @@ export interface EvalSettings {
    */
   lineRows?: { p1?: string[]; p2?: string[] };
   /**
+   * Round 89 (#104, ruling G2b): the answers the host's card ranks first, by label and by the side whose lines they are (`p1` holds the
+   * labels of player 2's rows that player 1's lines should meet, best first). The donors meet them before the search's merged ranking.
+   */
+  lineReplies?: { p1?: string[]; p2?: string[] };
+  /**
+   * Round 89 (#104, G14b, ruling G9a option L): extra tree iterations per tree, run after the tree's result, cell statistics and
+   * ranking are final, aimed at the rows whose lines the card shows (the tree's best row and the played row, against the tree's top three
+   * answers) until each line holds two turns or the quota is spent. They descend below the root cells and never write the root's own statistics, so no score, rank or grade
+   * moves; only the visits a line reads grow. Absent or 0: no pass. A search that is stopped runs none. Part of the settings key only when present.
+   */
+  linePass?: number;
+  /**
    * Round 65: the rule set the replay runs under (Pokémon Champions or the
    * standard games), named by the host from the replay's format: the
    * simulator reconstructs every doubles game as Doubles OU and knows no
@@ -104,6 +117,12 @@ export interface EvalPreferences {
    * Evaluate button. Persisted — switching it on once keeps it on.
    */
   autoAnalyze: boolean;
+  /**
+   * Round 89 (#153, Hard mode): the opponent answers each move the user plays with the reply that hurts that move most (`worstAnswer`):
+   * on a click of an engine move, in the turn dock and in a turn's lines. A preference of the app alone: no search setting, score,
+   * grade or report reads it. Absent: off.
+   */
+  hardMode?: boolean;
   /**
    * Tera enumeration: 'auto' = only when the replay terastallized (and in
    * draft/custom formats, only the Pokémon that did); 'revealed' forces the
@@ -271,6 +290,11 @@ export interface EvalResult {
    * search, on an engine that sends none and when the tree holds no line for the row. No score, ranking or grade reads it.
    */
   lines?: EvalLine[];
+  /**
+   * Round 89 (#104, G14b): the extra iterations per tree (`EvalSettings.linePass`) that made `lines`, written by the host that asked
+   * for them when it stores the lines. Absent: the lines come from the tree's own iterations alone. Nothing in the engine reads it.
+   */
+  linePass?: number;
 }
 
 /**
@@ -305,6 +329,11 @@ export interface EvalLine {
   end: number;
   endFainted: number;
   visits: number;
+  /**
+   * Round 89 (#153, Hard mode): `worst` marks the line of this row against the reply that hurts it most (`worstAnswer`), which a turn
+   * holds beside the row's usual line (same side, label and roles). Absent: the usual line, which meets the search's own top answers.
+   */
+  versus?: 'worst';
   cut?: string;
   /** The side (or both) the position after the last step asks to send a body in: a line ends when a choice is needed that the tree did not make. */
   awaits?: 'p1' | 'p2' | 'both';
@@ -314,11 +343,18 @@ export interface EvalLine {
 /** One step of a row's line as a tree carries it: both sides' choices by label and the visits of its cell. */
 export interface TreeLineStep { p1: string; p2: string; visits: number }
 
-/** A tree's line for each root row that holds one, by side and row label. */
-export interface RowLines { p1: Record<string, TreeLineStep[]>; p2: Record<string, TreeLineStep[]> }
+/**
+ * A tree's lines for each root row that holds one, by side and row label: up to three per row, the tree's own first (round 89, G12).
+ * Round 89 (#153, Hard mode): `floor` is, by side and row label, the tree's line through the cell of the row's floor answer (the caller
+ * names it) when that cell holds the visits a line needs; it stays apart from the lists the plain request's donors read. Absent: none.
+ */
+export interface RowLines { p1: Record<string, TreeLineStep[][]>; p2: Record<string, TreeLineStep[][]>; floor?: { p1: Record<string, TreeLineStep[]>; p2: Record<string, TreeLineStep[]> } }
 
-/** One line to replay: the row, the trees' lines for it best first (the next one stands in when a replay is cut) and the visits of the first. */
-export interface LineRequest { side: 'p1' | 'p2'; label: string; for: ('engine' | 'played')[]; donors: TreeLineStep[][]; visits: number }
+/**
+ * One line to replay: the row, the trees' lines for it best first (the next one stands in when a replay is cut) and the visits of the first.
+ * Round 89 (#153): `versus: 'worst'` asks for the row's line against the reply that hurts it most (`worstAnswer`); absent: the usual line.
+ */
+export interface LineRequest { side: 'p1' | 'p2'; label: string; for: ('engine' | 'played')[]; donors: TreeLineStep[][]; visits: number; versus?: 'worst' }
 
 /** The lines job: the requests, and the settings the root's options need to resolve the first labels. */
 export interface LinesInput { requests: LineRequest[]; tera?: TeraAllowance; sleepClause?: boolean; keepPlayed?: EvalSettings['keepPlayed'] }
@@ -703,6 +739,7 @@ export type EvalWorkerRequest = (
   | { type: 'subsearch'; id: number; serializedBattle: string; job: EvalSubSearchJob }
   | { type: 'prove'; id: number; serializedBattle: string; input: ForcedWinInput }
   | { type: 'lines'; id: number; serializedBattle: string; input: LinesInput }
+  | { type: 'job'; id: number; serializedBattle: string; job: OnRequestJob }
 ) & SimFastStamp & RulesetStamp;
 
 /** Final answers carry the worker's speed-layer status and its counters since the last one. */
@@ -715,5 +752,7 @@ export type EvalWorkerResponse = (
   | { type: 'cellsResult'; id: number; values: EvalCellValue[] }
   | { type: 'proveResult'; id: number; outcome: ForcedWinOutcome | null }
   | { type: 'linesResult'; id: number; lines: EvalLine[] }
+  | { type: 'jobStep'; id: number; step: OnRequestStep }
+  | { type: 'jobResult'; id: number; result: OnRequestResult }
   | { type: 'error'; id: number; message: string }
 ) & { simFast?: SimFastReport };

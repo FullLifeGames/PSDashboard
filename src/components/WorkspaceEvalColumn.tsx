@@ -53,11 +53,14 @@ function useVariationShares(history: AppController['ctx']['branch']['history'], 
   return useMemo(() => (variationSpan ? variationBoardShares(history, variationSpan.startTurn) : []), [history, variationSpan]);
 }
 
-/** Round 89 (#104, G4d): with a variation open and a game report held, the way back to the report, as "Main line" of the Line selector. */
-function backToMain(app: AppController, viewingVariation: boolean): (() => void) | undefined {
+/**
+ * Round 89 (#104, G4d): with a variation open and a game report held, the way back to the report, as "Main line" of the Line selector.
+ * G13b: a line started from a turn card (`cardTurn`) goes back to that turn, whichever turn the variation reached.
+ */
+function backToMain(app: AppController, viewingVariation: boolean): ((cardTurn: number | null) => void) | undefined {
   if (!viewingVariation || !app.analysis.gameReport) return undefined;
   const { viewTurn, maxTurn, navigateTo } = app.board.timeline;
-  return () => navigateTo(mainLineTarget(viewTurn, maxTurn));
+  return cardTurn => navigateTo(cardTurn === null ? mainLineTarget(viewTurn, maxTurn) : mainLineTarget(cardTurn, maxTurn));
 }
 
 function EvalSection({ app, replayData }: WorkspaceColumnProps) {

@@ -78,6 +78,28 @@ describe('useEvaluation preferences', () => {
   });
 });
 
+describe('useEvaluation preferences: Hard mode (round 89, #153)', () => {
+  test('off by default and in an old store; only a stored true restores it; the switch is stored', () => {
+    expect(renderHook(() => useEvaluation()).result.current.prefs).not.toHaveProperty('hardMode');
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ depth: 1, mode: 'matrix', hardMode: 'yes' }));
+    expect(renderHook(() => useEvaluation()).result.current.prefs.hardMode).toBeUndefined();
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ depth: 1, mode: 'matrix', hardMode: true }));
+    const restored = renderHook(() => useEvaluation());
+    expect(restored.result.current.prefs.hardMode).toBe(true);
+    act(() => restored.result.current.setPrefs({ ...restored.result.current.prefs, hardMode: false }));
+    expect(JSON.parse(localStorage.getItem(PREFS_KEY)!).hardMode).toBe(false);
+  });
+
+  test('the switch marks no result stale: nothing a search reads changes', async () => {
+    const { result } = renderHook(() => useEvaluation());
+    act(() => result.current.setPrefs(matrixPrefs));
+    act(() => result.current.evaluate({ cacheKey: null, tera: false, acquire: async () => position(0), tag: 'main:2' }));
+    await waitFor(() => expect(result.current.status).toBe('done'));
+    act(() => result.current.setPrefs({ ...matrixPrefs, hardMode: true }));
+    expect(result.current.status).toBe('done');
+  });
+});
+
 describe('useEvaluation single position', () => {
   test('evaluates through the pool with the configured engine, streams progress, installs and caches the result', async () => {
     script.evaluate = async (serialized, _settings, handlers) => {

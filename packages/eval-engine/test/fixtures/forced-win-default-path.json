@@ -1,0 +1,82 @@
+{
+ "budget gen9doublesou-2695084835-t8": {
+  "mass": 0.95,
+  "turns": 1,
+  "caveat": "sampled-rolls",
+  "openValue": 0.8976019026893985,
+  "states": 52,
+  "cells": 100
+ },
+ "budget gen9vgc2026regf-2532857804-t7": {
+  "mass": 0.6666666666666667,
+  "turns": 2,
+  "caveat": "sampled-rolls",
+  "openValue": 0.7,
+  "states": 6,
+  "cells": 96
+ },
+ "plain-dice-gen9championsvgc2026regmbbo3-2679549596-t7": {
+  "mass": 1,
+  "turns": 8,
+  "caveat": "sampled-rolls",
+  "openValue": null,
+  "states": 8,
+  "cells": 55
+ },
+ "plain-dice-gen9vgc2025regi-2408473310-t13": {
+  "mass": 0.6699999999999999,
+  "turns": 4,
+  "caveat": "sampled-rolls",
+  "openValue": 0.6,
+  "states": 9,
+  "cells": 11
+ },
+ "scout-miss-gen9championsvgc2026regmbbo3-2682637901-t6": {
+  "mass": 0.5833333333333334,
+  "turns": 2,
+  "caveat": "sampled-rolls",
+  "openValue": 0.9479237917223807,
+  "states": 18,
+  "cells": 100
+ },
+ "scout-miss-gen9championsvgc2026regmc-2694684816-t8": {
+  "mass": 0,
+  "turns": 0,
+  "caveat": "none",
+  "openValue": null,
+  "states": 56,
+  "cells": 100
+ },
+ "scout-miss-gen9doublesou-2661746817-t8": {
+  "mass": 1,
+  "turns": 1,
+  "caveat": "sampled-rolls",
+  "openValue": null,
+  "states": 1,
+  "cells": 20
+ },
+ "scout-miss-gen9vgc2024regg-2163312677-t8": {
+  "mass": 1,
+  "turns": 1,
+  "caveat": "sampled-rolls",
+  "openValue": null,
+  "states": 1,
+  "cells": 18
+ },
+ "smogtours-gen9ou-749351-t10": {
+  "mass": 1,
+  "turns": 1,
+  "caveat": "none",
+  "openValue": null,
+  "states": 1,
+  "cells": 4
+ },
+ "smogtours-gen9ou-749828-t23": {
+  "mass": 1,
+  "turns": 1,
+  "caveat": "barring-crit",
+  "openValue": null,
+  "states": 1,
+  "cells": 4
+ }
+}

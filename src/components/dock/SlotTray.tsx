@@ -10,7 +10,7 @@ import { TrayMore } from './TrayMore';
  * Round 84 (turn dock): the tray of one slot, above the dock: header, move tiles with their targets, the bench, and behind
  * "Dice · What if" the dice, the What-if loader and all choices. A slot that must replace a body shows only the bench.
  */
-export function SlotTray({ slot, hpByLabel, gen, moreOpen, diceViews, onChoice, onHypotheticalMove, onMore, onDone }: {
+export function SlotTray({ slot, hpByLabel, gen, moreOpen, diceViews, onChoice, onHypotheticalMove, onMore, onBackToEngine, onDone }: {
   slot: DockSlotModel;
   hpByLabel: Record<string, number>;
   gen: number;
@@ -19,11 +19,13 @@ export function SlotTray({ slot, hpByLabel, gen, moreOpen, diceViews, onChoice, 
   onChoice: (choice: BranchSlotChoice) => void;
   onHypotheticalMove: (params: { species: string; move: string; replace: string | null }) => void;
   onMore: () => void;
+  /** Round 89 (#153, HM3b): set where the slot holds a pick that differs from the engine's. */
+  onBackToEngine?: () => void;
   onDone: () => void;
 }) {
   return (
     <div className={`ps-tray${moreOpen ? ' ps-tray-roomy' : ''}`} role="region" aria-label={`Choices for ${slot.label} ${slot.name}`}>
-      <TrayHeader slot={slot} moreOpen={moreOpen} onMore={onMore} onDone={onDone} />
+      <TrayHeader slot={slot} moreOpen={moreOpen} onMore={onMore} onBackToEngine={onBackToEngine} onDone={onDone} />
       {!slot.forceSwitch && slot.moves.length > 0 && <MoveTiles slot={slot} hpByLabel={hpByLabel} onChoice={onChoice} />}
       {slot.switches.length > 0 && (
         <div className="ps-tray-line">

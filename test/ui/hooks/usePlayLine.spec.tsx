@@ -100,8 +100,11 @@ describe('useLinesHost', () => {
     const snapshots = [{ turn: 1 }, { turn: 2 }, { turn: 3 }];
     const app = {
       ...stub.app,
-      ctx: { ...stub.app.ctx, replay: { snapshots } },
-      board: { ...stub.app.board, timeline: { ...stub.app.board.timeline, analysisTurn: 2 } },
+      ctx: { ...stub.app.ctx, evaluation: { ...stub.app.ctx.evaluation, graph: { results: [] } }, replay: { snapshots } },
+      board: { ...stub.app.board, timeline: { ...stub.app.board.timeline, analysisTurn: 2, analyzableTurns: 3 } },
+      // round 89 (#130, G8b): the host mounts the win-path hook, which reads the analyses, the position source and the effective rules
+      analysis: { gameAnalyses: null },
+      engine: { smogonPending: false, acquire: { makeReplayAcquire: vi.fn() }, evalView: { effectiveTera: false, effectiveSleepClause: true, effectiveRuleset: undefined } },
     } as unknown as AppController;
     const replay = { log: '|gen|9\n|gametype|singles', players: ['a', 'b'] } as unknown as Parameters<typeof useLinesHost>[1];
     const { result } = renderHook(() => useLinesHost(app, replay));

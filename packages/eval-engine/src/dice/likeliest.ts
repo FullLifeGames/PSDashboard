@@ -133,15 +133,35 @@ export interface LikeliestTurn {
   unnamed: number;
 }
 
+/** A turn played with some dice pinned (`playTurnWith`): the likeliest turn's fields, the draw each die was read from and the order the turn asked for them (die keys). */
+export interface PinnedTurn extends LikeliestTurn {
+  draws: ReadonlyMap<string, Draw>;
+  drawOrder: readonly string[];
+}
+
 /**
  * Plays `play` on a copy of `live` with every die at its likeliest result. `play` writes both sides' choices to the battle it gets
  * and lets the turn run (it runs several times, on copies). The copy carries the stream of the live battle's PRNG; nothing the
  * dice name reads it.
  */
 export function playLikeliestTurn(live: Battle, play: (battle: Battle) => void): LikeliestTurn {
+  const { battle, dice, unforced, unnamed } = playTurnWith(live, play, []);
+  return { battle, dice, unforced, unnamed };
+}
+
+/**
+ * Round 89 (#130, step 2): the likeliest turn with some dice pinned to the result the caller names (`pinned` carries each die with the
+ * chance of that result). A pinned die keeps its result wherever the turn draws it; every other die takes its likeliest result, so a
+ * die the pin makes appear (a forced hit adds a crit and a roll) is read from its own draw. `dice` lists the dice the played turn drew
+ * pinned ones included with the chance they were given (`drawOrder` is the order the turn asked for them); `draws` holds the draw each die was read from, the input of
+ * `otherResults`. With nothing pinned this is `playLikeliestTurn`.
+ */
+export function playTurnWith(live: Battle, play: (battle: Battle) => void, pinned: readonly LikeliestDie[]): PinnedTurn {
   const forced = new Map<string, LikeliestDie>();
   const skipped = new Map<string, DieName>();
+  const draws = new Map<string, Draw>();
   for (const die of orderDice(live, play)) forced.set(dieKey(die.die.name), die);
+  for (const die of pinned) forced.set(dieKey(die.die.name), die);
   for (let round = 0; ; round++) {
     const trial = copyOf(live);
     trial.prng = live.prng.clone();
@@ -151,7 +171,8 @@ export function playLikeliestTurn(live: Battle, play: (battle: Battle) => void):
       onDraw: (name, _value, draw) => { if (!seen.has(dieKey(name))) seen.set(dieKey(name), { name, draw: { ...draw } }); },
     });
     let added = 0;
-    for (const { name, draw } of seen.values()) {
+    for (const [key, { name, draw }] of seen) {
+      draws.set(key, draw);
       if (covered(forced, name) || skipped.has(dieKey(name))) continue;
       const likeliest = likeliestOf(name, draw, live, live.gen);
       if (likeliest) {
@@ -166,8 +187,10 @@ export function playLikeliestTurn(live: Battle, play: (battle: Battle) => void):
       return {
         battle: trial,
         dice: [...forced.values()].filter(entry => drawn.has(dieKey(entry.die.name))),
+        drawOrder: [...seen.keys()],
         unforced: [...new Set([...skipped.values()].map(name => name.kind))],
         unnamed: report.unnamed ?? 0,
+        draws,
       };
     }
   }
@@ -190,8 +213,27 @@ export function rollDecides(
 ): { rolls: number; of: number; chance: number } | null {
   const die = dice[index];
   if (!die || die.name.kind !== 'damage-roll' || !('step' in die.result)) return null;
+  const boundary = rollBoundary(live, play, dice, index);
+  if (!boundary) return null;
+  const { lo, steps } = boundary;
+  const rolls = steps - lo;
+  return { rolls, of: steps, chance: (die.result.step >= lo ? rolls : steps - rolls) / steps };
+}
+
+/**
+ * Round 89 (#130): where a damage roll decides the turn's outcome: the lowest step that gives the highest roll's outcome (the bodies
+ * that fall), and the number of steps; null when the same bodies fall at the lowest and the highest roll. `plays` counts the turns
+ * played on copies (the caller's work counter).
+ */
+export function rollBoundary(
+  live: Battle, play: (battle: Battle) => void, dice: readonly ForcedDie[], index: number,
+): { lo: number; steps: number; plays: number } | null {
+  const die = dice[index];
+  if (!die || die.name.kind !== 'damage-roll' || !('step' in die.result)) return null;
   const steps = genShape(live.gen).roll.steps;
+  let plays = 0;
   const outcomeAt = (step: number): string => {
+    plays++;
     const trial = copyOf(live);
     trial.prng = live.prng.clone();
     playForcedTurn({ live: trial, forced: dice.map((entry, at) => (at === index ? { ...entry, result: { step } } : entry)), play });
@@ -208,8 +250,55 @@ export function rollDecides(
     if (outcomeAt(mid) === high) hi = mid;
     else lo = mid + 1;
   }
-  const rolls = steps - lo;
-  return { rolls, of: steps, chance: (die.result.step >= lo ? rolls : steps - rolls) / steps };
+  return { lo, steps, plays };
+}
+
+/**
+ * Round 89 (#130): the other results of one die and the simulator's own chance of each, for a die `entry` read from `draw` (the draw
+ * `playTurnWith` keeps in `draws`). A chance die, a status check and a speed tie have the one other answer (1 minus the chance of the
+ * result taken; a tie 1/2); a hit count and a pick have every other item of their draw, each at its share of the draw. A damage roll
+ * is not here (its groups depend on the turn: `rollBoundary`), and neither is a die whose draw names no chance (the Gen 2 crit) or
+ * whose result is sure (chance 1: nothing to turn).
+ */
+export function otherResults(entry: LikeliestDie, draw: Draw | undefined): LikeliestDie[] {
+  const { name, result } = entry.die;
+  if (name.kind === 'speed-tie') {
+    if (!('first' in result) || !name.targetSlot) return [];
+    return [{ die: { name, result: { first: result.first === name.slot ? name.targetSlot : name.slot } }, chance: 0.5 }];
+  }
+  if ('happens' in result) {
+    if (entry.chance === undefined || !(entry.chance > 0 && entry.chance < 1)) return [];
+    return [{ die: { name, result: { happens: !result.happens } }, chance: 1 - entry.chance }];
+  }
+  if (!draw || !('hits' in result || 'option' in result)) return [];
+  return otherItems(entry, draw);
+}
+
+/** The other items of a draw as results of a hit count or a pick, each at its share of the draw (a sample's items, a range's values). */
+function otherItems(entry: LikeliestDie, draw: Draw): LikeliestDie[] {
+  const { name, result } = entry.die;
+  const key = 'hits' in result ? result.hits : 'option' in result ? result.option : undefined;
+  const asResult = (value: number | string): ForcedDie['result'] => ('hits' in result ? { hits: value as number } : { option: String(value) });
+  if (draw.call === 'sample' && draw.items && draw.items.length > 0) {
+    const counts = new Map<number | string, number>();
+    for (const item of draw.items) counts.set(item as number | string, (counts.get(item as number | string) ?? 0) + 1);
+    return [...counts].filter(([value]) => String(value) !== String(key)).map(([value, count]) => ({ die: { name, result: asResult(value) }, chance: count / draw.items!.length }));
+  }
+  if ('hits' in result && draw.call === 'random' && draw.to !== undefined) {
+    const from = draw.from ?? 0;
+    const values = Array.from({ length: draw.to - from }, (_, at) => from + at).filter(value => value !== key);
+    return values.map(value => ({ die: { name, result: asResult(value) }, chance: 1 / (draw.to! - from) }));
+  }
+  return [];
+}
+
+/** The damage roll's other group across its knock-out boundary (`rollBoundary`): its middle step and the share of rolls that land in it. */
+export function otherRollGroup(entry: LikeliestDie, boundary: { lo: number; steps: number }): LikeliestDie | null {
+  const { result } = entry.die;
+  if (entry.die.name.kind !== 'damage-roll' || !('step' in result)) return null;
+  const { lo, steps } = boundary;
+  const [from, to] = result.step >= lo ? [0, lo - 1] : [lo, steps - 1];
+  return { die: { name: entry.die.name, result: { step: from + Math.floor((to - from) / 2) } }, chance: (to - from + 1) / steps };
 }
 
 /**

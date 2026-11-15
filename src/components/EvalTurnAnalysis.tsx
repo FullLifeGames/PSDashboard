@@ -6,6 +6,7 @@ import {
 import { attributionBadge, isPairLead, leadTier } from './eval-badges';
 import { EngineRow } from './eval/analysis-bits';
 import { LinesSection } from './eval/LinesSection';
+import { WinPathsEntry } from './eval/WinPathsEntry';
 import type { LinesHost } from '../lib/line-view';
 import { SideRow } from './eval/SideRow';
 import { evTitle } from './eval/turn-copy';
@@ -19,7 +20,7 @@ interface EvalTurnAnalysisProps {
   /** Exploitative Read recommendations (advisory — never part of the grade). */
   reads?: { p1?: ReadRecommendation | null; p2?: ReadRecommendation | null } | null;
   /** Click on an engine line: play it out in a branch at this turn, the other side answering with `reply`. */
-  onExplore?: (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice | null) => void;
+  onExplore?: (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice | null, from?: EvalResult | null) => void;
   /** Round 89 (#104): the turn's own result (its `lines`) and what the Lines section needs of the host; without them the section is absent. */
   result?: EvalResult | null;
   linesHost?: LinesHost;
@@ -88,9 +89,9 @@ function TurnSummary({ text }: { text: string }) {
 }
 
 /** A game's tip: the position is open, so the card names it as such and shows each side's engine line (round 89, H4h). */
-function OpenTurnAnalysis({ analysis, playerNames, reads, onExplore }: Omit<EvalTurnAnalysisProps, 'open'>) {
+function OpenTurnAnalysis({ analysis, playerNames, reads, onExplore, result }: Omit<EvalTurnAnalysisProps, 'open'>) {
   const exploreFor = (side: 'p1' | 'p2') =>
-    onExplore && ((choice: RankedChoice) => onExplore(side, choice, side === 'p1' ? analysis.p2.best : analysis.p1.best));
+    onExplore && ((choice: RankedChoice) => onExplore(side, choice, side === 'p1' ? analysis.p2.best : analysis.p1.best, result));
   return (
     <div className="ps-eval-analysis">
       <div className="ps-eval-analysis-row">
@@ -106,11 +107,11 @@ function OpenTurnAnalysis({ analysis, playerNames, reads, onExplore }: Omit<Eval
 
 /** Chess-style explanation of one analyzed turn: played vs best, and why the score moved. */
 export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore, result, linesHost, doubles, open = false }: EvalTurnAnalysisProps) {
-  if (open) return <OpenTurnAnalysis analysis={analysis} playerNames={playerNames} reads={reads} onExplore={onExplore} />;
+  if (open) return <OpenTurnAnalysis analysis={analysis} playerNames={playerNames} reads={reads} onExplore={onExplore} result={result} />;
   const badge = attributionBadge(analysis, playerNames);
   const exploreFor = (side: 'p1' | 'p2') =>
     onExplore && ((choice: RankedChoice) =>
-      onExplore(side, choice, side === 'p1' ? analysis.p2.best : analysis.p1.best));
+      onExplore(side, choice, side === 'p1' ? analysis.p2.best : analysis.p1.best, result));
   return (
     <div className="ps-eval-analysis">
       <div className="ps-eval-analysis-row">
@@ -135,6 +136,7 @@ export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore, resu
       )}
       <ReadRows reads={reads} playerNames={playerNames} faintedFraction={analysis.faintedFraction} />
       {linesHost && <LinesSection turn={analysis.turn} result={result} playerNames={playerNames} doubles={!!doubles} host={linesHost} analysis={analysis} />}
+      {linesHost && <WinPathsEntry turn={analysis.turn} host={linesHost} playerNames={playerNames} doubles={!!doubles} />}
     </div>
   );
 }

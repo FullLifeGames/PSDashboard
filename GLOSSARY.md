@@ -25,6 +25,9 @@ The dice a replay's log does not show, such as damage rolls and sleep turns. The
 A die whose result comes from outside the simulator's draw: the user sets it in a branch turn, or the reconstruction takes it from the log (logged dice). The simulator decides whether that result can take effect.
 _Avoid_: forced hax, forced outcome
 
+**Hard mode**:
+A setting beside "Always on" (`EvalPreferences.hardMode`, off by default). With it on, the opponent answers the move in hand with the reply the search rates lowest for it, instead of its own best row: in a click on an engine move, in the turn dock once one side's slots are set by the user, and in the Lines section and the Game review, where a line's head names the reply by what holds ("the reply the search rates lowest for this choice, 49% in its cell": the cell's value in the card's matrix). The reply is the lowest value of the move's row among the cells the search trusts (verified, or with 8 visits; every cell of a matrix pass), else the row's own floor, else the opponent's best row (`worstReply` in `src/lib/worst-reply.ts`). In the turn dock a slot's tray offers "Back to the engine's pick" where a pick of the user's differs from the fill's: it restores the engine's choice for that slot and the opponent's reply to it (with the setting off, the opponent's fill as at the start). The setting changes no grade, score or report, and a click on a matrix cell plays the pair as clicked.
+
 **Hax**:
 The players' word for a die that decided something, such as a critical hit or a miss.
 
@@ -105,17 +108,23 @@ The turns of the replay, or the turns played in a game. The pointer sits on the 
 The one line the user plays from a turn of the main line, by a different choice, by a click on a line, or by Let it play out. At most one exists (ADR 0015).
 
 **Line**:
-The turns the engine expects after a choice, for the choices that the search rated: both players' choices for at most three turns, every die at its likeliest result, and the win chance for the player at the line's end (`EvalLine` in the code). A tree search keeps a line only where a node holds 8 visits, so a line ends early where the search stopped there, and it says so when the next step is a switch nobody chose. A row's percentage averages many outcomes of its dice; a line follows one of them. The user sees a line in the Lines section under the turn's analysis and in the Game review. ▶ Play turns the line into a variation with those dice forced (the button's tooltip lists them); a chip shows a die only where the other result was possible.
+The turns the engine expects after a choice, for the choices that the search rated: both players' choices for at most three turns, every die at its likeliest result, and the win chance for the player at the line's end (`EvalLine` in the code). A tree search keeps a line only where a node holds 4 visits, so a line ends early where the search stopped there (after the game report the app adds the line pass, extra iterations aimed at the rows a line shows, for every graded turn), and it says so when the next step is a switch nobody chose. A row's percentage averages many outcomes of its dice; a line follows one of them, so the Lines section shows both ("row 23%, this line ends at 19%") and says why they differ. The user sees a line in the Lines section under the turn's analysis and in the Game review. A graded turn gets its lines from one more tree search after the game report: an early singles turn, which the matrix scores and which keeps no line, and every tree turn, whose lines from the sweep stand on thin second turns; the review shows the progress. ▶ Play turns the line into a variation with those dice forced (the button's tooltip lists them); a chip shows a die only where the other result was possible.
 _Avoid_: principal variation, PV (code names such as `PV_MAX_STEPS` keep them)
 
 **Engine line**:
-A line that starts with the engine's best choice for a player, the opponent answering with the reply that the search rated best. The Lines section shows it before the played line.
+A line that starts with the engine's best choice for a player, the opponent answering with a reply that the search ranked; the line's head names the reply and its rank ("vs Draining Kiss (Tzon's top choice)"), and the best reply means the best one overall by the merged ranking. The Lines section shows it before the played line.
 
 **Played line**:
 A line that starts with the choice the player made. A player who played the engine's choice gets one line.
 
 **Game review**:
-The panel under the game report that lists, per player, the graded turns (inaccuracy, mistake or blunder) with the played value, the engine's value, the loss, and the engine line and the played line with a ▶ Play button each. The graph marks the same turns, a circle for player 1 and a square for player 2.
+The panel under the game report that lists, per player, the graded turns (inaccuracy, mistake or blunder) with the played value, the engine's value, the loss, and the engine line and the played line with a ▶ Play button each. The graph marks the same turns, a circle for player 1 and a square for player 2. A game that reached its endgame adds an Endgame row for the player who lost.
+
+**Endgame**:
+A position with at most three Pokémon standing in total, both sides together (`ENDGAME_MAX_BODIES` in the code). A side counts the bodies it brought, so a VGC player who brought four and lost one has three. The forced-win prover runs there, and the Game review's Endgame row opens at the first turn of the game that has this few left.
+
+**Win path**:
+A way the player who lost an endgame could have won, found from a turn of the endgame by a search that the user starts (the Endgame row in the Game review, or `How could <player> have won from here?` on the turn's card). It has three steps, named in the panel: `1 · A stronger play` (a choice that wins within three turns in a share of the dice whatever the opponent answers), `2 · Luck` (the likeliest dice that give the player the win, with the chance of that sequence) and `3 · A mistake by <opponent>` (the smallest slip by the opponent that hands the player the win, with the chance of the dice it needs). Each step shows its line with ▶ Play. Every number is a lower bound: it holds within three turns and within the search limit, so a path the search did not reach may add to it.
 
 **New game**:
 A game that starts in the app from two pasted teams and a format (a listed format or a Custom Game), not from a Showdown replay. The `Game` menu opens its dialog. Both sides know both teams in full, as with open team sheets, and the user plays both sides or lets the engine play; the turns played become the game's main line, graded, reported and branched like a replay's.

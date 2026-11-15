@@ -1,8 +1,9 @@
 import { Fragment } from 'react';
 import type { EvalResult, TurnAnalysis } from '@fulllifegames/eval-engine';
 import { LineConfirm } from './LineConfirm';
-import { cardLines } from './turn-copy';
-import { activeNamesAt, lineAnchor, lineBlocks, type LineBlockView, type LinesHost, type LineSideView } from '../../lib/line-view';
+import { cardLines, rowValueTexts } from './turn-copy';
+import { linesForMode, worstLookup } from '../../lib/worst-reply';
+import { activeNamesAt, differsSentences, lineAnchor, lineBlocks, ranksOf, REPLY_OFF_TOP_TITLE, type LineBlockView, type LinesHost, type LineSideView } from '../../lib/line-view';
 
 interface LinesSectionProps {
   turn: number;
@@ -23,19 +24,10 @@ function SideText({ view }: { view: LineSideView }) {
   );
 }
 
-function LineBlock({ block, turn, onPlay, confirm }: { block: LineBlockView; turn: number; onPlay?: LinesHost['onPlay']; confirm?: LinesHost['confirm'] }) {
+/** The numbered rows of a line with their chips (the Lines section's and the win-path panel's). */
+export function LineRows({ block }: { block: LineBlockView }) {
   return (
-    <div className="ps-eval-line-block">
-      <div className="ps-eval-line-head">
-        <span style={{ color: '#cde' }}>{block.player} · {block.role}</span>
-        {onPlay && (
-          <button type="button" className="ps-btn ps-eval-inline-btn" title={block.tooltip} onClick={() => onPlay(block.line, turn)}>
-            ▶ Play
-          </button>
-        )}
-        <span style={{ color: '#778' }}>{block.end}</span>
-      </div>
-      {confirm && confirm.anchor === lineAnchor(block.line, turn) && <LineConfirm confirm={confirm} />}
+    <>
       {block.rows.map(row => (
         <div key={row.key} className="ps-eval-line-turn">
           <span className="t">{row.turn}</span>
@@ -46,8 +38,30 @@ function LineBlock({ block, turn, onPlay, confirm }: { block: LineBlockView; tur
           </span>
         </div>
       ))}
+    </>
+  );
+}
+
+function LineBlock({ block, turn, onPlay, confirm }: { block: LineBlockView; turn: number; onPlay?: LinesHost['onPlay']; confirm?: LinesHost['confirm'] }) {
+  return (
+    <div className="ps-eval-line-block">
+      <div className="ps-eval-line-head">
+        <span style={{ color: '#cde' }}>{block.player} · {block.role}</span>
+        {block.reply && (
+          <span style={{ color: '#9ab' }} title={block.reply.off ? REPLY_OFF_TOP_TITLE : undefined}>{`vs ${block.reply.label} (${block.reply.rank})`}</span>
+        )}
+        {onPlay && (
+          <button type="button" className="ps-btn ps-eval-inline-btn" title={block.tooltip} onClick={() => onPlay(block.line, turn)}>
+            ▶ Play
+          </button>
+        )}
+        <span style={{ color: '#778' }}>{block.end}</span>
+      </div>
+      {confirm && confirm.anchor === lineAnchor(block.line, turn) && <LineConfirm confirm={confirm} />}
+      <LineRows block={block} />
       {block.note && <span className="ps-eval-line">{block.note}</span>}
       {block.endNote && <span className="ps-eval-line">{block.endNote}</span>}
+      {block.worstNote && <span className="ps-eval-line">{block.worstNote}</span>}
     </div>
   );
 }
@@ -56,8 +70,10 @@ function LineBlock({ block, turn, onPlay, confirm }: { block: LineBlockView; tur
  * Why a turn holds no line. A matrix turn (a result with a matrix and no tree cells) ran no tree, so it cannot have kept lines;
  * a tree search that kept none says so of the search.
  */
-function noLineSentence(result: EvalResult): string {
+function noLineSentence(result: EvalResult, coming: ReturnType<NonNullable<LinesHost['lineComing']>> = null): string {
   if (result.engine) return `No line: ${result.engine.name} sends none.`;
+  if (coming === 'stage') return 'No line yet: the app searches this turn after the game report (the review shows the progress).';
+  if (coming === 'sweep') return 'No line yet: the game analysis is still running. If the report grades this turn, its lines follow the report.';
   if (result.matrix && !result.matrix.cells) return 'No line on this turn: the matrix pass keeps none. Analyze the position with MCTS to get lines.';
   return 'No line on this turn: the search kept none for these choices.';
 }
@@ -69,22 +85,23 @@ function noLineSentence(result: EvalResult): string {
  */
 export function LinesSection({ turn, result, playerNames, doubles, host, analysis }: LinesSectionProps) {
   if (!result) return null;
-  const lines = cardLines(result.lines ?? [], analysis);
+  const lines = linesForMode(cardLines(result.lines ?? [], analysis), !!host.hardMode);
   if (lines.length === 0) {
     return (
       <div className="ps-eval-lines">
         <span className="ps-eval-lines-title">Lines</span>
         <span className="ps-eval-line" style={{ marginTop: 0 }}>
-          {noLineSentence(result)}
+          {noLineSentence(result, host.lineComing?.(turn))}
         </span>
       </div>
     );
   }
-  const blocks = lineBlocks(lines, { turn, playerNames, doubles, rules: host.rules, actives: activeNamesAt(host.snapshot) });
+  const blocks = lineBlocks(lines, { turn, playerNames, doubles, rules: host.rules, actives: activeNamesAt(host.snapshot), rowValues: rowValueTexts(analysis), ranks: ranksOf(result), ...(host.hardMode ? { worst: worstLookup(result, { p1: analysis?.p1.faintedFraction, p2: analysis?.p2.faintedFraction }) } : {}) });
   return (
     <div className="ps-eval-lines">
       <span className="ps-eval-lines-title">Lines</span>
       {blocks.map(block => <LineBlock key={block.key} block={block} turn={turn} onPlay={host.onPlay} confirm={host.confirm} />)}
+      {differsSentences(blocks).map(sentence => <span key={sentence} className="ps-eval-line">{sentence}</span>)}
     </div>
   );
 }

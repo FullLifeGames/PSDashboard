@@ -71,7 +71,11 @@ export interface ProveRequest {
 }
 
 interface Memo extends Proven { remaining: number }
-interface ReplyProof { proven: Proven; cells: CellProof[] }
+/** Round 89 (#130): the own choice that proved a position and the reply that gave the minimum mass (the line of a stronger play follows them). */
+export interface ProofPlan { own: ChoiceOption; reply: ChoiceOption }
+interface ReplyProof { proven: Proven; cells: CellProof[]; plan?: ProofPlan }
+/** Round 89 (#130): the prover's options beyond the budget; the defaults are the production path. */
+export interface ProverExtras { floor?: number; plan?: boolean }
 interface ProverOptions { tera?: TeraAllowance; sleepClause?: boolean; ruleset?: StaticRuleset }
 
 const NONE: Proven = { mass: 0, turns: 0, caveat: 'none' };
@@ -140,16 +144,24 @@ export class ForcedWinProver {
   private readonly side: Side;
   private readonly opts: ProverOptions;
   private readonly budget: ProverBudget;
+  private readonly floor: number;
+  private readonly planned: boolean;
+  /** Round 89 (#130), with `plan`: the plan of every proven position, by endgame key. */
+  readonly plans = new Map<string, ProofPlan>();
+  /** Round 89 (#130): a states or cells cap cut a branch (a depth cut is the turns asked and does not count). */
+  capped = false;
   states: number;
   cells: number;
 
-  constructor(side: Side, opts: ProverOptions, budget: ProverBudget, spent: { states: number; cells: number }) {
+  constructor(side: Side, opts: ProverOptions, budget: ProverBudget, spent: { states: number; cells: number }, extras: ProverExtras = {}) {
     this.side = side;
     this.opts = opts;
     this.cache = createMatchupCache(opts.ruleset);
     this.budget = budget;
     this.states = spent.states;
     this.cells = spent.cells;
+    this.floor = extras.floor ?? MIN_FORCED_MASS;
+    this.planned = extras.plan ?? false;
   }
 
   prove(position: SimPosition, ply: number): Proven {
@@ -158,12 +170,17 @@ export class ForcedWinProver {
     const key = endgameKey(battle);
     const hit = this.memo.get(key);
     if (hit && (hit.mass >= 1 || hit.remaining >= this.budget.depth - ply)) return hit;
-    if (this.inProgress.has(key) || ply >= this.budget.depth || this.states >= this.budget.states) return NONE;
+    if (this.inProgress.has(key) || ply >= this.budget.depth) return NONE;
+    if (this.states >= this.budget.states) {
+      this.capped = true;
+      return NONE;
+    }
     this.states += 1;
     this.inProgress.add(key);
-    const { proven } = this.expand(position, ply, null);
+    const { proven, plan } = this.expand(position, ply, null);
     this.inProgress.delete(key);
     this.memo.set(key, { ...proven, remaining: this.budget.depth - ply });
+    if (plan && proven.mass > 0) this.plans.set(key, plan);
     return proven;
   }
 
@@ -214,10 +231,32 @@ export class ForcedWinProver {
     let best: ReplyProof = { proven: NONE, cells: [] };
     for (const candidate of candidates) {
       const attempt = this.replies(position, candidate.choice, replies, ply);
-      if (attempt.proven.mass > best.proven.mass) best = attempt;
+      if (attempt.proven.mass > best.proven.mass) best = this.planned ? { ...attempt, plan: this.planOf(candidate, attempt) } : attempt;
       if (best.proven.mass >= 1) break;
     }
     return best;
+  }
+
+  /** The reply of an AND node's proof that gave the minimum mass (the first, in the node's order, on a tie). */
+  private planOf(own: ChoiceOption, attempt: ReplyProof): ProofPlan | undefined {
+    const worst = attempt.cells.reduce<CellProof | null>((low, proof) => (!low || proof.proven.mass < low.proven.mass ? proof : low), null);
+    return worst ? { own, reply: worst.cell.reply } : undefined;
+  }
+
+  /**
+   * Round 89 (#130): the proof of one own choice at a position by itself, with its plan (the choice and the reply that gave the
+   * minimum), at the full pass of the root (every reply, the root's draw budget). Reads the shared memo, so candidates after the
+   * first reuse what the first proved.
+   */
+  candidateProof(position: SimPosition, own: ChoiceOption): ReplyProof {
+    const proof = this.pass(position, own.choice, this.replyChoices(position), 0, false);
+    return this.planned ? { ...proof, plan: this.planOf(own, proof) } : proof;
+  }
+
+  /** Round 89 (#130): the plan of a position proved as an inner node (the odds order's candidates), or null when it proves nothing. */
+  planAt(position: SimPosition, ply: number): { proven: Proven; plan: ProofPlan | null } {
+    const proven = this.prove(position, ply);
+    return { proven, plan: this.plans.get(endgameKey(positionBattle(position))) ?? null };
   }
 
   /** The replies the AND node answers: every legal choice of a doubles side, the engine's list for a single slot (see `expand`). */
@@ -239,7 +278,7 @@ export class ForcedWinProver {
     let passed = false;
     for (const candidate of candidates) {
       const lazy = this.pass(position, candidate.choice, replies, ply, true);
-      if (lazy.proven.mass < MIN_FORCED_MASS) continue;
+      if (lazy.proven.mass < this.floor) continue;
       passed = true;
       const attempt = lazy.proven.mass < 1 ? this.pass(position, candidate.choice, replies, ply, false) : lazy;
       const better = attempt.proven.mass > lazy.proven.mass ? attempt : lazy;
@@ -277,7 +316,10 @@ export class ForcedWinProver {
   /** The AND node: every reply, worst static first; the running minimum stops at the first escape. */
   private replies(position: SimPosition, ownChoice: string, replies: ChoiceOption[], ply: number): ReplyProof {
     const battle = positionBattle(position);
-    if (this.cells + replies.length > this.budget.cells) return { proven: NONE, cells: [] };
+    if (this.cells + replies.length > this.budget.cells) {
+      this.capped = true;
+      return { proven: NONE, cells: [] };
+    }
     const cells: Cell[] = replies.map(reply => {
       const [p1Choice, p2Choice] = this.pair(ownChoice, reply.choice);
       return { reply, p1Choice, p2Choice, ...this.cellsFor(position, p1Choice, p2Choice, ply) };
@@ -291,7 +333,7 @@ export class ForcedWinProver {
       const proof = this.cell(battle, cell, ply);
       proofs.push(proof);
       mass = Math.min(mass, proof.proven.mass);
-      if (mass < MIN_FORCED_MASS) return { proven: NONE, cells: proofs };
+      if (mass < this.floor || mass <= 0) return { proven: NONE, cells: proofs };
       turns = Math.max(turns, proof.proven.turns);
       caveat = worse(caveat, proof.proven.caveat);
     }

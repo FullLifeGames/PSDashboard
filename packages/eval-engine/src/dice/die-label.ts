@@ -12,6 +12,11 @@ export interface DieWords {
   move(id: string): string;
   /** A status, a volatile, an ability or an item by its id (a secondary's `boosts:spd` and `self:atk` pass through as given). */
   effect(id: string): string;
+  /**
+   * The same effect as a common noun inside a result ("no burn", like "no crit"): a status or a volatile in lower case, a stat change
+   * and the names of abilities and items as `effect` writes them. Absent: `effect`.
+   */
+  plain?(id: string): string;
   slot(slot: string): string;
 }
 
@@ -34,12 +39,13 @@ function subjectOf(name: DieName, words: DieWords): string {
 /** The two words of a chance, by what the die decides: yes and no. */
 function chanceText(name: DieName, words: DieWords): [string, string] {
   const effect = words.effect(idOf(name));
+  const noun = (words.plain ?? words.effect)(idOf(name));
   switch (name.kind) {
     case 'accuracy': return ['hits', 'misses'];
     case 'crit': return ['crit', 'no crit'];
-    case 'secondary': return [effect, `no ${effect}`];
+    case 'secondary': return [noun, `no ${noun}`];
     case 'self-effect': return ['stat change', 'no stat change'];
-    case 'status-check': return [`${effect} lets it move`, `${effect} stops it`];
+    case 'status-check': return [`${noun} lets it move`, `${noun} stops it`];
     case 'stalling': return ['succeeds again', 'fails'];
     case 'power': return [`${effect} boost`, `no ${effect} boost`];
     case 'move-first': return ['acts first', 'does not act first'];

@@ -1,0 +1,101 @@
+import { describe, expect, test } from 'vitest';
+import type { EvalLine, WinStep } from '@fulllifegames/eval-engine';
+import { chanceText, rankWords, sequenceNote, winStepViews, type WinPathsViewContext } from '../../../src/lib/win-paths-view';
+import { doublesLine, DOUBLES_NAMES, singlesLine, SINGLES_NAMES } from '../fixtures/lines';
+
+/**
+ * Round 89 (#130, G8b): the words of the win-path panel, as the user ruled them (14.11.2026, W1a to W5a), singles and doubles.
+ */
+const ctx = (extra: Partial<WinPathsViewContext> = {}): WinPathsViewContext =>
+  ({ turn: 23, playerNames: SINGLES_NAMES, doubles: false, host: { rules: { gen: 9, mod: undefined } }, side: 'p2', playedLabel: null, ...extra });
+const spent = { cells: 3, turns: 5 };
+const step = (kind: WinStep['kind'], status: WinStep['status'], extra: Partial<WinStep> = {}): WinStep => ({ kind, status, spent, ...extra });
+const line = (extra: Partial<EvalLine> = {}): EvalLine => ({ ...singlesLine, for: [], ...extra });
+
+describe('the win-path words', () => {
+  test('the step names and the empty sentences (W5a, W4a)', () => {
+    const views = winStepViews([step('stronger', 'none'), step('luck', 'none'), step('mistake', 'none')], ctx());
+    expect(views.map(view => view.title)).toEqual(['1 · A stronger play', '2 · Luck', '3 · A mistake by Tzon']);
+    expect(views.map(view => view.empty)).toEqual(['None within 3 turns.', 'None within 3 turns at 1 in 1,000 or better.', 'None within 3 turns.']);
+    expect(views.every(view => view.block === null && view.headline === null)).toBe(true);
+  });
+
+  test('a stopped step and a failed one each have one sentence', () => {
+    const [stopped, failed] = winStepViews([step('luck', 'stopped'), step('stronger', 'failed', { error: 'broke' })], ctx());
+    expect(stopped.empty).toBe('Stopped at the search limit; nothing found so far.');
+    expect(failed.empty).toBe('This step could not run.');
+    expect(failed.empty).not.toContain('broke');
+  });
+
+  test('step 1 names the chance whatever the opponent answers, beside the played choice (W1a)', () => {
+    const [view] = winStepViews([step('stronger', 'found', { chance: 0.5175, played: 0, line: line() })], ctx({ playedLabel: 'Hydro Pump' }));
+    expect(view.headline).toBe('Hydro Pump wins within 3 turns in 52 % of the dice whatever Tzon plays. What Pepitopalotin played, Hydro Pump, wins in 0 % of the dice.');
+    expect(view.empty).toBeNull();
+    expect(view.block?.line.label).toBe('Hydro Pump');
+    expect(view.block?.tooltip).toContain('Play this line as a variation');
+  });
+
+  test('step 1 without a played choice in the log shows the number alone; in doubles it says the rolls were sampled', () => {
+    const [single] = winStepViews([step('stronger', 'found', { chance: 1, line: line() })], ctx());
+    expect(single.headline).toBe('Hydro Pump wins within 3 turns in 100 % of the dice whatever Tzon plays.');
+    const [pair] = winStepViews([step('stronger', 'found', { chance: 0.25, played: 0.1, line: { ...doublesLine, for: [] } })], ctx({ playerNames: DOUBLES_NAMES, doubles: true, side: 'p1', playedLabel: 'Protect + Protect' }));
+    expect(pair.headline).toBe('Fake Out → Rillaboom + Spore → Zamazenta wins within 3 turns in 25 % of the dice whatever Mstr_Hawk plays (over sampled rolls). What pixelfrost played, Protect + Protect, wins in 10 % of the dice.');
+    // one row per player and step, the chips of the dice that could have gone the other way
+    expect(pair.block?.rows.length).toBeGreaterThan(3);
+  });
+
+  // Round 89 (#130), G13b (tester, third pass): "Played stayed in (KO’d before acting): 4 %." printed the card's description as a choice
+  // and a number nobody could relate to a move. The panel names the played choice in Showdown's words and says what the number is.
+  test('step 1 on a body that was knocked out before it moved says so instead of naming a choice', () => {
+    const host = { rules: { gen: 9, mod: undefined }, snapshot: { p1: { pokemon: [{ name: 'Tentacruel', isActive: true }] }, p2: { pokemon: [{ name: 'Rotom-Wash', isActive: true }] } } } as unknown as WinPathsViewContext['host'];
+    const [view] = winStepViews([step('stronger', 'found', { chance: 0.106, played: 0.04, line: line() })], ctx({ host, playedLabel: 'stayed in (KO’d before acting)', playedNeverActed: true }));
+    expect(view.headline).toBe('Hydro Pump wins within 3 turns in 10.6 % of the dice whatever Tzon plays. Rotom-Wash was knocked out before it moved, so the log shows no choice; staying in wins in 4 % of the dice.');
+    expect(view.headline).not.toContain('Played');
+  });
+
+  test.each([
+    ['a switch', '→ Corviknight', 'a switch to Corviknight'],
+    ['a move with a target', 'Heat Wave→Ursaluna', 'Heat Wave on Ursaluna'],
+    ['a Tera move', 'Tera + Hydro Pump', 'Terastallize and Hydro Pump'],
+    ['a doubles pair', 'Fake Out→Rillaboom + Protect', 'Fake Out on Rillaboom + Protect'],
+    ['a Mega move', 'Mega + Flare Blitz', 'Mega Evolve and Flare Blitz'],
+  ])('the played choice is written in Showdown\'s words: %s', (_name, label, words) => {
+    const [view] = winStepViews([step('stronger', 'found', { chance: 0.5, played: 0.25, line: line() })], ctx({ playedLabel: label }));
+    expect(view.headline).toContain(`What Pepitopalotin played, ${words}, wins in 25 % of the dice.`);
+  });
+
+  test('step 2 names the chance of the dice, with its chips on the rows', () => {
+    const [view] = winStepViews([step('luck', 'found', { chance: 0.108, line: line() })], ctx());
+    expect(view.headline).toBe('This sequence: 10.8 %.');
+    expect(view.block?.rows.flatMap(row => row.sides.flatMap(side => side.chips)).length).toBeGreaterThan(0);
+  });
+
+  test('step 3 names the slip by its rank and turn, then the chance of the dice (W3a)', () => {
+    const [view] = winStepViews([step('mistake', 'found', { chance: 0.84375, deviation: { turn: 24, label: 'Scald', rank: 2 }, line: line() })], ctx());
+    expect(view.headline).toBe('If Tzon had played Scald (its second choice) on turn 24. This sequence: 84 %.');
+  });
+
+  // Round 89 (G13b, tester questions 8 and 9): a sequence's number multiplies the dice whose other result would change who faints, and
+  // it prices one sequence; a chip also shows a die that changes nothing, and the stronger play's share adds every winning sequence.
+  test('a luck or mistake step that found a path carries the note on what its number counts; the other steps do not', () => {
+    const found = (kind: WinStep['kind']) => winStepViews([step(kind, 'found', { chance: 0.5, line: line() })], ctx());
+    expect(sequenceNote(found('luck'))).toBe('A sequence\'s chance multiplies the dice whose other result would change who faints; a die that changes nothing counts as certain, and other sequences that also win are not added.');
+    expect(sequenceNote(found('mistake'))).not.toBeNull();
+    expect(sequenceNote(found('stronger'))).toBeNull();
+    expect(sequenceNote(winStepViews([step('luck', 'none'), step('mistake', 'stopped')], ctx()))).toBeNull();
+    // singles and doubles read the same words
+    expect(sequenceNote(winStepViews([step('luck', 'found', { chance: 0.25, line: { ...doublesLine, for: [] } })], ctx({ playerNames: DOUBLES_NAMES, doubles: true, side: 'p1' })))).not.toBeNull();
+  });
+
+  test('chances and ordinals', () => {
+    expect([0.0005, 0.004, 0.108, 0.19, 0.2, 0.5175, 1].map(chanceText)).toEqual(['0.1 %', '0.4 %', '10.8 %', '19 %', '20 %', '52 %', '100 %']);
+    // the rank reads as the line heads of the Lines section read it (G13b, G16): "second choice", "third choice", then "fourth choice", "11th choice"
+    expect([2, 3, 4, 5, 10, 11, 12, 21, 22, 23].map(rankWords)).toEqual(['second choice', 'third choice', 'fourth choice', 'fifth choice', 'tenth choice', '11th choice', '12th choice', '21st choice', '22nd choice', '23rd choice']);
+  });
+
+  test('a found step with no line (the witness search found none) keeps its sentence and shows no play button data', () => {
+    const [view] = winStepViews([step('stronger', 'found', { chance: 0.6 })], ctx());
+    expect(view.block).toBeNull();
+    expect(view.headline).toContain('60 %');
+  });
+});

@@ -1,7 +1,7 @@
 import type { Battle } from '@pkmn/sim';
-import { ENDGAME_MAX_BODIES } from '../types.ts';
+import { ENDGAME_MAX_BODIES, type TeraAllowance } from '../types.ts';
 import { createMatchupCache, type MatchupCache, type StaticRuleset } from '../eval-function.ts';
-import { createRootPosition, positionBattle, type SimPosition } from '../forward-model.ts';
+import { createRootPosition, positionBattle, type ChoiceOption, type SimPosition } from '../forward-model.ts';
 import { solveMatrixGame } from '../ranking/solve.ts';
 import { livingMons } from '../score/threat.ts';
 import { leafValue } from '../search/leaf.ts';
@@ -17,7 +17,9 @@ import { endgameKey } from './key.ts';
  * the endgame key. Chance is priced per cell (children.ts). Three caps
  * keep it finite (turns from the root, states, wall clock); at a cap the
  * search's leaf value stands in and the result is flagged. Ground truth
- * for the estimators, never a production path.
+ * for the estimators. Round 89 (#130, D2): `oneTurnMatrix` is also a
+ * production path, the engine's first choice at a position of a win-path
+ * search (endgame/win-paths/first-choice.ts); `solveEndgame` stays as it was.
  */
 export interface EndgameCaps { turns: number; states: number; wallMs: number }
 export const ENDGAME_CAPS: EndgameCaps = { turns: 30, states: 20000, wallMs: 120000 };
@@ -60,9 +62,12 @@ class EndgameSolver {
   states = 0;
   depth = 0;
 
-  constructor(caps: EndgameCaps, ruleset: StaticRuleset) {
+  private readonly options: { tera: TeraAllowance; sleepClause?: boolean };
+
+  constructor(caps: EndgameCaps, ruleset: StaticRuleset, options: { tera?: TeraAllowance; sleepClause?: boolean } = {}) {
     this.caps = caps;
     this.cache = createMatchupCache(ruleset);
+    this.options = { tera: options.tera ?? false, ...(options.sleepClause === undefined ? {} : { sleepClause: options.sleepClause }) };
   }
 
   solve(position: SimPosition, ply: number): Solved {
@@ -93,8 +98,8 @@ class EndgameSolver {
   }
 
   private expand(position: SimPosition, ply: number): Solved {
-    const p1Options = searchOptions(position, 'p1', { tera: false });
-    const p2Options = searchOptions(position, 'p2', { tera: false });
+    const p1Options = searchOptions(position, 'p1', this.options);
+    const p2Options = searchOptions(position, 'p2', this.options);
     if (p1Options.length === 0 || p2Options.length === 0) return this.standIn(positionBattle(position), 'capped');
     const cells = p1Options.map(p1 => p2Options.map(p2 => this.cell(position, p1.choice, p2.choice, ply)));
     const solution = solveMatrixGame(cells.map(row => row.map(cell => cell.value)));
@@ -102,6 +107,17 @@ class EndgameSolver {
     const j = argmax(solution.p2Mix);
     const pv = [`${p1Options[i].label} / ${p2Options[j].label}`, ...cells[i][j].pv].slice(0, PV_LIMIT);
     return { value: solution.value, exact: cells.every(row => row.every(cell => cell.exact)), pv };
+  }
+
+  /** The one-turn matrix of a position: every option pair played once, each child at its static value (see `oneTurnMatrix`). */
+  oneTurn(position: SimPosition): OneTurnMatrix | null {
+    const p1 = searchOptions(position, 'p1', this.options);
+    const p2 = searchOptions(position, 'p2', this.options);
+    if (positionBattle(position).ended || p1.length === 0 || p2.length === 0) return null;
+    const cells = p1.map(first => p2.map(second => this.cell(position, first.choice, second.choice, 0)));
+    const solution = solveMatrixGame(cells.map(row => row.map(cell => cell.value)));
+    this.states += 1;
+    return { p1, p2, values: cells.map(row => row.map(cell => cell.value)), p1Mix: solution.p1Mix, p2Mix: solution.p2Mix, value: solution.value, cells: p1.length * p2.length, unpriced: this.flags.has('unpriced') };
   }
 
   private cell(position: SimPosition, p1Choice: string, p2Choice: string, ply: number): Solved {
@@ -118,6 +134,31 @@ class EndgameSolver {
     }
     return { value, exact, pv: heaviest.pv };
   }
+}
+
+/**
+ * Round 89 (#130, D1): the one-turn matrix of a position, the engine's first choice past a search's root. Both sides' options are
+ * the search's own (`searchOptions`), every pair is played once with its chance priced as the prover's cells price it, and every
+ * child stands at its static value (the solver at one turn: every state below is a stand-in at its leaf). `values` is the p1
+ * perspective (win-probability units, -1 to 1); the mixes are the equilibrium of the matrix. Null when the game is over or a side
+ * has no option. `cells` is the number of pairs played, the caller's work counter.
+ */
+export interface OneTurnMatrix {
+  p1: ChoiceOption[];
+  p2: ChoiceOption[];
+  values: number[][];
+  p1Mix: number[];
+  p2Mix: number[];
+  value: number;
+  cells: number;
+  /** A cell of the matrix has a chance the class plan could not price (the value is the median draw's there). */
+  unpriced: boolean;
+}
+
+export function oneTurnMatrix(
+  position: SimPosition, options: { tera?: TeraAllowance; sleepClause?: boolean; ruleset?: StaticRuleset } = {},
+): OneTurnMatrix | null {
+  return new EndgameSolver({ ...ENDGAME_CAPS, turns: 1 }, options.ruleset ?? position.ruleset ?? 'standard', options).oneTurn(position);
 }
 
 /**

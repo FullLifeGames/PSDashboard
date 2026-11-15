@@ -7,9 +7,9 @@ import { useDockPreview } from '../../hooks/useDockPreview';
 import { useDiceViews } from '../../hooks/useDiceView';
 import { useDockHeight } from '../../hooks/useDockHeight';
 import type { DockFillView } from '../../hooks/useDockFill';
-import { engineHoldsForcedBeside } from '../../lib/dock-fill';
+import { engineHoldsForcedBeside, sameChoice } from '../../lib/dock-fill';
 import { useTrayState, type TrayOpen } from '../../hooks/useTrayState';
-import { buildDockModel, type Side } from './dock-model';
+import { buildDockModel, type DockSlotModel, type Side } from './dock-model';
 import { DockRows } from './DockRows';
 import { DockStatus, EndedNotice } from './DockStatus';
 import type { MainLineEnd } from '../../lib/game-end';
@@ -61,6 +61,7 @@ export interface TurnDockProps {
 /**
  * A pick of the user takes the slot from the engine's fill first, then the choice is stored. A forced replacement normally goes out
  * at once; while another forced slot of the turn holds only the engine's pick (ruling 16a) the pick is recorded and Execute sends it.
+ * `writeChoice` stores a choice without that first step: "Back to the engine's pick" gives the slot back to the fill and writes its choice.
  */
 function useUserChoice(
   simState: TurnDockProps['simState'], fill: DockFillView | null | undefined, onSetChoice: TurnDockProps['onSetChoice'],
@@ -68,11 +69,15 @@ function useUserChoice(
 ) {
   const onUserChoice = fill?.onUserChoice;
   const engine = fill?.engine;
-  return useCallback((side: Side, choice: BranchSlotChoice, slot?: number) => {
-    onUserChoice?.(side, slot ?? 0);
+  const writeChoice = useCallback((side: Side, choice: BranchSlotChoice, slot?: number) => {
     const holdBack = !!onRecordChoice && !!simState && !!engine && engineHoldsForcedBeside(simState, engine, side, slot ?? 0);
     (holdBack ? onRecordChoice : onSetChoice)(side, choice, slot);
-  }, [onUserChoice, onSetChoice, onRecordChoice, simState, engine]);
+  }, [onSetChoice, onRecordChoice, simState, engine]);
+  const setChoice = useCallback((side: Side, choice: BranchSlotChoice, slot?: number) => {
+    onUserChoice?.(side, slot ?? 0, choice);
+    writeChoice(side, choice, slot);
+  }, [onUserChoice, writeChoice]);
+  return { setChoice, writeChoice };
 }
 
 /** Round 84: tells the fill which slot's tray is open, so a result that lands later never writes it. The effect only writes a ref. */
@@ -123,6 +128,20 @@ function DockExecute({ model, fill, executing, onRun, onClose }: {
 }
 
 /**
+ * Round 89 (#153, HM3b): the tray offers "Back to the engine's pick" where the slot holds a pick of the user's (the engine's mark is
+ * gone) that differs from what the fill chose for it. A forced replacement goes out at once, so its tray has none.
+ */
+function backHandler(fill: DockFillView | null | undefined, slot: DockSlotModel | undefined, write: (side: Side, choice: BranchSlotChoice, slot: number) => void): (() => void) | undefined {
+  if (!fill || !slot) return undefined;
+  const own = fill.picks[slot.side][slot.slot];
+  if (!own || !slot.pending || slot.forceSwitch || fill.engine[slot.side][slot.slot] || sameChoice(slot.pending, own)) return undefined;
+  return () => {
+    const restored = fill.restore(slot.side, slot.slot);
+    if (restored) write(slot.side, restored, slot.slot);
+  };
+}
+
+/**
  * Round 84 (turn dock): the dock at the foot of the replay column. One chip per active slot with its choice, a tray above it for
  * the open slot, and Execute at the right. The picker state it reads already holds the seed under the user's picks.
  */
@@ -131,7 +150,7 @@ export function TurnDock(props: TurnDockProps) {
     simState, stale, source, acquiringExact, executeError, executing, gen, onSetChoice, onRecordChoice, onHypotheticalMove, onExecuteTurn,
     played, positionKey, getBattle, replayLog, seed, fill, nearSide, endOfGame, isGame,
   } = props;
-  const setChoice = useUserChoice(simState, fill, onSetChoice, onRecordChoice);
+  const { setChoice, writeChoice } = useUserChoice(simState, fill, onSetChoice, onRecordChoice);
   const onEdit = useCallback((side: Side, slot: number, choice: BranchSlotChoice) => setChoice(side, choice, slot), [setChoice]);
   const { slots, gimmickFor, damageBySide } = useDockPreview(simState, gen, positionKey, getBattle, onEdit);
   const release = fill?.release;
@@ -146,6 +165,7 @@ export function TurnDock(props: TurnDockProps) {
 
   const model = buildDockModel({ simState, slots, damageBySide, gimmickFor, played, seed, fill });
   const openSlot = open ? model[open.side][open.slot] : undefined;
+  const backToEngine = backHandler(fill, openSlot, writeChoice);
   return (
     <div className="ps-dock" ref={attachDock} onKeyDown={onKeyDown} inert={stale} aria-busy={stale || undefined}>
       <DockStatus source={source} acquiringExact={acquiringExact} executeError={executeError} model={model} diceOpen={!!open?.more} game={isGame} />
@@ -166,6 +186,7 @@ export function TurnDock(props: TurnDockProps) {
               close();
             }}
             onMore={toggleMore}
+            onBackToEngine={backToEngine}
             onDone={() => close(true)}
           />
         )}

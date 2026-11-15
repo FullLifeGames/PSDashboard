@@ -7,6 +7,7 @@ import { dieKey } from '../src/dice/types';
 import { createMatchupCache } from '../src/eval-function';
 import { createLocalTreeExecutor, searchTreesOrchestrated, type TreeExecutor } from '../src/tree-orchestrator';
 import { leafValue } from '../src/search/leaf';
+import { worstAnswer } from '../src/turn-analysis/worst-answer';
 import type { EvalLine, EvalResult, EvalSettings } from '../src/types';
 import { branchOf, runTurn, type Commands } from './branch-dice-support';
 import { set } from './move-oracle';
@@ -86,18 +87,18 @@ const SCENES: Scene[] = [
 const searched = new Map<string, Promise<EvalResult>>();
 
 /** One search per scene and executor: the tests of a scene read the same result. `plain` is the executor without the lines job. */
-function search(scene: Scene, kind: 'lines' | 'plain'): Promise<EvalResult> {
+function search(scene: Scene, kind: 'lines' | 'plain' | 'pass'): Promise<EvalResult> {
   const key = `${scene.name}|${kind}`;
   if (!searched.has(key)) searched.set(key, searchOnce(scene, kind));
   return searched.get(key)!;
 }
 
-async function searchOnce(scene: Scene, kind: 'lines' | 'plain'): Promise<EvalResult> {
+async function searchOnce(scene: Scene, kind: 'lines' | 'plain' | 'pass'): Promise<EvalResult> {
   const runtime = await branchOf(scene.format, scene.p1, scene.p2, '1,2,3,4');
   scene.prepare?.(runtime.battleStream.battle!);
   const serialized = JSON.stringify(State.serializeBattle(runtime.battleStream.battle!));
-  const executor: TreeExecutor = kind === 'lines' ? createLocalTreeExecutor(serialized) : { ...createLocalTreeExecutor(serialized), lines: undefined };
-  return searchTreesOrchestrated(executor, { ...SETTINGS, keepPlayed: scene.played });
+  const executor: TreeExecutor = kind !== 'plain' ? createLocalTreeExecutor(serialized) : { ...createLocalTreeExecutor(serialized), lines: undefined };
+  return searchTreesOrchestrated(executor, { ...SETTINGS, keepPlayed: scene.played, ...(kind === 'pass' ? { linePass: 300 } : {}) });
 }
 
 describe.each(SCENES)('the lines of a tree search: $name', scene => {
@@ -122,6 +123,18 @@ describe.each(SCENES)('the lines of a tree search: $name', scene => {
     }
   }, 120_000);
 
+  test('the line pass (G14b) changes no score, rank or grade, and the lines hold at least the turns they held', async () => {
+    const passed = await search(scene, 'pass');
+    const plain = await search(scene, 'plain');
+    const lined = await search(scene, 'lines');
+    const { lines, ...rest } = passed;
+    expect(rest, 'the result outside the lines equals the run without the lines job').toEqual(plain);
+    expect(lines, 'the passed search carries lines').toBeDefined();
+    const turns = (list: EvalLine[] | undefined): number => (list ?? []).reduce((sum, line) => sum + line.steps.length, 0);
+    expect(turns(lines)).toBeGreaterThanOrEqual(turns(lined.lines));
+    for (const line of lines!) expect(line.steps.length).toBeLessThanOrEqual(3);
+  }, 120_000);
+
   test('a step\'s dice ride on their holders, and the waiting side of a replacement holds no choice', async () => {
     const result = await search(scene, 'lines');
     for (const line of result.lines!) {
@@ -131,6 +144,20 @@ describe.each(SCENES)('the lines of a tree search: $name', scene => {
         if (step.replacement === 'p1') expect(step.p2.slots.every(slot => slot === null) && step.p2.choice === 'wait').toBe(true);
         if (step.replacement === 'p2') expect(step.p1.slots.every(slot => slot === null) && step.p1.choice === 'wait').toBe(true);
       }
+    }
+  }, 120_000);
+
+  test('an engine line meets the answer that the merged ranking puts first, as far as a tree holds a line against it (G12)', async () => {
+    const result = await search(scene, 'lines');
+    for (const line of result.lines!.filter(entry => entry.for.includes('engine') && !entry.versus)) {
+      const other = line.side === 'p1' ? 'p2' : 'p1';
+      const first = line.steps[0];
+      if (first.replacement) continue;
+      const ranking = result.perSide[other].map(row => row.label);
+      const at = ranking.indexOf(first[other].label);
+      // a tree keeps lines against its own top three answers, so the merged top three are the answers a line can meet
+      expect(at, `${line.side} ${line.label}: the answer ${first[other].label} is among the merged top three`).toBeGreaterThanOrEqual(0);
+      expect(at, `${line.side} ${line.label}: the answer ${first[other].label} is among the merged top three`).toBeLessThanOrEqual(2);
     }
   }, 120_000);
 
@@ -147,4 +174,39 @@ describe.each(SCENES)('the lines of a tree search: $name', scene => {
       }
     }
   }, 180_000);
+});
+
+/**
+ * Round 89 (#153, Hard mode): a turn holds, beside a row's usual line, the line against the reply that hurts the row most
+ * (`versus: 'worst'`) where a tree holds one. Its first answer is the row's `worstAnswer` of the result, it belongs to a row that also
+ * has its usual line (same side, label and roles), and the result outside `lines` equals the run without the job.
+ */
+describe.each(SCENES)('the line against the reply that hurts most: $name', scene => {
+  test.each(['lines', 'pass'] as const)('a worst line meets the row\'s worst answer and sits beside the row\'s usual line (%s)', async kind => {
+    const result = await search(scene, kind);
+    const plain = await search(scene, 'plain');
+    const { lines, ...rest } = result;
+    expect(rest, 'nothing outside the lines moves').toEqual(plain);
+    const worst = lines!.filter(line => line.versus === 'worst');
+    for (const line of worst) {
+      const row = result.perSide[line.side].find(entry => entry.label === line.label)!;
+      const answer = worstAnswer(result, line.side, row);
+      const other = line.side === 'p1' ? 'p2' : 'p1';
+      expect(answer, `${line.side} ${line.label}: the result names a worst answer`).not.toBeNull();
+      expect(line.steps[0][other].label, `${line.side} ${line.label}: the line meets the worst answer`).toBe(answer!.label);
+      const usual = lines!.find(entry => entry.side === line.side && entry.label === line.label && !entry.versus && entry.for.join() === line.for.join());
+      expect(usual, `${line.side} ${line.label}: the usual line stands beside it`).toBeDefined();
+      expect(usual!.steps[0][other].label, 'the worst line is asked for only when the usual one meets another answer').not.toBe(answer!.label);
+    }
+    // the usual lines are exactly the lines the job made before the setting existed: one per row and role, none of them marked
+    const usual = lines!.filter(line => !line.versus);
+    expect(new Set(usual.map(line => `${line.side}|${line.label}|${line.for.join()}`)).size).toBe(usual.length);
+  }, 120_000);
+
+  test('the line pass finds a worst line on a singles scene; a doubles tree is thinner and may hold none (its best rows already meet their worst answer)', async () => {
+    const result = await search(scene, 'pass');
+    const worst = result.lines!.filter(line => line.versus === 'worst');
+    if (scene.name.startsWith('singles')) expect(worst.length, 'at least one row holds its worst line').toBeGreaterThanOrEqual(1);
+    else expect(worst.length).toBeGreaterThanOrEqual(0);
+  }, 120_000);
 });
