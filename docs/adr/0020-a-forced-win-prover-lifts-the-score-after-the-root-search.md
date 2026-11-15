@@ -27,4 +27,14 @@ Round 89 moved four rules of the prover (#59, #145; the lane's step names are A5
 
 The two rules together cost about 2.5 times the prover's time on the 163 positions of the lane's sample, which adds about 1.3 % to a doubles search. The card does not name a stall: no new `ForcedWinOpen` kind and no change to `summary.ts` (user ruling of 11.11.2026).
 
+## Amended (round 89, #130)
+
+The win paths ("How could <player> have won?") use the prover as their first step and give it three options beyond the budget. The defaults are the production path, so the score, the card and the report read as before.
+
+- **`floor`** (`ProverExtras.floor`, default `MIN_FORCED_MASS`): the mass under which a candidate or an AND node stops. The win paths pass 0, so a proof that wins in a small share of the dice stays visible, and the step reports the best mass it found and the played choice's mass.
+- **`plan`** (`ProverExtras.plan`, default off): when on, the prover records for each position it proves the own choice that proved it and the reply that gave the minimum mass (`ProofPlan`, `plans`, `planAt`). `candidateProof` proves one own choice at the root by itself, at the full pass, and reads the shared memo, so a later candidate reuses what the first proved. The step follows these plans to build the line that ends in the win.
+- **`capped`** (a field of the prover): true once the states cap or the cells cap cut a branch. A cut by depth is the turns the request asked for and does not count. The step reads it to tell `stopped` (the budget ran out) from `none` (every candidate was proved and none wins).
+
+A step passes the cap of `WIN_BUDGET` as both the states and the cells cap and the turns asked as the depth. The job that runs the step lives on a worker of its own (ADR 0025); the prover in the analysis keeps `PROVER_BUDGET` and its defaults.
+
 Sources: `docs/completed/eval-quality.md` (rounds 15, 34, 35, 50), `docs/superpowers/specs/2026-09-04-round-34-design.md`, `docs/superpowers/specs/2026-09-04-round-35-design.md`, `docs/superpowers/specs/2026-09-04-forced-win-prover-candidate.md`, `docs/superpowers/plans/2026-09-04-round-35-plan.md`, `docs/completed/triage.md` (T34, T55, T87); gate 05.09.2026.
