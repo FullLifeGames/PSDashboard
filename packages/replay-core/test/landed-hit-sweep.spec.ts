@@ -59,11 +59,14 @@ function battleOf(realm: Realm, doubles: boolean, move: string, target: PlayBody
   });
 }
 
-/** What the reader looks at: the damage line of the hit on the target, without a `[from]`. */
-const LANDED = /\|-damage\|p2a: Target\|[^|\n]*(\n|$)/;
+/**
+ * What the reader looks at: the damage line of the hit on the target, without a `[from]`. The log names the body in front, which is the disguise when the
+ * target holds Illusion (it shows the name of the last party member, here the filler: round 89, N4c), so the name is not read.
+ */
+const LANDED = /\|-damage\|p2a: [^|\n]*\|[^|\n]*(\n|$)/;
 const landed = (log: string): boolean => LANDED.test(log);
 /** A log with the hit and no other effect on the target (a secondary of the move would be read by #110's rules, which the sweep of blocked-effects holds). */
-const clean = (log: string): boolean => landed(log) && !/\|(-status|-unboost|-boost|-start|cant)\|p2a: Target/.test(log);
+const clean = (log: string): boolean => landed(log) && !/\|(-status|-unboost|-boost|-start|cant)\|p2a: /.test(log);
 
 /** The abilities of the sweep's source: Smeargle holds an ability that touches no move of the sweep (the first of the generation's). */
 const sourceOf = (realm: Realm): PlayBody => {
