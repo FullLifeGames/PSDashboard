@@ -70,7 +70,7 @@ test.describe('Doubles OU, turn 5, no variation standing', () => {
     expect(clicks.count).toBe(4);
     await expect(variationPanel(page)).toContainText(`Turn ${TURN}`, { timeout: 90_000 });
     await openVariationHistory(page);
-    await expect(page.getByRole('group', { name: 'Forced dice' })).toContainText(/Rock Slide.*Flinch/);
+    await expect(page.getByRole('group', { name: 'Forced dice' })).toContainText(/Rock Slide.*flinch/);
     const entries = await branchFrameEntries(page);
     await expect.poll(async () => (await entries()).some(entry => entry.startsWith('Forced: Rock Slide flinch')), { timeout: 60_000 }).toBe(true);
   });
