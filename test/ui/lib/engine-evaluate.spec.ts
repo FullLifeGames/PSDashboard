@@ -53,6 +53,19 @@ describe('another engine answers over HTTP (round 77, user gate 28.10.2026)', ()
     expect(result.engine).toEqual({ id: engine.id, name: 'Test engine', version: '0.1' });
   });
 
+  test('the order bound of the played turn rides on the result, whichever engine ranked the rows (round 89, #108)', async () => {
+    serve(request => ({
+      body: {
+        protocol: ENGINE_PROTOCOL, score: 0.2,
+        values: { p1: Object.fromEntries(request.options.p1.map(option => [option.id, 0.1])), p2: Object.fromEntries(request.options.p2.map(option => [option.id, -0.2])) },
+      },
+    }));
+    const playedBounds = { p1: [{ moves: ['switch'], switchOut: true }] };
+    const bounded = await evaluateWithEngine(engine, serialized, { choices: vi.fn(async () => ({ ...choices, playedBounds })) }, { tera: true }, () => true);
+    expect(bounded.playedBounds).toEqual(playedBounds);
+    expect(await evaluateWithEngine(engine, serialized, executor, { tera: true }, () => true)).not.toHaveProperty('playedBounds');
+  });
+
   test('a played pair asks for one option per side and reads the score', async () => {
     const seen = serve(() => ({ body: { protocol: ENGINE_PROTOCOL, score: -0.4, values: { p1: { 'switch 5': -0.4 }, p2: { 'switch 6': 0.4 } } } }));
     await expect(evalPairWithEngine(engine, serialized, 'switch 5', 'switch 6', () => true)).resolves.toBe(-0.4);

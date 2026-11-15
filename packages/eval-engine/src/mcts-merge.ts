@@ -360,6 +360,8 @@ export function mergeMctsTrees(trees: MctsTreeStats[], verified?: Map<number, Ev
   }
   // Round 13: the root unanswered profile is tree-invariant — take trees[0]'s.
   if (base.result.unanswered) result.unanswered = base.result.unanswered;
+  // Round 89 (#108): so is the order bound of the played turn's fallen bodies (the root battle's, read once per tree).
+  if (base.result.playedBounds) result.playedBounds = base.result.playedBounds;
 
   const { score, interval } = visitMeanScore(trees, base, pooled);
   // rankedToResult wrote the matrix mode's score; the visit mean replaces it unless EVAL_TREE_SCORE says otherwise (T114).

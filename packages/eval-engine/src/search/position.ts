@@ -7,6 +7,7 @@ import {
   selectTieProbeCells, toResult, TOP_EXPANSION, type PvStep, type Ranked,
 } from '../rank.ts';
 import { koOddsForOptions } from '../cell-blend.ts';
+import { playedBoundsOf } from '../branch/action-bound.ts';
 import type { CellValue, SearchExecutor } from '../orchestrator.ts';
 import type { CellDraw, EvalCellJob, EvalResult, EvalSettings, RankedChoice } from '../types.ts';
 import { countFainted, leafValue } from './leaf.ts';
@@ -127,13 +128,16 @@ function rootPayload(
   p2Options: ChoiceOption[],
   matchupCache: MatchupCache,
   restrictCandidates: boolean,
+  settings: EvalSettings,
 ): RootPayload {
   const koOddsMaps = restrictCandidates ? null : koOddsMapsFor(p1Options, p2Options, {
     p1: koOddsForOptions(battle, 'p1', p1Options.map(option => option.choice)),
     p2: koOddsForOptions(battle, 'p2', p2Options.map(option => option.choice)),
   });
   const unanswered = restrictCandidates ? null : unansweredMons(battle, matchupCache);
-  return { diagnostics: matrix.diagnostics, koOddsMaps, unanswered };
+  // Round 89 (#108): the order bound of the played turn's fallen bodies, on the root battle.
+  const playedBounds = restrictCandidates ? undefined : playedBoundsOf(battle, settings.keepPlayed?.fell);
+  return { diagnostics: matrix.diagnostics, koOddsMaps, unanswered, playedBounds };
 }
 
 /** The sync search's deepening state: the shared record plus what the sync sub-searches need. */
@@ -260,7 +264,7 @@ function searchOn(
   // Root matrices blend boundary cells analytically; restricted sub-searches
   // keep the plain seed average (their consumers read only score/tops).
   const matrix = buildMatrix(root, p1Options, p2Options, settings.samples, 1, callbacks, progress, matchupCache, !restrictCandidates);
-  const payload = rootPayload(battle, matrix, p1Options, p2Options, matchupCache, restrictCandidates);
+  const payload = rootPayload(battle, matrix, p1Options, p2Options, matchupCache, restrictCandidates, settings);
   // Pre-deepening statics: the trend baseline. Every trend the tiebreak
   // compares is uniformly 1-ply-vs-static — mixed ply counts inside one
   // comparison are the depth-asymmetry trap.
@@ -347,6 +351,8 @@ function localExecutorOn(serializedBattle: string, ruleset: StaticRuleset): Sear
       // worker-pool matrix shows a bare "U-turn" row the sync pins never see.
       const p1 = expandPivotPairs(root, 'p1', searchOptions(root, 'p1', { tera, keep: keepPlayed?.p1Slots, sleepClause }));
       const p2 = expandPivotPairs(root, 'p2', searchOptions(root, 'p2', { tera, keep: keepPlayed?.p2Slots, sleepClause }));
+      // Round 89 (#108): the order bound of the played turn's fallen bodies, on the root battle; the main thread holds none.
+      const playedBounds = playedBoundsOf(battle, keepPlayed?.fell);
       return {
         p1, p2,
         rootValue: leafValue(battle, matchupCache),
@@ -356,6 +362,7 @@ function localExecutorOn(serializedBattle: string, ruleset: StaticRuleset): Sear
           p2: koOddsForOptions(battle, 'p2', p2.map(option => option.choice)),
         },
         unanswered: unansweredMons(battle, matchupCache),
+        ...(playedBounds ? { playedBounds } : {}),
       };
     },
     async evalCells(jobs, onDone) {

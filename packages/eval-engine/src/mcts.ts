@@ -3,6 +3,7 @@ import { advancePositionWithLog, createRootPosition, legalChoices, positionBattl
 import { foldClassWeights, koOddsForOptions, observeOrder, planCellEvents, type CellEvent } from './cell-blend.ts';
 import { cellKey, rankFromMatrix, toResult as rankedToResult } from './rank.ts';
 import { attachKoOdds, hasUnansweredContent, koOddsMapsFor } from './search/root-payload.ts';
+import { playedBoundsOf } from './branch/action-bound.ts';
 import { matrixCells, topVisitedIndex, treeScore } from './mcts-merge.ts';
 import { floorLabels } from './turn-analysis/worst-answer.ts';
 import { cellStats, makeNode, principalVariation, rowLines, treeMatrix, type Node } from './search/mcts-node.ts';
@@ -17,6 +18,7 @@ import { searchBudget, SEARCH_BUDGET_DEFAULT } from './search/budget.ts';
 import { benchOrder, callbacksToGiven, resultToGiven, treeToGiven } from './search/bench-order.ts';
 import { pairPlanAnswer } from './pair/root-plan.ts';
 import { findPlayedOption } from './turn-analysis/played-match.ts';
+import type { PlayedBounds } from './played.ts';
 import type {
   CellOutcomeClass, EvalResult, EvalSettings, KoOddsInfo, MctsTreeStats, PlannedCell, SearchProgress, TeraAllowance, UnansweredProfile,
 } from './types.ts';
@@ -65,6 +67,7 @@ function toResult(
   maxDepth: number,
   koOdds?: RootKoOdds,
   unanswered?: UnansweredProfile,
+  playedBounds?: PlayedBounds,
 ): EvalResult {
   if (root.ended || root.p1Options.length === 0 || root.p2Options.length === 0 || root.visits === 0) {
     return { score: root.value, interval: 0, depthCompleted: maxDepth, perSide: { p1: [], p2: [] } };
@@ -91,6 +94,8 @@ function toResult(
   if (koOdds) attachKoOdds(result, koOddsMapsFor(root.p1Options, root.p2Options, koOdds));
   // Round 13: root narrative payload, same contract as search.ts.
   if (unanswered && hasUnansweredContent(unanswered)) result.unanswered = unanswered;
+  // Round 89 (#108): the order bound of a body that fell before it acted, read once per root like the profile.
+  if (playedBounds) result.playedBounds = playedBounds;
   return result;
 }
 
@@ -102,11 +107,12 @@ function reportIteration(
   maxDepth: number,
   koOdds: RootKoOdds,
   unanswered: UnansweredProfile,
+  playedBounds: PlayedBounds | undefined,
 ): void {
   const { done, total } = progress;
   callbacks?.onProgress?.({ done, total, depth: maxDepth });
   if (done % PARTIAL_EVERY === 0 && done < total) {
-    callbacks?.onPartial?.(toResult(root, maxDepth, koOdds, unanswered));
+    callbacks?.onPartial?.(toResult(root, maxDepth, koOdds, unanswered, playedBounds));
   }
 }
 
@@ -146,6 +152,8 @@ function runMcts(
   };
   // Round 13: root unanswered-mon profile, once per root like the ko odds.
   const unanswered = unansweredMons(rootBattle, matchupCache);
+  // Round 89 (#108): the order bound of the played turn's fallen bodies, on the root battle, once per root.
+  const playedBounds = playedBoundsOf(rootBattle, settings.keepPlayed?.fell);
   const ctx: ExpansionContext = {
     tera, matchupCache, sleepClause: settings.sleepClause,
     // Round 42: a forced switch after a knock-out is a decision node of the tree; the matrix, verify, play-out and prover resolve it greedily.
@@ -162,10 +170,10 @@ function runMcts(
     const { path, leaf, depth } = selectAndExpand(root, iteration, seedOffset, ctx, book);
     maxDepth = Math.max(maxDepth, depth);
     backpropagate(path, leaf);
-    reportIteration(callbacks, root, { done: iteration + 1, total: iterations }, maxDepth, koOdds, unanswered);
+    reportIteration(callbacks, root, { done: iteration + 1, total: iterations }, maxDepth, koOdds, unanswered, playedBounds);
   }
 
-  const result = toResult(root, maxDepth, koOdds, unanswered);
+  const result = toResult(root, maxDepth, koOdds, unanswered, playedBounds);
   callbacks?.onPartial?.(result);
   return { root, maxDepth, result, koOdds, rootClassKeys: book.keys, rootClassWeights: book.weights, ctx };
 }

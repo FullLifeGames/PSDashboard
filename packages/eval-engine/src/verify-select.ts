@@ -260,8 +260,9 @@ export function rowCompletedCells(trees: MctsTreeStats[], merged: EvalResult, jo
 /**
  * Round 63 (T78): the played option per side from keepPlayed, as an index
  * into the base tree's lists — doubles slots through the combined option
- * (the charitable consistent one where a slot stayed hidden), singles the
- * played action. Sides without a match are left out.
+ * (the charitable consistent one where a slot stayed hidden, inside the
+ * order bound the merged result carries: round 89, #108), singles the played
+ * action. Sides without a match are left out.
  */
 export function playedIndices(
   trees: MctsTreeStats[], merged: EvalResult, keepPlayed: EvalSettings['keepPlayed'],
@@ -270,7 +271,7 @@ export function playedIndices(
   const played = { p1: keepPlayed.p1 ?? null, p2: keepPlayed.p2 ?? null, p1Slots: keepPlayed.p1Slots, p2Slots: keepPlayed.p2Slots };
   const out: { p1?: number; p2?: number } = {};
   for (const side of ['p1', 'p2'] as const) {
-    const match = matchPlayedSide(merged, side, played);
+    const match = matchPlayedSide(merged, side, played, merged.playedBounds);
     const options = side === 'p1' ? trees[0].p1Options : trees[0].p2Options;
     const index = match ? options.findIndex(option => option.choice === match.choice) : -1;
     if (index >= 0) out[side] = index;

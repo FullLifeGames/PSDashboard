@@ -1,7 +1,7 @@
 import type { BranchSlotChoice } from './branch-choices.ts';
 import type { ForcedDie } from './dice/types.ts';
 import type { OnRequestJob, OnRequestResult, OnRequestStep } from './on-request.ts';
-import type { PlayedAction } from './played.ts';
+import type { PlayedAction, PlayedBounds, PlayedTurn } from './played.ts';
 import type { SimFastLever, SimFastReport } from './forward/sim-fast/state.ts';
 import type { SearchBudget } from './search/budget.ts';
 import type { StaticRuleset } from './score/weights.ts';
@@ -41,6 +41,11 @@ export interface EvalSettings {
     p2?: PlayedAction | null;
     p1Slots?: (PlayedAction | null)[];
     p2Slots?: (PlayedAction | null)[];
+    /**
+     * Round 89 (#108): the marks of the bodies that fell before they acted (`PlayedTurn.fell`). The worker reads the order bound of
+     * them once per root, with the root battle, and ships it as `EvalResult.playedBounds`. Plain data; absent when no body fell.
+     */
+    fell?: PlayedTurn['fell'];
   } | null;
   /**
    * Round 35: false skips the forced-win prover after the root search. The
@@ -275,6 +280,12 @@ export interface EvalResult {
    * principle (648453 t13). Absent when empty or on sub-searches.
    */
   unanswered?: UnansweredProfile;
+  /**
+   * Round 89 (#108): per side and slot, the moves (and the switch) a body that fell before it acted cannot have chosen, read once per
+   * root from the played turn's `fell` mark (`branch/action-bound.ts`). The grading drops those options before it matches a hidden slot
+   * to a row. Absent when no body fell, on sub-searches and on results cached before the field existed (they grade as before).
+   */
+  playedBounds?: PlayedBounds;
   /** Round 35: the forced win proven from this root, when one stands at or above MIN_FORCED_MASS; the score already carries its bar. */
   forcedWin?: ForcedWin;
   /** Round 77: the engine that answered, when another one than this package's own search (the engine protocol, ENGINES.md). */
@@ -576,6 +587,8 @@ export interface EvalChoicesInfo {
   koOdds?: { p1: (KoOddsInfo | null)[]; p2: (KoOddsInfo | null)[] };
   /** Root unanswered-mon profile (rounds 13/14) for the orchestrated path. */
   unanswered?: UnansweredProfile;
+  /** Round 89 (#108): the order bound of a body that fell before it acted, for the orchestrated path and the HTTP engine path. */
+  playedBounds?: PlayedBounds;
 }
 
 export interface EvalCellJob {

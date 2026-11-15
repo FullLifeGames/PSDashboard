@@ -84,7 +84,7 @@ function collectCells(
  */
 function orchestratedPayload(info: ChoicesInfo, diagnostics: KoOddsMismatch[]): RootPayload {
   const koOddsMaps = info.koOdds ? koOddsMapsFor(info.p1, info.p2, info.koOdds) : null;
-  return { diagnostics, koOddsMaps, unanswered: info.unanswered };
+  return { diagnostics, koOddsMaps, unanswered: info.unanswered, playedBounds: info.playedBounds };
 }
 
 /** The orchestrated search's deepening state: the shared record plus the executor-side context. */
