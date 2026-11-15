@@ -121,9 +121,13 @@ function play(dex: RulesDex, scene: EffectScene): boolean {
   return battle.log.slice(mark).some(line => line.startsWith('|-unboost|p2a: ') && line.split('|')[3] === (stat ?? 'atk'));
 }
 
-/** The choice text of the move at the foe in front: the simulator asks for a target only for the moves that pick one. */
-function aimOf(dex: RulesDex, move: string, doubles: boolean): string {
-  return doubles && ['normal', 'any', 'adjacentFoe'].includes(dex.moves.get(move).target) ? ' 1' : '';
+/**
+ * The choice text of the move at the foe in front: the simulator asks for a target only for the moves that pick one (`targetTypeChoices` of the battle's
+ * actions, so no list of target types stands here); a move that picks the ally or the user is no hit on a foe.
+ */
+function aimOf(battle: Battle, move: string, doubles: boolean): string {
+  const target = battle.dex.moves.get(move).target;
+  return doubles && battle.actions.targetTypeChoices(target) && !target.startsWith('adjacentAlly') ? ' 1' : '';
 }
 
 /**
@@ -169,7 +173,7 @@ function hitLands(dex: RulesDex, scene: EffectScene): boolean {
   battle.onEvent('BeforeMove', battle.format, (pokemon: { side: unknown }) => (pokemon.side === battle.p2 ? false : undefined));
   const mark = battle.log.length;
   const move = scene.move ?? NO_MOVE;
-  battle.makeChoices(doubles ? `move 1${aimOf(dex, move, doubles)}, move 1` : 'move 1', doubles ? 'move 1, move 1' : 'move 1');
+  battle.makeChoices(doubles ? `move 1${aimOf(battle, move, doubles)}, move 1` : 'move 1', doubles ? 'move 1, move 1' : 'move 1');
   if (battle.log.some(line => line.startsWith('|-transform|'))) throw new Error('a transform plays another battle');
   return battle.log.slice(mark).some(line => line.startsWith('|-damage|p2a: ') && !line.includes('[from]'));
 }
