@@ -32,7 +32,7 @@ function appAt({ sim, historyLength, liveTip = true }: Where): AppController {
       positionPicker: null, dockSimState: sim, pickerSeed: null, pickerStale: false, playedAtView: undefined,
       getPickerBattle: undefined, pickerReplayLog: undefined,
       acquire: { exactAcquiringTurn: null },
-      dockFill: { pending: false, busy: false, waits: false, engine: { p1: [], p2: [] }, choices: null, deferred: { p1: [], p2: [] }, queueExecute: noop, onUserChoice: noop, holdTray: noop, release: noop, arm: noop },
+      dockFill: { pending: false, busy: false, waits: false, engine: { p1: [], p2: [] }, choices: null, deferred: { p1: [], p2: [] }, picks: { p1: [], p2: [] }, queueExecute: noop, onUserChoice: noop, restore: () => null, holdTray: noop, release: noop, arm: noop },
     },
     transients: { playOut: null, pendingConfirm: null, setPendingConfirm: noop },
     handleHypotheticalMove: noop, handleExecuteTurn: noop,

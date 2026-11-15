@@ -106,6 +106,18 @@ export function rowOfChoices(side: Side, ranked: RankedChoice[], state: BranchSi
   return found?.row ?? null;
 }
 
+/**
+ * Round 89 (#153, HM3b): whether two choices of one slot are the same pick (the same move, target, gimmick and forced dice, or the same
+ * body to switch in). Keys are read in order of name, so the way a choice was built does not matter.
+ */
+export function sameChoice(a: BranchSlotChoice | null | undefined, b: BranchSlotChoice | null | undefined): boolean {
+  if (!a || !b) return !a && !b;
+  const keys = (choice: BranchSlotChoice) => JSON.stringify(choice, (_key, value: unknown) => (
+    value && typeof value === 'object' && !Array.isArray(value) ? Object.fromEntries(Object.entries(value).sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0))) : value
+  ));
+  return keys(a) === keys(b);
+}
+
 /** The choices to write now (see `pickFillParts`). */
 export function pickFill(side: Side, ranked: RankedChoice[], state: BranchSimState, touched: Choices, held: readonly boolean[] = []): Choices {
   return pickFillParts(side, ranked, state, touched, held).filled;

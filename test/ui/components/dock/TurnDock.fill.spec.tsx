@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { BranchSlotChoice } from '@fulllifegames/eval-engine';
 import { TurnDock } from '../../../../src/components/dock/TurnDock';
@@ -20,8 +20,8 @@ const move = (moveId: string, moveName: string, targetLoc?: number): BranchSlotC
 
 function fillOf(overrides: Partial<DockFillView> = {}): DockFillView {
   return {
-    pending: false, busy: false, waits: false, engine: { p1: [], p2: [] }, choices: null, deferred: { p1: [], p2: [] }, queueExecute: vi.fn(), onUserChoice: vi.fn(),
-    holdTray: vi.fn(), release: vi.fn(), arm: vi.fn(), ...overrides,
+    pending: false, busy: false, waits: false, engine: { p1: [], p2: [] }, choices: null, deferred: { p1: [], p2: [] }, picks: { p1: [], p2: [] }, queueExecute: vi.fn(), onUserChoice: vi.fn(),
+    restore: vi.fn(() => null), holdTray: vi.fn(), release: vi.fn(), arm: vi.fn(), ...overrides,
   };
 }
 
@@ -383,3 +383,87 @@ describe('TurnDock fill, two forced slots of one side (ruling 16a, doubles)', ()
   });
 });
 
+
+/**
+ * Round 89 (#153, HM3b, user gate 15.11.2026): "Back to the engine's pick" in the open tray of a slot that holds a user pick that
+ * differs from what the fill chose. The click asks the fill (`restore`) for the choice and writes it like any pick, but without telling
+ * the fill that the user chose: the slot is the engine's again. Singles and doubles; in doubles per slot.
+ */
+describe.each(['singles', 'doubles'] as const)('TurnDock fill, Back to the engine\'s pick, %s', (kind) => {
+  const first = kind === 'doubles' ? 'P1A' : 'P1';
+  const engineMove = kind === 'doubles' ? move('flareblitz', 'Flare Blitz', 2) : move('earthquake', 'Earthquake');
+  const userMove = kind === 'doubles' ? move('protect', 'Protect') : move('stoneedge', 'Stone Edge');
+  const slots = (first: BranchSlotChoice | null, second: BranchSlotChoice | null = null) => (kind === 'doubles' ? [first, second] : [first]);
+  const opponent = kind === 'doubles' ? [null, null] : [null];
+  const state = (choice: BranchSlotChoice | null) => simState(kind, { p1Choices: slots(choice), p2Choices: opponent });
+  const fillWith = (overrides: Partial<DockFillView> = {}) => fillOf({
+    picks: { p1: slots(engineMove), p2: opponent }, engine: { p1: slots(null).map(() => false), p2: opponent.map(() => false) },
+    restore: vi.fn(() => engineMove), ...overrides,
+  });
+  const back = () => screen.queryByRole('button', { name: "Back to the engine's pick" });
+
+  test('shown in the tray of a slot with a user pick that differs from the engine\'s: a .ps-btn', async () => {
+    renderDock(kind, fillWith(), {}, state(userMove));
+    expect(back()).toBeNull();
+    await userEvent.click(chip(first));
+    expect(back()).toBeInTheDocument();
+    expect(back()).toHaveClass('ps-btn');
+  });
+
+  test('the click restores the fill\'s choice: the slot is written, the fill is not told that the user chose', async () => {
+    const fill = fillWith();
+    const props = renderDock(kind, fill, {}, state(userMove));
+    await userEvent.click(chip(first));
+    await userEvent.click(back()!);
+    expect(fill.restore).toHaveBeenCalledWith('p1', 0);
+    expect(props.onSetChoice).toHaveBeenCalledWith('p1', engineMove, 0);
+    expect(fill.onUserChoice).not.toHaveBeenCalled();
+  });
+
+  test('not shown for the engine\'s own mark, for a pick that equals the engine\'s, for a slot the fill chose nothing for, or for an empty slot', async () => {
+    const marked = renderDock(kind, fillWith({ engine: { p1: slots(true).map(() => true), p2: opponent.map(() => false) } }), {}, state(userMove));
+    await userEvent.click(chip(first));
+    expect(back()).toBeNull();
+    expect(marked.onSetChoice).not.toHaveBeenCalled();
+    cleanup();
+    renderDock(kind, fillWith(), {}, state(engineMove));
+    await userEvent.click(chip(first));
+    expect(back()).toBeNull();
+    cleanup();
+    renderDock(kind, fillWith({ picks: { p1: slots(null), p2: opponent } }), {}, state(userMove));
+    await userEvent.click(chip(first));
+    expect(back()).toBeNull();
+    cleanup();
+    renderDock(kind, fillWith(), {}, state(null));
+    await userEvent.click(chip(first));
+    expect(back()).toBeNull();
+  });
+
+  test('a forced replacement\'s tray (only the bench) has no such button, and neither does a dock without a fill', async () => {
+    renderDock(kind, undefined as unknown as DockFillView, { fill: null }, state(userMove));
+    await userEvent.click(chip(first));
+    expect(back()).toBeNull();
+  });
+
+  test('doubles: each slot has its own button; the partner\'s engine pick does not show it on this slot', async () => {
+    if (kind !== 'doubles') return;
+    const partnerEngine = move('ragepowder', 'Rage Powder');
+    const fill = fillWith({ picks: { p1: [engineMove, partnerEngine], p2: opponent }, restore: vi.fn((_side, slot) => (slot === 0 ? engineMove : partnerEngine)) });
+    const props = renderDock(kind, fill, {}, simState('doubles', { p1Choices: [engineMove, move('protect', 'Protect')], p2Choices: opponent }));
+    await userEvent.click(chip('P1A'));
+    expect(back()).toBeNull();
+    await userEvent.click(chip('P1B'));
+    expect(back()).toBeInTheDocument();
+    await userEvent.click(back()!);
+    expect(fill.restore).toHaveBeenCalledWith('p1', 1);
+    expect(props.onSetChoice).toHaveBeenCalledWith('p1', partnerEngine, 1);
+  });
+
+  test('a fill that has nothing to give back writes nothing', async () => {
+    const fill = fillWith({ restore: vi.fn(() => null) });
+    const props = renderDock(kind, fill, {}, state(userMove));
+    await userEvent.click(chip(first));
+    await userEvent.click(back()!);
+    expect(props.onSetChoice).not.toHaveBeenCalled();
+  });
+});

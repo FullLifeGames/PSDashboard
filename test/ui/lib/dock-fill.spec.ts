@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { BranchSlotChoice, RankedChoice } from '@fulllifegames/eval-engine';
-import { engineHoldsForcedBeside, fitsBeside, overlayFill, pickFill, pickFillParts, rowOfChoices, slotChoicesOf } from '../../../src/lib/dock-fill';
+import { engineHoldsForcedBeside, fitsBeside, overlayFill, pickFill, pickFillParts, rowOfChoices, sameChoice, slotChoicesOf } from '../../../src/lib/dock-fill';
 import { rankedChoice } from '../fixtures/eval-result';
 import { simState } from '../fixtures/sim-state';
 
@@ -327,5 +327,30 @@ describe('rowOfChoices', () => {
     // and the row the fill takes beside Protect... is none that opens with Fake Out, so only the user's slot 1 decides
     const row = rowOfChoices('p1', doublesRanked, doubles, slot([fakeOut, protect]), slot([null, protect]));
     expect(row).toBe(doublesRanked[2]);
+  });
+});
+
+/** Round 89 (#153, HM3b): the test of "Back to the engine's pick": a pick that is the engine's own needs no button. */
+describe('sameChoice', () => {
+  test('the same move, target and gimmick are one pick, however the object was built', () => {
+    expect(sameChoice(fakeOut, { targetLoc: 2, moveName: 'Fake Out', moveId: 'fakeout', kind: 'move' })).toBe(true);
+    expect(sameChoice(fakeOut, { ...fakeOut, targetLoc: undefined } as BranchSlotChoice)).toBe(false);
+    expect(sameChoice(fakeOut, { ...fakeOut, targetLoc: 1 })).toBe(false);
+    expect(sameChoice(fakeOut, flareBlitz)).toBe(false);
+  });
+
+  test('forced dice and a gimmick make another pick; two switches name the body', () => {
+    const forced = { ...flareBlitz, dice: [{ kind: 'crit' }] } as unknown as BranchSlotChoice;
+    expect(sameChoice(flareBlitz, forced)).toBe(false);
+    const heatran: BranchSlotChoice = { kind: 'switch', speciesId: 'heatran', pokemonName: 'Heatran' };
+    expect(sameChoice(heatran, { ...heatran })).toBe(true);
+    expect(sameChoice(heatran, { kind: 'switch', speciesId: 'latias', pokemonName: 'Latias' })).toBe(false);
+    expect(sameChoice(heatran, fakeOut)).toBe(false);
+  });
+
+  test('an empty slot is the same as an empty slot and as nothing else', () => {
+    expect(sameChoice(null, undefined)).toBe(true);
+    expect(sameChoice(null, fakeOut)).toBe(false);
+    expect(sameChoice(protect, null)).toBe(false);
   });
 });

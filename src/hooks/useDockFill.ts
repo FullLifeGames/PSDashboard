@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import type { BranchSimState, BranchSlotChoice, EvalResult, RankedChoice } from '@fulllifegames/eval-engine';
-import { fitsBeside, pickFillParts, rowOfChoices } from '../lib/dock-fill';
+import { fitsBeside, pickFillParts, rowOfChoices, sameChoice } from '../lib/dock-fill';
 import { worstReply } from '../lib/worst-reply';
 import type { SideChoices } from '../lib/dock-seed';
 import type { EvaluateOptions } from './useEvalView';
@@ -60,6 +60,18 @@ export interface DockFillView {
    * opponent's engine slots are written again with the reply that hurts the user's side most (the pick's own handler, never an effect).
    */
   onUserChoice: (side: Side, slot: number, pick?: BranchSlotChoice) => void;
+  /**
+   * Round 89 (#153, HM3b): what the fill chose for each slot, as it chose it and frozen for the position (a slot held open takes its deferred
+   * pick; a slot the user had set before the fill landed holds null). Empty before the fill landed. The dock offers "Back to the engine's
+   * pick" where a user pick differs from it.
+   */
+  picks: SideChoices;
+  /**
+   * "Back to the engine's pick" for one slot: marks the slot as the engine's again, answers for the opponent (Hard mode on: its engine slots
+   * take the reply to the restored pick, as after any pick; off: the opponent's fill as at the start) and returns the choice the dock writes
+   * into the slot; null when the fill chose nothing for it. Called from the click's handler, never from an effect.
+   */
+  restore: (side: Side, slot: number) => BranchSlotChoice | null;
   /** A replay turn: what the fill wrote, slot by slot (null where it wrote nothing); null at the tip and before the fill landed. */
   choices: SideChoices | null;
   /** The user clicked a chip: at a replay turn this starts the fill for the position (Q19 b). A no-op at the tip. */
@@ -78,9 +90,12 @@ export interface DockFillView {
 const NO_MARKS: EngineMarks = { p1: [], p2: [] };
 const RUNNING = new Set<Evaluation['status']>(['reconstructing', 'searching']);
 
-interface Settled { key: string | null; marks: EngineMarks; choices: SideChoices; deferred: SideChoices }
+interface Settled { key: string | null; marks: EngineMarks; choices: SideChoices; deferred: SideChoices; picks: SideChoices }
 
 const NO_CHOICES: SideChoices = { p1: [], p2: [] };
+
+/** `list` with `value` at `slot`, grown to reach it. */
+const withSlot = <T,>(list: readonly T[], slot: number, value: T): T[] => Array.from({ length: Math.max(list.length, slot + 1) }, (_, index) => (index === slot ? value : list[index]));
 
 const slotCount = (state: BranchSimState, side: Side): number => (side === 'p1' ? state.p1ActiveSlots : state.p2ActiveSlots)?.length ?? 1;
 
@@ -103,7 +118,7 @@ function gate(inputs: DockFillInputs, armedKey: string | null): { key: string; o
 
 /** The marks the fill left and the Execute queued behind it, in state for the chips and mirrored in refs for the callbacks of a run. */
 function useFillMarks() {
-  const [settled, setSettled] = useState<Settled>({ key: null, marks: NO_MARKS, choices: NO_CHOICES, deferred: NO_CHOICES });
+  const [settled, setSettled] = useState<Settled>({ key: null, marks: NO_MARKS, choices: NO_CHOICES, deferred: NO_CHOICES, picks: NO_CHOICES });
   const [queued, setQueued] = useState<string | null>(null);
   const settledRef = useRef(settled);
   const heldRef = useRef<HeldSlot | null>(null);
@@ -199,6 +214,35 @@ function useRefill(latest: LatestFill, fillResultRef: FillResult, settledRef: Fi
   };
 }
 
+/**
+ * Round 89 (#153, HM3b): "Back to the engine's pick" for one slot. The slot is the engine's again (mark, no deferred pick), and the
+ * opponent answers: with the setting on its engine slots take the reply to the restored pick (`refill`, the rule of any pick); off,
+ * the engine slots the fill wrote return to their fill as at the start, where they differ. Slots the user set are left alone. Returns the
+ * choice for the dock to write into the slot, null when the fill chose nothing for it.
+ */
+function useRestore(latest: LatestFill, settledRef: FillMarks['settledRef'], commit: FillMarks['commit'], refill: ReturnType<typeof useRefill>) {
+  return (side: Side, slot: number): BranchSlotChoice | null => {
+    const now = latest.current;
+    const current = settledRef.current;
+    const own = current.picks[side][slot] ?? null;
+    if (!own || !now.simState || current.key !== now.key) return null;
+    const opponent: Side = side === 'p1' ? 'p2' : 'p1';
+    const marks = { ...current.marks, [side]: withSlot(current.marks[side], slot, true) };
+    const deferred = { ...current.deferred, [side]: withSlot(current.deferred[side], slot, null) };
+    const choices = { ...current.choices, [side]: withSlot(current.choices[side], slot, own) };
+    if (now.hardMode) {
+      commit({ ...current, marks, deferred, choices });
+      refill(side, slot, own);
+      return own;
+    }
+    // the opponent's engine slots return to the fill as at the start
+    const back = current.picks[opponent].map((pick, index) => (pick && current.marks[opponent][index] && !sameChoice(current.choices[opponent][index], pick) ? pick : null));
+    if (now.liveTip) back.forEach((pick, index) => { if (pick) now.setChoice(opponent, pick, index); });
+    commit({ ...current, marks, deferred, choices: { ...choices, [opponent]: choices[opponent].map((pick, index) => back[index] ?? pick) } });
+    return own;
+  };
+}
+
 /** What the fill wrote, side by side: the marks, the choices, the picks held slots take later, and the sides' choices as they now stand. */
 interface FillWrite { written: EngineMarks; wrote: SideChoices; deferred: SideChoices; merged: SideChoices }
 
@@ -250,7 +294,8 @@ function useFillApply(inputs: DockFillInputs, key: string, eligible: boolean, ma
     const state = now.simState;
     const { written, wrote, deferred, merged } = fillSides(now, state, result, heldRef.current);
     fillResultRef.current = { key: runKey, result };
-    commit({ key: runKey, marks: written, choices: wrote, deferred });
+    const picks = { p1: wrote.p1.map((choice, slot) => choice ?? deferred.p1[slot] ?? null), p2: wrote.p2.map((choice, slot) => choice ?? deferred.p2[slot] ?? null) };
+    commit({ key: runKey, marks: written, choices: wrote, deferred, picks });
     if (now.queued === runKey) {
       unqueue();
       void now.executeTurn(merged);
@@ -263,8 +308,7 @@ function useFillApply(inputs: DockFillInputs, key: string, eligible: boolean, ma
     const choice = current.deferred[side][slot];
     if (current.key !== now.key || !choice) return;
     const others = now.getChoices()[side] as (BranchSlotChoice | null)[];
-    const withSlot = <T,>(list: T[], value: T): T[] => Array.from({ length: Math.max(list.length, slot + 1) }, (_, index) => (index === slot ? value : list[index]));
-    const deferred = { ...current.deferred, [side]: withSlot(current.deferred[side], null) };
+    const deferred = { ...current.deferred, [side]: withSlot(current.deferred[side], slot, null) };
     // The user may have chosen in this slot or beside it while the tray stood open: then the engine's pick is gone or no longer fits.
     if (others[slot] || !fitsBeside(choice, others, slot)) {
       commit({ ...current, deferred });
@@ -273,11 +317,12 @@ function useFillApply(inputs: DockFillInputs, key: string, eligible: boolean, ma
     if (now.liveTip) now.setChoice(side, choice, slot);
     commit({
       ...current, deferred,
-      marks: { ...current.marks, [side]: withSlot(current.marks[side], true) },
-      choices: { ...current.choices, [side]: withSlot(current.choices[side], choice) },
+      marks: { ...current.marks, [side]: withSlot(current.marks[side], slot, true) },
+      choices: { ...current.choices, [side]: withSlot(current.choices[side], slot, choice) },
     });
   }, [settledRef, commit]);
-  return { apply, release, refill };
+  const restore = useRestore(latest, settledRef, commit, refill);
+  return { apply, release, refill, restore };
 }
 
 type Apply = ReturnType<typeof useFillApply>['apply'];
@@ -378,7 +423,7 @@ export function useDockFill(inputs: DockFillInputs): DockFillView {
   const dropMark = useOnUserChoice(marks);
   const done = settled.key === key;
   const { running, pending } = useFillPending(inputs, key, eligible, done);
-  const { apply, release, refill } = useFillApply(inputs, key, eligible, marks);
+  const { apply, release, refill, restore } = useFillApply(inputs, key, eligible, marks);
   const onUserChoice = useCallback((side: Side, slot: number, pick?: BranchSlotChoice) => {
     dropMark(side, slot);
     if (pick) refill(side, slot, pick);
@@ -396,7 +441,7 @@ export function useDockFill(inputs: DockFillInputs): DockFillView {
   const landed = done ? settled : null;
   return {
     pending, busy: open && evaluation.graph.running && !done, waits,
-    ...landedView(landed, liveTip),
-    queueExecute, onUserChoice, holdTray, release, arm,
+    ...landedView(landed, liveTip), picks: landed?.picks ?? NO_CHOICES,
+    queueExecute, onUserChoice, restore, holdTray, release, arm,
   };
 }

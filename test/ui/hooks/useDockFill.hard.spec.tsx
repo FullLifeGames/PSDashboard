@@ -25,7 +25,7 @@ function evaluationOf(hardMode: boolean | undefined) {
   } as unknown as Evaluation;
 }
 
-function setup(kind: FormatKind, hardMode: boolean | undefined, touched: Partial<Choices> = {}) {
+function setupWired(kind: FormatKind, hardMode: boolean | undefined, touched: Partial<Choices> = {}) {
   const slots = kind === 'doubles' ? 2 : 1;
   const choices: Choices = { p1: Array(slots).fill(null), p2: Array(slots).fill(null), ...touched };
   const setChoice = vi.fn((side: 'p1' | 'p2', choice: BranchSlotChoice, slot = 0) => {
@@ -40,6 +40,11 @@ function setup(kind: FormatKind, hardMode: boolean | undefined, touched: Partial
   };
   const hook = renderHook(() => useDockFill(wired));
   const land = (result: EvalResult) => act(() => handleEvaluate.mock.calls[0][0]!.onResult!(result));
+  return { choices, setChoice, hook, land, wired };
+}
+
+function setup(kind: FormatKind, hardMode: boolean | undefined, touched: Partial<Choices> = {}) {
+  const { choices, setChoice, hook, land } = setupWired(kind, hardMode, touched);
   return { choices, setChoice, hook, land };
 }
 
@@ -163,5 +168,124 @@ describe('useDockFill, Hard mode: a pick after the fill', () => {
     off.setChoice.mockClear();
     act(() => off.hook.result.current.onUserChoice('p1', 0, move('swordsdance', 'Swords Dance')));
     expect(off.setChoice).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Round 89 (#153, HM3b, user gate 15.11.2026): "Back to the engine's pick". The fill keeps what it chose for each slot (`picks`, frozen
+ * at the fill); `restore(side, slot)` hands that choice back for the dock to write, marks the slot as the engine's again, and answers
+ * for the opponent: Hard mode on, its engine slots get the reply to the restored pick (the pick's own rule, `onUserChoice`); off, they
+ * get the opponent's fill as it was at the start. A slot the fill never wrote has nothing to restore. Singles and doubles.
+ */
+describe('useDockFill: Back to the engine\'s pick', () => {
+  const turnOff = (wired: { evaluation: Evaluation }, hook: { rerender: () => void }) => { wired.evaluation = evaluationOf(false); hook.rerender(); };
+
+  test('singles, on: the engine\'s fill stays as `picks` whatever the user picks, and restore returns it', () => {
+    const { setChoice, hook, land } = setup('singles', true);
+    land(singles());
+    expect(hook.result.current.picks).toEqual({ p1: [expect.objectContaining({ moveId: 'earthquake' })], p2: [expect.objectContaining({ moveId: 'leechseed' })] });
+    act(() => hook.result.current.onUserChoice('p1', 0, move('swordsdance', 'Swords Dance')));
+    expect(hook.result.current.picks.p1[0]).toEqual(expect.objectContaining({ moveId: 'earthquake' }));
+    setChoice.mockClear();
+    let back: BranchSlotChoice | null = null;
+    act(() => { back = hook.result.current.restore('p1', 0); });
+    expect(back).toEqual(expect.objectContaining({ moveId: 'earthquake' }));
+    // the opponent answers the restored pick again: Earthquake is hurt most by the switch to Rotom-Wash
+    expect(setChoice).toHaveBeenCalledWith('p2', { kind: 'switch', speciesId: 'rotomwash', pokemonName: 'Rotom-Wash' }, 0);
+    // the dock writes the user's own slot, the hook never does
+    expect(setChoice).not.toHaveBeenCalledWith('p1', expect.anything(), expect.anything());
+    expect(hook.result.current.engine).toEqual({ p1: [true], p2: [true] });
+  });
+
+  test('singles, on: a pick after the restore is the user\'s again', () => {
+    const { setChoice, hook, land } = setup('singles', true);
+    land(singles());
+    act(() => hook.result.current.onUserChoice('p1', 0, move('swordsdance', 'Swords Dance')));
+    act(() => { hook.result.current.restore('p1', 0); });
+    setChoice.mockClear();
+    act(() => hook.result.current.onUserChoice('p1', 0, move('swordsdance', 'Swords Dance')));
+    expect(hook.result.current.engine.p1).toEqual([false]);
+    expect(setChoice).toHaveBeenCalledWith('p2', expect.objectContaining({ moveId: 'bodypress' }), 0);
+  });
+
+  test('singles, off: the opponent returns to its fill as at the start (the setting was on when the user picked)', () => {
+    const { setChoice, hook, land, wired } = setupWired('singles', true);
+    land(singles());
+    act(() => hook.result.current.onUserChoice('p1', 0, move('swordsdance', 'Swords Dance')));
+    expect(setChoice).toHaveBeenLastCalledWith('p2', expect.objectContaining({ moveId: 'bodypress' }), 0);
+    turnOff(wired, hook);
+    setChoice.mockClear();
+    act(() => { hook.result.current.restore('p1', 0); });
+    expect(setChoice).toHaveBeenCalledWith('p2', expect.objectContaining({ moveId: 'leechseed' }), 0);
+    expect(setChoice).not.toHaveBeenCalledWith('p1', expect.anything(), expect.anything());
+  });
+
+  test('singles, off from the start: the opponent was never rewritten, so nothing is written for it', () => {
+    const { setChoice, hook, land } = setup('singles', false);
+    land(singles());
+    act(() => hook.result.current.onUserChoice('p1', 0, move('swordsdance', 'Swords Dance')));
+    setChoice.mockClear();
+    let back: BranchSlotChoice | null = null;
+    act(() => { back = hook.result.current.restore('p1', 0); });
+    expect(back).toEqual(expect.objectContaining({ moveId: 'earthquake' }));
+    expect(setChoice).not.toHaveBeenCalled();
+  });
+
+  test('a slot the fill never wrote (the user picked before the result landed) has nothing to restore', () => {
+    const { setChoice, hook, land } = setup('singles', true, { p1: [move('swordsdance', 'Swords Dance')] });
+    land(singles());
+    expect(hook.result.current.picks.p1).toEqual([null]);
+    setChoice.mockClear();
+    let back: BranchSlotChoice | null = move('x', 'X');
+    act(() => { back = hook.result.current.restore('p1', 0); });
+    expect(back).toBeNull();
+    expect(setChoice).not.toHaveBeenCalled();
+  });
+
+  test('before the fill landed there is nothing to restore either', () => {
+    const { hook } = setup('singles', true);
+    expect(hook.result.current.picks).toEqual({ p1: [], p2: [] });
+    expect(hook.result.current.restore('p1', 0)).toBeNull();
+  });
+
+  test('doubles, on: one slot goes back, the partner stays and the opponent answers the joint row again', () => {
+    const { setChoice, hook, land } = setup('doubles', true);
+    land(doubles());
+    expect(hook.result.current.picks.p1).toEqual([expect.objectContaining({ moveId: 'fakeout' }), expect.objectContaining({ moveId: 'spore' })]);
+    // the user swaps slot 1 to Protect (Fake Out + Protect is R3, answered by A), then goes back (Fake Out + Spore is R1, answered by B)
+    act(() => hook.result.current.onUserChoice('p1', 1, move('protect', 'Protect')));
+    expect(setChoice).toHaveBeenCalledWith('p2', expect.objectContaining({ moveId: 'grassyglide' }), 0);
+    setChoice.mockClear();
+    let back: BranchSlotChoice | null = null;
+    act(() => { back = hook.result.current.restore('p1', 1); });
+    expect(back).toEqual(expect.objectContaining({ moveId: 'spore' }));
+    expect(setChoice).toHaveBeenCalledWith('p2', expect.objectContaining({ moveId: 'woodhammer' }), 0);
+    expect(setChoice).toHaveBeenCalledWith('p2', expect.objectContaining({ moveId: 'taunt' }), 1);
+    expect(setChoice).not.toHaveBeenCalledWith('p1', expect.anything(), expect.anything());
+    expect(hook.result.current.engine).toEqual({ p1: [true, true], p2: [true, true] });
+  });
+
+  test('doubles, off: both slots of the opponent return to the fill as at the start', () => {
+    const { setChoice, hook, land, wired } = setupWired('doubles', true);
+    land(doubles());
+    const start = hook.result.current.picks.p2;
+    // Rage Powder on slot 1 stands for row R2, which C answers; the fill at the start had A
+    act(() => hook.result.current.onUserChoice('p1', 1, move('ragepowder', 'Rage Powder')));
+    expect(setChoice).toHaveBeenLastCalledWith('p2', expect.objectContaining({ moveId: 'protect' }), 1);
+    turnOff(wired, hook);
+    setChoice.mockClear();
+    act(() => { hook.result.current.restore('p1', 1); });
+    expect(setChoice).toHaveBeenCalledWith('p2', start[0], 0);
+    expect(setChoice).toHaveBeenCalledWith('p2', start[1], 1);
+  });
+
+  test('doubles, on: the opponent\'s slots the user set themselves are left alone', () => {
+    const { setChoice, hook, land } = setup('doubles', true);
+    land(doubles());
+    act(() => hook.result.current.onUserChoice('p1', 1, move('protect', 'Protect')));
+    act(() => hook.result.current.onUserChoice('p2', 0, move('woodhammer', 'Wood Hammer', 1)));
+    setChoice.mockClear();
+    act(() => { hook.result.current.restore('p1', 1); });
+    expect(setChoice).not.toHaveBeenCalledWith('p2', expect.anything(), expect.anything());
   });
 });
