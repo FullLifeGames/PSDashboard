@@ -12,7 +12,7 @@ import type { WinBudget } from './types.ts';
  */
 export const WIN_BUDGET: WinBudget = { cells: 350, turns: 175 };
 
-/** The default chance below which the luck search stops (gate question 4a, 1 in 1,000; the question is open at the user). */
+/** The default chance below which the luck search stops (gate question 4a, 1 in 1,000, ruling 35 W4a). */
 export const LUCK_FLOOR = 0.001;
 
 export class WinMeter {

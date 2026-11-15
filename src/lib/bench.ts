@@ -7,9 +7,10 @@ import {
  * Round 88 (T314, #55): the bench of a bring-limited game. `replayBringOnly` pins the bring lists only when BOTH sides fielded every
  * brought body, because the evaluation of a pinned four against an open six flips games (the A.3c gate, 2630452654). The user's bench
  * has no such constraint: a side that played its whole selection (four bodies in VGC, three in Battle Stadium Singles) has exactly the
- * bodies the log fielded, whatever the other side did. The rebuild keeps its six (the engine's ranked choices and the play-out still
- * reach the unbrought bodies: option (c), round 89); the pickers, the stored positions and the live What-if filter their switch
- * options through this list.
+ * bodies the log fielded, whatever the other side did. Round 89 (ADR 0024) trims the rebuild itself: it plays the brought bodies of
+ * the world the user plays, and `trimTeamsToBring` trims both teams or neither. Where the trim applies, the battle holds no more
+ * bodies than the list and `limitBench` leaves it whole; the pickers, the stored positions and the live What-if still filter their
+ * switch options through this list for a battle that holds more bodies than the list names.
  */
 
 type ReplaySource = Parameters<typeof getReplayBringCount>[0];

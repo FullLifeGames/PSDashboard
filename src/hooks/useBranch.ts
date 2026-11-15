@@ -28,10 +28,11 @@ function useReportingExecutor(run: () => Promise<void>, lastErrorRef: React.RefO
  * with the execute side (turns, forced interludes, choice recording) and the
  * session side (rebuild, battle access, teardown) composed over shared refs.
  *
- * Round 88 (T314, #55): `bench` is the bring-limited game's bench lists (`replayBench`). The battle keeps the whole team the rebuild
- * built; the state the pickers and the dock read offers only the bodies the bring allows, so the What-if and its forced replacements
- * never name a body that stayed home. Round 88 (M3): `engineSimState` is the state as the battle offers it, for the engine's own
- * choices (a ranked line, the play-out, a forced replacement), which still reach the unbrought bodies (option (c), round 89).
+ * Round 88 (T314, #55): `bench` is the bring-limited game's bench lists (`replayBench`). Round 89 (ADR 0024): the rebuild plays the
+ * brought bodies of the world the user plays (both teams trimmed to the bring count, or neither), so the battle's party is
+ * usually the bench already; where it holds more bodies, the state the pickers and the dock read offers only the bodies the bring
+ * allows, so the What-if and its forced replacements never name a body that stayed home. Round 88 (M3): `engineSimState` is the
+ * unfiltered state of that battle, for the engine's own choices (a ranked line, the play-out, a forced replacement).
  */
 export function useBranch(bench: Bench | null = null, afterTurnRef?: React.RefObject<(() => Promise<void>) | null>) {
   const [branching, setBranching] = useState(false);
