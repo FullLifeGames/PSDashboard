@@ -76,6 +76,29 @@ describe('worstLookup', () => {
   });
 });
 
+/**
+ * Round 89 (G16, wave-tester pass 4, finding 1): the card's rows of a pivot are pairs ("U-turn → Keldeo"), and the lines of a tree name
+ * the move alone ("U-turn": the follow-up is a step of its own). The lookup finds the row of a bare move among its pairs (the best
+ * ranked pair, the one the line's follow-up resembles), and a reply that is a pair stands for its bare move.
+ */
+describe('worstLookup with a pivot\'s pair rows (singles)', () => {
+  const pairs = result(['Pursuit', 'Knock Off'], ['U-turn → Tyranitar', 'U-turn → Keldeo', '→ Excadrill'], [[0.1, -0.3, 0.2], [0.3, 0.2, 0.1]], [[solid, solid, solid], [solid, solid, solid]]);
+  const lookup = worstLookup(pairs);
+
+  test('a line whose label is the bare move finds its pair rows; the reply is the answer of the best ranked pair', () => {
+    expect(lookup('p2', { label: 'U-turn', choice: 'move uturn' })).toEqual({ label: 'Knock Off', basis: 'cell' });
+  });
+
+  test('a row of the other side still answers with the pair that hurts it most', () => {
+    expect(lookup('p1', { label: 'Pursuit', choice: 'move Pursuit' })).toEqual({ label: 'U-turn → Keldeo', basis: 'cell' });
+  });
+
+  test('a doubles joint choice with a switch part is no pair row', () => {
+    const doubles = result(['Protect + → Basculegion', 'A + B'], ['E + F', 'G + H'], [[0.3, -0.2], [0.1, 0.0]], [[solid, solid], [solid, solid]]);
+    expect(worstLookup(doubles)('p1', { label: 'Protect', choice: 'x' })).toBeNull();
+  });
+});
+
 describe('linesForMode', () => {
   const step = { p1: { choice: 'x', label: 'Surf', slots: [] }, p2: { choice: 'y', label: 'Moonblast', slots: [] }, dice: [] };
   const line = (label: string, forRoles: EvalLine['for'], versus?: 'worst'): EvalLine => ({

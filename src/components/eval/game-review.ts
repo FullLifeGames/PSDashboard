@@ -1,6 +1,6 @@
 import { lostGround, winDeltaText, winPctText, type EvalLine, type EvalResult, type SideAnalysis, type TurnAnalysis, type VerdictTier } from '@fulllifegames/eval-engine';
 import { linesForMode, worstLookup } from '../../lib/worst-reply';
-import { activeNamesAt, lineBlocks, ranksOf, type LineBlockView, type LineReply, type LinesHost } from '../../lib/line-view';
+import { activeNamesAt, lineBlocks, ranksOf, replacementWords, type LineBlockView, type LineReply, type LinesHost } from '../../lib/line-view';
 import { cardLines, engineChoice, regretView, rowValueTexts } from './turn-copy';
 
 /**
@@ -89,7 +89,7 @@ function lineText(line: EvalLine, playerNames: [string, string], doubles: boolea
   return line.steps.map((step, index) => {
     if (step.replacement) {
       const replacing: Side[] = step.replacement === 'both' ? ['p1', 'p2'] : [step.replacement];
-      return replacing.map(side => `${playerNames[SIDE_INDEX[side]]} replaces: ${step[side].label}`).join(' and ');
+      return replacing.map(side => `${playerNames[SIDE_INDEX[side]]} replaces: ${replacementWords(step[side].label)}`).join(' and ');
     }
     if (doubles) return `${playerNames[SIDE_INDEX[line.side]]}: ${step[line.side].label}; ${playerNames[SIDE_INDEX[other]]}: ${ranked(step[other].label, index)}`;
     return `${step[line.side].label} vs ${ranked(step[other].label, index)}`;

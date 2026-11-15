@@ -1,5 +1,5 @@
 import type { WinStep } from '@fulllifegames/eval-engine';
-import { activeNamesAt, lineBlocks, type LineBlockView, type LinesHost } from './line-view';
+import { activeNamesAt, lineBlocks, rankWords, type LineBlockView, type LinesHost } from './line-view';
 
 /**
  * Round 89 (#130, G8b): what the win-path panel shows, as plain data, in the words the user ruled on 14.11.2026 (W1a to W5a): a
@@ -40,9 +40,7 @@ export interface WinPathsViewContext {
   playedNeverActed?: boolean;
 }
 
-const RANK_NAMES: Record<number, string> = { 2: 'second choice', 3: 'third choice' };
-/** A choice's place in the ranking (1 is the top) in the words of the line heads ("second choice", "choice 4"; round 89, G13b). */
-export const rankWords = (rank: number): string => RANK_NAMES[rank] ?? `choice ${rank}`;
+export { rankWords };
 
 /** A chance as the panel prints it: one decimal under 20 %, whole percent above ("52 %", "10.8 %"). */
 export function chanceText(chance: number): string {

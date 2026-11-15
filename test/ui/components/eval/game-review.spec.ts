@@ -163,6 +163,10 @@ describe('gameReview, doubles', () => {
     );
     // the block is the section's own: doubles rows, one per player
     expect(line.block.rows.length).toBeGreaterThan(3);
+    // the engine's label of a replacement with a slot that passes ends in "+ pass"; the line's words leave it out (round 89, G16)
+    const passing = { ...doublesLine, steps: doublesLine.steps.map(step => (step.replacement ? { ...step, p2: { ...step.p2, label: '→ Zamazenta-Crowned + pass' } } : step)) };
+    const again = gameReview({ analyses, results: [null, null, null, { ...results[3]!, lines: [passing] }], playerNames: DOUBLES_NAMES, doubles: true, host });
+    expect(again[0].rows[0].lines[0].text).toContain('then Mstr_Hawk replaces: → Zamazenta-Crowned, then pixelfrost');
   });
 
   test('doubles: the engine line is the line of the card\'s engine pair, and another pair\'s line is dropped', () => {
@@ -311,7 +315,7 @@ describe('gameReview: Hard mode (round 89, #153)', () => {
 
   test('singles, on: the engine line is the worst line and its answer says why; off: the usual line, whatever the result holds', () => {
     const [engine] = review([singlesLine, meetsSurf], hard);
-    expect(engine.text).toBe('Hydro Pump vs Surf (the reply that hurts Hydro Pump most), then Moonblast vs → Corviknight, then Moonblast vs Brave Bird');
+    expect(engine.text).toBe('Hydro Pump vs Surf (the reply that hurts this choice most), then Moonblast vs → Corviknight, then Moonblast vs Brave Bird');
     const [usual] = review([singlesLine, meetsSurf], host);
     expect(usual.text).toBe("Hydro Pump vs Draining Kiss (Tzon's top choice), then Moonblast vs → Corviknight, then Moonblast vs Brave Bird");
   });
@@ -320,6 +324,6 @@ describe('gameReview: Hard mode (round 89, #153)', () => {
     const lines = review([singlesLine], hard);
     expect(lines).toHaveLength(1);
     expect(lines[0].text).toContain("vs Draining Kiss (Tzon's top choice)");
-    expect(lines[0].block.worstNote).toBe('No line against Surf, the reply that hurts Hydro Pump most. This line meets Draining Kiss.');
+    expect(lines[0].block.worstNote).toBe('No line against Surf, the reply that hurts this choice most. This line meets Draining Kiss.');
   });
 });

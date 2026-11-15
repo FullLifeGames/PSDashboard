@@ -2,7 +2,7 @@ import { dieKey, dieLabel, winPctText, type DieKind, type DieWords, type EvalLin
 import { rulesDex, type GameRules, type TurnSnapshot } from '@fulllifegames/replay-core';
 import { wordsOf } from './branch-dice';
 import type { WinPathsHost } from './win-paths-host';
-import type { ReplyBasis } from './worst-reply';
+import { sameAnswer, type ReplyBasis } from './worst-reply';
 
 /**
  * Round 89 (#104), step G3: what the "Lines" section of the turn card shows, as plain data. One block per line (head, end value,
@@ -255,6 +255,9 @@ function endNote(line: EvalLine, playerNames: [string, string]): string | null {
   return `The line ends where ${who} must choose who to send in; the search made no choice there.`;
 }
 
+/** The words of a replacement: the engine labels a slot that sends nobody in "pass"; a line names the bodies that come in. */
+export const replacementWords = (label: string): string => label.replace(/ \+ pass$/, '').replace(/^pass \+ /, '');
+
 const roleText = (line: EvalLine): string => {
   if (line.for.includes('engine') && line.for.includes('played')) return `played the engine's move: ${line.label}`;
   return `${line.for.includes('engine') ? 'engine' : 'played'}: ${line.label}`;
@@ -277,7 +280,7 @@ function stepViews(line: EvalLine, ctx: LineViewContext): { rows: LineRowView[];
         const entry = step.dice.find(candidate => dieKey(candidate.die.name) === dieKey(die.name));
         return entry?.shown ? [chipText(entry, wordsOfDie(entry, step, words))] : [];
       });
-      return { side, player: ctx.playerNames[SIDE_INDEX[side]], text: step.replacement ? `replaces: ${choice.label}` : choice.label, chips };
+      return { side, player: ctx.playerNames[SIDE_INDEX[side]], text: step.replacement ? `replaces: ${replacementWords(choice.label)}` : choice.label, chips };
     });
     // a replacement inside a turn (a pivot's switch, a faint's) plays on in the turn before it: its dice belong to that turn's number
     for (const entry of step.dice) every.push(`${label || `T${turn - 1}`}: ${tooltipText(entry, wordsOfDie(entry, step, words))}`);
@@ -288,7 +291,22 @@ function stepViews(line: EvalLine, ctx: LineViewContext): { rows: LineRowView[];
   return { rows, every };
 }
 
-const RANK_WORDS = ['top choice', 'second choice', 'third choice'];
+const ORDINALS = ['', 'first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth'];
+
+/**
+ * A choice's place in a ranking (1 is the top) in the words of the line heads: "top choice", "second choice", up to "tenth choice", then
+ * "11th choice" (round 89, G16: a number after the word "choice" read as a menu entry).
+ */
+export function rankWords(rank: number): string {
+  if (rank <= 1) return 'top choice';
+  if (rank < ORDINALS.length) return `${ORDINALS[rank]} choice`;
+  const tens = rank % 100;
+  const suffix = tens >= 11 && tens <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[rank % 10] ?? 'th';
+  return `${rank}${suffix} choice`;
+}
+
+/** What a hurt-most bracket calls the choice of the line it stands on: the line printed the choice a few words before. */
+const HURTS_WHAT = 'this choice';
 
 /**
  * The answer a line meets: the other side's choice in the line's first step, by its place in the ranking. A line that opens with a
@@ -302,20 +320,21 @@ export function replyOf(line: EvalLine, ctx: Pick<LineViewContext, 'ranks' | 'pl
   const name = ctx.playerNames[SIDE_INDEX[other]];
   // Hard mode: a line that meets the reply that hurts its row most says so, by what the reply stands on
   const hurt = ctx.worst?.(line.side, line);
-  if (hurt && hurt.basis !== 'best' && hurt.label === label) {
-    return { label, rank: `the reply that hurts ${line.label} most${hurt.basis === 'punisher' ? ', from a thinly searched cell' : ''}`, off: false };
+  if (hurt && hurt.basis !== 'best' && sameAnswer(hurt.label, label)) {
+    return { label, rank: `the reply that hurts ${HURTS_WHAT} most${hurt.basis === 'punisher' ? ', from a thinly searched cell' : ''}`, off: false };
   }
-  const at = ctx.ranks[other].indexOf(label);
+  // a pivot's pair rows ("U-turn → Keldeo") stand in the ranking for the bare move the line's step names
+  const at = ctx.ranks[other].findIndex(ranked => sameAnswer(ranked, label));
   if (at < 0) return { label, rank: `not among ${name}'s ranked choices`, off: true };
-  if (at === 0) return { label, rank: `${name}'s ${RANK_WORDS[0]}`, off: false };
-  return { label, rank: `${name}'s ${RANK_WORDS[at] ?? `choice ${at + 1}`} in this search`, off: true };
+  if (at === 0) return { label, rank: `${name}'s ${rankWords(1)}`, off: false };
+  return { label, rank: `${name}'s ${rankWords(at + 1)} in this search`, off: true };
 }
 
 /** Round 89 (#153): the sentence for a row whose search holds no line against the reply that hurts it most; null when the line meets it or none is known. */
 function worstNote(line: EvalLine, reply: LineReply | null, ctx: Pick<LineViewContext, 'worst'>): string | null {
   const hurt = ctx.worst?.(line.side, line);
-  if (!hurt || hurt.basis === 'best' || !reply || reply.label === hurt.label) return null;
-  return `No line against ${hurt.label}, the reply that hurts ${line.label} most. This line meets ${reply.label}.`;
+  if (!hurt || hurt.basis === 'best' || !reply || sameAnswer(hurt.label, reply.label)) return null;
+  return `No line against ${hurt.label}, the reply that hurts ${HURTS_WHAT} most. This line meets ${reply.label}.`;
 }
 
 /** The tooltip of ▶ Play: what the click does and every die it forces. */

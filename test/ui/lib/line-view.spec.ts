@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { DIE_KINDS, winPctText, type EvalLine, type ForcedDie, type LineDie, type LineStep } from '@fulllifegames/eval-engine';
-import { LINE_DIFFERS_SENTENCE, LINE_PROVEN_SENTENCE, differsSentences, lineBlocks, type LineViewContext } from '../../../src/lib/line-view';
+import { LINE_DIFFERS_SENTENCE, LINE_PROVEN_SENTENCE, differsSentences, lineBlocks, replacementWords, type LineViewContext } from '../../../src/lib/line-view';
 import { bothRolesLine, doublesLine, DOUBLES_NAMES, playedLine, singlesLine, SINGLES_NAMES } from '../fixtures/lines';
 
 /**
@@ -273,7 +273,24 @@ describe('the answer a line meets', () => {
     expect(replyOf('Draining Kiss', 'Surf')).toEqual({ label: 'Draining Kiss', rank: "Tzon's top choice", off: false });
     expect(replyOf('Surf', 'Draining Kiss')).toEqual({ label: 'Draining Kiss', rank: "Tzon's second choice in this search", off: true });
     expect(replyOf('Surf', 'Earthquake', 'Draining Kiss')).toEqual({ label: 'Draining Kiss', rank: "Tzon's third choice in this search", off: true });
-    expect(replyOf('A', 'B', 'C', 'Draining Kiss')).toEqual({ label: 'Draining Kiss', rank: "Tzon's choice 4 in this search", off: true });
+    expect(replyOf('A', 'B', 'C', 'Draining Kiss')).toEqual({ label: 'Draining Kiss', rank: "Tzon's fourth choice in this search", off: true });
+    expect(replyOf('A', 'B', 'C', 'D', 'Draining Kiss')).toEqual({ label: 'Draining Kiss', rank: "Tzon's fifth choice in this search", off: true });
+    expect(replyOf('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'Draining Kiss')?.rank).toBe("Tzon's 12th choice in this search");
+  });
+
+  test('a pivot\'s pair rows stand for the bare move a line names (finding 1 of pass 4)', () => {
+    // the line meets "Draining Kiss"; the ranking holds "Draining Kiss → Mew" at place 2: the answer is that row, not an unranked one
+    expect(lineBlocks([singlesLine], { ...singles, ranks: ranked('Surf', 'Draining Kiss → Mew', 'Draining Kiss → Corviknight') })[0].reply)
+      .toEqual({ label: 'Draining Kiss', rank: "Tzon's second choice in this search", off: true });
+    expect(lineBlocks([singlesLine], { ...singles, ranks: ranked('Draining Kiss → Mew', 'Surf') })[0].reply)
+      .toEqual({ label: 'Draining Kiss', rank: "Tzon's top choice", off: false });
+  });
+
+  test('a doubles joint choice with a switch part is never cut at its arrow', () => {
+    const joint = 'Protect + → Basculegion';
+    const line = { ...doublesLine, steps: [{ ...doublesLine.steps[0], p2: { ...doublesLine.steps[0].p2, label: 'Protect' } }, ...doublesLine.steps.slice(1)] };
+    expect(lineBlocks([line], { turn: 4, playerNames: DOUBLES_NAMES, doubles: true, rules: { gen: 9, mod: undefined }, ranks: { p1: [], p2: [joint] } })[0].reply?.rank)
+      .toBe("not among Mstr_Hawk's ranked choices");
   });
 
   test('an answer the ranking does not hold is named as such', () => {
@@ -300,5 +317,58 @@ describe('the answer a line meets', () => {
     expect(lineBlocks([opening], { ...doubles, ranks: { p1: [], p2: ['x'] } })[0].reply).toBeNull();
     expect(lineBlocks([singlesLine], singles)[0].reply).toBeNull();
     expect(lineBlocks([doublesLine], doubles)[0].reply).toBeNull();
+  });
+});
+
+/**
+ * Round 89 (G16, pass 4, findings 1 and 4): in Hard mode the bracket names the reply that hurts the line's choice most by those words
+ * (not by the choice's own label, which the line printed a few words before: a switch read as "hurts → Clefable", a joint choice ran
+ * to fifty characters), and a reply that is a pivot's pair ("Draining Kiss → Mew") is the bare move the line meets.
+ */
+describe('the reply that hurts most, in the bracket', () => {
+  const ranks = { p1: ['Draining Kiss', 'Surf'], p2: ['Hydro Pump', 'Hyper Voice'] };
+  const worst = (label: string, basis: 'cell' | 'punisher' = 'cell') => () => ({ label, basis });
+
+  test('singles: a move, a switch and a thin cell', () => {
+    expect(lineBlocks([bothRolesLine], { ...singles, ranks, worst: worst('Hydro Pump') })[0].reply)
+      .toEqual({ label: 'Hydro Pump', rank: 'the reply that hurts this choice most', off: false });
+    expect(lineBlocks([bothRolesLine], { ...singles, ranks, worst: worst('Hydro Pump', 'punisher') })[0].reply?.rank)
+      .toBe('the reply that hurts this choice most, from a thinly searched cell');
+  });
+
+  test('a pair row of the card is the bare move the line meets: no "No line against" sentence, the bracket names the reply', () => {
+    const [block] = lineBlocks([bothRolesLine], { ...singles, ranks, worst: worst('Hydro Pump → Mew') });
+    expect(block.reply).toEqual({ label: 'Hydro Pump', rank: 'the reply that hurts this choice most', off: false });
+    expect(block.worstNote).toBeNull();
+  });
+
+  test('a line that meets another reply keeps its rank words and gets the sentence, which names the choice by those words too', () => {
+    const [block] = lineBlocks([bothRolesLine], { ...singles, ranks, worst: worst('Hyper Voice') });
+    expect(block.reply?.rank).toBe("Pepitopalotin's top choice");
+    expect(block.worstNote).toBe('No line against Hyper Voice, the reply that hurts this choice most. This line meets Hydro Pump.');
+  });
+
+  test('doubles: the joint choice is not repeated', () => {
+    const joint = 'Sucker Punch → Terapagos + Protect';
+    const [block] = lineBlocks([doublesLine], { turn: 4, playerNames: DOUBLES_NAMES, doubles: true, rules: { gen: 9, mod: undefined }, ranks: { p1: [], p2: [joint] }, worst: worst(joint) });
+    expect(block.reply?.rank).toBe('the reply that hurts this choice most');
+  });
+});
+
+/** Round 89 (G16, pass 4, finding 13): a doubles replacement whose other slot needs no body carries "pass" in the engine's label; the words of a line leave it out. */
+describe('a replacement names the bodies that come in, not the slot that passes', () => {
+  const withPass: typeof doublesLine = {
+    ...doublesLine,
+    steps: doublesLine.steps.map(step => (step.replacement ? { ...step, p2: { ...step.p2, label: '→ Zamazenta-Crowned + pass' } } : step)),
+  };
+
+  test('the row of the Lines section', () => {
+    const [block] = lineBlocks([withPass], doubles);
+    expect(block.rows[2].sides[0].text).toBe('replaces: → Zamazenta-Crowned');
+  });
+
+  test('both orders, and a label with no pass is unchanged', () => {
+    expect(replacementWords('pass + → Zamazenta-Crowned')).toBe('→ Zamazenta-Crowned');
+    expect(replacementWords('→ A + → B')).toBe('→ A + → B');
   });
 });

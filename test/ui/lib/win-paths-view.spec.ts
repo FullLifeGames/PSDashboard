@@ -89,8 +89,8 @@ describe('the win-path words', () => {
 
   test('chances and ordinals', () => {
     expect([0.0005, 0.004, 0.108, 0.19, 0.2, 0.5175, 1].map(chanceText)).toEqual(['0.1 %', '0.4 %', '10.8 %', '19 %', '20 %', '52 %', '100 %']);
-    // the rank reads as the line heads of the Lines section read it (G13b): "second choice", "third choice", then "choice 4"
-    expect([2, 3, 4, 11].map(rankWords)).toEqual(['second choice', 'third choice', 'choice 4', 'choice 11']);
+    // the rank reads as the line heads of the Lines section read it (G13b, G16): "second choice", "third choice", then "fourth choice", "11th choice"
+    expect([2, 3, 4, 5, 10, 11, 12, 21, 22, 23].map(rankWords)).toEqual(['second choice', 'third choice', 'fourth choice', 'fifth choice', 'tenth choice', '11th choice', '12th choice', '21st choice', '22nd choice', '23rd choice']);
   });
 
   test('a found step with no line (the witness search found none) keeps its sentence and shows no play button data', () => {

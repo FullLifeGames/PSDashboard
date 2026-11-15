@@ -229,7 +229,7 @@ describe('Hard mode in the Lines section', () => {
 
   test('singles, on: the worst line stands where the usual line stood, and its head names the reply', () => {
     render(<LinesSection turn={20} result={hurtBy([singlesLine, meetsSurf])} playerNames={SINGLES_NAMES} doubles={false} host={hard()} />);
-    expect(screen.getByText('vs Surf (the reply that hurts Hydro Pump most)')).toBeInTheDocument();
+    expect(screen.getByText('vs Surf (the reply that hurts this choice most)')).toBeInTheDocument();
     expect(screen.queryByText(/Tzon's top choice/)).toBeNull();
     expect(screen.getAllByRole('button', { name: '▶ Play' })).toHaveLength(1);
     expect(screen.queryByText(/No line against/)).toBeNull();
@@ -238,27 +238,27 @@ describe('Hard mode in the Lines section', () => {
   test('singles, on, and no tree holds a line against the reply: today\'s line, with the sentence that says so', () => {
     render(<LinesSection turn={20} result={hurtBy([singlesLine])} playerNames={SINGLES_NAMES} doubles={false} host={hard()} />);
     expect(screen.getByText("vs Draining Kiss (Tzon's top choice)")).toBeInTheDocument();
-    expect(screen.getByText('No line against Surf, the reply that hurts Hydro Pump most. This line meets Draining Kiss.')).toBeInTheDocument();
+    expect(screen.getByText('No line against Surf, the reply that hurts this choice most. This line meets Draining Kiss.')).toBeInTheDocument();
   });
 
   test('singles, off: the usual line and no worst line, no sentence', () => {
     render(<LinesSection turn={20} result={hurtBy([singlesLine, meetsSurf])} playerNames={SINGLES_NAMES} doubles={false} host={host()} />);
     expect(screen.getByText("vs Draining Kiss (Tzon's top choice)")).toBeInTheDocument();
-    expect(screen.queryByText(/hurts Hydro Pump most/)).toBeNull();
+    expect(screen.queryByText(/hurts this choice most/)).toBeNull();
     expect(screen.getAllByRole('button', { name: '▶ Play' })).toHaveLength(1);
   });
 
   test('a usual line that already meets the reply reads as the worst line; a thin cell says so', () => {
     const asTop = { ...hurtBy([{ ...singlesLine, steps: meetsSurf.steps }]) };
     render(<LinesSection turn={20} result={asTop} playerNames={SINGLES_NAMES} doubles={false} host={hard()} />);
-    expect(screen.getByText('vs Surf (the reply that hurts Hydro Pump most)')).toBeInTheDocument();
+    expect(screen.getByText('vs Surf (the reply that hurts this choice most)')).toBeInTheDocument();
     cleanup();
     const thinCells = { ...hurtBy([{ ...singlesLine, steps: meetsSurf.steps }]) };
     thinCells.matrix = { ...thinCells.matrix!, cells: [[{ visits: 2, verified: false }, { visits: 2, verified: false }], [{ visits: 2, verified: false }, { visits: 2, verified: false }]] };
     thinCells.perSide.p1[1] = { ...thinCells.perSide.p1[1] };
     thinCells.perSide.p2[0] = { ...thinCells.perSide.p2[0], punishedBy: 'Surf' };
     render(<LinesSection turn={20} result={thinCells} playerNames={SINGLES_NAMES} doubles={false} host={hard()} />);
-    expect(screen.getByText('vs Surf (the reply that hurts Hydro Pump most, from a thinly searched cell)')).toBeInTheDocument();
+    expect(screen.getByText('vs Surf (the reply that hurts this choice most, from a thinly searched cell)')).toBeInTheDocument();
   });
 
   test('doubles, on: the joint answer is named like a single one', () => {
@@ -273,6 +273,6 @@ describe('Hard mode in the Lines section', () => {
       lines: [{ ...doublesLine, versus: 'worst' }, { ...doublesLine, steps: [{ ...doublesLine.steps[0], p2: { choice: 'b', label: other, slots: [] } }, ...doublesLine.steps.slice(1)] }],
     };
     render(<LinesSection turn={4} result={result} playerNames={DOUBLES_NAMES} doubles host={hard()} />);
-    expect(screen.getByText(`vs ${pair} (the reply that hurts Fake Out → Rillaboom + Spore → Zamazenta most)`)).toBeInTheDocument();
+    expect(screen.getByText(`vs ${pair} (the reply that hurts this choice most)`)).toBeInTheDocument();
   });
 });

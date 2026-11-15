@@ -33,12 +33,25 @@ export function worstReply(result: EvalResult, side: Side, row: Pick<RankedChoic
 }
 
 /**
- * The answer a line's row meets in Hard mode, by side and the row the line belongs to (its label, then its choice string): the reply's
+ * Round 89 (G16): a pivot's rows in the card's matrix are pairs, the move and the body it brings in ("U-turn → Keldeo"), where a line's
+ * step names the move alone ("U-turn": the follow-up is a step of its own). The move of a pair row; any other label unchanged. Only a
+ * label with one arrow between two names counts (after a gimmick segment at most: "Mega + U-turn → Keldeo"), so a switch ("→ Keldeo") and a doubles joint choice ("Protect + → Rillaboom")
+ * are never cut.
+ */
+export const pivotMove = (label: string): string => (/^((Tera|Mega|Ultra) \+ )?[^→+]+ → [^→+]+$/.test(label) ? label.slice(0, label.indexOf(' → ')) : label);
+
+/** Whether a ranked label and a line's step label name the same answer: equal, or the step is the bare move of the ranked pivot pair. */
+export const sameAnswer = (ranked: string, step: string): boolean => ranked === step || pivotMove(ranked) === step;
+
+/**
+ * The answer a line's row meets in Hard mode, by side and the row the line belongs to (its label, its choice string, then the pair rows of its move): the reply's
  * label and its basis; null for a row the result lacks.
  */
 export function worstLookup(result: EvalResult): (side: Side, row: Pick<EvalLine, 'label' | 'choice'>) => { label: string; basis: ReplyBasis } | null {
   return (side, line) => {
-    const row = result.perSide[side].find(entry => entry.label === line.label) ?? result.perSide[side].find(entry => entry.choice === line.choice);
+    // a line's label may be the bare move of a pivot whose rows are pairs: the best ranked pair stands for it (the line's follow-up is the greedy one)
+    const row = result.perSide[side].find(entry => entry.label === line.label) ?? result.perSide[side].find(entry => entry.choice === line.choice)
+      ?? result.perSide[side].find(entry => pivotMove(entry.label) === line.label);
     const found = row ? worstReply(result, side, row) : null;
     return found ? { label: found.reply.label, basis: found.basis } : null;
   };
