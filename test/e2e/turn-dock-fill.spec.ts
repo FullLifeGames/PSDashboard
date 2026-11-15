@@ -99,15 +99,24 @@ test('Back to the engine\'s pick returns a picked slot to the fill\'s move and t
   const tray = await openTray(page, 'p1a');
   const back = tray.getByRole('button', { name: "Back to the engine's pick" });
   await expect(back).toHaveCount(0);
-  // the first tile that gives another chip text than the engine's pick
+  // the first tile whose move is not the engine's own (the chip's text names the engine's move)
   const tiles = tray.locator('.ps-movebtn:enabled');
   const count = await tiles.count();
   let picked = false;
   for (let index = 0; index < count && !picked; index++) {
+    const name = ((await tiles.nth(index).locator('.ps-movebtn-name').first().textContent()) ?? '').trim();
+    if (name === '' || engineText.includes(name)) continue;
     await tiles.nth(index).click();
-    picked = ((await dockChip(page, 'p1a').textContent()) ?? '').trim() !== engineText;
+    await expect(dockChip(page, 'p1a')).toContainText(name);
+    picked = true;
   }
-  expect(picked, 'a tile other than the engine\'s pick exists').toBe(true);
+  // a body with one revealed move has no other tile: a switch is another pick
+  const benched = tray.locator('.ps-switchbtn:enabled');
+  if (!picked && await benched.count() > 0) {
+    await benched.first().click();
+    picked = true;
+  }
+  expect(picked, 'a pick other than the engine\'s exists').toBe(true);
   await expect(dockChip(page, 'p1a')).not.toHaveAttribute('data-origin', 'engine');
   await expect(back).toBeVisible();
   await expect(back).toHaveClass(/ps-btn/);
