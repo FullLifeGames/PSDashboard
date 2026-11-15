@@ -101,7 +101,8 @@ function overlayIvs(pokemon: RevealedPokemonInfo, candidate: SpreadCandidate): P
  * Display overlay for damage-consistent spreads and the items the
  * move-order evidence decided: mirrors the simulator precedence
  * (edited/revealed/sheet beat inference; inference beats usage guesses),
- * so what the panel shows is what the sim runs.
+ * so what the panel shows is what the sim runs. A body whose EVs are set (manual or revealed) keeps its info whole,
+ * nature included, and the build plays that nature (`shownNature` in `team/set-resolvers.ts`, issue 150).
  */
 export function applyInferredSpreads(
   info: OpponentTeamInfo,
