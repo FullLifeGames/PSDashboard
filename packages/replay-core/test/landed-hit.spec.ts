@@ -155,6 +155,49 @@ describe('where the log proves nothing, nothing is ruled out', () => {
     }
   });
 
+  describe('an Illusion user the log has not revealed', () => {
+    // Zoroark leads and shows the name and the species of the last member of its party (the simulator's Illusion). The log names the disguise on the hit
+    // (`|-damage|p2a: Bronzong|`), and the damage breaks the disguise right after it (`|replace|`, `|-end|...|Illusion`). Bronzong is the disguise whose
+    // second ability the hit would seem to rule out: a Ground move lands on the body, and the real body is Zoroark (Dark, no Levitate).
+    const withoutPreview = (log: string) => log.split('\n').filter(line => !line.startsWith('|poke|')).join('\n');
+    const disguised = (preview: boolean, doubleBattle: boolean) => {
+      const zoroark = mon('Zoroark', 'Illusion');
+      const log = doubleBattle
+        ? play({ format: DOUBLES, p1: [mon('Smeargle', '', ['Earthquake']), FILLER, FILLER, FILLER], p2: [zoroark, FILLER, FILLER, mon('Bronzong', 'Heatproof')], turns: [{ p1: 'move 1, move 1', p2: 'move 1, move 1' }] })
+        : play({ format: SINGLES, p1: [mon('Smeargle', '', ['Earthquake']), FILLER], p2: [zoroark, mon('Bronzong', 'Heatproof')], turns: [{ p1: 'move 1', p2: 'move 1' }] });
+      // A format without team preview (Random Battle) has no `|poke|` lines: the party is not on the log.
+      return preview ? log : withoutPreview(log);
+    };
+
+    test('the log names the disguise on the hit and the damage breaks it', () => {
+      for (const doubleBattle of [false, true]) {
+        const log = disguised(false, doubleBattle);
+        expect(log).toMatch(/\|-damage\|p2a: Bronzong\|/);
+        expect(log).toMatch(/\|replace\|p2a: Zoroark\|/);
+      }
+    });
+
+    test('a party the team preview showed holds Zoroark: nothing is ruled out (singles and doubles)', () => {
+      for (const doubleBattle of [false, true]) expect(ruledOut(disguised(true, doubleBattle), 'Bronzong'), doubleBattle ? 'doubles' : 'singles').toEqual([]);
+    });
+
+    test('a party the log never showed may hold Zoroark: the disguise\'s species gets no verdict, and it is counted (singles and doubles)', () => {
+      for (const doubleBattle of [false, true]) {
+        const before = blockedSkips();
+        expect(ruledOut(disguised(false, doubleBattle), 'Bronzong'), doubleBattle ? 'doubles' : 'singles').toEqual([]);
+        expect(blockedSkips(), doubleBattle ? 'doubles' : 'singles').toBeGreaterThan(before);
+      }
+    });
+
+    test('Generation 4 has no Illusion: with no team preview the hit still reads (singles and doubles)', () => {
+      const source = mon('Smeargle', '', ['Earthquake']);
+      const single = play({ format: 'gen4customgame', p1: [source, FILLER], p2: [mon('Bronzong', 'Heatproof'), FILLER], turns: [{ p1: 'move 1', p2: 'move 1' }] });
+      const double = play({ format: 'gen4doublescustomgame', p1: [source, FILLER, FILLER, FILLER], p2: [mon('Bronzong', 'Heatproof'), FILLER, FILLER, FILLER], turns: [{ p1: 'move 1, move 1', p2: 'move 1, move 1' }] });
+      expect(ruledOut(withoutPreview(single), 'Bronzong')).toEqual(['levitate']);
+      expect(ruledOut(withoutPreview(double), 'Bronzong')).toEqual(['levitate']);
+    });
+  });
+
   test('known limit: a hidden Iron Ball grounds a Levitate holder, and the log does not show it (the rule rules Levitate out)', () => {
     const log = play({ format: SINGLES, p1: [mon('Smeargle', '', ['Earthquake']), FILLER], p2: [mon('Bronzong', 'Levitate', ['Splash'], 'Iron Ball'), FILLER], turns: [{ p1: 'move 1', p2: 'move 1' }] });
     expect(log).toMatch(/\|-damage\|p2a: Bronzong\|/);

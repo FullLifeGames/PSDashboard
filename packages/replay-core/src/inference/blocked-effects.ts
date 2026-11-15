@@ -2,7 +2,7 @@ import { toId } from '../ids.ts';
 import { dexOf, type RulesDex } from '../rules-dex.ts';
 import { effectLands, mayRefuseHit, type EffectScene, type SceneBody, type SceneEffect } from '../sim-ask/effect-refusal.ts';
 import { clientPokemon } from './client-facts.ts';
-import { illusionPossible, possibleAbilities } from './item-evidence.ts';
+import { illusionPossible, partyMayHideIllusion, possibleAbilities } from './item-evidence.ts';
 import { findPokemon, ruleOut, type InferrerState } from './inferrer-state.ts';
 import { arg, fromEffect, hasKw, identOf, keyOf, type LogLine } from './log-line.ts';
 
@@ -21,7 +21,8 @@ import { arg, fromEffect, hasKw, identOf, keyOf, type LogLine } from './log-line
  * battle's own `suppressingAbility` then skips the breakable handlers), and counts as blocked only when it refuses in all of them while
  * the same scene with no ability lets the effect land (a scene the log contradicts proves nothing). The ally of the body is asked too in
  * doubles: Flower Veil, Sweet Veil and the other guards of the `onAlly` kind refuse for their ally.
- * Nothing is ruled out when the log names Neutralizing Gas, when an Illusion user may stand on the team, when the body is transformed,
+ * Nothing is ruled out when the log names Neutralizing Gas, when an Illusion user may stand on the team (the party of the team preview, or a game with no
+ * preview from Generation 5: a disguise names another species on the hit, `partyMayHideIllusion`), when the body is transformed,
  * in another forme than its team entry, has its ability suppressed or changed, or when the abilities that refuse the effect are the whole
  * set the species has left (a contradiction: a misread or a rule the simulator lacks, never a proof). `blockedContradictions()` counts the last.
  *
@@ -57,7 +58,10 @@ export interface BlockedWatch {
 /** Events where every legal ability of the body would have refused the effect (nothing is ruled out for them), counted over the process. */
 let contradictionCount = 0;
 export const blockedContradictions = (): number => contradictionCount;
-/** Landed hits the reader could not ask the simulator about (a move whose type the log does not show), counted over the process. */
+/**
+ * Landed effects the reader could not judge, counted over the process: a hit by a move whose type the log does not show, and any effect on a side whose
+ * party may hold an Illusion user the log never showed (no team preview).
+ */
 let skipCount = 0;
 export const blockedSkips = (): number => skipCount;
 
@@ -315,9 +319,9 @@ export function watchBlockedEffects(state: InferrerState, line: LogLine) {
   if (!readable(state)) return;
   const read = causesOf(state, watch, line);
   if (!read || identOf(read.target)?.side !== state.opponentSide) return;
-  if (read.unsure) skipCount++;
+  if (read.unsure || partyMayHideIllusion(state)) skipCount++;
   // A cause that is the body itself (Close Combat, a reflected Intimidate) proves nothing about a guard against others.
-  if (read.causes.length === 0 || read.causes.some(cause => keyOf(cause.source) === keyOf(read.target)) || illusionPossible(state)) return;
+  if (read.causes.length === 0 || read.causes.some(cause => keyOf(cause.source) === keyOf(read.target)) || illusionPossible(state) || partyMayHideIllusion(state)) return;
   const { own, effectTarget, ally, partner } = situationOf(state, watch, read.target);
   if (!effectTarget.species) return;
   if (own) ruleOutRefusers(state, watch, effectTarget, own, partner, read.causes);
