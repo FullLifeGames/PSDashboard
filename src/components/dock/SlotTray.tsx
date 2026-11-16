@@ -10,10 +10,11 @@ import { TrayMore } from './TrayMore';
  * Round 84 (turn dock): the tray of one slot, above the dock: header, move tiles with their targets, the bench, and behind
  * "Dice · What if" the dice, the What-if loader and all choices. A slot that must replace a body shows only the bench.
  */
-export function SlotTray({ slot, hpByLabel, gen, moreOpen, diceViews, onChoice, onHypotheticalMove, onMore, onBackToEngine, onDone }: {
+export function SlotTray({ slot, hpByLabel, gen, format, moreOpen, diceViews, onChoice, onHypotheticalMove, onMore, onBackToEngine, onDone }: {
   slot: DockSlotModel;
   hpByLabel: Record<string, number>;
   gen: number;
+  format: string;
   moreOpen: boolean;
   diceViews: DiceViews;
   onChoice: (choice: BranchSlotChoice) => void;
@@ -43,7 +44,7 @@ export function SlotTray({ slot, hpByLabel, gen, moreOpen, diceViews, onChoice, 
         </div>
       )}
       {moreOpen && !slot.forceSwitch && (
-        <TrayMore slot={slot} gen={gen} diceViews={diceViews} onChoice={onChoice} onHypotheticalMove={onHypotheticalMove} />
+        <TrayMore slot={slot} gen={gen} format={format} diceViews={diceViews} onChoice={onChoice} onHypotheticalMove={onHypotheticalMove} />
       )}
     </div>
   );

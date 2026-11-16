@@ -1,5 +1,6 @@
 import type { AppController } from '../../hooks/useAppController';
 import { ConfirmBanner } from '../ConfirmBanner';
+import { replayFormatId } from '../../lib/replay-format-id';
 import { gameEnd } from '../../lib/game-end';
 import { RawLogToggle } from './RawLogToggle';
 import type { Side } from './dock-model';
@@ -27,6 +28,7 @@ function dockProps(app: AppController, replayId: string): TurnDockProps {
     executeError: liveTip ? executeError : null,
     executing: executing || branchPreparing,
     gen: app.ctx.meta.replayGen,
+    format: replayFormatId(app.ctx.replay.replayData),
     onSetChoice: handleSetChoice,
     // The live tip can hold a forced replacement back for Execute (ruling 16a); a replay turn has none.
     onRecordChoice: liveTip ? app.ctx.branch.recordChoice : undefined,

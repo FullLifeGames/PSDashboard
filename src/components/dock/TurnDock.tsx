@@ -35,6 +35,8 @@ export interface TurnDockProps {
   executing: boolean;
   /** Generation of the loaded replay: keeps the damage calc on the sim's generation. */
   gen: number;
+  /** The game's format id ('' when unknown): the tray's What if list reads its move pool by it. */
+  format?: string;
   onSetChoice: (side: Side, choice: BranchSlotChoice, activeSlot?: number) => void;
   /** Round 84 (A7c, ruling 16a): stores a pick without sending anything (the live tip only). Without it every pick goes through `onSetChoice`. */
   onRecordChoice?: (side: Side, choice: BranchSlotChoice, activeSlot?: number) => void;
@@ -147,7 +149,7 @@ function backHandler(fill: DockFillView | null | undefined, slot: DockSlotModel 
  */
 export function TurnDock(props: TurnDockProps) {
   const {
-    simState, stale, source, acquiringExact, executeError, executing, gen, onSetChoice, onRecordChoice, onHypotheticalMove, onExecuteTurn,
+    simState, stale, source, acquiringExact, executeError, executing, gen, format = '', onSetChoice, onRecordChoice, onHypotheticalMove, onExecuteTurn,
     played, positionKey, getBattle, replayLog, seed, fill, nearSide, endOfGame, isGame,
   } = props;
   const { setChoice, writeChoice } = useUserChoice(simState, fill, onSetChoice, onRecordChoice);
@@ -176,6 +178,7 @@ export function TurnDock(props: TurnDockProps) {
             slot={openSlot}
             hpByLabel={model.hpByLabel}
             gen={gen}
+            format={format}
             moreOpen={open.more}
             diceViews={diceViews}
             onChoice={choice => setChoice(open.side, choice, open.slot)}

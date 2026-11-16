@@ -1,7 +1,10 @@
-import { describe, expect, test } from 'vitest';
+import { beforeAll, describe, expect, test } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { BranchSlotChoice, BranchSlotModifiers } from '@fulllifegames/eval-engine';
+import { Dex } from '@pkmn/sim';
+import { loadSimMods } from '@fulllifegames/eval-engine';
 import { useGimmickToggles, useMovePool } from '../../../src/hooks/useSideControlsState';
+import { getMovePool } from '../../../src/lib/pokemon-options';
 import { NO_MODIFIERS } from '../fixtures/sim-state';
 
 const withTera: BranchSlotModifiers = { ...NO_MODIFIERS, teraType: 'Fire' };
@@ -246,5 +249,47 @@ describe('useMovePool', () => {
   test('an empty species loads nothing', () => {
     const { result } = renderHook(() => useMovePool('', 9));
     expect(result.current).toEqual([]);
+  });
+});
+
+/**
+ * Round 89 (T8a): the pool follows the game's format. A Champions game reads the mod's learnsets (the Generation 9 pool offers
+ * moves the mod does not teach); a National Dex draft gets its Past species' pool; a format change reloads the pool. The
+ * oracles are the mod's own Dex and the team editor's reader, `getMovePool`, never a move name.
+ */
+describe('useMovePool follows the format', () => {
+  beforeAll(async () => {
+    await loadSimMods('gen9championsou');
+  });
+
+  // Singles (Champions OU) and doubles (Champions VGC) both.
+  describe.each(['gen9championsou', 'gen9championsvgc2026regmcbo3'])('%s', format => {
+    test('the pool is the mod\'s, and lacks a move the Generation 9 pool has', async () => {
+      const species = 'Garchomp';
+      const modPool = (await Dex.mod('champions').learnsets.get('garchomp')).learnset ?? {};
+      const modMoves = new Set(Object.keys(modPool).map(id => Dex.mod('champions').moves.get(id).name));
+      const standard = await getMovePool(species, 9);
+      const missing = standard.filter(name => !modMoves.has(name));
+      expect(missing.length).toBeGreaterThan(0);
+
+      const { result } = renderHook(() => useMovePool(species, 9, format));
+      const expected = await getMovePool(species, 9, format);
+      await waitFor(() => expect(result.current).toEqual(expected), { timeout: 20_000 });
+      for (const name of missing) expect(result.current).not.toContain(name);
+    }, 30_000);
+  });
+
+  // A National Dex draft (singles) and a doubles draft league: the simulator's pool of a Past species.
+  describe.each(['gen9natdexdraft', 'gen9doublesdraftleague'])('%s', format => {
+    test('Dracovish is offered Fishious Rend, and only with the format', async () => {
+      const { result, rerender } = renderHook((id: string) => useMovePool('Dracovish', 9, id), { initialProps: format });
+      await waitFor(() => expect(result.current).toContain('Fishious Rend'), { timeout: 20_000 });
+      expect(result.current).toEqual(await getMovePool('Dracovish', 9, format));
+      // A format change drops the pool at once and loads the next one.
+      rerender('gen9ou');
+      expect(result.current).toEqual([]);
+      await waitFor(() => expect(result.current.length).toBeGreaterThan(0), { timeout: 20_000 });
+      expect(result.current).not.toContain('Fishious Rend');
+    }, 30_000);
   });
 });

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { EvictedGameNotice } from './components/EvictedGameNotice';
-import { inferReplayFormatId } from '@fulllifegames/replay-core';
+import { replayFormatId } from './lib/replay-format-id';
 import { LazyNewGameDialog } from './components/NewGameDialogLazy';
 import { GameEditNotices } from './components/GameEditNotices';
 import { unsavedVariation, variationOpen } from './components/game-tip';
@@ -115,7 +115,7 @@ function AppModals({ app }: { app: AppController }) {
           title="Edit Player Team"
           teamInfo={statsP1Info}
           gen={replayGen}
-          format={replayData ? inferReplayFormatId(replayData) : ''}
+          format={replayFormatId(replayData)}
           onSave={(info) => onSave('p1', info)}
           onClose={() => setEditorSide(null)}
         />
@@ -125,7 +125,7 @@ function AppModals({ app }: { app: AppController }) {
           title="Edit Opponent Team"
           teamInfo={statsP2Info}
           gen={replayGen}
-          format={replayData ? inferReplayFormatId(replayData) : ''}
+          format={replayFormatId(replayData)}
           onSave={(info) => onSave('p2', info)}
           onClose={() => setEditorSide(null)}
         />
