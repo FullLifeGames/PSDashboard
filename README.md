@@ -46,6 +46,7 @@ To reproduce a report, run `REPRO_STATE=<state file> npm run test:e2e -- test/e2
 ## Embedding
 
 - **Deep link:** `?replay=gen3customgame-2115579570` loads that replay on startup, standalone or inside an iframe. The app writes the address of what is open: `?replay=<id>` for a replay loaded by link or id, `?game=<id>` for a game it saved in your browser.
+- **Deep link to a turn:** `?replay=<id>&turn=<n>` opens the replay on turn `n`, as if you had moved the timeline there: the frame, the slider and the analysis stand on that turn. A turn past the end opens on the last position, a value that is not a whole number is ignored, and the link without `turn` opens on turn 1. The address is read once at load and keeps its `turn` as written; moving the timeline later does not rewrite it. Works in embed mode too.
 - **Embed mode:** `?embed=1` hides the header and the loader; the top bar keeps `Report issue` and leaves the creator link to the host page. Combine both: `?embed=1&replay=<id>`.
 - **postMessage** for replays you host yourself (exported HTML files, raw logs):
 
