@@ -46,7 +46,7 @@ function ReviewRow({ row, onPlay, confirm, onSelectTurn }: { row: ReviewRowView;
           T{row.turn}
         </button>
         <span style={{ color: GRADE_COLORS[row.grade] }} title={row.lossTitle}>{row.grade} · {row.loss}</span>
-        <span style={{ color: '#aab' }}>played {row.played}</span>
+        <span style={{ color: '#aab' }}>{row.playedText}</span>
         <span style={{ color: '#778' }}>{row.engineWord} {row.engine}</span>
       </div>
       {row.lines.length === 0

@@ -1,7 +1,7 @@
 import { Fragment } from 'react';
 import type { EvalResult, TurnAnalysis } from '@fulllifegames/eval-engine';
 import { LineConfirm } from './LineConfirm';
-import { cardLines, rowValueTexts } from './turn-copy';
+import { cardLines, neverActedOf, rowValueTexts } from './turn-copy';
 import { linesForMode, worstLookup } from '../../lib/worst-reply';
 import { activeNamesAt, differsSentences, lineAnchor, lineBlocks, ranksOf, REPLY_OFF_TOP_TITLE, type LineBlockView, type LinesHost, type LineSideView } from '../../lib/line-view';
 
@@ -95,7 +95,7 @@ export function LinesSection({ turn, result, playerNames, doubles, host, analysi
       </div>
     );
   }
-  const blocks = lineBlocks(lines, { turn, playerNames, doubles, rules: host.rules, actives: activeNamesAt(host.snapshot), rowValues: rowValueTexts(analysis), ranks: ranksOf(result), ...(host.hardMode ? { worst: worstLookup(result, { p1: analysis?.p1.faintedFraction, p2: analysis?.p2.faintedFraction }) } : {}) });
+  const blocks = lineBlocks(lines, { turn, playerNames, doubles, rules: host.rules, actives: activeNamesAt(host.snapshot), rowValues: rowValueTexts(analysis), neverActed: neverActedOf(analysis), ranks: ranksOf(result), ...(host.hardMode ? { worst: worstLookup(result, { p1: analysis?.p1.faintedFraction, p2: analysis?.p2.faintedFraction }) } : {}) });
   return (
     <div className="ps-eval-lines-body">
       {blocks.map(block => <LineBlock key={block.key} block={block} turn={turn} onPlay={host.onPlay} confirm={host.confirm} />)}

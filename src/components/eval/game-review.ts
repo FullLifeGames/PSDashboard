@@ -1,7 +1,7 @@
 import { lostGround, winDeltaText, winPctText, type EvalLine, type EvalResult, type SideAnalysis, type TurnAnalysis, type VerdictTier } from '@fulllifegames/eval-engine';
 import { linesForMode, worstLookup } from '../../lib/worst-reply';
 import { activeNamesAt, lineBlocks, ranksOf, replacementWords, type LineBlockView, type LineReply, type LinesHost } from '../../lib/line-view';
-import { cardLines, engineChoice, regretView, rowValueTexts } from './turn-copy';
+import { cardLines, engineChoice, neverActedOf, neverActedText, regretView, rowValueTexts } from './turn-copy';
 
 /**
  * Round 89 (#104), step G4: what the Game review lists, as plain data. Ruling 33 (4a): only the turns the cards grade (inaccuracy,
@@ -29,6 +29,8 @@ export interface ReviewRowView {
   grade: ReviewGrade;
   /** "Hyper Voice 42%". */
   played: string;
+  /** The row's head as the card words it: "played Hyper Voice 42%", or that the body was knocked out before it moved (X1a). */
+  playedText: string;
   /** "Surf 51%": the engine's choice as the turn card names it (`engineChoice`). */
   engine: string;
   /** "engine", or "safe" where the card's reference is the safe line. */
@@ -114,6 +116,7 @@ function rowLines(args: ReviewArgs, analysis: TurnAnalysis, side: Side): ReviewL
     turn, playerNames: args.playerNames, doubles: args.doubles, rules: args.host.rules,
     actives: activeNamesAt(args.host.snapshotAt?.(turn) ?? args.host.snapshot),
     rowValues: rowValueTexts(analysis),
+    neverActed: neverActedOf(analysis),
     ranks: result ? ranksOf(result) : undefined,
     ...(args.host.hardMode && result ? { worst: worstLookup(result, { p1: analysis.p1.faintedFraction, p2: analysis.p2.faintedFraction }) } : {}),
   };
@@ -133,6 +136,7 @@ function reviewRow(args: ReviewArgs, analysis: TurnAnalysis, side: Side, grade: 
   return {
     key: `${analysis.turn}-${side}`, turn: analysis.turn, side, grade,
     played: `${played.label} ${winPctText(played.ev, share)}`,
+    playedText: sideAnalysis.neverActed ? neverActedText(sideAnalysis) : `played ${played.label} ${winPctText(played.ev, share)}`,
     engine: `${engine.label} ${winPctText(engine.value, share)}`,
     engineWord: engine.word,
     loss: grade === 'inaccuracy' ? winDeltaText(-(sideAnalysis.regret ?? 0)) : loss.text,

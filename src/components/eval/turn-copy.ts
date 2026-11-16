@@ -43,8 +43,22 @@ function playedSlotsLabel(side: SideAnalysis): string | undefined {
     .join(' + ');
 }
 
+/**
+ * Round 89 (X1a part 1): a body knocked out before it moved has no choice in the log; the engine stands a stay-in in for it. The card
+ * says so, with the stand-in's chance, as the win-path panel does ("knocked out before it moved, so the log shows no choice").
+ */
+export function neverActedText(side: SideAnalysis): string {
+  return `knocked out before it moved, so the log shows no choice${side.played ? ` · staying in ${winPctText(side.played.ev, side.faintedFraction)}` : ''}`;
+}
+
+/** Which sides of a turn never acted (the stand-in of their played row reads as no choice); absent without an analysis. */
+export function neverActedOf(analysis: Pick<TurnAnalysis, 'p1' | 'p2'> | null | undefined): { p1: boolean; p2: boolean } | undefined {
+  return analysis ? { p1: analysis.p1.neverActed === true, p2: analysis.p2.neverActed === true } : undefined;
+}
+
 /** What the side played, worded by what the analysis could match. */
 export function playedTextFor(side: SideAnalysis): { acted: boolean; playedText: string } {
+  if (side.neverActed) return { acted: false, playedText: neverActedText(side) };
   const playedRawName = playedRawLabel(side);
   const slotText = playedSlotsLabel(side);
   const acted = Boolean(side.played || slotText || side.playedRaw);

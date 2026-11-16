@@ -26,6 +26,16 @@ describe('lineBlocks', () => {
     ]);
   });
 
+  // Round 89 (X1a part 1): the played line of a body that never acted is the line of its stand-in; the head does not say it was played.
+  test('the head of a line of a body knocked out before it moved says staying in, never that it was played', () => {
+    const asNever = { ...singles, neverActed: { p2: true } };
+    expect(lineBlocks([playedLine], asNever)[0].role).toBe('staying in: Hyper Voice');
+    expect(lineBlocks([{ ...playedLine, for: ['engine', 'played'] }], asNever)[0].role).toBe('engine: Hyper Voice');
+    expect(lineBlocks([singlesLine], asNever)[0].role).toBe('engine: Hydro Pump');
+    // the other side of the same turn keeps its words
+    expect(lineBlocks([bothRolesLine], asNever)[0].role).toBe('played the engine\'s move: Draining Kiss');
+  });
+
   test('chips name the dice that could have gone the other way and nothing quiet (3a)', () => {
     const [block] = lineBlocks([singlesLine], singles);
     const chips = block.rows.map(row => row.sides.map(side => side.chips));
