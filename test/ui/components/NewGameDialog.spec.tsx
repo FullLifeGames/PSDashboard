@@ -376,7 +376,8 @@ describe('a pasted set without an ability (H20a)', () => {
       await pickFormat(search, name);
       paste(1, NO_ABILITY);
       paste(2, GOOD);
-      const abilityOf = (species: string) => Dex.forGen(9).species.get(species).abilities['0'];
+      // slot 0 of Garchomp, Sand Veil, is banned by Evasion Abilities Clause in both formats: the fill takes its next slot (X2a)
+      const abilityOf = (species: string) => (species === 'Garchomp' ? 'Rough Skin' : Dex.forGen(9).species.get(species).abilities['0']);
       expect(id).toBeTruthy();
       expect(await screen.findByText(`Gengar has no ability: plays ${abilityOf('Gengar')}.`, undefined, { timeout: 30_000 })).toBeInTheDocument();
       expect(screen.getByText(`Garchomp has no ability: plays ${abilityOf('Garchomp')}.`)).toBeInTheDocument();
