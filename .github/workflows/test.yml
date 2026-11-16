@@ -102,6 +102,74 @@ jobs:
         env:
           DICE_SWEEPS: full
 
+  # Round 89 (final gate, D6b): the dice job above reaches the `dice-*` files only, and 29 other specs read the same switch. The
+  # two parts below run them with DICE_SWEEPS=full, split by measured run time (about 7,850 s of local suite time each, so about
+  # 23 min on a runner; the longest single file, landed-hit-sweep, is about 23 min alone). Not a required check until the user
+  # makes it one (branch protection names the six jobs above). `full-sweep-job.spec.ts` fails when a spec reads the switch and
+  # sits in neither job, or when a listed file is gone: add a new sweep spec to the part with less time.
+  full-sweeps:
+    name: Full sweeps, the other specs, part ${{ matrix.part }} of 2
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - part: 1
+            files: >-
+              packages/eval-engine/test/board-facts.spec.ts
+              packages/eval-engine/test/board-key-census.spec.ts
+              packages/eval-engine/test/board-key-readers.spec.ts
+              packages/eval-engine/test/flip-turn-recorder.spec.ts
+              packages/eval-engine/test/forced-answers.spec.ts
+              packages/eval-engine/test/new-game-blank-ability.spec.ts
+              packages/eval-engine/test/new-game-unknown-names.spec.ts
+              packages/eval-engine/test/plain-dice-sweep.spec.ts
+              packages/eval-engine/test/prover-helping-secondary-sweep.spec.ts
+              packages/eval-engine/test/scripted-dice-parity.spec.ts
+              packages/eval-engine/test/secondary-classes.spec.ts
+              packages/eval-engine/test/secondary-records.spec.ts
+              packages/replay-core/test/field-evidence-sweep.spec.ts
+              packages/replay-core/test/landed-hit-sweep.spec.ts
+          - part: 2
+            files: >-
+              packages/eval-engine/test/board-key-effects.spec.ts
+              packages/eval-engine/test/board-key-predicate.spec.ts
+              packages/eval-engine/test/flip-turn-sweep.spec.ts
+              packages/eval-engine/test/hidden-aim.spec.ts
+              packages/eval-engine/test/likeliest-dice-sweep.spec.ts
+              packages/eval-engine/test/low-pp-sweep.spec.ts
+              packages/eval-engine/test/new-game-formats.spec.ts
+              packages/eval-engine/test/plain-repeated-die-sweep.spec.ts
+              packages/eval-engine/test/relayed-move-choice.spec.ts
+              packages/eval-engine/test/secondary-classes-paths.spec.ts
+              packages/eval-engine/test/stand-in-priority-sweep.spec.ts
+              packages/eval-engine/test/stratified-root-sweep.spec.ts
+              packages/eval-engine/test/unlogged-choice-sweep.spec.ts
+              packages/replay-core/test/blocked-effects-sweep.spec.ts
+              packages/replay-core/test/screen-evidence.spec.ts
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Show the runner
+        run: nproc && free -m
+
+      - name: Run the sweep specs of part ${{ matrix.part }}
+        run: npx vitest run $SPECS
+        env:
+          DICE_SWEEPS: full
+          SPECS: ${{ matrix.files }}
+
   browser:
     name: Browser flows
     runs-on: ubuntu-24.04
