@@ -24,7 +24,8 @@ import { sweepSelection } from './dice-fixtures';
  *      `buildForcedSwitchChoice` sends the slot of that body (the simulator's own `default` would revive the first);
  *   2. doubles: both foes fall, the log writes the replacement of slot b before slot a (the faster body first), and the answer built
  *      from that log puts each body on the slot the log names, in both orders of the sides; the ability sweep finds the abilities whose
- *      switch-in output depends on the slot (Imposter) and plays the answer built from the log: the same lines come out.
+ *      switch-in output depends on the slot (Imposter) and plays the answer built from the log: the same lines come out. The disguising
+ *      abilities (Illusion) play apart in every run: they show the open fault of #141 on the forced path, as a `test.fails` row.
  */
 await loadSimMods('gen9championsou');
 
@@ -244,14 +245,19 @@ function slotBoard(rules: Rules, ability: string): SlotBoard {
 /** The slot-ordered answers for the holder in slot `a` or `b`, the Vaporeon in the other. */
 const ORDERS = { 'holder in a': 'switch 3, switch 4', 'holder in b': 'switch 4, switch 3' } as const;
 
-/** The lines the replacements wrote, with the slot letters of the sides removed: what each body did on entering, however the slots were filled. */
+/**
+ * The lines the replacements wrote, with the slot letters of the sides removed: what each body did on entering, however the slots were filled.
+ * The window starts at the first `|switch|p2` line after the last faint of p2, so a disguise line (a name that is neither body's) is compared too.
+ */
 const enteringLines = (battle: Battle): string[] => {
   const lines = publicLog(battle);
-  const from = lines.findIndex(line => /^\|switch\|p2[ab]: (Dragonite|Vaporeon)/.test(line));
+  const lastFaint = lines.reduce((last, line, index) => (line.startsWith('|faint|p2') ? index : last), -1);
+  const from = lines.findIndex((line, index) => index > lastFaint && line.startsWith('|switch|p2'));
   return lines.slice(from).filter(line => line !== '|' && !/^\|(t:|turn|upkeep)(\||$)/.test(line)).map(line => line.replace(/\|(p[12])[ab]:/g, '|$1:'));
 };
 
-function slotCase(rules: Rules, ability: string, order: keyof typeof ORDERS): void {
+/** The reference turn of `order` (the simulator's own switch-in), the list the log gives, and the answer built from it on a fresh board. */
+function forcedAnswer(rules: Rules, ability: string, order: keyof typeof ORDERS) {
   const ref = slotBoard(rules, ability);
   expect(ref.battle.sides[1].requestState).toBe('switch');
   expect(forceSwitches(simOf(ref.battle), 1)).toEqual([true, true]);
@@ -262,9 +268,14 @@ function slotCase(rules: Rules, ability: string, order: keyof typeof ORDERS): vo
   const list = collectForcedSwitchSpecies(block.preUpkeep, block.postUpkeep, 'p2', dexOfRules(rules));
   expect(list.length).toBe(2);
   const fresh = slotBoard(rules, ability);
-  const choice = buildForcedSwitchChoice(simOf(fresh.battle), 1, list, { current: 0 });
+  const choice = buildForcedSwitchChoice(simOf(fresh.battle), 1, list, { current: 0 })!;
+  return { ref, fresh, list, choice };
+}
+
+function slotCase(rules: Rules, ability: string, order: keyof typeof ORDERS): void {
+  const { ref, fresh, choice } = forcedAnswer(rules, ability, order);
   expect(choice, `${rules.name} ${ability} ${order}: the answer names each body's slot`).toBe(ORDERS[order]);
-  expect(fresh.battle.choose('p2', choice!)).toBe(true);
+  expect(fresh.battle.choose('p2', choice)).toBe(true);
   expect(enteringLines(fresh.battle)).toEqual(enteringLines(ref.battle));
 }
 
@@ -309,11 +320,23 @@ describe('a forced replacement enters the slot the log names (#144)', () => {
   });
 });
 
+/** The abilities whose Dex entry disguises the holder on entry: a BeforeSwitchIn handler (the read `mayDisguise` makes in `team-order.ts`). */
+const disguisesOf = (abilities: readonly { id: string }[]): string[] =>
+  abilities.filter(ability => typeof (ability as { onBeforeSwitchIn?: unknown }).onBeforeSwitchIn === 'function').map(ability => ability.id);
+
+const slotAbilities = (rules: Rules) => {
+  const dex = dexOfRules(rules);
+  const abilities = dex.abilities.all().filter(ability => ability.exists && ability.gen <= dex.gen && (ability.isNonstandard === null || ability.isNonstandard === undefined));
+  return { dex, abilities, disguises: disguisesOf(abilities) };
+};
+const SLOT_RULES = RULES.filter(entry => entry.doubles && entry.generation >= 5).map(entry => [entry.name, entry] as const);
+
 describe('the abilities whose switch-in depends on the slot (#144)', () => {
-  test.each(RULES.filter(entry => entry.doubles && entry.generation >= 5).map(entry => [entry.name, entry] as const))('%s', (_, rules) => {
-    const dex = dexOfRules(rules);
-    const abilities = dex.abilities.all().filter(ability => ability.exists && ability.gen <= dex.gen && (ability.isNonstandard === null || ability.isNonstandard === undefined));
-    const sample = new Set(sweepSelection(abilities, 'moves').map(ability => ability.id));
+  test.each(SLOT_RULES)('%s', (_, rules) => {
+    const { dex, abilities, disguises } = slotAbilities(rules);
+    // a disguising ability seats the wrong body today (#141), and has its own rows below
+    const rest = abilities.filter(ability => !disguises.includes(ability.id));
+    const sample = new Set(sweepSelection(rest, 'moves').map(ability => ability.id));
     if (dex.abilities.get('imposter').exists) sample.add('imposter');
     const dependent: string[] = [];
     for (const id of sample) {
@@ -328,4 +351,30 @@ describe('the abilities whose switch-in depends on the slot (#144)', () => {
     // the sweep finds Imposter: the holder copies the foe in front of it
     expect(dependent).toContain('imposter');
   }, 300_000);
+});
+
+/**
+ * #141, the forced replacement path: the log writes the disguise (`|switch|p2a: Raichu|Raichu, M|`, the last living body to the holder's
+ * right), the list holds the disguise's species, and `findSpeciesSlot` seats the body of that species: the real Raichu takes the slot where the
+ * game had the holder. The answer should seat the holder where the log shows its disguise. Both disguising abilities of the Dex play in every
+ * run, in both orders, in every rule set that has them. The first row says what the path does today; the `test.fails` row holds the demand and
+ * turns red when #141 lands (then the `fails` goes).
+ */
+describe('a disguised holder takes its slot (#141)', () => {
+  test.each(SLOT_RULES)('%s: today the forced path seats the body whose species the log shows', (_, rules) => {
+    const { disguises } = slotAbilities(rules);
+    expect(disguises.length).toBeGreaterThan(0);
+    for (const id of disguises) {
+      for (const order of Object.keys(ORDERS) as (keyof typeof ORDERS)[]) {
+        const { fresh, list, choice } = forcedAnswer(rules, id, order);
+        const seated = choice.split(', ').map(part => fresh.battle.sides[1].pokemon[Number(part.replace('switch ', '')) - 1].species.name);
+        expect(seated, `${rules.name} ${id} ${order}: the answer seats the bodies the log names`).toEqual(list);
+        expect(choice, `${rules.name} ${id} ${order}: and that is not the holder's slot`).not.toBe(ORDERS[order]);
+      }
+    }
+  }, 60_000);
+
+  test.fails.each(SLOT_RULES)('%s: the holder takes the slot where the log shows its disguise', (_, rules) => {
+    for (const id of slotAbilities(rules).disguises) for (const order of Object.keys(ORDERS) as (keyof typeof ORDERS)[]) slotCase(rules, id, order);
+  }, 60_000);
 });
