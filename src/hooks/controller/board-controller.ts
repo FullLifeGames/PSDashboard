@@ -60,6 +60,12 @@ function useDeviationLayer(ctx: ReplayContext, transients: Transients, timeline:
   return { ...deviation, restoreVariation };
 }
 
+/** The requested turn of the page's link, read from the replay layer's context (a helper so the controller stays in its complexity budget). */
+function useRequestedTurnOf(ctx: ReplayContext, maxTurn: number, landOnTurn: (turn: number) => void) {
+  const { requestedReplay, requestedTurn, replayData } = ctx.replay;
+  useRequestedTurn({ requestedReplay, requestedTurn, replayId: replayData?.id ?? null, maxTurn, landOnTurn });
+}
+
 /**
  * Board layer: the unified-timeline pointer, the deviation/rebuild road,
  * the branch refresh, and the line lifecycle (discard, replay-load reset).
@@ -131,8 +137,7 @@ export function useTimelineController(ctx: ReplayContext, transients: Transients
     if (tip !== null) landOnTurn(tip);
   }, [replayData?.id, stopBranch, resetPointer, setBranchDivergence, branchWindowOpenRef, takeLanding, landOnTurn]);
   // Round 89 (lane L): `?replay=<id>&turn=<n>` lands on its turn after the reset above, in the same selection a graph click makes.
-  const { requestedReplay, requestedTurn } = ctx.replay;
-  useRequestedTurn({ requestedReplay, requestedTurn, replayId: replayData?.id ?? null, maxTurn, landOnTurn });
+  useRequestedTurnOf(ctx, maxTurn, landOnTurn);
 
   return { timeline, deviation, evalResultMatchesView, liveEvalStatus, tipEvalStatus, discardVariation };
 }
