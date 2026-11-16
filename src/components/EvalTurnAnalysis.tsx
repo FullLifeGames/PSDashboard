@@ -1,10 +1,10 @@
-import { useId, useState } from 'react';
 import {
   type TurnAnalysis, type LeadAnalysis, type EvalResult, type LeadSideAnalysis, type RankedChoice, type ReadRecommendation,
   chanceRolled, formatRead, lostGround, summarizeTurn, winDeltaText, winPctText,
 } from '@fulllifegames/eval-engine';
 import { attributionBadge, isPairLead, leadTier } from './eval-badges';
 import { EngineRow } from './eval/analysis-bits';
+import { CardToggle } from './eval/CardToggle';
 import { LinesSection } from './eval/LinesSection';
 import { MatrixDialogButton } from './eval/MatrixDialog';
 import { WinPathsEntry } from './eval/WinPathsEntry';
@@ -76,19 +76,11 @@ function SplitRow({ analysis, name }: { analysis: TurnAnalysis; name: string }) 
 
 /**
  * Round 80 (T294): the turn's summary sits closed under a one-line toggle, so the card opens on the verdict and both
- * sides. Every turn starts closed (the card keys it by turn), and the app remembers nothing.
+ * sides. Every turn starts closed (the card keys it by turn), and the app remembers nothing. Round 89 (the user's note on X1): the Lines
+ * section and the win-path question fold the same way (`CardToggle`).
  */
 function TurnSummary({ text }: { text: string }) {
-  const [open, setOpen] = useState(false);
-  const id = useId();
-  return (
-    <>
-      <button type="button" className="ps-eval-analysis-toggle" aria-expanded={open} aria-controls={id} onClick={() => setOpen(!open)}>
-        {open ? '▾' : '▸'} Explanation
-      </button>
-      <div id={id} className="ps-eval-analysis-summary" hidden={!open}>{text}</div>
-    </>
-  );
+  return <CardToggle label="Explanation" bodyClassName="ps-eval-analysis-summary">{text}</CardToggle>;
 }
 
 /** A game's tip: the position is open, so the card names it as such and shows each side's engine line (round 89, H4h). */
@@ -140,7 +132,13 @@ export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore, resu
         </>
       )}
       <ReadRows reads={reads} playerNames={playerNames} faintedFraction={analysis.faintedFraction} />
-      {linesHost && <LinesSection turn={analysis.turn} result={result} playerNames={playerNames} doubles={!!doubles} host={linesHost} analysis={analysis} />}
+      {linesHost && result && (
+        <div className="ps-eval-lines">
+          <CardToggle key={analysis.turn} label="Lines" lazy>
+            <LinesSection turn={analysis.turn} result={result} playerNames={playerNames} doubles={!!doubles} host={linesHost} analysis={analysis} />
+          </CardToggle>
+        </div>
+      )}
       {linesHost && <WinPathsEntry turn={analysis.turn} host={linesHost} playerNames={playerNames} doubles={!!doubles} />}
     </div>
   );

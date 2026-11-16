@@ -79,7 +79,7 @@ function noLineSentence(result: EvalResult, coming: ReturnType<NonNullable<Lines
 }
 
 /**
- * Round 89 (#104), step G3: the Lines section under a turn's rows. Per player the engine's line and the played line (one line for a
+ * Round 89 (#104), step G3: the Lines section under a turn's rows (the card puts it under its closed `Lines` toggle). Per player the engine's line and the played line (one line for a
  * player who played the engine's move), each with ▶ Play, the end value and the dice that could have gone the other way. A turn
  * that holds no line says why in one muted sentence; a turn without a result shows nothing.
  */
@@ -88,8 +88,7 @@ export function LinesSection({ turn, result, playerNames, doubles, host, analysi
   const lines = linesForMode(cardLines(result.lines ?? [], analysis), !!host.hardMode);
   if (lines.length === 0) {
     return (
-      <div className="ps-eval-lines">
-        <span className="ps-eval-lines-title">Lines</span>
+      <div className="ps-eval-lines-body">
         <span className="ps-eval-line" style={{ marginTop: 0 }}>
           {noLineSentence(result, host.lineComing?.(turn))}
         </span>
@@ -98,8 +97,7 @@ export function LinesSection({ turn, result, playerNames, doubles, host, analysi
   }
   const blocks = lineBlocks(lines, { turn, playerNames, doubles, rules: host.rules, actives: activeNamesAt(host.snapshot), rowValues: rowValueTexts(analysis), ranks: ranksOf(result), ...(host.hardMode ? { worst: worstLookup(result, { p1: analysis?.p1.faintedFraction, p2: analysis?.p2.faintedFraction }) } : {}) });
   return (
-    <div className="ps-eval-lines">
-      <span className="ps-eval-lines-title">Lines</span>
+    <div className="ps-eval-lines-body">
       {blocks.map(block => <LineBlock key={block.key} block={block} turn={turn} onPlay={host.onPlay} confirm={host.confirm} />)}
       {differsSentences(blocks).map(sentence => <span key={sentence} className="ps-eval-line">{sentence}</span>)}
     </div>

@@ -140,6 +140,12 @@ button.ps-eval-choice:hover,
 .ps-eval-analysis-toggle:hover {
   color: #cde;
 }
+.ps-eval-analysis-toggle:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+/* Round 89: the Lines section's body under its toggle (the title moved to the toggle). */
+.ps-eval-lines-body { display: flex; flex-direction: column; gap: 4px; }
 /* Round 84 (A7f): the history panel's toggle carries the panel's heading size. */
 .ps-history-toggle {
   font-size: 13px;

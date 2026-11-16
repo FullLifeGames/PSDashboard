@@ -137,7 +137,7 @@ describe('GameReviewPanel, the Endgame row', () => {
     const group = screen.getByRole('group', { name: 'Endgame' });
     const button = within(group).getByRole('button', { name: 'Endgame · T23 · How could Pepitopalotin have won?' });
     await userEvent.click(button);
-    expect(lined.winPaths.show).toHaveBeenCalledWith(23);
+    expect(lined.winPaths.show).toHaveBeenCalledWith(23, 'review');
     // only for the loser: the winner has no such row
     expect(screen.queryByRole('button', { name: /How could Tzon have won/ })).toBeNull();
   });
@@ -157,7 +157,7 @@ describe('GameReviewPanel, the Endgame row', () => {
 
   test('with a search open the row closes it, and the panel stands under the row', async () => {
     const { analyses, results } = singlesGame();
-    const lined = endgameHost({ run: { turn: 23, side: 'p2', steps: [], status: 'searching' } });
+    const lined = endgameHost({ run: { turn: 23, side: 'p2', steps: [], status: 'searching', from: 'review' } });
     render(<GameReviewPanel analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={lined} />);
     const group = screen.getByRole('group', { name: 'Endgame' });
     expect(within(group).getByRole('region', { name: 'How could Pepitopalotin have won?' })).toBeInTheDocument();
@@ -165,6 +165,15 @@ describe('GameReviewPanel, the Endgame row', () => {
     expect(button).toHaveAttribute('aria-expanded', 'true');
     await userEvent.click(button);
     expect(lined.winPaths.hide).toHaveBeenCalled();
+  });
+
+  test('a search the turn card opened shows no panel under the review, and the row stays an open question', () => {
+    const { analyses, results } = singlesGame();
+    const lined = endgameHost({ run: { turn: 23, side: 'p2', steps: [], status: 'searching', from: 'card' } });
+    render(<GameReviewPanel analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={lined} />);
+    const group = screen.getByRole('group', { name: 'Endgame' });
+    expect(within(group).queryByRole('region')).toBeNull();
+    expect(within(group).getByRole('button', { name: 'Endgame · T23 · How could Pepitopalotin have won?' })).toHaveAttribute('aria-expanded', 'false');
   });
 
   test('while the sets load the row is disabled and says why', () => {

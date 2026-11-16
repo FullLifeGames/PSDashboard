@@ -71,7 +71,7 @@ function ReviewSide({ view, onPlay, confirm, onSelectTurn }: { view: ReviewSideV
 function EndgameEntry({ row, host, playerNames, doubles }: { row: EndgameRowView; host: LinesHost; playerNames: [string, string]; doubles: boolean }) {
   const { winPaths } = host;
   if (!winPaths) return null;
-  const open = winPaths.run !== null;
+  const open = winPaths.run?.from === 'review';
   return (
     <div className="ps-eval-review-side" role="group" aria-label="Endgame">
       <div className="ps-eval-review-row">
@@ -79,7 +79,7 @@ function EndgameEntry({ row, host, playerNames, doubles }: { row: EndgameRowView
           <button
             type="button" className="ps-btn ps-eval-inline-btn" aria-expanded={open} disabled={!!winPaths.unavailable && !open}
             title={winPaths.unavailable ?? 'Search the endgame for a way the player could have won'}
-            onClick={() => (open ? winPaths.hide() : winPaths.show(row.turn))}
+            onClick={() => (open ? winPaths.hide() : winPaths.show(row.turn, 'review'))}
           >
             {row.text}
           </button>
