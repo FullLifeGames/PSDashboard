@@ -12,6 +12,8 @@ import type { ReplayWorkerClient } from '../lib/replay-jobs/client';
 import type { SensitivityTarget } from '@fulllifegames/eval-engine';
 import type { useSmogonUsageStats } from './useSmogonUsageStats';
 import type { useSmogonSetAssumptions } from './useSmogonSetAssumptions';
+import { forgetImportText, readImportText, saveTeamEdits } from '../lib/team-edits-store';
+import { useRestoredTeamEdits } from './useRestoredTeamEdits';
 import { useHpResolver, useSheetTeams, useSpreadSolve, useTeamPaste } from './useTeamSources';
 
 export interface TeamKnowledgeInputs {
@@ -32,7 +34,7 @@ export interface TeamKnowledgeInputs {
 }
 
 /** Manual team edits and the editor/sets-panel UI state, reset per replay. */
-function useTeamEdits(replayId: string | undefined) {
+function useTeamEdits(replayId: string | undefined, p1Info: OpponentTeamInfo | null, opponentInfo: OpponentTeamInfo | null) {
   const [editedP1Info, setEditedP1Info] = useState<OpponentTeamInfo | null>(null);
   const [editedP2Info, setEditedP2Info] = useState<OpponentTeamInfo | null>(null);
   const [editorSide, setEditorSide] = useState<'p1' | 'p2' | null>(null);
@@ -47,6 +49,10 @@ function useTeamEdits(replayId: string | undefined) {
     setEditedP2Info(null);
     setEditorSide(null);
   }
+  // Round 89 (T9c): the edit saved in the editor comes back before the stored import text applies on top of it.
+  useRestoredTeamEdits({
+    replayId, p1Info, opponentInfo, edited: { p1: editedP1Info, p2: editedP2Info }, setEdited: { p1: setEditedP1Info, p2: setEditedP2Info },
+  });
   return {
     editedP1Info, setEditedP1Info, editedP2Info, setEditedP2Info,
     editorSide, setEditorSide, setsPanelOpen, setSetsPanelOpen,
@@ -93,9 +99,7 @@ function useSetsIO(args: {
   useEffect(() => {
     // Sets imported for this replay earlier are re-applied once the fresh
     // inference is available (see the effect below).
-    pendingStoredSetsRef.current = replayData?.id
-      ? localStorage.getItem(`ps-replay-interceptor:sets:${replayData.id}`)
-      : null;
+    pendingStoredSetsRef.current = replayData?.id ? readImportText(replayData.id) : null;
   }, [replayData?.id]);
 
   /** Loads the legal pools the import checks against; a failed load leaves the import with the checks that need no pools. */
@@ -164,7 +168,7 @@ export function useTeamKnowledge(inputs: TeamKnowledgeInputs) {
     replayWorker,
   } = inputs;
   const paste = useTeamPaste();
-  const edits = useTeamEdits(replayData?.id);
+  const edits = useTeamEdits(replayData?.id, p1Info, opponentInfo);
   const { hpResolverFor, replayGenNumber } = useHpResolver(replayData, hpEvidence, usageStats);
   const sheetTeams = useSheetTeams(replayData);
 
@@ -209,7 +213,7 @@ export function useTeamKnowledge(inputs: TeamKnowledgeInputs) {
 
   const openAfterSolve = useOpenAfterSolve(getInferredSpreads);
   const status = useTeamStatus({ paste, p1Info });
-  const saveTeam = useSaveTeam({ effectiveP1Info, effectiveP2Info, edits, onTeamsEdited });
+  const saveTeam = useSaveTeam({ replayId: replayData?.id, effectiveP1Info, effectiveP2Info, edits, onTeamsEdited });
   const setsFingerprint = useMemo(
     () => JSON.stringify([edits.editedP1Info, edits.editedP2Info, paste.teamText]),
     [edits.editedP1Info, edits.editedP2Info, paste.teamText],
@@ -295,17 +299,26 @@ function useTeamStatus(args: { paste: ReturnType<typeof useTeamPaste>; p1Info: O
   return { teamPasteStatus, teamPasteError: paste.teamPasteParseError || teamPasteMismatch };
 }
 
-/** Save from the team editor: apply the edit, close the editor, refresh. */
+/**
+ * Save from the team editor: apply the edit, write it per replay (round 89, T9c), close the editor, refresh. The record holds every
+ * edited side, an import's included, so it replaces the stored import text: a reload restores the record and nothing is left to
+ * apply on top.
+ */
 function useSaveTeam(args: {
+  replayId: string | undefined;
   effectiveP1Info: OpponentTeamInfo | null;
   effectiveP2Info: OpponentTeamInfo | null;
   edits: ReturnType<typeof useTeamEdits>;
   onTeamsEdited: TeamKnowledgeInputs['onTeamsEdited'];
 }) {
-  const { effectiveP1Info, effectiveP2Info, edits, onTeamsEdited } = args;
+  const { replayId, effectiveP1Info, effectiveP2Info, edits, onTeamsEdited } = args;
   return useCallback((side: 'p1' | 'p2', info: OpponentTeamInfo) => {
     const nextP1Info = side === 'p1' ? info : effectiveP1Info;
     const nextP2Info = side === 'p2' ? info : effectiveP2Info;
+    if (replayId) {
+      saveTeamEdits(replayId, { p1: side === 'p1' ? info : edits.editedP1Info, p2: side === 'p2' ? info : edits.editedP2Info });
+      forgetImportText(replayId);
+    }
     if (side === 'p1') {
       edits.setEditedP1Info(info);
     } else {
@@ -315,7 +328,7 @@ function useSaveTeam(args: {
     if (nextP1Info && nextP2Info) {
       onTeamsEdited({ p1: nextP1Info, p2: nextP2Info });
     }
-  }, [effectiveP1Info, effectiveP2Info, edits, onTeamsEdited]);
+  }, [replayId, effectiveP1Info, effectiveP2Info, edits, onTeamsEdited]);
 }
 
 export type TeamKnowledge = ReturnType<typeof useTeamKnowledge>;
