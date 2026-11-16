@@ -85,4 +85,38 @@ describe('ComboBox', () => {
     const boxes = screen.getAllByRole('combobox');
     expect(boxes[1]).toBeDisabled();
   });
+  // Round 89 (T9c): Escape with the list open closes the list only; a dialog around the box keeps its edits.
+  test('Escape closes an open list and stops there; with the list closed the key reaches the host', async () => {
+    const onHostKey = vi.fn();
+    render(
+      <div onKeyDown={event => onHostKey(event.key)}>
+        <Host onSelect={vi.fn()} />
+      </div>,
+    );
+    const input = screen.getByRole('combobox');
+    await userEvent.type(input, 'su');
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('listbox')).toBeNull();
+    expect(onHostKey).not.toHaveBeenCalledWith('Escape');
+
+    await userEvent.keyboard('{Escape}');
+    expect(onHostKey).toHaveBeenCalledWith('Escape');
+  });
+
+  test('focus on an empty field highlights nothing: Enter adds nothing, ArrowDown then Enter takes the first option', async () => {
+    const onSelect = vi.fn();
+    const onEnterFreeText = vi.fn();
+    render(<Host onSelect={onSelect} onEnterFreeText={onEnterFreeText} />);
+    const input = screen.getByRole('combobox');
+    await userEvent.click(input);
+    expect(screen.getAllByRole('option')).toHaveLength(OPTIONS.length);
+    expect(input).not.toHaveAttribute('aria-activedescendant');
+    await userEvent.keyboard('{Enter}');
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(input).toHaveValue('');
+
+    await userEvent.click(input);
+    await userEvent.keyboard('{ArrowDown}{Enter}');
+    expect(onSelect).toHaveBeenCalledWith('Earthquake');
+  });
 });

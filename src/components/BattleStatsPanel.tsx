@@ -166,6 +166,7 @@ function PokemonEntry({ poke, isRandomFormat }: { poke: RevealedPokemonInfo; isR
         <div className="ps-stats-meta">
           <MetaTag field={poke.ability} className="ps-stats-tag" />
           <MetaTag field={poke.item} className="ps-stats-tag ps-stats-tag-item" />
+          {poke.nature && <MetaTag field={poke.nature} className="ps-stats-tag" />}
           <SpreadTag info={poke.evs} text={formatEvs(poke.evs, isRandomFormat)} />
           {poke.ivs && formatIvs(poke.ivs) && <SpreadTag info={poke.ivs} text={formatIvs(poke.ivs)} />}
           {poke.teraType.value && (

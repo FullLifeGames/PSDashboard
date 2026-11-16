@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import {
   INFERRED_SPREAD_DETAIL, MEASURED_HP_SPREAD_DETAIL, ORDER_SPREAD_DETAIL, inferOpponentTeam, withStandIns,
@@ -182,6 +182,21 @@ describe('BattleStatsPanel', () => {
       unmount();
       render(<BattleStatsPanel replayData={replay(6, true)} p1Info={{ pokemon: [shown] }} p2Info={null} />);
       expect(screen.queryByText(/never showed/)).toBeNull();
+    });
+  });
+
+  // Round 89 (T9c): the panel names the nature with its source. A set without one (Generations 1 and 2) shows no tag.
+  describe.each(['singles', 'doubles'] as const)('the nature tag (%s)', kind => {
+    const replayData = () => (kind === 'singles' ? singlesReplay() : { ...singlesReplay(), formatid: 'gen9doublesou' });
+
+    test('a Jolly set shows Jolly with its source word; a set without a nature shows none', () => {
+      const jolly = revealedPokemon('Garchomp', { nature: field('Jolly', 'guessed', { probability: 0.4 }) });
+      const none = revealedPokemon('Heatran');
+      render(<BattleStatsPanel replayData={replayData()} p1Info={{ pokemon: [jolly, none] }} p2Info={null} />);
+      const garchomp = screen.getByRole('img', { name: 'Garchomp' }).parentElement!;
+      const tag = within(garchomp).getByText('Jolly', { exact: false });
+      expect(tag).toHaveTextContent('guessed 40%');
+      expect(screen.getByRole('img', { name: 'Heatran' }).parentElement!).not.toHaveTextContent(/Jolly|Timid|Bold|nature/i);
     });
   });
 });

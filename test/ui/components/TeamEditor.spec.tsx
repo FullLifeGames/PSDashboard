@@ -50,4 +50,52 @@ describe('TeamEditor', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onSave).not.toHaveBeenCalled();
   });
+
+  // Round 89 (T9c, tester BROKEN 2 and 3; singles and doubles share the editor).
+  describe.each([
+    { label: 'singles', kind: 'singles' as const, format: 'gen9ou', first: 'Ferrothorn' },
+    { label: 'doubles', kind: 'doubles' as const, format: 'gen9doublesou', first: 'Rillaboom' },
+  ])('keys in the move field ($label)', ({ kind, format, first }) => {
+    const open = async (onClose = vi.fn()) => {
+      render(<TeamEditor title="Edit Opp" teamInfo={teamInfo(kind, 'p2')} gen={9} format={format} onSave={vi.fn()} onClose={onClose} />);
+      const nature = await screen.findByRole('combobox', { name: `${first} nature` }, { timeout: 30_000 });
+      await waitFor(() => expect(nature.tagName).toBe('SELECT'), { timeout: 30_000 });
+      return { nature, onClose };
+    };
+
+    test('Escape in an open move list closes the list, keeps the dialog and its edits; a second Escape closes the dialog', async () => {
+      const { nature, onClose } = await open();
+      await userEvent.selectOptions(nature, 'Bold');
+      const add = screen.getAllByPlaceholderText('Add move...')[0];
+      await userEvent.type(add, 'surf');
+      expect(screen.getByRole('listbox')).toBeInTheDocument();
+      await userEvent.keyboard('{Escape}');
+      expect(screen.queryByRole('listbox')).toBeNull();
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByRole('dialog', { name: 'Edit Opp' })).toBeInTheDocument();
+      expect(screen.getByRole('combobox', { name: `${first} nature` })).toHaveValue('Bold');
+
+      await userEvent.keyboard('{Escape}');
+      expect(onClose).toHaveBeenCalledTimes(1);
+    }, 60_000);
+
+    test('Enter in the empty Add move adds nothing', async () => {
+      await open();
+      const before = screen.getAllByText(/Moves \(2\/4\)/).length;
+      await userEvent.click(screen.getAllByPlaceholderText('Add move...')[0]);
+      await userEvent.keyboard('{Enter}');
+      expect(screen.getAllByText(/Moves \(2\/4\)/)).toHaveLength(before);
+      expect(screen.queryByRole('alert')).toBeNull();
+    }, 60_000);
+
+    test('a typed move the set already holds gets an alert and stays in the field', async () => {
+      await open();
+      const add = screen.getAllByPlaceholderText('Add move...')[0];
+      await userEvent.type(add, 'Earthquake');
+      await userEvent.keyboard('{Enter}');
+      expect(screen.getByRole('alert')).toHaveTextContent('"Earthquake" is already in the set.');
+      expect(screen.getAllByText(/Moves \(2\/4\)/)).toHaveLength(teamInfo(kind, 'p2').pokemon.length);
+      expect(add).toHaveValue('Earthquake');
+    }, 60_000);
+  });
 });

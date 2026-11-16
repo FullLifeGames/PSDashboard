@@ -1,3 +1,4 @@
+import { sourceLabel as panelSourceLabel } from './provenance-labels';
 import { type RevealedPokemonInfo, type StatId, evBudget, manualMove, toId } from '@fulllifegames/replay-core';
 
 export interface EditorPools {
@@ -19,9 +20,9 @@ export interface EditorPools {
   evLimit?: number | null;
 }
 
-export function sourceLabel(source: RevealedPokemonInfo['ability']['source'], probability?: number) {
-  const suffix = probability === undefined ? '' : ` ${Math.round(probability * 1000) / 10}%`;
-  return `${source.toUpperCase()}${suffix}`;
+/** The editor's caption word: the stats panel's word for the source (a fitted spread says so), in capitals. */
+export function sourceLabel(source: RevealedPokemonInfo['ability']['source'], probability?: number, sourceDetail?: string) {
+  return panelSourceLabel(source, probability, sourceDetail).toUpperCase();
 }
 
 export const EV_STATS: { id: StatId; label: string }[] = [
