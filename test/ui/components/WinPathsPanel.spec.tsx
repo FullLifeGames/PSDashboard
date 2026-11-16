@@ -51,7 +51,7 @@ describe('WinPathsPanel, singles', () => {
     expect(within(panel).getByText('Hydro Pump wins within 3 turns in 52 % of the dice whatever Tzon plays. What Pepitopalotin played, Hydro Pump, wins in 0 % of the dice.')).toBeInTheDocument();
     expect(within(panel).getByText('This sequence: 10.8 %.')).toBeInTheDocument();
     expect(within(panel).getAllByText(/^A sequence's chance multiplies the dice whose other result would change who faints/)).toHaveLength(1);
-    expect(within(panel).getByText('If Tzon had played Scald (its second choice) on turn 24. This sequence: 84 %.')).toBeInTheDocument();
+    expect(within(panel).getByText('If Tzon had played Scald (its second choice) on turn 24, Pepitopalotin wins: this sequence has 84 %.')).toBeInTheDocument();
     const plays = within(panel).getAllByRole('button', { name: '▶ Play' });
     expect(plays).toHaveLength(3);
     await userEvent.click(plays[1]);

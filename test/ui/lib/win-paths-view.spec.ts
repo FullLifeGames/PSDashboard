@@ -72,7 +72,21 @@ describe('the win-path words', () => {
 
   test('step 3 names the slip by its rank and turn, then the chance of the dice (W3a)', () => {
     const [view] = winStepViews([step('mistake', 'found', { chance: 0.84375, deviation: { turn: 24, label: 'Scald', rank: 2 }, line: line() })], ctx());
-    expect(view.headline).toBe('If Tzon had played Scald (its second choice) on turn 24. This sequence: 84 %.');
+    expect(view.headline).toBe('If Tzon had played Scald (its second choice) on turn 24, Pepitopalotin wins: this sequence has 84 %.');
+  });
+
+  // Round 89 (X1a part 4, 649664 T23): "If BKC had played Icy Wind (its third choice) on turn 23. This sequence: 86 %." opened with a fragment.
+  test('step 3 is one sentence in singles and in doubles, with or without a chance', () => {
+    const deviation = { turn: 23, label: 'Icy Wind', rank: 3 };
+    const [singles] = winStepViews([step('mistake', 'found', { chance: 0.86, deviation, line: line() })], ctx());
+    expect(singles.headline).toBe('If Tzon had played Icy Wind (its third choice) on turn 23, Pepitopalotin wins: this sequence has 86 %.');
+    const [doubles] = winStepViews([step('mistake', 'found', { chance: 0.25, deviation, line: { ...doublesLine, for: [] } })], ctx({ playerNames: DOUBLES_NAMES, doubles: true, side: 'p1' }));
+    expect(doubles.headline).toBe('If Mstr_Hawk had played Icy Wind (its third choice) on turn 23, pixelfrost wins: this sequence has 25 %.');
+    const [bare] = winStepViews([step('mistake', 'found', { deviation, line: line() })], ctx());
+    expect(bare.headline).toBe('If Tzon had played Icy Wind (its third choice) on turn 23, Pepitopalotin wins.');
+    // no slip named: the step keeps the sequence sentence of the luck step
+    const [noSlip] = winStepViews([step('mistake', 'found', { chance: 0.5, line: line() })], ctx());
+    expect(noSlip.headline).toBe('This sequence: 50 %.');
   });
 
   // Round 89 (G13b, tester questions 8 and 9): a sequence's number multiplies the dice whose other result would change who faints, and
