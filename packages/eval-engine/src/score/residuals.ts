@@ -58,7 +58,10 @@ const memo = new Map<string, readonly number[] | null>();
 /** The numbers the memo's keys hold for the keys of the boards and bodies (score/memo-keys.ts); it starts over with the memo. */
 const interner = new Interner();
 
-/** For probes: what the memo and the interner of this process hold (entries and characters of the memo's keys, the interned texts). */
+/**
+ * For probes: what the memo and the interner of this process hold (entries and characters of the memo's keys, the interned texts).
+ * @public A probe hook: no spec and no source file calls it; the memory probes under docs/perf/probes read it (round 89, gate D8a: knip skips it by this tag).
+ */
 export function residualMemoSize(): { entries: number; keyChars: number; interned: number; internedChars: number } {
   let keyChars = 0;
   for (const key of memo.keys()) keyChars += key.length;
