@@ -103,6 +103,7 @@ type PlayerTendencies
 type PokemonStatTable
 type ProveRequest
 type ProverBudget
+type QuietVoice
 type RankedChoice
 type ReadRecommendation
 type ReconstructParams
@@ -271,6 +272,7 @@ value perfSync
 value phantomStayIn
 value playedSetupMove
 value proveForcedWin
+value quietVoice
 value readGameSeed
 value reconstructBranchRuntime
 value reconstructionReached

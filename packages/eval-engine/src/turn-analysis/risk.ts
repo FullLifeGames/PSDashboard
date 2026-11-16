@@ -4,6 +4,7 @@ import {
   type AnalyzeTurnParams, type Side, type SideAnalysis, type TurnAnalysis, type TurnAttribution,
 } from './types.ts';
 import { bestWindowPayoff } from './sack-gates.ts';
+import { beatsSafeCell, clickedCells } from './clicked-cell.ts';
 
 /**
  * A flagged risk whose punishing reply was never clicked reads differently
@@ -63,8 +64,22 @@ function bookRiskPayoff(params: AnalyzeTurnParams, key: Side, side: SideAnalysis
   side.riskPayoff = payoff;
   if (payoffTurn > 0) side.riskPayoffTurn = payoffTurn;
   if (payoff <= -RISK_PAYOFF_MARGIN) return true;
-  if (payoff >= RISK_PAYOFF_MARGIN - RISK_PAYOFF_EPSILON) side.riskPaidOff = true;
+  if (payoff >= RISK_PAYOFF_MARGIN - RISK_PAYOFF_EPSILON && readBeatSafeLine(params, key, side)) side.riskPaidOff = true;
   return false;
+}
+
+/**
+ * Round 89 (B6a): a payoff over the safe line's floor is a read only when the played line also beat the safe line in the cell of
+ * the reply that came (the same matrix, the same column: like against like). The cells go on the side as `safeAgainstClick`.
+ * No cell to compare (no matrix, a hidden slot of the click, the played line is the safe line) keeps today's rule.
+ */
+function readBeatSafeLine(params: AnalyzeTurnParams, key: Side, side: SideAnalysis): boolean {
+  if (!side.played || !side.safe || side.played.choice === side.safe.choice) return true;
+  const cells = clickedCells(params, key, [side.played.choice, side.safe.choice]);
+  if (!cells) return true;
+  const [playedValue, safeValue] = cells.values;
+  side.safeAgainstClick = { against: cells.against, playedValue, safeValue };
+  return beatsSafeCell(playedValue, safeValue);
 }
 
 /** A choice the side's equilibrium mix weighs under this share counts as one the engine gave no weight. */

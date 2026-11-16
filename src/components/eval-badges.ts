@@ -1,4 +1,4 @@
-import { chanceRolled, shownAttribution, type LeadSideAnalysis, type TurnAnalysis } from '@fulllifegames/eval-engine';
+import { chanceRolled, quietVoice, shownAttribution, type LeadSideAnalysis, type TurnAnalysis } from '@fulllifegames/eval-engine';
 
 /**
  * Round 63 (T116): the team-preview verdict a side's lead may carry. In
@@ -52,6 +52,7 @@ export function attributionBadge(analysis: TurnAnalysis, playerNames: [string, s
         ? { text: 'advantage shifted', color: '#b6a46a' }
         : { text: 'advantage shifted (no blunder)', color: '#b6a46a' };
     case 'unclear': return { text: 'unclear (a choice never surfaced)', color: '#778' };
-    default: return { text: 'quiet turn', color: '#778' };
+    // Round 89 (B8a): "quiet turn" stands only where the card highlights nothing else; beside a hint or a sentence it reads "no mistake".
+    default: return { text: quietVoice(analysis, playerNames) === 'no-mistake' ? 'no mistake' : 'quiet turn', color: '#778' };
   }
 }

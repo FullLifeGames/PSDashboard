@@ -8,7 +8,7 @@ import {
   type AnalyzeTurnParams, type Side, type SideAnalysis, type VerdictTier,
 } from './types.ts';
 import { decidedSignals } from './decided-signals.ts';
-import { matchClickedColumn } from './played-match.ts';
+import { opponentColumn, ownCell } from './clicked-cell.ts';
 import { hindsightLine } from '../prose/phrases.ts';
 import { cellSolid, HINDSIGHT_MIN_VISITS } from './cell-solid.ts';
 import type { SideGrading } from './grading.ts';
@@ -44,8 +44,7 @@ function matrixView(params: AnalyzeTurnParams, key: Side): MatrixView {
   const sideLabels = pick(matrix?.p1Labels, matrix?.p2Labels);
   const oppLabels = pick(matrix?.p2Labels, matrix?.p1Labels);
   const mix = pick(matrix?.mixes.p1, matrix?.mixes.p2);
-  const ownValue = (grid: EvalMatrix, i: number, j: number): number =>
-    key === 'p1' ? grid.values[i][j] : -grid.values[j][i];
+  const ownValue = (grid: EvalMatrix, i: number, j: number): number => ownCell(grid, key, i, j);
   const mixTop = mix && mix.length > 0
     ? mix.reduce((top, weight, index) => (weight > mix[top] ? index : top), 0)
     : -1;
@@ -124,19 +123,6 @@ function hindsightShown(
 ): { shown: true; line: string } | { thin: true } | Record<string, never> {
   if (!cells.every(cellSolid)) return { thin: true };
   return read.gain >= (regret ?? 0) + HINDSIGHT_BAND ? { shown: true, line: hindsightLine(read) } : {};
-}
-
-/** The opponent's ACTUAL click as a matrix column (−1 when unknown), with the matched choice for the sentence. */
-function opponentColumn(
-  params: AnalyzeTurnParams,
-  key: Side,
-  matrix: EvalMatrix,
-): { column: number; oppPlayed: RankedChoice | null } {
-  const oppKey = key === 'p1' ? 'p2' as const : 'p1' as const;
-  const oppChoices = key === 'p1' ? matrix.p2Choices : matrix.p1Choices;
-  const oppPlayed = matchClickedColumn(params.result, oppKey, params.played);
-  const column = oppPlayed && oppChoices ? oppChoices.indexOf(oppPlayed.choice) : -1;
-  return { column, oppPlayed };
 }
 
 /** The own row with the best own-perspective value in the column. */
