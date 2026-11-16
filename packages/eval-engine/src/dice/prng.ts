@@ -248,6 +248,14 @@ export class ForcedDicePRNG extends WatchedPRNG {
     return note;
   }
 
+  /**
+   * Round 89 (P2): the keys of the dice the turn has drawn without a forced answer, one entry for each die with a draw so far. A forced
+   * die answers through `force` and is not among them; the caller already knows it.
+   */
+  drawnKeys(): ReadonlySet<string> {
+    return new Set([...this.cursors].filter(([, count]) => count > 0).map(([key]) => key));
+  }
+
   protected override decide(name: DieName, draw: Draw, natural: number): number {
     const key = dieKey(name);
     // Round 88 (T337): a later hit looks up its own die first, then the die that covers every hit, and notes under the key it used

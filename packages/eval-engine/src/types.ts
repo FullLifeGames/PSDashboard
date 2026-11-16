@@ -445,6 +445,8 @@ export interface ForcedWin {
   turns: number;
   mass: number;
   caveat: ForcedWinCaveat;
+  /** Round 89 (P2): the id of the stalling move whose repeats the proof delays (a foe that Protects again only postpones the knock-out). Absent when no cell of the proof leans on a delay. */
+  delay?: string;
   open?: ForcedWinOpen;
   engineScore: number;
   /** Prover states expanded (both side attempts). */
@@ -481,6 +483,8 @@ export interface ForcedWinProof {
   mass: number;
   turns: number;
   caveat: ForcedWinCaveat;
+  /** Round 89 (P2): the id of the stalling move whose repeats the proof delays; see `ForcedWin.delay`. */
+  delay?: string;
   open?: ForcedWinOpen;
   /** p1-perspective static of the open root children, share-weighted; null without open root children. */
   openValue: number | null;

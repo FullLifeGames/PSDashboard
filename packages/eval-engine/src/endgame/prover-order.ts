@@ -18,7 +18,13 @@ import { splitClassKey } from './prover-helping.ts';
  */
 
 export type Side = 'p1' | 'p2';
-export interface Proven { mass: number; turns: number; caveat: ForcedWinCaveat }
+export interface Proven {
+  mass: number;
+  turns: number;
+  caveat: ForcedWinCaveat;
+  /** Round 89 (P2): the id of the stalling move whose repeat the proof delays (the delay rule, `endgame/delay-rule.ts`); absent when no cell of the proof leans on a delay. */
+  delay?: string;
+}
 export interface Cell extends EndgameChildren { reply: ChoiceOption; p1Choice: string; p2Choice: string }
 export interface CellProof { cell: Cell; proofs: Proven[]; proven: Proven }
 

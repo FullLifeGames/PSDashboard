@@ -80,6 +80,7 @@ export function applyForcedWin(result: EvalResult, outcome: ForcedWinOutcome | n
   const openValue = proof.openValue ?? result.score;
   result.forcedWin = {
     side, turns: proof.turns, mass: proof.mass, caveat: proof.caveat,
+    ...(proof.delay ? { delay: proof.delay } : {}),
     ...(proof.open ? { open: proof.open } : {}),
     engineScore: result.score, states: proof.states,
   };

@@ -8,6 +8,7 @@ import { leafValue } from '../search/leaf.ts';
 import { searchOptions } from '../search/options.ts';
 import { MIN_FORCED_MASS, type ForcedWinCaveat, type ForcedWinProof, type TeraAllowance } from '../types.ts';
 import { endgameChildren, type EndgameChildren } from './children.ts';
+import { delayMass, readDelay } from './delay-rule.ts';
 import { endgameKey } from './key.ts';
 import { helpedSources, splitClassKey } from './prover-helping.ts';
 import { firstMoveId, openFields, orderByOdds, orderByRanking, other, type Cell, type CellProof, type Proven, type Side } from './prover-order.ts';
@@ -329,6 +330,7 @@ export class ForcedWinProver {
     let mass = 1;
     let turns = 0;
     let caveat: ForcedWinCaveat = 'none';
+    let delay: string | undefined;
     for (const cell of cells) {
       const proof = this.cell(battle, cell, ply);
       proofs.push(proof);
@@ -336,8 +338,9 @@ export class ForcedWinProver {
       if (mass < this.floor || mass <= 0) return { proven: NONE, cells: proofs };
       turns = Math.max(turns, proof.proven.turns);
       caveat = worse(caveat, proof.proven.caveat);
+      delay ??= proof.proven.delay;
     }
-    return { proven: { mass, turns, caveat }, cells: proofs };
+    return { proven: { mass, turns, caveat, ...(delay ? { delay } : {}) }, cells: proofs };
   }
 
   /** Share-weighted static of a cell's children from the own side. */
@@ -347,33 +350,47 @@ export class ForcedWinProver {
   }
 
   private cell(root: Battle, cell: Cell, ply: number): CellProof {
+    // Round 89 (P2): a repeated stall whose held turn leaves the board as it was is a delay; the cell is priced by what its other children
+    // give (`endgame/delay-rule.ts`), also when the plain path left it unpriced because the hold and the failure end the turn differently
+    const read = readDelay(root, this.side, cell);
     // A plain cell whose draws disagree on a knock-out has no class to
     // prove per; a class cell with a class the draws never showed keeps
     // that class open (its share never enters the mass) unless a drawn
     // class dominates it, and proves the rest.
-    if (cell.unpriced && cell.plain) return { cell, proofs: [], proven: NONE };
+    if (cell.unpriced && cell.plain && !read) return { cell, proofs: [], proven: NONE };
+    const view: Cell = read?.split ? { ...cell, children: read.children } : cell;
     // Round 88 (T336, #72): a child in which a secondary that only helps this side fired takes the proof of the child in which it
     // did not (prover-helping.ts); only the sources are proven, so the positions behind the effect cost no cells.
-    const sources = helpedSources(cell, this.side);
-    // Round 89 (A6-3b): the lazy pass leaves a turned child aside, so what it proves is a lower bound of the full proof.
-    const proofs: Proven[] = cell.children.map((child, index) => (sources[index] < 0 && !(this.lazy && child.turned) ? this.prove(child.position, ply + 1) : NONE));
+    const sources = read?.split ? view.children.map(() => -1) : helpedSources(cell, this.side);
+    // Round 89 (A6-3b): the lazy pass leaves a turned child aside, so what it proves is a lower bound of the full proof; a turned child that
+    // ended costs no cell and no state, so the pass reads it (round 89, P2)
+    const proofs: Proven[] = view.children.map((child, index) => (!read?.delays[index] && sources[index] < 0 && !(this.lazy && child.turned && !child.ended) ? this.prove(child.position, ply + 1) : NONE));
     sources.forEach((source, index) => { if (source >= 0) proofs[index] = proofs[source]; });
     let mass = 0;
     let turns = 0;
-    let caveat: ForcedWinCaveat = sampled(root, cell) ? 'sampled-rolls' : this.survivedHit(root, cell, proofs) ? 'barring-crit' : 'none';
+    let delayShare = 0;
+    let delay: string | undefined;
+    let caveat: ForcedWinCaveat = sampled(root, cell) ? 'sampled-rolls' : this.survivedHit(root, view, proofs) ? 'barring-crit' : 'none';
     const credit = (share: number, proof: Proven) => {
       mass += share * proof.mass;
       if (proof.mass > 0) {
         turns = Math.max(turns, proof.turns);
         caveat = worse(caveat, proof.caveat);
+        delay ??= proof.delay;
       }
     };
-    proofs.forEach((proof, index) => credit(cell.children[index].share, proof));
-    for (const gap of cell.missing) {
-      const index = cell.children.findIndex(child => child.key !== undefined && dominates(child.key, gap.key, cell.events, this.side));
+    proofs.forEach((proof, index) => (read?.delays[index] ? (delayShare += view.children[index].share) : credit(view.children[index].share, proof)));
+    for (const gap of view.missing) {
+      const index = view.children.findIndex(child => child.key !== undefined && dominates(child.key, gap.key, view.events, this.side));
       if (index >= 0) credit(gap.share, proofs[index]);
     }
-    return { cell, proofs, proven: { mass, turns: turns + 1, caveat } };
+    if (read) {
+      mass = delayMass(mass, delayShare);
+      if (mass > 0) delay = read.move;
+      // the delay children read as the cell itself (the parent again with a weaker stall), so the open share the bar weighs is 1 - mass
+      read.delays.forEach((isDelay, index) => { if (isDelay) proofs[index] = { mass, turns, caveat }; });
+    }
+    return { cell: view, proofs, proven: { mass, turns: turns + 1, caveat, ...(delay ? { delay } : {}) } };
   }
 
   /** A defender hit by a critable move and still standing in a PROVEN child: the class plan never priced a crit there. */

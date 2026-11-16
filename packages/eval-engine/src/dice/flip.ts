@@ -89,6 +89,11 @@ export interface FlippedTurn {
   logStart: number;
   /** The turn drew the die and answered it the other way. False when the simulator never drew it on this branch, or the draw has no way to give the answer. */
   took: boolean;
+  /**
+   * Round 89 (P2): the other dice this branch drew (the keys of `FlipDie`), read from the forcing PRNG's cursors. A die the branch never
+   * reached (a paralysis that a knock-out ends the turn before) is no part of the branch's chance.
+   */
+  drawn: ReadonlySet<string>;
 }
 
 /** The chance die behind a recorded name, or null when the draw is no chance or the chance is sure (0 or 1). */
@@ -159,5 +164,5 @@ export function flipTurn(turn: FlipTurn, recorded: RecordedTurn, die: FlipDie): 
     battle.prng = inner;
   }
   const note = forcing.notes.get(dieKey(die.name));
-  return { battle, logStart, took: !!note && note.draws > 0 && !note.noChance && !note.unfit };
+  return { battle, logStart, took: !!note && note.draws > 0 && !note.noChance && !note.unfit, drawn: forcing.drawnKeys() };
 }
