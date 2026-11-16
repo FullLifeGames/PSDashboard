@@ -155,3 +155,7 @@ _Avoid_: good guess, lucky read
 
 **Risk that went unpunished**:
 A risk that cleared the same payoff margin but whose played choice did not beat the safe choice by one shown point against the reply that came. The card says "a risk that went unpunished" and the gap to the safe line; the side earns no read credit (`safeAgainstClick` without `riskPaidOff`). Where no matrix cell is known, the test is skipped and the old rule stands.
+
+**Quiet turn**:
+A turn where the estimate moved less than a mistake band and no one earned a grade (attribution `quiet`). The card says "A quiet turn." only when it highlights nothing else; beside another sentence or a hindsight hint it says "Neither side made a mistake." and the badge reads "no mistake" instead of "quiet turn" (`quietVoice`).
+_Avoid_: calm turn, nothing happened
