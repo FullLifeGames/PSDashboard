@@ -20,15 +20,22 @@ import { attackerOf, boardFor, defenderOf, HOLDERS, holderOf, twoValues, verdict
  *   (`moveSlots`, `lastMove`, `hurtThisTurn`, ... of BattleActions) do not reach a hit's cost, or the field moves to `key`.
  *
  * The plain run plays the cases of the four rule sets that count most (Scarlet/Violet and the Champions mod, singles and
- * doubles), the scan's readers up to a few per field and a fixed sample of the others; `DICE_SWEEPS=full` plays every case and every entry.
+ * doubles), the scan's readers up to a few per field and a fixed sample of the others; `DICE_SWEEPS=full` plays every case, every reader the scan
+ * names and 8 of the other entries per field (the 120-entry sample of the first full run found no split and no wrong row on 88,616 rows in
+ * two cases and cost an hour). The teeth (some entry splits, `activeTurns` is touched) are checked in the four cases of the plain run only:
+ * the older Dexes have no entry that changes the cost of this hit through a `read` field (Stakeout, which does, comes in Gen 7), so the other
+ * cases check the fault verdict (`wrong`) and count the splits.
  */
 
 await loadSimMods('gen9championscustomgame');
 
-const CASES = SWEEPS_FULL ? SWEEP_CASES : SWEEP_CASES.filter(({ name }) => ['Gen 9 singles', 'Gen 9 doubles', 'Champions singles', 'Champions doubles'].includes(name));
+const PLAIN_CASES = ['Gen 9 singles', 'Gen 9 doubles', 'Champions singles', 'Champions doubles'];
+const CASES = SWEEPS_FULL ? SWEEP_CASES : SWEEP_CASES.filter(({ name }) => PLAIN_CASES.includes(name));
 /** Entries the scan names for a field: how many the plain run plays, and how many entries it does not name. */
 const NAMED_CAP = SWEEPS_FULL ? Infinity : 3;
-const SAMPLE = SWEEPS_FULL ? 120 : 4;
+const SAMPLE = SWEEPS_FULL ? 8 : 4;
+/** The full run reads every named entry: Gen 9 doubles takes several minutes. */
+const NAMED_TIMEOUT = SWEEPS_FULL ? 600_000 : 60_000;
 
 type Pair = [unknown, unknown];
 type Setter = (battle: Battle, value: unknown) => void;
@@ -125,12 +132,15 @@ describe.each(CASES)('the read fields of the key hold on $name', ({ rules, mode,
     expect(wrong).toEqual([]);
     // No read field reaches a bare hit: the sweep's teeth are the control below, a stage (a `key` field) on the same boards.
     expect(split).toBe(0);
+    // The stage goes in through the simulator's own `boostBy`: Gen 1 reads `modifiedStats`, which a write to `boosts` leaves alone.
     const staged = moves.filter(recoil => recoil.category === 'Physical' && recoil.basePower > 0 && !!recoil.recoil).slice(0, 3).map(recoil => verdictOf(
-      ...[0, 1].map(index => { const battle = boardFor(rules, mode, recoil.id); attackerOf(battle).boosts.atk = index * 3; return battle; }) as [Battle, Battle], recoil.id));
+      ...[0, 3].map(stage => { const battle = boardFor(rules, mode, recoil.id); attackerOf(battle).boostBy({ atk: stage }); return battle; }) as [Battle, Battle], recoil.id));
     expect(staged).toContain('split');
   });
 
-  test('every ability and item the scan names as a reader, and a sample of the others, on every holder: no board is priced by another', () => {
+  test('every ability and item the scan names as a reader, and a sample of the others, on every holder: no board is priced by another', { timeout: NAMED_TIMEOUT }, () => {
+    // Gen 1 has no abilities and no items: no entry to place
+    if (entries.length === 0) return;
     const wrong: string[] = [];
     let split = 0;
     let rows = 0;
@@ -156,13 +166,15 @@ describe.each(CASES)('the read fields of the key hold on $name', ({ rules, mode,
     }
     expect(rows).toBeGreaterThan(0);
     expect(wrong).toEqual([]);
-    expect(split).toBeGreaterThan(0);
-    if (rules.generation >= 3) expect(touched.has('activeTurns')).toBe(true);
+    if (PLAIN_CASES.includes(name)) {
+      expect(split).toBeGreaterThan(0);
+      if (rules.generation >= 3) expect(touched.has('activeTurns')).toBe(true);
+    }
     // The fields without a pair of values are named, not dropped; a new simulator field of the `read` class is held by the census.
     expect(skipped.length).toBeLessThan(40);
   });
 
-  test('every move the scan names as a reader, played into a Flame Body, prices each board by its own state', () => {
+  test('every move the scan names as a reader, played into a Flame Body, prices each board by its own state', { timeout: NAMED_TIMEOUT }, () => {
     if (rules.generation < 3) return;
     const wrong: string[] = [];
     let split = 0;
