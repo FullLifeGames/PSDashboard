@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { describe, expect, test } from 'vitest';
 import { loadSimMods } from '../src/forward/sim-mods';
-import { delayFacts, LAST_FIELDS, readsCountExactly, readsOfEntry, type DelayReads, type EntryKind } from '../src/endgame/delay-facts';
+import { delayFacts, LAST_FIELDS, readsCountExactly, readsOfBoard, readsOfEntry, type DelayReads, type EntryKind } from '../src/endgame/delay-facts';
 import { RULES } from './dice-fixtures';
 import { dexOfRules } from './dice-sweep-support';
 import { battleOf } from './power-oracle';
@@ -16,6 +16,7 @@ import { mon } from './dice-fixtures';
  *     updated simulator fails here and has to be classified before the facts may drop its field.
  *  2. Every line of the played builds that reads a dropped field belongs to a detected entry, or is a core read pinned below with its reason.
  *  3. The reads that survive the clamp of the two counters.
+ *  4. A fallen body's entries are no entry of the board (round 89, P2), unless a standing body may revive it.
  * The sweep rows over the rule sets are in `delay-facts-sweep.spec.ts`.
  */
 await loadSimMods('gen9championsou');
@@ -228,6 +229,46 @@ describe('an entry on the board keeps the field it reads', () => {
         }
       }
       expect(missed).toEqual([]);
+    });
+  });
+});
+
+describe('a body that has fainted keeps no entry on the board unless a revive is possible', () => {
+  // Champions VGC 2682637901 turn 6 (P2): the foe's fallen Whimsicott carries Encore, a reader of PP and of the last move; counted as an entry
+  // on the board it kept the PP of every standing body a fact, and no held Protect was ever a delay there
+  describe.each(RULES.filter(rules => rules.generation >= 2))('$name', rules => {
+    const dex = dexOfRules(rules);
+    const playable = (move: ReturnType<typeof dex.moves.get>): boolean => move.exists && move.gen <= dex.gen && (move.isNonstandard === null || move.isNonstandard === undefined || move.isNonstandard === 'Past');
+    const reader = dex.moves.all().filter(playable).sort((a, b) => (a.id < b.id ? -1 : 1)).find(move => readsOfEntry(dex, 'move', move.id).pp);
+    const reviver = dex.moves.all().filter(playable).sort((a, b) => (a.id < b.id ? -1 : 1)).find(move => !!(move as { slotCondition?: string }).slotCondition);
+
+    /** A fallen second body of side p2 that knows `reader`, and a first body of side p1 that knows `tackle` and, with `revives`, a move that sets a slot condition. */
+    function board(revives: boolean): ReturnType<typeof battleOf> {
+      const moves = revives && reviver ? ['tackle', reviver.id] : ['tackle', 'splash'];
+      const battle = battleOf(rules.singles, [mon(rules, { species: 'Snorlax', moves })], [mon(rules, { species: 'Vaporeon', moves: ['splash'] }), mon(rules, { species: 'Blissey', moves: [reader!.id] })]);
+      const fallen = battle.sides[1].pokemon[1];
+      fallen.hp = 0;
+      fallen.fainted = true;
+      battle.turn = 5;
+      return battle;
+    }
+
+    test('the rule set has a move that reads PP', () => expect(reader).toBeDefined());
+
+    test('a fallen body\'s PP reader is no entry: the PP of the standing bodies stays out of the facts', () => {
+      const a = board(false);
+      const b = board(false);
+      b.sides[0].active[0].moveSlots[0].pp -= 1;
+      expect(readsOfBoard(a).pp).toBe(false);
+      expect(delayFacts(b, 'p2')).toBe(delayFacts(a, 'p2'));
+    });
+
+    test.skipIf(!reviver)('a standing body with a move that sets a slot condition may revive it: the reader counts and the PP is a fact', () => {
+      const a = board(true);
+      const b = board(true);
+      b.sides[0].active[0].moveSlots[0].pp -= 1;
+      expect(readsOfBoard(a).pp).toBe(true);
+      expect(delayFacts(b, 'p2')).not.toBe(delayFacts(a, 'p2'));
     });
   });
 });

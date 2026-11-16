@@ -119,10 +119,22 @@ function bodyEntries(body: Pokemon): [EntryKind, string][] {
   ];
 }
 
-/** The reads of every entry on the board: the bodies (the bench too), the side and slot conditions, the weather, the terrain, the rooms. */
+/**
+ * Whether a body that stands on the board could bring a fainted one back: a move of the Dex that sets a slot condition (the simulator
+ * revives a body through the queue action such a condition raises). Read from the Dex entry, not from a name.
+ */
+const mayRevive = (battle: Battle): boolean => battle.sides.some(side => side.pokemon.some(body => !body.fainted
+  && [...body.moveSlots, ...body.baseMoveSlots].some(slot => !!(battle.dex.moves.get(slot.id) as { slotCondition?: string }).slotCondition)));
+
+/**
+ * The reads of every entry on the board: the bodies (the bench too), the side and slot conditions, the weather, the terrain, the rooms.
+ * A body that has fainted acts no more and its fields do not change, so its entries count only where a revive is possible (`mayRevive`):
+ * VGC boards keep their fallen bodies in the team, and one fallen body with Encore would keep the PP of every standing body a fact.
+ */
 export function readsOfBoard(battle: Battle): DelayReads {
+  const revive = mayRevive(battle);
   const entries = battle.sides.flatMap(side => [
-    ...side.pokemon.flatMap(bodyEntries),
+    ...side.pokemon.filter(body => revive || !body.fainted).flatMap(bodyEntries),
     ...[...Object.keys(side.sideConditions), ...side.slotConditions.flatMap(slot => Object.keys(slot))].map((id): [EntryKind, string] => ['condition', id]),
   ]);
   const field = [battle.field.weather, battle.field.terrain, ...Object.keys(battle.field.pseudoWeather)].filter(Boolean);
