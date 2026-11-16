@@ -132,6 +132,8 @@ Verdict bands sit on equilibrium-EV regret in win probability: inaccuracy at 5 p
 
 Sensitivity probes check a surviving verdict against the opponent's next plausible items, rule-outs respected. If some item flips it, the verdict softens to the most charitable tier and says so ("hinges on Heatran's item (Choice Scarf: mistake · Leftovers: fine)"), because a grade that depends on hidden information is not a grade.
 
+The matrix behind a turn opens from the turn card (`Open matrix`, the overview keeps its own `Matrix` toggle) as a dialog that reads what the card reads. The played row and column carry the word "played" and an outline, the engine's best row and column the word "engine", every header its equilibrium weight (0 % included), and each player's worst cell the word "worst": the cell [`worstReply`](./src/lib/worst-reply.ts) names for the played choice, lowest in Player 1's row and highest in Player 2's column, the rule Hard mode reads. A turn with a matrix but no ranked match for a played action marks that row or column as nothing; a result cached before the choice ids existed matches by label, shows no worst cell and stays read-only. A cell click plays the pair out as a variation, as in the overview.
+
 ### The Read lens
 
 A boundedly rational opponent model (softmax over the opponent's payoffs, anchored to the equilibrium mix, sharpened by the attack and switch tendencies seen in the replay) surfaces a "Read:" line when a confident prediction makes a non-equilibrium choice the better pick, with the payoff per predicted reply. The model is advice and never part of the grade, except that a flagged risk matching it becomes "a read against the opponent's tendencies".

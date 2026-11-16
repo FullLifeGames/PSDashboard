@@ -6,6 +6,7 @@ import {
 import { attributionBadge, isPairLead, leadTier } from './eval-badges';
 import { EngineRow } from './eval/analysis-bits';
 import { LinesSection } from './eval/LinesSection';
+import { MatrixDialogButton } from './eval/MatrixDialog';
 import { WinPathsEntry } from './eval/WinPathsEntry';
 import type { LinesHost } from '../lib/line-view';
 import { SideRow } from './eval/SideRow';
@@ -27,6 +28,8 @@ interface EvalTurnAnalysisProps {
   doubles?: boolean;
   /** Round 89 (#105): the turn is a game's open tip: nobody has played it, so there is no played choice to grade, only the engine's lines. */
   open?: boolean;
+  /** Round 89 (B7a): the panel's handler of a matrix cell, which the card's matrix dialog calls (absent: the dialog reads only). */
+  onPickPair?: (p1: { choice: string; label: string }, p2: { choice: string; label: string }) => void;
 }
 
 function ReadRows({ reads, playerNames, faintedFraction }: Pick<EvalTurnAnalysisProps, 'reads' | 'playerNames'> & { faintedFraction?: number }) {
@@ -89,7 +92,7 @@ function TurnSummary({ text }: { text: string }) {
 }
 
 /** A game's tip: the position is open, so the card names it as such and shows each side's engine line (round 89, H4h). */
-function OpenTurnAnalysis({ analysis, playerNames, reads, onExplore, result }: Omit<EvalTurnAnalysisProps, 'open'>) {
+function OpenTurnAnalysis({ analysis, playerNames, reads, onExplore, result, onPickPair }: Omit<EvalTurnAnalysisProps, 'open'>) {
   const exploreFor = (side: 'p1' | 'p2') =>
     onExplore && ((choice: RankedChoice) => onExplore(side, choice, side === 'p1' ? analysis.p2.best : analysis.p1.best, result));
   return (
@@ -97,6 +100,7 @@ function OpenTurnAnalysis({ analysis, playerNames, reads, onExplore, result }: O
       <div className="ps-eval-analysis-row">
         <span style={{ fontWeight: 'bold', fontSize: 11, color: '#cde' }}>Turn {analysis.turn}</span>
         <span style={{ color: '#aab' }}>open position: nothing played yet</span>
+        <MatrixDialogButton result={result} analysis={analysis} playerNames={playerNames} onPickPair={onPickPair} />
       </div>
       <EngineRow name={playerNames[0]} side={analysis.p1} onExplore={exploreFor('p1')} />
       <EngineRow name={playerNames[1]} side={analysis.p2} onExplore={exploreFor('p2')} />
@@ -106,8 +110,8 @@ function OpenTurnAnalysis({ analysis, playerNames, reads, onExplore, result }: O
 }
 
 /** Chess-style explanation of one analyzed turn: played vs best, and why the score moved. */
-export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore, result, linesHost, doubles, open = false }: EvalTurnAnalysisProps) {
-  if (open) return <OpenTurnAnalysis analysis={analysis} playerNames={playerNames} reads={reads} onExplore={onExplore} result={result} />;
+export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore, result, linesHost, doubles, open = false, onPickPair }: EvalTurnAnalysisProps) {
+  if (open) return <OpenTurnAnalysis analysis={analysis} playerNames={playerNames} reads={reads} onExplore={onExplore} result={result} onPickPair={onPickPair} />;
   const badge = attributionBadge(analysis, playerNames);
   const exploreFor = (side: 'p1' | 'p2') =>
     onExplore && ((choice: RankedChoice) =>
@@ -120,6 +124,7 @@ export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore, resu
           <span style={{ color: '#aab' }} title={`How much the graph estimate moved for ${playerNames[0]} across this turn, in win-probability points.`}>swing {winDeltaText(analysis.swing)}</span>
         )}
         <span style={{ color: badge.color }}>{badge.text}</span>
+        <MatrixDialogButton key={analysis.turn} result={result} analysis={analysis} playerNames={playerNames} onPickPair={onPickPair} />
       </div>
       <TurnSummary key={analysis.turn} text={summarizeTurn(analysis, playerNames)} />
       {analysis.decisionDelta !== null && analysis.chanceDelta !== null && <SplitRow analysis={analysis} name={playerNames[0]} />}

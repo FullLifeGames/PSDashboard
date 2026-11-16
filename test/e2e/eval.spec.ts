@@ -72,11 +72,11 @@ test.describe('PS Dashboard', () => {
 
     // The solved matrix behind the rankings opens on demand: every pair at
     // its win probability, equilibrium mixes on the headers.
-    await panel.locator('button', { hasText: 'Matrix' }).click();
+    await panel.locator('button.ps-eval-matrix-toggle').click();
     const matrix = panel.locator('table');
     await expect(matrix).toBeVisible();
     await expect(matrix.locator('td').first()).toContainText(/\d+%/);
-    await panel.locator('button', { hasText: 'Hide matrix' }).click();
+    await panel.locator('button.ps-eval-matrix-toggle').click();
     await expect(matrix).toBeHidden();
   });
 
@@ -128,7 +128,7 @@ test.describe('PS Dashboard', () => {
 
     // A cell names BOTH sides' choices — the branch executes exactly that
     // pair (not the engine's preferred reply).
-    await panel.locator('button', { hasText: 'Matrix' }).click();
+    await panel.locator('button.ps-eval-matrix-toggle').click();
     await panel.locator('table td button').first().click();
     await expect(page.getByText(/Branching · Turn/)).toBeVisible({ timeout: 60_000 });
     await expect(page.getByText(/Branching · Turn 2/)).toBeVisible({ timeout: 60_000 });

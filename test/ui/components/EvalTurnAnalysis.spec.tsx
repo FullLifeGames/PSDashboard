@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { formatRead, summarizeTurn, winDeltaText, winPctText } from '@fulllifegames/eval-engine';
 import { EvalLeadAnalysis, EvalTurnAnalysis } from '../../../src/components/EvalTurnAnalysis';
 import { leadAnalysis, misplayedSide, sideAnalysis, turnAnalysis } from '../fixtures/analysis';
-import { rankedChoice } from '../fixtures/eval-result';
+import { evalResult, rankedChoice } from '../fixtures/eval-result';
 
 const names: [string, string] = ['Alice', 'Bob'];
 
@@ -112,6 +112,35 @@ describe('EvalTurnAnalysis', () => {
 });
 
 describe('EvalLeadAnalysis', () => {
+  test.each(['singles', 'doubles'] as const)('B7a, %s: the card offers Open matrix beside the turn header only with a matrix, on a played turn and on an open tip', async kind => {
+    const analysis = turnAnalysis(4);
+    const { rerender } = render(<EvalTurnAnalysis analysis={analysis} playerNames={names} result={evalResult(kind)} />);
+    const button = screen.getByRole('button', { name: 'Open matrix' });
+    expect(button).toHaveClass('ps-btn', 'ps-eval-inline-btn');
+    expect(screen.getByText('Turn 4').parentElement).toContainElement(button);
+    await userEvent.click(button);
+    expect(screen.getByRole('dialog', { name: "Turn 4 · Alice's choices against Bob's" })).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+
+    rerender(<EvalTurnAnalysis analysis={analysis} playerNames={names} result={evalResult(kind, { matrix: undefined })} />);
+    expect(screen.queryByRole('button', { name: 'Open matrix' })).toBeNull();
+    rerender(<EvalTurnAnalysis analysis={analysis} playerNames={names} result={null} />);
+    expect(screen.queryByRole('button', { name: 'Open matrix' })).toBeNull();
+
+    rerender(<EvalTurnAnalysis analysis={analysis} playerNames={names} result={evalResult(kind)} open />);
+    expect(screen.getByRole('button', { name: 'Open matrix' })).toBeInTheDocument();
+    rerender(<EvalTurnAnalysis analysis={analysis} playerNames={names} result={evalResult(kind, { matrix: undefined })} open />);
+    expect(screen.queryByRole('button', { name: 'Open matrix' })).toBeNull();
+  });
+
+  test('B7a: a cell of the card\'s matrix dialog plays the pair through the card\'s handler', async () => {
+    const onPickPair = vi.fn();
+    render(<EvalTurnAnalysis analysis={turnAnalysis(4)} playerNames={names} result={evalResult('singles')} onPickPair={onPickPair} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Open matrix' }));
+    await userEvent.click(screen.getByTitle(/^Earthquake × Leech Seed:/));
+    expect(onPickPair).toHaveBeenCalledWith({ choice: 'move earthquake', label: 'Earthquake' }, { choice: 'move leechseed', label: 'Leech Seed' });
+  });
+
   test('grades both sides\' lead decisions', () => {
     render(<EvalLeadAnalysis leads={leadAnalysis()} playerNames={names} />);
     expect(screen.getByText('Team preview')).toBeInTheDocument();
