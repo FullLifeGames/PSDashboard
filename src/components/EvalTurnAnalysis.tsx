@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   type TurnAnalysis, type LeadAnalysis, type EvalResult, type LeadSideAnalysis, type RankedChoice, type ReadRecommendation,
   chanceRolled, formatRead, lostGround, summarizeTurn, winDeltaText, winPctText,
@@ -103,6 +104,10 @@ function OpenTurnAnalysis({ analysis, playerNames, reads, onExplore, result, onP
 
 /** Chess-style explanation of one analyzed turn: played vs best, and why the score moved. */
 export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore, result, linesHost, doubles, open = false, onPickPair }: EvalTurnAnalysisProps) {
+  // The turn whose Lines section is open. It follows the turn prop (every turn starts closed) and survives a result that goes away
+  // and comes back under the card; reconciled during render, never in an effect.
+  const [lines, setLines] = useState({ turn: analysis.turn, open: false });
+  if (lines.turn !== analysis.turn) setLines({ turn: analysis.turn, open: false });
   if (open) return <OpenTurnAnalysis analysis={analysis} playerNames={playerNames} reads={reads} onExplore={onExplore} result={result} onPickPair={onPickPair} />;
   const badge = attributionBadge(analysis, playerNames);
   const exploreFor = (side: 'p1' | 'p2') =>
@@ -134,7 +139,7 @@ export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore, resu
       <ReadRows reads={reads} playerNames={playerNames} faintedFraction={analysis.faintedFraction} />
       {linesHost && result && (
         <div className="ps-eval-lines">
-          <CardToggle key={analysis.turn} label="Lines" lazy>
+          <CardToggle label="Lines" lazy open={lines.turn === analysis.turn && lines.open} onToggle={next => setLines({ turn: analysis.turn, open: next })}>
             <LinesSection turn={analysis.turn} result={result} playerNames={playerNames} doubles={!!doubles} host={linesHost} analysis={analysis} />
           </CardToggle>
         </div>

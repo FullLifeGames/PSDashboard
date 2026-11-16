@@ -133,7 +133,12 @@ for (const game of GAMES) {
     const lineTurns = line.rows.map(row => row.turn).filter(label => label !== '');
     expect(lineTurns[0]).toBe(`T${turn}`);
 
-    await block!.getByRole('button', { name: '▶ Play' }).click();
+    // the turn's view can be rebuilt under the test (see settleOnTurn), and the Lines toggle then starts closed again: open it again and retry
+    await expect(async () => {
+      const toggle = panel.locator('.ps-eval-lines').getByRole('button', { name: 'Lines', exact: true });
+      if ((await toggle.getAttribute('aria-expanded', { timeout: 5_000 })) !== 'true') await toggle.click({ timeout: 5_000 });
+      await block!.getByRole('button', { name: '▶ Play' }).click({ timeout: 10_000 });
+    }).toPass({ timeout: 120_000 });
     // an existing variation would ask first; the page has none
     const history = variationPanel(page);
     await expect(history).toContainText(`${lineTurns.length} ${lineTurns.length === 1 ? 'turn' : 'turns'}`, { timeout: 240_000 });

@@ -235,6 +235,21 @@ describe.each([
     expect(screen.queryByRole('button', { name: '▶ Play' })).toBeNull();
   });
 
+  test('an open Lines section stays open while its result goes away and comes back; a turn away and back starts closed again', async () => {
+    const host = { rules, onPlay: vi.fn() };
+    const card = (turn: number, shown: typeof result | null) => <EvalTurnAnalysis analysis={turnAnalysis(turn)} playerNames={names} linesHost={host} result={shown} doubles={doubles} />;
+    const { rerender } = render(card(4, result));
+    await userEvent.click(screen.getByRole('button', { name: 'Lines' }));
+    rerender(card(4, null));
+    expect(screen.queryByRole('button', { name: 'Lines' })).toBeNull();
+    rerender(card(4, result));
+    expect(screen.getByRole('button', { name: 'Lines' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: '▶ Play' })).toBeVisible();
+    rerender(card(5, result));
+    rerender(card(4, result));
+    expect(screen.getByRole('button', { name: 'Lines' })).toHaveAttribute('aria-expanded', 'false');
+  });
+
   test('a closed Lines section builds nothing: the host is read only after the toggle opens', async () => {
     const reads = vi.fn(() => rules);
     const host = Object.defineProperty({}, 'rules', { get: reads, enumerable: true }) as { rules: typeof rules };
