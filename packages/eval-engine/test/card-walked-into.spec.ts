@@ -278,14 +278,16 @@ describe.each(GAMES)('%s: the card of a turn the chance part carried', (_name, m
 });
 
 describe.each(GAMES)('%s: the card of a quiet turn (round 76, T233)', (_name, make) => {
-  test('the side that walked into its punisher keeps the read it showed on a chance card (red before: "A quiet turn." alone)', () => {
+  test('the side that walked into its punisher keeps the read it showed on a chance card (red before: the quiet sentence alone)', () => {
     const { analysis, names } = turnOf(make, { scores: QUIET });
     expect(analysis.attribution).toBe('quiet');
     const text = summarizeTurn(analysis, names);
-    expect(text).toContain('A quiet turn.');
+    // Round 89 (B8a): the walked read stands beside the sentence, so the card says "Neither side made a mistake." and never "A quiet turn.".
+    expect(text).toContain('Neither side made a mistake.');
+    expect(text).not.toContain('quiet');
     expect(text).toContain(`${READ} ${names[0]}: against`);
     expect(text).toContain('was worth +55% more.');
-    expect(text.indexOf(READ)).toBeGreaterThan(text.indexOf('A quiet turn.'));
+    expect(text.indexOf(READ)).toBeGreaterThan(text.indexOf('Neither side made a mistake.'));
   });
 
   test('no read when the click was no punisher, the cell is a guess, or the worst case trails by less than a band', () => {

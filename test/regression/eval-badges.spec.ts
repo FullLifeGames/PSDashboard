@@ -34,6 +34,20 @@ describe('attributionBadge', () => {
     expect(attributionBadge(analysis('none' as TurnAnalysis['attribution']), names).text).toBe('quiet turn');
   });
 
+  test('round 89 (B8a): the quiet badge stands only on a card that highlights nothing else; beside a hint or a switch it reads "no mistake"', () => {
+    const quiet = (p1: Partial<TurnAnalysis['p1']> = {}, p2: Partial<TurnAnalysis['p2']> = {}) =>
+      attributionBadge(analysis('none' as TurnAnalysis['attribution'], p1, p2), names);
+    const hint = { hindsightRead: { response: 'Hurricane', against: 'Lopunny-Mega', gain: 0.2, shown: true, line: 'Against switching to Lopunny-Mega, Hurricane was worth +20% more.' } };
+    expect(quiet()).toEqual({ text: 'quiet turn', color: '#778' });
+    expect(quiet(hint)).toEqual({ text: 'no mistake', color: '#778' });
+    expect(quiet({}, { forcedMix: { label: 'Bisharp', weight: 0.95 } }).text).toBe('no mistake');
+    expect(quiet({}, { unanswered: { species: 'Lopunny-Mega' } }).text).toBe('no mistake');
+    // A side with a mistake tier makes "no mistake" false: the badge keeps the plain movement word.
+    expect(quiet({ tier: 'mistake', ...hint }).text).toBe('quiet turn');
+    // Without played actions the card cannot claim that no one made a mistake.
+    expect(attributionBadge(analysis('none' as TurnAnalysis['attribution'], hint, {}, { playedTracking: false }), names).text).toBe('quiet turn');
+  });
+
   test('round 67 (T59): a read whose side lost ground loses its praise badge and shows the turn\'s movement', () => {
     const lost = { swing: -0.3, chanceDelta: -0.25 };
     expect(attributionBadge(analysis('p1-read', { riskPaidOff: true }, {}, lost), names).text).toBe('chance swing (rolls, crits, reveals)');
