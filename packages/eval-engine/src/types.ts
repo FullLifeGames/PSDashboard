@@ -447,6 +447,8 @@ export interface ForcedWin {
   caveat: ForcedWinCaveat;
   /** Round 89 (P2): the id of the stalling move whose repeats the proof delays (a foe that Protects again only postpones the knock-out). Absent when no cell of the proof leans on a delay. */
   delay?: string;
+  /** Round 89 (P3): the root choice that proves the win, when the search's own list does not hold it (a sure strike from the legal combinations); absent when the choice is one of the list's. */
+  choice?: string;
   open?: ForcedWinOpen;
   engineScore: number;
   /** Prover states expanded (both side attempts). */
@@ -479,12 +481,11 @@ export interface ForcedWinInput {
   ruleset?: StaticRuleset;
 }
 
-export interface ForcedWinProof {
+/** The prover's answer; `delay` and `choice` (round 89, lane P) are the optional fields of `ForcedWin`, which the proof hands on unchanged. */
+export interface ForcedWinProof extends Pick<ForcedWin, 'delay' | 'choice'> {
   mass: number;
   turns: number;
   caveat: ForcedWinCaveat;
-  /** Round 89 (P2): the id of the stalling move whose repeats the proof delays; see `ForcedWin.delay`. */
-  delay?: string;
   open?: ForcedWinOpen;
   /** p1-perspective static of the open root children, share-weighted; null without open root children. */
   openValue: number | null;

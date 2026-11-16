@@ -81,6 +81,7 @@ export function applyForcedWin(result: EvalResult, outcome: ForcedWinOutcome | n
   result.forcedWin = {
     side, turns: proof.turns, mass: proof.mass, caveat: proof.caveat,
     ...(proof.delay ? { delay: proof.delay } : {}),
+    ...(proof.choice ? { choice: proof.choice } : {}),
     ...(proof.open ? { open: proof.open } : {}),
     engineScore: result.score, states: proof.states,
   };

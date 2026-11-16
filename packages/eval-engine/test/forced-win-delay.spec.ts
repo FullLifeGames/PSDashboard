@@ -196,27 +196,27 @@ describe('the scenes of the user\'s three Champions boards and #145', () => {
     expect(proof.mass).toBe(0);
   });
 
-  // the ranking's three root candidates, as the app asks: each repeated Protect is a delay, and the inner node that follows Raichu's first
-  // Protect still picks its own choice by the left slot's move, so Zap Cannon into Primarina goes first and the win rests on Volcarona's
-  // 7/8 at each of two levels. Stage P3 puts the sure strike (Aqua Jet) first at the root and at inner nodes and moves these to mass 1.
+  // the ranking's three root candidates and the sure strike before them, as the app asks: each repeated Protect is a delay, and Aqua Jet knocks
+  // Raichu out before Zap Cannon lands, so the proof reads mass 1 in 2 turns (the first Protect is sure, the second can hold, then Aqua Jet).
+  // Without the strike (stage P2 alone) these two boards read 0.765625, 7/8 of 7/8 (Volcarona's paralysis die at each of two levels).
   test.each([
     ['the fixture', 'forced-win/scout-miss-gen9championsvgc2026regmbbo3-2682637901-t6'],
     ['today\'s bank root', 'forced-win-delay/champions-vgc-2682637901-t6-bank'],
-  ])('Champions VGC 2682637901 turn 6, %s: the repeated Protect is a delay, the proof reads 7/8 of 7/8 in 2 turns (3/4 of the way to the sure win)', (_title, name) => {
+  ])('Champions VGC 2682637901 turn 6, %s: the repeated Protect is a delay and the sure strike proves it: mass 1 in 2 turns', (_title, name) => {
     const proof = sceneProof(scene(name));
-    expect(proof.mass).toBeCloseTo(0.765625, 9);
+    expect(proof.mass).toBeCloseTo(1, 9);
     expect(proof.turns).toBe(2);
     expect(proof.delay).toBe('protect');
   });
 
-  test('Heat Wave with Aqua Jet alone on the fixture: the lazy mass reads the ended failed repeat (never above the full mass)', () => {
+  test('Heat Wave with Aqua Jet alone on the fixture: the proof reads 1 (stage P2 alone read 0.765625: the inner node played Zap Cannon\'s losing side)', () => {
     const board = scene('forced-win/scout-miss-gen9championsvgc2026regmbbo3-2682637901-t6');
     const root = createRootPosition(board.serialized, board.ruleset);
     const choice = 'move heatwave, move aquajet 1';
     const prover = () => new ForcedWinProver(board.side, { tera: false, ruleset: board.ruleset }, { ...PROVER_BUDGET }, { states: 0, cells: 0 });
     const lazy = prover().candidateMass(root, choice, true);
     const full = prover().candidateMass(root, choice, false);
-    expect(full.mass).toBeCloseTo(0.765625, 9);
+    expect(full.mass).toBeCloseTo(1, 9);
     expect(lazy.mass).toBeGreaterThan(0.5);
     expect(lazy.mass).toBeLessThanOrEqual(full.mass + 1e-12);
   });

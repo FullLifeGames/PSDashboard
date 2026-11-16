@@ -30,6 +30,9 @@ export interface CellProof { cell: Cell; proofs: Proven[]; proven: Proven }
 
 export const other = (side: Side): Side => (side === 'p1' ? 'p2' : 'p1');
 
+/** Won by the side: battle.winner is the player's name ('' on a tie). */
+export const wonBy = (battle: Battle, side: Side): boolean => battle.ended && battle.winner === battle.sides[sideIndex(side)].name;
+
 /** The move id of a choice's first move part, or null for switches and passes. */
 export function firstMoveId(choice: string): string | null {
   for (const part of choice.split(',')) {
@@ -95,4 +98,34 @@ export function openFields(root: Battle, side: Side, cells: CellProof[], cache: 
   if (weight === 0) return { openValue: null };
   const open = openOf(root, binding.cell, heaviest.key, side);
   return { ...(open ? { open } : {}), openValue: sum / weight };
+}
+
+/**
+ * Whether a drawn class is at least as bad for the side as a class no draw
+ * showed, so the drawn class's proof carries over: the same turn order and
+ * the same outcomes except one event, where the opponent's move MISSED
+ * (never better for them than the hit the draws showed) or the side's own
+ * move KNOCKED OUT (never worse for the side than the survived hit). A
+ * class model leaks mass on rare outcomes otherwise: a 90% Toxic whose
+ * three draws all hit left ten percent of a certain win unproven.
+ *
+ * Round 88 (T336): a class in which a secondary that only helps the mover fired is a third case, and it is decided by the
+ * positions the cell drew, not by the keys (prover-helping.ts: helpedSources). A class the draws never showed (the forced-draw cap
+ * reached, or a secondary class under MIN_CLASS_MASS) keeps the two cases above, because no position says what its effect did.
+ */
+export function dominates(drawnKey: string, missingKey: string, events: CellEvent[], side: Side): boolean {
+  const [drawnClass, missingClass] = [splitClassKey(drawnKey), splitClassKey(missingKey)];
+  if (!drawnClass || !missingClass || drawnClass.order !== missingClass.order) return false;
+  const [drawn, missing] = [drawnClass.outcomes, missingClass.outcomes];
+  if (drawn.length !== missing.length || drawn.length !== events.length) return false;
+  let differing = -1;
+  for (let index = 0; index < drawn.length; index++) {
+    if (drawn[index] === missing[index]) continue;
+    if (differing >= 0) return false;
+    differing = index;
+  }
+  if (differing < 0) return false;
+  const event = events[differing];
+  if (event.side !== side) return missing[differing] === 'miss' && drawn[differing].startsWith('hit');
+  return missing[differing] === 'hit-kill' && drawn[differing] === 'hit-nokill';
 }

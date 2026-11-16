@@ -1,6 +1,5 @@
 import type { Battle } from '@pkmn/sim';
 import { sideIndex } from '@fulllifegames/replay-core';
-import type { CellEvent } from '../cell-blend.ts';
 import { createMatchupCache, type MatchupCache, type StaticRuleset } from '../eval-function.ts';
 import { createRootPosition, legalChoices, positionBattle, type ChoiceOption, type SimPosition } from '../forward-model.ts';
 import { isCombined } from '../search/hints.ts';
@@ -10,8 +9,11 @@ import { MIN_FORCED_MASS, type ForcedWinCaveat, type ForcedWinProof, type TeraAl
 import { endgameChildren, type EndgameChildren } from './children.ts';
 import { delayMass, readDelay } from './delay-rule.ts';
 import { endgameKey } from './key.ts';
-import { helpedSources, splitClassKey } from './prover-helping.ts';
-import { firstMoveId, openFields, orderByOdds, orderByRanking, other, type Cell, type CellProof, type Proven, type Side } from './prover-order.ts';
+import { helpedSources } from './prover-helping.ts';
+import { firstMoveId, openFields, orderByOdds, dominates, orderByRanking, other, wonBy, type Cell, type CellProof, type Proven, type Side } from './prover-order.ts';
+import { cachedStrike } from './prover-strike.ts';
+
+export { dominates } from './prover-order.ts';
 
 /**
  * The forced-win prover (round 35): an AND/OR proof search from the root.
@@ -54,7 +56,7 @@ export const PROVER_BUDGET: ProverBudget = { states: 200, cells: 100, depth: 12 
  */
 const PROVER_DRAW_BUDGET = 6;
 const PROVER_INNER_DRAW_BUDGET = 3;
-/** Own candidates tried at the root (ranking order) and at inner nodes (odds order). */
+/** Own candidates tried at the root (ranking order) and at inner nodes (odds order); a sure strike (`prover-strike.ts`) goes before them, one more at the root. */
 const ROOT_CANDIDATES = 3;
 const INNER_CANDIDATES = 2;
 
@@ -74,7 +76,8 @@ export interface ProveRequest {
 interface Memo extends Proven { remaining: number }
 /** Round 89 (#130): the own choice that proved a position and the reply that gave the minimum mass (the line of a stronger play follows them). */
 export interface ProofPlan { own: ChoiceOption; reply: ChoiceOption }
-interface ReplyProof { proven: Proven; cells: CellProof[]; plan?: ProofPlan }
+/** `choice` (round 89, P3): the root choice that gave the proof, set by the root loop. */
+interface ReplyProof { proven: Proven; cells: CellProof[]; plan?: ProofPlan; choice?: string }
 /** Round 89 (#130): the prover's options beyond the budget; the defaults are the production path. */
 export interface ProverExtras { floor?: number; plan?: boolean }
 interface ProverOptions { tera?: TeraAllowance; sleepClause?: boolean; ruleset?: StaticRuleset }
@@ -99,39 +102,6 @@ function critable(battle: Battle, choice: string): boolean {
  */
 const sampled = (root: Battle, cell: Cell): boolean => cell.plain && (root.gameType !== 'singles' || cell.spread);
 
-/**
- * Whether a drawn class is at least as bad for the side as a class no draw
- * showed, so the drawn class's proof carries over: the same turn order and
- * the same outcomes except one event, where the opponent's move MISSED
- * (never better for them than the hit the draws showed) or the side's own
- * move KNOCKED OUT (never worse for the side than the survived hit). A
- * class model leaks mass on rare outcomes otherwise: a 90% Toxic whose
- * three draws all hit left ten percent of a certain win unproven.
- *
- * Round 88 (T336): a class in which a secondary that only helps the mover fired is a third case, and it is decided by the
- * positions the cell drew, not by the keys (prover-helping.ts: helpedSources). A class the draws never showed (the forced-draw cap
- * reached, or a secondary class under MIN_CLASS_MASS) keeps the two cases above, because no position says what its effect did.
- */
-export function dominates(drawnKey: string, missingKey: string, events: CellEvent[], side: Side): boolean {
-  const [drawnClass, missingClass] = [splitClassKey(drawnKey), splitClassKey(missingKey)];
-  if (!drawnClass || !missingClass || drawnClass.order !== missingClass.order) return false;
-  const [drawn, missing] = [drawnClass.outcomes, missingClass.outcomes];
-  if (drawn.length !== missing.length || drawn.length !== events.length) return false;
-  let differing = -1;
-  for (let index = 0; index < drawn.length; index++) {
-    if (drawn[index] === missing[index]) continue;
-    if (differing >= 0) return false;
-    differing = index;
-  }
-  if (differing < 0) return false;
-  const event = events[differing];
-  if (event.side !== side) return missing[differing] === 'miss' && drawn[differing].startsWith('hit');
-  return missing[differing] === 'hit-kill' && drawn[differing] === 'hit-nokill';
-}
-
-/** Won by the side: battle.winner is the player's name ('' on a tie). */
-const wonBy = (battle: Battle, side: Side): boolean => battle.ended && battle.winner === battle.sides[sideIndex(side)].name;
-
 /** Round 89 (A6-2): the specs ask one root candidate by itself (`expand(root, 0, [own])`), the way a repeated-Protect scene reads its proving move. */
 export class ForcedWinProver {
   /** Swapped for a fresh map during a lazy pass: a lazy mass must never answer the full pass. */
@@ -141,10 +111,12 @@ export class ForcedWinProver {
   /** Cells drawn once per (position, pair): a position the proof reaches twice draws its cell once. */
   private readonly cellCache = new Map<string, EndgameChildren>();
   private readonly inProgress = new Set<string>();
+  /** Round 89 (P3): the sure strike of each position the proof asks about, read once (`strikeFor`). */
+  private readonly strikes = new WeakMap<SimPosition, ChoiceOption | null>();
   private readonly cache: MatchupCache;
   private readonly side: Side;
   private readonly opts: ProverOptions;
-  private readonly budget: ProverBudget;
+  private budget: ProverBudget;
   private readonly floor: number;
   private readonly planned: boolean;
   /** Round 89 (#130), with `plan`: the plan of every proven position, by endgame key. */
@@ -201,14 +173,30 @@ export class ForcedWinProver {
     return this.side === 'p1' ? [ownChoice, replyChoice] : [replyChoice, ownChoice];
   }
 
+  /** Round 89 (P3): the sure strike of a position (`prover-strike.ts`), or null; read once per position. */
+  private strikeFor(position: SimPosition, own: ChoiceOption[]): ChoiceOption | null {
+    return cachedStrike(this.strikes, position, this.side, own, this.opts.tera);
+  }
+
   /**
-   * The root candidates the full proof tries: the ranking's order (the kill odds when no ranking is given), the first
-   * ROOT_CANDIDATES. The proof proves or refutes every one of them against every legal reply; nothing gates them first.
+   * Round 89 (P3): a node's candidates, the sure strike first (when the position has one), then the first `limit` of today's order
+   * without it: the strike is added to the candidates of before and takes none of their places (a root of four, an inner node of three).
+   */
+  private candidatesOf(position: SimPosition, own: ChoiceOption[], order: (options: ChoiceOption[]) => ChoiceOption[], limit: number): ChoiceOption[] {
+    const strike = this.strikeFor(position, own);
+    const today = order(strike ? own.filter(option => option.choice !== strike.choice) : own).slice(0, limit);
+    return strike ? [strike, ...today] : today;
+  }
+
+  /**
+   * The root candidates the full proof tries: the sure strike when the position has one, then the ranking's order (the kill odds
+   * when no ranking is given), the first ROOT_CANDIDATES. The proof proves or refutes every one of them against every legal
+   * reply; nothing gates them first.
    */
   rootCandidates(root: SimPosition, rootOrder: string[]): string[] {
     const own = searchOptions(root, this.side, this.opts);
-    const ordered = rootOrder.length > 0 ? orderByRanking(own, rootOrder) : orderByOdds(positionBattle(root), this.side, own);
-    return ordered.slice(0, ROOT_CANDIDATES).map(candidate => candidate.choice);
+    const order = (options: ChoiceOption[]) => (rootOrder.length > 0 ? orderByRanking(options, rootOrder) : orderByOdds(positionBattle(root), this.side, options));
+    return this.candidatesOf(root, own, order, ROOT_CANDIDATES).map(candidate => candidate.choice);
   }
 
   /**
@@ -226,8 +214,8 @@ export class ForcedWinProver {
     const own = searchOptions(position, this.side, this.opts);
     const replies = this.replyChoices(position);
     if (own.length === 0 || replies.length === 0) return { proven: NONE, cells: [] };
-    const ordered = rootOrder && rootOrder.length > 0 ? orderByRanking(own, rootOrder) : orderByOdds(battle, this.side, own);
-    const candidates = ordered.slice(0, rootOrder ? ROOT_CANDIDATES : INNER_CANDIDATES);
+    const order = (options: ChoiceOption[]) => (rootOrder && rootOrder.length > 0 ? orderByRanking(options, rootOrder) : orderByOdds(battle, this.side, options));
+    const candidates = this.candidatesOf(position, own, order, rootOrder ? ROOT_CANDIDATES : INNER_CANDIDATES);
     if (rootOrder) return this.rootLoop(position, ply, candidates, replies);
     let best: ReplyProof = { proven: NONE, cells: [] };
     for (const candidate of candidates) {
@@ -278,21 +266,39 @@ export class ForcedWinProver {
     let best: ReplyProof = { proven: NONE, cells: [] };
     let passed = false;
     for (const candidate of candidates) {
-      const lazy = this.pass(position, candidate.choice, replies, ply, true);
+      const { lazy, attempt } = this.passes(position, candidate, replies, ply);
       if (lazy.proven.mass < this.floor) continue;
       passed = true;
-      const attempt = lazy.proven.mass < 1 ? this.pass(position, candidate.choice, replies, ply, false) : lazy;
       const better = attempt.proven.mass > lazy.proven.mass ? attempt : lazy;
-      if (better.proven.mass > best.proven.mass) best = better;
+      if (better.proven.mass > best.proven.mass) best = { ...better, choice: candidate.choice };
       if (best.proven.mass >= 1) return best;
     }
     if (passed) return best;
     for (const candidate of candidates) {
       const attempt = this.replies(position, candidate.choice, replies, ply);
-      if (attempt.proven.mass > best.proven.mass) best = attempt;
+      if (attempt.proven.mass > best.proven.mass) best = { ...attempt, choice: candidate.choice };
       if (best.proven.mass >= 1) break;
     }
     return best;
+  }
+
+  /**
+   * A root candidate's lazy pass and, when that passes the floor short of 1, its full pass. The sure strike (round 89, P3) runs on cells
+   * of its own, up to a whole budget, and gives them back unless it ends the root (they stay cached): the ranking's candidates meet the
+   * budget as before the strike, and the cells a proof reports are the ranking's plus the strike's only where the strike proves the win.
+   */
+  private passes(position: SimPosition, candidate: ChoiceOption, replies: ChoiceOption[], ply: number): { lazy: ReplyProof; attempt: ReplyProof } {
+    const strike = this.strikes.get(position)?.choice === candidate.choice;
+    const [before, budget] = [this.cells, this.budget];
+    if (strike) this.budget = { ...budget, cells: before + budget.cells };
+    try {
+      const lazy = this.pass(position, candidate.choice, replies, ply, true);
+      const attempt = lazy.proven.mass >= this.floor && lazy.proven.mass < 1 ? this.pass(position, candidate.choice, replies, ply, false) : lazy;
+      if (strike && Math.max(lazy.proven.mass, attempt.proven.mass) < 1) this.cells = before;
+      return { lazy, attempt };
+    } finally {
+      this.budget = budget;
+    }
   }
 
   /** One candidate's AND node, lazily (the turned children left aside, a memo of its own) or in full. */
@@ -421,7 +427,10 @@ export function proveForcedWin(rootOrSerialized: string | SimPosition, request: 
   const candidates = prover.rootCandidates(root, request.rootOrder);
   if (candidates.length === 0) return { ...NONE, openValue: null, states: prover.states, cells: prover.cells };
   prover.states += 1;
-  const { proven, cells } = prover.expand(root, 0, candidates);
+  const { proven, cells, choice } = prover.expand(root, 0, candidates);
   const fields = openFields(battle, request.side, cells, createMatchupCache(request.ruleset));
-  return { ...proven, ...fields, states: prover.states, cells: prover.cells };
+  // Round 89 (P3): a proof through a choice the search's list never held (a strike from the legal combinations) names it
+  const outside = choice !== undefined && proven.mass > 0
+    && !searchOptions(root, request.side, { tera: request.tera, sleepClause: request.sleepClause }).some(option => option.choice === choice);
+  return { ...proven, ...fields, ...(outside ? { choice } : {}), states: prover.states, cells: prover.cells };
 }
