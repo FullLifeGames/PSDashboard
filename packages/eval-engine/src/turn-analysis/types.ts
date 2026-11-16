@@ -187,6 +187,13 @@ export interface SideAnalysis {
    */
   riskPaidOff?: boolean;
   /**
+   * Round 89 (B6a): the played line and the safe line, each against the opponent's clicked reply, in the side's own perspective.
+   * Written when the payoff cleared the margin and both cells are known (the clicked label and the two cells). The credit needs
+   * the played cell to beat the safe cell by CLICK_EDGE_MIN; a side that carries the field without `riskPaidOff` took a risk
+   * the safe line did as well or better against. Absent where there is no cell to compare (no matrix, a hidden doubles slot).
+   */
+  safeAgainstClick?: { against: string; playedValue: number; safeValue: number };
+  /**
    * The flagged risk MATCHES the opponent model's best response — phrased
    * as "a read against the opponent's tendencies" (grading unchanged).
    */
