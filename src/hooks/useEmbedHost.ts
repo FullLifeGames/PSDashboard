@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { looksLikeReplayFileContent } from '../lib/replay-file';
 import { loadGame } from '../lib/new-game/store';
 import type { LoadReplayResult } from './useReplay';
+import { parseRequestedTurn } from './useRequestedTurn';
 
 interface EmbedHostOptions {
   loadReplay: (urlOrId: string) => Promise<LoadReplayResult>;
@@ -13,13 +14,15 @@ export interface EmbedHostState {
   embed: boolean;
   /** `?replay=<id|url>` — replay to load on startup. */
   requestedReplay: string | null;
+  /** `?turn=<n>` — the turn to open that replay on (read once; null for no turn, a non-number, or a link a share link or a held game overrides). */
+  requestedTurn: number | null;
   /** `?game=<id>` — the saved game the address names (opened by `useOpenAddress`; round 89, #105). */
   requestedGame: string | null;
 }
 
 /**
  * Lets another site drive the app: `?replay=` deep links auto-load a replay,
- * `?embed=1` strips the chrome for iframe use, and the host page can post
+ * `&turn=<n>` opens it on that turn (`useRequestedTurn`), `?embed=1` strips the chrome for iframe use, and the host page can post
  * `{ type: 'ps-load-replay', replay }` where `replay` is an id, a URL, a raw
  * protocol log, or a full exported replay HTML document. The app answers with
  * `ps-embed-ready` / `ps-replay-loaded` / `ps-replay-error`.
@@ -32,10 +35,13 @@ export function useEmbedHost({ loadReplay, loadReplayFile }: EmbedHostOptions): 
   const [config] = useState<EmbedHostState>(() => {
     const params = new URLSearchParams(window.location.search);
     const requestedGame = params.get('game');
+    // a saved game the address names is the game to open; a game this browser does not hold leaves the replay link its way
+    const requestedReplay = requestedGame && loadGame(requestedGame) ? null : params.get('replay');
     return {
       embed: params.get('embed') === '1',
-      // a saved game the address names is the game to open; a game this browser does not hold leaves the replay link its way
-      requestedReplay: requestedGame && loadGame(requestedGame) ? null : params.get('replay'),
+      requestedReplay,
+      // the turn belongs to the replay link; a #branch= share link owns the view and brings its own turn
+      requestedTurn: requestedReplay === null || window.location.hash.startsWith('#branch=') ? null : parseRequestedTurn(params.get('turn')),
       requestedGame,
     };
   });

@@ -38,7 +38,7 @@ function useReplaySurface() {
     loading, error, replayData, snapshots, observations, speedOrders, hpEvidence, opponentInfo, p1Info, itemJudge, loadReplay, loadReplayFile,
     openGame, extendGame, byLink,
   } = useReplay();
-  const { embed, requestedReplay, requestedGame } = useEmbedHost({ loadReplay, loadReplayFile });
+  const { embed, requestedReplay, requestedTurn, requestedGame } = useEmbedHost({ loadReplay, loadReplayFile });
   // Canonical link of whatever is loaded — mirrored into the loader input,
   // whichever path (typed URL, file, share link, embed message) loaded it.
   const loadedReplayUrl = replayData
@@ -46,7 +46,7 @@ function useReplaySurface() {
     : null;
   return {
     loading, error, replayData, snapshots, observations, speedOrders, hpEvidence,
-    opponentInfo, p1Info, itemJudge, loadReplay, loadReplayFile, openGame, extendGame, embed, requestedReplay, requestedGame, loadedReplayUrl, byLink,
+    opponentInfo, p1Info, itemJudge, loadReplay, loadReplayFile, openGame, extendGame, embed, requestedReplay, requestedTurn, requestedGame, loadedReplayUrl, byLink,
   };
 }
 

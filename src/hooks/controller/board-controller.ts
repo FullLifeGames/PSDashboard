@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo } from 'react';
 import { useTimeline } from '../useTimeline';
+import { useRequestedTurn } from '../useRequestedTurn';
 import type { Timeline } from '../useTimeline';
 import { useDeviation } from '../useDeviation';
 import { useBranchRefresh } from '../useBranchRefresh';
@@ -129,6 +130,9 @@ export function useTimelineController(ctx: ReplayContext, transients: Transients
     // loads; the guard of the landing drops that report until the frame confirms the tip, however long it loads (round 89, H4e, H4f).
     if (tip !== null) landOnTurn(tip);
   }, [replayData?.id, stopBranch, resetPointer, setBranchDivergence, branchWindowOpenRef, takeLanding, landOnTurn]);
+  // Round 89 (lane L): `?replay=<id>&turn=<n>` lands on its turn after the reset above, in the same selection a graph click makes.
+  const { requestedReplay, requestedTurn } = ctx.replay;
+  useRequestedTurn({ requestedReplay, requestedTurn, replayId: replayData?.id ?? null, maxTurn, landOnTurn });
 
   return { timeline, deviation, evalResultMatchesView, liveEvalStatus, tipEvalStatus, discardVariation };
 }
