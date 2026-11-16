@@ -126,6 +126,9 @@ A position with at most three Pokémon standing in total, both sides together (`
 **Delay (repeated stall)**:
 A foe's repeated Protect, Detect or Endure that holds and leaves the board as it was, so the position after the hold is the position before it with a weaker stall. The forced-win prover does not follow such a hold as a new position: it prices the cell by what happens when the repeat fails (the hold's chance falls with each repeat and the move's PP ends the chain) and records the stalling move in the proof (`delay`). A hold that heals the foe, hurts the attacker, lets the foe's partner hit or changes a stage is no delay.
 
+**Sure strike**:
+A move that knocks out the foe's last standing body in every roll and moves before every damaging move the foe can click, so the game ends before the foe acts. The forced-win prover tries it first, at the root and at inner nodes; the one reply that can stop it is a stalling move, which the proof reads as a reply of its own (a repeat that changes nothing is a delay). When a proof stands on a strike that the engine's own list does not hold, it names the choice (`choice`).
+
 **Win path**:
 A way the player who lost an endgame could have won, found from a turn of the endgame by a search that the user starts (the Endgame row in the Game review, or `How could <player> have won from here?` on the turn's card). It has three steps, named in the panel: `1 · A stronger play` (a choice that wins within three turns in a share of the dice whatever the opponent answers), `2 · Luck` (the likeliest dice that give the player the win, with the chance of that sequence) and `3 · A mistake by <opponent>` (the smallest slip by the opponent that hands the player the win, with the chance of the dice it needs). Each step shows its line with ▶ Play. Every number is a lower bound: it holds within three turns and within the search limit, so a path the search did not reach may add to it.
 
