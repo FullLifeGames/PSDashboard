@@ -272,3 +272,22 @@ describe('a body that has fainted keeps no entry on the board unless a revive is
     });
   });
 });
+
+describe('the facts are a string, so they do not depend on the order of the state\'s keys', () => {
+  // `EVAL_SIM_FAST=0` copies a battle through the simulator's own state, which lists the keys of a body's volatiles in another order than the live
+  // board did; two boards that hold the same volatiles must read as one
+  test.each(RULES.filter(rules => rules.generation >= 4))('$name: the same volatiles listed in the other order give equal facts', rules => {
+    const board = (): ReturnType<typeof battleOf> => {
+      const battle = battleOf(rules.singles, [mon(rules, { species: 'Snorlax', moves: ['tackle'] })], [mon(rules, { species: 'Vaporeon', moves: ['splash'] })]);
+      battle.turn = 5;
+      for (const id of ['focusenergy', 'torment']) battle.sides[0].active[0].addVolatile(id);
+      return battle;
+    };
+    const a = board();
+    const b = board();
+    const body = b.sides[0].active[0];
+    body.volatiles = Object.fromEntries(Object.entries(body.volatiles).reverse());
+    expect(Object.keys(body.volatiles)).not.toEqual(Object.keys(a.sides[0].active[0].volatiles));
+    expect(delayFacts(b, 'p2')).toBe(delayFacts(a, 'p2'));
+  });
+});

@@ -148,6 +148,13 @@ export function readsOfBoard(battle: Battle): DelayReads {
   return all;
 }
 
+/**
+ * A replacer that writes every object with its keys in order. A board that went through the simulator's own state copy (`EVAL_SIM_FAST=0`)
+ * lists its keys in another order than the live board it came from, and the facts are a string the caller compares.
+ */
+const sortedKeys = (_key: string, value: unknown): unknown =>
+  value && typeof value === 'object' && !Array.isArray(value) ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) : value;
+
 /** The serialized position without the stripped fields (the memo key's reading of a board). */
 function serialized(battle: Battle): Json & { sides: { pokemon: Json[] }[] } {
   const state = State.serializeBattle(battle) as unknown as Json & { sides: { pokemon: Json[] }[] };
@@ -187,7 +194,7 @@ export function delayFacts(battle: Battle, foe: SideId): string {
   delete state['debugMode'];
   if (!reads.last && !reads.calls) delete state['lastMove'];
   state.sides.forEach((side, index) => side.pokemon.forEach(body => trimBody(body, reads, index === sideIndex(foe), keepBookkeeping)));
-  return JSON.stringify(state);
+  return JSON.stringify(state, sortedKeys);
 }
 
 const sameBody = (a: Pokemon, b: Pokemon): boolean => a.set.name === b.set.name && a.set.species === b.set.species && a.position === b.position;
