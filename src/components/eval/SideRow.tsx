@@ -70,6 +70,15 @@ function EngineCell({ name, side, regretful, onExplore }: RowProps & { regretful
   );
 }
 
+/** The chip title of an unpunished risk; round 89 (B6a): where the matrix shows the safe line did as well against the reply that came, it says so. */
+function unpunishedTitle(side: SideAnalysis): string {
+  const punisher = side.played?.punishedBy ?? 'the punishing reply';
+  const held = side.safeAgainstClick;
+  return held
+    ? `The floor assumes ${punisher}; the opponent chose ${held.against} instead, and against that the safe line did as well or better.`
+    : `The floor assumes ${punisher}; the opponent chose differently, so the read came true.`;
+}
+
 /** The graded regret chip: setup caveat, unpunished risk, blunder, or mistake. */
 function RegretCell({ name, side, setupMove }: Pick<RowProps, 'name' | 'side'> & { setupMove: string | null }) {
   if (side.regret === null) return null;
@@ -88,7 +97,7 @@ function RegretCell({ name, side, setupMove }: Pick<RowProps, 'name' | 'side'> &
     return (
       <span
         style={{ color: '#b6a46a' }}
-        title={`The floor assumes ${side.played?.punishedBy ?? 'the punishing reply'}; the opponent chose differently, so the read came true.`}
+        title={unpunishedTitle(side)}
       >
         {view.text} regret · risk unpunished
       </span>

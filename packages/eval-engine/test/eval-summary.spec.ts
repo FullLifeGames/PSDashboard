@@ -239,7 +239,9 @@ describe('natural-language turn summaries', () => {
       scoreBefore: 0.1,
       scoreAfter: 0.1,
     }), names);
-    expect(summary).toContain('quiet turn');
+    // Round 89 (B8a): an inaccuracy beside the quiet sentence is "a minor imprecision, not a mistake", so the card says that, never "quiet".
+    expect(summary).toContain('Neither side made a mistake.');
+    expect(summary).not.toContain('quiet turn');
     expect(summary).toContain("Alpha's U-turn was an inaccuracy; Draco Meteor was slightly better");
   });
 
