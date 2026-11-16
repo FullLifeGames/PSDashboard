@@ -4,10 +4,9 @@ import { State } from '@pkmn/sim';
 import {
   getBranchSimulatorFormat, logRules, parseReplayLogWithObservations, replayBringOnly,
 } from '@fulllifegames/replay-core';
-import { allTurnEvents, buildChoiceLockContext, detectSacks } from '@fulllifegames/eval-engine';
-import { applyTargetCorrections, reconstructBranchRuntime } from '../../packages/eval-engine/src/branch-engine';
-import { deserializeBattleExact } from '../../packages/eval-engine/src/forward-model';
-import { battleFaintedFraction } from '../../packages/eval-engine/src/search';
+import {
+  allTurnEvents, applyTargetCorrections, buildChoiceLockContext, deserializeBattleExact, detectSacks, reconstructBranchRuntime,
+} from '@fulllifegames/eval-engine';
 import { bankKeepPlayed, bankSettings } from './bank-search.ts';
 import { bankTeamsFor } from './bank-build.ts';
 
@@ -46,6 +45,15 @@ export const SCENE_BOARDS: SceneBoard[] = [
 ];
 
 export const boardFile = (scene: SceneBoard) => new URL(`${scene.id}-t${scene.turn}-r89.json`, BOARD_DIR);
+
+/**
+ * The share of fainted bodies the app's dispatch reads (`battleFaintedFraction` in the engine's search, which the barrel does
+ * not export). A deliberate copy: `verify-scenes.spec.ts` compares it with the engine's on every board.
+ */
+const faintedShare = (battle: { sides: { pokemon: { fainted: boolean; hp: number }[] }[] }) => {
+  const bodies = battle.sides.flatMap(side => side.pokemon);
+  return bodies.length > 0 ? bodies.filter(pokemon => pokemon.fainted || pokemon.hp <= 0).length / bodies.length : 0;
+};
 
 /** The harness's saved Smogon files (`smogon/<path>.json`), the same names `record-smogon-fixtures.mjs` writes. */
 const recordedSmogon = (): typeof fetch => (async (url: string | URL | Request) => {
@@ -95,7 +103,7 @@ export async function buildBoard(scene: SceneBoard): Promise<Record<string, unkn
     tera: settings.tera,
     sleepClause: settings.sleepClause,
     ruleset: settings.ruleset,
-    faintedFraction: battleFaintedFraction(battle),
+    faintedFraction: faintedShare(battle),
     keepPlayed,
     played: keepPlayed,
     sacks: detectSacks(allTurnEvents(replay.log)[scene.turn] ?? [], snapshots[scene.turn - 1] ?? null, logRules(replay.log)),

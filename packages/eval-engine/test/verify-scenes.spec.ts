@@ -1,6 +1,9 @@
 import { describe, expect, test } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { analyzeTurn } from '../src/analysis';
+import { battleFaintedFraction, searchPosition } from '../src/search';
+import { deserializeBattleExact } from '../src/forward-model';
+import { autoTurnSettings } from '../src/search/budget';
 import { createLocalTreeExecutor, searchTreesOrchestrated } from '../src/tree-orchestrator';
 import type { EvalResult, EvalSettings } from '../src/types';
 import type { PlayedTurn } from '../src/played';
@@ -23,10 +26,32 @@ interface Scene {
   keepPlayed: EvalSettings['keepPlayed'];
   played: PlayedTurn;
   sacks: Parameters<typeof analyzeTurn>[0]['sacks'];
+  /** The boards of round 89 (`verify-scenes/`) carry the rule set, the game type and the fainted share the app's dispatch reads. */
+  ruleset?: EvalSettings['ruleset'];
+  gameType?: 'singles' | 'doubles';
+  faintedFraction?: number;
 }
 
 const scene = (name: string) =>
   JSON.parse(readFileSync(new URL(`./fixtures/positions/${name}.json`, import.meta.url), 'utf-8')) as Scene;
+
+/**
+ * Round 89 (user ruling 16.11.2026, B5a): the board the app builds today, from `fixtures/verify-scenes/`.
+ * `test/regression/verify-scenes-boards.spec.ts` rebuilds it in every run and fails when the app's build moves it.
+ */
+const board = (name: string) =>
+  JSON.parse(readFileSync(new URL(`./fixtures/verify-scenes/${name}-r89.json`, import.meta.url), 'utf-8')) as Scene;
+
+/** The search of the app's Auto mode at this board: the matrix below the fainted share where the tree starts, the tree above it. */
+async function searchAsApp(position: Scene): Promise<EvalResult> {
+  const resolved = autoTurnSettings(position.faintedFraction ?? 0, position.gameType === 'doubles');
+  const settings: EvalSettings = {
+    depth: resolved.depth, samples: resolved.samples, mode: resolved.mode, tera: position.tera, sleepClause: position.sleepClause,
+    keepPlayed: position.keepPlayed ?? undefined, ruleset: position.ruleset,
+  };
+  if (resolved.mode === 'matrix') return searchPosition(position.serialized, settings);
+  return searchTreesOrchestrated(createLocalTreeExecutor(position.serialized, position.ruleset), { ...settings, depth: 1, samples: 1 });
+}
 
 async function search(position: Scene): Promise<EvalResult> {
   const settings: EvalSettings = {
@@ -42,72 +67,66 @@ function flat(position: Scene, result: EvalResult) {
   });
 }
 
-describe('verify scenes: every class one ply deeper (round 63, T16)', () => {
-  test('648453 t13: p1 agrees with the Monte-Carlo reference (inaccuracy 0.1286 and 0.1312 on two seed blocks on the hashed tree seeds, round 86 A15b, user gate 06.11.2026, 5a; 0.1527 and 0.1547 under the round 73 static, 0.1863 and 0.1875 under the round 70 static)', { timeout: 300_000 }, async () => {
-    // The reference re-prices the same verify cells with 40 fresh draws each, one ply deeper (seed blocks 1001 and
-    // 5001, the probe lanes/F/pins-mc.vt.ts of round 73). Hidden Power Ice against the best row (Heat Wave) reads
-    // 0.1527 and 0.1547 on the two blocks, the engine 0.1549. Round 73 moved the pin from 0.187: the winner-share pair
-    // value (T248) lowers the engine and the fresh reference alike. Round 86 (T323, the tree's dice follow the Dex
-    // through seeds hashed from the offset and the iteration) moves the engine to 0.1284 (best row Heat Wave) and the
-    // reference with it: A15b recomputed it with the same 40 draws per cell on the seed blocks 1001 and 5001, the
-    // draw seeds hashed from (block, cell, draw) as the tree's are, and reads inaccuracy 0.1286 and 0.1312 (the
-    // lattice draws 0.1274 and 0.1283). User gate 06.11.2026, 5a: re-pinned. Band: 0.130 ± 0.02, the blocks' mean
-    // and the pin's tolerance (earlier pin 0.154).
-    const position = scene('smogtours-gen6ou-648453-t13');
-    const analysis = flat(position, await search(position));
-    expect(analysis.p1.tier).toBe('inaccuracy');
-    expect(Math.abs(analysis.p1.regret! - 0.130)).toBeLessThan(0.02);
+describe('verify scenes: every class one ply deeper (round 63, T16; boards and settings of the app since round 89)', () => {
+  // Round 89 (B5a, user gate 16.11.2026): the three rows grade the board the app builds today (fixtures/verify-scenes/, kept by
+  // test/regression/verify-scenes-boards.spec.ts) with the search the app's Auto mode runs on it (`searchAsApp`). Round 63 had
+  // exported the boards once: 912045's Ursaluna held a Life Orb the log rules out, 648453's Tornadus-Therian a Hardy 248 HP
+  // spread, and 648453 was searched with the tree where Auto runs the depth-1 matrix on an early singles turn. The references
+  // are the Monte-Carlo probe of round 86 (A15b: every verified tree cell re-priced with 24 draws, 40 for 648453, one ply
+  // deeper, hashed draw seeds, blocks 1001 and 5001, answers off), recomputed on the new boards. Flat verdicts: the app's
+  // deeper re-search of a flagged side (`verifyFlagged`) only acquits, so a flat tier here can be one the card later clears.
+
+  test('the boards name the share of fainted bodies the engine reads, and Auto picks the search the rows name', () => {
+    // test/regression/verify-scenes-boards.ts keeps its own count of fainted bodies (the barrel does not export the engine's).
+    const modes = ['smogtours-gen6ou-648453-t13', 'smogtours-gen8ou-573756-t73', 'smogtours-gen9doublesou-912045-t8'].map(name => {
+      const position = board(name);
+      expect(position.faintedFraction).toBe(battleFaintedFraction(deserializeBattleExact(position.serialized)));
+      return autoTurnSettings(position.faintedFraction!, position.gameType === 'doubles').mode;
+    });
+    expect(modes).toEqual(['matrix', 'mcts', 'mcts']);
   });
 
-  test('573756 t73: Body Press carries no tier (MC 0.0143 and 0.0143 on two seed blocks on the hashed tree seeds, round 86 A15b, user gate 06.11.2026, 5a; 0.1208 and 0.1278 under the round 76 static; an inaccuracy, 0.1122 and 0.1200 under the round 73 static)', { timeout: 300_000 }, async () => {
-    // Fresh reference, 40 draws per cell on seed blocks 1001 and 5001 (round 73, lanes/F/pins-mc.vt.ts): best row Roost,
-    // regret 0.1122 and 0.1200, an inaccuracy on both blocks; the engine reads 0.1299 (best Toxapex). The matchup part
-    // of T248 (hit-first healer, winner-share pair value) moved the engine and the reference together. Watched at the
-    // gate: this scene is a feedback pin. Band: 0.116 ± 0.02 (the blocks' mean, the pin's tolerance).
-    const position = scene('smogtours-gen8ou-573756-t73');
-    const analysis = flat(position, await search(position));
-    expect(analysis.p1.played?.label).toBe('Body Press');
-    // Round 76 (T258, user gate 24.10.2026, 1a): the simulator's heal rate moves the engine to score -0.7042 (was
-    // -0.6975), best row Defog, regret 0.1272, and the tier to none. The raw regret is still an inaccuracy (at least
-    // 0.1); the decided-position leniency (DECIDED_SCORE 0.7, own perspective) now demotes it because the root score
-    // sits 0.0042 beyond the line. The fresh reference (24 draws, seed blocks 1001 and 5001, answers off) shares the
-    // root score and reads the same: best row Defog, regret 0.1208 and 0.1278, flat tier none on both blocks. The pin is
-    // a 0.004 margin on the 0.7 line by construction; the feedback pin of this scene is watched at the gate. Band:
-    // 0.124 ± 0.02, the blocks' mean and the pin's tolerance.
-    // Round 86 (T323, hashed tree seeds): the engine reads score -0.7133, best row Defog, regret 0.0160, tier none,
-    // and no longer rests on the decided-position leniency. A15b recomputed the reference with 24 draws per cell on
-    // the seed blocks 1001 and 5001 and hashed draw seeds: regret 0.0143 on both blocks, tier none (the lattice
-    // draws read the same). User gate 06.11.2026, 5a: re-pinned. Band: 0.014 ± 0.02 (earlier pin 0.124); it admits
-    // up to 0.034, far under the 0.1 line of an inaccuracy.
+  test('648453 t13: AcrOne carries no tier (matrix 0.0550; MC 0.0732 and 0.0779 on two seed blocks; round 63 board and tree: an inaccuracy, 0.1286 and 0.1312)', { timeout: 300_000 }, async () => {
+    // Auto runs this turn on the matrix (one body of twelve has fainted: depth 1, three draws), so the row does too. The
+    // matrix has no verify cells to re-price; the reference is the tree's, on the same board: regret 0.0732 (best Hurricane)
+    // and 0.0779 (best -> Excadrill), tier none on both blocks, the tree itself 0.0758. The feedback pin of this turn (truth:
+    // AcrOne without a tier, BKC's switch named) holds the same. Old pin: inaccuracy, 0.130 ± 0.02, on the round 63 board and
+    // the tree. New pin: none, 0.065 ± 0.03 (the matrix, the tree and both blocks lie inside 0.055 to 0.078; the band stops
+    // 0.005 under the 0.1 line of an inaccuracy).
+    const position = board('smogtours-gen6ou-648453-t13');
+    const analysis = flat(position, await searchAsApp(position));
+    expect(analysis.p1.played?.label).toBe('Hidden Power Ice');
     expect(analysis.p1.tier).toBeUndefined();
-    // r89 A5 gate: was `Math.abs(regret - 0.014) < 0.02`. The cell's own seeds (T324) read regret 0.0992 (0.0852 above the reference),
-    // 0.0008 under the 0.1 line of an inaccuracy; the tier stays none. The reference (0.0143) is unchanged; the band waits for the gate.
-    expect(analysis.p1.regret!).toBeLessThan(0.1);
+    expect(Math.abs(analysis.p1.regret! - 0.065)).toBeLessThan(0.03);
   });
 
-  test("912045 t8 (doubles): p1's flat verdict agrees with the Monte-Carlo reference (a mistake, 0.2824 and 0.2932 on two seed blocks on the hashed tree seeds, round 86 A15b, user gate 06.11.2026, 5a; none, 0.0601 and 0.0679 under the round 76 static; a mistake, 0.3166 and 0.2067 under the round 73 static)", { timeout: 300_000 }, async () => {
-    // Before round 63, the fallback cell Earth Power + Matcha Gotcha × Earth Power + Tera + Drain Punch read −0.9
-    // through its first draw and p1's played Blood Moon line graded a blunder (0.4778). Doubles verify
-    // cells go deeper through their heaviest outcome (the doubles time bound). Fresh reference on round 70 (24 draws
-    // per cell, seed blocks 1001 and 5001, answers off): no tier on both, regret 0.0084 (best Hyper Voice + Rage
-    // Powder) and 0.0236 (best Blood Moon→Okidogi + Rage Powder); the engine read none at 0.0411, answers on or off.
-    // Round 73 (T248 winner-share pair value) recomputed the reference the same way (lanes/F/pins-mc.vt.ts, 24 draws,
-    // seed blocks 1001 and 5001, answers off): a mistake on both, regret 0.3166 and 0.2067 (best Hyper Voice + Matcha
-    // Gotcha); the engine reads a mistake at 0.2327. Band: 0.262 ± 0.04, the blocks' mean and the pin's tolerance.
-    const position = scene('smogtours-gen9doublesou-912045-t8');
-    const analysis = flat(position, await search(position));
-    // Round 76 (T258, user gate 24.10.2026, 1a): the simulator's heal rate moves the engine to none at 0.0516 (best Hyper
-    // Voice + Matcha Gotcha). Fresh reference (same draws and blocks, answers off): none on both, regret 0.0601 (best
-    // Hyper Voice + Matcha Gotcha) and 0.0679 (best Earth Power→Okidogi + Rage Powder; block B swaps the top two rows,
-    // 0.7125 against 0.7099 ev). Band: 0.064 ± 0.04, the blocks' mean and the pin's tolerance.
-    // Round 86 (T323, hashed tree seeds): A9b had moved the engine to an inaccuracy at 0.1001; the hashed seeds move it
-    // to a mistake at 0.2709 (best row Blood Moon→Okidogi + Rage Powder, a near tie of three rows within 0.004 ev). A15b
-    // recomputed the reference with 24 draws per cell on the seed blocks 1001 and 5001 and hashed draw seeds: a mistake
-    // on both, regret 0.2824 and 0.2932 (best Hyper Voice + Rage Powder); the lattice draws read 0.3053 and 0.2461.
-    // User gate 06.11.2026, 5a: re-pinned. Band: 0.288 ± 0.04, the blocks' mean and the pin's tolerance (earlier pin
-    // none at 0.064).
-    expect(analysis.p1.tier).toBe('mistake');
-    expect(Math.abs(analysis.p1.regret! - 0.288)).toBeLessThan(0.04);
+  test('573756 t73: Body Press carries no tier (0.0100; MC 0.0078 and 0.0077 on two seed blocks; round 63 board: an inaccuracy, 0.1271)', { timeout: 300_000 }, async () => {
+    // The tree runs this turn (five of twelve fainted), as in the app: score -0.7405, best row -> Toxapex 0.0100 ahead of Body
+    // Press, a near tie (U-turn and the switch within 0.01 of it). The reference reads
+    // 0.0078 and 0.0077, best -> Toxapex, tier none. Fire Fang knocks Corviknight out at 95 %; Body Press is the only click
+    // that wins the turn on a miss, which the regret prices (the 5 % miss class). The score also lies past DECIDED_SCORE
+    // (0.7), which would soften a tier by one step. Old pin: none, regret < 0.1 (earlier 0.014 ± 0.02), on the round 63 board,
+    // where the engine read 0.127. New pin: none, 0.009 ± 0.02 (the engine and the blocks' mean).
+    const position = board('smogtours-gen8ou-573756-t73');
+    const analysis = flat(position, await searchAsApp(position));
+    expect(analysis.p1.played?.label).toBe('Body Press');
+    expect(analysis.p1.tier).toBeUndefined();
+    expect(Math.abs(analysis.p1.regret! - 0.009)).toBeLessThan(0.02);
+  });
+
+  test("912045 t8 (doubles): p1's Blood Moon line carries no tier (0.0088; MC 0.0205 and 0.0435 on two seed blocks; round 63 board: a mistake, 0.2824 and 0.2932)", { timeout: 300_000 }, async () => {
+    // The tree runs this turn (eight of twelve fainted), the answers round on, as in the app. On the board the app builds
+    // (Ursaluna with the Throat Spray of the recorded usage data, not the Life Orb of round 63) the engine reads score
+    // 0.6987, best row Hyper Voice + Rage Powder, regret 0.0088, tier none: P2's equilibrium puts no weight on the double
+    // target into Ursaluna, so the played line's one hole costs nothing. The reference re-prices the verified cells and
+    // reads 0.0205 and 0.0435 (same best row), tier none on both. The three best rows lie within 0.007 of each other, so the
+    // regret is a near tie (a11, item 39). Old pin: a mistake, 0.288 ± 0.04, on the round 63 board. New pin: none,
+    // 0.025 ± 0.04 (the engine and the blocks' mean; the band stops 0.035 under the 0.1 line of an inaccuracy).
+    const position = board('smogtours-gen9doublesou-912045-t8');
+    const analysis = flat(position, await searchAsApp(position));
+    expect(analysis.p1.played?.label).toBe('Blood Moon→Okidogi + Matcha Gotcha');
+    expect(analysis.p1.tier).toBeUndefined();
+    expect(Math.abs(analysis.p1.regret! - 0.025)).toBeLessThan(0.04);
   });
 });
 
