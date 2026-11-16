@@ -2,11 +2,11 @@ import { describe, expect, test } from 'vitest';
 import { loadSimMods } from '../src/forward/sim-mods';
 import { DIE_KINDS, dieKey, type DieName, type ForcedDie } from '../src/dice/types';
 import { dieLabel } from '../src/dice/die-label';
-import { playClicks, standing, sweepSelection, SWEEPS_FULL, type Mode, type Rules } from './dice-fixtures';
+import { standing, sweepSelection, SWEEPS_FULL, type Mode, type Rules } from './dice-fixtures';
 import { clicksAccepted, dexOfRules, forcedOn, isCharge, SWEEP_CASES, sweepMoves, VGC_RULES, type DexMove } from './dice-sweep-support';
 import { loggedDice } from '../src/dice/logged-results';
 import { loggedOptions } from '../src/dice/turn';
-import { aimOf, ofKind, pickBoard, pickClicks, publicHalf, recorded, type Recorded } from './dice-pick-support';
+import { aimOf, bentScene, ofKind, pickBoard, pickClicks, publicHalf, recorded, type Recorded } from './dice-pick-support';
 
 // Round 89 (#137): the simulator draws a random target in two places that the log shows and the rebuild does not read. A move
 // that picks its foe at random (the Dex target `randomNormal`: Outrage, Thrash, Petal Dance, Uproar, Raging Fury, Struggle) draws it
@@ -105,15 +105,7 @@ describe.each(CASES)('an Encore that bends a click draws the target of the bent 
   const dex = dexOfRules(rules);
   const encores = dex.moves.get('encore').exists && dex.moves.get('encore').gen <= dex.gen;
   const { moves } = sweepMoves(rules, oneTarget);
-  const scene = (moveId: string) => {
-    const board = pickBoard({ rules, mode, vgc, attacker: [moveId, 'splash'], foe: ['encore', 'splash'] });
-    const first = pickClicks(mode, mode === 'singles' ? 'move 1' : 'move 1 1', 'move 2');
-    if (!clicksAccepted(board, first)) return null;
-    playClicks(board, first);
-    // turn two: the user clicks Splash, the faster foe's Encore lands on it first
-    const clicks = pickClicks(mode, 'move 2', mode === 'singles' ? 'move 1' : 'move 1 1');
-    return clicksAccepted(board, clicks) ? { board, clicks } : null;
-  };
+  const scene = (moveId: string) => bentScene({ rules, mode, vgc }, moveId, mode === 'singles' ? 'move 1' : 'move 1 1');
   /** The user ran the Encore's move after the Encore started on it. */
   const bent = (lines: readonly string[], moveId: string): boolean => {
     const started = lines.findIndex(line => line.startsWith('|-start|p1a') && line.endsWith('|Encore'));

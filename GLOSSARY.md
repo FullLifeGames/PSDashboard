@@ -45,7 +45,7 @@ A die that chooses one option out of several, such as the move Metronome calls o
 The die that sets how many times a multi-hit move hits, such as Bullet Seed's 2 to 5. A move whose every hit rolls its own accuracy (Triple Axel, Triple Kick, Population Bomb) has one accuracy die per later hit instead, and the dice panel folds them into one "Hits" row of counts under the move's "Hit" row. A count the game cut short reads "(5 landed)", and the log line says "Forced 10 hits, 5 landed". An ability or item that fixes the count shows one row without a choice, such as "Hits: 5 (Skill Link)".
 
 **Random target**:
-The die that picks a foe for a move with no chosen target: a spread move clicked in doubles, a move that hits a random foe, or a click that an Encore bent onto another target. It names no chip in the dice panel.
+The die that picks a foe for a move with no chosen target: a spread move clicked in doubles, a move that hits a random foe, or a click that an Encore bent onto another target. It names no chip in the dice panel. A line says "the seed decides the random target" only where the sample can change the turn (more than one foe stands and the move aims at one body); a spread or field move ignores the sample.
 
 **Drag**:
 The die that picks which bench body Roar, Whirlwind, Dragon Tail, Circle Throw or a Red Card pulls in. One drag die belongs to the slot dragged out. It names no chip in the dice panel.

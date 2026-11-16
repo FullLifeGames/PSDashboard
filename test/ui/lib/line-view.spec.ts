@@ -121,6 +121,22 @@ describe('lineBlocks: the tester\'s smaller items', () => {
     expect(single.rows[0].sides[0].chips).toEqual(['Rock Slide: hits (90%)']);
   });
 
+  // Round 89 (X1a part 3, 2630685175 T7): a Protect that fails at 67 percent decided the turn; its chip shows, in singles and in doubles.
+  const stallOn = (line: EvalLine, side: 'p1' | 'p2', at: number, slot: string): EvalLine => {
+    const die: ForcedDie = { name: { slot, moveId: 'protect', kind: 'stalling', effectId: 'protect' }, result: { happens: false } };
+    const [first, ...later] = line.steps;
+    const choice = first[side];
+    const slots = choice.slots.map((entry, index) => (index === at && entry?.kind === 'move' ? { ...entry, moveId: 'protect', moveName: 'Protect', dice: [die] } : entry));
+    return { ...line, steps: [{ ...first, [side]: { ...choice, slots }, dice: [{ die, chance: 2 / 3, shown: true }] }, ...later] };
+  };
+  test.each([
+    ['singles', singles, stallOn(singlesLine, 'p2', 0, 'p2a')],
+    ['doubles', doubles, stallOn(doublesLine, 'p2', 1, 'p2b')],
+  ] as const)('a stalling move that fails shows its chip, %s', (_kind, ctx, line) => {
+    const [block] = lineBlocks([line], ctx);
+    expect(block.rows.flatMap(row => row.sides.flatMap(side => side.chips))).toContain('Protect: fails (67%)');
+  });
+
   test('the dice of a replacement inside a turn are filed under that turn, not under "Replacement:"', () => {
     const roll = shown({ name: { slot: 'p1a', moveId: 'woodhammer', targetSlot: 'p2a', kind: 'crit' }, result: { happens: false } }, 0.96);
     const pivot = stepWith([]);

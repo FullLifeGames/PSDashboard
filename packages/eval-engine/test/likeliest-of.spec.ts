@@ -78,6 +78,17 @@ describe('which dice earn a chip (ruling 33, question 3a)', () => {
     expect(chipShown(forced('damage-roll', { step: 8 }), undefined, false)).toBe(false);
   });
 
+  // Round 89 (X1a part 3, 2630685175 T7): a Protect that fails at 67 percent decided the turn and could have worked; the line showed no chip.
+  test('a stalling move shows whenever its chance is below one, both when it fails and when it works again', () => {
+    expect(chipShown(forced('stalling', { happens: false }), 2 / 3, false)).toBe(true);
+    expect(chipShown(forced('stalling', { happens: true }), 1 / 3, false)).toBe(true);
+    expect(chipShown(forced('stalling', { happens: false }), 80 / 81, false)).toBe(true);
+    expect(chipShown(forced('stalling', { happens: true }), 1, false)).toBe(false);
+    // a draw that names no chance keeps the rule of any event: shown when it happens
+    expect(chipShown(forced('stalling', { happens: true }), undefined, false)).toBe(true);
+    expect(chipShown(forced('stalling', { happens: false }), undefined, false)).toBe(false);
+  });
+
   test('a roll that decides a knock-out shows', () => {
     expect(chipShown(forced('damage-roll', { step: 8 }), 9 / 16, true)).toBe(true);
   });
