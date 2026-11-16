@@ -6,7 +6,7 @@ import { chanceRolled } from './turn-analysis/luck.ts';
 import { lostGround, shownAttribution, walkedInto } from './turn-analysis/risk.ts';
 import { caveatWords, forcedQualifier, percentBelowSure, phrase, phraseReplies, playedBest, rollText } from './prose/phrases.ts';
 import {
-  forcedClause, inaccuracyClause, readCreditClause, sackClause, sensitivityClause, sideClause, streakClause, unansweredClause,
+  forcedClause, heldRiskNote, inaccuracyClause, readCreditClause, sackClause, sensitivityClause, sideClause, streakClause, unansweredClause,
 } from './prose/clauses.ts';
 
 /**
@@ -257,7 +257,7 @@ function rideAlongSentences(analysis: TurnAnalysis, playerNames: PlayerNames): s
   const rolled = chanceRolled(analysis) !== false;
   const kinds: ((name: string, side: SideAnalysis, ownLuck: number | null, praised: boolean) => string | null)[] = [
     (name, side, ownLuck, praised) => sackClause(name, side) ??
-      (praised ? readCreditClause(name, side, ownLuck, rolled) : null) ?? inaccuracyClause(name, side),
+      (praised ? readCreditClause(name, side, ownLuck, rolled) ?? heldRiskNote(name, side) : null) ?? inaccuracyClause(name, side),
     forcedClause,
     (_name, side) => unansweredClause(side),
     streakClause,

@@ -140,6 +140,21 @@ describe('SideRow', () => {
     expect(screen.getByText(line)).toBeInTheDocument();
   });
 
+  test('an unpunished risk whose safe line did as well against the reply that came says so in the chip title, never "the read came true" (round 89, B6a)', () => {
+    const held = { against: 'Toxic', playedValue: 0.189, safeValue: 0.19 };
+    const side = misplayedSide('mistake', { riskUnpunished: true, safeAgainstClick: held });
+    const { rerender } = render(<SideRow name="Alice" side={side} />);
+    const chip = screen.getByText(`${winDeltaText(-0.25)} regret · risk unpunished`);
+    expect(chip).toHaveAttribute(
+      'title',
+      'The floor assumes Leech Seed; the opponent chose Toxic instead, and against that the safe line did as well or better.',
+    );
+    expect(screen.queryByText(/read paid off/)).toBeNull();
+    // Without the field (a result with no matrix) the old title stands.
+    rerender(<SideRow name="Alice" side={misplayedSide('mistake', { riskUnpunished: true })} />);
+    expect(screen.getByText(`${winDeltaText(-0.25)} regret · risk unpunished`).getAttribute('title')).toContain('so the read came true');
+  });
+
   test('an inaccuracy whose read paid off shows the read alone; the review and the report list it the same way (round 89, G4d)', () => {
     const paid = sideAnalysis({ tier: 'inaccuracy', regret: 0.09, riskPaidOff: true, riskPayoff: 0.09 });
     const { rerender } = render(<SideRow name="Alice" side={paid} />);
