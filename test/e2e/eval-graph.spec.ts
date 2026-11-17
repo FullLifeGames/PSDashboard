@@ -179,7 +179,8 @@ test.describe('PS Dashboard', () => {
     const panel = page.locator('.ps-main-right .ps-eval-panel');
     // The auto pref round-trips into the dropdown and the caption names the routing.
     await expect(panel.locator('select').first()).toHaveValue('auto');
-    await expect(panel.getByText('auto (matrix early, MCTS late)')).toBeVisible();
+    // The routing sits in the title of the Game graph heading (round 89: no description line takes room).
+    await expect(panel.getByText('Game graph', { exact: true })).toHaveAttribute('title', /re-evaluates each turn with auto \(matrix early, MCTS late\)/);
     await panel.locator('button', { hasText: 'Analyze game' }).click();
     await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 300_000 });
 

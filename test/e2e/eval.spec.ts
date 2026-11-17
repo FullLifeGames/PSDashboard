@@ -214,7 +214,8 @@ test.describe('PS Dashboard', () => {
     // The summary sits closed under its toggle (T294).
     const summary = panel.locator('.ps-eval-analysis .ps-eval-analysis-summary');
     await expect(summary).toBeHidden();
-    await panel.locator('.ps-eval-analysis-toggle').click();
+    // The card holds two closed toggles, Explanation and Lines: the summary sits under the first.
+    await panel.locator('.ps-eval-analysis').getByRole('button', { name: 'Explanation' }).click();
     await expect(summary).toBeVisible();
     await expect(summary).toContainText('%');
     await expect(panel.locator('.ps-eval-analysis')).toContainText('engine:');
