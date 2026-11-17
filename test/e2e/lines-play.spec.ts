@@ -73,6 +73,19 @@ async function settleOnTurn(page: Page, panel: Locator, turn: number) {
   await expect(panel.locator('.ps-eval-lines')).toBeVisible();
 }
 
+/**
+ * The Lines section starts closed under its `Lines` toggle, like the Explanation (round 89, the user's note on X1): a turn shows no
+ * line until the toggle opens it. Check it closed, open it, check the lines are there.
+ */
+async function openLines(panel: Locator) {
+  const toggle = panel.locator('.ps-eval-lines').getByRole('button', { name: 'Lines', exact: true });
+  await expect(toggle).toBeVisible();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(panel.locator('.ps-eval-line-block')).toHaveCount(0);
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+}
+
 /** A die's words without its chance or its knock-out count: what the history's mark says. */
 const bare = (text: string) => text.replace(/ \([^)]*\)/g, '').replace(/ → [^:]+(?=:)/, '').trim();
 
@@ -98,6 +111,7 @@ for (const game of GAMES) {
       const produced = panel.locator('svg title').filter({ hasText: new RegExp(`\\(what turn ${candidate} produced\\)`) });
       await expect(produced.or(panel.locator('.ps-eval-analysis').filter({ hasText: `Turn ${candidate}` })).first()).toBeAttached({ timeout: 400_000 });
       await settleOnTurn(page, panel, candidate);
+      await openLines(panel);
       turn = candidate;
       // the longest line of the turn (steps counted as the rows that carry a turn number); a turn with no line tries the next candidate
       const blocks = panel.locator('.ps-eval-line-block');
@@ -119,7 +133,12 @@ for (const game of GAMES) {
     const lineTurns = line.rows.map(row => row.turn).filter(label => label !== '');
     expect(lineTurns[0]).toBe(`T${turn}`);
 
-    await block!.getByRole('button', { name: '▶ Play' }).click();
+    // the turn's view can be rebuilt under the test (see settleOnTurn), and the Lines toggle then starts closed again: open it again and retry
+    await expect(async () => {
+      const toggle = panel.locator('.ps-eval-lines').getByRole('button', { name: 'Lines', exact: true });
+      if ((await toggle.getAttribute('aria-expanded', { timeout: 5_000 })) !== 'true') await toggle.click({ timeout: 5_000 });
+      await block!.getByRole('button', { name: '▶ Play' }).click({ timeout: 10_000 });
+    }).toPass({ timeout: 120_000 });
     // an existing variation would ask first; the page has none
     const history = variationPanel(page);
     await expect(history).toContainText(`${lineTurns.length} ${lineTurns.length === 1 ? 'turn' : 'turns'}`, { timeout: 240_000 });

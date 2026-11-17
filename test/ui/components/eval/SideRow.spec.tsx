@@ -165,4 +165,34 @@ describe('SideRow', () => {
     expect(screen.queryByText(/read paid off/)).toBeNull();
     expect(screen.getByText(`· inaccuracy (${winDeltaText(-0.09)})`)).toBeInTheDocument();
   });
+
+  // Round 89 (X1a part 1, 649664 T24 and T23): "played stayed in (KO'd before acting)" with "✓ the engine's move" printed the engine's
+  // description of a stand-in as a choice and ticked it. A body knocked out before it moved has no choice in the log.
+  test('singles: a body knocked out before it moved says so, names the stand-in\'s chance and the engine\'s move, and earns no tick', () => {
+    const standIn = rankedChoice('move painsplit', 'stayed in (KO’d before acting)', 0.11);
+    const best = rankedChoice('move painsplit', 'Pain Split', 0.11);
+    render(<SideRow name="Alice" side={sideAnalysis({ playedRaw: null, played: standIn, best, safe: best, neverActed: true, prevented: 'faint' })} />);
+    expect(document.body.textContent).not.toMatch(/stayed in|KO’d|played /);
+    expect(screen.getByText(/knocked out before it moved/)).toHaveTextContent(`knocked out before it moved, so the log shows no choice · staying in ${winPctText(0.11)}`);
+    expect(screen.queryByText(/the engine's move/)).toBeNull();
+    expect(screen.getByText(/engine:/)).toHaveTextContent(`engine: Pain Split (${winPctText(0.11)})`);
+    expect(screen.queryByText(/risked/)).toBeNull();
+  });
+
+  test('singles: a stand-in that is not the engine\'s move still reads as no choice, with the engine\'s move beside it', () => {
+    const standIn = rankedChoice('move splash', 'stayed in (KO’d before acting)', -0.1);
+    const best = rankedChoice('move painsplit', 'Pain Split', 0.11);
+    render(<SideRow name="Alice" side={sideAnalysis({ playedRaw: null, played: standIn, best, safe: best, regret: null, neverActed: true, prevented: 'faint' })} />);
+    expect(screen.getByText(/knocked out before it moved/)).toHaveTextContent(`staying in ${winPctText(-0.1)}`);
+    expect(screen.getByText(/engine:/)).toHaveTextContent(`engine: Pain Split (${winPctText(0.11)})`);
+  });
+
+  test('doubles: the stand-in is a singles reading (a slot choice never makes one), so a side with slots keeps its card', () => {
+    const slot = { kind: 'move' as const, name: 'Fake Out' };
+    const pair = rankedChoice('move 1, move 2', 'Fake Out → Rillaboom + Protect', 0.2);
+    render(<SideRow name="Alice" side={sideAnalysis({ playedRaw: null, playedSlots: [slot, null], played: pair, best: pair, safe: pair })} />);
+    expect(screen.getByText(/^played /)).toHaveTextContent(`played Fake Out → Rillaboom + Protect (${winPctText(0.2)})`);
+    expect(screen.getByText("✓ the engine's move")).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/knocked out before it moved/);
+  });
 });

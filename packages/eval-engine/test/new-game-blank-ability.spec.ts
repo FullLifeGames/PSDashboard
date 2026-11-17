@@ -8,7 +8,7 @@ import { legalTeams, playableFormatIds } from './new-game-teams';
 /**
  * Round 89 (lane H, #105, H20a, user ruling 13.11.2026): a pasted set without an ability. The simulator plays such a set with no
  * ability at all (the packed team writes "-" for it), while the team knowledge guesses the species' first ability. Start fills the
- * gap once, from the format's own Dex (the first ability of the species, as Showdown's team import and its packed-team reader do),
+ * gap once, from the format's own Dex (the first ability of the species that the format allows, as Showdown's team import and its packed-team reader take the first one; `new-game-ability-fill.spec.ts` holds the banned-slot-0 species),
  * writes it into the saved team, and the team check names it before Start ("<species> has no ability: plays <ability>."). Generations
  * 1 and 2 have no abilities and fill nothing. The sweep reads each format's Dex as the oracle and plays the filled battle in the
  * simulator: singles, doubles, VGC, Champions and the older generations.

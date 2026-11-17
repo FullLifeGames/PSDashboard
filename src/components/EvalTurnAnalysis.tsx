@@ -1,11 +1,13 @@
-import { useId, useState } from 'react';
+import { useState } from 'react';
 import {
   type TurnAnalysis, type LeadAnalysis, type EvalResult, type LeadSideAnalysis, type RankedChoice, type ReadRecommendation,
   chanceRolled, formatRead, lostGround, summarizeTurn, winDeltaText, winPctText,
 } from '@fulllifegames/eval-engine';
 import { attributionBadge, isPairLead, leadTier } from './eval-badges';
 import { EngineRow } from './eval/analysis-bits';
+import { CardToggle } from './eval/CardToggle';
 import { LinesSection } from './eval/LinesSection';
+import { MatrixDialogButton } from './eval/MatrixDialog';
 import { WinPathsEntry } from './eval/WinPathsEntry';
 import type { LinesHost } from '../lib/line-view';
 import { SideRow } from './eval/SideRow';
@@ -27,6 +29,8 @@ interface EvalTurnAnalysisProps {
   doubles?: boolean;
   /** Round 89 (#105): the turn is a game's open tip: nobody has played it, so there is no played choice to grade, only the engine's lines. */
   open?: boolean;
+  /** Round 89 (B7a): the panel's handler of a matrix cell, which the card's matrix dialog calls (absent: the dialog reads only). */
+  onPickPair?: (p1: { choice: string; label: string }, p2: { choice: string; label: string }) => void;
 }
 
 function ReadRows({ reads, playerNames, faintedFraction }: Pick<EvalTurnAnalysisProps, 'reads' | 'playerNames'> & { faintedFraction?: number }) {
@@ -73,23 +77,15 @@ function SplitRow({ analysis, name }: { analysis: TurnAnalysis; name: string }) 
 
 /**
  * Round 80 (T294): the turn's summary sits closed under a one-line toggle, so the card opens on the verdict and both
- * sides. Every turn starts closed (the card keys it by turn), and the app remembers nothing.
+ * sides. Every turn starts closed (the card keys it by turn), and the app remembers nothing. Round 89 (the user's note on X1): the Lines
+ * section and the win-path question fold the same way (`CardToggle`).
  */
 function TurnSummary({ text }: { text: string }) {
-  const [open, setOpen] = useState(false);
-  const id = useId();
-  return (
-    <>
-      <button type="button" className="ps-eval-analysis-toggle" aria-expanded={open} aria-controls={id} onClick={() => setOpen(!open)}>
-        {open ? '▾' : '▸'} Explanation
-      </button>
-      <div id={id} className="ps-eval-analysis-summary" hidden={!open}>{text}</div>
-    </>
-  );
+  return <CardToggle label="Explanation" bodyClassName="ps-eval-analysis-summary">{text}</CardToggle>;
 }
 
 /** A game's tip: the position is open, so the card names it as such and shows each side's engine line (round 89, H4h). */
-function OpenTurnAnalysis({ analysis, playerNames, reads, onExplore, result }: Omit<EvalTurnAnalysisProps, 'open'>) {
+function OpenTurnAnalysis({ analysis, playerNames, reads, onExplore, result, onPickPair }: Omit<EvalTurnAnalysisProps, 'open'>) {
   const exploreFor = (side: 'p1' | 'p2') =>
     onExplore && ((choice: RankedChoice) => onExplore(side, choice, side === 'p1' ? analysis.p2.best : analysis.p1.best, result));
   return (
@@ -97,6 +93,7 @@ function OpenTurnAnalysis({ analysis, playerNames, reads, onExplore, result }: O
       <div className="ps-eval-analysis-row">
         <span style={{ fontWeight: 'bold', fontSize: 11, color: '#cde' }}>Turn {analysis.turn}</span>
         <span style={{ color: '#aab' }}>open position: nothing played yet</span>
+        <MatrixDialogButton result={result} analysis={analysis} playerNames={playerNames} onPickPair={onPickPair} />
       </div>
       <EngineRow name={playerNames[0]} side={analysis.p1} onExplore={exploreFor('p1')} />
       <EngineRow name={playerNames[1]} side={analysis.p2} onExplore={exploreFor('p2')} />
@@ -106,8 +103,12 @@ function OpenTurnAnalysis({ analysis, playerNames, reads, onExplore, result }: O
 }
 
 /** Chess-style explanation of one analyzed turn: played vs best, and why the score moved. */
-export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore, result, linesHost, doubles, open = false }: EvalTurnAnalysisProps) {
-  if (open) return <OpenTurnAnalysis analysis={analysis} playerNames={playerNames} reads={reads} onExplore={onExplore} result={result} />;
+export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore, result, linesHost, doubles, open = false, onPickPair }: EvalTurnAnalysisProps) {
+  // The turn whose Lines section is open. It follows the turn prop (every turn starts closed) and survives a result that goes away
+  // and comes back under the card; reconciled during render, never in an effect.
+  const [lines, setLines] = useState({ turn: analysis.turn, open: false });
+  if (lines.turn !== analysis.turn) setLines({ turn: analysis.turn, open: false });
+  if (open) return <OpenTurnAnalysis analysis={analysis} playerNames={playerNames} reads={reads} onExplore={onExplore} result={result} onPickPair={onPickPair} />;
   const badge = attributionBadge(analysis, playerNames);
   const exploreFor = (side: 'p1' | 'p2') =>
     onExplore && ((choice: RankedChoice) =>
@@ -120,6 +121,7 @@ export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore, resu
           <span style={{ color: '#aab' }} title={`How much the graph estimate moved for ${playerNames[0]} across this turn, in win-probability points.`}>swing {winDeltaText(analysis.swing)}</span>
         )}
         <span style={{ color: badge.color }}>{badge.text}</span>
+        <MatrixDialogButton key={analysis.turn} result={result} analysis={analysis} playerNames={playerNames} onPickPair={onPickPair} />
       </div>
       <TurnSummary key={analysis.turn} text={summarizeTurn(analysis, playerNames)} />
       {analysis.decisionDelta !== null && analysis.chanceDelta !== null && <SplitRow analysis={analysis} name={playerNames[0]} />}
@@ -135,7 +137,13 @@ export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore, resu
         </>
       )}
       <ReadRows reads={reads} playerNames={playerNames} faintedFraction={analysis.faintedFraction} />
-      {linesHost && <LinesSection turn={analysis.turn} result={result} playerNames={playerNames} doubles={!!doubles} host={linesHost} analysis={analysis} />}
+      {linesHost && result && (
+        <div className="ps-eval-lines">
+          <CardToggle label="Lines" lazy open={lines.turn === analysis.turn && lines.open} onToggle={next => setLines({ turn: analysis.turn, open: next })}>
+            <LinesSection turn={analysis.turn} result={result} playerNames={playerNames} doubles={!!doubles} host={linesHost} analysis={analysis} />
+          </CardToggle>
+        </div>
+      )}
       {linesHost && <WinPathsEntry turn={analysis.turn} host={linesHost} playerNames={playerNames} doubles={!!doubles} />}
     </div>
   );

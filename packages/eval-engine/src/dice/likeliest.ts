@@ -1,5 +1,6 @@
 import type { Battle } from '@pkmn/sim';
 import { copyOf } from '../sim-ask/copy.ts';
+import { sampleDecides } from './aim.ts';
 import { naturalTurn, playForcedTurn } from './play.ts';
 import { genShape, rollsAtTurnStart } from './recognize.ts';
 import { readsStartRoll } from './start-roll.ts';
@@ -188,7 +189,8 @@ export function playTurnWith(live: Battle, play: (battle: Battle) => void, pinne
         battle: trial,
         dice: [...forced.values()].filter(entry => drawn.has(dieKey(entry.die.name))),
         drawOrder: [...seen.keys()],
-        unforced: [...new Set([...skipped.values()].map(name => name.kind))],
+        // a random target whose sample cannot change the turn is no die the seed decides (`sampleDecides`, X1a)
+        unforced: [...new Set([...skipped].filter(([key, name]) => name.kind !== 'random-target' || sampleDecides(trial.dex.moves.get(name.moveId).target, draws.get(key))).map(([, name]) => name.kind))],
         unnamed: report.unnamed ?? 0,
         draws,
       };
@@ -304,7 +306,7 @@ export function otherRollGroup(entry: LikeliestDie, boundary: { lo: number; step
 /**
  * Round 89 (#104, ruling 33 question 3a): whether the user sees a chip for the die: only a die that could have gone the other way and
  * did not read as the default. An event that happens (a hit below 100 percent, a crit, an effect that lands, a pick, a hit count), a
- * status check and a speed tie show; the miss of a likely hit, a crit that does not come, an effect that does not land and a roll
+ * status check and a speed tie show, and so does a stalling move that fails or works again; the miss of a likely hit, a crit that does not come, an effect that does not land and a roll
  * that decides no knock-out do not (the tooltip of the button lists every die).
  */
 export function chipShown(die: ForcedDie, chance: number | undefined, decides: boolean): boolean {
@@ -312,6 +314,8 @@ export function chipShown(die: ForcedDie, chance: number | undefined, decides: b
   if (kind === 'speed-tie' || kind === 'hit-count') return true;
   if (kind === 'damage-roll') return decides;
   if (kind === 'status-check' || kind === 'accuracy') return chance !== undefined && chance < 1;
+  // a stalling move's failure decided the turn and could have gone the other way: it shows as well as its success (X1a, ruling 39)
+  if (kind === 'stalling' && 'happens' in die.result && chance !== undefined) return chance < 1;
   if ('happens' in die.result) return die.result.happens && (chance === undefined || chance < 1);
   return 'option' in die.result;
 }

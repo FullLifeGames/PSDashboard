@@ -96,6 +96,18 @@ describe('gameReview, singles', () => {
     expect(view[1].rows[1].grade).toBe('blunder');
   });
 
+  test('a row reads "played" for a choice and says no choice was shown for a body knocked out before it moved (round 89, X1a part 1)', () => {
+    expect(view[1].rows[0].playedText).toBe(`played Hyper Voice ${winPctText(0.06)}`);
+    const standIn = rankedChoice('move 2', 'stayed in (KO’d before acting)', -0.24);
+    const knockedOut = gameReview({
+      analyses: [turnAnalysis(1, { p2: gradedP2('blunder', { played: standIn, playedRaw: null, neverActed: true, prevented: 'faint' }) })], results: [null], playerNames: SINGLES_NAMES, doubles: false, host,
+    });
+    const row = knockedOut[1].rows[0];
+    expect(row.playedText).toBe(`knocked out before it moved, so the log shows no choice · staying in ${winPctText(-0.24)}`);
+    expect(row.playedText).not.toMatch(/stayed in|played/);
+    expect(row.engine).toBe(`Hydro Pump ${winPctText(0.1)}`);
+  });
+
   test('the lines of the row: the engine\'s line and the played line, each with its own text and block', () => {
     const lines = view[1].rows[0].lines;
     expect(lines.map(line => line.role)).toEqual(['engine', 'played']);

@@ -79,7 +79,7 @@ export interface StartGameParams {
   p2Team: PokemonSet[];
   playerNames?: [string, string];
   seed?: string;
-  /** Start fills a set without an ability with the one the format gives its species (H20a); a rebuild of a saved game leaves its sets as stored. */
+  /** Start fills a set without an ability with the first one of its species the format allows (H20a, X2a); a rebuild of a saved game leaves its sets as stored. */
   fillAbilities?: boolean;
 }
 
@@ -117,19 +117,33 @@ function refuseUnknownSpecies(format: ReturnType<ReturnType<typeof simFormats>['
   }
 }
 
-/**
- * A set without an ability (round 89, H20a). The simulator plays it with no ability at all, while a paste almost always means the
- * species' own: Showdown's team import and packed-team reader fill a blank with the first ability of the species. The fill reads the
- * format's own Dex; a generation without abilities (1 and 2) and a species the Dex does not know fill nothing.
- */
-function blankAbilityFill(dex: ReturnType<typeof dexOfFormat>, set: PokemonSet): string | null {
-  if (set.ability || dex.gen < 3) return null;
-  const species = dex.species.get(set.species);
-  return species.exists ? species.abilities['0'] || null : null;
+/** The abilities a species can have in the Dex's slot order (0, 1, hidden, special), without gaps or repeats. */
+function abilitiesInSlotOrder(species: { abilities: object }): string[] {
+  const slots = species.abilities as Record<string, string | undefined>;
+  const names = ['0', '1', 'H', 'S'].map(slot => slots[slot]).filter((name): name is string => !!name);
+  return names.filter((name, index) => names.indexOf(name) === index);
 }
 
-const filledAbilities = (dex: ReturnType<typeof dexOfFormat>, team: PokemonSet[]): PokemonSet[] =>
-  team.map(set => { const fill = blankAbilityFill(dex, set); return fill ? { ...set, ability: fill } : set; });
+/**
+ * A set without an ability (round 89, H20a; X2a). The simulator plays it with no ability at all, while a paste almost always means the
+ * species' own: Showdown's team import and packed-team reader fill a blank with the first ability of the species. Here the fill is the
+ * first one the format allows: the species' slots in the Dex's order, each asked of the format's own validator (`checkAbility`: its
+ * banlist, clauses and existence rules), so Evasion Abilities Clause or a banned Commander skips a species' slot 0. When no slot passes
+ * the fill keeps slot 0 and the team check names the ban. The fill reads the format's own Dex; a generation without abilities (1 and 2)
+ * and a species the Dex does not know fill nothing. A Custom Game's validator bans nothing, so slot 0 stays there.
+ */
+function blankAbilityFill(dex: ReturnType<typeof dexOfFormat>, validator: TeamValidator, set: PokemonSet): string | null {
+  if (set.ability || dex.gen < 3) return null;
+  const species = dex.species.get(set.species);
+  if (!species.exists) return null;
+  const own = abilitiesInSlotOrder(species);
+  const named = { ...set, name: set.name || species.name };
+  const allowed = own.find(name => !validator.checkAbility(named, dex.abilities.get(name), {}));
+  return allowed ?? own[0] ?? null;
+}
+
+const filledAbilities = (dex: ReturnType<typeof dexOfFormat>, validator: TeamValidator, team: PokemonSet[]): PokemonSet[] =>
+  team.map(set => { const fill = blankAbilityFill(dex, validator, set); return fill ? { ...set, ability: fill } : set; });
 
 /**
  * Starts the chosen format's battle on the omniscient stream, the one a game's log is written from, and reads its header (the
@@ -144,7 +158,7 @@ export async function startGameLog(params: StartGameParams): Promise<NewGameStar
   refuseUnknownSpecies(format, [...params.p1Team, ...params.p2Team]);
   const rules = simFormats().getRuleTable(format);
   const dex = dexOfFormat(format);
-  const given = (team: PokemonSet[]): PokemonSet[] => (params.fillAbilities ? filledAbilities(dex, team) : team);
+  const given = (team: PokemonSet[]): PokemonSet[] => (params.fillAbilities ? filledAbilities(dex, TeamValidator.get(formatId), team) : team);
   const leveled = (team: PokemonSet[]): PokemonSet[] => given(team).map(set => ({ ...set, level: levelOfSet(rules, set) }));
   const p1Team = leveled(params.p1Team);
   const p2Team = leveled(params.p2Team);
@@ -224,7 +238,7 @@ export async function checkGameTeams(formatId: string, teams: { p1: PokemonSet[]
   const free = !format.debug || simFormats().getRuleTable(format).has('obtainableabilities');
   const check = (pasted: PokemonSet[]): string[] => {
     // Start fills a blank ability, so the validator reads the team as it will play and the check names each fill (H20a).
-    const team = filledAbilities(dex, pasted);
+    const team = filledAbilities(dex, validator, pasted);
     const fills = pasted.flatMap((set, index) => (team[index].ability === set.ability ? [] : [`${dex.species.get(set.species).name} has no ability: plays ${team[index].ability}.`]));
     // The validator may rewrite a set (names, spreads): it reads a copy.
     const problems = [...(validator.validateTeam(JSON.parse(JSON.stringify(team)) as PokemonSet[]) ?? []), ...fills];

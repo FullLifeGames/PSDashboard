@@ -16,7 +16,8 @@ const host = (onPlay = vi.fn()): LinesHost => ({ rules: { gen: 9, mod: undefined
 describe('LinesSection', () => {
   test('singles: a block per line with its head, its end value, its play button and one row per step', () => {
     render(<LinesSection turn={20} result={withLines([bothRolesLine, singlesLine, playedLine])} playerNames={SINGLES_NAMES} doubles={false} host={host()} />);
-    expect(screen.getByText('Lines')).toBeInTheDocument();
+    // the "Lines" title moved to the turn card's toggle (EvalTurnAnalysis.spec.tsx)
+    expect(screen.queryByText('Lines')).toBeNull();
     expect(screen.getByText('Tzon · played the engine\'s move: Draining Kiss')).toBeInTheDocument();
     expect(screen.getByText('Pepitopalotin · engine: Hydro Pump')).toBeInTheDocument();
     expect(screen.getByText('Pepitopalotin · played: Hyper Voice')).toBeInTheDocument();
@@ -124,9 +125,12 @@ describe('a line that ends on a switch nobody chose', () => {
 });
 
 describe('the Lines section in the turn card', () => {
-  test('the card mounts it under the rows when its host hands one over, and not otherwise', () => {
+  test('the card mounts it under its closed Lines toggle when its host hands one over, and not otherwise', async () => {
     const analysis = turnAnalysis(20, { p2: { ...turnAnalysis(20).p2, best: rankedChoice('move 1', 'Hydro Pump', 0.1) } });
     const { rerender } = render(<EvalTurnAnalysis analysis={analysis} playerNames={SINGLES_NAMES} result={withLines([singlesLine])} linesHost={host()} />);
+    // closed first (the user's note on X1): the section's lines are not built until the toggle opens it
+    expect(screen.queryByText('Pepitopalotin · engine: Hydro Pump')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Lines' }));
     expect(screen.getByText('Pepitopalotin · engine: Hydro Pump')).toBeInTheDocument();
     rerender(<EvalTurnAnalysis analysis={analysis} playerNames={SINGLES_NAMES} result={withLines([singlesLine])} />);
     expect(screen.queryByText('Lines')).toBeNull();

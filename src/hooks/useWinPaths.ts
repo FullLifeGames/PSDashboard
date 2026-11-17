@@ -4,7 +4,7 @@ import type { AppController } from './useAppController';
 import { EvalWorkerClient } from '../lib/eval/worker-client';
 import { endgameTurns, loserOf } from '../lib/endgame-scope';
 import { winPathsRequest } from '../lib/win-paths-request';
-import type { WinPathsHost, WinPathsRun } from '../lib/win-paths-host';
+import type { WinPathsFrom, WinPathsHost, WinPathsRun } from '../lib/win-paths-host';
 
 /** The run the panel shows, with the replay and the call it belongs to (a run of another replay is gone without an effect). */
 interface Held { replayId: string; call: number; run: WinPathsRun }
@@ -59,7 +59,7 @@ export function useWinPaths(app: AppController, replayData: ReplayData): WinPath
     setHeld(null);
   }, []);
 
-  const show = useCallback((turn: number) => {
+  const show = useCallback((turn: number, from: WinPathsFrom) => {
     if (!endgame) return;
     abortRef.current?.abort();
     const controller = new AbortController();
@@ -67,7 +67,7 @@ export function useWinPaths(app: AppController, replayData: ReplayData): WinPath
     const call = ++calls.current;
     const { loser: side } = endgame;
     const update = (change: (run: WinPathsRun) => WinPathsRun) => setHeld(current => (current && current.call === call ? { ...current, run: change(current.run) } : current));
-    setHeld({ replayId, call, run: { turn, side, steps: [], status: 'positioning' } });
+    setHeld({ replayId, call, run: { turn, side, steps: [], status: 'positioning', from } });
     const request = winPathsRequest({
       side, turn, result: graph.results[turn - 1], analysis: analyses?.[turn - 1],
       tera: effectiveTera, sleepClause: effectiveSleepClause, ruleset: effectiveRuleset,

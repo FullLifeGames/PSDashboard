@@ -14,9 +14,11 @@ import { ChoicePicker, WhatIfRow, type WhatIfState } from './WhatIfSection';
  * "What if it had…" loader and the list of all choices. The dice of the slot's move are a table (A4), with the dice of the turn
  * under it; the "What if" loader and the list are today's. The pool of moves loads when this section opens.
  */
-export function TrayMore({ slot, gen, diceViews, onChoice, onHypotheticalMove }: {
+export function TrayMore({ slot, gen, format, diceViews, onChoice, onHypotheticalMove }: {
   slot: DockSlotModel;
   gen: number;
+  /** The game's format id: the What if list offers what the format's own rules allow. */
+  format: string;
   diceViews: DiceViews;
   onChoice: (choice: BranchSlotChoice) => void;
   onHypotheticalMove: (params: { species: string; move: string; replace: string | null }) => void;
@@ -25,7 +27,7 @@ export function TrayMore({ slot, gen, diceViews, onChoice, onHypotheticalMove }:
   const [whatIfMove, setWhatIfMove] = useState('');
   const [whatIfReplace, setWhatIfReplace] = useState<string | null>(null);
   const whatIf: WhatIfState = { whatIfMove, setWhatIfMove, whatIfReplace, setWhatIfReplace };
-  const movePool = useMovePool(species, gen);
+  const movePool = useMovePool(species, gen, format);
   const ctx: ChoiceContext = { modifier: gimmick.modifier, modifierAvailable: gimmick.modifierAvailable, moves, modifiers };
   const dice = diceViews.slot(slot.side, slot.slot);
   const onPickChoice = (value: string) => {

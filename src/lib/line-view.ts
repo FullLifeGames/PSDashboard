@@ -120,6 +120,8 @@ export interface LineViewContext {
   turn: number;
   /** The card's own row values by side (`rowValueTexts`): a line shows its row beside its end. Absent: the end alone. */
   rowValues?: { p1?: RowValues; p2?: RowValues };
+  /** The sides whose body was knocked out before it moved (`neverActedOf`): their played line is a stand-in, so its head never says played (X1a). */
+  neverActed?: { p1?: boolean; p2?: boolean };
   /** The labels of each side's ranked choices, best first (`ranksOf`): a line names the rank of the answer it meets. Absent: no rank. */
   ranks?: { p1: readonly string[]; p2: readonly string[] };
   playerNames: [string, string];
@@ -258,7 +260,8 @@ function endNote(line: EvalLine, playerNames: [string, string]): string | null {
 /** The words of a replacement: the engine labels a slot that sends nobody in "pass"; a line names the bodies that come in. */
 export const replacementWords = (label: string): string => label.replace(/ \+ pass$/, '').replace(/^pass \+ /, '');
 
-const roleText = (line: EvalLine): string => {
+const roleText = (line: EvalLine, neverActed = false): string => {
+  if (neverActed) return line.for.includes('engine') ? `engine: ${line.label}` : `staying in: ${line.label}`;
   if (line.for.includes('engine') && line.for.includes('played')) return `played the engine's move: ${line.label}`;
   return `${line.for.includes('engine') ? 'engine' : 'played'}: ${line.label}`;
 };
@@ -361,7 +364,7 @@ export function lineBlocks(lines: readonly EvalLine[], ctx: LineViewContext): Li
     const row = ctx.rowValues?.[line.side]?.[line.for.includes('engine') ? 'engine' : 'played'] ?? null;
     const reply = replyOf(line, ctx);
     return {
-      key: `${line.side}-${line.label}-${index}`, line, player, role: roleText(line),
+      key: `${line.side}-${line.label}-${index}`, line, player, role: roleText(line, ctx.neverActed?.[line.side]),
       end: row === null ? `ends at ${endPct} for ${player}` : `row ${row}, this line ends at ${endPct}`, endPct, row, differs: row !== null && row !== endPct, reply,
       rows, tooltip: tooltipOf(every), note: unforcedNote(line), endNote: endNote(line, ctx.playerNames), worstNote: worstNote(line, reply, ctx),
     };

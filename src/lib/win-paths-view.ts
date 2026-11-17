@@ -62,10 +62,12 @@ function emptySentence(step: WinStep): string | null {
 
 const sequenceOf = (step: WinStep): string => (step.chance === undefined ? '' : `This sequence: ${chanceText(step.chance)}.`);
 
-function mistakeHeadline(step: WinStep, opponent: string): string | null {
+/** One sentence (X1a part 4): the slip, who wins by it, and the chance of the dice of that sequence. */
+function mistakeHeadline(step: WinStep, opponent: string, player: string): string | null {
   const { deviation } = step;
-  const slip = deviation ? `If ${opponent} had played ${deviation.label} (its ${rankWords(deviation.rank)}) on turn ${deviation.turn}.` : '';
-  return [slip, sequenceOf(step)].filter(Boolean).join(' ') || null;
+  if (!deviation) return sequenceOf(step) || null;
+  const chance = step.chance === undefined ? '' : `: this sequence has ${chanceText(step.chance)}`;
+  return `If ${opponent} had played ${deviation.label} (its ${rankWords(deviation.rank)}) on turn ${deviation.turn}, ${player} wins${chance}.`;
 }
 
 const PREFIXES: Record<string, string> = { Tera: 'Terastallize', Mega: 'Mega Evolve', Ultra: 'Ultra Burst' };
@@ -111,7 +113,7 @@ function headlineOf(step: WinStep, ctx: WinPathsViewContext): string | null {
   if (step.status !== 'found') return null;
   const opponent = ctx.playerNames[ctx.side === 'p1' ? 1 : 0];
   if (step.kind === 'luck') return sequenceOf(step) || null;
-  return step.kind === 'mistake' ? mistakeHeadline(step, opponent) : strongerHeadline(step, ctx, opponent);
+  return step.kind === 'mistake' ? mistakeHeadline(step, opponent, ctx.playerNames[ctx.side === 'p1' ? 0 : 1]) : strongerHeadline(step, ctx, opponent);
 }
 
 const TITLES: Record<WinStepKind, (opponent: string) => string> = {

@@ -17,7 +17,7 @@ interface RowProps {
 
 function PlayedCell({ name, side }: Pick<RowProps, 'name' | 'side'>) {
   const { acted, playedText } = playedTextFor(side);
-  const playedGamble = side.played !== null && side.played.ev - side.played.worstCase >= RISK_DISPLAY_GAP;
+  const playedGamble = !side.neverActed && side.played !== null && side.played.ev - side.played.worstCase >= RISK_DISPLAY_GAP;
   return (
     <>
       <span style={{ color: '#aab' }} title={side.played ? evTitle(name) : undefined}>{acted ? 'played ' : ''}{playedText}</span>
@@ -47,7 +47,8 @@ function EngineCell({ name, side, regretful, onExplore }: RowProps & { regretful
   if (!side.best || !engine) return null;
   const best = side.best;
   const explore = onExplore && (() => onExplore(best));
-  if (!side.played) {
+  // a stand-in for a choice the log does not show earns no tick (X1a): the engine's move stands as it does for a side that played nothing
+  if (!side.played || side.neverActed) {
     return (
       <span style={{ color: '#778' }} title={evTitle(name)}>
         engine: <ExplorableLabel label={engine.label} color="#778" onClick={explore} />

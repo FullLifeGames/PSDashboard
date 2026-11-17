@@ -6,6 +6,9 @@ import type { WinStep } from '@fulllifegames/eval-engine';
  */
 export type WinPathsSide = 'p1' | 'p2';
 
+/** The place that opened a run: the turn card's toggle or the Game review's Endgame row. Each place shows only its own run. */
+export type WinPathsFrom = 'card' | 'review';
+
 export interface WinPathsRun {
   turn: number;
   side: WinPathsSide;
@@ -13,6 +16,8 @@ export interface WinPathsRun {
   steps: WinStep[];
   /** `positioning`: the position of the turn is being rebuilt; `searching`: the worker runs; then `done` or `failed` (the job itself broke). */
   status: 'positioning' | 'searching' | 'done' | 'failed';
+  /** Where the user opened it. */
+  from: WinPathsFrom;
 }
 
 export interface WinPathsHost {
@@ -26,8 +31,8 @@ export interface WinPathsHost {
   playedLabel(turn: number): string | null;
   /** The loser was knocked out before it moved at a turn: its `playedLabel` is a stand-in, not a choice the log shows. */
   playedNeverActed?(turn: number): boolean;
-  /** Search the turn for the loser (a turn of the endgame). */
-  show(turn: number): void;
+  /** Search the turn for the loser (a turn of the endgame); `from` names the place that shows the answer. */
+  show(turn: number, from: WinPathsFrom): void;
   /** Close the panel and stop the search. */
   hide(): void;
 }

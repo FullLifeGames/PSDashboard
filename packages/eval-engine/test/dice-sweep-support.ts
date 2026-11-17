@@ -3,8 +3,9 @@ import { rulesDex } from '@fulllifegames/replay-core';
 import { playForcedTurn } from '../src/dice/play';
 import { genShape } from '../src/dice/recognize';
 import type { DiceReport, DieName, ForcedDie } from '../src/dice/types';
+import { AIM_FREE_TARGETS } from '../src/dice/aim';
 import { copyOf } from '../src/sim-ask/copy';
-import { CHAMPIONS, mon, playClicks, RULES, sweepSelection, type Mode, type Rules } from './dice-fixtures';
+import { CHAMPIONS, mon, playClicks, RULES, stableLog, sweepSelection, type Mode, type Rules } from './dice-fixtures';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
@@ -27,13 +28,13 @@ const FOE_REACHING = new Set(['normal', 'any', 'adjacentFoe', 'allAdjacentFoes',
 /** In doubles these moves need a target in the click. */
 const NEEDS_AIM = new Set(['normal', 'any', 'adjacentFoe']);
 
-/** Every move a rule set plays (the probe's filter: no Z or Max moves, past moves stay) that the sweep's predicate keeps and a foe can be the target of. */
-export function sweepMoves(rules: Rules, keep: (move: DexMove) => boolean, foesOnly = true): { moves: DexMove[]; skipped: number } {
+/** Every move a rule set plays (the probe's filter: no Z or Max moves, past moves stay) that the sweep's predicate keeps and a foe can be the target of (`whole`: the whole list, for a sweep that picks its own sample). */
+export function sweepMoves(rules: Rules, keep: (move: DexMove) => boolean, foesOnly = true, whole = false): { moves: DexMove[]; skipped: number } {
   const dex = dexOfRules(rules);
   const all = dex.moves.all().filter(move => move.exists && !move.isZ && !move.isMax && move.gen <= dex.gen
     && (move.isNonstandard === null || move.isNonstandard === undefined || move.isNonstandard === 'Past') && keep(move));
   const reaching = foesOnly ? all.filter(move => FOE_REACHING.has(move.target)) : all;
-  return { moves: sweepSelection(reaching, 'moves'), skipped: all.length - reaching.length };
+  return { moves: whole ? reaching : sweepSelection(reaching, 'moves'), skipped: all.length - reaching.length };
 }
 
 /** The rule sets VGC plays (Scarlet/Violet and Champions doubles): a team of six per side. */
@@ -218,4 +219,30 @@ export function outfitBoard(
   return battleOf(
     rules.doubles!, [attacker, mon(rules, { species: 'Blissey', moves: ['splash'] })], [foe, mon(rules, { species: 'Chansey', moves: ['splash'] })],
   );
+}
+
+/**
+ * The log of a turn as its effects read it: the stable log, without the target field of the `|move|` line of a move that ignores the
+ * foe the simulator sampled for it (`AIM_FREE_TARGETS`: a spread move names the sampled body there, and no effect reads it).
+ */
+export function effectLog(battle: Battle): string {
+  return stableLog(battle).split('\n').map(line => {
+    if (!line.startsWith('|move|')) return line;
+    const fields = line.split('|');
+    return AIM_FREE_TARGETS.has(battle.dex.moves.get(fields[3]).target) ? [...fields.slice(0, 4), ...fields.slice(5)].join('|') : line;
+  }).join('\n');
+}
+
+/**
+ * Whether two plays of a turn did the same: the same log (`effectLog`), or the same lines in another order that leave the same bodies
+ * (the end-of-turn damage of two bodies of one speed lands in an order the simulator shuffles with its stream, from Generation 5 on:
+ * Poison Gas poisons both foes of a doubles board, and the two poison ticks swap places under another seed).
+ */
+export function sameEffects(a: Battle, b: Battle): boolean {
+  const left = effectLog(a);
+  const right = effectLog(b);
+  if (left === right) return true;
+  const sorted = (log: string): string => log.split('\n').sort().join('\n');
+  const bodies = (battle: Battle): string => JSON.stringify(battle.sides.map(side => side.pokemon.map(body => [body.hp, body.status, body.item, body.ability, Object.keys(body.volatiles), body.boosts])));
+  return sorted(left) === sorted(right) && bodies(a) === bodies(b);
 }

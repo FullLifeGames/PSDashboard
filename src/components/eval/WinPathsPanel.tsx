@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { lineAnchor, type LinesHost } from '../../lib/line-view';
+import type { WinPathsFrom } from '../../lib/win-paths-host';
 import { sequenceNote, winStepViews, type WinStepView } from '../../lib/win-paths-view';
 import { LineConfirm } from './LineConfirm';
 import { LineRows } from './LinesSection';
@@ -10,6 +11,8 @@ interface WinPathsPanelProps {
   doubles: boolean;
   /** The turn picker of the endgame's turns (the Game review's); the turn card searches its own turn and has none. */
   picker?: boolean;
+  /** The place the panel stands in: it shows only a run that place opened (the Game review's panel by default). */
+  from?: WinPathsFrom;
 }
 
 function StepView({ view, turn, host, clicked, onClick }: { view: WinStepView; turn: number; host: LinesHost; clicked: boolean; onClick: () => void }) {
@@ -50,11 +53,11 @@ function statusLine(status: 'positioning' | 'searching' | 'done' | 'failed', tur
  * the order the user ruled (a stronger play, luck, a mistake by the opponent); a step without a find says so in one sentence.
  * ▶ Play opens the line as a variation, with the dice it forces (the replace question stands under the step that was clicked).
  */
-export function WinPathsPanel({ host, playerNames, doubles, picker = true }: WinPathsPanelProps) {
+export function WinPathsPanel({ host, playerNames, doubles, picker = true, from = 'review' }: WinPathsPanelProps) {
   const { winPaths } = host;
   const [clicked, setClicked] = useState<string | null>(null);
   const run = winPaths?.run;
-  if (!winPaths || !run || !winPaths.endgame) return null;
+  if (!winPaths || !run || run.from !== from || !winPaths.endgame) return null;
   const { turns } = winPaths.endgame;
   const player = playerNames[run.side === 'p1' ? 0 : 1];
   const views = winStepViews(run.steps, { turn: run.turn, playerNames, doubles, host, side: run.side, playedLabel: winPaths.playedLabel(run.turn), playedNeverActed: winPaths.playedNeverActed?.(run.turn) });
@@ -69,7 +72,7 @@ export function WinPathsPanel({ host, playerNames, doubles, picker = true }: Win
       {picker && turns.length > 1 && (
         <div className="ps-winpaths-turns" role="group" aria-label="Endgame turn">
           {turns.map(turn => (
-            <button key={turn} type="button" className="ps-btn ps-eval-inline-btn" aria-pressed={turn === run.turn} disabled={!!winPaths.unavailable} onClick={() => winPaths.show(turn)}>
+            <button key={turn} type="button" className="ps-btn ps-eval-inline-btn" aria-pressed={turn === run.turn} disabled={!!winPaths.unavailable} onClick={() => winPaths.show(turn, run.from)}>
               T{turn}
             </button>
           ))}

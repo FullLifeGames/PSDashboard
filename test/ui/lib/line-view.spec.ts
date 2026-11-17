@@ -26,6 +26,16 @@ describe('lineBlocks', () => {
     ]);
   });
 
+  // Round 89 (X1a part 1): the played line of a body that never acted is the line of its stand-in; the head does not say it was played.
+  test('the head of a line of a body knocked out before it moved says staying in, never that it was played', () => {
+    const asNever = { ...singles, neverActed: { p2: true } };
+    expect(lineBlocks([playedLine], asNever)[0].role).toBe('staying in: Hyper Voice');
+    expect(lineBlocks([{ ...playedLine, for: ['engine', 'played'] }], asNever)[0].role).toBe('engine: Hyper Voice');
+    expect(lineBlocks([singlesLine], asNever)[0].role).toBe('engine: Hydro Pump');
+    // the other side of the same turn keeps its words
+    expect(lineBlocks([bothRolesLine], asNever)[0].role).toBe('played the engine\'s move: Draining Kiss');
+  });
+
   test('chips name the dice that could have gone the other way and nothing quiet (3a)', () => {
     const [block] = lineBlocks([singlesLine], singles);
     const chips = block.rows.map(row => row.sides.map(side => side.chips));
@@ -109,6 +119,22 @@ describe('lineBlocks: the tester\'s smaller items', () => {
     // a move with one target keeps its plain subject
     const single = lineBlocks([lineOf([stepWith([dice[0]])])], doubles)[0];
     expect(single.rows[0].sides[0].chips).toEqual(['Rock Slide: hits (90%)']);
+  });
+
+  // Round 89 (X1a part 3, 2630685175 T7): a Protect that fails at 67 percent decided the turn; its chip shows, in singles and in doubles.
+  const stallOn = (line: EvalLine, side: 'p1' | 'p2', at: number, slot: string): EvalLine => {
+    const die: ForcedDie = { name: { slot, moveId: 'protect', kind: 'stalling', effectId: 'protect' }, result: { happens: false } };
+    const [first, ...later] = line.steps;
+    const choice = first[side];
+    const slots = choice.slots.map((entry, index) => (index === at && entry?.kind === 'move' ? { ...entry, moveId: 'protect', moveName: 'Protect', dice: [die] } : entry));
+    return { ...line, steps: [{ ...first, [side]: { ...choice, slots }, dice: [{ die, chance: 2 / 3, shown: true }] }, ...later] };
+  };
+  test.each([
+    ['singles', singles, stallOn(singlesLine, 'p2', 0, 'p2a')],
+    ['doubles', doubles, stallOn(doublesLine, 'p2', 1, 'p2b')],
+  ] as const)('a stalling move that fails shows its chip, %s', (_kind, ctx, line) => {
+    const [block] = lineBlocks([line], ctx);
+    expect(block.rows.flatMap(row => row.sides.flatMap(side => side.chips))).toContain('Protect: fails (67%)');
   });
 
   test('the dice of a replacement inside a turn are filed under that turn, not under "Replacement:"', () => {

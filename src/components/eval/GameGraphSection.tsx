@@ -100,6 +100,8 @@ interface TurnViewProps {
   playerNames: [string, string];
   reads?: { p1?: ReadRecommendation | null; p2?: ReadRecommendation | null } | null;
   onPickChoice?: (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice | null, from?: EvalResult | null) => void;
+  /** Round 89 (B7a): a cell of the card's matrix dialog plays its pair out (the panel's handler, the overview's). */
+  onPickPair?: (p1: { choice: string; label: string }, p2: { choice: string; label: string }) => void;
   /** Round 89 (#104): what the Lines section under the turn's rows needs of its host (absent: no section). */
   linesHost?: LinesHost;
   /** Doubles replay: auto routes per game type, and the Lines section writes one row per player (EvalPanel passes its own prop through). */
@@ -108,7 +110,7 @@ interface TurnViewProps {
   openTurn?: number | null;
 }
 
-function TurnView({ report, onBackToReport, onBackToMain, result, currentTurn, graph, analyzeTurn, hasAnalyzeTurn, leadAnalysis, analysis, playerNames, reads, onPickChoice, linesHost, doubles, openTurn }: TurnViewProps) {
+function TurnView({ report, onBackToReport, onBackToMain, result, currentTurn, graph, analyzeTurn, hasAnalyzeTurn, leadAnalysis, analysis, playerNames, reads, onPickChoice, onPickPair, linesHost, doubles, openTurn }: TurnViewProps) {
   return (
     <>
       {report && (
@@ -150,7 +152,7 @@ function TurnView({ report, onBackToReport, onBackToMain, result, currentTurn, g
       {!leadAnalysis && analysis && <ReplacementNote analysis={analysis} graph={graph} playerNames={playerNames} />}
       {!leadAnalysis && analysis && (
         <EvalTurnAnalysis
-          analysis={analysis} playerNames={playerNames} reads={reads} onExplore={onPickChoice}
+          analysis={analysis} playerNames={playerNames} reads={reads} onExplore={onPickChoice} onPickPair={onPickPair}
           result={graph.results[analysis.turn - 1] ?? null} linesHost={linesHost} doubles={doubles}
           open={analysis.turn === openTurn}
         />

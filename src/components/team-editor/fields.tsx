@@ -32,7 +32,7 @@ export function AbilityField({ entry, index, pools, draft }: FieldProps) {
   return (
     <div>
       <FieldCaption>
-        Ability ({sourceLabel(entry.ability.source, entry.ability.probability)})
+        Ability ({sourceLabel(entry.ability.source, entry.ability.probability, entry.ability.sourceDetail)})
       </FieldCaption>
       {pools && (pools.abilitiesBySpecies[entry.species]?.length ?? 0) > 0 ? (
         <select
@@ -78,7 +78,7 @@ export function ItemField({ entry, index, pools, draft }: FieldProps) {
   return (
     <div>
       <FieldCaption>
-        Item ({sourceLabel(entry.item.source, entry.item.probability)})
+        Item ({sourceLabel(entry.item.source, entry.item.probability, entry.item.sourceDetail)})
       </FieldCaption>
       <ComboBox
         options={pools?.items ?? []}
@@ -107,7 +107,7 @@ export function TeraField({ entry, index, pools, draft }: FieldProps) {
   return (
     <div>
       <FieldCaption>
-        Tera Type ({sourceLabel(entry.teraType.source, entry.teraType.probability)})
+        Tera Type ({sourceLabel(entry.teraType.source, entry.teraType.probability, entry.teraType.sourceDetail)})
       </FieldCaption>
       {pools && pools.teraTypes.length > 0 ? (
         <select
@@ -141,7 +141,7 @@ export function NatureField({ entry, index, pools, draft }: FieldProps) {
   return (
     <div>
       <FieldCaption>
-        Nature ({sourceLabel(entry.nature?.source ?? 'unknown', entry.nature?.probability)})
+        Nature ({sourceLabel(entry.nature?.source ?? 'unknown', entry.nature?.probability, entry.nature?.sourceDetail)})
       </FieldCaption>
       {pools ? (
         <select
@@ -183,7 +183,7 @@ export function EvGrid({ entry, index, draft }: Omit<FieldProps, 'pools'>) {
   return (
     <div style={{ marginBottom: 6 }}>
       <FieldCaption>
-        EVs ({sourceLabel(entry.evs.source, entry.evs.probability)})
+        EVs ({sourceLabel(entry.evs.source, entry.evs.probability, entry.evs.sourceDetail)})
       </FieldCaption>
       <div className="ps-ev-grid">
         {EV_STATS.map(stat => (

@@ -110,7 +110,7 @@ function EvaluateButton({ running, onEvaluate, onCancel, result, status }: {
 
 /** The panel header: title, the engine preferences, and the Evaluate/Cancel entry. */
 /** Round 89 (#153): what the setting changes and where; the grades stay as they are. */
-export const HARD_MODE_TITLE = 'The opponent answers each move you play with the reply the search rates lowest for it: when you click an engine move, in the turn dock, and in the lines. Grades stay as they are. A change applies from your next pick.';
+export const HARD_MODE_TITLE = 'The opponent answers each move you play with the reply the search rates lowest for it: when you click an engine move, in the turn dock once you pick a move, and in the lines. Grades stay as they are. A change applies from your next pick.';
 
 export function EvalControls({ prefs, onPrefsChange, running, showAuto, showTera, onEvaluate, onCancel, result, status, engines }: PrefsProps & {
   showAuto: boolean;

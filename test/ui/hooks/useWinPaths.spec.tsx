@@ -76,7 +76,7 @@ describe('useWinPaths', () => {
     expect(tie.result.current.endgame).toBeNull();
     const early = renderHook(() => useWinPaths(app({ snapshots: SNAPSHOTS.slice(0, 2) }), REPLAY('g3')));
     expect(early.result.current.endgame).toBeNull();
-    act(() => early.result.current.show(2));
+    act(() => early.result.current.show(2, 'review'));
     await flush();
     expect(calls).toHaveLength(0);
     expect(early.result.current.run).toBeNull();
@@ -86,8 +86,8 @@ describe('useWinPaths', () => {
     const { result: hook } = renderHook(() => useWinPaths(app(), REPLAY('g4', 'BKC')));
     // BKC won: devin (p2) lost
     expect(hook.current.endgame?.loser).toBe('p2');
-    act(() => hook.current.show(3));
-    expect(hook.current.run).toMatchObject({ turn: 3, side: 'p2', steps: [], status: 'positioning' });
+    act(() => hook.current.show(3, 'review'));
+    expect(hook.current.run).toMatchObject({ turn: 3, side: 'p2', steps: [], status: 'positioning', from: 'review' });
     await flush();
     expect(hook.current.run?.status).toBe('searching');
     expect(calls).toHaveLength(1);
@@ -113,7 +113,7 @@ describe('useWinPaths', () => {
 
   test('closing the panel stops the worker, and a late step of that search is dropped', async () => {
     const { result: hook } = renderHook(() => useWinPaths(app(), REPLAY('g5')));
-    act(() => hook.current.show(3));
+    act(() => hook.current.show(3, 'review'));
     await flush();
     const [call] = calls;
     act(() => hook.current.hide());
@@ -124,11 +124,19 @@ describe('useWinPaths', () => {
     expect(hook.current.run).toBeNull();
   });
 
+  test('the run remembers the place that opened it: the turn card or the Game review', () => {
+    const { result: hook } = renderHook(() => useWinPaths(app(), REPLAY('g4', 'BKC')));
+    act(() => hook.current.show(3, 'card'));
+    expect(hook.current.run).toMatchObject({ turn: 3, from: 'card' });
+    act(() => hook.current.show(3, 'review'));
+    expect(hook.current.run).toMatchObject({ turn: 3, from: 'review' });
+  });
+
   test('asking for another turn stops the first search; only the second one\'s steps are shown', async () => {
     const { result: hook } = renderHook(() => useWinPaths(app(), REPLAY('g6')));
-    act(() => hook.current.show(3));
+    act(() => hook.current.show(3, 'review'));
     await flush();
-    act(() => hook.current.show(4));
+    act(() => hook.current.show(4, 'review'));
     await flush();
     expect(calls).toHaveLength(2);
     expect(calls[0].signal.aborted).toBe(true);
@@ -140,7 +148,7 @@ describe('useWinPaths', () => {
 
   test('a job that breaks reads failed', async () => {
     const { result: hook } = renderHook(() => useWinPaths(app(), REPLAY('g7')));
-    act(() => hook.current.show(3));
+    act(() => hook.current.show(3, 'review'));
     await flush();
     await act(async () => { calls[0].fail(new Error('the worker broke')); });
     expect(hook.current.run?.status).toBe('failed');
@@ -148,7 +156,7 @@ describe('useWinPaths', () => {
 
   test('a position that cannot be rebuilt reads failed and starts no worker', async () => {
     const { result: hook } = renderHook(() => useWinPaths(app({ acquire: () => Promise.reject(new Error('no position')) }), REPLAY('g8')));
-    act(() => hook.current.show(3));
+    act(() => hook.current.show(3, 'review'));
     await flush();
     expect(hook.current.run?.status).toBe('failed');
     expect(calls).toHaveLength(0);
@@ -156,7 +164,7 @@ describe('useWinPaths', () => {
 
   test('another replay shows no search of the previous one, and stops it', async () => {
     const { result: hook, rerender } = renderHook(({ replay }) => useWinPaths(app(), replay), { initialProps: { replay: REPLAY('g9') } });
-    act(() => hook.current.show(3));
+    act(() => hook.current.show(3, 'review'));
     await flush();
     expect(hook.current.run).not.toBeNull();
     rerender({ replay: REPLAY('g10') });
@@ -171,7 +179,7 @@ describe('useWinPaths', () => {
 
   test('leaving the page stops the search and ends the client', async () => {
     const { result: hook, unmount } = renderHook(() => useWinPaths(app(), REPLAY('g12')));
-    act(() => hook.current.show(3));
+    act(() => hook.current.show(3, 'review'));
     await flush();
     unmount();
     expect(calls[0].signal.aborted).toBe(true);

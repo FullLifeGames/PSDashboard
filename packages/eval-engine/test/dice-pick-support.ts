@@ -3,7 +3,7 @@ import { RecordingPRNG } from '../src/dice/prng';
 import type { DieName, Draw } from '../src/dice/types';
 import { watchBattle } from '../src/dice/watch';
 import { copyOf } from '../src/sim-ask/copy';
-import { dexOfRules } from './dice-sweep-support';
+import { clicksAccepted, dexOfRules } from './dice-sweep-support';
 import { mon, playClicks, sweepSelection, SWEEPS_FULL, type Mode, type Rules } from './dice-fixtures';
 import { battleOf } from './power-oracle';
 
@@ -111,4 +111,19 @@ export function sweepItems(rules: Rules) {
   const dex = dexOfRules(rules);
   const legal = dex.items.all().filter(item => item.exists && item.gen <= dex.gen && (item.isNonstandard === null || item.isNonstandard === undefined || item.isNonstandard === 'Past'));
   return sweepSelection(legal, SWEEPS_FULL ? undefined : 'pool');
+}
+
+/**
+ * Round 89 (#137, X1a): the scene where a click bends. The user's first turn plays `moveId` with the click `first`; the second
+ * turn clicks Splash while the faster foe's Encore lands on it first and bends the click to the last move used, a click with no target.
+ * Null when the simulator refuses a click (a move with an unmet condition).
+ */
+export function bentScene(input: { rules: Rules; mode: Mode; vgc: boolean }, moveId: string, first: string): { board: Battle; clicks: { p1: string; p2: string } } | null {
+  const { rules, mode, vgc } = input;
+  const board = pickBoard({ rules, mode, vgc, attacker: [moveId, 'splash'], foe: ['encore', 'splash'] });
+  const opening = pickClicks(mode, first, 'move 2');
+  if (!clicksAccepted(board, opening)) return null;
+  playClicks(board, opening);
+  const clicks = pickClicks(mode, 'move 2', mode === 'singles' ? 'move 1' : 'move 1 1');
+  return clicksAccepted(board, clicks) ? { board, clicks } : null;
 }

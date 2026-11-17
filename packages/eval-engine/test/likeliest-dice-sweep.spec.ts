@@ -9,9 +9,9 @@ import { dieKey, type Draw, type ForcedDie } from '../src/dice/types';
 import { copyOf } from '../src/sim-ask/copy';
 import { EFFECT_SPORE, END_ROWS, endBoard, present, PROCS, procBoard } from './dice-ability-support';
 import { moverBoard, moverClicks, moversOf, tieBoard, tieClicks } from './dice-order-support';
-import { playClicks, stableLog, standing, sweepSelection, type Mode } from './dice-fixtures';
+import { playClicks, standing, sweepSelection, type Mode } from './dice-fixtures';
 import { CHECK_MOVES, CHECKS } from './dice-status-support';
-import { dexOfRules, isCharge, SWEEP_CASES, sweepBoard, sweepClicks, sweepMoves, type DexMove } from './dice-sweep-support';
+import { dexOfRules, isCharge, SWEEP_CASES, sameEffects, sweepBoard, sweepClicks, sweepMoves, type DexMove } from './dice-sweep-support';
 
 // Round 89 (#104), step G2: the likeliest result of each die, and a turn played with every die at it (dice/likeliest.ts). The sweep
 // plays every Dex entry of the kinds that draw a die, in every rule set the corpus plays (Gens 1 to 9, the Champions mod), singles and
@@ -20,7 +20,9 @@ import { dexOfRules, isCharge, SWEEP_CASES, sweepBoard, sweepClicks, sweepMoves,
 //   - two passes over the same turn name the same dice (determinism);
 //   - the dice the pass lists, replayed through `playForcedTurn` under two other seeds, give the log the pass played: the line does not
 //     depend on the seed. Where a log does differ, the pass says so (`unnamed` draws or an `unforced` die): a draw no die names, a
-//     duration or a target picked at random, stays with the stream and the line marks itself;
+//     duration or a target picked at random, stays with the stream and the line marks itself (the log is read as its effects read
+//     it: a spread move's `|move|` line names the body the simulator sampled, which no effect reads, and two bodies of one speed take
+//     their end-of-turn damage in a shuffled order, which leaves the same bodies: `sameEffects`);
 //   - every result is the likeliest by the simulator's own data: an accuracy die takes the Dex's accuracy (a hit above 50), a
 //     secondary the entry's chance, the damage roll its middle step, a hit count a count of the move's range; a status check, a proc,
 //     an end-of-turn die, a first mover and a speed tie as their rows below read them.
@@ -53,12 +55,11 @@ function pass(board: Battle, play: (battle: Battle) => void, row: string): Likel
   const again = playLikeliestTurn(board, play);
   expect(again.dice.map(entry => [dieKey(entry.die.name), entry.die.result]), `${row}: the pass is deterministic`).toEqual(turn.dice.map(entry => [dieKey(entry.die.name), entry.die.result]));
   const forced: ForcedDie[] = turn.dice.map(entry => entry.die);
-  const played = stableLog(turn.battle);
   for (const seed of SEEDS) {
     const copy = copyOf(board);
     copy.prng = new PRNG(seed as ConstructorParameters<typeof PRNG>[0]);
     playForcedTurn({ live: copy, forced, play });
-    if (stableLog(copy) !== played) {
+    if (!sameEffects(copy, turn.battle)) {
       expect(turn.unnamed + turn.unforced.length, `${row}: the log depends on seed ${seed}, so the pass must say that a draw stays with the stream`).toBeGreaterThan(0);
     }
   }

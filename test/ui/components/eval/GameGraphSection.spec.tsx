@@ -119,6 +119,17 @@ describe('GameGraphSection', () => {
     expect(screen.queryByText('Turn 3')).toBeNull();
   });
 
+  test('B7a: the turn card of the section opens the matrix of the turn\'s own result and a cell click reaches the panel\'s pair handler', async () => {
+    const onPickPair = vi.fn();
+    const graph = evalGraph();
+    render(<GameGraphSection {...props({ graph, analysis: turnAnalysis(3), onPickPair })} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Open matrix' }));
+    expect(screen.getByRole('dialog', { name: "Turn 3 · Alice's choices against Bob's" })).toBeInTheDocument();
+    await userEvent.click(screen.getByTitle(/^Earthquake × Leech Seed:/));
+    expect(onPickPair).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
   test('the decided strip stands only where the bar backs the sweep (round 50)', () => {
     // 649664 t15 to t22 named Medicham-Mega for p2 under a bar leaning to p1; t23 stood at 0.89 for p2.
     const graph = evalGraph();

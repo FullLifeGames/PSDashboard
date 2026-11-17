@@ -4,7 +4,9 @@ import userEvent from '@testing-library/user-event';
 import { formatRead, summarizeTurn, winDeltaText, winPctText } from '@fulllifegames/eval-engine';
 import { EvalLeadAnalysis, EvalTurnAnalysis } from '../../../src/components/EvalTurnAnalysis';
 import { leadAnalysis, misplayedSide, sideAnalysis, turnAnalysis } from '../fixtures/analysis';
-import { rankedChoice } from '../fixtures/eval-result';
+import { evalResult, rankedChoice } from '../fixtures/eval-result';
+import { doublesLine, playedLine } from '../fixtures/lines';
+import type { WinPathsRun } from '../../../src/lib/win-paths-host';
 
 const names: [string, string] = ['Alice', 'Bob'];
 
@@ -112,6 +114,35 @@ describe('EvalTurnAnalysis', () => {
 });
 
 describe('EvalLeadAnalysis', () => {
+  test.each(['singles', 'doubles'] as const)('B7a, %s: the card offers Open matrix beside the turn header only with a matrix, on a played turn and on an open tip', async kind => {
+    const analysis = turnAnalysis(4);
+    const { rerender } = render(<EvalTurnAnalysis analysis={analysis} playerNames={names} result={evalResult(kind)} />);
+    const button = screen.getByRole('button', { name: 'Open matrix' });
+    expect(button).toHaveClass('ps-btn', 'ps-eval-inline-btn');
+    expect(screen.getByText('Turn 4').parentElement).toContainElement(button);
+    await userEvent.click(button);
+    expect(screen.getByRole('dialog', { name: "Turn 4 · Alice's choices against Bob's" })).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+
+    rerender(<EvalTurnAnalysis analysis={analysis} playerNames={names} result={evalResult(kind, { matrix: undefined })} />);
+    expect(screen.queryByRole('button', { name: 'Open matrix' })).toBeNull();
+    rerender(<EvalTurnAnalysis analysis={analysis} playerNames={names} result={null} />);
+    expect(screen.queryByRole('button', { name: 'Open matrix' })).toBeNull();
+
+    rerender(<EvalTurnAnalysis analysis={analysis} playerNames={names} result={evalResult(kind)} open />);
+    expect(screen.getByRole('button', { name: 'Open matrix' })).toBeInTheDocument();
+    rerender(<EvalTurnAnalysis analysis={analysis} playerNames={names} result={evalResult(kind, { matrix: undefined })} open />);
+    expect(screen.queryByRole('button', { name: 'Open matrix' })).toBeNull();
+  });
+
+  test('B7a: a cell of the card\'s matrix dialog plays the pair through the card\'s handler', async () => {
+    const onPickPair = vi.fn();
+    render(<EvalTurnAnalysis analysis={turnAnalysis(4)} playerNames={names} result={evalResult('singles')} onPickPair={onPickPair} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Open matrix' }));
+    await userEvent.click(screen.getByTitle(/^Earthquake × Leech Seed:/));
+    expect(onPickPair).toHaveBeenCalledWith({ choice: 'move earthquake', label: 'Earthquake' }, { choice: 'move leechseed', label: 'Leech Seed' });
+  });
+
   test('grades both sides\' lead decisions', () => {
     render(<EvalLeadAnalysis leads={leadAnalysis()} playerNames={names} />);
     expect(screen.getByText('Team preview')).toBeInTheDocument();
@@ -154,13 +185,13 @@ describe('EvalLeadAnalysis', () => {
 });
 
 describe('EvalTurnAnalysis, the endgame entry (round 89, #130)', () => {
-  const winPaths = (turns: number[]) => ({ endgame: { loser: 'p2' as const, turns }, run: null, unavailable: null, playedLabel: () => null, show: vi.fn(), hide: vi.fn() });
+  const winPaths = (turns: number[], run: WinPathsRun | null = null) => ({ endgame: { loser: 'p2' as const, turns }, run, unavailable: null, playedLabel: () => null, show: vi.fn(), hide: vi.fn() });
 
   test.each([false, true])('an endgame turn of the card (doubles %s) asks how the player who lost could have won from here', async doubles => {
     const host = { rules: { gen: 9, mod: undefined }, winPaths: winPaths([4, 5]) };
     render(<EvalTurnAnalysis analysis={turnAnalysis(4)} playerNames={names} linesHost={host} doubles={doubles} />);
     await userEvent.click(screen.getByRole('button', { name: 'How could Bob have won from here?' }));
-    expect(host.winPaths.show).toHaveBeenCalledWith(4);
+    expect(host.winPaths.show).toHaveBeenCalledWith(4, 'card');
   });
 
   test('a turn before the endgame has no such question', () => {
@@ -170,3 +201,96 @@ describe('EvalTurnAnalysis, the endgame entry (round 89, #130)', () => {
   });
 });
 
+/** The user's note on X1 (ruling 39): the Lines section and the win-path view start closed, like the Explanation. */
+describe.each([
+  ['singles', false, { ...evalResult('singles'), lines: [playedLine] }],
+  ['doubles', true, { ...evalResult('doubles'), lines: [{ ...doublesLine, for: ['played' as const] }] }],
+] as const)('EvalTurnAnalysis, closed sections, %s', (_kind, doubles, result) => {
+  const rules = { gen: 9, mod: undefined };
+  const winRun = (turn: number, from: WinPathsRun['from']): WinPathsRun => ({ turn, side: 'p2', steps: [], status: 'done', from });
+  const winPaths = (run: WinPathsRun | null = null) => ({ endgame: { loser: 'p2' as const, turns: [4, 5] }, run, unavailable: null, playedLabel: () => null, show: vi.fn(), hide: vi.fn() });
+
+  test('the Lines section sits closed under a toggle: aria-controls its body, a click or the keyboard opens it, every turn starts closed', async () => {
+    const host = { rules, onPlay: vi.fn() };
+    const { rerender } = render(<EvalTurnAnalysis analysis={turnAnalysis(4)} playerNames={names} linesHost={host} result={result} doubles={doubles} />);
+    const toggle = screen.getByRole('button', { name: 'Lines' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    const body = document.getElementById(toggle.getAttribute('aria-controls')!)!;
+    expect(body).not.toBeVisible();
+    expect(document.querySelector('.ps-eval-line-block')).toBeNull();
+    expect(screen.queryByRole('button', { name: '▶ Play' })).toBeNull();
+
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(body).toBeVisible();
+    expect(screen.getByRole('button', { name: '▶ Play' })).toBeVisible();
+    await userEvent.keyboard('{Enter}');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('button', { name: '▶ Play' })).toBeNull();
+    await userEvent.keyboard(' ');
+    expect(screen.getByRole('button', { name: '▶ Play' })).toBeVisible();
+
+    rerender(<EvalTurnAnalysis analysis={turnAnalysis(5)} playerNames={names} linesHost={host} result={result} doubles={doubles} />);
+    expect(screen.getByRole('button', { name: 'Lines' })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('button', { name: '▶ Play' })).toBeNull();
+  });
+
+  test('an open Lines section stays open while its result goes away and comes back; a turn away and back starts closed again', async () => {
+    const host = { rules, onPlay: vi.fn() };
+    const card = (turn: number, shown: typeof result | null) => <EvalTurnAnalysis analysis={turnAnalysis(turn)} playerNames={names} linesHost={host} result={shown} doubles={doubles} />;
+    const { rerender } = render(card(4, result));
+    await userEvent.click(screen.getByRole('button', { name: 'Lines' }));
+    rerender(card(4, null));
+    expect(screen.queryByRole('button', { name: 'Lines' })).toBeNull();
+    rerender(card(4, result));
+    expect(screen.getByRole('button', { name: 'Lines' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: '▶ Play' })).toBeVisible();
+    rerender(card(5, result));
+    rerender(card(4, result));
+    expect(screen.getByRole('button', { name: 'Lines' })).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  test('a closed Lines section builds nothing: the host is read only after the toggle opens', async () => {
+    const reads = vi.fn(() => rules);
+    const host = Object.defineProperty({}, 'rules', { get: reads, enumerable: true }) as { rules: typeof rules };
+    render(<EvalTurnAnalysis analysis={turnAnalysis(4)} playerNames={names} linesHost={host} result={result} doubles={doubles} />);
+    expect(reads).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: 'Lines' }));
+    expect(reads).toHaveBeenCalled();
+  });
+
+  test('a card without a result has no Lines toggle', () => {
+    render(<EvalTurnAnalysis analysis={turnAnalysis(4)} playerNames={names} linesHost={{ rules }} doubles={doubles} />);
+    expect(screen.queryByRole('button', { name: 'Lines' })).toBeNull();
+  });
+
+  test('the win-path question is a closed toggle: a click asks the host for the card\'s run, and the panel shows for that run only', async () => {
+    const closed = { rules, winPaths: winPaths() };
+    const { rerender } = render(<EvalTurnAnalysis analysis={turnAnalysis(4)} playerNames={names} linesHost={closed} doubles={doubles} />);
+    const toggle = screen.getByRole('button', { name: 'How could Bob have won from here?' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('region')).toBeNull();
+    await userEvent.click(toggle);
+    expect(closed.winPaths.show).toHaveBeenCalledWith(4, 'card');
+
+    const opened = { rules, winPaths: winPaths(winRun(4, 'card')) };
+    rerender(<EvalTurnAnalysis analysis={turnAnalysis(4)} playerNames={names} linesHost={opened} doubles={doubles} />);
+    const open = screen.getByRole('button', { name: 'How could Bob have won from here?' });
+    expect(open).toHaveAttribute('aria-expanded', 'true');
+    expect(open).toHaveAttribute('aria-controls', screen.getByRole('region', { name: 'How could Bob have won?' }).parentElement!.id);
+    await userEvent.click(open);
+    expect(opened.winPaths.hide).toHaveBeenCalled();
+
+    // the next endgame turn starts closed: the open run is the other turn's
+    rerender(<EvalTurnAnalysis analysis={turnAnalysis(5)} playerNames={names} linesHost={opened} doubles={doubles} />);
+    expect(screen.getByRole('button', { name: 'How could Bob have won from here?' })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('region')).toBeNull();
+  });
+
+  test('a run the Game review opened does not open the card of the same turn', () => {
+    const host = { rules, winPaths: winPaths(winRun(4, 'review')) };
+    render(<EvalTurnAnalysis analysis={turnAnalysis(4)} playerNames={names} linesHost={host} doubles={doubles} />);
+    expect(screen.getByRole('button', { name: 'How could Bob have won from here?' })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('region')).toBeNull();
+  });
+});
