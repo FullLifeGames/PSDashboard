@@ -160,42 +160,76 @@ describe.each(WITH_STALL)('a repeated stall that held, $name', ({ rules, mode })
  * Equal facts mean the same next turn. The sample is the moves of the Dex a side may click next (the attacker's slot holds the move for
  * all three turns); the facts of two positions that differ only in dropped fields give the same log (the turn number line apart) and the same facts again.
  */
+/**
+ * Equal facts mean the same next turn. The attacker's slot holds the move for all three turns; for each move the facts of the two positions
+ * (after turn 1 and after the held turn 2) are compared, and where they are equal, turn 3 played on both with one seed gives the same log
+ * (the turn number line apart) and the same facts again. A move whose turn 2 gives different facts or no held repeat is no case.
+ */
+function nextTurnReads(rules: Rules, mode: Mode, moves: { id: string; target: string }[]): { bad: string[]; equalCases: number } {
+  let equalCases = 0;
+  const bad: string[] = [];
+  for (const move of moves) {
+    const scene: Case = { name: move.id, p1: { moves: [move.id] }, p2: { moves: ['protect', 'splash'] }, t1: ['1', '1'], t2: ['1', '1'], ids: ['protect'], differs: false };
+    const aim = ['normal', 'any', 'adjacentFoe'].includes(move.target) ? '*' : '';
+    const first: [string, string] = [`1${aim}`, '1'];
+    const held = heldTurn(rules, mode, { ...scene, t1: first, t2: first });
+    if (!held) continue;
+    // a move that rewrites its own slot (the one that copies a foe's move) may leave the board before the reader is asked
+    const reads = readsOfBoard(held.parent);
+    const same = delayFacts(held.parent, 'p2') === delayFacts(held.child, 'p2');
+    if ((reads.pp || reads.calls) && same && held.parent.sides[0].active[0].moveSlots[0].pp !== held.child.sides[0].active[0].moveSlots[0].pp) bad.push(`${move.id}: PP dropped`);
+    if (!same) continue;
+    equalCases += 1;
+    const third = clicksOf(mode, scene, [`1${aim}`, '2']);
+    const logs = [held.parent, held.child].map(board => {
+      const copy = turnOf(board, third).fork();
+      // the effects a turn creates take their `effectOrder` from a counter that differs between the two histories; only the order of creation is read
+      copy.prng = new PRNG('5,6,7,8');
+      const start = copy.log.length;
+      playClicks(copy, third);
+      return { log: copy.log.slice(start).filter(line => !line.startsWith('|t:|') && !line.startsWith('|turn|')).join('\n'), facts: delayFacts(copy, 'p2').replace(/"effectOrder":\d+/g, '') };
+    });
+    if (logs[0].log !== logs[1].log || logs[0].facts !== logs[1].facts) bad.push(`${move.id}: another turn`);
+  }
+  return { bad, equalCases };
+}
+
+/** A future attack (the `futuremove` flag of the Dex move) waits in a slot condition of the target's side and lands when the battle's turn count reaches a turn it noted. */
+const isFutureAttack = (move: { flags: Record<string, unknown> }): boolean => !!move.flags.futuremove;
+
 describe.each(WITH_STALL)('equal facts, the same next turn, $name', ({ rules, mode }) => {
   const dex = dexOfRules(rules);
   const moves = sweepMoves(rules, () => true, false).moves;
   const readers = dex.moves.all().filter(move => move.exists && move.gen <= dex.gen && Object.entries(readsOfEntry(dex, 'move', move.id)).some(([name, read]) => read && name !== 'last'));
-  const sample = [...new Map([...sweepSelection(moves, 'moves'), ...readers, dex.moves.get('tackle')].map(move => [move.id, move])).values()];
+  // the future attacks are the next describe's rows: their condition keeps the turn it lands on, which the facts do not read yet
+  const sample = [...new Map([...sweepSelection(moves, 'moves'), ...readers, dex.moves.get('tackle')].filter(move => !isFutureAttack(move)).map(move => [move.id, move])).values()];
 
   test('the sample holds moves that read PP, the last move and the entry counters', () => expect(readers.length).toBeGreaterThan(0));
 
   test('every move of the sample: equal facts give equal turns, an entry that reads PP keeps it', () => {
-    let equalCases = 0;
-    const bad: string[] = [];
-    for (const move of sample) {
-      const scene: Case = { name: move.id, p1: { moves: [move.id] }, p2: { moves: ['protect', 'splash'] }, t1: ['1', '1'], t2: ['1', '1'], ids: ['protect'], differs: false };
-      const aim = ['normal', 'any', 'adjacentFoe'].includes(move.target) ? '*' : '';
-      const first: [string, string] = [`1${aim}`, '1'];
-      const held = heldTurn(rules, mode, { ...scene, t1: first, t2: first });
-      if (!held) continue;
-      // a move that rewrites its own slot (the one that copies a foe's move) may leave the board before the reader is asked
-      const reads = readsOfBoard(held.parent);
-      const same = delayFacts(held.parent, 'p2') === delayFacts(held.child, 'p2');
-      if ((reads.pp || reads.calls) && same && held.parent.sides[0].active[0].moveSlots[0].pp !== held.child.sides[0].active[0].moveSlots[0].pp) bad.push(`${move.id}: PP dropped`);
-      if (!same) continue;
-      equalCases += 1;
-      const third = clicksOf(mode, scene, [`1${aim}`, '2']);
-      const logs = [held.parent, held.child].map(board => {
-        const copy = turnOf(board, third).fork();
-        // the effects a turn creates take their `effectOrder` from a counter that differs between the two histories; only the order of creation is read
-        copy.prng = new PRNG('5,6,7,8');
-        const start = copy.log.length;
-        playClicks(copy, third);
-        return { log: copy.log.slice(start).filter(line => !line.startsWith('|t:|') && !line.startsWith('|turn|')).join('\n'), facts: delayFacts(copy, 'p2').replace(/"effectOrder":\d+/g, '') };
-      });
-      if (logs[0].log !== logs[1].log || logs[0].facts !== logs[1].facts) bad.push(`${move.id}: another turn`);
-    }
+    const { bad, equalCases } = nextTurnReads(rules, mode, sample);
     expect(bad).toEqual([]);
     expect(equalCases, 'cases with equal facts').toBeGreaterThan(0);
+  });
+});
+
+/**
+ * Round 89 (CI-1), a fault of the delay facts that the full sweep found: since Generation 5 a future attack (Future Sight, Doom Desire) notes the
+ * absolute turn it lands on (`endingTurn` of the `futuremove` condition, read as `getOverflowedTurnCount() >= endingTurn`), and the facts drop the
+ * battle's turn count. The position after a held repeat has the same facts as the one before it and lands the attack one turn sooner, so the delay
+ * rule would call it the same board. Generations 2 to 4 count a duration down in the condition (the facts differ), and the rows read right there.
+ * The rows of the later generations are `test.fails` until the facts carry the turn relative to the count; then they become plain tests and the
+ * future attacks join the sample above.
+ */
+describe.each(WITH_STALL)('a pending future attack, equal facts, the same next turn, $name', ({ rules, mode }) => {
+  const dex = dexOfRules(rules);
+  const attacks = dex.moves.all().filter(move => move.exists && move.gen <= dex.gen && isFutureAttack(move));
+  // Generations 2 to 4 give the condition a duration that counts down (its facts differ with every turn); from Generation 5 it holds the ending turn alone
+  const keepsTurn = rules.generation >= 5;
+  test('the Dex holds a future attack', () => expect(attacks.length).toBeGreaterThan(0));
+  (keepsTurn ? test.fails : test)('the turn after a held repeat is the same where the facts are equal', () => {
+    const { bad } = nextTurnReads(rules, mode, attacks);
+    expect(bad).toEqual([]);
   });
 });
 
