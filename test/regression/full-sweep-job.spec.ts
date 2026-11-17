@@ -110,6 +110,10 @@ describe('the two CI jobs that run the specs with DICE_SWEEPS=full', () => {
     // Guards the scan itself: if it stops finding these, an empty list would pass the rows above.
     expect(readers).toContain('packages/eval-engine/test/board-key-readers.spec.ts');
     expect(readers).toContain('packages/eval-engine/test/dice-logged-sweep.spec.ts');
+    // the five parts of the logged sweep (D9b): the support module they share is read through its exports
+    for (const part of ['sweep', 'crit-doubles-a', 'crit-doubles-b', 'crit-singles', 'secondary']) {
+      expect(readers).toContain(part === 'sweep' ? 'packages/eval-engine/test/dice-logged-sweep.spec.ts' : `packages/eval-engine/test/dice-logged-${part}.spec.ts`);
+    }
     expect(readers).toContain('packages/replay-core/test/landed-hit-sweep.spec.ts');
     expect(readers).not.toContain('test/regression/upgrade-checks-dice.spec.ts');
     expect(readers.length).toBeGreaterThan(50);
