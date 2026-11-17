@@ -445,6 +445,12 @@ export interface ForcedWin {
   turns: number;
   mass: number;
   caveat: ForcedWinCaveat;
+  /** Round 89 (P2): the id of the stalling move whose repeats the proof delays (a foe that Protects again only postpones the knock-out). Absent when no cell of the proof leans on a delay. */
+  delay?: string;
+  /** Round 89 (P3): the root choice that proves the win, when the search's own list does not hold it (a sure strike from the legal combinations); absent when the choice is one of the list's. */
+  choice?: string;
+  /** Round 89 (P4): the Dex names the card prints: of `delay` ("Protect"; a result without it says "a repeated stalling move") and of `choice` (the move that strikes first and, in doubles, its partner). */
+  delayName?: string; choiceNames?: { first: string; partner?: string };
   open?: ForcedWinOpen;
   engineScore: number;
   /** Prover states expanded (both side attempts). */
@@ -477,7 +483,8 @@ export interface ForcedWinInput {
   ruleset?: StaticRuleset;
 }
 
-export interface ForcedWinProof {
+/** The prover's answer; `delay`, `choice` and their names (round 89, lane P) are the optional fields of `ForcedWin`, which the proof hands on unchanged. */
+export interface ForcedWinProof extends Pick<ForcedWin, 'delay' | 'choice' | 'delayName' | 'choiceNames'> {
   mass: number;
   turns: number;
   caveat: ForcedWinCaveat;

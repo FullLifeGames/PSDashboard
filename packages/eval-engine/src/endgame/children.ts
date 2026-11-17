@@ -24,7 +24,7 @@ import { boardFacts } from './board-facts.ts';
  * `share` keeps the analytic weight for the prover, `plain` marks the
  * median path. Round 89 (#60): every seed is a slot of the cell's own list (`cellSeeds`), the matrix's slots; the base count stays 5.
  */
-interface EndgameChild {
+export interface EndgameChild {
   position: SimPosition;
   /** Weight normalized over the drawn classes (the solver's blend). */
   weight: number;
@@ -50,6 +50,14 @@ export interface EndgameChildren {
   missing: { key: string; share: number }[];
   /** Class path: the cell's priced events, in the order the class keys join their outcomes. */
   events: CellEvent[];
+  /**
+   * Round 89 (P2): on an unpriced plain cell, the cell read through its recorded dice, as the plain path prices a group whose draws agree:
+   * children with the simulator's own chances, priced from a draw that did not end. Null when the dice do not explain every draw or a die
+   * repeated. The cell stays `unpriced` and keeps its median child for every other reader; the prover's delay rule reads this split in a
+   * cell whose foe repeats a stalling move (`endgame/delay-rule.ts`), nothing else does. A function, so the replay of the turn runs only
+   * where the delay rule asks; it answers the same each time. Absent on a cell that is priced or on the class path.
+   */
+  delaySplit?: () => EndgameChild[] | null;
 }
 
 /**
@@ -115,7 +123,7 @@ interface PricedGroup { children: { position: SimPosition; share: number; ended:
  * is played once the other way (`dice/flip.ts`, the other dice held to the recorded answers). A flip that changes the board facts
  * (`endgame/board-facts.ts`: the memo key without the roll fields and the turn's bookkeeping) is a child whose share is the simulator's
  * own chance of that answer (`randomChance(33, 100)`, one in three for a second Protect), and the recorded turn keeps the product of
- * the chances it drew. Two dice turned together are not played: their share leaves the mass, as a missing class does on the class
+ * the chances it drew; a flipped branch multiplies the chances of the other deciding dice it drew again (round 89, P2). Two dice turned together are not played: their share leaves the mass, as a missing class does on the class
  * path. A flip that changes nothing is dropped. Every draw of the group must land on the facts of one child: a draw that lands on
  * none (a damage roll that decides a Berry, Moody's pick, a sleep's length, a random target) leaves a die no child prices, and the
  * group is unpriced, as a split of the faints is. Round 89 (A6-3a): so is a group whose turn drew one die more than once (a contact
@@ -126,11 +134,15 @@ function pricedGroup(turn: FlipTurn, draws: Draw[], spread: boolean): PricedGrou
   const base = boardFacts(recorded.battle);
   const deciding = recorded.dice.flatMap(die => {
     const flipped = flipTurn(turn, recorded, die);
-    return flipped.took && boardFacts(flipped.battle) !== base ? [{ die, battle: flipped.battle }] : [];
+    return flipped.took && boardFacts(flipped.battle) !== base ? [{ die, battle: flipped.battle, drawn: flipped.drawn }] : [];
   });
   const held = deciding.reduce((product, entry) => product * entry.die.held, 1);
   const children: PricedGroup['children'] = [{ position: toPosition(recorded.battle), share: held, ended: recorded.battle.ended }];
-  for (const { die, battle } of deciding) children.push({ position: toPosition(battle), share: (held / die.held) * die.other, ended: battle.ended, turned: true });
+  // Round 89 (P2): a flipped branch is worth its die's other answer times the recorded chances of the other deciding dice it drew again; a die the
+  // branch never reached (Volcarona's paralysis once Aqua Jet ended the game) is no part of its chance
+  const flippedShare = (entry: (typeof deciding)[number]): number =>
+    deciding.reduce((product, other) => (other !== entry && entry.drawn.has(other.die.key) ? product * other.die.held : product), entry.die.other);
+  for (const entry of deciding) children.push({ position: toPosition(entry.battle), share: flippedShare(entry), ended: entry.battle.ended, turned: true });
   const facts = new Set([base, ...deciding.map(entry => boardFacts(entry.battle))]);
   const unexplained = draws.some(draw => !facts.has(boardFacts(positionBattle(draw.position))));
   // Round 89 (A6-3a, ruling 27.2): a die the turn drew more than once has no single price (the flip turns every draw of it), so no proof runs through the group
@@ -148,13 +160,40 @@ function heldTies(tied: string[][], first: 'p1' | 'p2'): ForcedDie[] {
   return [...dice.values()];
 }
 
+type Group = ReturnType<typeof plainGroup>;
+type Raw = PricedGroup['children'];
+
+/** The children of a priced group, each weighted by its share of the group's shares (`scale` halves a tie order's). */
+const weighed = (children: Raw, scale = 1): EndgameChild[] => {
+  const total = children.reduce((sum, child) => sum + child.share, 0);
+  return children.map(child => ({ position: child.position, weight: (scale * child.share) / total, share: scale * child.share, ended: child.ended, ...(child.turned ? { turned: true as const } : {}) }));
+};
+
+/**
+ * Round 89 (P2): an unpriced group read through its recorded dice, from a draw that did not end (a draw that ended would record the turn
+ * without the die that decides it). Priced when the dice explain every draw and none repeated: a repeated Protect whose draws split
+ * between the hold (the board stays) and the failure (the knock-out) is such a group. Null otherwise.
+ */
+function splitOf(turnAt: (seed: PRNGSeed) => FlipTurn, seeds: PRNGSeed[], group: Group): Raw | null {
+  const open = group.draws.findIndex(draw => !draw.ended);
+  const priced = pricedGroup(turnAt(seeds[open >= 0 ? open : group.index]), group.draws, true);
+  return priced.unpriced ? null : priced.children;
+}
+
+/** A read that runs once, when first asked, and gives the same answer after. */
+const once = <T>(read: () => T): (() => T) => {
+  let answer: { value: T } | null = null;
+  return () => (answer ??= { value: read() }).value;
+};
+
 /**
  * The plain path: the median of `PLAIN_DRAWS` draws (three in singles, five in doubles) for damaging pairs, one draw
  * otherwise. Round 67 (T114): a doubles pair whose order a speed tie decides
  * prices each order as a child of half the weight (the scripted dice put one
  * side's move actions first): the fixed draws resolved doubles-ohko-tie
  * alike, and the prover proved a coin flip with mass 1. Round 89 (A6-2): inside each order (or the one order of a pair without a
- * tie) the group prices its chance dice (`pricedGroup`); a group whose draws split the faints or the end stays unpriced as before.
+ * tie) the group prices its chance dice (`pricedGroup`); a group whose draws split the faints or the end stays unpriced as before,
+ * and carries its read through the recorded dice as `delaySplit` for the prover's delay rule (P2).
  */
 function plainChildren(root: SimPosition, battle: Battle, rootHp: number, p1Choice: string, p2Choice: string): EndgameChildren {
   const count = damagingPair(battle, p1Choice, p2Choice) ? plainDrawCount(battle) : 1;
@@ -163,23 +202,24 @@ function plainChildren(root: SimPosition, battle: Battle, rootHp: number, p1Choi
   const tied = doublesTie(root, battle, p1Choice, p2Choice) ? recordTurn(cellTurn(root, p1Choice, p2Choice, seeds[0])).ties : [];
   if (tied.length > 0) {
     const orders = (['p1', 'p2'] as const).map(first => {
+      const turnAt = (seed: PRNGSeed) => cellTurn(root, p1Choice, p2Choice, seed, heldTies(tied, first));
       const group = plainGroup(seeds.map(seed => drawChild(root, rootHp, p1Choice, p2Choice, seed, { scripts: new Map([[`${first}:tie`, { first }]]) })));
-      if (group.unpriced) return { children: [{ position: group.pick.position, share: 1, ended: group.pick.ended }], unpriced: true, spread: true };
-      return pricedGroup(cellTurn(root, p1Choice, p2Choice, seeds[group.index], heldTies(tied, first)), group.draws, group.spread);
+      if (group.unpriced) return { children: [{ position: group.pick.position, share: 1, ended: group.pick.ended }], unpriced: true, spread: true, split: once(() => splitOf(turnAt, seeds, group)) };
+      const priced = pricedGroup(turnAt(seeds[group.index]), group.draws, group.spread);
+      return { ...priced, split: () => (priced.unpriced ? null : priced.children) };
     });
-    const children = orders.flatMap(order => {
-      const total = order.children.reduce((sum, child) => sum + child.share, 0);
-      return order.children.map(child => ({ position: child.position, weight: (0.5 * child.share) / total, share: 0.5 * child.share, ended: child.ended, ...(child.turned ? { turned: true as const } : {}) }));
+    const delaySplit = once(() => {
+      const parts = orders.map(order => order.split());
+      return parts.some(part => part === null) ? null : parts.flatMap(part => weighed(part!, 0.5));
     });
-    return { children, unpriced: orders.some(order => order.unpriced), plain: true, spread: orders.some(order => order.spread), missing: [], events: [] };
+    return { children: orders.flatMap(order => weighed(order.children, 0.5)), unpriced: orders.some(order => order.unpriced), plain: true, spread: orders.some(order => order.spread), missing: [], events: [], ...(orders.some(order => order.unpriced) ? { delaySplit } : {}) };
   }
   const group = plainGroup(seeds.map(seed => drawChild(root, rootHp, p1Choice, p2Choice, seed)));
   const { pick, unpriced, spread } = group;
-  if (unpriced) return { children: [{ position: pick.position, weight: 1, share: 1, ended: pick.ended }], unpriced, plain: true, spread, missing: [], events: [] };
-  const priced = pricedGroup(cellTurn(root, p1Choice, p2Choice, seeds[group.index]), group.draws, spread);
-  const total = priced.children.reduce((sum, child) => sum + child.share, 0);
-  const children = priced.children.map(child => ({ position: child.position, weight: child.share / total, share: child.share, ended: child.ended, ...(child.turned ? { turned: true as const } : {}) }));
-  return { children, unpriced: priced.unpriced, plain: true, spread: priced.spread, missing: [], events: [] };
+  const turnAt = (seed: PRNGSeed) => cellTurn(root, p1Choice, p2Choice, seed);
+  if (unpriced) return { children: [{ position: pick.position, weight: 1, share: 1, ended: pick.ended }], unpriced, plain: true, spread, missing: [], events: [], delaySplit: once(() => { const split = splitOf(turnAt, seeds, group); return split && weighed(split); }) };
+  const priced = pricedGroup(turnAt(seeds[group.index]), group.draws, spread);
+  return { children: weighed(priced.children), unpriced: priced.unpriced, plain: true, spread: priced.spread, missing: [], events: [] };
 }
 
 /**

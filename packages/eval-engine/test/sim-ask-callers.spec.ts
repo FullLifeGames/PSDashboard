@@ -95,7 +95,9 @@ describe('the callers of the simulator', () => {
     // Round 89 (#108): `action-bound.ts` holds the order rules both read (the places of the logged actions, `loggedActions`) and the bound of a
     // body that fell before it acted (`ruledOutMoves`); the Dex read of an off-field body moved there from `cant-stand-in.ts`.
     const rebuild = ['eval-engine:branch/action-bound.ts', 'eval-engine:branch/cant-stand-in.ts', 'eval-engine:branch/protocol-choices.ts'];
-    expect(filesWith(/\b(?:actionPriority|queuePlace)\(/)).toEqual(rebuild);
+    // Round 89 (P3): the forced-win prover's sure strike asks the queue for the place of its own move and of every damaging foe move
+    // (`endgame/prover-strike.ts`), the same question on a copy; `forced-win-strike-sweep.spec.ts` holds it to the simulator.
+    expect(filesWith(/\b(?:actionPriority|queuePlace)\(/)).toEqual([...rebuild, 'eval-engine:endgame/prover-strike.ts']);
     expect(filesWith(/\.moves\.get\([^)]*\)\.priority\b/).filter(name => rebuild.includes(name))).toEqual(['eval-engine:branch/action-bound.ts']);
   });
 });

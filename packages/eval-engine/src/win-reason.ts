@@ -1,7 +1,7 @@
 import { BREADTH_MIN_OPTIONS, TIER_THRESHOLDS, playedSetupMove, type SideAnalysis, type TurnAnalysis } from './analysis.ts';
 import { DECIDED_SCORE } from './turn-analysis/types.ts';
 import { KEY_TURN_SWING } from './graph.ts';
-import { displayBest, forcedQualifier, koPhrase, phrase, regretText } from './prose/phrases.ts';
+import { choiceSentence, delayClause, displayBest, forcedQualifier, koPhrase, phrase, regretText } from './prose/phrases.ts';
 import { chanceRolled, rollsCarry, type LuckSplit } from './turn-analysis/luck.ts';
 import { lostGround } from './turn-analysis/risk.ts';
 import { SPOKEN_MASS } from './types.ts';
@@ -153,7 +153,7 @@ export function conversionFor(
       return {
         conversion: { kind: 'forced', turn: analysis.turn, provenTurns: forced.turns },
         sentence: `From turn ${analysis.turn} the win was forced: ` +
-          `every reply lost within ${forced.turns} turn${forced.turns === 1 ? '' : 's'}${forcedQualifier(forced)}.`,
+          `every reply lost within ${forced.turns} turn${forced.turns === 1 ? '' : 's'}${forcedQualifier(forced)}${delayClause(forced, true)}.${choiceSentence(forced, true)}`,
       };
     }
     if (side.decided) {

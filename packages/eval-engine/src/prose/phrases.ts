@@ -87,6 +87,35 @@ export function forcedQualifier(forced: { mass: number; caveat: ForcedCaveat }):
   return forced.caveat === 'sampled-rolls' ? ` in ${share}% of the sampled rolls` : ` in ${share}% of the rolls${tail}`;
 }
 
+/** What a forced-win proof says besides its mass: the stall it delays and the choice it wins through (round 89, lane P; `ForcedWin.delayName`, `ForcedWin.choiceNames`). */
+interface ForcedLean {
+  delay?: string;
+  delayName?: string;
+  choiceNames?: { first: string; partner?: string };
+}
+
+/**
+ * Round 89 (P4, ruling 39 B4a): the clause a delayed win carries, in one place for the turn card and the game report. "; a repeated
+ * Protect only delays it" (the report: "only delayed it"), the stall by the battle's own Dex name; a result cached without the name
+ * says "a repeated stalling move". Empty without a delay.
+ */
+export function delayClause(forced: ForcedLean, past = false): string {
+  if (!forced.delay) return '';
+  return `; a repeated ${forced.delayName ?? 'stalling move'} only ${past ? 'delayed' : 'delays'} it`;
+}
+
+/**
+ * Round 89 (P4, ruling 39 B4a): the sentence that names the winning choice when the proof wins through one the search's own list never
+ * held (a sure strike from the legal combinations, doubles only): the move that strikes first, with its partner. "The winning line is
+ * Aqua Jet, which strikes first, with Heat Wave beside it." (the report: "was", "struck"). Empty without a choice.
+ */
+export function choiceSentence(forced: ForcedLean, past = false): string {
+  const names = forced.choiceNames;
+  if (!names) return '';
+  const beside = names.partner ? `, with ${names.partner} beside it` : '';
+  return ` The winning line ${past ? 'was' : 'is'} ${names.first}, which ${past ? 'struck' : 'strikes'} first${beside}.`;
+}
+
 /** The near-decided click: a "sure KO" only at odds 1, else an "N% roll" (T123: 99.5% is no sure KO). */
 export const rollText = (odds: number): string => (odds >= 1 ? 'sure KO' : `${percentBelowSure(odds)}% roll`);
 
