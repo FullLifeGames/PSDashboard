@@ -72,7 +72,7 @@ The seed of one tree expansion's dice below the root, hashed from the tree's num
 The answer a tree gives to each named die of a root cell. Tree k of T takes the quarter `(pi_d(k) + u_d) / T` of the die's range: `pi_d` is the die's own order of the quarters and `u_d` a hash that places the die inside its quarter. A die with chance p comes true in floor(T p) or ceil(T p) of the trees, a die of a quarter or more is never missed by all four, and two dice are independent across the trees (`search/root-quantile.ts`).
 
 **Cell seed**:
-The seed that a cell of the matrix, the verify round, the pair search or the trend probe reads at one slot of its list. It is hashed from the cell's key (the position and the two choices) and the slot (`cellSeed` in `search/leaf.ts`), so two cells never share one dice stream, and the paths that read one cell share its list.
+The seed that a cell of the matrix, the verify round, the pair search or the trend probe reads at one slot of its list. The engine hashes it from the cell's key (the position and the two choices) and the slot (`cellSeed` in `search/leaf.ts`), so two cells never share one dice stream, and the paths that read one cell share its list.
 
 **Rolled copy**:
 A copy of a logged turn that plays with one die turned over, a miss turned into a hit (`rolledCopy` in the code). The report uses it to price the die behind its "biggest roll" sentence. The headword follows the code; the report's sentence keeps "roll" for this die.
@@ -105,7 +105,7 @@ In a bring-limited game (VGC, Champions VGC, Battle Stadium Singles), a side who
 The turns of the replay, or the turns played in a game. The pointer sits on the main line or on the variation.
 
 **Variation**:
-The one line the user plays from a turn of the main line, by a different choice, by a click on a line, or by Let it play out. At most one exists (ADR 0015).
+The one line the user plays from a turn of the main line, by a different choice, by a click on a line, or by Let it play out. At most one exists (ADR 0015). The top bar names the variation's last position its **tip** ("Variation tip: Turn 33"), whichever turn the slider shows; a game's main line has a tip too, its last played position. `Discard variation` asks first once the variation holds a played turn.
 
 **Replacement**:
 The switch-in the simulator asks for in the middle of a turn: after a knockout, or after a pivot move such as U-turn, Flip Turn or Eject Button. The history list and a shared branch print it as its own row, "replacement (P1)", "replacement (P2)" or "replacement (both sides)", and it takes no turn of its own. The row's word is neutral because the sim does not say whether a knockout or a pivot move asked for it.
@@ -148,6 +148,9 @@ A game record in the browser's storage (`ps-replay-interceptor:game:<id>`). The 
 **Game seed**:
 The seed of the dice of a new game's simulator. Start draws a fresh one and shows it in the dialog, where "New seed" draws another and a typed or pasted seed is checked (four numbers or a sodium seed; an empty field means a fresh seed). The same seed, teams and choices roll the same dice. A variation of a game plays the game's own dice up to the change and what the seed gives after it. Saved rows and share links show the seed.
 
+**Turn link**:
+The address `?replay=<id>&turn=<n>`, which opens a replay on turn `n`. A `#branch=` share link or a saved game named in the same address takes precedence and brings its own turn.
+
 **Share link**:
 A URL with the sharer's branch in its hash. Version 1 holds a replay's branch (the replay id, the executed choices and the final log). Version 2 holds a game: the format, both teams, the seed, the played choices, the open variation and the turn on screen, and the reader plays it on its own simulator (ADR 0014). Opening a link of the open game opens its branch in that game; any other game link opens a copy.
 
@@ -159,6 +162,9 @@ The JSON file that `Report issue` downloads: the replay log, the sets, the varia
 **Safe line**:
 The choice with the best worst case on a turn (`side.safe`). The card calls its worst case the guarantee and compares the played choice with it; "safe" does not mean "better".
 
+**Worst reply**:
+The opponent's reply that hurts a move most: the lowest value of the move's row among the cells the search trusts (`worstAnswer` in the engine, `worstReply` in `src/lib/worst-reply.ts`), with the row's own floor and then the opponent's best row as fallbacks. Hard mode plays it, and the matrix dialog marks it as the "worst" cell of the played choice.
+
 **Read that paid off**:
 A risk whose punisher the opponent did not click, whose payoff over the safe line's guarantee cleared the margin, and whose played choice also beat the safe choice by at least one shown point against the reply that came (`riskPaidOff`, `safeAgainstClick` on `SideAnalysis`). The card ends it "…came instead, and against it the play beat the safe line by +N%."
 _Avoid_: good guess, lucky read
@@ -167,5 +173,5 @@ _Avoid_: good guess, lucky read
 A risk that cleared the same payoff margin but whose played choice did not beat the safe choice by one shown point against the reply that came. The card says "a risk that went unpunished" and the gap to the safe line; the side earns no read credit (`safeAgainstClick` without `riskPaidOff`). Where no matrix cell is known, the test is skipped and the old rule stands.
 
 **Quiet turn**:
-A turn where the estimate moved less than a mistake band and no one earned a grade (attribution `quiet`). The card says "A quiet turn." only when it highlights nothing else; beside another sentence or a hindsight hint it says "Neither side made a mistake." and the badge reads "no mistake" instead of "quiet turn" (`quietVoice`).
+A turn where the estimate moved less than a mistake band and no one earned a grade (attribution `quiet`). The card says "A quiet turn." only when it highlights nothing else; beside another sentence or a hindsight hint it says "Neither side made a mistake." and the badge reads "no mistake" instead of "quiet turn" (`quietVoice`). Where a side carries a mistake or blunder tier, the card writes no such sentence beside the others; that case and a turn without played actions keep the badge "quiet turn".
 _Avoid_: calm turn, nothing happened
