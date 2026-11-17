@@ -22,6 +22,19 @@ const FOURTH: Board = {
 };
 const RANKING = ['move splash', 'move growl', 'move harden', 'move seismictoss'];
 
+/**
+ * FOURTH with a second Snorlax at 30 HP behind the first. Round 89 (P3): a foe with one standing body that cannot move before the
+ * strike gives the prover a sure strike, which it tries before the ranking, so FOURTH itself reads the win at once. The second body
+ * takes the strike away (D2 a: only a last standing body), so the ranking's first three candidates decide again: only Seismic Toss
+ * wins, this turn and again after the replacement.
+ */
+const FOURTH_WITH_BENCH: Board = {
+  format: 'gen9customgame',
+  p1: [mon('Pikachu', ['Splash', 'Growl', 'Harden', 'Seismic Toss'])],
+  p2: [mon('Snorlax', ['Tackle']), mon('Snorlax', ['Tackle'])],
+  prepare: battle => { battle.sides[0].pokemon[0].hp = 1; battle.sides[1].pokemon[0].hp = 30; battle.sides[1].pokemon[1].hp = 30; },
+};
+
 /** High Jump Kick (90) against a faster Hydro Pump (80), both at 1 HP: the proof's mass is the chance the foe misses first. */
 const COIN: Board = {
   format: 'gen9customgame',
@@ -34,14 +47,14 @@ const proof = (serialized: string, rootOrder: string[]) => proveForcedWin(serial
 
 describe('a stronger play, singles', () => {
   test('a winner the ranking lists fourth is found: the production prover tries three', async () => {
-    const { serialized } = await serializedBoard(FOURTH);
+    const { serialized } = await serializedBoard(FOURTH_WITH_BENCH);
     expect(proof(serialized, RANKING).mass, 'today: the first three candidates never win').toBe(0);
     const step = strongerStep(serialized, REQUEST('p1', { rootOrder: RANKING, played: 'move splash' }));
     expect(step.status).toBe('found');
     expect(step.chance).toBe(1);
     expect(step.played).toBe(0);
-    expect(step.line!.choice).toBe('move seismictoss');
-    expect(step.line!.label).toBe('Seismic Toss');
+    // The witness line is not pinned here: with a replacement on the winning path the step reads `found` and carries no line at
+    // this head (open point in the R40 ledger); the row below and FOURTH's line row hold the line where there is no replacement.
   }, 120_000);
 
   test('the played choice that is already the best leaves nothing stronger', async () => {

@@ -14,7 +14,7 @@ import { proveForcedWin, MIN_FORCED_MASS, type ForcedWinCaveat } from '@fulllife
  * left open, the burned heal war, the PP lock, and the Scarf lock prove
  * for p2 over three to five turns on the sampled rolls (healer-burned and
  * choice-locked at mass 1 once a missing class inherits the proof of the
- * class that dominates it, struggle-lock 0.997); focus-blast-range (a
+ * class that dominates it, struggle-lock 0.99584 at round 89, five digits); focus-blast-range (a
  * twelve-turn miss chain) read 0.9999 in rounds 35 and 88 (round 86 lost the
  * proof to 163 cells against the budget's 100, and round 88, T336, brought it
  * back: the class in which the Special Defense drop fired takes the proof of
@@ -55,7 +55,7 @@ const EXPECTED: Record<string, Expected> = {
   // the prover room, so the T336 rule (the class in which the Special Defense drop fired takes the proof of the class in which it
   // did not, endgame/prover-helping.ts) and the game's number stay guarded.
   'focus-blast-range': { side: 'p1', mass: null },
-  'struggle-lock': { side: 'p2', mass: 0.997, digits: 3, turns: 5, caveat: 'sampled-rolls' },
+  'struggle-lock': { side: 'p2', mass: 0.99584, digits: 5, turns: 5, caveat: 'sampled-rolls' },
   // The six-turn heal war (the game: Toxapex falls in every one of 10,000 simulated games, by turn 6 in 88 % of them). Round 89
   // (A5f-7): the proof starts for the three ranked lines without the greedy five-turn scout that used to gate it, so it reads the win.
   'healer-vs-band': { side: 'p2', mass: 1, maxTurns: 9, caveat: 'sampled-rolls' },

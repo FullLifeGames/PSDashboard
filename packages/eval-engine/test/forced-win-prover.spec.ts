@@ -51,24 +51,36 @@ describe('forced-win prover (round 35)', () => {
     expect(proof.openValue).toBeNull();
   });
 
-  test('a stalling first candidate spends the cells the second one needs; the winning line first, or room, proves', () => {
-    // Splash first: the Chansey out-heals Splash for as long as the depth cap allows, so the Splash line refutes nothing and
-    // proves nothing, and its search takes the whole cell budget (100 cells, 44 states) before the Seismic Toss line is tried.
-    // Round 89 (A5f-7): no greedy scout filters the stalling line out any more, so the budget is the whole defence here. The
-    // ranking's first line is the search's best move, and A5f-6 found no corpus position (singles or doubles) where this
-    // starves a proof the scout found.
+  test('a stalling first candidate no longer starves the second: the sure strike goes first, whatever the ranking says', () => {
+    // Round 89 (A5f-7): no greedy scout filters the stalling line out. Round 89 (P3): the position has a sure strike (Seismic Toss
+    // kills the Chansey at 1 HP, and the Chansey has no damaging move), which the proof tries before the ranking and on cells of
+    // its own, so Splash first reads the win the Toss-first ranking reads, at the same cells. The budget no longer decides
+    // between the two orders in this position; the next row holds a position where the ranking still decides.
     const serialized = serializeAt(makeBattle(
       [makeSet('Champ', 'Machamp', ['Seismic Toss', 'Splash'])],
       [makeSet('Egg', 'Chansey', ['Soft-Boiled', 'Recover'])],
     ), { p2: [1] });
     const stalling = proveForcedWin(serialized, { side: 'p1', rootOrder: ['move splash', 'move seismictoss'], tera: false });
-    expect(stalling.mass).toBe(0);
-    expect(stalling.cells).toBe(PROVER_BUDGET.cells);
     const winning = proveForcedWin(serialized, { side: 'p1', rootOrder: ['move seismictoss', 'move splash'], tera: false });
-    expect(winning.mass).toBe(1);
-    expect(winning.turns).toBe(1);
-    expect(winning.cells).toBeLessThan(PROVER_BUDGET.cells);
-    expect(proveForcedWin(serialized, { side: 'p1', rootOrder: ['move splash', 'move seismictoss'], tera: false, budget: { cells: 1000, states: 1000 } }).mass).toBe(1);
+    for (const proof of [stalling, winning]) {
+      expect(proof.mass).toBe(1);
+      expect(proof.turns).toBe(1);
+      expect(proof.cells).toBe(2);
+    }
+  });
+
+  test('with no sure strike the ranking decides which three candidates the proof tries: a winner listed fourth is never tried, listed first it wins', () => {
+    // A foe with a second body takes the strike away (D2 a: only a last standing body), and the Snorlax's Tackle kills the Pikachu at
+    // 1 HP unless the first move does: only Seismic Toss wins, this turn. The proof tries ROOT_CANDIDATES (3) of the ranking.
+    const serialized = serializeAt(makeBattle(
+      [makeSet('Pika', 'Pikachu', ['Splash', 'Growl', 'Harden', 'Seismic Toss'])],
+      [makeSet('Lax', 'Snorlax', ['Tackle']), makeSet('Lax2', 'Snorlax', ['Tackle'])],
+    ), { p1: [1], p2: [30, 30] });
+    const fourth = proveForcedWin(serialized, { side: 'p1', rootOrder: ['move splash', 'move growl', 'move harden', 'move seismictoss'], tera: false });
+    expect(fourth.mass).toBe(0);
+    const first = proveForcedWin(serialized, { side: 'p1', rootOrder: ['move seismictoss', 'move splash', 'move growl', 'move harden'], tera: false });
+    expect(first.mass).toBe(1);
+    expect(first.turns).toBe(2);
   });
 
   test('the losing side proves nothing', () => {

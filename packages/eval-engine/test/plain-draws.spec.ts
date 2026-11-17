@@ -82,12 +82,25 @@ describe('plain draws of the endgame children (round 89, A5f-5)', () => {
 
   // A5f-3 (a5f3-draws.jsonl): the proof below reads mass 1 with three draws and mass 0 with five. The root order is empty, so the
   // prover tries the root candidates in its own odds order; the scenes are the bank's positions as the holdout run builds them.
-  // gen9doublesou-2694460841 turn 16: Player 2 proves a win in 1 turn on three draws. gen9vgc2025regi-2391814405 turn 9: Player 2
-  // proves a win on three draws and loses the game (one of the three proofs for a losing side that A5f-3 found).
-  test.each(['gen9doublesou-2694460841-t16', 'gen9vgc2025regi-2391814405-t9'])('doubles, %s: three agreeing draws prove nothing once five must agree', async name => {
-    const board = scene(name);
+  // gen9vgc2025regi-2391814405 turn 9: Player 2 proves a win on three draws and loses the game (one of the three proofs for a losing
+  // side that A5f-3 found); five draws prove nothing, and that still holds.
+  // gen9doublesou-2694460841 turn 16: Player 2 proved a win in 1 turn on three draws, and five draws read 0 until round 89 (P3): the
+  // sure strike now proves it on the sampled rolls, mass 0.995 in 2 turns (49 cells; the rest is a Protect reply the proof does not
+  // close). That is a proof for the side that won the game (probe p3-draws.vt.ts of lane P), no lost-side proof, and the row reads it.
+  test('doubles, gen9vgc2025regi-2391814405-t9: three agreeing draws prove nothing once five must agree', async () => {
+    const board = scene('gen9vgc2025regi-2391814405-t9');
     await loadSimMods('gen9doublescustomgame');
     const proof = proveForcedWin(board.serialized, { side: board.side, rootOrder: [], tera: board.tera, sleepClause: board.sleepClause, ruleset: board.ruleset });
     expect(proof.mass).toBe(0);
+  });
+
+  test('doubles, gen9doublesou-2694460841-t16: the sure strike proves the winner (P3) where five draws once proved nothing', async () => {
+    const board = scene('gen9doublesou-2694460841-t16');
+    await loadSimMods('gen9doublescustomgame');
+    const proof = proveForcedWin(board.serialized, { side: board.side, rootOrder: [], tera: board.tera, sleepClause: board.sleepClause, ruleset: board.ruleset });
+    expect(board.p1Won).toBe(board.side === 'p1');
+    expect(proof.mass).toBeCloseTo(0.995, 9);
+    expect(proof.turns).toBe(2);
+    expect(proof.caveat).toBe('sampled-rolls');
   });
 });
