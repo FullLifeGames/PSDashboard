@@ -6,8 +6,8 @@ import { fileURLToPath } from 'node:url';
 /**
  * Round 89 (final gate, D6b): every spec that reads the full-sweep switch runs with `DICE_SWEEPS=full` in one of two CI jobs of
  * test.yml: "Dice sweeps, every move" (the eval-engine specs whose path matches the job's pattern) or "Full sweeps, the other
- * specs" (an explicit list in two parts). In round 89 three specs failed only under the switch and stayed red for days because
- * the dice job's pattern reaches `dice-*` files only; 29 sweep specs never ran full in CI (D9b split two of them into five parts of about 1,500 seconds each: the list names 32 files now). This spec holds the lists to the
+ * specs" (an explicit list in three parts). In round 89 three specs failed only under the switch and stayed red for days because
+ * the dice job's pattern reaches `dice-*` files only; 29 sweep specs never ran full in CI (D9b split two of them into five parts of about 1,500 seconds each: the list names 36 files now). This spec holds the lists to the
  * truth: a spec that reads the switch and sits in neither job fails here, a listed file that no longer exists fails here, and a
  * spec that sits in both runs twice.
  *
@@ -80,9 +80,9 @@ const otherParts = otherLines.join('\n').split(/- part:/).slice(1).map(part => p
 const otherSpecs = otherParts.flat();
 
 describe('the two CI jobs that run the specs with DICE_SWEEPS=full', () => {
-  test('the dice job names a path pattern and the other job exists with two parts', () => {
+  test('the dice job names a path pattern and the other job exists with three parts', () => {
     expect(dicePattern).toBe('packages/eval-engine/test/dice-');
-    expect(otherParts).toHaveLength(2);
+    expect(otherParts).toHaveLength(3);
     expect(otherParts.every(part => part.length > 0)).toBe(true);
   });
 
@@ -128,7 +128,7 @@ describe('the job names that branch protection reads', () => {
 
   // The five job definitions give the six required checks (the engine job is a matrix of two); GitHub matches a check by its whole name.
   test('the six required checks keep their names, and the new job takes none of them', () => {
-    const added = 'Full sweeps, the other specs, part ${{ matrix.part }} of 2';
+    const added = 'Full sweeps, the other specs, part ${{ matrix.part }} of 3';
     expect(names.filter(name => name === added)).toHaveLength(1);
     expect(names.filter(name => name !== added)).toEqual([
       'Node suites',
