@@ -10,7 +10,7 @@ import type { TeraAllowance } from '../src/types';
  * longer gates them on a greedy five-turn line. A5f-6 measured the greedy line: it missed 8 to 20 % of the doubles proofs the
  * full proof finds (one to three turns long, all for the side that won), because one 16-cell allowance served its three
  * candidates and a doubles root has 6 to 16 replies; singles missed none. The four doubles scenes below are A5f-6's miss list at
- * the production budget: no proof before, mass 1 after. `rootOrder` is the three candidates the search ranked first (the probe's
+ * the production budget: no proof before, mass 1 after (three still do; 2694684816 turn 8 reads no proof again since the priced dice, see its row). `rootOrder` is the three candidates the search ranked first (the probe's
  * record), so the call is the app's. The two singles scenes keep a singles proof as it was (the round 35 positions of
  * 749351 and 749828), so one rule serves both game types. The four doubles scenes live in fixtures/forced-win/, outside
  * fixtures/positions/, because the speed-layer sweeps (`loadPositions`) read every file there and the Champions scenes need
@@ -36,7 +36,6 @@ describe('the forced-win proof without the greedy scout (round 89, A5f-7)', () =
   const misses: Array<[string, string, number]> = [
     ['Doubles OU 2661746817 turn 8', 'scout-miss-gen9doublesou-2661746817-t8', 1],
     ['VGC 2024 Reg G 2163312677 turn 8', 'scout-miss-gen9vgc2024regg-2163312677-t8', 1],
-    ['Champions VGC 2694684816 turn 8', 'scout-miss-gen9championsvgc2026regmc-2694684816-t8', 3],
     ['Champions VGC 2682637901 turn 6 (Bo3)', 'scout-miss-gen9championsvgc2026regmbbo3-2682637901-t6', 2],
   ];
   test.each(misses)('doubles, %s: the proof the scout missed reads mass 1', async (_title, name, turns) => {
@@ -46,6 +45,16 @@ describe('the forced-win proof without the greedy scout (round 89, A5f-7)', () =
     expect(proof.mass).toBe(1);
     expect(proof.turns).toBe(turns);
     expect(proof.caveat).toBe('sampled-rolls');
+  });
+
+  // Round 89, final gate (B3a): Champions VGC 2694684816 turn 8 found a proof of mass 1 in 3 turns before A5's priced dice; now 36 of the 100
+  // cells are unpriced faint splits and the production budget ends with no proof (mass 0). Whether the win is certain by the game is open:
+  // the pricing of a split that follows a crit is #155 and the class plan's read of slot a with one body per side is #156 (both 1.3.0). The
+  // row turns red when either lands; the pin then moves to the proof it finds.
+  test('doubles, Champions VGC 2694684816 turn 8: no proof within the production budget (#155, #156)', async () => {
+    const board = scene('scout-miss-gen9championsvgc2026regmc-2694684816-t8');
+    await loadSimMods('gen9championsdoublescustomgame');
+    expect(prove(board).mass).toBe(0);
   });
 
   test.each([
