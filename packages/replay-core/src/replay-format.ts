@@ -228,6 +228,15 @@ function sleepClauseSuffix(rawLog: string | undefined, base: string): string {
 }
 
 /**
+ * Round 89 (FB-1): Terastal Clause for the branch sim. It nulls every canTerastallize at battle start, so a draft game that declared
+ * it must not offer Tera in the branch. Read like Sleep Clause: the `|rule|` line decides, a real format is its own authority.
+ */
+const teraClause = (rawLog: string | undefined): string => (/^\|rule\|Terastal Clause/m.test(lfLog(rawLog) ?? '') ? 'Terastal Clause' : '');
+
+/** The custom rules of the branch format in the simulator's "@@@A,B" form; empty for none. */
+const joinRules = (...rules: string[]): string => (rules.some(Boolean) ? `@@@${rules.filter(Boolean).join(',')}` : '');
+
+/**
  * How many Pokémon each side BRINGS at team preview (VGC: 4 of 6, Battle
  * Stadium Singles: 3 of 6), or null for formats that bring the full team.
  * The Dex's own rule table answers for formats it knows. For the rest the
@@ -461,12 +470,12 @@ export function getBranchSimulatorFormat(source: ReplayFormatSource): string {
   const doubles = gameType === 'doubles' || formatid.includes('doubles') || formatid.includes('vgc');
 
   if (replayRuleset(source) === 'champions') return doubles ? CHAMPIONS_DOUBLES_FORMAT : CHAMPIONS_SINGLES_FORMAT;
-  if (doubles) return `gen${gen}doublesou`;
+  if (doubles) return `gen${gen}doublesou${joinRules(teraClause(source.log))}`;
 
   // A formatid the sim doesn't know (draft leagues, video pipelines) runs as
   // a rule-less custom game anyway — name that explicitly so clause suffixes
   // have a real base to attach to.
   const known = formatid && simFormats().get(formatid).exists ? formatid : '';
   const base = known || (formatid ? `gen${gen}customgame` : `gen${gen}ou`);
-  return `${base}${sleepClauseSuffix(source.log, base)}`;
+  return `${base}${joinRules(sleepClauseSuffix(source.log, base).slice(3), base.endsWith('customgame') ? teraClause(source.log) : '')}`;
 }

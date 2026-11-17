@@ -77,7 +77,8 @@ function EvalSection({ app, replayData }: WorkspaceColumnProps) {
   } = app.engine.evalView;
   const { handleExploreChoice, handlePickPair } = app.engine.walk;
   const { playOut, fastPlayOut } = app.transients;
-  const clickable = linesClickable(liveEvalView, evalResultMatchesView);
+  // Round 89 (FB-1): the rows at T0 rank the leads; a click on one found no live position and opened an empty variation at turn 1.
+  const clickable = linesClickable(liveEvalView, evalResultMatchesView) && analysisTurn !== 0;
   const reads = idleReads(app, viewingVariation, evaluation.resultTag);
   const variationShares = useVariationShares(app.ctx.branch.history, variationSpan);
   const linesHost = useLinesHost(app, replayData);

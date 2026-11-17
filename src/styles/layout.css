@@ -263,7 +263,10 @@
     flex: 1 0 100%;
   }
   .ps-topbar > .ps-topbar-actions {
-    flex: 1 1 0;
+    /* Round 89 (FB-1): the basis is the actions' own width, not zero. With a zero basis the support links took their width first and
+       the status ("Branching · Turn 33"), Game and Setup ran over "Report issue"; now the links wrap to a third line when both do
+       not fit one. */
+    flex: 1 1 auto;
     flex-wrap: nowrap;
     min-width: 0;
   }

@@ -30,7 +30,7 @@ test('an engine added by address evaluates the position, and the dropdown and th
   await page.getByRole('textbox', { name: 'Address' }).fill(new URL('/__test-engine/', page.url()).toString());
   await page.getByRole('button', { name: 'Add engine' }).click();
   await expect(page.getByRole('combobox', { name: 'Engine' })).toHaveValue(/__test-engine/);
-  await expect(page.getByText('estimate from Test engine')).toBeVisible();
+  await expect(page.locator('span[title="Estimate from Test engine."]')).toHaveText('Evaluation');
 
   await page.getByRole('button', { name: /^(Re-)?[Ee]valuate$/ }).click();
   // The first engine evaluation builds its request on the simulator in the main thread, which the unbundled dev server
@@ -40,10 +40,10 @@ test('an engine added by address evaluates the position, and the dropdown and th
   expect(asked[0].options.p1.length).toBeGreaterThan(0);
   expect(asked[0].state.length).toBeGreaterThan(1000);
   // The engine's favourite row (0.5 against -0.5 for every other) leads the panel's p1 ranking.
-  const panel = page.locator('.ps-panel', { hasText: 'estimate from Test engine' });
+  const panel = page.locator('.ps-panel', { has: page.locator('span[title="Estimate from Test engine."]') });
   await expect(panel).toContainText(`1.${asked[0].options.p1[0].label}`);
 
   // Back to the own engine: the dropdown stays, the panel names the sim search again.
   await page.getByRole('combobox', { name: 'Engine' }).selectOption('ps-dashboard');
-  await expect(page.getByText('built-in engine: it plays the turns in the simulator')).toBeVisible();
+  await expect(page.locator('span[title="Built-in engine: it plays the turns in the simulator."]')).toHaveText('Evaluation');
 });

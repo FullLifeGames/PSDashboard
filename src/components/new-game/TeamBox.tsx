@@ -1,7 +1,7 @@
 import { useId } from 'react';
 import type { PokemonSet } from '@pkmn/sim';
 import { formatRules } from '@fulllifegames/replay-core';
-import { spriteUrl } from '../../lib/sprite-url';
+import { SpriteImg } from '../SpriteImg';
 import { TEAM_SIZE, type TeamRead } from '../../lib/new-game/start';
 import type { TeamCheck } from './use-team-check';
 
@@ -28,9 +28,9 @@ function Sprites({ sets, format }: { sets: PokemonSet[]; format: string }) {
   return (
     <>
       {sets.map((set, index) => (
-        <img key={`${set.species}-${index}`} src={spriteUrl(set.species, rules)} alt={set.species} title={set.species}
-          // a species the sprite sheet does not hold: the problem list names it, the empty image box (alt text) goes
-          onError={event => { event.currentTarget.hidden = true; }} />
+        // a species the sprite sheet does not hold: its base species shows, or, when that is missing too, the problem list names it
+        // and the empty image box (alt text) goes
+        <SpriteImg key={`${set.species}-${index}`} species={set.species} rules={rules} alt={set.species} title={set.species} hideOnMiss />
       ))}
     </>
   );

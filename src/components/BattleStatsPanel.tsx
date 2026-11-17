@@ -9,7 +9,7 @@ import {
 } from '@fulllifegames/replay-core';
 import { useScrollFade } from '../hooks/useScrollFade';
 import { sourceAccent, sourceLabel } from '../lib/provenance-labels';
-import { spriteUrl } from '../lib/sprite-url';
+import { SpriteImg } from './SpriteImg';
 import { useReplayRules } from '../lib/replay-rules';
 import { generatesTeam } from '../lib/random-sets';
 import { standInMarkOf } from '../lib/stand-in-mark';
@@ -144,8 +144,9 @@ function PokemonEntry({ poke, isRandomFormat }: { poke: RevealedPokemonInfo; isR
   const mark = standInMarkOf(poke);
   return (
     <div className="ps-stats-pokemon">
-      <img
-        src={spriteUrl(poke.species, rules)}
+      <SpriteImg
+        species={poke.species}
+        rules={rules}
         alt={poke.species}
         className="ps-stats-sprite"
       />
