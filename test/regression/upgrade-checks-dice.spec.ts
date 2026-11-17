@@ -13,7 +13,7 @@ describe('the checks the upgrade script prints', () => {
     expect(text).toContain('DICE_SWEEPS=full npx vitest run --project eval-engine packages/eval-engine/test/dice-');
   });
 
-  test('they name the other full sweeps, which the job "Full sweeps, the other specs" runs in two parts', () => {
+  test('they name the other full sweeps, which the job "Full sweeps, the other specs" runs in three parts', () => {
     expect(text).toContain('Full sweeps, the other specs');
     expect(text).toContain('.github/workflows/test.yml');
   });

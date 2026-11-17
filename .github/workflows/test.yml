@@ -102,14 +102,15 @@ jobs:
         env:
           DICE_SWEEPS: full
 
-  # Round 89 (final gate, D6b): the dice job above reaches the `dice-*` files only, and 36 other spec files read the same switch (the merge of the lanes added four). The
-  # two parts below run them with DICE_SWEEPS=full, split by measured run time (about 7,850 s of local suite time each, so about
-  # 23 min on a runner). D9b (#125) split the two longest files by realm (landed-hit-sweep in three, blocked-effects-sweep in two, 1,300 to
-  # 1,600 s of local time each), so the longest single file is landed-hit-sweep-3 now, not a 70-minute file. Not a required check until the user
-  # makes it one (branch protection names the six jobs above). `full-sweep-job.spec.ts` fails when a spec reads the switch and
-  # sits in neither job, or when a listed file is gone: add a new sweep spec to the part with less time.
+  # Round 89 (final gate, D6b): the dice job above reaches the `dice-*` files only, and 36 other spec files read the same switch. The three
+  # parts below run them with DICE_SWEEPS=full. Their size comes from the run of 17.11.2026 (CI-1, the first run of the job): parts 1 and 2 hold
+  # about 3,448 summed seconds of file time each (runner measure, 2.6 summed seconds per wall second, so about 22 min), part 3 holds
+  # `board-key-census.spec.ts` alone, which played every move against every entry (a few million hits, over an hour) and now plays a bounded set (see its header). The longest
+  # single files are landed-hit-sweep (675 s) and stratified-root-sweep (650 s). Not a required check until the user makes it one (branch protection names
+  # the six jobs above). `full-sweep-job.spec.ts` fails when a spec reads the switch and sits in neither job, or when a listed file is gone: add a new
+  # sweep spec to the part with the least time, and keep every part under 25 minutes of wall time.
   full-sweeps:
-    name: Full sweeps, the other specs, part ${{ matrix.part }} of 2
+    name: Full sweeps, the other specs, part ${{ matrix.part }} of 3
     runs-on: ubuntu-24.04
     timeout-minutes: 50
     strategy:
@@ -118,44 +119,46 @@ jobs:
         include:
           - part: 1
             files: >-
-              packages/eval-engine/test/board-facts.spec.ts
-              packages/eval-engine/test/board-key-census.spec.ts
-              packages/eval-engine/test/board-key-readers.spec.ts
-              packages/eval-engine/test/delay-facts-sweep.spec.ts
-              packages/eval-engine/test/flip-turn-recorder.spec.ts
-              packages/eval-engine/test/forced-answers.spec.ts
-              packages/eval-engine/test/new-game-ability-fill.spec.ts
-              packages/eval-engine/test/new-game-blank-ability.spec.ts
-              packages/eval-engine/test/new-game-unknown-names.spec.ts
-              packages/eval-engine/test/plain-dice-sweep.spec.ts
-              packages/eval-engine/test/prover-helping-secondary-sweep.spec.ts
-              packages/eval-engine/test/scripted-dice-parity.spec.ts
-              packages/eval-engine/test/secondary-classes.spec.ts
-              packages/eval-engine/test/secondary-records.spec.ts
-              packages/replay-core/test/field-evidence-sweep.spec.ts
-              packages/replay-core/test/landed-hit-sweep.spec.ts
-              packages/replay-core/test/landed-hit-sweep-2.spec.ts
-              packages/replay-core/test/landed-hit-sweep-3.spec.ts
-          - part: 2
-            files: >-
               packages/eval-engine/test/board-key-effects.spec.ts
               packages/eval-engine/test/board-key-predicate.spec.ts
+              packages/eval-engine/test/delay-facts-sweep.spec.ts
+              packages/eval-engine/test/flip-turn-recorder.spec.ts
               packages/eval-engine/test/flip-turn-sweep.spec.ts
-              packages/eval-engine/test/forced-win-delay-sweep.spec.ts
+              packages/eval-engine/test/forced-answers.spec.ts
               packages/eval-engine/test/forced-win-strike-sweep.spec.ts
+              packages/eval-engine/test/new-game-unknown-names.spec.ts
+              packages/eval-engine/test/plain-dice-sweep.spec.ts
+              packages/eval-engine/test/plain-repeated-die-sweep.spec.ts
+              packages/eval-engine/test/scripted-dice-parity.spec.ts
+              packages/eval-engine/test/secondary-classes-paths.spec.ts
+              packages/eval-engine/test/stand-in-priority-sweep.spec.ts
+              packages/eval-engine/test/unlogged-choice-sweep.spec.ts
+              packages/replay-core/test/blocked-effects-sweep-2.spec.ts
+              packages/replay-core/test/landed-hit-sweep-2.spec.ts
+              packages/replay-core/test/landed-hit-sweep.spec.ts
+              packages/replay-core/test/screen-evidence.spec.ts
+          - part: 2
+            files: >-
+              packages/eval-engine/test/board-facts.spec.ts
+              packages/eval-engine/test/board-key-readers.spec.ts
+              packages/eval-engine/test/forced-win-delay-sweep.spec.ts
               packages/eval-engine/test/hidden-aim.spec.ts
               packages/eval-engine/test/likeliest-dice-sweep.spec.ts
               packages/eval-engine/test/low-pp-sweep.spec.ts
+              packages/eval-engine/test/new-game-ability-fill.spec.ts
+              packages/eval-engine/test/new-game-blank-ability.spec.ts
               packages/eval-engine/test/new-game-formats.spec.ts
-              packages/eval-engine/test/plain-repeated-die-sweep.spec.ts
+              packages/eval-engine/test/prover-helping-secondary-sweep.spec.ts
               packages/eval-engine/test/relayed-move-choice.spec.ts
-              packages/eval-engine/test/secondary-classes-paths.spec.ts
-              packages/eval-engine/test/stand-in-priority-sweep.spec.ts
+              packages/eval-engine/test/secondary-classes.spec.ts
+              packages/eval-engine/test/secondary-records.spec.ts
               packages/eval-engine/test/stratified-root-sweep.spec.ts
-              packages/eval-engine/test/unlogged-choice-sweep.spec.ts
               packages/replay-core/test/blocked-effects-sweep.spec.ts
-              packages/replay-core/test/blocked-effects-sweep-2.spec.ts
-              packages/replay-core/test/screen-evidence.spec.ts
+              packages/replay-core/test/field-evidence-sweep.spec.ts
+              packages/replay-core/test/landed-hit-sweep-3.spec.ts
+          - part: 3
+            files: >-
+              packages/eval-engine/test/board-key-census.spec.ts
     steps:
       - name: Check out repository
         uses: actions/checkout@v7

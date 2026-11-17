@@ -20,6 +20,9 @@ vi.mock('../src/sim-ask/copy', async importOriginal => {
   return { ...real, copyOf: (battle: Battle) => { const copy = real.copyOf(battle); hooks.onCopy?.(copy); return copy; } };
 });
 
+/** Under `DICE_SWEEPS=full` an ability or item is played against this many moves, not against every move (the full product took over an hour in one CI part). */
+const FULL_MOVES_PER_ENTRY = 6;
+
 const EVENT_CALLS = ['runEvent', 'singleEvent', 'priorityEvent', 'eachEvent', 'fieldEvent'] as const;
 
 /** Records the name of every event the battle fires from now on (the first argument of each call). */
@@ -43,6 +46,13 @@ function listen(battle: Battle, fired: Set<string>): void {
  *
  * Every rule set the corpus plays (Gens 1 to 9, the Champions mod), singles and, from Gen 3 on, doubles: a board of
  * three bodies a side after a Substitute, a poison, a hit and a switch.
+ *
+ * The last row plays hits. The plain run plays 6 cases, a sample of the moves and a sample of the entries. `DICE_SWEEPS=full` plays every case, every move
+ * of the Dex on five fixed boards (a Flame Body, a Static, a Poison Point with a Sticky Barb, a Life Orb against a Rocky Helmet with a Rough Skin, and the
+ * bare board) and every ability and item of the Dex, on the attacker and on the defender, against 6 moves spread over the list. It no longer plays every
+ * move against every entry (a few million hits, over an hour in CI): an event that only a particular move and a particular entry fire together, and
+ * neither fires with the five boards or the six moves, is not reached. The first two rows of the file (every field of the simulator is in the table) and
+ * the fail-safe row read no hit.
  */
 
 await loadSimMods('gen9championscustomgame');
@@ -112,7 +122,7 @@ describe('the board key names every own field of the simulator', () => {
     }
   });
 
-  test('a played hit fires none of the events the key leaves out, and the end of the turn only the events it reads', () => {
+  test('a played hit fires none of the events the key leaves out, and the end of the turn only the events it reads', { timeout: SWEEPS_FULL ? 1_800_000 : 60_000 }, () => {
     const fired = new Set<string>();
     hooks.onCopy = copy => listen(copy, fired);
     const cases = SWEEPS_FULL ? SWEEP_CASES : SWEEP_CASES.filter(({ name }) => ['Gen 9 singles', 'Gen 9 doubles', 'Champions singles', 'Champions doubles', 'Gen 4 singles', 'Gen 1 singles'].includes(name));
@@ -122,14 +132,23 @@ describe('the board key names every own field of the simulator', () => {
       const probe = boardFor(rules, mode, 'tackle');
       const abilities = rules.generation >= 3 ? probe.dex.abilities.all().filter(ability => ability.exists && !ability.isNonstandard).map(ability => ability.id) : [];
       const items = rules.generation >= 2 ? probe.dex.items.all().filter(item => item.exists && !item.isNonstandard).map(item => item.id) : [];
-      const lineups: Lineup[] = [{}, { defender: { ability: 'flamebody' } }, { defender: { ability: 'static' } }, { defender: { ability: 'poisonpoint', item: 'stickybarb' } }, { attacker: { item: 'lifeorb' }, defender: { item: 'rockyhelmet', ability: 'roughskin' } }];
-      for (const ability of abilities.filter((_, index) => SWEEPS_FULL || index % 12 === 0)) lineups.push({ attacker: { ability } }, { defender: { ability } });
-      for (const item of items.filter((_, index) => SWEEPS_FULL || index % 12 === 0)) lineups.push({ attacker: { item } }, { defender: { item } });
-      for (const move of moves) {
-        for (const lineup of lineups.filter((_, index) => SWEEPS_FULL || index < 5 || index % 7 === 0)) {
-          const battle = boardFor(rules, mode, move.id, lineup);
-          playHit(battle, attackerOf(battle), defenderOf(battle), move.id);
-        }
+      const base: Lineup[] = [{}, { defender: { ability: 'flamebody' } }, { defender: { ability: 'static' } }, { defender: { ability: 'poisonpoint', item: 'stickybarb' } }, { attacker: { item: 'lifeorb' }, defender: { item: 'rockyhelmet', ability: 'roughskin' } }];
+      const entryLineups: Lineup[] = [];
+      for (const ability of abilities.filter((_, index) => SWEEPS_FULL || index % 12 === 0)) entryLineups.push({ attacker: { ability } }, { defender: { ability } });
+      for (const item of items.filter((_, index) => SWEEPS_FULL || index % 12 === 0)) entryLineups.push({ attacker: { item } }, { defender: { item } });
+      const plays: [(typeof moves)[number], Lineup][] = [];
+      if (SWEEPS_FULL) {
+        // every move on the five fixed lineups, and every ability and item on each side against FULL_MOVES_PER_ENTRY moves spread over the list (each entry starts at another move)
+        for (const move of moves) for (const lineup of base) plays.push([move, lineup]);
+        const step = Math.max(1, Math.floor(moves.length / FULL_MOVES_PER_ENTRY));
+        entryLineups.forEach((lineup, index) => { for (let slot = 0; slot < FULL_MOVES_PER_ENTRY; slot++) plays.push([moves[(index * 7 + slot * step) % moves.length], lineup]); });
+      } else {
+        const lineups = [...base, ...entryLineups].filter((_, index) => index < 5 || index % 7 === 0);
+        for (const move of moves) for (const lineup of lineups) plays.push([move, lineup]);
+      }
+      for (const [move, lineup] of plays) {
+        const battle = boardFor(rules, mode, move.id, lineup);
+        playHit(battle, attackerOf(battle), defenderOf(battle), move.id);
       }
       // The end of the turn: a board with a status, a Substitute and a weather has played.
       const battle = boardFor(rules, mode, 'tackle');
