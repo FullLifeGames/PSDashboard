@@ -25,6 +25,14 @@ test('sliderMax extends past the replay when the variation is longer', () => {
   expect(sliderMax(24, null)).toBe(24);
 });
 
+test('sliderMax stays at the replay end when a short play-out ends inside it', () => {
+  // Round 89 (P6a): a play-out from turn 1 of four real turns (turn 5 is its tip) inside a replay of eight, and a hand-played
+  // variation from turn 6 of two turns (tip 8) in the same replay.
+  expect(sliderMax(8, { startTurn: 1, length: 4 })).toBe(8);
+  expect(sliderMax(8, { startTurn: 6, length: 2 })).toBe(8);
+  expect(sliderMax(8, { startTurn: 6, length: 3 })).toBe(9);
+});
+
 test('normalizePosition forces main outside coverage and variation past the replay end', () => {
   expect(normalizePosition({ turn: 10, line: 'variation' }, 24, span))
     .toEqual({ turn: 10, line: 'main' });
