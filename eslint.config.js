@@ -10,9 +10,10 @@ import namesPlugin from './eslint.names.mjs'
 import dexPlugin from './eslint.dex.mjs'
 
 export default defineConfig([
-  // docs/ holds Markdown and the local, gitignored probes (copies of old sources among them): CI never sees them,
+  // docs/ holds Markdown and the local, gitignored probes (copies of old sources among them), and .claude/ holds the local agent
+  // worktrees (foreign checkouts with their own tsconfigs) beside Markdown role files: CI never sees them,
   // and a local `npm run lint` must read only what CI reads.
-  globalIgnores(['dist', 'packages/*/dist', '.remember', 'docs']),
+  globalIgnores(['dist', 'packages/*/dist', '.remember', 'docs', '.claude']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
