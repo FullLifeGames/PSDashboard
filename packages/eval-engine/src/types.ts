@@ -449,6 +449,8 @@ export interface ForcedWin {
   delay?: string;
   /** Round 89 (P3): the root choice that proves the win, when the search's own list does not hold it (a sure strike from the legal combinations); absent when the choice is one of the list's. */
   choice?: string;
+  /** Round 89 (P4): the Dex names the card prints: of `delay` ("Protect"; a result without it says "a repeated stalling move") and of `choice` (the move that strikes first and, in doubles, its partner). */
+  delayName?: string; choiceNames?: { first: string; partner?: string };
   open?: ForcedWinOpen;
   engineScore: number;
   /** Prover states expanded (both side attempts). */
@@ -481,8 +483,8 @@ export interface ForcedWinInput {
   ruleset?: StaticRuleset;
 }
 
-/** The prover's answer; `delay` and `choice` (round 89, lane P) are the optional fields of `ForcedWin`, which the proof hands on unchanged. */
-export interface ForcedWinProof extends Pick<ForcedWin, 'delay' | 'choice'> {
+/** The prover's answer; `delay`, `choice` and their names (round 89, lane P) are the optional fields of `ForcedWin`, which the proof hands on unchanged. */
+export interface ForcedWinProof extends Pick<ForcedWin, 'delay' | 'choice' | 'delayName' | 'choiceNames'> {
   mass: number;
   turns: number;
   caveat: ForcedWinCaveat;

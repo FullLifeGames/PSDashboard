@@ -21,6 +21,9 @@ function forcedWinSignal(params: AnalyzeTurnParams, key: Side): SideAnalysis['fo
   return {
     turns: forced.turns, mass: forced.mass, caveat: forced.caveat,
     ...(forced.open ? { open: forced.open } : {}),
+    ...(forced.delay ? { delay: forced.delay } : {}),
+    ...(forced.delayName ? { delayName: forced.delayName } : {}),
+    ...(forced.choiceNames ? { choiceNames: forced.choiceNames } : {}),
     announce: !params.decidedSeen?.has(forcedWinSeenKey(key)),
   };
 }

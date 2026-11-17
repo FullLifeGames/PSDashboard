@@ -98,6 +98,12 @@ describe.each(WITH_STALL)('a repeated stall is a delay, $name', ({ rules, mode }
     expect(proof.turns).toBe(2);
   });
 
+  // Round 89 (P4): the card says "a repeated <name> only delays it"; the name is the Dex's, never a name of our code
+  test.each(moves.map(move => move.id))('%s: the proof names the stall as the Dex does', stall => {
+    const proof = proofOf(delayBoard(rules, mode, strike!.id, { stall }), rules);
+    expect(proof.delayName).toBe(dex.moves.get(stall).name);
+  });
+
   describe.each(KINDS.filter(kind => has(rules, kind.needs)))('the stall that matters: $name', kind => {
     test('no delay, and no mass above what the simulator plays out', () => {
       const proof = proofOf(kind.build(rules, mode, '1,2,3,4'), rules);

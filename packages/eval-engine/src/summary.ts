@@ -4,7 +4,7 @@ import { forcedWinSpeaks } from './turn-analysis/forced-speech.ts';
 import { splitCombinedLabel } from './turn-analysis/played-match.ts';
 import { chanceRolled } from './turn-analysis/luck.ts';
 import { lostGround, shownAttribution, walkedInto } from './turn-analysis/risk.ts';
-import { caveatWords, forcedQualifier, percentBelowSure, phrase, phraseReplies, rollText } from './prose/phrases.ts';
+import { caveatWords, choiceSentence, delayClause, forcedQualifier, percentBelowSure, phrase, phraseReplies, rollText } from './prose/phrases.ts';
 import { sideClause } from './prose/clauses.ts';
 import { rideAlongSentences } from './prose/ride-along.ts';
 import { QUIET_TURN, hintShown, quietSentences, quietVoiceOf, type QuietVoice } from './prose/quiet.ts';
@@ -56,9 +56,9 @@ function forcedWinSentence(side: SideAnalysis, player: string, ownBar: number): 
   const head = `${player} wins within ${forced.turns} turn${forced.turns === 1 ? '' : 's'} against every reply`;
   if (forced.open && forced.mass < 1) {
     const verb = forced.open.kind === 'hit' ? 'lands' : 'knocks out';
-    return `${head} if the ${percentBelowSure(forced.open.odds)}% ${forced.open.label} ${verb}${caveatWords(forced.caveat)}.`;
+    return `${head} if the ${percentBelowSure(forced.open.odds)}% ${forced.open.label} ${verb}${caveatWords(forced.caveat)}${delayClause(forced)}.${choiceSentence(forced)}`;
   }
-  return `${head}${forcedQualifier(forced)}.`;
+  return `${head}${forcedQualifier(forced)}${delayClause(forced)}.${choiceSentence(forced)}`;
 }
 
 /**

@@ -11,7 +11,7 @@ import { delayMass, readDelay } from './delay-rule.ts';
 import { endgameKey } from './key.ts';
 import { helpedSources } from './prover-helping.ts';
 import { firstMoveId, openFields, orderByOdds, dominates, orderByRanking, other, wonBy, type Cell, type CellProof, type Proven, type Side } from './prover-order.ts';
-import { cachedStrike } from './prover-strike.ts';
+import { cachedStrike, strikeNames } from './prover-strike.ts';
 
 export { dominates } from './prover-order.ts';
 
@@ -432,5 +432,8 @@ export function proveForcedWin(rootOrSerialized: string | SimPosition, request: 
   // Round 89 (P3): a proof through a choice the search's list never held (a strike from the legal combinations) names it
   const outside = choice !== undefined && proven.mass > 0
     && !searchOptions(root, request.side, { tera: request.tera, sleepClause: request.sleepClause }).some(option => option.choice === choice);
-  return { ...proven, ...fields, ...(outside ? { choice } : {}), states: prover.states, cells: prover.cells };
+  // Round 89 (P4): the names the card prints come from the battle's own Dex (`dex.moves.get(id).name`), never from our code
+  const choiceNames = outside && choice ? strikeNames(root, request.side, choice, request.tera) : undefined;
+  const delayName = proven.delay ? battle.dex.moves.get(proven.delay).name : undefined;
+  return { ...proven, ...fields, ...(outside ? { choice } : {}), ...(delayName ? { delayName } : {}), ...(choiceNames ? { choiceNames } : {}), states: prover.states, cells: prover.cells };
 }

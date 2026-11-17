@@ -139,6 +139,24 @@ export function sureStrike(position: SimPosition, side: Side, pool: ChoiceOption
   return null;
 }
 
+/**
+ * Round 89 (P4): the Dex names the card gives a winning choice that is a strike (`ForcedWin.choiceNames`): the strike part that moves
+ * first (of two strike parts, the one the simulator's queue puts first) and the partner's move, from the battle's own Dex. Undefined
+ * for a choice that is no strike of this position.
+ */
+export function strikeNames(position: SimPosition, side: Side, choice: string, tera: TeraAllowance | undefined): { first: string; partner?: string } | undefined {
+  const board = boardOf(position, side, tera);
+  const parts = parse(choice);
+  if (!board || !parts) return undefined;
+  const slots = parts.flatMap((part, slot) => (isStrike(board, slot, part) ? [slot] : []));
+  const place = (slot: number): QueuePlace => queuePlace(board.battle, board.bodies[slot], parts[slot].id, false);
+  const first = slots.reduce<number | null>((best, slot) => (best === null || before(place(slot), place(best)) ? slot : best), null);
+  if (first === null) return undefined;
+  const nameOf = (part: Part): string => board.battle.dex.moves.get(part.id).name;
+  const partner = parts.find((_, slot) => slot !== first);
+  return { first: nameOf(parts[first]), ...(partner ? { partner: nameOf(partner) } : {}) };
+}
+
 /** The strike of a position, read once per position object (the cache is the prover's own); the pool is the legal combinations in doubles and the search's list in singles. */
 export function cachedStrike(cache: WeakMap<SimPosition, ChoiceOption | null>, position: SimPosition, side: Side, own: ChoiceOption[], tera: TeraAllowance | undefined): ChoiceOption | null {
   const known = cache.get(position);
