@@ -5,6 +5,7 @@ import type { EvalPreferences } from '@fulllifegames/eval-engine';
 import { EvalControls } from '../../../../src/components/eval/EvalControls';
 import type { EvalStatus } from '../../../../src/hooks/useEvaluation';
 import { evalResult } from '../../fixtures/eval-result';
+import { BUILTIN_ENGINE } from '../../../../src/lib/engines/registry';
 
 const prefs: EvalPreferences = { depth: 1, samples: 1, mode: 'matrix', auto: false, autoAnalyze: false, tera: 'auto' };
 
@@ -25,7 +26,9 @@ describe('EvalControls', () => {
     const wired = props();
     const { rerender } = render(<EvalControls {...wired} />);
     expect(screen.getByText('Evaluation')).toBeInTheDocument();
-    expect(screen.getByText('built-in engine: it plays the turns in the simulator')).toBeInTheDocument();
+    // Round 89 (FB-1): the engine's description is the heading's title, not a line of text.
+    expect(screen.queryByText(/built-in engine/)).toBeNull();
+    expect(screen.getByText('Evaluation')).toHaveAttribute('title', 'Built-in engine: it plays the turns in the simulator.');
 
     await userEvent.selectOptions(select('Depth'), '2');
     expect(wired.onPrefsChange).toHaveBeenLastCalledWith({ ...prefs, mode: 'matrix', depth: 2 });
@@ -104,5 +107,20 @@ describe('EvalControls', () => {
 
     rerender(<EvalControls {...wired} onEvaluate={undefined} />);
     expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  test('another engine names itself in the heading title and the Engine select title, not in a line of text (round 89, FB-1)', () => {
+    const bot = { id: 'url:http://localhost:8765/', name: 'My bot', url: 'http://localhost:8765/', source: 'added' as const };
+    const engines = { engines: [BUILTIN_ENGINE, bot], selected: bot, select: vi.fn(), add: vi.fn(), remove: vi.fn() };
+    render(<EvalControls {...props({ engines })} />);
+    expect(screen.queryByText(/estimate from/i)).toBeNull();
+    expect(screen.getByText('Evaluation')).toHaveAttribute('title', 'Estimate from My bot.');
+    expect(screen.getByRole('combobox', { name: 'Engine' }).closest('label')).toHaveAttribute('title', expect.stringContaining('Estimate from My bot.'));
+  });
+
+  test('the built-in engine reaches the Engine select title too', () => {
+    const engines = { engines: [BUILTIN_ENGINE, { id: 'u', name: 'Other', url: 'http://x/', source: 'added' as const }], selected: BUILTIN_ENGINE, select: vi.fn(), add: vi.fn(), remove: vi.fn() };
+    render(<EvalControls {...props({ engines })} />);
+    expect(screen.getByRole('combobox', { name: 'Engine' }).closest('label')).toHaveAttribute('title', expect.stringContaining('Built-in engine: it plays the turns in the simulator.'));
   });
 });

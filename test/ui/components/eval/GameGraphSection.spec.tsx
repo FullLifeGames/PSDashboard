@@ -7,7 +7,9 @@ import { evalGraph, evalResult, gameReport } from '../../fixtures/eval-result';
 import { leadAnalysis, turnAnalysis } from '../../fixtures/analysis';
 
 const names: [string, string] = ['Alice', 'Bob'];
-const HINT_TITLE = 'Analyze game makes a quick depth-1 pass over every turn, then re-evaluates each turn with the settings above, starting with the swings worth reporting. Tera applies to every turn.';
+/** Round 89 (FB-1): the description line left the layout; the "Game graph" heading carries it as its title. */
+const hintTitle = (mode: string) => `Analyze game makes a quick depth-1 pass over every turn, then re-evaluates each turn with ${mode}, starting with the swings worth reporting. Tera applies to every turn.`;
+const headingTitle = () => screen.getByText('Game graph').getAttribute('title');
 const prefs: EvalPreferences = { depth: 2, samples: 1, mode: 'matrix', auto: false, autoAnalyze: false, tera: 'auto' };
 const emptyGraph = () => evalGraph('singles', {
   scores: [], results: [], settings: [], faintedFractions: [], played: [], playedOutcome: [], verified: [], sensitivity: [], evalErrors: [],
@@ -29,9 +31,10 @@ describe('GameGraphSection', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Analyze game' }));
     expect(wired.onAnalyzeGame).toHaveBeenCalledTimes(1);
     // Round 67 (T109): the deeper stage left with Think deeper, so the hint names none.
-    expect(screen.getByText(/^graph:/)).toHaveTextContent(/^graph: a quick pass over every turn, then depth 2 on each$/);
-    expect(screen.getByText(/^graph:/).getAttribute('title')).not.toMatch(/deeper/i);
-    expect(screen.getByText(/^graph:/).getAttribute('title')).toBe(HINT_TITLE);
+    // Round 89 (FB-1): no description line takes space; the heading's title names the configured mode.
+    expect(screen.queryByText(/^graph:/)).toBeNull();
+    expect(headingTitle()).not.toMatch(/deeper/i);
+    expect(headingTitle()).toBe(hintTitle('depth 2'));
     expect(screen.queryByRole('img')).toBeNull();
 
     rerender(<GameGraphSection {...wired} hasGraph graph={evalGraph()} />);
@@ -46,13 +49,13 @@ describe('GameGraphSection', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(wired.onCancel).toHaveBeenCalledTimes(1);
     // Round 63 default (T110): auto runs early singles turns on the matrix.
-    expect(screen.getByText(/^graph:/)).toHaveTextContent(/then auto \(matrix early, MCTS late\) on each$/);
+    expect(headingTitle()).toBe(hintTitle('auto (matrix early, MCTS late)'));
 
     rerender(<GameGraphSection {...wired} hasGraph smogonPending prefs={{ ...prefs, mode: 'mcts' }} />);
     const analyze = screen.getByRole('button', { name: 'Re-analyze' });
     expect(analyze).toBeDisabled();
     expect(analyze).toHaveAttribute('title', expect.stringMatching(/^Waiting for Smogon data/));
-    expect(screen.getByText(/^graph:/)).toHaveTextContent('then MCTS on each');
+    expect(headingTitle()).toBe(hintTitle('MCTS'));
   });
 
   // Round 77 (C1): a single evaluation that took over a running sweep leaves a status line instead of a silent stop.
@@ -76,9 +79,12 @@ describe('GameGraphSection', () => {
     onTestFinished(() => configureSearchBudget(null));
     const auto = { ...prefs, mode: 'auto' as const };
     const { rerender } = render(<GameGraphSection {...props({ prefs: auto })} />);
-    expect(screen.getByText(/^graph:/)).toHaveTextContent(/^graph: a quick pass over every turn, then auto \(matrix early, MCTS late\) on each$/);
+    expect(headingTitle()).toBe(hintTitle('auto (matrix early, MCTS late)'));
     rerender(<GameGraphSection {...props({ prefs: auto, doubles: true })} />);
-    expect(screen.getByText(/^graph:/)).toHaveTextContent('graph: a quick pass over every turn, then auto (MCTS every turn) on each');
+    expect(headingTitle()).toBe(hintTitle('auto (MCTS every turn)'));
+    rerender(<GameGraphSection {...props({ prefs: { ...prefs, mode: 'mcts' } })} />);
+    expect(headingTitle()).toBe(hintTitle('MCTS'));
+    expect(screen.queryByText(/^graph:/)).toBeNull();
   });
 
   test('the notice, the gap-turn reason with its analysis control, and the variation-only hint explain partial lines', () => {

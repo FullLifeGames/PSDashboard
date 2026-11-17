@@ -123,12 +123,13 @@ export function EvalControls({ prefs, onPrefsChange, running, showAuto, showTera
   status: EvalStatus;
 }) {
   const external = !!engines && engines.selected.source !== 'builtin';
+  const engineNote = external ? `Estimate from ${engines.selected.name}.` : 'Built-in engine: it plays the turns in the simulator.';
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
-      <span style={{ fontSize: 13, fontWeight: 'bold' }}>Evaluation</span>
-      <span style={{ fontSize: 10, color: '#778' }}>{external ? `estimate from ${engines.selected.name}` : 'built-in engine: it plays the turns in the simulator'}</span>
+      {/* Round 89 (FB-1): the engine's description left the layout; it is the title of the heading and of the Engine select. */}
+      <span style={{ fontSize: 13, fontWeight: 'bold' }} title={engineNote}>Evaluation</span>
       <span style={{ flex: 1 }} />
-      {engines && <EngineControls engines={engines.engines} selected={engines.selected} running={running} onSelect={engines.select} onAdd={engines.add} onRemove={engines.remove} />}
+      {engines && <EngineControls engines={engines.engines} selected={engines.selected} running={running} note={engineNote} onSelect={engines.select} onAdd={engines.add} onRemove={engines.remove} />}
       {!external && <DepthSelect prefs={prefs} onPrefsChange={onPrefsChange} running={running} />}
       {!external && prefs.mode === 'matrix' && <SamplesSelect prefs={prefs} onPrefsChange={onPrefsChange} running={running} />}
       {showTera && <TeraSelect prefs={prefs} onPrefsChange={onPrefsChange} running={running} />}

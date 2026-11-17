@@ -15,7 +15,8 @@ import type { VariationSeries } from '../../lib/eval-graph-view';
 
 type SelectTurn = ((turn: number, line?: 'main' | 'variation') => void) | undefined;
 
-function GraphHeader({ onAnalyzeGame, graph, onCancel, running, smogonPending, hasGraph }: {
+function GraphHeader({ onAnalyzeGame, graph, onCancel, running, smogonPending, hasGraph, title }: {
+  title: string;
   onAnalyzeGame?: () => void;
   graph: EvalGraphState;
   onCancel: () => void;
@@ -25,7 +26,7 @@ function GraphHeader({ onAnalyzeGame, graph, onCancel, running, smogonPending, h
 }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 10, color: '#aabbcc' }}>
-      <span style={{ fontWeight: 'bold', fontSize: 11, color: '#cde' }}>Game graph</span>
+      <span style={{ fontWeight: 'bold', fontSize: 11, color: '#cde' }} title={title}>Game graph</span>
       {onAnalyzeGame && (graph.running ? (
         <>
           <span style={{ color: '#fd6' }}>
@@ -61,20 +62,17 @@ function GraphHeader({ onAnalyzeGame, graph, onCancel, running, smogonPending, h
   );
 }
 
-function LineHint({ prefs, doubles }: { prefs: EvalPreferences; doubles?: boolean }) {
-  // Round 61: auto reads the search budget. Round 63 (T110): per game type; by default doubles run the tree on every
-  // turn, singles the matrix until a quarter of all bodies fell. Round 67 (T109): no deeper stage per turn.
+/**
+ * Round 89 (FB-1): what Analyze game does, with the configured mode. It was a line of text under the heading; it is the
+ * heading's title now. Round 61: auto reads the search budget. Round 63 (T110): per game type; by default doubles run the
+ * tree on every turn, singles the matrix until a quarter of all bodies fell. Round 67 (T109): no deeper stage per turn.
+ */
+function graphTitle(prefs: EvalPreferences, doubles?: boolean): string {
   const autoTreeEverywhere = autoTurnSettings(0, !!doubles).mode === 'mcts';
-  return (
-    <div
-      style={{ fontSize: 10, color: '#778', marginTop: 2 }}
-      title="Analyze game makes a quick depth-1 pass over every turn, then re-evaluates each turn with the settings above, starting with the swings worth reporting. Tera applies to every turn."
-    >
-      graph: a quick pass over every turn, then {prefs.mode === 'mcts' ? 'MCTS'
-        : prefs.mode === 'auto' ? (autoTreeEverywhere ? 'auto (MCTS every turn)' : 'auto (matrix early, MCTS late)')
-        : `depth ${prefs.depth}`} on each
-    </div>
-  );
+  const mode = prefs.mode === 'mcts' ? 'MCTS'
+    : prefs.mode === 'auto' ? (autoTreeEverywhere ? 'auto (MCTS every turn)' : 'auto (matrix early, MCTS late)')
+    : `depth ${prefs.depth}`;
+  return `Analyze game makes a quick depth-1 pass over every turn, then re-evaluates each turn with ${mode}, starting with the swings worth reporting. Tera applies to every turn.`;
 }
 
 /** The replacement note of the card's turn: the points of the knockout block before it, when the sweep priced any. */
@@ -236,8 +234,7 @@ export function GameGraphSection(props: GameGraphSectionProps) {
   } = props;
   return (
     <div style={{ margin: '6px 0' }}>
-      <GraphHeader onAnalyzeGame={onAnalyzeGame} graph={graph} onCancel={onCancel} running={running} smogonPending={smogonPending} hasGraph={hasGraph} />
-      <LineHint prefs={prefs} doubles={doubles} />
+      <GraphHeader onAnalyzeGame={onAnalyzeGame} graph={graph} onCancel={onCancel} running={running} smogonPending={smogonPending} hasGraph={hasGraph} title={graphTitle(prefs, doubles)} />
       {/* A short or missing line says why — an unexplained blank graph
           reads as a broken app rather than a diverged reconstruction. */}
       {graph.notice && (
