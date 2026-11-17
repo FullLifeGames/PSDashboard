@@ -102,7 +102,7 @@ jobs:
         env:
           DICE_SWEEPS: full
 
-  # Round 89 (final gate, D6b): the dice job above reaches the `dice-*` files only, and 32 other spec files read the same switch. The
+  # Round 89 (final gate, D6b): the dice job above reaches the `dice-*` files only, and 36 other spec files read the same switch (the merge of the lanes added four). The
   # two parts below run them with DICE_SWEEPS=full, split by measured run time (about 7,850 s of local suite time each, so about
   # 23 min on a runner). D9b (#125) split the two longest files by realm (landed-hit-sweep in three, blocked-effects-sweep in two, 1,300 to
   # 1,600 s of local time each), so the longest single file is landed-hit-sweep-3 now, not a 70-minute file. Not a required check until the user
@@ -121,8 +121,10 @@ jobs:
               packages/eval-engine/test/board-facts.spec.ts
               packages/eval-engine/test/board-key-census.spec.ts
               packages/eval-engine/test/board-key-readers.spec.ts
+              packages/eval-engine/test/delay-facts-sweep.spec.ts
               packages/eval-engine/test/flip-turn-recorder.spec.ts
               packages/eval-engine/test/forced-answers.spec.ts
+              packages/eval-engine/test/new-game-ability-fill.spec.ts
               packages/eval-engine/test/new-game-blank-ability.spec.ts
               packages/eval-engine/test/new-game-unknown-names.spec.ts
               packages/eval-engine/test/plain-dice-sweep.spec.ts
@@ -139,6 +141,8 @@ jobs:
               packages/eval-engine/test/board-key-effects.spec.ts
               packages/eval-engine/test/board-key-predicate.spec.ts
               packages/eval-engine/test/flip-turn-sweep.spec.ts
+              packages/eval-engine/test/forced-win-delay-sweep.spec.ts
+              packages/eval-engine/test/forced-win-strike-sweep.spec.ts
               packages/eval-engine/test/hidden-aim.spec.ts
               packages/eval-engine/test/likeliest-dice-sweep.spec.ts
               packages/eval-engine/test/low-pp-sweep.spec.ts
