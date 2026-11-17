@@ -345,7 +345,11 @@ export interface StoredEval {
 //      a switch (#103); a game without team preview fills its unseen bodies with stand-ins (#101); the dice offer a
 //      charge move that skips its charge turn (T344) and one accuracy die per hit (T337); the prover carries a proof
 //      over a secondary that only helps the mover (T336). Positions of those games and turns read new values.
-const EVAL_ENGINE_CACHE_VERSION = 78;
+// v79 (round 89, the wave of 1.2.0): the rebuild and the set reader follow the log more closely (#110, #75, #137,
+//      #139, #150); a body that cannot act is no longer offered; each search cell draws its own seed list (T324);
+//      the prover prices more dice, delays a win behind a repeated Protect and tries a sure strike first. Positions of
+//      those games and turns read new values.
+const EVAL_ENGINE_CACHE_VERSION = 79;
 
 /** Round 61: a search-budget form stores under its own tag; the default keeps today's keys. */
 const versionTag = (): string => {
