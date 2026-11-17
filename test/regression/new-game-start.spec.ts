@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
-import { Dex, PRNG, Teams } from '@pkmn/sim';
+import { Dex, PRNG, TeamValidator, Teams } from '@pkmn/sim';
+import type { PokemonSet } from '@pkmn/sim';
 import { readTeamPaste, seedProblem, startNewGame, startProblem } from '../../src/lib/new-game/start';
 import { newGameSeed } from '../../src/lib/new-game/record';
 
@@ -68,6 +69,23 @@ describe('the seed field', () => {
   });
 });
 
+/**
+ * X2a: the ability a new game fills is the first slot (0, 1, H, S) the format's validator accepts, and slot 0 where none passes.
+ * The oracle is the simulator: a refused ability shows in `validateSet` as "ability <name> ..." (the sweep in
+ * packages/eval-engine/test/new-game-ability-fill.spec.ts holds the fill to the same call over every species).
+ */
+function firstAllowedAbility(format: string, species: string): string {
+  const dex = Dex.forFormat(Dex.formats.get(format));
+  const slots = dex.species.get(species).abilities as Record<string, string | undefined>;
+  const names = (['0', '1', 'H', 'S'] as const).map(slot => slots[slot]).filter((name): name is string => !!name);
+  const validator = TeamValidator.get(format);
+  const refused = (ability: string) => {
+    const set = { name: species, species, item: '', ability, moves: [], nature: 'Hardy', gender: '', evs: {}, ivs: {}, level: 100 } as unknown as PokemonSet;
+    return (validator.validateSet(set, {}) ?? []).some(problem => problem.includes(`ability ${ability} `));
+  };
+  return names.find(name => !refused(name)) ?? names[0];
+}
+
 describe('Start', () => {
   test('refuses a side without a set and a bad seed, in the dialog\'s words', () => {
     expect(startProblem({ texts: ['', ''] })).toBe('Paste a team for each player to start.');
@@ -122,13 +140,12 @@ describe('Start', () => {
   // H20a: a paste without an Ability line starts with the species' first ability written into the saved team (the simulator would play none)
   for (const [label, format, formatName, gen] of [
     ['singles', 'gen9ou', '[Gen 9] OU', 9], ['doubles', 'gen9doublesou', '[Gen 9] Doubles OU', 9], ['VGC', 'gen9vgc2025regi', '[Gen 9] VGC 2025 Reg I', 9],
-    ['Champions', 'gen9championsou', '[Gen 9 Champions] OU', 9], ['an older generation', 'gen4ou', '[Gen 4] OU', 4], ['a generation without abilities', 'gen2ou', '[Gen 2] OU', 2],
+    ['Champions', 'gen9championsou', '[Gen 9 Champions] OU', 9], ['a Custom Game', 'gen9customgame', '[Gen 9] Custom Game', 9], ['an older generation', 'gen4ou', '[Gen 4] OU', 4], ['a generation without abilities', 'gen2ou', '[Gen 2] OU', 2],
   ] as const) {
     test(`${label}: a set without an ability is saved with the species' first ability (${formatName})`, async () => {
       const record = await startNewGame({ format, formatName, names: ['Ann', 'Bo'], texts: [FOUR, TEAM], seed: '1,2,3,4' });
-      const dex = Dex.forFormat(Dex.formats.get(format));
       for (const set of record.teams.p1) {
-        expect(set.ability ?? '', `${set.species} in ${format}`).toBe(gen >= 3 ? dex.species.get(set.species).abilities['0'] : '');
+        expect(set.ability ?? '', `${set.species} in ${format}`).toBe(gen >= 3 ? firstAllowedAbility(format, set.species) : '');
       }
       // the other side pasted its abilities: they stay
       expect(record.teams.p2.map(set => set.ability)).toEqual(readTeamPaste(TEAM).sets.map(set => set.ability));
