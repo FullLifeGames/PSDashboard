@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react';
 import { chipAside } from '../../lib/dock-chip';
 import { useReplayRules } from '../../lib/replay-rules';
-import { spriteUrl } from '../../lib/sprite-url';
+import { SpriteImg } from '../SpriteImg';
 import { typeTileVars } from '../../lib/type-colors';
 import { chipKey } from '../../hooks/useTrayState';
 import type { DockSlotModel } from './dock-model';
@@ -44,7 +44,7 @@ export function SlotChip({ slot, open, onToggle }: { slot: DockSlotModel; open: 
       </span>
       {aside && (
         <span className="ps-dock-aside" aria-hidden="true">
-          {aside.kind === 'type' ? <TypeTag type={aside.type} /> : <img className="ps-dock-sprite" src={spriteUrl(aside.species, rules)} alt="" />}
+          {aside.kind === 'type' ? <TypeTag type={aside.type} /> : <SpriteImg className="ps-dock-sprite" species={aside.species} rules={rules} alt="" />}
         </span>
       )}
     </button>

@@ -1,6 +1,6 @@
 import { displayName } from '../lib/branch-history';
 import { useReplayRules } from '../lib/replay-rules';
-import { spriteUrl } from '../lib/sprite-url';
+import { SpriteImg } from './SpriteImg';
 import type { LeadOption } from '../lib/lead-options';
 import { useIsGuessed, type GuessedSide } from '../lib/stand-in-mark';
 
@@ -47,7 +47,7 @@ function LeadTile({ side, option, slot, leadsPerSide, showOrder, onToggle }: {
           ? `${label} was brought in the real game.`
           : label}
     >
-      <img src={spriteUrl(option.species, rules)} alt={label} />
+      <SpriteImg species={option.species} rules={rules} alt={label} />
       <span className="ps-switch-text">
         <span className="ps-switchbtn-name">{label}</span>
       </span>

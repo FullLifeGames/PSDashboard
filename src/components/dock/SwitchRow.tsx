@@ -4,7 +4,7 @@ import type { BranchSwitchOption } from '../../hooks/useBranch';
 import { displayName } from '../../lib/branch-history';
 import { hpBarClass } from '../../lib/hit-bar';
 import { useReplayRules } from '../../lib/replay-rules';
-import { spriteUrl } from '../../lib/sprite-url';
+import { SpriteImg } from '../SpriteImg';
 import type { PlayedPick } from '../../lib/played-pick';
 import { useIsGuessed, type GuessedSide, type StandInMark } from '../../lib/stand-in-mark';
 
@@ -30,7 +30,7 @@ function SwitchTile({ sw, selected, disabled, disabledReason, wasPlayed, engine,
       aria-pressed={selected}
       className={`ps-switchbtn ${selected ? 'ps-switchbtn-selected' : ''}`}
     >
-      <img src={spriteUrl(sw.species, rules)} alt={label} />
+      <SpriteImg species={sw.species} rules={rules} alt={label} />
       {(wasPlayed || engine || guessed) && (
         <span className="ps-tile-flags">
           {guessed && <span className="ps-guess-badge" title={guessed.title}>{guessed.badge}</span>}
