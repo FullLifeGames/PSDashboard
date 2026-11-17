@@ -53,8 +53,9 @@ describe('a stronger play, singles', () => {
     expect(step.status).toBe('found');
     expect(step.chance).toBe(1);
     expect(step.played).toBe(0);
-    // The witness line is not pinned here: with a replacement on the winning path the step reads `found` and carries no line at
-    // this head (open point in the R40 ledger); the row below and FOURTH's line row hold the line where there is no replacement.
+    // The witness line is not pinned here: both of the foe's bodies are named Snorlax, and `makeSwitches` (branch/state.ts)
+    // filters the bench by name, so the path's `switch 2` finds no choice and the step carries no line. FOURTH's line row
+    // holds the line on a board without same-named bodies.
   }, 120_000);
 
   test('the played choice that is already the best leaves nothing stronger', async () => {
