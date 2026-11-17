@@ -150,10 +150,22 @@ describe('AppTopBar', () => {
     expect(wired.onCancelPreparation).toHaveBeenCalledTimes(1);
   });
 
-  test('a live branch shows its turn and the divergence notice; the animate toggle sits in the Setup menu', async () => {
+  // Round 89 (user ruling 40, FB7a): the status names the live simulator's tip, which is not the turn on the slider after a play-out.
+  test.each(['singles', 'doubles'] as const)('%s: the live branch status reads "Variation tip: Turn N", and a preparing branch keeps its progress words', kind => {
+    const { rerender } = render(<AppTopBar {...props({ showBranch: true, simState: simState(kind, { turnNumber: 33 }) })} />);
+    expect(screen.getByText('Variation tip: Turn 33')).toBeInTheDocument();
+    expect(screen.queryByText(/Branching/)).toBeNull();
+    rerender(<AppTopBar {...props({ showBranch: true, simState: null })} />);
+    expect(screen.getByText('Variation tip: Turn …')).toBeInTheDocument();
+    rerender(<AppTopBar {...props({ showBranch: true, branchPreparing: true, branchProgress: { turn: 3, target: 12 }, simState: simState(kind, { turnNumber: 33 }) })} />);
+    expect(screen.getByText('Preparing branch... (turn 3/12)')).toBeInTheDocument();
+    expect(screen.queryByText(/Variation tip/)).toBeNull();
+  });
+
+  test('a live branch shows its tip turn and the divergence notice; the animate toggle sits in the Setup menu', async () => {
     const wired = props({ showBranch: true, simState: simState('singles', { turnNumber: 7, ended: true, winner: 'Alice' }), branchDivergence: 'The simulated replay diverged' });
     render(<AppTopBar {...wired} />);
-    expect(screen.getByText('Branching · Turn 7')).toBeInTheDocument();
+    expect(screen.getByText('Variation tip: Turn 7')).toBeInTheDocument();
     // The winner shows in the branch panel, where the pickers were (round 77).
     expect(screen.queryByText(/Alice wins/)).toBeNull();
     expect(screen.getByTitle('The simulated replay diverged')).toHaveTextContent('⚠ The simulated replay diverged');

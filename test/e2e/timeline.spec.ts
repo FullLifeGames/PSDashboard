@@ -146,7 +146,7 @@ test.describe('PS Dashboard', () => {
 
     // The executed turn is entry "Turn 2"; the sim continues one past it.
     await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 2');
-    await expect(page.getByText(/Branching · Turn/)).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/Variation tip: Turn/)).toBeVisible({ timeout: 15000 });
   });
 
   test.describe('unified timeline', () => {
@@ -265,7 +265,7 @@ test.describe('PS Dashboard', () => {
       // history records the lead decision as its turn-0 entry.
       await p1Column.locator('.ps-switchbtn:not(.ps-switchbtn-selected)').first().click();
       await page.locator('.ps-execute-btn', { hasText: 'Play from turn 0' }).click();
-      await expect(page.getByText(/Branching · Turn 1/)).toBeVisible({ timeout: 60_000 });
+      await expect(page.getByText(/Variation tip: Turn 1/)).toBeVisible({ timeout: 60_000 });
       const history = page.locator('.ps-panel', { hasText: 'Variation moves' });
       await expect(history).toContainText('Turn 0');
       await expect(history).toContainText('lead');
@@ -314,7 +314,7 @@ test.describe('PS Dashboard', () => {
       await expect(p1Column.locator('.ps-switchbtn-selected')).toHaveCount(2);
 
       await page.locator('.ps-execute-btn', { hasText: 'Play from turn 0' }).click();
-      await expect(page.getByText(/Branching · Turn 1/)).toBeVisible({ timeout: 60_000 });
+      await expect(page.getByText(/Variation tip: Turn 1/)).toBeVisible({ timeout: 60_000 });
       const history = page.locator('.ps-panel', { hasText: 'Variation moves' });
       await expect(history).toContainText('Turn 0');
       // Two leads per side, slot-ordered ("lead X + Y").
@@ -341,7 +341,7 @@ test.describe('PS Dashboard', () => {
       await expect(p1Column.locator('.ps-switchbtn-selected')).toHaveCount(4);
 
       await page.locator('.ps-execute-btn', { hasText: 'Play from turn 0' }).click();
-      await expect(page.getByText(/Branching · Turn 1/)).toBeVisible({ timeout: 60_000 });
+      await expect(page.getByText(/Variation tip: Turn 1/)).toBeVisible({ timeout: 60_000 });
       const history = page.locator('.ps-panel', { hasText: 'Variation moves' });
       await expect(history).toContainText('Turn 0');
       await expect(history).toContainText('back');
@@ -359,17 +359,17 @@ test.describe('PS Dashboard', () => {
       await page.locator('.ps-branch-bar button[title^="Turn 0"]').click();
       await expect(page.getByText('pick the 4 each side brings')).toBeVisible();
       await page.locator('.ps-execute-btn', { hasText: 'Play from turn 0' }).click();
-      await expect(page.getByText(/Branching · Turn 1/)).toBeVisible({ timeout: 60_000 });
+      await expect(page.getByText(/Variation tip: Turn 1/)).toBeVisible({ timeout: 60_000 });
 
       // The user's report of 30.10.2026 (Champions VGC 2646618972): back on T0, the same picks started again hung at
-      // "Branching"; discarding the variation first worked.
+      // "Variation tip"; discarding the variation first worked.
       await page.locator('.ps-branch-bar button[title^="Turn 0"]').click();
       await expect(page.getByText('pick the 4 each side brings')).toBeVisible();
       await page.locator('.ps-execute-btn', { hasText: 'Play from turn 0' }).click();
       const confirm = page.locator('[role="alertdialog"]');
       await expect(confirm).toContainText('Start a new game from turn 0: replace the existing variation from turn 0');
       await confirm.locator('button', { hasText: 'Replace' }).click();
-      await expect(page.getByText(/Branching · Turn 1/)).toBeVisible({ timeout: 60_000 });
+      await expect(page.getByText(/Variation tip: Turn 1/)).toBeVisible({ timeout: 60_000 });
       await expect(page.locator('.ps-dock-chip')).toHaveCount(4);
       await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 0');
     });

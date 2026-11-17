@@ -55,7 +55,7 @@ export interface IdleTipArgs {
 /**
  * Whether the live branch is the game's own next turn and no variation: no turn was played from the tip, or the first one is still
  * waiting for a replacement (it joins the main line once that is chosen). The top bar, the timeline and the side panels then show
- * none of a variation's chrome ("Branching", Discard variation, Variation moves, Save Branch); a variation from an earlier turn does.
+ * none of a variation's chrome ("Variation tip", Discard variation, Variation moves, Save Branch); a variation from an earlier turn does.
  */
 export function idleGameTip(args: IdleTipArgs): boolean {
   const { gameTip, startTurn, history, turnEntries, replacementPending } = args;

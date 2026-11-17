@@ -121,7 +121,7 @@ async function evaluateTurn(page: Page, turn: number): Promise<Offer> {
 async function clickEngineMove(page: Page, turn: number): Promise<string> {
   const panel = page.locator('.ps-main-right .ps-eval-panel');
   await panel.locator('.ps-eval-column').first().locator('button.ps-eval-choice').first().click();
-  await expect(page.getByText(/Branching · Turn/)).toBeVisible({ timeout: 90_000 });
+  await expect(page.getByText(/Variation tip: Turn/)).toBeVisible({ timeout: 90_000 });
   const history = variationPanel(page);
   await expect(history).toContainText(`Turn ${turn}`, { timeout: 90_000 });
   return (await history.textContent()) ?? '';

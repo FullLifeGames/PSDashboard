@@ -61,7 +61,7 @@ test('Gen 9 OU: paste, Start at Team Preview, pick leads, play a turn by hand, r
   await page.locator('.ps-dock .ps-execute-btn').click();
   await expect(page.getByText('T2/')).toBeVisible({ timeout: 90_000 });
   // the turn joined the main line: the tip is no variation, so the bar names none and offers no Discard
-  await expect(page.getByText(/Branching · Turn/)).toHaveCount(0);
+  await expect(page.getByText(/Variation tip: Turn/)).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Discard variation' })).toHaveCount(0);
   await expect(page.getByText('Variation moves')).toHaveCount(0);
   // the game is saved after the finished turn
@@ -246,7 +246,7 @@ test('the Game menu copies a game\'s link at Team Preview and on the main line; 
     await expect(page.getByRole('button', { name: 'Discard variation' })).toHaveCount(0);
     await expect(page.getByRole('group', { name: 'Line selector' })).toHaveCount(0);
     await expect(page.getByText('Variation moves')).toHaveCount(0);
-    await expect(page.getByText(/Branching · Turn/)).toHaveCount(0);
+    await expect(page.getByText(/Variation tip: Turn/)).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Copy Share Link' })).toHaveCount(0);
   };
   await noChrome();

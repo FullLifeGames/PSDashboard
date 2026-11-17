@@ -71,7 +71,7 @@ function TopBarBranchStatus({
       {showBranch && !branchPreparing && (
         <>
           <span style={{ fontSize: 11, fontWeight: 'bold', color: '#8cf', whiteSpace: 'nowrap' }}>
-            Branching · Turn {simState?.turnNumber ?? '…'}
+            Variation tip: Turn {simState?.turnNumber ?? '…'}
           </span>
           {branchDivergence && (
             <span className="ps-topbar-divergence" title={branchDivergence}>

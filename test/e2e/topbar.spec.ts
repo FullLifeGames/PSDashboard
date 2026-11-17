@@ -118,7 +118,7 @@ for (const width of [641, 1366]) {
 
 /**
  * Round 89 (FB-1, forum replay gen9natdexdraft-2713067801): on a phone, with a live branch at turn 33, "Setup ▾" ran over "Report
- * issue": the actions took no width of their own beside the support links. The status ("Branching · Turn 33"), Game, Setup and the
+ * issue": the actions took no width of their own beside the support links. The status ("Variation tip: Turn 33"), Game, Setup and the
  * links each keep their own box, and the buttons stay on one line. The status text is set to the long form before the read (the
  * fixture's branch reads a short turn); no render follows.
  */
@@ -131,9 +131,9 @@ test('390 px: the branch status, Game, Setup and the support links do not overla
   await loadDockReplay(page, 'gen9doublesou-2693620934', 1);
   // The branch opens with the first executed turn (the engine's pick stands in every slot).
   await page.locator('.ps-execute-btn').click();
-  const status = page.locator('.ps-topbar-actions > span', { hasText: /^Branching/ });
+  const status = page.locator('.ps-topbar-actions > span', { hasText: /^Variation tip/ });
   await expect(status).toBeVisible({ timeout: 90_000 });
-  await status.evaluate(element => { element.textContent = 'Branching · Turn 33'; });
+  await status.evaluate(element => { element.textContent = 'Variation tip: Turn 33'; });
   const boxes = await page.evaluate(() => {
     const rect = (element: Element) => {
       const box = element.getBoundingClientRect();

@@ -44,7 +44,7 @@ test.describe('PS Dashboard', () => {
     await pickMove(page, 'p1a');
     await pickMove(page, 'p2a');
     await page.locator('.ps-execute-btn').click();
-    await expect(page.getByText(/Branching · Turn 5[6-9]/)).toBeVisible({ timeout: 120_000 });
+    await expect(page.getByText(/Variation tip: Turn 5[6-9]/)).toBeVisible({ timeout: 120_000 });
     await expect(page.getByText(/already ended|wedged at turn/)).toHaveCount(0);
 
     await discardVariation(page);
@@ -55,7 +55,7 @@ test.describe('PS Dashboard', () => {
     await expect(page.locator('button', { hasText: 'Let it play out' })).toHaveCount(0);
     await expect(page.getByText('The game ended at this position: nothing left to play out.')).toBeVisible();
     await expect(page.getByText(/Engine is playing both sides/)).toHaveCount(0);
-    await expect(page.getByText(/Branching · Turn/)).toHaveCount(0);
+    await expect(page.getByText(/Variation tip: Turn/)).toHaveCount(0);
   });
 
   // Round 70 (user gate 17.10., 2a): known red until T243. Under the log's dice p2 sends Heatran into Mienshao's Knock Off
@@ -122,7 +122,7 @@ test.describe('PS Dashboard', () => {
         if (p2Part.startsWith('→ ')) p2Switches.push(p2Part.slice(2).trim());
       }
     });
-    const lastTurn = Number(/Branching · Turn (\d+)/.exec(await page.getByText(/Branching · Turn \d+/).innerText())?.[1]);
+    const lastTurn = Number(/Variation tip: Turn (\d+)/.exec(await page.getByText(/Variation tip: Turn \d+/).innerText())?.[1]);
     const line = `ended at turn ${lastTurn}, p2 switches: ${p2Switches.join(', ')}`;
     // The finished run leaves the frame where the user watches it (round 88, T347: no return to the start turn; the last
     // turn still does not drag the pointer to the tip); the click goes to the tip, which names the winner.
@@ -162,7 +162,7 @@ test.describe('PS Dashboard', () => {
     await expect(page.getByText('puffelmaedchen', { exact: true }).first()).toBeVisible({ timeout: 15_000 });
     await page.locator('.ps-branch-bar button[title^="Turn 0"]').click();
     await page.locator('.ps-execute-btn', { hasText: 'Play from turn 0' }).click();
-    await expect(page.getByText(/Branching · Turn 1/)).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText(/Variation tip: Turn 1/)).toBeVisible({ timeout: 60_000 });
 
     const history = page.locator('.ps-panel', { hasText: 'Variation moves' });
     // Turn 1: U-turn and Chilly Reception, each side then sends its first switch-in.
@@ -204,7 +204,7 @@ test.describe('PS Dashboard', () => {
     await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await startVariationAt(page, 1);
 
-    await expect(page.getByText(/Branching · Turn/)).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/Variation tip: Turn/)).toBeVisible({ timeout: 15000 });
     await expect(page.locator('button', { hasText: 'Discard variation' })).toBeVisible();
 
     await expect(page.locator('iframe[title="Branch Simulation"]')).toBeVisible({ timeout: 10000 });
@@ -413,7 +413,7 @@ test.describe('PS Dashboard', () => {
     await discardVariation(page, { confirm: false });
     await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 1');
     await discardVariation(page);
-    await expect(page.getByText(/Branching · Turn/)).toHaveCount(0);
+    await expect(page.getByText(/Variation tip: Turn/)).toHaveCount(0);
     await expect(page.locator('iframe[title="PS Replay"]')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('.ps-branch-bar input[type="range"]')).toBeVisible();
   });

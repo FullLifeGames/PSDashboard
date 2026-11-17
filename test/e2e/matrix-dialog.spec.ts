@@ -117,7 +117,7 @@ for (const game of GAMES) {
     await expect(dialog).toBeVisible();
     await table.locator('td button').first().click();
     await expect(dialog).toBeHidden();
-    await expect(page.getByText(/Branching · Turn/)).toBeVisible({ timeout: 90_000 });
+    await expect(page.getByText(/Variation tip: Turn/)).toBeVisible({ timeout: 90_000 });
     await expect(variationPanel(page)).toContainText(`Turn ${game.turn}`, { timeout: 90_000 });
   });
 }

@@ -81,7 +81,7 @@ function expectNoVariationChrome() {
   expect(screen.queryByRole('button', { name: 'Save Branch' })).toBeNull();
   expect(screen.queryByRole('button', { name: 'Copy Share Link' })).toBeNull();
   expect(screen.queryByText(/Gold = your variation/)).toBeNull();
-  expect(screen.queryByText(/Branching/)).toBeNull();
+  expect(screen.queryByText(/Variation tip/)).toBeNull();
   expect(document.querySelector('.ps-timeline-stripe')).toBeNull();
   expect(document.body.textContent).not.toMatch(/Turn \d+ · variation/);
 }

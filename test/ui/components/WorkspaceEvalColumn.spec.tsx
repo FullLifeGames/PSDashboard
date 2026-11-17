@@ -108,7 +108,7 @@ describe('WorkspaceEvalColumn', () => {
     expect(screen.getByText('Team preview')).toBeInTheDocument();
     expect(screen.queryByText('Turn 3')).toBeNull();
     // Round 89 (FB-1): the rows at T0 rank the leads, and no code applies a lead to the picker, so a click on one opened an empty
-    // variation at turn 1 ("Branching · Turn 1"). They read as rows, not buttons, until a feature applies them to the picker.
+    // variation at turn 1 ("Variation tip: Turn 1"). They read as rows, not buttons, until a feature applies them to the picker.
     expect(document.querySelectorAll('.ps-eval-choice').length).toBeGreaterThan(0);
     expect(document.querySelectorAll('button.ps-eval-choice')).toHaveLength(0);
     expect(app().ctx.branch.simState).toBeNull();

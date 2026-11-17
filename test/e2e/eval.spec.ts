@@ -99,8 +99,8 @@ test.describe('PS Dashboard', () => {
     // Clicking p1's top engine line enters a branch and PLAYS THE TURN OUT
     // against the engine's reply…
     await panel.locator('.ps-eval-column').first().locator('button.ps-eval-choice').first().click();
-    await expect(page.getByText(/Branching · Turn/)).toBeVisible({ timeout: 60_000 });
-    await expect(page.getByText(/Branching · Turn 2/)).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText(/Variation tip: Turn/)).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText(/Variation tip: Turn 2/)).toBeVisible({ timeout: 60_000 });
 
     // …auto re-evaluation surfaces the next recommendations for the walk
     // (the click also arms Auto for the turns that follow).
@@ -130,8 +130,8 @@ test.describe('PS Dashboard', () => {
     // pair (not the engine's preferred reply).
     await panel.locator('button.ps-eval-matrix-toggle').click();
     await panel.locator('table td button').first().click();
-    await expect(page.getByText(/Branching · Turn/)).toBeVisible({ timeout: 60_000 });
-    await expect(page.getByText(/Branching · Turn 2/)).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText(/Variation tip: Turn/)).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText(/Variation tip: Turn 2/)).toBeVisible({ timeout: 60_000 });
   });
 
   test('evaluates a position with the MCTS mode', async ({ page }) => {
@@ -166,7 +166,7 @@ test.describe('PS Dashboard', () => {
     // Unified timeline: playing a move puts the live sim at the tip — the
     // Evaluate button and choice clicks work from there.
     await startVariationAt(page, 1);
-    await expect(page.getByText(/Branching · Turn 2/)).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText(/Variation tip: Turn 2/)).toBeVisible({ timeout: 60_000 });
 
     const panel = page.locator('.ps-eval-panel');
     await panel.locator('button', { hasText: /^Evaluate$|^Re-evaluate$/ }).click();
@@ -175,7 +175,7 @@ test.describe('PS Dashboard', () => {
     // One click commits the line, answers with the engine's reply, and
     // executes — the walk continues from the next position.
     await panel.locator('.ps-eval-column').nth(0).locator('.ps-eval-choice').first().click();
-    await expect(page.getByText(/Branching · Turn 3/)).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText(/Variation tip: Turn 3/)).toBeVisible({ timeout: 60_000 });
   });
 
   test('evaluates a doubles replay position with combined choices', async ({ page }) => {

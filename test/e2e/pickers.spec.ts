@@ -105,7 +105,7 @@ test.describe('PS Dashboard', () => {
   test('saving player edits mid-branch preserves branch progress and pending choices', async ({ page }) => {
     await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await startVariationAt(page, 1, { p1Move: 'Swords Dance' });
-    await expect(page.getByText(/Branching · Turn 2/)).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/Variation tip: Turn 2/)).toBeVisible({ timeout: 15000 });
     await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 1');
 
     // The chip shows the pending pick (pickMove waits for the name on the chip).
@@ -120,7 +120,7 @@ test.describe('PS Dashboard', () => {
     await garchompCard.getByPlaceholder('Add move...').press('Enter');
     await editor.locator('button', { hasText: /^Save$/ }).click();
 
-    await expect(page.getByText(/Branching.*Turn 2/)).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/Variation tip.*Turn 2/)).toBeVisible({ timeout: 15000 });
     await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 1');
     await expect(async () => {
       const tray = await openTray(page, 'p1a', { timeout: 3000 });
@@ -178,7 +178,7 @@ test.describe('PS Dashboard', () => {
     await tray.locator('button', { hasText: 'Load move' }).click();
 
     // The branch rebuilds with the move in the set and pre-selected as pending: the chip names it, the tray lists it.
-    await expect(page.getByText(/Branching.*Turn/)).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/Variation tip.*Turn/)).toBeVisible({ timeout: 15000 });
     await expect(dockChip(page, 'p1a')).toContainText('Flamethrower', { timeout: 15000 });
     // The rebuild closes the tray the loader belonged to: open it again until it stands with the new tile.
     await expect(async () => {
