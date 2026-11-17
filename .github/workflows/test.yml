@@ -102,9 +102,10 @@ jobs:
         env:
           DICE_SWEEPS: full
 
-  # Round 89 (final gate, D6b): the dice job above reaches the `dice-*` files only, and 29 other specs read the same switch. The
+  # Round 89 (final gate, D6b): the dice job above reaches the `dice-*` files only, and 32 other spec files read the same switch. The
   # two parts below run them with DICE_SWEEPS=full, split by measured run time (about 7,850 s of local suite time each, so about
-  # 23 min on a runner; the longest single file, landed-hit-sweep, is about 23 min alone). Not a required check until the user
+  # 23 min on a runner). D9b (#125) split the two longest files by realm (landed-hit-sweep in three, blocked-effects-sweep in two, 1,300 to
+  # 1,600 s of local time each), so the longest single file is landed-hit-sweep-3 now, not a 70-minute file. Not a required check until the user
   # makes it one (branch protection names the six jobs above). `full-sweep-job.spec.ts` fails when a spec reads the switch and
   # sits in neither job, or when a listed file is gone: add a new sweep spec to the part with less time.
   full-sweeps:
@@ -131,6 +132,8 @@ jobs:
               packages/eval-engine/test/secondary-records.spec.ts
               packages/replay-core/test/field-evidence-sweep.spec.ts
               packages/replay-core/test/landed-hit-sweep.spec.ts
+              packages/replay-core/test/landed-hit-sweep-2.spec.ts
+              packages/replay-core/test/landed-hit-sweep-3.spec.ts
           - part: 2
             files: >-
               packages/eval-engine/test/board-key-effects.spec.ts
@@ -147,6 +150,7 @@ jobs:
               packages/eval-engine/test/stratified-root-sweep.spec.ts
               packages/eval-engine/test/unlogged-choice-sweep.spec.ts
               packages/replay-core/test/blocked-effects-sweep.spec.ts
+              packages/replay-core/test/blocked-effects-sweep-2.spec.ts
               packages/replay-core/test/screen-evidence.spec.ts
     steps:
       - name: Check out repository

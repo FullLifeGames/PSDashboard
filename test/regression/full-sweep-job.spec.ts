@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
  * Round 89 (final gate, D6b): every spec that reads the full-sweep switch runs with `DICE_SWEEPS=full` in one of two CI jobs of
  * test.yml: "Dice sweeps, every move" (the eval-engine specs whose path matches the job's pattern) or "Full sweeps, the other
  * specs" (an explicit list in two parts). In round 89 three specs failed only under the switch and stayed red for days because
- * the dice job's pattern reaches `dice-*` files only; 29 sweep specs never ran full in CI. This spec holds the lists to the
+ * the dice job's pattern reaches `dice-*` files only; 29 sweep specs never ran full in CI (D9b split two of them into five parts of about 1,500 seconds each: the list names 32 files now). This spec holds the lists to the
  * truth: a spec that reads the switch and sits in neither job fails here, a listed file that no longer exists fails here, and a
  * spec that sits in both runs twice.
  *
@@ -114,7 +114,10 @@ describe('the two CI jobs that run the specs with DICE_SWEEPS=full', () => {
     for (const part of ['sweep', 'crit-doubles-a', 'crit-doubles-b', 'crit-singles', 'secondary']) {
       expect(readers).toContain(part === 'sweep' ? 'packages/eval-engine/test/dice-logged-sweep.spec.ts' : `packages/eval-engine/test/dice-logged-${part}.spec.ts`);
     }
-    expect(readers).toContain('packages/replay-core/test/landed-hit-sweep.spec.ts');
+    // the sweeps D9b split by realm: every part reads the switch through its body module
+    for (const part of ['landed-hit-sweep', 'landed-hit-sweep-2', 'landed-hit-sweep-3', 'blocked-effects-sweep', 'blocked-effects-sweep-2']) {
+      expect(readers).toContain(`packages/replay-core/test/${part}.spec.ts`);
+    }
     expect(readers).not.toContain('test/regression/upgrade-checks-dice.spec.ts');
     expect(readers.length).toBeGreaterThan(50);
   });
