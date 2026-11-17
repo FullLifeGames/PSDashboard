@@ -213,7 +213,7 @@ export async function startVariationAt(page: Page, turn: number, options?: { p1M
   if (await forcedNote.isVisible().catch(() => false)) {
     await pickForcedReplacement(page);
     await expect(page.locator('.ps-panel', { hasText: 'Variation moves' }))
-      .toContainText('forced replacement', { timeout: 30_000 });
+      .toContainText('replacement (', { timeout: 30_000 });
   }
   for (const slot of slots) {
     await expect(dockChip(page, slot)).toBeVisible({ timeout: 30_000 });

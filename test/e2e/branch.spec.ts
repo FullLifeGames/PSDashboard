@@ -115,7 +115,7 @@ test.describe('PS Dashboard', () => {
     // when it is a switch, and the forced-replacement rows of P2.
     const p2Switches: string[] = [];
     lines.forEach((line, index) => {
-      const forced = /forced replacement \(P2\): → (.+)$/.exec(line);
+      const forced = /replacement \(P2\): → (.+)$/.exec(line);
       if (forced) p2Switches.push(forced[1].trim());
       if (/^Turn \d+$/.test(line.trim())) {
         const p2Part = (lines[index + 1] ?? '').split(' | ')[1] ?? '';
@@ -171,7 +171,7 @@ test.describe('PS Dashboard', () => {
     await page.locator('.ps-execute-btn').click();
     for (const side of ['P1', 'P2']) {
       await pickForcedReplacement(page);
-      await expect(history).toContainText(`forced replacement (${side})`, { timeout: 30_000 });
+      await expect(history).toContainText(`replacement (${side})`, { timeout: 30_000 });
     }
     // Turn 2 as played first, then one turn back and Freeze-Dry instead.
     await pickMove(page, 'p1a', 'Ice Beam');

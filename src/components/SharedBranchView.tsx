@@ -54,7 +54,7 @@ function choiceLine(choice: SharedChoice): string {
   const p1 = choice.p1Label ?? choice.p1Choice;
   const p2 = choice.p2Label ?? choice.p2Choice;
   if (choice.forcedSide) {
-    return `Turn ${choice.turnNumber}, forced replacement (${choice.forcedSide.toUpperCase()}): ${choice.forcedSide === 'p1' ? p1 : p2}`;
+    return `Turn ${choice.turnNumber}, replacement (${choice.forcedSide.toUpperCase()}): ${choice.forcedSide === 'p1' ? p1 : p2}`;
   }
   return `Turn ${choice.turnNumber}: P1 ${p1} / P2 ${p2}`;
 }

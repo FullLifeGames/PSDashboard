@@ -120,7 +120,7 @@ test.describe('the dock on the inner turns of a variation with a replacement', (
     await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText(`${played} turns`);
     // A replacement on one side is an entry of kind turn that makes no turn (the run holds none on both sides: the scene below does).
     await page.getByRole('button', { name: /Variation moves/ }).click();
-    await expect(page.getByText(/forced replacement \(P[12]\)/).first()).toBeVisible();
+    await expect(page.getByText(/replacement \(P[12]\)/).first()).toBeVisible();
 
     // The inner turns, 2 to the last played one (the tip is the live position, which was always right).
     for (let turn = 2; turn < 1 + played; turn++) await expectDockMatchesFrame(page, turn, 'issue replay');
@@ -151,7 +151,7 @@ test.describe('the dock on the inner turns of a variation with a replacement', (
     const history = page.locator('.ps-panel', { hasText: 'Variation moves' });
     await expect(history).toContainText('2 turns', { timeout: 60_000 });
     await page.getByRole('button', { name: /Variation moves/ }).click();
-    await expect(page.getByText(/forced replacement \(both sides\)/).first()).toBeVisible();
+    await expect(page.getByText(/replacement \(both sides\)/).first()).toBeVisible();
     expect(await slider(page)).toMatchObject({ max: Math.max(replayEnd, 6 + 2) });
     await expect(page.getByTitle('Variation: turns 6 to 8'), 'the stripe names the real turns').toBeVisible();
 

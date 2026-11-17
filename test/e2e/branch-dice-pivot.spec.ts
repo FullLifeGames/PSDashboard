@@ -32,7 +32,7 @@ test('U-turn against Chilly Reception from the viewed turn 1: both sides send th
   const history = page.locator('.ps-panel', { hasText: 'Variation moves' });
   for (const side of ['P1', 'P2']) {
     await pickForcedReplacement(page, { timeout: 60_000 });
-    await expect(history).toContainText(`forced replacement (${side})`, { timeout: 30_000 });
+    await expect(history).toContainText(`replacement (${side})`, { timeout: 30_000 });
   }
   await expect(page.getByText('You need a switch response')).toHaveCount(0);
 });

@@ -63,7 +63,7 @@ describe('SharedBranchView', () => {
     ] };
     render(<SharedBranchView branch={named} onLoadOriginal={vi.fn()} onClear={vi.fn()} />);
     expect(screen.getByText(`Turn 3: P1 ${p1Label} / P2 ${p2Label}`)).toBeInTheDocument();
-    expect(screen.getByText('Turn 4, forced replacement (P2): → Kyurem')).toBeInTheDocument();
+    expect(screen.getByText('Turn 4, replacement (P2): → Kyurem')).toBeInTheDocument();
     expect(screen.queryByText(/move 2|switch 3/)).toBeNull();
   });
 

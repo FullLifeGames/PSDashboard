@@ -107,6 +107,10 @@ The turns of the replay, or the turns played in a game. The pointer sits on the 
 **Variation**:
 The one line the user plays from a turn of the main line, by a different choice, by a click on a line, or by Let it play out. At most one exists (ADR 0015).
 
+**Replacement**:
+The switch-in the simulator asks for in the middle of a turn: after a knockout, or after a pivot move such as U-turn, Flip Turn or Eject Button. The history list and a shared branch print it as its own row, "replacement (P1)", "replacement (P2)" or "replacement (both sides)", and it takes no turn of its own. The row's word is neutral because the sim does not say whether a knockout or a pivot move asked for it.
+_Avoid_: forced replacement (in the lists; the code's `forced` entry kind keeps its name)
+
 **Line**:
 The turns the engine expects after a choice, for the choices that the search rated: both players' choices for at most three turns, every die at its likeliest result, and the win chance for the player at the line's end (`EvalLine` in the code). A tree search keeps a line only where a node holds 4 visits, so a line ends early where the search stopped there (after the game report the app adds the line pass, extra iterations aimed at the rows a line shows, for every graded turn), and it says so when the next step is a switch nobody chose. A row's percentage averages many outcomes of its dice; a line follows one of them, so the Lines section shows both ("row 23%, this line ends at 19%") and says why they differ. The user sees a line in the Lines section under the turn's analysis (closed until its `Lines` toggle opens it) and in the Game review. A graded turn gets its lines from one more tree search after the game report: an early singles turn, which the matrix scores and which keeps no line, and every tree turn, whose lines from the sweep stand on thin second turns; the review shows the progress. ▶ Play turns the line into a variation with those dice forced (the button's tooltip lists them); a chip shows a die only where the other result was possible.
 _Avoid_: principal variation, PV (code names such as `PV_MAX_STEPS` keep them)
