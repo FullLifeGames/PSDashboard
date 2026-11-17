@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'fs';
 import {
-  dockChip, expectReplaySettled, expectReplayTurnAtLeast, fixturePath, installReplayEmbedCache, pickForcedReplacement, pickMove, pickSwitch,
+  discardVariation, dockChip, expectReplaySettled, expectReplayTurnAtLeast, fixturePath, installReplayEmbedCache, pickForcedReplacement, pickMove, pickSwitch,
   routeOfflineFixtures, routeSlowReplayEmbed, startVariationAt, type ReplayWindow,
 } from './helpers';
 import { openVariationHistory } from './dock-helpers';
@@ -47,7 +47,7 @@ test.describe('PS Dashboard', () => {
     await expect(page.getByText(/Branching · Turn 5[6-9]/)).toBeVisible({ timeout: 120_000 });
     await expect(page.getByText(/already ended|wedged at turn/)).toHaveCount(0);
 
-    await page.locator('button', { hasText: 'Discard variation' }).click();
+    await discardVariation(page);
     await expect(slider).toBeVisible({ timeout: 10_000 });
     await slider.fill('68');
     // The end snapshot is the post-battle sentinel: no play-out is offered there (round 77, A-6: the bar says the game
@@ -409,7 +409,10 @@ test.describe('PS Dashboard', () => {
     await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await startVariationAt(page, 1);
 
-    await page.locator('button', { hasText: 'Discard variation' }).click();
+    // Cancel keeps the variation (FB4a); the second answer discards it.
+    await discardVariation(page, { confirm: false });
+    await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 1');
+    await discardVariation(page);
     await expect(page.getByText(/Branching · Turn/)).toHaveCount(0);
     await expect(page.locator('iframe[title="PS Replay"]')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('.ps-branch-bar input[type="range"]')).toBeVisible();

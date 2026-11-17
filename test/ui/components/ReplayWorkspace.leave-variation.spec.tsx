@@ -119,3 +119,42 @@ describe('loading a replay while an unsaved variation is open (H16a)', () => {
     await act(async () => {});
   }, 300_000);
 });
+
+/**
+ * Round 89 (user ruling 40, FB4a): Discard variation asks first once the variation has a played turn (the same banner as the leave
+ * question); with no played turn it goes at once. Singles and doubles run the same rows.
+ */
+describe('Discard variation (FB4a)', () => {
+  test.each(CASES)('$name: with a played turn the question comes first; Cancel keeps the variation, Discard variation drops it', async ({ format, leads }) => {
+    const app = await openVariation(format, leads);
+    await userEvent.click(screen.getByRole('button', { name: 'Discard variation' }));
+    const question = await screen.findByRole('alertdialog');
+    expect(question).toHaveTextContent(/The variation has \d+ played turns?\. Discarding drops (it|them)\./);
+    expect(app().ctx.branch.history.length).toBeGreaterThan(0);
+    await userEvent.click(within(question).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(app().ctx.branch.history.length).toBeGreaterThan(0);
+    await userEvent.click(screen.getByRole('button', { name: 'Discard variation' }));
+    await userEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Discard variation' }));
+    await waitFor(() => expect(app().ctx.branch.history.length).toBe(0));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(app().ctx.branch.branching).toBe(false);
+  }, 300_000);
+
+  test.each(CASES)('$name: a variation with no played turn is discarded at once', async ({ format, leads }) => {
+    const { app } = await mountGame(format);
+    await playKnockoutTurn(app, leads);
+    await act(async () => {
+      picks(app().ctx.branch.simState!, 'p2').forEach((choice, slot) => { if (choice) app().ctx.branch.setChoice('p2', choice, slot); });
+    });
+    await act(async () => { await app().ctx.branch.executeTurn(); });
+    await waitFor(() => expect(app().ctx.newGame.record!.turns).toBe(1), { timeout: 30_000 });
+    act(() => app().board.timeline.navigateTo({ turn: 1, line: 'main' }));
+    act(() => app().board.deviation.requestDeviation(null));
+    await waitFor(() => expect(app().analysis.showBranch).toBe(true), { timeout: 60_000 });
+    expect(app().ctx.branch.history.length).toBe(0);
+    await userEvent.click(await screen.findByRole('button', { name: 'Discard variation' }));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    await waitFor(() => expect(app().ctx.branch.branching).toBe(false));
+  }, 300_000);
+});

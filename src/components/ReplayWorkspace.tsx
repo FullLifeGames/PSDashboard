@@ -9,6 +9,8 @@ import { AppTopBar } from './AppTopBar';
 import { TimelineBar } from './TimelineBar';
 import { ConfirmBanner } from './ConfirmBanner';
 import { useLayoutHeight } from '../hooks/useLayoutHeight';
+import { useDiscardAsk } from '../hooks/useDiscardAsk';
+import { turnEntryCount } from '../lib/variation-turns';
 import { WorkspaceEvalColumn } from './WorkspaceEvalColumn';
 import type { AppController } from '../hooks/useAppController';
 import { useCallback, useMemo, useState } from 'react';
@@ -225,6 +227,7 @@ function WorkspaceLeft({ app, replayData, onNewGame }: WorkspaceProps) {
   const { variationSpan } = app.board.timeline;
   const branching = app.ctx.branch.branching && !idleTip(app);
   const { nearSide, onSideChange } = useNearSide(frameIdentity(app, replayData), replayData.viewpoint);
+  const discard = useDiscardAsk(turnEntryCount(app.ctx.branch.history), app.board.discardVariation);
   return (
     <div className="ps-main-left">
       {/* Match info, the Load and Setup menus in one bar */}
@@ -246,8 +249,9 @@ function WorkspaceLeft({ app, replayData, onNewGame }: WorkspaceProps) {
         idle={idleTip(app)}
         onNavigate={app.board.timeline.navigateTo}
         onGraphSelectLine={app.board.timeline.handleGraphSelectLine}
-        onDiscard={app.board.discardVariation}
+        onDiscard={discard.request}
       />
+      {discard.question && <ConfirmBanner message={discard.question.message} proceedLabel="Discard variation" onProceed={discard.question.proceed} onCancel={discard.question.cancel} />}
       {branchDivergence && !app.analysis.showBranch && <WorkspaceAlert text={`⚠ ${branchDivergence}`} />}
       {variationNotice && <WorkspaceAlert text={variationNotice} />}
       {(branching || variationSpan !== null) && !idleTip(app) && <BranchSidePanels app={app} replayData={replayData} />}

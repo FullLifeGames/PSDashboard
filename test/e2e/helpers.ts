@@ -171,6 +171,18 @@ export async function moveTimeline(page: Page, turn: number): Promise<void> {
 }
 
 /**
+ * Round 89 (user ruling 40, FB4a): Discard variation asks first once a turn was played. The bar's button opens the question, the
+ * question's own button discards. `confirm: false` cancels instead and leaves the variation.
+ */
+export async function discardVariation(page: Page, options?: { confirm?: boolean }) {
+  await page.locator('.ps-branch-bar').getByRole('button', { name: 'Discard variation' }).click();
+  const question = page.getByRole('alertdialog');
+  await expect(question).toContainText(/The variation has \d+ played turns?\./);
+  await question.getByRole('button', { name: options?.confirm === false ? 'Cancel' : 'Discard variation' }).click();
+  await expect(question).toHaveCount(0);
+}
+
+/**
  * Unified-timeline helper: moves the slider to `turn`, gives EVERY active slot an explicit move through its tray, executes,
  * and waits for the rebuilt sim's history entry: after this a live variation covers `turn` and the pointer sits on its tip.
  *
