@@ -25,7 +25,9 @@ import { diffsOf, emittedBlock, FIXTURES, rebuild, type FixtureId, type GameType
  *   click that fills in takes the enabled move of the lowest priority at 0 or below, so the foe's logged action stays first;
  * - resolved by the accuracy of one hit (1, round 88, T337): 2628340185 turn 13 (ruling Q4), a Triple Axel whose log shows one hit: the
  *   die of hit 2 names the miss the log never writes (only `|-hitcount|1`), so the forced turn stops the chain where the game's did;
- * - named residuals (9): the turn stays imperfect for a cause that is no die of the log. A row
+ * - resolved by the build (3, round 89, #110, #75; final gate P3a): the set reader rules out the ability a landed effect refutes, so Dragonite of
+ *   2663093831 holds Multiscale, not Inner Focus, and turns 8 to 10 rebuild as the log shows them (they were named residuals of the build);
+ * - named residuals (6): the turn stays imperfect for a cause that is no die of the log. A row
  *   holds the cause where the base and the forced turn share it, so a later fix moves a row to the gate by failing it;
  * - guards: the two turns the base plays perfectly by seed luck and a plain forced turn breaks (2629703929 turn 10, a failed second
  *   Protect; 2663093831 turn 11, a damage roll the faint step repairs), and the 330 other perfect turns, counted per replay;
@@ -54,17 +56,16 @@ const BY_STAND_IN: Row[] = [
 ];
 /** Turns that the accuracy die of one hit resolves (round 88, T337): the log shows a multi-accuracy chain that broke, the miss of the next hit has no line. */
 const BY_HIT_DIE: Row[] = [{ id: 'gen9championsou-2628340185', turn: 13 }];
-const RESOLVED = [...BY_FORCING, ...BY_FAINT_STEP, ...BY_STAND_IN, ...BY_HIT_DIE];
+/** Turns that the set reader resolves (round 89, #110, #75): the log shows a flinch and an Intimidate drop that Inner Focus would stop, so the build takes Multiscale. */
+const BY_BUILD: Row[] = [{ id: 'gen9doublesou-2663093831', turn: 8 }, { id: 'gen9doublesou-2663093831', turn: 9 }, { id: 'gen9doublesou-2663093831', turn: 10 }];
+const RESOLVED = [...BY_FORCING, ...BY_FAINT_STEP, ...BY_STAND_IN, ...BY_HIT_DIE, ...BY_BUILD];
 
 interface Residual extends Row { cause: string; /** The diff of the emitted block against the log that the base and the forced turn share. */ stays: string | null }
 const RESIDUALS: Residual[] = [
   { id: 'smogtours-gen6ou-648453', turn: 4, cause: 'damage model: the simulator keeps Rotom alive that the log\'s hit knocked out (no step of the roll kills it)', stays: null },
   { id: 'gen9championsou-2628340185', turn: 23, cause: 'damage model: the log shows the Shadow Sneak of Aegislash leaving Floette at 1/100, the roll of the simulator knocks Floette out first (round 88, T325: no unlogged choice, the move of Aegislash is in the log)', stays: 'moveCount p1:floette:moonblast log=1 sim=0' },
-  { id: 'gen9doublesou-2663093831', turn: 8, cause: 'build: the set has Inner Focus, the log shows the Intimidate drop of Multiscale', stays: 'secondaries p1:dragonite:unboost:atk:1 log=1 sim=0' },
   { id: 'smogtours-gen9doublesou-912045', turn: 9, cause: 'build: an item (Throat Spray) the log disproves', stays: 'secondaries p1:ursaluna:boost:spa:1 log=0 sim=1' },
   { id: 'smogtours-gen9doublesou-912045', turn: 1, cause: 'damage model: the simulator deals half of the log\'s damage to Rillaboom', stays: 'faint log-only p2:rillaboom' },
-  { id: 'gen9doublesou-2663093831', turn: 9, cause: 'build: the set has Inner Focus, which blocks the flinch the log shows (the cause of turn 8; the stand-in Scale Shot then knocks out Landorus, and the turn runs on a seed); round 88, X2: p1 Sinistcha, whose flinch stands before the Shadow Ball, keeps its place, and its flinch lands', stays: 'cants p1:dragonite:flinch log=1 sim=0' },
-  { id: 'gen9doublesou-2663093831', turn: 10, cause: 'damage model: the flinches now match (T325), the Rock Slide of the simulator leaves Dragonite alive that the log knocked out', stays: 'faint log-only p1:dragonite' },
   { id: 'gen9vgc2026regi-2630685175', turn: 3, cause: 'unlogged aim: a charge move\'s |move| line names no target (the aim sits in |-anim|)', stays: null },
   { id: 'gen9vgc2026regi-2630685175', turn: 9, cause: 'damage model and a premature end: the log\'s crit leaves Zamazenta alive, a forced crit ends the game in the simulator (ruling Q2: the fallback takes this turn)', stays: null },
 ];
@@ -135,6 +136,14 @@ describe.each(['singles', 'doubles', 'vgc'] as GameType[])('the rebuild plays th
     }
   });
 
+  describe.skipIf(!BY_BUILD.some(entry => typeOf(entry.id) === type))('resolved by the build (#110, #75)', () => {
+    for (const row of BY_BUILD.filter(entry => typeOf(entry.id) === type)) {
+      test(`${key(row)}: the emitted block matches the log in faints and every die`, () => {
+        expect(isPerfectAlignment(recordOf(row).actual), shown(row)).toBe(true);
+      });
+    }
+  });
+
   describe('named residuals: the cause is no die of the log', () => {
     for (const row of RESIDUALS.filter(entry => typeOf(entry.id) === type)) {
       test(`${key(row)}: ${row.cause}`, () => {
@@ -162,21 +171,22 @@ describe.each(['singles', 'doubles', 'vgc'] as GameType[])('the rebuild plays th
 
 describe('the counts of the drift line', () => {
   // 24 turns of the named rows missed the log in round 85 (singles 11, Doubles OU 8, VGC 5, with Q3 and Q4); B3 resolved the eight of forcing, B4
-  // resolves the three of the faint step, T325 (round 88) the three of the stand-in, T337 the one of the hit die: the imperfect rows are the residuals
-  test('the named rows that miss the log: the residuals (singles 2, Doubles OU 5, VGC 2 after T337)', () => {
+  // resolves the three of the faint step, T325 (round 88) the three of the stand-in, T337 the one of the hit die, #110 (round 89) the three of the build: the imperfect rows are the residuals
+  test('the named rows that miss the log: the residuals (singles 2, Doubles OU 2, VGC 2 after #110)', () => {
     const imperfect = [...RESOLVED, ...RESIDUALS].filter(row => !isPerfectAlignment(recordOf(row).actual));
     const byType = (type: GameType) => imperfect.filter(row => typeOf(row.id) === type).length;
-    expect({ singles: byType('singles'), doubles: byType('doubles'), vgc: byType('vgc'), total: imperfect.length }).toEqual({ singles: 2, doubles: 5, vgc: 2, total: 9 });
+    expect({ singles: byType('singles'), doubles: byType('doubles'), vgc: byType('vgc'), total: imperfect.length }).toEqual({ singles: 2, doubles: 2, vgc: 2, total: 6 });
   });
 
   // Round 86 (ruling C2): the turns the hybrid search plays under another seed than index 0
   // 2630685175 turn 3 is a named residual (the aim of a charge move sits in |-anim|): the search keeps the seed whose unnamed dice fit best and the row stays imperfect
   // Round 88 (gate of 08.11.2026): since X2 Sinistcha's flinch of 2663093831 turn 9 lands; the forced pass still misses the log (the built
-  // Dragonite holds Inner Focus), and the seed search finds a seed that fits the turn's other dice better
-  test('the seeded turns of the twelve replays: 2663093831 turn 9 and 2630685175 turn 3, both named residuals', () => {
+  // Dragonite holds Inner Focus), and the seed search finds a seed that fits the turn's other dice better.
+  // Round 89 (final gate, P3a, #110): the set reader rules Inner Focus out, Dragonite holds Multiscale, and turn 9 plays perfectly on the base seed
+  test('the seeded turns of the twelve replays: only 2630685175 turn 3, a named residual', () => {
     const seeded = FIXTURES.flatMap(({ id }) => [...rebuilt.get(id)!.records.values()].filter(record => record.via === 'forced' && record.seed !== '1,2,3,4').map(record => `${key({ id, turn: record.turn })} ${record.seed}`));
-    expect(seeded).toEqual([`${key({ id: 'gen9doublesou-2663093831', turn: 9 })} 62,64,33,83`, `${key({ id: 'gen9vgc2026regi-2630685175', turn: 3 })} 2,4,6,8`]);
-    expect(isPerfectAlignment(recordOf({ id: 'gen9doublesou-2663093831', turn: 9 }).actual)).toBe(false);
+    expect(seeded).toEqual([`${key({ id: 'gen9vgc2026regi-2630685175', turn: 3 })} 2,4,6,8`]);
+    expect(isPerfectAlignment(recordOf({ id: 'gen9doublesou-2663093831', turn: 9 }).actual)).toBe(true);
     expect(isPerfectAlignment(recordOf({ id: 'gen9vgc2026regi-2630685175', turn: 3 }).actual)).toBe(false);
   });
 

@@ -48,8 +48,8 @@ describe('Doubles OU 2663093831: the Intimidate and the Rock Slide flinch rule o
     expect(ruledOut(lines.slice(0, intimidate - 1).join('\n'), 'p1', 'Dragonite')).toEqual([]);
   });
 
-  test('Sinistcha took the same drop and flinch and holds no ability they refuse: it keeps the two rule-outs it had (Ground and indirect damage)', () => {
-    expect(ruledOut(fixture.log, 'p1', 'Sinistcha')).toEqual(['levitate', 'magicguard']);
+  test('Sinistcha took the same drop and flinch and holds no ability they refuse: it keeps the rule-out of indirect damage (Levitate is no ability of Sinistcha, #150)', () => {
+    expect(ruledOut(fixture.log, 'p1', 'Sinistcha')).toEqual(['magicguard']);
   });
 });
 
@@ -118,8 +118,8 @@ describe('a landed stat drop, status, confusion or Taunt rules out the guard aga
     expect(ruledOut(log, 'p2', 'Kangaskhan').sort()).toEqual(['innerfocus', 'scrappy']);
   });
 
-  test('a secondary drop (Mud-Slap, accuracy) rules out Keen Eye (and Levitate, which the Ground hit refuted before this round)', () => {
-    expect(ruledOut(singles(mon('Smeargle', '', ['Mud-Slap']), mon('Sneasel', 'Pickpocket')), 'p2', 'Sneasel').sort()).toEqual(['keeneye', 'levitate']);
+  test('a secondary drop (Mud-Slap, accuracy) rules out Keen Eye (Sneasel cannot hold Levitate, so the Ground hit rules out nothing else, #150)', () => {
+    expect(ruledOut(singles(mon('Smeargle', '', ['Mud-Slap']), mon('Sneasel', 'Pickpocket')), 'p2', 'Sneasel').sort()).toEqual(['keeneye']);
   });
 
   test('sleep lands on Hypno: Insomnia is out (singles)', () => {
