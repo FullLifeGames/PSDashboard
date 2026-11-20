@@ -83,10 +83,14 @@ export interface StartGameParams {
   fillAbilities?: boolean;
 }
 
-/** The team validator's problems, per side. */
+/**
+ * The team validator's problems, per side, and the refusal Start would give each side: the sentence `startGameLog` throws for a
+ * species the Dex does not know, or null (round 89, NG-2: the dialog blocks Start on it and shows it under the box).
+ */
 export interface GameTeamProblems {
   p1: string[];
   p2: string[];
+  refused: { p1: string | null; p2: string | null };
 }
 
 /**
@@ -106,15 +110,22 @@ function levelOfSet(rules: ReturnType<ReturnType<typeof simFormats>['getRuleTabl
 /**
  * The simulator cannot start a battle with a species its Dex does not know: the stream throws "Cannot read properties of null". The
  * start says so in the game's words, naming the species and the format (round 89, H4h); `checkGameTeams` reports the same set in the
- * simulator's words, and a move, an item or an ability the Dex does not know starts as given.
+ * simulator's words and hands the start's sentence back as `refused` (NG-2), and a move, an item or an ability the Dex does not know
+ * starts as given.
  */
-function refuseUnknownSpecies(format: ReturnType<ReturnType<typeof simFormats>['get']>, team: PokemonSet[]): void {
+function unknownSpeciesRefusal(format: ReturnType<ReturnType<typeof simFormats>['get']>, team: PokemonSet[]): string | null {
   const dex = dexOfFormat(format);
   for (const set of team) {
     if (dex.species.get(set.species).exists) continue;
     const name = (set.species || set.name || '').trim();
-    throw new Error(name ? `${name} is no Pokémon of ${format.name}. Fix the set to start.` : `A set has no Pokémon. Fix the set to start.`);
+    return name ? `${name} is no Pokémon of ${format.name}. Fix the set to start.` : `A set has no Pokémon. Fix the set to start.`;
   }
+  return null;
+}
+
+function refuseUnknownSpecies(format: ReturnType<ReturnType<typeof simFormats>['get']>, team: PokemonSet[]): void {
+  const refusal = unknownSpeciesRefusal(format, team);
+  if (refusal) throw new Error(refusal);
 }
 
 /** The abilities a species can have in the Dex's slot order (0, 1, hidden, special), without gaps or repeats. */
@@ -226,8 +237,8 @@ function ownAbilityIds(species: { abilities: object }): Set<string> {
 /**
  * The simulator's own validation of each team against the format, as its problems in the simulator's words; an empty list is a
  * legal team. A Custom Game checks nothing in the simulator, so the project's rule joins: each species plays its own
- * abilities (a Hackmons format, which has no such rule, stays free). The result informs the interface; it never decides
- * whether a game may start.
+ * abilities (a Hackmons format, which has no such rule, stays free). The problems inform the interface and never stop a start; only
+ * `refused` does, because the simulator cannot play such a set.
  */
 export async function checkGameTeams(formatId: string, teams: { p1: PokemonSet[]; p2: PokemonSet[] }): Promise<GameTeamProblems> {
   await loadSimMods(formatId);
@@ -251,5 +262,5 @@ export async function checkGameTeams(formatId: string, teams: { p1: PokemonSet[]
     }
     return problems;
   };
-  return { p1: check(teams.p1), p2: check(teams.p2) };
+  return { p1: check(teams.p1), p2: check(teams.p2), refused: { p1: unknownSpeciesRefusal(format, teams.p1), p2: unknownSpeciesRefusal(format, teams.p2) } };
 }
