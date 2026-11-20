@@ -104,6 +104,20 @@ describe('MatrixDialogButton', () => {
     expect(aliceCell).toHaveTextContent(`${winPercent(result.matrix!.values[1][2])}%`);
   });
 
+  test('a side knocked out before it moved has no played column and no worst cell (655336 t27); the side that moved keeps both', async () => {
+    const { result, analysis } = singles();
+    const phantom = { ...analysis.p2.played!, label: 'stayed in (KO’d before acting)' };
+    const patched: TurnAnalysis = { ...analysis, p2: { ...analysis.p2, played: phantom, neverActed: true } };
+    renderButton({ result, analysis: patched });
+    await userEvent.click(screen.getByRole('button', { name: 'Open matrix' }));
+    const table = screen.getByRole('table');
+    expect(headerOf(table, 'Swords Dance')).toHaveTextContent(/played/);
+    expect(headerOf(table, 'Body Press')).not.toHaveTextContent(/played/);
+    expect(within(table).queryAllByText('played')).toHaveLength(1);
+    expect(within(table).getAllByText(/worst/)).toHaveLength(1);
+    expect(screen.queryByTitle(/worst reply to Bob's/)).toBeNull();
+  });
+
   test('a played pair that is also the engine pair, and a cell that is worst for both, mark once each', async () => {
     const result = evalResult('singles');
     const [earthquake] = result.perSide.p1;

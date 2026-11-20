@@ -36,11 +36,14 @@ function worstCell(result: EvalResult, matrix: EvalMatrix, side: 'p1' | 'p2', pl
   return side === 'p1' ? [own, reply] : [reply, own];
 }
 
-/** The marks of one turn; A turn that tracked no played action (`playedTracking` false) marks no played choice. */
+/**
+ * The marks of one turn. A turn that tracked no played action (`playedTracking` false) marks no played choice, and neither does a
+ * side knocked out before it moved (`neverActed`): its log shows no choice, the engine's stand-in is no play (655336 t27).
+ */
 export function matrixMarks(result: EvalResult, matrix: EvalMatrix, analysis: TurnAnalysis): MatrixMarks {
   const tracked = analysis.playedTracking !== false;
-  const p1Played = tracked ? analysis.p1.played : null;
-  const p2Played = tracked ? analysis.p2.played : null;
+  const p1Played = tracked && !analysis.p1.neverActed ? analysis.p1.played : null;
+  const p2Played = tracked && !analysis.p2.neverActed ? analysis.p2.played : null;
   return {
     playedRow: indexOnAxis(matrix.p1Choices, matrix.p1Labels, p1Played),
     playedColumn: indexOnAxis(matrix.p2Choices, matrix.p2Labels, p2Played),
