@@ -30,17 +30,20 @@ export function ConfirmBanner({ message, onProceed, onCancel, proceedLabel = 'Re
       }}
     >
       <span style={{ flex: '1 1 12em' }}>{message}</span>
-      <button type="button" className="ps-btn ps-btn-red" style={KEEP_WORDS} onClick={onProceed}>
-        {proceedLabel}
-      </button>
-      <button
-        type="button"
-        className="ps-btn"
-        style={KEEP_WORDS}
-        onClick={onCancel}
-      >
-        Cancel
-      </button>
+      {/* FT-1: the two buttons wrap as one pair, so a narrow column never leaves Cancel alone on its own line. */}
+      <span style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+        <button type="button" className="ps-btn ps-btn-red" style={KEEP_WORDS} onClick={onProceed}>
+          {proceedLabel}
+        </button>
+        <button
+          type="button"
+          className="ps-btn"
+          style={KEEP_WORDS}
+          onClick={onCancel}
+        >
+          Cancel
+        </button>
+      </span>
     </div>
   );
 }
