@@ -171,6 +171,15 @@ export const regretSpanFor = (side: SideAnalysis): { span?: { from: number; to: 
     ? { span: { from: displayBest(side).ev, to: side.played.ev, ...(side.faintedFraction === undefined ? {} : { faintedFraction: side.faintedFraction }) } }
     : {};
 
+/** The report's misplay of a body that fell before it moved: the stand-in's chance, for the sentence of `neverActedText` (round 89, FT-1). */
+export const neverActedFor = (side: SideAnalysis): { neverActed?: { ev: number; faintedFraction?: number } } =>
+  side.neverActed && side.played
+    ? { neverActed: { ev: side.played.ev, ...(side.faintedFraction === undefined ? {} : { faintedFraction: side.faintedFraction }) } }
+    : {};
+
+/** What a report misplay carries beyond its sentence: the span of a regret over 1 and the stand-in of a body that never acted. */
+export const misplayExtrasFor = (side: SideAnalysis) => ({ ...regretSpanFor(side), ...neverActedFor(side) });
+
 /** The null recommendation kept its place (no alternative): name the caveat. */
 export const nullNote = (side: SideAnalysis): string =>
   side.bestNull && !side.bestNull.alternative && side.best
