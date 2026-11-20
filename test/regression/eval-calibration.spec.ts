@@ -912,6 +912,319 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * ROUND 89 2026-11-09 to 2026-11-20 (improvement round 89, the wave of 1.2.0:
+ * the 38 open issues of milestone 1.2.0, built in lanes A to H, N, P, Q, S, L
+ * and a feedback lane; base r89 on master 439ae2d (release 1.1.1 plus PR #128
+ * and #129) with its opening commit 8976c749 (jsdom 31, knip 6.44.2); every
+ * part of the round ran on devbox (user 09.11.2026), CI as the second machine
+ * from 12.11.; lanes A and C branch from the opening commit, later lanes from
+ * r89's head; one fresh agent per step; merged in the clone ps-dashboard-2-m89
+ * on m89 and fast-forwarded into r89: fe8d9785 lane C, ed4a9449 lane E,
+ * d0a3d275 lane B, acd33f1f and 373ac634 lane D, 64872837 lane A, bced4531 and
+ * 1430b8b5 lane F, 36ced864 and e438a036 lane H, 462bac2e and 47b5a76c lane G,
+ * ffa7127f and 01c554d1 lane N, df62fa88 to d1e27cd8 the deletions of #57,
+ * ac11892e lane P, 4e6b7b37 the app and test lanes, aa13bff9 the feedback
+ * fixes, b6da02f6 the full-sweep fixes; then 15d606c5 cache v79, 3fbd193f,
+ * 376ca975 and a49ffbe8 the re-pins, ccc2baf1 the documents, 5667106d the
+ * head; probes docs/perf/probes/2026-11-09-r89/). Gates: the opening 09.11.
+ * (every open issue of 1.2.0 in one wave, eight rulings on the plan), the
+ * mid-wave gate 09.11. (24 questions), lane rulings 09.11. to 15.11. (rulings
+ * 15 to 38 of the brief), the final gate from 16.11. (paused the same day for
+ * the grades and forced-win readings of two games, then answered in three
+ * batches on 16.11., 17.11. and 19.11.).
+ *
+ * DELIVERED: Lane A, search draws and the forced-win proof (#59 block 1, #60,
+ * #145, #148, #149; score-touching). Block 1 of T322 reads each die of a root
+ * draw by its own quantile, permuted by hash, so two 50 % dice no longer share
+ * one tree; the pre-registered trust rule for thin trees missed its bar (test
+ * half 6 of 16 pools closer than one-ply, 38 % against 70 %) and a revert took
+ * it out (f71673d2); #59 closes with block 1 and block 2 stays parked with a
+ * trigger. #60 reads one seed list per cell, shared by every path, keyed by a
+ * hash of the saved position. #145: a repeated Protect no longer reads as a
+ * sure failure; a proof below mass 1 stays visible above MIN_FORCED_MASS, also
+ * for the side that lost. #148: the helping rule counts a critical hit's
+ * leftover as a roll fact (sweep over every boost move in every generation and
+ * mod, the crit forced both ways). #149: the hit-cost memo keys the state of
+ * effects, so a Substitute at 53 HP and one at 10 HP no longer share a price
+ * (cost accepted by the user: about +8 to +12 % CPU per singles search, +5 %
+ * in VGC). Prover in doubles: five plain draws, and the prover asks the full
+ * proof for its root candidates without the five-turn scout (doubles proofs 70
+ * new against 25 gone, accepted).
+ *
+ * Lane B, brought bodies (#116, #124, #117; score-touching). A transformed
+ * Ditto no longer breaks the bring list. A side that did not bring all six is
+ * played four against four, or, where the log never showed a body, as a blend
+ * of the three heaviest worlds by usage weight (a full search per world; every
+ * world cost +51 to +66 % search time, three worlds +35 to +42 %). The
+ * short-side reading found 134 bodies in 131 games that entered and fainted in
+ * one turn, so the game that ADR 0010 used as its example (2630452654) is full
+ * by the log; ADR 0024 supersedes ADR 0010 and carries the corrected table. A
+ * Random Battle fills its unseen bodies from the format's random-set data, one
+ * draw per game seeded by the log header (static error 0.118 against 0.485
+ * with shown bodies only in singles, 0.092 against 0.298 in doubles, 240
+ * simulated games). Illusion moved to 1.3.0 with #141.
+ *
+ * Lane C, choices from the protocol (#111, #118, #108, #106, #131, #144, #135,
+ * #138, #143, #136; score-touching). The stand-in move and the cant order read
+ * priority abilities (#111); the forme tie of findSlotBySpecies goes through
+ * the Dex and drops the prefix pass (#118); a body that fell before it acted
+ * is graded inside the order bound the simulator's priorities allow, and the
+ * bound is attached to the search result (#108, C4b: Doubles OU 2663093831
+ * turn 7 and VGC 2629703929 turn 9 read another played row); PokemonSnapshot
+ * gains an optional ppUsed read from @pkmn/client, so a spent Revival Blessing
+ * or a 1-PP move no longer ranks first (#106; Pressure's extra PP is charged
+ * by a corrected copy held to the simulator); the revive answer and forced
+ * replacements by slot (#131, #144); a relayed Magic Bounce, Magic Coat,
+ * Snatch or Dancer move is no click of the body (#135); exit corrections
+ * (#138); a stand-in for a choice the request refuses (#143); the aim of a
+ * failed move whose target the protocol hides, asked from the simulator (#136,
+ * 2,511 doubles turns exposed, 23 games diverge).
+ *
+ * Lane D, set inference (#110, #75, #132, #139, #140, #146; score-touching). A
+ * logged effect now rules out the ability that blocks it (78 of 7,035 corpus
+ * replays); #75 reads a knockout by the game's display bounds (Scarlet/Violet
+ * rounds the shown HP up, Champions down) and D9 repairs the top-up that a
+ * refuted knockout had widened (singles late +1 [0, +3] after it); a guessed
+ * Leppa Berry the log refutes goes (#132); a transformed body's moves book to
+ * its target (#139) and a Pledge combination books the partner's Pledge on the
+ * right body (#140); transform-booking-corpus.spec.ts and a sweep that holds
+ * every logged own move to the built set on every build path without a user
+ * edit (#146).
+ *
+ * Lane E, play-out and small app fixes (#112, #119, #113, #115; lossless). The
+ * play-out loop reads its own tip, not the pointer, so a click behind the tip
+ * no longer stalls it (new hook inputs tip and tipEvalStatus; four rows in
+ * singles and doubles); the status line follows the stop (#119); the lead
+ * picker at turn 0 follows Switch sides (#113); a forced-win label keeps its
+ * open text when the open class carries an effect (#115).
+ *
+ * Lane F, a die per hit and logged random targets (#114, #137;
+ * score-touching). The dice panel offers one Hits row with the counts 1 to N
+ * under the first hit, saved branches and the engine's dice as before; a count
+ * the game cuts short reads "(5 landed)" and "Forced 10 hits, 5 landed"; Skill
+ * Link and Loaded Dice show one fixed row (optional DieOffer.fixedBy). Random
+ * targets and Roar's drag are logged dice now (four turns of Doubles OU
+ * 2663093831 move; four rebuild rows move).
+ *
+ * Lane G, lines over the whole game (#104, #130, #153; #104 and #153 lossless
+ * on the corpus, the stall fix of G4b score-touching). Under a turn's analysis
+ * the Lines section (closed by default, like the Explanation) shows the
+ * engine's line and the played line per player, up to three turns, with both
+ * numbers and a play button that forces the dice the line assumes; the Game
+ * review lists the graded turns per side, the graph marks them. The game
+ * analysis also searches every graded early singles turn with the trees (1.09
+ * to 1.65 times the analysis time, accepted at 1.2 times), the graded-turn
+ * stage costs 0.97 to 1.42 times, the lines job at most 1.12 % of the tree's
+ * CPU. #130: "How could <player> have won?" searches three steps (a stronger
+ * play, luck down to 1 in 1,000, an opponent's mistake) with a budget of 350
+ * cells and 175 turns, from the Endgame row or any endgame turn. #153: Hard
+ * mode, a checkbox that lets the opponent answer with the reply the search
+ * rates lowest for the move in hand, and "Back to the engine's pick" in the
+ * dock's tray. G4b fixed the stalling die an Encore rebuilt as a Protect that
+ * succeeded where the log's failed.
+ *
+ * Lane H, a new game from two teams (#105; lossless for replays). The Game
+ * menu holds Load replay, New game and Saved games; a dialog takes two teams
+ * as Showdown text, the format (the simulator's whole list, searchable, the
+ * calibrated families on top, or a Custom Game) and a seed that the user can
+ * see and set; the game opens at Team Preview with both teams in full view and
+ * every turn played becomes the main line; saved games (20 at most) list under
+ * the menu and on the landing page; the address names what is open (?game=<id>
+ * or ?replay=<id>); the share link has version 2 (two teams, the format, the
+ * seed, the played entries) and the app keeps reading version 1; a pasted set
+ * without an ability gets the format's first ability, named in the dialog; a
+ * team change that cuts played turns and an unsaved variation ask first.
+ *
+ * Lane N, #150 (larger bug, score-touching): a landed hit rules an ability out
+ * (Water Absorb for Dracovish after Aqua Step), with the Illusion guard of the
+ * older readers; hand-set EVs keep their nature; the editor's pools for a
+ * species the generation marks Past read the National Dex, and typed moves
+ * accept every move the battle plays (cold inference 1.20 times).
+ *
+ * Lane P, the prover's delay and sure strike (score-touching through the
+ * prover). A repeated Protect delays a proof and no longer removes it (delay
+ * rule, split read, lazy read; endgame/delay-rule.ts); a one-body foe that
+ * cannot move before a strike that always knocks it out is tried first
+ * (endgame/prover-strike.ts); the card and the Game review say "... wins
+ * within 2 turns against every reply on the sampled rolls; a repeated Protect
+ * only delays it. The winning line is Aqua Jet, which strikes first, with Heat
+ * Wave beside it." The optional fields delay, delayName and choiceNames carry
+ * it; ENGINE_PROTOCOL stays.
+ *
+ * Lane Q and the app steps. A read counts as paid off only when it also beat
+ * the safe line against the reply that came, else the card names a risk that
+ * went unpunished; a quiet card that speaks beside another sentence reads
+ * "Neither side made a mistake."; the matrix opens as a dialog from the turn
+ * card; the team editor keeps an edited set across a reload and loses fewer
+ * edits to its smaller faults; the what-if move picker follows the format;
+ * Variation tip, Replacement and the Discard question carry the new words; the
+ * turn link ?replay=<id>&turn=<n> opens a replay on a turn (lane L). Five
+ * fixes from the outside forum post on gen9natdexdraft-2713067801 (Terastal
+ * Clause in the branch format, plain turn-0 rows and others).
+ *
+ * Lane S and merge steps (#57, #133, #125; lossless). M3 deleted the tree's
+ * chance nodes (CHANCE_NODES), FORCED_SWITCH_NODES and FIRST_TURN_JOINS_LOG
+ * with every line only they reach and 33 real knip findings, and ADR 0023
+ * supersedes ADR 0009; OBSERVATION_SLACK lives in one module (#133); M4 gave
+ * the Tests workflow room for a slow runner and runs pack:smoke in CI; the
+ * three verify-scenes boards are rebuilt through the app's team build; the
+ * sweeps that read DICE_SWEEPS=full outside the dice files run in a second,
+ * informational CI job in three parts, held by full-sweep-job.spec.ts; #125
+ * steps 1 and 2 split dice-logged-sweep into five files, landed-hit-sweep into
+ * three and blocked-effects-sweep into two (23,970 rows before and after, 0
+ * lost, 0 gained). New ADRs 0023, 0024, 0025; ADR 0014 and ADR 0020 amended.
+ *
+ * MEASUREMENT: classes: lanes E, G (lines), H, L, S and the app steps
+ * lossless; A to D, F, N, P and Q's rule score-touching. Base r89-base
+ * (8976c749) in CI; feedback base q0 is c1 = c2 on master (13 of 13 passed,
+ * 834 s and 824 s, 12 dumps byte-identical on devbox; the PC's last wave dumps
+ * differ only in the last digits, 0 moved turns). Wave bank r89-w2 (16fbc855,
+ * CI set against r89-base eight days older, so not a same-day base): no harm
+ * in any pooled row. Bank -1 [-12, +11]; Doubles OU holdout -7 [-26, +10];
+ * vgc2 -50 [-69, -32] (reads better); Champions OU -2 [-30, +27]; Champions
+ * VGC -7 [-34, +20]; the doubles combined table (bank, Doubles OU, vgc2) -36
+ * [-50, -22] (reads better), hq -26 [-50, -3]; one phase warning, the Doubles
+ * OU holdout in hq mid with own K (+198 [+0, +321], 8 games), already present
+ * in the first wave set and not moved by the later fixes. The wave set before
+ * the last fixes (r89-w0 against r89-w2) moves only late-phase rows by under 1
+ * bp. Along the way: B's #124 against the commit before it doubles -18 [-25,
+ * -10], VGC holdout -27 [-38, -16] (wall time +16 %); C no harm, 94 of 8,042
+ * rows moved; D after D9 no harm in a deciding table; A (a10) combined doubles
+ * -2 [-7, +3]; F (f137) 0 harm; C4b moves gameValue only (9, 31, 70 and 30
+ * rows of the bank, vgc2 and Champions VGC, every pooled row +0); lane E and
+ * the deletions of M3 are byte-identical in all five sets; the #150 rule moves
+ * 3 of 4,218 vgc2 rows in one replay. The five sets hold 838, 1,092, 4,218,
+ * 445 and 1,449 rows, as in round 88. Feedback: every lane's pair equals
+ * itself (13 of 13 pins); census against c1: A (a10) 75 moved turns without a
+ * moved truth pin, C and E 0, D 8 (all Doubles OU 2663093831), B 0; the merged
+ * head at b1ffee26 (w1f1 = w1f2, 13 passed in 37.8 min per run) equals lane
+ * G's run outside lines; at ed27beb3 C4b moves two turns (Doubles OU
+ * 2663093831 turn 7, VGC 2629703929 turn 9). No expert pin of corpus.ts moved.
+ * Prover sample of 163 roots (singles 26, Doubles OU 10, VGC 99, Champions OU
+ * 4, Champions VGC 24): the delay rule raises 3 proofs, lowers 0, removes 0;
+ * the sure strike raises 4 winner-side proofs (2204521710#7, 2474083068#10,
+ * 2683837036#6, 2683915311#10 from 0.667 to 1 or 0.9963), adds 1
+ * (2582617212#7) and lowers 1 (2470704517#6 from 1 in 5 turns to 0.963 in 3,
+ * the form right by the game; the no-refund form reads 0.667 there). Prover
+ * time of the sure strike against the delay rule, mean of both run orders,
+ * interleaved in one process, run 1 / run 2: singles +6.9 / +3.6 %, Doubles OU
+ * +5.8 / +3.2 %, VGC +17.2 / +13.8 %, Champions OU -0.8 / +10.4 % (4 rows),
+ * Champions VGC +46.1 / +44.2 %, all 163 roots +19.8 / +16.8 % (848 to 991 ms
+ * a row); 13 roots carry 40 of the 53 extra seconds. Re-pins: 3fbd193f 14 rows
+ * (faint-step-last-first 6, forced-reconstruction 5, blocked-effects 2,
+ * stats-panel-quality 1), a49ffbe8 ten prover rows (forced-win-budget 2,
+ * forced-win-default-path 4, forced-win-direct 1, forced-win-prover 1,
+ * plain-draws 1, win-paths-stronger 1), 376ca975 Champions VGC 2694684816 turn
+ * 8 to no proof until #155 and #156, the three verify-scenes boards at S1; the
+ * e2e rows of the Lines toggle, flinch wording and the graph caption.
+ * EVAL_ENGINE_CACHE_VERSION 78 to 79 (15d606c5). CI: Tests run 44046564963 on
+ * ccc2baf1 (one spec comment before the head 5667106d), all nine jobs green,
+ * the three full-sweep parts and the dice job included; earlier runs
+ * 43773287403 (f6f4c548) and 44018587599 (16fbc855) read red only in the rows
+ * named in the re-pins. Final suite on 5667106d in the main checkout, plain,
+ * two workers: 998 files passed, 2 skipped; 25,157 tests passed, 50 expected
+ * fail, 30 skipped (reconstruction.spec.ts played with the local data). Engine
+ * project with EVAL_SIM_FAST=0: 475 files, 17,147 passed, 48 expected fail, 24
+ * skipped. Full e2e, one worker: 224 passed, 8 skipped, 1 failed
+ * (lines-play.spec.ts:93, a click on the Lines toggle that landed while the
+ * panel re-rendered under load; the file passed 5 of 5 on two reruns).
+ * BOOK-GAP: three feedback runs on the final head (byte compare of the dumps,
+ * tier census against c1 with --moved, the corpus cards that carry the delay
+ * clause).
+ * BOOK-GAP: the wave-tester's findings on the merged head and what the final
+ * gate ruled on them.
+ *
+ * GATE: opening 09.11.: every open issue of 1.2.0 in one wave on devbox, with
+ * two worktree slots; the trust rule of T322 loses its two open clauses; the
+ * unknown fourth body is evaluated once per candidate by usage. Mid-wave gate
+ * 09.11.: the play-out loop reads its own tip (#112); the prefix pass of #118
+ * goes; #60 is built per cell; the tree's chance nodes go (ADR 0009
+ * superseded); #125 splits the large sweeps and #57 deletes the 33 real
+ * findings; new issues approved for 1.2.0 (the revive answer, a Leppa Berry
+ * the log refutes, one module for OBSERVATION_SLACK, the relayed click, the
+ * hidden-target failure, random targets and drags, the two exit corrections,
+ * the transform and Pledge bookings, a stand-in for a refused choice, forced
+ * replacements by slot). Lane rulings 10.11. to 15.11.: B plays the three
+ * heaviest worlds; the blend passes its test on two short-side games; #145
+ * widens to the lost side's proof; the dice spread of the grades is described
+ * with its numbers and no more draws come in 1.2.0 (a TODO proposal waits);
+ * the strand sentence of A4 leaves 1.2.0 and #59's block 2 is parked; #149
+ * stays at its measured cost; H and G decide their views (modal dialog, Game
+ * menu, seed, lines per player, Hard mode as a checkbox); #150 joins with the
+ * National Dex pools for Past species. Final gate, first batch 16.11.: the
+ * grades and forced-win readings of two games sent the gate back to fixes
+ * (lanes P and Q), then ruling on the re-pins of rebuild and inference rows,
+ * the card's delay wording, "read paid off" only against the safe line, the
+ * matrix as a dialog, the Lines and win-path views closed by default, the
+ * ability fill from the format's first ability, the scene of 2628166702 turn 7
+ * stays without a forced win, #59 closes with block 1 and a second CI job
+ * holds the full sweeps outside the dice files. 17.11.: five fixes of the
+ * forum feedback stay, the Discard question, the word "replacement",
+ * "Variation tip", #154 (Champions Reg M-B) as one larger bug for 1.3.0.
+ * 19.11.: the bounded board-key census stays; the future-attack delay fix, the
+ * Protective Pads tell and the bench filter by name go to 1.2.1, and 1.2.0
+ * ships with the documented limits.
+ * BOOK-GAP: the rulings of the final gate that closes the round (the answers
+ * after 19.11., the release decision).
+ *
+ * LESSONS: (1) The slow feedback run of 19.11. (573756 hit the 2,100 s cap;
+ * 562428 took 10.7 minutes where it took 1.2 on 15.11.) was the machine and no
+ * change of the round. Interleaving base and head on one game (562428 alone,
+ * four runs: head 11.4 and 13.1 minutes, base 11.6 and 8.0) showed identical
+ * dumps at equal cost; sar showed 17 to 20 % system time and 5 to 11 % iowait
+ * against 4 to 7 % and 0.1 % on 15.11., from a crawl job at its 1 GiB memory
+ * cap (792,028 limit hits, 220 GB read in 61 hours) and a second session's
+ * unqueued work at nice 0 beside our nice-10 run. A feedback run starts only
+ * after load, system share and the corpus test's own time (0.2 to 0.56 s
+ * normal) read quiet, and a slow run is first compared base against head on
+ * one game. (2) A CI job's time estimate needs the per-file times, not the row
+ * counts: the three full-sweep parts of #125's plan promised about 14 minutes
+ * each, the first CI run timed out because board-key-census alone ran past 49
+ * minutes (6,500 s of work in one synchronous loop that the 60 s test timeout
+ * never saw); the three parts came from the per-file seconds of that run
+ * (3,552 and 3,344 s summed, wall about the sum divided by 2.6), and the
+ * census plays a bounded sample under full (588 s). (3) A subagent's stated
+ * cause is checked by a reviewer before it enters a spec comment: the missing
+ * line on a stalling board was written up as a prover limit with no witness
+ * line, the reviewer found makeSwitches filtering the bench by name (two
+ * bodies called Snorlax, slotChoicesOf returns null), and 5667106d corrected
+ * the comment; the fault predates the round (1.2.1). (4) The switch
+ * DICE_SWEEPS=full reaches 57 specs and CI played it in only the dice-* files
+ * (31 specs sat outside); three specs were red only under full sweeps until
+ * the second job existed. (5) A change that crosses the packages needs
+ * pack:smoke in CI (41e3e204: an import without its extension passed every
+ * job); M4 added it. (6) A pre-registered bar worked: the trust rule failed
+ * its 70 % test and a revert took it out of the round without a second
+ * reading. (7) A lane's own engine run in both speed modes catches what the
+ * merge would show late (two rows of lane C); a topbar row read 0.576 px
+ * against its 0.5 px tolerance once in CI, the button's hover lift was the
+ * cause, and the spec now waits for transform: none (6055d200).
+ *
+ * RESTS: approved for 1.2.1 (milestone created, issue #157 is the comment rule
+ * and clean-up with its own pull request after the release): Fake Out only on
+ * the first turn (a line's Fake Out against a foe on the field since turn 4),
+ * items that announce themselves (Throat Spray and kin, hit-triggered
+ * berries), replay-core's default ability reading the format's ban list, the
+ * pair plan dividing its missing mass by the coverage it reached, a probe of
+ * the 90 % accuracy delay, the delay facts for future attacks (Future Sight,
+ * Doom Desire from Gen 5), the Protective Pads tell (Rocky Helmet and the
+ * silent contact punishers), the bench filter by name in makeSwitches. Open
+ * for 1.3.0: #141 Illusion in the rebuild, #142 Struggle as evidence, #147 a
+ * hint when a pasted set lacks a logged move, #151 a census of speed ties,
+ * #152 National Dex usage and sets files, #154 Champions Reg M-B
+ * (registration, then the resolver's answer), #155 split pricing, #156 slot
+ * read with one body per side, more draws for the graded side with a cost
+ * measurement first, Hard mode's three rests, the use of the engine's leads, a
+ * tidy workspace, and the testers' text and layout list. Upstream list:
+ * @pkmn/client 0.7.4 never charges Pressure's extra PP, the Pledge from-move
+ * booking (#134), the Mega-Z formes without battleOnly (#95). #125 steps 4 to
+ * 6 (folding about 130 small files, about 320 s) wait for files that lanes P
+ * and Q moved; #57's coverage run over the bank's quick tier did not run. The
+ * worktrees w89a to w89h and the clone m89 go after the merge, on the user's
+ * okay.
+ * BOOK-GAP: issue numbers of the 1.2.1 and 1.3.0 proposals that are not issues
+ * yet, the pull request number, the closing of #125's remaining steps.
+ *
  * ROUND 88 2026-11-07 to 2026-11-08 (improvement round 88, the wave of
  * 1.1.1: 17 planned issues, five more that joined during the wave (#101,
  * #102, #103, #107, #122), 22 closed by the pull request; base r88 at
