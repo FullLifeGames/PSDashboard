@@ -90,8 +90,8 @@ function decidedSentences(analysis: TurnAnalysis, playerNames: PlayerNames, deci
 /** A decision or read turn: each side's clause (round 67, T59: no praise for a side that lost ground), then the luck rider. */
 function decisionSentences(analysis: TurnAnalysis, playerNames: PlayerNames): string[] {
   const sentences: string[] = [];
-  const p1Clause = sideClause(playerNames[0], analysis.p1, analysis.p2, !lostGround(analysis, 'p1'));
-  const p2Clause = sideClause(playerNames[1], analysis.p2, analysis.p1, !lostGround(analysis, 'p2'));
+  const p1Clause = sideClause(playerNames[0], analysis.p1, analysis.p2, !lostGround(analysis, 'p1'), playerNames[1]);
+  const p2Clause = sideClause(playerNames[1], analysis.p2, analysis.p1, !lostGround(analysis, 'p2'), playerNames[0]);
   if (p1Clause) sentences.push(p1Clause);
   if (p2Clause) sentences.push(p2Clause);
   if (analysis.chanceDelta !== null && Math.abs(analysis.chanceDelta) >= CHANCE_THRESHOLD) {
@@ -231,7 +231,7 @@ function attributionSentences(analysis: TurnAnalysis, playerNames: PlayerNames, 
       return ['The score swung, but a choice never surfaced (a Pokémon slept, flinched, or was fully paralyzed), so no blame is assigned.'];
     default:
       // Round 76 (T233): a quiet card keeps the read a chance card shows (round 70, 1a) where the cell is solid.
-      return quietSentences(analysis, walkedSentence(analysis, playerNames), othersSpeak);
+      return quietSentences(analysis, walkedSentence(analysis, playerNames), othersSpeak, playerNames);
   }
 }
 

@@ -13,6 +13,19 @@ export const NEITHER_MISTAKE = 'Neither side made a mistake.';
 export const BOTH_BEST = "Both sides played the engine's preferred line.";
 
 /**
+ * Round 89 (FT-1b): a body knocked out before it moved played nothing, and the stand-in the engine grades for it is no play, so
+ * "both sides played" would credit it with a move (655336 t28). The sentence names the side that moved when that side played the
+ * engine's line and the other never acted; two sides that never acted, or a mover off the engine's line, keep the plain words.
+ */
+function onlyMoverBest(analysis: TurnAnalysis, playerNames: [string, string]): string | null {
+  const sides = [['p1', playerNames[0]], ['p2', playerNames[1]]] as const;
+  const idle = sides.filter(([key]) => analysis[key].neverActed === true);
+  if (idle.length !== 1) return null;
+  const mover = sides.find(([key]) => analysis[key].neverActed !== true)!;
+  return playedBest(analysis[mover[0]]) ? mover[1] : null;
+}
+
+/**
  * How a quiet card speaks: `alone` (nothing else on the card, the quiet sentence), `no-mistake` (something else speaks, no side
  * carries a mistake or blunder tier), `silent` (something else speaks and a side carries such a tier, so no sentence is true).
  */
@@ -33,15 +46,16 @@ export function quietVoiceOf(analysis: TurnAnalysis, othersSpeak: boolean): Quie
 }
 
 /** The quiet sentence of a tracked card, or none. */
-export function quietSentence(analysis: TurnAnalysis, voice: QuietVoice): string | null {
-  const best = playedBest(analysis.p1) && playedBest(analysis.p2);
-  if (voice === 'alone') return best ? QUIET_TURN_BEST : QUIET_TURN;
-  if (voice === 'no-mistake') return best ? BOTH_BEST : NEITHER_MISTAKE;
+export function quietSentence(analysis: TurnAnalysis, voice: QuietVoice, playerNames: [string, string]): string | null {
+  const mover = onlyMoverBest(analysis, playerNames);
+  const both = playedBest(analysis.p1) && playedBest(analysis.p2) && !analysis.p1.neverActed && !analysis.p2.neverActed;
+  if (voice === 'alone') return both ? QUIET_TURN_BEST : mover ? `A quiet turn: ${mover} played the engine's preferred line.` : QUIET_TURN;
+  if (voice === 'no-mistake') return both ? BOTH_BEST : mover ? `${mover} played the engine's preferred line.` : NEITHER_MISTAKE;
   return null;
 }
 
 /** The quiet part of a card's attribution sentences: the quiet sentence, then the walked read (round 76, T233). */
-export function quietSentences(analysis: TurnAnalysis, walked: string | null, othersSpeak: boolean): string[] {
-  const sentence = quietSentence(analysis, quietVoiceOf(analysis, othersSpeak || walked !== null));
+export function quietSentences(analysis: TurnAnalysis, walked: string | null, othersSpeak: boolean, playerNames: [string, string]): string[] {
+  const sentence = quietSentence(analysis, quietVoiceOf(analysis, othersSpeak || walked !== null), playerNames);
   return [...(sentence ? [sentence] : []), ...(walked ? [walked] : [])];
 }

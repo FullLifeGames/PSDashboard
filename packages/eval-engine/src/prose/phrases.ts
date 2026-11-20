@@ -125,6 +125,17 @@ export const choiceNoun = (label: string): string =>
     .map(part => (part.startsWith('→ ') ? `switch to ${part.slice(2)}` : part))
     .join(' and ');
 
+/**
+ * Round 89 (FT-1): the words for a body knocked out before it moved, whose log shows no choice. The engine's stand-in label
+ * ("stayed in (KO’d before acting)") names what it graded, not what happened; a sentence says this instead. The app's row
+ * (`neverActedText`) builds on the same words.
+ */
+export const NEVER_ACTED_WORDS = 'knocked out before it moved, so the log shows no choice';
+
+/** "... ; <this> came instead": what the other side did, or that it was knocked out before it moved. */
+export const cameInstead = (name: string, side: SideAnalysis): string =>
+  side.neverActed ? `${name} was ${NEVER_ACTED_WORDS}` : `${phrase(side.played!.label)} came instead`;
+
 export const playedBest = (side: SideAnalysis) =>
   side.played !== null && side.best !== null && side.played.choice === side.best.choice;
 
