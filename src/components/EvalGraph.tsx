@@ -210,7 +210,7 @@ function MainPoints({ scores, blunders, scales: { x, y } }: { scores: (number | 
   );
 }
 
-const REVIEW_COLORS = { p1: '#8ac', p2: '#c8a' } as const;
+export const REVIEW_COLORS = { p1: '#8ac', p2: '#c8a' } as const;
 const REVIEW_CIRCLE_R = 5.6;
 const REVIEW_SQUARE = 11.2;
 

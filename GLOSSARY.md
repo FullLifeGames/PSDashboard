@@ -122,7 +122,7 @@ A line that starts with the engine's best choice for a player, the opponent answ
 A line that starts with the choice the player made. A player who played the engine's choice gets one line.
 
 **Game review**:
-The panel under the game report that lists, per player, the graded turns (inaccuracy, mistake or blunder) with the played value, the engine's value, the loss, and the engine line and the played line with a ▶ Play button each. The graph marks the same turns, a circle for player 1 and a square for player 2. A game that reached its endgame adds an Endgame row for the player who lost.
+The panel under the game report that lists, per player, the graded turns (inaccuracy, mistake or blunder) with the played value, the engine's value, the loss, and the engine line and the played line with a ▶ Play button each. The graph marks the same turns, a circle for player 1 and a square for player 2, in the player's colour; a line under the graph names each shape by its player. A game that reached its endgame adds an Endgame row for the player who lost.
 
 **Endgame**:
 A position with at most three Pokémon standing in total, both sides together (`ENDGAME_MAX_BODIES` in the code). A side counts the bodies it brought, so a VGC player who brought four and lost one has three. The forced-win prover runs there, and the Game review's Endgame row opens at the first turn of the game that has this few left.

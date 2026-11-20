@@ -7,7 +7,7 @@ import type { EvalGraphState } from '../../hooks/useEvaluation';
 import { EvalGameReport } from '../EvalGameReport';
 import { GameReviewPanel } from './GameReviewPanel';
 import { reviewMarks } from './game-review';
-import { EvalGraph } from '../EvalGraph';
+import { EvalGraph, REVIEW_COLORS } from '../EvalGraph';
 import { EvalLeadAnalysis, EvalTurnAnalysis } from '../EvalTurnAnalysis';
 import { EvalReplacementAnalysis } from './EvalReplacementAnalysis';
 import type { LinesHost } from '../../lib/line-view';
@@ -181,26 +181,50 @@ export interface GameGraphSectionProps extends TurnViewProps {
 /** The card's share per turn where the caller has it, else the sweep's own record (auto only). */
 const graphShares = ({ faintedShares, graph }: GameGraphSectionProps) => faintedShares ?? graph.faintedFractions;
 
+/**
+ * Round 89 (FT-1): what the marks on the graph mean. A circle marks a graded turn (an inaccuracy, a mistake or a blunder, GLOSSARY.md)
+ * of player 1, a square one of player 2, in the player's colour; the Game review lists the same turns. Only the sides that carry a mark
+ * are named.
+ */
+function GraphMarksLegend({ marks, playerNames }: { marks: ReturnType<typeof reviewMarks>; playerNames: [string, string] }) {
+  const sides = (['p1', 'p2'] as const).filter(side => marks.some(mark => mark.side === side));
+  if (sides.length === 0) return null;
+  return (
+    <div data-testid="graph-marks-legend" style={{ fontSize: 10, color: '#778', marginTop: 2 }}>
+      {sides.map((side, index) => (
+        <span key={side}>
+          {index > 0 ? ' · ' : ''}
+          <span aria-hidden style={{ color: REVIEW_COLORS[side] }}>{side === 'p1' ? '○' : '□'}</span> {playerNames[side === 'p1' ? 0 : 1]}
+        </span>
+      ))}
+      : graded turns (an inaccuracy, a mistake or a blunder), listed in the Game review
+    </div>
+  );
+}
+
 /** The game graph with the Game review's marks on it (round 89). */
 function GraphView(props: GameGraphSectionProps) {
   const { graph, playerNames, currentTurn, currentLine, selectTurn, reportLeads, variation, graphMaxTurn, reviewAnalyses } = props;
   const marks = useMemo(() => reviewMarks(reviewAnalyses), [reviewAnalyses]);
   return (
-    <EvalGraph
-      scores={graph.scores}
-      playerNames={playerNames}
-      currentTurn={currentTurn}
-      currentLine={currentLine}
-      onSelectTurn={selectTurn}
-      leadScore={graph.lead?.result.score ?? null}
-      leadDetail={reportLeads ?? null}
-      evalErrors={graph.evalErrors}
-      faintedFractions={graphShares(props)}
-      decided={graph.results.map(result => (result ? heldDecided(result) ?? null : null))}
-      variation={variation}
-      maxTurn={graphMaxTurn}
-      reviewMarks={marks}
-    />
+    <>
+      <EvalGraph
+        scores={graph.scores}
+        playerNames={playerNames}
+        currentTurn={currentTurn}
+        currentLine={currentLine}
+        onSelectTurn={selectTurn}
+        leadScore={graph.lead?.result.score ?? null}
+        leadDetail={reportLeads ?? null}
+        evalErrors={graph.evalErrors}
+        faintedFractions={graphShares(props)}
+        decided={graph.results.map(result => (result ? heldDecided(result) ?? null : null))}
+        variation={variation}
+        maxTurn={graphMaxTurn}
+        reviewMarks={marks}
+      />
+      <GraphMarksLegend marks={marks} playerNames={playerNames} />
+    </>
   );
 }
 
