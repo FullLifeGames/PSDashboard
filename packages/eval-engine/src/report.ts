@@ -2,7 +2,7 @@ import type { SideAnalysis, TurnAnalysis, VerdictTier } from './analysis.ts';
 import { type BiggestRoll, biggestRollFor, biggestRollSentence, type RollFlip } from './biggest-roll.ts';
 import { type DeniedEnd, deniedEndFor, deniedEndSentence } from './denied-end.ts';
 import { KEY_MOMENT_SWING, keyMomentsFor } from './key-moments.ts';
-import { regretSpanFor } from './prose/phrases.ts';
+import { misplayExtrasFor } from './prose/phrases.ts';
 import { inStandoff, type Standoff, standoffSentence, standoffsOf } from './standoff.ts';
 import { diceAnchorFor, luckSplit, type LuckSplit } from './turn-analysis/luck.ts';
 import { lostGround } from './turn-analysis/risk.ts';
@@ -49,6 +49,8 @@ interface GameMisplay {
   riskUnpunished?: boolean;
   /** A nearly-dead Pokémon was deliberately fed — rendered neutrally as a sack. */
   sacrifice?: boolean;
+  /** Round 89 (FT-1d, #162): the body fell before it moved; `played` is the engine's stand-in label, so the display says so and gives the stand-in's chance. */
+  neverActed?: { ev: number; faintedFraction?: number };
   /** Round 64 (T123): a regret over 1 spans these two values (shown best, played), rendered as two win chances. */
   span?: { from: number; to: number; faintedFraction?: number };
 }
@@ -211,7 +213,7 @@ function misplaysFor(known: TurnAnalysis[], side: Side): GameMisplay[] {
       ...(analysis[side].tier ? { tier: analysis[side].tier } : {}),
       ...(analysis[side].riskUnpunished ? { riskUnpunished: true } : {}),
       ...(analysis[side].sacrifice ? { sacrifice: true } : {}),
-      ...regretSpanFor(analysis[side]),
+      ...misplayExtrasFor(analysis[side]),
     }))
     .sort((a, b) => b.regret - a.regret)
     .slice(0, REPORT_MISPLAYS_PER_SIDE);

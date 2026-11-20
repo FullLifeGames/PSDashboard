@@ -23,4 +23,12 @@ describe('ConfirmBanner', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Apply edit' }));
     expect(onProceed).toHaveBeenCalledTimes(1);
   });
+
+  test('both buttons share one wrapper, so a narrow column never leaves Cancel alone on a line (FT-1)', () => {
+    render(<ConfirmBanner message="The variation has 3 played turns. Discarding drops them." proceedLabel="Discard variation" onProceed={vi.fn()} onCancel={vi.fn()} />);
+    const proceed = screen.getByRole('button', { name: 'Discard variation' });
+    const cancel = screen.getByRole('button', { name: 'Cancel' });
+    expect(proceed.parentElement).toBe(cancel.parentElement);
+    expect(proceed.parentElement).not.toBe(screen.getByRole('alertdialog'));
+  });
 });

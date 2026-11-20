@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import type { LeadAnalysis } from '@fulllifegames/eval-engine';
 import {
-  decidedSpans, graphBlunders, graphScales, GRAPH_HEIGHT as HEIGHT, GRAPH_PAD_X as PAD_X, highlightEdge, hitTitle,
+  decidedSpans, graphBlunders, graphScales, GRAPH_HEIGHT as HEIGHT, GRAPH_PAD_X as PAD_X, highlightEdge, hitTitle, REVIEW_COLORS,
   lastVariationTurnOf, leadTooltip, mainLinePaths, ringScore, sharedHitBands, variationHitTitle, variationOverlay,
   type DecidedSignal, type DecidedSpan, type GapLink, type GraphScales, type HitBand, type VariationPoint, type VariationSeries,
 } from '../lib/eval-graph-view';
@@ -210,7 +210,6 @@ function MainPoints({ scores, blunders, scales: { x, y } }: { scores: (number | 
   );
 }
 
-const REVIEW_COLORS = { p1: '#8ac', p2: '#c8a' } as const;
 const REVIEW_CIRCLE_R = 5.6;
 const REVIEW_SQUARE = 11.2;
 

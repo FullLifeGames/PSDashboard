@@ -6,6 +6,7 @@ import { gameLeadOptions } from '../lib/new-game/lead-options';
 import type { NewGameRecord } from '../lib/new-game/record';
 import type { BranchSlotChoice } from '@fulllifegames/eval-engine';
 import { classifyDeviation, keptEntries, variationTip, type TimelinePosition } from '../lib/timeline';
+import { turnEntryCount } from '../lib/variation-turns';
 import { snapshotAt, type TeamBuildSources } from '../lib/eval-acquire';
 import { divergenceNoticeFor, keptHistorySlice, prepareBranchInputs } from '../lib/branch-build';
 import { buildLeadOptions, defaultLeadSelectionFor } from '../lib/lead-options';
@@ -145,7 +146,7 @@ export async function executeRebuild(
         (ctx.reportEnded ?? ctx.setBranchDivergence)(outcome.endedNotice);
       } else if (!abortController.signal.aborted) {
         ctx.branchWindowOpenRef.current = true;
-        ctx.setBranchDivergence(divergenceNoticeFor(ctx.branch.getBattle(), startTurn));
+        ctx.setBranchDivergence(divergenceNoticeFor(ctx.branch.getBattle(), startTurn, turnEntryCount(replayHistory.filter(entry => !entry.leadChoices))));
         // The pointer lands where the sim now stands; the tip-follow effect
         // covers replayed histories (and the turn-0 lead entry, which is
         // seeded by startBranch), this covers the entry-less start.

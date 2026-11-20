@@ -29,6 +29,16 @@ function decisionBadge(side: TurnAnalysis['p1'], name: string): Badge {
   return { text: `${name} ${decisionWord}`, color: side.tier === 'blunder' ? '#ff7a7a' : '#f3a6a6' };
 }
 
+/** The badge of a quiet turn by how its card speaks (`quietVoice`). */
+function quietBadge(voice: ReturnType<typeof quietVoice>): Badge {
+  switch (voice) {
+    case 'no-mistake': return { text: 'no mistake', color: '#778' };
+    case 'risk': return { text: 'risk (unpunished)', color: '#b6a46a' };
+    case 'inaccuracy': return { text: 'small inaccuracy', color: '#b6a46a' };
+    default: return { text: 'quiet turn', color: '#778' };
+  }
+}
+
 /**
  * Shared attribution label + color for analysis and report views. Round 67 (T59): the attribution as shown,
  * so a read whose side lost ground shows the turn's movement, never "read paid off".
@@ -53,6 +63,7 @@ export function attributionBadge(analysis: TurnAnalysis, playerNames: [string, s
         : { text: 'advantage shifted (no blunder)', color: '#b6a46a' };
     case 'unclear': return { text: 'unclear (a choice never surfaced)', color: '#778' };
     // Round 89 (B8a): "quiet turn" stands only where the card highlights nothing else; beside a hint or a sentence it reads "no mistake".
-    default: return { text: quietVoice(analysis, playerNames) === 'no-mistake' ? 'no mistake' : 'quiet turn', color: '#778' };
+    // Round 89 (FT-1): a card that names an unpunished risk or an inaccuracy says so on the badge, never "no mistake".
+    default: return quietBadge(quietVoice(analysis, playerNames));
   }
 }

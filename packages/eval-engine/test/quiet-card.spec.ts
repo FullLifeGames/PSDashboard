@@ -83,19 +83,24 @@ describe.each(GAMES)('%s', (_game, make) => {
       const side = analysis[reader];
       const patched: TurnAnalysis = { ...analysis, [reader]: { ...side, safeAgainstClick: undefined, riskPaidOff: undefined, tier: 'inaccuracy' } };
       const text = summarizeTurn(patched, names);
+      // Round 89 (FT-1, ruling 43 FT4a): the card names the inaccuracy, so it starts with that sentence and never claims that no one erred.
       expect(text).toContain('was an inaccuracy');
-      expect(text).toContain(NEITHER);
+      expect(text).not.toContain(NEITHER);
       expect(text).not.toContain('quiet');
+      expect(text).toMatch(/^The estimate [^.]*\. \S+'s .* was an inaccuracy; /);
+      expect(quietVoice(patched, names)).toBe('inaccuracy');
     });
 
     test('the risk sentence of B6 beside the quiet turn (648453 t8)', () => {
       const { analysis, names } = buildScene(make, { reader, kind: 'gamble', playedCell: 0.189, safeCell: 0.19 });
       expect(analysis.attribution).toBe('quiet');
       const text = summarizeTurn(analysis, names);
+      // Round 89 (FT-1, ruling 43 FT4a): the card names the risk; "Neither side made a mistake." gives way (2663093831 t6).
       expect(text).toContain('a risk that went unpunished');
-      expect(text).toContain(NEITHER);
+      expect(text).not.toContain(NEITHER);
       expect(text).not.toContain('quiet');
-      expect(quietVoice(analysis, names)).toBe('no-mistake');
+      expect(text).toMatch(/^The estimate [^.]*\. \S+ played .*: a risk that went unpunished\./);
+      expect(quietVoice(analysis, names)).toBe('risk');
     });
 
     test('both sides on the engine line with another sentence: "Both sides played the engine\'s preferred line." and no quiet turn', () => {

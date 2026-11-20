@@ -3,6 +3,7 @@ import {
 } from '@fulllifegames/eval-engine';
 import type { TurnEvalSettings } from '../hooks/useEvaluation';
 import { attributionBadge, leadTier } from './eval-badges';
+import { neverActedText } from './eval/turn-copy';
 import { sideIndex } from '@fulllifegames/replay-core';
 
 interface EvalGameReportProps {
@@ -100,7 +101,9 @@ function MisplayChip({ misplay, playerNames, onSelectTurn, settingsFor }: {
       <span style={{ color: '#cde' }}>T{misplay.turn}</span>
       <SettingsBadge turn={misplay.turn} settingsFor={settingsFor} />
       <span style={{ color: tone }}>{playerNames[sideIndex(misplay.side)]}</span>
-      <span style={{ color: '#aab' }}>{misplay.played}</span>
+      <span style={{ color: '#aab' }}>
+        {misplay.neverActed ? neverActedText({ played: { ev: misplay.neverActed.ev }, faintedFraction: misplay.neverActed.faintedFraction }) : misplay.played}
+      </span>
       {misplay.sacrifice
         ? <span style={{ color: tone }}>sack</span>
         : misplay.riskUnpunished

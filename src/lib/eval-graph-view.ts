@@ -3,6 +3,8 @@ import { sideIndex } from '@fulllifegames/replay-core';
 
 export const GRAPH_HEIGHT = 72;
 export const GRAPH_PAD_X = 6;
+/** The colours of the Game review's marks on the graph, and of their legend (round 89). */
+export const REVIEW_COLORS = { p1: '#8ac', p2: '#c8a' } as const;
 
 export interface GraphScales {
   x: (turn: number) => number;

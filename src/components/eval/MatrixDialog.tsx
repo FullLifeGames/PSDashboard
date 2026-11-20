@@ -57,6 +57,7 @@ export function MatrixDialogButton({ result, analysis, playerNames, onPickPair }
       <button
         type="button"
         className="ps-btn ps-eval-inline-btn"
+        style={{ padding: '1px 6px', fontSize: 10 }}
         aria-haspopup="dialog"
         title="Read this turn's matrix in a dialog: every pair of choices at its win probability, with the played and the engine's choices marked"
         onClick={() => setOpen(true)}

@@ -122,7 +122,7 @@ A line that starts with the engine's best choice for a player, the opponent answ
 A line that starts with the choice the player made. A player who played the engine's choice gets one line.
 
 **Game review**:
-The panel under the game report that lists, per player, the graded turns (inaccuracy, mistake or blunder) with the played value, the engine's value, the loss, and the engine line and the played line with a ▶ Play button each. The graph marks the same turns, a circle for player 1 and a square for player 2. A game that reached its endgame adds an Endgame row for the player who lost.
+The panel under the game report that lists, per player, the graded turns (inaccuracy, mistake or blunder) with the played value, the engine's value, the loss, and the engine line and the played line with a ▶ Play button each. The graph marks the same turns, a circle for player 1 and a square for player 2, in the player's colour; a line under the graph names each shape by its player. A game that reached its endgame adds an Endgame row for the player who lost.
 
 **Endgame**:
 A position with at most three Pokémon standing in total, both sides together (`ENDGAME_MAX_BODIES` in the code). A side counts the bodies it brought, so a VGC player who brought four and lost one has three. The forced-win prover runs there, and the Game review's Endgame row opens at the first turn of the game that has this few left.
@@ -173,5 +173,5 @@ _Avoid_: good guess, lucky read
 A risk that cleared the same payoff margin but whose played choice did not beat the safe choice by one shown point against the reply that came. The card says "a risk that went unpunished" and the gap to the safe line; the side earns no read credit (`safeAgainstClick` without `riskPaidOff`). Where no matrix cell is known, the test is skipped and the old rule stands.
 
 **Quiet turn**:
-A turn where the estimate moved less than a mistake band and no one earned a grade (attribution `quiet`). The card says "A quiet turn." only when it highlights nothing else; beside another sentence or a hindsight hint it says "Neither side made a mistake." and the badge reads "no mistake" instead of "quiet turn" (`quietVoice`). Where a side carries a mistake or blunder tier, the card writes no such sentence beside the others; that case and a turn without played actions keep the badge "quiet turn".
+A turn where the estimate moved less than a mistake band and no one earned a grade (attribution `quiet`). The card says "A quiet turn." only when it highlights nothing else; beside another sentence or a hindsight hint it says "Neither side made a mistake." and the badge reads "no mistake" instead of "quiet turn" (`quietVoice`). A card that names an unpunished risk or an inaccuracy starts with that sentence instead, and its badge reads "risk (unpunished)" or "small inaccuracy". Where a side carries a mistake or blunder tier, the card writes no quiet sentence beside the others; that case and a turn without played actions keep the badge "quiet turn".
 _Avoid_: calm turn, nothing happened
