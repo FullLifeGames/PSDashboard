@@ -7,7 +7,7 @@ import type { TeamCheck } from './use-team-check';
 
 /**
  * Round 89 (lane H, #105), stage H4: one player's side of the New game dialog: the name, Validate, the paste field, the sprites of
- * the sets that were read with their count, and the simulator's check under it. The check shows the problems and leaves Start possible.
+ * the sets that were read with their count, and the simulator's check under it. The check shows the problems and leaves Start possible; what does stop Start (no set, more than six, an unknown species) stands under the box that causes it.
  */
 
 interface Props {
@@ -20,6 +20,10 @@ interface Props {
   format: string;
   formatName: string;
   check: TeamCheck;
+  /** What stops Start for this side, in plain words, or null. */
+  reason: string | null;
+  /** True when anything stops Start (either side or the seed): the note "Start plays the team as pasted" is only true when nothing does. */
+  startBlocked: boolean;
   onValidate: () => void;
 }
 
@@ -43,7 +47,7 @@ function CheckNote({ read, check }: Pick<Props, 'read' | 'check'>) {
   return null;
 }
 
-export function TeamBox({ side, name, onName, text, onText, read, format, formatName, check, onValidate }: Props) {
+export function TeamBox({ side, name, onName, text, onText, read, format, formatName, check, reason, startBlocked, onValidate }: Props) {
   const number = side === 'p1' ? 1 : 2;
   const pasteId = useId();
   const problems = check.state === 'done' ? check.problems[side] : null;
@@ -82,6 +86,7 @@ export function TeamBox({ side, name, onName, text, onText, read, format, format
           No moves read for {read.skipped.join(', ')}: a set needs at least one move line ("- Earthquake"), so it is left out.
         </div>
       )}
+      {reason && <div className={text.trim() === '' ? 'ps-newgame-field' : 'ps-newgame-start-block'} role="status">{reason}</div>}
       <CheckNote read={read} check={check} />
       {problems && problems.length === 0 && read.sets.length > 0 && (
         <div className="ps-newgame-valid" role="status">This team is valid for {formatName}.</div>
@@ -90,7 +95,7 @@ export function TeamBox({ side, name, onName, text, onText, read, format, format
         <div className="ps-newgame-problems" role="status">
           This team has {problems.length} {problems.length === 1 ? 'problem' : 'problems'} for {formatName}:
           <ul>{problems.map(problem => <li key={problem}>{problem}</li>)}</ul>
-          <span className="ps-newgame-note">Start plays the team as pasted; a league may allow what the format bans.</span>
+          {!startBlocked && <span className="ps-newgame-note">Start plays the team as pasted; a league may allow what the format bans.</span>}
         </div>
       )}
     </section>

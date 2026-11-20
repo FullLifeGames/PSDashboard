@@ -71,6 +71,7 @@
 }
 .ps-newgame-actions .ps-btn-red { flex: 1; }                                   /* Import of the sets dialog */
 .ps-newgame-error { font-size: 11px; color: #f3a6a6; }                         /* the loader's error color (App EmbedLoadStatus) */
+.ps-newgame-start-block { font-size: 11px; color: #f3a6a6; }                      /* what stops Start, under the box that causes it */
 
 /* Saved games: the saved branches' rows (BranchSaveSharePanel SavedBranchRow). */
 .ps-newgame-saved { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }

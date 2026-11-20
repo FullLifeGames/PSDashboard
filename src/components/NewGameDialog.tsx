@@ -8,7 +8,7 @@ import { useTeamCheck } from './new-game/use-team-check';
 import { CALIBRATED_FORMATS, formatHasTeamPreview, formatNote, loadPanelGroups } from '../lib/new-game/format-list';
 import type { FormatGroup, FormatOption } from '../lib/new-game/format-options';
 import { newGameSeed, type NewGameRecord } from '../lib/new-game/record';
-import { readTeamPaste, seedProblem, startNewGame, startProblem } from '../lib/new-game/start';
+import { readTeamPaste, seedProblem, startBlocks, startNewGame, stopsStart } from '../lib/new-game/start';
 
 /**
  * Round 89 (lane H, #105), stage H4: the New game dialog (user ruling 13.11.2026, variant A of the mocks: a modal built from the
@@ -84,7 +84,8 @@ function useNewGameDraft({ onOpenChange, onStart, open, unsavedVariation }: Pick
     [groups, format],
   );
   const check = useTeamCheck(format, reads[0].sets, reads[1].sets, nonce);
-  const hint = startProblem({ texts, seed });
+  const blocks = startBlocks({ texts, seed, refused: check.state === 'done' ? [check.problems.refused.p1, check.problems.refused.p2] : undefined });
+  const blocked = stopsStart(blocks);
   const { ask, question } = leave;
 
   /** Runs Start: busy while it runs, its message when it fails, closed when it works. */
@@ -109,19 +110,19 @@ function useNewGameDraft({ onOpenChange, onStart, open, unsavedVariation }: Pick
     });
   };
   const start = () => {
-    if (!selected || hint) return;
+    if (!selected || blocked) return;
     ask('Starting a game', () => begin(selected));
   };
   return {
     groups, format, setFormat, names, setNames, texts, setTexts, seed, setSeed, setNonce, busy, error,
-    reads, selected, check, hint, start, question,
+    reads, selected, check, blocks, blocked, start, question,
   };
 }
 
 export function NewGameDialog(props: Props) {
   const { open, onOpenChange } = props;
   const draft = useNewGameDraft(props);
-  const { groups, format, names, texts, reads, selected, check, hint, busy, error, question } = draft;
+  const { groups, format, names, texts, reads, selected, check, blocks, blocked, busy, error, question } = draft;
   if (!open) return null;
   return (
     <ModalDialog title="New game" closeLabel="Close new game" onClose={() => onOpenChange(false)} maxWidth={940}>
@@ -151,15 +152,16 @@ export function NewGameDialog(props: Props) {
               format={format}
               formatName={selected?.name ?? format}
               check={check}
+              reason={blocks.teams[index]}
+              startBlocked={blocked}
               onValidate={() => draft.setNonce(current => current + 1)}
             />
           ))}
         </div>
         {error && <div className="ps-newgame-error" role="alert">{error}</div>}
-        {hint && <div className="ps-newgame-field">{hint}</div>}
         {question && <ConfirmBanner message={question.message} proceedLabel="Discard variation" onProceed={question.proceed} onCancel={question.cancel} />}
         <div className="ps-newgame-actions">
-          <button type="button" className="ps-btn ps-btn-red" disabled={!selected || hint !== null || busy} onClick={draft.start}>
+          <button type="button" className="ps-btn ps-btn-red" disabled={!selected || blocked || busy} onClick={draft.start}>
             {busy ? 'Starting…' : 'Start'}
           </button>
           <button type="button" className="ps-btn" onClick={() => onOpenChange(false)}>Cancel</button>
