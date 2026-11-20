@@ -1,0 +1,123 @@
+name: Feedback
+
+# Round 89: the expert-feedback drift run in GitHub Actions (devbox read the page-fault cost of its host 7 to 10 times higher from
+# 17.11.2026, and a game passed the harness cap there; user 20.11.2026). A push of a feedback/<name> branch starts a run:
+# scripts/feedback-ci.mjs builds that branch from the measured commit plus one file, .feedback-run.json, and deletes it after the
+# download. Each job of the matrix runs one whole `npm run test:feedback` with FEEDBACK_DUMP=1 on a runner of its own, one
+# Playwright worker, no trace, as the script runs it on a machine; it keeps the dumps (docs/reports/feedback-full-*.json), the
+# drift report and the log as the artifact feedback-run-<index>. The last job compares the dumps of all runs byte for byte.
+#
+# Security, as bank.yml: only a push to feedback/** starts it (no pull_request, no workflow_run: a fork cannot) or a run by hand;
+# the token is read-only and no job holds a secret; every action is GitHub's own and pinned to a commit; the checkout keeps no
+# credentials; .feedback-run.json is untrusted input, so scripts/feedback-run-config.mjs validates it, and no shell line holds an
+# expression. The fixtures of the harness are tracked
+# (test/e2e-feedback/fixtures), so a run needs no data download.
+# Every job runs on ubuntu-24.04 and Node 24.21.0, the image and version of bank.yml (round 76: pin exact versions).
+# test/regression/feedback-workflow.spec.ts pins these properties.
+
+on:
+  push:
+    branches: ['feedback/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: feedback-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  config:
+    name: Read the run
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      runs: ${{ steps.config.outputs.runs }}
+      name: ${{ steps.config.outputs.name }}
+    steps:
+      - name: Check out the run commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.21.0
+
+      - name: Validate .feedback-run.json
+        id: config
+        run: node scripts/feedback-run-config.mjs check
+
+  feedback:
+    name: Run ${{ matrix.index }}
+    needs: config
+    runs-on: ubuntu-24.04
+    # A run took 27 minutes on devbox while the host was healthy; a runner has 4 cores and the harness caps one game at 35 minutes.
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        index: ${{ fromJSON(needs.config.outputs.runs) }}
+    steps:
+      - name: Check out the run commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Show the runner
+        run: nproc && free -m
+
+      - name: Run the feedback corpus
+        shell: bash
+        run: mkdir -p docs/reports && npm run test:feedback 2>&1 | tee docs/reports/feedback.log
+        env:
+          FEEDBACK_DUMP: '1'
+
+      - name: Keep the run
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: feedback-run-${{ matrix.index }}
+          path: docs/reports
+          retention-days: 7
+          if-no-files-found: error
+
+  compare:
+    name: Compare the runs
+    needs: [config, feedback]
+    if: ${{ always() && needs.config.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out the run commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.21.0
+
+      - name: Fetch the runs
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: feedback-run-*
+          path: .feedback/runs
+
+      - name: Compare the dumps byte for byte
+        run: node scripts/feedback-run-config.mjs compare .feedback/runs
