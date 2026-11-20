@@ -49,6 +49,12 @@ interface GameMisplay {
   riskUnpunished?: boolean;
   /** A nearly-dead Pokémon was deliberately fed — rendered neutrally as a sack. */
   sacrifice?: boolean;
+  /**
+   * Round 89 (FT-1d, issue 162): the body fell before it moved, so `played` holds the engine's stand-in label, not a choice. The
+   * display says what happened and gives the stand-in's chance (`ev`, with the fainted share) instead of the label. A new optional
+   * field keeps the protocol version.
+   */
+  neverActed?: { ev: number; faintedFraction?: number };
   /** Round 64 (T123): a regret over 1 spans these two values (shown best, played), rendered as two win chances. */
   span?: { from: number; to: number; faintedFraction?: number };
 }
@@ -211,6 +217,9 @@ function misplaysFor(known: TurnAnalysis[], side: Side): GameMisplay[] {
       ...(analysis[side].tier ? { tier: analysis[side].tier } : {}),
       ...(analysis[side].riskUnpunished ? { riskUnpunished: true } : {}),
       ...(analysis[side].sacrifice ? { sacrifice: true } : {}),
+      ...(analysis[side].neverActed
+        ? { neverActed: { ev: analysis[side].played!.ev, ...(analysis[side].faintedFraction !== undefined ? { faintedFraction: analysis[side].faintedFraction } : {}) } }
+        : {}),
       ...regretSpanFor(analysis[side]),
     }))
     .sort((a, b) => b.regret - a.regret)

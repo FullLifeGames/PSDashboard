@@ -44,11 +44,17 @@ function playedSlotsLabel(side: SideAnalysis): string | undefined {
 }
 
 /**
+ * The engine's sentences (`NEVER_ACTED_WORDS` in `prose/phrases.ts`) and this row use the same words. A package reaches the other only
+ * through its barrel, so the words are a deliberate copy; `test/regression/never-acted-words.spec.ts` compares the two.
+ */
+export const NEVER_ACTED_WORDS = 'knocked out before it moved, so the log shows no choice';
+
+/**
  * Round 89 (X1a part 1): a body knocked out before it moved has no choice in the log; the engine stands a stay-in in for it. The card
  * says so, with the stand-in's chance, as the win-path panel does ("knocked out before it moved, so the log shows no choice").
  */
-export function neverActedText(side: SideAnalysis): string {
-  return `knocked out before it moved, so the log shows no choice${side.played ? ` · staying in ${winPctText(side.played.ev, side.faintedFraction)}` : ''}`;
+export function neverActedText(side: { played: { ev: number } | null; faintedFraction?: number }): string {
+  return `${NEVER_ACTED_WORDS}${side.played ? ` · staying in ${winPctText(side.played.ev, side.faintedFraction)}` : ''}`;
 }
 
 /** Which sides of a turn never acted (the stand-in of their played row reads as no choice); absent without an analysis. */

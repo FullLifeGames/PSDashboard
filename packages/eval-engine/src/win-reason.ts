@@ -1,7 +1,7 @@
 import { BREADTH_MIN_OPTIONS, TIER_THRESHOLDS, playedSetupMove, type SideAnalysis, type TurnAnalysis } from './analysis.ts';
 import { DECIDED_SCORE } from './turn-analysis/types.ts';
 import { KEY_TURN_SWING } from './graph.ts';
-import { choiceSentence, delayClause, displayBest, forcedQualifier, koPhrase, phrase, regretText } from './prose/phrases.ts';
+import { NEVER_ACTED_WORDS, choiceSentence, delayClause, displayBest, forcedQualifier, koPhrase, phrase, regretText } from './prose/phrases.ts';
 import { chanceRolled, rollsCarry, type LuckSplit } from './turn-analysis/luck.ts';
 import { lostGround } from './turn-analysis/risk.ts';
 import { SPOKEN_MASS } from './types.ts';
@@ -403,6 +403,8 @@ export function seedPhrase(analysis: TurnAnalysis, loser: Side): string {
   // Round 76 (T233): a hit the opponent's click stopped is no claim (the turn card drops it too, round 70, 4a).
   const odds = side.hitStopped?.played ? undefined : side.played!.koOdds;
   const oddsBit = odds ? ` (${odds.label ? `${phrase(odds.label)}: ` : ''}${koPhrase(odds)})` : '';
-  return `turn ${analysis.turn} (${phrase(side.played!.label)}${oddsBit}, ` +
+  // Round 89 (FT-1d): a body that fell before it moved played nothing; the sentence says so instead of printing the stand-in's label.
+  const played = side.neverActed ? NEVER_ACTED_WORDS : `${phrase(side.played!.label)}${oddsBit}`;
+  return `turn ${analysis.turn} (${played}, ` +
     `${regretText(side.regret ?? 0, better.ev, side.played!.ev, side.faintedFraction)}; safer was ${phrase(better.label)}${setup})`;
 }

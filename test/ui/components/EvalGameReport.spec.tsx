@@ -22,6 +22,21 @@ describe('EvalGameReport', () => {
     expect(screen.queryByRole('button')).toBeNull();
   });
 
+  test('a misplay of a body that fell before it moved prints the card\'s sentence, not the engine\'s label (issue 162); an acted one keeps its move', () => {
+    const report = gameReport({
+      misplays: [
+        { turn: 4, side: 'p2', regret: 0.3, played: 'stayed in (KO’d before acting)', better: '→ Landorus-Therian', tier: 'mistake', neverActed: { ev: -0.8, faintedFraction: 0.25 } },
+        { turn: 6, side: 'p1', regret: 0.3, played: 'Stone Edge', better: 'Earthquake', tier: 'mistake' },
+      ],
+    });
+    render(<EvalGameReport report={report} playerNames={names} />);
+    const idle = within(chip(4));
+    expect(idle.getByText(/^knocked out before it moved, so the log shows no choice · staying in \d+%$/)).toBeInTheDocument();
+    expect(chip(4)).not.toHaveTextContent('stayed in');
+    expect(chip(4)).not.toHaveTextContent('KO’d before acting');
+    expect(within(chip(6)).getByText('Stone Edge')).toBeInTheDocument();
+  });
+
   test('misplay, read, denied-end, and key-moment chips jump to their turn and carry the settings badge', async () => {
     const onSelectTurn = vi.fn();
     const report = gameReport({
