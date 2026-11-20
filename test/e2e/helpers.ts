@@ -175,6 +175,8 @@ export async function moveTimeline(page: Page, turn: number): Promise<void> {
  * question's own button discards. `confirm: false` cancels instead and leaves the variation.
  */
 export async function discardVariation(page: Page, options?: { confirm?: boolean }) {
+  // The bar counts a turn only once it has played; a click before that discards without the question.
+  await expect(page.getByRole('button', { name: /Variation moves · \d+ turns?/ })).toBeVisible({ timeout: 120_000 });
   await page.locator('.ps-branch-bar').getByRole('button', { name: 'Discard variation' }).click();
   const question = page.getByRole('alertdialog');
   await expect(question).toContainText(/The variation has \d+ played turns?\./);
