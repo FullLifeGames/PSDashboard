@@ -185,7 +185,7 @@ function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
       sleepClause: effectiveSleepClause,
       rules,
       ruleset: effectiveRuleset,
-      doubles: evalIsDoubles,
+      doubles: evalIsDoubles, game: isGameId(replayData.id),
       cacheKeyFor: turn => turnCacheKey(replayData.id, turn, snapshots.length, setsFingerprint),
       // Round 79 (T290): the replacement points of the knockouts, each under its own key beside the turn keys.
       replacementRounds: replacementRounds(replayData.log),
