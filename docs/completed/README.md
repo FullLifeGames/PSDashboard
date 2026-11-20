@@ -4,11 +4,11 @@ Hier steht jede abgeschlossene Runde, sortiert nach Gebiet. `NextSteps.md` hält
 
 | Datei | Gebiet | Enthält |
 | --- | --- | --- |
-| `eval-quality.md` | Eval-Qualität | Verbesserungsrunden 4 bis 15 und 32 bis 84 (ohne 38, 39, 59 und 71), der Expert-Feedback-Korpus, geschlossene Korpus-Gaps |
+| `eval-quality.md` | Eval-Qualität | Verbesserungsrunden 4 bis 15 und 32 bis 89 (ohne 38, 39, 59, 71 und 85), der Expert-Feedback-Korpus, geschlossene Korpus-Gaps |
 | `timeline-ux.md` | Timeline und UX | Runden 17 bis 21 (Unified Timeline, T0-Branching, Play-out, Bring-Limit), Runde 38 (flüssige Oberfläche), Spur F der Wellen 1 und 1.5 (Schadensvorschau) |
 | `performance.md` | Performance | Runde 16 (Time-Performance), die Perf-Evaluation vom 01.09.2026, Runde 31 (verlustfreie Perf-Basis), die Sichtung der Runde 32, Runde 59 (Tempo-Schicht für den Simulator), Runde 85 (die Oberfläche bleibt flüssig) |
 | `architecture-refactor.md` | Architektur-Refactor | Runden 22 bis 30 (Workspace-Split, Publish-Readiness, Paket-Testsuiten, CSS), der erste npm-Publish und Trusted Publishing |
-| `test-infrastructure.md` | Test-Infrastruktur | Runde 39 (Vitest, App-Testsuite unter jsdom, e2e in Themen-Dateien, Test-Workflow in CI), Runde 71 (Bank in GitHub Actions) |
+| `test-infrastructure.md` | Test-Infrastruktur | Runde 39 (Vitest, App-Testsuite unter jsdom, e2e in Themen-Dateien, Test-Workflow in CI), Runde 71 (Bank in GitHub Actions), Runde 89 (CI-Jobs für volle Sweeps, geteilte Sweep-Specs) |
 | `triage.md` | Triage | stillgelegte TODOs mit Urteil, Beleg und altem Text (Runde 62, Nachträge der Runden 67 und 69, die Triage vor dem Release vom 21.10.2026) |
 | `qa-campaign-2026-07.md` | QA-Kampagne 07/2026 | der Fix-Plan der 45 Befunde und die Nachtest-Runden (vor der Rundenzählung) |
 
