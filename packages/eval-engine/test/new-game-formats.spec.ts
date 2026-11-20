@@ -174,7 +174,7 @@ describe('scenes of the report', () => {
     expect(custom.p1[0]).toContain('Garchomp');
     expect(custom.p1[0]).toContain('Levitate');
     expect(custom.p2).toEqual([]);
-    expect(await checkGameTeams('gen9balancedhackmons', { p1: [levitate], p2: [garchomp()] })).toEqual({ p1: [], p2: [] });
+    expect(await checkGameTeams('gen9balancedhackmons', { p1: [levitate], p2: [garchomp()] })).toEqual({ p1: [], p2: [], refused: { p1: null, p2: null } });
     const doubles = await checkGameTeams('gen9doublescustomgame', { p1: [garchomp(), garchomp()], p2: [levitate, garchomp()] });
     expect(doubles.p1).toEqual([]);
     expect(doubles.p2).toHaveLength(1);
