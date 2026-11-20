@@ -48,7 +48,7 @@ async function readBlock(block: Locator) {
   const rows = await block.locator('.ps-eval-line-turn').evaluateAll(nodes => nodes.map(node => ({
     turn: node.querySelector('.t')?.textContent ?? '',
     text: node.textContent ?? '',
-    chips: [...node.querySelectorAll('.ps-line-chip')].map(chip => chip.textContent ?? ''),
+    chips: [...node.querySelectorAll('.ps-lines-chip')].map(chip => chip.textContent ?? ''),
   })));
   const title = (await block.getByRole('button', { name: '▶ Play' }).getAttribute('title')) ?? '';
   return { rows, dice: title.split('\n').slice(1).filter(line => /^(T\d+|Replacement): /.test(line)).map(line => line.replace(/^(T\d+|Replacement): /, '')) };

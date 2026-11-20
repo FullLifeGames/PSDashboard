@@ -19,7 +19,7 @@ function SideText({ view }: { view: LineSideView }) {
   return (
     <>
       <span className="side">{view.player}</span> {view.text}
-      {view.chips.map((chip, index) => <span key={`${index}-${chip}`} className="ps-line-chip">{chip}</span>)}
+      {view.chips.map((chip, index) => <span key={`${index}-${chip}`} className="ps-lines-chip">{chip}</span>)}
     </>
   );
 }
