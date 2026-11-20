@@ -58,6 +58,22 @@ describe('MatrixDialogButton', () => {
     expect(screen.queryByRole('button', { name: 'Open matrix' })).toBeNull();
   });
 
+  test('the button takes the size of the panel\'s other buttons (Re-analyze, Analyze game: 10 px, 1px 6px), not the full .ps-btn (FT-1)', () => {
+    renderButton(singles());
+    const button = screen.getByRole('button', { name: 'Open matrix' });
+    expect(button).toHaveStyle({ fontSize: '10px', padding: '1px 6px' });
+  });
+
+  test('"worst" is a tag in the style of "played" and "engine": light red text in a bordered box, not the dashed outline\'s dark red (FT-1)', async () => {
+    renderButton(singles());
+    await userEvent.click(screen.getByRole('button', { name: 'Open matrix' }));
+    const worst = within(screen.getByRole('table')).getAllByText('worst')[0];
+    const played = within(screen.getByRole('table')).getAllByText('played')[0];
+    expect(worst).toHaveStyle({ color: '#f3a6a6', fontSize: '9px', border: '1px solid #f3a6a6' });
+    expect(worst.style.borderRadius).toBe(played.style.borderRadius);
+    expect(worst.style.padding).toBe(played.style.padding);
+  });
+
   test('the button opens a dialog titled with the turn and both names; the overview toggle is not in it', async () => {
     renderButton(singles());
     expect(screen.queryByRole('dialog')).toBeNull();
