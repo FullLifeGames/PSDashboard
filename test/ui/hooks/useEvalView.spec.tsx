@@ -347,15 +347,18 @@ describe('useEvalView', () => {
     expect(stopped.spies.evaluate).toHaveBeenCalledTimes(1);
   });
 
-  // Round 89 (SB-9): a stop before any result (a tree before its interim result) is the user's answer too; "Always on" does not start the run again.
-  test('Always on leaves a position whose search the user stopped before a first result alone', () => {
-    const live = { branching: true, liveEvalView: true, liveTip: true, liveEvalStatus: 'idle' as const, evalViewKey: 'variation:3' };
-    const stopped = evaluationOf({ prefs: { autoAnalyze: true }, status: 'idle', stopped: { tag: 'variation:3', empty: true } });
-    const { rerender } = renderHook((props: EvalViewInputs) => useEvalView(props), { initialProps: inputs(stopped.evaluation, live) });
-    expect(stopped.spies.evaluate).not.toHaveBeenCalled();
-    rerender(inputs(stopped.evaluation, { ...live, evalViewKey: 'variation:4' }));
-    expect(stopped.spies.evaluate).toHaveBeenCalledTimes(1);
-  });
+  // Round 89 (SB-9): a stop before any result (a tree before its interim result) is the user's answer too; "Always on" does not start the run
+  // again. Round 89 (SB-10): the game analysis it starts stands: no single evaluation supersedes it in the same commit ("Analysis stopped").
+  test.each([['kept nothing', { tag: 'variation:3', empty: true as const }], ['kept a result', { tag: 'variation:3' }]] as const)(
+    'Always on leaves a position whose stop %s alone and starts the game analysis, not a search', (_name, mark) => {
+      const live = { branching: true, liveEvalView: true, liveTip: true, liveEvalStatus: 'idle' as const, evalViewKey: 'variation:3' };
+      const stopped = evaluationOf({ prefs: { autoAnalyze: true }, status: 'idle', stopped: mark });
+      const { rerender } = renderHook((props: EvalViewInputs) => useEvalView(props), { initialProps: inputs(stopped.evaluation, live) });
+      expect(stopped.spies.runGraphSweep).toHaveBeenCalledTimes(1);
+      expect(stopped.spies.evaluate).not.toHaveBeenCalled();
+      rerender(inputs(stopped.evaluation, { ...live, evalViewKey: 'variation:4' }));
+      expect(stopped.spies.evaluate).toHaveBeenCalledTimes(1);
+    });
 
   // Round 89 (#112): a frame report can park the pointer on an earlier turn of the variation while a play-out runs at the tip.
   // The run's evaluation (the user's and the Auto one) is the live sim's, tagged with the tip, and its score fills the tip's slot.

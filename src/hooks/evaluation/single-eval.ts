@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   type TurnSensitivity, type TurnVerification, type EvalPreferences, type EvalResult, type EvalSettings,
   type SearchProgress, type StaticRuleset, type TeraAllowance, teraKey,
@@ -87,7 +87,7 @@ interface SingleEvalIO {
   runRef: React.RefObject<number>;
   clientRef: React.RefObject<EvalWorkerClient | null>;
   cacheRef: React.RefObject<Map<string, CachedEval>>;
-  setStatus: (value: EvalStatus | ((prev: EvalStatus) => EvalStatus)) => void;
+  setStatus: (value: EvalStatus) => void;
   setResult: (value: EvalResult | null) => void;
   setError: (value: string | null) => void;
   setProgress: (value: SearchProgress | null) => void;
@@ -290,7 +290,14 @@ export function useSingleEval(env: {
   stopGraphPaint: (superseded?: boolean) => void;
 }) {
   const { runRef, clientRef, cacheRef, prefsRef, engineOverrideRef, stopGraphPaint } = env;
-  const [status, setStatus] = useState<EvalStatus>('idle');
+  const [status, setStatusState] = useState<EvalStatus>('idle');
+  // Round 89 (SB-10): the run's own status, written with every change. A click on Cancel can land between a change and the commit's
+  // effects (a long task right after the paint), so the stop must not read a ref that an effect writes after the render.
+  const statusRef = useRef<EvalStatus>('idle');
+  const setStatus = useCallback((value: EvalStatus) => {
+    statusRef.current = value;
+    setStatusState(value);
+  }, []);
   const [result, setResultState] = useState<EvalResult | null>(null);
   /** Position tag of the run that produced `result` (see EvaluateParams.tag). */
   const [resultTag, setResultTagState] = useState<string | null>(null);
@@ -314,25 +321,20 @@ export function useSingleEval(env: {
     clientRef.current?.cancel();
     setProgress(null);
     setReconstructProgress(null);
-    setStatus(prev => {
-      if (prev !== 'searching' && prev !== 'reconstructing') return prev;
-      return resultRef.current ? 'stale' : 'idle';
-    });
+    if (statusRef.current === 'searching' || statusRef.current === 'reconstructing') setStatus(resultRef.current ? 'stale' : 'idle');
     stopGraphPaint();
-  }, [runRef, clientRef, stopGraphPaint]);
+  }, [runRef, clientRef, stopGraphPaint, setStatus]);
 
   const io = useMemo<SingleEvalIO>(() => ({
     runRef, clientRef, cacheRef, setStatus, setResult, setError, setProgress, setReconstructProgress, stopGraphPaint,
-  }), [runRef, clientRef, cacheRef, setResult, stopGraphPaint]);
+  }), [runRef, clientRef, cacheRef, setStatus, setResult, stopGraphPaint]);
   const evaluate = useEvaluateAction(io, prefsRef, engineOverrideRef, setResultTag, setStopped);
 
-  const statusRef = useRef<EvalStatus>('idle');
-  useEffect(() => { statusRef.current = status; }, [status]);
   const stop = useStop(cancel, resultRef, resultTagRef, statusRef, setStopped);
 
   const markStale = useCallback(() => {
-    setStatus(prev => (prev === 'done' ? 'stale' : prev));
-  }, []);
+    if (statusRef.current === 'done') setStatus('stale');
+  }, [setStatus]);
 
   const reset = useCallback(() => {
     cancel();
@@ -340,7 +342,7 @@ export function useSingleEval(env: {
     setResult(null);
     setError(null);
     setStopped(null);
-  }, [cancel, setResult]);
+  }, [cancel, setStatus, setResult]);
 
   return {
     status, result, resultTag, progress, error, reconstructProgress, stopped,
