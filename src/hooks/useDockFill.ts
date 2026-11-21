@@ -20,7 +20,7 @@ export interface DockFillInputs {
   playOutActive: boolean;
   /** The game type has an evaluation at all (singles and doubles). */
   evalAvailable: boolean;
-  evaluation: Pick<Evaluation, 'status' | 'result' | 'resultTag' | 'prefs' | 'graph'>;
+  evaluation: Pick<Evaluation, 'status' | 'result' | 'resultTag' | 'prefs' | 'graph' | 'stopped'>;
   /** The evaluation status as the timeline reads it: a finished result of another position counts as stale. */
   liveEvalStatus: Evaluation['status'];
   evalViewKey: string;
@@ -367,7 +367,8 @@ function useFillTrigger(inputs: DockFillInputs, key: string, eligible: boolean, 
       attemptRef.current = null;
       return;
     }
-    if (!current.foreign && evaluation.status === 'done' && evaluation.result !== null && attempted && evaluation.result !== current.result) {
+    // Round 89 (SB-7): a run the user stopped with a partial result has answered; its result so far fills like a finished one.
+    if (!current.foreign && (evaluation.status === 'done' || (evaluation.status === 'stale' && !!evaluation.stopped)) && evaluation.result !== null && attempted && evaluation.result !== current.result) {
       apply(key, evaluation.result);
       return;
     }
@@ -378,7 +379,7 @@ function useFillTrigger(inputs: DockFillInputs, key: string, eligible: boolean, 
     attemptRef.current = key;
     current.foreign = false;
     handleEvaluate({ onResult: result => apply(key, result) });
-  }, [key, eligible, attempted, running, evaluation.status, evaluation.result, evaluation.prefs, liveEvalStatus, liveTip, handleEvaluate, apply, settledRef, updateBase]);
+  }, [key, eligible, attempted, running, evaluation.status, evaluation.stopped, evaluation.result, evaluation.prefs, liveEvalStatus, liveTip, handleEvaluate, apply, settledRef, updateBase]);
 }
 
 /** What the dock reads of a fill that landed for this position (nothing before). A replay turn reads its choices from the view. */

@@ -290,10 +290,12 @@ function useEvalHousekeeping(inputs: EvalViewInputs, format: EvalFormat, handleE
     const atTip = playOutActive && tip !== null;
     const view = atTip || liveEvalView;
     const status = atTip ? tipEvalStatus : liveEvalStatus;
-    if (branching && evaluation.prefs.auto && view && status === 'stale' && !executing && !evaluation.graph.running) {
+    // Round 89 (SB-7): a position the user stopped keeps the stopped result; Auto does not start the run over.
+    const stoppedHere = evaluation.stopped?.tag === (atTip ? tip?.key : inputs.evalViewKey);
+    if (branching && evaluation.prefs.auto && view && status === 'stale' && !stoppedHere && !executing && !evaluation.graph.running) {
       handleEvaluate();
     }
-  }, [branching, evaluation.prefs.auto, liveEvalView, liveEvalStatus, tipEvalStatus, playOutActive, tip, executing, evaluation.graph.running, handleEvaluate]);
+  }, [branching, evaluation.prefs.auto, evaluation.stopped, inputs.evalViewKey, liveEvalView, liveEvalStatus, tipEvalStatus, playOutActive, tip, executing, evaluation.graph.running, handleEvaluate]);
   // "Always on" also covers the live sim: a freshly opened variation (or a
   // navigation back to its tip) evaluates without the Evaluate button. Never
   // while the game sweep runs — a single evaluation supersedes the run id
@@ -303,9 +305,11 @@ function useEvalHousekeeping(inputs: EvalViewInputs, format: EvalFormat, handleE
     if (!inputs.liveTip || executing || branchPreparing || playOutActive) return;
     if (evaluation.graph.running) return;
     if (liveEvalStatus !== 'idle' && liveEvalStatus !== 'stale') return;
+    // Round 89 (SB-7): the same for "Always on": a position the user stopped is not started again.
+    if (evaluation.stopped?.tag === inputs.evalViewKey) return;
     handleEvaluate();
   }, [
-    evaluation.prefs.autoAnalyze, format.evalAvailable, inputs.liveTip, executing, branchPreparing,
+    evaluation.prefs.autoAnalyze, evaluation.stopped, inputs.evalViewKey, format.evalAvailable, inputs.liveTip, executing, branchPreparing,
     playOutActive, evaluation.graph.running, liveEvalStatus, handleEvaluate,
   ]);
 }

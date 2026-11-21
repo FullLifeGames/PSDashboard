@@ -8,7 +8,7 @@ import { useEarlyLinesIO } from './evaluation/early-lines-io';
 
 export { resolveAutoTurnSettings, serializedFaintedFraction, supersedesStored } from './evaluation/prefs';
 export type { TurnEvalSettings } from './evaluation/prefs';
-export type { EvalStatus } from './evaluation/single-eval';
+export type { EvalStatus, StoppedRun } from './evaluation/single-eval';
 export { verificationDeepSettings } from './evaluation/sweep-verify';
 export { recordEvalError } from './evaluation/sweep-types';
 export { coverageNotice, withEvalGapNotice } from './evaluation/graph-sweep';
@@ -42,8 +42,8 @@ export function useEvaluation() {
   }, []);
 
   const {
-    status, result, resultTag, progress, error, reconstructProgress,
-    evaluate, cancel, markStale, reset,
+    status, result, resultTag, progress, error, reconstructProgress, stopped,
+    evaluate, cancel, stop, markStale, reset,
   } = useSingleEval({ runRef, clientRef, cacheRef, prefsRef, engineOverrideRef, stopGraphPaint });
 
   const setPrefs = useCallback((next: EvalPreferences) => {
@@ -57,8 +57,8 @@ export function useEvaluation() {
 
   return {
     prefs, setPrefs, setEngineOverride, searchLines, attachLines,
-    status, result, resultTag, progress, error, reconstructProgress,
-    evaluate, markStale, reset, cancel,
+    status, result, resultTag, progress, error, reconstructProgress, stopped,
+    evaluate, markStale, reset, cancel, stop,
     graph, runGraphSweep, clearGraph, dropGraphFrom,
   };
 }

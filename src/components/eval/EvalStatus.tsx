@@ -32,12 +32,29 @@ function PlayOutProgressLine({ playOutProgress }: { playOutProgress: PlayOutProg
 }
 
 /** The run state under the header: play-out, reconstruction, search progress, error, staleness. */
-export function EvalStatus({ playOutProgress, status, reconstructProgress, progress, error }: {
+/**
+ * The line under a stale result. Round 89 (SB-7): a search the user stopped says what it left: the first level of a search is the
+ * quick estimate (a forced replacement's arrival values, a normal turn's depth-1 matrix), a later partial is the result so far.
+ * Any other stale result stands for a position that changed.
+ */
+function StaleLine({ stoppedAt }: { stoppedAt: number | null }) {
+  return (
+    <div role={stoppedAt === null ? undefined : 'status'} style={{ fontSize: 11, color: '#b6a46a', marginBottom: 4 }}>
+      {stoppedAt === null
+        ? 'Position changed; re-evaluate.'
+        : `Search stopped. Showing ${stoppedAt <= 1 ? 'the quick estimate' : 'the result so far'}.`}
+    </div>
+  );
+}
+
+export function EvalStatus({ playOutProgress, status, reconstructProgress, progress, error, stoppedAt = null }: {
   playOutProgress?: PlayOutProgress | null;
   status: EvalStatusKind;
   reconstructProgress: { turn: number; target: number } | null;
   progress: SearchProgress | null;
   error: string | null;
+  /** Round 89 (SB-7): the depth of the partial result a user stop kept; null when the stale result is no stopped run. */
+  stoppedAt?: number | null;
 }) {
   return (
     <>
@@ -62,11 +79,7 @@ export function EvalStatus({ playOutProgress, status, reconstructProgress, progr
           Evaluation failed: {error}
         </div>
       )}
-      {!playOutProgress && status === 'stale' && (
-        <div style={{ fontSize: 11, color: '#b6a46a', marginBottom: 4 }}>
-          Position changed; re-evaluate.
-        </div>
-      )}
+      {!playOutProgress && status === 'stale' && <StaleLine stoppedAt={stoppedAt} />}
     </>
   );
 }
