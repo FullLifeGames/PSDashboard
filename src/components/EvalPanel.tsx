@@ -199,6 +199,7 @@ function SingleResult(props: EvalPanelProps) {
       onPickPair={onPickPair}
       doubles={doubles}
       faintedFraction={shownShare(props)}
+      opponentReads={!!props.prefs.hardMode}
     />
   );
 }

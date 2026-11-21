@@ -349,7 +349,10 @@ export interface StoredEval {
 //      #139, #150); a body that cannot act is no longer offered; each search cell draws its own seed list (T324);
 //      the prover prices more dice, delays a win behind a repeated Protect and tries a sure strike first. Positions of
 //      those games and turns read new values.
-const EVAL_ENGINE_CACHE_VERSION = 79;
+// v80 (round 89, SB3c): a stat drop counts in boostsBiting and in the boosts term only while its holder cannot switch
+//      out (trapped, or no living body off the field); a free holder loses the drop with its switch. Turns whose
+//      leaves hold a drop on a free holder read new values.
+const EVAL_ENGINE_CACHE_VERSION = 80;
 
 /** Round 61: a search-budget form stores under its own tag; the default keeps today's keys. */
 const versionTag = (): string => {

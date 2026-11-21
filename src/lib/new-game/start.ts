@@ -44,14 +44,35 @@ export interface StartParams {
   seed?: string;
 }
 
+/** What stops Start, by the box that causes it: a message per side and one for the seed, each null when nothing stops. */
+export interface StartBlocks {
+  teams: [string | null, string | null];
+  seed: string | null;
+}
+
+/**
+ * The one rule for what blocks Start (round 89, NG-2): a side with no readable set, a side with more than six, a seed the engine
+ * refuses, and a species the format's Dex does not know (`refused`, the sentence `checkGameTeams` takes from the start's own rule;
+ * absent until the team check has read the paste, where Start refuses it itself). The simulator's other team problems never block:
+ * a league may allow what the format bans (ruling 31, H2b).
+ */
+export function startBlocks(params: Pick<StartParams, 'texts' | 'seed'> & { refused?: [string | null, string | null] }): StartBlocks {
+  const teams = params.texts.map((text, index) => {
+    const { sets } = readTeamPaste(text);
+    if (sets.length === 0) return `Paste a team for Player ${index + 1} to start.`;
+    if (sets.length > TEAM_SIZE) return `A team holds at most ${TEAM_SIZE} Pokémon.`;
+    return params.refused?.[index] ?? null;
+  }) as StartBlocks['teams'];
+  return { teams, seed: params.seed?.trim() ? seedProblem(params.seed) : null };
+}
+
+export const stopsStart = (blocks: StartBlocks): boolean => blocks.teams[0] !== null || blocks.teams[1] !== null || blocks.seed !== null;
+
 /** The first problem that stops Start, in the dialog's words, or null. */
 export function startProblem(params: Pick<StartParams, 'texts' | 'seed'>): string | null {
-  const reads = params.texts.map(readTeamPaste);
-  if (reads[0].sets.length === 0 && reads[1].sets.length === 0) return 'Paste a team for each player to start.';
-  if (reads[0].sets.length === 0) return 'Paste a team for Player 1 to start.';
-  if (reads[1].sets.length === 0) return 'Paste a team for Player 2 to start.';
-  if (reads.some(read => read.sets.length > TEAM_SIZE)) return `A team holds at most ${TEAM_SIZE} Pokémon.`;
-  return params.seed?.trim() ? seedProblem(params.seed) : null;
+  if (params.texts.every(text => readTeamPaste(text).sets.length === 0)) return 'Paste a team for each player to start.';
+  const blocks = startBlocks(params);
+  return blocks.teams[0] ?? blocks.teams[1] ?? blocks.seed;
 }
 
 /**

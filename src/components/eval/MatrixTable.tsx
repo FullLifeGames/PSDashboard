@@ -47,6 +47,8 @@ const sameCell = (at: readonly [number, number] | null | undefined, i: number, j
 const ACCENT = 'var(--ps-accent)';
 const WARM = 'var(--ps-accent-warm)';
 const DANGER = 'var(--ps-danger)';
+/** The tag colour of "worst": the app's light red (misplay and error text), readable on the dialog's blue where --ps-danger is not. */
+const DANGER_TEXT = '#f3a6a6';
 
 /** The outline of the played row and column: a solid line on the row's top and bottom, on the column's left and right. */
 function playedOutline(row: boolean, column: boolean): string | undefined {
@@ -97,7 +99,7 @@ function MatrixCell(props: MatrixTableProps & { i: number; j: number; value: num
   const content = (
     <>
       {pct}%
-      {isWorst && <span style={{ display: 'block', fontSize: 9, color: DANGER }}>worst</span>}
+      {isWorst && <span style={{ display: 'block', marginTop: 2 }}><span style={tagStyle(DANGER_TEXT)}>worst</span></span>}
     </>
   );
   if (!clickable) {

@@ -51,6 +51,8 @@ export interface GraphSweepParams {
   rules: GameRules;
   /** Round 65: the rule set the replay runs under (Pokémon Champions or standard), resolved from its format. */
   ruleset: StaticRuleset;
+  /** Round 89 (NG-2): the sweep runs over a new game, whose positions come from its record, not from a replay's guessed sets: the coverage notice words itself for that. */
+  game?: boolean;
   /** The replay's game type: auto resolves each turn per game type (round 63, T110). */
   doubles: boolean;
   cacheKeyFor(turn: number): string;

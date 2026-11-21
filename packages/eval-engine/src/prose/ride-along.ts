@@ -18,24 +18,60 @@ type PlayerNames = [string, string];
  * hinge itself is the finding).
  */
 export function rideAlongSentences(analysis: TurnAnalysis, playerNames: PlayerNames): string[] {
+  return rideAlongOf(analysis, playerNames).sentences;
+}
+
+/** What a ride-along note judges, by its words: an unpunished risk or a light inaccuracy (round 89, FT-1). */
+export type NamedJudgement = 'risk' | 'inaccuracy';
+
+/**
+ * The first note of a side: a sack, a read credit or a held risk (the last two only on a side that kept ground), else the
+ * inaccuracy. `judged` says when the note names a risk or an inaccuracy, the two a quiet card may not follow with "Neither side made a
+ * mistake." (ruling 43, FT4a).
+ */
+function sideNote(
+  name: string, side: SideAnalysis, ownLuck: number | null, rolled: boolean, praised: boolean,
+): { text: string; judged?: NamedJudgement } | null {
+  const sack = sackClause(name, side);
+  if (sack) return { text: sack };
+  if (praised) {
+    const credit = readCreditClause(name, side, ownLuck, rolled);
+    if (credit) return { text: credit };
+    const held = heldRiskNote(name, side);
+    if (held) return { text: held, judged: 'risk' };
+  }
+  const inaccuracy = inaccuracyClause(name, side);
+  return inaccuracy ? { text: inaccuracy, judged: 'inaccuracy' } : null;
+}
+
+/** The ride-along sentences, and which judgements the card names in them. */
+export function rideAlongOf(analysis: TurnAnalysis, playerNames: PlayerNames): { sentences: string[]; judged: NamedJudgement[] } {
   const sentences: string[] = [];
+  const judged: NamedJudgement[] = [];
   // Round 67 (T22): the credit's luck rider says no roll is behind it when none went the residual's way;
   // (T59) a side that lost ground gets no credit sentence.
   const rolled = chanceRolled(analysis) !== false;
+  const luck = analysis.chanceDelta;
+  const sides = [
+    { key: 'p1' as const, name: playerNames[0], ownLuck: luck },
+    { key: 'p2' as const, name: playerNames[1], ownLuck: luck === null ? null : -luck },
+  ];
   const kinds: ((name: string, side: SideAnalysis, ownLuck: number | null, praised: boolean) => string | null)[] = [
-    (name, side, ownLuck, praised) => sackClause(name, side) ??
-      (praised ? readCreditClause(name, side, ownLuck, rolled) ?? heldRiskNote(name, side) : null) ?? inaccuracyClause(name, side),
+    (name, side, ownLuck, praised) => {
+      const note = sideNote(name, side, ownLuck, rolled, praised);
+      if (note?.judged) judged.push(note.judged);
+      return note?.text ?? null;
+    },
     forcedClause,
     (_name, side) => unansweredClause(side),
     streakClause,
     sensitivityClause,
   ];
-  const luck = analysis.chanceDelta;
   for (const clause of kinds) {
-    const p1Note = clause(playerNames[0], analysis.p1, luck, !lostGround(analysis, 'p1'));
-    const p2Note = clause(playerNames[1], analysis.p2, luck === null ? null : -luck, !lostGround(analysis, 'p2'));
-    if (p1Note) sentences.push(p1Note);
-    if (p2Note) sentences.push(p2Note);
+    for (const { key, name, ownLuck } of sides) {
+      const note = clause(name, analysis[key], ownLuck, !lostGround(analysis, key));
+      if (note) sentences.push(note);
+    }
   }
-  return sentences;
+  return { sentences, judged };
 }

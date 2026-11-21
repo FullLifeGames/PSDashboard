@@ -125,6 +125,17 @@ export const choiceNoun = (label: string): string =>
     .map(part => (part.startsWith('→ ') ? `switch to ${part.slice(2)}` : part))
     .join(' and ');
 
+/**
+ * Round 89 (FT-1): the words for a body knocked out before it moved, whose log shows no choice. The engine's stand-in label
+ * ("stayed in (KO’d before acting)") names what it graded, not what happened; a sentence says this instead. The app's row
+ * (`neverActedText`) builds on the same words.
+ */
+export const NEVER_ACTED_WORDS = 'knocked out before it moved, so the log shows no choice';
+
+/** "... ; <this> came instead": what the other side did, or that it was knocked out before it moved. */
+export const cameInstead = (name: string, side: SideAnalysis): string =>
+  side.neverActed ? `${name} was ${NEVER_ACTED_WORDS}` : `${phrase(side.played!.label)} came instead`;
+
 export const playedBest = (side: SideAnalysis) =>
   side.played !== null && side.best !== null && side.played.choice === side.best.choice;
 
@@ -159,6 +170,15 @@ export const regretSpanFor = (side: SideAnalysis): { span?: { from: number; to: 
   side.played && side.best && (side.regret ?? 0) > REGRET_SPAN_MIN
     ? { span: { from: displayBest(side).ev, to: side.played.ev, ...(side.faintedFraction === undefined ? {} : { faintedFraction: side.faintedFraction }) } }
     : {};
+
+/** The report's misplay of a body that fell before it moved: the stand-in's chance, for the sentence of `neverActedText` (round 89, FT-1). */
+export const neverActedFor = (side: SideAnalysis): { neverActed?: { ev: number; faintedFraction?: number } } =>
+  side.neverActed && side.played
+    ? { neverActed: { ev: side.played.ev, ...(side.faintedFraction === undefined ? {} : { faintedFraction: side.faintedFraction }) } }
+    : {};
+
+/** What a report misplay carries beyond its sentence: the span of a regret over 1 and the stand-in of a body that never acted. */
+export const misplayExtrasFor = (side: SideAnalysis) => ({ ...regretSpanFor(side), ...neverActedFor(side) });
 
 /** The null recommendation kept its place (no alternative): name the caveat. */
 export const nullNote = (side: SideAnalysis): string =>

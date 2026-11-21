@@ -35,6 +35,8 @@ type Props = Parameters<typeof NewGameDialog>[0];
 const props = (overrides: Partial<Props> = {}): Props => ({ open: true, onOpenChange: vi.fn(), onStart: vi.fn(), ...overrides });
 const box = (side: 1 | 2) => screen.getByRole('textbox', { name: `Player ${side} team` });
 const paste = (side: 1 | 2, text: string) => fireEvent.change(box(side), { target: { value: text } });
+const team = (side: 1 | 2) => screen.getByRole('region', { name: `Player ${side} team` });
+const NOTE = /Start plays the team as pasted/;
 const start = () => screen.getByRole('button', { name: /^Start|Starting/ });
 
 async function pickFormat(search: string, name: string) {
@@ -53,9 +55,12 @@ describe('the dialog', () => {
     rerender(<NewGameDialog {...props()} />);
     expect(screen.getByRole('dialog', { name: 'New game' })).toHaveAttribute('aria-modal', 'true');
     expect(start()).toBeDisabled();
-    expect(screen.getByText('Paste a team for each player to start.')).toBeInTheDocument();
+    // each empty box says what it lacks, under itself
+    expect(within(team(1)).getByText('Paste a team for Player 1 to start.')).toBeInTheDocument();
+    expect(within(team(2)).getByText('Paste a team for Player 2 to start.')).toBeInTheDocument();
     paste(1, GOOD);
-    expect(screen.getByText('Paste a team for Player 2 to start.')).toBeInTheDocument();
+    expect(within(team(1)).queryByText(/to start\./)).toBeNull();
+    expect(within(team(2)).getByText('Paste a team for Player 2 to start.')).toBeInTheDocument();
     paste(2, GOOD);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Start' })).toBeEnabled(), { timeout: 30_000 });
   });
@@ -177,6 +182,56 @@ describe('a team box', () => {
     expect(screen.getByRole('button', { name: 'Start' })).toBeEnabled();
   }, 60_000);
 
+  const SEVEN = [...FOUR.split('\n\n'), 'Dragonite\n- Protect'].join('\n\n');
+
+  test('seven sets block Start: the reason stands under that box and the "plays as pasted" note goes (NG-2)', async () => {
+    render(<NewGameDialog {...props()} />);
+    paste(1, LEVITATE);
+    paste(2, SEVEN);
+    expect(await screen.findByText('This team has 1 problem for [Gen 9] OU:', undefined, { timeout: 30_000 })).toBeInTheDocument();
+    expect(within(team(2)).getByText('A team holds at most 6 Pokémon.')).toBeInTheDocument();
+    expect(within(team(1)).queryByText('A team holds at most 6 Pokémon.')).toBeNull();
+    expect(start()).toBeDisabled();
+    expect(screen.queryByText(NOTE)).toBeNull();
+    paste(2, FOUR);
+    expect(within(team(2)).queryByText('A team holds at most 6 Pokémon.')).toBeNull();
+    expect(start()).toBeEnabled();
+    expect((await screen.findAllByText(NOTE, undefined, { timeout: 30_000 })).length).toBeGreaterThan(0);
+  }, 60_000);
+
+  test('a side with no readable set blocks Start: its box says so, the note goes (NG-2)', async () => {
+    render(<NewGameDialog {...props()} />);
+    paste(1, LEVITATE);
+    paste(2, 'Garchomp\nAbility: Rough Skin\n\nGliscor\nAbility: Poison Heal');
+    expect(await within(team(1)).findByText('This team has 1 problem for [Gen 9] OU:', undefined, { timeout: 30_000 })).toBeInTheDocument();
+    expect(within(team(2)).getByText(/No moves read for/)).toBeInTheDocument();
+    expect(within(team(2)).getByText('Paste a team for Player 2 to start.')).toBeInTheDocument();
+    expect(start()).toBeDisabled();
+    expect(screen.queryByText(NOTE)).toBeNull();
+  }, 60_000);
+
+  test('a refused seed blocks Start under the seed field and the note goes; the simulator\'s problems alone do not block (NG-2)', async () => {
+    render(<NewGameDialog {...props()} />);
+    paste(1, LEVITATE);
+    paste(2, GOOD);
+    expect(await screen.findByText('This team has 1 problem for [Gen 9] OU:', undefined, { timeout: 30_000 })).toBeInTheDocument();
+    expect(start()).toBeEnabled();
+    expect(screen.getByText(NOTE)).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Seed' }), { target: { value: '1,2,3' } });
+    expect(screen.getByRole('alert')).toHaveTextContent(/four whole numbers/);
+    expect(start()).toBeDisabled();
+    expect(screen.queryByText(NOTE)).toBeNull();
+  }, 60_000);
+
+  test('a VGC team of six with a bring of four is no block: the six limit counts the pasted sets (NG-2)', async () => {
+    render(<NewGameDialog {...props()} />);
+    await pickFormat('vgc 2025', '[Gen 9] VGC 2025 Reg I');
+    paste(1, FOUR);
+    paste(2, FOUR);
+    expect(start()).toBeEnabled();
+    expect(screen.queryByText('A team holds at most 6 Pokémon.')).toBeNull();
+  }, 60_000);
+
   test('Validate runs the check again and a Custom Game reads the project\'s ability rule', async () => {
     render(<NewGameDialog {...props()} />);
     paste(1, LEVITATE);
@@ -235,16 +290,28 @@ describe('Start', () => {
     expect(box(1)).toHaveValue(GOOD);
   }, 60_000);
 
-  test('a species the format\'s Dex does not know is a problem under its box and Start says why it cannot start, in plain words (H4h)', async () => {
+  test('a species the format\'s Dex does not know is a problem under its box, and once the check has read it Start waits and says why (H4h, NG-2)', async () => {
     const wired = props();
     render(<NewGameDialog {...wired} />);
     paste(1, `Zzqxvwk @ Leftovers\nAbility: Pressure\n- Tackle\n\n${GOOD}`);
     paste(2, GOOD);
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Start' })).toBeEnabled());
     await waitFor(() => expect(screen.getByText(/does not exist/)).toBeInTheDocument(), { timeout: 30_000 });
-    await userEvent.click(screen.getByRole('button', { name: 'Start' }));
-    expect(await screen.findByText('The game could not start: zzqxvwk is no Pokémon of [Gen 9] OU. Fix the set to start.', undefined, { timeout: 30_000 })).toBeInTheDocument();
+    expect(within(team(1)).getByText('zzqxvwk is no Pokémon of [Gen 9] OU. Fix the set to start.')).toBeInTheDocument();
+    expect(within(team(2)).queryByText(/is no Pokémon/)).toBeNull();
+    expect(start()).toBeDisabled();
+    expect(screen.queryByText(NOTE)).toBeNull();
+    await userEvent.click(start());
+    expect(wired.onStart).not.toHaveBeenCalled();
     expect(document.body.textContent).not.toMatch(/Cannot read properties/);
+  }, 60_000);
+
+  test('Start before the check has read a paste still refuses an unknown species in plain words (the backstop)', async () => {
+    const wired = props();
+    render(<NewGameDialog {...wired} />);
+    paste(1, `Zzqxvwk @ Leftovers\nAbility: Pressure\n- Tackle\n\n${GOOD}`);
+    paste(2, GOOD);
+    await userEvent.click(start());
+    expect(await screen.findByText('The game could not start: zzqxvwk is no Pokémon of [Gen 9] OU. Fix the set to start.', undefined, { timeout: 30_000 })).toBeInTheDocument();
     expect(wired.onStart).not.toHaveBeenCalled();
   }, 60_000);
 

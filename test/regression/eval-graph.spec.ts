@@ -1,5 +1,7 @@
 import { test, expect, describe, onTestFinished } from 'vitest';
 import { coverageNotice, recordEvalError, resolveAutoTurnSettings, serializedFaintedFraction, supersedesStored, verificationDeepSettings, withEvalGapNotice } from '../../src/hooks/useEvaluation';
+import { makePositionSource } from '../../src/hooks/evaluation/sweep-positions';
+import type { GraphSweepParams, SweepData } from '../../src/hooks/evaluation/sweep-types';
 import {
   AUTO_MCTS_FAINTED_FRACTION, computeBlunders, configureSearchBudget, selectKeyTurns, BLUNDER_SWING, KEY_TURN_SWING, KEY_MOMENT_SWING,
   SEARCH_BUDGET_DEFAULT,
@@ -41,6 +43,48 @@ describe('coverage notice (acquisition pass)', () => {
   test('a long trailing run is divergence, not the mild story', () => {
     const notice = coverageNotice(pos([1, 1, 1, 0, 0, 0, 0]))!;
     expect(notice).toContain('3 of 7 turns could be reconstructed');
+  });
+});
+
+describe('coverage notice of a new game (NG-2)', () => {
+  // A new game has no replay and no guessed sets: the notice says what is true (its record rebuilds the positions) and what the user
+  // can do, and never advises Edit Player/Opp.
+  const pos = (bits: (0 | 1)[]) => bits.map((bit, index) => (bit ? `p${index + 1}` : null));
+  const game = { game: true } as const;
+
+  test('full coverage stays silent', () => {
+    expect(coverageNotice(pos([1, 1]), game)).toBeNull();
+    expect(coverageNotice([], game)).toBeNull();
+  });
+
+  test('nothing rebuilt: names the record and the retry, no guessed sets, no Edit Player/Opp', () => {
+    expect(coverageNotice(pos([0, 0, 0]), game)).toBe(
+      "This game's positions could not be rebuilt from its record, so no turn has a live position to analyze. Analyze game again; if this stays, Report issue sends the game.",
+    );
+  });
+
+  test('some turns rebuilt, a missing last turn included: counts the turns and offers the retry', () => {
+    expect(coverageNotice(pos([1, 1, 0]), game)).toBe('Only 2 of 3 turns could be rebuilt from this game\'s record for analysis. Analyze game again to retry the rest.');
+    expect(coverageNotice(pos([1, 0, 1]), game)).toBe('Only 2 of 3 turns could be rebuilt from this game\'s record for analysis. Analyze game again to retry the rest.');
+  });
+
+  test('the position source words its notice by the sweep\'s game flag: a rebuild that finds nothing and one that throws', async () => {
+    const run = async (game: boolean, acquireAll: () => Promise<(string | null)[]>) => {
+      const data = { notice: null } as unknown as SweepData;
+      const source = makePositionSource({ turns: 2, game, acquireAll } as unknown as GraphSweepParams, data);
+      await source.positionFor(1).catch(() => undefined);
+      return data.notice;
+    };
+    expect(await run(true, async () => [null, null])).toBe(coverageNotice([null, null], { game: true }));
+    expect(await run(false, async () => [null, null])).toBe(coverageNotice([null, null]));
+    expect(await run(true, async () => { throw new Error('boom'); })).toBe('The game could not be rebuilt: boom');
+    expect(await run(false, async () => { throw new Error('boom'); })).toBe('The replay could not be reconstructed: boom');
+  });
+
+  test('every game notice avoids the replay words', () => {
+    for (const bits of [[0, 0], [1, 0], [0, 1, 1]] as (0 | 1)[][]) {
+      expect(coverageNotice(pos(bits), game)).not.toMatch(/guessed sets|Edit Player|replay|simulated/i);
+    }
   });
 });
 

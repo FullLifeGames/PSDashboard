@@ -58,6 +58,9 @@ export interface TurnDockProps {
   fill?: DockFillView | null;
   /** Round 88 (T316): the side the replay frame shows near; its chips come first. Default P1. */
   nearSide?: Side;
+  /** Round 89 (#153, HM-2): the Setup setting "Opponent reads my move" is on: the status strip says so and offers "Turn off". */
+  opponentReads?: boolean;
+  onOpponentReadsChange?: (value: boolean) => void;
 }
 
 /**
@@ -150,7 +153,7 @@ function backHandler(fill: DockFillView | null | undefined, slot: DockSlotModel 
 export function TurnDock(props: TurnDockProps) {
   const {
     simState, stale, source, acquiringExact, executeError, executing, gen, format = '', onSetChoice, onRecordChoice, onHypotheticalMove, onExecuteTurn,
-    played, positionKey, getBattle, replayLog, seed, fill, nearSide, endOfGame, isGame,
+    played, positionKey, getBattle, replayLog, seed, fill, nearSide, endOfGame, isGame, opponentReads, onOpponentReadsChange,
   } = props;
   const { setChoice, writeChoice } = useUserChoice(simState, fill, onSetChoice, onRecordChoice);
   const onEdit = useCallback((side: Side, slot: number, choice: BranchSlotChoice) => setChoice(side, choice, slot), [setChoice]);
@@ -170,7 +173,7 @@ export function TurnDock(props: TurnDockProps) {
   const backToEngine = backHandler(fill, openSlot, writeChoice);
   return (
     <div className="ps-dock" ref={attachDock} onKeyDown={onKeyDown} inert={stale} aria-busy={stale || undefined}>
-      <DockStatus source={source} acquiringExact={acquiringExact} executeError={executeError} model={model} diceOpen={!!open?.more} game={isGame} />
+      <DockStatus source={source} acquiringExact={acquiringExact} executeError={executeError} model={model} diceOpen={!!open?.more} game={isGame} opponentReads={opponentReads} onOpponentReadsChange={onOpponentReadsChange} />
       <div className="ps-dock-anchor">
         {open && openSlot && (
           <SlotTray

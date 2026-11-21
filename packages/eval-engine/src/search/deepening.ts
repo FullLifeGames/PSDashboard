@@ -1,5 +1,5 @@
 import { cellKey, reblendValue, type PvStep, type ValueMatrix } from '../rank.ts';
-import type { CellBlend, EvalResult } from '../types.ts';
+import type { CellBlend, EvalResult, EvalSettings } from '../types.ts';
 
 /**
  * The deepening bookkeeping the sync search and the orchestrator share:
@@ -43,4 +43,27 @@ export function recordDeepenedCell(
       ...(subTopP1?.line ?? []),
     ]);
   }
+}
+
+/**
+ * Round 89 (SB-4, #197): the turn search of a forced root's cell (search/forced-root.ts). Depth 1 over the child's own option lists,
+ * the root's draws per cell, no prover, and none of the root's played-turn hints (they name the root's actions, which mean nothing
+ * one turn on).
+ */
+export function turnSettings(settings: EvalSettings): EvalSettings {
+  return { ...settings, depth: 1, keepPlayed: undefined, prove: false };
+}
+
+/** The level a forced root's turn searches book as: the root's own matrix is level 1, the turn after it level 2. */
+export const FORCED_ROOT_LEVEL = 2;
+
+/**
+ * Books one cell of a forced root by the turn search of its child. The turn search is the cell's horizon: the trend layers read a
+ * cell's trend as the shift one more ply would make, and here "one more ply" is the turn the search already played, so the cell books
+ * trend 0. Without it the layers would fold the whole gap between the arrival static and the turn value into the tied leaders again
+ * (655336 turn 5: Lopunny and Landorus-T moved up by 0.04 each, away from the turn search's own values).
+ */
+export function recordTurnCell(state: DeepeningState, i: number, j: number, sub: EvalResult): void {
+  recordDeepenedCell(state, i, j, sub, FORCED_ROOT_LEVEL, new Set<number>());
+  state.trendMap.set(cellKey(i, j), 0);
 }

@@ -16,6 +16,9 @@ interface AppTopBarProps {
   branchDivergence: string | null;
   onCancelPreparation: () => void;
   onAnimateChange: (value: boolean) => void;
+  /** Round 89 (#153, HM-2): the opponent-reads-my-move setting of the Setup menu. */
+  opponentReads: boolean;
+  onOpponentReadsChange: (value: boolean) => void;
   onEditSide: (side: 'p1' | 'p2') => void;
   onOpenSets: () => void;
   /** A host site frames the app (round 77: the creator link is left out). */
@@ -106,6 +109,8 @@ export function AppTopBar(props: AppTopBarProps) {
         <SetupMenu
           animateBranchTurns={props.animateBranchTurns}
           onAnimateChange={props.onAnimateChange}
+          opponentReads={props.opponentReads}
+          onOpponentReadsChange={props.onOpponentReadsChange}
           onEditSide={props.onEditSide}
           onOpenSets={props.onOpenSets}
         />

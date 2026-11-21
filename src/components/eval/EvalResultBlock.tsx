@@ -2,13 +2,17 @@ import { type EvalResult, type RankedChoice, formatLine, winDeltaText, winPercen
 import type { EvalStatus, TurnEvalSettings } from '../../hooks/useEvaluation';
 import { EvalMatrixView } from '../EvalMatrixView';
 import { MiniBar } from '../EvalTurnAnalysis';
+import { exploreTitle } from './turn-copy';
+import { rowLineTail } from '../../lib/row-line';
 
 // Displayed values are win probabilities ("52%") and point deltas ("−8%").
 
 type PickChoice = (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice | null, from?: EvalResult | null) => void;
 
-function ChoiceDetail({ choice, index, best, faintedFraction }: {
+function ChoiceDetail({ choice, index, best, faintedFraction, tail }: {
   choice: RankedChoice; index: number; best: RankedChoice | undefined; faintedFraction?: number | null;
+  /** The later steps of the row's line (`rowLineTail`): the line the Lines section shows, not the principal variation. */
+  tail?: { p1: string; p2: string }[];
 }) {
   const evPct = winPercent(choice.ev, faintedFraction);
   const gap = best ? choice.ev - best.ev : 0;
@@ -23,9 +27,9 @@ function ChoiceDetail({ choice, index, best, faintedFraction }: {
           {index > 0 && gap < 0 && <span style={{ color: '#778' }}>({winDeltaText(gap)})</span>}
         </span>
       </span>
-      {choice.line && choice.line.length > 0 && (
+      {tail && tail.length > 0 && (
         <span className="ps-eval-line">
-          then {formatLine(choice.line)}
+          then {formatLine(tail)}
         </span>
       )}
     </>
@@ -35,16 +39,16 @@ function ChoiceDetail({ choice, index, best, faintedFraction }: {
 /** The equilibrium value in the eval bar's own language: the win odds
  *  this choice is worth against balanced play. The guaranteed floor
  *  and the punishing reply live in the tooltip. */
-function choiceTooltip(choice: RankedChoice, clickable: boolean, faintedFraction?: number | null): string {
+function choiceTooltip(choice: RankedChoice, clickable: boolean, faintedFraction?: number | null, opponentReads = false): string {
   return `Win probability ${winPercent(choice.ev, faintedFraction)}% vs balanced play; higher is better for this side` +
     ` · guaranteed at least ${winPercent(choice.worstCase, faintedFraction)}%` +
     (choice.punishedBy ? ` (worst reply: ${choice.punishedBy})` : '') +
     '. Choices are ranked by their value against balanced play.' +
-    (clickable ? ' Click to play this turn out against the engine’s reply.' : '');
+    (clickable ? ' ' + exploreTitle(opponentReads) : '');
 }
 
 function ChoiceList({
-  side, choices, reply, result, onPickChoice, faintedFraction,
+  side, choices, reply, result, onPickChoice, faintedFraction, opponentReads,
 }: {
   side: 'p1' | 'p2';
   choices: RankedChoice[];
@@ -55,13 +59,15 @@ function ChoiceList({
   onPickChoice?: PickChoice;
   doubles?: boolean;
   faintedFraction?: number | null;
+  /** Round 89 (#153, HM-2): the Setup setting "Opponent reads my move" is on: the click sentence of the title says so. */
+  opponentReads?: boolean;
 }) {
   const best = choices[0];
   return (
     <div className="ps-eval-column">
       {choices.slice(0, 3).map((choice, index) => {
-        const tooltip = choiceTooltip(choice, !!onPickChoice, faintedFraction);
-        const detail = <ChoiceDetail choice={choice} index={index} best={best} faintedFraction={faintedFraction} />;
+        const tooltip = choiceTooltip(choice, !!onPickChoice, faintedFraction, opponentReads);
+        const detail = <ChoiceDetail choice={choice} index={index} best={best} faintedFraction={faintedFraction} tail={rowLineTail(result, side, choice, !!opponentReads)} />;
         return onPickChoice ? (
           <button
             key={choice.choice}
@@ -105,7 +111,7 @@ function SettingsLine({ result, resultSettings }: {
 }
 
 /** The single-position result: the advantage bar, its provenance, the ranked lines, and the matrix. */
-export function EvalResultBlock({ result, status, playerNames, positionLabel, resultSettings, onPickChoice, onPickPair, doubles, faintedFraction }: {
+export function EvalResultBlock({ result, status, playerNames, positionLabel, resultSettings, onPickChoice, onPickPair, doubles, faintedFraction, opponentReads }: {
   result: EvalResult;
   status: EvalStatus;
   playerNames: [string, string];
@@ -116,6 +122,8 @@ export function EvalResultBlock({ result, status, playerNames, positionLabel, re
   doubles?: boolean;
   /** Round 69 (T51): the fainted share of the shown turn; the percents print at it, as the graph does. Absent: the opening map. */
   faintedFraction?: number | null;
+  /** Round 89 (#153, HM-2): the Setup setting "Opponent reads my move" is on: the ranked rows' titles say so. */
+  opponentReads?: boolean;
 }) {
   const p1Pct = winPercent(result.score, faintedFraction);
   return (
@@ -135,8 +143,8 @@ export function EvalResultBlock({ result, status, playerNames, positionLabel, re
       <div className="ps-eval-columns">
         {/* Stale results describe the PREVIOUS position — clicking them
             would map old choices onto the new state (wrong switches). */}
-        <ChoiceList side="p1" choices={result.perSide.p1} reply={result.perSide.p2[0] ?? null} result={result} onPickChoice={status === 'stale' ? undefined : onPickChoice} doubles={doubles} faintedFraction={faintedFraction} />
-        <ChoiceList side="p2" choices={result.perSide.p2} reply={result.perSide.p1[0] ?? null} result={result} onPickChoice={status === 'stale' ? undefined : onPickChoice} doubles={doubles} faintedFraction={faintedFraction} />
+        <ChoiceList side="p1" choices={result.perSide.p1} reply={result.perSide.p2[0] ?? null} result={result} onPickChoice={status === 'stale' ? undefined : onPickChoice} doubles={doubles} faintedFraction={faintedFraction} opponentReads={opponentReads} />
+        <ChoiceList side="p2" choices={result.perSide.p2} reply={result.perSide.p1[0] ?? null} result={result} onPickChoice={status === 'stale' ? undefined : onPickChoice} doubles={doubles} faintedFraction={faintedFraction} opponentReads={opponentReads} />
       </div>
       {result.matrix && (
         <EvalMatrixView

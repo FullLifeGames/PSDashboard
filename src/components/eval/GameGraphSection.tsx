@@ -8,6 +8,7 @@ import { EvalGameReport } from '../EvalGameReport';
 import { GameReviewPanel } from './GameReviewPanel';
 import { reviewMarks } from './game-review';
 import { EvalGraph } from '../EvalGraph';
+import { REVIEW_COLORS } from '../../lib/eval-graph-view';
 import { EvalLeadAnalysis, EvalTurnAnalysis } from '../EvalTurnAnalysis';
 import { EvalReplacementAnalysis } from './EvalReplacementAnalysis';
 import type { LinesHost } from '../../lib/line-view';
@@ -106,9 +107,11 @@ interface TurnViewProps {
   doubles?: boolean;
   /** Round 89 (#105): the open tip of a new game (nobody has played it yet), else null or absent. */
   openTurn?: number | null;
+  /** Round 89 (#153, HM-2): the Setup setting "Opponent reads my move" is on: the card's engine-move buttons say so in their titles. */
+  opponentReads?: boolean;
 }
 
-function TurnView({ report, onBackToReport, onBackToMain, result, currentTurn, graph, analyzeTurn, hasAnalyzeTurn, leadAnalysis, analysis, playerNames, reads, onPickChoice, onPickPair, linesHost, doubles, openTurn }: TurnViewProps) {
+function TurnView({ report, onBackToReport, onBackToMain, result, currentTurn, graph, analyzeTurn, hasAnalyzeTurn, leadAnalysis, analysis, playerNames, reads, onPickChoice, onPickPair, linesHost, doubles, openTurn, opponentReads }: TurnViewProps) {
   return (
     <>
       {report && (
@@ -152,7 +155,7 @@ function TurnView({ report, onBackToReport, onBackToMain, result, currentTurn, g
         <EvalTurnAnalysis
           analysis={analysis} playerNames={playerNames} reads={reads} onExplore={onPickChoice} onPickPair={onPickPair}
           result={graph.results[analysis.turn - 1] ?? null} linesHost={linesHost} doubles={doubles}
-          open={analysis.turn === openTurn}
+          open={analysis.turn === openTurn} opponentReads={opponentReads}
         />
       )}
     </>
@@ -181,26 +184,50 @@ export interface GameGraphSectionProps extends TurnViewProps {
 /** The card's share per turn where the caller has it, else the sweep's own record (auto only). */
 const graphShares = ({ faintedShares, graph }: GameGraphSectionProps) => faintedShares ?? graph.faintedFractions;
 
+/**
+ * Round 89 (FT-1): what the marks on the graph mean. A circle marks a graded turn (an inaccuracy, a mistake or a blunder, GLOSSARY.md)
+ * of player 1, a square one of player 2, in the player's colour; the Game review lists the same turns. Only the sides that carry a mark
+ * are named.
+ */
+function GraphMarksLegend({ marks, playerNames }: { marks: ReturnType<typeof reviewMarks>; playerNames: [string, string] }) {
+  const sides = (['p1', 'p2'] as const).filter(side => marks.some(mark => mark.side === side));
+  if (sides.length === 0) return null;
+  return (
+    <div data-testid="graph-marks-legend" style={{ fontSize: 10, color: '#778', marginTop: 2 }}>
+      {sides.map((side, index) => (
+        <span key={side}>
+          {index > 0 ? ' · ' : ''}
+          <span aria-hidden style={{ color: REVIEW_COLORS[side] }}>{side === 'p1' ? '○' : '□'}</span> {playerNames[side === 'p1' ? 0 : 1]}
+        </span>
+      ))}
+      : graded turns (an inaccuracy, a mistake or a blunder), listed in the Game review
+    </div>
+  );
+}
+
 /** The game graph with the Game review's marks on it (round 89). */
 function GraphView(props: GameGraphSectionProps) {
   const { graph, playerNames, currentTurn, currentLine, selectTurn, reportLeads, variation, graphMaxTurn, reviewAnalyses } = props;
   const marks = useMemo(() => reviewMarks(reviewAnalyses), [reviewAnalyses]);
   return (
-    <EvalGraph
-      scores={graph.scores}
-      playerNames={playerNames}
-      currentTurn={currentTurn}
-      currentLine={currentLine}
-      onSelectTurn={selectTurn}
-      leadScore={graph.lead?.result.score ?? null}
-      leadDetail={reportLeads ?? null}
-      evalErrors={graph.evalErrors}
-      faintedFractions={graphShares(props)}
-      decided={graph.results.map(result => (result ? heldDecided(result) ?? null : null))}
-      variation={variation}
-      maxTurn={graphMaxTurn}
-      reviewMarks={marks}
-    />
+    <>
+      <EvalGraph
+        scores={graph.scores}
+        playerNames={playerNames}
+        currentTurn={currentTurn}
+        currentLine={currentLine}
+        onSelectTurn={selectTurn}
+        leadScore={graph.lead?.result.score ?? null}
+        leadDetail={reportLeads ?? null}
+        evalErrors={graph.evalErrors}
+        faintedFractions={graphShares(props)}
+        decided={graph.results.map(result => (result ? heldDecided(result) ?? null : null))}
+        variation={variation}
+        maxTurn={graphMaxTurn}
+        reviewMarks={marks}
+      />
+      <GraphMarksLegend marks={marks} playerNames={playerNames} />
+    </>
   );
 }
 
@@ -254,7 +281,7 @@ export function GameGraphSection(props: GameGraphSectionProps) {
         </div>
       )}
       {showReportView && report && <ReportOverview {...props} report={report} />}
-      {!showReportView && <TurnView {...props} />}
+      {!showReportView && <TurnView {...props} opponentReads={!!prefs.hardMode} />}
     </div>
   );
 }

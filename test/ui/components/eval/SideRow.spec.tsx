@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { winDeltaText, winPctText } from '@fulllifegames/eval-engine';
 import { SideRow } from '../../../../src/components/eval/SideRow';
-import { rankedChoice } from '../../fixtures/eval-result';
+import { evalResult, rankedChoice } from '../../fixtures/eval-result';
 import { misplayedSide, sideAnalysis } from '../../fixtures/analysis';
 
 describe('SideRow', () => {
@@ -18,6 +18,16 @@ describe('SideRow', () => {
     expect(onExplore).toHaveBeenCalledWith(side.best);
     expect(screen.queryByText('difference:')).toBeNull();
   });
+
+  // Round 89 (#153, HM-2): the engine-move buttons of a row (the tick, the engine's line, the better line) carry the title of the Setup setting.
+  test.each([[false, 'Play this turn in a variation; the opponent plays its top choice.'],
+    [true, 'Play this turn in a variation; the opponent reads your move and plays the reply the search rates lowest for it.']])(
+    'the engine-move titles follow the setting (opponentReads %s)', (opponentReads, title) => {
+      const { rerender } = render(<SideRow name="Alice" side={sideAnalysis()} onExplore={vi.fn()} opponentReads={opponentReads} />);
+      expect(screen.getByRole('button', { name: '✓ the engine\'s move ↗' })).toHaveAttribute('title', title);
+      rerender(<SideRow name="Alice" side={misplayedSide()} onExplore={vi.fn()} opponentReads={opponentReads} />);
+      expect(screen.getByRole('button', { name: 'Earthquake ↗' })).toHaveAttribute('title', title);
+    });
 
   test('a mistake: the regret chip, the played line against the engine line, and their difference', async () => {
     const onExplore = vi.fn();
@@ -46,6 +56,27 @@ describe('SideRow', () => {
     render(<SideRow name="Alice" side={misplayedSide('mistake', { best, safe: best })} />);
     expect(screen.getByText('then → Keldeo → Hydro Pump · High Jump Kick')).toBeInTheDocument();
     expect(screen.queryByText(/\(waiting\)/)).toBeNull();
+  });
+
+  // Round 89 (LN-4): the better line's "then ..." reads the line the Lines section shows for the row (one line per row on a card).
+  test.each([['singles', 'Earthquake'], ['doubles', 'Fake Out → Rillaboom + Spore → Tornadus']])('the better line (%s) reads its later steps from the result\'s line, in Hard mode from the worst line', (kind, label) => {
+    const pick = (name: string) => ({ choice: name.toLowerCase(), label: name, slots: [null] });
+    const line = (steps: [string, string][], extra = {}) => ({
+      side: 'p1' as const, label, choice: 'move earthquake', for: ['engine' as const], end: 0.1, endFainted: 0, visits: 50, ...extra,
+      steps: [{ p1: pick(label), p2: pick('Leech Seed'), dice: [] }, ...steps.map(([a, b]) => ({ p1: pick(a), p2: pick(b), dice: [] }))],
+    });
+    const best = rankedChoice('move earthquake', label, 0.35, { punishedBy: 'Protect', line: [{ p1: 'Stone Edge', p2: 'Protect' }] });
+    const result = evalResult(kind === 'singles' ? 'singles' : 'doubles', {
+      lines: [line([['Swords Dance', 'Fake Out']]), line([['Rock Slide', 'Taunt']], { versus: 'worst' })],
+    });
+    const side = misplayedSide('mistake', { best, safe: best });
+    const { rerender } = render(<SideRow name="Alice" side={side} rowLines={{ result, side: 'p1' }} />);
+    expect(screen.getByText('then Swords Dance · Fake Out')).toBeInTheDocument();
+    expect(screen.queryByText('then Stone Edge · Protect')).toBeNull();
+    rerender(<SideRow name="Alice" side={side} rowLines={{ result, side: 'p1' }} opponentReads />);
+    expect(screen.getByText('then Rock Slide · Taunt')).toBeInTheDocument();
+    rerender(<SideRow name="Alice" side={side} rowLines={{ result: evalResult('singles'), side: 'p1' }} />);
+    expect(screen.getByText('then Stone Edge · Protect')).toBeInTheDocument();
   });
 
   test('the sack note says which sack it was: a switch-in the hazards took, or a body left in to take the priced hit', () => {

@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
-import { mctsTreeSearch } from '../src/mcts';
+import { mctsRoot, mctsTreeSearch } from '../src/mcts';
 import { cellKey } from '../src/rank';
 import { LINE_MIN_VISITS, lineFrom, principalVariation, rowLines as rowLinesAt, type Node } from '../src/search/mcts-node';
 import type { EvalSettings, RowLines, TreeLineStep } from '../src/types';
@@ -9,7 +9,8 @@ import type { EvalSettings, RowLines, TreeLineStep } from '../src/types';
 /**
  * Round 89 (#104), step G2: the line of a root row. Synthetic nodes by hand (only the fields the walk reads): the row's first cell is
  * the one against the opponent's top row once it has 8 visits, else the row's heaviest cell; a step under 8 visits ends the line;
- * three steps at most; a replacement step keeps the waiting label. `principalVariation` returns what it always returned (the
+ * three steps at most (the fixtures' nodes carry equal means, so each later step is the pair of the most visited options, as the walk
+ * of visits read it before LN-2; the last describe holds the by-value rule); a replacement step keeps the waiting label. `principalVariation` returns what it always returned (the
  * reference below is the walk as it stood before the rows had lines). Rows are keyed by label: a reordered bench moves the choice
  * strings and not the labels (singles and doubles boards).
  */
@@ -24,15 +25,27 @@ const rowLines = (root: Node, tops: { p1: readonly string[]; p2: readonly string
 
 const options = (labels: string[]) => labels.map((label, index) => ({ choice: `move ${index + 1}`, label }));
 
-function node(p1: string[], p2: string[], cells: Cell[], extra: Partial<Node> = {}): Node {
+/**
+ * What a node's options carry besides the cells: the visits of an option are the visits of its cells, and its mean (p1's view for both
+ * sides, as the tree stores it) is `means` by option index, 0.5 where none is given; the hint order is the list order.
+ */
+interface Means { p1?: Record<number, number>; p2?: Record<number, number> }
+
+function node(p1: string[], p2: string[], cells: Cell[], extra: Partial<Node> = {}, means: Means = {}): Node {
   const children = new Map<number, Node>();
+  const p1N = p1.map(() => 0);
+  const p2N = p2.map(() => 0);
   for (const cell of cells) {
     const child = cell.child ?? node([], [], []);
     child.visits = cell.visits;
     children.set(cellKey(cell.i, cell.j), child);
+    p1N[cell.i] += cell.visits;
+    p2N[cell.j] += cell.visits;
   }
   return {
-    kind: 'decision', ended: false, boundary: true, p1Options: options(p1), p2Options: options(p2), children, visits: 0, ...extra,
+    kind: 'decision', ended: false, boundary: true, p1Options: options(p1), p2Options: options(p2), children, visits: 0,
+    p1N, p2N, p1W: p1N.map((n, i) => n * (means.p1?.[i] ?? 0.5)), p2W: p2N.map((n, j) => n * (means.p2?.[j] ?? 0.5)),
+    p1Order: p1.map((_, i) => i), p2Order: p2.map((_, j) => j), ...extra,
   } as unknown as Node;
 }
 
@@ -72,7 +85,7 @@ describe('the line of a root row', () => {
     { i: 1, j: 1, visits: 5 },
   ]);
 
-  test('the first cell is the one against the opponent\'s top row, then the heaviest cell of each node, three steps at most', () => {
+  test('the first cell is the one against the opponent\'s top row, then the best-mean pair of each node, three steps at most', () => {
     const lines = rowLines(deep(), tops('Surf', 'Draining Kiss'));
     expect(lines.p1.Surf[0].map(step => [step.p1, step.p2, step.visits])).toEqual([
       ['Surf', 'Draining Kiss', 40], ['→ Gyarados', 'Draining Kiss', 20], ['Surf', 'Moonblast', 9],
@@ -226,7 +239,7 @@ describe('lines against the tree\'s top three answers', () => {
     const lines = rowLines(wide(), { p1: ['A', 'B'], p2: ['X', 'Y', 'Z'] });
     expect(lines.p1.A).toHaveLength(2);
     expect(lines.p1.A.map(line => [line[0].p2, line[0].visits])).toEqual([['X', 20], ['Y', 9]]);
-    // the first entry reads as before: the cell against the top row, then the heaviest cell of each node
+    // the first entry reads as before: the cell against the top row, then each node's pair (equal means here: the most visited options)
     expect(lines.p1.A[0].map(step => step.p2)).toEqual(['X', 'Y']);
     // the answer outside the top three (W, 11 visits) and the thin one (Z, 3 visits) hold no line
     expect(lines.p1.A.some(line => line[0].p2 === 'W' || line[0].p2 === 'Z')).toBe(false);
@@ -346,4 +359,123 @@ describe('the line through a row\'s floor cell', () => {
     expect(rowLinesAt(deep(), tops('Surf', 'Draining Kiss'), 8, { p1: { Surf: 'Moonblast' } }).floor).toBeUndefined();
     expect(Object.keys(rowLinesAt(deep(), tops('Surf', 'Draining Kiss'), 8))).toEqual(['p1', 'p2']);
   });
+});
+
+/**
+ * Round 89 (LN-2, ruling 44 LN1a): the later steps of a row's line read each node by value. Each side takes its best mean (p1 the
+ * highest, p2 the lowest, both in p1's view) among its options with `min` visits and a quarter of the node's most visited option; the
+ * step is that pair's cell when it holds `min` visits, else the node's heaviest cell. The first step stays the row's cell. The principal
+ * variation keeps the heaviest cell. Scene (655336 turn 25): Roost draws most of the visits at a lower mean than Dragon Claw.
+ */
+describe('the later steps of a row\'s line read each node by value', () => {
+  /** Charizard (p1) below Dragon Dance/High Jump Kick: Roost is the heaviest option and the heaviest cell, Dragon Claw the better mean. */
+  const turn25 = (): Node => node(['Dragon Claw', 'Roost'], ['Encore', 'Return 102'], [
+    { i: 0, j: 0, visits: 31 }, { i: 0, j: 1, visits: 10 }, { i: 1, j: 0, visits: 22 }, { i: 1, j: 1, visits: 40 },
+  ], {}, { p1: { 0: 0.55, 1: 0.43 }, p2: { 0: 0.42, 1: 0.5 } });
+  const rootOf = (child: Node): Node => node(['Dragon Dance'], ['High Jump Kick'], [{ i: 0, j: 0, visits: 90, child }]);
+  const second = (root: Node, min = 4): string[] => {
+    const line = rowLinesAt(root, tops('Dragon Dance', 'High Jump Kick'), min).p1['Dragon Dance'][0];
+    return [line[1].p1, line[1].p2];
+  };
+
+  test('singles: the step is the best-mean pair, not the heaviest cell', () => {
+    expect(second(rootOf(turn25()))).toEqual(['Dragon Claw', 'Encore']);
+    // the heaviest cell of the node is Roost against Return 102, and the principal variation still walks it
+    expect(principalVariation(rootOf(turn25())).map(step => [step.p1, step.p2])).toEqual([['Dragon Dance', 'High Jump Kick'], ['Roost', 'Return 102']]);
+  });
+
+  test('doubles: the same rule on combined labels', () => {
+    const own = ['Fake Out + Flare Blitz', 'Protect + Wood Hammer', 'Fake Out + Wood Hammer'];
+    const other = ['Spore + Rage Powder', 'Close Combat + Sucker Punch'];
+    const below = node(own, other, [
+      { i: 0, j: 0, visits: 12 }, { i: 0, j: 1, visits: 9 }, { i: 1, j: 0, visits: 6 }, { i: 1, j: 1, visits: 30 }, { i: 2, j: 0, visits: 5 },
+    ], {}, { p1: { 0: 0.6, 1: 0.4, 2: 0.7 }, p2: { 0: 0.45, 1: 0.5 } });
+    // Fake Out + Wood Hammer has the best mean (0.7) but 5 of 56 visits is under a quarter of the heaviest option's 39 visits (10)
+    const line = rowLinesAt(rootOf(below), tops('Dragon Dance', 'High Jump Kick'), 4).p1['Dragon Dance'][0];
+    expect([line[1].p1, line[1].p2]).toEqual(['Fake Out + Flare Blitz', 'Spore + Rage Powder']);
+  });
+
+  test('p2 takes its lowest mean, ties go to the more visited option, then to the hint order', () => {
+    const tied = node(['A', 'B'], ['X', 'Y', 'Z'], [
+      { i: 0, j: 0, visits: 10 }, { i: 0, j: 1, visits: 12 }, { i: 0, j: 2, visits: 12 }, { i: 1, j: 0, visits: 10 }, { i: 1, j: 1, visits: 12 }, { i: 1, j: 2, visits: 12 },
+    ], {}, { p1: { 0: 0.5, 1: 0.5 }, p2: { 0: 0.3, 1: 0.3, 2: 0.3 } });
+    // p1 ties on mean and on visits (44 each): the first in hint order; p2 ties on mean: Y and Z hold 24 visits against X's 20
+    expect(second(rootOf(tied))).toEqual(['A', 'Y']);
+    tied.p2Order = [2, 1, 0];
+    expect(second(rootOf(tied))).toEqual(['A', 'Z']);
+  });
+
+  test('an option under the visits a line needs, or under a quarter of the heaviest option, is not read', () => {
+    const thinBest = node(['A', 'B', 'C'], ['X'], [{ i: 0, j: 0, visits: 3 }, { i: 1, j: 0, visits: 40 }, { i: 2, j: 0, visits: 12 }], {}, { p1: { 0: 0.9, 1: 0.5, 2: 0.6 } });
+    expect(second(rootOf(thinBest))).toEqual(['C', 'X']);
+    const light = node(['A', 'B'], ['X'], [{ i: 0, j: 0, visits: 9 }, { i: 1, j: 0, visits: 40 }], {}, { p1: { 0: 0.9, 1: 0.5 } });
+    expect(second(rootOf(light))).toEqual(['B', 'X']);
+  });
+
+  test('a pair whose cell is thin or absent falls back to the node\'s heaviest cell', () => {
+    // A and X are the best means with the visits, but their cell holds 3 visits; B against Y is the heaviest cell
+    const thinCell = node(['A', 'B'], ['X', 'Y'], [
+      { i: 0, j: 0, visits: 3 }, { i: 0, j: 1, visits: 10 }, { i: 1, j: 0, visits: 10 }, { i: 1, j: 1, visits: 20 },
+    ], {}, { p1: { 0: 0.6, 1: 0.4 }, p2: { 0: 0.3, 1: 0.5 } });
+    expect(second(rootOf(thinCell))).toEqual(['B', 'Y']);
+  });
+
+  test('the first step stays the row\'s cell, the floor lines read the same rule, and the tree is left as it was', () => {
+    const root = rootOf(turn25());
+    const lines = rowLinesAt(root, tops('Dragon Dance', 'High Jump Kick'), 4, { p1: { 'Dragon Dance': 'High Jump Kick' } });
+    expect(lines.floor?.p1['Dragon Dance'].map(step => [step.p1, step.p2])).toEqual([['Dragon Dance', 'High Jump Kick'], ['Dragon Claw', 'Encore']]);
+    const before = JSON.stringify([...root.children].map(([key, child]) => [key, child.visits, child.p1N, child.p1W]));
+    rowLinesAt(root, tops('Dragon Dance', 'High Jump Kick'));
+    expect(JSON.stringify([...root.children].map(([key, child]) => [key, child.visits, child.p1N, child.p1W]))).toBe(before);
+  });
+
+  test('lineFrom without the flag is the walk of visits: the line pass and the principal variation read it', () => {
+    const line = lineFrom(rootOf(turn25()), 0, 4);
+    expect(line.map(step => [step.p1, step.p2])).toEqual([['Dragon Dance', 'High Jump Kick'], ['Roost', 'Return 102']]);
+  });
+});
+
+describe('real trees: the later steps follow the rule, the principal variation stays the walk of visits', () => {
+  /** The rule written again from the node's own tallies, independent of the walk's code. */
+  function expectedStep(node: Node, min: number): [string, string] | null {
+    const eligible = (n: number[]): number[] => n.map((visits, index) => (visits >= min && visits * 4 >= Math.max(...n) ? index : -1)).filter(index => index >= 0);
+    const best = (n: number[], w: number[], order: number[], sign: 1 | -1): number => eligible(n).sort((a, b) =>
+      sign * (w[b] / n[b] - w[a] / n[a]) || n[b] - n[a] || order.indexOf(a) - order.indexOf(b))[0];
+    const i = best(node.p1N, node.p1W, node.p1Order, 1);
+    const j = best(node.p2N, node.p2W, node.p2Order, -1);
+    const cell = i === undefined || j === undefined ? undefined : node.children.get(cellKey(i, j));
+    if (cell && cell.visits >= min) return [node.p1Options[i].label, node.p2Options[j].label];
+    let heavy: [number, number] | null = null;
+    let most = 0;
+    for (const [key, child] of node.children) if (child.visits > most) { most = child.visits; heavy = [Math.floor(key / 10_000), key % 10_000]; }
+    return heavy && most >= min ? [node.p1Options[heavy[0]].label, node.p2Options[heavy[1]].label] : null;
+  }
+
+  const SINGLES: [string, string[]][] = [['Machamp', ['Seismic Toss', 'Bulk Up']], ['Gyarados', ['Waterfall', 'Earthquake']], ['Mew', ['Psychic', 'Ice Beam']]];
+  const FOES: [string, string[]][] = [['Pikachu', ['Thunderbolt', 'Surf']], ['Eevee', ['Tackle', 'Quick Attack']]];
+  const DOUBLES: [string, string[]][] = [['Incineroar', ['Fake Out', 'Flare Blitz']], ['Rillaboom', ['Grassy Glide', 'Wood Hammer']], ['Amoonguss', ['Spore', 'Rage Powder']], ['Urshifu', ['Close Combat', 'Sucker Punch']]];
+  const cases: [string, string, [string, string[]][], [string, string[]][]][] = [
+    ['singles', 'gen9customgame', SINGLES, FOES], ['doubles', 'gen9doublescustomgame', DOUBLES, DOUBLES.slice().reverse()],
+  ];
+
+  for (const [name, format, p1, p2] of cases) {
+    test(`${name}: every second step of every row's line is the rule's pair, and principalVariation equals the walk of visits`, () => {
+      const root = mctsRoot(board(format, p1, p2), { ...SETTINGS }, 0);
+      expect(principalVariation(root)).toEqual(referenceVariation(root));
+      const tops3 = { p1: [root.p1Options[0].label], p2: [root.p2Options[0].label] };
+      let checked = 0;
+      for (const side of ['p1', 'p2'] as const) {
+        for (const lines of Object.values(rowLinesAt(root, tops3)[side])) {
+          for (const line of lines) {
+            const first = [...root.children].find(([key]) => root.p1Options[Math.floor(key / 10_000)].label === line[0].p1 && root.p2Options[key % 10_000].label === line[0].p2);
+            const below = first?.[1];
+            if (!below || line.length < 2) continue;
+            expect([line[1].p1, line[1].p2], `${side} ${line[0].p1} / ${line[0].p2}`).toEqual(expectedStep(below, LINE_MIN_VISITS));
+            checked += 1;
+          }
+        }
+      }
+      expect(checked).toBeGreaterThan(0);
+    });
+  }
 });

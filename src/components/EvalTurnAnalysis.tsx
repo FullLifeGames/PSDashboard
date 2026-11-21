@@ -31,6 +31,8 @@ interface EvalTurnAnalysisProps {
   open?: boolean;
   /** Round 89 (B7a): the panel's handler of a matrix cell, which the card's matrix dialog calls (absent: the dialog reads only). */
   onPickPair?: (p1: { choice: string; label: string }, p2: { choice: string; label: string }) => void;
+  /** Round 89 (#153, HM-2): the Setup setting "Opponent reads my move" is on: the engine-move buttons say so in their titles. */
+  opponentReads?: boolean;
 }
 
 function ReadRows({ reads, playerNames, faintedFraction }: Pick<EvalTurnAnalysisProps, 'reads' | 'playerNames'> & { faintedFraction?: number }) {
@@ -85,7 +87,7 @@ function TurnSummary({ text }: { text: string }) {
 }
 
 /** A game's tip: the position is open, so the card names it as such and shows each side's engine line (round 89, H4h). */
-function OpenTurnAnalysis({ analysis, playerNames, reads, onExplore, result, onPickPair }: Omit<EvalTurnAnalysisProps, 'open'>) {
+function OpenTurnAnalysis({ analysis, playerNames, reads, onExplore, result, onPickPair, opponentReads }: Omit<EvalTurnAnalysisProps, 'open'>) {
   const exploreFor = (side: 'p1' | 'p2') =>
     onExplore && ((choice: RankedChoice) => onExplore(side, choice, side === 'p1' ? analysis.p2.best : analysis.p1.best, result));
   return (
@@ -95,20 +97,20 @@ function OpenTurnAnalysis({ analysis, playerNames, reads, onExplore, result, onP
         <span style={{ color: '#aab' }}>open position: nothing played yet</span>
         <MatrixDialogButton result={result} analysis={analysis} playerNames={playerNames} onPickPair={onPickPair} />
       </div>
-      <EngineRow name={playerNames[0]} side={analysis.p1} onExplore={exploreFor('p1')} />
-      <EngineRow name={playerNames[1]} side={analysis.p2} onExplore={exploreFor('p2')} />
+      <EngineRow name={playerNames[0]} side={analysis.p1} onExplore={exploreFor('p1')} opponentReads={opponentReads} rowLines={{ result, side: 'p1' }} />
+      <EngineRow name={playerNames[1]} side={analysis.p2} onExplore={exploreFor('p2')} opponentReads={opponentReads} rowLines={{ result, side: 'p2' }} />
       <ReadRows reads={reads} playerNames={playerNames} faintedFraction={analysis.faintedFraction} />
     </div>
   );
 }
 
 /** Chess-style explanation of one analyzed turn: played vs best, and why the score moved. */
-export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore, result, linesHost, doubles, open = false, onPickPair }: EvalTurnAnalysisProps) {
+export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore, result, linesHost, doubles, open = false, onPickPair, opponentReads }: EvalTurnAnalysisProps) {
   // The turn whose Lines section is open. It follows the turn prop (every turn starts closed) and survives a result that goes away
   // and comes back under the card; reconciled during render, never in an effect.
   const [lines, setLines] = useState({ turn: analysis.turn, open: false });
   if (lines.turn !== analysis.turn) setLines({ turn: analysis.turn, open: false });
-  if (open) return <OpenTurnAnalysis analysis={analysis} playerNames={playerNames} reads={reads} onExplore={onExplore} result={result} onPickPair={onPickPair} />;
+  if (open) return <OpenTurnAnalysis analysis={analysis} playerNames={playerNames} reads={reads} onExplore={onExplore} result={result} onPickPair={onPickPair} opponentReads={opponentReads} />;
   const badge = attributionBadge(analysis, playerNames);
   const exploreFor = (side: 'p1' | 'p2') =>
     onExplore && ((choice: RankedChoice) =>
@@ -127,13 +129,13 @@ export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore, resu
       {analysis.decisionDelta !== null && analysis.chanceDelta !== null && <SplitRow analysis={analysis} name={playerNames[0]} />}
       {analysis.playedTracking === false ? (
         <>
-          <EngineRow name={playerNames[0]} side={analysis.p1} onExplore={exploreFor('p1')} />
-          <EngineRow name={playerNames[1]} side={analysis.p2} onExplore={exploreFor('p2')} />
+          <EngineRow name={playerNames[0]} side={analysis.p1} onExplore={exploreFor('p1')} opponentReads={opponentReads} rowLines={{ result, side: 'p1' }} />
+          <EngineRow name={playerNames[1]} side={analysis.p2} onExplore={exploreFor('p2')} opponentReads={opponentReads} rowLines={{ result, side: 'p2' }} />
         </>
       ) : (
         <>
-          <SideRow name={playerNames[0]} side={analysis.p1} onExplore={exploreFor('p1')} lostGround={lostGround(analysis, 'p1')} />
-          <SideRow name={playerNames[1]} side={analysis.p2} onExplore={exploreFor('p2')} lostGround={lostGround(analysis, 'p2')} />
+          <SideRow name={playerNames[0]} side={analysis.p1} onExplore={exploreFor('p1')} lostGround={lostGround(analysis, 'p1')} opponentReads={opponentReads} rowLines={{ result, side: 'p1' }} />
+          <SideRow name={playerNames[1]} side={analysis.p2} onExplore={exploreFor('p2')} lostGround={lostGround(analysis, 'p2')} opponentReads={opponentReads} rowLines={{ result, side: 'p2' }} />
         </>
       )}
       <ReadRows reads={reads} playerNames={playerNames} faintedFraction={analysis.faintedFraction} />

@@ -31,6 +31,7 @@ function WorkspaceTopBar({ app, replayData, onNewGame }: WorkspaceProps) {
   const { branchPreparing, branchProgress, cancelPreparation, branchDivergence } = app.board.deviation;
   const { setEditorSide, setSetsPanelOpen, handleTeamLoad, teamPasteStatus, teamPasteError } = app.ctx.knowledge;
   const { loading, error, embed, loadReplay, loadReplayFile, loadedReplayUrl } = app.ctx.replay;
+  const { prefs, setPrefs } = app.ctx.evaluation;
   return (
     <AppTopBar
       replayData={replayData}
@@ -44,6 +45,9 @@ function WorkspaceTopBar({ app, replayData, onNewGame }: WorkspaceProps) {
       branchDivergence={branchDivergence}
       onCancelPreparation={cancelPreparation}
       onAnimateChange={app.ctx.setAnimateBranchTurns}
+      // Round 89 (#153, HM-2): the stored `hardMode` preference, called "Opponent reads my move" where the user sees it.
+      opponentReads={!!prefs.hardMode}
+      onOpponentReadsChange={value => setPrefs({ ...prefs, hardMode: value })}
       onEditSide={setEditorSide}
       onOpenSets={() => setSetsPanelOpen(true)}
       embed={embed}

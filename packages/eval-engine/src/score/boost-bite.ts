@@ -8,6 +8,7 @@ import {
 } from './boost-race.ts';
 import { residualReader, type Residuals } from './residuals.ts';
 import { hitReader, type HitReader } from './contact.ts';
+import { stageStands } from './switch-out.ts';
 
 /**
  * Round 69 (T49, decision 16): boostsBiting, `boosts` with every standing
@@ -29,6 +30,12 @@ import { hitReader, type HitReader } from './contact.ts';
  * survives; T218) and, T225, while the holder does not win the race against a
  * foe on the field within the horizon (a wall it needs six turns for keeps the
  * bench shut, though it cannot KO the holder either).
+ *
+ * 21.11.2026 (SB3c, the Gholdengo report): a drop counts only while its holder cannot switch out (score/switch-out.ts). The
+ * simulator clears every stage of a body that leaves, so a holder that can leave carries its drop for a turn, not for the rest
+ * of the game: the engine had read Gholdengo's -1 Special Attack as lasting, sent Glimmora in against it and expected it to
+ * flee. A holder that is trapped or has no living bench keeps the value as before; the drop still weakens the holder's hits in
+ * the damage reads of this turn.
  */
 
 /** The value of one standing stage: sign, stat weight, schedule and status discount of the boosts term. */
@@ -148,7 +155,8 @@ function holderBites(
   mine: Pokemon, foes: Pokemon[], removers: ReadonlySet<Pokemon>, idle: ReadonlySet<Pokemon>, battle: Battle, threat: ThreatOf,
   bodies: Bodies, hits: HitReader,
 ): number {
-  const stats = stagedStats(mine);
+  const stats = stagedStats(mine).filter(stat => stageStands(battle, mine, mine.boosts[stat]));
+  if (stats.length === 0) return 0;
   const races = new Map<Pokemon, PairRace>();
   const raceWith = (foe: Pokemon): PairRace => {
     let race = races.get(foe);

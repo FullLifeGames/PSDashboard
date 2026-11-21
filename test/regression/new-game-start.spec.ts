@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { Dex, PRNG, TeamValidator, Teams } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
-import { readTeamPaste, seedProblem, startNewGame, startProblem } from '../../src/lib/new-game/start';
+import { readTeamPaste, seedProblem, startNewGame, startBlocks, startProblem, stopsStart } from '../../src/lib/new-game/start';
 import { newGameSeed } from '../../src/lib/new-game/record';
 
 /**
@@ -96,6 +96,19 @@ describe('Start', () => {
     expect(startProblem({ texts: [TEAM, TEAM], seed: '9,9,9,9' })).toBeNull();
     const seven = Array.from({ length: 7 }, (_, index) => `Garchomp\n- Earthquake${' '.repeat(index)}`).join('\n\n');
     expect(startProblem({ texts: [seven, TEAM] })).toMatch(/at most 6/);
+  });
+
+  test('one rule names what stops Start by box: a side, the seed, and a species the check refused; the simulator\'s other problems never stop it (NG-2)', () => {
+    const seven = Array.from({ length: 7 }, (_, index) => `Garchomp\n- Earthquake${' '.repeat(index)}`).join('\n\n');
+    expect(startBlocks({ texts: [TEAM, TEAM] })).toEqual({ teams: [null, null], seed: null });
+    expect(startBlocks({ texts: ['', seven] })).toEqual({ teams: ['Paste a team for Player 1 to start.', 'A team holds at most 6 Pokémon.'], seed: null });
+    expect(startBlocks({ texts: [TEAM, TEAM], seed: '1,2' }).seed).toMatch(/four whole numbers/);
+    const refusal = 'Zzqxvwk is no Pokémon of [Gen 9] OU. Fix the set to start.';
+    expect(startBlocks({ texts: [TEAM, TEAM], refused: [null, refusal] }).teams).toEqual([null, refusal]);
+    expect(stopsStart(startBlocks({ texts: [TEAM, TEAM], refused: [null, refusal] }))).toBe(true);
+    expect(stopsStart(startBlocks({ texts: [TEAM, TEAM], seed: '1,2,3,4' }))).toBe(false);
+    // the same rule feeds startProblem, which Start itself reads
+    expect(startProblem({ texts: [TEAM, seven] })).toBe('A team holds at most 6 Pokémon.');
   });
 
   const FORMATS: { id: string; name: string; level: number; gameType: 'singles' | 'doubles'; bring: number | null }[] = [

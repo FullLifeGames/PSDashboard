@@ -20,6 +20,8 @@ export function EndedNotice({ winner, game = false, battle = false }: { winner: 
   );
 }
 
+const OPPONENT_READS_NOTE_TITLE = 'The opponent\'s engine picks answer yours with the reply the search rates lowest for your pick. Setup ▾ holds this setting.';
+
 /** What a forced replacement asks of its slot. */
 function forcePrompt(slot: DockSlotModel): string {
   return slot.fainted ? `${slot.name} fainted! Choose who to send in:` : `${slot.name} is switching out. Choose who to send in:`;
@@ -29,7 +31,7 @@ function forcePrompt(slot: DockSlotModel): string {
  * Round 84 (turn dock): the strip above the chips: where the choices come from, what a forced replacement asks, which side
  * waits for the other's replacement, the note that dice need the exact position, and the error of the last Execute.
  */
-export function DockStatus({ source, acquiringExact, executeError, model, diceOpen, game = false }: {
+export function DockStatus({ source, acquiringExact, executeError, model, diceOpen, game = false, opponentReads = false, onOpponentReadsChange }: {
   source?: PickerSource;
   acquiringExact?: boolean;
   executeError: string | null;
@@ -38,12 +40,23 @@ export function DockStatus({ source, acquiringExact, executeError, model, diceOp
   diceOpen: boolean;
   /** Round 89 (#105): the position belongs to a new game, so the words name the game, not a replay. */
   game?: boolean;
+  /** Round 89 (#153, HM-2): the Setup setting "Opponent reads my move" is on: the strip opens with a note and a button that turns it off. */
+  opponentReads?: boolean;
+  onOpponentReadsChange?: (value: boolean) => void;
 }) {
   const slots = [...model.p1, ...model.p2];
   // The side that does not replace waits; the note names the side that does.
   const waitingFor = [...(model.flags.p1Waits ? ['P2'] : []), ...(model.flags.p2Waits ? ['P1'] : [])];
   return (
     <div className="ps-dock-status">
+      {opponentReads && (
+        <>
+          <span className="ps-dock-source" title={OPPONENT_READS_NOTE_TITLE}>Opponent reads your move</span>
+          <button type="button" className="ps-btn ps-dock-turn-off" onClick={() => onOpponentReadsChange?.(false)}>
+            Turn off
+          </button>
+        </>
+      )}
       {source === 'stored' && <span className="ps-dock-source">{game ? 'Choices from the game\'s position' : 'Choices from the reconstructed position'}</span>}
       {source === 'snapshot' && (
         <span className="ps-dock-source">

@@ -159,6 +159,7 @@ jobs:
           - part: 3
             files: >-
               packages/eval-engine/test/board-key-census.spec.ts
+              packages/eval-engine/test/switch-out-sweep.spec.ts
     steps:
       - name: Check out repository
         uses: actions/checkout@v7

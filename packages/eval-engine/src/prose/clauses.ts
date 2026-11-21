@@ -2,7 +2,7 @@ import { TIER_THRESHOLDS, diffChoices, playedSetupMove, type SideAnalysis } from
 import type { RankedChoice } from '../types.ts';
 import { winDeltaText, winPctText } from '../winprob.ts';
 import { formatLine } from './line.ts';
-import { choiceNoun, conditionalNote, displayBest, nullNote, oddsNote, oddsPart, phrase, phraseReplies, playedVerb } from './phrases.ts';
+import { cameInstead, choiceNoun, conditionalNote, displayBest, nullNote, oddsNote, oddsPart, phrase, phraseReplies, playedVerb } from './phrases.ts';
 
 /**
  * The per-side clauses of the turn summary: paid-off reads, misplays,
@@ -12,9 +12,9 @@ import { choiceNoun, conditionalNote, displayBest, nullNote, oddsNote, oddsPart,
  */
 
 /** A flagged risk that won value over the safe guarantee — praised, not blamed. */
-function readClause(name: string, side: SideAnalysis, opponent: SideAnalysis): string | null {
+function readClause(name: string, side: SideAnalysis, opponent: SideAnalysis, opponentName: string): string | null {
   if (!side.riskPaidOff || !side.played || !side.safe) return null;
-  const came = opponent.played ? `; ${phrase(opponent.played.label)} came instead` : '';
+  const came = opponent.played ? `; ${cameInstead(opponentName, opponent)}` : '';
   // Round 89 (G-Q2 b): the fair test's own numbers, the played cell against the safe cell in the clicked column.
   const held = side.safeAgainstClick;
   const beat = held ? `, and against it the play beat the safe line by ${winDeltaText(held.playedValue - held.safeValue)}` : '';
@@ -57,9 +57,9 @@ const partialNote = (side: SideAnalysis, verb: 'graded' | 'credited'): string =>
   side.playedPartial ? ` (Partner's action hidden; ${verb} on the visible slot.)` : '';
 
 /** Round 67 (T59): `praised` false (the side lost ground) silences a paid-off read; no misplay clause takes its place. */
-export function sideClause(name: string, side: SideAnalysis, opponent: SideAnalysis, praised = true): string | null {
+export function sideClause(name: string, side: SideAnalysis, opponent: SideAnalysis, praised = true, opponentName = 'the opponent'): string | null {
   if (side.riskPaidOff && !praised) return null;
-  const clause = readClause(name, side, opponent) ?? mistakeClause(name, side, opponent);
+  const clause = readClause(name, side, opponent, opponentName) ?? mistakeClause(name, side, opponent, opponentName);
   return clause ? `${clause}${partialNote(side, 'graded')}` : null;
 }
 
@@ -77,13 +77,14 @@ function unpunishedReadClause(
   name: string,
   side: SideAnalysis,
   opponent: SideAnalysis,
+  opponentName: string,
   played: RankedChoice,
   safe: RankedChoice,
   why: string,
   caveat: string,
 ): string {
   const came = played.punishedBy && opponent.played
-    ? `its floor risked ${phraseReplies(played.punishedBy)} (down to ${winPctText(played.worstCase, side.faintedFraction)}); ${phrase(opponent.played.label)} came instead`
+    ? `its floor risked ${phraseReplies(played.punishedBy)} (down to ${winPctText(played.worstCase, side.faintedFraction)}); ${cameInstead(opponentName, opponent)}`
     : `its floor sat at ${winPctText(played.worstCase, side.faintedFraction)}`;
   const framing = side.riskWasRead
     ? `a read against the opponent's tendencies: ${came}`
@@ -117,7 +118,7 @@ function punishedMisplayClause(
     `safer was ${phrase(shown.label)} (${winPctText(shown.ev, side.faintedFraction)})${line}.${reasons}`;
 }
 
-function mistakeClause(name: string, side: SideAnalysis, opponent: SideAnalysis): string | null {
+function mistakeClause(name: string, side: SideAnalysis, opponent: SideAnalysis, opponentName: string): string | null {
   if (side.sacrifice) return null; // the sack note carries the turn instead
   if ((side.tier !== 'mistake' && side.tier !== 'blunder') || !side.played || !side.best) return null;
   const difference = diffChoices(side.played, side.best);
@@ -128,7 +129,7 @@ function mistakeClause(name: string, side: SideAnalysis, opponent: SideAnalysis)
     : '';
   if (side.safeAgainstClick && !side.riskPaidOff) return heldRiskClause(name, side);
   if (side.riskUnpunished && side.safe) {
-    return unpunishedReadClause(name, side, opponent, side.played, side.safe, why, caveat);
+    return unpunishedReadClause(name, side, opponent, opponentName, side.played, side.safe, why, caveat);
   }
   return punishedMisplayClause(name, side, side.played, side.best, why, caveat);
 }
@@ -189,7 +190,7 @@ export function forcedClause(name: string, side: SideAnalysis): string | null {
   if (!side.played) return `${base}.`;
   return side.played.label === side.forcedMix.label
     ? `${base}, which is what happened.`
-    : `${base}, but ${phrase(side.played.label)} came instead.`;
+    : `${base}, but ${cameInstead(name, side)}.`;
 }
 
 /**

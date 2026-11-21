@@ -22,6 +22,18 @@ describe('EvalTurnAnalysis', () => {
     expect(screen.getByText(`mistake · ${winDeltaText(-0.25)}`)).toBeInTheDocument();
   });
 
+  // Round 89 (#153, HM-2): the setting reaches the engine-move buttons of every card shape: tracked rows (singles), untracked rows (doubles) and the open tip.
+  test.each([['a tracked card', {}, false], ['an untracked card (doubles)', { playedTracking: false }, false], ['an open tip', {}, true]] as const)(
+    '%s names the reply in its engine-move titles, off and on', (_name, extra, open) => {
+      const analysis = turnAnalysis(4, { ...extra, p1: sideAnalysis(open ? { played: null, regret: null } : {}), p2: sideAnalysis(open ? { played: null, regret: null } : {}) });
+      const titles = () => screen.getAllByRole('button', { name: /↗/ }).map(button => button.getAttribute('title'));
+      const { rerender } = render(<EvalTurnAnalysis analysis={analysis} playerNames={names} onExplore={vi.fn()} open={open} />);
+      expect(titles().length).toBeGreaterThan(0);
+      expect(new Set(titles())).toEqual(new Set(['Play this turn in a variation; the opponent plays its top choice.']));
+      rerender(<EvalTurnAnalysis analysis={analysis} playerNames={names} onExplore={vi.fn()} open={open} opponentReads />);
+      expect(new Set(titles())).toEqual(new Set(['Play this turn in a variation; the opponent reads your move and plays the reply the search rates lowest for it.']));
+    });
+
   test.each([['singles', {}], ['doubles', { playedSlots: [null, null] }]] as const)('the open turn of a game, %s, reads as an open position: the engine lines, no played choice, no verdict (H4h)', (_kind, slots) => {
     const open = { playedRaw: undefined, played: null, regret: null, ...slots };
     const analysis = turnAnalysis(4, { attribution: 'unclear', swing: null, scoreAfter: null, playedOutcome: null, decisionDelta: null, chanceDelta: null, p1: sideAnalysis(open), p2: sideAnalysis(open) });
@@ -292,5 +304,28 @@ describe.each([
     render(<EvalTurnAnalysis analysis={turnAnalysis(4)} playerNames={names} linesHost={host} doubles={doubles} />);
     expect(screen.getByRole('button', { name: 'How could Bob have won from here?' })).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByRole('region')).toBeNull();
+  });
+});
+
+// Round 89 (LN-4): the card hands its result to the rows, so the ranked row's "then ..." and the Lines section show one line per row.
+describe.each([
+  ['singles', 'Earthquake', evalResult('singles'), true],
+  ['doubles', 'Fake Out → Rillaboom + Spore → Tornadus', evalResult('doubles'), false],
+] as const)('EvalTurnAnalysis, one line per row, %s', (_kind, label, base, tracked) => {
+  const pick = (name: string) => ({ choice: name.toLowerCase(), label: name, slots: [null] });
+  const usual = { side: 'p1' as const, label, choice: base.perSide.p1[0].choice, for: ['engine' as const], end: 0.1, endFainted: 0, visits: 50,
+    steps: [{ p1: pick(label), p2: pick('Leech Seed'), dice: [] }, { p1: pick('Roost'), p2: pick('Encore'), dice: [] }] };
+  const result = { ...base, lines: [usual, { ...usual, versus: 'worst' as const, steps: [usual.steps[0], { p1: pick('Rock Slide'), p2: pick('Taunt'), dice: [] }] }] };
+  const best = rankedChoice(base.perSide.p1[0].choice, label, 0.35, { line: [{ p1: 'Stone Edge', p2: 'Protect' }] });
+  const analysis = turnAnalysis(4, { playedTracking: tracked, p1: misplayedSide('mistake', { best, safe: best }) });
+
+  test('the row reads the result\'s line; Hard mode reads the worst line', () => {
+    const { rerender } = render(<EvalTurnAnalysis analysis={analysis} playerNames={names} result={result} />);
+    expect(screen.getByText('then Roost · Encore')).toBeInTheDocument();
+    expect(screen.queryByText('then Stone Edge · Protect')).toBeNull();
+    rerender(<EvalTurnAnalysis analysis={analysis} playerNames={names} result={result} opponentReads />);
+    expect(screen.getByText('then Rock Slide · Taunt')).toBeInTheDocument();
+    rerender(<EvalTurnAnalysis analysis={analysis} playerNames={names} result={null} />);
+    expect(screen.getByText('then Stone Edge · Protect')).toBeInTheDocument();
   });
 });
