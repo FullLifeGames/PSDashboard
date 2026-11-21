@@ -21,8 +21,10 @@ import type { StaticRuleset } from '../src/eval-function';
  *  2. The replacement after U-turn: Great Tusk, not Glimmora (Glimmora meets a Gholdengo that beats it).
  * Both rows run the app's road for a singles turn before a quarter of the bodies fell: the matrix at depth 1 with 3 samples.
  * Margins on 21.11.2026 (SB3c): turn 2, Earth Power -0.193 against Stealth Rock -0.243 (0.050), Gholdengo's Make It Rain 0.225 against
- * a Dragonite switch 0.217, mix 100 % Make It Rain; the replacement, Great Tusk -0.130 against Pawmot and Lokix -0.145 (0.015), four
- * bodies tie in the solved mix and the one-ply trend breaks the tie in Great Tusk's favour, Glimmora -0.153 is out of the mix.
+ * a Dragonite switch 0.217, mix 100 % Make It Rain. The replacement with the drop rule alone (SB-3): Great Tusk -0.130 against Pawmot
+ * and Lokix -0.145 (0.015), four bodies tied in the solved mix and the one-ply trend broke the tie in Great Tusk's favour, Glimmora
+ * -0.153 out of the mix. With the replacement judged by the turn after it (SB-4, #197): Great Tusk -0.121 against Lokix -0.142
+ * (0.021), Pawmot -0.157, Meowscarada -0.162, Glimmora -0.193 last; the solved mix is 100 % Great Tusk, no tie and no tie-break.
  * Before the change: Sludge Bomb and Stealth Rock led turn 2 and Gholdengo switched, Glimmora was the only body in the mix.
  */
 
@@ -63,6 +65,10 @@ describe('SB5a: the shared Gholdengo game, Tera off', () => {
   test('the replacement after U-turn is Great Tusk', async () => {
     const result = await search(scene.forced);
     expect(result.perSide.p1[0].label).toBe('→ Great Tusk');
-    expect(mixOf(result, 'p1').map(([label]) => label)).not.toContain('→ Glimmora');
+    // By value since SB-4: the turn after each replacement is searched, so Great Tusk leads on its own and holds the whole mix (the
+    // drop rule alone left four bodies tied and a one-ply tie-break to decide).
+    expect(result.depthCompleted).toBe(2);
+    expect(mixOf(result, 'p1').map(([label]) => label)).toEqual(['→ Great Tusk']);
+    expect(result.perSide.p1[0].ev - result.perSide.p1[1].ev).toBeGreaterThan(0.015);
   }, 120_000);
 });

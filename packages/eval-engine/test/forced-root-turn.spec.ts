@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { PRNG } from '@pkmn/sim';
+import { Battle, PRNG, Teams, toID, type PokemonSet } from '@pkmn/sim';
 import { describe, expect, test } from 'vitest';
 import { searchOrchestrated, type SearchExecutor } from '../src/orchestrator';
 import { createLocalExecutor, searchPosition } from '../src/search';
@@ -127,39 +127,66 @@ function counting(base: SearchExecutor, onTurn?: () => void): { executor: Search
 
 const rowsOf = (result: EvalResult, side: 'p1' | 'p2') => result.perSide[side].map(row => [row.label, row.ev]);
 
+/** The guards run on a small game of the simulator's own: Rillaboom's Memento faints it, and P1 chooses among Pikachu, Eevee and Snorlax. */
+const mon = (species: string, moves: string[]): PokemonSet => ({
+  name: species, species, item: '', ability: 'No Ability', moves, nature: 'Hardy',
+  evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, level: 50,
+});
+function smallGame(memento: boolean): string {
+  const battle = new Battle({
+    formatid: toID('gen9customgame') as never, seed: [1, 2, 3, 4],
+    p1: { name: 'Alpha', team: Teams.pack([mon('Rillaboom', ['Memento', 'Splash']), mon('Pikachu', ['Thunderbolt']), mon('Eevee', ['Tackle']), mon('Snorlax', ['Body Slam'])]) },
+    p2: { name: 'Beta', team: Teams.pack([mon('Corviknight', ['Splash', 'Brave Bird']), mon('Garchomp', ['Earthquake'])]) },
+  });
+  if (battle.sides[0].requestState === 'teampreview') {
+    battle.choose('p1', 'default');
+    battle.choose('p2', 'default');
+  }
+  if (memento) {
+    battle.choose('p1', 'move 1');
+    battle.choose('p2', 'move 1');
+  }
+  return serializeLiveBattle(battle);
+}
+const small = { settings: { tera: false, ruleset: 'standard' as StaticRuleset, sleepClause: false }, serialized: smallGame(true) };
+
 describe('guards', () => {
-  test('a root with no forced request keeps its matrix: no turn search, depth 1, the same rows', async () => {
-    await loadSimModsFor(gholdengo.turn2);
-    const { executor, turns } = counting(createLocalExecutor(gholdengo.turn2, gholdengo.settings.ruleset));
-    const result = await searchOrchestrated(executor, settingsOf(gholdengo, 3));
+  test('a root with no forced request keeps its matrix: no turn search, depth 1', async () => {
+    const open = smallGame(false);
+    const { executor, turns } = counting(createLocalExecutor(open, small.settings.ruleset));
+    const result = await searchOrchestrated(executor, settingsOf(small, 3));
     expect(turns()).toBe(0);
     expect(result.depthCompleted).toBe(1);
-    expect(result.perSide.p1[0].label).toBe('Earth Power');
-    expect(result.perSide.p1[0].ev).toBeCloseTo(-0.193, 3);
-  }, 240_000);
+  }, 120_000);
+
+  test('the small game stands at a forced request and the turn searches match the reference', async () => {
+    const { result, side } = await expectTurnValues(small, small.serialized, settingsOf(small, 3));
+    expect(side).toBe('p1');
+    expect(result.depthCompleted).toBe(2);
+    expect(result.perSide.p1).toHaveLength(3);
+  }, 120_000);
 
   test('the sync search and the orchestrated search agree at a forced root', async () => {
-    await loadSimModsFor(gholdengo.forced);
-    const settings = settingsOf(gholdengo, 3);
-    const sync = searchPosition(gholdengo.forced, settings);
-    const orchestrated = await search(gholdengo, gholdengo.forced, settings);
+    const settings = settingsOf(small, 3);
+    const sync = searchPosition(small.serialized, settings);
+    const orchestrated = await search(small, small.serialized, settings);
     expect(sync.depthCompleted).toBe(orchestrated.depthCompleted);
     expect(sync.score).toBeCloseTo(orchestrated.score, 9);
     expect(rowsOf(sync, 'p1')).toEqual(rowsOf(orchestrated, 'p1'));
-  }, 240_000);
+  }, 120_000);
 
   test.each([
-    ['singles (the shared game)', 'gholdengo'],
+    ['singles (the small game)', 'small'],
     ['doubles (VGC 2630685175 turn 2)', 'vgc'],
   ])('the tree keeps its own forced node, %s: no turn search', async (_name, which) => {
-    const scene = which === 'vgc' ? read('forced-root/vgc-2630685175-t2.json') : { ...gholdengo, serialized: gholdengo.forced };
+    const scene = which === 'vgc' ? read('forced-root/vgc-2630685175-t2.json') : small;
     await loadSimModsFor(scene.serialized);
     const previous = searchBudget();
     configureSearchBudget({ ...previous, trees: 2, iterations: 50 });
     try {
-      const counted = counting(createLocalTreeExecutor(scene.serialized, scene.settings.ruleset));
-      await searchTreesOrchestrated({ ...createLocalTreeExecutor(scene.serialized, scene.settings.ruleset), subSearch: counted.executor.subSearch },
-        { ...settingsOf(scene, 1), mode: 'mcts' });
+      const base = createLocalTreeExecutor(scene.serialized, scene.settings.ruleset);
+      const counted = counting(base);
+      await searchTreesOrchestrated({ ...base, subSearch: counted.executor.subSearch }, { ...settingsOf(scene, 1), mode: 'mcts' });
       expect(counted.turns()).toBe(0);
     } finally {
       configureSearchBudget(previous === SEARCH_BUDGET_DEFAULT ? null : previous);
@@ -172,37 +199,34 @@ describe('guards', () => {
   });
 
   test('a stop before the turn searches leaves the depth-1 result, sync and orchestrated', async () => {
-    await loadSimModsFor(gholdengo.forced);
-    const settings = settingsOf(gholdengo, 3);
-    const { executor, turns } = counting(createLocalExecutor(gholdengo.forced, gholdengo.settings.ruleset));
+    const settings = settingsOf(small, 3);
+    const { executor, turns } = counting(createLocalExecutor(small.serialized, small.settings.ruleset));
     const stopped = await searchOrchestrated(executor, settings, { shouldStop: () => true });
-    const sync = searchPosition(gholdengo.forced, settings, { shouldStop: () => true });
+    const sync = searchPosition(small.serialized, settings, { shouldStop: () => true });
     expect(turns()).toBe(0);
     expect(stopped.depthCompleted).toBe(1);
     expect(sync.depthCompleted).toBe(1);
     expect(rowsOf(sync, 'p1')).toEqual(rowsOf(stopped, 'p1'));
-  }, 240_000);
+  }, 120_000);
 
   test('a stop during the turn searches discards them: no row mixes a turn value with an arrival value', async () => {
-    await loadSimModsFor(gholdengo.forced);
-    const settings = settingsOf(gholdengo, 3);
-    const baseline = await searchOrchestrated(createLocalExecutor(gholdengo.forced, gholdengo.settings.ruleset), settings, { shouldStop: () => true });
+    const settings = settingsOf(small, 3);
+    const baseline = await searchOrchestrated(createLocalExecutor(small.serialized, small.settings.ruleset), settings, { shouldStop: () => true });
     let stop = false;
-    const { executor } = counting(createLocalExecutor(gholdengo.forced, gholdengo.settings.ruleset), () => { stop = true; });
+    const { executor } = counting(createLocalExecutor(small.serialized, small.settings.ruleset), () => { stop = true; });
     const orchestrated = await searchOrchestrated(executor, settings, { shouldStop: () => stop });
     expect(orchestrated.depthCompleted).toBe(1);
     expect(rowsOf(orchestrated, 'p1')).toEqual(rowsOf(baseline, 'p1'));
     let flipped = false;
-    const sync = searchPosition(gholdengo.forced, settings, { shouldStop: () => flipped, onProgress: progress => { if (progress.depth === 2) flipped = true; } });
+    const sync = searchPosition(small.serialized, settings, { shouldStop: () => flipped, onProgress: progress => { if (progress.depth === 2) flipped = true; } });
     expect(sync.depthCompleted).toBe(1);
     expect(rowsOf(sync, 'p1')).toEqual(rowsOf(baseline, 'p1'));
-  }, 480_000);
+  }, 240_000);
 
   test('an explicit depth 2 reads the turn after the replacement once: rows equal the depth-1 forced rows', async () => {
-    await loadSimModsFor(gholdengo.forced);
-    const d1 = await search(gholdengo, gholdengo.forced, settingsOf(gholdengo, 3, 1));
-    const d2 = await search(gholdengo, gholdengo.forced, settingsOf(gholdengo, 3, 2));
+    const d1 = await search(small, small.serialized, settingsOf(small, 3, 1));
+    const d2 = await search(small, small.serialized, settingsOf(small, 3, 2));
     expect(d2.depthCompleted).toBe(2);
     expect(rowsOf(d2, 'p1')).toEqual(rowsOf(d1, 'p1'));
-  }, 480_000);
+  }, 240_000);
 });
