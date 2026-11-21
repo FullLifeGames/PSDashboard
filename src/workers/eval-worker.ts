@@ -81,6 +81,8 @@ scope.onmessage = async (event: MessageEvent<EvalWorkerRequest | ReplayJobReques
             post({ type: 'progress', id: message.id, progress });
           }
         },
+        // Round 89 (SB-9): tree 0 of a search with a listener streams its interim result (every 150 iterations); the others ask for none.
+        ...(message.partials && { onPartial: partial => post({ type: 'partial', id: message.id, result: partial }) }),
       });
       settle({ type: 'mctsTreeResult', id: message.id, tree });
     } else if (message.type === 'choices') {

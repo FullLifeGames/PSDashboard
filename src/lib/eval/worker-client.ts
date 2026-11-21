@@ -231,9 +231,8 @@ export class EvalWorkerClient {
       onProgress: (progress: SearchProgress) => {
         if (live()) handlers?.onProgress?.(progress);
       },
-      onPartial: (partial: EvalResult) => {
-        if (live()) handlers?.onPartial?.(partial);
-      },
+      // Round 89 (SB-9): a listener is what makes tree 0 compute its interim result; the game analysis and the play-out pass none.
+      ...(handlers?.onPartial && { onPartial: (partial: EvalResult) => { if (live()) handlers.onPartial?.(partial); } }),
       shouldStop: () => !live(),
     };
     // Round 77: another engine answers over HTTP; the pool still lists the options it ranks.
@@ -257,6 +256,7 @@ export class EvalWorkerClient {
     offset: number,
     live: () => boolean,
     onProgress: (progress: SearchProgress) => void,
+    onPartial?: (result: EvalResult) => void,
   ): Promise<MctsTreeStats> {
     const handle = this.pickWorker();
     const id = this.nextId++;
@@ -268,12 +268,14 @@ export class EvalWorkerClient {
         },
         reject,
         onStream: response => {
-          if (!live() || response.type !== 'progress') return;
-          onProgress(response.progress);
+          if (!live()) return;
+          if (response.type === 'progress') onProgress(response.progress);
+          else if (response.type === 'partial') onPartial?.(response.result);
         },
       });
       handle.worker.postMessage({
         type: 'mctstree', id, serializedBattle, settings, seedOffset: offset, simFast: simFastLevers(), searchBudget: searchBudgetStamp(),
+        ...(onPartial && { partials: true as const }),
       });
     });
   }
@@ -286,8 +288,8 @@ export class EvalWorkerClient {
   private createPooledTreeExecutor(serializedBattle: string, live: () => boolean, ruleset: StaticRuleset): TreeExecutor {
     return {
       ...this.createPooledExecutor(serializedBattle, ruleset),
-      tree: (settings, seedOffset, onProgress) =>
-        this.runTree(serializedBattle, settings, seedOffset, live, onProgress ?? (() => undefined)),
+      tree: (settings, seedOffset, onProgress, onPartial) =>
+        this.runTree(serializedBattle, settings, seedOffset, live, onProgress ?? (() => undefined), onPartial),
     };
   }
 

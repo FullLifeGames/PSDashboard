@@ -121,11 +121,10 @@ describe('tree 0 streams its interim result until the first tree ends', () => {
       },
     };
     const heard: EvalResult[] = [];
-    let after = -1;
     const run = searchTreesOrchestrated(executor, b.settings, { onPartial: result => heard.push(result) });
     await othersDone;
     await new Promise(resolve => setTimeout(resolve, 0));
-    after = heard.length;
+    const after = heard.length;
     expect(late, 'tree 0 was handed a listener to drop').toBeTypeOf('function');
     late?.({ score: 0, interval: 0, depthCompleted: 9, perSide: { p1: [], p2: [] } });
     expect(heard.length, 'a late interim result of tree 0 is dropped').toBe(after);
