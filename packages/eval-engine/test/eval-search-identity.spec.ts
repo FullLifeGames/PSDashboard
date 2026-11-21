@@ -28,6 +28,9 @@ import doublesTeams from './fixtures/doubles-identity-fixture';
  * for a pinned healer) moved the static again, so the search picks other children (PERF_IDENTITY_RECORD=1).
  * Re-recorded in round 78 (@pkmn 0.10.12, for the round's gate): a fainted body that left the field carries the status ''
  * where 0.10.11 kept 'fnt', so the state hashes move; the children's facts, the depth-1 matrix and the tree stay.
+ * Re-recorded in round 89 (SB-3, for the round's gate): a stat drop counts only while its holder cannot switch out, so the singles
+ * MCTS tree, whose leaves hold such drops, moves (score, visits per option, cell values); the children, both depth-1 matrices and the
+ * doubles tree are byte for byte as before.
  */
 
 const RECORD = process.env.PERF_IDENTITY_RECORD === '1';
