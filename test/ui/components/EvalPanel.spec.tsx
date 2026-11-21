@@ -98,6 +98,18 @@ describe('EvalPanel', () => {
     expect(document.querySelector('.ps-eval-stale')).not.toBeNull();
   });
 
+  // Round 89 (SB-9): a stop before any partial result (a tree search before its first interim result) leaves no card; the panel says why.
+  test.each([['singles', false], ['doubles', true]] as const)('%s: a search stopped before a first result says so beside Evaluate, and only then', (_kind, doubles) => {
+    const onEvaluate = vi.fn();
+    const { rerender } = render(<EvalPanel {...props({ status: 'idle', result: null, doubles, onEvaluate, stoppedEmpty: true })} />);
+    expect(screen.getByRole('status')).toHaveTextContent('Search stopped before a first result.');
+    expect(screen.getByRole('button', { name: /Evaluate/ })).toBeInTheDocument();
+    rerender(<EvalPanel {...props({ status: 'idle', result: null, doubles, onEvaluate })} />);
+    expect(screen.queryByText(/Search stopped/)).toBeNull();
+    rerender(<EvalPanel {...props({ status: 'searching', result: null, doubles, onEvaluate, stoppedEmpty: true })} />);
+    expect(screen.queryByText(/Search stopped/)).toBeNull();
+  });
+
   test('replay view: the report is the overview; a card or a navigation opens the turn view, with a way back', async () => {
     const onSelectTurn = vi.fn();
     const onAnalyzeTurn = vi.fn();

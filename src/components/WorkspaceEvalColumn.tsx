@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type { EvalResult } from '@fulllifegames/eval-engine';
 import type { EvalStatus, StoppedRun } from '../hooks/useEvaluation';
+import { stoppedEmptyHere } from '../lib/stopped-line';
 import { EvalPanel } from './EvalPanel';
 import { PlayOutBar } from './PlayOutBar';
 import { resultPositionLabel } from './eval/turn-copy';
@@ -107,6 +108,7 @@ function EvalSection({ app, replayData }: WorkspaceColumnProps) {
       onPrefsChange={evaluation.setPrefs}
       onEvaluate={liveEvalView ? handleEvaluate : undefined}
       onCancel={evaluation.stop}
+      stoppedEmpty={stoppedEmptyHere(evaluation.stopped, { live: liveEvalView, status: liveEvalStatus, key: app.board.timeline.evalViewKey })}
       stoppedAt={stoppedDepth(evaluation.stopped, { live: liveEvalView, status: liveEvalStatus, matches: evalResultMatchesView }, analyzedResult)}
       onPickChoice={clickable ? handleExploreChoice : undefined}
       onPickPair={clickable ? handlePickPair : undefined}

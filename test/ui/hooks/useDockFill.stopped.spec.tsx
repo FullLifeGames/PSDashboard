@@ -84,15 +84,48 @@ describe('a stop keeps the result so far', () => {
     expect(script.runs).toBe(1);
   });
 
-  test.each(['singles', 'doubles'] as const)('%s: a stop before any partial result leaves the chips empty and the evaluation idle', async (kind) => {
+  // Round 89 (SB-9, gate finding BROKEN 1): a tree search streams its first interim result (tree depth 3 to 5, not the quick estimate)
+  // after 150 iterations of its first tree; a Cancel after it keeps that result in a doubles replacement like any other partial.
+  test('doubles: Stop after a tree\'s interim result (depth 3) fills the replacement chips from it and reads as the result so far', async () => {
+    const setChoice = vi.fn();
+    const { result } = renderHook(() => useFilled('doubles', setChoice));
+    await searching(result);
+    const partial = evalResult('doubles', { depthCompleted: 3 });
+    act(() => script.handlers!.onPartial!(partial));
+    await waitFor(() => expect(result.current.evaluation.result).toBe(partial));
+    act(() => result.current.evaluation.stop());
+    await waitFor(() => expect(result.current.fill.pending).toBe(false));
+    expect(result.current.evaluation.status).toBe('stale');
+    expect(result.current.evaluation.stopped).toEqual({ tag: KEY });
+    expect(result.current.evaluation.result?.depthCompleted).toBe(3);
+    expect(setChoice).toHaveBeenCalledWith('p1', expect.anything(), 0);
+    expect(result.current.fill.engine.p1[0]).toBe(true);
+    expect(script.runs).toBe(1);
+  });
+
+  test.each(['singles', 'doubles'] as const)('%s: a stop before any partial result leaves the chips empty and the evaluation idle, and marks the stop as empty', async (kind) => {
     const setChoice = vi.fn();
     const { result } = renderHook(() => useFilled(kind, setChoice));
     await searching(result);
     act(() => result.current.evaluation.stop());
     await waitFor(() => expect(result.current.evaluation.status).toBe('idle'));
-    expect(result.current.evaluation.stopped).toBeNull();
+    expect(result.current.evaluation.stopped).toEqual({ tag: KEY, empty: true });
+    expect(script.runs).toBe(1);
     expect(setChoice).not.toHaveBeenCalled();
     expect(result.current.fill.engine).toEqual({ p1: [], p2: [] });
+  });
+
+  // The game analysis's Cancel button calls the same stop: with no single search under way it marks nothing.
+  test.each(['singles', 'doubles'] as const)('%s: a stop while no single search runs leaves no mark', async (kind) => {
+    const { result } = renderHook(() => useFilled(kind, vi.fn()));
+    await searching(result);
+    act(() => result.current.evaluation.stop());
+    await waitFor(() => expect(result.current.evaluation.status).toBe('idle'));
+    act(() => result.current.evaluation.reset());
+    await waitFor(() => expect(result.current.evaluation.stopped).toBeNull());
+    act(() => result.current.evaluation.stop());
+    expect(result.current.evaluation.stopped).toBeNull();
+    expect(result.current.evaluation.status).toBe('idle');
   });
 
   test.each(['singles', 'doubles'] as const)('%s: a run that something else cancelled (the game analysis) fills nothing, however far it got', async (kind) => {

@@ -79,6 +79,8 @@ interface EvalPanelProps {
   linesHost?: LinesHost;
   /** Round 89 (SB-7): the user stopped the search and its partial result stands for the position: its depth. Null: no stopped run. */
   stoppedAt?: number | null;
+  /** Round 89 (SB-9): the user stopped the search before any partial result came: the panel says nothing was kept. */
+  stoppedEmpty?: boolean;
   /** Which position the shown single result belongs to (e.g. "Turn 5 · variation"). */
   positionLabel?: string | null;
   /** Round 77 (C7): the pointer sits on the finished end of a variation: there is nothing to evaluate, the panel says who won. */
@@ -163,6 +165,7 @@ function PanelHeader({ running, ...props }: EvalPanelProps & { running: boolean 
         progress={props.progress}
         error={props.error}
         stoppedAt={props.stoppedAt ?? null}
+        stoppedEmpty={!props.ended && !!props.stoppedEmpty}
       />
     </>
   );

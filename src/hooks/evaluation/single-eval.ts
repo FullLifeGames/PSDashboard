@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   type TurnSensitivity, type TurnVerification, type EvalPreferences, type EvalResult, type EvalSettings,
   type SearchProgress, type StaticRuleset, type TeraAllowance, teraKey,
@@ -80,7 +80,7 @@ export interface CachedEval {
  * Round 89 (SB-7): the run the user stopped while it held a partial result. `tag` names its position (`EvaluateParams.tag`). The
  * partial stays the shown result, read as the answer of that position: the dock fills from it, the panel says it is a stopped run.
  */
-export interface StoppedRun { tag: string | null }
+export interface StoppedRun { tag: string | null; /** Round 89 (SB-9): the stop came before any partial result; the panel says so and nothing is kept. */ empty?: true }
 
 /** The state setters and shared refs a single-evaluation run writes through. */
 interface SingleEvalIO {
@@ -258,17 +258,21 @@ function useEvaluateAction(
 /**
  * The user's Cancel (round 89, SB-7). Like `cancel`, and a run that streamed a partial result keeps it as its answer (`stopped`): the
  * engine's own stop leaves the quick estimate, and the app reads it the same way. Every other cancel (the game analysis taking over,
- * a changed engine) leaves the partial as a stale result and no answer.
+ * a changed engine) leaves the partial as a stale result and no answer. A stop before any partial result (a tree before its first
+ * interim result) keeps nothing and says so (`empty`, SB-9).
  */
 function useStop(
   cancel: () => void, resultRef: React.RefObject<EvalResult | null>, resultTagRef: React.RefObject<string | null>,
-  setStopped: (value: StoppedRun | null) => void,
+  statusRef: React.RefObject<EvalStatus>, setStopped: (value: StoppedRun | null) => void,
 ) {
   return useCallback(() => {
     const partial = resultRef.current !== null;
+    // Round 89 (SB-9): the game analysis's Cancel calls this too; only a single search that was under way leaves the empty mark.
+    const searching = statusRef.current === 'searching' || statusRef.current === 'reconstructing';
     cancel();
     if (partial) setStopped({ tag: resultTagRef.current });
-  }, [cancel, resultRef, resultTagRef, setStopped]);
+    else if (searching) setStopped({ tag: resultTagRef.current, empty: true });
+  }, [cancel, resultRef, resultTagRef, statusRef, setStopped]);
 }
 
 /**
@@ -322,7 +326,9 @@ export function useSingleEval(env: {
   }), [runRef, clientRef, cacheRef, setResult, stopGraphPaint]);
   const evaluate = useEvaluateAction(io, prefsRef, engineOverrideRef, setResultTag, setStopped);
 
-  const stop = useStop(cancel, resultRef, resultTagRef, setStopped);
+  const statusRef = useRef<EvalStatus>('idle');
+  useEffect(() => { statusRef.current = status; }, [status]);
+  const stop = useStop(cancel, resultRef, resultTagRef, statusRef, setStopped);
 
   const markStale = useCallback(() => {
     setStatus(prev => (prev === 'done' ? 'stale' : prev));

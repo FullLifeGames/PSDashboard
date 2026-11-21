@@ -47,7 +47,18 @@ function StaleLine({ stoppedAt }: { stoppedAt: number | null }) {
   );
 }
 
-export function EvalStatus({ playOutProgress, status, reconstructProgress, progress, error, stoppedAt = null }: {
+/** The note of a stale result, or of a stop that kept nothing (round 89, SB-9: the search stopped before its first result). */
+function StopNote({ status, stoppedAt, stoppedEmpty }: { status: EvalStatusKind; stoppedAt: number | null; stoppedEmpty: boolean }) {
+  if (status === 'stale') return <StaleLine stoppedAt={stoppedAt} />;
+  if (status !== 'idle' || !stoppedEmpty) return null;
+  return (
+    <div role="status" style={{ fontSize: 11, color: '#b6a46a', marginBottom: 4 }}>
+      Search stopped before a first result.
+    </div>
+  );
+}
+
+export function EvalStatus({ playOutProgress, status, reconstructProgress, progress, error, stoppedAt = null, stoppedEmpty = false }: {
   playOutProgress?: PlayOutProgress | null;
   status: EvalStatusKind;
   reconstructProgress: { turn: number; target: number } | null;
@@ -55,6 +66,8 @@ export function EvalStatus({ playOutProgress, status, reconstructProgress, progr
   error: string | null;
   /** Round 89 (SB-7): the depth of the partial result a user stop kept; null when the stale result is no stopped run. */
   stoppedAt?: number | null;
+  /** Round 89 (SB-9): the user stopped the search before any partial result; nothing was kept. */
+  stoppedEmpty?: boolean;
 }) {
   return (
     <>
@@ -79,7 +92,7 @@ export function EvalStatus({ playOutProgress, status, reconstructProgress, progr
           Evaluation failed: {error}
         </div>
       )}
-      {!playOutProgress && status === 'stale' && <StaleLine stoppedAt={stoppedAt} />}
+      {!playOutProgress && <StopNote status={status} stoppedAt={stoppedAt} stoppedEmpty={stoppedEmpty} />}
     </>
   );
 }
