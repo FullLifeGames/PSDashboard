@@ -18,6 +18,7 @@ interface EvalShape {
   resultTag?: string | null;
   graph?: Evaluation['graph'];
   prefs?: Partial<Evaluation['prefs']>;
+  stopped?: Evaluation['stopped'];
 }
 
 /** The evaluation surface as the view hook reads it, every action a spy. */
@@ -25,7 +26,7 @@ function evaluationOf(shape: EvalShape = {}) {
   const spies = { evaluate: vi.fn(), runGraphSweep: vi.fn(), markStale: vi.fn(), reset: vi.fn(), clearGraph: vi.fn(), dropGraphFrom: vi.fn(), setPrefs: vi.fn() };
   const prefs = { depth: 1, samples: 1, mode: 'matrix', auto: false, autoAnalyze: false, tera: 'auto', ...shape.prefs } as Evaluation['prefs'];
   const evaluation = {
-    ...spies, prefs, status: shape.status ?? 'idle', result: shape.result ?? null, resultTag: shape.resultTag ?? null,
+    ...spies, prefs, status: shape.status ?? 'idle', result: shape.result ?? null, resultTag: shape.resultTag ?? null, stopped: shape.stopped ?? null,
     graph: shape.graph ?? evalGraph('singles', { scores: Array(10).fill(null), results: Array(10).fill(null), settings: Array(10).fill(null) }),
   } as unknown as Evaluation;
   return { evaluation, spies };
@@ -334,6 +335,30 @@ describe('useEvalView', () => {
     renderHook(() => useEvalView(inputs(pending.evaluation, { smogonPending: true })));
     expect(pending.spies.runGraphSweep).not.toHaveBeenCalled();
   });
+
+  // Round 89 (SB-7): Cancel is the user's answer for that position; Auto and "always on" start no new run over it. Another position
+  // (another tag) is theirs again. The same for singles and doubles: the view does not read the game type here.
+  test.each([['Auto', { auto: true }], ['Always on', { autoAnalyze: true }]] as const)('%s leaves a position the user stopped alone, and takes the next one', (_name, prefs) => {
+    const live = { branching: true, liveEvalView: true, liveTip: true, liveEvalStatus: 'stale' as const, evalViewKey: 'variation:3' };
+    const stopped = evaluationOf({ prefs, status: 'stale', result: evalResult(), resultTag: 'variation:3', stopped: { tag: 'variation:3' } });
+    const { rerender } = renderHook((props: EvalViewInputs) => useEvalView(props), { initialProps: inputs(stopped.evaluation, live) });
+    expect(stopped.spies.evaluate).not.toHaveBeenCalled();
+    rerender(inputs(stopped.evaluation, { ...live, evalViewKey: 'variation:4' }));
+    expect(stopped.spies.evaluate).toHaveBeenCalledTimes(1);
+  });
+
+  // Round 89 (SB-9): a stop before any result (a tree before its interim result) is the user's answer too; "Always on" does not start the run
+  // again. Round 89 (SB-10): the game analysis it starts stands: no single evaluation supersedes it in the same commit ("Analysis stopped").
+  test.each([['kept nothing', { tag: 'variation:3', empty: true as const }], ['kept a result', { tag: 'variation:3' }]] as const)(
+    'Always on leaves a position whose stop %s alone and starts the game analysis, not a search', (_name, mark) => {
+      const live = { branching: true, liveEvalView: true, liveTip: true, liveEvalStatus: 'idle' as const, evalViewKey: 'variation:3' };
+      const stopped = evaluationOf({ prefs: { autoAnalyze: true }, status: 'idle', stopped: mark });
+      const { rerender } = renderHook((props: EvalViewInputs) => useEvalView(props), { initialProps: inputs(stopped.evaluation, live) });
+      expect(stopped.spies.runGraphSweep).toHaveBeenCalledTimes(1);
+      expect(stopped.spies.evaluate).not.toHaveBeenCalled();
+      rerender(inputs(stopped.evaluation, { ...live, evalViewKey: 'variation:4' }));
+      expect(stopped.spies.evaluate).toHaveBeenCalledTimes(1);
+    });
 
   // Round 89 (#112): a frame report can park the pointer on an earlier turn of the variation while a play-out runs at the tip.
   // The run's evaluation (the user's and the Auto one) is the live sim's, tagged with the tip, and its score fills the tip's slot.

@@ -77,6 +77,10 @@ interface EvalPanelProps {
   doubles?: boolean;
   /** Round 89 (#104): the host of the Lines section under a turn's rows (the game's rules, the turn's field, ▶ Play); absent: no section. */
   linesHost?: LinesHost;
+  /** Round 89 (SB-7): the user stopped the search and its partial result stands for the position: its depth. Null: no stopped run. */
+  stoppedAt?: number | null;
+  /** Round 89 (SB-9): the user stopped the search before any partial result came: the panel says nothing was kept. */
+  stoppedEmpty?: boolean;
   /** Which position the shown single result belongs to (e.g. "Turn 5 · variation"). */
   positionLabel?: string | null;
   /** Round 77 (C7): the pointer sits on the finished end of a variation: there is nothing to evaluate, the panel says who won. */
@@ -160,6 +164,8 @@ function PanelHeader({ running, ...props }: EvalPanelProps & { running: boolean 
         reconstructProgress={props.reconstructProgress}
         progress={props.progress}
         error={props.error}
+        stoppedAt={props.stoppedAt ?? null}
+        stoppedEmpty={!props.ended && !!props.stoppedEmpty}
       />
     </>
   );
@@ -191,7 +197,8 @@ function SingleResult(props: EvalPanelProps) {
   return (
     <EvalResultBlock
       result={result}
-      status={status}
+      // a stopped run's result is the position's answer: not greyed, its rows play like a finished result's
+      status={status === 'stale' && props.stoppedAt != null ? 'done' : status}
       playerNames={playerNames}
       positionLabel={positionLabel}
       resultSettings={resultSettings}

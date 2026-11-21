@@ -80,6 +80,36 @@ describe('EvalPanel', () => {
     expect(screen.queryByRole('button', { name: /Earthquake/ })).toBeNull();
   });
 
+  // Round 89 (SB-7): a stopped search keeps its partial result as the position's answer, and the panel says what it is.
+  test.each([['singles'], ['doubles']] as const)('%s: a stopped search says so, keeps its rows playable and never claims the position changed', async kind => {
+    const onPickChoice = vi.fn();
+    const result = evalResult(kind, { depthCompleted: 1 });
+    const { rerender } = render(<EvalPanel {...props({ status: 'stale', result, stoppedAt: 1, onPickChoice })} />);
+    expect(screen.getByRole('status')).toHaveTextContent('Search stopped. Showing the quick estimate.');
+    expect(screen.queryByText('Position changed; re-evaluate.')).toBeNull();
+    expect(document.querySelector('.ps-eval-stale')).toBeNull();
+    await userEvent.click(document.querySelector('button.ps-eval-choice')!);
+    expect(onPickChoice).toHaveBeenCalledTimes(1);
+    rerender(<EvalPanel {...props({ status: 'stale', result, stoppedAt: 3, onPickChoice })} />);
+    expect(screen.getByRole('status')).toHaveTextContent('Search stopped. Showing the result so far.');
+    // a stale result of a run nobody stopped keeps its text and its grey
+    rerender(<EvalPanel {...props({ status: 'stale', result, onPickChoice })} />);
+    expect(screen.getByText('Position changed; re-evaluate.')).toBeInTheDocument();
+    expect(document.querySelector('.ps-eval-stale')).not.toBeNull();
+  });
+
+  // Round 89 (SB-9): a stop before any partial result (a tree search before its first interim result) leaves no card; the panel says why.
+  test.each([['singles', false], ['doubles', true]] as const)('%s: a search stopped before a first result says so beside Evaluate, and only then', (_kind, doubles) => {
+    const onEvaluate = vi.fn();
+    const { rerender } = render(<EvalPanel {...props({ status: 'idle', result: null, doubles, onEvaluate, stoppedEmpty: true })} />);
+    expect(screen.getByRole('status')).toHaveTextContent('Search stopped before a first result.');
+    expect(screen.getByRole('button', { name: /Evaluate/ })).toBeInTheDocument();
+    rerender(<EvalPanel {...props({ status: 'idle', result: null, doubles, onEvaluate })} />);
+    expect(screen.queryByText(/Search stopped/)).toBeNull();
+    rerender(<EvalPanel {...props({ status: 'searching', result: null, doubles, onEvaluate, stoppedEmpty: true })} />);
+    expect(screen.queryByText(/Search stopped/)).toBeNull();
+  });
+
   test('replay view: the report is the overview; a card or a navigation opens the turn view, with a way back', async () => {
     const onSelectTurn = vi.fn();
     const onAnalyzeTurn = vi.fn();

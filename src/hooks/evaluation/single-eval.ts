@@ -76,12 +76,18 @@ export interface CachedEval {
   sensitivity?: TurnSensitivity | null;
 }
 
+/**
+ * Round 89 (SB-7): the run the user stopped while it held a partial result. `tag` names its position (`EvaluateParams.tag`). The
+ * partial stays the shown result, read as the answer of that position: the dock fills from it, the panel says it is a stopped run.
+ */
+export interface StoppedRun { tag: string | null; /** Round 89 (SB-9): the stop came before any partial result; the panel says so and nothing is kept. */ empty?: true }
+
 /** The state setters and shared refs a single-evaluation run writes through. */
 interface SingleEvalIO {
   runRef: React.RefObject<number>;
   clientRef: React.RefObject<EvalWorkerClient | null>;
   cacheRef: React.RefObject<Map<string, CachedEval>>;
-  setStatus: (value: EvalStatus | ((prev: EvalStatus) => EvalStatus)) => void;
+  setStatus: (value: EvalStatus) => void;
   setResult: (value: EvalResult | null) => void;
   setError: (value: string | null) => void;
   setProgress: (value: SearchProgress | null) => void;
@@ -210,6 +216,7 @@ function useEvaluateAction(
   prefsRef: React.RefObject<EvalPreferences>,
   engineOverrideRef: React.RefObject<TurnEvalSettings | null>,
   setResultTag: (value: string | null) => void,
+  setStopped: (value: StoppedRun | null) => void,
 ) {
   const { runRef, cacheRef, setResult, setStatus, setError, setProgress, setReconstructProgress, stopGraphPaint } = io;
   return useCallback((params: EvaluateParams) => {
@@ -224,6 +231,7 @@ function useEvaluateAction(
         stopGraphPaint(true);
         setResult(hit.result);
         setResultTag(params.tag ?? null);
+        setStopped(null);
         setStatus('done');
         setError(null);
         setProgress(null);
@@ -239,11 +247,32 @@ function useEvaluateAction(
     setError(null);
     setResult(null);
     setResultTag(params.tag ?? null);
+    setStopped(null);
     setProgress(null);
     setReconstructProgress(null);
 
     void runSingleEvaluation(io, params, runId, { depth, samples, mode });
-  }, [io, prefsRef, engineOverrideRef, setResultTag, runRef, cacheRef, setResult, setStatus, setError, setProgress, setReconstructProgress, stopGraphPaint]);
+  }, [io, prefsRef, engineOverrideRef, setResultTag, setStopped, runRef, cacheRef, setResult, setStatus, setError, setProgress, setReconstructProgress, stopGraphPaint]);
+}
+
+/**
+ * The user's Cancel (round 89, SB-7). Like `cancel`, and a run that streamed a partial result keeps it as its answer (`stopped`): the
+ * engine's own stop leaves the quick estimate, and the app reads it the same way. Every other cancel (the game analysis taking over,
+ * a changed engine) leaves the partial as a stale result and no answer. A stop before any partial result (a tree before its first
+ * interim result) keeps nothing and says so (`empty`, SB-9).
+ */
+function useStop(
+  cancel: () => void, resultRef: React.RefObject<EvalResult | null>, resultTagRef: React.RefObject<string | null>,
+  statusRef: React.RefObject<EvalStatus>, setStopped: (value: StoppedRun | null) => void,
+) {
+  return useCallback(() => {
+    const partial = resultRef.current !== null;
+    // Round 89 (SB-9): the game analysis's Cancel calls this too; only a single search that was under way leaves the empty mark.
+    const searching = statusRef.current === 'searching' || statusRef.current === 'reconstructing';
+    cancel();
+    if (partial) setStopped({ tag: resultTagRef.current });
+    else if (searching) setStopped({ tag: resultTagRef.current, empty: true });
+  }, [cancel, resultRef, resultTagRef, statusRef, setStopped]);
 }
 
 /**
@@ -261,13 +290,26 @@ export function useSingleEval(env: {
   stopGraphPaint: (superseded?: boolean) => void;
 }) {
   const { runRef, clientRef, cacheRef, prefsRef, engineOverrideRef, stopGraphPaint } = env;
-  const [status, setStatus] = useState<EvalStatus>('idle');
+  const [status, setStatusState] = useState<EvalStatus>('idle');
+  // Round 89 (SB-10): the run's own status, written with every change. A click on Cancel can land between a change and the commit's
+  // effects (a long task right after the paint), so the stop must not read a ref that an effect writes after the render.
+  const statusRef = useRef<EvalStatus>('idle');
+  const setStatus = useCallback((value: EvalStatus) => {
+    statusRef.current = value;
+    setStatusState(value);
+  }, []);
   const [result, setResultState] = useState<EvalResult | null>(null);
   /** Position tag of the run that produced `result` (see EvaluateParams.tag). */
-  const [resultTag, setResultTag] = useState<string | null>(null);
+  const [resultTag, setResultTagState] = useState<string | null>(null);
+  const resultTagRef = useRef<string | null>(null);
+  const setResultTag = useCallback((value: string | null) => {
+    resultTagRef.current = value;
+    setResultTagState(value);
+  }, []);
   const [progress, setProgress] = useState<SearchProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reconstructProgress, setReconstructProgress] = useState<{ turn: number; target: number } | null>(null);
+  const [stopped, setStopped] = useState<StoppedRun | null>(null);
   const resultRef = useRef<EvalResult | null>(null);
   const setResult = useCallback((value: EvalResult | null) => {
     resultRef.current = value;
@@ -279,31 +321,31 @@ export function useSingleEval(env: {
     clientRef.current?.cancel();
     setProgress(null);
     setReconstructProgress(null);
-    setStatus(prev => {
-      if (prev !== 'searching' && prev !== 'reconstructing') return prev;
-      return resultRef.current ? 'stale' : 'idle';
-    });
+    if (statusRef.current === 'searching' || statusRef.current === 'reconstructing') setStatus(resultRef.current ? 'stale' : 'idle');
     stopGraphPaint();
-  }, [runRef, clientRef, stopGraphPaint]);
+  }, [runRef, clientRef, stopGraphPaint, setStatus]);
 
   const io = useMemo<SingleEvalIO>(() => ({
     runRef, clientRef, cacheRef, setStatus, setResult, setError, setProgress, setReconstructProgress, stopGraphPaint,
-  }), [runRef, clientRef, cacheRef, setResult, stopGraphPaint]);
-  const evaluate = useEvaluateAction(io, prefsRef, engineOverrideRef, setResultTag);
+  }), [runRef, clientRef, cacheRef, setStatus, setResult, stopGraphPaint]);
+  const evaluate = useEvaluateAction(io, prefsRef, engineOverrideRef, setResultTag, setStopped);
+
+  const stop = useStop(cancel, resultRef, resultTagRef, statusRef, setStopped);
 
   const markStale = useCallback(() => {
-    setStatus(prev => (prev === 'done' ? 'stale' : prev));
-  }, []);
+    if (statusRef.current === 'done') setStatus('stale');
+  }, [setStatus]);
 
   const reset = useCallback(() => {
     cancel();
     setStatus('idle');
     setResult(null);
     setError(null);
-  }, [cancel, setResult]);
+    setStopped(null);
+  }, [cancel, setStatus, setResult]);
 
   return {
-    status, result, resultTag, progress, error, reconstructProgress,
-    evaluate, cancel, markStale, reset,
+    status, result, resultTag, progress, error, reconstructProgress, stopped,
+    evaluate, cancel, stop, markStale, reset,
   };
 }

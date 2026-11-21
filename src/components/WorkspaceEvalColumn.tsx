@@ -1,4 +1,7 @@
 import { useMemo } from 'react';
+import type { EvalResult } from '@fulllifegames/eval-engine';
+import type { EvalStatus, StoppedRun } from '../hooks/useEvaluation';
+import { stoppedEmptyHere } from '../lib/stopped-line';
 import { EvalPanel } from './EvalPanel';
 import { PlayOutBar } from './PlayOutBar';
 import { resultPositionLabel } from './eval/turn-copy';
@@ -63,6 +66,11 @@ function backToMain(app: AppController, viewingVariation: boolean): ((cardTurn: 
   return cardTurn => navigateTo(cardTurn === null ? mainLineTarget(viewTurn, maxTurn) : mainLineTarget(cardTurn, maxTurn));
 }
 
+/** Round 89 (SB-7): the depth of the partial result a user stop kept, while that result is the live position's; null otherwise. */
+function stoppedDepth(stopped: StoppedRun | null, shown: { live: boolean; status: EvalStatus; matches: boolean }, result: EvalResult | null): number | null {
+  return stopped && shown.live && shown.status === 'stale' && shown.matches ? result?.depthCompleted ?? 1 : null;
+}
+
 function EvalSection({ app, replayData }: WorkspaceColumnProps) {
   const { evaluation } = app.ctx;
   const { replayGen, replayGameType } = app.ctx.meta;
@@ -99,7 +107,9 @@ function EvalSection({ app, replayData }: WorkspaceColumnProps) {
       engines={app.ctx.engines}
       onPrefsChange={evaluation.setPrefs}
       onEvaluate={liveEvalView ? handleEvaluate : undefined}
-      onCancel={evaluation.cancel}
+      onCancel={evaluation.stop}
+      stoppedEmpty={stoppedEmptyHere(evaluation.stopped, { live: liveEvalView, status: liveEvalStatus, key: app.board.timeline.evalViewKey })}
+      stoppedAt={stoppedDepth(evaluation.stopped, { live: liveEvalView, status: liveEvalStatus, matches: evalResultMatchesView }, analyzedResult)}
       onPickChoice={clickable ? handleExploreChoice : undefined}
       onPickPair={clickable ? handlePickPair : undefined}
       showAuto={liveEvalView}

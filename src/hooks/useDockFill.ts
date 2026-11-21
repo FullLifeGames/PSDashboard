@@ -6,6 +6,7 @@ import type { SideChoices } from '../lib/dock-seed';
 import type { EvaluateOptions } from './useEvalView';
 import type { useBranch } from './useBranch';
 import type { useEvaluation } from './useEvaluation';
+import { fillAnswer, useFillBase, useStoppedKey } from './dock-fill-trigger';
 
 type Side = 'p1' | 'p2';
 type Branch = ReturnType<typeof useBranch>;
@@ -20,7 +21,7 @@ export interface DockFillInputs {
   playOutActive: boolean;
   /** The game type has an evaluation at all (singles and doubles). */
   evalAvailable: boolean;
-  evaluation: Pick<Evaluation, 'status' | 'result' | 'resultTag' | 'prefs' | 'graph'>;
+  evaluation: Pick<Evaluation, 'status' | 'result' | 'resultTag' | 'prefs' | 'graph' | 'stopped'>;
   /** The evaluation status as the timeline reads it: a finished result of another position counts as stale. */
   liveEvalStatus: Evaluation['status'];
   evalViewKey: string;
@@ -335,42 +336,30 @@ function startedByHousekeeping(liveTip: boolean, prefs: Pick<Evaluation['prefs']
   return prefs.autoAnalyze && (status === 'idle' || status === 'stale');
 }
 
-/**
- * The result that stood when the position began: only a newer one belongs to it. Round 84 (A7h): `foreign` marks a run that was
- * under way when the position began (the replacement's run, when a forced replacement was just sent: the next request of the turn
- * has the same `evalViewKey`, so the tag cannot tell the two apart). Its result belongs to the request before; once it is over,
- * whatever stands is its result and the new base.
- */
-interface FillBase { key: string; result: EvalResult | null; foreign: boolean }
-
-function useFillBase(key: string, result: EvalResult | null, running: boolean) {
-  const ref = useRef<FillBase>({ key, result, foreign: running });
-  const update = useCallback((nextKey: string, nextResult: EvalResult | null, nextRunning: boolean): FillBase => {
-    if (ref.current.key !== nextKey) ref.current = { key: nextKey, result: nextResult, foreign: nextRunning };
-    else if (ref.current.foreign && !nextRunning) ref.current = { key: nextKey, result: nextResult, foreign: false };
-    return ref.current;
-  }, []);
-  return update;
-}
-
 /** The trigger only acts: a run for the position, or the result of a run another trigger started (Auto, the walk). */
 function useFillTrigger(inputs: DockFillInputs, key: string, eligible: boolean, running: boolean, apply: Apply, settledRef: FillMarks['settledRef']) {
   const { evaluation, liveEvalStatus, evalViewKey, handleEvaluate, liveTip } = inputs;
   const attemptRef = useRef<string | null>(null);
   const updateBase = useFillBase(key, evaluation.result, running);
+  const stoppedAt = useStoppedKey(evaluation, evalViewKey);
   const attempted = evaluation.resultTag === evalViewKey;
   useEffect(() => {
     const current = updateBase(key, evaluation.result, running);
+    const stoppedHere = stoppedAt(key);
     if (settledRef.current.key === key) return;
     if (!eligible) {
       // A run that the game analysis (or anything else) stopped starts again once the fill may run.
       attemptRef.current = null;
       return;
     }
-    if (!current.foreign && evaluation.status === 'done' && evaluation.result !== null && attempted && evaluation.result !== current.result) {
-      apply(key, evaluation.result);
+    // Round 89 (SB-7): a run the user stopped with a partial result has answered; its result so far fills like a finished one.
+    const answer = current.foreign ? null : fillAnswer(evaluation.status, !!evaluation.stopped, evaluation.result, attempted, current.result);
+    if (answer) {
+      apply(key, answer);
       return;
     }
+    // Round 89 (SB-10): a position the user stopped stays stopped, also after a game analysis took the run and gave it back.
+    if (stoppedHere) return;
     // A foreign run is no run for this position: the fill starts its own, which supersedes it.
     if (attemptRef.current === key || (running && !current.foreign)) return;
     // With Auto or "always on", the housekeeping effects of the view start this run; its result comes through the branch above.
@@ -378,7 +367,7 @@ function useFillTrigger(inputs: DockFillInputs, key: string, eligible: boolean, 
     attemptRef.current = key;
     current.foreign = false;
     handleEvaluate({ onResult: result => apply(key, result) });
-  }, [key, eligible, attempted, running, evaluation.status, evaluation.result, evaluation.prefs, liveEvalStatus, liveTip, handleEvaluate, apply, settledRef, updateBase]);
+  }, [key, eligible, attempted, running, evaluation.status, evaluation.stopped, evaluation.result, evaluation.prefs, liveEvalStatus, liveTip, handleEvaluate, apply, settledRef, updateBase, stoppedAt]);
 }
 
 /** What the dock reads of a fill that landed for this position (nothing before). A replay turn reads its choices from the view. */
