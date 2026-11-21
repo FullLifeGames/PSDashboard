@@ -97,8 +97,8 @@ function OpenTurnAnalysis({ analysis, playerNames, reads, onExplore, result, onP
         <span style={{ color: '#aab' }}>open position: nothing played yet</span>
         <MatrixDialogButton result={result} analysis={analysis} playerNames={playerNames} onPickPair={onPickPair} />
       </div>
-      <EngineRow name={playerNames[0]} side={analysis.p1} onExplore={exploreFor('p1')} opponentReads={opponentReads} />
-      <EngineRow name={playerNames[1]} side={analysis.p2} onExplore={exploreFor('p2')} opponentReads={opponentReads} />
+      <EngineRow name={playerNames[0]} side={analysis.p1} onExplore={exploreFor('p1')} opponentReads={opponentReads} rowLines={{ result, side: 'p1' }} />
+      <EngineRow name={playerNames[1]} side={analysis.p2} onExplore={exploreFor('p2')} opponentReads={opponentReads} rowLines={{ result, side: 'p2' }} />
       <ReadRows reads={reads} playerNames={playerNames} faintedFraction={analysis.faintedFraction} />
     </div>
   );
@@ -129,13 +129,13 @@ export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore, resu
       {analysis.decisionDelta !== null && analysis.chanceDelta !== null && <SplitRow analysis={analysis} name={playerNames[0]} />}
       {analysis.playedTracking === false ? (
         <>
-          <EngineRow name={playerNames[0]} side={analysis.p1} onExplore={exploreFor('p1')} opponentReads={opponentReads} />
-          <EngineRow name={playerNames[1]} side={analysis.p2} onExplore={exploreFor('p2')} opponentReads={opponentReads} />
+          <EngineRow name={playerNames[0]} side={analysis.p1} onExplore={exploreFor('p1')} opponentReads={opponentReads} rowLines={{ result, side: 'p1' }} />
+          <EngineRow name={playerNames[1]} side={analysis.p2} onExplore={exploreFor('p2')} opponentReads={opponentReads} rowLines={{ result, side: 'p2' }} />
         </>
       ) : (
         <>
-          <SideRow name={playerNames[0]} side={analysis.p1} onExplore={exploreFor('p1')} lostGround={lostGround(analysis, 'p1')} opponentReads={opponentReads} />
-          <SideRow name={playerNames[1]} side={analysis.p2} onExplore={exploreFor('p2')} lostGround={lostGround(analysis, 'p2')} opponentReads={opponentReads} />
+          <SideRow name={playerNames[0]} side={analysis.p1} onExplore={exploreFor('p1')} lostGround={lostGround(analysis, 'p1')} opponentReads={opponentReads} rowLines={{ result, side: 'p1' }} />
+          <SideRow name={playerNames[1]} side={analysis.p2} onExplore={exploreFor('p2')} lostGround={lostGround(analysis, 'p2')} opponentReads={opponentReads} rowLines={{ result, side: 'p2' }} />
         </>
       )}
       <ReadRows reads={reads} playerNames={playerNames} faintedFraction={analysis.faintedFraction} />

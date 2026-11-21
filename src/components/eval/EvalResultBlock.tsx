@@ -3,13 +3,16 @@ import type { EvalStatus, TurnEvalSettings } from '../../hooks/useEvaluation';
 import { EvalMatrixView } from '../EvalMatrixView';
 import { MiniBar } from '../EvalTurnAnalysis';
 import { exploreTitle } from './turn-copy';
+import { rowLineTail } from '../../lib/row-line';
 
 // Displayed values are win probabilities ("52%") and point deltas ("−8%").
 
 type PickChoice = (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice | null, from?: EvalResult | null) => void;
 
-function ChoiceDetail({ choice, index, best, faintedFraction }: {
+function ChoiceDetail({ choice, index, best, faintedFraction, tail }: {
   choice: RankedChoice; index: number; best: RankedChoice | undefined; faintedFraction?: number | null;
+  /** The later steps of the row's line (`rowLineTail`): the line the Lines section shows, not the principal variation. */
+  tail?: { p1: string; p2: string }[];
 }) {
   const evPct = winPercent(choice.ev, faintedFraction);
   const gap = best ? choice.ev - best.ev : 0;
@@ -24,9 +27,9 @@ function ChoiceDetail({ choice, index, best, faintedFraction }: {
           {index > 0 && gap < 0 && <span style={{ color: '#778' }}>({winDeltaText(gap)})</span>}
         </span>
       </span>
-      {choice.line && choice.line.length > 0 && (
+      {tail && tail.length > 0 && (
         <span className="ps-eval-line">
-          then {formatLine(choice.line)}
+          then {formatLine(tail)}
         </span>
       )}
     </>
@@ -64,7 +67,7 @@ function ChoiceList({
     <div className="ps-eval-column">
       {choices.slice(0, 3).map((choice, index) => {
         const tooltip = choiceTooltip(choice, !!onPickChoice, faintedFraction, opponentReads);
-        const detail = <ChoiceDetail choice={choice} index={index} best={best} faintedFraction={faintedFraction} />;
+        const detail = <ChoiceDetail choice={choice} index={index} best={best} faintedFraction={faintedFraction} tail={rowLineTail(result, side, choice, !!opponentReads)} />;
         return onPickChoice ? (
           <button
             key={choice.choice}

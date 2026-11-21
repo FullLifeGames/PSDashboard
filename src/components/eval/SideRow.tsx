@@ -1,7 +1,8 @@
 import {
-  diffChoices, formatLine, playedSetupMove, type SideAnalysis, type RankedChoice, winDeltaText, winPctText,
+  diffChoices, formatLine, playedSetupMove, type EvalResult, type SideAnalysis, type RankedChoice, winDeltaText, winPctText,
 } from '@fulllifegames/eval-engine';
 import { gradedTier } from './game-review';
+import { rowLineTail } from '../../lib/row-line';
 import { ExplorableLabel, KoSuffix, MiniBar } from './analysis-bits';
 import { comparisonTarget, ENGINE_EQUIVALENT_EPSILON, engineChoice, evTitle, playedTextFor, regretView, RISK_DISPLAY_GAP } from './turn-copy';
 
@@ -15,6 +16,8 @@ interface RowProps {
   lostGround?: boolean;
   /** Round 89 (#153, HM-2): the Setup setting is on: the engine-move buttons say the opponent reads the move. */
   opponentReads?: boolean;
+  /** Round 89 (LN-4): the turn's result and this row's side: the better line's "then ..." reads the line the Lines section shows. */
+  rowLines?: { result: EvalResult | null | undefined; side: 'p1' | 'p2' };
 }
 
 function PlayedCell({ name, side }: Pick<RowProps, 'name' | 'side'>) {
@@ -183,13 +186,14 @@ function VerdictCell({ name, side, regretful, setupMove, lostGround }: Pick<RowP
 }
 
 /** The played line against its reference (safe line or ev-best) with the difference, for regretful rows. */
-function ComparisonRows({ name, side, played, best, difference, onExplore, opponentReads }: Pick<RowProps, 'name' | 'side' | 'opponentReads'> & {
+function ComparisonRows({ name, side, played, best, difference, onExplore, opponentReads, rowLines }: Pick<RowProps, 'name' | 'side' | 'opponentReads' | 'rowLines'> & {
   played: RankedChoice;
   best: RankedChoice;
   difference: string | null;
   onExplore: Explore;
 }) {
   const { asSafe, target, swapped, value } = comparisonTarget(side, best);
+  const tail = rowLines ? rowLineTail(rowLines.result, rowLines.side, target, !!opponentReads) : target.line;
   return (
     <>
       <div className="ps-eval-analysis-row" style={{ color: '#aab' }} title={evTitle(name)}>
@@ -213,8 +217,8 @@ function ComparisonRows({ name, side, played, best, difference, onExplore, oppon
           />
         )}
         {!swapped && target.punishedBy && <span style={{ color: '#778' }}>· worst vs {target.punishedBy}</span>}
-        {!swapped && target.line && target.line.length > 0 && (
-          <span className="ps-eval-line">then {formatLine(target.line)}</span>
+        {!swapped && tail && tail.length > 0 && (
+          <span className="ps-eval-line">then {formatLine(tail)}</span>
         )}
         <KoSuffix odds={swapped ? swapped.koOdds : target.koOdds} />
       </div>
@@ -243,7 +247,7 @@ function HindsightRow({ line }: { line: string }) {
 }
 
 /** One tracked side of an analyzed turn: what it played, the engine's line, the verdict, and the comparison. */
-export function SideRow({ name, side, onExplore, lostGround, opponentReads }: RowProps) {
+export function SideRow({ name, side, onExplore, lostGround, opponentReads, rowLines }: RowProps) {
   const regretful = side.tier === 'mistake' || side.tier === 'blunder';
   const setupMove = playedSetupMove(side);
   const difference = regretful && side.played && side.best ? diffChoices(side.played, side.best) : null;
@@ -257,7 +261,7 @@ export function SideRow({ name, side, onExplore, lostGround, opponentReads }: Ro
         <VerdictCell name={name} side={side} regretful={regretful} setupMove={setupMove} lostGround={lostGround} />
       </div>
       {regretful && side.played && side.best && (
-        <ComparisonRows name={name} side={side} played={side.played} best={side.best} difference={difference} onExplore={onExplore} opponentReads={opponentReads} />
+        <ComparisonRows name={name} side={side} played={side.played} best={side.best} difference={difference} onExplore={onExplore} opponentReads={opponentReads} rowLines={rowLines} />
       )}
       {side.hindsightRead?.shown && side.hindsightRead.line && <HindsightRow line={side.hindsightRead.line} />}
     </div>

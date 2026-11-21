@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { winPctText } from '@fulllifegames/eval-engine';
 import { EngineRow, ExplorableLabel, KoSuffix, MiniBar } from '../../../../src/components/eval/analysis-bits';
-import { rankedChoice } from '../../fixtures/eval-result';
+import { evalResult, rankedChoice } from '../../fixtures/eval-result';
 import { sideAnalysis } from '../../fixtures/analysis';
 
 describe('ExplorableLabel', () => {
@@ -67,6 +67,20 @@ describe('EngineRow', () => {
     render(<EngineRow name="Alice" side={sideAnalysis({ best, played: null })} />);
     expect(screen.getByText('then → Rillaboom + Protect → Flare Blitz · Protect')).toBeInTheDocument();
     expect(screen.queryByText(/\(waiting\)/)).toBeNull();
+  });
+
+  // Round 89 (LN-4): the untracked row reads the line the Lines section shows, too.
+  test('the follow-up reads the result\'s line for the row, not the principal variation', () => {
+    const label = 'Fake Out → Rillaboom + Spore → Tornadus';
+    const pick = (name: string) => ({ choice: name.toLowerCase(), label: name, slots: [null, null] });
+    const best = rankedChoice('move fakeout 1, move spore 2', label, 0.3, { line: [{ p1: 'Flare Blitz', p2: 'Protect' }] });
+    const result = evalResult('doubles', { lines: [{
+      side: 'p1', label, choice: best.choice, for: ['engine'], end: 0.1, endFainted: 0, visits: 50,
+      steps: [{ p1: pick(label), p2: pick('Tailwind'), dice: [] }, { p1: pick('Rage Powder + Spore'), p2: pick('Taunt + Protect'), dice: [] }],
+    }] });
+    render(<EngineRow name="Alice" side={sideAnalysis({ best, played: null })} rowLines={{ result, side: 'p1' }} />);
+    expect(screen.getByText('then Rage Powder + Spore · Taunt + Protect')).toBeInTheDocument();
+    expect(screen.queryByText('then Flare Blitz · Protect')).toBeNull();
   });
 
   test('renders nothing without an engine line', () => {

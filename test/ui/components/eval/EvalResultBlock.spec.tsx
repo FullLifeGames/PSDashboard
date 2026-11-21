@@ -84,3 +84,24 @@ describe('EvalResultBlock', () => {
     expect(screen.queryByText(/\(waiting\)/)).toBeNull();
   });
 });
+
+// Round 89 (LN-4): one card shows one line per row; the panel's ranked row reads the later steps of the line the Lines section shows.
+describe('EvalResultBlock: the row\'s "then ..." follows the Lines section', () => {
+  const pick = (label: string, slots = 1) => ({ choice: label.toLowerCase(), label, slots: Array.from({ length: slots }, () => null) });
+  test.each([
+    ['singles', 'Earthquake', 'Stone Edge', 'Protect', 'then Stone Edge · Protect', 'then Swords Dance · Fake Out'],
+    ['doubles', 'Fake Out → Rillaboom + Spore → Tornadus', 'Flare Blitz + Protect', 'Tailwind + Protect', 'then Flare Blitz + Protect · Tailwind + Protect', 'then Rage Powder + Spore · Taunt + Protect'],
+  ] as const)('%s: the line of the row replaces the principal variation', (kind, label, pvP1, pvP2, pvText, lineText) => {
+    const base = evalResult(kind);
+    const [lineP1, lineP2] = lineText.slice(5).split(' · ');
+    const perSide = { ...base.perSide, p1: [{ ...base.perSide.p1[0], line: [{ p1: pvP1, p2: pvP2 }] }, ...base.perSide.p1.slice(1)] };
+    const lines = [{
+      side: 'p1' as const, label, choice: base.perSide.p1[0].choice, for: ['engine' as const], end: 0.1, endFainted: 0, visits: 50,
+      steps: [{ p1: pick(label), p2: pick('Leech Seed'), dice: [] }, { p1: pick(lineP1), p2: pick(lineP2), dice: [] }],
+    }];
+    const result = { ...base, perSide, lines, matrix: undefined };
+    render(<EvalResultBlock result={result} status="done" playerNames={names} doubles={kind === 'doubles'} />);
+    expect(screen.getByText(lineText)).toBeInTheDocument();
+    expect(screen.queryByText(pvText)).toBeNull();
+  });
+});
