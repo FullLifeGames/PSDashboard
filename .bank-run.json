@@ -1,0 +1,6 @@
+{
+  "name": "r89-sb1",
+  "jobs": 16,
+  "slicesPerJob": 4,
+  "env": {}
+}
