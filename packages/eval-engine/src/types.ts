@@ -673,7 +673,7 @@ interface RulesetStamp { ruleset?: StaticRuleset }
 
 export type EvalWorkerRequest = (
   | { type: 'search'; id: number; serializedBattle: string; settings: EvalSettings }
-  | { type: 'mctstree'; id: number; serializedBattle: string; settings: EvalSettings; seedOffset: number }
+  | { type: 'mctstree'; id: number; serializedBattle: string; settings: EvalSettings; seedOffset: number; partials?: true }
   | { type: 'choices'; id: number; serializedBattle: string; tera: TeraAllowance; keepPlayed?: EvalSettings['keepPlayed']; sleepClause?: boolean }
   | { type: 'cells'; id: number; serializedBattle: string; jobs: EvalCellJob[] }
   | { type: 'subsearch'; id: number; serializedBattle: string; job: EvalSubSearchJob }
