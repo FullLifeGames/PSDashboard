@@ -4,7 +4,7 @@ import { diceMarksOf, type DiceMarks } from './branch-dice-marks';
 
 /**
  * Round 82 (forced dice), step A7b, decision 6a: the lines the frame shows for the dice the user forced. A line before the event a
- * forced die decided ("Forced: Air Slash flinch, 60 %", the chance the simulator used, decision 14a) and, for a forced die that took
+ * forced die decided ("Forced: Air Slash flinch, 60 %", the chance of the result the click forced, decision 14a) and, for a forced die that took
  * no effect, a line at the end of its action ("Forced burn had no effect", with the report's reason). The lines live in the display
  * of the branch log, never in the battle's log: `branchFrameLog` puts them in. The replay client prints a `|-message|` line as it
  * is, and the frozen `/v1.0.2/` viewer plays the same client, so a shared branch shows the marks as well.
@@ -31,10 +31,18 @@ export interface TurnWindow {
 
 const lowerFirst = (text: string): string => text.charAt(0).toLowerCase() + text.slice(1);
 
-/** The chance the simulator used, as a percent with up to one decimal. */
+/** A chance as a percent with up to one decimal. */
 const percent = (chance: number): string => `${Math.round(chance * 1000) / 10} %`;
 
-/** "Forced: Air Slash flinch, 60 %": the subject and the result of the die's label, then the chance of the draw when it has one. */
+/**
+ * The chance of the result the click forced. The report holds the simulator's chance of the event, the die's "happens" (a 95 % move
+ * hits at 0.95), whichever way the click forced it; a die forced not to happen has the complement. A line of the Lines section reads
+ * the same number (`LineDie.chance` is the chance of the result the line takes: "no crit (96%)").
+ */
+const resultChance = (report: DieReport): number | undefined =>
+  report.chance !== undefined && 'happens' in report.die.result && !report.die.result.happens ? 1 - report.chance : report.chance;
+
+/** "Forced: Air Slash flinch, 60 %": the subject and the result of the die's label, then the chance of that result when the die has one. */
 export function dieText(report: DieReport, words: DieWords): string {
   const label = dieLabel(report.die, words);
   const cut = label.lastIndexOf(': ');
@@ -42,7 +50,8 @@ export function dieText(report: DieReport, words: DieWords): string {
   const result = label.slice(cut + 2);
   const named = 'first' in report.die.result;
   const text = `Forced: ${subject}${named ? ', ' : ' '}${named ? result : lowerFirst(result)}`;
-  return report.chance === undefined ? text : `${text}, ${percent(report.chance)}`;
+  const chance = resultChance(report);
+  return chance === undefined ? text : `${text}, ${percent(chance)}`;
 }
 
 /** What the die decided, as a noun for "Forced ... had no effect". */

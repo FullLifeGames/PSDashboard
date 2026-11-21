@@ -73,6 +73,17 @@ async function openPage(page: Page, replay: ReplayData, hardMode: boolean): Prom
   await expect(page.getByText(replay.players[0], { exact: true }).first()).toBeVisible({ timeout: 30_000 });
 }
 
+/**
+ * Round 89 (#153, HM-2): the setting is called "Opponent reads my move" and lives in the Setup menu. Opens the menu, hands the box to
+ * `check` and closes the menu again, so the pickers under it stay clickable.
+ */
+async function withSetupBox(page: Page, check: (box: Locator) => Promise<void>): Promise<void> {
+  await page.getByRole('button', { name: 'Setup', exact: true }).click();
+  await check(page.getByRole('checkbox', { name: 'Opponent reads my move' }));
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('checkbox', { name: 'Opponent reads my move' })).toBeHidden();
+}
+
 /** What the evaluated turn offers: the clicked row, the opponent's best row and the matrix's reading of the row. */
 interface Offer { own: string; best: string; hurtMost: string[] }
 
@@ -139,7 +150,7 @@ async function runGame(contexts: BrowserContext[], browser: Browser, replay: Rep
   contexts.push(onContext);
   const on = await onContext.newPage();
   await openPage(on, replay, true);
-  await expect(on.getByRole('checkbox', { name: 'Hard mode' })).toBeChecked();
+  await withSetupBox(on, box => expect(box).toBeChecked());
   let turn = turns[0];
   let offer = await evaluateTurn(on, turn);
   for (const candidate of turns.slice(1)) {
@@ -150,20 +161,28 @@ async function runGame(contexts: BrowserContext[], browser: Browser, replay: Rep
   expect(offer.hurtMost.length, 'the matrix names a reply that hurts the clicked move most').toBeGreaterThan(0);
   const worstParts = offer.hurtMost.map(partsIn);
   const hardText = await clickEngineMove(on, turn);
+  // the variation's dock says it, with the button that turns it off
+  await expect(on.getByText('Opponent reads your move')).toBeVisible();
+  await expect(on.getByRole('button', { name: 'Turn off' })).toBeVisible();
   // the opponent's choice in the executed turn is one of the lowest cells of the row (a tie is the engine's pick of equals)
   expect(worstParts.some(parts => parts.every(part => hardText.includes(part))), `the history names the reply that hurts most (${offer.hurtMost.join(' | ')}); it reads: ${hardText.replace(/\s+/g, ' ').slice(0, 600)}`).toBe(true);
   const bestOnly = partsIn(offer.best).filter(part => !worstParts.some(parts => parts.includes(part)) && !partsIn(offer.own).includes(part));
   for (const part of bestOnly) expect(hardText, `the best row's ${part} is not played`).not.toContain(part);
+  // "Turn off" in the dock switches the Setup setting off and takes the note away
+  await on.getByRole('button', { name: 'Turn off' }).click();
+  await expect(on.getByText('Opponent reads your move')).toHaveCount(0);
+  await withSetupBox(on, box => expect(box).not.toBeChecked());
 
   // arm two: the same turn with the setting off: the opponent's best row
   const offContext = await browser.newContext();
   contexts.push(offContext);
   const off = await offContext.newPage();
   await openPage(off, replay, false);
-  await expect(off.getByRole('checkbox', { name: 'Hard mode' })).not.toBeChecked();
+  await withSetupBox(off, box => expect(box).not.toBeChecked());
   const second = await evaluateTurn(off, turn);
   expect(second.own).toBe(offer.own);
   const offText = await clickEngineMove(off, turn);
+  await expect(off.getByText('Opponent reads your move')).toHaveCount(0);
   for (const part of partsIn(second.best)) expect(offText, `the best row's ${part} is played`).toContain(part);
 }
 

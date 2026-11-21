@@ -1,14 +1,15 @@
-import { type SideAnalysis, type RankedChoice, formatLine, winPctText } from '@fulllifegames/eval-engine';
-import { evTitle } from './turn-copy';
+import { type EvalResult, type SideAnalysis, type RankedChoice, formatLine, winPctText } from '@fulllifegames/eval-engine';
+import { rowLineTail } from '../../lib/row-line';
+import { evTitle, exploreTitle } from './turn-copy';
 
 /** The engine's line as a click-to-explore button, or a plain span. */
-export function ExplorableLabel({ label, color = '#cde', onClick }: { label: string; color?: string; onClick?: () => void }) {
+export function ExplorableLabel({ label, color = '#cde', onClick, opponentReads }: { label: string; color?: string; onClick?: () => void; opponentReads?: boolean }) {
   if (!onClick) return <span style={{ color }}>{label}</span>;
   return (
     <button
       type="button"
       className="ps-btn ps-eval-inline-btn"
-      title="Play this line out in a branch"
+      title={exploreTitle(opponentReads)}
       onClick={onClick}
       style={{ padding: '0 4px', fontSize: 10, color, whiteSpace: 'normal', textAlign: 'left' }}
     >
@@ -42,18 +43,23 @@ export function MiniBar({ value }: { value: number }) {
 }
 
 /** Untracked (doubles): only the engine's preferred line — no played/blame. */
-export function EngineRow({ name, side, onExplore }: { name: string; side: SideAnalysis; onExplore?: (choice: RankedChoice) => void }) {
+export function EngineRow({ name, side, onExplore, opponentReads, rowLines }: {
+  name: string; side: SideAnalysis; onExplore?: (choice: RankedChoice) => void; opponentReads?: boolean;
+  /** Round 89 (LN-4): the turn's result and this row's side: the follow-up reads the line the Lines section shows. */
+  rowLines?: { result: EvalResult | null | undefined; side: 'p1' | 'p2' };
+}) {
   if (!side.best) return null;
   const best = side.best;
+  const tail = rowLines ? rowLineTail(rowLines.result, rowLines.side, best, !!opponentReads) : best.line;
   return (
     <div className="ps-eval-analysis-side">
       <div className="ps-eval-analysis-row">
         <span style={{ color: '#cde', fontWeight: 'bold' }}>{name}</span>
         <span style={{ color: '#aab' }} title={evTitle(name)}>
-          engine: <ExplorableLabel label={best.label} onClick={onExplore && (() => onExplore(best))} /> ({winPctText(best.ev, side.faintedFraction)})
+          engine: <ExplorableLabel label={best.label} onClick={onExplore && (() => onExplore(best))} opponentReads={opponentReads} /> ({winPctText(best.ev, side.faintedFraction)})
         </span>
-        {best.line && best.line.length > 0 && (
-          <span className="ps-eval-line">then {formatLine(best.line)}</span>
+        {tail && tail.length > 0 && (
+          <span className="ps-eval-line">then {formatLine(tail)}</span>
         )}
       </div>
     </div>

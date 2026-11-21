@@ -72,19 +72,14 @@ describe('EvalControls', () => {
     expect(screen.getByRole('checkbox', { name: 'Always on' })).toBeChecked();
   });
 
-  // Round 89 (#153): the Hard mode checkbox sits beside Always on, in every engine, and its title says where it acts.
-  test('the Hard mode checkbox reports its state and explains itself', async () => {
-    const wired = props();
-    const { rerender } = render(<EvalControls {...wired} />);
-    const box = screen.getByRole('checkbox', { name: 'Hard mode' });
-    expect(box).not.toBeChecked();
-    expect(box.closest('label')).toHaveAttribute('title', expect.stringMatching(/rates lowest for it.*engine move.*in the turn dock once you pick a move.*lines.*Grades stay/s));
-    await userEvent.click(box);
-    expect(wired.onPrefsChange).toHaveBeenLastCalledWith({ ...prefs, hardMode: true });
-    rerender(<EvalControls {...wired} prefs={{ ...prefs, hardMode: true }} showAuto={false} />);
-    expect(screen.getByRole('checkbox', { name: 'Hard mode' })).toBeChecked();
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Hard mode' }));
-    expect(wired.onPrefsChange).toHaveBeenLastCalledWith({ ...prefs, hardMode: false });
+  // Round 89 (#153, HM-2): the setting left the Evaluation row for the Setup menu (SetupMenu.reply.spec.tsx) and lost the name "Hard mode".
+  test('the Evaluation row holds no checkbox for the opponent\'s reply, in any engine', () => {
+    const { rerender } = render(<EvalControls {...props()} />);
+    expect(screen.queryByRole('checkbox', { name: /Hard mode|Opponent reads my move/ })).toBeNull();
+    expect(screen.queryByText(/Hard mode/)).toBeNull();
+    rerender(<EvalControls {...props()} prefs={{ ...prefs, hardMode: true }} showAuto={false} />);
+    expect(screen.queryByRole('checkbox', { name: /Hard mode|Opponent reads my move/ })).toBeNull();
+    expect(screen.getAllByRole('checkbox').map(box => box.closest('label')?.textContent?.trim())).toEqual(['Always on']);
   });
 
   test('Evaluate turns into Re-evaluate with a result or a stale state, into Cancel while running; running locks the selects', async () => {

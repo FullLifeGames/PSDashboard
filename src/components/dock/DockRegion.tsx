@@ -43,6 +43,9 @@ function dockProps(app: AppController, replayId: string): TurnDockProps {
     seed: liveTip ? null : pickerSeed,
     // The first chip click at a replay turn starts the fill for its empty slots; the tip fills at once.
     fill: app.engine.dockFill,
+    // Round 89 (#153, HM-2): the stored `hardMode` preference, called "Opponent reads my move" where the user sees it.
+    opponentReads: !!app.ctx.evaluation.prefs.hardMode,
+    onOpponentReadsChange: value => app.ctx.evaluation.setPrefs({ ...app.ctx.evaluation.prefs, hardMode: value }),
   };
 }
 

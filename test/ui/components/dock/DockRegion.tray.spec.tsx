@@ -16,9 +16,9 @@ vi.mock('../../../../src/lib/pokemon-options', () => ({
  * Round 84 (A7g): a forced replacement and the choice after it share the turn, so the dock's position key needs the step within
  * the turn. A bench click sends the replacement at once; the next request at the same turn must not inherit the open tray.
  */
-interface Where { sim: BranchSimState; historyLength: number; liveTip?: boolean; replayData?: { id: string; log: string } }
+interface Where { sim: BranchSimState; historyLength: number; liveTip?: boolean; replayData?: { id: string; log: string }; prefs?: { hardMode?: boolean }; setPrefs?: (prefs: object) => void }
 
-function appAt({ sim, historyLength, liveTip = true, replayData }: Where): AppController {
+function appAt({ sim, historyLength, liveTip = true, replayData, prefs = {}, setPrefs = vi.fn() }: Where): AppController {
   const noop = vi.fn();
   return {
     board: {
@@ -30,6 +30,7 @@ function appAt({ sim, historyLength, liveTip = true, replayData }: Where): AppCo
       meta: { replayGen: 9 },
       replay: { replayData },
       newGame: { record: null },
+      evaluation: { prefs, setPrefs },
     },
     engine: {
       positionPicker: null, dockSimState: sim, pickerSeed: null, pickerStale: false, playedAtView: undefined,
@@ -96,4 +97,18 @@ test('a dock without a loaded replay asks for no format', async () => {
   await userEvent.click(screen.getByRole('button', { name: /Dice · What if/ }));
   await screen.findByRole('combobox', { name: /Hypothetical move for/ });
   expect(poolCalls.list.map(call => call[2])).toEqual(['']);
+});
+
+// Round 89 (#153, HM-2): the dock's note reads the stored `hardMode` preference and its button writes it back through the evaluation's setter.
+describe.each(['singles', 'doubles'] as const)('the "Opponent reads your move" note of the dock (%s)', type => {
+  test('shows only while the preference is on; "Turn off" writes the preference with the flag false and keeps the others', async () => {
+    const setPrefs = vi.fn();
+    const prefs = { depth: 2, autoAnalyze: true, hardMode: true };
+    const view = render(<DockRegion app={appAt({ sim: simState(type), historyLength: 1, prefs: { ...prefs, hardMode: false } })} replayId="r1" />);
+    expect(screen.queryByText('Opponent reads your move')).toBeNull();
+    view.rerender(<DockRegion app={appAt({ sim: simState(type), historyLength: 1, prefs, setPrefs })} replayId="r1" />);
+    expect(screen.getByText('Opponent reads your move')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Turn off' }));
+    expect(setPrefs).toHaveBeenCalledWith({ depth: 2, autoAnalyze: true, hardMode: false });
+  });
 });
