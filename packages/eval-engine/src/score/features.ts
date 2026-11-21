@@ -7,6 +7,7 @@ import { idleHolders } from './boost-race.ts';
 import { matchupTerms, sweepCells } from './matchup.ts';
 import { fieldPairCells } from './field-pair.ts';
 import { boostBiteValue, removalFormat, stageValue } from './boost-bite.ts';
+import { stageStands } from './switch-out.ts';
 import { residualReader } from './residuals.ts';
 import { hitReader } from './contact.ts';
 import { statusRight } from './status-factor.ts';
@@ -84,17 +85,19 @@ function choiceMismatchOf(pokemon: Pokemon, battle: Battle): number {
 /**
  * Standing boost stages on the side's actives, weighted and status-discounted. A body that never acts, because a foe on
  * the field moves first and KOs it (`idle`, score/boost-race.ts idleHolders), carries no value for its boosts (T249,
- * round 73); its drops stay, as in boostsBiting, so that a body losing HP never gains a point by losing the drop.
+ * round 73); its drops stay, as in boostsBiting, so that a body losing HP never gains a point by losing the drop. A drop stands
+ * only while the holder cannot switch out (SB3c, 21.11.2026, score/switch-out.ts): a body that can leave loses it at once, so it
+ * is no lasting handicap. Doubles OU reads this term (weight 27); the other tables carry it at 0.
  * Round 76 (T262): the idle set is read once per evaluation and shared with the pair terms; the boosts term used to
  * ask holderActsInFront again for the same bodies and foes.
  */
-function activeBoostValue(side: Side, idle: ReadonlySet<Pokemon>): number {
+function activeBoostValue(side: Side, idle: ReadonlySet<Pokemon>, battle: Battle): number {
   let boosts = 0;
   for (const active of side.active) {
     if (!active || active.fainted) continue;
     const never = idle.has(active);
     for (const [stat, stage] of Object.entries(active.boosts)) {
-      if (stage && !(never && stage > 0)) boosts += stageValue(active, stat, stage);
+      if (stage && !(never && stage > 0) && stageStands(battle, active, stage)) boosts += stageValue(active, stat, stage);
     }
   }
   return boosts;
@@ -115,7 +118,7 @@ function sideFeatureValues(side: Side, battle: Battle, twin: string | null, idle
     choiceMismatch += choiceMismatchOf(pokemon, battle);
     if (twin) statusFix += statusFixOf(pokemon, stranded, twin);
   }
-  const boosts = activeBoostValue(side, idle);
+  const boosts = activeBoostValue(side, idle, battle);
   const screens = screenCount(side);
   return {
     bodies,

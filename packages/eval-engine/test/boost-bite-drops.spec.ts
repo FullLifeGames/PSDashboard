@@ -36,11 +36,24 @@ const MODES: Mode[] = [
   { name: 'Champions doubles', format: 'gen9championsdoublescustomgame', doubles: true, mon: champion },
 ];
 
-/** The board: my slot 0 and the foe's slot 0 carry the scene, a Splashing Snorlax stands next to each in doubles. */
-function board(mode: Mode, mine: [string, string[]], foe: [string, string[]], seed = '1,2,3,4'): Battle {
+/**
+ * The board: my slot 0 and the foe's slot 0 carry the scene, a Splashing Snorlax stands next to each in doubles. `bench` puts a Blissey
+ * behind my side (alive, or fainted as after a loss); `trapper` is the ability of the foe's lead.
+ */
+function board(mode: Mode, mine: [string, string[]], foe: [string, string[]], seed = '1,2,3,4', extra: { bench?: 'living' | 'fainted'; trapper?: string } = {}): Battle {
   const partner = () => mode.mon('Snorlax', ['splash']);
   const team = (lead: [string, string[]]) => [mode.mon(lead[0], lead[1]), ...(mode.doubles ? [partner()] : [])];
-  return battleOf(mode.format, team(mine), team(foe), seed);
+  const mineTeam = [...team(mine), ...(extra.bench ? [mode.mon('Blissey', ['splash'])] : [])];
+  const foeTeam = team(foe);
+  if (extra.trapper) foeTeam[0].ability = extra.trapper;
+  const battle = battleOf(mode.format, mineTeam, foeTeam, seed);
+  if (extra.bench === 'fainted') {
+    const body = battle.sides[0].pokemon[mineTeam.length - 1];
+    body.hp = 0;
+    body.fainted = true;
+    battle.sides[0].pokemonLeft--;
+  }
+  return battle;
 }
 
 const mons = (battle: Battle) => ({ mine: battle.sides[0].active[0]!, foe: battle.sides[1].active[0]! });
@@ -269,5 +282,87 @@ describe.each(MODES)('a positive stage that moves the race, as before, $name', m
     // T249 (round 73): the slowed holder at 1 HP never acts (the foe moves first and KOs it), so `boosts` reads its stage as 0 too (before: it read the stage in full).
     expect(features.boosts).toBe(0);
     expect(features.boostsBiting).toBe(0);
+  });
+});
+
+describe.each(MODES)('a drop its holder clears by switching counts nothing (SB-2, round 89), $name', mode => {
+  const GARCHOMP: [string, string[]] = ['Garchomp', ['crunch', 'splash']];
+  const JOLTEON: [string, string[]] = ['Jolteon', ['shadowball', 'splash']];
+  const PIKACHU: [string, string[]] = ['Pikachu', ['tackle', 'splash']];
+  const SHADOW_TAG = 'Shadow Tag';
+  type Extra = { bench?: 'living' | 'fainted'; trapper?: string };
+
+  /** The three scenes of (a), (b) and (c) above, each with its drop, after one Splash turn (the end of a turn writes `trapped`). */
+  const SCENES: Record<'a' | 'b' | 'c', (extra: Extra, stage?: number) => Battle> = {
+    a: (extra, stage = -2) => {
+      const battle = board(mode, GARCHOMP, JOLTEON, '1,2,3,4', extra);
+      const { mine, foe } = mons(battle);
+      foe.sethp(hpAt(1.15, mode, GARCHOMP, JOLTEON, 0));
+      mine.sethp(hpAt(2.4, mode, GARCHOMP, JOLTEON, 1));
+      mine.boosts.atk = stage;
+      return battle;
+    },
+    b: (extra, stage = -1) => {
+      const battle = board(mode, ['Snorlax', ['splash']], PIKACHU, '1,2,3,4', extra);
+      const { mine } = mons(battle);
+      mine.sethp(hpAt(2.4, mode, ['Snorlax', ['splash']], PIKACHU, 1));
+      mine.boosts.def = stage;
+      return battle;
+    },
+    c: (extra, stage = -1) => {
+      const battle = board(mode, GARCHOMP, ['Gyarados', ['waterfall', 'splash']], '1,2,3,4', extra);
+      const { mine, foe } = mons(battle);
+      mine.sethp(1);
+      foe.sethp(1);
+      mine.boosts.spe = stage;
+      return battle;
+    },
+  };
+  const idleTurn = (battle: Battle): Battle => {
+    battle.choose('p1', click(mode, mons(battle).mine, false));
+    battle.choose('p2', click(mode, mons(battle).foe, false));
+    return battle;
+  };
+  const read = (kind: 'a' | 'b' | 'c', extra: Extra, stage?: number) => {
+    const battle = idleTurn(SCENES[kind](extra, stage));
+    return { battle, features: evalFeatures(battle), holder: mons(battle).mine };
+  };
+
+  test.each(['a', 'b', 'c'] as const)('scene (%s): with a living bench the drop is free, with the bench fainted or behind Shadow Tag it counts as before', kind => {
+    const held = read(kind, {});
+    expect(held.holder.isActive && held.battle.canSwitch(held.holder.side)).toBe(0);
+    expect(held.features.boostsBiting).toBeLessThan(0);
+    expect(held.features.boosts).toBeLessThan(0);
+
+    const free = read(kind, { bench: 'living' });
+    expect(free.holder.trapped).toBe(false);
+    expect(free.battle.canSwitch(free.holder.side)).toBeGreaterThan(0);
+    expect(free.features.boostsBiting).toBe(0);
+    expect(free.features.boosts).toBe(0);
+
+    const fainted = read(kind, { bench: 'fainted' });
+    expect(fainted.battle.canSwitch(fainted.holder.side)).toBe(0);
+    expect(fainted.features.boostsBiting).toBeCloseTo(held.features.boostsBiting, 12);
+    expect(fainted.features.boosts).toBeCloseTo(held.features.boosts, 12);
+
+    const trapped = read(kind, { bench: 'living', trapper: SHADOW_TAG });
+    expect(trapped.holder.trapped).toBeTruthy();
+    expect(trapped.features.boostsBiting).toBeCloseTo(held.features.boostsBiting, 12);
+    expect(trapped.features.boosts).toBeCloseTo(held.features.boosts, 12);
+  });
+
+  test('a raised stage is the holder\'s asset whatever the bench: the boosts term reads it with and without a bench', () => {
+    const plain = read('c', {}, 2);
+    const benched = read('c', { bench: 'living' }, 2);
+    expect(plain.features.boosts).toBeGreaterThan(0);
+    expect(benched.features.boosts).toBeCloseTo(plain.features.boosts, 12);
+  });
+
+  test('the foe\'s drop counts for me as before: it can switch out only if it has a bench, and the foe lead here has none', () => {
+    const battle = idleTurn(SCENES.a({}, 0));
+    mons(battle).foe.boosts.atk = -2;
+    const features = evalFeatures(battle);
+    expect(battle.canSwitch(mons(battle).foe.side)).toBe(0);
+    expect(features.boosts).toBeGreaterThan(0);
   });
 });
