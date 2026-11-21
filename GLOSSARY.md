@@ -109,6 +109,7 @@ The one line the user plays from a turn of the main line, by a different choice,
 
 **Replacement**:
 The switch-in the simulator asks for in the middle of a turn: after a knockout, or after a pivot move such as U-turn, Flip Turn or Eject Button. The history list and a shared branch print it as its own row, "replacement (P1)", "replacement (P2)" or "replacement (both sides)", and it takes no turn of its own. The row's word is neutral because the sim does not say whether a knockout or a pivot move asked for it.
+The engine picks one by the turn that follows it: under the matrix each switch-in's board gets the engine's own search of that turn, and the best value wins; the tree plays the next turn inside its forced node.
 _Avoid_: forced replacement (in the lists; the code's `forced` entry kind keeps its name)
 
 **Line**:
