@@ -13,7 +13,7 @@ import { battleOf } from './power-oracle';
  * acts when a foe on the field moves first and takes its HP with one hit; the stage is then worth what it is worth
  * to a dead body. Each scene is held to turns of the simulator (who moves first, who faints), and read in the score and
  * in the `boosts` term: the score with the stage equals the score without it for the idle body, and the control (the same
- * board where the body does act) keeps the stage's worth. Singles, doubles and the Champions mod; a drop stays.
+ * board where the body does act) keeps the stage's worth. Singles, doubles and the Champions mod; a drop stays while the holder cannot switch out (SB3c, 21.11.2026: a holder with a living bench loses it by switching, so it reads 0).
  */
 
 await loadSimMods('gen9championscustomgame');
@@ -86,9 +86,21 @@ describe.each([['Gen 9 singles', SINGLES], ['Champions singles', CHAMPIONS]])('%
     expect(boostsTerm(battle)).toBeCloseTo(stageValue(holder, 'atk', 2), 12);
   });
 
-  test('a drop on the idle holder stays: it costs what it cost', () => {
+  test('a drop on the idle holder with a living bench is free: it can switch out and loses the stage (SB3c, 21.11.2026)', () => {
     const { battle, holder } = board();
     holder.boosts.atk = -2;
+    expect(battle.canSwitch(holder.side)).toBeGreaterThan(0);
+    expect(boostsTerm(battle)).toBe(0);
+  });
+
+  test('a drop on the idle holder with no living bench stays: it costs what it cost', () => {
+    const { battle, holder } = board();
+    const bench = battle.sides[0].pokemon[1];
+    bench.hp = 0;
+    bench.fainted = true;
+    battle.sides[0].pokemonLeft--;
+    holder.boosts.atk = -2;
+    expect(battle.canSwitch(holder.side)).toBe(0);
     expect(boostsTerm(battle)).toBeCloseTo(stageValue(holder, 'atk', -2), 12);
   });
 
