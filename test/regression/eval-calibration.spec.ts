@@ -930,15 +930,19 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * d526268c the tester fixes, 7cee4971 the New Game fixes, c256dd28 Lines by
  * value, f47da36b to 70ab1133 "Opponent reads my move", aae93d37 to ccc0cb42
  * the engine change set of #196 and #197 with cache v80 (1a9a0ddb), 952cc834
- * one line per ranked row, c137ab0e the chances of forced dice; 8ba45318 the
- * head of 21.11.; probes docs/perf/probes/2026-11-09-r89/). Gates: the opening
+ * one line per ranked row, c137ab0e the chances of forced dice, 8ba45318 the
+ * draft t56 pin at ten switches; then e3d15c06 to 04252524 the stop that keeps
+ * the result so far (e3d15c06 singles, 2ee71242, 2fec5001 and 506fb49c the
+ * tree search's interim result and the third line, 04252524 the two stop bugs
+ * of the fifth tester pass) with 389f4705 closing four document gaps, the head
+ * of 21.11.; probes docs/perf/probes/2026-11-09-r89/). Gates: the opening
  * 09.11. (every open issue of 1.2.0 in one wave, eight rulings on the plan),
  * the mid-wave gate 09.11. (24 questions), lane rulings 09.11. to 15.11.
  * (rulings 15 to 38 of the brief), the final gate from 16.11. (paused the same
  * day for the grades and forced-win readings of two games, then answered in
  * three batches on 16.11., 17.11. and 19.11.), and four more review pages on
- * 20.11. and 21.11. (rulings 43 to 46 of the brief: the tester fixes, Lines by
- * value, the Gholdengo scene, the engine change set).
+ * 20.11. and 21.11. (rulings 43 to 47 of the brief: the tester fixes, Lines by
+ * value, the Gholdengo scene, the engine change set, the stop).
  *
  * DELIVERED: Lane A, search draws and the forced-win proof (#59 block 1, #60,
  * #145, #148, #149; score-touching). Block 1 of T322 reads each die of a root
@@ -1187,6 +1191,39 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * shared game 45 s, 655336 turn 5 24 s, VGC 2630685175 turn 2 31 s, so 10 to
  * 30 s on a normal machine, shown by the dock chip "engine choosing...".
  *
+ * A stop keeps the result so far (e3d15c06, 2ee71242, 2fec5001, 506fb49c,
+ * 04252524; lossless, app and a listener-only path of the tree search). The
+ * scene: a user presses Cancel during a forced-replacement search; the panel
+ * read "Position changed; re-evaluate.", the card greyed, the chip fell back
+ * to "choose a replacement" and, with Auto on, the search started again. Now
+ * a stop keeps the last interim result in singles, doubles and VGC: the panel
+ * reads "Search stopped. Showing the quick estimate." after depth 1 and
+ * "Search stopped. Showing the result so far." later, the card stays live, the
+ * dock chip takes the engine's pick from it and Execute plays it; Auto and
+ * Always on do not search a stopped position again. "Position changed;
+ * re-evaluate." stays for a position that changed. Doubles and VGC at Auto run
+ * the tree search, which had no interim result before its first whole tree
+ * ended; its first tree now streams its own interim result every 150
+ * iterations until it ends, only for a caller that listens (the game
+ * analysis sweep and the bank pass no listener), and the worker pool carries
+ * it with a partials flag on the mctstree request (ENGINE_PROTOCOL keeps its
+ * value). A stop that comes before any interim result reads "Search stopped
+ * before a first result." and also holds through the rebuild before a
+ * replacement search and through the game analysis's own Cancel, which had
+ * started the search again 1 s later. Tests: useDockFill.stopped.spec.tsx (19
+ * rows, singles and doubles, red first), tree-partials.spec.ts (11 rows
+ * on a VGC, a Doubles OU and a singles tree board, four red first, the final
+ * result with and without a listener equal, tree stats byte-identical),
+ * worker-client-tree-partials.spec.ts, stopped-line.spec.ts and rows of
+ * EvalPanel.spec.tsx and useEvalView.spec.tsx. The limit, from the fifth
+ * tester pass: in the browser on devbox the tree's first interim ranking
+ * arrives at 65 to 75 % of a doubles search (VGC 2630685175 turn 4: search
+ * start 9.5 s, first ranking 52.1 s, end 62 s; Doubles OU 2663093831 turn 8:
+ * 18.8, 57.0, 76.9 s), so a Cancel at 45 s keeps nothing there and reads the
+ * third line; that is #207. Four small gaps of the round's documents closed
+ * with 389f4705 (the row-line limit, the ENGINES.md forced field, the
+ * ARCHITECTURE.md row-line module, the stat-drop sentence).
+ *
  * MEASUREMENT: classes: lanes E, G (lines), H, L, S and the app steps
  * lossless; A to D, F, N, P and Q's rule score-touching. Base r89-base
  * (8976c749) in CI; feedback base q0 is c1 = c2 on master (13 of 13 passed,
@@ -1285,8 +1322,8 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * byte-identical), the pair-sampler bound of the three-draw estimate 0.1 to
  * 0.15 (it reads 0.127), and the draft t56 play-out pin (branch.spec.ts:69)
  * at ten p2 switches (the play-out ends at turn 71 with nine switches; the
- * turn bound 75 holds; 8ba45318); the drift pin 562428 t10 stays in known
- * drift (#86). CI: run 44896289550 on c84bee80 (the first stage alone) was red
+ * turn bound 75 holds; 8ba45318, ruled at the last page 21.11.); the drift pin
+ * 562428 t10 stays in known drift (#86). CI: run 44896289550 on c84bee80 (the first stage alone) was red
  * in two engine rows (eval-search-identity and pair-sampler, in the three
  * engine and Node jobs) and the browser job's play-out pin; run 44901844084 on
  * ccc0cb42 was green in every job except that pin, which 8ba45318 re-pinned.
@@ -1304,13 +1341,51 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * dialog wording, "Re-analyze" on a game never analyzed, inaccuracy sizes off
  * by one point. Ruled (TS1a): the wrong texts as small fixes for 1.2.1, the
  * looks and two questions into #176 for 1.3.0, the dock note stays on the
- * main line.
- * BOOK-GAP: the final CI Tests run on 8ba45318 (all jobs).
- * BOOK-GAP: three feedback runs r89-final on the final head (byte compare of
- * the dumps, tier census against the base with --moved).
- * BOOK-GAP: the final tester pass on the final head.
- * BOOK-GAP: the final document review (wave-reviewer) of the documents
- * against the merged code.
+ * main line. Pass 3 on 8ba45318 (the forced replacement under the new
+ * engine, 93 shots): 0 BROKEN, 6 WRONG TEXT, 3 LOOKS OFF, 5 QUESTION; #196
+ * and #197 read right in the app (Earth Power 41 %, Stealth Rock 39 %, switch
+ * to Pawmot 38 %; Gholdengo keeps Make It Rain at 60 %; the picks and their
+ * seconds, 7 to 78 s, in the findings), one line per ranked row works, the
+ * chance of a forced die reads right; its first question (a stop during a
+ * replacement search leaves no suggestion) became the stop fix e3d15c06, its
+ * texts became #209 to #213 and #176 (ruling 47: hidden faint in a row's
+ * line, the "then ..." under the "(waiting)" row, two turn numbers, the
+ * Game review lines at a forced replacement, the depth-2 scene) and #207 (the
+ * slow Setup menu). Pass 4 on e3d15c06: the stop works in singles (panel
+ * line, live card, chip and Execute, 390 px fine), 1 BROKEN (doubles and VGC
+ * at Auto keep nothing when stopped, the tree has no interim result before
+ * its first tree), 1 LOOKS OFF (a three-way tie of the quick estimate), 2
+ * QUESTION; the BROKEN became the three commits 2ee71242 to 506fb49c. Pass 5
+ * on 506fb49c: 3 BROKEN, 2 WRONG TEXT, 2 LOOKS OFF, 3 QUESTION, no page
+ * error; works: a Cancel after the first ranking on VGC 2630685175 turn 4
+ * and Doubles OU 2663093831 turn 8 keeps the result and the chip plays it, a
+ * normal doubles turn keeps its result, Champions VGC turn 4 reads "->
+ * Charizard engine", the stopped full run ends on the same order (interim
+ * 45/41/33 at 57 s, final 42/39/34 at 77 s), 390 px clean. Its BROKEN 1
+ * (a Cancel during "Rebuilding position..." leaves no line, Always on then
+ * searches again) and 2 (the game analysis's Cancel restarted the search of an
+ * empty stop) were fixed by 04252524 (the stop path read a status that an
+ * effect wrote after the render; the fill trigger forgot the stop when the
+ * analysis ran); BROKEN 3 is the limit above (#207), its depth readout that
+ * runs backwards is #215. A stop mark on a replay turn's analysis sweep and
+ * Always on starting the game analysis in a variation are rulings that wait.
+ * CI Tests, the commits after 8ba45318: 8ba45318 green after one rerun
+ * (right-column.spec.ts:72 failed once), e3d15c06 with one red browser test
+ * (new-game.spec.ts:140) that passed on the next head, 506fb49c green on the
+ * first run; both flaky tests are #214. The stop commits are lossless: the
+ * bank r89-fin (506fb49c) equals r89-sb1 byte for byte on its 838 rows, three
+ * feedback runs r89-final (8ba45318) are byte-identical in their 12 dumps, and
+ * three runs r89-final2 (506fb49c) are byte-identical to each other and to
+ * r89-final; the bank's tree path passes no listener. No cache bump, no pin.
+ * Final document review (wave-reviewer, head 8ba45318, read-only): no wrong
+ * claim in README.md, GLOSSARY.md, ARCHITECTURE.md, ENGINES.md, EVALUATION.md
+ * or the ADRs about the changes of the round; of 401 backticked identifiers
+ * the wave added, 393 exist (the other 8 are symbols that ADR 0023 says are
+ * deleted); four unclear points, low weight, all four closed by 389f4705.
+ * BOOK-GAP: the final CI Tests run on 04252524 (all jobs).
+ * BOOK-GAP: three feedback runs r89-final3 on 04252524 (byte compare of the
+ * dumps against r89-final2).
+ * BOOK-GAP: tester pass 6 on 04252524.
  *
  * GATE: opening 09.11.: every open issue of 1.2.0 in one wave on devbox, with
  * two worktree slots; the trust rule of T322 loses its two open clauses; the
@@ -1373,8 +1448,22 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * ten p2 switches; the five re-pinned rows stand and the drift pin 562428 t10
  * stays in known drift; the Lines fix stays on the condition that #200 moves to
  * 1.2.1 (done); the tester findings as proposed; the button per line of
- * "Opponent reads my move" goes to 1.3.0 with #188. The release itself is a
- * separate pull request with its own okay.
+ * "Opponent reads my move" goes to 1.3.0 with #188. Gate page 21.11. (the
+ * stop): the stop fix ships in 1.2.0 for singles with its two strings;
+ * doubles and VGC follow in 1.2.0 only if the diagnosis finds a way without a
+ * score change, otherwise with #207 (the diagnosis found one, the tree's
+ * interim result, and it was built); the depth-2 scene (switch to Pawmot 39 %
+ * ahead of Earth Power 37 %) is a TODO for 1.2.1 with the diagnosis first, the
+ * user finding the switch acceptable in itself because of the resistance (#213);
+ * the Game review lines choose the forced replacement like the dock (#212);
+ * the tester findings of pass 3 as proposed: the hidden faint in a row's line,
+ * the line under the "(waiting)" row in doubles and the two turn numbers are
+ * small fixes for 1.2.1 (#209, #210, #211), the depth readout and the slow
+ * Setup menu go to #207 (the readout later got #215), the arrows, nickname
+ * against species, "Waits for engine..." and two layout points go to #176, and
+ * the flaky browser test of the right column is a 1.2.1 fix (#214). The play-out
+ * pin at ten switches (ruling 46) was built as 8ba45318. The release itself is
+ * a separate pull request with its own okay.
  *
  * LESSONS: (1) The slow feedback run of 19.11. (573756 hit the 2,100 s cap;
  * 562428 took 10.7 minutes where it took 1.2 on 15.11.) was the machine and no
@@ -1426,50 +1515,77 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * engine suite in both speed modes and the full sweeps run on runners, and the
  * first CI run of the engine change set found the two engine rows and the
  * play-out pin that no local spec file had reached. A change set that touches
- * the leaves of the search gets its CI run before its lane ends.
+ * the leaves of the search gets its CI run before its lane ends. (11) A claim
+ * on a gate page about what the app does needs a tester's check first. The
+ * page said the stop leaves the depth-1 result; the engine does, the app threw
+ * it away, and the claim was false in the browser. The fix then took four
+ * builder steps and three tester passes (a status that read "stale", a tree
+ * with no interim result, two races in the stop path). The gate names what a
+ * tester saw, and a diagnosis of a scene with a click reads the browser too.
+ * (12) A Node timing of a search does not carry over to the browser. The tree's
+ * first interim result came at 3.5 to 4.7 s in a Node probe and at 24 to 43 s
+ * in the browser on devbox (65 to 75 % of the doubles search). The cause is
+ * not measured: worker start and load, trees running side by side and a loaded
+ * machine are the candidates, and #207 holds the measure. A promise about a
+ * wait states the browser's number or none.
  *
  * RESTS: milestone 1.2.1 (small, as the user asked on 17.11.): #157 the
  * comment rule and clean-up with its own pull request after the release and
  * before any 1.2.1 lane opens; #158 Fake Out and the other first-turn moves
- * leave the options after the first turn; #159 the replay build's default
- * ability reads the format's ban list; #160 the pair plan divides by its
- * coverage; #161 a probe of the delay reading at 90 % accuracy or less; #163
- * the delay facts for Future Sight and Doom Desire (Gen 5 and later); #164 the
- * Protective Pads tell (Rocky Helmet and the silent contact punishers); #165
- * the bench filter by name in makeSwitches; #175 items that announce
- * themselves; #195 a doubles slot that fell before it acted still gets a
- * played move; #198 "(only choice)" in Lines; #199 Tera "Auto" in a new game
- * follows the format; #200 the winner's line from the proof and how the loser
- * could still win (moved from 1.3.0, the answer for 655336 turn 24; #162 closes
- * with this round). Approved on 21.11. whose issues the integrator writes after
- * a review: an evaluation of a faster forced-replacement search (1.2.1), five
- * small text fixes from the second tester pass (1.2.1: the random-target note
- * under Tera Starstorm, the New game wording, "Re-analyze" on a game never
- * analyzed, the inaccuracy size off by one point, and the row title "at least
- * 65 %" against the matrix cell 62 %, cause first; its Fake Out step belongs
- * to #158), and the refit of the Doubles OU boosts weight (1.3.0). Milestone
- * 1.3.0: #141 Illusion in the rebuild, #142 Struggle as evidence, #147 a hint
- * for a pasted set that lacks a logged move, #151 a census of speed ties, #152
- * National Dex usage and sets files, #155 split pricing, #156 slot read with
- * one body per side, #166 use the engine's leads, #167 tidy the workspace, #168
- * keep the open variation across a reload, #169 one display-name function,
- * #170 a sweep of rule lines, #171 fold small test files (the steps 4 to 6 of
- * #125, about 130 files, about 320 s), #172 shard the engine suite, #173 the
- * code-structure rests of #57, #176 the testers' text and layout list, #177
- * more draws for the graded side with a cost measurement first, #178 to #187
- * (rests of the prover, the solver, the dice panel, the inference and the
- * effect-state key), #188 the rests of
- * "Opponent reads my move" including its button per line, #201 pricing the
- * unused Tera. #154 (Champions Reg M-B: registration, then the resolver's
- * answer) is approved as one larger bug for 1.3.0 and still carries no
- * milestone. Without milestone: #189 and #134 and #95 (upstream list:
- * @pkmn/client 0.7.4 charges no extra PP for Pressure, the Pledge from-move,
- * the Mega-Z formes without battleOnly), #190 and #191 (triage), #192 to #194
- * (parked). #57 and #125 close with this round: the dead-code deletions and the
- * three split sweeps (23,970 rows kept) are built, and their rests are #171,
- * #172, #173 and #191. Known drift: #86 (562428 t10 and t12), #87, #88 (the
- * t56 play-out pin now reads ten switches). The worktrees w89a to w89h and the
- * clone m89 go after the merge, on the user's okay.
+ * leave the options after the first turn (seen again in the second tester
+ * pass, VGC 2630685175 turn 7); #159 the replay build's default ability reads
+ * the format's ban list; #160 the pair plan divides by its coverage; #161 a
+ * probe of the delay reading at 90 % accuracy or less; #163 the delay facts
+ * for Future Sight and Doom Desire (Gen 5 and later); #164 the Protective Pads
+ * tell (Rocky Helmet and the silent contact punishers); #165 the bench filter
+ * by name in makeSwitches; #175 items that announce themselves; #195 a doubles
+ * slot that fell before it acted still gets a played move; #198 "(only
+ * choice)" in Lines; #199 Tera "Auto" in a new game follows the format; #200
+ * the winner's line from the proof and how the loser could still win (moved
+ * from 1.3.0 by ruling 46, the answer for 655336 turn 24); #162 is fixed in
+ * this round and closes with it. Written on 21.11. after the gate pages and a
+ * review of each against the code: #202 the random-target note under a line
+ * whose move the simulator turns into a spread move (Tera Starstorm, Curse,
+ * Expanding Force); #203 four texts of the New game dialog; #204 a row's
+ * "guaranteed at least" floor above its own matrix cells (larger bug,
+ * score-touching, probe first); #205 "Re-analyze" on a game never analyzed and
+ * "analyzing... turn 0/?"; #206 an inaccuracy's size against the two win
+ * chances beside it; #207 a cheaper forced-replacement search without moved
+ * picks, with the browser's wait before the first progress, the stop's limit
+ * on doubles and the slow Setup menu during the search; #209 a ranked row's
+ * "then ..." at matrix depth hides a faint on entry; #210 the best row of P2
+ * carries no "then ..." in doubles and the tail stands under P1's "(waiting)"
+ * row; #211 two turn numbers at a forced replacement; #212 Game review lines
+ * end at a forced replacement that the dock now chooses; #213 the depth-2
+ * scene of the new game (Pawmot above Earth Power), diagnosis first; #214 two
+ * browser specs that failed once in CI (right-column.spec.ts:72 and
+ * new-game.spec.ts:140); #215 the depth readout runs backwards in a tree
+ * search and says "depth 1" before any progress. Milestone 1.3.0: #141
+ * Illusion in the rebuild, #142 Struggle as evidence, #147 a hint for a pasted
+ * set that lacks a logged move, #151 a census of speed ties, #152 National Dex
+ * usage and sets files, #154 the Champions Reg M-B mod (a larger bug, now in
+ * the milestone), #155 split pricing, #156 slot read with one body per side,
+ * #166 use the engine's leads, #167 tidy the workspace, #168 keep the open
+ * variation across a reload, #169 one display-name function, #170 a sweep of
+ * rule lines, #171 fold small test files (the steps 4 to 6 of #125, about 130
+ * files, about 320 s), #172 shard the engine suite, #173 the code-structure
+ * rests of #57, #176 the testers' text and layout list (with the arrows, the
+ * nickname against the species, "Waits for engine..." and two layout points
+ * of the third pass), #177 more draws for the graded side with a cost
+ * measurement first, #178 to #187 (rests of the prover, the solver, the dice
+ * panel, the inference and the effect-state key), #188 the rests of "Opponent
+ * reads my move" including its button per line, #201 pricing the unused Tera,
+ * #208 the refit of the Doubles OU boosts weight, parked in effect until a
+ * fresh holdout draw repeats the harm. Without milestone: #189 and #134 and
+ * #95 (upstream list: @pkmn/client 0.7.4 charges no extra PP for Pressure, the
+ * Pledge from-move, the Mega-Z formes without battleOnly), #190 and #191
+ * (triage), #192 to #194 (parked). #57 and #125 close with this round: the
+ * dead-code deletions and the three split sweeps (23,970 rows kept) are built,
+ * and their rests are #171, #172, #173 and #191. Known drift: #86 (562428 t10
+ * and t12, with the new state of 21.11.), #87, #88 (the t56 play-out pin now
+ * reads ten switches). Comments of 21.11. on #86, #88, #158, #176, #188 and
+ * #207 hold the new evidence. The worktrees w89a to w89h and the clone m89 go
+ * after the merge, on the user's okay.
  *
  * ROUND 88 2026-11-07 to 2026-11-08 (improvement round 88, the wave of
  * 1.1.1: 17 planned issues, five more that joined during the wave (#101,
