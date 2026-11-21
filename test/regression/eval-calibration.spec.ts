@@ -926,12 +926,19 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * ac11892e lane P, 4e6b7b37 the app and test lanes, aa13bff9 the feedback
  * fixes, b6da02f6 the full-sweep fixes; then 15d606c5 cache v79, 3fbd193f,
  * 376ca975 and a49ffbe8 the re-pins, ccc2baf1 the documents, 5667106d the
- * head; probes docs/perf/probes/2026-11-09-r89/). Gates: the opening 09.11.
- * (every open issue of 1.2.0 in one wave, eight rulings on the plan), the
- * mid-wave gate 09.11. (24 questions), lane rulings 09.11. to 15.11. (rulings
- * 15 to 38 of the brief), the final gate from 16.11. (paused the same day for
- * the grades and forced-win readings of two games, then answered in three
- * batches on 16.11., 17.11. and 19.11.).
+ * head of 19.11.; then, in the round's own branches and merged by c85ee825:
+ * d526268c the tester fixes, 7cee4971 the New Game fixes, c256dd28 Lines by
+ * value, f47da36b to 70ab1133 "Opponent reads my move", aae93d37 to ccc0cb42
+ * the engine change set of #196 and #197 with cache v80 (1a9a0ddb), 952cc834
+ * one line per ranked row, c137ab0e the chances of forced dice; 8ba45318 the
+ * head of 21.11.; probes docs/perf/probes/2026-11-09-r89/). Gates: the opening
+ * 09.11. (every open issue of 1.2.0 in one wave, eight rulings on the plan),
+ * the mid-wave gate 09.11. (24 questions), lane rulings 09.11. to 15.11.
+ * (rulings 15 to 38 of the brief), the final gate from 16.11. (paused the same
+ * day for the grades and forced-win readings of two games, then answered in
+ * three batches on 16.11., 17.11. and 19.11.), and four more review pages on
+ * 20.11. and 21.11. (rulings 43 to 46 of the brief: the tester fixes, Lines by
+ * value, the Gholdengo scene, the engine change set).
  *
  * DELIVERED: Lane A, search draws and the forced-win proof (#59 block 1, #60,
  * #145, #148, #149; score-touching). Block 1 of T322 reads each die of a root
@@ -1018,7 +1025,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * CPU. #130: "How could <player> have won?" searches three steps (a stronger
  * play, luck down to 1 in 1,000, an opponent's mistake) with a budget of 350
  * cells and 175 turns, from the Endgame row or any endgame turn. #153: Hard
- * mode, a checkbox that lets the opponent answer with the reply the search
+ * mode (renamed "Opponent reads my move" at the end of the round), a checkbox that lets the opponent answer with the reply the search
  * rates lowest for the move in hand, and "Back to the engine's pick" in the
  * dock's tray. G4b fixed the stalling die an Encore rebuilt as a Protect that
  * succeeded where the log's failed.
@@ -1074,6 +1081,112 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * three and blocked-effects-sweep into two (23,970 rows before and after, 0
  * lost, 0 gained). New ADRs 0023, 0024, 0025; ADR 0014 and ADR 0020 amended.
  *
+ * Feedback in CI (M-lane step, 88a934eb and 9714eb85; lossless). From
+ * 17.11. devbox read the page-fault cost of its host 7 to 10 times higher, and
+ * a feedback game passed the harness cap there. scripts/feedback-ci.mjs pushes
+ * the branch feedback/<name>, .github/workflows/feedback.yml runs N whole
+ * feedback runs (default 3) on one runner each with FEEDBACK_DUMP=1, one
+ * Playwright worker and no trace, a last job compares the dumps byte for byte
+ * and the drift reports without their dates and wall times, and the script
+ * downloads the artifacts into .calibration/feedback-<name>/ and deletes the
+ * branch. feedback-ci.spec.ts and feedback-workflow.spec.ts hold the
+ * workflow's security properties, the compare step's file list against the
+ * harness and the script's pushes. The user's standing okay covers the
+ * feedback/<name> branches (20.11.); AGENTS.md, README, ARCHITECTURE and
+ * EVALUATION name the script.
+ *
+ * Tester fixes (FT-1 to FT-4, d526268c; lossless for the corpus, card prose
+ * moves). The first tester pass of the merged head (16.11., f6f4c548) found
+ * that the singles card said "stayed in (KO'd before acting)" with "the
+ * engine's move" for a Pokemon that never moved. A body knocked out before it
+ * moved gets no played column in the matrix dialog (2e6949b1), its sentences
+ * on the card and the Game report say "knocked out before it moved, so the log
+ * shows no choice" (1a0b2825, bc0cd0cf; closes #162), a named inaccuracy or
+ * risk replaces "Neither side made a mistake." (cd0e8cc0), a variation that
+ * ends the game itself raises no divergence notice (ec6e0f62), the Main line |
+ * Variation chip fills again (e5503d59), "Open matrix" has the size of the
+ * panel's other buttons and "worst" reads in the dialog (0a2473e1), the two
+ * Discard buttons stay together at 390 px (6004122d), and the graph names its
+ * shapes (a2d6f48d: a circle marks a graded turn of one side, a square one of
+ * the other, listed in the Game review). The 47 cards of the feedback corpus
+ * whose text moved (36 singles, 4 Doubles OU, 7 Champions OU; table
+ * gate/ft-cards-read.md) stand as rendered, the four that lose "Neither side
+ * made a mistake." beside the never-acted wording included (648453 t29,
+ * 649664 t16, 653785 t26, 562428 t21; user 21.11.). New Game fixes (7cee4971):
+ * one rule, startBlocks, blocks Start (a side with no readable set, more than
+ * six sets, a seed the engine refuses, a species the format's Dex does not
+ * know) and the dialog shows each reason under its box (e2f7b690); the
+ * rebuild of a new game's positions runs again when a turn is missing, so
+ * Analyze game no longer prints the replay's "guessed sets" notice for a game
+ * (b0dc343b).
+ *
+ * Lines by value (c256dd28, 12b3b342; lossless, the first step and every
+ * score stay). A line's later steps take the pair of options that rate best
+ * for their side (p1 highest mean, p2 lowest) among those with at least 4
+ * visits and a quarter of the node's most visited option, instead of the most
+ * visited cell; singles and doubles share the path. Over the 12 corpus dumps
+ * 185 of 1,003 later steps changed, in 171 of 1,030 lines (singles 163, 106 of
+ * them in gen8ou 573756; doubles 22: Doubles OU 5, VGC 14, Champions VGC 3),
+ * no first step and no score. The honest result of the lane's measure (LN-1):
+ * later steps on the played path that name another choice than the next turn's
+ * card puts first read 75 of 118, against 77 of 118 before, and 26 of 46
+ * unchanged for the side ahead by 0.3 or more; the trees' later nodes are too
+ * thin to know better. The scene that started it, 655336 turn 24 (BKC's
+ * Charizard-Mega-X reads Roost into Encore twice), stays: Roost is the best
+ * mean in all three trees that saw High Jump Kick hit, by every reading tried,
+ * and only a deeper search of the line's later steps reverses it (4 times the
+ * iterations at the turn-25 root: Dragon Claw 0.738 against Roost 0.555). The
+ * user's expected answer, the winner's line and how the loser could still win,
+ * is #200 (1.2.1, moved from 1.3.0 with the ruling). One line per ranked row
+ * (952cc834, src/lib/row-line.ts): the row's "then ..." on the card and in the
+ * panel read the later steps of the row's line from the result's lines, through
+ * the same choice as the Lines section; before, 124 results carried a ranked
+ * row line and the Lines block agreed with it in full in 28, differed at the
+ * first shown step in 69 and later in 3, and agreed as far as both went but
+ * not in length in 24. A result without lines keeps the principal variation;
+ * the engine's prose and the byte compare do not move. The battle log's dice
+ * lines name the chance of the result the click forced (c137ab0e: "Protect
+ * fails, 67 %" where the line said 33.3 %, "no crit, 96 %" where it said
+ * 4.2 %).
+ *
+ * "Opponent reads my move" (f47da36b, 422b7d29, 70ab1133; lossless). Hard mode
+ * leaves the Evaluation row and sits in the Setup menu under "Animate branch
+ * turns" as "Opponent reads my move", with a title that names the three places
+ * it acts and says grades stay; while it is on, the dock's status row opens
+ * with "Opponent reads your move" and a Turn off button, and the titles of
+ * engine-move buttons and of the panel's ranked rows name the reply the
+ * opponent plays. The stored key hardMode, the identifiers, the support-state
+ * file and the engine API keep their names. The second step (a button per
+ * line, the Game review on usual lines) stays with #188 for 1.3.0.
+ *
+ * The engine change set of #196 and #197 (aae93d37 to ccc0cb42; score-touching;
+ * larger bugs, 1.2.0 by ruling 45). The scene: a new Gen 9 OU game with open
+ * team sheets, turn 1, a Choice Scarf Gholdengo takes Dragapult from 317 to
+ * 56 HP with Make It Rain, drops itself to -1 Special Attack, and U-turn
+ * brings Glimmora in; the engine recommended Sludge Bomb and a switch to a
+ * Glimmora that Make It Rain leaves at 1 HP through its Sash. #196: the
+ * boosts term (Doubles OU weight 27) and boostsBiting counted a stat drop as
+ * lasting for the rest of the game, though the simulator clears every stage of
+ * a body that switches out; a drop now counts only while its holder is trapped
+ * or has no living bench (stageStands; a switch-out reader and
+ * switch-out-sweep.spec.ts hold the reading to the simulator in Generation 9
+ * and Champions, singles and doubles; a raised stage reads as before; cache
+ * v80). #197: at an open replacement request the early singles matrix judged
+ * the five candidates by the board on arrival, so Glimmora read -0.005 and the
+ * other four -0.108 each, equal to the digit; each cell now books the value of
+ * the engine's own depth-1 search of the turn that follows the arrival (an
+ * optional forced field of the choices answer and an optional turn field of the
+ * sub-search job; ENGINE_PROTOCOL keeps its value), and the result reads depth
+ * 2. Expert pin of the user's game (expert-sb5a.spec.ts, Tera off): turn 2
+ * leads with Earth Power and Gholdengo stays with Make It Rain, the
+ * replacement after U-turn is Great Tusk (-0.121, Lokix -0.142, Pawmot
+ * -0.157, Glimmora last at -0.193; the solved mix is Great Tusk alone); both
+ * rows were red before. Doubles pay only under an explicit matrix (Auto runs
+ * the tree there). Cost per request, Node, devbox (2.5 to 3 times slower than
+ * a normal machine, not interleaved with a base): 653785 turn 10 75 s, the
+ * shared game 45 s, 655336 turn 5 24 s, VGC 2630685175 turn 2 31 s, so 10 to
+ * 30 s on a normal machine, shown by the dock chip "engine choosing...".
+ *
  * MEASUREMENT: classes: lanes E, G (lines), H, L, S and the app steps
  * lossless; A to D, F, N, P and Q's rule score-touching. Base r89-base
  * (8976c749) in CI; feedback base q0 is c1 = c2 on master (13 of 13 passed,
@@ -1117,7 +1230,8 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * plain-draws 1, win-paths-stronger 1), 376ca975 Champions VGC 2694684816 turn
  * 8 to no proof until #155 and #156, the three verify-scenes boards at S1; the
  * e2e rows of the Lines toggle, flinch wording and the graph caption.
- * EVAL_ENGINE_CACHE_VERSION 78 to 79 (15d606c5). CI: Tests run 44046564963 on
+ * EVAL_ENGINE_CACHE_VERSION 78 to 79 (15d606c5) and 79 to 80 (1a9a0ddb, the
+ * drop of #196 moves leaves). CI: Tests run 44046564963 on
  * ccc2baf1 (one spec comment before the head 5667106d), all nine jobs green,
  * the three full-sweep parts and the dice job included; earlier runs
  * 43773287403 (f6f4c548) and 44018587599 (16fbc855) read red only in the rows
@@ -1128,11 +1242,75 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * skipped. Full e2e, one worker: 224 passed, 8 skipped, 1 failed
  * (lines-play.spec.ts:93, a click on the Lines toggle that landed while the
  * panel re-rendered under load; the file passed 5 of 5 on two reruns).
- * BOOK-GAP: three feedback runs on the final head (byte compare of the dumps,
- * tier census against c1 with --moved, the corpus cards that carry the delay
- * clause).
- * BOOK-GAP: the wave-tester's findings on the merged head and what the final
- * gate ruled on them.
+ * That suite and run read the head of 19.11.; the engine change set below came
+ * after it. Engine change set of #196 and #197, same-day pair: base r89-b3
+ * (measured 70ab1133), head r89-sb1 (measured ccc0cb42, cache v80), the bank
+ * and the four holdouts in CI, all ten folders complete, no HTTP skip, the
+ * five sets of 838, 1,092, 4,218, 445 and 1,449 rows joined in full. No pooled
+ * row reads harm except one table. Bank (fixed K, then own K) -1 [-13, +12]
+ * and +5 [-3, +13]; singles +4 [-1, +10] and +4 [-1, +9]; doubles -12 [-54,
+ * +26] and +9 [-19, +31]; the luck-adjusted singles rows +5 [-1, +11] and +6
+ * [-1, +14] cross 0. vgc2 +3 [+0, +5] and +2 [+0, +4]; Champions OU -9 [-24,
+ * +3]; Champions VGC +0 [-9, +8]. Doubles combined (D26, bank, Doubles OU and
+ * vgc2, 6,148 rows): doubles/all +3 [-1, +7] full, +2 [-3, +7] hq, +4 [+1, +8]
+ * luck-adjusted (below 5 bp). The Doubles OU holdout reads +10 [-4, +23] full
+ * (no harm) and +19 [+5, +35] luck-adjusted with fixed K, +16 [+3, +30] with
+ * own K, 672 rows in 336 games: harm by the rule in that one table, which the
+ * bank does not repeat (its luck-adjusted doubles rows read +0 [-52, +46] and
+ * +0 [-76, +63]); its hq run has 24 rows in 8 games (luck-adjusted +111 [+12,
+ * +252] on 18 rows). Phase warnings: bank late cells (all +11 [+3, +20],
+ * doubles +23 [+3, +43], luck-adjusted doubles +27 [+11, +44]), Doubles OU
+ * early cells (luck-adjusted +53 [+9, +95]), vgc2 mid +8 [+2, +14]; Champions
+ * none. gameValue moved in 670 of 838, 954 of 1,092, 2,786 of 4,218, 340 of
+ * 445 and 912 of 1,449 rows. Ruled to ship as built, with a TODO for the refit
+ * of the Doubles OU boosts weight (1.3.0). Feedback pair ci3 (measured
+ * 12b3b342) against ci4 (measured c85ee825), three runs byte-identical:
+ * tiers (inaccuracy / mistake / blunder) singles 39/8/0 to 36/8/1 over 608
+ * sides, doubles 12/3/1 to 9/5/1 over 128 sides (Doubles OU 8/1/0 to 5/2/0,
+ * SV VGC 1/1/1 to 2/1/1, Champions VGC 3/1/0 to 2/2/0, Champions OU 7/1/0
+ * both); 21 moved turns and 17 grade changes (6 singles, 7 Doubles OU, 1 SV
+ * VGC, 3 Champions VGC); 0 of the 14 expert pin items on 13 turns moved in
+ * tier or played match, and no pin's drift status changed; the drift text of
+ * 562428 t10 gained two lines ("The read was there for" and "likeliest click"
+ * missing from the summary). Forced-replacement cards whose pick matches the
+ * body sent: singles 30 of 53 to 33 of 53 (4 picks changed), Champions OU 1 of
+ * 2 to 2 of 2, Doubles OU 7 of 14 to 5 of 14 (2 picks changed, both away from
+ * the body sent; Auto runs the tree there and #197 does not apply), SV VGC
+ * 6 of 7 and Champions VGC 4 of 4 unchanged. Re-pins ruled at the gate (user
+ * 21.11.): the two rows of boost-idle-holder.spec.ts (a drop on a holder with a
+ * living bench reads 0, one without keeps the stage's worth), the pending T248
+ * entry of relation-checks.spec.ts removed (Champions 2634199230 turn 5 passes
+ * now), fork-identity.json recorded again (the singles MCTS tree moved, score
+ * -0.0198 to -0.0144; children, both depth-1 matrices and the doubles tree
+ * byte-identical), the pair-sampler bound of the three-draw estimate 0.1 to
+ * 0.15 (it reads 0.127), and the draft t56 play-out pin (branch.spec.ts:69)
+ * at ten p2 switches (the play-out ends at turn 71 with nine switches; the
+ * turn bound 75 holds; 8ba45318); the drift pin 562428 t10 stays in known
+ * drift (#86). CI: run 44896289550 on c84bee80 (the first stage alone) was red
+ * in two engine rows (eval-search-identity and pair-sampler, in the three
+ * engine and Node jobs) and the browser job's play-out pin; run 44901844084 on
+ * ccc0cb42 was green in every job except that pin, which 8ba45318 re-pinned.
+ * Tester passes: pass 1 on the merged head of 16.11. (f6f4c548, five
+ * sessions): 3 BROKEN, all editor faults older than the wave (edits lost on a
+ * reload, Escape in an open move list closes the editor, Enter in an empty
+ * Add move field adds the first move), 5 WRONG TEXT, 5 LOOKS OFF, 6
+ * QUESTION, none blocking; its first finding fed the tester fixes above. Pass
+ * 2 on 21.11. (70ab1133, two sessions): 0 BROKEN, 7 WRONG TEXT, 4 LOOKS OFF, 4
+ * QUESTION, console clean; "Opponent reads my move", the graph legend, the
+ * timeline chip, the New game checks and a variation that wins all worked in
+ * singles and doubles; open in it: 655336 turn 24 still reads Roost twice
+ * (LN-3), a random-target note under a line whose only untargeted move is
+ * Tera Starstorm, a Fake Out step on a turn Rillaboom already moved, new-game
+ * dialog wording, "Re-analyze" on a game never analyzed, inaccuracy sizes off
+ * by one point. Ruled (TS1a): the wrong texts as small fixes for 1.2.1, the
+ * looks and two questions into #176 for 1.3.0, the dock note stays on the
+ * main line.
+ * BOOK-GAP: the final CI Tests run on 8ba45318 (all jobs).
+ * BOOK-GAP: three feedback runs r89-final on the final head (byte compare of
+ * the dumps, tier census against the base with --moved).
+ * BOOK-GAP: the final tester pass on the final head.
+ * BOOK-GAP: the final document review (wave-reviewer) of the documents
+ * against the merged code.
  *
  * GATE: opening 09.11.: every open issue of 1.2.0 in one wave on devbox, with
  * two worktree slots; the trust rule of T322 loses its two open clauses; the
@@ -1164,8 +1342,39 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * 19.11.: the bounded board-key census stays; the future-attack delay fix, the
  * Protective Pads tell and the bench filter by name go to 1.2.1, and 1.2.0
  * ships with the documented limits.
- * BOOK-GAP: the rulings of the final gate that closes the round (the answers
- * after 19.11., the release decision).
+ * 20.11.: the three places that contradict "knocked out before it moved" (the
+ * matrix dialog's played column, "Both sides played the engine's preferred
+ * line", the Explanation's "stayed in") are fixed in 1.2.0 with #162, so is
+ * the divergence notice on a variation that wins, and "Neither side made a
+ * mistake." gives way when the card names an inaccuracy or a risk; a doubles
+ * slot that fell before it acted and still gets a played move is a larger bug
+ * for 1.2.1 (#195); three of the testers' looks finds (the size of Open matrix,
+ * "worst", the Discard question at 390 px) are fixed in 1.2.0 and the other
+ * five go to #176; #174 closes, three parked texts are written (trigger: at
+ * least 5 of 75 tiered sides). The page's free text became reports: Open
+ * matrix alignment (fixed), the Hard mode place, the graph's unexplained
+ * shapes (named), 655336 turn 24, Start blocked in New Game, the notice on a
+ * new game's analysis, odd recommendations in new games, the chip gap (fixed).
+ * 21.11. (two pages): the 47 moved cards stand as rendered; the fixes are
+ * accepted; Lines read each side's best mean instead of visits in 1.2.0, "(only
+ * choice)" is a small fix for 1.2.1 (#198), the winner's line and the loser's
+ * way back are one feature (#200, first 1.3.0, then 1.2.1 by the last page);
+ * Hard mode has no place that satisfies the user, so the setting becomes
+ * "Opponent reads my move" in the Setup menu with the dock note "Opponent
+ * reads your move" and a Turn off button (1.2.0), its second step is #188
+ * (1.3.0); the user doubted the Gholdengo scene itself, it was diagnosed to the
+ * ground and gave #196 and #197, both built before 1.2.0 (a larger bug each,
+ * score-touching, full measurement; the release waited for them); Tera "Auto"
+ * in a new game follows the format (#199, 1.2.1); pricing the unused Tera is a
+ * feature for 1.3.0 (#201), its measurement the first step. Last page 21.11.:
+ * both engine fixes ship as built, a TODO for the refit of the Doubles OU boosts
+ * weight (1.3.0); the forced-replacement search ships with its cost (10 to 30
+ * s), an evaluation of a faster one is a TODO for 1.2.1; the play-out pin takes
+ * ten p2 switches; the five re-pinned rows stand and the drift pin 562428 t10
+ * stays in known drift; the Lines fix stays on the condition that #200 moves to
+ * 1.2.1 (done); the tester findings as proposed; the button per line of
+ * "Opponent reads my move" goes to 1.3.0 with #188. The release itself is a
+ * separate pull request with its own okay.
  *
  * LESSONS: (1) The slow feedback run of 19.11. (573756 hit the 2,100 s cap;
  * 562428 took 10.7 minutes where it took 1.2 on 15.11.) was the machine and no
@@ -1198,32 +1407,69 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * reading. (7) A lane's own engine run in both speed modes catches what the
  * merge would show late (two rows of lane C); a topbar row read 0.576 px
  * against its 0.5 px tolerance once in CI, the button's hover lift was the
- * cause, and the spec now waits for transform: none (6055d200).
+ * cause, and the spec now waits for transform: none (6055d200). (8) A claim
+ * that a scene reads right is checked in the app, not in a diagnosis tree:
+ * the probe of Lines by value (LN-1) read 655336 turn 24 from the cached
+ * Smogon files and called it fixed, the tester's browser read Roost twice with
+ * the live files, and the cause was the data (the live stats file held 22,293
+ * battles against 21,976 and other sets for five species); the second probe
+ * pinned the live data and showed that the scene needs a deeper search of the
+ * line's later steps, which is #200. A gate that promises a scene names the
+ * data it was read with. (9) The tier census counts grades, not expert pins:
+ * the engine change set moved 21 turns and 17 grades and no pin's tier, and
+ * the one pin whose drift text changed (562428 t10) moved no tier; the pins
+ * are read from their own table (corpus.ts), the census says where to look.
+ * The cards that a prose change moves are read by rendering every card of the
+ * corpus (gate/ft-cards-read.md found four cards the builder had not
+ * announced). (10) CI is the second machine for whole suites: from 17.11.
+ * devbox ran 7 to 10 times slower on page faults, so the feedback runs, the
+ * engine suite in both speed modes and the full sweeps run on runners, and the
+ * first CI run of the engine change set found the two engine rows and the
+ * play-out pin that no local spec file had reached. A change set that touches
+ * the leaves of the search gets its CI run before its lane ends.
  *
- * RESTS: approved for 1.2.1 (milestone created, issue #157 is the comment rule
- * and clean-up with its own pull request after the release): Fake Out only on
- * the first turn (a line's Fake Out against a foe on the field since turn 4),
- * items that announce themselves (Throat Spray and kin, hit-triggered
- * berries), replay-core's default ability reading the format's ban list, the
- * pair plan dividing its missing mass by the coverage it reached, a probe of
- * the 90 % accuracy delay, the delay facts for future attacks (Future Sight,
- * Doom Desire from Gen 5), the Protective Pads tell (Rocky Helmet and the
- * silent contact punishers), the bench filter by name in makeSwitches. Open
- * for 1.3.0: #141 Illusion in the rebuild, #142 Struggle as evidence, #147 a
- * hint when a pasted set lacks a logged move, #151 a census of speed ties,
- * #152 National Dex usage and sets files, #154 Champions Reg M-B
- * (registration, then the resolver's answer), #155 split pricing, #156 slot
- * read with one body per side, more draws for the graded side with a cost
- * measurement first, Hard mode's three rests, the use of the engine's leads, a
- * tidy workspace, and the testers' text and layout list. Upstream list:
- * @pkmn/client 0.7.4 never charges Pressure's extra PP, the Pledge from-move
- * booking (#134), the Mega-Z formes without battleOnly (#95). #125 steps 4 to
- * 6 (folding about 130 small files, about 320 s) wait for files that lanes P
- * and Q moved; #57's coverage run over the bank's quick tier did not run. The
- * worktrees w89a to w89h and the clone m89 go after the merge, on the user's
- * okay.
- * BOOK-GAP: issue numbers of the 1.2.1 and 1.3.0 proposals that are not issues
- * yet, the pull request number, the closing of #125's remaining steps.
+ * RESTS: milestone 1.2.1 (small, as the user asked on 17.11.): #157 the
+ * comment rule and clean-up with its own pull request after the release and
+ * before any 1.2.1 lane opens; #158 Fake Out and the other first-turn moves
+ * leave the options after the first turn; #159 the replay build's default
+ * ability reads the format's ban list; #160 the pair plan divides by its
+ * coverage; #161 a probe of the delay reading at 90 % accuracy or less; #163
+ * the delay facts for Future Sight and Doom Desire (Gen 5 and later); #164 the
+ * Protective Pads tell (Rocky Helmet and the silent contact punishers); #165
+ * the bench filter by name in makeSwitches; #175 items that announce
+ * themselves; #195 a doubles slot that fell before it acted still gets a
+ * played move; #198 "(only choice)" in Lines; #199 Tera "Auto" in a new game
+ * follows the format; #200 the winner's line from the proof and how the loser
+ * could still win (moved from 1.3.0, the answer for 655336 turn 24; #162 closes
+ * with this round). Approved on 21.11. whose issues the integrator writes after
+ * a review: an evaluation of a faster forced-replacement search (1.2.1), five
+ * small text fixes from the second tester pass (1.2.1: the random-target note
+ * under Tera Starstorm, the New game wording, "Re-analyze" on a game never
+ * analyzed, the inaccuracy size off by one point, and the row title "at least
+ * 65 %" against the matrix cell 62 %, cause first; its Fake Out step belongs
+ * to #158), and the refit of the Doubles OU boosts weight (1.3.0). Milestone
+ * 1.3.0: #141 Illusion in the rebuild, #142 Struggle as evidence, #147 a hint
+ * for a pasted set that lacks a logged move, #151 a census of speed ties, #152
+ * National Dex usage and sets files, #155 split pricing, #156 slot read with
+ * one body per side, #166 use the engine's leads, #167 tidy the workspace, #168
+ * keep the open variation across a reload, #169 one display-name function,
+ * #170 a sweep of rule lines, #171 fold small test files (the steps 4 to 6 of
+ * #125, about 130 files, about 320 s), #172 shard the engine suite, #173 the
+ * code-structure rests of #57, #176 the testers' text and layout list, #177
+ * more draws for the graded side with a cost measurement first, #178 to #187
+ * (rests of the prover, the solver, the dice panel, the inference and the
+ * effect-state key), #188 the rests of
+ * "Opponent reads my move" including its button per line, #201 pricing the
+ * unused Tera. #154 (Champions Reg M-B: registration, then the resolver's
+ * answer) is approved as one larger bug for 1.3.0 and still carries no
+ * milestone. Without milestone: #189 and #134 and #95 (upstream list:
+ * @pkmn/client 0.7.4 charges no extra PP for Pressure, the Pledge from-move,
+ * the Mega-Z formes without battleOnly), #190 and #191 (triage), #192 to #194
+ * (parked). #57 and #125 close with this round: the dead-code deletions and the
+ * three split sweeps (23,970 rows kept) are built, and their rests are #171,
+ * #172, #173 and #191. Known drift: #86 (562428 t10 and t12), #87, #88 (the
+ * t56 play-out pin now reads ten switches). The worktrees w89a to w89h and the
+ * clone m89 go after the merge, on the user's okay.
  *
  * ROUND 88 2026-11-07 to 2026-11-08 (improvement round 88, the wave of
  * 1.1.1: 17 planned issues, five more that joined during the wave (#101,
