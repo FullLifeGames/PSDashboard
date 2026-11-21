@@ -143,6 +143,36 @@ function heaviestCell(node: Node, min: number): { key: number; child: Node } | n
   return best && bestVisits >= min ? { key: bestKey, child: best } : null;
 }
 
+/**
+ * Round 89 (LN-2, #104): the option a side plays at a node when a line reads it by value: the best mean (p1's view for both sides: p1
+ * the highest, p2 the lowest) among the options with `min` visits and a quarter of the node's most visited option; ties go to the more
+ * visited option, then to the hint order. -1 when no option qualifies.
+ */
+function bestOption(n: number[], w: number[], order: number[], maximize: boolean, min: number): number {
+  const most = Math.max(0, ...n);
+  let best = -1;
+  for (const index of order) {
+    if (n[index] < min || n[index] * 4 < most) continue;
+    if (best < 0) { best = index; continue; }
+    const diff = (w[index] / n[index] - w[best] / n[best]) * (maximize ? 1 : -1);
+    if (diff > 0 || (diff === 0 && n[index] > n[best])) best = index;
+  }
+  return best;
+}
+
+/**
+ * Round 89 (LN-2, #104): the step of a line at a node read by value: the joint cell of each side's best option (`bestOption`) when that
+ * cell holds `min` visits, else the node's heaviest cell. The decoupled search spreads a node's visits over near-equal options, so the
+ * most visited cell can belong to an option that is worse by its own mean (655336 turn 25: Roost drew more visits than Dragon Claw).
+ */
+function valueCell(node: Node, min: number): { key: number; child: Node } | null {
+  const i = bestOption(node.p1N, node.p1W, node.p1Order, true, min);
+  const j = bestOption(node.p2N, node.p2W, node.p2Order, false, min);
+  const key = i < 0 || j < 0 ? -1 : cellKey(i, j);
+  const child = node.children.get(key);
+  return child && child.visits >= min ? { key, child } : heaviestCell(node, min);
+}
+
 const hasChoices = (node: Node): boolean => !node.ended && node.p1Options.length > 0 && node.p2Options.length > 0;
 
 const stepAt = (node: Node, key: number, child: Node): TreeLineStep => ({
@@ -153,9 +183,10 @@ const stepAt = (node: Node, key: number, child: Node): TreeLineStep => ({
  * Round 89 (#104): the line the tree holds from one cell of `root` on: the cell itself, then each node's most visited cell while it has
  * `min` visits (the principal variation's 8 unless a caller asks for the lines' own), at most `PV_MAX_STEPS` steps in all. Each step names both sides' choices by label (the labels survive the
  * bench order, the choice strings below the root do not translate) and the visits of its cell. Without a first cell the line starts
- * at `root`'s own most visited cell, the principal variation.
+ * at `root`'s own most visited cell, the principal variation. Round 89 (LN-2): `byValue` reads each later node by its options' means
+ * (`valueCell`) instead of its most visited cell; the rows' lines ask for it, the principal variation and the line pass do not.
  */
-export function lineFrom(root: Node, first?: number, min: number = PV_MIN_VISITS): TreeLineStep[] {
+export function lineFrom(root: Node, first?: number, min: number = PV_MIN_VISITS, byValue = false): TreeLineStep[] {
   const steps: TreeLineStep[] = [];
   let current: Node = root;
   let pick: { key: number; child: Node } | null = null;
@@ -166,7 +197,7 @@ export function lineFrom(root: Node, first?: number, min: number = PV_MIN_VISITS
   }
   for (let step = 0; step < PV_MAX_STEPS; step++) {
     if (!hasChoices(current)) break;
-    pick ??= heaviestCell(current, min);
+    pick ??= byValue ? valueCell(current, min) : heaviestCell(current, min);
     if (!pick) break;
     steps.push(stepAt(current, pick.key, pick.child));
     current = pick.child;
@@ -216,7 +247,7 @@ function sideCells(root: Node, against: Record<Side, number[]>, min: number): Re
  * cell the row already holds a line from. Empty when the first cell gives no line.
  */
 function linesOfRow(root: Node, first: RowCell, byColumn: Map<number, RowCell> | undefined, lower: number[], min: number): TreeLineStep[][] {
-  const head = lineFrom(root, first.key, min);
+  const head = lineFrom(root, first.key, min, true);
   if (head.length === 0) return [];
   const lines = [head];
   const taken = new Set([first.key]);
@@ -224,7 +255,7 @@ function linesOfRow(root: Node, first: RowCell, byColumn: Map<number, RowCell> |
     const cell = column < 0 ? undefined : byColumn?.get(column);
     if (!cell || cell.visits < min || taken.has(cell.key)) continue;
     taken.add(cell.key);
-    const line = lineFrom(root, cell.key, min);
+    const line = lineFrom(root, cell.key, min, true);
     if (line.length > 0) lines.push(line);
   }
   return lines;
@@ -271,7 +302,7 @@ function withFloorLines(root: Node, out: RowLines, cells: Record<Side, SideCells
       const row = own.findIndex(option => option.label === label);
       const column = against.findIndex(option => option.label === answer);
       const cell = row < 0 || column < 0 ? undefined : cells[side].byColumn.get(row)?.get(column);
-      const line = cell && cell.visits >= min ? lineFrom(root, cell.key, min) : [];
+      const line = cell && cell.visits >= min ? lineFrom(root, cell.key, min, true) : [];
       if (line.length > 0) {
         floor[side][label] = line;
         kept = true;
