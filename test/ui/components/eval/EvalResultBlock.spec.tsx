@@ -41,7 +41,7 @@ describe('EvalResultBlock', () => {
     expect(onPickChoice).toHaveBeenCalledWith('p1', result.perSide.p1[1], result.perSide.p2[0], result);
     await userEvent.click(screen.getByRole('button', { name: /Body Press/ }));
     expect(onPickChoice).toHaveBeenLastCalledWith('p2', result.perSide.p2[1], result.perSide.p1[0], result);
-    expect(screen.getByRole('button', { name: /Earthquake/ })).toHaveAttribute('title', expect.stringContaining('Click to play this turn out'));
+    expect(screen.getByRole('button', { name: /Earthquake/ })).toHaveAttribute('title', expect.stringContaining('Play this turn in a variation; the opponent plays its top choice.'));
     expect(screen.getByText('depth 1')).toBeInTheDocument();
 
     rerender(<EvalResultBlock {...shared} status="stale" />);
@@ -49,6 +49,19 @@ describe('EvalResultBlock', () => {
     expect(document.querySelector('.ps-eval-stale')).not.toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Matrix' }));
     expect(screen.getByTitle(/^Earthquake × Leech Seed:/).tagName).toBe('TD');
+  });
+
+  // Round 89 (#153, HM-2): the ranked rows are an engine-move click target too; their title ends with the sentence of the other targets.
+  test.each([['singles'], ['doubles']] as const)('the ranked rows (%s) name the reply the opponent plays, by the Setup setting; a result with no handler has no click sentence', kind => {
+    const shared = { result: evalResult(kind), playerNames: names, status: 'done' as const, onPickChoice: vi.fn() };
+    const titles = () => [...document.querySelectorAll('button.ps-eval-choice')].map(button => button.getAttribute('title') ?? '');
+    const { rerender } = render(<EvalResultBlock {...shared} />);
+    expect(titles().length).toBeGreaterThan(0);
+    for (const title of titles()) expect(title).toMatch(/Win probability .* Play this turn in a variation; the opponent plays its top choice\.$/);
+    rerender(<EvalResultBlock {...shared} opponentReads />);
+    for (const title of titles()) expect(title).toMatch(/Win probability .* Play this turn in a variation; the opponent reads your move and plays the reply the search rates lowest for it\.$/);
+    rerender(<EvalResultBlock {...shared} onPickChoice={undefined} opponentReads />);
+    for (const row of document.querySelectorAll('.ps-eval-choice')) expect(row.getAttribute('title')).not.toMatch(/Play this turn/);
   });
 
   test('a wide interval flags a toss-up; MCTS provenance and the follow-up line render; no matrix, no matrix button', () => {

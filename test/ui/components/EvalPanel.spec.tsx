@@ -41,6 +41,15 @@ describe('EvalPanel', () => {
     expect(wired.onPrefsChange).toHaveBeenCalledWith({ ...prefs, mode: 'matrix', depth: 2 });
   });
 
+  // Round 89 (#153, HM-2): the panel hands the stored `hardMode` preference to its ranked rows' titles.
+  test.each([['singles'], ['doubles']] as const)('the ranked rows (%s) name the reply by the hardMode preference', kind => {
+    const wired = props({ status: 'done', result: evalResult(kind), onPickChoice: vi.fn() });
+    const { rerender } = render(<EvalPanel {...wired} />);
+    expect(document.querySelector('button.ps-eval-choice')).toHaveAttribute('title', expect.stringContaining('the opponent plays its top choice.'));
+    rerender(<EvalPanel {...wired} prefs={{ ...prefs, hardMode: true }} />);
+    expect(document.querySelector('button.ps-eval-choice')).toHaveAttribute('title', expect.stringContaining('the opponent reads your move and plays the reply'));
+  });
+
   // Round 77 (C7): Evaluate at a finished variation showed a 100 % bar and an empty line list. The panel says who won,
   // as the branch panel does; the end of a game reads the same in singles and doubles.
   test('at a finished variation the panel names the winner instead of a bar and empty lines, and offers no Evaluate', () => {
