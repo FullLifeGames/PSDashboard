@@ -87,6 +87,11 @@ test.describe('PS Dashboard', () => {
     // turn-56 switch into Slowking included (every other turn-57 choice wins by
     // turn 66). The pin keeps the core: p2 wins by turn 75 with at most six
     // switches.
+    // Round 89 (user gate 21.11.): a stat drop no longer counts while its holder can switch it away (#196), and the forced
+    // replacement searches the turn after it (#197). P2 now alternates Slowking and Heatran while Mienshao stays locked
+    // into Knock Off. Over 16 arrival dice in Node (probe docs/perf/probes/2026-11-09-r89/lanes/M/sb5) p2 wins 15 of 16,
+    // with 5.63 switches on average (range 2 to 10); the CI run plays nine switches and wins at turn 71. The bound moves
+    // from six to ten switches; the turn bound stays at 75.
     // Nicknames in the history rows: Sludge Shadow = Muk-Alola, Fire Shadow = Heatran.
     test.setTimeout(600_000);
     const draftReplay = JSON.parse(readFileSync(fixturePath('draft-replay.json'), 'utf-8'));
@@ -129,7 +134,7 @@ test.describe('PS Dashboard', () => {
     await page.getByRole('button', { name: 'End of the variation: the game is over here' }).click();
     await expect(page.locator('.ps-branch-ended'), line).toContainText('Bene wins this variation.');
     expect(lastTurn, line).toBeLessThanOrEqual(75);
-    expect(p2Switches.length, line).toBeLessThanOrEqual(6);
+    expect(p2Switches.length, line).toBeLessThanOrEqual(10);
   });
 
   test('the branch sim iframe follows the played variation line', async ({ page }) => {
