@@ -1,0 +1,9 @@
+{
+  "name": "r89-sb1-hold-vgc2",
+  "jobs": 16,
+  "slicesPerJob": 4,
+  "env": {
+    "EVAL_CALIBRATION_SOURCE": "holdout",
+    "EVAL_CALIBRATION_TRANCHE": "holdout-vgc2"
+  }
+}
