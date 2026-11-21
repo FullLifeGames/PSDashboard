@@ -96,6 +96,7 @@ for (const width of [390, 640]) {
     expect(boxes.panel.right, `the panel's right edge ${message}`).toBeLessThanOrEqual(boxes.width);
     expect(boxes.panel.top, `the panel hangs under the button ${message}`).toBeGreaterThanOrEqual(boxes.button.bottom);
     await expect(panel.getByRole('checkbox', { name: 'Animate branch turns' })).toBeVisible();
+    await expect(panel.getByRole('checkbox', { name: 'Opponent reads my move' })).toBeVisible();
     await expect(panel.getByLabel('Size')).toBeVisible();
     for (const name of ['Edit Player', 'Edit Opp', 'Import/Export Sets']) await expect(panel.getByRole('button', { name, exact: true })).toBeVisible();
     for (const control of await panel.locator('input, select, button').all()) {

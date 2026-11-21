@@ -194,6 +194,26 @@ describe('the states of a position', () => {
     expect(screen.getByRole('status')).toHaveTextContent('The battle ended in a tie. Go back a turn to play it another way.');
   });
 
+  // Round 89 (#153, HM-2, ruling 45 HM3a): while the Setup setting is on, the strip opens with the note and a button that turns it off.
+  test.each([['singles'], ['doubles']] as const)('the strip names the setting while "Opponent reads my move" is on, with a button that turns it off (%s)', async kind => {
+    const onOpponentReadsChange = vi.fn();
+    const { rerender } = render(<TurnDock {...props({ simState: simState(kind), source: 'stored' })} />);
+    expect(screen.queryByText('Opponent reads your move')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Turn off' })).toBeNull();
+    rerender(<TurnDock {...props({ simState: simState(kind), source: 'stored', opponentReads: true, onOpponentReadsChange })} />);
+    const note = screen.getByText('Opponent reads your move');
+    expect(note).toHaveClass('ps-dock-source');
+    expect(note).toHaveAttribute('title', 'The opponent\'s engine picks answer yours with the reply the search rates lowest for your pick. Setup ▾ holds this setting.');
+    const strip = note.closest('.ps-dock-status') as HTMLElement;
+    expect(strip.firstElementChild).toBe(note);
+    expect(note.nextElementSibling).toBe(screen.getByRole('button', { name: 'Turn off' }));
+    expect(screen.getByRole('button', { name: 'Turn off' })).toHaveClass('ps-btn');
+    expect(strip).toHaveTextContent(/^Opponent reads your moveTurn offChoices from the reconstructed position$/);
+    await userEvent.click(screen.getByRole('button', { name: 'Turn off' }));
+    expect(onOpponentReadsChange).toHaveBeenCalledWith(false);
+    expect(document.querySelectorAll('.ps-dock-chip')).toHaveLength(kind === 'doubles' ? 4 : 2);
+  });
+
   test('a game\'s dock speaks of the game, not of a replay (H4h)', () => {
     const { rerender } = render(<TurnDock {...props({ source: 'stored', isGame: true })} />);
     expect(screen.getByText('Choices from the game\'s position')).toBeInTheDocument();

@@ -176,3 +176,8 @@ export function regretView(name: string, side: SideAnalysis, regret: number): { 
         `(regret ${regret.toFixed(2)} on the score scale from −1 to 1).`,
     };
 }
+
+/** Round 89 (#153, HM-2): what a click on an engine move does to the other side, by the Setup setting "Opponent reads my move". */
+export const exploreTitle = (opponentReads = false): string => opponentReads
+  ? 'Play this turn in a variation; the opponent reads your move and plays the reply the search rates lowest for it.'
+  : 'Play this turn in a variation; the opponent plays its top choice.';

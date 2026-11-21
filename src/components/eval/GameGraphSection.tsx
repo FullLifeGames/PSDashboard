@@ -107,9 +107,11 @@ interface TurnViewProps {
   doubles?: boolean;
   /** Round 89 (#105): the open tip of a new game (nobody has played it yet), else null or absent. */
   openTurn?: number | null;
+  /** Round 89 (#153, HM-2): the Setup setting "Opponent reads my move" is on: the card's engine-move buttons say so in their titles. */
+  opponentReads?: boolean;
 }
 
-function TurnView({ report, onBackToReport, onBackToMain, result, currentTurn, graph, analyzeTurn, hasAnalyzeTurn, leadAnalysis, analysis, playerNames, reads, onPickChoice, onPickPair, linesHost, doubles, openTurn }: TurnViewProps) {
+function TurnView({ report, onBackToReport, onBackToMain, result, currentTurn, graph, analyzeTurn, hasAnalyzeTurn, leadAnalysis, analysis, playerNames, reads, onPickChoice, onPickPair, linesHost, doubles, openTurn, opponentReads }: TurnViewProps) {
   return (
     <>
       {report && (
@@ -153,7 +155,7 @@ function TurnView({ report, onBackToReport, onBackToMain, result, currentTurn, g
         <EvalTurnAnalysis
           analysis={analysis} playerNames={playerNames} reads={reads} onExplore={onPickChoice} onPickPair={onPickPair}
           result={graph.results[analysis.turn - 1] ?? null} linesHost={linesHost} doubles={doubles}
-          open={analysis.turn === openTurn}
+          open={analysis.turn === openTurn} opponentReads={opponentReads}
         />
       )}
     </>
@@ -279,7 +281,7 @@ export function GameGraphSection(props: GameGraphSectionProps) {
         </div>
       )}
       {showReportView && report && <ReportOverview {...props} report={report} />}
-      {!showReportView && <TurnView {...props} />}
+      {!showReportView && <TurnView {...props} opponentReads={!!prefs.hardMode} />}
     </div>
   );
 }

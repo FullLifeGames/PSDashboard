@@ -15,7 +15,15 @@ describe('ExplorableLabel', () => {
     rerender(<ExplorableLabel label="Earthquake" onClick={onClick} />);
     await userEvent.click(screen.getByRole('button', { name: 'Earthquake ↗' }));
     expect(onClick).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole('button')).toHaveAttribute('title', 'Play this line out in a branch');
+    expect(screen.getByRole('button')).toHaveAttribute('title', 'Play this turn in a variation; the opponent plays its top choice.');
+  });
+
+  // Round 89 (#153, HM-2): the title names which reply the opponent gives, by the Setup setting.
+  test('the title says which reply the opponent plays, off and on', () => {
+    const { rerender } = render(<ExplorableLabel label="Earthquake" onClick={vi.fn()} opponentReads={false} />);
+    expect(screen.getByRole('button')).toHaveAttribute('title', 'Play this turn in a variation; the opponent plays its top choice.');
+    rerender(<ExplorableLabel label="Earthquake" onClick={vi.fn()} opponentReads />);
+    expect(screen.getByRole('button')).toHaveAttribute('title', 'Play this turn in a variation; the opponent reads your move and plays the reply the search rates lowest for it.');
   });
 });
 
@@ -41,6 +49,15 @@ describe('EngineRow', () => {
     expect(screen.getByText('then Flare Blitz · Protect')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /Fake Out/ }));
     expect(onExplore).toHaveBeenCalledWith(best);
+  });
+
+  // Round 89 (#153, HM-2): the untracked row (a doubles card) names the reply too.
+  test('the explore title follows the Setup setting', () => {
+    const best = rankedChoice('move fakeout 1, move spore 2', 'Fake Out → Rillaboom + Spore → Tornadus', 0.3);
+    const { rerender } = render(<EngineRow name="Alice" side={sideAnalysis({ best, played: null })} onExplore={vi.fn()} />);
+    expect(screen.getByRole('button', { name: /Fake Out/ })).toHaveAttribute('title', 'Play this turn in a variation; the opponent plays its top choice.');
+    rerender(<EngineRow name="Alice" side={sideAnalysis({ best, played: null })} onExplore={vi.fn()} opponentReads />);
+    expect(screen.getByRole('button', { name: /Fake Out/ })).toHaveAttribute('title', 'Play this turn in a variation; the opponent reads your move and plays the reply the search rates lowest for it.');
   });
 
   test('a follow-up through a forced-switch node shows the replacement alone, never the waiting placeholder', () => {

@@ -22,6 +22,18 @@ describe('EvalTurnAnalysis', () => {
     expect(screen.getByText(`mistake · ${winDeltaText(-0.25)}`)).toBeInTheDocument();
   });
 
+  // Round 89 (#153, HM-2): the setting reaches the engine-move buttons of every card shape: tracked rows (singles), untracked rows (doubles) and the open tip.
+  test.each([['a tracked card', {}, false], ['an untracked card (doubles)', { playedTracking: false }, false], ['an open tip', {}, true]] as const)(
+    '%s names the reply in its engine-move titles, off and on', (_name, extra, open) => {
+      const analysis = turnAnalysis(4, { ...extra, p1: sideAnalysis(open ? { played: null, regret: null } : {}), p2: sideAnalysis(open ? { played: null, regret: null } : {}) });
+      const titles = () => screen.getAllByRole('button', { name: /↗/ }).map(button => button.getAttribute('title'));
+      const { rerender } = render(<EvalTurnAnalysis analysis={analysis} playerNames={names} onExplore={vi.fn()} open={open} />);
+      expect(titles().length).toBeGreaterThan(0);
+      expect(new Set(titles())).toEqual(new Set(['Play this turn in a variation; the opponent plays its top choice.']));
+      rerender(<EvalTurnAnalysis analysis={analysis} playerNames={names} onExplore={vi.fn()} open={open} opponentReads />);
+      expect(new Set(titles())).toEqual(new Set(['Play this turn in a variation; the opponent reads your move and plays the reply the search rates lowest for it.']));
+    });
+
   test.each([['singles', {}], ['doubles', { playedSlots: [null, null] }]] as const)('the open turn of a game, %s, reads as an open position: the engine lines, no played choice, no verdict (H4h)', (_kind, slots) => {
     const open = { playedRaw: undefined, played: null, regret: null, ...slots };
     const analysis = turnAnalysis(4, { attribution: 'unclear', swing: null, scoreAfter: null, playedOutcome: null, decisionDelta: null, chanceDelta: null, p1: sideAnalysis(open), p2: sideAnalysis(open) });

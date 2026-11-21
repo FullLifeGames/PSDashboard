@@ -13,6 +13,8 @@ interface RowProps {
   onExplore?: (choice: RankedChoice) => void;
   /** Round 67 (T59): the side lost ground on the turn (lostGround): its paid-off read shows no praise chip. */
   lostGround?: boolean;
+  /** Round 89 (#153, HM-2): the Setup setting is on: the engine-move buttons say the opponent reads the move. */
+  opponentReads?: boolean;
 }
 
 function PlayedCell({ name, side }: Pick<RowProps, 'name' | 'side'>) {
@@ -42,7 +44,7 @@ function PlayedCell({ name, side }: Pick<RowProps, 'name' | 'side'>) {
 }
 
 /** The engine's line next to the played one: agreement, a better line, or the line when nothing was played. */
-function EngineCell({ name, side, regretful, onExplore }: RowProps & { regretful: boolean }) {
+function EngineCell({ name, side, regretful, onExplore, opponentReads }: RowProps & { regretful: boolean }) {
   const engine = engineChoice(side);
   if (!side.best || !engine) return null;
   const best = side.best;
@@ -51,18 +53,18 @@ function EngineCell({ name, side, regretful, onExplore }: RowProps & { regretful
   if (!side.played || side.neverActed) {
     return (
       <span style={{ color: '#778' }} title={evTitle(name)}>
-        engine: <ExplorableLabel label={engine.label} color="#778" onClick={explore} />
+        engine: <ExplorableLabel label={engine.label} color="#778" onClick={explore} opponentReads={opponentReads} />
         {' '}({winPctText(engine.value, side.faintedFraction)})
       </span>
     );
   }
   if (regretful) return null;
   if (side.played.choice === best.choice) {
-    return <ExplorableLabel label="✓ the engine's move" color="#8c8" onClick={explore} />;
+    return <ExplorableLabel label="✓ the engine's move" color="#8c8" onClick={explore} opponentReads={opponentReads} />;
   }
   return (
     <span style={{ color: '#778' }} title={evTitle(name)}>
-      engine: <ExplorableLabel label={engine.label} color="#778" onClick={explore} />
+      engine: <ExplorableLabel label={engine.label} color="#778" onClick={explore} opponentReads={opponentReads} />
       {' '}({winPctText(engine.value, side.faintedFraction)})
       {best.ev - side.played.ev < ENGINE_EQUIVALENT_EPSILON && (
         <span title="The win-probability gap is inside noise: the engine considers both picks equally good."> · equivalent</span>
@@ -181,7 +183,7 @@ function VerdictCell({ name, side, regretful, setupMove, lostGround }: Pick<RowP
 }
 
 /** The played line against its reference (safe line or ev-best) with the difference, for regretful rows. */
-function ComparisonRows({ name, side, played, best, difference, onExplore }: Pick<RowProps, 'name' | 'side'> & {
+function ComparisonRows({ name, side, played, best, difference, onExplore, opponentReads }: Pick<RowProps, 'name' | 'side' | 'opponentReads'> & {
   played: RankedChoice;
   best: RankedChoice;
   difference: string | null;
@@ -207,6 +209,7 @@ function ComparisonRows({ name, side, played, best, difference, onExplore }: Pic
           <ExplorableLabel
             label={target.label}
             onClick={onExplore && (() => onExplore(target))}
+            opponentReads={opponentReads}
           />
         )}
         {!swapped && target.punishedBy && <span style={{ color: '#778' }}>· worst vs {target.punishedBy}</span>}
@@ -240,7 +243,7 @@ function HindsightRow({ line }: { line: string }) {
 }
 
 /** One tracked side of an analyzed turn: what it played, the engine's line, the verdict, and the comparison. */
-export function SideRow({ name, side, onExplore, lostGround }: RowProps) {
+export function SideRow({ name, side, onExplore, lostGround, opponentReads }: RowProps) {
   const regretful = side.tier === 'mistake' || side.tier === 'blunder';
   const setupMove = playedSetupMove(side);
   const difference = regretful && side.played && side.best ? diffChoices(side.played, side.best) : null;
@@ -250,11 +253,11 @@ export function SideRow({ name, side, onExplore, lostGround }: RowProps) {
       <div className="ps-eval-analysis-row">
         <span style={{ color: '#cde', fontWeight: 'bold' }}>{name}</span>
         <PlayedCell name={name} side={side} />
-        <EngineCell name={name} side={side} regretful={regretful} onExplore={onExplore} />
+        <EngineCell name={name} side={side} regretful={regretful} onExplore={onExplore} opponentReads={opponentReads} />
         <VerdictCell name={name} side={side} regretful={regretful} setupMove={setupMove} lostGround={lostGround} />
       </div>
       {regretful && side.played && side.best && (
-        <ComparisonRows name={name} side={side} played={side.played} best={side.best} difference={difference} onExplore={onExplore} />
+        <ComparisonRows name={name} side={side} played={side.played} best={side.best} difference={difference} onExplore={onExplore} opponentReads={opponentReads} />
       )}
       {side.hindsightRead?.shown && side.hindsightRead.line && <HindsightRow line={side.hindsightRead.line} />}
     </div>

@@ -19,6 +19,16 @@ describe('SideRow', () => {
     expect(screen.queryByText('difference:')).toBeNull();
   });
 
+  // Round 89 (#153, HM-2): the engine-move buttons of a row (the tick, the engine's line, the better line) carry the title of the Setup setting.
+  test.each([[false, 'Play this turn in a variation; the opponent plays its top choice.'],
+    [true, 'Play this turn in a variation; the opponent reads your move and plays the reply the search rates lowest for it.']])(
+    'the engine-move titles follow the setting (opponentReads %s)', (opponentReads, title) => {
+      const { rerender } = render(<SideRow name="Alice" side={sideAnalysis()} onExplore={vi.fn()} opponentReads={opponentReads} />);
+      expect(screen.getByRole('button', { name: '✓ the engine\'s move ↗' })).toHaveAttribute('title', title);
+      rerender(<SideRow name="Alice" side={misplayedSide()} onExplore={vi.fn()} opponentReads={opponentReads} />);
+      expect(screen.getByRole('button', { name: 'Earthquake ↗' })).toHaveAttribute('title', title);
+    });
+
   test('a mistake: the regret chip, the played line against the engine line, and their difference', async () => {
     const onExplore = vi.fn();
     const side = misplayedSide();

@@ -28,6 +28,8 @@
 .ps-dock-status:empty { display: none; }
 .ps-dock-status .ps-force-switch-note { margin: 0; padding: 2px 8px; font-size: 10px; }
 .ps-dock-status .ps-choice-error { margin: 0; flex: 1 0 100%; }
+/* Round 89 (#153, HM-2): the note "Opponent reads your move" and its "Turn off" button, the size of the Open matrix button; they wrap with the strip and never push the chips. */
+.ps-dock-status .ps-dock-turn-off { padding: 0 6px; font-size: 10px; line-height: 1.5; }
 
 .ps-dock-anchor { position: relative; }
 
