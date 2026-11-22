@@ -3,7 +3,9 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { test, expect, type Locator, type Page } from '@playwright/test';
 import type { ReplayData } from '@fulllifegames/replay-core';
-import { installReplayEmbedCache, routeOfflineFixtures } from './helpers';
+import { evalStoreFileName } from './eval-store';
+import { openReplayAnalysis } from './eval-store-seed';
+import { installReplayEmbedCache } from './helpers';
 import { openVariationHistory, variationPanel } from './dock-helpers';
 
 /**
@@ -11,6 +13,10 @@ import { openVariationHistory, variationPanel } from './dock-helpers';
  * (the panel's own "Analyze this position"), the section shows its lines, and the click on ▶ Play opens a variation that plays the
  * line's turns with the line's dice: the history lists the line's turns, and the forced dice it marks are the dice the tooltip of
  * the button lists (the chips are the shown ones among them). Singles, Doubles OU, VGC, Champions OU and Champions VGC.
+ *
+ * Round 90 (#222), step E3: the row judges the Lines section and the click, not the search, so "Analyze this position" reads the saved
+ * result of the turn (the capture analyzed the candidate turns, scripts/capture-eval-store.mjs; `EVAL_STORE=live` runs the row live).
+ * The variation ▶ Play opens is a new position: its own evaluation runs live, and the guard stands down from the click.
  */
 const here = dirname(fileURLToPath(import.meta.url));
 const fixture = (name: string) =>
@@ -18,30 +24,14 @@ const fixture = (name: string) =>
 
 test.beforeAll(installReplayEmbedCache);
 
+const SETTINGS = { mode: 'mcts', depth: 1, samples: 1 };
 const GAMES = [
   { kind: 'singles (Gen 6 OU)', id: 'smogtours-gen6ou-655336', turns: [8, 12] },
   { kind: 'Doubles OU', id: 'smogtours-gen9doublesou-912884', turns: [5, 8, 11] },
   { kind: 'VGC (Scarlet/Violet)', id: 'gen9vgc2026regi-2630452654', turns: [4, 6] },
   { kind: 'Champions OU', id: 'gen9championsou-2691703002', turns: [8, 12] },
   { kind: 'Champions VGC', id: 'gen9championsvgc2026regma-2625939941', turns: [3, 5] },
-];
-
-async function loadReplay(page: Page, replay: ReplayData) {
-  await routeOfflineFixtures(page);
-  await page.goto('/');
-  await page.evaluate(() => {
-    localStorage.setItem('ps-replay-interceptor:eval-pool', '2');
-    localStorage.setItem('ps-replay-interceptor:eval-prefs', JSON.stringify({ depth: 1, samples: 1, mode: 'mcts', auto: false, tera: 'auto' }));
-  });
-  await page.reload();
-  // Registered last, so it answers before routeOfflineFixtures' default replay.
-  await page.route('**/replay.pokemonshowdown.com/**', route => route.fulfill({
-    status: 200, contentType: 'application/json', body: JSON.stringify(replay),
-  }));
-  await page.locator('input[type="text"]').first().fill(replay.id);
-  await page.locator('button', { hasText: 'Load' }).click();
-  await expect(page.getByText(replay.players[0], { exact: true }).first()).toBeVisible({ timeout: 30_000 });
-}
+].map(game => ({ ...game, seed: evalStoreFileName(game.id, SETTINGS, game.turns) }));
 
 /** What a block of the Lines section shows, read from the page. */
 async function readBlock(block: Locator) {
@@ -93,7 +83,7 @@ for (const game of GAMES) {
   test(`${game.kind}: ▶ Play plays the line's turns and dice`, async ({ page }) => {
     test.setTimeout(900_000);
     const replay = fixture(game.id);
-    await loadReplay(page, replay);
+    const { guard } = await openReplayAnalysis(page, replay, SETTINGS, { seed: game.seed });
     const panel = page.locator('.ps-main-right .ps-eval-panel');
     const slider = page.locator('input[type="range"]');
     let block: Locator | null = null;
@@ -109,7 +99,7 @@ for (const game of GAMES) {
       await analyze.click();
       // the graph names the turn's result once the search has finished (the turn's own view may have closed by then, see below)
       const produced = panel.locator('svg title').filter({ hasText: new RegExp(`\\(what turn ${candidate} produced\\)`) });
-      await expect(produced.or(panel.locator('.ps-eval-analysis').filter({ hasText: `Turn ${candidate}` })).first()).toBeAttached({ timeout: 400_000 });
+      await guard.race(expect(produced.or(panel.locator('.ps-eval-analysis').filter({ hasText: `Turn ${candidate}` })).first()).toBeAttached({ timeout: 400_000 }));
       await settleOnTurn(page, panel, candidate);
       await openLines(panel);
       turn = candidate;
@@ -129,9 +119,12 @@ for (const game of GAMES) {
     // the last candidate may hold a one-turn line: the click is still tested on it
     expect(block, 'a turn of the game holds a line').not.toBeNull();
     expect(longest, 'the line has a step').toBeGreaterThanOrEqual(1);
+    console.log(`${game.id}: the longest line of turn ${turn} has ${longest} steps${guard.requests().length ? `; worker requests: ${guard.requests().join(', ')}` : ''}`);
     const line = await readBlock(block!);
     const lineTurns = line.rows.map(row => row.turn).filter(label => label !== '');
     expect(lineTurns[0]).toBe(`T${turn}`);
+    guard.assertClean();
+    guard.pause(); // the variation ▶ Play opens is a new position: its own evaluation may search
 
     // the turn's view can be rebuilt under the test (see settleOnTurn), and the Lines toggle then starts closed again: open it again and retry
     await expect(async () => {
