@@ -182,10 +182,73 @@ jobs:
           DICE_SWEEPS: full
           SPECS: ${{ matrix.files }}
 
+  # Round 90 (step E6, #222): the browser flows run in three parts side by side, and the job "Browser flows" (key `browser-flows`)
+  # after them stays the one required check, so branch protection needs no change. One job took 33.9 minutes on 22.11.2026 (49 of
+  # its 50 on a slow runner). The lists balance the seconds of the Playwright report of r90-e (run 45078312352 at E3, play-out-finish cut from 496 to an estimated 390 seconds by E4), summed
+  # over the two workers of a part: about 996, 997 and 1000 seconds, so about 8 minutes of wall time each (two workers) plus a
+  # minute of setup. The regression spec `browser-flows-parts` holds every file of test/e2e/ in exactly one part: a new file goes
+  # into the part with the least seconds, and a part stays under 30 minutes. The files go to Playwright as path filters
+  # (regular expressions on the path); the same spec holds each entry to one file.
   browser:
-    name: Browser flows
+    name: Browser flows, part ${{ matrix.part }} of 3
     runs-on: ubuntu-24.04
-    timeout-minutes: 50
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - part: 1
+            files: >-
+              test/e2e/bench-bring.spec.ts
+              test/e2e/branch-dice-flinch.spec.ts
+              test/e2e/branch-dice-hits.spec.ts
+              test/e2e/branch-dice-lines.spec.ts
+              test/e2e/embed.spec.ts
+              test/e2e/game-review.spec.ts
+              test/e2e/matrix-dialog.spec.ts
+              test/e2e/new-game-share.spec.ts
+              test/e2e/play-out-finish.spec.ts
+              test/e2e/replay-end.spec.ts
+              test/e2e/repro-state.spec.ts
+              test/e2e/stand-ins.spec.ts
+              test/e2e/sweet-spot.spec.ts
+              test/e2e/timeline-bar.spec.ts
+              test/e2e/timeline.spec.ts
+              test/e2e/turn-dock-vgc.spec.ts
+              test/e2e/zoom-probe.spec.ts
+          - part: 2
+            files: >-
+              test/e2e/branch-dice-pivot.spec.ts
+              test/e2e/dock-narrow.spec.ts
+              test/e2e/eval-graph.spec.ts
+              test/e2e/eval.spec.ts
+              test/e2e/frame-controls.spec.ts
+              test/e2e/lead-dock.spec.ts
+              test/e2e/loader.spec.ts
+              test/e2e/new-game.spec.ts
+              test/e2e/phone.spec.ts
+              test/e2e/replacement-note.spec.ts
+              test/e2e/scale.spec.ts
+              test/e2e/topbar.spec.ts
+              test/e2e/turn-dock-fill.spec.ts
+              test/e2e/win-paths.spec.ts
+          - part: 3
+            files: >-
+              test/e2e/branch.spec.ts
+              test/e2e/dock-column.spec.ts
+              test/e2e/engines.spec.ts
+              test/e2e/eval-header.spec.ts
+              test/e2e/hard-mode.spec.ts
+              test/e2e/lines-play.spec.ts
+              test/e2e/pickers.spec.ts
+              test/e2e/replay-sprites.spec.ts
+              test/e2e/right-column.spec.ts
+              test/e2e/support.spec.ts
+              test/e2e/teambuilder-table.spec.ts
+              test/e2e/turn-dock-forced.spec.ts
+              test/e2e/turn-dock.spec.ts
+              test/e2e/turn-link.spec.ts
+              test/e2e/variation-interlude.spec.ts
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -208,48 +271,24 @@ jobs:
       # Playwright runs 2 workers here (half of the 4 vCPUs). Tried on 13.11.2026: 3 workers took 28 min instead
       # of 21 to 24 and turned play-out-finish.spec.ts:65 red (its 10 s predicate); Vitest with --maxWorkers=100%
       # (4 workers instead of 3) took 34 min instead of 28 on Node suites. More workers did not
-      # make a run faster. The JSON report feeds the next step.
-      - name: Run the browser flows
-        run: npm run test:e2e -- --reporter=dot,json
+      # make a run faster. The JSON report feeds the next steps.
+      - name: Run the browser flows of part ${{ matrix.part }}
+        run: npm run test:e2e -- --reporter=dot,json $SPECS
         env:
           PLAYWRIGHT_JSON_OUTPUT_FILE: ${{ github.workspace }}/playwright-report.json
+          SPECS: ${{ matrix.files }}
 
-      # Round 90 (step E0, #222): the 15 slowest spec files, summed over their tests, and the 20 slowest tests, so the
-      # next limit review and the next cut read numbers from the log. The JSON report is kept on every run (green too).
+      # Round 90 (step E0): the slowest spec files and tests of the part, so the next limit review and the next cut read numbers
+      # from the log. The aggregate job prints the same over all three parts. The JSON report is kept on every run (green too).
       - name: List the slowest browser specs and tests
         if: always()
-        run: |
-          node - <<'EOF'
-          const fs = require('node:fs');
-          if (!fs.existsSync('playwright-report.json')) process.exit(0);
-          const report = JSON.parse(fs.readFileSync('playwright-report.json', 'utf8'));
-          const perFile = new Map();
-          const perTest = [];
-          const walk = (suite, titles) => {
-            const path = suite.title && suite.title !== suite.file ? [...titles, suite.title] : titles;
-            for (const spec of suite.specs ?? []) {
-              for (const t of spec.tests) {
-                const ms = t.results.reduce((n, r) => n + r.duration, 0);
-                perFile.set(spec.file, (perFile.get(spec.file) ?? 0) + ms);
-                perTest.push([ms, t.status, `${spec.file}:${spec.line}  ${[...path, spec.title].join(' > ')}`]);
-              }
-            }
-            for (const child of suite.suites ?? []) walk(child, path);
-          };
-          for (const suite of report.suites) walk(suite, []);
-          const rows = [...perFile].sort((a, b) => b[1] - a[1]);
-          console.log(`${rows.length} spec files, ${perTest.length} tests, ${(rows.reduce((n, r) => n + r[1], 0) / 1000).toFixed(0)} s summed over ${report.config.workers} workers`);
-          for (const [file, ms] of rows.slice(0, 15)) console.log(`${(ms / 1000).toFixed(1).padStart(7)} s  ${file}`);
-          console.log('');
-          console.log('The 20 slowest tests');
-          for (const [ms, status, name] of perTest.sort((a, b) => b[0] - a[0]).slice(0, 20)) console.log(`${(ms / 1000).toFixed(1).padStart(7)} s  ${status.padEnd(10)} ${name}`);
-          EOF
+        run: test -f playwright-report.json && node scripts/merge-playwright-reports.mjs playwright-report.json || true
 
       - name: Keep the JSON report
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: playwright-report
+          name: playwright-report-part-${{ matrix.part }}
           path: playwright-report.json
           retention-days: 14
           if-no-files-found: ignore
@@ -258,9 +297,57 @@ jobs:
         uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: playwright-results
+          name: playwright-results-part-${{ matrix.part }}
           path: test-results
           retention-days: 7
+
+  # The required check. It needs the three parts, passes only when the matrix result is "success" (a failed, cancelled or skipped
+  # part gives another result), and prints the wall time of each part and the slowest files and tests over all of them.
+  browser-flows:
+    name: Browser flows
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    needs: browser
+    if: always()
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Fetch the reports of the three parts
+        uses: actions/download-artifact@v4
+        if: always()
+        with:
+          pattern: playwright-report-part-*
+          path: part-reports
+
+      - name: Merge the reports and list the wall time of each part and the slowest specs and tests
+        if: always()
+        run: |
+          shopt -s nullglob
+          reports=(part-reports/playwright-report-part-*/playwright-report.json)
+          echo "${#reports[@]} of 3 part reports found"
+          if [ "${#reports[@]}" -gt 0 ]; then node scripts/merge-playwright-reports.mjs --out playwright-report.json "${reports[@]}"; fi
+
+      - name: Keep the merged JSON report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report.json
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Fail unless all three parts passed
+        env:
+          PARTS: ${{ needs.browser.result }}
+        run: |
+          echo "The parts' result: $PARTS"
+          test "$PARTS" = success
 
   build:
     name: Production build smoke

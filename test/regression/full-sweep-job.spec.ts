@@ -126,11 +126,12 @@ describe('the two CI jobs that run the specs with DICE_SWEEPS=full', () => {
 describe('the job names that branch protection reads', () => {
   const names = WORKFLOW.map(line => /^ {4}name:\s*(.+)$/.exec(line)?.[1]).filter((name): name is string => name !== undefined);
 
-  // The five job definitions give the six required checks (the engine job is a matrix of two); GitHub matches a check by its whole name.
-  test('the six required checks keep their names, and the new job takes none of them', () => {
-    const added = 'Full sweeps, the other specs, part ${{ matrix.part }} of 3';
-    expect(names.filter(name => name === added)).toHaveLength(1);
-    expect(names.filter(name => name !== added)).toEqual([
+  // The five required checks plus the engine job's second matrix entry give the six contexts; GitHub matches a check by its whole name.
+  // "Browser flows" is the aggregate job of the three parts (round 90, E6; browser-flows-parts.spec.ts holds it); the parts and the sweep parts are no required checks.
+  test('the six required checks keep their names, and the jobs in parts take none of them', () => {
+    const parts = ['Full sweeps, the other specs, part ${{ matrix.part }} of 3', 'Browser flows, part ${{ matrix.part }} of 3'];
+    for (const added of parts) expect(names.filter(name => name === added)).toHaveLength(1);
+    expect(names.filter(name => !parts.includes(name))).toEqual([
       'Node suites',
       'Engine suite, speed layer ${{ matrix.speed-layer }}',
       'Dice sweeps, every move',
