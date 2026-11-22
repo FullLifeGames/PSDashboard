@@ -1,0 +1,63 @@
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { test, expect } from '@playwright/test';
+import type { ReplayData } from '@fulllifegames/replay-core';
+import { EVAL_STORE_CAPTURES, EVAL_STORE_DIR, evalStoreFileName, serializeEvalStoreFile, type EvalStoreFile } from '../e2e/eval-store';
+import { currentTag, openReplayAnalysis, readEvalStore } from '../e2e/eval-store-seed';
+import { installReplayEmbedCache } from '../e2e/helpers';
+
+/**
+ * Round 90 (#222): one live analysis per capture of `EVAL_STORE_CAPTURES`, then the records of the app's IndexedDB store go to
+ * `test/e2e/fixtures/eval-store/<replay>--<mode>-d<depth>s<samples>.json`. `EVAL_STORE_ONLY=<replay id>` captures one replay.
+ */
+const here = dirname(fileURLToPath(import.meta.url));
+const only = process.env.EVAL_STORE_ONLY;
+
+test.beforeAll(installReplayEmbedCache);
+test.use({ actionTimeout: 60_000 });
+
+/** A saved record holds numbers, text and nested lists only: JSON would turn Infinity or NaN into null and the seed would differ from the live record. */
+function findNonFinite(value: unknown, path: string): string | null {
+  if (typeof value === 'number') return Number.isFinite(value) ? null : path;
+  if (Array.isArray(value)) {
+    for (let i = 0; i < value.length; i += 1) {
+      const found = findNonFinite(value[i], `${path}[${i}]`);
+      if (found) return found;
+    }
+  } else if (value && typeof value === 'object') {
+    for (const [name, item] of Object.entries(value)) {
+      const found = findNonFinite(item, `${path}.${name}`);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+for (const capture of EVAL_STORE_CAPTURES.filter(entry => !only || entry.replay === only)) {
+  test(`capture ${evalStoreFileName(capture.replay, capture.settings)}`, async ({ page }) => {
+    const replay = JSON.parse(readFileSync(join(here, '../../packages/eval-engine/test/fixtures', `${capture.replay}.json`), 'utf-8')) as ReplayData;
+    await openReplayAnalysis(page, replay, capture.settings);
+    const panel = page.locator('.ps-main-right .ps-eval-panel');
+    await panel.getByRole('button', { name: 'Analyze game' }).click();
+    await expect(panel.getByRole('button', { name: 'Re-analyze' })).toBeVisible({ timeout: 1_500_000 });
+
+    // The sweep saves fire and forget: read until the count stands still.
+    let records = await readEvalStore(page, replay.id);
+    for (let stable = 0; stable < 3;) {
+      await page.waitForTimeout(1_000);
+      const next = await readEvalStore(page, replay.id);
+      stable = next.length === records.length ? stable + 1 : 0;
+      records = next;
+    }
+    expect(records.length, 'the analysis saved records').toBeGreaterThan(0);
+    for (const record of records) expect(findNonFinite(record, record.key), 'a saved record that JSON cannot hold').toBeNull();
+
+    const file: EvalStoreFile = { format: 1, replay: replay.id, cacheVersion: await currentTag(page), settings: capture.settings, records };
+    const target = join(process.cwd(), EVAL_STORE_DIR, evalStoreFileName(replay.id, capture.settings));
+    mkdirSync(dirname(target), { recursive: true });
+    const text = serializeEvalStoreFile(file);
+    writeFileSync(target, text);
+    console.log(`${target}: ${records.length} records, ${(text.length / 1024).toFixed(0)} KiB`);
+  });
+}
