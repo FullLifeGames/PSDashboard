@@ -158,6 +158,9 @@ A URL with the sharer's branch in its hash. Version 1 holds a replay's branch (t
 **State file**:
 The JSON file that `Report issue` downloads: the replay log, the sets, the variation and its choices, the position on screen and the engine settings, enough to replay a report. For a new game it also holds the game record.
 
+**Depth**:
+The search mode the user picks in the `Setup` menu (`EvalPreferences.mode` and `depth`): 1 or 2 (the joint matrix), MCTS (the tree) or Auto, the default, which chooses per turn from the game type and the fainted share. Under a matrix depth the menu also shows `Samples`, the damage-roll seeds averaged per cell. The Evaluation panel's header does not carry either (release 1.2.0). Another engine decides its own depth, so the menu hides both then.
+
 ### Turn verdicts
 
 **Safe line**:

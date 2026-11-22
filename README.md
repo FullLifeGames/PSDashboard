@@ -42,7 +42,7 @@ Two features exist in the code and ship behind a flag that is off in every build
 3. Read the evaluation column: the score, the ranked lines, the safe line, and the punishing reply.
 4. Click an engine line, or pick a move for each side and execute. The variation opens and the timeline marks it in gold.
 5. `Analyze game` grades every turn. Click a graph point to jump to that turn's analysis.
-6. The `Setup` menu in the top bar holds `Edit Player`, `Edit Opp`, and `Import/Export Sets`, which fix the hidden information when a guess is wrong, and the switch for animating branch turns.
+6. The `Setup` menu in the top bar holds `Edit Player`, `Edit Opp`, and `Import/Export Sets`, which fix the hidden information when a guess is wrong, the switch for animating branch turns, and the search's `Depth` (`Auto` by default; `1`, `2` and `MCTS` pick a mode; under a matrix depth a `Samples` select appears). Another engine decides its own depth, so the menu hides both then.
 
 The score is an estimate for spotting swings and blunders, not an oracle. The app needs the network: replays come from replay.pokemonshowdown.com (file drops work offline), the viewer script and sprites from play.pokemonshowdown.com, and usage stats from data.pkmn.cc with a GitHub Pages mirror. A Random Battle also reads its random-set data from data.pkmn.cc/random, mirrored by the randbats pages.
 
