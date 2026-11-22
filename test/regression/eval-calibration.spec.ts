@@ -1406,6 +1406,11 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * to r89-final3 (12 dumps); CI Tests run 45022453829, nine jobs green. Tester
  * pass 7: 0 broken; the header still wraps with Depth 1 or 2 and inside a
  * variation.
+ * Depth and Samples then moved from the header into the Setup menu (6b625d20,
+ * bd7a2bc4; the stored prefs keep their meaning): the header holds one row in
+ * every state of tester pass 8 (0 broken; its points are in #223). Three
+ * feedback runs (r89-ff2) byte-identical to r89-ff1; CI Tests run 45033371201,
+ * nine jobs green, Browser flows in 49 of its 50 minutes (#222).
  *
  * GATE: opening 09.11.: every open issue of 1.2.0 in one wave on devbox, with
  * two worktree slots; the trust rule of T322 loses its two open clauses; the
