@@ -1,15 +1,16 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import type { ReplayData } from '@fulllifegames/replay-core';
-import { EVAL_STORE_CAPTURES, EVAL_STORE_DIR, evalStoreFileName, serializeEvalStoreFile, type EvalStoreFile } from '../e2e/eval-store';
+import { EVAL_STORE_CAPTURES, EVAL_STORE_DIR, evalStoreFileName, serializeEvalStoreFile, type EvalStoreFile, type EvalStoreRecord } from '../e2e/eval-store';
 import { currentTag, openReplayAnalysis, readEvalStore } from '../e2e/eval-store-seed';
 import { installReplayEmbedCache } from '../e2e/helpers';
 
 /**
- * Round 90 (#222): one live analysis per capture of `EVAL_STORE_CAPTURES`, then the records of the app's IndexedDB store go to
- * `test/e2e/fixtures/eval-store/<replay>--<mode>-d<depth>s<samples>.json`. `EVAL_STORE_ONLY=<replay id>` captures one replay.
+ * Round 90 (#222): one live analysis per capture of `EVAL_STORE_CAPTURES` (the game's sweep, or the capture's turns one by one with
+ * "Analyze this position", as the spec does), then the records of the app's IndexedDB store go to
+ * `test/e2e/fixtures/eval-store/<replay>--<mode>-d<depth>s<samples>[-t<turns>].json`. `EVAL_STORE_ONLY=<replay id or file name>` captures one replay or one file.
  */
 const here = dirname(fileURLToPath(import.meta.url));
 const only = process.env.EVAL_STORE_ONLY;
@@ -34,27 +35,60 @@ function findNonFinite(value: unknown, path: string): string | null {
   return null;
 }
 
-for (const capture of EVAL_STORE_CAPTURES.filter(entry => !only || entry.replay === only)) {
-  test(`capture ${evalStoreFileName(capture.replay, capture.settings)}`, async ({ page }) => {
-    const replay = JSON.parse(readFileSync(join(here, '../../packages/eval-engine/test/fixtures', `${capture.replay}.json`), 'utf-8')) as ReplayData;
+/** The replay fixture of an id: the engine's fixtures first, then the feedback corpus' (win-paths reads both). */
+function readReplay(id: string): ReplayData {
+  const dirs = ['../../packages/eval-engine/test/fixtures', '../e2e-feedback/fixtures'].map(dir => join(here, dir, `${id}.json`));
+  const found = dirs.find(path => existsSync(path));
+  if (!found) throw new Error(`No replay fixture ${id}`);
+  return JSON.parse(readFileSync(found, 'utf-8')) as ReplayData;
+}
+
+/** The sweep saves fire and forget: read until the count stands still. */
+async function settledRecords(page: Page, replayId: string): Promise<EvalStoreRecord[]> {
+  let records = await readEvalStore(page, replayId);
+  for (let stable = 0; stable < 3;) {
+    await page.waitForTimeout(1_000);
+    const next = await readEvalStore(page, replayId);
+    stable = next.length === records.length ? stable + 1 : 0;
+    records = next;
+  }
+  return records;
+}
+
+for (const capture of EVAL_STORE_CAPTURES.filter(entry => !only || entry.replay === only || evalStoreFileName(entry.replay, entry.settings, entry.turns) === only)) {
+  test(`capture ${evalStoreFileName(capture.replay, capture.settings, capture.turns)}`, async ({ page }) => {
+    test.setTimeout(1_800_000);
+    const replay = readReplay(capture.replay);
     await openReplayAnalysis(page, replay, capture.settings);
     const panel = page.locator('.ps-main-right .ps-eval-panel');
-    await panel.getByRole('button', { name: 'Analyze game' }).click();
-    await expect(panel.getByRole('button', { name: 'Re-analyze' })).toBeVisible({ timeout: 1_500_000 });
-
-    // The sweep saves fire and forget: read until the count stands still.
-    let records = await readEvalStore(page, replay.id);
-    for (let stable = 0; stable < 3;) {
-      await page.waitForTimeout(1_000);
-      const next = await readEvalStore(page, replay.id);
-      stable = next.length === records.length ? stable + 1 : 0;
-      records = next;
+    let records: EvalStoreRecord[];
+    if (capture.turns) {
+      // the route of lines-play and hard-mode: the slider to the turn, "Analyze this position", until the turn's record is saved
+      let held = (await readEvalStore(page, replay.id)).length;
+      for (const turn of capture.turns) {
+        await page.locator('input[type="range"]').fill(String(turn));
+        // after the first report of the game the panel shows the overview: the graph's column opens the turn's own view
+        const column = panel.locator(`svg rect[data-turn="${turn}"]`).first();
+        if (await column.count() > 0) await column.click({ force: true });
+        const analyze = panel.getByRole('button', { name: /^Analyze this position/ });
+        await expect(analyze).toBeEnabled({ timeout: 60_000 });
+        await analyze.click();
+        await expect.poll(async () => (await readEvalStore(page, replay.id)).length, { timeout: 600_000, intervals: [2_000] }).toBeGreaterThan(held);
+        held = (await settledRecords(page, replay.id)).length;
+      }
+      records = await settledRecords(page, replay.id);
+    } else {
+      await panel.getByRole('button', { name: 'Analyze game' }).click();
+      await expect(panel.getByRole('button', { name: 'Re-analyze' })).toBeVisible({ timeout: 1_500_000 });
+      records = await settledRecords(page, replay.id);
     }
     expect(records.length, 'the analysis saved records').toBeGreaterThan(0);
     for (const record of records) expect(findNonFinite(record, record.key), 'a saved record that JSON cannot hold').toBeNull();
 
-    const file: EvalStoreFile = { format: 1, replay: replay.id, cacheVersion: await currentTag(page), settings: capture.settings, records };
-    const target = join(process.cwd(), EVAL_STORE_DIR, evalStoreFileName(replay.id, capture.settings));
+    const file: EvalStoreFile = {
+      format: 1, replay: replay.id, cacheVersion: await currentTag(page), settings: capture.settings, ...(capture.turns ? { turns: capture.turns } : {}), records,
+    };
+    const target = join(process.cwd(), EVAL_STORE_DIR, evalStoreFileName(replay.id, capture.settings, capture.turns));
     mkdirSync(dirname(target), { recursive: true });
     const text = serializeEvalStoreFile(file);
     writeFileSync(target, text);

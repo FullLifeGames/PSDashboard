@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  CAPTURE_COMMAND, EVAL_STORE_DIR, createSearchGuard, parseEvalStoreFile, rewriteCacheVersion, seedRecords, serializeEvalStoreFile,
+  CAPTURE_COMMAND, EVAL_STORE_CAPTURES, EVAL_STORE_DIR, createSearchGuard, evalStoreFileName, parseEvalStoreFile, rewriteCacheVersion, seedRecords, serializeEvalStoreFile,
   type EvalStoreFile,
 } from '../e2e/eval-store';
 
@@ -87,6 +87,15 @@ describe('the file form', () => {
     expect(parseEvalStoreFile(serializeEvalStoreFile(original), 'x.json')).toEqual(original);
   });
 
+  it('names a file by its game, settings and turns, and keeps the turns of a file through the round trip', () => {
+    const settings = { depth: 1, samples: 1, mode: 'mcts', tera: 'auto' } as const;
+    expect(evalStoreFileName('gen9ou-1', settings)).toBe('gen9ou-1--mcts-d1s1.json');
+    expect(evalStoreFileName('gen9ou-1', settings, [8, 12])).toBe('gen9ou-1--mcts-d1s1-t8_12.json');
+    const text = serializeEvalStoreFile(file([record('v80|gen9ou-1:3:[null]|d1s1mmctst1')], { turns: [3] }));
+    expect(parseEvalStoreFile(text, 'x').turns).toEqual([3]);
+    expect(parseEvalStoreFile(serializeEvalStoreFile(file([record('v80|gen9ou-1:3:[null]|d1s1mmctst1')])), 'x').turns).toBeUndefined();
+  });
+
   it('names the file and the capture command when the text does not parse', () => {
     expect(() => parseEvalStoreFile('{ nope', 'gen9ou-1.json')).toThrow(/gen9ou-1\.json[\s\S]*capture-eval-store/);
   });
@@ -133,6 +142,12 @@ describe('the saved files in the repository', () => {
   const dir = join(__dirname, '..', 'e2e', 'fixtures', 'eval-store');
   const names = readdirSync(dir).filter(name => name.endsWith('.json'));
 
+  it('has one file per capture of the list and no file the list does not name', () => {
+    const wanted = EVAL_STORE_CAPTURES.map(capture => evalStoreFileName(capture.replay, capture.settings, capture.turns));
+    expect(new Set(wanted).size, 'two captures share a file name').toBe(wanted.length);
+    expect([...names].sort()).toEqual([...wanted].sort());
+  });
+
   it('lives where the capture writes', () => {
     expect(EVAL_STORE_DIR).toBe('test/e2e/fixtures/eval-store');
   });
@@ -140,7 +155,7 @@ describe('the saved files in the repository', () => {
   for (const name of names) {
     it(`${name} parses, fits its replay and seeds`, () => {
       const parsed = parseEvalStoreFile(readFileSync(join(dir, name), 'utf-8'), name);
-      expect(name).toBe(`${parsed.replay}--${parsed.settings.mode}-d${parsed.settings.depth}s${parsed.settings.samples}.json`);
+      expect(name).toBe(evalStoreFileName(parsed.replay, parsed.settings, parsed.turns));
       expect(seedRecords(parsed, { tag: 'v999', now: 1 }).every(entry => entry.key.startsWith('v999|'))).toBe(true);
     });
   }

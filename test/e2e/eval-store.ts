@@ -19,12 +19,40 @@ export interface EvalStoreSettings {
   tera: string;
 }
 
+/** One capture: a replay and the settings, and either the whole game ("Analyze game") or the turns a spec analyzes one by one. */
+export interface EvalStoreCapture {
+  replay: string;
+  settings: EvalStoreSettings;
+  /** The turns the spec analyzes with "Analyze this position" (the store key of a single turn); absent: the game's sweep. */
+  turns?: number[];
+}
+
+const S_MCTS: EvalStoreSettings = { mode: 'mcts', depth: 1, samples: 1, tera: 'auto' };
+const S_MATRIX: EvalStoreSettings = { mode: 'matrix', depth: 1, samples: 1, tera: 'auto' };
+const S_AUTO: EvalStoreSettings = { mode: 'auto', depth: 1, samples: 1, tera: 'auto' };
+
 /**
- * The captures: one file per replay and settings. A spec names its file with `evalStoreFileName(replay, settings)`. The replay is the
- * fixture of the same id under packages/eval-engine/test/fixtures/. Round 90, step E2: the singles row of the Game review only.
+ * The captures: one file per replay, settings and turns. A spec names its file with `evalStoreFileName(replay, settings, turns)`. The
+ * replay is the fixture of the same id under packages/eval-engine/test/fixtures/ or test/e2e-feedback/fixtures/. Round 90, steps E2
+ * and E3: the Game review rows except the Auto row, the single turns of lines-play and hard-mode.
  */
-export const EVAL_STORE_CAPTURES: { replay: string; settings: EvalStoreSettings }[] = [
-  { replay: 'gen9ou-2658662321', settings: { mode: 'mcts', depth: 1, samples: 1, tera: 'auto' } },
+export const EVAL_STORE_CAPTURES: EvalStoreCapture[] = [
+  { replay: 'gen9ou-2658662321', settings: S_MCTS },
+  { replay: 'gen9vgc2026regi-2630452654', settings: S_AUTO },
+  { replay: 'gen9championsvgc2026regma-2625939941', settings: S_AUTO },
+  { replay: 'smogtours-gen6ou-655336', settings: S_MCTS, turns: [8, 12] },
+  { replay: 'smogtours-gen9doublesou-912884', settings: S_MCTS, turns: [5, 8, 11] },
+  { replay: 'gen9vgc2026regi-2630452654', settings: S_MCTS, turns: [4, 6] },
+  { replay: 'gen9championsou-2691703002', settings: S_MCTS, turns: [8, 12] },
+  { replay: 'gen9championsvgc2026regma-2625939941', settings: S_MCTS, turns: [3, 5] },
+  { replay: 'smogtours-gen6ou-655336', settings: S_MATRIX, turns: [8, 12, 5] },
+  { replay: 'smogtours-gen9doublesou-912884', settings: S_MATRIX, turns: [5, 8, 11] },
+  { replay: 'gen9vgc2026regi-2630452654', settings: S_MATRIX, turns: [4, 6, 3] },
+  { replay: 'gen9championsou-2691703002', settings: S_MATRIX, turns: [8, 12, 5] },
+  { replay: 'smogtours-gen6ou-649664', settings: S_MATRIX },
+  { replay: 'gen9championsvgc2026regmc-2695803506', settings: S_MATRIX },
+  { replay: 'gen9vgc2026regi-2629703929', settings: S_MATRIX },
+  { replay: 'smogtours-gen9doublesou-912045', settings: S_MATRIX },
 ];
 
 /** The record the app stores: the fields the app reads are checked, the rest passes through untouched. */
@@ -45,12 +73,14 @@ export interface EvalStoreFile {
   /** The cache version the records were captured under (`v80`); a seed rewrites it to the current one. */
   cacheVersion: string;
   settings: EvalStoreSettings;
+  /** The single turns the records hold; absent for a game's sweep. */
+  turns?: number[];
   records: EvalStoreRecord[];
 }
 
-/** The file name of a capture: one file per game and settings. */
-export const evalStoreFileName = (replay: string, settings: Pick<EvalStoreSettings, 'depth' | 'samples' | 'mode'>): string =>
-  `${replay}--${settings.mode}-d${settings.depth}s${settings.samples}.json`;
+/** The file name of a capture: one file per game, settings and turns (`-t8_12` for the single turns 8 and 12; none for the sweep). */
+export const evalStoreFileName = (replay: string, settings: Pick<EvalStoreSettings, 'depth' | 'samples' | 'mode'>, turns?: readonly number[]): string =>
+  `${replay}--${settings.mode}-d${settings.depth}s${settings.samples}${turns?.length ? `-t${turns.join('_')}` : ''}.json`;
 
 const fix = (what: string): Error => new Error(`${what}. Run \`${CAPTURE_COMMAND}\` to capture the saved engine results again, then commit test/e2e/fixtures/eval-store/.`);
 
@@ -103,7 +133,7 @@ export function serializeEvalStoreFile(file: EvalStoreFile): string {
   const lines = [...file.records]
     .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
     .map(record => JSON.stringify(sorted({ ...record, savedAt: 0 }, true)));
-  const head = JSON.stringify({ format: file.format, replay: file.replay, cacheVersion: file.cacheVersion, settings: sorted(file.settings) }).slice(0, -1);
+  const head = JSON.stringify({ format: file.format, replay: file.replay, cacheVersion: file.cacheVersion, settings: sorted(file.settings), ...(file.turns ? { turns: file.turns } : {}) }).slice(0, -1);
   return `${head},"records":[\n${lines.join(',\n')}\n]}\n`;
 }
 
