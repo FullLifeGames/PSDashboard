@@ -3,9 +3,11 @@
  * branch view both show them. The tag and the names clip with an ellipsis (`.ps-topbar-match` in `layout.css` orders the shrinking:
  * the tag first, the names next) and carry their full text in a title.
  */
-export function MatchTitle({ format, players }: { format: string; players: readonly string[] }) {
+export function MatchTitle({ format, players, newGame = false }: { format: string; players: readonly string[]; newGame?: boolean }) {
   return (
     <>
+      {/* Round 89 (#105): a game the user started from two teams, not a replay. */}
+      {newGame && <span className="ps-format-tag ps-newgame-tag">New game</span>}
       <span className="ps-format-tag" title={format}>{format}</span>
       <span className="ps-player" title={players[0]} style={{ fontSize: 11, color: '#8ac' }}>{players[0]}</span>
       <span style={{ fontSize: 10, color: '#556', flexShrink: 0 }}>vs</span>

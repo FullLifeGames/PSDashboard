@@ -19,7 +19,7 @@ test.describe('PS Dashboard', () => {
     const input = page.locator('input[type="text"]');
     await expect(input).toBeVisible();
     await expect(input).toHaveValue(/replay\.pokemonshowdown\.com/);
-    await expect(page.locator('button', { hasText: 'Load' })).toBeVisible();
+    await expect(page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ })).toBeVisible();
   });
 
   test('defaults to the featured draft replay', async ({ page }) => {
@@ -40,7 +40,7 @@ test.describe('PS Dashboard', () => {
   test('shows a notice when the Smogon sets fail to load', async ({ page }) => {
     // Both data hosts unreachable: the fallback runs dry and the top bar says so.
     await routeSmogon(page, route => route.abort());
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.getByText('Smogon sets unavailable')).toBeVisible({ timeout: 15000 });
     await expect(page.getByText('Smogon stats unavailable')).toBeVisible();
   });
@@ -80,7 +80,7 @@ test.describe('PS Dashboard', () => {
   });
 
   test('exports both sides and applies an imported set as manual data (Import/Export Sets)', async ({ page }) => {
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
 
     await fromSetup(page, 'Import/Export Sets');
@@ -102,7 +102,7 @@ test.describe('PS Dashboard', () => {
   });
 
   test('imported sets persist per replay across reloads', async ({ page }) => {
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await fromSetup(page, 'Import/Export Sets');
     const dialog = page.getByRole('dialog', { name: 'Import / Export Sets' });
     await dialog.locator('textarea')
@@ -111,12 +111,12 @@ test.describe('PS Dashboard', () => {
     await expect(page.locator('.ps-main-right')).toContainText('Choice Band');
 
     await page.reload();
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.locator('.ps-main-right')).toContainText('Choice Band', { timeout: 10000 });
   });
 
   test('team editor offers legal dropdown pools first, takes other moves and abilities with a note, and rejects unknown moves', async ({ page }) => {
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
     await fromSetup(page, 'Edit Player');
     const editor = page.getByRole('dialog', { name: 'Edit Player Team' });
@@ -157,7 +157,7 @@ test.describe('PS Dashboard', () => {
   });
 
   test('rejects an import without side headers', async ({ page }) => {
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await fromSetup(page, 'Import/Export Sets');
     const dialog = page.getByRole('dialog', { name: 'Import / Export Sets' });
     await dialog.locator('textarea').fill('Garchomp @ Choice Band\n- Earthquake');
@@ -172,21 +172,21 @@ test.describe('PS Dashboard', () => {
   });
 
   test('loads a replay and shows match info', async ({ page }) => {
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
     await expect(page.getByText('TestPlayer2', { exact: true }).first()).toBeVisible();
     await expect(page.locator('text=[Gen 9] OU')).toBeVisible();
   });
 
   test('shows single replay iframe after loading', async ({ page }) => {
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     const iframe = page.locator('iframe[title="PS Replay"]');
     await expect(iframe).toBeVisible({ timeout: 10000 });
     await expect(page.locator('iframe')).toHaveCount(1);
   });
 
   test('the loader input reflects the loaded replay link', async ({ page }) => {
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     // The default draft link gives way to the canonical link of what loaded —
     // whichever path (typed URL, file, share link) brought the replay in.
     // Round 84 (Q20 a): the loader moved from the column into the top bar's Load panel.
@@ -197,7 +197,7 @@ test.describe('PS Dashboard', () => {
 
   test('with a replay loaded the loader folds into the Load button: the panel loads another replay and closes', async ({ page }) => {
     // Round 84 (turn dock, Q20 a): the column holds no loader once a replay is loaded; the start page keeps it.
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
     await expect(page.locator('.ps-main-left input[aria-label="Replay URL or ID"]')).toHaveCount(0);
     await expect(page.locator('.ps-main-left').getByText('Load Replay')).toHaveCount(0);
@@ -222,7 +222,7 @@ test.describe('PS Dashboard', () => {
   });
 
   test('an exported replay dropped anywhere on the page loads while a replay is loaded', async ({ page }) => {
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
 
     const html = readFileSync(fixturePath('exported-replay.html'), 'utf-8');
@@ -249,13 +249,13 @@ test.describe('PS Dashboard', () => {
   });
 
   test('the Setup menu offers Edit Opp after loading a replay', async ({ page }) => {
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await page.getByRole('button', { name: 'Setup', exact: true }).click({ timeout: 10000 });
     await expect(page.locator('.ps-setup-panel').getByRole('button', { name: 'Edit Opp' })).toBeVisible();
   });
 
   test('Battle Statistics panel appears after loading replay', async ({ page }) => {
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.locator('text=Battle Statistics')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('.ps-stats-team')).toHaveCount(2);
     await expect(page.locator('.ps-stats-pokemon').first()).toBeVisible();

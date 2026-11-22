@@ -12,8 +12,8 @@ import { simState, switchOption } from '../../fixtures/sim-state';
  * Round 84 (turn dock), step A3b: the free-choice picker and the What-if loader of the old FightSection spec, now parts of the
  * tray's "Dice · What if" section, plus the labels of the old switch-labels spec.
  */
-const pool = vi.hoisted(() => ({ list: ['Dragon Claw', 'Fire Fang'] as string[] }));
-vi.mock('../../../../src/lib/pokemon-options', () => ({ getMovePool: async () => pool.list }));
+const pool = vi.hoisted(() => ({ list: ['Dragon Claw', 'Fire Fang'] as string[], calls: [] as unknown[][] }));
+vi.mock('../../../../src/lib/pokemon-options', () => ({ getMovePool: async (...args: unknown[]) => { pool.calls.push(args); return pool.list; } }));
 
 const singles = simState('singles');
 const doubles = simState('doubles');
@@ -160,5 +160,19 @@ describe('displayName in the picker', () => {
     const picker = screen.getByRole('combobox', { name: 'Choice picker for P1B' });
     expect(within(picker).getByRole('option', { name: 'Switch: Power Police (Meowstic) (100% HP)' })).toBeInTheDocument();
     expect(within(picker).getByRole('option', { name: `Switch: ${bench[1].species} (100% HP)` })).toBeInTheDocument();
+  });
+});
+
+describe.each([
+  ['singles', singles, 'gen9championsou', /^P1\b/],
+  ['doubles', doubles, 'gen9championsvgc2026regma', /^P1A\b/],
+] as const)('the tray of a %s Champions game (T8a)', (_kind, state, format, chip) => {
+  test('asks for the move pool with the format of the game', async () => {
+    pool.calls.length = 0;
+    render(<TurnDock simState={state} executeError={null} executing={false} gen={9} format={format} onSetChoice={vi.fn()} onHypotheticalMove={vi.fn()} onExecuteTurn={vi.fn()} />);
+    await userEvent.click(screen.getByRole('button', { name: chip }));
+    await userEvent.click(within(document.querySelector('.ps-tray') as HTMLElement).getByRole('button', { name: /Dice · What if/ }));
+    await waitFor(() => expect(pool.calls.length).toBeGreaterThan(0));
+    expect(pool.calls.every(([, gen, askedFormat]) => gen === 9 && askedFormat === format)).toBe(true);
   });
 });

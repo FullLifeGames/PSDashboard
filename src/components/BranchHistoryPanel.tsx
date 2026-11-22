@@ -56,7 +56,7 @@ function ForcedRow({ entry }: { entry: BranchHistoryEntry }) {
         color: '#9fb5d9',
       }}
     >
-      Turn {entry.turnNumber} · forced replacement ({both ? 'both sides' : entry.forcedSide?.toUpperCase()}): {forcedChoice}
+      Turn {entry.turnNumber} · replacement ({both ? 'both sides' : entry.forcedSide?.toUpperCase()}): {forcedChoice}
     </div>
   );
 }

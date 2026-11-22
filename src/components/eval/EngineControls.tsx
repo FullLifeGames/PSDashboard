@@ -8,6 +8,8 @@ interface EngineControlsProps {
   engines: EngineEntry[];
   selected: EngineEntry;
   running: boolean;
+  /** What the selected engine does, appended to the select's title (the Evaluation heading carries the same text). */
+  note?: string;
   onSelect: (id: string) => void;
   onAdd: (name: string, url: string) => void;
   onRemove: (id: string) => void;
@@ -62,12 +64,12 @@ function AddEngineDialog({ engines, onAdd, onRemove, onClose }: Pick<EngineContr
  * Round 77 (user gate 28.10.2026, 4a and 5a): the engine choice of the Evaluation panel. The dropdown
  * shows once another engine is integrated; "+ engine" adds one by address in this browser.
  */
-export function EngineControls({ engines, selected, running, onSelect, onAdd, onRemove }: EngineControlsProps) {
+export function EngineControls({ engines, selected, running, note, onSelect, onAdd, onRemove }: EngineControlsProps) {
   const [adding, setAdding] = useState(false);
   return (
     <>
       {engines.length > 1 && (
-        <label style={LABEL_STYLE} title="Which engine evaluates: the dashboard's own search or another one (ENGINES.md).">
+        <label style={LABEL_STYLE} title={`Which engine evaluates: the dashboard's own search or another one (ENGINES.md).${note ? ` ${note}` : ''}`}>
           Engine
           <select aria-label="Engine" value={selected.id} disabled={running} onChange={event => onSelect(event.target.value)}>
             {engines.map(engine => <option key={engine.id} value={engine.id}>{engine.name}</option>)}

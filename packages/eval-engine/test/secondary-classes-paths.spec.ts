@@ -135,6 +135,32 @@ function massOf(blend: CellBlend, eventKey: string, effect: string): number {
   }, 0);
 }
 
+/**
+ * The coverage the pair plan reached, read back from its classes: each class weighs the product of its events' probabilities (a miss
+ * `1 - accuracy`; a hit that does not kill `accuracy` times, for every die of the target, its chance when the key names the effect and the
+ * rest when it does not), and the plan divides every found class by the sum of those weights (`blended`, pair/sampler.ts). Returns the
+ * coverage, or the reason the keys are not priced here. The weights each class carries are the product over the coverage, so the quotient is
+ * the same for every class; a spread that is not is a reading this function got wrong, and it says so.
+ */
+function coverageOf(blend: CellBlend, accuracy: number, dice: (slot: string) => readonly { effectId: string; chance: number }[]): number | string {
+  const covers: number[] = [];
+  for (const cls of blend.classes) {
+    let raw = 1;
+    for (const segment of cls.key.split('|')) {
+      const [event, outcome] = [segment.slice(0, segment.indexOf('=')), segment.slice(segment.indexOf('=') + 1)];
+      const [kind, ...tokens] = outcome.split('+');
+      if (kind === 'miss') raw *= 1 - accuracy;
+      else if (kind === 'hit-nokill') {
+        raw *= accuracy;
+        for (const die of dice(event.slice(event.indexOf('>') + 1))) raw *= die.effectId.split('+').every(part => tokens.includes(part)) ? die.chance : 1 - die.chance;
+      } else return `an event of the class ${cls.key} is no miss or hit-nokill`;
+    }
+    covers.push(raw / cls.weight);
+  }
+  const cover = covers[0];
+  return covers.every(entry => Math.abs(entry - cover) < 1e-6) ? cover : `the classes read different coverages (${covers.map(entry => entry.toFixed(4)).join(', ')})`;
+}
+
 describe.each(DOUBLES)('the pair plan reads the secondary dice: $name', ({ rules, name }) => {
   const { moves } = sweepMoves(rules, move => hasChanceEntry(move) && !isDelayed(move) && !isCharge(move) && !move.multihit
     && ['normal', 'any', 'adjacentFoe', 'allAdjacentFoes', 'allAdjacent'].includes(move.target));
@@ -174,7 +200,18 @@ describe.each(DOUBLES)('the pair plan reads the secondary dice: $name', ({ rules
       const accuracy = typeof move.accuracy === 'number' ? move.accuracy / 100 : 1;
       for (const entry of played.filter(candidate => candidate.chance >= 0.2)) {
         const mass = massOf(blend, `p1a:${move.id}>p2a`, entry.effectId);
-        if (Math.abs(mass - accuracy * entry.chance) > 0.07) problems.push(`${move.id} ${entry.effectId}: mass ${mass.toFixed(3)}, chance ${(accuracy * entry.chance).toFixed(3)}`);
+        const chance = accuracy * entry.chance;
+        const gap = Math.abs(mass - chance);
+        if (gap <= 0.07) continue;
+        // r89 S2 (user gate 16.11.2026, P7a): a plan that stops below full coverage divides the classes it found by the coverage `c`
+        // (sampler.ts `blended`), so the missing classes take their chance away from the targets they sit on. The mass of an effect is
+        // (found part)/c, the found part lies between chance - (1 - c) and chance, so the mass is off by at most max(chance, 1 - chance) * (1 - c) / c.
+        // Past the old flat bound of 0.07, the row asks for that bound of the coverage the plan reached.
+        const slots = new Set(blend.classes.flatMap(cls => cls.key.split('|').map(segment => segment.slice(segment.indexOf('>') + 1, segment.indexOf('=')))));
+        const dice = new Map([...slots].map(slot => [slot, playedChances(board, clicks, [slot]).get(slot) ?? []]));
+        const cover = coverageOf(blend, accuracy, slot => dice.get(slot) ?? []);
+        const bound = typeof cover === 'number' ? Math.max(chance, 1 - chance) * (1 - cover) / cover + 1e-9 : 0.07;
+        if (gap > bound) problems.push(`${move.id} ${entry.effectId}: mass ${mass.toFixed(3)}, chance ${chance.toFixed(3)}, ${typeof cover === 'number' ? `coverage ${cover.toFixed(3)}, bound ${bound.toFixed(3)}` : cover}`);
       }
     }
     expect(joined(problems)).toBe('');
@@ -417,7 +454,9 @@ describe('scene: a doubles cell with secondary dice (the pair plan)', () => {
     expect(cell).toMatchObject({ kind: 'sample', via: 'plan', reason: null });
     const blend = (cell as { sample: { blend?: CellBlend } }).sample.blend!;
     expect(blend.classes.reduce((sum, cls) => sum + cls.weight, 0)).toBeCloseTo(1, 9);
-    for (const target of ['p2a', 'p2b']) expect(massOf(blend, `p1a:rockslide>${target}`, 'flinch')).toBeCloseTo(0.9 * 0.3, 1);
+    // r89 A5 gate: was toBeCloseTo(0.27, 1) (within 0.05). The cell's own seeds (T324) leave the plan at a coverage of 0.84 (the least the
+    // sampler accepts is 0.8), so the p2a mass reads 0.3226; the bound is 0.06 now.
+    for (const target of ['p2a', 'p2b']) expect(Math.abs(massOf(blend, `p1a:rockslide>${target}`, 'flinch') - 0.9 * 0.3)).toBeLessThan(0.06);
   });
 
   row('script-doubles')('a script answers the flinch die of one hit: yes cuts that target, no does not', () => {

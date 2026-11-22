@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   type OpponentTeamInfo, type PokemonEvs, type RevealedPokemonInfo, type StatId, EMPTY_EVS, manualEvs,
-  manualField,
+  manualField, toId,
 } from '@fulllifegames/replay-core';
 import { canonicalMove, clampEv, evLimitsFor, evsBeside, withAddedMove, type EditorPools } from '../lib/team-editor';
 
@@ -28,6 +28,7 @@ export function useEditorPools(teamInfo: OpponentTeamInfo, gen: number, format =
         movesBySpecies,
         abilitiesBySpecies,
         allMoves: options.getEveryMovePool(gen, format),
+        playedMoves: options.getEveryMovePool(gen, format, 'import'),
         allAbilities: options.getEveryAbilityPool(gen, format),
         evLimit: options.getEvLimit(format),
       });
@@ -76,9 +77,14 @@ export function useTeamDraft(initial: RevealedPokemonInfo[], pools: EditorPools 
     if (!trimmed) return false;
 
     const species = pokemon[index]?.species ?? '';
-    const resolved = canonicalMove(pools?.movesBySpecies[species], trimmed, pools?.allMoves);
+    const resolved = canonicalMove(pools?.movesBySpecies[species], trimmed, pools?.allMoves, pools?.playedMoves);
     if ('unknown' in resolved) {
       setMoveError(prev => ({ ...prev, [index]: `"${trimmed}" is not a known move.` }));
+      return false;
+    }
+
+    if (pokemon[index]?.moves.some(entry => toId(entry.name) === toId(resolved.canonical))) {
+      setMoveError(prev => ({ ...prev, [index]: `"${resolved.canonical}" is already in the set.` }));
       return false;
     }
 

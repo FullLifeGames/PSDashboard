@@ -1,13 +1,13 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  buildTeamsFromReplay, getBranchSimulatorFormat, parseReplayLog, parseReplayLogWithObservations, replayBringOnly, type ReplayData,
+  buildTeamsFromReplay, getBranchSimulatorFormat, parseReplayLog, parseReplayLogWithObservations, type ReplayData,
 } from '@fulllifegames/replay-core';
 import { buildChoiceLockContext, reconstructBranchRuntime, serializeLiveBattle, loadSimMods } from '@fulllifegames/eval-engine';
 import type { TurnAlignmentRecord } from '@fulllifegames/eval-engine';
 import { extractProtocolEvents, type ProtocolEvents } from '../../packages/eval-engine/src/hax-alignment';
 import { parseTurnBlocks } from '../../packages/eval-engine/src/branch/protocol-choices';
-import { bankTeamsFor } from './bank-build';
+import { bankTeamsFor, bankWorldsFor } from './bank-build';
 import { diskCachedSmogonFetcher } from './smogon-fetch-cache';
 
 /**
@@ -32,7 +32,7 @@ export type GameType = typeof FIXTURES[number]['type'];
 
 type Fixture = ReplayData & { formatid: string };
 
-const pinnedFetcher = (async (input: string | URL | Request) => {
+export const pinnedFetcher = (async (input: string | URL | Request) => {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
   const path = url.replace(/^https:\/\/(data\.pkmn\.cc|pkmn\.github\.io\/smogon\/data)/, '').replace(/\/{2,}/g, '/');
   const key = join('test', 'e2e-feedback', 'fixtures', 'smogon', path.replace(/[^a-z0-9.]+/gi, '_'));
@@ -61,7 +61,7 @@ export async function rebuild(id: string, options: { naked?: boolean; corpus?: b
   const parsed = parseReplayLogWithObservations(replay.log);
   // Round 86 (B4b): `naked` builds the teams from the log alone, with no Smogon data (the engine package's test helper does the same), so a species keeps its first ability
   const built = options.naked
-    ? { teams: buildTeamsFromReplay(replay.log, { observations: parsed.observations, speedOrders: parsed.speedOrders }), reason: 'no teams' }
+    ? { teams: buildTeamsFromReplay(replay.log, { observations: parsed.observations, speedOrders: parsed.speedOrders }), usageStats: null, reason: 'no teams' }
     : await bankTeamsFor({ log: replay.log, formatId: replay.formatid ?? id, parsed, fetcher: options.corpus ? diskCachedSmogonFetcher() : pinnedFetcher });
   if (!built.teams) throw new Error(`${id}: no teams (${built.reason})`);
   const { p1Team, p2Team } = built.teams;
@@ -75,7 +75,8 @@ export async function rebuild(id: string, options: { naked?: boolean; corpus?: b
     format: getBranchSimulatorFormat(replay), p1Team, p2Team, replayLog: replay.log, targetTurn: lastTurn,
     snapshot: snapshotFor(lastTurn), playerNames: [replay.players[0], replay.players[1]],
     choiceLocks: buildChoiceLockContext(replay.log, { p1Team, p2Team }, observations),
-    bringOnly: replayBringOnly(replay, parseReplayLog(replay.log)) ?? undefined,
+    // Round 89 (#124): the heaviest world, the one the app's main line stores; a pinned or bring-all game has the one world it had.
+    bringOnly: bankWorldsFor(replay, parseReplayLog(replay.log), built.usageStats)[0].bringOnly,
     deadlineMs: 600_000,
     capturePositions: options.bare ? undefined : { snapshotFor, onPosition: (turn, battle) => { positions.set(turn, serializeLiveBattle(battle)); } },
   });

@@ -2,9 +2,10 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import {
-  NEW_ISSUE_URL, buildSupportState, isSupportState, issueUrl, positionLabel, screenMessage, supportFileName,
-  type SupportStateInputs,
+  NEW_ISSUE_URL, SUPPORT_STATE_VERSION, buildSupportState, isSupportState, issueUrl, positionLabel, screenMessage, supportFileName,
+  supportStateProblem, type SupportStateInputs,
 } from '../../../src/lib/support-state';
+import { savedRecord } from '../fixtures/saved-game';
 import type { BranchHistoryEntry } from '../../../src/lib/branch-history';
 
 const entry = (turnNumber: number, overrides: Partial<BranchHistoryEntry> = {}): BranchHistoryEntry => ({
@@ -55,6 +56,79 @@ describe('the support state file (round 77, user gate 28.10.2026)', () => {
     expect(screenMessage(state)).toBe('PBA S 2 3 & 5 (Kyurem) no longer knows Brave Bird.');
     expect(screenMessage(buildSupportState(inputs({ messages: { executeError: null, branchDivergence: '  ' } })))).toBeNull();
     expect(supportFileName(state)).toBe('ps-dashboard-state-gen9draft-2058494320-2026-10-28T12-34-56Z.json');
+  });
+
+  // Round 89 (#105, H7, tester finding 11): at the end of a finished game the position reads "End", as the timeline does, not "T34".
+  test('the end of a finished game reads End; a game at its tip and a replay keep their turn', async () => {
+    const started = await savedRecord(['Ann', 'Ben'], 33);
+    const finished = { ...started, turns: 33, body: ['|start', '|turn|33', '|win|Ann'] };
+    const noVariation = { startTurn: null, branching: false, history: [] };
+    const atEnd = buildSupportState(inputs({ game: finished, variation: noVariation, view: { turn: 34, line: 'main', t0: false, viewingVariation: false, liveTip: false } }));
+    expect(positionLabel(atEnd)).toBe('the End of the main line');
+    // the game that just finished stands on a live tip too
+    expect(positionLabel(buildSupportState(inputs({ game: finished, variation: noVariation, view: { turn: 34, line: 'main', t0: false, viewingVariation: false, liveTip: true } })))).toBe('the End of the main line');
+    const tip = buildSupportState(inputs({ game: { ...finished, body: ['|start', '|turn|33'] }, variation: noVariation, view: { turn: 34, line: 'main', t0: false, viewingVariation: false, liveTip: true } }));
+    expect(positionLabel(tip)).toBe('T34 on the main line');
+    const midGame = buildSupportState(inputs({ game: finished, variation: noVariation, view: { turn: 20, line: 'main', t0: false, viewingVariation: false, liveTip: false } }));
+    expect(positionLabel(midGame)).toBe('T20 on the main line');
+  });
+
+  // Round 89 (#105, H8, finding 8): the record's optional `pending` (a tip turn waiting for its replacement) rides in the state file; a file whose record has none still reads.
+  test('the state file of a game carries its pending tip turn and still reads a record without one; the version stays', async () => {
+    const record = await savedRecord(['Alice', 'Bob'], 2);
+    const waiting = { ...record, pending: [entry(3, { p2SlotChoices: [{ kind: 'move', moveId: 'icebeam', moveName: 'Ice Beam' }] })] };
+    const replay = { id: record.id, format: '[Gen 9] OU', formatid: 'gen9ou', players: record.players, log: '|turn|1', uploadtime: 1, rating: undefined, viewpoint: 'p1' as const };
+    const withPending = JSON.parse(JSON.stringify(buildSupportState(inputs({ replay, game: waiting })))) as ReturnType<typeof buildSupportState>;
+    expect(isSupportState(withPending)).toBe(true);
+    expect(withPending.version).toBe(SUPPORT_STATE_VERSION);
+    expect(withPending.game?.pending).toHaveLength(1);
+    expect(withPending.game?.pending?.[0].p2SlotChoices).toEqual([{ kind: 'move', moveId: 'icebeam', moveName: 'Ice Beam' }]);
+    const old = JSON.parse(JSON.stringify(buildSupportState(inputs({ replay, game: record })))) as ReturnType<typeof buildSupportState>;
+    expect(isSupportState(old)).toBe(true);
+    expect('pending' in (old.game ?? {})).toBe(false);
+    expect(supportStateProblem(old)).toBeNull();
+  });
+
+  test('the issue link of a new game names the game and the format, not a Showdown replay that does not exist (H4h)', () => {
+    const game = buildSupportState(inputs({ replay: { id: 'newgame-m7nj3hx23e', format: '[Gen 9] OU', formatid: 'gen9ou', players: ['Tidepool', 'Marrowkid'], log: '|turn|1', uploadtime: 1, rating: undefined, viewpoint: 'p1' } }));
+    const url = new URL(issueUrl(game, 'state.json'));
+    expect(url.searchParams.get('replay')).toBe('New game newgame-m7nj3hx23e, [Gen 9] OU (no Showdown replay)');
+    expect(url.searchParams.get('body')).not.toContain('replay.pokemonshowdown.com');
+    expect(url.searchParams.get('body')).toContain('**Replay:** New game newgame-m7nj3hx23e, [Gen 9] OU (no Showdown replay)');
+  });
+
+  // Round 89 (#105, H5): a game has no replay to load, so its file carries the game's record, and the issue says which game it is.
+  describe('a new game in the file', () => {
+    const gameReplay = { id: 'newgame-m7nj3hx23e', format: '[Gen 9] OU', formatid: 'gen9ou', players: ['Tidepool', 'Marrowkid'] as [string, string], log: '|turn|1', uploadtime: 1, rating: undefined, viewpoint: 'p1' as const };
+
+    test('the record rides along, the version stays 1, and a replay\'s file has no game key at all', async () => {
+      const record = await savedRecord(['Tidepool', 'Marrowkid'], 4, '5,6,7,8');
+      const withGame = buildSupportState(inputs({ replay: { ...gameReplay, id: record.id }, game: record }));
+      expect(withGame.game).toEqual(record);
+      expect(withGame.version).toBe(1);
+      expect(SUPPORT_STATE_VERSION).toBe(1);
+      expect(isSupportState(JSON.parse(JSON.stringify(withGame)))).toBe(true);
+      const replayFile = buildSupportState(inputs());
+      expect('game' in replayFile).toBe(false);
+      expect(Object.keys(buildSupportState(inputs({ game: null })))).toEqual(Object.keys(replayFile));
+    }, 60_000);
+
+    test('the issue link names the game, its format, seed and turns, and links no replay', async () => {
+      const record = await savedRecord(['Tidepool', 'Marrowkid'], 4, '5,6,7,8');
+      const state = buildSupportState(inputs({ replay: { ...gameReplay, id: record.id }, game: record }));
+      const url = new URL(issueUrl(state, 'state.json'));
+      const named = `New game ${record.id}, [Gen 9] OU, seed 5,6,7,8, 4 turns played (no Showdown replay)`;
+      expect(url.searchParams.get('replay')).toBe(named);
+      expect(url.searchParams.get('body')).toContain(`**Replay:** ${named}`);
+      expect(url.searchParams.get('body')).not.toContain('pokemonshowdown.com');
+    }, 60_000);
+
+    test('a file of a newer version says so, a file of no kind says what a state file is', () => {
+      expect(supportStateProblem(buildSupportState(inputs()))).toBeNull();
+      expect(supportStateProblem({ kind: 'ps-dashboard-state', version: 2 })).toBe('This state file has version 2; this app reads version 1. Open it in a newer PS Dashboard.');
+      expect(supportStateProblem({ kind: 'something else' })).toBe('Not a PS Dashboard state file (kind ps-dashboard-state, version 1).');
+      expect(supportStateProblem(null)).toBe('Not a PS Dashboard state file (kind ps-dashboard-state, version 1).');
+    });
   });
 
   test('the issue link fills the form fields by their ids, carries the same facts as a description, and clips long text', () => {

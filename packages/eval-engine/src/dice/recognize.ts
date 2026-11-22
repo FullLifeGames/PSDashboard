@@ -111,7 +111,7 @@ function isCritDraw(draw: Draw, shape: GenShape, watch: BattleWatch): boolean {
  */
 export function recognize(draw: Draw, watch: BattleWatch, gen: number): DieName | null {
   const { battle, armed } = watch;
-  const first = firstMoverDie(draw, battle) ?? endOfTurnDie(draw, watch);
+  const first = pickedDie(draw, watch) ?? firstMoverDie(draw, battle) ?? endOfTurnDie(draw, watch);
   if (first) return first;
   const move = battle.activeMove;
   const user = battle.activePokemon;
@@ -229,6 +229,20 @@ function recognizeMoveDraw(draw: Draw, watch: BattleWatch, gen: number, base: Ba
   }
   if (hitCountDraw(draw, battle, scope, gen, quiet)) return { ...base, kind: 'hit-count' };
   return handlerDie(draw, battle, base) ?? procDie(draw, battle, base);
+}
+
+/**
+ * Round 89 (#137): the two draws that sample a body. `getRandomTarget` samples the standing foes in doubles for a move aimed at none
+ * (it runs before the move is in flight, so the watch hands over the user and the move it was called with); `dragIn` takes the body
+ * that comes in from `getRandomSwitchable`'s `sample` over the bench (the watch hands over the slot dragged out). A draw inside
+ * a handler that the drag's switch-in or the target's redirect runs is not this call's own: only the innermost call counts.
+ */
+function pickedDie(draw: Draw, watch: BattleWatch): DieName | null {
+  if (draw.call !== 'sample') return null;
+  const scope = watch.scope();
+  if (scope === 'getRandomTarget' && watch.aim) return { slot: watch.aim.slot, moveId: watch.aim.moveId, kind: 'random-target' };
+  if (scope === 'getRandomSwitchable' && watch.dragged) return { slot: watch.dragged.slot, moveId: '', kind: 'drag' };
+  return null;
 }
 
 /** Events whose handler lets its holder act first: Gen 4 draws in the item's `BeforeTurn`, Gens 5 on in `FractionalPriority`. */

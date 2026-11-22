@@ -1,4 +1,8 @@
-import type { PlayedAction } from './played.ts';
+import type { BranchSlotChoice } from './branch-choices.ts';
+import type { EvalCellJob, EvalCellValue, EvalChoiceOption, EvalChoicesInfo, EvalSubSearchJob } from './executor-types.ts';
+import type { ForcedDie } from './dice/types.ts';
+import type { OnRequestJob, OnRequestResult, OnRequestStep } from './on-request.ts';
+import type { PlayedAction, PlayedBounds, PlayedTurn } from './played.ts';
 import type { SimFastLever, SimFastReport } from './forward/sim-fast/state.ts';
 import type { SearchBudget } from './search/budget.ts';
 import type { StaticRuleset } from './score/weights.ts';
@@ -38,6 +42,11 @@ export interface EvalSettings {
     p2?: PlayedAction | null;
     p1Slots?: (PlayedAction | null)[];
     p2Slots?: (PlayedAction | null)[];
+    /**
+     * Round 89 (#108): the marks of the bodies that fell before they acted (`PlayedTurn.fell`). The worker reads the order bound of
+     * them once per root, with the root battle, and ships it as `EvalResult.playedBounds`. Plain data; absent when no body fell.
+     */
+    fell?: PlayedTurn['fell'];
   } | null;
   /**
    * Round 35: false skips the forced-win prover after the root search. The
@@ -45,6 +54,24 @@ export interface EvalSettings {
    * pass, so its proof would only cost); everything else proves.
    */
   prove?: boolean;
+  /**
+   * Round 89 (#104): the rows whose lines the search should replay as the engine's lines, by label per side, instead of the merged
+   * result's best row. A host that grades a turn with another search (the matrix of an early singles turn) asks the tree for the lines
+   * of the rows that grade named. Absent: each side's best row. Part of the settings key only when present.
+   */
+  lineRows?: { p1?: string[]; p2?: string[] };
+  /**
+   * Round 89 (#104, ruling G2b): the answers the host's card ranks first, by label and by the side whose lines they are (`p1` holds the
+   * labels of player 2's rows that player 1's lines should meet, best first). The donors meet them before the search's merged ranking.
+   */
+  lineReplies?: { p1?: string[]; p2?: string[] };
+  /**
+   * Round 89 (#104, G14b, ruling G9a option L): extra tree iterations per tree, run after the tree's result, cell statistics and
+   * ranking are final, aimed at the rows whose lines the card shows (the tree's best row and the played row, against the tree's top three
+   * answers) until each line holds two turns or the quota is spent. They descend below the root cells and never write the root's own statistics, so no score, rank or grade
+   * moves; only the visits a line reads grow. Absent or 0: no pass. A search that is stopped runs none. Part of the settings key only when present.
+   */
+  linePass?: number;
   /**
    * Round 65: the rule set the replay runs under (Pokémon Champions or the
    * standard games), named by the host from the replay's format: the
@@ -96,6 +123,12 @@ export interface EvalPreferences {
    * Evaluate button. Persisted — switching it on once keeps it on.
    */
   autoAnalyze: boolean;
+  /**
+   * Round 89 (#153, Hard mode): the opponent answers each move the user plays with the reply that hurts that move most (`worstAnswer`):
+   * on a click of an engine move, in the turn dock and in a turn's lines. A preference of the app alone: no search setting, score,
+   * grade or report reads it. Absent: off.
+   */
+  hardMode?: boolean;
   /**
    * Tera enumeration: 'auto' = only when the replay terastallized (and in
    * draft/custom formats, only the Pokémon that did); 'revealed' forces the
@@ -151,7 +184,7 @@ export interface CellBlend {
 
 /**
  * Round 70: one of the base draws that priced a root cell, the draws the
- * horizon-trend probe replays: the index of its search seed (SEARCH_SEEDS)
+ * horizon-trend probe replays: the slot of its seed in the cell's list (round 89: `cellSeeds`; before, SEARCH_SEEDS)
  * and, for a speed-tied singles cell, the move order scripted into it.
  */
 export interface CellDraw {
@@ -248,6 +281,12 @@ export interface EvalResult {
    * principle (648453 t13). Absent when empty or on sub-searches.
    */
   unanswered?: UnansweredProfile;
+  /**
+   * Round 89 (#108): per side and slot, the moves (and the switch) a body that fell before it acted cannot have chosen, read once per
+   * root from the played turn's `fell` mark (`branch/action-bound.ts`). The grading drops those options before it matches a hidden slot
+   * to a row. Absent when no body fell, on sub-searches and on results cached before the field existed (they grade as before).
+   */
+  playedBounds?: PlayedBounds;
   /** Round 35: the forced win proven from this root, when one stands at or above MIN_FORCED_MASS; the score already carries its bar. */
   forcedWin?: ForcedWin;
   /** Round 77: the engine that answered, when another one than this package's own search (the engine protocol, ENGINES.md). */
@@ -257,7 +296,80 @@ export interface EvalResult {
    * score minus the leaf of the draw's own child. Absent on every other search.
    */
   trend?: number;
+  /**
+   * Round 89 (#104): the lines over the next turns, from the tree search: for each side its best row's line and its played row's line
+   * (one line when the two are the row), each a replay of the tree's line with every die at its likeliest result. Absent on a matrix
+   * search, on an engine that sends none and when the tree holds no line for the row. No score, ranking or grade reads it.
+   */
+  lines?: EvalLine[];
+  /**
+   * Round 89 (#104, G14b): the extra iterations per tree (`EvalSettings.linePass`) that made `lines`, written by the host that asked
+   * for them when it stores the lines. Absent: the lines come from the tree's own iterations alone. Nothing in the engine reads it.
+   */
+  linePass?: number;
 }
+
+/**
+ * Round 89 (#104): one die a line names, with the chance of the result the line takes (the draw's own, absent when the simulator's draw
+ * names none) and whether it could have gone the other way in a way the user wants to see (`shown`: ruling 33, question 3a). `ko`
+ * counts the damage rolls of a die whose roll decides a knock-out.
+ */
+export interface LineDie { die: ForcedDie; chance?: number; shown: boolean; ko?: { rolls: number; of: number } }
+
+/** One side's click of a step: the engine's choice string and label, and the slot choices the branch layer replays (the dice ride on their holders). */
+export interface LineChoice { choice: string; label: string; slots: (BranchSlotChoice | null)[] }
+
+/**
+ * One step of a line: a turn, or a replacement after a faint or a pivot (`replacement` names the side that picks, `both` when both do;
+ * the other side waits). `dice` are the dice the step names, each at its likeliest result.
+ */
+export interface LineStep { p1: LineChoice; p2: LineChoice; replacement?: 'p1' | 'p2' | 'both'; dice: LineDie[] }
+
+/**
+ * Round 89 (#104): the line of one row. `for` says which of the turn's two lines it is (the engine's best row, the row the player
+ * played; one line carries both when they are the same row). `end` is the static evaluation after the last step from `side`'s view
+ * (the value space of `RankedChoice.worstCase`), `endFainted` that position's fainted share. `cut` says why a line stops short of the
+ * tree's own (a step no longer legal after the likeliest dice), `awaits` who the last position asks to send a body in (a pivot's or a faint's switch the tree made no choice for); `unforced` lists what the replay left to the stream (a die the draw
+ * cannot name, a draw no die names), so the click depends on the seed there.
+ */
+export interface EvalLine {
+  side: 'p1' | 'p2';
+  label: string;
+  choice: string;
+  for: ('engine' | 'played')[];
+  steps: LineStep[];
+  end: number;
+  endFainted: number;
+  visits: number;
+  /**
+   * Round 89 (#153, Hard mode): `worst` marks the line of this row against the reply that hurts it most (`worstAnswer`), which a turn
+   * holds beside the row's usual line (same side, label and roles). Absent: the usual line, which meets the search's own top answers.
+   */
+  versus?: 'worst';
+  cut?: string;
+  /** The side (or both) the position after the last step asks to send a body in: a line ends when a choice is needed that the tree did not make. */
+  awaits?: 'p1' | 'p2' | 'both';
+  unforced?: string[];
+}
+
+/** One step of a row's line as a tree carries it: both sides' choices by label and the visits of its cell. */
+export interface TreeLineStep { p1: string; p2: string; visits: number }
+
+/**
+ * A tree's lines for each root row that holds one, by side and row label: up to three per row, the tree's own first (round 89, G12).
+ * Round 89 (#153, Hard mode): `floor` is, by side and row label, the tree's line through the cell of the row's floor answer (the caller
+ * names it) when that cell holds the visits a line needs; it stays apart from the lists the plain request's donors read. Absent: none.
+ */
+export interface RowLines { p1: Record<string, TreeLineStep[][]>; p2: Record<string, TreeLineStep[][]>; floor?: { p1: Record<string, TreeLineStep[]>; p2: Record<string, TreeLineStep[]> } }
+
+/**
+ * One line to replay: the row, the trees' lines for it best first (the next one stands in when a replay is cut) and the visits of the first.
+ * Round 89 (#153): `versus: 'worst'` asks for the row's line against the reply that hurts it most (`worstAnswer`); absent: the usual line.
+ */
+export interface LineRequest { side: 'p1' | 'p2'; label: string; for: ('engine' | 'played')[]; donors: TreeLineStep[][]; visits: number; versus?: 'worst' }
+
+/** The lines job: the requests, and the settings the root's options need to resolve the first labels. */
+export interface LinesInput { requests: LineRequest[]; tera?: TeraAllowance; sleepClause?: boolean; keepPlayed?: EvalSettings['keepPlayed'] }
 
 /**
  * One switch-in-stage row (round 14): every BENCHED enemy loses the entry
@@ -334,6 +446,12 @@ export interface ForcedWin {
   turns: number;
   mass: number;
   caveat: ForcedWinCaveat;
+  /** Round 89 (P2): the id of the stalling move whose repeats the proof delays (a foe that Protects again only postpones the knock-out). Absent when no cell of the proof leans on a delay. */
+  delay?: string;
+  /** Round 89 (P3): the root choice that proves the win, when the search's own list does not hold it (a sure strike from the legal combinations); absent when the choice is one of the list's. */
+  choice?: string;
+  /** Round 89 (P4): the Dex names the card prints: of `delay` ("Protect"; a result without it says "a repeated stalling move") and of `choice` (the move that strikes first and, in doubles, its partner). */
+  delayName?: string; choiceNames?: { first: string; partner?: string };
   open?: ForcedWinOpen;
   engineScore: number;
   /** Prover states expanded (both side attempts). */
@@ -366,7 +484,8 @@ export interface ForcedWinInput {
   ruleset?: StaticRuleset;
 }
 
-export interface ForcedWinProof {
+/** The prover's answer; `delay`, `choice` and their names (round 89, lane P) are the optional fields of `ForcedWin`, which the proof hands on unchanged. */
+export interface ForcedWinProof extends Pick<ForcedWin, 'delay' | 'choice' | 'delayName' | 'choiceNames'> {
   mass: number;
   turns: number;
   caveat: ForcedWinCaveat;
@@ -461,86 +580,7 @@ export interface SearchProgress {
   depth: number;
 }
 
-export interface EvalChoiceOption {
-  choice: string;
-  label: string;
-}
-
-export interface EvalChoicesInfo {
-  p1: EvalChoiceOption[];
-  p2: EvalChoiceOption[];
-  /** Static eval of the root (±1 when the battle already ended). */
-  rootValue: number;
-  rootEnded: boolean;
-  /** Per-option analytic kill odds, index-aligned with p1/p2 (round 6). */
-  koOdds?: { p1: (KoOddsInfo | null)[]; p2: (KoOddsInfo | null)[] };
-  /** Root unanswered-mon profile (rounds 13/14) for the orchestrated path. */
-  unanswered?: UnansweredProfile;
-}
-
-export interface EvalCellJob {
-  i: number;
-  j: number;
-  p1Choice: string;
-  p2Choice: string;
-  /** Number of fixed seeds to average. */
-  samples: number;
-  /**
-   * Round 63 (T16): the verify step's sub-search settings. With them the
-   * cell goes one ply deeper per outcome in the same job: every open class
-   * of a blend (CellBlendClass.deepened), or the outcome groups of a plain
-   * cell over more natural draws (EvalCellValue.deepened).
-   */
-  deepen?: EvalSettings;
-  /**
-   * Round 67 (T128): one natural draw (the first search seed) and its leaf,
-   * no pair plan and no class blend: the answer round's cheap price of a
-   * row against an answer the tree did not list.
-   */
-  plain?: boolean;
-}
-
-export interface EvalCellValue {
-  i: number;
-  j: number;
-  value: number;
-  /** The first-seed child is terminal (blended cells: every sampled child is). */
-  ended: boolean;
-  /** Analytic class blend of a boundary cell (root cells only). */
-  blend?: CellBlend;
-  /** Probe budget exhausted with analytic classes unsampled. */
-  diagnostic?: KoOddsMismatch;
-  /**
-   * Round 70: the base draws that priced the cell, for the horizon-trend probe
-   * (root matrix cells only). Absent for a cell of one draw of the first seed,
-   * whose child the probe takes for the cell.
-   */
-  baseDraws?: CellDraw[];
-  /**
-   * Round 33: the first-seed child's depth-2 value (a depth-1 sub-search
-   * on that child), set by the verify step in the MCTS mode. Below the
-   * depth floor it replaces the one-ply sampler value; blended cells
-   * re-blend it through the first-seed class (as reblendValue does).
-   * Round 63 (T16): a plain verify cell carries its outcome groups one ply
-   * deeper, mixed by draw share; blended cells carry the depth per class.
-   */
-  deepened?: number;
-}
-
-export interface EvalSubSearchJob {
-  i: number;
-  j: number;
-  p1Choice: string;
-  p2Choice: string;
-  /** Sub-search settings (depth already reduced, samples fixed to 1). */
-  settings: EvalSettings;
-  /**
-   * Round 70: a trend probe. The child is the one this draw of the cell leads
-   * to (not the first seed's), and the answer carries `trend`, the sub-search
-   * score minus the child's own leaf.
-   */
-  draw?: CellDraw;
-}
+export type { EvalCellJob, EvalCellValue, EvalChoiceOption, EvalChoicesInfo, EvalSubSearchJob } from './executor-types.ts';
 
 /** One MCTS tree's root statistics — mergeable across parallel trees. */
 export interface MctsTreeStats {
@@ -604,6 +644,11 @@ export interface MctsTreeStats {
      */
     classKey?: string;
     /**
+     * Round 89 (#59, T322 block 1): the plan's chance of the drawn class (the Dex weight the sampler gives it, half of it in a tied
+     * singles cell), booked beside `classKey`. Absent on an unkeyed cell and on a class the fold names no weight for.
+     */
+    classWeight?: number;
+    /**
      * Round 43: a root chance cell's outcome classes with their subtree
      * stats (`total` = leaves backed through the class, `value` = the
      * class child's static, one prior each); the merge pools them per
@@ -613,6 +658,8 @@ export interface MctsTreeStats {
   }[];
   /** This tree's own ranked result (PV/punisher donor for the merge). */
   result: EvalResult;
+  /** Round 89 (#104): the tree's line for each root row that holds one, read by the lines job. Absent on trees from before. */
+  rowLines?: RowLines;
 }
 
 /** Round 59: the speed-layer levers; round 61: the search budget. Both ride on every request (several carry no EvalSettings). */
@@ -626,11 +673,13 @@ interface RulesetStamp { ruleset?: StaticRuleset }
 
 export type EvalWorkerRequest = (
   | { type: 'search'; id: number; serializedBattle: string; settings: EvalSettings }
-  | { type: 'mctstree'; id: number; serializedBattle: string; settings: EvalSettings; seedOffset: number }
+  | { type: 'mctstree'; id: number; serializedBattle: string; settings: EvalSettings; seedOffset: number; partials?: true }
   | { type: 'choices'; id: number; serializedBattle: string; tera: TeraAllowance; keepPlayed?: EvalSettings['keepPlayed']; sleepClause?: boolean }
   | { type: 'cells'; id: number; serializedBattle: string; jobs: EvalCellJob[] }
   | { type: 'subsearch'; id: number; serializedBattle: string; job: EvalSubSearchJob }
   | { type: 'prove'; id: number; serializedBattle: string; input: ForcedWinInput }
+  | { type: 'lines'; id: number; serializedBattle: string; input: LinesInput }
+  | { type: 'job'; id: number; serializedBattle: string; job: OnRequestJob }
 ) & SimFastStamp & RulesetStamp;
 
 /** Final answers carry the worker's speed-layer status and its counters since the last one. */
@@ -642,5 +691,8 @@ export type EvalWorkerResponse = (
   | { type: 'choicesResult'; id: number; info: EvalChoicesInfo }
   | { type: 'cellsResult'; id: number; values: EvalCellValue[] }
   | { type: 'proveResult'; id: number; outcome: ForcedWinOutcome | null }
+  | { type: 'linesResult'; id: number; lines: EvalLine[] }
+  | { type: 'jobStep'; id: number; step: OnRequestStep }
+  | { type: 'jobResult'; id: number; result: OnRequestResult }
   | { type: 'error'; id: number; message: string }
 ) & { simFast?: SimFastReport };

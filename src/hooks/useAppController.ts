@@ -7,7 +7,11 @@ import type { BoardController } from './controller/board-controller';
 import { useEngineController } from './controller/engine-controller';
 import type { EngineController } from './controller/engine-controller';
 import { useGameAnalysis } from './useGameAnalysis';
+import { useEarlyLines } from './useEarlyLines';
+import { turnCacheKey } from './useEvalView';
 import { useSupport } from './useSupport';
+import { useOpenSharedGame } from './useOpenSharedGame';
+import { useRestorePendingTurn } from './useRestorePendingTurn';
 import { branchFrameLog } from '../lib/branch-log';
 import { manualMove, toId } from '@fulllifegames/replay-core';
 import type { BranchSlotChoice } from '@fulllifegames/eval-engine';
@@ -82,6 +86,26 @@ function useHypotheticalMove(ctx: ReplayContext, board: BoardController) {
   }, [effectiveP1Info, effectiveP2Info, setEditedP1Info, setEditedP2Info, simState, history, liveTip, variationSpan, setPendingBranchRefresh]);
 }
 
+/** Round 89 (#104, G13): the early-lines stage after the game report; its progress goes to the Game review's header. */
+function useEarlyLinesStage(ctx: ReplayContext, engine: EngineController, analyses: ReturnType<typeof useGameAnalysis>['gameAnalyses']) {
+  const { evaluation } = ctx;
+  const { replayData, snapshots } = ctx.replay;
+  const { setsFingerprint } = ctx.knowledge;
+  const { makeReplayAcquire } = engine.acquire;
+  const { effectiveTera, effectiveSleepClause, effectiveRuleset } = engine.evalView;
+  const replayId = replayData?.id ?? null;
+  const positionFor = useCallback((turn: number) => makeReplayAcquire(turn)(() => {}), [makeReplayAcquire]);
+  const cacheKeyFor = useCallback(
+    (turn: number) => turnCacheKey(replayId ?? '', turn, snapshots.length, setsFingerprint),
+    [replayId, snapshots.length, setsFingerprint],
+  );
+  return useEarlyLines({
+    replayId, analyses, graph: evaluation.graph, prefsMode: evaluation.prefs.mode,
+    tera: effectiveTera, sleepClause: effectiveSleepClause, ruleset: effectiveRuleset,
+    searchLines: evaluation.searchLines, attachLines: evaluation.attachLines, cancel: evaluation.cancel, positionFor, cacheKeyFor,
+  });
+}
+
 /** Per-turn and game-level analysis plus the branch iframe's derived log. */
 function useAnalysisSurface(ctx: ReplayContext, board: BoardController, engine: EngineController) {
   const { replayData, snapshots } = ctx.replay;
@@ -94,9 +118,11 @@ function useAnalysisSurface(ctx: ReplayContext, board: BoardController, engine: 
 
   // Per-turn and game-level analysis (reads, turn card, lead analysis,
   // game report, the feedback harness's window handle).
-  const { turnReads, turnAnalysis, faintedShares, leadAnalysisData, gameReport } = useGameAnalysis({
+  const { turnReads, turnAnalysis, faintedShares, leadAnalysisData, gameReport, gameAnalyses } = useGameAnalysis({
     replayData, snapshots, evaluation, analysisTurn, sweepAlignment, replayGen,
   });
+
+  const { progress: earlyLines, lineComing } = useEarlyLinesStage(ctx, engine, gameAnalyses);
 
   const simLines = simState?.log;
   // Round 82 (forced dice), step A7b: the display lines of the forced dice join the frame's log, never the battle's own.
@@ -112,7 +138,7 @@ function useAnalysisSurface(ctx: ReplayContext, board: BoardController, engine: 
   // sim iframe on every navigation and every executed turn (tip advance).
   const branchReloadKey = `${branchSession}:${variationStartTurn ?? 0}`;
 
-  return { turnReads, turnAnalysis, faintedShares, leadAnalysisData, gameReport, simLog, latestBranchHistoryEntry, showBranch, branchReloadKey };
+  return { turnReads, turnAnalysis, faintedShares, leadAnalysisData, gameReport, gameAnalyses, earlyLines, lineComing, simLog, latestBranchHistoryEntry, showBranch, branchReloadKey };
 }
 
 /**
@@ -132,7 +158,11 @@ export function useAppController() {
   }, [executePending]);
   const analysis = useAnalysisSurface(ctx, board, engine);
   const support = useSupport({ ctx, transients, board });
-  return { ctx, transients, board, engine, handleHypotheticalMove, handleExecuteTurn, analysis, support };
+  // Round 89 (#105, H5): a game's share link opens the game, its branch and the sharer's turn.
+  const sharedGame = useOpenSharedGame({ ctx, board });
+  // Round 89 (#105, H8): a reload while the tip turn waits for its replacement plays that turn again.
+  useRestorePendingTurn({ ctx, board }, sharedGame.opening || ctx.shared.sharedGame !== null);
+  return { ctx, transients, board, engine, handleHypotheticalMove, handleExecuteTurn, analysis, support, sharedGame };
 }
 
 export type AppController = ReturnType<typeof useAppController>;

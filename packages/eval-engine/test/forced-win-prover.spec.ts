@@ -51,16 +51,36 @@ describe('forced-win prover (round 35)', () => {
     expect(proof.openValue).toBeNull();
   });
 
-  test('a failing first candidate does not stop the proof', () => {
-    // Splash first: the Chansey out-heals Seismic Toss for longer than the
-    // depth cap allows (sixteen heals), so the Splash line proves nothing.
+  test('a stalling first candidate no longer starves the second: the sure strike goes first, whatever the ranking says', () => {
+    // Round 89 (A5f-7): no greedy scout filters the stalling line out. Round 89 (P3): the position has a sure strike (Seismic Toss
+    // kills the Chansey at 1 HP, and the Chansey has no damaging move), which the proof tries before the ranking and on cells of
+    // its own, so Splash first reads the win the Toss-first ranking reads, at the same cells. The budget no longer decides
+    // between the two orders in this position; the next row holds a position where the ranking still decides.
     const serialized = serializeAt(makeBattle(
       [makeSet('Champ', 'Machamp', ['Seismic Toss', 'Splash'])],
       [makeSet('Egg', 'Chansey', ['Soft-Boiled', 'Recover'])],
     ), { p2: [1] });
-    const proof = proveForcedWin(serialized, { side: 'p1', rootOrder: ['move splash', 'move seismictoss'], tera: false });
-    expect(proof.mass).toBe(1);
-    expect(proof.turns).toBe(1);
+    const stalling = proveForcedWin(serialized, { side: 'p1', rootOrder: ['move splash', 'move seismictoss'], tera: false });
+    const winning = proveForcedWin(serialized, { side: 'p1', rootOrder: ['move seismictoss', 'move splash'], tera: false });
+    for (const proof of [stalling, winning]) {
+      expect(proof.mass).toBe(1);
+      expect(proof.turns).toBe(1);
+      expect(proof.cells).toBe(2);
+    }
+  });
+
+  test('with no sure strike the ranking decides which three candidates the proof tries: a winner listed fourth is never tried, listed first it wins', () => {
+    // A foe with a second body takes the strike away (D2 a: only a last standing body), and the Snorlax's Tackle kills the Pikachu at
+    // 1 HP unless the first move does: only Seismic Toss wins, this turn. The proof tries ROOT_CANDIDATES (3) of the ranking.
+    const serialized = serializeAt(makeBattle(
+      [makeSet('Pika', 'Pikachu', ['Splash', 'Growl', 'Harden', 'Seismic Toss'])],
+      [makeSet('Lax', 'Snorlax', ['Tackle']), makeSet('Lax2', 'Snorlax', ['Tackle'])],
+    ), { p1: [1], p2: [30, 30] });
+    const fourth = proveForcedWin(serialized, { side: 'p1', rootOrder: ['move splash', 'move growl', 'move harden', 'move seismictoss'], tera: false });
+    expect(fourth.mass).toBe(0);
+    const first = proveForcedWin(serialized, { side: 'p1', rootOrder: ['move seismictoss', 'move splash', 'move growl', 'move harden'], tera: false });
+    expect(first.mass).toBe(1);
+    expect(first.turns).toBe(2);
   });
 
   test('the losing side proves nothing', () => {
@@ -93,20 +113,20 @@ describe('forced-win prover (round 35)', () => {
     expect(proof.openValue).toBe(-1);
   });
 
-  test('the greedy probe spends a few cells on a hopeless position and no full proof', () => {
-    // Protect and Substitute on both sides: no line ends, so the probe fails
-    // every candidate inside its own budget and the tree search never starts.
+  test('a position without a line costs the proof its budget and no more', () => {
+    // Protect and Substitute on both sides: no line ends, so the full proof refutes the candidates inside the cell and state
+    // budgets and proves nothing (round 89, A5f-7: no greedy scout stops it first).
     const serialized = serializeAt(makeBattle(
       [makeSet('A', 'Snorlax', ['Protect', 'Substitute'])],
       [makeSet('B', 'Chansey', ['Protect', 'Substitute'])],
     ), {});
     const proof = proveForcedWin(serialized, { side: 'p1', rootOrder: ['move protect', 'move substitute'], tera: false });
     expect(proof.mass).toBe(0);
-    expect(proof.states).toBe(0);
-    expect(proof.cells).toBeLessThanOrEqual(PROVER_BUDGET.probeCells);
+    expect(proof.cells).toBeLessThanOrEqual(PROVER_BUDGET.cells);
+    expect(proof.states).toBeLessThanOrEqual(PROVER_BUDGET.states);
   });
 
-  test('a two-turn proof against four replies fits the budget after the probe', () => {
+  test('a two-turn proof against four replies fits the budget', () => {
     // Seismic Toss twice against a 150-HP Chansey with four harmless moves:
     // four replies at the root, four children each proving in one more turn.
     const serialized = serializeAt(makeBattle(

@@ -83,7 +83,7 @@ describe.each(SCENES)('a turn that pauses for a switch, $kind', scene => {
     const marks = turnDiceMarks(current.history, 0)!;
     expect(marks).toBe(current.history[1].diceMarks);
     expect(sideMarkTexts(marks, 'p1')).toEqual(['Volt Switch: hits']);
-    expect(sideMarkTexts(marks, 'p2')).toEqual(['Scald: Burn']);
+    expect(sideMarkTexts(marks, 'p2')).toEqual(['Scald: burn']);
     expect(turnDiceMarks(current.history, 1)).toBeUndefined();
   }, 180_000);
 
@@ -106,7 +106,7 @@ describe.each(SCENES)('a turn that pauses for a switch, $kind', scene => {
     const payload = decodeBranchShare(encodeBranchShare(makeBranchSharePayload({ replay, branchTurn: 1, history: current.history, finalLog })));
     expect(payload.version).toBe(1);
     expect(payload.finalLog.split('\n').filter(line => line.startsWith('|-message|Forced'))).toHaveLength(2);
-    expect(payload.choices.map(choice => [choice.p1DiceLabels, choice.p2DiceLabels])).toEqual([[['Volt Switch: hits'], ['Scald: Burn']], [undefined, undefined]]);
+    expect(payload.choices.map(choice => [choice.p1DiceLabels, choice.p2DiceLabels])).toEqual([[['Volt Switch: hits'], ['Scald: burn']], [undefined, undefined]]);
 
     const blobs: Blob[] = [];
     vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: vi.fn((blob: Blob) => { blobs.push(blob); return 'blob:test/dice'; }), revokeObjectURL: vi.fn() }));
@@ -115,7 +115,7 @@ describe.each(SCENES)('a turn that pauses for a switch, $kind', scene => {
       const html = await blobs[0].text();
       expect(html).toContain('|-message|Forced: Volt Switch hits');
       expect(html).toContain('|-message|Forced: Scald burn');
-      expect(screen.getByRole('group', { name: 'Forced dice, turn 1' })).toHaveTextContent('P1 Volt Switch: hitsP2 Scald: Burn');
+      expect(screen.getByRole('group', { name: 'Forced dice, turn 1' })).toHaveTextContent('P1 Volt Switch: hitsP2 Scald: burn');
     } finally {
       vi.unstubAllGlobals();
     }

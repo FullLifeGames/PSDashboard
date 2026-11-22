@@ -239,7 +239,9 @@ describe('natural-language turn summaries', () => {
       scoreBefore: 0.1,
       scoreAfter: 0.1,
     }), names);
-    expect(summary).toContain('quiet turn');
+    // Round 89 (FT-1): the card names the inaccuracy, so it says neither "quiet" nor that no one made a mistake.
+    expect(summary).not.toContain('Neither side made a mistake.');
+    expect(summary).not.toContain('quiet turn');
     expect(summary).toContain("Alpha's U-turn was an inaccuracy; Draco Meteor was slightly better");
   });
 

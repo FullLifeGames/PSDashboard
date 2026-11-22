@@ -97,6 +97,16 @@ describe('TimelineBar', () => {
     expect(wired.onDiscard).toHaveBeenCalledTimes(1);
   });
 
+  // Round 89 (#105, H7, finding 2): a game's tip turn that waits for its replacement is the main line's next turn.
+  test('an idle game tip keeps the slider and shows no stripe, no line chips and no Discard variation', () => {
+    render(<TimelineBar {...props({ viewTurn: 5, maxTurn: 4, variationSpan: { startTurn: 4, length: 1 }, viewingVariation: true, viewLine: 'variation', branching: true, idle: true })} />);
+    expect(screen.getByRole('slider')).toHaveAttribute('max', '5');
+    expect(screen.getByRole('slider')).toHaveValue('5');
+    expect(screen.queryByTitle(/^Variation: turns/)).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Line selector' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Discard variation' })).toBeNull();
+  });
+
   test('a variation past the replay end widens the slider; the chip clamps into the covered turns', async () => {
     const wired = props({ viewTurn: 2, variationSpan: { startTurn: 9, length: 4 }, maxTurn: 10 });
     render(<TimelineBar {...wired} />);

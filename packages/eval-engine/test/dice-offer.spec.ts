@@ -68,15 +68,15 @@ function exercise(rules: Rules, mode: Mode, move: DexMove, tally: Tally): string
   const problems: string[] = [];
   // every die the natural turn draws is offered
   const offered = new Set(offers.map(offer => dieKey(offer.name)));
-  for (const key of drawnKeys(board, clicks, move.id)) {
-    const [, , target, kind, ...rest] = key.split(':');
-    // round 88 (gate of 08.11.2026): since T337 the engine draws the accuracy of each hit as the simulator does (Triple Axel, Triple
-    // Kick, Population Bomb); the offer names the first hit's die, and the die of a later hit waits for its offer and chip (#114)
-    const laterHit = kind === 'accuracy' && Number(/^hit(\d+)$/.exec(rest.at(-1) ?? '')?.[1] ?? 1) >= 2;
+  // round 89 (#114): a multi-accuracy move draws the die of a later hit only when the earlier hits land, so it plays a few more seeds
+  const dexMove = move as unknown as { multiaccuracy?: boolean };
+  const extra = dexMove.multiaccuracy ? ['5,6,7,8', '9,10,11,12', '13,14,15,16', '17,18,19,20'].flatMap(seed => drawnKeys(sweepBoard(rules, move.id, mode, seed, false, FAST), clicks, move.id)) : [];
+  for (const key of new Set([...drawnKeys(board, clicks, move.id), ...extra])) {
+    const [, , target, kind] = key.split(':');
     // a die the state cannot name before the hit stays unoffered: a move that sets its self effect in its own hit handler
     // (`onTryHit`), and an accuracy aimed at the user (a move that works through its own condition: Bide, Nature Power)
     const lateSelf = kind === 'self-effect' && typeof (dexOfRules(rules).moves.get(move.id) as unknown as { onTryHit?: unknown }).onTryHit === 'function';
-    if (OFFERED_KINDS.has(kind) && !offered.has(key) && !lateSelf && !laterHit && target !== 'p1a') problems.push(`drawn but not offered: ${key}`);
+    if (OFFERED_KINDS.has(kind) && !offered.has(key) && !lateSelf && target !== 'p1a') problems.push(`drawn but not offered: ${key}`);
   }
   if (offers.length === 0) return problems;
   // every offered die, forced, is drawn (the accuracy forced to hit so the dice behind it run)
@@ -144,11 +144,13 @@ describe.each(SWEEP_CASES)('the offer follows the state: $name', ({ rules, mode 
     expect(kindsOf(offerOn('thunderbolt', { ability: 'Sheer Force' }))).not.toContain('secondary:par');
   });
 
-  test('Skill Link fixes the hit count: no hit count die', () => {
+  test('Skill Link fixes the hit count: no hit count die to choose, one row without a choice that names the count and the ability (round 89, F4a)', () => {
     if (!has(rules, 'abilities', 'skilllink')) return;
     play('skilllink');
     expect(kindsOf(offerOn('furyattack'))).toContain('hit-count');
-    expect(kindsOf(offerOn('furyattack', { ability: 'Skill Link' }))).not.toContain('hit-count');
+    expect(offerOn('furyattack').some(offer => offer.fixedBy !== undefined)).toBe(false);
+    const fixed = offerOn('furyattack', { ability: 'Skill Link' }).filter(offer => offer.name.kind === 'hit-count');
+    expect(fixed).toEqual([{ name: { slot: 'p1a', moveId: 'furyattack', kind: 'hit-count' }, results: [{ hits: 5 }], fixedBy: dexOfRules(rules).abilities.get('skilllink').name }]);
   });
 
   test('a stalling die exists on the second use only', () => {

@@ -4,11 +4,9 @@ import { nationalDexDoublesFormat, ouFallbackFormat, vgcYearFormat } from './smo
 import { fetcherKey } from './smogon/fetcher-key';
 import { withSmogonFallback, type SmogonFetch } from './smogon/hosts';
 
-export type { PokemonUsageStats, SmogonUsageStats, SpeciesUsageSet, UsageProbability, UsageSpread } from '@fulllifegames/replay-core';
+export type { SmogonUsageStats } from '@fulllifegames/replay-core';
 export { parseSmogonChaosStats, parseSpread } from './smogon/stats-parse';
-export {
-  alternativeItems, fillUsageMoves, getSpeciesUsageSet, getSpeciesUsageStats, guessedFieldFromUsage,
-} from '@fulllifegames/replay-core';
+export { alternativeItems, fillUsageMoves, getSpeciesUsageSet } from '@fulllifegames/replay-core';
 
 const usageCache = new Map<string, Promise<SmogonUsageStats | null>>();
 

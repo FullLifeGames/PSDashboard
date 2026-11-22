@@ -1,8 +1,12 @@
 import type { AppController } from '../../hooks/useAppController';
 import { ConfirmBanner } from '../ConfirmBanner';
+import { replayFormatId } from '../../lib/replay-format-id';
+import { gameEnd } from '../../lib/game-end';
 import { RawLogToggle } from './RawLogToggle';
 import type { Side } from './dock-model';
 import { TurnDock, type TurnDockProps } from './TurnDock';
+
+const isGame = (app: AppController): boolean => app.ctx.newGame.record !== null;
 
 /** What the dock reads from the app: the live branch at its tip, the resolved picker (with its seed) at every other position. */
 function dockProps(app: AppController, replayId: string): TurnDockProps {
@@ -13,12 +17,18 @@ function dockProps(app: AppController, replayId: string): TurnDockProps {
   return {
     // A replay turn shows the picker's state with the engine's fill laid over its empty slots (Q19 b).
     simState: liveTip ? simState : dockSimState,
+    isGame: isGame(app),
+    endOfGame: gameEnd({
+      isGame: isGame(app), viewingVariation: app.board.timeline.viewingVariation, liveTip, simState,
+      atEndPosition: app.board.timeline.atEndPosition, log: app.ctx.replay.replayData?.log ?? '',
+    }),
     stale: !liveTip && pickerStale,
     source: liveTip ? 'live' : positionPicker?.source,
     acquiringExact: !liveTip && app.engine.acquire.exactAcquiringTurn === viewTurn,
     executeError: liveTip ? executeError : null,
     executing: executing || branchPreparing,
     gen: app.ctx.meta.replayGen,
+    format: replayFormatId(app.ctx.replay.replayData),
     onSetChoice: handleSetChoice,
     // The live tip can hold a forced replacement back for Execute (ruling 16a); a replay turn has none.
     onRecordChoice: liveTip ? app.ctx.branch.recordChoice : undefined,
@@ -33,6 +43,9 @@ function dockProps(app: AppController, replayId: string): TurnDockProps {
     seed: liveTip ? null : pickerSeed,
     // The first chip click at a replay turn starts the fill for its empty slots; the tip fills at once.
     fill: app.engine.dockFill,
+    // Round 89 (#153, HM-2): the stored `hardMode` preference, called "Opponent reads my move" where the user sees it.
+    opponentReads: !!app.ctx.evaluation.prefs.hardMode,
+    onOpponentReadsChange: value => app.ctx.evaluation.setPrefs({ ...app.ctx.evaluation.prefs, hardMode: value }),
   };
 }
 

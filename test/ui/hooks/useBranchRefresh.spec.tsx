@@ -52,6 +52,19 @@ describe('useBranchRefresh', () => {
     expect(wired.session.begin).not.toHaveBeenCalled();
   });
 
+  // Round 89 (#105): a game's own seed rides on the rebuild, a replay's rebuild names none (its default seed stays).
+  test('the dice seed of a new game reaches the rebuild; a replay passes none', async () => {
+    const game = args({ request: request(), gameSeed: '7,8,9,10', viewTurn: 0 });
+    renderHook(() => useBranchRefresh(game));
+    await waitFor(() => expect(game.startBranch).toHaveBeenCalledTimes(1), { timeout: 30_000 });
+    expect((game.startBranch as ReturnType<typeof vi.fn>).mock.calls[0][6]).toMatchObject({ seed: '7,8,9,10' });
+
+    const replay = args({ request: request() });
+    renderHook(() => useBranchRefresh(replay));
+    await waitFor(() => expect(replay.startBranch).toHaveBeenCalledTimes(1), { timeout: 30_000 });
+    expect((replay.startBranch as ReturnType<typeof vi.fn>).mock.calls[0][6]).not.toHaveProperty('seed');
+  }, 60_000);
+
   test('a request rebuilds the branch with the edited teams at the viewed turn and hands the pending choices on', async () => {
     const wired = args({ request: request() });
     renderHook(() => useBranchRefresh(wired));

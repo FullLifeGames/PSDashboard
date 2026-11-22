@@ -127,7 +127,8 @@ describe('static rule set', () => {
     const standard = (await run('standard')).score;
     const champions = await withChampionsMatchupAsync(FEATURE_WEIGHTS.matchup + 400, async () => (await run('champions')).score);
     expect(champions).not.toBe(standard);
-  });
+    // Two orchestrated trees took 80 to 108 s with the speed layer forced off on devbox (round 89, the merge's slow-mode timeouts); 180 s is its neighbour's bound since round 78.
+  }, 180_000);
 
   // Review fix: the greedy replacement after a knock-out (matrix cells, a pivot without a follow-up, prover cells, the repair on deserialization) weighs by the rule set the position carries from its root.
   test('the greedy replacement after a knock-out reads the rule set of its position', () => {

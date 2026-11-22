@@ -117,7 +117,7 @@ describe('BranchHistoryPanel', () => {
     });
     renderOpen(<BranchHistoryPanel branchStartTurn={2} history={[entry(2), entry(3), both, entry(4)]} snapshots={snapshots} onNavigate={vi.fn()} />);
     expect(toggle()).toHaveTextContent('▾ Variation moves · 3 turns');
-    expect(screen.getByText(/Turn 3 · forced replacement \(both sides\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Turn 3 · replacement \(both sides\)/)).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /Variation result/ })).toHaveLength(3);
   });
 
@@ -125,7 +125,7 @@ describe('BranchHistoryPanel', () => {
     // a replacement finishes the turn it follows: it carries that turn's number (the battle's turn has not moved)
     const forced = entry(2, { kind: 'forced', forcedSide: 'p2', p1Choice: '—', p2Choice: 'switch 3' });
     renderOpen(<BranchHistoryPanel branchStartTurn={2} history={[entry(2), forced, entry(3)]} snapshots={snapshots} onNavigate={vi.fn()} />);
-    expect(screen.getByText(/Turn 2 · forced replacement \(P2\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Turn 2 · replacement \(P2\)/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Tip of the variation/ })).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /Variation result/ })).toHaveLength(2);
   });

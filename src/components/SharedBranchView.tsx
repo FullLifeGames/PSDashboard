@@ -3,6 +3,7 @@ import { MatchTitle } from './MatchTitle';
 import { PSReplayFrame } from './PSReplayFrame';
 import type { BranchSharePayload } from '../lib/branch-share';
 import { REPLAY_FRAME_HEIGHT } from '../lib/replay-html';
+import { isGameId } from '../lib/new-game/record';
 
 function SharedBranchTopbar({
   branch,
@@ -22,14 +23,17 @@ function SharedBranchTopbar({
         <span style={{ fontSize: 11, fontWeight: 'bold', color: '#8cf' }}>
           Shared Branch
         </span>
-        <button
-          type="button"
-          className="ps-btn"
-          onClick={() => onLoadOriginal(branch.replayId)}
-          style={{ padding: '2px 8px', fontSize: 10 }}
-        >
-          Load Original Replay
-        </button>
+        {/* a game of the app has no Showdown replay to load (round 89, #105, H5) */}
+        {!isGameId(branch.replayId) && (
+          <button
+            type="button"
+            className="ps-btn"
+            onClick={() => onLoadOriginal(branch.replayId)}
+            style={{ padding: '2px 8px', fontSize: 10 }}
+          >
+            Load Original Replay
+          </button>
+        )}
         <button
           type="button"
           className="ps-btn"
@@ -50,7 +54,7 @@ function choiceLine(choice: SharedChoice): string {
   const p1 = choice.p1Label ?? choice.p1Choice;
   const p2 = choice.p2Label ?? choice.p2Choice;
   if (choice.forcedSide) {
-    return `Turn ${choice.turnNumber}, forced replacement (${choice.forcedSide.toUpperCase()}): ${choice.forcedSide === 'p1' ? p1 : p2}`;
+    return `Turn ${choice.turnNumber}, replacement (${choice.forcedSide.toUpperCase()}): ${choice.forcedSide === 'p1' ? p1 : p2}`;
   }
   return `Turn ${choice.turnNumber}: P1 ${p1} / P2 ${p2}`;
 }

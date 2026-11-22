@@ -1,3 +1,4 @@
+import type { PlayedBounds } from '../played.ts';
 import type { EvalChoiceOption, EvalResult, KoOddsInfo, KoOddsMismatch, UnansweredProfile } from '../types.ts';
 
 /**
@@ -43,11 +44,14 @@ export interface RootPayload {
   diagnostics: KoOddsMismatch[];
   koOddsMaps: KoOddsMaps | null;
   unanswered: UnansweredProfile | null | undefined;
+  /** Round 89 (#108): the order bound of the played turn's fallen bodies, read with the root battle. */
+  playedBounds?: PlayedBounds | undefined;
 }
 
-/** Diagnostics, then kill odds, then the profile — the order every partial result gets them in. */
+/** Diagnostics, then kill odds, then the profile, then the played bound — the order every partial result gets them in. */
 export function attachRootPayload(target: EvalResult, payload: RootPayload): void {
   if (payload.diagnostics.length > 0) target.koDiagnostics = payload.diagnostics;
   attachKoOdds(target, payload.koOddsMaps);
   if (payload.unanswered && hasUnansweredContent(payload.unanswered)) target.unanswered = payload.unanswered;
+  if (payload.playedBounds) target.playedBounds = payload.playedBounds;
 }

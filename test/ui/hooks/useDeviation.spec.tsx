@@ -257,6 +257,20 @@ describe('useDeviation', () => {
     expect(startCalls(wired)[0][6].replayHistory).toEqual(history);
   }, 60_000);
 
+  test('a variation that ended the game by itself raises no divergence notice (FT-1)', async () => {
+    const history = [entry(2), entry(3)];
+    const wired = inputs({
+      timeline: timelineAt(4, { viewLine: 'variation', variationSpan: { startTurn: 2, length: 2 } }),
+      branch: branchSurface({ history, getBattle: vi.fn(() => ({ ended: true, winner: 'Alice', turn: 3 }) as unknown as ReturnType<BranchSurface['getBattle']>) }),
+    });
+    const { result } = renderHook(() => useDeviation(wired));
+    act(() => result.current.requestDeviation(null));
+    await waitFor(() => expect(startCalls(wired)).toHaveLength(1), { timeout: 30_000 });
+    await waitFor(() => expect(result.current.branchPreparing).toBe(false));
+    expect(wired.branchWindowOpenRef.current).toBe(true);
+    expect(result.current.branchDivergence).toBeNull();
+  }, 60_000);
+
   test('choices off the live tip go to the draft; on the tip they reach the sim', () => {
     const wired = inputs({ draftChoices: { p1: [], p2: [null, { kind: 'move', moveId: 'spore', moveName: 'Spore' }] } });
     const { result } = renderHook(() => useDeviation(wired));

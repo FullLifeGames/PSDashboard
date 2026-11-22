@@ -1,11 +1,11 @@
 import { describe, expect, test } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { RevealedPokemonInfo } from '@fulllifegames/replay-core';
+import { INFERRED_ITEM_DETAIL, INFERRED_SPREAD_DETAIL, type RevealedPokemonInfo } from '@fulllifegames/replay-core';
 import { AbilityField, EvGrid, ItemField, MovesField, NatureField, TeraField } from '../../../../src/components/team-editor/fields';
 import { useTeamDraft } from '../../../../src/hooks/useTeamDraft';
 import type { EditorPools } from '../../../../src/lib/team-editor';
-import { revealedPokemon } from '../../fixtures/team-info';
+import { evs, field, revealedPokemon } from '../../fixtures/team-info';
 
 const pools: EditorPools = {
   items: ['Choice Scarf', 'Leftovers', 'Loaded Dice'],
@@ -127,5 +127,17 @@ describe('team editor fields', () => {
     expect(screen.getByText('Intimidate is not an ability of Garchomp.')).toBeInTheDocument();
     await userEvent.selectOptions(select, 'Rough Skin');
     expect(screen.queryByText(/not an ability of Garchomp/)).not.toBeInTheDocument();
+  });
+
+  // Round 89 (T9c): the editor's captions read the source detail the way the stats panel does.
+  test('a fitted spread and an inferred item keep their word in the captions', () => {
+    const fitted = revealedPokemon('Garchomp', {
+      evs: { ...evs('guessed', { hp: 252, atk: 0, def: 4, spa: 0, spd: 252, spe: 0 }), sourceDetail: INFERRED_SPREAD_DETAIL },
+      item: field('Choice Scarf', 'guessed', { sourceDetail: INFERRED_ITEM_DETAIL }),
+    });
+    render(<Fields initial={fitted} withPools={pools} />);
+    expect(screen.getByText('EVs (FITTED)')).toBeInTheDocument();
+    expect(screen.getByText('Item (INFERRED)')).toBeInTheDocument();
+    expect(screen.getByText('Ability (GUESSED 90%)')).toBeInTheDocument();
   });
 });

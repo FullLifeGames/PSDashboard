@@ -8,8 +8,9 @@ import {
   type AnalyzeTurnParams, type Side, type SideAnalysis, type VerdictTier,
 } from './types.ts';
 import { decidedSignals } from './decided-signals.ts';
-import { matchClickedColumn } from './played-match.ts';
+import { opponentColumn, ownCell } from './clicked-cell.ts';
 import { hindsightLine } from '../prose/phrases.ts';
+import { cellSolid, HINDSIGHT_MIN_VISITS } from './cell-solid.ts';
 import type { SideGrading } from './grading.ts';
 
 /**
@@ -43,8 +44,7 @@ function matrixView(params: AnalyzeTurnParams, key: Side): MatrixView {
   const sideLabels = pick(matrix?.p1Labels, matrix?.p2Labels);
   const oppLabels = pick(matrix?.p2Labels, matrix?.p1Labels);
   const mix = pick(matrix?.mixes.p1, matrix?.mixes.p2);
-  const ownValue = (grid: EvalMatrix, i: number, j: number): number =>
-    key === 'p1' ? grid.values[i][j] : -grid.values[j][i];
+  const ownValue = (grid: EvalMatrix, i: number, j: number): number => ownCell(grid, key, i, j);
   const mixTop = mix && mix.length > 0
     ? mix.reduce((top, weight, index) => (weight > mix[top] ? index : top), 0)
     : -1;
@@ -109,17 +109,7 @@ function forcedMixFor(view: MatrixView, options: RankedChoice[]): SideAnalysis['
  * plain cell is no guess either (cellSolid), and the played row's cell against the click is held to the same gate.
  */
 export const HINDSIGHT_BAND = TIER_THRESHOLDS.inaccuracy;
-export const HINDSIGHT_MIN_VISITS = 8;
-
-/**
- * The cell behind a read is no guess: enough visits or re-priced by the verify step; a cell the result does not carry passes.
- * Round 70 (gate of 13.10. 20:26, 2a): so is a cell the planner calls plain ("none": no accuracy roll and no kill range in the
- * pair, the pair plan's plain cell in doubles) once a tree expanded it, since its one outcome needs no second visit to be seen
- * (2630685175 t7: the best row against the clicked Wide Guard, 4 visits, value 1.00). A plain cell nobody expanded reads the
- * root static and stays a guess.
- */
-const cellSolid = (cell: Pick<MatrixCell, 'visits' | 'verified' | 'plan'> | undefined): boolean =>
-  !cell || cell.verified || cell.visits >= HINDSIGHT_MIN_VISITS || (cell.plan === 'none' && cell.visits >= 1);
+export { HINDSIGHT_MIN_VISITS };
 
 /**
  * The gate's parts of a hindsight read. The side row's flag and sentence need the solid cells and the band past the
@@ -133,19 +123,6 @@ function hindsightShown(
 ): { shown: true; line: string } | { thin: true } | Record<string, never> {
   if (!cells.every(cellSolid)) return { thin: true };
   return read.gain >= (regret ?? 0) + HINDSIGHT_BAND ? { shown: true, line: hindsightLine(read) } : {};
-}
-
-/** The opponent's ACTUAL click as a matrix column (−1 when unknown), with the matched choice for the sentence. */
-function opponentColumn(
-  params: AnalyzeTurnParams,
-  key: Side,
-  matrix: EvalMatrix,
-): { column: number; oppPlayed: RankedChoice | null } {
-  const oppKey = key === 'p1' ? 'p2' as const : 'p1' as const;
-  const oppChoices = key === 'p1' ? matrix.p2Choices : matrix.p1Choices;
-  const oppPlayed = matchClickedColumn(params.result, oppKey, params.played);
-  const column = oppPlayed && oppChoices ? oppChoices.indexOf(oppPlayed.choice) : -1;
-  return { column, oppPlayed };
 }
 
 /** The own row with the best own-perspective value in the column. */

@@ -171,6 +171,20 @@ export async function moveTimeline(page: Page, turn: number): Promise<void> {
 }
 
 /**
+ * Round 89 (user ruling 40, FB4a): Discard variation asks first once a turn was played. The bar's button opens the question, the
+ * question's own button discards. `confirm: false` cancels instead and leaves the variation.
+ */
+export async function discardVariation(page: Page, options?: { confirm?: boolean }) {
+  // The bar counts a turn only once it has played; a click before that discards without the question.
+  await expect(page.getByRole('button', { name: /Variation moves · \d+ turns?/ })).toBeVisible({ timeout: 120_000 });
+  await page.locator('.ps-branch-bar').getByRole('button', { name: 'Discard variation' }).click();
+  const question = page.getByRole('alertdialog');
+  await expect(question).toContainText(/The variation has \d+ played turns?\./);
+  await question.getByRole('button', { name: options?.confirm === false ? 'Cancel' : 'Discard variation' }).click();
+  await expect(question).toHaveCount(0);
+}
+
+/**
  * Unified-timeline helper: moves the slider to `turn`, gives EVERY active slot an explicit move through its tray, executes,
  * and waits for the rebuilt sim's history entry: after this a live variation covers `turn` and the pointer sits on its tip.
  *
@@ -201,7 +215,7 @@ export async function startVariationAt(page: Page, turn: number, options?: { p1M
   if (await forcedNote.isVisible().catch(() => false)) {
     await pickForcedReplacement(page);
     await expect(page.locator('.ps-panel', { hasText: 'Variation moves' }))
-      .toContainText('forced replacement', { timeout: 30_000 });
+      .toContainText('replacement (', { timeout: 30_000 });
   }
   for (const slot of slots) {
     await expect(dockChip(page, slot)).toBeVisible({ timeout: 30_000 });
@@ -304,4 +318,21 @@ export async function routeOfflineFixtures(page: Page): Promise<void> {
     });
   });
   await routeSmogon(page, emptySmogon);
+}
+
+/**
+ * Round 89 (ruling 49): Depth lives in the Setup menu, not in the Evaluation header. These two helpers open the menu, read or pick the
+ * Depth select, and close the menu again (Escape), so the next click lands on the page.
+ */
+export async function readDepth(page: Page): Promise<string> {
+  await page.getByRole('button', { name: 'Setup' }).click();
+  const value = await page.locator('.ps-setup-panel label', { hasText: 'Depth' }).locator('select').inputValue();
+  await page.keyboard.press('Escape');
+  return value;
+}
+
+export async function pickDepth(page: Page, value: '1' | '2' | 'mcts' | 'auto'): Promise<void> {
+  await page.getByRole('button', { name: 'Setup' }).click();
+  await page.locator('.ps-setup-panel label', { hasText: 'Depth' }).locator('select').selectOption(value);
+  await page.keyboard.press('Escape');
 }

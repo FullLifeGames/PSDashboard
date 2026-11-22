@@ -84,6 +84,8 @@ async function withAnswers<T>(mode: 'off' | 'protect' | 'full', run: () => Promi
   }
 }
 
+const withoutLines = <T extends { lines?: unknown }>(result: T): T => ({ ...result, lines: undefined });
+
 const settingsOf = (name: string, keepPlayed?: EvalSettings['keepPlayed']): EvalSettings => {
   const { tera, sleepClause } = fixture(name);
   return {
@@ -218,7 +220,8 @@ describe('tree orchestration (round 61; read through the executor since round 64
       expect(record.proofs[0].input, name).toEqual(forcedWinInput(verified, settings));
       if (JSON.stringify(forcedWinInput(verified, settings)) !== JSON.stringify(forcedWinInput(unverified, settings))) shifted.push(name);
       applyForcedWin(verified, record.proofs[0].outcome);
-      expect(result, name).toEqual(verified);
+      // Round 89 (#104): the lines of the turn come after the prover and nothing reads them to score or rank.
+      expect(withoutLines(result), name).toEqual(verified);
     }
     // Round 76 (user gate 24.10.2026, 1a): T258 (the simulator's heal rate of a pinned healer) moved the static, and the
     // verified ranking of 649664 t14 g1 (Excadrill over Scald, unverified Scald over Excadrill) now feeds the prover the
@@ -267,7 +270,7 @@ describe('tree orchestration (round 61; read through the executor since round 64
       applyForcedWin(merged, await createLocalExecutor(serialized).prove(forcedWinInput(merged, settings)));
       const local = createLocalTreeExecutor(serialized);
       const executor: TreeExecutor = { ...local, evalCells: async () => { throw new Error('worker crashed'); } };
-      expect(await searchTreesOrchestrated(executor, settings), name).toEqual(merged);
+      expect(withoutLines(await searchTreesOrchestrated(executor, settings)), name).toEqual(merged);
       return;
     }
     throw new Error('no case runs the verify round');

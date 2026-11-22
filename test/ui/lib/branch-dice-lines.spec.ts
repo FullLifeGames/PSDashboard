@@ -42,11 +42,28 @@ const report = (kind: DieName['kind'], result: DieResult, rest: Partial<DieRepor
 const turnReport = (...forced: DieReport[]): DiceReport => ({ forced, naturalEndSeed: '1,2,3,4' });
 
 describe('the text of a forced die', () => {
-  test('a chance names its result and the chance the simulator used, as a percent', () => {
+  test('a chance names its result and the chance of that result, as a percent', () => {
     expect(dieText(report('secondary', { happens: true }, { chance: 0.3 }, { effectId: 'flinch' }), words)).toBe('Forced: Air Slash flinch, 30 %');
-    expect(dieText(report('accuracy', { happens: false }, { chance: 0.95 }), words)).toBe('Forced: Air Slash misses, 95 %');
+    expect(dieText(report('accuracy', { happens: false }, { chance: 0.95 }), words)).toBe('Forced: Air Slash misses, 5 %');
     expect(dieText(report('crit', { happens: true }, { chance: 1 / 24 }), words)).toBe('Forced: Air Slash crit, 4.2 %');
     expect(dieText(report('secondary', { happens: true }, { chance: 0.6 }, { effectId: 'flinch' }), words)).toBe('Forced: Air Slash flinch, 60 %');
+  });
+
+  // LN-4 (tester pass on the built state): the report holds the chance of the event, the line names the chance of the result the click forced.
+  // A two-outcome die forced each way; the Lines read the chance of the result they take ("fails (67%)", "no crit (96%)").
+  test.each([
+    ['accuracy', 'hits', 'misses', 0.95, '95 %', '5 %', {}],
+    ['crit', 'crit', 'no crit', 1 / 24, '4.2 %', '95.8 %', {}],
+    ['stalling', 'succeeds again', 'fails', 1 / 3, '33.3 %', '66.7 %', {}],
+    ['secondary', 'flinch', 'no flinch', 0.3, '30 %', '70 %', { effectId: 'flinch' }],
+  ] as const)('a %s die forced each way names the chance of the result it forced', (kind, happensWord, otherWord, chance, happensPercent, otherPercent, extra) => {
+    const text = (happens: boolean) => dieText(report(kind, { happens }, { chance }, extra), words);
+    expect(text(true)).toMatch(new RegExp(`^Forced: .+ ${happensWord}, ${happensPercent.replace('.', '\\.')}$`));
+    expect(text(false)).toMatch(new RegExp(`^Forced: .+ ${otherWord}, ${otherPercent.replace('.', '\\.')}$`));
+  });
+
+  test('a die forced to happen at certainty reads 100 %', () => {
+    expect(dieText(report('secondary', { happens: true }, { chance: 1 }, { effectId: 'brn' }), words)).toBe('Forced: Air Slash burn, 100 %');
   });
 
   test('a die with no chance to name leaves the percent out', () => {
@@ -59,7 +76,7 @@ describe('the text of a forced die', () => {
 describe('the lines of a turn', () => {
   test('a die that took effect gets one line, before the lines of its event', () => {
     const lines = dieLines(turnReport(report('accuracy', { happens: false }, { chance: 0.95, logIndex: 3 })), WINDOW, words);
-    expect(lines).toEqual([{ at: 3, text: 'Forced: Air Slash misses, 95 %' }]);
+    expect(lines).toEqual([{ at: 3, text: 'Forced: Air Slash misses, 5 %' }]);
   });
 
   test('the index of the battle\'s log counts the split lines the shown log does not have', () => {
@@ -131,14 +148,14 @@ describe('the dice part of a history entry', () => {
 });
 
 describe('the shown log with the lines in it', () => {
-  const lines = [{ at: 3, text: 'Forced: Air Slash misses, 95 %' }, { at: 4, text: 'Forced burn had no effect' }, { at: 4, text: 'Forced crit had no effect' }];
+  const lines = [{ at: 3, text: 'Forced: Air Slash misses, 5 %' }, { at: 4, text: 'Forced burn had no effect' }, { at: 4, text: 'Forced crit had no effect' }];
 
   test('puts each line before the line at its index, keeping the order of lines with one index', () => {
     const shown = withDieLines(SHOWN_LOG, lines);
     expect(shown).toEqual([
       '|old', '|old two',
       '|move|p1a: Noivern|Air Slash|p2a: Snorlax',
-      `${DIE_LINE}Forced: Air Slash misses, 95 %`,
+      `${DIE_LINE}Forced: Air Slash misses, 5 %`,
       '|-damage|p2a: Snorlax|60/100',
       `${DIE_LINE}Forced burn had no effect`,
       `${DIE_LINE}Forced crit had no effect`,
@@ -153,13 +170,26 @@ describe('the shown log with the lines in it', () => {
     expect(withDieLines(['|a', '|b'], [{ at: 2, text: 'Forced x' }])).toEqual(['|a', '|b', `${DIE_LINE}Forced x`]);
   });
 
+  // Round 89 (F5, the wave-tester's finding 1): the replay client splits a protocol line at every pipe and prints its first field, so
+  // a reason that quotes a protocol line ("the protocol shows "|-activate|p1a: Glimmora|ability: Toxic Debris"") broke off at the quote.
+  test('a reason that quotes protocol lines reaches the frame whole: its pipes leave the line one field after the message type', () => {
+    const reason = 'Triple Axel drew no accuracy: the protocol shows "|-activate|p1a: Glimmora|ability: Toxic Debris" and "|-miss|p2a: Weavile|p1a: Glimmora"';
+    const shown = withDieLines(['|a'], [{ at: 1, text: `Forced 3 hits had no effect: ${reason}` }])[1];
+    expect(shown.startsWith(DIE_LINE)).toBe(true);
+    const text = shown.slice(DIE_LINE.length);
+    expect(text).not.toContain('|');
+    expect(text.replace(/\u00a6/g, '|')).toBe(`Forced 3 hits had no effect: ${reason}`);
+    expect(shown.split('|')).toEqual(['', '-message', text]);
+    expect(branchFrameLog(['|a'], [{ at: 1, text: 'Forced x: "|-miss|p1a: A"' }]).split('\n')[1]).toBe(`${DIE_LINE}Forced x: "\u00a6-miss\u00a6p1a: A"`);
+  });
+
   test('no lines leave the log as it is', () => {
     expect(withDieLines(SHOWN_LOG, [])).toBe(SHOWN_LOG);
   });
 
   test('the frame log keeps the lines (the replay client renders a message line) and still drops what the embed must not show', () => {
     const frame = branchFrameLog([...SHOWN_LOG, '|c|chat'], lines);
-    expect(frame.split('\n')).toContain(`${DIE_LINE}Forced: Air Slash misses, 95 %`);
+    expect(frame.split('\n')).toContain(`${DIE_LINE}Forced: Air Slash misses, 5 %`);
     expect(frame).not.toContain('|c|');
     expect(branchFrameLog(SHOWN_LOG)).toBe(SHOWN_LOG.join('\n'));
   });

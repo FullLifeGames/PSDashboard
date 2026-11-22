@@ -17,9 +17,10 @@ function hashText(text: string): string {
  * one drops it by derivation), and its marker joins the sets fingerprint: stored positions and cached
  * evaluations never mix pinned and inferred sets.
  */
-export function usePinnedTeams(replayId: string | null) {
+export function usePinnedTeams(replayId: string | null, gameTeams: PinnedTeams | null = null) {
   const [pinned, setPinned] = useState<{ replayId: string; teams: PinnedTeams } | null>(null);
-  const teams = pinned && pinned.replayId === replayId ? pinned.teams : null;
+  // Round 89 (#105): a new game plays its record's teams, exactly as typed; they stand in for a reproduction's pin.
+  const teams = gameTeams ?? (pinned && pinned.replayId === replayId ? pinned.teams : null);
   const marker = useMemo(() => (teams ? hashText(JSON.stringify(teams)) : null), [teams]);
   const setTeams = useCallback((next: PinnedTeams | null) => {
     setPinned(next && replayId ? { replayId, teams: next } : null);

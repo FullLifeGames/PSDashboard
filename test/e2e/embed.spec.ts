@@ -34,21 +34,21 @@ test.describe('PS Dashboard', () => {
   });
 
   test('a replay injected while branching replaces the branch cleanly', async ({ page }) => {
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await startVariationAt(page, 1);
-    await expect(page.getByText(/Branching · Turn/)).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/Variation tip: Turn/)).toBeVisible({ timeout: 15000 });
 
     await page.evaluate(() => window.postMessage({ type: 'ps-load-replay', replay: 'gen9doubles-test' }, '*'));
 
     await expect(page.getByText('Alice', { exact: true }).first()).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText(/Branching · Turn/)).toHaveCount(0);
+    await expect(page.getByText(/Variation tip: Turn/)).toHaveCount(0);
     await expect(page.locator('iframe[title="PS Replay"]')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('.ps-branch-bar input[type="range"]')).toBeVisible();
   });
 
   test('a ?p2 replay link loads the p2 perspective', async ({ page }) => {
     await page.getByLabel('Replay URL or ID').fill('https://replay.pokemonshowdown.com/gen9ou-123?p2');
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     const iframeHandle = await page.locator('iframe[title="PS Replay"]').elementHandle({ timeout: 10000 });
     const frame = await iframeHandle?.contentFrame();
     expect(frame).toBeTruthy();

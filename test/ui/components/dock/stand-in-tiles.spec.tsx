@@ -1,11 +1,12 @@
 import { describe, expect, test, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { logRules, type OpponentTeamInfo } from '@fulllifegames/replay-core';
+import { readFileSync } from 'node:fs';
+import { inferOpponentTeam, logRules, withStandIns, type OpponentTeamInfo } from '@fulllifegames/replay-core';
 import { ChoicePicker } from '../../../../src/components/dock/WhatIfSection';
 import { SwitchRow } from '../../../../src/components/dock/SwitchRow';
 import { LeadPanel } from '../../../../src/components/LeadPanel';
-import { GuessedBodiesContext, STAND_IN_MARK, guessedBodies } from '../../../../src/lib/stand-in-mark';
+import { GuessedBodiesContext, RANDOM_SET_MARK, STAND_IN_MARK, guessedBodies } from '../../../../src/lib/stand-in-mark';
 import type { LeadOption } from '../../../../src/lib/lead-options';
 import { simState, switchOption } from '../../fixtures/sim-state';
 
@@ -138,5 +139,80 @@ describe('the marker of a stand-in in the lead picker', () => {
     );
     expect(screen.getAllByTitle(MARK_TITLE)).toHaveLength(1);
     expect(within(screen.getByRole('button', { name: /^Kingambit/ })).getByTitle(MARK_TITLE)).toBeInTheDocument();
+  });
+});
+
+/**
+ * Round 89 (lane B, #117): a body that came from the format's random-set data (a Random Battle) wears its own words, in the same places:
+ * the switch tile, the All choices list, the lead picker, singles and doubles. The bodies are the real output of `withStandIns` on logs
+ * the simulator played, so the provenance the lookup reads is the provenance the fill writes.
+ */
+describe('the marker of a random-set stand-in', () => {
+  const game = (id: string) => JSON.parse(readFileSync(`packages/replay-core/test/fixtures/random-${id}.json`, 'utf-8')) as { log: string; randomSets: never };
+  const filledOf = (id: string) => {
+    const { log, randomSets } = game(id);
+    const filled = withStandIns({ p1: inferOpponentTeam(log, 'p1'), p2: inferOpponentTeam(log, 'p2') }, log, null, undefined, randomSets);
+    return { rules: logRules(log), p1: filled.p1, standIns: filled.p1.pokemon.filter(mon => mon.standIn).map(mon => mon.species) };
+  };
+  const MARK = new RegExp(RANDOM_SET_MARK.replace(/[()]/g, '\\$&'));
+
+  test.each(['gen3randombattle-1', 'gen9randomdoublesbattle-11'])('%s: the lookup words the guesses, never the shown bodies', id => {
+    const { rules, p1, standIns } = filledOf(id);
+    const lookup = guessedBodies(p1, null, rules);
+    expect(standIns.length).toBeGreaterThan(0);
+    for (const species of standIns) {
+      expect(lookup('p1', species)).toMatchObject({ text: RANDOM_SET_MARK, badge: 'guessed' });
+      expect(lookup('p1', species)?.title).toMatch(/random-set data/);
+    }
+    const shown = p1.pokemon.filter(mon => !mon.standIn)[0].species;
+    expect(lookup('p1', shown)).toBeNull();
+  });
+
+  test('singles: a random-set tile wears the random-set words, not the teammate words, and still switches', async () => {
+    const { rules, p1, standIns } = filledOf('gen3randombattle-1');
+    const onPick = vi.fn();
+    render(
+      <GuessedBodiesContext.Provider value={guessedBodies(p1, null, rules)}>
+        <SwitchRow
+          side="p1" activeName="Garchomp" pending={null} blockedSwitchKeys={new Set()} played={null} onPick={onPick}
+          switches={[switchOption(standIns[0])]}
+        />
+      </GuessedBodiesContext.Provider>,
+    );
+    const tile = screen.getByRole('button', { name: new RegExp(standIns[0]) });
+    expect(within(tile).getByTitle(MARK)).toHaveTextContent('guessed');
+    expect(within(tile).queryByTitle(MARK_TITLE)).toBeNull();
+    await userEvent.click(tile);
+    expect(onPick).toHaveBeenCalled();
+  });
+
+  test('doubles: the All choices list names the random-set mark for a guess of the Doubles battle', () => {
+    const { rules, p1, standIns } = filledOf('gen9randomdoublesbattle-11');
+    const doubles = simState('doubles');
+    const [first] = doubles.p1SwitchesBySlot[0];
+    const asGuess = { ...first, species: standIns[0], name: standIns[0] };
+    render(
+      <GuessedBodiesContext.Provider value={guessedBodies(p1, null, rules)}>
+        <ChoicePicker side="p1" label="P1" moves={doubles.p1MovesBySlot[0]} switches={[asGuess]} blockedSwitchKeys={new Set()} onPick={vi.fn()} />
+      </GuessedBodiesContext.Provider>,
+    );
+    const picker = screen.getByRole('combobox', { name: 'Choice picker for P1' });
+    expect(within(picker).getByRole('option', { name: new RegExp(`${standIns[0]}.*${RANDOM_SET_MARK.replace(/[()]/g, '\\$&')}`) })).toBeInTheDocument();
+  });
+
+  test('the lead picker marks a guess of either game type', () => {
+    for (const id of ['gen3randombattle-1', 'gen9randomdoublesbattle-11']) {
+      const { rules, p1, standIns } = filledOf(id);
+      const { unmount } = render(
+        <GuessedBodiesContext.Provider value={guessedBodies(p1, null, rules)}>
+          <LeadPanel
+            playerNames={['Alice', 'Bob']} leadsPerSide={id.includes('doubles') ? 2 : 1} bringCount={null} executing={false} onStart={vi.fn()}
+            p1Options={standIns.slice(0, 2).map(name => ({ name, species: name, wasLead: false, wasBrought: false }))} p2Options={['Weavile', 'Clefable'].map(name => ({ name, species: name, wasLead: false, wasBrought: false }))}
+          />
+        </GuessedBodiesContext.Provider>,
+      );
+      expect(screen.getAllByTitle(MARK).length).toBeGreaterThan(0);
+      unmount();
+    }
   });
 });

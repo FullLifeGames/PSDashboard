@@ -75,7 +75,7 @@ for (const scene of SCENES) {
     await page.goto('/');
     if (scene.id) await loadDockReplay(page, scene.id, scene.turn);
     else {
-      await page.locator('button', { hasText: 'Load' }).click();
+      await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
       await expect(page.locator('.ps-branch-bar input[type="range"]')).toBeVisible({ timeout: 30_000 });
       await page.locator('.ps-branch-bar input[type="range"]').fill(String(scene.turn));
       await expect(page.getByText(`T${scene.turn}/`)).toBeVisible();

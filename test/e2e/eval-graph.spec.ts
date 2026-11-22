@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { emptySmogon, routeSmogon } from './smogon-routes';
-import { fixturePath, installReplayEmbedCache, routeOfflineFixtures } from './helpers';
+import { fixturePath, installReplayEmbedCache, pickDepth, readDepth, routeOfflineFixtures } from './helpers';
 
 test.beforeAll(installReplayEmbedCache);
 
@@ -18,7 +18,7 @@ test.describe('PS Dashboard', () => {
       localStorage.setItem('ps-replay-interceptor:eval-prefs', JSON.stringify({ depth: 1, samples: 1, auto: false, tera: 'auto' }));
     });
     await page.reload();
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
 
     const panel = page.locator('.ps-main-right .ps-eval-panel');
@@ -72,7 +72,7 @@ test.describe('PS Dashboard', () => {
 
     // …so after a reload the graph re-analyzes from the store.
     await page.reload();
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
     await panel.locator('button', { hasText: 'Analyze game' }).click();
     await expect(panel.locator('.ps-eval-graph')).toBeVisible({ timeout: 30_000 });
@@ -87,7 +87,7 @@ test.describe('PS Dashboard', () => {
         JSON.stringify({ depth: 1, samples: 1, auto: false, tera: 'auto' }));
     });
     await page.reload();
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
 
     const panel = page.locator('.ps-main-right .ps-eval-panel');
@@ -99,7 +99,7 @@ test.describe('PS Dashboard', () => {
     await panel.locator('.ps-eval-graph rect[data-turn="2"]').click();
     await expect(panel.locator('.ps-eval-analysis')).toContainText('Turn 2', { timeout: 15_000 });
     await expect(panel.locator('.ps-eval-bar')).toBeVisible();
-    await expect(panel.locator('button', { hasText: 'Matrix' })).toBeVisible();
+    await expect(panel.locator('button.ps-eval-matrix-toggle')).toBeVisible();
     await panel.locator('.ps-eval-graph rect[data-turn="1"]').click();
     await expect(panel.locator('.ps-eval-analysis')).toContainText('Turn 1', { timeout: 15_000 });
   });
@@ -112,7 +112,7 @@ test.describe('PS Dashboard', () => {
         JSON.stringify({ depth: 2, samples: 1, auto: false, tera: 'auto' }));
     });
     await page.reload();
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
 
     const panel = page.locator('.ps-main-right .ps-eval-panel');
@@ -128,7 +128,8 @@ test.describe('PS Dashboard', () => {
 
     // Monotone merge: a later re-analyze at depth 1 must NOT downgrade the
     // turn stored at depth 2.
-    await panel.locator('label', { hasText: 'Depth' }).locator('select').selectOption('1');
+    // Round 89 (ruling 49): Depth lives in the Setup menu now.
+    await pickDepth(page, '1');
     await panel.locator('button', { hasText: 'Re-analyze' }).click();
     await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 180_000 });
     await panel.locator('.ps-eval-graph rect[data-turn="1"]').click();
@@ -143,11 +144,11 @@ test.describe('PS Dashboard', () => {
         JSON.stringify({ depth: 1, samples: 1, mode: 'mcts', auto: false, tera: 'auto' }));
     });
     await page.reload();
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
 
     const panel = page.locator('.ps-main-right .ps-eval-panel');
-    await expect(panel.locator('select').first()).toHaveValue('mcts');
+    expect(await readDepth(page)).toBe('mcts');
     await panel.locator('button', { hasText: 'Analyze game' }).click();
     await expect(panel.locator('.ps-eval-graph')).toBeVisible({ timeout: 180_000 });
     await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 120_000 });
@@ -178,8 +179,9 @@ test.describe('PS Dashboard', () => {
 
     const panel = page.locator('.ps-main-right .ps-eval-panel');
     // The auto pref round-trips into the dropdown and the caption names the routing.
-    await expect(panel.locator('select').first()).toHaveValue('auto');
-    await expect(panel.getByText('auto (matrix early, MCTS late)')).toBeVisible();
+    expect(await readDepth(page)).toBe('auto');
+    // The routing sits in the title of the Game graph heading (round 89: no description line takes room).
+    await expect(panel.getByText('Game graph', { exact: true })).toHaveAttribute('title', /re-evaluates each turn with auto \(matrix early, MCTS late\)/);
     await panel.locator('button', { hasText: 'Analyze game' }).click();
     await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 300_000 });
 
@@ -201,7 +203,7 @@ test.describe('PS Dashboard', () => {
   // replaces it. The truth table lives in test/regression/supersedes-stored-t184.spec.ts; these two drive the buttons.
   const STAGE_BADGE = 'What produced the numbers shown for this turn.';
 
-  /** Sweeps the loaded game at matrix depth 2, switches the engine dropdown to `mode` and re-analyzes; turn 1 must read the new engine. */
+  /** Sweeps the loaded game at matrix depth 2, switches Depth (Setup menu) to `mode` and re-analyzes; turn 1 must read the new engine. */
   async function expectReanalyzeReplaces(page: Page, mode: 'mcts' | 'auto') {
     const panel = page.locator('.ps-main-right .ps-eval-panel');
     await panel.locator('button', { hasText: 'Analyze game' }).click();
@@ -209,7 +211,7 @@ test.describe('PS Dashboard', () => {
     await panel.locator('.ps-eval-graph rect[data-turn="1"]').click();
     await expect(panel.getByTitle(STAGE_BADGE)).toHaveText(/^depth 2/, { timeout: 15_000 });
 
-    await panel.locator('select').first().selectOption(mode);
+    await pickDepth(page, mode);
     await panel.locator('button', { hasText: 'Re-analyze' }).click();
     // The click may land on a stale panel: keep opening turn 1 until the sweep has swapped its result.
     await expect(async () => {
@@ -227,7 +229,7 @@ test.describe('PS Dashboard', () => {
     });
     await page.reload();
     await page.locator('input[type="text"]').fill('gen9vgc-test');
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.getByText('Alice', { exact: true }).first()).toBeVisible({ timeout: 10000 });
     // Auto runs the tree from the first doubles turn, VGC counted as doubles.
     await expectReanalyzeReplaces(page, 'auto');
@@ -241,7 +243,7 @@ test.describe('PS Dashboard', () => {
         JSON.stringify({ depth: 2, samples: 1, mode: 'matrix', auto: false, tera: 'auto' }));
     });
     await page.reload();
-    await page.locator('button', { hasText: 'Load' }).click();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
     await expectReanalyzeReplaces(page, 'mcts');
   });
@@ -261,7 +263,7 @@ test.describe('PS Dashboard', () => {
       });
       await page.reload();
       if (replayId) await page.locator('input[type="text"]').fill(replayId);
-      await page.locator('button', { hasText: 'Load' }).click();
+      await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
       await expect(page.getByText(player, { exact: true }).first()).toBeVisible({ timeout: 10000 });
 
       // No sweep ran: step back from the end to turn 2, a turn with a later turn after it.

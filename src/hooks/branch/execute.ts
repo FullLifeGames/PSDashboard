@@ -6,6 +6,11 @@ import {
   type BranchEngineModule, type BranchRefs, type BranchSetters, type LiveBattle, type SideId,
 } from './shared';
 
+/** Round 89 (#105): the entry has landed; a new game promotes its tip turn here (a replay has no hook set). */
+const runAfterTurn = async (refs: BranchRefs): Promise<void> => {
+  await refs.afterTurnRef?.current?.();
+};
+
 /** Resolve both sides' pending choices against the live request; an error string on the first miss. */
 function resolveBothSides(
   branchEngine: BranchEngineModule, battle: LiveBattle, refs: BranchRefs,
@@ -74,6 +79,7 @@ function useExecuteTurn(refs: BranchRefs, setters: BranchSetters, clearChoices: 
         serializedPosition: branchEngine.captureSerializedPosition(battleStream.battle),
       }]);
       setSimState(nextState);
+      await runAfterTurn(refs);
     } finally {
       executingRef.current = false;
       setExecuting(false);
@@ -134,11 +140,12 @@ function useExecuteForcedSide(refs: BranchRefs, setters: BranchSetters) {
         serializedPosition: branchEngine.captureSerializedPosition(battleStream.battle),
       }]);
       setSimState(nextState);
+      await runAfterTurn(refs);
     } finally {
       executingRef.current = false;
       setExecuting(false);
     }
-  }, [streamsRef, battleStreamRef, branchEngineRef, choiceErrorsRef, executingRef, logRef, p1ChoicesRef, p2ChoicesRef,
+  }, [refs, streamsRef, battleStreamRef, branchEngineRef, choiceErrorsRef, executingRef, logRef, p1ChoicesRef, p2ChoicesRef,
     setExecuting, setExecuteError, setHistory, setSimState]);
 }
 

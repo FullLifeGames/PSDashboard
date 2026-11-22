@@ -3,12 +3,13 @@ import type { DockSlotModel } from './dock-model';
 
 /**
  * Round 84 (turn dock): the head of an open tray: the slot, its body and HP, the gimmick toggles (they edit the slot's pending
- * move), the "Dice · What if" toggle and Done. A slot that must replace a body has neither gimmicks nor "Dice · What if".
+ * move), "Back to the engine's pick" where the slot holds another pick than the fill's (round 89), the "Dice · What if" toggle and Done. A slot that must replace a body has neither gimmicks nor "Dice · What if".
  */
-export function TrayHeader({ slot, moreOpen, onMore, onDone }: {
+export function TrayHeader({ slot, moreOpen, onMore, onBackToEngine, onDone }: {
   slot: DockSlotModel;
   moreOpen: boolean;
   onMore: () => void;
+  onBackToEngine?: () => void;
   onDone: () => void;
 }) {
   const { label, name, hpPercent, modifiers, gimmick, forceSwitch } = slot;
@@ -18,6 +19,7 @@ export function TrayHeader({ slot, moreOpen, onMore, onDone }: {
       <span className="ps-tray-hp">{hpPercent}% HP</span>
       <span className="ps-tray-spacer" />
       {!forceSwitch && gimmick.hasAnyModifier && <ModifierRow label={label} modifiers={modifiers} gimmick={gimmick} />}
+      {onBackToEngine && <button type="button" className="ps-btn ps-tray-btn" onClick={onBackToEngine}>Back to the engine's pick</button>}
       {!forceSwitch && (
         <button type="button" className="ps-btn ps-tray-btn" aria-expanded={moreOpen} onClick={onMore}>
           Dice · What if {moreOpen ? '▴' : '▾'}

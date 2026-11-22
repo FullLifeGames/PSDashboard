@@ -126,7 +126,7 @@ async function readLadder(page: Page, scene: string, variation: boolean): Promis
 
 test('singles: the bar keeps its slider in line at every width, with and without a variation', async ({ page }) => {
   test.setTimeout(180_000);
-  await page.locator('button', { hasText: 'Load' }).click();
+  await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
   await expect(page.locator('.ps-branch-bar input[type="range"]')).toBeVisible({ timeout: 30_000 });
   await readLadder(page, 'singles', false);
   await startVariationAt(page, 1);

@@ -14,9 +14,12 @@ import type { RolledCopyParams } from '../../lib/rolled-copy-stage';
 /** Played-pair matching with the KO'd-before-acting stand-in: a side that
  * never got to act still prices its pair through the charitable
  * outcome-equivalent phantom (analysis.ts) — T14/T36 stop reading
- * "unclear". */
+ * "unclear". Round 89 (#108): both read the order bound the result carries
+ * (`playedBounds`), so a hidden slot that fell before it acted is matched
+ * to a row it could have played; a result cached before has none and
+ * matches as it did. */
 export const matchOrPhantom = (result: EvalResult, side: 'p1' | 'p2', played: PlayedTurn | null, rules: GameRules): RankedChoice | null =>
-  matchPlayedSide(result, side, played) ?? phantomStayIn(result, side, played, rules);
+  matchPlayedSide(result, side, played, result.playedBounds) ?? phantomStayIn(result, side, played, rules, result.playedBounds?.[side]?.[0]);
 
 /**
  * Eval-layer lifecycle guard: a failure is only a gap while the turn is
@@ -48,6 +51,8 @@ export interface GraphSweepParams {
   rules: GameRules;
   /** Round 65: the rule set the replay runs under (Pokémon Champions or standard), resolved from its format. */
   ruleset: StaticRuleset;
+  /** Round 89 (NG-2): the sweep runs over a new game, whose positions come from its record, not from a replay's guessed sets: the coverage notice words itself for that. */
+  game?: boolean;
   /** The replay's game type: auto resolves each turn per game type (round 63, T110). */
   doubles: boolean;
   cacheKeyFor(turn: number): string;

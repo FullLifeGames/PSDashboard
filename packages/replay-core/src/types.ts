@@ -1,3 +1,5 @@
+import type { HpText } from './hp-display.ts';
+
 export interface ReplayData {
   id: string;
   format: string;
@@ -15,6 +17,11 @@ export interface ReplayData {
 export interface PokemonSnapshot {
   name: string;
   speciesForme: string;
+  /**
+   * The species the body entered with, only while it wears a Transform copy (`speciesForme` then reads the copied species);
+   * absent otherwise and on snapshots written before round 89 (#116).
+   */
+  baseSpeciesForme?: string;
   hp: number;
   maxhp: number;
   hpPercent: number;
@@ -47,6 +54,12 @@ export interface PokemonSnapshot {
    * round 76 (T265).
    */
   timesAttacked?: number;
+  /**
+   * The PP the log shows spent, by move name, as @pkmn/client counts it (Pressure's extra point included, a Leppa or Mystery Berry
+   * restore taken off); a pair is the range when the log leaves Pressure open. The body's own moves only, never the copies a
+   * Transform holds. Absent means no information, and so on snapshots written before round 89 (#106).
+   */
+  ppUsed?: Record<string, number | [number, number]>;
 }
 
 export interface SideSnapshot {
@@ -142,6 +155,12 @@ export interface DamageObservation {
   /** The type each side Terastallized to, as the client names it; absent when it has not. */
   attackerTera?: string;
   defenderTera?: string;
+  /**
+   * The HP texts the log showed for the defender of a knockout (`lethal`): before the hit and, when the hit left it standing (Sturdy, Focus Sash:
+   * `survivedAtOne`), after it (round 89, #75: a knockout reads the real HP the display rounding allows, `hp-display.ts`). Absent on a hit that did
+   * not knock out, and on observations of caches older than round 89, which read the fraction with the slack of two percent.
+   */
+  defenderShown?: { before: HpText; after?: HpText };
   /** Each side's HP as a fraction of its maximum before the hit: Multiscale needs full HP, Eruption and Water Spout scale with it. */
   attackerHp?: number;
   defenderHp?: number;

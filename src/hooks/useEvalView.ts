@@ -1,4 +1,6 @@
+import { isGameId } from '../lib/new-game/record';
 import { useCallback, useEffect, useMemo, useRef, type Dispatch, type SetStateAction } from 'react';
+import type { BringWorld } from '@fulllifegames/eval-engine';
 import {
   type GameRules, type OpponentTeamInfo, type ReplayData, type TurnSnapshot, formatEnforcesSleepClause,
   getBranchSimulatorFormat, inferReplayFormatId, logRules, replayRuleset,
@@ -38,6 +40,9 @@ export interface EvalViewInputs {
   evalViewKey: string;
   serializedAtView: string | null;
   liveEvalStatus: Evaluation['status'];
+  /** Round 89 (#112): the live sim's position (null outside a variation) and the status of the result against it. */
+  tip: { key: string; turn: number; variation: boolean } | null;
+  tipEvalStatus: Evaluation['status'];
   analysisTurn: number | null;
   analyzableTurns: number;
   branching: boolean;
@@ -48,6 +53,8 @@ export interface EvalViewInputs {
   acquire: Pick<Acquire, 'acquireBranchPosition' | 'acquireReplayPosition' | 'makeReplayAcquire' | 'makeSweepAcquireAll'>;
   sources: TeamBuildSources;
   bringOnlyLists: { p1: string[]; p2: string[] } | null;
+  /** Round 89 (#124): the worlds of a short-side game (the heaviest first); null for any other game. */
+  bringWorlds?: BringWorld[] | null;
   setsFingerprint: string;
   sensitivityTargetsFor: (side: 'p1' | 'p2') => SensitivityTarget[];
   editedP1Info: OpponentTeamInfo | null;
@@ -92,21 +99,35 @@ function useEvalFormat(inputs: EvalViewInputs) {
 
 type EvalFormat = ReturnType<typeof useEvalFormat>;
 
+/**
+ * Round 89 (#105): the position at a new game's tip, where nothing has been played yet, caches under its own key. Once the turn is
+ * played, the sweep's entry for it carries the played outcome, the verified round and the sensitivity, and an entry made before
+ * (none of those) must never serve it. A replay's keys stay as they were.
+ */
+const gameTipTag = (id: string, turn: number, snapshotCount: number): string => (isGameId(id) && turn >= snapshotCount ? 't' : '');
+
+/** The cache key of a replay turn's evaluation: the sweep's, and the early-lines stage's (it re-saves a turn's own entry). */
+export const turnCacheKey = (replayId: string, turn: number, snapshotCount: number, setsFingerprint: string): string =>
+  `${replayId}:${turn}${gameTipTag(replayId, turn, snapshotCount)}:${setsFingerprint}${engineCacheTag()}`;
+
 /** What a caller may hand to Evaluate: the dock's engine fill acts on the result (round 84). */
 export type EvaluateOptions = Pick<EvaluateParams, 'onResult'>;
 
 /** The Evaluate action for whatever position the pointer holds, and the
  *  variation-score recording of finished live evals. */
 function useEvaluateAction(inputs: EvalViewInputs, format: EvalFormat) {
-  const { replayData, snapshots, evalIsDoubles, evaluation, liveTip, viewingVariation, serializedAtView, viewTurn, setsFingerprint, evalViewKey, acquire, setVariationScores } = inputs;
+  const { replayData, snapshots, evalIsDoubles, evaluation, liveTip, viewingVariation, serializedAtView, viewTurn, setsFingerprint, evalViewKey, acquire, setVariationScores, tip, playOutActive } = inputs;
   const { effectiveTera, effectiveSleepClause, effectiveRuleset } = format;
+  // Round 89 (#112): while a run is active the live sim is what the user asked for, wherever the pointer stands (a frame
+  // report can move it): the evaluation, its tag and its score slot follow the tip. Outside a run the pointer decides.
+  const runAtTip = playOutActive && tip !== null ? tip : null;
   // Round 84: `onResult` is read by name, never spread: the Evaluate button hands its click event to this function. Evaluate
   // never sets `prefs.auto`; only the explore click of the engine walk does.
   const handleEvaluate = useCallback((options?: EvaluateOptions) => {
     if (!replayData) return;
     const onResult = typeof options?.onResult === 'function' ? options.onResult : undefined;
-    if (liveTip) {
-      evaluation.evaluate({ cacheKey: null, tera: effectiveTera, sleepClause: effectiveSleepClause, ruleset: effectiveRuleset, acquire: acquire.acquireBranchPosition, tag: evalViewKey, onResult });
+    if (liveTip || runAtTip) {
+      evaluation.evaluate({ cacheKey: null, tera: effectiveTera, sleepClause: effectiveSleepClause, ruleset: effectiveRuleset, acquire: acquire.acquireBranchPosition, tag: runAtTip?.key ?? evalViewKey, onResult });
     } else if (viewingVariation && serializedAtView) {
       // A recorded variation position: acquisition is instant — the search
       // itself still runs at the configured settings.
@@ -114,7 +135,7 @@ function useEvaluateAction(inputs: EvalViewInputs, format: EvalFormat) {
       evaluation.evaluate({ cacheKey: null, tera: effectiveTera, sleepClause: effectiveSleepClause, ruleset: effectiveRuleset, acquire: async () => stored, tag: evalViewKey, onResult });
     } else {
       evaluation.evaluate({
-        cacheKey: `${replayData.id}:${viewTurn}:${setsFingerprint}${engineCacheTag()}`,
+        cacheKey: `${replayData.id}:${viewTurn}${gameTipTag(replayData.id, viewTurn, snapshots.length)}:${setsFingerprint}${engineCacheTag()}`,
         tera: effectiveTera,
         sleepClause: effectiveSleepClause,
         ruleset: effectiveRuleset,
@@ -125,22 +146,23 @@ function useEvaluateAction(inputs: EvalViewInputs, format: EvalFormat) {
         keepPlayed: keptPlayed(playedOn(snapshots, viewTurn, evalIsDoubles, logRules(replayData.log))),
       });
     }
-  }, [replayData, snapshots, evalIsDoubles, liveTip, viewingVariation, serializedAtView, evaluation, effectiveTera, effectiveSleepClause, effectiveRuleset, acquire.acquireBranchPosition, acquire.acquireReplayPosition, viewTurn, setsFingerprint, evalViewKey]);
+  }, [replayData, snapshots, evalIsDoubles, liveTip, runAtTip, viewingVariation, serializedAtView, evaluation, effectiveTera, effectiveSleepClause, effectiveRuleset, acquire.acquireBranchPosition, acquire.acquireReplayPosition, viewTurn, setsFingerprint, evalViewKey]);
 
   // Every eval finishing while the pointer sits on the variation feeds the
   // graph overlay — auto-evals after executed turns included. The tag guard
   // keeps a run that finished after a navigation from landing in the wrong
   // turn's slot (the score belongs to the position it was STARTED at).
+  const scored = runAtTip ?? { key: evalViewKey, turn: viewTurn, variation: viewingVariation };
   useEffect(() => {
-    if (evaluation.status !== 'done' || !evaluation.result || !viewingVariation) return;
-    if (evaluation.resultTag !== null && evaluation.resultTag !== evalViewKey) return;
+    if (evaluation.status !== 'done' || !evaluation.result || !scored.variation) return;
+    if (evaluation.resultTag !== null && evaluation.resultTag !== scored.key) return;
     const score = evaluation.result.score;
     setVariationScores(previous => {
       const next = [...previous];
-      next[viewTurn - 1] = score;
+      next[scored.turn - 1] = score;
       return next;
     });
-  }, [evaluation.status, evaluation.result, evaluation.resultTag, evalViewKey, viewingVariation, viewTurn, setVariationScores]);
+  }, [evaluation.status, evaluation.result, evaluation.resultTag, scored.key, scored.turn, scored.variation, setVariationScores]);
 
   return handleEvaluate;
 }
@@ -148,7 +170,7 @@ function useEvaluateAction(inputs: EvalViewInputs, format: EvalFormat) {
 /** Analyze game (full sweep incl. turn 0), a gap turn's single analysis,
  *  and the "always on" auto-analyze. */
 function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
-  const { replayData, snapshots, evaluation, analyzableTurns, evalIsDoubles, acquire, sources, bringOnlyLists, setsFingerprint, sensitivityTargetsFor, smogonPending } = inputs;
+  const { replayData, snapshots, evaluation, analyzableTurns, evalIsDoubles, acquire, sources, bringOnlyLists, bringWorlds = null, setsFingerprint, sensitivityTargetsFor, smogonPending } = inputs;
   const { effectiveTera, effectiveSleepClause, effectiveRuleset, evalAvailable } = format;
 
   // Round 75 (T160): the replay's generation and mod, for the Dex reads of the played-action parser and the sweep.
@@ -163,8 +185,8 @@ function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
       sleepClause: effectiveSleepClause,
       rules,
       ruleset: effectiveRuleset,
-      doubles: evalIsDoubles,
-      cacheKeyFor: turn => `${replayData.id}:${turn}:${setsFingerprint}${engineCacheTag()}`,
+      doubles: evalIsDoubles, game: isGameId(replayData.id),
+      cacheKeyFor: turn => turnCacheKey(replayData.id, turn, snapshots.length, setsFingerprint),
       // Round 79 (T290): the replacement points of the knockouts, each under its own key beside the turn keys.
       replacementRounds: replacementRounds(replayData.log),
       replacementKeyFor: (turn, ordinal) => `${replayData.id}:${turn}r${ordinal}:${setsFingerprint}${engineCacheTag()}`,
@@ -175,11 +197,11 @@ function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
       // actions actually played on `turn`.
       playedFor,
       // Turn 0: the lead decision at team preview.
-      acquirePreview: makePreviewAcquire(replayData, sources, bringOnlyLists),
+      acquirePreview: makePreviewAcquire(replayData, sources, bringOnlyLists, bringWorlds),
       playedLeads: parseLeadSpecies(replayData.log),
       sensitivityTargetsFor, rolledCopy: rolledCopyParams({ replayData, snapshots, rules, setsFingerprint }),
     });
-  }, [replayData, snapshots, evaluation, analyzableTurns, effectiveTera, effectiveSleepClause, effectiveRuleset, evalIsDoubles, setsFingerprint, acquire, playedFor, rules, sources, bringOnlyLists, sensitivityTargetsFor]);
+  }, [replayData, snapshots, evaluation, analyzableTurns, effectiveTera, effectiveSleepClause, effectiveRuleset, evalIsDoubles, setsFingerprint, acquire, playedFor, rules, sources, bringOnlyLists, bringWorlds, sensitivityTargetsFor]);
 
   // Explains ONE turn: a two-turn mini sweep (turn + its follow-up) so the
   // report can price the played outcome, at the panel's settings. Runs ONLY
@@ -196,13 +218,13 @@ function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
       rules,
       ruleset: effectiveRuleset,
       doubles: evalIsDoubles,
-      cacheKeyFor: sweepTurn => `${replayData.id}:${sweepTurn}:${setsFingerprint}${engineCacheTag()}`,
+      cacheKeyFor: sweepTurn => turnCacheKey(replayData.id, sweepTurn, snapshots.length, setsFingerprint),
       storePrefix: evalStorePrefix(replayData.id),
       acquireFor: acquire.makeReplayAcquire,
       playedFor,
       sensitivityTargetsFor,
     });
-  }, [replayData, evaluation, analyzableTurns, effectiveTera, effectiveSleepClause, effectiveRuleset, evalIsDoubles, setsFingerprint, acquire, playedFor, rules, sensitivityTargetsFor]);
+  }, [replayData, snapshots, evaluation, analyzableTurns, effectiveTera, effectiveSleepClause, effectiveRuleset, evalIsDoubles, setsFingerprint, acquire, playedFor, rules, sensitivityTargetsFor]);
 
   /**
    * "Always on": with the autoAnalyze pref set, Analyze game starts by
@@ -230,11 +252,11 @@ function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
 
 /** Invalidations and the auto re-evaluations of live positions. */
 function useEvalHousekeeping(inputs: EvalViewInputs, format: EvalFormat, handleEvaluate: () => void) {
-  const { evaluation, historyLength, editedP1Info, editedP2Info, replayData, branching, liveEvalView, liveEvalStatus, executing, branchPreparing, playOutActive } = inputs;
+  const { evaluation, historyLength, editedP1Info, editedP2Info, replayData, branching, liveEvalView, liveEvalStatus, tip, tipEvalStatus, executing, branchPreparing, playOutActive } = inputs;
   // A change of the position itself (a turn executed, a set edited) invalidates a displayed result. Moving the
   // pointer does not (round 77, C6): the result's position tag decides whether it fits the screen, so the result
   // is current again when the pointer returns to the position it was computed for.
-  const { markStale: markEvalStale, reset: resetEval, clearGraph } = evaluation;
+  const { markStale: markEvalStale, reset: resetEval, clearGraph, dropGraphFrom } = evaluation;
   useEffect(() => {
     markEvalStale();
   }, [historyLength, editedP1Info, editedP2Info, markEvalStale]);
@@ -248,16 +270,32 @@ function useEvalHousekeeping(inputs: EvalViewInputs, format: EvalFormat, handleE
   useEffect(() => {
     clearGraph();
   }, [replayData?.id, inputs.setsFingerprint, format.effectiveTera, clearGraph]);
+  // Round 89 (#105, H4h): a new game's main line grows at its tip, and the graph's entry for the old tip was swept before anybody
+  // played that turn (no played choice, no outcome); the played turn takes a new sweep, not that entry.
+  const tipSeen = useRef<{ id: string; count: number } | null>(null);
+  const snapshotCount = inputs.snapshots.length;
+  const gameId = replayData?.id ?? null;
+  useEffect(() => {
+    const before = tipSeen.current;
+    tipSeen.current = gameId === null ? null : { id: gameId, count: snapshotCount };
+    if (before && gameId === before.id && isGameId(gameId) && snapshotCount > before.count) dropGraphFrom(before.count);
+  }, [gameId, snapshotCount, dropGraphFrom]);
   // Opt-in: keep the branch evaluation fresh after each executed turn. Live
   // positions only: without the liveEvalView gate, navigating onto a
   // main-line turn (the end sentinel included) fired a stray single-turn
   // reconstruction — the "diverged before turn 68" error on a 67-turn game.
   useEffect(() => {
     // Round 77 (C1): not while the game sweep runs; a single evaluation would stop it. The effect fires again when it ends.
-    if (branching && evaluation.prefs.auto && liveEvalView && liveEvalStatus === 'stale' && !executing && !evaluation.graph.running) {
+    // Round 89 (#112): a run keeps the live tip fresh, whichever turn the pointer shows.
+    const atTip = playOutActive && tip !== null;
+    const view = atTip || liveEvalView;
+    const status = atTip ? tipEvalStatus : liveEvalStatus;
+    // Round 89 (SB-7): a position the user stopped keeps the stopped result; Auto does not start the run over.
+    const stoppedHere = evaluation.stopped?.tag === (atTip ? tip?.key : inputs.evalViewKey);
+    if (branching && evaluation.prefs.auto && view && status === 'stale' && !stoppedHere && !executing && !evaluation.graph.running) {
       handleEvaluate();
     }
-  }, [branching, evaluation.prefs.auto, liveEvalView, liveEvalStatus, executing, evaluation.graph.running, handleEvaluate]);
+  }, [branching, evaluation.prefs.auto, evaluation.stopped, inputs.evalViewKey, liveEvalView, liveEvalStatus, tipEvalStatus, playOutActive, tip, executing, evaluation.graph.running, handleEvaluate]);
   // "Always on" also covers the live sim: a freshly opened variation (or a
   // navigation back to its tip) evaluates without the Evaluate button. Never
   // while the game sweep runs — a single evaluation supersedes the run id
@@ -267,9 +305,11 @@ function useEvalHousekeeping(inputs: EvalViewInputs, format: EvalFormat, handleE
     if (!inputs.liveTip || executing || branchPreparing || playOutActive) return;
     if (evaluation.graph.running) return;
     if (liveEvalStatus !== 'idle' && liveEvalStatus !== 'stale') return;
+    // Round 89 (SB-7): the same for "Always on": a position the user stopped is not started again.
+    if (evaluation.stopped?.tag === inputs.evalViewKey) return;
     handleEvaluate();
   }, [
-    evaluation.prefs.autoAnalyze, format.evalAvailable, inputs.liveTip, executing, branchPreparing,
+    evaluation.prefs.autoAnalyze, evaluation.stopped, inputs.evalViewKey, format.evalAvailable, inputs.liveTip, executing, branchPreparing,
     playOutActive, evaluation.graph.running, liveEvalStatus, handleEvaluate,
   ]);
 }

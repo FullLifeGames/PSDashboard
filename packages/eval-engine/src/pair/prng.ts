@@ -4,6 +4,7 @@ import { strengthMix } from '../calc/fickle.ts';
 import { DrawNamer } from '../dice/namer.ts';
 import { answerDie } from '../dice/answer.ts';
 import type { DieName, Draw } from '../dice/types.ts';
+import type { DieQuantiles } from '../search/root-quantile.ts';
 import type { PricedHit } from './kill-table.ts';
 import { captureHit, type HitSnapshot } from './snapshot.ts';
 
@@ -37,6 +38,10 @@ import { captureHit, type HitSnapshot } from './snapshot.ts';
  * Round 86 (T305): a secondary die (an entry of the move's `secondaries`, one `random(100)` per entry the target's rules leave)
  * is booked per hit instance with its effect id, its chance and the result it had. A script answers it by effect id
  * (`secondary`); as with the other rolls the natural value is drawn first, so the stream stays where it would have been.
+ *
+ * Round 89 (#59, T322 block 1): a tree's root draw may carry `DieQuantiles` (`search/root-quantile.ts`). The natural value is drawn
+ * first, then replaced for every NAMED die the quantiles answer (they read the raw name, also a status check the records skip), and
+ * the records carry the replaced value, so `readPattern` names the class the battle shows. A script outranks a quantile.
  */
 
 export interface PairScript {
@@ -114,13 +119,15 @@ export class PairPRNG extends PRNG {
   private namer: DrawNamer | null = null;
   private readonly scripts: PairScripts;
   private readonly usedScripts = new Set<string>();
+  private readonly quantiles: DieQuantiles | undefined;
   private readonly instances = new WeakMap<object, Map<string, Instance>>();
   private nextInstance = 0;
   private delegating = false;
 
-  constructor(seed: PRNGSeed, scripts: PairScripts = new Map()) {
+  constructor(seed: PRNGSeed, scripts: PairScripts = new Map(), quantiles?: DieQuantiles) {
     super(seed);
     this.scripts = scripts;
+    this.quantiles = quantiles;
   }
 
   attach(battle: Battle): void {
@@ -140,9 +147,23 @@ export class PairPRNG extends PRNG {
     return name && name.effectId === undefined ? name : null;
   }
 
+  /** The quantiles' answer for a named die, undefined when there are none or they leave the draw to the stream. */
+  private quantile(name: DieName | null, draw: Draw): number | boolean | undefined {
+    return name && this.quantiles ? this.quantiles.answer(name, draw) : undefined;
+  }
+
+  /** The seed's chance (drawn first, so the stream stays where it was), replaced by the quantiles' answer when they have one. */
+  private chanceValue(name: DieName | null, draw: Draw): boolean {
+    const drawn = this.delegate(() => super.randomChance(draw.numerator!, draw.from!));
+    const answered = this.quantile(name, draw);
+    return typeof answered === 'boolean' ? answered : drawn;
+  }
+
   override randomChance(numerator: number, denominator: number): boolean {
-    const name = PairPRNG.ownDie(this.namer?.name({ call: 'chance', from: denominator, numerator }) ?? null);
-    const natural = this.delegate(() => super.randomChance(numerator, denominator));
+    const draw: Draw = { call: 'chance', from: denominator, numerator };
+    const raw = this.namer?.name(draw) ?? null;
+    const name = PairPRNG.ownDie(raw);
+    const natural = this.chanceValue(raw, draw);
     const hit = this.instance();
     if (!hit) return natural;
     if (name?.kind === 'accuracy' && !hit.accuracy) {
@@ -175,8 +196,10 @@ export class PairPRNG extends PRNG {
     const named = this.namer?.name(draw) ?? null;
     if (named?.kind === 'secondary') return this.secondaryRandom(named, draw);
     const name = PairPRNG.ownDie(named);
-    if (name?.kind !== 'damage-roll') return super.random(from, to);
-    const natural = super.random(from, to);
+    const drawn = super.random(from, to);
+    const answered = this.quantile(named, draw);
+    const natural = typeof answered === 'number' ? answered : drawn;
+    if (name?.kind !== 'damage-roll') return natural;
     const hit = this.instance();
     if (!hit) return natural;
     const roll = (hit.roll ? undefined : hit.script?.roll) ?? natural;
@@ -193,7 +216,9 @@ export class PairPRNG extends PRNG {
 
   /** The entry's `random(100)`: the natural value is drawn, the script (once per effect of the instance) may replace it, the record keeps the result. */
   private secondaryRandom(name: DieName, draw: Draw): number {
-    const natural = super.random(draw.from, draw.to);
+    const drawn = super.random(draw.from, draw.to);
+    const answered = this.quantile(name, draw);
+    const natural = typeof answered === 'number' ? answered : drawn;
     const hit = name.targetSlot ? this.instance(name.targetSlot) : null;
     if (!hit || !name.effectId) return natural;
     const happens = hit.script?.secondary?.[name.effectId];
@@ -212,8 +237,11 @@ export class PairPRNG extends PRNG {
   }
 
   override sample<T>(items: readonly T[]): T {
-    this.namer?.name({ call: 'sample', from: items.length, items });
-    return this.delegate(() => super.sample(items));
+    const draw: Draw = { call: 'sample', from: items.length, items };
+    const name = this.namer?.name(draw) ?? null;
+    const natural = this.delegate(() => super.sample(items));
+    const answered = this.quantile(name, draw);
+    return typeof answered === 'number' ? items[answered] : natural;
   }
 
   override shuffle<T>(items: T[], start = 0, end = items.length): void {

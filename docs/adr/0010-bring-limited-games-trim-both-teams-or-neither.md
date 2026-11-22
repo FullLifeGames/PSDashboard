@@ -1,5 +1,5 @@
 ---
-Status: accepted; round 88 (T314) kept the rule for the evaluation and filters only the bench
+Status: superseded by ADR 0024 (round 89, #124); accepted until then, round 88 (T314) kept the rule for the evaluation and filters only the bench
 ---
 
 # A bring-limited game trims both teams to the Pokémon that were brought, or neither

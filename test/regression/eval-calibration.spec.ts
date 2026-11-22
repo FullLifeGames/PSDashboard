@@ -5,14 +5,14 @@ import type { Battle } from '@pkmn/sim';
 import { buildTeamsFromReplay } from '../../packages/replay-core/src/team-builder';
 import { applyTargetCorrections, reconstructBranchRuntime } from '../../packages/eval-engine/src/branch-engine';
 import { buildChoiceLockContext } from '../../packages/eval-engine/src/choice-lock';
-import { getBranchSimulatorFormat, replayBringOnly } from '../../packages/replay-core/src/replay-format';
+import { getBranchSimulatorFormat } from '../../packages/replay-core/src/replay-format';
 import { parseReplayLogWithObservations } from '../../packages/replay-core/src/protocol-parser';
 import { logRules } from '../../packages/replay-core/src/rules-dex';
 import { battleFaintedFraction, searchPosition } from '../../packages/eval-engine/src/search';
 import { leafValue } from '../../packages/eval-engine/src/search/leaf';
 import { bankKeepPlayed, bankSampleCount, bankSearch, bankSettings } from './bank-search';
 import { diskCachedSmogonFetcher } from './smogon-fetch-cache';
-import { bankTeamsFor } from './bank-build';
+import { bankTeamsFor, bankWorldsFor, blendReadings, type BankWorld, type WorldReading } from './bank-build';
 import { loadReplayMods } from '../../src/lib/replay-mods';
 import { bankUniverse, phaseOf } from './bank-universe';
 import { createMatchupCache, evalFeatures, EVAL_WEIGHTS, FEATURE_WEIGHTS, type EvalFeatures } from '../../packages/eval-engine/src/eval-function';
@@ -911,6 +911,706 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * actually gets traded), not eval-basis. CONSEQUENCE: stop mining the
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
+ *
+ * ROUND 89 2026-11-09 to 2026-11-20 (improvement round 89, the wave of 1.2.0:
+ * the 38 open issues of milestone 1.2.0, built in lanes A to H, N, P, Q, S, L
+ * and a feedback lane; base r89 on master 439ae2d (release 1.1.1 plus PR #128
+ * and #129) with its opening commit 8976c749 (jsdom 31, knip 6.44.2); every
+ * part of the round ran on devbox (user 09.11.2026), CI as the second machine
+ * from 12.11.; lanes A and C branch from the opening commit, later lanes from
+ * r89's head; one fresh agent per step; merged in the clone ps-dashboard-2-m89
+ * on m89 and fast-forwarded into r89: fe8d9785 lane C, ed4a9449 lane E,
+ * d0a3d275 lane B, acd33f1f and 373ac634 lane D, 64872837 lane A, bced4531 and
+ * 1430b8b5 lane F, 36ced864 and e438a036 lane H, 462bac2e and 47b5a76c lane G,
+ * ffa7127f and 01c554d1 lane N, df62fa88 to d1e27cd8 the deletions of #57,
+ * ac11892e lane P, 4e6b7b37 the app and test lanes, aa13bff9 the feedback
+ * fixes, b6da02f6 the full-sweep fixes; then 15d606c5 cache v79, 3fbd193f,
+ * 376ca975 and a49ffbe8 the re-pins, ccc2baf1 the documents, 5667106d the
+ * head of 19.11.; then, in the round's own branches and merged by c85ee825:
+ * d526268c the tester fixes, 7cee4971 the New Game fixes, c256dd28 Lines by
+ * value, f47da36b to 70ab1133 "Opponent reads my move", aae93d37 to ccc0cb42
+ * the engine change set of #196 and #197 with cache v80 (1a9a0ddb), 952cc834
+ * one line per ranked row, c137ab0e the chances of forced dice, 8ba45318 the
+ * draft t56 pin at ten switches; then e3d15c06 to 04252524 the stop that keeps
+ * the result so far (e3d15c06 singles, 2ee71242, 2fec5001 and 506fb49c the
+ * tree search's interim result and the third line, 04252524 the two stop bugs
+ * of the fifth tester pass) with 389f4705 closing four document gaps, the head
+ * of 21.11.; probes docs/perf/probes/2026-11-09-r89/). Gates: the opening
+ * 09.11. (every open issue of 1.2.0 in one wave, eight rulings on the plan),
+ * the mid-wave gate 09.11. (24 questions), lane rulings 09.11. to 15.11.
+ * (rulings 15 to 38 of the brief), the final gate from 16.11. (paused the same
+ * day for the grades and forced-win readings of two games, then answered in
+ * three batches on 16.11., 17.11. and 19.11.), and four more review pages on
+ * 20.11. and 21.11. (rulings 43 to 47 of the brief: the tester fixes, Lines by
+ * value, the Gholdengo scene, the engine change set, the stop).
+ *
+ * DELIVERED: Lane A, search draws and the forced-win proof (#59 block 1, #60,
+ * #145, #148, #149; score-touching). Block 1 of T322 reads each die of a root
+ * draw by its own quantile, permuted by hash, so two 50 % dice no longer share
+ * one tree; the pre-registered trust rule for thin trees missed its bar (test
+ * half 6 of 16 pools closer than one-ply, 38 % against 70 %) and a revert took
+ * it out (f71673d2); #59 closes with block 1 and block 2 stays parked with a
+ * trigger. #60 reads one seed list per cell, shared by every path, keyed by a
+ * hash of the saved position. #145: a repeated Protect no longer reads as a
+ * sure failure; a proof below mass 1 stays visible above MIN_FORCED_MASS, also
+ * for the side that lost. #148: the helping rule counts a critical hit's
+ * leftover as a roll fact (sweep over every boost move in every generation and
+ * mod, the crit forced both ways). #149: the hit-cost memo keys the state of
+ * effects, so a Substitute at 53 HP and one at 10 HP no longer share a price
+ * (cost accepted by the user: about +8 to +12 % CPU per singles search, +5 %
+ * in VGC). Prover in doubles: five plain draws, and the prover asks the full
+ * proof for its root candidates without the five-turn scout (doubles proofs 70
+ * new against 25 gone, accepted).
+ *
+ * Lane B, brought bodies (#116, #124, #117; score-touching). A transformed
+ * Ditto no longer breaks the bring list. A side that did not bring all six is
+ * played four against four, or, where the log never showed a body, as a blend
+ * of the three heaviest worlds by usage weight (a full search per world; every
+ * world cost +51 to +66 % search time, three worlds +35 to +42 %). The
+ * short-side reading found 134 bodies in 131 games that entered and fainted in
+ * one turn, so the game that ADR 0010 used as its example (2630452654) is full
+ * by the log; ADR 0024 supersedes ADR 0010 and carries the corrected table. A
+ * Random Battle fills its unseen bodies from the format's random-set data, one
+ * draw per game seeded by the log header (static error 0.118 against 0.485
+ * with shown bodies only in singles, 0.092 against 0.298 in doubles, 240
+ * simulated games). Illusion moved to 1.3.0 with #141.
+ *
+ * Lane C, choices from the protocol (#111, #118, #108, #106, #131, #144, #135,
+ * #138, #143, #136; score-touching). The stand-in move and the cant order read
+ * priority abilities (#111); the forme tie of findSlotBySpecies goes through
+ * the Dex and drops the prefix pass (#118); a body that fell before it acted
+ * is graded inside the order bound the simulator's priorities allow, and the
+ * bound is attached to the search result (#108, C4b: Doubles OU 2663093831
+ * turn 7 and VGC 2629703929 turn 9 read another played row); PokemonSnapshot
+ * gains an optional ppUsed read from @pkmn/client, so a spent Revival Blessing
+ * or a 1-PP move no longer ranks first (#106; Pressure's extra PP is charged
+ * by a corrected copy held to the simulator); the revive answer and forced
+ * replacements by slot (#131, #144); a relayed Magic Bounce, Magic Coat,
+ * Snatch or Dancer move is no click of the body (#135); exit corrections
+ * (#138); a stand-in for a choice the request refuses (#143); the aim of a
+ * failed move whose target the protocol hides, asked from the simulator (#136,
+ * 2,511 doubles turns exposed, 23 games diverge).
+ *
+ * Lane D, set inference (#110, #75, #132, #139, #140, #146; score-touching). A
+ * logged effect now rules out the ability that blocks it (78 of 7,035 corpus
+ * replays); #75 reads a knockout by the game's display bounds (Scarlet/Violet
+ * rounds the shown HP up, Champions down) and D9 repairs the top-up that a
+ * refuted knockout had widened (singles late +1 [0, +3] after it); a guessed
+ * Leppa Berry the log refutes goes (#132); a transformed body's moves book to
+ * its target (#139) and a Pledge combination books the partner's Pledge on the
+ * right body (#140); transform-booking-corpus.spec.ts and a sweep that holds
+ * every logged own move to the built set on every build path without a user
+ * edit (#146).
+ *
+ * Lane E, play-out and small app fixes (#112, #119, #113, #115; lossless). The
+ * play-out loop reads its own tip, not the pointer, so a click behind the tip
+ * no longer stalls it (new hook inputs tip and tipEvalStatus; four rows in
+ * singles and doubles); the status line follows the stop (#119); the lead
+ * picker at turn 0 follows Switch sides (#113); a forced-win label keeps its
+ * open text when the open class carries an effect (#115).
+ *
+ * Lane F, a die per hit and logged random targets (#114, #137;
+ * score-touching). The dice panel offers one Hits row with the counts 1 to N
+ * under the first hit, saved branches and the engine's dice as before; a count
+ * the game cuts short reads "(5 landed)" and "Forced 10 hits, 5 landed"; Skill
+ * Link and Loaded Dice show one fixed row (optional DieOffer.fixedBy). Random
+ * targets and Roar's drag are logged dice now (four turns of Doubles OU
+ * 2663093831 move; four rebuild rows move).
+ *
+ * Lane G, lines over the whole game (#104, #130, #153; #104 and #153 lossless
+ * on the corpus, the stall fix of G4b score-touching). Under a turn's analysis
+ * the Lines section (closed by default, like the Explanation) shows the
+ * engine's line and the played line per player, up to three turns, with both
+ * numbers and a play button that forces the dice the line assumes; the Game
+ * review lists the graded turns per side, the graph marks them. The game
+ * analysis also searches every graded early singles turn with the trees (1.09
+ * to 1.65 times the analysis time, accepted at 1.2 times), the graded-turn
+ * stage costs 0.97 to 1.42 times, the lines job at most 1.12 % of the tree's
+ * CPU. #130: "How could <player> have won?" searches three steps (a stronger
+ * play, luck down to 1 in 1,000, an opponent's mistake) with a budget of 350
+ * cells and 175 turns, from the Endgame row or any endgame turn. #153: Hard
+ * mode (renamed "Opponent reads my move" at the end of the round), a checkbox that lets the opponent answer with the reply the search
+ * rates lowest for the move in hand, and "Back to the engine's pick" in the
+ * dock's tray. G4b fixed the stalling die an Encore rebuilt as a Protect that
+ * succeeded where the log's failed.
+ *
+ * Lane H, a new game from two teams (#105; lossless for replays). The Game
+ * menu holds Load replay, New game and Saved games; a dialog takes two teams
+ * as Showdown text, the format (the simulator's whole list, searchable, the
+ * calibrated families on top, or a Custom Game) and a seed that the user can
+ * see and set; the game opens at Team Preview with both teams in full view and
+ * every turn played becomes the main line; saved games (20 at most) list under
+ * the menu and on the landing page; the address names what is open (?game=<id>
+ * or ?replay=<id>); the share link has version 2 (two teams, the format, the
+ * seed, the played entries) and the app keeps reading version 1; a pasted set
+ * without an ability gets the format's first ability, named in the dialog; a
+ * team change that cuts played turns and an unsaved variation ask first.
+ *
+ * Lane N, #150 (larger bug, score-touching): a landed hit rules an ability out
+ * (Water Absorb for Dracovish after Aqua Step), with the Illusion guard of the
+ * older readers; hand-set EVs keep their nature; the editor's pools for a
+ * species the generation marks Past read the National Dex, and typed moves
+ * accept every move the battle plays (cold inference 1.20 times).
+ *
+ * Lane P, the prover's delay and sure strike (score-touching through the
+ * prover). A repeated Protect delays a proof and no longer removes it (delay
+ * rule, split read, lazy read; endgame/delay-rule.ts); a one-body foe that
+ * cannot move before a strike that always knocks it out is tried first
+ * (endgame/prover-strike.ts); the card and the Game review say "... wins
+ * within 2 turns against every reply on the sampled rolls; a repeated Protect
+ * only delays it. The winning line is Aqua Jet, which strikes first, with Heat
+ * Wave beside it." The optional fields delay, delayName and choiceNames carry
+ * it; ENGINE_PROTOCOL stays.
+ *
+ * Lane Q and the app steps. A read counts as paid off only when it also beat
+ * the safe line against the reply that came, else the card names a risk that
+ * went unpunished; a quiet card that speaks beside another sentence reads
+ * "Neither side made a mistake."; the matrix opens as a dialog from the turn
+ * card; the team editor keeps an edited set across a reload and loses fewer
+ * edits to its smaller faults; the what-if move picker follows the format;
+ * Variation tip, Replacement and the Discard question carry the new words; the
+ * turn link ?replay=<id>&turn=<n> opens a replay on a turn (lane L). Five
+ * fixes from the outside forum post on gen9natdexdraft-2713067801 (Terastal
+ * Clause in the branch format, plain turn-0 rows and others).
+ *
+ * Lane S and merge steps (#57, #133, #125; lossless). M3 deleted the tree's
+ * chance nodes (CHANCE_NODES), FORCED_SWITCH_NODES and FIRST_TURN_JOINS_LOG
+ * with every line only they reach and 33 real knip findings, and ADR 0023
+ * supersedes ADR 0009; OBSERVATION_SLACK lives in one module (#133); M4 gave
+ * the Tests workflow room for a slow runner and runs pack:smoke in CI; the
+ * three verify-scenes boards are rebuilt through the app's team build; the
+ * sweeps that read DICE_SWEEPS=full outside the dice files run in a second,
+ * informational CI job in three parts, held by full-sweep-job.spec.ts; #125
+ * steps 1 and 2 split dice-logged-sweep into five files, landed-hit-sweep into
+ * three and blocked-effects-sweep into two (23,970 rows before and after, 0
+ * lost, 0 gained). New ADRs 0023, 0024, 0025; ADR 0014 and ADR 0020 amended.
+ *
+ * Feedback in CI (M-lane step, 88a934eb and 9714eb85; lossless). From
+ * 17.11. devbox read the page-fault cost of its host 7 to 10 times higher, and
+ * a feedback game passed the harness cap there. scripts/feedback-ci.mjs pushes
+ * the branch feedback/<name>, .github/workflows/feedback.yml runs N whole
+ * feedback runs (default 3) on one runner each with FEEDBACK_DUMP=1, one
+ * Playwright worker and no trace, a last job compares the dumps byte for byte
+ * and the drift reports without their dates and wall times, and the script
+ * downloads the artifacts into .calibration/feedback-<name>/ and deletes the
+ * branch. feedback-ci.spec.ts and feedback-workflow.spec.ts hold the
+ * workflow's security properties, the compare step's file list against the
+ * harness and the script's pushes. The user's standing okay covers the
+ * feedback/<name> branches (20.11.); AGENTS.md, README, ARCHITECTURE and
+ * EVALUATION name the script.
+ *
+ * Tester fixes (FT-1 to FT-4, d526268c; lossless for the corpus, card prose
+ * moves). The first tester pass of the merged head (16.11., f6f4c548) found
+ * that the singles card said "stayed in (KO'd before acting)" with "the
+ * engine's move" for a Pokemon that never moved. A body knocked out before it
+ * moved gets no played column in the matrix dialog (2e6949b1), its sentences
+ * on the card and the Game report say "knocked out before it moved, so the log
+ * shows no choice" (1a0b2825, bc0cd0cf; closes #162), a named inaccuracy or
+ * risk replaces "Neither side made a mistake." (cd0e8cc0), a variation that
+ * ends the game itself raises no divergence notice (ec6e0f62), the Main line |
+ * Variation chip fills again (e5503d59), "Open matrix" has the size of the
+ * panel's other buttons and "worst" reads in the dialog (0a2473e1), the two
+ * Discard buttons stay together at 390 px (6004122d), and the graph names its
+ * shapes (a2d6f48d: a circle marks a graded turn of one side, a square one of
+ * the other, listed in the Game review). The 47 cards of the feedback corpus
+ * whose text moved (36 singles, 4 Doubles OU, 7 Champions OU; table
+ * gate/ft-cards-read.md) stand as rendered, the four that lose "Neither side
+ * made a mistake." beside the never-acted wording included (648453 t29,
+ * 649664 t16, 653785 t26, 562428 t21; user 21.11.). New Game fixes (7cee4971):
+ * one rule, startBlocks, blocks Start (a side with no readable set, more than
+ * six sets, a seed the engine refuses, a species the format's Dex does not
+ * know) and the dialog shows each reason under its box (e2f7b690); the
+ * rebuild of a new game's positions runs again when a turn is missing, so
+ * Analyze game no longer prints the replay's "guessed sets" notice for a game
+ * (b0dc343b).
+ *
+ * Lines by value (c256dd28, 12b3b342; lossless, the first step and every
+ * score stay). A line's later steps take the pair of options that rate best
+ * for their side (p1 highest mean, p2 lowest) among those with at least 4
+ * visits and a quarter of the node's most visited option, instead of the most
+ * visited cell; singles and doubles share the path. Over the 12 corpus dumps
+ * 185 of 1,003 later steps changed, in 171 of 1,030 lines (singles 163, 106 of
+ * them in gen8ou 573756; doubles 22: Doubles OU 5, VGC 14, Champions VGC 3),
+ * no first step and no score. The honest result of the lane's measure (LN-1):
+ * later steps on the played path that name another choice than the next turn's
+ * card puts first read 75 of 118, against 77 of 118 before, and 26 of 46
+ * unchanged for the side ahead by 0.3 or more; the trees' later nodes are too
+ * thin to know better. The scene that started it, 655336 turn 24 (BKC's
+ * Charizard-Mega-X reads Roost into Encore twice), stays: Roost is the best
+ * mean in all three trees that saw High Jump Kick hit, by every reading tried,
+ * and only a deeper search of the line's later steps reverses it (4 times the
+ * iterations at the turn-25 root: Dragon Claw 0.738 against Roost 0.555). The
+ * user's expected answer, the winner's line and how the loser could still win,
+ * is #200 (1.2.1, moved from 1.3.0 with the ruling). One line per ranked row
+ * (952cc834, src/lib/row-line.ts): the row's "then ..." on the card and in the
+ * panel read the later steps of the row's line from the result's lines, through
+ * the same choice as the Lines section; before, 124 results carried a ranked
+ * row line and the Lines block agreed with it in full in 28, differed at the
+ * first shown step in 69 and later in 3, and agreed as far as both went but
+ * not in length in 24. A result without lines keeps the principal variation;
+ * the engine's prose and the byte compare do not move. The battle log's dice
+ * lines name the chance of the result the click forced (c137ab0e: "Protect
+ * fails, 67 %" where the line said 33.3 %, "no crit, 96 %" where it said
+ * 4.2 %).
+ *
+ * "Opponent reads my move" (f47da36b, 422b7d29, 70ab1133; lossless). Hard mode
+ * leaves the Evaluation row and sits in the Setup menu under "Animate branch
+ * turns" as "Opponent reads my move", with a title that names the three places
+ * it acts and says grades stay; while it is on, the dock's status row opens
+ * with "Opponent reads your move" and a Turn off button, and the titles of
+ * engine-move buttons and of the panel's ranked rows name the reply the
+ * opponent plays. The stored key hardMode, the identifiers, the support-state
+ * file and the engine API keep their names. The second step (a button per
+ * line, the Game review on usual lines) stays with #188 for 1.3.0.
+ *
+ * The engine change set of #196 and #197 (aae93d37 to ccc0cb42; score-touching;
+ * larger bugs, 1.2.0 by ruling 45). The scene: a new Gen 9 OU game with open
+ * team sheets, turn 1, a Choice Scarf Gholdengo takes Dragapult from 317 to
+ * 56 HP with Make It Rain, drops itself to -1 Special Attack, and U-turn
+ * brings Glimmora in; the engine recommended Sludge Bomb and a switch to a
+ * Glimmora that Make It Rain leaves at 1 HP through its Sash. #196: the
+ * boosts term (Doubles OU weight 27) and boostsBiting counted a stat drop as
+ * lasting for the rest of the game, though the simulator clears every stage of
+ * a body that switches out; a drop now counts only while its holder is trapped
+ * or has no living bench (stageStands; a switch-out reader and
+ * switch-out-sweep.spec.ts hold the reading to the simulator in Generation 9
+ * and Champions, singles and doubles; a raised stage reads as before; cache
+ * v80). #197: at an open replacement request the early singles matrix judged
+ * the five candidates by the board on arrival, so Glimmora read -0.005 and the
+ * other four -0.108 each, equal to the digit; each cell now books the value of
+ * the engine's own depth-1 search of the turn that follows the arrival (an
+ * optional forced field of the choices answer and an optional turn field of the
+ * sub-search job; ENGINE_PROTOCOL keeps its value), and the result reads depth
+ * 2. Expert pin of the user's game (expert-sb5a.spec.ts, Tera off): turn 2
+ * leads with Earth Power and Gholdengo stays with Make It Rain, the
+ * replacement after U-turn is Great Tusk (-0.121, Lokix -0.142, Pawmot
+ * -0.157, Glimmora last at -0.193; the solved mix is Great Tusk alone); both
+ * rows were red before. Doubles pay only under an explicit matrix (Auto runs
+ * the tree there). Cost per request, Node, devbox (2.5 to 3 times slower than
+ * a normal machine, not interleaved with a base): 653785 turn 10 75 s, the
+ * shared game 45 s, 655336 turn 5 24 s, VGC 2630685175 turn 2 31 s, so 10 to
+ * 30 s on a normal machine, shown by the dock chip "engine choosing...".
+ *
+ * A stop keeps the result so far (e3d15c06, 2ee71242, 2fec5001, 506fb49c,
+ * 04252524; lossless, app and a listener-only path of the tree search). The
+ * scene: a user presses Cancel during a forced-replacement search; the panel
+ * read "Position changed; re-evaluate.", the card greyed, the chip fell back
+ * to "choose a replacement" and, with Auto on, the search started again. Now
+ * a stop keeps the last interim result in singles, doubles and VGC: the panel
+ * reads "Search stopped. Showing the quick estimate." after depth 1 and
+ * "Search stopped. Showing the result so far." later, the card stays live, the
+ * dock chip takes the engine's pick from it and Execute plays it; Auto and
+ * Always on do not search a stopped position again. "Position changed;
+ * re-evaluate." stays for a position that changed. Doubles and VGC at Auto run
+ * the tree search, which had no interim result before its first whole tree
+ * ended; its first tree now streams its own interim result every 150
+ * iterations until it ends, only for a caller that listens (the game
+ * analysis sweep and the bank pass no listener), and the worker pool carries
+ * it with a partials flag on the mctstree request (ENGINE_PROTOCOL keeps its
+ * value). A stop that comes before any interim result reads "Search stopped
+ * before a first result." and also holds through the rebuild before a
+ * replacement search and through the game analysis's own Cancel, which had
+ * started the search again 1 s later. Tests: useDockFill.stopped.spec.tsx (19
+ * rows, singles and doubles, red first), tree-partials.spec.ts (11 rows
+ * on a VGC, a Doubles OU and a singles tree board, four red first, the final
+ * result with and without a listener equal, tree stats byte-identical),
+ * worker-client-tree-partials.spec.ts, stopped-line.spec.ts and rows of
+ * EvalPanel.spec.tsx and useEvalView.spec.tsx. The limit, from the fifth
+ * tester pass: in the browser on devbox the tree's first interim ranking
+ * arrives at 65 to 75 % of a doubles search (VGC 2630685175 turn 4: search
+ * start 9.5 s, first ranking 52.1 s, end 62 s; Doubles OU 2663093831 turn 8:
+ * 18.8, 57.0, 76.9 s), so a Cancel at 45 s keeps nothing there and reads the
+ * third line; that is #207. Four small gaps of the round's documents closed
+ * with 389f4705 (the row-line limit, the ENGINES.md forced field, the
+ * ARCHITECTURE.md row-line module, the stat-drop sentence).
+ *
+ * MEASUREMENT: classes: lanes E, G (lines), H, L, S and the app steps
+ * lossless; A to D, F, N, P and Q's rule score-touching. Base r89-base
+ * (8976c749) in CI; feedback base q0 is c1 = c2 on master (13 of 13 passed,
+ * 834 s and 824 s, 12 dumps byte-identical on devbox; the PC's last wave dumps
+ * differ only in the last digits, 0 moved turns). Wave bank r89-w2 (16fbc855,
+ * CI set against r89-base eight days older, so not a same-day base): no harm
+ * in any pooled row. Bank -1 [-12, +11]; Doubles OU holdout -7 [-26, +10];
+ * vgc2 -50 [-69, -32] (reads better); Champions OU -2 [-30, +27]; Champions
+ * VGC -7 [-34, +20]; the doubles combined table (bank, Doubles OU, vgc2) -36
+ * [-50, -22] (reads better), hq -26 [-50, -3]; one phase warning, the Doubles
+ * OU holdout in hq mid with own K (+198 [+0, +321], 8 games), already present
+ * in the first wave set and not moved by the later fixes. The wave set before
+ * the last fixes (r89-w0 against r89-w2) moves only late-phase rows by under 1
+ * bp. Along the way: B's #124 against the commit before it doubles -18 [-25,
+ * -10], VGC holdout -27 [-38, -16] (wall time +16 %); C no harm, 94 of 8,042
+ * rows moved; D after D9 no harm in a deciding table; A (a10) combined doubles
+ * -2 [-7, +3]; F (f137) 0 harm; C4b moves gameValue only (9, 31, 70 and 30
+ * rows of the bank, vgc2 and Champions VGC, every pooled row +0); lane E and
+ * the deletions of M3 are byte-identical in all five sets; the #150 rule moves
+ * 3 of 4,218 vgc2 rows in one replay. The five sets hold 838, 1,092, 4,218,
+ * 445 and 1,449 rows, as in round 88. Feedback: every lane's pair equals
+ * itself (13 of 13 pins); census against c1: A (a10) 75 moved turns without a
+ * moved truth pin, C and E 0, D 8 (all Doubles OU 2663093831), B 0; the merged
+ * head at b1ffee26 (w1f1 = w1f2, 13 passed in 37.8 min per run) equals lane
+ * G's run outside lines; at ed27beb3 C4b moves two turns (Doubles OU
+ * 2663093831 turn 7, VGC 2629703929 turn 9). No expert pin of corpus.ts moved.
+ * Prover sample of 163 roots (singles 26, Doubles OU 10, VGC 99, Champions OU
+ * 4, Champions VGC 24): the delay rule raises 3 proofs, lowers 0, removes 0;
+ * the sure strike raises 4 winner-side proofs (2204521710#7, 2474083068#10,
+ * 2683837036#6, 2683915311#10 from 0.667 to 1 or 0.9963), adds 1
+ * (2582617212#7) and lowers 1 (2470704517#6 from 1 in 5 turns to 0.963 in 3,
+ * the form right by the game; the no-refund form reads 0.667 there). Prover
+ * time of the sure strike against the delay rule, mean of both run orders,
+ * interleaved in one process, run 1 / run 2: singles +6.9 / +3.6 %, Doubles OU
+ * +5.8 / +3.2 %, VGC +17.2 / +13.8 %, Champions OU -0.8 / +10.4 % (4 rows),
+ * Champions VGC +46.1 / +44.2 %, all 163 roots +19.8 / +16.8 % (848 to 991 ms
+ * a row); 13 roots carry 40 of the 53 extra seconds. Re-pins: 3fbd193f 14 rows
+ * (faint-step-last-first 6, forced-reconstruction 5, blocked-effects 2,
+ * stats-panel-quality 1), a49ffbe8 ten prover rows (forced-win-budget 2,
+ * forced-win-default-path 4, forced-win-direct 1, forced-win-prover 1,
+ * plain-draws 1, win-paths-stronger 1), 376ca975 Champions VGC 2694684816 turn
+ * 8 to no proof until #155 and #156, the three verify-scenes boards at S1; the
+ * e2e rows of the Lines toggle, flinch wording and the graph caption.
+ * EVAL_ENGINE_CACHE_VERSION 78 to 79 (15d606c5) and 79 to 80 (1a9a0ddb, the
+ * drop of #196 moves leaves). CI: Tests run 44046564963 on
+ * ccc2baf1 (one spec comment before the head 5667106d), all nine jobs green,
+ * the three full-sweep parts and the dice job included; earlier runs
+ * 43773287403 (f6f4c548) and 44018587599 (16fbc855) read red only in the rows
+ * named in the re-pins. Final suite on 5667106d in the main checkout, plain,
+ * two workers: 998 files passed, 2 skipped; 25,157 tests passed, 50 expected
+ * fail, 30 skipped (reconstruction.spec.ts played with the local data). Engine
+ * project with EVAL_SIM_FAST=0: 475 files, 17,147 passed, 48 expected fail, 24
+ * skipped. Full e2e, one worker: 224 passed, 8 skipped, 1 failed
+ * (lines-play.spec.ts:93, a click on the Lines toggle that landed while the
+ * panel re-rendered under load; the file passed 5 of 5 on two reruns).
+ * That suite and run read the head of 19.11.; the engine change set below came
+ * after it. Engine change set of #196 and #197, same-day pair: base r89-b3
+ * (measured 70ab1133), head r89-sb1 (measured ccc0cb42, cache v80), the bank
+ * and the four holdouts in CI, all ten folders complete, no HTTP skip, the
+ * five sets of 838, 1,092, 4,218, 445 and 1,449 rows joined in full. No pooled
+ * row reads harm except one table. Bank (fixed K, then own K) -1 [-13, +12]
+ * and +5 [-3, +13]; singles +4 [-1, +10] and +4 [-1, +9]; doubles -12 [-54,
+ * +26] and +9 [-19, +31]; the luck-adjusted singles rows +5 [-1, +11] and +6
+ * [-1, +14] cross 0. vgc2 +3 [+0, +5] and +2 [+0, +4]; Champions OU -9 [-24,
+ * +3]; Champions VGC +0 [-9, +8]. Doubles combined (D26, bank, Doubles OU and
+ * vgc2, 6,148 rows): doubles/all +3 [-1, +7] full, +2 [-3, +7] hq, +4 [+1, +8]
+ * luck-adjusted (below 5 bp). The Doubles OU holdout reads +10 [-4, +23] full
+ * (no harm) and +19 [+5, +35] luck-adjusted with fixed K, +16 [+3, +30] with
+ * own K, 672 rows in 336 games: harm by the rule in that one table, which the
+ * bank does not repeat (its luck-adjusted doubles rows read +0 [-52, +46] and
+ * +0 [-76, +63]); its hq run has 24 rows in 8 games (luck-adjusted +111 [+12,
+ * +252] on 18 rows). Phase warnings: bank late cells (all +11 [+3, +20],
+ * doubles +23 [+3, +43], luck-adjusted doubles +27 [+11, +44]), Doubles OU
+ * early cells (luck-adjusted +53 [+9, +95]), vgc2 mid +8 [+2, +14]; Champions
+ * none. gameValue moved in 670 of 838, 954 of 1,092, 2,786 of 4,218, 340 of
+ * 445 and 912 of 1,449 rows. Ruled to ship as built, with a TODO for the refit
+ * of the Doubles OU boosts weight (1.3.0). Feedback pair ci3 (measured
+ * 12b3b342) against ci4 (measured c85ee825), three runs byte-identical:
+ * tiers (inaccuracy / mistake / blunder) singles 39/8/0 to 36/8/1 over 608
+ * sides, doubles 12/3/1 to 9/5/1 over 128 sides (Doubles OU 8/1/0 to 5/2/0,
+ * SV VGC 1/1/1 to 2/1/1, Champions VGC 3/1/0 to 2/2/0, Champions OU 7/1/0
+ * both); 21 moved turns and 17 grade changes (6 singles, 7 Doubles OU, 1 SV
+ * VGC, 3 Champions VGC); 0 of the 14 expert pin items on 13 turns moved in
+ * tier or played match, and no pin's drift status changed; the drift text of
+ * 562428 t10 gained two lines ("The read was there for" and "likeliest click"
+ * missing from the summary). Forced-replacement cards whose pick matches the
+ * body sent: singles 30 of 53 to 33 of 53 (4 picks changed), Champions OU 1 of
+ * 2 to 2 of 2, Doubles OU 7 of 14 to 5 of 14 (2 picks changed, both away from
+ * the body sent; Auto runs the tree there and #197 does not apply), SV VGC
+ * 6 of 7 and Champions VGC 4 of 4 unchanged. Re-pins ruled at the gate (user
+ * 21.11.): the two rows of boost-idle-holder.spec.ts (a drop on a holder with a
+ * living bench reads 0, one without keeps the stage's worth), the pending T248
+ * entry of relation-checks.spec.ts removed (Champions 2634199230 turn 5 passes
+ * now), fork-identity.json recorded again (the singles MCTS tree moved, score
+ * -0.0198 to -0.0144; children, both depth-1 matrices and the doubles tree
+ * byte-identical), the pair-sampler bound of the three-draw estimate 0.1 to
+ * 0.15 (it reads 0.127), and the draft t56 play-out pin (branch.spec.ts:69)
+ * at ten p2 switches (the play-out ends at turn 71 with nine switches; the
+ * turn bound 75 holds; 8ba45318, ruled at the last page 21.11.); the drift pin
+ * 562428 t10 stays in known drift (#86). CI: run 44896289550 on c84bee80 (the first stage alone) was red
+ * in two engine rows (eval-search-identity and pair-sampler, in the three
+ * engine and Node jobs) and the browser job's play-out pin; run 44901844084 on
+ * ccc0cb42 was green in every job except that pin, which 8ba45318 re-pinned.
+ * Tester passes: pass 1 on the merged head of 16.11. (f6f4c548, five
+ * sessions): 3 BROKEN, all editor faults older than the wave (edits lost on a
+ * reload, Escape in an open move list closes the editor, Enter in an empty
+ * Add move field adds the first move), 5 WRONG TEXT, 5 LOOKS OFF, 6
+ * QUESTION, none blocking; its first finding fed the tester fixes above. Pass
+ * 2 on 21.11. (70ab1133, two sessions): 0 BROKEN, 7 WRONG TEXT, 4 LOOKS OFF, 4
+ * QUESTION, console clean; "Opponent reads my move", the graph legend, the
+ * timeline chip, the New game checks and a variation that wins all worked in
+ * singles and doubles; open in it: 655336 turn 24 still reads Roost twice
+ * (LN-3), a random-target note under a line whose only untargeted move is
+ * Tera Starstorm, a Fake Out step on a turn Rillaboom already moved, new-game
+ * dialog wording, "Re-analyze" on a game never analyzed, inaccuracy sizes off
+ * by one point. Ruled (TS1a): the wrong texts as small fixes for 1.2.1, the
+ * looks and two questions into #176 for 1.3.0, the dock note stays on the
+ * main line. Pass 3 on 8ba45318 (the forced replacement under the new
+ * engine, 93 shots): 0 BROKEN, 6 WRONG TEXT, 3 LOOKS OFF, 5 QUESTION; #196
+ * and #197 read right in the app (Earth Power 41 %, Stealth Rock 39 %, switch
+ * to Pawmot 38 %; Gholdengo keeps Make It Rain at 60 %; the picks and their
+ * seconds, 7 to 78 s, in the findings), one line per ranked row works, the
+ * chance of a forced die reads right; its first question (a stop during a
+ * replacement search leaves no suggestion) became the stop fix e3d15c06, its
+ * texts became #209 to #213 and #176 (ruling 47: hidden faint in a row's
+ * line, the "then ..." under the "(waiting)" row, two turn numbers, the
+ * Game review lines at a forced replacement, the depth-2 scene) and #207 (the
+ * slow Setup menu). Pass 4 on e3d15c06: the stop works in singles (panel
+ * line, live card, chip and Execute, 390 px fine), 1 BROKEN (doubles and VGC
+ * at Auto keep nothing when stopped, the tree has no interim result before
+ * its first tree), 1 LOOKS OFF (a three-way tie of the quick estimate), 2
+ * QUESTION; the BROKEN became the three commits 2ee71242 to 506fb49c. Pass 5
+ * on 506fb49c: 3 BROKEN, 2 WRONG TEXT, 2 LOOKS OFF, 3 QUESTION, no page
+ * error; works: a Cancel after the first ranking on VGC 2630685175 turn 4
+ * and Doubles OU 2663093831 turn 8 keeps the result and the chip plays it, a
+ * normal doubles turn keeps its result, Champions VGC turn 4 reads "->
+ * Charizard engine", the stopped full run ends on the same order (interim
+ * 45/41/33 at 57 s, final 42/39/34 at 77 s), 390 px clean. Its BROKEN 1
+ * (a Cancel during "Rebuilding position..." leaves no line, Always on then
+ * searches again) and 2 (the game analysis's Cancel restarted the search of an
+ * empty stop) were fixed by 04252524 (the stop path read a status that an
+ * effect wrote after the render; the fill trigger forgot the stop when the
+ * analysis ran); BROKEN 3 is the limit above (#207), its depth readout that
+ * runs backwards is #215. A stop mark on a replay turn's analysis sweep and
+ * Always on starting the game analysis in a variation are rulings that wait.
+ * CI Tests, the commits after 8ba45318: 8ba45318 green after one rerun
+ * (right-column.spec.ts:72 failed once), e3d15c06 with one red browser test
+ * (new-game.spec.ts:140) that passed on the next head, 506fb49c green on the
+ * first run; both flaky tests are #214. The stop commits are lossless: the
+ * bank r89-fin (506fb49c) equals r89-sb1 byte for byte on its 838 rows, three
+ * feedback runs r89-final (8ba45318) are byte-identical in their 12 dumps, and
+ * three runs r89-final2 (506fb49c) are byte-identical to each other and to
+ * r89-final; the bank's tree path passes no listener. No cache bump, no pin.
+ * Final document review (wave-reviewer, head 8ba45318, read-only): no wrong
+ * claim in README.md, GLOSSARY.md, ARCHITECTURE.md, ENGINES.md, EVALUATION.md
+ * or the ADRs about the changes of the round; of 401 backticked identifiers
+ * the wave added, 393 exist (the other 8 are symbols that ADR 0023 says are
+ * deleted); four unclear points, low weight, all four closed by 389f4705.
+ * Final checks on the code head 04252524: CI Tests run 44956076990, all nine
+ * jobs green on the first run. Three feedback runs (r89-final3) byte-identical
+ * to each other and to r89-final2 (12 dumps). Tester pass 6: 0 broken; a
+ * Cancel during "Rebuilding position…" leaves the stop mark (VGC four times,
+ * singles once) and a cancelled game analysis leaves a stopped position alone
+ * (Doubles OU, VGC).
+ * Final suite in the main checkout on 04252524 with DICE_SWEEPS=full (three
+ * and a half hours on devbox): 68,724 passed, 49 expected fail, 30 skipped,
+ * 17 failed. 16 of the 17 are timeouts of full sweeps and corpus rows on the
+ * slow machine; the sweep files are green in the CI jobs "Dice sweeps" and
+ * "Full sweeps" of the same head, and bank-search and generated-games pass
+ * alone. The seventeenth, App.new-game.spec.tsx:58, read the address before
+ * the app wrote it and passes alone (20 of 20; #214). bring-list-corpus needs
+ * the local corpus, so CI skips it: it passed in 237.9 s on 20.11. and timed
+ * out at 240 s now; with the limit at 1,200 s it passes in 597.5 s (9fe75e30).
+ * The engine project with EVAL_SIM_FAST=0: 482 files, 17,257 passed.
+ * Last change before the release (user 22.11.2026, 8156ede4 to e55d3544): the
+ * Game review and "Opponent reads my move" ship switched off behind feature
+ * flags (src/lib/feature-flags.ts) and return in 1.2.1 (#217, #221); the
+ * Evaluation header carries "Always on" in the row of Depth and Tera. No
+ * score moves: three feedback runs (r89-ff1) byte-identical to each other and
+ * to r89-final3 (12 dumps); CI Tests run 45022453829, nine jobs green. Tester
+ * pass 7: 0 broken; the header still wraps with Depth 1 or 2 and inside a
+ * variation.
+ * Depth and Samples then moved from the header into the Setup menu (6b625d20,
+ * bd7a2bc4; the stored prefs keep their meaning): the header holds one row in
+ * every state of tester pass 8 (0 broken; its points are in #223). Three
+ * feedback runs (r89-ff2) byte-identical to r89-ff1; CI Tests run 45033371201,
+ * nine jobs green, Browser flows in 49 of its 50 minutes (#222).
+ *
+ * GATE: opening 09.11.: every open issue of 1.2.0 in one wave on devbox, with
+ * two worktree slots; the trust rule of T322 loses its two open clauses; the
+ * unknown fourth body is evaluated once per candidate by usage. Mid-wave gate
+ * 09.11.: the play-out loop reads its own tip (#112); the prefix pass of #118
+ * goes; #60 is built per cell; the tree's chance nodes go (ADR 0009
+ * superseded); #125 splits the large sweeps and #57 deletes the 33 real
+ * findings; new issues approved for 1.2.0 (the revive answer, a Leppa Berry
+ * the log refutes, one module for OBSERVATION_SLACK, the relayed click, the
+ * hidden-target failure, random targets and drags, the two exit corrections,
+ * the transform and Pledge bookings, a stand-in for a refused choice, forced
+ * replacements by slot). Lane rulings 10.11. to 15.11.: B plays the three
+ * heaviest worlds; the blend passes its test on two short-side games; #145
+ * widens to the lost side's proof; the dice spread of the grades is described
+ * with its numbers and no more draws come in 1.2.0 (a TODO proposal waits);
+ * the strand sentence of A4 leaves 1.2.0 and #59's block 2 is parked; #149
+ * stays at its measured cost; H and G decide their views (modal dialog, Game
+ * menu, seed, lines per player, Hard mode as a checkbox); #150 joins with the
+ * National Dex pools for Past species. Final gate, first batch 16.11.: the
+ * grades and forced-win readings of two games sent the gate back to fixes
+ * (lanes P and Q), then ruling on the re-pins of rebuild and inference rows,
+ * the card's delay wording, "read paid off" only against the safe line, the
+ * matrix as a dialog, the Lines and win-path views closed by default, the
+ * ability fill from the format's first ability, the scene of 2628166702 turn 7
+ * stays without a forced win, #59 closes with block 1 and a second CI job
+ * holds the full sweeps outside the dice files. 17.11.: five fixes of the
+ * forum feedback stay, the Discard question, the word "replacement",
+ * "Variation tip", #154 (Champions Reg M-B) as one larger bug for 1.3.0.
+ * 19.11.: the bounded board-key census stays; the future-attack delay fix, the
+ * Protective Pads tell and the bench filter by name go to 1.2.1, and 1.2.0
+ * ships with the documented limits.
+ * 20.11.: the three places that contradict "knocked out before it moved" (the
+ * matrix dialog's played column, "Both sides played the engine's preferred
+ * line", the Explanation's "stayed in") are fixed in 1.2.0 with #162, so is
+ * the divergence notice on a variation that wins, and "Neither side made a
+ * mistake." gives way when the card names an inaccuracy or a risk; a doubles
+ * slot that fell before it acted and still gets a played move is a larger bug
+ * for 1.2.1 (#195); three of the testers' looks finds (the size of Open matrix,
+ * "worst", the Discard question at 390 px) are fixed in 1.2.0 and the other
+ * five go to #176; #174 closes, three parked texts are written (trigger: at
+ * least 5 of 75 tiered sides). The page's free text became reports: Open
+ * matrix alignment (fixed), the Hard mode place, the graph's unexplained
+ * shapes (named), 655336 turn 24, Start blocked in New Game, the notice on a
+ * new game's analysis, odd recommendations in new games, the chip gap (fixed).
+ * 21.11. (two pages): the 47 moved cards stand as rendered; the fixes are
+ * accepted; Lines read each side's best mean instead of visits in 1.2.0, "(only
+ * choice)" is a small fix for 1.2.1 (#198), the winner's line and the loser's
+ * way back are one feature (#200, first 1.3.0, then 1.2.1 by the last page);
+ * Hard mode has no place that satisfies the user, so the setting becomes
+ * "Opponent reads my move" in the Setup menu with the dock note "Opponent
+ * reads your move" and a Turn off button (1.2.0), its second step is #188
+ * (1.3.0); the user doubted the Gholdengo scene itself, it was diagnosed to the
+ * ground and gave #196 and #197, both built before 1.2.0 (a larger bug each,
+ * score-touching, full measurement; the release waited for them); Tera "Auto"
+ * in a new game follows the format (#199, 1.2.1); pricing the unused Tera is a
+ * feature for 1.3.0 (#201), its measurement the first step. Last page 21.11.:
+ * both engine fixes ship as built, a TODO for the refit of the Doubles OU boosts
+ * weight (1.3.0); the forced-replacement search ships with its cost (10 to 30
+ * s), an evaluation of a faster one is a TODO for 1.2.1; the play-out pin takes
+ * ten p2 switches; the five re-pinned rows stand and the drift pin 562428 t10
+ * stays in known drift; the Lines fix stays on the condition that #200 moves to
+ * 1.2.1 (done); the tester findings as proposed; the button per line of
+ * "Opponent reads my move" goes to 1.3.0 with #188. Gate page 21.11. (the
+ * stop): the stop fix ships in 1.2.0 for singles with its two strings;
+ * doubles and VGC follow in 1.2.0 only if the diagnosis finds a way without a
+ * score change, otherwise with #207 (the diagnosis found one, the tree's
+ * interim result, and it was built); the depth-2 scene (switch to Pawmot 39 %
+ * ahead of Earth Power 37 %) is a TODO for 1.2.1 with the diagnosis first, the
+ * user finding the switch acceptable in itself because of the resistance (#213);
+ * the Game review lines choose the forced replacement like the dock (#212);
+ * the tester findings of pass 3 as proposed: the hidden faint in a row's line,
+ * the line under the "(waiting)" row in doubles and the two turn numbers are
+ * small fixes for 1.2.1 (#209, #210, #211), the depth readout and the slow
+ * Setup menu go to #207 (the readout later got #215), the arrows, nickname
+ * against species, "Waits for engine..." and two layout points go to #176, and
+ * the flaky browser test of the right column is a 1.2.1 fix (#214). The play-out
+ * pin at ten switches (ruling 46) was built as 8ba45318. The release itself is
+ * a separate pull request with its own okay.
+ *
+ * LESSONS: (1) The slow feedback run of 19.11. (573756 hit the 2,100 s cap;
+ * 562428 took 10.7 minutes where it took 1.2 on 15.11.) was the machine and no
+ * change of the round. Interleaving base and head on one game (562428 alone,
+ * four runs: head 11.4 and 13.1 minutes, base 11.6 and 8.0) showed identical
+ * dumps at equal cost; sar showed 17 to 20 % system time and 5 to 11 % iowait
+ * against 4 to 7 % and 0.1 % on 15.11., from a crawl job at its 1 GiB memory
+ * cap (792,028 limit hits, 220 GB read in 61 hours) and a second session's
+ * unqueued work at nice 0 beside our nice-10 run. A feedback run starts only
+ * after load, system share and the corpus test's own time (0.2 to 0.56 s
+ * normal) read quiet, and a slow run is first compared base against head on
+ * one game. (2) A CI job's time estimate needs the per-file times, not the row
+ * counts: the three full-sweep parts of #125's plan promised about 14 minutes
+ * each, the first CI run timed out because board-key-census alone ran past 49
+ * minutes (6,500 s of work in one synchronous loop that the 60 s test timeout
+ * never saw); the three parts came from the per-file seconds of that run
+ * (3,552 and 3,344 s summed, wall about the sum divided by 2.6), and the
+ * census plays a bounded sample under full (588 s). (3) A subagent's stated
+ * cause is checked by a reviewer before it enters a spec comment: the missing
+ * line on a stalling board was written up as a prover limit with no witness
+ * line, the reviewer found makeSwitches filtering the bench by name (two
+ * bodies called Snorlax, slotChoicesOf returns null), and 5667106d corrected
+ * the comment; the fault predates the round (1.2.1). (4) The switch
+ * DICE_SWEEPS=full reaches 57 specs and CI played it in only the dice-* files
+ * (31 specs sat outside); three specs were red only under full sweeps until
+ * the second job existed. (5) A change that crosses the packages needs
+ * pack:smoke in CI (41e3e204: an import without its extension passed every
+ * job); M4 added it. (6) A pre-registered bar worked: the trust rule failed
+ * its 70 % test and a revert took it out of the round without a second
+ * reading. (7) A lane's own engine run in both speed modes catches what the
+ * merge would show late (two rows of lane C); a topbar row read 0.576 px
+ * against its 0.5 px tolerance once in CI, the button's hover lift was the
+ * cause, and the spec now waits for transform: none (6055d200). (8) A claim
+ * that a scene reads right is checked in the app, not in a diagnosis tree:
+ * the probe of Lines by value (LN-1) read 655336 turn 24 from the cached
+ * Smogon files and called it fixed, the tester's browser read Roost twice with
+ * the live files, and the cause was the data (the live stats file held 22,293
+ * battles against 21,976 and other sets for five species); the second probe
+ * pinned the live data and showed that the scene needs a deeper search of the
+ * line's later steps, which is #200. A gate that promises a scene names the
+ * data it was read with. (9) The tier census counts grades, not expert pins:
+ * the engine change set moved 21 turns and 17 grades and no pin's tier, and
+ * the one pin whose drift text changed (562428 t10) moved no tier; the pins
+ * are read from their own table (corpus.ts), the census says where to look.
+ * The cards that a prose change moves are read by rendering every card of the
+ * corpus (gate/ft-cards-read.md found four cards the builder had not
+ * announced). (10) CI is the second machine for whole suites: from 17.11.
+ * devbox ran 7 to 10 times slower on page faults, so the feedback runs, the
+ * engine suite in both speed modes and the full sweeps run on runners, and the
+ * first CI run of the engine change set found the two engine rows and the
+ * play-out pin that no local spec file had reached. A change set that touches
+ * the leaves of the search gets its CI run before its lane ends. (11) A claim
+ * on a gate page about what the app does needs a tester's check first. The
+ * page said the stop leaves the depth-1 result; the engine does, the app threw
+ * it away, and the claim was false in the browser. The fix then took four
+ * builder steps and three tester passes (a status that read "stale", a tree
+ * with no interim result, two races in the stop path). The gate names what a
+ * tester saw, and a diagnosis of a scene with a click reads the browser too.
+ * (12) A Node timing of a search does not carry over to the browser. The tree's
+ * first interim result came at 3.5 to 4.7 s in a Node probe and at 24 to 43 s
+ * in the browser on devbox (65 to 75 % of the doubles search). The cause is
+ * not measured: worker start and load, trees running side by side and a loaded
+ * machine are the candidates, and #207 holds the measure. A promise about a
+ * wait states the browser's number or none.
+ *
+ * RESTS: milestone 1.2.1 (small, as the user asked on 17.11.): #157 the
+ * comment rule and clean-up with its own pull request after the release and
+ * before any 1.2.1 lane opens; #158 Fake Out and the other first-turn moves
+ * leave the options after the first turn (seen again in the second tester
+ * pass, VGC 2630685175 turn 7); #159 the replay build's default ability reads
+ * the format's ban list; #160 the pair plan divides by its coverage; #161 a
+ * probe of the delay reading at 90 % accuracy or less; #163 the delay facts
+ * for Future Sight and Doom Desire (Gen 5 and later); #164 the Protective Pads
+ * tell (Rocky Helmet and the silent contact punishers); #165 the bench filter
+ * by name in makeSwitches; #175 items that announce themselves; #195 a doubles
+ * slot that fell before it acted still gets a played move; #198 "(only
+ * choice)" in Lines; #199 Tera "Auto" in a new game follows the format; #200
+ * the winner's line from the proof and how the loser could still win (moved
+ * from 1.3.0 by ruling 46, the answer for 655336 turn 24); #162 is fixed in
+ * this round and closes with it. Written on 21.11. after the gate pages and a
+ * review of each against the code: #202 the random-target note under a line
+ * whose move the simulator turns into a spread move (Tera Starstorm, Curse,
+ * Expanding Force); #203 four texts of the New game dialog; #204 a row's
+ * "guaranteed at least" floor above its own matrix cells (larger bug,
+ * score-touching, probe first); #205 "Re-analyze" on a game never analyzed and
+ * "analyzing... turn 0/?"; #206 an inaccuracy's size against the two win
+ * chances beside it; #207 a cheaper forced-replacement search without moved
+ * picks, with the browser's wait before the first progress, the stop's limit
+ * on doubles and the slow Setup menu during the search; #209 a ranked row's
+ * "then ..." at matrix depth hides a faint on entry; #210 the best row of P2
+ * carries no "then ..." in doubles and the tail stands under P1's "(waiting)"
+ * row; #211 two turn numbers at a forced replacement; #212 Game review lines
+ * end at a forced replacement that the dock now chooses; #213 the depth-2
+ * scene of the new game (Pawmot above Earth Power), diagnosis first; #214 two
+ * browser specs that failed once in CI (right-column.spec.ts:72 and
+ * new-game.spec.ts:140); #215 the depth readout runs backwards in a tree
+ * search and says "depth 1" before any progress. Milestone 1.3.0: #141
+ * Illusion in the rebuild, #142 Struggle as evidence, #147 a hint for a pasted
+ * set that lacks a logged move, #151 a census of speed ties, #152 National Dex
+ * usage and sets files, #154 the Champions Reg M-B mod (a larger bug, now in
+ * the milestone), #155 split pricing, #156 slot read with one body per side,
+ * #166 use the engine's leads, #167 tidy the workspace, #168 keep the open
+ * variation across a reload, #169 one display-name function, #170 a sweep of
+ * rule lines, #171 fold small test files (the steps 4 to 6 of #125, about 130
+ * files, about 320 s), #172 shard the engine suite, #173 the code-structure
+ * rests of #57, #176 the testers' text and layout list (with the arrows, the
+ * nickname against the species, "Waits for engine..." and two layout points
+ * of the third pass), #177 more draws for the graded side with a cost
+ * measurement first, #178 to #187 (rests of the prover, the solver, the dice
+ * panel, the inference and the effect-state key), #188 the rests of "Opponent
+ * reads my move" including its button per line, #201 pricing the unused Tera,
+ * #208 the refit of the Doubles OU boosts weight, parked in effect until a
+ * fresh holdout draw repeats the harm. Without milestone: #189 and #134 and
+ * #95 (upstream list: @pkmn/client 0.7.4 charges no extra PP for Pressure, the
+ * Pledge from-move, the Mega-Z formes without battleOnly), #190 and #191
+ * (triage), #192 to #194 (parked). #57 and #125 close with this round: the
+ * dead-code deletions and the three split sweeps (23,970 rows kept) are built,
+ * and their rests are #171, #172, #173 and #191. Known drift: #86 (562428 t10
+ * and t12, with the new state of 21.11.), #87, #88 (the t56 play-out pin now
+ * reads ten switches). Comments of 21.11. on #86, #88, #158, #176, #188 and
+ * #207 hold the new evidence. The worktrees w89a to w89h and the clone m89 go
+ * after the merge, on the user's okay.
  *
  * ROUND 88 2026-11-07 to 2026-11-08 (improvement round 88, the wave of
  * 1.1.1: 17 planned issues, five more that joined during the wave (#101,
@@ -7429,6 +8129,98 @@ async function exportPosition(
   }));
 }
 
+/**
+ * Round 89 (#124): what the bank needs to read one world of a replay at a sampled turn: the replay, its teams and snapshots, the
+ * pass instrument and the run's levers. One world reads exactly as the bank always read a replay.
+ */
+type WorldReadContext = {
+  id: string; replay: { id: string; log: string; formatid?: string }; p1Team: Parameters<typeof buildChoiceLockContext>[1]['p1Team'];
+  p2Team: Parameters<typeof buildChoiceLockContext>[1]['p2Team']; snapshots: ReturnType<typeof parseReplayLogWithObservations>['snapshots'];
+  instrument: ReturnType<typeof passInstrument>; legacy: boolean; replaySettings: ReturnType<typeof bankSettings>;
+  sampleCount: Parameters<typeof bankSearch>[0]['samples']; gameType: Sample['gameType'];
+};
+
+type WorldRead = WorldReading & { battle: Battle; serialized: string; faintedFraction: number; root: RootReading };
+
+/**
+ * One world's reading at a sampled turn: its boundary from the single pass (or the per-target fallback), the position's
+ * features and the root search. Null when the world cannot read the turn (no live battle, an ended reconstruction, a NaN score);
+ * the bank's blend then renormalizes over the worlds that did.
+ */
+async function readWorld(ctx: WorldReadContext, world: BankWorld, rawAt: Map<number, string>, turn: number): Promise<WorldRead | null> {
+  const { id, replay, p1Team, p2Team, snapshots, instrument, legacy, replaySettings, sampleCount, gameType } = ctx;
+    let battle: Battle;
+    const raw = legacy ? undefined : rawAt.get(turn);
+    if (raw) {
+      battle = deserializeBattleExact(raw);
+      applyTargetCorrections(battle, snapshots[Math.min(turn - 1, snapshots.length - 1)]);
+    } else {
+      // One reconstruction for this sample — either forced
+      // (EVAL_CALIBRATION_LEGACY=1) or as the per-sample fallback
+      // for a boundary the single pass never handed out (a wedged
+      // or prematurely ended pass, or the rare replay whose async
+      // stream timing shifts under the pass). It carries the same
+      // instrument parameters as the pass on purpose, so the few
+      // fallback samples (4 per bank run, 15 on the raw pass) sit
+      // on the same board as the rest.
+      if (!legacy) console.log(`${id} turn ${turn}: single-pass boundary missing — per-target fallback`);
+      const runtime = await reconstructBranchRuntime({
+        format: getBranchSimulatorFormat(replay), p1Team, p2Team, replayLog: replay.log, targetTurn: turn,
+        snapshot: snapshots[Math.min(turn - 1, snapshots.length - 1)], bringOnly: world.bringOnly, ...instrument.perTarget,
+      });
+      const live = runtime.battleStream.battle;
+      if (!live) return null;
+      battle = live;
+    }
+    if (battle.ended) {
+      // A sampled turn is always BEFORE the real game's end (the loop
+      // stops short of maxTurn), so an ended reconstruction is always
+      // a divergence artifact: the choice replay cascaded a side into
+      // a wipe the real game never had (gen9draft-2058494320 t56+ —
+      // five greedy forced switches fed into a kill zone). Scoring it
+      // would hand the record a free ±1.00 with the real winner's
+      // sign; 55/827 grand-bed d1 rows carried exactly that.
+      console.log(`${id} turn ${turn}: reconstruction ended prematurely — skipped`);
+      return null;
+    }
+    // EVAL_CALIBRATION_FEATURES=1: capture the static eval's scaled
+    // feature vector (identical construction to eval-fit's g) so the
+    // offline suspect diagnosis can compare feature profiles.
+    let g: number[] | undefined;
+    if (process.env.EVAL_CALIBRATION_FEATURES === '1') {
+      const featureCache = createMatchupCache(replaySettings.ruleset);
+      const features = evalFeatures(battle, featureCache);
+      const teamSize = Math.max(battle.sides[0].pokemon.length, battle.sides[1].pokemon.length, 1);
+      const scaleOverNorm = EVAL_WEIGHTS.scale / (teamSize * (EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp));
+      g = (Object.keys(FEATURE_WEIGHTS) as (keyof EvalFeatures)[]).map(key => features[key] * scaleOverNorm);
+    }
+    const serialized = JSON.stringify(State.serializeBattle(battle));
+    // EVAL_CALIBRATION_DEPTH separates the two levers: does more
+    // search fix a phase, or is the static eval itself miscalibrated?
+    // EVAL_CALIBRATION_MODE=mcts runs the DUCT tree instead — the
+    // matrix path is gated every round; MCTS earns numbers here too.
+    // (Round 61: tree turns run the app's searchTreesOrchestrated, bank-search.ts.)
+    const depth = process.env.EVAL_CALIBRATION_DEPTH === '2' ? 2 : 1;
+    const faintedFraction = battleFaintedFraction(battle);
+    // EVAL_CALIBRATION_MODE=auto mirrors the app's sweep dispatch
+    // exactly: matrix below the threshold, the DUCT tree at or above.
+    // Round 61: the app's dispatch and the app's tree search (bank-search.ts).
+    // Round 65: rootReading runs the search, or the static alone under EVAL_CALIBRATION_STATIC=1.
+    const root = await rootReading(battle, {
+      serialized, faintedFraction, depth, samples: sampleCount, mode: process.env.EVAL_CALIBRATION_MODE,
+      settings: {
+        ...replaySettings,
+        keepPlayed: bankKeepPlayed(snapshots.map(snapshot => snapshot.log), turn, gameType === 'doubles', logRules(replay.log)),
+      },
+    });
+    if (Number.isNaN(root.score)) {
+      // A NaN would silently poison every aggregate — surface it loudly.
+      console.log(`NaN score: ${id} turn ${turn}`);
+      return null;
+    }
+    return { weight: world.weight, score: root.score, gameValue: root.gameValue, g, battle, serialized, faintedFraction, root };
+}
+
 describe.skipIf(!process.env.EVAL_CALIBRATION)('eval calibration against real replays', () => {
 
   test('score sign tracks the actual winner', { timeout: 3600000 }, async () => {
@@ -7505,10 +8297,11 @@ describe.skipIf(!process.env.EVAL_CALIBRATION)('eval calibration against real re
       const maxTurn = snapshots.length;
       const sampleTurns = universe.sampleTurns(maxTurn);
 
-      // A.3c: bring-limited replays (the VGC tranche) reconstruct with only
-      // the brought species per side — the same trim the app's sweep and
-      // single-turn acquire apply. Per-side fail-open, null for bring-all.
-      const bringOnly = replayBringOnly(replay, snapshots) ?? undefined;
+      // A.3c: bring-limited replays (the VGC tranche) reconstruct with only the brought species per side, the same trim the app's
+      // sweep and single-turn acquire apply. Round 89 (#124): a side that never fielded its whole selection plays its fielded
+      // bodies plus a guess for each missing one, so a short-side game gets up to three worlds (the heaviest by usage weight), and
+      // each sampled turn is read in every world and blended. A bring-all or fully pinned game has one world and reads as before.
+      const worlds = bankWorldsFor(replay, snapshots, built.usageStats);
 
       // SINGLE-PASS RECONSTRUCTION (time-performance round, 2026-08-28):
       // ONE pass per replay hands out the boundary state at every sampled
@@ -7531,101 +8324,41 @@ describe.skipIf(!process.env.EVAL_CALIBRATION)('eval calibration against real re
       // docs/perf/probes/2026-09-18-r46/t04.
       const legacy = process.env.EVAL_CALIBRATION_LEGACY === '1';
       const instrument = passInstrument(replay.log, { p1Team, p2Team }, observations, snapshots);
-      const rawAt = new Map<number, string>();
+      const readContext: WorldReadContext = { id, replay, p1Team, p2Team, snapshots, instrument, legacy, replaySettings, sampleCount, gameType };
+      const rawAts = worlds.map(() => new Map<number, string>());
       if (!legacy && sampleTurns.length > 0) {
-        try {
-          await reconstructBranchRuntime({
-            format: getBranchSimulatorFormat(replay),
-            p1Team, p2Team,
-            replayLog: replay.log,
-            bringOnly,
-            // The one pass carries the whole per-target family's work, so
-            // it gets the family's total deadline, not a single run's 60s.
-            deadlineMs: 60_000 * Math.max(1, sampleTurns.length),
-            ...instrument.singlePass(sampleTurns, rawAt),
-          });
-        } catch (error) {
-          console.log(`${id}: single-pass reconstruction failed — ${error instanceof Error ? error.message : error}`);
+        for (const [index, world] of worlds.entries()) {
+          try {
+            await reconstructBranchRuntime({
+              format: getBranchSimulatorFormat(replay), p1Team, p2Team, replayLog: replay.log, bringOnly: world.bringOnly,
+              // The one pass carries the whole per-target family's work, so
+              // it gets the family's total deadline, not a single run's 60s.
+              deadlineMs: 60_000 * Math.max(1, sampleTurns.length),
+              ...instrument.singlePass(sampleTurns, rawAts[index]),
+            });
+          } catch (error) {
+            console.log(`${id}: single-pass reconstruction failed — ${error instanceof Error ? error.message : error}`);
+          }
         }
       }
 
       for (const turn of sampleTurns) {
         try {
-          let battle: Battle;
-          const raw = legacy ? undefined : rawAt.get(turn);
-          if (raw) {
-            battle = deserializeBattleExact(raw);
-            applyTargetCorrections(battle, snapshots[Math.min(turn - 1, snapshots.length - 1)]);
-          } else {
-            // One reconstruction for this sample — either forced
-            // (EVAL_CALIBRATION_LEGACY=1) or as the per-sample fallback
-            // for a boundary the single pass never handed out (a wedged
-            // or prematurely ended pass, or the rare replay whose async
-            // stream timing shifts under the pass). It carries the same
-            // instrument parameters as the pass on purpose, so the few
-            // fallback samples (4 per bank run, 15 on the raw pass) sit
-            // on the same board as the rest.
-            if (!legacy) console.log(`${id} turn ${turn}: single-pass boundary missing — per-target fallback`);
-            const runtime = await reconstructBranchRuntime({
-              format: getBranchSimulatorFormat(replay),
-              p1Team, p2Team,
-              replayLog: replay.log,
-              targetTurn: turn,
-              snapshot: snapshots[Math.min(turn - 1, snapshots.length - 1)],
-              bringOnly,
-              ...instrument.perTarget,
-            });
-            const live = runtime.battleStream.battle;
-            if (!live) continue;
-            battle = live;
+          // One reading per world; a world that cannot read this turn (no live battle, an ended reconstruction, a NaN) drops out
+          // and the blend renormalizes over the rest. The first world that reads is the heaviest of them (the worlds come
+          // heaviest first), and its position carries every field the blend does not average.
+          const readings: WorldRead[] = [];
+          for (const [index, world] of worlds.entries()) {
+            try {
+              const reading = await readWorld(readContext, world, rawAts[index], turn);
+              if (reading) readings.push(reading);
+            } catch (error) {
+              console.log(`${id} turn ${turn}: ${error instanceof Error ? error.message : error}`);
+            }
           }
-          if (battle.ended) {
-            // A sampled turn is always BEFORE the real game's end (the loop
-            // stops short of maxTurn), so an ended reconstruction is always
-            // a divergence artifact: the choice replay cascaded a side into
-            // a wipe the real game never had (gen9draft-2058494320 t56+ —
-            // five greedy forced switches fed into a kill zone). Scoring it
-            // would hand the record a free ±1.00 with the real winner's
-            // sign; 55/827 grand-bed d1 rows carried exactly that.
-            console.log(`${id} turn ${turn}: reconstruction ended prematurely — skipped`);
-            continue;
-          }
-          // EVAL_CALIBRATION_FEATURES=1: capture the static eval's scaled
-          // feature vector (identical construction to eval-fit's g) so the
-          // offline suspect diagnosis can compare feature profiles.
-          let g: number[] | undefined;
-          if (process.env.EVAL_CALIBRATION_FEATURES === '1') {
-            const featureCache = createMatchupCache(replaySettings.ruleset);
-            const features = evalFeatures(battle, featureCache);
-            const teamSize = Math.max(battle.sides[0].pokemon.length, battle.sides[1].pokemon.length, 1);
-            const scaleOverNorm = EVAL_WEIGHTS.scale / (teamSize * (EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp));
-            g = (Object.keys(FEATURE_WEIGHTS) as (keyof EvalFeatures)[]).map(key => features[key] * scaleOverNorm);
-          }
-          const serialized = JSON.stringify(State.serializeBattle(battle));
-          // EVAL_CALIBRATION_DEPTH separates the two levers: does more
-          // search fix a phase, or is the static eval itself miscalibrated?
-          // EVAL_CALIBRATION_MODE=mcts runs the DUCT tree instead — the
-          // matrix path is gated every round; MCTS earns numbers here too.
-          // (Round 61: tree turns run the app's searchTreesOrchestrated, bank-search.ts.)
-          const depth = process.env.EVAL_CALIBRATION_DEPTH === '2' ? 2 : 1;
-          const faintedFraction = battleFaintedFraction(battle);
-          // EVAL_CALIBRATION_MODE=auto mirrors the app's sweep dispatch
-          // exactly: matrix below the threshold, the DUCT tree at or above.
-          // Round 61: the app's dispatch and the app's tree search (bank-search.ts).
-          // Round 65: rootReading runs the search, or the static alone under EVAL_CALIBRATION_STATIC=1.
-          const root = await rootReading(battle, {
-            serialized, faintedFraction, depth, samples: sampleCount, mode: process.env.EVAL_CALIBRATION_MODE,
-            settings: {
-              ...replaySettings,
-              keepPlayed: bankKeepPlayed(snapshots.map(snapshot => snapshot.log), turn, gameType === 'doubles', logRules(replay.log)),
-            },
-          });
-          const { score } = root;
-          if (Number.isNaN(score)) {
-            // A NaN would silently poison every aggregate — surface it loudly.
-            console.log(`NaN score: ${id} turn ${turn}`);
-            continue;
-          }
+          if (readings.length === 0) continue;
+          const { battle, serialized, faintedFraction, root } = readings[0];
+          const blended = blendReadings(readings);
           const rating = replay.rating ?? null;
           const sample: Sample = {
             id,
@@ -7633,8 +8366,8 @@ describe.skipIf(!process.env.EVAL_CALIBRATION)('eval calibration against real re
             tranche: trancheOf.get(id) ?? 'unknown',
             phase: phaseOf(turn, maxTurn),
             gameType,
-            score,
-            gameValue: root.gameValue,
+            score: blended.score,
+            gameValue: blended.gameValue,
             faintedFraction,
             p1Won,
             // Round 32 enabler for Q4: the root's decided-sweep side, so the
@@ -7645,10 +8378,10 @@ describe.skipIf(!process.env.EVAL_CALIBRATION)('eval calibration against real re
             lastPair: lastPairAt(battle),
             rating,
             quality: qualityOf(id, rating),
-            luckAgainstFavored: luckFlag(replay.log, turn, score),
+            luckAgainstFavored: luckFlag(replay.log, turn, blended.score),
             forcedWinMass: root.forcedWinMass,
             forcedWinTurns: root.forcedWinTurns,
-            ...(g ? { g } : {}),
+            ...(blended.g ? { g: blended.g } : {}),
           };
           samples.push(sample);
           await exportPosition(process.env.EVAL_CALIBRATION_POSITIONS, sample, serialized, livingTotal(battle), replaySettings);
@@ -7736,87 +8469,89 @@ describe.skipIf(process.env.CALIB_POS_PROBE !== '1')('single-pass position ident
       if (sampleTurns.length === 0) continue;
       const format = getBranchSimulatorFormat(replay);
       const snapshotAt = (turn: number) => snapshots[Math.min(turn - 1, snapshots.length - 1)];
-      // Same bring trim as the calibration instrument (A.3c) — both paths.
-      const bringOnly = replayBringOnly(replay, snapshots) ?? undefined;
+      // Same bring trim as the calibration instrument (A.3c) — both paths. Round 89 (#124): the probe compares the two paths in
+      // every world of a short-side game (equal weights, the naked build holds no usage stats).
+      for (const { bringOnly } of bankWorldsFor(replay, snapshots, null)) {
 
-      // Path A — the instrument before 28 Aug: one reconstruction per
-      // sampled turn, without the app parameters (the RAW family; the
-      // bank's default since round 46 is not what this probe compares).
-      const canonA = new Map<number, string>();
-      for (const turn of sampleTurns) {
-        const runtime = await reconstructBranchRuntime({
-          format, p1Team, p2Team, replayLog: replay.log, targetTurn: turn, snapshot: snapshotAt(turn), bringOnly,
+        // Path A — the instrument before 28 Aug: one reconstruction per
+        // sampled turn, without the app parameters (the RAW family; the
+        // bank's default since round 46 is not what this probe compares).
+        const canonA = new Map<number, string>();
+        for (const turn of sampleTurns) {
+          const runtime = await reconstructBranchRuntime({
+            format, p1Team, p2Team, replayLog: replay.log, targetTurn: turn, snapshot: snapshotAt(turn), bringOnly,
+          });
+          const battle = runtime.battleStream.battle;
+          canonA.set(turn, !battle ? 'NONE' : battle.ended ? 'ENDED' : canon(battle));
+        }
+
+        // Path B — ONE pass; raw boundaries; clone + target corrections.
+        const rawAt = new Map<number, string>();
+        const pending = [...sampleTurns].sort((a, b) => a - b);
+        const targetTurn = pending[pending.length - 1];
+        await reconstructBranchRuntime({
+          format, p1Team, p2Team, replayLog: replay.log, targetTurn, snapshot: null, bringOnly,
+          // One pass carries the whole per-target family's work, so it gets
+          // the family's total deadline budget, not a single run's 60s.
+          deadlineMs: 60_000 * Math.max(1, sampleTurns.length),
+          onRawBoundary: (blockTurn, battle) => {
+            if (pending.length === 0 || blockTurn < pending[0]) return;
+            const serialized = JSON.stringify(State.serializeBattle(battle));
+            while (pending.length > 0 && pending[0] <= blockTurn) {
+              rawAt.set(pending[0], serialized);
+              pending.shift();
+            }
+          },
         });
-        const battle = runtime.battleStream.battle;
-        canonA.set(turn, !battle ? 'NONE' : battle.ended ? 'ENDED' : canon(battle));
-      }
-
-      // Path B — ONE pass; raw boundaries; clone + target corrections.
-      const rawAt = new Map<number, string>();
-      const pending = [...sampleTurns].sort((a, b) => a - b);
-      const targetTurn = pending[pending.length - 1];
-      await reconstructBranchRuntime({
-        format, p1Team, p2Team, replayLog: replay.log, targetTurn, snapshot: null, bringOnly,
-        // One pass carries the whole per-target family's work, so it gets
-        // the family's total deadline budget, not a single run's 60s.
-        deadlineMs: 60_000 * Math.max(1, sampleTurns.length),
-        onRawBoundary: (blockTurn, battle) => {
-          if (pending.length === 0 || blockTurn < pending[0]) return;
-          const serialized = JSON.stringify(State.serializeBattle(battle));
-          while (pending.length > 0 && pending[0] <= blockTurn) {
-            rawAt.set(pending[0], serialized);
-            pending.shift();
+        for (const turn of sampleTurns) {
+          comparedSamples += 1;
+          const raw = rawAt.get(turn);
+          let canonB: string | null = null;
+          if (raw) {
+            const clone = deserializeBattleExact(raw);
+            applyTargetCorrections(clone, snapshotAt(turn));
+            if (!clone.ended) canonB = canon(clone);
           }
-        },
-      });
-      for (const turn of sampleTurns) {
-        comparedSamples += 1;
-        const raw = rawAt.get(turn);
-        let canonB: string | null = null;
-        if (raw) {
-          const clone = deserializeBattleExact(raw);
-          applyTargetCorrections(clone, snapshotAt(turn));
-          if (!clone.ended) canonB = canon(clone);
-        }
-        const a = canonA.get(turn) ?? 'NONE';
-        const aExists = a !== 'NONE' && a !== 'ENDED';
-        const bExists = canonB !== null;
-        // Both sides skip the sample (ended/none/past-the-end) — the
-        // instrument records nothing either way: equivalent.
-        if (!aExists && !bExists) continue;
-        if (aExists && bExists && a === canonB) continue;
-        // Discrepancy. Is the OLD instrument even stable here? A per-target
-        // run that hits its 60s deadline truncates at a timing-dependent
-        // block and then snapshot-corrects — such samples have no stable
-        // old value to reproduce. Rerun path A once: if it disagrees with
-        // itself (or flags the deadline), the sample is excluded as
-        // old-instrument-unstable; a REPRODUCIBLE old value that path B
-        // misses is a hard failure.
-        const rerun = await reconstructBranchRuntime({
-          format, p1Team, p2Team, replayLog: replay.log, targetTurn: turn, snapshot: snapshotAt(turn), bringOnly,
-        });
-        const rerunBattle = rerun.battleStream.battle;
-        const a2 = !rerunBattle ? 'NONE' : rerunBattle.ended ? 'ENDED' : canon(rerunBattle);
-        if (a2 !== a || rerun.timedOut) {
-          unstable += 1;
-          console.log(`${id} t${turn}: old-instrument unstable (timedOut=${rerun.timedOut}) — excluded`);
-          continue;
-        }
-        if (!bExists) {
-          // The single pass never handed this boundary out — the switched
-          // instrument serves it through the verbatim per-target fallback,
-          // so the sample stays exactly the old instrument's. Bounded, not
-          // a value risk.
-          fallbackServed += 1;
-          console.log(`${id} t${turn}: boundary missing from the pass — served by the per-target fallback`);
-          continue;
-        }
-        mismatches += 1;
-        if (details.length < 20) {
-          const b = canonB ?? (raw ? 'ENDED' : 'MISSING');
-          let at = 0;
-          while (at < Math.min(a.length, b.length) && a[at] === b[at]) at++;
-          details.push(`${id} t${turn}: first divergence at char ${at}: A …${a.slice(Math.max(0, at - 40), at + 80)}… B …${b.slice(Math.max(0, at - 40), at + 80)}…`);
+          const a = canonA.get(turn) ?? 'NONE';
+          const aExists = a !== 'NONE' && a !== 'ENDED';
+          const bExists = canonB !== null;
+          // Both sides skip the sample (ended/none/past-the-end) — the
+          // instrument records nothing either way: equivalent.
+          if (!aExists && !bExists) continue;
+          if (aExists && bExists && a === canonB) continue;
+          // Discrepancy. Is the OLD instrument even stable here? A per-target
+          // run that hits its 60s deadline truncates at a timing-dependent
+          // block and then snapshot-corrects — such samples have no stable
+          // old value to reproduce. Rerun path A once: if it disagrees with
+          // itself (or flags the deadline), the sample is excluded as
+          // old-instrument-unstable; a REPRODUCIBLE old value that path B
+          // misses is a hard failure.
+          const rerun = await reconstructBranchRuntime({
+            format, p1Team, p2Team, replayLog: replay.log, targetTurn: turn, snapshot: snapshotAt(turn), bringOnly,
+          });
+          const rerunBattle = rerun.battleStream.battle;
+          const a2 = !rerunBattle ? 'NONE' : rerunBattle.ended ? 'ENDED' : canon(rerunBattle);
+          if (a2 !== a || rerun.timedOut) {
+            unstable += 1;
+            console.log(`${id} t${turn}: old-instrument unstable (timedOut=${rerun.timedOut}) — excluded`);
+            continue;
+          }
+          if (!bExists) {
+            // The single pass never handed this boundary out — the switched
+            // instrument serves it through the verbatim per-target fallback,
+            // so the sample stays exactly the old instrument's. Bounded, not
+            // a value risk.
+            fallbackServed += 1;
+            console.log(`${id} t${turn}: boundary missing from the pass — served by the per-target fallback`);
+            continue;
+          }
+          mismatches += 1;
+          if (details.length < 20) {
+            const b = canonB ?? (raw ? 'ENDED' : 'MISSING');
+            let at = 0;
+            while (at < Math.min(a.length, b.length) && a[at] === b[at]) at++;
+            details.push(`${id} t${turn}: first divergence at char ${at}: A …${a.slice(Math.max(0, at - 40), at + 80)}… B …${b.slice(Math.max(0, at - 40), at + 80)}…`);
+          }
         }
       }
       replays += 1;

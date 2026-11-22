@@ -7,15 +7,18 @@ import { DockRegion } from '../../../../src/components/dock/DockRegion';
 import { simState } from '../../fixtures/sim-state';
 
 // The legal move pool is heavy dex data; a fixed pool keeps the what-if row deterministic here.
-vi.mock('../../../../src/lib/pokemon-options', () => ({ getMovePool: async () => ['Dragon Claw', 'Fire Fang'] }));
+const poolCalls = vi.hoisted(() => ({ list: [] as unknown[][] }));
+vi.mock('../../../../src/lib/pokemon-options', () => ({
+  getMovePool: async (...args: unknown[]) => { poolCalls.list.push(args); return ['Dragon Claw', 'Fire Fang']; },
+}));
 
 /**
  * Round 84 (A7g): a forced replacement and the choice after it share the turn, so the dock's position key needs the step within
  * the turn. A bench click sends the replacement at once; the next request at the same turn must not inherit the open tray.
  */
-interface Where { sim: BranchSimState; historyLength: number; liveTip?: boolean }
+interface Where { sim: BranchSimState; historyLength: number; liveTip?: boolean; replayData?: { id: string; log: string }; prefs?: { hardMode?: boolean }; setPrefs?: (prefs: object) => void }
 
-function appAt({ sim, historyLength, liveTip = true }: Where): AppController {
+function appAt({ sim, historyLength, liveTip = true, replayData, prefs = {}, setPrefs = vi.fn() }: Where): AppController {
   const noop = vi.fn();
   return {
     board: {
@@ -25,12 +28,15 @@ function appAt({ sim, historyLength, liveTip = true }: Where): AppController {
     ctx: {
       branch: { simState: sim, executing: false, executeError: null, recordChoice: noop, getBattle: undefined, history: new Array(historyLength).fill({}) },
       meta: { replayGen: 9 },
+      replay: { replayData },
+      newGame: { record: null },
+      evaluation: { prefs, setPrefs },
     },
     engine: {
       positionPicker: null, dockSimState: sim, pickerSeed: null, pickerStale: false, playedAtView: undefined,
       getPickerBattle: undefined, pickerReplayLog: undefined,
       acquire: { exactAcquiringTurn: null },
-      dockFill: { pending: false, busy: false, waits: false, engine: { p1: [], p2: [] }, choices: null, deferred: { p1: [], p2: [] }, queueExecute: noop, onUserChoice: noop, holdTray: noop, release: noop, arm: noop },
+      dockFill: { pending: false, busy: false, waits: false, engine: { p1: [], p2: [] }, choices: null, deferred: { p1: [], p2: [] }, picks: { p1: [], p2: [] }, queueExecute: noop, onUserChoice: noop, restore: () => null, holdTray: noop, release: noop, arm: noop },
     },
     transients: { playOut: null, pendingConfirm: null, setPendingConfirm: noop },
     handleHypotheticalMove: noop, handleExecuteTurn: noop,
@@ -56,5 +62,53 @@ describe.each(['singles', 'doubles'] as const)('the tray at a forced replacement
     await userEvent.click(screen.getByRole('button', { name: chipName(type) }));
     view.rerender(<DockRegion app={appAt({ sim: { ...forced(type) }, historyLength: 1 })} replayId="r1" />);
     expect(document.querySelector('.ps-tray')).not.toBeNull();
+  });
+});
+
+/**
+ * Round 89 (T8a): the "What if it had ..." list of the tray reads the game's format, so a Champions game is offered the Champions
+ * mod's moves and a National Dex draft its Past species' pool, as the team editor already does. Singles and doubles both.
+ */
+describe.each([
+  ['singles', 'gen9championsou-2600000001', 'gen9championsou'],
+  ['doubles', 'gen9championsvgc2026regma-2623421463', 'gen9championsvgc2026regma'],
+  ['singles', 'gen9nationaldex-2713067801', 'gen9nationaldex'],
+  ['doubles', 'gen9doublesou-2693620934', 'gen9doublesou'],
+] as const)('the What if list of a %s game (%s)', (type, id, format) => {
+  test(`asks the pool for the format ${format}`, async () => {
+    poolCalls.list.length = 0;
+    const replayData = { id, log: '' };
+    render(<DockRegion app={appAt({ sim: simState(type), historyLength: 0, replayData })} replayId={id} />);
+    await userEvent.click(screen.getByRole('button', { name: chipName(type) }));
+    await userEvent.click(screen.getByRole('button', { name: /Dice · What if/ }));
+    await screen.findByRole('combobox', { name: /Hypothetical move for/ });
+    expect(poolCalls.list.length).toBeGreaterThan(0);
+    for (const [, gen, askedFormat] of poolCalls.list) {
+      expect(gen).toBe(9);
+      expect(askedFormat).toBe(format);
+    }
+  });
+});
+
+test('a dock without a loaded replay asks for no format', async () => {
+  poolCalls.list.length = 0;
+  render(<DockRegion app={appAt({ sim: simState('singles'), historyLength: 0 })} replayId="r1" />);
+  await userEvent.click(screen.getByRole('button', { name: chipName('singles') }));
+  await userEvent.click(screen.getByRole('button', { name: /Dice · What if/ }));
+  await screen.findByRole('combobox', { name: /Hypothetical move for/ });
+  expect(poolCalls.list.map(call => call[2])).toEqual(['']);
+});
+
+// Round 89 (#153, HM-2): the dock's note reads the stored `hardMode` preference and its button writes it back through the evaluation's setter.
+describe.each(['singles', 'doubles'] as const)('the "Opponent reads your move" note of the dock (%s)', type => {
+  test('shows only while the preference is on; "Turn off" writes the preference with the flag false and keeps the others', async () => {
+    const setPrefs = vi.fn();
+    const prefs = { depth: 2, autoAnalyze: true, hardMode: true };
+    const view = render(<DockRegion app={appAt({ sim: simState(type), historyLength: 1, prefs: { ...prefs, hardMode: false } })} replayId="r1" />);
+    expect(screen.queryByText('Opponent reads your move')).toBeNull();
+    view.rerender(<DockRegion app={appAt({ sim: simState(type), historyLength: 1, prefs, setPrefs })} replayId="r1" />);
+    expect(screen.getByText('Opponent reads your move')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Turn off' }));
+    expect(setPrefs).toHaveBeenCalledWith({ depth: 2, autoAnalyze: true, hardMode: false });
   });
 });

@@ -7,21 +7,26 @@ import {
   selectTieProbeCells, toResult, TOP_EXPANSION, type PvStep, type Ranked,
 } from '../rank.ts';
 import { koOddsForOptions } from '../cell-blend.ts';
+import { playedBoundsOf } from '../branch/action-bound.ts';
 import type { CellValue, SearchExecutor } from '../orchestrator.ts';
 import type { CellDraw, EvalCellJob, EvalResult, EvalSettings, RankedChoice } from '../types.ts';
-import { countFainted, leafValue, SEARCH_SEEDS } from './leaf.ts';
+import { countFainted, leafValue } from './leaf.ts';
+import { cellSeeds } from './root-quantile.ts';
 import { sampleCell, type CellSample } from './cell-sampler.ts';
 import { probeDraw } from './trend-probe.ts';
 import { deepenVerifiedCell, lightOptions, VERIFY_CHEAP, VERIFY_DEEPEN_COVER, VERIFY_LIGHT, VERIFY_PLAIN_DRAWS, type CheapDeepening } from './verify-cell.ts';
 import { isCombined } from './hints.ts';
-import { expandPivotPairs, restrictOptions, searchOptions } from './options.ts';
-import { attachRootPayload, koOddsMapsFor, type RootPayload } from './root-payload.ts';
-import { recordDeepenedCell, type DeepeningState } from './deepening.ts';
+import { expandPivotPairs, searchOptions } from './options.ts';
+import { attachRootPayload, type RootPayload } from './root-payload.ts';
+import { FORCED_ROOT_LEVEL, recordDeepenedCell, type DeepeningState } from './deepening.ts';
+import { deepenForcedRoot, isForcedRoot } from './forced-root.ts';
 import { forcedWinFor } from './forced-win.ts';
+import { rootOptions, rootPayload } from './root-setup.ts';
 import { applyForcedWin, forcedWinInput } from './forced-win-apply.ts';
 import { perfCount, perfSync } from '../perf-trace.ts';
 import { buildMatrix, cellValueMemo, maximinRows, minimaxColumns, type Matrix, type SearchCallbacks } from './matrix.ts';
 import { benchOrder, callbacksToGiven, executorToGiven, resultToGiven } from './bench-order.ts';
+import { playLines } from './lines.ts';
 
 /**
  * The sync search: the pruned depth-1 sub-search, the full root search with
@@ -89,49 +94,6 @@ function subSearch(serializedBattle: string, settings: EvalSettings, matchupCach
   return settings.depth === 1
     ? subSearchDepth1(serializedBattle, settings, matchupCache)
     : searchOn(serializedBattle, settings, undefined, matchupCache, true);
-}
-
-/** The root's option lists: restricted for deep sub-searches, pivot-expanded for the root matrix. */
-function rootOptions(
-  root: SimPosition,
-  settings: EvalSettings,
-  restrictCandidates: boolean,
-): { p1Options: ChoiceOption[]; p2Options: ChoiceOption[] } {
-  const tera = settings.tera ?? true;
-  let p1Options = searchOptions(root, 'p1', { tera, keep: settings.keepPlayed?.p1Slots, sleepClause: settings.sleepClause });
-  let p2Options = searchOptions(root, 'p2', { tera, keep: settings.keepPlayed?.p2Slots, sleepClause: settings.sleepClause });
-  if (restrictCandidates) {
-    p1Options = restrictOptions(root, 'p1', p1Options);
-    p2Options = restrictOptions(root, 'p2', p2Options);
-  } else {
-    // Root matrix only: sub-searches keep the greedy pivot resolution.
-    p1Options = expandPivotPairs(root, 'p1', p1Options);
-    p2Options = expandPivotPairs(root, 'p2', p2Options);
-  }
-  return { p1Options, p2Options };
-}
-
-/**
- * The root's narrative payload, computed once per search and re-attached
- * to every partial result: the sampler's mismatch diagnostics, each root
- * option's analytic kill odds (vs the standing opposing active), and the
- * unanswered-mon profile (round 13). Sub-searches skip the odds and the
- * profile.
- */
-function rootPayload(
-  battle: ReturnType<typeof positionBattle>,
-  matrix: Matrix,
-  p1Options: ChoiceOption[],
-  p2Options: ChoiceOption[],
-  matchupCache: MatchupCache,
-  restrictCandidates: boolean,
-): RootPayload {
-  const koOddsMaps = restrictCandidates ? null : koOddsMapsFor(p1Options, p2Options, {
-    p1: koOddsForOptions(battle, 'p1', p1Options.map(option => option.choice)),
-    p2: koOddsForOptions(battle, 'p2', p2Options.map(option => option.choice)),
-  });
-  const unanswered = restrictCandidates ? null : unansweredMons(battle, matchupCache);
-  return { diagnostics: matrix.diagnostics, koOddsMaps, unanswered };
 }
 
 /** The sync search's deepening state: the shared record plus what the sync sub-searches need. */
@@ -237,6 +199,44 @@ export function searchPosition(
   return resultToGiven(order, searchOn(order.serialized, settings, callbacksToGiven(order, callbacks), matchupCache, restrictCandidates));
 }
 
+/**
+ * The root's levels above the first, in order: a forced root's turn after each replacement (level 2, search/forced-root.ts), then one
+ * deepening per further depth the settings name. Returns the finished result and whether a stop cut a level short.
+ */
+function deepenRoot(
+  state: Deepening, root: SimPosition, payload: RootPayload, first: EvalResult, restrictCandidates: boolean,
+): { result: EvalResult; stopped: boolean } {
+  const { matrix, rootValue, callbacks, settings } = state;
+  let result = first;
+  let stopped = false;
+  let firstLevel = 2;
+  // Round 89 (SB-4, #197): a forced root's level 2 is the turn after each replacement, whatever depth the settings name.
+  if (!restrictCandidates && isForcedRoot(root)) {
+    firstLevel = FORCED_ROOT_LEVEL + 1;
+    stopped = deepenForcedRoot(state, (serialized, turn) => searchPosition(serialized, turn, undefined, state.matchupCache));
+    if (!stopped) {
+      state.ranked = rankFromMatrix(matrix, rootValue);
+      attachLines(matrix, state.ranked, state.pvByCell);
+      result = toResult(state.ranked, FORCED_ROOT_LEVEL);
+      attachRootPayload(result, payload);
+      callbacks?.onPartial?.(result);
+    }
+  }
+  for (let depth = firstLevel; depth <= settings.depth && !stopped; depth++) {
+    if (callbacks?.shouldStop?.()) break;
+    if (deepenLevel(state, depth)) {
+      stopped = true;
+      break;
+    }
+    state.ranked = rankFromMatrix(matrix, rootValue);
+    attachLines(matrix, state.ranked, state.pvByCell);
+    result = toResult(state.ranked, depth);
+    attachRootPayload(result, payload);
+    callbacks?.onPartial?.(result);
+  }
+  return { result, stopped };
+}
+
 function searchOn(
   serializedBattle: string,
   settings: EvalSettings,
@@ -258,7 +258,7 @@ function searchOn(
   // Root matrices blend boundary cells analytically; restricted sub-searches
   // keep the plain seed average (their consumers read only score/tops).
   const matrix = buildMatrix(root, p1Options, p2Options, settings.samples, 1, callbacks, progress, matchupCache, !restrictCandidates);
-  const payload = rootPayload(battle, matrix, p1Options, p2Options, matchupCache, restrictCandidates);
+  const payload = rootPayload(battle, matrix, p1Options, p2Options, matchupCache, restrictCandidates, settings);
   // Pre-deepening statics: the trend baseline. Every trend the tiebreak
   // compares is uniformly 1-ply-vs-static — mixed ply counts inside one
   // comparison are the depth-asymmetry trap.
@@ -271,19 +271,9 @@ function searchOn(
   attachRootPayload(result, payload);
   callbacks?.onPartial?.(result);
 
-  let stopped = false;
-  for (let depth = 2; depth <= settings.depth; depth++) {
-    if (callbacks?.shouldStop?.()) break;
-    if (deepenLevel(state, depth)) {
-      stopped = true;
-      break;
-    }
-    state.ranked = rankFromMatrix(matrix, rootValue);
-    attachLines(matrix, state.ranked, state.pvByCell);
-    result = toResult(state.ranked, depth);
-    attachRootPayload(result, payload);
-    callbacks?.onPartial?.(result);
-  }
+  const levels = deepenRoot(state, root, payload, result, restrictCandidates);
+  result = levels.result;
+  const { stopped } = levels;
 
   applyTrendLayers(state, result, p1Options, p2Options, restrictCandidates, stopped);
   if (!restrictCandidates && settings.prove !== false) {
@@ -301,8 +291,10 @@ function searchOn(
 export function createLocalExecutor(serializedBattle: string, ruleset: StaticRuleset = 'standard'): SearchExecutor {
   // Round 67 (T129): the executor serves the canonical bench and speaks the given board's slots.
   const order = benchOrder(serializedBattle);
-  if (!order) return localExecutorOn(serializedBattle, ruleset);
-  return executorToGiven(order, localExecutorOn(order.serialized, ruleset));
+  const lines: SearchExecutor['lines'] = async input => playLines(serializedBattle, ruleset, input);
+  if (!order) return { ...localExecutorOn(serializedBattle, ruleset), lines };
+  // Round 89 (#104): the lines replay on the given board (their choices and slot choices name its bench), not on the canonical one
+  return { ...executorToGiven(order, localExecutorOn(order.serialized, ruleset)), lines };
 }
 
 /**
@@ -343,6 +335,8 @@ function localExecutorOn(serializedBattle: string, ruleset: StaticRuleset): Sear
       // worker-pool matrix shows a bare "U-turn" row the sync pins never see.
       const p1 = expandPivotPairs(root, 'p1', searchOptions(root, 'p1', { tera, keep: keepPlayed?.p1Slots, sleepClause }));
       const p2 = expandPivotPairs(root, 'p2', searchOptions(root, 'p2', { tera, keep: keepPlayed?.p2Slots, sleepClause }));
+      // Round 89 (#108): the order bound of the played turn's fallen bodies, on the root battle; the main thread holds none.
+      const playedBounds = playedBoundsOf(battle, keepPlayed?.fell);
       return {
         p1, p2,
         rootValue: leafValue(battle, matchupCache),
@@ -352,6 +346,9 @@ function localExecutorOn(serializedBattle: string, ruleset: StaticRuleset): Sear
           p2: koOddsForOptions(battle, 'p2', p2.map(option => option.choice)),
         },
         unanswered: unansweredMons(battle, matchupCache),
+        ...(playedBounds ? { playedBounds } : {}),
+        // Round 89 (SB-4, #197): the orchestrator deepens a forced root's cells by the turn search of each child.
+        ...(isForcedRoot(root) ? { forced: true } : {}),
       };
     },
     async evalCells(jobs, onDone) {
@@ -361,10 +358,11 @@ function localExecutorOn(serializedBattle: string, ruleset: StaticRuleset): Sear
       let completed = 0;
       for (const job of jobs) {
         if (job.plain) {
+          // Round 89 (#60): the seed is slot 0 of the cell's list, the matrix's first draw of the same cell.
           // Round 67 (T128): the answer round's cheap price of a cell, one natural draw and its leaf. Round 69 (T149):
           // with `deepen` the draw's child goes through the light depth-1 sub-search of the verify round's small outcomes,
           // so the cell is priced one ply deeper at a fraction of a verify cell.
-          const child = advancePosition(root, job.p1Choice, job.p2Choice, SEARCH_SEEDS[0]);
+          const child = advancePosition(root, job.p1Choice, job.p2Choice, cellSeeds(root, job.p1Choice, job.p2Choice)[0]);
           const battle = positionBattle(child);
           const deeper = job.deepen !== undefined && !battle.ended;
           if (deeper) perfCount('answer-sub-light');
@@ -390,7 +388,9 @@ function localExecutorOn(serializedBattle: string, ruleset: StaticRuleset): Sear
     async subSearch(job) {
       // Round 70: a trend probe names the base draw whose child it searches and answers with that child's trend.
       if (job.draw) return probeDraw(root, job.p1Choice, job.p2Choice, job.draw, serialized => subSearch(serialized, job.settings, matchupCache), matchupCache);
-      const child = advancePosition(root, job.p1Choice, job.p2Choice, SEARCH_SEEDS[0]);
+      const child = advancePosition(root, job.p1Choice, job.p2Choice, cellSeeds(root, job.p1Choice, job.p2Choice)[0]);
+      // Round 89 (SB-4, #197): a forced root's cell takes the whole turn search of its child, as the sync path's `deepenForcedRoot` does.
+      if (job.turn) return searchPosition(child.serialized, job.settings, undefined, matchupCache);
       return subSearch(child.serialized, job.settings, matchupCache);
     },
     async prove(input) {

@@ -52,7 +52,4 @@ export function battleIn(view: SimView, p1: PokemonSet[], p2: PokemonSet[], seed
   return battle;
 }
 
-/** The move names of a view's Dex that a set may carry (a move the view lacks is dropped). */
-export const known = (view: SimView, ids: string[]): string[] => ids.filter(id => view.dex.moves.get(id).exists);
-
 export { oracleTagAbove } from './oracle-tag';

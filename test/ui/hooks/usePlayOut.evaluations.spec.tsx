@@ -38,16 +38,22 @@ function useRunHarness(kind: FormatKind, forcedAt: number[], endAfterTurns: numb
   const [executing, setExecuting] = useState(false);
   const [entries, setEntries] = useState(0);
   const [turns, setTurns] = useState(0);
-  const counts = useRef({ evaluate: 0, tags: [] as (string | null)[], pendingTag: null as string | null });
-  const viewTurn = START_TURN + turns;
+  const counts = useRef({ evaluate: 0, tags: [] as (string | null)[], acquires: [] as unknown[], pendingTag: null as string | null });
+  const [pointerBehind, setPointerBehind] = useState(false);
+  const tipTurn = START_TURN + turns;
+  // Round 89 (#112): `pointerBehind` parks the pointer one turn before the tip, as a frame report does; the run plays on at the tip.
+  const viewTurn = pointerBehind ? tipTurn - 1 : tipTurn;
+  const liveTip = !pointerBehind;
   const evalViewKey = `variation:${viewTurn}`;
+  const tip = { key: `variation:${tipTurn}`, turn: tipTurn, variation: true };
   const evaluation = {
     prefs: { depth: 1, samples: 1, mode: 'matrix', auto, autoAnalyze: false, tera: 'auto' },
     setPrefs: (next: { auto: boolean }) => setAuto(next.auto),
     setEngineOverride: vi.fn(), runGraphSweep: vi.fn(), reset: vi.fn(), clearGraph: vi.fn(),
     markStale: () => setStatus(previous => (previous === 'done' ? 'stale' : previous)),
-    evaluate: (params: { tag?: string | null }) => {
+    evaluate: (params: { tag?: string | null; acquire?: unknown }) => {
       counts.current.evaluate += 1;
+      counts.current.acquires.push(params.acquire);
       counts.current.tags.push(params.tag ?? null);
       counts.current.pendingTag = params.tag ?? null;
       setStatus('reconstructing');
@@ -59,6 +65,8 @@ function useRunHarness(kind: FormatKind, forcedAt: number[], endAfterTurns: numb
   } as unknown as Evaluation;
   // The board layer's reading of a result that belongs to another position.
   const liveEvalStatus: Status = status === 'done' && resultTag !== evalViewKey ? 'stale' : status;
+  const tipEvalStatus: Status = status === 'done' && resultTag !== tip.key ? 'stale' : status;
+  const [acquireBranchPosition] = useState(() => vi.fn());
   const transients = useTransients('gen9ou-1');
   const land = (kindOfEntry: 'turn' | 'forced') => {
     setExecuting(true);
@@ -71,18 +79,19 @@ function useRunHarness(kind: FormatKind, forcedAt: number[], endAfterTurns: numb
   };
   const handleEvaluate = useEvalView({
     replayData, snapshots, evaluation, replayGameType: kind === 'doubles' ? 'doubles' : 'singles', evalIsDoubles: kind === 'doubles',
-    viewTurn, viewLine: 'variation', viewingVariation: true, liveTip: true, liveEvalView: true, evalViewKey, serializedAtView: null,
-    liveEvalStatus, analysisTurn: viewTurn, analyzableTurns: 6, branching: true, executing, branchPreparing: false,
+    viewTurn, viewLine: 'variation', viewingVariation: true, liveTip, liveEvalView: true, evalViewKey,
+    serializedAtView: pointerBehind ? `{"turn":${viewTurn}}` : null,
+    liveEvalStatus, tip, tipEvalStatus, analysisTurn: viewTurn, analyzableTurns: 6, branching: true, executing, branchPreparing: false,
     playOutActive: transients.playOut?.active ?? false, smogonPending: false,
-    acquire: { acquireBranchPosition: vi.fn(), acquireReplayPosition: vi.fn(), makeReplayAcquire: vi.fn(), makeSweepAcquireAll: vi.fn(() => vi.fn()) },
+    acquire: { acquireBranchPosition, acquireReplayPosition: vi.fn(), makeReplayAcquire: vi.fn(), makeSweepAcquireAll: vi.fn(() => vi.fn()) },
     sources, bringOnlyLists: null, setsFingerprint: 'fp', sensitivityTargetsFor: () => [], editedP1Info: null, editedP2Info: null,
     historyLength: entries, setVariationScores: vi.fn(),
   }).handleEvaluate;
   const playOut = usePlayOut({
     playOut: transients.playOut, setPlayOut: transients.setPlayOut, setPlayOutNotice: transients.setPlayOutNotice,
     playOutProcessedRef: transients.playOutProcessedRef, playOutRef: transients.playOutRef, stopPlayOutRef: transients.stopPlayOutRef,
-    evaluation, fastPlayOut: false, evalViewKey, liveEvalStatus, liveTip: true, viewingVariation: true, atEndPosition: false,
-    viewT0: false, viewTurn, tipTurn: viewTurn, holdTipFollow: vi.fn(), navigateTo: vi.fn(), setNavSeek: vi.fn(),
+    evaluation, fastPlayOut: false, tip, tipEvalStatus, liveTip, viewingVariation: true, atEndPosition: false,
+    viewT0: false, viewTurn, tipTurn, holdTipFollow: vi.fn(), navigateTo: vi.fn(), setNavSeek: vi.fn(),
     executing, executeError: null, branchPreparing: false,
     getBattle: () => ({ ended: turns >= endAfterTurns }) as never,
     executeTurn: async () => { land('turn'); await Promise.resolve(); return null; },
@@ -98,7 +107,7 @@ function useRunHarness(kind: FormatKind, forcedAt: number[], endAfterTurns: numb
     setResultTag(counts.current.pendingTag);
     setStatus('done');
   };
-  return { counts, playOut, transients, deliver, status, turns, entries };
+  return { counts, playOut, transients, deliver, status, turns, entries, acquireBranchPosition, setPointerBehind };
 }
 
 async function settle() {
@@ -106,9 +115,11 @@ async function settle() {
 }
 
 /** Plays a run to its end: deliver the finished evaluation of every position the loop asked for. */
-async function runToEnd(kind: FormatKind, forcedAt: number[], endAfterTurns: number) {
+async function runToEnd(kind: FormatKind, forcedAt: number[], endAfterTurns: number, pointerBehind = false) {
   const hook = renderHook(() => useRunHarness(kind, forcedAt, endAfterTurns));
   act(() => hook.result.current.playOut.startPlayOut());
+  // The frame reports a turn before the tip right after the run armed, and the pointer stays there for the whole run.
+  if (pointerBehind) act(() => hook.result.current.setPointerBehind(true));
   // Evaluations that finish are delivered one by one: the harness answers the latest request.
   for (let guard = 0; guard < 40 && hook.result.current.transients.playOut?.active; guard += 1) {
     if (hook.result.current.status === 'reconstructing') act(() => hook.result.current.deliver());
@@ -137,5 +148,17 @@ describe('a play-out evaluates every position once', () => {
     // Start, after turn 1, after the forced entry, after turns 2 and 3.
     expect(done.counts.current.evaluate).toBe(5);
     expect(done.counts.current.tags).toEqual(['variation:3', 'variation:4', 'variation:4', 'variation:5', 'variation:6']);
+  });
+
+  // Round 89 (#112): the frame's report parks the pointer one turn behind the tip, right after the run armed. The run asks for the tip's position (the live
+  // sim, tagged with the tip's key) and plays it, never the evaluation of the turn the pointer shows.
+  test.each(['singles', 'doubles'] as const)('%s: a pointer behind the tip does not stop the run or send an evaluation of the clicked turn', async kind => {
+    const done = await runToEnd(kind, [], 3, true);
+    expect(done.transients.playOut).toBeNull();
+    expect(done.turns).toBe(3);
+    expect(done.counts.current.evaluate).toBe(4);
+    expect(done.counts.current.tags).toEqual(['variation:3', 'variation:4', 'variation:5', 'variation:6']);
+    // Every one acquired the live sim, none the recorded position of the pointer's turn.
+    expect(done.counts.current.acquires.every(acquire => acquire === done.acquireBranchPosition)).toBe(true);
   });
 });

@@ -75,7 +75,7 @@ describe('ReplayWorkspace', () => {
     // Round 84 (Q20 a): the column holds no loader; the Load button in the top bar opens it with the loaded link.
     expect(document.querySelector('.ps-main-left .ps-panel input[aria-label="Replay URL or ID"]')).toBeNull();
     expect(screen.queryByRole('textbox', { name: 'Replay URL or ID' })).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: 'Load' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Game' }));
     expect((screen.getByRole('textbox', { name: 'Replay URL or ID' }) as HTMLInputElement).value).toContain(replay.id);
     expect(document.querySelector('.ps-topbar-actions .ps-loader-panel')).not.toBeNull();
     await userEvent.keyboard('{Escape}');
@@ -245,6 +245,20 @@ describe("ReplayWorkspace: the dock follows the frame's near side", () => {
     expect(app().ctx.replay.replayData?.viewpoint).toBe('p2');
     expect(sideLabels()[0]).toMatch(/^P2/);
     expect(sideLabels().at(-1)).toMatch(/^P1/);
+  }, 90_000);
+
+  // Round 89 (#113): the lead picker at turn 0 follows the same near side.
+  test.each(['singles', 'doubles'] as const)('%s at turn 0: the lead picker lists the near side first', async kind => {
+    const { app } = await mountLoaded(kind);
+    act(() => app().board.timeline.handleGraphSelect(0));
+    await waitFor(() => expect(document.querySelector('.ps-lead-side')).not.toBeNull());
+    const leadLabels = () => [...document.querySelectorAll('.ps-lead-label')].map(label => label.textContent?.slice(0, 2));
+    expect(leadLabels()).toEqual(['P1', 'P2']);
+    const source = frameWindow();
+    reportSide(source, 'p2');
+    expect(leadLabels()).toEqual(['P2', 'P1']);
+    reportSide(source, 'p1');
+    expect(leadLabels()).toEqual(['P1', 'P2']);
   }, 90_000);
 
   test('the frames report their side and hide the two choosers, and keep the turn buttons', async () => {

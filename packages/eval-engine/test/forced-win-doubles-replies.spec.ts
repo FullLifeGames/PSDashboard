@@ -88,9 +88,8 @@ describe('forced-win prover: every reply of the defending side (round 64, T118)'
     const protect = replies.find(reply => reply.label === 'Astral Barrage + Protect');
     expect(protect).toBeDefined();
     expect(p1WinsThisTurn(board.serialized, line, protect!.choice)).toBe(0);
-    // Round 70 (Protect tempo, batch gate): the engine's own reply list holds Zamazenta's Protect, so the probe finds no
-    // winning line and the full proof over every legal reply never starts (12 cells instead of 98). The two tests below
-    // keep the proof over every legal reply pinned.
+    // The full proof runs for the three ranked lines against every legal reply (round 89, A5f-7: no greedy scout before it), and
+    // Zamazenta's Protect escapes each of them, so the proof holds no mass.
     const proof = proveForcedWin(root, { side: 'p1', rootOrder: board.rootOrder, tera: board.tera, sleepClause: board.sleepClause });
     expect(proof.mass).toBe(0);
   });
@@ -100,7 +99,10 @@ describe('forced-win prover: every reply of the defending side (round 64, T118)'
     const root = createRootPosition(board.serialized);
     const replies = legalChoices(root, 'p1', { tera: board.tera });
     expect(replies).toHaveLength(42);
-    const proof = proveForcedWin(root, { side: 'p2', rootOrder: board.rootOrder, tera: board.tera, sleepClause: board.sleepClause });
+    const request = { side: 'p2' as const, rootOrder: board.rootOrder, tera: board.tera, sleepClause: board.sleepClause };
+    // The production call: the full proof starts for the first three lines of the ranking, and every one is refuted.
+    expect(board.rootOrder[0]).toBe('move knockoff 1, move heatwave');
+    const proof = proveForcedWin(root, request);
     expect(proof.mass).toBe(0);
     expect(proof.cells).toBeGreaterThanOrEqual(replies.length);
   });
@@ -114,8 +116,8 @@ describe('forced-win prover: every reply of the defending side (round 64, T118)'
     expect(proof.mass).toBe(1);
     expect(proof.turns).toBe(1);
     expect(proof.cells).toBeGreaterThanOrEqual(replies.length);
-    // What does not fit the budget proves nothing: 40 cells hold the tree's 12 combos, not the 36 legal replies.
-    expect(proveForcedWin(serialized, { ...request, budget: { cells: 40 } }).mass).toBeLessThan(MIN_FORCED_MASS);
+    // What does not fit the budget proves nothing: 30 cells hold the tree's 12 combos, not the 36 legal replies.
+    expect(proveForcedWin(serialized, { ...request, budget: { cells: 30 } }).mass).toBeLessThan(MIN_FORCED_MASS);
   });
 
   test('singles: the defender keeps the engine\'s list, so a Stealth Rock that fails into standing rocks draws no cell', () => {

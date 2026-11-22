@@ -4,10 +4,11 @@ import { forcedWinSpeaks } from './turn-analysis/forced-speech.ts';
 import { splitCombinedLabel } from './turn-analysis/played-match.ts';
 import { chanceRolled } from './turn-analysis/luck.ts';
 import { lostGround, shownAttribution, walkedInto } from './turn-analysis/risk.ts';
-import { percentBelowSure, phrase, phraseReplies, playedBest, rollText } from './prose/phrases.ts';
-import {
-  forcedClause, inaccuracyClause, readCreditClause, sackClause, sensitivityClause, sideClause, streakClause, unansweredClause,
-} from './prose/clauses.ts';
+import { caveatWords, choiceSentence, delayClause, forcedQualifier, percentBelowSure, phrase, phraseReplies, rollText } from './prose/phrases.ts';
+import { sideClause } from './prose/clauses.ts';
+import { rideAlongOf } from './prose/ride-along.ts';
+import { QUIET_TURN, hintShown, quietSentences, quietVoiceOf, type QuietVoice } from './prose/quiet.ts';
+import type { NamedJudgement } from './prose/ride-along.ts';
 
 /**
  * Annotator-style natural-language rendering of a turn analysis. Pure
@@ -52,18 +53,13 @@ function estimateSentence(analysis: TurnAnalysis, playerNames: PlayerNames): str
 function forcedWinSentence(side: SideAnalysis, player: string, ownBar: number): string | null {
   const forced = side.forcedWin;
   if (!forced || !forcedWinSpeaks(forced, ownBar)) return null;
-  const tail = forced.caveat === 'barring-crit' ? ', barring a crit' : forced.caveat === 'sampled-rolls' ? ' on the sampled rolls' : '';
   // Round 64 (T123): `turns` is the deepest proven line in own moves, so the win comes within it.
   const head = `${player} wins within ${forced.turns} turn${forced.turns === 1 ? '' : 's'} against every reply`;
-  if (forced.mass >= 1) return `${head}${tail}.`;
-  if (forced.open) {
+  if (forced.open && forced.mass < 1) {
     const verb = forced.open.kind === 'hit' ? 'lands' : 'knocks out';
-    return `${head} if the ${percentBelowSure(forced.open.odds)}% ${forced.open.label} ${verb}${tail}.`;
+    return `${head} if the ${percentBelowSure(forced.open.odds)}% ${forced.open.label} ${verb}${caveatWords(forced.caveat)}${delayClause(forced)}.${choiceSentence(forced)}`;
   }
-  const share = percentBelowSure(forced.mass);
-  return forced.caveat === 'sampled-rolls'
-    ? `${head} in ${share}% of the sampled rolls.`
-    : `${head} in ${share}% of the rolls${tail}.`;
+  return `${head}${forcedQualifier(forced)}${delayClause(forced)}.${choiceSentence(forced)}`;
 }
 
 /**
@@ -95,8 +91,8 @@ function decidedSentences(analysis: TurnAnalysis, playerNames: PlayerNames, deci
 /** A decision or read turn: each side's clause (round 67, T59: no praise for a side that lost ground), then the luck rider. */
 function decisionSentences(analysis: TurnAnalysis, playerNames: PlayerNames): string[] {
   const sentences: string[] = [];
-  const p1Clause = sideClause(playerNames[0], analysis.p1, analysis.p2, !lostGround(analysis, 'p1'));
-  const p2Clause = sideClause(playerNames[1], analysis.p2, analysis.p1, !lostGround(analysis, 'p2'));
+  const p1Clause = sideClause(playerNames[0], analysis.p1, analysis.p2, !lostGround(analysis, 'p1'), playerNames[1]);
+  const p2Clause = sideClause(playerNames[1], analysis.p2, analysis.p1, !lostGround(analysis, 'p2'), playerNames[0]);
   if (p1Clause) sentences.push(p1Clause);
   if (p2Clause) sentences.push(p2Clause);
   if (analysis.chanceDelta !== null && Math.abs(analysis.chanceDelta) >= CHANCE_THRESHOLD) {
@@ -219,7 +215,7 @@ function shiftSentences(analysis: TurnAnalysis, playerNames: PlayerNames): strin
  * The attribution's own sentences: decisions and reads, chance, shift, unclear, or quiet. Round 67 (T59): as
  * shown, so a read whose side lost ground tells the turn's movement instead (the attribution field stays).
  */
-function attributionSentences(analysis: TurnAnalysis, playerNames: PlayerNames, decided: Decided): string[] {
+function attributionSentences(analysis: TurnAnalysis, playerNames: PlayerNames, decided: Decided, othersSpeak: boolean, judged: readonly NamedJudgement[]): string[] {
   switch (shownAttribution(analysis)) {
     case 'p1-decision':
     case 'p2-decision':
@@ -234,71 +230,47 @@ function attributionSentences(analysis: TurnAnalysis, playerNames: PlayerNames, 
       return shiftSentences(analysis, playerNames);
     case 'unclear':
       return ['The score swung, but a choice never surfaced (a Pokémon slept, flinched, or was fully paralyzed), so no blame is assigned.'];
-    default: {
-      const quiet = playedBest(analysis.p1) && playedBest(analysis.p2)
-        ? "A quiet turn: both sides played the engine's preferred line."
-        : 'A quiet turn.';
+    default:
       // Round 76 (T233): a quiet card keeps the read a chance card shows (round 70, 1a) where the cell is solid.
-      const walked = walkedSentence(analysis, playerNames);
-      return walked ? [quiet, walked] : [quiet];
-    }
+      return quietSentences(analysis, walkedSentence(analysis, playerNames), othersSpeak, playerNames, judged);
   }
 }
 
+/** The sentences that stand beside the quiet sentence: decided, predictive and ride-along, and whether a side row shows a hint. */
+function cardSpeakers(analysis: TurnAnalysis, playerNames: PlayerNames, decided: Decided) {
+  const beside = [...decidedSentences(analysis, playerNames, decided), predictiveSentence(analysis, playerNames) ?? []].flat();
+  const { sentences: rideAlong, judged } = rideAlongOf(analysis, playerNames);
+  const standing = beside.length > 0 || hintShown(analysis);
+  return { beside, rideAlong, judged, standing, othersSpeak: standing || rideAlong.length > 0 };
+}
+
 /**
- * The notes that ride along on any attribution, p1 before p2 per kind:
- * sacks and inaccuracies (the decision clauses only speak at mistake level
- * and up; a sack replaces the inaccuracy note its demoted tier would
- * otherwise produce), forced equilibrium expectations (turn context, not
- * a verdict), entry-is-profit context (round 13), streak cumulation
- * (multi-turn expectation, never a verdict), and sensitivity hinges (the
- * softened tier may have silenced the decision clause entirely, but the
- * hinge itself is the finding).
+ * Round 89 (B8a): how the turn's quiet card speaks: "A quiet turn." alone, "Neither side made a mistake." beside another sentence
+ * or a shown hint, or no sentence where a side carries a mistake tier. The badge reads it too.
  */
-function rideAlongSentences(analysis: TurnAnalysis, playerNames: PlayerNames): string[] {
-  const sentences: string[] = [];
-  // Round 67 (T22): the credit's luck rider says no roll is behind it when none went the residual's way;
-  // (T59) a side that lost ground gets no credit sentence.
-  const rolled = chanceRolled(analysis) !== false;
-  const kinds: ((name: string, side: SideAnalysis, ownLuck: number | null, praised: boolean) => string | null)[] = [
-    (name, side, ownLuck, praised) => sackClause(name, side) ??
-      (praised ? readCreditClause(name, side, ownLuck, rolled) : null) ?? inaccuracyClause(name, side),
-    forcedClause,
-    (_name, side) => unansweredClause(side),
-    streakClause,
-    sensitivityClause,
-  ];
-  const luck = analysis.chanceDelta;
-  for (const clause of kinds) {
-    const p1Note = clause(playerNames[0], analysis.p1, luck, !lostGround(analysis, 'p1'));
-    const p2Note = clause(playerNames[1], analysis.p2, luck === null ? null : -luck, !lostGround(analysis, 'p2'));
-    if (p1Note) sentences.push(p1Note);
-    if (p2Note) sentences.push(p2Note);
-  }
-  return sentences;
+export function quietVoice(analysis: TurnAnalysis, playerNames: PlayerNames): QuietVoice {
+  const { standing, othersSpeak, judged } = cardSpeakers(analysis, playerNames, decidedSide(analysis));
+  // Without played actions the card cannot claim that no one made a mistake, and it shows no ride-along notes.
+  if (analysis.playedTracking === false) return standing ? 'silent' : 'alone';
+  return quietVoiceOf(analysis, othersSpeak || walkedSentence(analysis, playerNames) !== null, judged);
 }
 
 export function summarizeTurn(
   analysis: TurnAnalysis,
   playerNames: [string, string],
 ): string {
-  const sentences: string[] = [estimateSentence(analysis, playerNames)];
   const decided = decidedSide(analysis);
-  sentences.push(...decidedSentences(analysis, playerNames, decided));
-  // Before the played-tracking split: the read needs no played actions.
-  const predictive = predictiveSentence(analysis, playerNames);
-  if (predictive) sentences.push(predictive);
+  const { beside, rideAlong, judged, standing, othersSpeak } = cardSpeakers(analysis, playerNames, decided);
+  const sentences: string[] = [estimateSentence(analysis, playerNames), ...beside];
 
   if (analysis.playedTracking === false) {
-    // Played actions were never parsed (doubles) — describe the movement
-    // and point at the engine lines; blame is off the table.
-    sentences.push(analysis.attribution === 'shift'
-      ? "The advantage moved; compare the engine's preferred lines for both sides below."
-      : 'A quiet turn.');
+    // Played actions were never parsed (doubles): describe the movement and point at the engine lines; blame is off the table,
+    // so the card cannot say that no one made a mistake (round 89, B8a).
+    if (analysis.attribution === 'shift') sentences.push("The advantage moved; compare the engine's preferred lines for both sides below.");
+    else if (!standing) sentences.push(QUIET_TURN);
     return sentences.join(' ');
   }
 
-  sentences.push(...attributionSentences(analysis, playerNames, decided));
-  sentences.push(...rideAlongSentences(analysis, playerNames));
+  sentences.push(...attributionSentences(analysis, playerNames, decided, othersSpeak, judged), ...rideAlong);
   return sentences.join(' ');
 }

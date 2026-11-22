@@ -18,14 +18,15 @@ interface EvalShape {
   resultTag?: string | null;
   graph?: Evaluation['graph'];
   prefs?: Partial<Evaluation['prefs']>;
+  stopped?: Evaluation['stopped'];
 }
 
 /** The evaluation surface as the view hook reads it, every action a spy. */
 function evaluationOf(shape: EvalShape = {}) {
-  const spies = { evaluate: vi.fn(), runGraphSweep: vi.fn(), markStale: vi.fn(), reset: vi.fn(), clearGraph: vi.fn(), setPrefs: vi.fn() };
+  const spies = { evaluate: vi.fn(), runGraphSweep: vi.fn(), markStale: vi.fn(), reset: vi.fn(), clearGraph: vi.fn(), dropGraphFrom: vi.fn(), setPrefs: vi.fn() };
   const prefs = { depth: 1, samples: 1, mode: 'matrix', auto: false, autoAnalyze: false, tera: 'auto', ...shape.prefs } as Evaluation['prefs'];
   const evaluation = {
-    ...spies, prefs, status: shape.status ?? 'idle', result: shape.result ?? null, resultTag: shape.resultTag ?? null,
+    ...spies, prefs, status: shape.status ?? 'idle', result: shape.result ?? null, resultTag: shape.resultTag ?? null, stopped: shape.stopped ?? null,
     graph: shape.graph ?? evalGraph('singles', { scores: Array(10).fill(null), results: Array(10).fill(null), settings: Array(10).fill(null) }),
   } as unknown as Evaluation;
   return { evaluation, spies };
@@ -37,7 +38,7 @@ function inputs(evaluation: Evaluation, overrides: Partial<EvalViewInputs> = {})
   return {
     replayData, snapshots, evaluation, replayGameType: 'singles', evalIsDoubles: false, viewTurn: 3, viewLine: 'main',
     viewingVariation: false, liveTip: false, liveEvalView: false, evalViewKey: 'main:3', serializedAtView: null,
-    liveEvalStatus: 'idle', analysisTurn: 3, analyzableTurns: 6, branching: false, executing: false, branchPreparing: false,
+    liveEvalStatus: 'idle', tip: null, tipEvalStatus: 'idle', analysisTurn: 3, analyzableTurns: 6, branching: false, executing: false, branchPreparing: false,
     playOutActive: false, smogonPending: false,
     acquire: { acquireBranchPosition: vi.fn(), acquireReplayPosition: vi.fn(), makeReplayAcquire: vi.fn(), makeSweepAcquireAll: vi.fn(() => vi.fn()) },
     sources, bringOnlyLists: null, setsFingerprint: 'fp1', sensitivityTargetsFor: vi.fn(() => []), editedP1Info: null, editedP2Info: null,
@@ -73,6 +74,54 @@ describe('useEvalView', () => {
     // Round 65 gate (2b): VGC outside Champions is its own rule set too.
     const vgc = { ...replayData, id: 'gen9vgc2026regi-2630181744', formatid: 'gen9vgc2026regi' };
     expect(renderHook(() => useEvalView(inputs(evaluation, { replayData: vgc }))).result.current.effectiveRuleset).toBe('vgc');
+  });
+
+  test('a new game keys its tip apart from the turn once it is played; a replay keeps every key', () => {
+    const { evaluation, spies } = evaluationOf();
+    const game = { ...replayData, id: 'newgame-abcdefghij', formatid: 'gen9ou' };
+    const atTip = renderHook(() => useEvalView(inputs(evaluation, { replayData: game, viewTurn: snapshots.length, evalViewKey: `main:${snapshots.length}` })));
+    act(() => atTip.result.current.handleEvaluate());
+    expect(spies.evaluate.mock.calls.at(-1)![0]).toMatchObject({ cacheKey: `newgame-abcdefghij:${snapshots.length}t:fp1` });
+    const played = renderHook(() => useEvalView(inputs(evaluation, { replayData: game, viewTurn: 3, evalViewKey: 'main:3' })));
+    act(() => played.result.current.handleEvaluate());
+    expect(spies.evaluate.mock.calls.at(-1)![0]).toMatchObject({ cacheKey: 'newgame-abcdefghij:3:fp1' });
+    const replay = renderHook(() => useEvalView(inputs(evaluation, { viewTurn: snapshots.length, evalViewKey: `main:${snapshots.length}` })));
+    act(() => replay.result.current.handleEvaluate());
+    expect(spies.evaluate.mock.calls.at(-1)![0]).toMatchObject({ cacheKey: `${replayData.id}:${snapshots.length}:fp1` });
+  });
+
+  test('the sweeps of a game key its open tip apart too, so an analysis made before the turn was played never serves the played turn (H4h)', () => {
+    const { evaluation, spies } = evaluationOf();
+    const game = { ...replayData, id: 'newgame-abcdefghij', formatid: 'gen9ou' };
+    const tip = snapshots.length;
+    const view = renderHook(() => useEvalView(inputs(evaluation, { replayData: game, viewTurn: tip, evalViewKey: `main:${tip}` })));
+    act(() => view.result.current.handleAnalyzeGame());
+    const sweep = spies.runGraphSweep.mock.calls.at(-1)![0] as { cacheKeyFor: (turn: number) => string };
+    expect(sweep.cacheKeyFor(tip)).toBe(`newgame-abcdefghij:${tip}t:fp1`);
+    expect(sweep.cacheKeyFor(tip - 1)).toBe(`newgame-abcdefghij:${tip - 1}:fp1`);
+    act(() => view.result.current.analyzeTurnNow(tip));
+    expect((spies.runGraphSweep.mock.calls.at(-1)![0] as { cacheKeyFor: (turn: number) => string }).cacheKeyFor(tip)).toBe(`newgame-abcdefghij:${tip}t:fp1`);
+    // a replay's sweep keys stay as they were
+    const replay = renderHook(() => useEvalView(inputs(evaluation, { viewTurn: tip, evalViewKey: `main:${tip}` })));
+    act(() => replay.result.current.handleAnalyzeGame());
+    expect((spies.runGraphSweep.mock.calls.at(-1)![0] as { cacheKeyFor: (turn: number) => string }).cacheKeyFor(tip)).toBe(`${replayData.id}:${tip}:fp1`);
+  });
+
+  test('a game that grows drops the graph entry of its old tip, which was swept before the turn was played; a replay and a shrinking record keep theirs (H4h)', () => {
+    const { evaluation, spies } = evaluationOf();
+    const game = { ...replayData, id: 'newgame-abcdefghij', formatid: 'gen9ou' };
+    const tip = snapshots.length;
+    const grown = [...snapshots, { ...snapshots[snapshots.length - 1], turn: tip + 1 }];
+    const { rerender } = renderHook((props: EvalViewInputs) => useEvalView(props), { initialProps: inputs(evaluation, { replayData: game }) });
+    expect(spies.dropGraphFrom).not.toHaveBeenCalled();
+    rerender(inputs(evaluation, { replayData: game, snapshots: grown }));
+    expect(spies.dropGraphFrom).toHaveBeenCalledTimes(1);
+    expect(spies.dropGraphFrom).toHaveBeenCalledWith(tip);
+    rerender(inputs(evaluation, { replayData: game, snapshots: grown }));
+    expect(spies.dropGraphFrom).toHaveBeenCalledTimes(1);
+    const replay = renderHook((props: EvalViewInputs) => useEvalView(props), { initialProps: inputs(evaluation) });
+    replay.rerender(inputs(evaluation, { snapshots: grown }));
+    expect(spies.dropGraphFrom).toHaveBeenCalledTimes(1);
   });
 
   test('Evaluate targets the position under the pointer: live sim, recorded variation, or cached main line', async () => {
@@ -285,5 +334,73 @@ describe('useEvalView', () => {
     const pending = evaluationOf({ prefs: { autoAnalyze: true } });
     renderHook(() => useEvalView(inputs(pending.evaluation, { smogonPending: true })));
     expect(pending.spies.runGraphSweep).not.toHaveBeenCalled();
+  });
+
+  // Round 89 (SB-7): Cancel is the user's answer for that position; Auto and "always on" start no new run over it. Another position
+  // (another tag) is theirs again. The same for singles and doubles: the view does not read the game type here.
+  test.each([['Auto', { auto: true }], ['Always on', { autoAnalyze: true }]] as const)('%s leaves a position the user stopped alone, and takes the next one', (_name, prefs) => {
+    const live = { branching: true, liveEvalView: true, liveTip: true, liveEvalStatus: 'stale' as const, evalViewKey: 'variation:3' };
+    const stopped = evaluationOf({ prefs, status: 'stale', result: evalResult(), resultTag: 'variation:3', stopped: { tag: 'variation:3' } });
+    const { rerender } = renderHook((props: EvalViewInputs) => useEvalView(props), { initialProps: inputs(stopped.evaluation, live) });
+    expect(stopped.spies.evaluate).not.toHaveBeenCalled();
+    rerender(inputs(stopped.evaluation, { ...live, evalViewKey: 'variation:4' }));
+    expect(stopped.spies.evaluate).toHaveBeenCalledTimes(1);
+  });
+
+  // Round 89 (SB-9): a stop before any result (a tree before its interim result) is the user's answer too; "Always on" does not start the run
+  // again. Round 89 (SB-10): the game analysis it starts stands: no single evaluation supersedes it in the same commit ("Analysis stopped").
+  test.each([['kept nothing', { tag: 'variation:3', empty: true as const }], ['kept a result', { tag: 'variation:3' }]] as const)(
+    'Always on leaves a position whose stop %s alone and starts the game analysis, not a search', (_name, mark) => {
+      const live = { branching: true, liveEvalView: true, liveTip: true, liveEvalStatus: 'idle' as const, evalViewKey: 'variation:3' };
+      const stopped = evaluationOf({ prefs: { autoAnalyze: true }, status: 'idle', stopped: mark });
+      const { rerender } = renderHook((props: EvalViewInputs) => useEvalView(props), { initialProps: inputs(stopped.evaluation, live) });
+      expect(stopped.spies.runGraphSweep).toHaveBeenCalledTimes(1);
+      expect(stopped.spies.evaluate).not.toHaveBeenCalled();
+      rerender(inputs(stopped.evaluation, { ...live, evalViewKey: 'variation:4' }));
+      expect(stopped.spies.evaluate).toHaveBeenCalledTimes(1);
+    });
+
+  // Round 89 (#112): a frame report can park the pointer on an earlier turn of the variation while a play-out runs at the tip.
+  // The run's evaluation (the user's and the Auto one) is the live sim's, tagged with the tip, and its score fills the tip's slot.
+  describe.each(['singles', 'doubles'] as const)('a run with the pointer behind the tip, %s', kind => {
+    const fixture = replayFixture(kind);
+    const behind = (evaluation: Evaluation, overrides: Partial<EvalViewInputs> = {}) => inputs(evaluation, {
+      replayData: fixture.replayData, snapshots: fixture.snapshots, replayGameType: kind, evalIsDoubles: kind === 'doubles',
+      viewTurn: 3, viewLine: 'variation', viewingVariation: true, liveEvalView: true, evalViewKey: 'variation:3',
+      serializedAtView: '{"turn":3}', branching: true, tip: { key: 'variation:4', turn: 4, variation: true }, ...overrides,
+    });
+
+    test('Evaluate asks for the live sim and tags the tip; without a run the pointer decides', async () => {
+      const { evaluation, spies } = evaluationOf();
+      const run = behind(evaluation, { playOutActive: true });
+      const view = renderHook(() => useEvalView(run));
+      act(() => view.result.current.handleEvaluate());
+      expect(spies.evaluate).toHaveBeenLastCalledWith(expect.objectContaining({ cacheKey: null, tag: 'variation:4', acquire: run.acquire.acquireBranchPosition }));
+
+      const idle = renderHook(() => useEvalView(behind(evaluation)));
+      act(() => idle.result.current.handleEvaluate());
+      const recorded = spies.evaluate.mock.calls.at(-1)![0] as { tag: string; acquire: () => Promise<string> };
+      expect(recorded.tag).toBe('variation:3');
+      await expect(recorded.acquire()).resolves.toBe('{"turn":3}');
+    });
+
+    test('Auto re-evaluates a stale tip during a run, whatever the pointer shows', () => {
+      const { evaluation, spies } = evaluationOf({ prefs: { auto: true }, status: 'done', resultTag: 'variation:3' });
+      // The pointer's reading is current (the result is its own); the tip's is not.
+      const stale = { liveEvalStatus: 'done' as const, tipEvalStatus: 'stale' as const };
+      renderHook(() => useEvalView(behind(evaluation, { ...stale, playOutActive: false })));
+      expect(spies.evaluate).not.toHaveBeenCalled();
+      renderHook(() => useEvalView(behind(evaluation, { ...stale, playOutActive: true })));
+      expect(spies.evaluate).toHaveBeenCalledTimes(1);
+      expect(spies.evaluate).toHaveBeenLastCalledWith(expect.objectContaining({ tag: 'variation:4' }));
+    });
+
+    test("the tip's finished evaluation fills the tip's score slot", () => {
+      const { evaluation } = evaluationOf({ status: 'done', result: evalResult(kind, { score: 0.42 }), resultTag: 'variation:4' });
+      const setVariationScores = vi.fn();
+      renderHook(() => useEvalView(behind(evaluation, { playOutActive: true, setVariationScores })));
+      const updater = setVariationScores.mock.calls[0][0] as (previous: (number | null)[]) => (number | null)[];
+      expect(updater([0.1, null, null])).toEqual([0.1, null, null, 0.42]);
+    });
   });
 });

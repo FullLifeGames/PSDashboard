@@ -274,7 +274,21 @@ export function useGraphState() {
     graphDataRef.current = null;
     setGraph(emptyGraphState());
   }, []);
-  return { graph, setGraph, graphDataRef, stopGraphPaint, clearGraph };
+  /**
+   * Round 89 (#105, H4h): a new game's main line grew, so the entry of its old tip (swept while nobody had played that turn) is no
+   * longer the turn's own: the graph keeps the turns before it. A running sweep paints from its own arrays and is left alone.
+   */
+  const dropGraphFrom = useCallback((turn: number) => {
+    const kept = <T,>(list: T[]): T[] => list.slice(0, Math.max(0, turn - 1));
+    const trimmed = <D extends GraphData>(data: D): D => ({
+      ...data, scores: kept(data.scores), results: kept(data.results), settings: kept(data.settings), faintedFractions: kept(data.faintedFractions),
+      played: kept(data.played), playedOutcome: kept(data.playedOutcome), verified: kept(data.verified), sensitivity: kept(data.sensitivity),
+      evalErrors: kept(data.evalErrors), replacements: kept(data.replacements ?? []), rollFlip: null,
+    });
+    if (graphDataRef.current) graphDataRef.current = trimmed(graphDataRef.current);
+    setGraph(prev => (prev.running ? prev : trimmed(prev)));
+  }, []);
+  return { graph, setGraph, graphDataRef, stopGraphPaint, clearGraph, dropGraphFrom };
 }
 
 /**

@@ -18,7 +18,7 @@ test('U-turn against Chilly Reception from the viewed turn 1: both sides send th
   await page.route('**/replay.pokemonshowdown.com/**', route => route.fulfill({ status: 200, contentType: 'application/json', body: draftReplay }));
   await page.goto('/');
   await routeSmogon(page, emptySmogon);
-  await page.locator('button', { hasText: 'Load' }).click();
+  await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
   await expect(page.locator('.ps-branch-bar input[type="range"]')).toBeVisible({ timeout: 30_000 });
   await page.locator('.ps-branch-bar input[type="range"]').fill('1');
   await expect(page.getByText('T1/')).toBeVisible();
@@ -32,7 +32,7 @@ test('U-turn against Chilly Reception from the viewed turn 1: both sides send th
   const history = page.locator('.ps-panel', { hasText: 'Variation moves' });
   for (const side of ['P1', 'P2']) {
     await pickForcedReplacement(page, { timeout: 60_000 });
-    await expect(history).toContainText(`forced replacement (${side})`, { timeout: 30_000 });
+    await expect(history).toContainText(`replacement (${side})`, { timeout: 30_000 });
   }
   await expect(page.getByText('You need a switch response')).toHaveCount(0);
 });

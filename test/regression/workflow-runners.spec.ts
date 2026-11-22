@@ -11,8 +11,8 @@ const DIR = fileURLToPath(new URL('../../.github/workflows/', import.meta.url));
 const workflows = readdirSync(DIR).filter(name => /\.ya?ml$/.test(name)).sort();
 
 describe('the runner of every workflow job', () => {
-  test('the workflows are the four the repository runs', () => {
-    expect(workflows).toEqual(['bank.yml', 'pages.yml', 'release.yml', 'test.yml']);
+  test('the workflows are the five the repository runs', () => {
+    expect(workflows).toEqual(['bank.yml', 'feedback.yml', 'pages.yml', 'release.yml', 'test.yml']);
   });
 
   test.each(workflows)('%s: every runs-on names ubuntu-24.04', name => {

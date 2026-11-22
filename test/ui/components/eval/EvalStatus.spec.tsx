@@ -33,6 +33,12 @@ describe('EvalStatus', () => {
     expect(screen.getByText('Position changed; re-evaluate.')).toBeInTheDocument();
   });
 
+  test('a play-out in a game names no gold line: a game\'s line is its main line (H4h)', () => {
+    render(<EvalStatus {...base} status="searching" playOutProgress={{ startTurn: 5, turns: 1, atTurn: null, game: true }} />);
+    expect(screen.getByRole('status')).toHaveTextContent('Engine is playing both sides from turn 5. 1 turn played. The line below grows as it plays.');
+    expect(screen.getByRole('status')).not.toHaveTextContent(/gold/);
+  });
+
   test('a running play-out replaces the per-turn churn with one status line', () => {
     const { rerender } = render(<EvalStatus {...base} status="searching" playOutProgress={{ startTurn: 5, turns: 1, atTurn: null }} />);
     expect(screen.getByRole('status')).toHaveTextContent('Engine is playing both sides from turn 5. 1 turn played. The gold line below grows as it plays.');
@@ -46,5 +52,16 @@ describe('EvalStatus', () => {
   test('a run from turn 0 names turn 0 in the status line', () => {
     render(<EvalStatus {...base} status="searching" playOutProgress={{ startTurn: 0, turns: 0, atTurn: 1 }} />);
     expect(screen.getByRole('status')).toHaveTextContent('Engine is playing both sides from turn 0. 0 turns played, now at turn 1.');
+  });
+
+  // Round 89 (#119): after Stop the status line says the engine finishes the turn in flight, as the bar does.
+  test('a stopping run says the engine finishes the turn in flight', () => {
+    const { rerender } = render(<EvalStatus {...base} status="searching" playOutProgress={{ startTurn: 5, turns: 3, atTurn: 8, stopping: true }} />);
+    const line = screen.getByRole('status');
+    expect(line).toHaveTextContent('Stopping: the engine finishes the turn in flight, then the play-out ends. 3 turns played, now at turn 8.');
+    expect(line).not.toHaveTextContent(/Engine is playing both sides/);
+    expect(line).not.toHaveTextContent(/The gold line below grows/);
+    rerender(<EvalStatus {...base} status="searching" playOutProgress={{ startTurn: 5, turns: 1, atTurn: null, stopping: false }} />);
+    expect(screen.getByRole('status')).toHaveTextContent('Engine is playing both sides from turn 5.');
   });
 });

@@ -68,7 +68,12 @@ export async function evaluateWithEngine(
   const request = buildEngineRequest(serialized, { p1: info.p1, p2: info.p2 }, ENGINE_BUDGET_MS, { format: engineGameFormat() ?? undefined });
   const response = await askEngine(engine, request, live);
   const version = response.engine?.version;
-  return { ...engineResponseToResult(request, response), engine: { id: engine.id, name: engine.name, ...(version ? { version } : {}) } };
+  return {
+    ...engineResponseToResult(request, response),
+    // Round 89 (#108): the grading's order bound comes from our own root battle, whichever engine ranked the rows.
+    ...(info.playedBounds ? { playedBounds: info.playedBounds } : {}),
+    engine: { id: engine.id, name: engine.name, ...(version ? { version } : {}) },
+  };
 }
 
 /** The value of one played pair: the position with one option per side, so the engine's score is that pair's. */

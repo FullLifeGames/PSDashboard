@@ -3,6 +3,7 @@ import { Battle, State, Teams, toID, type PokemonSet } from '@pkmn/sim';
 import { advancePositionWithLog, createRootPosition, positionBattle, type SimPosition } from '../src/forward-model';
 import { createMatchupCache } from '../src/eval-function';
 import { mctsTreeSearch } from '../src/mcts';
+import { SEARCH_BUDGET_DEFAULT } from '../src/search/budget';
 import { cellKey } from '../src/rank';
 import { cellContribution } from '../src/search/merge-pool';
 import { sampleCell } from '../src/search/cell-sampler';
@@ -74,7 +75,9 @@ describe('tree class keys of a tied cell (T146 c5)', () => {
       const j = stats.p2Options.findIndex(option => option.choice === p2);
       const cell = stats.cells.find(entry => entry.key === cellKey(i, j))!;
       expect(cell.classKey).toBeDefined();
-      expect(drawnKeys(root, p1, p2, offset)).toContain(cell.classKey);
+      // Round 89 (#59): a tree inside the budget's tree count (0 to 3) answers the dice of its root draw by quantile, so the class
+      // it books may be one the stream's seeds never show (a 0.09 class in forty iterations); the sampler's classes bound it.
+      if (offset >= SEARCH_BUDGET_DEFAULT.trees) expect(drawnKeys(root, p1, p2, offset)).toContain(cell.classKey);
       expect(sampled).toContain(cell.classKey);
       // The merge's pool for the sampler class of that key joins this tree.
       expect(cellContribution(cell, cell.classKey, false)).not.toBeNull();

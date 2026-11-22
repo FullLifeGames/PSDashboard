@@ -30,8 +30,10 @@ export interface PlayOutInputs {
   evaluation: Evaluation;
   /** Session option: every evaluation of the run uses the depth-1 matrix instead of the Auto line. */
   fastPlayOut: boolean;
-  evalViewKey: string;
-  liveEvalStatus: Evaluation['status'];
+  /** Round 89 (#112): the live sim's position, which the loop plays on whatever the pointer shows (null: no variation yet). */
+  tip: { key: string } | null;
+  /** The evaluation's status against the tip's position (the board's `tipEvalStatus`). */
+  tipEvalStatus: Evaluation['status'];
   liveTip: boolean;
   viewingVariation: boolean;
   atEndPosition: boolean;
@@ -174,15 +176,23 @@ function useStartPlayOut(args: PlayOutInputs) {
 }
 
 /** The loop itself: kick a fresh arm, step on completed evals, end on
- *  eval errors — all only while the pointer sits on the live tip. */
+ *  eval errors. Round 89 (#112): it reads the live sim's tip, not the pointer, so a frame report that moves the pointer does not stop it. */
 function usePlayOutLoop(args: PlayOutInputs, finishPlayOut: ReturnType<typeof usePlayOutFinish>['finishPlayOut']) {
   const {
-    playOut, setPlayOut, playOutProcessedRef, evaluation, evalViewKey, liveEvalStatus,
+    playOut, setPlayOut, playOutProcessedRef, evaluation, tip, tipEvalStatus,
     liveTip, executing, executeError, branchPreparing, getBattle, executeTurn, handleEvaluate, applyEvalChoice, playOutRef,
   } = args;
   // Round 88 (#103, A7): set while the run waits on a forced replacement it submitted; the settle reports a refusal through
   // `executeError` and the position does not change, so no evaluation would ever end the wait.
   const forcedPendingRef = useRef(false);
+  // Round 89 (#112): the run reads the live sim's tip once the pointer has stood on it. A run armed off the tip waits for the
+  // rebuild that replaces the variation (the old tip is not its position); after that a frame report that moves the pointer
+  // elsewhere does not stop it.
+  const reachedTipRef = useRef(false);
+  useEffect(() => {
+    if (!playOut?.active) reachedTipRef.current = false;
+    else if (liveTip) reachedTipRef.current = true;
+  }, [playOut?.active, liveTip]);
   /**
    * A play-out started from the MAIN LINE arms before its rebuild finishes —
    * startPlayOut cannot evaluate a sim that does not exist yet, and entering
@@ -191,27 +201,29 @@ function usePlayOutLoop(args: PlayOutInputs, finishPlayOut: ReturnType<typeof us
    * forever. Fires once the live tip stands and no evaluation is in flight.
    */
   useEffect(() => {
-    if (!playOut?.active || playOut.stopping || !liveTip || executing || branchPreparing) return;
+    const runTip = runTipOf(tip, liveTip || reachedTipRef.current);
+    if (!playOut?.active || playOut.stopping || !runTip || executing || branchPreparing) return;
     // A stale position is the Auto pref's to evaluate (the run switched it on): asking here too sent two
     // evaluations per position. Only a user who turned Auto off mid-run leaves the kick to us.
-    const autoCovers = liveEvalStatus === 'stale' && evaluation.prefs.auto;
-    if ((liveEvalStatus !== 'idle' && liveEvalStatus !== 'stale') || autoCovers) return;
+    const autoCovers = tipEvalStatus === 'stale' && evaluation.prefs.auto;
+    if ((tipEvalStatus !== 'idle' && tipEvalStatus !== 'stale') || autoCovers) return;
     handleEvaluate();
-  }, [playOut?.active, playOut?.stopping, liveTip, executing, branchPreparing, liveEvalStatus, evaluation.prefs.auto, handleEvaluate]);
+  }, [playOut?.active, playOut?.stopping, tip, liveTip, executing, branchPreparing, tipEvalStatus, evaluation.prefs.auto, handleEvaluate]);
 
   useEffect(() => {
-    if (!playOut?.active || playOut.stopping || !liveTip || executing || branchPreparing) return;
+    const runTip = runTipOf(tip, liveTip || reachedTipRef.current);
+    if (!playOut?.active || playOut.stopping || !runTip || executing || branchPreparing) return;
     if (evaluation.status !== 'done' || !evaluation.result) return;
     // A result finished for another position (navigation race, pre-play-out
     // leftovers) must never be played from here — the tip's own eval follows.
-    if (evaluation.resultTag !== null && evaluation.resultTag !== evalViewKey) return;
+    if (evaluation.resultTag !== null && evaluation.resultTag !== runTip.key) return;
     if (playOutProcessedRef.current === evaluation.result) return;
     playOutProcessedRef.current = evaluation.result;
     forcedPendingRef.current = false;
     const battle = getBattle();
     const step = nextPlayOutStep(evaluation.result, battle?.ended ?? false, playOut.executed);
     applyLoopStep({ step, interlude: bothSidesReplace(battle), playOut, playOutRef, forcedPendingRef, finishPlayOut, applyEvalChoice, setPlayOut, executeTurn });
-  }, [playOut, liveTip, executing, branchPreparing, evaluation.status, evaluation.result, evaluation.resultTag, evalViewKey, getBattle, applyEvalChoice, executeTurn, finishPlayOut, playOutProcessedRef, playOutRef, setPlayOut]);
+  }, [playOut, tip, liveTip, executing, branchPreparing, evaluation.status, evaluation.result, evaluation.resultTag, getBattle, applyEvalChoice, executeTurn, finishPlayOut, playOutProcessedRef, playOutRef, setPlayOut]);
 
   useEffect(() => {
     if (!playOut?.active) {
@@ -233,6 +245,11 @@ function usePlayOutLoop(args: PlayOutInputs, finishPlayOut: ReturnType<typeof us
     if (evaluation.status !== 'error') return;
     finishPlayOut(playOut, `Play-out stopped after ${playOut.turns} turn${playOut.turns === 1 ? '' : 's'}: the evaluation failed here${evaluation.error ? ` (${evaluation.error})` : ''}.`);
   }, [playOut, executing, branchPreparing, evaluation.status, evaluation.error, finishPlayOut]);
+}
+
+/** Round 89 (#112): the position the loop acts on: the live sim's tip, once the pointer has stood on it. */
+function runTipOf(tip: PlayOutInputs['tip'], reached: boolean): PlayOutInputs['tip'] {
+  return reached ? tip : null;
 }
 
 /** Round 88 (#103, A7): the simulator's reasons end in a full stop; inside the notice's parentheses it would read ").)." */

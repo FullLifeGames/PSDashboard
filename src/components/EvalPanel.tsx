@@ -6,6 +6,7 @@ import type {
 } from '@fulllifegames/eval-engine';
 import type { EvalGraphState, EvalStatus, TurnEvalSettings } from '../hooks/useEvaluation';
 import type { VariationSeries } from '../lib/eval-graph-view';
+import type { LinesHost } from '../lib/line-view';
 import { EvalControls } from './eval/EvalControls';
 import { EvalStatus as EvalStatusBlock, type PlayOutProgress } from './eval/EvalStatus';
 import { GameGraphSection } from './eval/GameGraphSection';
@@ -25,7 +26,7 @@ interface EvalPanelProps {
   onEvaluate?: () => void;
   onCancel: () => void;
   /** Click on an engine line: plays it out in a branch (entering one first when needed), the other side answering with `reply`. */
-  onPickChoice?: (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice | null) => void;
+  onPickChoice?: (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice | null, from?: EvalResult | null) => void;
   /** Click on a matrix cell: plays EXACTLY that pair out in a branch. */
   onPickPair?: (p1: { choice: string; label: string }, p2: { choice: string; label: string }) => void;
   /** Replay view: the settings that produced the shown result (fast scan vs configured). */
@@ -56,6 +57,10 @@ interface EvalPanelProps {
   currentTurn: number;
   /** Analysis of the graph-selected turn (replay view only). */
   analysis: TurnAnalysis | null;
+  /** Round 89 (#105): the open tip of a new game, whose analysis names an open position instead of a played choice. */
+  openTurn?: number | null;
+  /** Round 89 (#104, G4d): with a variation open and a game report held, the way back to the main line (see GameGraphSection). */
+  onBackToMain?: (cardTurn: number | null) => void;
   /** Exploitative Read recommendations for the selected turn (advisory). */
   reads?: { p1?: ReadRecommendation | null; p2?: ReadRecommendation | null } | null;
   /** The fainted share per swept turn as the card takes it (any engine mode): the graph tooltips print at it. */
@@ -66,8 +71,16 @@ interface EvalPanelProps {
   reportLeads?: LeadAnalysis | null;
   /** Game-level root-cause report, once a sweep covers enough turns. */
   report?: GameReport | null;
+  /** Round 89 (#104): the report's analysis of every turn; the Game review lists the graded ones and the graph marks them. */
+  reviewAnalyses?: (TurnAnalysis | null)[] | null;
   /** Doubles replay — selects the fitted win-probability curve for percents. */
   doubles?: boolean;
+  /** Round 89 (#104): the host of the Lines section under a turn's rows (the game's rules, the turn's field, ▶ Play); absent: no section. */
+  linesHost?: LinesHost;
+  /** Round 89 (SB-7): the user stopped the search and its partial result stands for the position: its depth. Null: no stopped run. */
+  stoppedAt?: number | null;
+  /** Round 89 (SB-9): the user stopped the search before any partial result came: the panel says nothing was kept. */
+  stoppedEmpty?: boolean;
   /** Which position the shown single result belongs to (e.g. "Turn 5 · variation"). */
   positionLabel?: string | null;
   /** Round 77 (C7): the pointer sits on the finished end of a variation: there is nothing to evaluate, the panel says who won. */
@@ -93,9 +106,19 @@ function useReportView(report: GameReport | null | undefined, analysisTurn: numb
   // Render-time adjustment (not an effect): when a report first APPEARS —
   // initial sweep done, or a new replay's sweep — land on the overview.
   const [hadReport, setHadReport] = useState(false);
+  // Round 89 (G13b): a variation takes the report away; the way back leads to where the line was started (the review, or the card of
+  // its turn). The analysis turn does not follow a variation, so it still names that card.
+  const [startedFrom, setStartedFrom] = useState<{ view: 'report' | 'turn'; turn: number | null } | null>(null);
+  let returned = false;
   if (!!report !== hadReport) {
     setHadReport(!!report);
-    if (report) setView('report');
+    if (report) {
+      setView(startedFrom?.view ?? 'report');
+      returned = startedFrom !== null;
+      setStartedFrom(null);
+    } else if (hadReport) {
+      setStartedFrom({ view, turn: analysisTurn ?? null });
+    }
   }
   // Same pattern for navigation: moving to another turn (slider, arrows,
   // graph, the timeline's T0 button) IS the request to see that turn's
@@ -103,9 +126,10 @@ function useReportView(report: GameReport | null | undefined, analysisTurn: numb
   const [seenAnalysisTurn, setSeenAnalysisTurn] = useState<number | null>(analysisTurn ?? null);
   if ((analysisTurn ?? null) !== seenAnalysisTurn) {
     setSeenAnalysisTurn(analysisTurn ?? null);
-    if (analysisTurn !== null && analysisTurn !== undefined && report) setView('turn');
+    // the main line's turn that the way back lands on is no request to open its card
+    if (analysisTurn !== null && analysisTurn !== undefined && report && !returned) setView('turn');
   }
-  return { view, setView };
+  return { view, setView, startedFrom };
 }
 
 /** Round 77 (C7): the finished end of a variation has no lines to rank; it names the winner as the branch panel does. */
@@ -140,6 +164,8 @@ function PanelHeader({ running, ...props }: EvalPanelProps & { running: boolean 
         reconstructProgress={props.reconstructProgress}
         progress={props.progress}
         error={props.error}
+        stoppedAt={props.stoppedAt ?? null}
+        stoppedEmpty={!props.ended && !!props.stoppedEmpty}
       />
     </>
   );
@@ -171,7 +197,8 @@ function SingleResult(props: EvalPanelProps) {
   return (
     <EvalResultBlock
       result={result}
-      status={status}
+      // a stopped run's result is the position's answer: not greyed, its rows play like a finished result's
+      status={status === 'stale' && props.stoppedAt != null ? 'done' : status}
       playerNames={playerNames}
       positionLabel={positionLabel}
       resultSettings={resultSettings}
@@ -179,6 +206,7 @@ function SingleResult(props: EvalPanelProps) {
       onPickPair={onPickPair}
       doubles={doubles}
       faintedFraction={shownShare(props)}
+      opponentReads={!!props.prefs.hardMode}
     />
   );
 }
@@ -192,7 +220,7 @@ export function EvalPanel(props: EvalPanelProps) {
   const running = status === 'searching' || status === 'reconstructing';
   const hasGraph = graph.scores.some(score => score !== null);
 
-  const { view, setView } = useReportView(report, analysisTurn);
+  const { view, setView, startedFrom } = useReportView(report, analysisTurn);
   const selectTurn = onSelectTurn
     ? (turn: number, line?: 'main' | 'variation') => {
       onSelectTurn(turn, line);
@@ -220,6 +248,7 @@ export function EvalPanel(props: EvalPanelProps) {
           selectTurn={selectTurn}
           showReportView={showReportView}
           onBackToReport={() => setView('report')}
+          onBackToMain={props.onBackToMain && (() => props.onBackToMain?.(startedFrom?.view === 'turn' ? startedFrom.turn : null))}
           analyzeTurn={analyzeTurn}
           hasAnalyzeTurn={!!(onAnalyzeTurn && analyzeTarget)}
         />

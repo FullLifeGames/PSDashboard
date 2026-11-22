@@ -73,6 +73,11 @@ async function openSetupPanel(page: Page, viewport: { width: number; height: num
   await button.click();
   const panel = page.locator('.ps-setup-panel');
   await expect(panel).toBeVisible();
+  // `.ps-btn:hover` lifts the button by 1 px over 0.1 s, and the click leaves the pointer on it: a box read during that
+  // transition is up to 1 px off the panel's anchor (0.58 px in the CI run of D9, 0.93 px in the merge of lane H), and one read after
+  // it is 1 px off for good. The spec means the layout boxes, so the pointer leaves and the lift settles before the read.
+  await page.mouse.move(2, viewport.height - 2);
+  await expect(button).toHaveCSS('transform', 'none');
   const boxes = await page.evaluate(() => {
     const rect = (selector: string) => {
       const box = document.querySelector(selector)!.getBoundingClientRect();
@@ -91,6 +96,7 @@ for (const width of [390, 640]) {
     expect(boxes.panel.right, `the panel's right edge ${message}`).toBeLessThanOrEqual(boxes.width);
     expect(boxes.panel.top, `the panel hangs under the button ${message}`).toBeGreaterThanOrEqual(boxes.button.bottom);
     await expect(panel.getByRole('checkbox', { name: 'Animate branch turns' })).toBeVisible();
+    await expect(panel.getByRole('checkbox', { name: 'Opponent reads my move' })).toBeVisible();
     await expect(panel.getByLabel('Size')).toBeVisible();
     for (const name of ['Edit Player', 'Edit Opp', 'Import/Export Sets']) await expect(panel.getByRole('button', { name, exact: true })).toBeVisible();
     for (const control of await panel.locator('input, select, button').all()) {
@@ -110,3 +116,44 @@ for (const width of [641, 1366]) {
     expect(boxes.panel.left, `the panel stays inside the window ${message}`).toBeGreaterThanOrEqual(0);
   });
 }
+
+/**
+ * Round 89 (FB-1, forum replay gen9natdexdraft-2713067801): on a phone, with a live branch at turn 33, "Setup ▾" ran over "Report
+ * issue": the actions took no width of their own beside the support links. The status ("Variation tip: Turn 33"), Game, Setup and the
+ * links each keep their own box, and the buttons stay on one line. The status text is set to the long form before the read (the
+ * fixture's branch reads a short turn); no render follows.
+ */
+test('390 px: the branch status, Game, Setup and the support links do not overlap', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await lightEngine(page);
+  await routeOfflineFixtures(page);
+  await page.goto('/');
+  await loadDockReplay(page, 'gen9doublesou-2693620934', 1);
+  // The branch opens with the first executed turn (the engine's pick stands in every slot).
+  await page.locator('.ps-execute-btn').click();
+  const status = page.locator('.ps-topbar-actions > span', { hasText: /^Variation tip/ });
+  await expect(status).toBeVisible({ timeout: 90_000 });
+  await status.evaluate(element => { element.textContent = 'Variation tip: Turn 33'; });
+  const boxes = await page.evaluate(() => {
+    const rect = (element: Element) => {
+      const box = element.getBoundingClientRect();
+      return { left: box.left, right: box.right, top: box.top, bottom: box.bottom, text: (element.textContent ?? '').trim().slice(0, 24) };
+    };
+    const bar = document.querySelector('.ps-topbar')!;
+    return [
+      ...bar.querySelectorAll('.ps-topbar-actions > span, .ps-topbar-actions button'),
+      ...bar.querySelectorAll('.ps-support-links > button, .ps-support-links > a'),
+    ].map(rect);
+  });
+  expect(boxes.length, JSON.stringify(boxes)).toBeGreaterThanOrEqual(5);
+  for (let a = 0; a < boxes.length; a++) {
+    for (let b = a + 1; b < boxes.length; b++) {
+      const across = Math.min(boxes[a].right, boxes[b].right) - Math.max(boxes[a].left, boxes[b].left);
+      const down = Math.min(boxes[a].bottom, boxes[b].bottom) - Math.max(boxes[a].top, boxes[b].top);
+      expect(across > 1 && down > 1, `"${boxes[a].text}" and "${boxes[b].text}" overlap ${JSON.stringify(boxes)}`).toBe(false);
+    }
+  }
+  // One line each: a wrapped "Setup ▾" is two lines tall.
+  for (const box of boxes) expect(box.bottom - box.top, `"${box.text}" stays on one line ${JSON.stringify(boxes)}`).toBeLessThan(30);
+});

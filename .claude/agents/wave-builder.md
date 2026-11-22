@@ -15,6 +15,7 @@ Work:
 - Test first: write the red test, see it fail for the right reason, change the code, see it green.
 - Singles and doubles both: every fix and test covers both game types or says why one is not affected.
 - Commit only through the brief's commit script, one small step per commit; English release-style messages without attribution lines.
+- A step that changes what a user sees or what the code does ends with the documents it touches (README, GLOSSARY.md, ARCHITECTURE.md, ENGINES.md, EVALUATION.md, the ADR whose decision moves), in the same lane and checked against your own code; the ledger names them. A document outside your list goes to the integrator as a patch.
 - Never start a bank, holdout, feedback, e2e or full-regression run, never push, never edit a file outside your lane's list.
 - End only the processes you started, by their PID, after you checked the command line: other sessions and the user's own tools run node too.
 

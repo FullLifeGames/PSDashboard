@@ -58,13 +58,17 @@ function comboKeyHandler(ctx: KeyContext) {
       return;
     }
     if (event.key === 'Escape') {
-      ctx.setOpen(false);
+      // An open list closes alone: the dialog around it keeps its edits. With the list closed the key reaches the dialog.
+      if (ctx.open) {
+        event.stopPropagation();
+        ctx.setOpen(false);
+      }
       return;
     }
     if (event.key === 'Enter') {
       event.preventDefault();
       const exact = ctx.options.find(option => toId(option) === toId(ctx.value));
-      if (ctx.open && ctx.filtered[ctx.highlight]) {
+      if (ctx.open && ctx.highlight >= 0 && ctx.filtered[ctx.highlight]) {
         ctx.commit(ctx.filtered[ctx.highlight]);
       } else if (exact) {
         ctx.commit(exact);
@@ -164,7 +168,7 @@ export function ComboBox({
         aria-expanded={open}
         aria-autocomplete="list"
         aria-controls={`${idBase}-list`}
-        aria-activedescendant={open && filtered[highlight] ? `${idBase}-${highlight}` : undefined}
+        aria-activedescendant={open && highlight >= 0 && filtered[highlight] ? `${idBase}-${highlight}` : undefined}
         aria-label={ariaLabel}
         placeholder={placeholder}
         disabled={disabled}
@@ -175,9 +179,10 @@ export function ComboBox({
           setOpen(true);
           setHighlight(0);
         }}
+        // Focus lists every option and highlights none, so Enter in an empty field commits nothing.
         onFocus={() => {
           setOpen(true);
-          setHighlight(0);
+          setHighlight(value.trim() ? 0 : -1);
         }}
         onBlur={() => {
           setOpen(false);

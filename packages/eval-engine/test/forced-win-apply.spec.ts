@@ -118,6 +118,9 @@ describe('forced-win trigger and bar (round 35)', () => {
       [makeSet('Egg', 'Chansey', ['Soft-Boiled'])],
     ), { p2: [1] });
     const result = resultWith(0.4, ['move seismictoss', 'move protect'], ['move softboiled']);
+    // A band apart keeps Seismic Toss first. Equal rows order by label, Protect would lead, and the full proof (round 89, A5f-7:
+    // no greedy scout names the winning line first) reads that stalling line's win in 11 turns instead of the Toss's one.
+    result.perSide.p1[1] = row('move protect', 0.2);
     const outcome = forcedWinFor(createRootPosition(serialized), forcedWinInput(result, { depth: 1, samples: 1, tera: false }));
     expect(outcome?.side).toBe('p1');
     expect(outcome?.proof.mass).toBe(1);

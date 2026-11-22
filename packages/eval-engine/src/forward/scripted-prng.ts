@@ -3,6 +3,7 @@ import type { Battle, PRNGSeed } from '@pkmn/sim';
 import { answerDie, scriptRoll } from '../dice/answer.ts';
 import { DrawNamer } from '../dice/namer.ts';
 import type { DieName, Draw } from '../dice/types.ts';
+import type { DieQuantiles } from '../search/root-quantile.ts';
 
 /**
  * Round 43: the simulator's dice on demand. A scripted PRNG answers the
@@ -25,6 +26,10 @@ import type { DieName, Draw } from '../dice/types.ts';
  * Round 86 (T305): a secondary die (the entry of the move's `secondaries` the simulator draws after a hit) is named too. A script
  * answers it by effect id (`secondary`), and a `DiceSink` as the scripts map records every secondary die of the turn with the
  * result it had, answered or drawn, so a class draw reads which effects came true from the dice, not from the log.
+ *
+ * Round 89 (#59, T322 block 1): a `QuantileSink` carries the root quantiles of a tree (`search/root-quantile.ts`). The PRNG
+ * draws the natural number first, then lets the quantiles replace it for every NAMED die (a chance, a `random(m)`, a `sample`),
+ * so an unnamed draw, a speed tie and every draw below the root keep the stream's number. A script outranks a quantile.
  */
 export interface RollScript {
   /** The accuracy roll: true connects, false misses. */
@@ -61,6 +66,16 @@ export interface SecondaryRecord {
  */
 export class DiceSink extends Map<string, RollScript> {
   readonly secondaries: SecondaryRecord[] = [];
+}
+
+/** A sink whose draws are also answered by the root quantiles of a tree (Round 89, #59). */
+export class QuantileSink extends DiceSink {
+  readonly quantiles: DieQuantiles;
+
+  constructor(quantiles: DieQuantiles) {
+    super();
+    this.quantiles = quantiles;
+  }
 }
 
 interface Answered { accuracy: boolean; crit: boolean; roll: boolean; secondary: Set<string> }
@@ -134,6 +149,12 @@ export class ScriptedPRNG extends PRNG {
     return answer && 'value' in answer ? answer.value : undefined;
   }
 
+  /** The root quantiles' answer for a named die: undefined when no quantiles are attached, the draw has no name or the quantiles leave it to the stream. */
+  private quantile(name: DieName | null, draw: Draw): number | boolean | undefined {
+    if (!name || !(this.scripts instanceof QuantileSink)) return undefined;
+    return this.scripts.quantiles.answer(name, draw);
+  }
+
   /** The sink's record of a secondary die and the result it had. */
   private note(name: DieName, chance: number, happened: boolean): void {
     if (!(this.scripts instanceof DiceSink)) return;
@@ -157,7 +178,9 @@ export class ScriptedPRNG extends PRNG {
         if (script.crit !== undefined) return script.crit;
       }
     }
-    return this.delegate(() => super.randomChance(numerator, denominator));
+    const natural = this.delegate(() => super.randomChance(numerator, denominator));
+    const answered = this.quantile(name, draw);
+    return typeof answered === 'boolean' ? answered : natural;
   }
 
   override random(from?: number, to?: number): number {
@@ -170,23 +193,40 @@ export class ScriptedPRNG extends PRNG {
       const answer = this.answerRandom(name!, hit, draw);
       if (answer !== undefined) return answer;
     }
-    return super.random(from, to);
+    const natural = super.random(from, to);
+    const answered = this.quantile(name, draw);
+    return typeof answered === 'number' ? answered : natural;
   }
 
   /** Gens 1 and 2: the entry's `chance(n, 256)`. */
   private secondaryChance(name: DieName, draw: Draw, numerator: number, denominator: number): boolean {
     const answered = this.secondaryAnswer(name, draw);
-    const happened = answered === undefined ? this.delegate(() => super.randomChance(numerator, denominator)) : answered < numerator;
+    let happened: boolean;
+    if (answered !== undefined) {
+      happened = answered < numerator;
+    } else {
+      const natural = this.delegate(() => super.randomChance(numerator, denominator));
+      const quantile = this.quantile(name, draw);
+      happened = typeof quantile === 'boolean' ? quantile : natural;
+    }
     this.note(name, numerator / denominator, happened);
     return happened;
   }
 
   /** Gens 3 and up: the entry's `random(100)`, compared with its percent by the simulator (`draw.chance` is the naming's reading of the entry). */
   private secondaryRandom(name: DieName, draw: Draw): number {
-    const value = this.secondaryAnswer(name, draw) ?? super.random(draw.from, draw.to);
+    const scripted = this.secondaryAnswer(name, draw);
+    const value = scripted ?? this.drawnSecondary(name, draw);
     const chance = draw.chance ?? 1;
     this.note(name, chance, value < Math.round(chance * 1e6) / 1e4);
     return value;
+  }
+
+  /** The seed's `random` for a secondary die (drawn first), replaced by the quantiles' answer when they have one. */
+  private drawnSecondary(name: DieName, draw: Draw): number {
+    const natural = super.random(draw.from, draw.to);
+    const answered = this.quantile(name, draw);
+    return typeof answered === 'number' ? answered : natural;
   }
 
   /** The value a script gives a `random` call: the damage roll, or Gen 2's crit (`random(256)` against a threshold). */
@@ -204,8 +244,11 @@ export class ScriptedPRNG extends PRNG {
   }
 
   override sample<T>(items: readonly T[]): T {
-    this.namer?.name({ call: 'sample', from: items.length, items });
-    return this.delegate(() => super.sample(items));
+    const draw: Draw = { call: 'sample', from: items.length, items };
+    const name = this.namer?.name(draw) ?? null;
+    const natural = this.delegate(() => super.sample(items));
+    const answered = this.quantile(name, draw);
+    return typeof answered === 'number' ? items[answered] : natural;
   }
 
   override shuffle<T>(items: T[], start = 0, end = items.length): void {

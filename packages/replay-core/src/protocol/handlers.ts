@@ -1,7 +1,7 @@
 import type { Battle, Pokemon, Side, Field } from '@pkmn/client';
 import type { GenerationNum } from '@pkmn/data';
 import type { DamageObservation, PokemonSnapshot, SideSnapshot, FieldSnapshot } from '../types.ts';
-import { flushSpeedOrder, speedContaminatedAt, type ClientIdent, type ParserState, type PendingMove } from './parser-state.ts';
+import { flushSpeedOrder, ppUsedOf, speedContaminatedAt, type ClientIdent, type ParserState, type PendingMove } from './parser-state.ts';
 import { firstMoverContaminated, foreignAction, secondMoverContaminated, switchTriggered } from './speed-evidence.ts';
 import { toId } from '../ids.ts';
 import { standingScreens } from '../dex-facts/index.ts';
@@ -9,7 +9,14 @@ import { itemFieldsOf } from './item-reading.ts';
 import { paradoxFieldsOf } from './paradox-reading.ts';
 import { forgetAbilityEnd, hitFactsOf } from './hit-facts.ts';
 import { survivedAtOne } from './survival-marker.ts';
+import type { HpText } from '../hp-display.ts';
 
+
+/** The two numbers of an HP text (`75/100`, `24/48g`), null for a faint or no text. */
+function hpTextOf(text: string): HpText | null {
+  const match = text.match(/^(\d+)\/(\d+)/);
+  return match && parseInt(match[1], 10) > 0 && parseInt(match[2], 10) > 0 ? { hp: parseInt(match[1], 10), maxhp: parseInt(match[2], 10) } : null;
+}
 
 function hpFractionOf(text: string): number | null {
   if (!text) return null;
@@ -39,9 +46,11 @@ function snapshotPokemon(mon: Pokemon): PokemonSnapshot {
   const slot = mon.side.active.indexOf(mon);
   const boostedStat = boostedStatOf(mon);
   const fallen = fallenOf(mon);
+  const ppUsed = ppUsedOf(mon);
   return {
     name: mon.name,
     speciesForme: mon.speciesForme,
+    ...(mon.volatiles.transform ? { baseSpeciesForme: mon.baseSpeciesForme } : {}),
     hp: mon.hp,
     maxhp: mon.maxhp,
     hpPercent: mon.maxhp > 0 ? Math.round((mon.hp / mon.maxhp) * 100) : 0,
@@ -60,6 +69,7 @@ function snapshotPokemon(mon: Pokemon): PokemonSnapshot {
     ...(boostedStat ? { boostedStat } : {}),
     ...(fallen ? { fallen } : {}),
     ...(mon.timesAttacked ? { timesAttacked: mon.timesAttacked } : {}),
+    ...(ppUsed ? { ppUsed } : {}),
   };
 }
 
@@ -245,6 +255,13 @@ function recordHiddenPowerHit(state: ParserState, defenderIdent: string, count: 
   }
 }
 
+/** The HP texts of a knockout: the defender's before it (the client still holds them) and the one the line shows, kept only when the defender stands after it (a survivor). */
+function shownFieldOf(defender: Pokemon, lineText: string, lethal: boolean): { defenderShown?: DamageObservation['defenderShown'] } {
+  if (!lethal || !(defender.hp > 0 && defender.maxhp > 0)) return {};
+  const after = hpTextOf(lineText);
+  return { defenderShown: { before: { hp: defender.hp, maxhp: defender.maxhp }, ...(after ? { after } : {}) } };
+}
+
 /** Read the defender BEFORE battle.add applies the line — its current
  *  client HP is the pre-hit value. Null when the line is no reading. */
 function recordDamageObservation(state: ParserState, parts: string[], defenderIdent: string): DamageObservation | null {
@@ -259,13 +276,14 @@ function recordDamageObservation(state: ParserState, parts: string[], defenderId
   const observedFraction = preFraction - newFraction;
   if (!(observedFraction > 0)) return null;
   const defenderSide = defenderIdent.startsWith('p1') ? battle.p1 : battle.p2;
+  const lethal = newFraction === 0 || survivedAtOne(lastMove, defenderIdent, newFraction);
   const observation: DamageObservation = {
     attackerSpecies: attacker.speciesForme,
     defenderSpecies: defender.speciesForme,
     attackerSide: lastMove.attacker.startsWith('p1') ? 'p1' : 'p2',
     moveId: lastMove.moveId,
     observedFraction,
-    lethal: newFraction === 0 || survivedAtOne(lastMove, defenderIdent, newFraction),
+    lethal,
     attackerBoosts: { ...attacker.boosts },
     defenderBoosts: { ...defender.boosts },
     attackerStatus: attacker.status || '',
@@ -274,6 +292,7 @@ function recordDamageObservation(state: ParserState, parts: string[], defenderId
     doubles: !state.singles,
     spread: lastMove.spread,
     defenderSide: defenderIdent.startsWith('p1') ? 'p1' : 'p2',
+    ...shownFieldOf(defender, parts[3] ?? '', lethal),
     ...itemFieldsOf(lastMove, attacker, defender, defenderIdent),
     ...hitFactsOf(state, lastMove, attacker, defender),
     ...paradoxFieldsOf(state, attacker, defender),

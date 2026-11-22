@@ -48,7 +48,7 @@ describe('the replay loader in the app', () => {
     // The workspace: no loader in the column, the button opens it with the loaded link.
     expect(screen.queryByText('Load Replay')).toBeNull();
     expect(screen.queryByRole('textbox', { name: 'Replay URL or ID' })).toBeNull();
-    const load = screen.getByRole('button', { name: 'Load' });
+    const load = screen.getByRole('button', { name: 'Game' });
     expect(load.closest('.ps-topbar-actions')).not.toBeNull();
     await userEvent.click(load);
     const reopened = screen.getByRole('textbox', { name: 'Replay URL or ID' });

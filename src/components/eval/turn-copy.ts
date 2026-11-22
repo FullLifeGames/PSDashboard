@@ -1,4 +1,6 @@
-import { TIER_THRESHOLDS, type SideAnalysis, type RankedChoice, winPctText } from '@fulllifegames/eval-engine';
+import { regretText, TIER_THRESHOLDS, type EvalLine, type SideAnalysis, type TurnAnalysis, type RankedChoice, winDeltaText, winPctText } from '@fulllifegames/eval-engine';
+import { opponentReadsEnabled } from '../../lib/feature-flags';
+import type { RowValues } from '../../lib/line-view';
 
 /**
  * Every displayed value is a WIN PROBABILITY for the named player — "52%"
@@ -42,8 +44,28 @@ function playedSlotsLabel(side: SideAnalysis): string | undefined {
     .join(' + ');
 }
 
+/**
+ * The engine's sentences (`NEVER_ACTED_WORDS` in `prose/phrases.ts`) and this row use the same words. A package reaches the other only
+ * through its barrel, so the words are a deliberate copy; `test/regression/never-acted-words.spec.ts` compares the two.
+ */
+export const NEVER_ACTED_WORDS = 'knocked out before it moved, so the log shows no choice';
+
+/**
+ * Round 89 (X1a part 1): a body knocked out before it moved has no choice in the log; the engine stands a stay-in in for it. The card
+ * says so, with the stand-in's chance, as the win-path panel does ("knocked out before it moved, so the log shows no choice").
+ */
+export function neverActedText(side: { played: { ev: number } | null; faintedFraction?: number }): string {
+  return `${NEVER_ACTED_WORDS}${side.played ? ` · staying in ${winPctText(side.played.ev, side.faintedFraction)}` : ''}`;
+}
+
+/** Which sides of a turn never acted (the stand-in of their played row reads as no choice); absent without an analysis. */
+export function neverActedOf(analysis: Pick<TurnAnalysis, 'p1' | 'p2'> | null | undefined): { p1: boolean; p2: boolean } | undefined {
+  return analysis ? { p1: analysis.p1.neverActed === true, p2: analysis.p2.neverActed === true } : undefined;
+}
+
 /** What the side played, worded by what the analysis could match. */
 export function playedTextFor(side: SideAnalysis): { acted: boolean; playedText: string } {
+  if (side.neverActed) return { acted: false, playedText: neverActedText(side) };
   const playedRawName = playedRawLabel(side);
   const slotText = playedSlotsLabel(side);
   const acted = Boolean(side.played || slotText || side.playedRaw);
@@ -77,6 +99,52 @@ export function comparisonTarget(side: SideAnalysis, best: RankedChoice) {
 }
 
 /**
+ * Round 89 (#104), step G4b: the engine's choice of a side as the turn card names it, and the one place that says so: a graded
+ * mistake or blunder shows its reference line (`comparisonTarget`: the safe line for a read, the co-optimal alternative for a null
+ * best, else the best), every other row its best row at the row's own value. The Game review reads the same choice, value and word
+ * ("safe" where the card says "safe:"), and takes as the engine's line only the line of this choice.
+ */
+export function engineChoice(side: SideAnalysis): { label: string; value: number; word: 'engine' | 'safe' } | null {
+  const best = side.best;
+  if (!best) return null;
+  if (side.tier !== 'mistake' && side.tier !== 'blunder') return { label: best.label, value: best.ev, word: 'engine' };
+  const { asSafe, target, swapped, value } = comparisonTarget(side, best);
+  return { label: swapped ? swapped.label : target.label, value, word: asSafe ? 'safe' : 'engine' };
+}
+
+/**
+ * The lines a card shows: a line is the engine's only when it is the line of the card's engine choice (a result blended over
+ * several worlds keeps the heaviest world's lines, whose best row need not be the blend's), and a line that was both the engine's
+ * and the played one but is no longer the engine's reads as the played line alone.
+ */
+export function cardLines(lines: readonly EvalLine[], analysis: Pick<TurnAnalysis, 'p1' | 'p2'> | null | undefined): EvalLine[] {
+  if (!analysis) return [...lines];
+  return lines.flatMap((line): EvalLine[] => {
+    const engine = engineChoice(analysis[line.side]);
+    const roles = line.for.filter(role => role !== 'engine' || engine === null || engine.label === line.label);
+    if (roles.length === 0) return [];
+    return [roles.length === line.for.length ? line : { ...line, for: roles }];
+  });
+}
+
+/**
+ * Round 89 (#104), G10: the percentages the card's rows show for each side, printed as the card prints them: the engine's row (the
+ * value `engineChoice` names) and the played row. A line reads its own row's number from here, so the Lines section and the Game
+ * review put the same two numbers side by side.
+ */
+export function rowValueTexts(analysis: Pick<TurnAnalysis, 'p1' | 'p2'> | null | undefined): { p1?: RowValues; p2?: RowValues } | undefined {
+  if (!analysis) return undefined;
+  const of = (side: SideAnalysis): RowValues => {
+    const engine = engineChoice(side);
+    return {
+      ...(engine ? { engine: winPctText(engine.value, side.faintedFraction) } : {}),
+      ...(side.played ? { played: winPctText(side.played.ev, side.faintedFraction) } : {}),
+    };
+  };
+  return { p1: of(analysis.p1), p2: of(analysis.p2) };
+}
+
+/**
  * The heading over the live evaluation (round 77, C6): it names the position the shown result was computed for,
  * read from the run's position tag (`main:10`, `variation:10`), never the position the pointer holds now. A result
  * without a tag falls back to the position on screen.
@@ -89,3 +157,28 @@ export function resultPositionLabel(
   const variation = match ? match[1] === 'variation' : screen.viewingVariation;
   return `Turn ${turn} · ${variation ? 'variation' : 'main line'}`;
 }
+
+/**
+ * Round 64 (T123): the regret as its chip shows it. Over 1 it reads as the two win chances it spans
+ * (regretText), and the title keeps the real number on the score scale.
+ */
+export function regretView(name: string, side: SideAnalysis, regret: number): { text: string; title: string } {
+  const from = side.bestNull?.alternative?.ev ?? side.best?.ev;
+  const to = side.played?.ev;
+  if (from === undefined || to === undefined) {
+    return { text: winDeltaText(-regret), title: `${name} gave up this much win probability vs the engine's best.` };
+  }
+  const text = regretText(regret, from, to, side.faintedFraction);
+  return text === winDeltaText(-regret)
+    ? { text, title: `${name} gave up this much win probability vs the engine's best.` }
+    : {
+      text,
+      title: `${name}'s win chance fell from ${winPctText(from, side.faintedFraction)} with the engine's line to ${winPctText(to, side.faintedFraction)} with the played choice ` +
+        `(regret ${regret.toFixed(2)} on the score scale from −1 to 1).`,
+    };
+}
+
+/** Round 89 (#153, HM-2): what a click on an engine move does to the other side, by the Setup setting "Opponent reads my move". */
+export const exploreTitle = (opponentReads = false): string => opponentReads && opponentReadsEnabled()
+  ? 'Play this turn in a variation; the opponent reads your move and plays the reply the search rates lowest for it.'
+  : 'Play this turn in a variation; the opponent plays its top choice.';

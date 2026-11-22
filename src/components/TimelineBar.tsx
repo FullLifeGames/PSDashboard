@@ -1,5 +1,6 @@
 import { sliderMax, variationTip } from '../lib/timeline';
 import type { TimelinePosition, VariationSpan, ViewLine } from '../lib/timeline';
+import { mainLineTarget } from './timeline-target';
 
 interface TimelineBarProps {
   viewT0: boolean;
@@ -13,6 +14,8 @@ interface TimelineBarProps {
   /** The variation's live sim has a winner: its tip reads End and the total counts played turns (round 77, A-6). */
   variationEnded?: boolean;
   branching: boolean;
+  /** A new game's tip turn that is no variation (waiting for its replacement): the slider counts it, the variation's chrome stays away. */
+  idle?: boolean;
   onNavigate: (position: TimelinePosition) => void;
   onGraphSelectLine: (turn: number) => void;
   onDiscard: () => void;
@@ -65,7 +68,7 @@ function TimelineLineChip({ viewTurn, variationSpan, maxTurn, viewingVariation, 
       <button
         type="button"
         className={!viewingVariation ? 'on-main' : ''}
-        onClick={() => onNavigate({ turn: Math.min(viewTurn, maxTurn), line: 'main' })}
+        onClick={() => onNavigate(mainLineTarget(viewTurn, maxTurn))}
       >Main line</button>
       <button
         type="button"
@@ -79,11 +82,11 @@ function TimelineLineChip({ viewTurn, variationSpan, maxTurn, viewingVariation, 
   );
 }
 
-function TimelineTrack({ viewT0, viewTurn, viewLine, variationSpan, maxTurn, onNavigate }: Pick<TimelineBarProps,
-  'viewT0' | 'viewTurn' | 'viewLine' | 'variationSpan' | 'maxTurn' | 'onNavigate'>) {
+function TimelineTrack({ viewT0, viewTurn, viewLine, variationSpan, maxTurn, idle, onNavigate }: Pick<TimelineBarProps,
+  'viewT0' | 'viewTurn' | 'viewLine' | 'variationSpan' | 'maxTurn' | 'idle' | 'onNavigate'>) {
   return (
     <span className="ps-timeline-track">
-      {variationSpan && <VariationStripe variationSpan={variationSpan} maxTurn={maxTurn} />}
+      {variationSpan && !idle && <VariationStripe variationSpan={variationSpan} maxTurn={maxTurn} />}
       <input
         type="range"
         min={1}
@@ -126,12 +129,12 @@ function TimelineBackControls({ viewT0, viewTurn, viewLine, onNavigate, onGraphS
 
 /** Timeline bar: always visible — one slider over main line and variation. */
 export function TimelineBar(props: TimelineBarProps) {
-  const { viewT0, viewTurn, viewLine, variationSpan, maxTurn, branching, onNavigate, onGraphSelectLine, onDiscard } = props;
+  const { viewT0, viewTurn, viewLine, variationSpan, maxTurn, branching, idle = false, onNavigate, onGraphSelectLine, onDiscard } = props;
   return (
     <div className="ps-branch-bar">
       <span style={{ fontSize: 11, fontWeight: 'bold', whiteSpace: 'nowrap', color: '#cde' }}>Timeline</span>
       <TimelineBackControls viewT0={viewT0} viewTurn={viewTurn} viewLine={viewLine} onNavigate={onNavigate} onGraphSelectLine={onGraphSelectLine} />
-      <TimelineTrack viewT0={viewT0} viewTurn={viewTurn} viewLine={viewLine} variationSpan={variationSpan} maxTurn={maxTurn} onNavigate={onNavigate} />
+      <TimelineTrack viewT0={viewT0} viewTurn={viewTurn} viewLine={viewLine} variationSpan={variationSpan} maxTurn={maxTurn} idle={idle} onNavigate={onNavigate} />
       <button
         type="button"
         onClick={() => onNavigate({ turn: viewT0 ? 1 : viewTurn + 1, line: viewLine })}
@@ -152,7 +155,7 @@ export function TimelineBar(props: TimelineBarProps) {
       {/* Round 88 (T345, #81): the chip and Discard variation share one wrapper, so they move to a second row together when the slider
           would fall below 200 px. The chip stays put while a variation exists: flickering away outside the covered turns made the
           whole bar jump around. */}
-      {(variationSpan !== null || branching) && (
+      {(variationSpan !== null || branching) && !idle && (
         <div className="ps-branch-bar-vari">
           {variationSpan !== null && (
             <TimelineLineChip

@@ -16,19 +16,26 @@ interface AppTopBarProps {
   branchDivergence: string | null;
   onCancelPreparation: () => void;
   onAnimateChange: (value: boolean) => void;
+  /** Round 89 (#153, HM-2): the opponent-reads-my-move setting of the Setup menu. */
+  opponentReads: boolean;
+  onOpponentReadsChange: (value: boolean) => void;
   onEditSide: (side: 'p1' | 'p2') => void;
   onOpenSets: () => void;
+  /** Round 89 (ruling 49): the search's Depth and Samples of the Setup menu. */
+  search?: Parameters<typeof SetupMenu>[0]['search'];
   /** A host site frames the app (round 77: the creator link is left out). */
   embed: boolean;
   /** Round 84: the replay loader's props; the Load button sits beside Setup. Left out in the embedded view, which keeps no loader. */
   loader?: Parameters<typeof LoaderMenu>[0];
   onReportIssue: () => void;
+  /** Round 89 (#105): the loaded game is a new game of the app's own, not a Showdown replay. */
+  newGame?: boolean;
 }
 
-function TopBarMatchInfo({ replayData, usageStats, setAssumptions }: Pick<AppTopBarProps, 'replayData' | 'usageStats' | 'setAssumptions'>) {
+function TopBarMatchInfo({ replayData, usageStats, setAssumptions, newGame }: Pick<AppTopBarProps, 'replayData' | 'usageStats' | 'setAssumptions' | 'newGame'>) {
   return (
     <div className="ps-topbar-match" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      <MatchTitle format={replayData.format} players={replayData.players} />
+      <MatchTitle format={replayData.format} players={replayData.players} newGame={newGame} />
       {usageStats.loading && (
         <span style={{ fontSize: 10, color: '#b6a46a' }}>Smogon stats loading...</span>
       )}
@@ -69,7 +76,7 @@ function TopBarBranchStatus({
       {showBranch && !branchPreparing && (
         <>
           <span style={{ fontSize: 11, fontWeight: 'bold', color: '#8cf', whiteSpace: 'nowrap' }}>
-            Branching · Turn {simState?.turnNumber ?? '…'}
+            Variation tip: Turn {simState?.turnNumber ?? '…'}
           </span>
           {branchDivergence && (
             <span className="ps-topbar-divergence" title={branchDivergence}>
@@ -90,7 +97,7 @@ export function AppTopBar(props: AppTopBarProps) {
   const { replayData, usageStats, setAssumptions } = props;
   return (
     <div className="ps-topbar">
-      <TopBarMatchInfo replayData={replayData} usageStats={usageStats} setAssumptions={setAssumptions} />
+      <TopBarMatchInfo replayData={replayData} usageStats={usageStats} setAssumptions={setAssumptions} newGame={props.newGame} />
       <div className="ps-topbar-actions">
         <TopBarBranchStatus
           branchPreparing={props.branchPreparing}
@@ -104,8 +111,11 @@ export function AppTopBar(props: AppTopBarProps) {
         <SetupMenu
           animateBranchTurns={props.animateBranchTurns}
           onAnimateChange={props.onAnimateChange}
+          opponentReads={props.opponentReads}
+          onOpponentReadsChange={props.onOpponentReadsChange}
           onEditSide={props.onEditSide}
           onOpenSets={props.onOpenSets}
+          search={props.search}
         />
       </div>
       <SupportLinks embed={props.embed} withName onReportIssue={props.onReportIssue} />

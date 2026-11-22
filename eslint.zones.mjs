@@ -33,14 +33,15 @@ export const importZones = [
   // The root suite consumes the packages the way the app does: by name over
   // the curated barrel. The three measurement chains read engine internals
   // (feature weights, leaf values, sweep setters) and stay white-box, and the
-  // speed-layer setting spec reads each lever of the worker's switch (simFastOn).
+  // speed-layer setting spec reads each lever of the worker's switch (simFastOn). The spec that compares a deliberate copy of
+  // the app with the engine's own function (branch-required-choices-copy.spec.ts) reads that function's file: the barrel does not export it.
   {
     ...zone(['test/regression/**/*.ts'], '^(\\.\\./)+packages/',
       'Root specs import the packages by name (@fulllifegames/replay-core, @fulllifegames/eval-engine); only the measurement chains read package internals.'),
     ignores: ['test/regression/eval-calibration.spec.ts', 'test/regression/eval-fit.spec.ts', 'test/regression/endgame-truth.spec.ts',
       'test/regression/eval-sim-fast-setting.spec.ts', 'test/regression/forced-reconstruction.spec.ts',
       'test/regression/forced-reconstruction-support.ts', 'test/regression/bank-reconstruction-rows.spec.ts',
-      'test/regression/rolled-copy.spec.ts'],
+      'test/regression/rolled-copy.spec.ts', 'test/regression/branch-required-choices-copy.spec.ts'],
   },
   zone(['test/ui/**/*.{ts,tsx}'], '^(\\.\\./)+packages/',
     'The app suite imports components, hooks, and src/lib directly and the packages by name, never their files.'),

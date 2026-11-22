@@ -147,7 +147,14 @@ describe.each(RULES_WITH_DOUBLES)('Rock Slide in doubles: $name', (rules: Rules)
         if (rules.generation === 3 && hit.includes(target)) expected.push(flinch(target));
       }
       if (rules.generation !== 3) expected.push(...hit.map(flinch));
-      expect(played.names.map(entry => dieKey(entry.name)), `seed ${seed}`).toEqual(expected.map(dieKey));
+      // Round 89 (#137): a click that names no target (a spread move) still draws the simulator's random target, a sample over the two foes
+      // that `getRandomTarget` takes when the choice is queued and again when the move runs, before the move is in flight; the module
+      // names each draw a die of the user and the move with no target slot, one key for every repeat
+      const keys = played.names.map(entry => dieKey(entry.name));
+      const picks = keys.filter(key => key.endsWith(':random-target'));
+      expect(picks.length, `seed ${seed}: the target draws`).toBeGreaterThan(0);
+      expect(new Set(picks), `seed ${seed}`).toEqual(new Set([dieKey({ slot: 'p1a', moveId: 'rockslide', kind: 'random-target' })]));
+      expect(keys.filter(key => !picks.includes(key)), `seed ${seed}`).toEqual(expected.map(dieKey));
       if (missedTargets.length === 0) both++;
       else oneMissed++;
     }

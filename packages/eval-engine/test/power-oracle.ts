@@ -41,12 +41,6 @@ export function powerInTurn(battle: Battle, choices: { p1: string; p2: string },
   return seen;
 }
 
-/** The power the simulator gives in one turn as a single number: power times modifier of the first hit. */
-export function firstPower(seen: PowerSeen[]): number {
-  if (seen.length === 0) throw new Error('the move never reached the BasePower event');
-  return seen[0].basePower * seen[0].modifier;
-}
-
 /** Everything one call into the static could leave behind: the log, the dice, the bodies' state, the Dex move. */
 export function fingerprint(battle: Battle, bodies: Pokemon[], moveId: string): string {
   const move = battle.dex.moves.get(moveId);

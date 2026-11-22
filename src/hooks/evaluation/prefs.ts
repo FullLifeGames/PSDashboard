@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { autoTurnSettings, searchBudget, type EvalPreferences, type EvalSettings } from '@fulllifegames/eval-engine';
+import { opponentReadsEnabled } from '../../lib/feature-flags';
 
 const PREFS_KEY = 'ps-replay-interceptor:eval-prefs';
 // Default line engine: 'auto' — the measured-best line per game type from
@@ -20,9 +21,21 @@ function loadPrefs(): EvalPreferences {
       auto: !!parsed.auto,
       autoAnalyze: !!parsed.autoAnalyze,
       tera: parsed.tera === 'on' || parsed.tera === 'off' || parsed.tera === 'revealed' ? parsed.tera : 'auto',
+      // Round 89 (#153): Hard mode restores only from a stored true; off leaves the preferences as they were before it existed.
+      // Ruling 49: with the flag of Opponent reads my move off, a stored true reads as unset (see `storedHardMode`).
+      ...(parsed.hardMode === true && opponentReadsEnabled() ? { hardMode: true } : {}),
     };
   } catch {
     return DEFAULT_PREFS;
+  }
+}
+
+/** The `hardMode` an earlier nightly stored, kept as it was while the flag hides it: a write of the other preferences must not drop it. */
+function storedHardMode(): true | undefined {
+  try {
+    return (JSON.parse(localStorage.getItem(PREFS_KEY) ?? 'null') as { hardMode?: unknown } | null)?.hardMode === true ? true : undefined;
+  } catch {
+    return undefined;
   }
 }
 
@@ -30,7 +43,7 @@ function loadPrefs(): EvalPreferences {
  * The panel preferences with their synchronous ref (evaluate and the sweep
  * are stable callbacks and read the CURRENT prefs through it) and the
  * localStorage persistence. `persistPrefs` returns whether an
- * engine-relevant setting changed — the caller marks a done result stale.
+ * engine-relevant setting changed — the caller marks a done result stale. Hard mode (round 89, #153) is not one of them: no search reads it.
  */
 export function usePrefsState() {
   const [prefs, setPrefsState] = useState<EvalPreferences>(loadPrefs);
@@ -43,7 +56,8 @@ export function usePrefsState() {
     prefsRef.current = next;
     setPrefsState(next);
     try {
-      localStorage.setItem(PREFS_KEY, JSON.stringify(next));
+      const kept = opponentReadsEnabled() ? undefined : storedHardMode();
+      localStorage.setItem(PREFS_KEY, JSON.stringify(kept ? { ...next, hardMode: kept } : next));
     } catch {
       // Storage full/blocked — the prefs still apply for this session.
     }

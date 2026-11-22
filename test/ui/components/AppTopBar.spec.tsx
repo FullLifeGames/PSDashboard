@@ -1,8 +1,9 @@
-import { describe, expect, test, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AppTopBar } from '../../../src/components/AppTopBar';
 import { simState } from '../fixtures/sim-state';
+import { savedRecord } from '../fixtures/saved-game';
 
 type Props = Parameters<typeof AppTopBar>[0];
 
@@ -16,6 +17,8 @@ function props(overrides: Partial<Props> = {}): Props {
     ...overrides,
   };
 }
+
+beforeEach(() => localStorage.clear());
 
 describe('AppTopBar', () => {
   test('with a replay loaded the bar ends with the name, Beta, Report issue and the creator link (round 77)', async () => {
@@ -79,15 +82,58 @@ describe('AppTopBar', () => {
     // Round 84 (turn dock, Q20 a): the loader folds into the top bar when a replay is loaded.
     const loader = { onLoad: vi.fn(), onLoadFile: vi.fn(), onTeamLoad: vi.fn(), loading: false, error: null };
     const { rerender } = render(<AppTopBar {...props()} />);
-    expect(screen.queryByRole('button', { name: 'Load' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Game' })).toBeNull();
     rerender(<AppTopBar {...props({ loader })} />);
-    const load = screen.getByRole('button', { name: 'Load' });
+    const load = screen.getByRole('button', { name: 'Game' });
     const setup = screen.getByRole('button', { name: 'Setup' });
     expect(load.compareDocumentPosition(setup) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(load.closest('.ps-topbar-actions')).toBe(setup.closest('.ps-topbar-actions'));
     await userEvent.click(load);
     await userEvent.type(screen.getByRole('textbox', { name: 'Replay URL or ID' }), '{Enter}');
     expect(loader.onLoad).toHaveBeenCalledTimes(1);
+  });
+
+  test('the Game menu holds three parts: Load replay, New game and the saved games; it closes when New game opens the dialog or a saved game opens; the embedded view has none', async () => {
+    // Round 89 (lane H, #105, user ruling 13.11.2026): the menu is "Game", no third button in the bar, at every width.
+    const onNewGame = vi.fn();
+    const onOpenGame = vi.fn().mockResolvedValue(undefined);
+    const record = await savedRecord();
+    const loader = { onLoad: vi.fn(), onLoadFile: vi.fn(), onTeamLoad: vi.fn(), loading: false, error: null, onNewGame, onOpenGame, currentGameId: null };
+    const { rerender } = render(<AppTopBar {...props({ loader })} />);
+    expect(screen.queryByRole('button', { name: 'New game' })).toBeNull();
+    const game = screen.getByRole('button', { name: 'Game' });
+    expect(screen.queryByRole('button', { name: 'Load' })).toBeNull();
+    await userEvent.click(game);
+    expect(screen.getByText('Load replay')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Replay URL or ID' })).toBeInTheDocument();
+    expect(screen.getByText('Saved games')).toBeInTheDocument();
+    expect(document.querySelectorAll('.ps-newgame-saved-row')).toHaveLength(1);
+    await userEvent.click(screen.getByRole('button', { name: 'Open' }));
+    expect(onOpenGame).toHaveBeenCalledWith(expect.objectContaining({ id: record.id }));
+    await waitFor(() => expect(game).toHaveAttribute('aria-expanded', 'false'));
+    await userEvent.click(game);
+    await userEvent.click(screen.getByRole('button', { name: 'New game' }));
+    expect(onNewGame).toHaveBeenCalledTimes(1);
+    expect(game).toHaveAttribute('aria-expanded', 'false');
+    rerender(<AppTopBar {...props()} />);
+    expect(screen.queryByRole('button', { name: 'Game' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'New game' })).toBeNull();
+  });
+
+  test('a menu with no saved game shows no Saved games part', async () => {
+    const loader = { onLoad: vi.fn(), onLoadFile: vi.fn(), onTeamLoad: vi.fn(), loading: false, error: null, onNewGame: vi.fn(), onOpenGame: vi.fn(), currentGameId: null };
+    render(<AppTopBar {...props({ loader })} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Game' }));
+    expect(screen.getByRole('button', { name: 'New game' })).toBeInTheDocument();
+    expect(screen.queryByText('Saved games')).toBeNull();
+  });
+
+  test('a new game carries a New game tag beside its format in the title row', () => {
+    const { rerender } = render(<AppTopBar {...props()} />);
+    expect(screen.queryByText('New game')).toBeNull();
+    rerender(<AppTopBar {...props({ newGame: true })} />);
+    expect(screen.getByText('New game')).toHaveClass('ps-newgame-tag');
+    expect(screen.getByText('[Gen 9] OU')).toBeInTheDocument();
   });
 
   test('the Smogon states read as loading or unavailable', () => {
@@ -104,10 +150,22 @@ describe('AppTopBar', () => {
     expect(wired.onCancelPreparation).toHaveBeenCalledTimes(1);
   });
 
-  test('a live branch shows its turn and the divergence notice; the animate toggle sits in the Setup menu', async () => {
+  // Round 89 (user ruling 40, FB7a): the status names the live simulator's tip, which is not the turn on the slider after a play-out.
+  test.each(['singles', 'doubles'] as const)('%s: the live branch status reads "Variation tip: Turn N", and a preparing branch keeps its progress words', kind => {
+    const { rerender } = render(<AppTopBar {...props({ showBranch: true, simState: simState(kind, { turnNumber: 33 }) })} />);
+    expect(screen.getByText('Variation tip: Turn 33')).toBeInTheDocument();
+    expect(screen.queryByText(/Branching/)).toBeNull();
+    rerender(<AppTopBar {...props({ showBranch: true, simState: null })} />);
+    expect(screen.getByText('Variation tip: Turn …')).toBeInTheDocument();
+    rerender(<AppTopBar {...props({ showBranch: true, branchPreparing: true, branchProgress: { turn: 3, target: 12 }, simState: simState(kind, { turnNumber: 33 }) })} />);
+    expect(screen.getByText('Preparing branch... (turn 3/12)')).toBeInTheDocument();
+    expect(screen.queryByText(/Variation tip/)).toBeNull();
+  });
+
+  test('a live branch shows its tip turn and the divergence notice; the animate toggle sits in the Setup menu', async () => {
     const wired = props({ showBranch: true, simState: simState('singles', { turnNumber: 7, ended: true, winner: 'Alice' }), branchDivergence: 'The simulated replay diverged' });
     render(<AppTopBar {...wired} />);
-    expect(screen.getByText('Branching · Turn 7')).toBeInTheDocument();
+    expect(screen.getByText('Variation tip: Turn 7')).toBeInTheDocument();
     // The winner shows in the branch panel, where the pickers were (round 77).
     expect(screen.queryByText(/Alice wins/)).toBeNull();
     expect(screen.getByTitle('The simulated replay diverged')).toHaveTextContent('⚠ The simulated replay diverged');

@@ -2,10 +2,12 @@ import { describe, expect, test, beforeAll } from 'vitest';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  broughtSpeciesFor, buildTeamsFromReplay, getBranchSimulatorFormat, getReplayBringCount, parseReplayLog, replayBringOnly, replayRules,
-  speciesBaseId, type ReplayData, type TurnSnapshot,
+  broughtSpeciesFor, buildTeamsFromReplay, getBranchSimulatorFormat, getReplayBringCount, parseReplayLog, replayBringList, replayBringOnly,
+  replayRules, speciesBaseId, type ReplayData, type TurnSnapshot,
 } from '@fulllifegames/replay-core';
-import { createBranchStateFromBattle, loadSimMods, reconstructBranchRuntime, serializeLiveBattle } from '@fulllifegames/eval-engine';
+import {
+  BRING_WORLD_CAP, bringWorlds, createBranchStateFromBattle, loadSimMods, reconstructBranchRuntime, serializeLiveBattle, type BringWorld,
+} from '@fulllifegames/eval-engine';
 import type { BranchSimState, BranchSwitchOption } from '@fulllifegames/eval-engine';
 import { pickerStateFromSerialized, pickerStateFromSnapshot } from '../../src/lib/picker-state';
 import { limitBench, replayBench, type Bench } from '../../src/lib/bench';
@@ -18,8 +20,11 @@ import { dockReplays } from '../e2e/helpers';
  * neither: a pinned four against an open six flipped game 2630452654 in the A.3c gate). Option (a) of the mid-wave gate leaves that
  * rebuild alone and filters what the user sees: the snapshot pickers, the stored positions and the live What-if, per side.
  *
- * The oracle is the log: a side whose fielded count equals the bring count has exactly those bodies; the other side stays whole.
- * The sweep reads every bring-limited game of `.fit-corpus` and `.calibration/replays` (skipped without them), Champions VGC and
+ * Round 89 (#124) moves the short side: the app rebuilds the heaviest world of its unknown bodies (the fielded bodies plus one guess
+ * per missing body from the side's team preview, trimmed to the count) and the bench lists those bodies, so no side stays whole.
+ *
+ * The oracle is the log: a side whose fielded count equals the bring count has exactly those bodies; a short side has its fielded
+ * bodies plus the heaviest world's guess (a body of its team preview the log never fielded). The sweep reads every bring-limited game of `.fit-corpus` and `.calibration/replays` (skipped without them), Champions VGC and
  * Scarlet/Violet VGC in their own rows, and a synthetic Battle Stadium Singles log.
  */
 
@@ -49,6 +54,14 @@ function readGame(source: ReplayData): Game | null {
   const snapshots = parseReplayLog(source.log);
   const rules = replayRules(source);
   return { id: source.id, source, family, snapshots, count, fielded: { p1: broughtSpeciesFor(snapshots, 'p1', rules), p2: broughtSpeciesFor(snapshots, 'p2', rules) } };
+}
+
+/** The app's reading of a game (replay-context.ts): the heaviest world of a short-side game, else the protocol's pinned lists. */
+function appReading(game: Game): { world: BringWorld | undefined; bringOnly: { p1: string[]; p2: string[]; guessed?: BringWorld['guessed'] } | null } {
+  const list = replayBringList(game.source, game.snapshots);
+  const short = !!list && (list.p1.open > 0 || list.p2.open > 0);
+  const world = short ? bringWorlds(list, BRING_WORLD_CAP)?.[0] : undefined;
+  return { world, bringOnly: world ? { p1: world.p1, p2: world.p2, guessed: world.guessed } : replayBringOnly(game.source, game.snapshots) };
 }
 
 const fullSides = (game: Game) => (['p1', 'p2'] as const).filter(side => game.fielded[side].length === game.count);
@@ -83,18 +96,16 @@ const BSS = { id: 'synthetic-bss', formatid: 'gen9battlestadiumsinglesregh', for
 const switchSpecies = (state: BranchSimState, side: 'p1' | 'p2') =>
   (side === 'p1' ? state.p1SwitchesBySlot : state.p2SwitchesBySlot).flat().map(option => option.species);
 
-/** The problems of a bench the user sees: a full side offers only its fielded bodies, a short side offers what it offered before. */
-function benchProblems(game: Game, label: string, shown: BranchSimState, unfiltered: BranchSimState): string[] {
+/** The problems of a bench the user sees: a full side offers only its fielded bodies, a short side those and the world's guess. */
+function benchProblems(game: Game, label: string, shown: BranchSimState, world: BringWorld | undefined): string[] {
   const problems: string[] = [];
   const rules = replayRules(game.source);
   for (const side of ['p1', 'p2'] as const) {
-    if (game.fielded[side].length === game.count) {
-      const allowed = baseIds(game.fielded[side], rules);
-      const stray = switchSpecies(shown, side).filter(species => !allowed.has(speciesBaseId(species, rules)));
-      if (stray.length > 0) problems.push(`${game.id} ${label} ${side}: bench offers ${[...new Set(stray)].join(', ')}`);
-    } else if (JSON.stringify(shown[`${side}SwitchesBySlot`]) !== JSON.stringify(unfiltered[`${side}SwitchesBySlot`])) {
-      problems.push(`${game.id} ${label} ${side}: a short side's bench changed`);
-    }
+    const allowed = baseIds(world ? world[side] : game.fielded[side], rules);
+    // A short side without a world (its preview cannot name the missing bodies) keeps its whole team, as before round 89.
+    if (game.fielded[side].length !== game.count && !world) continue;
+    const stray = switchSpecies(shown, side).filter(species => !allowed.has(speciesBaseId(species, rules)));
+    if (stray.length > 0) problems.push(`${game.id} ${label} ${side}: bench offers ${[...new Set(stray)].join(', ')}`);
   }
   return problems;
 }
@@ -105,31 +116,32 @@ function snapshotPicker(game: Game, snapshot: TurnSnapshot, bench: Bench | null)
 }
 
 function snapshotProblems(game: Game): string[] {
-  const bench = replayBench(game.source, game.snapshots);
+  const { world } = appReading(game);
+  const bench = replayBench(game.source, game.snapshots, world);
   const problems: string[] = [];
   for (let index = 0; index < game.snapshots.length; index += Math.max(1, Math.floor(game.snapshots.length / 4))) {
     const snapshot = game.snapshots[index];
-    problems.push(...benchProblems(game, `snapshot t${snapshot.turn}`, snapshotPicker(game, snapshot, bench), snapshotPicker(game, snapshot, null)));
+    problems.push(...benchProblems(game, `snapshot t${snapshot.turn}`, snapshotPicker(game, snapshot, bench), world));
   }
   return problems;
 }
 
-/** The live What-if and a stored position of the same battle, both through the bench filter. */
+/** The live What-if and a stored position of the same battle, both through the bench filter, on the app's own rebuild. */
 async function battleProblems(game: Game, targetTurn: number): Promise<string[]> {
   await loadSimMods(getBranchSimulatorFormat(game.source));
   const { p1Team, p2Team } = buildTeamsFromReplay(game.source.log);
+  const { world, bringOnly } = appReading(game);
   const runtime = await reconstructBranchRuntime({
     format: getBranchSimulatorFormat(game.source), p1Team, p2Team, replayLog: game.source.log, targetTurn,
     snapshot: game.snapshots[Math.min(targetTurn - 1, game.snapshots.length - 1)] ?? null,
-    // The app's own reading: both sides or neither.
-    bringOnly: replayBringOnly(game.source, game.snapshots) ?? undefined,
+    bringOnly: bringOnly ?? undefined,
   });
   const battle = runtime.battleStream.battle!;
-  const bench = replayBench(game.source, game.snapshots);
+  const bench = replayBench(game.source, game.snapshots, world);
   const live = createBranchStateFromBattle(battle, battle.log ?? [], { p1Choices: [], p2Choices: [] });
-  const problems = benchProblems(game, `live t${targetTurn}`, limitBench(live, bench), live);
+  const problems = benchProblems(game, `live t${targetTurn}`, limitBench(live, bench), world);
   const serialized = serializeLiveBattle(battle);
-  problems.push(...benchProblems(game, `stored t${targetTurn}`, await pickerStateFromSerialized(serialized, bench), await pickerStateFromSerialized(serialized)));
+  problems.push(...benchProblems(game, `stored t${targetTurn}`, await pickerStateFromSerialized(serialized, bench), world));
   return problems;
 }
 
@@ -140,16 +152,23 @@ beforeAll(async () => {
 describe('the scenes of the issue', () => {
   const byId = (id: string) => dockReplays.find(replay => replay.id === id)!;
 
-  test('Champions VGC 2625939941: P1 fielded three bodies, so P2 offers its four and P1 offers all it has', () => {
+  test('Champions VGC 2625939941: P1 fielded three bodies, so it offers them and the guess, and P2 offers its four', () => {
     const replay = byId('gen9championsvgc2026regma-2625939941');
-    const snapshots = parseReplayLog(replay.log);
+    const game = readGame(replay)!;
+    const snapshots = game.snapshots;
     expect(replayBringOnly(replay, snapshots)).toBeNull();
-    const bench = replayBench(replay, snapshots);
-    expect(bench?.lists.p1).toEqual([]);
+    const { world } = appReading(game);
+    expect(world?.guessed).toEqual({ p1: 1, p2: 0 });
+    const bench = replayBench(replay, snapshots, world);
+    expect(bench?.lists.p1).toEqual(world!.p1);
+    expect(bench?.lists.p1.slice(0, 3).sort()).toEqual(['Basculegion', 'Farigiraf', 'Lopunny']);
+    expect(['Ceruledge', 'Kingambit', 'Ninetales-Alola']).toContain(bench?.lists.p1[3]);
     expect([...(bench?.lists.p2 ?? [])].sort()).toEqual(['Aerodactyl', 'Farigiraf', 'Kingambit', 'Sylveon']);
-    const picker = snapshotPicker(readGame(replay)!, snapshots[0], bench);
+    const picker = snapshotPicker(game, snapshots[0], bench);
     expect([...new Set(picker.p2SwitchesBySlot.flat().map(option => option.species))].sort()).toEqual(['Farigiraf', 'Sylveon']);
-    expect(picker.p1SwitchesBySlot.flat().length).toBeGreaterThan(2);
+    // The bench never offers Lopunny's unbrought teammates: the guess and the fielded bodies only.
+    const offered = new Set(picker.p1SwitchesBySlot.flat().map(option => option.species));
+    for (const species of offered) expect(world!.p1, species).toContain(species);
   });
 
   test('a game that pins both sides keeps the lists of replayBringOnly', () => {
@@ -163,11 +182,13 @@ describe('the scenes of the issue', () => {
     expect(replayBench(replay, parseReplayLog(replay.log))).toBeNull();
   });
 
-  test('Battle Stadium Singles: P1 fielded two of three, so only P2 offers its three bodies', async () => {
+  test('Battle Stadium Singles: P1 fielded two of three, so it offers them and the guess, and P2 offers its three', async () => {
     const game = readGame(BSS)!;
     expect(game.fielded.p1).toHaveLength(2);
-    const bench = replayBench(BSS, game.snapshots);
-    expect(bench?.lists.p1).toEqual([]);
+    const { world } = appReading(game);
+    expect(world?.guessed).toEqual({ p1: 1, p2: 0 });
+    const bench = replayBench(BSS, game.snapshots, world);
+    expect(bench?.lists.p1).toEqual(['Garchomp', 'Gholdengo', 'Kingambit']);
     expect([...(bench?.lists.p2 ?? [])].sort()).toEqual(['Corviknight', 'Dragonite', 'Kingambit']);
     expect(snapshotProblems(game)).toEqual([]);
     expect(await battleProblems(game, 1)).toEqual([]);
@@ -188,18 +209,22 @@ describe.skipIf(!HAVE_CORPUS)('every bring-limited game of the corpus', () => {
     expect(games.find(game => game.id.includes('2630452654'))).toBeDefined();
   });
 
-  test('the lists equal replayBringOnly wherever it pins, and name the full side only elsewhere', () => {
+  test('the lists equal replayBringOnly wherever it pins, and name the fielded bodies and the guess elsewhere', () => {
     const problems: string[] = [];
     for (const game of games) {
-      const bench = replayBench(game.source, game.snapshots);
+      const { world } = appReading(game);
+      const bench = replayBench(game.source, game.snapshots, world);
       const pinned = replayBringOnly(game.source, game.snapshots);
       if (pinned) {
         if (JSON.stringify(bench?.lists) !== JSON.stringify(pinned)) problems.push(`${game.id}: pinned lists differ`);
         continue;
       }
+      if (!world) continue;
       for (const side of ['p1', 'p2'] as const) {
-        const want = game.fielded[side].length === game.count ? game.fielded[side] : [];
-        if (JSON.stringify(bench?.lists[side] ?? []) !== JSON.stringify(want)) problems.push(`${game.id} ${side}: list ${JSON.stringify(bench?.lists[side])}`);
+        const want = world[side].slice(0, game.fielded[side].length);
+        if (JSON.stringify(want) !== JSON.stringify(game.fielded[side])) problems.push(`${game.id} ${side}: world ${JSON.stringify(world[side])} lacks the fielded bodies`);
+        if (JSON.stringify(bench?.lists[side]) !== JSON.stringify(world[side])) problems.push(`${game.id} ${side}: list ${JSON.stringify(bench?.lists[side])}`);
+        if (world[side].length !== game.count) problems.push(`${game.id} ${side}: ${world[side].length} bodies of ${game.count}`);
       }
     }
     expect(problems.slice(0, 10)).toEqual([]);

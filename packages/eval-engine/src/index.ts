@@ -34,6 +34,8 @@ export type {
 export { DIE_KINDS, dieKey, tieName } from './dice/types.ts';
 export type { DiceReport, DieKind, DieName, DieReport, DieResult, DieTook, ForcedDie } from './dice/types.ts';
 export { dieLabel } from './dice/die-label.ts';
+export { chainCount, chainResults } from './dice/chain.ts';
+export type { HitResult } from './dice/chain.ts';
 export type { DieWords } from './dice/die-label.ts';
 export { loggedDice, mergeLoggedDice } from './dice/logged-results.ts';
 export type { LoggedOptions } from './dice/logged-results.ts';
@@ -58,6 +60,10 @@ export { ENDGAME_CAPS, endgameScope, solveEndgame } from './endgame/solver.ts';
 export type { EndgameCaps, EndgameFlag, EndgameResult } from './endgame/solver.ts';
 export { PROVER_BUDGET, proveForcedWin } from './endgame/prover.ts';
 export type { ProveRequest, ProverBudget } from './endgame/prover.ts';
+export { WIN_BUDGET, winPaths } from './endgame/win-paths/index.ts';
+export type { WinBudget, WinPaths, WinPathsRequest, WinStep } from './endgame/win-paths/index.ts';
+export { runOnRequestJob } from './on-request.ts';
+export type { OnRequestJob, OnRequestResult, OnRequestStep } from './on-request.ts';
 export { forcedWinFor } from './search/forced-win.ts';
 export { applyForcedWin, forcedWinInput, forcedWinPossible } from './search/forced-win-apply.ts';
 export { ENDGAME_MAX_BODIES, MIN_FORCED_MASS, SPOKEN_MASS } from './types.ts';
@@ -108,6 +114,14 @@ export { rollToCopy } from './biggest-roll.ts';
 export type { BiggestRoll, RollFlip } from './biggest-roll.ts';
 export { rolledCopy } from './branch/rolled-copy.ts';
 export type { RolledCopy, RollSelector } from './branch/rolled-copy.ts';
+// Round 89 (#124): the worlds of a bring-limited game, for the hosts that measure (the bank) and the app's world registry.
+export { BRING_WORLD_CAP, bringWorlds, blendValues, blendWorlds } from './branch/bring-worlds.ts';
+export type { BringWorld } from './branch/bring-worlds.ts';
+// Round 89 (#105): a new game from two teams starts the chosen format in the simulator and reports the simulator's team problems; the interface rules whether Start is allowed.
+export { startGameLog, checkGameTeams, readGameSeed } from './branch/new-game.ts';
+/** The seed a game starts on when the caller names none: the one every reconstruction of the replay path uses (`startBattle`). */
+export { DEFAULT_GAME_SEED } from './branch/game-seed.ts';
+export type { NewGameBody, NewGameStart, StartGameParams, GameTeamProblems, GameSeedRead } from './branch/new-game.ts';
 export type { WinConversion, WinPath } from './win-reason.ts';
 export type { DeniedEnd } from './denied-end.ts';
 export { detectRolls, diceEventTurns } from './dice-events.ts';
@@ -119,7 +133,8 @@ export { selectProbeCombos, patchSerializedItem } from './sensitivity.ts';
 export type { SensitivityTarget } from './sensitivity.ts';
 export { serializeLiveBattle } from './serialize.ts';
 export type { StreakHistoryEntry, StreakOdds } from './streaks.ts';
-export { summarizeTurn, formatRead } from './summary.ts';
+export { summarizeTurn, quietVoice, formatRead } from './summary.ts';
+export type { QuietVoice } from './prose/quiet.ts';
 export { formatLine } from './prose/line.ts';
 export { regretText, rollText } from './prose/phrases.ts';
 export { heldDecided } from './turn-analysis/decided-held.ts';
@@ -127,6 +142,8 @@ export { forcedWinSpeaks } from './turn-analysis/forced-speech.ts';
 export { noteSpokenClaim, releaseBrokenClaims } from './turn-analysis/decided-signals.ts';
 export { chanceRolled } from './turn-analysis/luck.ts';
 export { lostGround, shownAttribution } from './turn-analysis/risk.ts';
+export { worstAnswer } from './turn-analysis/worst-answer.ts';
+export type { WorstAnswer } from './turn-analysis/worst-answer.ts';
 export { resolveTeraPreference, teraKey } from './tera.ts';
 export type { TeraPreference } from './tera.ts';
 export { AUTO_MCTS_FAINTED_FRACTION } from './types.ts';
@@ -136,6 +153,7 @@ export type {
   ForcedWin, ForcedWinCaveat, ForcedWinOpen, ForcedWinInput, ForcedWinOutcome, ForcedWinProof,
   ReadRecommendation, SearchProgress, EvalChoiceOption, EvalChoicesInfo, EvalCellJob, EvalCellValue,
   EvalSubSearchJob, MctsTreeStats, EvalWorkerRequest, EvalWorkerResponse,
+  EvalLine, LineChoice, LineDie, LineRequest, LinesInput, LineStep, RowLines, TreeLineStep,
 } from './types.ts';
 export type { StaticRuleset } from './score/weights.ts';
 export { winProbability, winPercent, winPctText, winDeltaText } from './winprob.ts';

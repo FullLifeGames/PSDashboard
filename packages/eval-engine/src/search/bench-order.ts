@@ -189,7 +189,3 @@ export function executorToGiven(order: BenchOrder, executor: SearchExecutor): Se
     prove: input => executor.prove(inputToCanonical(order, input)),
   };
 }
-
-/** The prover's root order in the canonical board's slots, for a string entry point. */
-export const rootOrderToCanonical = (order: BenchOrder, side: SideId, rootOrder: string[]): string[] =>
-  rootOrder.map(choice => choiceToCanonical(order, side, choice));

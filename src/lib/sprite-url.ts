@@ -27,3 +27,14 @@ export function spriteUrl(species: string, rules: GameRules): string {
 
   return `https://play.pokemonshowdown.com/sprites/gen5/${id}.png`;
 }
+
+/**
+ * Round 89 (FB-1): the sprite of the base species for a forme whose own file the folder lacks (Dragalge-Mega has none), read from the
+ * Dex's `baseSpecies`; null for a base species, an unknown name or a base whose file name is the forme's own.
+ */
+export function baseSpriteUrl(species: string, rules: GameRules): string | null {
+  const known = dexOf(rules).species.get(species.replace(/-*$/, ''));
+  if (!known.exists || known.baseSpecies === known.name) return null;
+  const url = spriteUrl(known.baseSpecies, rules);
+  return url === spriteUrl(species, rules) ? null : url;
+}

@@ -31,6 +31,8 @@ describe('the label of a forced die', () => {
     expect(label({ name: name('crit'), result: { happens: false } })).toBe('Move tackle: no crit');
     expect(label({ name: name('secondary', { effectId: 'flinch' }), result: { happens: false } })).toBe('Move tackle: no Effect flinch');
     expect(label({ name: name('hit-count', { targetSlot: undefined }), result: { hits: 4 } })).toBe('Move tackle: 4 hits');
+    // the count of a multi-accuracy move (round 89, #114) can be one
+    expect(label({ name: name('hit-count'), result: { hits: 1 } })).toBe('Move tackle: 1 hit');
     expect(label({ name: name('damage-roll'), result: { step: 0 } })).toBe('Move tackle: damage roll 1');
     expect(label({ name: { slot: 'p1a', moveId: '', targetSlot: 'p2a', kind: 'speed-tie' }, result: { first: 'p2a' } })).toBe('Speed tie: Body p2a first');
   });
@@ -42,6 +44,28 @@ describe('the label of a forced die', () => {
     expect(label({ name: { ...holder, targetSlot: 'p1a', kind: 'ability-proc', effectId: 'effectspore:option' }, result: { option: 'slp' } })).toBe('Effect effectspore: slp');
     expect(label({ name: { ...holder, kind: 'move-first', effectId: 'quickclaw' }, result: { happens: true } })).toBe('Effect quickclaw: acts first');
     expect(label({ name: { slot: 'p1a', moveId: 'tackle', kind: 'status-check', effectId: 'par' }, result: { happens: false } })).toBe('Move tackle: Effect par stops it');
+  });
+
+  test('the accuracy die of a later hit names its hit, the first hit keeps the plain label', () => {
+    expect(label({ name: name('accuracy', { hit: 2 }), result: { happens: false } })).toBe('Move tackle hit 2: misses');
+    expect(label({ name: name('accuracy', { hit: 3 }), result: { happens: true } })).toBe('Move tackle hit 3: hits');
+    expect(label({ name: name('accuracy'), result: { happens: false } })).toBe('Move tackle: misses');
+    expect(dieLabel({ name: name('accuracy', { hit: 4 }), result: { happens: false } })).toBe('tackle hit 4: misses');
+  });
+
+  test('the die of a random target and the die of a drag name the body the answer picks (round 89, #137)', () => {
+    expect(label({ name: { slot: 'p1a', moveId: 'thrash', kind: 'random-target' }, result: { option: 'p2b' } })).toBe('Move thrash: aims at Body p2b');
+    expect(label({ name: { slot: 'p2a', moveId: '', kind: 'drag' }, result: { option: 'Chansey' } })).toBe('Body p2a: dragged out for Chansey');
+  });
+
+  // Round 89 (G13b, tester, third pass): "no Burn" beside "no crit". A reader that names a plain form writes a status as a common noun.
+  test('a reader with a plain form writes a status or a volatile as a common noun inside the result', () => {
+    const words: DieWords = { ...WORDS, effect: id => `Effect ${id}`, plain: id => (id === 'brn' ? 'burn' : `Effect ${id}`) };
+    expect(dieLabel({ name: name('secondary', { effectId: 'brn' }), result: { happens: false } }, words)).toBe('Move tackle: no burn');
+    expect(dieLabel({ name: name('secondary', { effectId: 'brn' }), result: { happens: true } }, words)).toBe('Move tackle: burn');
+    expect(dieLabel({ name: { slot: 'p1a', moveId: 'tackle', kind: 'status-check', effectId: 'brn' }, result: { happens: false } }, words)).toBe('Move tackle: burn stops it');
+    // a reader without the form keeps the effect's own words
+    expect(dieLabel({ name: name('secondary', { effectId: 'brn' }), result: { happens: false } }, WORDS)).toBe('Move tackle: no Effect brn');
   });
 
   test('without a reader the ids stand in for the names', () => {

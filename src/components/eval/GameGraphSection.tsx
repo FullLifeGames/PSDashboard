@@ -1,18 +1,24 @@
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import {
   autoTurnSettings, heldDecided,
   type EvalPreferences, type EvalResult, type RankedChoice, type ReadRecommendation, type TurnAnalysis, type GameReport, type LeadAnalysis,
 } from '@fulllifegames/eval-engine';
 import type { EvalGraphState } from '../../hooks/useEvaluation';
 import { EvalGameReport } from '../EvalGameReport';
+import { GameReviewPanel } from './GameReviewPanel';
+import { reviewMarks } from './game-review';
 import { EvalGraph } from '../EvalGraph';
+import { REVIEW_COLORS } from '../../lib/eval-graph-view';
+import { gameReviewEnabled } from '../../lib/feature-flags';
 import { EvalLeadAnalysis, EvalTurnAnalysis } from '../EvalTurnAnalysis';
 import { EvalReplacementAnalysis } from './EvalReplacementAnalysis';
+import type { LinesHost } from '../../lib/line-view';
 import type { VariationSeries } from '../../lib/eval-graph-view';
 
 type SelectTurn = ((turn: number, line?: 'main' | 'variation') => void) | undefined;
 
-function GraphHeader({ onAnalyzeGame, graph, onCancel, running, smogonPending, hasGraph }: {
+function GraphHeader({ onAnalyzeGame, graph, onCancel, running, smogonPending, hasGraph, title }: {
+  title: string;
   onAnalyzeGame?: () => void;
   graph: EvalGraphState;
   onCancel: () => void;
@@ -22,7 +28,7 @@ function GraphHeader({ onAnalyzeGame, graph, onCancel, running, smogonPending, h
 }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 10, color: '#aabbcc' }}>
-      <span style={{ fontWeight: 'bold', fontSize: 11, color: '#cde' }}>Game graph</span>
+      <span style={{ fontWeight: 'bold', fontSize: 11, color: '#cde' }} title={title}>Game graph</span>
       {onAnalyzeGame && (graph.running ? (
         <>
           <span style={{ color: '#fd6' }}>
@@ -58,20 +64,17 @@ function GraphHeader({ onAnalyzeGame, graph, onCancel, running, smogonPending, h
   );
 }
 
-function LineHint({ prefs, doubles }: { prefs: EvalPreferences; doubles?: boolean }) {
-  // Round 61: auto reads the search budget. Round 63 (T110): per game type; by default doubles run the tree on every
-  // turn, singles the matrix until a quarter of all bodies fell. Round 67 (T109): no deeper stage per turn.
+/**
+ * Round 89 (FB-1): what Analyze game does, with the configured mode. It was a line of text under the heading; it is the
+ * heading's title now. Round 61: auto reads the search budget. Round 63 (T110): per game type; by default doubles run the
+ * tree on every turn, singles the matrix until a quarter of all bodies fell. Round 67 (T109): no deeper stage per turn.
+ */
+function graphTitle(prefs: EvalPreferences, doubles?: boolean): string {
   const autoTreeEverywhere = autoTurnSettings(0, !!doubles).mode === 'mcts';
-  return (
-    <div
-      style={{ fontSize: 10, color: '#778', marginTop: 2 }}
-      title="Analyze game makes a quick depth-1 pass over every turn, then re-evaluates each turn with the settings above, starting with the swings worth reporting. Tera applies to every turn."
-    >
-      graph: a quick pass over every turn, then {prefs.mode === 'mcts' ? 'MCTS'
-        : prefs.mode === 'auto' ? (autoTreeEverywhere ? 'auto (MCTS every turn)' : 'auto (matrix early, MCTS late)')
-        : `depth ${prefs.depth}`} on each
-    </div>
-  );
+  const mode = prefs.mode === 'mcts' ? 'MCTS'
+    : prefs.mode === 'auto' ? (autoTreeEverywhere ? 'auto (MCTS every turn)' : 'auto (matrix early, MCTS late)')
+    : `depth ${prefs.depth}`;
+  return `Analyze game makes a quick depth-1 pass over every turn, then re-evaluates each turn with ${mode}, starting with the swings worth reporting. Tera applies to every turn.`;
 }
 
 /** The replacement note of the card's turn: the points of the knockout block before it, when the sweep priced any. */
@@ -84,6 +87,8 @@ function ReplacementNote({ analysis, graph, playerNames }: { analysis: TurnAnaly
 interface TurnViewProps {
   report?: GameReport | null;
   onBackToReport: () => void;
+  /** Round 89 (#104, G4d): with a variation open the report is out of reach; this goes back to the main line, where it stands (the Line selector's "Main line"). Absent: nothing to return to. */
+  onBackToMain?: () => void;
   result: EvalResult | null;
   currentTurn: number;
   graph: EvalGraphState;
@@ -94,10 +99,24 @@ interface TurnViewProps {
   analysis: TurnAnalysis | null;
   playerNames: [string, string];
   reads?: { p1?: ReadRecommendation | null; p2?: ReadRecommendation | null } | null;
-  onPickChoice?: (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice | null) => void;
+  onPickChoice?: (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice | null, from?: EvalResult | null) => void;
+  /** Round 89 (B7a): a cell of the card's matrix dialog plays its pair out (the panel's handler, the overview's). */
+  onPickPair?: (p1: { choice: string; label: string }, p2: { choice: string; label: string }) => void;
+  /** Round 89 (#104): what the Lines section under the turn's rows needs of its host (absent: no section). */
+  linesHost?: LinesHost;
+  /** Doubles replay: auto routes per game type, and the Lines section writes one row per player (EvalPanel passes its own prop through). */
+  doubles?: boolean;
+  /** Round 89 (#105): the open tip of a new game (nobody has played it yet), else null or absent. */
+  openTurn?: number | null;
+  /** Round 89 (#153, HM-2): the Setup setting "Opponent reads my move" is on: the card's engine-move buttons say so in their titles. */
+  opponentReads?: boolean;
 }
 
-function TurnView({ report, onBackToReport, result, currentTurn, graph, analyzeTurn, hasAnalyzeTurn, leadAnalysis, analysis, playerNames, reads, onPickChoice }: TurnViewProps) {
+/** The way back from a variation names the Game review only while that section exists (ruling 49). */
+const backToMainTitle = (): string =>
+  `The game report${gameReviewEnabled() ? ' and the Game review show' : ' shows'} on the main line. Same as Main line in the Line selector`;
+
+function TurnView({ report, onBackToReport, onBackToMain, result, currentTurn, graph, analyzeTurn, hasAnalyzeTurn, leadAnalysis, analysis, playerNames, reads, onPickChoice, onPickPair, linesHost, doubles, openTurn, opponentReads }: TurnViewProps) {
   return (
     <>
       {report && (
@@ -109,6 +128,17 @@ function TurnView({ report, onBackToReport, result, currentTurn, graph, analyzeT
           title="Back to the game report's cards"
         >
           ← Game report
+        </button>
+      )}
+      {!report && onBackToMain && (
+        <button
+          type="button"
+          className="ps-btn"
+          style={{ padding: '1px 6px', fontSize: 10, marginTop: 4 }}
+          onClick={onBackToMain}
+          title={backToMainTitle()}
+        >
+          Back to the main line
         </button>
       )}
       {/* The sweep's recorded reason this turn is a hole — without
@@ -126,7 +156,13 @@ function TurnView({ report, onBackToReport, result, currentTurn, graph, analyzeT
       {leadAnalysis && <EvalLeadAnalysis leads={leadAnalysis} playerNames={playerNames} />}
       {/* Round 79 (T290): the replacement after a knockout sits above the card of the turn that follows it. */}
       {!leadAnalysis && analysis && <ReplacementNote analysis={analysis} graph={graph} playerNames={playerNames} />}
-      {!leadAnalysis && analysis && <EvalTurnAnalysis analysis={analysis} playerNames={playerNames} reads={reads} onExplore={onPickChoice} />}
+      {!leadAnalysis && analysis && (
+        <EvalTurnAnalysis
+          analysis={analysis} playerNames={playerNames} reads={reads} onExplore={onPickChoice} onPickPair={onPickPair}
+          result={graph.results[analysis.turn - 1] ?? null} linesHost={linesHost} doubles={doubles}
+          open={analysis.turn === openTurn} opponentReads={opponentReads}
+        />
+      )}
     </>
   );
 }
@@ -144,25 +180,93 @@ export interface GameGraphSectionProps extends TurnViewProps {
   variation?: VariationSeries | null;
   graphMaxTurn?: number;
   showReportView: boolean;
+  /** Round 89 (#104): the report's analysis of every turn: the Game review lists the graded ones, the graph marks them. */
+  reviewAnalyses?: (TurnAnalysis | null)[] | null;
   /** The card's fainted share per swept turn (any engine mode); the sweep's own record exists in auto only. */
   faintedShares?: (number | null)[];
-  /** Doubles replay — auto routes per game type (EvalPanel passes its own prop through). */
-  doubles?: boolean;
 }
 
 /** The card's share per turn where the caller has it, else the sweep's own record (auto only). */
 const graphShares = ({ faintedShares, graph }: GameGraphSectionProps) => faintedShares ?? graph.faintedFractions;
 
+/**
+ * Round 89 (FT-1): what the marks on the graph mean. A circle marks a graded turn (an inaccuracy, a mistake or a blunder, GLOSSARY.md)
+ * of player 1, a square one of player 2, in the player's colour; the Game review lists the same turns. Only the sides that carry a mark
+ * are named.
+ */
+function GraphMarksLegend({ marks, playerNames }: { marks: ReturnType<typeof reviewMarks>; playerNames: [string, string] }) {
+  const sides = (['p1', 'p2'] as const).filter(side => marks.some(mark => mark.side === side));
+  if (sides.length === 0) return null;
+  return (
+    <div data-testid="graph-marks-legend" style={{ fontSize: 10, color: '#778', marginTop: 2 }}>
+      {sides.map((side, index) => (
+        <span key={side}>
+          {index > 0 ? ' · ' : ''}
+          <span aria-hidden style={{ color: REVIEW_COLORS[side] }}>{side === 'p1' ? '○' : '□'}</span> {playerNames[side === 'p1' ? 0 : 1]}
+        </span>
+      ))}
+      : graded turns (an inaccuracy, a mistake or a blunder), listed in the Game review
+    </div>
+  );
+}
+
+/** The game graph with the Game review's marks on it (round 89). */
+function GraphView(props: GameGraphSectionProps) {
+  const { graph, playerNames, currentTurn, currentLine, selectTurn, reportLeads, variation, graphMaxTurn, reviewAnalyses } = props;
+  const marks = useMemo(() => (gameReviewEnabled() ? reviewMarks(reviewAnalyses) : []), [reviewAnalyses]);
+  return (
+    <>
+      <EvalGraph
+        scores={graph.scores}
+        playerNames={playerNames}
+        currentTurn={currentTurn}
+        currentLine={currentLine}
+        onSelectTurn={selectTurn}
+        leadScore={graph.lead?.result.score ?? null}
+        leadDetail={reportLeads ?? null}
+        evalErrors={graph.evalErrors}
+        faintedFractions={graphShares(props)}
+        decided={graph.results.map(result => (result ? heldDecided(result) ?? null : null))}
+        variation={variation}
+        maxTurn={graphMaxTurn}
+        reviewMarks={marks}
+      />
+      <GraphMarksLegend marks={marks} playerNames={playerNames} />
+    </>
+  );
+}
+
+/** The report overview: the cards, then the Game review of the graded turns (round 89, #104). */
+function ReportOverview({ report, ...props }: GameGraphSectionProps & { report: GameReport }) {
+  const { graph, playerNames, selectTurn, reportLeads, reviewAnalyses, linesHost, doubles } = props;
+  return (
+    <>
+      <EvalGameReport
+        report={report}
+        playerNames={playerNames}
+        onSelectTurn={selectTurn}
+        leads={reportLeads}
+        settingsFor={turn => (turn >= 1 ? graph.settings[turn - 1] ?? null : null)}
+      />
+      {gameReviewEnabled() && reviewAnalyses && linesHost && (
+        <GameReviewPanel
+          analyses={reviewAnalyses} results={graph.results} playerNames={playerNames} doubles={!!doubles}
+          host={linesHost} onSelectTurn={selectTurn}
+        />
+      )}
+    </>
+  );
+}
+
 /** The game graph with its controls, the report overview, or the selected turn's view. */
 export function GameGraphSection(props: GameGraphSectionProps) {
   const {
-    onAnalyzeGame, onCancel, running, smogonPending, hasGraph, prefs, graph, playerNames, currentTurn, currentLine,
-    selectTurn, reportLeads, variation, graphMaxTurn, showReportView, report, analysis, doubles,
+    onAnalyzeGame, onCancel, running, smogonPending, hasGraph, prefs, graph,
+    variation, showReportView, report, analysis, doubles,
   } = props;
   return (
     <div style={{ margin: '6px 0' }}>
-      <GraphHeader onAnalyzeGame={onAnalyzeGame} graph={graph} onCancel={onCancel} running={running} smogonPending={smogonPending} hasGraph={hasGraph} />
-      <LineHint prefs={prefs} doubles={doubles} />
+      <GraphHeader onAnalyzeGame={onAnalyzeGame} graph={graph} onCancel={onCancel} running={running} smogonPending={smogonPending} hasGraph={hasGraph} title={graphTitle(prefs, doubles)} />
       {/* A short or missing line says why — an unexplained blank graph
           reads as a broken app rather than a diverged reconstruction. */}
       {graph.notice && (
@@ -170,22 +274,7 @@ export function GameGraphSection(props: GameGraphSectionProps) {
           ⚠ {graph.notice}
         </div>
       )}
-      {(hasGraph || variation) && (
-        <EvalGraph
-          scores={graph.scores}
-          playerNames={playerNames}
-          currentTurn={currentTurn}
-          currentLine={currentLine}
-          onSelectTurn={selectTurn}
-          leadScore={graph.lead?.result.score ?? null}
-          leadDetail={reportLeads ?? null}
-          evalErrors={graph.evalErrors}
-          faintedFractions={graphShares(props)}
-          decided={graph.results.map(result => (result ? heldDecided(result) ?? null : null))}
-          variation={variation}
-          maxTurn={graphMaxTurn}
-        />
-      )}
+      {(hasGraph || variation) && <GraphView {...props} />}
       {!hasGraph && variation && (
         <div style={{ fontSize: 10, color: '#778', marginTop: 2 }}>
           Gold = your variation. The main line has no curve yet; Analyze game fills it for comparison.
@@ -196,16 +285,8 @@ export function GameGraphSection(props: GameGraphSectionProps) {
           Click a point for that turn's analysis; its movement lights up on the line.
         </div>
       )}
-      {showReportView && report && (
-        <EvalGameReport
-          report={report}
-          playerNames={playerNames}
-          onSelectTurn={selectTurn}
-          leads={reportLeads}
-          settingsFor={turn => (turn >= 1 ? graph.settings[turn - 1] ?? null : null)}
-        />
-      )}
-      {!showReportView && <TurnView {...props} />}
+      {showReportView && report && <ReportOverview {...props} report={report} />}
+      {!showReportView && <TurnView {...props} opponentReads={!!prefs.hardMode} />}
     </div>
   );
 }

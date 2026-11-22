@@ -1,8 +1,12 @@
+---
+Status: superseded by ADR 0023 (round 89, #57): the tree machinery it kept is deleted
+---
+
 # Chance is priced by outcome classes at the cells, and chance nodes in the search tree stay built and switched off
 
 Five fixed seeds can all hit at a true 43 % kill range, and a cell then reads as a certain kill: game 649664 turn 23 charged a 0.82-regret mistake to the winning Hydro Pump for that reason. Seed frequency is not probability. The engine handles chance in two ways. At the root cells it prices a boundary event (an accuracy or kill-roll cell) as a mixture of outcome classes, with the odds from `@smogon/calc` and the consequences of each class from the simulator (round 6, 16.08.2026, singles; fixed probe seeds fill empty classes). Doubles root cells (round 56, gate 23.09.2026) use a recording die that writes every hit and damage roll, turn each draw into a class and aim the next draw at the heaviest missing alternative; they cost 3.46x to 3.72x against a 4x gate, and a self-check falls back to plain seeds. In the tree, round 43 (12.09.2026) built chance nodes for the first two plies: a damage-roll or accuracy cell became a node with one child per outcome class, each class forced through the simulator's dice. The tree part lost on every measure that counts: the bank read +12 bp late (hq +15, luck-adjusted +11), the doubles tree cost 44 to 70 % more time, and the play-out pin flipped. A node that prices a side class sends the descents there in proportion to its odds, and late in the game depth is what finds the winning line. The user took the fallback at the gate (12.09.2026): `CHANCE_NODES = false` in `search/expansion.ts` keeps today's flat tree, whose root cells the cell sampler prices, while the outcome-class children (`classChildren` in `search/outcome-children.ts`) stay in service for the endgame solver and the forced-win prover (`endgame/children.ts`). The tree machinery and its tests (`eval-mcts-chance.spec.ts`) stay in the repository behind the switch, because a second attempt needs a new spec (main class deep, side classes static or one step) and not a rebuild.
 
-Forced switches after a knock-out are decision nodes in the tree (round 42, user gate); the matrix, the verify sampler, the play-out and the prover resolve them greedily. The flag `FORCED_SWITCH_NODES` still reads `true`.
+Forced switches after a knock-out are decision nodes in the tree (round 42, user gate); the matrix, the verify sampler, the play-out and the prover resolve them greedily. The flag `FORCED_SWITCH_NODES` read `true` until round 89 deleted it (ADR 0023): the tree always stops at a forced switch.
 
 ## Considered options
 

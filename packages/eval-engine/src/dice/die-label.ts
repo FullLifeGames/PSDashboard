@@ -12,6 +12,11 @@ export interface DieWords {
   move(id: string): string;
   /** A status, a volatile, an ability or an item by its id (a secondary's `boosts:spd` and `self:atk` pass through as given). */
   effect(id: string): string;
+  /**
+   * The same effect as a common noun inside a result ("no burn", like "no crit"): a status or a volatile in lower case, a stat change
+   * and the names of abilities and items as `effect` writes them. Absent: `effect`.
+   */
+  plain?(id: string): string;
   slot(slot: string): string;
 }
 
@@ -27,18 +32,20 @@ const idOf = (name: DieName): string => (name.effectId ?? '').split(':option')[0
 function subjectOf(name: DieName, words: DieWords): string {
   if (name.kind === 'speed-tie') return 'Speed tie';
   if (EFFECT_SUBJECT.has(name.kind) && name.effectId) return words.effect(idOf(name));
-  return name.moveId ? words.move(name.moveId) : words.slot(name.slot);
+  // the accuracy die of a later hit of a multi-hit move names its hit (round 89, #114); the first hit's die keeps the plain subject
+  return name.moveId ? `${words.move(name.moveId)}${name.hit ? ` hit ${name.hit}` : ''}` : words.slot(name.slot);
 }
 
 /** The two words of a chance, by what the die decides: yes and no. */
 function chanceText(name: DieName, words: DieWords): [string, string] {
   const effect = words.effect(idOf(name));
+  const noun = (words.plain ?? words.effect)(idOf(name));
   switch (name.kind) {
     case 'accuracy': return ['hits', 'misses'];
     case 'crit': return ['crit', 'no crit'];
-    case 'secondary': return [effect, `no ${effect}`];
+    case 'secondary': return [noun, `no ${noun}`];
     case 'self-effect': return ['stat change', 'no stat change'];
-    case 'status-check': return [`${effect} lets it move`, `${effect} stops it`];
+    case 'status-check': return [`${noun} lets it move`, `${noun} stops it`];
     case 'stalling': return ['succeeds again', 'fails'];
     case 'power': return [`${effect} boost`, `no ${effect} boost`];
     case 'move-first': return ['acts first', 'does not act first'];
@@ -47,8 +54,10 @@ function chanceText(name: DieName, words: DieWords): [string, string] {
 }
 
 function resultText(name: DieName, result: DieResult, words: DieWords): string {
-  if ('hits' in result) return `${result.hits} hits`;
+  if ('hits' in result) return result.hits === 1 ? '1 hit' : `${result.hits} hits`;
   if ('step' in result) return `damage roll ${result.step + 1}`;
+  if (name.kind === 'random-target' && 'option' in result) return `aims at ${words.slot(result.option)}`;
+  if (name.kind === 'drag' && 'option' in result) return `dragged out for ${result.option}`;
   if ('option' in result) return result.option;
   if ('first' in result) return `${words.slot(result.first)} first`;
   return chanceText(name, words)[result.happens ? 0 : 1];

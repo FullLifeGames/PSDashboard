@@ -41,6 +41,32 @@ export interface PlayedAction {
   pivotTarget?: string;
 }
 
+/** One move action of a turn's log: the body's slot ('p1a') and the move's name as the line writes it. */
+export interface LoggedMove { slot: string; move: string }
+
+/**
+ * Round 89 (#108): a body that fell before it acted, with what the order bound reads (`branch/action-bound.ts`): the move actions the log
+ * shows before the fall (other bodies), whether a line before it can have moved a speed (then only a priority bracket proves an order), and
+ * the turn's `|-activate|` lines (the dice of Quick Claw, Custap Berry, Quick Draw and the like). Plain data, so it travels with a cache entry.
+ */
+export interface FellMark {
+  before: LoggedMove[];
+  speedMoved: boolean;
+  activations: string[];
+}
+
+/**
+ * Round 89 (#108): what the order rules rule out for a body that fell before it acted: the move ids it cannot have chosen, and whether a
+ * chosen switch is out too. Plain data (the grading reads it, the cache carries it).
+ */
+export interface SlotBound {
+  moves: string[];
+  switchOut: boolean;
+}
+
+/** The bound per side and slot, as the parse's `fell` marks it (null: no bound for the slot). */
+export interface PlayedBounds { p1?: (SlotBound | null)[]; p2?: (SlotBound | null)[] }
+
 export interface PlayedTurn {
   p1: PlayedAction | null;
   p2: PlayedAction | null;
@@ -53,6 +79,11 @@ export interface PlayedTurn {
    * choose — the report should say what swallowed it, not "could not act".
    */
   prevented?: { p1?: string; p2?: string };
+  /**
+   * Round 89 (#108): per side and slot, the mark of a body that fell before it acted (null: the slot did not). Singles carry one slot.
+   * Absent when no body fell before acting.
+   */
+  fell?: { p1?: (FellMark | null)[]; p2?: (FellMark | null)[] };
 }
 
 const sideOf = (pokemonRef: string): SideId | null => {
@@ -68,6 +99,52 @@ const slotOf = (pokemonRef: string): { side: SideId; slot: number } | null => {
 };
 
 const nickname = (pokemonRef: string): string => pokemonRef.replace(/^p[12][a-c]: /, '');
+
+/**
+ * The move actions in a stretch of a turn's lines: a `|move|` line is an action unless a `[from]` tag says another effect ran it (a Dancer
+ * copy, a Magic Bounce reflection, Sleep Talk's inner move); a locked move still is one.
+ */
+export function loggedMoves(lines: readonly string[]): LoggedMove[] {
+  const out: LoggedMove[] = [];
+  for (const line of lines) {
+    const parts = line.split('|');
+    const mover = /^p[12][a-d](?=:)/.exec(parts[2] ?? '');
+    if (parts[1] !== 'move' || !mover) continue;
+    if (parts.slice(5).some(tag => tag.startsWith('[from]') && !tag.startsWith('[from]lockedmove'))) continue;
+    out.push({ slot: mover[0], move: parts[3] ?? '' });
+  }
+  return out;
+}
+
+/** Tags that can move an action speed in the middle of a turn: field and side conditions, weather, status, an ability, an item, a forme, a Mega Evolution. */
+const SPEED_MOVING = new Set([
+  '-sidestart', '-sideend', '-fieldstart', '-fieldend', '-weather', '-curestatus', '-item', '-enditem', '-ability', '-endability',
+  '-formechange', '-detailschange', '-transform', '-mega', '-burst', '-swapboost', '-copyboost', '-clearboost', '-clearallboost',
+  '-clearnegativeboost', '-clearpositiveboost', '-invertboost',
+]);
+
+/** Whether a protocol line can move an action speed: a Speed stage, a paralysis, or one of the tags above. */
+const movesSpeed = (parts: string[]): boolean =>
+  SPEED_MOVING.has(parts[1] ?? '') ||
+  ((parts[1] === '-boost' || parts[1] === '-unboost' || parts[1] === '-setboost') && parts[3] === 'spe') ||
+  (parts[1] === '-status' && parts[3] === 'par');
+
+/** What the scans track up to a fall: the move actions so far and whether a line moved a speed. */
+interface FellTrack { moves: LoggedMove[]; speedMoved: boolean }
+
+function trackLine(track: FellTrack, line: string, parts: string[]): void {
+  track.moves.push(...loggedMoves([line]));
+  if (movesSpeed(parts)) track.speedMoved = true;
+}
+
+/** The mark of the body at `ref` ('p1a: Name'): the moves of the other slots so far. */
+const fellMark = (track: FellTrack, ref: string, activations: string[]): FellMark => ({
+  before: track.moves.filter(action => action.slot !== ref.slice(0, 3)),
+  speedMoved: track.speedMoved,
+  activations: [...activations],
+});
+
+const activationLines = (lines: string[]): string[] => lines.filter(line => line.startsWith('|-activate|'));
 
 /** The singles scan: per side the settled action, the gimmick flags, and why a choice never surfaced. */
 interface PlayedScan {
@@ -163,15 +240,26 @@ export function parsePlayedActions(lines: string[], rules: GameRules): PlayedTur
     prevented: {},
   };
 
-  for (const line of normalizeLines(lines)) {
+  const turn = normalizeLines(lines);
+  const activations = activationLines(turn);
+  const track: FellTrack = { moves: [], speedMoved: false };
+  const fell: NonNullable<PlayedTurn['fell']> = {};
+  for (const line of turn) {
     const parts = line.split('|');
     const tag = parts[1];
     if (!tag) continue;
     const side = sideOf(parts[2] ?? '');
+    if (side && tag === 'faint' && !scan.settled[side] && scan.actions[side] === null && scan.prevented[side] === undefined) {
+      fell[side] = [fellMark(track, parts[2] ?? '', activations)];
+    }
+    trackLine(track, line, parts);
     if (side) notePlayedLine(scan, tag, side, parts);
   }
 
-  return { ...scan.actions, ...(scan.prevented.p1 || scan.prevented.p2 ? { prevented: scan.prevented } : {}) };
+  return {
+    ...scan.actions, ...(scan.prevented.p1 || scan.prevented.p2 ? { prevented: scan.prevented } : {}),
+    ...(fell.p1 || fell.p2 ? { fell } : {}),
+  };
 }
 
 /**
@@ -264,16 +352,27 @@ export function parsePlayedActionsDoubles(lines: string[]): PlayedTurn {
     ultra: { p1: [false, false], p2: [false, false] },
   };
 
-  for (const line of normalizeLines(lines)) {
+  const turn = normalizeLines(lines);
+  const activations = activationLines(turn);
+  const track: FellTrack = { moves: [], speedMoved: false };
+  const fell: Record<SideId, (FellMark | null)[]> = { p1: [null, null], p2: [null, null] };
+  for (const line of turn) {
     const parts = line.split('|');
     const tag = parts[1];
     if (!tag) continue;
     const ref = slotOf(parts[2] ?? '');
-    if (!ref || ref.slot > 1) continue;
-    noteDoublesLine(scan, tag, ref, parts);
+    if (ref && ref.slot <= 1 && tag === 'faint' && !scan.settled[ref.side][ref.slot]) {
+      fell[ref.side][ref.slot] = fellMark(track, parts[2] ?? '', activations);
+    }
+    trackLine(track, line, parts);
+    if (ref && ref.slot <= 1) noteDoublesLine(scan, tag, ref, parts);
   }
 
-  return { p1: null, p2: null, p1Slots: scan.slots.p1, p2Slots: scan.slots.p2 };
+  const marked = (['p1', 'p2'] as const).filter(side => fell[side].some(mark => mark !== null));
+  return {
+    p1: null, p2: null, p1Slots: scan.slots.p1, p2Slots: scan.slots.p2,
+    ...(marked.length > 0 ? { fell: Object.fromEntries(marked.map(side => [side, fell[side]])) as NonNullable<PlayedTurn['fell']> } : {}),
+  };
 }
 
 /**

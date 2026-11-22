@@ -29,11 +29,17 @@ export async function prepareBranchInputs(
   };
 }
 
-/** The honest divergence notice after a branch arrival (or null). */
+/**
+ * The honest divergence notice after a branch arrival (or null). An ended battle is a divergence only when the rebuild itself ended
+ * it: with turns of a variation replayed on top (`replayedTurns`), the variation carried the game to its end, which is no fault of
+ * the guessed sets (round 89, FT-1: VGC 2630685175 t7, the engine line wins).
+ */
 export function divergenceNoticeFor(
   battle: { ended?: boolean; winner?: string | null; turn: number } | null | undefined,
   startTurn: number,
+  replayedTurns = 0,
 ): string | null {
+  if (battle?.ended && replayedTurns > 0) return null;
   if (battle?.ended) {
     return 'The simulated replay diverged from the real game and already ended' +
       `${battle.winner ? ` (${battle.winner} won the simulated line)` : ''}: ` +

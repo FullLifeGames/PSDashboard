@@ -2,6 +2,7 @@ import type { Battle, Pokemon } from '@pkmn/sim';
 import type { BranchSlotChoice } from '../branch-choices.ts';
 import { strengthMix } from '../calc/fickle.ts';
 import { copyOf } from '../sim-ask/copy.ts';
+import { fixedCountOffers } from './fixed-count.ts';
 import { reachableOptions } from './learn.ts';
 import { naturalTurn } from './play.ts';
 import { RecordingPRNG } from './prng.ts';
@@ -28,6 +29,12 @@ export interface DieOffer {
   results: DieResult[];
   /** The chance of a die that is one chance (a secondary entry, a chance of power). */
   chance?: number;
+  /**
+   * Round 89 (#114, ruling 34 F4a): the name, from the Dex, of the ability or item that fixes the hit count of a variable multi-hit move
+   * (Skill Link, Loaded Dice). Such an offer is no draw: it is a `hit-count` die with the one count the simulator plays, shown as a row
+   * without a choice, and never forced.
+   */
+  fixedBy?: string;
 }
 
 /** The targets a move reaches that a foe can be among (`move.target` of the Dex): the others (the user, a side, the field, an ally) draw no accuracy or crit against a foe. */
@@ -111,10 +118,25 @@ function stallCondition(user: Pokemon, battle: Battle): string | undefined {
 
 const fixedDamage = (move: ActiveMove): boolean => !!move.damage || !!move.ohko || !!move.damageCallback;
 
+/**
+ * Round 89 (#114): the accuracy die of a later hit of a move whose every hit rolls its own accuracy (the Dex's `multiaccuracy` with a
+ * fixed `multihit`, read after `ModifyMove`: Skill Link and Loaded Dice have cleared the flag by then and the simulator draws one die
+ * only). The die of hit N is named as `recognize.ts` names the draw (`hit` N, 2 and up), so a forced hit die finds its draw.
+ */
+function laterHitsOf(move: ActiveMove): number[] {
+  const { multiaccuracy, multihit } = move as ActiveMove & { multiaccuracy?: boolean };
+  return multiaccuracy && typeof multihit === 'number' ? Array.from({ length: Math.max(0, Math.floor(multihit) - 1) }, (_, index) => index + 2) : [];
+}
+
 function accuracyOffers(battle: Battle, move: ActiveMove, base: Base, targets: string[]): DieOffer[] {
   // Gen 2 draws no accuracy for a move of 100 percent (accuracy 255), whatever the answer
   const draws = typeof move.accuracy === 'number' && !move.alwaysHit && !(battle.gen === 2 && move.accuracy >= 100);
-  return draws ? targets.map(targetSlot => ({ name: { ...base, targetSlot, kind: 'accuracy' }, results: YES_NO })) : [];
+  if (!draws) return [];
+  const later = laterHitsOf(move);
+  return targets.flatMap((targetSlot): DieOffer[] => [
+    { name: { ...base, targetSlot, kind: 'accuracy' }, results: YES_NO },
+    ...later.map((hit): DieOffer => ({ name: { ...base, targetSlot, kind: 'accuracy', hit }, results: YES_NO })),
+  ]);
 }
 
 function damageOffers(battle: Battle, move: ActiveMove, base: Base, targets: string[]): DieOffer[] {
@@ -264,6 +286,7 @@ export function offeredDice(battle: Battle, slot: string, choice: BranchSlotChoi
   if (move.flags.futuremove || chargesThisTurn(battle, slot, choice, move)) return checks;
   const targets = FOE_REACHING.has(move.target) ? targetsOf(user, move, choice) : [];
   const offers = targets.length > 0 ? moveOffers(copy, user, move, targets) : [];
+  if (targets.length > 0) offers.push(...fixedCountOffers(battle, copy, user, move, { slot, moveId: move.id }, targets));
   offers.push(...procOffers(copy, user, move, targets));
   offers.push(...checks);
   return [...offers, ...userOffers(copy, user, move)];

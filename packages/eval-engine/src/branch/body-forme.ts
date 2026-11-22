@@ -23,9 +23,31 @@ export function formeFamily(dex: FormeDex, species: string | undefined): Readonl
     const entry = dex.species.get(raw);
     if (!entry.exists) continue;
     family.add(entry.id);
-    for (const origin of [entry.battleOnly].flat()) if (origin) queue.push(origin);
+    for (const origin of [entry.battleOnly].flat()) {
+      if (!origin) continue;
+      queue.push(origin);
+      const shownAs = originShownAsBase(dex, entry, dex.species.get(origin));
+      if (shownAs) queue.push(shownAs);
+    }
   }
   return family;
+}
+
+/**
+ * Round 89 (#118): a forme an ability makes in battle (Greninja-Ash by Battle Bond) from an origin that carries that ability and differs
+ * from its base species in nothing but the ability list (Greninja-Bond: the base species' stats and types, Battle Bond alone). The simulator
+ * shows such an origin to the log by its base species ("Greninja"), so the body on the bench holds the base species while the log asks for
+ * the forme, and the base species stands for the origin. A forme that needs an item or a move, an origin with other stats or types
+ * (Darmanitan-Galar-Zen, Ogerpon-Wellspring-Tera, Urshifu-Rapid-Strike-Gmax, Necrozma-Ultra) or with the base species' abilities
+ * (Mimikyu-Totem) is another body than the base species and does not tie.
+ */
+function originShownAsBase(dex: FormeDex, forme: ReturnType<FormeDex['species']['get']>, origin: ReturnType<FormeDex['species']['get']>): string | undefined {
+  if (!origin.exists || origin.baseSpecies === origin.name || !forme.requiredAbility) return undefined;
+  if (!Object.values(origin.abilities).includes(forme.requiredAbility)) return undefined;
+  const base = dex.species.get(origin.baseSpecies);
+  if (!base.exists || JSON.stringify(base.abilities) === JSON.stringify(origin.abilities)) return undefined;
+  const same = JSON.stringify(base.baseStats) === JSON.stringify(origin.baseStats) && base.types.join() === origin.types.join();
+  return same ? base.name : undefined;
 }
 
 /** Whether two species names (or ids) are one body: equal ids, or families that meet. */

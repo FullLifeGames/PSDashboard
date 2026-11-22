@@ -5,7 +5,8 @@ import { PROBE_SEEDS } from '../cell-blend.ts';
 import type { CellBlendClass } from '../types.ts';
 import { leafValue, SEARCH_SEEDS } from '../search/leaf.ts';
 import type { CellSample } from '../search/cell-sampler.ts';
-import { drawPlain, firstDraw, outcomeGroups, stateGroups, VERIFY_PLAIN_SEEDS, VERIFY_STATE_RULE, type StateGroup } from '../search/verify-cell.ts';
+import { drawPlain, firstDraw, outcomeGroups, stateGroups, VERIFY_STATE_RULE, type StateGroup } from '../search/verify-cell.ts';
+import { cellSeeds } from '../search/root-quantile.ts';
 import { drawPair, type PairDraw } from './draw.ts';
 import { parsePairChoice, planTimeFallback } from './guards.ts';
 import { memoKillTable, type KillTable } from './kill-table.ts';
@@ -50,6 +51,8 @@ interface Found {
 interface Candidate { id: string; prior: number; branch: Branch; prefix: PairEvent[]; flipKey: string; outcome: PairOutcome; tokens?: string[] }
 interface Cell {
   root: SimPosition; p1Choice: string; p2Choice: string; samples: number; matchupCache: MatchupCache; tableFor: TableFor; entriesFor: EntriesFor; plainDraws?: number;
+  /** Round 89 (#60, T324): the cell's own seed list, slot s where slot s of the fixed lists stood (the matrix's first draw is slot 0). */
+  seeds: readonly PRNGSeed[];
 }
 
 const memos = new WeakMap<SimPosition, Map<string, KillTable | null>>();
@@ -92,7 +95,7 @@ export function entriesOf(battle: Battle): EntriesFor {
  */
 function fallbackCell(cell: Cell, first: PairDraw | null, reason: string, spent: number): PairCell {
   if (cell.plainDraws) {
-    const draws = VERIFY_PLAIN_SEEDS.slice(0, cell.plainDraws).map((seed, index) =>
+    const draws = cell.seeds.slice(0, cell.plainDraws).map((seed, index) =>
       (index === 0 && first ? first : drawPlain(cell.root, cell.p1Choice, cell.p2Choice, seed, cell.matchupCache)));
     const value = draws.reduce((sum, draw) => sum + draw.leaf, 0) / draws.length;
     const sample: CellSample = { value, ended: draws[0].ended, firstChild: draws[0].child, outcomes: outcomeGroups(draws) };
@@ -101,7 +104,7 @@ function fallbackCell(cell: Cell, first: PairDraw | null, reason: string, spent:
   const leaves: number[] = [];
   let firstChild = first?.child;
   let ended = first?.ended ?? false;
-  FALLBACK_SEEDS.forEach((seed, index) => {
+  cell.seeds.slice(0, FALLBACK_SEEDS.length).forEach((seed, index) => {
     if (index === 0 && first) {
       leaves.push(first.leaf);
       return;
@@ -192,7 +195,7 @@ const coverage = (found: Map<string, Found>) => [...found.values()].reduce((sum,
  * states of the classes whose draws differ.
  */
 function poolStates(cell: Cell, found: Map<string, Found>, natural: number): Map<string, StateGroup[]> {
-  for (const seed of VERIFY_PLAIN_SEEDS.slice(natural, VERIFY_STATE_RULE.doubles.pool)) {
+  for (const seed of cell.seeds.slice(natural, VERIFY_STATE_RULE.doubles.pool)) {
     const draw = drawn(cell, seed, NO_SCRIPTS);
     const pattern = read(cell, draw);
     if (pattern.kind === 'pattern') found.get(pattern.key)?.draws.push(draw);
@@ -222,15 +225,15 @@ function blended(found: Map<string, Found>, first: PairDraw, cover: number, clas
 function plan(cell: Cell, first: PairDraw, firstPattern: Pattern): PairCell {
   const found = new Map<string, Found>();
   const candidates = new Map<string, Candidate>();
-  record(found, candidates, firstPattern, first, { seed: SEARCH_SEEDS[0], scripts: NO_SCRIPTS, from: -1 }, true);
+  record(found, candidates, firstPattern, first, { seed: cell.seeds[0], scripts: NO_SCRIPTS, from: -1 }, true);
   let draws = 1;
   const base = Math.max(1, Math.min(cell.samples, SEARCH_SEEDS.length));
   for (let s = 1; s < base; s++) {
-    const draw = drawn(cell, SEARCH_SEEDS[s], NO_SCRIPTS);
+    const draw = drawn(cell, cell.seeds[s], NO_SCRIPTS);
     draws += 1;
     const pattern = read(cell, draw);
     if (pattern.kind === 'fallback') return fallbackCell(cell, first, pattern.reason, draws);
-    record(found, candidates, pattern, draw, { seed: SEARCH_SEEDS[s], scripts: NO_SCRIPTS, from: -1 }, false);
+    record(found, candidates, pattern, draw, { seed: cell.seeds[s], scripts: NO_SCRIPTS, from: -1 }, false);
   }
   const tried = new Set<string>();
   while (draws < PAIR_DRAW_BUDGET && coverage(found) < COVER_TARGET) {
@@ -246,7 +249,7 @@ function plan(cell: Cell, first: PairDraw, firstPattern: Pattern): PairCell {
   }
   const cover = coverage(found);
   if (cover < COVER_MIN || cover > COVER_MAX) return fallbackCell(cell, first, cover < COVER_MIN ? 'low-cover' : 'over-cover', draws);
-  // Natural draws so far: the base seeds, the first of VERIFY_PLAIN_SEEDS.
+  // Natural draws so far: the base seeds, the first of the cell's list.
   const states = cell.plainDraws ? poolStates(cell, found, base) : undefined;
   return { kind: 'sample', sample: blended(found, first, cover, states), via: 'plan', reason: null, draws };
 }
@@ -258,10 +261,10 @@ export function pairCellSample(
   const p1 = parsePairChoice(battle, 0, p1Choice);
   const p2 = parsePairChoice(battle, 1, p2Choice);
   if (!p1 || !p2) return { kind: 'skip' };
-  const cell: Cell = { root, p1Choice, p2Choice, samples, matchupCache, tableFor: tablesFor(root), entriesFor: entriesOf(battle), ...(plainDraws ? { plainDraws } : {}) };
+  const cell: Cell = { root, p1Choice, p2Choice, samples, matchupCache, tableFor: tablesFor(root), entriesFor: entriesOf(battle), seeds: cellSeeds(root, p1Choice, p2Choice), ...(plainDraws ? { plainDraws } : {}) };
   const early = planTimeFallback(battle, [p1, p2]);
   if (early) return fallbackCell(cell, null, early, 0);
-  const first = drawn(cell, SEARCH_SEEDS[0], NO_SCRIPTS);
+  const first = drawn(cell, cell.seeds[0], NO_SCRIPTS);
   const pattern = read(cell, first);
   if (pattern.kind === 'fallback') return fallbackCell(cell, first, pattern.reason, 1);
   if (pattern.events.length === 0) return { kind: 'plain', first: { child: first.child, leaf: first.leaf, ended: first.ended, log: first.log } };

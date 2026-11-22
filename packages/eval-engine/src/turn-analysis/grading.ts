@@ -38,13 +38,13 @@ function matchPlayedForSide(
   let playedPartial = false;
   let neverActed = false;
   if (playedSlots) {
-    const match = matchPlayedSlots(params.result.perSide[key], playedSlots);
+    const match = matchPlayedSlots(params.result.perSide[key], playedSlots, params.result.playedBounds?.[key]);
     played = match.played;
     playedPartial = match.partial;
   } else if (params.played) {
     played = matchPlayedChoice(params.result, key, playedRaw);
     if (!played) {
-      const phantom = phantomStayIn(params.result, key, params.played, rulesOfActives(params.actives));
+      const phantom = phantomStayIn(params.result, key, params.played, rulesOfActives(params.actives), params.result.playedBounds?.[key]?.[0]);
       if (phantom) {
         played = phantom;
         neverActed = true;

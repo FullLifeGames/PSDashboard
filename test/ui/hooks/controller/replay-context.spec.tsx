@@ -6,6 +6,7 @@ import type { ReplayData } from '@fulllifegames/replay-core';
 import { doublesReplay, singlesReplay } from '../../fixtures/replay';
 import { stubReplayFetch } from '../../fixtures/network';
 import { realReplayWorkerClient } from '../../fixtures/worker';
+import { startedRecord } from '../../fixtures/new-game';
 
 // The context runs its real hooks; the replay worker is the real job handler
 // on this thread, and the network serves the fixture replays only.
@@ -24,7 +25,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-/** Round 88 (T314, #55): Champions VGC 2625939941, where P1 fielded three bodies: no pinned lists, but P2's four are known. */
+/** Round 88 (T314, #55): Champions VGC 2625939941, where P1 fielded three bodies and P2's four are known. */
 const championsOpenGame = () => JSON.parse(readFileSync('test/e2e/fixtures/dock-championsvgc-2625939941.json', 'utf-8')) as ReplayData;
 
 describe('useReplayContext', () => {
@@ -40,10 +41,33 @@ describe('useReplayContext', () => {
     expect(ctx.shared.sharedBranch).toBeNull();
     expect(ctx.refreshQueue.pendingBranchRefresh).toBeNull();
     expect(ctx.knowledge.effectiveP1Info).toBeNull();
-    expect(ctx.meta).toEqual({ replayGen: 9, bringCount: null, bringOnlyLists: null, bench: null, replayGameType: null, evalIsDoubles: false });
+    expect(ctx.meta).toEqual({ replayGen: 9, bringCount: null, bringOnlyLists: null, bringWorlds: null, bench: null, replayGameType: null, evalIsDoubles: false });
     expect(ctx.animateBranchTurns).toBe(true);
     expect(ctx.branchWindowOpenRef.current).toBe(false);
     expect(ctx.positions.getExact(1)).toBeNull();
+  });
+
+  // Round 89 (#105, stage H4): the Load menu offers both a replay and a new game, in either order.
+  test('a game opens as the context\'s game; a replay loaded after it is a replay again: no record, its own link, its own positions', async () => {
+    const { result } = renderHook(() => useReplayContext());
+    const record = await startedRecord('gen9ou');
+    await act(async () => { await result.current.newGame.openRecord(record); });
+    await waitFor(() => expect(result.current.replay.replayData?.id).toBe(record.id));
+    expect(result.current.newGame.record?.id).toBe(record.id);
+    expect(result.current.replay.loadedReplayUrl).toBeNull();
+
+    const replay = singlesReplay();
+    await act(async () => { await result.current.replay.loadReplay(replay.id); });
+    expect(result.current.replay.replayData?.id).toBe(replay.id);
+    expect(result.current.newGame.record).toBeNull();
+    expect(result.current.replay.loadedReplayUrl).toBe(`https://replay.pokemonshowdown.com/${replay.id}`);
+    expect(result.current.positions.exactKeyFor(2)).toBe(`${replay.id}:2:${result.current.knowledge.setsFingerprint}`);
+
+    // a game opened once more after the replay works the same way (a failed load leaves the game as it was)
+    await act(async () => { await result.current.newGame.openRecord(record); });
+    await waitFor(() => expect(result.current.replay.replayData?.id).toBe(record.id));
+    await act(async () => { await result.current.replay.loadReplay('no-such-replay-at-all'); });
+    expect(result.current.newGame.record?.id).toBe(record.id);
   });
 
   test('a loaded replay fills the meta, the team knowledge, and the sources; the Smogon data settles as absent', async () => {
@@ -66,13 +90,15 @@ describe('useReplayContext', () => {
     await waitFor(() => expect(result.current.smogon.setAssumptions.loading).toBe(false));
   });
 
-  test('an open bring-limited game keeps its rebuild whole and hands the bench of the full side to the branch', async () => {
+  // Round 89 (#124): a short side is no longer left whole: the rebuild plays the heaviest world (the worlds are in replay-context-worlds.spec.tsx).
+  test('an open bring-limited game rebuilds its heaviest world and hands the bench of both sides to the branch', async () => {
     await loadSimMods('gen9championsvgc2026regma');
     const replay = championsOpenGame();
     const { result } = renderHook(() => useReplayContext());
     await act(async () => { await result.current.replay.loadReplay(replay.id); });
-    expect(result.current.meta.bringOnlyLists).toBeNull();
-    expect(result.current.meta.bench?.lists.p1).toEqual([]);
+    expect(result.current.meta.bringOnlyLists?.p1).toHaveLength(4);
+    expect(result.current.meta.bringOnlyLists?.guessed).toEqual({ p1: 1, p2: 0 });
+    expect(result.current.meta.bench?.lists.p1).toEqual(result.current.meta.bringOnlyLists?.p1);
     expect([...(result.current.meta.bench?.lists.p2 ?? [])].sort()).toEqual(['Aerodactyl', 'Farigiraf', 'Kingambit', 'Sylveon']);
   });
 

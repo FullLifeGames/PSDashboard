@@ -9,6 +9,7 @@ import type { TriggerWatch } from './trigger-evidence.ts';
 import type { ScreenWatch } from './screen-evidence.ts';
 import type { FieldWatch } from './field-evidence.ts';
 import type { HitWalk } from './hits.ts';
+import type { BlockedWatch } from './blocked-effects.ts';
 import { arg, type LogLine } from './log-line.ts';
 
 /** The scan state one team inference carries from line to line. */
@@ -43,7 +44,6 @@ export interface InferrerState {
   // the SAME action the counterpart line may still credit the giver's
   // original; from a later action the ident only gives away acquired items.
   swappedIdents: Map<string, object | null>;
-  gravityActive: boolean;
   /** The replay's generation (|gen| line): the dex that decides who may hold an ability (round 60, T104). */
   gen: number;
   /** The replay's mod, read from its tier line ('champions' for a Pokémon Champions format; round 75, T160): the Dex of the game is `rulesDex(gen, mod)`. */
@@ -60,6 +60,8 @@ export interface InferrerState {
   fieldWatch?: FieldWatch;
   /** The client walk that collects each opponent attacker's clean hits (round 67, T130); hits.ts creates it. */
   hitWalk?: HitWalk;
+  /** The abilities a landed effect rules out (round 89, #110); blocked-effects.ts creates it. */
+  blockedWatch?: BlockedWatch;
 }
 
 export function createInferrerState(lines: readonly LogLine[], opponentSide: 'p1' | 'p2'): InferrerState {
@@ -77,7 +79,6 @@ export function createInferrerState(lines: readonly LogLine[], opponentSide: 'p1
     plainMovesSince: new Map<string, Set<string>>(),
     nicknameSpecies: new Map<string, string>(),
     swappedIdents: new Map<string, object | null>(),
-    gravityActive: false,
   };
 }
 

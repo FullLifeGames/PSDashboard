@@ -7,6 +7,10 @@ export interface PlayOutProgress {
   atTurn: number | null;
   /** The run uses the depth-1 matrix on every turn (the fast option). */
   fast?: boolean;
+  /** Stop was pressed with a turn in flight (round 89, #119): the run ends when that turn landed. */
+  stopping?: boolean;
+  /** Round 89 (#105): the run plays a new game; its line is the main line, not a gold variation. */
+  game?: boolean;
 }
 
 function PlayOutProgressLine({ playOutProgress }: { playOutProgress: PlayOutProgress }) {
@@ -14,24 +18,56 @@ function PlayOutProgressLine({ playOutProgress }: { playOutProgress: PlayOutProg
     <div className="ps-playout-progress" role="status">
       <span className="ps-spinner" aria-hidden="true" />
       <span>
-        Engine is playing both sides from turn {playOutProgress.startTurn}.{' '}
+        {playOutProgress.stopping
+          ? 'Stopping: the engine finishes the turn in flight, then the play-out ends.'
+          : `Engine is playing both sides from turn ${playOutProgress.startTurn}.`}{' '}
         {playOutProgress.turns} turn{playOutProgress.turns === 1 ? '' : 's'} played
         {playOutProgress.atTurn !== null && playOutProgress.atTurn > playOutProgress.startTurn
           ? `, now at turn ${playOutProgress.atTurn}` : ''}.
-        The gold line below grows as it plays.
-        {playOutProgress.fast ? ' Fast mode: every turn is a depth-1 matrix search.' : ''}
+        {playOutProgress.stopping ? '' : playOutProgress.game ? ' The line below grows as it plays.' : ' The gold line below grows as it plays.'}
+        {playOutProgress.fast && !playOutProgress.stopping ? ' Fast mode: every turn is a depth-1 matrix search.' : ''}
       </span>
     </div>
   );
 }
 
 /** The run state under the header: play-out, reconstruction, search progress, error, staleness. */
-export function EvalStatus({ playOutProgress, status, reconstructProgress, progress, error }: {
+/**
+ * The line under a stale result. Round 89 (SB-7): a search the user stopped says what it left: the first level of a search is the
+ * quick estimate (a forced replacement's arrival values, a normal turn's depth-1 matrix), a later partial is the result so far.
+ * Any other stale result stands for a position that changed.
+ */
+function StaleLine({ stoppedAt }: { stoppedAt: number | null }) {
+  return (
+    <div role={stoppedAt === null ? undefined : 'status'} style={{ fontSize: 11, color: '#b6a46a', marginBottom: 4 }}>
+      {stoppedAt === null
+        ? 'Position changed; re-evaluate.'
+        : `Search stopped. Showing ${stoppedAt <= 1 ? 'the quick estimate' : 'the result so far'}.`}
+    </div>
+  );
+}
+
+/** The note of a stale result, or of a stop that kept nothing (round 89, SB-9: the search stopped before its first result). */
+function StopNote({ status, stoppedAt, stoppedEmpty }: { status: EvalStatusKind; stoppedAt: number | null; stoppedEmpty: boolean }) {
+  if (status === 'stale') return <StaleLine stoppedAt={stoppedAt} />;
+  if (status !== 'idle' || !stoppedEmpty) return null;
+  return (
+    <div role="status" style={{ fontSize: 11, color: '#b6a46a', marginBottom: 4 }}>
+      Search stopped before a first result.
+    </div>
+  );
+}
+
+export function EvalStatus({ playOutProgress, status, reconstructProgress, progress, error, stoppedAt = null, stoppedEmpty = false }: {
   playOutProgress?: PlayOutProgress | null;
   status: EvalStatusKind;
   reconstructProgress: { turn: number; target: number } | null;
   progress: SearchProgress | null;
   error: string | null;
+  /** Round 89 (SB-7): the depth of the partial result a user stop kept; null when the stale result is no stopped run. */
+  stoppedAt?: number | null;
+  /** Round 89 (SB-9): the user stopped the search before any partial result; nothing was kept. */
+  stoppedEmpty?: boolean;
 }) {
   return (
     <>
@@ -56,11 +92,7 @@ export function EvalStatus({ playOutProgress, status, reconstructProgress, progr
           Evaluation failed: {error}
         </div>
       )}
-      {!playOutProgress && status === 'stale' && (
-        <div style={{ fontSize: 11, color: '#b6a46a', marginBottom: 4 }}>
-          Position changed; re-evaluate.
-        </div>
-      )}
+      {!playOutProgress && <StopNote status={status} stoppedAt={stoppedAt} stoppedEmpty={stoppedEmpty} />}
     </>
   );
 }

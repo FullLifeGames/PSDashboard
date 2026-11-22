@@ -41,8 +41,6 @@ export interface DiceOffers {
   logged: ForcedDie[];
 }
 
-export const NO_OFFERS: DiceOffers = { bySlot: {}, turn: [], logged: [] };
-
 const slotName = (side: 'p1' | 'p2', index: number): string => `${side}${String.fromCharCode(97 + index)}`;
 
 function slotOffers(engine: Engine, ask: DiceAsk): Record<string, DieOffer[]> {

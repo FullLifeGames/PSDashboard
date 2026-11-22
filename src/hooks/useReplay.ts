@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { fetchReplay } from '../lib/replay-fetcher';
 import { parseExportedReplay } from '../lib/replay-file';
 import { loadReplayMods } from '../lib/replay-mods';
+import { useGameReplay } from './useGameReplay';
 import type {
   DamageObservation, HiddenPowerEvidence, ItemDamageJudge, ReplayData, SpeedOrderObservation, TurnSnapshot, OpponentTeamInfo,
 } from '@fulllifegames/replay-core';
@@ -24,6 +25,8 @@ export interface ReplayState {
    * reads the infos' logged hits with it, so both arrive in one render.
    */
   itemJudge: ItemDamageJudge | null;
+  /** Round 89 (#105): the replay came by link or id, so the address can name it (`?replay=`); a file or a game has no such address. */
+  byLink: boolean;
 }
 
 /** Load outcome for callers that need to react (embed host responses). */
@@ -44,9 +47,10 @@ export function useReplay() {
     p1Info: null,
     opponentInfo: null,
     itemJudge: null,
+    byLink: false,
   });
 
-  const runLoad = useCallback(async (task: () => Promise<ReplayData>): Promise<LoadReplayResult> => {
+  const runLoad = useCallback(async (task: () => Promise<ReplayData>, given?: { p1: OpponentTeamInfo; p2: OpponentTeamInfo }, byLink = false): Promise<LoadReplayResult> => {
     setState(prev => ({ ...prev, loading: true, error: null }));
     try {
       const data = await task();
@@ -57,8 +61,8 @@ export function useReplay() {
         import('../lib/lazy/opponent-inferrer'),
       ]);
       const { snapshots, observations, speedOrders, hpEvidence } = parseReplayLogWithObservations(data.log);
-      const p1Info = inferOpponentTeam(data.log, 'p1');
-      const opponentInfo = inferOpponentTeam(data.log, 'p2');
+      const p1Info = given ? given.p1 : inferOpponentTeam(data.log, 'p1');
+      const opponentInfo = given ? given.p2 : inferOpponentTeam(data.log, 'p2');
 
       setState({
         loading: false,
@@ -71,6 +75,7 @@ export function useReplay() {
         p1Info,
         opponentInfo,
         itemJudge: judgeItemsByDamage,
+        byLink,
       });
       return { data, error: null };
     } catch (err) {
@@ -80,8 +85,10 @@ export function useReplay() {
     }
   }, []);
 
+  const { openGame, extendGame } = useGameReplay(runLoad, setState);
+
   const loadReplay = useCallback(
-    (urlOrId: string) => runLoad(() => fetchReplay(urlOrId)),
+    (urlOrId: string) => runLoad(() => fetchReplay(urlOrId), undefined, true),
     [runLoad],
   );
 
@@ -90,5 +97,5 @@ export function useReplay() {
     [runLoad],
   );
 
-  return { ...state, loadReplay, loadReplayFile };
+  return { ...state, loadReplay, loadReplayFile, openGame, extendGame };
 }

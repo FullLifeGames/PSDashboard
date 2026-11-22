@@ -50,7 +50,7 @@ async function loadReplay(page: Page, replay: ReplayData) {
     ? route.fulfill({ status: 200, contentType: 'application/json', body: STATS })
     : route.fulfill({ status: 404, contentType: 'application/json', body: '{}' })));
   await page.locator('input[type="text"]').first().fill(replay.id);
-  await page.locator('button', { hasText: 'Load' }).click();
+  await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
   await expect(page.getByText(replay.players[0], { exact: true }).first()).toBeVisible({ timeout: 15_000 });
 }
 

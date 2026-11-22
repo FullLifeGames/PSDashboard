@@ -1,4 +1,6 @@
 import { test, expect, describe } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { Battle } from '@pkmn/sim';
 import {
   formatEnforcesSleepClause,
   replayRuleset,
@@ -154,6 +156,53 @@ describe('replay format inference', () => {
     expect(formatEnforcesSleepClause('gen9ou')).toBe(false);
     expect(formatEnforcesSleepClause('gen9customgame')).toBe(false);
     expect(formatEnforcesSleepClause('gen9customgame@@@Sleep Clause Mod')).toBe(true);
+  });
+
+  // Round 89 (FB-1): a draft game that declares "Terastal Clause" ran as a Custom Game that offered Tera (forum replay
+  // gen9natdexdraft-2713067801: "Tera (Psychic)" in the tray, Execute Turn terastallized). The clause rides the branch format like
+  // Sleep Clause, in singles and in doubles; the simulator is the oracle for what the format then offers.
+  describe('Terastal Clause from the log (round 89, FB-1)', () => {
+    const rules = '|rule|Sleep Clause Mod: Limit one foe put to sleep\n|rule|Terastal Clause: You cannot Terastallize';
+    const mon = {
+      name: 'Garchomp', species: 'Garchomp', item: '', ability: 'Rough Skin', moves: ['Earthquake'], nature: 'Hardy', gender: '', level: 50,
+      evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, teraType: 'Steel',
+    };
+    const offersTera = (formatid: string) => {
+      const battle = new Battle({ formatid: formatid as never, seed: '1,2,3,4', p1: { name: 'A', team: [mon] }, p2: { name: 'B', team: [mon] } });
+      return battle.sides[0].pokemon[0].canTerastallize !== null;
+    };
+
+    test('singles draft: the Custom Game carries both clauses, and the simulator offers no Tera', () => {
+      const withClause = getBranchSimulatorFormat({ id: 'gen9natdexdraft-1', log: `|gametype|singles\n|gen|9\n${rules}` });
+      expect(withClause).toBe('gen9customgame@@@Sleep Clause Mod,Terastal Clause');
+      expect(offersTera(withClause)).toBe(false);
+      // Without the line the same game keeps Tera (the control), and the clause alone rides without Sleep Clause.
+      const without = getBranchSimulatorFormat({ id: 'gen9natdexdraft-2', log: '|gametype|singles\n|gen|9\n|rule|Sleep Clause Mod: Limit one foe put to sleep' });
+      expect(without).toBe('gen9customgame@@@Sleep Clause Mod');
+      expect(offersTera(without)).toBe(true);
+      expect(getBranchSimulatorFormat({ id: 'gen9natdexdraft-3', log: '|gametype|singles\n|gen|9\n|rule|Terastal Clause: You cannot Terastallize' }))
+        .toBe('gen9customgame@@@Terastal Clause');
+    });
+
+    test('the forum replay itself (gen9natdexdraft-2713067801) declares the clause and reads as a Custom Game with both', () => {
+      const replay = JSON.parse(readFileSync(new URL('./fixtures/gen9natdexdraft-2713067801.json', import.meta.url), 'utf8')) as { id: string; log: string };
+      expect(getBranchSimulatorFormat(replay)).toBe('gen9customgame@@@Sleep Clause Mod,Terastal Clause');
+    });
+
+    test('doubles draft: Doubles OU carries the clause, and the simulator offers no Tera', () => {
+      const withClause = getBranchSimulatorFormat({ id: 'gen9natdexdraft-4', log: `|gametype|doubles\n|gen|9\n${rules}` });
+      expect(withClause).toBe('gen9doublesou@@@Terastal Clause');
+      expect(offersTera(withClause)).toBe(false);
+      const without = getBranchSimulatorFormat({ id: 'gen9natdexdraft-5', log: '|gametype|doubles\n|gen|9\n|rule|Sleep Clause Mod: Limit one foe put to sleep' });
+      expect(without).toBe('gen9doublesou');
+      expect(offersTera(without)).toBe(true);
+    });
+
+    test('a real singles format and a CRLF log keep their own reading', () => {
+      expect(getBranchSimulatorFormat({ id: 'gen9ou-1', log: `|gametype|singles\n|gen|9\n|tier|[Gen 9] OU\n${rules}` })).toBe('gen9ou');
+      expect(getBranchSimulatorFormat({ id: 'gen9natdexdraft-6', log: `|gametype|singles\r\n|gen|9\r\n${rules.replace(/\n/g, '\r\n')}` }))
+        .toBe('gen9customgame@@@Sleep Clause Mod,Terastal Clause');
+    });
   });
 
   // Round 65: the static weighs a replay by the tables of its rule set, named

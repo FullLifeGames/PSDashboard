@@ -16,6 +16,8 @@ interface Poll {
   running: boolean;
   done: number;
   total: number;
+  /** The early-lines stage (`__psEarlyLines`); absent on a page that mounts none. */
+  stage?: { active: boolean; done: number; total: number } | null;
 }
 
 /** A page whose evaluate never settles: the dead renderer. */
@@ -79,6 +81,48 @@ describe('waitForSweepEnd on a dead renderer', () => {
       { running: false, done: 3, total: 3 },
     ]);
     expect(await waitForSweepEnd(page, FAST)).toEqual({ ok: true });
+  });
+});
+
+describe('waitForSweepEnd and the early-lines stage (round 89, G13b)', () => {
+  const stage = (active: boolean, done: number) => ({ active, done, total: 3 });
+
+  test('the sweep ending is not the end: the dump waits for the stage, so two runs dump the same lines', async () => {
+    const { page, calls } = scriptedPage([
+      { running: true, done: 2, total: 3 },
+      { running: false, done: 3, total: 3, stage: stage(true, 0) },
+      { running: false, done: 3, total: 3, stage: stage(true, 1) },
+      { running: false, done: 3, total: 3, stage: stage(true, 2) },
+      { running: false, done: 3, total: 3, stage: stage(false, 3) },
+    ]);
+    expect(await waitForSweepEnd(page, FAST)).toEqual({ ok: true });
+    expect(calls()).toBe(5);
+  });
+
+  test('a page without the stage (doubles, an explicit mode, an old build) ends with the sweep', async () => {
+    const { page, calls } = scriptedPage([
+      { running: true, done: 0, total: 3 },
+      { running: false, done: 3, total: 3, stage: stage(false, 0) },
+    ]);
+    expect(await waitForSweepEnd(page, FAST)).toEqual({ ok: true });
+    expect(calls()).toBe(2);
+  });
+
+  test('a stage that stops ticking is a wedge with a stable reason, as a wedged sweep is', async () => {
+    let now = 0;
+    const real = Date.now;
+    Date.now = () => (now += 120_000);
+    try {
+      const { page } = scriptedPage([
+        { running: false, done: 3, total: 3, stage: stage(true, 1) },
+        { running: false, done: 3, total: 3, stage: stage(true, 1) },
+      ]);
+      const result = await waitForSweepEnd(page, FAST);
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.reason).toMatch(/early lines|stage/i);
+    } finally {
+      Date.now = real;
+    }
   });
 });
 

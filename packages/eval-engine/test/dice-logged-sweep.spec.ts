@@ -1,5 +1,5 @@
 import type { Battle } from '@pkmn/sim';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { afterAll, describe, expect, test, vi } from 'vitest';
 import { rulesDex, toId, type ReplayData } from '@fulllifegames/replay-core';
 import { parseTurnBlocks } from '../src/branch/protocol-choices';
@@ -11,8 +11,9 @@ import { DIE_KINDS, type DieKind } from '../src/dice/types';
 import { CLASSES } from './dice-census-support';
 import { mon, playClicks, type Mode, type Rules } from './dice-fixtures';
 import { CHECKS } from './dice-status-support';
-import { dexOfRules, picksOne, sweepClicks, sweepMoves, SWEEP_CASES, type DexMove } from './dice-sweep-support';
-import { clickedOf, moveScene, powerMoves, scan, witnessesWanted, type Scan, type Scene } from './dice-logged-sweep-support';
+import { dexOfRules, sweepClicks, sweepMoves, SWEEP_CASES, type DexMove } from './dice-sweep-support';
+import { clickedOf, moveScene, powerMoves, scan, type Scan, type Scene } from './dice-logged-sweep-support';
+import { GAPS, registerKindRows, summaries, sweepMovesOf, total, WANT, writeSummaries } from './dice-logged-sweep-rows';
 import { battleOf } from './power-oracle';
 
 /**
@@ -28,36 +29,21 @@ import { battleOf } from './power-oracle';
  * KNOWN (`test.fails`, red today): the causes the full sweep
  * found in the reader (`GAPS`); each has a plain row that holds the sweep finds a seed pair to repair, so a row never goes green because it
  * played nothing. Moves aimed at a random foe in doubles stay out (see `randomAim`).
+ *
+ * D9b (#125): the crit rows moved to `dice-logged-crit-doubles-a.spec.ts`, `dice-logged-crit-doubles-b.spec.ts` and `dice-logged-crit-singles.spec.ts`,
+ * the secondary and self-effect rows to `dice-logged-secondary.spec.ts`; every row keeps its full name. The dice job then spreads the 2,700 seconds
+ * of the full sweep over its workers. The helpers the five files share are in `dice-logged-sweep-rows.ts`. This file keeps the accuracy rows and every small group.
  */
 await loadSimMods('gen9championsou');
 // a full sweep plays every Dex move of a rule set in one test (about two minutes for the crits of a doubles cell)
 vi.setConfig({ testTimeout: 900_000 });
 
-const logPath = process.env.DICE_SWEEP_LOG;
-const summaries: string[] = [];
-afterAll(() => {
-  if (logPath) writeFileSync(logPath, summaries.join('\n') + '\n', 'utf8');
-});
+afterAll(() => writeSummaries());
 
-const WANT = witnessesWanted();
 const multihitOf = (move: DexMove): number | number[] | undefined => (move as unknown as { multihit?: number | number[] }).multihit;
 const multiAccuracy = (move: DexMove): boolean => !!(move as unknown as { multiaccuracy?: boolean }).multiaccuracy;
 const stalling = (move: DexMove): boolean => !!(move as unknown as { stallingMove?: boolean }).stallingMove;
-/**
- * A move aimed at a random foe in doubles (Thrash, Struggle): the simulator picks the target from the stream (a `pick` of the census, out
- * of the module's scope) and the log names the one it picked. A forced turn on another seed can hit the other foe; the alignment reads
- * bodies by side and species, so two foes of one species hide the difference and the sweep leaves these moves out.
- */
-const randomAim = (mode: Mode, move: DexMove): boolean => mode === 'doubles' && picksOne(move.target);
-/**
- * The moves the full sweep (`DICE_SWEEPS=full`, 04.11.2026) found that `loggedDice` cannot repeat, each group with its cause. The main rows leave
- * them out; one known row per group plays them and stays red until the reader (B3, lane B's files) or a die (lane A's files) covers the cause.
- * Names stand here because the sweep's oracle is the simulator's own log of each move; the code that fixes a cause reads the Dex, not these ids.
- */
-const GAPS: { cause: string; moves: string[]; modes: Mode[] }[] = [
-  { cause: 'the power Present picks (damage or a heal) is a draw no kind of die names, so the other seed can pick another power than the log shows', moves: ['present'], modes: ['singles', 'doubles'] },
-  { cause: 'a secondary that picks its status (the die names the chance, the pick follows the stream)', moves: ['triattack', 'direclaw'], modes: ['singles', 'doubles'] },
-];
+
 /**
  * The moves the full sweep found the reader missed (04.11.2026) and B3 fixed, each group with its cause. One plain row per group plays them
  * through every rule set that has them, so the main rows' sample cannot leave them out; a group moves to `GAPS` when a rule set shows it again.
@@ -69,98 +55,7 @@ const FIXED: { cause: string; moves: string[]; modes: Mode[]; when?: (rules: Rul
   { cause: 'a self effect of a spread move: one gain for the whole move from Gen 7 (`self.chance`, drawn once per move: Diamond Storm in doubles) and one per target that gave it in the secondary entry of Gen 6 (round 88, T338)', moves: ['diamondstorm'], modes: ['singles', 'doubles'] },
 ];
 
-/** Whether the move is a gap of this game type (a gap may hold in singles and stay open in doubles). */
-const gapped = (mode: Mode, id: string): boolean => GAPS.some(gap => gap.modes.includes(mode) && gap.moves.includes(id));
-const lowAccuracy = (move: DexMove): boolean => typeof move.accuracy === 'number' && move.accuracy < 100;
-
-/** What a block of a case counted, for the log and the census. */
-function total(label: string, moves: number, scans: Scan[]): Scan {
-  const sum: Scan = { scanned: 0, skipped: 0, witnesses: 0, named: 0, rollFaints: 0, failures: [], why: {} };
-  for (const entry of scans) {
-    sum.scanned += entry.scanned; sum.skipped += entry.skipped; sum.witnesses += entry.witnesses; sum.named += entry.named; sum.rollFaints += entry.rollFaints;
-    for (const [reason, count] of Object.entries(entry.why)) sum.why[reason] = (sum.why[reason] ?? 0) + count;
-    sum.failures.push(...entry.failures);
-  }
-  summaries.push(`${label}: ${moves} moves, ${scans.length} played, ${sum.witnesses} witnesses (${sum.named} name the kind), ${sum.rollFaints} faints of the damage roll, ${sum.failures.length} failures, left out ${JSON.stringify(sum.why)}`);
-  return sum;
-}
-
-/** Plays every move of a list through `sceneOf` and checks that the forced turn gives the log's turn. */
-function sweepMovesOf(
-  label: string, rules: Rules, mode: Mode, keep: (move: DexMove) => boolean, sceneOf: (move: DexMove) => Scene | null, foesOnly = true, withGaps = false,
-): Scan {
-  const { moves } = sweepMoves(rules, move => keep(move) && !randomAim(mode, move) && (withGaps || !gapped(mode, move.id)), foesOnly);
-  const scans: Scan[] = [];
-  const failures: string[] = [];
-  for (const move of moves) {
-    const scene = sceneOf(move);
-    if (!scene) continue;
-    const result = scan(scene, WANT);
-    scans.push(result);
-    failures.push(...result.failures.map(failure => `${move.id} ${failure}`));
-  }
-  const sum = total(`${label} ${rules.name} ${mode}`, moves.length, scans);
-  sum.failures = failures;
-  return sum;
-}
-
-/** The cases of a block: the rule sets and game types, and whether the rule set has the moves at all. */
-const KINDS = {
-  accuracy: { keep: (move: DexMove) => lowAccuracy(move), channels: ['misses'] },
-  crit: { keep: (move: DexMove) => move.category !== 'Status', channels: ['crits'] },
-} as const;
-
-describe.each(SWEEP_CASES)('the logged accuracy and crit dice give the log\'s turn: $name', ({ rules, mode }) => {
-  const dex = dexOfRules(rules);
-  const options = (move: DexMove) => ({ clicked: clickedOf(move.id, mode), secondariesOf: secondariesIn(dex), hitsOf: hitsOfDex(dex) });
-
-  for (const [kind, spec] of Object.entries(KINDS) as [keyof typeof KINDS, typeof KINDS[keyof typeof KINDS]][]) {
-    test(`${kind}: every move that draws one`, () => {
-      // a crit comes once in 16 to 24 draws: its seeds scan wider than the other kinds'
-      const result = sweepMovesOf(kind, rules, mode, spec.keep, move => moveScene(rules, mode, move, { channels: spec.channels, kind, pool: kind === 'crit' ? 40 : undefined, options: options(move) }));
-      expect(result.failures).toEqual([]);
-      expect(result.witnesses, 'the sweep found a seed pair the log repairs').toBeGreaterThan(0);
-      // a crit the other seed shows against a hit the log missed has no crit die in the log: the log names it where the move hit
-      expect(result.named, 'the log names the die').toBeGreaterThan(0);
-    });
-  }
-});
-
-describe.each(SWEEP_CASES)('the logged secondaries and self effects give the log\'s turn: $name', ({ rules, mode }) => {
-  const dex = dexOfRules(rules);
-  const secondaries = secondariesIn(dex);
-  const options = (move: DexMove) => ({ clicked: clickedOf(move.id, mode), secondariesOf: secondaries, hitsOf: hitsOfDex(dex) });
-  const entries = (move: DexMove): string[] => secondaries(move.id);
-  const has = (kind: 'items' | 'abilities', id: string): boolean => { const entry = dex[kind].get(id); return entry.exists && entry.gen <= dex.gen && !entry.isNonstandard; };
-
-  const plain = (move: DexMove): boolean => entries(move).length > 0;
-  const ownSelf = (move: DexMove): boolean => entries(move).some(id => id.startsWith('self:'));
-  const sceneOf = (move: DexMove, outfit?: { ability: string }): Scene | null =>
-    moveScene(rules, mode, move, { channels: ['secondaries', 'cants'], kind: 'secondary', options: options(move) }, outfit);
-
-  test('secondary: every move with a chance entry', () => {
-    const result = sweepMovesOf('secondary', rules, mode, plain, move => sceneOf(move));
-    expect(result.failures).toEqual([]);
-    expect(result.witnesses).toBeGreaterThan(0);
-  });
-
-  test('self-effect: every move whose chance entry moves its own user', () => {
-    const keep = (move: DexMove): boolean => ownSelf(move);
-    const result = sweepMovesOf('self-effect', rules, mode, keep, move => sceneOf(move));
-    expect(result.failures).toEqual([]);
-    // a rule set whose Dex has no such move plays none (Gen 1 has no stat change of the user as a secondary)
-    expect(result.witnesses > 0 || sweepMoves(rules, keep).moves.length === 0).toBe(true);
-  });
-
-  // Serene Grace doubles the chances, Sheer Force removes the secondaries: the log shows what the simulator rolled under the outfit
-  for (const outfit of [{ ability: 'serenegrace' }, { ability: 'sheerforce' }]) {
-    test(`secondary under ${outfit.ability}`, () => {
-      if (!has('abilities', outfit.ability)) return;
-      const result = sweepMovesOf(outfit.ability, rules, mode, plain, move => sceneOf(move, outfit));
-      expect(result.failures).toEqual([]);
-    });
-  }
-});
+registerKindRows(SWEEP_CASES, ['accuracy']);
 
 // Known gaps (see GAPS), one row per cause over every rule set that has its moves: the sweep finds seed pairs the log would repair, and the forced
 // turn repairs none of them (somewhere). Where a rule set does not show the cause (Tri Attack has no secondary in Gen 1) its pairs just pass.
@@ -359,8 +254,9 @@ describe.each(SWEEP_CASES)('the logged stalling die gives the turn of the log: $
 });
 
 describe('the kinds the log may show and the reader does not name: the census of the ledger', () => {
-  const named: readonly DieKind[] = ['accuracy', 'crit', 'secondary', 'self-effect', 'hit-count', 'status-check', 'speed-tie', 'stalling'];
+  const named: readonly DieKind[] = ['accuracy', 'crit', 'secondary', 'self-effect', 'hit-count', 'status-check', 'speed-tie', 'stalling', 'random-target', 'drag'];
   // damage-roll is no reader kind: the faint step (B4) forces it from a search, the log shows the HP only
+  // round 89 (#137): the two kinds that sample a body (`random-target`, `drag`) are reader kinds since step G2; their sweeps are `dice-random-target-sweep.spec.ts` and `dice-drag-sweep.spec.ts`
   const unnamed = DIE_KINDS.filter(kind => !named.includes(kind) && kind !== 'damage-roll');
 
   test('the kinds that stay unnamed, with their Dex entries and the corpus turns that carry the event', () => {
@@ -387,6 +283,23 @@ describe('the kinds the log may show and the reader does not name: the census of
       const per = ['singles', 'doubles', 'vgc'].map(type => `${type} ${turns.filter(turn => turn.type === type && carries(turn.lines)).length} of ${turns.filter(turn => turn.type === type).length}`);
       summaries.push(`census ${kind}: ${ids.length} Dex entries (${ids.join(',')}); turns of the 12 fixtures whose lines name one: ${per.join(', ')}`);
       expect(ids.length, `${kind} has Dex entries`).toBeGreaterThan(0);
+    }
+  });
+});
+
+// Round 89 (#114): the offer names a die per later hit of a multi-accuracy move, and `loggedOptions` reads the accuracy targets of a click
+// from the offer for a move the log writes with no target. The list stays one entry per target (the reconstruction plays it, ADR 0022).
+describe.each(SWEEP_CASES.filter(entry => entry.rules.generation >= 3))('the accuracy targets of a click are one per target for a multi-accuracy move: $name', ({ rules, mode }) => {
+  const { moves } = sweepMoves(rules, multiAccuracy);
+
+  test('every multi-accuracy move lists its aimed foe once', () => {
+    expect(moves.length).toBeGreaterThan(0);
+    for (const move of moves) {
+      const scene = moveScene(rules, mode, move, { channels: [], options: {} });
+      if (!scene) continue;
+      const clicks = sweepClicks(mode, move.target);
+      const { accuracyTargets } = loggedOptions(scene.board('1,2,3,4'), clicks);
+      expect(accuracyTargets.get('p1a'), `${move.id}: one accuracy target for the one foe`).toEqual(['p2a']);
     }
   });
 });

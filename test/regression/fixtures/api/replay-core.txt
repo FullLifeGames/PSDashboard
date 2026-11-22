@@ -1,3 +1,5 @@
+type BringList
+type BringSide
 type CalcGeneration
 type CalcPokemonOptions
 type ChaosStatsPayload
@@ -57,6 +59,7 @@ value EMPTY_EVS
 value HP_TYPES
 value INFERRED_ITEM_DETAIL
 value INFERRED_SPREAD_DETAIL
+value KNOCKOUT_BOOST_ITEM_DETAIL
 value MEASURED_HP_SPREAD_DETAIL
 value NO_BOOST_ITEM_DETAIL
 value ORDER_SPREAD_DETAIL
@@ -126,6 +129,7 @@ value parseTeamText
 value poweredMove
 value protectKind
 value registerChampionsDex
+value replayBringList
 value replayBringOnly
 value replayRules
 value replayRuleset
@@ -142,6 +146,7 @@ value speciesBaseId
 value speciesOverrides
 value splitReplayPassword
 value standingScreens
+value teamInfoOfSets
 value teamSizes
 value terrainConditions
 value toId

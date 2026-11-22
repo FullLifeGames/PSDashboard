@@ -1,8 +1,10 @@
 import {
-  diffChoices, formatLine, playedSetupMove, regretText, type SideAnalysis, type RankedChoice, winDeltaText, winPctText,
+  diffChoices, formatLine, playedSetupMove, type EvalResult, type SideAnalysis, type RankedChoice, winDeltaText, winPctText,
 } from '@fulllifegames/eval-engine';
+import { gradedTier } from './game-review';
+import { rowLineTail } from '../../lib/row-line';
 import { ExplorableLabel, KoSuffix, MiniBar } from './analysis-bits';
-import { comparisonTarget, ENGINE_EQUIVALENT_EPSILON, evTitle, playedTextFor, RISK_DISPLAY_GAP } from './turn-copy';
+import { comparisonTarget, ENGINE_EQUIVALENT_EPSILON, engineChoice, evTitle, playedTextFor, regretView, RISK_DISPLAY_GAP } from './turn-copy';
 
 type Explore = ((choice: RankedChoice) => void) | undefined;
 
@@ -12,11 +14,15 @@ interface RowProps {
   onExplore?: (choice: RankedChoice) => void;
   /** Round 67 (T59): the side lost ground on the turn (lostGround): its paid-off read shows no praise chip. */
   lostGround?: boolean;
+  /** Round 89 (#153, HM-2): the Setup setting is on: the engine-move buttons say the opponent reads the move. */
+  opponentReads?: boolean;
+  /** Round 89 (LN-4): the turn's result and this row's side: the better line's "then ..." reads the line the Lines section shows. */
+  rowLines?: { result: EvalResult | null | undefined; side: 'p1' | 'p2' };
 }
 
 function PlayedCell({ name, side }: Pick<RowProps, 'name' | 'side'>) {
   const { acted, playedText } = playedTextFor(side);
-  const playedGamble = side.played !== null && side.played.ev - side.played.worstCase >= RISK_DISPLAY_GAP;
+  const playedGamble = !side.neverActed && side.played !== null && side.played.ev - side.played.worstCase >= RISK_DISPLAY_GAP;
   return (
     <>
       <span style={{ color: '#aab' }} title={side.played ? evTitle(name) : undefined}>{acted ? 'played ' : ''}{playedText}</span>
@@ -41,26 +47,28 @@ function PlayedCell({ name, side }: Pick<RowProps, 'name' | 'side'>) {
 }
 
 /** The engine's line next to the played one: agreement, a better line, or the line when nothing was played. */
-function EngineCell({ name, side, regretful, onExplore }: RowProps & { regretful: boolean }) {
-  if (!side.best) return null;
+function EngineCell({ name, side, regretful, onExplore, opponentReads }: RowProps & { regretful: boolean }) {
+  const engine = engineChoice(side);
+  if (!side.best || !engine) return null;
   const best = side.best;
   const explore = onExplore && (() => onExplore(best));
-  if (!side.played) {
+  // a stand-in for a choice the log does not show earns no tick (X1a): the engine's move stands as it does for a side that played nothing
+  if (!side.played || side.neverActed) {
     return (
       <span style={{ color: '#778' }} title={evTitle(name)}>
-        engine: <ExplorableLabel label={best.label} color="#778" onClick={explore} />
-        {' '}({winPctText(best.ev, side.faintedFraction)})
+        engine: <ExplorableLabel label={engine.label} color="#778" onClick={explore} opponentReads={opponentReads} />
+        {' '}({winPctText(engine.value, side.faintedFraction)})
       </span>
     );
   }
   if (regretful) return null;
   if (side.played.choice === best.choice) {
-    return <ExplorableLabel label="✓ the engine's move" color="#8c8" onClick={explore} />;
+    return <ExplorableLabel label="✓ the engine's move" color="#8c8" onClick={explore} opponentReads={opponentReads} />;
   }
   return (
     <span style={{ color: '#778' }} title={evTitle(name)}>
-      engine: <ExplorableLabel label={best.label} color="#778" onClick={explore} />
-      {' '}({winPctText(best.ev, side.faintedFraction)})
+      engine: <ExplorableLabel label={engine.label} color="#778" onClick={explore} opponentReads={opponentReads} />
+      {' '}({winPctText(engine.value, side.faintedFraction)})
       {best.ev - side.played.ev < ENGINE_EQUIVALENT_EPSILON && (
         <span title="The win-probability gap is inside noise: the engine considers both picks equally good."> · equivalent</span>
       )}
@@ -68,24 +76,13 @@ function EngineCell({ name, side, regretful, onExplore }: RowProps & { regretful
   );
 }
 
-/**
- * Round 64 (T123): the regret as its chip shows it. Over 1 it reads as the two win chances it spans
- * (regretText), and the title keeps the real number on the score scale.
- */
-function regretView(name: string, side: SideAnalysis, regret: number): { text: string; title: string } {
-  const from = side.bestNull?.alternative?.ev ?? side.best?.ev;
-  const to = side.played?.ev;
-  if (from === undefined || to === undefined) {
-    return { text: winDeltaText(-regret), title: `${name} gave up this much win probability vs the engine's best.` };
-  }
-  const text = regretText(regret, from, to, side.faintedFraction);
-  return text === winDeltaText(-regret)
-    ? { text, title: `${name} gave up this much win probability vs the engine's best.` }
-    : {
-      text,
-      title: `${name}'s win chance fell from ${winPctText(from, side.faintedFraction)} with the engine's line to ${winPctText(to, side.faintedFraction)} with the played choice ` +
-        `(regret ${regret.toFixed(2)} on the score scale from −1 to 1).`,
-    };
+/** The chip title of an unpunished risk; round 89 (B6a): where the matrix shows the safe line did as well against the reply that came, it says so. */
+function unpunishedTitle(side: SideAnalysis): string {
+  const punisher = side.played?.punishedBy ?? 'the punishing reply';
+  const held = side.safeAgainstClick;
+  return held
+    ? `The floor assumes ${punisher}; the opponent chose ${held.against} instead, and against that the safe line did as well or better.`
+    : `The floor assumes ${punisher}; the opponent chose differently, so the read came true.`;
 }
 
 /** The graded regret chip: setup caveat, unpunished risk, blunder, or mistake. */
@@ -106,7 +103,7 @@ function RegretCell({ name, side, setupMove }: Pick<RowProps, 'name' | 'side'> &
     return (
       <span
         style={{ color: '#b6a46a' }}
-        title={`The floor assumes ${side.played?.punishedBy ?? 'the punishing reply'}; the opponent chose differently, so the read came true.`}
+        title={unpunishedTitle(side)}
       >
         {view.text} regret · risk unpunished
       </span>
@@ -166,7 +163,7 @@ function VerdictCell({ name, side, regretful, setupMove, lostGround }: Pick<RowP
       )}
       {side.riskPaidOff && !side.sacrifice && !lostGround && <ReadPaidOffCell side={side} />}
       {regretful && !side.sacrifice && !side.riskPaidOff && <RegretCell name={name} side={side} setupMove={setupMove} />}
-      {side.tier === 'inaccuracy' && side.best && (
+      {gradedTier(side, lostGround) === 'inaccuracy' && side.best && (
         <span
           style={{ color: '#b6a46a' }}
           title={`${side.best.label} was a touch better: a minor imprecision, not a mistake.`}
@@ -189,13 +186,14 @@ function VerdictCell({ name, side, regretful, setupMove, lostGround }: Pick<RowP
 }
 
 /** The played line against its reference (safe line or ev-best) with the difference, for regretful rows. */
-function ComparisonRows({ name, side, played, best, difference, onExplore }: Pick<RowProps, 'name' | 'side'> & {
+function ComparisonRows({ name, side, played, best, difference, onExplore, opponentReads, rowLines }: Pick<RowProps, 'name' | 'side' | 'opponentReads' | 'rowLines'> & {
   played: RankedChoice;
   best: RankedChoice;
   difference: string | null;
   onExplore: Explore;
 }) {
   const { asSafe, target, swapped, value } = comparisonTarget(side, best);
+  const tail = rowLines ? rowLineTail(rowLines.result, rowLines.side, target, !!opponentReads) : target.line;
   return (
     <>
       <div className="ps-eval-analysis-row" style={{ color: '#aab' }} title={evTitle(name)}>
@@ -215,11 +213,12 @@ function ComparisonRows({ name, side, played, best, difference, onExplore }: Pic
           <ExplorableLabel
             label={target.label}
             onClick={onExplore && (() => onExplore(target))}
+            opponentReads={opponentReads}
           />
         )}
         {!swapped && target.punishedBy && <span style={{ color: '#778' }}>· worst vs {target.punishedBy}</span>}
-        {!swapped && target.line && target.line.length > 0 && (
-          <span className="ps-eval-line">then {formatLine(target.line)}</span>
+        {!swapped && tail && tail.length > 0 && (
+          <span className="ps-eval-line">then {formatLine(tail)}</span>
         )}
         <KoSuffix odds={swapped ? swapped.koOdds : target.koOdds} />
       </div>
@@ -248,7 +247,7 @@ function HindsightRow({ line }: { line: string }) {
 }
 
 /** One tracked side of an analyzed turn: what it played, the engine's line, the verdict, and the comparison. */
-export function SideRow({ name, side, onExplore, lostGround }: RowProps) {
+export function SideRow({ name, side, onExplore, lostGround, opponentReads, rowLines }: RowProps) {
   const regretful = side.tier === 'mistake' || side.tier === 'blunder';
   const setupMove = playedSetupMove(side);
   const difference = regretful && side.played && side.best ? diffChoices(side.played, side.best) : null;
@@ -258,11 +257,11 @@ export function SideRow({ name, side, onExplore, lostGround }: RowProps) {
       <div className="ps-eval-analysis-row">
         <span style={{ color: '#cde', fontWeight: 'bold' }}>{name}</span>
         <PlayedCell name={name} side={side} />
-        <EngineCell name={name} side={side} regretful={regretful} onExplore={onExplore} />
+        <EngineCell name={name} side={side} regretful={regretful} onExplore={onExplore} opponentReads={opponentReads} />
         <VerdictCell name={name} side={side} regretful={regretful} setupMove={setupMove} lostGround={lostGround} />
       </div>
       {regretful && side.played && side.best && (
-        <ComparisonRows name={name} side={side} played={side.played} best={side.best} difference={difference} onExplore={onExplore} />
+        <ComparisonRows name={name} side={side} played={side.played} best={side.best} difference={difference} onExplore={onExplore} opponentReads={opponentReads} rowLines={rowLines} />
       )}
       {side.hindsightRead?.shown && side.hindsightRead.line && <HindsightRow line={side.hindsightRead.line} />}
     </div>

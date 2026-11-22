@@ -19,19 +19,12 @@ import { dieKey, plainKey, type DiceReport, type DieReport, type DieTook, type F
  * - The user's dice come from the slot choices of both sides (`BranchSlotChoice.dice`, ADR 0001).
  * - On the first turn of a branch (the live PRNG is a `LoggedRollPRNG` that knows the logged turn) the dice the log shows for the
  *   actions the user leaves as logged join the user's dice, with or without a die of the user's (gate answers 19a and 2a). The
- *   turn after the first plays as without the module when the user forces nothing. One place holds this choice:
- *   `FIRST_TURN_JOINS_LOG`.
+ *   turn after the first plays as without the module when the user forces nothing.
  * - A turn can pause for a switch in the middle (U-turn, Volt Switch, Flip Turn, Parting Shot, Eject Button, Eject Pack, Emergency
  *   Exit, Wimp Out) and go on in a later `choose`. The forced dice span the whole turn: the pause leaves a `PendingTurn` that the
  *   next call picks up. Each call plays its part through `playForcedTurn`, so the natural copy plays the same switch choice, and
  *   each part ends the stream on the natural turn's seed at that place (decision D8): the parts chain into the whole turn.
  */
-
-/**
- * Gates 19a and 2a: the log's results join the user's dice on the first turn, always (before 2a: once the user forced a die). The
- * first turn of a branch that has no logged turn (a position without one) has nothing to join.
- */
-export const FIRST_TURN_JOINS_LOG = true;
 
 /** What a turn that paused for a switch hands to the next call. */
 export interface PendingTurn {
@@ -124,6 +117,20 @@ function selfChanceIn(dex: Battle['dex']): (moveId: string) => string | undefine
   };
 }
 
+/**
+ * Round 89 (#104, G4b): the stall conditions of the stalling moves a body knows but did not click, keyed `slot:move`. One of them can
+ * still be the move the log shows: Encore makes the body repeat its last move after the click. Read from the same offers as the click's own.
+ */
+function redirectedStalls(battle: Battle, slot: string, body: Battle['sides'][number]['active'][number] | undefined, clickedId: string): Map<string, string> {
+  const found = new Map<string, string>();
+  for (const known of body?.moveSlots ?? []) {
+    if (known.id === clickedId || !(battle.dex.moves.get(known.id) as unknown as { stallingMove?: boolean }).stallingMove) continue;
+    const effectId = offeredDice(battle, slot, { kind: 'move', moveId: known.id, moveName: known.id }).find(offer => offer.name.kind === 'stalling' && offer.name.effectId)?.name.effectId;
+    if (effectId) found.set(`${slot}:${known.id}`, effectId);
+  }
+  return found;
+}
+
 /** What the log cannot name (`LoggedOptions`): the move each body clicked, the checks each body stood under, the secondaries of every move. */
 export function loggedOptions(battle: Battle, logged: { p1: string; p2: string }): LoggedOptions {
   const clicked = new Map<string, string>();
@@ -142,17 +149,22 @@ export function loggedOptions(battle: Battle, logged: { p1: string; p2: string }
       // Round 86 (T306): the condition that makes a stalling move draw its chance to succeed again, as the offer names it
       const stall = offers.find(offer => offer.name.kind === 'stalling' && offer.name.effectId)?.name.effectId;
       if (stall) stalling.set(slot, stall);
-      // Round 86 (T306): the foes the click draws an accuracy for, for a move the log writes without an aim
-      accuracyTargets.set(slot, offers.filter(offer => offer.name.kind === 'accuracy' && offer.name.targetSlot).map(offer => offer.name.targetSlot!));
+      redirectedStalls(battle, slot, body, moveId).forEach((effectId, key) => stalling.set(key, effectId));
+      // Round 86 (T306): the foes the click draws an accuracy for, for a move the log writes without an aim. Round 89 (#114): the offer
+      // also names the die of each later hit; the list keeps one entry per target, as before, so the reconstruction's forced list does not move.
+      accuracyTargets.set(slot, offers.filter(offer => offer.name.kind === 'accuracy' && offer.name.hit === undefined && offer.name.targetSlot).map(offer => offer.name.targetSlot!));
     });
   }
-  return { clicked, checks, stalling, accuracyTargets, secondariesOf: secondariesIn(battle.dex), selfOf: selfChanceIn(battle.dex), hitsOf: hitsIn(battle.dex) };
+  return { clicked, checks, stalling, accuracyTargets, secondariesOf: secondariesIn(battle.dex), selfOf: selfChanceIn(battle.dex), hitsOf: hitsIn(battle.dex), randomTargets: battle.gameType !== 'singles' };
 }
 
-/** The forced list of a turn the user has just chosen: the user's dice, joined by the log's on the branch's first turn. */
+/**
+ * The forced list of a turn the user has just chosen: the user's dice, joined by the log's on the branch's first turn, always
+ * (gates 19a and 2a; before 2a: once the user forced a die). A branch whose first turn has no logged turn has nothing to join.
+ */
 function firstTurnDice(input: BranchTurnInput, mine: readonly ForcedDie[]): ForcedDie[] {
   const logged = battleLoggedTurn(input.battle);
-  if (!FIRST_TURN_JOINS_LOG || !logged) return [...mine];
+  if (!logged) return [...mine];
   const { changed, switched } = turnChanges(logged.choices, input.commands);
   return mergeLoggedDice({
     logged: loggedDice(logged.lines, loggedOptions(input.battle, logged.choices)), forced: mine, changed, switched,

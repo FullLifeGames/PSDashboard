@@ -163,8 +163,12 @@ export function resolveSideChoices(
   return { ok: true, command: fragments.join(', ') };
 }
 
-/** The commands on a copy of the battle, as the stream writes them to the live one; a refused choice ends the play. */
-function chooseOnCopy(battle: SimBattle, commands: { side: 'p1' | 'p2'; command: string }[]): void {
+/**
+ * The commands on a copy of the battle, as the stream writes them to the live one; a refused choice ends the play. A deliberate copy
+ * of `chooseOnCopy` in `dice/logged-block.ts` (this module loads the dice layer lazily, so it keeps its own); `choose-on-copy-copies.spec.ts`
+ * holds the two to the same answers.
+ */
+export function chooseOnCopy(battle: SimBattle, commands: { side: 'p1' | 'p2'; command: string }[]): void {
   for (const { side, command } of commands) {
     if (battle.choose(side, command)) continue;
     throw new Error(battle.sides[sideIndex(side)].choice.error || 'The simulator rejected this choice.');

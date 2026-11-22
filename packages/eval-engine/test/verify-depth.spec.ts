@@ -7,7 +7,9 @@ import { planCellEvents } from '../src/cell-blend';
 import { createMatchupCache } from '../src/eval-function';
 import { advancePosition, createRootPosition, positionBattle, type SimPosition } from '../src/forward-model';
 import { createLocalExecutor, subSearchDepth1 } from '../src/search';
-import { countFainted, leafValue, SEARCH_SEEDS } from '../src/search/leaf';
+import { countFainted, leafValue } from '../src/search/leaf';
+import { benchOrder } from '../src/search/bench-order';
+import { cellSeeds } from '../src/search/root-quantile';
 import { sampleCell } from '../src/search/cell-sampler';
 import { deeperValues, VERIFY_CHEAP, VERIFY_DEEPEN_COVER, VERIFY_LIGHT, VERIFY_PLAIN_DRAWS, VERIFY_STATE_RULE, type CheapDeepening } from '../src/search/verify-cell';
 import type { EvalCellValue, EvalSettings, MctsTreeStats } from '../src/types';
@@ -251,11 +253,15 @@ describe('the verify executor deepens per class (round 63, T16)', () => {
   });
 
   test('a doubles pair-plan cell: the heaviest open class goes one ply deeper through its states, the rest take the light price', { timeout: 120_000 }, async () => {
-    const root = anchorRoot();
-    const [value] = await createLocalExecutor(root.serialized).evalCells([{ i: 0, j: 0, p1Choice: PLAYED[0], p2Choice: PLAYED[1], samples: 3, deepen: SUB }]);
+    // r89 A5 gate: the executor reads the root through `benchOrder`, and a cell's seeds (T324) key the saved position, so the spec reads it
+    // the same way (the raw anchor and its canonical bench are two keys, two sets of draws). Samples was 3: the played cell with three base draws of its
+    // own seeds covers under 0.8 of its classes in eight draws and falls back (low-cover), so the plan reads from one base draw.
+    const order = benchOrder(anchorRoot().serialized);
+    const root = createRootPosition(order ? order.serialized : anchorRoot().serialized);
+    const [value] = await createLocalExecutor(root.serialized).evalCells([{ i: 0, j: 0, p1Choice: PLAYED[0], p2Choice: PLAYED[1], samples: 1, deepen: SUB }]);
     const open = value.blend!.classes.filter(cls => !cls.ended);
     expect(open.length).toBeGreaterThan(1);
-    const sample = sampleCell(root, countFainted(positionBattle(root)), ...PLAYED, 3, createMatchupCache(), true, VERIFY_PLAIN_DRAWS);
+    const sample = sampleCell(root, countFainted(positionBattle(root)), ...PLAYED, 1, createMatchupCache(), true, VERIFY_PLAIN_DRAWS);
     // Round 64 (T119): a class whose draws leave several states goes deeper through each of them.
     const expected = deeperValues(open.map(cls => ({
       weight: cls.weight, child: sample.classChildren!.get(cls.key)!, leaf: cls.leafSum / cls.count, ended: false,
@@ -264,7 +270,7 @@ describe('the verify executor deepens per class (round 63, T16)', () => {
     open.forEach((cls, index) => expect(cls.deepened, cls.key).toBeCloseTo(expected[index], 12));
     // The first natural draw's class deepens the same child the old verify step deepened.
     const first = open.find(cls => cls.hasFirst)!;
-    expect(sample.classChildren!.get(first.key)!.serialized).toBe(advancePosition(root, ...PLAYED, SEARCH_SEEDS[0]).serialized);
+    expect(sample.classChildren!.get(first.key)!.serialized).toBe(advancePosition(root, ...PLAYED, cellSeeds(root, ...PLAYED)[0]).serialized);
   });
 });
 

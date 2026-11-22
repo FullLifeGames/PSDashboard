@@ -1,0 +1,98 @@
+{
+ "budget gen9doublesou-2695084835-t8": {
+  "mass": 0.95,
+  "turns": 1,
+  "caveat": "sampled-rolls",
+  "openValue": 0.8976019026893985,
+  "states": 52,
+  "cells": 100
+ },
+ "budget gen9vgc2026regf-2532857804-t7": {
+  "mass": 1,
+  "turns": 3,
+  "caveat": "sampled-rolls",
+  "delay": "detect",
+  "openValue": null,
+  "delayName": "Detect",
+  "states": 9,
+  "cells": 96
+ },
+ "plain-dice-gen9championsvgc2026regmbbo3-2679549596-t7": {
+  "mass": 1,
+  "turns": 2,
+  "caveat": "sampled-rolls",
+  "delay": "protect",
+  "openValue": null,
+  "choice": "move dazzlinggleam, move flashcannon 2",
+  "delayName": "Protect",
+  "choiceNames": {
+   "first": "Flash Cannon",
+   "partner": "Dazzling Gleam"
+  },
+  "states": 2,
+  "cells": 14
+ },
+ "plain-dice-gen9vgc2025regi-2408473310-t13": {
+  "mass": 0.6699999999999999,
+  "turns": 4,
+  "caveat": "sampled-rolls",
+  "openValue": 0.6,
+  "states": 9,
+  "cells": 11
+ },
+ "scout-miss-gen9championsvgc2026regmbbo3-2682637901-t6": {
+  "mass": 1,
+  "turns": 2,
+  "caveat": "sampled-rolls",
+  "delay": "protect",
+  "openValue": null,
+  "choice": "move heatwave, move aquajet 1",
+  "delayName": "Protect",
+  "choiceNames": {
+   "first": "Aqua Jet",
+   "partner": "Heat Wave"
+  },
+  "states": 4,
+  "cells": 15
+ },
+ "scout-miss-gen9championsvgc2026regmc-2694684816-t8": {
+  "mass": 0,
+  "turns": 0,
+  "caveat": "none",
+  "openValue": null,
+  "states": 63,
+  "cells": 100
+ },
+ "scout-miss-gen9doublesou-2661746817-t8": {
+  "mass": 1,
+  "turns": 1,
+  "caveat": "sampled-rolls",
+  "openValue": null,
+  "states": 1,
+  "cells": 20
+ },
+ "scout-miss-gen9vgc2024regg-2163312677-t8": {
+  "mass": 1,
+  "turns": 1,
+  "caveat": "sampled-rolls",
+  "openValue": null,
+  "states": 1,
+  "cells": 18
+ },
+ "smogtours-gen9ou-749351-t10": {
+  "mass": 1,
+  "turns": 1,
+  "caveat": "none",
+  "openValue": null,
+  "states": 1,
+  "cells": 4
+ },
+ "smogtours-gen9ou-749828-t23": {
+  "mass": 1,
+  "turns": 1,
+  "caveat": "barring-crit",
+  "openValue": null,
+  "states": 1,
+  "cells": 4
+ }
+}

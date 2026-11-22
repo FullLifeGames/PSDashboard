@@ -7,6 +7,8 @@ interface Props {
   /** Returns an error message to display, or null when the import applied. */
   onImport: (text: string) => string | null;
   onClose: () => void;
+  /** Round 89 (#105): the sets belong to a new game, not to a replay. */
+  game?: boolean;
 }
 
 /**
@@ -14,7 +16,7 @@ interface Props {
  * current export (revealed + guessed + manual, exactly what the stats panel
  * shows); imported text overlays both sides as manual knowledge.
  */
-export function SetsImportExportPanel({ exportText, onImport, onClose }: Props) {
+export function SetsImportExportPanel({ exportText, onImport, onClose, game = false }: Props) {
   const [text, setText] = useState(exportText);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -24,7 +26,7 @@ export function SetsImportExportPanel({ exportText, onImport, onClose }: Props) 
       <div style={{ fontSize: 10, color: '#8899aa', marginBottom: 8 }}>
         Both teams in Showdown export format under "=== p1 ===" / "=== p2 ===" headers.
         Edit the text (or paste the real sets) and import; imported values show as green
-        manual data and are remembered for this replay.
+        manual data and are remembered for this {game ? 'game' : 'replay'}.
       </div>
       <textarea
         value={text}

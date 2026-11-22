@@ -1,12 +1,15 @@
 import {
-  perfCount, searchOrchestrated, searchTreesOrchestrated, forcedWinPossible,
+  blendValues, blendWorlds, searchOrchestrated, searchTreesOrchestrated, forcedWinPossible,
   type SearchExecutor, type TreeExecutor, type EvalCellValue, type EvalResult, type EvalSettings, type EvalWorkerRequest,
-  type EvalWorkerResponse, type MctsTreeStats, type SearchProgress, type StaticRuleset,
+  type EvalWorkerResponse, type MctsTreeStats, type SearchProgress, type StaticRuleset, type WinPaths, type WinPathsRequest,
 } from '@fulllifegames/eval-engine';
 import { evalPoolSize } from './pool-size';
 import { selectedEngine } from './engine-setting';
 import { searchBudgetStamp } from './search-budget-setting';
-import { recordSimFastReport, simFastLevers } from './sim-fast-setting';
+import { simFastLevers } from './sim-fast-setting';
+import { OnRequestJobs, type WinPathsHandlers } from './on-request-jobs';
+import { spawnWorker, type WorkerHandle } from './worker-handle';
+import { worldPositionsOf, type WorldPosition } from './world-positions';
 
 /**
  * The engine protocol builds its request on the simulator, so it loads with the first evaluation another engine answers
@@ -17,18 +20,6 @@ const engineEvaluate = () => import('./engine-evaluate');
 export interface EvalRunHandlers {
   onProgress?(progress: SearchProgress): void;
   onPartial?(result: EvalResult): void;
-}
-
-interface PendingEntry {
-  resolve(response: EvalWorkerResponse): void;
-  reject(error: Error): void;
-  /** Streaming responses (progress/partial) that must not settle the RPC. */
-  onStream?(response: EvalWorkerResponse): void;
-}
-
-interface WorkerHandle {
-  worker: Worker;
-  pending: Map<number, PendingEntry>;
 }
 
 /** Omit that distributes over a discriminated union (plain Omit collapses it). */
@@ -80,36 +71,11 @@ export class EvalWorkerClient {
   private workers: WorkerHandle[] = [];
   private nextId = 1;
   private generation = 0;
+  private jobs = new OnRequestJobs();
 
   private ensureWorkers(): WorkerHandle[] {
     while (this.workers.length < evalPoolSize()) {
-      perfCount('workerSpawn');
-      const worker = new Worker(new URL('../../workers/eval-worker.ts', import.meta.url), { type: 'module' });
-      const handle: WorkerHandle = { worker, pending: new Map() };
-      worker.onmessage = (event: MessageEvent<EvalWorkerResponse>) => {
-        const response = event.data;
-        if (response.simFast) recordSimFastReport(response.simFast);
-        const entry = handle.pending.get(response.id);
-        if (!entry) return;
-        if ((response.type === 'progress' || response.type === 'partial') && entry.onStream) {
-          entry.onStream(response);
-          return;
-        }
-        handle.pending.delete(response.id);
-        if (response.type === 'error') entry.reject(new Error(response.message));
-        else entry.resolve(response);
-      };
-      worker.onerror = event => {
-        const error = new Error(event.message || 'evaluation worker crashed');
-        for (const entry of handle.pending.values()) entry.reject(error);
-        handle.pending.clear();
-        // A crashed worker leaves the pool — the pool outlives single
-        // evaluations now, and a dead worker would swallow the next RPC
-        // without ever answering it.
-        handle.worker.terminate();
-        this.workers = this.workers.filter(other => other !== handle);
-      };
-      this.workers.push(handle);
+      this.workers.push(spawnWorker(crashed => { this.workers = this.workers.filter(other => other !== crashed); }));
     }
     return this.workers;
   }
@@ -185,10 +151,66 @@ export class EvalWorkerClient {
         if (response.type !== 'proveResult') throw new Error('unexpected worker response');
         return response.outcome;
       },
+      // Round 89 (#104): the lines replay on one worker; the answer is a list of plain lines
+      lines: async input => {
+        const response = await this.rpc(this.pickWorker(), { type: 'lines', serializedBattle, input, ruleset });
+        if (response.type !== 'linesResult') throw new Error('unexpected worker response');
+        return response.lines;
+      },
     };
   }
 
+  /**
+   * Round 89 (#124): a position the world registry knows (a short-side game's heaviest world) runs once per world, one after the
+   * other, and comes back blended by usage; any other position runs once, exactly as before. The first world takes the caller's
+   * `exclusive` and streams its partials (the heaviest world, the one the user sees), the rest never cancel it. Another engine
+   * over HTTP reads the heaviest world alone.
+   */
   evaluate(
+    serializedBattle: string,
+    settings: AppEvalSettings,
+    handlers?: EvalRunHandlers,
+    opts?: { exclusive?: boolean },
+  ): Promise<EvalResult> {
+    const worlds = selectedEngine() ? null : worldPositionsOf(serializedBattle);
+    if (!worlds) return this.evaluateOne(serializedBattle, settings, handlers, opts);
+    return this.evaluateWorlds(worlds, settings, handlers, opts);
+  }
+
+  private async evaluateWorlds(
+    worlds: readonly WorldPosition[],
+    settings: AppEvalSettings,
+    handlers: EvalRunHandlers | undefined,
+    opts: { exclusive?: boolean } | undefined,
+  ): Promise<EvalResult> {
+    // The first world's evaluation bumps the generation when it is exclusive, so the loop reads it right after that call.
+    const first = this.evaluateOne(worlds[0].position, settings, handlers && { ...handlers, onProgress: this.worldProgress(handlers, 0, worlds.length) }, opts);
+    const generation = this.generation;
+    const results = [await first];
+    const weights = [worlds[0].weight];
+    for (let index = 1; index < worlds.length; index += 1) {
+      // A cancel between two worlds leaves no call to reject: the loop itself stops.
+      if (generation !== this.generation) throw new Error('cancelled');
+      try {
+        const progress = handlers?.onProgress && { onProgress: this.worldProgress(handlers, index, worlds.length) };
+        results.push(await this.evaluateOne(worlds[index].position, settings, progress, { exclusive: false }));
+        weights.push(worlds[index].weight);
+      } catch (error) {
+        // A lighter world that cannot answer leaves the blend; a cancel ends the loop.
+        if (generation !== this.generation) throw error;
+      }
+    }
+    return blendWorlds(results, weights);
+  }
+
+  /** One world's progress as a share of the whole loop: the bar runs once across the worlds, not once per world. */
+  private worldProgress(handlers: EvalRunHandlers, index: number, count: number): EvalRunHandlers['onProgress'] {
+    const { onProgress } = handlers;
+    if (!onProgress) return undefined;
+    return progress => onProgress({ ...progress, done: progress.done + index * progress.total, total: progress.total * count });
+  }
+
+  private evaluateOne(
     serializedBattle: string,
     settings: AppEvalSettings,
     handlers?: EvalRunHandlers,
@@ -209,9 +231,8 @@ export class EvalWorkerClient {
       onProgress: (progress: SearchProgress) => {
         if (live()) handlers?.onProgress?.(progress);
       },
-      onPartial: (partial: EvalResult) => {
-        if (live()) handlers?.onPartial?.(partial);
-      },
+      // Round 89 (SB-9): a listener is what makes tree 0 compute its interim result; the game analysis and the play-out pass none.
+      ...(handlers?.onPartial && { onPartial: (partial: EvalResult) => { if (live()) handlers.onPartial?.(partial); } }),
       shouldStop: () => !live(),
     };
     // Round 77: another engine answers over HTTP; the pool still lists the options it ranks.
@@ -235,6 +256,7 @@ export class EvalWorkerClient {
     offset: number,
     live: () => boolean,
     onProgress: (progress: SearchProgress) => void,
+    onPartial?: (result: EvalResult) => void,
   ): Promise<MctsTreeStats> {
     const handle = this.pickWorker();
     const id = this.nextId++;
@@ -246,12 +268,14 @@ export class EvalWorkerClient {
         },
         reject,
         onStream: response => {
-          if (!live() || response.type !== 'progress') return;
-          onProgress(response.progress);
+          if (!live()) return;
+          if (response.type === 'progress') onProgress(response.progress);
+          else if (response.type === 'partial') onPartial?.(response.result);
         },
       });
       handle.worker.postMessage({
         type: 'mctstree', id, serializedBattle, settings, seedOffset: offset, simFast: simFastLevers(), searchBudget: searchBudgetStamp(),
+        ...(onPartial && { partials: true as const }),
       });
     });
   }
@@ -264,8 +288,8 @@ export class EvalWorkerClient {
   private createPooledTreeExecutor(serializedBattle: string, live: () => boolean, ruleset: StaticRuleset): TreeExecutor {
     return {
       ...this.createPooledExecutor(serializedBattle, ruleset),
-      tree: (settings, seedOffset, onProgress) =>
-        this.runTree(serializedBattle, settings, seedOffset, live, onProgress ?? (() => undefined)),
+      tree: (settings, seedOffset, onProgress, onPartial) =>
+        this.runTree(serializedBattle, settings, seedOffset, live, onProgress ?? (() => undefined), onPartial),
     };
   }
 
@@ -276,6 +300,26 @@ export class EvalWorkerClient {
    * estimator disagreement into the decision/chance decomposition.
    */
   async evalPair(serializedBattle: string, p1Choice: string, p2Choice: string, settings: AppEvalSettings): Promise<number> {
+    // Round 89 (#124): the pair is valued in every world of a short-side position and blended by usage (see `evaluate`).
+    const worlds = selectedEngine() ? null : worldPositionsOf(serializedBattle);
+    if (!worlds) return this.evalPairOne(serializedBattle, p1Choice, p2Choice, settings);
+    const generation = this.generation;
+    const values: number[] = [];
+    const weights: number[] = [];
+    for (const [index, world] of worlds.entries()) {
+      if (generation !== this.generation) throw new Error('cancelled');
+      try {
+        values.push(await this.evalPairOne(world.position, p1Choice, p2Choice, settings));
+        weights.push(world.weight);
+      } catch (error) {
+        // The heaviest world must answer; a lighter one that cannot leaves the blend, and a cancel ends the loop.
+        if (index === 0 || generation !== this.generation) throw error;
+      }
+    }
+    return blendValues(values, weights);
+  }
+
+  private async evalPairOne(serializedBattle: string, p1Choice: string, p2Choice: string, settings: AppEvalSettings): Promise<number> {
     const ruleset = settings.ruleset;
     if (!ruleset) throw new Error(MISSING_RULESET);
     const engine = selectedEngine();
@@ -308,6 +352,14 @@ export class EvalWorkerClient {
     return response.values[0].value;
   }
 
+  /**
+   * Round 89 (#130): the win paths of a lost endgame, searched on request, on a worker of its own (see `OnRequestJobs`): a sweep's
+   * `cancel` leaves it, and its `signal` leaves the sweep.
+   */
+  winPaths(serializedBattle: string, request: WinPathsRequest, ruleset: StaticRuleset, handlers?: WinPathsHandlers): Promise<WinPaths> {
+    return this.jobs.winPaths(serializedBattle, request, ruleset, handlers);
+  }
+
   cancel(): void {
     this.generation += 1;
     if (this.workers.length === 0) return;
@@ -330,5 +382,6 @@ export class EvalWorkerClient {
     this.cancel();
     for (const handle of this.workers) handle.worker.terminate();
     this.workers = [];
+    this.jobs.dispose();
   }
 }

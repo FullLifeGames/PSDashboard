@@ -11,10 +11,11 @@ import type { GraphSweepParams, SweepData, SweepEnv } from './sweep-types';
  * turn early — the draft replay does this) and gets a calm story without
  * set-correction advice; anything else is genuine divergence.
  */
-export function coverageNotice(positions: (string | null)[]): string | null {
+export function coverageNotice(positions: (string | null)[], opts: { game?: boolean } = {}): string | null {
   const total = positions.length;
   const covered = positions.filter(Boolean).length;
   if (total === 0 || covered === total) return null;
+  if (opts.game) return gameCoverageNotice(covered, total);
   if (covered === 0) {
     return 'The replay could not be reconstructed from the guessed sets: no turn has a live position to analyze. Correcting items/moves via Edit Player/Opp is the common fix.';
   }
@@ -25,11 +26,22 @@ export function coverageNotice(positions: (string | null)[]): string | null {
 }
 
 /**
+ * Round 89 (NG-2): a new game has no replay and no guessed sets; its positions come from its own record. The notice says that the
+ * rebuild fell short and what the user can do, and never advises Edit Player/Opp.
+ */
+function gameCoverageNotice(covered: number, total: number): string {
+  if (covered === 0) {
+    return "This game's positions could not be rebuilt from its record, so no turn has a live position to analyze. Analyze game again; if this stays, Report issue sends the game.";
+  }
+  return `Only ${covered} of ${total} turns could be rebuilt from this game's record for analysis. Analyze game again to retry the rest.`;
+}
+
+/**
  * An unexplained short line is the worst outcome: the sweep leaves gaps for every turn the reconstruction never produced, and
  * the panel used to show that as a blank graph with no reason given.
  */
-function noteCoverage(data: SweepData, positions: (string | null)[], diagnostics: string[]): void {
-  data.notice = coverageNotice(positions);
+function noteCoverage(data: SweepData, positions: (string | null)[], diagnostics: string[], game: boolean): void {
+  data.notice = coverageNotice(positions, { game });
   if (diagnostics.length === 0) return;
   const extra = diagnostics.join(' ');
   data.notice = data.notice ? `${data.notice} ${extra}` : extra;
@@ -103,10 +115,11 @@ export function makePositionSource(params: GraphSweepParams, data: SweepData): P
       positions.forEach((serialized, index) => {
         if (serialized) arrived.set(index + 1, serialized);
       });
-      noteCoverage(data, positions, acquireDiagnostics);
+      noteCoverage(data, positions, acquireDiagnostics, params.game === true);
     }).catch(error => {
       acquireError = error;
-      data.notice = `The replay could not be reconstructed: ${error instanceof Error ? error.message : String(error)}`;
+      const message = error instanceof Error ? error.message : String(error);
+      data.notice = params.game ? `The game could not be rebuilt: ${message}` : `The replay could not be reconstructed: ${message}`;
     }).finally(() => {
       acquireSettled = true;
       settleWaiters();

@@ -15,23 +15,66 @@ import type { PokemonIdent, SimBattle, SimPokemon } from './types.ts';
  * Filtering preserves team order, so leads stay in front.
  */
 export function trimTeamToBring(team: PokemonSet[], keep: string[] | undefined, rules: GameRules): PokemonSet[] {
-  if (!keep || keep.length === 0 || keep.length >= team.length) return team;
-  const claimed = new Set<PokemonSet>();
+  const claimed = claimBring(team, keep, rules);
+  return claimed && claimed.length > 0 ? team.filter(set => claimed.includes(set)) : team;
+}
+
+/**
+ * The sets a bring list names, in list order: null when the list is empty or missing, or a name stays unresolved or ambiguous
+ * (the side fails open). A list as long as the team (or longer) trims nothing and claims nothing: it names no set, so its guesses
+ * cannot move either.
+ */
+function claimBring(team: PokemonSet[], keep: string[] | undefined, rules: GameRules): PokemonSet[] | null {
+  if (!keep || keep.length === 0) return null;
+  if (keep.length >= team.length) return [];
+  const claimed: PokemonSet[] = [];
   for (const name of keep) {
     const nameId = toId(name);
-    const free = team.filter(set => !claimed.has(set));
+    const free = team.filter(set => !claimed.includes(set));
     const exact = (name ? free.find(set => set.name === name) : undefined) ??
       free.find(set => (nameId !== '' && toId(set.species) === nameId) || sameBodyName(set.name, name));
     if (exact) {
-      claimed.add(exact);
+      claimed.push(exact);
       continue;
     }
     const base = speciesBaseId(name, rules);
     const byBase = free.filter(set => speciesBaseId(set.species, rules) === base);
-    if (byBase.length !== 1) return team;
-    claimed.add(byBase[0]);
+    if (byBase.length !== 1) return null;
+    claimed.push(byBase[0]);
   }
-  return team.filter(set => claimed.has(set));
+  return claimed;
+}
+
+/** Round 89 (#124): a bring list of both sides, with how many trailing names of each list are guesses (absent: none). */
+export interface BringLists {
+  p1: string[];
+  p2: string[];
+  guessed?: { p1: number; p2: number };
+}
+
+/**
+ * Round 89 (#124): both teams trim to their bring lists, or neither does. A pinned four against an open six overrates the open
+ * side (the A.3c gate flipped game 452654 on that asymmetry, ADR 0010), so one side whose list is empty, unresolved or ambiguous
+ * leaves both teams whole. After the trim each side's guessed sets (the trailing names of its list) move behind the known bodies, in list
+ * order; every other set keeps team order, leads first. A guess therefore takes the last party slots, and every world of a game
+ * puts each known body at the same party index, so one choice string names one body in all worlds.
+ */
+export function trimTeamsToBring(
+  p1Team: PokemonSet[], p2Team: PokemonSet[], list: BringLists | null | undefined, rules: GameRules,
+): { p1: PokemonSet[]; p2: PokemonSet[] } {
+  if (!list) return { p1: p1Team, p2: p2Team };
+  const claimed = { p1: claimBring(p1Team, list.p1, rules), p2: claimBring(p2Team, list.p2, rules) };
+  if (!claimed.p1 || !claimed.p2) return { p1: p1Team, p2: p2Team };
+  const side = (team: PokemonSet[], claim: PokemonSet[], guessed: number): PokemonSet[] => {
+    if (claim.length === 0) return team;
+    const trimmed = team.filter(set => claim.includes(set));
+    const guesses = claim.slice(claim.length - Math.min(Math.max(guessed, 0), claim.length));
+    return [...trimmed.filter(set => !guesses.includes(set)), ...guesses];
+  };
+  return {
+    p1: side(p1Team, claimed.p1, list.guessed?.p1 ?? 0),
+    p2: side(p2Team, claimed.p2, list.guessed?.p2 ?? 0),
+  };
 }
 
 /**

@@ -14,8 +14,8 @@ const dexes = [...[1, 2, 3, 4, 5, 6, 7, 8, 9].map(gen => ({ name: `Gen ${gen}`, 
 const idOf = (kind: string): string => kind.replace(/[^a-z0-9]/g, '');
 
 describe('the kinds of dice', () => {
-  test('the list holds the fourteen kinds of the plan', () => {
-    expect(new Set(DIE_KINDS).size).toBe(14);
+  test('the list holds the sixteen kinds of the plan', () => {
+    expect(new Set(DIE_KINDS).size).toBe(16);
     expect(DIE_KINDS).toEqual(expect.arrayContaining(['stalling', 'power', 'move-first']));
   });
 

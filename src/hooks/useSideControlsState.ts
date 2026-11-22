@@ -4,8 +4,8 @@ import { toId } from '@fulllifegames/replay-core';
 import { gimmickApplies } from '../lib/dock-seed';
 
 /** Legal move pool for "What if it had …" — loaded lazily per active species. */
-export function useMovePool(activeSpecies: string, gen: number): string[] {
-  const key = `${activeSpecies}:${gen}`;
+export function useMovePool(activeSpecies: string, gen: number, format: string): string[] {
+  const key = `${activeSpecies}:${gen}:${format}`;
   // A species change drops the previous pool in the same render (the old
   // effect cleared it one commit later); the async load fills the new key.
   const [loaded, setLoaded] = useState<{ key: string; pool: string[] }>({ key, pool: [] });
@@ -13,14 +13,14 @@ export function useMovePool(activeSpecies: string, gen: number): string[] {
     let alive = true;
     if (!activeSpecies) return;
     void import('../lib/pokemon-options')
-      .then(options => options.getMovePool(activeSpecies, gen))
+      .then(options => options.getMovePool(activeSpecies, gen, format))
       .then(pool => {
         if (alive) setLoaded({ key, pool });
       });
     return () => {
       alive = false;
     };
-  }, [activeSpecies, gen, key]);
+  }, [activeSpecies, gen, format, key]);
   return loaded.key === key ? loaded.pool : [];
 }
 

@@ -1,3 +1,4 @@
+import { sourceLabel as panelSourceLabel } from './provenance-labels';
 import { type RevealedPokemonInfo, type StatId, evBudget, manualMove, toId } from '@fulllifegames/replay-core';
 
 export interface EditorPools {
@@ -9,13 +10,19 @@ export interface EditorPools {
   /** Every move and every ability of the generation (empty before Generation 3 for abilities): the editor takes these beside the species' own. */
   allMoves: string[];
   allAbilities: string[];
+  /**
+   * Round 89 (#150): every move the battle plays, which a typed name may take beyond `allMoves` (the editor's dropdown lists the
+   * standard moves for a format id the simulator does not list, and a Past species' own moves come from `movesBySpecies`).
+   * Absent where `allMoves` already is that list (the sets import).
+   */
+  playedMoves?: string[];
   /** The simulator's total EV limit of the format (`null`: none); absent until the pools are read. */
   evLimit?: number | null;
 }
 
-export function sourceLabel(source: RevealedPokemonInfo['ability']['source'], probability?: number) {
-  const suffix = probability === undefined ? '' : ` ${Math.round(probability * 1000) / 10}%`;
-  return `${source.toUpperCase()}${suffix}`;
+/** The editor's caption word: the stats panel's word for the source (a fitted spread says so), in capitals. */
+export function sourceLabel(source: RevealedPokemonInfo['ability']['source'], probability?: number, sourceDetail?: string) {
+  return panelSourceLabel(source, probability, sourceDetail).toUpperCase();
 }
 
 export const EV_STATS: { id: StatId; label: string }[] = [
@@ -55,17 +62,18 @@ export function clampEv(value: string, limits: EvLimits = evLimitsFor(''), other
 
 /**
  * The move's canonical spelling and whether it lies outside the species' own pool (`outside`: the editor marks it with a note),
- * or `unknown` when the generation's whole list is known and does not hold the name. Before the lists load (`everyMove` empty
- * or absent) any name is taken as typed. A species without a pool of its own has no note to carry.
+ * or `unknown` when the generation's whole list is known and does not hold the name. A name outside `everyMove` still counts when
+ * `playedMoves` (every move the battle plays) holds it. Before the lists load (`everyMove` empty or absent) any name is taken as
+ * typed. A species without a pool of its own has no note to carry.
  */
 export function canonicalMove(
-  pool: string[] | undefined, trimmed: string, everyMove?: string[],
+  pool: string[] | undefined, trimmed: string, everyMove?: string[], playedMoves?: string[],
 ): { canonical: string; outside: boolean } | { unknown: true } {
   const find = (names: string[] | undefined) => names?.find(name => toId(name) === toId(trimmed));
   const own = find(pool);
   if (own) return { canonical: own, outside: false };
   if (!everyMove || everyMove.length === 0) return { canonical: trimmed, outside: false };
-  const other = find(everyMove);
+  const other = find(everyMove) ?? find(playedMoves);
   return other ? { canonical: other, outside: !!pool && pool.length > 0 } : { unknown: true };
 }
 

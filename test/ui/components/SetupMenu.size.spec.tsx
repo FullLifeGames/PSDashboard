@@ -18,7 +18,7 @@ function windowOf(width: number, height: number) {
 }
 
 async function openMenu() {
-  render(<SetupMenu animateBranchTurns onAnimateChange={vi.fn()} onEditSide={vi.fn()} onOpenSets={vi.fn()} />);
+  render(<SetupMenu animateBranchTurns onAnimateChange={vi.fn()} opponentReads={false} onOpponentReadsChange={vi.fn()} onEditSide={vi.fn()} onOpenSets={vi.fn()} />);
   await userEvent.click(screen.getByRole('button', { name: 'Setup' }));
   return screen.getByRole('combobox', { name: 'Size' }) as HTMLSelectElement;
 }

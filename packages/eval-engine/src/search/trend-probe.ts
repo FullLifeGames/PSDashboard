@@ -1,7 +1,8 @@
 import type { MatchupCache } from '../eval-function.ts';
 import { advancePosition, advancePositionWithLog, positionBattle, type SimPosition } from '../forward-model.ts';
 import type { CellDraw, EvalResult } from '../types.ts';
-import { leafValue, SEARCH_SEEDS, tieOrderScripts } from './leaf.ts';
+import { leafValue, tieOrderScripts } from './leaf.ts';
+import { cellSeeds } from './root-quantile.ts';
 
 /**
  * Round 70: the horizon-trend probe of one base draw of a decisive cell. The trend layers ask how a tied row's
@@ -13,10 +14,11 @@ import { leafValue, SEARCH_SEEDS, tieOrderScripts } from './leaf.ts';
 
 /**
  * The child one base draw of a cell leads to: the very child the matrix priced, the draw's seed and, for a
- * speed-tied cell, the move order scripted into it (cell-sampler.ts mixOrders).
+ * speed-tied cell, the move order scripted into it (cell-sampler.ts mixOrders). Round 89 (#60, T324): the draw's seed is slot
+ * `index` of the cell's own list, which the root and the two choices name, so the record needs no key of its own.
  */
 export function drawChild(root: SimPosition, p1Choice: string, p2Choice: string, draw: CellDraw): SimPosition {
-  const seed = SEARCH_SEEDS[draw.index];
+  const seed = cellSeeds(root, p1Choice, p2Choice)[draw.index];
   if (!draw.first) return advancePosition(root, p1Choice, p2Choice, seed);
   const scripts = tieOrderScripts(p1Choice, p2Choice)[draw.first];
   return advancePositionWithLog(root, p1Choice, p2Choice, seed, { scripts }).child;

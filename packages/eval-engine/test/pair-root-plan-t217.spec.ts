@@ -5,6 +5,7 @@ import { createMatchupCache } from '../src/eval-function';
 import { createRootPosition } from '../src/forward-model';
 import { mctsTreeSearch } from '../src/mcts';
 import { mergeMctsTrees } from '../src/mcts-merge';
+import { benchOrder } from '../src/search/bench-order';
 import { cellKey } from '../src/rank';
 import { pairCellSample } from '../src/pair/sampler';
 import { summarizeTurn } from '../src/summary';
@@ -60,7 +61,9 @@ describe('a doubles root plans the cells of the played row and column (VGC 26306
   });
 
   test('each answer is the pair plan\'s own: plain is none, a planned cell lists its classes (heaviest first, weights summing to 1)', () => {
-    const root = createRootPosition(position.serialized, position.ruleset);
+    // r89 A5 gate: the tree reads the root through `benchOrder`, and a cell's seeds (T324) key the saved position, so the spec builds it the same way.
+    const order = benchOrder(position.serialized);
+    const root = createRootPosition(order ? order.serialized : position.serialized, position.ruleset);
     const cache = createMatchupCache(position.ruleset);
     const answered = new Map<number, PlannedCell>(tree.plannedCells!.map(entry => [entry.key, entry]));
     const seen = { none: 0, events: 0, unlisted: 0 };

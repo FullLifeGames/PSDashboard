@@ -79,7 +79,7 @@ describe('stats panel data quality (WP11)', () => {
     expect(corv?.ruledOut?.items).toContain('heavydutyboots');
   });
 
-  test('taking a Ground move rules out Levitate', () => {
+  test('taking a Ground move rules out Levitate only for a species that can hold it (#150: Rotom-Heat holds only Levitate, a landed hit is a contradiction the rule leaves unread)', () => {
     const log = [
       '|player|p2|Bob|', '|gen|9', '|poke|p2|Rotom-Heat|',
       '|start', '|switch|p1a: Chomp|Garchomp, M|100/100',
@@ -89,7 +89,7 @@ describe('stats panel data quality (WP11)', () => {
       '|turn|2',
     ].join('\n');
     const rotom = inferOpponentTeam(log, 'p2').pokemon.find(p => p.species === 'Rotom-Heat');
-    expect(rotom?.ruledOut?.abilities).toContain('levitate');
+    expect(rotom?.ruledOut?.abilities).toEqual([]);
   });
 
   test('an immune Ground move plus later unattributed damage does NOT rule out Levitate', () => {

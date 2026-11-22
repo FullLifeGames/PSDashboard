@@ -13,7 +13,7 @@ import {
   assembleMoves, buildSheetSet, editedFields, findUserMatch, resolveAbility, resolveItem, resolveItemWithout, resolveSpread,
   selectCuratedFor, USAGE_MOVE_POOL, usageMoveTail,
 } from './team/set-resolvers.ts';
-import { resolveInferredItems, speedKnowledgeFor } from './team/inferred-items.ts';
+import { itemClauseLimit, resolveInferredItems, speedKnowledgeFor } from './team/inferred-items.ts';
 import { abilitiesAreFree, dexLegalSet, type LegalityContext } from './team/dex-legal.ts';
 import { dexOf, formatRules, logRules, type GameRules } from './rules-dex.ts';
 import { rocksMayMiss } from './inference/rocks-tell.ts';
@@ -164,7 +164,7 @@ function inferredSpreadsFor(
   if (!hasSpreadEvidence(options)) return undefined;
   const base = build();
   const solved = inferSpreads(options?.observations ?? [], { p1: base.p1Team, p2: base.p2Team },
-    formatHint, options?.speedOrders ?? [], speedKnowledgeFor(infos, knownTeams, options?.usageStats), observedMaxHp(log));
+    formatHint, options?.speedOrders ?? [], speedKnowledgeFor(infos, knownTeams, options?.usageStats, itemClauseLimit(log)), observedMaxHp(log));
   carryOrdersOnly(solved, log, options, build, formatHint, infos, knownTeams);
   return resolveSolvedItems(solved, infos, formatHint, options?.usageStats, options?.setAssumptions);
 }
@@ -199,7 +199,7 @@ export function solveReplaySpreads(
   const infos = infosFor(log, options);
   const { teams: base, inferred: preSolved } = buildTeams(log, { ...options, p1Info: infos.p1, p2Info: infos.p2 });
   const solved = inferSpreads(observations, { p1: base.p1Team, p2: base.p2Team }, formatHintFor(log).formatHint,
-    speedOrders, speedKnowledgeFor(infos, knownTeamsFor(log, userTeamText), usageStats), observedMaxHp(log));
+    speedOrders, speedKnowledgeFor(infos, knownTeamsFor(log, userTeamText), usageStats, itemClauseLimit(log)), observedMaxHp(log));
   carryPreSolve(solved, preSolved);
   return resolveSolvedItems(solved, infos, formatHintFor(log).formatHint, usageStats, setAssumptions);
 }

@@ -30,3 +30,15 @@ export function requiresItem(dex: RulesDex, species: string, item: string): bool
   const entry = dex.species.get(species);
   return [entry.requiredItem, ...(entry.requiredItems ?? [])].some(name => !!name && toId(name) === toId(item));
 }
+
+/** Whether the item changes its holder's Speed (the simulator's `onModifySpe` hook: the Choice Scarf, the Iron Ball and the like). */
+export function changesSpeed(dex: RulesDex, item: string): boolean {
+  const entry = dex.items.get(item);
+  return entry.exists && typeof (entry as unknown as Record<string, unknown>).onModifySpe === 'function';
+}
+
+/** Whether the item belongs to other species only (Light Ball, Thick Club, Soul Dew: the Dex's `itemUser`). */
+export function belongsToOthers(dex: RulesDex, species: string, item: string): boolean {
+  const users = dex.items.get(item).itemUser;
+  return !!users && !users.some(user => toId(user) === toId(species));
+}

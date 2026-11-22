@@ -2,7 +2,7 @@ import { TIER_THRESHOLDS, diffChoices, playedSetupMove, type SideAnalysis } from
 import type { RankedChoice } from '../types.ts';
 import { winDeltaText, winPctText } from '../winprob.ts';
 import { formatLine } from './line.ts';
-import { choiceNoun, conditionalNote, displayBest, nullNote, oddsNote, oddsPart, phrase, phraseReplies, playedVerb } from './phrases.ts';
+import { cameInstead, choiceNoun, conditionalNote, displayBest, nullNote, oddsNote, oddsPart, phrase, phraseReplies, playedVerb } from './phrases.ts';
 
 /**
  * The per-side clauses of the turn summary: paid-off reads, misplays,
@@ -12,10 +12,13 @@ import { choiceNoun, conditionalNote, displayBest, nullNote, oddsNote, oddsPart,
  */
 
 /** A flagged risk that won value over the safe guarantee — praised, not blamed. */
-function readClause(name: string, side: SideAnalysis, opponent: SideAnalysis): string | null {
+function readClause(name: string, side: SideAnalysis, opponent: SideAnalysis, opponentName: string): string | null {
   if (!side.riskPaidOff || !side.played || !side.safe) return null;
-  const came = opponent.played ? `; ${phrase(opponent.played.label)} came instead` : '';
-  const priced = side.played.punishedBy ? ` The floor priced in ${phraseReplies(side.played.punishedBy)}${came}.` : '';
+  const came = opponent.played ? `; ${cameInstead(opponentName, opponent)}` : '';
+  // Round 89 (G-Q2 b): the fair test's own numbers, the played cell against the safe cell in the clicked column.
+  const held = side.safeAgainstClick;
+  const beat = held ? `, and against it the play beat the safe line by ${winDeltaText(held.playedValue - held.safeValue)}` : '';
+  const priced = side.played.punishedBy ? ` The floor priced in ${phraseReplies(side.played.punishedBy)}${came}${beat}.` : '';
   const horizon = side.riskPayoffTurn
     ? side.riskPayoffTurn === 1 ? ' one turn later' : ` ${side.riskPayoffTurn} turns later`
     : '';
@@ -27,6 +30,25 @@ function readClause(name: string, side: SideAnalysis, opponent: SideAnalysis): s
 }
 
 /**
+ * Round 89 (B6a, G-Q1 a): the payoff cleared the margin, but the safe line did as well or better against the reply that came
+ * (`safeAgainstClick` without `riskPaidOff`). The card says so, with the gap in the safe line's favour; a gap that rounds to
+ * 0% reads "did as well". The one place for these words.
+ */
+export function heldRiskClause(name: string, side: SideAnalysis): string | null {
+  const held = side.safeAgainstClick;
+  if (!held || side.riskPaidOff || !side.played || !side.safe) return null;
+  const gap = held.safeValue - held.playedValue;
+  const versus = Math.round(gap * 50) === 0 ? 'did as well' : `was worth ${winDeltaText(gap)} more`;
+  const priced = side.played.punishedBy
+    ? ` The floor priced in ${phraseReplies(side.played.punishedBy)}; ${phrase(held.against)} came instead.`
+    : '';
+  const odds = side.hitStopped?.played ? undefined : side.played.koOdds;
+  const click = odds ? ` ${oddsPart('The click', odds, 'was')}.` : '';
+  return `${name} ${playedVerb(side.played.label)}: a risk that went unpunished.${priced} ` +
+    `Against it the safe ${choiceNoun(side.safe.label)} ${versus}.${click}`;
+}
+
+/**
  * A charitable partial grade must say so — one slot's choice was never
  * visible (flinch/sleep), so the combo shown is the best consistent one.
  * Round 64 (T123): the read credit and the inaccuracy say it too.
@@ -35,9 +57,9 @@ const partialNote = (side: SideAnalysis, verb: 'graded' | 'credited'): string =>
   side.playedPartial ? ` (Partner's action hidden; ${verb} on the visible slot.)` : '';
 
 /** Round 67 (T59): `praised` false (the side lost ground) silences a paid-off read; no misplay clause takes its place. */
-export function sideClause(name: string, side: SideAnalysis, opponent: SideAnalysis, praised = true): string | null {
+export function sideClause(name: string, side: SideAnalysis, opponent: SideAnalysis, praised = true, opponentName = 'the opponent'): string | null {
   if (side.riskPaidOff && !praised) return null;
-  const clause = readClause(name, side, opponent) ?? mistakeClause(name, side, opponent);
+  const clause = readClause(name, side, opponent, opponentName) ?? mistakeClause(name, side, opponent, opponentName);
   return clause ? `${clause}${partialNote(side, 'graded')}` : null;
 }
 
@@ -55,13 +77,14 @@ function unpunishedReadClause(
   name: string,
   side: SideAnalysis,
   opponent: SideAnalysis,
+  opponentName: string,
   played: RankedChoice,
   safe: RankedChoice,
   why: string,
   caveat: string,
 ): string {
   const came = played.punishedBy && opponent.played
-    ? `its floor risked ${phraseReplies(played.punishedBy)} (down to ${winPctText(played.worstCase, side.faintedFraction)}); ${phrase(opponent.played.label)} came instead`
+    ? `its floor risked ${phraseReplies(played.punishedBy)} (down to ${winPctText(played.worstCase, side.faintedFraction)}); ${cameInstead(opponentName, opponent)}`
     : `its floor sat at ${winPctText(played.worstCase, side.faintedFraction)}`;
   const framing = side.riskWasRead
     ? `a read against the opponent's tendencies: ${came}`
@@ -95,7 +118,7 @@ function punishedMisplayClause(
     `safer was ${phrase(shown.label)} (${winPctText(shown.ev, side.faintedFraction)})${line}.${reasons}`;
 }
 
-function mistakeClause(name: string, side: SideAnalysis, opponent: SideAnalysis): string | null {
+function mistakeClause(name: string, side: SideAnalysis, opponent: SideAnalysis, opponentName: string): string | null {
   if (side.sacrifice) return null; // the sack note carries the turn instead
   if ((side.tier !== 'mistake' && side.tier !== 'blunder') || !side.played || !side.best) return null;
   const difference = diffChoices(side.played, side.best);
@@ -104,8 +127,9 @@ function mistakeClause(name: string, side: SideAnalysis, opponent: SideAnalysis)
   const caveat = setup
     ? ` (${setup} is a setup move: its payoff lies past the search horizon, so the regret may be overstated.)`
     : '';
+  if (side.safeAgainstClick && !side.riskPaidOff) return heldRiskClause(name, side);
   if (side.riskUnpunished && side.safe) {
-    return unpunishedReadClause(name, side, opponent, side.played, side.safe, why, caveat);
+    return unpunishedReadClause(name, side, opponent, opponentName, side.played, side.safe, why, caveat);
   }
   return punishedMisplayClause(name, side, side.played, side.best, why, caveat);
 }
@@ -132,12 +156,20 @@ export function readCreditClause(name: string, side: SideAnalysis, ownLuck: numb
     `${partialNote(side, 'credited')}${luck}`;
 }
 
+/** The ride-along slot of `heldRiskClause`: a gamble or an inaccuracy risk that kept ground; a mistake or blunder speaks through `sideClause`. */
+export function heldRiskNote(name: string, side: SideAnalysis): string | null {
+  if (side.tier === 'mistake' || side.tier === 'blunder') return null;
+  const clause = heldRiskClause(name, side);
+  return clause ? `${clause}${partialNote(side, 'graded')}` : null;
+}
+
 /**
  * Sub-verdict note: a light imprecision worth naming, not blaming. Round 77 (562428 t12): a read that paid off speaks for the
  * inaccuracy, as the read clause does for a misplay.
  */
 export function inaccuracyClause(name: string, side: SideAnalysis): string | null {
-  if (side.tier !== 'inaccuracy' || side.riskPaidOff || !side.played || !side.best) return null;
+  // Round 89 (B6a): a risk with `safeAgainstClick` speaks through `heldRiskClause`, or, on a side that lost ground, stays silent (D-Q2).
+  if (side.tier !== 'inaccuracy' || side.riskPaidOff || side.safeAgainstClick || !side.played || !side.best) return null;
   const shown = displayBest(side);
   return `${name}'s ${phrase(side.played.label)} was an inaccuracy; ` +
     `${phrase(shown.label)} was slightly better (${winPctText(shown.ev, side.faintedFraction)} vs ${winPctText(side.played.ev, side.faintedFraction)}).` +
@@ -158,7 +190,7 @@ export function forcedClause(name: string, side: SideAnalysis): string | null {
   if (!side.played) return `${base}.`;
   return side.played.label === side.forcedMix.label
     ? `${base}, which is what happened.`
-    : `${base}, but ${phrase(side.played.label)} came instead.`;
+    : `${base}, but ${cameInstead(name, side)}.`;
 }
 
 /**

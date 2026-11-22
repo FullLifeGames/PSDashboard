@@ -1,5 +1,5 @@
-import { dieKey, dieLabel, type DieName, type DieOffer, type DieWords, type ForcedDie } from '@fulllifegames/eval-engine';
-import { TURN_KINDS, captionOf, resultWord, targetHeading } from '../../lib/branch-dice';
+import { dieKey, dieLabel, type DieName, type DieOffer, type DieResult, type DieWords, type ForcedDie } from '@fulllifegames/eval-engine';
+import { TURN_KINDS, captionOf, heldHits, isCountDie, resultWord, targetHeading } from '../../lib/branch-dice';
 import type { StepDamage } from '../../lib/branch-rolls';
 import { RollSelect } from './RollSelect';
 
@@ -50,6 +50,11 @@ export function DieRow({ offer, dice, logged, words, target, withMove, rollsOf, 
   const key = dieKey(offer.name);
   const held = dice.find(die => dieKey(die.name) === key);
   const seen = logged.find(die => dieKey(die.name) === key);
+  // the Hits row of a multi-accuracy move (round 89, #114): a chip is pressed for the count of the move's later hit dice, not for a die of its own
+  const counted = isCountDie(offer.name);
+  const heldCount = counted ? heldHits(dice, offer.name) : undefined;
+  const seenCount = counted ? heldHits(logged, offer.name) : undefined;
+  const isCount = (count: number | undefined, result: DieResult): boolean => count !== undefined && 'hits' in result && result.hits === count;
   const caption = captionOf(offer.name, words);
   const label = [
     caption,
@@ -59,14 +64,17 @@ export function DieRow({ offer, dice, logged, words, target, withMove, rollsOf, 
   return (
     <div className={`ps-dice-row${cell ? ` ps-dice-cell${cell === 'shared' ? ' ps-dice-cell-shared' : ''}` : ''}`} role="group" aria-label={label}>
       {!cell && <span className="ps-dice-caption">{caption}</span>}
-      {offer.name.kind === 'damage-roll' ? <RollSelect offer={offer} held={held} label={label} words={words} rolls={rollsOf?.(offer.name)} crit={critForced(dice, offer.name)} onToggle={onToggle} /> : offer.results.map(result => {
+      {offer.fixedBy !== undefined ? (
+        // Round 89 (ruling 34 F4a): an ability or item fixed the count; the simulator draws no die, so the row names the count and its source and offers no chip
+        <span className="ps-dice-note">{'hits' in offer.results[0] ? offer.results[0].hits : ''} ({offer.fixedBy})</span>
+      ) : offer.name.kind === 'damage-roll' ? <RollSelect offer={offer} held={held} label={label} words={words} rolls={rollsOf?.(offer.name)} crit={critForced(dice, offer.name)} onToggle={onToggle} /> : offer.results.map(result => {
         const die: ForcedDie = { name: offer.name, result };
         return (
           <Chip
             key={JSON.stringify(result)}
             die={die}
-            set={!!held && sameResult(held.result, result)}
-            logMark={!!seen && sameResult(seen.result, result)}
+            set={counted ? isCount(heldCount, result) : !!held && sameResult(held.result, result)}
+            logMark={counted ? isCount(seenCount, result) : !!seen && sameResult(seen.result, result)}
             words={words}
             onToggle={onToggle}
           />

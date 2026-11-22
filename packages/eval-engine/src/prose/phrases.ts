@@ -69,6 +69,53 @@ export const playedVerb = (label: string): string =>
  */
 export const percentBelowSure = (odds: number): number => (odds >= 1 ? 100 : Math.min(99, Math.round(odds * 100)));
 
+type ForcedCaveat = 'none' | 'barring-crit' | 'sampled-rolls';
+
+/** The caveat of a forced-win proof in words. */
+export const caveatWords = (caveat: ForcedCaveat): string =>
+  caveat === 'barring-crit' ? ', barring a crit' : caveat === 'sampled-rolls' ? ' on the sampled rolls' : '';
+
+/**
+ * The words a forced-win proof adds to its sentence, in one place for the turn card and the game report (round 89, ruling
+ * 30.2): empty for a full proof, the crit caveat for a full proof that carries it, and below mass 1 the share of the rolls
+ * the proof covers ("in 98% of the sampled rolls", "in 98% of the rolls, barring a crit"). The share stops at 99%.
+ */
+export function forcedQualifier(forced: { mass: number; caveat: ForcedCaveat }): string {
+  const tail = caveatWords(forced.caveat);
+  if (forced.mass >= 1) return tail;
+  const share = percentBelowSure(forced.mass);
+  return forced.caveat === 'sampled-rolls' ? ` in ${share}% of the sampled rolls` : ` in ${share}% of the rolls${tail}`;
+}
+
+/** What a forced-win proof says besides its mass: the stall it delays and the choice it wins through (round 89, lane P; `ForcedWin.delayName`, `ForcedWin.choiceNames`). */
+interface ForcedLean {
+  delay?: string;
+  delayName?: string;
+  choiceNames?: { first: string; partner?: string };
+}
+
+/**
+ * Round 89 (P4, ruling 39 B4a): the clause a delayed win carries, in one place for the turn card and the game report. "; a repeated
+ * Protect only delays it" (the report: "only delayed it"), the stall by the battle's own Dex name; a result cached without the name
+ * says "a repeated stalling move". Empty without a delay.
+ */
+export function delayClause(forced: ForcedLean, past = false): string {
+  if (!forced.delay) return '';
+  return `; a repeated ${forced.delayName ?? 'stalling move'} only ${past ? 'delayed' : 'delays'} it`;
+}
+
+/**
+ * Round 89 (P4, ruling 39 B4a): the sentence that names the winning choice when the proof wins through one the search's own list never
+ * held (a sure strike from the legal combinations, doubles only): the move that strikes first, with its partner. "The winning line is
+ * Aqua Jet, which strikes first, with Heat Wave beside it." (the report: "was", "struck"). Empty without a choice.
+ */
+export function choiceSentence(forced: ForcedLean, past = false): string {
+  const names = forced.choiceNames;
+  if (!names) return '';
+  const beside = names.partner ? `, with ${names.partner} beside it` : '';
+  return ` The winning line ${past ? 'was' : 'is'} ${names.first}, which ${past ? 'struck' : 'strikes'} first${beside}.`;
+}
+
 /** The near-decided click: a "sure KO" only at odds 1, else an "N% roll" (T123: 99.5% is no sure KO). */
 export const rollText = (odds: number): string => (odds >= 1 ? 'sure KO' : `${percentBelowSure(odds)}% roll`);
 
@@ -77,6 +124,17 @@ export const choiceNoun = (label: string): string =>
   splitCombinedLabel(label)
     .map(part => (part.startsWith('→ ') ? `switch to ${part.slice(2)}` : part))
     .join(' and ');
+
+/**
+ * Round 89 (FT-1): the words for a body knocked out before it moved, whose log shows no choice. The engine's stand-in label
+ * ("stayed in (KO’d before acting)") names what it graded, not what happened; a sentence says this instead. The app's row
+ * (`neverActedText`) builds on the same words.
+ */
+export const NEVER_ACTED_WORDS = 'knocked out before it moved, so the log shows no choice';
+
+/** "... ; <this> came instead": what the other side did, or that it was knocked out before it moved. */
+export const cameInstead = (name: string, side: SideAnalysis): string =>
+  side.neverActed ? `${name} was ${NEVER_ACTED_WORDS}` : `${phrase(side.played!.label)} came instead`;
 
 export const playedBest = (side: SideAnalysis) =>
   side.played !== null && side.best !== null && side.played.choice === side.best.choice;
@@ -112,6 +170,15 @@ export const regretSpanFor = (side: SideAnalysis): { span?: { from: number; to: 
   side.played && side.best && (side.regret ?? 0) > REGRET_SPAN_MIN
     ? { span: { from: displayBest(side).ev, to: side.played.ev, ...(side.faintedFraction === undefined ? {} : { faintedFraction: side.faintedFraction }) } }
     : {};
+
+/** The report's misplay of a body that fell before it moved: the stand-in's chance, for the sentence of `neverActedText` (round 89, FT-1). */
+export const neverActedFor = (side: SideAnalysis): { neverActed?: { ev: number; faintedFraction?: number } } =>
+  side.neverActed && side.played
+    ? { neverActed: { ev: side.played.ev, ...(side.faintedFraction === undefined ? {} : { faintedFraction: side.faintedFraction }) } }
+    : {};
+
+/** What a report misplay carries beyond its sentence: the span of a regret over 1 and the stand-in of a body that never acted. */
+export const misplayExtrasFor = (side: SideAnalysis) => ({ ...regretSpanFor(side), ...neverActedFor(side) });
 
 /** The null recommendation kept its place (no alternative): name the caveat. */
 export const nullNote = (side: SideAnalysis): string =>

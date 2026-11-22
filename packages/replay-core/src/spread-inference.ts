@@ -12,6 +12,7 @@ import { paradoxError } from './spreads/paradox.ts';
 import { hpEvsForMaxHp, type ObservedMaxHp } from './spreads/max-hp.ts';
 import { readableOrders, settledSets } from './spreads/order-limit.ts';
 import { isBoostItem, requiresItem } from './spreads/boost-items.ts';
+import { itemOffers } from './spreads/item-rung.ts';
 import { dexOf, dexOfCalc, formatRules } from './rules-dex.ts';
 
 export { evBudget, legalizeEvs } from './spreads/ev-budget.ts';
@@ -137,6 +138,44 @@ function forfeitsToPrior(ctx: SolveContext, key: string, best: CandidateRung, pr
     provenError(ctx, key, best) >= provenError(ctx, key, prior);
 }
 
+/**
+ * Round 89 (#75 step 2): the usage-listed boost item that explains a knockout no spread reaches. The log is the evidence: the game refutes the best
+ * rung (a knockout read by the shown HP, `observationError` of a lethal observation with its text above 0) under the item the build guessed, so the
+ * item may be another one. Each item of `itemOffers` (usage order, boost items only) re-scores the whole ladder with that item; the first whose best
+ * rung reaches every knockout of the mon with a lower total error than the best spread alone is the answer, and none is when no item does (the prior's
+ * item stays, and the forfeit rule reads the fit as before). Knockouts without the shown text (older caches) never trigger it.
+ */
+function itemRung(
+  ctx: SolveContext, key: string, ladder: CandidateRung[], best: CandidateRung, evidence: MonEvidence,
+): CandidateRung | null {
+  const knockouts = evidence.observations.filter(obs => obs.lethal && obs.defenderShown && keyOf(obs.attackerSide, obs.attackerSpecies) === key);
+  const refuted = (rung: CandidateRung) => knockouts.reduce((sum, obs) => sum + observationError(ctx, obs, key, rung), 0);
+  if (!evidence.attacked || !(refuted(best) > 0)) return null;
+  const total = (rung: CandidateRung) => evidence.observations.reduce((sum, obs) => sum + observationError(ctx, obs, key, rung), 0) + provenError(ctx, key, rung);
+  const floor = total(best);
+  for (const item of itemOffers(ctx, key, evidence.hasSpeedObs)) {
+    const rung = bestRung(ctx, key, ladder.map(entry => ({ ...entry, item })), evidence.observations);
+    if (rung && refuted(rung) === 0 && total(rung) < floor - 1e-12) return rung;
+  }
+  return null;
+}
+
+/** The best spread, or the item rung's answer for a knockout the best spread leaves refuted (the item rung runs before the forfeit rule reads the fit). */
+function withItemRung(
+  ctx: SolveContext, key: string, ladder: CandidateRung[], fitted: CandidateRung, droppable: boolean, evidence: MonEvidence,
+): CandidateRung {
+  return (!droppable && itemRung(ctx, key, ladder, fitted, evidence)) || fitted;
+}
+
+/**
+ * The item a solved rung carries out on the candidate. A guessed boost item the lines refute rides out like a decided Scarf (the builder resolves its
+ * replacement); a boost item a knockout needs rides out the same way, named (#75).
+ */
+function itemDecision(best: CandidateRung): Pick<SpreadCandidate, 'item' | 'itemReason'> {
+  if (best.item === '') return { item: '', itemReason: 'no-boost' };
+  return best.item ? { item: best.item, itemReason: 'boost' } : {};
+}
+
 /** The mon's damage misfit under a spread (the bestRung sum without the move-order term), plus the Paradox stat it must keep. */
 const damageError = (ctx: SolveContext, key: string, rung: CandidateRung, observations: DamageObservation[]) =>
   observations.reduce((sum, obs) => sum + observationError(ctx, obs, key, rung), 0) + paradoxError(ctx, key, rung);
@@ -167,6 +206,35 @@ function neutralRoom(
 }
 
 /**
+ * Round 89 (D9, gen9ou-2658671254): the fewest offense EVs, in the ladder's steps up to `room`, that make the mon reach every knockout the game refutes at `rung`
+ * (a lethal observation with its display text, read without slack), when that costs the mon's other lines nothing more than the rung's own misfit. A winning
+ * rung is a coarse one (the ladder knows an offense stat at 0 and 252), and its error is the knockouts' shortfall: measured from there, the top-up's "fits as
+ * well as at the rung" let a clean line on the same mon overshoot by as much, and the stat ran past where the lines fit best (Iron Valiant's Special Attack
+ * 180 where 32 to 56 reach the knockout and fit the hit on Moltres; the base reading's slack had hidden half of it). 0 when no knockout is refuted, none is
+ * within reach, or reaching it costs more than the rung's misfit: the top-up then measures from the rung as before.
+ */
+function knockoutReach(
+  ctx: SolveContext, key: string, rung: CandidateRung, offenseStat: keyof PokemonEvs, room: number, observations: DamageObservation[],
+): number {
+  const knockouts = observations.filter(obs => obs.lethal && obs.defenderShown && keyOf(obs.attackerSide, obs.attackerSpecies) === key);
+  const at = (add: number): CandidateRung => ({ ...rung, evs: { ...rung.evs, [offenseStat]: (rung.evs[offenseStat] ?? 0) + add } });
+  const short = (add: number) => knockouts.reduce((sum, obs) => sum + observationError(ctx, obs, key, at(add)), 0);
+  if (room <= 0 || !(short(0) > 0)) return 0;
+  const step = evStep(ctx.budget);
+  const adds = [...new Set([...Array.from({ length: Math.floor(room / step) }, (_, i) => (i + 1) * step), room])];
+  if (short(adds[adds.length - 1]) > 0) return 0;
+  // A hit's best roll never falls as the offense rises, so the reach is monotone: the first add that reaches it.
+  let low = 0;
+  let high = adds.length - 1;
+  while (low < high) {
+    const mid = (low + high) >> 1;
+    if (short(adds[mid]) === 0) high = mid;
+    else low = mid + 1;
+  }
+  return damageError(ctx, key, at(adds[low]), observations) <= damageError(ctx, key, rung, observations) + 1e-12 ? adds[low] : 0;
+}
+
+/**
  * Top up the leftover budget in the non-Speed stats: a winner like "252
  * HP only" would otherwise field a systematically under-statted sim mon.
  * An unmeasured stat takes what fits (it carries no observation evidence
@@ -192,6 +260,12 @@ function topUp(
     evs[stat] = (evs[stat] ?? 0) + add;
     remaining -= add;
   };
+  // A knockout the winning rung leaves refuted: the offense starts from the fewest EVs that reach it, and the plateau is measured from there (D9).
+  if (measured.has(offenseStat)) {
+    const reach = knockoutReach(ctx, key, { evs, nature: best.nature, item: best.item }, offenseStat, Math.min(ctx.budget.perStat - (evs[offenseStat] ?? 0), remaining), evidence.observations);
+    evs[offenseStat] = (evs[offenseStat] ?? 0) + reach;
+    remaining -= reach;
+  }
   const order = ([offenseStat, 'hp', 'def', 'spd', offenseStat === 'atk' ? 'spa' : 'atk'] as (keyof PokemonEvs)[])
     .filter(stat => stat !== 'hp' || evidence.fixedHp === undefined);
   for (const stat of order) give(stat, Math.min((prior.evs[stat] ?? 0) - (evs[stat] ?? 0), ctx.budget.perStat - (evs[stat] ?? 0), remaining));
@@ -204,6 +278,8 @@ interface MonEvidence {
   observations: DamageObservation[];
   /** Clean (non-lethal) attacker lines exist: offense is measurable. */
   hasOffenseEvidence: boolean;
+  /** The offense rungs are open: clean lines measure it, or a knockout the game refutes the prior's offense for (offenseRefuted). */
+  offenseOpen: boolean;
   /** The mon attacked at all (knock-outs alone keep the prior's offense). */
   attacked: boolean;
   hasDefenderObs: boolean;
@@ -214,20 +290,40 @@ interface MonEvidence {
   paradoxBound: boolean;
 }
 
+/**
+ * Round 89 (#75): whether the game refutes the prior's offense and a rung repairs it. A knockout is a lower bound, which measures no ceiling, so an
+ * attacker seen only in knockouts keeps the prior's offense. But a knockout the prior's best roll cannot reach, read by the display the log shows
+ * (the lowest HP the shown text allows: hp-display.ts), is refuted by the game itself: when some offense rung reaches it with a lower error, the
+ * offense rungs open, and the tie-break toward the prior (`bestRung`) takes the nearest rung that reaches. The same test as `speedMeasured` asks
+ * of a move order: refuted, and repairable. Knockouts without the text (older caches) never open it.
+ */
+function offenseRefuted(ctx: SolveContext, key: string, prior: SpreadCandidate, evidence: Pick<MonEvidence, 'observations' | 'hasDefenderObs' | 'fixedHp'>): boolean {
+  const lethal = evidence.observations.filter(obs => obs.lethal && obs.defenderShown && keyOf(obs.attackerSide, obs.attackerSpecies) === key);
+  const refuted = lethal.reduce((sum, obs) => sum + observationError(ctx, obs, key, prior), 0);
+  if (!(refuted > 0)) return false;
+  const fixed: Partial<PokemonEvs> = evidence.fixedHp === undefined ? {} : { hp: evidence.fixedHp };
+  const rungs = candidateLadder(dexOfCalc(ctx.gen), prior, physicalAttackerFor(ctx, key), true, evidence.hasDefenderObs, false, ctx.budget, new Set(), fixed);
+  return rungs.some(rung => lethal.reduce((sum, obs) => sum + observationError(ctx, obs, key, rung), 0) < refuted);
+}
+
 function evidenceFor(ctx: SolveContext, key: string): MonEvidence {
   const observations = ctx.byMon.get(key) ?? [];
   const attackerObs = observations.filter(obs => keyOf(obs.attackerSide, obs.attackerSpecies) === key);
   const prior = ctx.priors.get(key);
+  const hasDefenderObs = observations.some(obs => keyOf(defenderSideOf(obs), obs.defenderSpecies) === key);
+  const fixedHp = measuredHpEvs(ctx, key);
+  const hasOffenseEvidence = attackerObs.some(obs => !obs.lethal);
   return {
     observations,
     // Knock-outs are lower bounds (fit.ts): they refute rungs whose best roll
     // falls short, but an attacker seen only in knock-outs has no measured
     // offense — the prior's investment stands instead of yielding to bulk.
-    hasOffenseEvidence: attackerObs.some(obs => !obs.lethal),
+    hasOffenseEvidence,
+    offenseOpen: hasOffenseEvidence || (attackerObs.length > 0 && prior !== undefined && offenseRefuted(ctx, key, prior, { observations, hasDefenderObs, fixedHp })),
     attacked: attackerObs.length > 0,
-    hasDefenderObs: observations.some(obs => keyOf(defenderSideOf(obs), obs.defenderSpecies) === key),
+    hasDefenderObs,
     hasSpeedObs: (ctx.speedByMon.get(key) ?? []).length > 0,
-    fixedHp: measuredHpEvs(ctx, key),
+    fixedHp,
     paradoxBound: prior !== undefined && paradoxError(ctx, key, prior) > 0,
   };
 }
@@ -242,7 +338,7 @@ function ladderFor(
 ): CandidateRung[] {
   const fixed: Partial<PokemonEvs> = evidence.fixedHp === undefined ? {} : { hp: evidence.fixedHp };
   const build = (hasSpeedObs: boolean) =>
-    candidateLadder(dexOfCalc(ctx.gen), prior, physicalAttacker, evidence.hasOffenseEvidence, evidence.hasDefenderObs, hasSpeedObs, ctx.budget, keep, fixed);
+    candidateLadder(dexOfCalc(ctx.gen), prior, physicalAttacker, evidence.offenseOpen, evidence.hasDefenderObs, hasSpeedObs, ctx.budget, keep, fixed);
   if (!evidence.hasSpeedObs && !evidence.paradoxBound) return build(false);
   const ladder = build(true);
   if (speedMeasured(ctx, key, ladder, prior)) return ladder;
@@ -276,10 +372,12 @@ function solveOne(ctx: SolveContext, key: string) {
   const physicalAttacker = physicalAttackerFor(ctx, key);
   const offenseStat: keyof PokemonEvs = physicalAttacker ? 'atk' : 'spa';
   const keep = new Set<keyof PokemonEvs>();
-  if (evidence.attacked && !evidence.hasOffenseEvidence) keep.add(offenseStat);
+  if (evidence.attacked && !evidence.offenseOpen) keep.add(offenseStat);
   const droppable = evidence.attacked && guessedBoostItem(ctx, key) !== undefined;
-  const best = bestRung(ctx, key, ladderFor(ctx, key, prior, physicalAttacker, evidence, keep), evidence.observations, droppable);
-  if (!best) return;
+  const ladder = ladderFor(ctx, key, prior, physicalAttacker, evidence, keep);
+  const fitted = bestRung(ctx, key, ladder, evidence.observations, droppable);
+  if (!fitted) return;
+  const best = withItemRung(ctx, key, ladder, fitted, droppable, evidence);
   if (forfeitsToPrior(ctx, key, best, prior, evidence.observations)) {
     // The prior stands — with the log's HP where the log measured it.
     if (evidence.fixedHp === undefined) ctx.solved.delete(key);
@@ -289,8 +387,7 @@ function solveOne(ctx: SolveContext, key: string) {
   const evs = topUp(ctx, key, best, prior, offenseStat, measuredIn(evidence, offenseStat), evidence);
   // Damage lines on the mon make the fit theirs; without any, a proven move order (or a Paradox activation) decided it (T69).
   const origin = evidence.observations.length > 0 ? 'damage' : 'order';
-  // A guessed boost item the lines refute rides out on the candidate like a decided Scarf: the builder resolves its replacement.
-  ctx.solved.set(key, { evs, nature: best.nature, origin, ...(best.item === '' ? { item: '', itemReason: 'no-boost' as const } : {}) });
+  ctx.solved.set(key, { evs, nature: best.nature, origin, ...itemDecision(best) });
 }
 
 /**

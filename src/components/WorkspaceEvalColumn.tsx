@@ -1,11 +1,18 @@
 import { useMemo } from 'react';
+import type { EvalResult } from '@fulllifegames/eval-engine';
+import type { EvalStatus, StoppedRun } from '../hooks/useEvaluation';
+import { stoppedEmptyHere } from '../lib/stopped-line';
 import { EvalPanel } from './EvalPanel';
 import { PlayOutBar } from './PlayOutBar';
 import { resultPositionLabel } from './eval/turn-copy';
 import { BattleStatsPanel } from './BattleStatsPanel';
 import type { AppController } from '../hooks/useAppController';
+import { gameTipTurn } from '../hooks/useNewGame';
+import { idleTip } from './game-tip';
 import { variationBoardShares } from '../lib/variation-shares';
 import type { ReplayData } from '@fulllifegames/replay-core';
+import { useLinesHost } from '../hooks/usePlayLine';
+import { mainLineTarget } from './timeline-target';
 
 interface WorkspaceColumnProps {
   app: AppController;
@@ -21,6 +28,7 @@ function analysisPropsFor(liveEvalView: boolean, analysisTurn: number | null, an
     leadAnalysis: !liveEvalView && analysisTurn === 0 ? analysis.leadAnalysisData : null,
     reportLeads: analysis.leadAnalysisData,
     report: !liveEvalView ? analysis.gameReport : null,
+    reviewAnalyses: !liveEvalView ? analysis.gameAnalyses : null,
   };
 }
 
@@ -33,6 +41,35 @@ const linesClickable = (liveEvalView: boolean, evalResultMatchesView: boolean) =
 /** Round 77 (C7): the finished end of a variation, with the winner the branch panel names. */
 const endedFor = (atVariationEnd: boolean, simState: AppController['ctx']['branch']['simState']) =>
   (atVariationEnd ? { winner: simState?.winner ?? null } : null);
+
+/** A game's tip turn that waits for its replacement is the main line's next turn: no gold line, no "variation" in the card's tag. */
+function idleReads(app: AppController, viewingVariation: boolean, resultTag: string | null) {
+  const idle = idleTip(app);
+  return { idle, viewingVariation: viewingVariation && !idle, resultTag: idle ? resultTag?.replace(/^variation:/, 'main:') ?? null : resultTag };
+}
+
+/**
+ * Round 70 (T216): the gold points and the panel's bar print at the share of the variation's own board, read from the rosters the
+ * branch recorded after each executed turn; the main line's share of the same turn number is another board.
+ */
+function useVariationShares(history: AppController['ctx']['branch']['history'], variationSpan: { startTurn: number } | null) {
+  return useMemo(() => (variationSpan ? variationBoardShares(history, variationSpan.startTurn) : []), [history, variationSpan]);
+}
+
+/**
+ * Round 89 (#104, G4d): with a variation open and a game report held, the way back to the report, as "Main line" of the Line selector.
+ * G13b: a line started from a turn card (`cardTurn`) goes back to that turn, whichever turn the variation reached.
+ */
+function backToMain(app: AppController, viewingVariation: boolean): ((cardTurn: number | null) => void) | undefined {
+  if (!viewingVariation || !app.analysis.gameReport) return undefined;
+  const { viewTurn, maxTurn, navigateTo } = app.board.timeline;
+  return cardTurn => navigateTo(cardTurn === null ? mainLineTarget(viewTurn, maxTurn) : mainLineTarget(cardTurn, maxTurn));
+}
+
+/** Round 89 (SB-7): the depth of the partial result a user stop kept, while that result is the live position's; null otherwise. */
+function stoppedDepth(stopped: StoppedRun | null, shown: { live: boolean; status: EvalStatus; matches: boolean }, result: EvalResult | null): number | null {
+  return stopped && shown.live && shown.status === 'stale' && shown.matches ? result?.depthCompleted ?? 1 : null;
+}
 
 function EvalSection({ app, replayData }: WorkspaceColumnProps) {
   const { evaluation } = app.ctx;
@@ -48,16 +85,14 @@ function EvalSection({ app, replayData }: WorkspaceColumnProps) {
   } = app.engine.evalView;
   const { handleExploreChoice, handlePickPair } = app.engine.walk;
   const { playOut, fastPlayOut } = app.transients;
-  const clickable = linesClickable(liveEvalView, evalResultMatchesView);
-  // Round 70 (T216): the gold points and the panel's bar print at the share of the variation's own board, read from the
-  // rosters the branch recorded after each executed turn; the main line's share of the same turn number is another board.
-  const { history } = app.ctx.branch;
-  const variationShares = useMemo(
-    () => (variationSpan ? variationBoardShares(history, variationSpan.startTurn) : []),
-    [history, variationSpan],
-  );
+  // Round 89 (FB-1): the rows at T0 rank the leads; a click on one found no live position and opened an empty variation at turn 1.
+  const clickable = linesClickable(liveEvalView, evalResultMatchesView) && analysisTurn !== 0;
+  const reads = idleReads(app, viewingVariation, evaluation.resultTag);
+  const variationShares = useVariationShares(app.ctx.branch.history, variationSpan);
+  const linesHost = useLinesHost(app, replayData);
   return (
     <EvalPanel
+      linesHost={linesHost}
       playerNames={[replayData.players[0], replayData.players[1]]}
       status={liveEvalView ? liveEvalStatus : 'idle'}
       result={analyzedResult}
@@ -72,7 +107,9 @@ function EvalSection({ app, replayData }: WorkspaceColumnProps) {
       engines={app.ctx.engines}
       onPrefsChange={evaluation.setPrefs}
       onEvaluate={liveEvalView ? handleEvaluate : undefined}
-      onCancel={evaluation.cancel}
+      onCancel={evaluation.stop}
+      stoppedEmpty={stoppedEmptyHere(evaluation.stopped, { live: liveEvalView, status: liveEvalStatus, key: app.board.timeline.evalViewKey })}
+      stoppedAt={stoppedDepth(evaluation.stopped, { live: liveEvalView, status: liveEvalStatus, matches: evalResultMatchesView }, analyzedResult)}
       onPickChoice={clickable ? handleExploreChoice : undefined}
       onPickPair={clickable ? handlePickPair : undefined}
       showAuto={liveEvalView}
@@ -80,16 +117,18 @@ function EvalSection({ app, replayData }: WorkspaceColumnProps) {
       graph={evaluation.graph}
       onAnalyzeGame={handleAnalyzeGame}
       ended={endedFor(atVariationEnd, app.ctx.branch.simState)}
-      positionLabel={liveEvalView ? resultPositionLabel(evaluation.resultTag, { viewTurn, viewingVariation }) : null}
-      playOutProgress={playOut?.active ? { startTurn: playOut.startTurn, turns: playOut.turns, atTurn: liveSimTurn, fast: fastPlayOut } : null}
+      positionLabel={liveEvalView ? resultPositionLabel(reads.resultTag, { viewTurn, viewingVariation: reads.viewingVariation }) : null}
+      playOutProgress={playOut?.active ? { startTurn: playOut.startTurn, turns: playOut.turns, atTurn: liveSimTurn, fast: fastPlayOut, stopping: !!playOut.stopping, game: app.ctx.newGame.record !== null } : null}
       graphMaxTurn={analyzableTurns}
       analysisTurn={analysisTurn}
       onSelectTurn={handleGraphSelectLine}
       currentTurn={viewTurn}
-      currentLine={viewingVariation ? 'variation' : 'main'}
-      variation={variationSpan ? { startTurn: variationSpan.startTurn, scores: variationScores, shares: variationShares } : null}
+      currentLine={reads.viewingVariation ? 'variation' : 'main'}
+      variation={variationSpan && !reads.idle ? { startTurn: variationSpan.startTurn, scores: variationScores, shares: variationShares } : null}
       {...analysisPropsFor(liveEvalView, analysisTurn, app.analysis)}
       doubles={replayGameType === 'doubles'}
+      openTurn={app.ctx.newGame.record ? gameTipTurn(app.ctx.newGame.record) : null}
+      onBackToMain={backToMain(app, reads.viewingVariation)}
     />
   );
 }

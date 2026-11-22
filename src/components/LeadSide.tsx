@@ -1,8 +1,8 @@
 import { displayName } from '../lib/branch-history';
 import { useReplayRules } from '../lib/replay-rules';
-import { spriteUrl } from '../lib/sprite-url';
+import { SpriteImg } from './SpriteImg';
 import type { LeadOption } from '../lib/lead-options';
-import { STAND_IN_BADGE, STAND_IN_BADGE_TITLE, useIsGuessed, type GuessedSide } from '../lib/stand-in-mark';
+import { useIsGuessed, type GuessedSide } from '../lib/stand-in-mark';
 
 /** The slot letter of a lead: a, b, c (selection order is the slot order). */
 const slotLetter = (slot: number): string => String.fromCharCode(97 + slot);
@@ -47,13 +47,13 @@ function LeadTile({ side, option, slot, leadsPerSide, showOrder, onToggle }: {
           ? `${label} was brought in the real game.`
           : label}
     >
-      <img src={spriteUrl(option.species, rules)} alt={label} />
+      <SpriteImg species={option.species} rules={rules} alt={label} />
       <span className="ps-switch-text">
         <span className="ps-switchbtn-name">{label}</span>
       </span>
       {(order !== null || option.wasLead || guessed) && (
         <span className="ps-tile-flags">
-          {guessed && <span className="ps-guess-badge" title={STAND_IN_BADGE_TITLE}>{STAND_IN_BADGE}</span>}
+          {guessed && <span className="ps-guess-badge" title={guessed.title}>{guessed.badge}</span>}
           {order !== null && (
             <span className="ps-lead-slot" title={slot < leadsPerSide ? `Leads in slot ${slotLetter(slot)}.` : 'Comes along in the back.'}>{order}</span>
           )}

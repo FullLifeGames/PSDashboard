@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { winDeltaText, winPctText } from '@fulllifegames/eval-engine';
 import { SideRow } from '../../../../src/components/eval/SideRow';
-import { rankedChoice } from '../../fixtures/eval-result';
+import { evalResult, rankedChoice } from '../../fixtures/eval-result';
 import { misplayedSide, sideAnalysis } from '../../fixtures/analysis';
 
 describe('SideRow', () => {
@@ -18,6 +18,16 @@ describe('SideRow', () => {
     expect(onExplore).toHaveBeenCalledWith(side.best);
     expect(screen.queryByText('difference:')).toBeNull();
   });
+
+  // Round 89 (#153, HM-2): the engine-move buttons of a row (the tick, the engine's line, the better line) carry the title of the Setup setting.
+  test.each([[false, 'Play this turn in a variation; the opponent plays its top choice.'],
+    [true, 'Play this turn in a variation; the opponent reads your move and plays the reply the search rates lowest for it.']])(
+    'the engine-move titles follow the setting (opponentReads %s)', (opponentReads, title) => {
+      const { rerender } = render(<SideRow name="Alice" side={sideAnalysis()} onExplore={vi.fn()} opponentReads={opponentReads} />);
+      expect(screen.getByRole('button', { name: '✓ the engine\'s move ↗' })).toHaveAttribute('title', title);
+      rerender(<SideRow name="Alice" side={misplayedSide()} onExplore={vi.fn()} opponentReads={opponentReads} />);
+      expect(screen.getByRole('button', { name: 'Earthquake ↗' })).toHaveAttribute('title', title);
+    });
 
   test('a mistake: the regret chip, the played line against the engine line, and their difference', async () => {
     const onExplore = vi.fn();
@@ -46,6 +56,27 @@ describe('SideRow', () => {
     render(<SideRow name="Alice" side={misplayedSide('mistake', { best, safe: best })} />);
     expect(screen.getByText('then → Keldeo → Hydro Pump · High Jump Kick')).toBeInTheDocument();
     expect(screen.queryByText(/\(waiting\)/)).toBeNull();
+  });
+
+  // Round 89 (LN-4): the better line's "then ..." reads the line the Lines section shows for the row (one line per row on a card).
+  test.each([['singles', 'Earthquake'], ['doubles', 'Fake Out → Rillaboom + Spore → Tornadus']])('the better line (%s) reads its later steps from the result\'s line, in Hard mode from the worst line', (kind, label) => {
+    const pick = (name: string) => ({ choice: name.toLowerCase(), label: name, slots: [null] });
+    const line = (steps: [string, string][], extra = {}) => ({
+      side: 'p1' as const, label, choice: 'move earthquake', for: ['engine' as const], end: 0.1, endFainted: 0, visits: 50, ...extra,
+      steps: [{ p1: pick(label), p2: pick('Leech Seed'), dice: [] }, ...steps.map(([a, b]) => ({ p1: pick(a), p2: pick(b), dice: [] }))],
+    });
+    const best = rankedChoice('move earthquake', label, 0.35, { punishedBy: 'Protect', line: [{ p1: 'Stone Edge', p2: 'Protect' }] });
+    const result = evalResult(kind === 'singles' ? 'singles' : 'doubles', {
+      lines: [line([['Swords Dance', 'Fake Out']]), line([['Rock Slide', 'Taunt']], { versus: 'worst' })],
+    });
+    const side = misplayedSide('mistake', { best, safe: best });
+    const { rerender } = render(<SideRow name="Alice" side={side} rowLines={{ result, side: 'p1' }} />);
+    expect(screen.getByText('then Swords Dance · Fake Out')).toBeInTheDocument();
+    expect(screen.queryByText('then Stone Edge · Protect')).toBeNull();
+    rerender(<SideRow name="Alice" side={side} rowLines={{ result, side: 'p1' }} opponentReads />);
+    expect(screen.getByText('then Rock Slide · Taunt')).toBeInTheDocument();
+    rerender(<SideRow name="Alice" side={side} rowLines={{ result: evalResult('singles'), side: 'p1' }} />);
+    expect(screen.getByText('then Stone Edge · Protect')).toBeInTheDocument();
   });
 
   test('the sack note says which sack it was: a switch-in the hazards took, or a body left in to take the priced hit', () => {
@@ -138,5 +169,61 @@ describe('SideRow', () => {
     expect(screen.queryByText(/was worth/)).toBeNull();
     rerender(<SideRow name="Alice" side={misplayedSide('mistake', { hindsightRead: { ...read, shown: true, line } })} />);
     expect(screen.getByText(line)).toBeInTheDocument();
+  });
+
+  test('an unpunished risk whose safe line did as well against the reply that came says so in the chip title, never "the read came true" (round 89, B6a)', () => {
+    const held = { against: 'Toxic', playedValue: 0.189, safeValue: 0.19 };
+    const side = misplayedSide('mistake', { riskUnpunished: true, safeAgainstClick: held });
+    const { rerender } = render(<SideRow name="Alice" side={side} />);
+    const chip = screen.getByText(`${winDeltaText(-0.25)} regret · risk unpunished`);
+    expect(chip).toHaveAttribute(
+      'title',
+      'The floor assumes Leech Seed; the opponent chose Toxic instead, and against that the safe line did as well or better.',
+    );
+    expect(screen.queryByText(/read paid off/)).toBeNull();
+    // Without the field (a result with no matrix) the old title stands.
+    rerender(<SideRow name="Alice" side={misplayedSide('mistake', { riskUnpunished: true })} />);
+    expect(screen.getByText(`${winDeltaText(-0.25)} regret · risk unpunished`).getAttribute('title')).toContain('so the read came true');
+  });
+
+  test('an inaccuracy whose read paid off shows the read alone; the review and the report list it the same way (round 89, G4d)', () => {
+    const paid = sideAnalysis({ tier: 'inaccuracy', regret: 0.09, riskPaidOff: true, riskPayoff: 0.09 });
+    const { rerender } = render(<SideRow name="Alice" side={paid} />);
+    expect(screen.getByText(`read paid off · ${winDeltaText(0.09)}`)).toBeInTheDocument();
+    expect(screen.queryByText(/· inaccuracy/)).toBeNull();
+    // the side lost ground: the read is not praised, so the inaccuracy stays
+    rerender(<SideRow name="Alice" side={paid} lostGround />);
+    expect(screen.queryByText(/read paid off/)).toBeNull();
+    expect(screen.getByText(`· inaccuracy (${winDeltaText(-0.09)})`)).toBeInTheDocument();
+  });
+
+  // Round 89 (X1a part 1, 649664 T24 and T23): "played stayed in (KO'd before acting)" with "✓ the engine's move" printed the engine's
+  // description of a stand-in as a choice and ticked it. A body knocked out before it moved has no choice in the log.
+  test('singles: a body knocked out before it moved says so, names the stand-in\'s chance and the engine\'s move, and earns no tick', () => {
+    const standIn = rankedChoice('move painsplit', 'stayed in (KO’d before acting)', 0.11);
+    const best = rankedChoice('move painsplit', 'Pain Split', 0.11);
+    render(<SideRow name="Alice" side={sideAnalysis({ playedRaw: null, played: standIn, best, safe: best, neverActed: true, prevented: 'faint' })} />);
+    expect(document.body.textContent).not.toMatch(/stayed in|KO’d|played /);
+    expect(screen.getByText(/knocked out before it moved/)).toHaveTextContent(`knocked out before it moved, so the log shows no choice · staying in ${winPctText(0.11)}`);
+    expect(screen.queryByText(/the engine's move/)).toBeNull();
+    expect(screen.getByText(/engine:/)).toHaveTextContent(`engine: Pain Split (${winPctText(0.11)})`);
+    expect(screen.queryByText(/risked/)).toBeNull();
+  });
+
+  test('singles: a stand-in that is not the engine\'s move still reads as no choice, with the engine\'s move beside it', () => {
+    const standIn = rankedChoice('move splash', 'stayed in (KO’d before acting)', -0.1);
+    const best = rankedChoice('move painsplit', 'Pain Split', 0.11);
+    render(<SideRow name="Alice" side={sideAnalysis({ playedRaw: null, played: standIn, best, safe: best, regret: null, neverActed: true, prevented: 'faint' })} />);
+    expect(screen.getByText(/knocked out before it moved/)).toHaveTextContent(`staying in ${winPctText(-0.1)}`);
+    expect(screen.getByText(/engine:/)).toHaveTextContent(`engine: Pain Split (${winPctText(0.11)})`);
+  });
+
+  test('doubles: the stand-in is a singles reading (a slot choice never makes one), so a side with slots keeps its card', () => {
+    const slot = { kind: 'move' as const, name: 'Fake Out' };
+    const pair = rankedChoice('move 1, move 2', 'Fake Out → Rillaboom + Protect', 0.2);
+    render(<SideRow name="Alice" side={sideAnalysis({ playedRaw: null, playedSlots: [slot, null], played: pair, best: pair, safe: pair })} />);
+    expect(screen.getByText(/^played /)).toHaveTextContent(`played Fake Out → Rillaboom + Protect (${winPctText(0.2)})`);
+    expect(screen.getByText("✓ the engine's move")).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/knocked out before it moved/);
   });
 });

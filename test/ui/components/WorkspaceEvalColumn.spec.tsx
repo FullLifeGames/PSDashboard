@@ -107,6 +107,11 @@ describe('WorkspaceEvalColumn', () => {
     expect(app().analysis.leadAnalysisData).not.toBeNull();
     expect(screen.getByText('Team preview')).toBeInTheDocument();
     expect(screen.queryByText('Turn 3')).toBeNull();
+    // Round 89 (FB-1): the rows at T0 rank the leads, and no code applies a lead to the picker, so a click on one opened an empty
+    // variation at turn 1 ("Variation tip: Turn 1"). They read as rows, not buttons, until a feature applies them to the picker.
+    expect(document.querySelectorAll('.ps-eval-choice').length).toBeGreaterThan(0);
+    expect(document.querySelectorAll('button.ps-eval-choice')).toHaveLength(0);
+    expect(app().ctx.branch.simState).toBeNull();
 
     // Entering a variation: the live evaluation view owns the panel, the analysis block and report step back.
     act(() => app().board.timeline.navigateTo({ turn: 2, line: 'main' }));
@@ -118,5 +123,8 @@ describe('WorkspaceEvalColumn', () => {
     expect(screen.queryByText('Game report', { selector: 'span' })).toBeNull();
     expect(screen.queryByRole('button', { name: /Think deeper/ })).toBeNull();
     expect(screen.queryByText(/^Turn \d$/)).toBeNull();
+    // Round 89 (#104, G4d): a deviation that has played no turn is no variation to leave: no way back to offer (the e2e specs of the
+    // Lines section and the review click the button on a played line's variation).
+    expect(screen.queryByRole('button', { name: 'Back to the main line' })).toBeNull();
   }, 240_000);
 });

@@ -20,7 +20,7 @@ test('a forced replacement: the engine fills the slot, Execute sends it, on both
   await page.route('**/replay.pokemonshowdown.com/**', route => route.fulfill({ status: 200, contentType: 'application/json', body: draftReplay }));
   await page.goto('/');
   await routeSmogon(page, emptySmogon);
-  await page.locator('button', { hasText: 'Load' }).click();
+  await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
   await expect(page.locator('.ps-branch-bar input[type="range"]')).toBeVisible({ timeout: 30_000 });
   await page.locator('.ps-branch-bar input[type="range"]').fill('1');
   await expect(page.getByText('T1/')).toBeVisible();
@@ -39,7 +39,7 @@ test('a forced replacement: the engine fills the slot, Execute sends it, on both
     const execute = page.locator('.ps-execute-btn');
     await expect(execute).toBeEnabled();
     await execute.click();
-    await expect(history).toContainText(`forced replacement (${side})`, { timeout: 60_000 });
+    await expect(history).toContainText(`replacement (${side})`, { timeout: 60_000 });
   }
   await expect(page.locator('.ps-force-switch-note')).toHaveCount(0, { timeout: 30_000 });
 });
@@ -88,13 +88,13 @@ test('two forced slots of one side: a bench click records the choice while the o
   await expect(p1a).toHaveAttribute('data-forced', 'true');
   await expect(p1a).not.toHaveAttribute('data-origin', 'engine');
   await expect(p1b).toHaveAttribute('data-origin', 'engine');
-  await expect(variationPanel(page)).not.toContainText('forced replacement');
+  await expect(variationPanel(page)).not.toContainText('replacement (');
   await expect(execute).toBeEnabled();
 
   await execute.click();
   await expect(page.locator('.ps-dock-chip[data-forced="true"]')).toHaveCount(0, { timeout: 120_000 });
   await expect(page.locator('.ps-force-switch-note')).toHaveCount(0, { timeout: 30_000 });
-  await expect(variationPanel(page)).toContainText('forced replacement (P1)');
+  await expect(variationPanel(page)).toContainText('replacement (P1)');
 });
 
 /**
@@ -150,7 +150,7 @@ test('a bench click while the run for the replacement is under way: the next req
   await expect(page.locator('.ps-dock-chip[data-forced="true"]:not([inert])').first()).toBeVisible({ timeout: 120_000 });
   await pickForcedReplacement(page);
   await expect(page.locator('.ps-dock-chip[data-forced="true"]')).toHaveCount(0, { timeout: 60_000 });
-  await expect(variationPanel(page)).toContainText('forced replacement', { timeout: 30_000 });
+  await expect(variationPanel(page)).toContainText('replacement (', { timeout: 30_000 });
   for (const slot of DOUBLES_SLOTS) {
     await expect(dockChip(page, slot)).toHaveAttribute('data-origin', 'engine', { timeout: 240_000 });
   }

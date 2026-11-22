@@ -1,10 +1,11 @@
-import { describe, expect, onTestFinished, test, vi } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { EvalPreferences } from '@fulllifegames/eval-engine';
 import { EvalControls } from '../../../../src/components/eval/EvalControls';
 import type { EvalStatus } from '../../../../src/hooks/useEvaluation';
 import { evalResult } from '../../fixtures/eval-result';
+import { BUILTIN_ENGINE } from '../../../../src/lib/engines/registry';
 
 const prefs: EvalPreferences = { depth: 1, samples: 1, mode: 'matrix', auto: false, autoAnalyze: false, tera: 'auto' };
 
@@ -21,36 +22,20 @@ function props(overrides: Partial<Props> = {}): Props {
 const select = (label: string) => within(screen.getByText(label)).getByRole('combobox');
 
 describe('EvalControls', () => {
-  test('the depth select routes to a matrix depth, MCTS, or auto; samples only apply under matrix', async () => {
+  // Round 89 (ruling 49): Depth and Samples moved to the Setup menu (SetupMenu.search.spec.tsx); the header keeps the title, the engine link, Tera and "Always on".
+  test('the header holds the title, Tera and "Always on", and no Depth or Samples in any mode', () => {
     const wired = props();
     const { rerender } = render(<EvalControls {...wired} />);
     expect(screen.getByText('Evaluation')).toBeInTheDocument();
-    expect(screen.getByText('built-in engine: it plays the turns in the simulator')).toBeInTheDocument();
-
-    await userEvent.selectOptions(select('Depth'), '2');
-    expect(wired.onPrefsChange).toHaveBeenLastCalledWith({ ...prefs, mode: 'matrix', depth: 2 });
-    await userEvent.selectOptions(select('Depth'), 'mcts');
-    expect(wired.onPrefsChange).toHaveBeenLastCalledWith({ ...prefs, mode: 'mcts' });
-    await userEvent.selectOptions(select('Samples'), '5');
-    expect(wired.onPrefsChange).toHaveBeenLastCalledWith({ ...prefs, samples: 5 });
-
-    rerender(<EvalControls {...wired} prefs={{ ...prefs, mode: 'auto' }} />);
-    expect(select('Depth')).toHaveValue('auto');
-    // Round 63 (T110): the help text names the routing per game type.
-    expect(select('Depth')).toHaveAttribute('title', expect.stringMatching(/^Auto picks the engine per turn\. Singles: .+\. Doubles: the MCTS tree on every turn\./));
-    expect(screen.queryByText('Samples')).toBeNull();
-    rerender(<EvalControls {...wired} prefs={{ ...prefs, depth: 2 }} />);
-    expect(select('Depth')).toHaveValue('2');
-  });
-
-  // Round 67 (T111 point 8): the help text reads the search budget instead of naming its numbers by hand.
-  test('the auto help text names the search budget in force', () => {
-    const { rerender } = render(<EvalControls {...props({ prefs: { ...prefs, mode: 'auto' } })} />);
-    expect(select('Depth')).toHaveAttribute('title', 'Auto picks the engine per turn. Singles: the depth-1 matrix with 3 samples until 25% of all Pokémon have fainted, then the MCTS tree. Doubles: the MCTS tree on every turn. The MCTS search runs 4 trees of 600 iterations each.');
-    localStorage.setItem('ps-replay-interceptor:search-budget', 'trees=8,iterations=1200,singles-tree-from=0.5,doubles-tree-from=0.25,doubles-early-samples=5');
-    onTestFinished(() => localStorage.removeItem('ps-replay-interceptor:search-budget'));
-    rerender(<EvalControls {...props({ prefs: { ...prefs, mode: 'auto' } })} />);
-    expect(select('Depth')).toHaveAttribute('title', 'Auto picks the engine per turn. Singles: the depth-1 matrix with 3 samples until 50% of all Pokémon have fainted, then the MCTS tree. Doubles: the depth-1 matrix with 5 samples until 25% of all Pokémon have fainted, then the MCTS tree. The MCTS search runs 8 trees of 1200 iterations each.');
+    // Round 89 (FB-1): the engine's description is the heading's title, not a line of text.
+    expect(screen.queryByText(/built-in engine/)).toBeNull();
+    expect(screen.getByText('Evaluation')).toHaveAttribute('title', 'Built-in engine: it plays the turns in the simulator.');
+    for (const shown of [prefs, { ...prefs, mode: 'auto' as const }, { ...prefs, mode: 'mcts' as const }, { ...prefs, depth: 2 as const }]) {
+      rerender(<EvalControls {...wired} prefs={shown} />);
+      expect(screen.queryByText('Depth')).toBeNull();
+      expect(screen.queryByText('Samples')).toBeNull();
+      expect(screen.getAllByRole('combobox').map(box => box.closest('label')?.textContent?.trim().slice(0, 4))).toEqual(['Tera']);
+    }
   });
 
   test('tera and auto follow their visibility flags; the checkboxes report their new state', async () => {
@@ -69,12 +54,22 @@ describe('EvalControls', () => {
     expect(screen.getByRole('checkbox', { name: 'Always on' })).toBeChecked();
   });
 
-  test('Evaluate turns into Re-evaluate with a result or a stale state, into Cancel while running; running locks the selects', async () => {
+  // Round 89 (#153, HM-2): the setting left the Evaluation row for the Setup menu (SetupMenu.reply.spec.tsx) and lost the name "Hard mode".
+  test('the Evaluation row holds no checkbox for the opponent\'s reply, in any engine', () => {
+    const { rerender } = render(<EvalControls {...props()} />);
+    expect(screen.queryByRole('checkbox', { name: /Hard mode|Opponent reads my move/ })).toBeNull();
+    expect(screen.queryByText(/Hard mode/)).toBeNull();
+    rerender(<EvalControls {...props()} prefs={{ ...prefs, hardMode: true }} showAuto={false} />);
+    expect(screen.queryByRole('checkbox', { name: /Hard mode|Opponent reads my move/ })).toBeNull();
+    expect(screen.getAllByRole('checkbox').map(box => box.closest('label')?.textContent?.trim())).toEqual(['Always on']);
+  });
+
+  test('Evaluate turns into Re-evaluate with a result or a stale state, into Cancel while running; running locks Tera', async () => {
     const wired = props();
     const { rerender } = render(<EvalControls {...wired} />);
     await userEvent.click(screen.getByRole('button', { name: 'Evaluate' }));
     expect(wired.onEvaluate).toHaveBeenCalledTimes(1);
-    expect(select('Depth')).toBeEnabled();
+    expect(select('Tera')).toBeEnabled();
 
     rerender(<EvalControls {...wired} result={evalResult()} />);
     expect(screen.getByRole('button', { name: 'Re-evaluate' })).toBeInTheDocument();
@@ -84,10 +79,24 @@ describe('EvalControls', () => {
     rerender(<EvalControls {...wired} running status="searching" />);
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(wired.onCancel).toHaveBeenCalledTimes(1);
-    expect(select('Depth')).toBeDisabled();
     expect(select('Tera')).toBeDisabled();
 
     rerender(<EvalControls {...wired} onEvaluate={undefined} />);
     expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  test('another engine names itself in the heading title and the Engine select title, not in a line of text (round 89, FB-1)', () => {
+    const bot = { id: 'url:http://localhost:8765/', name: 'My bot', url: 'http://localhost:8765/', source: 'added' as const };
+    const engines = { engines: [BUILTIN_ENGINE, bot], selected: bot, select: vi.fn(), add: vi.fn(), remove: vi.fn() };
+    render(<EvalControls {...props({ engines })} />);
+    expect(screen.queryByText(/estimate from/i)).toBeNull();
+    expect(screen.getByText('Evaluation')).toHaveAttribute('title', 'Estimate from My bot.');
+    expect(screen.getByRole('combobox', { name: 'Engine' }).closest('label')).toHaveAttribute('title', expect.stringContaining('Estimate from My bot.'));
+  });
+
+  test('the built-in engine reaches the Engine select title too', () => {
+    const engines = { engines: [BUILTIN_ENGINE, { id: 'u', name: 'Other', url: 'http://x/', source: 'added' as const }], selected: BUILTIN_ENGINE, select: vi.fn(), add: vi.fn(), remove: vi.fn() };
+    render(<EvalControls {...props({ engines })} />);
+    expect(screen.getByRole('combobox', { name: 'Engine' }).closest('label')).toHaveAttribute('title', expect.stringContaining('Built-in engine: it plays the turns in the simulator.'));
   });
 });

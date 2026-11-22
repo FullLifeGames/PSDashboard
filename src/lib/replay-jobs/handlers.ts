@@ -95,6 +95,7 @@ async function reconstruct(job: ReconstructJob, id: number, post: ReplayPost): P
       : buildChoiceLockContext(job.replayLog, { p1Team: job.p1Team, p2Team: job.p2Team }, job.observations),
     bringOnly: job.bringOnly ?? undefined,
     leadOverride: job.leadOverride,
+    ...(job.seed ? { seed: job.seed } : {}),
     deadlineMs: job.deadlineMs,
     ...(lead ? {} : { capturePositions: capturePositionsFor(job, id, post, snapshotFor) }),
   });

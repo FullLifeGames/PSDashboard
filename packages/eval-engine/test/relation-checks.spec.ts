@@ -25,11 +25,12 @@ import {
  * group passes at 1e-9 as a plain test, so the list never hides an unnamed fault. The race flips of boostsBiting that
  * stood here (nine positions) went with the fresh-race reading of `stageBites` (score/boost-race.ts); the slopes of the
  * matchup term (five positions, 1e-5 to 1.3e-3 per HP point) went with the pair value of the winner's HP share
- * (score/matchup.ts, `pairValue`); no smooth slope is left, so the list holds no slope entry. The one pending break is
+ * (score/matchup.ts, `pairValue`); no smooth slope is left, so the list holds no slope entry. The one pending break was
  * the bench gate of a stage drop (score/boost-bite.ts, `frontGate`): when the holder starts to win its front race, the
  * drop starts to count against the bench behind it, and the whole step lands where a priced recoil moves an integer
- * clock by one turn (Champions 2634199230 turn 5, Incineroar 81 to 80 of 174, 0.031). The gate is the rule of round 69
- * (boost-bite-drops.spec.ts) and right by the game, so the break waits for a smoother price, not for a new gate.
+ * clock by one turn (Champions 2634199230 turn 5, Incineroar 81 to 80 of 174, 0.031). It went on 21.11.2026 (SB3c, round 89)
+ * with the drop's reading: a holder that can switch out carries no drop (score/switch-out.ts), so the step at the gate is
+ * gone for that position, and the list is empty. A pending break goes back into `KNOWN_BREAKS` with its reason.
  */
 
 interface KnownBreak {
@@ -40,12 +41,8 @@ interface KnownBreak {
   reason: string;
 }
 
-const pending = (reason: string, relation: KnownBreak['relation'], group: RelationGroup, ...positions: string[]): KnownBreak[] =>
-  positions.map(position => ({ relation, group, position, reason }));
-
-const KNOWN_BREAKS: KnownBreak[] = [
-  ...pending('T248 bench gate of a drop at a clock step', 'ownHpDown', 'champions', 'gen9championsvgc2026regmbbo3-2634199230-t5'),
-];
+/** Empty since 21.11.2026 (SB3c). An entry is `{ relation, group, position, reason }`; its `test.fails` row turns red the day the position passes. */
+const KNOWN_BREAKS: KnownBreak[] = [];
 
 await loadSimMods('gen9championscustomgame');
 

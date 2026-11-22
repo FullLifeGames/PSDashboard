@@ -4,12 +4,12 @@ import {
 } from './rank.ts';
 import { perfSpan, perfSync } from './perf-trace.ts';
 import type {
-  CellBlend, CellDraw, EvalCellJob, EvalCellValue, EvalChoiceOption, EvalChoicesInfo, EvalResult, EvalSettings,
-  EvalSubSearchJob, ForcedWinInput, ForcedWinOutcome, KoOddsMismatch, SearchProgress, TeraAllowance,
+  CellBlend, CellDraw, EvalCellJob, EvalCellValue, EvalChoiceOption, EvalChoicesInfo, EvalLine, EvalResult, EvalSettings,
+  EvalSubSearchJob, ForcedWinInput, ForcedWinOutcome, KoOddsMismatch, LinesInput, SearchProgress, TeraAllowance,
 } from './types.ts';
 import { applyForcedWin, forcedWinInput } from './search/forced-win-apply.ts';
 import { attachRootPayload, koOddsMapsFor, type RootPayload } from './search/root-payload.ts';
-import { recordDeepenedCell, type DeepeningState } from './search/deepening.ts';
+import { FORCED_ROOT_LEVEL, recordDeepenedCell, recordTurnCell, turnSettings, type DeepeningState } from './search/deepening.ts';
 
 /**
  * Async search orchestration over an abstract executor. Pure — no @pkmn/sim
@@ -32,6 +32,8 @@ export interface SearchExecutor {
   subSearch(job: SubSearchJob): Promise<EvalResult>;
   /** Round 35: the forced-win prover on the root, given the finished result's input. */
   prove(input: ForcedWinInput): Promise<ForcedWinOutcome | null>;
+  /** Round 89 (#104): replays the trees' lines for the rows a turn shows, every die at its likeliest result (search/lines.ts). An executor without it sends no lines. */
+  lines?(input: LinesInput): Promise<EvalLine[]>;
 }
 
 export interface OrchestratorCallbacks {
@@ -82,7 +84,7 @@ function collectCells(
  */
 function orchestratedPayload(info: ChoicesInfo, diagnostics: KoOddsMismatch[]): RootPayload {
   const koOddsMaps = info.koOdds ? koOddsMapsFor(info.p1, info.p2, info.koOdds) : null;
-  return { diagnostics, koOddsMaps, unanswered: info.unanswered };
+  return { diagnostics, koOddsMaps, unanswered: info.unanswered, playedBounds: info.playedBounds };
 }
 
 /** The orchestrated search's deepening state: the shared record plus the executor-side context. */
@@ -131,6 +133,28 @@ async function deepenLevelAsync(state: Orchestration, depth: number): Promise<bo
 }
 
 /**
+ * Round 89 (SB-4, #197), mirroring searchPosition: level 2 of a forced root. Every switch-in's child goes to the executor as the turn it
+ * opens (`turn: true`), in parallel; the values are booked together, so a stop leaves the arrival values and no row mixes the two scales.
+ * A cancel that ends the pool rejects the pending jobs, as it does for any sub-search. True when stopped.
+ */
+async function deepenForcedRootAsync(state: Orchestration): Promise<boolean> {
+  const cells: [number, number][] = [];
+  state.matrix.values.forEach((row, i) => row.forEach((_, j) => { if (!state.matrix.ended[i][j]) cells.push([i, j]); }));
+  if (state.callbacks?.shouldStop?.()) return true;
+  let done = 0;
+  const settings = turnSettings(state.settings);
+  const subs = await Promise.all(cells.map(async ([i, j]) => {
+    const sub = await state.executor.subSearch({ i, j, p1Choice: state.p1[i].choice, p2Choice: state.p2[j].choice, settings, turn: true });
+    done += 1;
+    state.callbacks?.onProgress?.({ done, total: cells.length, depth: FORCED_ROOT_LEVEL });
+    return sub;
+  }));
+  if (state.callbacks?.shouldStop?.()) return true;
+  cells.forEach(([i, j], index) => recordTurnCell(state, i, j, subs[index]));
+  return false;
+}
+
+/**
  * Horizon-trend tiebreak, mirroring searchPosition: singles-shaped lists
  * only; probes are one-ply sub-searches of the tied rows' decisive cells.
  * Round 70: a cell of several draws gets one probe per base draw (the executor
@@ -162,6 +186,43 @@ async function applyTrendLayersAsync(state: Orchestration, result: EvalResult, s
   // the ordering-only tiebreak runs on what remains tied.
   applyTrendExtrapolation(state.matrix, result, state.trendMap);
   applyTrendTiebreak(state.matrix, result, state.trendMap);
+}
+
+/**
+ * The root's levels above the first, mirroring the sync search's `deepenRoot`: a forced root's turn after each replacement (level 2),
+ * then one deepening per further depth the settings name. Returns the finished result and whether a stop cut a level short.
+ */
+async function deepenRootAsync(
+  state: Orchestration, forced: boolean, payload: RootPayload, first: EvalResult,
+): Promise<{ result: EvalResult; stopped: boolean }> {
+  const { matrix, rootValue, callbacks, settings } = state;
+  let result = first;
+  let stopped = false;
+  let firstLevel = 2;
+  if (forced) {
+    firstLevel = FORCED_ROOT_LEVEL + 1;
+    stopped = await deepenForcedRootAsync(state);
+    if (!stopped) {
+      state.ranked = perfSync('main:rank', () => rankFromMatrix(matrix, rootValue));
+      attachLines(matrix, state.ranked, state.pvByCell);
+      result = toResult(state.ranked, FORCED_ROOT_LEVEL);
+      attachRootPayload(result, payload);
+      callbacks?.onPartial?.(result);
+    }
+  }
+  for (let depth = firstLevel; depth <= settings.depth && !stopped; depth++) {
+    if (callbacks?.shouldStop?.()) break;
+    if (await deepenLevelAsync(state, depth)) {
+      stopped = true;
+      break;
+    }
+    state.ranked = perfSync('main:rank', () => rankFromMatrix(matrix, rootValue));
+    attachLines(matrix, state.ranked, state.pvByCell);
+    result = toResult(state.ranked, depth);
+    attachRootPayload(result, payload);
+    callbacks?.onPartial?.(result);
+  }
+  return { result, stopped };
 }
 
 export async function searchOrchestrated(
@@ -199,19 +260,9 @@ export async function searchOrchestrated(
   attachRootPayload(result, payload);
   callbacks?.onPartial?.(result);
 
-  let stopped = false;
-  for (let depth = 2; depth <= settings.depth; depth++) {
-    if (callbacks?.shouldStop?.()) break;
-    if (await deepenLevelAsync(state, depth)) {
-      stopped = true;
-      break;
-    }
-    state.ranked = perfSync('main:rank', () => rankFromMatrix(matrix, rootValue));
-    attachLines(matrix, state.ranked, state.pvByCell);
-    result = toResult(state.ranked, depth);
-    attachRootPayload(result, payload);
-    callbacks?.onPartial?.(result);
-  }
+  const levels = await deepenRootAsync(state, info.forced === true, payload, result);
+  result = levels.result;
+  const { stopped } = levels;
 
   await applyTrendLayersAsync(state, result, stopped);
   await proveRoot(executor, result, settings, callbacks);

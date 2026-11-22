@@ -3,18 +3,22 @@ import { advancePositionWithLog, createRootPosition, legalChoices, positionBattl
 import { foldClassWeights, koOddsForOptions, observeOrder, planCellEvents, type CellEvent } from './cell-blend.ts';
 import { cellKey, rankFromMatrix, toResult as rankedToResult } from './rank.ts';
 import { attachKoOdds, hasUnansweredContent, koOddsMapsFor } from './search/root-payload.ts';
+import { playedBoundsOf } from './branch/action-bound.ts';
 import { matrixCells, topVisitedIndex, treeScore } from './mcts-merge.ts';
-import { makeNode, pick, principalVariation, treeMatrix, type Node } from './search/mcts-node.ts';
-import { cellStats, isChanceNode, pickClass } from './search/chance-node.ts';
-import { expandCell, type ExpansionContext, type RootClassBook } from './search/expansion.ts';
+import { floorLabels } from './turn-analysis/worst-answer.ts';
+import { cellStats, makeNode, principalVariation, rowLines, treeMatrix, type Node } from './search/mcts-node.ts';
+import { backpropagate, selectAndExpand } from './search/descent.ts';
+import { passAfterResult } from './search/line-pass.ts';
+import { cellSeeds, positionSalt } from './search/root-quantile.ts';
+import type { ExpansionContext, RootClassBook } from './search/expansion.ts';
 import { forcedWinFor } from './search/forced-win.ts';
 import { applyForcedWin, forcedWinInput } from './search/forced-win-apply.ts';
 import { perfSync } from './perf-trace.ts';
 import { searchBudget, SEARCH_BUDGET_DEFAULT } from './search/budget.ts';
-import { SEARCH_SEEDS } from './search/leaf.ts';
 import { benchOrder, callbacksToGiven, resultToGiven, treeToGiven } from './search/bench-order.ts';
 import { pairPlanAnswer } from './pair/root-plan.ts';
 import { findPlayedOption } from './turn-analysis/played-match.ts';
+import type { PlayedBounds } from './played.ts';
 import type {
   CellOutcomeClass, EvalResult, EvalSettings, KoOddsInfo, MctsTreeStats, PlannedCell, SearchProgress, TeraAllowance, UnansweredProfile,
 } from './types.ts';
@@ -35,13 +39,6 @@ import type {
 /** Iterations per tree at the default budget; the budget in force sets them (round 61, search/budget.ts). */
 export const MCTS_ITERATIONS = SEARCH_BUDGET_DEFAULT.iterations;
 const PARTIAL_EVERY = 150;
-/**
- * Round 42: forced switches are decision nodes. The fallback the roadmap
- * pre-registered for a failed gate is this constant at false (greedy
- * resolution inside the tree, everything else unchanged).
- */
-const FORCED_SWITCH_NODES = true;
-
 export { WIDENING_BASE, WIDENING_VISITS_PER_SLOT, wideningWindow } from './search/mcts-node.ts';
 
 export interface MctsCallbacks {
@@ -70,6 +67,7 @@ function toResult(
   maxDepth: number,
   koOdds?: RootKoOdds,
   unanswered?: UnansweredProfile,
+  playedBounds?: PlayedBounds,
 ): EvalResult {
   if (root.ended || root.p1Options.length === 0 || root.p2Options.length === 0 || root.visits === 0) {
     return { score: root.value, interval: 0, depthCompleted: maxDepth, perSide: { p1: [], p2: [] } };
@@ -96,64 +94,9 @@ function toResult(
   if (koOdds) attachKoOdds(result, koOddsMapsFor(root.p1Options, root.p2Options, koOdds));
   // Round 13: root narrative payload, same contract as search.ts.
   if (unanswered && hasUnansweredContent(unanswered)) result.unanswered = unanswered;
+  // Round 89 (#108): the order bound of a body that fell before it acted, read once per root like the profile.
+  if (playedBounds) result.playedBounds = playedBounds;
   return result;
-}
-
-interface PathStep {
-  node: Node;
-  i: number;
-  j: number;
-}
-
-/**
- * Selection: descend through existing children via decoupled UCB, expanding
- * at most one child. Returns the joint path, the leaf value the descent
- * ended on, and the depth it reached.
- */
-function selectAndExpand(
-  root: Node, iteration: number, seedOffset: number, ctx: ExpansionContext, book: RootClassBook,
-): { path: PathStep[]; leaf: number; depth: number } {
-  const path: PathStep[] = [];
-  let node = root;
-  let leaf: number;
-  let depth = 1;
-  for (;;) {
-    if (node.ended || node.p1Options.length === 0 || node.p2Options.length === 0) {
-      leaf = node.value;
-      break;
-    }
-    const i = pick(node.p1N, node.p1W, node.visits, true, node.p1Order);
-    const j = pick(node.p2N, node.p2W, node.visits, false, node.p2Order);
-    path.push({ node, i, j });
-    const key = cellKey(i, j);
-    const existing = node.children.get(key);
-    if (!existing) {
-      // Expansion (search/expansion.ts): the first two plies draw fixed
-      // worlds and may open a chance node; deeper cells fix one outcome
-      // from the iteration-rotated seed as before.
-      const expanded = expandCell(node, i, j, depth, iteration, seedOffset, ctx, node === root ? book : undefined);
-      node.children.set(key, expanded.child);
-      if (!isChanceNode(expanded.child)) expanded.child.visits += 1;
-      leaf = expanded.leaf;
-      if (expanded.boundary) depth += 1;
-      break;
-    }
-    // Round 43: a chance node hands the descent to the class with the largest deficit.
-    node = isChanceNode(existing) ? pickClass(existing).child : existing;
-    if (node.boundary) depth += 1;
-  }
-  return { path, leaf, depth };
-}
-
-/** Backpropagation along the joint path. */
-function backpropagate(path: PathStep[], leaf: number): void {
-  for (const step of path) {
-    step.node.visits += 1;
-    step.node.p1N[step.i] += 1;
-    step.node.p1W[step.i] += leaf;
-    step.node.p2N[step.j] += 1;
-    step.node.p2W[step.j] += leaf;
-  }
 }
 
 /** Progress after every iteration; a partial result every PARTIAL_EVERY iterations before the last. */
@@ -164,12 +107,19 @@ function reportIteration(
   maxDepth: number,
   koOdds: RootKoOdds,
   unanswered: UnansweredProfile,
+  playedBounds: PlayedBounds | undefined,
 ): void {
   const { done, total } = progress;
   callbacks?.onProgress?.({ done, total, depth: maxDepth });
   if (done % PARTIAL_EVERY === 0 && done < total) {
-    callbacks?.onPartial?.(toResult(root, maxDepth, koOdds, unanswered));
+    callbacks?.onPartial?.(toResult(root, maxDepth, koOdds, unanswered, playedBounds));
   }
+}
+
+/** Round 89 (#59, ruling D2): the root quantiles of a tree inside the budget's tree count; a lone tree has no strata to spread, and a tree past the count keeps the stream. */
+function treeQuantiles(serializedBattle: string, seedOffset: number, trees: number | undefined): RootClassBook['quantiles'] {
+  if (trees === undefined || trees < 2 || seedOffset < 0 || seedOffset >= trees) return undefined;
+  return { salt: positionSalt(serializedBattle), offset: seedOffset, trees };
 }
 
 function runMcts(
@@ -177,7 +127,8 @@ function runMcts(
   settings: EvalSettings,
   callbacks?: MctsCallbacks,
   seedOffset = 0,
-): { root: Node; maxDepth: number; result: EvalResult; koOdds?: RootKoOdds; rootClassKeys: Map<number, string> } {
+  trees?: number,
+): { root: Node; maxDepth: number; result: EvalResult; koOdds?: RootKoOdds; rootClassKeys: Map<number, string>; rootClassWeights: Map<number, number>; ctx?: ExpansionContext } {
   const matchupCache = createMatchupCache(settings.ruleset);
   const tera = settings.tera ?? true;
   // keepPlayed applies to the root only — children have their own spaces.
@@ -188,6 +139,7 @@ function runMcts(
       maxDepth: 1,
       result: { score: root.value, interval: 0, depthCompleted: 1, perSide: { p1: [], p2: [] } },
       rootClassKeys: new Map(),
+      rootClassWeights: new Map(),
     };
   }
 
@@ -200,8 +152,16 @@ function runMcts(
   };
   // Round 13: root unanswered-mon profile, once per root like the ko odds.
   const unanswered = unansweredMons(rootBattle, matchupCache);
-  const ctx: ExpansionContext = { tera, matchupCache, sleepClause: settings.sleepClause, stopAtForcedSwitch: FORCED_SWITCH_NODES };
-  const book: RootClassBook = { battle: rootBattle, events: new Map(), keys: new Map() };
+  // Round 89 (#108): the order bound of the played turn's fallen bodies, on the root battle, once per root.
+  const playedBounds = playedBoundsOf(rootBattle, settings.keepPlayed?.fell);
+  const ctx: ExpansionContext = {
+    tera, matchupCache, sleepClause: settings.sleepClause,
+    // Round 42: a forced switch after a knock-out is a decision node of the tree; the matrix, verify, play-out and prover resolve it greedily.
+    stopAtForcedSwitch: true,
+  };
+  const book: RootClassBook = { battle: rootBattle, events: new Map(), keys: new Map(), weights: new Map() };
+  // Round 89 (#59, ruling D2): only a tree inside the budget's tree count spreads its root dice; a lone tree has no strata to spread.
+  book.quantiles = treeQuantiles(serializedBattle, seedOffset, trees);
 
   let maxDepth = 1;
   const iterations = searchBudget().iterations;
@@ -210,12 +170,12 @@ function runMcts(
     const { path, leaf, depth } = selectAndExpand(root, iteration, seedOffset, ctx, book);
     maxDepth = Math.max(maxDepth, depth);
     backpropagate(path, leaf);
-    reportIteration(callbacks, root, { done: iteration + 1, total: iterations }, maxDepth, koOdds, unanswered);
+    reportIteration(callbacks, root, { done: iteration + 1, total: iterations }, maxDepth, koOdds, unanswered, playedBounds);
   }
 
-  const result = toResult(root, maxDepth, koOdds, unanswered);
+  const result = toResult(root, maxDepth, koOdds, unanswered, playedBounds);
   callbacks?.onPartial?.(result);
-  return { root, maxDepth, result, koOdds, rootClassKeys: book.keys };
+  return { root, maxDepth, result, koOdds, rootClassKeys: book.keys, rootClassWeights: book.weights, ctx };
 }
 
 /** Round 67 (T129): the tree runs on the board with its bench in canonical order and names its choices in the given board's slots. */
@@ -255,13 +215,13 @@ const sortedClasses = (weights: Map<string, number>): CellOutcomeClass[] =>
 
 /**
  * Round 69 (T178): the outcome classes of a rolled root cell. One event folds in its own order; two events fold in
- * the order one advance of the cell shows (the first fixed search seed); an order the log does not settle gives no
+ * the order one advance of the cell shows (slot 0 of the cell's seed list, round 89); an order the log does not settle gives no
  * classes (the cell still reads events). Analytic weights, summing to 1.
  */
-function classesOf(root: Node, p1Choice: string, p2Choice: string, events: CellEvent[]): CellOutcomeClass[] | undefined {
+export function classesOf(root: Node, p1Choice: string, p2Choice: string, events: CellEvent[]): CellOutcomeClass[] | undefined {
   const first = events.length === 1
     ? events[0].side
-    : observeOrder([advancePositionWithLog(root.position, p1Choice, p2Choice, SEARCH_SEEDS[0]).log], events);
+    : observeOrder([advancePositionWithLog(root.position, p1Choice, p2Choice, cellSeeds(root.position, p1Choice, p2Choice)[0]).log], events);
   return first ? sortedClasses(foldClassWeights(events, first)) : undefined;
 }
 
@@ -331,7 +291,7 @@ function treeSearchOn(
   seedOffset: number,
   callbacks?: MctsCallbacks,
 ): MctsTreeStats {
-  const { root, maxDepth, result, koOdds, rootClassKeys } = runMcts(serializedBattle, settings, callbacks, seedOffset);
+  const { root, maxDepth, result, koOdds, rootClassKeys, rootClassWeights, ctx } = runMcts(serializedBattle, settings, callbacks, seedOffset, searchBudget().trees);
   // Boundary flags for the merge's verify selection. Analytic only (one
   // calc per damaging pair, no sim advances) and identical across trees,
   // and the merge reads trees[0] alone — so only the offset-0 tree pays
@@ -346,12 +306,14 @@ function treeSearchOn(
   const legal = seedOffset === 0 && doubles ? rootLegal(root, settings.tera ?? true) : {};
   const sides = positionBattle(root.position).sides;
   const living = { p1: sides[0].pokemon.filter(mon => !mon.fainted).length, p2: sides[1].pokemon.filter(mon => !mon.fainted).length };
-  const cells = [...root.children.entries()].map(([key, child]) => cellStats(key, child, rootClassKeys.get(key)));
+  const cells = [...root.children.entries()].map(([key, child]) => cellStats(key, child, rootClassKeys.get(key), rootClassWeights.get(key)));
   // Round 69 (T64): a single tree is never merged (mergeMctsTrees returns this result), so it writes its own cell visits.
   if (result.matrix) {
     const visits = new Map(cells.map(cell => [cell.key, cell.visits]));
     result.matrix.cells = matrixCells(root.p1Options.length, root.p2Options.length, key => visits.get(key) ?? 0, undefined, plannedCells);
   }
+  // Round 89 (#104, G14b, option L): everything the result and the merge read is final above; the pass writes below the root only.
+  passAfterResult(root, result, settings, ctx, seedOffset, searchBudget().iterations, callbacks?.shouldStop);
   return {
     p1Options: root.p1Options.map(option => ({ choice: option.choice, label: option.label })),
     p2Options: root.p2Options.map(option => ({ choice: option.choice, label: option.label })),
@@ -367,6 +329,8 @@ function treeSearchOn(
     ...(doubles ? {} : { boundaryCells }),
     ...(plannedCells ? { plannedCells } : {}),
     ...legal,
+    // Round 89 (#104, G12): every root row's lines, against this tree's own top three rows of the other side
+    rowLines: rowLines(root, { p1: result.perSide.p1.slice(0, 3).map(row => row.label), p2: result.perSide.p2.slice(0, 3).map(row => row.label) }, undefined, floorLabels(result)),
     // Root-cell stats for the merged equilibrium (Map order is insertion
     // order — deterministic under the fixed seed schedule).
     cells,

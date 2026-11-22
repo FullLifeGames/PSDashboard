@@ -7,7 +7,7 @@ import type {
   BranchChoices, BranchMoveOption, BranchSimState, BranchSlotModifiers, BranchSwitchOption, BranchTargetOption,
   SimBattle, SimPokemon, SimSide,
 } from './types.ts';
-import { slotLetter, trimTeamToBring } from './team-order.ts';
+import { slotLetter, trimTeamsToBring } from './team-order.ts';
 import { formatRules, toId } from '@fulllifegames/replay-core';
 import { targetTypeForMove } from './protocol-choices.ts';
 import { isLockedEntry } from '../forward/request-moves.ts';
@@ -367,19 +367,21 @@ export function serializePreviewPosition(
   p2Team: PokemonSet[],
   /** Bring-limited replays: the preview holds only the brought species, so
    *  the lead enumeration prices real pairs instead of a phantom pool.
-   *  Callers pass both sides or nothing; an unmatchable list keeps its
-   *  side whole (same trim as the branch reconstruction). */
-  bringOnly?: { p1: string[]; p2: string[] } | null,
+   *  Callers pass both sides or nothing; an unmatchable list keeps both
+   *  teams whole (same trim as the branch reconstruction, round 89), and
+   *  `guessed` marks the trailing names of a list that are guesses. */
+  bringOnly?: { p1: string[]; p2: string[]; guessed?: { p1: number; p2: number } } | null,
 ): string | null {
   try {
+    const trimmed = trimTeamsToBring(p1Team, p2Team, bringOnly, formatRules(format));
     const battle = new Battle({
       // The raw format string, never toID: clause suffixes ride along as
       // "@@@Sleep Clause Mod", and toID mangles them into an unknown format
       // WITHOUT team preview — every draft replay lost its turn 0 that way.
       formatid: format as ID,
       seed: '1,2,3,4',
-      p1: { name: 'p1', team: Teams.pack(trimTeamToBring(p1Team, bringOnly?.p1, formatRules(format))) },
-      p2: { name: 'p2', team: Teams.pack(trimTeamToBring(p2Team, bringOnly?.p2, formatRules(format))) },
+      p1: { name: 'p1', team: Teams.pack(trimmed.p1) },
+      p2: { name: 'p2', team: Teams.pack(trimmed.p2) },
     });
     if (battle.sides[0]?.requestState !== 'teampreview') return null;
     return serializeBattleStable(battle);

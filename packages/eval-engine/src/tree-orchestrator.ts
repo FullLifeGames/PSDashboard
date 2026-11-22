@@ -5,6 +5,7 @@ import { perfAdd, perfCount, perfSync } from './perf-trace.ts';
 import { cellKey } from './rank.ts';
 import { searchBudget } from './search/budget.ts';
 import { applyForcedWin, forcedWinInput } from './search/forced-win-apply.ts';
+import { lineRequests } from './search/line-donors.ts';
 import { createLocalExecutor } from './search/position.ts';
 import type { EvalCellJob, EvalCellValue, EvalResult, EvalSettings, MctsTreeStats, SearchProgress } from './types.ts';
 import type { StaticRuleset } from './score/weights.ts';
@@ -24,19 +25,35 @@ import {
  * worker pool, the bank an in-process executor.
  */
 export interface TreeExecutor extends SearchExecutor {
-  /** One DUCT tree with this seed offset. */
-  tree(settings: EvalSettings, seedOffset: number, onProgress?: (progress: SearchProgress) => void): Promise<MctsTreeStats>;
+  /**
+   * One DUCT tree with this seed offset. Round 89 (SB-9): `onPartial` asks the tree for its interim result (every 150 iterations); only
+   * tree 0 is asked, and only while a caller listens, so a search without a listener (the bank, the game analysis) computes none.
+   */
+  tree(
+    settings: EvalSettings, seedOffset: number, onProgress?: (progress: SearchProgress) => void, onPartial?: (result: EvalResult) => void,
+  ): Promise<MctsTreeStats>;
 }
 
 export function createLocalTreeExecutor(serializedBattle: string, ruleset: StaticRuleset = 'standard'): TreeExecutor {
   return {
     ...createLocalExecutor(serializedBattle, ruleset),
-    tree: async (settings, seedOffset, onProgress) =>
-      mctsTreeSearch(serializedBattle, settings, seedOffset, onProgress ? { onProgress } : undefined),
+    tree: async (settings, seedOffset, onProgress, onPartial) =>
+      mctsTreeSearch(serializedBattle, settings, seedOffset, onProgress || onPartial ? { ...(onProgress && { onProgress }), ...(onPartial && { onPartial }) } : undefined),
   };
 }
 
 const stopped = (callbacks?: OrchestratorCallbacks) => callbacks?.shouldStop?.() === true;
+
+/**
+ * Round 89 (SB-9): tree 0's own interim result, handed on until a tree has finished (the merged partial below takes over then) and
+ * only for a caller that listens. Reading it changes no node of the tree (`toResult` only reads), so the search is the same with and
+ * without it. The other trees are asked for none.
+ */
+function interim(offset: number, completed: MctsTreeStats[], callbacks?: OrchestratorCallbacks): ((result: EvalResult) => void) | undefined {
+  const listener = callbacks?.onPartial;
+  if (offset !== 0 || !listener) return undefined;
+  return result => { if (completed.length === 0 && !stopped(callbacks)) listener(result); };
+}
 
 function runTrees(executor: TreeExecutor, settings: EvalSettings, callbacks?: OrchestratorCallbacks): Promise<MctsTreeStats[]> {
   const treeCount = searchBudget().trees;
@@ -53,7 +70,7 @@ function runTrees(executor: TreeExecutor, settings: EvalSettings, callbacks?: Or
         total: treeCount * totalPerTree,
         depth: progress.depth,
       });
-    });
+    }, interim(offset, completed, callbacks));
     perfAdd('tree-wall', Date.now() - started);
     if (!stopped(callbacks)) {
       completed.push(tree);
@@ -238,6 +255,26 @@ export async function answerRound(
   }
 }
 
+/**
+ * Round 89 (#104): the lines of the turn, after the prover has had its say about the rows. A refinement like the verify round: an
+ * executor without the job, an empty list and a failed replay leave the result as it is. Nothing reads `lines` to score or rank.
+ */
+async function withLines(executor: TreeExecutor, trees: MctsTreeStats[], result: EvalResult, settings: EvalSettings): Promise<EvalResult> {
+  if (!executor.lines) return result;
+  const requests = lineRequests(trees, result, settings);
+  if (requests.length === 0) return result;
+  const started = Date.now();
+  try {
+    const lines = await executor.lines({ requests, tera: settings.tera, sleepClause: settings.sleepClause, keepPlayed: settings.keepPlayed });
+    if (lines.length > 0) result.lines = lines;
+  } catch {
+    // the lines are an extra: the turn reads without them
+  } finally {
+    perfAdd('lines', Date.now() - started);
+  }
+  return result;
+}
+
 export async function searchTreesOrchestrated(
   executor: TreeExecutor, settings: EvalSettings, callbacks?: OrchestratorCallbacks,
 ): Promise<EvalResult> {
@@ -248,5 +285,5 @@ export async function searchTreesOrchestrated(
   const outcome = await executor.prove(forcedWinInput(result, settings));
   perfAdd('prover', Date.now() - started);
   if (!stopped(callbacks)) applyForcedWin(result, outcome);
-  return result;
+  return stopped(callbacks) ? result : withLines(executor, trees, result, settings);
 }

@@ -38,9 +38,10 @@ export interface ForcedTurnInput {
   observe?: (from: number | undefined, to: number | undefined, value: number) => void;
   /**
    * Round 86 (T306): told every recognized die of the real turn with the raw value the turn took. The faint step reads the damage rolls
-   * the forced turn really draws (the log's dice can add a hit the natural turn lacks) and the step each one took.
+   * the forced turn really draws (the log's dice can add a hit the natural turn lacks) and the step each one took. Round 89 (#104): also the draw's shape (its call, range and items), so a caller can read the chance or the
+   * results the simulator drew from.
    */
-  onDraw?: (name: DieName, value: number) => void;
+  onDraw?: (name: DieName, value: number, draw: Draw) => void;
 }
 
 /** The real turn's PRNG that reports each answer it gives, and each die it names. */
@@ -60,7 +61,7 @@ class ObservedForcedPRNG extends ForcedDicePRNG {
 
   protected override decide(name: DieName, draw: Draw, natural: number): number {
     const value = super.decide(name, draw, natural);
-    this.hooks.onDraw?.(name, value);
+    this.hooks.onDraw?.(name, value, draw);
     return value;
   }
 }
@@ -184,5 +185,6 @@ export function playForcedTurn({ live, forced, play, observe, onDraw }: ForcedTu
       die, note: prng.notes.get(dieKey(die.name)), battle: live, start, saw: watch.moves, startRoll: written.has(dieKey(die.name)),
     })),
     naturalEndSeed: natural.endSeed,
+    ...(prng.unnamed > 0 ? { unnamed: prng.unnamed } : {}),
   };
 }

@@ -74,6 +74,8 @@ describe.each(CASES)('the display lines of a forced die, $kind', ({ kind, turn }
     expect(entry.dieLines).toHaveLength(1);
     const { at, text } = entry.dieLines![0];
     expect(text).toMatch(/^Forced: .+ misses, \d+(\.\d)? %$/);
+    // the chance printed is the miss's own: the report holds the simulator's chance of the hit, the line names its complement
+    expect(text.endsWith(`, ${Math.round((1 - tookOf(result.current).chance!) * 1000) / 10} %`)).toBe(true);
     // the line stands where the die decided: the next line of the shown log is the miss it caused
     expect(log[at].startsWith('|-miss|')).toBe(true);
     const frame = frameOf(result.current);

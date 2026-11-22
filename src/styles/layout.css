@@ -148,8 +148,9 @@
   font-size: 11px;
   color: #aabbcc;
 }
-/* Round 84 (T315, A7d): the Size select of the app's scale. */
-.ps-setup-size {
+/* Round 84 (T315, A7d): the Size select of the app's scale. Round 89 (ruling 49): Depth and Samples (SearchSelects) use the same row. */
+.ps-setup-size,
+.ps-setup-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -157,7 +158,8 @@
   font-size: 11px;
   color: #aabbcc;
 }
-.ps-setup-size-select {
+.ps-setup-size-select,
+.ps-setup-row-select {
   font: inherit;
   max-width: 230px;
   padding: 2px 4px;
@@ -263,7 +265,10 @@
     flex: 1 0 100%;
   }
   .ps-topbar > .ps-topbar-actions {
-    flex: 1 1 0;
+    /* Round 89 (FB-1): the basis is the actions' own width, not zero. With a zero basis the support links took their width first and
+       the status ("Branching · Turn 33"), Game and Setup ran over "Report issue"; now the links wrap to a third line when both do
+       not fit one. */
+    flex: 1 1 auto;
     flex-wrap: nowrap;
     min-width: 0;
   }

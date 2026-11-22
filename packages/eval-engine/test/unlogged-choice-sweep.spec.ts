@@ -11,7 +11,7 @@ import { battleOf } from './power-oracle';
 /**
  * Round 88 (T325, #61), lane D, step D3: the stand-in for a slot whose action the log never shows. The log of such a turn says the
  * body fainted before it moved or flinched, so the foe's action came first; the click that rebuilds the turn must keep that order.
- * The rebuild fills the click in with the enabled move of the lowest priority at 0 or below, else the first enabled move. The oracle
+ * The rebuild fills the click in with the enabled move of the lowest priority (round 89, #111: no cut at 0). The oracle
  * is the simulator, on a copy, in every rule set the corpus plays (Gens 1 to 9, the Champions mod), singles everywhere, doubles from
  * Gen 3, VGC (a team of six) in Scarlet/Violet and Champions:
  * - the Dex's priority brackets: each bracket of the rule set's own Dex gets a move the simulator takes as a click; the simulator
@@ -19,8 +19,8 @@ import { battleOf } from './power-oracle';
  *   after a higher one, a higher before, a tie goes to the faster foe), the rule the stand-in reads;
  * - the bodies: every body of one move per bracket, in pairs of brackets with the highest and the lowest bracket behind them, and the
  *   bodies of positive brackets only, in both orders, get a stand-in; against every foe bracket the stand-in moves behind the foe
- *   whenever any move of the body would (a body with no move at 0 or below keeps its first move), and it is the lowest bracket at 0 or
- *   below, else the body's first move;
+ *   whenever any move of the body would, and it is the lowest bracket (round 89, #111: there is no cut at 0, a body of priority moves only
+ *   takes the slowest of them; before, it kept its first move);
  * - the reported rows: Fake Out and Protect filled in for a body that never acted, the Assault Vest that disables the status moves.
  * Round 88 (X2): a body whose turn shows a `|cant|` line (a flinch, a full paralysis) has its place in the log's order. Its stand-in is
  * the slowest move that keeps it ahead of every action the log shows after the cant line (and behind those before it); the
@@ -167,15 +167,14 @@ describe.each(CASES)('the stand-in for a slot the log never shows acting: $name'
     let rows = 0;
     const all = bodies();
     for (const body of all) {
-      const slow = body.map(id => dex.moves.get(id).priority).filter(p => p <= 0);
+      const slow = body.map(id => dex.moves.get(id).priority);
       for (const q of priorities) {
         const foeMove = rep(q);
         const stand = standInOf(c, body, foeMove);
         rows++;
-        const expected = slow.length > 0 ? body.find(id => dex.moves.get(id).priority === Math.min(...slow))! : body[0];
+        const expected = body.find(id => dex.moves.get(id).priority === Math.min(...slow))!;
         if (stand.id !== expected) problems.push(`${body.join(',')} against ${foeMove}: stand-in ${stand.id}, expected ${expected} (${stand.choice})`);
-        // a body with no move at 0 or below keeps its first move (the plan's fallback), so only a body with one holds the order
-        const someBehind = slow.length > 0 && body.some(id => !before(id, foeMove));
+        const someBehind = body.some(id => !before(id, foeMove));
         if (someBehind && before(stand.id, foeMove)) problems.push(`${body.join(',')} against ${foeMove}: ${stand.id} moves before the foe, a move of the body would not`);
       }
     }
@@ -188,8 +187,8 @@ describe.each(CASES)('the stand-in for a slot the log never shows acting: $name'
     let rows = 0;
     let moved = 0;
     for (const body of bodies()) {
-      const slow = body.map(id => dex.moves.get(id).priority).filter(p => p <= 0);
-      const slowest = slow.length > 0 ? body.find(id => dex.moves.get(id).priority === Math.min(...slow))! : body[0];
+      const slow = body.map(id => dex.moves.get(id).priority);
+      const slowest = body.find(id => dex.moves.get(id).priority === Math.min(...slow))!;
       for (const q of priorities) {
         const foeMove = rep(q);
         for (const species of FOES) {
@@ -213,8 +212,8 @@ describe.each(CASES)('the stand-in for a slot the log never shows acting: $name'
   test('a cant line after the foe\'s action keeps the slowest stand-in, and so does a cant line with no action after it (X2)', () => {
     const problems: string[] = [];
     for (const body of bodies()) {
-      const slow = body.map(id => dex.moves.get(id).priority).filter(p => p <= 0);
-      const slowest = slow.length > 0 ? body.find(id => dex.moves.get(id).priority === Math.min(...slow))! : body[0];
+      const slow = body.map(id => dex.moves.get(id).priority);
+      const slowest = body.find(id => dex.moves.get(id).priority === Math.min(...slow))!;
       for (const q of priorities) {
         const foeMove = rep(q);
         for (const species of FOES) {
@@ -258,8 +257,9 @@ describe('the reported rows', () => {
     expect(standInOf(c, ['shadowsneak', 'protect', 'earthquake', 'uturn'], 'shadowsneak').id).toBe('earthquake');
   });
 
-  test.each(REPORTED)('a body of priority moves only keeps its first move ($name)', ({ c }) => {
-    expect(standInOf(c, ['fakeout', 'protect', 'quickattack'], 'quickattack').id).toBe('fakeout');
+  // Round 89 (#111): the cut at 0 is gone; a body of priority moves only takes the slowest of them (it kept Fake Out before)
+  test.each(REPORTED)('a body of priority moves only takes the slowest of them ($name)', ({ c }) => {
+    expect(standInOf(c, ['fakeout', 'protect', 'quickattack'], 'quickattack').id).toBe('quickattack');
   });
 
   test.each(REPORTED)('the lowest bracket wins over a tie at 0 ($name)', ({ c }) => {

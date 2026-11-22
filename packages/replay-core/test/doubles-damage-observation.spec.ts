@@ -125,12 +125,12 @@ describe('singles logs give the observations they gave before (T31)', () => {
   const fixture = (name: string) => readFileSync(fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url)), 'utf-8');
   // T31 added the first three fields, T191 the four item fields, T167 the two paradox readings (the logs hold a Protosynthesis
   // mon), T86 the move name, terrain, HP, Tera, ability and field-fact fields, round 73 (T203, T210) the partner readings and the
-  // history facts; all are stripped before the comparison with 006b33c.
+  // history facts, round 89 (#75) the HP texts of a knockout; all are stripped before the comparison with 006b33c.
   const NEW_FIELDS = [
     'doubles', 'spread', 'defenderSide', 'attackerItem', 'defenderItem', 'attackerItemChanged', 'defenderItemChanged',
     'attackerParadox', 'defenderParadox', 'moveName', 'terrain', 'attackerHp', 'defenderHp', 'attackerAbility', 'defenderAbility',
     'attackerTera', 'defenderTera', 'attackerFallen', 'attackerSuppressed', 'defenderSuppressed', 'attackerAbilityOn', 'fieldFacts',
-    'attackerAlly', 'defenderAlly', 'attackerFainted', 'attackerTimesAttacked', 'defenderStatus', 'defenderNewlyIn', 'lastToMove',
+    'attackerAlly', 'defenderAlly', 'attackerFainted', 'attackerTimesAttacked', 'defenderStatus', 'defenderNewlyIn', 'lastToMove', 'defenderShown',
   ] as const;
 
   for (const name of ['singles-1', 'singles-2']) {

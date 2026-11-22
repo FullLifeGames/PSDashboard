@@ -96,7 +96,7 @@ describe('the auto re-evaluation waits for a running sweep (C1)', () => {
   const viewInputs = (evaluation: ReturnType<typeof useEvaluation>) => ({
     replayData, snapshots, evaluation, replayGameType: 'singles', evalIsDoubles: false, viewTurn: 3, viewLine: 'variation' as const,
     viewingVariation: false, liveTip: true, liveEvalView: true, evalViewKey: 'variation:3', serializedAtView: null,
-    liveEvalStatus: 'stale' as const, analysisTurn: 3, analyzableTurns: 6, branching: true, executing: false, branchPreparing: false,
+    liveEvalStatus: 'stale' as const, tip: { key: 'variation:3', turn: 3, variation: true }, tipEvalStatus: 'stale' as const, analysisTurn: 3, analyzableTurns: 6, branching: true, executing: false, branchPreparing: false,
     playOutActive: false, smogonPending: false,
     acquire: { acquireBranchPosition: vi.fn(), acquireReplayPosition: vi.fn(), makeReplayAcquire: vi.fn(), makeSweepAcquireAll: vi.fn(() => vi.fn()) },
     sources, bringOnlyLists: null, setsFingerprint: 'fp1', sensitivityTargetsFor: vi.fn(() => []), editedP1Info: null, editedP2Info: null,

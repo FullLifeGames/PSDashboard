@@ -3,7 +3,7 @@ import { revealedField, unknownEvs, unknownField } from '../team-info.ts';
 import { canHaveDancer, findPokemon, ruleOut, type InferrerState } from './inferrer-state.ts';
 import { revealMarkerForme, teamSpecies, unknownFormeMarkerFor } from './lookup.ts';
 import { abilityHolderIdent } from './ability-holder.ts';
-import { ATTACKER_PUNISH_ITEMS, ownMove } from './client-facts.ts';
+import { ATTACKER_PUNISH_ITEMS, bookingIdent, ownMove } from './client-facts.ts';
 import { arg, detailsOf, fromEffect, hasKw, identOf, kwText, ofIdent, type LogLine } from './log-line.ts';
 import { bookPowerMove, readPowerMove } from './power-moves.ts';
 import { toId } from '../ids.ts';
@@ -26,8 +26,6 @@ export const SWAP_ITEM_SOURCES: Record<string, Set<string>> = {
 export const ITEM_HANDOVER_ACTIVATIONS: Record<string, Set<string>> = { ability: new Set(['Symbiosis']) };
 /** Swap moves whose resolving-move context pairs giver and receiver (no [of] emitted). */
 const SWAP_PAIR_MOVES = new Set(['trick', 'switcheroo', 'thief', 'covet']);
-/** A landed Ground move from a possible immunity-breaker proves nothing about Levitate. */
-const MOLD_BREAKER_ABILITIES = new Set(['moldbreaker', 'teravolt', 'turboblaze']);
 
 /**
  * The item is still open: nothing shown, or only the team preview's flag
@@ -85,11 +83,6 @@ export function noteMoveOrBoundary(state: InferrerState, line: LogLine) {
   }
 }
 
-export function noteGravity(state: InferrerState, line: LogLine) {
-  if (line.cmd === '-fieldstart' && arg(line, 1).includes('Gravity')) state.gravityActive = true;
-  if (line.cmd === '-fieldend' && arg(line, 1).includes('Gravity')) state.gravityActive = false;
-}
-
 /** Entries reset the plain-move count and map idents (both sides) and opponent nicknames to species. */
 export function noteEntry(state: InferrerState, line: LogLine) {
   if (line.cmd !== 'switch' && line.cmd !== 'drag') return;
@@ -106,28 +99,12 @@ export function noteEntry(state: InferrerState, line: LogLine) {
   state.plainMovesSince.delete(ident);
 }
 
-/** A landed Ground move rules out Levitate — unless the attacker may break immunities. */
-function ruleOutLevitate(state: InferrerState, nickname: string) {
-  const { pendingMove } = state;
-  if (!pendingMove) return;
-  const move = dexOf(state).moves.get(pendingMove.moveName);
-  const ignore = move.ignoreImmunity as boolean | Record<string, boolean> | undefined;
-  const ignoresGround = ignore === true || (typeof ignore === 'object' && !!ignore?.Ground);
-  const attackerSpecies = state.identSpecies.get(pendingMove.attacker);
-  const possiblyMoldBreaker = attackerSpecies
-    ? Object.values(dexOf(state).species.get(attackerSpecies).abilities ?? {})
-      .some(ability => MOLD_BREAKER_ABILITIES.has(toId(String(ability))))
-    : false;
-  if (move.type === 'Ground' && !ignoresGround && !possiblyMoldBreaker) {
-    ruleOut(state, nickname, 'abilities', 'levitate');
-  }
-}
-
 /**
  * Disproving evidence: a Pokémon that TAKES hazard/status/weather/recoil
- * damage cannot be Magic Guard; rocks chip rules out Heavy-Duty Boots; a
- * landed Ground move rules out Levitate (T25 — Clefable was simmed with
- * Magic Guard while visibly taking Stealth Rock damage).
+ * damage cannot be Magic Guard; rocks chip rules out Heavy-Duty Boots (T25 —
+ * Clefable was simmed with Magic Guard while visibly taking Stealth Rock
+ * damage). A landed move hit rules out the abilities that would have refused
+ * it (round 89, #150): the simulator answers, in inference/blocked-effects.ts.
  */
 const HAZARDS = new Set(['Stealth Rock', 'Spikes']);
 const INDIRECT = new Set(['psn', 'tox', 'brn', 'Sandstorm', 'Hail']);
@@ -142,8 +119,6 @@ export function ruleOutFromDamage(state: InferrerState, line: LogLine) {
     ruleOut(state, nickname, 'items', 'heavydutyboots');
   } else if ((!from.type && INDIRECT.has(from.name)) || (from.type === 'item' && from.name === 'Life Orb')) {
     ruleOut(state, nickname, 'abilities', 'magicguard');
-  } else if (!hasKw(line, 'from') && state.pendingMove && !state.gravityActive) {
-    ruleOutLevitate(state, nickname);
   }
 }
 
@@ -202,8 +177,11 @@ function blockedMoveLine(line: LogLine): LogLine | null {
 /** Move: |move|p2a: Nickname|Move Name|target, or the move of a |cant| line; the client's rule decides which move the line books (T108 step 2). */
 export function recordMove(state: InferrerState, line: LogLine) {
   const moveLine = line.cmd === 'cant' ? blockedMoveLine(line) : line;
-  const nickname = moveLine?.cmd === 'move' ? sideSubject(moveLine, state.opponentSide) : null;
-  if (!moveLine || nickname === null) return;
+  if (!moveLine || moveLine.cmd !== 'move') return;
+  // Round 89 (#139): a copy's move books to the body it copied, whichever side the copy stands on.
+  const booked = identOf(bookingIdent(state, arg(moveLine, 1)));
+  if (booked?.side !== state.opponentSide) return;
+  const nickname = booked.name;
   const moveName = ownMove(state, moveLine);
   if (!moveName) return;
 

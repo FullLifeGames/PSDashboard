@@ -21,7 +21,7 @@ import { MAX_PRICED_HITS, NO_COST, type HitCost, type StatusCost } from './conta
  * deterministic and the mean of the probes is its cost (the damage rolls at the two ends average to the middle one);
  * otherwise the other 18 points of the grid are played too.
  *
- * Each hit is played at full HP on both sides and with the foe's whole HP under it: the chip is the amount of the
+ * Each hit is played at full HP on both sides, the other bodies on the field at full HP too, and with the foe's whole HP under it: the chip is the amount of the
  * effect, not what a body at low HP has left, and a recoil is read on a hit that does not run into the foe's last HP
  * (the race counts the hit that finishes it as free, score/contact-price.ts). A benched body is put on the field of
  * the copy for the hit, as the static asks the simulator about benched bodies everywhere else.
@@ -76,6 +76,8 @@ function prepare(battle: Battle, attacker: Pokemon, defender: Pokemon, neutral =
   const setup = { copy, attacker: counterpart(battle, copy, attacker), defender: counterpart(battle, copy, defender) };
   bringIn(setup.attacker);
   bringIn(setup.defender);
+  // Every body on the field plays at full HP, the pair and the others alike: the memo's key leaves the HP of the actives out (score/board-key.ts).
+  for (const side of copy.sides) for (const body of side.active) if (body && !body.fainted) body.hp = body.maxhp;
   setup.attacker.hp = setup.attacker.maxhp;
   setup.defender.hp = setup.defender.maxhp;
   if (neutral) {

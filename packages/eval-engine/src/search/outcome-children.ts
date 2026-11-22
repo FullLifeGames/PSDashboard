@@ -3,7 +3,7 @@ import { advancePositionWithLog, positionBattle, type SimPosition } from '../for
 import { classifyChild, foldClassWeights, observeOrder, planCellEvents, type CellEvent } from '../cell-blend.ts';
 import { DiceSink, type RollScript, type RollScripts, type SecondaryRecord } from '../forward/scripted-prng.ts';
 import { hasSecondary, splitOutcome, worthForcing } from './secondary-classes.ts';
-import { countFainted, rollSensitivePair, speedTie, tieOrderScripts } from './leaf.ts';
+import { countFainted, speedTie } from './leaf.ts';
 
 /**
  * Round 43: one cell's children by outcome. The CLASS path prices a
@@ -11,19 +11,18 @@ import { countFainted, rollSensitivePair, speedTie, tieOrderScripts } from './le
  * foldClassWeights): natural draws on the base seeds name the move order
  * and fill the classes they land in, and every class no draw showed is
  * drawn ON DEMAND through a scripted PRNG (miss, median kill roll, median
- * non-kill roll, the other tie order) and confirmed on its log. The
- * EMPIRICAL path (doubles, guarded singles pairs) draws fixed seeds and
- * groups them by who fell. Shared by the MCTS tree's chance nodes, the
- * endgame solver and the prover.
+ * non-kill roll, the other tie order) and confirmed on its log. Shared by
+ * the endgame solver and the prover (the tree's own chance nodes are gone,
+ * ADR 0023).
  */
 
 interface OutcomeChild {
   position: SimPosition;
-  /** Group key `${order}:${classKey}` on the class path; the faint signature on the empirical path. */
+  /** Group key `${order}:${classKey}`. */
   key: string;
   /** Normalized over the drawn groups. */
   weight: number;
-  /** Analytic weight before that normalization (empirical path: equals weight). */
+  /** Analytic weight before that normalization. */
   share: number;
   ended: boolean;
   /** The draw stopped at a forced-switch request (stopAtForcedSwitch). */
@@ -32,7 +31,7 @@ interface OutcomeChild {
 
 export interface OutcomeChildren {
   children: OutcomeChild[];
-  /** Class path: expected groups no draw reached, with their analytic share. */
+  /** Expected groups no draw reached, with their analytic share. */
   missing: { key: string; share: number }[];
   events: CellEvent[];
   tie: boolean;
@@ -42,12 +41,6 @@ export interface ClassDrawOptions {
   baseSeeds: readonly PRNGSeed[];
   /** Cap on forced draws per cell, retries included; groups beyond it stay missing. */
   forcedCap: number;
-  stopAtForcedSwitch?: boolean;
-}
-
-export interface GroupedDrawOptions {
-  /** seeds[0] always; the rest only when the first draw fainted someone or the pair carries a roll. */
-  seeds: readonly PRNGSeed[];
   stopAtForcedSwitch?: boolean;
 }
 
@@ -256,44 +249,4 @@ export function classChildren(root: SimPosition, p1Choice: string, p2Choice: str
   }
   forceMissing({ root, rootHp, p1Choice, p2Choice, events, tie, order, advance, record }, expected, grouped, opts.forcedCap, opts.baseSeeds[0]);
   return toChildren(expected, grouped, events, tie);
-}
-
-/** The faint signature of a draw: who fell, and whether the game ended. */
-function signature(draw: Draw): string {
-  const faints = draw.log.filter(line => line.startsWith('|faint|')).map(line => line.slice('|faint|'.length)).sort();
-  return `${faints.join(',')}${draw.ended ? '|end' : ''}`;
-}
-
-/**
- * The empirical path for pairs without a class plan (doubles, guarded
- * singles pairs): seeds[0] always, the remaining seeds when that draw
- * fainted someone or the pair carries an accuracy or random-call roll
- * (plainCellSample's rule), grouped by faint signature with the median
- * draw as representative. Weights are draw shares. Round 69 (T146 c4): a tied singles pair draws each move order
- * with the order scripted and gives each order one half of the weight.
- */
-export function groupedChildren(root: SimPosition, p1Choice: string, p2Choice: string, opts: GroupedDrawOptions): OutcomeChildren {
-  const battle = positionBattle(root);
-  const rootHp = totalHp(battle);
-  const rootFainted = countFainted(battle);
-  const orders = speedTie(battle, p1Choice, p2Choice) ? Object.values(tieOrderScripts(p1Choice, p2Choice)) : [undefined];
-  const groups = new Map<string, { draws: Draw[]; weight: number }>();
-  for (const scripts of orders) {
-    const advance = { stopAtForcedSwitch: opts.stopAtForcedSwitch, scripts };
-    const draws = [drawChild(root, rootHp, p1Choice, p2Choice, opts.seeds[0], advance)];
-    if (draws[0].fainted > rootFainted || rollSensitivePair(battle, p1Choice, p2Choice)) {
-      for (const seed of opts.seeds.slice(1)) draws.push(drawChild(root, rootHp, p1Choice, p2Choice, seed, advance));
-    }
-    for (const draw of draws) {
-      const group = groups.get(signature(draw)) ?? { draws: [], weight: 0 };
-      group.draws.push(draw);
-      group.weight += 1 / (orders.length * draws.length);
-      groups.set(signature(draw), group);
-    }
-  }
-  const children = [...groups.entries()].map(([key, { draws, weight }]) => {
-    const pick = median(draws);
-    return { position: pick.position, key, weight, share: weight, ended: pick.ended, pendingSwitch: pick.pendingSwitch };
-  });
-  return { children, missing: [], events: [], tie: false };
 }

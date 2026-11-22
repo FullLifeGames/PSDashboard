@@ -39,11 +39,17 @@ export const RULE_SETS = [
   { name: 'Champions doubles', format: 'gen9championsdoublescustomgame', gen: 9, doubles: true },
 ];
 
-/** The suite takes the first eight kinds of move in singles and the first four in doubles (a board costs twice as much); the probe takes sixteen. */
+/**
+ * The suite takes the first eight kinds of move in singles and the first four in doubles (a board costs twice as much); the probe takes sixteen.
+ * @public The probe's size sits beside the suite's two: no spec reads it, the probes under docs/perf/probes do (round 89, gate D8a: knip skips it by this tag).
+ */
 export const MOVES_PER_RULES = 16;
 export const MOVES_PER_RULES_SUITE = 8;
 export const MOVES_PER_RULES_DOUBLES = 4;
-/** The sweep that runs in every speed-layer mode takes the first six kinds of move (the suite's single run, the first three). */
+/**
+ * The sweep that runs in every speed-layer mode takes the first six kinds of move (the suite's single run, the first three).
+ * @public The probe's size sits beside the suite's short one: no spec reads it, the probes under docs/perf/probes do (round 89, gate D8a: knip skips it by this tag).
+ */
 export const MODES_MOVES = 6;
 export const MODES_MOVES_SHORT = 3;
 

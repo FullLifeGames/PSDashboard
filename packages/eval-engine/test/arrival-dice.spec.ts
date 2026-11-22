@@ -4,6 +4,9 @@ import { adoptSerializedRuntime } from '../src/branch-engine';
 import { serializeLiveBattle } from '../src/serialize';
 import { alignArrivalDice } from '../src/branch/arrival-dice';
 import { deserializeBattleExact } from '../src/forward-model';
+import { LoggedRollPRNG } from '../src/branch/logged-rolls';
+import { getMainChoice, parseTurnBlocks } from '../src/branch/protocol-choices';
+import { toId } from '@fulllifegames/replay-core';
 import { playTurn, prngOf, reconstruct } from './arrival-turn';
 
 /**
@@ -78,16 +81,66 @@ describe('the unchanged first mover keeps its logged roll when the other side cl
   });
 });
 
-describe('an arrival whose turn no trial can play keeps its dice', () => {
-  // Review of round 70: with every trial failed (an edited set that lost the logged move), the arrival landed on 1,2,3,4.
-  test('GPL turn 13 with Air Slash taken out of Noivern\'s set: the dice stay as they were', { timeout: 300000 }, async () => {
-    const { replay, captured } = await reconstruct(SINGLES.fixture, SINGLES.turn + 1);
-    const battle = deserializeBattleExact(captured.get(SINGLES.turn)!);
-    const noivern = battle.sides[0].active[0]!;
-    noivern.moveSlots = noivern.moveSlots.filter(slot => slot.id !== 'airslash');
-    noivern.baseMoveSlots = noivern.baseMoveSlots.filter(slot => slot.id !== 'airslash');
+describe.each([
+  { ...SINGLES, side: 'p1' as const, slot: 0 },
+  { ...DOUBLES, side: 'p1' as const, slot: 0 },
+  { ...VGC, side: 'p1' as const, slot: 0 },
+])('an arrival whose logged move the edited set lost plays with the rebuild\'s stand-in: $label', ({ fixture, turn, seed, side, slot }) => {
+  // Round 89 (#143, ruling 18): before, the click named the missing move, the simulator refused it, the forced turn threw and no trial played, so the
+  // function returned null (round 70's review). Now the click is the stand-in of the body's request (`playableMove`), the turn plays as the
+  // rebuild plays it, and the arrival is that turn's own: the seed of the unedited rebuild, the logged dice forced on it.
+  test('the stand-in click plays, the record is the forced turn\'s and the dice follow the logged draws', { timeout: 300000 }, async () => {
+    const { replay, runtime, captured } = await reconstruct(fixture, turn + 1);
+    const battle = deserializeBattleExact(captured.get(turn)!);
+    const block = parseTurnBlocks(replay.log).turns.find(entry => entry.turn === turn)!;
+    const loggedMove = block.preUpkeep.find(line => line.startsWith(`|move|${side}${'ab'[slot]}:`) && !line.includes('[from]'))!.split('|')[3];
+    const active = battle.sides[side === 'p1' ? 0 : 1].active[slot]!;
+    const keeps = (slot: { id: string }) => slot.id !== toId(loggedMove);
+    active.moveSlots = active.moveSlots.filter(keeps);
+    active.baseMoveSlots = active.baseMoveSlots.filter(keeps);
+    expect(active.getMoveRequestData().moves.some(move => move.id === toId(loggedMove))).toBe(false);
     battle.prng = new PRNG('7,7,7,7');
-    expect(alignArrivalDice(battle, replay.log, SINGLES.turn)).toBeNull();
+    const choices = { p1: getMainChoice(block.preUpkeep, 'p1', battle), p2: getMainChoice(block.preUpkeep, 'p2', battle) };
+    // the click is a request move now, not the lost one
+    expect(choices[side].split(', ')[slot]).toMatch(/^move \d/);
+
+    const aligned = runtime.haxAlignment.find(record => record.turn === turn)!;
+    const result = alignArrivalDice(battle, replay.log, turn);
+    // the meaning: a forced record (no trial ran) on the seed the rebuild plays this turn under; the other fields are that record's constants
+    expect(result).toEqual({ seed: aligned.seed, trialScore: null, trialPerfect: false, candidatesTried: 0, trialsFailed: 0 });
+    expect(result!.seed).toBe(seed);
+    expect(aligned).toMatchObject({ via: 'forced', trialPerfect: false, candidatesTried: 0 });
+    // the dice: the logged-draws stream on that seed, carrying the turn and the clicks the rebuild's function answers for this position
+    expect(battle.prng).toBeInstanceOf(LoggedRollPRNG);
+    expect(battle.prng.getSeed()).toBe(seed);
+    const prng = battle.prng as LoggedRollPRNG;
+    expect(prng.loggedTurn).toMatchObject({ turn, choices });
+  });
+});
+
+describe.each([
+  { ...SINGLES, turn: 12, side: 'p1' as const, label: 'singles (GPL DzBQ5azlO5l)' },
+  { ...DOUBLES, turn: 9, side: 'p1' as const, label: 'doubles (Doubles OU 912884)' },
+  { ...VGC, turn: 3, side: 'p2' as const, label: 'VGC doubles (Regulation I 2630181744)' },
+])('an arrival whose turn no trial can play keeps its dice: $label', ({ fixture, turn, side }) => {
+  // Round 70 (review): with every trial failed, the arrival landed on 1,2,3,4. Round 89 (#143, ruling 18): a lost move is repaired by the stand-in
+  // now, so the scene is a logged switch with no one left to go to. `playableMove` repairs moves only; the click stays `switch n`, the simulator
+  // refuses a switch to a fainted body, the forced turn throws, and none of the sixteen trials plays either.
+  test('the logged switch has no benched body: null, and the dice stay as they were', { timeout: 300000 }, async () => {
+    const { replay, captured } = await reconstruct(fixture, turn + 1);
+    const battle = deserializeBattleExact(captured.get(turn)!);
+    const block = parseTurnBlocks(replay.log).turns.find(entry => entry.turn === turn)!;
+    const unedited = getMainChoice(block.preUpkeep, side, battle);
+    expect(unedited).toMatch(/\bswitch \d/);
+    for (const body of battle.sides[side === 'p1' ? 0 : 1].pokemon) {
+      if (body.isActive) continue;
+      body.hp = 0;
+      body.fainted = true;
+    }
+    battle.prng = new PRNG('7,7,7,7');
+    const before = battle.prng;
+    expect(alignArrivalDice(battle, replay.log, turn)).toBeNull();
+    expect(battle.prng).toBe(before);
     expect(battle.prng.getSeed()).toBe('7,7,7,7');
   });
 });

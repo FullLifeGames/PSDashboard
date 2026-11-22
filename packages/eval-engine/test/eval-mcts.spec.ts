@@ -235,11 +235,9 @@ describe('MCTS koOdds payload (round 7)', () => {
     expect(j).toBeGreaterThanOrEqual(0);
     const pump = tree.cells.find(cell => cell.key === cellKey(i, j));
     expect(pump).toBeTruthy();
-    // Round 43: a root boundary cell is a chance node over its classes (cells[].classes); a
-    // single-child boundary cell keeps the drawn class as classKey (round 33).
-    const pumpKeys = pump!.classes ? pump!.classes.map(cls => cls.key) : [pump!.classKey];
-    expect(pumpKeys.length).toBeGreaterThan(0);
-    for (const key of pumpKeys) expect(['miss', 'hit-kill', 'hit-nokill']).toContain(key);
+    // A root boundary cell keeps the class its draw showed as classKey (round 33); the tree holds no chance nodes.
+    expect(['miss', 'hit-kill', 'hit-nokill']).toContain(pump!.classKey);
+    expect(pump!.classes).toBeUndefined();
     const certain = tree.cells.find(cell => cell.key === cellKey(toss, j));
     expect(certain?.classKey).toBeUndefined();
     expect(certain?.classes).toBeUndefined();
