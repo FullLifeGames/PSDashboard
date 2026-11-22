@@ -1,9 +1,10 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { gameReviewEnabled, opponentReadsEnabled } from '../lib/feature-flags';
 import { SizeSelect } from './SizeSelect';
 
 /** Round 89 (#153, HM-2): what the setting changes and where; the grades stay as they are. */
-export const OPPONENT_READS_TITLE = 'In a variation the opponent answers each move you pick with the reply the search rates lowest for it, as if it had read your move: '
-  + 'when you click an engine move, in the turn dock, and in a turn\'s lines and the Game review. '
+const opponentReadsTitle = (): string => 'In a variation the opponent answers each move you pick with the reply the search rates lowest for it, as if it had read your move: '
+  + `when you click an engine move, in the turn dock, and in a turn's lines${gameReviewEnabled() ? ' and the Game review' : ''}. `
   + 'Off, it plays its own top choice, which does not depend on your move. Grades and scores stay as they are. A change applies from your next pick.';
 
 interface SetupMenuProps {
@@ -21,7 +22,7 @@ interface SetupMenuProps {
  * actions open from one button; a pick closes the menu, the toggle keeps it open, and so do Escape and
  * a click outside it. Round 84 (T315): the Size select of the app's scale stands under the animate toggle and keeps the menu
  * open like it. Round 89 (#153, HM-2): the box that stood in the Evaluation row as "Hard mode" sits here as "Opponent reads my move", below
- * the animate toggle, and keeps the menu open too.
+ * the animate toggle, and keeps the menu open too. Round 89 (ruling 49): behind the flag `opponentReadsEnabled` (src/lib/feature-flags.ts); off, the box is not drawn.
  */
 export function SetupMenu({ animateBranchTurns, onAnimateChange, opponentReads, onOpponentReadsChange, onEditSide, onOpenSets }: SetupMenuProps) {
   const [open, setOpen] = useState(false);
@@ -63,10 +64,12 @@ export function SetupMenu({ animateBranchTurns, onAnimateChange, opponentReads, 
             <input type="checkbox" checked={animateBranchTurns} onChange={event => onAnimateChange(event.target.checked)} />
             Animate branch turns
           </label>
-          <label className="ps-setup-check" title={OPPONENT_READS_TITLE}>
-            <input type="checkbox" checked={opponentReads} onChange={event => onOpponentReadsChange(event.target.checked)} />
-            Opponent reads my move
-          </label>
+          {opponentReadsEnabled() && (
+            <label className="ps-setup-check" title={opponentReadsTitle()}>
+              <input type="checkbox" checked={opponentReads} onChange={event => onOpponentReadsChange(event.target.checked)} />
+              Opponent reads my move
+            </label>
+          )}
           <SizeSelect />
           <button type="button" className="ps-btn" onClick={pick(() => onEditSide('p1'))}>Edit Player</button>
           <button type="button" className="ps-btn" onClick={pick(() => onEditSide('p2'))}>Edit Opp</button>

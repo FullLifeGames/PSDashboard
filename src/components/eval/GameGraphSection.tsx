@@ -9,6 +9,7 @@ import { GameReviewPanel } from './GameReviewPanel';
 import { reviewMarks } from './game-review';
 import { EvalGraph } from '../EvalGraph';
 import { REVIEW_COLORS } from '../../lib/eval-graph-view';
+import { gameReviewEnabled } from '../../lib/feature-flags';
 import { EvalLeadAnalysis, EvalTurnAnalysis } from '../EvalTurnAnalysis';
 import { EvalReplacementAnalysis } from './EvalReplacementAnalysis';
 import type { LinesHost } from '../../lib/line-view';
@@ -111,6 +112,10 @@ interface TurnViewProps {
   opponentReads?: boolean;
 }
 
+/** The way back from a variation names the Game review only while that section exists (ruling 49). */
+const backToMainTitle = (): string =>
+  `The game report${gameReviewEnabled() ? ' and the Game review show' : ' shows'} on the main line. Same as Main line in the Line selector`;
+
 function TurnView({ report, onBackToReport, onBackToMain, result, currentTurn, graph, analyzeTurn, hasAnalyzeTurn, leadAnalysis, analysis, playerNames, reads, onPickChoice, onPickPair, linesHost, doubles, openTurn, opponentReads }: TurnViewProps) {
   return (
     <>
@@ -131,7 +136,7 @@ function TurnView({ report, onBackToReport, onBackToMain, result, currentTurn, g
           className="ps-btn"
           style={{ padding: '1px 6px', fontSize: 10, marginTop: 4 }}
           onClick={onBackToMain}
-          title="The game report and the Game review show on the main line. Same as Main line in the Line selector"
+          title={backToMainTitle()}
         >
           Back to the main line
         </button>
@@ -208,7 +213,7 @@ function GraphMarksLegend({ marks, playerNames }: { marks: ReturnType<typeof rev
 /** The game graph with the Game review's marks on it (round 89). */
 function GraphView(props: GameGraphSectionProps) {
   const { graph, playerNames, currentTurn, currentLine, selectTurn, reportLeads, variation, graphMaxTurn, reviewAnalyses } = props;
-  const marks = useMemo(() => reviewMarks(reviewAnalyses), [reviewAnalyses]);
+  const marks = useMemo(() => (gameReviewEnabled() ? reviewMarks(reviewAnalyses) : []), [reviewAnalyses]);
   return (
     <>
       <EvalGraph
@@ -243,7 +248,7 @@ function ReportOverview({ report, ...props }: GameGraphSectionProps & { report: 
         leads={reportLeads}
         settingsFor={turn => (turn >= 1 ? graph.settings[turn - 1] ?? null : null)}
       />
-      {reviewAnalyses && linesHost && (
+      {gameReviewEnabled() && reviewAnalyses && linesHost && (
         <GameReviewPanel
           analyses={reviewAnalyses} results={graph.results} playerNames={playerNames} doubles={!!doubles}
           host={linesHost} onSelectTurn={selectTurn}

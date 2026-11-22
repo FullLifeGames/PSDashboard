@@ -1,4 +1,5 @@
 import type { PickerSource } from '../../lib/picker-state';
+import { opponentReadsEnabled } from '../../lib/feature-flags';
 import { DICE_WAIT_NOTE } from '../branch/DiceChips';
 import type { DockModel, DockSlotModel } from './dock-model';
 
@@ -49,7 +50,7 @@ export function DockStatus({ source, acquiringExact, executeError, model, diceOp
   const waitingFor = [...(model.flags.p1Waits ? ['P2'] : []), ...(model.flags.p2Waits ? ['P1'] : [])];
   return (
     <div className="ps-dock-status">
-      {opponentReads && (
+      {opponentReads && opponentReadsEnabled() && (
         <>
           <span className="ps-dock-source" title={OPPONENT_READS_NOTE_TITLE}>Opponent reads your move</span>
           <button type="button" className="ps-btn ps-dock-turn-off" onClick={() => onOpponentReadsChange?.(false)}>

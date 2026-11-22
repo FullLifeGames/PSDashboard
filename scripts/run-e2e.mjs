@@ -117,10 +117,23 @@ async function assertPortFree() {
   }
 }
 
+/**
+ * Round 89 (ruling 49): the two features behind a flag (src/lib/feature-flags.ts) are off in every build. The e2e specs of both run on a
+ * dev server with the flags on; the feedback run (`-c playwright.feedback.config.ts`) reads neither and keeps the default build, which
+ * is what ships. A flag the caller already set in the environment wins, so `VITE_FEATURE_GAME_REVIEW=0` runs the suite with one off.
+ */
+const FEATURE_FLAGS = ['VITE_FEATURE_GAME_REVIEW', 'VITE_FEATURE_OPPONENT_READS'];
+function serverEnv() {
+  const feedback = playwrightArgs.some(arg => arg.includes('playwright.feedback.config'));
+  if (feedback) return process.env;
+  return { ...process.env, ...Object.fromEntries(FEATURE_FLAGS.filter(name => process.env[name] === undefined).map(name => [name, '1'])) };
+}
+
 function startServer() {
   server = spawn(process.execPath, viteArgs, {
     stdio: 'inherit',
     windowsHide: true,
+    env: serverEnv(),
   });
   serverExit = new Promise(resolve => {
     server.on('exit', (code, signal) => {

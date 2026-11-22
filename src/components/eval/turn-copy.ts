@@ -1,4 +1,5 @@
 import { regretText, TIER_THRESHOLDS, type EvalLine, type SideAnalysis, type TurnAnalysis, type RankedChoice, winDeltaText, winPctText } from '@fulllifegames/eval-engine';
+import { opponentReadsEnabled } from '../../lib/feature-flags';
 import type { RowValues } from '../../lib/line-view';
 
 /**
@@ -178,6 +179,6 @@ export function regretView(name: string, side: SideAnalysis, regret: number): { 
 }
 
 /** Round 89 (#153, HM-2): what a click on an engine move does to the other side, by the Setup setting "Opponent reads my move". */
-export const exploreTitle = (opponentReads = false): string => opponentReads
+export const exploreTitle = (opponentReads = false): string => opponentReads && opponentReadsEnabled()
   ? 'Play this turn in a variation; the opponent reads your move and plays the reply the search rates lowest for it.'
   : 'Play this turn in a variation; the opponent plays its top choice.';

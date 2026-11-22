@@ -86,6 +86,17 @@ describe('LinesSection', () => {
     expect(screen.getByText('No line on this turn: the matrix pass keeps none. Analyze the position with MCTS to get lines.')).toBeInTheDocument();
   });
 
+  // Round 89 (ruling 49): the review is not there with its flag off, so the sentence does not send the reader to it.
+  test.each([['singles', false], ['doubles', true]])('%s: with the Game review flag off the coming-lines sentence names no review', (_kind, doubles) => {
+    vi.stubEnv('VITE_FEATURE_GAME_REVIEW', '');
+    try {
+      render(<LinesSection turn={3} result={withLines()} playerNames={doubles ? DOUBLES_NAMES : SINGLES_NAMES} doubles={doubles} host={{ ...host(), lineComing: () => 'stage' }} />);
+      expect(screen.getByText('No line yet: the app searches this turn after the game report.')).toBeInTheDocument();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   test('with the card\'s analysis the engine line is the line of the card\'s engine choice (singles and doubles)', () => {
     const stale: EvalLine = { ...singlesLine, label: 'Surf', choice: 'move 4' };
     const analysis = turnAnalysis(20, { p2: { ...turnAnalysis(20).p2, best: rankedChoice('move 1', 'Hydro Pump', 0.1) } });

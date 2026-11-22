@@ -80,6 +80,29 @@ test.describe.serial('production build', () => {
     await page.goto('/');
   });
 
+  /**
+   * Round 89 (ruling 49): the production build carries both feature flags off (src/lib/feature-flags.ts). Opponent reads my move has no
+   * Setup checkbox, though an earlier nightly stored hardMode true, and the Game review is neither on the page nor in the text of the
+   * panel; the Lines fold is still there. A dev server with the variables set shows both (test/e2e/hard-mode.spec.ts, game-review.spec.ts).
+   */
+  test('the build ships Opponent reads my move and the Game review switched off', async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.evaluate(() => {
+      localStorage.setItem('ps-replay-interceptor:eval-prefs',
+        JSON.stringify({ depth: 1, samples: 1, mode: 'matrix', auto: false, tera: 'auto', hardMode: true }));
+    });
+    await page.reload();
+    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
+    await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 30_000 });
+    await page.getByRole('button', { name: /^Setup/ }).click();
+    await expect(page.getByRole('checkbox', { name: 'Animate branch turns' })).toBeVisible();
+    await expect(page.getByRole('checkbox', { name: 'Opponent reads my move' })).toHaveCount(0);
+    await expect(page.getByText('Opponent reads your move')).toHaveCount(0);
+    await expect(page.getByText(/Game review/)).toHaveCount(0);
+    await expect(page.locator('[data-review-mark]')).toHaveCount(0);
+    expect(JSON.parse(await page.evaluate(() => localStorage.getItem('ps-replay-interceptor:eval-prefs') ?? '{}')).hardMode).toBe(true);
+  });
+
   const analysisBySwitch: Record<string, string> = {};
   for (const simFast of ['0', '1'] as const) {
     test(`the minified worker still evaluates positions (speed layer ${simFast}): the eval graph fills`, async ({ page }) => {

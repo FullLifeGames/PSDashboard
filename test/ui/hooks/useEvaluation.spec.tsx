@@ -100,6 +100,50 @@ describe('useEvaluation preferences: Hard mode (round 89, #153)', () => {
   });
 });
 
+/**
+ * Round 89 (ruling 49): with the flag VITE_FEATURE_OPPONENT_READS off (the default of every build), a `hardMode: true` that an earlier
+ * nightly stored is ignored: the hook hands every reader (the dock fill, the engine walk, the lines, the cards) the preference as
+ * unset, no search request carries it, and the stored value stays as it was. The preference does not depend on the game type, so one
+ * row covers singles and doubles; the position of the search row is a doubles one on purpose.
+ */
+describe('useEvaluation preferences: Opponent reads my move behind its flag (round 89, ruling 49)', () => {
+  beforeEach(() => vi.stubEnv('VITE_FEATURE_OPPONENT_READS', ''));
+  afterEach(() => vi.unstubAllEnvs());
+
+  test('a stored hardMode true reads as unset and the search request does not carry it', async () => {
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ depth: 1, mode: 'matrix', hardMode: true }));
+    script.calls.length = 0;
+    script.evaluate = async serialized => evalResult('doubles', { score: scoreOf(serialized) });
+    const { result } = renderHook(() => useEvaluation());
+    expect(result.current.prefs.hardMode).toBeUndefined();
+    act(() => result.current.evaluate({ cacheKey: null, tera: false, acquire: async () => doublesPosition(0), tag: 'main:2' }));
+    await waitFor(() => expect(result.current.status).toBe('done'));
+    expect(script.calls.length).toBeGreaterThan(0);
+    for (const call of script.calls) expect(JSON.stringify(call.settings)).not.toContain('hardMode');
+  });
+
+  test('a later preference change keeps the stored true untouched, and the hook still reads it as unset', () => {
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ depth: 1, mode: 'matrix', hardMode: true }));
+    const { result } = renderHook(() => useEvaluation());
+    act(() => result.current.setPrefs({ ...result.current.prefs, depth: 2 }));
+    expect(result.current.prefs.depth).toBe(2);
+    expect(result.current.prefs.hardMode).toBeUndefined();
+    expect(JSON.parse(localStorage.getItem(PREFS_KEY)!)).toMatchObject({ depth: 2, hardMode: true });
+  });
+
+  test('nothing stored stays nothing: a change adds no hardMode key', () => {
+    const { result } = renderHook(() => useEvaluation());
+    act(() => result.current.setPrefs({ ...result.current.prefs, depth: 2 }));
+    expect(JSON.parse(localStorage.getItem(PREFS_KEY)!)).not.toHaveProperty('hardMode');
+  });
+
+  test('with the flag back on, the stored true is read again', () => {
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ depth: 1, mode: 'matrix', hardMode: true }));
+    vi.stubEnv('VITE_FEATURE_OPPONENT_READS', '1');
+    expect(renderHook(() => useEvaluation()).result.current.prefs.hardMode).toBe(true);
+  });
+});
+
 describe('useEvaluation single position', () => {
   test('evaluates through the pool with the configured engine, streams progress, installs and caches the result', async () => {
     script.evaluate = async (serialized, _settings, handlers) => {
