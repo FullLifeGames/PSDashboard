@@ -5,7 +5,7 @@ import { createMatchupCache } from '../src/eval-function';
 import { sampleCell, plainVerifySample } from '../src/search/cell-sampler';
 import { pairCellSample } from '../src/pair/sampler';
 import { speedTie } from '../src/search/leaf';
-import { VERIFY_PLAIN_SEEDS } from '../src/search/verify-cell';
+import { VERIFY_PLAIN_SEEDS } from './seed-streams';
 import { doublesRoot, pairSet } from './pair-battles';
 
 /**

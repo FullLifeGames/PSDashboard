@@ -8,12 +8,10 @@ import { endgameChildren } from '../src/endgame/children';
 import { classesOf } from '../src/mcts';
 import { benchOrder } from '../src/search/bench-order';
 import { sampleCell } from '../src/search/cell-sampler';
-import { SEARCH_SEEDS, cellSeedList, countFainted } from '../src/search/leaf';
+import { BASE_DRAWS, cellSeedList, countFainted } from '../src/search/leaf';
 import { createLocalExecutor } from '../src/search/position';
 import { cellHash, positionKey } from '../src/search/root-quantile';
-import { VERIFY_PLAIN_SEEDS } from '../src/search/verify-cell';
-import { PROBE_SEEDS } from '../src/cell-blend';
-import { FALLBACK_SEEDS } from '../src/pair/sampler';
+import { FALLBACK_SEEDS, PROBE_SEEDS, SEARCH_SEEDS, VERIFY_PLAIN_SEEDS } from './seed-streams';
 import type { EvalSettings } from '../src/types';
 
 /**
@@ -253,7 +251,7 @@ describe('(c) the paths share the cell\'s slots', () => {
       const seeds = readsOf(endgame, cell);
       if (seeds.length === 0) continue;
       checked++;
-      const slots = new Set(listOf(cell, SEARCH_SEEDS.length));
+      const slots = new Set(listOf(cell, BASE_DRAWS));
       if (seeds[0] !== listOf(cell, 1)[0] || seeds.some(seed => !slots.has(seed))) wrong.push(`${cell.p1} / ${cell.p2}: ${seeds.join(' ')}`);
     }
     expect(checked).toBeGreaterThan(40);

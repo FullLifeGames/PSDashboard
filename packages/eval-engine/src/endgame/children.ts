@@ -1,7 +1,7 @@
 import type { Battle, PRNGSeed } from '@pkmn/sim';
 import { positionBattle, type SimPosition } from '../forward-model.ts';
 import { BOUNDARY_DRAW_BUDGET, type CellEvent } from '../cell-blend.ts';
-import { SEARCH_SEEDS } from '../search/leaf.ts';
+import { BASE_DRAWS } from '../search/leaf.ts';
 import { cellSeeds } from '../search/root-quantile.ts';
 import { classChildren, drawChild, median, totalHp, type Draw } from '../search/outcome-children.ts';
 import { createMatchupCache } from '../eval-function.ts';
@@ -229,7 +229,7 @@ function plainChildren(root: SimPosition, battle: Battle, rootHp: number, p1Choi
  */
 export function endgameChildren(root: SimPosition, p1Choice: string, p2Choice: string, drawBudget = BOUNDARY_DRAW_BUDGET): EndgameChildren {
   const battle = positionBattle(root);
-  const classes = classChildren(root, p1Choice, p2Choice, { baseSeeds: cellSeeds(root, p1Choice, p2Choice).slice(0, SEARCH_SEEDS.length), forcedCap: drawBudget });
+  const classes = classChildren(root, p1Choice, p2Choice, { baseSeeds: cellSeeds(root, p1Choice, p2Choice).slice(0, BASE_DRAWS), forcedCap: drawBudget });
   if (classes) {
     const children = classes.children.map(child => ({ position: child.position, weight: child.weight, share: child.share, ended: child.ended, key: child.key }));
     return { children, unpriced: classes.missing.length > 0, plain: false, spread: false, missing: classes.missing, events: classes.events };

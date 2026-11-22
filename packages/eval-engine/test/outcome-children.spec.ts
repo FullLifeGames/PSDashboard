@@ -4,7 +4,7 @@ import type { PokemonSet } from '@pkmn/sim';
 import { createRootPosition, positionBattle } from '../src/forward-model';
 import { boundaryEvent } from '../src/ko-odds';
 import { classChildren, speedTie } from '../src/search/outcome-children';
-import { SEARCH_SEEDS } from '../src/search/leaf';
+import { SEARCH_SEEDS } from './seed-streams';
 
 /**
  * Round 43: outcome children on demand. The boundary event's kill-roll

@@ -5,12 +5,11 @@ import { createMatchupCache } from '../src/eval-function';
 import { createRootPosition, legalChoices, positionBattle, type SimPosition } from '../src/forward-model';
 import { benchOrder } from '../src/search/bench-order';
 import { sampleCell } from '../src/search/cell-sampler';
-import { SEARCH_SEEDS, cellSeedList } from '../src/search/leaf';
+import { cellSeedList } from '../src/search/leaf';
 import { cellHash, positionKey } from '../src/search/root-quantile';
 import { drawChild } from '../src/search/trend-probe';
-import { VERIFY_PLAIN_SEEDS } from '../src/search/verify-cell';
-import { PROBE_SEEDS } from '../src/cell-blend';
-import { FALLBACK_SEEDS, pairCellSample } from '../src/pair/sampler';
+import { pairCellSample } from '../src/pair/sampler';
+import { FALLBACK_SEEDS, PROBE_SEEDS, SEARCH_SEEDS, VERIFY_PLAIN_SEEDS } from './seed-streams';
 import { countFainted } from '../src/search/leaf';
 
 /**

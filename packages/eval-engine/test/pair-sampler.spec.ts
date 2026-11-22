@@ -4,7 +4,7 @@ import { createMatchupCache } from '../src/eval-function';
 import { advancePosition, createRootPosition, positionBattle } from '../src/forward-model';
 import { countFainted, leafValue } from '../src/search/leaf';
 import { sampleCell, type CellSample } from '../src/search/cell-sampler';
-import { FALLBACK_SEEDS, PAIR_DRAW_BUDGET, pairCellSample, type PairCell } from '../src/pair/sampler';
+import { FALLBACK_DRAWS, PAIR_DRAW_BUDGET, pairCellSample, type PairCell } from '../src/pair/sampler';
 import { cellSeeds } from '../src/search/root-quantile';
 import { anchorRoot, doublesRoot, pairSet, PLAYED, QUIET } from './pair-battles';
 
@@ -78,7 +78,7 @@ describe('the pair plan at the root (round 56)', () => {
     const cell = pairCellSample(root, 'move dragonclaw 1, move softboiled', 'move rest, move rest', 1, createMatchupCache());
     expect(cell).toMatchObject({ kind: 'sample', via: 'fallback', reason: 'prevented:par', draws: 8 });
     if (cell.kind !== 'sample') return;
-    expect(cell.sample.value).toBeCloseTo(meanOver(root, 'move dragonclaw 1, move softboiled', 'move rest, move rest', cellSeeds(root, 'move dragonclaw 1, move softboiled', 'move rest, move rest').slice(0, FALLBACK_SEEDS.length)), 12); // r89 A5 gate: the cell's eight, not FALLBACK_SEEDS
+    expect(cell.sample.value).toBeCloseTo(meanOver(root, 'move dragonclaw 1, move softboiled', 'move rest, move rest', cellSeeds(root, 'move dragonclaw 1, move softboiled', 'move rest, move rest').slice(0, FALLBACK_DRAWS)), 12); // r89 A5 gate: the cell's eight
   });
 
   // Round 86 (T305): old expectation, the cell fell back after the first draw with `flinch-chance` (8 draws, the plain mean). New: the

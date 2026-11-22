@@ -3,7 +3,7 @@ import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import {
   classifyChild, foldClassWeights, observeOrder, planCellEvents, koOddsForOptions,
-  BOUNDARY_DRAW_BUDGET, PROBE_SEEDS, type CellEvent,
+  BOUNDARY_DRAW_BUDGET, type CellEvent,
 } from '../src/cell-blend';
 import { reblendValue } from '../src/rank';
 import { advancePositionWithLog, createRootPosition } from '../src/forward-model';
@@ -187,11 +187,8 @@ test('koOddsForOptions prices the stay-column headline', () => {
   expect(toss).toBeNull(); // fully deterministic — no event
 });
 
-// Keep the fixed-seed constants honest without pinning exact values elsewhere.
-test('probe constants: eleven fixed seeds under a 16-draw budget', () => {
-  expect(PROBE_SEEDS).toHaveLength(11);
-  expect(PROBE_SEEDS[0]).toBe('21,22,23,24');
-  expect(PROBE_SEEDS[10]).toBe('61,62,63,64');
+// The old probe seeds live in seed-streams.ts; cell-seed-t324.spec.ts holds their count (eleven) to the lists.
+test('the boundary cell draws at most sixteen times', () => {
   expect(BOUNDARY_DRAW_BUDGET).toBe(16);
 });
 

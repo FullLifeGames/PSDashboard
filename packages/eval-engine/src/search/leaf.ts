@@ -13,10 +13,8 @@ import { wpUnits } from '../winprob.ts';
  * the roll-sensitivity of a choice pair.
  */
 
-/** Fixed seeds: index < settings.samples are used. Never randomized. */
-export const SEARCH_SEEDS: readonly PRNGSeed[] = [
-  '1,2,3,4', '5,6,7,8', '9,10,11,12', '13,14,15,16', '17,18,19,20',
-];
+/** Base draws per cell: slots below `settings.samples` and below this count are drawn first; the rest of a cell's list is its probe slots. */
+export const BASE_DRAWS = 5;
 
 /** A murmur-style 32-bit finalizer: integer arithmetic only, so the browser and Node agree to the bit. */
 function mix32(x: number): number {
@@ -40,13 +38,13 @@ export function hashText(text: string): number {
 
 /**
  * Round 61: the seed a tree cell draws at creation. Round 86 (the engine reads the dice, T323): a hash of (seedOffset,
- * iteration). The five SEARCH_SEEDS are one arithmetic progression of the Gen 5 LCG state, so at one draw index a die came true
+ * iteration). The five fixed seeds of the old list are one arithmetic progression of the Gen 5 LCG state, so at one draw index a die came true
  * in 0, 1 or 2 of the five streams, never in a tenth of them at random: a 10 % paralysis in none or in a fifth of the five
  * seeds (in the singles tree one seed carried it in 74 % of its cells, the other four in at most 2 %), a 90 % move missing
  * in 73 % of slot 1's cells and in at most 7 % of the others, the same outcome in every cell of one slot (A10). A tree expands at most one cell per iteration, so (offset, iteration) names the expansion and
  * needs no cell key. The four 16-bit words of the seed come from a chain of the finalizer, none zero, and any tree
- * count gets its own streams. The sampler, the matrix search, the verify round and the endgame children keep
- * SEARCH_SEEDS.
+ * count gets its own streams. The sampler, the matrix search, the verify round and the endgame children read a cell's own list
+ * (`cellSeeds`).
  */
 export function treeSeed(iteration: number, seedOffset: number): PRNGSeed {
   let h = mix32((Math.imul(seedOffset + 1, 0x9e3779b1) ^ Math.imul(iteration + 1, 0x85ebca6b)) >>> 0);
@@ -59,8 +57,7 @@ export function treeSeed(iteration: number, seedOffset: number): PRNGSeed {
 }
 
 /**
- * Round 89 (#60, T324): the seed a cell reads at slot `index` of its list. Today's fixed list (`SEARCH_SEEDS`, `PROBE_SEEDS`,
- * `VERIFY_PLAIN_SEEDS`) gives every cell of a search the same stream, so a die at one draw index came true in none or in all of
+ * Round 89 (#60, T324): the seed a cell reads at slot `index` of its list. The fixed list of the old paths (five search seeds, then probe seeds) gave every cell of a search the same stream, so a die at one draw index came true in none or in all of
  * the cells (a 20 % secondary in 73 to 80 % of a singles matrix, a crit at 1.4 % against 4.2 %: A1b, round 88's E1). Every path
  * that reads slot s of the fixed list reads `cellSeed(s, key)` instead, so the paths keep sharing one list per cell: the matrix's
  * first child is the verify round's, the trend probe rebuilds the matrix's child. `key` is the cell's hash (`cellHash` of the

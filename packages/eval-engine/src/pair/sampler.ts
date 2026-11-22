@@ -1,9 +1,8 @@
 import type { Battle, PRNGSeed } from '@pkmn/sim';
 import type { MatchupCache } from '../eval-function.ts';
 import { advancePosition, positionBattle, type SimPosition } from '../forward-model.ts';
-import { PROBE_SEEDS } from '../cell-blend.ts';
 import type { CellBlendClass } from '../types.ts';
-import { leafValue, SEARCH_SEEDS } from '../search/leaf.ts';
+import { BASE_DRAWS, leafValue } from '../search/leaf.ts';
 import type { CellSample } from '../search/cell-sampler.ts';
 import { drawPlain, firstDraw, outcomeGroups, stateGroups, VERIFY_STATE_RULE, type StateGroup } from '../search/verify-cell.ts';
 import { cellSeeds } from '../search/root-quantile.ts';
@@ -27,8 +26,8 @@ import type { PairScript } from './prng.ts';
 
 /** Draws per cell, base draws included. */
 export const PAIR_DRAW_BUDGET = 8;
-/** The fallback's natural draws: the five search seeds and the first three probe seeds. */
-export const FALLBACK_SEEDS: readonly PRNGSeed[] = [...SEARCH_SEEDS, ...PROBE_SEEDS.slice(0, 3)];
+/** The fallback's natural draws: the base draws and the first three probe slots of the cell's list. */
+export const FALLBACK_DRAWS = BASE_DRAWS + 3;
 const COVER_TARGET = 0.95;
 const COVER_MIN = 0.8;
 const COVER_MAX = 1.02;
@@ -104,7 +103,7 @@ function fallbackCell(cell: Cell, first: PairDraw | null, reason: string, spent:
   const leaves: number[] = [];
   let firstChild = first?.child;
   let ended = first?.ended ?? false;
-  cell.seeds.slice(0, FALLBACK_SEEDS.length).forEach((seed, index) => {
+  cell.seeds.slice(0, FALLBACK_DRAWS).forEach((seed, index) => {
     if (index === 0 && first) {
       leaves.push(first.leaf);
       return;
@@ -118,7 +117,7 @@ function fallbackCell(cell: Cell, first: PairDraw | null, reason: string, spent:
     leaves.push(leafValue(battle, cell.matchupCache));
   });
   const value = leaves.reduce((sum, leaf) => sum + leaf, 0) / leaves.length;
-  const draws = spent + FALLBACK_SEEDS.length - (first ? 1 : 0);
+  const draws = spent + FALLBACK_DRAWS - (first ? 1 : 0);
   return { kind: 'sample', sample: { value, ended, firstChild: firstChild! }, via: 'fallback', reason, draws };
 }
 
@@ -227,7 +226,7 @@ function plan(cell: Cell, first: PairDraw, firstPattern: Pattern): PairCell {
   const candidates = new Map<string, Candidate>();
   record(found, candidates, firstPattern, first, { seed: cell.seeds[0], scripts: NO_SCRIPTS, from: -1 }, true);
   let draws = 1;
-  const base = Math.max(1, Math.min(cell.samples, SEARCH_SEEDS.length));
+  const base = Math.max(1, Math.min(cell.samples, BASE_DRAWS));
   for (let s = 1; s < base; s++) {
     const draw = drawn(cell, cell.seeds[s], NO_SCRIPTS);
     draws += 1;

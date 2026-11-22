@@ -1,4 +1,4 @@
-import type { Battle, Pokemon, PRNGSeed } from '@pkmn/sim';
+import type { Battle, Pokemon } from '@pkmn/sim';
 import { boundaryEvent, randomCallMoves, type BoundaryEvent } from './ko-odds.ts';
 import { pairKoOdds } from './pair/odds.ts';
 import { accuracyRollReached } from './search/event-reach.ts';
@@ -37,16 +37,6 @@ export type CellEventPlan =
 
 /** `miss`, `hit-kill`, `none`, or `hit-nokill` with the secondary effects that came true (`hit-nokill+brn`). */
 type EventOutcome = string;
-
-/**
- * Fixed probe seeds for boundary cells whose analytic classes went
- * unsampled by the base draws. Never randomized.
- */
-export const PROBE_SEEDS: readonly PRNGSeed[] = [
-  '21,22,23,24', '25,26,27,28', '29,30,31,32', '33,34,35,36', '37,38,39,40',
-  '41,42,43,44', '45,46,47,48', '49,50,51,52', '53,54,55,56', '57,58,59,60',
-  '61,62,63,64',
-];
 
 /** Total draw budget per boundary cell (base samples + probe draws). */
 export const BOUNDARY_DRAW_BUDGET = 16;

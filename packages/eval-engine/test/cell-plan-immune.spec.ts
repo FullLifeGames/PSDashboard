@@ -5,7 +5,7 @@ import { advancePositionWithLog, createRootPosition, positionBattle, type SimPos
 import { createMatchupCache } from '../src/eval-function';
 import { sampleCell } from '../src/search/cell-sampler';
 import { classChildren } from '../src/search/outcome-children';
-import { SEARCH_SEEDS } from '../src/search/leaf';
+import { SEARCH_SEEDS } from './seed-streams';
 
 /**
  * Round 69 (T146 part c3): a status move that never reaches its accuracy roll has no miss class. The simulator

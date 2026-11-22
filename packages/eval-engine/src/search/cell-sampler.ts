@@ -8,7 +8,7 @@ import type { CellBlend, CellBlendClass, CellDraw, KoOddsMismatch } from '../typ
 import { DiceSink, type RollScripts, type SecondaryRecord } from '../forward/scripted-prng.ts';
 import { mergeScripts, scriptsFor } from './outcome-children.ts';
 import { hasSecondary, worthForcing } from './secondary-classes.ts';
-import { countFainted, leafValue, rollSensitivePair, SEARCH_SEEDS, speedTie, tieOrderScripts } from './leaf.ts';
+import { countFainted, leafValue, rollSensitivePair, BASE_DRAWS, speedTie, tieOrderScripts } from './leaf.ts';
 import { pairCellSample, type FirstDraw } from '../pair/sampler.ts';
 import { cellSeeds } from './root-quantile.ts';
 import {
@@ -44,7 +44,7 @@ const leadingDraws = (count: number): { baseDraws?: CellDraw[] } =>
   (count > 1 ? { baseDraws: Array.from({ length: count }, (_, index) => ({ index })) } : {});
 
 /** The base draws of a boundary cell: `samples` leading seeds, at least the first. */
-const blendBaseDraws = (samples: number): number => Math.max(1, Math.min(samples, SEARCH_SEEDS.length));
+const blendBaseDraws = (samples: number): number => Math.max(1, Math.min(samples, BASE_DRAWS));
 
 /**
  * Round 63 (T16): a verify cell without a plan prices `plainDraws` natural
@@ -280,7 +280,7 @@ function chaseMissingClasses(
 ): boolean {
   // The probe seeds are slots 5 on of the cell's list (round 89, T324).
   for (
-    let slot = SEARCH_SEEDS.length;
+    let slot = BASE_DRAWS;
     [...expected.keys()].some(key => !classes.has(key)) && draws.length < BOUNDARY_DRAW_BUDGET && slot < seeds.length;
     slot++
   ) {

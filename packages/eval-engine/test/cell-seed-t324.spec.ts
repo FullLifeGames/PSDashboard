@@ -1,10 +1,12 @@
 import { describe, expect, test } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { PRNG, State } from '@pkmn/sim';
 import { deserializeBattleExact } from '../src/forward/serialize';
 import { createRootPosition, type SimPosition } from '../src/forward/position';
 import { benchOrder } from '../src/search/bench-order';
-import { SEARCH_SEEDS, cellSeed, cellSeedList, treeSeed } from '../src/search/leaf';
+import { BASE_DRAWS, cellSeed, cellSeedList, treeSeed } from '../src/search/leaf';
+import { FALLBACK_DRAWS } from '../src/pair/sampler';
+import { FALLBACK_SEEDS, PROBE_SEEDS, SEARCH_SEEDS, VERIFY_PLAIN_SEEDS } from './seed-streams';
 import { cellHash, positionKey, positionSalt, rootSalt } from '../src/search/root-quantile';
 
 /**
@@ -171,5 +173,25 @@ describe('(d) the key of a cell', () => {
     expect(state.sides.every(side => side.pokemon.every(body => !body.details.includes('shiny')))).toBe(true);
     for (const side of state.sides) for (const body of side.pokemon) body.details += ', shiny';
     expect(positionSalt(JSON.stringify(state))).toBe(positionSalt(text));
+  });
+});
+
+describe('the old fixed lists live in the test module, the engine keeps their counts', () => {
+  const sources = (dir: URL): string[] => readdirSync(dir, { withFileTypes: true }).flatMap(entry =>
+    entry.isDirectory() ? sources(new URL(`${entry.name}/`, dir)) : entry.name.endsWith('.ts') ? [new URL(entry.name, dir).pathname] : []);
+
+  test('the counts are the lengths of the lists the engine read before round 90', () => {
+    expect(BASE_DRAWS).toBe(5);
+    expect(FALLBACK_DRAWS).toBe(8);
+    expect(SEARCH_SEEDS).toHaveLength(BASE_DRAWS);
+    expect(FALLBACK_SEEDS).toHaveLength(FALLBACK_DRAWS);
+    expect(PROBE_SEEDS).toHaveLength(11);
+    expect(VERIFY_PLAIN_SEEDS).toHaveLength(16);
+  });
+
+  test('no file of the engine\'s src names a list', () => {
+    const named = sources(new URL('../src/', import.meta.url))
+      .filter(file => /\b(SEARCH_SEEDS|PROBE_SEEDS|FALLBACK_SEEDS|VERIFY_PLAIN_SEEDS)\b/.test(readFileSync(file, 'utf-8')));
+    expect(named).toEqual([]);
   });
 });

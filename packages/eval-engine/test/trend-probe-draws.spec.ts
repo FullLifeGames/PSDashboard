@@ -9,7 +9,7 @@ import { benchOrder } from '../src/search/bench-order';
 import { cellSeeds } from '../src/search/root-quantile';
 import { buildMatrix } from '../src/search/matrix';
 import { sampleCell } from '../src/search/cell-sampler';
-import { countFainted, leafValue, SEARCH_SEEDS } from '../src/search/leaf';
+import { BASE_DRAWS, countFainted, leafValue } from '../src/search/leaf';
 import { expandPivotPairs, searchOptions } from '../src/search/options';
 import {
   applyTrendExtrapolation, applyTrendTiebreak, cellKey, rankFromMatrix, selectTieProbeCells, toResult,
@@ -46,7 +46,7 @@ type Trend = (ctx: { root: ReturnType<typeof createRootPosition>; cache: ReturnT
 const todaysProbe: Trend = ({ cache, value, first }) => subSearchDepth1(first.serialized, PROBE_SETTINGS, cache).score - value;
 /** The mean over the cell's first three search seeds of (the child searched one ply) - (the child's own leaf). */
 const drawsProbe: Trend = ({ root, cache, p1Choice, p2Choice }) => {
-  // r89 A5 gate: the cell's first three seeds (T324), where it read SEARCH_SEEDS.slice(0, 3).
+  // r89 A5 gate: the cell's first three seeds (T324), where it read the first three of the old fixed list.
   const trends = cellSeeds(root, p1Choice, p2Choice).slice(0, 3).map(seed => {
     const child = advancePosition(root, p1Choice, p2Choice, seed);
     return subSearchDepth1(child.serialized, PROBE_SETTINGS, cache).score - leafValue(positionBattle(child), cache);
@@ -136,7 +136,7 @@ describe('the trend probe reads the cell from its base draws (round 70)', () => 
     const orders = (cell.baseDraws ?? []).map(draw => draw.first);
     expect(orders).toContain('p1');
     expect(orders).toContain('p2');
-    expect((cell.baseDraws ?? []).every(draw => draw.index >= 0 && draw.index < SEARCH_SEEDS.length)).toBe(true);
+    expect((cell.baseDraws ?? []).every(draw => draw.index >= 0 && draw.index < BASE_DRAWS)).toBe(true);
   });
 
   test('a draw of a speed-tied cell replays its move order: the child is the one the cell priced', () => {

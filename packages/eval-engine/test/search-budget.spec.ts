@@ -2,7 +2,8 @@ import { afterEach, describe, expect, test } from 'vitest';
 import {
   autoTurnSettings, configureSearchBudget, parseSearchBudget, searchBudget, searchBudgetTag, SEARCH_BUDGET_DEFAULT,
 } from '../src/search/budget';
-import { SEARCH_SEEDS, treeSeed } from '../src/search/leaf';
+import { treeSeed } from '../src/search/leaf';
+import { SEARCH_SEEDS } from './seed-streams';
 import { AUTO_MCTS_FAINTED_FRACTION } from '../src/types';
 
 afterEach(() => configureSearchBudget(null));

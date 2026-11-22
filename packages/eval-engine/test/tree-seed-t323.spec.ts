@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { PRNG } from '@pkmn/sim';
-import { SEARCH_SEEDS, treeSeed } from '../src/search/leaf';
+import { treeSeed } from '../src/search/leaf';
+import { SEARCH_SEEDS } from './seed-streams';
 
 /**
  * Round 86 (the engine reads the dice, A13): the seed of a tree's cell. The five SEARCH_SEEDS are one arithmetic
