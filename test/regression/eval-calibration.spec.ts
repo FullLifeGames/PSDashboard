@@ -1382,10 +1382,22 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * or the ADRs about the changes of the round; of 401 backticked identifiers
  * the wave added, 393 exist (the other 8 are symbols that ADR 0023 says are
  * deleted); four unclear points, low weight, all four closed by 389f4705.
- * BOOK-GAP: the final CI Tests run on 04252524 (all jobs).
- * BOOK-GAP: three feedback runs r89-final3 on 04252524 (byte compare of the
- * dumps against r89-final2).
- * BOOK-GAP: tester pass 6 on 04252524.
+ * Final checks on the code head 04252524: CI Tests run 44956076990, all nine
+ * jobs green on the first run. Three feedback runs (r89-final3) byte-identical
+ * to each other and to r89-final2 (12 dumps). Tester pass 6: 0 broken; a
+ * Cancel during "Rebuilding position…" leaves the stop mark (VGC four times,
+ * singles once) and a cancelled game analysis leaves a stopped position alone
+ * (Doubles OU, VGC).
+ * Final suite in the main checkout on 04252524 with DICE_SWEEPS=full (three
+ * and a half hours on devbox): 68,724 passed, 49 expected fail, 30 skipped,
+ * 17 failed. 16 of the 17 are timeouts of full sweeps and corpus rows on the
+ * slow machine; the sweep files are green in the CI jobs "Dice sweeps" and
+ * "Full sweeps" of the same head, and bank-search and generated-games pass
+ * alone. The seventeenth, App.new-game.spec.tsx:58, read the address before
+ * the app wrote it and passes alone (20 of 20; #214). bring-list-corpus needs
+ * the local corpus, so CI skips it: it passed in 237.9 s on 20.11. and timed
+ * out at 240 s now; with the limit at 1,200 s it passes in 597.5 s (9fe75e30).
+ * The engine project with EVAL_SIM_FAST=0: 482 files, 17,257 passed.
  *
  * GATE: opening 09.11.: every open issue of 1.2.0 in one wave on devbox, with
  * two worktree slots; the trust rule of T322 loses its two open clauses; the
