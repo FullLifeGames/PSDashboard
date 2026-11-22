@@ -82,6 +82,10 @@ for (const capture of EVAL_STORE_CAPTURES.filter(entry => !only || entry.replay 
     } else {
       await panel.getByRole('button', { name: 'Analyze game' }).click();
       await expect(panel.getByRole('button', { name: 'Re-analyze' })).toBeVisible({ timeout: 1_500_000 });
+      // an Auto sweep keeps no lines on its matrix turns: after the report the app searches them (the review's "Finding lines for graded
+      // turns" stage) and writes the lines into each turn's record, so the capture waits for that stage to end
+      const stage = panel.locator('.ps-eval-review').getByText(/Finding lines for graded turns: \d+ of \d+/);
+      if (await stage.waitFor({ state: 'visible', timeout: 30_000 }).then(() => true, () => false)) await stage.waitFor({ state: 'hidden', timeout: 1_200_000 });
       records = await settledRecords(page, replay.id);
     }
     expect(records.length, 'the analysis saved records').toBeGreaterThan(0);

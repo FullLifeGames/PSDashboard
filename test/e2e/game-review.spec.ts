@@ -22,13 +22,14 @@ test.beforeAll(installReplayEmbedCache);
 // A red row fails in minutes, not after the test's whole budget: no single click or assertion waits longer than this (G4c).
 test.use({ actionTimeout: 60_000 });
 
+// Round 90 (#222), steps E2 and E3: these rows judge the view, so they read saved engine results (`EVAL_STORE=live` runs them live; the
+// capture is scripts/capture-eval-store.mjs). The Auto row below keeps its live search: it judges the pipeline that searches after the report.
 /** Singles runs the matrix on its early turns in auto, and a matrix turn holds no line: that row sweeps with the tree on every turn. */
-const GAMES: { kind: string; id: string; mode: string; seed?: string }[] = [
-  // Round 90 (#222), step E2: the one row that reads saved engine results (EVAL_STORE=live runs it live; the capture is scripts/capture-eval-store.mjs).
-  { kind: 'singles (Scarlet/Violet OU)', id: 'gen9ou-2658662321', mode: 'mcts', seed: evalStoreFileName('gen9ou-2658662321', { mode: 'mcts', depth: 1, samples: 1 }) },
+const GAMES = [
+  { kind: 'singles (Scarlet/Violet OU)', id: 'gen9ou-2658662321', mode: 'mcts' },
   { kind: 'VGC (Scarlet/Violet)', id: 'gen9vgc2026regi-2630452654', mode: 'auto' },
   { kind: 'Champions VGC', id: 'gen9championsvgc2026regma-2625939941', mode: 'auto' },
-];
+].map(game => ({ ...game, seed: evalStoreFileName(game.id, { mode: game.mode, depth: 1, samples: 1 }) }));
 
 /** The rows of the review: the turn, the side's list and whether a line has its play button. */
 async function readRows(review: Locator) {
@@ -46,13 +47,17 @@ for (const game of GAMES) {
   test(`${game.kind}: the Game review lists the graded turns, the graph marks them, ▶ Play opens the line`, async ({ page }) => {
     test.setTimeout(900_000);
     const replay = fixture(game.id);
+    const started = Date.now();
+    const lap = (step: string) => console.log(`${game.id}: ${step} at ${((Date.now() - started) / 1000).toFixed(1)} s`);
     const { guard } = await openReplayAnalysis(page, replay, { mode: game.mode, depth: 1, samples: 1 }, { seed: game.seed });
+    lap('replay open');
     const panel = page.locator('.ps-main-right .ps-eval-panel');
     await panel.getByRole('button', { name: 'Analyze game' }).click();
     await guard.race(expect(panel.getByRole('button', { name: 'Re-analyze' })).toBeVisible({ timeout: 600_000 }));
     const review = panel.locator('.ps-eval-review');
     await guard.race(expect(review).toBeVisible({ timeout: 60_000 }));
     await expect(review).toContainText('Game review · what the engine would have played');
+    lap('report shown');
 
     const rows = await readRows(review);
     expect(rows.length, 'the game holds a graded turn').toBeGreaterThanOrEqual(1);
@@ -85,9 +90,11 @@ for (const game of GAMES) {
     // the button stands inline in the row's 10 px text, not as a full-size button (round 89, G4b)
     expect((await play.boundingBox())!.height, 'the play button is inline').toBeLessThan(26);
     const tooltip = (await play.getAttribute('title')) ?? '';
+    lap('▶ Play clicked');
     await play.click();
     const history = variationPanel(page);
     await expect(history).toContainText(/\d+ turns?/, { timeout: 240_000 });
+    lap('variation history shown');
     await openVariationHistory(page);
     expect(await history.locator('strong').allTextContents(), `the history starts at turn ${turn}`).toContain(`Turn ${turn}`);
     console.log(`${game.id}: worker requests with ▶ Play: ${guard.requests().join(', ') || 'none'}`);
@@ -113,6 +120,7 @@ for (const game of GAMES) {
     expect(Math.abs(replaceBox.height - cancelBox.height), 'the buttons share a height').toBeLessThan(4);
     await question.getByRole('button', { name: 'Cancel' }).click();
     await expect(question).toHaveCount(0);
+    lap('row done');
   });
 }
 
