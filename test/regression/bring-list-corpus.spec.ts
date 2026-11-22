@@ -54,8 +54,9 @@ describe.skipIf(!HAVE_CORPUS)('the bring lists of the corpus (#116)', () => {
       }
     }
     expect(strangers).toEqual([]);
-  }, 240_000);
+  }, 1_200_000);
 
+  // Round 89: this test read 237.9 s on 20.11.2026 and timed out at 240 s on the slower devbox; the limit guards against a hang, not a slow machine.
   test('every game that pins trims both sides to the bring count', async () => {
     await loadSimMods('gen9championsvgc2026regmbbo3');
     const games = bringLimitedGames();
@@ -81,5 +82,5 @@ describe.skipIf(!HAVE_CORPUS)('the bring lists of the corpus (#116)', () => {
     // Round 89: 3,190 of the corpus' 4,033 bring-limited games pin once the copy no longer takes the Ditto's place.
     expect(pinned).toBeGreaterThan(3000);
     expect(wrong).toEqual([]);
-  }, 240_000);
+  }, 1_200_000);
 });
