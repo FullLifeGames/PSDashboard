@@ -62,29 +62,53 @@ async function playOutFromVariation(page: Page, file: string) {
 
 test.describe('the end of a play-out', () => {
   for (const [name, file] of REPLAYS) {
-    test(`${name}: a frame that plays during the run keeps playing from its turn after the notice`, async ({ page }) => {
-      test.setTimeout(240_000);
+    // One play-out from a variation at turn 2 serves two rows of round 88: the frame that plays during the run (Play and Hyperfast
+    // pressed in the frame) and Watch from turn N after the notice. Each keeps its old title as a step, so a red step names its row
+    // (round 90, E4: one run instead of two, about 110 seconds on the CI runner per game type).
+    test(`${name}: one play-out from a variation at turn 2, a frame that plays on and Watch from turn N`, async ({ page }) => {
+      test.setTimeout(360_000);
       const frame = await playOutFromVariation(page, file);
       await page.locator('button', { hasText: 'Let it play out' }).click();
       await playHyperfast(frame);
       await expect(notice(page)).toBeVisible({ timeout: 180_000 });
+      const watch = page.locator('button', { hasText: /Watch from turn \d+/ }).first();
+      const watchTurn = Number(/Watch from turn (\d+)/.exec(await watch.innerText())?.[1]);
 
-      // The notice leaves the frame where it stands: its turn never drops, it plays on unless it reached the end of its log.
-      const atNotice = await frameState(frame);
-      for (let sample = 0; sample < 6; sample++) {
-        await page.waitForTimeout(500);
-        const now = await frameState(frame);
-        expect(now.turn, `sample ${sample}, at the notice ${JSON.stringify(atNotice)}`).toBeGreaterThanOrEqual(atNotice.turn);
-        expect(now.paused && !now.atQueueEnd, `sample ${sample}: ${JSON.stringify(now)}`).toBe(false);
-      }
-      // Pointer and frame name the same turn: the end position of an ended battle sits one past the last played turn.
-      await expect.poll(async () => {
-        const [slider, shown] = [await sliderTurn(page), (await frameState(frame)).turn];
-        return slider - shown;
-      }, { timeout: 10_000, intervals: [250] }).toBeGreaterThanOrEqual(0);
-      expect(await sliderTurn(page)).toBeGreaterThanOrEqual(atNotice.turn);
-      await expect(branchIframe(page)).toHaveCount(1);
-      await expect(page.locator('.ps-line-chip button.on-vari')).toBeVisible();
+      await test.step(`${name}: a frame that plays during the run keeps playing from its turn after the notice`, async () => {
+        // The notice leaves the frame where it stands: its turn never drops, it plays on unless it reached the end of its log.
+        const atNotice = await frameState(frame);
+        for (let sample = 0; sample < 6; sample++) {
+          await page.waitForTimeout(500);
+          const now = await frameState(frame);
+          expect(now.turn, `sample ${sample}, at the notice ${JSON.stringify(atNotice)}`).toBeGreaterThanOrEqual(atNotice.turn);
+          expect(now.paused && !now.atQueueEnd, `sample ${sample}: ${JSON.stringify(now)}`).toBe(false);
+        }
+        // Pointer and frame name the same turn: the end position of an ended battle sits one past the last played turn.
+        await expect.poll(async () => {
+          const [slider, shown] = [await sliderTurn(page), (await frameState(frame)).turn];
+          return slider - shown;
+        }, { timeout: 10_000, intervals: [250] }).toBeGreaterThanOrEqual(0);
+        expect(await sliderTurn(page)).toBeGreaterThanOrEqual(atNotice.turn);
+        await expect(branchIframe(page)).toHaveCount(1);
+        await expect(page.locator('.ps-line-chip button.on-vari')).toBeVisible();
+      });
+
+      await test.step(`${name}: Watch from turn N plays the variation from N while the frame plays past N`, async () => {
+        // The step before left the frame at Hyperfast; Watch plays from N at the speed the user chose, so the old row's speed returns.
+        await frame.locator('.speedchooser button[value="normal"]').click({ timeout: 10_000 });
+        // Let the frame play past the start of the run, then press Watch.
+        await frame.evaluate(() => { const battle = (window as ReplayWindow).Replays?.battle as { paused?: boolean; play?: () => void } | undefined; if (battle?.paused) battle.play?.(); });
+        await expect.poll(async () => (await frameState(frame)).turn, { timeout: 90_000 }).toBeGreaterThanOrEqual(watchTurn + 2);
+        await watch.click();
+        await expect.poll(async () => (await frameState(frame)).turn, { timeout: 3000, intervals: [100] }).toBeLessThanOrEqual(watchTurn);
+        await expect.poll(async () => {
+          const state = await frameState(frame);
+          return !state.paused || state.atQueueEnd;
+        }, { timeout: 10_000 }).toBe(true);
+        await expect.poll(async () => (await frameState(frame)).turn, { timeout: 30_000 }).toBeGreaterThan(watchTurn);
+        await expect(branchIframe(page)).toHaveCount(1);
+        await expect(page.locator('.ps-line-chip button.on-vari')).toBeVisible();
+      });
     });
 
     test(`${name}: a run from the main line leaves the branch frame mounted on the turn it showed`, async ({ page }) => {
@@ -106,28 +130,6 @@ test.describe('the end of a play-out', () => {
       expect(later.turn, 'the frame stands where the run left it').toBe(atNotice.turn);
       // The frame's start turn holds the shared prefix: the pointer takes the first covered turn, 3 for a run from turn 2.
       expect(await sliderTurn(page)).toBe(Math.max(atNotice.turn, 3));
-    });
-
-    test(`${name}: Watch from turn N plays the variation from N while the frame plays past N`, async ({ page }) => {
-      test.setTimeout(240_000);
-      const frame = await playOutFromVariation(page, file);
-      await page.locator('button', { hasText: 'Let it play out' }).click();
-      await expect(notice(page)).toBeVisible({ timeout: 180_000 });
-      const watch = page.locator('button', { hasText: /Watch from turn \d+/ }).first();
-      const watchTurn = Number(/Watch from turn (\d+)/.exec(await watch.innerText())?.[1]);
-
-      // Let the frame play past the start of the run, then press Watch.
-      await frame.evaluate(() => { const battle = (window as ReplayWindow).Replays?.battle as { paused?: boolean; play?: () => void } | undefined; if (battle?.paused) battle.play?.(); });
-      await expect.poll(async () => (await frameState(frame)).turn, { timeout: 90_000 }).toBeGreaterThanOrEqual(watchTurn + 2);
-      await watch.click();
-      await expect.poll(async () => (await frameState(frame)).turn, { timeout: 3000, intervals: [100] }).toBeLessThanOrEqual(watchTurn);
-      await expect.poll(async () => {
-        const state = await frameState(frame);
-        return !state.paused || state.atQueueEnd;
-      }, { timeout: 10_000 }).toBe(true);
-      await expect.poll(async () => (await frameState(frame)).turn, { timeout: 30_000 }).toBeGreaterThan(watchTurn);
-      await expect(branchIframe(page)).toHaveCount(1);
-      await expect(page.locator('.ps-line-chip button.on-vari')).toBeVisible();
     });
 
     test(`${name}: a stop with a turn in flight sends the frame no play or follow-end command`, async ({ page }) => {
