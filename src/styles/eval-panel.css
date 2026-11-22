@@ -9,6 +9,24 @@
   overflow-wrap: anywhere;
   min-width: 0;
 }
+/* Round 89 (ruling 49): the header of the panel (EvalControls) in one row at the column's desktop width; the title keeps the left edge and the controls
+   stand to its right. A narrower column wraps the controls under the title. */
+.ps-eval-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+/* The checkbox's own margin (about 7 px) would push "Always on" under the title at 380 px: the label's gap already spaces it. */
+.ps-eval-controls input[type='checkbox'] { margin: 0; }
+/* A select as wide as its chosen option, not its longest one (Tera: "Auto" against "Revealed"); a browser without the property keeps the longest. */
+.ps-eval-controls select { field-sizing: content; }
+.ps-eval-controls-title {
+  margin-right: auto;
+  font-size: 13px;
+  font-weight: bold;
+}
 .ps-eval-labels {
   display: flex;
   justify-content: space-between;

@@ -108,7 +108,10 @@ function EvaluateButton({ running, onEvaluate, onCancel, result, status }: {
   );
 }
 
-/** The panel header: title, the engine preferences, and the Evaluate/Cancel entry. */
+/**
+ * The panel header: title, the engine preferences, and the Evaluate/Cancel entry. Round 89 (ruling 49): "Always on" shares the row with the title,
+ * the engine link, Depth and Tera at the right column's desktop width (380 px, see `.ps-eval-controls` in eval-panel.css); a narrower column wraps it.
+ */
 export function EvalControls({ prefs, onPrefsChange, running, showAuto, showTera, onEvaluate, onCancel, result, status, engines }: PrefsProps & {
   showAuto: boolean;
   /** Round 77: the engines on offer; another engine than the own search decides its own depth. */
@@ -122,10 +125,9 @@ export function EvalControls({ prefs, onPrefsChange, running, showAuto, showTera
   const external = !!engines && engines.selected.source !== 'builtin';
   const engineNote = external ? `Estimate from ${engines.selected.name}.` : 'Built-in engine: it plays the turns in the simulator.';
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
+    <div className="ps-eval-controls">
       {/* Round 89 (FB-1): the engine's description left the layout; it is the title of the heading and of the Engine select. */}
-      <span style={{ fontSize: 13, fontWeight: 'bold' }} title={engineNote}>Evaluation</span>
-      <span style={{ flex: 1 }} />
+      <span className="ps-eval-controls-title" title={engineNote}>Evaluation</span>
       {engines && <EngineControls engines={engines.engines} selected={engines.selected} running={running} note={engineNote} onSelect={engines.select} onAdd={engines.add} onRemove={engines.remove} />}
       {!external && <DepthSelect prefs={prefs} onPrefsChange={onPrefsChange} running={running} />}
       {!external && prefs.mode === 'matrix' && <SamplesSelect prefs={prefs} onPrefsChange={onPrefsChange} running={running} />}
