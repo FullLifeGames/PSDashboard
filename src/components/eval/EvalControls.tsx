@@ -1,6 +1,5 @@
-import type { EvalPreferences, EvalResult, SearchBudget } from '@fulllifegames/eval-engine';
+import type { EvalPreferences, EvalResult } from '@fulllifegames/eval-engine';
 import type { EvalStatus } from '../../hooks/useEvaluation';
-import { readSearchBudget, treeThresholdText } from '../../lib/eval/search-budget-setting';
 import type { EngineChoice } from '../../hooks/useEngineChoice';
 import { EngineControls } from './EngineControls';
 
@@ -11,63 +10,6 @@ interface PrefsProps {
 }
 
 const LABEL_STYLE = { display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#aabbcc' } as const;
-
-/** One game type's auto line in words, from its split of the search budget. */
-function autoLineText(split: SearchBudget['singles']): string {
-  const threshold = treeThresholdText(split);
-  if (threshold === null) return 'the MCTS tree on every turn';
-  const draws = split.earlySamples === 1 ? 'one sample' : `${split.earlySamples} samples`;
-  return `the depth-${split.earlyDepth} matrix with ${draws} until ${threshold}, then the MCTS tree`;
-}
-
-/** Round 67 (T111): the auto help text reads the budget in force, so a measurement form never shows stale numbers. */
-function autoTitle(budget: SearchBudget): string {
-  return `Auto picks the engine per turn. Singles: ${autoLineText(budget.singles)}. Doubles: ${autoLineText(budget.doubles)}. ` +
-    `The MCTS search runs ${budget.trees} trees of ${budget.iterations} iterations each.`;
-}
-
-function DepthSelect({ prefs, onPrefsChange, running }: PrefsProps) {
-  return (
-    <label style={LABEL_STYLE}>
-      Depth
-      <select
-        value={prefs.mode === 'mcts' || prefs.mode === 'auto' ? prefs.mode : String(prefs.depth)}
-        onChange={event => {
-          const value = event.target.value;
-          if (value === 'mcts' || value === 'auto') onPrefsChange({ ...prefs, mode: value });
-          else onPrefsChange({ ...prefs, mode: 'matrix', depth: parseInt(value, 10) as EvalPreferences['depth'] });
-        }}
-        disabled={running}
-        title={autoTitle(readSearchBudget())}
-      >
-        <option value="1">1</option>
-        <option value="2">2</option>
-        <option value="mcts">MCTS</option>
-        <option value="auto">Auto</option>
-      </select>
-    </label>
-  );
-}
-
-function SamplesSelect({ prefs, onPrefsChange, running }: PrefsProps) {
-  return (
-    <label
-      title="Damage-roll seeds averaged per cell. Only affects cells where a KO is in range; quiet cells are roll-insensitive and always simulate once."
-      style={LABEL_STYLE}
-    >
-      Samples
-      <select
-        value={prefs.samples}
-        onChange={event => onPrefsChange({ ...prefs, samples: parseInt(event.target.value, 10) as EvalPreferences['samples'] })}
-        disabled={running}
-      >
-        <option value={1}>1</option>
-        <option value={3}>3</option>
-        <option value={5}>5</option>
-      </select>
-    </label>
-  );
-}
 
 function TeraSelect({ prefs, onPrefsChange, running }: PrefsProps) {
   return (
@@ -109,8 +51,9 @@ function EvaluateButton({ running, onEvaluate, onCancel, result, status }: {
 }
 
 /**
- * The panel header: title, the engine preferences, and the Evaluate/Cancel entry. Round 89 (ruling 49): "Always on" shares the row with the title,
- * the engine link, Depth and Tera at the right column's desktop width (380 px, see `.ps-eval-controls` in eval-panel.css); a narrower column wraps it.
+ * The panel header: title, the engine link, Tera, and the Evaluate/Cancel entry. Round 89 (ruling 49): "Always on" shares the row with the title,
+ * the engine link and Tera at the right column's desktop width (380 px, see `.ps-eval-controls` in eval-panel.css); a narrower column wraps it.
+ * Depth and Samples left the header for the Setup menu (`SearchSelects`); the header imports nothing of them.
  */
 export function EvalControls({ prefs, onPrefsChange, running, showAuto, showTera, onEvaluate, onCancel, result, status, engines }: PrefsProps & {
   showAuto: boolean;
@@ -129,8 +72,6 @@ export function EvalControls({ prefs, onPrefsChange, running, showAuto, showTera
       {/* Round 89 (FB-1): the engine's description left the layout; it is the title of the heading and of the Engine select. */}
       <span className="ps-eval-controls-title" title={engineNote}>Evaluation</span>
       {engines && <EngineControls engines={engines.engines} selected={engines.selected} running={running} note={engineNote} onSelect={engines.select} onAdd={engines.add} onRemove={engines.remove} />}
-      {!external && <DepthSelect prefs={prefs} onPrefsChange={onPrefsChange} running={running} />}
-      {!external && prefs.mode === 'matrix' && <SamplesSelect prefs={prefs} onPrefsChange={onPrefsChange} running={running} />}
       {showTera && <TeraSelect prefs={prefs} onPrefsChange={onPrefsChange} running={running} />}
       {showAuto && (
         <label style={LABEL_STYLE}>

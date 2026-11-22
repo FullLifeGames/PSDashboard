@@ -319,3 +319,20 @@ export async function routeOfflineFixtures(page: Page): Promise<void> {
   });
   await routeSmogon(page, emptySmogon);
 }
+
+/**
+ * Round 89 (ruling 49): Depth lives in the Setup menu, not in the Evaluation header. These two helpers open the menu, read or pick the
+ * Depth select, and close the menu again (Escape), so the next click lands on the page.
+ */
+export async function readDepth(page: Page): Promise<string> {
+  await page.getByRole('button', { name: 'Setup' }).click();
+  const value = await page.locator('.ps-setup-panel label', { hasText: 'Depth' }).locator('select').inputValue();
+  await page.keyboard.press('Escape');
+  return value;
+}
+
+export async function pickDepth(page: Page, value: '1' | '2' | 'mcts' | 'auto'): Promise<void> {
+  await page.getByRole('button', { name: 'Setup' }).click();
+  await page.locator('.ps-setup-panel label', { hasText: 'Depth' }).locator('select').selectOption(value);
+  await page.keyboard.press('Escape');
+}

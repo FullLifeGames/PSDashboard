@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { installReplayEmbedCache, routeOfflineFixtures, startVariationAt } from './helpers';
+import { installReplayEmbedCache, readDepth, routeOfflineFixtures, startVariationAt } from './helpers';
 
 test.beforeAll(installReplayEmbedCache);
 
@@ -146,7 +146,7 @@ test.describe('PS Dashboard', () => {
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
 
     const panel = page.locator('.ps-main-right .ps-eval-panel');
-    await expect(panel.locator('select').first()).toHaveValue('mcts');
+    expect(await readDepth(page)).toBe('mcts');
     await panel.locator('button', { hasText: 'Analyze game' }).click();
     await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 120_000 });
     await panel.locator('.ps-eval-graph rect[data-turn="1"]').click();

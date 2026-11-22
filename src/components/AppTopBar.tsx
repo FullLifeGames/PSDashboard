@@ -21,6 +21,8 @@ interface AppTopBarProps {
   onOpponentReadsChange: (value: boolean) => void;
   onEditSide: (side: 'p1' | 'p2') => void;
   onOpenSets: () => void;
+  /** Round 89 (ruling 49): the search's Depth and Samples of the Setup menu. */
+  search?: Parameters<typeof SetupMenu>[0]['search'];
   /** A host site frames the app (round 77: the creator link is left out). */
   embed: boolean;
   /** Round 84: the replay loader's props; the Load button sits beside Setup. Left out in the embedded view, which keeps no loader. */
@@ -113,6 +115,7 @@ export function AppTopBar(props: AppTopBarProps) {
           onOpponentReadsChange={props.onOpponentReadsChange}
           onEditSide={props.onEditSide}
           onOpenSets={props.onOpenSets}
+          search={props.search}
         />
       </div>
       <SupportLinks embed={props.embed} withName onReportIssue={props.onReportIssue} />

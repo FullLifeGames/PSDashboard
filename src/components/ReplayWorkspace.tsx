@@ -50,6 +50,11 @@ function WorkspaceTopBar({ app, replayData, onNewGame }: WorkspaceProps) {
       onOpponentReadsChange={value => setPrefs({ ...prefs, hardMode: value })}
       onEditSide={setEditorSide}
       onOpenSets={() => setSetsPanelOpen(true)}
+      // Round 89 (ruling 49): Depth and Samples left the Evaluation header; another engine decides its own depth.
+      search={{
+        prefs, onPrefsChange: setPrefs, external: app.ctx.engines.selected.source !== 'builtin',
+        running: app.board.liveEvalStatus === 'searching' || app.board.liveEvalStatus === 'reconstructing',
+      }}
       embed={embed}
       // Round 84 (Q20 a): with a replay loaded the loader is the top bar's Load button; the embedded view keeps none.
       loader={embed ? undefined : {

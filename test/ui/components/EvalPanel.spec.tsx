@@ -37,8 +37,10 @@ describe('EvalPanel', () => {
     await userEvent.click(screen.getByRole('button', { name: /Earthquake/ }));
     // round 89 (#153): the click hands the result along, for Hard mode
     expect(onPickChoice).toHaveBeenCalledWith('p1', result.perSide.p1[0], result.perSide.p2[0], result);
-    await userEvent.selectOptions(within(screen.getByText('Depth')).getByRole('combobox'), '2');
-    expect(wired.onPrefsChange).toHaveBeenCalledWith({ ...prefs, mode: 'matrix', depth: 2 });
+    // Round 89 (ruling 49): Depth lives in the Setup menu now, not in the panel's header.
+    expect(screen.queryByText('Depth')).toBeNull();
+    await userEvent.selectOptions(within(screen.getByText('Tera')).getByRole('combobox'), 'on');
+    expect(wired.onPrefsChange).toHaveBeenCalledWith({ ...prefs, tera: 'on' });
   });
 
   // Round 89 (#153, HM-2): the panel hands the stored `hardMode` preference to its ranked rows' titles.

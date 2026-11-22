@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { gameReviewEnabled, opponentReadsEnabled } from '../lib/feature-flags';
+import { SearchSelects, type SearchSelectsProps } from './SearchSelects';
 import { SizeSelect } from './SizeSelect';
 
 /** Round 89 (#153, HM-2): what the setting changes and where; the grades stay as they are. */
@@ -15,6 +16,11 @@ interface SetupMenuProps {
   onOpponentReadsChange: (value: boolean) => void;
   onEditSide: (side: 'p1' | 'p2') => void;
   onOpenSets: () => void;
+  /**
+   * Round 89 (ruling 49): the search's Depth and Samples. Left out, the menu draws neither (an embedded view); `external` is another engine
+   * than the built-in search, which decides its own depth.
+   */
+  search?: SearchSelectsProps & { external: boolean };
 }
 
 /**
@@ -22,9 +28,9 @@ interface SetupMenuProps {
  * actions open from one button; a pick closes the menu, the toggle keeps it open, and so do Escape and
  * a click outside it. Round 84 (T315): the Size select of the app's scale stands under the animate toggle and keeps the menu
  * open like it. Round 89 (#153, HM-2): the box that stood in the Evaluation row as "Hard mode" sits here as "Opponent reads my move", below
- * the animate toggle, and keeps the menu open too. Round 89 (ruling 49): behind the flag `opponentReadsEnabled` (src/lib/feature-flags.ts); off, the box is not drawn.
+ * the animate toggle, and keeps the menu open too. Round 89 (ruling 49): the Depth and Samples selects stand under the checkboxes, above Size (`SearchSelects`). Round 89 (ruling 49): behind the flag `opponentReadsEnabled` (src/lib/feature-flags.ts); off, the box is not drawn.
  */
-export function SetupMenu({ animateBranchTurns, onAnimateChange, opponentReads, onOpponentReadsChange, onEditSide, onOpenSets }: SetupMenuProps) {
+export function SetupMenu({ animateBranchTurns, onAnimateChange, opponentReads, onOpponentReadsChange, onEditSide, onOpenSets, search }: SetupMenuProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const panelId = useId();
@@ -70,6 +76,7 @@ export function SetupMenu({ animateBranchTurns, onAnimateChange, opponentReads, 
               Opponent reads my move
             </label>
           )}
+          {search && !search.external && <SearchSelects prefs={search.prefs} onPrefsChange={search.onPrefsChange} running={search.running} />}
           <SizeSelect />
           <button type="button" className="ps-btn" onClick={pick(() => onEditSide('p1'))}>Edit Player</button>
           <button type="button" className="ps-btn" onClick={pick(() => onEditSide('p2'))}>Edit Opp</button>

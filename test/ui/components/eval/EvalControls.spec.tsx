@@ -1,4 +1,4 @@
-import { describe, expect, onTestFinished, test, vi } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { EvalPreferences } from '@fulllifegames/eval-engine';
@@ -22,38 +22,20 @@ function props(overrides: Partial<Props> = {}): Props {
 const select = (label: string) => within(screen.getByText(label)).getByRole('combobox');
 
 describe('EvalControls', () => {
-  test('the depth select routes to a matrix depth, MCTS, or auto; samples only apply under matrix', async () => {
+  // Round 89 (ruling 49): Depth and Samples moved to the Setup menu (SetupMenu.search.spec.tsx); the header keeps the title, the engine link, Tera and "Always on".
+  test('the header holds the title, Tera and "Always on", and no Depth or Samples in any mode', () => {
     const wired = props();
     const { rerender } = render(<EvalControls {...wired} />);
     expect(screen.getByText('Evaluation')).toBeInTheDocument();
     // Round 89 (FB-1): the engine's description is the heading's title, not a line of text.
     expect(screen.queryByText(/built-in engine/)).toBeNull();
     expect(screen.getByText('Evaluation')).toHaveAttribute('title', 'Built-in engine: it plays the turns in the simulator.');
-
-    await userEvent.selectOptions(select('Depth'), '2');
-    expect(wired.onPrefsChange).toHaveBeenLastCalledWith({ ...prefs, mode: 'matrix', depth: 2 });
-    await userEvent.selectOptions(select('Depth'), 'mcts');
-    expect(wired.onPrefsChange).toHaveBeenLastCalledWith({ ...prefs, mode: 'mcts' });
-    await userEvent.selectOptions(select('Samples'), '5');
-    expect(wired.onPrefsChange).toHaveBeenLastCalledWith({ ...prefs, samples: 5 });
-
-    rerender(<EvalControls {...wired} prefs={{ ...prefs, mode: 'auto' }} />);
-    expect(select('Depth')).toHaveValue('auto');
-    // Round 63 (T110): the help text names the routing per game type.
-    expect(select('Depth')).toHaveAttribute('title', expect.stringMatching(/^Auto picks the engine per turn\. Singles: .+\. Doubles: the MCTS tree on every turn\./));
-    expect(screen.queryByText('Samples')).toBeNull();
-    rerender(<EvalControls {...wired} prefs={{ ...prefs, depth: 2 }} />);
-    expect(select('Depth')).toHaveValue('2');
-  });
-
-  // Round 67 (T111 point 8): the help text reads the search budget instead of naming its numbers by hand.
-  test('the auto help text names the search budget in force', () => {
-    const { rerender } = render(<EvalControls {...props({ prefs: { ...prefs, mode: 'auto' } })} />);
-    expect(select('Depth')).toHaveAttribute('title', 'Auto picks the engine per turn. Singles: the depth-1 matrix with 3 samples until 25% of all Pokémon have fainted, then the MCTS tree. Doubles: the MCTS tree on every turn. The MCTS search runs 4 trees of 600 iterations each.');
-    localStorage.setItem('ps-replay-interceptor:search-budget', 'trees=8,iterations=1200,singles-tree-from=0.5,doubles-tree-from=0.25,doubles-early-samples=5');
-    onTestFinished(() => localStorage.removeItem('ps-replay-interceptor:search-budget'));
-    rerender(<EvalControls {...props({ prefs: { ...prefs, mode: 'auto' } })} />);
-    expect(select('Depth')).toHaveAttribute('title', 'Auto picks the engine per turn. Singles: the depth-1 matrix with 3 samples until 50% of all Pokémon have fainted, then the MCTS tree. Doubles: the depth-1 matrix with 5 samples until 25% of all Pokémon have fainted, then the MCTS tree. The MCTS search runs 8 trees of 1200 iterations each.');
+    for (const shown of [prefs, { ...prefs, mode: 'auto' as const }, { ...prefs, mode: 'mcts' as const }, { ...prefs, depth: 2 as const }]) {
+      rerender(<EvalControls {...wired} prefs={shown} />);
+      expect(screen.queryByText('Depth')).toBeNull();
+      expect(screen.queryByText('Samples')).toBeNull();
+      expect(screen.getAllByRole('combobox').map(box => box.closest('label')?.textContent?.trim().slice(0, 4))).toEqual(['Tera']);
+    }
   });
 
   test('tera and auto follow their visibility flags; the checkboxes report their new state', async () => {
@@ -82,12 +64,12 @@ describe('EvalControls', () => {
     expect(screen.getAllByRole('checkbox').map(box => box.closest('label')?.textContent?.trim())).toEqual(['Always on']);
   });
 
-  test('Evaluate turns into Re-evaluate with a result or a stale state, into Cancel while running; running locks the selects', async () => {
+  test('Evaluate turns into Re-evaluate with a result or a stale state, into Cancel while running; running locks Tera', async () => {
     const wired = props();
     const { rerender } = render(<EvalControls {...wired} />);
     await userEvent.click(screen.getByRole('button', { name: 'Evaluate' }));
     expect(wired.onEvaluate).toHaveBeenCalledTimes(1);
-    expect(select('Depth')).toBeEnabled();
+    expect(select('Tera')).toBeEnabled();
 
     rerender(<EvalControls {...wired} result={evalResult()} />);
     expect(screen.getByRole('button', { name: 'Re-evaluate' })).toBeInTheDocument();
@@ -97,7 +79,6 @@ describe('EvalControls', () => {
     rerender(<EvalControls {...wired} running status="searching" />);
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(wired.onCancel).toHaveBeenCalledTimes(1);
-    expect(select('Depth')).toBeDisabled();
     expect(select('Tera')).toBeDisabled();
 
     rerender(<EvalControls {...wired} onEvaluate={undefined} />);
