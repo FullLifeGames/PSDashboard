@@ -1,9 +1,11 @@
 import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import { test, expect, type Locator, type Page } from '@playwright/test';
+import { test, expect, type Locator } from '@playwright/test';
 import type { ReplayData } from '@fulllifegames/replay-core';
-import { installReplayEmbedCache, routeOfflineFixtures } from './helpers';
+import { evalStoreFileName } from './eval-store';
+import { openReplayAnalysis } from './eval-store-seed';
+import { installReplayEmbedCache } from './helpers';
 import { openVariationHistory, variationPanel } from './dock-helpers';
 
 /**
@@ -20,29 +22,14 @@ test.beforeAll(installReplayEmbedCache);
 // A red row fails in minutes, not after the test's whole budget: no single click or assertion waits longer than this (G4c).
 test.use({ actionTimeout: 60_000 });
 
+// Round 90 (#222), steps E2 and E3: these rows judge the view, so they read saved engine results (`EVAL_STORE=live` runs them live; the
+// capture is scripts/capture-eval-store.mjs). The Auto row below keeps its live search: it judges the pipeline that searches after the report.
 /** Singles runs the matrix on its early turns in auto, and a matrix turn holds no line: that row sweeps with the tree on every turn. */
 const GAMES = [
   { kind: 'singles (Scarlet/Violet OU)', id: 'gen9ou-2658662321', mode: 'mcts' },
   { kind: 'VGC (Scarlet/Violet)', id: 'gen9vgc2026regi-2630452654', mode: 'auto' },
   { kind: 'Champions VGC', id: 'gen9championsvgc2026regma-2625939941', mode: 'auto' },
-];
-
-async function loadReplay(page: Page, replay: ReplayData, mode: string) {
-  await routeOfflineFixtures(page);
-  await page.goto('/');
-  await page.evaluate(engineMode => {
-    localStorage.setItem('ps-replay-interceptor:eval-pool', '2');
-    localStorage.setItem('ps-replay-interceptor:eval-prefs', JSON.stringify({ depth: 1, samples: 1, mode: engineMode, auto: false, tera: 'auto' }));
-  }, mode);
-  await page.reload();
-  // Registered last, so it answers before routeOfflineFixtures' default replay.
-  await page.route('**/replay.pokemonshowdown.com/**', route => route.fulfill({
-    status: 200, contentType: 'application/json', body: JSON.stringify(replay),
-  }));
-  await page.locator('input[type="text"]').first().fill(replay.id);
-  await page.locator('button', { hasText: 'Load' }).click();
-  await expect(page.getByText(replay.players[0], { exact: true }).first()).toBeVisible({ timeout: 30_000 });
-}
+].map(game => ({ ...game, seed: evalStoreFileName(game.id, { mode: game.mode, depth: 1, samples: 1 }) }));
 
 /** The rows of the review: the turn, the side's list and whether a line has its play button. */
 async function readRows(review: Locator) {
@@ -60,13 +47,17 @@ for (const game of GAMES) {
   test(`${game.kind}: the Game review lists the graded turns, the graph marks them, ▶ Play opens the line`, async ({ page }) => {
     test.setTimeout(900_000);
     const replay = fixture(game.id);
-    await loadReplay(page, replay, game.mode);
+    const started = Date.now();
+    const lap = (step: string) => console.log(`${game.id}: ${step} at ${((Date.now() - started) / 1000).toFixed(1)} s`);
+    const { guard } = await openReplayAnalysis(page, replay, { mode: game.mode, depth: 1, samples: 1 }, { seed: game.seed });
+    lap('replay open');
     const panel = page.locator('.ps-main-right .ps-eval-panel');
     await panel.getByRole('button', { name: 'Analyze game' }).click();
-    await expect(panel.getByRole('button', { name: 'Re-analyze' })).toBeVisible({ timeout: 600_000 });
+    await guard.race(expect(panel.getByRole('button', { name: 'Re-analyze' })).toBeVisible({ timeout: 600_000 }));
     const review = panel.locator('.ps-eval-review');
-    await expect(review).toBeVisible({ timeout: 60_000 });
+    await guard.race(expect(review).toBeVisible({ timeout: 60_000 }));
     await expect(review).toContainText('Game review · what the engine would have played');
+    lap('report shown');
 
     const rows = await readRows(review);
     expect(rows.length, 'the game holds a graded turn').toBeGreaterThanOrEqual(1);
@@ -82,6 +73,8 @@ for (const game of GAMES) {
     await expect(panel.locator('.ps-eval-graph [data-review-mark]')).toHaveCount(rows.length);
     await panel.getByRole('button', { name: /Game report/ }).click();
     await expect(review).toBeVisible();
+    guard.assertClean();
+    console.log(`${game.id}: worker requests up to the report and a turn: ${guard.requests().join(', ') || 'none'}`);
 
     // ▶ Play on a row with a line: the variation plays the line from the graded turn with the dice the tooltip lists
     const withLine = review.locator('.ps-eval-review-row').filter({ has: page.locator('.ps-eval-review-line button') });
@@ -93,14 +86,18 @@ for (const game of GAMES) {
     const row = withLine.first();
     const turn = Number(((await row.getByRole('button').first().textContent()) ?? '').replace(/^T/, ''));
     const play = row.getByRole('button', { name: '▶ Play' }).first();
+    guard.pause(); // the variation a line opens is a new position: its own evaluation may search
     // the button stands inline in the row's 10 px text, not as a full-size button (round 89, G4b)
     expect((await play.boundingBox())!.height, 'the play button is inline').toBeLessThan(26);
     const tooltip = (await play.getAttribute('title')) ?? '';
+    lap('▶ Play clicked');
     await play.click();
     const history = variationPanel(page);
     await expect(history).toContainText(/\d+ turns?/, { timeout: 240_000 });
+    lap('variation history shown');
     await openVariationHistory(page);
     expect(await history.locator('strong').allTextContents(), `the history starts at turn ${turn}`).toContain(`Turn ${turn}`);
+    console.log(`${game.id}: worker requests with ▶ Play: ${guard.requests().join(', ') || 'none'}`);
     const named = tooltip.split('\n').slice(1).filter(line => /^(T\d+|Replacement): /.test(line)).map(line => bare(line.replace(/^(T\d+|Replacement): /, '')));
     const marked = (await page.getByRole('group', { name: 'Forced dice' }).allTextContents()).flatMap(text => text.replace(/^Forced dice/, '').split(/(?=P[12] )/)).map(text => bare(text.replace(/^P[12] /, '')));
     for (const mark of marked.filter(text => text !== '')) expect(named, `the tooltip lists ${mark}`).toContain(mark);
@@ -123,6 +120,7 @@ for (const game of GAMES) {
     expect(Math.abs(replaceBox.height - cancelBox.height), 'the buttons share a height').toBeLessThan(4);
     await question.getByRole('button', { name: 'Cancel' }).click();
     await expect(question).toHaveCount(0);
+    lap('row done');
   });
 }
 
@@ -134,7 +132,7 @@ for (const game of GAMES) {
 test('singles in Auto: the graded early turns get their lines after the report, ▶ Play opens one', async ({ page }) => {
   test.setTimeout(1_500_000);
   const replay = fixture('gen9ou-2658662321');
-  await loadReplay(page, replay, 'auto');
+  await openReplayAnalysis(page, replay, { mode: 'auto', depth: 1, samples: 1 });
   const panel = page.locator('.ps-main-right .ps-eval-panel');
   await panel.getByRole('button', { name: 'Analyze game' }).click();
   await expect(panel.getByRole('button', { name: 'Re-analyze' })).toBeVisible({ timeout: 600_000 });
