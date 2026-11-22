@@ -64,8 +64,11 @@ export function missingBodies(log: string, built: number, side: Side): number {
   return Math.max(0, size - built);
 }
 
-/** The game's format, when its Dex entry generates the team: such a game has no stats file and no stand-ins. */
-function generatedTeam(formatId: string): boolean {
+/**
+ * Whether the format's Dex entry generates the team (Random Battle, Hackmons Cup): such a game has no stats file, and its stand-ins
+ * come from the random-set file. The one rule of `withStandIns`, read from the Dex, never from a name; the app reads it from here.
+ */
+export function generatesTeam(formatId: string): boolean {
   const format = simFormats().get(formatId);
   return format.exists && !!format.team;
 }
@@ -230,7 +233,7 @@ export function withStandIns(
 ): SideInfos {
   const lf = normalizeLineEndings(log);
   const formatId = inferReplayFormatId({ log: lf });
-  const generated = generatedTeam(formatId);
+  const generated = generatesTeam(formatId);
   if (generated && !randomSets) return raw;
   const fileOf = generated ? randomSets ?? null : null;
   const next: SideInfos = { ...raw };

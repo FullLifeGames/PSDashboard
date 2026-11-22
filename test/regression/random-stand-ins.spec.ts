@@ -1,14 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import {
-  enrichTeamInfos, inferOpponentTeam, inferReplayFormatId, judgeItemsByDamage, logRules, parseReplayLogWithObservations,
-  resolveHiddenPowerType, simFormats, solveReplaySpreads, withStandIns, type OpponentTeamInfo,
+  enrichTeamInfos, judgeItemsByDamage, logRules, parseReplayLogWithObservations,
+  buildTeamsFromReplay, resolveHiddenPowerType, solveReplaySpreads, withStandIns, type OpponentTeamInfo,
 } from '@fulllifegames/replay-core';
 import { buildReplayTeams, type TeamBuildSources } from '../../src/lib/eval-acquire';
 import { replaySolveOptions } from '../../src/lib/team-build-options';
 import { appTeamSeed, buildAppTeams } from '../../src/lib/app-team-build';
 import { loadReplayMods } from '../../src/lib/replay-mods';
-import { generatesTeam, fetchRandomSets } from '../../src/lib/random-sets';
+import { fetchRandomSets } from '../../src/lib/random-sets';
 import { fetchSmogonSetAssumptions } from '../../src/lib/smogon-sets';
 
 /**
@@ -85,21 +85,6 @@ describe('the fetch', () => {
     expect(hosts[1]).toBe(`https://pkmn.github.io/randbats/data/${game.formatid}.json`);
     expect(await fetchRandomSets(game.formatid, (async () => ({ ok: false, status: 404, json: async () => ({}) })) as never)).toBeNull();
   });
-
-  test('the rule is the one withStandIns reads: every Dex format fills with the file exactly when generatesTeam says so', () => {
-    const pool = { Pikachu: { level: 80, moves: ['Tackle'] }, Eevee: { level: 80, moves: ['Tackle'] }, Snorlax: { level: 80, moves: ['Tackle'] }, Gengar: { level: 80, moves: ['Tackle'] }, Machamp: { level: 80, moves: ['Tackle'] }, Gyarados: { level: 80, moves: ['Tackle'] }, Alakazam: { level: 80, moves: ['Tackle'] } };
-    let compared = 0;
-    for (const format of simFormats().all()) {
-      if (!format.exists || !format.name.startsWith('[Gen ')) continue;
-      const log = ['|gametype|singles', '|player|p1|a|', '|player|p2|b|', `|gen|${format.gen}`, `|tier|${format.name}`, '|teamsize|p1|6', '|teamsize|p2|6', '|start',
-        '|switch|p1a: Mew|Mew, L80|100/100', '|switch|p2a: Mewtwo|Mewtwo, L80|100/100', '|turn|1'].join('\n');
-      if (inferReplayFormatId({ log }) !== format.id) continue;
-      const raw = { p1: inferOpponentTeam(log, 'p1'), p2: inferOpponentTeam(log, 'p2') };
-      expect(withStandIns(raw, log, null, undefined, pool) !== raw, format.id).toBe(generatesTeam(format.id));
-      compared++;
-    }
-    expect(compared).toBeGreaterThan(100);
-  });
 });
 
 describe.each(ROWS)('buildAppTeams: $label', ({ id, missing }) => {
@@ -155,5 +140,29 @@ describe.each([ROWS[0], ROWS[1]])('the live chain builds what buildAppTeams buil
     expect(live.p1Team).toHaveLength(6);
     expect(live.p1Team).toEqual(app.p1Team);
     expect(live.p2Team).toEqual(app.p2Team);
+  });
+});
+
+describe.each(ROWS)('a Node caller of buildTeamsFromReplay: $label', ({ id, missing }) => {
+  const game = fixture(id);
+  const seed = appTeamSeed(game.log);
+  const setAssumptions = { format: game.formatid, source: 'test', pokemon: {}, randomSets: game.randomSets };
+  /** What the stand-ins are: the body, its level and its set's moves, ability and item (the spreads come from the solver, which the Node call does not run here). */
+  const bodies = (team: { species: string; level?: number; moves: string[]; ability: string; item: string }[]) =>
+    team.map(set => ({ species: set.species, level: set.level, moves: set.moves, ability: set.ability, item: set.item }));
+
+  test('without the file the short side plays short, as before', () => {
+    const built = buildTeamsFromReplay(game.log, {});
+    expect(built.p1Team).toHaveLength(6 - missing);
+    expect(built.p2Team).toHaveLength(6);
+  });
+
+  test('with randomSets it builds the stand-ins the app builds', () => {
+    const built = buildTeamsFromReplay(game.log, { randomSets: game.randomSets });
+    const app = buildAppTeams(game.log, seed, { usageStats: null, setAssumptions });
+    expect(built.p1Team).toHaveLength(6);
+    expect(built.p2Team).toHaveLength(6);
+    expect(bodies(built.p1Team)).toEqual(bodies(app.p1Team));
+    expect(bodies(built.p2Team)).toEqual(bodies(app.p2Team));
   });
 });

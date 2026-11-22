@@ -1,4 +1,4 @@
-import { simFormats, withStandIns } from '@fulllifegames/replay-core';
+import type { withStandIns } from '@fulllifegames/replay-core';
 import type { SmogonFetch } from './smogon/hosts';
 
 /**
@@ -7,15 +7,6 @@ import type { SmogonFetch } from './smogon/hosts';
  * game that shows fewer bodies than its `|teamsize|` fills the rest from it. The file is not a Smogon analysis file: the hosts differ.
  */
 export type RandomSetFile = NonNullable<Parameters<typeof withStandIns>[4]>;
-
-/**
- * Whether the format's Dex entry generates the team: such a game has no stats file and, from round 89, a random-set file. The one rule
- * of replay-core's `withStandIns` (a spec compares the two over every format the Dex knows), read from the Dex, never from a name.
- */
-export function generatesTeam(formatId: string): boolean {
-  const format = simFormats().get(formatId);
-  return format.exists && !!format.team;
-}
 
 /** data.pkmn.cc/random answers with a redirect to the randbats pages; the second host is the page itself. */
 const RANDOM_SET_HOSTS = ['https://data.pkmn.cc/random', 'https://pkmn.github.io/randbats/data'] as const;

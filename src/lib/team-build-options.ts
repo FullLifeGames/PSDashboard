@@ -37,6 +37,8 @@ export function replaySolveOptions(sources: Omit<ReplayBuildSources, 'hpEvidence
     speedOrders: sources.speedOrders,
     // The worker's solve job carries no HP evidence; only the build reads it.
     hpEvidence: undefined,
+    // The app's infos arrive filled (withStandIns in the panel and in buildAppTeams); only a Node caller hands the file to the builder.
+    randomSets: undefined,
   });
 }
 
@@ -57,5 +59,6 @@ export function replayBuildOptions(
     // solve a second time from observations and speed orders.
     observations: undefined,
     speedOrders: undefined,
+    randomSets: undefined,
   });
 }

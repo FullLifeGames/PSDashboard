@@ -1,5 +1,5 @@
 import {
-  inferReplayFormatId, missingBodies, teamSizes,
+  generatesTeam, inferReplayFormatId, missingBodies, teamSizes,
   type OpponentTeamInfo,
   type PokemonEvsInfo,
   type PokemonFieldInfo,
@@ -11,7 +11,6 @@ import { useScrollFade } from '../hooks/useScrollFade';
 import { sourceAccent, sourceLabel } from '../lib/provenance-labels';
 import { SpriteImg } from './SpriteImg';
 import { useReplayRules } from '../lib/replay-rules';
-import { generatesTeam } from '../lib/random-sets';
 import { standInMarkOf } from '../lib/stand-in-mark';
 import { typeBg } from '../lib/type-colors';
 

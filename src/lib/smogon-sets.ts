@@ -1,12 +1,12 @@
 import { Smogon } from '@pkmn/smogon';
 import type { ID } from '@pkmn/data';
 import {
-  generationsFor, toId, type PokemonSetAssumption, type SetAssumption, type SetSpreadAssumption, type SmogonSetAssumptions as PublishedSets,
+  generatesTeam, generationsFor, toId, type PokemonSetAssumption, type SetAssumption, type SetSpreadAssumption, type SmogonSetAssumptions as PublishedSets,
 } from '@fulllifegames/replay-core';
 import { championsSetsFormat, nationalDexDoublesFormat, ouFallbackFormat, vgcYearFormat } from './smogon/format-fallback';
 import { fetcherKey } from './smogon/fetcher-key';
 import { withSmogonFallback, type SmogonFetch } from './smogon/hosts';
-import { fetchRandomSets, generatesTeam, type RandomSetFile } from './random-sets';
+import { fetchRandomSets, type RandomSetFile } from './random-sets';
 
 /** The published sets of a request; round 89 (#117): a generated-team format carries its random-set file beside them. */
 export type SmogonSetAssumptions = PublishedSets & { randomSets?: RandomSetFile };

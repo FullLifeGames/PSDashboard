@@ -22,7 +22,7 @@ import { toId } from './ids.ts';
 import { normalizeLineEndings } from './line-endings.ts';
 import { isChampionsFormat } from './champions-format.ts';
 import { withReplayIdentity } from './team-identity.ts';
-import { withStandIns } from './team/stand-ins.ts';
+import { withStandIns, type RandomSetFile } from './team/stand-ins.ts';
 
 /**
  * Build PokemonSet arrays for both sides from a replay's protocol log.
@@ -48,6 +48,11 @@ export function buildTeamsFromReplay(
     speedOrders?: SpeedOrderObservation[];
     /** Typeless-HP effectiveness readings — type evidence for the resolver. */
     hpEvidence?: HiddenPowerEvidence[];
+    /**
+     * The published random-set file of a format whose Dex entry generates the team (Random Battle): a side the builder infers itself
+     * and that showed fewer bodies than its `|teamsize|` gets stand-ins from it, as the app's fill does. Without it that side plays short.
+     */
+    randomSets?: RandomSetFile | null;
   },
 ): BuiltTeams {
   return buildTeams(normalizeLineEndings(rawLog), options).teams;
@@ -83,7 +88,7 @@ function infosFor(log: string, options: BuildOptions): SideInfos {
   const inferred = { p1: given('p1') || inferOpponentTeam(log, 'p1'), p2: given('p2') || inferOpponentTeam(log, 'p2') };
   if (given('p1') && given('p2')) return inferred;
   // Round 88 (F, #101): a side the builder infers itself gets the stand-in step the app's enriched infos got before they came here.
-  const filled = withStandIns(inferred, log, options?.usageStats, { p1: importedUserTeam(options?.userTeamText) ?? [] });
+  const filled = withStandIns(inferred, log, options?.usageStats, { p1: importedUserTeam(options?.userTeamText) ?? [] }, options?.randomSets);
   const pick = (side: 'p1' | 'p2') => (given(side) ? inferred[side] : filled[side]);
   return { p1: pick('p1'), p2: pick('p2') };
 }
