@@ -1398,6 +1398,14 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * the local corpus, so CI skips it: it passed in 237.9 s on 20.11. and timed
  * out at 240 s now; with the limit at 1,200 s it passes in 597.5 s (9fe75e30).
  * The engine project with EVAL_SIM_FAST=0: 482 files, 17,257 passed.
+ * Last change before the release (user 22.11.2026, 8156ede4 to e55d3544): the
+ * Game review and "Opponent reads my move" ship switched off behind feature
+ * flags (src/lib/feature-flags.ts) and return in 1.2.1 (#217, #221); the
+ * Evaluation header carries "Always on" in the row of Depth and Tera. No
+ * score moves: three feedback runs (r89-ff1) byte-identical to each other and
+ * to r89-final3 (12 dumps); CI Tests run 45022453829, nine jobs green. Tester
+ * pass 7: 0 broken; the header still wraps with Depth 1 or 2 and inside a
+ * variation.
  *
  * GATE: opening 09.11.: every open issue of 1.2.0 in one wave on devbox, with
  * two worktree slots; the trust rule of T322 loses its two open clauses; the
