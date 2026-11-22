@@ -21,7 +21,6 @@ export interface ExpansionContext {
   tera: TeraAllowance;
   matchupCache: MatchupCache;
   sleepClause?: boolean;
-  stopAtForcedSwitch: boolean;
 }
 
 /** Root bookkeeping: the planned events per root cell (one calc each) and the drawn class of single-child boundary cells (round 33). */
@@ -70,7 +69,7 @@ function doublesRootChild(
   quantiles?: DieQuantiles,
 ): Expanded | null {
   if (book.battle.gameType !== 'doubles') return null;
-  const keyed = keyedAdvance(book, node.position, key, p1Choice, p2Choice, seed, ctx.stopAtForcedSwitch, quantiles);
+  const keyed = keyedAdvance(book, node.position, key, p1Choice, p2Choice, seed, quantiles);
   if (!keyed) return null;
   const made = nodeFrom(keyed.child, keyed.pendingSwitch, ctx);
   if (keyed.classKey !== null) {
@@ -121,7 +120,7 @@ function singleChild(
   const recording = !!events && hasSecondary(events);
   const sink = drawSink(quantiles, book, recording);
   const { child, log, pendingSwitch } = advancePositionWithLog(node.position, p1Choice, p2Choice, seed, {
-    stopAtForcedSwitch: ctx.stopAtForcedSwitch, ...(sink ? { scripts: sink } : {}),
+    stopAtForcedSwitch: true, ...(sink ? { scripts: sink } : {}),
   });
   const made = nodeFrom(child, pendingSwitch, ctx);
   if (book && events) bookDrawnClass(book, key, events, log, recording ? sink?.secondaries : undefined, () => speedTie(book.battle, p1Choice, p2Choice));

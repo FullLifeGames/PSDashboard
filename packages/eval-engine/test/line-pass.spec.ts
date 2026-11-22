@@ -104,7 +104,7 @@ describe.each(BOARDS)('the line pass of a %s tree', (_name, serialized) => {
 });
 
 describe('the pass on a searched root', () => {
-  const ctx = { tera: false, matchupCache: createMatchupCache(), stopAtForcedSwitch: true };
+  const ctx = { tera: false, matchupCache: createMatchupCache() };
   const fresh = (serialized: string): Node => mctsRoot(serialized, BASE);
   const thinnest = (root: Node): number => [...root.children].filter(([, child]) => !child.ended).sort((a, b) => a[1].visits - b[1].visits)[0][0];
   const total = (root: Node, key: number): number => root.children.get(key)!.visits;

@@ -156,8 +156,6 @@ function runMcts(
   const playedBounds = playedBoundsOf(rootBattle, settings.keepPlayed?.fell);
   const ctx: ExpansionContext = {
     tera, matchupCache, sleepClause: settings.sleepClause,
-    // Round 42: a forced switch after a knock-out is a decision node of the tree; the matrix, verify, play-out and prover resolve it greedily.
-    stopAtForcedSwitch: true,
   };
   const book: RootClassBook = { battle: rootBattle, events: new Map(), keys: new Map(), weights: new Map() };
   // Round 89 (#59, ruling D2): only a tree inside the budget's tree count spreads its root dice; a lone tree has no strata to spread.

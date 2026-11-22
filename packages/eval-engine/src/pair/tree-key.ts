@@ -47,15 +47,15 @@ export interface KeyedAdvance { child: SimPosition; log: string[]; pendingSwitch
 
 /**
  * One root draw of a doubles tree with its class key (null when the draw shows no uncertain event or the read falls back). Null as a
- * whole when the pair plan never reads the cell: the caller draws plainly.
+ * whole when the pair plan never reads the cell: the caller draws plainly. The draw stops at a forced switch (round 42: it is a
+ * decision node of the tree; the matrix, verify, play-out and prover resolve it greedily).
  */
 export function keyedAdvance(
-  owner: object, root: SimPosition, key: number, p1Choice: string, p2Choice: string, seed: PRNGSeed, stopAtForcedSwitch: boolean,
-  quantiles?: DieQuantiles,
+  owner: object, root: SimPosition, key: number, p1Choice: string, p2Choice: string, seed: PRNGSeed, quantiles?: DieQuantiles,
 ): KeyedAdvance | null {
   const state = stateOf(owner, root);
   if (!pairable(state, key, p1Choice, p2Choice)) return null;
-  const drawn = drawKeyed(root, p1Choice, p2Choice, seed, stopAtForcedSwitch, quantiles);
+  const drawn = drawKeyed(root, p1Choice, p2Choice, seed, true, quantiles);
   const pattern = readPattern(drawn.records, drawn.log, state.battle.dex, state.tableFor, state.entriesFor);
   const keyed = pattern.kind === 'pattern' && pattern.events.length > 0;
   return {

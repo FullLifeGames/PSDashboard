@@ -90,6 +90,21 @@ describe('(a) the keyed draw is the plain advance with its dice written down', (
     // the board does reach the forced switch under the tree's rule, or the row proves nothing about it
     if (stop) expect(pending).toBeGreaterThan(0);
   });
+
+  test('the tree\'s keyed draw always stops at a forced switch (the rule of `stop` true above)', async () => {
+    const { keyedAdvance } = await keyedModule();
+    const root = anchorRoot();
+    let pending = 0;
+    for (const seed of SEEDS) {
+      const plain = advancePositionWithLog(root, ...PLAYED, seed as never, { stopAtForcedSwitch: true });
+      const keyed = keyedAdvance({}, root, cellKey(0, 0), ...PLAYED, seed as never);
+      expect(keyed, seed).not.toBeNull();
+      expect(keyed!.pendingSwitch, seed).toBe(plain.pendingSwitch);
+      expect(serializeBattleStable(positionBattle(keyed!.child)), seed).toBe(serializeBattleStable(positionBattle(plain.child)));
+      if (plain.pendingSwitch) pending++;
+    }
+    expect(pending).toBeGreaterThan(0);
+  });
 });
 
 describe('(b) the key of a keyed draw is the sampler\'s class key', () => {
@@ -101,10 +116,10 @@ describe('(b) the key of a keyed draw is the sampler\'s class key', () => {
       const blend = blendOf(root, p1, p2);
       const owner = {};
       const seen = new Set<string>();
-      const first = keyedAdvance(owner, root, cellKey(0, 0), p1, p2, SEARCH_SEEDS[0], false);
+      const first = keyedAdvance(owner, root, cellKey(0, 0), p1, p2, SEARCH_SEEDS[0]);
       expect(first?.classKey).toBe(blend.classes.find(cls => cls.hasFirst)?.key);
       for (let iteration = 0; iteration < 40; iteration++) {
-        const drawn = keyedAdvance(owner, root, cellKey(0, 0), p1, p2, treeSeed(iteration, 1), false);
+        const drawn = keyedAdvance(owner, root, cellKey(0, 0), p1, p2, treeSeed(iteration, 1));
         expect(drawn).not.toBeNull();
         // Round 86 (T323): the hashed seeds reach a paralysed target that cannot move on the same turn (a read the pair plan
         // falls back on, `cant:par`), which the five lattice seeds never drew in forty iterations: such a draw books no key.
@@ -154,18 +169,18 @@ describe('(c) a guarded cell and a cell without an uncertain event book no key; 
       [pairSet('A', 'Snorlax', ['Rest', 'Protect']), pairSet('B', 'Snorlax', ['Rest', 'Protect'])],
       battle => { battle.sides[0].active[0]!.setStatus('par'); },
     );
-    expect(keyedAdvance({}, root, cellKey(0, 0), 'move dragonclaw 1, move softboiled', 'move rest, move rest', SEARCH_SEEDS[0], false)).toBeNull();
+    expect(keyedAdvance({}, root, cellKey(0, 0), 'move dragonclaw 1, move softboiled', 'move rest, move rest', SEARCH_SEEDS[0])).toBeNull();
   });
 
   test('a choice the pair plan does not parse is no keyed draw', async () => {
     const { keyedAdvance } = await keyedModule();
-    expect(keyedAdvance({}, anchorRoot(), cellKey(0, 0), 'team 12', 'team 12', SEARCH_SEEDS[0], false)).toBeNull();
+    expect(keyedAdvance({}, anchorRoot(), cellKey(0, 0), 'team 12', 'team 12', SEARCH_SEEDS[0])).toBeNull();
   });
 
   test('a cell with no uncertain event draws and books no key', async () => {
     const { keyedAdvance } = await keyedModule();
     const root = anchorRoot();
-    const drawn = keyedAdvance({}, root, cellKey(0, 0), ...QUIET, SEARCH_SEEDS[0], false);
+    const drawn = keyedAdvance({}, root, cellKey(0, 0), ...QUIET, SEARCH_SEEDS[0]);
     expect(drawn).not.toBeNull();
     expect(drawn!.classKey).toBeNull();
   });
@@ -231,10 +246,10 @@ describe('(e) the clones of a keyed draw equal the plain draw\'s', () => {
     const [p1, p2] = board.choices;
     const owner = {};
     // the first call builds the pair state (the battle's copy for the reader's own questions): a cost of the cell, not of a draw
-    keyedAdvance(owner, root, cellKey(0, 0), p1, p2, SEARCH_SEEDS[0], false);
+    keyedAdvance(owner, root, cellKey(0, 0), p1, p2, SEARCH_SEEDS[0]);
     for (const seed of SEEDS) {
-      const plain = clones(() => advancePositionWithLog(root, p1, p2, seed as never, { stopAtForcedSwitch: false }));
-      const keyed = clones(() => keyedAdvance(owner, root, cellKey(0, 0), p1, p2, seed as never, false));
+      const plain = clones(() => advancePositionWithLog(root, p1, p2, seed as never, { stopAtForcedSwitch: true }));
+      const keyed = clones(() => keyedAdvance(owner, root, cellKey(0, 0), p1, p2, seed as never));
       expect(keyed, seed).toBe(plain);
     }
   });
