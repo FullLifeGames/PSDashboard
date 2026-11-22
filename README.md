@@ -118,7 +118,7 @@ CI ([test.yml](./.github/workflows/test.yml)) runs on every push to master and o
 - Report a bug with the form under [Issues](https://github.com/FullLifeGames/PSDashboard/issues/new/choose) ("Report issue" in the app fills most of it); a new report starts with the label `needs triage`. Changes reach `master` through pull requests that pass the six jobs of the test workflow.
 - New files stay under the lint ceilings of 300 lines per file, 60 per function, and complexity 15. Older files sit on shrink-only pins in `eslint.ratchet.mjs`; `node scripts/update-lint-ratchet.mjs` re-measures them and refuses to raise a pin.
 - `eslint.zones.mjs` makes the layering a lint error: a package never reaches `src/`, replay-core never imports the engine, the app imports the packages by name (dynamic imports go through `src/lib/lazy/`), and nothing under `src/lib` imports the UI.
-- Keep the knip report empty; internal helpers stay unexported.
+- Keep the knip report empty; internal helpers stay unexported. `npm run knip` and `npm run lint` run in CI, in the required job `Production build smoke` of the test workflow (and `npm run lint` again in the Pages workflow), so a merge needs both clean.
 - Package barrels (`packages/*/src/index.ts`) are the public API. After widening one, run `UPDATE_API_SNAPSHOT=1 npm run test:regression -- test/regression/package-api.spec.ts`.
 - A package behavior gets its spec under `packages/<name>/test/`. A spec that needs app code goes under `test/regression/`, a component or hook spec under `test/ui/`, and a browser flow into the matching theme file under `test/e2e/`.
 

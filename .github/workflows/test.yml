@@ -258,6 +258,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Round 90 (#173): the unused-code report and the lint rules run in a required check, so a merge needs both empty.
+      - name: Check for unused code
+        run: npm run knip
+
+      - name: Lint
+        run: npm run lint
+
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
