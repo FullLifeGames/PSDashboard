@@ -1,7 +1,7 @@
 import { cellKey, rankFromMatrix, toResult as rankedToResult } from './rank.ts';
 import { attachKoOdds, koOddsMapsFor } from './search/root-payload.ts';
 import type { CellBlendClass, EvalCellValue, EvalMatrix, EvalResult, KoOddsMismatch, MatrixCell, MctsTreeStats, PlannedCell } from './types.ts';
-import { cellContribution, keyedCell, pooledChanceValue, type TreeCell } from './search/merge-pool.ts';
+import { cellContribution, keyedCell, type TreeCell } from './search/merge-pool.ts';
 import { VERIFY_DISAGREEMENT, VERIFY_MIN_TREES, VERIFY_MIN_VISITS, weightedDisagreement } from './verify-select.ts';
 
 // Round 63: the verify cell selection lives in verify-select.ts; its names stay importable from here.
@@ -90,8 +90,7 @@ function pooledCells(trees: MctsTreeStats[]): Map<number, PooledCell> {
  * of their per-tree means. With `classKey` only the trees that drew that
  * outcome class count (round 33); `acceptUnkeyed` lets trees without a
  * recorded class join (the one-open-class shape, where every open draw
- * must belong to that class). Round 43: a chance cell (cells[].classes)
- * contributes the pool of the named class itself (merge-pool.ts).
+ * must belong to that class).
  */
 function poolContinuation(
   trees: MctsTreeStats[], key: number, classKey?: string, acceptUnkeyed = false,
@@ -182,9 +181,8 @@ function pooledMatrix(
   const values = base.p1Options.map((_, i) => base.p2Options.map((_, j) => {
     const entry = pooled.get(cellKey(i, j));
     if (!entry) return base.rootValue;
-    // Round 43: a chance cell pools per class across the trees (merge-pool.ts).
     // Round 89 (T322, #59): a keyed cell weighs its drawn classes by the Dex, then the visit pool.
-    return pooledChanceValue(entry.cells) ?? keyedCell(entry.cells)?.value ?? (entry.total + entry.value) / (entry.visits + 1);
+    return keyedCell(entry.cells)?.value ?? (entry.total + entry.value) / (entry.visits + 1);
   }));
   const ended = base.p1Options.map((_, i) =>
     base.p2Options.map((_, j) => pooled.get(cellKey(i, j))?.ended ?? false));
