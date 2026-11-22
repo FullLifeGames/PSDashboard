@@ -44,5 +44,5 @@ export function winPaths(
   return { side: request.side, turn: request.turn ?? 0, steps };
 }
 
-export { LUCK_FLOOR, WIN_BUDGET, WinMeter } from './budget.ts';
+export { WIN_BUDGET, WinMeter } from './budget.ts';
 export type { WinBudget, WinPaths, WinPathsRequest, WinStep } from './types.ts';

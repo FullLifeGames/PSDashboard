@@ -10,7 +10,7 @@ import {
 import { decidedSignals } from './decided-signals.ts';
 import { opponentColumn, ownCell } from './clicked-cell.ts';
 import { hindsightLine } from '../prose/phrases.ts';
-import { cellSolid, HINDSIGHT_MIN_VISITS } from './cell-solid.ts';
+import { cellSolid } from './cell-solid.ts';
 import type { SideGrading } from './grading.ts';
 
 /**
@@ -109,7 +109,6 @@ function forcedMixFor(view: MatrixView, options: RankedChoice[]): SideAnalysis['
  * plain cell is no guess either (cellSolid), and the played row's cell against the click is held to the same gate.
  */
 export const HINDSIGHT_BAND = TIER_THRESHOLDS.inaccuracy;
-export { HINDSIGHT_MIN_VISITS };
 
 /**
  * The gate's parts of a hindsight read. The side row's flag and sentence need the solid cells and the band past the

@@ -1,6 +1,5 @@
-import { createRootPosition, positionBattle, type ChoiceOption, type SimPosition } from '../../forward-model.ts';
+import { positionBattle, type ChoiceOption, type SimPosition } from '../../forward-model.ts';
 import type { TeraAllowance } from '../../types.ts';
-import type { WinPathsRequest } from './types.ts';
 import type { StaticRuleset } from '../../score/weights.ts';
 import { endgameKey } from '../key.ts';
 import { oneTurnMatrix } from '../solver.ts';
@@ -54,9 +53,4 @@ export class FirstChoice {
     this.memo.set(key, result);
     return result;
   }
-}
-
-/** The root position of a request (the serialized battle at the start of the turn). */
-export function rootOf(serialized: string, request: Pick<WinPathsRequest, 'ruleset'>): SimPosition {
-  return createRootPosition(serialized, request.ruleset);
 }
