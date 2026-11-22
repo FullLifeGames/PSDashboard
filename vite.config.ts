@@ -22,6 +22,15 @@ const appCommit = (() => {
   }
 })()
 
+/**
+ * Round 90 (#222): the dev server watches the repository root. On devbox the local folders below hold more than
+ * 60,000 files and used up the inotify budget (37,260 `ENOSPC` lines in one e2e run). None of them holds a module
+ * the app imports, so the watch skips them; tracked root files (README.md, index.html, the configs) stay watched.
+ * test/regression/vite-watch-ignore.spec.ts holds the list.
+ */
+const rootDir = fileURLToPath(new URL('.', import.meta.url)).replace(/[\\/]$/, '')
+const unwatchedFolders = ['.calibration', '.claude', '.fit-corpus', '.playwright-mcp', '.smogon-cache', 'docs']
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
 
@@ -31,6 +40,10 @@ export default defineConfig({
   },
 
   base: "./",
+
+  server: {
+    watch: { ignored: unwatchedFolders.map(folder => `${rootDir}/${folder}/**`) },
+  },
 
   resolve: {
     alias: {
