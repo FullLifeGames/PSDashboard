@@ -34,7 +34,7 @@ const S_AUTO: EvalStoreSettings = { mode: 'auto', depth: 1, samples: 1, tera: 'a
 /**
  * The captures: one file per replay, settings and turns. A spec names its file with `evalStoreFileName(replay, settings, turns)`. The
  * replay is the fixture of the same id under packages/eval-engine/test/fixtures/ or test/e2e-feedback/fixtures/. Round 90, steps E2
- * and E3: the Game review rows except the Auto row, the single turns of lines-play and hard-mode.
+ * and E3: the Game review rows except the Auto row, the single turns of lines-play and the sweeps of win-paths. Hard-mode stays live.
  */
 export const EVAL_STORE_CAPTURES: EvalStoreCapture[] = [
   { replay: 'gen9ou-2658662321', settings: S_MCTS },
@@ -45,10 +45,6 @@ export const EVAL_STORE_CAPTURES: EvalStoreCapture[] = [
   { replay: 'gen9vgc2026regi-2630452654', settings: S_MCTS, turns: [4, 6] },
   { replay: 'gen9championsou-2691703002', settings: S_MCTS, turns: [8, 12] },
   { replay: 'gen9championsvgc2026regma-2625939941', settings: S_MCTS, turns: [3, 5] },
-  { replay: 'smogtours-gen6ou-655336', settings: S_MATRIX, turns: [8, 12, 5] },
-  { replay: 'smogtours-gen9doublesou-912884', settings: S_MATRIX, turns: [5, 8, 11] },
-  { replay: 'gen9vgc2026regi-2630452654', settings: S_MATRIX, turns: [4, 6, 3] },
-  { replay: 'gen9championsou-2691703002', settings: S_MATRIX, turns: [8, 12, 5] },
   { replay: 'smogtours-gen6ou-649664', settings: S_MATRIX },
   { replay: 'gen9championsvgc2026regmc-2695803506', settings: S_MATRIX },
   { replay: 'gen9vgc2026regi-2629703929', settings: S_MATRIX },
