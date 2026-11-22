@@ -63,8 +63,8 @@ for (const capture of EVAL_STORE_CAPTURES.filter(entry => !only || entry.replay 
     const panel = page.locator('.ps-main-right .ps-eval-panel');
     let records: EvalStoreRecord[];
     if (capture.turns) {
-      // the route of lines-play and hard-mode: the slider to the turn, "Analyze this position", until the turn's record is saved
-      let held = (await readEvalStore(page, replay.id)).length;
+      // the route of lines-play and hard-mode: the slider to the turn, "Analyze this position", until the records of the turn and of the
+      // next position (the search grades the played move there) are saved: a doubles turn saves its second record seconds after its first
       for (const turn of capture.turns) {
         await page.locator('input[type="range"]').fill(String(turn));
         // after the first report of the game the panel shows the overview: the graph's column opens the turn's own view
@@ -73,8 +73,10 @@ for (const capture of EVAL_STORE_CAPTURES.filter(entry => !only || entry.replay 
         const analyze = panel.getByRole('button', { name: /^Analyze this position/ });
         await expect(analyze).toBeEnabled({ timeout: 60_000 });
         await analyze.click();
-        await expect.poll(async () => (await readEvalStore(page, replay.id)).length, { timeout: 600_000, intervals: [2_000] }).toBeGreaterThan(held);
-        held = (await settledRecords(page, replay.id)).length;
+        await expect.poll(async () => {
+          const keys = (await readEvalStore(page, replay.id)).map(record => record.key);
+          return [turn, turn + 1].every(position => keys.some(key => key.includes(`|${replay.id}:${position}:`)));
+        }, { message: `the records of turn ${turn} and ${turn + 1}`, timeout: 600_000, intervals: [2_000] }).toBe(true);
       }
       records = await settledRecords(page, replay.id);
     } else {

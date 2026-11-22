@@ -158,5 +158,14 @@ describe('the saved files in the repository', () => {
       expect(name).toBe(evalStoreFileName(parsed.replay, parsed.settings, parsed.turns));
       expect(seedRecords(parsed, { tag: 'v999', now: 1 }).every(entry => entry.key.startsWith('v999|'))).toBe(true);
     });
+
+    it(`${name} holds the turn and the next position of every turn it names`, () => {
+      const parsed = parseEvalStoreFile(readFileSync(join(dir, name), 'utf-8'), name);
+      for (const turn of parsed.turns ?? []) {
+        for (const position of [turn, turn + 1]) {
+          expect(parsed.records.some(entry => entry.key.includes(`|${parsed.replay}:${position}:`)), `position ${position} of turn ${turn}`).toBe(true);
+        }
+      }
+    });
   }
 });
