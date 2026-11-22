@@ -214,24 +214,45 @@ jobs:
         env:
           PLAYWRIGHT_JSON_OUTPUT_FILE: ${{ github.workspace }}/playwright-report.json
 
-      # The 15 slowest spec files, summed over their tests, so the next limit review reads numbers from the log.
-      - name: List the slowest browser specs
+      # Round 90 (step E0, #222): the 15 slowest spec files, summed over their tests, and the 20 slowest tests, so the
+      # next limit review and the next cut read numbers from the log. The JSON report is kept on every run (green too).
+      - name: List the slowest browser specs and tests
         if: always()
         run: |
           node - <<'EOF'
           const fs = require('node:fs');
           if (!fs.existsSync('playwright-report.json')) process.exit(0);
           const report = JSON.parse(fs.readFileSync('playwright-report.json', 'utf8'));
-          const per = new Map();
-          const walk = suite => {
-            for (const spec of suite.specs ?? []) for (const t of spec.tests) for (const r of t.results) per.set(spec.file, (per.get(spec.file) ?? 0) + r.duration);
-            for (const child of suite.suites ?? []) walk(child);
+          const perFile = new Map();
+          const perTest = [];
+          const walk = (suite, titles) => {
+            const path = suite.title && suite.title !== suite.file ? [...titles, suite.title] : titles;
+            for (const spec of suite.specs ?? []) {
+              for (const t of spec.tests) {
+                const ms = t.results.reduce((n, r) => n + r.duration, 0);
+                perFile.set(spec.file, (perFile.get(spec.file) ?? 0) + ms);
+                perTest.push([ms, t.status, `${spec.file}:${spec.line}  ${[...path, spec.title].join(' > ')}`]);
+              }
+            }
+            for (const child of suite.suites ?? []) walk(child, path);
           };
-          for (const suite of report.suites) walk(suite);
-          const rows = [...per].sort((a, b) => b[1] - a[1]);
-          console.log(`${rows.length} spec files, ${(rows.reduce((n, r) => n + r[1], 0) / 1000).toFixed(0)} s summed over ${report.config.workers} workers`);
+          for (const suite of report.suites) walk(suite, []);
+          const rows = [...perFile].sort((a, b) => b[1] - a[1]);
+          console.log(`${rows.length} spec files, ${perTest.length} tests, ${(rows.reduce((n, r) => n + r[1], 0) / 1000).toFixed(0)} s summed over ${report.config.workers} workers`);
           for (const [file, ms] of rows.slice(0, 15)) console.log(`${(ms / 1000).toFixed(1).padStart(7)} s  ${file}`);
+          console.log('');
+          console.log('The 20 slowest tests');
+          for (const [ms, status, name] of perTest.sort((a, b) => b[0] - a[0]).slice(0, 20)) console.log(`${(ms / 1000).toFixed(1).padStart(7)} s  ${status.padEnd(10)} ${name}`);
           EOF
+
+      - name: Keep the JSON report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report.json
+          retention-days: 14
+          if-no-files-found: ignore
 
       - name: Keep the failure traces
         uses: actions/upload-artifact@v4
