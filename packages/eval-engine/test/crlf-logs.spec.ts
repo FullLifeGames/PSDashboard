@@ -21,7 +21,7 @@ import { parseRevealedTeraSpecies, resolveTeraPreference } from '../src/tera';
  * turn reader no `|turn|N`, and the click behind an Encore compared "Encore\r" with "Encore". replay-core normalizes once at each of
  * its doors (packages/replay-core/src/line-endings.ts). This package does the same with its own copy, because replay-core's barrel
  * does not export that helper. The fixtures are real replays, singles and doubles, each read from its LF text and its CRLF twin. The
- * Encore scenes are the rebuild's synthetic logs (encore-click.spec.ts).
+ * Encore scenes are the rebuild's synthetic logs (runtime.active-correction.spec.ts).
  */
 
 const lfOf = (text: string) => text.replace(/\r\n?/g, '\n');
@@ -149,7 +149,7 @@ const mon = (species: string, ability: string, moves: string[], spe: number): Po
   evs: { hp: 252, atk: 0, def: 0, spa: 0, spd: 0, spe }, ivs, level: 100, teraType: 'Normal',
 });
 
-/** The Encore scene of encore-click.spec.ts: the Encore lands before its target moves, so the click behind it is the encored move. */
+/** The Encore scene of runtime.active-correction.spec.ts: the Encore lands before its target moves, so the click behind it is the encored move. */
 const encoreTurns = (target: string, user: string) => [
   '|turn|1',
   `|move|${target}: Snorlax|Protect|${target}: Snorlax`, `|-singleturn|${target}: Snorlax|Protect`,
