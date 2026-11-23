@@ -1,9 +1,6 @@
 import type { EngineEntry } from '../engines/registry';
 
-/**
- * Round 77 (user gate 28.10.2026, 5a): the engine the Evaluation panel chose, read by the worker client
- * for every evaluation (Evaluate, Analyze game, Let it play out). Null is the dashboard's own search.
- */
+/** The engine the Evaluation panel chose, read by the worker client for every evaluation; null is the dashboard's own search. */
 let selected: EngineEntry | null = null;
 
 export function setSelectedEngine(engine: EngineEntry | null): void {
@@ -14,14 +11,14 @@ export function selectedEngine(): EngineEntry | null {
   return selected;
 }
 
-/** Another engine's results never share a cache key with the own search's; those keys stay as they were. */
+/** The cache key suffix of the chosen engine: another engine's results never share a key with the own search's. */
 export function engineCacheTag(): string {
   return selected ? `|engine:${selected.id}` : '';
 }
 
 /**
- * The loaded replay's format, which a request names beside the simulator's: the dashboard rebuilds a
- * VGC game on the doubles format, and an engine wants to know it plays VGC.
+ * The loaded replay's format, named in a request beside the simulator's: a VGC game is rebuilt on the doubles format, and an engine
+ * wants to know it plays VGC.
  */
 let gameFormat: string | null = null;
 

@@ -10,7 +10,7 @@ export const ENGINE_BUDGET_MS = 5000;
 /** The network's share on top of the budget before the dashboard gives up. */
 const ENGINE_SLACK_MS = 5000;
 
-/** One POST of the engine protocol: the answer checked as the conformance tool checks it, or a message that says why not. */
+/** One POST of the engine protocol, the answer checked as the conformance tool checks it. */
 async function askEngine(engine: EngineEntry, request: EngineRequest, live: () => boolean): Promise<EngineResponse> {
   const controller = new AbortController();
   let timedOut = false;
@@ -50,9 +50,8 @@ async function askEngine(engine: EngineEntry, request: EngineRequest, live: () =
 }
 
 /**
- * Round 77 (user gate 28.10.2026, "1a 2a 3a 5a"): a position evaluated by another engine. The options
- * are the ones the dashboard's own matrix ranks (the pool's choices, pivot pairs included); the answer
- * is read through the same ranking, and the result names the engine.
+ * A position evaluated by another engine: the options are the ones the dashboard's own matrix ranks (the pool's choices, pivot pairs
+ * included), read through the same ranking; the result names the engine.
  */
 export async function evaluateWithEngine(
   engine: EngineEntry,
@@ -63,14 +62,14 @@ export async function evaluateWithEngine(
 ): Promise<EvalResult> {
   const info = await executor.choices(settings.tera ?? true, settings.keepPlayed, settings.sleepClause);
   if (info.rootEnded) return { score: info.rootValue, interval: 0, depthCompleted: 1, perSide: { p1: [], p2: [] } };
-  // A Champions position revives on the Champions mod (round 67, T145).
+  // A Champions position revives on the Champions mod.
   await loadSimModsFor(serialized);
   const request = buildEngineRequest(serialized, { p1: info.p1, p2: info.p2 }, ENGINE_BUDGET_MS, { format: engineGameFormat() ?? undefined });
   const response = await askEngine(engine, request, live);
   const version = response.engine?.version;
   return {
     ...engineResponseToResult(request, response),
-    // Round 89 (#108): the grading's order bound comes from our own root battle, whichever engine ranked the rows.
+    // The grading's order bound comes from our own root battle, whichever engine ranked the rows.
     ...(info.playedBounds ? { playedBounds: info.playedBounds } : {}),
     engine: { id: engine.id, name: engine.name, ...(version ? { version } : {}) },
   };

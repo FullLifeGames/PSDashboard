@@ -3,23 +3,19 @@ import { searchBudgetStamp } from './search-budget-setting';
 import { simFastLevers } from './sim-fast-setting';
 import { spawnWorker, type WorkerHandle } from './worker-handle';
 
-/** What a caller of the win-paths job may hand in: a callback for each step and a signal that ends the job. */
 export interface WinPathsHandlers {
   onStep?(step: WinStep): void;
   signal?: AbortSignal;
 }
 
-/** The finished answers kept for the next open of the same question (the newest few). */
 const MEMO_SIZE = 16;
 
 /**
- * Round 89 (#130, G8a): the jobs the user asks for, each on a worker of its own, outside the evaluation pool. A job never queues behind
- * a sweep's search (a pool worker is busy until its search ends), a sweep's `cancel` never ends it, and ending it never touches a sweep.
- * Its worker lives for the job: a job that ends, fails or is cancelled terminates it. The message is the generic `job` of the worker
- * (`kind` names the job), so another on-request search shares this class: a new method over `run`, not a new protocol.
- *
- * A finished answer is kept for the same question (position, rule set and request) and replays its steps at once; a failed or cancelled
- * job keeps nothing. No job writes into an `EvalResult`.
+ * The jobs the user asks for, each on a worker of its own outside the evaluation pool: a job never queues behind a sweep's search, a
+ * sweep's `cancel` never ends it and ending it never touches a sweep. The worker lives for the job. The message is the worker's generic
+ * `job` (`kind` names it), so another on-request search is a new method over `run`, not a new protocol. A finished answer is kept for
+ * the same question (position, rule set and request) and replays its steps at once; a failed or cancelled job keeps nothing. No job
+ * writes into an `EvalResult`.
  */
 export class OnRequestJobs {
   private nextId = 1;

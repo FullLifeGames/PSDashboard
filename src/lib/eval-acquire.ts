@@ -15,13 +15,12 @@ export type CaptureBattle = Parameters<NonNullable<ReconstructOptions['capturePo
 
 type BuildOptions = NonNullable<Parameters<typeof import('./lazy/team-builder')['buildTeamsFromReplay']>[1]>;
 
-/** Teams a reported session built, pinned for its reproduction (round 77, src/hooks/usePinnedTeams.ts). */
+/** Teams a reported session built, pinned for its reproduction. */
 export interface PinnedTeams {
   p1Team: PokemonSet[];
   p2Team: PokemonSet[];
 }
 
-/** Everything a replay team build needs, assembled once per render. */
 export interface TeamBuildSources {
   /** Set: every build without an edit override returns these teams. */
   pinnedTeams?: PinnedTeams | null;
@@ -39,7 +38,7 @@ export interface TeamBuildSources {
 }
 
 export interface TeamBuildOptions {
-  /** Use the solved spreads only when a matching solve already exists — never start one (the pickers). */
+  /** Use the solved spreads only when a matching solve already exists, never start one (the pickers). */
   cachedOnly?: boolean;
 }
 
@@ -47,17 +46,16 @@ export function snapshotAt(snapshots: TurnSnapshot[], turn: number): TurnSnapsho
   return snapshots[Math.min(turn - 1, snapshots.length - 1)] ?? null;
 }
 
-/** One team build for every acquisition path (branch, sweep, preview,
- *  refresh) — the same options block used to be pasted at four sites. */
+/** One team build for every acquisition path (branch, sweep, preview, refresh). */
 export async function buildReplayTeams(
   replayData: ReplayData,
   sources: TeamBuildSources,
   overrides?: { p1: OpponentTeamInfo | null; p2: OpponentTeamInfo | null },
   opts?: TeamBuildOptions,
 ): Promise<{ p1Team: PokemonSet[]; p2Team: PokemonSet[] }> {
-  // Round 77 (user gate 28.10.2026, 3a): a reproduction plays the reported sets; an edit made since still builds.
+  // A reproduction plays the reported sets; an edit made since still builds.
   if (sources.pinnedTeams && !overrides) return structuredClone(sources.pinnedTeams);
-  // Round 75 (T160): the team build reads the Dex of the game; a Champions replay needs its mod registered first.
+  // The team build reads the Dex of the game; a Champions replay needs its mod registered first.
   await loadReplayMods(replayData);
   const { buildTeamsFromReplay } = await import('./lazy/team-builder');
   return buildTeamsFromReplay(replayData.log, replayBuildOptions({
@@ -71,8 +69,8 @@ export async function buildReplayTeams(
 }
 
 /**
- * Turn-0 team preview for the lead analysis, bring-trimmed (A.3c). Round 89 (#124): a game with the worlds of a short side previews
- * each world (the lighter ones registered under the heaviest world's position, which comes back), so the lead analysis blends them.
+ * Turn-0 team preview for the lead analysis, bring-trimmed. A game with the worlds of a short side previews each world (the lighter
+ * ones registered under the heaviest world's position, which comes back), so the lead analysis blends them.
  */
 export function makePreviewAcquire(
   replayData: ReplayData,
@@ -84,10 +82,8 @@ export function makePreviewAcquire(
     const branchEngine = await import('./lazy/branch-engine');
     const { p1Team, p2Team } = await buildReplayTeams(replayData, sources);
     if (p1Team.length === 0 || p2Team.length === 0) return null;
-    // Bring-limited replays: the lead analysis enumerates pairs over the
-    // brought species, not the whole six. Both sides trim or neither (round
-    // 89). A Champions preview plays on the Champions mod, loaded first
-    // (round 67, T145).
+    // Bring-limited replays: the lead analysis enumerates pairs over the brought species, and both sides trim or neither. A Champions
+    // preview plays on the Champions mod, loaded first.
     const format = getBranchSimulatorFormat(replayData);
     await branchEngine.loadSimMods(format);
     const primary = branchEngine.serializePreviewPosition(format, p1Team, p2Team, bringOnlyLists);
@@ -102,8 +98,7 @@ export function makePreviewAcquire(
   };
 }
 
-/** Reconstruct the main line to a turn with choice locks and per-boundary
- *  capture — the shared core of the single-turn and sweep acquisitions. */
+/** Reconstruct the main line to a turn with choice locks and per-boundary capture (the core of the single-turn and sweep acquisitions). */
 export async function reconstructReplayRuntime(args: {
   replayData: ReplayData;
   p1Team: PokemonSet[];
@@ -114,7 +109,7 @@ export async function reconstructReplayRuntime(args: {
   bringOnly?: { p1: string[]; p2: string[] };
   onProgress: (turn: number, target: number) => void;
   onPosition?: (turn: number, battle: CaptureBattle) => void;
-  /** Round 79 (T290): the open replacement requests of the knockouts (the main-thread twin of the worker's hand-out). */
+  /** The open replacement requests of the knockouts (the main-thread twin of the worker's hand-out). */
   onReplacement?: (point: ReplacementPoint, battle: CaptureBattle) => void;
 }) {
   const branchEngine = await import('./lazy/branch-engine');

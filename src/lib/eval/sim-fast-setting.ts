@@ -3,11 +3,9 @@ import {
 } from '@fulllifegames/eval-engine';
 
 /**
- * Round 59 (T91): the speed layer's override, without a UI switch: '0' off,
- * '1' all levers, or a list of rules, clone, dispatch; missing means the
- * engine's default. The main thread reads it and stamps it on every worker
- * message (workers have no localStorage); final answers bring each worker's
- * status and counters back into the perf trace.
+ * The speed layer's override, without a UI switch: '0' off, '1' all levers, or a list of rules, clone, dispatch; missing means the
+ * engine's default. The main thread reads it and stamps it on every worker message (workers have no localStorage); final answers
+ * bring each worker's status and counters back into the perf trace.
  */
 export const SIM_FAST_STORAGE_KEY = 'ps-replay-interceptor:sim-fast';
 
@@ -28,7 +26,6 @@ export function simFastLevers(): readonly SimFastLever[] {
   return levers;
 }
 
-/** Worker side: a stamped message reconfigures the worker; an unstamped one leaves it alone. */
 export function adoptSimFastStamp(message: { simFast?: readonly SimFastLever[] }): void {
   if (message.simFast) configureSimFast(message.simFast);
 }

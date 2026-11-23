@@ -3,12 +3,8 @@ import type { SpreadTargetDamage } from './branch-damage';
 import { koShort, shortRange } from './move-damage-text';
 import { preselectTarget } from './preselect-target';
 
-/**
- * Round 84 (turn dock): what a move tile shows under its name, and the target a click on it takes. The tile and the click read
- * one target, so the bar a tile shows is the hit the click will play.
- */
+/** What a move tile shows under its name and the target a click on it takes: both read one target, so the bar is the hit the click plays. */
 
-/** One bar of a tile: a body's HP, and what one hit of the move does to it. */
 export interface TileBar {
   /** The body's slot label ("P2A"); empty for the one foe of a singles game. */
   label: string;
@@ -18,7 +14,6 @@ export interface TileBar {
   range: string;
   /** The calc's KO verdict in its short form ("2HKO", "62.5% OHKO"); empty without one. */
   ko: string;
-  /** The tooltip: the calc's whole sentence. */
   title: string;
 }
 
@@ -52,7 +47,6 @@ const present = (bars: (TileBar | null)[]): TileBar[] => bars.filter((bar): bar 
 export function tileBars(args: TileDamage & {
   move: BranchMoveOption;
   side: 'p1' | 'p2';
-  /** The HP of every body on the field by slot label. */
   hpByLabel: Record<string, number>;
   /** The HP of the one living foe, for a move that names no target. */
   foeHp: number | undefined;

@@ -2,24 +2,18 @@ import {
   type EvalResult, type TeraAllowance, type TurnSensitivity, type TurnVerification, searchBudgetTag, teraKey,
 } from '@fulllifegames/eval-engine';
 
-/**
- * IndexedDB persistence for evaluation results, keyed by position + settings.
- * A completed sweep survives reloads, so re-analyzing a replay is instant.
- * Every failure path degrades to "no cache" — evaluation never depends on
- * storage working.
- */
+/** IndexedDB persistence for evaluation results, keyed by position and settings; every failure degrades to "no cache". */
 
 export interface StoredEval {
   /** Full cache key (replay:turn:sets-fingerprint + settings suffix). */
   key: string;
   result: EvalResult;
-  /** Round 35: false marks a sketch result (no forced-win prover); a full pass never reuses it. */
+  /** false marks a sketch result (no forced-win prover); a full pass never reuses it. */
   prove?: boolean;
   depth: number;
   samples: number;
   mode: string;
   tera: TeraAllowance;
-  /** Engine expectation of the actually played pair (sweeps). */
   playedOutcome?: number | null;
   /** Depth+1 re-search of flagged misplays (null = checked, nothing flagged). */
   verified?: TurnVerification | null;
@@ -28,333 +22,10 @@ export interface StoredEval {
   savedAt: number;
 }
 
-/**
- * Bump when the engine's numbers change meaning (eval weights, search
- * behavior) — persisted results from older engine versions must not
- * resurface as current.
- */
-// v7: active-pair matchup emphasis + team-preview (turn 0) evaluation.
-// v11: phase-aware winprob (K = k0 + k1·faintedFraction), sensitivity
-//      probes cached per turn.
-// v12: hazard-removal option value (net board state, move-aware).
-// v13: entry-cost-weighted matchup/coverage (benched mons fight through
-//      their hazard entry damage; Boots/Magic Guard exempt).
-// v14: guaranteed-failing field moves dropped from candidate lists.
-// v15: horizon-trend tiebreak — EV ties in the leading rows reorder by the
-//      one-ply trend of their decisive cells (stall lines stop shading out
-//      equivalent switches).
-// v16: seeded reconstruction — evals cached from unseeded (run-varying)
-//      reconstructions could disagree with the branch a click executes in.
-// v17: Sleep Clause — branch formats carry the clause (declared |rule| lines
-//      or the singles default), and redundant sleep moves leave the
-//      candidate lists.
-// v18: video-pipeline watermark |rule| lines no longer suppress the
-//      singles Sleep Clause default (GPL evals cached without the clause).
-// v19: corrected actives enter FRESH (no inherited choice locks from
-//      diverged sim histories — GPL T38 hid Grass Knot).
-// v20: post-correction request refresh, Imprison-concealed candidates
-//      filtered, transform-shortened moveSlots round-trip (the Mew replay
-//      crashed whole searches; corrected positions offered benched mons'
-//      moves).
-// v21: horizon-trend extrapolation (2b-lite) — tied leading rows carry
-//      their one-ply trend in their VALUES (no re-solve; score untouched).
-// v22: pivot pairs — the root matrix enumerates "U-turn → X" as first-class
-//      choices instead of one greedy row.
-// v23: pivot pairs reach the ORCHESTRATED path too (the app's worker-pool
-//      results cached under v22 were built from unexpanded root options).
-// v24: locked releases carry dex-derived targets (doubles mid-charge
-//      Phantom Force/Meteor Beam candidates were guaranteed rejects on
-//      round-tripped states — those cells never sampled).
-// v25: KO'd-before-acting sides price their pair through the stay-in
-//      phantom — playedOutcome values stored as null under v24 would
-//      otherwise never heal (null means "tried, unmatched" and is final).
-// v26: side invariants (pokemonLeft, isActive) restore on every
-//      deserialize — corrupted-correction positions used to throw (GPL
-//      T38/T39 gaps) or evaluate wiped sides as alive.
-// v27: choice tokens come from the request's move id (display names carry
-//      computed BP for happiness moves — "Return 102" built a token the
-//      sim rejects, silently gapping every Return/Frustration turn) and
-//      guessed Frustration sets assume 0 happiness (the sim default 255
-//      priced them at BP 1).
-// v28: hidden-trapped actives (unrevealed Magnet Pull — the request conceals
-//      trapping the validation enforces) stop offering bench switches, the
-//      guaranteed reject that killed whole turn evals (573756 t24/32/38-40).
-// v29: corrected actives regain protocol-proven choice locks (one distinct
-//      committed move since entry + choice item + undisturbed item), a
-//      guessed Choice item additionally needing damage corroboration —
-//      Keldeo @ Specs graded as a free 4-option side (649664 t23).
-// v30: typeless Hidden Power resolves via effectiveness evidence + usage
-//      instead of the IV-default type (648453 t13 ran HP Dark for a real
-//      HP Ice).
-// v31: stranded bench mons (hp ≤ own-side hazard entry fraction, no living
-//      removal carrier) price at a damped alive share instead of a full
-//      body, leaving the hazard victim term (653785 t19's switch banked a
-//      Charizard that could never return; 655336 t23/t24 artifacts) — and
-//      the sweep feature weight becomes adoptable (fit 2026-08-15).
-// v32: hax-aligned reconstruction — every turn boundary reseeds the sim
-//      with the pinned candidate whose rolls reproduce the protocol's
-//      crits/misses/secondaries/faints (best of 16, deterministic), so
-//      positions no longer carry phantom RNG the real game disproves
-//      (653785's endgame died 2 turns early to a seeded crit).
-// v33: analytic class-blend at root boundary cells + koOdds payloads
-//      (expectation grounding round — a 43% kill roll can no longer
-//      sample 5/5 and grade certain; 649664 t23's desired).
-// v34: MCTS root odds grounding — koOdds payloads on MCTS rows, boundary-
-//      suspect verify coverage (uniform-outcome kill ranges re-priced by
-//      the blending sampler), mismatch diagnostics passthrough.
-// v35: effective speed is the standard speed source — the matchup and
-//      sweep tie-breaks and the Trick Room sign read stages, paralysis,
-//      Tailwind, Choice Scarf, Iron Ball, Unburden, weather abilities,
-//      and invert under Trick Room instead of comparing naked stats.
-// v36: PP truth in the threat model — pair threats, heal status, and the
-//      removal-option terms read live slot PP (a drained wall stops
-//      walling, a Struggle-locked body stops threatening; 573756's
-//      endgame). PP comes from the sim state only, never from dex pools.
-// v37: pin-efficiency discount on held heal PP — past the heal rate a
-//      race defender's healAbsorb realizes only at healRate/incoming
-//      (a pinned healer heals at a net loss and dies with PP in the
-//      tank), so healing now outprices holding (655336 t26: Slack Off
-//      over a free-turn Protect).
-// v38: bring-limited positions field only the brought species (A.3c) —
-//      sweep and single-turn reconstructions of VGC/BSS replays trim to
-//      the protocol-pinned bring per side (per-side fail-open), and the
-//      turn-0 preview enumerates lead pairs over the real four. Singles
-//      and bring-all formats are byte-identical to v37.
-// v39: knock-out hits are lower bounds in the spread fit (a KO line only
-//      says "at least the remainder"; read as a reading it pulled every
-//      solve toward a bulkier defender and a weaker attacker: 573756's
-//      p1 Toxapex fitted as Bold 252 Def, Melmetal at 0 Atk). Sets, and
-//      with them positions, change wherever a knock-out was observed.
-// v40: the last pair is priced by its race (a burned, healing-only Toxapex
-//      no longer outscores a Choice Band Zapdos-Galar on HP alone), the
-//      threat proxy sees fixed-damage moves, the verify step pools tree
-//      depth per outcome class and prices verified cells one ply deeper
-//      with their rows completed, tree disagreement is visit-weighted, and
-//      knock-out hits corroborate Choice items as lower bounds. Teams also
-//      moved in round 33 (published Smogon sets, the Ubers fallback, the
-//      revealed-attack default, the keep-the-prior fit). Scores move in
-//      every endgame and wherever an MCTS verdict leaned on a verified cell.
-// v41: round 35, the forced-win bar on the score.
-// v42: round 37, a Choice Scarf inferred or dropped from move orders no
-//      plausible spread reproduces, and speed evidence in doubles. Sets
-//      move wherever an order decided an item or a doubles turn proved one.
-// v43: round 40, the log's maximum HP pins the HP EVs, a move order the
-//      prior satisfies keeps its Speed, benched bodies keep the sim's HP
-//      (Regenerator), and a death after the mon's own miss is no sack.
-//      Sets and positions move in every server-log replay.
-// v44: round 41, a kept Speed gives way to an offense claim the budget
-//      cannot express beside the log's HP, and two kept stats over the
-//      budget offer both shaving orders. Sets move where a body lost its
-//      measured offense under round 40.
-// v45: round 42, a forced switch after a knock-out is a decision node of
-//      the MCTS tree (the replaced side picks from its bench with lookahead,
-//      the other side waits) instead of the greedy static pick, and doubles
-//      option lists offer the pass assignments. Every tree-evaluated
-//      position moves (Auto past a quarter of all bodies fainted).
-// v46: round 43, the endgame solver and the forced-win prover draw an
-//      outcome class the base seeds never showed on demand (the simulator's
-//      accuracy, crit and damage rolls scripted for that one move) instead
-//      of chasing it with probe seeds. Every proof and every solved endgame
-//      with a formerly open class moves; the tree is unchanged (the chance
-//      nodes measured in this round stay switched off).
-// v47: round 47, a benched body reads its last protocol sighting (plus the
-//      third Regenerator restores on the way out) instead of the sim's own
-//      bench HP. Every position moves whose bench holds a body that was hit
-//      and left within one turn, or whose departure the sim rolled apart
-//      from the log (38 of 2306 benched bodies on the bank).
-// v48: round 49, the matchup memo keys a halving move (Super Fang, Nature's
-//      Madness, Ruination) on the defender's current HP. Before, the first
-//      forked position to ask froze its HP into the memo, and a matrix the
-//      worker pool split read a different value run to run. The key also
-//      carries the other live reads of the memoized threat (current types,
-//      the stored stats, the defender's max HP). Every position moves whose
-//      sets carry a halving move or whose bodies change type or stats
-//      mid-search (Protean, Soak, Power Trick).
-// v49: round 53, a mon the full spread solve forfeits keeps the speed-only
-//      pre-solve's spread instead of falling back to the usage guess, so
-//      the built teams hold the move orders the pre-solve repaired. Every
-//      replay moves whose sets carry such a mon (9 of 1549 sets on the
-//      bank, all singles).
-// v50: round 54, Tera reaches the reconstruction and the static eval. A Tera
-//      click on a turn without an action line for its slot (a flinch) is
-//      replayed, a body that fainted only in the reconstruction gets its
-//      marker back from the snapshot, and the static leaves read the Tera
-//      type (immunity, type chart, Stealth Rock, Toxic Spikes, Black Sludge);
-//      Wind Rider, Soundproof and Bulletproof blank wind, sound and ball
-//      moves. 297 of 833 bank positions move, 293 of them with a living
-//      terastallized body (334 positions carry one). STAB stays tera-blind:
-//      the rule by the book is parked on branch r54-stab.
-// v51: round 55, two rebuild fixes. An Encore that lands before its target
-//      moves no longer stands a turn too long (the rebuild sent the encored
-//      Protect back as the click, and it ran ahead of the Encore), and a
-//      locked doubles slot (recharge, the release turn of Fly) carries no
-//      target loc, so the sim no longer rejects the whole side choice and
-//      the partner plays its protocol move.
-// v52: round 56, the doubles cell plan (pair/). A doubles root cell of the
-//      matrix or of an MCTS verify sample whose draws show a dice event
-//      (a hit chance under 100 %, a kill only some damage rolls reach) is
-//      priced as the weighted mix of its outcome classes (pair/sampler.ts)
-//      instead of the plain seed mean. A cell where a fallback rule fires
-//      (a speed tie among move actions, a random drag-in, a |cant| or
-//      confusion line, a flinch chance on a target that moves later, a
-//      status or confusion before the turn, a Protect whose success is
-//      rolled, a shield such as Focus Sash at full HP, a multi-hit move, a
-//      calc that misses the drawn damage, a missed flip, a coverage outside
-//      0.8 to 1.02) takes the mean of eight natural draws. A crit that
-//      decides no kill and a chance secondary such as a burn or a stat drop
-//      stay inside the drawn class. A cell with neither keeps its value to
-//      the digit. On the bank 115 of 129 doubles matrix positions move;
-//      singles, the MCTS tree, the solver and the prover are untouched.
-//      Doubles options carry kill odds labeled with their slot's move and
-//      target.
-// v53: round 57, the static prices a move as it lands (move-use.ts). Its
-//      type, category and power follow the user's ability (Liquid Voice,
-//      the -ate family, Normalize), forme (Ivy Cudgel), item (Judgment), the
-//      weather, the terrain, the Tera click and Hidden Power's type and
-//      power; Scrappy and Mind's Eye hit Ghosts. Power set at use (weight,
-//      happiness, HP, speed: T81) is parked on branch r57-power.
-// v54: round 60, the simulator gets the right state and choices. A doubles
-//      slot locked in a move (Outrage and the other rampages, Uproar, Bide,
-//      charge releases, recharge) is one option without a target and goes
-//      to the sim by request index (913996 turn 6 had no playable option).
-//      A snapshot correction writes Spikes and Toxic Spikes layers and the
-//      remaining turns of weather and terrain (T92). The build gives every
-//      set an ability the dex knows for its species: the log's "As One"
-//      becomes Calyrex's As One forme, and outside custom games Ogerpon and
-//      Terapagos lose the ability of their battle-only forme (T93).
-//      Outside custom games a species with a fixed Tera type or item
-//      carries it (Ogerpon's masks and Tera types, Terapagos; T79), and a
-//      Tera forme switching back in maps to its species through the dex
-//      (749895 built a second Ogerpon). An ability from a protocol line
-//      goes to the Pokémon whose species can have it (Water Absorb heals,
-//      Pickpocket, Trace; T104). The static's burn and poison residual
-//      follows the generation (burn 1/8 in gens 2 to 6, poison 1/16 in
-//      gen 1; T95). The static's speed list matches the simulator's getStat
-//      on every bank body: Slush Rush in snow, Protosynthesis and Quark
-//      Drive, Unburden only with the simulator's volatile, suppressed
-//      abilities and items, stages floored (T95).
-// v55 (round 61, T98): the search budget chosen at the round-61 gate
-//      (03.10. 23:30): auto turns run the tree from the first turn
-//      (tree-from 0) with 1200 iterations per tree, measured in T97 against
-//      the app's own search on the bank (early tree -23 bp, doubled
-//      iterations -10 bp pooled) and inside the time window from before
-//      round 59.
-// v56 (round 61, T98): the pair missed the time gate (04.10.: 222 s
-//      against 198 s before round 59), so the gate's fallback holds: the
-//      tree from the first turn with 600 iterations per tree (-23 bp
-//      pooled on the bank).
-// v57 (round 63, wave 1): eight lanes land together: early singles turns
-//      on the matrix again (T110), the static's move core asks the
-//      simulator (T81 without STAB) and memoizes its hints (T112), the
-//      verify step deepens per class and checks doubles boundary cells
-//      (T16, T78), set fidelity (T89, T28, T80, T101), the choice lock
-//      after Trick (T115) and observed move orders (T117).
-// v58 (round 64, wave 1.5): the doubles prover answers every legal reply
-//      (T118), the static's memo and setup hint read the stats a move
-//      really uses (T125), the verify step deepens per state a class
-//      leaves (T119), sets read published item slots, IVs and the Boots
-//      tell (T120, T122 point 4), the rebuild follows every protocol item
-//      line and switch-in (T121), and the speed solver reads formes,
-//      Transform and Scarf rounding and fills open EV budgets toward the
-//      prior (T122).
-// v59 (round 65): the static weighs by the replay's rule set. Champions OU
-//      gets its own fitted weights (bodies 121, hazards 1.13, matchup 210),
-//      and the greedy replacement after a knock-out reads the table of the
-//      rule set its position carries. Champions OU positions read new
-//      values; every other position keeps its value.
-// v60 (round 65, gate "2b"): Doubles OU and every doubles format outside
-//      VGC and Champions take the round-65 fit (bodies 180, hazards 0.51,
-//      screens 88, Trick Room 58, matchup 118, coverage 91); VGC outside
-//      Champions is a rule set of its own and keeps the hand doubles table,
-//      as Champions VGC does. Doubles OU positions read new values.
-// v61 (round 66, T141): Champions VGC builds its teams from the Champions
-//      VGC usage file (gen9championsvgc2026: megas, Champions items and EV
-//      scale) instead of the Scarlet/Violet one (gen9vgc2026). Champions VGC
-//      positions read new values; every other position keeps its value.
-// v62 (round 66, T142): VGC reads the VGC set file of its year
-//      (gen9vgc2025, gen9vgc2024, Champions championsvgc2026) and never the
-//      Doubles OU analyses; a year without a file (Scarlet/Violet 2026)
-//      guesses from its usage file. VGC positions read new values.
-// v63 (round 66, T137, gate "2a"): Champions doubles weigh by the Champions
-//      VGC fit (screens 83, bodies 196, matchup 96). Champions doubles
-//      positions read new values.
-// v64 (round 67, wave 2): the rebuild plays the entry effects of a body its
-//      correction puts on the field and reads the protocol with the
-//      simulator's names; the inference rules out guessed items the log's
-//      damage refutes and takes facts from its own client walk; every calc
-//      Pokémon comes from one builder (entry boosts once, Tera bodies, forms,
-//      Paradox, Supreme Overlord, Hidden Power); the search reads one bench
-//      order, lists partner targets and grades doubles roots against the
-//      unlisted answers; Pokémon Champions runs on the Champions mod with
-//      Stat Points, reads its own set file and prices doubles with its own K.
-//      Positions of every format read new values.
-// v65 (round 68, T186): @smogon/calc 0.12: Pokémon Champions is the calculator's
-//      own generation 0 (Stat Points, species and moves from the mod), Gen 1 and 2
-//      read their EVs, Rivalry reads the species' gender, Protect and entry
-//      stages follow the simulator. Calculator values of every format can move.
-// v66 (round 69, wave 3): doubles hits feed the spread solver and every hit is priced with the field,
-//      the item and the Paradox stat it landed with; the inference reads Champions species, item triggers,
-//      |cant| moves and defender items; the rebuild keeps volatiles, sleep counters and slots; the singles
-//      cell plan prices missing weight, immunity and speed ties; doubles verify and answers go deeper; the
-//      static reads boosts that bite, the field pair, a status fix and a phase form, with refitted tables;
-//      results carry cell visits, outcome classes and hindsight reads. Positions of every format read new values.
-// v67 (round 70, batch of fixes): standing stages count where they win a race the holder gets to act in,
-//      with end-of-turn residuals and contact costs played in the simulator; healers attack where that wins;
-//      side protectors and Protect get a damage tempo in the doubles hints; the trend probe reads every base
-//      draw; Gen 1 and 2 build at the server's spread; Z-moves and Max moves reveal their item and base type;
-//      the cards name the click a row walked into. Positions of every format read new values.
-// v68 (round 72, wave 4): the built sets carry the replay's nicknames, shiny flags, levels and genders, so a
-//      serialized position carries the names; a commanding Tatsugiri passes its slot in the search and in the
-//      rebuilt turn; the speed tie comes from the simulator's queue; Dex reads replace hand lists (Tidy Up clears
-//      both sides, Defog before Generation 6, Normalize and Hidden Power, Generation 1 screens, Symbiosis and
-//      Pickup). Positions of every format read new values.
-// v69 (round 73, wave 5): the static counts a stage only where its holder acts and wins its front race, a
-//      matchup pair weighs the HP share of its winner, paralysis and sleep are priced from the played hit; the
-//      rebuild leaves a slot empty where the log does, plays the log's -start lines and keeps a Sitrus Berry the
-//      game kept; the spread solver reads history powers, partner abilities and the field of the hit, and drops
-//      Z, Max and cut spread hits. Positions of every format read new values.
-// v70 (round 76, the last wave): the healer race follows the simulator's sequence of hits and heals, Rage Fist and
-//      Last Respects read the hits taken and the faints from the history, a Taunt from a -start line ticks as the
-//      simulator does, and an open team sheet without EVs takes the solved spread (the sets of open-sheet games move).
-//      Positions of every format read new values.
-// v71 (round 77, T267): in an endgame (at most two living Pokémon on each side) the verify round keeps an agreeing
-//      tree pool of 100 visits below the depth floor, so the rankings and verdicts of endgame turns move, and with
-//      them a prover's proof; the score of the trees stays.
-// v72 (round 78, @pkmn 0.10.12): the simulator of Showdown b354a81f (Pursuit, recoil, Emergency Exit, the Gen 3 and 4
-//      entry, the faint order, Champions Regulation M-C), a corrected Gen 1 to 4 entry plays it, and a calculator body
-//      takes the Dex values where the calculator's differ. Positions of every format may read new values.
-// v73 (round 79, wave 7): a tree turn prices its played pair with the root's own cell (T287), a defensive stage that
-//      takes away the foe's win counts (T288), the near-decided stage and the clean-up read who acts (T282, T283), and
-//      the sweep prices the replacements after a knockout (T290). Stored decision and chance parts, tiers and the
-//      positions with a Defense or Special Defense stage read new values.
-// v74 (round 80, small batch): the near-decided stage names the clicker, who clears the rest itself, and records its
-//      click (T292); stored near stages, the forced-win starts they name and the denied ends read new values.
-// v75 (round 83, small batch): the turn boundary keeps the simulator's count of a side condition or a pseudo weather
-//      where the client's snapshot allows it (T307); positions under a screen of a Light Clay holder read new turns.
-// v76 (round 86, the engine reads the dice): the tree's dice run on the dice module (T299), secondary effects count at
-//      their chance (T305), the doubles trees key their root draws, and the trees' seeds follow the Dex (T323); the
-//      rebuild plays each turn with the dice the log shows (T306), the report prices the copy of the turn's biggest
-//      roll (T304), and the item reader sees screen turns (T310). Every tree turn, rebuilt position and report moves.
-// v77 (round 87, release 1.1.0): the @pkmn train moves from 0.10.12 to 0.10.15 (Showdown 16db150a); a Struggle that
-//      deals no damage costs its user a quarter of its HP, a Gen 1 Transform resets the last move slot, and a typeless
-//      Synchronoise misses a typeless target, so any search line that reaches them reads new values.
-// v78 (round 88, the wave of 1.1.1): the set reader rules out a terrain seed or Room Service that never fired (T349)
-//      and reads weather and terrain as proof of the setter's item (T329); the bench offers brought bodies only
-//      (T314); the rebuild keeps the logged order for a body that never acts (T325), takes out a body the log never
-//      shows (T327), forces Diamond Storm's gain once per move in doubles (T338) and keeps a battle-only forme through
-//      a switch (#103); a game without team preview fills its unseen bodies with stand-ins (#101); the dice offer a
-//      charge move that skips its charge turn (T344) and one accuracy die per hit (T337); the prover carries a proof
-//      over a secondary that only helps the mover (T336). Positions of those games and turns read new values.
-// v79 (round 89, the wave of 1.2.0): the rebuild and the set reader follow the log more closely (#110, #75, #137,
-//      #139, #150); a body that cannot act is no longer offered; each search cell draws its own seed list (T324);
-//      the prover prices more dice, delays a win behind a repeated Protect and tries a sure strike first. Positions of
-//      those games and turns read new values.
-// v80 (round 89, SB3c): a stat drop counts in boostsBiting and in the boosts term only while its holder cannot switch
-//      out (trapped, or no living body off the field); a free holder loses the drop with its switch. Turns whose
-//      leaves hold a drop on a free holder read new values.
+/** Persisted results of another engine version never resurface as current: bump it when the engine's numbers change meaning. */
 const EVAL_ENGINE_CACHE_VERSION = 80;
 
-/** Round 61: a search-budget form stores under its own tag; the default keeps today's keys. */
+/** A search-budget form stores under its own tag; the default keeps the plain keys. */
 const versionTag = (): string => {
   const tag = searchBudgetTag();
   return tag ? `v${EVAL_ENGINE_CACHE_VERSION}~${tag}` : `v${EVAL_ENGINE_CACHE_VERSION}`;
@@ -381,7 +52,6 @@ const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 let dbPromise: Promise<IDBDatabase | null> | null = null;
 
-/** Deletes entries older than MAX_AGE_MS — bounds growth, best-effort. */
 function prune(db: IDBDatabase): void {
   try {
     const tx = db.transaction(STORE, 'readwrite');
@@ -441,11 +111,8 @@ export async function loadStoredEval(key: string): Promise<StoredEval | null> {
 }
 
 /**
- * One transaction for every stored eval of a replay (all turns, engines,
- * and set fingerprints): the graph sweep reads the store once instead of
- * once per turn (five seconds of serial reads on a 139-turn game). null
- * means the store is unavailable or the read failed; the caller then
- * falls back to single reads.
+ * One transaction for every stored eval of a replay, so the graph sweep reads the store once, not once per turn. null: the store is
+ * unavailable or the read failed (the caller falls back to single reads).
  */
 export async function loadStoredEvalsByPrefix(prefix: string): Promise<Map<string, StoredEval> | null> {
   const db = await openDb();

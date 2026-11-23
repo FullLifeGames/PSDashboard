@@ -5,15 +5,7 @@ import {
 } from '@fulllifegames/eval-engine';
 import type { PlayedAtPosition, PlayedPick } from './played-pick';
 
-/**
- * Round 84 (turn dock), lane A: the seed of the dock. Each slot of a position starts with the choice the viewed line played, so
- * "Execute" without a change plays the logged turn. The seed is derived, never stored: the user's own picks (the draft) win slot
- * by slot, and a slot the user has not touched shows the seed.
- *
- * The validation lives here and nowhere else: a move seeds only if the picker offers it enabled, a switch only if the body is on
- * the bench, a target only if the move lists it (a spread move lists none), a gimmick only if the slot offers it. What fails
- * leaves the slot empty with the played pick kept, for the chip's note.
- */
+/** The seed of the dock: each slot starts with the choice the viewed line played, derived and never stored, so Execute without a change plays the logged turn. */
 
 type Side = 'p1' | 'p2';
 
@@ -34,7 +26,6 @@ export interface SeedSlot {
 export type SeedChoices = Record<Side, SeedSlot[]>;
 export type SideChoices = Record<Side, (BranchSlotChoice | null)[]>;
 
-/** Whether a gimmick still applies to a slot's active Pokémon. */
 export function gimmickApplies(kind: BranchMoveModifier, modifiers: BranchSlotModifiers | undefined): boolean {
   if (!modifiers) return false;
   if (kind === 'terastallize') return !!modifiers.teraType;
@@ -43,7 +34,6 @@ export function gimmickApplies(kind: BranchMoveModifier, modifiers: BranchSlotMo
   return modifiers.zMoves.some(Boolean);
 }
 
-/** Whether the position still offers this pick for this slot (a move that is known and enabled, a switch that is on the bench). */
 export function stillOffered(choice: BranchSlotChoice, state: OfferedState, side: Side, slot: number): boolean {
   if (choice.kind === 'move') {
     const moves = (side === 'p1' ? state.p1MovesBySlot : state.p2MovesBySlot)?.[slot] ?? [];
@@ -61,7 +51,6 @@ function playedSlots(played: PlayedAtPosition, side: Side): (PlayedPick | null)[
   return slots ?? [side === 'p1' ? played.p1 : played.p2];
 }
 
-/** The gimmick a played move carries, kept only where the slot offers it (and, for a Z-Move, the move has a Z option). */
 function seededModifier(
   wanted: BranchMoveModifier | undefined, modifiers: BranchSlotModifiers | undefined, moves: BranchMoveOption[], option: BranchMoveOption,
 ): BranchMoveModifier | undefined {
@@ -79,7 +68,7 @@ function seedMove(pick: PlayedPick, state: SeedState, side: Side, slot: number):
   const moves = (side === 'p1' ? state.p1MovesBySlot : state.p2MovesBySlot)?.[slot] ?? [];
   const option = moves.find(candidate => toId(candidate.name) === toId(pick.name));
   if (!option || option.disabled) return null;
-  // A recorded choice (behind the tip) is the source of truth for target, gimmick and dice; the log's pick is the other.
+  // A recorded choice (behind the tip) is the source for target, gimmick and dice; else the log's pick.
   const source = pick.recorded?.kind === 'move' ? pick.recorded : pick;
   const targetLoc = seededTarget(source.targetLoc, option);
   const modifiers = (side === 'p1' ? state.p1ModifiersBySlot : state.p2ModifiersBySlot)?.[slot];
@@ -115,8 +104,8 @@ function seedSide(played: PlayedAtPosition, state: SeedState, side: Side): SeedS
 }
 
 /**
- * The seed of a position: per side and slot the choice the viewed line played, validated against the position's pickers.
- * `played` null (the tip, an unreadable turn) seeds nothing.
+ * Per side and slot the choice the viewed line played, validated against the position's pickers; `played` null (the tip, an
+ * unreadable turn) seeds nothing.
  */
 export function seedChoices(played: PlayedAtPosition | null, state: SeedState): SeedChoices {
   if (!played) return { p1: [], p2: [] };

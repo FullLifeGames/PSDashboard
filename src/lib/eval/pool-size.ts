@@ -1,12 +1,8 @@
 /**
- * Worker-pool sizing. Measured 2026-09-02 on a 12C/24T Ryzen 9 5900X: 12
- * workers ran the 573756 sweep in 70 to 76 s against 101 to 106 s with 6,
- * with byte-identical results (pool and lanes only move wall-clock, never a
- * number); 18 workers froze the page (about 350 MB per worker while an MCTS
- * tree is alive). Rules: never below the old min(cores - 2, 6), otherwise
- * about one worker per physical core (cores / 2), capped at 12, and a memory
- * brake of about 0.6 GB per worker when navigator.deviceMemory is known
- * (Chrome reports at most 8, so the brake only bites on small machines).
+ * Worker-pool sizing: never below min(cores - 2, 6), otherwise about one worker per physical core (cores / 2), capped at 12, with a
+ * memory brake of about 0.6 GB per worker when navigator.deviceMemory is known (Chrome reports at most 8, so it bites on small
+ * machines only). 18 workers froze the page (about 350 MB per worker while an MCTS tree is alive). Pool and lanes move wall-clock,
+ * never a number.
  */
 export const POOL_MAX = 12;
 const POOL_GB_PER_WORKER = 0.6;
@@ -30,7 +26,6 @@ export function lanesForPool(pool: number): number {
   return Math.max(3, Math.ceil(pool / 2));
 }
 
-/** The pool for this browser: cores and memory from navigator, the cap from localStorage. */
 export function evalPoolSize(): number {
   const nav = typeof navigator !== 'undefined'
     ? (navigator as { hardwareConcurrency?: number; deviceMemory?: number })

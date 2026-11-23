@@ -1,26 +1,14 @@
 import { withDieLines, type DieLine } from './branch-dice-lines';
 
-/**
- * The protocol log the replay iframe plays for a branch: the simulator's lines
- * without what the embed must not show.
- *
- * The embed finds a Pokémon again by its ident and its details string
- * (`|switch|p1a: NOT ICT|Landorus-Therian, M, shiny|`). Since round 72 (T238)
- * the team builder gives every set the replay's own nickname, level, gender and
- * shiny flag, so the simulator writes those lines as the game did and the frame
- * plays them as they are. Before, the frame rewrote every ident and every
- * details string of the simulator's lines into the replay's names: a simulator
- * switch-in met no roster entry and became a second one, and the sidebar kept
- * showing the first one alive.
- */
+/** The protocol log the replay iframe plays for a branch: the simulator's lines without what the embed must not show. */
 
-/** Lines the embed must not show: spectator splits, chat, and the simulator's debug output (G13). */
+/** Lines the embed must not show: spectator splits, chat and the simulator's debug output. */
 const HIDDEN_FROM_FRAME = ['|split|', '|c|', '|debug|'];
 
 /**
- * The log string the iframe plays: the branch's lines without what the embed must not show. Round 82 (forced dice), step A7b: the
- * display lines of the forced dice (`dieLines`) go in first, at the indexes of the shown log, so the frame prints them where the die
- * decided; the battle's own log never holds them.
+ * The embed finds a Pokémon again by its ident and its details string (`|switch|p1a: NOT ICT|Landorus-Therian, M, shiny|`): the sim's
+ * lines play as they are because the team builder gives every set the replay's nickname, level, gender and shiny flag (a rewritten
+ * ident made a switch-in a second roster entry and the sidebar kept the first alive). `dieLines` go in at the indexes of the shown log.
  */
 export function branchFrameLog(simLog: readonly string[], dieLines: readonly DieLine[] = []): string {
   return withDieLines(simLog, dieLines)
