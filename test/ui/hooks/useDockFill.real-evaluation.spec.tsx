@@ -174,3 +174,74 @@ describe('useDockFill: the first frame of a new key', () => {
     expect(view.result.current.fill.engine.p1[0]).toBeFalsy();
   });
 });
+
+const { useEvaluation } = await import('../../../src/hooks/useEvaluation');
+
+describe('useDockFill.run', () => {
+  function useFilled(key: string, onChoice: (side: 'p1' | 'p2', choice: BranchSlotChoice, slot?: number) => void, executeTurn: () => Promise<string | null>) {
+    const evaluation = useEvaluation();
+    const handleEvaluate = (options?: { onResult?: (result: EvalResult) => void }) => evaluation.evaluate({
+      cacheKey: null, tera: false, ruleset: 'standard', acquire: async () => position, tag: key, onResult: options?.onResult,
+    });
+    const fill = useDockFill({
+      simState: simState('singles'), liveTip: true, branching: true, executing: false, branchPreparing: false, playOutActive: false,
+      evalAvailable: true, evaluation, liveEvalStatus: evaluation.status, evalViewKey: key, historyLength: 1, sessionKey: 's',
+      handleEvaluate, getChoices: () => ({ p1: [], p2: [] }), setChoice: onChoice, executeTurn,
+    });
+    return { evaluation, fill };
+  }
+
+  describe('useDockFill over a real evaluation run', () => {
+    test('the chips are held from the start of the run to its result, then the fill is written and a waiting Execute runs', async () => {
+      let release: (value: EvalResult) => void = () => {};
+      script.evaluate = () => new Promise<EvalResult>(resolve => { release = resolve; });
+      const setChoice = vi.fn();
+      const executeTurn = vi.fn(async () => null);
+      const { result } = renderHook(() => useFilled('variation:3', setChoice, executeTurn));
+      await waitFor(() => expect(result.current.evaluation.status).toBe('searching'));
+      expect(result.current.fill.pending).toBe(true);
+      act(() => result.current.fill.queueExecute());
+      expect(result.current.fill.waits).toBe(true);
+
+      await act(async () => release(evalResult('singles')));
+      await waitFor(() => expect(result.current.evaluation.status).toBe('done'));
+      expect(setChoice).toHaveBeenCalledWith('p1', expect.objectContaining({ moveId: 'earthquake' }), 0);
+      expect(setChoice).toHaveBeenCalledWith('p2', expect.objectContaining({ moveId: 'leechseed' }), 0);
+      expect(executeTurn).toHaveBeenCalledTimes(1);
+      expect(result.current.fill.pending).toBe(false);
+      expect(result.current.fill.waits).toBe(false);
+      expect(result.current.fill.engine).toEqual({ p1: [true], p2: [true] });
+      // The run is over: nothing starts a second one for the same position.
+      expect(result.current.evaluation.status).toBe('done');
+    });
+
+    test('a failed run releases the chips and a waiting Execute, and writes nothing', async () => {
+      script.evaluate = async () => { throw new Error('worker failed'); };
+      const setChoice = vi.fn();
+      const executeTurn = vi.fn(async () => null);
+      const { result } = renderHook(() => useFilled('variation:3', setChoice, executeTurn));
+      act(() => result.current.fill.queueExecute());
+      await waitFor(() => expect(result.current.evaluation.status).toBe('error'));
+      expect(result.current.fill.pending).toBe(false);
+      expect(result.current.fill.waits).toBe(false);
+      expect(setChoice).not.toHaveBeenCalled();
+      expect(executeTurn).not.toHaveBeenCalled();
+    });
+
+    test('a stopped run releases them too', async () => {
+      script.evaluate = () => new Promise<EvalResult>(() => {});
+      const setChoice = vi.fn();
+      const executeTurn = vi.fn(async () => null);
+      const { result } = renderHook(() => useFilled('variation:3', setChoice, executeTurn));
+      await waitFor(() => expect(result.current.evaluation.status).toBe('searching'));
+      act(() => result.current.fill.queueExecute());
+      expect(result.current.fill.waits).toBe(true);
+      act(() => result.current.evaluation.cancel());
+      expect(result.current.evaluation.status).toBe('idle');
+      expect(result.current.fill.pending).toBe(false);
+      expect(result.current.fill.waits).toBe(false);
+      expect(setChoice).not.toHaveBeenCalled();
+      expect(executeTurn).not.toHaveBeenCalled();
+    });
+  });
+});
