@@ -7,7 +7,6 @@ import { bodyOf, calcPokemon, type CalcBody, calcAddsStages } from '../src/calc/
 import { checkedRolls, drawTurn, rollSet, rootOf, rollSet as setFromStellarFirstUse } from './calc-roll-oracle';
 import { battleOf } from './power-oracle';
 import { set } from './move-oracle';
-import { readFileSync } from 'node:fs';
 import { Dex, type PokemonSet, Battle, Teams, toID } from '@pkmn/sim';
 import { positionBattle, type SimPosition } from '../src/forward-model';
 import { loadSimMods } from '../src/forward/sim-mods';
@@ -177,11 +176,6 @@ describe('calc-champions-entry-stage', () => {
       expect(reads(0, 'Download')).toBe(byHand(0));
       expect(reads(9, 'Download'), 'a generation the probe always read').toBe(true);
       expect(reads(0, 'Pressure'), 'an ability with no stage').toBe(false);
-    });
-
-    test('the probes name no species: the species they build with comes from the generation they probe', () => {
-      const source = readFileSync(new URL('../src/calc/body.ts', import.meta.url), 'utf-8');
-      expect(source).not.toMatch(/Pokemon\(\w+, '[A-Z]/);
     });
 
     for (const game of ['singles', 'doubles'] as const) {

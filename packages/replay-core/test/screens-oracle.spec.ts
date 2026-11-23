@@ -1,6 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 import { SCREENS, standingScreens } from '../src/dex-facts/index';
 import { parseReplayLogWithObservations } from '../src/protocol-parser';
@@ -18,7 +15,7 @@ import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-vi
  *    `side.sideConditions` never sees them there; the volatile cuts the damage (played below). `standingScreens(side)` reads the
  *    side conditions and the volatiles of the side's actives; the spec plays each screen move and checks it against the simulator,
  *    and checks that the log parser books the screen on a hit in every view.
- * The seven readers (and ko-odds.ts) import the one constant instead of keeping a list of their own; a source check holds that.
+ * The readers import the one constant instead of keeping a list of their own; the name ratchet (`names/no-new-dex-name`) holds that.
  */
 
 const SPEC = 'packages/replay-core/test/screens-oracle.spec.ts';
@@ -109,19 +106,5 @@ describe('SCREENS is held to the simulator (round 72)', () => {
         expect(booked.map(observation => observation.screens), id).toEqual(booked.map(() => [id]));
       }
     });
-  });
-
-  test('the readers import the one constant and keep no list of their own', () => {
-    const root = fileURLToPath(new URL('../../..', import.meta.url));
-    const readers = [
-      'packages/eval-engine/src/score/features.ts', 'packages/eval-engine/src/pair/snapshot.ts', 'packages/eval-engine/src/damage-calc.ts',
-      'packages/eval-engine/src/ko-odds.ts', 'packages/replay-core/src/inference/hits.ts', 'packages/replay-core/src/protocol/handlers.ts',
-      'packages/replay-core/src/team/item-damage-shared.ts', 'packages/replay-core/src/spreads/observation-read.ts',
-    ];
-    for (const file of readers) {
-      const source = readFileSync(resolve(root, file), 'utf8');
-      expect(/\b(SCREENS|screenFlags|standingScreens)\b/.test(source), `${file} reads the constant`).toBe(true);
-      expect(/'(reflect|lightscreen|auroraveil)'/.test(source), `${file} keeps no screen literal`).toBe(false);
-    }
   });
 });

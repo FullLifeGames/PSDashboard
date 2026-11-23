@@ -1,6 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 import { randomCallMoves } from '../src/ko-odds';
 import { ALL_VIEWS, battleIn, mon, type SimView } from './sim-views';
@@ -13,11 +10,8 @@ import { ALL_VIEWS, battleIn, mon, type SimView } from './sim-views';
  * In every view the corpus plays:
  *  - the moves the Dex marks `callsMove`, over all views, are the set (derived from the Dex, no hand list);
  *  - each of them is played, and the simulator writes a `|move|` line "[from] move: <its name>" for the move it called;
- *  - pair/guards.ts keeps no copy of the set.
  * A move the Dex flags `sleepUsable` (Sleep Talk) is played asleep, the user carries no Tackle (Generation 2 Mirror Move refuses a move the user knows), Mirror Move and Copycat behind a faster foe, Me First ahead of one, Assist with a bench mate.
  */
-
-const root = fileURLToPath(new URL('../../..', import.meta.url));
 
 const real = (view: SimView, id: string): boolean => {
   const move = view.dex.moves.get(id);
@@ -60,11 +54,5 @@ describe('randomCallMoves is held to the simulator (round 72)', () => {
     test('each call move of the view calls a move in the simulator', () => {
       expect(callers(view).filter(id => !calls(view, id))).toEqual([]);
     });
-  });
-
-  test('pair/guards.ts reads the one set and keeps no copy', () => {
-    const source = readFileSync(resolve(root, 'packages/eval-engine/src/pair/guards.ts'), 'utf8');
-    expect(/randomCallMoves\s*=\s*new Set/.test(source)).toBe(false);
-    expect(/import\s*\{[^}]*randomCallMoves[^}]*\}\s*from\s*'\.\.\/ko-odds\.ts'/.test(source)).toBe(true);
   });
 });
