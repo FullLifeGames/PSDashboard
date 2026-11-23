@@ -17,7 +17,7 @@ import { serializeLiveBattle } from '../src/serialize';
 import { reconstruct } from './arrival-turn';
 
 /**
- * Round 89 (#130), step G6: the luck step. Boards are small custom games whose bodies the spec sets, so every number is one the
+ * The luck step. Boards are small custom games whose bodies the spec sets, so every number is one the
  * simulator shows on that board: an accuracy of the Dex, the one-in-24 crit of Gen 9, a speed tie's one half. Singles and doubles.
  */
 /** Singles 1 v 1: Snorlax (slow) with High Jump Kick (90) against a faster Pikachu with Hydro Pump (80); both fall to any hit. */
@@ -75,7 +75,6 @@ describe('the luck step, singles', () => {
     const step = luckPath(serialized, REQUEST('p1'));
     expect(step).toMatchObject({ kind: 'luck', status: 'none' });
     expect(step.line).toBeUndefined();
-    // the same board with four turns allowed finds the win
     const four = luckPath(serialized, REQUEST('p1', { turns: 4 }));
     expect(four.status).toBe('found');
     expect(four.chance).toBe(1);
@@ -197,7 +196,6 @@ describe('the win-paths job', () => {
     const result = winPaths(serialized, REQUEST('p1', { turn: 7, rootOrder: ['move highjumpkick'] }), step => log.push(`step ${step.kind} ${step.status}`), runners);
     expect(WIN_STEPS.map(runner => runner.kind)).toEqual(['stronger', 'luck', 'mistake']);
     expect(result.steps.map(step => step.kind)).toEqual(['stronger', 'luck', 'mistake']);
-    // a step is reported before the next one starts
     expect(log).toEqual(['run stronger', 'step stronger found', 'run luck', 'step luck found', 'run mistake', 'step mistake none']);
     expect(result.side).toBe('p1');
     expect(result.turn).toBe(7);

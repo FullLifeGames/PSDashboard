@@ -7,11 +7,11 @@ import { serializeBattleStable } from '../src/forward/serialize';
 import { ALL_VIEWS, battleIn, mon, type SimView } from './sim-views';
 
 /**
- * Round 72 (T246b): a Pokemon locked into a move (Outrage, a charge, Uproar) whose move Disable has hit. The request lists the
+ * A Pokemon locked into a move (Outrage, a charge, Uproar) whose move Disable has hit. The request lists the
  * locked entry with no `disabled` key, and the simulator plays it (side.js chooseMove returns the locked move before it reads
- * the disabled flag), but the moveSlot carries `disabled: true`. The search's slot choices dropped every entry whose id sat in
- * that live-disabled set, the locked slot offered nothing, and a doubles side was left with the partner's part alone: "move
- * flashcannon 1" went to the Charizard in slot a ("Your Charizard doesn't have a move matching flashcannon", Champions VGC
+ * the disabled flag), but the moveSlot carries `disabled: true`. Slot choices that drop every entry whose id sits in
+ * that live-disabled set offer the locked slot nothing, and a doubles side is left with the partner's part alone: "move
+ * flashcannon 1" goes to the Charizard in slot a ("Your Charizard doesn't have a move matching flashcannon", Champions VGC
  * gen9championsvgc2026regmbbo3-2680872224, one of 1,445 positions). Held against the simulator: every locked move of every
  * view (Generations 1 to 9, Champions, both doubles rule sets) is played with its slot flagged disabled, and the choices the
  * search offers must name the locked move and be accepted on a copy of the battle.

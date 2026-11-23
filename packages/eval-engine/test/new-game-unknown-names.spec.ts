@@ -6,8 +6,8 @@ import { SWEEPS_FULL } from './dice-fixtures';
 import { legalTeams, playableFormatIds } from './new-game-teams';
 
 /**
- * Round 89 (lane H, #105, H4h): a set with a name the format's Dex does not know. The simulator names it in its own words
- * (`checkGameTeams`) and the interface lets Start go on, as ruled; where the simulator cannot start the battle (a species it does not
+ * A set with a name the format's Dex does not know. The simulator names it in its own words
+ * (`checkGameTeams`) and the interface lets Start go on; where the simulator cannot start the battle (a species it does not
  * know: the stream throws "Cannot read properties of null") the start says why in the game's words and names the species and the
  * format, never a JavaScript error. A move, an item or an ability the Dex does not know starts: the battle plays what it is given.
  * The sweep reads each format's own Dex as the oracle: no species, move, item or ability list in the code under test.

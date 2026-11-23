@@ -7,7 +7,7 @@ import { classChildren, speedTie } from '../src/search/outcome-children';
 import { SEARCH_SEEDS } from './seed-streams';
 
 /**
- * Round 43: outcome children on demand. The boundary event's kill-roll
+ * Outcome children on demand. The boundary event's kill-roll
  * counts, the class path with forced draws, the empirical grouping, and
  * the speed-tie split.
  */
@@ -60,7 +60,6 @@ describe('boundary event kill rolls (round 43)', () => {
     expect(bolt.critKillRolls).toBeGreaterThanOrEqual(0);
     expect(bolt.killFraction).toBeCloseTo((bolt.normalKillRolls * 23 / 24 + bolt.critKillRolls / 24) / 16, 9);
 
-    // Machamp in range of a non-crit Thunderbolt: some rolls kill, some do not.
     const range = createRootPosition(serializeAt(makeBattle('gen9customgame', [jolt()], [champ()]), [null, 160]));
     const rangeBattle = positionBattle(range);
     const inRange = boundaryEvent(rangeBattle, rangeBattle.sides[0].active[0]!, rangeBattle.sides[1].active[0]!, 'thunderbolt')!;
@@ -86,7 +85,6 @@ describe('classChildren (round 43)', () => {
     expect(positionBattle(kill.position).sides[1].pokemon[0].fainted).toBe(true);
     const miss = drawn.children.find(child => child.key === 'p1:miss')!;
     expect(positionBattle(miss.position).sides[1].pokemon[0].fainted).toBe(false);
-    // Deterministic.
     const again = classChildren(thunderAtOne(), 'move thunder', 'move closecombat', TREE_OPTS)!;
     expect(again.children.map(child => child.position.serialized)).toEqual(drawn.children.map(child => child.position.serialized));
   });
@@ -143,7 +141,6 @@ describe('classChildren (round 43)', () => {
     const root = createRootPosition(serializeAt(makeBattle('gen9customgame',
       [makeSet('Champ', 'Machamp', ['Seismic Toss'])], [makeSet('Egg', 'Chansey', ['Soft-Boiled'])]), [null, null]));
     expect(classChildren(root, 'move seismictoss', 'move softboiled', TREE_OPTS)).toBeNull();
-    // Doubles pairs have no class plan either.
     const doubles = createRootPosition(serializeAt(makeBattle('gen9doublescustomgame',
       [jolt(), champ()], [champ(), makeSet('Chu', 'Pikachu', ['Tackle'], 30)]), [null, null]));
     expect(classChildren(doubles, 'move thunder 1, move closecombat 1', 'move closecombat 1, move tackle 1', TREE_OPTS)).toBeNull();

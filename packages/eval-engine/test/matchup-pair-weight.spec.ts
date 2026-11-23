@@ -7,10 +7,10 @@ import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
 /**
- * T248 (round 73), the matchup slope (gen9vgc-2629703929 turn 13, 1.2e-3 of the grade for every point of Koraidon's HP
- * in a 1v1 it loses): the pair verdict was weighted by both bodies' HP shares, so a lost pair counted less the lower
- * the loser's HP and a hit you took raised the matchup, and the won pair counted less the lower the foe's HP. The
- * bodies term cannot cancel that in a small board. The pair now weighs the HP of the side that wins it. This file holds
+ * The matchup slope (gen9vgc-2629703929 turn 13, 1.2e-3 of the grade for every point of Koraidon's HP
+ * in a 1v1 it loses): a pair verdict weighted by both bodies' HP shares makes a lost pair count less the lower
+ * the loser's HP, so a hit you took raises the matchup, and the won pair count less the lower the foe's HP. The
+ * bodies term cannot cancel that in a small board. The pair weighs the HP of the side that wins it. This file holds
  * the property on the term itself, one HP point at a time over the whole range of one body, for a pair the body loses,
  * a pair it wins and a pair that turns with HP, in Scarlet/Violet and Champions, singles and doubles, with the body
  * in front.

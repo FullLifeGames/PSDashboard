@@ -4,7 +4,7 @@ import { BOTH_SIDES_REMOVAL_MOVES, OWN_SIDE_REMOVAL_MOVES, removalKind } from '.
 import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-views';
 
 /**
- * Round 72 (T235), plan row 10: score/hazards.ts names five hazard removal moves in two lists, those that clear only the
+ * score/hazards.ts names five hazard removal moves in two lists, those that clear only the
  * user's side (Rapid Spin, Mortal Spin, Tidy Up) and those that clear or swap both sides (Defog, Court Change). No field of
  * the Dex says it: a removal is a handler (`onHit` or `onAfterHit` walking the side conditions), so this list stays by hand
  * and this spec says why it is right. It splits the hazards the view has between the two sides,
@@ -12,8 +12,8 @@ import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-vi
  * left out (a Dynamax or a Z crystal is not a move set), and so is every move whose Dex entry holds no function (a hazard
  * comes off through code; 495 of 866 Generation 9 entries are plain data), which keeps the sweep near 15 seconds. The list, held to the simulator:
  *  - Rapid Spin, Mortal Spin and Court Change clear the user's side, Defog and Court Change the foe's, as listed;
- *  - FINDING W6a: Tidy Up clears the foe's hazards too (Generation 9 and Champions), so it stands in the second list;
- *  - FINDING W6b: Defog clears only the foe's side in Generations 4 and 5, so it brings the user no relief there (`removalKind`
+ *  - Tidy Up clears the foe's hazards too (Generation 9 and Champions), so it stands in the second list;
+ *  - Defog clears only the foe's side in Generations 4 and 5, so it brings the user no relief there (`removalKind`
  *    answers null for it before Generation 6).
  * A new Dex move or a new difference fails here.
  */

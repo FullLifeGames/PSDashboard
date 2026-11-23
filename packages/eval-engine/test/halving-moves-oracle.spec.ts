@@ -3,12 +3,11 @@ import { HALVING_MOVES } from '../src/score/threat';
 import { ALL_VIEWS, battleIn, mon, oracleTagAbove } from './sim-views';
 
 /**
- * Round 72 (T235), plan row 9: `HALVING_MOVES` in score/threat.ts names the moves that deal half the target's current HP
- * (the threat prices them from the defender's live HP). The Dex marks ten moves with a `damageCallback`; halving is one of
- * its results, so a field cannot say it. This spec plays every damaging move that has a damage callback in every view the
- * corpus plays, against a target at two different HP values and an attacker at a third, and keeps the moves whose damage is
- * half the target's HP (rounded down) at both. A new Dex move that halves, or a listed move the simulator stops halving,
- * fails with its id.
+ * `HALVING_MOVES` in score/threat.ts names the moves that deal half the target's current HP (the threat prices them from the
+ * defender's live HP). The Dex marks ten moves with a `damageCallback`; halving is one of its results, so a field cannot say it.
+ * This spec plays every damaging move that has a damage callback in every view the corpus plays, against a target at two HP
+ * values and an attacker at a third, and keeps the moves whose damage is half the target's HP (rounded down) at both. A new Dex
+ * move that halves, or a listed move the simulator stops halving, fails with its id.
  */
 
 describe('HALVING_MOVES is held to the simulator (round 72)', () => {

@@ -2,7 +2,7 @@ import { Dex, TeamValidator } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 
 /**
- * Round 89 (lane H, #105): a legal team for any format of the simulator's registry, found the way the simulator itself judges
+ * A legal team for any format of the simulator's registry, found the way the simulator itself judges
  * one: a species is a candidate when its own learnset gives four moves of the format's generation and the validator accepts
  * the set alone; a prefix of candidates is kept while the validator accepts the whole team (Monotype, Species Clause and the
  * like are team rules). The helper holds no species or move names: it reads the Dex as the oracle (a spec may).
@@ -68,7 +68,6 @@ function legalTeamsOf(formatId: string, type: string | null): { p1: PokemonSet[]
     candidates.push(set);
     if (candidates.length === 80) break;
   }
-  // Team rules (Monotype, Species Clause): grow a team one body at a time while the whole team stays legal.
   const teams: PokemonSet[][] = [];
   const used = new Set<PokemonSet>();
   for (let attempt = 0; attempt < 2; attempt++) {

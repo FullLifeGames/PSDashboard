@@ -8,15 +8,11 @@ import { collectForcedSwitchSpecies, parseTurnBlocks } from '../src/branch/proto
 import { rulesDex } from '@fulllifegames/replay-core';
 
 /**
- * Round 64 (T121, step G4): every switch the protocol shows that answers a
- * forced request goes to the sim as that answer. Older logs (gen 6 and 8,
- * 2022) write a U-turn's, Volt Switch's or Flip Turn's switch without
- * `[from]`, after the slot's own move; gens 1 to 4 replace a fainted body
- * before upkeep. Before, the forced list skipped both and the sim brought
- * its first free body (653785 t5: Weavile instead of Excadrill, so Bisharp's
- * Knock Off took Weavile's Choice Band), and a body knocked out before it
- * acted had its replacement sent as the turn's choice (gen 3: Gengar came
- * in at turn start and took the Hidden Power meant for Blastoise).
+ * Every switch the protocol shows that answers a forced request goes to the sim as that answer. Older logs (gen 6 and 8, 2022) write a
+ * U-turn's, Volt Switch's or Flip Turn's switch without `[from]`, after the slot's own move; gens 1 to 4 replace a fainted body before
+ * upkeep. A forced list that skips both makes the sim bring its first free body (653785 t5: Weavile instead of Excadrill, so Bisharp's
+ * Knock Off took Weavile's Choice Band), and a body knocked out before it acted has its replacement sent as the turn's choice (gen 3:
+ * Gengar came in at turn start and took the Hidden Power meant for Blastoise).
  */
 
 type Replay = { id: string; format: string; formatid?: string; players: string[]; log: string };
@@ -63,7 +59,6 @@ function simBlock(battle: Battle, boundary: number): string[] {
   return log.slice(start + 1, end).filter((line, index, all) => !line.startsWith('|split|') && !all[index - 1]?.startsWith('|split|'));
 }
 
-/** Species of every switch-in on `slot` in the block, in order. */
 const switchIns = (lines: string[], slot: string) =>
   lines.filter(line => line.startsWith(`|switch|${slot}:`)).map(line => line.split('|')[3].split(',')[0].trim());
 

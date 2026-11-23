@@ -4,9 +4,8 @@ import type { PokemonSet } from '@pkmn/sim';
 import { createRootPosition, type SimPosition } from '../src/forward-model';
 
 /**
- * Round 56 test helpers for the doubles pair plan: the anchor position (VGC
- * 2634199230 turn 5, rebuilt over the bank's app build, probe
- * docs/perf/probes/2026-09-23-r56/plan-facts.vt.ts) with its three cells,
+ * Helpers for the doubles pair plan: the anchor position (VGC
+ * 2634199230 turn 5, rebuilt over the bank's app build) with its three cells,
  * and a builder for small doubles battles.
  */
 const ANCHOR = JSON.parse(readFileSync(

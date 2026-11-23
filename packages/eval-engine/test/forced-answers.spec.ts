@@ -14,18 +14,14 @@ import { battleOf } from './power-oracle';
 import { sweepSelection } from './dice-fixtures';
 
 /**
- * Round 89 (#131, #144): the forced answers read the log's slot and the log's revive line.
- *
- * The rows: `collectForcedSwitchSpecies` on written lines (a revive line is an entry of its own; the replacements of one request come in
- * slot order, with the slot each entry names beside the list). Then two sweeps over the rule sets the corpus plays (Gens 1 to 9 and the
- * Champions mod), singles and doubles:
- *   1. every Dex move with a `slotCondition`, played on a board with two fainted bench bodies: exactly the moves whose request carries
- *      `reviving` write a `-heal ... [from] move:` line on a fainted body; the log's second fainted body is the one the answer names, and
- *      `buildForcedSwitchChoice` sends the slot of that body (the simulator's own `default` would revive the first);
- *   2. doubles: both foes fall, the log writes the replacement of slot b before slot a (the faster body first), and the answer built
- *      from that log puts each body on the slot the log names, in both orders of the sides; the ability sweep finds the abilities whose
- *      switch-in output depends on the slot (Imposter) and plays the answer built from the log: the same lines come out. The disguising
- *      abilities (Illusion) play apart in every run: they show the open fault of #141 on the forced path, as a `test.fails` row.
+ * The forced answers read the log's slot and the log's revive line: `collectForcedSwitchSpecies` on written lines, then two sweeps over
+ * the rule sets the corpus plays (Gens 1 to 9 and the Champions mod), singles and doubles:
+ *   1. every Dex move with a `slotCondition`: exactly the moves whose request carries `reviving` write a `-heal ... [from] move:` line on
+ *      a fainted body; the answer names the log's second fainted body and `buildForcedSwitchChoice` sends its slot (the simulator's own
+ *      `default` would revive the first);
+ *   2. doubles: the log writes the replacement of slot b before slot a (the faster body first), and the answer puts each body on the
+ *      slot the log names, in both orders; the abilities whose switch-in output depends on the slot (Imposter) play the answer built from
+ *      the log. Disguising abilities (Illusion) show an open fault on the forced path, as a `test.fails` row.
  */
 await loadSimMods('gen9championsou');
 
@@ -43,7 +39,6 @@ describe('the forced list: slots and revives', () => {
     const list = collectForcedSwitchSpecies(lines, [], 'p1', DEX);
     expect(list).toEqual(['Samurott']);
     expect(forcedAnswersOf(list)).toEqual([{ slot: null, revive: true, request: 0 }]);
-    // the other side has its own entries only
     expect(collectForcedSwitchSpecies(lines, [], 'p2', DEX)).toEqual(['Tinkaton']);
   });
 
@@ -81,8 +76,6 @@ describe('the forced list: slots and revives', () => {
   });
 });
 
-// ---------- the revive sweep ----------
-
 /** The public half of the simulator's log: the third line of each `|split|` triple. */
 function publicLog(battle: Battle): string[] {
   const out: string[] = [];
@@ -104,10 +97,7 @@ const ALLY = new Set(['adjacentAlly', 'adjacentAllyOrSelf']);
 
 interface ReviveBoard { battle: Battle; party: string[]; click: string }
 
-/**
- * Snorlax with the move leads p1; the bench holds two fainted bodies and one living body (a fifth body in doubles, where two bodies lead).
- * The foes splash. Returns the board before the move is clicked.
- */
+/** Snorlax with the move leads p1; the bench holds two fainted bodies and one living body (a fifth body in doubles). The foes splash. */
 function reviveBoard(rules: Rules, mode: Mode, move: DexMove): ReviveBoard {
   const body = (species: string, moves: string[]) => mon(rules, { species, moves, gender: 'M' });
   const user = body('Snorlax', [move.id, 'splash']);
@@ -184,7 +174,6 @@ describe('the revive answer, every Dex move with a slot condition (#131)', () =>
         expect(benchHeals[0]).toContain(`p1: ${board.party[lastSlot - 1]}|`);
         const list = lists.find(entry => forcedAnswersOf(entry)?.some(item => item.revive))!;
         expect(list).toEqual([board.party[lastSlot - 1]]);
-        // the answer of the forced answers, from the log, on a board stopped at the prompt
         const fresh = reviveBoard(rules, mode, move);
         expect(stopAtPrompt(fresh, mode)).toBe(true);
         expect(buildForcedSwitchChoice(simOf(fresh.battle), 0, list, { current: 0 })).toBe(answer);
@@ -220,8 +209,6 @@ describe('a replacement request is not a revive request', () => {
   });
 });
 
-// ---------- the slot sweep ----------
-
 interface SlotBoard { battle: Battle; holder: string }
 
 /**
@@ -242,7 +229,6 @@ function slotBoard(rules: Rules, ability: string): SlotBoard {
   return { battle, holder: 'Dragonite' };
 }
 
-/** The slot-ordered answers for the holder in slot `a` or `b`, the Vaporeon in the other. */
 const ORDERS = { 'holder in a': 'switch 3, switch 4', 'holder in b': 'switch 4, switch 3' } as const;
 
 /**
@@ -256,7 +242,6 @@ const enteringLines = (battle: Battle): string[] => {
   return lines.slice(from).filter(line => line !== '|' && !/^\|(t:|turn|upkeep)(\||$)/.test(line)).map(line => line.replace(/\|(p[12])[ab]:/g, '|$1:'));
 };
 
-/** The reference turn of `order` (the simulator's own switch-in), the list the log gives, and the answer built from it on a fresh board. */
 function forcedAnswer(rules: Rules, ability: string, order: keyof typeof ORDERS) {
   const ref = slotBoard(rules, ability);
   expect(ref.battle.sides[1].requestState).toBe('switch');
@@ -334,7 +319,7 @@ const SLOT_RULES = RULES.filter(entry => entry.doubles && entry.generation >= 5)
 describe('the abilities whose switch-in depends on the slot (#144)', () => {
   test.each(SLOT_RULES)('%s', (_, rules) => {
     const { dex, abilities, disguises } = slotAbilities(rules);
-    // a disguising ability seats the wrong body today (#141), and has its own rows below
+    // a disguising ability seats the wrong body (an open fault), and has its own rows below
     const rest = abilities.filter(ability => !disguises.includes(ability.id));
     const sample = new Set(sweepSelection(rest, 'moves').map(ability => ability.id));
     if (dex.abilities.get('imposter').exists) sample.add('imposter');
@@ -348,17 +333,16 @@ describe('the abilities whose switch-in depends on the slot (#144)', () => {
       if (inA !== inB) dependent.push(id);
       for (const order of Object.keys(ORDERS) as (keyof typeof ORDERS)[]) slotCase(rules, id, order);
     }
-    // the sweep finds Imposter: the holder copies the foe in front of it
     expect(dependent).toContain('imposter');
   }, 300_000);
 });
 
 /**
- * #141, the forced replacement path: the log writes the disguise (`|switch|p2a: Raichu|Raichu, M|`, the last living body to the holder's
- * right), the list holds the disguise's species, and `findSpeciesSlot` seats the body of that species: the real Raichu takes the slot where the
- * game had the holder. The answer should seat the holder where the log shows its disguise. Both disguising abilities of the Dex play in every
- * run, in both orders, in every rule set that has them. The first row says what the path does today; the `test.fails` row holds the demand and
- * turns red when #141 lands (then the `fails` goes).
+ * The forced replacement path with a disguise: the log writes the disguise (`|switch|p2a: Raichu|Raichu, M|`, the last living body to the
+ * holder's right), the list holds the disguise's species, and `findSpeciesSlot` seats the body of that species: the real Raichu takes the
+ * slot where the game had the holder. The answer should seat the holder where the log shows its disguise. Both disguising abilities of the
+ * Dex play in every run, in both orders, in every rule set that has them. The first row pins what the path does; the `test.fails` row holds
+ * the demand and turns red when the fault is fixed (then the `fails` goes).
  */
 describe('a disguised holder takes its slot (#141)', () => {
   test.each(SLOT_RULES)('%s: today the forced path seats the body whose species the log shows', (_, rules) => {

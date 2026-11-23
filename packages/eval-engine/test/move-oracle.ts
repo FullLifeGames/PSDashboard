@@ -3,7 +3,7 @@ import type { Pokemon, PokemonSet } from '@pkmn/sim';
 import type { MoveAtUse } from '../src/move-use';
 
 /**
- * Round 57 test helpers: small battles and the simulator's own reading of a
+ * Small battles and the simulator's own reading of a
  * move at use (the oracle). The oracle follows battle-actions.js useMoveInner
  * (the move's ModifyType, its ModifyMove for an allow-list of handlers that
  * only write the move copy, the ModifyType event) plus the power callback. It

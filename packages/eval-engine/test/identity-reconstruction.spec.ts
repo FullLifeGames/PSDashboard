@@ -3,10 +3,10 @@ import { buildTeamsFromReplay } from '@fulllifegames/replay-core';
 import { entries, lastTurn, play, rebuiltWith, set } from './named-games-support';
 
 /**
- * Round 72, T238: names the id function cannot tell apart. `toId` keeps letters and digits, so a Chinese or Japanese
+ * Names the id function cannot tell apart. `toId` keeps letters and digits, so a Chinese or Japanese
  * name has the id "" and a decorated name loses its decoration; two such bodies of one side would share an id, and a
- * quote or a backslash in a name would break the team in the stream's JSON line. The holdouts of the merged wave lost
- * positions in six games of exactly these names (gen9doublesou-2693607366, gen9doublesou-2695281966,
+ * quote or a backslash in a name would break the team in the stream's JSON line. Holdout games with exactly these names
+ * lost positions (gen9doublesou-2693607366, gen9doublesou-2695281966,
  * gen9vgc2025regh-2437382000, gen9vgc2026regi-2574882651, gen9vgc2026regi-2575764780 and one more): the lead was
  * another body than the replay's, or the reconstruction died before the first turn.
  *
@@ -17,7 +17,6 @@ import { entries, lastTurn, play, rebuiltWith, set } from './named-games-support
  * name (team-order.ts, sameBodyName). Singles and doubles.
  */
 
-/** The entries the simulator writes when the app builds the teams from the log and rebuilds the game. */
 function rebuilt(format: string, log: string) {
   const { p1Team, p2Team } = buildTeamsFromReplay(log);
   return rebuiltWith(format, log, p1Team, p2Team);

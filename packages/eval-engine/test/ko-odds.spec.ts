@@ -61,7 +61,6 @@ describe('boundaryEvent arithmetic', () => {
     const event = boundaryEvent(battle, atk, def, 'hydropump');
     expect(event).not.toBeNull();
     expect(event!.accuracy).toBeCloseTo(0.8, 5);
-    // Lvl-100 Hydro Pump obliterates a lvl-30 Pikachu on every roll.
     expect(event!.killFraction).toBe(1);
     expect(event!.pKill).toBeCloseTo(0.8, 5);
   });

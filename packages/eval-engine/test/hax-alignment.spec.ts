@@ -132,7 +132,6 @@ describe('seed list + summary', () => {
     expect(summary).toEqual({ turns: 3, perfectTurns: 1, softResidual: 2, faintResidualTurns: 1, endedMismatches: 1 });
   });
 
-  // Round 86 (ruling C2): a forced turn under another seed than index 0 is "seeded", a turn of the seed search is "fallback", never both
   test('summarizeAlignment counts the forced turns that play under another seed, apart from the fallback turns', () => {
     const perfect: AlignmentScore = { endedMismatch: false, faintMismatches: 0, softMismatches: 0 };
     const record = (turn: number, seed: string, via: 'forced' | 'fallback'): TurnAlignmentRecord => ({
@@ -157,7 +156,7 @@ function makeSet(species: string, moves: string[], extras: Partial<PokemonSet> =
   } as PokemonSet;
 }
 
-/** Keldeo Hydro Pump (80% accurate) into a wall — the seed decides the miss. */
+/** Keldeo Hydro Pump (80% accurate) into a wall: the seed decides the miss. */
 function hydroPosition(): { serialized: string } {
   const battle = new Battle({
     formatid: 'gen9customgame' as never,
@@ -187,9 +186,8 @@ describe('trialAdvanceLog', () => {
       const trial = trialAdvanceLog(position, 'move 1', 'move 1', seed);
       return extractProtocolEvents(trial.log).misses.size > 0 ? 'miss' : 'hit';
     });
-    // Sanity for the search: both outcomes must be reachable within the list.
-    // If this ever fails, the pinned list cannot align accuracy rolls — that
-    // is a design-level finding, not a flaky test (the run is deterministic).
+    // Both outcomes must be reachable within the list; if this fails, the pinned list cannot align accuracy rolls
+    // (the run is deterministic, so it is no flake).
     expect(new Set(outcomes).size).toBe(2);
   });
 
@@ -233,7 +231,7 @@ describe('chooseAlignedSeed', () => {
   });
 
   test('no perfect candidate: strict-improvement argmin, ties keep the earlier seed', () => {
-    // Every trial hits (1 soft mismatch vs the expected miss) — all tie.
+    // Every trial hits (1 soft mismatch vs the expected miss): all tie.
     const choice = chooseAlignedSeed({
       expected: extractProtocolEvents(missBlock),
       trial: () => ({ log: hitBlock }),
@@ -311,7 +309,7 @@ describe('the simulator\'s body names are the protocol\'s names', () => {
     // The sim's lines name the body as the set does, the protocol as the player did: the same words.
     const sim = protocol.map(line => line.replaceAll('Last Regrets', battle.sides[0].pokemon[1].name));
     expect(scoreAlignment(extractProtocolEvents(protocol), extractProtocolEvents(sim))).toEqual({ endedMismatch: false, faintMismatches: 0, softMismatches: 0 });
-    // A set under the species' own name (as the build made it before round 72) does not meet the protocol's name.
+    // A set under the species' own name does not meet the protocol's name.
     const plain = make(format, [mon('Gholdengo', ['Nasty Plot']), mon('Landorus-Therian', ['Taunt'])], [mon('Dragapult', ['Draco Meteor']), mon('Clefable', ['Moonblast'])]);
     expect(plain.sides[0].pokemon[1].name).toBe('Landorus');
     expect(scoreAlignment(extractProtocolEvents(protocol), extractProtocolEvents(protocol.map(line => line.replaceAll('Last Regrets', 'Landorus')))).faintMismatches).toBe(2);
@@ -337,7 +335,7 @@ describe('scene: 751543, the alignment keeps the KO the game had', () => {
         },
       },
     });
-    // Round 86 (T306): the turn plays under the log's dice and the record scores the block it emitted (before: the trial of the chosen seed was perfect)
+    // the turn plays under the log's dice and the record scores the block it emitted, not the trial of the chosen seed (that one is perfect)
     const record = runtime.haxAlignment.find(entry => entry.turn === 19);
     expect(record).toMatchObject({ via: 'forced', actual: { endedMismatch: false, faintMismatches: 0, softMismatches: 0 } });
     expect(dragapultTaunted).toBe(false);

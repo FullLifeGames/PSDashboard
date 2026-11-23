@@ -13,16 +13,14 @@ import { playClicks, standing, sweepSelection, type Mode } from './dice-fixtures
 import { CHECK_MOVES, CHECKS } from './dice-status-support';
 import { dexOfRules, isCharge, SWEEP_CASES, sameEffects, sweepBoard, sweepClicks, sweepMoves, type DexMove } from './dice-sweep-support';
 
-// Round 89 (#104), step G2: the likeliest result of each die, and a turn played with every die at it (dice/likeliest.ts). The sweep
-// plays every Dex entry of the kinds that draw a die, in every rule set the corpus plays (Gens 1 to 9, the Champions mod), singles and
-// doubles:
+// The likeliest result of each die, and a turn played with every die at it (dice/likeliest.ts), over every Dex entry of the kinds that
+// draw a die, in every rule set the corpus plays (Gens 1 to 9, the Champions mod), singles and doubles:
 //   - the live battle stays as it was (`standing`: the fingerprint of every body, the queue and the move in flight);
-//   - two passes over the same turn name the same dice (determinism);
-//   - the dice the pass lists, replayed through `playForcedTurn` under two other seeds, give the log the pass played: the line does not
-//     depend on the seed. Where a log does differ, the pass says so (`unnamed` draws or an `unforced` die): a draw no die names, a
-//     duration or a target picked at random, stays with the stream and the line marks itself (the log is read as its effects read
-//     it: a spread move's `|move|` line names the body the simulator sampled, which no effect reads, and two bodies of one speed take
-//     their end-of-turn damage in a shuffled order, which leaves the same bodies: `sameEffects`);
+//   - the dice the pass lists, replayed through `playForcedTurn` under two other seeds, give the log the pass played. Where a log does
+//     differ, the pass says so (`unnamed` draws or an `unforced` die): a draw no die names, a duration or a target picked at random,
+//     stays with the stream (the log is read as its effects read it: a spread move's `|move|` line names the body the simulator
+//     sampled, which no effect reads, and two bodies of one speed take their end-of-turn damage in a shuffled order, which leaves the
+//     same bodies: `sameEffects`);
 //   - every result is the likeliest by the simulator's own data: an accuracy die takes the Dex's accuracy (a hit above 50), a
 //     secondary the entry's chance, the damage roll its middle step, a hit count a count of the move's range; a status check, a proc,
 //     an end-of-turn die, a first mover and a speed tie as their rows below read them.
@@ -44,10 +42,6 @@ const choiceOf = (move: DexMove, mode: Mode) => ({
 interface Tally { cases: number; dice: number; unforced: number; unnamed: string[] }
 const newTally = (): Tally => ({ cases: 0, dice: 0, unforced: 0, unnamed: [] });
 
-/**
- * One likeliest pass with the checks every row shares: the live battle stays, the pass is deterministic, and a log that depends on
- * the seed belongs to a pass that says it leaves a draw to the stream.
- */
 function pass(board: Battle, play: (battle: Battle) => void, row: string): LikeliestTurn {
   const before = standing(board);
   const turn = playLikeliestTurn(board, play);
@@ -67,11 +61,10 @@ function pass(board: Battle, play: (battle: Battle) => void, row: string): Likel
   return turn;
 }
 
-/** The dice of one row whose other results the pass tries (a row has a handful; the sweep plays every row, so a few per row cover the kinds). */
 const OTHERS_PER_ROW = 4;
 
 /**
- * Round 89 (#130, step 2): the other-result column. For the dice of a row the pass can turn (`otherResults`: a chance die, a status
+ * The other-result column. For the dice of a row the pass can turn (`otherResults`: a chance die, a status
  * check, a speed tie, a hit count or a pick; a damage roll through its knock-out boundary): the pinned other result takes (the
  * die is drawn in the likeliest turn and keeps it), and its chance is the simulator's: the chosen result and
  * its others share the draw's own chance or items and sum to one; a roll group's share is the share of rolls on its side of the boundary
@@ -102,7 +95,6 @@ function checkOthers(board: Battle, play: (battle: Battle) => void, row: string)
   }
 }
 
-/** One other result of a die: it takes when forced, and its chance is the simulator's (see `checkOthers`). */
 function checkOther(board: Battle, play: (battle: Battle) => void, entry: LikeliestTurn['dice'][number], other: LikeliestTurn['dice'][number], draw: Draw | undefined, label: string): void {
   // pinned inside the likeliest turn, as the search pins it: the die is drawn there and keeps the result (`dice` lists only dice the turn drew)
   const pinned = playTurnWith(board, play, [other]).dice.find(item => dieKey(item.die.name) === dieKey(other.die.name));
@@ -128,7 +120,6 @@ const byKind = (turn: LikeliestTurn, kind: string) => turn.dice.filter(entry => 
 /** The Dex accuracy of a move as the number the die is compared with: a sure move is 100. */
 const accuracyOf = (move: DexMove): number => (move.accuracy === true ? 100 : move.accuracy);
 
-/** One die of a move's pass against the simulator's own data: the Dex accuracy, the secondary's chance, the middle roll, the move's range of hits. */
 function checkDie(entry: LikeliestTurn['dice'][number], move: DexMove, board: Battle, mode: Mode, generation: number): void {
   const die = entry.die.name;
   const { result } = entry.die;
@@ -197,7 +188,6 @@ describe.each(SWEEP_CASES)('the likeliest dice of the status checks: $name', ({ 
     // says, so the protocol does not show the die's answer there (the pass above held the replay to the log all the same)
     if (dies.length === 0 || dex.moves.get(moveId).flags.defrost) return;
     const result = dies[0].die.result;
-    // the result is what the body does: the protocol shows its move or its thaw, or the stop
     const lines = turn.battle.log;
     const goesOn = lines.some(line => check.yes.test(line)) && !lines.some(line => check.no.test(line));
     expect('happens' in result && result.happens, `${check.id}: the result agrees with the protocol`).toBe(goesOn);
@@ -227,7 +217,6 @@ describe.each(SWEEP_CASES)('the likeliest dice of procs, the end of the turn and
     const board = moverBoard(rules, mode, mover, '1,2,3,4');
     const clicks = moverClicks(mode);
     const turn = pass(board, battle => playClicks(battle, clicks), `${rules.name} ${mode} first mover ${mover.id}`);
-    // the holder does not move first: the die does not come true
     for (const entry of byKind(turn, 'move-first')) expect(entry.die.result).toEqual({ happens: false });
   });
 
@@ -238,7 +227,6 @@ describe.each(SWEEP_CASES)('the likeliest dice of procs, the end of the turn and
     const ties = byKind(turn, 'speed-tie');
     expect(ties.length).toBeGreaterThan(0);
     for (const entry of ties) expect('first' in entry.die.result && entry.die.result.first).toBe(entry.die.name.slot);
-    // the first body of the first pair moves before its partner, whatever the seed
     const order = turn.battle.log.filter(line => line.startsWith('|move|')).map(line => line.split('|')[2].slice(0, 3));
     expect(order[0]).toBe(ties[0].die.name.slot);
   });

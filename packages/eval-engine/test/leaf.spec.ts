@@ -16,10 +16,9 @@ import { battleOf as oracleBattleOf } from './power-oracle';
 import { cheapOracle, SLOT_A } from './speed-tie-oracle';
 
 /**
- * Round 89 (#60, T324), A5 stage 1: a seed per cell. Round 88 (E1) and A1b: the fixed seeds roll one number at one draw index
- * in every cell, so a die at draw n came true in 0 % or 100 % of a search's cells (a 20 % secondary in 73 to 80 % of a singles
- * matrix, a crit at 1.4 % against 4.2 %). Ruling 11 of 09.11.2026: one list of seeds per cell, read by every path as it reads
- * the fixed list today (slot s of today's list is `cellSeed(s, key)`), the key a hash of the saved position and the cell's two
+ * A seed per cell: fixed seeds roll one number at one draw index in every cell, so a die at draw n comes true in 0 % or 100 %
+ * of a search's cells (a 20 % secondary in 73 to 80 % of a singles matrix, a crit at 1.4 % against 4.2 %). Every path reads one
+ * list of seeds per cell (slot s of the list is `cellSeed(s, key)`), the key a hash of the saved position and the cell's two
  * choice strings, hashed once per root. Rows: (a) a die at a fixed draw index over 200 cell keys sits inside its binomial band,
  * (b) the four-number form and the prefix of the list, (c) no clash with `treeSeed`, the fixed seeds or another cell, (d) the
  * key reads the game state, not the bench order (649664 t14), is hashed once per root and moves with the cell.
@@ -47,7 +46,6 @@ function families(): Record<string, number[]> {
   const doubles = positionSalt(fixture('gen9doublesou-2660802611-t2').serialized);
   const vgc = positionSalt(fixture('gen9vgc2026regi-2629703929-t6').serialized);
   const single = (j: number) => (j < 4 ? `move ${j + 1}` : `switch ${j - 1}`);
-  /** 144 distinct doubles choices: a move and a target for each of the two slots. */
   const pairOf = (j: number) =>
     `move ${1 + (j % 4)} ${(Math.floor(j / 4) % 3) - 1}, move ${1 + (Math.floor(j / 12) % 4)} ${(Math.floor(j / 48) % 3) - 1}`;
   const doublesCells = (salt: number) => Array.from({ length: KEYS }, (_, i) => cellHash(salt, pairOf(i % 100), pairOf(100 + Math.floor(i / 100))));
@@ -280,13 +278,11 @@ describe('tree-seed', () => {
   const DRAWS = 12;
   const PS = [0.10, 0.30, 0.85];
 
-  /** Draw n of the stream the seed starts: the number the simulator compares with a chance. */
   function draws(seed: ReturnType<typeof treeSeed>): number[] {
     const prng = new PRNG(seed);
     return Array.from({ length: DRAWS }, () => prng.random());
   }
 
-  /** Inside four standard errors of the binomial share. */
   function inBand(share: number, p: number, n: number): boolean {
     return Math.abs(share - p) <= 4 * Math.sqrt(p * (1 - p) / n);
   }

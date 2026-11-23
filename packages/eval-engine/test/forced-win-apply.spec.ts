@@ -60,7 +60,7 @@ const resultWith = (score: number, p1: string[], p2: string[], extra: Partial<Ev
 
 describe('forced-win trigger and bar (round 35)', () => {
   test('forcedWinInput carries score, profile, ranking order and the search allowance', () => {
-    // Rows a band apart keep the ranking's order; a near tie goes by label since round 67 (the prover-near-tie rows below).
+    // Rows a band apart keep the ranking's order; a near tie goes by label (the prover-near-tie rows below).
     const result = resultWith(0.3, ['move seismictoss', 'move protect'], ['move softboiled'], {
       unanswered: { p1: [], p2: [], decided: { side: 'p1', species: 'Machamp' } },
     });
@@ -131,8 +131,8 @@ describe('forced-win trigger and bar (round 35)', () => {
       [makeSet('Egg', 'Chansey', ['Soft-Boiled'])],
     ), { p2: [1] });
     const result = resultWith(0.4, ['move seismictoss', 'move protect'], ['move softboiled']);
-    // A band apart keeps Seismic Toss first. Equal rows order by label, Protect would lead, and the full proof (round 89, A5f-7:
-    // no greedy scout names the winning line first) reads that stalling line's win in 11 turns instead of the Toss's one.
+    // A band apart keeps Seismic Toss first. Equal rows order by label, Protect would lead, and the full proof (no greedy scout names
+    // the winning line first) reads that stalling line's win in 11 turns instead of the Toss's one.
     result.perSide.p1[1] = row('move protect', 0.2);
     const outcome = forcedWinFor(createRootPosition(serialized), forcedWinInput(result, { depth: 1, samples: 1, tera: false }));
     expect(outcome?.side).toBe('p1');
@@ -361,7 +361,7 @@ describe('the scenes of the user\'s three Champions boards and #145', () => {
 
   // the ranking's three root candidates and the sure strike before them, as the app asks: each repeated Protect is a delay, and Aqua Jet knocks
   // Raichu out before Zap Cannon lands, so the proof reads mass 1 in 2 turns (the first Protect is sure, the second can hold, then Aqua Jet).
-  // Without the strike (stage P2 alone) these two boards read 0.765625, 7/8 of 7/8 (Volcarona's paralysis die at each of two levels).
+  // Without the strike these two boards read 0.765625, 7/8 of 7/8 (Volcarona's paralysis die at each of two levels).
   test.each([
     ['the fixture', 'forced-win/scout-miss-gen9championsvgc2026regmbbo3-2682637901-t6'],
     ['today\'s bank root', 'forced-win-delay/champions-vgc-2682637901-t6-bank'],
@@ -440,8 +440,8 @@ describe('Champions VGC 2682637901 turn 6: Aqua Jet knocks Raichu out before it 
 
 describe('a strike that does not end the root runs on cells of its own', () => {
   // VGC 2470704517 turn 6: the strike (Stomping Tantrum with Knock Off) proves 2/3 on 35 cells; the ranking's third candidate proves the win
-  // on 98 of the 100. Inside the shared budget the strike left 65 and the proof fell to 2/3; on cells of its own, given back, the ranking's
-  // candidates meet the budget of before (stage P2 read 1 in 5 turns; the strike's partial proof is the 0.963 of a longer line).
+  // on 98 of the 100. Inside the shared budget the strike left 65 and the proof fell to 2/3; on cells of its own the ranking's
+  // candidates keep their budget (the strike's partial proof is the 0.963 of a longer line).
   test('the ranking\'s proving candidate keeps its cells: mass 0.96 or more, at most 100 cells', () => {
     const proof = proofOf(scene('forced-win-delay/vgc-2470704517-t6'));
     expect(proof.mass).toBeGreaterThanOrEqual(0.96);
@@ -489,8 +489,8 @@ describe('singles: a sure kill that moves before the foe', () => {
     expect(strikeOn(slowOnly)).toBe('move tackle');
   });
 
-  // the strike joins the candidates of before and takes none of their places: with the strike among the engine's own options and named first in
-  // the root's list, the first draft of the order read it twice and the ranking's third candidate fell out (the proving one in three corpus rows)
+  // the strike takes none of the candidates' places: with the strike among the engine's own options and named first in the root's list,
+  // an order that reads it twice drops the ranking's third candidate (the proving one in three corpus rows)
   test('the root tries the strike and the ranking\'s first three: four candidates, none displaced (the strike is also an option of the engine\'s list)', () => {
     const battle = battleOf(SINGLES, [set('Snorlax', ['Tackle', 'Quick Attack', 'Body Slam', 'Splash'])], [set('Pikachu', ['Tackle', 'Splash'])]);
     oneHp(battle);
@@ -563,9 +563,8 @@ describe('prover-near-tie', () => {
 
   describe('the prover’s root order across near ties (round 67, T134)', () => {
     test('two rankings that differ only inside a near tie give the prover one root order (653785 t24)', () => {
-      // The official ranking of 653785 t24 on the round-67 board (probe lanes/B/mc-oracle, RANKS=1): U-turn and Hidden
-      // Power Ice stand 0.0017 apart. The second ranking is a noise-sized estimate of the same root with the two swapped
-      // (every value moved by less than 0.016), the kind of reordering behind round 64's proof.
+      // The ranking of 653785 t24: U-turn and Hidden Power Ice stand 0.0017 apart. The second ranking is a noise-sized estimate of
+      // the same root with the two swapped (every value moved by less than 0.016).
       const official = result([
         row('Hurricane', 'move hurricane', 0.1764), row('U-turn', 'move uturn', -0.0136), row('Hidden Power Ice', 'move hiddenpower', -0.0153),
         row('→ Cofagrigus', 'switch 4', -0.0329), row('Knock Off', 'move knockoff', -0.0359), row('→ Volcanion', 'switch 3', -0.1073),

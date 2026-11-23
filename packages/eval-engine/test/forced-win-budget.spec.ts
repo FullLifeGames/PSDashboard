@@ -12,12 +12,11 @@ import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
 /**
- * Round 89 (A6-3b, #145): the root candidates no longer share one cell budget through their turned dice. A6-2 priced the dice of
- * the plain path, so every cell of a failing candidate also drew the cells of its dice (a 5 % miss and what follows it), and the
- * first two candidates of Doubles OU 2695084835 turn 8 spent 98 of the shared 100 cells before the third one, which wins on the
- * spot in 95 of 100 games, found a cell left. Each candidate now runs a lazy pass first, with the turned dice left aside (the
- * children `turned` marks), and only a candidate that passes it gets the full proof. The lazy mass is a lower bound of the full
- * mass without a game rule: a child left aside counts mass 0.
+ * The root candidates do not share one cell budget through their turned dice. Every cell of a failing candidate also draws the cells of
+ * its dice (a 5 % miss and what follows it), so the first two candidates of Doubles OU 2695084835 turn 8 spent 98 of the shared 100 cells
+ * before the third one, which wins on the spot in 95 of 100 games, found a cell left. Each candidate runs a lazy pass first, with the
+ * turned dice left aside (the children `turned` marks), and only a candidate that passes it gets the full proof. The lazy mass is a lower
+ * bound of the full mass without a game rule: a child left aside counts mass 0.
  */
 interface BudgetScene {
   id: string;
@@ -28,7 +27,6 @@ interface BudgetScene {
 }
 const budgetScene = (name: string) => JSON.parse(readFileSync(new URL(`./fixtures/forced-win/budget-${name}.json`, import.meta.url), 'utf-8')) as BudgetScene;
 
-/** The scenes of the other forced-win specs: a captured root, the side that proves and its ranking. */
 interface RankedScene {
   id: string;
   turn: number;

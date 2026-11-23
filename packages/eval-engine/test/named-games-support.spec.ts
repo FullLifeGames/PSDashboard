@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { entries, lastTurn, play, rebuiltWith, set } from './named-games-support';
 
 /**
- * Round 72, T238: the lookups of eval-engine/src/branch with the replay's own names in the sets, none left out. The
+ * The lookups of eval-engine/src/branch with the replay's own names in the sets, none left out. The
  * teams are the sets the simulator played the game with, so every name reaches the lookups as the game wrote it: Japanese
  * and Chinese names (the id is ""), two names of one id, one name on two bodies, a decorated name. The rebuilt game must
  * enter every body as the game did, in the same order, with no choice the simulator refuses. Singles and doubles.

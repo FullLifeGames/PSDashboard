@@ -6,7 +6,7 @@ import { chanceRolled, rolledSides } from '../src/turn-analysis/luck';
 import type { EvalResult, KoOddsInfo, RankedChoice } from '../src/types';
 
 /**
- * Round 67 (T22 stage a): the luck ledger splits into what the turn rolled
+ * The luck ledger splits into what the turn rolled
  * and what the engine re-read. Detection reads the turn's protocol: each
  * dice marker favors the side opposing the body the dice went against, and
  * every hit of a move on an opposing body is kept with its target and

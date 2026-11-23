@@ -14,7 +14,7 @@ import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
 /**
- * Round 89 (P4, 1.2.0, ruling 39 B4a): the card says what the proof leans on. A forced win that a repeated Protect only delays reads
+ * The card says what the proof leans on. A forced win that a repeated Protect only delays reads
  * "...wins within 2 turns against every reply on the sampled rolls; a repeated Protect only delays it.", the stall named by the battle's
  * Dex (`ForcedWin.delayName`), and a win through a choice the search's own list never held (a sure strike from the legal combinations,
  * doubles only: the singles pool is the search's list) names the move that strikes first and its partner (`ForcedWin.choiceNames`).
@@ -29,7 +29,6 @@ const scene = (name: string) => JSON.parse(readFileSync(new URL(`./fixtures/${na
 const names: [string, string] = ['PsychedelicDawgII', 'Opponent'];
 const ranked = (choice: string, label: string, worstCase: number): RankedChoice => ({ choice, label, worstCase, expected: worstCase, ev: worstCase, punishedBy: 'Reply' });
 
-/** The card and the report's conversion sentence for a proof the way the engine hands it on (the bar applied to a result). */
 function speak(proof: ForcedWinProof, side: 'p1' | 'p2' = 'p1'): { card: string; report: string | undefined } {
   const result: EvalResult = {
     score: 0.5, interval: 0, depthCompleted: 1,

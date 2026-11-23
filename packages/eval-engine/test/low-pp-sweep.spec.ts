@@ -11,19 +11,15 @@ import { sweepMoves, SWEEP_CASES, type DexMove } from './dice-sweep-support';
 import { battleOf } from './power-oracle';
 
 /**
- * Round 89 (#106): the PP a move has left. A move at 0 PP in the game ranked first in the rebuilt battle (Revival Blessing, 1 PP, used
- * once and offered again): the rebuild spends PP by the moves it plays, and a Leppa Berry the log rules out, or a turn the rebuild played
- * differently, leaves its slot at the wrong count. The snapshot now carries the PP the log shows spent (`ppUsed`, read by @pkmn/client);
- * the snapshot correction sets each own move slot to the simulator's maximum minus that count.
+ * The PP a move has left. A move at 0 PP in the game ranked first in the rebuilt battle (Revival Blessing, 1 PP, used once and offered
+ * again): a Leppa Berry the log rules out, or a turn the rebuild played differently, leaves a slot at the wrong count. The snapshot carries
+ * the PP the log shows spent (`ppUsed`, read by @pkmn/client); the snapshot correction sets each own move slot to the simulator's maximum
+ * minus that count.
  *
- * The sweep plays every Dex move with a low PP count (base PP of 8 or less: the moves that run dry within a few uses) in every rule set the
- * corpus plays (Generations 1 to 9 and the Champions mod), singles and doubles. A case plays up to three turns on a board in which the body
- * uses the move, takes the spectator log, parses it with the replay parser, and checks three things against the simulator's own slot:
- *   1. the log's count (maximum minus `ppUsed`) equals the simulator's PP after the logged uses;
- *   2. a rebuild that drifted either way (every move at full PP: the uses never happened; every move at 0: a berry it never saw) takes the
- *      simulator's PP back from the snapshot;
- *   3. the ranking (`legalChoices`) of the corrected rebuild offers exactly what the simulator offers, so no move it disables is ranked.
- * The rows after the sweep are the reported scenes: Revival Blessing, Pressure (two PP per use), a Leppa Berry restore, Spite and Eerie Spell.
+ * The sweep plays every Dex move with a base PP of 8 or less in every rule set the corpus plays (Generations 1 to 9 and the Champions
+ * mod), singles and doubles: up to three turns on a board where the body uses the move, parsed from the spectator log and checked against
+ * the simulator's own slot. The rows after the sweep are the reported scenes: Revival Blessing, Pressure (two PP per use), a Leppa Berry
+ * restore, Spite and Eerie Spell.
  */
 await loadSimMods('gen9championsou');
 
@@ -31,7 +27,7 @@ const LOW_PP = 8;
 // Struggle is never a slot of a body: it appears when every slot is empty, and the client leaves it out of the count.
 const lowPp = (move: DexMove): boolean => move.pp > 0 && move.pp <= LOW_PP && move.id !== 'struggle';
 
-/** The log as the spectator sees it (the public half of every `|split|` pair), closed by a turn line so the parser takes the last boundary. */
+/** The spectator log (the public half of every `|split|` pair), closed by a turn line so the parser takes the last boundary. */
 function spectatorLog(battle: Battle): string {
   const out: string[] = [];
   for (let index = 0; index < battle.log.length; index++) {
@@ -44,7 +40,6 @@ function spectatorLog(battle: Battle): string {
 const AIMED_FOE = new Set(['normal', 'any', 'adjacentFoe']);
 const AIMED_ALLY = new Set(['adjacentAlly', 'adjacentAllyOrSelf']);
 
-/** A click for the body's first slot (aimed when the game type needs a target) and the matching splash of its partner. */
 function clickOf(mode: Mode, slot: number, target: string, aim = ''): string {
   if (mode === 'singles') return `move ${slot}`;
   const named = aim || (AIMED_FOE.has(target) ? '1' : AIMED_ALLY.has(target) ? '-2' : '');
@@ -57,7 +52,6 @@ interface Board { battle: Battle; mode: Mode }
 interface BoardOptions {
   rules: Rules;
   mode: Mode;
-  /** The body's moves; its click slot is the index plus one. */
   moves: string[];
   item?: string;
   foe?: { species: string; moves: string[]; ability?: string };
@@ -73,7 +67,6 @@ function boardFor({ rules, mode, moves, item, foe }: BoardOptions): Board {
   return { battle, mode };
 }
 
-/** Plays the scripted turns while the simulator takes them; returns how many it played. */
 function play(board: Board, turns: { p1: string; p2: string }[]): number {
   let played = 0;
   for (const turn of turns) {
@@ -93,7 +86,6 @@ const snapshotOf = (battle: Battle): TurnSnapshot => {
 
 const bodyOf = (battle: Battle) => battle.sides[0].pokemon[0];
 
-/** The simulator's slots of the body, by move id, with the maximum and the PP they hold. */
 const slotsOf = (battle: Battle): Map<string, { pp: number; maxpp: number }> =>
   new Map(bodyOf(battle).baseMoveSlots.map(slot => [slot.id, { pp: slot.pp, maxpp: slot.maxpp }]));
 
@@ -112,7 +104,6 @@ const offered = (battle: Battle): string[] | null => {
   return legalChoices({ serialized: serializeLiveBattle(battle) }, 'p1').map(option => option.choice).sort();
 };
 
-/** The count the snapshot gives for one move, against the simulator's slot: a message when they differ. */
 function readingProblem(snapshot: TurnSnapshot, truth: Battle, moveName: string): string | null {
   const slot = slotsOf(truth).get(toId(moveName));
   if (!slot) return 'the body lost the slot';
@@ -124,7 +115,6 @@ function readingProblem(snapshot: TurnSnapshot, truth: Battle, moveName: string)
   return slot.pp >= low && slot.pp <= high ? null : `the log counts ${least}..${most} spent, the slot holds ${slot.pp}/${slot.maxpp}`;
 }
 
-/** What the correction does to a rebuild that drifted: the problems found for the body's slots and for the ranking. */
 function driftProblems(truth: Battle, snapshot: TurnSnapshot, moveNames: string[]): string[] {
   const problems: string[] = [];
   const baseline = rebuilt(truth);
@@ -177,7 +167,6 @@ describe.each(SWEEP_CASES)('#106 low-PP moves, spent PP read from the log ($name
   });
 });
 
-/** The scenes of the report, one row per game type. */
 const GEN9: Rules = RULES.find(rules => rules.generation === 9 && rules !== CHAMPIONS)!;
 const MODS: [string, Rules][] = [['Generation 9', GEN9], ['Champions', CHAMPIONS]];
 
@@ -271,7 +260,7 @@ describe.each(MODS)('#106 Pressure, Spite and Eerie Spell (%s)', (_label, rules)
 });
 
 /**
- * Round 89 (#106): the client's Pressure count has a Generation 3 branch, because the log of that generation does not always show the foe's
+ * The client's Pressure count has a Generation 3 branch, because the log of that generation does not always show the foe's
  * ability: a foe whose species can only have Pressure charges it, a foe whose species can have it beside another ability leaves the count a
  * range. `getPressurePP` of parser-state.ts reads the generation from the client's Dex; this row holds that read to the simulator in
  * Generation 3, singles and doubles, against a species with the one ability (Zapdos), and one with two (Aerodactyl: Rock Head or Pressure,

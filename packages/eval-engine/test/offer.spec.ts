@@ -8,7 +8,7 @@ import { reconstruct, playTurn } from './arrival-turn';
 import { loadSimMods } from '../src/forward/sim-mods';
 
 /**
- * Round 82, the user's test of 01.11.2026: gen9draft-2058494320, a branch on turn 1 in Advanced, U-turn against Chilly
+ * gen9draft-2058494320, a branch on turn 1 in Advanced, U-turn against Chilly
  * Reception. The turn waits for P1's switch after U-turn, and the panel still asks for the turn's dice with both picks, on a
  * copy of the live battle. The copy refuses the move ("Can't move: You need a switch response"); the copy had kept the live
  * battle's `send`, so the refusal reached the live error log while Execute waited for the turn, and the turn read as refused.

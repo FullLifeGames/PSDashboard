@@ -3,17 +3,16 @@ import { inferOpponentTeam } from '@fulllifegames/replay-core';
 import { expectNameBlind, replays } from './identity-blind-support';
 import { loadSimMods } from '../src/forward/sim-mods';
 
-// Round 75 (T160): a Champions game reads the registered Champions Dex, so the mod loads first, as the hosts do.
+// a Champions game reads the registered Champions Dex, so the mod loads first, as the hosts do
 await loadSimMods('gen9championsou');
 
 /**
- * Round 72, T238: a nickname or a shiny flag never reaches the engine's words or its numbers. The turn analysis of a
+ * A nickname or a shiny flag never reaches the engine's words or its numbers. The turn analysis of a
  * position (the search, the played actions, the tiers, the sentence) must read the same when every name is the species
  * and no body is shiny (the reading and its failure message are in `identity-blind-support.ts`).
  *
  * This spec reads one replay each of singles with nicknames, Doubles OU, VGC and Champions VGC, a shiny body among
- * them, so it stays in the regular suite. The full run over all 20 fixture replays with a nicknamed or shiny body is
- * the lane probe `identity-blind-full.vt.ts`, run before a merge that touches how the build names a body.
+ * them, so it stays in the regular suite. A run over all 20 fixture replays with a nicknamed or shiny body takes about 80 s.
  */
 
 // The shares of each replay's snapshots that are read: the cheap singles replay reads three positions, the others one or two (the VGC position costs most).

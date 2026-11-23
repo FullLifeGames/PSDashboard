@@ -3,7 +3,7 @@ import { getBranchSimulatorFormat } from '@fulllifegames/replay-core';
 import { reconstructBranchRuntime } from '../src/branch-engine';
 
 /**
- * Round 72, T238: games the simulator plays itself with named bodies, and the same game rebuilt by the app's
+ * Games the simulator plays itself with named bodies, and the same game rebuilt by the app's
  * reconstruction. Shared by the specs that put a name the id function cannot tell apart into the simulator.
  */
 
@@ -12,7 +12,6 @@ export const set = (name: string, species: string, extra: Partial<PokemonSet> = 
   evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, ...extra,
 });
 
-/** The spectator log of a scripted game, as a replay holds it. */
 export async function play(format: string, p1: PokemonSet[], p2: PokemonSet[], commands: string[]): Promise<string> {
   const streams = BattleStreams.getPlayerStreams(new BattleStreams.BattleStream());
   const chunks: string[] = [];

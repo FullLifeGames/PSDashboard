@@ -11,8 +11,8 @@ import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
 /**
- * Round 76 (T265): a move whose `basePowerCallback` reads the battle's history (the fallen of the user's side, the hits the user
- * took: Last Respects and Rage Fist in today's Dex) is priced at the power the simulator's own callback gives on those facts by
+ * A move whose `basePowerCallback` reads the battle's history (the fallen of the user's side, the hits the user
+ * took: Last Respects and Rage Fist) is priced at the power the simulator's own callback gives on those facts by
  * every path that prices a move: the calculator's move (calc/move.ts, which the kill table and the KO odds read) and the static
  * (score/move-facts.ts). The moves are found by `historyPower` of replay-core, the one rule that classifies them, in every
  * generation and mod the corpus plays, singles and doubles. The scene: an Annihilape that took two hits plays Rage Fist at 150

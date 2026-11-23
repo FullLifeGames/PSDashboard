@@ -7,7 +7,7 @@ import { battleOf, fingerprint, powerInTurn } from './power-oracle';
 import { ScriptedPRNG } from '../src/forward/scripted-prng';
 
 /**
- * Round 63 (T81): the static prices a move's power as it lands by asking the
+ * The static prices a move's power as it lands by asking the
  * simulator's own handler of that move (basePowerCallback, the move's
  * onBasePower, Endeavor's damageCallback). Each answer is checked against
  * what the simulator uses in a real turn, read before the turn starts.
@@ -173,7 +173,6 @@ describe('multi-hit', () => {
     landedMove(active(battle, 0), battle.sides[1].active[slot], battle.dex.moves.get(id), battle);
   const mean = (values: readonly number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
 
-  /** BasePower events of one turn: one per hit and target. */
   function hitsInTurn(format: string, attacker: PokemonSet, defender: PokemonSet, id: string, seed: string): number {
     return powerInTurn(battleOf(format, [attacker], [defender], seed), { p1: 'move 1', p2: 'move 1' }, id).length;
   }
@@ -222,7 +221,6 @@ describe('multi-hit', () => {
     });
 
     test("Triple Axel sums the per-hit power the simulator's callback gives, each later hit at the move's accuracy", () => {
-      // A seed on which all three hits land, to read the per-hit power from the turn.
       let powers: number[] = [];
       for (let seed = 1; powers.length < 3; seed++) {
         const battle = battleOf('gen9customgame', [set('Weavile', ['tripleaxel'])], [splash('Snorlax')], `${seed},2,3,4`);

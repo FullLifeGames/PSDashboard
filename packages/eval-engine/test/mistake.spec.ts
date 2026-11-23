@@ -11,7 +11,7 @@ import { searchPosition } from '../src/search/position';
 import { reconstruct } from './arrival-turn';
 
 /**
- * Round 89 (#130), step G7b: a mistake by the opponent (ruling W3a). Both sides play the engine's first choice with every die at its
+ * A mistake by the opponent. Both sides play the engine's first choice with every die at its
  * likeliest result; the opponent's lower-ranked choices are tried one at a time, the mildest mistake first, and the first one after
  * which the line wins for the side that lost is the answer, with the chance of the dice it needs. Boards are small custom games:
  * every number is one the simulator shows there. Singles and doubles.

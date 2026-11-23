@@ -7,7 +7,7 @@ import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
 /**
- * Round 79 (T282): the near-decided stage weighs a click by the chance its user still acts. 573756 turn 71: SOULWIND's
+ * The near-decided stage weighs a click by the chance its user still acts. 573756 turn 71: SOULWIND's
  * Clefable has a sure Moonblast against the +4 Garchomp, but Garchomp moves first and its Earthquake kills Clefable 82 % of
  * the time, so "Magnezone stood one sure KO from clearing the rest" described a click that rarely happens. The order of a
  * click against the foe's kill is the move's priority first, then the effective speed (inverted under Trick Room), and an
@@ -20,7 +20,7 @@ await loadSimMods('gen9championsou');
 const SLOW = { nature: 'Brave', evs: { hp: 252, atk: 252, def: 0, spa: 0, spd: 4, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 0 } };
 const FAST = { nature: 'Jolly', evs: { hp: 4, atk: 252, def: 0, spa: 0, spd: 0, spe: 252 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 } };
 
-// Round 79 (T282 sweep): every generation the near stage reads (boundaryEvent returns nothing for generations 1 and 2) and the Champions mod.
+// every generation the near stage reads (boundaryEvent returns nothing for generations 1 and 2) and the Champions mod
 const RULES = [
   { name: 'Generation 3', singles: 'gen3customgame', doubles: 'gen3doublescustomgame' },
   { name: 'Generation 4', singles: 'gen4customgame', doubles: 'gen4doublescustomgame' },
@@ -34,7 +34,7 @@ const RULES = [
 
 describe('the near stage weighs the click by the chance its user acts (T282)', () => {
   const attackerSet = (): PokemonSet => set('Tauros', ['doubleedge'], { level: 50, item: 'choiceband' });
-  // Round 80 (T292): the clicker clears the rest itself, so no second sweeper waits. A 95 % Crush Claw kills the 1-HP
+  // The clicker clears the rest itself, so no second sweeper waits. A 95 % Crush Claw kills the 1-HP
   // Alakazam, whose Psychic kills the attacker when it acts first; behind Alakazam a 1-HP Machamp only bulks up. The
   // poisoned attacker at 20 % survives the one turn the rest takes, not the two the whole board takes, so the board reads
   // near-decided rather than decided. The attacker's partner is immune to the foe's move, so the foe never reads decided
@@ -81,7 +81,6 @@ describe('the near stage weighs the click by the chance its user acts (T282)', (
     const battle = battleOf('gen9customgame', [attackerSet(), attackerSet()],
       [set('Alakazam', ['splash'], { level: 50 }), set('Machamp', ['dynamicpunch'], { level: 50 })]);
     battle.sides[0].active[0]!.boosts.spe = -6;
-    // Nothing of the foe's kills before the click, so the board reads decided (the near stage stands aside for it).
     const profile = unansweredMons(battle);
     expect((profile.nearDecided ?? profile.decided)?.side).toBe('p1');
   });

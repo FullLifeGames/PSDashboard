@@ -9,7 +9,7 @@ import { SWEEPS_FULL } from './dice-fixtures';
 import { legalTeams, playableFormatIds } from './new-game-teams';
 
 /**
- * Round 89 (lane H, #105): a new game starts from two teams in the format the user picks. The sweep plays every format the
+ * A new game starts from two teams in the format the user picks. The sweep plays every format the
  * simulator lists for a user's own team (singles or doubles, no generated team) after the Champions mod loads: each one starts
  * from two legal teams, and what the app needs of the start reads from the simulator's own battle (the header log, the game
  * type, the team preview, the picked team size, the level the format gives). A plain run plays the families the app measures
@@ -46,7 +46,6 @@ function bringProblems(id: string, start: Awaited<ReturnType<typeof startGameLog
   ];
 }
 
-/** What reads wrong in one format's start, against the simulator's own rule table and validator. */
 function headerProblems(id: string, teams: { p1: PokemonSet[]; p2: PokemonSet[] }, start: Awaited<ReturnType<typeof startGameLog>>, problems: { p1: string[]; p2: string[] }): string[] {
   const format = Dex.formats.get(id);
   const rules = Dex.formats.getRuleTable(format);

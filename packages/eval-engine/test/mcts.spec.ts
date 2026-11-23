@@ -55,7 +55,7 @@ const threeTurnWin = () => serialize(makeBattle(
 ));
 
 // Machamp's Hydro Pump always kills a lvl-30 Pikachu (killFraction 1) but
-// carries the 80% accuracy roll — a priceable boundary event with
+// carries the 80% accuracy roll: a priceable boundary event with
 // pKill 0.8 < 1, so koOddsForOptions emits it. Seismic Toss is the
 // deterministic KO: no event, no odds. The Eevee bench gives p2 switch rows.
 const gambleRoot = () => serialize(makeBattle(
@@ -66,10 +66,10 @@ const gambleRoot = () => serialize(makeBattle(
   ],
 ));
 
-// Round-6 mutual-OHKO cell (see cell-blend.spec.ts): the 1-HP
+// Mutual-OHKO cell (see cell-blend.spec.ts): the 1-HP
 // Deoxys-Speed's 80% Hydro Pump kills on a hit (+1); on a miss the
 // surviving Pikachu's Tackle kills the attacker (−1). Analytic value
-// 0.8·1 + 0.2·(−1) = 0.6 exactly — and BOTH classes end the game, so the
+// 0.8·1 + 0.2·(−1) = 0.6 exactly, and BOTH classes end the game, so the
 // cell is ended in every tree that expands it.
 const mutualRoot = () => {
   const battle = makeBattle(
@@ -85,12 +85,11 @@ describe('DUCT-MCTS search', () => {
     const result = mctsSearch(threeTurnWin(), { depth: 1, samples: 1, tera: false, mode: 'mcts' });
     expect(result.perSide.p1[0].choice).toBe('move seismictoss');
     expect(result.score).toBeGreaterThan(0.3);
-    // The tree reached beyond one turn.
     expect(result.depthCompleted).toBeGreaterThan(1);
   });
 
   test('sees deeper than the static depth-1 matrix', () => {
-    // Round 35: the forced-win bar lifts both to the proven mass; the
+    // The forced-win bar lifts both to the proven mass; the
     // engines' own scores (before the bar) still tell the depths apart.
     const matrix = searchPosition(threeTurnWin(), { depth: 1, samples: 1, tera: false });
     const mcts = mctsSearch(threeTurnWin(), { depth: 1, samples: 1, tera: false, mode: 'mcts' });
@@ -168,7 +167,6 @@ describe('DUCT-MCTS search', () => {
     const settings = { depth: 1, samples: 1, tera: false, mode: 'mcts' } as const;
     const trees = Array.from({ length: searchBudget().trees }, (_, offset) => mctsTreeSearch(root, settings, offset));
 
-    // All trees rank the same option lists (a hard merge precondition).
     for (const tree of trees) {
       expect(tree.p1Options).toEqual(trees[0].p1Options);
       expect(tree.p1N).toHaveLength(tree.p1Options.length);
@@ -177,17 +175,14 @@ describe('DUCT-MCTS search', () => {
     const merged = mergeMctsTrees(trees);
     expect(merged.perSide.p1[0].choice).toBe('move seismictoss');
     expect(merged.score).toBeGreaterThan(0.3);
-    // Merged visits cover every tree's iterations.
     const totalTopVisits = trees.reduce((sum, tree) => sum + tree.visits, 0);
     expect(totalTopVisits).toBe(searchBudget().trees * MCTS_ITERATIONS);
-    // Deterministic: same trees, same merge.
     expect(mergeMctsTrees(trees.map(tree => ({ ...tree })))).toEqual(merged);
-    // A single tree merges to exactly its own result.
     expect(mergeMctsTrees([trees[0]])).toEqual(trees[0].result);
   });
 
   test('attaches the solved matrix for the Read lens', () => {
-    // The Read lens reads EvalResult.matrix — MCTS mode must attach it too,
+    // The Read lens reads EvalResult.matrix: MCTS mode must attach it too,
     // or reads silently vanish whenever the engine mode is 'mcts'.
     const result = mctsSearch(threeTurnWin(), { depth: 1, samples: 1, tera: false, mode: 'mcts' });
     expect(result.matrix).toBeTruthy();
@@ -245,13 +240,12 @@ describe('MCTS koOdds payload (round 7)', () => {
     expect(j).toBeGreaterThanOrEqual(0);
     const pump = tree.cells.find(cell => cell.key === cellKey(i, j));
     expect(pump).toBeTruthy();
-    // A root boundary cell keeps the class its draw showed as classKey (round 33); the tree holds no chance nodes.
+    // A root boundary cell keeps the class its draw showed as classKey; the tree holds no chance nodes.
     expect(['miss', 'hit-kill', 'hit-nokill']).toContain(pump!.classKey);
     expect(pump!.classes).toBeUndefined();
     const certain = tree.cells.find(cell => cell.key === cellKey(toss, j));
     expect(certain?.classKey).toBeUndefined();
     expect(certain?.classes).toBeUndefined();
-    // Same offset, same draws, same keys.
     const again = mctsTreeSearch(root, settings, 1);
     const keysOf = (cells: typeof tree.cells) => cells.map(cell => [cell.key, cell.classKey, cell.classes?.map(cls => cls.key)]);
     expect(keysOf(again.cells)).toEqual(keysOf(tree.cells));
@@ -290,7 +284,7 @@ describe('MCTS koOdds payload (round 7)', () => {
     }
     const result = mctsSearch(serialize(battle), settings);
     const odds = (choice: string) => result.perSide.p1.find(row => row.choice === choice)!.koOdds;
-    // Round 56, the doubles cell plan: a pair option names the slot its odds belong to.
+    // the doubles cell plan: a pair option names the slot its odds belong to
     expect(odds('move rockslide, move protect')).toEqual({ accuracy: 0.9, killFraction: 1, label: 'Rock Slide→Pikachu', attacker: expect.any(Object) });
     expect(odds('move karatechop 1, move tackle 2')).toEqual({ accuracy: 1, killFraction: expect.closeTo(1 / 24, 12), label: 'Tackle→Eevee', attacker: expect.any(Object) });
     // Karate Chop kills Eevee on every roll: the Tackle's crit kill on the same Eevee is no headline.
@@ -303,7 +297,7 @@ describe('MCTS koOdds payload (round 7)', () => {
     const trees = Array.from({ length: 2 }, (_, offset) => mctsTreeSearch(root, settings, offset));
     const merged = mergeMctsTrees(trees);
     const jobs = starvedSupportCells(trees, merged);
-    // Every draw of this cell ends the game — only the boundary bypass
+    // Every draw of this cell ends the game: only the boundary bypass
     // can emit it for verification.
     const cell = jobs.find(job => job.p1Choice === 'move hydropump' && job.p2Choice === 'move tackle');
     expect(cell).toBeTruthy();
@@ -368,7 +362,6 @@ describe('eval-mcts-forced-switch', () => {
       expect(greedy.pendingSwitch).toBe(false);
       expect(positionBattle(greedy.child).turn).toBe(2);
 
-      // The next step from the mid-turn child plays the replacement and reaches the boundary.
       const resumed = advancePositionWithLog(stopped.child, 'switch 3', 'wait', '1,2,3,4', { stopAtForcedSwitch: true });
       expect(resumed.pendingSwitch).toBe(false);
       const resumedBattle = positionBattle(resumed.child);
@@ -378,7 +371,6 @@ describe('eval-mcts-forced-switch', () => {
     });
 
     test('a pivot follow-up is answered before the stop; the knocked-out target then becomes the node', () => {
-      // No knock-out: the follow-up alone resolves the turn.
       const quiet = createRootPosition(serialize(makeBattle('gen9customgame',
         [makeSet('Scyther', 'Scyther', ['U-turn']), makeSet('Pichu', 'Pichu', ['Protect'])],
         [makeSet('Snorlax', 'Snorlax', ['Protect', 'Substitute'])],
@@ -389,7 +381,7 @@ describe('eval-mcts-forced-switch', () => {
       expect(positionBattle(quietStep.child).turn).toBe(2);
 
       // Knock-out: the sim asks the pivot side first (answered by the follow-up),
-      // then the fallen side — that request stays open as the node.
+      // then the fallen side; that request stays open as the node.
       const lethal = createRootPosition(serialize(makeBattle('gen9customgame',
         [makeSet('Scyther', 'Scyther', ['U-turn'], 100), makeSet('Pichu', 'Pichu', ['Protect'], 100)],
         [makeSet('Pikachu', 'Pikachu', ['Tackle'], 5), makeSet('Eevee', 'Eevee', ['Tackle'], 5)],
@@ -526,7 +518,7 @@ describe('mcts starved-support verification (draft t56)', () => {
     const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });
 
     // The app's branch path heals divergence with per-turn snapshot
-    // corrections — the same route the user took to stand at t56.
+    // corrections: the same route the user took to stand at turn 56.
     let serialized: string | null = null;
     await reconstructBranchRuntime({
       format: getBranchSimulatorFormat(replay),
@@ -561,13 +553,11 @@ describe('mcts starved-support verification (draft t56)', () => {
     const p1Top3 = verified.perSide.p1.slice(0, 3).map(entry => entry.label);
     expect(p1Top3).not.toContain('→ Mienshao');
 
-    // p2's phantom Draco inflation is gone: Shadow Ball outranks Draco
-    // Meteor again (matrix d2s3 reference: 0.535 vs 0.208).
+    // p2's phantom Draco inflation stays out: Shadow Ball outranks Draco
+    // Meteor (matrix d2s3 reference: 0.535 vs 0.208).
     const p2Labels = verified.perSide.p2.map(entry => entry.label);
     expect(p2Labels.indexOf('Shadow Ball')).toBeLessThan(p2Labels.indexOf('Draco Meteor'));
 
-    // HYBRID invariant on a real position: verification refines rankings,
-    // never the recorded score line.
     expect(verified.score).toBeCloseTo(merged.score, 10);
   });
 });

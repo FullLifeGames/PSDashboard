@@ -4,7 +4,7 @@ import { landedMove } from '../src/score/move-facts';
 import { active, bench, clickTera, set, simUse, singles } from './move-oracle';
 
 /**
- * Round 57 (T73): the rule table answers like the simulator for every active
+ * The rule table answers like the simulator for every active
  * carrier, and like the active body for a benched one.
  */
 const ours = (battle: Battle, attacker: Pokemon, defender: Pokemon, id: string) =>

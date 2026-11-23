@@ -7,7 +7,7 @@ import { SWEEPS_FULL } from './dice-fixtures';
 import { playableFormatIds } from './new-game-teams';
 
 /**
- * Round 89 (app lane, X2a): the ability a new game fills into a pasted set without one. Slot 0 of the species can be a banned
+ * The ability a new game fills into a pasted set without one. Slot 0 of the species can be a banned
  * ability (Garchomp's Sand Veil under Evasion Abilities Clause in OU and Doubles OU, Dugtrio's Sand Veil and Arena Trap in OU,
  * Tatsugiri's Commander in Doubles OU), so the fill takes the first slot (0, 1, H, S) the format allows and keeps slot 0 only when none passes.
  * The sweep plays every species of the format's Dex that the format lets in, in every format family the app offers for new games

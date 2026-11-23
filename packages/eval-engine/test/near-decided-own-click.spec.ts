@@ -5,10 +5,10 @@ import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
 /**
- * Round 80 (T292): the near-decided stage names the mon whose own click removes the standing foe and who then clears the
- * rest itself ("Own active, own click", the stage's rule since round 15). The code let any teammate clear the rest:
- * 573756 t71 named Magnezone behind Clefable's Moonblast, and Champions VGC 2695803506 t2 wrote "Kingambit stood one 94%
- * roll from clearing the rest" about Basculegion's Wave Crash. The scenes: a fast Tauros lands a 95 % Crush Claw on a
+ * The near-decided stage names the mon whose own click removes the standing foe and who then clears the
+ * rest itself ("Own active, own click"). A rule that lets any teammate clear the rest named Magnezone behind Clefable's
+ * Moonblast (573756 t71) and wrote "Kingambit stood one 94% roll from clearing the rest" about Basculegion's Wave Crash
+ * (Champions VGC 2695803506 t2). The scenes: a fast Tauros lands a 95 % Crush Claw on a
  * 1-HP Alakazam whose Psychic would kill it if Alakazam acted first.
  */
 

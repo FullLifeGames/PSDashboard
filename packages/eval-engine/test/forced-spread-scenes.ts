@@ -2,7 +2,6 @@ import type { Battle, PokemonSet } from '@pkmn/sim';
 import type { SimPosition } from '../src/forward-model';
 import { rollSet as set, rootOf } from './calc-roll-oracle';
 
-/** The scenes of the forced spread behind a screen (round 73, T202): which hits the calc forces onto every foe, and the doubles battle that plays them. */
 
 const terapagos = (): PokemonSet => set('Terapagos', ['Tera Starstorm', 'Splash'], { ability: 'Tera Shift', teraType: 'Stellar' });
 const hatterene = (): PokemonSet => set('Hatterene', ['Expanding Force', 'Splash']);

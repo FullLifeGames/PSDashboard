@@ -3,7 +3,7 @@ import { Battle, BattleStreams, Teams, type PokemonSet } from '@pkmn/sim';
 import { buildTeamsFromReplay } from '@fulllifegames/replay-core';
 
 /**
- * Round 72, T238: scenes the simulator writes itself. A game of the simulator, played through its battle stream, yields
+ * Scenes the simulator writes itself. A game of the simulator, played through its battle stream, yields
  * the spectator log (the log a replay holds: no `shiny` on `|poke|` lines, the disguise of an Illusion on the field).
  * The teams built from that log must switch in with the lines the game wrote: the body that entered as
  * `|switch|p1a: NOT ICT|Landorus-Therian, L50, M, shiny|` exists in the branch battle with that name and those details,
@@ -48,7 +48,6 @@ function unreproduced(log: string, format: string): string[] {
   return missing;
 }
 
-/** The sets the build made for one side, by species. */
 function builtSide(log: string, side: 'p1' | 'p2'): Record<string, { name: string; shiny: boolean }> {
   const built = buildTeamsFromReplay(log);
   return Object.fromEntries((side === 'p1' ? built.p1Team : built.p2Team).map(mon => [mon.species, { name: mon.name, shiny: !!mon.shiny }]));

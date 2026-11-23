@@ -7,7 +7,7 @@ import { doublesRoot, pairSet } from './pair-battles';
 import { SEEDS } from './sim-fast-helpers';
 
 /**
- * Round 60 (T94): a locked doubles slot (rampage, charge release, recharge,
+ * A locked doubles slot (rampage, charge release, recharge,
  * Bide, Uproar) gets a request entry with NO target type (pokemon.js
  * getMoves(lockedMove)). By name the sim then assumes 'normal' and demands a
  * target (side.js:397,469: "Outrage needs a target"); by index it takes the
@@ -19,7 +19,6 @@ import { SEEDS } from './sim-fast-helpers';
 const WALLS = [pairSet('Wall', 'Blissey', ['Splash'], { level: 100 }), pairSet('Wall2', 'Chansey', ['Splash'], { level: 100 })];
 const QUIET = 'move splash, move splash';
 
-/** The request entries of p1's slot `slot` after the setup turn. */
 function slotEntries(position: ReturnType<typeof createRootPosition>, slot: number): Record<string, unknown>[] {
   const request = positionBattle(position).sides[0].activeRequest as { active?: { moves: Record<string, unknown>[] }[] } | null;
   return request?.active?.[slot]?.moves ?? [];
@@ -58,7 +57,6 @@ describe('locked doubles slots (round 60, T94)', () => {
         WALLS,
         battle => battle.makeChoices(kind.turn1, QUIET),
       );
-      // Not vacuous (the round-60 lesson of eval-search.spec.ts): the slot IS locked.
       const entries = slotEntries(root, 0);
       expect(entries).toHaveLength(1);
       expect('target' in entries[0]).toBe(false);

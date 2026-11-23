@@ -9,15 +9,14 @@ import { dexOfRules } from './dice-sweep-support';
 import { battleOf } from './power-oracle';
 
 /**
- * Round 89 (#136): the protocol hides the target of a move that fails before it animates (`attrLastMove('[still]')`, "if no animation
- * plays, the target should never be known"): the log shows `|move|p2b: Sableye|Disable||[still]`. The rebuild aimed such a move at the
- * default foe, the one in slot a, and a Disable or Encore that failed on a fresh switch-in in slot b landed on the body in slot a: the
- * rebuilt body carried a volatile the game never gave it, and the turn analysis offered it only the moves that volatile leaves.
+ * The protocol hides the target of a move that fails before it animates (`attrLastMove('[still]')`, "if no animation
+ * plays, the target should never be known"): the log shows `|move|p2b: Sableye|Disable||[still]`. A rebuild that aims such a move at the
+ * default foe, the one in slot a, lands a Disable or Encore that failed on a fresh switch-in in slot b on the body in slot a: the
+ * rebuilt body carries a volatile the game never gave it, and the turn analysis offers it only the moves that volatile leaves.
  *
- * The rebuild now asks the simulator on a copy of the battle which aim makes the move fail as the log shows (`sim-ask/hidden-aim.ts`).
- * Rows: the scene (a Disable or Encore at a body that switched in that turn, no last move) in doubles, the guard rows (the target the log
- * shows stays; two failing aims keep the default; singles has one foe), and the live battle after the question. The sweep over every
- * single-target move of the Dex is below.
+ * The rebuild asks the simulator on a copy of the battle which aim makes the move fail as the log shows (`sim-ask/hidden-aim.ts`).
+ * Rows: the scene in doubles (a Disable or Encore at a body that switched in that turn, no last move), the guard rows and the live
+ * battle after the question; the sweep over every single-target move of the Dex is below.
  */
 await loadSimMods('gen9championsou');
 
@@ -60,7 +59,6 @@ const locOf = (battle: Battle, slot: number): number => battle.sides[1].active[1
 /** What the switch of p1's slot b (`both`: both slots) leaves: the probe is aimed at `aim`. */
 interface Played { events: string[]; log: string[]; line: string }
 
-/** Plays turn 2 with p1's switches and p2's probe at `aim`; returns the turn's public lines and the probe's move line. */
 function playTurn2(battle: Battle, p1Click: string, aim: number | null, singles = false): Played {
   const p2Click = singles ? 'move 1' : `move 1, move 1${aim === null ? '' : ` ${aim > 0 ? `+${aim}` : aim}`}`;
   if (!battle.choose('p1', p1Click) || !battle.choose('p2', p2Click)) throw new Error(`refused ${p1Click} / ${p2Click}`);
@@ -141,7 +139,6 @@ type Move = ReturnType<Dex['moves']['get']>;
 
 interface Situation { id: string; p1: string; inject?: (target: Battle['sides'][number]['active'][number]) => void }
 
-/** The situations a move has: each reads the move's own Dex entry. */
 function situationsOf(move: Move): Situation[] {
   const keep = 'move 1, move 1';
   const out: Situation[] = [{ id: 'switch-in', p1: 'move 1, switch 3' }];
@@ -205,7 +202,6 @@ describe('the sweep: every single-target move, played where it fails at one foe 
             const aim = Number(choice.split(', ')[1].split(' ').pop());
             const replay = playTurn2(make()!, situation.p1, aim);
             expect(replay.line, `${label}: the choice "${choice}" hides the target as the log does`).toBe(row.played!.line);
-            // an aim that shows its target is never the answer
             expect(showing.some(other => other.aim === aim), `${label}: "${choice}" aims where the move shows its target`).toBe(false);
             seen.hiddenRows++;
             seen.moves.add(move.id);

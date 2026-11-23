@@ -8,13 +8,12 @@ import { battleOf } from './power-oracle';
 import { delayBoard, foeClick, ownClick, proofOf, strikeOf } from './forced-win-delay-support';
 
 /**
- * Round 89 (P2, 1.2.0): the delay rule of the forced-win prover against the simulator, in every rule set the corpus plays (Gens 2 to
+ * The delay rule of the forced-win prover against the simulator, in every rule set the corpus plays (Gens 2 to
  * 9 and the Champions mod; Gen 1 has no stalling move), singles and doubles. A foe at 1 HP behind a stalling move that rolls
  * (`rollsStall`) and a Splash, against a side whose move cannot miss and knocks it out: the repeat only delays the knock-out, so the
- * proof reads mass 1 in 2 turns (the first use is sure, the repeat is the delay) and names the stalling move. Beside it each kind of
- * stall that matters (a heal, a status on the attacker, a weather timer, a contact shield's damage, an Endure that held a body up from
- * full HP, the foe's partner attacking) gets no delay, and a mass the simulator's rollouts (300 seeds, the foe stalling every turn or
- * never) do not reach. `DICE_SWEEPS=full` plays every stalling move of a rule set; a plain run plays the sample of `sweepSelection`.
+ * proof reads mass 1 in 2 turns (the first use is sure, the repeat is the delay) and names the stalling move. Each kind of stall that
+ * matters (see forced-win-delay-support.ts) gets no delay, and no mass above what the simulator's rollouts (300 seeds, the foe stalling
+ * every turn or never) reach. `DICE_SWEEPS=full` plays every stalling move of a rule set; a plain run plays the sample of `sweepSelection`.
  */
 await loadSimMods('gen9championsou');
 
@@ -44,10 +43,8 @@ function winRate(build: (seed: string) => Battle, own: string, foe: string): num
 
 interface Kind {
   name: string;
-  /** The moves and items the rule set must have for the kind. */
   needs: string[];
   stall: string;
-  /** The attacker's move: the first of its slots. */
   attack: string;
   build(rules: Rules, mode: Mode, seed: string): Battle;
 }
@@ -98,7 +95,7 @@ describe.each(WITH_STALL)('a repeated stall is a delay, $name', ({ rules, mode }
     expect(proof.turns).toBe(2);
   });
 
-  // Round 89 (P4): the card says "a repeated <name> only delays it"; the name is the Dex's, never a name of our code
+  // the card says "a repeated <name> only delays it"; the name is the Dex's, never a name of our code
   test.each(moves.map(move => move.id))('%s: the proof names the stall as the Dex does', stall => {
     const proof = proofOf(delayBoard(rules, mode, strike!.id, { stall }), rules);
     expect(proof.delayName).toBe(dex.moves.get(stall).name);
@@ -118,7 +115,6 @@ describe.each(WITH_STALL)('a repeated stall is a delay, $name', ({ rules, mode }
 
 describe('the foe\'s partner attacks while the repeat holds (doubles)', () => {
   test.each(WITH_STALL.filter(({ mode, rules }) => mode === 'doubles' && has(rules, ['protect', 'tackle'])))('$name: the held Protect lets the partner hit, so no delay', ({ rules }) => {
-    // the pure board without the fall: the foe's partner stands and attacks
     const partner = battleOf(rules.doubles!, [mon(rules, { species: 'Snorlax', moves: ['tackle', 'splash'], gender: 'M' }), mon(rules, { species: 'Blissey', moves: ['splash'] })], [mon(rules, { species: 'Vaporeon', moves: ['protect', 'splash'] }), mon(rules, { species: 'Machamp', moves: ['tackle'] })]);
     partner.sides[1].active[0]!.hp = 1;
     expect(proofOf(partner, rules).delay).toBeUndefined();

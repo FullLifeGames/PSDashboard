@@ -3,9 +3,9 @@ import { idsOfStrings, lex, readsOfCode } from '../src/dex-facts/handler-source'
 import { tokensOf } from '../src/dex-facts/state-readers';
 
 /**
- * Round 89 (#149): the five ways the first scan of a handler's source read what the handler does not read, each found by
- * packages/eval-engine/test/state-readers-built.spec.ts (the Dex built with the app's Vite settings against the Dex in Node: 5,547 rows
- * differed). The rows here pin each one on its own source, and the same source written the way a production build writes it.
+ * The five ways a scan of a handler's source can read what the handler does not read, each found by `state-readers-built.spec.ts` (the Dex
+ * built with the app's Vite settings against the Dex in Node: 5,547 rows differed). The rows pin each one on its own source, and on the
+ * same source written the way a production build writes it.
  */
 const reads = (source: string): string[] => [...tokensOf(source)].sort();
 

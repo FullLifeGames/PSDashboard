@@ -10,7 +10,7 @@ import { battleOf } from './power-oracle';
 import { rulesetOf } from './forced-win-delay-support';
 
 /**
- * Round 89 (P3, 1.2.0): the sure strike against the simulator, in every rule set the corpus plays (Gens 1 to 9 and the Champions mod),
+ * The sure strike against the simulator, in every rule set the corpus plays (Gens 1 to 9 and the Champions mod),
  * singles and doubles. The board: the foe's last body stands at 1 HP behind a Tackle and a Splash and outruns the attacker; the attacker
  * clicks one move of the Dex with positive priority. The oracle plays that turn on 20 seeds (6 without `DICE_SWEEPS=full`): the strike
  * exists exactly where every game ends before the foe moves. Rules that stop a priority move (Psychic Terrain, Dazzling, a move that
@@ -70,7 +70,6 @@ function endsBeforeFoe(build: (seed: string) => Battle, own: string, foe: string
   return { ended, refused: false };
 }
 
-/** The strike the prover offers on a board: the first of the legal choices that the strike rule takes (null when none). */
 function offered(battle: Battle, rules: Rules): string | null {
   const position = createRootPosition(JSON.stringify(State.serializeBattle(battle)), rulesetOf(rules));
   const live = standing(positionBattle(position));

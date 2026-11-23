@@ -9,7 +9,7 @@ import { LINE_MIN_VISITS, lineFrom, type Node } from '../src/search/mcts-node';
 import type { EvalSettings, MctsTreeStats } from '../src/types';
 
 /**
- * Round 89 (#104), step G14b (ruling G9a, option L): the line pass. After a tree has its result, its cell statistics and its ranking,
+ * The line pass. After a tree has its result, its cell statistics and its ranking,
  * extra iterations aimed at the rows whose lines the card shows give the second turn of a line the visits it needs. They write below
  * the root only, so every statistic outside `rowLines` is what the tree without the pass shipped. Real boards, singles and doubles
  * (VGC and Champions boards are doubles trees too: the code has no game-type branch; the app specs name the families).
@@ -38,7 +38,6 @@ const DOUBLES = board('gen9doublescustomgame', TEAM, TEAM.slice().reverse());
 const BASE: EvalSettings = { depth: 1, samples: 1, mode: 'mcts', tera: false };
 const BOARDS = [['singles', SINGLES], ['doubles', DOUBLES]] as const;
 
-/** Everything a tree ships but its lines. */
 const withoutLines = (stats: MctsTreeStats): Omit<MctsTreeStats, 'rowLines'> => { const { rowLines, ...rest } = stats; void rowLines; return rest; };
 
 /** How many rows of a side hold a line of two turns or more. */
@@ -147,16 +146,12 @@ describe('the pass on a searched root', () => {
     expect(wanted).toEqual([...wanted].sort((a, b) => a - b));
     expect(wanted.length).toBeGreaterThan(0);
     for (const key of wanted) expect(root.children.has(key)).toBe(true);
-    // naming rows by label replaces the best row
     const named = wantedCells(root, stats.result, { ...BASE, lineRows: { p1: [stats.p1Options[stats.p1Options.length - 1].label], p2: [] } });
     expect(named.length).toBeGreaterThan(0);
   });
 });
 
-/**
- * Round 89 (#153, Hard mode): after the cells above the pass also aims at the cell of each wanted row's worst answer, with what is left
- * of the quota. Those cells are never ones the first phase wants, so the lines of the plain rows read what they read before.
- */
+// those cells are never ones the first phase wants, so the lines of the plain rows do not change
 describe.each(BOARDS)('the floor cells of a %s tree', (_name, serialized) => {
   const root = mctsRoot(serialized, BASE);
   const stats = mctsTreeSearch(serialized, { ...BASE, keepPlayed: { p1: { kind: 'move', name: 'Bulk Up' } } }, 0);

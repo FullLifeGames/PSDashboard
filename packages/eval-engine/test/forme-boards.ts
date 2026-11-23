@@ -5,7 +5,7 @@ import { battleOf } from './power-oracle';
 import { set } from './move-oracle';
 
 /**
- * Round 88 (#103): the boards of the forme sweeps (`switch-forme-sweep.spec.ts`, `body-forme-sites.spec.ts`): every generation and mod the
+ * The boards of the forme sweeps (`switch-forme-sweep.spec.ts`, `body-forme-sites.spec.ts`): every generation and mod the
  * corpus plays, singles and doubles, a bench where a body takes any forme by the simulator's own `formeChange`.
  */
 await loadSimMods('gen9championsou');

@@ -5,9 +5,9 @@ import type { PokemonSet } from '@pkmn/sim';
 import { legalTeams } from './new-game-teams';
 
 /**
- * Round 89 (lane H, #105, stage H4b; user ruling 13.11.2026): the seed a new game starts on is set by hand in the dialog, so the
- * engine decides which texts are a seed. The simulator is the oracle: every seed it draws passes and rolls the same dice from the
- * normalized text; a text the simulator would take but never draws (a number above 65535) is refused on purpose (D-E2).
+ * The seed a new game starts on is set by hand in the dialog, so the engine decides which texts are a seed. The simulator is
+ * the oracle: every seed it draws passes and rolls the same dice from the normalized text; a text the simulator would take but
+ * never draws (a number above 65535) is refused on purpose.
  */
 
 describe('readGameSeed', () => {

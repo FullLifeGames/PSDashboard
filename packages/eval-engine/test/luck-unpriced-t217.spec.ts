@@ -11,11 +11,11 @@ import type { EvalMatrix, EvalResult, RankedChoice } from '../src/types';
 import { battleOf } from './power-oracle';
 
 /**
- * Round 70 (T217, review finding 4 of round 69): a cell the planner calls "none" has no PRICED roll. The planner prices the
+ * A cell the planner calls "none" has no PRICED roll. The planner prices the
  * accuracy and the kill range of a hit; Body Slam's paralysis, Scald's burn, Earth Power's drop and every other secondary
- * effect with a chance under 100 sit in a "none" cell and may have rolled. A turn without its protocol used to read such a cell
- * as "nothing rolled" and the card said the engine re-read the position. Now the cell reads "no priced roll" when a move of the
- * played pair carries such an effect: no answer, so the sentences keep their ungated wording. The chance is read from the Dex.
+ * effect with a chance under 100 sit in a "none" cell and may have rolled. A turn without its protocol reads the cell as
+ * "no priced roll" when a move of the played pair carries such an effect: no answer, so the sentences keep their ungated
+ * wording. The chance is read from the Dex.
  */
 
 const row = (choice: string, label: string, ev: number): RankedChoice => ({ choice, label, worstCase: ev, expected: ev, ev, punishedBy: null });
@@ -60,7 +60,6 @@ describe('singles: a plain cell with an unpriced secondary effect is "no priced 
   test('Body Slam and Scald (30% paralysis, 30% burn) in a plain cell give no answer (red before: nothing rolled)', () => {
     for (const move of ['Body Slam', 'Scald']) {
       expect(singlesTurn(move, 'Seismic Toss', NONE).rolledFor).toBeUndefined();
-      // The opposing click counts as much as the own one.
       expect(singlesTurn('Seismic Toss', move, NONE).rolledFor).toBeUndefined();
     }
   });

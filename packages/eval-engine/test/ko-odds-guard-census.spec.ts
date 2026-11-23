@@ -9,12 +9,9 @@ import { set } from './move-oracle';
 import { battleOf, fingerprint } from './power-oracle';
 
 /**
- * Round 70 (N1): the one-turn odds model prices a move's accuracy from the stage table and its crit from the move's own
- * ratio, and `unpriceable` sends a pair it cannot price to the plain seed average. Its guard named eleven of the
- * eighteen items and abilities of Gen 9 that carry a handler on a crit or accuracy event (Wide Lens, Zoom Lens, Bright
- * Powder, Lax Incense, Compound Eyes, Hustle, Sand Veil, Snow Cloak, Victory Star, Tangled Feet, Wonder Skin); Leek,
- * Stick, Lucky Punch, Razor Claw, Scope Lens, Merciless and Super Luck passed, and the comment said they "fail closed".
- * The guard now reads the rule from the simulator's Dex: a holder of an item or ability with a handler on the
+ * The one-turn odds model prices a move's accuracy from the stage table and its crit from the move's own
+ * ratio, and `unpriceable` sends a pair it cannot price to the plain seed average. The guard reads the rule from the
+ * simulator's Dex: a holder of an item or ability with a handler on the
  * ModifyAccuracy or ModifyCritRatio event (the holder's own, a foe's, an ally's, the source's or any) is unpriceable. This
  * census walks every item and ability of every generation and the Champions mod (@pkmn/dex strips the handlers, so it
  * reads the simulator's Dex), and each effect with a crit or accuracy handler is either guarded or listed below with the
@@ -29,7 +26,6 @@ const RULES: Rules[] = [
   { name: 'Pokémon Champions', gen: 9, format: 'gen9championscustomgame', level: 50, evs: { hp: 32, atk: 32, def: 0, spa: 32, spd: 2, spe: 0 } },
 ];
 
-/** The handlers that change the number the model prices: the accuracy or the crit rate. */
 const MODIFIES = /^on(Any|Foe|Ally|Source)?Modify(Accuracy|CritRatio)$/;
 /** A handler of the family that leaves both numbers to the model: the event that skips the roll or blocks the crit. */
 const PRICED = new Set(['onAnyAccuracy', 'onCriticalHit']);
@@ -62,7 +58,6 @@ function effectsOf(battle: Battle, gen: number): Found[] {
 const keyOf = (found: Found) => `${found.kind}:${found.id}`;
 const guardedByRule = (found: Found) => found.handlers.some(handler => MODIFIES.test(handler));
 
-/** Snorlax (attacker) against Blissey (defender), both standing in front. */
 function scene(rules: Rules, format = rules.format): Battle {
   const mon = (species: string, moves: string[]): PokemonSet => set(species, moves, { level: rules.level, ...(rules.evs ? { evs: rules.evs } : {}) });
   return battleOf(format, [mon('Snorlax', ['hydropump', 'bodyslam', 'tackle'])], [mon('Blissey', ['splash'])]);
@@ -130,7 +125,6 @@ describe('Gen 9: the census in numbers (round 70, N1)', () => {
   });
 });
 
-/** The exclusions above, each played where its effect exists. */
 const PLAYED = ['ability:battlearmor', 'ability:disguise', 'ability:iceface', 'ability:noguard', 'ability:shellarmor'];
 
 test('every exclusion has a play below', () => {

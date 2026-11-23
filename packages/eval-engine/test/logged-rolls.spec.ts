@@ -7,14 +7,14 @@ import { drawsByAction, observeDraws, playTurn, prngOf, reconstruct, type Draw }
 import { loadSimMods } from '../src/forward/sim-mods';
 import { compareAlignment } from '../src/hax-alignment';
 
-// Round 75 (T160): a Champions game reads the registered Champions Dex, so the mod loads first, as the hosts do.
+// a Champions game reads the registered Champions Dex, so the mod loads first, as the hosts do
 await loadSimMods('gen9championsou');
 
 /**
- * Round 73, T232: the first turn of a branch keeps the logged dice of every action the user leaves as it was. Round 70 put the
- * position on the seed its turn has in the log, but one stream serves all actions in order: when the faster action's move
- * changes, the slower action draws later numbers of the stream and loses its logged roll (GPL DzBQ5azlO5l turn 16: Earthquake
- * replaced, Strength Sap rolled 13 where the log has 47). The dice are now per action (side, slot and move).
+ * The first turn of a branch keeps the logged dice of every action the user leaves as it was. The position sits on the seed its
+ * turn has in the log, but one stream serves all actions in order: when the faster action's move
+ * changes, the slower action would draw later numbers of the stream and lose its logged roll (GPL DzBQ5azlO5l turn 16: Earthquake
+ * replaced, Strength Sap rolled 13 where the log has 47). The dice are per action (side, slot and move).
  *
  * The scenes are turns of the five fixtures the dice specs use, one per game type and rule set: the draws of every action are
  * read from the battle's PRNG as the sim calls it, keyed by the move in flight, so the assertions name the numbers and not
@@ -45,7 +45,6 @@ const SCENES: Scene[] = [
   { label: 'Champions VGC (2679053861 turn 3, Twin Beam replaced)', fixture: 'champions/gen9championsvgc2026regmbbo3-2679053861', turn: 3, changed: { side: 'p2', slot: 1, click: 'move 4 1' }, kept: ['p2a:sacredsword', 'p1b:psychic'], marker: /^|-crit|p1a: Penny Parker/, onSeedPlace: true },
 ];
 
-/** The logged turn, with the dice read, and the same turn with one slot's click replaced. */
 async function play(scene: Scene, replaced: boolean, plainSeed = false) {
   const { replay, runtime } = await reconstruct(scene.fixture, scene.turn);
   const battle = runtime.battleStream.battle!;
@@ -94,7 +93,6 @@ describe.each(SCENES)('the first branch turn keeps the logged dice of the action
       const logs = logged.byAction.get(key)!;
       expect(asSubsequence(logs, changed.byAction.get(key) ?? []), key).toEqual(values(logs));
     }
-    // The change is a real one: the faster slot's logged action no longer acts.
     for (const key of [...logged.byAction.keys()].filter(entry => entry.startsWith(changedSlot))) {
       expect(changed.byAction.has(key), `${key} is replaced`).toBe(false);
     }
@@ -109,10 +107,10 @@ describe.each(SCENES)('the first branch turn keeps the logged dice of the action
     }
   });
 
-  // Round 86 (T306): the arrival records the draws of the turn the rebuild plays, the log's dice forced on the hidden dice of seed index 0. A forced
+  // The arrival records the draws of the turn the rebuild plays, the log's dice forced on the hidden dice of seed index 0. A forced
   // die answers with the number that gives the log's result (a hit is 0) where the plain seed draws its own, and a forced order of a speed tie
-  // changes the shuffles that follow. So the draws are no longer the plain seed's: the turn is held to the log's block, never worse than the plain
-  // seed's turn (a body the log never shows acting still gets a move filled in, ruling Q1 of the plan). Before: the draws and the lines were equal.
+  // changes the shuffles that follow. So the draws are not the plain seed's: the turn is held to the log's block, never worse than the plain
+  // seed's turn (a body the log never shows acting still gets a move filled in).
   test('a turn whose actions all stay as logged plays the block of the log at least as well as the plain seed', { timeout: 300000 }, async () => {
     const logged = await play(scene, false);
     const plain = await play(scene, false, true);

@@ -4,20 +4,15 @@ import type { positionBattle } from '../src/forward-model';
 import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-views';
 
 /**
- * Round 72 (T235), plan row 15, FINDINGS W4 and W4b: search/options.ts drops a field move from the option list while its
- * condition already stands ("clicking it is a pass with a real-looking label", GPL T25). The hand table of ten ids missed three
- * side-condition moves the simulator fails against their standing condition (Crafty Shield, Lucky Chant, Mat Block) and never
- * dropped Spikes in Generation 2, where one layer is the cap. Quick Guard and Wide Guard also lack a table entry, but they run an
- * `onHitSide` handler and print no failure with their condition standing (it ends within the turn), so the rule leaves them. The
- * simulator's rule (`Side.addSideCondition`)
- * is: a condition that stands and has no restart handler (`onSideRestart`) fails to start again; Spikes and Toxic Spikes have the
- * handler and refuse a layer past their cap, which lives in the handler's code (`LAYER_CAPS`, held here). For every move that sets a
- * side condition, in every view the corpus plays, this spec lays the condition on the side the move acts on (as many layers as the
- * simulator takes), plays the move once and keeps the moves that print a failure where the same turn without the standing
- * condition does not (under the weather a move may need: none, Snow, Hail). Then:
- *  - `failsAgainstStanding` drops exactly those moves with the full stack standing;
- *  - the cap of each layered hazard is what the simulator takes, and one layer below it is no no-op;
- *  - the layered hazards are the conditions with a restart handler (none in Generation 2).
+ * search/options.ts drops a field move from the option list while its condition already stands ("clicking it is a pass with a
+ * real-looking label", GPL turn 25). The simulator fails three side-condition moves against their standing condition (Crafty
+ * Shield, Lucky Chant, Mat Block), and Spikes in Generation 2, where one layer is the cap. Quick Guard and Wide Guard run an
+ * `onHitSide` handler and print no failure with their condition standing (it ends within the turn), so the rule leaves them.
+ * The simulator's rule (`Side.addSideCondition`) is: a condition that stands and has no restart handler (`onSideRestart`) fails
+ * to start again; Spikes and Toxic Spikes have the handler and refuse a layer past their cap, which lives in the handler's code
+ * (`LAYER_CAPS`, held here). For every move that sets a side condition, in every view the corpus plays, this spec lays the condition
+ * on the side the move acts on (as many layers as the simulator takes), plays the move once and keeps the moves that print a failure
+ * where the same turn without the standing condition does not (under the weather a move may need: none, Snow, Hail).
  */
 
 const SPEC = 'packages/eval-engine/test/noop-field-moves-oracle.spec.ts';
@@ -73,7 +68,6 @@ describe('field moves against a standing condition are read from the Dex and hel
     /** Moves whose condition has a restart handler: the layered hazards (Generation 2 builds Spikes without one). */
     const restarts = (id: string) => typeof (view.dex.conditions.get(view.dex.moves.get(id).sideCondition!) as unknown as { onSideRestart?: unknown }).onSideRestart === 'function';
 
-    /** The moves failsAgainstStanding drops with the full stack of their condition standing. */
     const dropped = () => setters.filter(id => {
       const { battle } = prepared(view, id, WEATHERS.find(w => !play(view, id, false, w) && play(view, id, true, w)) ?? '', 9);
       return failsAgainstStanding(battle.dex, id, battle.sides[0] as unknown as Side, battle.sides[1] as unknown as Side);

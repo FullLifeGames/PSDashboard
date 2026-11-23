@@ -7,8 +7,8 @@ import { dexOfRules } from './dice-sweep-support';
 import { battleOf } from './power-oracle';
 
 /**
- * Round 89 (P2): the boards of the delay specs. A pure delay board is one body against one body (in doubles the foe's partner has
- * fallen and the attacker's partner splashes): the foe stands at 1 HP behind a stalling move and a Splash, the attacker holds a
+ * The boards of the delay specs. A pure delay board is one body against one body (in doubles the foe's partner has fallen and
+ * the attacker's partner splashes): the foe stands at 1 HP behind a stalling move and a Splash, the attacker holds a
  * damaging move that cannot miss and knocks it out. Every kind of "stall that matters" changes that board by one fact the held turn
  * writes (a heal, a status, a weather timer, a contact shield's damage, an Endure that held a body up from full HP, the foe's partner
  * attacking), and the spec asks the prover for no delay there and for no mass above what the simulator plays out.
@@ -25,7 +25,6 @@ export const foeClick = (slot: number): string => `move ${slot}`;
 
 interface Options { moves?: string[]; stall: string; foeItem?: string; hp?: number }
 
-/** A body that has fainted in place, as a battle that played on without it leaves it. */
 function fall(battle: Battle, sideIndex: 0 | 1, index: number): void {
   const body = battle.sides[sideIndex].pokemon[index];
   body.hp = 0;

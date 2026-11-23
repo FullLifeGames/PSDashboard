@@ -10,10 +10,10 @@ import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
 /**
- * Round 70 (N1): the pair plan reads a draw's own lines, and `randomDeviation` sends a draw to the plain mean when a `|cant|`
- * line shows a dice outcome the plan does not price. The set it read held 'attract', but the simulator writes the
- * infatuation by the name of its condition, `|cant|p1a: Blissey|Attract`, so a real infatuation passed as a plain turn
- * (the reported scene below, seed 2). The reasons now come from the simulator: this census scans every `add('cant', ...)`
+ * The pair plan reads a draw's own lines, and `randomDeviation` sends a draw to the plain mean when a `|cant|`
+ * line shows a dice outcome the plan does not price. The simulator writes the infatuation by the name of its condition,
+ * `|cant|p1a: Blissey|Attract`, not 'attract', so a set of reasons that lists only 'attract' passes a real infatuation as a
+ * plain turn (the scene below, seed 2). The reasons come from the simulator: this census scans every `add('cant', ...)`
  * of @pkmn/sim (the data of every generation and its scripts) and of the Champions mod, names each reason it can write as
  * dice (the simulator draws a number this turn to decide it) or fixed (the position decides it), plays every reason in a
  * small doubles scene over 40 seeds (a dice reason shows on some seeds and not on others, a fixed one on every seed), and
@@ -81,8 +81,7 @@ describe('the |cant| reasons of the simulator, scanned (round 70, N1)', () => {
   const found = scan();
 
   test('every write has a plain reason, and the census names exactly the reasons the simulator writes', () => {
-    // Round 78 (@pkmn 0.10.12): the Champions mod no longer carries a copy of the simulator, so the scan finds 50 writes
-    // where it found 93, with the same 21 reasons.
+    // The Champions mod carries no copy of the simulator (@pkmn 0.10.12), so the scan finds 50 writes with the same 21 reasons.
     expect(found.writes).toBeGreaterThan(40);
     expect(found.plain).toBe(found.writes);
     expect(found.reasons).toEqual(Object.keys(REASONS).sort());
@@ -94,7 +93,7 @@ describe('the |cant| reasons of the simulator, scanned (round 70, N1)', () => {
     }
   });
 
-  // Round 76 (T233): the report's dice markers read the same census: a dice reason is a dice event (sleep stays the documented
+  // The report's dice markers read the same census: a dice reason is a dice event (sleep stays the documented
   // over-inclusion: the sleep length is drawn at the start, but a sleeping turn has always read as a roll in the luck claims).
   test('diceEventTurns and the sack scan (CHANCE_CANT) read every dice reason, and the pair plan reads the same set without sleep', () => {
     for (const [reason, kind] of Object.entries(REASONS)) {
@@ -143,7 +142,6 @@ function turn(battle: Battle, p1: string, p2: string): Battle {
 const AT_FOE = 'move 1 1, move 1';
 const PLAIN = 'move 1, move 1';
 
-/** One scene per reason: the cause is set up so that the reason is what the first (or second) turn writes. */
 const SCENES: Record<string, (rules: Rules, seed: string) => Battle> = {
   par: (rules, seed) => {
     const battle = board(rules, seed, ['tackle'], ['splash']);

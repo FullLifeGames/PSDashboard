@@ -3,7 +3,7 @@ import { lineRequests } from '../src/search/line-donors';
 import type { EvalResult, EvalSettings, MctsTreeStats, RankedChoice, TreeLineStep } from '../src/types';
 
 /**
- * Round 89 (#104), step G2: which lines the lines job replays. Each side's best row and its played row; one request with both roles
+ * Which lines the lines job replays. Each side's best row and its played row; one request with both roles
  * when they are the row; the donors of a row are the trees that hold its line, the ones whose first step answers with the other side's
  * best row first, then by the visits of the first step.
  */
@@ -70,11 +70,7 @@ describe('the requests of the lines job', () => {
   });
 });
 
-/**
- * Round 89 (#104), step G12 (ruling G8a): a tree ships up to three lines for a row, against its own top answers. The donors of a row are
- * every tree's lines, ordered by the rank of the first answer in the merged ranking of the other side (the best answer overall comes
- * first, an answer the ranking does not hold comes last), then by the first step's visits, then by the lower tree.
- */
+// a tree ships up to three lines for a row; an answer the merged ranking does not hold comes last
 describe('the donors follow the merged ranking of the answers', () => {
   const ranking = (answers: [string, string][]): EvalResult => ({
     ...result(),
@@ -121,10 +117,6 @@ describe('the donors follow the merged ranking of the answers', () => {
   });
 });
 
-/**
- * Round 89 (#104), step G13 (ruling G2b): a host that graded the turn with the matrix names the answers its card ranks first
- * (settings.lineReplies, by the side whose lines they are). The donors then meet those answers before the tree's merged ranking.
- */
 describe('a host names the answers its card ranks first (lineReplies)', () => {
   const two = [tree({ Surf: [step('Surf', 'Draining Kiss', 8)], 'Ice Beam': [step('Ice Beam', '→ Mew', 40)] }, { 'Draining Kiss': [[step('Surf', 'Draining Kiss', 30)], [step('Ice Beam', 'Draining Kiss', 12)]] })];
 
@@ -147,11 +139,7 @@ describe('a host names the answers its card ranks first (lineReplies)', () => {
   });
 });
 
-/**
- * Round 89 (#153, Hard mode): beside a row's usual request the job asks for the row's line against the reply that hurts it most
- * (`worstAnswer` of the merged result), from the lines the trees hold against that answer: their lists and their floor lines. Only
- * when a tree holds one, and only when the usual line does not already meet that answer. The usual request stays what it was.
- */
+// the extra request is made only when a tree holds a line against that answer and the usual line does not already meet it
 describe('the line against the reply that hurts a row most (versus worst)', () => {
   /** Surf is hurt most by → Mew (its floor); Ice Beam by Draining Kiss; the best answer overall is Draining Kiss. */
   const hurt = (): EvalResult => ({
