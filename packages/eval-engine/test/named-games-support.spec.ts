@@ -41,3 +41,31 @@ describe('a game rebuilt with every name of the replay in the sets', () => {
     expect(log).toMatch(/\|switch\|p2a: Twin\|Snorlax/);
   }, 60_000);
 });
+
+describe('a team with a backslash or a quote in a name seats its player', () => {
+  test('doubles: names with a backslash, a quote and a trailing backslash on both sides', async () => {
+    const format = 'gen9doublescustomgame';
+    const p1 = [set('Say "hi"', 'Amoonguss'), set('Mouse\\', 'Pikachu')];
+    const p2 = [set('J36Venom/⌵\\', 'Garchomp'), set('Say "hi"', 'Dragapult'), set('Plain', 'Snorlax')];
+    const log = await play(format, p1, p2,
+      ['>p1 team 12', '>p2 team 123', '>p1 move 1 1, move 1 1\n>p2 move 1 1, move 1 1', '>p1 move 1 1, move 1 1\n>p2 switch 3, move 1 1']);
+    expect(log).toMatch(/\|switch\|p2a: J36Venom\/⌵\\\|Garchomp/);
+    const again = await rebuiltWith(format, log, p1, p2);
+    expect(again.entries).toEqual(entries(log));
+    expect(again.turn).toBe(lastTurn(log));
+    expect(again.errors).toBe(0);
+  }, 60_000);
+
+  test('singles: a name with a backslash and a name with a quote', async () => {
+    const format = 'gen9customgame';
+    const p1 = [set('Back\\slash', 'Pikachu'), set('Clef', 'Clefable')];
+    const p2 = [set('Say "hi"', 'Garchomp'), set('End\\', 'Snorlax')];
+    const log = await play(format, p1, p2,
+      ['>p1 team 12', '>p2 team 12', '>p1 move 1\n>p2 move 1', '>p1 move 1\n>p2 switch 2']);
+    expect(log).toMatch(/\|switch\|p2a: Say "hi"\|Garchomp/);
+    const again = await rebuiltWith(format, log, p1, p2);
+    expect(again.entries).toEqual(entries(log));
+    expect(again.turn).toBe(lastTurn(log));
+    expect(again.errors).toBe(0);
+  }, 60_000);
+});
