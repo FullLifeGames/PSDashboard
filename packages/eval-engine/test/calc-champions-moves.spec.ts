@@ -14,7 +14,7 @@ import { loadSimMods } from '../src/forward/sim-mods';
  * power (a power callback excepted: the engine asks the callback), type, category, hit count and the contact, punch,
  * bite, sound and slicing flags. Negative priority is left out on purpose: the calculator reads priority only as
  * "greater than zero", so it has no damage effect. A move's data does not depend on the game type, so one run covers
- * singles and doubles (the roll oracle in champions-roll-oracle.spec.ts prices a spread move in doubles).
+ * singles and doubles (the roll oracle in pokemon-info.spec.ts prices a spread move in doubles).
  * The moves the engine's override layer touches in legal Champions play (the calculator's own data differs from the
  * mod, or has none) go to steps/champions-override-moves.json so the ledger can name them without a list in the test.
  */
