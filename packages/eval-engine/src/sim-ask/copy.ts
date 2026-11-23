@@ -3,10 +3,7 @@ import { deserializeBattleExact, serializeBattleStable } from '../forward/serial
 import { copyBattle } from '../forward/sim-fast/index.ts';
 import { guarded } from './guard.ts';
 
-/**
- * Round 72 (T239): copy and play. A question that has to run the simulator's own code runs on a throw-away copy of
- * the battle with dice of the asker's choosing; the live battle is read and never written.
- */
+// Copy and play: a question that runs the simulator's own code runs on a throw-away copy with dice of the asker's choosing.
 
 /** A throw-away copy: the speed layer's when it is on, else a round trip through the stable serialization. */
 export const copyOf = (battle: Battle): Battle => copyBattle(battle) ?? deserializeBattleExact(serializeBattleStable(battle));
@@ -19,11 +16,10 @@ export interface DiceSpec {
   quantile?: number;
   /** Every `randomChance` answers this; left out, chances draw from the seeded stream as the PRNG does. */
   chance?: boolean;
-  /** Round 89 (#136): every `randomChance` answers yes when it is at least even (an accuracy of 90 hits, a flinch of 30 does not); wins over `chance`. */
+  /** Every `randomChance` answers yes when it is at least even (an accuracy of 90 hits, a flinch of 30 does not); wins over `chance`. */
   likely?: boolean;
 }
 
-/** Dice that answer every draw with one quantile of its range, and optionally every chance with one answer. */
 export class FixedDice extends PRNG {
   private readonly quantile: number;
   private readonly chance: boolean | undefined;
@@ -65,10 +61,7 @@ export class FixedDice extends PRNG {
   }
 }
 
-/**
- * Plays on a copy of the live battle with these dice and returns what `play` returns. With the development check on,
- * a play that left a mark on the live battle throws `AskLeak`.
- */
+/** Plays on a copy of the live battle with these dice and returns what `play` returns; the live battle is never written. */
 export function playOnCopy<T>(live: Battle, dice: PRNG, play: (copy: Battle) => T, extras: readonly unknown[] = []): T {
   return guarded(live, extras, () => {
     const copy = copyOf(live);

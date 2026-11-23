@@ -1,23 +1,14 @@
-// Round 89 (#108): a body that fell before it acted is bounded by the order rules the caller reads from the simulator (`branch/action-bound.ts`).
-// Round 75 (T160): move priorities (the stay-in phantom) and the setup moves are read by the replay's own Dex, handed in by the caller.
 import type { EvalResult, RankedChoice } from '../types.ts';
 import type { PlayedAction, PlayedBounds, PlayedTurn, SlotBound } from '../played.ts';
 import type { SideAnalysis } from './types.ts';
 import { dexOf, toId, type GameRules, type RulesDex } from '@fulllifegames/replay-core';
 import { setupMoves } from '../dex-facts/setup.ts';
 
-/**
- * Matching the protocol's played actions into the engine's ranked lists:
- * singles by choice id, doubles per slot (charitable when a slot stayed
- * hidden), the stay-in phantom for sides KO'd before acting, and the
- * condensed "why" between a played and a recommended choice.
- */
+// Matching the protocol's played actions into the engine's ranked lists, and the condensed "why" between a played and a recommended choice.
 
 /**
- * Pure self-boosting moves. The maximin worst case prices a setup turn as
- * "took a hit for nothing" — the boost's payoff lies past the search
- * horizon, so regret against these moves reads systematically high.
- * Round 72 (W2): read from the Dex's boost fields plus five handler moves
+ * Pure self-boosting moves. The maximin worst case prices a setup turn as "took a hit for nothing" (the boost's payoff lies past the
+ * search horizon), so regret against these moves reads systematically high. Read from the Dex's boost fields plus five handler moves
  * (dex-facts/setup.ts), held to the simulator by test/setup-moves-oracle.spec.ts.
  */
 export const setupMovesOf = (dex: RulesDex): ReadonlySet<string> => setupMoves(dex);
@@ -30,10 +21,10 @@ export function setupMoveClicked(side: Pick<SideAnalysis, 'playedSlots' | 'playe
   return setup?.name ?? null;
 }
 
-/** The setup move this side actually clicked, if any (display name): the record carries it (round 75, T160). */
+/** The setup move this side actually clicked, if any (display name), as the record carries it. */
 export const playedSetupMove = (side: Pick<SideAnalysis, 'setupMove'>): string | null => side.setupMove ?? null;
 
-/** "Tera + X" labels contain the slot separator — re-merge after splitting. */
+/** "Tera + X" labels contain the slot separator, so they are re-merged after splitting. */
 export const splitCombinedLabel = (label: string): string[] => {
   const segments = label.split(' + ');
   const parts: string[] = [];
@@ -50,8 +41,7 @@ export const splitCombinedLabel = (label: string): string[] => {
 
 function slotMatches(choicePart: string, labelPart: string, action: PlayedAction): boolean {
   if (action.kind === 'switch') return labelPart === `→ ${action.species ?? action.name}`;
-  // A pivot pair ("move uturn > switch 4") must bring in the Pokémon the
-  // player actually chose; with the target unknown (old parses) any pair of
+  // A pivot pair ("move uturn > switch 4") must bring in the Pokémon the player actually chose; with the target unknown any pair of
   // the move matches and ranking order picks the charitable one.
   if (action.pivotTarget && choicePart.includes(' > ') &&
     labelPart.split(' → ').pop() !== action.pivotTarget) {
@@ -59,8 +49,7 @@ function slotMatches(choicePart: string, labelPart: string, action: PlayedAction
   }
   const tokens = choicePart.split(' ');
   if (tokens[0] !== 'move' || tokens[1] !== toId(action.name)) return false;
-  // Every gimmick marker must agree — a mega move must match the mega
-  // variant, never the base option (VGC 2026 brought Megas back to gen 9).
+  // Every gimmick marker must agree: a mega move matches the mega variant, never the base option (gen 9 VGC has Megas).
   if (tokens.includes('terastallize') !== !!action.tera) return false;
   if (tokens.includes('mega') !== !!action.mega) return false;
   if (tokens.includes('ultra') !== !!action.ultra) return false;
@@ -70,11 +59,7 @@ function slotMatches(choicePart: string, labelPart: string, action: PlayedAction
   return true;
 }
 
-/**
- * Finds the combined (doubles) option matching the side's per-slot actions.
- * Generic over anything with choice + label, so the search restriction can
- * use it on raw options and the analysis on ranked results.
- */
+/** The combined (doubles) option matching the side's per-slot actions; generic over anything with choice and label, so the search restriction can use it on raw options. */
 export function findPlayedOption<T extends { choice: string; label: string }>(
   options: T[],
   slots: (PlayedAction | null)[] | undefined,
@@ -89,11 +74,7 @@ export function findPlayedOption<T extends { choice: string; label: string }>(
   }) ?? null;
 }
 
-/**
- * Combos consistent with the OBSERVED slots — hidden (null) slots match
- * anything. Empty when no slot was observed at all: with nothing visible
- * there is nothing to grade.
- */
+/** Combos consistent with the observed slots (hidden null slots match anything); empty when no slot was observed, since there is nothing to grade. */
 export function findConsistentOptions<T extends { choice: string; label: string }>(
   options: T[],
   slots: (PlayedAction | null)[] | undefined,
@@ -114,10 +95,7 @@ function ruledOut(choicePart: string, bound: SlotBound): boolean {
   return tokens[0] === 'switch' ? bound.switchOut : tokens[0] === 'move' && bound.moves.includes(tokens[1] ?? '');
 }
 
-/**
- * Round 89 (#108): the options a hidden slot's bound leaves. A bound that leaves none is no proof (the log and the queue disagree), and
- * the options stay as they are.
- */
+/** The options a hidden slot's bound leaves; a bound that leaves none is no proof (the log and the queue disagree), and the options stay. */
 function withinBounds(options: RankedChoice[], slots: (PlayedAction | null)[], bounds: (SlotBound | null)[] | undefined): RankedChoice[] {
   if (!bounds) return options;
   const kept = options.filter(option => {
@@ -131,11 +109,9 @@ function withinBounds(options: RankedChoice[], slots: (PlayedAction | null)[], b
 }
 
 /**
- * Doubles matcher: the exact combo when every slot was observed, otherwise
- * the CHARITABLE pick among consistent combos — the hidden slot is assumed
- * to have chosen whatever grades best, so regret becomes a lower bound.
- * Round 89 (#108): a hidden slot that fell before it acted carries a bound (per slot, optional): the moves and the switch the order rules
- * out are not among the consistent combos. Absent, the pick is as before.
+ * Doubles matcher: the exact combo when every slot was observed, otherwise the CHARITABLE pick among consistent combos (the hidden slot is
+ * assumed to have chosen whatever grades best, so regret becomes a lower bound). A hidden slot that fell before it acted carries a bound
+ * (per slot, optional): the moves and the switch the order rules out are not among the consistent combos.
  */
 export function matchPlayedSlots(
   options: RankedChoice[],
@@ -167,12 +143,7 @@ const moveDisplayName = (labelPart: string): string =>
 const partPhrase = (labelPart: string): string =>
   labelPart.startsWith('→ ') ? `switching to ${labelPart.slice(2)}` : labelPart;
 
-/**
- * The condensed "why" between the played and the recommended choice: names
- * the single structural difference when there is exactly one — a skipped
- * gimmick, a move's target, or one slot of a doubles pair. Null when the
- * choices differ wholesale (the full labels already tell that story).
- */
+/** The condensed "why" between the played and the recommended choice: the single structural difference (a skipped gimmick, a move's target, one slot of a pair), else null. */
 export function diffChoices(played: RankedChoice, best: RankedChoice): string | null {
   const playedParts = played.choice.split(',').map(part => part.trim().split(' '));
   const bestParts = best.choice.split(',').map(part => part.trim().split(' '));
@@ -198,15 +169,14 @@ export function diffChoices(played: RankedChoice, best: RankedChoice): string | 
       diffs.push(`only the target of ${moveDisplayName(bestLabels[index] ?? best.label)}`);
       continue;
     }
-    // A whole-action difference only condenses when it is one slot of a
-    // multi-slot pair — for a single action the full labels say it all.
+    // A whole-action difference only condenses when it is one slot of a multi-slot pair.
     if (playedParts.length === 1) return null;
     diffs.push(`${partPhrase(bestLabels[index] ?? best.label)} instead of ${partPhrase(playedLabels[index] ?? played.label)}`);
   }
   return diffs.length === 1 ? diffs[0] : null;
 }
 
-/** Side dispatcher: doubles slots when present, singles action otherwise. */
+/** The ranked option a side's played action matches: doubles slots when present, the singles action otherwise. */
 export function matchPlayedSide(
   result: EvalResult,
   side: 'p1' | 'p2',
@@ -220,10 +190,8 @@ export function matchPlayedSide(
 }
 
 /**
- * Round 69 (T64): the choice a side actually CLICKED, as a ranked option of its list (the opponent's column in a
- * hindsight read). Doubles slots go through the exact matcher: a hidden slot gives no click (the charitable pick of
- * matchPlayedSlots is for grading a side, not for saying what was clicked); singles go through matchPlayedChoice,
- * whose pivot pair rows share findPlayedOption.
+ * The choice a side actually CLICKED, as a ranked option of its list (the opponent's column in a hindsight read). A hidden doubles slot
+ * gives no click: the charitable pick of `matchPlayedSlots` is for grading a side, not for saying what was clicked.
  */
 export function matchClickedColumn(
   result: EvalResult,
@@ -236,21 +204,7 @@ export function matchClickedColumn(
   return matchPlayedChoice(result, side, played[side]);
 }
 
-/**
- * Stand-in for a side KO'd before it ever acted (`prevented: 'faint'` with
- * no action line): the KO-before-acting logic proves the side chose a MOVE
- * (a chosen switch would have resolved before the attack), and every
- * priority-0 move is outcome-equivalent — none of them executed. The
- * best-ranked priority-0 move represents the stay-in most charitably; a
- * priority choice cannot represent it (it would have preempted the KO).
- * Null when the marker is absent, the parse is doubles-shaped, or only
- * priority moves exist. Cant-family preventions (sleep, flinch, full
- * paralysis) get NO phantom — their hidden choice may have mattered.
- * Round 89 (#108): with the side's order bound (`ruledOutMoves`: the simulator's priority and speed against the actions the log shows
- * before the fall) the best-ranked move the bound does not rule out stands in, and the Dex priority is not read: Prankster, Grassy Glide
- * and the other handlers move a status move or an attack above 0, and a slower body's own priority move is no contradiction. A bound that
- * rules out every move is no proof, and the Dex pick stays. Absent, the pick is as before.
- */
+/** The stay-in phantom: the ranked move that stands for a side KO'd before it acted, or null. */
 export function phantomStayIn(
   result: EvalResult,
   side: 'p1' | 'p2',
@@ -258,6 +212,13 @@ export function phantomStayIn(
   rules: GameRules | undefined,
   bound?: SlotBound | null,
 ): RankedChoice | null {
+  // A KO before acting proves the side chose a MOVE (a chosen switch would have resolved before the attack), and every priority-0 move is
+  // outcome-equivalent, since none executed: the best-ranked priority-0 move represents the stay-in most charitably, a priority choice
+  // cannot (it would have preempted the KO). Cant-family preventions (sleep, flinch, full paralysis) get NO phantom: their hidden choice
+  // may have mattered. With the side's order bound (`ruledOutMoves`: the simulator's priority and speed against the actions the log shows
+  // before the fall, `branch/action-bound.ts`) the best-ranked move the bound does not rule out stands in and the Dex priority is not read:
+  // Prankster and Grassy Glide move a move above 0, and a slower body's own priority move is no contradiction. A bound that rules out
+  // every move is no proof, and the Dex pick stays.
   if (!played || played[side] !== null || !rules) return null;
   const dex = dexOf(rules);
   if (played.p1Slots || played.p2Slots) return null;
@@ -269,6 +230,7 @@ export function phantomStayIn(
   return option ? { ...option, label: 'stayed in (KO’d before acting)' } : null;
 }
 
+/** The ranked option the side's single played action matches: a move through the slot matcher, a switch by its label. */
 export function matchPlayedChoice(
   result: EvalResult,
   side: 'p1' | 'p2',
@@ -276,13 +238,10 @@ export function matchPlayedChoice(
 ): RankedChoice | null {
   if (!action) return null;
   const options = result.perSide[side];
-  // Moves go through the slot matcher: the root matrix lists a pivot ONLY
-  // as pairs ("move uturn > switch 2"), so an exact-choice lookup left a
-  // played U-turn unmatched (draft t1 read "not among the engine's
-  // options" while "U-turn → Kyurem" sat in the matrix).
+  // Moves go through the slot matcher: the root matrix lists a pivot ONLY as pairs ("move uturn > switch 2"), so an exact-choice
+  // lookup would leave a played U-turn unmatched.
   if (action.kind === 'move') return findPlayedOption(options, [action]);
-  // Labels carry species names; the nickname is only a fallback for logs
-  // where the species could not be parsed.
+  // Labels carry species names; the nickname is only a fallback for logs where the species could not be parsed.
   return (action.species ? options.find(option => option.label === `→ ${action.species}`) : undefined) ??
     options.find(option => option.label === `→ ${action.name}`) ?? null;
 }

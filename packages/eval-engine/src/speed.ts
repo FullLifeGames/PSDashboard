@@ -2,20 +2,11 @@ import type { Battle, Pokemon } from '@pkmn/sim';
 import { stageMultiplier } from './stat-stages.ts';
 
 /**
- * Effective speed for move-order decisions: the sim's getStat('spe') rebuilt
- * as a list, because asking the sim directly cost the static 15 to 22 %
- * (round 60, T95 time gate). speed-oracle.spec.ts checks every rule and every
- * body of the committed bank positions against getStat (at most 1 apart).
- * The list reads the sim's own state where the sim decides: suppressed
- * abilities and items (ignoringAbility, ignoringItem: Neutralizing Gas,
- * Klutz), the weather a holder feels (effectiveWeather: Utility Umbrella,
- * Air Lock), the Unburden, Protosynthesis and Quark Drive volatiles.
- * Deliberately not modeled: Slow Start, Lagging Tail/Full Incense
- * (move-order, not speed), Quick Powder.
- *
- * A benched body is read as if on the field: the sim ignores the item and
- * ability of an inactive Pokémon from gen 5 on, the static compares benched
- * bodies as if they stood there, so isActive is set for this call only.
+ * Effective speed for move-order decisions: the sim's getStat('spe') rebuilt as a list (asking the sim cost the static 15 to 22 %).
+ * It reads the sim's own state where the sim decides (ignoringAbility, ignoringItem, effectiveWeather, the Unburden, Protosynthesis and
+ * Quark Drive volatiles). Not modeled: Slow Start, Lagging Tail and Full Incense (move order, not speed), Quick Powder.
+ * A benched body is read as if on the field (the sim ignores the item and ability of an inactive Pokémon from gen 5 on); `isActive` is set
+ * for this call only.
  */
 export function effectiveSpeed(pokemon: Pokemon, battle: Battle): number {
   if (pokemon.isActive) return listSpeed(pokemon, battle);
@@ -68,10 +59,8 @@ function itemFactor(pokemon: Pokemon): number {
 }
 
 /**
- * Who acts first in a pairing: a usable priority move outranks speed (the
- * beatsPair rule), then effective speed compares — inverted under Trick
- * Room. An exact tie is never "first" (speed tie = coin flip; keeps the
- * strict > of the old tie-break).
+ * Who acts first in a pairing: a usable priority move outranks speed, then effective speed compares, inverted under Trick Room.
+ * An exact tie is never "first" (a speed tie is a coin flip).
  */
 export function movesFirst(
   a: Pokemon,

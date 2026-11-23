@@ -5,16 +5,10 @@ import {
 import { heldDecided } from './decided-held.ts';
 import { forcedWinSpeaks } from './forced-speech.ts';
 
-/**
- * Round 15: the decided sweep / the near-decided roll — board states, not
- * click context: they attach to the owning side on every turn they hold
- * (display layers book resolution prose from the state) and announce only
- * until the game report has spoken them once. Round 35 adds the proven
- * forced win, which speaks for the board when it speaks. Narrative only:
- * computed where the full result is in scope (signals.ts), never graded.
- */
+// The decided sweep, the near-decided roll and the proven forced win: board states that attach to the owning side on every turn they hold
+// and announce only until the game report has spoken them once. Narrative only, never graded.
 
-/** Round 35: the forced win for this side, spoken once by the report; when it speaks, the decided stages stay quiet. */
+/** The forced win for this side, spoken once by the report; when it speaks, the decided stages stay quiet. */
 function forcedWinSignal(params: AnalyzeTurnParams, key: Side): SideAnalysis['forcedWin'] {
   const forced = params.result.forcedWin;
   if (!forced || forced.side !== key) return undefined;
@@ -29,27 +23,21 @@ function forcedWinSignal(params: AnalyzeTurnParams, key: Side): SideAnalysis['fo
 }
 
 /**
- * Round 63 (T18): the near stage speaks once a quarter of the bodies has
- * fallen (the auto mode's phase line). Gated on announce, so the report
- * walk speaks it at the first turn in phase; the state stays for the
- * denied-early-end reading. An unknown share keeps the gate off.
+ * The near stage speaks once a quarter of the bodies has fallen (the auto mode's phase line); gated on announce, so the report walk speaks
+ * it at the first turn in phase, and the state stays for the denied-early-end reading. An unknown share keeps the gate off.
  */
 const nearInPhase = (params: AnalyzeTurnParams): boolean =>
   params.faintedFraction === undefined || params.faintedFraction === null ||
   params.faintedFraction >= AUTO_MCTS_FAINTED_FRACTION;
 
 /**
- * Round 63 (T18): the card's own outcome still backs the sweep — the
- * after-score holds the decided line (DECIDED_SCORE) for the side, or the
- * game ended. A turn that undid it says so in its estimate; "from here X
- * clears everything" would contradict it (649664 t23: 16% to 81% the other
- * way; 573756 t124: down to 0.39). The near stage has no such gate: its
- * sentence is about a roll that may fail (573756 t73).
+ * The card's own outcome still backs the sweep: the after-score holds the decided line for the side, or the game ended. A turn that
+ * undid it says so in its estimate, and "from here X clears everything" would contradict it. The near stage has no such gate: its
+ * sentence is about a roll that may fail.
  */
 const outcomeHolds = (params: AnalyzeTurnParams, key: Side): boolean =>
   params.scoreAfter === null || (key === 'p1' ? params.scoreAfter : -params.scoreAfter) >= DECIDED_SCORE;
 
-/** Round 50: the sweep needs the search's key (heldDecided); the near stage below does not. */
 function decidedStage(params: AnalyzeTurnParams, key: Side): SideAnalysis['decided'] {
   const ownDecided = heldDecided(params.result);
   if (!ownDecided || ownDecided.side !== key) return undefined;
@@ -72,30 +60,21 @@ function nearStage(params: AnalyzeTurnParams, key: Side): SideAnalysis['nearDeci
 /** A spoken claim's marker: it was spoken while the side's bar sat inside the decided zone. */
 const zoneMarker = (claim: string): string => `${claim}:zone`;
 
-/**
- * Round 64 (T123): the walk notes a spoken decided or forced key, and when
- * the turn's bar read the side at DECIDED_SCORE or beyond, also that it was
- * spoken inside the decided zone (releaseBrokenClaims needs it).
- */
+/** Notes a spoken decided or forced key, and, when the turn's bar read the side at DECIDED_SCORE or beyond, that it was spoken in the decided zone. */
 export function noteSpokenClaim(seen: Set<string>, claim: string, key: Side, scoreBefore: number): void {
   seen.add(claim);
   if ((key === 'p1' ? scoreBefore : -scoreBefore) >= DECIDED_SCORE) seen.add(zoneMarker(claim));
 }
 
-/**
- * Round 64 (T123): the report walk speaks a side's decided and forced
- * sentences once, until the board leaves the decided zone: a claim spoken
- * inside the zone is forgotten once a later turn's bar reads the side under
- * DECIDED_SCORE, and a new sweep or proof speaks again (2630685175: decided
- * at t6, the bar fell to 16% at t7, decided again at t10). The release is a
- * transition: a proof spoken under the line (an open event holding the bar
- * at 0.65) left no zone and stays spoken, or it would repeat every turn.
- * Near keys stay; a near stage lives under the line by nature (573756 t73).
- */
+/** Forgets the decided and forced claims spoken inside the decided zone once the side's bar falls under DECIDED_SCORE. */
 export function releaseBrokenClaims(seen: Set<string>, scoreBefore: number): void {
+  // The report walk speaks a side's decided and forced sentences once, until the board leaves the decided zone: a claim spoken inside the
+  // zone is forgotten once a later turn's bar reads the side under DECIDED_SCORE, and a new sweep or proof speaks again (decided at t6, the
+  // bar fell to 16% at t7, decided again at t10). A proof spoken under the line (an open event holding the bar at 0.65) left no zone and
+  // stays spoken, or it would repeat every turn. Near keys stay: a near stage lives under the line by nature.
   for (const key of ['p1', 'p2'] as const) {
     if ((key === 'p1' ? scoreBefore : -scoreBefore) >= DECIDED_SCORE) continue;
-    // The decided stage keys on the side alone (round 63), whatever the species.
+    // The decided stage keys on the side alone, whatever the species.
     for (const claim of [decidedSeenKey(key, { species: '' }), forcedWinSeenKey(key)]) {
       if (!seen.has(zoneMarker(claim))) continue;
       seen.delete(claim);
@@ -111,8 +90,7 @@ export function decidedSignals(
   let decided = decidedStage(params, key);
   let nearDecided = nearStage(params, key);
   const forcedWin = forcedWinSignal(params, key);
-  // Round 63 (T18): once the report has spoken the side's proof, its decided
-  // stages add nothing (648453: t36 and t39 after the proof at t35).
+  // Once the report has spoken the side's proof, its decided stages add nothing.
   const proofSpoken = params.decidedSeen?.has(forcedWinSeenKey(key)) ?? false;
   if (proofSpoken || forcedWinSpeaks(forcedWin, key === 'p1' ? params.scoreBefore : -params.scoreBefore)) {
     // The proof speaks for the board; the decided stages keep their state, quietly.

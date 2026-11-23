@@ -1,13 +1,9 @@
 import type { Battle } from '@pkmn/sim';
 import { serializeBattleStable } from '../forward/serialize.ts';
 
-/**
- * Round 72 (T239): the development check of the module that asks the simulator. A question to the simulator runs on a
- * copy (AGENTS.md); the check proves the live battle came out of the question as it went in. It costs milliseconds (a
- * whole serialization twice), so it is off in the app and the bank and on in specs (`setAskCheck(true)`) and under
- * `EVAL_ASK_CHECK=1` in a Node run, the way `EVAL_SIM_FAST` is read: through `globalThis.process`, so the browser
- * bundle never touches `process`.
- */
+// The development check of the module that asks the simulator: it proves the live battle came out of a question as it went in. It costs a
+// whole serialization twice, so it is on in specs (`setAskCheck(true)`) and under `EVAL_ASK_CHECK=1`; read through `globalThis.process`
+// so the browser bundle never touches `process`.
 
 interface ProcessLike { env?: Record<string, string | undefined> }
 
@@ -33,10 +29,7 @@ export class AskLeak extends Error {
 
 const stable = (value: unknown): string => JSON.stringify(value, (_key, inner: unknown) => (typeof inner === 'function' ? 'fn' : inner));
 
-/**
- * Everything one question could leave behind: the whole stable serialization (sides, bodies, field, queue, log, dice),
- * the event bookkeeping, and the JSON of the Dex entries the question read.
- */
+/** Everything one question could leave behind: the stable serialization, the event bookkeeping and the JSON of the Dex entries read. */
 export function fingerprint(battle: Battle, extras: readonly unknown[] = []): string {
   return JSON.stringify({
     state: serializeBattleStable(battle),

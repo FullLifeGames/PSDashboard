@@ -3,22 +3,17 @@ import type { KoOddsInfo, MatrixCell, RankedChoice } from '../types.ts';
 import { matchClickedColumn } from './played-match.ts';
 import type { AnalyzeTurnParams, Side, SideAnalysis } from './types.ts';
 
-/**
- * Round 70 (gate of 13.10.2026 20:26, 4a): which KO-odds claims of a side's clause price a hit that never landed against the
- * opponent's actual click. A claim ("Tera Starstorm kills ~4% of the time") is priced on the board before the turn and says
- * nothing about the opponent's reply; when that reply stops the hit (Wide Guard turns Tera Starstorm away, a Protect a single
- * hit) the note quotes a roll that did not happen (VGC 2630685175 turn 7). The answer comes from the cell of the line against
- * the click, which the search priced from the simulator's own turn, so no move name enters here:
- *  - a cell the planner calls plain ("none") holds no uncertain hit at all, so every claim of that cell never landed;
- *  - a doubles cell lists the events of its classes with their attacker slot and move (`p1b:terastarstorm>p2b=hit-nokill`);
- *    a claim whose attacker slot and move have no event there never landed. A singles class names no move, so a singles cell
- *    that holds a roll keeps the claim.
- * A cell the search did not plan or failed on, and a claim the cell still lists, keep the claim. Display only, pure.
- */
+// Which KO-odds claims of a side's clause price a hit that never landed against the opponent's actual click. A claim ("Tera Starstorm kills
+// ~4% of the time") is priced on the board before the turn; when the reply stops the hit (Wide Guard turns Tera Starstorm away, a Protect a
+// single hit) the note would quote a roll that did not happen. The answer comes from the cell of the line against the click, which the
+// search priced from the simulator's own turn, so no move name enters here:
+//  - a cell the planner calls plain ("none") holds no uncertain hit, so every claim of that cell never landed;
+//  - a doubles cell lists the events of its classes with their attacker slot and move (`p1b:terastarstorm>p2b=hit-nokill`); a claim whose
+//    attacker slot and move have no event there never landed. A singles class names no move, so a singles cell that holds a roll keeps the claim.
+// A cell the search did not plan or failed on, and a claim the cell still lists, keep the claim. Display only, pure.
 
 const SLOT_LETTERS = ['a', 'b', 'c'];
 
-/** The claim's hit has no uncertain outcome in the cell of its line against the click. */
 function claimStopped(cell: MatrixCell | undefined, odds: KoOddsInfo, side: Side): boolean {
   if (!cell) return false;
   if (cell.plan === 'none') return true;
@@ -54,10 +49,7 @@ function shownRecommendation(
     : { line: best, odds: best?.koOdds };
 }
 
-/**
- * The claims of one side's clause the actual click stops: the played line's KO odds and the shown recommendation's.
- * Undefined when no claim is stopped or the result carries no cell facts.
- */
+/** The claims of one side's clause the actual click stops (the played line's KO odds and the shown recommendation's); undefined when none or without cell facts. */
 export function hitStoppedFor(
   params: AnalyzeTurnParams,
   key: Side,

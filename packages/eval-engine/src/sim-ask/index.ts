@@ -1,9 +1,4 @@
-/**
- * Round 72 (T239): the one module that asks the simulator. A stand-in factory per format (`twinBattle`, `twinFormat`),
- * copy-and-play with fixed dice (`copyOf`, `FixedDice`, `playOnCopy`), a handler call with a throwaway `this`
- * (`callHandler`, `isolated`), the aim of a move whose target the log hides (`aimThatFailsAsLogged`), whether a protector stops a hit (`protectorStops`), the speed tie of two actions (`actionsTie`), the priority and speed of one (`actionPriority`, `queuePlace`, `activated`) and the development check that proves the live battle unchanged (`fingerprint`,
- * `setAskCheck`). Not part of the package barrel: the engine's own files import it.
- */
+// The one module that asks the simulator (copy and play, handler calls, action order, protectors, the development check); not in the package barrel.
 export { askCheckOn, AskLeak, fingerprint, guarded, setAskCheck } from './guard.ts';
 export { copyOf, FixedDice, playOnCopy } from './copy.ts';
 export { queuePlace, actionPriority, actionsTie, activated } from './action-order.ts';

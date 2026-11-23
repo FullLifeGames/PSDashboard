@@ -6,22 +6,13 @@ import { matchClickedColumn } from './played-match.ts';
 import { rulesOfActives } from './rules.ts';
 import type { AnalyzeTurnParams, Side, SideAnalysis, TurnAnalysis } from './types.ts';
 
-/**
- * Round 67 (T22 stage a): the luck ledger in two parts, what the turn rolled
- * and what the engine re-read. The chance residual (scoreAfter minus the
- * played pair's value) holds both: since the tree runs from the first turn,
- * most of it is the next root pricing the position differently from the
- * played cell (649664 t12: the only roll, a 90% High Jump Kick, went the
- * other way). A turn rolled for a side when a protocol dice marker favored
- * it, or when a played line's KO odds came out its way on the body they
- * priced; display only, the attribution and every number stay. Pure, the
- * Dex is data only.
- */
+// The luck ledger in two parts, what the turn rolled and what the engine re-read. The chance residual (scoreAfter minus the played pair's
+// value) holds both: most of it is the next root pricing the position differently from the played cell (the only roll, a 90% High Jump
+// Kick, went the other way). Display only, the attribution and every number stay. Pure, the Dex is data only.
 
 /**
- * A KO roll counts as rolled when the other outcome had at least this
- * chance on the played odds, in the whole percents the cards print: a 90%
- * hit that knocks out counts, a 4% kill range that does not kill is none.
+ * A KO roll counts as rolled when the other outcome had at least this chance on the played odds, in the whole percents the cards print:
+ * a 90% hit that knocks out counts, a 4% kill range that does not kill is none.
  */
 export const ROLL_MIN_CHANCE = 0.1;
 
@@ -45,11 +36,9 @@ function pricedEvent(side: Pick<SideAnalysis, 'played'>, defender: string | null
 }
 
 /**
- * The side a played line's KO odds favored, as the protocol shows the event
- * on the body they priced: the knock-out favors the attacker, a hit the body
- * survived favors the body's side, each only when the other outcome was a
- * real chance. Null when the event did not happen (a miss is a marker; a
- * switch-out, a Protect or an unreached body is no roll).
+ * The side a played line's KO odds favored, as the protocol shows the event on the body they priced: a knock-out favors the attacker, a hit
+ * the body survived favors the body's side, each only when the other outcome was a real chance. Null when the event did not happen (a miss
+ * is a marker; a switch-out, a Protect or an unreached body is no roll).
  */
 function oddsFavor(rolls: TurnRolls, key: Side, side: Pick<SideAnalysis, 'played'>, defender: string | null | undefined, rules: GameRules | undefined): Side | null {
   const event = pricedEvent(side, defender);
@@ -64,10 +53,8 @@ function oddsFavor(rolls: TurnRolls, key: Side, side: Pick<SideAnalysis, 'played
 }
 
 /**
- * The sides the turn's rolls favored: the protocol's dice markers, then each
- * played line's KO odds as they came out. Doubles: an option's odds belong
- * to its labeled slot (round 56), so the partner slot adds no odds-based
- * roll; its markers count like any other.
+ * The sides the turn's rolls favored: the protocol's dice markers, then each played line's KO odds as they came out. In doubles an option's
+ * odds belong to its labeled slot, so the partner slot adds no odds-based roll; its markers count like any other.
  */
 export function rolledSides(
   rolls: TurnRolls,
@@ -102,9 +89,9 @@ export function playedMoveIds(played: PlayedTurn | null | undefined): string[] {
 }
 
 /**
- * Round 70 (T217): whether any of the moves carries a secondary effect that may or may not happen: a chance under 100 on a
- * status, a stat change or a flinch (Body Slam's paralysis, Scald's burn, Earth Power's drop), read from the Dex. The planner
- * prices the accuracy and the kill range of a hit and nothing else, so such an effect sits in a cell it calls plain.
+ * Whether any of the moves carries a secondary effect that may or may not happen (a chance under 100 on a status, a stat change or a
+ * flinch: Body Slam's paralysis, Scald's burn, Earth Power's drop), read from the Dex. The planner prices the accuracy and the kill range
+ * of a hit and nothing else, so such an effect sits in a cell it calls plain.
  */
 function rollsUnpricedEffect(moves: readonly string[], rules: GameRules): boolean {
   const dex = dexOf(rules);
@@ -115,14 +102,11 @@ function rollsUnpricedEffect(moves: readonly string[], rules: GameRules): boolea
 }
 
 /**
- * Round 69 (T178): what the played cell's outcome classes say about the turn when the turn's protocol is missing. A
- * cell with at least two classes, each weighted strictly between 0 and 1, held a real roll. The classes do not say which
- * way it went, so a rolled cell counts for both sides and the residual's direction is not checked. A cell the planner
- * calls plain ("none") or holds in one class has no PRICED roll (round 70, T217; review finding 4 of round 69: the planner
- * prices the accuracy and the kill range of a hit): it rolled nothing unless a move of the pair carries a secondary effect
- * under 100%, which may have rolled and which `moves` names. Undefined where the planner gave no answer (a doubles cell the
- * search did not plan, fail, a result from before the field) and where such an effect leaves the question open: the
- * sentences keep their ungated form.
+ * What the played cell's outcome classes say about the turn when the turn's protocol is missing. A cell with at least two classes, each
+ * weighted strictly between 0 and 1, held a real roll; the classes do not say which way it went, so a rolled cell counts for both sides.
+ * A cell the planner calls plain ("none") or holds in one class has no PRICED roll: it rolled nothing unless a move of the pair carries a
+ * secondary effect under 100%, which `moves` names. Undefined where the planner gave no answer (a doubles cell the search did not plan,
+ * a failed plan, a result without the field) and where such an effect leaves the question open: the sentences keep their ungated form.
  */
 export function rolledFromCell(
   cell: MatrixCell | null,
@@ -131,15 +115,14 @@ export function rolledFromCell(
 ): { p1: boolean; p2: boolean } | undefined {
   if (!cell || (cell.plan !== 'none' && (cell.plan !== 'events' || !cell.classes))) return undefined;
   const real = (cell.classes ?? []).filter(entry => entry.weight > 0 && entry.weight < 1).length >= 2;
-  // Round 75 (T160): without the game's generation the secondary effects cannot be read, and the question stays open.
+  // Without the game's generation the secondary effects cannot be read, and the question stays open.
   if (!real && (!rules || rollsUnpricedEffect(moves, rules))) return undefined;
   return { p1: real, p2: real };
 }
 
 /**
- * The sides the turn's rolls favored: the protocol's markers and the played odds when the turn has its log, else the classes
- * of the played cell. Undefined where neither answers. The sides enter as their matched played lines, so the sack gates can
- * ask before the side records exist (round 79, hazard sack).
+ * The sides the turn's rolls favored: the protocol's markers and the played odds when the turn has its log, else the classes of the played
+ * cell. Undefined where neither answers. The sides enter as their matched played lines, so the sack gates can ask before the side records exist.
  */
 export function turnRolledFor(
   params: AnalyzeTurnParams,
@@ -164,8 +147,7 @@ export interface LuckSplit {
 }
 
 /**
- * The ledger split over the same turns as the report's chanceTotal
- * (resolution turns stay out). Null unless every turn carries its rolls:
+ * The ledger split over the same turns as the report's chanceTotal (resolution turns stay out). Null unless every turn carries its rolls:
  * without the protocol the report keeps the marker anchor's gates.
  */
 export function luckSplit(known: TurnAnalysis[], resolution: ReadonlySet<number>): LuckSplit | null {

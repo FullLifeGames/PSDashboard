@@ -4,9 +4,7 @@ import { askCheckOn, AskLeak, guarded } from './guard.ts';
 import { callHandler } from './handler.ts';
 import { bodyInView, isolated } from './isolated.ts';
 
-/**
- * Round 70, round 72 (T239): whether a protector stops a hit, asked from the protector's own handler.
- */
+// Whether a protector stops a hit, asked from the protector's own handler.
 
 type HitHandler = (this: unknown, target: unknown, source: unknown, move: unknown) => unknown;
 
@@ -14,14 +12,11 @@ type HitHandler = (this: unknown, target: unknown, source: unknown, move: unknow
 const stopsAsked = new WeakMap<Pokemon, WeakMap<Pokemon, Map<string, boolean>>>();
 
 /**
- * Round 72 (T256, step 7d): the answers every board shares, per Dex. The handlers of the Protect family (shieldsFromHits and
- * shieldsSide of dex-facts/protect.ts) read the attack (its flags, target, category, priority, Z and Max power) and ask the
- * simulator whether a HitProtect handler of the field lets the hit through (`checkMoveBypassesProtect`); what they do to the
- * bodies (the punishments of King's Shield and its kin, the lockedmove counter) is a write and never changes the return. So the
- * answer for a protector and an attack is the same on every board where `findEventHandlers(source, 'HitProtect', target)` finds
- * no handler, which is the call `runEvent` makes. A board with such a handler (Unseen Fist in the Champions mod, Piercing Drill)
- * keeps the question on its own bodies. A first ask on views costs about 60 us, and a search asks fresh bodies every position.
- * test/protector-memo.spec.ts plays every protector against boards that differ in everything else a handler could read.
+ * The answers every board shares, per Dex. The handlers of the Protect family (`shieldsFromHits`, `shieldsSide`) read the attack and ask
+ * the simulator whether a HitProtect handler of the field lets the hit through (`checkMoveBypassesProtect`); what they do to bodies is a
+ * write and never changes the return. So the answer is the same on every board where `findEventHandlers(source, 'HitProtect', target)`
+ * finds no handler (the call `runEvent` makes). A board with such a handler (Unseen Fist in the Champions mod, Piercing Drill) keeps the
+ * question on its own bodies.
  */
 const sharedStops = new WeakMap<object, Map<string, boolean>>();
 
@@ -101,17 +96,13 @@ function askBoard(battle: Battle, protector: DexMove, handler: HitHandler, attac
 }
 
 /**
- * Whether the protector's condition stops `attack` from `source` on `target`: the simulator's own onTryHit, run through
- * `callHandler` on copy-on-write views of the battle, both bodies and the attack, so it writes nothing the live battle can see,
- * whatever it does to them. The protector sets a side condition (Wide Guard) or a volatile on its user (Protect and its kin, gate of
- * 13.10. 20:26, 3a). The handler returns nothing for a hit it lets through and the simulator's NOT_FAIL for a hit it stops. A handler
- * that needs more than the views offer stops nothing. The caller sets the attack's target at use. The shields that punish a contact
- * hit (King's Shield, Obstruct, Silk Trap, Baneful Bunker, Burning Bulwark, Spiky Shield) do it in this same handler; on the views the
- * punishment lands in the views (test/protect-ask.spec.ts plays every protector of the Dex against every class of attack). The reader
- * battle of a position is never mutated and an option list asks the same hit once per option: one answer per body pair, protector
- * and attack, and for the Protect family one answer per Dex where no HitProtect handler reaches the hit (`sharedStops`). With the
- * development check on, a hit is asked again, so a caller that mutated the battle after its first question, or a shared answer
- * a board contradicts, fails loudly.
+ * Whether the protector's condition stops `attack` from `source` on `target`: the simulator's own onTryHit (a side condition such as Wide
+ * Guard, or a volatile on the user), run through `callHandler` on views, so it writes nothing the live battle can see. The handler returns
+ * nothing for a hit it lets through and NOT_FAIL for a hit it stops; the punishing shields (King's Shield, Obstruct, Silk Trap, Baneful
+ * Bunker, Burning Bulwark, Spiky Shield) punish in this same handler, and the punishment lands in the views. A handler that needs more than
+ * the views offer stops nothing. The caller sets the attack's target at use. One answer is kept per body pair, protector and attack
+ * (an option list asks the same hit once per option); with the development check on a hit is asked again, so a battle mutated after its
+ * first question, or a shared answer a board contradicts, fails loudly.
  */
 export function protectorStops(battle: Battle, protector: DexMove, attack: ActiveMove, source: Pokemon, target: Pokemon): boolean {
   const condition = protector.sideCondition || protector.volatileStatus;

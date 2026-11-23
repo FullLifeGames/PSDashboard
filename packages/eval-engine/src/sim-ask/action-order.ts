@@ -2,26 +2,7 @@ import type { Battle, Pokemon } from '@pkmn/sim';
 import { copyOf, FixedDice } from './copy.ts';
 import { askCheckOn, AskLeak, guarded } from './guard.ts';
 
-/**
- * Round 72 (T196): do two move actions tie in the simulator's queue? `speedSort` flips a coin between actions that
- * `battle.comparePriority` calls equal, and the actions come from `queue.resolveAction`: the move's priority after its
- * ModifyPriority events, plus the fractional priority of FractionalPriority events (Stall, Lagging Tail, Quick Claw,
- * Custap Berry), against the speed of `getActionSpeed` (Trick Room, Tailwind, paralysis, Scarf and the generation's own
- * rules inside it). Resolving an action is not free of effects: Quick Claw and Quick Draw draw from the PRNG and write
- * the log, Custap Berry eats the item. The question therefore runs on a copy with fixed dice: once with every chance
- * answering no and once with every chance answering yes, and a tie under either answer is a possible tie.
- *
- * The copy is the last rung of a ladder of exact prefilters, each read from the simulator's own numbers. A tie needs
- * equal order, priority and speed (`comparePriority` reads those, then `subOrder` and `effectOrder`, which only event
- * handlers carry); a move action's order is 200 for both. The speed of a move action is the body's
- * `getActionSpeed()` (the generations 4 and below swap in `-getStat('spe')` for a negative fractional priority, and
- * equal priorities mean equal fractional parts, so both bodies take the same branch). Two different action speeds
- * therefore mean no tie, whatever handlers either body holds. At equal speed the priority is the Dex priority plus the
- * FractionalPriority event, after the move's own ModifyPriority and the ModifyPriority event; when the simulator's own
- * handler discovery (`findEventHandlers`, the call `runEvent` makes) finds no handler of either event for either body,
- * and the move carries no ModifyPriority of its own, the queue would return the Dex priority for both and the pair ties
- * exactly when the Dex priorities are equal. Any handler sends the pair to the copy.
- */
+// Questions about the simulator's action queue: do two move actions tie, and where does one stand.
 
 export interface ActionAsk {
   /** The acting body of the live battle. */
@@ -30,14 +11,10 @@ export interface ActionAsk {
 }
 
 /**
- * What the search's questions share, per battle object: the action speed of each body (only `actionsTie` reads it, on a
- * position's reader battle). A reader battle is never written after it is built, so a number read once stays true; with the
- * development check on, a hit is read again and a battle that changed since its first question throws `AskLeak`.
- *
- * Round 89 (M, fix 3 of #111): the rebuild's questions (`queuePlace`, `actionPriority`) never read this memo. The rebuild asks on
- * its LIVE battle and plays it turn after turn, so a speed or a handler read in one turn is stale in the next (Trick Room, Tailwind,
- * paralysis, a stat stage, a switch, an item knocked off). The memo has no key that the simulator's own state could make stale-proof,
- * and the rebuild asks a handful of times per turn, so those two read the battle fresh every time.
+ * The action speed of each body, per battle object (only `actionsTie` reads it, on a reader battle). A reader battle is never written,
+ * so a number read once stays true; with the development check on, a hit is read again and a changed battle throws `AskLeak`.
+ * `queuePlace` and `actionPriority` never read it: the rebuild asks on its LIVE battle and plays it turn after turn, so a speed read
+ * in one turn is stale in the next (Trick Room, Tailwind, paralysis, a stat stage, a switch, an item knocked off).
  */
 const speeds = new WeakMap<Battle, Map<Pokemon, number>>();
 
@@ -103,7 +80,13 @@ function moveAction(copy: Battle, ask: ActionAsk) {
   return action;
 }
 
-/** Can the simulator's queue meet these two move actions at equal order, priority and speed? */
+/**
+ * Can the simulator's queue meet these two move actions at equal order, priority and speed? `speedSort` flips a coin between actions
+ * that `comparePriority` calls equal. The prefilters are exact: different action speeds never tie (generations 4 and below swap in
+ * `-getStat('spe')` for a negative fractional priority, but equal priorities mean equal fractional parts); at equal speed, with no
+ * handler of either priority event for either body and no ModifyPriority of the move, the queue returns the Dex priority for both.
+ * Any handler sends the pair to the copy.
+ */
 export function actionsTie(battle: Battle, first: ActionAsk, second: ActionAsk): boolean {
   return guarded(battle, [], () => {
     if (speedOf(battle, first.pokemon) !== speedOf(battle, second.pokemon)) return false;
@@ -113,7 +96,10 @@ export function actionsTie(battle: Battle, first: ActionAsk, second: ActionAsk):
   });
 }
 
-/** The plain answer: both move actions resolved by the queue on a copy, once per answer of the dice. */
+/**
+ * Both move actions resolved by the queue on a copy, once per answer of the dice; a tie under either answer is a possible tie.
+ * Resolving an action has effects (Quick Claw and Quick Draw draw from the PRNG and write the log, Custap Berry eats the item).
+ */
 function queueTie(battle: Battle, first: ActionAsk, second: ActionAsk): boolean {
   return ANSWERS.some(chance => {
     const copy = copyOf(battle);
@@ -123,16 +109,10 @@ function queueTie(battle: Battle, first: ActionAsk, second: ActionAsk): boolean 
 }
 
 /**
- * Round 89 (#111): where a move action stands in the queue, for the body that will use it: the queue's own priority (the Dex priority
- * after the move's ModifyPriority, the ModifyPriority event and the FractionalPriority event) and the action speed, as the simulator
- * resolves them on a copy with fixed dice. The rebuild reads it where a click is unknown (the stand-in of a body whose log shows no
- * action) and where an action of the log stands in an order (a cant line between two moves); the Dex priority alone misses Prankster,
- * Gale Wings, Triage, Grassy Glide (ModifyPriority) and Stall, Lagging Tail, Full Incense, Custap Berry, Quick Claw, Quick Draw,
- * Mycelium Might (FractionalPriority). `chance` answers every chance of the question: `activated` reads it from the turn's lines.
- * Behind the same exact prefilter as `actionsTie` a body and move free of every handler keep their Dex priority without a copy
- * (from Generation 4 on: Generation 3's Quick Claw sits in `getActionSpeed` through the battle's `quickClawRoll`, which the copy
- * sets to the answer). A Generation 4 Quick Claw or Custap Berry holds no priority handler: its `onBeforeTurn` queues an event at
- * the action's priority plus 0.1 that runs the move at once, so an activated holder stands at that priority.
+ * Where a move action stands in the queue for the body that uses it: the queue's own priority (Dex priority after the move's
+ * ModifyPriority, the ModifyPriority event and the FractionalPriority event) and the action speed, resolved on a copy with fixed dice.
+ * The Dex priority alone misses Prankster, Gale Wings, Triage, Grassy Glide (ModifyPriority) and Stall, Lagging Tail, Full Incense,
+ * Custap Berry, Quick Claw, Quick Draw, Mycelium Might (FractionalPriority). `chance` answers every chance of the question.
  */
 export interface QueuePlace {
   priority: number;
@@ -150,6 +130,9 @@ function hasCustapEvent(battle: Battle, pokemon: Pokemon): boolean {
 /** Read fresh on every call: the battle is the rebuild's live one, played between two questions (see `speeds`). */
 export function queuePlace(battle: Battle, pokemon: Pokemon, moveId: string, chance: boolean): QueuePlace {
   return guarded(battle, [], () => {
+    // A body and move free of every handler keep their Dex priority without a copy, from Generation 4 on: Generation 3's Quick Claw
+    // sits in `getActionSpeed` through `quickClawRoll`, which the copy sets. A Generation 4 Quick Claw or Custap Berry holds no
+    // priority handler: its `onBeforeTurn` queues an event at the action's priority plus 0.1, so an activated holder stands there.
     const gain = chance && hasCustapEvent(battle, pokemon) ? CUSTAP_EVENT_GAIN : 0;
     const plain = plainPriority(battle, moveId);
     if (plain !== null && battle.gen > 3 && readFreeOfPriorityHandlers(battle, pokemon)) {
@@ -169,10 +152,9 @@ export function actionPriority(battle: Battle, pokemon: Pokemon, moveId: string,
 }
 
 /**
- * The chance answer of a body's action in one turn, read from the turn's lines and the Dex: yes when the lines show an activation
- * of this body (`|-activate|p1a: Name|item: X` or `|ability: X`) whose item or ability the simulator's queue reads for the order
- * (a FractionalPriority or Custap handler in the Dex entry; Generation 3's Quick Claw has none and moves the body through the
- * action speed, which the copy shows as a difference between the two answers). Else no.
+ * The chance answer of a body's action in one turn: yes when the turn's lines show an activation of this body (`|-activate|p1a: Name|item: X`
+ * or `|ability: X`) whose item or ability the queue reads for the order (a FractionalPriority or Custap handler in the Dex entry; Generation
+ * 3's Quick Claw has none and moves the action speed, which the copy shows as a difference between the two answers). Else no.
  */
 export function activated(battle: Battle, pokemon: Pokemon, lines: readonly string[]): boolean {
   const slot = pokemon.getSlot();

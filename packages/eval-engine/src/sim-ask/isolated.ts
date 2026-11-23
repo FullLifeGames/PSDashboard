@@ -1,20 +1,9 @@
 import type { Battle, Pokemon } from '@pkmn/sim';
 import { AskLeak, askCheckOn, fingerprint } from './guard.ts';
 
-/**
- * Round 72 (T239): a copy-on-write view of a live object, for a stand-in that must hand a Dex handler a live body
- * without letting the handler write it. Reads fall through to the live object; every write (a property, an index, a
- * length, a delete, a nested object, an array) lands in an overlay of the view, so the handler sees its own writes and
- * the live object never changes. A Map, a Set, a Date or anything else with internal slots cannot be copied on write:
- * the view refuses it, and the first touch throws `NeedsMore`, which `callHandler` turns into the typed answer.
- * The battle's Dex is the exception: game data every copy shares, whose caches are Maps. It passes through, and the
- * development check fingerprints the Dex entries a question reads. So does every entry the Dex hands out (a species,
- * a move, an ability, an item, a condition, a nature) and a format: the speed layer (forward/sim-fast/dispatch.ts) keeps a
- * table from an effect object to its handlers for as long as the Dex lives, and a view is a new object on every question,
- * so a view of a body's species or of the format would enter that table for good, with the graph behind it (round 72,
- * T256: the renderer of the feedback run ran out of memory). Objects the handler creates are its own and pass back
- * unwrapped. The development check (guard.ts) fingerprints the live battle around every `callHandler` on a view.
- */
+// A copy-on-write view of a live object: reads fall through, every write lands in an overlay, so a Dex handler that gets a live body
+// never changes it. A Map, a Set, a Date or anything else with internal slots cannot be copied on write: the first touch throws
+// `NeedsMore`, which `callHandler` turns into the typed answer. Objects the handler creates are its own and pass back unwrapped.
 
 export class NeedsMore extends Error {
   constructor(what: string) {
@@ -35,8 +24,10 @@ const DEX_KINDS: Readonly<Record<string, string>> = {
 };
 
 /**
- * Game data a view hands out as itself: a format, or an entry the Dex returns for its own id (the active move of a
- * battle is a copy of its Dex entry, so it is not one).
+ * Game data a view hands out as itself: a format, or an entry the Dex returns for its own id (the active move of a battle is a copy of
+ * its Dex entry, so it is not one). The speed layer (forward/sim-fast/dispatch.ts) keeps a table from an effect object to its handlers for
+ * as long as the Dex lives; a view is a new object on every question, so a view of a species or of the format would enter that table for
+ * good with the graph behind it (the renderer of a feedback run ran out of memory). The battle's Dex itself passes through too.
  */
 function isGameData(value: object, dex: object | undefined): boolean {
   const { effectType, id } = value as { effectType?: unknown; id?: unknown };

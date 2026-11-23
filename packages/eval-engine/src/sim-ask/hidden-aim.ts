@@ -1,15 +1,10 @@
 import { toID, type Battle } from '@pkmn/sim';
 import { FixedDice, playOnCopy } from './copy.ts';
 
-/**
- * Round 89 (#136): the aim of a move whose target the protocol hides. The simulator blanks the target of a move line when no animation
- * plays (`attrLastMove('[still]')`, "if no animation plays, the target should never be known"): a Disable that fails on a body without a
- * last move, an Encore on a body that has not moved, any single-target move that the game stops before it animates. The log shows
- * `|move|p2b: Sableye|Disable||[still]` and the click's aim is lost. The question asks the simulator: play the turn on a copy of the
- * battle with each legal aim and keep the first that makes the move fail as the log shows (the move line with its target blanked).
- * The turn runs with the dice of a likely game (`FixedDice` with `likely`: an accuracy hits, a secondary effect does not), and a
- * play that the simulator refuses or that never reaches the move counts as "does not fail as logged".
- */
+// The aim of a move whose target the protocol hides: the simulator blanks the target of a move line when no animation plays
+// (`attrLastMove('[still]')`), e.g. `|move|p2b: Sableye|Disable||[still]` for a Disable that fails on a body without a last move.
+// The turn is played on a copy with each legal aim and the first that fails as the log shows wins; a play that the simulator
+// refuses or that never reaches the move counts as "does not fail as logged".
 
 /** A `|move|` line that hides its target: an empty target field and the `[still]` mark (the log of a failed move). */
 export const hidesItsTarget = (line: string): boolean => line.startsWith('|move|') && line.split('|')[4] === '' && line.includes('[still]');
@@ -25,7 +20,7 @@ export interface HiddenAimAsk {
   choicesFor(aim: number): { p1: string; p2: string };
 }
 
-/** The move line the mover's own click writes in the copy's new lines: the first without a `[from]` source. */
+/** The first move line of the mover in the copy's new lines that has no `[from]` source. */
 const ownMoveLine = (lines: readonly string[], { ident, moveId }: HiddenAimAsk): string | undefined =>
   lines.find(line => line.startsWith(`|move|${ident}`) && !line.includes('[from]') && toID(line.split('|')[3]) === moveId);
 
@@ -44,10 +39,7 @@ function failsAsLogged(live: Battle, ask: HiddenAimAsk, aim: number): boolean {
   });
 }
 
-/**
- * The first aim, in the asker's order, whose play fails as the log shows; null when none does (the asker keeps its default aim). With
- * one legal aim there is nothing to ask.
- */
+/** The first aim, in the asker's order, whose play fails as the log shows; null when none does or with one legal aim. */
 export function aimThatFailsAsLogged(live: Battle, ask: HiddenAimAsk): number | null {
   if (ask.aims.length < 2) return null;
   return ask.aims.find(aim => failsAsLogged(live, ask, aim)) ?? null;

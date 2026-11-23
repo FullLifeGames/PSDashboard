@@ -10,13 +10,7 @@ import { rulesOfActives } from './rules.ts';
 import { turnRolledFor } from './luck.ts';
 import { praisedSack, sackGate, type SackGate, type SackGrade } from './sack-gates.ts';
 
-/**
- * The grading half of one side's turn, stage by stage in analyzeTurn's
- * original order: the played match, the verified regret, the verdict band
- * with its leniencies (decided position, sack, item sensitivity). Every
- * stage is pure and reads analyzeTurn's params; the narrative signals live
- * in signals.ts and never touch the grading.
- */
+// The grading half of one side's turn: played match, verified regret, verdict band with its leniencies. Pure; the narrative signals (signals.ts) never touch it.
 
 /** The played action matched into the ranked list, with the doubles and phantom flags. */
 interface PlayedMatch {
@@ -55,10 +49,8 @@ function matchPlayedForSide(
 }
 
 /**
- * best.ev − played.ev (own perspective), floored at 0. Verification can
- * only ACQUIT: a deep pass that confirms the gap keeps the shallow
- * equilibrium regret (the deep pair values are an exploitative lens, not a
- * fairer grade when they agree).
+ * best.ev − played.ev (own perspective), floored at 0. Verification can only ACQUIT: a deep pass that confirms the gap keeps the shallow
+ * equilibrium regret (the deep pair values are an exploitative lens, not a fairer grade when they agree).
  */
 function verifiedRegret(
   params: AnalyzeTurnParams,
@@ -107,15 +99,9 @@ interface SackVerdict {
 }
 
 /**
- * A sack of a nearly-dead body is a deliberate low-cost play: demote one
- * band (same shape as the decided-position leniency) and mark it so the
- * risk machinery and the report treat it neutrally. BOUNDED: a
- * blunder-sized regret is a throw whatever the body was worth — the sack
- * leniency never forgives the blunder band. A stayed feed VERIFIES when
- * its windowed payoff repaid the FULL regret with the read margin on top:
- * the line reached what the engine's best promised, measured from the
- * accepted floor upward (573756 t68 post-race: payoff 0.359 ≥ regret
- * 0.129 + 0.1), and no verdict band sticks.
+ * A sack of a nearly-dead body is a deliberate low-cost play: demote one band and mark it so the risk machinery and the report treat it
+ * neutrally. BOUNDED: a blunder-sized regret is a throw whatever the body was worth. A stayed feed VERIFIES when its windowed payoff
+ * repaid the FULL regret with the read margin on top (payoff 0.359 against regret 0.129 + 0.1), and no verdict band sticks.
  */
 function sackVerdict(tier: VerdictTier | undefined, regret: number | null, gate: SackGate): SackVerdict {
   const sacrificed = !!(tier && gate.sackApplies && (regret ?? 0) < TIER_THRESHOLDS.blunder);
@@ -137,10 +123,8 @@ function sideVerdict(
 }
 
 /**
- * Item-sensitivity: if the verdict changes band under a usage-plausible
- * alternative item for an opposing mon whose item is only a guess, the
- * verdict HINGES on hidden information — soften to the most charitable
- * probed band (acquit-only) and record the hinge.
+ * Item sensitivity: when the verdict changes band under a usage-plausible alternative item for an opposing mon whose item is only a guess,
+ * it HINGES on hidden information: soften to the most charitable probed band (acquit-only) and record the hinge.
  */
 function sensitivityAcquittal(
   tier: VerdictTier | undefined,
@@ -176,9 +160,9 @@ export interface SideGrading {
   playedPartial: boolean;
   neverActed: boolean;
   options: RankedChoice[];
-  /** The top choice by equilibrium EV — the grading reference. */
+  /** The top choice by equilibrium EV, the grading reference. */
   best: RankedChoice | null;
-  /** The max-floor choice — the engine's safe line, the safety reference. */
+  /** The max-floor choice, the engine's safe line. */
   safe: RankedChoice | null;
   regret: number | null;
   verifiedAtDepth: boolean;
@@ -190,10 +174,7 @@ export interface SideGrading {
   sensitivity: SideAnalysis['sensitivity'];
 }
 
-/**
- * Round 79: the turn's dice for the sack gates, read before the side records exist: both sides' matched played lines go to
- * the one rule that builds `rolledFor` (luck.ts). Only a side with a sack asks.
- */
+/** The turn's dice for the sack gates, read before the side records exist: both sides' matched played lines go to the one rule that builds `rolledFor` (luck.ts). Only a side with a sack asks. */
 function rolledForTurn(params: AnalyzeTurnParams, key: Side, played: RankedChoice | null): { p1: boolean; p2: boolean } | undefined {
   if (!params.sacks?.[key]) return undefined;
   const foe: Side = key === 'p1' ? 'p2' : 'p1';
@@ -224,7 +205,7 @@ export function gradeSide(params: AnalyzeTurnParams, key: Side): SideGrading {
   };
 }
 
-/** The setup move the side clicked, by the replay's own Dex (round 75, T160); none without the board context. */
+/** The setup move the side clicked, by the replay's own Dex; none without the board context. */
 function setupField(params: AnalyzeTurnParams, g: SideGrading): { setupMove?: string } {
   const rules = rulesOfActives(params.actives);
   const setup = rules ? setupMoveClicked({ playedRaw: g.playedRaw, playedSlots: g.playedSlots }, dexOf(rules)) : null;

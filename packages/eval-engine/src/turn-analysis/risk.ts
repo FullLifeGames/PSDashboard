@@ -6,23 +6,13 @@ import {
 import { bestWindowPayoff } from './sack-gates.ts';
 import { beatsSafeCell, clickedCells } from './clicked-cell.ts';
 
-/**
- * A flagged risk whose punishing reply was never clicked reads differently
- * from a punished misplay. Where the pair's expected value is known, the
- * payoff over the safe guarantee grades the read: clearly ahead = a good
- * play, clearly behind = a plain misplay even unpunished, between = risk.
- * UNTIERED turns enter too, but only as genuine gambles — the play deviated
- * from the engine's pick AND gave up a mistake-sized floor vs the safe line
- * (draft T50: a co-optimal switch whose floor priced in Earth Power). They
- * can only EARN the paid-off credit; with no verdict to soften, the risk
- * labels stay off. Two honesty bounds (GPL T35): no praise from an
- * already-lost position (garbage time makes every move a "gamble" outcome
- * noise can credit), and the credit grades on the IMMEDIATE outcome only —
- * the payoff window softens flagged risks; here it would attribute the
- * opponent's follow-up choices and the rolls to the gamble.
- */
+// Risk marking: a flagged risk whose punishing reply was never clicked is graded by its payoff over the safe guarantee, and attribution of the turn.
 
-/** An untiered play that deviated from the engine's pick AND gave up a mistake-sized floor, from a not-yet-lost position. */
+/**
+ * An untiered play that deviated from the engine's pick AND gave up a mistake-sized floor (a co-optimal switch whose floor priced in
+ * Earth Power), from a not-yet-lost position: garbage time makes every move a "gamble" that outcome noise can credit. Gambles can only
+ * EARN the paid-off credit; with no verdict to soften, the risk labels stay off.
+ */
 function isGamble(params: AnalyzeTurnParams, key: Side, side: SideAnalysis, tiered: boolean): boolean {
   const ownBefore = key === 'p1' ? params.scoreBefore : -params.scoreBefore;
   return !tiered && side.played !== null && side.best !== null && side.safe !== null
@@ -34,10 +24,9 @@ function isGamble(params: AnalyzeTurnParams, key: Side, side: SideAnalysis, tier
 }
 
 /**
- * Round 77 (user report 28.10.2026, the expert pin 562428 t12): an inaccuracy that gave up floor against the safe line, from
- * a not-yet-lost position, can earn the paid-off credit as a gamble does, on the immediate outcome. Between the mistake band,
- * which books its risk, and the gamble's bound of a mistake-sized floor it fell through every rule: LordEnz's Close Combat
- * into the Weavile switch paid 0.448 over the safe Mandibuzz line and read as a plain shift.
+ * An inaccuracy that gave up floor against the safe line, from a not-yet-lost position, can earn the paid-off credit as a gamble does, on
+ * the immediate outcome. It sits between the mistake band, which books its risk, and the gamble's bound of a mistake-sized floor (a Close
+ * Combat into the Weavile switch paid 0.448 over the safe Mandibuzz line and read as a plain shift).
  */
 function isInaccuracyRisk(params: AnalyzeTurnParams, key: Side, side: SideAnalysis): boolean {
   const ownBefore = key === 'p1' ? params.scoreBefore : -params.scoreBefore;
@@ -49,10 +38,9 @@ function isInaccuracyRisk(params: AnalyzeTurnParams, key: Side, side: SideAnalys
 }
 
 /**
- * Books the windowed payoff over the safe guarantee on the side record —
- * the BEST expected outcome within the window (tiered turns look
- * PAYOFF_WINDOW turns ahead, gambles at the immediate outcome only). True
- * when the read clearly FAILED, which keeps every risk label off.
+ * Books the windowed payoff over the safe guarantee on the side record: the BEST expected outcome within the window (tiered turns look
+ * PAYOFF_WINDOW turns ahead, gambles at the immediate outcome only, since the window would credit the opponent's follow-up choices and
+ * the rolls to the gamble). True when the read clearly FAILED, which keeps every risk label off.
  */
 function bookRiskPayoff(params: AnalyzeTurnParams, key: Side, side: SideAnalysis, tiered: boolean): boolean {
   if (!(params.playedOutcome !== null && side.safe)) return false;
@@ -69,9 +57,9 @@ function bookRiskPayoff(params: AnalyzeTurnParams, key: Side, side: SideAnalysis
 }
 
 /**
- * Round 89 (B6a): a payoff over the safe line's floor is a read only when the played line also beat the safe line in the cell of
- * the reply that came (the same matrix, the same column: like against like). The cells go on the side as `safeAgainstClick`.
- * No cell to compare (no matrix, a hidden slot of the click, the played line is the safe line) keeps today's rule.
+ * A payoff over the safe line's floor is a read only when the played line also beat the safe line in the cell of the reply that came
+ * (the same matrix, the same column). The cells go on the side as `safeAgainstClick`. With no cell to compare (no matrix, a hidden slot
+ * of the click, the played line is the safe line) the payoff alone decides.
  */
 function readBeatSafeLine(params: AnalyzeTurnParams, key: Side, side: SideAnalysis): boolean {
   if (!side.played || !side.safe || side.played.choice === side.safe.choice) return true;
@@ -104,13 +92,9 @@ function quietReadShape(params: AnalyzeTurnParams, key: Side, played: RankedChoi
 }
 
 /**
- * Round 63 (T17): the read credit of an UNTIERED turn (648453 t13), the
- * narrowest rule that carries the scene on the ten feedback dumps (eight
- * sides there, four singles and four doubles): not from a lost position
- * (the gamble bound), a choice the equilibrium gave no weight, some floor
- * given up against the safe line, an immediate payoff over the safe
- * guarantee of at least the regret plus the read margin, and within the
- * window a mistake-sized edge on top of the regret. Card sentence only.
+ * The read credit of an UNTIERED turn, the narrowest rule that carries its scene: not from a lost position, a choice the equilibrium gave
+ * no weight, some floor given up against the safe line, an immediate payoff over the safe guarantee of at least the regret plus the read
+ * margin, and within the window a mistake-sized edge on top of the regret. Card sentence only.
  */
 function markQuietRead(params: AnalyzeTurnParams, key: Side, side: SideAnalysis): void {
   const { played, safe } = side;
@@ -124,11 +108,7 @@ function markQuietRead(params: AnalyzeTurnParams, key: Side, side: SideAnalysis)
   side.readCredit = { payoff, ...(payoffTurn > 0 ? { payoffTurn } : {}) };
 }
 
-/**
- * The opponent model's best response matches the played choice: the
- * machine id is authoritative; the label match only serves cached reads
- * written before choice ids existed.
- */
+/** The opponent model's best response matches the played choice: the choice id is authoritative; the label match serves cached reads without one. */
 function readMatches(read: ReadRecommendation | null | undefined, played: RankedChoice | null): boolean {
   return !!(read && played && (read.choice.choiceId !== undefined
     ? read.choice.choiceId === played.choice
@@ -142,7 +122,7 @@ export function markRisk(params: AnalyzeTurnParams, key: Side, side: SideAnalysi
   const tiered = side.tier === 'mistake' || side.tier === 'blunder';
   const gamble = isGamble(params, key, side, tiered) || isInaccuracyRisk(params, key, side);
   if (!tiered && !gamble) {
-    // Round 63 (T17): no band and no gamble — a quiet read can still earn its sentence.
+    // No band and no gamble: a quiet read can still earn its sentence.
     markQuietRead(params, key, side);
     return;
   }
@@ -152,19 +132,13 @@ export function markRisk(params: AnalyzeTurnParams, key: Side, side: SideAnalysi
   // Gambles stop here: paid-off credit or nothing.
   if (!tiered) return;
   side.riskUnpunished = true;
-  // The opponent model agrees: this "risk" was the exploitative best
-  // response to how the opponent actually plays — phrase it as a read.
+  // The opponent model agrees: this "risk" was the exploitative best response to how the opponent plays, so it reads as a read.
   if (readMatches(params.reads?.[key], side.played)) side.riskWasRead = true;
 }
 
 const badTier = (side: SideAnalysis): boolean => side.tier === 'mistake' || side.tier === 'blunder';
 
-/**
- * Who owns the swing when a verdict or a paid-off read stands. A paid-off
- * read does not count as a decision problem; neither does an inaccuracy
- * or a leniency-softened verdict. Null when nothing crossed a blame
- * threshold.
- */
+/** Who owns the swing when a verdict or a paid-off read stands (an inaccuracy, a softened verdict and a paid-off read are no decision problem); null when nothing crossed a blame threshold. */
 function culpritAttribution(p1: SideAnalysis, p2: SideAnalysis): TurnAttribution | null {
   const p1Bad = badTier(p1) && !p1.riskPaidOff;
   const p2Bad = badTier(p2) && !p2.riskPaidOff;
@@ -178,10 +152,9 @@ function culpritAttribution(p1: SideAnalysis, p2: SideAnalysis): TurnAttribution
 }
 
 /**
- * Round 70 (gate of 13.10.2026 20:26, 2a): the residual names the turn only when it is the larger part of the swing. The
- * decision part (the played pair against the position before) can be several times the residual (2630685175 t7: -1.34 against
- * -0.42, a Wide Guard the played pair walked into), and a card that blames the residual then never names the turn's cause. A
- * tie goes to the swing's own reading; a turn without a decision part keeps the residual alone.
+ * The residual names the turn only when it is the larger part of the swing. The decision part (the played pair against the position
+ * before) can be several times the residual (-1.34 against -0.42, a Wide Guard the played pair walked into), and a card that blames the
+ * residual then never names the turn's cause. A tie goes to the swing's own reading; a turn without a decision part keeps the residual alone.
  */
 const chanceLeads = (chanceDelta: number, decisionDelta: number | null | undefined): boolean =>
   decisionDelta === null || decisionDelta === undefined || Math.abs(chanceDelta) > Math.abs(decisionDelta);
@@ -196,15 +169,14 @@ function movementAttribution(
 ): TurnAttribution {
   if (chanceDelta !== null && Math.abs(chanceDelta) >= CHANCE_THRESHOLD && chanceLeads(chanceDelta, decisionDelta)) return 'chance';
   if (swing !== null && Math.abs(swing) >= CHANCE_THRESHOLD) {
-    // The score clearly moved but nothing crossed a blame threshold: either
-    // a side's choice never surfaced (unclear), or pressure and rolls just
-    // added up (shift) — never "quiet".
+    // The score clearly moved but nothing crossed a blame threshold: a side's choice never surfaced (unclear), or pressure and rolls
+    // added up (shift); never "quiet".
     return p1.played === null || p2.played === null ? 'unclear' : 'shift';
   }
   return 'quiet';
 }
 
-/** The turn's attribution, culprits before movement, in the original precedence. */
+/** The turn's attribution: culprits before movement. */
 export function attributionFor(
   playedTracking: boolean,
   p1: SideAnalysis,
@@ -221,10 +193,9 @@ export function attributionFor(
 }
 
 /**
- * Round 70 (gate of 13.10.2026 20:26, 1a): the side walked into its played line's punisher. The opponent's actual click is the
- * reply the played line's floor was priced on, and that floor trails the best line's floor by at least a mistake band. The
- * equilibrium may give the reply no weight (2630685175 t7: regret 0.0005, no tier, the opponent clicked Pollen Puff with Wide
- * Guard), so no grade says it; the card does. Display only.
+ * The side walked into its played line's punisher: the opponent's actual click is the reply the played line's floor was priced on, and
+ * that floor trails the best line's floor by at least a mistake band. The equilibrium may give the reply no weight (regret 0.0005, no
+ * tier, the opponent clicked Pollen Puff with Wide Guard), so no grade says it; the card does. Display only.
  */
 export function walkedInto(side: SideAnalysis, opponent: SideAnalysis): boolean {
   const { played, best } = side;
@@ -233,9 +204,9 @@ export function walkedInto(side: SideAnalysis, opponent: SideAnalysis): boolean 
 }
 
 /**
- * Round 76 (T233): the click is the played line's punisher, or ties it: a fresh search can name a sibling of the click as the
- * punisher (2630685175 t7: "Pollen Puff→Rillaboom + Wide Guard" for "Pollen Puff→Zamazenta-Crowned + Wide Guard"), and the
- * floor does not tell them apart when the played line's value against the click lies within one inaccuracy of that floor.
+ * The click is the played line's punisher, or ties it: a fresh search can name a sibling of the click as the punisher ("Pollen Puff→Rillaboom
+ * + Wide Guard" for "Pollen Puff→Zamazenta-Crowned + Wide Guard"), and the floor does not tell them apart when the played line's value
+ * against the click lies within one inaccuracy of that floor.
  */
 function punisherClicked(side: SideAnalysis, opponent: SideAnalysis): boolean {
   const { played, hindsightRead } = side;
@@ -245,25 +216,14 @@ function punisherClicked(side: SideAnalysis, opponent: SideAnalysis): boolean {
     hindsightRead.playedValue - played.worstCase < TIER_THRESHOLDS.inaccuracy;
 }
 
-/**
- * Round 67 (T59): the side's own estimate fell across the turn by at least
- * the edge a read must win (RISK_PAYOFF_MARGIN). The read was priced from the
- * played cell; on such a turn every place that praises it stays silent
- * (653785 t10 of round 62: Hydro Pump hit nothing and 3d fell 0.298). A
- * window read at a small loss keeps its praise (2663093831 t1: −0.041).
- */
+/** The side's own estimate fell across the turn by at least the edge a read must win (RISK_PAYOFF_MARGIN); its read is then not praised. */
 export function lostGround(analysis: Pick<TurnAnalysis, 'swing'>, side: Side): boolean {
   const swing = analysis.swing ?? null;
   if (swing === null) return false;
   return (side === 'p1' ? swing : -swing) <= -RISK_PAYOFF_MARGIN;
 }
 
-/**
- * Round 67 (T59): the attribution as the card and the badges show it. A read
- * whose side lost ground no longer claims the turn (both-read keeps the other
- * side's); with no read left the turn shows its movement. The attribution
- * field stays, so pins, key moments and totals read the same.
- */
+/** The attribution as the card and the badges show it: a read whose side lost ground no longer claims the turn (the field stays). */
 export function shownAttribution(analysis: TurnAnalysis): TurnAttribution {
   const { attribution, p1, p2 } = analysis;
   if (attribution !== 'p1-read' && attribution !== 'p2-read' && attribution !== 'both-read') return attribution;
