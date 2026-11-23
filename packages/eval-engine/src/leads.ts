@@ -1,13 +1,10 @@
 import { TIER_THRESHOLDS, type VerdictTier } from './analysis.ts';
 import type { EvalResult, RankedChoice } from './types.ts';
 
-/**
- * Turn-0 (team preview) analysis: the lead decision graded like any other
- * simultaneous choice — played pair vs the equilibrium-best pair. Pure, no
- * sim imports, main-bundle safe. No decided-position leniency: the game
- * start is never decided.
- */
+// Turn-0 (team preview) analysis: the lead decision graded like any other simultaneous choice, the played pair against the
+// equilibrium-best pair. No decided-position leniency: the game start is never decided. Pure, no sim imports, main-bundle safe.
 
+/** The grade of one side's lead choice. */
 export interface LeadSideAnalysis {
   /** The actually led pair matched into the ranked options. */
   played: RankedChoice | null;
@@ -17,6 +14,7 @@ export interface LeadSideAnalysis {
   tier?: VerdictTier;
 }
 
+/** The lead analysis of both sides. */
 export interface LeadAnalysis {
   p1: LeadSideAnalysis;
   p2: LeadSideAnalysis;
@@ -32,10 +30,7 @@ export interface LeadEvalData {
 export const leadSpeciesOf = (label: string): string[] =>
   label.replace(/^Lead /, '').split(' + ');
 
-/**
- * Matches led species against a ranked lead option as an UNORDERED set —
- * the engine enumerates pairs i<j while the replay shows actual slot order.
- */
+/** Matches led species against a ranked lead option as an unordered set: the engine enumerates pairs i<j, the replay shows slot order. */
 export function matchLeadOption(
   options: RankedChoice[],
   species: string[] | null,
@@ -45,6 +40,7 @@ export function matchLeadOption(
   return options.find(option => leadSpeciesOf(option.label).sort().join('|') === wanted) ?? null;
 }
 
+/** Grades each side's played lead against the best ranked pair, by regret tier. */
 export function analyzeLeads(
   result: EvalResult,
   played: { p1: string[] | null; p2: string[] | null },

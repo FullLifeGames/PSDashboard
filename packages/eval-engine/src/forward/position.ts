@@ -8,13 +8,9 @@ import { DiceSink, ScriptedPRNG, type RollScripts } from './scripted-prng.ts';
 import { battleRuleset, tagRuleset } from './ruleset.ts';
 import type { StaticRuleset } from '../score/weights.ts';
 
-/**
- * The immutable search position: a lazily serialized/deserialized battle
- * whose serialized string is its identity. Forks start from the position's
- * parsed state (parsed once, history stripped; parsed-state.ts), so a
- * position that fans out into many children pays the JSON parse once.
- */
+// The immutable search position: a lazily serialized or deserialized battle whose serialized string is its identity.
 
+/** One legal choice of a side with its label. */
 export interface ChoiceOption {
   /** Sim choice string, accepted verbatim by Battle#choose. */
   choice: string;
@@ -22,13 +18,12 @@ export interface ChoiceOption {
 }
 
 /**
- * An immutable battle position. The serialized string is the identity, but it
- * is computed lazily — depth-1 leaf children are only ever evaluated, and
- * serializing them would double the cost of every fork for nothing.
+ * An immutable battle position. The serialized string is its identity, computed lazily: depth-1 leaf children are only
+ * evaluated, and serializing them would double the cost of every fork for nothing.
  */
 export interface SimPosition {
   readonly serialized: string;
-  /** Round 65: the rule set the position is searched under (a root takes its search's, children inherit). */
+  /** The rule set the position is searched under (a root takes its search's, children inherit). */
   readonly ruleset?: StaticRuleset;
 }
 
@@ -67,10 +62,8 @@ class Position implements SimPosition {
   }
 
   /**
-   * Round 59 (lever clone): the battle forks copy, never handed to readers
-   * and never written. A root's template is its own unrepaired
-   * deserialization (the reader's battle is repaired); a child's is a copy of
-   * its battle at the first fork, the moment today's path serializes it.
+   * The battle forks copy, never handed to readers and never written. A root's template is its own unrepaired deserialization
+   * (the reader's battle is repaired); a child's is a copy of its battle at the first fork.
    */
   template(): Battle | null {
     if (!this.templateCache) {
@@ -86,11 +79,11 @@ class Position implements SimPosition {
 const foreignParsedCache = new WeakMap<SimPosition, ParsedSearchState>();
 const foreignBattleCache = new WeakMap<SimPosition, Battle>();
 
+/** A root position from a serialized battle, searched under `ruleset`. */
 export function createRootPosition(serializedBattle: string, ruleset: StaticRuleset = 'standard'): SimPosition {
   return new Position(serializedBattle, null, ruleset);
 }
 
-/** The parsed state every fork of the position starts from (one parse per position). */
 function positionParsed(position: SimPosition): ParsedSearchState {
   if (position instanceof Position) return position.getParsed();
   let parsed = foreignParsedCache.get(position);
@@ -101,7 +94,7 @@ function positionParsed(position: SimPosition): ParsedSearchState {
   return parsed;
 }
 
-/** Cached read-only deserialization — never mutate the returned battle. */
+/** Cached read-only deserialization; never mutate the returned battle. */
 export function positionBattle(position: SimPosition): Battle {
   if (position instanceof Position) return position.getBattle();
   let battle = foreignBattleCache.get(position);
@@ -112,7 +105,7 @@ export function positionBattle(position: SimPosition): Battle {
   return battle;
 }
 
-/** A fresh, unseeded, unrepaired battle of the position: a copy of its template, or today's deserialization. */
+/** A fresh, unseeded, unrepaired battle of the position: a copy of its template, or a fresh deserialization. */
 function freshBattle(position: SimPosition): Battle {
   if (position instanceof Position && simFastOn('clone')) {
     const template = position.template();
@@ -127,9 +120,8 @@ function freshBattle(position: SimPosition): Battle {
 }
 
 /**
- * A fresh battle from the position's parsed state, seeded so the advance is
- * reproducible. Siblings share the parsed state, never a battle. Round 43:
- * with scripts the dice of the named moves answer on demand.
+ * A fresh battle from the position's parsed state, seeded so the advance is reproducible; siblings share the parsed state, never
+ * a battle. With scripts the dice of the named moves answer on demand.
  */
 export function forkBattle(position: SimPosition, seed: PRNGSeed, scripts?: RollScripts): Battle {
   const battle = tagRuleset(freshBattle(position), position.ruleset ?? 'standard');
@@ -144,10 +136,7 @@ export function forkBattle(position: SimPosition, seed: PRNGSeed, scripts?: Roll
   return battle;
 }
 
-/**
- * Round 56: a fork whose dice are the given PRNG — the doubles pair plan's
- * recorder attaches itself to the battle it rolls for.
- */
+/** A fork whose dice are the given PRNG: the doubles pair plan's recorder attaches itself to the battle it rolls for. */
 export function forkBattleWithPrng(position: SimPosition, prng: PRNG & { attach(battle: Battle): void }): Battle {
   const battle = tagRuleset(freshBattle(position), position.ruleset ?? 'standard');
   prng.attach(battle);
@@ -156,8 +145,9 @@ export function forkBattleWithPrng(position: SimPosition, prng: PRNG & { attach(
   return battle;
 }
 
+/** Wraps a live battle as a position. */
 export function toPosition(battle: Battle): SimPosition {
-  // Round 86 (T299): a scripted PRNG's watch leaves the battle before the position wraps it.
+  // A scripted PRNG's watch leaves the battle before the position wraps it.
   if (battle.prng instanceof ScriptedPRNG) battle.prng.release();
   return new Position(null, battle, battleRuleset(battle));
 }

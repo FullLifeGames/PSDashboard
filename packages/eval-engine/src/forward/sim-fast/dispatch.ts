@@ -1,21 +1,12 @@
-/**
- * Round 59 (T91), lever dispatch: the pre-check (round 58 prototype
- * 'mirror', docs/perf/probes/2026-09-24-r58/patch/dispatch-mirror.ts).
- * runEvent asks every Pokemon, side and the field whether anyone handles an
- * event; almost never does anyone. The pre-check walks exactly the control
- * flow of findEventHandlers, but each "does this effect carry on<Event>?" is
- * one map lookup per (dex, event, effect id). When nobody can answer it
- * returns what runEvent returns for an empty handler list; when someone
- * might, the original runs untouched (order, ties, PRNG).
- *
- * Attached per battle as its own runEvent (the prototype stays the sim's,
- * so battles of package users stay untouched); a copy carries it along. It
- * steps aside when the battle's runEvent is no longer this function (review
- * round 58: compare against the attached function), when discovery or
- * getters are not the prototype's, at event depth 8, with onEffect, and for
- * array targets. Assumes nobody writes on* handlers onto dex effects at
- * runtime; the guard spec greps for that.
- */
+// The dispatch lever: runEvent asks every Pokemon, side and the field whether anyone handles an event, and almost never does anyone.
+// The pre-check walks exactly the control flow of findEventHandlers, but each "does this effect carry on<Event>?" is one map lookup
+// per (dex, event, effect id). When nobody can answer it returns what runEvent returns for an empty handler list; when someone
+// might, the original runs untouched (order, ties, PRNG).
+//
+// Attached per battle as its own runEvent (the prototype stays the sim's, so battles of package users stay untouched); a copy
+// carries it along. It steps aside when the battle's runEvent is no longer this function, when discovery or getters are not the
+// prototype's, at event depth 8, with onEffect, and for array targets. Assumes nobody writes on* handlers onto dex effects at
+// runtime; the guard spec greps for that.
 import type { Battle } from '@pkmn/sim';
 import { simFastCounters, simFastFlags } from './state.ts';
 
@@ -94,9 +85,9 @@ function directBits(effect: Bag, event: string): number {
   if (effect[`onFoe${event}`] !== undefined) bits |= FOE;
   if (effect[`onAny${event}`] !== undefined) bits |= ANY;
   if (effect[`onSource${event}`] !== undefined) bits |= SOURCE;
-  // getCallback's SwitchIn fallbacks, counted wide: onStart in every generation since 0.10.12 (gen 5 on before), and
-  // a gen 3 weather ability's onAfterEntryHazard on turn 0 (battle.mjs getCallback). No SwitchIn reaches runEvent in
-  // 0.10.12 (fieldEvent runs it in every generation), so this guards future versions.
+  // getCallback's SwitchIn fallbacks, counted wide: onStart in every generation, and a gen 3 weather ability's onAfterEntryHazard
+  // on turn 0 (battle.mjs getCallback). No SwitchIn reaches runEvent (fieldEvent runs it in every generation), so this guards
+  // future sim versions.
   if (event === 'SwitchIn' && (effect.onStart !== undefined || effect.onAfterEntryHazard !== undefined)) bits |= ALL;
   return bits;
 }

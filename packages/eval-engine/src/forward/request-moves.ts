@@ -2,9 +2,8 @@ import type { Side } from '@pkmn/sim';
 import { toId } from '@fulllifegames/replay-core';
 
 /**
- * Request entries as the sim writes them (side.activeRequest.active[n].moves).
- * A locked move (rampage, charge release, recharge, Bide, Uproar) comes with
- * no `target` key at all (pokemon.js getMoves(lockedMove)).
+ * A request entry as the sim writes it (side.activeRequest.active[n].moves). A locked move (rampage, charge release, recharge,
+ * Bide, Uproar) has no `target` key at all (pokemon.js getMoves(lockedMove)).
  */
 export interface RequestMove {
   move: string;
@@ -45,7 +44,6 @@ export function nextChoosingSlot(sideState: Side, from: number): number {
   return slot;
 }
 
-/** One part of a doubles choice in the form the sim accepts for the slot's request entries. */
 function submittablePart(part: string, entries: RequestMove[]): string {
   const tokens = part.split(' ');
   if (tokens[0] !== 'move') return part;
@@ -55,12 +53,9 @@ function submittablePart(part: string, entries: RequestMove[]): string {
 }
 
 /**
- * A doubles choice the sim accepts. By name a locked move makes the sim assume
- * target type 'normal' and demand a target (side.js:397,469); by its entry
- * index the sim takes the missing type as is and then uses the locked target
- * (side.js:384,480-492). Locked parts therefore go by index, without a target
- * number. Singles and every choice without a locked part come back as the
- * same string.
+ * A doubles choice the sim accepts. By name a locked move makes the sim assume target type 'normal' and demand a target
+ * (side.js:397,469); by its entry index the sim takes the missing type as is and uses the locked target (side.js:384,480-492).
+ * Locked parts therefore go by index, without a target number; singles and choices without a locked part come back unchanged.
  */
 export function submittableChoice(sideState: Side, choice: string): string {
   if (sideState.active.length < 2 || sideState.requestState !== 'move') return choice;

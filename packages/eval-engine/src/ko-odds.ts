@@ -7,17 +7,11 @@ import { calcMove } from './calc/move.ts';
 import { stellarFirstUse } from './calc/stellar.ts';
 import { bodyAsClicked } from './calc/tera-click.ts';
 
-/**
- * Analytic one-turn boundary-event odds (round 6 expectation grounding).
- * The sim keeps answering WHAT happens after a roll; this module answers
- * only HOW LIKELY each roll outcome is — kill share of the 16 damage rolls
- * (crit-weighted) times the accuracy after stage modifiers. Everything it
- * cannot price confidently returns null and the caller keeps the plain
- * seed average (fail closed). The value/narrative contract: the search
- * prices what the next roll is worth; the report narrates what many rolls
- * mean.
- */
+// Analytic one-turn boundary-event odds: the sim answers what happens after a roll, this module only how likely each roll outcome
+// is (the kill share of the 16 damage rolls, crit-weighted, times the accuracy after stage modifiers). What it cannot price
+// returns null and the caller keeps the plain seed average (fail closed).
 
+/** The odds of one move's roll outcomes against one defender. */
 export interface BoundaryEvent {
   /** 0..1 chance the move connects (accuracy × stage modifiers; 1 for true-accuracy/No Guard). */
   accuracy: number;
@@ -25,18 +19,15 @@ export interface BoundaryEvent {
   killFraction: number;
   /** accuracy × killFraction. */
   pKill: number;
-  /** Round 43: of the 16 damage rolls, how many knock out without a crit (0 for status moves; 0 or 16 for fixed damage). */
+  /** Of the 16 damage rolls, how many knock out without a crit (0 for status moves; 0 or 16 for fixed damage). */
   normalKillRolls: number;
-  /** Round 43: of the 16 damage rolls, how many knock out with a crit. */
+  /** Of the 16 damage rolls, how many knock out with a crit. */
   critKillRolls: number;
 }
 
 type DexMove = ReturnType<Battle['dex']['moves']['get']>;
 
-/**
- * Moves that call another move, so the seed or the turn decides what actually happens (Round 72, W1: the Dex's `callsMove`,
- * seven moves over every generation; the hand list held four). test/random-call-oracle.spec.ts plays each of them.
- */
+/** Moves that call another move, so the seed or the turn decides what happens (the Dex's `callsMove`; test/random-call-oracle.spec.ts plays each). */
 export const randomCallMoves = (dex: RulesDex): ReadonlySet<string> => callingMoves(dex);
 
 /** Moves whose immediate damage the one-turn model cannot price. */
@@ -58,16 +49,12 @@ export const UNPRICEABLE_MOVE_IDS = new Set([
   'beatup',
 ]);
 
-/**
- * Round 70 (N1): the crit and accuracy modifiers the stage table does not cover → fail closed, read from the simulator's Dex.
- * An item or an ability with a handler on the ModifyAccuracy or ModifyCritRatio event (its own, a foe's, an ally's, the
- * source's or any: Wide Lens, Sand Veil, Victory Star, Scope Lens, Super Luck, Merciless) changes the number the model
- * prices. The first version named eleven of the eighteen such effects of Gen 9 and its comment said the rest "fail closed".
- * A handler on the Accuracy or CriticalHit event stays out: No Guard is priced in moveAccuracy, and the calc gives a
- * crit-proof defender the normal roll for a crit. test/ko-odds-guard-census.spec.ts walks every item and ability of every
- * generation and the Champions mod and lists the reason of each exclusion. @pkmn/dex strips handlers, so a body asks the
- * simulator's own Dex objects (getItem, getAbility).
- */
+// The crit and accuracy modifiers the stage table does not cover fail closed, read from the simulator's Dex: an item or an ability
+// with a handler on the ModifyAccuracy or ModifyCritRatio event (its own, a foe's, an ally's, the source's or any: Wide Lens, Sand
+// Veil, Victory Star, Scope Lens, Super Luck, Merciless) changes the number the model prices. A handler on the Accuracy or
+// CriticalHit event stays out: No Guard is priced in moveAccuracy, and the calc gives a crit-proof defender the normal roll for a
+// crit. test/ko-odds-guard-census.spec.ts walks every item and ability of every generation and the Champions mod. @pkmn/dex strips
+// handlers, so a body asks the simulator's own Dex objects (getItem, getAbility).
 const ODDS_HANDLER = /^on(?:Any|Foe|Ally|Source)?Modify(?:Accuracy|CritRatio)$/;
 const changesOdds = new WeakMap<object, boolean>();
 
@@ -147,8 +134,8 @@ function weatherAccuracy(move: DexMove, base: number, weather: string): number {
 }
 
 /**
- * Accuracy after weather and stage modifiers; No Guard on either side makes the move sure. `weather` is the weather the
- * move meets when it is not the battle's own: '' after a Tera click that clears it (T152).
+ * Accuracy after weather and stage modifiers; No Guard on either side makes the move sure. `weather` is the weather the move
+ * meets when it is not the battle's own: '' after a Tera click that clears it.
  */
 export function moveAccuracy(battle: Battle, move: DexMove, attacker: Pokemon, defender: Pokemon, weather = battle.field.weather ?? ''): number {
   let accuracy: number;
@@ -179,7 +166,7 @@ function damageKillFraction(
     const defPoke = calcPokemon(gen, bodies.defender);
     const field = calcField(battle, defender);
     const hp = bodies.defender.hp;
-    // A Stellar body's first use of a type hits harder (T152); the type at use is the calc's own.
+    // A Stellar body's first use of a type hits harder; the type at use is the calc's own.
     const first = stellarFirstUse(bodies.attacker, () => calculate(gen, atkPoke, defPoke, calcMove(gen, move.name, bodies.attacker), field).move.type);
     const stellar = first ? { isStellarFirstUse: true } : {};
     const sharesAt = (power: { basePower: number } | null) => {
@@ -191,7 +178,7 @@ function damageKillFraction(
     const weak = sharesAt(null);
     const c = critRate(genNum, move.critRatio ?? 1);
     if (weak === null || c === null) return null;
-    // A move that doubles on a chance (Fickle Beam, T154) is the mix of its two strengths; the roll counts stay the weaker one's, which the scripts aim by.
+    // A move that doubles on a chance (Fickle Beam) is the mix of its two strengths; the roll counts stay the weaker one's, which the scripts aim by.
     const mix = strengthMix(dexOfCalc(gen), move.name);
     const strong = mix ? sharesAt(strongerPower(calcMove(gen, move.name, bodies.attacker, stellar).bp, mix.factor)) : null;
     if (mix && strong === null) return null;
@@ -209,15 +196,11 @@ function damageKillFraction(
 /** Which of the two bodies an option clicks Tera for: its own attacker, or (a cell's other side) the defender. */
 export interface TeraClicks { attacker?: boolean; defender?: boolean }
 
-/**
- * The analytic odds of one attacking move against one defender, or null
- * when the model cannot price it (the caller keeps the seed average). `tera`:
- * a body whose side clicks Tera this turn is read as the click makes it,
- * before any move lands (round 67, T84); left out, the bodies as they stand.
- */
+/** The analytic odds of one attacking move against one defender, or null when the model cannot price it (the caller keeps the seed average). */
 export function boundaryEvent(
   battle: Battle, attacker: Pokemon, defender: Pokemon, moveId: string, tera: TeraClicks = {},
 ): BoundaryEvent | null {
+  // `tera`: a body whose side clicks Tera this turn is read as the click makes it, before any move lands; left out, the bodies as they stand.
   const genNum = battle.gen;
   if (genNum <= 2 || genNum > 9) return null;
   const move = battle.dex.moves.get(moveId);

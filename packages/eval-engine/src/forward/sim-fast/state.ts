@@ -1,16 +1,13 @@
-/**
- * Round 59 (T91): the speed layer's switch, status and counters.
- *
- * Sim-free on purpose: the app's main thread imports configureSimFast from
- * the barrel, and the main chunk never loads @pkmn/sim (types.ts:48). Under
- * Node the variable EVAL_SIM_FAST decides ('0' off, '1' all, or a list of
- * rules, clone, dispatch; a set variable forces, so a break throws); in a
- * browser the layer stays off until the host configures it.
- */
+// The speed layer's switch, status and counters, sim-free on purpose: the app's main thread imports configureSimFast from the
+// barrel, and the main chunk never loads @pkmn/sim (types.ts). Under Node EVAL_SIM_FAST decides ('0' off, '1' all, or a list of
+// rules, clone, dispatch; a set variable forces, so a break throws); in a browser the layer stays off until the host configures it.
 
+/** One lever of the speed layer: rule tables, battle copy or the dispatch pre-check. */
 export type SimFastLever = 'rules' | 'clone' | 'dispatch';
+/** The layer's state: active, off, or stepped back after a hash mismatch or a fallback. */
 export type SimFastStatus = 'active' | 'off' | 'hash-mismatch' | 'fallback';
 
+/** What the levers did since the last report. */
 export interface SimFastCounters {
   /** Battles built on a rule table the layer keeps (lever rules). */
   ruleTables: number;
@@ -24,17 +21,16 @@ export interface SimFastCounters {
   fallbacks: number;
 }
 
+/** The status with the counters, as a worker reports them. */
 export interface SimFastReport {
   status: SimFastStatus;
   counters: SimFastCounters;
 }
 
+/** Every lever, in the order the switch lists them. */
 export const SIM_FAST_LEVERS: readonly SimFastLever[] = ['rules', 'clone', 'dispatch'];
 
-/**
- * Levers a host gets without asking (Node without the variable, the app without an override).
- * Round 59: adopted at the gate on 2026-09-26; EVAL_SIM_FAST=0 (Node) and '0' in localStorage are the kill switch.
- */
+/** Levers a host gets without asking (Node without the variable, the app without an override); `EVAL_SIM_FAST=0` or '0' in localStorage turns them off. */
 export const SIM_FAST_DEFAULT: readonly SimFastLever[] = ['rules', 'clone', 'dispatch'];
 
 /** Effective flags (configured and not broken); the hot paths read them directly. */
@@ -56,6 +52,7 @@ let forced = false;
 let broken: 'hash-mismatch' | 'fallback' | null = null;
 let changeHook: (() => void) | null = null;
 
+/** Parses an EVAL_SIM_FAST value: null when unset, [] for '0', every lever for '1', else the named list; throws on an unknown lever. */
 export function parseSimFastSwitch(raw: string | null | undefined): SimFastLever[] | null {
   const value = raw?.trim() ?? '';
   if (value === '') return null;
@@ -114,6 +111,7 @@ export function breakSimFast(status: 'hash-mismatch' | 'fallback', reason: strin
   applyFlags();
 }
 
+/** The layer's status: a break outlives the host's choice, else active or off. */
 export function simFastStatus(): SimFastStatus {
   if (!configured) configureFromEnvironment();
   if (broken) return broken;

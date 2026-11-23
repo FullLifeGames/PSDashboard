@@ -1,17 +1,9 @@
-/**
- * Round 59 (T91), lever clone: a Battle -> Battle copy for the pinned
- * @pkmn/sim release (named at PINNED_SIM_HASHES in guard.ts), no JSON and no
- * constructor. Phase one allocates a shell for the battle,
- * the field, every side and every Pokemon; phase two fills each shell field
- * by field and remaps back-references through the shells.
- *
- * Value rules: primitives and functions shared; Battle, Field, Side and
- * Pokemon remapped (Pokemon by side.n and position, as the sim's own
- * toRef/fromRef); ActiveMoves copied at the top level with references
- * remapped (queued actions and battle.activeMove deep); plain objects and
- * arrays copied per site; Sets copied; dex data of the classes on the
- * positive list shared; any other class throws, and the caller falls back.
- */
+// A Battle -> Battle copy for the pinned @pkmn/sim release (PINNED_SIM_HASHES in guard.ts), no JSON and no constructor: phase one
+// allocates a shell for the battle, the field, every side and every Pokemon; phase two fills each shell field by field and remaps
+// back-references through the shells. Value rules: primitives and functions shared; Battle, Field, Side and Pokemon remapped
+// (Pokemon by side.n and position, as the sim's own toRef/fromRef); ActiveMoves copied at the top level with references remapped
+// (queued actions and battle.activeMove deep); plain objects and arrays copied per site; Sets copied; dex data of the classes on
+// the positive list shared; any other class throws, and the caller falls back.
 import { PRNG, type Battle } from '@pkmn/sim';
 import {
   BATTLE_SPECIAL, FIELD_SPECIAL, POKEMON_SPECIAL, SIDE_SPECIAL, closuresFor, copyActiveMoveFast, forgetClosures, planFor,
@@ -168,13 +160,10 @@ function shellOf(proto: object): Obj {
   return Object.create(proto) as Obj;
 }
 
-/**
- * A copy writes to no stream, as a deserialized battle does (`new Battle` without `send` gets a no-op). Round 82, the user's
- * test of 01.11.2026: a copy of a branch's live battle kept its `send`, and a click the copy refused reached the branch's stream.
- */
+// A copy writes to no stream, as a deserialized battle does (`new Battle` without `send` gets a no-op): a copy of a branch's live
+// battle kept its `send`, and a click the copy refused reached the branch's stream.
 const silentSend = (): void => {};
 
-/** Queue, actions and the move in flight (deep), PRNG, history and the silent send for the battle's filler. */
 function battleParts(src: Source, x: Ctx, history: boolean): Obj {
   x.deep = true;
   const queue = shellOf(Object.getPrototypeOf(src.queue) as object);
@@ -194,7 +183,7 @@ function battleParts(src: Source, x: Ctx, history: boolean): Obj {
   };
 }
 
-/** First copy per process: the rebuilt closures answer as the originals do (spec, decision 3). */
+/** First copy per process: the rebuilt closures are checked to answer as the originals do. */
 function checkClosures(src: Source, x: Ctx): void {
   if (closuresChecked) return;
   for (let i = 0; i < src.sides.length; i++) {

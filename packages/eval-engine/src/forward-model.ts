@@ -1,7 +1,4 @@
-/**
- * The forward model's facade: positions, serialization, legal choices, and
- * seeded advances live in forward/; this module keeps the public names.
- */
+// The forward model's facade: the public names of forward/.
 
 export { deserializeBattleExact, restoreSideInvariants, serializeBattleStable } from './forward/serialize.ts';
 export { createRootPosition, positionBattle } from './forward/position.ts';

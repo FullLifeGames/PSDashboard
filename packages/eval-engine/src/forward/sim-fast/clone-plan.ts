@@ -1,12 +1,4 @@
-/**
- * Round 59 (T91), lever clone: the generated parts of the copy (round 58
- * prototype v2, docs/perf/probes/2026-09-24-r58/patch/clone.ts). One shell
- * constructor and one filler per own-key list keep every copy of one shape
- * in one hidden class with its fields in-object; the fast ActiveMove copier
- * does the same per move id. Pokemon's two per-instance arrow closures
- * (getHealth, getFullDetails) are rebuilt from the sim's own source and
- * bound to the copy.
- */
+// The generated parts of the copy: one shell constructor and one filler per own-key list keep every copy of one shape in one hidden class.
 
 export type Obj = Record<string, unknown>;
 export type CopyValue = (value: unknown, x: Ctx) => unknown;
@@ -100,7 +92,7 @@ type ClosureFactory = (this: Obj) => unknown[];
 const CLOSURE_SHAPE = /^\(\)\s*=>/;
 let closureFactory: ClosureFactory | null = null;
 
-/** Rebuilds [getFullDetails, getHealth] from the source Pokemon's own closures. */
+/** Rebuilds [getFullDetails, getHealth], the Pokemon's two per-instance arrow closures, from the source's own text. */
 export function compileClosures(source: Obj): ClosureFactory {
   const details = String(source.getFullDetails);
   const health = String(source.getHealth);

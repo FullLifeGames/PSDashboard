@@ -2,43 +2,25 @@ import { State } from '@pkmn/sim';
 import type { Battle } from '@pkmn/sim';
 import { assertSimMods } from './sim-mods.ts';
 
-/**
- * Battle serialization for positions: the stable string identity, the
- * exact deserializer, and the side-invariant restore the search's own
- * deserializer (parsed-state.ts) shares.
- */
+// Battle serialization for positions: the stable identity string, the exact deserializer and the side-invariant restore.
 
-/**
- * Serializes without the sim's wall-clock `|t:|` log lines — they made two
- * identical advances straddling a second boundary serialize differently,
- * breaking position-identity determinism.
- */
+/** Serializes without the sim's wall-clock `|t:|` log lines, which made identical advances across a second boundary differ. */
 export function serializeBattleStable(battle: Battle): string {
   const state = State.serializeBattle(battle) as { log?: string[] };
   if (Array.isArray(state.log)) state.log = state.log.filter(line => !line.startsWith('|t:|'));
   return JSON.stringify(state);
 }
 
-/**
- * @pkmn/sim's deserializer walks baseMoveSlots indexing moveSlots to restore
- * slot identity — a transformed mon that copied a PARTIALLY REVEALED target
- * has fewer moveSlots than base, and the walk crashes on the missing tail
- * ("reading 'id'"; Imprison-Transform Mew, gen9doublesou-2660802611). Pad a
- * parsed copy up to base length, deserialize, trim the live arrays back —
- * the battle round-trips exactly and the original string stays the cache key.
- */
-/**
- * Exact-fidelity deserialize: ONLY the moveSlots padding workaround above,
- * no invariant restoration — for callers that compare or continue a
- * round-tripped battle against a live one and need the state untouched
- * (the calibration harness's clone-and-correct path).
- */
+/** Deserializes a battle with exact fidelity: only the moveSlots padding below, no invariant restoration (for harness clone-and-correct paths). */
 export function deserializeBattleExact(serialized: string): Battle {
   const state = JSON.parse(serialized) as {
     formatid?: string;
     sides?: { pokemon?: { moveSlots?: unknown[]; baseMoveSlots?: unknown[] }[] }[];
   };
   assertSimMods(state.formatid ?? '');
+  // @pkmn/sim's deserializer walks baseMoveSlots indexing moveSlots; a transformed mon that copied a partially revealed target has
+  // fewer moveSlots than base, and the walk crashes on the missing tail ("reading 'id'"; Imprison-Transform Mew). Pad a parsed
+  // copy up to base length, deserialize, trim the live arrays back: the battle round-trips exactly and the string stays the key.
   const trims: { side: number; index: number; length: number }[] = [];
   state.sides?.forEach((side, sideIndex) => side.pokemon?.forEach((pokemon, index) => {
     const base = pokemon.baseMoveSlots;
@@ -55,12 +37,9 @@ export function deserializeBattleExact(serialized: string): Battle {
 }
 
 /**
- * Per-mon corrections change fainted/hp/actives without maintaining the
- * side-level derived state the sim runs on: `pokemonLeft` is the WIN-CHECK
- * counter (drifted high, a wiped side plays on behind a stale move request
- * — GPL T38), and `isActive` drives bench enumeration (drifted false on
- * the active, "switch 1" targeted the field — GPL T39). Recompute both
- * from ground truth after every correction pass and every deserialize.
+ * Recomputes side state the sim runs on from ground truth after every correction pass and deserialize: `pokemonLeft` is the win-check
+ * counter (drifted high, a wiped side plays on behind a stale move request) and `isActive` drives bench enumeration (drifted false
+ * on the active, "switch 1" targeted the field).
  */
 export function restoreSideInvariants(battle: Battle): void {
   for (const side of battle.sides) {

@@ -49,10 +49,8 @@ type BattleOptions = ConstructorParameters<typeof Battle>[0];
 const createdByProto = new WeakMap<object, Map<string, CreatedKeys>>();
 
 /**
- * The keys State.deserializeBattle's `new Battle(...)` creates before it
- * assigns the JSON's (state.mjs:64-95): the same class, format, seed and
- * `deserialized`, with copies of the battle's own sets (the Pokemon
- * constructor normalizes a set in place). Built once per prototype and format.
+ * The keys State.deserializeBattle's `new Battle(...)` creates before it assigns the JSON's (state.mjs:64-95): the same class,
+ * format, seed and `deserialized`, with copies of the battle's own sets. Built once per prototype and format.
  */
 function constructorKeys(battle: Battle): CreatedKeys {
   const proto = Object.getPrototypeOf(battle) as object;
@@ -84,31 +82,24 @@ function dropEmptied(object: object, created: Keys): void {
 }
 
 /**
- * A battle that becomes a copy source (position template, mid-turn snapshot);
- * never written afterwards. Always a copy or a fresh deserialization, never a
- * reader's battle.
+ * A battle that becomes a copy source (position template, mid-turn snapshot), never written afterwards: always a copy or a fresh
+ * deserialization, never a reader's battle.
  *
- * Today's fork is a JSON round trip: it drops own keys holding undefined
- * (state.mjs:385), and `new Battle` recreates only the constructor's keys
- * (state.mjs:95, 390-397). A key the constructor does not create and the sim
- * empties (Pokemon.pendingStaleness, pokemon.mjs:1518, 1583, 1602; gen 2's
- * lastMoveTargetLoc on every move, mods/gen2/scripts.mjs:128 and
- * pokemon.mjs:640) is gone after the round trip; a copy would keep its slot,
- * a later write would fill the slot instead of appending the key, and the key
- * order of the serialized state (endgame memo keys) would differ. So the
- * source drops such keys on the battle, the field, every side and every
- * Pokemon. A constructor key the sim empties (showCure, pokemon.mjs:145;
- * moveLastTurnResult, moveThisTurnResult and volatileStaleness, clearVolatile
- * :1275-1282, which the constructor runs) holds undefined on a fresh object
- * too, so the round trip leaves it undefined and the copy may keep it; the
- * guard spec's census pins both halves in every gen.
+ * The fork is a JSON round trip: it drops own keys holding undefined (state.mjs:385), and `new Battle` recreates only the
+ * constructor's keys (state.mjs:95, 390-397). A key the constructor does not create and the sim empties (Pokemon.pendingStaleness,
+ * pokemon.mjs:1518, 1583, 1602; gen 2's lastMoveTargetLoc on every move, mods/gen2/scripts.mjs:128 and pokemon.mjs:640) is gone
+ * after the round trip; a copy would keep its slot, a later write would fill the slot instead of appending the key, and the key
+ * order of the serialized state (endgame memo keys) would differ. So the source drops such keys on the battle, the field, every
+ * side and every Pokemon. A constructor key the sim empties (showCure, pokemon.mjs:145; moveLastTurnResult, moveThisTurnResult and
+ * volatileStaleness, clearVolatile :1275-1282, which the constructor runs) holds undefined on a fresh object too, so the copy may
+ * keep it; the guard spec's census pins both halves in every gen.
  */
 export function adoptTemplate(battle: Battle): Battle {
   let created: CreatedKeys;
   try {
     created = constructorKeys(battle);
   } catch (error) {
-    // The copy cannot match today's fork without the key sets: the standard path from here on (forced: throws).
+    // The copy cannot match the fork without the key sets: the standard path from here on (forced: throws).
     breakSimFast('fallback', error instanceof Error ? error.message : String(error));
     return battle;
   }

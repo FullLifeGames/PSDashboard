@@ -1,28 +1,20 @@
 import type { PRNGSeed } from '@pkmn/sim';
 import { toId } from '@fulllifegames/replay-core';
 
-/**
- * Hax alignment: the replay reconstruction replays the real game's choices,
- * but the sim rolls its own crits/misses/secondaries. This module extracts
- * the protocol's discrete RNG witnesses from a turn block and scores how
- * well a trial advance reproduces them, so the reconstruction can pick the
- * candidate seed whose rolls match reality (spec: docs/superpowers/specs/
- * 2026-08-15-hax-alignment-design.md). Damage magnitude is deliberately
- * not scored — snapshots correct HP at every boundary, and matching rolls
- * would reward wrongly guessed spreads.
- *
- * PURE module: type-only sim imports. App.tsx imports it statically; a
- * runtime @pkmn/sim import here would drag the sim into the main chunk.
- */
+// Hax alignment: the replay reconstruction replays the real game's choices, but the sim rolls its own crits, misses and secondaries.
+// This module extracts the protocol's discrete RNG witnesses from a turn block and scores how well a trial advance reproduces them.
+// Damage magnitude is deliberately not scored: snapshots correct HP at every boundary, and matching rolls would reward wrongly
+// guessed spreads. Pure module with type-only sim imports: App.tsx imports it statically, and a runtime @pkmn/sim import here would
+// drag the sim into the main chunk.
 
-/** `${side}:${nameId}` — slot letters dropped so a diverged doubles slot
- *  layout cannot fake a mismatch. */
+/** `${side}:${nameId}`, slot letters dropped so a diverged doubles slot layout cannot fake a mismatch. */
 function normalizeIdent(raw: string): string {
   const match = raw.match(/^(p[12])[a-d]?:\s*(.*)$/);
   if (!match) return toId(raw);
   return `${match[1]}:${toId(match[2])}`;
 }
 
+/** The discrete RNG witnesses of one turn block, read from the protocol. */
 export interface ProtocolEvents {
   /** |faint| idents (hard criterion). */
   faints: Set<string>;
@@ -31,16 +23,18 @@ export interface ProtocolEvents {
   winner: string | null;
   /** `${ident}:${moveId}` sequence of |move| lines (speed-tie signal). */
   moveOrder: string[];
-  /** `${ident}:${moveId}` -> count. |-miss| carries no move id: attributed
-   *  to the source's immediately preceding |move|; `[miss]` sits on the
-   *  |move| line itself. */
+  /**
+   * `${ident}:${moveId}` -> count. |-miss| carries no move id: it is attributed to the source's immediately preceding |move|;
+   * `[miss]` sits on the |move| line itself.
+   */
   misses: Map<string, number>;
   /** Target ident -> count. */
   crits: Map<string, number>;
-  /** `${targetIdent}:status:${st}` / `${targetIdent}:boost:${stat}:${n}` /
-   *  `${targetIdent}:unboost:${stat}:${n}` -> count over ALL such lines,
-   *  no [from] filtering: deterministic entries appear identically on both
-   *  sides and cancel; RNG-driven ones (Scald burn, Ancient Power) signal. */
+  /**
+   * `${targetIdent}:status:${st}` / `${targetIdent}:boost:${stat}:${n}` / `${targetIdent}:unboost:${stat}:${n}` -> count over all
+   * such lines, with no [from] filtering: deterministic entries appear identically on both sides and cancel; RNG-driven ones
+   * (Scald burn, Ancient Power) signal.
+   */
   secondaries: Map<string, number>;
   /** `${targetIdent}:${n}` -> count (|-hitcount|). */
   hitCounts: Map<string, number>;
@@ -129,6 +123,7 @@ export function extractProtocolEvents(lines: string[]): ProtocolEvents {
   return events;
 }
 
+/** How far a trial's events are from the expected ones: the hard channels are compared first, then the soft sum. */
 export interface AlignmentScore {
   /** Hard, compared first: one side's game ended where the other's continued. */
   endedMismatch: boolean;
@@ -153,17 +148,17 @@ function setMismatch(a: Set<string>, b: Set<string>): number {
   return total;
 }
 
-/** `${ident}:${moveId}` -> count, derived from the move sequence so a mover
- *  present in one block but not the other (died first, sim-only flinch
- *  without |cant|) registers as a soft mismatch. */
+/**
+ * `${ident}:${moveId}` -> count, derived from the move sequence so a mover present in one block but not the other (died first,
+ * sim-only flinch without |cant|) registers as a soft mismatch.
+ */
 function moveCounts(order: string[]): Map<string, number> {
   const counts = new Map<string, number>();
   for (const entry of order) counts.set(entry, (counts.get(entry) ?? 0) + 1);
   return counts;
 }
 
-/** 0/1 order-only signal over the entries both sequences contain — presence
- *  differences are counted by the moveCounts channel. */
+/** 0/1 order-only signal over the entries both sequences contain; presence differences are counted by the moveCounts channel. */
 function orderMismatch(a: string[], b: string[]): number {
   const shared = new Set(a.filter(entry => b.includes(entry)));
   const filteredA = a.filter(entry => shared.has(entry));
@@ -171,6 +166,7 @@ function orderMismatch(a: string[], b: string[]): number {
   return filteredA.join('\n') === filteredB.join('\n') ? 0 : 1;
 }
 
+/** The mismatch of a trial's events against the expected ones, per channel. */
 export function scoreAlignment(expected: ProtocolEvents, trial: ProtocolEvents): AlignmentScore {
   return {
     endedMismatch: expected.ended !== trial.ended,
@@ -199,11 +195,9 @@ export function isPerfectAlignment(score: AlignmentScore): boolean {
 }
 
 /**
- * Pinned candidate seeds. Index 0 MUST stay '1,2,3,4' (the legacy fixed
- * reconstruction seed — candidate-0-perfect turns behave exactly as before
- * this feature, modulo the per-turn reseed). Values are arbitrary but
- * FROZEN: changing any entry changes every reconstruction and is a cache
- * version event (eval-cache-store.ts).
+ * Pinned candidate seeds. Index 0 must stay '1,2,3,4' (the fixed reconstruction seed: a candidate-0-perfect turn behaves as an
+ * unaligned one, modulo the per-turn reseed). The values are arbitrary but frozen: changing any entry changes every reconstruction
+ * and is a cache version event (eval-cache-store.ts).
  */
 export const ALIGNMENT_SEEDS: readonly PRNGSeed[] = [
   '1,2,3,4', '5,9,13,17', '2,4,6,8', '11,7,5,3',
@@ -212,6 +206,7 @@ export const ALIGNMENT_SEEDS: readonly PRNGSeed[] = [
   '27,18,28,18', '31,41,59,26', '161,80,33,98', '14,142,13,56',
 ];
 
+/** The chosen seed with the score of its best trial and the search's counts. */
 export interface SeedChoice {
   seed: PRNGSeed;
   /** Best trial's score; null when every trial failed. */
@@ -222,14 +217,10 @@ export interface SeedChoice {
 }
 
 /**
- * Deterministic best-of-K seed search: candidate 0 first (perfect → done,
- * so an RNG-quiet turn costs one trial), then the rest in order with
- * early-exit on perfect and strict-improvement argmin (ties keep the
- * earlier candidate). The trial runner is injected — the reconstruction
- * supplies a forkBattle-based runner; tests supply canned logs. A runner
- * returning null marks a failed trial; all-failed falls back to candidate 0
- * so the block runs exactly as before this feature. shouldStop (abort /
- * reconstruction deadline) halts between candidates, keeping the best so far.
+ * Deterministic best-of-K seed search: candidate 0 first (perfect: done, so an RNG-quiet turn costs one trial), then the rest in
+ * order with early exit on perfect and strict-improvement argmin (ties keep the earlier candidate). A runner returning null marks
+ * a failed trial; all failed falls back to candidate 0. shouldStop (abort or reconstruction deadline) halts between candidates,
+ * keeping the best so far.
  */
 export function chooseAlignedSeed(params: {
   expected: ProtocolEvents;
@@ -265,6 +256,7 @@ export function chooseAlignedSeed(params: {
   };
 }
 
+/** The alignment of one turn: the seed chosen, the trial's outcome and the score of the truly emitted block. */
 export interface TurnAlignmentRecord {
   turn: number;
   seed: PRNGSeed;
@@ -272,29 +264,30 @@ export interface TurnAlignmentRecord {
   trialsFailed: number;
   candidatesTried: number;
   /**
-   * Round 86 (the log's dice, T306): how the turn's dice were set. `forced`: the log's dice forced on the hidden dice of seed index 0
-   * (no search, `candidatesTried` 0, `trialPerfect` false: there is no trial; since ruling C2 the faint step may have chosen another seed of
-   * the list for the dice no `DieKind` names, and the record's `seed` says which). `fallback`: the forced turn could not play (a choice the
-   * copy refused, an odd state) and the sixteen-seed search ran. Absent on a record from before the round.
+   * How the turn's dice were set. `forced`: the log's dice forced on the hidden dice of seed index 0 (no search, `candidatesTried` 0,
+   * `trialPerfect` false: there is no trial); the faint step may have chosen another seed of the list for the dice no `DieKind`
+   * names, and the record's `seed` says which. `fallback`: the forced turn could not play (a choice the copy refused, an odd state)
+   * and the sixteen-seed search ran.
    */
   via?: 'forced' | 'fallback';
-  /** Scored from the TRULY emitted block, not the trial — instrumentation
-   *  cannot flatter itself; a trial-vs-actual gap is a fork-fidelity finding. */
+  /** Scored from the truly emitted block, not the trial: a trial-versus-actual gap is a fork-fidelity finding. */
   actual: AlignmentScore;
 }
 
+/** The totals of a game's per-turn alignment records. */
 export interface AlignmentSummary {
   turns: number;
   perfectTurns: number;
   softResidual: number;
   faintResidualTurns: number;
   endedMismatches: number;
-  /** Round 86 (ruling C2): forced turns that play under another seed than index 0 (the hybrid search found one); absent when none did. */
+  /** Forced turns that play under another seed than index 0 (the hybrid search found one); absent when none did. */
   seededTurns?: number;
   /** Turns that fell back to the seed search (`via: 'fallback'`); absent when none did. */
   fallbackTurns?: number;
 }
 
+/** Totals a game's per-turn records. */
 export function summarizeAlignment(records: TurnAlignmentRecord[]): AlignmentSummary {
   const summary: AlignmentSummary = {
     turns: records.length, perfectTurns: 0, softResidual: 0,

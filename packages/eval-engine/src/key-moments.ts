@@ -4,11 +4,7 @@ import { inStandoff, type Standoff } from './standoff.ts';
 import { chanceRolled } from './turn-analysis/luck.ts';
 import { momentScore } from './win-reason.ts';
 
-/** A key moment needs at least this much swing in one COMPONENT (net swing
- * or the chance share alone — a roll a decision partially cancelled still
- * swung the game, 573756 t73) — the same constant that selects the sweep's
- * deepening turns (graph.ts): whatever the report names ran at the
- * configured settings. */
+/** The swing one component (net swing or chance share alone) needs for a key moment; the same constant selects the sweep's deepening turns (graph.ts). */
 export const KEY_MOMENT_SWING = KEY_TURN_SWING;
 /** How many key moments the report keeps by rank. */
 const REPORT_KEY_MOMENTS = 4;
@@ -16,14 +12,12 @@ const REPORT_KEY_MOMENTS = 4;
 type Winner = 'p1' | 'p2' | null;
 
 /**
- * Selection by the biggest component (momentScore, win-reason.ts); resolution turns stay excluded.
- * Round 76 (T264): the top REPORT_KEY_MOMENTS stay, and every other qualifying dice turn whose
- * chance went against the winner joins them (573756 t73: a missed 95 % Fire Fang ranked eighth).
- * A dice turn is a turn whose own rolls ran in its residual's direction (chanceRolled) or, without
- * the turn's rolls, one that carries a protocol-visible dice event. Without a winner or dice info
- * no turn joins. Round 79 (T285): the selection runs over the whole game, then a turn inside a standoff drops out unless it
- * is a graded decision (a decision attribution): its shift, roll or read is the HP and PP cycle of one position. The slot
- * of a dropped turn stays empty (573756 reads 68, 71 and 73, not a marginal turn 78 pulled up from the fifth rank).
+ * Selection by the biggest component (momentScore, win-reason.ts); resolution turns stay excluded. The top REPORT_KEY_MOMENTS stay,
+ * and every other qualifying dice turn whose chance went against the winner joins them (a missed 95 % Fire Fang ranked eighth). A
+ * dice turn is a turn whose own rolls ran in its residual's direction (chanceRolled) or, without the turn's rolls, one that carries
+ * a protocol-visible dice event. Without a winner or dice info no turn joins. The selection runs over the whole game, then a turn
+ * inside a standoff drops out unless it is a graded decision (a decision attribution): its shift, roll or read is the HP and PP
+ * cycle of one position. The slot of a dropped turn stays empty.
  */
 export function keyMomentsFor(
   known: TurnAnalysis[],

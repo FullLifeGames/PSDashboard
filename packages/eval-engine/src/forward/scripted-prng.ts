@@ -5,32 +5,15 @@ import { DrawNamer } from '../dice/namer.ts';
 import type { DieName, Draw } from '../dice/types.ts';
 import type { DieQuantiles } from '../search/root-quantile.ts';
 
-/**
- * Round 43: the simulator's dice on demand. A scripted PRNG answers the
- * rolls of ONE named move (side + move id) the way a script says, so an
- * outcome class the seeds never showed (the 5% miss, the crit-only
- * knock-out) can be drawn directly instead of chased with probe seeds.
- * Everything the script does not name delegates to the seed, and the log
- * still decides the class (classifyChild), so a script is a request, not
- * a promise. A speed tie is answered through prng.shuffle.
- *
- * Round 86 (T299): the PRNG no longer tells a draw by its numbers. A `DrawNamer`
- * (dice/namer.ts, the module's naming by the simulator's own hook, docs/adr/0002)
- * names each call before the PRNG answers, and the script answers only the
- * move's own accuracy, crit and damage roll. A status check of the attacker
- * (full paralysis, infatuation, the confusion check and its self-hit, the thaw)
- * has the shape of a crit or an accuracy and draws from the seed; Gens 1 and 2,
- * which draw accuracy and crit in 256ths and the roll as random(217, 256), are
- * reached too. An answer consumes no draw, as before.
- *
- * Round 86 (T305): a secondary die (the entry of the move's `secondaries` the simulator draws after a hit) is named too. A script
- * answers it by effect id (`secondary`), and a `DiceSink` as the scripts map records every secondary die of the turn with the
- * result it had, answered or drawn, so a class draw reads which effects came true from the dice, not from the log.
- *
- * Round 89 (#59, T322 block 1): a `QuantileSink` carries the root quantiles of a tree (`search/root-quantile.ts`). The PRNG
- * draws the natural number first, then lets the quantiles replace it for every NAMED die (a chance, a `random(m)`, a `sample`),
- * so an unnamed draw, a speed tie and every draw below the root keep the stream's number. A script outranks a quantile.
- */
+// The simulator's dice on demand: a ScriptedPRNG answers the rolls of one named move (side and move id) the way a script says.
+// Everything the script does not name delegates to the seed, and the log still decides the outcome class (classifyChild), so a
+// script is a request, not a promise. A `DrawNamer` (dice/namer.ts, ADR 0002) names each call before the PRNG answers, and the
+// script answers only the move's own accuracy, crit, damage roll and secondary dice. A status check of the attacker (full
+// paralysis, infatuation, the confusion check and its self-hit, the thaw) has the shape of a crit or an accuracy and draws from the
+// seed. Gens 1 and 2 draw accuracy and crit in 256ths and the roll as random(217, 256), and are reached too. An answer consumes
+// no draw, and a speed tie is answered through prng.shuffle.
+
+/** What a script says about one move's dice; a field left out draws from the seed. */
 export interface RollScript {
   /** The accuracy roll: true connects, false misses. */
   hit?: boolean;
@@ -38,7 +21,7 @@ export interface RollScript {
   crit?: boolean;
   /** The damage roll random(16): 0 is the maximum roll, 15 the minimum (randomizer: base × (100 − roll) / 100). */
   roll?: number;
-  /** The secondary dice by effect id (`secondaryEffectId`): true lets the entry happen, false stops it. An id the script leaves out draws from the seed. */
+  /** The secondary dice by effect id (`secondaryEffectId`): true lets the entry happen, false stops it. */
   secondary?: Record<string, boolean>;
   /** Speed tie: the side whose move acts first. */
   first?: 'p1' | 'p2';
@@ -60,15 +43,16 @@ export interface SecondaryRecord {
   logIndex: number;
 }
 
-/**
- * Scripts that record. A class draw passes a sink (an empty map is fine) as the fork's `scripts`; `forkBattle` builds the recording
- * `ScriptedPRNG` for it, and the caller reads `secondaries` after the advance.
- */
+/** Scripts that record: pass a sink (an empty map is fine) as the fork's `scripts` and read `secondaries` after the advance. */
 export class DiceSink extends Map<string, RollScript> {
   readonly secondaries: SecondaryRecord[] = [];
 }
 
-/** A sink whose draws are also answered by the root quantiles of a tree (Round 89, #59). */
+/**
+ * A sink whose draws the root quantiles of a tree also answer (`search/root-quantile.ts`): the PRNG draws the natural number
+ * first, then the quantiles replace it for every named die (a chance, a `random(m)`, a `sample`). An unnamed draw, a speed tie and
+ * every draw below the root keep the stream's number. A script outranks a quantile.
+ */
 export class QuantileSink extends DiceSink {
   readonly quantiles: DieQuantiles;
 
@@ -109,13 +93,12 @@ export class ScriptedPRNG extends PRNG {
     this.namer = new DrawNamer(battle);
   }
 
-  /** Puts the battle back as the simulator made it (`toPosition` calls this when the turn is over). After it, every draw comes from the seed. */
+  /** Puts the battle back as the simulator made it (`toPosition` calls it when the turn is over); later draws come from the seed. */
   release(): void {
     this.namer?.release();
     this.namer = null;
   }
 
-  /** The script and the answer state of the move the sim is executing, when this die is one of its own and a script names the move. */
   private active(name: DieName | null): { script: RollScript; state: Answered } | null {
     if (!name) return null;
     // the move's own accuracy, crit and damage roll carry no effect; a secondary die always does
@@ -155,7 +138,6 @@ export class ScriptedPRNG extends PRNG {
     return this.scripts.quantiles.answer(name, draw);
   }
 
-  /** The sink's record of a secondary die and the result it had. */
   private note(name: DieName, chance: number, happened: boolean): void {
     if (!(this.scripts instanceof DiceSink)) return;
     this.scripts.secondaries.push({

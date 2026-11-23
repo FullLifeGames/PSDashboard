@@ -1,8 +1,5 @@
-/**
- * Round 89 (C7): the one reader of a Revival Blessing prompt. The simulator marks the user's party entry `reviving` in the request
- * (`@pkmn/sim` pokemon.js, getSwitchRequestData), so whether a request asks for a fainted body comes from the request, never from a
- * move name. The forward model (`switchInSlots`) and the branch layer (`switchInsOf`, `revivingSlots` of the forced answers) import it.
- */
+// The one reader of a Revival Blessing prompt: the simulator marks the user's party entry `reviving` in the request (`@pkmn/sim`
+// pokemon.js, getSwitchRequestData), so a request asks for a fainted body by that mark, never by a move name.
 
 /** What the reader needs of a side: its active table (one entry per slot) and the request the simulator last sent it. */
 export interface RevivingSide {
