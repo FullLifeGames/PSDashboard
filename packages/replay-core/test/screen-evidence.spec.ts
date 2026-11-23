@@ -10,18 +10,14 @@ import { swept } from './screen-sweep-moves';
 import type { SimView } from './sim-views';
 
 /**
- * Round 86 (T310, GitHub issue #3): the turns of a screen name the item that held it. Reflect, Light Screen and Aurora Veil last
- * five turns, eight with Light Clay; the log shows the start and the end of a screen but never the item. The inference reads
- * the screen's lifetime from the log (a start in the action phase, an end in the residual phase of a later turn) and holds it
- * to the Dex's own turns (`conditionTurns`, held to the simulator by `screen-turns-sweep.spec.ts`):
- *  - the lifetime of the plain turns rules Light Clay out for the setter, the lifetime of Light Clay's turns proves it;
- *  - nothing is read when the turns prove nothing: a removal (the screen ends in the action phase), a screen moved by Court
- *    Change, a screen still standing at the log's end, an item that did not count (Klutz, Embargo, Magic Room), an item the
- *    log showed change, an Illusion team, a generation without the item (Generations 1 to 3).
- * These rows were red before the reader (step C2 of lane C, `test.fails`); step C3 built the reader and flipped them to `test`.
- * The rows that read nothing pass both before and after; they guard the cases a careless reader would get wrong.
- * Every log below comes from the simulator, in singles and in doubles (the setter in either slot), in the simulator's own style
- * and with the log's `|t:|` lines taken out (a reconstructed log).
+ * The turns of a screen name the item that held it: Reflect, Light Screen and Aurora Veil last five turns, eight with Light Clay, and
+ * the log never shows the item. The inference reads the lifetime from the log and holds it to the Dex's turns (`conditionTurns`,
+ * held to the simulator by `screen-turns-sweep.spec.ts`):
+ *  - the plain turns rule Light Clay out for the setter, Light Clay's turns prove it;
+ *  - nothing is read when the turns prove nothing: a removal, a screen moved by Court Change, a screen still standing at the log's
+ *    end, an item that did not count (Klutz, Embargo, Magic Room), an item the log showed change, an Illusion team, a generation
+ *    without the item (Generations 1 to 3). Those rows guard the cases a careless reader would get wrong.
+ * Every log comes from the simulator, in singles and in doubles (the setter in either slot), with and without the `|t:|` lines.
  */
 const red = test;
 
@@ -153,7 +149,7 @@ describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 4))('the turns prove not
 
   red('an Illusion user on the team: the setter may be the user\'s disguise, no verdict (where the generation has Illusion)', () => {
     expect(ruledOut(control({ species: SNORLAX }), 'p1', SNORLAX)).toBe(true);
-    // Round 86 (C3): the generation decides, read from the Dex. Where the ability does not exist, a bench the log never shows holds no disguise.
+    // The generation decides, read from the Dex. Where the ability does not exist, a bench the log never shows holds no disguise.
     const illusion = view.dex.abilities.get('illusion');
     const hasIllusion = illusion.exists && illusion.gen <= view.dex.gen;
     expect(ruledOut(control({ species: SNORLAX }, { bench: [{ species: 'Zoroark', ability: 'Illusion' }] }), 'p1', SNORLAX)).toBe(!hasIllusion);
@@ -171,9 +167,8 @@ describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 4))('the turns prove not
 });
 
 /**
- * The ruling after C1: a start whose move line carries `[from]` (a Snatch that steals the screen, a move called by Copycat) is
- * set by the body that line names, and that body's item decides the turns. A reader that credits the body of the earlier
- * `|move|` line instead gets a wrong verdict: these rows hold the scenes where it would. They pass today and must keep passing.
+ * A start whose move line carries `[from]` (a Snatch that steals the screen, a move called by Copycat) is set by the body that line
+ * names, and that body's item decides the turns; a reader that credits the body of the earlier `|move|` line gets a wrong verdict.
  * The Snatch rows come from the Dex's `snatch` flag, the Copycat row from the Dex's move.
  */
 describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 4))('a screen set through another move: $name', view => {
@@ -219,16 +214,14 @@ describe.each(RULE_VIEWS.filter(view => view.dex.gen < 4))('no table before Ligh
 });
 
 /**
- * S3, the removers and the silent movers, found by playing every move of the rule set against a board with a screen on each
- * side (Reflect on p1's, Light Screen on p2's, set by `addSideCondition`): a move that ends a screen in the action phase is a
- * remover, a move that changes which side holds a screen with no line is a silent mover. For each found move the log of a
- * game where p1 plays it on the screen's plain last turn must give a verdict to a side only when its screen ran out on its own
- * side in the residual phase, and the control without the move gives both sides their verdict.
+ * S3, the removers and the silent movers, found by playing every move of the rule set against a board with a screen on each side
+ * (Reflect on p1's, Light Screen on p2's): with a found move on the screen's plain last turn, a side gets a verdict only when its
+ * screen ran out on its own side in the residual phase; the control without the move gives both sides their verdict.
  */
 describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 2 && screenMoves(view).length >= 2))('S3, removers and movers of screens: $name', view => {
   const found = swept(view);
   const both = (log: string): [boolean, boolean] => [ruledOut(log, 'p1', SNORLAX), ruledOut(log, 'p2', 'Vaporeon')];
-  // Round 86 (C3): before Generation 4 no item changes a screen's turns (Light Clay debuts there), so no screen gives a verdict.
+  // Before Generation 4 no item changes a screen's turns (Light Clay debuts there), so no screen gives a verdict.
   const verdicts = (clean: [boolean, boolean]): [boolean, boolean] => (view.dex.gen >= 4 ? clean : [false, false]);
 
   test('the sweep found the removers and movers the rule set has', () => {

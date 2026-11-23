@@ -19,10 +19,8 @@ import {
 } from './paradox-scenes';
 
 /**
- * Round 69, T187 and T151 (spec decisions 29 and 30): the snapshot carries what
- * @pkmn/client counts for a sleeping body (statusState.sleepTurns, one per
- * |cant|..|slp| line) and the slot of every active body (side.active). Every
- * log comes from @pkmn/sim; the expected numbers come from that log.
+ * The snapshot carries what @pkmn/client counts for a sleeping body (statusState.sleepTurns, one per |cant|..|slp| line) and the
+ * slot of every active body (side.active); the expected numbers come from the simulator's log.
  */
 
 const ivs = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
@@ -99,10 +97,8 @@ describe.each([['singles', SINGLES], ['doubles', DOUBLES]] as const)('snapshot f
 });
 
 /**
- * Round 69, T158 (spec decision 32): the quick picker needs the facts the simulator's body keeps for the calc:
- * the stat Protosynthesis or Quark Drive raised (the client's `protosynthesis` and `quarkdrive` volatile names it)
- * and the fallen allies of Supreme Overlord (the client's `fallenN` volatile). Battle B is the simulator's own;
- * the expected values come from its body, not from the log.
+ * The quick picker needs the stat Protosynthesis or Quark Drive raised (the client's `protosynthesis` and `quarkdrive` volatiles)
+ * and the fallen allies of Supreme Overlord (`fallenN`); the expected values come from the simulator's own body, not from the log.
  */
 type SimBattle = InstanceType<typeof Battle>;
 function playSteps(format: string, p1: PokemonSet[], p2: PokemonSet[], steps: [string, string][][], seed = 1): { battle: SimBattle; log: string } {

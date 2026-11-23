@@ -14,9 +14,8 @@ import type { PokemonUsageStats, SmogonUsageStats } from '../src/smogon/stats-ty
 import { toId } from '../src/ids';
 
 /**
- * Round 75 (T160, decision D1): the one resolver of generation and mod. The global Dex is Generation 9 on Scarlet/Violet; a game
- * reads the Dex of its own generation, and a Pokémon Champions game the registered Champions Dex. This file never registers the
- * mod before the throw test (a spec file runs in its own module registry), so the order is the host's order: load, then read.
+ * The one resolver of generation and mod: a game reads the Dex of its own generation (the global Dex is Generation 9 on Scarlet/Violet),
+ * a Pokémon Champions game the registered Champions Dex. The mod is not registered before the throw test (one module registry per file).
  */
 describe('rulesDex', () => {
   test('a Champions game without the registered mod throws, never reads Scarlet/Violet', () => {
@@ -140,7 +139,6 @@ const stats = (...entries: PokemonUsageStats[]): SmogonUsageStats => ({
   format: 'test', month: 'm', source: 's', pokemon: Object.fromEntries(entries.map(entry => [toId(entry.species), entry])),
 });
 
-/** The app's chain without a spread solve: inferred infos, the enrichment, then the build. */
 function build(log: string, species: string, usageStats: SmogonUsageStats) {
   const p2Info = enrichTeamInfo(inferOpponentTeam(log, 'p2'), usageStats, null);
   const team = buildTeamsFromReplay(log, { p2Info, usageStats, setAssumptions: null }).p2Team;

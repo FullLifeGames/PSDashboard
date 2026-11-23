@@ -8,26 +8,20 @@ import { fixtureTexts, GENERATIONS, generatedTeams, withCorners } from './team-t
 import './champions-mod';
 
 /**
- * Round 72, T241 step 1b: an Open Team Sheet (`|showteam|`) goes through the library. `parseShowteamSheet` and the sets
- * `extractTeamSheets` builds read one packed team entry by entry through `Teams.import` of @pkmn/sim, which unpacks a
- * single line with the Dex tables. The hand reader it replaced lives on below as `legacyParseShowteamSheet`, and this
- * spec holds the library to it on every `|showteam|` side of the fixtures and on simulator-generated teams of
- * generations 1 to 9 (plain and with corners, on both sides, so singles and doubles teams alike). Census at the change
- * (1,734 sides of fixtures and fit corpus): 974 read as before, 760 differ in the spelling of 12 names, all with equal
- * ids (`out/team-text-census.txt` of lane D).
- *   F2  The Dex spells a name where it knows the id: the hand splitter wrote "Will OWisp", "XScissor", "Lightof Ruin",
- *       "Uturn", "Freeze Dry", "Kings Shield", and the library's own fallback "Will O Wisp"; the Dex says "Will-O-Wisp",
- *       "X-Scissor", "Light of Ruin", "U-turn", "Freeze-Dry", "King's Shield". A name the Dex does not know keeps the
- *       text as written.
- *   F5  A species the sheet writes in its own field reads the Dex name ("Porygon2", "Zygarde-10%"); the real sheets (the
- *       server writes the species into the name field) read the same as before.
+ * An Open Team Sheet (`|showteam|`) goes through the library: `parseShowteamSheet` and the sets `extractTeamSheets` builds read one
+ * packed team entry by entry through `Teams.import` of @pkmn/sim. The hand reader it replaced lives on below as
+ * `legacyParseShowteamSheet`; this spec holds the library to it on every `|showteam|` side of the fixtures and on simulator-generated
+ * teams of generations 1 to 9 (both sides, singles and doubles teams), except where they differ on purpose:
+ *   F2  The Dex spells a name where it knows the id: the hand splitter wrote "Will OWisp", "XScissor", "Uturn", the Dex says
+ *       "Will-O-Wisp", "X-Scissor", "U-turn". A name the Dex does not know keeps the text as written.
+ *   F5  A species the sheet writes in its own field reads the Dex name ("Porygon2", "Zygarde-10%"); the real sheets (the server
+ *       writes the species into the name field) read the same as before.
  */
 
 interface LegacySheetPokemon { species: string; item: string; ability: string; moves: string[]; teraType: string; level: number; gender: string }
 
 const legacySplitPackedName = (value: string): string => value.replace(/([a-z0-9])([A-Z])/g, '$1 $2').trim();
 
-/** The hand reader as it stood before round 72 (packages/replay-core/src/opponent-inferrer.ts). */
 function legacyParseShowteamSheet(log: string, side: 'p1' | 'p2'): LegacySheetPokemon[] | null {
   const prefix = `|showteam|${side}|`;
   const line = log.split('\n').find(candidate => candidate.startsWith(prefix));
@@ -51,7 +45,7 @@ function legacyParseShowteamSheet(log: string, side: 'p1' | 'p2'): LegacySheetPo
   return pokemon.length > 0 ? pokemon : null;
 }
 
-/** The Dex's name where the Dex knows the id, the text as written where it does not (round 72, F2). */
+/** The Dex's name where the Dex knows the id, the text as written where it does not (F2). */
 const dexSpelled = (table: { get(name: string): { exists: boolean; name: string } }, text: string): string => {
   const entry = table.get(text);
   return entry.exists ? entry.name : text;
@@ -147,7 +141,7 @@ describe('parseShowteamSheet reads like the hand reader did, through the Dex tab
     const sets = extractTeamSheets(`|player|p2|Bo|1|
 ${line}`).p2!;
     const sheet = parseShowteamSheet(line, 'p2')!;
-    // A short first entry no longer drops the entries after it (F6), and the spelling is the sheet reader's.
+    // A short first entry does not drop the entries after it (F6), and the spelling is the sheet reader's.
     expect(sets.map(set => set.species)).toEqual(sheet.map(mon => mon.species));
     expect(sets.map(set => set.moves)).toEqual(sheet.map(mon => mon.moves));
     expect(sets[1].moves).toEqual(['Will-O-Wisp', 'X-Scissor', 'Protect', 'Tailwind']);

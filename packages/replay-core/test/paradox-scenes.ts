@@ -1,11 +1,7 @@
 import { Battle, Teams, toID, type PokemonSet } from '@pkmn/sim';
 import type { PokemonEvs } from '../src/types';
 
-/**
- * Real simulator battles for the paradox ability tests (round 69, T167): Protosynthesis and Quark Drive name the stat they
- * raise on the activation line. A scene is a few scripted turns on Gen 9 singles or doubles; the simulator's own HP loss of
- * the target per turn is the oracle, the log is what the parser reads.
- */
+/** Real simulator battles for the paradox ability tests: the simulator's own HP loss of the target per turn is the oracle. */
 
 export type Kind = 'singles' | 'doubles';
 export const KINDS: Kind[] = ['singles', 'doubles'];
@@ -18,7 +14,6 @@ export const set = (species: string, item: string, ability: string, moves: strin
 });
 export const partner = () => set('Blissey', '', 'Natural Cure', ['Splash'], 'Calm', { hp: 252 });
 
-/** One scripted turn, as the choice of each side's first slot (the partner of a doubles side splashes). */
 export interface Turn {
   p1: string;
   p2: string;
@@ -30,13 +25,11 @@ export interface SceneSpec {
   lead: PokemonSet;
   bench?: PokemonSet;
   turns: Turn[];
-  /** The species whose HP the oracle follows. */
   target: string;
 }
 
 export interface Scene {
   log: string;
-  /** The target's HP lost on each turn, in the simulator's own numbers. */
   damage: number[];
   maxHp: number;
 }
@@ -72,7 +65,6 @@ export function sceneOf(kind: Kind, spec: SceneSpec, seed: number): Scene | null
   return { log, damage, maxHp };
 }
 
-/** Up to `count` clean scenes whose last damage differs. */
 export function scenesOf(kind: Kind, spec: SceneSpec, count: number): Scene[] {
   const scenes: Scene[] = [];
   for (let seed = 1; scenes.length < count && seed <= 200; seed++) {
@@ -109,7 +101,6 @@ export const INTIMIDATE_BEFORE_ACTIVATION: SceneSpec = {
   turns: [{ p1: 'move dragonclaw', p2: 'switch 2' }, DRAGON_CLAW],
 };
 
-/** Quark Drive in the Electric Terrain of Tapu Koko. */
 export const QUARK_DRIVE: SceneSpec = {
   attacker: set('Iron Valiant', '', 'Quark Drive', ['Spirit Break'], 'Adamant', { atk: 252 }),
   lead: set('Tapu Koko', '', 'Electric Surge', ['Splash'], 'Calm', { hp: 252, spd: 252 }), target: 'Tapu Koko',

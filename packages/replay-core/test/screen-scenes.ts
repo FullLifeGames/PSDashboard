@@ -5,13 +5,9 @@ import type { OpponentTeamInfo } from '../src/types';
 import { DOUBLES_VIEWS, SINGLES_VIEWS, battleIn, mon, type SimView } from './sim-views';
 import { Dex } from '@pkmn/sim';
 
-/**
- * Round 86 (T310, Light Clay from the screen turns): the scenes of `screen-evidence.spec.ts`. Every log comes from the
- * simulator (the spectator's view, as a replay holds it), so the simulator says how long a screen lasted and what the log
- * shows; the specs read the inference from the same log. Side p1 (Alpha) sets the screen, side p2 (Beta) faces it.
- */
+/** The scenes of `screen-evidence.spec.ts`: every log comes from the simulator (the spectator's view), side p1 (Alpha) sets the screen, side p2 (Beta) faces it. */
 
-/** `timed`: the log as the simulator and a server write it (a `|t:|` line after each header); `plain`: the same with those lines taken out (a reconstructed or older log). */
+/** `timed`: the log as a server writes it (a `|t:|` line after each header); `plain`: the same without those lines (a reconstructed log). */
 export type Style = 'timed' | 'plain';
 export type Side = 'p1' | 'p2';
 
@@ -20,9 +16,7 @@ export interface Holder { species: string; item?: string; ability?: string }
 
 export interface SceneOptions {
   holder: Holder;
-  /** The screen's move id. */
   screen: string;
-  /** How many turns the log plays. */
   turns: number;
   /** The setter's slot in doubles (the ally takes the other). */
   slot?: 0 | 1;
@@ -39,19 +33,15 @@ export interface SceneOptions {
 
 const FOE_DEFAULT: Holder = { species: 'Abomasnow', ability: 'Snow Warning' };
 
-/** A move that needs a target in doubles reads it from the Dex. */
 const needsTarget = (view: SimView, id: string): boolean => ['normal', 'any', 'adjacentFoe'].includes(view.dex.moves.get(id).target);
 
 const setOf = (holder: Holder, moves: string[]): PokemonSet =>
   mon(holder.species, moves, { item: holder.item ?? '', ability: holder.ability ?? 'No Ability' });
 
-/** The spectator's view of the simulator's log: what a replay shows. */
 export const spectatorLog = (battle: Battle): string => extractChannelMessages(battle.log.join('\n'), [0])[0].join('\n');
 
-/** The log without its `|t:|` lines. */
 export const plainStyle = (log: string): string => log.split('\n').filter(line => !line.startsWith('|t:|')).join('\n');
 
-/** Plays the scene and returns the log of the setter's side p1 and the foe's side p2. */
 export function playScene(view: SimView, options: SceneOptions): string {
   const { holder, screen, turns, slot = 0, style = 'timed', setter = {}, foeMoves = {}, bench = [] } = options;
   const foe = options.foe ?? FOE_DEFAULT;
@@ -76,14 +66,12 @@ export function playScene(view: SimView, options: SceneOptions): string {
   return style === 'plain' ? plainStyle(log) : log;
 }
 
-/** The inferred info of one body of a side, read from the log by the inference. */
 export function infoOf(log: string, side: Side, species: string): OpponentTeamInfo['pokemon'][number] {
   const info = inferOpponentTeam(log, side).pokemon.find(entry => entry.species === species);
   if (!info) throw new Error(`the inference found no ${species} on ${side}`);
   return info;
 }
 
-/** Light Clay's rule-out: the inference wrote the item into the body's ruled-out items. */
 export const ruledOut = (log: string, side: Side, species: string, item = 'lightclay'): boolean =>
   (infoOf(log, side, species).ruledOut?.items ?? []).includes(item);
 
@@ -93,7 +81,6 @@ export function proven(log: string, side: Side, species: string): string {
   return field.source === 'revealed' && field.value !== '(has item)' ? field.value : '';
 }
 
-/** The screens' ends and starts in the log's lines, with the phase of the turn each stands in. */
 export interface ScreenLine { kind: 'start' | 'end'; side: Side; screen: string; turn: number; phase: 'action' | 'residual' }
 
 /** Reads the screen lines of a log: the turn comes from `|turn|N`; the first bare `|` after it is the header, the second opens the residual phase. */
@@ -122,7 +109,6 @@ export function endsCleanly(log: string, side: Side, screen: string): boolean {
   return !!started && ends.some(line => line.side === side && line.phase === 'residual') && !ends.some(line => line.phase === 'action');
 }
 
-/** The screens a log of the simulator can show: the Dex lists a move that sets each, in the generation. */
 export function screenMoves(view: SimView): string[] {
   const dex = view.dex;
   return SCREENS.filter(id => {

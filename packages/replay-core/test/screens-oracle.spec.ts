@@ -4,18 +4,14 @@ import { parseReplayLogWithObservations } from '../src/protocol-parser';
 import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-views';
 
 /**
- * Round 72 (T235), plan row 5 and GO point 4: the screens are one constant (`SCREEN_FLAGS` in dex-facts/screens.ts, `SCREENS` its keys), because the Dex
- * cannot say them: the handler rule (`onAnyModifyDamage`) finds them only from Generation 5, and Generations 2 to 4 cut the
- * damage inside the stat or damage calculation. The simulator is the oracle, played in every view the corpus plays: for every
- * side condition a move of the view sets, the damage of a physical hit (Tackle) and of a special hit (Thunderbolt) against a
- * Snorlax is asked of the simulator with and without the condition standing on its side (crits off, same dice), and the
- * conditions that cut it are the list: Reflect for the physical hit, Light Screen for the special hit, Aurora Veil for both,
- * wherever the move is real (Aurora Veil from Generation 7). In doubles the cut is the same condition at a different fraction.
- *  - FINDING W10: Generation 1 builds Reflect and Light Screen as volatiles (no side condition), so a read of
- *    `side.sideConditions` never sees them there; the volatile cuts the damage (played below). `standingScreens(side)` reads the
- *    side conditions and the volatiles of the side's actives; the spec plays each screen move and checks it against the simulator,
- *    and checks that the log parser books the screen on a hit in every view.
- * The readers import the one constant instead of keeping a list of their own; the name ratchet (`names/no-new-dex-name`) holds that.
+ * The screens are one constant (`SCREEN_FLAGS` in dex-facts/screens.ts, `SCREENS` its keys), because the Dex cannot say them: the
+ * handler rule (`onAnyModifyDamage`) finds them only from Generation 5, and Generations 2 to 4 cut the damage inside the stat or
+ * damage calculation. In every view the corpus plays, the damage of a physical (Tackle) and a special (Thunderbolt) hit against a
+ * Snorlax is asked of the simulator with and without each side condition a move of the view sets (crits off, same dice): the
+ * conditions that cut it are the list (Reflect physical, Light Screen special, Aurora Veil both, from Generation 7); in doubles the
+ * cut is the same condition at a different fraction. Generation 1 builds Reflect and Light Screen as volatiles, so a read of
+ * `side.sideConditions` never sees them: `standingScreens(side)` reads the side conditions and the volatiles of the actives, and the
+ * log parser books the screen on a hit in every view.
  */
 
 const SPEC = 'packages/replay-core/test/screens-oracle.spec.ts';
@@ -26,7 +22,6 @@ const isReal = (view: SimView, id: string): boolean => {
   return move.exists && move.isNonstandard !== 'Future' && !move.isMax && !move.isZ;
 };
 
-/** The damage the simulator gives the hit after `prepare` ran on the defender's side. */
 function damage(view: SimView, hit: (typeof HITS)[number], prepare?: (side: ReturnType<typeof battleIn>['sides'][0], defender: ReturnType<typeof battleIn>['sides'][0]['active'][0]) => void): unknown {
   const battle = battleIn(view, [mon(hit.user, [hit.move]), mon('Blissey', ['splash'])], [mon('Snorlax', ['splash']), mon('Blissey', ['splash'])]);
   const defender = battle.sides[1].active[0];

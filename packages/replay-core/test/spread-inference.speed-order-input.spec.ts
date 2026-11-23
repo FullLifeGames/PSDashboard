@@ -13,11 +13,9 @@ import { buildCalcPokemon } from '../src/calc-build';
 import { calcGenerationFor } from '../src/calc-gen';
 
 /**
- * Round 63 (T117): what the solver reads from a move order. A race ran with
- * the Choice Scarf the mover held that turn, and a Scarf that came or went
- * by Trick, Switcheroo or Knock Off is read at the races around it instead
- * of voiding them (the build keeps the set's original item, so a race won
- * with a tricked Scarf is no claim on the set's Speed alone).
+ * What the solver reads from a move order. A race ran with the Choice Scarf the mover held that turn, and a Scarf that came or went
+ * by Trick, Switcheroo or Knock Off is read at the races around it instead of voiding them (the build keeps the set's original
+ * item, so a race won with a tricked Scarf is no claim on the set's Speed alone).
  */
 
 const header = (gametype: 'singles' | 'doubles') => [
@@ -116,8 +114,8 @@ describe('the solver reads a race with the Scarf the order names', () => {
 });
 
 describe('a knock-out order says the victim fell before acting', () => {
-  // Its chosen move, and with it the move's priority, never shows: a Trick Room or a Roar the victim
-  // clicked would have moved last at any Speed (T117 reads such an order as weak evidence).
+  // Its chosen move, and with it the move's priority, never shows: a Trick Room or a Roar the victim clicked would have moved last
+  // at any Speed (such an order is weak evidence).
   test('singles', () => {
     const log = [
       ...header('singles'), '|switch|p1a: A|Sylveon, F|100/100', '|switch|p2a: B|Cresselia, F|100/100', '|turn|1',
@@ -149,7 +147,6 @@ const asSet = (m: Mon, moves: string[]): PokemonSet => ({
   name: m.species, species: m.species, item: '', ability: '', moves, nature: m.nature, evs: m.evs,
   ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, level: 100, gender: '',
 });
-/** A mid-roll hit computed forward with the TRUE spreads. */
 function hit(attacker: Mon, defender: Mon, moveName: string): DamageObservation {
   const a = new Pokemon(gen, attacker.species, { level: 100, nature: attacker.nature, evs: attacker.evs });
   const d = new Pokemon(gen, defender.species, { level: 100, nature: defender.nature, evs: defender.evs });
@@ -214,7 +211,6 @@ describe('spread-ladder-release', () => {
     name: m.species, species: m.species, item: '', ability: '', moves, nature: m.nature, evs: m.evs,
     ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, level: 100, gender: '',
   });
-  /** A hit computed forward with the TRUE spreads: the mid roll, or the roll at `rollIndex` (0..15). */
   function hit(attacker: Side, defender: Side, moveName: string, lethal = false, rollIndex = 8): DamageObservation {
     const a = new Pokemon(gen, attacker.species, { level: 100, nature: attacker.nature, evs: attacker.evs });
     const d = new Pokemon(gen, defender.species, { level: 100, nature: defender.nature, evs: defender.evs });
@@ -248,11 +244,9 @@ describe('spread-ladder-release', () => {
 
     for (const formatid of ['gen9ou', 'gen9doublesou']) {
       test(`a measured offense outlasts a kept Speed beside the log's HP (${formatid})`, () => {
-        // Prior Jolly 252 Atk / 252 Spe, the log says 420 HP (252 HP EVs), the
-        // order Garchomp-before-Clefable is satisfied by the prior (Speed
-        // kept), the Earthquakes measure 252 Atk. Round 40 dropped every
-        // offense rung the budget could not express beside the kept Speed and
-        // solved Jolly 252/0/0/0/4/252 (sim Earthquake 75% of the hit).
+        // Prior Jolly 252 Atk / 252 Spe, the log says 420 HP (252 HP EVs), the order Garchomp-before-Clefable is satisfied by the prior
+        // (Speed kept), the Earthquakes measure 252 Atk. Dropping every offense rung the budget cannot express beside the kept Speed solves
+        // Jolly 252/0/0/0/4/252 (sim Earthquake 75% of the hit).
         const solved = inferSpreads(observations, sets, formatid, [beforeClefable], new Map(), maxHp420).get('p2:garchomp');
         expect(solved?.evs.hp).toBe(252);
         expect(solved?.evs.atk).toBe(252);
@@ -265,12 +259,11 @@ describe('spread-ladder-release', () => {
     test('without the HP reading the EVs stand, without the order the fit was already right', () => {
       const noHp = inferSpreads(observations, sets, 'gen9ou', [beforeClefable]).get('p2:garchomp');
       expect(noHp?.evs ?? offensive).toEqual(offensive);
-      // Round 69 (T26): the kept Speed no longer blocks the offense nature. Round 40 held Jolly here and paid 10 % of
-      // the lines (the top roll on Toxapex lies above what a Jolly body deals); the order still holds at Adamant.
+      // The kept Speed does not block the offense nature: holding Jolly here costs 10 % of the lines (the top roll on Toxapex lies above
+      // what a Jolly body deals); the order still holds at Adamant.
       expect(noHp?.nature).toBe('Adamant');
-      // Round 69 (T132): without the order nothing measures the prior's 252 Spe, so the log's HP and the offense
-      // claim no longer take its room; round 41 had the fit "already right" with the Speed at 4. A prior whose Speed
-      // is the truth's 4 still solves the bulky attacker.
+      // Without the order nothing measures the prior's 252 Spe, so the log's HP and the offense claim do not take its room. A prior whose
+      // Speed is the truth's 4 still solves the bulky attacker.
       const noOrder = inferSpreads(observations, sets, 'gen9ou', [], new Map(), maxHp420).get('p2:garchomp');
       expect(noOrder?.evs.spe).toBe(252);
       expect(noOrder?.evs.hp).toBe(252);
@@ -281,17 +274,12 @@ describe('spread-ladder-release', () => {
     });
 
     test('a bulk claim beside an expressed offense claim does not release the kept Speed', () => {
-      // No HP reading: the offense rung fits beside the kept Speed (the prior
-      // itself), only the 252-HP claim riding with it is shaved. Round 41
-      // releases Speed for the offense claim's own room, never for a bulk
-      // claim (573756 t73 before round 40: a bulk rung stripped the Speed).
-      // The fit corpus measured the wider rule at 162 bodies that lost their
-      // Speed to a bulk claim beside an unchanged offense; that reading is a
-      // registered candidate, not this round's rule.
+      // No HP reading: the offense rung fits beside the kept Speed (the prior itself), only the 252-HP claim riding with it is shaved.
+      // Speed is released for the offense claim's own room, never for a bulk claim (573756 t73: a bulk rung stripped the Speed).
       const defenderLines = [hit(clefable, truth, 'Moonblast'), hit(toxapex, truth, 'Scald')];
       const solved = inferSpreads([...observations, ...defenderLines], sets, 'gen9ou', [beforeClefable]).get('p2:garchomp');
       expect(solved?.evs.spe ?? 252).toBe(252);
-      // Round 69 (T26): the Speed EVs stay (a bulk claim releases nothing); the offense nature of the seen lines opens.
+      // The Speed EVs stay (a bulk claim releases nothing); the offense nature of the seen lines opens.
       expect(solved?.nature).toBe('Adamant');
     });
 
@@ -319,11 +307,9 @@ describe('spread-ladder-release', () => {
     const maxRoll = (attacker: Side) => hit(attacker, clefable, 'Earthquake', true, 15).observedFraction;
 
     test('a knock-out the shaved offense cannot reach frees the kept Speed', () => {
-      // Knock-out-only offense (kept), the log's 420 HP (fixed), a satisfied
-      // order (Speed kept): 252 + 252 + 252 do not fit. Round 40 shaved the
-      // kept Atk to 4 by the kept order (Jolly 252/4/0/0/0/252) with nothing
-      // measuring it; a knock-out that a 4-Atk body cannot deal now picks the
-      // body that can (knock-out lines are lower bounds).
+      // Knock-out-only offense (kept), the log's 420 HP (fixed), a satisfied order (Speed kept): 252 + 252 + 252 do not fit. The kept order
+      // must not shave the kept Atk to 4 (Jolly 252/4/0/0/0/252) with nothing measuring it: a knock-out that a 4-Atk body cannot deal picks
+      // the body that can (knock-out lines are lower bounds).
       expect(maxRoll(full)).toBeGreaterThan(maxRoll(shaved) + 0.04);
       const ko = (maxRoll(shaved) + 0.02 + maxRoll(full)) / 2;
       const observations = [
@@ -352,7 +338,6 @@ const set = (species: string, spread: PokemonEvs, level = 100, moves = ['Protect
   ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, level, gender: '',
 });
 
-/** A mid-roll hit computed forward with the true spreads. */
 function observe(attacker: string, defender: string, moveName: string, defEvs: Partial<PokemonEvs>, attackerSide: 'p1' | 'p2'): DamageObservation {
   const hit = new Pokemon(gen, attacker, { level: 100, nature: 'Hardy', evs: evs(0, 252, 0, 252, 0, 0) });
   const target = new Pokemon(gen, defender, { level: 100, nature: 'Hardy', evs: defEvs });
@@ -443,7 +428,6 @@ describe('spread-tempo-kept', () => {
     name: m.species, species: m.species, item: '', ability: '', moves, nature: m.nature, evs: m.evs,
     ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, level, gender: '',
   });
-  /** A hit computed forward with the TRUE spreads on the world's generation: the roll at `rollIndex` (0..15). */
   function hit(world: World, attacker: Mon, defender: Mon, moveName: string, rollIndex = 8): DamageObservation {
     const body = (m: Mon) => buildCalcPokemon(world.gen, m.species, { level: world.level, nature: m.nature, evs: m.evs });
     const result = calculate(world.gen, body(attacker), body(defender), new Move(world.gen, moveName));

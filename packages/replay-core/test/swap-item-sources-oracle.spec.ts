@@ -5,21 +5,20 @@ import { inferOpponentTeam } from '../src/opponent-inferrer';
 import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-views';
 
 /**
- * Round 72 (T235), plan row 17: `SWAP_ITEM_SOURCES` in inference/handlers.ts names the `[from]` sources of an `|-item|` line that
- * mean the holder took the item from another Pokémon, so the item is not its set item (GPL T11: a Trick scarf hid the real
- * moves). The Dex cannot say it as a field, but the simulator's handlers write those lines, so the spec reads them: every
- * handler (a move's, an ability's, an item's, also inside `secondary`, `self` and `condition`) whose source text emits an `-item`
- * line names its `[from]` effect in a string literal, and the ones that call `takeItem` move an item between two Pokémon. In
- * every view the corpus plays:
- *  - the sources whose handler takes an item are the list, as `type: Name` (the move names Trick, Switcheroo, Thief, Covet and
- *    Bestow, the ability names Magician and Pickpocket), the Generation 2 forms of Thief and Covet included;
+ * `SWAP_ITEM_SOURCES` in inference/handlers.ts names the `[from]` sources of an `|-item|` line that mean the holder took the item from
+ * another Pokémon, so the item is not its set item (a Trick scarf hid the real moves). The Dex cannot say it as a field, but the
+ * simulator's handlers write those lines: every handler (a move's, an ability's, an item's, also inside `secondary`, `self` and
+ * `condition`) whose source text emits an `-item` line names its `[from]` effect in a string literal, and the ones that call
+ * `takeItem` move an item between two Pokémon. In every view the corpus plays:
+ *  - the sources whose handler takes an item are the list, as `type: Name` (the moves Trick, Switcheroo, Thief, Covet and Bestow, the
+ *    abilities Magician and Pickpocket), the Generation 2 forms of Thief and Covet included;
  *  - each of them is played (a user with no item, a user with an item, both with items) and the log's `|-item|` line carries the
  *    source in the shape the inference reads, through its own `readLine` and `fromEffect`;
- *  - FINDING W9a: Symbiosis hands an item over with `|-activate|<giver>|ability: Symbiosis|<item>|[of] <receiver>` and writes no
- *    `|-item|` line, so it is no entry of the `-item` list; `ITEM_HANDOVER_ACTIVATIONS` names it for the inference, which credits
- *    the giver's set item and marks the receiver as having been handed an item (played in both doubles rule sets);
- *  - FINDING W9b: Pickup (Generation 5 on) writes `|-item|` with `[from] ability: Pickup` for an item it picks up from another
- *    Pokémon, without `takeItem`; the list names it, so the picker's item is not read as its set item.
+ *  - Symbiosis hands an item over with `|-activate|<giver>|ability: Symbiosis|<item>|[of] <receiver>` and writes no `|-item|` line, so
+ *    it is no entry of the `-item` list; `ITEM_HANDOVER_ACTIVATIONS` names it, and the inference credits the giver's set item and marks
+ *    the receiver as handed an item (played in both doubles rule sets);
+ *  - Pickup (Generation 5 on) writes `|-item|` with `[from] ability: Pickup` for an item it picks up from another Pokémon, without
+ *    `takeItem`; the list names it, so the picker's item is not read as its set item.
  * Recycle, Harvest, Frisk and G-Max Replenish write `|-item|` lines too and move no item between Pokémon: they stay out.
  */
 
@@ -30,7 +29,6 @@ type Entry = Record<string, unknown>;
 /** The log as a spectator reads it: the line after a |split| marker is the owner's private copy, left out. */
 const publicLog = (log: string[]) => log.filter((line, index) => !line.startsWith('|split|') && !log[index - 1]?.startsWith('|split|'));
 
-/** The source text of every function inside an entry (its handlers, those of `secondary`, `self` and `condition`). */
 function handlerTexts(value: unknown, depth = 0): string[] {
   if (typeof value === 'function') return [String(value)];
   if (depth > 3 || typeof value !== 'object' || value === null) return [];
@@ -62,7 +60,6 @@ const PICKS_UP = ['ability: Pickup'];
 
 const ITEM_ARRANGEMENTS: [string, string][] = [['', 'leftovers'], ['leftovers', ''], ['leftovers', 'quickclaw']];
 
-/** The `[from]` sources of every `|-item|` line the simulator writes when the move or ability plays against the arrangement. */
 function observedSources(view: SimView, emitter: Emitter): string[] {
   const seen = new Set<string>();
   for (const [userItem, targetItem] of ITEM_ARRANGEMENTS) {

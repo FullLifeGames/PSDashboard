@@ -7,11 +7,9 @@ import {
 } from '../src/index.ts';
 
 /**
- * Round 89 (lane B, #117): a game whose format generates its teams (a Random Battle: no team preview, no stats file) fills the bodies
- * a side never showed from the format's random-set data: distinct base species the side does not show, the file's level, one role
- * with its moves, ability and item. The corpus holds no Random Battle, so each row is a log the simulator played (lanes/B/b7-gen.vt.ts:
- * two RandomPlayerAI on teams drawn from the published file) with the entries of that file it reads. Gen 3 singles, Gen 9 Random
- * Doubles, and both Champions formats (the mod registers first, as every host does, round 75).
+ * A game whose format generates its teams (a Random Battle: no team preview, no stats file) fills the bodies a side never showed
+ * from the format's random-set data. The corpus holds no Random Battle, so each row is a log the simulator played (two RandomPlayerAI
+ * on teams drawn from the published file): Gen 3 singles, Gen 9 Random Doubles and both Champions formats (the mod registers first).
  */
 registerChampionsDex(championsMod as unknown as Parameters<typeof registerChampionsDex>[0], championsMod.Formats as unknown as Parameters<typeof registerChampionsDex>[1]);
 

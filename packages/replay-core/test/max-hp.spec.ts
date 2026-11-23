@@ -2,10 +2,8 @@ import { describe, expect, test } from 'vitest';
 import { hpEvsForMaxHp, observedMaxHp } from '../src/spreads/max-hp';
 
 /**
- * Round 40: a server log prints every Pokémon's exact maximum HP on its
- * switch line; at level 100 that pins the HP EVs (573756 Garchomp 409/409
- * = 208 HP EVs, so 300 EVs remain for 252 Spe — the 252-HP rung the fitter
- * used to pick reads 420 HP and contradicts the log).
+ * A server log prints every Pokémon's exact maximum HP on its switch line; at level 100 that pins the HP EVs (573756 Garchomp
+ * 409/409 = 208 HP EVs, so 300 EVs remain for 252 Spe; the 252-HP rung reads 420 HP and contradicts the log).
  */
 describe('max HP from the log', () => {
   test('reads the first switch or drag line per side and species, skipping percent logs', () => {
@@ -23,7 +21,6 @@ describe('max HP from the log', () => {
     expect(seen.get('p1:corviknight')).toEqual({ maxhp: 399, level: 100 });
     expect(seen.get('p1:toxapex')).toEqual({ maxhp: 303, level: 100 });
     expect(seen.get('p2:toxapex')).toEqual({ maxhp: 304, level: 100 });
-    // A percent log carries no measurement.
     expect(seen.get('p1:clefable')).toBeUndefined();
   });
 

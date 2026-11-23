@@ -15,12 +15,9 @@ import type { SpreadCandidate } from '../src/spread-inference';
 import { slotMoveKey } from '../src/team/move-slots';
 
 /**
- * The item after a proven rule-out (round 64, T120, spec decision 19):
- * when the log rules out the item of the set the evidence picks, that set
- * gives way, and the item the build plays is a guess the log supports (the
- * Boots tell) or else the most used item the log still allows, marked as a
- * guess. The next published set's item is no evidence: in 2663102863 the
- * Leftovers Gholdengo became a Choice Specs Gholdengo that way.
+ * The item after a proven rule-out: when the log rules out the item of the set the evidence picks, that set gives way, and the item
+ * the build plays is a guess the log supports (the Boots tell) or else the most used item the log still allows, marked as a guess.
+ * The next published set's item is no evidence: in 2663102863 the Leftovers Gholdengo became a Choice Specs Gholdengo that way.
  */
 
 const curated = (species: string, moves: string[], item: string): PokemonSetAssumption => ({
@@ -112,7 +109,6 @@ const doubles = (species: string, moves: string[]) => [
   ...moves.flatMap((move, index) => [`|turn|${index + 1}`, `|move|p2a: Mon|${move}|p1a: Skarmory`]),
 ].join('\n');
 
-/** The app's chain without a spread solve, with Leftovers ruled out on the inferred info. */
 function build(log: string) {
   const usageStats = stats(usage('Gholdengo', Object.entries({
     'Make It Rain': 0.99, 'Shadow Ball': 0.95, Protect: 0.6, 'Nasty Plot': 0.57, Trick: 0.27, 'Power Gem': 0.1,
@@ -143,7 +139,7 @@ describe('the panel and the build play the same item after a rule-out', () => {
   });
 });
 
-/** The Nasty Plot set as published: its item slot lists Leftovers, then Metal Coat (round 64, R1). */
+/** The Nasty Plot set as published: its item slot lists Leftovers, then Metal Coat. */
 const plotSlot = (): PokemonSetAssumption => ({
   ...plot(), item: { value: 'Leftovers', sourceDetail: 's', options: ['Leftovers', 'Metal Coat'] },
 });
@@ -322,7 +318,7 @@ describe('item-tell', () => {
       expect(log).not.toMatch(/\|-damage\|p2a: Clefable\|[^\n]*\[from\] Stealth Rock/);
       expect(log).not.toMatch(/\[from\] item: Life Orb/);
       const { tell, built } = buildClefable(log);
-      // The inference asks the simulator as the build does (round 67, T130): no guess at all.
+      // The inference asks the simulator as the build does: no guess at all.
       expect(tell.value).not.toBe('Heavy-Duty Boots');
       expect(built).toBe('Life Orb');
     });
@@ -446,7 +442,6 @@ describe('set-fidelity', () => {
     format: 'test', source: 's', pokemon: Object.fromEntries(entries.map(entry => [toId(entry.species), entry])),
   });
 
-  /** The app's chain without a spread solve: inferred infos, the enrichment, then the build. */
   function build(log: string, species: string, usageStats: SmogonUsageStats, setAssumptions: SmogonSetAssumptions | null, info?: OpponentTeamInfo) {
     const p2Info = info ?? enrichTeamInfo(inferOpponentTeam(log, 'p2'), usageStats, setAssumptions);
     const team = buildTeamsFromReplay(log, { p2Info, usageStats, setAssumptions }).p2Team;
@@ -554,8 +549,7 @@ describe('set-fidelity', () => {
       expect(rotom.built).toEqual(keysOf('Hydro Pump'));
     });
 
-    // Review of round 63: the usage tail joined row 1's boost context, so a
-    // boost at a fraction of a percent struck the guessed special attacks of
+    // The usage tail must not join row 1's boost context: a boost at a fraction of a percent struck the guessed special attacks of
     // every set no chosen Smogon set covered.
     const tail = (top: [string, number][]): [string, number][] => [...top, ['Dragon Dance', 0.002], ['Swords Dance', 0.001]];
 

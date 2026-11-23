@@ -6,13 +6,8 @@ import { ppEaters } from '../src/inference/item-triggers';
 import { maxPpOf } from '../src/inference/pp-trigger';
 
 /**
- * Round 89 (#132): the sweep behind the Leppa Berry rule. The rule rests on two readings of the simulator that this file holds to
- * the simulator itself, in every generation and mod the corpus plays (Generations 1 to 9 and the Champions mod), for singles and
- * doubles:
- *  - which items eat when a slot of their holder sits at 0 PP (`ppEaters`): the stand-in's verdict for every item of the Dex
- *    against the simulator playing a Splash turn that spends the holder's last PP (the PP comes back, or it does not);
- *  - the maximum PP of a move (`maxpp`), asked on a twin of the battle's format (`maxPpOf`), against the slot a battle of the
- *    realm's own tiers holds for the same move (Champions computes PP its own way).
+ * Holds the Leppa Berry rule to the simulator in every generation and mod the corpus plays, singles and doubles: which items eat at
+ * 0 PP (`ppEaters`) and the maximum PP of a move (`maxPpOf`, asked on a twin of the format).
  */
 
 if (!Dex.formats.get('gen9championscustomgame').exists) registerChampionsDex(championsMod as never, championsMod.Formats as never);

@@ -10,9 +10,8 @@ import type { PokemonSetAssumption, SmogonSetAssumptions } from '../src/smogon/s
 import { rulesDex } from '../src/rules-dex';
 
 /**
- * Round 70 (batch fix), the set side of Z-moves and Max moves: how the open slot of a hidden base move settles (team/open-moves.ts)
- * in the choice of a published set, in the build, in the panel's enrichment and next to a team sheet. The log scenes come from
- * @pkmn/sim, as in z-max-moves.spec.ts.
+ * The set side of Z-moves and Max moves: how the open slot of a hidden base move settles (team/open-moves.ts) in the choice of a
+ * published set, in the build, in the panel's enrichment and next to a team sheet. The log scenes come from @pkmn/sim, as in z-max-moves.spec.ts.
  */
 
 const mon = (species: string, item: string, ability: string, moves: string[], extra: Partial<PokemonSet> = {}): PokemonSet => ({
@@ -87,7 +86,6 @@ describe('the panel shows the moves the build plays', () => {
     const played = built(Z_LOG, { usageStats: USAGE, p2Info: enriched }).moves;
     expect([...played].sort()).toEqual(shown.map(move => move.name).sort());
     expect([...played].sort()).toEqual([...built(Z_LOG, { usageStats: USAGE }).moves].sort());
-    // Enriching the enriched info again changes nothing.
     const again = enrichTeamInfo(enriched, USAGE).pokemon.find(entry => entry.species === 'Garchomp')!.moves;
     expect(again.map(move => move.name)).toEqual(shown.map(move => move.name));
   });

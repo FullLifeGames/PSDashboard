@@ -5,11 +5,11 @@ import { CHAMPIONS_MOD, broughtSpeciesFor, dexOf, getReplayBringCount, logRules,
 import type { GameRules } from '../src/index';
 
 /**
- * Round 89 (#116): the bring list names the species a body entered with, never the copy it wears. A Ditto that transforms
- * (Imposter on entry, the move Transform) reads as the foe's species in the client's snapshot, and the list used to name the
- * copy: the trimmed team then dropped the Ditto's set and kept the unbrought body of the copied species (VGC 2382086291),
- * or counted a side's four as five names. The sweep reads the Dex and plays a real battle of every generation the corpus
- * plays (1 to 9) and of the Champions mod, singles and, from Generation 3, doubles; no species name stands in the code.
+ * The bring list names the species a body entered with, never the copy it wears. A Ditto that transforms (Imposter on entry, the
+ * move Transform) reads as the foe's species in the client's snapshot; naming the copy makes the trimmed team drop the Ditto's set
+ * and keep the unbrought body of the copied species (VGC 2382086291), or count a side's four as five names. The sweep reads the Dex
+ * and plays a real battle of every generation the corpus plays (1 to 9) and of the Champions mod, singles and, from Generation 3,
+ * doubles; no species name stands in the code.
  *
  *  - Transformers: every species whose learnset holds Transform, and every species with the ability Imposter, as of the
  *    generation (the move is the way in every generation, Imposter the way in from Generation 5). The body copies a foe on
@@ -55,7 +55,6 @@ function learnsTransform(dex: Dexish, id: string, gen: number): boolean {
 
 const inGeneration = (dex: Dexish, scene: Scene, ability: string) => dex.abilities.get(ability).gen <= scene.gen;
 
-/** The species of the generation that can carry the ability or the move. */
 function bearersOf(dex: Dexish, scene: Scene) {
   const transformers: { name: string; imposter: boolean }[] = [];
   const illusionists: string[] = [];

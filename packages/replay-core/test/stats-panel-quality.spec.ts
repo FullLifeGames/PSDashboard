@@ -227,7 +227,6 @@ describe('stats panel data quality (WP11)', () => {
     expect(uxie.evs.value.hp).toBe(252);
     expect(uxie.evs.sourceDetail).toBe(INFERRED_SPREAD_DETAIL);
     expect(uxie.nature?.value).toBe('Timid');
-    // Manual EVs are never overridden by inference.
     const clef = overlaid.pokemon[1];
     expect(clef.evs.value.hp).toBe(252);
     expect(clef.evs.sourceDetail).toBeUndefined();
@@ -415,7 +414,6 @@ describe('stats panel data quality (WP11)', () => {
     expect(alternativeItems(usageStats, 'Heatran', 'Leftovers', { items: ['choicespecs'] }))
       .toEqual(['Air Balloon', 'Assault Vest']);
     expect(alternativeItems(usageStats, 'Heatran', 'Choice Specs')).toEqual(['Leftovers', 'Air Balloon']);
-    // Unknown species: nothing to probe.
     expect(alternativeItems(usageStats, 'Blissey', 'Leftovers')).toEqual([]);
   });
 

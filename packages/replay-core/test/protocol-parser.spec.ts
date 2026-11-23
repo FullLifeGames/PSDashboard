@@ -41,7 +41,6 @@ describe('protocol parser fault tolerance', () => {
     ].join('\n');
     const snapshots = parseReplayLog(log);
     expect(snapshots.length).toBeGreaterThanOrEqual(2);
-    // Everything around the skipped line still applied.
     const last = snapshots[snapshots.length - 1];
     const sig = last.p2.pokemon.find(mon => mon.speciesForme.startsWith('Iron Jugulis'));
     expect(sig?.fainted).toBe(true);
@@ -353,8 +352,7 @@ describe('speed-order evidence', () => {
     expect(speedOrders).toEqual([]);
   });
 
-  // Round 37: doubles turns prove every opposite-side pair, copied actions
-  // and rearranged slots do not.
+  // Doubles turns prove every opposite-side pair; copied actions and rearranged slots do not.
   const doublesLog = (body: string[]) => [
     '|player|p1|Alice|', '|player|p2|Bob|',
     '|teamsize|p1|4', '|teamsize|p2|4',
@@ -435,8 +433,7 @@ describe('speed-order evidence', () => {
 
 });
 
-// Round 37: conditional priority, quick items, field speed, always-last
-// abilities, and a Scarf that changed hands explain an order without Speed.
+// Conditional priority, quick items, field speed, always-last abilities and a Scarf that changed hands explain an order without Speed.
 describe('speed-order cleanliness', () => {
   const singlesLog = (mons: [string, string], body: string[], pre: string[] = []) => [
     '|player|p1|Alice|', '|player|p2|Bob|', '|teamsize|p1|2', '|teamsize|p2|2',

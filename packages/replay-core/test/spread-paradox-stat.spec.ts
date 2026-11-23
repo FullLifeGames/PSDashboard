@@ -14,16 +14,15 @@ import {
 } from './paradox-scenes';
 
 /**
- * Round 69 (T167, spec decision 10): Protosynthesis and Quark Drive raise the best stat, and the activation line names it. The
- * simulator picks it with `getBestStat(false, true)`: the stored stats with their stages (no item or ability modifier), the first
- * of the stats in the game's order on a tie. A spread whose best stat is another contradicts the log, so the solver prices that
- * as it prices a move order the body breaks, and it hands the calculator the named stat so the damage carries the 1.3 boost.
- * The oracle is the simulator: its own `getBestStat` for the rule, real Gen 9 singles and doubles battles for the hits.
+ * Protosynthesis and Quark Drive raise the best stat, and the activation line names it. The simulator picks it with
+ * `getBestStat(false, true)`: the stored stats with their stages (no item or ability modifier), the first of the stats in the game's
+ * order on a tie. A spread whose best stat is another contradicts the log, so the solver prices that as it prices a move order the
+ * body breaks, and it hands the calculator the named stat so the damage carries the 1.3 boost. The oracle is the simulator: its own
+ * `getBestStat` for the rule, real Gen 9 singles and doubles battles for the hits.
  */
 
 const STATS = Dex.stats.ids().filter(stat => stat !== 'hp');
 
-/** A deterministic stream of integers for the random cases. */
 function stream(seed: number) {
   let state = seed;
   return (below: number) => {

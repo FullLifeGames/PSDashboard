@@ -6,18 +6,14 @@ import { RULE_VIEWS as VIEWS } from './screen-scenes';
 import { battleIn, mon, oracleTagAbove, type SimView } from './sim-views';
 
 /**
- * Round 86 (T310, Light Clay from the screen turns): the Dex reader `conditionTurns` is held to the simulator. The log shows a
- * screen's start and end but never the item, so the reader asks each condition's own `durationCallback` for the turns of a
- * source with no item and of a source holding each item. Two sweeps, in every rule set the corpus plays (Generations 1 to 9
- * and the Champions mod, singles; Generations 3 to 9 and the Champions mod, doubles):
- *  - S1, the turns: for every condition a move of the rule set sets (a side condition, a pseudo weather, a weather or a
- *    terrain) and every item of the rule set, the reader's turns equal what a real Pokémon holding the item gets from the
- *    condition's rule on a real battle. A condition with no callback gives null.
- *  - S2, the ignoring holders: a Light Clay holder's screen lasts its plain turns when, and only when, an ability, a volatile or
- *    a field condition of the rule set makes the simulator ignore the item. Every ability, move and condition of the rule set
- *    is played; the causes found equal `ITEM_BLOCKERS` (the list the screen reader doubts), so a Dex entry that adds a fourth
- *    cause fails here.
- * The reader takes no battle (a stand-in source, the Dex only), so a guard checks that it leaves a live battle untouched.
+ * The Dex reader `conditionTurns` is held to the simulator in every rule set the corpus plays (Generations 1 to 9 and the Champions
+ * mod, singles; Generations 3 to 9 and the Champions mod, doubles). The reader asks each condition's `durationCallback` for the
+ * turns of a source with no item and of a source holding each item, because the log never shows the item. Two sweeps:
+ *  - S1, the turns: for every condition a move sets and every item, the reader's turns equal what a real Pokémon holding the item
+ *    gets on a real battle; a condition with no callback gives null.
+ *  - S2, the ignoring holders: a Light Clay holder's screen lasts its plain turns when, and only when, an ability, a volatile or a
+ *    field condition makes the simulator ignore the item; the causes found equal `ITEM_BLOCKERS`, so a fourth cause fails here.
+ * The reader takes no battle (a stand-in source), so a guard checks that it leaves a live battle untouched.
  */
 
 const SPEC = 'packages/replay-core/test/screen-turns-sweep.spec.ts';

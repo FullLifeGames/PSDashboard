@@ -32,12 +32,9 @@ import { parsePastedTeam, type PastedSet } from '../src/team-paste';
 import { fixtureTexts, GENERATIONS, generatedTeams, withCorners } from './team-text-sources';
 
 /**
- * The Heavy-Duty Boots guess (round 67, T130, decision 18): a Pokémon that
- * enters on Stealth Rock without damage shows Boots only while no ability it
- * may have keeps the rock damage off. The inference asks the simulator, as
- * the build does since round 64, so the panel stops showing a guess the build
- * refuses, and the guess cannot reach the build through the usage fallback or
- * as the replacement after a rule-out. Logs come from @pkmn/sim.
+ * The Heavy-Duty Boots guess: a Pokémon that enters on Stealth Rock without damage shows Boots only while no ability it may have
+ * keeps the rock damage off. The inference asks the simulator, as the build does, so the panel shows no guess the build refuses, and
+ * the guess cannot reach the build through the usage fallback or as the replacement after a rule-out. Logs come from @pkmn/sim.
  */
 
 function play(p1: PokemonSet[], p2: PokemonSet[], turns: [string, string][], doubles = false): string {
@@ -144,7 +141,7 @@ describe('no Boots guess while an ability the Pokémon may have keeps the rocks 
   });
 
   test('after a rule-out the guess is no replacement: the usage majority the log allows plays', () => {
-    // Brave Bird leaves the Clefable below full HP and no Leftovers heal shows (T80): the Leftovers set gives way.
+    // Brave Bird leaves the Clefable below full HP and no Leftovers heal shows: the Leftovers set gives way.
     const log = singlesEntry(clefable(), 'bravebird');
     expect(inferOpponentTeam(log, 'p2').pokemon.find(entry => entry.species === 'Clefable')!.ruledOut?.items).toContain('leftovers');
     const sets: SmogonSetAssumptions = {
@@ -177,9 +174,9 @@ describe('the guess stands where no possible ability keeps the rocks off (guards
 });
 
 /**
- * Round 67 gate (11.10.): draft leagues play their games as custom games under the usual abilities, so a custom game
- * keeps each species to its own abilities. Noivern (Frisk, Infiltrator, Telepathy) can never have Magic Guard, and an
- * entry on Stealth Rock without damage reads as Heavy-Duty Boots there too (the GPL report's Noivern, eval-gpl t35).
+ * Draft leagues play their games as custom games under the usual abilities, so a custom game keeps each species to its own
+ * abilities. Noivern (Frisk, Infiltrator, Telepathy) can never have Magic Guard, and an entry on Stealth Rock without damage reads
+ * as Heavy-Duty Boots there too (the GPL report's Noivern).
  */
 describe('a custom game keeps each species to its own abilities (round 67 gate)', () => {
   test('a Noivern on Stealth Rock without damage reads as Heavy-Duty Boots in a custom game', () => {
@@ -361,7 +358,6 @@ describe('logged-entry-stage', () => {
 
   interface Scene {
     log: string;
-    /** The simulator's own damage: Zamazenta's HP before and after the hit. */
     damage: number;
     maxHp: number;
   }
@@ -388,7 +384,6 @@ describe('logged-entry-stage', () => {
     return { log, damage: maxHp - target.hp, maxHp };
   }
 
-  /** Up to `count` clean scenes of different rolls. */
   function scenesOf(kind: Kind, count: number): Scene[] {
     const scenes: Scene[] = [];
     for (let seed = 1; scenes.length < count && seed <= 200; seed++) {
@@ -398,7 +393,6 @@ describe('logged-entry-stage', () => {
     return scenes;
   }
 
-  /** The observation of the hit into Zamazenta, as the solver reads it from the log. */
   function hitObservation(log: string): DamageObservation {
     const { observations } = parseReplayLogWithObservations(log);
     const found = observations.filter(obs => obs.defenderSpecies === 'Zamazenta');
@@ -507,7 +501,6 @@ function legacyHeader(header: string): { species: string; nickname?: string; ite
   return { species: working, nickname, item: itemSide ? itemSetValue(itemSide) || undefined : undefined };
 }
 
-/** The hand parser as it stood before round 72 (packages/replay-core/src/team-paste.ts). */
 function legacyParsePastedTeam(teamText: string): PastedSet[] {
   const sets: PastedSet[] = [];
   for (const block of teamText.replace(/\r\n?/g, '\n').split(/\n\s*\n+/)) {

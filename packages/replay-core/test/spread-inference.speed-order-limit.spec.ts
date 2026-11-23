@@ -17,13 +17,10 @@ import type { SmogonSetAssumptions } from '../src/smogon/sets-lookup';
 import type { SmogonUsageStats } from '../src/smogon/stats-types';
 
 /**
- * Round 63 (T117): an observed move order is a hard limit for both sides.
- * Before the ladder, every order holds: a plausible usage spread yields
- * first, then any legal Speed (the side without its own Speed evidence
- * first, the second mover on a tie), then a Choice Scarf. A repaired order
- * ends strict, a cycle tied; a knock-out on a victim that may have clicked
- * a move below priority 0 binds while a set fits it and goes first when
- * none does.
+ * An observed move order is a hard limit for both sides. Before the ladder, every order holds: a plausible usage spread yields
+ * first, then any legal Speed (the side without its own Speed evidence first, the second mover on a tie), then a Choice Scarf. A
+ * repaired order ends strict, a cycle tied; a knock-out on a victim that may have clicked a move below priority 0 binds while a set
+ * fits it and goes first when none does.
  */
 const gen = Generations.get(9);
 type Side = 'p1' | 'p2';
@@ -43,10 +40,8 @@ const race = (first: Side, firstSpecies: string, second: Side, secondSpecies: st
 
 const entryOf = (solved: Map<string, SpreadCandidate>, side: Side, species: string) => solved.get(`${side}:${toId(species)}`);
 const setOf = (sets: Sets, side: Side, species: string) => sets[side].find(set => toId(set.species) === toId(species))!;
-/** The solved spread, else the set's. */
 const spreadOf = (solved: Map<string, SpreadCandidate>, sets: Sets, side: Side, species: string) =>
   entryOf(solved, side, species) ?? setOf(sets, side, species);
-/** The Speed stat the solve leaves the mon (no item). */
 const statOf = (solved: Map<string, SpreadCandidate>, sets: Sets, side: Side, species: string) => {
   const spread = spreadOf(solved, sets, side, species);
   return new Pokemon(gen, species, { nature: spread.nature, evs: spread.evs }).stats.spe;
@@ -56,7 +51,6 @@ function raceSpeed(solved: Map<string, SpreadCandidate>, sets: Sets, side: Side,
   const item = entryOf(solved, side, species)?.item ?? setOf(sets, side, species).item;
   return statOf(solved, sets, side, species) * ((held ?? toId(item ?? '') === 'choicescarf') ? 1.5 : 1);
 }
-/** First minus second for every order (positive: strict, zero: tied). */
 const margins = (solved: Map<string, SpreadCandidate>, sets: Sets, orders: SpeedOrderObservation[]) => orders.map(order =>
   raceSpeed(solved, sets, order.firstSide, order.firstSpecies, order.firstScarf) -
   raceSpeed(solved, sets, order.secondSide, order.secondSpecies, order.secondScarf));
@@ -81,7 +75,7 @@ describe('every observed order holds before the ladder (T117)', () => {
   });
 
   test('singles: a plain legal Speed explains the order, so no Scarf (Kingambit before Garchomp)', () => {
-    // Kingambit reaches 218 at Jolly 252, a Scarf would not reach Garchomp's 333 (no round-37 Scarf);
+    // Kingambit reaches 218 at Jolly 252, a Scarf would not reach Garchomp's 333;
     // Garchomp at 0 Speed with a minus nature (216) explains the order without one.
     const sets = {
       p1: [mon('Kingambit', 'Adamant', evs(0, 252, 4, 0, 0, 252), 'Leftovers', ['Iron Head'])],
@@ -255,7 +249,6 @@ describe('every observed order holds before the ladder (T117)', () => {
 });
 
 describe('the ladder keeps a minus-Speed nature the orders need', () => {
-  /** A mid-roll hit computed forward with the true spreads (level 100). */
   function hit(attacker: PokemonSet, defender: PokemonSet, moveName: string): DamageObservation {
     const calc = (set: PokemonSet) => new Pokemon(gen, set.species, { nature: set.nature, evs: set.evs, item: set.item || undefined });
     const a = calc(attacker);
@@ -368,7 +361,6 @@ describe('spread-offense-release', () => {
     name: m.species, species: m.species, item: '', ability: '', moves, nature: m.nature, evs: m.evs,
     ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, level, gender: '',
   });
-  /** A hit computed forward with the TRUE spreads on the world's generation: the roll at `rollIndex` (0..15). */
   function hit(world: World, attacker: Mon, defender: Mon, moveName: string, rollIndex = 15): DamageObservation {
     const body = (m: Mon) => buildCalcPokemon(world.gen, m.species, { level: world.level, nature: m.nature, evs: m.evs });
     const a = body(attacker);
@@ -463,8 +455,8 @@ describe('spread-offense-release', () => {
     });
   }
 
-  // The old assertions about the nature block stay where the game forces them (see spread-inference.speed-order-input.spec.ts):
-  // a Bulk rung never gives held tempo (573756 t73) and a held offense never gives way (round 33).
+  // The nature block stays where the game forces it (see spread-inference.speed-order-input.spec.ts):
+  // a Bulk rung never gives held tempo (573756 t73) and a held offense never gives way.
   test('a Pokemon without clean attacker lines never gets an offense nature from the opening', () => {
     const world = WORLDS[0];
     const prior: Mon = { species: 'Garchomp', side: 'p2', nature: 'Jolly', evs: evs({ atk: 252, spe: 252 }) };

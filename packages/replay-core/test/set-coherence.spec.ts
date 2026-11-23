@@ -9,10 +9,8 @@ import type { PokemonUsageStats, SmogonUsageStats } from '../src/smogon/stats-ty
 import { toId } from '../src/ids';
 
 /**
- * Pairwise coherence vetoes: guessed sets are assembled from independent
- * marginals (top usage moves + top usage item), and the combination is often
- * incoherent even when each part is plausible — SD Cobalion carrying Body
- * Press, Noivern with both Air Slash and Hurricane (GPL). Vetoes apply only
+ * Pairwise coherence vetoes: guessed sets are assembled from independent marginals (top usage moves + top usage item), so the
+ * combination is often incoherent (SD Cobalion carrying Body Press, Noivern with both Air Slash and Hurricane). Vetoes apply only
  * to GUESSED entries; revealed/manual knowledge is never second-guessed.
  */
 
@@ -121,9 +119,8 @@ describe('set-coherence vetoes', () => {
     ]);
   });
 
-  // T28 (round 63): rows 1 and 2 threw whole movesets away. Seven Kyurem
-  // with Choice Specs kept only Icicle Spear: a usage Dragon Dance that the
-  // Specs strike anyway still "served" Attack and vetoed every special move.
+  // Rows 1 and 2 must not throw whole movesets away: a Kyurem with Choice Specs kept only Icicle Spear, because a usage Dragon Dance
+  // that the Specs strike anyway still "served" Attack and vetoed every special move.
   const fromSet = (name: string): MoveCandidate => ({ name, guessed: true, fromSet: true });
 
   test('a guessed boost the Choice item strikes serves nothing (Kyurem with Specs, T28)', () => {
@@ -166,7 +163,7 @@ describe('set-coherence vetoes', () => {
   });
 
   test('a revealed same-type pair is never vetoed, and the chosen set keeps its own pair (round 63)', () => {
-    // The user gate of round 63 reads the published set as published (d2): row 2 spares the chosen set's moves.
+    // A published set is read as published: row 2 spares the chosen set's moves.
     expect(names(applyCoherenceVetoes([
       revealed('Headlong Rush'), revealed('Earthquake'), fromSet('Stomping Tantrum'),
     ], { dex: rulesDex(9), itemId: '' }))).toEqual(['Headlong Rush', 'Earthquake', 'Stomping Tantrum']);
@@ -241,8 +238,7 @@ describe('coherent-set selection', () => {
     expect(picked).toBe(second);
   });
 
-  // T89 (round 63): Smogon publishes slots with alternatives; the build must
-  // read a slot as filled once one option is seen, and never trade a fixed
+  // Smogon publishes slots with alternatives; the build must read a slot as filled once one option is seen, and never trade a fixed
   // move for a second option of a filled slot (648453 Tornadus-T).
   const slotted = (moves: (string | string[])[], item?: string): PokemonSetAssumption => ({
     species: 'Tornadus-Therian', sourceDetail: 't',
@@ -372,7 +368,6 @@ const doubles = [
   ...['Swords Dance', 'Spirit Break', 'Shadow Sneak'].flatMap((move, index) => [`|turn|${index + 1}`, `|move|p2a: Mon|${move}|p1a: Skarmory`]),
 ].join('\n');
 
-/** The app's chain without a spread solve, with Booster Energy ruled out on the inferred info. */
 function build(log: string) {
   const raw = inferOpponentTeam(log, 'p2');
   raw.pokemon.find(mon => mon.species === 'Iron Valiant')!.ruledOut = { items: ['boosterenergy'], abilities: [] };

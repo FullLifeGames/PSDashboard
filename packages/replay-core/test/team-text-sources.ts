@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import type { PokemonSet } from '@pkmn/sim';
 import { ExhaustiveRunner } from '@pkmn/sim/tools';
 
-/** Team texts for team-info.boots-guess.spec.ts and sheet-text.spec.ts (round 72, T241): the fixtures' own, and the simulator's generated teams. */
+/** Team texts for team-info.boots-guess.spec.ts and sheet-text.spec.ts: the fixtures' own, and the simulator's generated teams. */
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const FIXTURE_DIRS = [
@@ -19,7 +19,6 @@ const decodeEntities = (text: string) => text
   .replace(/&#(\d+);/g, (_, value: string) => String.fromCharCode(parseInt(value, 10)))
   .replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
 
-/** The "View team" exports and the `|showteam|` sides of every fixture replay. */
 export function fixtureTexts(): { exports: Array<{ tag: string; text: string }>; sheets: Array<{ tag: string; log: string; side: 'p1' | 'p2' }> } {
   const exports: Array<{ tag: string; text: string }> = [];
   const sheets: Array<{ tag: string; log: string; side: 'p1' | 'p2' }> = [];

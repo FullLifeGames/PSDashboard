@@ -6,17 +6,16 @@ import { CHAMPIONS_MOD, dexOf, generationsFor, inferOpponentTeam } from '../src/
 import type { GameRules } from '../src/index';
 
 /**
- * Round 89 (#139): a body under Transform uses the moves of its target, so a move line of the copy shows that the TARGET knows the
- * move. @pkmn/client books such a move to the target (`rememberMove` recurses into `volatiles.transform.pokemon`, and again for a copy
- * of a copy); the inference dropped the line (an early return for a subject on the other side, and `ownMove` read nothing for a
- * transformed body), so the built target lacked a move the game had shown and the rebuilt copy could not play it.
+ * A body under Transform uses the moves of its target, so a move line of the copy shows that the TARGET knows the move.
+ * @pkmn/client books such a move to the target (`rememberMove` recurses into `volatiles.transform.pokemon`, and again for a copy of
+ * a copy); the inference must too, or the built target lacks a move the game showed and the rebuilt copy cannot play it.
  *
- * The sweep reads the Dex for every entry that transforms a body (a move, an ability or an item whose handlers call `transformInto`;
- * the simulator's own transformation) and plays each of them on @pkmn/sim in every generation the corpus plays (1 to 9) and the
- * Champions mod, singles and, from Generation 3, doubles. The copy uses the target's moves; the inference must book each to the
- * target and nothing to the copy, and its booking must equal the client's non-virtual move slots of the target. Doubles plays
- * both foes as the target and an ally as the target (a same-side Transform), and singles a copy of a copy where the generation lets
- * one transform a transformed body. No species or move name stands in the code that is under test.
+ * The sweep reads the Dex for every entry that transforms a body (a move, an ability or an item whose handlers call `transformInto`)
+ * and plays each of them on @pkmn/sim in every generation the corpus plays (1 to 9) and the Champions mod, singles and, from
+ * Generation 3, doubles. The copy uses the target's moves; the inference must book each to the target and nothing to the copy, and
+ * its booking must equal the client's non-virtual move slots of the target. Doubles plays both foes as the target and an ally as the
+ * target (a same-side Transform), and singles a copy of a copy where the generation lets one transform a transformed body. No
+ * species or move name stands in the code that is under test.
  */
 Dex.mod(CHAMPIONS_MOD, championsMod as unknown as NonNullable<Parameters<typeof Dex.mod>[1]>);
 Dex.formats.extend(championsMod.Formats);
@@ -40,7 +39,6 @@ const body = (species: string, ability: string, moves: string[]): PokemonSet => 
 });
 const publicLog = (battle: Battle) => battle.log.filter((line, index) => !line.startsWith('|split|') && !battle.log[index - 1]?.startsWith('|split|')).join('\n');
 
-/** The text of an entry's handlers (the entry and what it holds), read from the Dex's functions. */
 function handlerText(entry: object): string {
   const seen = new Set<unknown>();
   const texts: string[] = [];
@@ -57,7 +55,6 @@ function handlerText(entry: object): string {
 
 interface Transformer { kind: 'move' | 'ability' | 'item'; id: string }
 
-/** Every entry of the generation's Dex whose handlers transform the user into another body. */
 function transformersOf(dex: Dexish, scene: Scene): Transformer[] {
   const live = (entry: { exists: boolean; gen: number; isNonstandard?: string | null }) => entry.exists && entry.gen <= scene.gen && entry.isNonstandard !== 'Future';
   const found: Transformer[] = [];
@@ -67,7 +64,6 @@ function transformersOf(dex: Dexish, scene: Scene): Transformer[] {
   return found;
 }
 
-/** Plain species of the scene: a base species of the generation with no forme of its own and no transformation. */
 function fillersOf(dex: Dexish, scene: Scene, count: number): string[] {
   return dex.species.all()
     .filter(species => species.exists && species.gen <= scene.gen && !species.isNonstandard && species.num > 0 && species.baseSpecies === species.name && !species.otherFormes)
@@ -80,7 +76,6 @@ const COPIED = ['harden', 'withdraw', 'defensecurl'];
 
 interface Played { log: string; battle: Battle; unplayable: string[]; label: string }
 
-/** Which body the Transform move names in doubles (the `-N` form is the partner). */
 type Aim = '1' | '2' | '-2';
 
 /**
@@ -116,7 +111,6 @@ function play(scene: Scene, kind: Kind, entry: Transformer, aim: Aim): Played {
   return { log: publicLog(battle), battle, unplayable, label: `${kind} ${entry.kind} ${entry.id} aim ${aim}` };
 }
 
-/** The same log, read by a fresh @pkmn/client battle (the oracle of the booking). */
 function clientOf(log: string): ClientBattle {
   const tier = log.split('\n').find(line => line.startsWith('|tier|'))?.split('|')[2] ?? '';
   const client = new ClientBattle(generationsFor(tier));
@@ -124,12 +118,10 @@ function clientOf(log: string): ClientBattle {
   return client;
 }
 
-/** The client's body of a side by its nickname (a bench body has no position in its ident). */
 const clientBody = (client: ClientBattle, side: string, name: string) => (side === 'p1' ? client.p1 : client.p2).team.find(mon => mon.name === name);
 
 interface Booking { side: string; species: string; booked: string[] }
 
-/** What each side's inference books on every body (the revealed moves, as move ids). */
 function bookings(log: string): Booking[] {
   return (['p1', 'p2'] as const).flatMap(side => inferOpponentTeam(log, side).pokemon.map(entry => ({
     side, species: entry.species, booked: entry.moves.filter(move => move.source === 'revealed').map(move => toID(move.name)).sort(),

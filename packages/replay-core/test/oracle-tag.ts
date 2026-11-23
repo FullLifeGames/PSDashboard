@@ -4,10 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = fileURLToPath(new URL('../../..', import.meta.url));
 
-/**
- * The tag that ties a hand list to its spec: the comment block directly above `declaration` in `file` (a path from the
- * repository root) contains `oracle: <spec>`. A list loses its tag, or a spec moves, and the spec fails here.
- */
+/** True when the comment block directly above `declaration` in `file` (a path from the repository root) contains `oracle: <spec>`. */
 export function oracleTagAbove(file: string, declaration: string, spec: string): boolean {
   const lines = readFileSync(resolve(REPO_ROOT, file), 'utf8').split(/\r?\n/);
   const at = lines.findIndex(line => line.includes(declaration));

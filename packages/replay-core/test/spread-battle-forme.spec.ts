@@ -9,11 +9,10 @@ import type { DamageObservation, PokemonEvs, SpeedOrderObservation } from '../sr
 import { rulesDex } from '../src/rules-dex';
 
 /**
- * Round 69 (T190, spec decision 8): a hit by or on a battle forme (a Mega, Aegislash-Blade, Ogerpon's Tera mask) belongs to the
- * set of the species it came from and prices on the forme's own stats. The log names the forme the mon wears at the line, the
- * team the base species; before this the solver found no set for 'Golisopod-Mega' and dropped the hit (840 of 2 851 hits on the
- * Champions OU holdout, 19 of 2 373 in the Gen 9 bank). The Dex names the origin (battleOnly, changesFrom, a Mega Stone's
- * megaStone); the oracle is the simulator: every scene is a real battle where the forme changes and the hit lands.
+ * A hit by or on a battle forme (a Mega, Aegislash-Blade, Ogerpon's Tera mask) belongs to the set of the species it came from and
+ * prices on the forme's own stats: the log names the forme the mon wears at the line, the team the base species. The Dex names the
+ * origin (battleOnly, changesFrom, a Mega Stone's megaStone); the oracle is the simulator: every scene is a real battle where the
+ * forme changes and the hit lands.
  */
 Dex.mod('champions', championsMod as unknown as NonNullable<Parameters<typeof Dex.mod>[1]>);
 Dex.formats.extend(championsMod.Formats);
@@ -38,7 +37,6 @@ const chansey = (cfg: Cfg) => body(cfg, 'Chansey', '', 'Natural Cure', ['Splash'
 
 interface Played {
   log: string;
-  /** What the simulator took off the defender, and its maximum HP. */
   damage: number;
   maxHp: number;
   sets: { p1: PokemonSet[]; p2: PokemonSet[] };

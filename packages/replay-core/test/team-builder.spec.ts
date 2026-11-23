@@ -9,10 +9,9 @@ import { Generations, Pokemon } from '@smogon/calc';
 import type { PokemonSet } from '@pkmn/sim';
 
 /**
- * Round 72, T238: the inference books the name and the shiny flag the replay showed for a body, so the simulator can
- * write the replay's own switch lines. Singles name a body `p2a`, doubles `p1a` or `p1b`; the side key drops the slot.
- * The sources are the first `switch`, `drag` or `replace` line of a body and an Open Team Sheet; team preview
- * (`|poke|`) carries no nickname and no shiny flag, so a body it alone names stays unset.
+ * The inference books the name and the shiny flag the replay showed for a body, so the simulator can write the replay's own switch
+ * lines. Singles name a body `p2a`, doubles `p1a` or `p1b`; the side key drops the slot. The sources are the first `switch`, `drag`
+ * or `replace` line of a body and an Open Team Sheet; team preview (`|poke|`) carries no nickname and no shiny flag.
  */
 
 const header = (kind: 'singles' | 'doubles') => [`|gametype|${kind}`, '|player|p1|A|1|', '|player|p2|B|2|', '|gen|9', '|tier|[Gen 9] Custom Game'];
@@ -176,7 +175,6 @@ describe('the one-stage chain carries the pre-solve at a forfeit', () => {
     const app = buildTeamsFromReplay(log, { inferredSpreads: solveReplaySpreads(log, observations, { speedOrders }) });
     const oneStage = buildTeamsFromReplay(log, { observations, speedOrders });
     expect(oneStage).toEqual(app);
-    // The pre-solve is the fallback of both chains.
     expect(oneStage).toEqual(buildTeamsFromReplay(log, { speedOrders }));
   });
 });
@@ -366,9 +364,8 @@ describe('the two-stage solve keeps the move orders its pre-solve repaired', () 
 
   test('a mon the full solve keeps is still solved by the full solve', () => {
     // Clean damage lines do not forfeit: the carry must not overwrite the full solve's answer.
-    // The usage guess already runs Garchomp (240) under Gliscor (289), so no order needs repair
-    // (round 63); the pre-solve tops the open half of the budget up into HP, the full solve's
-    // damage lines take it back.
+    // The usage guess already runs Garchomp (240) under Gliscor (289), so no order needs repair; the pre-solve tops the open half
+    // of the budget up into HP, the full solve's damage lines take it back.
     const log = scene;
     const { observations, speedOrders } = parseReplayLogWithObservations(log);
     const doubled = [...observations, ...observations];
@@ -379,9 +376,8 @@ describe('the two-stage solve keeps the move orders its pre-solve repaired', () 
     const built = buildTeamsFromReplay(log, { inferredSpreads: solved, usageStats });
     expect(speedOf(find(built.p2Team, 'Gliscor'))).toBeGreaterThanOrEqual(speedOf(find(built.p1Team, 'Garchomp')));
     expect(speedOf(find(oneStage.p2Team, 'Gliscor'))).toBeGreaterThanOrEqual(speedOf(find(oneStage.p1Team, 'Garchomp')));
-    // Garchomp is the mon an overwriting carry would destroy: the full solve
-    // fits its damage with less HP than the pre-solve topped the freed Speed
-    // up into (round 64: only the HP the damage lines allow, not 0).
+    // Garchomp is the mon an overwriting carry would destroy: the full solve fits its damage with less HP than the pre-solve topped
+    // the freed Speed up into (only the HP the damage lines allow, not 0).
     expect(built).toEqual(oneStage);
     expect(built).not.toEqual(preSolved);
     expect(find(built.p1Team, 'Garchomp').evs.hp).toBeLessThan(find(preSolved.p1Team, 'Garchomp').evs.hp);
@@ -389,11 +385,9 @@ describe('the two-stage solve keeps the move orders its pre-solve repaired', () 
   });
 
   test('the two chains agree on the settled Garchomp (round 63 path pin, T122): HP 60 both ways', () => {
-    // The species-shaped guesses run Garchomp (303) over Gliscor (289), which moved first. The
-    // settling (T117) frees only 60 Speed EVs (Garchomp 288); the pre-solve tops them up into HP, and
-    // the full solve keeps that HP because the damage lines fit it as well as none. Round 63 pinned
-    // the one-stage build at HP 0 (it left the 60 EVs open); since round 64 the full solve tops its
-    // open budget up wherever the damage lines still fit, so both chains land on HP 60.
+    // The species-shaped guesses run Garchomp (303) over Gliscor (289), which moved first. The settling frees only 60 Speed EVs
+    // (Garchomp 288); the pre-solve tops them up into HP, and the full solve keeps that HP because the damage lines fit it as well
+    // as none, so both chains land on HP 60.
     const { observations, speedOrders } = parseReplayLogWithObservations(scene);
     const doubled = [...observations, ...observations];
     const built = buildTeamsFromReplay(scene, { inferredSpreads: solveReplaySpreads(scene, doubled, { speedOrders }) });

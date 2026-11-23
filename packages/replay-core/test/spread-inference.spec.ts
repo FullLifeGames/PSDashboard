@@ -69,8 +69,8 @@ describe('damage-consistent spread inference', () => {
     const inferred = inferSpreads(observations, sets, 'gen9customgame');
     const uxie = inferred.get('p1:uxie');
     expect(uxie).toBeTruthy();
-    // Round 64 (T122): the open budget goes where the two lines still fit (their rolls and slack), so
-    // the frail reading keeps HP and Def well under the bulky 252 / 252 and fits both lines.
+    // The open budget goes where the two lines still fit (their rolls and slack): the frail reading keeps HP and Def well under the bulky
+    // 252 / 252 and fits both lines.
     expect(uxie!.evs.hp).toBeLessThan(252);
     expect(uxie!.evs.def).toBeLessThan(252);
     const ctx = buildSolveContext(observations, sets, 'gen9customgame', []);
@@ -82,11 +82,9 @@ describe('damage-consistent spread inference', () => {
   });
 
   test('a lethal hit is a lower bound: overkill rungs are not refuted, short rungs are', () => {
-    // Truth: an uninvested Uxie. Two clean hits say so; the third hit
-    // knocked out an Uxie that had 5% left. Read as a damage reading,
-    // "5%" punishes every rung whose weakest roll exceeds 5% and pulls the
-    // solve toward bulk (573756: p1 Toxapex was fitted as physically
-    // defensive off its own knock-out); read as a bound it refutes nothing.
+    // Truth: an uninvested Uxie. Two clean hits say so; the third knocked out an Uxie that had 5% left. Read as a damage reading, "5%"
+    // punishes every rung whose weakest roll exceeds 5% (573756: p1 Toxapex was fitted as physically defensive off its own knock-out); read
+    // as a bound it refutes nothing.
     const clean = [observe('U-turn', {}, 'Hardy'), observe('Knock Off', {}, 'Hardy')];
     const lethal: DamageObservation = { ...observe('Knock Off', {}, 'Hardy', true), observedFraction: 0.05 };
     const inferred = inferSpreads([...clean, lethal], sets, 'gen9customgame');
@@ -110,11 +108,8 @@ describe('damage-consistent spread inference', () => {
   });
 
   test('solving bulk preserves Speed and nature but never exceeds the EV budget', () => {
-    // Damage observations carry no information about Speed — the solver
-    // must not strip Speed EVs or the speed nature. But the LEGAL budget
-    // (508) binds: with 252 HP measured and 252 Spe preserved, the
-    // unmeasured 252 SpA cannot also survive — it yields first. (The old
-    // expectation institutionalized a 756-EV spread the sim then played.)
+    // Damage observations carry no information about Speed: the solver must not strip Speed EVs or the speed nature. But the LEGAL budget
+    // (508) binds: with 252 HP measured and 252 Spe preserved, the unmeasured 252 SpA cannot also survive, it yields first.
     const timidSets = {
       p1: [{
         ...set('Uxie', ['Stealth Rock', 'U-turn']),
@@ -138,9 +133,8 @@ describe('damage-consistent spread inference', () => {
   });
 
   test('an incomplete winner is topped up in unmeasured non-Speed stats', () => {
-    // Bulk-only evidence over an empty prior used to emit a 252-total
-    // spread — a systematically under-statted sim mon. Leftover EVs fill
-    // the unmeasured offense (U-turn Uxie: physical → Atk), never Speed.
+    // Bulk-only evidence over an empty prior must not emit a 252-total spread (a systematically under-statted sim mon). Leftover EVs fill
+    // the unmeasured offense (U-turn Uxie: physical, so Atk), never Speed.
     const emptyPriorSets = {
       p1: [{ ...set('Uxie', ['Stealth Rock', 'U-turn']), evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 } }],
       p2: [set('Landorus-Therian', ['U-turn', 'Knock Off'])],
@@ -218,8 +212,7 @@ describe('speed-order constraints', () => {
     expect(valiant).toBeTruthy();
   });
 
-  // Round 37: Choice Scarf decisions from orders no plausible spread of the
-  // first mover reproduces. Usage spreads stand in for the Smogon stats.
+  // Choice Scarf decisions from orders no plausible spread of the first mover reproduces. Usage spreads stand in for the Smogon stats.
   const usage = (entries: [string, number, number][]) =>
     entries.map(([nature, spe, probability]) => ({ nature, probability, evs: { hp: 0, atk: 0, def: 0, spa: 252, spd: 4, spe } }));
   const knowledge = (entries: [string, Partial<SpeedKnowledge>][]): Map<string, SpeedKnowledge> => new Map(entries.map(([key, value]) => [key, {
@@ -350,12 +343,9 @@ describe('goodness-of-fit forfeit', () => {
   });
 
   test('a typeless HP observation is fitted with the set\'s resolved type', () => {
-    // The protocol only ever records "hiddenpower"; the builder substitutes
-    // the typed variant into the set. Fitting the observation with the
-    // IV-default type instead (x1 Dark vs x4 Ice on Landorus) makes the
-    // solver explain a near-KO with absurd bulk assumptions — 653785:
-    // Dragonite survived the real t24 hit at 24/335, the Dark-fitted sim
-    // rolled a kill and the reconstruction lost its final turns.
+    // The protocol only ever records "hiddenpower"; the builder substitutes the typed variant into the set. Fitting the observation with
+    // the IV-default type instead (x1 Dark vs x4 Ice on Landorus) makes the solver explain a near-KO with absurd bulk assumptions (653785:
+    // Dragonite survived the real t24 hit at 24/335, the Dark-fitted sim rolled a kill and the reconstruction lost its final turns).
     const gen7 = Generations.get(7);
     const attacker = new Pokemon(gen7, 'Manectric', {
       level: 50, nature: 'Hardy',
@@ -395,7 +385,6 @@ describe('evidence that cannot measure keeps the prior', () => {
     ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
     level: 100, gender: '',
   });
-  /** A mid-roll hit computed forward with the TRUE spreads of both sides (level 100). */
   function hit(attacker: Side, defender: Side, moveName: string, lethal = false): DamageObservation {
     const a = new Pokemon(gen, attacker.species, { level: 100, nature: attacker.nature, evs: attacker.evs, item: attacker.item || undefined });
     const d = new Pokemon(gen, defender.species, { level: 100, nature: defender.nature, evs: defender.evs });
@@ -413,11 +402,9 @@ describe('evidence that cannot measure keeps the prior', () => {
 
   for (const formatid of ['gen9ou', 'gen9doublesou']) {
     test(`knock-outs alone keep the prior's offense investment (${formatid})`, () => {
-      // Prior: the curated Swords Dance Garchomp (252 Atk / 252 Spe). It was
-      // seen attacking twice, both hits knock-outs (lower bounds any Atk
-      // reaches), and it took one Magnezone hit whose damage a bulky spread
-      // explains better. 573756: the old solve traded the whole offense
-      // for bulk (252 HP / 252 SpD / 0 Atk) and fielded a 0-Atk sweeper.
+      // Prior: the curated Swords Dance Garchomp (252 Atk / 252 Spe), seen attacking twice with knock-outs (lower bounds any Atk reaches)
+      // and taking one Magnezone hit that a bulky spread explains better. 573756: the solve traded the whole offense for bulk (252 HP / 252
+      // SpD / 0 Atk) and fielded a 0-Atk sweeper.
       const garchomp = mon('Garchomp', 'p2', 'Jolly', offensive);
       const magnezone = mon('Magnezone', 'p1', 'Modest', { hp: 0, atk: 0, def: 4, spa: 252, spd: 0, spe: 252 }, 'Choice Specs');
       const clefable = mon('Clefable', 'p1', 'Bold', { hp: 252, atk: 0, def: 252, spa: 0, spd: 4, spe: 0 });
@@ -441,7 +428,7 @@ describe('evidence that cannot measure keeps the prior', () => {
         hit(magnezone, { ...garchomp, evs: bulky }, 'Flash Cannon'),
       ];
       const weak = inferSpreads(measured, sets, formatid).get('p2:garchomp');
-      // Round 69 (T132): the unmeasured Speed keeps its 252 EVs, so the offense goes down to what the budget leaves.
+      // The unmeasured Speed keeps its 252 EVs, so the offense goes down to what the budget leaves.
       expect(weak?.evs.atk).toBeLessThanOrEqual(4);
       expect(weak?.evs.spe).toBe(252);
     });
@@ -449,12 +436,9 @@ describe('evidence that cannot measure keeps the prior', () => {
 
   for (const formatid of ['gen9ou', 'gen9doublesou']) {
     test(`a move order no Speed can repair gets a Scarf after every legal Speed (T117, ${formatid})`, () => {
-      // Garchomp moved after a Toxapex (base 35): Toxapex's fastest Speed (185)
-      // stays under Garchomp's slowest legal one (216), so no spread explains
-      // the order. Round 63 (an observed order is a hard limit): the Choice
-      // Scarf the real Toxapex must have carried comes in last, and Garchomp
-      // sits under the Scarfed Toxapex. Before, every rung broke the order
-      // alike and the build kept a Garchomp the log proves too fast.
+      // Garchomp moved after a Toxapex (base 35): Toxapex's fastest Speed (185) stays under Garchomp's slowest legal one (216), so no
+      // spread explains the order. An observed order is a hard limit: the Choice Scarf the real Toxapex must have carried comes in last,
+      // and Garchomp sits under the Scarfed Toxapex.
       const garchomp = mon('Garchomp', 'p2', 'Jolly', offensive);
       const toxapex = mon('Toxapex', 'p1', 'Bold', { hp: 252, atk: 0, def: 252, spa: 0, spd: 4, spe: 0 });
       const clefable = mon('Clefable', 'p1', 'Bold', { hp: 252, atk: 0, def: 252, spa: 0, spd: 4, spe: 0 });
@@ -477,8 +461,7 @@ describe('evidence that cannot measure keeps the prior', () => {
       };
       expect(solved.get('p1:toxapex')?.item).toBe('Choice Scarf');
       expect(speedOf('p1', sets.p1[0]) * 1.5).toBeGreaterThan(speedOf('p2', sets.p2[0]));
-      // Control: without the order nothing measures Speed, so the same lines leave the prior's 252 Spe alone
-      // (round 69, T132: they used to buy full bulk with it); the order is what lowers it above.
+      // Control: without the order nothing measures Speed, so the same lines leave the prior's 252 Spe alone; the order is what lowers it above.
       const free = inferSpreads(observations, sets, formatid, []).get('p2:garchomp');
       expect(free?.evs.spe ?? 252).toBe(252);
       expect(solved.get('p2:garchomp')?.evs.spe ?? 252).toBeLessThan(free?.evs.spe ?? 252);
@@ -486,12 +469,9 @@ describe('evidence that cannot measure keeps the prior', () => {
   }
 
   test('a move order the prior already satisfies keeps the prior Speed and nature (round 40)', () => {
-    // 573756 after round 37: Garchomp (Jolly 252 Spe) moved before a
-    // Clefable its prior outruns anyway. Nothing measured its Speed
-    // downward, yet the old solve counted Speed as measured, let a 252-HP
-    // rung win the damage lines and shaved the Speed to 4 for the
-    // knock-out-only offense it keeps — a Garchomp Kyurem outspeeds, and
-    // turn 73's hit branch priced 29% for the defender instead of near 0.
+    // 573756: Garchomp (Jolly 252 Spe) moved before a Clefable its prior outruns anyway. Nothing measured its Speed downward, so Speed must
+    // not count as measured: else a 252-HP rung wins the damage lines and shaves the Speed to 4 for the knock-out-only offense it keeps (a
+    // Garchomp Kyurem outspeeds; turn 73's hit branch priced 29% for the defender instead of near 0).
     const garchomp = mon('Garchomp', 'p2', 'Jolly', offensive);
     const clefable = mon('Clefable', 'p1', 'Bold', { hp: 252, atk: 0, def: 252, spa: 0, spd: 4, spe: 0 });
     const magnezone = mon('Magnezone', 'p1', 'Modest', { hp: 0, atk: 0, def: 4, spa: 252, spd: 0, spe: 252 }, 'Choice Specs');
@@ -510,8 +490,7 @@ describe('evidence that cannot measure keeps the prior', () => {
     const solved = inferSpreads(observations, sets, 'gen9ou', [order]).get('p2:garchomp');
     expect(solved?.evs.spe).toBe(252);
     expect(solved?.nature).toBe('Jolly');
-    // Control: without any order the Speed stays too, since nothing measures it (round 69, T132; round 40 let
-    // damage-fitted bulk take it here, 252 HP and 4 Spe). The satisfied order above is no longer what protects it.
+    // Control: without any order the Speed stays too, since nothing measures it; the satisfied order above is not what protects it.
     const free = inferSpreads(observations, sets, 'gen9ou', []).get('p2:garchomp');
     expect(free?.evs.spe ?? 252).toBe(252);
     expect(free?.nature ?? 'Jolly').toBe('Jolly');
@@ -530,10 +509,8 @@ describe('evidence that cannot measure keeps the prior', () => {
       p2: [asSet(garchomp, ['Earthquake', 'Swords Dance'])],
     };
     const order = { firstSide: 'p2' as const, firstSpecies: 'Garchomp', secondSide: 'p1' as const, secondSpecies: 'Clefable', turn: 70 };
-    // The knock-out sits where the 48-Atk truth can deal it (its top roll on
-    // this Clefable is about 37%): round 41 reads a knock-out above the kept
-    // body's reach as the offense measured upward, and the first cut of this
-    // test had it at 60%, beyond its own truth.
+    // The knock-out sits where the 48-Atk truth can deal it (its top roll on this Clefable is about 37%): a knock-out above the kept body's
+    // reach reads as the offense measured upward.
     const observations = [
       { ...hit(garchomp, clefable, 'Earthquake'), observedFraction: 0.3, lethal: true },
       hit(clefable, { ...garchomp, evs: truth }, 'Moonblast'),
@@ -548,16 +525,14 @@ describe('evidence that cannot measure keeps the prior', () => {
     expect(alone?.evs.hp).toBe(208);
     expect(alone?.evs.spe).toBe(252);
     expect(Object.values(alone?.evs ?? {}).reduce((sum, value) => sum + value, 0)).toBeLessThanOrEqual(508);
-    // A percent log (100/100) measures nothing: the solve is the round-39 one.
+    // A percent log (100/100) measures nothing: no solve.
     expect(inferSpreads([], sets, 'gen9ou', [], new Map(), new Map()).get('p2:garchomp')).toBeUndefined();
   });
 
   test('a bulk rung the budget cannot express beside the kept stats is not offered (no nature-only bulk)', () => {
-    // Prior Jolly 252 Atk / 252 Spe, offense kept (knock-outs only), Speed
-    // kept (a satisfied order). The special lines ask for SpD bulk, but
-    // 252 HP + 252 SpD cannot sit beside the two kept stats: the old ladder
-    // shaved the claim to 4 SpD and kept the Calm nature standing on
-    // nothing. Such a rung is no longer offered; the prior's Jolly stands.
+    // Prior Jolly 252 Atk / 252 Spe, offense kept (knock-outs only), Speed kept (a satisfied order). The special lines ask for SpD bulk,
+    // but 252 HP + 252 SpD cannot sit beside the two kept stats: a rung that shaves the claim to 4 SpD and keeps the Calm nature standing
+    // on nothing is not offered; the prior's Jolly stands.
     const garchomp = mon('Garchomp', 'p2', 'Jolly', offensive);
     const clefable = mon('Clefable', 'p1', 'Bold', { hp: 252, atk: 0, def: 252, spa: 0, spd: 4, spe: 0 });
     const magnezone = mon('Magnezone', 'p1', 'Modest', { hp: 0, atk: 0, def: 4, spa: 252, spd: 0, spe: 252 }, 'Choice Specs');
@@ -580,8 +555,8 @@ describe('evidence that cannot measure keeps the prior', () => {
   });
 
   test('a fixed HP is never shaved for a bulk rung the damage lines ask for', () => {
-    // Truth: 208 HP / 252 SpD; the lines want SpD, the log fixes HP at 208. Round 69 (T132): the prior carries the
-    // truth's 48 Spe, because a Speed no order measures keeps its EVs and the bulk claim then needs room beside it.
+    // Truth: 208 HP / 252 SpD; the lines want SpD, the log fixes HP at 208. The prior carries the truth's 48 Spe, because a Speed no order
+    // measures keeps its EVs and the bulk claim then needs room beside it.
     const truth = { hp: 208, atk: 0, def: 0, spa: 0, spd: 252, spe: 48 };
     const garchomp = mon('Garchomp', 'p2', 'Jolly', { ...offensive, spe: 48 });
     const clefable = mon('Clefable', 'p1', 'Bold', { hp: 252, atk: 0, def: 252, spa: 0, spd: 4, spe: 0 });
@@ -601,8 +576,8 @@ describe('evidence that cannot measure keeps the prior', () => {
     expect(solved?.evs.hp).toBe(208);
     expect(solved?.evs.spd).toBe(252);
     expect(Object.values(solved?.evs ?? {}).reduce((sum, value) => sum + value, 0)).toBeLessThanOrEqual(508);
-    // With the offensive prior's 252 Spe the 252-SpD claim has no room beside the fixed HP: the Speed stays (T132),
-    // and the log's HP is still not shaved.
+    // With the offensive prior's 252 Spe the 252-SpD claim has no room beside the fixed HP: the Speed stays, and the log's HP is still not
+    // shaved.
     const fast = { p1: sets.p1, p2: [asSet(mon('Garchomp', 'p2', 'Jolly', offensive), ['Earthquake'])] };
     const kept = inferSpreads(observations, fast, 'gen9ou', [], new Map(), maxHp).get('p2:garchomp');
     expect(kept?.evs.hp).toBe(208);

@@ -91,10 +91,9 @@ describe('replay format inference', () => {
     expect(getBranchSimulatorFormat({ id: 'gen9vgc2024regh-2160552710', log: '|gametype|doubles\n|gen|9' })).toBe('gen9doublesou');
   });
 
-  // Round 67 (T145): Pokémon Champions branches on the Champions mod of @pkmn/mods. Singles play the mod's OU, doubles
-  // its Doubles Custom Game, which brings the whole team as Doubles OU does (the reconstruction trims to the brought
-  // Pokémon itself; a VGC format's team preview would keep the first four). The regulation (M-A, M-B, M-C) changes only
-  // legality, and a mod format takes no custom-rule suffix.
+  // Champions branches on the Champions mod of @pkmn/mods. Singles play the mod's OU, doubles its Doubles Custom Game, which brings the
+  // whole team as Doubles OU does (the reconstruction trims to the brought Pokémon itself; a VGC format's team preview would keep the
+  // first four). The regulation (M-A, M-B, M-C) changes only legality, and a mod format takes no custom-rule suffix.
   test('round 67 (T145): Champions replays branch on the Champions mod\'s formats', () => {
     expect(getBranchSimulatorFormat(vgcReplay)).toBe('gen9championsdoublescustomgame');
     for (const id of ['gen9championsvgc2026regma-2604410427', 'gen9championsvgc2026regmabo3-2603652560', 'gen9championsvgc2026regmc-2695803506',
@@ -120,13 +119,11 @@ describe('replay format inference', () => {
   });
 
   test('unknown singles formats run as custom games with Sleep Clause resolved from the log', () => {
-    // Declared |rule| line → the clause rides the format as a custom rule.
     expect(getBranchSimulatorFormat({
       id: 'gen9draft-123',
       log: '|gametype|singles\n|gen|9\n|rule|Sleep Clause Mod: Limit one foe put to sleep',
     })).toBe('gen9customgame@@@Sleep Clause Mod');
 
-    // Rules declared but no sleep clause among them → none injected.
     expect(getBranchSimulatorFormat({
       id: 'gen9draft-123',
       log: '|gametype|singles\n|gen|9\n|rule|OHKO Clause: OHKO moves are banned',
@@ -177,9 +174,9 @@ describe('replay format inference', () => {
     expect(formatEnforcesSleepClause('gen9customgame@@@Sleep Clause Mod')).toBe(true);
   });
 
-  // Round 89 (FB-1): a draft game that declares "Terastal Clause" ran as a Custom Game that offered Tera (forum replay
-  // gen9natdexdraft-2713067801: "Tera (Psychic)" in the tray, Execute Turn terastallized). The clause rides the branch format like
-  // Sleep Clause, in singles and in doubles; the simulator is the oracle for what the format then offers.
+  // A draft game that declares "Terastal Clause" ran as a Custom Game that offered Tera (gen9natdexdraft-2713067801: "Tera (Psychic)"
+  // in the tray, Execute Turn terastallized). The clause rides the branch format like Sleep Clause, in singles and in doubles; the
+  // simulator is the oracle for what the format then offers.
   describe('Terastal Clause from the log (round 89, FB-1)', () => {
     const rules = '|rule|Sleep Clause Mod: Limit one foe put to sleep\n|rule|Terastal Clause: You cannot Terastallize';
     const mon = {
@@ -224,10 +221,8 @@ describe('replay format inference', () => {
     });
   });
 
-  // Round 65: the static weighs a replay by the tables of its rule set, named
-  // from the replay's own format: Pokémon Champions (singles and doubles, on
-  // the Champions mod since round 67), VGC outside Champions, and every other
-  // format.
+  // The static weighs a replay by the tables of its rule set, named from the replay's own format: Pokémon Champions (singles and
+  // doubles), VGC outside Champions, and every other format.
   test('a replay names its rule set from its own format', () => {
     expect(replayRuleset(vgcReplay)).toBe('champions');
     expect(replayRuleset({ id: 'gen9championsvgc2026regmabo3-2603652560', log: '|gametype|doubles\n|gen|9' })).toBe('champions');
@@ -238,10 +233,9 @@ describe('replay format inference', () => {
     expect(replayRuleset({ id: 'gen9doublesou-2663093831', log: '|gametype|doubles\n|gen|9\n|tier|[Gen 9] Doubles OU' })).toBe('standard');
   });
 
-  // A private replay link carries a 31-character password as a `-{password}pw`
-  // suffix on the id. The suffix belongs in the fetched id and nowhere else:
-  // read as part of the format it produced `gen9ou2632003305e10u...pw`, so an
-  // ordinary private OU replay branched as a rule-less custom game (G22).
+  // A private replay link carries a 31-character password as a `-{password}pw` suffix on the id. The suffix belongs in the fetched id
+  // and nowhere else: read as part of the format it produced `gen9ou2632003305e10u...pw`, so an ordinary private OU replay branched
+  // as a rule-less custom game.
   const privateId = 'gen9ou-2632003305-e10u50b7xrkmn0w7j5q2bac68relhlwpw';
   const privateLog = '|gametype|singles\n|gen|9\n|tier|[Gen 9] OU\n|turn|1';
 
@@ -311,7 +305,6 @@ const LOGS: Record<string, string> = {
 /** The evidence a host hands the builder, read from the LF text for both twins: the build and the solve then show their own door. */
 const evidenceOf = (log: string) => parseReplayLogWithObservations(lfOf(log));
 
-/** The exported functions that take a log, each reduced to one value to compare. */
 const ENTRY_POINTS: Record<string, (log: string) => unknown> = {
   parseReplayLog: log => parseReplayLog(log),
   parseReplayLogWithObservations: log => parseReplayLogWithObservations(log),
@@ -439,7 +432,6 @@ describe('header-facts', () => {
     return { battle, hasGametype: lines.some((l) => l.startsWith('|gametype|')) };
   }
 
-  /** A log with a header only; what a test varies is the format and the lines. */
   const headerLog = (...lines: string[]) => ['|j|a', '|j|b', ...lines, '|start', '|turn|1'].join('\n');
 
   describe('header facts equal the client (fixtures of the four folders, singles, doubles, VGC, Champions, draft, GPL)', () => {

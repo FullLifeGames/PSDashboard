@@ -16,12 +16,10 @@ vi.mock('../src/spread-inference', async importOriginal => {
 });
 
 /**
- * Round 70 (T222, rest of T192): Gens 1 and 2 build at the server start. The server fills a set without EVs with 252 in every
- * stat there (no EV limit), but the build never handed the solver a set without EVs: the default prior per species gave Starmie
- * 0/0/0/252/4/252, and the build's format hint ('gen1', not a format of the Dex) did not match the regex over the format name
- * that switched the Gen 1 and 2 budget on, so the solver ran on the standard budget. The rule now reads the generation of the
- * format, and the default prior is the server's start where the budget has one. The oracle is the simulator: a set validated by
- * the server (which fills the EVs) and played in a real battle. Gens 1 and 2 have no doubles format, so these tests are singles.
+ * Gens 1 and 2 build at the server start: the server fills a set without EVs with 252 in every stat there (no EV limit), so the
+ * default prior is the server's start where the budget has one, and the build's format hint ('gen1', not a format of the Dex) is read
+ * through the generation of the format. The oracle is the simulator: a set validated by the server (which fills the EVs) and played
+ * in a real battle. Gens 1 and 2 have no doubles format, so these tests are singles.
  */
 const GENS = [{ num: 1, formatid: 'gen1customgame' }, { num: 2, formatid: 'gen2customgame' }];
 const ALL_31 = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
@@ -141,7 +139,7 @@ describe('Gen 3 and later builds keep the species default prior', () => {
 
 describe('the Gen 1 and 2 budget follows the generation of a format, checked against the simulator', () => {
   // Every format of the Dex that plays its own teams: the generation the Dex gives it decides the one-Special rule; the start is
-  // what the server's validator gives a set without EVs, and Gen 3 and later keep a start of 0 (T222 leaves them as they were).
+  // what the server's validator gives a set without EVs, and Gen 3 and later keep a start of 0.
   const formats = Dex.formats.all().filter(format => /^gen\d/.test(format.id) && !format.team);
   const startOf = (formatid: string): number => {
     const probe = { name: '', species: 'Pikachu', moves: [] } as unknown as { evs?: PokemonEvs };

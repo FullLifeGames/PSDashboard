@@ -5,13 +5,11 @@ import type { LoggedHit } from '../src/types';
 import { buildTeamsFromReplay } from '../src/team-builder';
 
 /**
- * Round 69, T175 (decision 36): a `|cant|` line that names a move is a move of that Pokémon's set, as a `|move|` line is.
- * The move never ran (Taunt, Imprison, Disable, Heal Block and Throat Chop stop it before the `|move|` line), so the
- * log shows it only here; 752301 t1 to t3 and the 16 Taunt lines of the fit corpus are the case. A blocker's line
- * (Dazzling, Queenly Majesty, Armor Tail, Damp) carries `[of]`, reaches the inference as the protocol's `-block` and follows the
- * stopped attacker's own `|move|` line: it books that move once for the attacker and nothing for the blocker. A reason without a move (sleep, paralysis, flinch, recharge, Truant) books nothing, and so does a
- * blocked move of a transformed Pokémon. Every log comes from @pkmn/sim; each scene first checks the line the sim
- * writes, so a wrong shape fails here and not in a game.
+ * A `|cant|` line that names a move books that move for the Pokémon, as a `|move|` line does: the move never ran (Taunt, Imprison,
+ * Disable, Heal Block, Throat Chop), so the log shows it only here (752301 t1 to t3). A blocker's `[of]` line (Dazzling, Queenly
+ * Majesty, Armor Tail, Damp) books that move once for the stopped attacker and nothing for the blocker; a reason without a move
+ * (sleep, paralysis, flinch, recharge, Truant) and a blocked move of a transformed Pokémon book nothing. Each scene first checks
+ * the line the simulator writes.
  */
 
 function mon(species: string, ability: string, moves: string[], spe = 0, item = 'Leftovers'): PokemonSet {
@@ -24,7 +22,6 @@ function mon(species: string, ability: string, moves: string[], spe = 0, item = 
 type Format = 'singles' | 'doubles';
 const FORMATS: Format[] = ['singles', 'doubles'];
 
-/** The battle's log as a viewer reads it. */
 function play(format: Format, p1: PokemonSet[], p2: PokemonSet[], turns: [string, string][]): string {
   const battle = new Battle({
     formatid: toID(format === 'doubles' ? 'gen9doublescustomgame' : 'gen9customgame'), seed: '1,2,3,4',
@@ -43,7 +40,7 @@ function play(format: Format, p1: PokemonSet[], p2: PokemonSet[], turns: [string
 }
 
 const SPLASH = mon('Chansey', 'Natural Cure', ['Splash']);
-/** p1 leads with a fast `lead`; in doubles its partner splashes, and p2 gets `mate` beside the tested body. */
+/** p1 leads with a fast `lead` (in doubles its partner splashes); p2 gets `mate` beside the tested body. */
 function scene(format: Format, lead: PokemonSet, tested: PokemonSet, turns: [string, string][]) {
   const doubles = format === 'doubles';
   const p1 = doubles ? [lead, SPLASH] : [lead];
@@ -102,7 +99,6 @@ describe('a blocker\'s line books the stopped move for the attacker and nothing 
     const kingambit = mon('Kingambit', 'Defiant', ['Sucker Punch', 'Iron Head']);
     const log = play('singles', [kingambit], [bruxish], [['move suckerpunch', 'move psychicfangs']]);
     expect(log).toMatch(/\|cant\|p2a: Bruxish\|ability: Dazzling\|Sucker Punch\|\[of\] p1a: Kingambit/);
-    // Sucker Punch is Kingambit's; Bruxish shows only its own Psychic Fangs.
     expect(movesOf(log, 'Bruxish')).toEqual(['Psychic Fangs']);
   });
 
@@ -267,7 +263,7 @@ const treads = () => set({ species: 'Iron Treads', item: 'Leftovers', ability: '
 const blissey = () => set({ species: 'Blissey', ability: 'Natural Cure', moves: ['Soft-Boiled'], evs: { hp: 252 } });
 const chansey = () => set({ species: 'Chansey', ability: 'Natural Cure', moves: ['Soft-Boiled'], evs: { hp: 252 } });
 
-/** One turn of a real battle for a seed, p1 attacking `p1Move`, p2 `p2Move`; the log has no crit. */
+/** One turn of a real battle for a seed; the log has no crit. */
 function turnLog(kind: Kind, p1: PokemonSet, p2: PokemonSet, moves: [string, string], seed: number): string | null {
   const doubles = kind === 'doubles';
   const battle = new Battle({
@@ -279,7 +275,7 @@ function turnLog(kind: Kind, p1: PokemonSet, p2: PokemonSet, moves: [string, str
     battle.choose('p1', 'team 1');
     battle.choose('p2', 'team 1');
   }
-  // A move that names its target needs one in doubles; a spread move (Earthquake, Dazzling Gleam) takes none.
+    // A move that names its target needs one in doubles; a spread move takes none.
   const choice = (move: string) => (doubles ? `move ${move}${['normal', 'any', 'adjacentFoe'].includes(Dex.moves.get(move).target) ? ' 1' : ''}, move softboiled` : `move ${move}`);
   battle.choose('p1', choice(moves[0]));
   battle.choose('p2', choice(moves[1]));
@@ -290,7 +286,6 @@ function turnLog(kind: Kind, p1: PokemonSet, p2: PokemonSet, moves: [string, str
 
 interface Scene { log: string; stat: string; tuskHits: LoggedHit[]; foeHits: LoggedHit[] }
 
-/** The first crit-free log in which both leads hit: the Paradox holder is on p2 (its hits) and the foe on p1 (hits into the holder). */
 function sceneOf(kind: Kind, foe: PokemonSet, holder: PokemonSet, moves: [string, string]): Scene {
   for (let seed = 1; seed <= 80; seed++) {
     const log = turnLog(kind, foe, holder, moves, seed);

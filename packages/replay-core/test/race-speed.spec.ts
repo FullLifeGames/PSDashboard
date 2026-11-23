@@ -12,11 +12,9 @@ import { toId } from '../src/ids';
 import { rulesDex } from '../src/rules-dex';
 
 /**
- * Round 64 (T122): the rests of the move order. A race reads the Speed the
- * simulator plays: a Choice Scarf rounded as the simulator rounds it, a
- * battle forme on its own base Speed, a transformed mover on its target's
- * Speed with its own item. Only a race that cannot end strict may tie, and
- * a Speed IV below 31 comes in only when no other Speed keeps an order.
+ * A race reads the Speed the simulator plays: a Choice Scarf rounded as the simulator rounds it, a battle forme on its own base
+ * Speed, a transformed mover on its target's Speed with its own item. Only a race that cannot end strict may tie, and a Speed IV
+ * below 31 comes in only when no other Speed keeps an order.
  */
 type Side = 'p1' | 'p2';
 type Sets = { p1: PokemonSet[]; p2: PokemonSet[] };
@@ -75,7 +73,6 @@ describe('a Choice Scarf races at the Speed the simulator rounds (T122 point 3)'
   }
 });
 
-/** A battle the simulator plays, with every player's choices per turn. */
 function simulate(format: string, p1: PokemonSet[], p2: PokemonSet[], turns: [string, string][]): Battle {
   const battle = new Battle({
     formatid: toID(format), seed: '1,2,3,4',
@@ -101,7 +98,6 @@ function replayLog(battle: Battle): string {
   return lines.join('\n');
 }
 
-/** The turn's move lines, in the order the simulator played them. */
 const movers = (battle: Battle, turn: number) => {
   const lines = replayLog(battle).split('\n');
   const start = lines.indexOf(`|turn|${turn}`);

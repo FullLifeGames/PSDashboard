@@ -4,9 +4,8 @@ import { twinBattle } from '../src/sim-ask/twin';
 import { twinBattle as exported } from '../src/index';
 
 /**
- * Round 72 (T239): the twin battle the callers ask the simulator on, built once. A twin is a one-body battle (or a
- * 2v1 with a benched body) past team preview, on the custom game of a generation, seeded 1,2,3,4. The six callers
- * built it by hand with the same lines; this spec holds the factory to those lines.
+ * The twin battle the callers ask the simulator on, built once: a one-body battle (or a 2v1 with a benched body) past team preview,
+ * on the custom game of a generation, seeded 1,2,3,4. This spec holds the factory to the lines the callers wrote by hand.
  */
 
 const SET: PokemonSet = {
@@ -14,7 +13,7 @@ const SET: PokemonSet = {
   evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, level: 50, gender: '',
 };
 
-/** The old hand-written lines of the callers (race-speed, tera-click, boost-bite, status-factor, snapshot-move-types). */
+/** The hand-written lines of the callers (race-speed, tera-click, boost-bite, status-factor, snapshot-move-types). */
 function byHand(format: string, p1: PokemonSet[], p2: PokemonSet[], names: [string, string], seed = '1,2,3,4'): Battle {
   const battle = new Battle({
     formatid: toID(format), seed: seed as never,
@@ -42,8 +41,8 @@ describe('twinBattle', () => {
     test(`gen ${gen}: a 1v1 twin is the battle the callers built by hand`, () => {
       const format = `gen${gen}customgame`;
       const made = twinBattle(format, { p1: { name: 'Body', team: [SET] }, p2: { name: 'Foe', team: [SET] } });
-      // Round 76 (12a): the simulator stamps the log with the wall clock in seconds (`|t:|`), so two builds that straddle a
-      // second boundary differ in that one line. The second build here always lands one second later.
+      // The simulator stamps the log with the wall clock in seconds (`|t:|`), so two builds that straddle a second boundary differ in
+      // that one line. The second build here always lands one second later.
       vi.setSystemTime(Date.now() + 1000);
       expect(identity(made)).toBe(identity(byHand(format, [SET], [SET], ['Body', 'Foe'])));
       expect(made.sides[0].active[0]?.species.name).toBe('Smeargle');

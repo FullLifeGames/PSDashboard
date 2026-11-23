@@ -8,10 +8,8 @@ import { readObservation } from '../src/spreads/observation-read';
 import { simGenNum } from '../src/calc-gen';
 
 /**
- * Round 73 (T229): a Z-move or a Max move prices from the base power of its placeholder in the Dex (1 for a Z-move, 10 for most
- * Max moves), while the simulator plays the real power of the base move. The solver read Devastating Drake as one point of damage
- * and Max Airstream as a ten-power hit, and pulled the defender's bulk and the attacker's offense toward values no set has. A
- * powered hit gives no reading: the solver leaves it out, and the one predicate comes from the Dex (`isZ`, `isMax`).
+ * A Z-move or Max move prices from the base power of its placeholder in the Dex (1 for a Z-move, 10 for most Max moves) while the
+ * simulator plays the real power: a powered hit gives no reading, and the one predicate comes from the Dex (`isZ`, `isMax`).
  */
 
 Dex.mod('champions', championsMod as unknown as NonNullable<Parameters<typeof Dex.mod>[1]>);

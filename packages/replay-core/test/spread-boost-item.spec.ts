@@ -13,11 +13,10 @@ import type { DamageObservation, PokemonEvs } from '../src/types';
 import { rulesDex } from '../src/rules-dex';
 
 /**
- * Round 69 (T26, spec decision 7): a guessed boost item (Choice Band, Choice Specs, Life Orb ...) the damage lines
- * refute gives way. The usage guess hits 1.5 times harder than the lines show at every spread, so the solver used
- * to zero the offense under the item (Kyurem Timid 0/0/0/0/0/252 with Choice Specs: Draco Meteor 28 % on Ting-Lu
- * fits only without the item). Every rung is now scored with the item and without it; the lower fit error wins,
- * the prior's distance breaks a tie, and the item stays on a tie. A revealed, sheet or manual item never yields.
+ * A guessed boost item (Choice Band, Choice Specs, Life Orb ...) the damage lines refute gives way: the usage guess hits 1.5 times
+ * harder than the lines show at every spread (Kyurem Timid 0/0/0/0/0/252 with Choice Specs: Draco Meteor 28 % on Ting-Lu fits only
+ * without the item). Every rung is scored with the item and without it; the lower fit error wins, the prior's distance breaks a tie,
+ * and the item stays on a tie. A revealed, sheet or manual item never yields.
  */
 const WORLDS = [
   { name: 'gen9ou', formatid: 'gen9ou', gen: calcGenerationFor(9), level: 100, max: 252 },
@@ -33,7 +32,6 @@ const asSet = (m: Mon, level: number, moves: string[]): PokemonSet => ({
   name: m.species, species: m.species, item: m.item ?? '', ability: '', moves, nature: m.nature, evs: m.evs,
   ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, level, gender: '',
 });
-/** A mid-roll hit computed forward with the TRUE bodies, items included. */
 function hit(world: World, attacker: Mon, defender: Mon, moveName: string, rollIndex = 8): DamageObservation {
   const body = (m: Mon) => buildCalcPokemon(world.gen, m.species, { level: world.level, nature: m.nature, evs: m.evs, item: m.item });
   const d = body(defender);

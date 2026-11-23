@@ -4,12 +4,12 @@ import { SENDERS } from '../src/inference/item-triggers';
 import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-views';
 
 /**
- * Round 72 (T235), plan row 18: `SENDERS` in inference/item-triggers.ts names the items whose `|-enditem|` line means the item sent
- * a Pokémon out of the field (it spent the switch the other triggers would need, so the watch doubts the window). The Dex has six
- * items with an `onAfterMoveSecondary` or `onAfterBoost` handler (Adrenaline Orb, Eject Button, Eject Pack, Kee Berry, Maranga
- * Berry, Red Card); the handler does not say it switches, so this spec plays each one in every view the corpus plays: a damaging
- * hit (Tackle) and a stat drop (Growl) on a holder with a Pokémon on the bench (three on a side, so doubles has one too), and keeps the items after whose use a Pokémon
- * left or waits to leave the field (the holder's `switchFlag`, or the attacker dragged out by `|drag|`). They are the list.
+ * `SENDERS` in inference/item-triggers.ts names the items whose `|-enditem|` line means the item sent a Pokémon out of the field (it
+ * spent the switch the other triggers would need). The Dex has six items with an `onAfterMoveSecondary` or `onAfterBoost` handler
+ * (Adrenaline Orb, Eject Button, Eject Pack, Kee Berry, Maranga Berry, Red Card) and the handler does not say it switches: this spec
+ * plays each one in every view the corpus plays (a Tackle and a Growl on a holder with a Pokémon on the bench, three on a side so
+ * doubles has one too) and keeps the items after whose use a Pokémon left or waits to leave (the holder's `switchFlag`, or the
+ * attacker dragged out by `|drag|`).
  */
 
 const SPEC = 'packages/replay-core/test/senders-oracle.spec.ts';

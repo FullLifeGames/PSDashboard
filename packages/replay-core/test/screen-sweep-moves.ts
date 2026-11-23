@@ -4,30 +4,26 @@ import { spectatorLog } from './screen-scenes';
 import { battleIn, mon, type SimView } from './sim-views';
 
 /**
- * Round 86 (T310), sweep S3: the moves of a rule set that end a screen outside the residual phase (removers) or change which
- * side holds a screen without a log line (silent movers), found by playing the move, never by its name. A board with Reflect
- * on p1's side and Light Screen on p2's (set by `addSideCondition`) plays one turn of the move by p1: a `-sideend` of a screen
- * before the residual marker is a removal, a screen that changed sides with no `-sidestart` or `-sideend` line is a silent
- * move. The plain run plays the moves whose Dex entry mentions a side condition (the handlers' source) and every tenth move;
- * `DICE_SWEEPS=full` plays them all.
+ * Sweep S3 finds, by playing the move and never by its name, the moves of a rule set that end a screen outside the residual phase
+ * (removers) or change which side holds a screen without a log line (silent movers): on a board with Reflect on p1's side and Light
+ * Screen on p2's, a `-sideend` before the residual marker is a removal, a screen that changed sides with no line is a silent move.
+ * The plain run plays the moves whose Dex entry mentions a side condition and every tenth move; `DICE_SWEEPS=full` plays them all.
  */
 const FULL = process.env.DICE_SWEEPS === 'full';
 
-/** The moves the scenes of the issue name: the sweep must find each of them in the rule sets that have them. */
+/** The moves the sweep must find in each rule set that has them. */
 const NAMED = ['brickbreak', 'psychicfangs', 'defog', 'ragingbull', 'courtchange'];
 
 type DexMove = ReturnType<SimView['dex']['moves']['get']>;
 export interface Found { id: string; kind: 'removal' | 'silent move' }
 export interface Swept {
   played: number;
-  /** The named moves the rule set has (the sweep must find them). */
   named: string[];
   moves: Found[];
   /** The log of a game where p1 plays the move on turn 5 (null: no move, the control). */
   log: (move: string | null) => string;
 }
 
-/** The target suffixes a click may need: none, a foe slot, the ally. */
 const AIMS = ['', ' 1', ' 2', ' -2'];
 
 const textOf = (move: DexMove): string => {

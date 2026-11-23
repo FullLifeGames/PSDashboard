@@ -3,12 +3,9 @@ import { Battle, Teams, toID, type PokemonSet } from '@pkmn/sim';
 import { inferOpponentTeam } from '../src/opponent-inferrer';
 
 /**
- * A guessed item whose trigger the protocol shows without the item's line is
- * ruled out (round 67, T130, decision 18). The round-64 census counted the
- * guesses the simulator consumed where the game showed nothing: Air Balloon,
- * Booster Energy and Eject Pack made 554 of the 562 singles rows. Every log
- * here comes from @pkmn/sim: each case first checks what a holder shows, then
- * what the inference reads for the side p2 from a log without the item.
+ * A guessed item whose trigger the protocol shows without the item's line is ruled out (Air Balloon, Booster Energy and Eject Pack
+ * are the common cases: the simulator consumes them where the game showed nothing). Every log comes from @pkmn/sim: each case first
+ * checks what a holder shows, then what the inference reads for the side p2 from a log without the item.
  */
 
 function set(species: string, item: string, ability: string, moves: string[], level = 100): PokemonSet {

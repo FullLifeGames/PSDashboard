@@ -91,7 +91,7 @@ describe('team paste pipeline (G15)', () => {
     expect(applied.pokemon[0].level).toBe(78);
   });
 
-  // Round 88 (F, #101): the user's own paste is knowledge, a stand-in is a guess; the overlay turns the guess into the user's body.
+  // The user's own paste is knowledge, a stand-in is a guess; the overlay turns the guess into the user's body.
   test('a pasted set that matches a stand-in takes the flag off: the body is the user body now', () => {
     const standIn: OpponentTeamInfo['pokemon'][number] = { ...baseInfo.pokemon[1], standIn: true };
     const other: OpponentTeamInfo['pokemon'][number] = { ...baseInfo.pokemon[0], species: 'Skarmory', standIn: true };
@@ -108,7 +108,6 @@ describe('team paste pipeline (G15)', () => {
     const sets = parsePastedTeam('Sneasler @ Heavy-Duty Boots (consumed)\n- Close Combat');
     expect(sets[0].item).toBe('Heavy-Duty Boots');
 
-    // A pure placeholder never becomes a set item.
     const placeholder = parsePastedTeam('Sneasler @ (has item)\n- Close Combat');
     expect(placeholder[0].item).toBeUndefined();
   });
@@ -158,7 +157,6 @@ describe('team paste pipeline (G15)', () => {
     expect(toxtricity?.moves.every(move => move.source === 'manual')).toBe(true);
     expect(toxtricity?.evs.source).toBe('manual');
 
-    // Unmatched species stay untouched.
     const garchomp = info.pokemon.find(pokemon => pokemon.species === 'Garchomp');
     expect(garchomp?.item.source).toBe('unknown');
   });
