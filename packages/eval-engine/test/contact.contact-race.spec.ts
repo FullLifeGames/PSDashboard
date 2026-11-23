@@ -3,7 +3,7 @@ import type { Battle, Pokemon, PokemonSet } from '@pkmn/sim';
 import { createMatchupCache } from '../src/eval-function';
 import { boostBiteValue, stageValue } from '../src/score/boost-bite';
 import { pairRace, raceBodies, setContactReads, setContactSides } from '../src/score/boost-race';
-import { hitReader, resetHitMemo } from '../src/score/contact';
+import { hitReader, resetHitMemo, playedHit, type HitCost } from '../src/score/contact';
 import { residualReader } from '../src/score/residuals';
 import { bestMoveId, boostedFraction, pairThreat, threatGetter } from '../src/score/threat';
 import { loadSimMods } from '../src/forward/sim-mods';
@@ -13,7 +13,7 @@ import { battleOf } from './power-oracle';
 /**
  * 13.10.2026 (the Swords Dance report on gen9draft-2058494320: Cobalion's contact moves into Talonflame meet Flame
  * Body, and the race did not know contact punishments): what a hit costs its attacker enters the races of boostsBiting.
- * The cost is read from the simulator (score/contact.ts, held to the simulator in contact-hits.spec.ts) and priced by
+ * The cost is read from the simulator (score/contact.ts, held to the simulator in contact.spec.ts) and priced by
  * score/contact-price.ts: the chip of every hit after which the race goes on joins the attacker's residual, a status
  * chance compounds over the hits into expected end-of-turn damage and expected lost damage. This spec holds the whole
  * path to turns of the simulator and to boards where the stage's verdict flips with the cost and nowhere else.
@@ -325,5 +325,55 @@ describe('nothing changes where nothing punishes', () => {
     const battle = battleOf(SINGLES, [set('Garchomp', ['bodypress', 'splash'])], [splash('Snorlax')]);
     const [holder, foe] = [mine(battle), theirs(battle)];
     expect(bestMoveId(pairThreat(holder, foe, battle), holder, foe)).toBe('bodypress');
+  });
+});
+
+const MOVE = 'crunch';
+const FORMATS = ['gen9doublescustomgame', 'gen9championsdoublescustomgame'] as const;
+
+/** The reaction of the defender and the side the gas stands on: next to the attacker, or next to the defender. */
+const REACTIONS = ['Rough Skin', 'Static', 'Flame Body'] as const;
+
+function board(format: string, reaction: string, gasOn: 'attacker' | 'defender' | null): Battle {
+  const gas = { ability: 'Neutralizing Gas' };
+  return battleOf(
+    format,
+    [set('Cobalion', [MOVE, 'splash']), set('Clefable', ['splash'], gasOn === 'attacker' ? gas : {})],
+    [set('Chansey', ['splash'], { ability: reaction }), set('Snorlax', ['splash'], gasOn === 'defender' ? gas : {})],
+  );
+}
+
+const pair = (battle: Battle): [Pokemon, Pokemon] => [battle.sides[0].active[0]!, battle.sides[1].active[0]!];
+const fresh = (battle: Battle): HitCost => playedHit(battle, ...pair(battle), MOVE);
+const read = (battle: Battle): HitCost => hitReader(battle)(...pair(battle), MOVE);
+
+describe.each(FORMATS)('a third body with Neutralizing Gas (%s)', format => {
+  test.each(REACTIONS)('the simulator: %s costs the attacker, and the gas of a third body on either side takes the cost away', reaction => {
+    const plain = fresh(board(format, reaction, null));
+    expect(plain.chip > 0 || plain.statuses.length > 0, `${reaction} costs the hit`).toBe(true);
+    for (const gasOn of ['attacker', 'defender'] as const) {
+      expect(fresh(board(format, reaction, gasOn)), `${reaction} with the gas next to the ${gasOn}`).toEqual({ chip: 0, statuses: [] });
+    }
+  });
+
+  test.each(REACTIONS)('%s: the memo reads the board with the gas and the board without it as their own, in both orders', reaction => {
+    for (const gasOn of ['attacker', 'defender'] as const) {
+      const boards = { plain: board(format, reaction, null), gas: board(format, reaction, gasOn) };
+      const expected = { plain: fresh(boards.plain), gas: fresh(boards.gas) };
+      expect(expected.plain).not.toEqual(expected.gas);
+      for (const order of [['plain', 'gas'], ['gas', 'plain']] as const) {
+        resetHitMemo();
+        for (const name of order) expect(read(boards[name]), `${reaction} ${gasOn} ${order.join('>')} reading ${name}`).toEqual(expected[name]);
+      }
+    }
+  });
+});
+
+describe('singles', () => {
+  test('a singles board has no third active, so the scene key has no body to add (not affected)', () => {
+    const battle = battleOf('gen9customgame', [set('Cobalion', [MOVE, 'splash'])], [set('Chansey', ['splash'], { ability: 'Rough Skin' }), set('Snorlax', ['splash'], { ability: 'Neutralizing Gas' })]);
+    expect(battle.getAllActive()).toHaveLength(2);
+    // The gas on the bench is off the field: the reaction stands.
+    expect(fresh(battle).chip).toBeGreaterThan(0);
   });
 });
