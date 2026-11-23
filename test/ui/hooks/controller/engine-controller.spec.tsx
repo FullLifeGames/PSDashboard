@@ -13,7 +13,6 @@ const { useTransients } = await import('../../../../src/hooks/controller/transie
 const { useTimelineController } = await import('../../../../src/hooks/controller/board-controller');
 const { useEngineController } = await import('../../../../src/hooks/controller/engine-controller');
 
-/** The engine layer over the real context, transients, and board. */
 function useEngineHarness() {
   const ctx = useReplayContext();
   const transients = useTransients(ctx.replay.replayData?.id);
@@ -40,7 +39,6 @@ async function loaded() {
 }
 
 describe('useEngineController', () => {
-  // Round 77 (swarm D2): a pending pick that the position no longer offers is dropped once the picker lands.
   test('a draft pick the viewed position does not offer is dropped, a pick it offers stays', async () => {
     const { result } = await loaded();
     act(() => result.current.board.timeline.navigateTo({ turn: 2, line: 'main' }));

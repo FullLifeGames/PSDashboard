@@ -17,7 +17,7 @@ describe('TeamEditor', () => {
     const ability = await screen.findByRole('combobox', { name: 'Garchomp ability' }, { timeout: 30_000 });
     await waitFor(() => expect(ability.tagName).toBe('SELECT'), { timeout: 30_000 });
     expect(within(ability).getByRole('option', { name: 'Rough Skin' })).toBeInTheDocument();
-    // Round 83 (T308): the other abilities of the generation follow, so Garchomp can hold Intimidate.
+    // The other abilities of the generation follow, so Garchomp can hold Intimidate.
     expect(within(ability).getByRole('option', { name: 'Intimidate' })).toBeInTheDocument();
     await userEvent.selectOptions(ability, 'Rough Skin');
 
@@ -51,7 +51,6 @@ describe('TeamEditor', () => {
     expect(onSave).not.toHaveBeenCalled();
   });
 
-  // Round 89 (T9c, tester BROKEN 2 and 3; singles and doubles share the editor).
   describe.each([
     { label: 'singles', kind: 'singles' as const, format: 'gen9ou', first: 'Ferrothorn' },
     { label: 'doubles', kind: 'doubles' as const, format: 'gen9doublesou', first: 'Rillaboom' },

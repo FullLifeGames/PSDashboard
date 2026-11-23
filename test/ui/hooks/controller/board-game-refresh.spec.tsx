@@ -27,7 +27,7 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllGlobals(); });
 
 /**
- * Round 89 (lane H, #105): the seed of a game reaches every path that builds a battle for it. A variation of a game from turn 0 starts
+ * The seed of a game reaches every path that builds a battle for it. A variation of a game from turn 0 starts
  * the game's own battle; the refresh after a team edit rebuilds it from turn 0 again and must start the same battle, so the dice of
  * the variation do not change under an edit that leaves the moves alone (the other callers: `useDeviation` and `useRestoreVariation`
  * pass the seed through `executeRebuild`; the game's main line rebuilds from its record, which holds the seed).

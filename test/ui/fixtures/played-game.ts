@@ -10,7 +10,7 @@ import type { PokemonSet } from '@pkmn/sim';
 import { picks, startedRecord } from './new-game';
 
 /**
- * Round 89 (lane H, #105, step H4e): a game saved in the browser's store after its leads and `turns` finished turns, played through
+ * A game saved in the browser's store after its leads and `turns` finished turns, played through
  * the real branch simulator and the game hook as the app composes them (the replay state is a fake, the save is the store's own).
  * The record has entries, so the app opens it on its tip (turn `turns + 1`), not at Team Preview.
  */

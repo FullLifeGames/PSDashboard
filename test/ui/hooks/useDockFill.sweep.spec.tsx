@@ -5,7 +5,7 @@ import type { EvalResult } from '@fulllifegames/eval-engine';
 import { simState } from '../fixtures/sim-state';
 
 /**
- * Round 84 (turn dock), step A6d: the engine fill and the game analysis, on the real hooks (`useEvaluation`, `useEvalView`,
+ * The engine fill and the game analysis, on the real hooks (`useEvaluation`, `useEvalView`,
  * `useDockFill`) with a worker that never answers. A single evaluation stops the analysis sweep, so the fill must never start
  * while the sweep runs. Two facts hold the e2e case "while Analyze game runs no fill starts":
  *  - Opening the variation (Execute at a replay turn) leaves branch mode's `resetEval`, which ends a running sweep. A sweep

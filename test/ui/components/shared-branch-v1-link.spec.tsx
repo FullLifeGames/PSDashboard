@@ -8,11 +8,8 @@ import { decodeBranchShare, encodeBranchShare, loadSavedBranches, savedBranchKey
 import { V1_SHARE_LINK, V1_SHARE_LINK_FACTS } from '../fixtures/v1-share-link';
 
 /**
- * Round 72, T238 (gate decision 2): share links keep format version 1, and an old link plays the log it carries. The
- * fixture is a link the app built before the change: a played-out branch of 450650 whose `finalLog` the v1
- * `branchFrameLog` had already put into the replay's nicknames and flags. A link carries no sets for the engine to
- * rebuild, only that log and the choices shown beside it, so the new code (which builds the sets with the replay's
- * names and hands the frame the simulator's lines unchanged) meets the same reader as before.
+ * An old v1 link plays the log it carries. The fixture is a played-out branch of 450650 whose `finalLog` the v1 `branchFrameLog` had
+ * already put into the replay's nicknames and flags; a link holds no sets, only that log and the choices shown beside it.
  */
 
 let blobs: Blob[] = [];

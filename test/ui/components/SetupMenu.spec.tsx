@@ -6,12 +6,6 @@ import { UI_SCALE_STORAGE_KEY } from '../../../src/lib/ui-scale-setting';
 import { getUiScaleState, startUiScale } from '../../../src/lib/ui-scale-store';
 import type { EvalPreferences } from '@fulllifegames/eval-engine';
 
-/**
- * Round 84 (T315, A7d, spec addendum A, 6a): the Size select of the Setup menu. Auto by default and named with the step it gives
- * now; 100, 125, 150, 175 and 200 % override it and persist per browser; a step that leaves the app less than 1050 px is disabled
- * and says why in its own label.
- */
-
 describe('SetupMenu.size', () => {
   let stop: (() => void) | null = null;
 

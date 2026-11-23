@@ -13,7 +13,6 @@ const { useReplayContext } = await import('../../../../src/hooks/controller/repl
 const { useTransients } = await import('../../../../src/hooks/controller/transients');
 const { useTimelineController } = await import('../../../../src/hooks/controller/board-controller');
 
-/** The board layer over the real context and transients, as the app composes it. */
 function useBoardHarness() {
   const ctx = useReplayContext();
   const transients = useTransients(ctx.replay.replayData?.id);
@@ -83,7 +82,6 @@ describe('useTimelineController', () => {
     expect(result.current.ctx.branchWindowOpenRef.current).toBe(false);
   }, 90_000);
 
-  // Round 77 (C4): discarding the variation during a run ends the run and gives the user's Auto setting back.
   test('discarding the variation during a play-out ends the run and restores the Auto setting', () => {
     const { result } = renderHook(() => useBoardHarness());
     act(() => result.current.ctx.evaluation.setPrefs({ ...result.current.ctx.evaluation.prefs, auto: false }));
@@ -94,7 +92,6 @@ describe('useTimelineController', () => {
     expect(result.current.transients.playOut).toBeNull();
     expect(result.current.ctx.evaluation.prefs.auto).toBe(false);
 
-    // A run that began with Auto on leaves it on.
     act(() => result.current.ctx.evaluation.setPrefs({ ...result.current.ctx.evaluation.prefs, auto: true }));
     act(() => result.current.transients.setPlayOut({ active: true, executed: 0, turns: 0, startTurn: 3, prevAuto: true }));
     act(() => result.current.board.discardVariation());
@@ -120,7 +117,7 @@ describe('useTimelineController', () => {
     expect(result.current.board.timeline.maxTurn).toBe(result.current.ctx.replay.snapshots.length);
     expect(result.current.ctx.branch.branching).toBe(false);
   });
-  // Round 89 (#105, H4e): a saved game opens on its tip. The frame of a game that opens at start (a reload) is not there yet and
+  // A saved game opens on its tip. The frame of a game that opens at start (a reload) is not there yet and
   // reports turn 1 while it loads; the landing holds the pointer against that report like any selection of a turn does.
   test('a saved game opened on its tip keeps the pointer there when the loading frame reports turn 1', async () => {
     const record = await playedRecord(1);
@@ -136,8 +133,8 @@ describe('useTimelineController', () => {
     expect(result.current.board.timeline.viewTurn).toBe(1);
   }, 90_000);
 
-  // Round 89 (#105, H4f): a slow load outran the four-second guard (the e2e reload on devbox), and the frame's report of turn 1 moved
-  // the pointer off the tip. The landing holds its turn until the frame confirms it, however long the load takes.
+  // The landing holds its turn until the frame confirms it, however long the load takes: a slow load outran the four-second guard and
+  // the frame's report of turn 1 moved the pointer off the tip.
   test('a saved game keeps its tip against a report of turn 1 that comes after the guard time of a selection', async () => {
     const record = await playedRecord(1);
     const { result } = renderHook(() => useBoardHarness());
@@ -176,7 +173,7 @@ describe('useTimelineController', () => {
     }
   }, 90_000);
 
-  // Round 89 (#105, H4g): the observed order of a reload on `?game=` (the browser log of the e2e row). The address opens the record
+  // The observed order of a reload on `?game=`: the address opens the record
   // first; the board mounts afterwards, while the new game's replay data has no id yet. Its reset effect ran then, took the landing and
   // put the pointer on the tip, and the run for the new id (the document arriving) reset the pointer to turn 1 and found no landing
   // left. The landing belongs to the game's id: a run for another id (none yet) leaves it, the run for the game's id takes it.

@@ -13,10 +13,10 @@ import { turnDiceMarks, sideMarkTexts } from '../../../src/lib/branch-dice-marks
 const mon = (species: string, moves: string[]) => setOf(species, moves, { level: 50 });
 
 /**
- * Round 84 (turn dock), step A7a, ruling 2a: a forced replacement the engine filled waits for Execute. The branch records a pick
+ * A forced replacement the engine filled waits for Execute. The branch records a pick
  * without its follow-ups (`recordChoice`: no command is sent although the replacing side is complete), and `executePending`
  * sends the forced replacement the dock holds, or the turn when no replacement is open. A bench click (`setChoice`) still sends
- * at once, as before. Singles and doubles, on the pivot scenes of the dice pause rows below (a Volt Switch pauses the turn
+ * at once. Singles and doubles, on the pivot scenes of the dice pause rows below (a Volt Switch pauses the turn
  * for the replacement of one side).
  */
 const SCENES = [
@@ -93,7 +93,7 @@ describe.each(SCENES)('the branch at a forced replacement, $kind', scene => {
     expect(result.current.history[1].kind).toBe('forced');
   }, 180_000);
 
-  // Round 84 (A7j): the bench click publishes its pick before the send goes out, so the dock's chip shows the clicked body (and
+  // The bench click publishes its pick before the send goes out, so the dock's chip shows the clicked body (and
   // Execute reads "Executing...") for the moments the send takes, not "choose a replacement" or the engine's earlier pick.
   test('a click on the bench publishes the clicked body while the send is under way', async () => {
     const result = await atForcedPosition();
@@ -126,7 +126,7 @@ describe.each(SCENES)('the branch at a forced replacement, $kind', scene => {
 });
 
 /**
- * Round 84 (A7c, ruling 16a), doubles with both slots of P1 forced: Garchomp's Explosion also faints the ally Magikarp, so P1 owes
+ * Doubles with both slots of P1 forced: Garchomp's Explosion also faints the ally Magikarp, so P1 owes
  * two replacements. The branch holds both recorded picks without sending anything (the dock records the click while the other
  * slot holds only the engine's pick), and `executePending` then sends the side's command once. A single slot of one side is
  * covered above; singles have one slot per side, so the rule has nothing to hold back there.
@@ -177,9 +177,9 @@ describe('the branch at a forced replacement of both slots of one side, doubles'
 
 
 /**
- * Round 84 (A7d): the scene of the e2e case `turn-dock-forced` (the hand-written Doubles OU replay `gen9doubles-forced-test`). Two
+ * The scene of the e2e case `turn-dock-forced` (the hand-written Doubles OU replay `gen9doubles-forced-test`). Two
  * Mementos faint both bodies of P1 whatever the dice roll, as long as neither foe protects: Memento's accuracy is 100 and the user
- * faints when it hits. The A7c case took a corpus turn whose two faints depend on the damage rolls, and the sim never asked for both
+ * faints when it hits. The case above takes a corpus turn whose two faints depend on the damage rolls, and the sim never asked for both
  * replacements there. The sim asks P1 for two replacements here, and P2 for none.
  */
 describe('two Mementos force both slots of P1 and no slot of P2, doubles', () => {
@@ -301,7 +301,7 @@ describe('useBranch', () => {
     expect(result.current.simState?.turnNumber).toBe(2);
   }, 60_000);
 
-  // Round 84 (turn dock): the engine fill reads the picks at the moment its result lands; a render closure would be stale.
+  // The engine fill reads the picks at the moment its result lands; a render closure would be stale.
   test('getChoices reads the pending picks of the moment, and nothing after the turn ran', async () => {
     const data = fixture('singles');
     const { result } = renderHook(() => useBranch());
@@ -311,7 +311,6 @@ describe('useBranch', () => {
 
     const read = result.current.getChoices;
     act(() => result.current.setChoice('p1', firstMove(state, 'p1')));
-    // The same function sees the pick although this render's closure was made before it.
     expect(read().p1[0]).toEqual(firstMove(state, 'p1'));
     expect(read().p2).toEqual([]);
     act(() => result.current.setChoice('p2', firstMove(state, 'p2')));
@@ -328,7 +327,6 @@ describe('useBranch', () => {
     expect(result.current.getBattle()).toBeNull();
   }, 60_000);
 
-  // Round 77 (swarm D1): an edit that makes the first variation move illegal used to leave an empty variation behind.
   test('a rebuild that keeps no turn ends the branch and names what was lost', async () => {
     const data = fixture('singles');
     const { result } = renderHook(() => useBranch());
@@ -429,7 +427,6 @@ describe('useBranch-dice-lines', () => {
   const CASES: { kind: ReplayKind; turn: number }[] = [{ kind: 'singles', turn: 2 }, { kind: 'doubles', turn: 1 }, { kind: 'vgc', turn: 1 }];
 
   describe.each(CASES)('the display lines of a forced die, $kind', ({ kind, turn }) => {
-    /** One turn with a die on the first slot's move: `make` builds the die from the move's id. */
     async function playWith(make: (moveId: string) => ForcedDie) {
       const data = fixture(kind);
       const { result } = renderHook(() => useBranch());
@@ -479,7 +476,7 @@ describe('useBranch-dice-lines', () => {
       const lines = result.current.history[0].dieLines!;
       expect(lines).toHaveLength(1);
       expect(lines[0].text).toMatch(/^Forced zzz had no effect: /);
-      // Round 82, step A7c: the history row and the share link read the marks of the same report
+      // The history row and the share link read the marks of the same report
       expect(result.current.history[0].diceMarks).toEqual({ p1: [{ label: expect.stringContaining('zzz'), noEffect: expect.any(String) }], p2: [] });
       const log = result.current.simState!.log;
       // before the end of the turn: the next shown line closes it
@@ -538,7 +535,6 @@ describe.each(SCENES)('a turn that pauses for a switch, $kind', scene => {
     await act(async () => { await result.current.executeTurn(); });
     expect(result.current.executeError).toBeNull();
     expect(result.current.simState!.p1ForceSwitch).toBe(true);
-    // the lone side that must replace executes as soon as its choice is in (a forced interlude entry)
     await act(async () => { result.current.setChoice('p1', { kind: 'switch', speciesId: scene.replacement, pokemonName: scene.replacement }, 0); });
     await waitFor(() => expect(result.current.history).toHaveLength(2));
     expect(result.current.executeError).toBeNull();
@@ -580,8 +576,8 @@ describe.each(SCENES)('a turn that pauses for a switch, $kind', scene => {
     expect(forcedLines(again)).toEqual(lines);
   }, 180_000);
 
-  // Round 82, step A7c, criterion 4: a link written from this branch shows the marks. The viewer plays `finalLog` without a
-  // simulator, so the display lines must be in it, and the turn's choice carries the labels of both dice once.
+  // The viewer plays `finalLog` without a simulator, so the display lines must be in it, and the turn's choice carries the labels of both
+  // dice once.
   test('a share link carries the display lines in its log and the labels of both dice on the turn, and the viewer shows them', async () => {
     const current = await play();
     const finalLog = branchFrameLog(current.simState!.log, current.history.flatMap(entry => entry.dieLines ?? []));

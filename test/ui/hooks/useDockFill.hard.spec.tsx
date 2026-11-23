@@ -7,11 +7,11 @@ import { evalResult, rankedChoice } from '../fixtures/eval-result';
 import { simState, type FormatKind } from '../fixtures/sim-state';
 
 /**
- * Round 89 (#153, Hard mode), the turn dock. The move in hand is the side whose slots the user set (a slot with a pick that no fill
+ * Hard mode in the turn dock. The move in hand is the side whose slots the user set (a slot with a pick that no fill
  * wrote), provided the other side holds none: that other side is the opponent, and the fill writes the reply that hurts the joint
  * choice of the side in hand most (`worstReply`) where it wrote its best row before. A doubles side in hand counts with its partner
  * slot, which the fill wrote from the best joint choice that agrees. After the fill, a pick of the user in the event handler
- * (`onUserChoice` with the pick) writes the opponent's slots again. Setting off, nothing differs from the fill of round 84.
+ * (`onUserChoice` with the pick) writes the opponent's slots again. Setting off, the fill is unchanged.
  */
 
 describe('useDockFill.hard', () => {
@@ -155,7 +155,6 @@ describe('useDockFill.hard', () => {
       const on = setup('singles', true);
       on.land(singles());
       on.setChoice.mockClear();
-      // the user also chooses for p2: both sides are the user's now
       act(() => on.hook.result.current.onUserChoice('p2', 0, move('knockoff', 'Knock Off')));
       act(() => on.hook.result.current.onUserChoice('p1', 0, move('swordsdance', 'Swords Dance')));
       expect(on.setChoice).not.toHaveBeenCalled();
@@ -173,7 +172,7 @@ describe('useDockFill.hard', () => {
   });
 
   /**
-   * Round 89 (#153, HM3b, user gate 15.11.2026): "Back to the engine's pick". The fill keeps what it chose for each slot (`picks`, frozen
+   * "Back to the engine's pick". The fill keeps what it chose for each slot (`picks`, frozen
    * at the fill); `restore(side, slot)` hands that choice back for the dock to write, marks the slot as the engine's again, and answers
    * for the opponent: Hard mode on, its engine slots get the reply to the restored pick (the pick's own rule, `onUserChoice`); off, they
    * get the opponent's fill as it was at the start. A slot the fill never wrote has nothing to restore. Singles and doubles.
@@ -517,7 +516,6 @@ describe('useDockFill at a replay turn: the engine\'s choice for the clicked slo
     expect(result.current.choices?.p2[0]).toEqual(expect.objectContaining({ moveId: 'grassyglide' }));
     expect(result.current.engine.p2).toEqual([true, true]);
     expect(result.current.deferred.p2).toEqual([null, null]);
-    // A replay turn never writes into the branch.
     expect(setChoice).not.toHaveBeenCalled();
   });
 

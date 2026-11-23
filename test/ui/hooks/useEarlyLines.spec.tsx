@@ -8,10 +8,10 @@ import { evalGraph, evalResult } from '../fixtures/eval-result';
 import { singlesLine } from '../fixtures/lines';
 
 /**
- * Round 89 (#104), step G13 (ruling G2b, kept by G7a): after the game report, one tree search per graded early singles turn keeps the
- * lines. The hook asks for the turns the report grades (matrix results without lines), one at a time, writes only `lines`, and stops
- * with a new sweep, a new replay or the user's Stop. Step G14b (ruling G9a, option L): the stage covers every graded turn in Auto, tree
- * turns and doubles included, with the line pass in the search's settings; a result is done when it carries the pass.
+ * After the game report, one tree search per graded early singles turn keeps the lines. The hook asks for the turns the report
+ * grades (matrix results without lines), one at a time, writes only `lines`, and stops with a new sweep, a new replay or the user's
+ * Stop. In Auto the stage covers every graded turn, tree turns and doubles included, with the line pass in the search's settings; a
+ * result is done when it carries the pass.
  */
 const MATRIX: TurnEvalSettings = { depth: 1, samples: 3, mode: 'matrix' };
 const TREE: TurnEvalSettings = { depth: 1, samples: 1, mode: 'mcts' };
@@ -239,8 +239,8 @@ describe('useEarlyLines', () => {
     });
   });
 
-  // Round 89 (G13b, tester, third pass): the card of a turn that was about to get its lines said "the matrix pass keeps none. Analyze the
-  // position with MCTS". The stage names the turns it will search and the sweep says lines may follow.
+  // The card of a turn that is about to get its lines must not say "the matrix pass keeps none. Analyze the position with MCTS": the
+  // stage names the turns it will search and the sweep says lines may follow.
   describe('lineComing: what a turn without lines waits for', () => {
     test('a graded turn the stage has not reached (matrix or tree) waits for the stage; one it has searched, or one nobody grades, waits for nothing', async () => {
       let release: (() => void) | undefined;

@@ -5,7 +5,7 @@ import { evalResult } from '../fixtures/eval-result';
 import { simState, type FormatKind } from '../fixtures/sim-state';
 
 /**
- * Round 89 (SB-7, gate finding QUESTION 1): the user stops a search that has streamed a partial result (a forced replacement's quick
+ * The user stops a search that has streamed a partial result (a forced replacement's quick
  * estimate, a deeper level of a normal turn). The dock keeps that result as the engine's pick: the chip holds the suggestion and
  * Execute stays. The partial belongs to the stop only: a run that something else cancelled (the game analysis) fills nothing, and a
  * stop before any partial leaves the chips empty.
@@ -16,9 +16,7 @@ const script = vi.hoisted(() => ({
   reject: null as null | ((error: Error) => void),
   runs: 0,
   acquire: null as unknown as () => Promise<string>,
-  /** The game analysis is running: the dock reads `graph.running`. */
   graphRunning: false,
-  /** The pointer stands on the live tip, so the fill may run. */
   liveTip: true,
 }));
 
@@ -89,11 +87,10 @@ describe('a stop keeps the result so far', () => {
     expect(setChoice).toHaveBeenCalledWith('p1', expect.anything(), 0);
     expect(result.current.fill.engine.p1[0]).toBe(true);
     expect(result.current.fill.picks.p1[0]).not.toBeNull();
-    // the stop starts no second run
     expect(script.runs).toBe(1);
   });
 
-  // Round 89 (SB-9, gate finding BROKEN 1): a tree search streams its first interim result (tree depth 3 to 5, not the quick estimate)
+  // A tree search streams its first interim result (tree depth 3 to 5, not the quick estimate)
   // after 150 iterations of its first tree; a Cancel after it keeps that result in a doubles replacement like any other partial.
   test('doubles: Stop after a tree\'s interim result (depth 3) fills the replacement chips from it and reads as the result so far', async () => {
     const setChoice = vi.fn();
@@ -124,7 +121,7 @@ describe('a stop keeps the result so far', () => {
     expect(result.current.fill.engine).toEqual({ p1: [], p2: [] });
   });
 
-  // Round 89 (SB-10, tester5 BROKEN 1): the same stop while the position is still being rebuilt, before the search's first level.
+  // The same stop while the position is still being rebuilt, before the search's first level.
   test.each(['singles', 'doubles'] as const)('%s: a stop while the position is rebuilt marks the stop as empty and starts no search', async (kind) => {
     const setChoice = vi.fn();
     script.acquire = () => new Promise<string>(() => {});
@@ -137,7 +134,7 @@ describe('a stop keeps the result so far', () => {
     expect(setChoice).not.toHaveBeenCalled();
   });
 
-  // Round 89 (SB-10, tester5 BROKEN 1): the Cancel click can land between the run's first state change and the commit's effects (a long
+  // The Cancel click can land between the run's first state change and the commit's effects (a long
   // task after the paint). The stop reads the run's own status, not the last committed one.
   test.each(['singles', 'doubles'] as const)('%s: a stop in the same batch as the run\'s start (before the effects of its render) still marks the stop as empty, and the fill leaves the position alone', async (kind) => {
     const setChoice = vi.fn();
@@ -159,7 +156,7 @@ describe('a stop keeps the result so far', () => {
     expect(setChoice).not.toHaveBeenCalled();
   });
 
-  // Round 89 (SB-10, tester5 BROKEN 2): the game analysis ends: the fill, which starts again after an analysis took its run, leaves a
+  // The game analysis ends: the fill, which starts again after an analysis took its run, leaves a
   // position the user stopped before its first result alone, as it does for one that kept a result.
   test.each(['singles', 'doubles'] as const)('%s: after a stop before a first result the game analysis starts and ends, and the fill starts no search', async (kind) => {
     const setChoice = vi.fn();

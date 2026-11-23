@@ -114,7 +114,7 @@ describe('useEngineWalk', () => {
     expect(wired.executeTurn).toHaveBeenCalledTimes(1);
   });
 
-  // Round 77 (C3): a pick played from the queue arms the walk in the same effect pass in which the walk's own effect
+  // A pick played from the queue arms the walk in the same effect pass in which the walk's own effect
   // still sees the result that stood before the click. That result is not the replacement position and must not
   // disarm the walk: the forced replacement that comes next still auto-plays. The arming does not read the game
   // type, so doubles (a combined choice per side, the same refs) take the same path; the singles case stands for both.
@@ -164,7 +164,7 @@ describe('useEngineWalk', () => {
 });
 
 /**
- * Round 89 (#153, Hard mode): a click on an engine move in a card or the live panel hands the result the card reads; with the setting on
+ * A click on an engine move in a card or the live panel hands the result the card reads; with the setting on
  * the opponent answers with the reply that hurts the clicked move most (`worstReply`), else with the reply the card names (the best
  * row). A matrix cell names its pair and is played as clicked. Singles and doubles.
  */

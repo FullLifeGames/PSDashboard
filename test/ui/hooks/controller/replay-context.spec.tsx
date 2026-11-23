@@ -25,7 +25,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-/** Round 88 (T314, #55): Champions VGC 2625939941, where P1 fielded three bodies and P2's four are known. */
+/** Champions VGC 2625939941, where P1 fielded three bodies and P2's four are known. */
 const championsOpenGame = () => JSON.parse(readFileSync('test/e2e/fixtures/dock-championsvgc-2625939941.json', 'utf-8')) as ReplayData;
 
 describe('useReplayContext', () => {
@@ -47,7 +47,6 @@ describe('useReplayContext', () => {
     expect(ctx.positions.getExact(1)).toBeNull();
   });
 
-  // Round 89 (#105, stage H4): the Load menu offers both a replay and a new game, in either order.
   test('a game opens as the context\'s game; a replay loaded after it is a replay again: no record, its own link, its own positions', async () => {
     const { result } = renderHook(() => useReplayContext());
     const record = await startedRecord('gen9ou');
@@ -90,7 +89,6 @@ describe('useReplayContext', () => {
     await waitFor(() => expect(result.current.smogon.setAssumptions.loading).toBe(false));
   });
 
-  // Round 89 (#124): a short side is no longer left whole: the rebuild plays the heaviest world (the worlds are in replay-context-worlds.spec.tsx).
   test('an open bring-limited game rebuilds its heaviest world and hands the bench of both sides to the branch', async () => {
     await loadSimMods('gen9championsvgc2026regma');
     const replay = championsOpenGame();

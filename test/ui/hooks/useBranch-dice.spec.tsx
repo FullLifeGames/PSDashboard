@@ -19,7 +19,7 @@ import { freshLog, setOf } from '../fixtures/dice-battle';
 import type { Bench } from '../../../src/lib/bench';
 
 /**
- * Round 82 (forced dice), step A6, item 5 (ADR 0001): a forced die rides on the slot choice. The turn plays through the dice
+ * A forced die (ADR 0001) rides on the slot choice. The turn plays through the dice
  * module, the history entry keeps the choice with its dice and the report of the user's dice, and a rebuild (a team edit, a
  * support state) replays the forced dice and reaches the same turn. Singles, doubles and VGC.
  */
@@ -222,7 +222,6 @@ async function started(kind: ReplayKind, bench: (open: { p2: string[] }) => Benc
       snapshotFor: (boundary: number) => snapshots[boundary - 1] ?? null,
     });
   });
-  // The whole team first, to name what the battle offers.
   const whole = renderHook(() => useBranch());
   await start(whole.result);
   const offered = [...new Set(whole.result.current.simState!.p2SwitchesBySlot.flat().map(option => option.species))];
@@ -240,7 +239,6 @@ describe.each([['singles' as const], ['doubles' as const]])('useBranch with a be
     expect([...new Set(state.p2SwitchesBySlot.flat().map(option => option.species))]).toEqual(run.offered.slice(0, 1));
     expect(state.p2Switches.map(option => option.species)).toEqual(run.offered.slice(0, 1));
     expect(state.p1SwitchesBySlot).toEqual(run.whole.current.simState!.p1SwitchesBySlot);
-    // The battle itself still holds every body.
     expect(run.filtered.current.getBattle()?.sides[1].pokemon.length).toBe(run.whole.current.getBattle()?.sides[1].pokemon.length);
   }, 60_000);
 

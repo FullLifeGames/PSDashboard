@@ -2,9 +2,8 @@ import type { BranchHistoryEntry } from '../../../src/lib/branch-history';
 import { pokemon } from './sim-state';
 
 /**
- * Round 88 (T348, #84): two real variation histories of 1.1.0 and before, copied from the reporter's state file
- * (GitHub issue #4, gen9vgc2025regg-2335527677, `state-issue4.json`) and from the check of 07.11.2026 (`issue4c.txt`, the
- * same replay, a variation from turn 1 that the engine played out). The simulator wrote a replacement on BOTH sides as an
+ * Two real variation histories, copied from a reporter's state file (gen9vgc2025regg-2335527677) and from a check of the same
+ * replay (a variation from turn 1 that the engine played out). The simulator wrote a replacement on BOTH sides as an
  * entry of kind `turn` that carries the `turnNumber` of the entry before it, a replacement on one side as kind `forced`.
  *
  * A row is [kind, turnNumber, forcedSide, p1Choice, p2Choice]. Every entry carries its own marker: the position
@@ -51,7 +50,7 @@ export const ISSUE4_STATE = {
   turns: 4,
 };
 
-/** The play-out of the check of 07.11.2026: start turn 1, 17 entries, 10 real turns; entry 4 replaces both sides. */
+/** The play-out of the check: start turn 1, 17 entries, 10 real turns; entry 4 replaces both sides. */
 export const ISSUE4C_PLAYOUT = {
   startTurn: 1,
   history: interludeHistory([

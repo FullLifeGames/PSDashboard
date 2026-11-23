@@ -88,7 +88,7 @@ describe('useDeviation', () => {
     expect(startCalls(wired)[0][6]).toMatchObject({ p1Choices: prefill.p1Choices });
   }, 60_000);
 
-  // Round 77 (swarm A-2): the executor refuses the picked turn after the rebuild replaced the variation.
+  // The executor refuses the picked turn after the rebuild replaced the variation.
   describe('a refused execute after the rebuild', () => {
     const prefill = { p1Choices: [{ kind: 'move' as const, moveId: 'toxicspikes', moveName: 'Toxic Spikes' }], p2Choices: [] };
 
@@ -140,7 +140,6 @@ describe('useDeviation', () => {
     }, 60_000);
   });
 
-  // Round 77 (swarm D1): a rebuild that keeps no turn leaves no variation and no phantom message.
   test('a rebuild that keeps no turn ends the variation: the notice names it and the pointer stays on the main line', async () => {
     const notice = 'The variation from turn 2 (2 turns) ended: Swampert no longer knows Earthquake.';
     const history = [entry(2), entry(3)];
@@ -181,7 +180,7 @@ describe('useDeviation', () => {
     expect(startCalls(wired)[0][4]).toBe(3);
   }, 60_000);
 
-  // Round 77 (C4): a caller that arms a run (the play-out) learns when the deviation really starts.
+  // A caller that arms a run (the play-out) learns when the deviation really starts.
   test('onStart fires when the deviation runs: at once without a variation, after the yes next to one, never on cancel', async () => {
     const wired = inputs();
     const free = renderHook(() => useDeviation(wired));
@@ -203,7 +202,7 @@ describe('useDeviation', () => {
     await waitFor(() => expect(startCalls(standing)).toHaveLength(1), { timeout: 30_000 });
   }, 60_000);
 
-  // Round 77 (C7): the notice of a finished run belongs to the line it ran on; a deviation ends it.
+  // The notice of a finished run belongs to the line it ran on; a deviation ends it.
   test('onDeviate fires when a deviation or a lead variation really starts, and not while the replace confirm waits', async () => {
     const onDeviate = vi.fn();
     const standing = inputs({ timeline: timelineAt(3, { variationSpan: { startTurn: 2, length: 2 } }), onDeviate });
@@ -296,7 +295,7 @@ describe('useDeviation', () => {
     act(() => result.current.startLeadVariation({ p1: ['Garchomp'], p2: ['Great Tusk'] }, { onStart }));
     expect(onStart).toHaveBeenCalledTimes(1);
     expect(wired.timeline.setVariationScores).toHaveBeenCalledWith([]);
-    // Round 80: the new game's tip is followed even when its span matches the one it replaces.
+    // The new game's tip is followed even when its span matches the one it replaces.
     expect(wired.timeline.followNextTip).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(startCalls(wired)).toHaveLength(1), { timeout: 30_000 });
     const [, , , , turn, , options] = startCalls(wired)[0];
@@ -377,7 +376,6 @@ describe.each(CASES)('Execute from a viewed position, $kind', ({ kind, turn }) =
   test('the draft\'s forced die reaches the first turn of the branch', async () => {
     const { result, p1, p2, die } = await viewedPosition();
 
-    // The user forces the die in the draft, then presses Execute at the viewed position.
     act(() => result.current.setDraft({ p1: p1.map((choice, slot) => (slot === 0 ? { ...choice, dice: [die] } : choice)), p2 }));
     act(() => result.current.deviation.handleExecuteDraft());
     await waitFor(() => expect(result.current.branch.history).toHaveLength(1), { timeout: 120_000 });

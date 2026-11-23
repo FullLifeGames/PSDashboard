@@ -7,7 +7,7 @@ import { evalResult, rankedChoice } from '../fixtures/eval-result';
 import { simState, type FormatKind } from '../fixtures/sim-state';
 
 /**
- * Round 84 (turn dock), step A5: the engine fill at the live tip of a variation. A stub evaluation stands in for the worker: the
+ * The engine fill at the live tip of a variation. A stub evaluation stands in for the worker: the
  * spec reads when a run starts, what the result writes, and what Execute does while the run is pending.
  */
 
@@ -63,7 +63,6 @@ const onResultOf = (handleEvaluate: ReturnType<typeof inputsOf>['handleEvaluate'
   return options.onResult;
 };
 
-/** The doubles fixture result with a second side the fixture's own pickers can play. */
 const doublesResult = (): EvalResult => {
   const base = evalResult('doubles');
   return { ...base, perSide: { p1: base.perSide.p1, p2: [rankedChoice('move grassyglide 1, move tailwind', 'Grassy Glide → Incineroar + Tailwind', -0.25)] } };
@@ -82,7 +81,6 @@ describe('useDockFill: when a run starts', () => {
     rerender({ ...wired, evaluation: evaluationOf({ status: 'searching', resultTag: 'variation:3' }).evaluation });
     rerender({ ...wired, evaluation: evaluationOf({ status: 'searching', resultTag: 'variation:3' }).evaluation });
     expect(handleEvaluate).toHaveBeenCalledTimes(1);
-    // The next position of the variation (a turn executed) is a new key.
     rerender({ ...wired, historyLength: 2, evalViewKey: 'variation:4' });
     expect(handleEvaluate).toHaveBeenCalledTimes(2);
     expect(setPrefs).not.toHaveBeenCalled();
@@ -147,7 +145,6 @@ describe('useDockFill: when a run starts', () => {
     const { wired, handleEvaluate, branch } = inputsOf('singles', { evaluation, liveEvalStatus: 'stale' });
     const { rerender } = renderHook((props: DockFillInputs) => useDockFill(props), { initialProps: wired });
     expect(handleEvaluate).not.toHaveBeenCalled();
-    // The Auto run is under way for this position, then lands: its result fills.
     rerender({ ...wired, evaluation: evaluationOf({ auto: true, status: 'searching', resultTag: 'variation:3' }).evaluation, liveEvalStatus: 'searching' });
     expect(handleEvaluate).not.toHaveBeenCalled();
     const landed = evalResult('singles');
@@ -333,7 +330,6 @@ describe('useDockFill: a queued Execute dies with its run', () => {
     act(() => result.current.queueExecute());
     rerender({ ...wired, evaluation: evaluationOf({ status: 'error', resultTag: 'variation:3' }).evaluation });
     expect(result.current.waits).toBe(false);
-    // The user presses Evaluate by hand: a run, then a result for the same position.
     rerender({ ...wired, evaluation: evaluationOf({ status: 'searching', resultTag: 'variation:3' }).evaluation });
     expect(result.current.waits).toBe(false);
     await act(async () => {

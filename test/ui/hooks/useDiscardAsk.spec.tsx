@@ -3,7 +3,7 @@ import { act, renderHook } from '@testing-library/react';
 import { useDiscardAsk } from '../../../src/hooks/useDiscardAsk';
 
 /**
- * Round 89 (user ruling 40, FB4a): Discard variation asks first once the variation has a played turn, through the same banner as
+ * Discard variation asks first once the variation has a played turn, through the same banner as
  * the leave question. A variation with no played turn discards at once. The count is the variation's turns, singles and doubles
  * alike (`turnEntryCount`), so one row per count covers both game types.
  */

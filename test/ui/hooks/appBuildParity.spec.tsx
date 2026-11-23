@@ -14,7 +14,7 @@ import { fetchSmogonUsageStats } from '../../../src/lib/smogon-stats';
 import { realReplayWorkerClient } from '../fixtures/worker';
 
 /**
- * The drift pin for round 52: the bank grades through `buildAppTeams`, so
+ * The bank grades through `buildAppTeams`, so
  * the app's own chain — the enrich memos of useTeamKnowledge, the real
  * spread solve in the replay worker, `buildReplayTeams` — must keep landing
  * on the same sets. Change the chain without changing `buildAppTeams` and
@@ -23,7 +23,6 @@ import { realReplayWorkerClient } from '../fixtures/worker';
  * there moves both sides at once and stays invisible here.
  */
 
-/** Every Smogon URL the chain asks for, and whether the harness pins it. */
 const unpinned: string[] = [];
 const pinnedFetcher = (async (input: string | URL | Request) => {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -67,7 +66,7 @@ describe('the app chain and buildAppTeams', () => {
       replayData,
       p1Info: inferOpponentTeam(replayData.log, 'p1'),
       opponentInfo: inferOpponentTeam(replayData.log, 'p2'),
-      // useReplay hands the damage judge over with the infos it loaded them with (round 67, T130).
+      // useReplay hands the damage judge over with the infos it loaded them with.
       itemJudge: judgeItemsByDamage,
       observations: parsed.observations,
       speedOrders: parsed.speedOrders,

@@ -6,7 +6,7 @@ import { SpriteImg } from '../../../src/components/SpriteImg';
 const rules = logRules('');
 const FOLDER = 'https://play.pokemonshowdown.com/sprites/gen5/';
 
-/** Round 89 (FB-1): the sprite folder holds no file for Dragalge-Mega (forum replay gen9natdexdraft-2713067801: broken images in the dock chip, the tray tile and the stats panel). */
+/** The sprite folder holds no file for Dragalge-Mega (replay gen9natdexdraft-2713067801: broken images in the dock chip, the tray tile and the stats panel). */
 describe('SpriteImg', () => {
   test('a forme without a file falls back to its base species\' sprite, once', () => {
     render(<SpriteImg species="Dragalge-Mega" rules={rules} alt="Dragalge-Mega" />);

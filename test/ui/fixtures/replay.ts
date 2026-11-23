@@ -15,7 +15,6 @@ export const singlesReplay = () => replayData('singles');
 export const doublesReplay = () => replayData('doubles');
 export const snapshotsOf = (replay: ReplayData) => parseReplayLog(replay.log);
 
-/** Replay data plus everything the protocol parser reads from its log. */
 export function replayFixture(kind: ReplayKind = 'singles') {
   const data = replayData(kind);
   const { snapshots, observations, speedOrders, hpEvidence } = parseReplayLogWithObservations(data.log);

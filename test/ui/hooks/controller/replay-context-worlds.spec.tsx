@@ -8,10 +8,10 @@ import { stubReplayFetch } from '../../fixtures/network';
 import { realReplayWorkerClient } from '../../fixtures/worker';
 
 /**
- * Round 89 (#124): the app's format meta reads the worlds of a short-side game. A side that brought more bodies than it fielded
+ * The app's format meta reads the worlds of a short-side game. A side that brought more bodies than it fielded
  * gives one world per guess, weighted by the usage counts of the format's statistics; the heaviest world is the one the user plays
  * (`bringOnlyLists` carries its guess, the bench lists its body). A game that brought all it could, a pinned game and a bring-all
- * game give no worlds and read exactly as before. Doubles (VGC, Champions VGC) and singles (Battle Stadium Singles) run the same
+ * game give no worlds. Doubles (VGC, Champions VGC) and singles (Battle Stadium Singles) run the same
  * code; the rows below play both.
  */
 const worker = vi.hoisted(() => ({ current: null as null | ReturnType<typeof import('../../fixtures/worker').realReplayWorkerClient> }));

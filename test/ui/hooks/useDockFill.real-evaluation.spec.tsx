@@ -5,7 +5,7 @@ import { evalResult } from '../fixtures/eval-result';
 import { simState, type FormatKind } from '../fixtures/sim-state';
 
 /**
- * Round 84 (turn dock), step A7h: the key of the fill moves while an evaluation is under way (a forced replacement is sent and
+ * The key of the fill moves while an evaluation is under way (a forced replacement is sent and
  * the next request of the same turn begins; both carry the evalViewKey `variation:2`). The run that was under way belongs to the
  * request before; its result must not fill the new request. The fill starts its own run for it and applies that one.
  */
@@ -32,7 +32,6 @@ const position = JSON.stringify({ sides: [{ pokemon: [{ hp: 100, fainted: false 
 const matrixPrefs = { depth: 1 as const, samples: 1 as const, mode: 'matrix' as const, auto: false, autoAnalyze: false, tera: 'auto' as const };
 const KEY = 'variation:2';
 
-/** Two runs the test releases by hand, in the order the fill starts them. */
 function scriptRuns() {
   const runs: ((value: EvalResult) => void)[] = [];
   script.evaluate = () => new Promise<EvalResult>(resolve => { runs.push(resolve); });
@@ -64,7 +63,6 @@ describe('useDockFill: the key moves while a run is under way', () => {
     const { result, rerender } = renderHook((props: { history: number }) => useFilled(kind, props.history, setChoice), { initialProps: { history: 1 } });
     await waitFor(() => expect(result.current.evaluation.status).toBe('searching'));
     expect(runs).toHaveLength(1);
-    // The forced replacement is sent: the history grows by one, the evaluation's tag (the turn) stays.
     rerender({ history: 2 });
     await waitFor(() => expect(runs).toHaveLength(2));
     expect(result.current.fill.pending).toBe(true);
@@ -73,7 +71,6 @@ describe('useDockFill: the key moves while a run is under way', () => {
     expect(setChoice).not.toHaveBeenCalled();
     expect(result.current.fill.engine).toEqual({ p1: [], p2: [] });
     expect(result.current.fill.pending).toBe(true);
-    // The fill's own run lands: it fills the new request.
     await act(async () => runs[1](evalResult(kind)));
     await waitFor(() => expect(result.current.evaluation.status).toBe('done'));
     expect(setChoice).toHaveBeenCalledWith('p1', expect.anything(), 0);
@@ -120,7 +117,7 @@ describe('useDockFill: the key moves while a run is under way', () => {
 });
 
 /**
- * Step A7i: the first frame of a new position. The previous request's run stands done with the same tag, so the render in which
+ * The first frame of a new position. The previous request's run stands done with the same tag, so the render in which
  * the key moves has no run under way and no tag to tell it apart. `pending` must hold there already, until the fill's own run
  * lands or fails.
  */
@@ -159,7 +156,6 @@ describe('useDockFill: the first frame of a new key', () => {
   });
 
   test.each(['singles', 'doubles'] as const)('%s: a run that fails ends the pending state', async (kind) => {
-    // The same script, but the second run rejects.
     const resolvers: ((value: EvalResult) => void)[] = [];
     const rejecters: ((reason: Error) => void)[] = [];
     script.evaluate = () => new Promise<EvalResult>((resolve, reject) => { resolvers.push(resolve); rejecters.push(reject); });
@@ -211,7 +207,6 @@ describe('useDockFill.run', () => {
       expect(result.current.fill.pending).toBe(false);
       expect(result.current.fill.waits).toBe(false);
       expect(result.current.fill.engine).toEqual({ p1: [true], p2: [true] });
-      // The run is over: nothing starts a second one for the same position.
       expect(result.current.evaluation.status).toBe('done');
     });
 

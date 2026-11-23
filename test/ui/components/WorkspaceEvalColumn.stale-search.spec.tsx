@@ -9,9 +9,9 @@ import { singlesReplay } from '../fixtures/replay';
 import { stubReplayFetch } from '../fixtures/network';
 import { realReplayWorkerClient } from '../fixtures/worker';
 
-// Round 77 (code-reading note of lane C): a search for a position the user just left kept its partial lines clickable.
-// A click mapped the old position's choice onto the new position. The panel reads one evaluation for singles and
-// doubles alike (the click handlers do not look at the game type), so the singles replay stands for both.
+// A search for a position the user just left must not keep clickable partial lines: a click would map the old position's choice onto
+// the new one. The panel reads one evaluation for singles and doubles alike (the click handlers ignore the game type), so the singles
+// replay stands for both.
 const worker = vi.hoisted(() => ({ current: null as null | ReturnType<typeof import('../fixtures/worker').realReplayWorkerClient> }));
 vi.mock('../../../src/hooks/useReplayWorker', () => ({ useReplayWorker: () => worker.current!.client }));
 
@@ -84,7 +84,6 @@ describe('a search for a position the user left', () => {
     act(() => app().board.timeline.navigateTo({ turn: app().board.timeline.viewTurn - 1, line: 'variation' }));
     await waitFor(() => expect(app().board.timeline.liveTip).toBe(false));
     expect(app().board.evalResultMatchesView).toBe(false);
-    // The lines stay on screen, as plain text.
     expect(document.querySelectorAll('.ps-eval-panel .ps-eval-choice').length).toBeGreaterThan(0);
     expect(document.querySelectorAll('.ps-eval-panel button.ps-eval-choice')).toHaveLength(0);
   }, 240_000);

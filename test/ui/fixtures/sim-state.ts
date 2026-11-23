@@ -6,7 +6,6 @@ export type FormatKind = 'singles' | 'doubles';
 
 const STATS = { atk: 200, def: 150, spa: 120, spd: 140, spe: 180 };
 
-/** A living team member; `active` places it in a slot. */
 export function pokemon(species: string, overrides: Partial<SimPokemonInfo> = {}): SimPokemonInfo {
   return {
     name: species, species, hp: 300, maxhp: 300, hpPercent: 100, status: '', fainted: false, isActive: false,
@@ -83,7 +82,6 @@ function sideState(side: 'p1' | 'p2', kind: FormatKind) {
   };
 }
 
-/** A branch position with pickers for both sides, singles (one slot) or doubles (two slots). */
 export function simState(kind: FormatKind = 'singles', overrides: Partial<BranchSimState> = {}): BranchSimState {
   const p1 = sideState('p1', kind);
   const p2 = sideState('p2', kind);

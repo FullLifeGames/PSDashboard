@@ -9,9 +9,9 @@ import type { ReconstructOutcome } from '../../../src/lib/replay-jobs/types';
 import { fakeReplayWorkerClient } from '../fixtures/worker';
 
 /**
- * Round 67 (T145): the branch view adopts a worker's position on the main thread (usePositionSource), which loads
- * the Champions mod first for a Champions replay. In a module graph of its own (vitest isolates files) and with a
- * stored position, so no reconstruction in this realm loads the mod for it. The turn-0 preview has its own file.
+ * The branch view adopts a worker's position on the main thread (usePositionSource), which loads the Champions mod first for a
+ * Champions replay. The file runs in a module graph of its own (vitest isolates files) and with a stored position, so no
+ * reconstruction in this realm loads the mod for it.
  */
 const fixture = <T,>(name: string) =>
   JSON.parse(readFileSync(join('packages', 'eval-engine', 'test', 'fixtures', 'champions', name), 'utf-8')) as T;

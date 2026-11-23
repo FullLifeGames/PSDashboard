@@ -3,7 +3,7 @@ import type { BranchSimState, BranchSlotChoice } from '@fulllifegames/eval-engin
 import { loadSimMods, startGameLog } from '@fulllifegames/eval-engine';
 import { newGameRecord, type NewGameRecord } from '../../../src/lib/new-game/record';
 
-/** Round 89 (lane H, #105): a new game for the hook specs: six bodies that exist in every generation, a started record, default picks. */
+/** A new game for the hook specs: six bodies that exist in every generation, a started record, default picks. */
 export const SIX: PokemonSet[] = ['Garchomp', 'Gengar', 'Dragonite', 'Tyranitar', 'Snorlax', 'Starmie'].map(species => ({
   name: species, species, item: '', ability: '', moves: ['Earthquake', 'Protect', 'Return', 'Substitute'], nature: '', gender: '',
   evs: { hp: 4, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, level: 100,

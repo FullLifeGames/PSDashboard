@@ -25,12 +25,9 @@ vi.mock('../../../src/lib/pokemon-options', async importOriginal => ({ ...(await
 const { default: App } = await import('../../../src/App');
 
 /**
- * Round 70 (T205): the sets export reads the values the stats panel shows (the solved spreads, the sheet), so an
- * export followed by an import pins what the build already plays and changes no set. Before, the export read the
- * enriched infos: their EVs and natures are the usage guesses, their IVs the published set's, and the import took
- * all of them as the user's own input over the solver (2663093831's Sinistcha: the log refutes the published Speed
- * IV 0, the import brought it back). The scenes are real replays with their pinned Smogon data, a singles game
- * and a doubles game, built through the app's own chain (the real replay worker, the real spread solve).
+ * Export then import leaves every set as it was: the export reads the solved spreads the stats panel shows, not the enriched infos
+ * (their EVs and natures are usage guesses; 2663093831's Sinistcha: the log refutes the published Speed IV 0). The scenes are real
+ * replays with pinned Smogon data, singles and doubles, built through the app's own chain.
  */
 const SMOGON_HOSTS = /^https:\/\/(data\.pkmn\.cc|pkmn\.github\.io\/smogon\/data)/;
 
@@ -60,7 +57,6 @@ afterEach(() => {
 
 const app = () => captured.app as AppController;
 
-/** Everything a set plays, one line each: the round trip must leave all of them as they were. */
 const rowOf = (set: PokemonSet) => [
   set.species, set.item, set.ability, set.nature, JSON.stringify(set.evs), JSON.stringify(set.ivs),
   [...set.moves].join(','), set.teraType, set.level, set.gender,
@@ -69,7 +65,6 @@ const rowsOf = (teams: { p1Team: PokemonSet[]; p2Team: PokemonSet[] }) => [
   ...teams.p1Team.map(set => `p1: ${rowOf(set)}`), ...teams.p2Team.map(set => `p2: ${rowOf(set)}`),
 ];
 
-/** The replay loaded, the Smogon data in, the spread solve settled: the state a user reaches after a few seconds on a turn. */
 async function mountSettled(replay: ReplayData) {
   stubNetwork(replay);
   render(<App />);
@@ -79,7 +74,6 @@ async function mountSettled(replay: ReplayData) {
   await waitFor(() => expect(app().ctx.knowledge.solvedSpreads).not.toBeNull(), { timeout: 60_000 });
 }
 
-/** The team actions sit in the top bar's Setup menu (round 77, user request 28.10.2026). */
 const fromSetup = async (name: string) => {
   await userEvent.click(screen.getByRole('button', { name: 'Setup' }));
   await userEvent.click(screen.getByRole('button', { name }));
@@ -91,7 +85,7 @@ describe('the sets export and import leave the inference where it was', () => {
     ['singles', 'smogtours-gen6ou-655336'],
     ['doubles', 'gen9doublesou-2663093831'],
     ['Champions singles, Stat Points', 'gen9championsou-2628340185'],
-    // Round 76 (T234): the two sets the coherence veto swapped on a round trip (a guessed fourth move, once the solved item
+    // The two sets the coherence veto swapped on a round trip (a guessed fourth move, once the solved item
     // is a Choice item), then the rest of the feedback fixtures: 144 sets in all.
     ['Champions VGC, Head Smash', 'gen9championsvgc2026regmc-2695803506'],
     ['singles, Body Press', 'smogtours-gen8ou-573756'],
@@ -137,7 +131,6 @@ describe('the sets export and import leave the inference where it was', () => {
   }, 240_000);
 });
 
-/** The replay loaded and the Smogon data in, no spread solve started: what a user sees who opens a panel at once. */
 async function mountEarly(replay: ReplayData) {
   stubNetwork(replay);
   render(<App />);
@@ -145,7 +138,6 @@ async function mountEarly(replay: ReplayData) {
   await waitFor(() => expect(app().engine.smogonPending).toBe(false), { timeout: 60_000 });
 }
 
-/** The build a settled app plays for the replay, read in a fresh mount and torn down again. */
 async function settledRows(replay: ReplayData) {
   await mountSettled(replay);
   const rows = rowsOf(await buildReplayTeams(replay, app().ctx.teamSources));
@@ -154,11 +146,7 @@ async function settledRows(replay: ReplayData) {
   return rows;
 }
 
-/**
- * Round 76 (T234): the editor and the sets panel read the same solved values as the stats panel, and a panel opened
- * before the first spread solve waits for it. Before, the editor took the enriched infos (the usage guesses) and a
- * save pinned them; the early sets export wrote the guesses and the import took them as the user's own input.
- */
+/** The editor and the sets panel read the same solved values as the stats panel; a panel opened before the first spread solve waits for it. */
 describe('the team editor and an early sets panel keep the inference', () => {
   test.each([
     ['singles', 'smogtours-gen6ou-655336'],

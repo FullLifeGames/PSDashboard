@@ -8,10 +8,10 @@ import { stubReplayFetch } from '../fixtures/network';
 import { realReplayWorkerClient } from '../fixtures/worker';
 import type { AppController } from '../../../src/hooks/useAppController';
 
-// Round 77 (C3): an engine line with a pivot, clicked off the tip of a variation, used to stop at the pivot's
-// replacement ("Choose a replacement", the other side "(waiting)"); at the tip the click played the switch. The
-// walk below runs over the real controller and a scripted search: the search answers with the pivot line on a
-// normal position and with the one-sided replacement on a position that waits for it.
+// An engine line with a pivot, clicked off the tip of a variation, must play the switch as it does at the tip, not stop at the
+// pivot's replacement ("Choose a replacement", the other side "(waiting)"). The walk below runs over the real controller and a
+// scripted search: the search answers with the pivot line on a normal position and with the one-sided replacement on a position that
+// waits for it.
 const worker = vi.hoisted(() => ({ current: null as null | ReturnType<typeof import('../fixtures/worker').realReplayWorkerClient> }));
 vi.mock('../../../src/hooks/useReplayWorker', () => ({ useReplayWorker: () => worker.current!.client }));
 

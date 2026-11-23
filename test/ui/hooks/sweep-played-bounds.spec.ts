@@ -4,8 +4,8 @@ import type { EvalResult, PlayedBounds, PlayedTurn, RankedChoice } from '@fullli
 import { matchOrPhantom } from '../../../src/hooks/evaluation/sweep-types';
 
 /**
- * Round 89 (#108, C4b): the sweep's played-pair match (a fresh result, a cache hit's backfill, the verify and sensitivity probes all call
- * `matchOrPhantom`) reads the order bound the result carries. A result stored before the field existed has none and matches as before.
+ * The sweep's played-pair match (a fresh result, a cache hit's backfill, the verify and sensitivity probes all call
+ * `matchOrPhantom`) reads the order bound the result carries. A result stored before the field existed has none and matches without it.
  * The store keeps the result by structured clone (IndexedDB), so the clone below is the cache hit.
  */
 const row = (choice: string, label: string, ev: number): RankedChoice => ({ choice, label, worstCase: ev, expected: ev, ev, punishedBy: 'Reply' });

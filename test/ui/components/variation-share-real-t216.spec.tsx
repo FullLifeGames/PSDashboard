@@ -29,11 +29,9 @@ const { useAppController } = await import('../../../src/hooks/useAppController')
 const { WorkspaceEvalColumn } = await import('../../../src/components/WorkspaceEvalColumn');
 
 /**
- * Round 70 (T216), through the real controller: a variation played late in a real game. The gold point of the
- * variation and the panel's bar print one number, at the fainted share of the variation's own board (read here off
- * the rosters the branch recorded), not at the opening map the bar used to take and not at the main line's share of
- * that turn number. The branch is a real reconstruction of a late position of 655336 (singles) and 2663093831
- * (doubles); the search answers 0.79 for p1.
+ * A variation played late in a real game: the gold point and the panel's bar print one number, at the fainted share of the variation's
+ * own board (read off the rosters the branch recorded), not at the opening map and not at the main line's share of that turn number.
+ * The branches are real late positions of 655336 (singles) and 2663093831 (doubles); the search answers 0.79 for p1.
  */
 const kAt = (share: number) => 1.85 + 5 * Math.min(0.25, Math.max(0, share - 0.25));
 const pct = (score: number, share = 0) => Math.round(100 / (1 + Math.exp(-kAt(share) * score)));
@@ -100,7 +98,6 @@ describe('the variation of a late position prints one number in the graph and in
     await waitFor(() => expect(app().ctx.branch.history.length).toBeGreaterThan(0), { timeout: 60_000 });
     await waitFor(() => expect(app().board.timeline.viewingVariation).toBe(true), { timeout: 30_000 });
 
-    // The live search of the variation's tip scores the point and fills the bar.
     act(() => app().engine.evalView.handleEvaluate());
     await waitFor(() => expect(app().ctx.evaluation.status).toBe('done'), { timeout: 60_000 });
 

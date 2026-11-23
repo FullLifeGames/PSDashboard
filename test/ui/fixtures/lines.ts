@@ -1,7 +1,5 @@
 import type { BranchSlotChoice, DieName, EvalLine, ForcedDie, LineChoice, LineDie, LineStep } from '@fulllifegames/eval-engine';
 
-/** Hand-built lines for the Lines section and the line history: a singles line and a doubles line with a replacement. */
-
 const move = (moveId: string, moveName: string, dice: ForcedDie[] = [], extra: Partial<Extract<BranchSlotChoice, { kind: 'move' }>> = {}): BranchSlotChoice =>
   ({ kind: 'move', moveId, moveName, ...extra, ...(dice.length > 0 ? { dice } : {}) });
 const swap = (speciesId: string, pokemonName: string): BranchSlotChoice => ({ kind: 'switch', speciesId, pokemonName });
