@@ -11,12 +11,16 @@
 // It also writes spec-count-ratchet.json, the spec files per test project: counts fall with the tree and rise only with --allow-raise,
 // for a new source module, a new sweep or a new browser flow that the pull request names.
 //
+// And comment-ratchet.json, the comment baselines (scripts/comment-counts.mjs): history lines per source file, which fall with the
+// clean-up and rise only with --allow-raise.
+//
 // Usage: node scripts/update-lint-ratchet.mjs [--allow-raise]
 
 import { ESLint } from 'eslint';
-import { writeFileSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
+import { commentBaseline, COMMENT_BASELINE, historyCounts, overBaseline } from './comment-counts.mjs';
 import { compareCounts, countSpecs, currentBaseline, SPEC_COUNT_FILE } from './spec-counts.mjs';
 
 const RULES = ['max-lines', 'max-lines-per-function', 'complexity'];
@@ -102,6 +106,11 @@ const specCounts = countSpecs();
 const specRaises = compareCounts(currentBaseline(), specCounts)
   .filter(entry => Object.keys(currentBaseline()).length > 0)
   .map(({ project, baseline, count }) => `spec files in ${project}: ${baseline} -> ${count}`);
+const commentCounts = { history: historyCounts() };
+const commentOld = commentBaseline();
+const commentRaises = existsSync(COMMENT_BASELINE)
+  ? overBaseline(commentOld.history, commentCounts.history).map(({ key, baseline, count }) => `history lines in ${key}: ${baseline} -> ${count}`)
+  : [];
 const worst = await measure();
 const existing = await loadExisting();
 
@@ -128,7 +137,7 @@ for (const file of [...worst.keys()].sort()) {
   overrides.push({ files: [file], rules });
 }
 
-raises.push(...specRaises);
+raises.push(...specRaises, ...commentRaises);
 
 if (raises.length > 0 && !allowRaise) {
   console.error('Refusing to loosen the ratchet. These files grew past their pins:');
@@ -157,9 +166,11 @@ export const ratchetBase = ${JSON.stringify(base, null, 2)};
 export const ratchetOverrides = ${JSON.stringify(overrides, null, 2)};
 `;
 writeFileSync('eslint.ratchet.mjs', body);
+writeFileSync(COMMENT_BASELINE, `${JSON.stringify({ ...commentOld, ...commentCounts }, null, 2)}\n`);
 writeFileSync(SPEC_COUNT_FILE, `${JSON.stringify(specCounts, null, 2)}\n`);
 console.log(`eslint.ratchet.mjs written: ${overrides.length} pinned files, ${removed.length} pins released.`);
 console.log(`spec-count-ratchet.json written: ${JSON.stringify(specCounts)}`);
+console.log(`comment-ratchet.json written: history lines ${Object.values(commentCounts.history).reduce((sum, count) => sum + count, 0)} in ${Object.keys(commentCounts.history).length} files`);
 for (const file of removed) console.log(`  released: ${file}`);
 if (allowRaise && raises.length > 0) {
   console.log('Raised with --allow-raise:');

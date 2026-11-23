@@ -9,6 +9,7 @@ import { importZones } from './eslint.zones.mjs'
 import namesPlugin from './eslint.names.mjs'
 import dexPlugin from './eslint.dex.mjs'
 import prosePlugin from './eslint.prose.mjs'
+import commentsPlugin from './eslint.comments.mjs'
 
 export default defineConfig([
   // docs/ holds Markdown and the local, gitignored probes (copies of old sources among them), and .claude/ holds the local agent
@@ -46,6 +47,12 @@ export default defineConfig([
     ignores: ['packages/replay-core/src/rules-dex.ts'],
     plugins: { dex: dexPlugin },
     rules: { 'dex/no-global-dex-read': 'error' },
+  },
+  // History in comments: counted per file against comment-ratchet.json, which only falls (see eslint.comments.mjs).
+  {
+    files: ['packages/*/src/**/*.ts', 'src/**/*.{ts,tsx}'],
+    plugins: { comments: commentsPlugin },
+    rules: { 'comments/no-history': 'error' },
   },
   // Dash rule: the report's prose sources and every label of src/components carry no em or en dash (see eslint.prose.mjs).
   {
