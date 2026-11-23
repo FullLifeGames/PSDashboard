@@ -4,7 +4,17 @@ import { WinMeter } from '../src/endgame/win-paths/budget';
 import { dieKey } from '../src/dice/types';
 import type { EvalLine } from '../src/types';
 import { fingerprint } from './power-oracle';
-import { mon, playLine, REQUEST, serializedBoard, won, type Board } from './win-paths-support';
+import { mon, playLine, REQUEST, serializedBoard, won, type Board, playLineOn } from './win-paths-support';
+import { searchPosition } from '../src/search/position';
+import { mistakeStep } from '../src/endgame/win-paths/mistake';
+import { strongerStep } from '../src/endgame/win-paths/stronger';
+import { WIN_STEPS, winPaths } from '../src/endgame/win-paths/index';
+import type { WinStep } from '../src/endgame/win-paths/types';
+import { readFileSync } from 'node:fs';
+import type { ReplayData } from '@fulllifegames/replay-core';
+import { loadSimMods } from '../src/forward/sim-mods';
+import { serializeLiveBattle } from '../src/serialize';
+import { reconstruct } from './arrival-turn';
 
 /**
  * Round 89 (#130), step G6: the luck step. Boards are small custom games whose bodies the spec sets, so every number is one the
@@ -168,4 +178,141 @@ describe('the luck step, doubles (2 v 2 bodies: the engine fixture builder canno
     expect(new Set(diceOf(step.line!).map(entry => dieKey(entry.die.name))).size).toBe(diceOf(step.line!).length);
     for (const seed of ['1,2,3,4', '905,17,333,4096']) expect(won(await playLine(board, step.line!, seed), 'p1')).toBe(true);
   }, 120_000);
+});
+
+/** Earthquake (spread) against two Pikachu at 1 HP that may Splash or Growl, as the doubles row of `stronger.spec.ts`. */
+const DOUBLES: Board = {
+  format: 'gen9doublescustomgame',
+  p1: [mon('Pikachu', ['Splash', 'Earthquake']), mon('Pidgeot', ['Splash'])],
+  p2: [mon('Pikachu', ['Splash', 'Growl']), mon('Pikachu', ['Splash', 'Growl'])],
+  prepare: battle => { battle.sides[1].pokemon[0].hp = 1; battle.sides[1].pokemon[1].hp = 1; },
+};
+const DOUBLES_ORDER = ['move splash, move splash', 'move earthquake, move splash'];
+
+describe('the win-paths job', () => {
+  test('the steps come in their ruled order, each reported when it is done', async () => {
+    const { serialized } = await serializedBoard(COIN);
+    const log: string[] = [];
+    const runners = WIN_STEPS.map(runner => ({ ...runner, run: (...args: Parameters<typeof runner.run>) => { log.push(`run ${runner.kind}`); return runner.run(...args); } }));
+    const result = winPaths(serialized, REQUEST('p1', { turn: 7, rootOrder: ['move highjumpkick'] }), step => log.push(`step ${step.kind} ${step.status}`), runners);
+    expect(WIN_STEPS.map(runner => runner.kind)).toEqual(['stronger', 'luck', 'mistake']);
+    expect(result.steps.map(step => step.kind)).toEqual(['stronger', 'luck', 'mistake']);
+    // a step is reported before the next one starts
+    expect(log).toEqual(['run stronger', 'step stronger found', 'run luck', 'step luck found', 'run mistake', 'step mistake none']);
+    expect(result.side).toBe('p1');
+    expect(result.turn).toBe(7);
+  }, 240_000);
+
+  test('each step has a meter of its own: the job spends what the step alone spends', async () => {
+    const { serialized } = await serializedBoard(COIN);
+    const request = REQUEST('p1', { rootOrder: ['move highjumpkick'] });
+    const result = winPaths(serialized, request);
+    expect(result.steps[0]).toEqual(strongerStep(serialized, request));
+    expect(result.steps[1]).toEqual(luckPath(serialized, request));
+    expect(result.steps[2]).toEqual(mistakeStep(serialized, request));
+  }, 240_000);
+
+  test('the third step is the mistake step: an opponent with one choice has no slip to make', async () => {
+    const { serialized } = await serializedBoard(COIN);
+    const third = winPaths(serialized, REQUEST('p1')).steps[2];
+    expect(third).toMatchObject({ kind: 'mistake', status: 'none' });
+    expect(third.line).toBeUndefined();
+  }, 240_000);
+
+  test('a step that throws leaves the others: it reads failed with the message, the rest run', async () => {
+    const { serialized } = await serializedBoard(COIN);
+    const seen: WinStep[] = [];
+    const runners = WIN_STEPS.map(runner => runner.kind === 'stronger' ? { ...runner, run: () => { throw new Error('the prover broke'); } } : runner);
+    const result = winPaths(serialized, REQUEST('p1'), step => seen.push(step), runners);
+    expect(result.steps.map(step => step.status)).toEqual(['failed', 'found', 'none']);
+    expect(result.steps[0]).toMatchObject({ kind: 'stronger', error: 'the prover broke', spent: { cells: 0, turns: 0 } });
+    expect(seen).toEqual(result.steps);
+  }, 240_000);
+
+  test('a search result is equal with and without a job between two runs of it', async () => {
+    const { serialized } = await serializedBoard(COIN);
+    const settings = { depth: 1 as const, samples: 1, mode: 'matrix' as const, ruleset: 'standard' as const, tera: false };
+    const before = JSON.stringify(searchPosition(serialized, settings));
+    winPaths(serialized, REQUEST('p1', { rootOrder: ['move highjumpkick'] }));
+    expect(JSON.stringify(searchPosition(serialized, settings))).toBe(before);
+  }, 240_000);
+
+  test('the job leaves the serialized position as it was (a string it only reads)', async () => {
+    const { serialized } = await serializedBoard(COIN);
+    const copy = `${serialized}`;
+    winPaths(serialized, REQUEST('p1'));
+    expect(serialized).toBe(copy);
+  }, 240_000);
+});
+
+describe('the win-paths job, doubles', () => {
+  test('the same order and the same lines: the stronger play wins under two seeds, luck reports its own meter', async () => {
+    const { serialized } = await serializedBoard(DOUBLES);
+    const seen: string[] = [];
+    const result = winPaths(serialized, REQUEST('p1', { rootOrder: DOUBLES_ORDER, played: DOUBLES_ORDER[0] }), step => seen.push(step.kind));
+    expect(seen).toEqual(['stronger', 'luck', 'mistake']);
+    const stronger = result.steps[0];
+    expect(stronger.status).toBe('found');
+    expect(stronger.line!.choice).toBe('move earthquake, move splash');
+    for (const seed of ['1,2,3,4', '905,17,333,4096']) expect(won(await playLine(DOUBLES, stronger.line!, seed), 'p1')).toBe(true);
+    expect(result.steps[1]).toEqual(luckPath(serialized, REQUEST('p1', { rootOrder: DOUBLES_ORDER, played: DOUBLES_ORDER[0] })));
+    expect(result.steps[2]).toEqual(mistakeStep(serialized, REQUEST('p1', { rootOrder: DOUBLES_ORDER, played: DOUBLES_ORDER[0] })));
+  }, 240_000);
+});
+
+await loadSimMods('gen9championsou');
+
+const fixture = (name: string) => JSON.parse(readFileSync(new URL(`../../../test/e2e-feedback/fixtures/${name}.json`, import.meta.url), 'utf-8')) as ReplayData;
+
+const SCENES = [
+  { id: '649664 t23, devin (singles)', name: 'smogtours-gen6ou-649664', turn: 23, side: 'p2', ruleset: 'standard' },
+  { id: 'Champions VGC 2695803506 t10, juacox300 (doubles 1 v 1)', name: 'gen9championsvgc2026regmc-2695803506', turn: 10, side: 'p2', ruleset: 'champions', champions: true },
+] as const;
+
+const shownDice = (line: EvalLine): string[] => line.steps.flatMap(step => step.dice.filter(entry => entry.shown).map(entry => {
+  const result = entry.die.result;
+  const text = 'happens' in result ? (result.happens ? 'happens' : 'does not happen') : JSON.stringify(result);
+  return `${entry.die.name.kind} ${text} (${Math.round((entry.chance ?? 1) * 1000) / 10} %)`;
+}));
+
+async function run(scene: typeof SCENES[number]) {
+  const rebuild = () => reconstruct(('champions' in scene ? 'champions/' : '') + scene.name, scene.turn, fixture(scene.name));
+  const { runtime } = await rebuild();
+  const serialized = serializeLiveBattle(runtime.battleStream.battle!);
+  const ranking = searchPosition(serialized, { depth: 1, samples: 1, mode: 'matrix', ruleset: scene.ruleset, tera: true });
+  const first = { p1: ranking.perSide.p1[0].choice, p2: ranking.perSide.p2[0].choice };
+  const step = luckPath(serialized, REQUEST(scene.side, { first, ruleset: scene.ruleset, tera: true }));
+  return { step, rebuild };
+}
+
+describe('the luck step on the corpus', () => {
+  test('649664 t23: devin wins when the shown dice go his way, and the line replays to the win', async () => {
+    const { step, rebuild } = await run(SCENES[0]);
+    expect(step.status).toBe('found');
+    const line = step.line!;
+    // the path: the first choices play out (Scald takes Rotom-Wash, devin sends Medicham-Mega in), then Hydro Pump misses and High Jump Kick hits
+    const dice = shownDice(line);
+    console.info(`649664 t23 for devin: ${line.steps.map(entry => `${entry.p1.label} / ${entry.p2.label}`).join(' > ')} · ${dice.join(' · ')} · this sequence: ${Math.round((step.chance ?? 0) * 1000) / 10} %`);
+    expect(line.steps.at(-1)!.p2.label).toBe('High Jump Kick');
+    const last = line.steps.at(-1)!.dice;
+    const accuracies = last.filter(entry => entry.die.name.kind === 'accuracy');
+    expect(accuracies.map(entry => entry.die.name.slot)).toEqual(['p1a', 'p2a']);
+    expect(accuracies.map(entry => ('happens' in entry.die.result ? entry.die.result.happens : null))).toEqual([false, true]);
+    // Hydro Pump's 80 percent and High Jump Kick's 90 percent are the Gen 6 Dex's
+    expect(accuracies[0].chance).toBeCloseTo(0.2, 9);
+    expect(accuracies[1].chance).toBeCloseTo(0.9, 9);
+    expect(step.chance).toBeGreaterThan(0);
+    expect(step.chance).toBeLessThanOrEqual(0.2 * 0.9 + 1e-12);
+    expect(step.spent.cells).toBeLessThan(600);
+    expect(won((await playLineOn((await rebuild()).runtime, line)), 'p2')).toBe(true);
+  }, 300_000);
+
+  test('Champions VGC 2695803506 t10: both sides on their first choice leave juacox300 nothing within three turns, inside the budget', async () => {
+    const { step } = await run(SCENES[1]);
+    // Delphox-Mega's first choice is Protect each turn and Kingambit's Sucker Punch fails against it; burn takes Kingambit first
+    expect(step.status).toBe('none');
+    expect(step.line).toBeUndefined();
+    expect(step.spent.cells).toBeLessThan(600);
+    expect(step.spent.turns).toBeLessThan(400);
+  }, 300_000);
 });
