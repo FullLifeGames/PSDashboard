@@ -1,12 +1,7 @@
 import { simFormats, toId } from '@fulllifegames/replay-core';
 import { formatGroups, loadFormatGroups, type FormatGroup, type FormatOption } from './format-options';
 
-/**
- * Round 89 (lane H, #105), stage H4: the list the New game dialog shows (user ruling 13.11.2026, H3a and H9a). The simulator's whole
- * list of playable formats, searchable, grouped by generation; the five measured families on top under "Calibrated", the
- * Custom Games of Generation 9 (the Champions ones too) under "Custom Game". The ids of the measured families are this
- * list's configuration: the bank and the holdouts measure these five.
- */
+// The New game dialog's list: the simulator's playable formats grouped by generation, the five measured families (bank and holdouts) on top, Generation 9 Custom Games under "Custom Game".
 
 export const CALIBRATED_FORMATS = ['gen9ou', 'gen9doublesou', 'gen9vgc2025regi', 'gen9championsou', 'gen9championsvgc2026regmc'] as const;
 export const CALIBRATED_LABEL = 'Calibrated';
@@ -16,7 +11,6 @@ export const CUSTOM_LABEL = 'Custom Game';
 export function panelGroups(): FormatGroup[] {
   const groups = formatGroups(CALIBRATED_FORMATS).map(group => (group.label === 'Featured' ? { ...group, label: CALIBRATED_LABEL } : group));
   const isCustom = (option: FormatOption) => option.custom && option.generation === 9;
-  // Generation 9 before Champions, singles before doubles
   const customs = groups.flatMap(group => group.options).filter(option => isCustom(option) && !CALIBRATED_FORMATS.includes(option.id as never))
     .sort((a, b) => Number(a.champions) - Number(b.champions) || Number(a.gameType === 'doubles') - Number(b.gameType === 'doubles'));
   if (customs.length === 0) return groups;
@@ -41,12 +35,12 @@ export function searchGroups(groups: readonly FormatGroup[], query: string): For
     .filter(group => group.options.length > 0);
 }
 
-/** Whether the format has a Team Preview step: the simulator's rule table says so (Gen 1 to 4 formats have none), never a list of generations. */
+/** Whether the format has a Team Preview step: the simulator's rule table says so (Gen 1 to 4 formats have none). */
 export function formatHasTeamPreview(formatId: string): boolean {
   try {
     return simFormats().getRuleTable(simFormats().get(formatId)).has('teampreview');
   } catch {
-    // a rule table the registry refuses: read as the usual format
+    // a rule table the registry refuses reads as the usual format
     return true;
   }
 }

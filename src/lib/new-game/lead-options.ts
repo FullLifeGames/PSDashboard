@@ -4,10 +4,8 @@ import { assembleGameLog } from './game-log';
 import type { NewGameRecord } from './record';
 
 /**
- * Round 89 (lane H, #105): the lead picker's options of a new game. The record knows both teams in full, so the picker offers them
- * from it: a format without team preview (Gen 1 to 4) has no `|poke|` line to read them from. A new game has no real leads to
- * mark; once the leads are picked they show as the ones the game started with (the first picks, as many as stand on the field),
- * and the whole selection as brought.
+ * The lead picker's options of a new game, read from the record (a format without team preview has no `|poke|` line). Once the
+ * leads are picked they show as the ones the game started with (the first picks, as many as stand on the field).
  */
 export function gameLeadOptions(record: NewGameRecord): { p1: LeadOption[]; p2: LeadOption[] } {
   const lead = record.entries[0]?.leadChoices;

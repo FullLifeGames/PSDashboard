@@ -29,9 +29,8 @@ export function sourceLabel(source: KnowledgeSource, probability?: number, sourc
     case 'revealed':
       return 'revealed';
     case 'guessed':
-      // A spread solved from observed damage is a fit, not a usage guess; one
-      // only the move order or the log's HP checked says so (round 69, T69); an
-      // item the move order proved is an inference.
+      // A spread solved from observed damage is a fit, not a usage guess; one only the move order or the log's HP checked says so;
+      // an item the move order proved is an inference.
       if (sourceDetail === INFERRED_SPREAD_DETAIL) return 'fitted';
       if (sourceDetail === ORDER_SPREAD_DETAIL) return 'from move order';
       if (sourceDetail === MEASURED_HP_SPREAD_DETAIL) return 'HP from log';

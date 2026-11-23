@@ -2,9 +2,9 @@ import type { withStandIns } from '@fulllifegames/replay-core';
 import type { SmogonFetch } from './smogon/hosts';
 
 /**
- * Round 89 (lane B, #117): the published random-set file of a format whose Dex entry generates the team (Random Battle, Hackmons Cup).
- * Its shape is the one `withStandIns` reads (replay-core's `RandomSetFile`, read off the function so the two cannot drift), and a
- * game that shows fewer bodies than its `|teamsize|` fills the rest from it. The file is not a Smogon analysis file: the hosts differ.
+ * The published random-set file of a format whose Dex entry generates the team (Random Battle, Hackmons Cup). Its shape is the one
+ * `withStandIns` reads (read off the function so the two cannot drift); a game that shows fewer bodies than its `|teamsize|` fills
+ * the rest from it. It is not a Smogon analysis file: the hosts differ.
  */
 export type RandomSetFile = NonNullable<Parameters<typeof withStandIns>[4]>;
 

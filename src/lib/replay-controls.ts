@@ -1,9 +1,4 @@
-/**
- * Round 88 (T316, #56): the controls of the workspace's replay frames. Color scheme and Music go (Music does nothing in our frame,
- * which silences every sound, and the OS setting picks light or dark). Play, Last turn, Next turn, Go to turn..., Reset, Speed and
- * Switch sides stay; T316 had hidden the three turn buttons, and the gate of 08.11.2026 brought them back. The embed shows its sound
- * chooser with an inline `display`, so the rule needs `!important`.
- */
+// The workspace's replay frames hide Color scheme and Music (Music does nothing in our frame, which silences every sound; the OS setting picks light or dark). The embed shows its sound chooser with an inline `display`, so the rule needs `!important`.
 
 /** The style of a frame that hides the two choosers (`hideChoosers`). */
 export const APP_CONTROLS_STYLES = `<style>

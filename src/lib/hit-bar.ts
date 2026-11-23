@@ -1,8 +1,7 @@
 /**
- * Round 84 (turn dock), lane A: the parts of the bar under a target. It shows the target's HP and what one hit does to it, in
- * percent of its maximum HP and from the left: `rest` is what surely stays (after the highest damage roll, drawn grey), `roll`
- * what the roll decides (striped), `sure` what even the lowest roll takes, `lost` what the target has lost already. The four
- * add up to 100. Variant F (A7b): the roll's part and the sure part take one colour, `tone`.
+ * The parts of the bar under a target, in percent of its maximum HP from the left: `rest` is what surely stays (after the highest
+ * damage roll), `roll` what the roll decides, `sure` what even the lowest roll takes, `lost` what the target has lost already.
+ * The four add up to 100.
  */
 export type HpTone = 'green' | 'yellow' | 'red';
 

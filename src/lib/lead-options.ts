@@ -10,14 +10,11 @@ export interface LeadOption {
   wasBrought: boolean;
 }
 
-/** T0 lead picker data: each side's team with the real leads marked (the
- *  pre-turn-1 snapshot's actives ARE the leads) and, for bring-limited
- *  formats, which Pokemon the real game brought (active in ANY snapshot). */
+/** Each side's team with the real leads marked (the pre-turn-1 snapshot's actives) and which Pokemon the real game brought (active in any snapshot). */
 export function buildLeadOptions(snapshots: TurnSnapshot[], rules: GameRules): { p1: LeadOption[]; p2: LeadOption[] } {
   const snapshot = snapshots[0] ?? null;
   if (!snapshot) return { p1: [], p2: [] };
-  // Base-species matching: the preview lists "Zamazenta-*" while the
-  // active reveals "Zamazenta-Crowned" — same body, same badge.
+  // Base-species matching: the preview lists "Zamazenta-*" while the active reveals "Zamazenta-Crowned".
   const optionsOf = (side: typeof snapshot.p1, broughtBases: Set<string>): LeadOption[] =>
     side.pokemon.map(pokemon => ({
       name: pokemon.name,
@@ -33,9 +30,7 @@ export function buildLeadOptions(snapshots: TurnSnapshot[], rules: GameRules): {
   };
 }
 
-/** The lead picker's default selection: the real game's leads, then the
- *  rest of its bring; unknown slots fill in option order (an engine run
- *  needs a complete selection even when the protocol reveals less). */
+/** The default selection: the real game's leads, then the rest of its bring; unknown slots fill in option order (an engine run needs a complete selection). */
 export function defaultLeadSelectionFor(
   leadOptions: { p1: LeadOption[]; p2: LeadOption[] },
   bringCount: number | null,

@@ -1,11 +1,6 @@
 import { CHAMPIONS_MOD, formatRules, simFormats } from '@fulllifegames/replay-core';
 
-/**
- * Round 89 (lane H, #105): the formats the new-game panel lists. Every format the simulator registers for a user's own team
- * (singles or doubles, no generated team, no other game type) is playable; the list names no format itself. The caller passes
- * the ids it wants on top (the measured families); the rest groups by generation, the Champions mod as its own group, a Custom
- * Game first in its group. The Champions formats register with the mod, so `loadFormatOptions` awaits it first.
- */
+// The formats the new-game panel lists: every format the simulator registers for a user's own team (singles or doubles, no generated team); the list names none itself.
 
 export interface FormatOption {
   id: string;
@@ -60,7 +55,7 @@ export function formatGroups(featured: readonly string[] = []): FormatGroup[] {
   return groups;
 }
 
-/** `formatGroups` after the Champions mod loads in this realm (the registry grows from 206 to 217 formats). */
+/** `formatGroups` after the Champions mod loads in this realm (the Champions formats register with the mod). */
 export async function loadFormatGroups(featured: readonly string[] = []): Promise<FormatGroup[]> {
   const { loadSimMods } = await import('../lazy/branch-engine');
   await loadSimMods('gen9championsou');

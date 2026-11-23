@@ -1,9 +1,8 @@
 import type { BranchMoveOption } from '@fulllifegames/eval-engine';
 
 /**
- * Round 84 (turn dock), lane A: the target a move opens with in doubles, so a pick takes one click. The played target wins for
- * the played move; else the foe the move hurts most (the highest maximum damage); else the first target the move lists. A move
- * with no target options (singles, spread and self moves) has nothing to preselect.
+ * The target a move opens with in doubles, so a pick takes one click: the played target for the played move; else the foe the move
+ * hurts most (the highest maximum damage); else the first target the move lists. A move with no target options has nothing to preselect.
  */
 export interface PreselectInput {
   /** The highest roll against each target, by the target's label ("P2A"). */

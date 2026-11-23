@@ -2,13 +2,9 @@ import { Battle as SimBattle, type PokemonSet } from '@pkmn/sim';
 import { simFormats } from '@fulllifegames/replay-core';
 
 /**
- * Terastal Clause in the branch format's rule table: the simulator nulls
- * every canTerastallize at battle start. Read the way replay-core reads
- * Sleep Clause (formatEnforcesSleepClause); no format, no clause. This
- * module loads through import() only, so the simulator's dex stays out of
- * the entry chunk. Round 67 merge (T145): a mod may switch Tera off in its
- * own actions without the clause (Pokémon Champions), so a format the rule
- * table allows is asked once more, through a throwaway battle.
+ * Terastal Clause in the branch format's rule table: the simulator nulls every canTerastallize at battle start; no format, no
+ * clause. A mod may switch Tera off in its own actions without the clause (Pokémon Champions), so a format the rule table allows
+ * is asked once more, through a throwaway battle. This module loads through import() only (the simulator's dex stays out of the entry chunk).
  */
 export function teraBanned(format: string | undefined): boolean {
   if (!format) return false;
@@ -30,10 +26,8 @@ const TERA_PROBE_SET = {
 const teraOffers = new Map<string, boolean>();
 
 /**
- * Whether the simulator offers Tera in a format: a battle of that format reads
- * canTerastallize at creation (null without Tera: Gen 8, Terastal Clause, the
- * Champions mod's actions). Null when no battle of the format can be built
- * (its mod not loaded yet), and then nothing is remembered.
+ * Whether the simulator offers Tera in a format: a battle of that format reads canTerastallize at creation (null without Tera:
+ * Gen 8, Terastal Clause, the Champions mod's actions). Null when no battle can be built (its mod not loaded yet); nothing is remembered then.
  */
 function simOffersTera(formatid: string): boolean | null {
   const known = teraOffers.get(formatid);

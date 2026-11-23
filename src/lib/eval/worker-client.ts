@@ -11,10 +11,7 @@ import { OnRequestJobs, type WinPathsHandlers } from './on-request-jobs';
 import { spawnWorker, type WorkerHandle } from './worker-handle';
 import { worldPositionsOf, type WorldPosition } from './world-positions';
 
-/**
- * The engine protocol builds its request on the simulator, so it loads with the first evaluation another engine answers
- * (round 77: a static import put the simulator's Pokemon class into the start load, 1,675 to 1,773 kB gzip).
- */
+// Loads with the first evaluation another engine answers: a static import would put the simulator's Pokemon class into the start load.
 const engineEvaluate = () => import('./engine-evaluate');
 
 export interface EvalRunHandlers {
@@ -22,35 +19,18 @@ export interface EvalRunHandlers {
   onPartial?(result: EvalResult): void;
 }
 
-/** Omit that distributes over a discriminated union (plain Omit collapses it). */
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
-/**
- * Round 67 (T139): every evaluation names the rule set of its position, and
- * the pool sends it on every message, standard included. A caller without
- * one is refused before any message instead of priced with the standard
- * table (the worker refuses such a message too).
- */
+// A caller without a rule set is refused before any message instead of priced with the standard table (the worker refuses too).
 const MISSING_RULESET = 'evaluation without a rule set';
 
-/**
- * Round 69 (T184): the settings the app hands the pool carry the rule set as
- * a required field, so a caller that drops it stops compiling; the runtime
- * refusals above and in the worker stay as the backstop for untyped callers.
- */
 export type AppEvalSettings = EvalSettings & { ruleset: StaticRuleset };
 
 /**
- * Sub-search settings that value a played pair with the same machinery the
- * sweep's own cells get: depth-1 matrix cells are static evals already
- * (null = use the plain cell path); deeper searches deepen their cells with
- * a depth-(d−1) sub-search, so the played pair gets exactly that. MCTS has
- * no fixed-depth equivalent — a depth-1 sub-search is the approximation. Round 79
- * (T287): the sweep asks it of a tree turn only where the root's merged matrix
- * holds no priced cell of the played pair (hooks/evaluation/played-cell.ts);
- * the roots are deep searches and the cell is their own number.
- * Round 67 (T140): the Sleep Clause rides along, because serialization strips
- * a custom game's clause from the rule table the sub-search would fall back on.
+ * Sub-search settings that value a played pair like the sweep's own cells: depth-1 matrix cells are static evals already
+ * (null = use the plain cell path); deeper searches deepen their cells with a depth-(d-1) sub-search. MCTS has no
+ * fixed-depth equivalent, so a depth-1 sub-search approximates it. The Sleep Clause rides along because serialization
+ * strips a custom game's clause from the rule table the sub-search would fall back on.
  */
 export function playedOutcomeSettings(settings: EvalSettings): EvalSettings | null {
   const mode = settings.mode ?? 'matrix';
@@ -59,14 +39,7 @@ export function playedOutcomeSettings(settings: EvalSettings): EvalSettings | nu
   return { depth, samples: 1, tera: settings.tera, mode: 'matrix', sleepClause: settings.sleepClause, ruleset: settings.ruleset };
 }
 
-/**
- * Coordinates the evaluation on the main thread (pure orchestrator + rank
- * math — no sim) and fans the sim work out to a pool of workers. One search
- * at a time; cancellation terminates the BUSY workers — a worker's
- * synchronous search never yields to onmessage, so termination is the only
- * reliable stop — while idle workers stay warm across evaluations, and
- * ensureWorkers() refills whatever termination took.
- */
+/** Orchestrates the evaluation on the main thread (no sim) and fans the sim work out to a pool of workers; one search at a time. */
 export class EvalWorkerClient {
   private workers: WorkerHandle[] = [];
   private nextId = 1;
@@ -81,12 +54,8 @@ export class EvalWorkerClient {
   }
 
   /**
-   * Least-loaded worker (ties keep the lowest index). Placement must never
-   * affect results: every job is a pure function of its message, which holds
-   * only while every engine memo is a function of its key (round 49: the
-   * matchup memo was not, and doubles cells differed run to run). It affects
-   * only queueing: pinning to worker 0 serialized the pair-eval phases and
-   * stacked concurrent turns' trees onto the same few workers.
+   * Least-loaded worker (ties keep the lowest index). Placement must never affect results: every job is a pure function of
+   * its message, which holds only while every engine memo is a function of its key. It affects only queueing.
    */
   private pickWorker(): WorkerHandle {
     const workers = this.ensureWorkers();
@@ -105,7 +74,6 @@ export class EvalWorkerClient {
     });
   }
 
-  /** Round 65: an executor serves one position under one rule set; every message names it, so the worker's executor reads the replay's weights. */
   private createPooledExecutor(serializedBattle: string, ruleset: StaticRuleset): SearchExecutor {
     let roundRobin = 0;
     return {
@@ -144,14 +112,11 @@ export class EvalWorkerClient {
         return response.result;
       },
       prove: async input => {
-        // Round 35: no round trip where the trigger cannot fire (full boards
-        // without a decided profile); a queued worker would only delay the turn.
         if (!forcedWinPossible(serializedBattle, input)) return null;
         const response = await this.rpc(this.pickWorker(), { type: 'prove', serializedBattle, input, ruleset });
         if (response.type !== 'proveResult') throw new Error('unexpected worker response');
         return response.outcome;
       },
-      // Round 89 (#104): the lines replay on one worker; the answer is a list of plain lines
       lines: async input => {
         const response = await this.rpc(this.pickWorker(), { type: 'lines', serializedBattle, input, ruleset });
         if (response.type !== 'linesResult') throw new Error('unexpected worker response');
@@ -161,10 +126,9 @@ export class EvalWorkerClient {
   }
 
   /**
-   * Round 89 (#124): a position the world registry knows (a short-side game's heaviest world) runs once per world, one after the
-   * other, and comes back blended by usage; any other position runs once, exactly as before. The first world takes the caller's
-   * `exclusive` and streams its partials (the heaviest world, the one the user sees), the rest never cancel it. Another engine
-   * over HTTP reads the heaviest world alone.
+   * A position the world registry knows (a short-side game's heaviest world) runs once per world and comes back blended by usage.
+   * The first world takes the caller's `exclusive` and streams its partials; the rest never cancel it. Another engine over HTTP
+   * reads the heaviest world alone.
    */
   evaluate(
     serializedBattle: string,
@@ -189,7 +153,6 @@ export class EvalWorkerClient {
     const results = [await first];
     const weights = [worlds[0].weight];
     for (let index = 1; index < worlds.length; index += 1) {
-      // A cancel between two worlds leaves no call to reject: the loop itself stops.
       if (generation !== this.generation) throw new Error('cancelled');
       try {
         const progress = handlers?.onProgress && { onProgress: this.worldProgress(handlers, index, worlds.length) };
@@ -203,7 +166,6 @@ export class EvalWorkerClient {
     return blendWorlds(results, weights);
   }
 
-  /** One world's progress as a share of the whole loop: the bar runs once across the worlds, not once per world. */
   private worldProgress(handlers: EvalRunHandlers, index: number, count: number): EvalRunHandlers['onProgress'] {
     const { onProgress } = handlers;
     if (!onProgress) return undefined;
@@ -218,11 +180,8 @@ export class EvalWorkerClient {
   ): Promise<EvalResult> {
     const ruleset = settings.ruleset;
     if (!ruleset) return Promise.reject(new Error(MISSING_RULESET));
-    // Exclusive (the default): a fresh evaluation supersedes whatever is
-    // running — the single-result panel's semantics. The graph sweep
-    // passes exclusive: false and pipelines several independent turns
-    // through the shared pool; they all die together on the next real
-    // cancel(), whose generation bump invalidates every live() below.
+    // Exclusive (the default): a fresh evaluation supersedes whatever is running. The graph sweep passes exclusive: false and
+    // pipelines several turns through the shared pool; they all die together on the next real cancel().
     if (opts?.exclusive !== false) this.cancel();
     const generation = this.generation;
     const live = () => generation === this.generation;
@@ -231,25 +190,22 @@ export class EvalWorkerClient {
       onProgress: (progress: SearchProgress) => {
         if (live()) handlers?.onProgress?.(progress);
       },
-      // Round 89 (SB-9): a listener is what makes tree 0 compute its interim result; the game analysis and the play-out pass none.
+      // A listener is what makes tree 0 compute its interim result; the game analysis and the play-out pass none.
       ...(handlers?.onPartial && { onPartial: (partial: EvalResult) => { if (live()) handlers.onPartial?.(partial); } }),
       shouldStop: () => !live(),
     };
-    // Round 77: another engine answers over HTTP; the pool still lists the options it ranks.
+    // Another engine answers over HTTP; the pool still lists the options it ranks.
     const engine = selectedEngine();
     if (engine) {
       return engineEvaluate().then(({ evaluateWithEngine }) =>
         evaluateWithEngine(engine, serializedBattle, this.createPooledExecutor(serializedBattle, ruleset), settings, live));
     }
-    // Round 61: the tree search's orchestration lives in the engine; the
-    // pool is its executor, the bank runs the same function in-process.
     if (settings.mode === 'mcts') {
       return searchTreesOrchestrated(this.createPooledTreeExecutor(serializedBattle, live, ruleset), settings, callbacks);
     }
     return searchOrchestrated(this.createPooledExecutor(serializedBattle, ruleset), settings, callbacks);
   }
 
-  /** Posts one MCTS tree to the least-loaded worker; progress streams while the evaluation is live. */
   private runTree(
     serializedBattle: string,
     settings: EvalSettings,
@@ -280,11 +236,6 @@ export class EvalWorkerClient {
     });
   }
 
-  /**
-   * Round 61: the pool as the engine's tree executor. A FIXED number of
-   * trees (searchTreesOrchestrated) spread across the pool; the count never
-   * follows the pool size, small pools just run trees in rounds.
-   */
   private createPooledTreeExecutor(serializedBattle: string, live: () => boolean, ruleset: StaticRuleset): TreeExecutor {
     return {
       ...this.createPooledExecutor(serializedBattle, ruleset),
@@ -294,13 +245,10 @@ export class EvalWorkerClient {
   }
 
   /**
-   * Engine expectation of one specific joint choice pair, valued at the
-   * SAME depth as the surrounding sweep (see playedOutcomeSettings) — a
-   * shallow static value against deep before/after scores would leak
-   * estimator disagreement into the decision/chance decomposition.
+   * Engine expectation of one joint choice pair, valued at the same depth as the surrounding sweep (see playedOutcomeSettings):
+   * a shallow static value against deep before/after scores would leak estimator disagreement into the decision/chance split.
    */
   async evalPair(serializedBattle: string, p1Choice: string, p2Choice: string, settings: AppEvalSettings): Promise<number> {
-    // Round 89 (#124): the pair is valued in every world of a short-side position and blended by usage (see `evaluate`).
     const worlds = selectedEngine() ? null : worldPositionsOf(serializedBattle);
     if (!worlds) return this.evalPairOne(serializedBattle, p1Choice, p2Choice, settings);
     const generation = this.generation;
@@ -352,10 +300,7 @@ export class EvalWorkerClient {
     return response.values[0].value;
   }
 
-  /**
-   * Round 89 (#130): the win paths of a lost endgame, searched on request, on a worker of its own (see `OnRequestJobs`): a sweep's
-   * `cancel` leaves it, and its `signal` leaves the sweep.
-   */
+  /** Runs on a worker of its own (see `OnRequestJobs`): a sweep's `cancel` leaves it, and its `signal` leaves the sweep. */
   winPaths(serializedBattle: string, request: WinPathsRequest, ruleset: StaticRuleset, handlers?: WinPathsHandlers): Promise<WinPaths> {
     return this.jobs.winPaths(serializedBattle, request, ruleset, handlers);
   }
@@ -364,11 +309,8 @@ export class EvalWorkerClient {
     this.generation += 1;
     if (this.workers.length === 0) return;
     const cancelled = new Error('cancelled');
-    // Only BUSY workers are terminated: a synchronous search never yields
-    // to onmessage, so termination is the only reliable stop for those.
-    // Idle workers (no pending RPC) have nothing to stop and stay warm —
-    // the routine turn-to-turn path of a sweep, which used to pay a fresh
-    // worker spawn (bundle parse and all) per turn per worker.
+    // Only busy workers are terminated: a synchronous search never yields to onmessage, so termination is the only reliable
+    // stop. Idle workers stay warm across turns; ensureWorkers() refills what termination took.
     this.workers = this.workers.filter(handle => {
       if (handle.pending.size === 0) return true;
       handle.worker.terminate();

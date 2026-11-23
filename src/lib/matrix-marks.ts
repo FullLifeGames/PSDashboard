@@ -5,10 +5,10 @@ import { worstReply } from './worst-reply';
 export type MatrixCellAt = readonly [row: number, column: number];
 
 /**
- * Round 89 (B7a): what the matrix dialog marks. The played row and column and the engine's best row and column come from the card's
- * analysis; each worst cell is the cell `worstReply` names for the played choice of its side (basis `cell` only), the rule the Hard mode
- * line reads, so the dialog and the line never disagree. P1's worst cell is the lowest cell of the played row, P2's the highest cell of
- * the played column (the matrix holds P1's chance to win). Every field is null where the analysis or the result does not name it.
+ * What the matrix dialog marks. The played and best rows and columns come from the card's analysis; each worst cell is the cell
+ * `worstReply` names for the played choice of its side (basis `cell` only), the rule the Hard mode line reads. P1's worst cell is
+ * the lowest of the played row, P2's the highest of the played column (the matrix holds P1's chance to win). A field is null where
+ * the analysis or the result does not name it.
  */
 export interface MatrixMarks {
   playedRow: number | null;
@@ -19,7 +19,7 @@ export interface MatrixMarks {
   worstP2: MatrixCellAt | null;
 }
 
-/** The index of a ranked choice in one side's axis: by its choice id, by its label for a result cached before the ids existed; null when absent. */
+/** The index of a ranked choice in one side's axis: by its choice id, by its label when the result carries no ids; null when absent. */
 function indexOnAxis(choices: readonly string[] | undefined, labels: readonly string[], entry: Pick<RankedChoice, 'choice' | 'label'> | null | undefined): number | null {
   if (!entry) return null;
   const at = choices ? choices.indexOf(entry.choice) : labels.indexOf(entry.label);
@@ -38,7 +38,7 @@ function worstCell(result: EvalResult, matrix: EvalMatrix, side: 'p1' | 'p2', pl
 
 /**
  * The marks of one turn. A turn that tracked no played action (`playedTracking` false) marks no played choice, and neither does a
- * side knocked out before it moved (`neverActed`): its log shows no choice, the engine's stand-in is no play (655336 t27).
+ * side knocked out before it moved (`neverActed`): its log shows no choice, the engine's stand-in is no play.
  */
 export function matrixMarks(result: EvalResult, matrix: EvalMatrix, analysis: TurnAnalysis): MatrixMarks {
   const tracked = analysis.playedTracking !== false;

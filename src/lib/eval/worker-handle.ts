@@ -13,7 +13,7 @@ export interface WorkerHandle {
   pending: Map<number, PendingEntry>;
 }
 
-/** One eval worker with its message handling; `forget` drops it from whichever list holds it once it has crashed. */
+/** Spawns one eval worker; `forget` drops it from whichever list holds it once it has crashed. */
 export function spawnWorker(forget: (handle: WorkerHandle) => void): WorkerHandle {
   perfCount('workerSpawn');
   const worker = new Worker(new URL('../../workers/eval-worker.ts', import.meta.url), { type: 'module' });
@@ -35,8 +35,7 @@ export function spawnWorker(forget: (handle: WorkerHandle) => void): WorkerHandl
     const error = new Error(event.message || 'evaluation worker crashed');
     for (const entry of handle.pending.values()) entry.reject(error);
     handle.pending.clear();
-    // A crashed worker leaves the pool: the pool outlives single evaluations now, and a dead worker would swallow the next RPC
-    // without ever answering it.
+    // A dead worker left in the pool would swallow the next RPC without ever answering it.
     handle.worker.terminate();
     forget(handle);
   };
