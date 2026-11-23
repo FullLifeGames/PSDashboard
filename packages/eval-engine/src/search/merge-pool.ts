@@ -4,13 +4,12 @@ import type { MctsTreeStats } from '../types.ts';
 export type TreeCell = MctsTreeStats['cells'][number];
 
 /**
- * Round 89 (T322, #59): a keyed root cell, the tree cells of one matrix cell that each drew one outcome class (`classKey`) and
- * booked the plan's chance of it (`classWeight`). With two or more classes among the trees the cell reads the Dex's mix,
- * `sum_c w_c m_c / sum_c w_c`, where `m_c = sum (total + value) / sum (visits + 1)` over the trees of class c, instead of the
- * visit pool (the trees' draws, not the dice, would weigh the classes). `visits` and `total` are the sums of the keyed trees
- * that did not end the game: what their row and column marginals hold (pair-tree-key.spec.ts (g)), so the visit mean of the score
- * can swap their totals for `visits * value`. A tree without a key leaves the cell's value. Null with fewer than two classes.
- * Sim-free.
+ * A keyed root cell: the tree cells of one matrix cell that each drew one outcome class (`classKey`) and booked the plan's chance of
+ * it (`classWeight`). With two or more classes among the trees the cell reads the Dex's mix, `sum_c w_c m_c / sum_c w_c`, where
+ * `m_c = sum (total + value) / sum (visits + 1)` over the trees of class c, instead of the visit pool (the trees' draws, not the
+ * dice, would weigh the classes). `visits` and `total` are the sums of the keyed trees that did not end the game: what their row and
+ * column marginals hold (draw.spec.ts (g)), so the visit mean of the score can swap their totals for `visits * value`. Null with
+ * fewer than two classes.
  */
 export function keyedCell(cells: readonly TreeCell[]): { value: number; visits: number; total: number } | null {
   const classes = new Map<string, { weight: number; total: number; visits: number }>();

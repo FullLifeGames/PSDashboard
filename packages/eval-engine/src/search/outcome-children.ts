@@ -6,32 +6,23 @@ import { hasSecondary, splitOutcome, worthForcing } from './secondary-classes.ts
 import { countFainted, speedTie } from './leaf.ts';
 
 /**
- * Round 43: one cell's children by outcome. The CLASS path prices a
- * singles pair through the root blend's plan (planCellEvents,
- * foldClassWeights): natural draws on the base seeds name the move order
- * and fill the classes they land in, and every class no draw showed is
- * drawn ON DEMAND through a scripted PRNG (miss, median kill roll, median
- * non-kill roll, the other tie order) and confirmed on its log. Shared by
- * the endgame solver and the prover (the tree's own chance nodes are gone,
- * ADR 0023).
+ * One cell's children by outcome. The class path prices a singles pair through the root blend's plan (planCellEvents,
+ * foldClassWeights): natural draws on the base seeds name the move order and fill the classes they land in, and every class no draw
+ * showed is drawn on demand through a scripted PRNG (miss, median kill roll, median non-kill roll, the other tie order) and
+ * confirmed on its log. Shared by the endgame solver and the prover (ADR 0023).
  */
 
 interface OutcomeChild {
   position: SimPosition;
-  /** Group key `${order}:${classKey}`. */
   key: string;
-  /** Normalized over the drawn groups. */
   weight: number;
-  /** Analytic weight before that normalization. */
   share: number;
   ended: boolean;
-  /** The draw stopped at a forced-switch request (stopAtForcedSwitch). */
   pendingSwitch: boolean;
 }
 
 export interface OutcomeChildren {
   children: OutcomeChild[];
-  /** Expected groups no draw reached, with their analytic share. */
   missing: { key: string; share: number }[];
   events: CellEvent[];
   tie: boolean;
@@ -52,7 +43,6 @@ export interface Draw {
   measure: number;
   fainted: number;
   pendingSwitch: boolean;
-  /** Round 86 (T305): the secondary dice of the draw with the result they had, for a cell that draws one (`record`). */
   dice?: SecondaryRecord[];
 }
 
@@ -61,7 +51,6 @@ type Order = 'p1' | 'p2';
 export const totalHp = (battle: Battle): number =>
   battle.sides.reduce((sum, side) => sum + side.pokemon.reduce((hp, pokemon) => hp + pokemon.hp, 0), 0);
 
-/** The move id a singles choice names, or null for switches and combined choices. */
 function moveIdOf(choice: string): string | null {
   const tokens = choice.split(' > ')[0].trim().split(/\s+/);
   return tokens[0] === 'move' && tokens[1] && !choice.includes(',') ? tokens[1] : null;
@@ -71,7 +60,7 @@ export function drawChild(
   root: SimPosition, rootHp: number, p1Choice: string, p2Choice: string, seed: PRNGSeed,
   opts: { stopAtForcedSwitch?: boolean; scripts?: RollScripts; record?: boolean } = {},
 ): Draw {
-  // Round 86 (T305): a recording draw runs under a `DiceSink` that keeps the scripts and notes every secondary die
+  // a recording draw runs under a `DiceSink` that keeps the scripts and notes every secondary die
   const sink = opts.record ? new DiceSink(opts.scripts) : null;
   const { child, log, pendingSwitch } = advancePositionWithLog(root, p1Choice, p2Choice, seed, {
     stopAtForcedSwitch: opts.stopAtForcedSwitch, scripts: sink ?? opts.scripts,
@@ -83,7 +72,6 @@ export function drawChild(
   };
 }
 
-/** The draw whose damage measure sits closest to the group's mean; ties keep the earliest draw. */
 function nearestMean(draws: Draw[]): Draw {
   const mean = draws.reduce((sum, draw) => sum + draw.measure, 0) / draws.length;
   let best = draws[0];
@@ -91,15 +79,13 @@ function nearestMean(draws: Draw[]): Draw {
   return best;
 }
 
-/** The median draw by damage measure (the middle one of a sorted copy). */
 export function median(draws: Draw[]): Draw {
   const sorted = [...draws].sort((a, b) => a.measure - b.measure);
   return sorted[Math.floor(sorted.length / 2)];
 }
 
-export { speedTie }; // moved to leaf.ts (round 69, T146 c4)
+export { speedTie };
 
-/** The side whose move line comes first in a draw's log, or null when nobody moved. */
 function firstMover(log: string[]): Order | null {
   for (const line of log) {
     if (line.startsWith('|move|p1a:')) return 'p1';
@@ -108,7 +94,6 @@ function firstMover(log: string[]): Order | null {
   return null;
 }
 
-/** Expected group weights: order groups (one half each on a tie) times the classes per order. */
 function expectedGroups(events: CellEvent[], orders: Order[]): Map<string, number> {
   const groups = new Map<string, number>();
   for (const order of orders) {
@@ -118,7 +103,6 @@ function expectedGroups(events: CellEvent[], orders: Order[]): Map<string, numbe
   return groups;
 }
 
-/** A draw's group key, or null when the draw fits no expected class. */
 function groupOf(draw: Draw, events: CellEvent[], tie: boolean, order: Order | null): string | null {
   const first = tie ? firstMover(draw.log) : order;
   if (!first) return null;
@@ -126,10 +110,9 @@ function groupOf(draw: Draw, events: CellEvent[], tie: boolean, order: Order | n
   return key === null ? null : `${first}:${key}`;
 }
 
-/** The roll script that aims a side's move at one outcome; `extreme` takes the edge roll for the retry. */
 function scriptFor(event: CellEvent, outcomeKey: string, extreme: boolean): RollScript | null {
   const { normalKillRolls: n, critKillRolls: c } = event.event;
-  // Round 86 (T305): a hit that does not kill names the effects that came true (`hit-nokill+brn`); the script says yes to those and no to the others
+  // a hit that does not kill names the effects that came true (`hit-nokill+brn`); the script says yes to those and no to the others
   const { base: outcome, tokens } = splitOutcome(outcomeKey, event.secondary);
   if (outcome === 'miss') return { hit: false };
   if (outcome === 'hit-nokill') {
@@ -145,10 +128,9 @@ function scriptFor(event: CellEvent, outcomeKey: string, extreme: boolean): Roll
 }
 
 /**
- * The scripts that aim a cell at one group key: one script per event side,
- * plus the tie order on the script of the side that should move first
- * (`tieMoves` names each side's move id; null without a tie). Two attempts
- * (median roll, then the edge roll) when a damage roll is involved.
+ * The scripts that aim a cell at one group key: one script per event side, plus the tie order on the script of the side that should
+ * move first (`tieMoves` names each side's move id; null without a tie). Two attempts (median roll, then the edge roll) when a
+ * damage roll is involved.
  */
 export function scriptsFor(groupKey: string, events: CellEvent[], tieMoves: { p1: string; p2: string } | null): RollScripts[] {
   // the class key may hold a colon itself (`hit-nokill+boosts:spe`): split at the first one only
@@ -171,7 +153,6 @@ export function scriptsFor(groupKey: string, events: CellEvent[], tieMoves: { p1
   return rolls ? [build(false), build(true)] : [build(false)];
 }
 
-/** `extra` over `base`: a key both name keeps the fields of both (a class script beside a tied cell's order script). */
 export function mergeScripts(base: RollScripts | undefined, extra: RollScripts): RollScripts {
   const merged = new Map<string, RollScript>(base);
   for (const [key, script] of extra) merged.set(key, { ...merged.get(key), ...script });
@@ -202,11 +183,9 @@ interface ClassCell {
   tie: boolean;
   order: Order | null;
   advance: { stopAtForcedSwitch?: boolean };
-  /** Round 86 (T305): the cell has a secondary die, so its draws record the dice. */
   record: boolean;
 }
 
-/** Forced draws for every expected group the base draws never reached, within the cap (retries included). */
 function forceMissing(cell: ClassCell, expected: Map<string, number>, grouped: Map<string, Draw[]>, forcedCap: number, seed: PRNGSeed): void {
   const tieMoves = cell.tie ? { p1: moveIdOf(cell.p1Choice)!, p2: moveIdOf(cell.p2Choice)! } : null;
   let forced = 0;
@@ -224,9 +203,8 @@ function forceMissing(cell: ClassCell, expected: Map<string, number>, grouped: M
 }
 
 /**
- * The class path. Null when the pair has no class plan and no speed tie,
- * when no base log shows the move order, or when a natural draw falls
- * outside the plan (the caller takes its plain path, as before).
+ * The class path. Null when the pair has no class plan and no speed tie, no base log shows the move order, or a natural draw falls outside
+ * the plan (the caller takes its plain path).
  */
 export function classChildren(root: SimPosition, p1Choice: string, p2Choice: string, opts: ClassDrawOptions): OutcomeChildren | null {
   const battle = positionBattle(root);

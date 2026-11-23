@@ -2,24 +2,20 @@ import type { Battle, Pokemon } from '@pkmn/sim';
 import { secondaryChances } from '../dice/secondaries.ts';
 
 /**
- * Round 86 (the engine reads the dice), T305: the secondary effects of a root cell as outcome classes. A hit that does not kill
- * splits by the entries of the move's `secondaries` that came true (a 30 percent burn is the class `hit-nokill+brn` beside
- * `hit-nokill`), with the weights the chances give. The chances come from the simulator through the dice module
- * (`dice/secondaries.ts`: Serene Grace, Sheer Force, Shield Dust, a King's Rock flinch are read, not named), and a draw says which
- * entries came true by its dice record (`DiceSink` of `forward/scripted-prng.ts`), not by a line of the log.
- *
- * An effect that stops the target's move this turn (the flinch: a volatile whose condition has a `BeforeMove` handler and lasts
- * one turn, read from the Dex) cuts the second mover: its event is `none` in that class.
+ * The secondary effects of a root cell as outcome classes. A hit that does not kill splits by the entries of the move's
+ * `secondaries` that came true (a 30 percent burn is the class `hit-nokill+brn` beside `hit-nokill`), with the weights the chances
+ * give. The chances come from the simulator through `dice/secondaries.ts` (Serene Grace, Sheer Force, Shield Dust, a King's Rock
+ * flinch), and a draw says which entries came true by its dice record (`DiceSink` of `forward/scripted-prng.ts`), not by a line of
+ * the log. An effect that stops the target's move this turn (the flinch: a volatile whose condition has a `BeforeMove` handler and
+ * lasts one turn) cuts the second mover: its event is `none` in that class.
  */
 
-/** One entry of a move's secondaries for the cell: the effect, its chance (under 1), and whether it stops a target that has not moved. */
 export interface EventSecondary {
   effectId: string;
   chance: number;
   truncates: boolean;
 }
 
-/** One secondary die of a draw, as the recording PRNG keeps it. */
 export interface SecondaryDie {
   slot: string;
   moveId: string;
@@ -48,7 +44,6 @@ export function eventSecondaries(battle: Battle, userSlot: string, moveId: strin
   }
 }
 
-/** A class of a hit that does not kill: the effects that came true (sorted, once each), its weight within the hit, and whether it cuts the second mover. */
 export interface HitClass {
   tokens: string[];
   weight: number;
@@ -83,23 +78,26 @@ export function hitClasses(secondary: readonly EventSecondary[] | undefined): Hi
   return [...classes.values()];
 }
 
-/** The class key of a hit that does not kill, with the effects that came true. */
 export const hitKey = (tokens: readonly string[]): string => ['hit-nokill', ...tokens].join('+');
 
-/** The effects of the entries `secondary` that came true according to the dice of the move `moveId` of the side `side`. */
 export function dieTokens(dice: readonly SecondaryDie[], side: 'p1' | 'p2', moveId: string, secondary: readonly EventSecondary[] | undefined): string[] {
   const known = new Set((secondary ?? []).map(entry => entry.effectId));
   const came = dice.filter(die => die.happened && die.slot.startsWith(side) && die.moveId === moveId && known.has(die.effectId)).map(die => die.effectId);
   return [...new Set(came)].sort();
 }
 
-/** Whether a cell's events draw a secondary die: its draws record the dice, and a missing class is forced by script, never chased with probe seeds. */
+/**
+ * Whether a cell's events draw a secondary die: its draws record the dice, and a missing class is forced by script, never chased with probe
+ * seeds.
+ */
 export const hasSecondary = (events: readonly { secondary?: readonly EventSecondary[] }[]): boolean => events.some(event => !!event.secondary?.length);
 
-/** The mass under which a class that carries a secondary effect is left unpriced: a forced draw for it would cost more than it moves (the pair plan's floor). */
+/**
+ * The mass under which a class that carries a secondary effect is left unpriced: a forced draw for it would cost more than it moves (the
+ * pair plan's floor).
+ */
 export const MIN_CLASS_MASS = 0.01;
 
-/** A class key with a secondary effect in it (`hit-nokill+brn`, `hit-nokill+flinch|none`). */
 export const isTokened = (classKey: string): boolean => classKey.includes('+');
 
 /**
@@ -113,5 +111,4 @@ export function splitOutcome(outcome: string, secondary: readonly EventSecondary
   return { base: outcome.slice(0, cut), tokens: secondary.map(entry => entry.effectId).filter(id => rest.includes(`+${id}+`)) };
 }
 
-/** Whether a missing class is worth a forced draw: every class of a plain cell, a class with an effect only from the mass floor up. */
 export const worthForcing = (classKey: string, share: number): boolean => !isTokened(classKey) || share >= MIN_CLASS_MASS;

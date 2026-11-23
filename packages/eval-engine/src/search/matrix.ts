@@ -5,11 +5,9 @@ import type { CellBlend, CellDraw, EvalResult, KoOddsMismatch, SearchProgress } 
 import { countFainted } from './leaf.ts';
 import { sampleCell } from './cell-sampler.ts';
 
-/**
- * The root matrix over both option lists, and the memoized alpha/beta
- * passes the pruned depth-1 sub-search runs over it.
- */
+/** The root matrix over both option lists, and the memoized alpha/beta passes the pruned depth-1 sub-search runs over it. */
 
+/** The progress, partial-result and stop hooks a search calls. */
 export interface SearchCallbacks {
   onProgress?(progress: SearchProgress): void;
   onPartial?(result: EvalResult): void;
@@ -24,7 +22,7 @@ export interface Matrix extends ValueMatrix {
   blends: Map<number, CellBlend>;
   /** Boundary cells whose analytic classes went unsampled (probe budget). */
   diagnostics: KoOddsMismatch[];
-  /** cellKey(i, j) → the base draws behind the cell, where it has more than the first seed's (round 70: the trend probe replays them). */
+  /** cellKey(i, j) → the base draws behind the cell, where it has more than the first seed's (the trend probe replays them). */
   baseDraws: Map<number, CellDraw[]>;
 }
 

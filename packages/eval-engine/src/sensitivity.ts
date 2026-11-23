@@ -1,12 +1,8 @@
-/**
- * Item-sensitivity probe plumbing: pure JSON surgery on serialized battle
- * positions (State.serializeBattle output) — no battle is built here (the Dex of the position's
- * format only names the Choice items), so the main-thread sweep can prepare probe
- * positions and hand them to the worker like any other serialized position.
- */
+/** Item-sensitivity probe plumbing: pure JSON surgery on serialized battle positions, with no battle built, so the main thread can prepare probes for the worker. */
 
 import { choiceItems, dexOf, formatRules, sideIndex, toId } from '@fulllifegames/replay-core';
 
+/** A guessed-item mon and the usage-plausible items to probe it with. */
 export interface SensitivityTarget {
   species: string;
   /** Usage-plausible alternative items (rule-outs already applied), in order. */
@@ -29,13 +25,7 @@ interface SerializedBattleShape {
 
 const monSpecies = (mon: SerializedMon): string => mon.set?.species ?? '';
 
-/**
- * The probe combos for one flagged side: opposing guessed-item mons that
- * were INVOLVED in the turn (active, or named by a switch label among the
- * opposing side's played/best labels), round-robin over each mon's
- * alternatives so two involved mons both get probed before a second item
- * does, capped at `cap` combos (each combo costs two pair-evals).
- */
+/** The probe combos for one flagged side: involved opposing guessed-item mons, round-robin over their alternatives, capped at `cap` (two pair-evals each). */
 export function selectProbeCombos(
   serialized: string,
   opposing: 'p1' | 'p2',
@@ -71,12 +61,7 @@ export function selectProbeCombos(
   return combos;
 }
 
-/**
- * The serialized position with `species`' held item swapped to `item` —
- * null when the species is not on that side. A removed Choice item also
- * drops the choicelock volatile: the lock only ever existed because the
- * GUESSED item fabricated it.
- */
+/** The serialized position with `species`' held item swapped to `item` (null when it is not on that side); a removed Choice item drops its choicelock volatile. */
 export function patchSerializedItem(
   serialized: string,
   side: 'p1' | 'p2',

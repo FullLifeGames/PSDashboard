@@ -7,7 +7,7 @@ import { expandPivotPairs, restrictOptions, searchOptions } from './options.ts';
 import { koOddsMapsFor, type RootPayload } from './root-payload.ts';
 import type { Matrix } from './matrix.ts';
 
-/** The root search's setup, split out of `position.ts` (round 89, SB-4): the option lists and the narrative payload of a root. */
+/** The root search's setup: the option lists and the narrative payload of a root. */
 
 /** The root's option lists: restricted for deep sub-searches, pivot-expanded for the root matrix. */
 export function rootOptions(
@@ -22,7 +22,7 @@ export function rootOptions(
     p1Options = restrictOptions(root, 'p1', p1Options);
     p2Options = restrictOptions(root, 'p2', p2Options);
   } else {
-    // Root matrix only: sub-searches keep the greedy pivot resolution.
+    // root matrix only: sub-searches keep the greedy pivot resolution
     p1Options = expandPivotPairs(root, 'p1', p1Options);
     p2Options = expandPivotPairs(root, 'p2', p2Options);
   }
@@ -30,11 +30,9 @@ export function rootOptions(
 }
 
 /**
- * The root's narrative payload, computed once per search and re-attached
- * to every partial result: the sampler's mismatch diagnostics, each root
- * option's analytic kill odds (vs the standing opposing active), and the
- * unanswered-mon profile (round 13). Sub-searches skip the odds and the
- * profile.
+ * The root's narrative payload, computed once per search and re-attached to every partial result: the sampler's mismatch
+ * diagnostics, each root option's analytic kill odds (vs the standing opposing active), and the unanswered-mon profile.
+ * Sub-searches skip the odds and the profile.
  */
 export function rootPayload(
   battle: ReturnType<typeof positionBattle>,
@@ -50,7 +48,7 @@ export function rootPayload(
     p2: koOddsForOptions(battle, 'p2', p2Options.map(option => option.choice)),
   });
   const unanswered = restrictCandidates ? null : unansweredMons(battle, matchupCache);
-  // Round 89 (#108): the order bound of the played turn's fallen bodies, on the root battle.
+  // the order bound of the played turn's fallen bodies, on the root battle
   const playedBounds = restrictCandidates ? undefined : playedBoundsOf(battle, settings.keepPlayed?.fell);
   return { diagnostics: matrix.diagnostics, koOddsMaps, unanswered, playedBounds };
 }

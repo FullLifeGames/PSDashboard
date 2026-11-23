@@ -7,13 +7,11 @@ import { actionsTie } from '../sim-ask/index.ts';
 import type { RollScripts } from '../forward/scripted-prng.ts';
 import { wpUnits } from '../winprob.ts';
 
-/**
- * The search's value space and its chance schedule: the fixed seed list,
- * the leaf value in win-prob units, the fainted-fraction phase signal, and
- * the roll-sensitivity of a choice pair.
- */
+/** The search's value space and its chance schedule: the seeds, the leaf value in win-prob units, the phase signal, roll sensitivity. */
 
-/** Base draws per cell: slots below `settings.samples` and below this count are drawn first; the rest of a cell's list is its probe slots. */
+/**
+ * Base draws per cell: slots below `settings.samples` and below this count are drawn first; the rest of a cell's list is its probe slots.
+ */
 export const BASE_DRAWS = 5;
 
 /** A murmur-style 32-bit finalizer: integer arithmetic only, so the browser and Node agree to the bit. */
@@ -25,10 +23,7 @@ function mix32(x: number): number {
   return h >>> 0;
 }
 
-/**
- * Round 89 (#59, T322 block 1): the finalizer and a text hash for the modules that key a draw by hash (the root quantiles of
- * `search/root-quantile.ts`; round 86's tree seeds keep `mix32` here). FNV-1a over the UTF-16 units, integer arithmetic only.
- */
+/** The finalizer and a text hash (FNV-1a over the UTF-16 units, integer arithmetic only) for the modules that key a draw by hash. */
 export const hash32 = mix32;
 export function hashText(text: string): number {
   let h = 0x811c9dc5;
@@ -37,14 +32,11 @@ export function hashText(text: string): number {
 }
 
 /**
- * Round 61: the seed a tree cell draws at creation. Round 86 (the engine reads the dice, T323): a hash of (seedOffset,
- * iteration). The five fixed seeds of the old list are one arithmetic progression of the Gen 5 LCG state, so at one draw index a die came true
- * in 0, 1 or 2 of the five streams, never in a tenth of them at random: a 10 % paralysis in none or in a fifth of the five
- * seeds (in the singles tree one seed carried it in 74 % of its cells, the other four in at most 2 %), a 90 % move missing
- * in 73 % of slot 1's cells and in at most 7 % of the others, the same outcome in every cell of one slot (A10). A tree expands at most one cell per iteration, so (offset, iteration) names the expansion and
- * needs no cell key. The four 16-bit words of the seed come from a chain of the finalizer, none zero, and any tree
- * count gets its own streams. The sampler, the matrix search, the verify round and the endgame children read a cell's own list
- * (`cellSeeds`).
+ * The seed a tree cell draws at creation: a hash of (seedOffset, iteration). Fixed seeds in one arithmetic progression of the Gen 5
+ * LCG state make a die come true in 0, 1 or 2 of five streams, never in a tenth of them at random (a 10 % paralysis in one seed's
+ * cells at 74 % and in the others at 2 %). A tree expands at most one cell per iteration, so (offset, iteration) names the expansion
+ * and needs no cell key. The four 16-bit words come from a chain of the finalizer, none zero. The sampler, the matrix search, the
+ * verify round and the endgame children read a cell's own list (`cellSeeds`).
  */
 export function treeSeed(iteration: number, seedOffset: number): PRNGSeed {
   let h = mix32((Math.imul(seedOffset + 1, 0x9e3779b1) ^ Math.imul(iteration + 1, 0x85ebca6b)) >>> 0);
@@ -57,13 +49,12 @@ export function treeSeed(iteration: number, seedOffset: number): PRNGSeed {
 }
 
 /**
- * Round 89 (#60, T324): the seed a cell reads at slot `index` of its list. The fixed list of the old paths (five search seeds, then probe seeds) gave every cell of a search the same stream, so a die at one draw index came true in none or in all of
- * the cells (a 20 % secondary in 73 to 80 % of a singles matrix, a crit at 1.4 % against 4.2 %: A1b, round 88's E1). Every path
- * that reads slot s of the fixed list reads `cellSeed(s, key)` instead, so the paths keep sharing one list per cell: the matrix's
- * first child is the verify round's, the trend probe rebuilds the matrix's child. `key` is the cell's hash (`cellHash` of the
- * position's key and the two choice strings, `search/root-quantile.ts`). Two 32-bit lanes (one of the key and the slot each, a
- * bijection of 32 bits) make the map from (slot, key) to the seed one to one up to the zero guard, and the lanes' constants keep
- * the streams apart from `treeSeed`'s. Integer arithmetic only: the browser and Node agree to the bit.
+ * The seed a cell reads at slot `index` of its list. One fixed list for every cell gives them all the same stream, so a die at one
+ * draw index comes true in none or in all of them (a 20 % secondary in 73 to 80 % of a singles matrix). The paths share one list per
+ * cell: the matrix's first child is the verify round's, the trend probe rebuilds the matrix's child. `key` is the cell's hash
+ * (`cellHash` of the position's key and the two choice strings, `search/root-quantile.ts`). Two 32-bit lanes (one of the key and
+ * the slot each, a bijection of 32 bits) make the map from (slot, key) to the seed one to one up to the zero guard, and the lanes'
+ * constants keep the streams apart from `treeSeed`'s. Integer arithmetic only: the browser and Node agree to the bit.
  */
 export function cellSeed(index: number, key: number): PRNGSeed {
   const a = mix32((key ^ Math.imul(index + 1, 0x85ebca6b) ^ 0x165667b1) >>> 0);
@@ -73,7 +64,6 @@ export function cellSeed(index: number, key: number): PRNGSeed {
   return [(x & 0xffff) || 1, (x >>> 16) || 1, (y & 0xffff) || 1, (y >>> 16) || 1].join(',') as PRNGSeed;
 }
 
-/** The first `count` slots of a cell's list: a path that reads the first n of the fixed list reads the first n of this one. */
 export function cellSeedList(key: number, count: number): PRNGSeed[] {
   return Array.from({ length: count }, (_, index) => cellSeed(index, key));
 }
@@ -83,7 +73,6 @@ export function countFainted(battle: ReturnType<typeof positionBattle>): number 
     battle.sides[1].pokemon.filter(p => p.fainted).length;
 }
 
-/** Fainted bodies over total bodies, both sides — the phase signal for the win-prob mapping. */
 export function battleFaintedFraction(battle: ReturnType<typeof positionBattle>): number {
   let fainted = 0;
   let total = 0;
@@ -97,16 +86,9 @@ export function battleFaintedFraction(battle: ReturnType<typeof positionBattle>)
 }
 
 /**
- * The ONE place the sigmoid applies: every leaf evaluation becomes win-prob
- * units (2p−1), so cell averages, the equilibrium solve, and regret all live
- * in probability space — variance is genuinely valuable when behind (Jensen)
- * instead of being flattened by score-space means. Ended battles clamp to
- * exact ±1 (the sigmoid saturates near but not at ±1). Shared by the sync
- * search, the executor (worker path), and MCTS — all engine modes must live
- * in the same value space. Round 33: the last pair is priced by its race
- * (last-pair.ts), after the sigmoid, in the same units. Round 67 (T138):
- * the sigmoid reads the phase K of the search's rule set, which the matchup
- * cache carries (Pokémon Champions has its own).
+ * The one place the sigmoid applies: every leaf becomes win-prob units (2p-1), so cell averages, the equilibrium solve and regret
+ * live in probability space, in every engine mode. Ended battles clamp to exact +-1; the last pair is priced by its race
+ * (last-pair.ts) after the sigmoid; the sigmoid reads the phase K of the matchup cache's rule set.
  */
 export function leafValue(battle: ReturnType<typeof positionBattle>, matchupCache: MatchupCache): number {
   const raw = evaluatePosition(battle, matchupCache);
@@ -116,17 +98,15 @@ export function leafValue(battle: ReturnType<typeof positionBattle>, matchupCach
   return wpUnits(raw, battle.gameType === 'doubles', battleFaintedFraction(battle), matchupCache.ruleset);
 }
 
-/** Move ids named in a (possibly combined) choice string. */
 const choiceMoveIds = (choice: string): string[] => choice.split(',')
   .map(part => part.trim().split(' '))
   .filter(tokens => tokens[0] === 'move')
   .map(tokens => tokens[1]);
 
 /**
- * Singles only: the simulator's queue meets both sides' moves at equal priority and speed, so it flips a coin for the
- * order. Round 69 (T146 c4): moved here from outcome-children.ts (which re-exports it) so the root cell and the
- * roll-sensitivity below read it too. Round 72 (T196): the queue itself answers (sim-ask/action-order.ts), so Prankster,
- * Gale Wings, Triage, Stall, Quick Claw and the speed rules of every generation count as the simulator counts them.
+ * Singles only: the simulator's queue meets both sides' moves at equal priority and speed, so it flips a coin for the order. The
+ * queue itself answers (sim-ask/action-order.ts), so Prankster, Gale Wings, Triage, Stall, Quick Claw and the speed rules of every
+ * generation count as the simulator counts them.
  */
 export function speedTie(battle: ReturnType<typeof positionBattle>, p1Choice: string, p2Choice: string): boolean {
   if (battle.gameType !== 'singles') return false;
@@ -136,14 +116,12 @@ export function speedTie(battle: ReturnType<typeof positionBattle>, p1Choice: st
   return actionsTie(battle, { pokemon: actives[0], moveId: ids[0] }, { pokemon: actives[1], moveId: ids[1] });
 }
 
-/** The scripts that settle a tied pair's coin flip for one order: the side that moves first, on its own move (scripted-prng.ts). */
 export function tieOrderScripts(p1Choice: string, p2Choice: string): Record<'p1' | 'p2', RollScripts> {
   const ids = { p1: choiceMoveIds(p1Choice)[0], p2: choiceMoveIds(p2Choice)[0] };
   const script = (first: 'p1' | 'p2'): RollScripts => new Map([[`${first}:${ids[first]}`, { first }]]);
   return { p1: script('p1'), p2: script('p2') };
 }
 
-/** The pair includes an accuracy roll, a random-call move or a speed tie — seeds diverge. */
 export function rollSensitivePair(battle: ReturnType<typeof positionBattle>, p1Choice: string, p2Choice: string): boolean {
   if (speedTie(battle, p1Choice, p2Choice)) return true;
   return [...choiceMoveIds(p1Choice), ...choiceMoveIds(p2Choice)].some(id => {

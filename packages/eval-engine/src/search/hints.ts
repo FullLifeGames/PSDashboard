@@ -8,10 +8,7 @@ import { shieldsFromHits, shieldsSide } from '../dex-facts/protect.ts';
 import { sideIndex } from '@fulllifegames/replay-core';
 import { bodyInView, callHandler, guarded, isolated, protectorStops } from '../sim-ask/index.ts';
 
-/**
- * Static per-option threat hints — the machinery candidate restriction
- * ranks with and the MCTS expansion order reuses (zero sim advances).
- */
+/** Static per-option threat hints: candidate restriction ranks with them and the MCTS expansion order reuses them. */
 
 export const isCombined = (options: ChoiceOption[]) => options.some(option => option.choice.includes(','));
 
@@ -20,20 +17,16 @@ const SUPPORT_HINT = 0.25;
 /** Fake Out on the turn it works: damage plus one neutralized foe action. */
 const FLINCH_BONUS = 0.3;
 /**
- * Round 69 (T42, decision 15): a KO that only the two attacks together make
- * (or that a Protect denies the foes) takes one action off the board, as a
- * flinch does, so it counts as much. Round 70: a side protector (Wide Guard,
- * Quick Guard) and a Protect earn the damage they deny, up to that much.
+ * A KO that only the two attacks together make (or that a Protect denies the foes) takes one action off the board, as a flinch does.
+ * A side protector (Wide Guard, Quick Guard) and a Protect earn the damage they deny, up to this much.
  */
 const PAIR_KO_BONUS = FLINCH_BONUS;
-/** Boost payoff counted for ~2 future attacks. */
 const SETUP_HORIZON = 2;
 /** Spread moves hit both foes, at the doubles spread penalty. */
 const SPREAD_FACTOR = 0.75;
 
 const clampStage = (stage: number) => Math.max(-6, Math.min(6, stage));
 
-/** The board one side's combined-option hints read: the mover's actors, the foes, and their slot order. */
 interface HintBoard {
   position: SimPosition;
   side: 'p1' | 'p2';
@@ -56,36 +49,29 @@ type HintDex = HintBoard['battle']['dex'];
 type DexMove = ReturnType<HintDex['moves']['get']>;
 
 /**
- * Round 69 (T42): a move that pulls the foes' single-target moves onto its
- * user (Follow Me, Rage Powder): a self-targeted move whose volatile carries
- * the redirect handler, read from the Dex (test/doubles-pair-hints.spec.ts
- * plays every self-targeted move against this reading).
+ * A self-targeted move whose volatile carries the redirect handler (Follow Me, Rage Powder); test/doubles-pair-hints.spec.ts plays
+ * every self-targeted move against this reading.
  */
 export function redirectsFoes(dex: HintDex, move: DexMove): boolean {
   return move.target === 'self' && !!move.volatileStatus && 'onFoeRedirectTarget' in dex.conditions.get(move.volatileStatus);
 }
 
 /**
- * Round 69 (T42) and round 70: the moves that stop the hits on their user (Protect, Detect and their kin) or on its whole side
- * (Wide Guard, Quick Guard, Crafty Shield, Mat Block), read from the Dex by the one Protect predicate (dex-facts/protect.ts;
- * test/side-protector-hints.spec.ts and test/protect-tempo-hints.spec.ts play the moves against these readings).
+ * The moves that stop the hits on their user (Protect, Detect and their kin) or on its whole side (Wide Guard, Quick Guard, Crafty
+ * Shield, Mat Block), by the one Protect predicate of dex-facts/protect.ts; test/side-protector-hints.spec.ts and
+ * test/protect-tempo-hints.spec.ts play the moves against these readings.
  */
 export { shieldsFromHits, shieldsSide };
 
-/** Round 70, round 72 (T239): whether a protector's handler stops the hit, asked through the module that asks the simulator (sim-ask/protector.ts). */
 export { protectorStops };
 
-/** Every stat a stage can sit on. */
 const STAGES = ['atk', 'def', 'spa', 'spd', 'spe', 'accuracy', 'evasion'] as const;
 
 /**
- * The stages a status move gives its user, as the simulator applies them
- * (round 64, T125): `self.boosts` always land on the user, the move's own
- * `boosts` on its targets, and the user is among them only for the target
- * classes 'self' and 'allies' (the simulator's alliesAndSelf). Swagger and
- * Decorate raise the target, Coaching the ally: none of them is the user's
- * setup. test/setup-equity.spec.ts plays every Dex move with stages in the
- * simulator against this reading.
+ * The stages a status move gives its user, as the simulator applies them: `self.boosts` always land on the user, the move's own
+ * `boosts` on its targets, and the user is among them only for the target classes 'self' and 'allies' (the simulator's
+ * alliesAndSelf). Swagger and Decorate raise the target, Coaching the ally: none of them is the user's setup.
+ * test/setup-equity.spec.ts plays every Dex move with stages in the simulator against this reading.
  */
 export function ownStages(move: DexMove): Partial<BoostsTable> | null {
   const onUser = move.target === 'self' || move.target === 'allies' ? move.boosts : null;
@@ -100,13 +86,9 @@ export function ownStages(move: DexMove): Partial<BoostsTable> | null {
 }
 
 /**
- * Damage-fraction gain a self-boosting move would buy over SETUP_HORIZON
- * turns. Since round 63 (T81) every stage a damage fraction reads counts:
- * Iron Defense buys a Body Press carrier its Defense, Calm Mind buys a
- * Stored Power carrier its power (boostedFraction reads PairThreat.axes).
- * Since round 64 (T125) only the user's own stages count, all seven of them:
- * a stage no move of the carrier reads changes no fraction, and Agility buys
- * Stored Power its power.
+ * Damage-fraction gain a self-boosting move would buy over SETUP_HORIZON turns. Every stage a damage fraction reads counts, and
+ * only the user's own: Iron Defense buys a Body Press carrier its Defense, Calm Mind and Agility buy a Stored Power carrier its
+ * power (boostedFraction reads PairThreat.axes); a stage no move of the carrier reads changes no fraction.
  */
 function setupEquity(board: HintBoard, attacker: Pokemon, moveId: string): number {
   const { battle, foes } = board;
@@ -124,7 +106,6 @@ function setupEquity(board: HintBoard, attacker: Pokemon, moveId: string): numbe
   return equity;
 }
 
-/** A switch part: the candidate's threat differential against the strongest foe. */
 function switchHint(board: HintBoard, tokens: string[]): number {
   const { battle, sideState, foes } = board;
   const candidate = sideState.pokemon[parseInt(tokens[1], 10) - 1];
@@ -135,10 +116,8 @@ function switchHint(board: HintBoard, tokens: string[]): number {
 }
 
 /**
- * A Tera option is hinted on the terastallized body (round 63, T81, the hint
- * part of T84): its STAB, Tera Blast and the 60-power floor follow the Tera
- * type. The body is set terastallized for the call and restored, the idiom
- * of speed.ts effectiveSpeed.
+ * A Tera option is hinted on the terastallized body: its STAB, Tera Blast and the 60-power floor follow the Tera type. The body is
+ * set terastallized for the call and restored, as speed.ts effectiveSpeed does.
  */
 function asClicked<T>(attacker: Pokemon, clicked: boolean, ask: () => T): T {
   if (!clicked || attacker.terastallized || !attacker.teraType) return ask();
@@ -150,7 +129,6 @@ function asClicked<T>(attacker: Pokemon, clicked: boolean, ask: () => T): T {
   }
 }
 
-/** The position's battle after the simulator ran the Tera click, and the clicked body in it. */
 interface ClickedTwin {
   battle: ReturnType<typeof positionBattle>;
   mon: Pokemon;
@@ -158,15 +136,10 @@ interface ClickedTwin {
 }
 
 /**
- * Round 69 (T155, decision 14): the body the simulator makes at a Tera click
- * that changes the forme (Terapagos-Terastal into Terapagos-Stellar with its
- * other stats, HP and type; Ogerpon into its Tera forme with Embody Aspect),
- * which the flag in asClicked cannot give. calc/tera-click.ts says whether
- * the click changes the forme; the twin is a fork of the position whose body
- * the simulator's own terastallize ran on. The position's battle is never
- * written (a fork of it is), and the twin is kept per body: the position
- * never changes. A click that keeps the forme returns null, and asClicked
- * prices it as before.
+ * The body the simulator makes at a Tera click that changes the forme (Terapagos-Terastal into Terapagos-Stellar with its other
+ * stats, HP and type; Ogerpon into its Tera forme with Embody Aspect), which the flag in asClicked cannot give. calc/tera-click.ts
+ * says whether the click changes the forme; the twin is a fork of the position whose body the simulator's own terastallize ran
+ * on, kept per body (the position never changes and is never written). A click that keeps the forme returns null.
  */
 const clickedTwins = new WeakMap<Pokemon, ClickedTwin | null>();
 
@@ -189,7 +162,6 @@ function formeClick(position: SimPosition, side: 'p1' | 'p2', mon: Pokemon): Cli
   return { battle: fork, mon: twinMon, board: null };
 }
 
-/** The mover's hint board in the twin, whose actors are the twin's bodies. */
 function twinBoard(twin: ClickedTwin, position: SimPosition, side: 'p1' | 'p2'): HintBoard {
   twin.board ??= hintBoard(position, side, twin.battle);
   return twin.board;
@@ -213,13 +185,12 @@ function targetAtUse(board: HintBoard, attacker: Pokemon, move: DexMove, victim:
 }
 
 /**
- * Round 70 (extends T42): the damage a protector denies the `covered` bodies. Per known damaging move of a foe, as it lands
- * (target at use, a spread hit at the spread factor), the damage on the covered bodies whose hit the protector's handler stops,
- * each capped at the body's HP: the sum over the bodies for a spread hit, the larger one for a single-target hit (the foe aims
- * it at one). The most any move of a foe denies. A side protector covers the whole side: Wide Guard answers the spread
- * attacker, Quick Guard the priority move, Crafty Shield (status only) no damage. A Protect (gate of 13.10. 20:26, 3a) covers
- * its user alone, and stops every hit whose move carries the flag its handler checks. T42's Protect tempo asks for a KO only
- * the pair can make; both deny the hit itself.
+ * The damage a protector denies the `covered` bodies: per known damaging move of a foe, as it lands (target at use, a spread hit
+ * at the spread factor), the damage on the covered bodies whose hit the protector's handler stops, each capped at the body's HP.
+ * The sum over the bodies for a spread hit, the larger one for a single-target hit (the foe aims it at one); the most any move of
+ * a foe denies. A side protector covers the whole side: Wide Guard answers the spread attacker, Quick Guard the priority move,
+ * Crafty Shield (status only) no damage. A Protect covers its user alone and stops every hit whose move carries the flag its
+ * handler checks.
  */
 function deniedDamage(board: HintBoard, protector: DexMove, covered: Pokemon[]): number {
   const { battle, foes } = board;
@@ -246,13 +217,6 @@ function deniedDamage(board: HintBoard, protector: DexMove, covered: Pokemon[]):
   return most;
 }
 
-/**
- * What one part of a combined option reads, kept per part so the pair terms
- * can combine two parts: the part's hint, the single foe slot it aims at with
- * that foe's HP and the damage fraction (pair focus), the damage its hint
- * prices when it attacks (what a partner's redirection covers), whether it
- * redirects, and its Protect tempo.
- */
 interface PartRead {
   hint: number;
   foeSlot: number;
@@ -265,14 +229,12 @@ interface PartRead {
 
 const plainRead = (hint: number): PartRead => ({ hint, foeSlot: 0, foeHp: 0, damage: 0, attack: 0, redirect: false, tempo: 0 });
 
-/** The foes can KO the mover only together: each hit leaves it standing, the two hits do not (a Protect denies that). */
 function pairOnlyKo(board: HintBoard, mon: Pokemon): boolean {
   const hits = board.foes.map(foe => boostedFraction(pairThreat(foe, mon, board.battle), foe, mon));
   const hp = mon.hp / mon.maxhp;
   return hits.length > 1 && hits.every(hit => hit < hp) && hits.reduce((sum, hit) => sum + hit, 0) >= hp;
 }
 
-/** A move part: support floor or setup equity for status, spread damage, targeted or best-foe damage, the Fake Out bonus. */
 function moveHint(board: HintBoard, tokens: string[], partIndex: number): PartRead {
   const attacker = board.actors[partIndex];
   if (!attacker || board.foes.length === 0) return plainRead(0);
@@ -288,8 +250,8 @@ function moveHintOf(board: HintBoard, tokens: string[], attacker: Pokemon): Part
   if (move.category === 'Status') {
     const read = plainRead(Math.max(SUPPORT_HINT, setupEquity(board, attacker, tokens[1])));
     read.redirect = redirectsFoes(battle.dex, move);
-    // Round 70 (gate of 13.10. 20:26, 3a): a Protect earns the damage it denies its user, up to the flinch-sized ceiling; T42's
-    // KO that only the pair can make keeps the whole ceiling.
+    // A Protect earns the damage it denies its user, up to the flinch-sized ceiling; a KO that only the pair can make keeps the whole
+    // ceiling.
     if (shieldsFromHits(battle.dex, move)) read.tempo = pairOnlyKo(board, attacker) ? PAIR_KO_BONUS : Math.min(PAIR_KO_BONUS, deniedDamage(board, move, [attacker]));
     if (shieldsSide(battle.dex, move)) read.tempo = Math.min(PAIR_KO_BONUS, deniedDamage(board, move, board.actors));
     return read;
@@ -300,12 +262,11 @@ function moveHintOf(board: HintBoard, tokens: string[], attacker: Pokemon): Part
     return { ...plainRead(spread), attack: spread };
   }
   const targetLoc = tokens.length > 2 ? parseInt(tokens[2], 10) : NaN;
-  // Round 67 (T113): a move aimed at the own partner (Pollen Puff's heal, a U-turn into it) is support, not foe damage.
+  // A move aimed at the own partner (Pollen Puff's heal, a U-turn into it) is support, not foe damage.
   if (targetLoc < 0) return plainRead(SUPPORT_HINT);
   return aimedRead(board, tokens, attacker, targetLoc);
 }
 
-/** A damaging move at one foe: the aimed slot's, else the best foe's (the only foe left is the aim). */
 function aimedRead(board: HintBoard, tokens: string[], attacker: Pokemon, targetLoc: number): PartRead {
   const { battle, foeActives, foes } = board;
   let damage: number;
@@ -336,11 +297,9 @@ function partRead(board: HintBoard, part: string, partIndex: number): PartRead {
 }
 
 /**
- * Round 69 (T42, decision 15): what the two parts of a combined option do
- * together. Two attacks on one foe that only the pair KOs count the KO bonus;
- * a redirection move is priced as the damage of the partner it covers (never
- * below its own hint); a Protect that denies a pair-only KO carries its tempo.
- * Singles options have one part: this never applies there.
+ * What the two parts of a combined option do together. Two attacks on one foe that only the pair KOs count the KO bonus; a
+ * redirection move is priced as the damage of the partner it covers (never below its own hint); a Protect that denies a pair-only
+ * KO carries its tempo. Singles options have one part: this never applies there.
  */
 function pairTerms(reads: PartRead[]): number {
   if (reads.length !== 2) return 0;
@@ -355,16 +314,9 @@ function pairTerms(reads: PartRead[]): number {
   return extra;
 }
 
-/** Summed per-slot static threat hints for combined doubles options. */
 /**
- * The hint of every part a position has priced, per side and slot (round 63,
- * T112). A doubles node ranks some hundred combos built from a few dozen
- * parts and hints its kept combos a second time for the expansion order; each
- * part is now priced once per position (the round-63 count: 9 to 11 % of the
- * parts are distinct). A position's battle never changes once built (a hint
- * that reads a body on other terms restores it: asClicked, effectiveSpeed),
- * so a part's hint is a function of the position, the side, the slot and the
- * part. Singles hint each position and side once and keep their path.
+ * The hint of every part a position has priced, per side and slot: a doubles node ranks some hundred combos built from a few dozen
+ * parts. A hint that reads a body on other terms restores it (asClicked, effectiveSpeed), so the position's battle never changes.
  */
 const partHints = new WeakMap<SimPosition, Map<string, PartRead>>();
 
@@ -399,14 +351,13 @@ export function combinedOptionHints(
   });
 }
 
-/** Static hints for singles options: damage fraction for moves, threat differential for switches. */
 export function singlesOptionHints(position: SimPosition, side: 'p1' | 'p2', options: ChoiceOption[]): number[] {
   const battle = positionBattle(position);
   const sideState = battle.sides[sideIndex(side)];
   const opponent = battle.sides[side === 'p1' ? 1 : 0].active[0];
   const active = sideState.active[0];
   const hint = (option: ChoiceOption): number => {
-    // The waiting side's sentinel (mid-turn nodes, round 42): nothing to rank.
+    // The waiting side's sentinel (mid-turn nodes): nothing to rank.
     if (option.choice === 'wait') return 0;
     if (!opponent || opponent.fainted) return 0;
     if (option.choice.startsWith('move ')) {
@@ -426,13 +377,6 @@ export function singlesOptionHints(position: SimPosition, side: 'p1' | 'p2', opt
   return options.map(hint);
 }
 
-/**
- * Static per-option threat hints — the SAME machinery candidate restriction
- * ranks with, exported so the MCTS expansion order can reuse it (zero sim
- * advances). Combined doubles options sum per-slot hints (support floor,
- * setup equity, spread factor); singles use damage fraction for moves and
- * the threat differential for switches.
- */
 export function optionHints(position: SimPosition, side: 'p1' | 'p2', options: ChoiceOption[]): number[] {
   if (isCombined(options)) return combinedOptionHints(position, side, options);
   return singlesOptionHints(position, side, options);

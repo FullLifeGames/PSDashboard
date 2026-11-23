@@ -17,16 +17,14 @@ import { battleFaintedFraction, leafValue } from './leaf.ts';
 import { searchOptions } from './options.ts';
 
 /**
- * Round 89 (#104): the lines job. A tree's line names both sides' choices by label; this replay plays it on the root, one step at a
- * time, with every die at its likeliest result (dice/likeliest.ts), and writes what the branch layer needs to play it as a variation:
- * each step's slot choices with the dice on the bodies that hold them. Each step is resolved by label against the options the replay's
- * own position offers (the trees run on the canonical bench order, their choice strings below the root do not translate), so a line
- * stops before a step that is no longer legal after the likeliest dice (`cut`): the tree's world had a miss where the line hits.
- *
- * Singles and doubles share this path. The replay reads the simulator on copies and never writes the root.
+ * The lines job: a tree's line names both sides' choices by label; this replay plays it on the root, one step at a time, with every
+ * die at its likeliest result (dice/likeliest.ts), and writes each step's slot choices with the dice on the bodies that hold them.
+ * Each step is resolved by label against the options the replay's own position offers (the trees run on the canonical bench order,
+ * their choice strings below the root do not translate), so a line stops before a step that is no longer legal after the likeliest
+ * dice (`cut`): the tree's world had a miss where the line hits. Singles and doubles share this path; the root is never written.
  */
 
-/** The seed of a replay's battle: every die the line names is forced, so nothing reads it (the sweep plays two seeds and compares the logs). */
+/** The seed of a replay's battle: every die the line names is forced, so nothing reads it. */
 const REPLAY_SEED = '1,2,3,4';
 
 /** One side's slot choices for the engine's choice string, aligned with the slots the simulator asks. */
@@ -41,7 +39,10 @@ export function slotChoicesOf(battle: Battle, side: 'p1' | 'p2', choice: string,
   );
 }
 
-/** The dice put on the slot choice of the body that holds them (a pair's die on its first slot); a die whose holder has no choice goes on the first choice of its side, else of the other. */
+/**
+ * The dice put on the slot choice of the body that holds them (a pair's die on its first slot); a die whose holder has no choice goes on
+ * the first choice of its side, else the other's.
+ */
 export function withDice(p1: (BranchSlotChoice | null)[], p2: (BranchSlotChoice | null)[], dice: readonly ForcedDie[]): void {
   for (const die of dice) {
     const own = die.name.slot[1] === '1' ? p1 : p2;
@@ -57,7 +58,10 @@ interface Replay { steps: LineStep[]; unforced: Set<string>; cut?: string; battl
 
 const labelOf = (line: TreeLineStep, side: 'p1' | 'p2'): string => (side === 'p1' ? line.p1 : line.p2);
 
-/** The two sides' options for one wanted step, resolved by label, and the slot choices that go with them; null with the reason when the step cannot be played. */
+/**
+ * The two sides' options for one wanted step, resolved by label, and their slot choices; resolveStep returns the reason as a string when
+ * the step cannot be played.
+ */
 interface Resolved { o1: ChoiceOption; o2: ChoiceOption; s1: (BranchSlotChoice | null)[]; s2: (BranchSlotChoice | null)[] }
 
 function resolveStep(root: SimPosition, battle: Battle, index: number, wanted: TreeLineStep, input: LinesInput): Resolved | string {
@@ -158,7 +162,7 @@ function lineOf(request: LineRequest, replay: Replay, perspective: 1 | -1, match
 
 /**
  * The lines of a search: for each request the first donor whose replay keeps every step of its tree's line, else the replay that kept
- * the most (the earlier donor on a tie). A request no donor can start is left out. The root battle is read and never written.
+ * the most (the earlier donor on a tie). A request no donor can start is left out.
  */
 export function playLines(serializedBattle: string, ruleset: StaticRuleset, input: LinesInput): EvalLine[] {
   const root = createRootPosition(serializedBattle, ruleset);

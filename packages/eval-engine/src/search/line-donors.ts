@@ -3,18 +3,15 @@ import { playedIndices } from '../verify-select.ts';
 import { worstAnswer } from '../turn-analysis/worst-answer.ts';
 
 /**
- * Round 89 (#104): which lines of a search get replayed, and from which trees. Sim-free (the orchestrator reads it): the replay runs
- * in the executor (search/lines.ts).
+ * Which lines of a search get replayed, and from which trees. Sim-free (the orchestrator reads it): the replay runs in the executor
+ * (search/lines.ts).
  *
- * A turn shows each side's best row and the row the side played (one line when they are the row). Every tree ships the line of every
- * row it has one for, against its own top three rows of the other side (mcts-node.ts `rowLines`). The donors of a row are the lines the
- * trees hold for it, the ones whose first step answers with the best row of the other side by the merged ranking first (the opponent
- * answers with its best choice overall), then by the visits of the first step. The replay takes the first donor whose line survives the likeliest
- * dice and the next one otherwise.
- *
- * Round 89 (#153, Hard mode): beside a row's request the job asks for the row's line against the reply that hurts it most
- * (`worstAnswer` of the merged result), `versus: 'worst'`, from the lines the trees hold against that answer (their lists and their
- * floor lines); a row whose usual line already meets that answer, and a row no tree holds such a line for, ask nothing more.
+ * A turn shows each side's best row and the row the side played. Every tree ships the line of every row it has one for, against its
+ * own top three rows of the other side (mcts-node.ts `rowLines`). The donors of a row are the lines the trees hold for it, those whose
+ * first step answers with the other side's best row by the merged ranking first, then by the visits of the first step. The replay
+ * takes the first donor whose line survives the likeliest dice, else the next. Beside a row's request the job asks for its line
+ * against the reply that hurts it most (`worstAnswer`, `versus: 'worst'`), unless the usual line already meets that reply or no
+ * tree holds such a line.
  */
 export function lineRequests(trees: readonly MctsTreeStats[], result: EvalResult, settings: EvalSettings): LineRequest[] {
   if (trees.length === 0 || !trees.some(tree => tree.rowLines)) return [];
