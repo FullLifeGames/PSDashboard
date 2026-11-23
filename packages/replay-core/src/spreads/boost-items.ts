@@ -7,9 +7,8 @@ const DAMAGE_HOOKS = ['onModifyAtk', 'onModifySpA', 'onBasePower', 'onModifyDama
 const cache = new WeakMap<RulesDex, Set<string>>();
 
 /**
- * The ids of the items that raise the holder's damage in the generation (round 69, T26): every item the simulator
- * gives a damage hook (Choice Band, Choice Specs, Life Orb, Muscle Band, the type boosters and the species items).
- * Read from the simulator's Dex, so a new item or a generation's changes need no edit here.
+ * The ids of the items that raise the holder's damage: every item the simulator gives a damage hook (Choice Band, Life Orb, the type
+ * boosters, the species items); no list here.
  */
 export function boostItemIds(dex: RulesDex): ReadonlySet<string> {
   let ids = cache.get(dex);
@@ -22,7 +21,6 @@ export function boostItemIds(dex: RulesDex): ReadonlySet<string> {
   return ids;
 }
 
-/** Whether the named item raises its holder's damage in the generation. */
 export const isBoostItem = (dex: RulesDex, item: string): boolean => boostItemIds(dex).has(toId(item));
 
 /** Whether the species cannot be what it is without the item (the Ogerpon masks, the orbs, Soul Dew: the Dex's required items). */

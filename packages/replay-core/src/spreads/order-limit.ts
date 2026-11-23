@@ -12,25 +12,16 @@ import { plausibleFor, scarfAllowed, type SpeedKnowledgeMap } from './scarf.ts';
 import { natureOf, type SpreadCandidate } from './ladder.ts';
 
 /**
- * T117 (round 63): an observed move order is a hard limit on the built
- * sets, for both sides. Before the ladder, every component of the order
- * graph that holds a broken order is settled: a plausible spread (round
- * 37's usage camp) yields first, then any legal Speed, then a Choice Scarf
- * on a first mover round 37 allows one. Inside a tier the mon with its own
- * Speed evidence (orders its prior already satisfies) keeps its Speed and
- * the side without it absorbs the change, the second mover on a tie. A
- * repaired order ends strict, a cycle tied. A weak race (a knock-out the
- * victim may have lost to its own negative priority) binds while a legal
- * set fits it and goes first when none does. A component no tier settles
- * keeps its sets. Round 64 (T122): a Speed IV below 31 comes after every
- * legal Speed and before a new Scarf; only a race that cannot end strict
- * may tie; a race reads the forme that raced and a transformed mover's
- * copied Speed, with the Scarf as the simulator rounds it. Round 69 (T132,
- * decision 12): the opposite IV comes first. A published Speed IV below 31
- * is a Trick Room set's; an order the log shows (no Trick Room) that the
- * published body cannot keep refutes it, so the IV restores to 31 before
- * any Speed EV is bought, and the legal Speeds are then asked at IV 31.
+ * An observed move order is a hard limit on the built sets, for both sides: before the ladder, every component of the order graph
+ * that holds a broken order is settled.
  */
+// Tiers in order: a plausible spread (the usage camp) yields first, then the published body with its Speed IV at 31 (a published Speed IV
+// below 31 is a Trick Room set's, and an order the log shows without Trick Room refutes it), then any legal Speed, then a Speed IV below 31,
+// then a Choice Scarf on a first mover that may carry one. Inside a tier the mon with its own Speed evidence (orders its prior already
+// satisfies) keeps its Speed and the side without it absorbs the change, the second mover on a tie. A repaired order ends strict, a cycle
+// tied; only a race that cannot end strict may tie. A weak race (a knock-out the victim may have lost to its own negative priority) binds
+// while a legal set fits it and goes first when none does. A component no tier settles keeps its sets. A race reads the forme that raced
+// and a transformed mover's copied Speed, with the Scarf as the simulator rounds it.
 
 type Side = 'p1' | 'p2';
 type Sets = { p1: PokemonSet[]; p2: PokemonSet[] };
@@ -55,7 +46,7 @@ interface Racer {
 }
 
 interface Race { order: ReadOrder; first: Racer; second: Racer; weak: boolean; broken: boolean }
-/** A mover's race Speed for an option: in the forme that raced, with the Scarf it ran with, as the simulator rounds it (round 64). */
+/** A mover's race Speed for an option: in the forme that raced, with the Scarf it ran with, as the simulator rounds it. */
 type Reading = (option: Option) => number;
 /** A race as one solve reads it: each mover's race Speed, whether the priors break it and whether it must end strict. */
 interface Bound { first: Racer; second: Racer; firstSpeed: Reading; secondSpeed: Reading; broken: boolean; strict: boolean }
@@ -71,11 +62,9 @@ const lowSpeedIv = (ctx: SolveContext, racer: Racer): boolean => !ctx.budget.sta
 const restoredIvs = (racer: Racer): PokemonEvs => ({ ...MAX_IVS, ...racer.set.ivs, spe: 31 });
 
 /**
- * The set an order's mover raced as: its own species, or the set of the
- * forme a battle-only forme comes from (Dex `battleOnly`). On the same base
- * Speed (Ogerpon's Tera masks) the set's Speed raced; a forme with its own
- * Speed (a Mega after its evolution, Terapagos-Terastal) raced on its base
- * Speed with the set's spread (round 64), so the race keeps the forme.
+ * The set an order's mover raced as: its own species, or the set of the forme a battle-only forme comes from (Dex `battleOnly`). On the
+ * same base Speed (Ogerpon's Tera masks) the set's Speed raced; a forme with its own Speed (a Mega after its evolution, Terapagos-Terastal)
+ * raced on its base Speed with the set's spread, so the race keeps the forme.
  */
 function racedAs(dex: RulesDex, sets: PokemonSet[], species: string): { species: string; forme?: string } {
   const origin = originIn(dex, sets, species);
@@ -86,9 +75,8 @@ function racedAs(dex: RulesDex, sets: PokemonSet[], species: string): { species:
 }
 
 /**
- * One mover as the solver reads it: the set whose spread raced (a
- * transformed mover's copied Pokémon, round 64), the forme, and the set
- * whose item ran the race when that is another one.
+ * One mover as the solver reads it: the set whose spread raced (a transformed mover's copied Pokémon), the forme, and the set whose
+ * item ran the race when that is another one.
  */
 function readMover(
   dex: RulesDex, sets: Sets, side: Side, species: string, copied?: { side: Side; species: string },
@@ -136,7 +124,7 @@ function option(ctx: SolveContext, racer: Racer, spread: SpreadCandidate, plausi
   return { stat: speedStat(ctx, racer.side, racer.species, spread), spread, plausible, cost: cost(ctx, spread, racer.prior) };
 }
 
-/** The prior and round 37's plausible spreads (on the budget's scale); a known spread is the only one. */
+/** The prior and the plausible spreads of the usage camp (scarf.ts, on the budget's scale); a known spread is the only one. */
 function plausibleOptions(ctx: SolveContext, knowledge: SpeedKnowledgeMap, racer: Racer): Option[] {
   const prior = option(ctx, racer, racer.prior, true);
   if (racer.known) return [prior];
@@ -166,11 +154,9 @@ function legalOptions(ctx: SolveContext, racer: Racer): Option[] {
 }
 
 /**
- * The Speeds below the set's own Speed IV (round 64, decision 28): no Speed
- * EVs, the prior's nature with its Speed effect lowered, each IV down to 0.
- * A changed IV costs more than a changed nature. Asked only after every
- * legal Speed at the set's IV failed. Pokémon Champions has no IVs to lower
- * (every IV is 31 and statModify reads none, round 67): no option there.
+ * The Speeds below the set's own Speed IV: no Speed EVs, the prior's nature with its Speed effect lowered, each IV down to 0. A changed
+ * IV costs more than a changed nature. Asked only after every legal Speed at the set's IV failed. Pokémon Champions has no IVs to lower
+ * (every IV is 31 and statModify reads none): no option there.
  */
 function slowOptions(ctx: SolveContext, racer: Racer): Option[] {
   if (ctx.budget.statPoints) return [];
@@ -184,8 +170,8 @@ function slowOptions(ctx: SolveContext, racer: Racer): Option[] {
 }
 
 /**
- * The published body with its Speed IV at 31 (round 69, T132 point 2): the order the log shows refutes the IV before
- * it asks for a Speed EV. Not a plausible spread, but it costs less than any legal Speed.
+ * The published body with its Speed IV at 31: the order the log shows refutes the IV before it asks for a Speed EV. Not a plausible
+ * spread, but it costs less than any legal Speed.
  */
 function restoredOptions(ctx: SolveContext, racer: Racer): Option[] {
   if (!lowSpeedIv(ctx, racer)) return [];
@@ -265,10 +251,8 @@ function fix(start: Map<string, Option[]>, bounds: Bound[], racers: Racer[]): Ma
 }
 
 /**
- * Who keeps its Speed first: a known spread, then the mon with more own
- * Speed evidence (decision 20: the orders its prior already satisfies, so
- * the replay measured it elsewhere), then a first mover (the second mover
- * yields on a tie, as the defensive Great Tusk of the decision does).
+ * Who keeps its Speed first: a known spread, then the mon with more own Speed evidence (orders its prior already satisfies, so the
+ * replay measured it elsewhere), then a first mover (the second mover yields on a tie).
  */
 function keepingOrder(racers: Racer[], bounds: Bound[]): Racer[] {
   const evidence = (racer: Racer) => bounds.filter(bound => !bound.broken && (bound.first === racer || bound.second === racer)).length;
@@ -298,11 +282,9 @@ function cyclic(races: Race[]): Set<Race> {
 }
 
 /**
- * One tier's settling. Every race ends strict (the first mover faster, no
- * coin flip on an order the log showed) unless its priors tie it or it sits
- * in a cycle of orders. When that fails, only the races that cannot end
- * strict may tie (round 64): each other race stays strict while the rest
- * still settles, the repaired ones first, then in turn order.
+ * One tier's settling. Every race ends strict (the first mover faster, no coin flip on an order the log showed) unless its priors tie it
+ * or it sits in a cycle of orders. When that fails, only the races that cannot end strict may tie: each other race stays strict while
+ * the rest still settles, the repaired ones first, then in turn order.
  */
 function solve(ctx: SolveContext, knowledge: SpeedKnowledgeMap, racers: Racer[], races: Race[], tier: Tier): Map<string, Option> | null {
   const loops = cyclic(races);
@@ -328,7 +310,7 @@ function solve(ctx: SolveContext, knowledge: SpeedKnowledgeMap, racers: Racer[],
   return attempt(bounds);
 }
 
-/** The last tier: a Scarf on one first mover of a broken race round 37 allows, with any legal Speed. */
+/** The last tier: a Scarf on one first mover of a broken race that scarf.ts allows, with any legal Speed. */
 function withScarf(ctx: SolveContext, knowledge: SpeedKnowledgeMap, racers: Racer[], races: Race[]): Map<string, Option> | null {
   // A copied race's item is its holder's, never the copied Pokémon's.
   for (const racer of new Set(races.filter(race => race.broken && !race.order.firstHolder).map(race => race.first))) {
@@ -381,8 +363,7 @@ function racerFor(ctx: SolveContext, knowledge: SpeedKnowledgeMap, side: Side, s
 }
 
 /**
- * The solve's sets with every order holding (T117): the sets themselves
- * when no order breaks, else copies whose settled mons carry the new
+ * The solve's sets with every order holding: the sets themselves when no order breaks, else copies whose settled mons carry the new
  * spread. A Scarf the last tier adds lands in `ctx.scarf`.
  */
 export function settledSets(ctx: SolveContext, knowledge: SpeedKnowledgeMap): Sets {

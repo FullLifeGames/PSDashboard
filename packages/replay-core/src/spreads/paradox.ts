@@ -17,8 +17,8 @@ function stagedStat(stat: number, stage: number): number {
 }
 
 /**
- * The stat Protosynthesis and Quark Drive raise: the simulator's `getBestStat(false, true)`, the highest stat with its stages
- * and without item or ability modifiers, the first of the game's stat order on a tie (round 69, T167).
+ * The stat Protosynthesis and Quark Drive raise: the simulator's `getBestStat(false, true)`, the highest stat with its stages and
+ * without item or ability modifiers, the first of the game's stat order on a tie.
  */
 export function boostedStatOf(stats: Record<string, number>, stages: Record<string, number>): StatId {
   let best = BOOSTABLE[0];

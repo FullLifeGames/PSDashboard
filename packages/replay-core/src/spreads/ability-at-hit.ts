@@ -4,9 +4,8 @@ export interface AbilityDex {
 }
 
 /**
- * The ability a body fought with at the hit (round 69, T86): the one the log showed beats the build's, and an ability Gastro Acid or
- * a Neutralizing Gas took away is none, unless the Dex marks it as one the gas cannot suppress (Stance Change, Multitype, ...).
- * `built` is what the set or the forme carries.
+ * The ability a body fought with at the hit: the one the log showed beats `built`; one Gastro Acid or Neutralizing Gas took away is
+ * none, unless the Dex marks it as unsuppressible (Stance Change, Multitype).
  */
 export function abilityAtHit(dex: AbilityDex, built: string | undefined, shown: string | undefined, suppressed: boolean | undefined): string | undefined {
   const row = shown ? dex.abilities.get(shown) : undefined;

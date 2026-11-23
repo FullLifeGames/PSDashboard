@@ -1,28 +1,18 @@
-/**
- * Round 73 (T210, group 1): the base power a move takes from the battle's history. The Dex move holds a placeholder power and a
- * `basePowerCallback` that reads the battle (Last Respects: the fallen of the user's side; Rage Fist: the hits the user took). The
- * callback runs on a recording stand-in: a move whose callback reads nothing but these two counts is a history power, and its
- * power comes from the callback itself. Every other callback (HP, status, weight, speed, happiness) stays with the calculator or
- * with its own group. No move name decides it.
- */
+/** The base power a move takes from the battle's history (Last Respects, Rage Fist): a Dex `basePowerCallback` that reads only these two counts is a history power. */
 
 export interface HistoryFacts {
-  /** The fainted members of the user's side. */
   fainted: number;
-  /** The hits the user took. */
   timesAttacked: number;
 }
 
 type PowerCallback = (this: unknown, pokemon: unknown, target: unknown, move: unknown) => unknown;
 
-/** The part of a Dex this reads: any generation's or mod's. */
 export interface PowerDex {
   gen: number;
   modid: string;
   moves: { get(id: string): { exists: boolean; basePowerCallback?: unknown } };
 }
 
-/** The reads a history power makes, and no others. */
 const HISTORY_READS = new Set(['pokemon.side', 'pokemon.side.totalFainted', 'pokemon.timesAttacked']);
 
 /** A stand-in that records every property path read on it; `values` answer by path, anything else answers another stand-in. */

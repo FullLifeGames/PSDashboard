@@ -4,11 +4,9 @@ import type { RulesDex } from '../rules-dex.ts';
 import { twinBattle } from '../sim-ask/twin.ts';
 
 /**
- * The Speed a race ran at, as the simulator of the replay's generation
- * plays it (round 64, T122). A Choice Scarf's Speed is the simulator's own
- * modifier and rounding (201 races at 301, not 301.5): one Scarf holder per
- * generation answers every stat through `getStat`, memoized per stat. In a
- * generation before the item exists the holder carries nothing.
+ * The Speed a race ran at, as the simulator of the replay's generation plays it. A Choice Scarf's Speed is the simulator's own modifier
+ * and rounding (201 races at 301, not 301.5): one Scarf holder per generation answers every stat through `getStat`, memoized per stat.
+ * In a generation before the item exists the holder carries nothing.
  */
 
 const holders = new Map<string, Pokemon | null>();
@@ -30,7 +28,6 @@ function scarfHolder(dex: RulesDex): Pokemon | null {
   return holder;
 }
 
-/** The Speed a Choice Scarf holder with this Speed stat races at. */
 export function scarfedSpeed(dex: RulesDex, stat: number): number {
   const key = `${dex.currentMod}:${stat}`;
   const known = memo.get(key);
@@ -45,5 +42,4 @@ export function scarfedSpeed(dex: RulesDex, stat: number): number {
   return speed;
 }
 
-/** A race's Speed: the stat, with the Scarf the mover held. */
 export const raceSpeed = (dex: RulesDex, stat: number, scarf: boolean): number => (scarf ? scarfedSpeed(dex, stat) : stat);

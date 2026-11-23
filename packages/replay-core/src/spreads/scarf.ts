@@ -7,15 +7,7 @@ import { raceSpeed, scarfedSpeed } from './race-speed.ts';
 import type { SpreadCandidate } from './ladder.ts';
 import { toId } from '../ids.ts';
 
-/**
- * Choice Scarf decisions from move-order evidence (round 37). A mover that
- * cannot reach an observed order at full Speed against every plausible
- * configuration of the second mover holds a Scarf; a guessed Scarf that
- * would make its holder faster than the order allows is dropped. Plausible
- * means: the known spread, else the usage spreads with a real share,
- * thinned to the confident tempo camp; a Scarf only rides on a species
- * that runs Speed-invested spreads.
- */
+/** Choice Scarf decisions from move orders: a mover that cannot reach an observed order against every plausible configuration holds a Scarf; a contradicted guess is dropped. */
 
 /** What the solver may assume about one mon's item and Speed. */
 export interface SpeedKnowledge {
@@ -28,8 +20,8 @@ export interface SpeedKnowledge {
   /** Usage spreads of the species in the format; empty without usage. */
   spreads: { nature: string; evs: PokemonEvs; probability: number }[];
   /**
-   * The items the species' usage lists, in usage order, that the log does not refute (round 89, #75: the item rung swaps in the first damage-boost
-   * item among them that makes a refuted knockout reach). Absent or empty: nothing to offer.
+   * The items the species' usage lists, in usage order, that the log does not refute; the item rung swaps in the first damage-boost
+   * item among them that makes a refuted knockout reach. Absent or empty: nothing to offer.
    */
   itemOffers?: readonly string[];
   /** The format's Item Clause: at most this many Pokémon of a team hold the same item. Absent: no clause (a Custom Game). */
@@ -59,7 +51,7 @@ interface Mover {
   plausible: SpreadCandidate[];
   /** Whether a spread counts as tempo-invested, on the format's scale. */
   invested: (spread: SpreadCandidate) => boolean;
-  /** The battle forme the order says raced, on its own base Speed (round 64). */
+  /** The battle forme the order says raced, on its own base Speed. */
   forme?: string;
 }
 
@@ -134,9 +126,8 @@ function decideAgainstGuessedScarf(ctx: SolveContext, first: Mover, second: Move
 }
 
 /**
- * One order's decision: [key, decision], or null when the order is
- * reachable or unexplained. A race the order reads with the Scarf a mover
- * held that turn (round 63) decides nothing about that mover's set item.
+ * One order's decision: [key, decision], or null when the order is reachable or unexplained. A race the order reads with the Scarf a
+ * mover held that turn decides nothing about that mover's set item.
  */
 function decide(ctx: SolveContext, order: ReadOrder, first: Mover, second: Mover): [string, ItemDecision] | null {
   const max = maxSpeed(ctx, first);
@@ -149,10 +140,8 @@ function decide(ctx: SolveContext, order: ReadOrder, first: Mover, second: Mover
 }
 
 /**
- * One pass over the orders before the ladder; the first decision per mon
- * stands. A weak race (round 63) never earns an item: the settling drops it
- * before it adds a Scarf. Nor does a copied race (round 64): its Speed is
- * the copied Pokémon's, its item the transformed mover's.
+ * One pass over the orders before the ladder; the first decision per mon stands. A weak race never earns an item (the settling drops it
+ * before it adds a Scarf), nor does a copied race: its Speed is the copied Pokémon's, its item the transformed mover's.
  */
 export function decideScarfs(ctx: SolveContext, knowledge: SpeedKnowledgeMap): Map<string, ItemDecision> {
   const decisions = new Map<string, ItemDecision>();
@@ -167,12 +156,12 @@ export function decideScarfs(ctx: SolveContext, knowledge: SpeedKnowledgeMap): M
   return decisions;
 }
 
-/** The spreads round 37 calls plausible for one mon: the known spread, else its usage camp (round 63 settles on them first). */
+/** The spreads that count as plausible for one mon: the known spread, else its usage camp. */
 export function plausibleFor(ctx: SolveContext, side: 'p1' | 'p2', species: string, knowledge: SpeedKnowledgeMap): SpreadCandidate[] {
   return mover(ctx, side, species, knowledge)?.plausible ?? [];
 }
 
-/** Round 37's rule for a Scarf the solver may give a first mover (round 63 asks it after any legal Speed). */
+/** The rule for a Scarf the solver may give a first mover, asked after any legal Speed. */
 export function scarfAllowed(ctx: SolveContext, side: 'p1' | 'p2', species: string, knowledge: SpeedKnowledgeMap): boolean {
   const m = mover(ctx, side, species, knowledge);
   return !!m && scarfInAllowed(m);

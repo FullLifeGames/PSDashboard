@@ -21,23 +21,17 @@ import { historyPower } from './hit-power.ts';
 import { leastDamageOf } from '../hp-display.ts';
 import { OBSERVATION_SLACK } from '../team/item-damage-shared.ts';
 
-/**
- * A violated move-order constraint outweighs any damage-fit error: the log
- * PROVED the order, while damage rolls only bound spreads. Rungs violating a
- * constraint lose to any non-violating rung; if every rung violates
- * (conflicting evidence), damage fit still decides among them.
- */
+/** A violated move-order constraint outweighs any damage-fit error: the log proved the order, damage rolls only bound spreads. */
 export const SPEED_VIOLATION_PENALTY = 1000;
 
 /**
- * An order as the solver reads it (round 64): each mover named by its set,
- * with the battle forme that raced when that forme runs on its own base
+ * An order as the solver reads it: each mover named by its set, with the battle forme that raced when that forme runs on its own base
  * Speed (a Mega after its evolution, Terapagos-Terastal).
  */
 export interface ReadOrder extends SpeedOrderObservation {
   firstForme?: string;
   secondForme?: string;
-  /** A transformed mover's own set: it ran the race on the copied Pokémon's Speed with its own item (round 64). */
+  /** A transformed mover's own set: it ran the race on the copied Pokémon's Speed with its own item. */
   firstHolder?: { side: 'p1' | 'p2'; species: string };
   secondHolder?: { side: 'p1' | 'p2'; species: string };
 }
@@ -58,7 +52,6 @@ export const secondOf = (order: ReadOrder): RaceSide => ({
   side: order.secondSide, species: order.secondSpecies, forme: order.secondForme, held: order.secondScarf, holder: order.secondHolder,
 });
 
-/** Everything one spread solve shares between its scoring functions. */
 export interface SolveContext {
   gen: CalcGeneration;
   /** The battle plays the Champions mod (the format's own answer: the calculator's generation number is not the simulator's). */
@@ -66,17 +59,14 @@ export interface SolveContext {
   budget: EvBudget;
   sets: { p1: PokemonSet[]; p2: PokemonSet[] };
   solved: Map<string, SpreadCandidate>;
-  /** Observations per mon (as attacker AND as defender). */
   byMon: Map<string, ReadObservation[]>;
-  /** Observed same-turn move order, indexed per participant. */
   speedByMon: Map<string, ReadOrder[]>;
-  /** The orders with sets on both sides, in observation order (round 37: the Scarf decisions walk them). */
   speedOrders: ReadOrder[];
-  /** Choice Scarf decisions from the move orders, keyed like `solved` (round 37). */
+  /** Choice Scarf decisions from the move orders, keyed like `solved`. */
   scarf: Map<string, ItemDecision>;
-  /** What the build knows of each mon's item (round 69, T26: a guessed boost item may give way, a known one never). */
+  /** What the build knows of each mon's item: a guessed boost item may give way, a known one never. */
   knowledge: SpeedKnowledgeMap;
-  /** Maximum HP per mon as the log printed it (round 40: pins the HP EVs). */
+  /** Maximum HP per mon as the log printed it: pins the HP EVs. */
   maxHp: Map<string, ObservedMaxHp>;
   priors: Map<string, SpreadCandidate>;
 }
@@ -99,7 +89,7 @@ export function hpBasisOf(ctx: SolveContext, side: 'p1' | 'p2', species: string)
   return { baseHp: baseStats.hp, iv: calcIvs(set?.ivs, ctx.budget)?.hp ?? 31 };
 }
 
-/** The sets with every spread on the budget's scale: a Stat Point solve never reads EVs as points (round 67). */
+/** The sets with every spread on the budget's scale: a Stat Point solve never reads EVs as points. */
 function onScale(sets: { p1: PokemonSet[]; p2: PokemonSet[] }, budget: EvBudget): { p1: PokemonSet[]; p2: PokemonSet[] } {
   if (!budget.statPoints) return sets;
   const scaled = (team: PokemonSet[]) => team.map(set => ({ ...set, evs: onBudgetScale({ ...ZERO_EVS, ...set.evs }, budget) }));
@@ -107,10 +97,8 @@ function onScale(sets: { p1: PokemonSet[]; p2: PokemonSet[] }, budget: EvBudget)
 }
 
 /**
- * Indexes the evidence per participant. Speed constraints are over the
- * BUILT configuration's effective speed (spread × the set's Scarf), the
- * pair-consistency philosophy: branches must reproduce the order the
- * replay showed, whatever the true item was.
+ * Indexes the evidence per participant. Speed constraints are over the built configuration's effective speed (spread × the set's Scarf):
+ * branches must reproduce the order the replay showed, whatever the true item was.
  */
 export function buildSolveContext(
   observations: DamageObservation[],
@@ -138,7 +126,7 @@ export function buildSolveContext(
 
   const dex = dexOfCalc(ctx.gen);
   for (const raw of observations) {
-    // A Z-move or a Max move prices from the Dex's placeholder power, not from the base move's (round 73, T229): no reading.
+    // A Z-move or a Max move prices from the Dex's placeholder power, not from the base move's: no reading.
     if (poweredMove(dex, raw.moveId)) continue;
     const obs = readObservation(dex, ctx.sets, raw);
     const defenderSide = defenderSideOf(obs);
@@ -179,7 +167,7 @@ type CalcOptions = NonNullable<ConstructorParameters<typeof Pokemon>[2]>;
 
 /**
  * The ability a body fought with at the hit and whether it is on: the shown or built one (abilityAtHit), and for an ability that
- * reads the turn's order (Stakeout, Analytic) the state the facts of the hit give it (round 73, T210 group 3).
+ * reads the turn's order (Stakeout, Analytic) the state the facts of the hit give it.
  */
 function abilityOfHit(dex: RulesDex, setAbility: string | undefined, hit: HitSide): { ability: string | undefined; abilityOn: boolean | undefined } {
   const built = abilityAtHit(dex, formeAbility(dex, hit.forme, setAbility), hit.ability, hit.suppressed);
@@ -188,9 +176,8 @@ function abilityOfHit(dex: RulesDex, setAbility: string | undefined, hit: HitSid
 }
 
 /**
- * A body as the calculator reads it: the spread itself, Stat Points in evs for Champions' generation 0, which ignores IVs (round 68,
- * T186), and what the log shows of the side at the hit (`hit`, round 69, T86): stages, status, forme, Terastallization, HP, the
- * fallen of Supreme Overlord, the ability it fought with.
+ * A body as the calculator reads it: the spread itself (Stat Points in evs for Champions' generation 0, which ignores IVs) and what the
+ * log shows of the side at the hit: stages, status, forme, Terastallization, HP, the fallen of Supreme Overlord, the ability it fought with.
  */
 export function calcPokemon(ctx: SolveContext, side: 'p1' | 'p2', species: string, spread: SpreadCandidate, hit: HitSide = {}) {
   const set = setOf(ctx, side, species);
@@ -205,7 +192,7 @@ export function calcPokemon(ctx: SolveContext, side: 'p1' | 'p2', species: strin
     evs: coupleSpecial(spread.evs, ctx.budget),
     ivs: coupleSpecial(set?.ivs, ctx.budget),
     boosts: hit.boosts,
-    // The stat the log named for an active Protosynthesis or Quark Drive (T167): the calculator boosts that one, not the best of its own reading.
+    // The stat the log named for an active Protosynthesis or Quark Drive: the calculator boosts that one, not the best of its own reading.
     boostedStat: hit.boostedStat as CalcOptions['boostedStat'],
     status: (hit.status || undefined) as CalcOptions['status'],
     teraType: hit.tera as CalcOptions['teraType'],
@@ -215,7 +202,10 @@ export function calcPokemon(ctx: SolveContext, side: 'p1' | 'p2', species: strin
   return body;
 }
 
-/** The base power a move takes from the battle's history, from the Dex callback; the handlers live in the simulator's Dex, not in @pkmn/dex's data. */
+/**
+ * The base power a move takes from the battle's history, from the Dex callback; the handlers live in the simulator's Dex, not in
+ * @pkmn/dex's data.
+ */
 function historyPowerOf(gen: CalcGeneration, moveId: string, obs: ReadObservation): number | undefined {
   return historyPower(dexOfCalc(gen), moveId, { fainted: obs.attackerFainted ?? 0, timesAttacked: obs.attackerTimesAttacked ?? 0 }) ?? undefined;
 }
@@ -230,9 +220,8 @@ export function rollRange(ctx: SolveContext, obs: ReadObservation, attackerSprea
   const defenderBody = withItemAtHit(dex, defenderSpread, setOf(ctx, defenderSide, obs.defenderSpecies)?.item, obs.defenderItem, obs.defenderItemChanged);
   const attacker = calcPokemon(ctx, obs.attackerSide, obs.attackerSpecies, attackerBody, hitSideOf(obs, 'attacker'));
   const defender = calcPokemon(ctx, defenderSide, obs.defenderSpecies, defenderBody, hitSideOf(obs, 'defender'));
-  // The protocol records typeless "hiddenpower"; calc it as the SET's
-  // resolved variant, or the fit runs the IV-default type against a hit
-  // the sim plays typed (653785: Dark-fitted spreads, Ice-rolled sim).
+  // The protocol records typeless "hiddenpower"; calc it as the set's resolved variant, or the fit runs the IV-default type against a hit
+  // the sim plays typed (Dark-fitted spreads, Ice-rolled sim).
   const calcMoveId = obs.moveId === 'hiddenpower'
     ? typedHiddenPowerId(setOf(ctx, obs.attackerSide, obs.attackerSpecies)?.moves ?? []) ?? obs.moveId
     : obs.moveId;
@@ -241,7 +230,7 @@ export function rollRange(ctx: SolveContext, obs: ReadObservation, attackerSprea
   // The calculator keys a few moves on the name (Weather Ball, Terrain Pulse); the typed Hidden Power is its own id.
   const moveName = calcMoveId === obs.moveId ? obs.moveName ?? calcMoveId : calcMoveId;
   const result = calculate(gen, attacker, defender, moveOf(gen, moveName, obs, historyPowerOf(gen, calcMoveId, obs)), fieldOf(obs));
-  // A spread the calculator forces on a hit that had one target in the game is no reading (T202).
+  // A spread the calculator forces on a hit that had one target in the game is no reading.
   if (forcedSpread(obs, result.move.target)) return null;
   const rolls = (Array.isArray(result.damage) ? (result.damage as number[]).flat() : [Number(result.damage)]).map(Number);
   if (rolls.length === 0) return null;
@@ -261,12 +250,9 @@ export function observationError(ctx: SolveContext, obs: ReadObservation, candid
     const range = rollRange(ctx, obs, attackerSpread, defenderSpread);
     if (!range) return 0;
     const { min, max, maxHp } = range;
-    // A lethal hit only says "at least this much": rungs whose best roll
-    // could not reach the remaining HP are refuted, overkill rungs are
-    // consistent. Read as a reading, every knock-out pulled the solve
-    // toward "bulkier defender, weaker attacker" (573756 p1 Toxapex).
-    // Round 89 (#75): the least the hit did is read by the game's display, in HP points of the candidate's defender
-    // (hp-display.ts); the game itself refutes a best roll below it, so that reading carries no slack.
+    // A lethal hit only says "at least this much": rungs whose best roll cannot reach the remaining HP are refuted, overkill rungs are
+    // consistent (read exactly, every knock-out pulled the solve toward "bulkier defender, weaker attacker"). The least the hit did is
+    // read by the game's display, in HP points of the candidate's defender (hp-display.ts); a best roll below it is refuted without slack.
     const least = obs.lethal && obs.defenderShown ? leastDamageOf(obs.defenderShown, maxHp, ctx.champions) : null;
     if (least !== null) return Math.max(0, least / maxHp - max) ** 2;
     const distance = obs.lethal
@@ -308,22 +294,20 @@ function holdsScarf(ctx: SolveContext, side: 'p1' | 'p2', species: string): bool
   return toId(setOf(ctx, side, species)?.item ?? '') === 'choicescarf';
 }
 
-/** Whether a race ran with a Scarf: the one the order says the mover held (round 63), else its holder's set's or decision's. */
+/** Whether a race ran with a Scarf: the one the order says the mover held, else its holder's set's or decision's. */
 export function racedWithScarf(ctx: SolveContext, mover: RaceSide): boolean {
   const holder = mover.holder ?? mover;
   return mover.held ?? holdsScarf(ctx, holder.side, holder.species);
 }
 
-/** The Speed a race ran at: the stat in the forme that raced, with the Scarf as the simulator rounds it (round 64). */
+/** The Speed a race ran at: the stat in the forme that raced, with the Scarf as the simulator rounds it. */
 function effectiveSpeed(ctx: SolveContext, mover: RaceSide, spread: SpreadCandidate): number {
   return raceSpeed(dexOfCalc(ctx.gen), speedStat(ctx, mover.side, mover.species, spread, mover.forme), racedWithScarf(ctx, mover));
 }
 
 /**
- * A knock-out on a victim whose set runs a move below priority 0 (Trick
- * Room, Roar, Teleport): the victim may have clicked it and moved last at
- * any Speed, so the order is weak evidence (round 63). Priorities from the
- * Dex of the replay's generation.
+ * A knock-out on a victim whose set runs a move below priority 0 (Trick Room, Roar, Teleport): the victim may have clicked it and moved
+ * last at any Speed, so the order is weak evidence.
  */
 export function weakRace(ctx: SolveContext, order: ReadOrder): boolean {
   if (!order.knockOut) return false;
@@ -349,8 +333,7 @@ export function physicalAttackerFor(ctx: SolveContext, key: string): boolean {
   const { gen } = ctx;
   const attacking = (ctx.byMon.get(key) ?? []).filter(obs => keyOf(obs.attackerSide, obs.attackerSpecies) === key);
   if (attacking.length === 0) {
-    // Never observed attacking — classify by the set's damaging moves so
-    // the leftover-EV fill lands in the right offense stat.
+    // Never observed attacking: classify by the set's damaging moves so the leftover-EV fill lands in the right offense stat.
     const [side, species] = key.split(':') as ['p1' | 'p2', string];
     let physical = 0;
     let special = 0;
@@ -373,9 +356,8 @@ export function physicalAttackerFor(ctx: SolveContext, key: string): boolean {
 const NATURE_DISTANCE_EVS = 64;
 
 /**
- * Roll ranges are wide: opposite rungs (0 EV and 252 EV) can BOTH fit an
- * observation with zero error. Ties break toward the mon's prior guess —
- * evidence that cannot distinguish must not move the spread.
+ * Roll ranges are wide: opposite rungs (0 EV and 252 EV) can both fit an observation with zero error. Ties break toward the mon's prior
+ * guess: evidence that cannot distinguish must not move the spread.
  */
 export function priorDistance(ctx: SolveContext, key: string, rung: CandidateRung): number {
   const prior = ctx.priors.get(key);

@@ -1,11 +1,7 @@
 import type { PokemonSet } from '@pkmn/sim';
 import { toId } from '../ids.ts';
 
-/**
- * Round 69 (T190, spec decision 8): the log names the forme a mon wears at the line (Golisopod-Mega, Aegislash-Blade,
- * Ogerpon-Wellspring-Tera), the team names the species it came from. The Dex says which species a forme comes from; no list
- * here. The solver reads the base set and prices on the forme's own stats and ability.
- */
+/** The log names the forme a mon wears (Golisopod-Mega, Aegislash-Blade), the team the species it came from; the Dex says which, no list here. */
 
 /** What this module reads of a Dex: the species and item rows (the simulator's Dex and @pkmn/dex both fit). */
 export interface FormeDex {
@@ -38,9 +34,8 @@ function stoneOrigins(dex: FormeDex, forme: FormeRow): string[] {
 }
 
 /**
- * The species a battle forme comes from, read from the Dex: `battleOnly` (a name, or the several a team may carry),
- * `changesFrom`, the species a Mega Stone evolves into the forme, and a Mega's base species. Empty for a species a team
- * carries as it is and for a name the Dex does not know.
+ * The species a battle forme comes from, read from the Dex (`battleOnly`, `changesFrom`, a Mega Stone's table, a Mega's base
+ * species); empty for a species a team carries as it is.
  */
 export function formeOrigin(dex: FormeDex, species: string): string[] {
   return [...originsOf(dex, species, new Set())];
@@ -75,8 +70,8 @@ const named = (sets: readonly PokemonSet[], species: string) =>
   sets.some(set => toId(set.species) === toId(species) || toId(set.name || '') === toId(species));
 
 /**
- * The species whose set a mon plays as: its own name when a set carries it, else the first species it comes from that a set
- * carries (the list of Zygarde-Complete or Necrozma-Ultra leaves the team to decide). Undefined when no set matches.
+ * The species whose set a mon plays as: its own name when a set carries it, else the first species it comes from that a set carries;
+ * undefined when none matches.
  */
 export function originIn(dex: FormeDex, sets: readonly PokemonSet[], species: string): string | undefined {
   if (named(sets, species)) return undefined;
@@ -84,8 +79,8 @@ export function originIn(dex: FormeDex, sets: readonly PokemonSet[], species: st
 }
 
 /**
- * The ability a forme fights with: the set's when the forme can have it (Aegislash-Blade keeps Stance Change), else the
- * forme's own first (a Mega's ability, Embody Aspect on a Tera mask). The set's ability for a mon that wears no forme.
+ * The ability a forme fights with: the set's when the forme can have it (Aegislash-Blade keeps Stance Change), else the forme's own
+ * first (a Mega's, Embody Aspect on a Tera mask).
  */
 export function formeAbility(dex: FormeDex, forme: string | undefined, setAbility: string | undefined): string | undefined {
   if (!forme) return setAbility || undefined;

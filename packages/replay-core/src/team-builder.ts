@@ -24,11 +24,7 @@ import { isChampionsFormat } from './champions-format.ts';
 import { withReplayIdentity } from './team-identity.ts';
 import { withStandIns, type RandomSetFile } from './team/stand-ins.ts';
 
-/**
- * Build PokemonSet arrays for both sides from a replay's protocol log.
- * Pasted teams take precedence for the user's side; otherwise hidden data can
- * be filled from Smogon usage probabilities when those stats are available.
- */
+/** Builds the PokemonSet arrays of both sides from a replay's protocol log: a pasted team wins for the user's side, hidden data comes from Smogon usage when given. */
 export function buildTeamsFromReplay(
   rawLog: string,
   options?: {
@@ -39,14 +35,11 @@ export function buildTeamsFromReplay(
     setAssumptions?: SmogonSetAssumptions | null;
     /** Precomputed damage-consistent spreads, keyed `side:speciesId`. */
     inferredSpreads?: Map<string, SpreadCandidate>;
-    /**
-     * Raw damage observations: the builder solves spreads itself — base
-     * guesses first, then the solver, then a rebuild with the overlay.
-     */
+    /** Raw damage observations: the builder solves spreads itself (base guesses, then the solver, then a rebuild with the overlay). */
     observations?: DamageObservation[];
-    /** Observed same-turn move order — hard speed constraints for the solver. */
+    /** Observed same-turn move order: hard speed constraints for the solver. */
     speedOrders?: SpeedOrderObservation[];
-    /** Typeless-HP effectiveness readings — type evidence for the resolver. */
+    /** Typeless Hidden Power effectiveness readings: type evidence for the resolver. */
     hpEvidence?: HiddenPowerEvidence[];
     /**
      * The published random-set file of a format whose Dex entry generates the team (Random Battle): a side the builder infers itself
@@ -63,13 +56,9 @@ type BuiltTeams = { p1Team: PokemonSet[]; p2Team: PokemonSet[] };
 type SideInfos = { p1: OpponentTeamInfo; p2: OpponentTeamInfo };
 
 /**
- * The items the protocol inference itself guesses, by side and species: its
- * one tell, Heavy-Duty Boots after a Stealth Rock switch-in without damage.
- * Enriched infos mix them with the enrichment's own guesses, so they are read
- * from the log's inference (round 64, T120). A tell is evidence only while no
- * ability the Pokémon may have explains the missing damage as well: the
- * inference's own rock check (inference/rocks-tell.ts; round 64 review, a
- * Magic Guard Clefable shows the Boots tell without Boots).
+ * The items the protocol inference itself guesses, by side and species: its one tell, Heavy-Duty Boots after a Stealth Rock switch-in
+ * without damage. Read from the log's inference, since enriched infos mix in the enrichment's own guesses. A tell is evidence only while no
+ * ability the Pokémon may have explains the missing damage as well (rocks-tell.ts: a Magic Guard Clefable shows the tell without Boots).
  */
 function itemTells(
   log: string, options: BuildOptions, infos: SideInfos, legality: LegalityContext,
@@ -87,7 +76,6 @@ function infosFor(log: string, options: BuildOptions): SideInfos {
   const given = (side: 'p1' | 'p2') => options?.[`${side}Info`] || null;
   const inferred = { p1: given('p1') || inferOpponentTeam(log, 'p1'), p2: given('p2') || inferOpponentTeam(log, 'p2') };
   if (given('p1') && given('p2')) return inferred;
-  // Round 88 (F, #101): a side the builder infers itself gets the stand-in step the app's enriched infos got before they came here.
   const filled = withStandIns(inferred, log, options?.usageStats, { p1: importedUserTeam(options?.userTeamText) ?? [] }, options?.randomSets);
   const pick = (side: 'p1' | 'p2') => (given(side) ? inferred[side] : filled[side]);
   return { p1: pick('p1'), p2: pick('p2') };
@@ -100,15 +88,13 @@ function knownTeamsFor(log: string, userTeamText: string | undefined): SideTeams
   return { p1: userTeam || embeddedTeams.p1 || null, p2: embeddedTeams.p2 || null };
 }
 
-/** The build plus the spreads it solved on the way (round 37: their item decisions ride into the app's solve). */
+/** The build plus the spreads it solved on the way: their item decisions ride into the app's solve. */
 function buildTeams(log: string, options: BuildOptions): { teams: BuiltTeams; inferred: Map<string, SpreadCandidate> | undefined } {
   const infos = infosFor(log, options);
   const knownTeams = knownTeamsFor(log, options?.userTeamText);
   const { formatHint } = formatHintFor(log);
-  // Pokémon Champions counts Stat Points (32 per stat, 66 total) and every
-  // IV is 31 (round 67, T145): a guess or fallback from an EV-scale source
-  // reaches the Stat Point scale by the level-50 inverse (legalizeEvs), and
-  // the sets keep every IV at 31, as the server plays them.
+  // Pokémon Champions counts Stat Points (32 per stat, 66 total) and every IV is 31: a guess or fallback from an EV-scale source reaches
+  // the Stat Point scale by the level-50 inverse (legalizeEvs), and the sets keep every IV at 31, as the server plays them.
   const budget = evBudget(formatHint);
   const champions = budget.statPoints;
   const legality = { ...logRules(log), freeAbilities: abilitiesAreFree(log) };
@@ -151,10 +137,8 @@ function hasSpreadEvidence(options: BuildOptions): boolean {
 }
 
 /**
- * Precomputed spreads win; otherwise raw observations solve against a base
- * build (guesses first, then the solver, then the caller rebuilds with the
- * overlay). The solver's item decisions come back resolved to concrete
- * items (round 37).
+ * Precomputed spreads win; otherwise raw observations solve against a base build and the caller rebuilds with the overlay. The
+ * solver's item decisions come back resolved to concrete items.
  */
 function inferredSpreadsFor(
   log: string,
@@ -175,8 +159,8 @@ function inferredSpreadsFor(
 }
 
 /**
- * The one-stage chain forfeits like the app's two-stage chain: the orders-only solve (the app's pre-solve) is
- * the fallback of a mon the damage lines forfeit (round 69, B13, D8: 912045 Rillaboom).
+ * The one-stage chain forfeits like the app's two-stage chain: the orders-only solve (the app's pre-solve) is the fallback of a mon
+ * the damage lines forfeit (Rillaboom).
  */
 function carryOrdersOnly(
   solved: Map<string, SpreadCandidate>, log: string, options: BuildOptions, build: () => BuiltTeams, formatHint: string,
@@ -186,13 +170,7 @@ function carryOrdersOnly(
   carryPreSolve(solved, inferredSpreadsFor(log, { ...options, observations: [] }, build, formatHint, infos, knownTeams));
 }
 
-/**
- * Solves the damage-consistent spreads once for a replay. The solve is
- * deterministic in (log, observations, build inputs) and runs thousands of
- * calc calls — memoize this per replay and hand the result to
- * buildTeamsFromReplay as `inferredSpreads` instead of passing raw
- * `observations` at every call site.
- */
+/** Solves the damage-consistent spreads of a replay once (thousands of calc calls); memoize it and pass the result to buildTeamsFromReplay as `inferredSpreads`. */
 export function solveReplaySpreads(
   rawLog: string,
   observations: DamageObservation[],
@@ -210,8 +188,8 @@ export function solveReplaySpreads(
 }
 
 /**
- * The solver's item decisions as concrete items: a boost item the damage lines dropped (round 69, T26) becomes the
- * build's next choice beside every boost item and the Scarf, then a dropped Scarf resolves as before (round 37).
+ * The solver's item decisions as concrete items: a boost item the damage lines dropped becomes the build's next choice beside every
+ * boost item and the Scarf, then a dropped Scarf resolves.
  */
 function resolveSolvedItems(
   solved: Map<string, SpreadCandidate>, infos: SideInfos, formatHint: string,
@@ -231,20 +209,14 @@ function resolveSolvedItems(
 }
 
 /**
- * The base build's speed-only solve already decided the items and the
- * Speed the move orders asked for, and built both into its sets: the full
- * solve sees them as its prior. A mon the full solve forfeits (misfit
- * damage) leaves its map, and the caller's build would reach past that
- * prior to the usage guess, so the pre-solve's entry comes back for it,
- * with or without an item decision (round 53, 2658663776: the forfeit
- * handed Volcanion its 252 Spe back and broke four orders the pre-solve
- * held). A mon the full solve kept takes only the item decision and the
- * Speed IV the settling restored or lowered along (round 69, T132 point 2:
- * the full solve starts from those IVs, so its own answer carries none); so
- * does a forfeited mon whose max HP the log pinned, which stays in the map
- * as that same prior with the measured HP. A mon a pasted team or a team
- * sheet matches is the exception: buildSet returns the sheet set before it
- * reads `inferred`, so a carried entry reaches only the stats panel there.
+ * The base build's speed-only solve already decided the items and the Speed the move orders asked for, and built both into its sets: the
+ * full solve sees them as its prior. A mon the full solve forfeits (misfit damage) leaves its map, and the caller's build would reach
+ * past that prior to the usage guess, so the pre-solve's entry comes back for it, with or without an item decision (a forfeit once
+ * handed Volcanion its 252 Spe back and broke four orders the pre-solve held). A mon the full solve kept takes only the item decision
+ * and the Speed IV the settling restored or lowered (the full solve starts from those IVs, so its own answer carries none); so does a
+ * forfeited mon whose max HP the log pinned, which stays in the map as that same prior with the measured HP. A mon a pasted team or a
+ * team sheet matches is the exception: buildSet returns the sheet set before it reads `inferred`, so a carried entry reaches only the
+ * stats panel there.
  */
 function carryPreSolve(solved: Map<string, SpreadCandidate>, preSolved: Map<string, SpreadCandidate> | undefined) {
   for (const [key, candidate] of preSolved ?? []) {
@@ -289,8 +261,7 @@ function buildSet(
   if (userMatch) return buildSheetSet(info, userMatch, edited, usageSet, smogonSet, inferred);
 
   const curated = selectCuratedFor(dexOf(rules), info, smogonSet, usageSet);
-  // A dropped Scarf ('' from the solver) resolves without it: the guessed
-  // Scarf must not return through the usage marginal (round 37).
+  // A dropped Scarf ('' from the solver) resolves without it: the guessed Scarf must not return through the usage marginal.
   const item = inferred?.item === ''
     ? resolveItemWithout(dexOf(rules), info, usageStats, setAssumptions, inferred.itemReason === 'no-boost' ? ['choicescarf', ...boostItemIds(dexOf(rules))] : 'choicescarf')
     : resolveItem(info, curated, usageSet, smogonSet, inferred?.item ?? '', tellItem);
@@ -310,28 +281,25 @@ function buildSet(
     level: info.level || 100,
     gender: (info.gender || '') as '' | 'M' | 'F',
     teraType: info.teraType.value || undefined,
-    // The log showed a Gigantamax: the simulator then plays the species' G-Max move (round 70).
+    // The log showed a Gigantamax: the simulator then plays the species' G-Max move.
     ...(info.gigantamax ? { gigantamax: true } : {}),
   };
-  // A typeless Hidden Power reads its type before guessed IVs arrive: the step
-  // keeps the type of deliberate (edited) IVs only, and the published or
-  // solved ones are no such choice (round 64, T122: gen 6 Attack 0 would play
-  // a Dragon-type Hidden Power).
+  // A typeless Hidden Power reads its type before guessed IVs arrive: the step keeps the type of deliberate (edited) IVs only, and the
+  // published or solved ones are no such choice (gen 6 Attack 0 would play a Dragon-type Hidden Power).
   const default31 = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
   return edited.editedIvs ? set : { ...hpTyped({ ...set, ivs: default31 }), ivs: spread.ivs };
 }
 
 /**
- * Showdown's teambuilder assumption: Frustration users run 0 happiness
- * (BP 102); Return users keep the sim default 255 (also BP 102). Explicit
- * values from sheets/imports win.
+ * Showdown's teambuilder assumption: Frustration users run 0 happiness (BP 102), Return users keep the sim default 255 (also BP 102);
+ * explicit values from sheets and imports win.
  */
 function withHappinessAssumption(set: PokemonSet): PokemonSet {
   if (set.happiness !== undefined) return set;
   return set.moves.some(move => toId(move) === 'frustration') ? { ...set, happiness: 0 } : set;
 }
 
-/** Public: the open-team-sheet sets both players posted, if any. */
+/** The open-team-sheet sets both players posted, if any. */
 export function extractTeamSheets(rawLog: string): { p1: PokemonSet[] | null; p2: PokemonSet[] | null } {
   return extractEmbeddedShowteamExports(normalizeLineEndings(rawLog));
 }
@@ -371,7 +339,7 @@ function extractEmbeddedShowteamExports(log: string): SideTeams {
       continue;
     }
 
-    // Open Team Sheets: |showteam|p1|<packed team, pipes included> (B3)
+    // Open Team Sheets: |showteam|p1|<packed team, pipes included>
     const showteamMatch = line.match(/^\|showteam\|(p[12])\|([\s\S]+)$/);
     if (showteamMatch) {
       const side = showteamMatch[1] as 'p1' | 'p2';
