@@ -13,7 +13,7 @@ import { BOARD_DIR, SCENE_BOARDS, boardFile, buildBoard, writeBoard } from './ve
  *
  *   UPDATE_VERIFY_SCENES=1 npx vitest run --project app test/regression/verify-scenes-boards.spec.ts
  *
- * writes the fixtures again. Then run `verify-scenes.spec.ts`, recompute the Monte-Carlo references of its rows (the
+ * writes the fixtures again. Then run `tree-orchestrator.verify-scenes.spec.ts`, recompute the Monte-Carlo references of its rows (the
  * recipe is in EVALUATION.md, "Scene pins") and move the pins at the gate, as the rows' comments say.
  * Cost: three team builds and replay reconstructions, about 3 to 8 seconds each on devbox.
  */

@@ -5,7 +5,7 @@ import { parseKTable } from './fit-families';
 /**
  * Round 74 (T163): the K stamp of a capture (EVAL_FIT_ROOT_K) comes from the code, scripts/k-stamp.mjs, never from
  * a hand. The root-scale report refuses a capture whose stamp differs from today's table. The stamp script calls the
- * leaf's own resolver (winprobK); packages/eval-engine/test/eval-winprob.spec.ts pins that resolver's five family
+ * leaf's own resolver (winprobK); packages/eval-engine/test/winprob.spec.ts pins that resolver's five family
  * values, and this spec pins the stamp to the same five, so the three agree. Root specs do not import package
  * sources, hence the literals.
  */

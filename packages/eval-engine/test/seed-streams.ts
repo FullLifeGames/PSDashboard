@@ -4,7 +4,7 @@ import type { PRNGSeed } from '@pkmn/sim';
  * The fixed seed lists the search read until round 89 (#60, T324), kept for the specs that name the old streams. No `src` file reads a
  * list: the engine reads only how many draws each path takes (`BASE_DRAWS` in `search/leaf.ts`, `FALLBACK_DRAWS` in
  * `pair/sampler.ts`) and takes the seeds themselves from `cellSeeds` (`search/root-quantile.ts`). A spec holds the counts to the
- * lengths of these lists (`cell-seed-t324.spec.ts`).
+ * lengths of these lists (`leaf.spec.ts`).
  */
 
 /** The five search seeds. */
