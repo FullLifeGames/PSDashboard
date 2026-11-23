@@ -4,12 +4,7 @@ import type {
 } from './types.ts';
 import { toId } from './ids.ts';
 
-/**
- * Display overlay for posted open team sheets: knowledge the engine already
- * uses (via buildTeamsFromReplay) surfaced into the stats panel with its own
- * 'sheet' provenance. Sim-free — type-only @pkmn/sim import, main-bundle
- * safe (the sheet extraction itself lives in the lazily-loaded team-builder).
- */
+/** Display overlay for posted open team sheets, kept free of the simulator (type-only import) so it stays in the main bundle. */
 
 const SHEET_DETAIL = 'from the team sheet posted in the replay chat';
 
@@ -32,10 +27,7 @@ const hasNonZeroEvs = (evs: PokemonSet['evs'] | undefined): boolean =>
 
 const ALL_31: PokemonEvs = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
 
-/**
- * Fills fields the protocol never proved from the posted team sheet.
- * Usage guesses are replaced — the sheet is authoritative for its side.
- */
+/** Fills the fields the protocol never proved from the posted team sheet, which is authoritative for its side: usage guesses give way. */
 export function applyTeamSheetToInfo(info: OpponentTeamInfo, sheet: PokemonSet[] | null): OpponentTeamInfo {
   if (!sheet || sheet.length === 0) return info;
   return {
@@ -44,8 +36,7 @@ export function applyTeamSheetToInfo(info: OpponentTeamInfo, sheet: PokemonSet[]
       const match = sheetMatchFor(pokemon, sheet);
       if (!match) return pokemon;
 
-      // The "(has item)" team-preview marker is revealed-source but names no
-      // item — a sheet's concrete name always beats the placeholder.
+      // The "(has item)" team-preview marker is revealed-source but names no item: a sheet's concrete name beats it.
       const field = (current: PokemonFieldInfo, value: string | undefined): PokemonFieldInfo =>
         (locked(current.source) && current.value !== '(has item)') || !value
           ? current
@@ -61,8 +52,8 @@ export function applyTeamSheetToInfo(info: OpponentTeamInfo, sheet: PokemonSet[]
         ? { value: { ...match.evs } as PokemonEvs, source: 'sheet' as const, sourceDetail: SHEET_DETAIL }
         : pokemon.evs;
 
-      // Round 70 (T205): the sheet's IVs reach the panel too. An all-31 sheet replaces a guessed table and adds none
-      // where none stood, so the panel shows exactly the IVs the built set plays.
+      // The sheet's IVs reach the panel too: an all-31 sheet replaces a guessed table and adds none where none stood,
+      // so the panel shows exactly the IVs the built set plays.
       const sheetIvs = { ...ALL_31, ...match.ivs } as PokemonEvs;
       const ivs = !locked(pokemon.ivs?.source ?? 'unknown') && (Object.values(sheetIvs).some(value => value !== 31) || pokemon.ivs)
         ? { value: sheetIvs, source: 'sheet' as const, sourceDetail: SHEET_DETAIL }

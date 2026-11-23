@@ -2,21 +2,7 @@ import type { PokemonSet } from '@pkmn/sim';
 import { toId } from '../ids.ts';
 import { dexOf, simFormats, type GameRules, type RulesDex } from '../rules-dex.ts';
 
-/**
- * Sets the simulator can play (round 60). The rules read only the dex of the
- * replay's generation, never a species or ability name. The sim plays an
- * unknown ability id as no ability at all (pokemon.js:184 takes
- * toID(set.ability); the engine's battles never validate teams).
- * - T93 rule 1: an ability name the dex does not know becomes the species'
- *   own ability whose id starts with it (the log writes "As One", the dex
- *   knows "As One (Spectrier)").
- * - T93 rule 2, outside formats with free abilities: an ability only a
- *   battle-only forme of the species' base carries becomes the species'
- *   default (Ogerpon before its Tera, Terapagos); in Balanced Hackmons any
- *   ability can be real.
- * - T79, outside formats with free abilities: a fixed Tera type or item from
- *   the dex.
- */
+/** Sets the simulator can play: the rules read only the dex of the replay's generation, never a species or ability name. */
 
 export type GenDex = RulesDex;
 
@@ -56,41 +42,36 @@ function slotZeroAbility(dex: GenDex, species: string): string | undefined {
   return slots[0] || slots[1] || slots.H || undefined;
 }
 
-/**
- * Whether the replay's format lets any species hold any ability: the sim's
- * rule table answers for a format it knows (Balanced and Pure Hackmons,
- * Hackmons Cup carry no 'obtainableabilities'). A custom game keeps each
- * species to its own abilities, although the sim's Custom Game checks none:
- * draft leagues play their games as custom games under the usual abilities
- * (round 67 gate: Noivern can never have Magic Guard). A format the sim does
- * not know (a newer VGC regulation, a league's own name) counts the same way.
- */
+/** Whether the format lets any species hold any ability, by the sim's rule table (Balanced and Pure Hackmons and Hackmons Cup carry no 'obtainableabilities'). */
 export function abilitiesAreFree(log: string): boolean {
   const tier = log.match(/^\|tier\|(.*)$/m)?.[1] ?? '';
   const format = simFormats().get(tier);
+  // A custom game keeps each species to its own abilities, although the sim's Custom Game checks none: draft leagues play as custom games under
+  // the usual abilities (Noivern can never have Magic Guard). A format the sim does not know (a newer VGC regulation, a league's name) counts the same way.
   if (!format.exists || format.id.endsWith('customgame')) return false;
   return !simFormats().getRuleTable(format).has('obtainableabilities');
 }
 
+/** The ability the simulator plays for a set: the species' own ability the log's name maps to, else its default where only a battle-only forme has it. */
 export function legalAbility(set: PokemonSet, context: LegalityContext): string {
   if (context.gen < 3 || !set.ability) return set.ability;
   const dex = dexOf(context);
   if (!dex.species.get(set.species).exists) return set.ability;
   const id = toId(set.ability);
   if (ownAbilities(dex, set.species).some(name => toId(name) === id)) return set.ability;
+  // The sim plays an unknown ability id as no ability (pokemon.js:184 takes toID(set.ability); the engine's battles never validate
+  // teams): the log's "As One" becomes the species' own ability whose id starts with it, "As One (Spectrier)".
   if (!dex.abilities.get(set.ability).exists) return speciesAbilityFor(dex, set.species, set.ability) ?? set.ability;
+  // Outside free-ability formats, an ability only a battle-only forme of the base carries (Ogerpon before its Tera, Terapagos)
+  // becomes the species' default; in Balanced Hackmons any ability can be real.
   if (!context.freeAbilities && battleOnlyAbilityIds(dex, set.species).has(id)) return slotZeroAbility(dex, set.species) ?? set.ability;
   return set.ability;
 }
 
-/**
- * T79, outside formats with free abilities: a species with a fixed Tera type or item
- * (requiredTeraType, requiredItem: Ogerpon's masks, Terapagos) carries it.
- * Without one the sim takes the species' first type as Tera type
- * (pokemon.js:209 `set.teraType || types[0]`): Ogerpon-Cornerstone would
- * terastallize into Grass instead of Rock.
- */
+/** Outside free-ability formats, a species with a fixed Tera type or item (requiredTeraType, requiredItem: Ogerpon's masks, Terapagos) carries it. */
 export function withRequiredFields(set: PokemonSet, context: LegalityContext): PokemonSet {
+  // Without a fixed one the sim takes the species' first type as Tera type (pokemon.js:209 `set.teraType || types[0]`):
+  // Ogerpon-Cornerstone would terastallize into Grass.
   if (context.freeAbilities) return set;
   const species = dexOf(context).species.get(set.species);
   if (!species.exists) return set;

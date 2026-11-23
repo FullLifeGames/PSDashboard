@@ -9,11 +9,7 @@ import { findUserMatch, resolveItemWithout } from './set-resolvers.ts';
 import type { KnowledgeSource, OpponentTeamInfo } from '../types.ts';
 import { toId } from '../ids.ts';
 
-/**
- * The bridge between the team builder and the solver's Choice Scarf
- * decisions (round 37): what each mon's item and Speed may be assumed to
- * be, and the concrete item a dropped Scarf gives way to.
- */
+/** The bridge between the team builder and the solver's Choice Scarf decisions: what each mon's item and Speed may be assumed to be. */
 
 type SideInfos = { p1: OpponentTeamInfo; p2: OpponentTeamInfo };
 type SideTeams = { p1: PokemonSet[] | null; p2: PokemonSet[] | null };
@@ -23,9 +19,9 @@ const KNOWN_SOURCES = new Set<KnowledgeSource>(['revealed', 'manual', 'sheet']);
 const hasEvs = (set: PokemonSet) => Object.values(set.evs ?? {}).some(value => (value ?? 0) > 0);
 
 /**
- * The format's Item Clause (round 89, #75): how many Pokémon of a team may hold the same item, undefined when the format has no clause. The log's
- * own `|rule|` line says it first (the game announced it, two spellings: "Limit 1 of each item" and "Limit one of each item"); a log without the
- * line asks the simulator's rule table of the `|tier|`; a Custom Game and a format the simulator does not know have none.
+ * The format's Item Clause: how many Pokemon of a team may hold the same item, undefined when there is none. The log's own `|rule|` line
+ * says it first ("Limit 1 of each item" and "Limit one of each item" both occur); else the simulator's rule table of the `|tier|` answers;
+ * a Custom Game and a format the simulator does not know have none.
  */
 export function itemClauseLimit(log: string): number | undefined {
   const line = log.match(/^\|rule\|Item Clause: Limit (\w+) of each item/m)?.[1];
@@ -41,13 +37,10 @@ export function itemClauseLimit(log: string): number | undefined {
 }
 
 /**
- * What the solver may assume per mon: a sheet or pasted set fixes the item
- * (and the spread when it carries EVs; Open Team Sheets omit them),
- * protocol evidence and user edits fix what they revealed, and the usage
- * spreads of the species are the plausible configurations. Since round 89
- * (#75) the usage items the log does not refute ride along in usage order
- * (`itemOffers`) with the format's Item Clause (`itemLimit`): what the
- * solver's item rung may swap in for a knockout no spread reaches.
+ * What the solver may assume per mon: a sheet or pasted set fixes the item (and the spread when it carries EVs; Open Team Sheets omit
+ * them), protocol evidence and user edits fix what they revealed, and the usage spreads are the plausible configurations. `itemOffers`
+ * (the usage items the log does not refute, in usage order) with `itemLimit` is what the solver's item rung may swap in for a knockout
+ * no spread reaches.
  */
 export function speedKnowledgeFor(
   infos: SideInfos, knownTeams: SideTeams, usageStats: SmogonUsageStats | null | undefined, itemLimit?: number,

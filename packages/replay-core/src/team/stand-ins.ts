@@ -7,23 +7,7 @@ import { normalizeLineEndings } from '../line-endings.ts';
 import { guessedField, unknownEvs, unknownField } from '../team-info.ts';
 import { toId } from '../ids.ts';
 
-/**
- * Round 88 (F, #101): the bodies a side never showed. A game without team preview lets a side win with the bodies that entered,
- * and the build maps the bodies the log shows one to one onto sets, so a side that showed 3 of its 6 played the engine as a
- * 3 against 6 game (smogtours-gen4ou-544639 read -0.750 at turn 1). `|teamsize|` is the side's real count (teamSizes), so a side
- * whose built count falls short of it gets the difference as stand-ins, guessed from the format's teammate statistics: greedy by
- * the sum of the share of teams that carry the candidate with each body the side already has, a distinct base species (Species
- * Clause), legal in the game's format. A pasted team fills the user's open slots before any guess. Every build path calls this one
- * function before it enriches the infos: the app's panel and live build, `buildAppTeams` of the bank, the builder itself.
- *
- * Round 89 (lane B, #117): a format whose Dex entry generates the team (Random Battle, Hackmons Cup) has no stats file, and its
- * missing bodies come from the format's published random-set data instead (`RandomSetFile`): a draw seeded by the log's header
- * (one game always gets the same guess) over the file's species, distinct base species the side does not show, legal in the
- * format, each with the file's level and one role's moves, ability and item. The data arrives through the app's set fetch.
- *
- * Nothing changes for a side with a team preview (the preview lists every body; a bring-limited format lists more than it
- * brings), for a log without `|teamsize|`, for a generated-team format without its file, and for a side that is not short.
- */
+/** The bodies a side never showed (ARCHITECTURE.md, "Stand-ins"): every build path calls `withStandIns` before it enriches the infos. */
 export type SideInfos = { p1: OpponentTeamInfo; p2: OpponentTeamInfo };
 type Side = 'p1' | 'p2';
 const SIDES: Side[] = ['p1', 'p2'];
@@ -53,10 +37,7 @@ const blankBody = (species: string, level: number): RevealedPokemonInfo => ({
 /** Whether the log's side listed its bodies at a team preview: the preview already says everything the log will show. */
 const hasPreview = (log: string, side: Side) => log.includes(`\n|poke|${side}|`);
 
-/**
- * How many bodies a side still lacks: its `|teamsize|` minus the bodies built, 0 for a side with a team preview, a log without a
- * size, or a side that is not short. The panel's notice reads it for a format the step cannot fill.
- */
+/** How many bodies a side still lacks: its `|teamsize|` minus the bodies built; 0 with a team preview, without a size, or when the side is not short. */
 export function missingBodies(log: string, built: number, side: Side): number {
   const lf = normalizeLineEndings(log);
   const size = teamSizes(lf)[side];
@@ -64,10 +45,7 @@ export function missingBodies(log: string, built: number, side: Side): number {
   return Math.max(0, size - built);
 }
 
-/**
- * Whether the format's Dex entry generates the team (Random Battle, Hackmons Cup): such a game has no stats file, and its stand-ins
- * come from the random-set file. The one rule of `withStandIns`, read from the Dex, never from a name; the app reads it from here.
- */
+/** Whether the format's Dex entry generates the team (Random Battle, Hackmons Cup): the rule of `withStandIns`, read from the Dex, never from a name. */
 export function generatesTeam(formatId: string): boolean {
   const format = simFormats().get(formatId);
   return format.exists && !!format.team;
@@ -102,7 +80,10 @@ function legalIn(dex: RulesDex, validator: TeamValidator | null, name: string): 
   return { name: species.name, base: species.baseSpecies || species.name };
 }
 
-/** `count` guesses for a side that holds `known`, most likely first. */
+/**
+ * `count` guesses for a side that holds `known`, most likely first: greedy by the summed share of teams that carry the candidate with each body
+ * the side already has, one per base species (Species Clause), legal in the game's format.
+ */
 function guessBodies(stats: SmogonUsageStats, known: RevealedPokemonInfo[], count: number, log: string, formatId: string): RevealedPokemonInfo[] {
   const dex = dexOf(logRules(log));
   const format = simFormats().get(formatId);
@@ -163,10 +144,9 @@ function randomBody(name: string, entry: RandomSetFile[string], below: (limit: n
 }
 
 /**
- * `count` guesses for a side of a generated-team game: a draw seeded by the log's header (its players, rules and sizes, which one
- * replay never changes) and the side, so a game keeps its guess on every build path. Candidates are the file's species the game's
- * Dex knows and the format lets in, one per base species, none of them a base the side shows; each draws one role of the file and
- * four of its moves (all of them when it lists four or fewer), takes that role's first ability and item and the file's level.
+ * `count` guesses for a side of a generated-team game: a draw seeded by the log's header (its players, rules and sizes, which one replay never
+ * changes) and the side, so a game keeps its guess on every build path. Candidates are the file's species the game's Dex knows and the format lets
+ * in, one per base species, none of them a base the side shows; each draws one role and four of its moves, and takes that role's first ability and item.
  */
 function randomBodies(
   file: RandomSetFile, known: RevealedPokemonInfo[], count: number, log: string, formatId: string, side: Side,
@@ -219,11 +199,7 @@ function filledSide(
   return bodies.length === info.pokemon.length ? null : { ...info, pokemon: bodies };
 }
 
-/**
- * The infos with every short side filled up to its `|teamsize|`: first by the pasted bodies the side does not show yet (the user's
- * own team, `pasted.p1`), then by stand-ins from the statistics. Returns `raw` itself when no side changes. A game whose format
- * generates its team reads `randomSets` (round 89, #117) instead of the statistics, and stays as it is without them.
- */
+/** Fills every short side up to its `|teamsize|` with pasted bodies, then stand-ins (`randomSets` for generated teams); `raw` itself when nothing changes. */
 export function withStandIns(
   raw: SideInfos,
   log: string,
@@ -231,6 +207,7 @@ export function withStandIns(
   pasted?: Partial<Record<Side, readonly PastedBody[]>>,
   randomSets?: RandomSetFile | null,
 ): SideInfos {
+  // The build maps the bodies the log shows one to one onto sets: a side that showed 3 of its 6 would play the engine as a 3 against 6 game.
   const lf = normalizeLineEndings(log);
   const formatId = inferReplayFormatId({ log: lf });
   const generated = generatesTeam(formatId);

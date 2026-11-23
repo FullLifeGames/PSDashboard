@@ -1,7 +1,4 @@
-/**
- * Parses PS team export format, handling German stat abbreviations.
- * German: KP=HP, Ang=Atk, Vert=Def, SpA=SpA, SpV=SpD, Init=Spe
- */
+// German stat labels in a pasted team: KP=HP, Ang=Atk, Vert=Def, SpV=SpD, Init=Spe; SpA is the same in both languages.
 
 const GERMAN_STAT_MAP: Record<string, string> = {
   'KP': 'HP',
@@ -9,7 +6,6 @@ const GERMAN_STAT_MAP: Record<string, string> = {
   'Vert': 'Def',
   'SpV': 'SpD',
   'Init': 'Spe',
-  // SpA is the same in both languages
 };
 
 function preprocessGermanTeam(rawText: string): string {
@@ -19,6 +15,7 @@ function preprocessGermanTeam(rawText: string): string {
   );
 }
 
+/** Rewrites the German stat labels of a pasted team export (KP, Ang, Vert, SpV, Init) to the English ones. */
 export function parseTeamText(rawText: string): string {
   return preprocessGermanTeam(rawText);
 }

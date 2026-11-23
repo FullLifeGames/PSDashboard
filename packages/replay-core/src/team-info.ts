@@ -15,6 +15,7 @@ import type {
 import { toId } from './ids.ts';
 import { dexOfSources, type RulesDex } from './rules-dex.ts';
 
+/** The zeroed spread that an unknown EVs field carries. */
 export const EMPTY_EVS: PokemonEvs = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
 
 export function unknownField(): PokemonFieldInfo {
@@ -29,10 +30,12 @@ export function guessedField(value: string, probability?: number, sourceDetail?:
   return { value, source: 'guessed', probability, sourceDetail };
 }
 
+/** A field the user typed in. */
 export function manualField(value: string): PokemonFieldInfo {
   return { value, source: 'manual' };
 }
 
+/** An EVs field with no evidence: all zero. */
 export function unknownEvs(): PokemonEvsInfo {
   return { value: { ...EMPTY_EVS }, source: 'unknown' };
 }
@@ -41,10 +44,12 @@ export function guessedEvs(value: PokemonEvs, probability?: number, sourceDetail
   return { value, source: 'guessed', probability, sourceDetail };
 }
 
+/** An EVs field the user typed in. */
 export function manualEvs(value: PokemonEvs): PokemonEvsInfo {
   return { value, source: 'manual' };
 }
 
+/** A move the user typed in. */
 export function manualMove(name: string): PokemonMoveInfo {
   return { name, source: 'manual' };
 }
@@ -68,9 +73,8 @@ const sameStats = (a: Partial<PokemonEvs>, b: Partial<PokemonEvs>, fallback: num
   STAT_IDS.every(stat => (a[stat] ?? fallback) === (b[stat] ?? fallback));
 
 /**
- * The EVs the panel shows for a solved spread. The label says who checked it (round 69, T69): a spread that keeps the
- * guess's numbers keeps the guess's label, a changed one carries its origin's, and an entry no evidence solved shows
- * its numbers under the label of the guess they come from.
+ * The EVs the panel shows for a solved spread, labelled by who checked it: a spread that keeps the guess's numbers keeps its label,
+ * a changed one carries its origin's, and an entry no evidence solved shows its numbers under the label of the guess they come from.
  */
 function overlayEvs(pokemon: RevealedPokemonInfo, candidate: SpreadCandidate): PokemonEvsInfo {
   const guess = pokemon.evs;
@@ -97,13 +101,7 @@ function overlayIvs(pokemon: RevealedPokemonInfo, candidate: SpreadCandidate): P
   return guessedEvs({ ...candidate.ivs }, undefined, ORDER_SPREAD_DETAIL);
 }
 
-/**
- * Display overlay for damage-consistent spreads and the items the
- * move-order evidence decided: mirrors the simulator precedence
- * (edited/revealed/sheet beat inference; inference beats usage guesses),
- * so what the panel shows is what the sim runs. A body whose EVs are set (manual or revealed) keeps its info whole,
- * nature included, and the build plays that nature (`shownNature` in `team/set-resolvers.ts`, issue 150).
- */
+/** Overlays solved spreads and move-order items onto the display info, with the simulator's precedence (edited, revealed or sheet beats inference beats usage). */
 export function applyInferredSpreads(
   info: OpponentTeamInfo,
   side: 'p1' | 'p2',
@@ -118,6 +116,8 @@ export function applyInferredSpreads(
       const item = overlayItem(pokemon, candidate);
       const evsGuessed = pokemon.evs.source === 'guessed' || pokemon.evs.source === 'unknown';
       const natureGuessed = !pokemon.nature || pokemon.nature.source === 'guessed' || pokemon.nature.source === 'unknown';
+      // A body with set EVs (manual or revealed) keeps its info whole, nature included: the build plays that nature
+      // (`shownNature` in `team/set-resolvers.ts`).
       if (!evsGuessed) return { ...pokemon, item };
       const ivs = overlayIvs(pokemon, candidate);
       return {
@@ -131,13 +131,7 @@ export function applyInferredSpreads(
   };
 }
 
-/**
- * Item values carry display annotations ("Sitrus Berry (consumed)",
- * "(has item)") that describe battle knowledge, not the set. This strips them
- * down to the set's item name — '' when there is no real item name at all.
- * Every boundary that needs a plain item (sets export/import, editor fields,
- * simulator teams) must go through this instead of the raw value.
- */
+/** The set's item name without display annotations such as "(consumed)"; '' when there is none. Every boundary that needs a plain item goes through it. */
 export function itemSetValue(value: string): string {
   const trimmed = (value || '').trim();
   if (!trimmed || trimmed.startsWith('(')) return '';
@@ -167,10 +161,8 @@ function allowedSetFallback(setFallback: SetAssumption | undefined, ruledOut?: s
 }
 
 /**
- * `preferSet` = the set fallback is the WINNING curated set (matched against
- * revealed evidence) — it then beats the usage marginal, exactly as it does
- * in the simulator's team builder. An unselected first-set fallback keeps
- * losing to usage.
+ * `preferSet`: the set fallback is the winning curated set (matched against revealed evidence), which beats the usage marginal
+ * as in the simulator's team builder; an unselected first-set fallback loses to usage.
  */
 function normalizeItemField(
   item: PokemonFieldInfo,
@@ -224,51 +216,41 @@ function normalizeNatureField(
   return guessedField(fallback.nature, fallback.probability, fallback.sourceDetail);
 }
 
-/**
- * Dedup key for move fills: "Hidden Power" and "Hidden Power Grass" describe
- * the same slot — a guessed typed variant must not join a revealed generic
- * one (G12).
- */
+/** Dedup key for move fills: a guessed "Hidden Power Grass" must not join a revealed "Hidden Power". */
 function moveDedupKey(name: string): string {
   const id = toId(name);
   return id.startsWith('hiddenpower') ? 'hiddenpower' : id;
 }
 
-/** Usage-move candidates offered to the veto pass (the tail refills vetoed
- * slots) — mirrors the team builder's USAGE_MOVE_POOL. */
+/** Usage-move candidates offered to the veto pass (the tail refills vetoed slots); mirrors the team builder's USAGE_MOVE_POOL. */
 const GUESS_MOVE_POOL = 10;
 
 type SpeciesUsage = ReturnType<typeof getSpeciesUsageSet>;
 type SmogonSet = ReturnType<typeof getSpeciesSetAssumption>;
 type CuratedSet = ReturnType<typeof selectCuratedSet>;
 
-/**
- * The same coherent-set selection the simulator's team builder runs — the
- * panel's fills and the sim's fills come from one winner (or one shared
- * marginal fallback), never from two different guessers (GPL Body Press).
- */
+/** The coherent-set selection of the simulator's team builder: the panel's fills and the sim's come from one winner or one shared marginal fallback. */
 function curatedSetFor(dex: RulesDex, pokemon: RevealedPokemonInfo, usageSet: SpeciesUsage, smogonSet: SmogonSet): CuratedSet | null {
   const proven = (field: PokemonFieldInfo) =>
     field.source === 'revealed' || field.source === 'manual' ? toId(field.value) : '';
   const known = pokemon.moves.filter(move => move.source === 'revealed' || move.source === 'manual');
   return smogonSet ? selectCuratedSet([smogonSet, ...(smogonSet.alternatives ?? [])], {
     dex, revealedMoves: known.map(move => toId(move.name)),
-    // The Z-moves and Max moves the revealed moves do not explain: a set with a move to fill them fits better (round 70).
+    // The Z-moves and Max moves the revealed moves do not explain: a set with a move to fill them fits better.
     openMoves: unfilledOpenMoves(dex, pokemon.openMoves, known.map(move => move.name)),
-    // A consumed or knocked-off item is still the set's item (round 63).
+    // A consumed or knocked-off item is still the set's item.
     revealedItem: proven({ ...pokemon.item, value: itemSetValue(pokemon.item.value) }),
     revealedAbility: proven(pokemon.ability),
     ruledOutItems: pokemon.ruledOut?.items ?? [],
     ruledOutAbilities: pokemon.ruledOut?.abilities ?? [],
     usageProbability: moveId =>
       usageSet?.moves.find(move => toId(move.value) === moveId)?.probability ?? 0,
-    // The item after a rule-out, as the build reads it (round 64, decision 19).
+    // The item after a rule-out, as the build reads it.
     guessedItem: pokemon.item.source === 'guessed' ? itemSetValue(pokemon.item.value) : '',
     usageItem: usageSet?.item?.value ?? '',
   }) : null;
 }
 
-/** The curated set's fields, falling back to the marginal set assumption. */
 function setFallbacks(curated: CuratedSet | null, smogonSet: SmogonSet) {
   return {
     item: curated?.item ?? smogonSet?.item,
@@ -278,10 +260,8 @@ function setFallbacks(curated: CuratedSet | null, smogonSet: SmogonSet) {
 }
 
 /**
- * The move pool in the build's offer order (assembleMoves): known, the
- * curated set (spared by veto rows 1 and 2), earlier guesses, usage, marginal
- * set moves when nothing curated won, then the usage tail (round 63, T89
- * with T28).
+ * The move pool in the build's offer order (assembleMoves): known, the curated set (spared by veto rows 1 and 2), earlier guesses,
+ * usage, marginal set moves when nothing curated won, then the usage tail.
  */
 function assembleMovePool(
   pokemon: RevealedPokemonInfo, curated: CuratedSet | null, usageSet: SpeciesUsage, smogonSet: SmogonSet,
@@ -308,10 +288,8 @@ function assembleMovePool(
 }
 
 /**
- * Known moves always stay; vetoed guesses drop and the pool's tail refills
- * the display up to four slots. The item rows spare the chosen set's moves
- * when the item is that set's own (T131), as the build does. A Z-move's or
- * Max move's open slot is settled as the build settles it (round 70).
+ * Known moves stay; vetoed guesses drop and the pool's tail refills the display up to four slots. The item rows spare the chosen
+ * set's moves when the item is that set's own, as the build does. A Z-move's or Max move's open slot settles as in the build.
  */
 function vetoedMoves(
   dex: RulesDex, pool: MoveCandidate[], infoFor: Map<string, PokemonMoveInfo>, itemValue: string, curated: CuratedSet | null,
@@ -329,10 +307,8 @@ function vetoedMoves(
 }
 
 /**
- * Display follows computed data (⑤): the sim substitutes a typeless
- * "Hidden Power" with the evidence/usage variant — show that same name so
- * the visible sheet and the simulated set agree. The revealed status
- * stays; only the name gains the typed suffix, marked by its detail.
+ * The simulator substitutes a typeless "Hidden Power" with the evidence or usage variant; the display shows the same name, keeps
+ * the revealed status and marks the added type in `sourceDetail`.
  */
 function withTypedHiddenPower(
   moves: PokemonMoveInfo[], species: string, hpTypeResolver: ((species: string) => string | null) | undefined,
@@ -347,9 +323,8 @@ function withTypedHiddenPower(
 }
 
 /**
- * The IVs the build plays (round 69, T136): the chosen published set's, read by the rule the build reads
- * (publishedIvs), shown as a guess; the user's own stay. A Champions body plays IV 31 whatever the set lists, so it
- * shows none, and a set that lists none leaves the field open (the body plays 31).
+ * The IVs the build plays: the chosen published set's, read by the build's rule (publishedIvs) and shown as a guess; the user's own stay.
+ * A Champions body plays IV 31 whatever the set lists, so it shows none; a set that lists none leaves the field open.
  */
 function ivsField(
   pokemon: RevealedPokemonInfo, curated: CuratedSet | null, usageSet: SpeciesUsage, smogonSet: SmogonSet, format: string,
@@ -361,13 +336,14 @@ function ivsField(
   return guessedEvs({ hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31, ...published }, undefined, sourceDetail);
 }
 
+/** Fills what a revealed Pokemon leaves open (item, ability, EVs, nature, IVs, moves) from the chosen published set and the usage stats, as the build does. */
 export function enrichPokemonInfo(
   pokemon: RevealedPokemonInfo,
   usageStats?: SmogonUsageStats | null,
   setAssumptions?: SmogonSetAssumptions | null,
   hpTypeResolver?: (species: string) => string | null,
 ): RevealedPokemonInfo {
-  // The Dex of the game the sets and the usage were published for (round 75, T160).
+  // The Dex of the game the sets and the usage were published for.
   const dex = dexOfSources(setAssumptions?.format, usageStats?.format);
   const usageSet = getSpeciesUsageSet(usageStats, pokemon.species, pokemon.ruledOut, GUESS_MOVE_POOL);
   const smogonSet = getSpeciesSetAssumption(setAssumptions, pokemon.species);
@@ -392,6 +368,7 @@ export function enrichPokemonInfo(
   };
 }
 
+/** Applies `enrichPokemonInfo` to every Pokemon of a team. */
 export function enrichTeamInfo(
   teamInfo: OpponentTeamInfo,
   usageStats?: SmogonUsageStats | null,
