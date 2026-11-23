@@ -125,6 +125,21 @@ describe('rows-compare', () => {
     expect(partial.out).toContain('LOST 1x app | x > two');
   });
 
+  test('--expect-lost names the rows a cut removes: exit 0 when exactly those are lost, 1 when more, fewer or a gain stand', () => {
+    const after = listOf(row('app', 'x > one'), row('ui', 'x > one', 'u.spec.tsx'));
+    const expectLost = (names: string[], rows: Row[] = after) => {
+      const args = [write('rows-before.json', before), write('rows-after.json', rows), '--expect-lost', write('rows-expected.json', names)];
+      return run('rows-compare.mjs', ...args);
+    };
+    const exact = expectLost(['app | x > two']);
+    expect(exact.code).toBe(0);
+    expect(exact.out).toContain('LOST 1x app | x > two (was in a.spec.ts), expected');
+    expect(exact.out).toContain('lost 1 of 1 expected, unexpected 0, gained 0');
+    expect(expectLost(['app | x > two', 'app | x > one']).code, 'an expected row that stays').toBe(1);
+    expect(expectLost([]).code, 'a row lost that no one named').toBe(1);
+    expect(expectLost(['app | x > two'], [...after, row('app', 'x > three')]).code, 'a gain').toBe(1);
+  });
+
   test('the longest prefix wins and a table entry that matches no row exits 2', () => {
     const { rows } = applyTable([row('app', 'a > b > c')], { prefixes: { 'a > ': 'X > ', 'a > b > ': 'Y > ' } });
     expect(rows[0].name).toBe('Y > c');
