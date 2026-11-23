@@ -1,39 +1,19 @@
 import type { Battle } from '@pkmn/sim';
 import { idsOfStrings, lex, readsOfCode } from './handler-source.ts';
 
-/**
- * Round 89 (#149, step A8): which fields of the board a Dex entry reads when one of its handlers runs. The memos of the
- * hit cost and of the end of turn (score/contact.ts, score/residuals.ts) key the state their play reads, and the state a
- * play reads is whatever the handlers of the entries on the board name. The names come from the Dex at run time (the
- * source of each handler, `String(fn)`, scanned for the properties it reads), so a move, an ability or an item that a new
- * simulator version adds is read the moment it exists, and no entry is named in our code.
- *
- * A read is a property name after a dot, or in brackets with a string, that is not the left side of an assignment. The
- * entry's own handlers, those of its `condition`, `self`, `secondary` and `secondaries`, and the callbacks that are no
- * handler (`basePowerCallback`) count. A handler for an event the consumer never fires does not count: the consumer
- * names its events (HIT_EVENTS_NEVER: the events a played hit never fires, held by test/board-key-census.spec.ts, which plays
- * every move; RESIDUAL_EVENTS: the events the end of the turn fires, held there too). A handler that calls a method of
- * `Pokemon`, `Side` or `Field` reads what that method reads (the closure over the methods' own sources).
- *
- * The scan errs toward reading too much: a name is a read wherever it appears, whoever owns the property, so a name
- * adds a field to the key and costs a hit, never a wrong answer. test/board-key-readers.spec.ts holds each field to the
- * entries the scan names.
- */
+/** Which fields of the board a Dex entry reads when its handlers run, scanned from the handler sources at run time (the memo keys of score/contact.ts, score/residuals.ts). */
 
 export type Consumer = 'hit' | 'residual';
 
-/** Property names read by the handlers of some entries. */
 export type ReadSet = ReadonlySet<string>;
 
 type BattleDex = Battle['dex'];
 
 /**
- * The events a played hit never fires (a move use on the copy of a board, score/contact-play.ts): the choice of the next turn
- * (the disabled moves, the trapped bodies, the lock of a move). The end of the turn does fire: a hit that leaves a status
- * prices it over the played end of the turns (Residual) and the turns the status takes (BeforeMove), so their handlers are read.
- * test/board-key-census.spec.ts plays every damaging move against a sample of abilities and items (every one with
- * `DICE_SWEEPS=full`) and requires that none of these events fired; an event the list does not know is read, so a new
- * simulator event costs hits, never an answer.
+ * The events a played hit never fires (a move use on the copy of a board, score/contact-play.ts): the choice of the next turn (the
+ * disabled moves, the trapped bodies, the lock of a move). The end of the turn does fire (Residual, BeforeMove). An event the list does
+ * not know is read, so a new simulator event costs hits, never an answer; test/board-key-census.spec.ts plays every damaging move and
+ * requires that none of these fired.
  */
 export const HIT_EVENTS_NEVER: ReadonlySet<string> = new Set([
   'DisableMove', 'StallMove', 'TrapPokemon', 'MaybeTrapPokemon', 'BeforeTurn', 'LockMove', 'LockMoveAbility',
@@ -54,13 +34,11 @@ const HANDLER = /^on(Ally|Foe|Source|Any|Field|Side|Slot|Self)?([A-Z]\w*)$/;
 const SUB_EFFECTS = ['condition', 'self', 'secondary', 'secondaries'] as const;
 const CREATES = ['volatileStatus', 'sideCondition', 'slotCondition', 'status', 'weather', 'terrain', 'pseudoWeather'] as const;
 
-/** What the scan of one entry found: the properties its handlers read, and the ids it names (conditions it can create). */
 export interface EntryReads { fields: ReadSet; names: ReadonlySet<string> }
 
 /** The reads of the simulator's own methods on a body, a side and the field: a handler that calls one of them reads what it reads. */
 export type Methods = ReadonlyMap<string, ReadSet>;
 
-/** The property names a source reads (comments and the text of strings never count). */
 export const tokensOf = (source: string): Set<string> => readsOfCode(lex(source).code);
 
 /** Whether the consumer fires the event of this handler key (a key that is no handler is a callback the move path calls: the hit reads it, the end of the turn does not). */
@@ -113,7 +91,6 @@ export function entryReads(entry: object, consumer: Consumer, methods: Methods):
 
 const methodTables = new WeakMap<object, Methods>();
 
-/** The closure of every method's reads over their calls of each other, and the methods each one reaches. */
 function closeOver(direct: ReadonlyMap<string, ReadonlySet<string>>): { reads: Map<string, Set<string>>; reach: Map<string, Set<string>> } {
   const reads = new Map<string, Set<string>>();
   const reach = new Map<string, Set<string>>();
@@ -141,9 +118,9 @@ const DISPATCH = 'getCallback';
  * The reads of the methods of the simulator's `Pokemon`, `Side` and `Field`, and of the `Battle` methods that never reach its event
  * dispatch, closed over their calls of each other: found from the prototypes of instances of the battle (a clone of the speed layer
  * carries the same sources). A handler that calls `this.getOverflowedTurnCount()` (a Future Sight, a Wish) reads the battle's `turn`.
- * A `Battle` method that reaches the dispatch (`runEvent`, `damage`, `heal`) runs the handlers of the entries on the board, whose reads the
- * scan already holds, and reads bookkeeping of the dispatch itself (`event`, `effect`, `activeMove`): its reads stay out, as before, because
- * with them every board would read the whole battle (a probe on the cost sample: the hit memo plays five times as often).
+ * A `Battle` method that reaches the dispatch (`runEvent`, `damage`, `heal`) runs the handlers of the entries on the board, whose reads
+ * the scan already holds, and reads bookkeeping of the dispatch (`event`, `effect`, `activeMove`): its reads stay out, because with
+ * them every board would read the whole battle (the hit memo would play five times as often).
  */
 export function methodsOf(battle: Battle): Methods {
   const side = battle.sides[0];

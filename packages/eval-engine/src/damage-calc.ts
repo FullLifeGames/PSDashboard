@@ -14,25 +14,22 @@ type CalcAbility = CalcMoveOptions['ability'];
 type CalcItem = CalcMoveOptions['item'];
 type CalcMoveOverrides = NonNullable<CalcMoveOptions['overrides']>;
 
+/** The preview of one move into one defender: the damage range in percent of max HP, the KO verdict, the hit-count shares and the roll steps. */
 export interface DamageResult {
   moveName: string;
   minPercent: number;
   maxPercent: number;
   range: string;
   koChance: string;
-  /**
-   * A move whose hit count the simulator draws: each count with its chance
-   * and its own range (round 67, T136 point 1), fewest hits first. Absent
-   * for one hit or a fixed count.
-   */
+  /** A move whose hit count the simulator draws: each count with its chance and its own range, fewest hits first. Absent for one hit or a fixed count. */
   hitShares?: { hits: number; chance: number; minPercent: number; maxPercent: number }[];
-  /** Round 82 (forced dice): the damage of each step of the roll, asked for with `DamageCalcContext.rolls`. */
+  /** The damage of each step of the roll, asked for with `DamageCalcContext.rolls`. */
   rolls?: DamageRolls;
 }
 
 /**
  * The damage roll's steps as the panel's select lists them: the calculator's damage for each step, lowest first (16 steps, 39 in
- * Gens 1 and 2). A multi-hit move gives the sum of its hits, every hit taking the step (decision 15a), for `hits` hits.
+ * Gens 1 and 2). A multi-hit move gives the sum of its hits, every hit taking the step, for `hits` hits.
  */
 export interface DamageRolls {
   damage: number[];
@@ -42,9 +39,10 @@ export interface DamageRolls {
   hits: number;
 }
 
+/** The field and the live position around a damage preview: game type, generation, weather, terrain, side conditions, the doubles partners and the forced dice. */
 export interface DamageCalcContext {
   gameType?: 'Singles' | 'Doubles';
-  /** Generation of the replay — the calc must match the sim's gen (B5). */
+  /** Generation of the replay; the calc must match the sim's gen. */
   gen?: number;
   /** Sim condition ids, mapped onto the calc field (e.g. 'raindance'). */
   weather?: string;
@@ -52,29 +50,23 @@ export interface DamageCalcContext {
   attackerSideConditions?: string[];
   defenderSideConditions?: string[];
   /**
-   * Doubles, when the preview sees the field: the defender's living partner
-   * (never the attacker; null when it stands alone) and whether the
-   * attacker's partner lives. They decide how the move lands (moveLanding);
-   * left out, the calc's own reading stands.
+   * Doubles, when the preview sees the field: the defender's living partner (never the attacker; null when it stands alone) and whether
+   * the attacker's partner lives. They decide how the move lands (moveLanding); left out, the calc's own reading stands.
    */
   defenderPartner?: SimPokemonInfo | null;
   attackerPartnerAlive?: boolean;
-  /** The move id the defender's partner picked this turn, when the preview knows it (T124). */
   defenderPartnerMove?: string;
-  /**
-   * The live battle of the branch with the two bodies of the hit (round 73, T202): the hits the calc cannot price are played on a
-   * copy of it. Left out where the position has no live battle.
-   */
+  /** The live battle of the branch with the two bodies of the hit: the hits the calc cannot price are played on a copy of it. Left out where the position has none. */
   liveHit?: LiveHit;
-  /** Round 82 (forced dice): the hit is a crit (the user forced one); the calculator prices it as a crit. */
+  /** The hit is a crit (the user forced one); the calculator prices it as a crit. */
   isCrit?: boolean;
-  /** Round 82: also list the damage of each step of the roll (`DamageResult.rolls`). */
+  /** Also list the damage of each step of the roll (`DamageResult.rolls`). */
   rolls?: boolean;
-  /** Round 82: the hit count the user forced; a move with a drawn count lists its rolls for that count (else for the fewest hits). */
+  /** The hit count the user forced; a move with a drawn count lists its rolls for that count (else for the fewest hits). */
   hits?: number;
 }
 
-/** The calc has no field that prices this hit: the simulator does (T202). */
+/** The calc has no field that prices this hit: the simulator does. */
 class UnpricedByCalc extends Error {}
 
 function toConditionId(value: string | undefined): string {
@@ -104,34 +96,26 @@ function calcField(context: DamageCalcContext, defenderProtected = false): Field
 type CalcGen = ReturnType<typeof calcGeneration>;
 
 /**
- * The info's body for the calc: an armed Tera toggle reads as the
- * simulator's click makes it (round 67: Terapagos-Terastal clicks into
- * Terapagos-Stellar, an Ogerpon into its -Tera forme; calc/tera-click.ts). The click goes into the context's weather and
- * terrain, which Terapagos-Stellar's Teraform Zero clears (round 69, T152).
+ * The info's body for the calc: an armed Tera toggle reads as the simulator's click makes it (Terapagos-Terastal into Terapagos-Stellar,
+ * an Ogerpon into its -Tera forme; calc/tera-click.ts). The click goes into the context's weather and terrain, which Teraform Zero clears.
  */
 const bodyFor = (gen: CalcGen, info: SimPokemonInfo, context: DamageCalcContext = {}) =>
   teraClicked(simGenNum(gen), bodyFromInfo(info), { weather: toConditionId(context.weather), terrain: toConditionId(context.terrain) });
 
-/** A calc Pokémon from the branch's live info, through the engine's one builder (calc/body.ts). */
 function calcPokemonFrom(gen: CalcGen, info: SimPokemonInfo, context: DamageCalcContext = {}): Pokemon {
   return calcPokemon(gen, bodyFor(gen, info, context));
 }
 
-/** Whether the move does damage to this Pokémon at all (the calc reads immunities, and Protect when it stands). */
 function landsOn(gen: CalcGen, attacker: SimPokemonInfo, target: SimPokemonInfo, moveName: string, context: DamageCalcContext, isProtected: boolean): boolean {
   const result = calculate(gen, calcPokemonFrom(gen, attacker, context), calcPokemonFrom(gen, target, context), calcMove(gen, moveName, bodyFor(gen, attacker)), calcField(context, isProtected));
   return result.range()[1] > 0;
 }
 
 /**
- * Whether the partner's pick shields it before the move lands: a shield of the
- * Protect family (protectKind: Protect, Detect, Spiky Shield and their kin
- * carry an onTryHit; Endure does not), going first by priority. All from
- * the Dex; whether the move breaks through is the calc's call (isProtected),
- * unless the simulator takes the move's protect flag away before the check
- * (Unseen Fist on a contact move: protectBlocks, calc/protect.ts), when the
- * calc gets no isProtected at all (round 68, T186; calc 0.12 prices that hit
- * at a quarter, the simulator at full damage).
+ * Whether the partner's pick shields it before the move lands: a shield of the Protect family (protectKind: Protect, Detect, Spiky
+ * Shield and their kin carry an onTryHit; Endure does not), going first by priority. Whether the move breaks through is the calc's call
+ * (isProtected), unless the simulator takes the move's protect flag away before the check (Unseen Fist on a contact move:
+ * protectBlocks, calc/protect.ts), when the calc gets no isProtected at all.
  */
 function shieldedBy(gen: CalcGen, pick: string | undefined, moveName: string, attacker: CalcBody): boolean {
   if (!pick) return false;
@@ -141,14 +125,10 @@ function shieldedBy(gen: CalcGen, pick: string | undefined, moveName: string, at
 }
 
 /**
- * How the move lands in doubles, as the simulator decides it per use: a
- * spread move loses its spread factor when it hits only one Pokémon
- * (trySpreadMoveHit sets spreadHit for more than one target;
- * Battle.getMoveTargets counts the living foes, and for allAdjacent the
- * attacker's living partner too, immune or not), and a smart-target
- * multi-hit (Dragon Darts) lands one hit on the defender and one on its
- * partner, unless the partner is immune or protected (Pokemon.getSmartTargets,
- * then a failed hit step turns the second hit back onto the defender).
+ * How the move lands in doubles, as the simulator decides it per use: a spread move loses its spread factor when it hits only one
+ * Pokémon (trySpreadMoveHit sets spreadHit for more than one target; Battle.getMoveTargets counts the living foes, and for allAdjacent
+ * the attacker's living partner too, immune or not), and a smart-target multi-hit (Dragon Darts) lands one hit on the defender and one
+ * on its partner, unless the partner is immune or protected (Pokemon.getSmartTargets, then a failed hit step turns the second hit back).
  */
 function moveLanding(
   gen: CalcGen,
@@ -175,13 +155,11 @@ function percentOfMaxHp(damage: number, maxhp: number): number {
   return maxhp > 0 ? Math.round(damage / maxhp * 1000) / 10 : 0;
 }
 
-/** One hit count the simulator can draw for a use of the move, with its chance. */
 export interface HitCount {
   hits: number;
   chance: number;
 }
 
-/** Each value of the simulator's sampled array with its share, fewest hits first. */
 function sharesOf(drawn: readonly number[]): HitCount[] {
   const counts = new Map<number, number>();
   for (const hits of drawn) counts.set(hits, (counts.get(hits) ?? 0) + 1);
@@ -195,12 +173,9 @@ type ModifyMoveHandler = (this: unknown, move: unknown, pokemon: unknown, target
 const multihitMemo = new Map<string, number | number[] | undefined>();
 
 /**
- * The move's hit count once the attacker's own ability and item have
- * reshaped it, as the simulator's ModifyMove event does before the hit loop:
- * their onModifyMove handlers from the Dex run on the simulator's own copy
- * of the move (Skill Link takes the top count, Battle Bond gives
- * Ash-Greninja's Water Shuriken three hits). A handler that asks the battle
- * for more than the preview holds leaves the copy as it is.
+ * The move's hit count once the attacker's own ability and item have reshaped it, as the simulator's ModifyMove event does before the
+ * hit loop: their onModifyMove handlers run on the simulator's own copy of the move (Skill Link takes the top count, Battle Bond gives
+ * Ash-Greninja's Water Shuriken three hits). A handler that asks the battle for more than the preview holds leaves the copy as it is.
  */
 function multihitAtUse(dex: RulesDex, attacker: GearHolder, moveName: string) {
   const key = `${dex.gen}|${dex.currentMod}|${attacker.species}|${attacker.ability}|${attacker.item}|${moveName}`;
@@ -224,11 +199,8 @@ function askModifyMove(dex: RulesDex, attacker: GearHolder, moveName: string) {
 }
 
 /**
- * The hit counts the simulator's hit loop draws for one use of the move
- * (calc/hit-draws.ts, held against the simulator's own draws by
- * test/damage-calc-hit-counts.spec.ts), or null when the Dex fixes one count
- * and the calc's own reading stands. A count the attacker's ability sets
- * (multihitAtUse) goes to the calc as such.
+ * The hit counts the simulator's hit loop draws for one use of the move (calc/hit-draws.ts, held against the simulator's own draws by
+ * test/damage-calc-hit-counts.spec.ts), or null when the Dex fixes one count and the calc's own reading stands.
  */
 export function hitCounts(dex: RulesDex, attacker: GearHolder, moveName: string): HitCount[] | null {
   const multihit = multihitAtUse(dex, attacker, moveName);
@@ -250,13 +222,10 @@ type PricedCount = { chance: number; result: CalcResult };
 const chancePercent = (chance: number) => Math.max(Math.min(Math.round(chance * 1000), 999), 1) / 10;
 
 /**
- * The KO verdict over the hit counts the move can draw. Counts that agree
- * keep the calc's text. A count that can OHKO gives the exact OHKO chance:
- * each count's own chance, weighed by how often it is drawn. Past one use the
- * count is drawn again each time, which the calc does not price, so a
- * verdict holds only when the fewest hits guarantee it (every larger count
- * does at least as much); otherwise a KO in the fewest uses any count
- * reaches is possible.
+ * The KO verdict over the hit counts the move can draw. Counts that agree keep the calc's text. A count that can OHKO gives the exact
+ * OHKO chance: each count's own chance, weighed by how often it is drawn. Past one use the count is drawn again each time, which the
+ * calc does not price, so a verdict holds only when the fewest hits guarantee it; otherwise a KO in the fewest uses any count reaches
+ * is possible.
  */
 function koOverCounts(priced: PricedCount[]): { n: number; text: string } {
   const verdicts = priced.map(({ chance, result }) => ({ share: chance, ...result.kochance(false) }));
@@ -268,19 +237,13 @@ function koOverCounts(priced: PricedCount[]): { n: number; text: string } {
   return { n, text: `possible ${n}HKO` };
 }
 
-/**
- * The calc's own KO verdict against the defender's current HP
- * (Result.kochance: the hits' combined rolls, end-of-turn chip and
- * recovery included), so a damaged target a third-of-max hit finishes
- * reads as a KO.
- */
+/** The calc's own KO verdict against the defender's current HP (Result.kochance: the hits' combined rolls, end-of-turn chip and recovery included). */
 function koChanceOf(priced: PricedCount[], maxDamage: number): string {
   if (maxDamage <= 0) return '';
   const { n, text } = priced.length === 1 ? priced[0].result.kochance(false) : koOverCounts(priced);
   return n >= 1 && n <= MAX_KO_HITS ? text : '';
 }
 
-/** The single hit, or for a move that doubles on a chance (Fickle Beam, T154) its weaker and its stronger strength, each with its chance. */
 function strengthPriced(priceAt: (hits?: number, firstUse?: boolean, power?: { basePower: number }) => CalcResult, firstUse: boolean, mix: ReturnType<typeof strengthMix>): PricedCount[] {
   const weak = priceAt(undefined, firstUse);
   if (!mix) return [{ chance: 1, result: weak }];
@@ -302,6 +265,7 @@ function priceOnCopy(context: DamageCalcContext, moveName: string): DamageResult
   return { moveName, minPercent: minPct, maxPercent: maxPct, range: `${minPct}% - ${maxPct}%`, koChance };
 }
 
+/** The damage preview of one move from the attacker into the defender: range, KO verdict, hit-count shares and roll steps; the empty result when the calc cannot price it. */
 export function calcSingleDamageRange(
   attacker: SimPokemonInfo,
   defender: SimPokemonInfo,
@@ -315,7 +279,7 @@ export function calcSingleDamageRange(
     const priceAt = (hits?: number, isStellarFirstUse = false, power?: { basePower: number }): CalcResult => {
       const atkPoke = calcPokemon(gen, atkBody);
       const defPoke = calcPokemonFrom(gen, defender, context);
-      // The attacker's ability and item reach the move too: Skill Link sets five hits.
+      // The attacker's ability and item reach the move too (Skill Link sets five hits).
       const calcMoveFor = () => calcMove(gen, moveOption.name, atkBody, {
         ability: (attacker.ability || undefined) as CalcAbility,
         item: (attacker.item || undefined) as CalcItem,
@@ -325,14 +289,15 @@ export function calcSingleDamageRange(
         ...(context.isCrit ? { isCrit: true } : {}),
       });
       const result = calculate(gen, atkPoke, defPoke, calcMoveFor(), calcField(context));
-      // The calc forces a spread on a few moves (Tera Starstorm of Terapagos-Stellar, Expanding Force on Psychic Terrain): against a lone foe the simulator plays one target, which the Singles game type prices (T152). Behind a screen no game type does (T202): the simulator prices the hit.
+      // The calc forces a spread on a few moves (Tera Starstorm of Terapagos-Stellar, Expanding Force on Psychic Terrain): against a lone
+      // foe the simulator plays one target, which the Singles game type prices. Behind a screen no game type does: the simulator prices it.
       if (!aloneSpread(context, result)) return result;
       if (defenderBehindScreen(context)) throw new UnpricedByCalc();
       return calculate(gen, atkPoke, defPoke, calcMoveFor(), calcField({ ...context, gameType: 'Singles' }));
     };
     const firstUse = stellarFirstUse(atkBody, () => priceAt().move.type);
-    // A multi-hit move deals the sum of its hits; the calc sums them itself (T96). A drawn hit
-    // count spans the fewest hits' minimum to the most hits' maximum, every count priced (T124).
+    // A multi-hit move deals the sum of its hits; the calc sums them itself. A drawn hit count spans the fewest hits' minimum to the
+    // most hits' maximum, every count priced.
     const counts = overrides?.multihit ? null : hitCounts(dexOfCalc(gen), attacker, moveOption.name);
     const priced = counts ? counts.map(({ hits, chance }) => ({ chance, result: priceAt(hits, firstUse) })) : strengthPriced(priceAt, firstUse, strengthMix(dexOfCalc(gen), moveOption.name));
     const minDamage = Math.min(...priced.map(({ result }) => result.range()[0]));
@@ -355,7 +320,10 @@ export function calcSingleDamageRange(
   }
 }
 
-/** The steps of the roll for the count the user forced, else for the fewest hits: the hits' damages added step by step. Absent where the calculator gives no list of steps (a fixed damage). */
+/**
+ * The steps of the roll for the count the user forced, else for the fewest hits: the hits' damages added step by step. Absent where
+ * the calculator gives no list of steps (a fixed damage).
+ */
 function rollsOf(priced: PricedCount[], counts: HitCount[] | null, hits: number | undefined, defender: { hp: number; maxhp: number }): { rolls: DamageRolls } | Record<string, never> {
   const index = Math.max(0, counts?.findIndex(count => count.hits === hits) ?? 0);
   const damage = priced[index]?.result.damage;
@@ -367,7 +335,6 @@ function rollsOf(priced: PricedCount[], counts: HitCount[] | null, hits: number 
   return { rolls: { damage: total, hp: defender.hp, maxhp: defender.maxhp, hits: counts ? counts[index].hits : perHit.length } };
 }
 
-/** Each drawn hit count with its chance and its own range (round 67, T136 point 1). */
 function hitSharesOf(counts: HitCount[], priced: PricedCount[], maxhp: number): NonNullable<DamageResult['hitShares']> {
   return counts.map(({ hits, chance }, index) => {
     const [min, max] = priced[index].result.range();

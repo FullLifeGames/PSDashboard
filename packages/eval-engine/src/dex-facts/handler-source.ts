@@ -1,13 +1,10 @@
 /**
- * Round 89 (#149, step A8): the text of a Dex handler, read for the properties it reads and the ids it names. The simulator runs
- * in the browser as a production build, which writes the same handler differently (comments gone, `x['a']` as `x.a`, quotes
- * turned into backticks, a list of ids joined into one string, the local names shortened), and the scan must find the same
- * reads in both: packages/eval-engine/test/state-readers-built.spec.ts builds the Dex with the app's own Vite settings and compares.
- * `lex` reads the source once, the way a build does not change: it drops comments and the text of strings, keeps the code of a
- * template's `${}`, and writes a bracket access with a plain string key as the dot access.
+ * The text of a Dex handler, read for the properties it reads and the ids it names. A production build writes the same handler differently
+ * (comments gone, `x['a']` as `x.a`, quotes turned into backticks, a list of ids joined into one string, local names shortened), and the
+ * scan must find the same reads in both; test/state-readers-built.spec.ts builds the Dex with the app's own Vite settings and compares.
  */
 
-/** The code of a source (comments dropped, every string and regular expression written as `""`, `x['key']` written as `x.key`, a quoted key of an object literal written bare) and the texts of its strings. */
+/** The code of a source (comments dropped, strings and regular expressions written as `""`, `x['key']` as `x.key`, quoted object keys bare) and the texts of its strings. */
 export interface Lexed { code: string; strings: string[] }
 
 const IDENT = /^[A-Za-z_$][\w$]*$/;
@@ -17,7 +14,6 @@ const REGEX_AFTER = /(?:^|[(,=:[!&|?{};+\-*%<>~^]|\breturn|\btypeof)\s*$/;
 /** Whether the code so far ends where a bracket would index something (`a.b[`, `f()[`), not where it opens an array (`return [`). */
 const opensKey = (out: string): boolean => /[\w$)\]]\s*\[\s*$/.test(out) && !/\b(?:return|typeof|in|of|case|delete|void|yield|await|throw|else|new)\s*\[\s*$/.test(out);
 
-/** The state of one pass over a source: the position, the code written so far, the texts of the strings, the depth of the `${}` it stands in. */
 interface Pass { src: string; i: number; out: string; strings: string[]; depth: number }
 
 /** A quoted string or a template without expressions that is the whole key of a bracket access: `a['key']` becomes `a.key`. Returns whether it did. */
@@ -121,7 +117,6 @@ export const lex = (source: string): Lexed => {
 /** A property read: `.name` that is no spread, no property of a string and no assignment target. */
 const READ = /(?<!\.|"")\.([A-Za-z_$][\w$]*)(?![\w$])(?!\s*(?:=(?!=)|\+\+|--|[-+*/%|&^]=|\*\*=|<<=|>>=))/g;
 
-/** The property names the code of a lexed source reads. */
 export const readsOfCode = (code: string): Set<string> => {
   const found = new Set<string>();
   for (const match of code.matchAll(READ)) found.add(match[1]);

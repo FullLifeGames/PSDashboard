@@ -1,15 +1,14 @@
 import type { PokemonSet } from '@pkmn/sim';
 import { dexOfCalc, itemSetValue, toId, type CalcGeneration, type RulesDex, type DamageObservation, type OpponentTeamInfo, type RevealedPokemonInfo } from '@fulllifegames/replay-core';
 
-/** The defender of an observation: its built set (when the team has one), the abilities and the items it may have (round 68, T157; round 69, T193). */
+/** The defender of an observation: its built set (when the team has one), the abilities and the items it may have. */
 export interface DefenderRead { set: PokemonSet | undefined; abilities: string[]; items: string[] }
 
 type SimDex = RulesDex;
 
 /**
- * The species a battle forme comes from, as ids (round 69, lane A's request): the forme's battleOnly and changesFrom
- * (Mega Evolution, Stance Change, Busted Mimikyu, Ash-Greninja), and the species a Mega Stone turns into the forme
- * (the Mega-Z formes of Champions carry neither). Read from the Dex, followed up to the base species.
+ * The species a battle forme comes from, as ids: the forme's battleOnly and changesFrom (Mega Evolution, Stance Change, Busted Mimikyu,
+ * Ash-Greninja), and the species a Mega Stone turns into the forme (the Mega-Z formes of Champions carry neither). Followed to the base.
  */
 function formeOrigins(dex: SimDex, name: string, depth = 0): string[] {
   const species = dex.species.get(name);
@@ -20,7 +19,6 @@ function formeOrigins(dex: SimDex, name: string, depth = 0): string[] {
   return [...new Set(from.flatMap(origin => [toId(origin), ...formeOrigins(dex, origin, depth + 1)]))];
 }
 
-/** Whether the species the log names is the built species, or a battle forme of it. */
 export const isBodyOf = (gen: CalcGeneration, logged: string, built: string): boolean =>
   toId(logged) === toId(built) || formeOrigins(dexOfCalc(gen), logged).includes(toId(built));
 
@@ -34,7 +32,6 @@ export function formeAbility(gen: CalcGeneration, species: string, ability: stri
   return !ability || listed.length === 0 || listed.includes(ability) ? ability : listed[0];
 }
 
-/** The inference's entry for the defender: under the species the log names, else under the set's. */
 const entryOf = (info: OpponentTeamInfo | undefined, set: PokemonSet | undefined, obs: DamageObservation) =>
   info?.pokemon.find(mon => toId(mon.species) === toId(obs.defenderSpecies)) ??
   info?.pokemon.find(mon => !!set && toId(mon.species) === toId(set.species));
@@ -48,11 +45,10 @@ const shownItem = (info: RevealedPokemonInfo | undefined): string =>
   info && (info.item.source === 'revealed' || info.item.source === 'manual') ? itemSetValue(info.item.value) : '';
 
 /**
- * The abilities the defender may have, as the item judge ranges them since R18 (replay-core team/item-damage.ts): the
- * one the log showed (revealed or entered by hand) when the inference of the defender's side is at hand, else the one
- * the built set names, and with neither, each ability its species may have beside the ones the log ruled out. An empty
- * name is the old reading, the calc's pick of the species' first ability, kept only where the Dex lists none. A battle
- * forme of the set's species ranges the forme's abilities (a Mega's own), not the set's.
+ * The abilities the defender may have, as the item judge ranges them (replay-core team/item-damage.ts): the one the log showed
+ * (revealed or entered by hand) when the defender's side has an inference, else the built set's, and with neither, each ability its
+ * species may have beside the ones the log ruled out. '' (the calc's pick of the first ability) only where the Dex lists none. A
+ * battle forme of the set's species ranges the forme's abilities (a Mega's own), not the set's.
  */
 export function defenderAbilities(gen: CalcGeneration, set: PokemonSet | undefined, obs: DamageObservation, info?: OpponentTeamInfo): string[] {
   const dex = dexOfCalc(gen);
@@ -68,9 +64,9 @@ export function defenderAbilities(gen: CalcGeneration, set: PokemonSet | undefin
 }
 
 /**
- * The items the defender may hold (round 69, T193, the span the item judge uses): the item the log showed alone, else
- * the built item or none, minus the items the log ruled out. A Choice hit into an Assault Vest or Eviolite holder
- * reads like no Choice item at all when the defender is priced bare, since the two 1.5 cancel.
+ * The items the defender may hold, as the item judge ranges them: the item the log showed alone, else the built item or none, minus
+ * the items the log ruled out. A Choice hit into an Assault Vest or Eviolite holder reads like no Choice item when the defender is
+ * priced bare, since the two 1.5 cancel.
  */
 export function defenderItems(set: PokemonSet | undefined, obs: DamageObservation, info?: OpponentTeamInfo): string[] {
   const revealed = entryOf(info, set, obs);

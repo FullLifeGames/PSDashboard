@@ -4,14 +4,11 @@ import { dieKey, type Answer, type DieKind, type DieName, type Draw, type Forced
 import { watchBattle } from './watch.ts';
 
 /**
- * Round 89 (A6-1, ruling 24, #145): one turn, and each of its chance dice turned the other way. The endgame prover reads a turn
- * through a few draws and takes the median; a die the draws all pass the same way (a second Protect that holds one time in
- * three, a confusion's self-hit, an accuracy) then counts as certain. This module records the turn on a fork, with the dice
- * panel's recorder, and plays it again with one die answered the other way and every other named die held to the recorded
- * answer (the panel's forcing PRNG). The caller reads the board each fork ends on; nothing here reads a species or a move.
- *
- * The recorder calls the stream first on every draw, so the recorded turn is the plain turn of the same seed: same log, same
- * state, same stream at the end. A fork never touches the battle it came from: the caller hands out copies.
+ * One turn, and each of its chance dice turned the other way: the turn is recorded on a fork with the dice panel's recorder and played
+ * again with one die answered the other way and every other named die held to the recorded answer (the panel's forcing PRNG). The
+ * endgame prover needs it because a die that a few draws all pass the same way (a second Protect that holds one time in three, a
+ * confusion's self-hit, an accuracy) would count as certain. The recorder calls the stream first on every draw, so the recorded turn is
+ * the plain turn of the same seed. A fork never touches the battle it came from: the caller hands out copies.
  */
 
 /** A turn: `fork` gives a fresh copy at the turn's start with the stream at the turn's place (it runs once per play), `play` runs the turn on it. */
@@ -19,8 +16,8 @@ export interface FlipTurn {
   fork(): Battle;
   play(battle: Battle): void;
   /**
-   * Round 89 (A6-2): the speed ties the turn is held to, by pair (the forcing PRNG's tie die: `{ first }` puts one slot ahead of the other
-   * wherever both stand in a shuffle). The recording and every flip play that order; the endgame children's tie path plays each order apart.
+   * The speed ties the turn is held to, by pair (the forcing PRNG's tie die: `{ first }` puts one slot ahead of the other wherever both
+   * stand in a shuffle). The recording and every flip play that order.
    */
   ties?: readonly ForcedDie[];
 }
@@ -46,19 +43,14 @@ class HeldRecordingPRNG extends ForcedDicePRNG {
   }
 }
 
-/**
- * The dice the module does not turn: the roll facts (the damage roll, the crit and the hit count are sampled and disclosed as
- * such, ADR 0020) and the speed tie (the endgame children price it on their own path).
- */
+/** The dice the module does not turn: the roll facts (damage roll, crit, hit count: sampled and disclosed as such, ADR 0020) and the speed tie (the endgame children price it). */
 export const ROLL_FACT_KINDS: ReadonlySet<DieKind> = new Set<DieKind>(['damage-roll', 'crit', 'hit-count', 'speed-tie']);
 
-/** A chance die of the recorded turn. */
 export interface FlipDie {
   key: string;
   name: DieName;
-  /** The chance the draw comes true: the numerator over the denominator of the simulator's `randomChance`, or the entry's chance of a `random(100)` the script compares. Strictly between 0 and 1. */
+  /** The chance the draw comes true: the numerator over the denominator of `randomChance`, or the entry's chance of a `random(100)` the script compares; strictly between 0 and 1. */
   chance: number;
-  /** Whether the recorded draw came true. */
   drew: boolean;
   /** The chance of the answer the recording drew. */
   held: number;
@@ -74,9 +66,9 @@ export interface RecordedTurn {
   /** Every chance die the turn drew once, in order of first draw, without the roll facts. */
   dice: FlipDie[];
   /**
-   * Round 89 (A6-3a, ruling 27.2, #145): the chance dice the turn drew more than once under one name (a contact proc rolled on each hit
-   * of a two-hit move, a secondary rolled on each hit), priced by their first draw. The flip forces every draw of a name, so no single
-   * chance prices them: they are not in `dice`, and the caller treats a turn that holds one as unpriced.
+   * The chance dice the turn drew more than once under one name (a contact proc rolled on each hit of a two-hit move, a secondary
+   * rolled on each hit). The flip forces every draw of a name, so no single chance prices them: they are not in `dice`, and the caller
+   * treats a turn that holds one as unpriced.
    */
   repeated: FlipDie[];
   record: NaturalRecord;
@@ -89,10 +81,7 @@ export interface FlippedTurn {
   logStart: number;
   /** The turn drew the die and answered it the other way. False when the simulator never drew it on this branch, or the draw has no way to give the answer. */
   took: boolean;
-  /**
-   * Round 89 (P2): the other dice this branch drew (the keys of `FlipDie`), read from the forcing PRNG's cursors. A die the branch never
-   * reached (a paralysis that a knock-out ends the turn before) is no part of the branch's chance.
-   */
+  /** The other dice this branch drew (the keys of `FlipDie`). A die the branch never reached (a paralysis that a knock-out ends the turn before) is no part of its chance. */
   drawn: ReadonlySet<string>;
 }
 
@@ -140,10 +129,9 @@ export function recordTurn(turn: FlipTurn): RecordedTurn {
 }
 
 /**
- * The recorded turn again on a fresh fork with one die answered the other way: the forced answer is the draw's own value turned
- * round (the draw's `true` is what the simulator reads, whichever way its handler goes: a status check's polarity needs no
- * reading), and every other named die answers what the recorded turn drew for it. The turn's later dice that the flip moves
- * (a die that the other branch never draws, one it draws anew) follow the stream.
+ * The recorded turn again on a fresh fork with one die answered the other way: the forced answer is the draw's own value turned round
+ * (the draw's `true` is what the simulator reads, whichever way its handler goes), and every other named die answers what the recorded
+ * turn drew for it. Later dice that the flip moves (never drawn on the other branch, or drawn anew) follow the stream.
  */
 export function flipTurn(turn: FlipTurn, recorded: RecordedTurn, die: FlipDie): FlippedTurn {
   const battle = turn.fork();
@@ -153,7 +141,7 @@ export function flipTurn(turn: FlipTurn, recorded: RecordedTurn, die: FlipDie): 
   const forcing = new ForcedDicePRNG({
     inner, watch, record: recorded.record,
     forced: [{ name: die.name, result: { happens: !die.drew } }, ...(turn.ties ?? [])],
-    // raw answers: "happens" is the draw's own true, for a status check too (its polarity is a question for the handler, not for us)
+    // raw answers: "happens" is the draw's own true, for a status check too (its polarity is the handler's question)
     actsOnTrue: new Map([[die.key, true]]),
   });
   battle.prng = forcing;

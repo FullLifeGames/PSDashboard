@@ -1,12 +1,8 @@
 /**
- * Round 72 (T235, finding W2): the pure self-boosting moves ("setup moves"), read from the Dex. The Dex states a boost in a data
- * field for most of them: a status move that raises its user's stats (`boosts` on a self move, or `self.boosts`) by two stages or
- * more, evasion left out. Five moves apply their boosts in a handler, where the data holds no field; they are named below and
- * test/setup-moves-oracle.spec.ts holds the list to the simulator (it plays every status move and requires the set to be the
- * moves that leave their user two stages up) and holds each name to a move no field covers.
- *
- * This module is in the app's main bundle through turn-analysis/played-match.ts, so it asks a structural Dex (the data-only one
- * of @pkmn/dex or the simulator's) and imports nothing.
+ * The pure self-boosting moves ("setup moves"), read from the Dex: a status move whose data field (`boosts` on a self move, or
+ * `self.boosts`) raises its user's stats by two stages or more, evasion left out. Five moves apply their boosts in a handler and are
+ * named below; test/setup-moves-oracle.spec.ts holds the list to the simulator. The module is in the app's main bundle, so it asks a
+ * structural Dex (the data-only one of @pkmn/dex or the simulator's) and imports nothing.
  */
 interface BoostFields { [stat: string]: number | undefined }
 

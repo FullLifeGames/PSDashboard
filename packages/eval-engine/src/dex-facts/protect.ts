@@ -4,11 +4,7 @@ import { protectKind } from '@fulllifegames/replay-core';
 type BattleDex = Battle['dex'];
 type DexMove = ReturnType<BattleDex['moves']['get']>;
 
-/**
- * Round 72 (T235): the Protect family as the engine's readers ask it, all on `protectKind` of replay-core's dex-facts (one
- * read of the Dex, one memo per Dex). test/dex-facts-protect.spec.ts holds each reader to the form it replaced, over every
- * move of Generations 1 to 9 and the Champions mod.
- */
+/** The Protect family as the engine's readers ask it, all on `protectKind` of replay-core; test/dex-facts-protect.spec.ts sweeps every move of Gens 1 to 9 and Champions. */
 
 /** A move that stops the hits on its user (Protect, Detect and their kin, Max Guard; Endure holds the user up and stops nothing). */
 export const shieldsFromHits = (dex: BattleDex, move: DexMove): boolean => protectKind(dex, move) === 'shield';

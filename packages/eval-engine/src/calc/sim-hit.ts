@@ -2,11 +2,9 @@ import type { ActiveMove, Battle, Pokemon } from '@pkmn/sim';
 import { FixedDice, playOnCopy } from '../sim-ask/index.ts';
 
 /**
- * Round 73 (T202, design gate 3a): the simulator's own price of one hit, for the hits the calculator cannot price. The calculator
- * forces the spread target for a few moves (Expanding Force in Psychic Terrain, Tera Starstorm of Terapagos-Stellar); against a lone
- * foe behind a screen the simulator plays one target and neither game type of the calculator holds its screen factor. The preview
- * plays the move on a copy of the live battle (sim-ask: `playOnCopy`, `FixedDice`) at the highest and the lowest damage roll and
- * reads the damage the simulator's own damage step returns. The live battle is read and never written.
+ * The simulator's own price of one hit, played on a copy of the live battle, for hits the calc cannot price: it forces the spread target
+ * for Expanding Force in Psychic Terrain and Tera Starstorm of Terapagos-Stellar, and against a lone foe behind a screen it holds no
+ * screen factor in either game type.
  */
 
 /** A body of the live battle: the side's index (0 is p1) and its active slot. */
@@ -15,6 +13,7 @@ export interface BattleSlot {
   slot: number;
 }
 
+/** A hit to price: the live battle (read, never written), its two bodies and the Terastallization the picker has armed. */
 export interface LiveHit {
   /** The live battle of the branch (`getBattle()` in the app). */
   battle: Battle;
@@ -24,7 +23,7 @@ export interface LiveHit {
   armed?: { attacker?: boolean; defender?: boolean };
 }
 
-/** The damage in HP of the highest and of the lowest roll, no crit, with the defender's HP at the hit. */
+/** The damage in HP of the highest and the lowest roll, no crit, with the defender's HP at the hit. */
 export interface SimHitRange {
   min: number;
   max: number;
@@ -36,7 +35,6 @@ export interface SimHitRange {
 const HIGHEST_ROLL = 0;
 const LOWEST_ROLL = 0.999;
 
-/** Clicks the Terastallization on a body of the copy, as the turn's first action does it. */
 function clickTera(copy: Battle, body: Pokemon): void {
   const actions = copy.actions as { terastallize?: (pokemon: Pokemon) => void };
   if (!body.terastallized && typeof actions.terastallize === 'function') actions.terastallize(body);
@@ -67,10 +65,7 @@ function damageAt(hit: LiveHit, moveId: string, quantile: number): { damage: num
   });
 }
 
-/**
- * The simulator's damage range of a single-hit move from the attacker into the defender on a copy of the live battle, or null when
- * the move never reaches the defender (an immunity, a failed move) or the battle cannot be copied.
- */
+/** The simulator's damage range of a single-hit move on a copy of the live battle, or null when it never reaches the defender or the battle cannot be copied. */
 export function simHitRange(hit: LiveHit, moveName: string): SimHitRange | null {
   try {
     const id = moveName.toLowerCase().replace(/[^a-z0-9]/g, '');

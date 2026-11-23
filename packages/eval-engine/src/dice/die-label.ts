@@ -1,11 +1,6 @@
 import type { DieKind, DieName, DieResult, ForcedDie } from './types.ts';
 
-/**
- * Round 82 (forced dice), step A5: one text per forced die, for the history rows, the shares and the frame lines of a branch
- * (A6) and for the chips (A7). It says what the die decided, with the names a reader gives it: the caller hands in the Dex of
- * the game's rule set (`rulesDex`), so this file holds no move, ability or item name. Free of simulator imports like
- * `logged-results.ts`.
- */
+/** One text per forced die (history rows, shares, frame lines, chips), with the names the caller's `DieWords` give it; free of simulator imports. */
 
 /** The reader of names: the game's own Dex for moves and effects, the battle's names for the bodies. */
 export interface DieWords {
@@ -20,7 +15,6 @@ export interface DieWords {
   slot(slot: string): string;
 }
 
-/** Without a reader the ids stand in for the names. */
 const IDS: DieWords = { move: id => id, effect: id => id, slot: slot => slot };
 
 /** Kinds whose subject is the effect that holds the die, not a move. */
@@ -32,11 +26,10 @@ const idOf = (name: DieName): string => (name.effectId ?? '').split(':option')[0
 function subjectOf(name: DieName, words: DieWords): string {
   if (name.kind === 'speed-tie') return 'Speed tie';
   if (EFFECT_SUBJECT.has(name.kind) && name.effectId) return words.effect(idOf(name));
-  // the accuracy die of a later hit of a multi-hit move names its hit (round 89, #114); the first hit's die keeps the plain subject
+  // the accuracy die of a later hit of a multi-hit move names its hit; the first hit's die keeps the plain subject
   return name.moveId ? `${words.move(name.moveId)}${name.hit ? ` hit ${name.hit}` : ''}` : words.slot(name.slot);
 }
 
-/** The two words of a chance, by what the die decides: yes and no. */
 function chanceText(name: DieName, words: DieWords): [string, string] {
   const effect = words.effect(idOf(name));
   const noun = (words.plain ?? words.effect)(idOf(name));
