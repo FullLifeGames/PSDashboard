@@ -2,50 +2,25 @@ import { PRNG, type Battle, type Pokemon } from '@pkmn/sim';
 import { AskLeak, playOnCopy } from '../sim-ask/index.ts';
 import { Interner, residualKey } from './memo-keys.ts';
 
-/**
- * 13.10.2026 (the Swords Dance report on gen9draft-2058494320): the HP a body in
- * a race gains or loses at the end of every turn, read from the simulator and
- * not from a list of effects. The table of the races knows burn, poison and
- * toxic; Leech Seed (the seeded body loses, the active of the seeder's side
- * gains the same HP), Leftovers and Black Sludge, the weather, the terrain and
- * the abilities of the weather are missing from it, and each of them kills or
- * saves a body the race says stands. Their fractions live in the simulator's
- * code (data/conditions.js, items.js, abilities.js, moves.js), not in its
- * data, so the answer is played: the end of the turn (`fieldEvent('Residual')`,
- * the call the simulator's own residual action makes) runs on a copy of the
- * battle and the HP of every active is read before and after.
- *
- * Three turns are played and the mean is read, the length of the race horizon
- * (BITE_TURNS of score/boost-race.ts): toxic ramps (1/16, 2/16, 3/16 on a fresh
- * toxic, the 1/8 that races.ts prices) and a Flame Orb burns one turn late. The
- * actives' HP is set to 3/4 before each turn, so that neither the cap of a
- * heal nor the cap of a hit on the HP left bends the reading, and the
- * durations of the weather, the terrain, the side conditions and the volatiles
- * are set to lasting (a weather on its last turn is read as the weather that
- * stands, not as the one that ends before it hurts). The dice are fixed: an
- * end-of-turn effect that rolls (Shed Skin) is read on one seed.
- *
- * A reading is the loss per turn as a fraction of the body's own max HP,
- * positive when the body loses HP and negative when it gains. It is kept in a
- * memo under the key of score/board-key.ts (round 89, #149: everything the
- * end of the turn reads, by the Dex's own handlers: the format, the field, the
- * sides and their conditions with the state a handler reads, a pending move in
- * a slot, the turn of the battle where a handler names it, and per active the
- * types, the status, the item, the ability, the volatiles and their state, the
- * max HP), not under the battle, so a search that visits thousands of leaves of
- * one board plays it once. Only the actives have a reading: the sim ignores the item and the
- * ability of a benched body, and the races read the table for it. Generations
- * 1 and 2 have none either: their status damage comes after the body's own
- * move (burn, poison), so the end of the turn plays nothing for it.
- */
+// The HP a body in a race gains or loses at the end of every turn, read from the simulator by playing the turn on a copy of the battle.
 
-/** Turns played, the length of the race horizon. */
+// Leech Seed, Leftovers, Black Sludge, the weather, the terrain and the abilities of the weather are missing from the races' table, and
+// their fractions live in the simulator's code, not its data: the end of the turn (`fieldEvent('Residual')`, the call the simulator's
+// own residual action makes) runs on a copy and the HP of every active is read before and after. The HP is set to 3/4 before each turn,
+// so that neither the cap of a heal nor the cap of a hit bends the reading; the durations of the weather, the terrain, the side
+// conditions and the volatiles are set to lasting (a weather on its last turn reads as the weather that stands). The dice are fixed: an
+// end-of-turn effect that rolls (Shed Skin) is read on one seed. A reading is the loss per turn as a fraction of the body's own max HP,
+// positive when the body loses HP. It is memoized under the board key of score/board-key.ts, not under the battle. Only the actives have
+// a reading: the sim ignores the item and the ability of a benched body (the races read the table for it). Generations 1 and 2 have none:
+// their status damage comes after the body's own move, so the end of the turn plays nothing for it.
+
+/** Turns played and averaged, the length of the race horizon (BITE_TURNS of score/boost-race.ts): toxic ramps and a Flame Orb burns one turn late. */
 export const RESIDUAL_TURNS = 3;
 
 /** HP fraction the actives are set to before each played turn. */
 const MID_HP = 3 / 4;
 
-/** The memo is a tool of one process; a long session starts over when it has grown past this many boards. */
+/** A long session starts the memo over when it has grown past this many boards. */
 const MEMO_LIMIT = 20_000;
 
 /** For tests: the boards played and the readings answered from the memo. */
@@ -60,7 +35,7 @@ const interner = new Interner();
 
 /**
  * For probes: what the memo and the interner of this process hold (entries and characters of the memo's keys, the interned texts).
- * @public A probe hook: no spec and no source file calls it; the memory probes under docs/perf/probes read it (round 89, gate D8a: knip skips it by this tag).
+ * @public A probe hook that no spec and no source file calls; the memory probes under docs/perf/probes read it (knip skips it by this tag).
  */
 export function residualMemoSize(): { entries: number; keyChars: number; interned: number; internedChars: number } {
   let keyChars = 0;
@@ -69,7 +44,7 @@ export function residualMemoSize(): { entries: number; keyChars: number; interne
   return { entries: memo.size, keyChars, interned: entries, internedChars: chars };
 }
 
-/** For tests and probes: forget the memo, so that the next reading plays its board again. */
+/** For tests and probes: forget the memo. */
 export function resetResidualMemo(): void {
   memo.clear();
   interner.reset();
@@ -134,9 +109,8 @@ function playedTurns(copy: Battle, bodies: (Pokemon | null)[]): number[] {
 }
 
 /**
- * The mean loss per turn of `bodies` over the played end-of-turns, on `copy` itself (the play spends it): the clocks of
- * the weather, the terrain, the side conditions and the volatiles set to lasting, the dice fixed. The contact reads of
- * score/contact.ts use it on the copy of a hit to price the status the hit left.
+ * The mean loss per turn of `bodies` over the played end-of-turns, on `copy` itself (the play spends it): the clocks of the weather,
+ * the terrain, the side conditions and the volatiles set to lasting, the dice fixed. score/contact.ts prices the status a hit left with it.
  */
 export function playResiduals(copy: Battle, bodies: (Pokemon | null)[]): number[] {
   lasting(copy.field.weatherState);

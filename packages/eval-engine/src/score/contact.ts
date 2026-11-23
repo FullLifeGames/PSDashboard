@@ -7,28 +7,21 @@ import { hitKeyReader, Interner } from './memo-keys.ts';
 export { NO_COST };
 export type { HitCost, StatusCost };
 
-/**
- * 13.10.2026 (the Swords Dance report on gen9draft-2058494320: Cobalion's contact moves into Talonflame meet Flame
- * Body, and the races of boostsBiting did not know it): what one hit of a move costs the attacker, read from the
- * simulator (score/contact-play.ts plays the hit on copies of the board) and memoized under everything the hit reads, so
- * that a search which visits thousands of leaves of one board plays each pair once. The cost is the HP the hit takes
- * from the attacker (the foe's item and ability on a contact hit, the move's recoil, the attacker's own item) and
- * the chance of each status it leaves.
- *
- * A hit is played only where something could cost: score/contact-filter.ts says so from the Dex (a handler for the hit on
- * the foe's item or ability, one for the attacker's own move on its item or ability, a move that costs its user), and
- * test/contact-prefilter.spec.ts holds that rule to the simulator over the whole Dex. What the simulator does with the
- * pair (contact at all, Protective Pads, Magic Guard, immunities) is left to the played hit.
- *
- * Not priced, and open: stat drops a contact hit gives (Gooey, Tangling Hair, Cotton Down), the turns a sleep or a
- * paralysis takes, the halved Speed of a paralysis, a Perish Song, an ability swapped by Mummy or Wandering Spirit, the
- * Aftermath of a foe the hit KOs, and what the move does to the stats of its own user (Close Combat).
- */
+// What one hit of a move costs the attacker, read from the simulator and memoized under everything the hit reads.
+//
+// The cost is the HP the hit takes from the attacker (the foe's item and ability on a contact hit, the move's recoil, the
+// attacker's own item) and the chance of each status it leaves. A hit is played only where something could cost
+// (score/contact-filter.ts, held to the simulator over the whole Dex by test/contact-prefilter.spec.ts); what the simulator does
+// with the pair (contact at all, Protective Pads, Magic Guard, immunities) is left to the played hit.
+//
+// Not priced: stat drops a contact hit gives (Gooey, Tangling Hair, Cotton Down), the halved Speed of a paralysis, a Perish Song,
+// an ability swapped by Mummy or Wandering Spirit, the Aftermath of a foe the hit KOs, the stat changes of the move on its user
+// (Close Combat).
 
-/** For tests: the pairs played, the readings answered from the memo, the copies played, the pairs that could not cost, the moves probed for a cost of their own. */
+/** For tests: the pairs played, the readings answered from the memo, the copies played, the pairs that could not cost, the moves probed. */
 export const hitStats = { plays: 0, hits: 0, runs: 0, free: 0, probes: 0 };
 
-/** The memo is a tool of one process; a long session starts over when it has grown past this many pairs. */
+/** A long session starts the memo over when it has grown past this many pairs. */
 const MEMO_LIMIT = 20_000;
 const memo = new Map<string, HitCost>();
 /** The numbers the memo's keys hold for the keys of the boards and bodies (score/memo-keys.ts); it starts over with the memo. */
@@ -36,7 +29,7 @@ const interner = new Interner();
 
 /**
  * For probes: what the memo and the interner of this process hold (entries and characters of the memo's keys, the interned texts).
- * @public A probe hook: no spec and no source file calls it; the memory probes under docs/perf/probes read it (round 89, gate D8a: knip skips it by this tag).
+ * @public A probe hook that no spec and no source file calls; the memory probes under docs/perf/probes read it (knip skips it by this tag).
  */
 export function hitMemoSize(): { entries: number; keyChars: number; interned: number; internedChars: number } {
   let keyChars = 0;
@@ -45,7 +38,7 @@ export function hitMemoSize(): { entries: number; keyChars: number; interned: nu
   return { entries: memo.size, keyChars, interned: entries, internedChars: chars };
 }
 
-/** For tests and probes: forget the memo, so that the next reading plays its pair again. */
+/** For tests and probes: forget the memo. */
 export function resetHitMemo(): void {
   memo.clear();
   interner.reset();
@@ -53,7 +46,7 @@ export function resetHitMemo(): void {
 
 const onProbe = (): void => { hitStats.probes++; };
 
-/** For tests: whether anything in the pair could cost the attacker when it uses the move (the rule of score/contact-filter.ts). */
+/** For tests: whether anything in the pair could cost the attacker when it uses the move (score/contact-filter.ts). */
 export function hitMayCost(battle: Battle, attacker: Pokemon, defender: Pokemon, moveId: string): boolean {
   const known = factsOf(battle);
   return mayCost(known, battle, attacker, defender, moveOf(known, battle, moveId), onProbe);
@@ -67,7 +60,7 @@ export function playedHit(battle: Battle, attacker: Pokemon, defender: Pokemon, 
 /** The reading function of one battle: the cost of a hit of `moveId` from `attacker` on `defender` (null where the body has no damaging move). */
 export type HitReader = (attacker: Pokemon, defender: Pokemon, moveId: string | null) => HitCost;
 
-/** A reader for one evaluation: it keeps the keys of the bodies it has seen, the memo is the process's. */
+/** A reader for one evaluation: it keeps the keys of the bodies it has seen; the memo is the process's. */
 export function hitReader(battle: Battle): HitReader {
   const known = factsOf(battle);
   // Half of the readers never meet a pair that could cost: the key reader is made when the first one does.

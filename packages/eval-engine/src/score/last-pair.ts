@@ -4,18 +4,13 @@ import { livingMons, threatGetter, type MatchupCache } from './threat.ts';
 import { raceClocks, raceSide } from './races.ts';
 import { expectedRate, unansweredMons } from './unanswered.ts';
 
+// The last pair: once each side is down to one living body, the leaf takes the race winner's side instead of the material static.
+
 /**
- * The last pair (round 33): once each side is down to one living body the
- * material static is the wrong instrument (573756 t135–t137: an 89 % HP
- * burned Toxapex with no damaging move read 53 % against a 19 % Choice
- * Band Zapdos-Galar; the trees read 3 %). The race clocks already price
- * the pair — heal PP, residuals, PP budgets — so the leaf takes the race
- * winner's side at a base of LAST_PAIR_BASE plus LAST_PAIR_PER_TURN per
- * turn of clock margin, capped at LAST_PAIR_CAP, in win-prob units. Mutual
- * walls (both clocks infinite) keep the static. Variant B (flag, measured
- * in the round-33 bench, adopted nowhere yet) extends the rule to a lone
- * sweeper the decided-sweep profile sees clearing the whole other side;
- * the race against the standing enemy sets its margin.
+ * The race winner's value in win-prob units: LAST_PAIR_BASE plus LAST_PAIR_PER_TURN per turn of clock margin, capped at LAST_PAIR_CAP.
+ * The static is the wrong instrument here (an 89 % HP burned Toxapex with no damaging move read 53 % against a 19 % Choice Band
+ * Zapdos-Galar; the trees read 3 %); the race clocks already price heal PP, residuals and PP budgets. Mutual walls (both clocks
+ * infinite) keep the static.
  */
 export const LAST_PAIR_BASE = 0.6;
 export const LAST_PAIR_PER_TURN = 0.1;
@@ -23,7 +18,7 @@ export const LAST_PAIR_CAP = 0.9;
 const MARGIN_CAP = 3;
 
 let sweepVariant = false;
-/** Variant B switch (default off): a lone decided sweeper races the standing enemy too. */
+/** Variant B switch (default off): a lone sweeper the decided-sweep profile sees clearing the other side races the standing enemy too. */
 export function setLastPairSweep(on: boolean): void {
   sweepVariant = on;
 }
@@ -51,7 +46,7 @@ function pairRace(battle: Battle, a: Pokemon, b: Pokemon, cache?: MatchupCache):
   return { winner: aWins ? 0 : 1, margin };
 }
 
-/** Variant B: a lone sweeper the decided profile sees clearing the rest races the standing enemy. */
+/** Variant B: the race against the standing enemy sets the margin. */
 function sweepRace(battle: Battle, p1: Pokemon[], p2: Pokemon[], cache?: MatchupCache): LastPairRace | null {
   const decided = unansweredMons(battle, cache).decided;
   if (!decided) return null;
@@ -61,7 +56,7 @@ function sweepRace(battle: Battle, p1: Pokemon[], p2: Pokemon[], cache?: Matchup
   const standing = theirs.find(mon => mon.isActive);
   if (!standing) return null;
   const race = decided.side === 'p1' ? pairRace(battle, mine[0], standing, cache) : pairRace(battle, standing, mine[0], cache);
-  // The race against the standing enemy sets the margin; the sweep profile vouches for the rest.
+  // The sweep profile vouches for the rest.
   return race && race.winner === (decided.side === 'p1' ? 0 : 1) ? race : null;
 }
 
@@ -76,7 +71,7 @@ export function lastPairRace(battle: Battle, cache?: MatchupCache): LastPairRace
   return sweepVariant ? sweepRace(battle, p1, p2, cache) : null;
 }
 
-/** The leaf value the race dictates, p1 perspective in win-prob units. */
+/** The leaf value the race dictates, in p1 perspective. */
 export function lastPairValue(race: LastPairRace): number {
   const magnitude = Math.min(LAST_PAIR_CAP, LAST_PAIR_BASE + LAST_PAIR_PER_TURN * race.margin);
   return race.winner === 0 ? magnitude : -magnitude;

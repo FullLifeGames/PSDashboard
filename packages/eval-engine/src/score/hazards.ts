@@ -2,18 +2,15 @@ import type { Battle, Pokemon, Side } from '@pkmn/sim';
 import { EVAL_WEIGHTS } from './weights.ts';
 import { liveTypes, usableSlots } from './threat.ts';
 
-/**
- * Hazards priced by their victims: the per-mon entry fraction, the capped
- * side cost, the stranded bench, and the removal option value.
- */
+// Hazards priced by their victims: the per-mon entry fraction, the capped side cost, the stranded bench and the removal option value.
 
 /** Removal moves that clear ONLY the user's side (pure relief). */
 // oracle: packages/eval-engine/test/hazard-removal-oracle.spec.ts
 export const OWN_SIDE_REMOVAL_MOVES = new Set(['rapidspin', 'mortalspin']);
-/** Removal moves that clear (or swap) BOTH sides — double-edged. Tidy Up clears the foe's hazards too (round 72, W6a). */
+/** Removal moves that clear (or swap) BOTH sides, so they are double-edged. Tidy Up clears the foe's hazards too. */
 // oracle: packages/eval-engine/test/hazard-removal-oracle.spec.ts
 export const BOTH_SIDES_REMOVAL_MOVES = new Set(['defog', 'courtchange', 'tidyup']);
-/** Defog clears only the target's side before this generation (round 72, W6b): no relief for its user. */
+/** Defog clears only the target's side before this generation: no relief for its user. */
 const DEFOG_CLEARS_OWN_FROM = 6;
 
 /**
@@ -26,10 +23,7 @@ export function removalKind(moveId: string, gen: number): 'own' | 'both' | null 
   return moveId === 'defog' && gen < DEFOG_CLEARS_OWN_FROM ? null : 'both';
 }
 
-/**
- * Victim-aware hazard cost for the side the hazards lie on, capped at
- * `hazardCap`. Exported for direct testing.
- */
+/** The hazard cost of the side the hazards lie on, by victim, capped at `hazardCap`. */
 export function hazardCost(side: Side, battle: Battle, exclude?: ReadonlySet<Pokemon>): number {
   const bodyWeight = EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp;
   let cost = 0;
@@ -50,9 +44,8 @@ function hazardLayers(side: Side): { hasRocks: boolean; spikesLayers: number; ha
 }
 
 /**
- * Grounded for entry pricing: the sim's grounding with the bench-Levitate
- * correction (the sim ignores an INACTIVE mon's ability, but entry pricing
- * is about the moment it becomes active).
+ * Grounded for entry pricing: the sim's grounding, except that a benched Levitate mon counts as airborne (the sim ignores an
+ * inactive mon's ability, but entry pricing is about the moment it becomes active).
  */
 function entryGrounded(pokemon: Pokemon, battle: Battle): boolean {
   const gravityActive = !!battle.field.pseudoWeather['gravity'];
@@ -61,20 +54,15 @@ function entryGrounded(pokemon: Pokemon, battle: Battle): boolean {
 }
 
 /**
- * The entry-damage fraction THIS mon pays to switch into its side's
- * hazards — the shared per-mon term behind hazardCost and the matchup
- * entry discount. 0 for Heavy-Duty Boots and Magic Guard; ground-bound
- * hazards use the sim's grounding (with the bench-Levitate correction:
- * the sim ignores an INACTIVE mon's ability, but entry pricing is about
- * the moment it becomes active); Toxic Spikes immunity is dex-typed.
+ * The entry-damage fraction THIS mon pays to switch into its side's hazards, the per-mon term behind hazardCost and the matchup
+ * entry discount. 0 for Heavy-Duty Boots and Magic Guard; Toxic Spikes immunity is dex-typed.
  */
 export function hazardEntryFraction(pokemon: Pokemon, side: Side, battle: Battle): number {
   const { hasRocks, spikesLayers, hasToxicSpikes, hasWeb } = hazardLayers(side);
   if (!hasRocks && !spikesLayers && !hasToxicSpikes && !hasWeb) return 0;
   if (pokemon.item === 'heavydutyboots' || pokemon.ability === 'magicguard') return 0;
 
-  // Grounding already follows a Tera click through the sim's isGrounded();
-  // the two typed reads follow it through liveTypes (round 54).
+  // Grounding follows a Tera click through the sim's isGrounded(); the two typed reads follow it through liveTypes.
   const grounded = entryGrounded(pokemon, battle);
   const types = liveTypes(pokemon);
   let fraction = 0;
@@ -92,13 +80,9 @@ export function hazardEntryFraction(pokemon: Pokemon, side: Side, battle: Battle
 }
 
 /**
- * Living BENCHED mons that cannot survive re-entry through their own side's
- * hazards (hp fraction ≤ hazardEntryFraction — Boots, Magic Guard, the
- * bench-Levitate correction, and typed immunities all inherit from that
- * shared term). Empty while the side keeps a living removal carrier: a
- * piece that can wait for removal is not finished, and removal's own
- * option value is already priced by hazardRemovalEquity. Exported for
- * direct testing.
+ * Living BENCHED mons that cannot survive re-entry through their own side's hazards (hp fraction <= hazardEntryFraction, so
+ * Boots, Magic Guard, the bench-Levitate correction and typed immunities all count). Empty while the side keeps a living
+ * removal carrier: a piece that can wait for removal is not finished, and hazardRemovalEquity prices the removal.
  */
 export function strandedMons(side: Side, battle: Battle): Set<Pokemon> {
   const stranded = new Set<Pokemon>();
@@ -119,14 +103,10 @@ export function strandedMons(side: Side, battle: Battle): Set<Pokemon> {
 }
 
 /**
- * The OPTION VALUE a side's living hazard removers hold over the board
- * state: the best net hazard-cost change any of them could buy by clicking
- * their removal move, floored at zero (a net-negative option — Defog that
- * would also destroy the side's own more-valuable hazards on the opponent's
- * board — is simply never exercised), then tempo-discounted. Own-side-only
- * moves (Rapid Spin, Mortal Spin) net the side's full relief;
- * both-sides moves (Defog, Court Change, Tidy Up) net relief MINUS the side's own
- * hazards' worth over there. Exported for direct testing.
+ * The option value a side's living hazard removers hold: the best net hazard-cost change any of them could buy by clicking
+ * their removal move, floored at zero (Defog that would destroy more of the side's own hazards on the foe's board is never
+ * exercised), then tempo-discounted. Own-side moves net the side's full relief; both-sides moves net relief minus the side's own
+ * hazards' worth over there.
  */
 export function hazardRemovalEquity(side: Side, battle: Battle): number {
   const own = hazardCost(side, battle);

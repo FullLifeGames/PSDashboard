@@ -1,13 +1,7 @@
 import type { Battle, Pokemon } from '@pkmn/sim';
 import { boostedFraction, usableSlots, type PairThreat } from './threat.ts';
 
-/**
- * The field pair (round 69, T42 part 2): what two actives do together that a
- * 1v1 race does not see. Doubles only, every cell 0 in singles. A side's two
- * actives focus one foe (pairFocus) or one of them covers the other with a
- * redirection move (pairRedirect). Read from the threat cache like the sweep
- * cells; the weights are 0 until a fit prices them.
- */
+// What two actives do together that a 1v1 race does not see (pairFocus, pairRedirect): doubles only, every cell is 0 in singles.
 
 interface FieldPairCells { focus: number; redirect: number }
 
@@ -17,25 +11,21 @@ interface RedirectDex {
 }
 
 /**
- * A move that draws the foes' single-target hits to its user (Follow Me, Rage
- * Powder): a self-targeted move whose volatile condition redirects foe moves.
- * The sweep of test/field-pair.spec.ts plays every self-targeted move with a
- * volatile in the simulator against this reading.
+ * A move that draws the foes' single-target hits to its user (Follow Me, Rage Powder): a self-targeted move whose volatile
+ * condition redirects foe moves. test/field-pair.spec.ts plays every such move in the simulator against this reading.
  */
 export function redirectsFoes(dex: Pick<RedirectDex, 'conditions'>, move: { target: string; volatileStatus?: string }): boolean {
   return move.target === 'self' && !!move.volatileStatus && 'onFoeRedirectTarget' in dex.conditions.get(move.volatileStatus);
 }
 
-/** The living actives of one side. */
 const fieldOf = (battle: Battle, sideIndex: number): Pokemon[] =>
   battle.sides[sideIndex].active.filter((mon): mon is Pokemon => !!mon && !mon.fainted && mon.hp > 0);
 
 const hpFraction = (mon: Pokemon): number => mon.hp / mon.maxhp;
 
 /**
- * pairFocus: a foe on the field that neither active KOs alone and both KO
- * together contributes the second attacker's marginal share of the foe's HP
- * (the part of the foe the first attacker leaves), over the foes on the field.
+ * pairFocus: a foe that neither active KOs alone and both KO together contributes the second attacker's marginal share of the
+ * foe's HP (the part the first attacker leaves), over the foes on the field.
  */
 function focusCell(mine: Pokemon[], foes: Pokemon[], threat: (attacker: Pokemon, defender: Pokemon) => PairThreat): number {
   let focus = 0;
@@ -50,9 +40,8 @@ function focusCell(mine: Pokemon[], foes: Pokemon[], threat: (attacker: Pokemon,
 }
 
 /**
- * pairRedirect: for each living active with a redirection move to click, its
- * partner's best share of a foe's current HP (capped at 1) at the redirector's
- * HP fraction: the damage the redirection keeps on the field.
+ * pairRedirect: for each active with a redirection move to click, its partner's best share of a foe's current HP (capped at 1)
+ * at the redirector's HP fraction: the damage the redirection keeps on the field.
  */
 function redirectCell(mine: Pokemon[], foes: Pokemon[], battle: Battle, threat: (attacker: Pokemon, defender: Pokemon) => PairThreat): number {
   let redirect = 0;

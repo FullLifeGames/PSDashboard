@@ -1,37 +1,20 @@
 import { PRNG, toID, type Battle, type Pokemon, type PokemonSet } from '@pkmn/sim';
 import { twinBattle } from '../sim-ask/index.ts';
 
-/**
- * Round 69 (T102, decision 17): the right status multiplier of a body. The
- * flat multiplier of `bodies` (EVAL_WEIGHTS.status) prices a burn, poison or
- * paralysis the same on every mon, but an ability can change what a status
- * costs: Poison Heal heals where poison hurts, Guts and Toxic Boost and Flare
- * Boost turn the status into extra power, Quick Feet into speed, Marvel
- * Scale into bulk, Magic Guard takes the chip. The simulator knows each case,
- * so the answer is played, not listed: a twin battle reads six channels
- * (HP over an idle turn, damage dealt and taken with a physical and a special
- * move, speed) for the ability with and without the status, against a mon
- * with no ability. The status costs the channels where the plain statused mon
- * is worse than the plain healthy one; an ability that lifts one of its
- * channels above its own healthy value turns the status into a gain (right
- * multiplier 1), else the right multiplier is the applied one plus the share
- * of the cost the ability gives back (the cost it still pays against the
- * cost of a mon with no ability: Magic Guard under poison pays none, Analytic
- * under burn pays all of it and more). A cost is the share a channel loses
- * (a halved Attack is half whatever the mon's Attack), except for the HP of
- * an idle turn, which is a fraction of the mon's HP already.
- *
- * The idle turn rolls dice (Shed Skin cures a third of the time): that
- * channel is played on several seeds and the answer is the mean, so an ability
- * that cures by chance gets the share of the cost it saves in expectation.
- * test/status-fix.spec.ts holds every ability under every status to whole
- * turns of real battles.
- *
- * Burn, paralysis, poison and toxic are played. Sleep and freeze keep the
- * applied multiplier: their cost is the turns the mon cannot act, which no
- * deterministic channel of the twin reads (Early Bird, Natural Cure and
- * Hydration are rests of this step).
- */
+// The right status multiplier of a body: an ability can change what a status costs, so the answer is played on a twin battle, not listed.
+
+// The flat multiplier of `bodies` (EVAL_WEIGHTS.status) prices a burn, poison or paralysis the same on every mon, but Poison Heal heals
+// where poison hurts, Guts, Toxic Boost and Flare Boost turn the status into power, Quick Feet into speed, Marvel Scale into bulk, Magic
+// Guard takes the chip. A twin reads six channels (HP over an idle turn, damage dealt and taken with a physical and a special move,
+// speed) for the ability with and without the status, against a mon with no ability. The status costs the channels where the plain
+// statused mon is worse than the plain healthy one; an ability that lifts one of its channels above its own healthy value turns the
+// status into a gain (right multiplier 1), else the right multiplier is the applied one plus the share of the cost the ability gives back
+// (Magic Guard under poison pays none, Analytic under burn pays all of it and more). A cost is the share a channel loses, except for the
+// HP of an idle turn, which is a fraction of the mon's HP already. The idle turn rolls dice (Shed Skin cures a third of the time): it is
+// played on several seeds and the answer is the mean. test/status-fix.spec.ts holds every ability under every status to real battles.
+//
+// Burn, paralysis, poison and toxic are played. Sleep and freeze keep the applied multiplier: their cost is the turns the mon cannot act,
+// which no deterministic channel of the twin reads.
 
 /** The statuses with a cost the twin can read: chip damage, a halved Attack, a halved Speed. */
 const PLAYED = new Set(['brn', 'par', 'psn', 'tox']);
@@ -139,10 +122,8 @@ function memoReading(format: string, ability: string, status: string | null): Pl
 }
 
 /**
- * The share of a cost the ability gives back in one channel: 1 when the
- * statused ability mon loses nothing of its healthy value, 0 when it loses
- * as much as a mon with no ability (a share of the value; the idle turn's HP
- * and a value of 0 compare the difference).
+ * The share of a cost the ability gives back in one channel: 1 when the statused ability mon loses nothing of its healthy value,
+ * 0 when it loses as much as a mon with no ability (a share of the value; the idle turn's HP and a value of 0 compare the difference).
  */
 function givenBack(channel: Channel, base: [number, number], mon: [number, number]): number {
   const [baseHealthy, baseStatused] = base;
@@ -188,10 +169,8 @@ function verdictFor(format: string, ability: string, status: string): Verdict {
 }
 
 /**
- * The right multiplier of a body with `ability` under `status`, given the
- * multiplier `applied` for every body: `applied` where the ability changes
- * nothing, 1 where it turns the status into a gain, between where it gives
- * part of the cost back. `format` is the twin's (removalFormat of the battle).
+ * The right multiplier of a body with `ability` under `status`, given the multiplier `applied` for every body: `applied` where the
+ * ability changes nothing, 1 where it turns the status into a gain, between where it gives part of the cost back. `format` is the twin's.
  */
 export function statusRight(format: string, ability: string, status: string, applied: number): number {
   const id = toID(ability);

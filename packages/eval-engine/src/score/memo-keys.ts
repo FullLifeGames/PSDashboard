@@ -2,11 +2,9 @@ import type { Battle, Pokemon } from '@pkmn/sim';
 import { bodyStateKey, boardStateKey, readsFactory, type ReadSet } from './board-key.ts';
 
 /**
- * Round 89 (#149, step A8): the memo keys of the two memos that play a board, built from the board key of score/board-key.ts.
- * A body's key runs to several hundred characters (every field the play reads), so a memo key holds numbers: a key string is
- * interned to a small integer, and the interner starts over together with the memo it serves. A reader caches the numbers it
- * handed out, with the interner's generation, and drops them when the memo started over: a number from before a clear is
- * never reused.
+ * Maps a key string to a small integer, so that the memo keys of the two memos that play a board (built from score/board-key.ts) hold
+ * numbers: a body's key runs to several hundred characters. It starts over with the memo it serves; a reader drops the numbers it
+ * cached when the generation moves, so a number from before a clear is never reused.
  */
 export class Interner {
   /** Raised when the interner starts over. */
@@ -19,7 +17,7 @@ export class Interner {
     return id;
   }
 
-  /** For probes: the texts held (a worker keeps them until the memo starts over) and their length in characters. */
+  /** For probes: the texts held and their length in characters. */
   held(): { entries: number; chars: number } {
     let chars = 0;
     for (const text of this.ids.keys()) chars += text.length;
@@ -32,10 +30,8 @@ export class Interner {
   }
 }
 
-/** Where a body stands. */
 export const placeKey = (pokemon: Pokemon): string => `${pokemon.side.id}${pokemon.position}:`;
 
-/** The id of a body's key under a set of reads, found once per reader and generation. */
 function bodyIds(consumer: 'hit' | 'residual', interner: Interner): (pokemon: Pokemon, reads: ReadSet, withHp?: boolean) => number {
   let generation = interner.generation;
   let cache = [new Map<ReadSet, Map<Pokemon, number>>(), new Map<ReadSet, Map<Pokemon, number>>()];

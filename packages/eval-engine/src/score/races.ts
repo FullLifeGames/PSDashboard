@@ -3,10 +3,7 @@ import { isChampionsSimFormat } from '../forward/sim-mods.ts';
 import { twinBattle, twinFormat } from '../sim-ask/index.ts';
 import { usableSlots } from './threat.ts';
 
-/**
- * KO-race clocks for one pair: heal PP as survival, the healer's action
- * economy, and PP budgets, all fed by live sim state.
- */
+// KO-race clocks for one pair: heal PP as survival, the healer's action economy and PP budgets, all fed by live sim state.
 
 /** The wall's finite fuel: the best per-turn heal rate and the total HP fraction the heal PP restore. */
 export interface HealProfile {
@@ -15,14 +12,13 @@ export interface HealProfile {
 }
 
 /**
- * Fallback per-turn heal fraction for a heal-flagged move when the simulator cannot be asked (the Champions mod is
- * not registered yet, or the twin battle fails to build). Round 76 (T258): a move whose heal lives in a callback
- * instead of a Dex ratio (Shore Up, the Moonlight family, Rest, Wish, Jungle Healing, Heal Pulse) is read from the
- * simulator itself; moves with a direct Dex ratio price exactly (Recover 1/2, Life Dew 1/4, ...).
+ * The per-turn heal fraction of a heal-flagged move when the simulator cannot be asked (the Champions mod is not registered yet, or
+ * the twin battle fails to build). A move whose heal lives in a callback instead of a Dex ratio (Shore Up, the Moonlight family, Rest,
+ * Wish, Jungle Healing, Heal Pulse) is read from the simulator itself; moves with a direct Dex ratio price exactly (Recover 1/2).
  */
 const HEAL_FRACTION_DEFAULT = 0.5;
 
-/** Turns a played heal move is clicked on the twin: a whole cycle of the slowest healer (Rest sleeps three turns after the click, a wake-up turn is lost), and of Wish (two). */
+/** Turns a played heal move is clicked on the twin: a whole cycle of the slowest healer (Rest sleeps three turns after the click, Wish takes two). */
 const HEAL_CYCLE = 12;
 
 /** A foe whose heal-by-Attack differs between a weak and a strong Attack follows the foe (Strength Sap). */
@@ -102,12 +98,11 @@ function cycleGain(dex: Battle['dex'], field: HealField, moveId: string, foeSpec
 const playedRates = new Map<string, number>();
 
 /**
- * Round 76 (T258): the heal per turn of a move without a Dex ratio, as the simulator plays it. The click runs on a twin
- * battle of the live battle's mode under its weather, terrain and the healer's item (a Utility Umbrella blanks sun and
- * rain); the HP the healer's own clicks restore per turn is the rate. Moves that heal the target (Heal Pulse, Floral
- * Healing: in singles the foe), the next body (Healing Wish) or later (Wish) and moves that sleep (Rest) read what a
- * repeated click gives over the cycle. Asked once per format, move, weather, item and terrain; test/races-heal-sim.spec.ts plays every heal move of the Dex
- * against it under every weather and terrain.
+ * The heal per turn of a move without a Dex ratio, as the simulator plays it: the click runs on a twin battle of the live battle's
+ * mode under its weather, terrain and the healer's item; the HP the healer's own clicks restore per turn is the rate. Moves that
+ * heal the target (Heal Pulse, Floral Healing: in singles the foe), the next body (Healing Wish) or later (Wish) and moves that
+ * sleep (Rest) read what a repeated click gives over the cycle. Asked once per format, move, weather, item and terrain;
+ * test/races-heal-sim.spec.ts plays every heal move of the Dex against it under every weather and terrain.
  */
 function playedRate(pokemon: Pokemon, battle: Battle, moveId: string): number {
   const format = twinFormat(battle.gen, isChampionsSimFormat(battle.format.id));
@@ -130,12 +125,9 @@ function playedRate(pokemon: Pokemon, battle: Battle, moveId: string): number {
 }
 
 /**
- * Per-turn fraction a status burns off its holder, as the sim's conditions
- * take it: burn 1/8 in gens 2 to 6, else 1/16; poison 1/16 in gen 1, else
- * 1/8; toxic priced at its early ramp (races-residual.spec.ts checks the
- * table against the sim, gens 1 to 9). Magic Guard blanks residuals; Poison
- * Heal turns poison into upkeep, priced as merely no residual (the passive
- * regen, like item regen, stays out: second-order next to the race sign).
+ * Per-turn fraction a status burns off its holder, as the sim's conditions take it: burn 1/8 in gens 2 to 6, else 1/16; poison 1/16
+ * in gen 1, else 1/8; toxic priced at its early ramp (test/races-residual.spec.ts checks the table against the sim, gens 1 to 9).
+ * Magic Guard blanks residuals; Poison Heal turns poison into upkeep, priced as no residual (passive regen stays out).
  */
 function residualFraction(status: string, gen: number): number {
   if (status === 'brn') return gen >= 2 && gen <= 6 ? 1 / 8 : 1 / 16;
@@ -149,18 +141,14 @@ export function statusResidual(pokemon: Pokemon): number {
   return residualFraction(pokemon.status, pokemon.battle.gen);
 }
 
-/**
- * The wall's finite fuel from usable heal moves: the best per-turn heal
- * rate, and the total HP fraction the remaining heal PP can restore
- * (Σ pp × per-move rate).
- */
+/** The wall's finite fuel from usable heal moves: the best per-turn heal rate and the total HP fraction the remaining heal PP can restore. */
 export function healProfile(pokemon: Pokemon, battle: Battle): HealProfile {
   let rate = 0;
   let absorb = 0;
   for (const slot of usableSlots(pokemon)) {
     const move = battle.dex.moves.get(slot.id);
-    // A drain move (Horn Leech, Giga Drain, Draining Kiss) carries the heal flag too, because Heal Block stops it, but
-    // it heals a share of the damage it deals as part of an attack: no turn is spent healing (T220, the Dex's `drain`).
+    // A drain move (Horn Leech, Giga Drain, Draining Kiss) carries the heal flag too, because Heal Block stops it, but it heals a
+    // share of the damage it deals as part of an attack: no turn is spent healing (the Dex's `drain`).
     if (!move.flags['heal'] || move.drain) continue;
     const fraction = move.heal ? move.heal[0] / move.heal[1] : playedRate(pokemon, battle, slot.id);
     rate = Math.max(rate, fraction);
@@ -169,11 +157,7 @@ export function healProfile(pokemon: Pokemon, battle: Battle): HealProfile {
   return { rate, absorb };
 }
 
-/**
- * Total usable PP — a coarse ceiling on how many turns of pressure the mon
- * can still produce (heal turns included; the Struggle a drained mon could
- * still click stays out, see usableSlots).
- */
+/** Total usable PP: a coarse ceiling on the turns of pressure the mon can still produce (the Struggle a drained mon could click stays out). */
 export function ppBudget(pokemon: Pokemon): number {
   let pp = 0;
   for (const slot of usableSlots(pokemon)) pp += slot.pp ?? 8;
@@ -206,33 +190,18 @@ export interface RaceClocks {
 }
 
 /**
- * KO-race clocks for one pair, replacing the old "a healer walls anything
- * short of a 2HKO" pauschal (573756 t134–139: that rule priced a burned,
- * 3-Recover-PP Toxapex as unkillable AND let it heal and chip in the same
- * turn). Three deliberately coarse rules, all fed by live sim state:
+ * KO-race clocks for one pair, three deliberately coarse rules fed by live sim state:
  *
- * - Heal PP absorbs as survival: the remaining heal PP restore healAbsorb
- *   bars in total, so a defender soaks hp + healAbsorb before it falls —
- *   pure delay whether or not the wall arithmetic holds. Past the heal
- *   rate the held PP realize only at healRate/incoming efficiency (the
- *   healer heals at a net loss and dies with PP in the tank), so HP
- *   already on the body outprices PP in the tank — healing now beats
- *   holding (round 12).
- * - Action economy: a healer under pressure spends pressure/healRate of its
- *   turns healing and attacks only on the spare ones; under crumbling
- *   pressure (≥ its best heal rate, e.g. a burn tipping a borderline hit
- *   over the sustain) it is pinned, priced as never attacking when it
- *   loses the pair either way. Since 13.10.2026 it is pinned only then:
- *   a pinned healer whose attack, spending no turn on a heal, KOs the
- *   other side no later than the other side KOs it attacks every turn
- *   (a 5% Cobalion in front of a full-HP Shore Up Palossand died to its
- *   Earth Power, and the race read the Palossand as a wall that never swings).
- * - The PP budget caps every clock: a win that needs more turns than the
- *   attacker has PP never lands (a full-PP wall still walls — the slow
- *   attacker runs dry first).
+ * - Heal PP absorbs as survival: the remaining heal PP restore healAbsorb bars in total, so a defender soaks hp + healAbsorb before
+ *   it falls. Past the heal rate the held PP realize only at healRate/incoming efficiency (the healer heals at a net loss and dies
+ *   with PP in the tank), so HP already on the body outprices PP in the tank: healing now beats holding.
+ * - Action economy: a healer under pressure spends pressure/healRate of its turns healing and attacks only on the spare ones; under
+ *   crumbling pressure (>= its best heal rate) it is pinned, priced as never attacking when it loses the pair either way. A pinned
+ *   healer whose attack, spending no turn on a heal, KOs the other side no later than the other side KOs it attacks every turn (a 5%
+ *   Cobalion in front of a full-HP Shore Up Palossand died to its Earth Power).
+ * - The PP budget caps every clock: a win that needs more turns than the attacker has PP never lands.
  *
- * Residuals alone can finish a race (stall wars end by status), but a side
- * with no damaging move at all never wins one.
+ * Residuals alone can finish a race (stall wars end by status), but a side with no damaging move at all never wins one.
  */
 export function raceClocks(a: RaceSide, b: RaceSide): RaceClocks {
   const incomingA = b.frac + a.residual;
@@ -278,32 +247,26 @@ function clock(attacker: RaceSide, effFrac: number, defender: RaceSide, incoming
   if (attacker.frac <= 0) return Infinity;
   const pressure = effFrac + defender.residual;
   if (pressure <= 0) return Infinity;
-  // Held heal PP realize only at the pin efficiency (round 12): past the
-  // heal rate the healer heals at a net loss and dies with PP in the
-  // tank, so a bar held in PP is worth healRate/incoming of a bar on the
-  // body — which is what makes healing NOW beat holding (655336 t26:
-  // Slack Off must price over a free-turn Protect even in a lost race;
-  // before this, hp + absorb was conserved by the heal click and a heal
-  // turn priced at ~0).
+  // Held heal PP realize only at the pin efficiency: past the heal rate the healer heals at a net loss and dies with PP in the tank,
+  // so a bar held in PP is worth healRate/incoming of a bar on the body, which makes healing NOW beat holding (Slack Off must price
+  // over a free-turn Protect even in a lost race).
   let absorb = 0;
   if (heals) {
     absorb = defender.healRate > 0 && incoming > defender.healRate
       ? defender.healAbsorb * (defender.healRate / incoming)
       : defender.healAbsorb;
   }
-  // The epsilon keeps float noise (0.1 − 0.45/0.5 ≠ exactly 0.02) from
-  // pushing an exact division over the next whole turn.
+  // The epsilon keeps float noise (0.1 - 0.45/0.5 is not exactly 0.02) from pushing an exact division over the next whole turn.
   const held = Math.ceil((defender.hp + absorb) / pressure - 1e-9);
   const turns = heals ? Math.min(held, healedSequence(defender, pressure, incoming)) : held;
   return turns > attacker.ppBudget ? Infinity : turns;
 }
 
 /**
- * Round 76 (T258): the clock of a healer the hits out-run, as the simulator plays it: hit, heal, hit, heal, hit. n hits
- * take 1 + (n - 1) heals of the healer's rate, so the KO lands at the first n with n * pressure >= hp + (n - 1) * rate.
- * The held-PP price above stays the clock where the PP cannot bridge that many heals (a short tank empties first), and
- * wherever it is the shorter one: it counts the PP at the pin efficiency (round 12), so healing now still beats holding.
- * Infinity where the hits never out-run a heal.
+ * The clock of a healer the hits out-run, as the simulator plays it: hit, heal, hit, heal, hit. n hits take 1 + (n - 1) heals of the
+ * healer's rate, so the KO lands at the first n with n * pressure >= hp + (n - 1) * rate. The held-PP price in `clock` stays where the
+ * PP cannot bridge that many heals (a short tank empties first) and wherever it is the shorter one. Infinity where the hits never
+ * out-run a heal.
  */
 function healedSequence(defender: RaceSide, pressure: number, incoming: number): number {
   const rate = defender.healRate;

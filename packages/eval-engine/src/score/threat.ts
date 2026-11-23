@@ -5,13 +5,8 @@ import {
 } from './move-facts.ts';
 import type { StaticRuleset } from './weights.ts';
 
-/**
- * The HP- and boost-independent threat proxy: one attacker→defender
- * direction's best expected move fractions, memoized per search, with the
- * live boost stages applied on read.
- */
+// The HP- and boost-independent threat proxy: one direction's best expected move fractions, memoized per search, live stages applied on read.
 
-/** Living mons of one side (fainted or zero-HP bodies excluded). */
 export const livingOf = (side: Side): Pokemon[] =>
   side.pokemon.filter(pokemon => !pokemon.fainted && pokemon.hp > 0);
 export const livingMons = (battle: Battle, index: number): Pokemon[] => livingOf(battle.sides[index]);
@@ -25,27 +20,22 @@ export interface PairThreat {
   /** The attacker carries a usable damaging priority move. */
   priority: boolean;
   /**
-   * Accuracy (0–1, 1 = never misses) of the category-max move (round 14).
-   * The narrative race weighs its rates by these — a 70% Hurricane is no
-   * full-hit clock (648453 t13) — while the SCORE path never reads them:
-   * matchup and coverage stay on the raw fractions. Optional so hand-built
-   * threats in tests keep working; consumers default to 1.
+   * Accuracy (0-1, 1 = never misses) of the category-max move. The narrative race weighs its rates by it (a 70% Hurricane is no
+   * full-hit clock); the SCORE path never reads it (matchup and coverage stay on the raw fractions). Optional so hand-built threats
+   * in tests keep working; consumers default to 1.
    */
   physicalAcc?: number;
   specialAcc?: number;
   /**
-   * The ids of the moves behind `physical` and `special` (13.10.2026, the contact punishments of boostsBiting): the
-   * race plays the hit of the move it prices (score/contact.ts). Optional like the accuracies; a hand-built threat
-   * has none and prices no hit.
+   * The ids of the moves behind `physical` and `special`: the race plays the hit of the move it prices (score/contact.ts). Optional
+   * like the accuracies; a hand-built threat has none and prices no hit.
    */
   physicalMove?: string;
   specialMove?: string;
   /**
-   * Moves whose stages are not their category's (round 63, T81), each with
-   * its own best fraction at stage 0: Body Press (the user's Defense),
-   * Psyshock (the target's Defense), Foul Play (the target's Attack), and
-   * the moves whose power the boosts set (Stored Power, Power Trip), priced
-   * at the power of no boosts. Absent on an ordinary pair.
+   * Moves whose stages are not their category's, each with its own best fraction at stage 0: Body Press (the user's Defense),
+   * Psyshock (the target's Defense), Foul Play (the target's Attack), and the moves whose power the boosts set (Stored Power, Power
+   * Trip), priced at the power of no boosts. Absent on an ordinary pair.
    */
   axes?: AxisThreat[];
 }
@@ -54,7 +44,6 @@ export interface PairThreat {
 export interface AxisThreat {
   fraction: number;
   acc: number;
-  /** The move this entry prices. */
   id?: string;
   /** Whose offensive stage the damage reads, and which. */
   holder: 'attacker' | 'defender';
@@ -65,34 +54,9 @@ export interface AxisThreat {
   staged?: { id: string; basePower: number };
 }
 
-/**
- * Memo for the boost-independent part of the matchup term. One cache spans
- * one search. The memo MUST be a function of its key: the app splits one
- * matrix over a worker pool with one cache per worker, so a value that
- * depends on what a cache saw first differs run to run (round 49: two runs
- * of one doubles replay disagreed on single cells). Most of what pairThreat
- * reads is constant across the forked positions of one battle, but not all
- * of it, so pairKey carries EVERY read of the memoized function: level, item,
- * ability, choice lock and usable slots, the current types (Protean, Soak,
- * Burn Up), the Tera type, the stored stats it divides (Power Trick, Guard Split;
- * since round 64 also those an off-axis move reads, axisKey), the
- * defender's max HP (forme change, Dynamax) and, where a halving move prices
- * off it, the defender's current HP. A new read inside pairThreat or
- * singleMoveFraction needs its key term (test/threat-memo.spec.ts). Round 57:
- * a move whose answer at use reads a fact the key does not name (weather,
- * terrain, grounding, stages, Hidden Power) keys its answer instead
- * (landedKey, CONTEXT_MOVES in move-use.ts); round 63 (T81) adds the moves
- * whose power the simulator sets from HP, status, the field, speed or weight
- * (the live class of POWER_MOVES in move-facts.ts).
- */
+/** The memo of the boost-independent threat of one search, a function of its key (pairKey). */
 export type MatchupCache = Map<string, PairThreat> & {
-  /**
-   * Round 65: the rule set whose weight table the static applies (score/weights.ts).
-   * The memo itself is weight-free; a search creates its cache with the
-   * rule set of its settings, and a plain Map reads as 'standard'. Round 67
-   * (T139): every cache names one, so a path that forgets to pass its rule
-   * set fails to compile instead of weighing with the standard table.
-   */
+  /** The rule set whose weight table the static applies (score/weights.ts); the memo itself is weight-free, and a plain Map reads as 'standard'. */
   readonly ruleset: StaticRuleset;
 };
 
@@ -101,21 +65,15 @@ export function createMatchupCache(ruleset: StaticRuleset | undefined): MatchupC
   return Object.assign(new Map<string, PairThreat>(), { ruleset: ruleset ?? 'standard' });
 }
 
-/** The move a Choice item has locked this Pokémon into, if any. */
 function lockedMoveId(pokemon: Pokemon): string | null {
   const locked = pokemon.volatiles['choicelock'] as { move?: string } | undefined;
   return locked?.move ?? null;
 }
 
 /**
- * Move slots with PP left to click. PP is read LIVE from the sim state and
- * never derived from dex base PP: pools differ across rule sets (Showdown
- * effectively always runs maxed PP Ups; Pokémon Champions runs different
- * counts), and the replay's PP bookkeeping is the only ground truth. A slot
- * without a pp field stays usable (defensive default). A fully drained mon
- * can still Struggle in reality, but its chip is no sustained threat — it
- * prices as threatless (573756: the Struggle-locked Toxapex kept pricing as
- * a full wall while it recoiled itself out).
+ * Move slots with PP left to click. PP is read LIVE from the sim state, never derived from dex base PP (pools differ across rule sets:
+ * Pokémon Champions runs different counts). A slot without a pp field stays usable. A fully drained mon could still Struggle, but its
+ * chip is no sustained threat: it prices as threatless (a Struggle-locked Toxapex kept pricing as a full wall while it recoiled itself out).
  */
 export function usableSlots(pokemon: Pokemon): Pokemon['moveSlots'] {
   return pokemon.moveSlots.filter(slot => (slot.pp ?? 1) > 0);
@@ -131,22 +89,22 @@ function pairKey(
   slots: Pokemon['moveSlots'],
   answers: ReadonlyMap<string, Landed> | null,
 ): string {
-  // The usable-slot signature keys PP transitions: a move draining to zero
-  // mid-search changes the attacker's threat, so it must miss the memo.
+  // The memo MUST be a function of its key: the app splits one matrix over a worker pool with one cache per worker, so a value that
+  // depends on what a cache saw first differs run to run (two runs of one doubles replay disagreed on single cells). The key carries
+  // EVERY read of pairThreat and singleMoveFraction (a new read needs its key term, test/threat.spec.ts): level, item, ability,
+  // choice lock, usable slots, current types (Protean, Soak, Burn Up), the Tera type, the stored stats it divides (Power Trick, Guard
+  // Split), the defender's max HP (forme change, Dynamax). A move whose answer at use reads a fact the key does not name (weather,
+  // terrain, grounding, stages, Hidden Power, a power the simulator sets from HP, status, field, speed or weight) keys its answer
+  // instead (landedKey, CONTEXT_MOVES in move-use.ts, the live class of POWER_MOVES in move-facts.ts).
+  // The usable-slot signature keys PP transitions: a move draining to zero mid-search changes the attacker's threat.
   const usable = slots.map(slot => slot.id).join(',');
-  // A halving move prices off the defender's current HP, so such a pair keys
-  // on it. Without it the first forked position to ask froze its HP into the
-  // memo for the whole search, and in the app, where a worker pool splits
-  // one matrix, the value of a cell followed which worker priced it (round 49).
+  // A halving move prices off the defender's current HP, so such a pair keys on it: otherwise the first forked position to ask would
+  // freeze its HP into the memo for the whole search, and with a worker pool the value of a cell would follow which worker priced it.
   const liveHp = slots.some(slot => HALVING_MOVES.has(slot.id)) ? `:${defender.hp}` : '';
-  // Types and the stored stats are constant for nearly every pair and move
-  // under Protean, Soak, Power Trick and their kin; the key carries them so
-  // the memo never answers for a body that has changed since it was asked.
-  // A Tera click leaves `types` alone and sets `terastallized`, so the key
-  // carries both. The defender's term mirrors a read (liveTypes); a Stellar
-  // body keeps its old types for defense, so the raw types stay. The
-  // attacker's term mirrors STAB by the rules (round 63, T81), a Stellar
-  // body's term the types it has spent its boost on.
+  // Types and stored stats are constant for nearly every pair but change under Protean, Soak, Power Trick and their kin: the key
+  // carries them. A Tera click leaves `types` alone and sets `terastallized`, so both are keyed. The defender's term mirrors liveTypes
+  // (a Stellar body keeps its old types for defense); the attacker's mirrors STAB by the rules (a Stellar body: the types it has spent
+  // its boost on).
   const stellar = attacker.terastallized === 'Stellar' ? `:${attacker.stellarBoostedTypes.join('/')}` : '';
   const offense = `${attacker.types.join('/')}:${attacker.terastallized ?? ''}${stellar}:${attacker.storedStats.atk}:${attacker.storedStats.spa}`;
   const defense = `${defender.types.join('/')}:${defender.terastallized ?? ''}:${defender.storedStats.def}:${defender.storedStats.spd}:${defender.maxhp}`;
@@ -156,12 +114,9 @@ function pairKey(
 }
 
 /**
- * The stored stats an off-axis slot reads besides the attacker's atk/spa and
- * the defender's def/spd (round 64, T125): Body Press the user's Defense,
- * Foul Play the target's Attack, as the Dex names them. Guard Split and
- * Power Split write exactly these and leave the four above alone. Both
- * category variants are keyed, so a move whose category flips at use stays
- * exact. '' for a pair without such a slot.
+ * The stored stats an off-axis slot reads besides the attacker's atk/spa and the defender's def/spd: Body Press the user's Defense,
+ * Foul Play the target's Attack, as the Dex names them. Guard Split and Power Split write exactly these. Both category variants are
+ * keyed, so a move whose category flips at use stays exact. '' for a pair without such a slot.
  */
 function axisKey(attacker: Pokemon, defender: Pokemon, slots: Pokemon['moveSlots']): string {
   const battle = attacker.battle;
@@ -179,12 +134,9 @@ function axisKey(attacker: Pokemon, defender: Pokemon, slots: Pokemon['moveSlots
 }
 
 /**
- * The types a body defends with. After a Tera click the sim keeps `types` at
- * the old types and carries the new one in `terastallized`; a Stellar Tera
- * keeps the old types for defense. Not `getTypes()` on purpose: that adds
- * Roost and the added types (Forest's Curse, Trick-or-Treat), and round 54
- * measured Tera alone. The shortcut is still exact at a turn boundary: the
- * click clears an added type, and Roost does not outlast its turn.
+ * The types a body defends with. After a Tera click the sim keeps `types` at the old types and carries the new one in `terastallized`;
+ * a Stellar Tera keeps the old types for defense. Not `getTypes()` on purpose: that adds Roost and the added types (Forest's Curse,
+ * Trick-or-Treat). The shortcut is exact at a turn boundary: the click clears an added type, and Roost does not outlast its turn.
  */
 export function liveTypes(pokemon: Pokemon): string[] {
   const tera = pokemon.terastallized;
@@ -207,9 +159,8 @@ const ABILITY_IMMUNITIES: Record<string, string[]> = {
 };
 
 /**
- * Defender abilities that blank a move FLAG instead of a type (round 54,
- * gen9doublesou-2660822493 t2: Hurricane into a Wind Rider Shiftry priced
- * 277 % of its HP where the damage calc reads 0).
+ * Defender abilities that blank a move FLAG instead of a type (Hurricane into a Wind Rider Shiftry priced 277 % of its HP where the
+ * damage calc reads 0).
  */
 const ABILITY_FLAG_IMMUNITIES: Record<string, 'wind' | 'sound' | 'bullet'> = {
   windrider: 'wind',
@@ -230,10 +181,8 @@ function offenseMultiplier(attacker: Pokemon, defender: Pokemon, use: Landed): n
 }
 
 /**
- * The defender's bulk items: Eviolite on an NFE, Assault Vest on Special
- * Defense. The sim modifies the defensive stat the move reads (getDamage:
- * Modify<Def|SpD> of defenseStat), so Psyshock passes an Assault Vest; the
- * offensive modifiers above follow the category, as getDamage's do.
+ * The defender's bulk items: Eviolite on an NFE, Assault Vest on Special Defense. The sim modifies the defensive stat the move reads
+ * (getDamage: Modify<Def|SpD> of defenseStat), so Psyshock passes an Assault Vest; the offensive modifiers follow the category.
  */
 function bulkMultiplier(defender: Pokemon, defense: StatIDExceptHP): number {
   let bulk = 1;
@@ -244,12 +193,9 @@ function bulkMultiplier(defender: Pokemon, defense: StatIDExceptHP): number {
 
 
 /**
- * Fixed damage the proxy can price without a base power (round 33: the
- * last-pair race must see a Seismic Toss Chansey as an attacker). Level
- * moves deal the user's level, the halving moves half the target's
- * current HP; the reactive family (Counter, Mirror Coat, Metal Burst) and
- * self-sacrifice stay at 0. Endeavor's HP difference comes from the
- * simulator (landedOrCatalog, round 63).
+ * Fixed damage the proxy can price without a base power (a last-pair race must see a Seismic Toss Chansey as an attacker). Level
+ * moves deal the user's level, the halving moves half the target's current HP; the reactive family (Counter, Mirror Coat, Metal
+ * Burst) and self-sacrifice stay at 0. Endeavor's HP difference comes from the simulator (landedOrCatalog).
  */
 function fixedDamage(move: DexMove, attacker: Pokemon, defender: Pokemon): number {
   if (HALVING_MOVES.has(move.id)) return Math.floor(defender.hp / 2);
@@ -273,17 +219,13 @@ function ignoresImmunity(attacker: Pokemon, type: string): boolean {
 }
 
 /**
- * Expected damage of one specific move as a fraction of the defender's max
- * HP under the proxy's rules — standard damage formula with STAB, the type
- * chart, and the big item/ability modifiers; fixed-damage moves at their
- * fixed amount; 0 for status, reactive, and immune moves. The type, category
- * and power are the move's at use (move-use.ts, round 57; the power the
- * simulator sets at use, move-facts.ts, round 63).
+ * Expected damage of one move as a fraction of the defender's max HP under the proxy's rules: the damage formula with STAB, the type
+ * chart and the big item/ability modifiers; fixed-damage moves at their amount; 0 for status, reactive and immune moves. Type,
+ * category and power are the move's at use (move-use.ts; the power the simulator sets at use, move-facts.ts).
  */
 export function singleMoveFraction(attacker: Pokemon, defender: Pokemon, moveId: string, battle: Battle): number {
   const move = battle.dex.moves.get(moveId);
   if (!move.exists || move.category === 'Status') return 0;
-  // The move as it lands (round 57): its type, category and power at use.
   return landedFraction(attacker, defender, move, landedOrCatalog(attacker, defender, move, battle), battle);
 }
 
@@ -295,20 +237,16 @@ function blanked(attacker: Pokemon, defender: Pokemon, move: DexMove, type: stri
   return !ignoresImmunity(attacker, type) && !battle.dex.getImmunity(type, defenderTypes);
 }
 
-/** The stats getDamage reads: the Dex entry's override, else the category's own (round 63, T81). */
+/** The stats getDamage reads: the Dex entry's override, else the category's own. */
 const offenseStat = (move: DexMove, physical: boolean): StatIDExceptHP => move.overrideOffensiveStat ?? (physical ? 'atk' : 'spa');
 const defenseStat = (move: DexMove, physical: boolean): StatIDExceptHP => move.overrideDefensiveStat ?? (physical ? 'def' : 'spd');
 
 /**
- * STAB by the game's rules (BattleActions#modifyDamage; T71, built in round
- * 54 and landed with T81 in round 63): an old type or the Tera type 1.5, an
- * old type that is also the Tera type 2.0; a Stellar Tera 2.0 on an old
- * type and 1.2 elsewhere, on the first use of a type only (the sim's
- * stellarBoostedTypes, which Terapagos-Stellar never fills); then the
- * attacker's own ModifySTAB handler (Adaptability), asked from the
- * simulator. modifyDamage writes the battle (it fills stellarBoostedTypes),
- * so the rest is mirrored here and test/stab-rules.spec.ts holds it against
- * the damage the simulator deals.
+ * STAB by the game's rules (BattleActions#modifyDamage): an old type or the Tera type 1.5, an old type that is also the Tera type
+ * 2.0; a Stellar Tera 2.0 on an old type and 1.2 elsewhere, on the first use of a type only (the sim's stellarBoostedTypes, which
+ * Terapagos-Stellar never fills); then the attacker's own ModifySTAB handler (Adaptability), asked from the simulator. modifyDamage
+ * writes the battle (it fills stellarBoostedTypes), so the rest is mirrored here and test/threat.stab-rules.spec.ts holds it
+ * against the damage the simulator deals.
  */
 function stabMultiplier(attacker: Pokemon, defender: Pokemon, move: DexMove, type: string, battle: Battle): number {
   if (type === '???') return 1;
@@ -324,10 +262,9 @@ function stabMultiplier(attacker: Pokemon, defender: Pokemon, move: DexMove, typ
 }
 
 /**
- * getDamage's floor: once the user terastallized, a move of its Tera type
- * (a Stellar body: of a type not yet boosted) under 60 power hits as 60,
- * unless it has priority, hits more than once or sets a power of 0 or 150
- * at use; mirrored for the same reason, held by test/stab-rules.spec.ts.
+ * getDamage's floor: once the user terastallized, a move of its Tera type (a Stellar body: of a type not yet boosted) under 60 power
+ * hits as 60, unless it has priority, hits more than once or sets a power of 0 or 150 at use; mirrored, held by
+ * test/threat.stab-rules.spec.ts.
  */
 function teraFloor(attacker: Pokemon, move: DexMove, type: string, power: number): boolean {
   const tera = attacker.terastallized;
@@ -338,9 +275,8 @@ function teraFloor(attacker: Pokemon, move: DexMove, type: string, power: number
 
 /** singleMoveFraction for a move already resolved at use (pairThreat resolves each slot once). */
 function landedFraction(attacker: Pokemon, defender: Pokemon, move: DexMove, use: Landed, battle: Battle): number {
-  // The defender's LIVE types: smogtours-gen9ou-751207 t6 priced Body Press
-  // into a Ceruledge that had terastallized to Fighting at 0, as into a Ghost
-  // (50 such false immunities on the bank's Tera positions, round 54).
+  // The defender's LIVE types: Body Press into a Ceruledge that had terastallized to Fighting priced at 0, as into a Ghost (50 such
+  // false immunities on the bank's Tera positions).
   const defenderTypes = liveTypes(defender);
   if (blanked(attacker, defender, move, use.type, defenderTypes, battle)) return 0;
   if (!use.basePower) return (use.simDamage ?? fixedDamage(move, attacker, defender)) / defender.maxhp;
@@ -363,10 +299,7 @@ function landedFraction(attacker: Pokemon, defender: Pokemon, move: DexMove, use
   return damage / defender.maxhp;
 }
 
-/**
- * The threat of one direction. threatGetter hands over what the memo key
- * already read: the keyed answers (`known`) and the usable slots.
- */
+/** The threat of one direction; threatGetter hands over what the memo key already read: the keyed answers (`known`) and the usable slots. */
 export function pairThreat(
   attacker: Pokemon,
   defender: Pokemon,
@@ -374,8 +307,7 @@ export function pairThreat(
   known?: ReadonlyMap<string, Landed> | null,
   usable: Pokemon['moveSlots'] = usableSlots(attacker),
 ): PairThreat {
-  // A choice-locked attacker only ever clicks its locked move again — a lock
-  // into a resisted attack (or a status move) ends its threat outright.
+  // A choice-locked attacker only ever clicks its locked move again: a lock into a resisted attack (or a status move) ends its threat.
   const locked = lockedMoveId(attacker);
   const slots = locked ? usable.filter(slot => slot.id === locked) : usable;
   const threat: PairThreat = { physical: 0, special: 0, priority: false, physicalAcc: 1, specialAcc: 1 };
@@ -425,14 +357,10 @@ function axisThreat(move: DexMove, use: Landed, fraction: number, acc: number, s
 export type StageOverride = Partial<BoostsTable>;
 
 /**
- * The memoized threat with the CURRENT boost stages applied. Stages stay
- * outside the memo key on purpose — they change between forked positions of
- * one search while the cached part does not. This is what makes setup moves
- * visible to the matchup term: +2 Atk doubles the pressure on every pair,
- * not just the flat boost weight. The optional override substitutes the
- * attacker's stages (candidate hints price a setup move by the stages it
- * WOULD grant); defender stages always read live. Since round 63 (T81) each
- * move reads the stages of its own stats (PairThreat.axes), and a move whose
+ * The memoized threat with the CURRENT boost stages applied. Stages stay outside the memo key on purpose: they change between forked
+ * positions of one search while the cached part does not. This makes setup moves visible to the matchup term (+2 Atk doubles the
+ * pressure on every pair). The optional override substitutes the attacker's stages (candidate hints price a setup move by the stages
+ * it WOULD grant); defender stages always read live. Each move reads the stages of its own stats (PairThreat.axes), and a move whose
  * power the boosts set asks the simulator for that power on these stages.
  */
 export function boostedFraction(threat: PairThreat, attacker: Pokemon, defender: Pokemon, attackerBoosts?: StageOverride): number {
@@ -444,7 +372,7 @@ export function boostedFraction(threat: PairThreat, attacker: Pokemon, defender:
   return threat.axes ? Math.max(best, axesFraction(threat.axes, attacker, defender, attackerBoosts, false)) : best;
 }
 
-/** boostedFraction with each fraction weighed by its move's accuracy (expectedRate, round 14). */
+/** boostedFraction with each fraction weighed by its move's accuracy (the narrative race's rate). */
 export function expectedFraction(threat: PairThreat, attacker: Pokemon, defender: Pokemon): number {
   const physical = threat.physical * (threat.physicalAcc ?? 1) *
     stageMultiplier(attacker.boosts.atk) / stageMultiplier(defender.boosts.def);
@@ -454,7 +382,6 @@ export function expectedFraction(threat: PairThreat, attacker: Pokemon, defender
   return threat.axes ? Math.max(best, axesFraction(threat.axes, attacker, defender, undefined, true)) : best;
 }
 
-/** The best of the PairThreat.axes entries, each on the stages of its own stats. */
 function axesFraction(axes: AxisThreat[], attacker: Pokemon, defender: Pokemon, attackerBoosts: StageOverride | undefined, withAccuracy: boolean): number {
   let best = 0;
   for (const axis of axes) best = Math.max(best, axisFraction(axis, attacker, defender, attackerBoosts, withAccuracy));

@@ -1,31 +1,6 @@
 import { MAX_PRICED_HITS, type HitCost } from './contact-cost.ts';
 
-/**
- * How the cost of one hit (score/contact.ts) enters a race of boostsBiting (13.10.2026, the Swords Dance report on
- * gen9draft-2058494320). The races of score/races.ts know a loss per turn and an HP, so the cost comes as three
- * numbers for the side that pays (the attacker of the hit): HP lost per turn on top of its residual, the share of its
- * damage it still deals, and an HP buffer.
- *
- * The chip of a hit is paid right after the hit, and it is paid for every hit, the one that wins the race included. The
- * side that moves first has paid t chips when the other side lands its t-th hit; the side that moves second has paid t - 1,
- * because the other side's hit comes before its own. A residual of the chip per turn counts t of them in the clock of
- * the other side; the second mover gets the missing one back as a buffer of one chip of HP, which makes the clock
- * exactly ceil((HP + chip) / (hit + chip)), the turn of the first hit for which t hits and t - 1 chips KO it. The chip
- * of the hit that finishes the race comes after the KO and decides nothing (a Brave Bird that KOs does not lose the race
- * to its own recoil; a second mover that KOs in one hit is not KO'd by a chip it has not paid yet), and a recoil that
- * KOs its user after the hit that did not finish the foe is the KO of that user a turn early, which the buffer shows
- * as the same verdict.
- *
- * A status chance compounds over the hits. With q the chance that some status lands on one hit, the first one to land
- * stays (the simulator gives a second status to nobody), so the chance that it lands on hit j is (1 - q)^(j - 1) q and
- * its share among the statuses follows from their chances. A status that lands on hit j takes its chip at the end of
- * the turns j to the turn before the other side's last hit, and the hits after j deal its share of the damage: a burn
- * halves a physical hit, a Guts body deals more, a Poison Heal body gains HP. Hit j itself is dealt before the status it
- * may leave. The expected chip is spread over the turns of the race, the expected damage over the hits the side lands.
- * Paralysis, sleep and freeze take turns instead of HP and damage (T225, round 73): the reader hands the share of turns
- * the body still moves on, turn by turn after the status landed (`acts`), and the k-th hit after the landing one deals
- * that share of its damage (the halved Speed of a paralysis is not priced: the move order of the race stays as it was).
- */
+// The cost of one hit (score/contact.ts) as three numbers for the side that pays, so that the races of score/races.ts can price it.
 
 /** What a hit's cost adds to a side of a race. */
 export interface HitPrice {
@@ -37,17 +12,27 @@ export interface HitPrice {
   buffer: number;
 }
 
-/** The longest race priced: a race that never ends, or runs longer, is priced over this many hits (the constant lives with the shape, score/contact-cost.ts). */
+/** The longest race priced; a race that never ends is priced over this many hits (defined in score/contact-cost.ts). */
 export { MAX_PRICED_HITS };
 
 const FREE: HitPrice = { residual: 0, output: 1, buffer: 0 };
 
-/** A clock as a number of hits to price: whole hits, at least one, at most the longest race priced (a clock that never ends is the longest). */
+/** A clock as a number of hits: whole, at least one, at most MAX_PRICED_HITS (a clock that never ends is the longest). */
 const horizon = (clock: number): number => Math.min(Math.max(1, Math.floor(clock)), MAX_PRICED_HITS);
 
 /**
  * The price of the hits of one side that cost `cost`. `own` is the side's clock on the other (the hits it lands to win),
  * `other` the other side's clock on it (the turns it has to live), `ownFirst` whether it moves first.
+ *
+ * The chip of a hit is paid right after the hit. The first mover has paid t chips when the other side lands its t-th hit,
+ * the second mover t - 1: a residual of one chip per turn counts t, so the second mover gets one chip back as `buffer`,
+ * which makes the clock ceil((HP + chip) / (hit + chip)). The chip of the hit that finishes the race decides nothing.
+ *
+ * With q the chance that some status lands on one hit, the first status stays (the simulator gives a second one to nobody),
+ * so it lands on hit j with chance (1 - q)^(j - 1) q. It takes its chip at the end of the turns j to the turn before the
+ * other side's last hit, and only the hits after j deal its share of the damage (hit j is dealt before the status).
+ * Paralysis, sleep and freeze take turns: `acts` holds the share of turns the body still moves on, turn by turn after the
+ * landing; the halved Speed of a paralysis is not priced.
  */
 export function priceHit(cost: HitCost, own: number, other: number, ownFirst: boolean): HitPrice {
   if (cost.chip === 0 && cost.statuses.length === 0) return FREE;

@@ -13,19 +13,13 @@ import { hitReader } from './contact.ts';
 import { statusRight } from './status-factor.ts';
 import { choiceItems, standingScreens } from '@fulllifegames/replay-core';
 
-/**
- * The raw feature vector: per-side bodies, boosts, hazards, screens,
- * tailwind, and the Choice mismatch, then the p1-positive differences with
- * the matchup, coverage, and sweep terms.
- */
+// The raw feature vector: the p1-positive differences of bodies, boosts, hazards, screens, tailwind and the matchup terms.
 
 const NO_PAIR = { focus: 0, redirect: 0 };
 
 /**
- * Residual items are beyond-horizon drips (Black Sludge erodes 1/8 a turn —
- * exactly what kills a Cosmic Power wincon after a Trick): price them like
- * status, as a body-value multiplier. Tactical items (Choice damage, Eviolite
- * bulk) stay in the threat proxy instead.
+ * Residual items are drips beyond the search horizon (Black Sludge erodes 1/8 a turn): priced like status, as a body-value
+ * multiplier. Tactical items (Choice damage, Eviolite bulk) stay in the threat proxy.
  */
 function itemMultiplier(pokemon: Pokemon): number {
   const item = pokemon.item;
@@ -42,17 +36,14 @@ function averageSpeed(side: Side, battle: Battle): number {
 }
 
 /**
- * A living body's share of the (alive + hp) weight, status and item folded
- * in. A stranded piece keeps only its damped alive share: its hp share
- * prices at effHp (0 by definition of stranded), and it leaves hazardCost
- * — the entry that finishes it is charged here at certainty, never twice.
+ * A living body's share of the (alive + hp) weight, status and item folded in. A stranded body keeps only its damped alive
+ * share (its hp share prices at 0) and leaves hazardCost: the entry that finishes it is charged here once, at certainty.
  */
 function bodyShare(pokemon: Pokemon, stranded: ReadonlySet<Pokemon>): number {
   return (bodyFraction(pokemon, stranded) *
     (EVAL_WEIGHTS.status[pokemon.status] ?? 1)) * itemMultiplier(pokemon);
 }
 
-/** The body's share of the (alive + hp) weight before the status and the item. */
 function bodyFraction(pokemon: Pokemon, stranded: ReadonlySet<Pokemon>): number {
   const bodyWeight = EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp;
   const bodyValue = stranded.has(pokemon)
@@ -61,12 +52,7 @@ function bodyFraction(pokemon: Pokemon, stranded: ReadonlySet<Pokemon>): number 
   return bodyValue / bodyWeight;
 }
 
-/**
- * statusFix of one body: what the flat status multiplier took off wrongly,
- * (the right multiplier of its ability minus the applied one) times its share
- * before the status. 0 for a healthy body and for an ability that changes
- * nothing.
- */
+/** statusFix of one body: (the right multiplier of its ability minus the applied one) times its share before the status. */
 function statusFixOf(pokemon: Pokemon, stranded: ReadonlySet<Pokemon>, twin: string): number {
   const applied = EVAL_WEIGHTS.status[pokemon.status];
   if (applied === undefined) return 0;
@@ -74,7 +60,6 @@ function statusFixOf(pokemon: Pokemon, stranded: ReadonlySet<Pokemon>, twin: str
   return right === applied ? 0 : (right - applied) * bodyFraction(pokemon, stranded) * itemMultiplier(pokemon);
 }
 
-/** The Choice-item liability: the holder's status-move fraction (0 without a Choice item). */
 function choiceMismatchOf(pokemon: Pokemon, battle: Battle): number {
   if (!(choiceItems(battle.dex).has(pokemon.item) && pokemon.moveSlots.length > 0)) return 0;
   const statusMoves = pokemon.moveSlots
@@ -83,13 +68,10 @@ function choiceMismatchOf(pokemon: Pokemon, battle: Battle): number {
 }
 
 /**
- * Standing boost stages on the side's actives, weighted and status-discounted. A body that never acts, because a foe on
- * the field moves first and KOs it (`idle`, score/boost-race.ts idleHolders), carries no value for its boosts (T249,
- * round 73); its drops stay, as in boostsBiting, so that a body losing HP never gains a point by losing the drop. A drop stands
- * only while the holder cannot switch out (SB3c, 21.11.2026, score/switch-out.ts): a body that can leave loses it at once, so it
- * is no lasting handicap. Doubles OU reads this term (weight 27); the other tables carry it at 0.
- * Round 76 (T262): the idle set is read once per evaluation and shared with the pair terms; the boosts term used to
- * ask holderActsInFront again for the same bodies and foes.
+ * Standing boost stages on the side's actives, weighted and status-discounted. A body that never acts, because a foe on the field
+ * moves first and KOs it (`idle`, score/boost-race.ts idleHolders), gets no value for its boosts; its drops stay, so that a body
+ * losing HP never gains a point by losing the drop. A drop stands only while the holder cannot switch out (score/switch-out.ts).
+ * Doubles OU reads this term; the other tables carry it at 0.
  */
 function activeBoostValue(side: Side, idle: ReadonlySet<Pokemon>, battle: Battle): number {
   let boosts = 0;
@@ -126,17 +108,15 @@ function sideFeatureValues(side: Side, battle: Battle, twin: string | null, idle
     choiceMismatch,
     statusFix,
     screens,
-    // Raw value carries the cap and the removal option; the entries weight
-    // scales back to points.
-    // Stranded mons leave the victim term (their fatal entry is priced in
-    // bodies at certainty); equity is only nonzero when a removal carrier
-    // lives, and then `stranded` is empty — the two never overlap.
+    // The raw value carries the cap and the removal option; the entries weight scales it back to points. Stranded mons leave the
+    // victim term (their fatal entry is priced in bodies); equity is nonzero only when a removal carrier lives, and then
+    // `stranded` is empty.
     hazards: (hazardCost(side, battle, stranded) - hazardRemovalEquity(side, battle)) / EVAL_WEIGHTS.hazardEntries,
     tailwind: side.sideConditions['tailwind'] ? 1 : 0,
   };
 }
 
-/** The share of fainted mons of both sides, inline (importing search.ts here would cycle); the same count as battleFaintedFraction. */
+/** The share of fainted mons of both sides, inline because importing search.ts here would cycle (the same count as battleFaintedFraction). */
 export function faintedFractionOf(battle: Battle): number {
   let fainted = 0;
   let total = 0;
@@ -150,11 +130,8 @@ export function faintedFractionOf(battle: Battle): number {
 }
 
 /**
- * The feature vector of a position. With a weight table, a feature of the
- * round-69 columns (the field pair, boostsBiting, statusFix) whose weight is 0 stays 0
- * instead of being read: the score multiplies it by 0 either way, and the
- * leaf does not pay for a column no fit has priced. Without a table (the
- * capture, the fit, the tests) every column is read.
+ * The feature vector of a position. With a weight table, a column whose weight is 0 stays 0 instead of being read (the score
+ * multiplies it by 0 either way); without one (the capture, the fit, the tests) every column is read.
  */
 export function evalFeatures(battle: Battle, cache?: MatchupCache, weights?: Readonly<Record<keyof EvalFeatures, number>>): EvalFeatures {
   const wants = (key: keyof EvalFeatures): boolean => !weights || weights[key] !== 0;
