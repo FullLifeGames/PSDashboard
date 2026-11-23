@@ -3,11 +3,10 @@ import { advancePositionWithLog } from '../forward/advance.ts';
 import { toPosition } from '../forward/position.ts';
 
 /**
- * Round 69 (T146 part c3): does a move's accuracy roll happen at all? A status move that the type chart, an
- * absorbing ability, Prankster against a Dark type or a powder immunity stops never rolls its accuracy, so the miss
- * class the odds plan weighs cannot occur. The simulator answers it, for every cause alike: one draw with the move's
- * accuracy roll scripted to miss shows a `|-miss|` line when the roll is reached and none when the move is stopped
- * before it. No list of moves, types or abilities.
+ * Does a move's accuracy roll happen at all? A status move that the type chart, an absorbing ability, Prankster against a Dark type
+ * or a powder immunity stops never rolls its accuracy, so the odds plan's miss class cannot occur. The simulator answers it for every
+ * cause alike: one draw with the move's accuracy roll scripted to miss shows a `|-miss|` line when the roll is reached and none when
+ * the move is stopped before it.
  */
 
 const REACH_SEED = '1,2,3,4';

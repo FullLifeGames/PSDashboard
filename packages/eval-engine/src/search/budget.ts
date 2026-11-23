@@ -1,26 +1,13 @@
 import { AUTO_MCTS_FAINTED_FRACTION } from '../types.ts';
 
 /**
- * Round 61 (T97, T98): every search budget the round measures, one object
- * for the app and the bank. The round-61 gate (03.10.) chose trees from the
- * first turn (tree-from 0). The pair with 1200 iterations per tree failed
- * the time gate (04.10.), so the iterations stay at 600; the search before
- * round 61 is tree-from=0.25,early-samples=1, the round-61 default
- * singles-tree-from=0,singles-early-samples=1.
- * A measurement switch without a UI knob picks a form: EVAL_SEARCH_BUDGET
- * under Node, the localStorage key ps-replay-interceptor:search-budget in
- * the browser (stamped on every worker message). Syntax: a comma list of
- * key=value over the default, read left to right (trees, iterations,
- * early-depth, early-samples, tree-from for both game types, the same three
- * with a singles- or doubles- prefix for one, lead-depth and lead-samples).
- *
- * Round 63 (T110): auto splits per game type, and the team-preview lead has
- * its own matrix that no early split moves. Doubles keep the tree from the
- * first turn; singles run the matrix with three draws until a quarter of
- * all bodies fell, because the tree read early singles turns narrower
- * (562428 t10 lost the Heatran read; read sentences on the corpus 11 -> 5),
- * and three draws keep the one-draw fallback of T65 closed.
+ * Every search budget the app and the bank run on, as one object. A measurement switch without a UI knob picks a form:
+ * EVAL_SEARCH_BUDGET under Node, the localStorage key ps-replay-interceptor:search-budget in the browser (stamped on every worker
+ * message). Syntax: a comma list of key=value over the default, read left to right (trees, iterations, early-depth, early-samples,
+ * tree-from for both game types or with a singles- or doubles- prefix for one, lead-depth, lead-samples).
  */
+
+/** The auto mode of one game type: below treeFrom the matrix, at or above it the tree. */
 export interface AutoSplit {
   /** Matrix depth of auto turns below treeFrom. */
   earlyDepth: 1 | 2 | 3;
@@ -30,6 +17,7 @@ export interface AutoSplit {
   treeFrom: number;
 }
 
+/** Every search budget a measurement varies: trees, iterations, the auto split per game type and the team-preview lead. */
 export interface SearchBudget {
   /** Trees of the tree search (root parallelization). */
   trees: number;
@@ -37,10 +25,11 @@ export interface SearchBudget {
   iterations: number;
   singles: AutoSplit;
   doubles: AutoSplit;
-  /** The team-preview lead under auto: the matrix in both game types (round 61, f806a41). */
+  /** The team-preview lead under auto: the matrix in both game types, which no early split moves. */
   lead: { depth: 1 | 2 | 3; samples: 1 | 3 | 5 };
 }
 
+/** The default budget: doubles run the tree from the first turn, singles the three-draw matrix until a quarter of all bodies fell (the tree read early singles turns narrower). */
 export const SEARCH_BUDGET_DEFAULT: SearchBudget = {
   trees: 4, iterations: 600,
   singles: { earlyDepth: 1, earlySamples: 3, treeFrom: AUTO_MCTS_FAINTED_FRACTION },

@@ -3,10 +3,12 @@ import { expandCell, type ExpansionContext, type RootClassBook } from './expansi
 import { pick, type Node } from './mcts-node.ts';
 
 /**
- * One iteration of the tree, in two halves: the descent through the existing cells by decoupled UCB with one expansion, and the
- * backpropagation of the leaf along the joint path. The tree's loop (`mcts.ts`) starts at the root; the line pass (G14b,
- * `search/line-pass.ts`) starts at a root cell's child, so the same code serves both and a spec holds the tree equal.
+ * One iteration of the tree is two halves: the descent through the existing cells by decoupled UCB with one expansion, and the
+ * backpropagation of the leaf along the joint path. The tree's loop (`mcts.ts`) starts at the root and the line pass
+ * (`search/line-pass.ts`) at a root cell's child, so the same code serves both.
  */
+
+/** One joint step of the descent: a node and the cell (i, j) chosen in it. */
 export interface PathStep {
   node: Node;
   i: number;
@@ -14,10 +16,9 @@ export interface PathStep {
 }
 
 /**
- * Selection: descend through existing children via decoupled UCB, expanding
- * at most one child. Returns the joint path, the leaf value the descent
- * ended on, and the depth it reached. `from` starts the descent below the
- * root (the path then holds no root step; the root's class book is never read).
+ * Selection: descend through existing children via decoupled UCB, expanding at most one child. Returns the joint path, the leaf
+ * value the descent ended on, and the depth it reached. `from` starts the descent below the root (the path then holds no root
+ * step; the root's class book is never read).
  */
 export function selectAndExpand(
   root: Node, iteration: number, seedOffset: number, ctx: ExpansionContext, book: RootClassBook | undefined, from: Node = root,

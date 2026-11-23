@@ -10,14 +10,7 @@ import {
 } from './threat.ts';
 import { healProfile, ppBudget, raceClocks, statusResidual, type HealProfile, type RaceClocks, type RaceSide } from './races.ts';
 
-/**
- * The root's unanswered-mon profile: mons no living enemy answers, the
- * switch-in stage, the decided sweep, and the near-decided roll. Narrative
- * input, with one reader on the score path: the side the sweep or the near
- * stage names starts the forced-win prover (search/forced-win.ts, round 35).
- * Readers speak the sweep through heldDecided (round 50), which asks the
- * finished score to back it.
- */
+/** The root's unanswered-mon profile: mons no living enemy answers, the switch-in stage, the decided sweep and the near-decided roll. */
 
 /** The memo state one unansweredMons call shares across its races. */
 interface ProfileContext {
@@ -27,15 +20,7 @@ interface ProfileContext {
   budgets: Map<Pokemon, number>;
 }
 
-/**
- * Expected per-turn rate: the boost-adjusted fraction weighed by the
- * category-max move's accuracy (round 14) — the profile's races run on
- * what a turn is worth, not on the best case.
- */
-/**
- * Per-turn expected damage fraction: the category-max move at its accuracy, stage-adjusted (round 14);
- * since round 63 each move on the stages of its own stats (PairThreat.axes, T81).
- */
+/** Per-turn expected damage fraction: the category-max move at its accuracy, each move on the stages of its own stats (PairThreat.axes). */
 export function expectedRate(threatOut: PairThreat, attacker: Pokemon, defender: Pokemon): number {
   return expectedFraction(threatOut, attacker, defender);
 }
@@ -55,10 +40,7 @@ function profileSide(ctx: ProfileContext, pokemon: Pokemon, threatOut: PairThrea
   };
 }
 
-/**
- * The fresh entry's free chip: a usable first-turn flinch move lands once
- * before the standing defender gets a turn (its own accuracy is sure).
- */
+/** The fresh entry's free chip: a usable first-turn flinch move lands once before the standing defender gets a turn. */
 function flinchChip(ctx: ProfileContext, standing: Pokemon, enemy: Pokemon): number {
   const slot = usableSlots(standing).find(entry => FIRST_TURN_FLINCH_MOVES.has(entry.id));
   if (!slot) return 0;
@@ -67,11 +49,9 @@ function flinchChip(ctx: ProfileContext, standing: Pokemon, enemy: Pokemon): num
 }
 
 /**
- * Round 79 (T283): does the first mover take a finite tie (both clocks equal)? Only when its own hit finishes the last
- * turn. A KO that needs the foe's end-of-turn damage (burn, poison, Toxic) leaves the slower foe its action first: the tick
- * comes after both moves. The foe's residual counts for the turns before the last, the first mover's own expected hit for
- * the last. race-tie-residual.spec.ts plays each status against the simulator. A foe without a residual ties as before.
- * The same tie in score/last-pair.ts and score/matchup.ts is not changed here (the score path).
+ * Does the first mover take a finite tie (both clocks equal)? Only when its own hit finishes the last turn: a KO that needs the
+ * foe's end-of-turn damage (burn, poison, Toxic) leaves the slower foe its action first, because the tick comes after both moves.
+ * The foe's residual counts for the turns before the last, the first mover's own expected hit for the last.
  */
 function firstTakesTie(sideA: RaceSide, sideB: RaceSide, clocks: RaceClocks, first: boolean): boolean {
   if (!first || clocks.turnsA === Infinity) return false;
@@ -82,11 +62,7 @@ function firstTakesTie(sideA: RaceSide, sideB: RaceSide, clocks: RaceClocks, fir
   return earlier + clocks.effFracA >= sideB.hp + absorb - 1e-9;
 }
 
-/**
- * Does the standing mon beat this enemy? Race verdict as the matchup term
- * weighs it; a benched enemy eats one free hit on the way in, a standing
- * one loses its first turn to the entry's flinch move.
- */
+/** Does the standing mon beat this enemy? A benched enemy eats one free hit on the way in, a standing one loses its first turn to the entry's flinch move. */
 function beatsEntry(ctx: ProfileContext, standing: Pokemon, enemy: Pokemon): boolean {
   const threatS = ctx.threat(standing, enemy);
   const threatE = ctx.threat(enemy, standing);
@@ -109,8 +85,7 @@ function sideProfile(ctx: ProfileContext, mine: Pokemon[], theirs: Pokemon[]): {
     const verdicts = theirs.map(enemy => ({ enemy, beats: beatsEntry(ctx, mon, enemy) }));
     if (verdicts.every(verdict => verdict.beats)) { full.push(mon.species.name); continue; }
     if (!hasBench) continue;
-    // Switch-in stage: only standing actives hold; every bench answer
-    // dies on arrival.
+    // Switch-in stage: only standing actives hold; every bench answer dies on arrival.
     if (!verdicts.every(verdict => verdict.beats || verdict.enemy.isActive)) continue;
     const holder = verdicts.find(verdict => !verdict.beats)!.enemy;
     entry.push({ species: mon.species.name, heldBy: holder.species.name });
@@ -118,10 +93,7 @@ function sideProfile(ctx: ProfileContext, mine: Pokemon[], theirs: Pokemon[]): {
   return { full, entry };
 }
 
-/**
- * The sweeper's clean-up clock over every living enemy, with the spare-turn
- * return fire it absorbs on the way; blocked when it loses a pair.
- */
+/** The sweeper's clean-up clock over every living enemy, with the spare-turn return fire it absorbs; blocked when it loses a pair. */
 function sweepClocks(ctx: ProfileContext, mon: Pokemon, theirs: Pokemon[]): { turns: number; chip: number; blocked: boolean } {
   let turns = 0;
   let chip = 0;
@@ -132,10 +104,8 @@ function sweepClocks(ctx: ProfileContext, mon: Pokemon, theirs: Pokemon[]): { tu
     const sideS = profileSide(ctx, mon, threatS, enemy);
     const sideE = profileSide(ctx, enemy, threatE, mon);
     const clocks = raceClocks(sideS, sideE);
-    // The sweeper must WIN every pair outright (the beatsEntry verdict,
-    // sans entry toll — replacements arrive on a KO, not a switch): a
-    // "survivor" that loses pairs but outlasts them on paper is an
-    // artifact of the spare-turn economy, not a clean-up.
+    // The sweeper must win every pair outright (the beatsEntry verdict without the entry toll, since replacements arrive on a KO):
+    // a survivor that loses pairs but outlasts them on paper is an artifact of the spare-turn economy.
     const wins = clocks.turnsA < clocks.turnsB ||
       (clocks.turnsA === clocks.turnsB && firstTakesTie(sideS, sideE, clocks, first));
     if (!wins) return { turns, chip, blocked: true };
@@ -147,26 +117,17 @@ function sweepClocks(ctx: ProfileContext, mon: Pokemon, theirs: Pokemon[]): { tu
 }
 
 /**
- * The decided sweep (round 15): pairwise unanswered is a threat; DECIDED
- * is stronger — one mon WINS every living enemy pair, clears the whole
- * team within a short clock (DECIDED_MAX_TURNS), and survives the
- * accumulated expected return fire (648453 t13: Lopunny wins every fresh
- * pair yet dies to the series; 573756 t134+: the last pair's one-sided
- * table is a decided endgame). Per pair the return fire is the
- * defender's spare-turn rate (raceClocks' action economy — a healer that
- * must heal to survive barely swings back). Replacements arrive
- * hazard-tolled but get no free hit (they enter on a KO, not a switch);
- * a benched sweeper pays its own entry: hazards plus one free expected
- * hit from the standing active.
+ * The decided sweep: one mon wins every living enemy pair, clears the whole team within DECIDED_MAX_TURNS and survives the
+ * accumulated expected return fire (a Lopunny that wins every fresh pair yet dies to the series is no sweeper). Per pair the
+ * return fire is the defender's spare-turn rate (a healer that must heal to survive barely swings back). Replacements arrive
+ * hazard-tolled but get no free hit; a benched sweeper pays its own entry: hazards plus one free expected hit from the standing active.
  */
 function sweepSurvivor(ctx: ProfileContext, mine: Pokemon[], theirs: Pokemon[]): string | null {
   const activeEnemy = theirs.find(enemy => enemy.isActive) ?? null;
   for (const mon of mine) {
     const { turns, chip, blocked } = sweepClocks(ctx, mon, theirs);
     if (blocked) continue;
-    // "Practically decided" resolves NOW: a grind past the cap leaves the
-    // opponent dozens of turns of play (573756 read decided from turn 1
-    // without this).
+    // A grind past the cap leaves the opponent dozens of turns of play: not decided.
     if (turns > DECIDED_MAX_TURNS) continue;
     const me = profileSide(ctx, mon, ctx.threat(mon, theirs[0]), theirs[0]);
     if (turns > me.ppBudget) continue;
@@ -180,10 +141,9 @@ function sweepSurvivor(ctx: ProfileContext, mine: Pokemon[], theirs: Pokemon[]):
 }
 
 /**
- * Round 79 (T282): does the foe's move act before mine? The move's priority decides first, then the effective speed
- * (inverted under Trick Room); an exact speed tie is a coin flip in the simulator, so the foe may act first (the near
- * stage fails closed). Dex priorities only: a priority a handler moves (Prankster, Gale Wings, Triage, Grassy Glide in
- * Grassy Terrain) is not read. near-decided-acts.spec.ts plays every priority move against the simulator's queue.
+ * Does the foe's move act before mine? Priority decides first, then the effective speed (inverted under Trick Room); an exact
+ * speed tie is a coin flip in the simulator, so the foe may act first (the near stage fails closed). Dex priorities only: a
+ * priority a handler moves (Prankster, Gale Wings, Triage, Grassy Glide in Grassy Terrain) is not read.
  */
 export function foeActsBefore(battle: Battle, foe: Pokemon, foeMoveId: string, mine: Pokemon, myMoveId: string): boolean {
   const foePriority = battle.dex.moves.getByID(foeMoveId as ID).priority;
@@ -195,20 +155,14 @@ export function foeActsBefore(battle: Battle, foe: Pokemon, foeMoveId: string, m
 }
 
 /**
- * The near stage: no decided sweep stands, but one high-odds click
- * removes the standing active and the REST clears — the 573756 t73 shape
- * (a 95% Fire Fang from the sweep). Own active, own click — a teammate's
- * kill unlocking someone else's sweep stays out (narrower is honest).
- * Round 80 (T292): the clicker itself clears the rest. Since round 15 any
- * teammate could: 573756 t71 named Magnezone behind Clefable's Moonblast,
- * 2695803506 t2 Kingambit behind Basculegion's Wave Crash.
+ * The near stage: no decided sweep stands, but one high-odds click removes the standing active and the rest clears. Own active,
+ * own click: the clicker itself clears the rest, a teammate's kill unlocking someone else's sweep stays out.
  */
 function nearDecidedFor(ctx: ProfileContext, key: 'p1' | 'p2', mine: Pokemon[], theirs: Pokemon[]): NearDecidedSweep | undefined {
   const attacker = mine.find(mon => mon.isActive);
   const target = theirs.find(mon => mon.isActive);
   if (!attacker || !target) return undefined;
-  // Round 79 (T282): a click lands only if its user still acts. The foe's moves that act before the click can kill the
-  // attacker first; the click's odds are its kill chance times the chance the foe's best earlier kill does not come.
+  // A click lands only if its user still acts: its odds are its kill chance times the chance the foe's best earlier kill does not come.
   const foeKills = usableSlots(target).map(slot => ({ id: slot.id, pKill: boundaryEvent(ctx.battle, target, attacker, slot.id)?.pKill ?? 0 }));
   let odds = 0;
   let move = '';
@@ -222,7 +176,7 @@ function nearDecidedFor(ctx: ProfileContext, key: 'p1' | 'p2', mine: Pokemon[], 
   if (odds < NEAR_DECIDED_ODDS) return undefined;
   const rest = theirs.filter(enemy => enemy !== target);
   if (rest.length > 0 && !sweepSurvivor(ctx, [attacker], rest)) return undefined;
-  // The click as the played choice writes it: a doubles move names the target's location (round 80, T292).
+  // The click as the played choice writes it: a doubles move names the target's location.
   const click = ctx.battle.gameType === 'doubles' ? { move, target: target.position + 1 } : { move };
   return { side: key, species: attacker.species.name, odds, removes: target.species.name, click };
 }
@@ -237,63 +191,25 @@ function nearStage(
   if (decided) return undefined;
   const p1Near = nearDecidedFor(ctx, 'p1', p1Living, p2Living);
   const p2Near = nearDecidedFor(ctx, 'p2', p2Living, p1Living);
-  if (p1Near && p2Near) return undefined; // both one roll away — fail closed
+  if (p1Near && p2Near) return undefined; // both one roll away: fail closed
   return p1Near ?? p2Near;
 }
 
-/**
- * Moves that flinch-lock a full-hit answer on the user's first field turn:
- * the fresh entry the profile narrates gets one free chip the standing
- * defender cannot answer (648453 t13: Lopunny's Fake Out into Tornadus-T).
- */
+/** Moves that flinch the target on the user's first field turn: the fresh entry gets one free chip (Lopunny's Fake Out into Tornadus-T). */
 const FIRST_TURN_FLINCH_MOVES = new Set(['fakeout']);
 
-/**
- * Near-decided odds floor (round 15, user-gated): a click only counts as
- * "one roll from decided" when its boundary event (accuracy × kill share)
- * is at least this sure. The user's bar: a 95%-to-win click should read
- * that way — 0.9 keeps the stage to genuinely near-sure rolls (573756 t73
- * prices 0.95) and leaves coin flips out.
- */
+/** Near-decided odds floor: a click counts as one roll from decided when its boundary event (accuracy x kill share) is at least this sure. */
 const NEAR_DECIDED_ODDS = 0.9;
 
-/**
- * Cap on the decided sweep's total clean-up clock (round 15). "Practically
- * decided" means the board resolves NOW, not eventually: the measured
- * anchors separate cleanly — real clean-up phases run 1–5 expected turns
- * (573756's locked endgame: 4; 648453's t23+ clean-up: 1–5), while the
- * false positives the uncapped check produced were 23–39-turn THEORETICAL
- * grinds (573756 read decided from turn 1 of a 139-turn game because the
- * whole enemy team priced as pinned healers). A slow grind leaves the
- * opponent dozens of turns of play — that is a threat, not a decided game.
- */
+/** Cap on the decided sweep's total clean-up clock: real clean-up phases run 1 to 5 expected turns, a longer grind is a threat, not a decided game. */
 const DECIDED_MAX_TURNS = 6;
 
 /**
- * Living mons the OTHER side has no live answer to (round 13): the mon
- * beats EVERY living enemy's KO-race pair (strictly fewer turns, or a
- * finite tie taken on effective speed — a wall that merely holds the pair
- * is answer enough). A benched enemy answers by SWITCHING IN, so its race
- * runs from entry-tolled HP: the hazard-adjusted arrival the matchup term
- * prices, minus one free hit from the standing mon (the switch-in economy
- * behind the expert's no-switch-ins principle — 648453 t13: Weavile "wins"
- * the standing pair against Lopunny but not the entry, so any successful
- * switch into Lopunny — a U-turn included — turns profit and the opponent
- * can only sacrifice into it). Root-level narrative input; never part of
- * the score.
- *
- * Round 14 refinements, all profile-local (the score path never changes):
- * - Rates are EXPECTED rates (fraction × the max-move's accuracy) — a 70%
- *   Hurricane is no full-hit one-turn clock. The entry toll weighs the
- *   same way.
- * - A first-turn flinch move (Fake Out) chips the standing active for free
- *   before the race starts — the fresh entry's move the defender cannot
- *   answer.
- * - The SWITCH-IN stage: a mon every benched enemy loses the entry race to
- *   while a standing active still holds the pair is carried per side in the
- *   entry lists — the expert's literal "no remaining switch-ins" state
- *   (648453 t13, Lopunny vs the standing Tornadus-T). Only meaningful while
- *   the other side still has a bench, so a 1v1 endgame never enters it.
+ * Living mons the other side has no live answer to: the mon beats every living enemy's KO-race pair (strictly fewer turns, or a
+ * finite tie taken on effective speed). A benched enemy answers by switching in, so its race runs from entry-tolled HP (the
+ * hazard-adjusted arrival, minus one free hit from the standing mon). The switch-in stage lists a mon every benched enemy loses
+ * the entry race to while a standing active still holds the pair; it needs a bench on the other side, so a 1v1 endgame never
+ * enters it. Narrative input, never part of the score.
  */
 export function unansweredMons(battle: Battle, cache?: MatchupCache): UnansweredProfile {
   const p1Living = livingMons(battle, 0);

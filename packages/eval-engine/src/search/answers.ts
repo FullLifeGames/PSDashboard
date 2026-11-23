@@ -5,43 +5,7 @@ import type {
   EvalCellJob, EvalCellValue, EvalChoiceOption, EvalResult, EvalSettings, EvalSubSearchJob, MctsTreeStats, RankedChoice,
 } from '../types.ts';
 
-/**
- * Round 67 (T128): the doubles root's answer round. The tree lists 16
- * combos per side (the hint cut of search/options.ts), so a best row can
- * read 1.00 against every listed answer while an unlisted legal answer
- * refutes it (VGC 2630685175 t7: Wood Hammer + Earth Power against the 12
- * listed p2 combos; each of Zamazenta's six Protect answers holds it near
- * 0.75). After the verify round each side is graded against the other
- * side's legal answers: 'protect' prices the side's best row against every
- * legal answer for one natural draw and adds the answers that beat the
- * listed ones by more than ANSWER_MARGIN (at most ANSWER_CAP), 'full' adds
- * every unlisted legal answer. An added answer is priced for every listed
- * row of the graded side by one natural draw, and the side's ranking is
- * solved over its listed rows against the listed and the added answers.
- * Since b4 (2630685175 t8) a 'protect' candidate counts only when it still
- * refutes the best row one ply deeper (one natural draw, a depth-1 search of
- * its child: the depth the verify round prices a cell at). At one ply a
- * stall answer reads the board's static, which can lie far from the trees'
- * value (p1's double Protect read -0.16 for p2 at one ply and +0.87 one ply
- * deeper, where every listed answer read +0.84). The added column itself
- * was priced by one natural draw: the best row's step from one ply to one
- * ply deeper does not carry to the other rows (2629703929 t8: shifted by it,
- * every p1 row fell to about -0.54 and the played row read a blunder).
- * Round 69 (T149): the three gaps of that round. Detection reads every row
- * within PROVER_NEAR_TIE of the top, up to ANSWER_NEAR_ROWS (2629703929 t4:
- * six p1 rows within 0.012, so which of them stood first, a tree's noise,
- * decided the verdict): the best row against every answer, the others
- * against the listed ones and the answers that read lowest against the best
- * row; each candidate meets the highest near row it refutes. The near rows
- * that can still decide the ranking (at most ANSWER_DEEP_ROWS) price the
- * added column one ply deeper (912045 t6: the switching row read 0.18 to
- * 0.21 by one draw, 0.03 to 0.07 one ply deeper), the other rows keep their
- * one plain draw; and a round that changes a side's best row sends the new
- * row's unverified cells through one more verify round (tree-orchestrator.ts).
- * The answers come from the simulator's legal list (legalChoices), never a
- * hand list. The score stays the visit mean; the rankings read the answers.
- * Pure and sim-free, like the merge.
- */
+/** The doubles root's answer round: each side's rows graded against the other side's legal answers, listed or not; pure and sim-free, like the merge. */
 
 export type AnswersMode = 'protect' | 'full' | 'off';
 /** One-ply margin by which an unlisted answer must beat the listed ones against the best row. */
@@ -107,10 +71,7 @@ function job(view: AnswerSide, row: number, answer: number, deepen?: EvalSetting
 const at = (view: AnswerSide, value: EvalCellValue): { row: number; answer: number } =>
   (view.side === 'p1' ? { row: value.i, answer: value.j } : { row: value.j, answer: value.i });
 
-/**
- * Round 69 (T149): the graded side's best row and every row within PROVER_NEAR_TIE of its ev (indices into rows), highest
- * ev first, equal evs by choice, so the order the ranking happened to list them in changes nothing.
- */
+/** The graded side's best row and every row within PROVER_NEAR_TIE of its ev (indices into rows), highest ev first, equal evs by choice. */
 export function nearRows(view: AnswerSide, result: EvalResult): number[] {
   const ranked = result.perSide[view.side];
   if (ranked.length === 0) return [];
@@ -133,9 +94,9 @@ export function detectionJobs(view: AnswerSide, result: EvalResult): EvalCellJob
 }
 
 /**
- * 'protect', second stage (round 69, T149): the other near rows (up to ANSWER_NEAR_ROWS in all) against the listed
- * answers and against the ANSWER_SIBLING_PROBES unlisted answers that read lowest against the best row. Pricing every
- * near row against every legal answer would multiply the stage's cost by the number of near rows (2629703929 t4: six).
+ * 'protect', second stage: the other near rows (up to ANSWER_NEAR_ROWS in all) against the listed answers and against the
+ * ANSWER_SIBLING_PROBES unlisted answers that read lowest against the best row. Pricing every near row against every legal
+ * answer would multiply the stage's cost by the number of near rows.
  */
 export function siblingJobs(view: AnswerSide, result: EvalResult, first: EvalCellValue[]): EvalCellJob[] {
   const [best, ...rest] = nearRows(view, result).slice(0, ANSWER_NEAR_ROWS);
@@ -157,8 +118,7 @@ export interface Refutation { answer: number; row: number }
  * The unlisted answers whose one-ply value against a near row lies more than ANSWER_MARGIN below the listed answers'
  * minimum against that row (from the graded side), lowest value first, at most ANSWER_CAP. Each is checked against the
  * highest-ranked near row it refutes: a stall answer reads the board's static at one ply and can look like a refutation
- * of the best row that the deeper search takes back (2630685175 t8), so the best row decides, and a second row's one-ply
- * gap never adds an answer the best row's depth check would have dropped.
+ * of the best row that the deeper search takes back, so the best row decides.
  */
 export function refutations(view: AnswerSide, result: EvalResult, detected: EvalCellValue[]): Refutation[] {
   const sign = view.side === 'p1' ? 1 : -1;
@@ -215,16 +175,18 @@ export function confirmedCells(view: AnswerSide, refuting: Refutation[], deep: E
     : []));
 }
 
-/** Every listed row of the graded side against each added answer by one plain draw, the `deep` rows one ply deeper. */
+/**
+ * Every listed row of the graded side against each added answer by one plain draw, the `deep` rows one ply deeper. The best row's
+ * step from one ply to one ply deeper does not carry to the other rows (shifted by it, every row of one scene fell to about -0.54).
+ */
 export function extensionJobs(view: AnswerSide, added: number[], deep: number[], deepen: EvalSettings): EvalCellJob[] {
   return added.flatMap(answer => view.rows.map((_, row) => job(view, row, answer, deep.includes(row) ? deepen : undefined)));
 }
 
 /**
- * The graded side's ranking over its listed rows against the listed and the
- * added answers (p1-perspective values: the result's matrix for the listed
- * cells, the extension's values for the added ones). Fields the solve does
- * not make (kill odds, the follow-up line) carry over by choice.
+ * The graded side's ranking over its listed rows against the listed and the added answers (p1-perspective values: the result's
+ * matrix for the listed cells, the extension's values for the added ones). Fields the solve does not make (kill odds, the
+ * follow-up line) carry over by choice.
  */
 export function gradedRanking(view: AnswerSide, result: EvalResult, tree: MctsTreeStats, added: number[], values: EvalCellValue[]): RankedChoice[] {
   const matrix = result.matrix!;

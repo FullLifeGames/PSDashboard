@@ -1,8 +1,4 @@
-/**
- * The search facade: the value space, the option lists, the hints, and the
- * matrix search live in search/; this module keeps the public names every
- * consumer imports.
- */
+/** The search facade: the value space, the option lists, the hints and the matrix search live in search/; this module keeps the public names. */
 
 export { battleFaintedFraction } from './search/leaf.ts';
 export { optionHints } from './search/hints.ts';

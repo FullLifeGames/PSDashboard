@@ -7,18 +7,9 @@ import type {
 } from '../types.ts';
 
 /**
- * Round 67 (T129): the search sees every board with its bench in one fixed
- * order. The order in which a rebuild keeps the bench in the simulator's team
- * list is not part of the game, but the search read it: the static sums over
- * the team in list order, and a tie among replacement hints (every singles
- * hint is 0 once the opposing active fell) falls to it, so two boards of one
- * game state parted at their first near tie (649664 t14: the switch to
- * Ferrothorn read best on one board and a blunder on the other). Every entry
- * point searches the board with each side's bench sorted by species and
- * nickname (the active slots stay where they are), names every choice that
- * leaves the search back in the slots of the board it was asked about, and
- * every choice that enters it in the canonical slots. Move targets name
- * active slots and stay as they are.
+ * The search sees every board with each side's bench sorted by species and nickname (active slots stay), because the team-list order
+ * is no part of the game yet a near tie falls to it (replacement hints are all 0 once the opposing active fell); choices that
+ * leave the search are named back in the given board's slots, choices that enter it in the canonical slots, and move targets stay.
  */
 
 type SideId = 'p1' | 'p2';
@@ -34,20 +25,15 @@ export interface BenchOrder {
 
 const sideIndex = (side: SideId): 0 | 1 => (side === 'p1' ? 0 : 1);
 
-/**
- * Species id, then nickname, compared by code unit (no locale). The same key
- * reads off the serialized board ('[Species:<id>]' and set.name), so a board
- * already in canonical order is recognized without deserializing it.
- */
+/** Species id, then nickname, by code unit (no locale); the same key reads off the serialized board ('[Species:<id>]' and set.name). */
 const benchKey = (speciesId: string, name: string | undefined): string => `${speciesId}\u0000${name ?? ''}`;
 const byKey = (a: { key: string; index: number }, b: { key: string; index: number }): number =>
   (a.key < b.key ? -1 : a.key > b.key ? 1 : a.index - b.index);
 
 /**
- * One side's canonical order as given slot indices: the active slots in
- * place, then the bench by species and nickname (equal keys keep their
- * order). Team preview seats nobody, so every body counts as bench there; a
- * board whose actives do not sit in their own slots keeps its order.
+ * One side's canonical order as given slot indices: the active slots in place, then the bench by species and nickname (equal keys
+ * keep their order). Team preview seats nobody, so every body counts as bench there; a board whose actives do not sit in their own
+ * slots keeps its order.
  */
 function canonicalOrder(side: Side): number[] {
   const slots = side.pokemon.map((_, index) => index);
@@ -172,11 +158,7 @@ const inputToCanonical = (order: BenchOrder, input: ForcedWinInput): ForcedWinIn
   },
 });
 
-/**
- * An executor over the canonical board that speaks the given board's slots:
- * its option lists and diagnostics leave in them, cell and sub-search jobs
- * and the prover's root order arrive in them.
- */
+/** An executor over the canonical board that speaks the given board's slots: its option lists and diagnostics leave in them, jobs and the prover's root order arrive in them. */
 export function executorToGiven(order: BenchOrder, executor: SearchExecutor): SearchExecutor {
   return {
     choices: async (tera, keepPlayed, sleepClause) => {
