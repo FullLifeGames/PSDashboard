@@ -3,10 +3,7 @@ import { Dex } from '@pkmn/sim';
 import { isChampionsFormat } from '@fulllifegames/replay-core';
 import { isChampionsSimFormat } from '../src/forward/sim-mods';
 
-/**
- * Round 75 (T160): the engine's name for "is this a Champions format" is replay-core's one rule. This compares the two over every
- * format of the base Dex and a set of spellings the hosts hand over, so a second regex cannot return under the old name.
- */
+/** The engine's "is this a Champions format" is replay-core's one rule: compared over every base-Dex format and the spellings hosts hand over. */
 describe('isChampionsSimFormat is replay-core isChampionsFormat', () => {
   const spellings = [
     'gen9championsou', 'gen9championsdoublescustomgame', 'gen9championsvgc2026regmbbo3', 'smogtours-gen9championsou-12',

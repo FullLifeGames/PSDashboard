@@ -9,11 +9,10 @@ import type { SideAnalysis, TurnAnalysis } from '../src/analysis';
 import type { KoOddsInfo, RankedChoice } from '../src/types';
 
 /**
- * Round 69 (T177, decision 21): the dice markers of a turn count a roll only where the move rolled. The oracle is the
- * simulator (real logs of real battles) and its Dex: a sure crit (`willCrit`), a status from a move whose accuracy and
- * status chance are 100 (Thunder Wave in Gen 6) and a hazard status on a switch-in are no roll; Hypnosis, Scald's burn
- * and an ability status still are. The replay's generation reaches detectRolls and diceEventTurns as an optional
- * parameter; without it the markers read as they did in round 67.
+ * The dice markers of a turn count a roll only where the move rolled. The oracle is the simulator (real logs of real battles) and its Dex:
+ * a sure crit (`willCrit`), a status from a move whose accuracy and status chance are 100 (Thunder Wave in Gen 6) and a hazard status on a
+ * switch-in are no roll; Hypnosis, Scald's burn and an ability status still are. The replay's generation reaches detectRolls and
+ * diceEventTurns as an optional parameter; without it the markers read as before the generation gate.
  */
 
 type Kind = 'singles' | 'doubles';
@@ -22,7 +21,6 @@ const set = (species: string, moves: string[], ability = 'Pressure'): PokemonSet
   name: species, species, item: '', ability, moves, nature: 'Hardy', evs: {}, ivs: ALL_31, level: 100, gender: '',
 } as PokemonSet);
 
-/** The whole protocol of a battle after the given turn choices, without the split lines. */
 function playedLog(format: string, p1: PokemonSet[], p2: PokemonSet[], turns: [string, string][], seed: number): string[] {
   const battle = new Battle({
     formatid: toID(format), seed: [1, 2, 3, seed],
@@ -40,7 +38,6 @@ function playedLog(format: string, p1: PokemonSet[], p2: PokemonSet[], turns: [s
   return lines.filter((line, index) => !line.startsWith('|split|') && !lines[index - 1]?.startsWith('|split|'));
 }
 
-/** The lines of one turn: after its `|turn|n` marker up to the next one. */
 function turnLines(lines: string[], turn: number): string[] {
   const from = lines.findIndex(line => line === `|turn|${turn}`);
   const to = lines.findIndex(line => line === `|turn|${turn + 1}`);
@@ -50,7 +47,6 @@ function turnLines(lines: string[], turn: number): string[] {
 const FORMAT: Record<Kind, string> = { singles: 'gen9ou', doubles: 'gen9doublesou' };
 const blissey = (move = 'Splash') => set('Blissey', [move], 'Natural Cure');
 
-/** One attacking move on Blissey, in singles (Garchomp alone) or doubles (Garchomp beside a Protecting Blissey). */
 function attackLog(kind: Kind, move: string, seed: number, format = FORMAT[kind]): string[] {
   const id = toID(move);
   return kind === 'singles'
@@ -62,7 +58,6 @@ function attackLog(kind: Kind, move: string, seed: number, format = FORMAT[kind]
 /** Dice the premise must not carry besides its own (a full paralysis after the status would be a roll of its own). */
 const OTHER_DICE = /^\|(cant|-miss)\|/;
 
-/** The first seed whose battle prints a line the premise needs (a crit, a status) and no other dice; null when none does. */
 function logWith(make: (seed: number) => string[], marker: RegExp, seeds = 400, reject = OTHER_DICE): string[] | null {
   for (let seed = 1; seed <= seeds; seed++) {
     const lines = make(seed);
@@ -76,7 +71,6 @@ const rolled = (lines: string[], generation?: number) => {
   return favored.p1 || favored.p2;
 };
 
-/** The simulator's own Dex says whether the move cannot miss and cannot fail to inflict its status. */
 const sureStatus = (generation: number, move: string): boolean => {
   const data = Dex.forGen(generation).moves.get(move);
   return (data.accuracy === true || data.accuracy >= 100) && !(data.secondaries ?? []).some(s => (s.chance ?? 100) < 100);
@@ -92,7 +86,6 @@ describe.each<Kind>(['singles', 'doubles'])('T177 sure crit, %s', kind => {
       expect(lines, move.name).not.toBeNull();
       expect(rolled(lines!, 9), move.name).toBe(false);
       expect(diceEventTurns([[], lines!], 9).has(1), move.name).toBe(false);
-      // Without the generation the marker reads as before.
       expect(rolled(lines!), move.name).toBe(true);
     }
   });
@@ -106,7 +99,6 @@ describe.each<Kind>(['singles', 'doubles'])('T177 sure crit, %s', kind => {
 });
 
 describe.each<Kind>(['singles', 'doubles'])('T177 status, %s', kind => {
-  /** A status move on Blissey (singles: the lone Garchomp; doubles: Garchomp beside a Protecting Blissey). */
   const statusLog = (format: string, move: string, seed: number): string[] => {
     const id = toID(move);
     return kind === 'singles'
@@ -124,7 +116,6 @@ describe.each<Kind>(['singles', 'doubles'])('T177 status, %s', kind => {
       expect(rolled(lines!, gen(format)), format).toBe(!sureStatus(gen(format), 'thunderwave'));
       expect(diceEventTurns([[], lines!], gen(format)).has(1), format).toBe(!sureStatus(gen(format), 'thunderwave'));
     }
-    // The two generations differ, so both answers are exercised.
     expect(sureStatus(6, 'thunderwave')).not.toBe(sureStatus(9, 'thunderwave'));
   });
 
@@ -182,7 +173,6 @@ describe('T177 the whole ledger, the variance sentence quotes the rolled part', 
     const sentence = luckSentence(-0.38, null, names, split);
     expect(sentence).toBe(`Luck ran against Alpha (${winDeltaText(-0.3)} from the rolls).`);
     expect(sentence).not.toContain(winDeltaText(-0.38));
-    // Without the split the sentence keeps the whole ledger.
     expect(luckSentence(-0.38, null, names)).toBe(`Luck ran against Alpha overall (${winDeltaText(-0.38)}).`);
   });
 });
@@ -237,18 +227,13 @@ describe.each<Kind>(['singles', 'doubles'])('T177 attacker slot, %s', kind => {
   });
 });
 
-/**
- * Round 69 (T177 review, item 7): a move whose secondary names only its chance picks the status in a handler (Tri Attack,
- * Dire Claw; the Dex of Generation 9 holds `{ chance: 20 }`), so it is a dice source like a secondary with a status. The
- * oracle is the Dex entry of each move: its accuracy and its secondaries.
- */
+/** A move whose secondary names only its chance picks the status in a handler (Tri Attack, Dire Claw; Generation 9 holds `{ chance: 20 }`), so it is a dice source like a secondary with a status. The oracle is the Dex entry of each move. */
 describe('T177 a status a handler picks is a roll', () => {
   const gen9 = Dex.forGen(9);
   const secondariesOf = (id: string) => {
     const move = gen9.moves.get(id);
     return move.secondaries ?? (move.secondary ? [move.secondary] : []);
   };
-  /** One action with its status line, in the slot letters of each game type. */
   const statusTurn = (move: string, kind: Kind): string[][] => [[], kind === 'singles'
     ? [`|move|p1a: Garchomp|${move}|p2a: Blissey`, '|-status|p2a: Blissey|brn']
     : [`|move|p1a: Garchomp|${move}|p2b: Blissey`, '|-status|p2b: Blissey|brn']];

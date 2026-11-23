@@ -12,16 +12,14 @@ import {
 } from './dice-fixtures';
 import { damageAtRaw as oracleDamage } from './dice-sweep-support';
 
-// Round 82 (forced dice), decision D4: how a die answers. A chance answers yes or no; a die with no way to give an answer
-// keeps the natural result and says so; the damage roll's step runs from the lowest damage up in every generation; and a
-// forced-dice PRNG with nothing forced plays byte for byte the plain PRNG.
+// A chance answers yes or no; a die with no way to give an answer keeps the natural result and says so; the damage roll's step runs
+// from the lowest damage up in every generation; and a forced-dice PRNG with nothing forced plays byte for byte the plain PRNG.
 await loadSimMods('gen9championsou');
 
 const SEEDS = Array.from({ length: 12 }, (_, index) => seedOf(index));
 const gameTypes = (rules: Rules): Mode[] => (rules.doubles ? ['singles', 'doubles'] : ['singles']);
 const cases = RULES.flatMap(rules => gameTypes(rules).map(mode => ({ rules, mode })));
 
-/** Plays the scene's turn with the module's PRNG over the battle's own and returns the PRNG and the battle. */
 function forcedTurn(rules: Rules, scene: Scene, mode: Mode, seed: string, forced: ForcedDie[]) {
   const battle = boardOf(rules, scene, mode, seed)!;
   const inner = battle.prng;
@@ -146,7 +144,6 @@ describe.each(cases)('the damage roll runs from the lowest damage up: $rules.nam
   const STRENGTH: Scene = { id: 'strength into Chansey', a: SNORLAX(['strength']), t: { species: 'Chansey', moves: ['splash'] } };
   const shape = genShape(rules.generation).roll;
 
-  /** The damage the target loses when the simulator draws this raw value for the roll (the oracle shared with the roll sweep). */
   const damageAtRaw = (seed: string, raw: number): number => oracleDamage(boardOf(rules, STRENGTH, mode, seed)!, clicksOf(STRENGTH, mode), 'p2a', raw);
 
   test('step 0 deals the least damage of the raw values, the top step the most, and no step deals less than the one before', () => {
@@ -170,7 +167,6 @@ describe.each(cases)('the damage roll runs from the lowest damage up: $rules.nam
     expect(byStep[0]).toBe(least);
     expect(byStep[shape.steps - 1]).toBe(most);
     for (let step = 1; step < shape.steps; step++) expect(byStep[step], `step ${step}`).toBeGreaterThanOrEqual(byStep[step - 1]);
-    // and each step plays exactly what the simulator plays when it draws that raw value
     expect(byStep).toEqual(Array.from({ length: shape.steps }, (_, step) => damageAtRaw(seed, shape.raw(step))));
   });
 

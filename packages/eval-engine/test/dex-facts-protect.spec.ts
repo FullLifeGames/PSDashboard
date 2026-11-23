@@ -6,11 +6,10 @@ import { shieldsFromHits, shieldsSide } from '../src/search/hints';
 import { rollsStall, stopsHits } from '../src/dex-facts/protect';
 
 /**
- * Round 72 (T235): the Protect family in one predicate. Five readers held five forms of the same rule (damage-calc.ts
- * shieldedBy, pair/guards.ts rollsStall, search/hints.ts shieldsFromHits and shieldsSide, cell-blend.ts stopsHits). The
- * forms below are the old ones, copied from the code before the change; the sweep plays every move of Generations 1 to 9 and
- * of the Champions mod through all of them and through `protectKind` (replay-core dex-facts), Max and Z moves included, and
- * requires the same answer for every move in every view.
+ * The Protect family in one predicate. Five readers held five forms of the same rule (damage-calc.ts shieldedBy, pair/guards.ts rollsStall,
+ * search/hints.ts shieldsFromHits and shieldsSide, cell-blend.ts stopsHits). The sweep plays every move of Generations 1 to 9 and of the
+ * Champions mod, Max and Z moves included, through the forms below (copies of the old ones) and through `protectKind` (replay-core
+ * dex-facts), and requires the same answer for every move in every view.
  */
 
 await loadSimMods('gen9championsou');
@@ -29,7 +28,7 @@ const oldShieldsSide = (dex: ModdedDex, move: DexMove) =>
   move.target === 'allySide' && !!move.sideCondition && 'onTryHit' in dex.conditions.get(move.sideCondition);
 const oldRollsStall = (move: DexMove) => move.target === 'self' && !!move.stallingMove && !!move.volatileStatus;
 const oldStopsHits = (dex: ModdedDex, move: DexMove) => !!move.stallingMove || oldShieldsSide(dex, move);
-/** damage-calc.ts shieldedBy before its priority and Unseen Fist conditions: no target test. */
+/** damage-calc.ts shieldedBy without its priority and Unseen Fist conditions: no target test. */
 const oldShieldedBy = (dex: ModdedDex, move: DexMove) =>
   !(!move.stallingMove || !move.volatileStatus) && 'onTryHit' in dex.conditions.get(move.volatileStatus);
 

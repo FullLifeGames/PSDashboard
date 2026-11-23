@@ -13,12 +13,11 @@ import { FALLBACK_SEEDS, PROBE_SEEDS, SEARCH_SEEDS, VERIFY_PLAIN_SEEDS } from '.
 import { countFainted } from '../src/search/leaf';
 
 /**
- * Round 89 (#60, T324), A5 stage 2a: the matrix, the verify round, the pair sampler and the trend probe read one seed list per
- * cell (`cellSeedList(cellHash(positionKey(root), p1Choice, p2Choice), 16)`) where they read the fixed lists. Rows: (a) a die at a
- * fixed draw index of the first seed sits inside its binomial band over 200 cells of each path's own call, singles and doubles
- * (the fixed list gave every cell the same stream); (b) every seed a path reads belongs to its own cell's list and none is a
- * fixed seed; (c) the lists are shared: the matrix's first draw is the verify round's slot 0 and the pair sampler's first draw,
- * the trend probe rebuilds the child the matrix priced.
+ * The matrix, the verify round, the pair sampler and the trend probe read one seed list per cell
+ * (`cellSeedList(cellHash(positionKey(root), p1Choice, p2Choice), 16)`). Rows: (a) a die at a fixed draw index of the first seed sits
+ * inside its binomial band over 200 cells of each path's own call, singles and doubles (the fixed list gave every cell one stream);
+ * (b) every seed a path reads belongs to its own cell's list and none is a fixed seed; (c) the lists are shared: the matrix's first
+ * draw is the verify round's slot 0 and the pair sampler's first draw, the trend probe rebuilds the child the matrix priced.
  */
 
 const seen = vi.hoisted(() => ({ reads: [] as { root: unknown; p1: string; p2: string; seed: string }[] }));
@@ -64,7 +63,6 @@ const rootOf = (name: string): SimPosition => {
   return createRootPosition(order ? order.serialized : serialized);
 };
 
-/** `count` distinct cells over the fixtures: the product of both sides' legal choices, stepped through evenly. */
 function cellsOf(names: string[], count: number): Cell[] {
   const per = Math.ceil(count / names.length);
   return names.flatMap(name => {
@@ -84,7 +82,6 @@ const streamOf = (seed: string): number[] => {
   return Array.from({ length: DRAWS }, () => prng.random());
 };
 
-/** The seeds one call read for the cell, in order. */
 function readsOf(call: (cell: Cell) => void, cell: Cell): string[] {
   seen.reads.length = 0;
   call(cell);
@@ -182,7 +179,6 @@ describe('(c) the paths share one list per cell', () => {
         if (draw.first || priced[draw.index] === undefined) continue;
         checked++;
         const expected = listOf(cell)[draw.index];
-        // the matrix drew slot `index` of the cell's list; the probe's child must come from the same seed
         if (!priced.includes(expected)) wrong.push(`${cell.p1} / ${cell.p2}: slot ${draw.index} not priced`);
         const probe = readsOf(() => { drawChild(cell.root, cell.p1, cell.p2, draw); }, cell);
         if (probe[0] !== expected) wrong.push(`${cell.p1} / ${cell.p2}: probe read ${probe[0]}, matrix ${expected}`);

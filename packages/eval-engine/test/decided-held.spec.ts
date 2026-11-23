@@ -82,7 +82,6 @@ interface BankPosition { id: string; turn: number; serialized: string; p1Won: bo
 const load = (file: string): BankPosition =>
   JSON.parse(readFileSync(new URL(`./fixtures/positions/${file}`, import.meta.url), 'utf-8')) as BankPosition;
 
-/** Round 67 (T139): the bench's settings for one position, under its replay's rule set as the bank names it (bankSettings). */
 const settingsFor = (position: BankPosition): EvalSettings => ({ depth: 1, samples: 1, tera: false, ruleset: replayRuleset({ id: position.id, log: '' }) });
 
 async function search(position: BankPosition) {
@@ -95,7 +94,6 @@ async function search(position: BankPosition) {
 }
 
 describe('the decided sweep needs the bar on real positions (round 50)', () => {
-  // Round 67 (T139): the bench searches every position with the tables of its replay's rule set, as the bank does.
   test('the bench searches each fixture under the rule set of its replay', () => {
     expect(settingsFor(load('gen9vgc2026regi-2629703929-t6.json')).ruleset).toBe('vgc');
     expect(settingsFor(load('gen9doublesou-2663093831-t12.json')).ruleset).toBe('standard');
@@ -103,8 +101,7 @@ describe('the decided sweep needs the bar on real positions (round 50)', () => {
   });
 
   test('749828 t23 (singles): the sweep names Primarina for p1, the bar reads p2, nothing is held', { timeout: 120000 }, async () => {
-    // Aqua Jet lends its first strike to Primarina's best move while Rillaboom's
-    // Grassy Glide goes first under the terrain (T33); the prover proves p2, and p2 won.
+    // Aqua Jet lends its first strike to Primarina's best move while Rillaboom's Grassy Glide goes first under the terrain; the prover proves p2, and p2 won.
     const result = await search(load('smogtours-gen9ou-749828-t23.json'));
     expect(result.unanswered?.decided?.side).toBe('p1');
     expect(result.score).toBeLessThan(0);

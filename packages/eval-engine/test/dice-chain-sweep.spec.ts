@@ -15,13 +15,10 @@ import {
   type DexMove,
 } from './dice-sweep-support';
 
-// Round 88 (T337, #73): a move whose every hit rolls its own accuracy (the Dex flag `multiaccuracy`: Triple Axel, Triple Kick,
-// Population Bomb) draws one accuracy die per hit, and the log shows only the hits that landed (`|-hitcount|`), never a miss for a
-// later hit. The accuracy die of a later hit carries `hit`, the simulator's own `move.hit` (2 and up); the first hit keeps its name.
-// For every such move in every rule set the corpus plays (Gens 1 and 2 have none: the Gen 2 mod clears the flag), singles, doubles
-// and VGC (a team of six): (a) the Dex rows, (b) the natural turn on a copy names each later hit the log shows and the hit that
-// broke the chain, (c) a forced hit die overrides its hit and a forced plain die still covers every hit, (d) Skill Link and Loaded
-// Dice delete the flag, so no hit die is named or drawn. Only accuracy carries a hit this round (crit and roll per hit are T332).
+// A move whose every hit rolls its own accuracy (the Dex flag `multiaccuracy`: Triple Axel, Triple Kick, Population Bomb) draws one accuracy
+// die per hit, and the log shows only the hits that landed (`|-hitcount|`), never a miss for a later hit. The die of a later hit carries `hit`,
+// the simulator's own `move.hit` (2 and up); the first hit keeps its name. Gens 1 and 2 have none (the Gen 2 mod clears the flag). Skill Link and
+// Loaded Dice delete the flag, so no hit die is named or drawn. Only accuracy carries a hit.
 await loadSimMods('gen9championsou');
 
 const FAST = 'Pikachu';
@@ -48,14 +45,11 @@ const hitOfKey = (key: string): number | null => {
   const found = /:hit(\d+)$/.exec(key);
   return found ? Number(found[1]) : null;
 };
-/** The turn's lines without the clock stamp (`|t:|`), which two plays of one turn never share. */
 const untimed = (line: string): boolean => !line.startsWith('|t:|');
 const kindOfKey = (key: string): string => key.split(':')[3];
 
-/** The numbers of the `|-hitcount|` lines of a turn. */
 const hitcounts = (lines: readonly string[]): number[] => lines.filter(line => line.startsWith('|-hitcount|')).map(line => Number(line.split('|')[3]));
 
-/** The natural turn on a copy: the keys of the dice the user's move drew, and the turn's lines. */
 function naturalTurn(board: ReturnType<typeof sweepBoard>, clicks: { p1: string; p2: string }, moveId: string): { keys: string[]; lines: string[] } {
   const copy = copyOf(board);
   copy.prng ??= board.prng.clone();
@@ -194,8 +188,8 @@ describe.each(CASES.filter(entry => entry.rules.generation >= 3))('the accuracy 
   });
 });
 
-// Round 89 (#114): the offer names the accuracy die of each later hit, so the panel can offer a chip for it. Read from the move after
-// `ModifyMove` (Skill Link and Loaded Dice have deleted the flag by then), from the Dex's own `multiaccuracy` and `multihit`.
+// The offer names the accuracy die of each later hit, so the panel can offer a chip for it. Read from the move after `ModifyMove` (Skill
+// Link and Loaded Dice have deleted the flag by then), from the Dex's own `multiaccuracy` and `multihit`.
 describe.each(CASES.filter(entry => entry.rules.generation >= 3))('the offer names a die per hit: $name', ({ rules, mode, vgc }) => {
   const { moves } = sweepMoves(rules, multiAccuracy);
   const choiceOf = (move: DexMove) => ({ kind: 'move' as const, moveId: move.id, moveName: move.name, ...(mode === 'doubles' ? { targetLoc: 1 } : {}) });
@@ -217,7 +211,6 @@ describe.each(CASES.filter(entry => entry.rules.generation >= 3))('the offer nam
       const offered = hitKeysOf(offers);
       expect(offered, `${move.id}: one die per later hit, on the aimed foe`).toEqual(wanted(move));
       expect(offers.filter(offer => offer.name.kind === 'accuracy' && offer.name.hit === undefined).map(offer => dieKey(offer.name)), move.id).toEqual([dieKey(dieOf(move.id, 'p2a', 'accuracy'))]);
-      // forced to land, the natural turn draws exactly the hits the offer names
       const forced: ForcedDie[] = [yes(move.id), ...offers.filter(offer => offer.name.hit !== undefined).map(offer => ({ name: offer.name, result: { happens: true } }))];
       const { report, battle, start } = forcedOn(board, clicks, forced);
       expect(report.forced.map(shown => shown.took), `${move.id}: every offered hit is drawn`).toEqual(Array(hitsOf(move)).fill('applied'));
@@ -258,8 +251,8 @@ describe.each(CASES.filter(entry => entry.rules.generation >= 3))('the offer nam
   function clicksOf(move: DexMove) { return sweepClicks(mode, move.target); }
 });
 
-// Round 89 (#114), Champions OU 2692379905 turn 2: Meowscarada's Triple Axel hit Garchomp twice and the third hit missed. The panel
-// can set that hit: the offer names it, and forcing it plays the hit the game never rolled.
+// Champions OU 2692379905 turn 2: Meowscarada's Triple Axel hit Garchomp twice and the third hit missed. The panel can set that hit: the
+// offer names it, and forcing it plays the hit the game never rolled.
 describe('the scene of Champions OU 2692379905 turn 2: the third hit of Triple Axel', () => {
   const board = () => outfitBoard(CHAMPIONS, 'singles', { species: 'Meowscarada', moves: ['tripleaxel'], ability: 'Protean' }, { species: 'Garchomp', ability: 'Rough Skin', item: 'Rocky Helmet' });
   const clicks = { p1: 'move 1', p2: 'move 1' };
@@ -273,15 +266,14 @@ describe('the scene of Champions OU 2692379905 turn 2: the third hit of Triple A
   test.each([[true, 3], [false, 2]] as const)('hit 3 forced to %s plays %i hits', (happens, count) => {
     const turn = forcedOn(board(), clicks, [yes('tripleaxel'), hitDie('tripleaxel', 2, true), hitDie('tripleaxel', 3, happens)]);
     expect(hitcounts(turn.battle.log.slice(turn.start))).toEqual([count]);
-    // the third hit takes the last of Garchomp's HP
     expect(turn.battle.log.slice(turn.start).some(line => line.startsWith('|faint|p2a')), 'Garchomp faints on hit 3 only').toBe(happens);
     // a fainted target's `|-hitcount|` line names the side (`p2: Garchomp`), and the report still reads it: every hit die is applied
     expect(turn.report.forced.map(shown => `${shown.took} ${shown.reason ?? ''}`.trim())).toEqual(['applied', 'applied', 'applied']);
   });
 });
 
-// Round 89 (#114, F2): the chain rule lives in `chain.ts` once. A count of k landed hits stands for hits 2 to k landing and, when the
-// move has a hit k + 1, that hit missing; `chainCount` reads the count back from the per-hit results (the panel's fold, F3).
+// The chain rule lives in `chain.ts` once. A count of k landed hits stands for hits 2 to k landing and, when the move has a hit k + 1, that
+// hit missing; `chainCount` reads the count back from the per-hit results.
 describe.each(RULES.filter(rules => rules.generation >= 3).map(rules => [rules.name, rules] as const))('the chain rule: %s', (_name, rules) => {
   const { moves } = sweepMoves(rules, multiAccuracy);
   const action = (moveId: string, count: number): LoggedAction => ({ slot: 'p1a', moveId, hitCounts: { p2a: count } }) as unknown as LoggedAction;
@@ -354,8 +346,8 @@ describe('the report of a hit die reads the hit count of its target', () => {
   });
 });
 
-// Round 89 (F5, the wave-tester's finding 1): the die of a later hit the simulator never drew reads what the game did to the chain,
-// in the lines it wrote: an `-activate` of an ability that answers a hit (Toxic Debris, Rough Skin) is no blocker of the later hits.
+// The die of a later hit the simulator never drew reads what the game did to the chain, in the lines it wrote: an `-activate` of an
+// ability that answers a hit (Toxic Debris, Rough Skin) is no blocker of the later hits.
 describe('the report of a later hit the simulator never drew reads the chain from the protocol', () => {
   const board = sweepBoard(RULES[9], 'tripleaxel', 'singles', '1,2,3,4', false, FAST);
   const move = '|move|p2a: Weavile|Triple Axel|p1a: Glimmora';
@@ -375,7 +367,6 @@ describe('the report of a later hit the simulator never drew reads the chain fro
     const shown = never(hit, [...lines]);
     expect(shown.took).toBe('no-draw');
     expect(shown.reason).toBe(reason);
-    // the hits the game played, for the panel's "(2 played)"
     expect(shown.landed).toBe(Number(/after (\d+) hit/.exec(reason)![1]));
   });
 

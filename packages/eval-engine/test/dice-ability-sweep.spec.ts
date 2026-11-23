@@ -10,11 +10,9 @@ import {
 import { playClicks, sweepSelection } from './dice-fixtures';
 import { forcedOn, monOf, newTally, outfitBoard, SWEEP_CASES, sweepClicks } from './dice-sweep-support';
 
-// Round 82 (forced dice), lane A4: the procs of abilities and items. A contact ability (Cute Charm, Flame Body, Poison Point,
-// Static), Cursed Body, the attacker's Poison Touch and Toxic Chain and the Focus Band draw a chance inside the move in
-// flight; the module names the die by the holder's slot, the move, the body that was hit and the ability's or the item's id.
-// Every proc in every rule set the Dex gives it, singles and doubles, forced to happen and not to, on three seeds; the witness
-// is the protocol line that names the ability or the item. The end of the turn and the future moves are further down.
+// Every proc (a contact ability, Cursed Body, Poison Touch, Toxic Chain, the Focus Band) in every rule set the Dex gives it, singles and
+// doubles, forced to happen and not to, on three seeds; the witness is the protocol line that names the ability or the item. The die is named
+// by the holder's slot, the move, the body that was hit and the ability's or the item's id.
 await loadSimMods('gen9championsou');
 
 const logPath = process.env.DICE_SWEEP_LOG;
@@ -52,7 +50,6 @@ describe.each(SWEEP_CASES)('the procs: $name', ({ rules, mode, name }) => {
         const target = monOf(battle, 'p2a');
         expect(target.fainted, 'the band saves the body from the lethal hit').toBe(!happens);
       }
-      // the chance the report names is one the simulator asked for while the effect's handler ran
       const asked = chanceOfEffect(procBoard(rules, mode, proc), clicks, proc.id, playClicks);
       if (asked.length > 0) expect(asked).toContain(shown.chance);
     });

@@ -8,12 +8,11 @@ import { EFFECT_SPORE, hitDie, present, procBoard } from './dice-ability-support
 import { playClicks } from './dice-fixtures';
 import { forcedOn, SWEEP_CASES, sweepClicks } from './dice-sweep-support';
 
-// Round 82 (forced dice), lane A4, plan D6: Effect Spore. Gens 3 and 4 draw a chance and then pick the status with a `sample`
-// over the three words (two dice: the proc and its `:option`). Gens 5 and on draw one number from 0 to 99 and the script
-// compares it with thresholds: below the first it puts the target to sleep, below the second it paralyses, below the third it
-// poisons, and above them nothing happens. The module never keeps the thresholds: it plays the turn on copies with raw
-// answers and reads the status from the protocol (learn.ts). This sweep plays all 100 raw numbers on a spy, holds that each
-// status is one run of numbers, and then forces every result in every rule set, singles and doubles.
+// Gens 3 and 4 draw a chance and then pick the status with a `sample` over the three words (two dice: the proc and its `:option`). Gens 5
+// and on draw one number from 0 to 99 and the script compares it with thresholds: below the first it puts the target to sleep, below the
+// second it paralyses, below the third it poisons, and above them nothing happens. The module keeps no thresholds: it plays the turn on
+// copies with raw answers and reads the status from the protocol (learn.ts). This sweep plays all 100 raw numbers on a spy and holds that
+// each status is one run of numbers.
 await loadSimMods('gen9championsou');
 
 const logPath = process.env.DICE_SWEEP_LOG;
@@ -35,7 +34,7 @@ function statusShown(battle: Battle, start: number): string | null {
   return line ? line.split('|')[3] : null;
 }
 
-/** The status the simulator gives when Effect Spore's `random(100)` comes out as `raw`: the oracle of the learner. */
+/** The status the simulator gives when Effect Spore's `random(100)` comes out as `raw`. */
 function statusAtRaw(board: Battle, clicks: { p1: string; p2: string }, raw: number): string | null {
   const battle = copyOf(board);
   battle.prng ??= board.prng.clone();

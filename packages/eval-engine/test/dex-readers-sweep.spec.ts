@@ -11,17 +11,11 @@ import { nullMoveReason } from '../src/null-moves';
 import { ALL_VIEWS } from './sim-views';
 
 /**
- * Round 75 (T160, decision D1), the sweep of eval-engine's half. The Dex a reader gets is the Dex of the game: the Champions
- * mod's for a Champions game, the generation's own for an older one, entry by entry. Replay-core's half is
- * packages/replay-core/test/dex-readers-sweep.spec.ts (it compares the raw mod data with Scarlet/Violet to find the changed
- * entries); this half reads the same changed entries through eval-engine's readers:
- *  - the damage calculator's move (calc/move.ts: the power and type of each changed move, 23 and 2 of the mod's 159);
- *  - the dice markers of a turn (dice-events.ts: the 5 changed accuracies and the 4 changed secondary effects decide whether a
- *    status line is a roll), in singles and doubles log shapes;
- *  - the lists the engine keeps per Dex (the calling moves, the setup moves), which view by view equal the Dex's own data;
- *  - the older generations (the item a typeless Struggle meets, the streak and null-move readers' generation gate and type chart).
- * Red proof by hand: with `dexOfCalc` replaced by the Generation 9 Dex the Champions rows fail, with `rulesDex(gen, mod)` in
- * dice-events.ts replaced by `rulesDex(gen)` the dice rows fail.
+ * The Dex a reader gets is the Dex of the game: the Champions mod's for a Champions game, the generation's own for an older one. This half
+ * reads the changed entries (found by packages/replay-core/test/dex-readers-sweep.spec.ts, which compares the raw mod data with Scarlet/Violet)
+ * through eval-engine's readers: the calculator's move (23 power and 2 type changes of the mod's 159), the dice markers (5 changed
+ * accuracies, 4 changed secondary effects), the lists the engine keeps per Dex, and the older generations' readers. Red proof by hand: with
+ * `dexOfCalc` replaced by the Generation 9 Dex the Champions rows fail, with `rulesDex(gen, mod)` in dice-events.ts replaced by `rulesDex(gen)` the dice rows fail.
  */
 await loadSimMods('gen9championsou');
 

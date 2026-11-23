@@ -9,11 +9,10 @@ import { clicksAccepted, dexOfRules, forcedOn, SWEEP_CASES, sweepMoves, VGC_RULE
 import { loggedDice } from '../src/dice/logged-results';
 import { draggedIn, ofKind, pickBoard, pickClicks, publicHalf, recorded, sweepItems, type Recorded } from './dice-pick-support';
 
-// Round 89 (#137): a drag (Roar, Whirlwind, Dragon Tail and Circle Throw by the Dex flag `forceSwitch`, and an item whose holder drags
-// the attacker out when it is hit: found below by playing every Dex item on a hit and keeping those under which `dragIn` ran) brings
-// in a body that `getRandomSwitchable` samples from the bench. The module names the draw as a `drag` die of the dragged-out slot, its
-// sample holds the bench bodies, and forcing each body makes the `|drag|` line name it. Gens 2 to 9 and Champions (Gen 1 has no drag),
-// singles, doubles and VGC (a bench of four), a bench of two or more in every case.
+// A drag (Roar, Whirlwind, Dragon Tail and Circle Throw by the Dex flag `forceSwitch`, and an item whose holder drags the attacker out when
+// it is hit: found by playing every Dex item on a hit and keeping those under which `dragIn` ran) brings in a body that `getRandomSwitchable`
+// samples from the bench. The module names the draw as a `drag` die of the dragged-out slot; forcing each body makes the `|drag|` line name
+// it. Gens 2 to 9 and Champions (Gen 1 has no drag), a bench of two or more in every case (VGC: four).
 await loadSimMods('gen9championsou');
 
 const CASES: { rules: Rules; mode: Mode; vgc: boolean; name: string }[] = [
@@ -25,7 +24,6 @@ const drag = (slot: string): DieName => ({ slot, moveId: '', kind: 'drag' });
 const namesOf = (items: readonly unknown[] | undefined): string[] => (items ?? []).map(item => (item as { name: string }).name).sort();
 const benchOf = (board: Battle, side: 0 | 1): string[] => board.sides[side].pokemon.filter(body => !body.isActive).map(body => body.name).sort();
 
-/** The dice of the drags a natural turn played: one die per dragged-out slot, over the bench of its side, each body forced is the one the line names. */
 function checkDragged(board: Battle, clicks: { p1: string; p2: string }, turn: Recorded): string[] {
   const problems: string[] = [];
   const lines = draggedIn(turn.lines);
@@ -39,7 +37,6 @@ function checkDragged(board: Battle, clicks: { p1: string; p2: string }, turn: R
     const bench = benchOf(board, line.slot[1] === '1' ? 0 : 1);
     if (shape?.call !== 'sample') problems.push(`${line.slot}: the draw is a ${shape?.call}, not a sample`);
     else if (namesOf(shape.items).join() !== bench.join()) problems.push(`${line.slot}: the sample holds ${namesOf(shape.items).join()}, the bench ${bench.join()}`);
-    // each body of the bench forced: the drag line of the slot names it (a second drag of the turn plays under the stream)
     for (const body of bench) {
       const forced: ForcedDie = { name, result: { option: body } };
       const played = forcedOn(board, clicks, [forced]);
@@ -52,10 +49,7 @@ function checkDragged(board: Battle, clicks: { p1: string; p2: string }, turn: R
   return problems;
 }
 
-/**
- * Round 89 (G2): the log reader answers the draw. The lines of a turn that brought `body` into `slot` give the drag die of the slot with
- * that body's name as the answer, and playing the board with the reader's die brings the same body in again.
- */
+/** The log reader answers the draw: the lines of a turn that brought `body` into `slot` give the slot's drag die with that body's name, and playing the board with it brings the same body in again. */
 function readBack(board: Battle, clicks: { p1: string; p2: string }, slot: string, body: string, lines: readonly string[]): string[] {
   const read = loggedDice(lines).find(die => dieKey(die.name) === dieKey(drag(slot)));
   if (!read) return [`${slot} forced ${body}: the reader names no drag die`];
@@ -71,7 +65,6 @@ describe('the words of a drag', () => {
   });
 });
 
-/** Whether the turn of these clicks runs `dragIn`, read on a copy of the board by a spy of this oracle. */
 function dragsIn(board: Battle, clicks: { p1: string; p2: string }): boolean {
   const copy = copyOf(board);
   copy.prng ??= board.prng.clone();
@@ -101,7 +94,6 @@ describe.each(CASES)('a drag draws a die: $name', ({ rules, mode, vgc }) => {
     if (!clicksAccepted(board, clicks)) return;
     const before = standing(board);
     const turn = recorded(board, clicks);
-    // Roar and Whirlwind of the board's Snorlax reach the foe in p2a: the drag happens
     if (moveId === 'roar' || moveId === 'whirlwind') expect(draggedIn(turn.lines).map(line => line.slot), 'the scene drags').toEqual(['p2a']);
     expect(checkDragged(board, clicks, turn)).toEqual([]);
     expect(standing(board), 'the question leaves the battle as it was').toBe(before);
@@ -120,7 +112,6 @@ describe.each(CASES)('a drag draws a die: $name', ({ rules, mode, vgc }) => {
       problems.push(...checkDragged(board, clicks, recorded(board, clicks)).map(problem => `${item.id}: ${problem}`));
     }
     expect(problems).toEqual([]);
-    // the full sweep plays every item: where the Dex has a Red Card the spy finds it
     if (SWEEPS_FULL && dex.items.get('redcard').exists && dex.items.get('redcard').gen <= dex.gen) expect(found).toContain('redcard');
   });
 

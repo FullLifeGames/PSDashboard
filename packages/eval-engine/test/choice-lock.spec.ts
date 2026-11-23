@@ -57,9 +57,7 @@ describe('protocol choice-lock trails', () => {
     ]));
     expect(protocolChoiceLock(trails, 'p1', 2, rulesDex(9))).toEqual({ species: 'Keldeo', moveId: 'hydropump' });
     expect(protocolChoiceLock(trails, 'p1', 3, rulesDex(9))).toEqual({ species: 'Keldeo', moveId: 'hydropump' });
-    // Two distinct moves since entry: no choice item can explain the trail.
     expect(protocolChoiceLock(trails, 'p1', 4, rulesDex(9))).toBeNull();
-    // Fresh entry, no move yet: nothing to lock on.
     expect(protocolChoiceLock(trails, 'p1', 1, rulesDex(9))).toBeNull();
     expect(protocolChoiceLock(trails, 'p2', 3, rulesDex(9))).toBeNull();
   });
@@ -79,10 +77,8 @@ describe('protocol choice-lock trails', () => {
   });
 
   test('a Trick-handed Choice item locks the next move; any other item event disturbs the trail', () => {
-    // Round 63 (T115): the sim's Choice Scarf drops the old lock on arrival
-    // and locks the next move (items.ts onStart / onModifyMove), and the GPL
-    // replay shows it: Vileplume clicks Sludge Bomb at t19 after the Trick
-    // and again at t20. The T38 re-entry at t37 starts a fresh trail.
+    // The sim's Choice Scarf drops the old lock on arrival and locks the next move (items.ts onStart / onModifyMove); the GPL replay shows it:
+    // Vileplume clicks Sludge Bomb at t19 after the Trick and again at t20. The re-entry at t37 starts a fresh trail.
     const trails = buildChoiceLockTrails(log([
       '|switch|p1a: Plume|Vileplume|100/100',
       '|turn|1',
@@ -110,10 +106,8 @@ describe('protocol choice-lock trails', () => {
 });
 
 describe('choice-item damage corroboration', () => {
-  // Bands measured once (gen6, Keldeo Hydro Pump vs the shared inline
-  // spread on Mew, ± the 0.02 HP-bar slack): Specs 0.766-0.947,
-  // Mystic Water 0.608-0.762, unboosted 0.502-0.639 — disjoint, so the
-  // pinned fractions below each sit strictly inside exactly one band.
+  // Bands measured once (gen6, Keldeo Hydro Pump vs the shared inline spread on Mew, ± the 0.02 HP-bar slack): Specs 0.766-0.947,
+  // Mystic Water 0.608-0.762, unboosted 0.502-0.639; disjoint, so each pinned fraction below sits inside exactly one band.
   const teams = {
     p1Team: [set('Keldeo', 'Choice Specs', ['Hydro Pump'])],
     p2Team: [set('Mew', '', ['Protect'])],
@@ -134,8 +128,7 @@ describe('choice-item damage corroboration', () => {
 
   test('a knock-out reads as a lower bound: below the choice band it neither contradicts nor corroborates', () => {
     const lethal = observation(0.55).map(obs => ({ ...obs, lethal: true }));
-    // 0.55 sits inside the unboosted band; a knock-out at 0.55 only says
-    // "at least 0.55", which both hypotheses explain.
+    // 0.55 sits inside the unboosted band; a knock-out at 0.55 only says "at least 0.55", which both hypotheses explain.
     expect(corroborateChoiceItem('p1', 'Keldeo', 'Choice Specs', teams, lethal, 6)).toBe('ambiguous');
   });
 
@@ -165,17 +158,13 @@ describe('choice-lock context', () => {
       p2Team: [set('Chansey', '', ['Protect'])],
     };
     const context = buildChoiceLockContext(contextLog, teams, []);
-    // No revealed item, no observations: guessed Specs stays eligible
-    // (ambiguous never blocks).
     expect(context.eligibility.p1['keldeo']).toBe(true);
-    // A non-choice item is never eligible.
     expect(context.eligibility.p2['chansey']).toBeFalsy();
     expect(context.trails.p1.get(1)).toBeTruthy();
   });
 
   test('a contradicted guessed choice item loses eligibility', () => {
-    // The 0.55 fraction sits strictly inside the unboosted band and outside
-    // both boost bands (measured in the corroboration block above).
+    // 0.55 sits inside the unboosted band and outside both boost bands.
     const teams = {
       p1Team: [set('Keldeo', 'Choice Specs', ['Hydro Pump'])],
       p2Team: [set('Mew', '', ['Protect'])],
@@ -190,15 +179,12 @@ describe('choice-lock context', () => {
 });
 
 test('649664: after its t23 Hydro Pump, Keldeo @ Specs is a locked side (the corpus gap\'s mechanism)', { timeout: 240000 }, async () => {
-  // Protocol facts: Keldeo enters at the end of t22 (Excadrill faints), fires
-  // its first Hydro Pump during t23 — so t24 is the protocol-locked boundary
-  // the t23 grading plays through (the corpus-gap claim "the pump was
-  // forced, not a gamble" lives on this follow-up position).
+  // Keldeo enters at the end of t22 (Excadrill faints) and fires its first Hydro Pump during t23, so t24 is the protocol-locked boundary
+  // the t23 grading plays through.
   const replay = JSON.parse(readFileSync(new URL('./fixtures/smogtours-gen6ou-649664.json', import.meta.url), 'utf-8')) as {
     id: string; format: string; formatid?: string; players: string[]; log: string;
   };
   const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
-  // The pinned gen6ou usage stats, parsed once and cut to this replay's twelve species.
   const usageStats = JSON.parse(readFileSync(new URL('./fixtures/usage-gen6ou-649664.json', import.meta.url), 'utf-8')) as SmogonUsageStats;
   const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders, usageStats });
   const choiceLocks = buildChoiceLockContext(replay.log, { p1Team, p2Team }, observations);
@@ -241,7 +227,6 @@ function make(format: string, p1: PokemonSet[], p2: PokemonSet[]): Battle {
   return battle;
 }
 
-/** Plays turn 1 and returns its public lines as the rebuild reads them, with a fresh board at the boundary. */
 function readTurn(format: string, p1: PokemonSet[], p2: PokemonSet[], choices: [string, string]) {
   const played = make(format, p1, p2);
   played.choose('p1', choices[0]);
@@ -302,7 +287,7 @@ describe('scene: 752301, Landorus\'s Taunt shows only in a |cant| line', () => {
     const replay = fixture('smogtours-gen9ou-752301.json');
     const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
     const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });
-    // The bank's set for p1's Landorus: the inference does not read the Taunt of the cant line (lane C's T108).
+    // The bank's set for p1's Landorus: the inference does not read the Taunt of the cant line.
     p1Team.find(set => set.species === 'Landorus-Therian')!.moves = ['U-turn', 'Earthquake', 'Stealth Rock', 'Stone Edge'];
     const snapshotFor = (turn: number) => snapshots[Math.min(turn - 1, snapshots.length - 1)] ?? null;
     const seen = new Map<number, { active: string; taunted: boolean }>();
@@ -393,10 +378,7 @@ const observations = (): DamageObservation[] => [{
   observedFraction: bandedFraction(), lethal: false, attackerBoosts: {}, defenderBoosts: {}, attackerStatus: '', screens: [], weather: '',
 }];
 
-/**
- * The Champions mod changes moves calc 0.11 still prices at Gen 9 values: Psyshield Bash hits at 90 there, not 70.
- * A banded Wyrdeer hit at the server's power fits the band only on the mod's move.
- */
+/** The Champions mod changes moves calc 0.11 still prices at Gen 9 values: Psyshield Bash hits at 90 there, not 70. */
 await loadSimMods('gen9championsou');
 const wyrdeer: PokemonSet = {
   name: 'Wyrdeer', species: 'Wyrdeer', item: 'Life Orb', ability: 'Intimidate', moves: ['Psyshield Bash'], nature: 'Adamant',
@@ -478,7 +460,6 @@ describe('choice-lock-defender-item', () => {
     attackerBoosts: {}, defenderBoosts: {}, attackerStatus: '', screens: [], weather: '',
   }];
 
-  /** The inference of the defender's side: what the log showed of its item and what it ruled out. */
   function defenderInfo(scene: Scene, item: { value: string; source: 'revealed' | 'guessed' | 'unknown' }, ruledOut: string[] = []): Record<'p1' | 'p2', OpponentTeamInfo> {
     const field = (value: string, source: string) => ({ value, source, probability: 1 }) as RevealedPokemonInfo['item'];
     const mon = {
@@ -530,7 +511,6 @@ describe('choice-lock-hit-field', () => {
   });
   const BLISSEY = () => mon('Blissey', '', 'Natural Cure', ['Splash'], { evs: { hp: 252, atk: 0, def: 0, spa: 0, spd: 252, spe: 0 } });
 
-  /** The public log of one turn, the attacker's first move into the defender. */
   function turnOf(format: string, attacker: PokemonSet, defender: PokemonSet, move: string, setup: string[] = [], seed = 4): string {
     const battle = new Battle({ formatid: toID(format) as never, seed: [1, 2, 3, seed], p1: { name: 'Alpha', team: Teams.pack([attacker]) }, p2: { name: 'Beta', team: Teams.pack([defender]) } });
     battle.choose('p1', 'team 1');
@@ -545,7 +525,6 @@ describe('choice-lock-hit-field', () => {
     return lines.filter((line, index) => !line.startsWith('|split|') && !lines[index - 1]?.startsWith('|split|')).join('\n');
   }
 
-  /** The verdict on a guessed `guess` item for a body that really holds `truth`. */
   function verdict(guess: string, truth: string, make: (item: string) => PokemonSet, defender: PokemonSet, move: string): ItemCorroboration {
     const log = turnOf('gen9customgame', make(truth), defender, move);
     const observations = parseReplayLogWithObservations(log).observations.filter(obs => obs.attackerSide === 'p1');

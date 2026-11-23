@@ -12,11 +12,7 @@ import { rulesDex } from '@fulllifegames/replay-core';
 import { set as setFromDamageCalcHitCounts } from './move-oracle';
 import { battleOf, powerInTurn } from './power-oracle';
 
-/**
- * T96 point 1: the preview's damage of a multi-hit move is the sum of its
- * hits, as the calc itself sums them (Result.range), and its KO text is the
- * calc's verdict over all the hits (Result.kochance).
- */
+/** The preview's damage of a multi-hit move is the sum of its hits, as the calc sums them (Result.range); its KO text is the calc's verdict over all the hits (Result.kochance). */
 const gen9 = Generations.get(9);
 const STATS = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
 
@@ -35,7 +31,6 @@ function move(name: string, targetType = 'normal'): BranchMoveOption {
   return { name, activeSlot: 0, slot: 1, pp: 16, maxpp: 16, disabled: false, type: '', targetType, requiresTarget: false, targetOptions: [] };
 }
 
-/** The calc's own result for the same two Pokémon, built straight from @smogon/calc; `hits` asks for one hit count. */
 function calcDirect(attacker: SimPokemonInfo, defender: SimPokemonInfo, name: string, gen = gen9, hits?: number) {
   const poke = (info: SimPokemonInfo) => new Pokemon(gen, info.species, {
     level: info.level, ability: info.ability || undefined, item: info.item || undefined, nature: info.nature,
@@ -56,7 +51,7 @@ describe('multi-hit moves in the damage preview', () => {
     const result = calcSingleDamageRange(urshifu, tusk, move('Surging Strikes'));
     expect(result.minPercent).toBe(pct(min, tusk.maxhp));
     expect(result.maxPercent).toBe(pct(max, tusk.maxhp));
-    // The preview used to read one hit: the weakest three hits beat the strongest one twice over.
+    // The weakest three hits beat the strongest one twice over.
     const oneHitMax = Math.max(...(direct.damage as number[][])[0]);
     expect(result.minPercent).toBeGreaterThan(2 * pct(oneHitMax, tusk.maxhp));
   });
@@ -74,7 +69,6 @@ describe('multi-hit moves in the damage preview', () => {
     const urshifu = mon('Urshifu-Rapid-Strike', { ability: 'Unseen Fist' });
     const full = mon('Great Tusk', { evs: { ...STATS, hp: 252, def: 4 } });
     const [min, max] = calcDirect(urshifu, full, 'Surging Strikes').range();
-    // Between the weakest and the strongest three hits: a KO only some roll combinations reach.
     const damaged = { ...full, hp: Math.round((min + max) / 2) };
     const verdict = calcDirect(urshifu, damaged, 'Surging Strikes').kochance(false);
     expect(verdict.n).toBe(1);
@@ -102,11 +96,8 @@ describe('multi-hit moves in the damage preview', () => {
 });
 
 /**
- * T124 point 3: a move whose hit count the simulator draws (2 to 5 hits, or
- * Population Bomb under Loaded Dice) shows every count it can land, each
- * priced by the calc; the counts and their chances are the simulator's
- * (35/35/15/15 from gen 5 on, Loaded Dice 4 or 5 and 4 to 10; held against
- * the simulator in damage-calc.spec.ts).
+ * A move whose hit count the simulator draws (2 to 5 hits, or Population Bomb under Loaded Dice) shows every count it can land, each priced
+ * by the calc; the counts and their chances are the simulator's (35/35/15/15 from gen 5 on, Loaded Dice 4 or 5 and 4 to 10).
  */
 describe('multi-hit moves with a drawn hit count (T124 point 3)', () => {
   const breloom = mon('Breloom');
@@ -166,11 +157,7 @@ describe('multi-hit moves with a drawn hit count (T124 point 3)', () => {
   });
 });
 
-/**
- * T136 point 1 (round 67, lane A): the result carries the distribution per
- * hit count, each count with the simulator's chance and its own calc range,
- * so the move button can show it.
- */
+/** The result carries the distribution per hit count, each count with the simulator's chance and its own calc range. */
 describe('the per-count distribution of a drawn hit count (T136 point 1)', () => {
   const breloom = mon('Breloom');
   const blissey = mon('Blissey', { evs: { ...STATS, hp: 252, def: 252 } });
@@ -258,14 +245,12 @@ describe('damage-calc-hit-counts', () => {
   const splash = (species: string, extra: Partial<PokemonSet> = {}) => set(species, ['splash'], extra);
   const gear = (species: string, ability = '', item = '') => ({ species, ability, item });
 
-  /** The distribution of a sampled array: each value with its share, fewest hits first. */
   function shares(values: readonly number[]): HitCount[] {
     const counts = new Map<number, number>();
     for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
     return [...counts].sort(([a], [b]) => a - b).map(([hits, count]) => ({ hits, chance: count / values.length }));
   }
 
-  /** Hits that connected in one turn of `id` (every BasePower event is one hit on the lone foe). */
   function hitsInTurn(format: string, attacker: PokemonSet, defender: PokemonSet, id: string, seed: string): number {
     return powerInTurn(battleOf(format, [attacker], [defender], seed), { p1: 'move 1', p2: 'move 1' }, id).length;
   }
@@ -346,7 +331,6 @@ describe('damage-calc-ko', () => {
   const move = (name: string, targetType = 'normal'): BranchMoveOption =>
     ({ name, activeSlot: 0, slot: 1, pp: 16, maxpp: 16, disabled: false, type: '', targetType, requiresTarget: false, targetOptions: [] });
 
-  /** The calc's own KO verdict for the same two Pokémon at the defender's current HP. */
   function calcVerdict(attacker: SimPokemonInfo, defender: SimPokemonInfo, name: string, gameType: 'Singles' | 'Doubles' = 'Singles') {
     const poke = (info: SimPokemonInfo) => new Pokemon(gen9, info.species, {
       level: info.level, ability: info.ability || undefined, item: info.item || undefined, nature: info.nature,
@@ -454,7 +438,6 @@ describe('damage-gen', () => {
       const gen9 = calcSingleDamageRange(salamence, swampert, move('Dragon Claw', 'Dragon'), { gen: 9 });
       const gen3 = calcSingleDamageRange(salamence, swampert, move('Dragon Claw', 'Dragon'), { gen: 3 });
 
-      // Attack-invested Salamence: physical gen 9 hits much harder than special gen 3.
       expect(gen3.maxPercent).toBeGreaterThan(0);
       expect(gen3.maxPercent).toBeLessThan(gen9.maxPercent);
     });

@@ -4,10 +4,9 @@ import { deserializeBattleExact, serializeBattleStable } from '../src/forward/se
 import { loadSimMods } from '../src/forward/sim-mods';
 
 /**
- * Round 67 (T145), in a module graph of its own (vitest isolates files): before the Champions mod is loaded, a
- * Champions position must fail loudly instead of reviving as a rule-less gen 9 battle with Stat Points read as EVs;
- * registering the mod must leave every other format's battle as it was (the bank without Champions games stays
- * byte-identical).
+ * In a module graph of its own (vitest isolates files): before the Champions mod is loaded, a Champions position must fail loudly
+ * instead of reviving as a rule-less gen 9 battle with Stat Points read as EVs; registering the mod must leave every other format's
+ * battle as it was.
  */
 const set = (species: string, moves: string[]): PokemonSet => ({
   name: species, species, item: 'Leftovers', ability: '', moves, nature: 'Jolly', gender: '', level: 100,

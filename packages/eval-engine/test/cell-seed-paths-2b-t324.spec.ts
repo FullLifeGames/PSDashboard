@@ -15,12 +15,11 @@ import { FALLBACK_SEEDS, PROBE_SEEDS, SEARCH_SEEDS, VERIFY_PLAIN_SEEDS } from '.
 import type { EvalSettings } from '../src/types';
 
 /**
- * Round 89 (#60, T324), A5 stage 2b: the answer round's plain price (search/position.ts), the endgame's plain and class
- * children (endgame/children.ts) and the order of a log (mcts.ts classesOf) read the cell's own seed list where they read
- * `SEARCH_SEEDS[0]` or the fixed list. Rows: (a) a die at a fixed draw index of the first seed sits inside its binomial band
- * over 200 cells of each path's own call, singles and doubles; (b) every seed a path reads belongs to its cell's list and to no
- * fixed list; (c) the paths share the cell's slots: the answer round's plain price and the matrix's first draw read one seed,
- * the endgame children read slots 0 to 4 (plain: 0 to count - 1), the log order reads slot 0.
+ * The answer round's plain price (search/position.ts), the endgame's plain and class children (endgame/children.ts) and the order of a
+ * log (mcts.ts classesOf) read the cell's own seed list. Rows: (a) a die at a fixed draw index of the first seed sits inside its
+ * binomial band over 200 cells of each path's own call, singles and doubles; (b) every seed a path reads belongs to its cell's list
+ * and to no fixed list; (c) the paths share the cell's slots: the plain price and the matrix's first draw read one seed, the endgame
+ * children read slots 0 to 4 (plain: 0 to count - 1), the log order reads slot 0.
  */
 
 const seen = vi.hoisted(() => ({
@@ -72,7 +71,6 @@ const rootOf = (name: string): SimPosition => {
   return createRootPosition(order ? order.serialized : serialized);
 };
 
-/** `count` distinct cells over the fixtures, stepped through evenly; `keep` filters the product of both sides' legal choices. */
 function cellsOf(names: string[], count: number, keep: (cell: Cell) => boolean = () => true): Cell[] {
   const per = Math.ceil(count / names.length);
   return names.flatMap(name => {
@@ -92,7 +90,6 @@ const streamOf = (seed: string): number[] => {
   return Array.from({ length: DRAWS }, () => prng.random());
 };
 
-/** The seeds one call read for the cell, in order. */
 function readsOf(call: (cell: Cell) => void | Promise<unknown>, cell: Cell): string[] {
   seen.reads.length = 0;
   const done = call(cell);
@@ -127,7 +124,6 @@ function logCells(count: number): Cell[] {
   return cells.slice(0, count);
 }
 
-/** Two events whose order a log settles: the cells `classesOf` reads a log for. */
 const twoEvents = (cell: Cell): boolean => {
   const plan = planCellEvents(positionBattle(cell.root), cell.p1, cell.p2);
   return plan.kind === 'events' && plan.events.length >= 2;
@@ -145,7 +141,6 @@ const PATHS: Record<string, Path> = {
   'doubles endgame children': { cells: () => cellsOf(DOUBLES, CELLS), call: endgame },
   'singles log order': { cells: () => logCells(CELLS), call: logOrder },
 };
-/** The answer round's plain price is async; its rows await the executor. */
 const ASYNC_PATHS: Record<string, Pick<Path, 'cells'>> = {
   'singles answer plain price': { cells: () => cellsOf(SINGLES, CELLS) },
   'doubles answer plain price': { cells: () => cellsOf(DOUBLES, CELLS) },

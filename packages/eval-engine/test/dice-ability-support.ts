@@ -5,18 +5,15 @@ import type { Mode, Rules } from './dice-fixtures';
 import { dexOfRules, monOf, outfitBoard } from './dice-sweep-support';
 
 /**
- * Round 82 (forced dice), lane A4: the boards of the ability and item procs, of the end of the turn, and of Effect Spore. One
- * proc is an ability or an item whose handler draws a chance when its holder is hit (or, for the holder's own hit, when it
- * hits): the die belongs to the move in flight, and the witness is a protocol line that names the ability or the item.
+ * The boards of the ability and item procs, of the end of the turn, and of Effect Spore. A proc is an ability or an item whose handler
+ * draws a chance when its holder is hit (or, for the holder's own hit, when it hits): the die belongs to the move in flight, and the
+ * witness is a protocol line that names the ability or the item.
  */
 
 export interface Proc {
-  /** The ability's or the item's id, as the die names it. */
   id: string;
   kind: 'abilities' | 'items';
-  /** Who holds it: the body that is hit, or the body that hits. */
   holder: 'target' | 'user';
-  /** The move that reaches the handler: a contact move for the contact abilities. */
   move: string;
   /** A hit that would faint the target (the item saves only a body that would faint). */
   lethal?: boolean;
@@ -39,20 +36,17 @@ export const EFFECT_SPORE: Proc = { id: 'effectspore', kind: 'abilities', holder
 /** The ids of every proc, the die kind of the census named: the census holds this list to the simulator's own handlers. */
 export const PROC_IDS: string[] = [...PROCS, EFFECT_SPORE].map(proc => proc.id);
 
-/** Whether the rule set has the ability or the item (the Dex says so, not a list of generations). */
 export function present(rules: Rules, kind: 'abilities' | 'items', id: string): boolean {
   const dex = dexOfRules(rules);
   const entry = dex[kind].get(id);
   return entry.exists && entry.gen <= dex.gen && !entry.isNonstandard;
 }
 
-/** The ability's or the item's name in the rule set's own Dex (the protocol writes it: `[from] ability: Static`). */
 export const nameOf = (rules: Rules, kind: 'abilities' | 'items', id: string): string => dexOfRules(rules)[kind].get(id).name;
 
 /** The label the protocol writes for the effect: `ability: Static`, `item: Focus Band`. */
 export const labelOf = (rules: Rules, kind: 'abilities' | 'items', id: string): string => `${kind === 'abilities' ? 'ability' : 'item'}: ${nameOf(rules, kind, id)}`;
 
-/** Snorlax uses the move on a Vaporeon; the proc's holder carries the ability or the item. */
 export function procBoard(rules: Rules, mode: Mode, proc: Proc): Battle {
   const outfit = { [proc.kind === 'abilities' ? 'ability' : 'item']: nameOf(rules, proc.kind, proc.id) };
   const board = outfitBoard(rules, mode, { species: 'Snorlax', moves: [proc.move], ...(proc.holder === 'user' ? outfit : {}) }, { species: 'Vaporeon', ...(proc.holder === 'target' ? outfit : {}) });
@@ -60,16 +54,13 @@ export function procBoard(rules: Rules, mode: Mode, proc: Proc): Battle {
   return board;
 }
 
-/** The accuracy die forced to hit, so the hit and the procs behind it run whatever the seed gives. */
 export const hitDie = (moveId: string): ForcedDie => ({ name: { slot: 'p1a', moveId, targetSlot: 'p2a', kind: 'accuracy' }, result: { happens: true } });
 
-/** Whether the turn's lines (from `start`) mention the label, in a `[from]` argument or an `-activate` line. */
 export const mentions = (battle: Battle, start: number, label: string): boolean => battle.log.slice(start).some(line => line.includes(label));
 
 /**
- * The oracle for a proc's chance: the chance the simulator itself passes to `randomChance` while the effect's handler runs
- * (`battle.effect` is the ability or the item), read from a plain turn under a spy over the battle's stream. A seed whose turn
- * never reaches the handler (a miss) gives nothing; the caller tries several seeds.
+ * The oracle for a proc's chance: the chance the simulator itself passes to `randomChance` while the effect's handler runs (`battle.effect`
+ * is the ability or the item), read from a plain turn under a spy over the battle's stream. A seed whose turn never reaches the handler (a miss) gives nothing.
  */
 export function chanceOfEffect(board: Battle, clicks: { p1: string; p2: string }, effectId: string, play: (battle: Battle, clicks: { p1: string; p2: string }) => void): number[] {
   const battle = copyOf(board);
@@ -91,21 +82,16 @@ export function chanceOfEffect(board: Battle, clicks: { p1: string; p2: string }
 }
 
 /**
- * One die of the end of the turn: a holder (and, for Healer, the ally it cures) whose handler draws at the Residual event.
- * `setup` puts the position the handler needs (a status to shed, a berry to harvest); `witness` is the protocol line that shows
- * the effect, read from the Dex's own name or the status word, never from the module.
+ * One die of the end of the turn: a holder (and, for Healer, the ally it cures) whose handler draws at the Residual event. `setup` puts the
+ * position the handler needs (a status to shed, a berry to harvest); `witness` is the protocol line that shows the effect.
  */
 export interface EndRow {
   id: string;
   kind: 'abilities' | 'condition';
-  /** The slot the die names after the holder; an ally's slot for Healer. */
   targetSlot?: string;
-  /** Needs a partner on the field. */
   doubles?: boolean;
-  /** Applies to the rule sets whose generation passes this test, beyond the Dex's own entry. */
   only?: (rules: Rules) => boolean;
   setup(board: Battle): void;
-  /** The line that shows the effect in the turn's lines. */
   witness(rules: Rules): RegExp;
 }
 
@@ -136,7 +122,6 @@ export const END_ROWS: EndRow[] = [
   },
 ];
 
-/** Snorlax splashes; its outfit and the position come from the row. */
 export function endBoard(rules: Rules, mode: Mode, row: EndRow): Battle {
   const outfit = row.kind === 'abilities' ? { ability: nameOf(rules, 'abilities', row.id) } : {};
   const board = outfitBoard(rules, mode, { species: 'Snorlax', moves: ['splash'], ...outfit }, { species: 'Vaporeon' });

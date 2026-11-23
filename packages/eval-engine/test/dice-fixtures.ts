@@ -2,11 +2,7 @@ import type { Battle, PokemonSet } from '@pkmn/sim';
 import { set } from './move-oracle';
 import { battleOf, fingerprint } from './power-oracle';
 
-/**
- * Round 82 (forced dice): the boards the dice specs share. One scene is a small turn in every rule set the corpus plays
- * (Gens 1 to 9 and the Champions mod), singles and, from Gen 3 on, doubles. A scene whose move the generation lacks is
- * skipped, as the hook probe (lanes/A/p1-hooks.vt.ts) does.
- */
+/** The boards the dice specs share: one small turn in every rule set the corpus plays (Gens 1 to 9 and the Champions mod), singles and, from Gen 3 on, doubles. A scene whose move the generation lacks is skipped. */
 
 export interface Rules { name: string; generation: number; singles: string; doubles: string | null; level: number; evs?: PokemonSet['evs'] }
 
@@ -96,8 +92,8 @@ export const GRID_SCENES: Scene[] = [
 ];
 
 /**
- * Round 82 (gate answer 1b): the full sweeps (every move, every row, every seed) run only with `DICE_SWEEPS=full`, which the
- * final suite of a round and the upgrade check of the simulator set. Any other run plays the same small sample of each list.
+ * The full sweeps (every move, every row, every seed) run only with `DICE_SWEEPS=full` (CI's dice jobs and the simulator upgrade check).
+ * Any other run plays the same small sample of each list.
  */
 export const SWEEPS_FULL = process.env.DICE_SWEEPS === 'full';
 
@@ -117,9 +113,9 @@ export function sweepSelection<T>(items: readonly T[], sweep?: string): T[] {
 }
 
 /**
- * Round 82 (forced dice), step A4: everything a question to the simulator could leave behind on the battle it reads (AGENTS.md:
- * a stand-in that calls a Dex handler proves the live battle unchanged). `fingerprint` of `power-oracle.ts` over every body
- * of both sides, plus the turn, the start-of-turn roll, the queue and the move in flight.
+ * Everything a question to the simulator could leave behind on the battle it reads (AGENTS.md: a stand-in that calls a Dex handler proves the
+ * live battle unchanged): `fingerprint` of `power-oracle.ts` over every body of both sides, plus the turn, the start-of-turn roll, the queue
+ * and the move in flight.
  */
 export function standing(battle: Battle): string {
   const state = battle as unknown as { turn: number; quickClawRoll?: boolean; queue: { list: unknown[] }; activeMove: { id: string } | null };

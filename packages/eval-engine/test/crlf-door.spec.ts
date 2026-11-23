@@ -26,10 +26,9 @@ vi.mock('../src/branch/entry-effects.ts', async importOriginal => {
 });
 
 /**
- * Round 73 (T230, the door of T206 for the correction): correctActivesFromProtocol takes the lines of a block, and a caller that
- * cut a CRLF log at '\n' hands it lines that end in '\r'. The readers behind the door see LF only. Today every reader happens
- * to trim or to match through toId, so the board comes out the same; the door keeps that true for the next reader that anchors
- * a pattern at the line end.
+ * correctActivesFromProtocol takes the lines of a block, and a caller that cut a CRLF log at '\n' hands it lines that end in '\r'. The
+ * readers behind the door see LF only. Every reader trims or matches through toId, so the board comes out the same; the door keeps
+ * that true for the next reader that anchors a pattern at the line end.
  */
 
 const mon = (species: string, item: string, ability: string, moves: string[], spe = 0): PokemonSet => ({

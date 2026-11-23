@@ -10,12 +10,9 @@ import type { SimBattle } from '../src/branch/types';
 import { Battle, Teams, toID, type PokemonSet } from '@pkmn/sim';
 
 /**
- * Round 69, T172 (spec decision 28): when the simulator faints a body the
- * game kept, the boundary correction revives it, and the volatiles the
- * simulator wiped at the faint (Protosynthesis or Quark Drive with its best
- * stat, Leech Seed) come back, unless the protocol ended them. Battle B is
- * the game's truth (the body survives the same hit); battle A is the
- * simulator's run (the body stands at 1 HP and is knocked out).
+ * When the simulator faints a body the game kept, the boundary correction revives it, and the volatiles the simulator wiped at the
+ * faint (Protosynthesis or Quark Drive with its best stat, Leech Seed) come back, unless the protocol ended them. Battle B is the
+ * game's truth (the body survives the same hit); battle A is the simulator's run (the body stands at 1 HP and is knocked out).
  */
 
 const ivs = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
@@ -28,7 +25,6 @@ interface Scene {
   format: string;
   p1: PokemonSet[];
   p2: PokemonSet[];
-  /** The body that is knocked out, and the choices of both turns. */
   victim: string;
   turn1: string;
   turn2: string;
@@ -81,7 +77,6 @@ async function play(scene: Scene, knockOut: boolean, bare = false): Promise<SimB
   return battle;
 }
 
-/** The game's own board at the boundary: what the protocol client would hold for battle B. */
 function snapshotFrom(truth: SimBattle, log: string[] = []): TurnSnapshot {
   const side = (index: number) => ({
     name: truth.sides[index].name,
@@ -196,10 +191,8 @@ describe.each([
 });
 
 /**
- * The second half of T172: a body the simulator pulled in and the game never
- * had consumed its Booster Energy at the entry (no Sun). The game's body
- * still holds the item. A body the protocol did show keeps the game's
- * verdict: it came in without a trigger line, so the item is ruled out.
+ * A body the simulator pulled in and the game never had consumed its Booster Energy at the entry (no Sun); the game's body still holds
+ * the item. A body the protocol did show keeps the game's verdict: it came in without a trigger line, so the item is ruled out.
  */
 describe.each([
   ['singles', 'gen9ou', 1],
@@ -257,9 +250,8 @@ describe.each([
 });
 
 /**
- * A switch-out the game never saw clears the volatiles too: 752755 turn 9,
- * where the build's guessed Eject Button sent Hatterene out of the simulator
- * after a Psychic Noise that had started Heal Block, and the game kept it in.
+ * A switch-out the game never saw clears the volatiles too: 752755 turn 9, where the build's guessed Eject Button sent Hatterene out of the
+ * simulator after a Psychic Noise that had started Heal Block, and the game kept it in.
  */
 describe.each([
   ['singles', 'gen9customgame', [set('Hatterene', 'Healer', ['Splash']), set('Gliscor', 'Hyper Cutter', ['Splash'])],
@@ -373,7 +365,6 @@ describe('doubles-revival-slot', () => {
       const side = battle.sides[0];
       expect(side.active.map((pokemon, index) => side.pokemon[index] === pokemon)).toEqual([true, true]);
       expect(side.active.map(pokemon => pokemon.position)).toEqual([0, 1]);
-      // The request offers the moves of the body in the slot: the game's own request is the witness.
       expect(moveNames(battle, 0)).toEqual(moveNames(game.battle, 0));
       expect(moveNames(battle, 1)).toEqual(moveNames(game.battle, 1));
     });
@@ -429,9 +420,7 @@ describe('revived-volatiles-switch', () => {
     p2: PokemonSet[];
     turn1: string;
     turn2: string;
-    /** The bench body the simulated battle sends instead of the returning one. */
     other: string;
-    /** The protocol's block of turn 2: the voluntary switch-out, the K.O. of the replacement and the return. */
     events: string[];
   }
 

@@ -2,10 +2,7 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import type { DieKind } from '../src/dice/types';
 
-/**
- * Round 82 (forced dice), step A4: the scan and the classes of the census (dice-census.spec.ts), shared with the ability sweep,
- * which holds every die of scope here to a proc it plays.
- */
+/** The scan and the classes of the census (dice-census.spec.ts), shared with the ability sweep, which holds every die of scope here to a proc it plays. */
 const require = createRequire(import.meta.url);
 const simRoot = join(dirname(require.resolve('@pkmn/sim')), '..');
 
@@ -35,7 +32,6 @@ function sources(): Source[] {
   ];
 }
 
-/** A call of the simulator's PRNG, whitespace folded: `randomChance(3, 10)`, `random(2, 5)`, `sample(stats)`. */
 export const DRAW = /\.(randomChance|random|sample|shuffle)\(((?:[^()]|\([^()]*\))*)\)/g;
 
 function handlersOf(value: unknown, path: string, out: [string, string][], depth = 0): void {
@@ -48,10 +44,9 @@ function handlersOf(value: unknown, path: string, out: [string, string][], depth
 }
 
 /**
- * Round 82 (forced dice), step A7e: the abilities and items whose handlers read `battle.activeMove`, directly or through a volatile
- * they add whose condition does (a Choice item adds `choicelock`). The simulator sets the move in flight in `runMove` before
- * `BeforeMove` and `ModifyMove`, so a stand-in that raises such a handler on a copy must set it too. `throwing` marks the entries
- * that throw "Battle.activeMove is null" when it is not set. Read from the data tables, not from a list of names.
+ * The abilities and items whose handlers read `battle.activeMove`, directly or through a volatile they add whose condition does (a Choice
+ * item adds `choicelock`). The simulator sets the move in flight in `runMove` before `BeforeMove` and `ModifyMove`, so a stand-in that
+ * raises such a handler on a copy must set it too. `throwing` marks the entries that throw "Battle.activeMove is null" when it is not set.
  */
 export function activeMoveReaders(): { kind: 'abilities' | 'items'; id: string; throwing: boolean }[] {
   const sourceOf = (value: unknown, depth = 0): string => {
@@ -84,7 +79,6 @@ export function activeMoveReaders(): { kind: 'abilities' | 'items'; id: string; 
   return [...found.values()];
 }
 
-/** Every handler with a draw: `table/entry/handler` mapped to the sorted distinct calls it makes, across all sources. */
 export function scan(): Map<string, Set<string>> {
   const found = new Map<string, Set<string>>();
   for (const source of sources()) {
@@ -111,9 +105,8 @@ export function scan(): Map<string, Set<string>> {
 
 export type Scope = 'action' | 'turn-order' | 'end-of-turn' | 'out';
 /**
- * `kind` is the kind of die the module names for the draw (a `DieKind`), or `pick` and `duration` for the draws that stay out.
- * `open` marks a draw in scope that no kind names yet: the reason says why and what the user sees (nothing is offered, the draw
- * follows the stream).
+ * `kind` is the kind of die the module names for the draw (a `DieKind`), or `pick` and `duration` for the draws that stay out. `open` marks a
+ * draw in scope that no kind names yet: the reason says why and what the user sees (nothing is offered, the draw follows the stream).
  */
 export interface Class { scope: Scope; kind: DieKind | 'pick' | 'duration'; calls: string[]; open?: string }
 
@@ -135,21 +128,17 @@ export const CLASSES: Record<string, Class> = {
   'abilities/poisontouch/onSourceDamagingHit': proc('randomChance(3, 10)'),
   'abilities/toxicchain/onSourceDamagingHit': proc('randomChance(3, 10)'),
   'items/focusband/onDamage': { scope: 'action', kind: 'item-proc', calls: ['randomChance(1, 10)', 'randomChance(30, 256)'] },
-  // the end of the turn: the Residual event of the holder
   'abilities/harvest/onResidual': end('randomChance(1, 2)'),
   'abilities/healer/onResidual': end('randomChance(1, 2)', 'randomChance(3, 10)'),
   'abilities/shedskin/onResidual': end('randomChance(33, 100)'),
   'conditions/frz/onResidual': end('randomChance(25, 256)'),
-  // the order of the turn: a holder that acts first in its bracket
   'abilities/quickdraw/onFractionalPriority': first('randomChance(3, 10)'),
   'items/quickclaw/onBeforeTurn': first('randomChance(1, 5)'),
   'items/quickclaw/onFractionalPriority': first('randomChance(1, 5)'),
-  // the check of the body about to move (a condition's BeforeMove handler)
   'conditions/confusion/onBeforeMove': check('randomChance(1, 2)', 'randomChance(128, 256)', 'randomChance(33, 100)'),
   'conditions/frz/onBeforeMove': check('randomChance(1, 4)', 'randomChance(1, 5)'),
   'conditions/par/onBeforeMove': check('randomChance(1, 4)', 'randomChance(1, 8)', 'randomChance(63, 256)'),
   'moves/attract/condition.onBeforeMove': check('randomChance(1, 2)'),
-  // a stalling move that succeeds again
   'conditions/stall/onStallMove': { scope: 'action', kind: 'stalling', calls: ['randomChance(1, 2 ** 32)', 'randomChance(1, counter)', 'randomChance(counter, 255)'] },
   // the Champions bundle's own hit loop: the count of a multi-hit move and the accuracy of each hit of a multi-accuracy move
   'scripts/actions/hitStepMoveHitLoop': {

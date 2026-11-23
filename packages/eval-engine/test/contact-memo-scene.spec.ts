@@ -6,19 +6,15 @@ import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
 /**
- * Round 72 (T257): the contact-cost memo of score/contact.ts answers one hit for every board that shares the pair's
- * own bodies, the field and the move. The played hit reads more than that: the other actives of the board take part
- * in it (a Ruin ability lowers a stat of every other body on the field, Friend Guard, Power Spot, Helping Hand and the
- * like reach the hit through an ally). The memo lives in every web worker, so a hit's answer came from whichever board
- * reached the worker first, and the evaluation of gen9vgc2026regi-2630685175 turn 1 (Chien-Pao with Sword of Ruin on
- * both sides) changed from run to run in the browser. Here the same two boards are read in both orders: each reading
- * must equal the hit played without a memo, whichever board came first.
+ * The contact-cost memo of score/contact.ts answers one hit for every board that shares the pair's own bodies, the field and the move.
+ * The played hit reads more: the other actives take part (a Ruin ability lowers a stat of every other body on the field, Friend
+ * Guard, Power Spot and Helping Hand reach the hit through an ally). The memo lives in every web worker, so the answer must not depend
+ * on which board reached the worker first (gen9vgc2026regi-2630685175 turn 1, Chien-Pao with Sword of Ruin on both sides). The same
+ * two boards are read in both orders: each reading must equal the hit played without a memo.
  *
- * The abilities come from the Dex: every ability with a handler for an event of another body on the field (onAny,
- * onAlly, onFoe). The sweep runs a physical recoil move (the cost follows the damage) on a doubles board of Scarlet and
- * Violet and of the Champions mod, with the ability on the attacker's partner and on the defender's partner.
- *
- * T257 is fixed in score/contact.ts: the key carries the side and position of the pair and the key of every other active.
+ * The abilities come from the Dex: every ability with a handler for an event of another body on the field (onAny, onAlly, onFoe).
+ * The sweep runs a physical recoil move (the cost follows the damage) on a doubles board of Scarlet/Violet and of the Champions mod,
+ * with the ability on the attacker's partner and on the defender's partner.
  */
 
 await loadSimMods('gen9championscustomgame');

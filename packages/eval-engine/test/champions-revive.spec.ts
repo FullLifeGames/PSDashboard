@@ -4,10 +4,9 @@ import { deserializeBattleExact } from '../src/forward/serialize';
 import { loadSimModsFor } from '../src/forward/sim-mods';
 
 /**
- * Round 67 (T145): a realm that only revives positions (an evaluation worker, the branch view's adopt, the move
- * picker) loads the Champions mod from the position itself before it deserializes one: `await
- * loadSimModsFor(serialized)` is the one call such a host needs. In a module graph of its own (vitest isolates files),
- * so nothing loaded the mod before. The positions are the two replay fixtures' turn-3 boundaries.
+ * A realm that only revives positions (an evaluation worker, the branch view's adopt, the move picker) loads the Champions mod from
+ * the position itself before it deserializes one: `await loadSimModsFor(serialized)`. In a module graph of its own (vitest isolates
+ * files), so nothing loaded the mod before. The positions are the two replay fixtures' turn-3 boundaries.
  */
 const POSITIONS = {
   singles: 'gen9championsou-2693832490-t3',

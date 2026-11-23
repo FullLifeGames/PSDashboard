@@ -6,12 +6,10 @@ import { copyOf } from '../src/sim-ask/copy';
 import { playClicks, type Mode, type Rules } from './dice-fixtures';
 import { clicksAccepted, dexOfRules, outfitBoard, SWEEP_CASES, sweepClicks, sweepMoves, type DexMove } from './dice-sweep-support';
 
-// Round 89 (#114, ruling 34 F4a): a holder whose ability or item fixes the hit count of a variable multi-hit move (Skill Link, Loaded
-// Dice) gets one row without a choice: the offer carries a die of the kind `hit-count` with the one count the simulator plays and
-// `fixedBy`, the name of the ability or item from the Dex. The oracle plays the turn on copies with six seeds and reads `|-hitcount|`:
-// the offer names a fixed count exactly when every played count is one value. For every ability and item of the Dex that has an
-// `onModifyMove` handler (the only entries that can rewrite a move), every variable move (a range of hits, or the Dex flag
-// `multiaccuracy`), in every rule set the corpus plays, singles and doubles.
+// A holder whose ability or item fixes the hit count of a variable multi-hit move (Skill Link, Loaded Dice) gets one row without a choice: a die
+// of the kind `hit-count` with the one count the simulator plays and `fixedBy`, the name from the Dex. The oracle plays the turn on copies with
+// six seeds and reads `|-hitcount|`: the offer names a fixed count exactly when every played count is one value, over every ability and item
+// with an `onModifyMove` handler (the only entries that can rewrite a move) and every variable move (a range of hits, or `multiaccuracy`).
 await loadSimMods('gen9championsou');
 
 const FAST = 'Pikachu';
@@ -24,7 +22,6 @@ const variable = (move: DexMove): boolean => {
 
 type Holder = { kind: 'abilities' | 'items'; id: string; name: string };
 
-/** The abilities and items of the rule set whose handler can rewrite a move. */
 function rewriters(rules: Rules): Holder[] {
   const dex = dexOfRules(rules);
   const keep = (entry: { exists: boolean; gen: number; isNonstandard?: string | null }): boolean => entry.exists && entry.gen <= dex.gen && !entry.isNonstandard;
@@ -35,7 +32,6 @@ function rewriters(rules: Rules): Holder[] {
   ];
 }
 
-/** The counts of the `|-hitcount|` lines the turn shows on copies of the board, one entry per seed that landed the move. */
 function playedCounts(board: ReturnType<typeof outfitBoard>, clicks: { p1: string; p2: string }): number[] {
   return SEEDS.flatMap(seed => {
     const copy = copyOf(board);

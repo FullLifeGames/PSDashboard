@@ -9,22 +9,16 @@ import { battleOf } from './power-oracle';
 import { mon } from './dice-fixtures';
 
 /**
- * Round 89 (P1): the readers of the delay facts. The facts (`endgame/delay-facts.ts`) drop the PP of every slot, a slot's `used` flag,
- * the last-move group, the entry counters' exact values and the switch-in order, because a held turn writes them and no later turn
- * reads them, unless an entry on the board reads them. This file holds that claim against the installed @pkmn/sim and @pkmn/mods:
- *  1. Which Dex entries read each dropped field, per rule set (Gens 1 to 9 and the Champions mod), pinned as lists: a new reader in an
- *     updated simulator fails here and has to be classified before the facts may drop its field.
- *  2. Every line of the played builds that reads a dropped field belongs to a detected entry, or is a core read pinned below with its reason.
- *  3. The reads that survive the clamp of the two counters.
- *  4. A fallen body's entries are no entry of the board (round 89, P2), unless a standing body may revive it.
- * The sweep rows over the rule sets are in `delay-facts-sweep.spec.ts`.
+ * The facts (`endgame/delay-facts.ts`) drop the PP of every slot, a slot's `used` flag, the last-move group, the entry counters' exact values
+ * and the switch-in order, because a held turn writes them and no later turn reads them, unless an entry on the board reads them. The Dex
+ * entries that read each dropped field are pinned as lists per rule set: a new reader in an updated simulator fails here and has to be
+ * classified before the facts may drop its field. The sweep rows over the rule sets are in `delay-facts-sweep.spec.ts`.
  */
 await loadSimMods('gen9championsou');
 
 const DEXES = RULES.map(rules => dexOfRules(rules));
 const KINDS: EntryKind[] = ['move', 'ability', 'item', 'condition'];
 
-/** Every entry id of every rule set that the reader of the module flags for `flag`. */
 function detected(flag: keyof DelayReads): string[] {
   const found = new Set<string>();
   for (const dex of DEXES) {
@@ -104,7 +98,6 @@ describe('the simulator reads a dropped field only where the facts keep it (sour
   };
   const ENTRY = /^( {2}| {4})"?([a-z0-9]+)"?: \{\s*$/;
 
-  /** The core lines of one field, by file: the lines whose entry is not flagged (or no entry), with the reads the clamp keeps counted out. */
   function remaining(name: string): Record<string, number> {
     const { token, flag, field } = FIELD_TOKENS[name];
     const flagged = flag ? new Set(detected(flag)) : new Set<string>();
@@ -125,7 +118,7 @@ describe('the simulator reads a dropped field only where the facts keep it (sour
   }
 
   /**
-   * What the pinned core reads are (reviewed in P1 against the installed 0.10.15 builds):
+   * What the pinned core reads are (reviewed against the installed 0.10.15 builds):
    *  - pp: `Pokemon.deductPP`, the Gen 1 and Gen 3 PP scripts and the move runner's `deductPP` call; the reads of "no PP left" (`pp <= 0`
    *    disables a move, Struggle follows) in `getMoves`, the Z-move request, the stalemate test of Gen 1 and `calculatePP`. The margin
    *    (`stallMargin`) keeps the own clicks above zero, and a foe slot that reaches zero only takes an option from the foe. The Champions
@@ -182,7 +175,6 @@ describe('the simulator reads a dropped field only where the facts keep it (sour
 });
 
 describe('an entry on the board keeps the field it reads', () => {
-  /** One board per rule set, a body of each side, and the entry put on the first body in the place its kind lives in. */
   function boardWith(rules: (typeof RULES)[number], kind: EntryKind, id: string): ReturnType<typeof battleOf> {
     const board = battleOf(rules.singles, [mon(rules, { species: 'Snorlax', moves: ['tackle', 'splash'] })], [mon(rules, { species: 'Vaporeon', moves: ['splash'] })]);
     const body = board.sides[0].active[0];
@@ -234,8 +226,8 @@ describe('an entry on the board keeps the field it reads', () => {
 });
 
 describe('a body that has fainted keeps no entry on the board unless a revive is possible', () => {
-  // Champions VGC 2682637901 turn 6 (P2): the foe's fallen Whimsicott carries Encore, a reader of PP and of the last move; counted as an entry
-  // on the board it kept the PP of every standing body a fact, and no held Protect was ever a delay there
+  // Champions VGC 2682637901 turn 6: the foe's fallen Whimsicott carries Encore, a reader of PP and of the last move; counted as an entry on
+  // the board it kept the PP of every standing body a fact, and no held Protect was ever a delay there.
   describe.each(RULES.filter(rules => rules.generation >= 2))('$name', rules => {
     const dex = dexOfRules(rules);
     const playable = (move: ReturnType<typeof dex.moves.get>): boolean => move.exists && move.gen <= dex.gen && (move.isNonstandard === null || move.isNonstandard === undefined || move.isNonstandard === 'Past');

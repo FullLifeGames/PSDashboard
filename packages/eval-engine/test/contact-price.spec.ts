@@ -4,13 +4,11 @@ import { raceClocks } from '../src/score/races';
 import { NO_COST, type HitCost, type StatusCost } from '../src/score/contact';
 
 /**
- * 13.10.2026 (the Swords Dance report on gen9draft-2058494320, the contact punishments): how the reading of one hit
- * (score/contact.ts) enters a race. The chip of a hit is paid right after the hit, for every hit: the side that moves
- * first has paid t chips when the other side lands its t-th hit, the side that moves second t - 1 (a buffer of one chip of
- * HP gives the clock of that). A status chance compounds over the hits: a status that lands on hit j takes its chip at the
- * end of the turns j to the turn before the other side's last hit and changes the damage of the hits after j. The oracle
- * here lists every way the statuses can land, hit by hit, with its probability; the clock tests hold the chip to the
- * exact turn-by-turn race of two sides.
+ * How the reading of one hit (score/contact.ts) enters a race. The chip of a hit is paid right after the hit, for every hit: the side
+ * that moves first has paid t chips when the other side lands its t-th hit, the side that moves second t - 1. A status chance
+ * compounds over the hits: a status that lands on hit j takes its chip at the end of the turns j to the turn before the other
+ * side's last hit and changes the damage of the hits after j. The oracle lists every way the statuses can land, hit by hit, with its
+ * probability; the clock tests hold the chip to the exact turn-by-turn race of two sides.
  */
 
 const status = (name: string, chance: number, chip: number, output: number): StatusCost => ({ status: name, chance, chip, output });
@@ -53,10 +51,7 @@ describe('the chip of a hit is paid for every hit, and the side that moves secon
     expect(priceHit(chip, 2, turns, false)).toEqual({ residual: 0.12, output: 1, buffer: 0.12 });
   });
 
-  /**
-   * The race turn by turn: Y hits X for `hit` a turn and X pays `chip` after each hit of its own, `first` says who moves
-   * first. The turn Y kills X is the first t where X's HP is gone before X's next action.
-   */
+  /** The race turn by turn: Y hits X for `hit` a turn and X pays `chip` after each hit of its own; X dies at the first t where its HP is gone before its next action. */
   function turnsToKill(hp: number, hit: number, chip: number, xFirst: boolean): number {
     for (let turn = 1; turn < 100; turn++) {
       const chipsPaid = xFirst ? turn : turn - 1;

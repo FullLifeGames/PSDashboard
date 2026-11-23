@@ -16,21 +16,18 @@ import { serializeLiveBattle } from '../src/serialize';
 import { parseRevealedTeraSpecies, resolveTeraPreference } from '../src/tera';
 
 /**
- * Round 70 (T206 for the engine): a log with Windows line endings reads like the same log with LF at every exported function that takes
- * a log. The engine split logs at '\n' in a dozen places and kept the '\r' on every line: the lead reader found no `|start`, the
- * turn reader no `|turn|N`, and the click behind an Encore compared "Encore\r" with "Encore". replay-core normalizes once at each of
- * its doors (packages/replay-core/src/line-endings.ts). This package does the same with its own copy, because replay-core's barrel
- * does not export that helper. The fixtures are real replays, singles and doubles, each read from its LF text and its CRLF twin. The
- * Encore scenes are the rebuild's synthetic logs (runtime.active-correction.spec.ts).
+ * A log with Windows line endings reads like the same log with LF at every exported function that takes a log. Split at '\n', every
+ * line keeps its '\r': the lead reader found no `|start`, the turn reader no `|turn|N`, and the click behind an Encore compared
+ * "Encore\r" with "Encore". replay-core normalizes once at each of its doors (packages/replay-core/src/line-endings.ts); this package does
+ * the same with its own copy, because replay-core's barrel does not export that helper. The fixtures are real replays, singles and
+ * doubles, each read from its LF text and its CRLF twin. The Encore scenes are the rebuild's synthetic logs (runtime.active-correction.spec.ts).
  */
 
 const lfOf = (text: string) => text.replace(/\r\n?/g, '\n');
 const crlfOf = (text: string) => lfOf(text).replace(/\n/g, '\r\n');
-/** The lines of a CRLF log cut at '\n': each one keeps its '\r'. */
 const withCr = (lines: string[]) => lines.map(line => `${line}\r`);
 const replayOf = (name: string) => JSON.parse(readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf-8')) as ReplayData;
 
-/** Real replays with what the readers below look at: Terastallization, a handed item, consumed items, a faint count that tells sacks. */
 const FIXTURES = {
   'singles: Trick and a Bisharp (Gen 6 OU)': 'smogtours-gen6ou-655336.json',
   'singles: Tera, a handed item (Gen 9 OU)': 'smogtours-gen9ou-751536.json',
@@ -85,10 +82,9 @@ describe('the readers of a log read a CRLF log like the LF log (T206)', () => {
 
 /**
  * The readers that take a turn's lines instead of the log sit on the barrel, and a caller that splits a CRLF log at '\n' hands them
- * lines that still end in '\r'. Read that way, detectSacks found no faint (its pattern ends at the line end), detectRolls flipped the
- * KO flag of a hit and a dice marker, parsePlayedActions printed the reason "flinch\r", and diceEventTurns dropped turns; each answer
- * was wrong without a word. allTurnEvents and the snapshots cut their lines from a normalized log, so the app never hands a '\r' in;
- * a library user can. Each of these readers settles the line endings at its own door.
+ * lines that still end in '\r': detectSacks found no faint (its pattern ends at the line end), detectRolls flipped the KO flag of a
+ * hit and a dice marker, parsePlayedActions printed the reason "flinch\r", and diceEventTurns dropped turns. The app never hands a '\r'
+ * in (allTurnEvents and the snapshots cut their lines from a normalized log); a library user can. Each reader settles the line endings at its own door.
  */
 describe('the readers of a turn\'s lines tolerate the "\\r" a CRLF log leaves on each line (T206)', () => {
   for (const [name, file] of Object.entries(FIXTURES)) {
@@ -138,7 +134,6 @@ describe('normalizeLines, the door of those readers (T206)', () => {
   test('one trailing "\\r" leaves each line that has one, and a "\\r" inside a line stays', () => {
     const lines = ['|turn|2\r', '|upkeep', '|cant|p1a: A|slp\r', '|c|a\rb', '\r'];
     expect(normalizeLines(lines)).toEqual(['|turn|2', '|upkeep', '|cant|p1a: A|slp', '|c|a\rb', '']);
-    // The input stays as it was.
     expect(lines[0]).toBe('|turn|2\r');
   });
 });
@@ -182,9 +177,7 @@ const DOUBLES_ENCORE = [
   ...encoreTurns('p1b', 'p2b'),
 ].join('\n');
 
-/** Protocol lines without the wall-clock `|t:|` stamps two runs may straddle. */
 const withoutTimestamps = (log: string[]) => log.filter(line => !line.startsWith('|t:|'));
-/** The battle minus the sim's log bookkeeping, as adopt-runtime.spec.ts compares them. */
 function comparable(runtime: BranchRuntime): string {
   const state = JSON.parse(serializeLiveBattle(runtime.battleStream.battle!)) as Record<string, unknown>;
   delete state.sentLogPos;

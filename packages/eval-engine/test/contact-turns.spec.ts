@@ -7,14 +7,12 @@ import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
 /**
- * T225 (round 73): paralysis and sleep take turns, not HP, so a hit that leaves them costs the attacker the share of
- * its next turns on which it cannot move. The reader plays the turns on a copy of the hit (BeforeMove of the attacker
- * with the status on it) and hands the race the share of turns the body acts on, turn by turn after the hit landed
- * (`acts`). Every claim is held to real turns of the simulator: a body that carries the status clicks a move for four
- * turns on 200 seeds, and the share of seeds on which the move runs is the oracle. A status that never stops a move
- * (a burn, poison) carries no profile, and the sweep over the foe's items and abilities in both modes checks every
- * status the reader finds against the simulator, so that a status of a later version of the simulator that stops a
- * move cannot slip in unpriced.
+ * Paralysis and sleep take turns, not HP, so a hit that leaves them costs the attacker the share of its next turns on which it cannot
+ * move. The reader plays the turns on a copy of the hit (BeforeMove of the attacker with the status on it) and hands the race the
+ * share of turns the body acts on (`acts`). The oracle is real simulator turns: a body that carries the status clicks a move for four
+ * turns on 200 seeds, and the share of seeds on which the move runs is the share. A status that never stops a move (a burn, poison)
+ * carries no profile; the sweep over the foe's items and abilities in both modes checks every status the reader finds, so a status
+ * of a later simulator that stops a move cannot slip in unpriced.
  */
 
 await loadSimMods('gen9championscustomgame');
@@ -35,7 +33,6 @@ const MODES: Mode[] = [
 
 const seedOf = (index: number) => `${index * 97 + 1},${index * 31 + 7},${index * 53 + 3},${index * 11 + 5}`;
 
-/** One game type's board and its clicks: in doubles each side brings a Splashing partner. */
 interface Shape { name: string; format: (mode: Mode) => string; board: (mode: Mode, seed: string, defender: PokemonSet, move?: string) => Battle; p1: string; p2: string }
 const SINGLES: Shape = {
   name: 'singles',
@@ -52,7 +49,6 @@ const DOUBLES: Shape = {
 
 const oracles = new Map<string, number[]>();
 
-/** The share of seeds on which a body that carries `status` runs its move, on each of its next turns, from real turns. */
 function oracleOf(mode: Mode, shape: Shape, status: string): number[] {
   const key = `${mode.name}|${shape.name}|${status}`;
   let shares = oracles.get(key);

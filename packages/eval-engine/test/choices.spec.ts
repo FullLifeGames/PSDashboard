@@ -11,14 +11,10 @@ import { Battle, State, Teams, toID } from '@pkmn/sim';
 import { createRootPosition as createRootPositionFromRevivalBlessing } from '../src/forward-model';
 
 /**
- * Round 72 (T246): a Tatsugiri that commands a Dondozo passes its slot, and the simulator hands the first part of a doubles
- * choice to the Dondozo (side.js getChoiceIndex skips fainted and commanding actives). The search's doubles choices gave
- * the commanding slot a move of its own, so every choice of that side was rejected ("Your Dondozo doesn't have a move
- * matching dracometeor", "You sent more choices than unfainted Pokémon") and the position was lost to a search error
- * (two of 1,123 VGC holdout positions). Held here against the simulator: every choice legalChoices offers is played on a
- * copy of the battle, with Commander active for either side or both and the Tatsugiri in slot a and in slot b, in both
- * rule sets. Singles is not affected (Commander's onUpdate returns outside doubles): one row shows the Tatsugiri keeps its
- * own moves there.
+ * A Tatsugiri that commands a Dondozo passes its slot, and the simulator hands the first part of a doubles choice to the Dondozo
+ * (side.js getChoiceIndex skips fainted and commanding actives). Held against the simulator: every choice legalChoices offers is
+ * played on a copy of the battle, with Commander active for either side or both and the Tatsugiri in slot a and in slot b, in both
+ * rule sets. Singles is not affected (Commander's onUpdate returns outside doubles): one row shows the Tatsugiri keeps its own moves there.
  */
 
 await loadSimMods('gen9championsou');
@@ -48,7 +44,6 @@ describe.each(RULES)('$name: the search offers a choice the simulator accepts fo
   const board = (commanders: ('p1' | 'p2')[], tatsugiriFirst: boolean): Battle =>
     battleOf(rules.format, team(tatsugiriFirst, commanders.includes('p1')), team(tatsugiriFirst, commanders.includes('p2')));
 
-  /** Every choice of the side, each played on its own copy of the position; the simulator's message for each rejection. */
   function rejections(battle: Battle, side: 'p1' | 'p2'): { offered: string[]; rejected: string[] } {
     const position = createRootPosition(serializeBattleStable(battle));
     const offered = legalChoices(position, side).map(option => option.choice);
@@ -84,7 +79,6 @@ describe.each(RULES)('$name: the search offers a choice the simulator accepts fo
           const parts = new Set(offered.map(choice => choice.split(',').length));
           expect([...parts]).toEqual([commanding ? 1 : 2]);
           if (!commanding) continue;
-          // The Dondozo's own moves are what the choice names: the request entry is the simulator's witness.
           const request = sideState.activeRequest as { active?: { moves: { id?: string }[] }[] } | null;
           const dondozoMoves = new Set((request?.active?.[tatsugiriFirst ? 1 : 0]?.moves ?? []).map(move => move.id));
           expect(dondozoMoves.size).toBeGreaterThan(0);

@@ -9,11 +9,8 @@ import { phrase } from '../src/prose/phrases';
 import { seedPhrase } from '../src/win-reason';
 
 /**
- * Round 64 (T123 point 10): detection keeps the side's first sack-shaped
- * faint and skipped every later faint of the side, so a turn that cost two
- * bodies read as one (corpus: 2663093831 t11, 2630685175 t4, 912045 t1,
- * 653785 t26). The verdict still reads the first faint (P2: no faint of the
- * four would earn a different one); the sentence now names the others.
+ * Detection reads every sack-shaped faint of a side, not only the first (corpus: 2663093831 t11, 2630685175 t4, 912045 t1,
+ * 653785 t26). The verdict still reads the first faint (no faint of the four would earn a different one); the sentence names the others.
  */
 
 const mon = (name: string, speciesForme: string, hpPercent: number, isActive: boolean) => ({
@@ -46,7 +43,6 @@ describe('point 10: a sack names the other bodies the side lost on the turn', ()
       [mon('Gholdengo', 'Gholdengo', 100, true)],
       [mon('Ogerpon', 'Ogerpon-Cornerstone', 9, true), mon('Rillaboom', 'Rillaboom', 78, true)],
     );
-    // Round 67 (T135 point 1): the other faint's shape rides along for the verdict.
     expect(detectSacks(events, before, logRules('')).p2).toEqual({
       name: 'Ogerpon', species: 'Ogerpon-Cornerstone', hpFraction: 0.09, alsoFell: ['Rillaboom'],
       others: [{ name: 'Rillaboom', species: 'Rillaboom', hpFraction: 0.78, stayed: true }],

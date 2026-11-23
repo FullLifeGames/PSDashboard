@@ -6,14 +6,11 @@ import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
 /**
- * 13.10.2026 (the contact punishments of boostsBiting): the reader plays a hit only for a pair where something could
- * cost the attacker, and that decision reads the Dex (a handler for the hit on the foe's item or ability, one for the
- * attacker's own move on its item or ability, a recoil field on the move) and plays the one move the Dex does not
- * describe (a move whose cost the simulator codes and does not list) on a bare pair, never a name. This spec holds the
- * decision to the simulator over the whole Dex of generation 9 and over the Champions mod's own Dex: wherever the
- * played hit costs the attacker HP or leaves it a status, the decision said so. A new item, ability or move in a later
- * version of the simulator that breaks the rule fails here (Chloroblast, whose recoil lives in the simulator's code, is
- * the move that found the probe).
+ * The reader plays a hit only for a pair where something could cost the attacker, and that decision reads the Dex (a handler for the
+ * hit on the foe's item or ability, one for the attacker's own move on its item or ability, a recoil field on the move) and plays
+ * the one move the Dex does not describe (a move whose cost the simulator codes and does not list) on a bare pair, never a name.
+ * Held to the simulator over the whole Dex of generation 9 and the Champions mod's: wherever the played hit costs the attacker HP
+ * or leaves it a status, the decision said so (Chloroblast, whose recoil lives in the simulator's code, is the move that found the probe).
  */
 
 await loadSimMods('gen9championscustomgame');
@@ -32,7 +29,6 @@ const costs = (cost: HitCost): boolean => cost.chip !== 0 || cost.statuses.lengt
 
 interface Scene { name: string; attacker: PokemonSet; defender: PokemonSet; move: string }
 
-/** Every scene of one role: the effect on the foe's side or on the attacker's, a contact move so that the foe's reactions can fire. */
 function scenes({ dex, extra }: Mode): Scene[] {
   const list: Scene[] = [];
   const attacker = (more: Partial<PokemonSet> = {}) => set('Cobalion', ['ironhead', 'splash'], { ...extra, ...more });
@@ -55,7 +51,6 @@ function scenes({ dex, extra }: Mode): Scene[] {
 interface Result { scene: Scene; cost: HitCost; may: boolean }
 const swept = new Map<string, Result[]>();
 
-/** The whole sweep of a mode, played once for the specs below. */
 function sweep(mode: Mode): Result[] {
   let results = swept.get(mode.name);
   if (!results) {

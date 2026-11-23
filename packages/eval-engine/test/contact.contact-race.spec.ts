@@ -11,12 +11,10 @@ import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
 /**
- * 13.10.2026 (the Swords Dance report on gen9draft-2058494320: Cobalion's contact moves into Talonflame meet Flame
- * Body, and the race did not know contact punishments): what a hit costs its attacker enters the races of boostsBiting.
- * The cost is read from the simulator (score/contact.ts, held to the simulator in contact.spec.ts) and priced by
- * score/contact-price.ts: the chip of every hit after which the race goes on joins the attacker's residual, a status
- * chance compounds over the hits into expected end-of-turn damage and expected lost damage. This spec holds the whole
- * path to turns of the simulator and to boards where the stage's verdict flips with the cost and nowhere else.
+ * What a hit costs its attacker enters the races of boostsBiting (Cobalion's contact moves into Talonflame meet Flame Body). The cost
+ * is read from the simulator (score/contact.ts, held to it in contact.spec.ts) and priced by score/contact-price.ts: the chip of every
+ * hit after which the race goes on joins the attacker's residual, a status chance compounds over the hits into expected end-of-turn
+ * damage and expected lost damage. Held to turns of the simulator and to boards where the stage's verdict flips with the cost and nowhere else.
  */
 
 await loadSimMods('gen9championscustomgame');
@@ -25,7 +23,6 @@ const SINGLES = 'gen9customgame';
 const DOUBLES = 'gen9doublescustomgame';
 const splash = (species: string, extra: Partial<PokemonSet> = {}) => set(species, ['splash'], extra);
 const GARCHOMP = (extra: Partial<PokemonSet> = {}) => set('Garchomp', ['crunch', 'splash'], extra);
-/** Faster than Garchomp, with one contact attack that Garchomp feels as a third of its HP. */
 const WEAVILE = (extra: Partial<PokemonSet> = {}) => set('Weavile', ['knockoff', 'splash'], extra);
 
 beforeEach(() => resetHitMemo());
@@ -35,7 +32,6 @@ const best = (battle: Battle, attacker: Pokemon, victim: Pokemon) => {
   return Math.max(threat.physical, threat.special);
 };
 
-/** HP (points) at which `hits` hits of the attacker's best move on no stages take the victim. */
 const hpAt = (battle: Battle, attacker: Pokemon, victim: Pokemon, hits: number) => {
   const share = hits * best(battle, attacker, victim);
   if (share > 1) throw new Error(`${hits} hits of ${attacker.name} are ${share.toFixed(2)} of ${victim.name}'s max HP`);
@@ -46,7 +42,6 @@ function sideValue(battle: Battle): number {
   return boostBiteValue(battle.sides[0], 0, battle, threatGetter(battle, createMatchupCache('standard')));
 }
 
-/** One turn of the simulator: both sides click their first move (doubles: the lead at the foe's first slot). */
 function turn(battle: Battle): void {
   const doubles = battle.gameType === 'doubles';
   battle.choose('p1', doubles ? 'move 1 1, move 1' : 'move 1');
@@ -71,7 +66,6 @@ function race(own: Partial<PokemonSet> = {}, other: Partial<PokemonSet> = {}, fo
 
 const STAGE = () => stageValue(mine(race()), 'atk', 2);
 
-/** The held race of the holder and the foe in front of it, as boostsBiting runs it. */
 function held(battle: Battle) {
   const threat = threatGetter(battle, createMatchupCache('standard'));
   return pairRace(mine(battle), theirs(battle), battle, threat, raceBodies(battle, residualReader(battle)), hitReader(battle)).held;
@@ -331,7 +325,6 @@ describe('nothing changes where nothing punishes', () => {
 const MOVE = 'crunch';
 const FORMATS = ['gen9doublescustomgame', 'gen9championsdoublescustomgame'] as const;
 
-/** The reaction of the defender and the side the gas stands on: next to the attacker, or next to the defender. */
 const REACTIONS = ['Rough Skin', 'Static', 'Flame Body'] as const;
 
 function board(format: string, reaction: string, gasOn: 'attacker' | 'defender' | null): Battle {

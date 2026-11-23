@@ -17,12 +17,9 @@ import { serializeBattleStable } from '../src/forward-model';
 import { loadSimMods } from '../src/forward/sim-mods';
 
 /**
- * Round 64 (T121): the board holds the items the protocol shows. Every item
- * line makes a body's item known (a move's, an ability's, the item's own);
- * an item the sim's move or ability took from a body the protocol never
- * touched comes back; and the team preview's "(has item)" marker says only
- * that a body holds something, so a guessed Choice item behind it still has
- * to survive the damage check.
+ * The board holds the items the protocol shows. Every item line makes a body's item known (a move's, an ability's, the item's own); an
+ * item the sim's move or ability took from a body the protocol never touched comes back; and the team preview's "(has item)" marker
+ * says only that a body holds something, so a guessed Choice item behind it still has to survive the damage check.
  */
 
 const log = (lines: string[]) => lines.join('\n');
@@ -36,8 +33,7 @@ const set = (species: string, item: string, moves: string[]): PokemonSet => ({
 });
 
 describe('the preview marker is no reveal (point 1)', () => {
-  // The 0.55 Hydro Pump fraction sits inside the unboosted band and outside
-  // the Choice Specs band (choice-lock.spec.ts measures the bands).
+  // The 0.55 Hydro Pump fraction sits inside the unboosted band and outside the Choice Specs band (choice-lock.spec.ts measures the bands).
   const teams = {
     p1Team: [set('Keldeo', 'Choice Specs', ['Hydro Pump'])],
     p2Team: [set('Mew', '', ['Protect'])],
@@ -78,11 +74,9 @@ describe('the preview marker is no reveal (point 1)', () => {
     const built = buildTeamsFromReplay(replay.log, { observations: seen, speedOrders, usageStats });
     const keldeo = built.p1Team.find(entry => entry.species === 'Keldeo')!;
     expect(keldeo.item).toBe('Choice Specs');
-    // The team preview marks Keldeo as holding something; the build guessed
-    // Choice Specs. Its 60% Hydro Pump into Tornadus-Therian fits Specs only if
-    // Tornadus holds the Assault Vest the build guessed for it (round 69, T193:
-    // the defender's item range), so the record is ambiguous; where the log
-    // rules that Vest out, the damage record contradicts the Specs as before.
+    // The team preview marks Keldeo as holding something; the build guessed Choice Specs. Its 60% Hydro Pump into Tornadus-Therian fits
+    // Specs only if Tornadus holds the Assault Vest the build guessed for it, so the record is ambiguous; where the log rules that Vest
+    // out, the damage record contradicts the Specs.
     const tornadus = built.p2Team.find(entry => entry.species === 'Tornadus-Therian')!;
     expect(tornadus.item).toBe('Assault Vest');
     const field = (value: string) => ({ value, source: 'unknown', probability: 1 }) as RevealedPokemonInfo['item'];
@@ -149,7 +143,6 @@ describe('the walk knows every item line (points 3 and 4)', () => {
       '|turn|4',
     ];
     expect(heldAt(lines, 2)).toEqual([
-      // The Ice Shard came before the Band: no first move since the arrival.
       { side: 'p1', species: 'Weavile', item: 'choiceband', firstMove: null, touched: true },
       { side: 'p2', species: 'Ferrothorn', item: '', firstMove: 'powerwhip', touched: true },
     ]);
@@ -160,7 +153,6 @@ describe('the walk knows every item line (points 3 and 4)', () => {
       { side: 'p2', species: 'Ferrothorn', item: '', firstMove: 'powerwhip', touched: false },
       { side: 'p1', species: 'Klefki', item: 'choicescarf', firstMove: null, touched: true },
     ]);
-    // The Band holder re-enters and attacks: its lock is that move.
     const trails = buildChoiceLockTrails(log(lines));
     expect(trails.p1.get(2)).toMatchObject({ handedItem: 'choiceband', moves: [] });
     expect(heldAt(lines, 4)?.[0]).toEqual({ side: 'p1', species: 'Weavile', item: 'choiceband', firstMove: 'knockoff', touched: false });
@@ -213,7 +205,6 @@ describe('the walk knows every item line (points 3 and 4)', () => {
   });
 });
 
-/** The simulator's own spectator log (the public line of every |split| pair) after the given turns. */
 function simLog(format: string, p1: PokemonSet[], p2: PokemonSet[], turns: [string, string][] = []): string {
   const battle = new LiveBattle({
     formatid: format as never, seed: [1, 2, 3, 4],
@@ -283,11 +274,7 @@ describe('a Frisk the simulator writes leaves the frisker\'s item alone (round 6
 type Replay = { id: string; format: string; formatid?: string; players: string[]; log: string };
 const fixture = (name: string) => JSON.parse(readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf-8')) as Replay;
 
-/**
- * The live pass the app and the bank run (boundary capture with snapshot
- * correction, choice locks on unless `locks` is false); `read` sees each
- * listed boundary's board.
- */
+/** The live pass the app and the bank run (boundary capture with snapshot correction, choice locks on unless `locks` is false); `read` sees each listed boundary's board. */
 async function boundaries<T>(
   replay: Replay, teams: { p1Team: PokemonSet[]; p2Team: PokemonSet[] }, turns: number[], read: (battle: Battle) => T, locks = true,
 ) {
@@ -326,8 +313,7 @@ const lockOf = (battle: Battle, side: 0 | 1, species: string) =>
 
 describe('the board holds the items the protocol shows (round 64, T121)', () => {
   test('751505: Kingambit keeps the Air Balloon the protocol announced and never popped', { timeout: 240000 }, async () => {
-    // Protocol facts: the balloon is announced as Kingambit enters at t21;
-    // at t22 Kingambit only takes Rocky Helmet chip. The sim popped it.
+    // The balloon is announced as Kingambit enters at t21; at t22 Kingambit only takes Rocky Helmet chip. The sim popped it.
     const replay = fixture('smogtours-gen9ou-751505.json');
     const teams = pinnedTeams(replay, [['p1', 'Kingambit', 'Air Balloon']]);
     const { seen } = await boundaries(replay, teams, [22, 23], battle => itemOf(battle, 0, 'Kingambit'));
@@ -351,8 +337,7 @@ describe('the board holds the items the protocol shows (round 64, T121)', () => 
   });
 
   test('doubles 938640: p2 Incineroar keeps the Heavy-Duty Boots the sim\'s Knock Off took', { timeout: 240000 }, async () => {
-    // In the sim, p1 Incineroar's turn-2 Knock Off lands on p2 Incineroar
-    // before its Parting Shot; in the game it hits Sinistcha.
+    // In the sim, p1 Incineroar's turn-2 Knock Off lands on p2 Incineroar before its Parting Shot; in the game it hits Sinistcha.
     const replay = fixture('smogtours-gen9doublesou-938640.json');
     const teams = pinnedTeams(replay, [['p2', 'Incineroar', 'Heavy-Duty Boots'], ['p2', 'Sinistcha', 'Sitrus Berry']]);
     const { seen } = await boundaries(replay, teams, [3, 5], battle => itemOf(battle, 1, 'Incineroar'));
@@ -434,7 +419,6 @@ describe('ability hand-overs and sim-only changes on synthetic boards (round 64,
     };
     const runtime = await reconstructBranchRuntime({ format: 'gen9ou', ...teams, replayLog: singlesLog, targetTurn: 2 });
     const battle = runtime.battleStream.battle!;
-    // What the sim writes when its move lands on the wrong body, and when a guess meets its own trigger.
     const snorlax = bodyOf(battle, 0, 'Snorlax')!;
     const toxapex = bodyOf(battle, 0, 'Toxapex')!;
     snorlax.item = '';
@@ -447,8 +431,7 @@ describe('ability hand-overs and sim-only changes on synthetic boards (round 64,
 });
 
 describe('item lines a disguised Zoroark writes belong to the Zoroark (round 64 review)', () => {
-  // The 681568 shape: Zoroark-Hisui enters as Volcarona (the last party
-  // member), Sucker Punch breaks its Focus Sash and its Illusion in one hit.
+  // The 681568 shape: Zoroark-Hisui enters as Volcarona (the last party member), Sucker Punch breaks its Focus Sash and its Illusion in one hit.
   const singlesLines = [
     '|player|p1|Alice|', '|player|p2|Bob|', '|gen|9', '|tier|[Gen 9] OU', '|start',
     '|switch|p1a: Gamb|Kingambit, M|100/100',
@@ -552,7 +535,6 @@ describe('sitrus-witness', () => {
     return battle;
   }
 
-  /** The protocol of the turn: the entries (no item line for Magikarp), the block's lines, the next boundary. */
   function protocol(kind: 'singles' | 'doubles', block: string[]) {
     const entries = ['|switch|p1a: Pikachu|Pikachu, M|100/100', '|switch|p2a: Magikarp|Magikarp, M|100/100'];
     if (kind === 'doubles') entries.push('|switch|p1b: Eevee|Eevee, M|100/100', '|switch|p2b: Ditto|Ditto|100/100');
@@ -567,7 +549,6 @@ describe('sitrus-witness', () => {
     const tick = (battle: LiveBattle) => battle.eachEvent('Update');
     const damage = (text: string) => ['|move|p1a: Pikachu|Splash|', `|-damage|p2a: Magikarp|${text}`];
 
-    /** The simulator's own trigger ate the berry at a HP the game never had. */
     function simAte() {
       const battle = board(format, kind);
       const body = battle.sides[1].active[0]!;
@@ -622,7 +603,6 @@ describe('sitrus-witness', () => {
         const display = (b: LiveBattle) => { b.reportExactHP = false; b.reportPercentages = percentages; return b; };
         const battle = display(board(format, kind));
         const body = battle.sides[1].active[0]!;
-        // The simulator, per HP: does its Update event eat the berry, and what does the log show for that HP?
         const byText = new Map<string, boolean[]>();
         for (let hp = Math.floor(body.maxhp * 0.3); hp <= Math.ceil(body.maxhp * 0.7); hp++) {
           body.setItem('sitrusberry');

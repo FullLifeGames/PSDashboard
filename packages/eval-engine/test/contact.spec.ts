@@ -7,14 +7,11 @@ import { set } from './move-oracle';
 import { battleOf, fingerprint } from './power-oracle';
 
 /**
- * 13.10.2026 (the Swords Dance report on gen9draft-2058494320: Cobalion's contact moves into Talonflame meet Flame
- * Body): what one hit of a move costs the attacker, read from the simulator and not from a list of items, abilities or
- * moves. The reader plays the hit on a copy of the board (a move use, the simulator's own code for contact, Protective
- * Pads, Long Reach, Magic Guard, recoil and every reaction) on fixed quantiles of its dice, and answers the HP the
- * hit takes (a share of the attacker's max HP) and the chance of each status it leaves. Every scene is held to turns of
- * the simulator: the HP the attacker really loses, and how often the dice really burn, paralyze or poison it. The
- * effects run in singles and in doubles; the generations, the Champions mod, benched bodies and the memo have their own
- * scenes below them.
+ * What one hit of a move costs the attacker, read from the simulator and not from a list of items, abilities or moves (Cobalion's
+ * contact moves into Talonflame meet Flame Body). The reader plays the hit on a copy of the board on fixed quantiles of its dice and
+ * answers the HP the hit takes (a share of the attacker's max HP) and the chance of each status it leaves. Every scene is held to turns
+ * of the simulator: the HP the attacker really loses, and how often the dice really burn, paralyze or poison it. The effects run in
+ * singles and in doubles; the generations, the Champions mod, benched bodies and the memo have their own scenes below.
  */
 
 await loadSimMods('gen9championscustomgame');
@@ -24,7 +21,6 @@ const DOUBLES = 'gen9doublescustomgame';
 const CHAMPIONS = 'gen9championscustomgame';
 const CHAMPIONS_DOUBLES = 'gen9championsdoublescustomgame';
 
-/** The choices of a real turn: the lead of p1 clicks its first move (at the foe's first slot in doubles), everybody else clicks Splash. */
 interface Click { p1: string; p2: string; idle: string }
 const SINGLES_CLICK: Click = { p1: 'move 1', p2: 'move 1', idle: 'move 2' };
 const DOUBLES_CLICK: Click = { p1: 'move 1 1, move 1', p2: 'move 1, move 1', idle: 'move 2, move 1' };
@@ -34,7 +30,6 @@ const seedOf = (index: number) => `${index * 97 + 1},${index * 31 + 7},${index *
 const foe = (species: string, extra: Partial<PokemonSet> = {}) => set(species, ['splash'], extra);
 const attackerOf = (species: string, moves: string[], extra: Partial<PokemonSet> = {}) => set(species, [...moves, 'splash'], extra);
 
-/** The pair on a board of a format: in doubles each side brings a Splashing partner next to it. */
 const boardOf = (format: string, attacker: PokemonSet, defender: PokemonSet, seed = '1,2,3,4'): Battle =>
   format === DOUBLES
     ? battleOf(format, [attacker, foe('Clefable')], [defender, foe('Snorlax')], seed)
@@ -43,10 +38,8 @@ const boardOf = (format: string, attacker: PokemonSet, defender: PokemonSet, see
 const mine = (battle: Battle): Pokemon => battle.sides[0].active[0]!;
 const theirs = (battle: Battle): Pokemon => battle.sides[1].active[0]!;
 
-/** The reader's answer for the hit of p1's lead on p2's lead. */
 const read = (battle: Battle, move: string): HitCost => hitReader(battle)(mine(battle), theirs(battle), move);
 
-/** One real turn: both sides click; the HP the attacker lost, as a share of its max HP. */
 function realLoss(battle: Battle, click: Click, idle = false): number {
   const attacker = mine(battle);
   const before = attacker.hp;
@@ -55,7 +48,6 @@ function realLoss(battle: Battle, click: Click, idle = false): number {
   return (before - attacker.hp) / attacker.maxhp;
 }
 
-/** How often a real turn leaves the attacker with `pick`, over seeds. */
 function rate(build: (seed: string) => Battle, count: number, pick: (battle: Battle) => boolean, click: Click): number {
   let times = 0;
   for (let index = 1; index <= count; index++) {
@@ -67,14 +59,12 @@ function rate(build: (seed: string) => Battle, count: number, pick: (battle: Bat
   return times / count;
 }
 
-/** The mean HP share the attacker loses in a real turn, over seeds. */
 function meanLoss(build: (seed: string) => Battle, count: number, click: Click): number {
   let total = 0;
   for (let index = 1; index <= count; index++) total += realLoss(build(seedOf(index)), click);
   return total / count;
 }
 
-/** The same mean over the seeds whose turn shows no crit. */
 function meanLossWithoutCrit(build: (seed: string) => Battle, count: number, click: Click): number {
   const losses: number[] = [];
   for (let index = 1; index <= count; index++) {
@@ -106,11 +96,9 @@ describe.each(FORMATS)('Flame Body, Static, Poison Point and Effect Spore: the c
   test('a burn takes 1/16 a turn and halves the damage of a physical move, as the simulator plays them', () => {
     const build = into('Flame Body', 'Talonflame');
     const burn = statusOf(read(build('1,2,3,4'), 'ironhead'), 'brn')!;
-    // The simulator's end of the turn: a burned Cobalion splashes while the foe splashes.
     const idle = build('1,2,3,4');
     mine(idle).setStatus('brn');
     expect(burn.chip).toBeCloseTo(realLoss(idle, click, true), 2);
-    // The simulator's damage with and without the burn, on one board and the same dice.
     const damage = (battle: Battle) => {
       const move = battle.dex.getActiveMove('ironhead');
       battle.activeMove = move;
@@ -395,9 +383,8 @@ describe('the Champions mod and every generation', () => {
     expect(read(skin(), 'bodyslam').chip).toBeCloseTo(realLoss(skin(), SINGLES_CLICK), 9);
     expect(read(skin(), 'bodyslam').chip).toBeGreaterThan(0);
     const recoil = (seed: string) => battleOf(format, [attackerOf('Snorlax', ['doubleedge'])], [foe('Snorlax')], seed);
-    // Round 78 (@pkmn 0.10.12): the reader's two probes (u = 0.075 and 0.925) meet no crit at the ordinary stage (1 in 16
-    // up to gen 6, 1 in 24 later; T279), so a recoil it reads deterministic is the cost of a hit without a crit, and the simulator's turns
-    // are held to that: their mean over every seed ran 6.8 % above it in gen 3 once the new simulator drew other dice.
+    // The reader's two probes (u = 0.075 and 0.925) meet no crit at the ordinary stage (1 in 16 up to gen 6, 1 in 24 later), so a recoil it
+    // reads deterministic is the cost of a hit without a crit, and the simulator's turns are held to that.
     expect(Math.abs(read(recoil('1,2,3,4'), 'doubleedge').chip / meanLossWithoutCrit(recoil, 60, SINGLES_CLICK) - 1)).toBeLessThan(0.06);
   });
 
@@ -433,7 +420,6 @@ describe('the Champions mod and every generation', () => {
 describe('the speed layer is not needed: the serialization round trip reads the same costs', () => {
   afterEach(() => resetSimFastForTests());
 
-  /** One scene per reading: a chip from the foe, a status from the foe, a recoil, an item of the attacker, a benched foe. */
   const scenes: [string, () => Battle, string][] = [
     ['Rocky Helmet', () => battleOf(SINGLES, [attackerOf('Cobalion', ['ironhead'])], [foe('Chansey', { item: 'Rocky Helmet' })]), 'ironhead'],
     ['Flame Body', () => battleOf(SINGLES, [attackerOf('Cobalion', ['ironhead'])], [foe('Talonflame', { ability: 'Flame Body' })]), 'ironhead'],
@@ -537,11 +523,7 @@ describe('contact-memo-state', () => {
     second: Tweak;
   }
 
-  /**
-   * The happiness of the attacker, in the field and in its set. The simulator's own serialization (the copy of the slow
-   * mode, EVAL_SIM_FAST=0) leaves `happiness` out and builds it again from the set; the fast mode's copy takes the field.
-   * In a game the two are the same, so a row sets both.
-   */
+  /** The attacker's happiness, in the field and in its set: the slow mode's copy (EVAL_SIM_FAST=0) rebuilds it from the set, the fast mode's takes the field. */
   const happiness = (battle: Battle, value: number): void => {
     attackerOf(battle).happiness = value;
     attackerOf(battle).set.happiness = value;
@@ -582,7 +564,6 @@ describe('contact-memo-state', () => {
     ['Champions singles', 'gen9championscustomgame'], ['Champions doubles', 'gen9championsdoublescustomgame'],
   ] as const;
 
-  /** The board of a row in a format, or null where the format's Dex lacks a species or the move. */
   function boardOf(format: string, row: Row, tweak: Tweak): Battle | null {
     const [species, ability, item] = row.attacker;
     const [foe, foeAbility] = row.defender;

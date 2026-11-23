@@ -10,12 +10,10 @@ import { dexOfRules } from './dice-sweep-support';
 
 
 /**
- * Round 82 (forced dice), step A4: the census of the draws that abilities, items and conditions make. The scan reads the
- * simulator's own data tables (the base data, every generation mod the corpus plays, and the Champions bundle), finds every
- * handler (a function under an entry, at any depth) that calls `random`, `randomChance`, `sample` or `shuffle`, and keys each by
- * table, entry and handler. A handler no one has classed fails the census; so does a class whose handler is gone or whose calls
- * changed. The class says whether the dice module owns the draw (a die of an action, of the turn order or of the end of the
- * turn: the user can force it) or leaves it out (a random pick or a duration die, GLOSSARY.md).
+ * The scan reads the simulator's own data tables (the base data, every generation mod the corpus plays, and the Champions bundle), finds every
+ * handler that calls `random`, `randomChance`, `sample` or `shuffle`, and keys each by table, entry and handler. A handler no one has classed
+ * fails the census; so does a class whose handler is gone or whose calls changed. The class says whether the dice module owns the draw (a die
+ * of an action, of the turn order or of the end of the turn) or leaves it out (a random pick or a duration die, GLOSSARY.md).
  */
 await loadSimMods('gen9championsou');
 

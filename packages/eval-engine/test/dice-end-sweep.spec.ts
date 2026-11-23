@@ -10,12 +10,10 @@ import { END_IDS, END_ROWS, endBoard, present } from './dice-ability-support';
 import { playClicks, sweepSelection } from './dice-fixtures';
 import { critsOf, dexOfRules, forcedOn, missesOf, monOf, newTally, SWEEP_CASES, sweepBoard, sweepClicks, sweepMoves, turnLines } from './dice-sweep-support';
 
-// Round 82 (forced dice), lane A4: the dice of the end of the turn. The simulator runs the Residual event of every body after
-// the moves: Shed Skin sheds a status, Harvest brings a berry back, Healer cures an ally (one draw for each statused ally, the
-// die is named by the holder and the ally), and Gen 2 thaws a frozen body. A future move (Future Sight, Doom Desire) lands in
-// the end-of-turn handling two turns after its use and draws its accuracy, crit and damage roll there; those dice carry the
-// move's own name, like the dice of any hit. Every die, in every rule set the Dex gives it, singles and doubles, forced to
-// happen and not to, on three seeds; the witness is the protocol line the effect writes.
+// The simulator runs the Residual event of every body after the moves: Shed Skin sheds a status, Harvest brings a berry back, Healer cures an
+// ally (one draw for each statused ally, named by the holder and the ally), and Gen 2 thaws a frozen body. A future move (Future Sight, Doom
+// Desire) lands in the end-of-turn handling two turns after its use and draws its accuracy, crit and damage roll there; those dice carry the
+// move's own name. The witness is the protocol line the effect writes.
 await loadSimMods('gen9championsou');
 
 const logPath = process.env.DICE_SWEEP_LOG;
@@ -69,7 +67,6 @@ describe.each(SWEEP_CASES)('the end of the turn: $name', ({ rules, mode, name })
   });
 });
 
-/** Plays `turns` turns of the same clicks on a copy of the board. */
 function after(board: Battle, clicks: { p1: string; p2: string }, turns: number): Battle {
   const copy = copyOf(board);
   copy.prng ??= board.prng.clone();
@@ -86,7 +83,6 @@ describe.each(SWEEP_CASES)('the future moves: $name', ({ rules, mode, name }) =>
     const clicks = sweepClicks(mode, move.target);
     const label = dex.moves.get(move.id).name;
 
-    /** The turns it takes the move to land: the first turn whose lines end the move's condition on the target. */
     function landing(): number {
       const copy = after(sweepBoard(rules, move.id, mode), clicks, 0);
       for (let turn = 1; turn <= 4; turn++) {

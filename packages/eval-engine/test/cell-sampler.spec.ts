@@ -10,15 +10,13 @@ import { pairCellSample } from '../src/pair/sampler';
 import { VERIFY_PLAIN_SEEDS } from './seed-streams';
 
 /**
- * Round 69 (T146 part c4): a singles cell whose two moves have equal priority at equal speed is a coin flip for the
- * move order, and a flip per seed is no price. The root cell draws each order with the order scripted and mixes the
- * two at one half, the way the doubles pair plan writes its `tie` record. The reference is the simulator: the mean
- * leaf over 64 natural seeds, where the shuffle of the tied actions decides the order.
+ * A singles cell whose two moves have equal priority at equal speed is a coin flip for the move order. The root cell draws each
+ * order with the order scripted and mixes the two at one half, as the doubles pair plan writes its `tie` record. The reference is
+ * the simulator: the mean leaf over 64 natural seeds, where the shuffle of the tied actions decides the order.
  */
 
 const cache = createMatchupCache();
 
-/** The simulator's mean leaf over 64 natural seeds, and the standard error of that mean. */
 function plainMean(root: SimPosition, p1Choice: string, p2Choice: string) {
   const leaves: number[] = [];
   for (let k = 0; k < 64; k++) {
@@ -92,7 +90,6 @@ describe('singles speed tie (T146 c4)', () => {
   });
 
   test('a tie with a roll event prices both orders at one half each', () => {
-    // Jolteon's Thunder (70 %) against a sure Tackle, both at 1 HP and equal speed.
     const root = ones(set('Jolteon', ['Thunder']), set('Jolteon', ['Tackle']));
     const [p1, p2] = ['move thunder', 'move tackle'];
     expect(speedTie(positionBattle(root), p1, p2)).toBe(true);
@@ -137,7 +134,7 @@ describe('singles speed tie (T146 c4)', () => {
     const { mean, se } = plainMean(root, p1, p2);
     const cell = sampleCell(root, 0, p1, p2, 3, cache, true);
     expect(Math.abs(cell.value - mean)).toBeLessThanOrEqual(2.5 * se);
-    // r89 A5 gate: was toBeCloseTo(0, 9) on the fixed seeds; the cell's own seeds (T324) draw 0.25 (inside 2.5 SE of the mean above).
+    // The cell's own seeds draw 0.25 (inside 2.5 SE of the mean above).
     expect(cell.value).toBeCloseTo(0.25, 9);
   });
 });
@@ -172,7 +169,6 @@ describe('cell-plan-missing', () => {
     return createRootPosition(JSON.stringify(State.serializeBattle(battle)));
   }
 
-  /** The simulator's mean leaf over 64 natural seeds, and the standard error of that mean plus a 16-draw one. */
   function plainMean(root: SimPosition, p1Choice: string, p2Choice: string) {
     const cache = createMatchupCache();
     const leaves: number[] = [];
@@ -191,10 +187,10 @@ describe('cell-plan-missing', () => {
       const [p1, p2] = ['move hiddenpower', 'move dragonclaw'];
       const truth = plainMean(root, p1, p2);
       const sample = sampleCell(root, 0, p1, p2, 1, createMatchupCache(), true);
-      // r89 A5 gate: was toEqual(['hit-nokill|hit-nokill']). The cell's own seeds (T324) also leave 'hit-kill|none' (a crit class) unreached.
-      expect(sample.diagnostic?.missing).toEqual(['hit-kill|none', 'hit-nokill|hit-nokill']); // the model still reports what it could not see
+      // The cell's own seeds also leave 'hit-kill|none' (a crit class) unreached.
+      expect(sample.diagnostic?.missing).toEqual(['hit-kill|none', 'hit-nokill|hit-nokill']);
       expect(Math.abs(sample.value - truth.mean)).toBeLessThan(2.5 * truth.se);
-      expect(sample.blend).toBeUndefined(); // priced by the draws, not by the renormalised classes
+      expect(sample.blend).toBeUndefined();
     });
 
     test('the same cell without the policy keeps the analytic blend (a small missing weight stays renormalised)', () => {
@@ -202,8 +198,7 @@ describe('cell-plan-missing', () => {
       const [p1, p2] = ['move hiddenpower', 'move dragonclaw'];
       const truth = plainMean(root, p1, p2);
       const sample = sampleCell(root, 0, p1, p2, 1, createMatchupCache(), true);
-      // r89 A5 gate: was `missing > 0` (a crit class no draw reached, with the fixed seeds). The cell's own seeds (T324) reach every class
-      // of this cell, so there is no diagnostic; a cell that misses a class must still stay below the cut.
+      // The cell's own seeds reach every class of this cell, so there is no diagnostic; a cell that misses a class must still stay below the cut.
       const missing = (sample.diagnostic?.missing ?? []).reduce((sum, key) => sum + sample.diagnostic!.analytic[key], 0);
       expect(missing).toBeLessThan(MISSING_WEIGHT_CUT);
       const classes = sample.blend!.classes;
