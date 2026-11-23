@@ -12,11 +12,9 @@ import type { PinnedTurn } from '../../dice/likeliest.ts';
 import { dieKey } from '../../dice/types.ts';
 
 /**
- * Round 89 (#130, step 2): the steps of a luck path and the line the app plays from them. A path is a list of steps (a turn, or the
- * replacement a faint or a pivot asks for), each with the choices of both sides, the battle it started from and the turn it played
- * with its dice (`playTurnWith`). Its exact chance is the product over its dice of the share of each die's results that leave the same
- * bodies standing as the result taken (`chanceOfDie`): the chance the simulator's draw names where the other result changes who falls,
- * one where it does not.
+ * The steps of a luck path and the line the app plays from them. A path is a list of steps (a turn, or the replacement a faint or a
+ * pivot asks for), each with the choices of both sides, its starting battle and the turn played with its dice (`playTurnWith`). Its exact
+ * chance is the product over its dice of `chanceOfDie`.
  */
 export interface PathStep {
   /** The battle at the step's start (read, never written). */
@@ -85,7 +83,7 @@ export function exactChance(path: readonly PathStep[], count: (plays: number) =>
 /** The dice the turn played (the list `rollDecides` and the line index into). */
 const turnDice = (step: PathStep): LikeliestDie[] => step.turn.dice;
 
-/** The line of a winning path, as the app plays it: each step's slot choices with its dice on their holders, the way #104's lines carry them. */
+/** The line of a winning path, as the app plays it: each step's slot choices with its dice on their holders. */
 export function lineOfPath(side: 'p1' | 'p2', path: readonly PathStep[], ruleset: StaticRuleset): EvalLine | null {
   const steps: LineStep[] = [];
   const unforced = new Set<string>();

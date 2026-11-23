@@ -1,5 +1,6 @@
 import { ENGINE_PROTOCOL, type EngineRequest, type EngineResponse } from './protocol.ts';
 
+/** The outcome of `validateEngineResponse`: the response, or every error found. */
 export type EngineCheck = { ok: true; response: EngineResponse } | { ok: false; errors: string[] };
 
 const inRange = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value >= -1 && value <= 1;
@@ -34,10 +35,7 @@ function matrixErrors(request: EngineRequest, matrix: unknown): string[] {
   return grid ? [] : ['matrix.values must have one row per matrix.p1 entry and one column per matrix.p2 entry, each from -1 to 1'];
 }
 
-/**
- * The checks every answer passes before the dashboard reads it; the conformance tool (check-engine)
- * runs the same ones, so an engine that passes there is read here.
- */
+/** The checks every answer passes before the dashboard reads it; `check-engine` runs the same ones. */
 export function validateEngineResponse(request: EngineRequest, value: unknown): EngineCheck {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return { ok: false, errors: ['the answer must be a JSON object'] };
   const response = value as Partial<EngineResponse>;

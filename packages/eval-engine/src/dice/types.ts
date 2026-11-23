@@ -1,31 +1,20 @@
-/**
- * Round 82 (forced dice): the words of the dice module. A die is one draw of the simulator that decides something the user
- * can see (GLOSSARY.md). The module names a die by the simulator's own hook (docs/adr/0002) and answers it as the user
- * forces it (docs/adr/0001). The types are JSON-clean on purpose: a forced die rides on the slot choice of a branch.
- */
+/** The words of the dice module: a die is one simulator draw that decides something the user sees (GLOSSARY.md); the types stay JSON-clean. */
 
-/**
- * What a die decides, never a Dex entry (AGENTS.md): `stalling` is a stalling move that succeeds again, `power` a chance that
- * changes a move's power, `move-first` a die that lets its holder act first in its priority bracket. Round 89 (#137):
- * `random-target` is the foe the simulator samples for a move aimed at none (a move that picks its foe, a click an Encore bent;
- * doubles only) and `drag` the bench body it samples to come in when a move or an item drags a body out; both are a `sample`
- * over bodies and answer `{ option }` with the slot of the foe or the name of the body. A text that names the move or the item
- * reads it from the Dex at run time.
- */
+/** What a die decides: `random-target` and `drag` are samples over bodies and answer `{ option }` with a foe slot or a body name (docs/adr/0001). */
 export const DIE_KINDS = [
   'accuracy', 'crit', 'damage-roll', 'secondary', 'self-effect', 'hit-count', 'status-check', 'stalling', 'power',
   'speed-tie', 'ability-proc', 'item-proc', 'move-first', 'end-of-turn', 'random-target', 'drag',
 ] as const;
+/** One of the kinds in `DIE_KINDS`. */
 export type DieKind = typeof DIE_KINDS[number];
 
-/**
- * `slot` is the body that holds the draw (the user of the move; the holder for end-of-turn dice; the body dragged out for a `drag`
- * die, so a turn that drags one slot twice gives one die the two draws share), `moveId` is empty outside a move.
- * `hit` (round 88, T337): the accuracy die of a later hit of a move whose every hit rolls its own accuracy (`multiaccuracy`), the
- * simulator's own `move.hit`, 2 and up. The first hit keeps the name without it.
- */
+// `slot` is the body that holds the draw (the user of the move; the holder for end-of-turn dice; the body dragged out for a `drag` die,
+// so two draws that drag one slot share one die), `moveId` is empty outside a move. `hit` is the simulator's `move.hit` (2 and up) on the
+// accuracy die of a later hit of a `multiaccuracy` move; the first hit keeps the name without it.
+/** The name of one die. */
 export interface DieName { slot: string; moveId: string; targetSlot?: string; kind: DieKind; effectId?: string; hit?: number }
 
+/** The answer to a die; the shape depends on the kind. */
 export type DieResult =
   | { happens: boolean }        // a chance: accuracy, crit, secondary, procs, stalling, end of turn; a status check: the body goes on; a first mover: it acts first
   | { step: number }            // the damage roll, 0 is the lowest damage
@@ -33,26 +22,20 @@ export type DieResult =
   | { option: string }          // a die with several results (Effect Spore's status), by its protocol word
   | { first: string };          // a tie: the slot that goes first
 
+/** A die with the result the user forces. */
 export interface ForcedDie { name: DieName; result: DieResult }
 
-/** `applied`: the draw ran and took the answer. `no-draw`: the simulator never drew it. `no-chance`: the draw has no way to give the answer. `blocked`: drew and forced, the effect did not land. */
+// `applied`: the draw ran and took the answer. `no-draw`: the simulator never drew it. `no-chance`: the draw cannot give the answer. `blocked`: forced, the effect did not land.
+/** What became of a forced die. */
 export type DieTook = 'applied' | 'no-draw' | 'no-chance' | 'blocked';
 
-/** `landed` (round 89): on the die of a later hit that the chain never reached, the hits the protocol counts for the target. */
+/** One forced die with its fate; `landed` is, on the die of a later hit the chain never reached, the hits the protocol counts for the target. */
 export interface DieReport { die: ForcedDie; took: DieTook; chance?: number; logIndex?: number; reason?: string; landed?: number }
 
-/**
- * `unnamed` (round 89, #104): how many draws of the real turn no die names and no forced tie covers (a duration, a random target, a
- * tie of bodies that are not move actions); the seed decides them. Absent when the turn drew none.
- */
+/** The dice of one turn; `unnamed` counts the draws no die names and no forced tie covers (a duration, a tie of non-move actions), which the seed decides. */
 export interface DiceReport { forced: DieReport[]; naturalEndSeed: string; unnamed?: number }
 
-/**
- * The key of a die: its name without the index of a repeat (the second secondary, the next hit of a move that draws no accuracy
- * per hit). A forced die applies to every repeat, so the key is what the user's choice and the record of the natural turn share.
- * The accuracy die of a later hit of a multi-accuracy move is the exception (round 88, T337): its key ends in `hit<N>`, so the
- * user can decide one hit; a forced die without a hit still covers every hit (`plainKey`).
- */
+/** The key of a die: its name without the index of a repeat; the accuracy die of a later `multiaccuracy` hit keeps `hit<N>`, so the user can decide one hit. */
 export function dieKey(name: DieName): string {
   return [name.slot, name.moveId, name.targetSlot ?? '', name.kind, ...(name.effectId ? [name.effectId] : []), ...(name.hit ? [`hit${name.hit}`] : [])].join(':');
 }
@@ -62,10 +45,7 @@ export function plainKey(name: DieName): string {
   return dieKey({ ...name, hit: undefined });
 }
 
-/**
- * The name of the die that decides which of two bodies acts first when their move actions tie in speed and priority: the
- * two slots in sorted order (the die belongs to the pair, whichever body the user names first). Its result is `{ first: slot }`.
- */
+/** The name of the die that decides which of two bodies acts first on a speed and priority tie; the slots sort, so the die belongs to the pair. */
 export function tieName(a: string, b: string): DieName {
   const [slot, targetSlot] = a < b ? [a, b] : [b, a];
   return { slot, moveId: '', targetSlot, kind: 'speed-tie' };

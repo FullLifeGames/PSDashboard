@@ -2,18 +2,12 @@ import type { Battle } from '@pkmn/sim';
 import type { SecondaryEntry } from './types.ts';
 
 /**
- * Round 82 (forced dice), decision D1: the watch. The simulator announces some dice by a hook right before the draw
- * (`Accuracy`, `ModifyCritRatio`) and hides the rest inside script calls (the damage roll inside `randomizer`, the Gen 1 crit
- * inside `getDamage`). The watch is a set of own-property wrappers on one battle that note both and change nothing: each
- * wrapper calls the saved original with the same arguments and returns its value. It lives for the natural copy's turn and
- * the real turn; `uninstall()` puts the saved property descriptors back, so the battle is the one it was (own keys, stable
- * serialization, the speed layer's pre-check). Round 86 (T299): a wrapper keeps the enumerability of the property it replaces,
- * so an inherited script call stays hidden from key walks, and called on any object but the watched battle it only passes
- * the call on; a copy of a battle under watch (a forced switch's snapshot) therefore notes nothing into this watch, and the
- * tree's scripted PRNGs rely on that.
- *
- * Not `battle.onEvent` listeners: a listener joins the speed sort and can draw a tie shuffle of its own, and not
- * `forceRandomChance`: it shifts later draws (docs/adr/0002).
+ * The watch: own-property wrappers on one battle that note the dice the simulator announces by a hook (`Accuracy`, `ModifyCritRatio`) or
+ * hides in script calls (the damage roll in `randomizer`, the Gen 1 crit in `getDamage`) and change nothing (docs/adr/0002).
+ * `uninstall()` restores the property descriptors. A wrapper keeps the enumerability of the property it replaces and, called on any
+ * object but the watched battle, only passes the call on: a copy of a battle under watch notes nothing into it, which the tree's
+ * scripted PRNGs rely on. Not `battle.onEvent` listeners (they join the speed sort and can draw a tie shuffle) and not
+ * `forceRandomChance` (it shifts later draws).
  */
 
 /** The hook that ran right before the next draw. */
@@ -24,9 +18,8 @@ export interface ArmedHook {
 }
 
 /**
- * The entries `ModifySecondaries` returned for one target, handed out one per `random(100)` draw of the `secondaries` call
- * (Gens 3 and up). A nested hit (the effect itself) can run its own hooks between two draws, so the queue stands apart from
- * the armed hook; the watch drops it when the `secondaries` call ends.
+ * The entries `ModifySecondaries` returned for one target, one per `random(100)` draw of the `secondaries` call (Gens 3 and up);
+ * it stands apart from the armed hook because a nested hit runs hooks between two draws.
  */
 export interface SecondaryQueue {
   targetSlot: string | undefined;
@@ -35,9 +28,8 @@ export interface SecondaryQueue {
 }
 
 /**
- * What the watch saw of a move at the damage step and in `ModifySecondaries`, for the report's reasons (a die that was never
- * drawn): how many secondary entries the move still carried when it dealt damage (an ability can strip them before), whether
- * the simulator marked it as stripped (`hasSheerForce`, a flag of the move), and the slots whose entries a hook removed.
+ * What the watch saw of a move at the damage step and in `ModifySecondaries`: the entries it still carried (an ability can strip
+ * them), `hasSheerForce`, and the slots whose entries a hook removed.
  */
 export interface MoveSight {
   secondaries: number;
@@ -45,11 +37,7 @@ export interface MoveSight {
   removedFor: string[];
 }
 
-/**
- * The allies a handler asked for with `adjacentAllies()` under the effect that was running (Healer loops over them and draws once
- * for each one that has a status). The end-of-turn die of such a handler is named by the ally it is about: the first draw takes the
- * first ally with a status, the next draw the next one.
- */
+/** The allies a handler asked for with `adjacentAllies()` (Healer draws once per ally with a status); the first draw names the first such ally, the next draw the next. */
 export interface AllyList {
   holder: unknown;
   effectId: string | undefined;
@@ -61,9 +49,9 @@ export interface AllyList {
 
 export interface BattleWatch {
   readonly battle: Battle;
-  /** Round 89 (#137): the user and the move id `getRandomTarget` in flight was called with, or null. */
+  /** The user and the move id `getRandomTarget` in flight was called with, or null. */
   aim: { slot: string; moveId: string } | null;
-  /** Round 89 (#137): the slot the `dragIn` in flight drags a body out of, or null. */
+  /** The slot the `dragIn` in flight drags a body out of, or null. */
   dragged: { slot: string } | null;
   /** The allies of the last `adjacentAllies()` call, or null. */
   allies: AllyList | null;
@@ -75,9 +63,7 @@ export interface BattleWatch {
   readonly taken: WeakSet<object>;
   /** The last hook since the previous draw, or null. The caller settles it after each draw. */
   armed: ArmedHook | null;
-  /** The wrapped script calls in flight, outermost first. */
   readonly scopes: readonly string[];
-  /** The innermost wrapped script call, or null. */
   scope(): string | null;
   /** A draw happened: no hook stands armed for the next one. */
   settle(): void;
@@ -93,7 +79,7 @@ interface Holder { getSlot?: () => string }
 const slotOf = (value: unknown): string | undefined =>
   typeof (value as Holder | null)?.getSlot === 'function' ? (value as { getSlot(): string }).getSlot() : undefined;
 
-/** The sight of a move object (an active move, or a number the simulator passes for a typeless hit: ignored). */
+/** The sight of a move object; a number the simulator passes for a typeless hit is ignored. */
 function sightOf(watch: BattleWatch, move: unknown): MoveSight {
   const holder = move as { id?: string } | number | null;
   const id = typeof holder === 'object' && holder?.id ? holder.id : '';
@@ -110,14 +96,13 @@ function noteSecondaries(watch: BattleWatch, args: unknown[], entries: Secondary
   if (targetSlot && given && entries.length < given.length) sightOf(watch, args[3]).removedFor.push(targetSlot);
 }
 
-/** Puts `make(original)` in the place of an owner's function property and notes how to put the property back. */
 function wrapProperty(undo: (() => void)[], owner: object, name: string, make: (original: AnyFn) => AnyFn): void {
   const original = (owner as Record<string, unknown>)[name];
   if (typeof original !== 'function') return;
   const had = Object.getOwnPropertyDescriptor(owner, name);
   const watched = make(original as AnyFn);
-  // Round 86 (T299): a copy of a watched battle that walks the own keys takes the wrapper of an own property along (the mods
-  // override some script calls as own properties). Called on any object but the watched one, the wrapper only passes the call on.
+  // A copy of a watched battle that walks the own keys takes the wrapper of an own property along (the mods override some script
+  // calls as own properties). Called on any object but the watched one, the wrapper only passes the call on.
   const wrapper: AnyFn = function (this: unknown, ...args: unknown[]) {
     return (this === owner ? watched : (original as AnyFn)).apply(this, args);
   };
@@ -193,10 +178,9 @@ export function watchBattle(battle: Battle): BattleWatch {
 const moveIdOf = (move: unknown): string => String(typeof move === 'string' ? move : (move as { id?: string } | null)?.id ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 /**
- * Round 89 (#137): the two calls that sample a body keep their arguments for the draw. `getRandomTarget(user, move)` runs before the
- * move is in flight; `dragIn(side, position)` hands the bench to `getRandomSwitchable`, whose own call is the scope of the draw
- * (the switch-in that follows runs handlers of its own, and a draw there is not the drag's). Each wrapper puts back what it found,
- * so a drag inside a drag's switch-in (a Red Card holder coming in) keeps its own slot.
+ * The two calls that sample a body keep their arguments for the draw: `getRandomTarget(user, move)` runs before the move is in flight;
+ * `dragIn(side, position)` hands the bench to `getRandomSwitchable`, whose call is the scope of the draw (a draw in the switch-in that
+ * follows is not the drag's). Each wrapper puts back what it found, so a drag inside a drag's switch-in (Red Card) keeps its slot.
  */
 function watchPicks(
   watch: BattleWatch, wrap: (owner: object, name: string, make: (original: AnyFn) => AnyFn) => void,

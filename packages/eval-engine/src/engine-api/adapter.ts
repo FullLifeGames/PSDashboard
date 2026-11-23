@@ -17,12 +17,7 @@ function rankedFromValues(options: EngineOption[], values: Record<string, number
     .sort((a, b) => b.ev - a.ev);
 }
 
-/**
- * The dashboard's reading of a checked answer (validateEngineResponse first). With a matrix the game
- * is solved by the ranking the dashboard's own engine uses (rankFromMatrix, toResult): floors,
- * punishers, the equilibrium mixes and the score as the solved value. Without one the engine's score
- * and values stand as given.
- */
+/** The dashboard's reading of a checked answer: with a matrix the game is solved as for its own engine (`rankFromMatrix`), without one the engine's score and values stand. */
 export function engineResponseToResult(request: EngineRequest, response: EngineResponse): EvalResult {
   if (response.matrix) {
     const { p1, p2, values } = response.matrix;

@@ -6,14 +6,11 @@ import { oneTurnMatrix } from '../solver.ts';
 import type { WinMeter } from './budget.ts';
 
 /**
- * Round 89 (#130, D1): the engine's first choice past the root of a win-path search. The turn the card shows has its own ranking
- * (the request's `first`); at every later position both sides take the best row of the one-turn matrix (`oneTurnMatrix`: each pair
- * of options played once, each child at its static value): a side's best row is the one with the highest value against the other
- * side's equilibrium mix. A depth-1 search per position would cost seconds (the play-out engine, G5 section 2); the matrix costs one
- * cell per pair of options, counted in the step's meter. Memoized per position, so a position the search reaches twice pays once.
- *
- * Singles and doubles share this path: a doubles side's options are the search's own (`searchOptions`, the hint-restricted list), a
- * position that asks one side for a replacement offers the other side `wait`.
+ * The engine's first choice past the root of a win-path search. The turn the card shows has its own ranking (the request's `first`); at
+ * every later position both sides take the best row of the one-turn matrix (`oneTurnMatrix`), the row with the highest value against the
+ * other side's equilibrium mix; it costs one cell per pair of options, counted in the step's meter, and is memoized per position.
+ * Singles and doubles share this path: a doubles side's options are the search's own (`searchOptions`), a position that asks one side
+ * for a replacement offers the other side `wait`.
  */
 export interface RankedOption { option: ChoiceOption; /** The value against the other side's mix, from the side's own view (-1 to 1). */ value: number }
 export interface FirstChoices { p1: ChoiceOption; p2: ChoiceOption; ranked: { p1: RankedOption[]; p2: RankedOption[] } }

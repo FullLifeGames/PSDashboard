@@ -10,19 +10,13 @@ import { awaitsReplacement, exactChance, inDrawOrder, lineOfPath, playOf, wonBy,
 import type { WinPathsRequest, WinStep } from './types.ts';
 
 /**
- * Round 89 (#130, step 3, a mistake by the opponent; ruling W3a): the smallest slip by the opponent after which the side that lost wins
- * within N turns. Both sides play the engine's first choice with every die at its likeliest result (`playTurnWith` with nothing
- * pinned, the choices of first-choice.ts). At each turn of that line the opponent's lower-ranked choices are the candidates; they are
- * tried mildest first (the smallest loss against its first choice, then the earlier turn, then the better rank): the slip is played at
- * its turn, both sides go back to their first choices, every die stays at its likeliest result, and the line counts when the game ends
- * in the side's win within N turns. The first candidate that counts is the answer: its line (the dice are forced, so ▶ Play ends in the
- * win under any seed) and the chance of the dice it needs (`exactChance`, as the luck step prices a path).
- *
- * The loss of a slip is the ranking's own: at the root the opponent's ranking of the request (`foeRanking`, the values the card shows;
- * a request without it reads the one-turn matrix, as every later position does). One slip per line: the path never mixes two, and a
- * line whose first choices already win (nothing was missed) answers `none`. A replacement after a faint is never a slip. It stops at
- * the first count (`found`), when every candidate was tried (`none`) or when the meter reaches its cap (`stopped`). The rules come from
- * the simulator and the battle's Dex, as everywhere in win-paths; no move, item or species name enters this file.
+ * The smallest slip by the opponent after which the side that lost wins within N turns. Both sides play the engine's first choice with
+ * every die at its likeliest result; at each turn of that line the opponent's lower-ranked choices are the candidates, tried mildest
+ * first (smallest loss against its first choice, then the earlier turn, then the better rank). The slip is played at its turn, both sides
+ * return to their first choices, and the line counts when the game ends in the side's win within N turns; the first candidate that counts
+ * is the answer, with the chance of the dice it forces (`exactChance`). The loss is the ranking's own: at the root the request's
+ * `foeRanking`, elsewhere the one-turn matrix. One slip per line; a line whose first choices already win answers `none`; a replacement
+ * after a faint is never a slip.
  */
 
 /** A candidate slip: the turn it would be played on, its rank in the opponent's ranking (the first choice is rank 1) and its loss. */

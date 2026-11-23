@@ -10,19 +10,14 @@ import type { EndgameChildren } from './children.ts';
 import { splitOutcome } from '../search/secondary-classes.ts';
 import { splitClassKey } from './prover-helping.ts';
 
-/**
- * The forced-win prover's candidate order and its open-branch fields
- * (moved out of prover.ts in round 67): the root tries the ranking's order,
- * inner nodes the kill odds, and a proof names the binding reply's open
- * children for the bar and the sentence.
- */
+/** The forced-win prover's candidate order (the root tries the ranking's order, inner nodes the kill odds) and its open-branch fields. */
 
 export type Side = 'p1' | 'p2';
 export interface Proven {
   mass: number;
   turns: number;
   caveat: ForcedWinCaveat;
-  /** Round 89 (P2): the id of the stalling move whose repeat the proof delays (the delay rule, `endgame/delay-rule.ts`); absent when no cell of the proof leans on a delay. */
+  /** The id of the stalling move whose repeat the proof delays (`endgame/delay-rule.ts`); absent when no cell of the proof leans on a delay. */
   delay?: string;
 }
 export interface Cell extends EndgameChildren { reply: ChoiceOption; p1Choice: string; p2Choice: string }
@@ -67,8 +62,8 @@ export function orderByOdds(battle: Battle, side: Side, options: ChoiceOption[])
 export function openOf(root: Battle, cell: Cell, key: string | undefined, side: Side): ForcedWinOpen | undefined {
   const plan = planCellEvents(root, cell.p1Choice, cell.p2Choice);
   if (plan.kind !== 'events' || !key) return undefined;
-  // Round 89 (#115): the class key splits at its first colon (an effect id holds one itself), and an outcome keeps its effects
-  // behind a plus (`hit-nokill+brn`); the open class is read by its base outcome, as the helping rule reads it.
+  // The class key splits at its first colon (an effect id holds one itself), and an outcome keeps its effects behind a plus
+  // (`hit-nokill+brn`); the open class is read by its base outcome, as the helping rule reads it.
   const outcomes = splitClassKey(key)?.outcomes ?? [];
   return plan.events.map((event: CellEvent, index: number) => ({ event, outcome: outcomes[index] && splitOutcome(outcomes[index], event.secondary).base }))
     .filter(({ event }) => event.side === side)
@@ -101,17 +96,12 @@ export function openFields(root: Battle, side: Side, cells: CellProof[], cache: 
 }
 
 /**
- * Whether a drawn class is at least as bad for the side as a class no draw
- * showed, so the drawn class's proof carries over: the same turn order and
- * the same outcomes except one event, where the opponent's move MISSED
- * (never better for them than the hit the draws showed) or the side's own
- * move KNOCKED OUT (never worse for the side than the survived hit). A
- * class model leaks mass on rare outcomes otherwise: a 90% Toxic whose
- * three draws all hit left ten percent of a certain win unproven.
- *
- * Round 88 (T336): a class in which a secondary that only helps the mover fired is a third case, and it is decided by the
- * positions the cell drew, not by the keys (prover-helping.ts: helpedSources). A class the draws never showed (the forced-draw cap
- * reached, or a secondary class under MIN_CLASS_MASS) keeps the two cases above, because no position says what its effect did.
+ * Whether a drawn class is at least as bad for the side as a class no draw showed, so the drawn class's proof carries over: the same
+ * turn order and the same outcomes except one event, where the opponent's move MISSED (never better for them than the hit the draws
+ * showed) or the side's own move KNOCKED OUT (never worse for the side than the survived hit). Otherwise the class model leaks mass on
+ * rare outcomes: a 90% Toxic whose three draws all hit left ten percent of a certain win unproven. A class in which a secondary that
+ * only helps the mover fired is a third case, decided by the drawn positions (`helpedSources` in `prover-helping.ts`), so a class no
+ * draw showed keeps the two cases above.
  */
 export function dominates(drawnKey: string, missingKey: string, events: CellEvent[], side: Side): boolean {
   const [drawnClass, missingClass] = [splitClassKey(drawnKey), splitClassKey(missingKey)];

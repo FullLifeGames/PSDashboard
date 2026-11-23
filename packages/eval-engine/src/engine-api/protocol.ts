@@ -1,12 +1,4 @@
-/**
- * The PS Dashboard engine protocol, version 1 (round 77, user gate 28.10.2026, "1a 2a 3a 4a 5a 6a").
- *
- * An engine is an HTTP endpoint: the dashboard POSTs an EngineRequest as JSON and reads an
- * EngineResponse back. A Showdown bot finds what it reads in a battle (the spectator log and each
- * side's request); an engine built on the simulator gets the whole battle (`state`). Every value is a
- * win expectation on [-1, 1]: -1 lost, +1 won. The protocol string names the version; a change that
- * breaks an engine gets a new one, and the dashboard keeps answering the old.
- */
+/** The version string of the engine protocol (ENGINES.md); every value on the wire is a win expectation on [-1, 1], and a change that breaks an engine gets a new string. */
 export const ENGINE_PROTOCOL = 'ps-dashboard-engine/1' as const;
 
 /** One legal choice of a side. */
@@ -24,6 +16,7 @@ export interface EngineOption {
   then?: string;
 }
 
+/** What the dashboard sends an engine: the position (the spectator log and each side's request for a bot, the whole battle in `state` for a simulator engine) and its options. */
 export interface EngineRequest {
   protocol: typeof ENGINE_PROTOCOL;
   /** The game's format as Showdown names it (the replay's): "gen9ou", "gen9vgc2026regi", "gen9championsvgc2026regmb". */
@@ -52,6 +45,7 @@ export interface EngineRequest {
   budgetMs: number;
 }
 
+/** What an engine answers: the position's value and a value for every option, optionally the matrix of option pairs. */
 export interface EngineResponse {
   protocol: typeof ENGINE_PROTOCOL;
   /** The position's value from p1's side. */

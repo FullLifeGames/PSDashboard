@@ -7,28 +7,7 @@ import type { EndgameChild, EndgameChildren } from './children.ts';
 import { delayFacts, heldStall, stallMargin, STALL_VOLATILE } from './delay-facts.ts';
 import { other, type Side } from './prover-order.ts';
 
-/**
- * Round 89 (P2, 1.2.0): the delay rule of the forced-win prover. A foe that repeats a stalling move (Protect and its kin, Endure) holds
- * with a chance that only falls along a chain, and the chain ends with its PP. A cell in which a foe body that carries the stall volatile
- * clicks a stalling move that rolls (`rollsStall`) is a repeat; a child of that cell is a delay when it did not end and its delay facts
- * equal the parent's (`delay-facts.ts`: the same board, HP kept, up to the foe's stall counter and the PP the margin covers), whether the
- * repeat held (`heldStall`) or failed and the foe still stands (an attack that missed: the stall is reset, the next use is sure and the
- * chain goes on).
- *
- * The rule applies when some child is a delay, every child in which the repeat held is one, and the own choice keeps the PP margin
- * (`stallMargin`). Then the cell is worth X = (the share-weighted mass of the other children) / (1 - the delays' share), and the proof
- * names the stalling move. Soundness, by induction over the foe's stall PP: let W be the least cell mass the other replies give at the
- * parent (a delay child has the parent's facts, so the other replies meet the same boards there). A delay child is the parent with another
- * stall counter and one stall PP less; the other children lose the volatile, so their positions do not depend on the counter, and their
- * relative shares are the side's own dice. With no stall PP left the foe has no stall reply and the value is W; otherwise the cell is worth
- * at least X (1 - d) + d min(W, X) >= min(W, X) for d the delay share, so the parent is worth at least min(W, X), the value the AND node
- * takes. The margin keeps the side's own choice legal along the chain. A held child that is no delay (a heal, a status, the partner's hit,
- * a contact shield's damage, a stage raised) refuses the rule for the whole cell.
- *
- * A cell whose draws split the end (the hold keeps the board, the failure knocks the foe out) is unpriced on the plain path, and no proof
- * runs through it; here its read through the recorded dice (`EndgameChildren.delaySplit`) stands in for it, and only when the rule fires.
- * Outside a repeated stall nothing in this module reads a cell.
- */
+/** The delay rule of the forced-win prover: a repeated stalling move that leaves the board as it was is a delay (EVALUATION.md, the forced-win prover). */
 
 /** The cell a delay is read from: the prover's `Cell` without its reply. */
 export type DelayCell = Pick<EndgameChildren, 'unpriced' | 'plain' | 'children' | 'delaySplit'> & { p1Choice: string; p2Choice: string };
@@ -57,8 +36,11 @@ export function stallClick(battle: Battle, foe: Side, foeChoice: string): string
 }
 
 /**
- * The delay reading of a cell for `side`'s proof at the position `root`, or null when the rule does not apply (no repeated stall in the
- * cell, no delay child, a held child that is no delay, the margin refused, or an unpriced cell without a read through its dice).
+ * The delay reading of a cell for `side`'s proof at the position `root`. A cell is a repeat when a foe body that carries the stall
+ * volatile clicks a stalling move that rolls (`rollsStall`); a child is a delay when it did not end and its delay facts equal the parent's,
+ * whether the repeat held (`heldStall`) or failed with the foe still standing (an attack that missed resets the stall, so the next use is sure).
+ * Null when the rule does not apply: no repeat, no delay child, a held child that is no delay (a heal, a status, the partner's hit, a contact
+ * shield's damage, a stage raised), the PP margin refused, or an unpriced cell without a read through its dice (`delaySplit`).
  */
 export function readDelay(root: Battle, side: Side, cell: DelayCell): DelayRead | null {
   const [own, foeChoice] = side === 'p1' ? [cell.p1Choice, cell.p2Choice] : [cell.p2Choice, cell.p1Choice];

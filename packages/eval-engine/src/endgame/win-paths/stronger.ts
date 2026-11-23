@@ -9,18 +9,12 @@ import { greedyReplacements } from './replacement.ts';
 import type { WinPathsRequest, WinStep } from './types.ts';
 
 /**
- * Round 89 (#130, step 1): a stronger play. The side that lost may pick any own choice at the turn; the opponent answers with its best
- * reply (every legal choice). The prover (endgame/prover.ts, `floor: 0` and `plan: true`) proves each own choice in the ranking's order
- * with the turns asked as its depth, the share of the dice that win whatever the opponent answers (the mass, a lower bound under the
- * class model, with the caveats of the prover: crits stay outside it and doubles prove over sampled rolls). The best choice's mass is the
- * step's `chance`, the played choice's `played`. A choice is stronger when its mass beats the played one's and is above 0.
- *
- * The line is a witness: the likeliest dice under which the proof's choices win (the own choice that proved each position and the reply
- * that gave its minimum, a replacement the simulator's greedy resolution picks), searched as the luck step searches (luck.ts). A
- * position the dice reach that the proof did not (a roll a little off the proof's own draw) is proved again from there with the turns
- * that are left. The line ends in the win, so ▶ Play shows a game the proof says is won in that share of the dice.
- *
- * Singles and doubles share this path; no species or move name enters it.
+ * A stronger play: the side that lost may pick any own choice at the turn and the opponent answers with its best reply. The prover
+ * (`floor: 0`, `plan: true`) proves each own choice in the ranking's order with the turns asked as its depth; the mass (a lower bound
+ * under the class model; crits stay outside it and doubles prove over sampled rolls) of the best choice is the step's `chance`, the played
+ * choice's `played`. A choice is stronger when its mass beats the played one's and is above 0. The line is a witness: the likeliest dice
+ * under which the proof's choices win, searched as the luck step searches (`luck.ts`); a position the dice reach that the proof did not
+ * (a roll a little off the proof's own draw) is proved again from there with the turns that are left.
  */
 
 const optionsOf = (request: WinPathsRequest) => ({ tera: request.tera, sleepClause: request.sleepClause, ruleset: request.ruleset });

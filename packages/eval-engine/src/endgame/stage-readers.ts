@@ -6,20 +6,16 @@ import { usableSlots } from '../score/threat.ts';
 import { other, type Side } from './prover-order.ts';
 
 /**
- * Round 88 (T336, #72, E2b): which moves read or move the stat stages a class moved. A class in which a secondary effect fired may
- * take the proof of the class in which it did not only while the effect cannot turn against the mover later in the proof: the mover's
- * stages up and the foe's down help the mover, unless a foe body clicks a move that reads them (Foul Play reads the target's Attack,
- * Punishment the target's positive stages), copies or steals a gain (Psych Up, Spectral Thief, Transform), turns the stages
- * (Topsy-Turvy) or hands them over (the Swap moves). The Dex has a field for some of them and none for the rest, so the answer is the
- * simulator's, played once per twin format and move, the way `removesStages` (score/boost-bite.ts) asks it about Haze and the phazers.
+ * Which moves read or move the stat stages a class moved (Foul Play, Punishment, Psych Up, Spectral Thief, Transform, Topsy-Turvy, the
+ * Swap moves). The Dex has a field for some and none for the rest, so the simulator answers, played once per twin format and move, as
+ * `removesStages` (score/boost-bite.ts) does for Haze and the phazers.
  *
- * The question: the foe (Snorlax, the move first) clicks the move at the target (Vaporeon, a pure Water type: no typing is immune)
- * in five runs, with every die answering yes and the damage roll at its middle (`FixedDice`), so the runs differ in the stages only.
- * Baseline: nobody has a stage. Then the target gains two stages in Attack and Special Attack, then in Defense and Special Defense,
- * then in Accuracy and Evasion (the gains a class gives the mover), and the foe loses two stages in all six (what the class takes from
- * it). Speed is left out: a class that moves a Speed stage is never carried over (`onlyHelpsMover`). A move reads the stages when, against
- * the baseline, the target loses more HP, a stage of the target ends lower, or a stage of the foe ends higher. Each of the three would
- * make the fired position worse for the mover than the unfired one, which the carried proof denies. A charge move plays its second turn.
+ * The question: the foe (Snorlax, the move first) clicks the move at the target (Vaporeon, a pure Water type: no typing is immune) in
+ * five runs, every die answering yes and the damage roll at its middle (`FixedDice`), so the runs differ in the stages only. Baseline:
+ * nobody has a stage; then the target gains two stages in Attack and Special Attack, in Defense and Special Defense, in Accuracy and
+ * Evasion (the gains a class gives the mover), and the foe loses two stages in all six. Speed is left out (`onlyHelpsMover` never
+ * carries a class that moves it). A move reads the stages when, against the baseline, the target loses more HP, a target stage ends
+ * lower or a foe stage ends higher. A charge move plays its second turn.
  */
 
 // A body with no ability and no item: nothing but the move answers the stages.

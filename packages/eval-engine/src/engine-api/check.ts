@@ -4,6 +4,7 @@ import { validateEngineResponse } from './validate.ts';
 /** The pages that host the dashboard: an engine must let them call it (CORS). */
 export const DASHBOARD_ORIGINS = ['https://fulllifegames.github.io', 'https://fulllifegames.com'];
 
+/** The result of `checkEngine`: one row per sample position and one per hosting origin's preflight. */
 export interface EngineCheckReport {
   ok: boolean;
   samples: { name: string; ok: boolean; ms: number; errors: string[] }[];
@@ -57,12 +58,7 @@ async function checkCors(url: string, origin: string, fetcher: Fetch) {
   }
 }
 
-/**
- * Round 77 (user gate 28.10.2026, 6a): the conformance check of an engine endpoint, behind
- * `npx @fulllifegames/eval-engine check-engine <url>`. It sends the shipped sample positions (singles,
- * doubles, VGC) with the options the dashboard ranks, checks every answer as the dashboard reads it
- * (validateEngineResponse) and against the budget, and checks the preflight of both hosting pages.
- */
+/** The conformance check of an engine endpoint (`check-engine <url>`): sample positions of each game type, every answer, the budget and both preflights. */
 export async function checkEngine(url: string, options: {
   positions: { name: string; serialized: string; format?: string }[];
   budgetMs?: number;

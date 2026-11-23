@@ -10,22 +10,17 @@ import { plainDrawCount } from './children.ts';
 import { other, wonBy, type Side } from './prover-order.ts';
 
 /**
- * Round 89 (P3, 1.2.0): the sure strike, a candidate the forced-win prover tries first. A move of the side that knocks out the foe's
- * last standing body in every roll and moves before every damaging move the foe can click ends the game before the foe acts: the foe's
- * reply decides nothing but a stalling move (a Protect that holds), which the proof's own cells and its delay rule read. Aqua Jet at
- * Raichu's 9 HP in Champions VGC 2682637901 turn 6 is one: Zap Cannon into Primarina (a knock-out in 200 of 200 rolls) never lands.
- *
- * Three reads, none from a list of moves:
+ * The sure strike, a candidate the forced-win prover tries first: a move that knocks out the foe's last standing body in every roll and
+ * moves before every damaging move the foe can click ends the game before the foe acts (only a stalling move can reply, which the delay
+ * rule reads). Three reads, none from a list of moves:
  * - the kill: the damage calculator's odds (`boundaryEvent`, 16 rolls with the crit) say every roll knocks the body out;
- * - the order: the simulator's own queue on a copy (`queuePlace`: the Dex priority after every modifier, then the action speed under
- *   Trick Room, Tailwind and paralysis), the foe's moves read with every chance answering yes (a Quick Claw that may fire counts
- *   against the strike) and the own move with every chance answering no; an equal place is a speed tie the queue shuffles, so no strike;
- * - the rules: the strike turn is played on copies of the battle against each damaging foe move on the seeds a plain cell draws, and the
- *   game must end in the side's win with no foe move in the turn's log. Psychic Terrain, Dazzling and its kin, a move that fails after
- *   the first turn, a Focus Sash and the like all show there, and the calculator knows none of them.
- * Decision D2 a (integrator, round 89): only the foe's last standing body. A foe with a second body keeps that body's moves, its
- * redirection and its switch in play, and the ranking's order already serves those boards. Generations 1 and 2 have no kill odds in
- * the model (`boundaryEvent` returns null): no strike is offered there.
+ * - the order: the simulator's queue on a copy (`queuePlace`: the Dex priority after every modifier, then the action speed under Trick
+ *   Room, Tailwind and paralysis), the foe's moves read with every chance answering yes (a Quick Claw that may fire counts against the
+ *   strike) and the own move with every chance answering no; an equal place is a speed tie the queue shuffles, so no strike;
+ * - the rules: the strike turn is played on copies against each damaging foe move on the seeds a plain cell draws, and the game must
+ *   end in the side's win with no foe move in the turn's log (Psychic Terrain, Dazzling and its kin, a Focus Sash: the calculator knows none).
+ * Only the foe's last standing body counts: a second body keeps its moves, its redirection and its switch in play. Gens 1 and 2 have no
+ * kill odds in the model (`boundaryEvent` returns null), so no strike is offered there.
  */
 
 interface Part { id: string; target: number | null; plain: boolean }
@@ -140,9 +135,8 @@ export function sureStrike(position: SimPosition, side: Side, pool: ChoiceOption
 }
 
 /**
- * Round 89 (P4): the Dex names the card gives a winning choice that is a strike (`ForcedWin.choiceNames`): the strike part that moves
- * first (of two strike parts, the one the simulator's queue puts first) and the partner's move, from the battle's own Dex. Undefined
- * for a choice that is no strike of this position.
+ * The Dex names the card gives a winning choice that is a strike (`ForcedWin.choiceNames`): the strike part that moves first (by the
+ * simulator's queue) and the partner's move, from the battle's own Dex; undefined for a choice that is no strike of this position.
  */
 export function strikeNames(position: SimPosition, side: Side, choice: string, tera: TeraAllowance | undefined): { first: string; partner?: string } | undefined {
   const board = boardOf(position, side, tera);

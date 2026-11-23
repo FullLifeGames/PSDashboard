@@ -5,12 +5,9 @@ import { strongerStep } from './stronger.ts';
 import type { WinPaths, WinPathsRequest, WinStep } from './types.ts';
 
 /**
- * Round 89 (#130, G8a): the on-demand job. `winPaths` runs the steps in the order the user ruled (a stronger play, luck, a mistake by the
- * opponent), each with a meter of its own (one budget per step, so a step that stops at its cap never takes the next one's work), and
- * reports each step the moment it is done. It runs only when the app asks, never in a sweep, and it reads the serialized position and
- * writes nothing into any result.
- *
- * A step that throws is a `failed` step with the message and the others still run. The third step is `mistakeStep` (ruling W3a).
+ * The on-demand job: the steps run in order (a stronger play, luck, a mistake by the opponent), each with a meter of its own so a step
+ * that stops at its cap never takes the next one's work, and each is reported the moment it is done. A step that throws is a `failed`
+ * step with the message and the others still run.
  */
 export interface WinStepRunner {
   kind: WinStep['kind'];
@@ -23,6 +20,7 @@ export const WIN_STEPS: readonly WinStepRunner[] = [
   { kind: 'mistake', run: mistakeStep },
 ];
 
+/** Runs the win-path steps for a lost endgame; it runs only when the app asks (never in a sweep) and reads the serialized position without writing into any result. */
 export function winPaths(
   serialized: string,
   request: WinPathsRequest,

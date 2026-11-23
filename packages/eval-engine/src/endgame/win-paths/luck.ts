@@ -11,21 +11,16 @@ import { FirstChoice, positionKey } from './first-choice.ts';
 import { awaitsReplacement, exactChance, inDrawOrder, lineOfPath, playOf, wonBy, type PathStep } from './luck-path.ts';
 
 /**
- * Round 89 (#130, step 2, luck): the likeliest sequence of dice under which the side that lost wins within N turns, both sides playing
- * the engine's first choice (first-choice.ts). A best-first search over the dice: a node is a step to play (a turn, or the replacement
- * a faint asks for) from a battle, with the dice pinned for it; a step is played with every die at its likeliest result except the
- * pinned ones (`playTurnWith`). A node's priority is an upper bound of its path's chance: the product of the chances of its dice,
- * a damage roll and a speed tie counted as certain until the path wins (their exact share reads the simulator on copies: `exactChance`).
- * Its successors are the next step from the outcome, and the same step with one more die turned the other way: a chance die, a status
- * check, a hit count or a pick to another result of its draw (`otherResults`, the chance the simulator's own), a damage roll to the
- * other side of its knock-out boundary (`rollBoundary`), a speed tie to the other order. Only dice after the last pinned one are
- * turned, so a set of pins is generated once. Chances only shrink, so the first win popped, after its exact chance is read and
- * the queue's best bound cannot beat it, is the likeliest winning sequence the enumeration reaches.
- *
- * It stops at that win (`found`), at an empty queue (`none`: every path above the floor was played) or when the meter reaches its cap
- * (`stopped`). Dice a draw cannot name (a duration, a random target) follow the seed; the line lists them in `unforced`.
- * Caveat: a damage roll sits at the middle step of its group and counts its share only where it decides who falls, so a roll that
- * leaves a body one hit from a later knock-out is carried at that HP, not priced.
+ * The likeliest sequence of dice under which the side that lost wins within N turns, both sides playing the engine's first choice. A
+ * best-first search over the dice: a node is a step to play with some dice pinned (every other die at its likeliest result, `playTurnWith`).
+ * A node's priority is an upper bound of its path's chance: the product of the chances of its dice, a damage roll and a speed tie counted
+ * as certain until the path wins (`exactChance` reads their share from the simulator on copies). Its successors are the next step and the
+ * same step with one more die turned the other way (a chance die, status check, hit count or pick to `otherResults`; a damage roll to the
+ * other side of its knock-out boundary, `rollBoundary`; a speed tie to the other order), only dice after the last pinned one, so a set
+ * of pins is generated once. Chances only shrink, so the first win popped with its exact chance, once no bound in the queue beats it,
+ * is the likeliest. Dice a draw cannot name (a duration, a random target) follow the seed; the line lists them in `unforced`.
+ * Caveat: a damage roll counts its share only where it decides who falls, so a roll that leaves a body one hit from a later knock-out
+ * is carried at that HP, not priced.
  */
 
 interface Entry {

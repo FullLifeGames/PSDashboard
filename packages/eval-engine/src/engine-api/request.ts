@@ -44,10 +44,7 @@ export function buildEngineRequest(
   };
 }
 
-/**
- * A request with the options the dashboard's own matrix ranks at this position (pivot pairs
- * included), for the conformance tool and for an engine's author who builds requests from own positions.
- */
+/** A request with the options the dashboard's own matrix ranks at this position (pivot pairs included), for the conformance tool and engine authors. */
 export function engineRequestFor(serialized: string, budgetMs = 5000, tera: TeraAllowance = true, format?: string): EngineRequest {
   const root = createRootPosition(serialized);
   return buildEngineRequest(serialized, {

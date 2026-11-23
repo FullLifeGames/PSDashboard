@@ -10,20 +10,17 @@ import { endgameChildren } from './children.ts';
 import { endgameKey } from './key.ts';
 
 /**
- * The endgame solver (round 34): the exact value of a small endgame (at
- * most three living bodies) under best play by both sides. Every state is
- * a turn boundary; its value is the equilibrium of the choice-pair matrix
- * over the children's values, recursively to the game's end, memoized on
- * the endgame key. Chance is priced per cell (children.ts). Three caps
- * keep it finite (turns from the root, states, wall clock); at a cap the
- * search's leaf value stands in and the result is flagged. Ground truth
- * for the estimators. Round 89 (#130, D2): `oneTurnMatrix` is also a
- * production path, the engine's first choice at a position of a win-path
- * search (endgame/win-paths/first-choice.ts); `solveEndgame` stays as it was.
+ * The endgame solver: the exact value of a small endgame under best play, the equilibrium of each turn's choice-pair matrix recursed to
+ * the game's end and memoized on the endgame key. `oneTurnMatrix` also serves the win-path search (`endgame/win-paths/first-choice.ts`).
  */
+
+/** The caps that keep the solver finite: turns from the root, states and wall clock; at a cap the search's leaf value stands in and the result is flagged. */
 export interface EndgameCaps { turns: number; states: number; wallMs: number }
+/** The default caps of `solveEndgame`. */
 export const ENDGAME_CAPS: EndgameCaps = { turns: 30, states: 20000, wallMs: 120000 };
+/** Why a result is not exact: a cap was hit, a chance stayed unpriced, or the position looped. */
 export type EndgameFlag = 'capped' | 'unpriced' | 'loop';
+/** The value of an endgame with its flags and principal variation. */
 export interface EndgameResult {
   /** False when the position has more than three living bodies; nothing else is filled then. */
   scope: boolean;
@@ -43,6 +40,7 @@ export interface EndgameResult {
 const MAX_BODIES = ENDGAME_MAX_BODIES;
 const PV_LIMIT = 12;
 
+/** Whether the battle is small enough for the solver (`ENDGAME_MAX_BODIES` living bodies). */
 export function endgameScope(battle: Battle): boolean {
   return livingMons(battle, 0).length + livingMons(battle, 1).length <= MAX_BODIES;
 }
@@ -137,11 +135,10 @@ class EndgameSolver {
 }
 
 /**
- * Round 89 (#130, D1): the one-turn matrix of a position, the engine's first choice past a search's root. Both sides' options are
- * the search's own (`searchOptions`), every pair is played once with its chance priced as the prover's cells price it, and every
- * child stands at its static value (the solver at one turn: every state below is a stand-in at its leaf). `values` is the p1
- * perspective (win-probability units, -1 to 1); the mixes are the equilibrium of the matrix. Null when the game is over or a side
- * has no option. `cells` is the number of pairs played, the caller's work counter.
+ * The one-turn matrix of a position, the engine's first choice past a search's root: both sides' options are the search's own
+ * (`searchOptions`), every pair is played once with its chance priced as the prover's cells price it, and every child stands at its
+ * static value. `values` is the p1 perspective (win-probability units, -1 to 1); the mixes are the equilibrium. `cells` is the number of
+ * pairs played. The function gives null when the game is over or a side has no option.
  */
 export interface OneTurnMatrix {
   p1: ChoiceOption[];
@@ -161,11 +158,7 @@ export function oneTurnMatrix(
   return new EndgameSolver({ ...ENDGAME_CAPS, turns: 1 }, options.ruleset ?? position.ruleset ?? 'standard', options).oneTurn(position);
 }
 
-/**
- * Round 65: `ruleset` names the weight table of the solver's statics
- * (EvalSettings.ruleset). Round 67 (T139): every caller names it (the
- * endgame bench passes each position's own); unset reads as 'standard'.
- */
+/** Solves an endgame given as a serialized battle; `ruleset` names the weight table of the statics (EvalSettings.ruleset), unset reads as 'standard'. */
 export function solveEndgame(serializedBattle: string, caps: Partial<EndgameCaps> | undefined, ruleset: StaticRuleset | undefined): EndgameResult {
   const root = createRootPosition(serializedBattle, ruleset ?? 'standard');
   if (!endgameScope(positionBattle(root))) {
