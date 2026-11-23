@@ -3,20 +3,13 @@ import { SavedGamesList } from './SavedGamesList';
 import { ShareLinkField } from './BranchSaveSharePanel';
 import type { NewGameRecord } from '../lib/new-game/record';
 
-/**
- * Round 89 (lane H, #105), stage H4b (user ruling 13.11.2026, H10b and H11a): the ways into a game besides a replay. The Game menu
- * holds them as its second and third part, the start page as its second panel under the loader's. The words are Showdown's and the
- * app's own ("Load", "New game", "Saved games"); every rule of the look is an existing app rule (new-game.css names each).
- */
+/** The ways into a game besides a replay: New game and Saved games, in the Game menu and on the start page. */
 
 export interface GameEntryProps {
-  /** Opens the New game dialog. */
   onNewGame: () => void;
-  /** Opens a saved game in the workspace. */
   onOpenGame: (record: NewGameRecord) => Promise<unknown> | void;
-  /** The id of the game that is open now, if any. */
   currentGameId: string | null;
-  /** The Game menu's share row: the link of the open game as it stands (its main line, the open variation, the turn on screen). Absent where no game is open. */
+  /** The link of the open game as it stands (main line, open variation, turn on screen); absent where no game is open. */
   onShareGame?: () => string | null;
 }
 
@@ -29,7 +22,7 @@ function NewGameRow({ onNewGame, text }: { onNewGame: () => void; text: string }
   );
 }
 
-/** Copy Share Link for the open game, at every position of it: Team Preview, the main line, the tip, the end (ruling 31 H6a). */
+/** Copy Share Link for the open game at every position: Team Preview, the main line, the tip, the end. */
 function GameShareRow({ onShare }: { onShare: () => string | null }) {
   const [link, setLink] = useState('');
   const [copied, setCopied] = useState(false);
@@ -57,7 +50,6 @@ function GameShareRow({ onShare }: { onShare: () => string | null }) {
   );
 }
 
-/** The Game menu's second and third part, each behind a divider; the saved games leave out theirs when there are none. */
 export function MenuGameParts({ onNewGame, onOpenGame, currentGameId, onShareGame }: GameEntryProps) {
   return (
     <>
@@ -69,7 +61,6 @@ export function MenuGameParts({ onNewGame, onOpenGame, currentGameId, onShareGam
   );
 }
 
-/** The start page's second panel: the New game button with its sentence, and the saved games under it. */
 export function LandingGamesPanel({ onNewGame, onOpenGame, currentGameId }: GameEntryProps) {
   return (
     <div className="ps-panel ps-entry-landing" style={{ marginBottom: 8 }}>

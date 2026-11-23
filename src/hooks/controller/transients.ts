@@ -8,7 +8,7 @@ export interface PlayOutState {
   turns: number;
   startTurn: number;
   prevAuto: boolean;
-  /** Round 88 (T347, #83): Stop was pressed with a turn in flight; the run ends when that turn landed. */
+  /** Stop was pressed with a turn in flight; the run ends when that turn landed. */
   stopping?: { text: string; navigated: boolean } | null;
 }
 
@@ -31,17 +31,11 @@ export function useTransients(replayId: string | undefined) {
   const playOutRef = useRef<{ active: boolean; stopping?: { navigated: boolean } | null } | null>(null);
   const stopPlayOutRef = useRef<((opts?: { navigated?: boolean }) => void) | null>(null);
 
-  // ── "Let it play out": the engine plays BOTH sides' top choice from the
-  // current position until the game ends, the user stops, or the safety cap
-  // trips. Each executed turn is a normal history entry — navigable,
-  // evaluable, truncatable like anything else; Stop keeps what was played.
   const [playOut, setPlayOut] = useState<PlayOutState | null>(null);
-  /** Why the last play-out ended + where watching it starts (panel notice). */
   const [playOutNotice, setPlayOutNotice] = useState<{ text: string; watchTurn: number } | null>(null);
   const playOutProcessedRef = useRef<EvalResult | null>(null);
   /**
-   * The lead picker's complete selection while the turn 0 view shows it (null otherwise): "Let it play out" starts
-   * from the leads on screen (round 77, C2).
+   * The lead picker's complete selection while the turn 0 view shows it (null otherwise): "Let it play out" starts from the leads on screen.
    */
   const leadPicksRef = useRef<LeadSelection | null>(null);
   const setLeadPicks = useCallback((picks: LeadSelection | null) => { leadPicksRef.current = picks; }, []);
@@ -59,11 +53,9 @@ export function useTransients(replayId: string | undefined) {
    * Cleared on every navigation — a draft belongs to one position.
    */
   const [draftChoices, setDraftChoices] = useState<{ p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] }>({ p1: [], p2: [] });
-  /** Inline confirm for main-line deviations that would replace the variation. */
   const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
 
-  // The transient interaction state dies with the previous replay —
-  // render-phase adjustment on the replay id (the react-hooks gate forbids
+  // The transient interaction state dies with the previous replay: render-phase adjustment on the replay id (the react-hooks gate forbids
   // plain setState resets inside the load-sync effect).
   const [transientsReplayId, setTransientsReplayId] = useState(replayId);
   if (transientsReplayId !== replayId) {

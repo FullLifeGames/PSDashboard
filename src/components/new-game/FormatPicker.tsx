@@ -2,24 +2,18 @@ import { useId, useMemo, useRef, useState } from 'react';
 import { formatNote, searchGroups } from '../../lib/new-game/format-list';
 import type { FormatGroup, FormatOption } from '../../lib/new-game/format-options';
 
-/**
- * Round 89 (lane H, #105), stage H4: the format list of the New game dialog. A button shows the chosen format and opens the list: a
- * search field on top, the groups under it as Showdown's format picker draws them, the arrow keys, Enter and Escape as the app's
- * ComboBox has them. The list is the simulator's whole list; the groups arrive ready (`panelGroups`).
- */
+/** The format list of the New game dialog: the simulator's whole list in Showdown's groups, with a search field and the ComboBox's keys. */
 
 interface Props {
   groups: readonly FormatGroup[];
   value: string;
   onSelect: (option: FormatOption) => void;
-  /** The format's one-line note (the rule table's); injected so the picker stays a view. */
   note?: (option: FormatOption) => string;
   disabled?: boolean;
 }
 
 type Row = { kind: 'group'; label: string } | { kind: 'option'; option: FormatOption; index: number };
 
-/** The flat rows of the visible list: a heading before each group, the options numbered for the keyboard. */
 function rowsOf(groups: readonly FormatGroup[]): { rows: Row[]; options: FormatOption[] } {
   const rows: Row[] = [];
   const options: FormatOption[] = [];
@@ -33,7 +27,6 @@ function rowsOf(groups: readonly FormatGroup[]): { rows: Row[]; options: FormatO
   return { rows, options };
 }
 
-/** The list's state: open, the search text, the highlighted option; the keys that move it. */
 function useFormatPicker(groups: readonly FormatGroup[], value: string, onSelect: (option: FormatOption) => void, buttonRef: React.RefObject<HTMLButtonElement | null>) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -82,7 +75,6 @@ function useFormatPicker(groups: readonly FormatGroup[], value: string, onSelect
 
 type PickerState = ReturnType<typeof useFormatPicker>;
 
-/** A stable ref callback: it runs once when the list mounts, not on every hover. */
 const bringIntoView = (element: HTMLDivElement | null): void => element?.scrollIntoView?.({ block: 'nearest' });
 
 function FormatList({ picker, idBase, value, total, note }: { picker: PickerState; idBase: string; value: string; total: number; note: (option: FormatOption) => string }) {
@@ -119,7 +111,6 @@ function FormatList({ picker, idBase, value, total, note }: { picker: PickerStat
             role="option"
             aria-selected={row.option.id === value}
             className={`ps-combobox-option${row.index === highlight ? ' ps-combobox-option-active' : ''}`}
-            // the search field keeps focus, so a click cannot blur it first
             onMouseDown={event => event.preventDefault()}
             onClick={() => picker.commit(row.option)}
             onMouseEnter={() => picker.setHighlight(row.index)}

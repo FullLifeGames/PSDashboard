@@ -23,7 +23,7 @@ function SharedBranchTopbar({
         <span style={{ fontSize: 11, fontWeight: 'bold', color: '#8cf' }}>
           Shared Branch
         </span>
-        {/* a game of the app has no Showdown replay to load (round 89, #105, H5) */}
+        {/* A game of the app has no Showdown replay to load. */}
         {!isGameId(branch.replayId) && (
           <button
             type="button"
@@ -49,7 +49,6 @@ function SharedBranchTopbar({
 
 type SharedChoice = BranchSharePayload['choices'][number];
 
-/** One line of the choice list: names where the link carries them, the simulator commands for an older link. */
 function choiceLine(choice: SharedChoice): string {
   const p1 = choice.p1Label ?? choice.p1Choice;
   const p2 = choice.p2Label ?? choice.p2Choice;

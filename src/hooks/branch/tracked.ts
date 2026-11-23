@@ -3,8 +3,8 @@ import type { Dispatch, RefObject, SetStateAction } from 'react';
 import type { BranchRefs, BranchHistoryEntry } from './shared';
 
 /**
- * State with a ref that holds its latest value: a caller that acts right after an async write (a new game's promotion, round 89,
- * #105) reads the ref where the render's copy is stale. Every write goes through the setter, a function update included.
+ * State with a ref that holds its latest value: a caller that acts right after an async write reads the ref where the render's copy is
+ * stale. Every write goes through the setter, a function update included.
  */
 export function useTrackedState<T>(initial: T): [T, Dispatch<SetStateAction<T>>, RefObject<T>] {
   const [value, setValue] = useState<T>(initial);
@@ -25,10 +25,9 @@ interface TrackedHandles {
 }
 
 /**
- * What a new game reads and does at the branch (round 89, #105): the history, the runtime's log with the length it had when the
- * branch started or was last rebased, the start turn, the stream, and `rebaseAtTip`: the live runtime stays and becomes the
- * start of a new branch at `startTurn` with no entry of its own (the turns it played joined the game's main line), the state
- * `requestDeviation(null)` leaves at a turn, so the tip is live.
+ * What a new game reads and does at the branch: the history, the runtime's log with the length it had when the branch started or was last
+ * rebased, the start turn, the stream, and `rebaseAtTip`: the live runtime stays and becomes the start of a new branch at `startTurn` with no
+ * entry of its own (the turns it played joined the game's main line), the state `requestDeviation(null)` leaves at a turn, so the tip is live.
  */
 export function useNewGameAccess(refs: BranchRefs, handles: TrackedHandles) {
   const { logRef, startLogLengthRef, battleStreamRef } = refs;
@@ -46,7 +45,7 @@ export function useNewGameAccess(refs: BranchRefs, handles: TrackedHandles) {
   return { getHistory, getLog, getStartTurn, getStream, rebaseAtTip };
 }
 
-/** A lead start is the first turn of a new game's main line: the game takes it in as soon as the start resolves (round 89, #105). */
+/** A lead start is the first turn of a new game's main line: the game takes it in as soon as the start resolves. */
 export function useLeadPromotion<Start extends (...args: never[]) => Promise<{ endedNotice: string | null } | void>>(
   start: Start, afterTurnRef?: RefObject<(() => Promise<void>) | null>,
 ): Start {

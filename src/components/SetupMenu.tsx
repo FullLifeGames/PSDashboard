@@ -3,7 +3,7 @@ import { gameReviewEnabled, opponentReadsEnabled } from '../lib/feature-flags';
 import { SearchSelects, type SearchSelectsProps } from './SearchSelects';
 import { SizeSelect } from './SizeSelect';
 
-/** Round 89 (#153, HM-2): what the setting changes and where; the grades stay as they are. */
+/** What the setting changes and where; the grades stay as they are. */
 const opponentReadsTitle = (): string => 'In a variation the opponent answers each move you pick with the reply the search rates lowest for it, as if it had read your move: '
   + `when you click an engine move, in the turn dock, and in a turn's lines${gameReviewEnabled() ? ' and the Game review' : ''}. `
   + 'Off, it plays its own top choice, which does not depend on your move. Grades and scores stay as they are. A change applies from your next pick.';
@@ -11,24 +11,22 @@ const opponentReadsTitle = (): string => 'In a variation the opponent answers ea
 interface SetupMenuProps {
   animateBranchTurns: boolean;
   onAnimateChange: (value: boolean) => void;
-  /** Round 89 (#153, HM-2): the stored `hardMode` preference, shown as "Opponent reads my move". */
+  /** The stored `hardMode` preference, shown as "Opponent reads my move". */
   opponentReads: boolean;
   onOpponentReadsChange: (value: boolean) => void;
   onEditSide: (side: 'p1' | 'p2') => void;
   onOpenSets: () => void;
   /**
-   * Round 89 (ruling 49): the search's Depth and Samples. Left out, the menu draws neither (an embedded view); `external` is another engine
-   * than the built-in search, which decides its own depth.
+   * The search's Depth and Samples. Left out, the menu draws neither (an embedded view); `external` is another engine than the built-in
+   * search, which decides its own depth.
    */
   search?: SearchSelectsProps & { external: boolean };
 }
 
 /**
- * Round 77 (user request 28.10.2026): the top bar keeps one row. The animate toggle and the three team
- * actions open from one button; a pick closes the menu, the toggle keeps it open, and so do Escape and
- * a click outside it. Round 84 (T315): the Size select of the app's scale stands under the animate toggle and keeps the menu
- * open like it. Round 89 (#153, HM-2): the box that stood in the Evaluation row as "Hard mode" sits here as "Opponent reads my move", below
- * the animate toggle, and keeps the menu open too. Round 89 (ruling 49): the Depth and Samples selects stand under the checkboxes, above Size (`SearchSelects`). Round 89 (ruling 49): behind the flag `opponentReadsEnabled` (src/lib/feature-flags.ts); off, the box is not drawn.
+ * The Setup menu: the animate toggle, the three team actions, Size, the "Opponent reads my move" box (drawn only with the flag
+ * `opponentReadsEnabled`, src/lib/feature-flags.ts) and the Depth and Samples selects (`SearchSelects`). A pick closes the menu;
+ * the toggle and the selects keep it open, and so do Escape and a click outside it.
  */
 export function SetupMenu({ animateBranchTurns, onAnimateChange, opponentReads, onOpponentReadsChange, onEditSide, onOpenSets, search }: SetupMenuProps) {
   const [open, setOpen] = useState(false);

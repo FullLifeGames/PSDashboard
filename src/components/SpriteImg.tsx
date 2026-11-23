@@ -10,9 +10,9 @@ type Props = Omit<ImgHTMLAttributes<HTMLImageElement>, 'src' | 'onError'> & {
 };
 
 /**
- * A species sprite with one fallback (round 89, FB-1): the sprite folder holds no file for some formes (Dragalge-Mega), so a miss shows
- * the base species' sprite, read from the Dex (`baseSpriteUrl`); a miss of that one ends the chain. The state names the files that
- * failed, so a new species starts over without an effect.
+ * A species sprite with one fallback: the sprite folder holds no file for some formes (Dragalge-Mega), so a miss shows the base species'
+ * sprite, read from the Dex (`baseSpriteUrl`); a miss of that one ends the chain. The state names the files that failed, so a new species
+ * starts over without an effect.
  */
 export function SpriteImg({ species, rules, hideOnMiss = false, ...image }: Props) {
   const own = spriteUrl(species, rules);

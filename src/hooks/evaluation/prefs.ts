@@ -3,10 +3,8 @@ import { autoTurnSettings, searchBudget, type EvalPreferences, type EvalSettings
 import { opponentReadsEnabled } from '../../lib/feature-flags';
 
 const PREFS_KEY = 'ps-replay-interceptor:eval-prefs';
-// Default line engine: 'auto' — the measured-best line per game type from
-// the search budget (search/budget.ts). depth/samples apply when the user
-// picks an explicit matrix mode; stored user prefs always win over this
-// default.
+// Default line engine: 'auto', the measured-best line per game type from the search budget (search/budget.ts). depth/samples apply when the
+// user picks an explicit matrix mode; stored user prefs always win over this default.
 const DEFAULT_PREFS: EvalPreferences = { depth: 2, samples: 3, mode: 'auto', auto: false, autoAnalyze: false, tera: 'auto' };
 
 function loadPrefs(): EvalPreferences {
@@ -21,8 +19,7 @@ function loadPrefs(): EvalPreferences {
       auto: !!parsed.auto,
       autoAnalyze: !!parsed.autoAnalyze,
       tera: parsed.tera === 'on' || parsed.tera === 'off' || parsed.tera === 'revealed' ? parsed.tera : 'auto',
-      // Round 89 (#153): Hard mode restores only from a stored true; off leaves the preferences as they were before it existed.
-      // Ruling 49: with the flag of Opponent reads my move off, a stored true reads as unset (see `storedHardMode`).
+      // Hard mode restores only from a stored true. With the flag of Opponent reads my move off, a stored true reads as unset (see `storedHardMode`).
       ...(parsed.hardMode === true && opponentReadsEnabled() ? { hardMode: true } : {}),
     };
   } catch {
@@ -30,7 +27,7 @@ function loadPrefs(): EvalPreferences {
   }
 }
 
-/** The `hardMode` an earlier nightly stored, kept as it was while the flag hides it: a write of the other preferences must not drop it. */
+/** A stored `hardMode`, kept as it was while the flag hides it: a write of the other preferences must not drop it. */
 function storedHardMode(): true | undefined {
   try {
     return (JSON.parse(localStorage.getItem(PREFS_KEY) ?? 'null') as { hardMode?: unknown } | null)?.hardMode === true ? true : undefined;
@@ -40,10 +37,9 @@ function storedHardMode(): true | undefined {
 }
 
 /**
- * The panel preferences with their synchronous ref (evaluate and the sweep
- * are stable callbacks and read the CURRENT prefs through it) and the
- * localStorage persistence. `persistPrefs` returns whether an
- * engine-relevant setting changed — the caller marks a done result stale. Hard mode (round 89, #153) is not one of them: no search reads it.
+ * The panel preferences with their synchronous ref (evaluate and the sweep are stable callbacks and read the CURRENT prefs through it) and the
+ * localStorage persistence. `persistPrefs` returns whether an engine-relevant setting changed: the caller marks a done result stale. Hard mode is
+ * not one of them: no search reads it.
  */
 export function usePrefsState() {
   const [prefs, setPrefsState] = useState<EvalPreferences>(loadPrefs);
@@ -77,23 +73,17 @@ export interface TurnEvalSettings {
 }
 
 /**
- * Resolve the auto mode at one position: the VERIFIED line configuration
- * from the search budget (search/budget.ts). Since round 63 (T110) each game
- * type has its own split: below its tree threshold auto runs its early
- * matrix, at or above it the DUCT tree. Auto is a complete engine spec,
- * independent of the depth prefs, which apply to the explicit matrix modes
- * only.
+ * Resolve the auto mode at one position: the VERIFIED line configuration from the search budget (search/budget.ts). Each game type has its own
+ * split: below its tree threshold auto runs its early matrix, at or above it the DUCT tree. Auto is a complete engine spec, independent of the
+ * depth prefs, which apply to the explicit matrix modes only.
  */
 export function resolveAutoTurnSettings(faintedFraction: number, doubles: boolean): TurnEvalSettings {
   return autoTurnSettings(faintedFraction, doubles);
 }
 
 /**
- * The team-preview lead under auto: the budget's lead matrix in both game
- * types, whatever the early splits. Measured in round 61 on the 128 bank
- * games with a team preview (gen 5 on): the tree read doubles previews
- * worse (hq +267 bp [+20, +534]) and singles no differently (-9 bp,
- * unresolved).
+ * The team-preview lead under auto: the budget's lead matrix in both game types, whatever the early splits. Measured on the 128 bank games with a
+ * team preview (gen 5 on): the tree read doubles previews worse (hq +267 bp [+20, +534]) and singles no differently (-9 bp, unresolved).
  */
 export function resolveAutoLeadSettings(): TurnEvalSettings {
   const { depth, samples } = searchBudget().lead;
@@ -137,16 +127,11 @@ const configuredTarget = (
   mode !== 'auto' ? mode : faintedFraction == null ? null : resolveAutoTurnSettings(faintedFraction, doubles).mode;
 
 /**
- * May a sweep pass replace the graph's stored per-turn data? Monotone merge:
- * a shallower result never overwrites a deeper one — the fast re-scan of a
- * later "Analyze game" must not downgrade a turn stored at deeper settings
- * (depth 2, then a re-analyze at depth 1). Cross-mode results replace only
- * when the incoming pass carries the CONFIGURED engine mode (the user's
- * stated intent beats a stale result from the other engine, whatever its
- * depth: round 69 removed the rule that let a matrix result of depth ≥ 2
- * outrank the tree in both directions). Auto resolves per turn via the
- * fainted fraction and the game type (`doubles`, read by auto only);
- * unresolvable cross-mode conflicts keep the stored result (fail closed).
+ * May a sweep pass replace the graph's stored per-turn data? Monotone merge: a shallower result never overwrites a deeper one: the fast re-scan
+ * of a later "Analyze game" must not downgrade a turn stored at deeper settings (depth 2, then a re-analyze at depth 1). Cross-mode results
+ * replace only when the incoming pass carries the CONFIGURED engine mode (the user's stated intent beats a stale result from the other engine,
+ * whatever its depth). Auto resolves per turn via the fainted fraction and the game type (`doubles`, read by auto only); unresolvable cross-mode
+ * conflicts keep the stored result (fail closed).
  */
 export function supersedesStored(
   stored: TurnEvalSettings | null,

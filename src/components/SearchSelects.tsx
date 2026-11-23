@@ -5,11 +5,9 @@ import { readSearchBudget, treeThresholdText } from '../lib/eval/search-budget-s
 export interface SearchSelectsProps {
   prefs: EvalPreferences;
   onPrefsChange: (prefs: EvalPreferences) => void;
-  /** A search runs: the selects lock. */
   running: boolean;
 }
 
-/** One game type's auto line in words, from its split of the search budget. */
 function autoLineText(split: SearchBudget['singles']): string {
   const threshold = treeThresholdText(split);
   if (threshold === null) return 'the MCTS tree on every turn';
@@ -17,17 +15,13 @@ function autoLineText(split: SearchBudget['singles']): string {
   return `the depth-${split.earlyDepth} matrix with ${draws} until ${threshold}, then the MCTS tree`;
 }
 
-/** Round 67 (T111): the auto help text reads the budget in force, so a measurement form never shows stale numbers. */
+/** The auto help text reads the budget in force, so a measurement form never shows stale numbers. */
 function autoTitle(budget: SearchBudget): string {
   return `Auto picks the engine per turn. Singles: ${autoLineText(budget.singles)}. Doubles: ${autoLineText(budget.doubles)}. ` +
     `The MCTS search runs ${budget.trees} trees of ${budget.iterations} iterations each.`;
 }
 
-/**
- * Round 89 (ruling 49): the search's own preferences, Depth and, under a matrix depth, Samples, as rows of the Setup menu (they stood in the
- * Evaluation header before). The stored `mode`, `depth` and `samples` keep their meaning; this is the one place that draws them. The rows
- * use the Setup menu's select rows (`.ps-setup-row` in layout.css).
- */
+/** The search's own preferences, Depth and, under a matrix depth, Samples, as rows of the Setup menu (`.ps-setup-row` in layout.css). */
 export function SearchSelects({ prefs, onPrefsChange, running }: SearchSelectsProps) {
   const depthId = useId();
   const samplesId = useId();

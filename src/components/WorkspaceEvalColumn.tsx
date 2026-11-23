@@ -19,7 +19,6 @@ interface WorkspaceColumnProps {
   replayData: ReplayData;
 }
 
-/** The analysis-mode prop block: hidden while the live evaluation view owns the panel. */
 function analysisPropsFor(liveEvalView: boolean, analysisTurn: number | null, analysis: AppController['analysis']) {
   return {
     analysis: !liveEvalView ? analysis.turnAnalysis : null,
@@ -38,7 +37,6 @@ function analysisPropsFor(liveEvalView: boolean, analysisTurn: number | null, an
  */
 const linesClickable = (liveEvalView: boolean, evalResultMatchesView: boolean) => !liveEvalView || evalResultMatchesView;
 
-/** Round 77 (C7): the finished end of a variation, with the winner the branch panel names. */
 const endedFor = (atVariationEnd: boolean, simState: AppController['ctx']['branch']['simState']) =>
   (atVariationEnd ? { winner: simState?.winner ?? null } : null);
 
@@ -49,16 +47,16 @@ function idleReads(app: AppController, viewingVariation: boolean, resultTag: str
 }
 
 /**
- * Round 70 (T216): the gold points and the panel's bar print at the share of the variation's own board, read from the rosters the
- * branch recorded after each executed turn; the main line's share of the same turn number is another board.
+ * The gold points and the panel's bar print at the share of the variation's own board, read from the rosters the branch recorded after
+ * each executed turn; the main line's share of the same turn number is another board.
  */
 function useVariationShares(history: AppController['ctx']['branch']['history'], variationSpan: { startTurn: number } | null) {
   return useMemo(() => (variationSpan ? variationBoardShares(history, variationSpan.startTurn) : []), [history, variationSpan]);
 }
 
 /**
- * Round 89 (#104, G4d): with a variation open and a game report held, the way back to the report, as "Main line" of the Line selector.
- * G13b: a line started from a turn card (`cardTurn`) goes back to that turn, whichever turn the variation reached.
+ * With a variation open and a game report held, the way back to the report, as "Main line" of the Line selector. A line started from a turn
+ * card (`cardTurn`) goes back to that turn, whichever turn the variation reached.
  */
 function backToMain(app: AppController, viewingVariation: boolean): ((cardTurn: number | null) => void) | undefined {
   if (!viewingVariation || !app.analysis.gameReport) return undefined;
@@ -66,7 +64,7 @@ function backToMain(app: AppController, viewingVariation: boolean): ((cardTurn: 
   return cardTurn => navigateTo(cardTurn === null ? mainLineTarget(viewTurn, maxTurn) : mainLineTarget(cardTurn, maxTurn));
 }
 
-/** Round 89 (SB-7): the depth of the partial result a user stop kept, while that result is the live position's; null otherwise. */
+/** The depth of the partial result a user stop kept, while that result is the live position's; null otherwise. */
 function stoppedDepth(stopped: StoppedRun | null, shown: { live: boolean; status: EvalStatus; matches: boolean }, result: EvalResult | null): number | null {
   return stopped && shown.live && shown.status === 'stale' && shown.matches ? result?.depthCompleted ?? 1 : null;
 }
@@ -85,7 +83,7 @@ function EvalSection({ app, replayData }: WorkspaceColumnProps) {
   } = app.engine.evalView;
   const { handleExploreChoice, handlePickPair } = app.engine.walk;
   const { playOut, fastPlayOut } = app.transients;
-  // Round 89 (FB-1): the rows at T0 rank the leads; a click on one found no live position and opened an empty variation at turn 1.
+  // The rows at T0 rank the leads; a click on one found no live position and opened an empty variation at turn 1.
   const clickable = linesClickable(liveEvalView, evalResultMatchesView) && analysisTurn !== 0;
   const reads = idleReads(app, viewingVariation, evaluation.resultTag);
   const variationShares = useVariationShares(app.ctx.branch.history, variationSpan);
@@ -133,7 +131,6 @@ function EvalSection({ app, replayData }: WorkspaceColumnProps) {
   );
 }
 
-/** Right column: evaluation beside the battle (chess-style), then stats. */
 export function WorkspaceEvalColumn({ app, replayData }: WorkspaceColumnProps) {
   const { evalAvailable } = app.engine.evalView;
   const { playOut, playOutNotice, fastPlayOut, setFastPlayOut } = app.transients;

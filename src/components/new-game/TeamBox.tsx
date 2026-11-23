@@ -6,8 +6,8 @@ import { TEAM_SIZE, type TeamRead } from '../../lib/new-game/start';
 import type { TeamCheck } from './use-team-check';
 
 /**
- * Round 89 (lane H, #105), stage H4: one player's side of the New game dialog: the name, Validate, the paste field, the sprites of
- * the sets that were read with their count, and the simulator's check under it. The check shows the problems and leaves Start possible; what does stop Start (no set, more than six, an unknown species) stands under the box that causes it.
+ * One player's side of the New game dialog: name, Validate, paste field, the sets read, and the simulator's check. The check shows the
+ * problems and leaves Start possible; what does stop Start (no set, more than six, an unknown species) stands under the box that causes it.
  */
 
 interface Props {
@@ -20,7 +20,6 @@ interface Props {
   format: string;
   formatName: string;
   check: TeamCheck;
-  /** What stops Start for this side, in plain words, or null. */
   reason: string | null;
   /** True when anything stops Start (either side or the seed): the note "Start plays the team as pasted" is only true when nothing does. */
   startBlocked: boolean;

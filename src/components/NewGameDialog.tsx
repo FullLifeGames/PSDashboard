@@ -11,21 +11,16 @@ import { newGameSeed, type NewGameRecord } from '../lib/new-game/record';
 import { readTeamPaste, seedProblem, startBlocks, startNewGame, stopsStart } from '../lib/new-game/start';
 
 /**
- * Round 89 (lane H, #105), stage H4: the New game dialog (user ruling 13.11.2026, variant A of the mocks: a modal built from the
- * app's own dialog). Two team fields with the player names, the format list and the dice seed; Start reads both
- * pastes, starts the format's battle and hands the record to `onStart`, which opens the game at Team Preview.
- *
- * The dialog stays mounted while it is closed, so the pasted teams survive a click beside it or Cancel. Where it is opened from
- * is the caller's (the Game menu and the start page); the dialog knows only `open` and `onOpenChange`. The saved games are
-listed in the menu and on the start page, never here (user ruling 13.11.2026, H11a).
+ * The New game dialog: two team fields with the player names, the format list and the dice seed; Start starts the format's battle and hands
+ * the record to `onStart`. The dialog stays mounted while closed, so the pasted teams survive a click beside it or Cancel. It knows only `open`
+ * and `onOpenChange`; the saved games are listed in the menu and on the start page, never here.
  */
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Opens a started game in the workspace. */
   onStart: (record: NewGameRecord) => Promise<unknown> | void;
-  /** H16a: whether a variation is open and not saved; Start asks first then (the game itself is saved after every turn). */
+  /** Whether a variation is open and not saved; Start asks first then (the game itself is saved after every turn). */
   unsavedVariation?: () => boolean;
 }
 
@@ -67,7 +62,6 @@ function SeedRow({ seed, onSeed }: { seed: string; onSeed: (seed: string) => voi
   );
 }
 
-/** The draft the dialog keeps while it is closed, and what Start does with it. */
 function useNewGameDraft({ onOpenChange, onStart, open, unsavedVariation }: Pick<Props, 'onOpenChange' | 'onStart' | 'open' | 'unsavedVariation'>) {
   const leave = useLeaveAsk(unsavedVariation, open);
   const groups = useFormatGroups(open);
@@ -88,7 +82,6 @@ function useNewGameDraft({ onOpenChange, onStart, open, unsavedVariation }: Pick
   const blocked = stopsStart(blocks);
   const { ask, question } = leave;
 
-  /** Runs Start: busy while it runs, its message when it fails, closed when it works. */
   const run = async (what: string, action: () => Promise<void>) => {
     setBusy(true);
     setError(null);

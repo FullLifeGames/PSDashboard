@@ -14,7 +14,6 @@ export type PlayerStreams = ReturnType<typeof BattleStreams.getPlayerStreams>;
 export type BranchEngineModule = typeof import('../../lib/lazy/branch-engine');
 export type LiveBattle = NonNullable<BattleStream['battle']>;
 
-/** The mutable runtime the branch hook owns: the sim streams, its log, and the pending choices. */
 export interface BranchRefs {
   // Concurrent sim writes commit unintended extra turns and desync the UI
   // from the battle (double clicks, rapid forced-switch clicks) — one execute
@@ -27,13 +26,12 @@ export interface BranchRefs {
   choiceErrorsRef: React.RefObject<BranchChoiceErrorLog | null>;
   p1ChoicesRef: React.RefObject<(BranchSlotChoice | null)[]>;
   p2ChoicesRef: React.RefObject<(BranchSlotChoice | null)[]>;
-  /** Round 89 (#105): the length of the runtime's log when the branch stood at its start (before any entry of its own); a new game's promotion reads the lines after it. */
+  /** The length of the runtime's log when the branch stood at its start; a new game's promotion reads the lines after it. */
   startLogLengthRef: React.RefObject<number>;
-  /** Round 89 (#105): called once an entry has landed in the history (a turn, or a replacement that finishes one); a new game promotes its tip turn there. */
+  /** Called once an entry has landed in the history (a turn, or a replacement that finishes one); a new game promotes its tip turn there. */
   afterTurnRef?: React.RefObject<(() => Promise<void>) | null>;
 }
 
-/** The state cells the execute and session sides write. */
 export interface BranchSetters {
   setSimState: React.Dispatch<React.SetStateAction<BranchSimState | null>>;
   setHistory: React.Dispatch<React.SetStateAction<BranchHistoryEntry[]>>;
@@ -49,7 +47,7 @@ export function forceSwitches(battle: LiveBattle, side: SideId): boolean[] {
 export function requiredChoices(battle: LiveBattle, side: SideId): boolean[] {
   const sideState = battle.sides[sideIndex(side)];
   const forced = forceSwitches(battle, side);
-  // The bench caps the replacements as the simulator does (round 77, B1): the same count as `canSwitchIn` in side.js.
+  // The bench caps the replacements as the simulator does: the same count as `canSwitchIn` in side.js.
   const party = (sideState.activeRequest as { side?: { pokemon?: { active?: boolean; reviving?: boolean }[] } } | null)?.side?.pokemon;
   const revival = !!party?.some(entry => entry.active && entry.reviving);
   const switchIns = revival ? undefined : sideState.pokemon.slice(sideState.active.length).filter(pokemon => pokemon && !pokemon.fainted).length;

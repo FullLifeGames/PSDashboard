@@ -5,7 +5,7 @@ export function ModalDialog({ title, closeLabel, onClose, maxWidth = 640, childr
   title: string;
   closeLabel: string;
   onClose: () => void;
-  /** The box's widest size in pixels (the New game dialog holds two team fields side by side). */
+  /** The box's widest size in pixels. */
   maxWidth?: number;
   children: React.ReactNode;
 }) {

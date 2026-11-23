@@ -6,15 +6,14 @@ import {
 } from './shared';
 
 /**
- * Re-applying a recorded history entry to a runtime, and the lead entry of a turn-0 start: the session's rebuild and the new
- * game's rebuild (`game-rebuild.ts`) both play entries through these (moved out of `session.ts`, round 89, #105).
+ * Re-applying a recorded history entry to a runtime, and the lead entry of a turn-0 start: the session's rebuild and a new game's rebuild
+ * (`game-rebuild.ts`) both play entries through these.
  */
 
 export type ReplayEntryOutcome =
   | { ok: true; entry: BranchHistoryEntry }
   | { ok: false; error: string };
 
-/** The commands one recorded entry resolves to against the rebuilt battle. */
 function resolveEntryCommands(
   branchEngine: BranchEngineModule, battle: NonNullable<BattleStream['battle']>, entry: BranchHistoryEntry,
 ): { ok: true; commands: { side: SideId; command: string }[]; p1Command: string; p2Command: string } | { ok: false; error: string } {
@@ -59,10 +58,8 @@ function resolveEntryCommands(
 }
 
 /**
- * Re-applies one recorded history entry against a freshly rebuilt runtime.
- * Choices are re-resolved by identity against the current request, so a team
- * edit can never silently replay the wrong move — mismatches abort with a
- * visible error instead (B1).
+ * Re-applies one recorded history entry against a freshly rebuilt runtime. Choices are re-resolved by identity against the current request,
+ * so a team edit can never silently replay the wrong move: a mismatch aborts with a visible error.
  */
 export async function replayHistoryEntry(
   runtime: BranchRuntime,
@@ -84,7 +81,7 @@ export async function replayHistoryEntry(
     log: runtime.log,
     choiceErrors: runtime.choiceErrors,
     commands: resolved.commands,
-    // the entry's slot choices carry the forced dice; a forced entry after a pause plays the rest of that turn with them (round 82)
+    // the entry's slot choices carry the forced dice; a forced entry after a pause plays the rest of that turn with them
     dice: { battle, p1Choices: entry.p1SlotChoices ?? [], p2Choices: entry.p2SlotChoices ?? [] },
   });
   if (!result.ok) return result;

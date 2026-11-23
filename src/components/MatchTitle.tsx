@@ -1,12 +1,10 @@
 /**
- * Round 84 (A7f, ruling 19a): the format tag, the two player names and the "vs" between them, as the top bar and the shared
- * branch view both show them. The tag and the names clip with an ellipsis (`.ps-topbar-match` in `layout.css` orders the shrinking:
- * the tag first, the names next) and carry their full text in a title.
+ * The format tag, the two player names and the "vs" between them, in the top bar and the shared branch view. The tag and the names clip
+ * with an ellipsis and carry their full text in a title; `.ps-topbar-match` in `layout.css` orders the shrinking.
  */
 export function MatchTitle({ format, players, newGame = false }: { format: string; players: readonly string[]; newGame?: boolean }) {
   return (
     <>
-      {/* Round 89 (#105): a game the user started from two teams, not a replay. */}
       {newGame && <span className="ps-format-tag ps-newgame-tag">New game</span>}
       <span className="ps-format-tag" title={format}>{format}</span>
       <span className="ps-player" title={players[0]} style={{ fontSize: 11, color: '#8ac' }}>{players[0]}</span>

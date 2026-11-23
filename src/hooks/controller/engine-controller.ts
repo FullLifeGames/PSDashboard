@@ -15,8 +15,6 @@ import { dropStaleDraft } from './draft-guard';
 import { overlayFill } from '../../lib/dock-fill';
 import type { SideChoices } from '../../lib/dock-seed';
 
-/** View-side gates for the acquisition hook: whether the dwell rebuild may
- *  arm (main-line position, nothing busy) and whether Smogon data is due. */
 function acquireGates(args: {
   liveTip: boolean;
   viewingVariation: boolean;
@@ -50,8 +48,8 @@ function useAcquireLayer(ctx: ReplayContext, transients: Transients, board: Boar
     playOut, evaluation, usageStats: ctx.smogon.usageStats, setAssumptions: ctx.smogon.setAssumptions,
   });
   const acquire = useEvalAcquire({ replayData, source: positions, getBattle, viewTurn, dwellEnabled, smogonPending });
-  // Round 84 (turn dock): read before the picker, which seeds its untouched slots with it.
-  // Round 75 (T160): the played-action parser reads the replay's own Dex (generation and mod).
+  // Read before the picker, which seeds its untouched slots with it.
+  // The played-action parser reads the replay's own Dex (generation and mod).
   const rules = useMemo(() => logRules(replayData?.log ?? ''), [replayData]);
   const parseSingles = useCallback((lines: string[]) => parsePlayedActions(lines, rules), [rules]);
   const playedAtView = usePlayedAtView({
@@ -65,8 +63,8 @@ function useAcquireLayer(ctx: ReplayContext, transients: Transients, board: Boar
     getExact: acquire.getExact, exactPositionsVersion: acquire.exactPositionsVersion, draftChoices,
     liveSimState: ctx.branch.simState, played: playedAtView,
   });
-  // Round 77 (D2): a draft pick that the rebuilt position no longer offers goes, instead of failing on Execute. The
-  // reconciliation runs in render: the draft state lives in this same component.
+  // A draft pick that the rebuilt position no longer offers goes, instead of failing on Execute. The reconciliation runs in render: the
+  // draft state lives in this same component.
   const resolvedForView = !liveTip ? positionPicker?.simState ?? null : null;
   if (resolvedForView) {
     const kept = dropStaleDraft(draftChoices, resolvedForView);
@@ -92,8 +90,6 @@ function useEvalViewLayer(
   const { branchPreparing } = board.deviation;
   const { acquire, smogonPending } = acquireLayer;
 
-  // Evaluation view glue: format switches, Evaluate, sweeps, invalidations,
-  // and the single-turn analysis of a gap turn.
   return useEvalView({
     replayData, snapshots, evaluation, replayGameType, evalIsDoubles,
     viewTurn, viewLine, viewingVariation, liveTip, liveEvalView, evalViewKey, serializedAtView,
@@ -111,9 +107,9 @@ function useEvalViewLayer(
 }
 
 /**
- * Round 84 (turn dock): the engine fill. At the live tip it reads the evaluation the view layer drives and writes into the branch's
- * picks. At a replay turn (Q19 b) it works on the picker's effective choices (the logged seed under the user's picks), keeps what
- * it writes in the view, and hands the dock the state with that fill laid over the empty slots.
+ * The engine fill. At the live tip it reads the evaluation the view layer drives and writes into the branch's picks. At a replay turn it
+ * works on the picker's effective choices (the logged seed under the user's picks), keeps what it writes in the view, and hands the dock the
+ * state with that fill laid over the empty slots.
  */
 function useFillLayer(
   ctx: ReplayContext, transients: Transients, board: BoardController,
@@ -124,7 +120,6 @@ function useFillLayer(
   const { pickerSimState, pickerStale } = acquireLayer;
   const { handleExecuteDraft } = board.deviation;
   const viewed = liveTip ? simState : pickerSimState;
-  // The picks of a replay turn are the picker state's own: the logged actions under the user's.
   const getPickerChoices = useCallback(() => ({ p1: pickerSimState?.p1Choices ?? [], p2: pickerSimState?.p2Choices ?? [] }), [pickerSimState]);
   const runTurn = useCallback((choices: SideChoices) => (
     liveTip ? executePending() : handleExecuteDraft(choices)
@@ -158,25 +153,22 @@ function usePlayLayer(
     branchPreparing, handleSetChoice, requestDeviation, setBranchDivergence, startLeadVariation, setVariationNotice,
   } = board.deviation;
   const { handleEvaluate } = evalView;
-  // Round 89 (#112): a run plays the live sim wherever the pointer stands. The pickers' handler files the choice as a draft
-  // for the viewed turn when the pointer is off the tip, which would leave the run's turn without its choices.
+  // A run plays the live sim wherever the pointer stands. The pickers' handler files the choice as a draft for the viewed turn when the
+  // pointer is off the tip, which would leave the run's turn without its choices.
   const runAtTip = (playOut?.active ?? false) && tip !== null;
   const handleSetChoiceForWalk = useCallback<typeof handleSetChoice>(
     (side, choice, activeSlot) => (runAtTip ? setChoice(side, choice, activeSlot) : handleSetChoice(side, choice, activeSlot)),
     [runAtTip, setChoice, handleSetChoice],
   );
 
-  // Engine walk: clicking a line plays the turn out; queued picks follow
-  // a rebuild; interludes finish forced replacements.
   const walk = useEngineWalk({
-    // Round 88 (M3): the walk applies the engine's own choices, which the filtered bench of the pickers must not refuse.
+    // The walk applies the engine's own choices, which the filtered bench of the pickers must not refuse.
     simState: engineSimState, liveTip, branching, branchPreparing, executing,
     confirmOpen: pendingConfirm !== null, playOutActive: playOut?.active ?? false,
     evaluation, evalViewKey, getBattle, executeTurn, handleEvaluate, handleSetChoice: handleSetChoiceForWalk,
     requestDeviation, setBranchDivergence,
   });
 
-  // "Let it play out": the engine plays both sides from the viewed position.
   const playOutControls = usePlayOut({
     playOut, setPlayOut, setPlayOutNotice, playOutProcessedRef, playOutRef, stopPlayOutRef,
     evaluation, fastPlayOut, tip, tipEvalStatus: board.tipEvalStatus, liveTip, viewingVariation, atEndPosition, viewT0,
@@ -187,10 +179,7 @@ function usePlayLayer(
   return { walk, playOutControls };
 }
 
-/**
- * Engine layer: position acquisition, the evaluation view glue, the engine
- * walk, and the play-out loop. Call order matches the pre-split App().
- */
+/** Engine layer: position acquisition, the evaluation view glue, the engine walk and the play-out loop. */
 export function useEngineController(ctx: ReplayContext, transients: Transients, board: BoardController) {
   const acquireLayer = useAcquireLayer(ctx, transients, board);
   const evalView = useEvalViewLayer(ctx, transients, board, acquireLayer);

@@ -11,7 +11,7 @@ interface TimelineBarProps {
   endSnapshotTurn: number | null;
   atEndPosition: boolean;
   viewingVariation: boolean;
-  /** The variation's live sim has a winner: its tip reads End and the total counts played turns (round 77, A-6). */
+  /** The variation's live sim has a winner: its tip reads End and the total counts played turns. */
   variationEnded?: boolean;
   branching: boolean;
   /** A new game's tip turn that is no variation (waiting for its replacement): the slider counts it, the variation's chrome stays away. */
@@ -22,8 +22,7 @@ interface TimelineBarProps {
 }
 
 function VariationStripe({ variationSpan, maxTurn }: { variationSpan: VariationSpan; maxTurn: number }) {
-  // Gold stripe under the slider marking where the variation
-  // lives — without it nothing on the timeline said so.
+  // Gold stripe under the slider marking where the variation lives.
   const max = sliderMax(maxTurn, variationSpan);
   const pos = (turn: number) => (max <= 1 ? 0 : ((turn - 1) / (max - 1)) * 100);
   // A turn-0 variation starts left of the slider's domain.
@@ -127,7 +126,6 @@ function TimelineBackControls({ viewT0, viewTurn, viewLine, onNavigate, onGraphS
   );
 }
 
-/** Timeline bar: always visible — one slider over main line and variation. */
 export function TimelineBar(props: TimelineBarProps) {
   const { viewT0, viewTurn, viewLine, variationSpan, maxTurn, branching, idle = false, onNavigate, onGraphSelectLine, onDiscard } = props;
   return (
@@ -152,9 +150,8 @@ export function TimelineBar(props: TimelineBarProps) {
         viewingVariation={props.viewingVariation}
         variationEnded={props.variationEnded}
       />
-      {/* Round 88 (T345, #81): the chip and Discard variation share one wrapper, so they move to a second row together when the slider
-          would fall below 200 px. The chip stays put while a variation exists: flickering away outside the covered turns made the
-          whole bar jump around. */}
+      {/* The chip and Discard variation share one wrapper, so they move to a second row together when the slider would fall below 200 px.
+          The chip stays put while a variation exists: flickering away outside the covered turns made the whole bar jump around. */}
       {(variationSpan !== null || branching) && !idle && (
         <div className="ps-branch-bar-vari">
           {variationSpan !== null && (

@@ -7,9 +7,8 @@ import { replayHistoryEntry, leadHistoryEntry } from './replay-entry';
 import type { BranchEngineModule, BranchHistoryEntry, BranchRefs, BranchSetters, BattleStream } from './shared';
 
 /**
- * Where the branch's runtime comes from (round 38): the app hands in the
- * position source, which adopts a stored position or reconstructs in the
- * worker; without it the runtime is reconstructed here on the main thread.
+ * Where the branch's runtime comes from: the app hands in the position source, which adopts a stored position or reconstructs in the worker;
+ * without it the runtime is reconstructed here on the main thread.
  */
 export type AcquireRuntime = (params: ReconstructParams, plan: { isT0: boolean }) => Promise<BranchRuntime>;
 
@@ -27,7 +26,6 @@ interface StartBranchOptions {
    * and the branch can open with the wrong Pokémon on the field.
    */
   snapshotFor?: (turn: number) => TurnSnapshot | null;
-  /** Protocol-truth lock context (③) for the boundary corrections. */
   choiceLocks?: ChoiceLockContext;
   /**
    * Turn-0 branching (targetTurn 0): start a FRESH game with these leads
@@ -43,7 +41,7 @@ interface StartBranchOptions {
    * live battle can never switch into a never-brought Pokémon.
    */
   bringOnly?: { p1: string[]; p2: string[] };
-  /** Round 89 (#105): the dice seed of a new game's lead start; a replay's branch never sets it. */
+  /** The dice seed of a new game's lead start; a replay's branch never sets it. */
   seed?: string;
 }
 
@@ -85,10 +83,8 @@ interface StartArgs {
   options?: StartBranchOptions;
 }
 
-/** The dice seed a new game's lead start names; a replay's start names none. */
 const seedOf = (options: StartBranchOptions | undefined) => (options?.seed ? { seed: options.seed } : {});
 
-/** The runtime rebuild at the target turn (turn 1 for a lead branch, no corrections there). */
 function reconstructForStart(branchEngine: BranchEngineModule, args: StartArgs, plan: StartPlan): Promise<BranchRuntime> {
   const { format, p1Team, p2Team, replayLog, targetTurn, snapshot, options } = args;
   const { isT0, leadOverride, bringOnly } = plan;
@@ -129,7 +125,6 @@ async function reconstructOrAbort(branchEngine: BranchEngineModule, args: StartA
   }
 }
 
-/** Replays the kept history onto the rebuilt runtime; stops at the first entry that no longer applies. */
 async function replayKeptHistory(
   runtime: BranchRuntime, branchEngine: BranchEngineModule, historyToReplay: BranchHistoryEntry[],
   replayedHistory: BranchHistoryEntry[],
@@ -147,18 +142,14 @@ export interface StartOutcome { endedNotice: string | null }
 
 
 /**
- * The text for a variation that a rebuild could not keep at all (round 77, D1): the first recorded move no longer
- * applies, so no turn survives and no variation stays behind.
+ * The text for a variation that a rebuild could not keep at all: the first recorded move no longer applies, so no turn survives and no
+ * variation stays behind.
  */
 function endedNoticeFor(startTurn: number, recorded: BranchHistoryEntry[], reason: string): string {
   const turns = turnEntryCount(recorded);
   return `The variation from turn ${startTurn} (${turns} ${turns === 1 ? 'turn' : 'turns'}) ended: ${reason}`;
 }
 
-/**
- * The history a start puts on the rebuilt runtime: the lead entry of a turn-0 variation, then the kept entries.
- * A start whose recorded turns all fail to apply reports `endedNotice` instead of an empty variation (round 77, D1).
- */
 async function replayStartHistory(
   runtime: BranchRuntime, branchEngine: BranchEngineModule, plan: StartPlan, startPosition: string | null, targetTurn: number,
 ): Promise<{ replayedHistory: BranchHistoryEntry[]; branchError: string | null; endedNotice: string | null }> {
@@ -239,7 +230,6 @@ function useStartBranch(
     p1ChoicesRef, p2ChoicesRef, startLogLengthRef, setExecuteError, setBranching, setHistory, setVariationStartTurn, setStartSerialized]);
 }
 
-/** The session side of the branch: rebuilding a runtime at a turn, reading its battle, and tearing it down. */
 export function useBranchSession(
   refs: BranchRefs, setters: SessionSetters, clearChoices: () => void,
   updateState: (battleStream: BattleStream | null) => void,

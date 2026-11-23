@@ -7,9 +7,8 @@ import { setUiScaleSetting } from '../lib/ui-scale-store';
 const valueOf = (setting: UiScaleSetting): string => String(setting);
 
 /**
- * Round 84 (T315, A7d, spec addendum A, 6a): the "Size" select of the Setup menu. Auto names the step it gives for this window; the
- * five steps override it and persist per browser (`ui-scale-store.ts`). A step that would leave the app less than 1050 px of width
- * is disabled, and its label says how wide a window it needs.
+ * The "Size" select of the Setup menu. Auto names the step it gives for this window; the five steps override it and persist per browser
+ * (`ui-scale-store.ts`). A step that would leave the app less than 1050 px of width is disabled, and its label says how wide a window it needs.
  */
 export function SizeSelect() {
   const { setting, auto, width } = useUiScale();
