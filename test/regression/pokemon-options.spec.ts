@@ -68,3 +68,23 @@ describe('legal option pools', () => {
     expect(NATURES).toContain('Jolly');
   });
 });
+
+describe('move pools of alternate formes', () => {
+  test('Rotom-Wash learns what Rotom learns, plus Hydro Pump', async () => {
+    const pool = await getMovePool('Rotom-Wash', 9);
+    expect(pool).toEqual(expect.arrayContaining(['Hydro Pump', 'Thunderbolt', 'Volt Switch', 'Will-O-Wisp']));
+  });
+
+  test('Necrozma-Dusk-Mane keeps Necrozma\'s moves next to its own', async () => {
+    const pool = await getMovePool('Necrozma-Dusk-Mane', 9);
+    expect(pool).toEqual(expect.arrayContaining(['Sunsteel Strike', 'Photon Geyser', 'Earthquake']));
+  });
+
+  test('prevos and the generation filter work as before', async () => {
+    expect(await getMovePool('Machoke', 3)).toContain('Low Kick');
+    expect(await getMovePool('Machoke', 3)).not.toContain('Close Combat');
+    const garchomp = await getMovePool('Garchomp', 9);
+    expect(garchomp).toContain('Earthquake');
+    expect(garchomp).not.toContain('Spore');
+  });
+});
